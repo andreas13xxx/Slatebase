@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Runtime data (vault storage)
+backend/data/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Test coverage
+coverage/
+
+# Playwright
+playwright-report/
+test-results/
+.playwright-mcp/
+slatebase-*.png
+
+# Logs
+*.log
+npm-debug.log*
+
+# Vite
+vite.config.ts.timestamp-*
