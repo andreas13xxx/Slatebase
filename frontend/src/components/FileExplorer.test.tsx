@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { FileExplorer } from './FileExplorer'
 import { AppContext } from '../state'
+import { TabProvider } from '../state/tabContext'
 import type { AppState, AppAction, DirectoryTree } from '../types'
 import { initialState } from '../state'
 import type { IApiClient } from '../api'
@@ -18,7 +19,7 @@ function renderFileExplorer(stateOverrides: Partial<AppState> = {}, apiClient?: 
     React.createElement(
       AppContext.Provider,
       { value: { state, dispatch, apiClient: apiClient ?? null } },
-      React.createElement(FileExplorer),
+      React.createElement(TabProvider, null, React.createElement(FileExplorer)),
     ),
   )
 
@@ -176,7 +177,7 @@ describe('FileExplorer', () => {
   })
 
   describe('file selection', () => {
-    it('dispatches LOADING_STARTED on file click when vault is selected', async () => {
+    it('calls openTab which fetches file content on file click when vault is selected', async () => {
       const user = userEvent.setup()
       const mockApiClient: IApiClient = {
         fetchVaults: vi.fn(),
@@ -195,8 +196,9 @@ describe('FileExplorer', () => {
         importFile: vi.fn(),
         importFolder: vi.fn(),
         deleteContent: vi.fn(),
+        saveFile: vi.fn(),
       }
-      const { dispatch } = renderFileExplorer(
+      renderFileExplorer(
         {
           directoryTree: sampleTree,
           selectedVaultId: 'vault-123',
@@ -207,8 +209,8 @@ describe('FileExplorer', () => {
       // Click on a top-level file
       await user.click(screen.getByText('readme.md'))
 
-      // loadFile dispatches LOADING_STARTED first
-      expect(dispatch).toHaveBeenCalledWith({ type: 'LOADING_STARTED' })
+      // openTab fetches file content via the API client
+      expect(mockApiClient.fetchFileContent).toHaveBeenCalledWith('vault-123', 'readme.md')
     })
 
     it('highlights the currently selected file with aria-current', () => {
@@ -307,6 +309,7 @@ describe('FileExplorer', () => {
         importFile: vi.fn().mockResolvedValue(undefined),
         importFolder: vi.fn(),
         deleteContent: vi.fn(),
+        saveFile: vi.fn(),
       }
       const { dispatch } = renderFileExplorer(
         { directoryTree: sampleTree, selectedVaultId: 'vault-123' },
@@ -333,6 +336,7 @@ describe('FileExplorer', () => {
         importFile: vi.fn(),
         importFolder: vi.fn().mockResolvedValue(undefined),
         deleteContent: vi.fn(),
+        saveFile: vi.fn(),
       }
       const { dispatch } = renderFileExplorer(
         { directoryTree: sampleTree, selectedVaultId: 'vault-123' },
@@ -376,6 +380,7 @@ describe('FileExplorer', () => {
         importFile: vi.fn(),
         importFolder: vi.fn(),
         deleteContent: vi.fn(),
+        saveFile: vi.fn(),
       }
 
       renderFileExplorer(
@@ -402,6 +407,7 @@ describe('FileExplorer', () => {
         importFile: vi.fn(),
         importFolder: vi.fn(),
         deleteContent: vi.fn().mockResolvedValue(undefined),
+        saveFile: vi.fn(),
       }
       const { dispatch } = renderFileExplorer(
         { directoryTree: sampleTree, selectedVaultId: 'vault-123' },
@@ -428,6 +434,7 @@ describe('FileExplorer', () => {
         importFile: vi.fn(),
         importFolder: vi.fn(),
         deleteContent: vi.fn(),
+        saveFile: vi.fn(),
       }
       renderFileExplorer(
         { directoryTree: sampleTree, selectedVaultId: 'vault-123' },

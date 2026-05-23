@@ -1,21 +1,22 @@
 import { useEffect, useRef } from 'react'
 import { AppProvider, useAppContext, loadVaults } from './state'
 import { ApiClient } from './api'
+import { TabProvider, useTabContext } from './state/tabContext'
 import { VaultList } from './components/VaultList'
 import { FileExplorer } from './components/FileExplorer'
-import { FileViewer } from './components/FileViewer'
+import { TabBar } from './components/TabBar'
+import { TabContent } from './components/TabContent'
 import './App.css'
 
 const apiClient = new ApiClient()
 
 /**
- * Inner component that uses AppContext to render the appropriate view.
- * Fetches vaults on mount. Shows VaultList in the sidebar above FileExplorer.
- *
- * Validates: Requirements 2.1, 2.2, 2.4
+ * Inner component that uses AppContext and TabContext to render the appropriate view.
+ * Fetches vaults on mount. Clears tabs when vault changes.
  */
 function AppContent() {
   const { state, dispatch } = useAppContext()
+  const { tabDispatch } = useTabContext()
   const prevVaultId = useRef<string | null>(null)
 
   // Fetch vaults on mount
@@ -23,10 +24,14 @@ function AppContent() {
     loadVaults(dispatch, apiClient)
   }, [dispatch])
 
-  // When selectedVaultId changes (set by VaultList dispatch), fetch the vault tree
+  // When selectedVaultId changes, fetch the vault tree and clear old tabs
   useEffect(() => {
     const vaultId = state.selectedVaultId
     if (vaultId && vaultId !== prevVaultId.current) {
+      // Clear tabs from previous vault
+      if (prevVaultId.current !== null) {
+        tabDispatch({ type: 'CLEAR_ALL_TABS' })
+      }
       dispatch({ type: 'LOADING_STARTED' })
       apiClient.fetchVaultTree(vaultId).then(
         (tree) => dispatch({ type: 'TREE_LOADED', payload: tree }),
@@ -40,7 +45,7 @@ function AppContent() {
       )
     }
     prevVaultId.current = vaultId
-  }, [state.selectedVaultId, dispatch])
+  }, [state.selectedVaultId, dispatch, tabDispatch])
 
   return (
     <div className="app">
@@ -71,7 +76,8 @@ function AppContent() {
             {state.selectedVaultId && <FileExplorer />}
           </aside>
           <section className="app-content">
-            <FileViewer />
+            <TabBar />
+            <TabContent />
           </section>
         </div>
       </main>
@@ -80,12 +86,14 @@ function AppContent() {
 }
 
 /**
- * Root App component that wraps everything in AppProvider.
+ * Root App component. TabProvider wraps AppContent so useTabContext is available.
  */
 export default function App() {
   return (
     <AppProvider apiClient={apiClient}>
-      <AppContent />
+      <TabProvider>
+        <AppContent />
+      </TabProvider>
     </AppProvider>
   )
 }

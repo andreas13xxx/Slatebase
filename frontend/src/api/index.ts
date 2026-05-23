@@ -1,4 +1,4 @@
-import type { VaultInfo, DirectoryTree, FileContent, AppError } from '../types'
+import type { VaultInfo, DirectoryTree, FileContent, FileSaveResult, AppError } from '../types'
 
 /**
  * Interface for the Slatebase API client.
@@ -13,6 +13,7 @@ export interface IApiClient {
   importFile(vaultId: string, file: File): Promise<void>
   importFolder(vaultId: string, files: FileList): Promise<void>
   deleteContent(vaultId: string, path: string): Promise<void>
+  saveFile(vaultId: string, filePath: string, content: string): Promise<FileSaveResult>
 }
 
 /**
@@ -116,5 +117,17 @@ export class ApiClient implements IApiClient {
     if (!response.ok) {
       await handleErrorResponse(response)
     }
+  }
+
+  async saveFile(vaultId: string, filePath: string, content: string): Promise<FileSaveResult> {
+    const response = await fetch(`/api/v1/vaults/${vaultId}/files`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: filePath, content }),
+    })
+    if (!response.ok) {
+      await handleErrorResponse(response)
+    }
+    return response.json()
   }
 }

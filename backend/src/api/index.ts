@@ -1,10 +1,12 @@
 // API Router Layer — Route modules and controllers
 
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import type { Context } from 'hono'
 import { Hono } from 'hono'
 import type { IVaultService } from '../business/index.js'
 import type { ILogger } from '../logger/index.js'
-import { VaultNotFoundError, VaultValidationError, StorageError } from '../business/index.js'
+import { VaultNotFoundError, VaultValidationError, StorageError, FileTooLargeError as BusinessFileTooLargeError } from '../business/index.js'
 import { PathTraversalError } from '../vault/index.js'
 import type { IImportService, UploadedFile } from '../import/index.js'
 import {
@@ -37,6 +39,7 @@ export interface IVaultController {
   listVaults(c: Context): Response | Promise<Response>
   getVaultTree(c: Context): Response | Promise<Response>
   getFileContent(c: Context): Response | Promise<Response>
+  saveFile(c: Context): Promise<Response>
   createVault(c: Context): Promise<Response>
   deleteVault(c: Context): Promise<Response>
   importFile(c: Context): Promise<Response>
@@ -80,6 +83,7 @@ export class VaultController implements IVaultController {
   }
 
   /**
+   * GET /vaults/:vaultId/files?path=...&raw=true — Returns raw file bytes with Content-Type header
    * GET /vaults/:vaultId/files?path=... — Returns 200 with FileContent JSON
    * or structured ApiError on failure.
    * URL-decodes the `path` query parameter before passing to VaultService.
@@ -87,6 +91,7 @@ export class VaultController implements IVaultController {
   async getFileContent(c: Context): Promise<Response> {
     const vaultId = c.req.param('vaultId') as string
     const rawPath = c.req.query('path')
+    const rawParam = c.req.query('raw')
 
     if (!rawPath) {
       const error = createApiError('PATH_TRAVERSAL', 'Missing required query parameter: path')
@@ -96,9 +101,57 @@ export class VaultController implements IVaultController {
     // URL-decode the path parameter
     const decodedPath = decodeURIComponent(rawPath)
 
+    // When raw=true, serve the file as binary with appropriate Content-Type
+    if (rawParam === 'true') {
+      try {
+        const resolvedPath = this.vaultService.resolveFilePath(vaultId, decodedPath)
+        const buffer = await fs.readFile(resolvedPath)
+        const contentType = getContentTypeFromExtension(decodedPath)
+        return new Response(buffer, {
+          status: 200,
+          headers: {
+            'Content-Type': contentType,
+            'Content-Length': buffer.length.toString(),
+          },
+        })
+      } catch (error) {
+        return this.handleError(c, error)
+      }
+    }
+
     try {
       const fileContent = await this.vaultService.getFileContent(vaultId, decodedPath)
       return c.json(fileContent, 200)
+    } catch (error) {
+      return this.handleError(c, error)
+    }
+  }
+
+  /**
+   * PUT /vaults/:vaultId/files — Saves file content.
+   * Parses JSON body { path, content }, validates required fields,
+   * calls vaultService.saveFile(vaultId, path, content), returns 200 with { path, name, size }.
+   */
+  async saveFile(c: Context): Promise<Response> {
+    const vaultId = c.req.param('vaultId') as string
+
+    try {
+      const body = await c.req.json()
+      const filePath = body?.path
+      const content = body?.content
+
+      if (!filePath || typeof filePath !== 'string') {
+        const apiError = createApiError('VALIDATION_ERROR', 'Missing required field: path')
+        return c.json(apiError, 400)
+      }
+
+      if (content === undefined || content === null || typeof content !== 'string') {
+        const apiError = createApiError('VALIDATION_ERROR', 'Missing required field: content')
+        return c.json(apiError, 400)
+      }
+
+      const result = await this.vaultService.saveFile(vaultId, filePath, content)
+      return c.json(result, 200)
     } catch (error) {
       return this.handleError(c, error)
     }
@@ -315,6 +368,12 @@ export class VaultController implements IVaultController {
       return c.json(apiError, 413)
     }
 
+    if (error instanceof BusinessFileTooLargeError) {
+      this.logger.warn('File too large', { message: error.message })
+      const apiError = createApiError('FILE_TOO_LARGE', error.message)
+      return c.json(apiError, 413)
+    }
+
     if (error instanceof FileConflictError) {
       this.logger.warn('File conflict', { message: error.message })
       const apiError = createApiError('FILE_CONFLICT', error.message)
@@ -374,6 +433,24 @@ function isNodeError(error: unknown): error is NodeError {
   return error instanceof Error && 'code' in error && typeof (error as NodeError).code === 'string'
 }
 
+// --- Helper: Content-Type mapping from file extension ---
+
+const CONTENT_TYPE_MAP: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.avif': 'image/avif',
+  '.webp': 'image/webp',
+  '.pdf': 'application/pdf',
+}
+
+function getContentTypeFromExtension(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase()
+  return CONTENT_TYPE_MAP[ext] ?? 'application/octet-stream'
+}
+
 // --- RouteModule Interface ---
 
 export interface RouteModule {
@@ -390,6 +467,9 @@ export class VaultRouteModule implements RouteModule {
     router.get('/vaults', (c) => this.controller.listVaults(c))
     router.get('/vaults/:vaultId/tree', (c) => this.controller.getVaultTree(c))
     router.get('/vaults/:vaultId/files', (c) => this.controller.getFileContent(c))
+
+    // PUT routes
+    router.put('/vaults/:vaultId/files', (c) => this.controller.saveFile(c))
 
     // POST routes (new)
     router.post('/vaults', (c) => this.controller.createVault(c))

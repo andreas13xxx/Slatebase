@@ -19,6 +19,9 @@ backend/data/
 *.swp
 *.swo
 
+# Kiro local settings (MCP config etc.)
+.kiro/settings/
+
 # OS files
 Thumbs.db
 .DS_Store
@@ -30,7 +33,10 @@ coverage/
 playwright-report/
 test-results/
 .playwright-mcp/
-slatebase-*.png
+
+# Screenshots (temporary/debug in project root)
+/*.png
+/*.jpg
 
 # Logs
 *.log

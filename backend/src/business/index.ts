@@ -50,6 +50,27 @@ export class StorageError extends Error {
   }
 }
 
+/**
+ * Thrown when file content exceeds the configured maximum file size.
+ */
+export class FileTooLargeError extends Error {
+  constructor(
+    public readonly actualSize: number,
+    public readonly maxSize: number,
+  ) {
+    super(`File content exceeds maximum size: ${actualSize} bytes (max: ${maxSize} bytes)`)
+    this.name = 'FileTooLargeError'
+  }
+}
+
+// --- Types ---
+
+export interface FileSaveResult {
+  path: string    // relative path from vault root
+  name: string    // filename
+  size: number    // written file size in bytes
+}
+
 // --- Interface ---
 
 export interface IVaultService {
@@ -57,6 +78,8 @@ export interface IVaultService {
   getVaultList(): VaultInfo[]
   getVaultTree(vaultId: string): DirectoryTree
   getFileContent(vaultId: string, filePath: string): Promise<FileContent>
+  resolveFilePath(vaultId: string, filePath: string): string
+  saveFile(vaultId: string, filePath: string, content: string): Promise<FileSaveResult>
   createVault(name: string): Promise<VaultInfo>
   deleteVault(vaultId: string): Promise<void>
   deleteContent(vaultId: string, relativePath: string): Promise<void>
@@ -162,6 +185,20 @@ export class VaultService implements IVaultService {
   }
 
   /**
+   * Resolves and validates a file path within a vault.
+   * Returns the absolute path to the file on disk.
+   * Throws VaultNotFoundError if vault doesn't exist.
+   * Throws PathTraversalError if path traversal is detected.
+   */
+  resolveFilePath(vaultId: string, filePath: string): string {
+    const vault = this.vaultManager.getVault(vaultId)
+    if (!vault) {
+      throw new VaultNotFoundError(vaultId)
+    }
+    return validateFilePath(vault.info.path, filePath)
+  }
+
+  /**
    * Reads file content from a vault.
    * Validates the vault exists, validates the file path against traversal,
    * then reads the file via IVaultReader.
@@ -183,6 +220,74 @@ export class VaultService implements IVaultService {
     fileContent.path = filePath
 
     return fileContent
+  }
+
+  /**
+   * Saves file content to a vault.
+   * 1. Validates vault exists (throws VaultNotFoundError if not)
+   * 2. Validates file path with validateFilePath (throws PathTraversalError if traversal detected)
+   * 3. Checks content size against maxFileSize (throws FileTooLargeError if exceeded)
+   * 4. Creates intermediate directories with fs.mkdir(recursive: true)
+   * 5. Writes content atomically: write to temp file, then rename
+   * 6. Refreshes the vault's in-memory directory tree
+   * 7. Returns { path, name, size }
+   */
+  async saveFile(vaultId: string, filePath: string, content: string): Promise<FileSaveResult> {
+    // 1. Validate vault exists
+    const vault = this.vaultManager.getVault(vaultId)
+    if (!vault) {
+      throw new VaultNotFoundError(vaultId)
+    }
+
+    // 2. Validate file path (path traversal protection)
+    const resolvedPath = validateFilePath(vault.info.path, filePath)
+
+    // 3. Check content size against maxFileSize
+    const contentBytes = Buffer.byteLength(content, 'utf-8')
+    const maxFileSize = this.configService.getServerConfig().maxFileSize
+    if (contentBytes > maxFileSize) {
+      throw new FileTooLargeError(contentBytes, maxFileSize)
+    }
+
+    // 4. Create intermediate directories
+    const dir = path.dirname(resolvedPath)
+    await fs.mkdir(dir, { recursive: true })
+
+    // 5. Atomic write: write to temp file, then rename
+    const tempPath = `${resolvedPath}.${Date.now()}.tmp`
+    try {
+      await fs.writeFile(tempPath, content, 'utf-8')
+      await fs.rename(tempPath, resolvedPath)
+    } catch (error) {
+      // Clean up temp file on failure
+      try {
+        await fs.unlink(tempPath)
+      } catch {
+        // Temp file may not exist if writeFile failed
+      }
+      const message = error instanceof Error ? error.message : String(error)
+      this.logger.error('Failed to save file', { vaultId, filePath, error: message })
+      throw new StorageError(`Failed to write file: ${message}`)
+    }
+
+    // 6. Refresh the vault's in-memory directory tree
+    const updatedTree = await this.vaultReader.readDirectory(
+      vault.info.path,
+      this.configService.getServerConfig().maxDirectoryDepth,
+    )
+    this.vaultManager.addVault({
+      info: vault.info,
+      tree: updatedTree,
+    })
+
+    this.logger.info('File saved', { vaultId, filePath, size: contentBytes })
+
+    // 7. Return result
+    return {
+      path: filePath,
+      name: path.basename(filePath),
+      size: contentBytes,
+    }
   }
 
   /**

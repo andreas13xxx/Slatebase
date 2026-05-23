@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
-import { useAppContext, loadFile, importFile, importFolder, deleteContent } from '../state'
+import { useAppContext, importFile, importFolder, deleteContent } from '../state'
+import { useTabContext } from '../state/tabContext'
+import { openTab } from '../state/tabActions'
 import type { DirectoryTree } from '../types'
 
 /**
@@ -10,7 +12,7 @@ interface TreeNodeProps {
   selectedFilePath: string | null
   expandedPaths: Set<string>
   onToggleFolder: (path: string) => void
-  onSelectFile: (path: string) => void
+  onSelectFile: (path: string, name: string) => void
   onDelete: (path: string, name: string) => void
 }
 
@@ -79,7 +81,7 @@ function TreeNode({ node, selectedFilePath, expandedPaths, onToggleFolder, onSel
           type="button"
           className={`tree-node-file${isSelected ? ' tree-node-file--selected' : ''}`}
           aria-current={isSelected ? 'true' : undefined}
-          onClick={() => onSelectFile(node.path)}
+          onClick={() => onSelectFile(node.path, node.name)}
         >
           {node.name}
         </button>
@@ -106,6 +108,7 @@ function TreeNode({ node, selectedFilePath, expandedPaths, onToggleFolder, onSel
  */
 export function FileExplorer() {
   const { state, dispatch, apiClient } = useAppContext()
+  const { tabDispatch } = useTabContext()
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
@@ -126,9 +129,9 @@ export function FileExplorer() {
     })
   }
 
-  function handleSelectFile(filePath: string) {
+  function handleSelectFile(filePath: string, fileName: string) {
     if (vaultId && apiClient) {
-      loadFile(dispatch, apiClient, vaultId, filePath)
+      openTab(tabDispatch, dispatch, apiClient, vaultId, filePath, fileName)
     }
   }
 

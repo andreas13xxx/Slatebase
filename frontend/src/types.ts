@@ -42,6 +42,16 @@ export interface FileContent {
   isTruncated: boolean
 }
 
+/** Result of a successful file save operation. */
+export interface FileSaveResult {
+  /** Relative path from vault root. */
+  path: string
+  /** Filename (last segment of path). */
+  name: string
+  /** Written file size in bytes. */
+  size: number
+}
+
 /** Application-level error representation. */
 export interface AppError {
   code: string

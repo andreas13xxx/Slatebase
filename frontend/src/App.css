@@ -92,9 +92,17 @@
 
 .app-content {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  text-align: left;
+}
+
+/* TabBar stays fixed at top, content scrolls below it */
+.tab-content {
+  flex: 1;
   overflow-y: auto;
   padding: 16px;
-  text-align: left;
 }
 
 /* Vault Dropdown */
@@ -459,4 +467,209 @@
   list-style: none;
   padding-left: 16px;
   margin: 0;
+}
+
+/* ===== Tab Bar ===== */
+.tab-bar {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f7fafc;
+  min-height: 36px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.tab-bar-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: #4a5568;
+  white-space: nowrap;
+  min-width: 0;
+  max-width: 180px;
+  flex: 0 1 auto;
+}
+
+.tab-bar-tab--active {
+  border-bottom-color: #4a6fa5;
+  background: #fff;
+  color: #1a202c;
+  font-weight: 500;
+}
+
+.tab-bar-tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.tab-bar-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 14px;
+  line-height: 1;
+  color: #718096;
+  flex-shrink: 0;
+}
+
+.tab-bar-mode-btn:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.tab-bar-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 14px;
+  line-height: 1;
+  color: #a0aec0;
+  flex-shrink: 0;
+}
+
+.tab-bar-close-btn:hover {
+  color: #c53030;
+  background: #fff5f5;
+}
+
+/* ===== ViewMode Headings ===== */
+.view-mode-section > summary {
+  display: flex;
+  align-items: baseline;
+  cursor: pointer;
+  list-style: none;
+  gap: 6px;
+}
+
+.view-mode-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.view-mode-section > summary::before {
+  content: '▼';
+  font-size: 10px;
+  color: #718096;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+  margin-top: 0.2em;
+}
+
+.view-mode-section:not([open]) > summary::before {
+  content: '▶';
+}
+
+.view-mode-section > summary > h1,
+.view-mode-section > summary > h2,
+.view-mode-section > summary > h3,
+.view-mode-section > summary > h4,
+.view-mode-section > summary > h5,
+.view-mode-section > summary > h6 {
+  display: inline;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* ===== ViewMode Frontmatter ===== */
+.view-mode-frontmatter {
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.view-mode-frontmatter-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.view-mode-frontmatter-table th {
+  text-align: left;
+  padding: 2px 12px 2px 0;
+  color: #4a5568;
+  font-weight: 600;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.view-mode-frontmatter-table td {
+  padding: 2px 0;
+  color: #2d3748;
+}
+
+/* ===== ViewMode Links ===== */
+.view-mode-link--internal {
+  color: #4a6fa5;
+  text-decoration: none;
+}
+
+.view-mode-link--internal:hover {
+  text-decoration: underline;
+}
+
+.view-mode-link--broken {
+  color: #a0aec0;
+  text-decoration: underline;
+  text-decoration-style: dashed;
+}
+
+.view-mode-link--external {
+  color: #2563eb;
+}
+
+/* ===== ViewMode Images ===== */
+.view-mode-image-not-found {
+  display: block;
+  padding: 8px 12px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 4px;
+  color: #92400e;
+  font-size: 13px;
+  margin: 4px 0;
+}
+
+/* ===== Auto-save indicator ===== */
+.edit-mode-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #718096;
+  border-top: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.edit-mode-status--saving {
+  color: #d97706;
+}
+
+.edit-mode-status--saved {
+  color: #16a34a;
+}
+
+.edit-mode-status--error {
+  color: #dc2626;
 }
