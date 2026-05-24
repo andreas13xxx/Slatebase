@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import path from 'node:path'
 import fs from 'node:fs/promises'
 import os from 'node:os'
-import { isBinaryContent, validateFilePath, PathTraversalError, VaultReader } from './index'
+import { isBinaryContent, validateFilePath, PathTraversalError, VaultReader, computeEtag } from './index'
 
 describe('isBinaryContent', () => {
   it('returns false for a pure text buffer', () => {
@@ -31,6 +31,34 @@ describe('isBinaryContent', () => {
   it('returns false for empty buffer', () => {
     const buffer = Buffer.alloc(0)
     expect(isBinaryContent(buffer)).toBe(false)
+  })
+})
+
+describe('computeEtag', () => {
+  it('returns a 16-character hex string', () => {
+    const buffer = Buffer.from('Hello, world!')
+    const etag = computeEtag(buffer)
+    expect(etag).toHaveLength(16)
+    expect(etag).toMatch(/^[0-9a-f]{16}$/)
+  })
+
+  it('returns the same etag for the same content', () => {
+    const buffer1 = Buffer.from('Same content')
+    const buffer2 = Buffer.from('Same content')
+    expect(computeEtag(buffer1)).toBe(computeEtag(buffer2))
+  })
+
+  it('returns different etags for different content', () => {
+    const buffer1 = Buffer.from('Content A')
+    const buffer2 = Buffer.from('Content B')
+    expect(computeEtag(buffer1)).not.toBe(computeEtag(buffer2))
+  })
+
+  it('handles empty buffer', () => {
+    const buffer = Buffer.alloc(0)
+    const etag = computeEtag(buffer)
+    expect(etag).toHaveLength(16)
+    expect(etag).toMatch(/^[0-9a-f]{16}$/)
   })
 })
 
@@ -228,6 +256,27 @@ describe('VaultReader', () => {
       expect(result.content).toBe('Ümlauts: äöü ß')
       expect(result.isBinary).toBe(false)
     })
+
+    it('includes etag computed from file content', async () => {
+      const filePath = path.join(fixtureDir, 'file-a.md')
+      const result = await reader.readFile(filePath, 1024)
+
+      expect(result.etag).toBeDefined()
+      expect(result.etag).toHaveLength(16)
+      expect(result.etag).toMatch(/^[0-9a-f]{16}$/)
+
+      // Verify etag matches expected hash of file content
+      const expectedEtag = computeEtag(Buffer.from('Hello World', 'utf-8'))
+      expect(result.etag).toBe(expectedEtag)
+    })
+
+    it('returns consistent etag for same file content', async () => {
+      const filePath = path.join(fixtureDir, 'file-a.md')
+      const result1 = await reader.readFile(filePath, 1024)
+      const result2 = await reader.readFile(filePath, 1024)
+
+      expect(result1.etag).toBe(result2.etag)
+    })
   })
 })
 
@@ -270,6 +319,7 @@ function createMockVaultReader(trees: Map<string, DirectoryTree> = new Map()): I
         encoding: 'utf-8',
         isBinary: false,
         isTruncated: false,
+        etag: '0000000000000000',
       }
     },
   }
@@ -411,7 +461,7 @@ describe('VaultManager', () => {
           return { name: 'test', type: 'directory', path: '', children: [], itemCount: 0 }
         },
         async readFile(): Promise<FileContent> {
-          return { path: '', name: '', content: '', size: 0, encoding: 'utf-8', isBinary: false, isTruncated: false }
+          return { path: '', name: '', content: '', size: 0, encoding: 'utf-8', isBinary: false, isTruncated: false, etag: '0000000000000000' }
         },
       }
       const manager = new VaultManager(reader, logger, 25)

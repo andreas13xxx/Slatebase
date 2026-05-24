@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { useAppContext, importFile, importFolder, deleteContent } from '../state'
+import { useState } from 'react'
+import { useAppContext, deleteContent } from '../state'
 import { useTabContext } from '../state/tabContext'
 import { openTab } from '../state/tabActions'
 import type { DirectoryTree } from '../types'
@@ -104,14 +104,12 @@ function TreeNode({ node, selectedFilePath, expandedPaths, onToggleFolder, onSel
  * Clicking a file dispatches a file load action.
  * Shows "Vault ist leer" when the tree has no children.
  *
- * Provides import file/folder buttons and delete actions on each tree node.
+ * Provides delete actions on each tree node.
  */
 export function FileExplorer() {
   const { state, dispatch, apiClient } = useAppContext()
   const { tabDispatch } = useTabContext()
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const folderInputRef = useRef<HTMLInputElement>(null)
 
   const tree = state.directoryTree
   const selectedFilePath = state.selectedFile?.path ?? null
@@ -135,35 +133,9 @@ export function FileExplorer() {
     }
   }
 
-  function handleImportFile() {
-    fileInputRef.current?.click()
-  }
-
-  function handleImportFolder() {
-    folderInputRef.current?.click()
-  }
-
-  function handleFileSelected(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    if (file && vaultId && apiClient) {
-      importFile(dispatch, apiClient, vaultId, file)
-    }
-    // Reset input so the same file can be re-selected
-    event.target.value = ''
-  }
-
-  function handleFolderSelected(event: React.ChangeEvent<HTMLInputElement>) {
-    const files = event.target.files
-    if (files && files.length > 0 && vaultId && apiClient) {
-      importFolder(dispatch, apiClient, vaultId, files)
-    }
-    // Reset input so the same folder can be re-selected
-    event.target.value = ''
-  }
-
   function handleDelete(path: string, name: string) {
     if (!vaultId || !apiClient) return
-    const confirmed = window.confirm(`Are you sure you want to delete "${name}"?`)
+    const confirmed = window.confirm(`"${name}" wirklich löschen?`)
     if (confirmed) {
       deleteContent(dispatch, apiClient, vaultId, path)
     }
@@ -171,45 +143,6 @@ export function FileExplorer() {
 
   return (
     <div className="file-explorer-container">
-      {/* Import actions toolbar */}
-      <div className="file-explorer-toolbar">
-        <button
-          type="button"
-          className="file-explorer-import-btn"
-          onClick={handleImportFile}
-          aria-label="Import file"
-        >
-          Import File
-        </button>
-        <button
-          type="button"
-          className="file-explorer-import-btn"
-          onClick={handleImportFolder}
-          aria-label="Import folder"
-        >
-          Import Folder
-        </button>
-        {/* Hidden file inputs */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          style={{ display: 'none' }}
-          onChange={handleFileSelected}
-          aria-hidden="true"
-          tabIndex={-1}
-        />
-        <input
-          ref={folderInputRef}
-          type="file"
-          // @ts-expect-error webkitdirectory is a non-standard attribute
-          webkitdirectory=""
-          style={{ display: 'none' }}
-          onChange={handleFolderSelected}
-          aria-hidden="true"
-          tabIndex={-1}
-        />
-      </div>
-
       {/* Error banner */}
       {state.error && (
         <div className="file-explorer-error" role="alert">

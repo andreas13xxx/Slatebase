@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
-import { VaultRegistry } from './registry.js'
-import type { VaultRegistryEntry } from './registry.js'
+import { VaultRegistry, VaultShareRegistry } from './registry.js'
+import type { VaultRegistryEntry, VaultShareEntry } from './registry.js'
 
 // Minimal logger for tests
 const testLogger = {
@@ -194,6 +194,201 @@ describe('VaultRegistry', () => {
     it('returns null when not found', async () => {
       await registry.load()
       expect(registry.findByName('Nonexistent')).toBeNull()
+    })
+  })
+})
+
+
+describe('VaultShareRegistry', () => {
+  let tempDir: string
+  let shareRegistry: VaultShareRegistry
+
+  beforeEach(async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'slatebase-share-registry-test-'))
+    shareRegistry = new VaultShareRegistry(tempDir)
+  })
+
+  afterEach(async () => {
+    await fs.rm(tempDir, { recursive: true, force: true })
+  })
+
+  function makeShare(overrides: Partial<VaultShareEntry> = {}): VaultShareEntry {
+    return {
+      vaultId: 'vault-abc123',
+      userId: 'user-def456',
+      permission: 'read',
+      grantedBy: 'owner-ghi789',
+      grantedAt: '2025-01-15T10:30:00.000Z',
+      ...overrides,
+    }
+  }
+
+  describe('getSharesForVault()', () => {
+    it('returns empty array when no shares exist', async () => {
+      const shares = await shareRegistry.getSharesForVault('vault-abc123')
+      expect(shares).toEqual([])
+    })
+
+    it('returns only shares for the specified vault', async () => {
+      const share1 = makeShare({ vaultId: 'vault-1', userId: 'user-a' })
+      const share2 = makeShare({ vaultId: 'vault-1', userId: 'user-b' })
+      const share3 = makeShare({ vaultId: 'vault-2', userId: 'user-a' })
+
+      await shareRegistry.addShare(share1)
+      await shareRegistry.addShare(share2)
+      await shareRegistry.addShare(share3)
+
+      const shares = await shareRegistry.getSharesForVault('vault-1')
+      expect(shares).toHaveLength(2)
+      expect(shares).toEqual([share1, share2])
+    })
+  })
+
+  describe('getSharesForUser()', () => {
+    it('returns empty array when no shares exist for user', async () => {
+      const shares = await shareRegistry.getSharesForUser('user-nonexistent')
+      expect(shares).toEqual([])
+    })
+
+    it('returns only shares for the specified user', async () => {
+      const share1 = makeShare({ vaultId: 'vault-1', userId: 'user-a' })
+      const share2 = makeShare({ vaultId: 'vault-2', userId: 'user-a' })
+      const share3 = makeShare({ vaultId: 'vault-1', userId: 'user-b' })
+
+      await shareRegistry.addShare(share1)
+      await shareRegistry.addShare(share2)
+      await shareRegistry.addShare(share3)
+
+      const shares = await shareRegistry.getSharesForUser('user-a')
+      expect(shares).toHaveLength(2)
+      expect(shares).toEqual([share1, share2])
+    })
+  })
+
+  describe('addShare()', () => {
+    it('adds a share and persists to disk', async () => {
+      const share = makeShare()
+      await shareRegistry.addShare(share)
+
+      const raw = await fs.readFile(path.join(tempDir, 'shares.json'), 'utf-8')
+      const data = JSON.parse(raw)
+      expect(data).toEqual([share])
+    })
+
+    it('appends to existing shares', async () => {
+      const share1 = makeShare({ userId: 'user-a' })
+      const share2 = makeShare({ userId: 'user-b' })
+
+      await shareRegistry.addShare(share1)
+      await shareRegistry.addShare(share2)
+
+      const raw = await fs.readFile(path.join(tempDir, 'shares.json'), 'utf-8')
+      const data = JSON.parse(raw)
+      expect(data).toHaveLength(2)
+    })
+
+    it('creates data directory if it does not exist', async () => {
+      const nestedDir = path.join(tempDir, 'nested', 'data')
+      const nestedRegistry = new VaultShareRegistry(nestedDir)
+
+      await nestedRegistry.addShare(makeShare())
+
+      const stat = await fs.stat(nestedDir)
+      expect(stat.isDirectory()).toBe(true)
+    })
+  })
+
+  describe('removeShare()', () => {
+    it('removes a specific share by vaultId and userId', async () => {
+      const share1 = makeShare({ vaultId: 'vault-1', userId: 'user-a' })
+      const share2 = makeShare({ vaultId: 'vault-1', userId: 'user-b' })
+
+      await shareRegistry.addShare(share1)
+      await shareRegistry.addShare(share2)
+      await shareRegistry.removeShare('vault-1', 'user-a')
+
+      const shares = await shareRegistry.getSharesForVault('vault-1')
+      expect(shares).toHaveLength(1)
+      expect(shares[0]).toEqual(share2)
+    })
+
+    it('does nothing if share does not exist', async () => {
+      const share = makeShare()
+      await shareRegistry.addShare(share)
+      await shareRegistry.removeShare('vault-nonexistent', 'user-nonexistent')
+
+      const shares = await shareRegistry.getSharesForVault(share.vaultId)
+      expect(shares).toHaveLength(1)
+    })
+  })
+
+  describe('removeAllSharesForVault()', () => {
+    it('removes all shares for a vault', async () => {
+      const share1 = makeShare({ vaultId: 'vault-1', userId: 'user-a' })
+      const share2 = makeShare({ vaultId: 'vault-1', userId: 'user-b' })
+      const share3 = makeShare({ vaultId: 'vault-2', userId: 'user-a' })
+
+      await shareRegistry.addShare(share1)
+      await shareRegistry.addShare(share2)
+      await shareRegistry.addShare(share3)
+      await shareRegistry.removeAllSharesForVault('vault-1')
+
+      const vault1Shares = await shareRegistry.getSharesForVault('vault-1')
+      expect(vault1Shares).toHaveLength(0)
+
+      const vault2Shares = await shareRegistry.getSharesForVault('vault-2')
+      expect(vault2Shares).toHaveLength(1)
+    })
+
+    it('does nothing if vault has no shares', async () => {
+      await shareRegistry.removeAllSharesForVault('vault-nonexistent')
+      // Should not throw
+    })
+  })
+
+  describe('updatePermission()', () => {
+    it('updates permission from read to write', async () => {
+      const share = makeShare({ permission: 'read' })
+      await shareRegistry.addShare(share)
+      await shareRegistry.updatePermission(share.vaultId, share.userId, 'write')
+
+      const shares = await shareRegistry.getSharesForVault(share.vaultId)
+      expect(shares[0]!.permission).toBe('write')
+    })
+
+    it('updates permission from write to read', async () => {
+      const share = makeShare({ permission: 'write' })
+      await shareRegistry.addShare(share)
+      await shareRegistry.updatePermission(share.vaultId, share.userId, 'read')
+
+      const shares = await shareRegistry.getSharesForVault(share.vaultId)
+      expect(shares[0]!.permission).toBe('read')
+    })
+
+    it('does nothing if share does not exist', async () => {
+      await shareRegistry.updatePermission('vault-nonexistent', 'user-nonexistent', 'write')
+      // Should not throw
+    })
+
+    it('persists the updated permission to disk', async () => {
+      const share = makeShare({ permission: 'read' })
+      await shareRegistry.addShare(share)
+      await shareRegistry.updatePermission(share.vaultId, share.userId, 'write')
+
+      // Read directly from disk with a fresh instance
+      const freshRegistry = new VaultShareRegistry(tempDir)
+      const shares = await freshRegistry.getSharesForVault(share.vaultId)
+      expect(shares[0]!.permission).toBe('write')
+    })
+  })
+
+  describe('atomic writes', () => {
+    it('leaves no temp files after save', async () => {
+      await shareRegistry.addShare(makeShare())
+
+      const files = await fs.readdir(tempDir)
+      const tmpFiles = files.filter((f) => f.endsWith('.tmp'))
+      expect(tmpFiles).toHaveLength(0)
     })
   })
 })

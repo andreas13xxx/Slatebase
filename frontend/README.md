@@ -1,73 +1,143 @@
-# React + TypeScript + Vite
+# Slatebase
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Ein selbst-gehosteter Knowledge-Context-Server für Markdown-Vaults. Slatebase ermöglicht das Verwalten, Durchsuchen und Anzeigen von Markdown-basierten Wissenssammlungen über eine Web-Oberfläche — kompatibel mit Obsidian-Vaults.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Multi-Vault-Verwaltung** — Erstellen, Löschen und Auflisten von Vaults
+- **Datei-Explorer** — Verzeichnisbaum-Navigation mit Ordnerstruktur
+- **Markdown-Viewer** — Darstellung von Markdown-Inhalten mit Syntax-Highlighting
+- **Tabs** — Mehrere Dateien gleichzeitig geöffnet halten
+- **Import** — Dateien und Ordner in Vaults importieren
+- **Inhalte löschen** — Dateien und Ordner innerhalb von Vaults entfernen
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Backend
 
-## Expanding the ESLint configuration
+- Node.js ≥ 22 (native TypeScript via `--experimental-strip-types`)
+- [Hono](https://hono.dev/) — HTTP-Framework
+- [Zod](https://zod.dev/) — Schema-Validierung
+- [Pino](https://getpino.io/) — Strukturiertes Logging
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Frontend
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- React 19 + TypeScript
+- [Vite](https://vite.dev/) — Build-Tool & Dev-Server
+- Vitest + Testing Library — Unit-Tests
+- Playwright — End-to-End-Tests
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Voraussetzungen
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- Node.js ≥ 22
+- npm
+
+## Installation
+
+```bash
+# Repository klonen
+git clone https://github.com/<user>/slatebase.git
+cd slatebase
+
+# Backend installieren
+cd backend
+npm install
+cp .env.example .env
+
+# Frontend installieren
+cd ../frontend
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Konfiguration
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Die Backend-Konfiguration erfolgt über `backend/config/default.json` und kann durch Umgebungsvariablen in `backend/.env` überschrieben werden:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Variable | Beschreibung | Standard |
+|----------|-------------|----------|
+| `SLATEBASE_PORT` | Server-Port | `3000` |
+| `SLATEBASE_HOST` | Host-Adresse | `127.0.0.1` |
+| `SLATEBASE_LOG_LEVEL` | Log-Level (debug/info/warn/error) | `info` |
+| `SLATEBASE_MAX_FILE_SIZE` | Max. Dateigröße in Bytes | `5242880` (5 MB) |
+| `SLATEBASE_ALLOWED_ORIGINS` | Erlaubte CORS-Origins | `http://localhost:5173` |
+
+## Entwicklung
+
+```bash
+# Backend starten (Hot Reload)
+cd backend
+npm run dev
+
+# Frontend starten (Vite Dev-Server auf Port 5173)
+cd frontend
+npm run dev
 ```
+
+Das Frontend proxied `/api`-Anfragen automatisch an `http://localhost:3000`.
+
+## Tests
+
+```bash
+# Backend-Tests
+cd backend
+npm test
+
+# Frontend Unit-Tests
+cd frontend
+npm test
+
+# Frontend E2E-Tests (Backend muss laufen)
+cd frontend
+npm run test:e2e
+```
+
+## Produktion
+
+```bash
+# Backend
+cd backend
+npm start
+
+# Frontend Build
+cd frontend
+npm run build
+# Statische Dateien aus dist/ ausliefern
+```
+
+## API
+
+Alle Routen unter `/api/v1`:
+
+| Methode | Pfad | Beschreibung |
+|---------|------|-------------|
+| GET | `/vaults` | Alle Vaults auflisten |
+| POST | `/vaults` | Neuen Vault erstellen |
+| DELETE | `/vaults/:vaultId` | Vault löschen |
+| GET | `/vaults/:vaultId/tree` | Verzeichnisbaum abrufen |
+| GET | `/vaults/:vaultId/files?path=` | Dateiinhalt abrufen |
+| POST | `/vaults/:vaultId/import/file` | Einzelne Datei importieren |
+| POST | `/vaults/:vaultId/import/folder` | Ordner importieren |
+| DELETE | `/vaults/:vaultId/content?path=` | Datei/Ordner löschen |
+
+## Projektstruktur
+
+```
+backend/          — Node.js REST API Server
+frontend/         — React SPA (Vite)
+```
+
+Vaults werden als Dateien unter `backend/data/vaults/<id>/` gespeichert. Keine Datenbank — alles filesystem-basiert.
+
+## Geplante Features
+
+- Obsidian-kompatibles Markdown-Rendering (Wikilinks, Embeds, Frontmatter)
+- Inline Markdown-Editor mit Live-Vorschau
+- Wissensgraph-Visualisierung
+- AI Context Server mit MCP-Integration
+- Vault-Synchronisation (LiveSync/CouchDB-kompatibel)
+- Authentifizierung & Autorisierung
+- Internationalisierung (DE/EN)
+
+## Lizenz
+
+MIT

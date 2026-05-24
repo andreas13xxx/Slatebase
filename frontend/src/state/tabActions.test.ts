@@ -5,6 +5,11 @@ import type { FileContent, FileSaveResult } from '../types'
 
 function createMockApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
   return {
+    setToken: vi.fn(),
+    getToken: vi.fn().mockReturnValue(null),
+    setCsrfToken: vi.fn(),
+    getCsrfToken: vi.fn().mockReturnValue(null),
+    setOnSessionExpired: vi.fn(),
     fetchVaults: vi.fn(),
     fetchVaultTree: vi.fn(),
     fetchFileContent: vi.fn(),
@@ -14,8 +19,16 @@ function createMockApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
     importFolder: vi.fn(),
     deleteContent: vi.fn(),
     saveFile: vi.fn(),
+    login: vi.fn(),
+    logout: vi.fn(),
+    getSessions: vi.fn(),
+    invalidateSession: vi.fn(),
+    getProfile: vi.fn(),
+    updateProfile: vi.fn(),
+    changePassword: vi.fn(),
+    deleteSelf: vi.fn(),
     ...overrides,
-  }
+  } as IApiClient
 }
 
 describe('openTab', () => {

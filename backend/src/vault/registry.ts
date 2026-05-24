@@ -12,6 +12,30 @@ export interface VaultRegistryEntry {
   name: string         // User-chosen name, 1-128 chars, unique
   storagePath: string  // Absolute path to vault directory on server
   createdAt: string    // ISO 8601 timestamp
+  ownerId?: string     // User ID of the vault owner (added by auth feature)
+}
+
+export interface VaultShareEntry {
+  vaultId: string
+  userId: string          // Recipient of the share
+  permission: 'read' | 'write'
+  grantedBy: string       // userId of the owner
+  grantedAt: string       // ISO 8601
+}
+
+export interface IVaultShareRegistry {
+  /** Returns all shares for a given vault. */
+  getSharesForVault(vaultId: string): Promise<VaultShareEntry[]>
+  /** Returns all shares granted to a given user. */
+  getSharesForUser(userId: string): Promise<VaultShareEntry[]>
+  /** Adds a new share entry. */
+  addShare(share: VaultShareEntry): Promise<void>
+  /** Removes a specific share for a user on a vault. */
+  removeShare(vaultId: string, userId: string): Promise<void>
+  /** Removes all shares for a given vault. */
+  removeAllSharesForVault(vaultId: string): Promise<void>
+  /** Updates the permission level of an existing share. */
+  updatePermission(vaultId: string, userId: string, permission: 'read' | 'write'): Promise<void>
 }
 
 interface RegistryFile {
@@ -166,4 +190,134 @@ export class VaultRegistry implements IVaultRegistry {
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error
+}
+
+// --- VaultShareRegistry Implementation ---
+
+export class VaultShareRegistry implements IVaultShareRegistry {
+  private shares: VaultShareEntry[] = []
+  private readonly sharesPath: string
+  private initialized = false
+
+  constructor(private readonly dataDir: string) {
+    this.sharesPath = path.join(dataDir, 'shares.json')
+  }
+
+  /**
+   * Ensures the data directory exists.
+   * Called lazily on first access.
+   */
+  private async ensureDirectory(): Promise<void> {
+    if (this.initialized) return
+    await fs.mkdir(this.dataDir, { recursive: true })
+    this.initialized = true
+  }
+
+  /**
+   * Reads and parses the shares file from disk.
+   * Returns an empty array if the file doesn't exist.
+   * Updates the in-memory cache.
+   */
+  private async load(): Promise<VaultShareEntry[]> {
+    await this.ensureDirectory()
+
+    try {
+      const raw = await fs.readFile(this.sharesPath, 'utf-8')
+      const data: unknown = JSON.parse(raw)
+      this.shares = Array.isArray(data) ? data : []
+      return [...this.shares]
+    } catch (error: unknown) {
+      if (isNodeError(error) && error.code === 'ENOENT') {
+        this.shares = []
+        return []
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Writes the shares array to disk atomically.
+   * Writes to a temp file first, then renames to prevent corruption.
+   * Updates the in-memory cache.
+   */
+  private async save(shares: VaultShareEntry[]): Promise<void> {
+    await this.ensureDirectory()
+
+    const content = JSON.stringify(shares, null, 2)
+    const tempPath = this.sharesPath + `.${crypto.randomBytes(8).toString('hex')}.tmp`
+
+    await fs.writeFile(tempPath, content, 'utf-8')
+
+    try {
+      await fs.rename(tempPath, this.sharesPath)
+    } catch (renameError) {
+      try {
+        await fs.unlink(tempPath)
+      } catch {
+        // Ignore cleanup errors
+      }
+      throw renameError
+    }
+
+    this.shares = [...shares]
+  }
+
+  /**
+   * Returns all shares for a given vault.
+   */
+  async getSharesForVault(vaultId: string): Promise<VaultShareEntry[]> {
+    await this.load()
+    return this.shares.filter((s) => s.vaultId === vaultId)
+  }
+
+  /**
+   * Returns all shares granted to a given user.
+   */
+  async getSharesForUser(userId: string): Promise<VaultShareEntry[]> {
+    await this.load()
+    return this.shares.filter((s) => s.userId === userId)
+  }
+
+  /**
+   * Adds a new share entry and persists to disk.
+   */
+  async addShare(share: VaultShareEntry): Promise<void> {
+    await this.load()
+    this.shares.push(share)
+    await this.save(this.shares)
+  }
+
+  /**
+   * Removes a specific share for a user on a vault and persists to disk.
+   */
+  async removeShare(vaultId: string, userId: string): Promise<void> {
+    await this.load()
+    this.shares = this.shares.filter(
+      (s) => !(s.vaultId === vaultId && s.userId === userId),
+    )
+    await this.save(this.shares)
+  }
+
+  /**
+   * Removes all shares for a given vault and persists to disk.
+   */
+  async removeAllSharesForVault(vaultId: string): Promise<void> {
+    await this.load()
+    this.shares = this.shares.filter((s) => s.vaultId !== vaultId)
+    await this.save(this.shares)
+  }
+
+  /**
+   * Updates the permission level of an existing share and persists to disk.
+   */
+  async updatePermission(vaultId: string, userId: string, permission: 'read' | 'write'): Promise<void> {
+    await this.load()
+    const share = this.shares.find(
+      (s) => s.vaultId === vaultId && s.userId === userId,
+    )
+    if (share) {
+      share.permission = permission
+      await this.save(this.shares)
+    }
+  }
 }

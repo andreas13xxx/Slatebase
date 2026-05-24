@@ -43,6 +43,17 @@ export class PathTraversalError extends Error {
 }
 
 /**
+ * Computes an ETag for file content using SHA-256.
+ * Returns the first 16 hex characters of the hash.
+ */
+export function computeEtag(content: Buffer): string {
+  return crypto.createHash('sha256')
+    .update(content)
+    .digest('hex')
+    .substring(0, 16)
+}
+
+/**
  * Checks whether a buffer contains binary content by scanning the first 8 KB for null bytes.
  * Returns true if any null byte is found within the sample window.
  */
@@ -98,6 +109,7 @@ export interface FileContent {
   encoding: 'utf-8'
   isBinary: boolean
   isTruncated: boolean
+  etag: string         // SHA-256 first 16 hex chars of file content
 }
 
 // --- IVaultReader Interface ---
@@ -126,6 +138,7 @@ export class VaultReader implements IVaultReader {
    * Detects binary content via `isBinaryContent`.
    * Sets `isTruncated` if the file exceeds `maxSize`.
    * Decodes content as UTF-8 (empty string for binary files).
+   * Computes an ETag from the raw file content bytes.
    */
   async readFile(absolutePath: string, maxSize: number): Promise<FileContent> {
     const stat = await fs.stat(absolutePath)
@@ -148,6 +161,7 @@ export class VaultReader implements IVaultReader {
     }
 
     const isBinary = isBinaryContent(buffer)
+    const etag = computeEtag(buffer)
 
     return {
       path: path.basename(absolutePath), // Will be overridden by caller with relative path
@@ -157,6 +171,7 @@ export class VaultReader implements IVaultReader {
       encoding: 'utf-8',
       isBinary,
       isTruncated,
+      etag,
     }
   }
 

@@ -153,6 +153,11 @@ describe('appReducer', () => {
 describe('Action Creators', () => {
   function createMockApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
     return {
+      setToken: vi.fn(),
+      getToken: vi.fn().mockReturnValue(null),
+      setCsrfToken: vi.fn(),
+      getCsrfToken: vi.fn().mockReturnValue(null),
+      setOnSessionExpired: vi.fn(),
       fetchVaults: vi.fn().mockResolvedValue([]),
       fetchVaultTree: vi.fn().mockResolvedValue({ name: 'root', type: 'directory', path: '/', children: [] }),
       fetchFileContent: vi.fn().mockResolvedValue({ path: 'a.md', name: 'a.md', content: '', size: 0, encoding: 'utf-8', isBinary: false, isTruncated: false }),
@@ -161,8 +166,17 @@ describe('Action Creators', () => {
       importFile: vi.fn().mockResolvedValue(undefined),
       importFolder: vi.fn().mockResolvedValue(undefined),
       deleteContent: vi.fn().mockResolvedValue(undefined),
+      saveFile: vi.fn().mockResolvedValue({ path: '', name: '', size: 0 }),
+      login: vi.fn(),
+      logout: vi.fn(),
+      getSessions: vi.fn(),
+      invalidateSession: vi.fn(),
+      getProfile: vi.fn(),
+      updateProfile: vi.fn(),
+      changePassword: vi.fn(),
+      deleteSelf: vi.fn(),
       ...overrides,
-    }
+    } as IApiClient
   }
 
   describe('loadVaults', () => {

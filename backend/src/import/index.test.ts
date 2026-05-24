@@ -68,6 +68,7 @@ function createMockVaultReader(): IVaultReader {
       encoding: 'utf-8' as const,
       isBinary: false,
       isTruncated: false,
+      etag: '0000000000000000',
     }),
   }
 }
@@ -367,7 +368,7 @@ describe('ImportService', () => {
         },
         readFile: async () => ({
           path: '', name: '', content: '', size: 0,
-          encoding: 'utf-8' as const, isBinary: false, isTruncated: false,
+          encoding: 'utf-8' as const, isBinary: false, isTruncated: false, etag: '0000000000000000',
         }),
       }
 
@@ -665,7 +666,7 @@ describe('ImportService', () => {
         },
         readFile: async () => ({
           path: '', name: '', content: '', size: 0,
-          encoding: 'utf-8' as const, isBinary: false, isTruncated: false,
+          encoding: 'utf-8' as const, isBinary: false, isTruncated: false, etag: '0000000000000000',
         }),
       }
 

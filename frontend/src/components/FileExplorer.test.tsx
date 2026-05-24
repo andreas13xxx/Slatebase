@@ -10,6 +10,35 @@ import { initialState } from '../state'
 import type { IApiClient } from '../api'
 import type { Dispatch } from 'react'
 
+/** Creates a mock API client with all required interface methods. */
+function createMockApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
+  return {
+    setToken: vi.fn(),
+    getToken: vi.fn().mockReturnValue(null),
+    setCsrfToken: vi.fn(),
+    getCsrfToken: vi.fn().mockReturnValue(null),
+    setOnSessionExpired: vi.fn(),
+    fetchVaults: vi.fn(),
+    fetchVaultTree: vi.fn(),
+    fetchFileContent: vi.fn(),
+    createVault: vi.fn(),
+    deleteVault: vi.fn(),
+    importFile: vi.fn(),
+    importFolder: vi.fn(),
+    deleteContent: vi.fn(),
+    saveFile: vi.fn(),
+    login: vi.fn(),
+    logout: vi.fn(),
+    getSessions: vi.fn(),
+    invalidateSession: vi.fn(),
+    getProfile: vi.fn(),
+    updateProfile: vi.fn(),
+    changePassword: vi.fn(),
+    deleteSelf: vi.fn(),
+    ...overrides,
+  }
+}
+
 /** Helper to render FileExplorer with a custom state and capture dispatched actions. */
 function renderFileExplorer(stateOverrides: Partial<AppState> = {}, apiClient?: IApiClient) {
   const dispatch = vi.fn() as Dispatch<AppAction> & ReturnType<typeof vi.fn>
@@ -179,9 +208,7 @@ describe('FileExplorer', () => {
   describe('file selection', () => {
     it('calls openTab which fetches file content on file click when vault is selected', async () => {
       const user = userEvent.setup()
-      const mockApiClient: IApiClient = {
-        fetchVaults: vi.fn(),
-        fetchVaultTree: vi.fn(),
+      const mockApiClient = createMockApiClient({
         fetchFileContent: vi.fn().mockResolvedValue({
           path: 'readme.md',
           name: 'readme.md',
@@ -191,13 +218,7 @@ describe('FileExplorer', () => {
           isBinary: false,
           isTruncated: false,
         }),
-        createVault: vi.fn(),
-        deleteVault: vi.fn(),
-        importFile: vi.fn(),
-        importFolder: vi.fn(),
-        deleteContent: vi.fn(),
-        saveFile: vi.fn(),
-      }
+      })
       renderFileExplorer(
         {
           directoryTree: sampleTree,
@@ -271,89 +292,6 @@ describe('FileExplorer', () => {
     })
   })
 
-  describe('import actions', () => {
-    it('renders Import File and Import Folder buttons', () => {
-      renderFileExplorer({ directoryTree: sampleTree, selectedVaultId: 'vault-123' })
-
-      expect(screen.getByRole('button', { name: 'Import file' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Import folder' })).toBeInTheDocument()
-    })
-
-    it('renders hidden file input for file import', () => {
-      renderFileExplorer({ directoryTree: sampleTree, selectedVaultId: 'vault-123' })
-
-      const fileInputs = document.querySelectorAll('input[type="file"]')
-      expect(fileInputs.length).toBeGreaterThanOrEqual(1)
-      // The first hidden input is for single file import
-      const fileInput = fileInputs[0] as HTMLInputElement
-      expect(fileInput).toHaveAttribute('aria-hidden', 'true')
-    })
-
-    it('renders hidden file input with webkitdirectory for folder import', () => {
-      renderFileExplorer({ directoryTree: sampleTree, selectedVaultId: 'vault-123' })
-
-      const fileInputs = document.querySelectorAll('input[type="file"]')
-      // The second hidden input is for folder import with webkitdirectory
-      const folderInput = fileInputs[1] as HTMLInputElement
-      expect(folderInput).toHaveAttribute('aria-hidden', 'true')
-      expect(folderInput).toHaveAttribute('webkitdirectory')
-    })
-
-    it('calls importFile when a file is selected', async () => {
-      const mockApiClient: IApiClient = {
-        fetchVaults: vi.fn(),
-        fetchVaultTree: vi.fn().mockResolvedValue({ name: 'root', type: 'directory', path: '', children: [] }),
-        fetchFileContent: vi.fn(),
-        createVault: vi.fn(),
-        deleteVault: vi.fn(),
-        importFile: vi.fn().mockResolvedValue(undefined),
-        importFolder: vi.fn(),
-        deleteContent: vi.fn(),
-        saveFile: vi.fn(),
-      }
-      const { dispatch } = renderFileExplorer(
-        { directoryTree: sampleTree, selectedVaultId: 'vault-123' },
-        mockApiClient,
-      )
-
-      const fileInputs = document.querySelectorAll('input[type="file"]')
-      const fileInput = fileInputs[0] as HTMLInputElement
-
-      const testFile = new File(['hello'], 'test.txt', { type: 'text/plain' })
-      await userEvent.upload(fileInput, testFile)
-
-      expect(dispatch).toHaveBeenCalledWith({ type: 'LOADING_STARTED' })
-      expect(mockApiClient.importFile).toHaveBeenCalledWith('vault-123', testFile)
-    })
-
-    it('calls importFolder when files are selected via folder picker', async () => {
-      const mockApiClient: IApiClient = {
-        fetchVaults: vi.fn(),
-        fetchVaultTree: vi.fn().mockResolvedValue({ name: 'root', type: 'directory', path: '', children: [] }),
-        fetchFileContent: vi.fn(),
-        createVault: vi.fn(),
-        deleteVault: vi.fn(),
-        importFile: vi.fn(),
-        importFolder: vi.fn().mockResolvedValue(undefined),
-        deleteContent: vi.fn(),
-        saveFile: vi.fn(),
-      }
-      const { dispatch } = renderFileExplorer(
-        { directoryTree: sampleTree, selectedVaultId: 'vault-123' },
-        mockApiClient,
-      )
-
-      const fileInputs = document.querySelectorAll('input[type="file"]')
-      const folderInput = fileInputs[1] as HTMLInputElement
-
-      const testFile = new File(['content'], 'file.txt', { type: 'text/plain' })
-      await userEvent.upload(folderInput, testFile)
-
-      expect(dispatch).toHaveBeenCalledWith({ type: 'LOADING_STARTED' })
-      expect(mockApiClient.importFolder).toHaveBeenCalled()
-    })
-  })
-
   describe('delete actions', () => {
     it('renders delete buttons for files', () => {
       renderFileExplorer({ directoryTree: sampleTree, selectedVaultId: 'vault-123' })
@@ -371,17 +309,7 @@ describe('FileExplorer', () => {
     it('shows confirmation dialog on delete click', async () => {
       const user = userEvent.setup()
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
-      const mockApiClient: IApiClient = {
-        fetchVaults: vi.fn(),
-        fetchVaultTree: vi.fn(),
-        fetchFileContent: vi.fn(),
-        createVault: vi.fn(),
-        deleteVault: vi.fn(),
-        importFile: vi.fn(),
-        importFolder: vi.fn(),
-        deleteContent: vi.fn(),
-        saveFile: vi.fn(),
-      }
+      const mockApiClient = createMockApiClient()
 
       renderFileExplorer(
         { directoryTree: sampleTree, selectedVaultId: 'vault-123' },
@@ -391,24 +319,17 @@ describe('FileExplorer', () => {
       const deleteBtn = screen.getByRole('button', { name: 'Delete file readme.md' })
       await user.click(deleteBtn)
 
-      expect(confirmSpy).toHaveBeenCalledWith('Are you sure you want to delete "readme.md"?')
+      expect(confirmSpy).toHaveBeenCalledWith('"readme.md" wirklich löschen?')
       confirmSpy.mockRestore()
     })
 
     it('calls deleteContent when deletion is confirmed', async () => {
       const user = userEvent.setup()
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
-      const mockApiClient: IApiClient = {
-        fetchVaults: vi.fn(),
+      const mockApiClient = createMockApiClient({
         fetchVaultTree: vi.fn().mockResolvedValue({ name: 'root', type: 'directory', path: '', children: [] }),
-        fetchFileContent: vi.fn(),
-        createVault: vi.fn(),
-        deleteVault: vi.fn(),
-        importFile: vi.fn(),
-        importFolder: vi.fn(),
         deleteContent: vi.fn().mockResolvedValue(undefined),
-        saveFile: vi.fn(),
-      }
+      })
       const { dispatch } = renderFileExplorer(
         { directoryTree: sampleTree, selectedVaultId: 'vault-123' },
         mockApiClient,
@@ -425,17 +346,7 @@ describe('FileExplorer', () => {
     it('does not call deleteContent when deletion is cancelled', async () => {
       const user = userEvent.setup()
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
-      const mockApiClient: IApiClient = {
-        fetchVaults: vi.fn(),
-        fetchVaultTree: vi.fn(),
-        fetchFileContent: vi.fn(),
-        createVault: vi.fn(),
-        deleteVault: vi.fn(),
-        importFile: vi.fn(),
-        importFolder: vi.fn(),
-        deleteContent: vi.fn(),
-        saveFile: vi.fn(),
-      }
+      const mockApiClient = createMockApiClient()
       renderFileExplorer(
         { directoryTree: sampleTree, selectedVaultId: 'vault-123' },
         mockApiClient,

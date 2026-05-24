@@ -4,9 +4,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { Context } from 'hono'
 import { Hono } from 'hono'
+
+export { UserController, UserRouteModule } from './userRoutes.js'
 import type { IVaultService } from '../business/index.js'
 import type { ILogger } from '../logger/index.js'
-import { VaultNotFoundError, VaultValidationError, StorageError, FileTooLargeError as BusinessFileTooLargeError } from '../business/index.js'
+import { VaultNotFoundError, VaultValidationError, StorageError, FileTooLargeError as BusinessFileTooLargeError, ConflictError } from '../business/index.js'
 import { PathTraversalError } from '../vault/index.js'
 import type { IImportService, UploadedFile } from '../import/index.js'
 import {
@@ -130,7 +132,8 @@ export class VaultController implements IVaultController {
   /**
    * PUT /vaults/:vaultId/files — Saves file content.
    * Parses JSON body { path, content }, validates required fields,
-   * calls vaultService.saveFile(vaultId, path, content), returns 200 with { path, name, size }.
+   * extracts optional If-Match header for ETag-based conflict detection,
+   * calls vaultService.saveFile(vaultId, path, content, ifMatch), returns 200 with { path, name, size, etag }.
    */
   async saveFile(c: Context): Promise<Response> {
     const vaultId = c.req.param('vaultId') as string
@@ -150,7 +153,10 @@ export class VaultController implements IVaultController {
         return c.json(apiError, 400)
       }
 
-      const result = await this.vaultService.saveFile(vaultId, filePath, content)
+      // Extract optional If-Match header for ETag conflict detection
+      const ifMatch = c.req.header('If-Match')
+
+      const result = await this.vaultService.saveFile(vaultId, filePath, content, ifMatch)
       return c.json(result, 200)
     } catch (error) {
       return this.handleError(c, error)
@@ -392,6 +398,13 @@ export class VaultController implements IVaultController {
       return c.json(apiError, 400)
     }
 
+    // ConflictError — 409 (ETag mismatch)
+    if (error instanceof ConflictError) {
+      this.logger.warn('ETag conflict detected', { currentEtag: error.currentEtag, providedEtag: error.providedEtag })
+      const apiError = createApiError('CONFLICT', error.message)
+      return c.json(apiError, 409)
+    }
+
     // StorageError — 500
     if (error instanceof StorageError) {
       this.logger.error('Storage error', { message: error.message })
@@ -482,6 +495,11 @@ export class VaultRouteModule implements RouteModule {
   }
 }
 
+// --- Re-exports ---
+
+export { createAdminRoutes, AdminRouteModule, AdminController } from './adminRoutes.js'
+export type { IAdminController, AdminRouteDependencies } from './adminRoutes.js'
+
 // --- Router Factory ---
 
 export function createRouter(registry: RouteModule[]): Hono {
@@ -491,3 +509,8 @@ export function createRouter(registry: RouteModule[]): Hono {
   }
   return router
 }
+
+// --- Re-exports from route modules ---
+
+export { AuthController, AuthRouteModule } from './authRoutes.js'
+export type { IAuthController } from './authRoutes.js'

@@ -18,12 +18,14 @@
     "hono": "^4.7.0",
     "@hono/node-server": "^1.14.0",
     "zod": "^3.24.0",
-    "pino": "^9.6.0"
+    "pino": "^9.6.0",
+    "argon2": "0.41.1"
   },
   "devDependencies": {
     "typescript": "^5.7.0",
     "tsx": "^4.19.0",
     "vitest": "^3.1.0",
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "fast-check": "3.22.0"
   }
 }

@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import path from 'node:path'
 import fs from 'node:fs/promises'
-import { VaultService, VaultNotFoundError, VaultValidationError, StorageError } from './index'
+import { VaultService, VaultNotFoundError, VaultValidationError, StorageError, ConflictError } from './index'
 import type { IVaultService } from './index'
 import type { IVaultManager, IVaultReader, Vault, DirectoryTree, FileContent } from '../vault/index'
-import { PathTraversalError } from '../vault/index'
+import { PathTraversalError, computeEtag } from '../vault/index'
 import type { IConfigService, ServerConfig, VaultConfig } from '../config/index'
 import type { ILogger } from '../logger/index'
 import type { IVaultRegistry, VaultRegistryEntry } from '../vault/registry'
@@ -109,6 +109,7 @@ function createMockVaultReader(fileContent?: FileContent): IVaultReader {
         encoding: 'utf-8',
         isBinary: false,
         isTruncated: false,
+        etag: '0000000000000000',
       }
     },
   }
@@ -351,6 +352,7 @@ describe('VaultService', () => {
         encoding: 'utf-8',
         isBinary: false,
         isTruncated: false,
+        etag: '0000000000000000',
       }
       const vaultReader = createMockVaultReader(expectedContent)
       const logger = createMockLogger()
@@ -413,6 +415,7 @@ describe('VaultService', () => {
             encoding: 'utf-8',
             isBinary: false,
             isTruncated: false,
+            etag: '0000000000000000',
           }
         },
       }
@@ -438,6 +441,7 @@ describe('VaultService', () => {
         encoding: 'utf-8',
         isBinary: false,
         isTruncated: false,
+        etag: '0000000000000000',
       })
       const logger = createMockLogger()
 
@@ -766,6 +770,143 @@ describe('VaultService', () => {
       await service.deleteVault('abc123def456')
       expect(registry.removedIds).toContain('abc123def456')
       expect(vaultManager.removedVaultIds).toContain('abc123def456')
+    })
+  })
+
+  describe('saveFile — ETag conflict detection', () => {
+    it('returns etag in save result', async () => {
+      const tmpDir = path.join(process.env['TEMP'] || '/tmp', `slatebase-etag-test-${Date.now()}`)
+      const vaultDir = path.join(tmpDir, 'vault')
+      await fs.mkdir(vaultDir, { recursive: true })
+
+      const vault = createMockVault('abc123def456', 'Test Vault', vaultDir)
+      const vaultManager = createMockVaultManager([vault])
+      const configService = createMockConfigService()
+      const vaultReader = createMockVaultReader()
+      const logger = createMockLogger()
+
+      const service = new VaultService(vaultManager, vaultReader, configService, logger)
+      const result = await service.saveFile('abc123def456', 'test.md', '# Hello')
+
+      expect(result.etag).toBeDefined()
+      expect(result.etag).toHaveLength(16)
+      expect(result.etag).toMatch(/^[0-9a-f]{16}$/)
+
+      // Verify etag matches the content hash
+      const expectedEtag = computeEtag(Buffer.from('# Hello', 'utf-8'))
+      expect(result.etag).toBe(expectedEtag)
+
+      await fs.rm(tmpDir, { recursive: true, force: true })
+    })
+
+    it('saves successfully when ifMatch matches current file etag', async () => {
+      const tmpDir = path.join(process.env['TEMP'] || '/tmp', `slatebase-etag-test-${Date.now()}`)
+      const vaultDir = path.join(tmpDir, 'vault')
+      await fs.mkdir(vaultDir, { recursive: true })
+
+      // Write initial file
+      const initialContent = '# Initial'
+      await fs.writeFile(path.join(vaultDir, 'test.md'), initialContent, 'utf-8')
+      const currentEtag = computeEtag(Buffer.from(initialContent, 'utf-8'))
+
+      const vault = createMockVault('abc123def456', 'Test Vault', vaultDir)
+      const vaultManager = createMockVaultManager([vault])
+      const configService = createMockConfigService()
+      const vaultReader = createMockVaultReader()
+      const logger = createMockLogger()
+
+      const service = new VaultService(vaultManager, vaultReader, configService, logger)
+      const result = await service.saveFile('abc123def456', 'test.md', '# Updated', currentEtag)
+
+      expect(result.path).toBe('test.md')
+      expect(result.etag).toMatch(/^[0-9a-f]{16}$/)
+      // New etag should differ from old
+      expect(result.etag).not.toBe(currentEtag)
+
+      await fs.rm(tmpDir, { recursive: true, force: true })
+    })
+
+    it('throws ConflictError when ifMatch does not match current file etag', async () => {
+      const tmpDir = path.join(process.env['TEMP'] || '/tmp', `slatebase-etag-test-${Date.now()}`)
+      const vaultDir = path.join(tmpDir, 'vault')
+      await fs.mkdir(vaultDir, { recursive: true })
+
+      // Write initial file
+      await fs.writeFile(path.join(vaultDir, 'test.md'), '# Current content', 'utf-8')
+
+      const vault = createMockVault('abc123def456', 'Test Vault', vaultDir)
+      const vaultManager = createMockVaultManager([vault])
+      const configService = createMockConfigService()
+      const vaultReader = createMockVaultReader()
+      const logger = createMockLogger()
+
+      const service = new VaultService(vaultManager, vaultReader, configService, logger)
+
+      // Provide a stale/wrong etag
+      await expect(service.saveFile('abc123def456', 'test.md', '# New content', 'stale_etag_value_'))
+        .rejects.toThrow(ConflictError)
+
+      // Verify file was NOT modified
+      const fileContent = await fs.readFile(path.join(vaultDir, 'test.md'), 'utf-8')
+      expect(fileContent).toBe('# Current content')
+
+      await fs.rm(tmpDir, { recursive: true, force: true })
+    })
+
+    it('skips conflict check when ifMatch is not provided (backward compatibility)', async () => {
+      const tmpDir = path.join(process.env['TEMP'] || '/tmp', `slatebase-etag-test-${Date.now()}`)
+      const vaultDir = path.join(tmpDir, 'vault')
+      await fs.mkdir(vaultDir, { recursive: true })
+
+      // Write initial file
+      await fs.writeFile(path.join(vaultDir, 'test.md'), '# Old content', 'utf-8')
+
+      const vault = createMockVault('abc123def456', 'Test Vault', vaultDir)
+      const vaultManager = createMockVaultManager([vault])
+      const configService = createMockConfigService()
+      const vaultReader = createMockVaultReader()
+      const logger = createMockLogger()
+
+      const service = new VaultService(vaultManager, vaultReader, configService, logger)
+
+      // No ifMatch provided — should save without conflict check
+      const result = await service.saveFile('abc123def456', 'test.md', '# New content')
+      expect(result.path).toBe('test.md')
+      expect(result.etag).toMatch(/^[0-9a-f]{16}$/)
+
+      await fs.rm(tmpDir, { recursive: true, force: true })
+    })
+
+    it('saves successfully when ifMatch is provided but file does not exist yet', async () => {
+      const tmpDir = path.join(process.env['TEMP'] || '/tmp', `slatebase-etag-test-${Date.now()}`)
+      const vaultDir = path.join(tmpDir, 'vault')
+      await fs.mkdir(vaultDir, { recursive: true })
+
+      const vault = createMockVault('abc123def456', 'Test Vault', vaultDir)
+      const vaultManager = createMockVaultManager([vault])
+      const configService = createMockConfigService()
+      const vaultReader = createMockVaultReader()
+      const logger = createMockLogger()
+
+      const service = new VaultService(vaultManager, vaultReader, configService, logger)
+
+      // File doesn't exist yet — ifMatch should be ignored (no conflict possible)
+      const result = await service.saveFile('abc123def456', 'new-file.md', '# Brand new', 'any_etag_value_x')
+      expect(result.path).toBe('new-file.md')
+      expect(result.etag).toMatch(/^[0-9a-f]{16}$/)
+
+      await fs.rm(tmpDir, { recursive: true, force: true })
+    })
+  })
+
+  describe('ConflictError', () => {
+    it('has correct name and message', () => {
+      const error = new ConflictError('current123456789', 'provided12345678')
+      expect(error.name).toBe('ConflictError')
+      expect(error.message).toBe('File has been modified by another session')
+      expect(error.currentEtag).toBe('current123456789')
+      expect(error.providedEtag).toBe('provided12345678')
+      expect(error).toBeInstanceOf(Error)
     })
   })
 })

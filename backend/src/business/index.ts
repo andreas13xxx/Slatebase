@@ -11,8 +11,10 @@ import type {
   DirectoryTree,
   FileContent,
 } from '../vault/index.js'
-import { validateFilePath, generateVaultId } from '../vault/index.js'
-import type { IVaultRegistry } from '../vault/registry.js'
+import { validateFilePath, generateVaultId, computeEtag } from '../vault/index.js'
+import type { IVaultRegistry, IVaultShareRegistry, VaultShareEntry } from '../vault/registry.js'
+import type { IUserRepository } from '../user/index.js'
+import type { IAuditService } from '../audit/index.js'
 import { validateVaultName } from './validation.js'
 
 // --- Custom Errors ---
@@ -63,12 +65,93 @@ export class FileTooLargeError extends Error {
   }
 }
 
+/**
+ * Thrown when an ETag-based conflict is detected during file save.
+ * The client's If-Match header does not match the current file's ETag.
+ */
+export class ConflictError extends Error {
+  constructor(
+    public readonly currentEtag: string,
+    public readonly providedEtag: string,
+  ) {
+    super('File has been modified by another session')
+    this.name = 'ConflictError'
+  }
+}
+
+/**
+ * Thrown when trying to delete a vault that has active shares.
+ */
+export class VaultHasActiveSharesError extends Error {
+  constructor(
+    public readonly vaultId: string,
+    public readonly activeShares: VaultShareEntry[],
+  ) {
+    super(`Vault ${vaultId} has ${activeShares.length} active share(s) and cannot be deleted`)
+    this.name = 'VaultHasActiveSharesError'
+  }
+}
+
+/**
+ * Thrown when trying to transfer ownership but other shares still exist.
+ */
+export class SharesNotRevokedError extends Error {
+  constructor(
+    public readonly vaultId: string,
+    public readonly remainingShares: VaultShareEntry[],
+  ) {
+    super(`Cannot transfer ownership of vault ${vaultId}: ${remainingShares.length} share(s) must be revoked first`)
+    this.name = 'SharesNotRevokedError'
+  }
+}
+
+/**
+ * Thrown when a user does not have the required access to a vault.
+ */
+export class VaultAccessDeniedError extends Error {
+  constructor(
+    public readonly vaultId: string,
+    public readonly userId: string,
+    public readonly requiredPermission: 'read' | 'write',
+  ) {
+    super(`Access denied: user ${userId} does not have ${requiredPermission} access to vault ${vaultId}`)
+    this.name = 'VaultAccessDeniedError'
+  }
+}
+
+/**
+ * Thrown when the maximum number of shares per vault has been reached.
+ */
+export class ShareLimitError extends Error {
+  constructor(
+    public readonly vaultId: string,
+    public readonly maxShares: number,
+  ) {
+    super(`Share limit reached: vault ${vaultId} already has ${maxShares} shares`)
+    this.name = 'ShareLimitError'
+  }
+}
+
+/**
+ * Thrown when a share target is invalid (non-existent user or self-share).
+ */
+export class InvalidShareTargetError extends Error {
+  constructor(
+    public readonly code: 'USER_NOT_FOUND' | 'SELF_SHARE',
+    message: string,
+  ) {
+    super(message)
+    this.name = 'InvalidShareTargetError'
+  }
+}
+
 // --- Types ---
 
 export interface FileSaveResult {
   path: string    // relative path from vault root
   name: string    // filename
   size: number    // written file size in bytes
+  etag: string    // SHA-256 first 16 hex chars of saved content
 }
 
 // --- Interface ---
@@ -79,10 +162,36 @@ export interface IVaultService {
   getVaultTree(vaultId: string): DirectoryTree
   getFileContent(vaultId: string, filePath: string): Promise<FileContent>
   resolveFilePath(vaultId: string, filePath: string): string
-  saveFile(vaultId: string, filePath: string, content: string): Promise<FileSaveResult>
+  saveFile(vaultId: string, filePath: string, content: string, ifMatch?: string): Promise<FileSaveResult>
   createVault(name: string): Promise<VaultInfo>
   deleteVault(vaultId: string): Promise<void>
+  deleteVaultWithChecks(vaultId: string, ownerId: string, force?: boolean): Promise<void>
+  transferOwnership(vaultId: string, currentOwnerId: string, newOwnerId: string): Promise<void>
   deleteContent(vaultId: string, relativePath: string): Promise<void>
+}
+
+/** Maximum number of shares allowed per vault. */
+export const MAX_SHARES_PER_VAULT = 20
+
+/**
+ * Interface for vault access control operations.
+ * Manages ownership checks, share-based permissions, and share lifecycle.
+ */
+export interface IVaultAccessControl {
+  /** Checks if the user has read access to the vault. Throws VaultAccessDeniedError if denied. */
+  checkReadAccess(vaultId: string, userId: string): Promise<void>
+
+  /** Checks if the user has write access to the vault. Throws VaultAccessDeniedError if denied. */
+  checkWriteAccess(vaultId: string, userId: string): Promise<void>
+
+  /** Creates a share for a target user on a vault owned by ownerId. */
+  createShare(vaultId: string, ownerId: string, targetUserId: string, permission: 'read' | 'write'): Promise<void>
+
+  /** Revokes a share for a target user on a vault owned by ownerId. */
+  revokeShare(vaultId: string, ownerId: string, targetUserId: string): Promise<void>
+
+  /** Updates the permission level of an existing share. */
+  updateSharePermission(vaultId: string, ownerId: string, targetUserId: string, permission: 'read' | 'write'): Promise<void>
 }
 
 // --- Implementation ---
@@ -94,6 +203,9 @@ export class VaultService implements IVaultService {
     private readonly configService: IConfigService,
     private readonly logger: ILogger,
     private readonly registry?: IVaultRegistry,
+    private readonly shareRegistry?: IVaultShareRegistry,
+    private readonly userRepository?: IUserRepository,
+    private readonly auditService?: IAuditService,
   ) {}
 
   /**
@@ -226,13 +338,14 @@ export class VaultService implements IVaultService {
    * Saves file content to a vault.
    * 1. Validates vault exists (throws VaultNotFoundError if not)
    * 2. Validates file path with validateFilePath (throws PathTraversalError if traversal detected)
-   * 3. Checks content size against maxFileSize (throws FileTooLargeError if exceeded)
-   * 4. Creates intermediate directories with fs.mkdir(recursive: true)
-   * 5. Writes content atomically: write to temp file, then rename
-   * 6. Refreshes the vault's in-memory directory tree
-   * 7. Returns { path, name, size }
+   * 3. If ifMatch is provided, checks current file's ETag (throws ConflictError on mismatch)
+   * 4. Checks content size against maxFileSize (throws FileTooLargeError if exceeded)
+   * 5. Creates intermediate directories with fs.mkdir(recursive: true)
+   * 6. Writes content atomically: write to temp file, then rename
+   * 7. Refreshes the vault's in-memory directory tree
+   * 8. Returns { path, name, size, etag }
    */
-  async saveFile(vaultId: string, filePath: string, content: string): Promise<FileSaveResult> {
+  async saveFile(vaultId: string, filePath: string, content: string, ifMatch?: string): Promise<FileSaveResult> {
     // 1. Validate vault exists
     const vault = this.vaultManager.getVault(vaultId)
     if (!vault) {
@@ -242,18 +355,34 @@ export class VaultService implements IVaultService {
     // 2. Validate file path (path traversal protection)
     const resolvedPath = validateFilePath(vault.info.path, filePath)
 
-    // 3. Check content size against maxFileSize
+    // 3. ETag conflict detection (only if If-Match header was provided)
+    if (ifMatch !== undefined) {
+      try {
+        const existingContent = await fs.readFile(resolvedPath)
+        const currentEtag = computeEtag(existingContent)
+        if (ifMatch !== currentEtag) {
+          throw new ConflictError(currentEtag, ifMatch)
+        }
+      } catch (error) {
+        if (error instanceof ConflictError) {
+          throw error
+        }
+        // File doesn't exist yet — no conflict possible, proceed with save
+      }
+    }
+
+    // 4. Check content size against maxFileSize
     const contentBytes = Buffer.byteLength(content, 'utf-8')
     const maxFileSize = this.configService.getServerConfig().maxFileSize
     if (contentBytes > maxFileSize) {
       throw new FileTooLargeError(contentBytes, maxFileSize)
     }
 
-    // 4. Create intermediate directories
+    // 5. Create intermediate directories
     const dir = path.dirname(resolvedPath)
     await fs.mkdir(dir, { recursive: true })
 
-    // 5. Atomic write: write to temp file, then rename
+    // 6. Atomic write: write to temp file, then rename
     const tempPath = `${resolvedPath}.${Date.now()}.tmp`
     try {
       await fs.writeFile(tempPath, content, 'utf-8')
@@ -270,7 +399,7 @@ export class VaultService implements IVaultService {
       throw new StorageError(`Failed to write file: ${message}`)
     }
 
-    // 6. Refresh the vault's in-memory directory tree
+    // 7. Refresh the vault's in-memory directory tree
     const updatedTree = await this.vaultReader.readDirectory(
       vault.info.path,
       this.configService.getServerConfig().maxDirectoryDepth,
@@ -280,13 +409,17 @@ export class VaultService implements IVaultService {
       tree: updatedTree,
     })
 
+    // 8. Compute ETag of saved content
+    const savedBuffer = Buffer.from(content, 'utf-8')
+    const etag = computeEtag(savedBuffer)
+
     this.logger.info('File saved', { vaultId, filePath, size: contentBytes })
 
-    // 7. Return result
     return {
       path: filePath,
       name: path.basename(filePath),
       size: contentBytes,
+      etag,
     }
   }
 
@@ -434,6 +567,133 @@ export class VaultService implements IVaultService {
   }
 
   /**
+   * Deletes a vault with ownership and share checks.
+   *
+   * If force=false (default) and the vault has active shares, throws
+   * VaultHasActiveSharesError with the list of active shares.
+   *
+   * If force=true, revokes all shares first, then deletes the vault.
+   *
+   * Validates that the caller is the vault owner before proceeding.
+   */
+  async deleteVaultWithChecks(vaultId: string, ownerId: string, force?: boolean): Promise<void> {
+    if (!this.registry) {
+      throw new StorageError('VaultRegistry is not configured')
+    }
+    if (!this.shareRegistry) {
+      throw new StorageError('VaultShareRegistry is not configured')
+    }
+
+    // Verify vault exists
+    const vault = this.vaultManager.getVault(vaultId)
+    if (!vault) {
+      throw new VaultNotFoundError(vaultId)
+    }
+
+    // Verify ownership via registry
+    await this.registry.load()
+    const entry = this.registry.findById(vaultId)
+    if (!entry || entry.ownerId !== ownerId) {
+      throw new VaultNotFoundError(vaultId)
+    }
+
+    // Check for active shares
+    const shares = await this.shareRegistry.getSharesForVault(vaultId)
+
+    if (shares.length > 0 && !force) {
+      throw new VaultHasActiveSharesError(vaultId, shares)
+    }
+
+    // If force=true, revoke all shares first
+    if (shares.length > 0 && force) {
+      await this.shareRegistry.removeAllSharesForVault(vaultId)
+      this.logger.info('All shares revoked for forced vault deletion', { vaultId, revokedCount: shares.length })
+    }
+
+    // Proceed with actual deletion
+    await this.deleteVault(vaultId)
+  }
+
+  /**
+   * Transfers ownership of a vault to a new owner.
+   *
+   * Preconditions:
+   * - Caller must be the current owner
+   * - All shares except to the new owner must be revoked first
+   * - New owner must exist
+   *
+   * After transfer:
+   * - Registry entry ownerId is updated to newOwnerId
+   * - Old owner loses all access (any share to old owner is removed)
+   * - New owner gets full control as the vault owner
+   */
+  async transferOwnership(vaultId: string, currentOwnerId: string, newOwnerId: string): Promise<void> {
+    if (!this.registry) {
+      throw new StorageError('VaultRegistry is not configured')
+    }
+    if (!this.shareRegistry) {
+      throw new StorageError('VaultShareRegistry is not configured')
+    }
+    if (!this.userRepository) {
+      throw new StorageError('UserRepository is not configured')
+    }
+
+    // Verify vault exists
+    const vault = this.vaultManager.getVault(vaultId)
+    if (!vault) {
+      throw new VaultNotFoundError(vaultId)
+    }
+
+    // Verify current ownership via registry
+    const entries = await this.registry.load()
+    const entry = entries.find((e) => e.id === vaultId)
+    if (!entry || entry.ownerId !== currentOwnerId) {
+      throw new VaultNotFoundError(vaultId)
+    }
+
+    // Verify new owner exists
+    const newOwner = await this.userRepository.findById(newOwnerId)
+    if (!newOwner) {
+      throw new VaultValidationError('USER_NOT_FOUND', `Target user not found: ${newOwnerId}`)
+    }
+
+    // Check that all shares except to the new owner are revoked
+    const shares = await this.shareRegistry.getSharesForVault(vaultId)
+    const remainingShares = shares.filter((s) => s.userId !== newOwnerId)
+    if (remainingShares.length > 0) {
+      throw new SharesNotRevokedError(vaultId, remainingShares)
+    }
+
+    // Transfer ownership: update registry entry
+    entry.ownerId = newOwnerId
+    await this.registry.save(entries)
+
+    // Remove any share the new owner had (they are now the owner, no share needed)
+    const newOwnerShare = shares.find((s) => s.userId === newOwnerId)
+    if (newOwnerShare) {
+      await this.shareRegistry.removeShare(vaultId, newOwnerId)
+    }
+
+    // Revoke old owner access (remove any share that might exist for old owner)
+    await this.shareRegistry.removeShare(vaultId, currentOwnerId)
+
+    this.logger.info('Vault ownership transferred', {
+      vaultId,
+      fromOwner: currentOwnerId,
+      toOwner: newOwnerId,
+    })
+
+    await this.auditService?.log({
+      userId: currentOwnerId,
+      action: 'VAULT_OWNERSHIP_TRANSFERRED',
+      target: vaultId,
+      ipAddress: '0.0.0.0',
+      success: true,
+      details: JSON.stringify({ fromOwner: currentOwnerId, toOwner: newOwnerId }),
+    })
+  }
+
+  /**
    * Deletes a file or folder within a vault.
    * 1. Verifies the vault exists (throws VaultNotFoundError if not)
    * 2. Validates the path using validateFilePath (path traversal protection)
@@ -475,5 +735,213 @@ export class VaultService implements IVaultService {
     })
 
     this.logger.info('Content deleted', { vaultId, path: relativePath, resolvedPath })
+  }
+}
+
+
+// --- Vault Access Control Implementation ---
+
+/**
+ * Service that enforces vault access control based on ownership and share permissions.
+ *
+ * Access rules:
+ * - Owner has full read/write access to their vault.
+ * - Users with a "read" share can only read; write attempts are rejected.
+ * - Users with a "write" share can read and write.
+ * - Users without ownership or a share are rejected for any access.
+ *
+ * Share rules:
+ * - Max 20 shares per vault.
+ * - Cannot share with self.
+ * - Cannot share with non-existent users.
+ */
+export class VaultAccessControlService implements IVaultAccessControl {
+  constructor(
+    private readonly vaultRegistry: IVaultRegistry,
+    private readonly shareRegistry: IVaultShareRegistry,
+    private readonly userRepository: IUserRepository,
+    private readonly logger: ILogger,
+    private readonly auditService?: IAuditService,
+  ) {}
+
+  /**
+   * Checks if the user has read access to the vault.
+   * Owner always has read access. Users with "read" or "write" shares have read access.
+   * Throws VaultAccessDeniedError if the user has no access.
+   * Throws VaultNotFoundError if the vault does not exist in the registry.
+   */
+  async checkReadAccess(vaultId: string, userId: string): Promise<void> {
+    const entry = this.vaultRegistry.findById(vaultId)
+    if (entry === null) {
+      throw new VaultNotFoundError(vaultId)
+    }
+
+    // Owner has full access
+    if (entry.ownerId === userId) {
+      return
+    }
+
+    // Check shares
+    const shares = await this.shareRegistry.getSharesForVault(vaultId)
+    const userShare = shares.find((s) => s.userId === userId)
+
+    if (userShare === undefined) {
+      throw new VaultAccessDeniedError(vaultId, userId, 'read')
+    }
+
+    // Both "read" and "write" shares grant read access
+    return
+  }
+
+  /**
+   * Checks if the user has write access to the vault.
+   * Owner always has write access. Only users with "write" shares have write access.
+   * Throws VaultAccessDeniedError if the user lacks write permission.
+   * Throws VaultNotFoundError if the vault does not exist in the registry.
+   */
+  async checkWriteAccess(vaultId: string, userId: string): Promise<void> {
+    const entry = this.vaultRegistry.findById(vaultId)
+    if (entry === null) {
+      throw new VaultNotFoundError(vaultId)
+    }
+
+    // Owner has full access
+    if (entry.ownerId === userId) {
+      return
+    }
+
+    // Check shares
+    const shares = await this.shareRegistry.getSharesForVault(vaultId)
+    const userShare = shares.find((s) => s.userId === userId)
+
+    if (userShare === undefined) {
+      throw new VaultAccessDeniedError(vaultId, userId, 'write')
+    }
+
+    if (userShare.permission !== 'write') {
+      throw new VaultAccessDeniedError(vaultId, userId, 'write')
+    }
+
+    return
+  }
+
+  /**
+   * Creates a share for a target user on a vault.
+   * Validates:
+   * - Target user is not the owner (no self-share).
+   * - Target user exists in the user repository.
+   * - Vault has not exceeded the maximum share limit (20).
+   *
+   * Throws InvalidShareTargetError if target is self or non-existent.
+   * Throws ShareLimitError if the vault already has 20 shares.
+   * Throws VaultNotFoundError if the vault does not exist in the registry.
+   */
+  async createShare(vaultId: string, ownerId: string, targetUserId: string, permission: 'read' | 'write'): Promise<void> {
+    // Validate vault exists
+    const entry = this.vaultRegistry.findById(vaultId)
+    if (entry === null) {
+      throw new VaultNotFoundError(vaultId)
+    }
+
+    // Reject self-share
+    if (ownerId === targetUserId) {
+      throw new InvalidShareTargetError('SELF_SHARE', 'Cannot share a vault with yourself')
+    }
+
+    // Validate target user exists
+    const targetUser = await this.userRepository.findById(targetUserId)
+    if (targetUser === null) {
+      throw new InvalidShareTargetError('USER_NOT_FOUND', `Target user not found: ${targetUserId}`)
+    }
+
+    // Check share limit
+    const existingShares = await this.shareRegistry.getSharesForVault(vaultId)
+    if (existingShares.length >= MAX_SHARES_PER_VAULT) {
+      throw new ShareLimitError(vaultId, MAX_SHARES_PER_VAULT)
+    }
+
+    // Create the share entry
+    const shareEntry: VaultShareEntry = {
+      vaultId,
+      userId: targetUserId,
+      permission,
+      grantedBy: ownerId,
+      grantedAt: new Date().toISOString(),
+    }
+
+    await this.shareRegistry.addShare(shareEntry)
+
+    this.logger.info('Vault share created', {
+      vaultId,
+      ownerId,
+      targetUserId,
+      permission,
+    })
+
+    await this.auditService?.log({
+      userId: ownerId,
+      action: 'VAULT_SHARE_CREATED',
+      target: vaultId,
+      ipAddress: '0.0.0.0',
+      success: true,
+      details: JSON.stringify({ targetUserId, permission }),
+    })
+  }
+
+  /**
+   * Revokes a share for a target user on a vault.
+   * Throws VaultNotFoundError if the vault does not exist in the registry.
+   */
+  async revokeShare(vaultId: string, ownerId: string, targetUserId: string): Promise<void> {
+    const entry = this.vaultRegistry.findById(vaultId)
+    if (entry === null) {
+      throw new VaultNotFoundError(vaultId)
+    }
+
+    await this.shareRegistry.removeShare(vaultId, targetUserId)
+
+    this.logger.info('Vault share revoked', {
+      vaultId,
+      ownerId,
+      targetUserId,
+    })
+
+    await this.auditService?.log({
+      userId: ownerId,
+      action: 'VAULT_SHARE_REVOKED',
+      target: vaultId,
+      ipAddress: '0.0.0.0',
+      success: true,
+      details: JSON.stringify({ targetUserId }),
+    })
+  }
+
+  /**
+   * Updates the permission level of an existing share.
+   * Throws VaultNotFoundError if the vault does not exist in the registry.
+   */
+  async updateSharePermission(vaultId: string, ownerId: string, targetUserId: string, permission: 'read' | 'write'): Promise<void> {
+    const entry = this.vaultRegistry.findById(vaultId)
+    if (entry === null) {
+      throw new VaultNotFoundError(vaultId)
+    }
+
+    await this.shareRegistry.updatePermission(vaultId, targetUserId, permission)
+
+    this.logger.info('Vault share permission updated', {
+      vaultId,
+      ownerId,
+      targetUserId,
+      permission,
+    })
+
+    await this.auditService?.log({
+      userId: ownerId,
+      action: 'VAULT_SHARE_UPDATED',
+      target: vaultId,
+      ipAddress: '0.0.0.0',
+      success: true,
+      details: JSON.stringify({ targetUserId, permission }),
+    })
   }
 }
