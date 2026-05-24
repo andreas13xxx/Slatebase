@@ -22,7 +22,19 @@ src/
 ├── business/
 │   ├── index.ts          — VaultService (business logic, orchestrates vault operations)
 │   └── validation.ts     — Vault name validation rules
-├── api/index.ts          — VaultController, route modules, error mapping
+├── auth/
+│   ├── index.ts          — AuthService, SessionStore, interfaces, error classes
+│   └── middleware.ts     — authMiddleware, csrfMiddleware, rateLimitMiddleware
+├── user/
+│   ├── index.ts          — UserService, UserRepository, RoleService, interfaces
+│   └── validation.ts     — Profile/password validation (Zod schemas)
+├── audit/
+│   └── index.ts          — AuditService, AuditLogger, interfaces
+├── api/
+│   ├── index.ts          — VaultController, route modules, error mapping
+│   ├── authRoutes.ts     — AuthController + login/logout/session routes
+│   ├── userRoutes.ts     — UserController + profile/password routes
+│   └── adminRoutes.ts    — AdminController + user management/config routes
 ├── import/index.ts       — ImportService (file/folder import logic)
 └── integration.test.ts   — Integration tests
 config/
@@ -70,10 +82,55 @@ All routes are prefixed with `/api/v1`:
 | DELETE | /vaults/:vaultId | Delete a vault |
 | GET | /vaults/:vaultId/tree | Get directory tree |
 | GET | /vaults/:vaultId/files?path= | Get file content |
+| PUT | /vaults/:vaultId/files | Save file content |
 | POST | /vaults/:vaultId/import/file | Import single file |
 | POST | /vaults/:vaultId/import/folder | Import folder |
 | DELETE | /vaults/:vaultId/content?path= | Delete file/folder |
+| POST | /auth/login | Authenticate user |
+| POST | /auth/logout | End session |
+| GET | /auth/sessions | List own sessions |
+| DELETE | /auth/sessions/:sessionId | Invalidate session |
+| DELETE | /auth/sessions | Invalidate all other sessions |
+| GET | /users/me | Get own profile |
+| PUT | /users/me | Update own profile |
+| PUT | /users/me/password | Change own password |
+| DELETE | /users/me | Delete own account |
+| GET | /admin/users | List users (admin) |
+| POST | /admin/users | Create user (admin) |
+| DELETE | /admin/users/:userId | Delete user (admin) |
+| PUT | /admin/users/:userId/role | Change role (admin) |
+| PUT | /admin/users/:userId/password | Reset password (admin) |
+| PUT | /admin/users/:userId/suspend | Suspend user (admin) |
+| PUT | /admin/users/:userId/unsuspend | Unsuspend user (admin) |
+| GET | /admin/config | Get server config (admin) |
+| PUT | /admin/config | Update server config (admin) |
+| POST | /admin/restart | Restart server (admin) |
+| GET | /admin/audit | Get audit log (admin) |
+| GET | /vaults/:vaultId/shares | List vault shares (owner) |
+| POST | /vaults/:vaultId/shares | Create share (owner) |
+| DELETE | /vaults/:vaultId/shares/:userId | Revoke share (owner) |
+| PUT | /vaults/:vaultId/shares/:userId | Update permission (owner) |
+| POST | /vaults/:vaultId/transfer | Transfer ownership (owner) |
 
 ## Data Storage
 
 Vaults are stored on disk under `backend/data/vaults/<vaultId>/`. The vault registry (`data/vaults.json`) maps vault IDs to names and storage paths. No database — all persistence is filesystem-based.
+
+### Auth & User Data
+
+```
+data/
+├── users/
+│   ├── _index.json           — Username → userId mapping (fast lookup)
+│   └── <userId>.json         — Individual user records (one file per user)
+├── sessions/
+│   └── <sessionId>.json      — Individual session records (one file per session)
+├── shares.json               — Vault share entries (all shares in one file)
+└── audit/
+    └── YYYY-MM-DD.jsonl      — Append-only audit log (one file per day, JSONL format)
+```
+
+- **Users**: One JSON file per user, atomic writes (temp → rename). Index file for username lookups.
+- **Sessions**: One JSON file per session. In-memory `Map<token, sessionId>` for fast validation, filesystem as source of truth.
+- **Shares**: Single JSON file with all vault share entries. Atomic writes.
+- **Audit**: Append-only JSONL files rotated daily. Never overwritten or deleted.
