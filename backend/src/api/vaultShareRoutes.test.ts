@@ -4,7 +4,6 @@ import { VaultShareRouteModule } from './vaultShareRoutes.js'
 import type { IVaultAccessControl, IVaultService } from '../business/index.js'
 import {
   VaultNotFoundError,
-  VaultAccessDeniedError,
   ShareLimitError,
   InvalidShareTargetError,
   SharesNotRevokedError,
@@ -50,8 +49,8 @@ function createMockVaultService(overrides?: Partial<IVaultService>): IVaultServi
   return {
     initializeVaults: async () => {},
     getVaultList: () => [],
-    getVaultTree: () => ({ name: '', type: 'directory' as const, children: [] }),
-    getFileContent: async () => ({ path: '', name: '', content: '', isBinary: false, size: 0 }),
+    getVaultTree: () => ({ name: '', type: 'directory' as const, path: '', children: [] }),
+    getFileContent: async () => ({ path: '', name: '', content: '', isBinary: false, size: 0, encoding: 'utf-8' as const, isTruncated: false, etag: '' }),
     resolveFilePath: () => '',
     saveFile: async () => ({ path: '', name: '', size: 0, etag: '' }),
     createVault: async () => ({ id: '', name: '', path: '', status: 'loaded' as const }),
@@ -102,7 +101,7 @@ function createApp(options?: {
   // Simulate auth middleware: set session context
   app.use('*', async (c, next) => {
     if (session !== null) {
-      c.set('session', session)
+      c.set('session' as never, session as never)
     }
     await next()
   })
@@ -141,7 +140,7 @@ describe('VaultShareRouteModule', () => {
       })
 
       expect(res.status).toBe(400)
-      const body = await res.json()
+      const body = await res.json() as { code: string }
       expect(body.code).toBe('VALIDATION_ERROR')
     })
 
@@ -155,7 +154,7 @@ describe('VaultShareRouteModule', () => {
       })
 
       expect(res.status).toBe(400)
-      const body = await res.json()
+      const body = await res.json() as { code: string }
       expect(body.code).toBe('VALIDATION_ERROR')
     })
 
@@ -175,7 +174,7 @@ describe('VaultShareRouteModule', () => {
       })
 
       expect(res.status).toBe(403)
-      const body = await res.json()
+      const body = await res.json() as { code: string }
       expect(body.code).toBe('ACCESS_DENIED')
     })
 
@@ -189,7 +188,7 @@ describe('VaultShareRouteModule', () => {
       })
 
       expect(res.status).toBe(404)
-      const body = await res.json()
+      const body = await res.json() as { code: string }
       expect(body.code).toBe('VAULT_NOT_FOUND')
     })
 
@@ -208,7 +207,7 @@ describe('VaultShareRouteModule', () => {
       })
 
       expect(res.status).toBe(409)
-      const body = await res.json()
+      const body = await res.json() as { code: string }
       expect(body.code).toBe('SHARE_LIMIT_REACHED')
     })
 
@@ -227,7 +226,7 @@ describe('VaultShareRouteModule', () => {
       })
 
       expect(res.status).toBe(400)
-      const body = await res.json()
+      const body = await res.json() as { code: string }
       expect(body.code).toBe('INVALID_SHARE_TARGET')
     })
 
@@ -246,7 +245,7 @@ describe('VaultShareRouteModule', () => {
       })
 
       expect(res.status).toBe(400)
-      const body = await res.json()
+      const body = await res.json() as { code: string }
       expect(body.code).toBe('INVALID_SHARE_TARGET')
     })
   })
@@ -329,7 +328,7 @@ describe('VaultShareRouteModule', () => {
       })
 
       expect(res.status).toBe(400)
-      const body = await res.json()
+      const body = await res.json() as { code: string }
       expect(body.code).toBe('VALIDATION_ERROR')
     })
 
@@ -377,7 +376,7 @@ describe('VaultShareRouteModule', () => {
       })
 
       expect(res.status).toBe(400)
-      const body = await res.json()
+      const body = await res.json() as { code: string }
       expect(body.code).toBe('VALIDATION_ERROR')
     })
 
@@ -416,7 +415,7 @@ describe('VaultShareRouteModule', () => {
       })
 
       expect(res.status).toBe(409)
-      const body = await res.json()
+      const body = await res.json() as { code: string }
       expect(body.code).toBe('SHARES_NOT_REVOKED')
     })
 
@@ -443,7 +442,7 @@ describe('VaultShareRouteModule', () => {
         body: JSON.stringify({ userId: TARGET_USER_ID, permission: 'read' }),
       })
 
-      const body = await res.json()
+      const body = await res.json() as { code: string; message: string; timestamp: string }
       expect(body).toHaveProperty('code')
       expect(body).toHaveProperty('message')
       expect(body).toHaveProperty('timestamp')

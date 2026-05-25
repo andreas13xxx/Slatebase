@@ -9,7 +9,7 @@ import {
   StorageError,
   VaultValidationError,
 } from './index.js'
-import type { IVaultManager, IVaultReader, Vault, DirectoryTree, FileContent, VaultInfo } from '../vault/index.js'
+import type { IVaultManager, IVaultReader, Vault, DirectoryTree, FileContent } from '../vault/index.js'
 import type { IConfigService, ServerConfig, VaultConfig } from '../config/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { IVaultRegistry, IVaultShareRegistry, VaultRegistryEntry, VaultShareEntry } from '../vault/registry.js'

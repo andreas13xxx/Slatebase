@@ -87,7 +87,7 @@ describe('createAuthMiddleware', () => {
 
     const res = await app.request('/api/v1/vaults')
     expect(res.status).toBe(401)
-    const body = await res.json()
+    const body = await res.json() as { code: string }
     expect(body.code).toBe('UNAUTHORIZED')
   })
 
@@ -127,7 +127,7 @@ describe('createAuthMiddleware', () => {
       headers: { Authorization: 'Bearer invalid-token' },
     })
     expect(res.status).toBe(401)
-    const body = await res.json()
+    const body = await res.json() as { code: string }
     expect(body.code).toBe('SESSION_EXPIRED')
   })
 
@@ -138,7 +138,7 @@ describe('createAuthMiddleware', () => {
     const app = new Hono()
     app.use('*', createAuthMiddleware(authService))
     app.get('/api/v1/vaults', (c) => {
-      const session = c.get('session')
+      const session = c.get('session' as never)
       return c.json({ session })
     })
 
@@ -146,7 +146,7 @@ describe('createAuthMiddleware', () => {
       headers: { Authorization: 'Bearer valid-token-123' },
     })
     expect(res.status).toBe(200)
-    const body = await res.json()
+    const body = await res.json() as { session: SessionContext }
     expect(body.session).toEqual(validSession)
   })
 })
@@ -218,7 +218,7 @@ describe('createCsrfMiddleware', () => {
       headers: { Authorization: 'Bearer valid-token' },
     })
     expect(res.status).toBe(403)
-    const body = await res.json()
+    const body = await res.json() as { code: string }
     expect(body.code).toBe('CSRF_INVALID')
   })
 
@@ -239,7 +239,7 @@ describe('createCsrfMiddleware', () => {
       },
     })
     expect(res.status).toBe(403)
-    const body = await res.json()
+    const body = await res.json() as { code: string }
     expect(body.code).toBe('CSRF_INVALID')
   })
 
@@ -311,7 +311,7 @@ describe('createRateLimitMiddleware', () => {
     })
     expect(res.status).toBe(429)
     expect(res.headers.get('Retry-After')).toBeTruthy()
-    const body = await res.json()
+    const body = await res.json() as { code: string }
     expect(body.code).toBe('RATE_LIMITED')
   })
 
@@ -441,7 +441,7 @@ describe('createMustChangePasswordMiddleware', () => {
       headers: { Authorization: 'Bearer valid-token' },
     })
     expect(res.status).toBe(403)
-    const body = await res.json()
+    const body = await res.json() as { code: string }
     expect(body.code).toBe('PASSWORD_CHANGE_REQUIRED')
   })
 
@@ -478,7 +478,7 @@ describe('createMustChangePasswordMiddleware', () => {
       headers: { Authorization: 'Bearer valid-token' },
     })
     expect(res.status).toBe(401)
-    const body = await res.json()
+    const body = await res.json() as { code: string }
     expect(body.code).toBe('UNAUTHORIZED')
   })
 })
