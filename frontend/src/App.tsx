@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
-import { AppProvider, useAppContext, loadVaults, importFile, importFolder } from './state'
+import { AppProvider, useAppContext, loadVaults, importFile, importFolder, exportVault } from './state'
 import { ApiClient } from './api'
 import { AuthProvider, useAuthContext } from './state/authContext'
 import { TabProvider, useTabContext } from './state/tabContext'
@@ -21,7 +21,7 @@ import { SidebarToolbar } from './components/SidebarToolbar'
 import { MyVaultsPage } from './components/MyVaultsPage'
 import {
   User, LogOut, Settings, Shield, FileText, Clock,
-  Database, Share2, Trash2, Server,
+  Database, Share2, Trash2, Server, Download,
   Upload, FolderOpen, PanelRight, X, Eye, Pencil,
 } from 'lucide-react'
 import './App.css'
@@ -48,12 +48,13 @@ type AppPage =
 /**
  * User avatar and dropdown menu component.
  */
-function UserMenu({ onNavigate, onLogout, hasVaultSelected, onImportFile, onImportFolder }: {
+function UserMenu({ onNavigate, onLogout, hasVaultSelected, onImportFile, onImportFolder, onExportVault }: {
   onNavigate: (page: AppPage) => void
   onLogout: () => void
   hasVaultSelected: boolean
   onImportFile: () => void
   onImportFolder: () => void
+  onExportVault: () => void
 }) {
   const { authState } = useAuthContext()
   const [open, setOpen] = useState(false)
@@ -107,6 +108,9 @@ function UserMenu({ onNavigate, onLogout, hasVaultSelected, onImportFile, onImpo
               </button>
               <button className="user-menu-item" role="menuitem" onClick={() => { onImportFolder(); setOpen(false) }}>
                 <FolderOpen size={14} /> Ordner importieren
+              </button>
+              <button className="user-menu-item" role="menuitem" onClick={() => { onExportVault(); setOpen(false) }}>
+                <Download size={14} /> Vault exportieren
               </button>
               <button className="user-menu-item" role="menuitem" onClick={() => { onNavigate('vault-sharing'); setOpen(false) }}>
                 <Share2 size={14} /> Freigaben
@@ -190,26 +194,6 @@ function useResize(initialWidth: number, min: number, max: number, side: 'left' 
   return { width, onMouseDown }
 }
 
-/**
- * Right panel placeholder for future features.
- */
-function RightPanel() {
-  return (
-    <div className="app-right-panel">
-      <div className="app-right-panel-header">
-        <PanelRight size={13} />
-        Kontext
-      </div>
-      <div className="app-right-panel-body">
-        <p className="app-right-panel-placeholder">
-          Dieser Bereich ist für zukünftige Features reserviert.<br /><br />
-          Geplant: Outline, Backlinks, Tags, MCP-Kontext.
-        </p>
-      </div>
-    </div>
-  )
-}
-
 /** Human-readable labels for settings pages. */
 const PAGE_LABELS: Record<AppPage, string> = {
   vaults: 'Tresore',
@@ -248,7 +232,7 @@ function AppContent() {
   // Settings tabs: list of open pages + which is active
   const [openSettingsPages, setOpenSettingsPages] = useState<AppPage[]>([])
   const [activeSettingsPage, setActiveSettingsPage] = useState<AppPage | null>(null)
-  const [showRightPanel, setShowRightPanel] = useState(false)
+  const [showRightPanel, setShowRightPanel] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
 
@@ -309,6 +293,13 @@ function AppContent() {
 
   function handleImportFile() { fileInputRef.current?.click() }
   function handleImportFolder() { folderInputRef.current?.click() }
+
+  function handleExportVault() {
+    if (state.selectedVaultId) {
+      const vault = state.vaults.find((v) => v.id === state.selectedVaultId)
+      void exportVault(dispatch, apiClient, state.selectedVaultId, vault?.name)
+    }
+  }
 
   function handleFileSelected(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -410,6 +401,7 @@ function AppContent() {
                 hasVaultSelected={state.selectedVaultId !== null}
                 onImportFile={handleImportFile}
                 onImportFolder={handleImportFolder}
+                onExportVault={handleExportVault}
               />
             </div>
 
@@ -442,6 +434,7 @@ function AppContent() {
             vaultId={state.selectedVaultId}
             onImportFile={handleImportFile}
             onImportFolder={handleImportFolder}
+            onExportVault={handleExportVault}
             onNavigate={handleNavigate}
             isAdmin={user?.role === 'admin'}
           />
@@ -544,17 +537,28 @@ function AppContent() {
                 role="separator"
                 aria-orientation="vertical"
               />
-              <RightPanel />
+              <aside className="app-right-panel" style={{ width: rightPanel.width }}>
+                <div className="app-right-panel-header">
+                  <PanelRight size={13} />
+                  Kontext
+                </div>
+                <div className="app-right-panel-body">
+                  <p className="app-right-panel-placeholder">
+                    Dieser Bereich ist für zukünftige Features reserviert.<br /><br />
+                    Geplant: Outline, Backlinks, Tags, MCP-Kontext.
+                  </p>
+                </div>
+              </aside>
             </>
           )}
 
           {/* Toggle right panel */}
           <button
-            className="toolbar-btn"
-            style={{ position: 'absolute', bottom: 12, right: 12, zIndex: 10, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
+            className={`right-panel-toggle${showRightPanel ? ' right-panel-toggle--active' : ''}`}
             onClick={() => setShowRightPanel((v) => !v)}
             title={showRightPanel ? 'Rechten Bereich ausblenden' : 'Rechten Bereich einblenden'}
             type="button"
+            aria-pressed={showRightPanel}
           >
             <PanelRight size={15} />
           </button>
@@ -569,6 +573,16 @@ function AppContent() {
  */
 function AuthGuard() {
   const { authState, authDispatch } = useAuthContext()
+
+  // Restore apiClient tokens from persisted auth state (after page reload)
+  useEffect(() => {
+    if (authState.token) {
+      apiClient.setToken(authState.token)
+    }
+    if (authState.csrfToken) {
+      apiClient.setCsrfToken(authState.csrfToken)
+    }
+  }, [authState.token, authState.csrfToken])
 
   useEffect(() => {
     apiClient.setOnSessionExpired(() => {

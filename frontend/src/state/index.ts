@@ -299,6 +299,197 @@ export async function deleteContent(
 }
 
 /**
+ * Exports a vault to a local directory.
+ *
+ * Strategy:
+ * 1. If the File System Access API is available (Chromium), use showDirectoryPicker
+ *    to let the user choose a target folder and write files directly from the browser.
+ * 2. Otherwise (Firefox etc.), download all files and package them as a ZIP in the browser,
+ *    then trigger a single ZIP download. Shows a hint that Chrome provides a better experience.
+ */
+export async function exportVault(
+  dispatch: Dispatch<AppAction>,
+  apiClient: IApiClient,
+  vaultId: string,
+  vaultName?: string,
+): Promise<void> {
+  if ('showDirectoryPicker' in window) {
+    await exportVaultViaFSA(dispatch, apiClient, vaultId)
+  } else {
+    await exportVaultViaZip(dispatch, apiClient, vaultId, vaultName)
+  }
+}
+
+/**
+ * Export using the File System Access API (Chromium browsers).
+ */
+async function exportVaultViaFSA(
+  dispatch: Dispatch<AppAction>,
+  apiClient: IApiClient,
+  vaultId: string,
+): Promise<void> {
+  let dirHandle: FileSystemDirectoryHandle
+  try {
+    dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' })
+  } catch (err: unknown) {
+    // User cancelled the picker
+    if (err instanceof Error && err.name === 'AbortError') return
+    const error = toAppError(err)
+    dispatch({ type: 'ERROR_OCCURRED', payload: error })
+    return
+  }
+
+  dispatch({ type: 'LOADING_STARTED' })
+
+  try {
+    const tree = await apiClient.fetchVaultTree(vaultId)
+
+    // Collect all file paths from the tree
+    const filePaths: string[] = []
+    const dirPaths: string[] = []
+
+    function collectPaths(node: import('../types').DirectoryTree): void {
+      if (node.type === 'file' && node.path) {
+        filePaths.push(node.path)
+      } else if (node.type === 'directory' && node.path) {
+        dirPaths.push(node.path)
+      }
+      if (node.children) {
+        for (const child of node.children) {
+          collectPaths(child)
+        }
+      }
+    }
+    collectPaths(tree)
+
+    // Create all directories first
+    for (const dirPath of dirPaths) {
+      const segments = dirPath.split('/').filter((s) => s.length > 0)
+      let current = dirHandle
+      for (const segment of segments) {
+        current = await current.getDirectoryHandle(segment, { create: true })
+      }
+    }
+
+    // Download and write each file
+    const token = apiClient.getToken()
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
+    for (const filePath of filePaths) {
+      const encodedPath = encodeURIComponent(filePath)
+      const response = await fetch(`/api/v1/vaults/${vaultId}/files?path=${encodedPath}&raw=true`, { headers })
+
+      if (!response.ok) {
+        // Skip files that can't be fetched
+        continue
+      }
+
+      const blob = await response.blob()
+
+      // Navigate to the correct directory
+      const segments = filePath.split('/')
+      const fileName = segments.pop()!
+      let current = dirHandle
+      for (const segment of segments) {
+        if (segment) {
+          current = await current.getDirectoryHandle(segment, { create: true })
+        }
+      }
+
+      // Write the file
+      const fileHandle = await current.getFileHandle(fileName, { create: true })
+      const writable = await fileHandle.createWritable()
+      await writable.write(blob)
+      await writable.close()
+    }
+
+    // Done — clear loading state
+    dispatch({ type: 'TREE_LOADED', payload: tree })
+  } catch (err: unknown) {
+    const error = toAppError(err)
+    dispatch({ type: 'ERROR_OCCURRED', payload: error })
+  }
+}
+
+/**
+ * Fallback export for browsers without File System Access API (e.g. Firefox).
+ * Downloads all vault files, packages them into a ZIP in the browser, and triggers download.
+ */
+async function exportVaultViaZip(
+  dispatch: Dispatch<AppAction>,
+  apiClient: IApiClient,
+  vaultId: string,
+  vaultName?: string,
+): Promise<void> {
+  const proceed = window.confirm(
+    'Dein Browser unterstützt keinen direkten Ordner-Export.\n\n' +
+    'Der Vault wird stattdessen als ZIP-Datei heruntergeladen.\n' +
+    'Tipp: In Chrome/Edge kannst du direkt in einen Ordner exportieren.\n\n' +
+    'Fortfahren?',
+  )
+  if (!proceed) return
+
+  dispatch({ type: 'LOADING_STARTED' })
+
+  try {
+    const { default: JSZip } = await import('jszip')
+    const zip = new JSZip()
+
+    const tree = await apiClient.fetchVaultTree(vaultId)
+
+    // Collect all file paths from the tree
+    const filePaths: string[] = []
+
+    function collectPaths(node: import('../types').DirectoryTree): void {
+      if (node.type === 'file' && node.path) {
+        filePaths.push(node.path)
+      }
+      if (node.children) {
+        for (const child of node.children) {
+          collectPaths(child)
+        }
+      }
+    }
+    collectPaths(tree)
+
+    // Download each file and add to ZIP
+    const token = apiClient.getToken()
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
+    for (const filePath of filePaths) {
+      const encodedPath = encodeURIComponent(filePath)
+      const response = await fetch(`/api/v1/vaults/${vaultId}/files?path=${encodedPath}&raw=true`, { headers })
+
+      if (!response.ok) continue
+
+      const blob = await response.blob()
+      zip.file(filePath, blob)
+    }
+
+    // Generate ZIP and trigger download
+    const zipBlob = await zip.generateAsync({ type: 'blob' })
+    const fileName = `${vaultName ?? 'vault'}-export.zip`
+
+    const url = URL.createObjectURL(zipBlob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+
+    // Done — clear loading state
+    dispatch({ type: 'TREE_LOADED', payload: tree })
+  } catch (err: unknown) {
+    const error = toAppError(err)
+    dispatch({ type: 'ERROR_OCCURRED', payload: error })
+  }
+}
+
+/**
  * Converts an unknown error into an AppError.
  * If the error already has code/message (thrown by ApiClient), use those.
  * Otherwise, wrap as INTERNAL_ERROR.

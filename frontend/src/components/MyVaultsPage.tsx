@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react'
-import { useAppContext, loadVaults, deleteVault } from '../state'
+import { useAppContext, loadVaults, deleteVault, exportVault } from '../state'
 import type { IApiClient, UserSearchResult } from '../api'
 import type { VaultInfo } from '../types'
-import { Database, Eye, Pencil, Crown, Trash2, Share2, RefreshCw, X, ArrowRightLeft } from 'lucide-react'
+import { Database, Eye, Pencil, Crown, Trash2, Share2, RefreshCw, X, ArrowRightLeft, Download } from 'lucide-react'
 
 interface ShareInfo {
   userId: string
@@ -27,6 +27,7 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
   const { state, dispatch } = useAppContext()
   const [sharesMap, setSharesMap] = useState<Map<string, ShareInfo[]>>(new Map())
   const [expandedVault, setExpandedVault] = useState<string | null>(null)
+  const [transferVault, setTransferVault] = useState<string | null>(null)
   const [vaultStats, setVaultStats] = useState<Map<string, { fileCount: number; sizeBytes: number }>>(new Map())
 
   const ownedVaults = state.vaults.filter((v) => v.permission === 'owner')
@@ -121,12 +122,7 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
     } catch { /* ignore */ }
   }
 
-  async function handleTransfer(vaultId: string, vaultName: string): Promise<void> {
-    const newOwner = window.prompt(`Vault "${vaultName}" übertragen an (Benutzername oder ID):`)
-    if (!newOwner || newOwner.trim() === '') return
-
-    if (!window.confirm(`Vault "${vaultName}" wirklich an "${newOwner.trim()}" übertragen? Du verlierst den Zugriff.`)) return
-
+  async function handleTransfer(vaultId: string, newOwnerId: string): Promise<void> {
     const token = apiClient.getToken()
     const csrf = apiClient.getCsrfToken()
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
@@ -135,16 +131,15 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
 
     try {
       const res = await fetch(`/api/v1/vaults/${vaultId}/transfer`, {
-        method: 'POST', headers, body: JSON.stringify({ newOwnerId: newOwner.trim() }),
+        method: 'POST', headers, body: JSON.stringify({ newOwnerId }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({ message: 'Fehler' }))
-        window.alert(`Übertragung fehlgeschlagen: ${body.message ?? `HTTP ${res.status}`}`)
-        return
+        throw new Error((body as { message?: string }).message ?? `HTTP ${res.status}`)
       }
       void loadVaults(dispatch, apiClient)
     } catch (err: unknown) {
-      window.alert(`Fehler: ${err instanceof Error ? err.message : String(err)}`)
+      throw err instanceof Error ? err : new Error(String(err))
     }
   }
 
@@ -202,7 +197,15 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
                     </button>
                     <button
                       className="my-vaults-action-btn"
-                      onClick={() => void handleTransfer(vault.id, vault.name)}
+                      onClick={() => void exportVault(dispatch, apiClient, vault.id, vault.name)}
+                      title="Vault exportieren"
+                      aria-label={`Vault "${vault.name}" exportieren`}
+                    >
+                      <Download size={12} />
+                    </button>
+                    <button
+                      className={`my-vaults-action-btn${transferVault === vault.id ? ' my-vaults-action-btn--active' : ''}`}
+                      onClick={() => setTransferVault(transferVault === vault.id ? null : vault.id)}
                       title="Besitz übertragen"
                       aria-label={`Vault "${vault.name}" übertragen`}
                     >
@@ -256,6 +259,18 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
                         onShareAdded={loadAllShares}
                       />
                     </div>
+                  )}
+
+                  {/* Inline transfer form */}
+                  {transferVault === vault.id && (
+                    <TransferForm
+                      apiClient={apiClient}
+                      vaultId={vault.id}
+                      vaultName={vault.name}
+                      onTransferred={() => { setTransferVault(null); void loadVaults(dispatch, apiClient) }}
+                      onCancel={() => setTransferVault(null)}
+                      onTransfer={handleTransfer}
+                    />
                   )}
                 </li>
               )
@@ -437,5 +452,162 @@ function AddShareForm({ apiClient, vaultId, onShareAdded }: AddShareFormProps) {
       </div>
       {error && <p className="my-vaults-add-share-error">{error}</p>}
     </form>
+  )
+}
+
+// ─── Inline Transfer Form ────────────────────────────────────────────────────
+
+interface TransferFormProps {
+  apiClient: IApiClient
+  vaultId: string
+  vaultName: string
+  onTransferred: () => void
+  onCancel: () => void
+  onTransfer: (vaultId: string, newOwnerId: string) => Promise<void>
+}
+
+/**
+ * Inline form for transferring vault ownership with user autocomplete.
+ * Shows a warning before executing the transfer.
+ */
+function TransferForm({ apiClient, vaultId, vaultName, onTransferred, onCancel, onTransfer }: TransferFormProps) {
+  const [username, setUsername] = useState('')
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [confirmStep, setConfirmStep] = useState(false)
+  const [suggestions, setSuggestions] = useState<UserSearchResult[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [])
+
+  function handleUsernameChange(value: string): void {
+    setUsername(value)
+    setSelectedUserId(null)
+    setConfirmStep(false)
+    if (error) setError(null)
+
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      if (value.trim().length === 0) { setSuggestions([]); setShowSuggestions(false); return }
+      void apiClient.searchUsers(value.trim()).then((results) => {
+        setSuggestions(results)
+        setShowSuggestions(results.length > 0)
+      }).catch(() => { setSuggestions([]); setShowSuggestions(false) })
+    }, SEARCH_DEBOUNCE_MS)
+  }
+
+  function selectSuggestion(user: UserSearchResult): void {
+    setUsername(user.username)
+    setSelectedUserId(user.userId)
+    setSuggestions([])
+    setShowSuggestions(false)
+  }
+
+  function handleInitiate(e: FormEvent): void {
+    e.preventDefault()
+    setError(null)
+    setShowSuggestions(false)
+
+    const trimmed = username.trim()
+    if (trimmed === '') { setError('Benutzername eingeben.'); return }
+
+    setConfirmStep(true)
+  }
+
+  async function handleConfirm(): Promise<void> {
+    const targetId = selectedUserId ?? username.trim()
+    setLoading(true)
+    setError(null)
+
+    try {
+      await onTransfer(vaultId, targetId)
+      onTransferred()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Übertragung fehlgeschlagen')
+      setConfirmStep(false)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="my-vaults-transfer-panel">
+      <div className="my-vaults-transfer-header">
+        <ArrowRightLeft size={12} />
+        <span>Besitz übertragen</span>
+      </div>
+
+      {!confirmStep ? (
+        <form onSubmit={handleInitiate} noValidate>
+          <div className="my-vaults-add-share-row">
+            <div className="my-vaults-add-share-input-wrap">
+              <input
+                type="text"
+                className="my-vaults-add-share-input"
+                value={username}
+                onChange={(e) => handleUsernameChange(e.target.value)}
+                onFocus={() => { if (suggestions.length > 0 && !selectedUserId) setShowSuggestions(true) }}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                placeholder="Neuer Besitzer…"
+                autoComplete="off"
+                aria-label="Benutzername für Übertragung"
+              />
+              {showSuggestions && suggestions.length > 0 && (
+                <ul className="my-vaults-add-share-suggestions">
+                  {suggestions.map((user) => (
+                    <li
+                      key={user.userId}
+                      className="my-vaults-add-share-suggestion"
+                      onMouseDown={(e) => { e.preventDefault(); selectSuggestion(user) }}
+                    >
+                      <span>{user.username}</span>
+                      {user.displayName && user.displayName !== user.username && (
+                        <span className="my-vaults-add-share-suggestion-name">{user.displayName}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <button type="submit" className="my-vaults-add-share-btn" disabled={loading || username.trim() === ''}>
+              Weiter
+            </button>
+            <button type="button" className="my-vaults-transfer-cancel" onClick={onCancel}>
+              <X size={12} />
+            </button>
+          </div>
+          {error && <p className="my-vaults-add-share-error">{error}</p>}
+        </form>
+      ) : (
+        <div className="my-vaults-transfer-confirm">
+          <p className="my-vaults-transfer-warning">
+            ⚠️ Vault <strong>„{vaultName}"</strong> wird an <strong>{username}</strong> übertragen. Du verlierst den Zugriff.
+          </p>
+          <div className="my-vaults-transfer-confirm-actions">
+            <button
+              type="button"
+              className="my-vaults-transfer-confirm-btn"
+              onClick={() => void handleConfirm()}
+              disabled={loading}
+            >
+              {loading ? 'Übertrage…' : 'Übertragen'}
+            </button>
+            <button
+              type="button"
+              className="my-vaults-transfer-cancel"
+              onClick={() => setConfirmStep(false)}
+              disabled={loading}
+            >
+              Abbrechen
+            </button>
+          </div>
+          {error && <p className="my-vaults-add-share-error">{error}</p>}
+        </div>
+      )}
+    </div>
   )
 }

@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import {
-  Upload, FolderOpen, Settings, Shield,
+  Upload, FolderOpen, Download, Settings, Shield,
   Database, FileText, Clock, User, Server,
 } from 'lucide-react'
 
@@ -22,6 +22,7 @@ interface SidebarToolbarProps {
   vaultId: string | null
   onImportFile: () => void
   onImportFolder: () => void
+  onExportVault: () => void
   onNavigate: (page: AppPage) => void
   isAdmin: boolean
 }
@@ -31,10 +32,11 @@ interface SidebarToolbarProps {
  * Buttons can be reordered by drag-and-drop.
  * Tooltips show on hover.
  */
-export function SidebarToolbar({ vaultId, onImportFile, onImportFolder, onNavigate, isAdmin }: SidebarToolbarProps) {
+export function SidebarToolbar({ vaultId, onImportFile, onImportFolder, onExportVault, onNavigate, isAdmin }: SidebarToolbarProps) {
   const allItems: ToolbarItem[] = [
     { id: 'import-file', icon: <Upload size={15} />, label: 'Datei importieren', action: onImportFile, requiresVault: true },
     { id: 'import-folder', icon: <FolderOpen size={15} />, label: 'Ordner importieren', action: onImportFolder, requiresVault: true },
+    { id: 'export-vault', icon: <Download size={15} />, label: 'Vault exportieren', action: onExportVault, requiresVault: true },
     { id: 'my-vaults', icon: <Database size={15} />, label: 'Meine Vaults', action: () => onNavigate('my-vaults') },
     { id: 'profile', icon: <User size={15} />, label: 'Profil', action: () => onNavigate('profile') },
     { id: 'sessions', icon: <Clock size={15} />, label: 'Sitzungen', action: () => onNavigate('sessions') },
