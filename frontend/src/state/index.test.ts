@@ -175,6 +175,7 @@ describe('Action Creators', () => {
       updateProfile: vi.fn(),
       changePassword: vi.fn(),
       deleteSelf: vi.fn(),
+      searchUsers: vi.fn().mockResolvedValue([]),
       ...overrides,
     } as IApiClient
   }

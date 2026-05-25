@@ -1,11 +1,11 @@
 import { useState, useRef, useCallback } from 'react'
 import {
-  Upload, FolderOpen, Share2, Settings, Shield,
-  Database, FileText, Clock, User,
+  Upload, FolderOpen, Settings, Shield,
+  Database, FileText, Clock, User, Server,
 } from 'lucide-react'
 
 type AppPage =
-  | 'vaults' | 'profile' | 'sessions'
+  | 'vaults' | 'my-vaults' | 'profile' | 'sessions'
   | 'admin-users' | 'admin-vaults' | 'admin-config' | 'admin-audit'
   | 'vault-sharing' | 'vault-deletion'
 
@@ -35,11 +35,11 @@ export function SidebarToolbar({ vaultId, onImportFile, onImportFolder, onNaviga
   const allItems: ToolbarItem[] = [
     { id: 'import-file', icon: <Upload size={15} />, label: 'Datei importieren', action: onImportFile, requiresVault: true },
     { id: 'import-folder', icon: <FolderOpen size={15} />, label: 'Ordner importieren', action: onImportFolder, requiresVault: true },
-    { id: 'sharing', icon: <Share2 size={15} />, label: 'Freigaben', action: () => onNavigate('vault-sharing'), requiresVault: true },
+    { id: 'my-vaults', icon: <Database size={15} />, label: 'Meine Vaults', action: () => onNavigate('my-vaults') },
     { id: 'profile', icon: <User size={15} />, label: 'Profil', action: () => onNavigate('profile') },
     { id: 'sessions', icon: <Clock size={15} />, label: 'Sitzungen', action: () => onNavigate('sessions') },
     { id: 'admin-users', icon: <Shield size={15} />, label: 'Benutzerverwaltung', action: () => onNavigate('admin-users'), adminOnly: true },
-    { id: 'admin-vaults', icon: <Database size={15} />, label: 'Vault-Übersicht', action: () => onNavigate('admin-vaults'), adminOnly: true },
+    { id: 'admin-vaults', icon: <Server size={15} />, label: 'Vault-Übersicht (Admin)', action: () => onNavigate('admin-vaults'), adminOnly: true },
     { id: 'admin-config', icon: <Settings size={15} />, label: 'Serverkonfiguration', action: () => onNavigate('admin-config'), adminOnly: true },
     { id: 'admin-audit', icon: <FileText size={15} />, label: 'Audit-Log', action: () => onNavigate('admin-audit'), adminOnly: true },
   ]

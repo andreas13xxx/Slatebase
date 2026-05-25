@@ -5,7 +5,6 @@ import { AuthProvider, useAuthContext } from './state/authContext'
 import { TabProvider, useTabContext } from './state/tabContext'
 import { VaultList } from './components/VaultList'
 import { FileExplorer } from './components/FileExplorer'
-import { TabBar } from './components/TabBar'
 import { TabContent } from './components/TabContent'
 import { LoginPage } from './components/LoginPage'
 import { ChangePasswordPage } from './components/ChangePasswordPage'
@@ -19,10 +18,11 @@ import { VaultSharing } from './components/VaultSharing'
 import { VaultDeletionWorkflow } from './components/VaultDeletionWorkflow'
 import { SlatebaseLogo } from './components/SlatebaseLogo'
 import { SidebarToolbar } from './components/SidebarToolbar'
+import { MyVaultsPage } from './components/MyVaultsPage'
 import {
   User, LogOut, Settings, Shield, FileText, Clock,
-  Database, Share2, Trash2,
-  Upload, FolderOpen, ChevronLeft, PanelRight, X,
+  Database, Share2, Trash2, Server,
+  Upload, FolderOpen, PanelRight, X, Eye, Pencil,
 } from 'lucide-react'
 import './App.css'
 
@@ -35,6 +35,7 @@ const LAST_VAULT_KEY = 'slatebase_last_vault'
 /** Available pages in the app. */
 type AppPage =
   | 'vaults'
+  | 'my-vaults'
   | 'profile'
   | 'sessions'
   | 'admin-users'
@@ -212,6 +213,7 @@ function RightPanel() {
 /** Human-readable labels for settings pages. */
 const PAGE_LABELS: Record<AppPage, string> = {
   vaults: 'Tresore',
+  'my-vaults': 'Meine Vaults',
   profile: 'Profil',
   sessions: 'Sitzungen',
   'admin-users': 'Benutzer',
@@ -224,56 +226,15 @@ const PAGE_LABELS: Record<AppPage, string> = {
 
 /** Icons for settings pages. */
 const PAGE_ICONS: Partial<Record<AppPage, React.ReactNode>> = {
+  'my-vaults': <Database size={13} />,
   profile: <User size={13} />,
   sessions: <Clock size={13} />,
   'admin-users': <Shield size={13} />,
-  'admin-vaults': <Database size={13} />,
+  'admin-vaults': <Server size={13} />,
   'admin-config': <Settings size={13} />,
   'admin-audit': <FileText size={13} />,
   'vault-sharing': <Share2 size={13} />,
   'vault-deletion': <Trash2 size={13} />,
-}
-
-/**
- * Settings tab bar — shown above the content area when settings pages are open.
- */
-function SettingsTabBar({ openPages, activePage, onActivate, onClose }: {
-  openPages: AppPage[]
-  activePage: AppPage
-  onActivate: (page: AppPage) => void
-  onClose: (page: AppPage) => void
-}) {
-  if (openPages.length === 0) return null
-  return (
-    <div className="tab-bar" role="tablist" aria-label="Einstellungen">
-      {openPages.map((page) => {
-        const isActive = page === activePage
-        return (
-          <div
-            key={page}
-            role="tab"
-            aria-selected={isActive}
-            className={`tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}`}
-            onClick={() => onActivate(page)}
-            title={PAGE_LABELS[page]}
-            tabIndex={isActive ? 0 : -1}
-          >
-            {PAGE_ICONS[page] && <span style={{ flexShrink: 0 }}>{PAGE_ICONS[page]}</span>}
-            <span className="tab-bar-tab-label">{PAGE_LABELS[page]}</span>
-            <button
-              type="button"
-              className="tab-bar-close-btn"
-              aria-label={`${PAGE_LABELS[page]} schließen`}
-              title="Schließen"
-              onClick={(e) => { e.stopPropagation(); onClose(page) }}
-            >
-              <X size={12} />
-            </button>
-          </div>
-        )
-      })}
-    </div>
-  )
 }
 
 /**
@@ -282,7 +243,7 @@ function SettingsTabBar({ openPages, activePage, onActivate, onClose }: {
 function AppContent() {
   const { state, dispatch } = useAppContext()
   const { authState, authDispatch } = useAuthContext()
-  const { tabDispatch } = useTabContext()
+  const { tabState, tabDispatch } = useTabContext()
   const prevVaultId = useRef<string | null>(null)
   // Settings tabs: list of open pages + which is active
   const [openSettingsPages, setOpenSettingsPages] = useState<AppPage[]>([])
@@ -384,6 +345,7 @@ function AppContent() {
 
   function renderSettingsPage(page: AppPage) {
     switch (page) {
+      case 'my-vaults': return <MyVaultsPage apiClient={apiClient} />
       case 'profile': return <ProfilePage apiClient={apiClient} />
       case 'sessions': return <SessionsPage apiClient={apiClient} />
       case 'admin-users': return <AdminUsersPage apiClient={apiClient} />
@@ -457,15 +419,7 @@ function AppContent() {
                 <VaultList />
               </div>
 
-              {isShowingSettings && (
-                <div className="app-sidebar-section">
-                  <button className="app-back-button" onClick={() => setActiveSettingsPage(null)} type="button">
-                    <ChevronLeft size={14} /> Zurück zu Tresoren
-                  </button>
-                </div>
-              )}
-
-              {!isShowingSettings && state.selectedVaultId && (
+              {state.selectedVaultId && (
                 <div className="app-sidebar-section">
                   <span className="app-sidebar-section-label">Dateien</span>
                   <FileExplorer />
@@ -494,14 +448,80 @@ function AppContent() {
 
           {/* ── Main Content ── */}
           <section className="app-content">
-            {/* Settings tabs bar */}
-            {openSettingsPages.length > 0 && (
-              <SettingsTabBar
-                openPages={openSettingsPages}
-                activePage={activeSettingsPage ?? openSettingsPages[0]!}
-                onActivate={(p) => setActiveSettingsPage(p)}
-                onClose={handleCloseSettingsTab}
-              />
+            {/* Unified tab bar: settings tabs + file tabs in one row */}
+            {(openSettingsPages.length > 0 || tabState.tabs.length > 0) && (
+              <div className="tab-bar" role="tablist" aria-label="Geöffnete Tabs">
+                {/* Settings tabs */}
+                {openSettingsPages.map((page) => {
+                  const isActive = isShowingSettings && page === activeSettingsPage
+                  return (
+                    <div
+                      key={`settings-${page}`}
+                      role="tab"
+                      aria-selected={isActive}
+                      className={`tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}`}
+                      onClick={() => setActiveSettingsPage(page)}
+                      title={PAGE_LABELS[page]}
+                      tabIndex={isActive ? 0 : -1}
+                    >
+                      {PAGE_ICONS[page] && <span style={{ flexShrink: 0 }}>{PAGE_ICONS[page]}</span>}
+                      <span className="tab-bar-tab-label">{PAGE_LABELS[page]}</span>
+                      <button
+                        type="button"
+                        className="tab-bar-close-btn"
+                        aria-label={`${PAGE_LABELS[page]} schließen`}
+                        title="Schließen"
+                        onClick={(e) => { e.stopPropagation(); handleCloseSettingsTab(page) }}
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  )
+                })}
+                {/* File tabs */}
+                {tabState.tabs.map((tab) => {
+                  const isActive = !isShowingSettings && tab.id === tabState.activeTabId
+                  const hasUnsaved = tab.editBuffer !== null && tab.editBuffer !== tab.content
+                  const modeLabel = tab.mode === 'edit' ? 'Vorschau anzeigen' : 'Bearbeiten'
+                  const ModeIcon = tab.mode === 'edit' ? Eye : Pencil
+                  return (
+                    <div
+                      key={tab.id}
+                      role="tab"
+                      aria-selected={isActive}
+                      aria-label={tab.filePath}
+                      className={`tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}`}
+                      onClick={() => { setActiveSettingsPage(null); tabDispatch({ type: 'ACTIVATE_TAB', payload: { tabId: tab.id } }) }}
+                      title={tab.filePath}
+                      tabIndex={isActive ? 0 : -1}
+                    >
+                      <span className="tab-bar-tab-label">
+                        {hasUnsaved ? '● ' : ''}{tab.fileName}
+                      </span>
+                      {!tab.isBinary && (
+                        <button
+                          type="button"
+                          className="tab-bar-mode-btn"
+                          aria-label={modeLabel}
+                          title={modeLabel}
+                          onClick={(e) => { e.stopPropagation(); tabDispatch({ type: 'TOGGLE_MODE', payload: { tabId: tab.id } }) }}
+                        >
+                          <ModeIcon size={12} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="tab-bar-close-btn"
+                        aria-label={`Tab schließen: ${tab.fileName}`}
+                        title="Tab schließen"
+                        onClick={(e) => { e.stopPropagation(); tabDispatch({ type: 'CLOSE_TAB', payload: { tabId: tab.id } }) }}
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
             )}
 
             {/* Content: settings page or vault editor */}
@@ -510,10 +530,7 @@ function AppContent() {
                 {renderSettingsPage(activeSettingsPage!)}
               </div>
             ) : (
-              <>
-                <TabBar />
-                <TabContent />
-              </>
+              <TabContent />
             )}
           </section>
 

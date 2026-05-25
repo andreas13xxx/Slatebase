@@ -224,9 +224,9 @@ describe('VaultService', () => {
 
       // Should not add vault to manager
       expect(vaultManager.addedVaults).toHaveLength(0)
-      // Should log a warning
-      expect(warnings).toHaveLength(1)
-      expect(warnings[0]!.message).toContain('not found')
+      // Should log a warning about missing storage directory
+      const storageWarning = warnings.find((w) => w.message.includes('not found'))
+      expect(storageWarning).toBeDefined()
     })
 
     it('loads valid vaults and skips missing ones in a mixed registry', async () => {
@@ -280,7 +280,7 @@ describe('VaultService', () => {
   })
 
   describe('getVaultList', () => {
-    it('returns VaultInfo[] from all loaded vaults', () => {
+    it('returns VaultInfo[] from all loaded vaults', async () => {
       const vault1 = createMockVault('abc123def456', 'Vault One', '/path/one')
       const vault2 = createMockVault('789xyz012abc', 'Vault Two', '/path/two')
       const vaultManager = createMockVaultManager([vault1, vault2])
@@ -289,21 +289,21 @@ describe('VaultService', () => {
       const logger = createMockLogger()
 
       const service = new VaultService(vaultManager, vaultReader, configService, logger)
-      const result = service.getVaultList()
+      const result = await service.getVaultList()
 
       expect(result).toHaveLength(2)
       expect(result[0]).toEqual(vault1.info)
       expect(result[1]).toEqual(vault2.info)
     })
 
-    it('returns empty array when no vaults are loaded', () => {
+    it('returns empty array when no vaults are loaded', async () => {
       const vaultManager = createMockVaultManager([])
       const configService = createMockConfigService()
       const vaultReader = createMockVaultReader()
       const logger = createMockLogger()
 
       const service = new VaultService(vaultManager, vaultReader, configService, logger)
-      const result = service.getVaultList()
+      const result = await service.getVaultList()
 
       expect(result).toEqual([])
     })
@@ -461,9 +461,9 @@ describe('VaultService', () => {
 
       const service = new VaultService(vaultManager, vaultReader, configService, logger)
 
-      await expect(service.createVault('My Vault'))
+      await expect(service.createVault('My Vault', 'test-owner-id'))
         .rejects.toThrow(StorageError)
-      await expect(service.createVault('My Vault'))
+      await expect(service.createVault('My Vault', 'test-owner-id'))
         .rejects.toThrow('VaultRegistry is not configured')
     })
 
@@ -476,7 +476,7 @@ describe('VaultService', () => {
 
       const service = new VaultService(vaultManager, vaultReader, configService, logger, registry)
 
-      await expect(service.createVault(''))
+      await expect(service.createVault('', 'test-owner-id'))
         .rejects.toThrow(VaultValidationError)
     })
 
@@ -489,7 +489,7 @@ describe('VaultService', () => {
 
       const service = new VaultService(vaultManager, vaultReader, configService, logger, registry)
 
-      await expect(service.createVault('   '))
+      await expect(service.createVault('   ', 'test-owner-id'))
         .rejects.toThrow(VaultValidationError)
     })
 
@@ -503,7 +503,7 @@ describe('VaultService', () => {
       const service = new VaultService(vaultManager, vaultReader, configService, logger, registry)
 
       const longName = 'a'.repeat(129)
-      await expect(service.createVault(longName))
+      await expect(service.createVault(longName, 'test-owner-id'))
         .rejects.toThrow(VaultValidationError)
     })
 
@@ -518,7 +518,7 @@ describe('VaultService', () => {
       const service = new VaultService(vaultManager, vaultReader, configService, logger, registry)
 
       try {
-        await service.createVault('Existing Vault')
+        await service.createVault('Existing Vault', 'test-owner-id')
         expect.fail('Should have thrown')
       } catch (error) {
         expect(error).toBeInstanceOf(VaultValidationError)
@@ -536,7 +536,7 @@ describe('VaultService', () => {
 
       const service = new VaultService(vaultManager, vaultReader, configService, logger, registry)
 
-      const result = await service.createVault('Test Vault')
+      const result = await service.createVault('Test Vault', 'test-owner-id')
 
       // Verify returned VaultInfo
       expect(result.id).toMatch(/^[0-9a-f]{12}$/)
@@ -571,7 +571,7 @@ describe('VaultService', () => {
 
       const service = new VaultService(vaultManager, vaultReader, configService, logger, registry)
 
-      await expect(service.createVault('Test Vault'))
+      await expect(service.createVault('Test Vault', 'test-owner-id'))
         .rejects.toThrow(StorageError)
 
       // Registry should not have been modified
@@ -591,7 +591,7 @@ describe('VaultService', () => {
 
       const service = new VaultService(vaultManager, vaultReader, configService, logger, registry)
 
-      await expect(service.createVault('Test Vault'))
+      await expect(service.createVault('Test Vault', 'test-owner-id'))
         .rejects.toThrow(StorageError)
 
       // The vault directory should have been cleaned up
@@ -621,7 +621,7 @@ describe('VaultService', () => {
 
       const service = new VaultService(vaultManager, vaultReader, configService, logger, registry)
 
-      const result = await service.createVault('ID Test')
+      const result = await service.createVault('ID Test', 'test-owner-id')
 
       // The ID should be a 12-char hex string (SHA-256 prefix)
       expect(result.id).toHaveLength(12)

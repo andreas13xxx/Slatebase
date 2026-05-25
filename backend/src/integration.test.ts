@@ -47,6 +47,12 @@ beforeAll(async () => {
   // Load the fixture vault
   await vaultManager.loadVaults([{ path: fixtureDir }])
 
+  // Set ownerId on the loaded vault for access control filtering
+  const loadedVault = vaultManager.getVault(vaultId)
+  if (loadedVault) {
+    loadedVault.info.ownerId = 'test-user-id'
+  }
+
   // Create a minimal IConfigService stub for VaultService
   const configStub: IConfigService = {
     getServerConfig(): ServerConfig {
@@ -85,6 +91,11 @@ beforeAll(async () => {
       allowHeaders: ['Content-Type'],
     }),
   )
+  // Fake session middleware for integration tests (no real auth)
+  app.use('*', async (c, next) => {
+    ;(c as unknown as { set(key: string, value: unknown): void }).set('session', { userId: 'test-user-id', username: 'testuser', role: 'admin' })
+    await next()
+  })
   app.route('/api/v1', router)
 })
 

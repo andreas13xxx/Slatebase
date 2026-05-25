@@ -62,7 +62,7 @@ const vaultService = new VaultService(vaultManager, vaultReader, config, logger,
 const importService = new ImportService(vaultManager, vaultReader, config, logger)
 
 // 5. Controllers
-const vaultController = new VaultController(vaultService, logger, importService)
+const vaultController = new VaultController(vaultService, logger, importService, userRepository)
 const authController = new AuthController(authService, logger)
 const userController = new UserController(userService, logger)
 
@@ -79,7 +79,7 @@ const routeModules = [
     configService: config,
     logger,
   }),
-  new VaultShareRouteModule(vaultAccessControl, vaultService, vaultRegistry, logger, vaultShareRegistry),
+  new VaultShareRouteModule(vaultAccessControl, vaultService, vaultRegistry, logger, vaultShareRegistry, userRepository),
 ]
 const router = createRouter(routeModules)
 

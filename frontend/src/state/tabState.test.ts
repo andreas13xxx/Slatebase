@@ -31,7 +31,7 @@ describe('tabReducer', () => {
       expect(state.tabs[0].filePath).toBe('notes/hello.md')
       expect(state.tabs[0].fileName).toBe('hello.md')
       expect(state.tabs[0].loading).toBe(true)
-      expect(state.tabs[0].mode).toBe('edit')
+      expect(state.tabs[0].mode).toBe('view')
       expect(state.tabs[0].isBinary).toBe(false)
       expect(state.tabs[0].content).toBe('')
       expect(state.tabs[0].editBuffer).toBeNull()
@@ -297,7 +297,7 @@ describe('tabReducer', () => {
 
       expect(state.tabs[0].content).toBe('# Hello')
       expect(state.tabs[0].isBinary).toBe(false)
-      expect(state.tabs[0].mode).toBe('edit')
+      expect(state.tabs[0].mode).toBe('view')
       expect(state.tabs[0].loading).toBe(false)
       expect(state.tabs[0].error).toBeNull()
     })
@@ -427,7 +427,7 @@ function createTab(
     vaultId,
     filePath,
     fileName,
-    mode: 'edit',
+    mode: 'view',
     isBinary: false,
     content: '',
     editBuffer: null,

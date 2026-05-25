@@ -31,6 +31,7 @@ function createMockUserRepository(overrides: Partial<IUserRepository> = {}): IUs
   return {
     findById: async () => null,
     findByUsername: async () => null,
+    searchByUsernamePrefix: async () => [],
     findAll: async () => ({ items: [], total: 0, page: 1, pageSize: 100, totalPages: 1 }),
     save: async () => {},
     delete: async () => {},

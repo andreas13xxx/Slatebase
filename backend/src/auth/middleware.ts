@@ -37,21 +37,25 @@ function createErrorResponse(c: Context, status: number, code: string, message: 
 
 /**
  * Extracts the Bearer token from the Authorization header.
- * Returns null if the header is missing or malformed.
+ * Falls back to the `token` query parameter for raw file requests (e.g. <img src="...">).
+ * Returns null if no token is found.
  */
 function extractBearerToken(c: Context): string | null {
   const authHeader = c.req.header('Authorization')
-  if (authHeader === undefined) {
-    return null
+  if (authHeader !== undefined && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.slice(7)
+    if (token.length > 0) {
+      return token
+    }
   }
-  if (!authHeader.startsWith('Bearer ')) {
-    return null
+
+  // Fallback: accept token from query parameter for raw file requests (images in <img> tags)
+  const queryToken = c.req.query('token')
+  if (queryToken !== undefined && queryToken.length > 0) {
+    return queryToken
   }
-  const token = authHeader.slice(7)
-  if (token.length === 0) {
-    return null
-  }
-  return token
+
+  return null
 }
 
 // ─── Auth Middleware ─────────────────────────────────────────────────────────

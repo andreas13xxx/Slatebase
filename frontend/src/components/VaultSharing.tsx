@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback, type FormEvent } from 'react'
-import type { IApiClient } from '../api'
+import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react'
+import type { IApiClient, UserSearchResult } from '../api'
 
 /** A single vault share entry as returned by the backend. */
 export interface VaultShareEntry {
   vaultId: string
   userId: string
+  username?: string
+  displayName?: string
   permission: 'read' | 'write'
   grantedBy: string
   grantedAt: string
@@ -21,10 +23,14 @@ export interface VaultSharingProps {
 /** Maximum number of shares allowed per vault. */
 const MAX_SHARES = 20
 
+/** Debounce delay for user search in milliseconds. */
+const SEARCH_DEBOUNCE_MS = 300
+
 /**
  * Vault sharing management component.
  * Displays current shares for an owned vault and provides controls
  * to add, revoke, and change permissions of shares.
+ * Includes username autocomplete when adding new shares.
  * UI labels are in German.
  */
 export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
@@ -34,9 +40,18 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
 
   // Add share form state
   const [username, setUsername] = useState('')
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [permission, setPermission] = useState<'read' | 'write'>('read')
   const [addLoading, setAddLoading] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
+
+  // Autocomplete state
+  const [suggestions, setSuggestions] = useState<UserSearchResult[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const suggestionsRef = useRef<HTMLUListElement>(null)
 
   /**
    * Fetches the current shares for the vault from the backend.
@@ -80,17 +95,130 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
   }, [loadShares])
 
   /**
+   * Searches for users matching the input prefix with debouncing.
+   */
+  const searchUsers = useCallback(async (query: string) => {
+    if (query.trim().length === 0) {
+      setSuggestions([])
+      setShowSuggestions(false)
+      return
+    }
+
+    try {
+      const results = await apiClient.searchUsers(query.trim())
+      setSuggestions(results)
+      setShowSuggestions(results.length > 0)
+      setActiveSuggestionIndex(-1)
+    } catch {
+      // Silently fail — autocomplete is a convenience feature
+      setSuggestions([])
+      setShowSuggestions(false)
+    }
+  }, [apiClient])
+
+  /**
+   * Handles username input changes with debounced search.
+   */
+  function handleUsernameChange(value: string): void {
+    setUsername(value)
+    setSelectedUserId(null)
+    if (addError) setAddError(null)
+
+    // Debounce the search
+    if (debounceRef.current !== null) {
+      clearTimeout(debounceRef.current)
+    }
+
+    debounceRef.current = setTimeout(() => {
+      void searchUsers(value)
+    }, SEARCH_DEBOUNCE_MS)
+  }
+
+  /**
+   * Selects a user from the suggestions list.
+   */
+  function selectSuggestion(user: UserSearchResult): void {
+    setUsername(user.username)
+    setSelectedUserId(user.userId)
+    setSuggestions([])
+    setShowSuggestions(false)
+    setActiveSuggestionIndex(-1)
+  }
+
+  /**
+   * Handles keyboard navigation in the suggestions list.
+   */
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>): void {
+    if (!showSuggestions || suggestions.length === 0) return
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setActiveSuggestionIndex((prev) =>
+        prev < suggestions.length - 1 ? prev + 1 : 0
+      )
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setActiveSuggestionIndex((prev) =>
+        prev > 0 ? prev - 1 : suggestions.length - 1
+      )
+    } else if (e.key === 'Enter' && activeSuggestionIndex >= 0) {
+      e.preventDefault()
+      const selected = suggestions[activeSuggestionIndex]
+      if (selected) {
+        selectSuggestion(selected)
+      }
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false)
+      setActiveSuggestionIndex(-1)
+    }
+  }
+
+  /**
+   * Closes suggestions when clicking outside.
+   */
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent): void {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(e.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  /**
+   * Cleanup debounce timer on unmount.
+   */
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current !== null) {
+        clearTimeout(debounceRef.current)
+      }
+    }
+  }, [])
+
+  /**
    * Handles adding a new share via the form.
    */
   async function handleAddShare(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault()
     setAddError(null)
+    setShowSuggestions(false)
 
     const trimmedUsername = username.trim()
     if (trimmedUsername === '') {
       setAddError('Benutzername darf nicht leer sein.')
       return
     }
+
+    // Use the selected userId if available, otherwise send the username
+    const targetId = selectedUserId ?? trimmedUsername
 
     setAddLoading(true)
     try {
@@ -109,7 +237,7 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
       const response = await fetch(`/api/v1/vaults/${vaultId}/shares`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ userId: trimmedUsername, permission }),
+        body: JSON.stringify({ userId: targetId, permission }),
       })
 
       if (!response.ok) {
@@ -118,6 +246,7 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
       }
 
       setUsername('')
+      setSelectedUserId(null)
       setPermission('read')
       await loadShares()
     } catch (err: unknown) {
@@ -224,7 +353,7 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
         <ul className="vault-sharing-list" aria-label="Aktuelle Freigaben">
           {shares.map((share) => (
             <li key={share.userId} className="vault-sharing-item">
-              <span className="vault-sharing-item-user">{share.userId}</span>
+              <span className="vault-sharing-item-user">{share.username ?? share.userId}</span>
               <select
                 className="vault-sharing-item-permission"
                 value={share.permission}
@@ -234,7 +363,7 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
                     void handleChangePermission(share.userId, newPerm)
                   }
                 }}
-                aria-label={`Berechtigung für ${share.userId}`}
+                aria-label={`Berechtigung für ${share.username ?? share.userId}`}
               >
                 <option value="read">Lesen</option>
                 <option value="write">Schreiben</option>
@@ -243,7 +372,7 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
                 className="vault-sharing-item-revoke"
                 type="button"
                 onClick={() => void handleRevoke(share.userId)}
-                aria-label={`Freigabe für ${share.userId} widerrufen`}
+                aria-label={`Freigabe für ${share.username ?? share.userId} widerrufen`}
               >
                 Widerrufen
               </button>
@@ -258,21 +387,62 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
           <h3 className="vault-sharing-form-title">Freigabe hinzufügen</h3>
 
           <div className="vault-sharing-form-fields">
-            <div className="vault-sharing-form-field">
+            <div className="vault-sharing-form-field vault-sharing-autocomplete">
               <label htmlFor="vault-sharing-username">Benutzername</label>
               <input
+                ref={inputRef}
                 id="vault-sharing-username"
                 className="vault-sharing-input"
                 type="text"
                 value={username}
-                onChange={(e) => {
-                  setUsername(e.target.value)
-                  if (addError) setAddError(null)
+                onChange={(e) => handleUsernameChange(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => {
+                  if (suggestions.length > 0 && !selectedUserId) {
+                    setShowSuggestions(true)
+                  }
                 }}
-                placeholder="Benutzername"
+                placeholder="Benutzername eingeben…"
+                autoComplete="off"
+                role="combobox"
+                aria-expanded={showSuggestions}
+                aria-controls="vault-sharing-suggestions"
+                aria-activedescendant={
+                  activeSuggestionIndex >= 0
+                    ? `vault-sharing-suggestion-${activeSuggestionIndex}`
+                    : undefined
+                }
                 aria-invalid={addError !== null}
                 aria-describedby={addError ? 'vault-sharing-add-error' : undefined}
               />
+              {showSuggestions && suggestions.length > 0 && (
+                <ul
+                  ref={suggestionsRef}
+                  id="vault-sharing-suggestions"
+                  className="vault-sharing-suggestions"
+                  role="listbox"
+                  aria-label="Benutzervorschläge"
+                >
+                  {suggestions.map((user, index) => (
+                    <li
+                      key={user.userId}
+                      id={`vault-sharing-suggestion-${index}`}
+                      className={`vault-sharing-suggestion-item${index === activeSuggestionIndex ? ' active' : ''}`}
+                      role="option"
+                      aria-selected={index === activeSuggestionIndex}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        selectSuggestion(user)
+                      }}
+                    >
+                      <span className="vault-sharing-suggestion-username">{user.username}</span>
+                      {user.displayName && user.displayName !== user.username && (
+                        <span className="vault-sharing-suggestion-display">{user.displayName}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             <div className="vault-sharing-form-field">

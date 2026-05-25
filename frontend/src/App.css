@@ -599,6 +599,69 @@
   border-radius: var(--radius-sm);
 }
 
+/* Vault permission badges in dropdown */
+.vault-permission-badge { display: inline-flex; align-items: center; margin-left: 6px; padding: 1px 5px; border-radius: var(--radius-full); font-size: 10px; font-weight: 600; vertical-align: middle; }
+.vault-permission-badge--read { background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border-subtle); }
+.vault-permission-badge--write { background: var(--accent-light, rgba(109,40,217,0.1)); color: var(--accent-text, #6d28d9); border: 1px solid var(--accent, #6d28d9); border-opacity: 0.3; }
+
+/* ===== My Vaults Page ===== */
+.my-vaults-page { padding: 28px 32px; max-width: 640px; }
+.my-vaults-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.my-vaults-title { font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0; }
+.my-vaults-section { margin-bottom: 24px; }
+.my-vaults-section-title { font-size: 14px; font-weight: 600; color: var(--text-secondary); margin: 0 0 10px; display: flex; align-items: center; gap: 6px; }
+.my-vaults-empty { color: var(--text-muted); font-size: 13px; padding: 8px 0; }
+.my-vaults-list { list-style: none; padding: 0; margin: 0; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); }
+.my-vaults-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); }
+.my-vaults-item:first-child { border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.my-vaults-item:last-child { border-bottom: none; border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+.my-vaults-item:only-child { border-radius: var(--radius-lg); }
+.my-vaults-item:hover { background: var(--bg-surface); }
+.my-vaults-item-icon { color: var(--text-muted); flex-shrink: 0; }
+.my-vaults-item-name { flex: 1; font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.my-vaults-item-stats { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.my-vaults-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: var(--radius-full); font-size: 11px; font-weight: 600; }
+.my-vaults-badge--owner { background: var(--success-bg, rgba(34,197,94,0.1)); color: var(--success, #16a34a); border: 1px solid var(--success-border, rgba(34,197,94,0.3)); }
+.my-vaults-badge--read { background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border-subtle); }
+.my-vaults-badge--write { background: var(--accent-light, rgba(109,40,217,0.1)); color: var(--accent-text, #6d28d9); border: 1px solid rgba(109,40,217,0.3); }
+.my-vaults-item--detailed { flex-direction: column; align-items: stretch; gap: 6px; }
+.my-vaults-item-main { display: flex; align-items: center; gap: 10px; }
+.my-vaults-item-shares { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); padding-left: 24px; }
+.my-vaults-item-shares--empty { color: var(--text-muted); font-style: italic; }
+.my-vaults-share-chip { font-weight: 500; }
+.my-vaults-share-chip-perm { margin-left: 2px; font-size: 10px; }
+.my-vaults-item-owner { font-size: 12px; color: var(--text-secondary); padding-left: 24px; }
+.my-vaults-item-owner strong { color: var(--text-primary); font-weight: 600; }
+.my-vaults-delete-btn { display: inline-flex; align-items: center; padding: 4px 8px; background: none; border: 1px solid var(--danger-border); border-radius: var(--radius-md); color: var(--danger-text); cursor: pointer; font-size: 12px; transition: background var(--transition-fast); }
+.my-vaults-delete-btn:hover { background: var(--danger-bg); }
+.my-vaults-action-btn { display: inline-flex; align-items: center; padding: 4px 8px; background: none; border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-secondary); cursor: pointer; font-size: 12px; transition: background var(--transition-fast); }
+.my-vaults-action-btn:hover { background: var(--bg-surface); color: var(--text-primary); }
+.my-vaults-share-btn { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: none; border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-secondary); cursor: pointer; font-size: 12px; transition: background var(--transition-fast); }
+.my-vaults-share-btn:hover { background: var(--bg-surface); color: var(--accent-text); border-color: var(--accent); }
+.my-vaults-share-count { font-size: 10px; font-weight: 700; background: var(--accent); color: white; border-radius: var(--radius-full); min-width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; }
+.my-vaults-sharing-panel { padding: 12px 0 4px 24px; border-top: 1px solid var(--border-subtle); margin-top: 6px; }
+.my-vaults-sharing-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.my-vaults-sharing-entry { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.my-vaults-sharing-user { flex: 1; font-weight: 500; color: var(--text-primary); }
+.my-vaults-sharing-perm-select { padding: 3px 6px; border: 1px solid var(--border-default); border-radius: var(--radius-sm); font-size: 12px; background: var(--bg-elevated); color: var(--text-primary); }
+.my-vaults-sharing-revoke { display: inline-flex; align-items: center; padding: 3px; background: none; border: none; color: var(--text-muted); cursor: pointer; border-radius: var(--radius-sm); }
+.my-vaults-sharing-revoke:hover { color: var(--danger-text); background: var(--danger-bg); }
+.my-vaults-sharing-empty { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+.my-vaults-add-share { margin-top: 8px; }
+.my-vaults-add-share-row { display: flex; align-items: center; gap: 6px; }
+.my-vaults-add-share-input-wrap { position: relative; flex: 1; }
+.my-vaults-add-share-input { width: 100%; padding: 5px 8px; border: 1px solid var(--border-default); border-radius: var(--radius-md); font-size: 12px; background: var(--bg-elevated); color: var(--text-primary); }
+.my-vaults-add-share-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(109,40,217,0.1); }
+.my-vaults-add-share-suggestions { position: absolute; top: 100%; left: 0; right: 0; z-index: 100; margin: 2px 0 0; padding: 4px 0; list-style: none; background: var(--bg-elevated); border: 1px solid var(--border-default); border-radius: var(--radius-md); box-shadow: 0 4px 12px rgba(0,0,0,0.12); max-height: 150px; overflow-y: auto; }
+.my-vaults-add-share-suggestion { padding: 6px 10px; cursor: pointer; font-size: 12px; display: flex; gap: 6px; }
+.my-vaults-add-share-suggestion:hover { background: var(--bg-surface); }
+.my-vaults-add-share-suggestion-name { color: var(--text-muted); }
+.my-vaults-add-share-perm { padding: 5px 6px; border: 1px solid var(--border-default); border-radius: var(--radius-md); font-size: 12px; background: var(--bg-elevated); color: var(--text-primary); }
+.my-vaults-add-share-btn { padding: 5px 10px; background: var(--accent); color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-size: 13px; font-weight: 600; }
+.my-vaults-add-share-btn:hover:not(:disabled) { background: var(--accent-hover); }
+.my-vaults-add-share-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.my-vaults-add-share-error { font-size: 11px; color: var(--danger-text); margin: 4px 0 0; }
+
 /* ===== File Explorer ===== */
 .file-explorer-container {
   display: flex;
@@ -1506,6 +1569,46 @@
 .edit-mode-status--saved { color: var(--success); }
 .edit-mode-status--error { color: var(--danger-text); }
 
+.edit-mode-readonly-banner {
+  display: flex;
+  align-items: center;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--warning);
+  background: var(--warning-bg);
+  border-bottom: 1px solid var(--warning-border);
+  flex-shrink: 0;
+}
+
+/* ===== Admin Config Page ===== */
+.admin-config-page { padding: 28px 32px; max-width: 640px; }
+.admin-config-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.admin-config-title { font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0; }
+.admin-config-loading { color: var(--text-muted); font-size: 13px; }
+.admin-config-card { padding: 18px 20px; margin-bottom: 16px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); }
+.admin-config-card--danger { border-color: var(--danger-border); }
+.admin-config-card-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0 0 14px; display: flex; align-items: center; gap: 6px; }
+.admin-config-card-desc { font-size: 13px; color: var(--text-secondary); margin: 0 0 12px; line-height: 1.5; }
+.admin-config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.admin-config-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.admin-config-field:last-child { margin-bottom: 0; }
+.admin-config-field label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.admin-config-field input, .admin-config-field select { padding: 7px 10px; border: 1px solid var(--border-default); border-radius: var(--radius-md); font-size: 13px; color: var(--text-primary); background: var(--bg-elevated); }
+.admin-config-field input:focus, .admin-config-field select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(109,40,217,0.12); }
+.admin-config-field input[aria-invalid="true"] { border-color: var(--danger-text); }
+.admin-config-field-error { font-size: 11px; color: var(--danger-text); margin: 2px 0 0; }
+.admin-config-hint { font-size: 11px; color: var(--text-muted); margin: 2px 0 0; }
+.admin-config-message { padding: 10px 14px; border-radius: var(--radius-md); font-size: 13px; margin-bottom: 12px; }
+.admin-config-message--success { background: var(--success-bg, rgba(34,197,94,0.1)); color: var(--success, #16a34a); border: 1px solid var(--success-border, rgba(34,197,94,0.3)); }
+.admin-config-message--error { background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
+.admin-config-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border: none; border-radius: var(--radius-md); font-size: 13px; font-weight: 500; cursor: pointer; transition: background var(--transition-fast); }
+.admin-config-btn--primary { background: var(--accent); color: white; }
+.admin-config-btn--primary:hover:not(:disabled) { background: var(--accent-hover); }
+.admin-config-btn--danger { background: var(--danger-text); color: white; }
+.admin-config-btn--danger:hover:not(:disabled) { opacity: 0.9; }
+.admin-config-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
 /* ===== ViewMode Markdown Rendering ===== */
 .view-mode {
   padding: 24px 32px;
@@ -1736,6 +1839,12 @@
 .vault-sharing-add-btn { padding: 7px 14px; background: var(--accent); color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-size: 13px; font-weight: 500; transition: background var(--transition-fast); }
 .vault-sharing-add-btn:hover:not(:disabled) { background: var(--accent-hover); }
 .vault-sharing-add-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.vault-sharing-autocomplete { position: relative; }
+.vault-sharing-suggestions { position: absolute; top: 100%; left: 0; right: 0; z-index: 100; margin: 4px 0 0; padding: 4px 0; list-style: none; background: var(--bg-elevated); border: 1px solid var(--border-default); border-radius: var(--radius-md); box-shadow: 0 4px 12px rgba(0,0,0,0.12); max-height: 200px; overflow-y: auto; }
+.vault-sharing-suggestion-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px; color: var(--text-primary); transition: background var(--transition-fast); }
+.vault-sharing-suggestion-item:hover, .vault-sharing-suggestion-item.active { background: var(--bg-surface); }
+.vault-sharing-suggestion-username { font-weight: 500; }
+.vault-sharing-suggestion-display { color: var(--text-muted); font-size: 12px; }
 
 /* ===== Vault Deletion Workflow ===== */
 .vault-deletion-workflow { padding: 28px 32px; max-width: 560px; }

@@ -269,6 +269,8 @@ export interface VaultInfo {
   path: string         // Absoluter Pfad (nur intern, nicht in API-Response)
   status: 'loaded' | 'error'
   errorMessage?: string
+  ownerId?: string     // User ID of the vault owner
+  permission?: 'owner' | 'read' | 'write'  // Access level for the requesting user
 }
 
 export interface Vault {

@@ -75,7 +75,7 @@ describe('AdminConfigPage', () => {
 
     expect(screen.getByLabelText('Host')).toHaveValue('127.0.0.1')
     expect(screen.getByLabelText('Erlaubte Origins')).toHaveValue('http://localhost:5173')
-    expect(screen.getByLabelText('Maximale Dateigröße (Bytes)')).toHaveValue(5242880)
+    expect(screen.getByLabelText('Max. Dateigröße (Bytes)')).toHaveValue(5242880)
     expect(screen.getByLabelText('Log-Level')).toHaveValue('info')
   })
 
@@ -86,7 +86,7 @@ describe('AdminConfigPage', () => {
     render(React.createElement(AdminConfigPage, { apiClient }))
 
     await waitFor(() => {
-      expect(screen.getByText('Fehler: Forbidden')).toBeInTheDocument()
+      expect(screen.getByText('Forbidden')).toBeInTheDocument()
     })
   })
 
@@ -123,7 +123,7 @@ describe('AdminConfigPage', () => {
     await user.type(portInput, '99999')
     await user.click(screen.getByRole('button', { name: 'Konfiguration speichern' }))
 
-    expect(screen.getByText('Port muss eine Ganzzahl zwischen 1 und 65535 sein.')).toBeInTheDocument()
+    expect(screen.getByText('Port muss zwischen 1 und 65535 liegen.')).toBeInTheDocument()
   })
 
   it('validates host must not be empty', async () => {
@@ -152,15 +152,15 @@ describe('AdminConfigPage', () => {
     render(React.createElement(AdminConfigPage, { apiClient }))
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Maximale Dateigröße (Bytes)')).toBeInTheDocument()
+      expect(screen.getByLabelText('Max. Dateigröße (Bytes)')).toBeInTheDocument()
     })
 
-    const maxFileSizeInput = screen.getByLabelText('Maximale Dateigröße (Bytes)')
+    const maxFileSizeInput = screen.getByLabelText('Max. Dateigröße (Bytes)')
     await user.clear(maxFileSizeInput)
     await user.type(maxFileSizeInput, '0')
     await user.click(screen.getByRole('button', { name: 'Konfiguration speichern' }))
 
-    expect(screen.getByText('Maximale Dateigröße muss eine positive Ganzzahl sein.')).toBeInTheDocument()
+    expect(screen.getByText('Muss eine positive Ganzzahl sein.')).toBeInTheDocument()
   })
 
   it('submits valid config via PUT', async () => {
@@ -208,7 +208,7 @@ describe('AdminConfigPage', () => {
     await user.click(screen.getByRole('button', { name: 'Konfiguration speichern' }))
 
     await waitFor(() => {
-      expect(screen.getByText('Konfiguration gespeichert. Neustart erforderlich, um Änderungen anzuwenden.')).toBeInTheDocument()
+      expect(screen.getByText('Konfiguration gespeichert. Neustart erforderlich.')).toBeInTheDocument()
     })
   })
 
@@ -257,7 +257,7 @@ describe('AdminConfigPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Server neustarten' }))
 
-    expect(confirmSpy).toHaveBeenCalledWith('Server wirklich neustarten?')
+    expect(confirmSpy).toHaveBeenCalledWith('Server wirklich neustarten? Alle aktiven Verbindungen werden unterbrochen.')
     // Should not have made a POST request since user cancelled
     expect(fetchSpy).toHaveBeenCalledTimes(1) // only the initial GET
   })

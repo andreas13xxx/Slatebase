@@ -65,6 +65,17 @@ function createMockUserRepository(users: UserRecord[] = []): IUserRepository & {
       }
       return null
     },
+    async searchByUsernamePrefix(prefix: string, limit: number = 10): Promise<UserRecord[]> {
+      const lowerPrefix = prefix.toLowerCase()
+      const results: UserRecord[] = []
+      for (const user of store.values()) {
+        if (user.username.toLowerCase().startsWith(lowerPrefix)) {
+          results.push(user)
+          if (results.length >= limit) break
+        }
+      }
+      return results
+    },
     async findAll(_options?: PaginationOptions): Promise<PaginatedResult<UserRecord>> {
       const items = Array.from(store.values())
       return { items, total: items.length, page: 1, pageSize: 100, totalPages: 1 }

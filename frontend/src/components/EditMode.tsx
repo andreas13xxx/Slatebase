@@ -15,6 +15,7 @@ export interface EditModeProps {
   onCancel: () => void
   saving: boolean
   error: string | null
+  readOnly?: boolean
 }
 
 type SaveStatus = 'idle' | 'unsaved' | 'saving' | 'saved' | 'error'
@@ -74,7 +75,7 @@ const TOOLBAR_ACTIONS: (ToolbarAction | 'sep')[] = [
 /**
  * EditMode renders a plain-text editor with toolbar and auto-save.
  */
-export function EditMode({ content, onChange, onSave, onCancel: _onCancel, saving, error }: EditModeProps) {
+export function EditMode({ content, onChange, onSave, onCancel: _onCancel, saving, error, readOnly }: EditModeProps) {
   const [status, setStatus] = useState<SaveStatus>('idle')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wasSavingRef = useRef(false)
@@ -147,27 +148,33 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
 
   return (
     <div className="edit-mode-container">
-      {/* Toolbar */}
-      <div className="edit-mode-toolbar" role="toolbar" aria-label="Formatierungsleiste">
-        {TOOLBAR_ACTIONS.map((item, i) => {
-          if (item === 'sep') {
-            return <div key={`sep-${i}`} className="edit-toolbar-separator" />
-          }
-          return (
-            <button
-              key={item.label}
-              type="button"
-              className="edit-toolbar-btn"
-              title={item.label}
-              aria-label={item.label}
-              onClick={() => applyAction(item.action)}
-              tabIndex={-1}
-            >
-              {item.icon}
-            </button>
-          )
-        })}
-      </div>
+      {/* Read-only banner or Toolbar */}
+      {readOnly ? (
+        <div className="edit-mode-readonly-banner" role="status">
+          Nur Lesen — dieser Vault wurde schreibgeschützt mit dir geteilt.
+        </div>
+      ) : (
+        <div className="edit-mode-toolbar" role="toolbar" aria-label="Formatierungsleiste">
+          {TOOLBAR_ACTIONS.map((item, i) => {
+            if (item === 'sep') {
+              return <div key={`sep-${i}`} className="edit-toolbar-separator" />
+            }
+            return (
+              <button
+                key={item.label}
+                type="button"
+                className="edit-toolbar-btn"
+                title={item.label}
+                aria-label={item.label}
+                onClick={() => applyAction(item.action)}
+                tabIndex={-1}
+              >
+                {item.icon}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Editor */}
       <textarea
@@ -177,6 +184,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
         onChange={handleChange}
         onKeyDown={handleKeyDown}
         disabled={saving}
+        readOnly={readOnly}
         aria-label="Dateiinhalt bearbeiten"
         spellCheck={false}
       />

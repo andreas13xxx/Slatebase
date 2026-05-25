@@ -103,6 +103,9 @@ export interface IUserRepository {
   /** Find a user by their username. */
   findByUsername(username: string): Promise<UserRecord | null>
 
+  /** Search users by username prefix (case-insensitive). Returns up to `limit` results. */
+  searchByUsernamePrefix(prefix: string, limit?: number): Promise<UserRecord[]>
+
   /** List all users with pagination, sorted by username ascending. */
   findAll(options?: PaginationOptions): Promise<PaginatedResult<UserRecord>>
 
@@ -143,6 +146,9 @@ export interface IUserService {
 
   /** List users with pagination. */
   listUsers(options?: PaginationOptions): Promise<PaginatedResult<PublicUserInfo>>
+
+  /** Search users by username prefix. Returns up to `limit` public user infos. */
+  searchUsers(prefix: string, limit?: number): Promise<PublicUserInfo[]>
 
   /** Suspend a user account. */
   suspendUser(userId: string): Promise<void>
@@ -377,6 +383,28 @@ export class UserRepository implements IUserRepository {
       return null
     }
     return this.readUserFile(userId)
+  }
+
+  /** Search users by username prefix (case-insensitive). Returns up to `limit` results. */
+  async searchByUsernamePrefix(prefix: string, limit: number = 10): Promise<UserRecord[]> {
+    await this.ensureDirectory()
+    const index = await this.readIndex()
+    const lowerPrefix = prefix.toLowerCase()
+    const matchingUsernames = Object.keys(index)
+      .filter((name) => name.toLowerCase().startsWith(lowerPrefix))
+      .sort((a, b) => a.localeCompare(b))
+      .slice(0, limit)
+
+    const results: UserRecord[] = []
+    for (const username of matchingUsernames) {
+      const userId = index[username]
+      if (userId === undefined) continue
+      const user = await this.readUserFile(userId)
+      if (user !== null) {
+        results.push(user)
+      }
+    }
+    return results
   }
 
   /** List all users with pagination, sorted by username ascending. */
@@ -936,6 +964,15 @@ export class UserService implements IUserService {
       pageSize: result.pageSize,
       totalPages: result.totalPages,
     }
+  }
+
+  /**
+   * Search users by username prefix (case-insensitive).
+   * Returns up to `limit` public user infos matching the prefix.
+   */
+  async searchUsers(prefix: string, limit: number = 10): Promise<PublicUserInfo[]> {
+    const users = await this.userRepository.searchByUsernamePrefix(prefix, limit)
+    return users.map(u => this.toPublicInfo(u))
   }
 
   /**

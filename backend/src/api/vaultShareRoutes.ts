@@ -15,6 +15,7 @@ import {
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
+import type { IUserRepository } from '../user/index.js'
 import type { RouteModule } from './index.js'
 
 // --- Helper: API Error Response ---
@@ -132,6 +133,7 @@ export class VaultShareRouteModule implements RouteModule {
     private readonly vaultRegistry: IVaultRegistry,
     private readonly logger: ILogger,
     private readonly shareRegistry?: IVaultShareRegistry,
+    private readonly userRepository?: IUserRepository,
   ) {}
 
   /**
@@ -157,6 +159,7 @@ export class VaultShareRouteModule implements RouteModule {
   /**
    * GET /vaults/:vaultId/shares
    * Lists all shares for a vault. Only the vault owner can list shares.
+   * Enriches each share entry with the username of the target user.
    */
   private async listShares(c: Context): Promise<Response> {
     const vaultId = c.req.param('vaultId') as string
@@ -173,6 +176,22 @@ export class VaultShareRouteModule implements RouteModule {
 
     try {
       const shares = await this.shareRegistry.getSharesForVault(vaultId)
+
+      // Enrich with username if userRepository is available
+      if (this.userRepository) {
+        const enriched = await Promise.all(
+          shares.map(async (share) => {
+            const user = await this.userRepository!.findById(share.userId)
+            return {
+              ...share,
+              username: user?.username ?? share.userId,
+              displayName: user?.displayName ?? '',
+            }
+          }),
+        )
+        return c.json(enriched, 200)
+      }
+
       return c.json(shares, 200)
     } catch (error) {
       return handleShareError(c, error, this.logger)

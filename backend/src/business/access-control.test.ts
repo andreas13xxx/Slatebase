@@ -76,6 +76,9 @@ function createMockUserRepository(users: UserRecord[] = []): IUserRepository {
     async findByUsername(username: string) {
       return users.find((u) => u.username === username) ?? null
     },
+    async searchByUsernamePrefix(prefix: string, limit: number = 10) {
+      return users.filter((u) => u.username.toLowerCase().startsWith(prefix.toLowerCase())).slice(0, limit)
+    },
     async findAll() {
       return { items: users, total: users.length, page: 1, pageSize: 100, totalPages: 1 }
     },

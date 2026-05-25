@@ -16,6 +16,7 @@ export interface ViewModeProps {
   vaultId: string
   directoryTree: DirectoryTree | null
   onInternalLinkClick?: (targetPath: string) => void
+  token?: string
 }
 
 /**
@@ -82,7 +83,7 @@ function collectFiles(node: DirectoryTree, result: { name: string; path: string 
  *
  * Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6
  */
-export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick }: ViewModeProps) {
+export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick, token }: ViewModeProps) {
   const rendered = useMemo(() => {
     try {
       const tree = unified()
@@ -91,12 +92,12 @@ export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick 
         .use(remarkGfm)
         .parse(content)
 
-      return renderRoot(tree, vaultId, directoryTree, onInternalLinkClick)
+      return renderRoot(tree, vaultId, directoryTree, onInternalLinkClick, token)
     } catch {
       // Req 5.7: Invalid/unparsable syntax rendered as plain text without crashing
       return createElement('pre', { className: 'view-mode-fallback' }, content)
     }
-  }, [content, vaultId, directoryTree, onInternalLinkClick])
+  }, [content, vaultId, directoryTree, onInternalLinkClick, token])
 
   return createElement('article', { className: 'view-mode', 'aria-label': 'Markdown-Ansicht' }, rendered)
 }
@@ -109,7 +110,8 @@ function renderRoot(
   root: Root,
   vaultId: string,
   directoryTree: DirectoryTree | null,
-  onInternalLinkClick?: (targetPath: string) => void
+  onInternalLinkClick?: (targetPath: string) => void,
+  token?: string
 ): ReactNode {
   const children = root.children
   const sections = groupByHeadings(children)
@@ -117,9 +119,9 @@ function renderRoot(
   const elements: ReactNode[] = []
   sections.forEach((section, i) => {
     if (section.type === 'content') {
-      elements.push(...renderBlockNodes(section.nodes, vaultId, directoryTree, onInternalLinkClick, `root-${i}`))
+      elements.push(...renderBlockNodes(section.nodes, vaultId, directoryTree, onInternalLinkClick, `root-${i}`, token))
     } else {
-      elements.push(renderHeadingSection(section, vaultId, directoryTree, onInternalLinkClick, `section-${i}`))
+      elements.push(renderHeadingSection(section, vaultId, directoryTree, onInternalLinkClick, `section-${i}`, token))
     }
   })
 
@@ -204,19 +206,20 @@ function renderHeadingSection(
   vaultId: string,
   directoryTree: DirectoryTree | null,
   onInternalLinkClick: ((targetPath: string) => void) | undefined,
-  key: string
+  key: string,
+  token?: string
 ): ReactNode {
   const HeadingTag = `h${section.depth}` as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
-  const headingContent = renderPhrasingNodes(section.headingChildren, vaultId, directoryTree, onInternalLinkClick, `${key}-heading`)
+  const headingContent = renderPhrasingNodes(section.headingChildren, vaultId, directoryTree, onInternalLinkClick, `${key}-heading`, token)
 
   // Recursively group the body content for nested headings
   const bodyGroups = groupByHeadings(section.body)
   const bodyElements: ReactNode[] = []
   bodyGroups.forEach((group, i) => {
     if (group.type === 'content') {
-      bodyElements.push(...renderBlockNodes(group.nodes, vaultId, directoryTree, onInternalLinkClick, `${key}-body-${i}`))
+      bodyElements.push(...renderBlockNodes(group.nodes, vaultId, directoryTree, onInternalLinkClick, `${key}-body-${i}`, token))
     } else {
-      bodyElements.push(renderHeadingSection(group, vaultId, directoryTree, onInternalLinkClick, `${key}-body-${i}`))
+      bodyElements.push(renderHeadingSection(group, vaultId, directoryTree, onInternalLinkClick, `${key}-body-${i}`, token))
     }
   })
 
@@ -236,9 +239,10 @@ function renderBlockNodes(
   vaultId: string,
   directoryTree: DirectoryTree | null,
   onInternalLinkClick: ((targetPath: string) => void) | undefined,
-  keyPrefix: string
+  keyPrefix: string,
+  token?: string
 ): ReactNode[] {
-  return nodes.map((node, i) => renderBlockNode(node, vaultId, directoryTree, onInternalLinkClick, `${keyPrefix}-${i}`))
+  return nodes.map((node, i) => renderBlockNode(node, vaultId, directoryTree, onInternalLinkClick, `${keyPrefix}-${i}`, token))
 }
 
 /**
@@ -249,34 +253,35 @@ function renderBlockNode(
   vaultId: string,
   directoryTree: DirectoryTree | null,
   onInternalLinkClick: ((targetPath: string) => void) | undefined,
-  key: string
+  key: string,
+  token?: string
 ): ReactNode {
   switch (node.type) {
     case 'paragraph':
       return createElement('p', { key },
-        renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key)
+        renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token)
       )
 
     case 'heading':
       // Standalone heading (shouldn't normally appear here due to grouping, but handle gracefully)
       return renderHeadingSection(
         { type: 'heading', depth: node.depth, headingChildren: node.children, body: [] },
-        vaultId, directoryTree, onInternalLinkClick, key
+        vaultId, directoryTree, onInternalLinkClick, key, token
       )
 
     case 'blockquote':
       return createElement('blockquote', { key },
-        renderBlockNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key)
+        renderBlockNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token)
       )
 
     case 'code':
       return renderCodeBlock(node.value, node.lang, key)
 
     case 'list':
-      return renderList(node, vaultId, directoryTree, onInternalLinkClick, key)
+      return renderList(node, vaultId, directoryTree, onInternalLinkClick, key, token)
 
     case 'table':
-      return renderTable(node, vaultId, directoryTree, onInternalLinkClick, key)
+      return renderTable(node, vaultId, directoryTree, onInternalLinkClick, key, token)
 
     case 'thematicBreak':
       return createElement('hr', { key })
@@ -384,7 +389,8 @@ function renderList(
   vaultId: string,
   directoryTree: DirectoryTree | null,
   onInternalLinkClick: ((targetPath: string) => void) | undefined,
-  key: string
+  key: string,
+  token?: string
 ): ReactNode {
   const Tag = node.ordered ? 'ol' : 'ul'
   const attrs: Record<string, unknown> = { key }
@@ -405,12 +411,12 @@ function renderList(
           readOnly: true,
           'aria-label': item.checked ? 'Erledigt' : 'Offen',
         }),
-        renderBlockNodes(item.children as RootContent[], vaultId, directoryTree, onInternalLinkClick, itemKey)
+        renderBlockNodes(item.children as RootContent[], vaultId, directoryTree, onInternalLinkClick, itemKey, token)
       )
     }
 
     return createElement('li', { key: itemKey },
-      renderBlockNodes(item.children as RootContent[], vaultId, directoryTree, onInternalLinkClick, itemKey)
+      renderBlockNodes(item.children as RootContent[], vaultId, directoryTree, onInternalLinkClick, itemKey, token)
     )
   })
 
@@ -426,7 +432,8 @@ function renderTable(
   vaultId: string,
   directoryTree: DirectoryTree | null,
   onInternalLinkClick: ((targetPath: string) => void) | undefined,
-  key: string
+  key: string,
+  token?: string
 ): ReactNode {
   const align = node.align ?? []
   const rows = node.children
@@ -446,7 +453,7 @@ function renderTable(
           key: `${key}-th-${ci}`,
           style: align[ci] ? { textAlign: align[ci] as string } : undefined,
         },
-          renderPhrasingNodes(cell.children, vaultId, directoryTree, onInternalLinkClick, `${key}-th-${ci}`)
+          renderPhrasingNodes(cell.children, vaultId, directoryTree, onInternalLinkClick, `${key}-th-${ci}`, token)
         )
       )
     )
@@ -461,7 +468,7 @@ function renderTable(
                 key: `${key}-td-${ri}-${ci}`,
                 style: align[ci] ? { textAlign: align[ci] as string } : undefined,
               },
-                renderPhrasingNodes(cell.children, vaultId, directoryTree, onInternalLinkClick, `${key}-td-${ri}-${ci}`)
+                renderPhrasingNodes(cell.children, vaultId, directoryTree, onInternalLinkClick, `${key}-td-${ri}-${ci}`, token)
               )
             )
           )
@@ -480,9 +487,10 @@ function renderPhrasingNodes(
   vaultId: string,
   directoryTree: DirectoryTree | null,
   onInternalLinkClick: ((targetPath: string) => void) | undefined,
-  keyPrefix: string
+  keyPrefix: string,
+  token?: string
 ): ReactNode[] {
-  return nodes.map((node, i) => renderPhrasingNode(node, vaultId, directoryTree, onInternalLinkClick, `${keyPrefix}-${i}`))
+  return nodes.map((node, i) => renderPhrasingNode(node, vaultId, directoryTree, onInternalLinkClick, `${keyPrefix}-${i}`, token))
 }
 
 /**
@@ -494,25 +502,26 @@ function renderPhrasingNode(
   vaultId: string,
   directoryTree: DirectoryTree | null,
   onInternalLinkClick: ((targetPath: string) => void) | undefined,
-  key: string
+  key: string,
+  token?: string
 ): ReactNode {
   switch (node.type) {
     case 'text':
-      return renderTextWithEmbeds(node.value, vaultId, directoryTree, onInternalLinkClick, key)
+      return renderTextWithEmbeds(node.value, vaultId, directoryTree, onInternalLinkClick, key, token)
 
     case 'strong':
       return createElement('strong', { key },
-        renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key)
+        renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token)
       )
 
     case 'emphasis':
       return createElement('em', { key },
-        renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key)
+        renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token)
       )
 
     case 'delete':
       return createElement('del', { key },
-        renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key)
+        renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token)
       )
 
     case 'inlineCode':
@@ -522,12 +531,12 @@ function renderPhrasingNode(
       return createElement('br', { key })
 
     case 'link':
-      return renderLink(node, vaultId, directoryTree, onInternalLinkClick, key)
+      return renderLink(node, vaultId, directoryTree, onInternalLinkClick, key, token)
 
     case 'image':
       // Req 7.5: Render inline images with max-width 100%
       // Req 7.6: Show placeholder for images not found
-      return renderImage(node.url, node.alt, vaultId, directoryTree, key)
+      return renderImage(node.url, node.alt, vaultId, directoryTree, key, token)
 
     case 'html':
       // Inline HTML rendered as plain text for safety
@@ -544,7 +553,7 @@ function renderPhrasingNode(
     case 'linkReference':
       // Render link reference as plain text (definitions not resolved here)
       return createElement('span', { key },
-        renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key)
+        renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token)
       )
 
     default:
@@ -614,8 +623,12 @@ function pathExistsInTree(tree: DirectoryTree | null, filePath: string): boolean
 /**
  * Constructs the image src URL for a vault file.
  */
-function buildImageSrc(vaultId: string, resolvedPath: string): string {
-  return `/api/v1/vaults/${vaultId}/files?path=${encodeURIComponent(resolvedPath)}&raw=true`
+function buildImageSrc(vaultId: string, resolvedPath: string, token?: string): string {
+  let url = `/api/v1/vaults/${vaultId}/files?path=${encodeURIComponent(resolvedPath)}&raw=true`
+  if (token) {
+    url += `&token=${encodeURIComponent(token)}`
+  }
+  return url
 }
 
 /**
@@ -628,7 +641,8 @@ function renderImage(
   alt: string | null | undefined,
   vaultId: string,
   directoryTree: DirectoryTree | null,
-  key: string
+  key: string,
+  token?: string
 ): ReactNode {
   // Check if the image exists in the vault tree
   const exists = pathExistsInTree(directoryTree, url)
@@ -642,7 +656,7 @@ function renderImage(
 
   return createElement('img', {
     key,
-    src: buildImageSrc(vaultId, url),
+    src: buildImageSrc(vaultId, url, token),
     alt: alt ?? '',
     style: { maxWidth: '100%', height: 'auto' },
     className: 'view-mode-image',
@@ -667,7 +681,8 @@ function renderTextWithEmbeds(
   vaultId: string,
   directoryTree: DirectoryTree | null,
   onInternalLinkClick: ((targetPath: string) => void) | undefined,
-  key: string
+  key: string,
+  token?: string
 ): ReactNode | ReactNode[] {
   // Quick check: if no embed or wikilink syntax present, return plain text
   if (!text.includes('![[') && !text.includes('[[')) {
@@ -702,7 +717,7 @@ function renderTextWithEmbeds(
         if (resolvedPath) {
           parts.push(createElement('img', {
             key: `${key}-embed-${matchStart}`,
-            src: buildImageSrc(vaultId, resolvedPath),
+            src: buildImageSrc(vaultId, resolvedPath, token),
             alt: filename,
             style: { maxWidth: '100%', height: 'auto' },
             className: 'view-mode-image',
@@ -766,10 +781,11 @@ function renderLink(
   vaultId: string,
   directoryTree: DirectoryTree | null,
   onInternalLinkClick: ((targetPath: string) => void) | undefined,
-  key: string
+  key: string,
+  token?: string
 ): ReactNode {
   const url = node.url
-  const children = renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key)
+  const children = renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token)
 
   // External link (http/https)
   if (url.startsWith('http://') || url.startsWith('https://')) {

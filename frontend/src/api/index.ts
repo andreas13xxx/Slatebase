@@ -34,6 +34,15 @@ export interface UpdateProfileData {
 }
 
 /**
+ * Result item from user search (public info subset).
+ */
+export interface UserSearchResult {
+  userId: string
+  username: string
+  displayName: string
+}
+
+/**
  * Interface for the Slatebase API client.
  * All methods throw an AppError on non-2xx responses.
  */
@@ -51,6 +60,7 @@ export interface IApiClient {
 
   // --- Vault methods ---
   fetchVaults(): Promise<VaultInfo[]>
+  fetchAllVaults(): Promise<VaultInfo[]>
   fetchVaultTree(vaultId: string): Promise<DirectoryTree>
   fetchFileContent(vaultId: string, filePath: string): Promise<FileContent>
   createVault(name: string): Promise<VaultInfo>
@@ -70,6 +80,9 @@ export interface IApiClient {
   updateProfile(data: UpdateProfileData): Promise<PublicUserInfo>
   changePassword(currentPassword: string, newPassword: string): Promise<void>
   deleteSelf(password: string): Promise<void>
+
+  // --- User search ---
+  searchUsers(query: string): Promise<UserSearchResult[]>
 }
 
 /**
@@ -131,6 +144,10 @@ export class ApiClient implements IApiClient {
 
   async fetchVaults(): Promise<VaultInfo[]> {
     return this.request<VaultInfo[]>('GET', '/api/v1/vaults')
+  }
+
+  async fetchAllVaults(): Promise<VaultInfo[]> {
+    return this.request<VaultInfo[]>('GET', '/api/v1/vaults?all=true')
   }
 
   async fetchVaultTree(vaultId: string): Promise<DirectoryTree> {
@@ -231,6 +248,14 @@ export class ApiClient implements IApiClient {
   /** Delete the current user's account (requires password confirmation). */
   async deleteSelf(password: string): Promise<void> {
     await this.request<void>('DELETE', '/api/v1/users/me', { password })
+  }
+
+  // --- User search ---
+
+  /** Search users by username prefix. */
+  async searchUsers(query: string): Promise<UserSearchResult[]> {
+    const encoded = encodeURIComponent(query)
+    return this.request<UserSearchResult[]>('GET', `/api/v1/users/search?q=${encoded}`)
   }
 
   // --- Internal helpers ---

@@ -321,7 +321,7 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - Settings-Seiten (Profil, Sitzungen, Admin-Seiten) öffnen sich als schließbare Tabs
 - Eigene `SettingsTabBar` über dem Content-Bereich (getrennt von Datei-Tabs)
 - Mehrere Settings-Seiten können gleichzeitig offen sein
-- "Zurück zu Tresoren" Button in der Sidebar wenn Settings aktiv
+- File Explorer bleibt sichtbar wenn Settings aktiv (kein "Zurück"-Button nötig)
 - Settings-Tabs haben Icons (Lucide) + Label + Close-Button
 
 ### Letzter Vault wiederherstellen
@@ -359,3 +359,58 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - `display: flex` + `align-items: baseline` auf `<summary>` → Icon und Heading auf einer Linie
 - Heading-Element (`h1`–`h6`) innerhalb `<summary>`: `display: inline` + `margin: 0` + `line-height: 1.4`
 - Verhindert Zeilenüberlappung bei langen Überschriften
+
+
+## Vault-Zugriffskontrolle & Sharing
+
+### Vault-Liste ist benutzergefiltert
+- `GET /api/v1/vaults` gibt nur Vaults zurück, die der User besitzt ODER die mit ihm geteilt sind
+- Jeder Vault hat ein `permission`-Feld: `'owner'`, `'read'` oder `'write'`
+- Admins können `?all=true` anhängen, um alle Vaults ungefiltert zu sehen
+- `ownerName` wird vom Backend aufgelöst (UserRepository.findById) und mitgeliefert
+
+### createShare akzeptiert Username ODER userId
+- Backend versucht zuerst `findById(targetUserId)`, dann `findByUsername(targetUserId)` als Fallback
+- Speichert immer die aufgelöste `userId` im Share-Eintrag
+- Prüft Self-Share auch nach Auflösung (falls Username des Owners übergeben wird)
+
+### User-Suche für Autocomplete
+- `GET /api/v1/users/search?q=...` — für alle authentifizierten User zugänglich (nicht nur Admins)
+- Sucht case-insensitive nach Username-Prefix, gibt bis zu 10 `PublicUserInfo`-Ergebnisse zurück
+- Route muss VOR `/users/me` registriert werden (Hono matcht sonst `search` als Parameter)
+- Frontend: Debounced (300ms) mit Dropdown, Keyboard-Navigation, ARIA-Combobox-Pattern
+
+### Freigabe-Verwaltung in "Meine Vaults" integriert
+- Kein separater "Freigaben"-Button in der Toolbar mehr
+- Pro Vault ein aufklappbares Panel mit: bestehende Shares (Permission-Dropdown + Widerrufen) + Add-Form
+- Share-Button zeigt Zähler-Badge wenn Shares existieren
+- Beim Löschen eines geteilten Vaults: explizite Warnung mit Anzahl der betroffenen Personen
+
+### Vault-Besitz-Transfer im Frontend
+- Button mit ArrowRightLeft-Icon pro eigenem Vault
+- `window.prompt` für neuen Besitzer (Username oder ID)
+- Bestätigungsdialog mit Warnung über Zugriffsverlust
+- Backend: `POST /vaults/:vaultId/transfer` mit `{ newOwnerId: string }`
+
+### Read-Only-Modus für geteilte Vaults
+- Wenn `vault.permission === 'read'`: Editor zeigt gelbes Banner statt Toolbar
+- Textarea ist `readOnly` — kein Tippen möglich, aber Quellcode sichtbar
+- Auto-Save und Toolbar-Aktionen sind deaktiviert
+- Mode-Toggle (View ↔ Edit) bleibt verfügbar — Read-Only betrifft nur den Edit-Modus
+
+### Default-Modus beim Öffnen: View statt Edit
+- `TAB_CONTENT_LOADED` setzt `mode: 'view'` für alle Dateien (auch Text)
+- User kann manuell in den Editor wechseln via Mode-Toggle-Button im Tab
+- Binary-Dateien haben keinen Mode-Toggle-Button (nur View)
+
+## CSS-Patterns
+
+### overflow: hidden schneidet Dropdowns ab
+- Listen-Container (`.my-vaults-list`) dürfen KEIN `overflow: hidden` haben wenn sie Elemente mit absolut positionierten Dropdowns enthalten (Autocomplete, Kontextmenüs)
+- Stattdessen: `border-radius` direkt auf `:first-child` / `:last-child` setzen
+- **Regel:** Vor dem Setzen von `overflow: hidden` prüfen ob Kinder absolute Positionierung nutzen
+
+### Admin-Seiten: Card-basiertes Layout
+- Sektionen in Cards (`.admin-config-card`) mit Titel, optionalem Grid für Felder
+- Gefahrenzone: eigene Card mit rotem Rahmen (`--danger` Tokens)
+- Buttons mit Icons (Lucide) + Text, Primary/Danger-Varianten

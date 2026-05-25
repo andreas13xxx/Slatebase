@@ -158,12 +158,12 @@ export interface FileSaveResult {
 
 export interface IVaultService {
   initializeVaults(): Promise<void>
-  getVaultList(): VaultInfo[]
+  getVaultList(userId?: string): VaultInfo[] | Promise<VaultInfo[]>
   getVaultTree(vaultId: string): DirectoryTree
   getFileContent(vaultId: string, filePath: string): Promise<FileContent>
   resolveFilePath(vaultId: string, filePath: string): string
   saveFile(vaultId: string, filePath: string, content: string, ifMatch?: string): Promise<FileSaveResult>
-  createVault(name: string, ownerId?: string): Promise<VaultInfo>
+  createVault(name: string, ownerId: string): Promise<VaultInfo>
   deleteVault(vaultId: string): Promise<void>
   deleteVaultWithChecks(vaultId: string, ownerId: string, force?: boolean): Promise<void>
   transferOwnership(vaultId: string, currentOwnerId: string, newOwnerId: string): Promise<void>
@@ -229,6 +229,9 @@ export class VaultService implements IVaultService {
 
     const entries = await this.registry.load()
 
+    // Migration: assign ownerId to vaults that don't have one
+    await this.migrateOrphanedVaults(entries)
+
     if (entries.length === 0) {
       this.logger.info('Vault registry is empty, no vaults to load')
       return
@@ -256,6 +259,7 @@ export class VaultService implements IVaultService {
           name: entry.name,
           path: entry.storagePath,
           status: 'loaded',
+          ...(entry.ownerId !== undefined ? { ownerId: entry.ownerId } : {}),
         }
 
         this.vaultManager.addVault({ info: vaultInfo, tree })
@@ -278,10 +282,76 @@ export class VaultService implements IVaultService {
   }
 
   /**
-   * Returns VaultInfo[] from all loaded vaults.
+   * Migrates vaults that have no ownerId by assigning them to the first admin user.
+   * This handles vaults created before the ownership feature was implemented.
+   * Persists the updated entries to the registry file.
    */
-  getVaultList(): VaultInfo[] {
-    return this.vaultManager.getAllVaults().map((vault) => vault.info)
+  private async migrateOrphanedVaults(entries: import('../vault/registry.js').VaultRegistryEntry[]): Promise<void> {
+    const orphaned = entries.filter((e) => e.ownerId === undefined || e.ownerId === '')
+    if (orphaned.length === 0) {
+      return
+    }
+
+    if (!this.userRepository) {
+      this.logger.warn('Cannot migrate orphaned vaults: UserRepository not configured', {
+        orphanedCount: orphaned.length,
+      })
+      return
+    }
+
+    // Find the first admin user to assign as owner
+    const adminUser = await this.userRepository.findByUsername('admin')
+    if (adminUser === null) {
+      this.logger.warn('Cannot migrate orphaned vaults: no admin user found', {
+        orphanedCount: orphaned.length,
+      })
+      return
+    }
+
+    for (const entry of orphaned) {
+      entry.ownerId = adminUser.userId
+      this.logger.info('Migrated orphaned vault: assigned owner', {
+        vaultId: entry.id,
+        vaultName: entry.name,
+        ownerId: adminUser.userId,
+      })
+    }
+
+    // Persist the updated entries
+    await this.registry!.save(entries)
+    this.logger.info('Orphaned vault migration complete', {
+      migratedCount: orphaned.length,
+      assignedTo: adminUser.username,
+    })
+  }
+
+  /**
+   * Returns VaultInfo[] filtered by user access.
+   * If userId is provided, returns only vaults the user owns or has been shared with.
+   * If no userId is provided (backward compatibility), returns all vaults.
+   */
+  async getVaultList(userId?: string): Promise<VaultInfo[]> {
+    const allVaults = this.vaultManager.getAllVaults().map((vault) => vault.info)
+
+    if (userId === undefined) {
+      return allVaults
+    }
+
+    // Get all shares for this user
+    const userShares = this.shareRegistry
+      ? await this.shareRegistry.getSharesForUser(userId)
+      : []
+    const shareMap = new Map(userShares.map((s) => [s.vaultId, s.permission]))
+
+    // Return vaults where user is owner OR has a share, with permission info
+    return allVaults
+      .filter((vault) => vault.ownerId === userId || shareMap.has(vault.id))
+      .map((vault) => {
+        const permission: 'owner' | 'read' | 'write' = vault.ownerId === userId
+          ? 'owner'
+          : (shareMap.get(vault.id) ?? 'read')
+        return { ...vault, permission }
+      })
   }
 
   /**
@@ -435,7 +505,7 @@ export class VaultService implements IVaultService {
    * - On filesystem failure: do not add to registry
    * - On registry failure after mkdir: remove the created directory
    */
-  async createVault(name: string, ownerId?: string): Promise<VaultInfo> {
+  async createVault(name: string, ownerId: string): Promise<VaultInfo> {
     if (!this.registry) {
       throw new StorageError('VaultRegistry is not configured')
     }
@@ -477,7 +547,7 @@ export class VaultService implements IVaultService {
       name,
       storagePath: finalStoragePath,
       createdAt: new Date().toISOString(),
-      ...(ownerId !== undefined ? { ownerId } : {}),
+      ownerId,
     }
 
     try {
@@ -507,6 +577,7 @@ export class VaultService implements IVaultService {
       name,
       path: finalStoragePath,
       status: 'loaded',
+      ownerId,
     }
 
     this.vaultManager.addVault({
@@ -514,7 +585,7 @@ export class VaultService implements IVaultService {
       tree,
     })
 
-    this.logger.info('Vault created', { vaultId, name, path: finalStoragePath })
+    this.logger.info('Vault created', { vaultId, name, path: finalStoragePath, ownerId })
 
     return vaultInfo
   }
@@ -849,10 +920,18 @@ export class VaultAccessControlService implements IVaultAccessControl {
       throw new InvalidShareTargetError('SELF_SHARE', 'Cannot share a vault with yourself')
     }
 
-    // Validate target user exists
-    const targetUser = await this.userRepository.findById(targetUserId)
+    // Validate target user exists — try by ID first, then by username
+    let targetUser = await this.userRepository.findById(targetUserId)
+    if (targetUser === null) {
+      targetUser = await this.userRepository.findByUsername(targetUserId)
+    }
     if (targetUser === null) {
       throw new InvalidShareTargetError('USER_NOT_FOUND', `Target user not found: ${targetUserId}`)
+    }
+
+    // Reject self-share by resolved userId (in case username was passed)
+    if (ownerId === targetUser.userId) {
+      throw new InvalidShareTargetError('SELF_SHARE', 'Cannot share a vault with yourself')
     }
 
     // Check share limit
@@ -861,10 +940,10 @@ export class VaultAccessControlService implements IVaultAccessControl {
       throw new ShareLimitError(vaultId, MAX_SHARES_PER_VAULT)
     }
 
-    // Create the share entry
+    // Create the share entry (always use the resolved userId)
     const shareEntry: VaultShareEntry = {
       vaultId,
-      userId: targetUserId,
+      userId: targetUser.userId,
       permission,
       grantedBy: ownerId,
       grantedAt: new Date().toISOString(),
@@ -875,7 +954,7 @@ export class VaultAccessControlService implements IVaultAccessControl {
     this.logger.info('Vault share created', {
       vaultId,
       ownerId,
-      targetUserId,
+      targetUserId: targetUser.userId,
       permission,
     })
 
@@ -885,7 +964,7 @@ export class VaultAccessControlService implements IVaultAccessControl {
       target: vaultId,
       ipAddress: '0.0.0.0',
       success: true,
-      details: JSON.stringify({ targetUserId, permission }),
+      details: JSON.stringify({ targetUserId: targetUser.userId, permission }),
     })
   }
 

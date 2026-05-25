@@ -181,6 +181,31 @@ export class UserController {
     }
   }
 
+  /**
+   * GET /users/search?q=... — Searches users by username prefix.
+   * Returns up to 10 matching users with public info.
+   */
+  async searchUsers(c: Context): Promise<Response> {
+    const query = c.req.query('q')
+
+    if (!query || query.trim().length === 0) {
+      return c.json([], 200)
+    }
+
+    const trimmed = query.trim()
+    if (trimmed.length > 128) {
+      const apiError = createApiError('VALIDATION_ERROR', 'Search query too long (max 128 characters)')
+      return c.json(apiError, 400)
+    }
+
+    try {
+      const results = await this.userService.searchUsers(trimmed, 10)
+      return c.json(results, 200)
+    } catch (error) {
+      return this.handleError(c, error)
+    }
+  }
+
   // ─── Error Mapping ───────────────────────────────────────────────────────────
 
   /**
@@ -228,6 +253,7 @@ export class UserRouteModule implements RouteModule {
    * Registers user routes on the provided Hono router.
    */
   register(router: Hono): void {
+    router.get('/users/search', (c) => this.controller.searchUsers(c))
     router.get('/users/me', (c) => this.controller.getProfile(c))
     router.put('/users/me', (c) => this.controller.updateProfile(c))
     router.put('/users/me/password', (c) => this.controller.changePassword(c))

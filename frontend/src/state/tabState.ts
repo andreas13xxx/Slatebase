@@ -83,7 +83,7 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
         vaultId,
         filePath,
         fileName,
-        mode: 'edit', // default, will be adjusted on TAB_CONTENT_LOADED
+        mode: 'view', // default, will be confirmed on TAB_CONTENT_LOADED
         isBinary: false,
         content: '',
         editBuffer: null,
@@ -164,8 +164,8 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
             ...tab,
             content,
             isBinary,
-            // Initial mode: edit for text files, view for binary files
-            mode: isBinary ? 'view' : 'edit',
+            // Initial mode: always view (user can switch to edit manually)
+            mode: 'view',
             loading: false,
             error: null,
           }

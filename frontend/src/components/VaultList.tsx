@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAppContext, createVault, deleteVault } from '../state'
-import { ChevronDown, ChevronUp, Plus, Trash2, Database } from 'lucide-react'
+import { ChevronDown, ChevronUp, Plus, Trash2, Database, Eye, Pencil } from 'lucide-react'
 
 /**
  * Maximum vault name length as defined in the spec.
@@ -130,16 +130,28 @@ export function VaultList() {
                     onClick={() => handleSelect(vault.id)}
                   >
                     {vault.name}
+                    {vault.permission === 'read' && (
+                      <span className="vault-permission-badge vault-permission-badge--read" title="Nur Lesen">
+                        <Eye size={11} />
+                      </span>
+                    )}
+                    {vault.permission === 'write' && (
+                      <span className="vault-permission-badge vault-permission-badge--write" title="Bearbeiten">
+                        <Pencil size={11} />
+                      </span>
+                    )}
                   </button>
-                  <button
-                    type="button"
-                    className="vault-dropdown-item-delete"
-                    aria-label={`Vault "${vault.name}" löschen`}
-                    title={`"${vault.name}" löschen`}
-                    onClick={(e) => handleDelete(e, vault.id, vault.name)}
-                  >
-                    <Trash2 size={13} />
-                  </button>
+                  {(vault.permission === 'owner' || vault.permission === undefined) && (
+                    <button
+                      type="button"
+                      className="vault-dropdown-item-delete"
+                      aria-label={`Vault "${vault.name}" löschen`}
+                      title={`"${vault.name}" löschen`}
+                      onClick={(e) => handleDelete(e, vault.id, vault.name)}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

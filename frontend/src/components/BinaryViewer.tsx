@@ -16,6 +16,7 @@ export interface BinaryViewerProps {
   fileExtension: string
   vaultId: string
   filePath: string
+  token?: string
 }
 
 const SUPPORTED_IMAGE_EXTENSIONS = ['.png', '.jpeg', '.jpg', '.gif', '.avif', '.webp', '.svg']
@@ -24,7 +25,7 @@ function isSupportedImage(extension: string): boolean {
   return SUPPORTED_IMAGE_EXTENSIONS.includes(extension.toLowerCase())
 }
 
-export function BinaryViewer({ fileName, fileExtension, vaultId, filePath }: BinaryViewerProps) {
+export function BinaryViewer({ fileName, fileExtension, vaultId, filePath, token }: BinaryViewerProps) {
   const [imageError, setImageError] = useState(false)
 
   const normalizedExtension = fileExtension.toLowerCase()
@@ -46,7 +47,10 @@ export function BinaryViewer({ fileName, fileExtension, vaultId, filePath }: Bin
 
   // Req 7.2: Render image preview for supported formats
   if (isImage) {
-    const src = `/api/v1/vaults/${vaultId}/files?path=${encodeURIComponent(filePath)}&raw=true`
+    let src = `/api/v1/vaults/${vaultId}/files?path=${encodeURIComponent(filePath)}&raw=true`
+    if (token) {
+      src += `&token=${encodeURIComponent(token)}`
+    }
 
     return (
       <section

@@ -10,6 +10,12 @@ export interface VaultInfo {
   id: string
   /** Derived from directory name, max 128 characters, unique across vaults. */
   name: string
+  /** User ID of the vault owner. */
+  ownerId?: string
+  /** Username of the vault owner (resolved by the backend). */
+  ownerName?: string
+  /** Access level for the current user: 'owner', 'read', or 'write'. */
+  permission?: 'owner' | 'read' | 'write'
 }
 
 /** Recursive directory/file tree structure for a vault. */

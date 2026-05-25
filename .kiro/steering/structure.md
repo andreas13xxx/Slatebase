@@ -64,22 +64,23 @@ src/
 ├── components/
 │   ├── SlatebaseLogo.tsx — SVG logo component
 │   ├── SidebarToolbar.tsx — Draggable vertical toolbar
-│   ├── VaultList.tsx     — Vault selector/manager dropdown
+│   ├── VaultList.tsx     — Vault selector/manager dropdown (with permission badges)
 │   ├── FileExplorer.tsx  — Directory tree navigation (Lucide icons)
 │   ├── TabBar.tsx        — Horizontal tab strip (file tabs)
 │   ├── TabContent.tsx    — Tab content orchestrator (Edit/View/Binary)
-│   ├── EditMode.tsx      — Plain-text editor with toolbar + auto-save
+│   ├── EditMode.tsx      — Plain-text editor with toolbar + auto-save + read-only mode
 │   ├── ViewMode.tsx      — Markdown renderer (remark + highlight.js)
 │   ├── BinaryViewer.tsx  — Binary file preview
 │   ├── LoginPage.tsx     — Login with logo + card design
 │   ├── ChangePasswordPage.tsx — Forced password change
 │   ├── ProfilePage.tsx   — User profile settings (card layout)
 │   ├── SessionsPage.tsx  — Session management
-│   ├── VaultSharing.tsx  — Vault share management
+│   ├── MyVaultsPage.tsx  — User vault overview with inline sharing + transfer + delete
+│   ├── VaultSharing.tsx  — Standalone vault share management (legacy, replaced by MyVaultsPage)
 │   ├── VaultDeletionWorkflow.tsx — Guided vault deletion
 │   ├── AdminUsersPage.tsx — User administration
-│   ├── AdminVaultsPage.tsx — Vault overview (files, size, shares)
-│   ├── AdminConfigPage.tsx — Server configuration
+│   ├── AdminVaultsPage.tsx — Admin: all vaults overview with delete
+│   ├── AdminConfigPage.tsx — Server configuration (card-based layout)
 │   └── AdminAuditPage.tsx — Audit log viewer
 ├── assets/               — Static images
 └── test-setup.ts         — Vitest/Testing Library setup
@@ -100,7 +101,7 @@ All routes are prefixed with `/api/v1`:
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | /vaults | List all vaults |
+| GET | /vaults | List vaults (filtered by user; ?all=true for admin) |
 | POST | /vaults | Create a new vault |
 | DELETE | /vaults/:vaultId | Delete a vault |
 | GET | /vaults/:vaultId/tree | Get directory tree |
@@ -114,6 +115,7 @@ All routes are prefixed with `/api/v1`:
 | GET | /auth/sessions | List own sessions |
 | DELETE | /auth/sessions/:sessionId | Invalidate session |
 | DELETE | /auth/sessions | Invalidate all other sessions |
+| GET | /users/search?q= | Search users by username prefix |
 | GET | /users/me | Get own profile |
 | PUT | /users/me | Update own profile |
 | PUT | /users/me/password | Change own password |

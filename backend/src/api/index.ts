@@ -12,6 +12,7 @@ import type { SessionContext } from '../auth/index.js'
 import { VaultNotFoundError, VaultValidationError, StorageError, FileTooLargeError as BusinessFileTooLargeError, ConflictError } from '../business/index.js'
 import { PathTraversalError } from '../vault/index.js'
 import type { IImportService, UploadedFile } from '../import/index.js'
+import type { IUserRepository } from '../user/index.js'
 import {
   InvalidFilenameError,
   FileTooLargeError,
@@ -39,7 +40,7 @@ function createApiError(code: string, message: string): ApiError {
 // --- IVaultController Interface ---
 
 export interface IVaultController {
-  listVaults(c: Context): Response | Promise<Response>
+  listVaults(c: Context): Promise<Response>
   getVaultTree(c: Context): Response | Promise<Response>
   getFileContent(c: Context): Response | Promise<Response>
   saveFile(c: Context): Promise<Response>
@@ -57,16 +58,30 @@ export class VaultController implements IVaultController {
     private readonly vaultService: IVaultService,
     private readonly logger: ILogger,
     private readonly importService?: IImportService,
+    private readonly userRepository?: IUserRepository,
   ) {}
 
   /**
    * GET /vaults — Returns 200 with VaultInfo[] JSON.
    * Strips the internal `path` field from each VaultInfo before responding.
+   * Filters vaults by the authenticated user's access (ownership or shares).
+   * Admins can pass ?all=true to get all vaults unfiltered.
    */
-  listVaults(c: Context): Response {
-    const vaults = this.vaultService.getVaultList()
-    // Strip internal `path` field from API response
-    const publicVaults = vaults.map(({ path, ...rest }) => rest)
+  async listVaults(c: Context): Promise<Response> {
+    const session = c.get('session') as SessionContext
+    const showAll = c.req.query('all') === 'true' && session.role === 'admin'
+    const vaults = await this.vaultService.getVaultList(showAll ? undefined : session.userId)
+    // Strip internal `path` field and resolve ownerName
+    const publicVaults = await Promise.all(
+      vaults.map(async ({ path, ...rest }) => {
+        let ownerName: string | undefined
+        if (rest.ownerId && this.userRepository) {
+          const owner = await this.userRepository.findById(rest.ownerId)
+          if (owner) ownerName = owner.username
+        }
+        return { ...rest, ownerName }
+      }),
+    )
     return c.json(publicVaults, 200)
   }
 
@@ -180,9 +195,9 @@ export class VaultController implements IVaultController {
         return c.json(apiError, 400)
       }
 
-      // Get the authenticated user's ID to set as vault owner
-      const session = c.get('session') as SessionContext | undefined
-      const ownerId = session?.userId
+      // Auth middleware guarantees session is set for authenticated routes
+      const session = c.get('session') as SessionContext
+      const ownerId = session.userId
 
       const vaultInfo = await this.vaultService.createVault(name, ownerId)
 

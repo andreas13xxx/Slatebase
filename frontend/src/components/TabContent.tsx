@@ -159,6 +159,7 @@ export function TabContent() {
           fileExtension={extension}
           vaultId={activeTab.vaultId}
           filePath={activeTab.filePath}
+          token={apiClient?.getToken() ?? undefined}
         />
       </div>
     )
@@ -167,6 +168,8 @@ export function TabContent() {
   // Edit mode
   if (activeTab.mode === 'edit') {
     const editContent = activeTab.editBuffer ?? activeTab.content
+    const currentVault = appState.vaults.find((v) => v.id === activeTab.vaultId)
+    const isReadOnly = currentVault?.permission === 'read'
     return (
       <div className="tab-content tab-content--edit" style={contentStyle}>
         <EditMode
@@ -176,6 +179,7 @@ export function TabContent() {
           onCancel={handleCancel}
           saving={saving}
           error={activeTab.error}
+          readOnly={isReadOnly}
         />
       </div>
     )
@@ -201,6 +205,7 @@ export function TabContent() {
         vaultId={activeTab.vaultId}
         directoryTree={appState.directoryTree}
         onInternalLinkClick={handleInternalLinkClick}
+        token={apiClient?.getToken() ?? undefined}
       />
     </div>
   )
