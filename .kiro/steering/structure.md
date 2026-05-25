@@ -49,16 +49,39 @@ data/
 ```
 src/
 ├── main.tsx              — React entry point
-├── App.tsx               — Root component, layout, data fetching
-├── App.css               — Global styles
+├── App.tsx               — Root component, 3-panel layout, routing, resize
+├── App.css               — Global styles (Design Tokens in index.css)
+├── index.css             — CSS Custom Properties (Design Tokens, Dark Mode)
 ├── types.ts              — Shared TypeScript interfaces (VaultInfo, DirectoryTree, etc.)
 ├── api/index.ts          — ApiClient (IApiClient interface + fetch implementation)
-├── state/index.ts        — AppProvider, appReducer, action creators (useReducer + Context)
+├── state/
+│   ├── index.ts          — AppProvider, appReducer, action creators
+│   ├── authState.ts      — Auth reducer + types
+│   ├── authContext.ts    — AuthProvider + useAuthContext hook
+│   ├── tabState.ts       — Tab reducer + types
+│   ├── tabContext.ts     — TabProvider + useTabContext hook
+│   └── tabActions.ts     — openTab, saveTab action creators
 ├── components/
-│   ├── VaultList.tsx     — Vault selector/manager UI
-│   ├── FileExplorer.tsx  — Directory tree navigation
-│   └── FileViewer.tsx    — File content display
-├── assets/               — Static images (hero, logos)
+│   ├── SlatebaseLogo.tsx — SVG logo component
+│   ├── SidebarToolbar.tsx — Draggable vertical toolbar
+│   ├── VaultList.tsx     — Vault selector/manager dropdown
+│   ├── FileExplorer.tsx  — Directory tree navigation (Lucide icons)
+│   ├── TabBar.tsx        — Horizontal tab strip (file tabs)
+│   ├── TabContent.tsx    — Tab content orchestrator (Edit/View/Binary)
+│   ├── EditMode.tsx      — Plain-text editor with toolbar + auto-save
+│   ├── ViewMode.tsx      — Markdown renderer (remark + highlight.js)
+│   ├── BinaryViewer.tsx  — Binary file preview
+│   ├── LoginPage.tsx     — Login with logo + card design
+│   ├── ChangePasswordPage.tsx — Forced password change
+│   ├── ProfilePage.tsx   — User profile settings (card layout)
+│   ├── SessionsPage.tsx  — Session management
+│   ├── VaultSharing.tsx  — Vault share management
+│   ├── VaultDeletionWorkflow.tsx — Guided vault deletion
+│   ├── AdminUsersPage.tsx — User administration
+│   ├── AdminVaultsPage.tsx — Vault overview (files, size, shares)
+│   ├── AdminConfigPage.tsx — Server configuration
+│   └── AdminAuditPage.tsx — Audit log viewer
+├── assets/               — Static images
 └── test-setup.ts         — Vitest/Testing Library setup
 ```
 

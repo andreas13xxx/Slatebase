@@ -33,6 +33,7 @@
 - **unified / remark-parse / remark-gfm / remark-frontmatter** — Markdown-Parsing (MDAST)
 - **yaml** — YAML-Parser für Frontmatter-Darstellung
 - **highlight.js** — Syntax-Highlighting in Code-Blöcken
+- **lucide-react** — Icon-Library (SVG-basiert, tree-shakeable, konsistente Lucide-Icons)
 
 ### Shared (devDependencies)
 - **fast-check** — Property-Based Testing (universelle Invarianten verifizieren)
@@ -43,10 +44,13 @@
 - Kein Redux, Zustand, Jotai (useReducer + Context reicht)
 - Kein ORM (Filesystem-basiert, keine DB)
 - Kein DI-Container (manuelle Verdrahtung ist bewusst)
-- Kein CSS-Framework (eigenes CSS, ggf. später CSS Modules)
+- Kein CSS-Framework / Tailwind (eigenes CSS mit Design Tokens, ggf. später CSS Modules)
 - Kein Mocking-Framework für Backend-Tests (hand-geschriebene Mocks)
 - Kein JWT/jose/jsonwebtoken (opake Tokens mit serverseitiger Session-Verwaltung gewählt)
 - Kein Passport.js oder ähnliche Auth-Frameworks (eigene Middleware, schlanker)
+- Kein Next.js (SPA mit eigenem Backend, kein SSR nötig)
+- Kein shadcn/ui (setzt Tailwind voraus)
+- Kein Framer Motion (kein klarer Mehrwert für Knowledge-Management-Tool)
 
 ## Updates
 

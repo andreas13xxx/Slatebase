@@ -145,12 +145,35 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 
 ## Frontend Styling
 
-### Dark Mode: CSS-Variablen konsequent nutzen
-- `index.css` definiert CSS Custom Properties mit `@media (prefers-color-scheme: dark)` Override
-- `App.css` verwendet aktuell noch hartcodierte Farbwerte — Dark-Mode-Anpassungen als separater `@media`-Block am Ende der Datei
-- **Regel für neue Styles:** Bevorzugt CSS-Variablen aus `index.css` verwenden (`var(--text)`, `var(--bg)`, `var(--border)`, etc.)
-- Falls komponentenspezifische Farben nötig: Dark-Mode-Override im `@media (prefers-color-scheme: dark)`-Block in `App.css` ergänzen
-- Farbpalette Dark Mode: Hintergründe `#16171d` / `#1a1b22` / `#1f2028` / `#2a2b36`, Text `#e5e7eb` / `#f3f4f6`, Akzent `#a78bfa`
+### Design-Token-System (CSS Custom Properties)
+- `index.css` definiert alle Design Tokens als CSS Custom Properties in `:root`
+- Kategorien: Farben (bg, text, border, accent, danger, success, warning), Schatten, Radien, Transitions, Fonts
+- Dark Mode: Kompletter Override aller Tokens in `@media (prefers-color-scheme: dark)` Block
+- `App.css` verwendet ausschließlich `var(--token-name)` — keine hartcodierten Farbwerte mehr
+- **Regel:** Neue Farben immer als Token in `index.css` definieren, nie direkt in Komponenten-CSS
+
+### Sidebar mit dunklem Theme
+- Sidebar hat eigene Token-Gruppe: `--sidebar-bg`, `--sidebar-text`, `--sidebar-text-active`, `--sidebar-hover`, `--sidebar-active`, `--sidebar-border`
+- Dunkler Hintergrund (`#1e1b4b` light / `#0d0b1e` dark) für visuellen Kontrast zum Content-Bereich
+- Sidebar-Elemente (VaultList, FileExplorer, Toolbar) nutzen Sidebar-Tokens statt globaler Tokens
+
+### 3-Spalten-Layout mit Resize
+- Layout: Sidebar | Toolbar | Content | (optional) Right Panel
+- Resize-Handles zwischen Panels: 4px breit, `cursor: col-resize`, Akzent-Farbe bei Hover
+- `useResize(initialWidth, min, max, side)` Hook für Maus-Drag-Resize
+- Panels haben `min-width` und `max-width` Constraints
+- Right Panel ist optional (Toggle-Button unten rechts)
+
+### Inter Font via Google Fonts
+- Eingebunden in `index.html` mit `preconnect` für Performance
+- `--font-sans: 'Inter', system-ui, -apple-system, sans-serif` als Fallback-Chain
+- `--font-mono: ui-monospace, 'Cascadia Code', 'Fira Code', Consolas, monospace` für Code
+
+### Lucide React Icons
+- `lucide-react` (pinned: 0.511.0) für alle Icons im Frontend
+- Konsistente Größen: 12px (Buttons), 13-14px (Menü-Items), 15px (Toolbar), 18px (Feature-Icons)
+- Icons als React-Komponenten: `<Upload size={14} />`, `<Trash2 size={12} />`
+- Ersetzt alle Unicode-Zeichen (▼, ▶, ×, ✏️, 👁️) durch Lucide-Äquivalente
 
 ## Häufige Stolperfallen
 
@@ -161,6 +184,10 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 5. **Vite Proxy** leitet `/api` an `localhost:3000` weiter → Backend muss laufen für Frontend-Dev
 6. **React.createElement** statt JSX in State/Context-Dateien (kein JSX-Transform dort)
 7. **Vault-IDs** sind SHA-256-Hashes (erste 12 Hex-Zeichen) des normalisierten Pfads — deterministisch, nicht zufällig
+8. **Singleton ApiClient** — `TabContent` und andere Komponenten müssen den shared `apiClient` aus `AppContext` nutzen, NICHT `new ApiClient()` erstellen (sonst fehlt der Token → 401 bei Speichern)
+9. **`vite.config.ts` Build** — `defineConfig` muss aus `vitest/config` importiert werden (nicht aus `vite`), damit der `test`-Block erkannt wird
+10. **Test-Dateien im Build** — `tsconfig.app.json` muss `"exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]` haben, sonst blockieren Test-Typ-Fehler den Production-Build
+11. **Vault-Ownership** — `createVault` im Backend muss `ownerId` aus der Session setzen, sonst funktionieren Sharing-Endpoints nicht (403 "Only the vault owner can manage shares")
 
 ## Vault-Besitz & Löschregeln
 
@@ -240,13 +267,17 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 ### Git-Proxy auf localhost:3128
 - Globale Git-Config hat `http.proxy = http://127.0.0.1:3128` gesetzt
 - Wenn der lokale Proxy (z.B. Squid, Clash, v2ray) nicht läuft, schlägt `git push` fehl mit "Failed to connect to github.com port 443 via 127.0.0.1"
-- **Workaround:** `git config --global --unset http.proxy` → Push → Proxy wieder setzen
+- **Workaround:** `git -c http.proxy="" push origin master` — überschreibt den Proxy nur für diesen einen Befehl
+- **Alternative:** `git config --global --unset http.proxy` → Push → Proxy wieder setzen
 - **Langfristig:** Proxy nur für bestimmte Hosts konfigurieren oder sicherstellen dass er immer läuft
 
 ### Gitignore-Pflege bei neuen Tools
 - `.kiro/settings/` (lokale MCP-Config) muss in `.gitignore` stehen — ist maschinenspezifisch
 - `.kiro/specs/` und `.kiro/steering/` gehören ins Repo (Projekt-Dokumentation)
 - Root-Level-Screenshots (`/*.png`, `/*.jpg`) ausschließen — entstehen durch Playwright-MCP und Debug-Sessions
+- `skills-lock.json` und `**/skills-lock.json` ausschließen — auto-generiert durch Kiro Skills
+- `.agents/` und `.kiro/skills/` ausschließen — auto-generiert, maschinenspezifisch
+- `frontend/.kiro/` wird durch die Regel für Unterverzeichnisse abgedeckt
 - **Regel:** Bei Einführung neuer Tools/Workflows prüfen ob `.gitignore`-Einträge fehlen
 
 ## Frontend UX-Patterns
@@ -284,6 +315,33 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - `flex: 0 1 auto` — Tabs schrumpfen bei Platzmangel, wachsen nicht über max-width
 - `overflow: hidden` auf dem Tab-Bar-Container (kein horizontales Scrollen)
 - Unsaved-Indikator: `● ` Prefix im Label wenn `editBuffer !== content`
+- **Tooltip:** Immer den vollen Dateipfad als `title`-Attribut anzeigen (nicht nur bei Duplikaten)
+
+### Einstellungsseiten als Tabs
+- Settings-Seiten (Profil, Sitzungen, Admin-Seiten) öffnen sich als schließbare Tabs
+- Eigene `SettingsTabBar` über dem Content-Bereich (getrennt von Datei-Tabs)
+- Mehrere Settings-Seiten können gleichzeitig offen sein
+- "Zurück zu Tresoren" Button in der Sidebar wenn Settings aktiv
+- Settings-Tabs haben Icons (Lucide) + Label + Close-Button
+
+### Letzter Vault wiederherstellen
+- `localStorage` Key `slatebase_last_vault` speichert die zuletzt gewählte Vault-ID
+- Nach Login: Vault automatisch wiederherstellen wenn er noch existiert
+- Bei Logout: Key aus localStorage entfernen
+
+### Draggable Toolbar
+- Vertikale Toolbar links vom File Explorer (zwischen Sidebar-Resize und Content)
+- Buttons per Drag-and-Drop umsortierbar (HTML5 Drag API)
+- Buttons zeigen Tooltip (`title`) bei Hover
+- Vault-spezifische Buttons (Import, Sharing) sind disabled wenn kein Vault ausgewählt
+- Admin-Buttons nur sichtbar wenn `user.role === 'admin'`
+
+### Editor-Toolbar
+- Horizontale Toolbar über dem Textarea im EditMode
+- Aktionen: H1, H2, H3, Fett, Kursiv, Durchgestrichen, Code, Link, Aufzählung, Nummerierte Liste, Aufgabe, Zitat, Trennlinie, Tabelle
+- Separatoren (`edit-toolbar-separator`) zwischen logischen Gruppen
+- Toolbar-Buttons setzen Markdown-Syntax an der Cursor-Position ein
+- Nach Einfügen: Cursor wird korrekt positioniert via `requestAnimationFrame` + `setSelectionRange`
 
 ## Markdown-Rendering
 

@@ -21,6 +21,9 @@ Monorepo with two independent packages: `backend/` and `frontend/`. No shared wo
 - **Build tool**: Vite 8
 - **Language**: TypeScript (~6.0)
 - **State management**: useReducer + Context (no external state library)
+- **Icons**: Lucide React (SVG-based, tree-shakeable)
+- **Fonts**: Inter (Google Fonts, loaded in index.html)
+- **Styling**: Custom CSS with Design Tokens (CSS Custom Properties), Dark Mode via `prefers-color-scheme`
 - **Testing**: Vitest + Testing Library (jsdom environment) + Playwright (e2e)
 - **Linting**: ESLint with react-hooks and react-refresh plugins
 - **Dev proxy**: Vite proxies `/api` to `http://localhost:3000`
@@ -59,5 +62,8 @@ Monorepo with two independent packages: `backend/` and `frontend/`. No shared wo
 - **zod** — Schema validation
 - **pino** — Structured logging
 - **react / react-dom** — UI framework
+- **lucide-react** — Icon library (SVG-based, consistent design)
 - **vite** — Build tooling and dev server
 - **vitest** — Test runner (both packages)
+- **highlight.js** — Syntax highlighting in Markdown code blocks
+- **unified / remark-parse / remark-gfm** — Markdown parsing (MDAST)
