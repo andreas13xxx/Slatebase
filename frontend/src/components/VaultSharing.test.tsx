@@ -151,7 +151,7 @@ describe('VaultSharing', () => {
 
     // Verify the POST was called with correct params
     const postCall = fetchSpy.mock.calls.find(
-      (call) => call[1] && (call[1] as RequestInit).method === 'POST',
+      (call: [string, RequestInit?]) => call[1] && (call[1] as RequestInit).method === 'POST',
     )
     expect(postCall).toBeDefined()
     expect(postCall![0]).toBe('/api/v1/vaults/vault-1/shares')
@@ -183,7 +183,7 @@ describe('VaultSharing', () => {
     })
 
     const deleteCall = fetchSpy.mock.calls.find(
-      (call) => call[1] && (call[1] as RequestInit).method === 'DELETE',
+      (call: [string, RequestInit?]) => call[1] && (call[1] as RequestInit).method === 'DELETE',
     )
     expect(deleteCall).toBeDefined()
     expect(deleteCall![0]).toBe('/api/v1/vaults/vault-1/shares/user-alice')

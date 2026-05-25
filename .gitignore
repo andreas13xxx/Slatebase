@@ -44,3 +44,11 @@ npm-debug.log*
 
 # Vite
 vite.config.ts.timestamp-*
+
+# Kiro skills lock files
+skills-lock.json
+**/skills-lock.json
+
+# Kiro agents/skills (auto-generated)
+.agents/
+.kiro/skills/

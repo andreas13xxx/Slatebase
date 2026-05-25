@@ -8,6 +8,7 @@ import { Hono } from 'hono'
 export { UserController, UserRouteModule } from './userRoutes.js'
 import type { IVaultService } from '../business/index.js'
 import type { ILogger } from '../logger/index.js'
+import type { SessionContext } from '../auth/index.js'
 import { VaultNotFoundError, VaultValidationError, StorageError, FileTooLargeError as BusinessFileTooLargeError, ConflictError } from '../business/index.js'
 import { PathTraversalError } from '../vault/index.js'
 import type { IImportService, UploadedFile } from '../import/index.js'
@@ -167,6 +168,7 @@ export class VaultController implements IVaultController {
    * POST /vaults — Creates a new vault.
    * Parses JSON body { name }, calls vaultService.createVault(name),
    * returns 201 with vault metadata (strips `path` field).
+   * Sets ownerId from the authenticated session.
    */
   async createVault(c: Context): Promise<Response> {
     try {
@@ -178,7 +180,11 @@ export class VaultController implements IVaultController {
         return c.json(apiError, 400)
       }
 
-      const vaultInfo = await this.vaultService.createVault(name)
+      // Get the authenticated user's ID to set as vault owner
+      const session = c.get('session') as SessionContext | undefined
+      const ownerId = session?.userId
+
+      const vaultInfo = await this.vaultService.createVault(name, ownerId)
 
       // Strip internal `path` field from response
       const { path, ...publicVault } = vaultInfo

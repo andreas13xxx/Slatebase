@@ -163,7 +163,7 @@ export interface IVaultService {
   getFileContent(vaultId: string, filePath: string): Promise<FileContent>
   resolveFilePath(vaultId: string, filePath: string): string
   saveFile(vaultId: string, filePath: string, content: string, ifMatch?: string): Promise<FileSaveResult>
-  createVault(name: string): Promise<VaultInfo>
+  createVault(name: string, ownerId?: string): Promise<VaultInfo>
   deleteVault(vaultId: string): Promise<void>
   deleteVaultWithChecks(vaultId: string, ownerId: string, force?: boolean): Promise<void>
   transferOwnership(vaultId: string, currentOwnerId: string, newOwnerId: string): Promise<void>
@@ -428,14 +428,14 @@ export class VaultService implements IVaultService {
    * 1. Validates the name using the validation module
    * 2. Generates a vault ID from the storage path
    * 3. Creates the vault storage directory
-   * 4. Adds entry to VaultRegistry
+   * 4. Adds entry to VaultRegistry (with ownerId if provided)
    * 5. Loads the vault into VaultManager's in-memory map
    *
    * Atomicity guarantees:
    * - On filesystem failure: do not add to registry
    * - On registry failure after mkdir: remove the created directory
    */
-  async createVault(name: string): Promise<VaultInfo> {
+  async createVault(name: string, ownerId?: string): Promise<VaultInfo> {
     if (!this.registry) {
       throw new StorageError('VaultRegistry is not configured')
     }
@@ -477,6 +477,7 @@ export class VaultService implements IVaultService {
       name,
       storagePath: finalStoragePath,
       createdAt: new Date().toISOString(),
+      ...(ownerId !== undefined ? { ownerId } : {}),
     }
 
     try {

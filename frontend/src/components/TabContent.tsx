@@ -2,13 +2,10 @@ import { useState, useCallback } from 'react'
 import { useTabContext } from '../state/tabContext'
 import { useAppContext } from '../state'
 import { openTab, saveTab } from '../state/tabActions'
-import { ApiClient } from '../api'
 import type { DirectoryTree } from '../types'
 import { EditMode } from './EditMode'
 import { ViewMode } from './ViewMode'
 import { BinaryViewer } from './BinaryViewer'
-
-const apiClient = new ApiClient()
 
 /**
  * Extracts the file extension from a filename (including the dot).
@@ -58,7 +55,7 @@ function pathExistsInTree(tree: DirectoryTree | null, filePath: string): boolean
  */
 export function TabContent() {
   const { tabState, tabDispatch } = useTabContext()
-  const { state: appState, dispatch: appDispatch } = useAppContext()
+  const { state: appState, dispatch: appDispatch, apiClient } = useAppContext()
   const [saving, setSaving] = useState(false)
   const [linkError, setLinkError] = useState<string | null>(null)
 
@@ -74,12 +71,12 @@ export function TabContent() {
   )
 
   const handleSave = useCallback(async () => {
-    if (!activeTab) return
+    if (!activeTab || !apiClient) return
     const contentToSave = activeTab.editBuffer ?? activeTab.content
     setSaving(true)
     await saveTab(tabDispatch, apiClient, activeTab.vaultId, activeTab.filePath, contentToSave)
     setSaving(false)
-  }, [activeTab, tabDispatch])
+  }, [activeTab, tabDispatch, apiClient])
 
   const handleCancel = useCallback(() => {
     if (!activeTab) return
@@ -90,7 +87,7 @@ export function TabContent() {
 
   const handleInternalLinkClick = useCallback(
     async (targetPath: string) => {
-      if (!activeTab) return
+      if (!activeTab || !apiClient) return
       const fileName = targetPath.split('/').pop() ?? targetPath
 
       // Clear any previous link error
@@ -119,7 +116,7 @@ export function TabContent() {
       // Validates: Requirement 6.3
       await openTab(tabDispatch, appDispatch, apiClient, activeTab.vaultId, targetPath, fileName)
     },
-    [activeTab, tabDispatch, appDispatch, appState.directoryTree],
+    [activeTab, tabDispatch, appDispatch, appState.directoryTree, apiClient],
   )
 
   // No active tab — empty state

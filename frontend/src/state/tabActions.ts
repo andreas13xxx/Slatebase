@@ -12,7 +12,7 @@ import { generateTabId, type TabAction } from './tabState'
  */
 export async function openTab(
   tabDispatch: Dispatch<TabAction>,
-  appDispatch: Dispatch<AppAction>,
+  _appDispatch: Dispatch<AppAction>,
   apiClient: IApiClient,
   vaultId: string,
   filePath: string,

@@ -1,93 +1,136 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import {
+  Heading1, Heading2, Heading3, Bold, Italic, Strikethrough,
+  Code, Link, List, ListOrdered, CheckSquare, Table,
+  Quote, Minus,
+} from 'lucide-react'
 
 /**
  * Props for the EditMode component.
- * Auto-saves after a debounce period when content changes.
  */
 export interface EditModeProps {
-  /** Current text content (editBuffer or original content). */
   content: string
-  /** Called when the user types in the textarea. */
   onChange: (content: string) => void
-  /** Called to trigger a save. */
   onSave: () => void
-  /** Called when the user clicks Cancel (discard changes, switch to view). */
   onCancel: () => void
-  /** Whether a save operation is in progress. */
   saving: boolean
-  /** Error message from a failed save, or null. */
   error: string | null
 }
 
 type SaveStatus = 'idle' | 'unsaved' | 'saving' | 'saved' | 'error'
 
+interface ToolbarAction {
+  icon: React.ReactNode
+  label: string
+  action: (text: string, selStart: number, selEnd: number) => { text: string; cursor: number }
+  separator?: boolean
+}
+
+/** Wraps selected text or inserts at cursor. */
+function wrap(text: string, selStart: number, selEnd: number, before: string, after = before): { text: string; cursor: number } {
+  const selected = text.slice(selStart, selEnd)
+  const newText = text.slice(0, selStart) + before + selected + after + text.slice(selEnd)
+  return { text: newText, cursor: selStart + before.length + selected.length + after.length }
+}
+
+/** Prepends a prefix to the current line. */
+function prependLine(text: string, selStart: number, prefix: string): { text: string; cursor: number } {
+  const lineStart = text.lastIndexOf('\n', selStart - 1) + 1
+  const newText = text.slice(0, lineStart) + prefix + text.slice(lineStart)
+  return { text: newText, cursor: selStart + prefix.length }
+}
+
+const TOOLBAR_ACTIONS: (ToolbarAction | 'sep')[] = [
+  { icon: <Heading1 size={14} />, label: 'Überschrift 1', action: (t, s, _e) => prependLine(t, s, '# ') },
+  { icon: <Heading2 size={14} />, label: 'Überschrift 2', action: (t, s, _e) => prependLine(t, s, '## ') },
+  { icon: <Heading3 size={14} />, label: 'Überschrift 3', action: (t, s, _e) => prependLine(t, s, '### ') },
+  'sep',
+  { icon: <Bold size={14} />, label: 'Fett', action: (t, s, e) => wrap(t, s, e, '**') },
+  { icon: <Italic size={14} />, label: 'Kursiv', action: (t, s, e) => wrap(t, s, e, '_') },
+  { icon: <Strikethrough size={14} />, label: 'Durchgestrichen', action: (t, s, e) => wrap(t, s, e, '~~') },
+  { icon: <Code size={14} />, label: 'Code', action: (t, s, e) => wrap(t, s, e, '`') },
+  'sep',
+  { icon: <Link size={14} />, label: 'Link', action: (t, s, e) => {
+    const selected = t.slice(s, e) || 'Text'
+    const newText = t.slice(0, s) + `[${selected}](url)` + t.slice(e)
+    return { text: newText, cursor: s + selected.length + 3 }
+  }},
+  'sep',
+  { icon: <List size={14} />, label: 'Aufzählung', action: (t, s, _e) => prependLine(t, s, '- ') },
+  { icon: <ListOrdered size={14} />, label: 'Nummerierte Liste', action: (t, s, _e) => prependLine(t, s, '1. ') },
+  { icon: <CheckSquare size={14} />, label: 'Aufgabe', action: (t, s, _e) => prependLine(t, s, '- [ ] ') },
+  'sep',
+  { icon: <Quote size={14} />, label: 'Zitat', action: (t, s, _e) => prependLine(t, s, '> ') },
+  { icon: <Minus size={14} />, label: 'Trennlinie', action: (t, s, e) => {
+    const ins = '\n---\n'
+    return { text: t.slice(0, s) + ins + t.slice(e), cursor: s + ins.length }
+  }},
+  { icon: <Table size={14} />, label: 'Tabelle', action: (t, s, e) => {
+    const tbl = '\n| Spalte 1 | Spalte 2 |\n|----------|----------|\n| Zelle    | Zelle    |\n'
+    return { text: t.slice(0, s) + tbl + t.slice(e), cursor: s + tbl.length }
+  }},
+]
+
 /**
- * EditMode renders a plain-text editor with auto-save.
- * Changes are automatically saved after 1.5 seconds of inactivity.
- * Shows a status indicator at the bottom (unsaved/saving/saved/error).
- *
- * Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5, 4.7
+ * EditMode renders a plain-text editor with toolbar and auto-save.
  */
-export function EditMode({ content, onChange, onSave, onCancel, saving, error }: EditModeProps) {
+export function EditMode({ content, onChange, onSave, onCancel: _onCancel, saving, error }: EditModeProps) {
   const [status, setStatus] = useState<SaveStatus>('idle')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wasSavingRef = useRef(false)
-  const hasEditedRef = useRef(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Detect save completion
   useEffect(() => {
     if (wasSavingRef.current && !saving) {
       if (error) {
         setStatus('error')
       } else {
         setStatus('saved')
-        // Reset to idle after 2 seconds
         const timer = setTimeout(() => setStatus('idle'), 2000)
         return () => clearTimeout(timer)
       }
     }
-    if (saving) {
-      setStatus('saving')
-    }
+    if (saving) setStatus('saving')
     wasSavingRef.current = saving
   }, [saving, error])
 
-  // Auto-save: debounce 1.5s after last edit
   const triggerAutoSave = useCallback(() => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current)
-    }
-    debounceRef.current = setTimeout(() => {
-      onSave()
-    }, 1500)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => { onSave() }, 1500)
   }, [onSave])
 
-  // Cleanup debounce on unmount
   useEffect(() => {
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current)
-      }
-    }
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newContent = e.target.value
-    onChange(newContent)
-    hasEditedRef.current = true
+    onChange(e.target.value)
     setStatus('unsaved')
     triggerAutoSave()
   }
 
-  // Keyboard shortcut: Ctrl+S / Cmd+S to save immediately
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
       e.preventDefault()
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current)
-      }
+      if (debounceRef.current) clearTimeout(debounceRef.current)
       onSave()
     }
+  }
+
+  /** Apply a toolbar action to the textarea content. */
+  function applyAction(action: ToolbarAction['action']) {
+    const ta = textareaRef.current
+    if (!ta) return
+    const { selectionStart: s, selectionEnd: e } = ta
+    const result = action(content, s, e)
+    onChange(result.text)
+    setStatus('unsaved')
+    triggerAutoSave()
+    // Restore cursor after React re-render
+    requestAnimationFrame(() => {
+      ta.focus()
+      ta.setSelectionRange(result.cursor, result.cursor)
+    })
   }
 
   const statusText = (() => {
@@ -100,19 +143,36 @@ export function EditMode({ content, onChange, onSave, onCancel, saving, error }:
     }
   })()
 
-  const statusClass = (() => {
-    switch (status) {
-      case 'saving': return 'edit-mode-status edit-mode-status--saving'
-      case 'saved': return 'edit-mode-status edit-mode-status--saved'
-      case 'error': return 'edit-mode-status edit-mode-status--error'
-      default: return 'edit-mode-status'
-    }
-  })()
+  const statusClass = `edit-mode-status${status === 'saving' ? ' edit-mode-status--saving' : status === 'saved' ? ' edit-mode-status--saved' : status === 'error' ? ' edit-mode-status--error' : ''}`
 
   return (
-    <div style={containerStyle}>
+    <div className="edit-mode-container">
+      {/* Toolbar */}
+      <div className="edit-mode-toolbar" role="toolbar" aria-label="Formatierungsleiste">
+        {TOOLBAR_ACTIONS.map((item, i) => {
+          if (item === 'sep') {
+            return <div key={`sep-${i}`} className="edit-toolbar-separator" />
+          }
+          return (
+            <button
+              key={item.label}
+              type="button"
+              className="edit-toolbar-btn"
+              title={item.label}
+              aria-label={item.label}
+              onClick={() => applyAction(item.action)}
+              tabIndex={-1}
+            >
+              {item.icon}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Editor */}
       <textarea
-        style={textareaStyle}
+        ref={textareaRef}
+        className="edit-mode-textarea"
         value={content}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
@@ -121,6 +181,7 @@ export function EditMode({ content, onChange, onSave, onCancel, saving, error }:
         spellCheck={false}
       />
 
+      {/* Status bar */}
       {status !== 'idle' && (
         <div className={statusClass} role={status === 'error' ? 'alert' : 'status'}>
           <span>{statusText}</span>
@@ -128,27 +189,4 @@ export function EditMode({ content, onChange, onSave, onCancel, saving, error }:
       )}
     </div>
   )
-}
-
-/* Inline styles */
-
-const containerStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  height: '100%',
-}
-
-const textareaStyle: React.CSSProperties = {
-  flex: 1,
-  fontFamily: 'monospace',
-  fontSize: '14px',
-  lineHeight: '1.5',
-  padding: '12px',
-  border: 'none',
-  borderRadius: 0,
-  resize: 'none',
-  outline: 'none',
-  whiteSpace: 'pre',
-  overflowWrap: 'normal',
-  overflow: 'auto',
 }

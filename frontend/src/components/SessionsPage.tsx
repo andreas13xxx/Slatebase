@@ -1,46 +1,29 @@
 import { useEffect, useState } from 'react'
 import type { IApiClient, SessionInfo } from '../api'
+import { Monitor, LogOut, RefreshCw } from 'lucide-react'
 
-/** Props for the SessionsPage component. */
 export interface SessionsPageProps {
-  /** API client instance for session management requests. */
   apiClient: IApiClient
 }
 
-/**
- * Determines the most recently created session as the "current" session.
- * Since the LoginResponse does not include a sessionId, we use the most
- * recent createdAt timestamp as a heuristic to identify the current session.
- */
 function findCurrentSessionId(sessions: SessionInfo[]): string | null {
   if (sessions.length === 0) return null
   let mostRecent = sessions[0]!
   for (const session of sessions) {
-    if (session.createdAt > mostRecent.createdAt) {
-      mostRecent = session
-    }
+    if (session.createdAt > mostRecent.createdAt) mostRecent = session
   }
   return mostRecent.sessionId
 }
 
-/**
- * Formats an ISO 8601 date string to a localized German date/time string.
- */
 function formatDateTime(isoString: string): string {
-  const date = new Date(isoString)
-  return date.toLocaleString('de-DE', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+  return new Date(isoString).toLocaleString('de-DE', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
   })
 }
 
 /**
- * Session management page displaying all active sessions for the current user.
- * Allows invalidating individual sessions or all other sessions.
- * Highlights the current session based on the most recent creation time.
+ * Session management page — redesigned with modern card layout.
  */
 export function SessionsPage({ apiClient }: SessionsPageProps) {
   const [sessions, setSessions] = useState<SessionInfo[]>([])
@@ -48,121 +31,94 @@ export function SessionsPage({ apiClient }: SessionsPageProps) {
   const [error, setError] = useState<string | null>(null)
   const [pendingAction, setPendingAction] = useState<string | null>(null)
 
-  /** Loads the list of active sessions from the API. */
   async function loadSessions(): Promise<void> {
     setIsLoading(true)
     setError(null)
     try {
-      const result = await apiClient.getSessions()
-      setSessions(result)
+      setSessions(await apiClient.getSessions())
     } catch (err: unknown) {
-      if (err !== null && typeof err === 'object' && 'message' in err) {
-        setError((err as { message: string }).message)
-      } else {
-        setError('Sitzungen konnten nicht geladen werden.')
-      }
+      setError(err !== null && typeof err === 'object' && 'message' in err
+        ? (err as { message: string }).message
+        : 'Sitzungen konnten nicht geladen werden.')
     } finally {
       setIsLoading(false)
     }
   }
 
-  useEffect(() => {
-    void loadSessions()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  useEffect(() => { void loadSessions() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Invalidates a single session by ID and refreshes the list. */
-  async function handleInvalidateSession(sessionId: string): Promise<void> {
+  async function handleInvalidate(sessionId: string): Promise<void> {
     setPendingAction(sessionId)
     setError(null)
     try {
       await apiClient.invalidateSession(sessionId)
       await loadSessions()
     } catch (err: unknown) {
-      if (err !== null && typeof err === 'object' && 'message' in err) {
-        setError((err as { message: string }).message)
-      } else {
-        setError('Sitzung konnte nicht beendet werden.')
-      }
-    } finally {
-      setPendingAction(null)
-    }
+      setError(err !== null && typeof err === 'object' && 'message' in err
+        ? (err as { message: string }).message : 'Sitzung konnte nicht beendet werden.')
+    } finally { setPendingAction(null) }
   }
 
-  /** Invalidates all sessions except the current one and refreshes the list. */
-  async function handleInvalidateAllOther(): Promise<void> {
+  async function handleInvalidateAll(): Promise<void> {
     setPendingAction('all-other')
     setError(null)
     try {
       await apiClient.invalidateAllOtherSessions()
       await loadSessions()
     } catch (err: unknown) {
-      if (err !== null && typeof err === 'object' && 'message' in err) {
-        setError((err as { message: string }).message)
-      } else {
-        setError('Sitzungen konnten nicht beendet werden.')
-      }
-    } finally {
-      setPendingAction(null)
-    }
+      setError(err !== null && typeof err === 'object' && 'message' in err
+        ? (err as { message: string }).message : 'Sitzungen konnten nicht beendet werden.')
+    } finally { setPendingAction(null) }
   }
 
   const currentSessionId = findCurrentSessionId(sessions)
-  const hasOtherSessions = sessions.length > 1
-
-  if (isLoading) {
-    return (
-      <div className="sessions-page">
-        <h1 className="sessions-title">Aktive Sitzungen</h1>
-        <p className="sessions-loading">Laden…</p>
-      </div>
-    )
-  }
+  const hasOtherSessions = sessions.filter((s) => s.sessionId !== currentSessionId).length > 0
 
   return (
     <div className="sessions-page">
-      <h1 className="sessions-title">Aktive Sitzungen</h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <h1 className="sessions-title" style={{ margin: 0 }}>Aktive Sitzungen</h1>
+        <button
+          className="sessions-revoke-btn"
+          style={{ marginLeft: 'auto', borderColor: 'var(--border-default)', color: 'var(--text-secondary)' }}
+          onClick={() => void loadSessions()}
+          disabled={isLoading}
+          title="Aktualisieren"
+        >
+          <RefreshCw size={13} />
+        </button>
+      </div>
 
-      {error && (
-        <p className="sessions-error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <p className="sessions-error" role="alert">{error}</p>}
 
-      {sessions.length === 0 && !error && (
+      {isLoading ? (
+        <p className="sessions-loading">Laden…</p>
+      ) : sessions.length === 0 ? (
         <p className="sessions-empty">Keine aktiven Sitzungen gefunden.</p>
-      )}
-
-      {sessions.length > 0 && (
+      ) : (
         <>
           <ul className="sessions-list" aria-label="Aktive Sitzungen">
             {sessions.map((session) => {
               const isCurrent = session.sessionId === currentSessionId
               return (
-                <li
-                  key={session.sessionId}
-                  className={`sessions-item${isCurrent ? ' sessions-item--current' : ''}`}
-                >
+                <li key={session.sessionId} className={`sessions-item${isCurrent ? ' sessions-item--current' : ''}`}>
+                  <Monitor size={18} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                   <div className="sessions-item-info">
-                    <span className="sessions-item-device">
-                      {session.userAgent}
-                    </span>
-                    {isCurrent && (
-                      <span className="sessions-item-badge">Aktuelle Sitzung</span>
-                    )}
-                    <span className="sessions-item-meta">
-                      Letzte Aktivität: {formatDateTime(session.lastActivity)}
-                    </span>
-                    <span className="sessions-item-meta">
-                      Erstellt am: {formatDateTime(session.createdAt)}
-                    </span>
+                    <div className="sessions-item-agent" title={session.userAgent}>
+                      {session.userAgent.length > 60 ? session.userAgent.slice(0, 60) + '…' : session.userAgent}
+                    </div>
+                    <div className="sessions-item-meta">
+                      IP: {session.ipAddress} · Erstellt: {formatDateTime(session.createdAt)} · Aktiv: {formatDateTime(session.lastActivity)}
+                    </div>
                   </div>
-                  {!isCurrent && (
+                  {isCurrent ? (
+                    <span className="sessions-current-badge">Aktuelle Sitzung</span>
+                  ) : (
                     <button
-                      className="sessions-item-action"
-                      onClick={() => void handleInvalidateSession(session.sessionId)}
+                      className="sessions-revoke-btn"
+                      onClick={() => void handleInvalidate(session.sessionId)}
                       disabled={pendingAction !== null}
-                      aria-label={`Sitzung beenden: ${session.userAgent}`}
+                      aria-label={`Sitzung beenden`}
                     >
                       {pendingAction === session.sessionId ? 'Beenden…' : 'Beenden'}
                     </button>
@@ -174,11 +130,12 @@ export function SessionsPage({ apiClient }: SessionsPageProps) {
 
           {hasOtherSessions && (
             <button
-              className="sessions-invalidate-all"
-              onClick={() => void handleInvalidateAllOther()}
+              className="sessions-revoke-all-btn"
+              onClick={() => void handleInvalidateAll()}
               disabled={pendingAction !== null}
             >
-              {pendingAction === 'all-other' ? 'Alle anderen beenden…' : 'Alle anderen beenden'}
+              <LogOut size={14} />
+              {pendingAction === 'all-other' ? 'Alle anderen beenden…' : 'Alle anderen Sitzungen beenden'}
             </button>
           )}
         </>

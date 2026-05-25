@@ -1,31 +1,5 @@
 import { useTabContext } from '../state/tabContext'
-import type { TabEntry } from '../state/tabState'
-
-/**
- * Extracts the parent folder path from a file path.
- * Returns the directory portion (everything before the last segment).
- */
-function getParentFolder(filePath: string): string {
-  const segments = filePath.replace(/\\/g, '/').split('/')
-  if (segments.length <= 1) return '/'
-  return segments.slice(0, -1).join('/')
-}
-
-/**
- * Determines which tabs have duplicate filenames and need a tooltip
- * showing the parent folder path for disambiguation.
- */
-function getDuplicateFileNames(tabs: TabEntry[]): Set<string> {
-  const nameCount = new Map<string, number>()
-  for (const tab of tabs) {
-    nameCount.set(tab.fileName, (nameCount.get(tab.fileName) ?? 0) + 1)
-  }
-  const duplicates = new Set<string>()
-  for (const [name, count] of nameCount) {
-    if (count > 1) duplicates.add(name)
-  }
-  return duplicates
-}
+import { Eye, Pencil, X } from 'lucide-react'
 
 /**
  * TabBar renders the horizontal tab strip showing all open tabs.
@@ -38,8 +12,6 @@ function getDuplicateFileNames(tabs: TabEntry[]): Set<string> {
 export function TabBar() {
   const { tabState, tabDispatch } = useTabContext()
   const { tabs, activeTabId } = tabState
-
-  const duplicateNames = getDuplicateFileNames(tabs)
 
   if (tabs.length === 0) {
     return null
@@ -77,9 +49,9 @@ export function TabBar() {
     <div className="tab-bar" role="tablist" aria-label="Geöffnete Dateien">
       {tabs.map((tab) => {
         const isActive = tab.id === activeTabId
-        const showTooltip = duplicateNames.has(tab.fileName)
-        const modeLabel = tab.mode === 'edit' ? 'Bearbeitungsmodus' : 'Ansichtsmodus'
-        const modeIcon = tab.mode === 'edit' ? '✏️' : '👁️'
+        const tooltip = tab.filePath
+        const modeLabel = tab.mode === 'edit' ? 'Vorschau anzeigen' : 'Bearbeiten'
+        const ModeIcon = tab.mode === 'edit' ? Eye : Pencil
         const hasUnsaved = tab.editBuffer !== null && tab.editBuffer !== tab.content
 
         const tabClassName = `tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}`
@@ -89,18 +61,16 @@ export function TabBar() {
             key={tab.id}
             role="tab"
             aria-selected={isActive}
-            aria-label={tab.fileName}
+            aria-label={tab.filePath}
             className={tabClassName}
             onClick={() => handleActivate(tab.id)}
-            title={showTooltip ? getParentFolder(tab.filePath) : undefined}
+            title={tooltip}
             tabIndex={isActive ? 0 : -1}
           >
-            {/* Filename label (truncated) */}
             <span className="tab-bar-tab-label">
               {hasUnsaved ? '● ' : ''}{tab.fileName}
             </span>
 
-            {/* Mode toggle icon */}
             <button
               type="button"
               className="tab-bar-mode-btn"
@@ -111,19 +81,19 @@ export function TabBar() {
               disabled={tab.isBinary}
               tabIndex={0}
             >
-              {modeIcon}
+              <ModeIcon size={12} />
             </button>
 
-            {/* Close button */}
             <button
               type="button"
               className="tab-bar-close-btn"
               aria-label={`Tab schließen: ${tab.fileName}`}
+              title="Tab schließen"
               onClick={(e) => handleClose(e, tab.id)}
               onKeyDown={(e) => handleCloseKeyDown(e, tab.id)}
               tabIndex={0}
             >
-              ×
+              <X size={12} />
             </button>
           </div>
         )

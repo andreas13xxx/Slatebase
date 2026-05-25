@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAppContext, createVault, deleteVault } from '../state'
+import { ChevronDown, ChevronUp, Plus, Trash2, Database } from 'lucide-react'
 
 /**
  * Maximum vault name length as defined in the spec.
@@ -99,10 +100,12 @@ export function VaultList() {
         aria-label="Vault auswählen"
       >
         <span className="vault-dropdown-label">
-          {selectedVault ? selectedVault.name : 'Vault auswählen…'}
+          {selectedVault
+            ? <><Database size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 5 }} />{selectedVault.name}</>
+            : 'Vault auswählen…'}
         </span>
         <span className="vault-dropdown-chevron" aria-hidden="true">
-          {isOpen ? '▲' : '▼'}
+          {isOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
         </span>
       </button>
 
@@ -132,9 +135,10 @@ export function VaultList() {
                     type="button"
                     className="vault-dropdown-item-delete"
                     aria-label={`Vault "${vault.name}" löschen`}
+                    title={`"${vault.name}" löschen`}
                     onClick={(e) => handleDelete(e, vault.id, vault.name)}
                   >
-                    ×
+                    <Trash2 size={13} />
                   </button>
                 </li>
               ))}
@@ -149,7 +153,7 @@ export function VaultList() {
                 className="vault-dropdown-create-btn"
                 onClick={handleShowCreateForm}
               >
-                + Neuer Vault
+                <Plus size={13} /> Neuer Vault
               </button>
             ) : (
               <form className="vault-dropdown-create-form" onSubmit={handleCreateSubmit}>

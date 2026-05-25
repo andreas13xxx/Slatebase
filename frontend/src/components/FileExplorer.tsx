@@ -3,6 +3,7 @@ import { useAppContext, deleteContent } from '../state'
 import { useTabContext } from '../state/tabContext'
 import { openTab } from '../state/tabActions'
 import type { DirectoryTree } from '../types'
+import { ChevronRight, ChevronDown, Folder, FolderOpen, FileText, Trash2 } from 'lucide-react'
 
 /**
  * Props for the recursive TreeNode component.
@@ -35,10 +36,12 @@ function TreeNode({ node, selectedFilePath, expandedPaths, onToggleFolder, onSel
             className="tree-node-toggle"
             aria-expanded={isExpanded}
             onClick={() => onToggleFolder(node.path)}
+            title={node.path}
           >
             <span className="tree-node-chevron" aria-hidden="true">
-              {isExpanded ? '▼' : '▶'}
+              {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             </span>
+            {isExpanded ? <FolderOpen size={14} style={{ flexShrink: 0, color: 'var(--accent)' }} /> : <Folder size={14} style={{ flexShrink: 0, color: 'var(--sidebar-text)' }} />}
             <span className="tree-node-name">
               {node.name}
               {node.itemCount != null && (
@@ -49,10 +52,11 @@ function TreeNode({ node, selectedFilePath, expandedPaths, onToggleFolder, onSel
           <button
             type="button"
             className="tree-node-delete"
-            aria-label={`Delete folder ${node.name}`}
+            aria-label={`Ordner "${node.name}" löschen`}
+            title={`"${node.name}" löschen`}
             onClick={() => onDelete(node.path, node.name)}
           >
-            ×
+            <Trash2 size={12} />
           </button>
         </div>
         {isExpanded && node.children && node.children.length > 0 && (
@@ -82,16 +86,20 @@ function TreeNode({ node, selectedFilePath, expandedPaths, onToggleFolder, onSel
           className={`tree-node-file${isSelected ? ' tree-node-file--selected' : ''}`}
           aria-current={isSelected ? 'true' : undefined}
           onClick={() => onSelectFile(node.path, node.name)}
+          title={node.path}
+          style={{ display: 'flex', alignItems: 'center', gap: 5 }}
         >
+          <FileText size={13} style={{ flexShrink: 0, opacity: 0.6 }} />
           {node.name}
         </button>
         <button
           type="button"
           className="tree-node-delete"
-          aria-label={`Delete file ${node.name}`}
+          aria-label={`Datei "${node.name}" löschen`}
+          title={`"${node.name}" löschen`}
           onClick={() => onDelete(node.path, node.name)}
         >
-          ×
+          <Trash2 size={12} />
         </button>
       </div>
     </li>

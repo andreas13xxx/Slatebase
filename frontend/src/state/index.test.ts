@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { appReducer, initialState, loadVaults, selectVault, loadFile, createVault, deleteVault, importFile, importFolder, deleteContent } from './index'
-import type { AppState, AppAction, VaultInfo, DirectoryTree, FileContent } from '../types'
+import type { AppState, VaultInfo, DirectoryTree, FileContent } from '../types'
 import type { IApiClient } from '../api'
 
 describe('appReducer', () => {
