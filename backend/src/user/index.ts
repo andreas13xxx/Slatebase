@@ -40,6 +40,7 @@ export interface PublicUserInfo {
   username: string
   displayName: string
   email: string
+  avatarUrl: string
   role: UserRole
   preferredLanguage: 'de' | 'en'
   colorScheme: 'light' | 'dark' | 'system'
@@ -1137,23 +1138,26 @@ export class UserService implements IUserService {
 
   /**
    * Validate email: RFC 5322 format, max 254 characters.
-   * Uses a basic regex for RFC 5322 compliance.
+   * Empty string is allowed (clears the email).
    */
   private validateEmail(email: string): void {
+    if (email === '') return
     if (email.length > 254) {
       throw new UserValidationError('EMAIL_TOO_LONG', 'Email must be at most 254 characters')
     }
     // Basic RFC 5322 email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      throw new UserValidationError('EMAIL_INVALID', 'Email must be a valid RFC 5322 address')
+      throw new UserValidationError('EMAIL_INVALID', 'Email must be a valid email address')
     }
   }
 
   /**
    * Validate avatar URL: max 2048 characters, must start with http:// or https://.
+   * Empty string is allowed (clears the avatar URL).
    */
   private validateAvatarUrl(avatarUrl: string): void {
+    if (avatarUrl === '') return
     if (avatarUrl.length > 2048) {
       throw new UserValidationError('AVATAR_URL_TOO_LONG', 'Avatar URL must be at most 2048 characters')
     }
@@ -1190,6 +1194,7 @@ export class UserService implements IUserService {
       username: user.username,
       displayName: user.displayName,
       email: user.email,
+      avatarUrl: user.avatarUrl,
       role: user.role,
       preferredLanguage: user.preferredLanguage,
       colorScheme: user.colorScheme,

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useAuthContext } from '../state/authContext'
+import { useTranslation } from '../i18n'
 import type { IApiClient } from '../api'
 
 /** Props for the ChangePasswordPage component. */
@@ -10,11 +11,12 @@ export interface ChangePasswordPageProps {
 
 /**
  * Change password page component shown when mustChangePassword is true.
- * Renders current password, new password, and confirm password fields with German labels.
+ * Renders current password, new password, and confirm password fields.
  * Performs client-side validation before calling the API.
  */
 export function ChangePasswordPage({ apiClient }: ChangePasswordPageProps) {
   const { authDispatch } = useAuthContext()
+  const { t } = useTranslation()
 
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -35,24 +37,24 @@ export function ChangePasswordPage({ apiClient }: ChangePasswordPageProps) {
     let valid = true
 
     if (currentPassword === '') {
-      setCurrentPasswordError('Aktuelles Passwort darf nicht leer sein.')
+      setCurrentPasswordError(t('auth.currentPasswordRequired'))
       valid = false
     } else {
       setCurrentPasswordError(null)
     }
 
     if (newPassword.length < 8) {
-      setNewPasswordError('Neues Passwort muss mindestens 8 Zeichen lang sein.')
+      setNewPasswordError(t('auth.newPasswordTooShort'))
       valid = false
     } else if (newPassword === currentPassword) {
-      setNewPasswordError('Neues Passwort muss sich vom aktuellen Passwort unterscheiden.')
+      setNewPasswordError(t('auth.newPasswordSameAsCurrent'))
       valid = false
     } else {
       setNewPasswordError(null)
     }
 
     if (confirmPassword !== newPassword) {
-      setConfirmPasswordError('Passwörter stimmen nicht überein.')
+      setConfirmPasswordError(t('auth.passwordsDoNotMatch'))
       valid = false
     } else {
       setConfirmPasswordError(null)
@@ -81,7 +83,7 @@ export function ChangePasswordPage({ apiClient }: ChangePasswordPageProps) {
       if (err !== null && typeof err === 'object' && 'message' in err) {
         setApiError((err as { message: string }).message)
       } else {
-        setApiError('Passwortänderung fehlgeschlagen. Bitte versuchen Sie es erneut.')
+        setApiError(t('auth.changePasswordFailed'))
       }
     } finally {
       setIsPending(false)
@@ -91,14 +93,14 @@ export function ChangePasswordPage({ apiClient }: ChangePasswordPageProps) {
   return (
     <div className="login-page">
       <form className="login-form" onSubmit={handleSubmit} noValidate>
-        <h1 className="login-title">Passwort ändern</h1>
+        <h1 className="login-title">{t('auth.changePassword')}</h1>
         <p className="change-password-info">
-          Sie müssen Ihr Passwort ändern, bevor Sie fortfahren können.
+          {t('auth.changePasswordInfo')}
         </p>
 
         <div className="login-field">
           <label className="login-label" htmlFor="change-current-password">
-            Aktuelles Passwort
+            {t('auth.currentPassword')}
           </label>
           <input
             id="change-current-password"
@@ -123,7 +125,7 @@ export function ChangePasswordPage({ apiClient }: ChangePasswordPageProps) {
 
         <div className="login-field">
           <label className="login-label" htmlFor="change-new-password">
-            Neues Passwort
+            {t('auth.newPassword')}
           </label>
           <input
             id="change-new-password"
@@ -148,7 +150,7 @@ export function ChangePasswordPage({ apiClient }: ChangePasswordPageProps) {
 
         <div className="login-field">
           <label className="login-label" htmlFor="change-confirm-password">
-            Passwort bestätigen
+            {t('auth.confirmPassword')}
           </label>
           <input
             id="change-confirm-password"
@@ -182,7 +184,7 @@ export function ChangePasswordPage({ apiClient }: ChangePasswordPageProps) {
           className="login-submit"
           disabled={isPending}
         >
-          {isPending ? 'Passwort ändern…' : 'Passwort ändern'}
+          {isPending ? t('auth.changingPassword') : t('auth.changePassword')}
         </button>
       </form>
     </div>

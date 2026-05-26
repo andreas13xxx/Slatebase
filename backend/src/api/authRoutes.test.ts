@@ -27,6 +27,7 @@ function createMockAuthService(overrides: Partial<IAuthService> = {}): IAuthServ
         username: 'testuser',
         displayName: 'Test User',
         email: 'test@example.com',
+        avatarUrl: '',
         role: 'user' as const,
         preferredLanguage: 'en' as const,
         colorScheme: 'system' as const,

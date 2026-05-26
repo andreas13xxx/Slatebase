@@ -43,6 +43,7 @@ export type AuthAction =
   | { type: 'LOGOUT' }
   | { type: 'SESSION_EXPIRED' }
   | { type: 'PASSWORD_CHANGED' }
+  | { type: 'PROFILE_UPDATED'; payload: { user: PublicUserInfo } }
 
 /** Initial auth state — unauthenticated with no user data. */
 export const initialAuthState: AuthState = {
@@ -104,13 +105,19 @@ export function authReducer(state: AuthState, action: AuthAction): AuthState {
     case 'SESSION_EXPIRED':
       return {
         ...initialAuthState,
-        error: 'Session abgelaufen. Bitte erneut anmelden.',
+        error: 'auth.sessionExpired',
       }
 
     case 'PASSWORD_CHANGED':
       return {
         ...state,
         mustChangePassword: false,
+      }
+
+    case 'PROFILE_UPDATED':
+      return {
+        ...state,
+        user: action.payload.user,
       }
   }
 }

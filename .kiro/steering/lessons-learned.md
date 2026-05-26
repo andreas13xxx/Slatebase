@@ -188,6 +188,8 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 9. **`vite.config.ts` Build** — `defineConfig` muss aus `vitest/config` importiert werden (nicht aus `vite`), damit der `test`-Block erkannt wird
 10. **Test-Dateien im Build** — `tsconfig.app.json` muss `"exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]` haben, sonst blockieren Test-Typ-Fehler den Production-Build
 11. **Vault-Ownership** — `createVault` im Backend muss `ownerId` aus der Session setzen, sonst funktionieren Sharing-Endpoints nicht (403 "Only the vault owner can manage shares")
+12. **Client vs. Server Filesystem** — Bei Features die auf das lokale Dateisystem des Users zugreifen (Export, Download), NIEMALS einen Backend-Endpoint verwenden der auf dem Server-Filesystem schreibt. Der Browser kann remote auf den Server zugreifen → Client- und Server-Filesystem sind unterschiedlich. Stattdessen Browser-APIs nutzen (File System Access API, Download via Blob, etc.)
+13. **File System Access API** — `showDirectoryPicker` ist nur in Chromium-Browsern verfügbar (Chrome, Edge, Brave). Firefox unterstützt es nicht und wird es absehbar nicht. Immer einen Fallback bereitstellen (z.B. ZIP-Download via JSZip).
 
 ## Vault-Besitz & Löschregeln
 
@@ -414,3 +416,107 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - Sektionen in Cards (`.admin-config-card`) mit Titel, optionalem Grid für Felder
 - Gefahrenzone: eigene Card mit rotem Rahmen (`--danger` Tokens)
 - Buttons mit Icons (Lucide) + Text, Primary/Danger-Varianten
+
+## Vault Import/Export
+
+### Export-Strategie: Progressive Enhancement
+- **Chromium (Chrome, Edge, Brave):** File System Access API (`showDirectoryPicker`) → User wählt Zielordner, Dateien werden direkt mit Ordnerstruktur geschrieben
+- **Firefox (Fallback):** JSZip im Browser → alle Dateien per fetch laden, clientseitig zu ZIP packen, als einzelne Datei downloaden
+- Kein Backend-Endpoint nötig — nutzt bestehende `/vaults/:vaultId/tree` und `/vaults/:vaultId/files?path=...&raw=true` Endpunkte
+- `exportVault()` ist ein Action Creator in `frontend/src/state/index.ts` (wie `importFile`/`importFolder`)
+- JSZip wird per dynamischem `import('jszip')` geladen (nur wenn Fallback gebraucht wird → kein Bundle-Overhead für Chrome-User)
+- ZIP-Dateiname: `<vault-name>-export.zip`
+- Vor dem ZIP-Fallback: `window.confirm` mit Hinweis dass Chrome besser funktioniert
+
+### Import nutzt Browser-native APIs
+- `<input type="file">` für Einzeldatei-Import
+- `<input type="file" webkitdirectory>` für Ordner-Import (funktioniert in allen modernen Browsern)
+- Kein Backend-seitiges Lesen vom Client-Filesystem möglich (Remote-Zugriff!)
+
+## Internationalisierung (i18n)
+
+### Eigener leichtgewichtiger i18n-Context
+- Kein `react-i18next` oder ähnliches Framework — eigener Provider mit `useTranslation()` Hook
+- Sprachdateien als TypeScript-Objekte (`de.ts`, `en.ts`) für Typsicherheit
+- Verschachtelte Keys mit Dot-Notation: `t('auth.login')`, `t('vault.nameEmpty')`
+- Interpolation mit `{placeholder}`-Syntax: `t('auth.rateLimited', { seconds: 30 })`
+- Typsichere Keys: TypeScript leitet erlaubte Keys aus dem deutschen Objekt ab (`TranslationKey`)
+
+### Locale-Ermittlung aus User-Profil
+- Sprache wird aus `user.preferredLanguage` bezogen (nach Login)
+- Vor Login: Fallback auf `navigator.language` (Browser-Erkennung)
+- `I18nBridge`-Komponente sitzt zwischen `AuthProvider` und Rest, liest Auth-State
+- Provider-Hierarchie: `AuthProvider` → `I18nBridge` → `I18nProvider` → `AuthGuard` → App
+- Nach Profil-Update: `PROFILE_UPDATED` Action aktualisiert Auth-State → Locale wechselt sofort
+
+### Graceful Fallback ohne Provider (Tests)
+- `useTranslation()` wirft NICHT wenn kein Provider vorhanden — gibt stattdessen deutsche Fallback-Übersetzungen zurück
+- Tests brauchen keinen `I18nProvider`-Wrapper
+- Test-Setup setzt `navigator.language = 'de-DE'` für konsistentes Verhalten in jsdom
+
+### Übersetzungs-Namespaces
+- `common.*` — Allgemeine UI-Strings (Laden, Fehler, Abbrechen, etc.)
+- `auth.*` — Login, Passwort, Session
+- `vault.*` — Vault-Verwaltung
+- `files.*` — Datei-Operationen
+- `editor.*` — Markdown-Editor-Toolbar
+- `tabs.*` — Tab-Leiste
+- `userMenu.*` — Benutzermenü
+- `pages.*` — Seitentitel
+- `profile.*` — Profilseite
+- `sessions.*` — Sitzungsverwaltung
+- `admin.users.*`, `admin.config.*`, `admin.audit.*`, `admin.vaults.*` — Admin-Seiten
+- `sharing.*` — Vault-Freigaben
+- `vaultDeletion.*` — Vault-Lösch-Workflow
+- `binaryViewer.*`, `fileViewer.*` — Datei-Anzeige
+- `rightPanel.*`, `resize.*` — Layout-Elemente
+
+### Doppelte Validierung beachten
+- Backend hat ZWEI Validierungsschichten: Zod-Schema (Controller) UND Service-Methoden (Business)
+- Beide müssen konsistent sein — wenn Zod leere Strings erlaubt, muss der Service das auch tun
+- **Regel:** Bei Validierungsänderungen IMMER beide Schichten prüfen (`validation.ts` UND Service-Methoden)
+
+## Color Scheme (Light/Dark/System)
+
+### Steuerung über data-theme Attribut
+- `<html data-theme="light|dark|system">` wird per JavaScript gesetzt
+- CSS-Logik:
+  - `data-theme="dark"` → expliziter Dark-Mode-Block (`:root[data-theme="dark"]`)
+  - `data-theme="light"` → kein Dark-Override (Light-Tokens aus `:root` greifen)
+  - `data-theme="system"` → `@media (prefers-color-scheme: dark)` mit `:root:not([data-theme="light"])` entscheidet
+- `I18nBridge` setzt `data-theme` per `useEffect` basierend auf `authState.user?.colorScheme`
+
+### Light Mode: Subtiler Kontrast statt dunkle Sidebar
+- Sidebar und Right Panel nutzen `#f1f5f9` (helles Grau-Blau), Content `#f8fafc` (noch heller)
+- Trennung durch `#e2e8f0` Borders statt durch Farbkontrast
+- Texte dunkel auf hellem Grund (Standard-Lesbarkeit)
+- Dark Mode behält dunkle Sidebar (`#0b1120`) bei
+
+## Dropdown-Positionierung bei overflow: hidden Parents
+
+### position: fixed für Dropdowns in geclippten Containern
+- `.app-vault-layout` hat `overflow: hidden` → schneidet absolut positionierte Kinder ab
+- Lösung: Dropdown mit `position: fixed` rendern
+- Position per JavaScript berechnen: `getBoundingClientRect()` des Trigger-Buttons
+- Dropdown unterhalb des Triggers, rechtsbündig zum Button
+- Schutz gegen Off-Screen: `if (left < 8) left = 8`
+- **Regel:** Wenn ein Dropdown in einem `overflow: hidden` Container sitzt → `position: fixed` + JS-Positionierung
+
+### Keine CSS-Pseudo-Element-Tooltips über Containergrenzen
+- `::after` mit `position: absolute` wird vom Parent-Overflow abgeschnitten
+- Native `title`-Attribute können über den Viewport hinausragen (Browser-Kontrolle)
+- Für Tooltips die über Container-Grenzen müssen: Custom Tooltip-Komponente mit `position: fixed` oder Portal
+- **Einfachste Lösung:** Auf Tooltip verzichten wenn die Info im Dropdown/Menü sichtbar ist
+
+## PublicUserInfo: Backend und Frontend synchron halten
+
+### Alle Felder im Backend-Interface UND in toPublicInfo()
+- Wenn ein Feld zum `PublicUserInfo`-Interface hinzugefügt wird, MUSS es auch in `toPublicInfo()` gemappt werden
+- Sonst gibt der Server das Feld nicht zurück → Frontend bekommt `undefined` statt des erwarteten Typs
+- **Betroffene Stellen:** `UserService.toPublicInfo()`, `AuthService` Login-Response, Test-Mocks
+- **Regel:** Bei Interface-Änderungen `grep` nach allen Stellen die das Interface konstruieren
+
+### Defensive Initialisierung im Frontend
+- Felder die vom Server kommen immer mit `?? ''` oder `?? defaultValue` initialisieren
+- Schützt gegen alte Sessions/Caches die das neue Feld noch nicht haben
+- Besonders wichtig nach Interface-Erweiterungen (alte Daten im sessionStorage)

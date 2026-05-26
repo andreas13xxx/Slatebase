@@ -723,27 +723,36 @@ export class VaultService implements IVaultService {
       throw new VaultNotFoundError(vaultId)
     }
 
-    // Verify new owner exists
-    const newOwner = await this.userRepository.findById(newOwnerId)
+    // Verify new owner exists — try by ID first, then by username
+    let newOwner = await this.userRepository.findById(newOwnerId)
+    if (!newOwner) {
+      newOwner = await this.userRepository.findByUsername(newOwnerId)
+    }
     if (!newOwner) {
       throw new VaultValidationError('USER_NOT_FOUND', `Target user not found: ${newOwnerId}`)
     }
 
+    // Use the resolved userId for all subsequent operations
+    const resolvedNewOwnerId = newOwner.userId
+
     // Check that all shares except to the new owner are revoked
     const shares = await this.shareRegistry.getSharesForVault(vaultId)
-    const remainingShares = shares.filter((s) => s.userId !== newOwnerId)
+    const remainingShares = shares.filter((s) => s.userId !== resolvedNewOwnerId)
     if (remainingShares.length > 0) {
       throw new SharesNotRevokedError(vaultId, remainingShares)
     }
 
     // Transfer ownership: update registry entry
-    entry.ownerId = newOwnerId
+    entry.ownerId = resolvedNewOwnerId
     await this.registry.save(entries)
 
+    // Update in-memory VaultManager so getVaultList reflects the new owner immediately
+    vault.info.ownerId = resolvedNewOwnerId
+
     // Remove any share the new owner had (they are now the owner, no share needed)
-    const newOwnerShare = shares.find((s) => s.userId === newOwnerId)
+    const newOwnerShare = shares.find((s) => s.userId === resolvedNewOwnerId)
     if (newOwnerShare) {
-      await this.shareRegistry.removeShare(vaultId, newOwnerId)
+      await this.shareRegistry.removeShare(vaultId, resolvedNewOwnerId)
     }
 
     // Revoke old owner access (remove any share that might exist for old owner)
@@ -752,7 +761,7 @@ export class VaultService implements IVaultService {
     this.logger.info('Vault ownership transferred', {
       vaultId,
       fromOwner: currentOwnerId,
-      toOwner: newOwnerId,
+      toOwner: resolvedNewOwnerId,
     })
 
     await this.auditService?.log({
@@ -761,7 +770,7 @@ export class VaultService implements IVaultService {
       target: vaultId,
       ipAddress: '0.0.0.0',
       success: true,
-      details: JSON.stringify({ fromOwner: currentOwnerId, toOwner: newOwnerId }),
+      details: JSON.stringify({ fromOwner: currentOwnerId, toOwner: resolvedNewOwnerId }),
     })
   }
 

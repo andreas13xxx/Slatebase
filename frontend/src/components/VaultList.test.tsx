@@ -117,21 +117,21 @@ describe('VaultList (Dropdown)', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
   })
 
-  it('shows "+ Neuer Vault" button in dropdown', async () => {
+  it('shows "Neuer Vault" button in dropdown', async () => {
     const user = userEvent.setup()
     renderVaultList()
 
     await user.click(screen.getByRole('button', { name: 'Vault auswählen' }))
 
-    expect(screen.getByText('+ Neuer Vault')).toBeInTheDocument()
+    expect(screen.getByText('Neuer Vault')).toBeInTheDocument()
   })
 
-  it('reveals create form when "+ Neuer Vault" is clicked', async () => {
+  it('reveals create form when "Neuer Vault" is clicked', async () => {
     const user = userEvent.setup()
     renderVaultList()
 
     await user.click(screen.getByRole('button', { name: 'Vault auswählen' }))
-    await user.click(screen.getByText('+ Neuer Vault'))
+    await user.click(screen.getByText('Neuer Vault'))
 
     expect(screen.getByPlaceholderText('Vault-Name…')).toBeInTheDocument()
   })
@@ -141,7 +141,7 @@ describe('VaultList (Dropdown)', () => {
     renderVaultList()
 
     await user.click(screen.getByRole('button', { name: 'Vault auswählen' }))
-    await user.click(screen.getByText('+ Neuer Vault'))
+    await user.click(screen.getByText('Neuer Vault'))
     await user.click(screen.getByRole('button', { name: 'OK' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent('Vault-Name darf nicht leer sein')
@@ -152,7 +152,7 @@ describe('VaultList (Dropdown)', () => {
     renderVaultList({ vaults: [{ id: 'v1', name: 'Existing' }] })
 
     await user.click(screen.getByRole('button', { name: 'Vault auswählen' }))
-    await user.click(screen.getByText('+ Neuer Vault'))
+    await user.click(screen.getByText('Neuer Vault'))
     await user.type(screen.getByPlaceholderText('Vault-Name…'), 'Existing')
     await user.click(screen.getByRole('button', { name: 'OK' }))
 
@@ -165,7 +165,7 @@ describe('VaultList (Dropdown)', () => {
     const { dispatch } = renderVaultList({}, { createVault: mockCreateVault })
 
     await user.click(screen.getByRole('button', { name: 'Vault auswählen' }))
-    await user.click(screen.getByText('+ Neuer Vault'))
+    await user.click(screen.getByText('Neuer Vault'))
     await user.type(screen.getByPlaceholderText('Vault-Name…'), 'New Vault')
     await user.click(screen.getByRole('button', { name: 'OK' }))
 

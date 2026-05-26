@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react'
 import type { IApiClient, UserSearchResult } from '../api'
+import { useTranslation } from '../i18n'
 
 /** A single vault share entry as returned by the backend. */
 export interface VaultShareEntry {
@@ -31,9 +32,10 @@ const SEARCH_DEBOUNCE_MS = 300
  * Displays current shares for an owned vault and provides controls
  * to add, revoke, and change permissions of shares.
  * Includes username autocomplete when adding new shares.
- * UI labels are in German.
  */
 export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
+  const { t } = useTranslation()
+
   const [shares, setShares] = useState<VaultShareEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -76,14 +78,14 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
       })
 
       if (!response.ok) {
-        const body = await response.json().catch(() => ({ message: 'Fehler beim Laden der Freigaben' }))
+        const body = await response.json().catch(() => ({ message: t('sharing.loadError') }))
         throw new Error(body.message || `HTTP ${response.status}`)
       }
 
       const data: VaultShareEntry[] = await response.json()
       setShares(data)
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Fehler beim Laden der Freigaben'
+      const message = err instanceof Error ? err.message : t('sharing.loadError')
       setError(message)
     } finally {
       setLoading(false)
@@ -213,7 +215,7 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
 
     const trimmedUsername = username.trim()
     if (trimmedUsername === '') {
-      setAddError('Benutzername darf nicht leer sein.')
+      setAddError(t('sharing.usernameRequired'))
       return
     }
 
@@ -241,8 +243,8 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
       })
 
       if (!response.ok) {
-        const body = await response.json().catch(() => ({ message: 'Fehler beim Hinzufügen' }))
-        throw new Error(mapShareError(body.code, body.message))
+        const body = await response.json().catch(() => ({ message: t('sharing.addError') }))
+        throw new Error(mapShareError(body.code, body.message, t))
       }
 
       setUsername('')
@@ -250,7 +252,7 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
       setPermission('read')
       await loadShares()
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Fehler beim Hinzufügen der Freigabe'
+      const message = err instanceof Error ? err.message : t('sharing.addError')
       setAddError(message)
     } finally {
       setAddLoading(false)
@@ -279,13 +281,13 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
       })
 
       if (!response.ok) {
-        const body = await response.json().catch(() => ({ message: 'Fehler beim Widerrufen' }))
-        throw new Error(body.message || 'Fehler beim Widerrufen der Freigabe')
+        const body = await response.json().catch(() => ({ message: t('sharing.revokeError') }))
+        throw new Error(body.message || t('sharing.revokeError'))
       }
 
       await loadShares()
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Fehler beim Widerrufen der Freigabe'
+      const message = err instanceof Error ? err.message : t('sharing.revokeError')
       setError(message)
     }
   }
@@ -315,13 +317,13 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
       })
 
       if (!response.ok) {
-        const body = await response.json().catch(() => ({ message: 'Fehler beim Ändern der Berechtigung' }))
-        throw new Error(body.message || 'Fehler beim Ändern der Berechtigung')
+        const body = await response.json().catch(() => ({ message: t('sharing.changePermissionError') }))
+        throw new Error(body.message || t('sharing.changePermissionError'))
       }
 
       await loadShares()
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Fehler beim Ändern der Berechtigung'
+      const message = err instanceof Error ? err.message : t('sharing.changePermissionError')
       setError(message)
     }
   }
@@ -329,12 +331,12 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
   const limitReached = shares.length >= MAX_SHARES
 
   if (loading) {
-    return <div className="vault-sharing"><p>Laden…</p></div>
+    return <div className="vault-sharing"><p>{t('sharing.loading')}</p></div>
   }
 
   return (
     <div className="vault-sharing">
-      <h2 className="vault-sharing-title">Freigaben</h2>
+      <h2 className="vault-sharing-title">{t('sharing.title')}</h2>
 
       {error && (
         <p className="vault-sharing-error" role="alert">{error}</p>
@@ -342,15 +344,15 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
 
       {limitReached && (
         <p className="vault-sharing-limit" role="status">
-          Maximale Anzahl erreicht (20)
+          {t('sharing.limitReached')}
         </p>
       )}
 
       {/* Share list */}
       {shares.length === 0 ? (
-        <p className="vault-sharing-empty">Keine Freigaben vorhanden.</p>
+        <p className="vault-sharing-empty">{t('sharing.empty')}</p>
       ) : (
-        <ul className="vault-sharing-list" aria-label="Aktuelle Freigaben">
+        <ul className="vault-sharing-list" aria-label={t('sharing.listAriaLabel')}>
           {shares.map((share) => (
             <li key={share.userId} className="vault-sharing-item">
               <span className="vault-sharing-item-user">{share.username ?? share.userId}</span>
@@ -363,18 +365,18 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
                     void handleChangePermission(share.userId, newPerm)
                   }
                 }}
-                aria-label={`Berechtigung für ${share.username ?? share.userId}`}
+                aria-label={t('sharing.permissionAriaLabel', { username: share.username ?? share.userId })}
               >
-                <option value="read">Lesen</option>
-                <option value="write">Schreiben</option>
+                <option value="read">{t('sharing.permissionRead')}</option>
+                <option value="write">{t('sharing.permissionWrite')}</option>
               </select>
               <button
                 className="vault-sharing-item-revoke"
                 type="button"
                 onClick={() => void handleRevoke(share.userId)}
-                aria-label={`Freigabe für ${share.username ?? share.userId} widerrufen`}
+                aria-label={t('sharing.revokeAriaLabel', { username: share.username ?? share.userId })}
               >
-                Widerrufen
+                {t('sharing.revoke')}
               </button>
             </li>
           ))}
@@ -384,11 +386,11 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
       {/* Add share form */}
       {!limitReached && (
         <form className="vault-sharing-form" onSubmit={handleAddShare} noValidate>
-          <h3 className="vault-sharing-form-title">Freigabe hinzufügen</h3>
+          <h3 className="vault-sharing-form-title">{t('sharing.addTitle')}</h3>
 
           <div className="vault-sharing-form-fields">
             <div className="vault-sharing-form-field vault-sharing-autocomplete">
-              <label htmlFor="vault-sharing-username">Benutzername</label>
+              <label htmlFor="vault-sharing-username">{t('sharing.usernameLabel')}</label>
               <input
                 ref={inputRef}
                 id="vault-sharing-username"
@@ -402,7 +404,7 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
                     setShowSuggestions(true)
                   }
                 }}
-                placeholder="Benutzername eingeben…"
+                placeholder={t('sharing.usernamePlaceholder')}
                 autoComplete="off"
                 role="combobox"
                 aria-expanded={showSuggestions}
@@ -421,7 +423,7 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
                   id="vault-sharing-suggestions"
                   className="vault-sharing-suggestions"
                   role="listbox"
-                  aria-label="Benutzervorschläge"
+                  aria-label={t('sharing.suggestionsAriaLabel')}
                 >
                   {suggestions.map((user, index) => (
                     <li
@@ -446,15 +448,15 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
             </div>
 
             <div className="vault-sharing-form-field">
-              <label htmlFor="vault-sharing-permission">Berechtigung</label>
+              <label htmlFor="vault-sharing-permission">{t('sharing.permissionLabel')}</label>
               <select
                 id="vault-sharing-permission"
                 className="vault-sharing-select"
                 value={permission}
                 onChange={(e) => setPermission(e.target.value as 'read' | 'write')}
               >
-                <option value="read">Lesen</option>
-                <option value="write">Schreiben</option>
+                <option value="read">{t('sharing.permissionRead')}</option>
+                <option value="write">{t('sharing.permissionWrite')}</option>
               </select>
             </div>
 
@@ -463,7 +465,7 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
               className="vault-sharing-add-btn"
               disabled={addLoading}
             >
-              {addLoading ? 'Hinzufügen…' : 'Hinzufügen'}
+              {addLoading ? t('sharing.adding') : t('sharing.add')}
             </button>
           </div>
 
@@ -479,23 +481,23 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
 }
 
 /**
- * Maps backend error codes to user-friendly German messages.
+ * Maps backend error codes to user-friendly messages via i18n.
  */
-function mapShareError(code: string | undefined, fallbackMessage: string): string {
+function mapShareError(code: string | undefined, fallbackMessage: string, t: (key: string) => string): string {
   switch (code) {
     case 'INVALID_SHARE_TARGET':
       if (fallbackMessage.includes('self')) {
-        return 'Sie können einen Vault nicht mit sich selbst teilen.'
+        return t('sharing.errorSelfShare')
       }
       if (fallbackMessage.includes('not found') || fallbackMessage.includes('does not exist')) {
-        return 'Benutzer nicht gefunden.'
+        return t('sharing.errorUserNotFound')
       }
       return fallbackMessage
     case 'SHARE_LIMIT_REACHED':
-      return 'Maximale Anzahl an Freigaben erreicht (20).'
+      return t('sharing.errorLimitReached')
     case 'VALIDATION_ERROR':
       return fallbackMessage
     default:
-      return fallbackMessage || 'Fehler beim Hinzufügen der Freigabe.'
+      return fallbackMessage || t('sharing.addError')
   }
 }

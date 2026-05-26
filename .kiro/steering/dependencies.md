@@ -34,6 +34,7 @@
 - **yaml** — YAML-Parser für Frontmatter-Darstellung
 - **highlight.js** — Syntax-Highlighting in Code-Blöcken
 - **lucide-react** — Icon-Library (SVG-basiert, tree-shakeable, konsistente Lucide-Icons)
+- **jszip** — Client-seitiges ZIP-Erstellen (Vault-Export-Fallback für Firefox)
 
 ### Shared (devDependencies)
 - **fast-check** — Property-Based Testing (universelle Invarianten verifizieren)

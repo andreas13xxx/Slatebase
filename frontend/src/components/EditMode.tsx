@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { useTranslation } from '../i18n'
 import {
   Heading1, Heading2, Heading3, Bold, Italic, Strikethrough,
   Code, Link, List, ListOrdered, CheckSquare, Table,
@@ -22,8 +23,8 @@ type SaveStatus = 'idle' | 'unsaved' | 'saving' | 'saved' | 'error'
 
 interface ToolbarAction {
   icon: React.ReactNode
-  label: string
-  action: (text: string, selStart: number, selEnd: number) => { text: string; cursor: number }
+  labelKey: string
+  action: (text: string, selStart: number, selEnd: number, t: (key: string) => string) => { text: string; cursor: number }
   separator?: boolean
 }
 
@@ -42,32 +43,34 @@ function prependLine(text: string, selStart: number, prefix: string): { text: st
 }
 
 const TOOLBAR_ACTIONS: (ToolbarAction | 'sep')[] = [
-  { icon: <Heading1 size={14} />, label: 'Überschrift 1', action: (t, s, _e) => prependLine(t, s, '# ') },
-  { icon: <Heading2 size={14} />, label: 'Überschrift 2', action: (t, s, _e) => prependLine(t, s, '## ') },
-  { icon: <Heading3 size={14} />, label: 'Überschrift 3', action: (t, s, _e) => prependLine(t, s, '### ') },
+  { icon: <Heading1 size={14} />, labelKey: 'editor.heading1', action: (t, s, _e) => prependLine(t, s, '# ') },
+  { icon: <Heading2 size={14} />, labelKey: 'editor.heading2', action: (t, s, _e) => prependLine(t, s, '## ') },
+  { icon: <Heading3 size={14} />, labelKey: 'editor.heading3', action: (t, s, _e) => prependLine(t, s, '### ') },
   'sep',
-  { icon: <Bold size={14} />, label: 'Fett', action: (t, s, e) => wrap(t, s, e, '**') },
-  { icon: <Italic size={14} />, label: 'Kursiv', action: (t, s, e) => wrap(t, s, e, '_') },
-  { icon: <Strikethrough size={14} />, label: 'Durchgestrichen', action: (t, s, e) => wrap(t, s, e, '~~') },
-  { icon: <Code size={14} />, label: 'Code', action: (t, s, e) => wrap(t, s, e, '`') },
+  { icon: <Bold size={14} />, labelKey: 'editor.bold', action: (t, s, e) => wrap(t, s, e, '**') },
+  { icon: <Italic size={14} />, labelKey: 'editor.italic', action: (t, s, e) => wrap(t, s, e, '_') },
+  { icon: <Strikethrough size={14} />, labelKey: 'editor.strikethrough', action: (t, s, e) => wrap(t, s, e, '~~') },
+  { icon: <Code size={14} />, labelKey: 'editor.code', action: (t, s, e) => wrap(t, s, e, '`') },
   'sep',
-  { icon: <Link size={14} />, label: 'Link', action: (t, s, e) => {
+  { icon: <Link size={14} />, labelKey: 'editor.link', action: (t, s, e) => {
     const selected = t.slice(s, e) || 'Text'
     const newText = t.slice(0, s) + `[${selected}](url)` + t.slice(e)
     return { text: newText, cursor: s + selected.length + 3 }
   }},
   'sep',
-  { icon: <List size={14} />, label: 'Aufzählung', action: (t, s, _e) => prependLine(t, s, '- ') },
-  { icon: <ListOrdered size={14} />, label: 'Nummerierte Liste', action: (t, s, _e) => prependLine(t, s, '1. ') },
-  { icon: <CheckSquare size={14} />, label: 'Aufgabe', action: (t, s, _e) => prependLine(t, s, '- [ ] ') },
+  { icon: <List size={14} />, labelKey: 'editor.bulletList', action: (t, s, _e) => prependLine(t, s, '- ') },
+  { icon: <ListOrdered size={14} />, labelKey: 'editor.numberedList', action: (t, s, _e) => prependLine(t, s, '1. ') },
+  { icon: <CheckSquare size={14} />, labelKey: 'editor.task', action: (t, s, _e) => prependLine(t, s, '- [ ] ') },
   'sep',
-  { icon: <Quote size={14} />, label: 'Zitat', action: (t, s, _e) => prependLine(t, s, '> ') },
-  { icon: <Minus size={14} />, label: 'Trennlinie', action: (t, s, e) => {
+  { icon: <Quote size={14} />, labelKey: 'editor.quote', action: (t, s, _e) => prependLine(t, s, '> ') },
+  { icon: <Minus size={14} />, labelKey: 'editor.horizontalRule', action: (t, s, e) => {
     const ins = '\n---\n'
     return { text: t.slice(0, s) + ins + t.slice(e), cursor: s + ins.length }
   }},
-  { icon: <Table size={14} />, label: 'Tabelle', action: (t, s, e) => {
-    const tbl = '\n| Spalte 1 | Spalte 2 |\n|----------|----------|\n| Zelle    | Zelle    |\n'
+  { icon: <Table size={14} />, labelKey: 'editor.table', action: (t, s, e, translate) => {
+    const col = translate('editor.tableTemplate.column')
+    const cell = translate('editor.tableTemplate.cell')
+    const tbl = `\n| ${col} 1 | ${col} 2 |\n|----------|----------|\n| ${cell}    | ${cell}    |\n`
     return { text: t.slice(0, s) + tbl + t.slice(e), cursor: s + tbl.length }
   }},
 ]
@@ -76,6 +79,7 @@ const TOOLBAR_ACTIONS: (ToolbarAction | 'sep')[] = [
  * EditMode renders a plain-text editor with toolbar and auto-save.
  */
 export function EditMode({ content, onChange, onSave, onCancel: _onCancel, saving, error, readOnly }: EditModeProps) {
+  const { t } = useTranslation()
   const [status, setStatus] = useState<SaveStatus>('idle')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wasSavingRef = useRef(false)
@@ -123,7 +127,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
     const ta = textareaRef.current
     if (!ta) return
     const { selectionStart: s, selectionEnd: e } = ta
-    const result = action(content, s, e)
+    const result = action(content, s, e, t as (key: string) => string)
     onChange(result.text)
     setStatus('unsaved')
     triggerAutoSave()
@@ -136,10 +140,10 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
 
   const statusText = (() => {
     switch (status) {
-      case 'unsaved': return '● Ungespeicherte Änderungen'
-      case 'saving': return 'Speichern…'
-      case 'saved': return '✓ Gespeichert'
-      case 'error': return `✗ Fehler: ${error ?? 'Unbekannt'}`
+      case 'unsaved': return t('editor.statusUnsaved')
+      case 'saving': return t('editor.statusSaving')
+      case 'saved': return t('editor.statusSaved')
+      case 'error': return t('editor.statusError', { error: error ?? 'Unknown' })
       default: return ''
     }
   })()
@@ -151,21 +155,22 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
       {/* Read-only banner or Toolbar */}
       {readOnly ? (
         <div className="edit-mode-readonly-banner" role="status">
-          Nur Lesen — dieser Vault wurde schreibgeschützt mit dir geteilt.
+          {t('editor.readOnlyBanner')}
         </div>
       ) : (
-        <div className="edit-mode-toolbar" role="toolbar" aria-label="Formatierungsleiste">
+        <div className="edit-mode-toolbar" role="toolbar" aria-label={t('editor.toolbarAriaLabel')}>
           {TOOLBAR_ACTIONS.map((item, i) => {
             if (item === 'sep') {
               return <div key={`sep-${i}`} className="edit-toolbar-separator" />
             }
+            const label = t(item.labelKey as Parameters<typeof t>[0])
             return (
               <button
-                key={item.label}
+                key={item.labelKey}
                 type="button"
                 className="edit-toolbar-btn"
-                title={item.label}
-                aria-label={item.label}
+                title={label}
+                aria-label={label}
                 onClick={() => applyAction(item.action)}
                 tabIndex={-1}
               >
@@ -185,7 +190,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
         onKeyDown={handleKeyDown}
         disabled={saving}
         readOnly={readOnly}
-        aria-label="Dateiinhalt bearbeiten"
+        aria-label={t('editor.textareaAriaLabel')}
         spellCheck={false}
       />
 

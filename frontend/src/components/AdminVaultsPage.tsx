@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { IApiClient } from '../api'
 import type { VaultInfo } from '../types'
+import { useTranslation } from '../i18n'
 import { Server, RefreshCw, Users, FileText, HardDrive, Trash2 } from 'lucide-react'
 
 interface VaultAdminEntry extends VaultInfo {
@@ -24,6 +25,8 @@ function formatBytes(bytes: number): string {
  * Admins can delete vaults from here.
  */
 export function AdminVaultsPage({ apiClient }: AdminVaultsPageProps) {
+  const { t } = useTranslation()
+
   const [vaults, setVaults] = useState<VaultAdminEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -40,6 +43,7 @@ export function AdminVaultsPage({ apiClient }: AdminVaultsPageProps) {
         data.map(async (v) => {
           let fileCount = 0
           let sizeBytes = 0
+          let shareCount = 0
           try {
             const tree = await apiClient.fetchVaultTree(v.id)
             function countFiles(node: { type: string; size?: number; children?: typeof node[] }): void {
@@ -48,12 +52,22 @@ export function AdminVaultsPage({ apiClient }: AdminVaultsPageProps) {
             }
             countFiles(tree)
           } catch { /* ignore */ }
-          return { ...v, fileCount, sizeBytes }
+          try {
+            const token = apiClient.getToken()
+            const headers: Record<string, string> = {}
+            if (token) headers['Authorization'] = `Bearer ${token}`
+            const res = await fetch(`/api/v1/vaults/${v.id}/shares`, { headers })
+            if (res.ok) {
+              const shares: unknown[] = await res.json()
+              shareCount = shares.length
+            }
+          } catch { /* ignore */ }
+          return { ...v, fileCount, sizeBytes, shareCount }
         }),
       )
       setVaults(enriched)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Laden der Vaults')
+      setError(err instanceof Error ? err.message : t('admin.vaults.loadError'))
     } finally {
       setLoading(false)
     }
@@ -62,14 +76,14 @@ export function AdminVaultsPage({ apiClient }: AdminVaultsPageProps) {
   useEffect(() => { void loadVaults() }, [loadVaults])
 
   async function handleDelete(vaultId: string, vaultName: string): Promise<void> {
-    if (!window.confirm(`Vault "${vaultName}" wirklich löschen? Alle Dateien werden unwiderruflich entfernt.`)) return
+    if (!window.confirm(t('admin.vaults.deleteConfirm', { name: vaultName }))) return
     try {
       await apiClient.deleteVault(vaultId)
-      setMessage({ type: 'success', text: `Vault "${vaultName}" gelöscht.` })
+      setMessage({ type: 'success', text: t('admin.vaults.deleteSuccess', { name: vaultName }) })
       void loadVaults()
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'message' in err ? String((err as { message: unknown }).message) : String(err)
-      setMessage({ type: 'error', text: `Fehler beim Löschen: ${msg}` })
+      setMessage({ type: 'error', text: t('admin.vaults.deleteError', { message: msg }) })
     }
   }
 
@@ -77,9 +91,9 @@ export function AdminVaultsPage({ apiClient }: AdminVaultsPageProps) {
     <div className="admin-users-page">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <Server size={22} color="var(--accent-text)" />
-        <h1 className="admin-users-title" style={{ margin: 0 }}>Alle Vaults (Admin)</h1>
+        <h1 className="admin-users-title" style={{ margin: 0 }}>{t('admin.vaults.title')}</h1>
         <button className="admin-users-btn admin-users-btn--small" onClick={() => void loadVaults()} style={{ marginLeft: 'auto' }}>
-          <RefreshCw size={13} /> Aktualisieren
+          <RefreshCw size={13} /> {t('admin.vaults.refresh')}
         </button>
       </div>
 
@@ -93,20 +107,20 @@ export function AdminVaultsPage({ apiClient }: AdminVaultsPageProps) {
       {error && <div className="admin-users-message admin-users-message--error">{error}</div>}
 
       {loading ? (
-        <p className="admin-users-loading">Laden…</p>
+        <p className="admin-users-loading">{t('admin.vaults.loading')}</p>
       ) : vaults.length === 0 ? (
-        <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Keine Vaults vorhanden.</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>{t('admin.vaults.empty')}</p>
       ) : (
         <div className="admin-users-table-wrapper">
           <table className="admin-users-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Besitzer</th>
-                <th><FileText size={12} style={{ verticalAlign: 'middle' }} /> Dateien</th>
-                <th><HardDrive size={12} style={{ verticalAlign: 'middle' }} /> Größe</th>
-                <th><Users size={12} style={{ verticalAlign: 'middle' }} /> Berechtigung</th>
-                <th>Aktionen</th>
+                <th>{t('admin.vaults.tableName')}</th>
+                <th>{t('admin.vaults.tableOwner')}</th>
+                <th><FileText size={12} style={{ verticalAlign: 'middle' }} /> {t('admin.vaults.tableFiles')}</th>
+                <th><HardDrive size={12} style={{ verticalAlign: 'middle' }} /> {t('admin.vaults.tableSize')}</th>
+                <th><Users size={12} style={{ verticalAlign: 'middle' }} /> {t('admin.vaults.tableShares')}</th>
+                <th>{t('admin.vaults.tableActions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -119,18 +133,18 @@ export function AdminVaultsPage({ apiClient }: AdminVaultsPageProps) {
                   <td>{vault.fileCount ?? '—'}</td>
                   <td>{vault.sizeBytes !== undefined ? formatBytes(vault.sizeBytes) : '—'}</td>
                   <td>
-                    {vault.permission === 'owner' && <span className="my-vaults-badge my-vaults-badge--owner">Besitzer</span>}
-                    {vault.permission === 'read' && <span className="my-vaults-badge my-vaults-badge--read">Lesen</span>}
-                    {vault.permission === 'write' && <span className="my-vaults-badge my-vaults-badge--write">Bearbeiten</span>}
-                    {!vault.permission && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>}
+                    {vault.shareCount !== undefined && vault.shareCount > 0
+                      ? <span style={{ fontWeight: 500 }}>{vault.shareCount}</span>
+                      : <span style={{ color: 'var(--text-muted)' }}>—</span>
+                    }
                   </td>
                   <td>
                     <button
                       className="admin-users-btn admin-users-btn--small admin-users-btn--danger"
                       onClick={() => void handleDelete(vault.id, vault.name)}
-                      title={`"${vault.name}" löschen`}
+                      title={t('admin.vaults.deleteTitle', { name: vault.name })}
                     >
-                      <Trash2 size={12} /> Löschen
+                      <Trash2 size={12} /> {t('admin.vaults.delete')}
                     </button>
                   </td>
                 </tr>

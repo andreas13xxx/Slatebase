@@ -72,7 +72,7 @@ describe('TabProvider and useTabContext', () => {
       })
     })
 
-    // Load content so it's a text file (mode starts as 'edit')
+    // Load content so it's a text file (mode starts as 'view' by default)
     act(() => {
       result.current.tabDispatch({
         type: 'TAB_CONTENT_LOADED',
@@ -80,7 +80,7 @@ describe('TabProvider and useTabContext', () => {
       })
     })
 
-    expect(result.current.tabState.tabs[0].mode).toBe('edit')
+    expect(result.current.tabState.tabs[0].mode).toBe('view')
 
     act(() => {
       result.current.tabDispatch({
@@ -89,6 +89,6 @@ describe('TabProvider and useTabContext', () => {
       })
     })
 
-    expect(result.current.tabState.tabs[0].mode).toBe('view')
+    expect(result.current.tabState.tabs[0].mode).toBe('edit')
   })
 })

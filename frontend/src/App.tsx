@@ -3,6 +3,7 @@ import { AppProvider, useAppContext, loadVaults, importFile, importFolder, expor
 import { ApiClient } from './api'
 import { AuthProvider, useAuthContext } from './state/authContext'
 import { TabProvider, useTabContext } from './state/tabContext'
+import { I18nProvider, useTranslation } from './i18n'
 import { VaultList } from './components/VaultList'
 import { FileExplorer } from './components/FileExplorer'
 import { TabContent } from './components/TabContent'
@@ -22,7 +23,7 @@ import { MyVaultsPage } from './components/MyVaultsPage'
 import {
   User, LogOut, Settings, Shield, FileText, Clock,
   Database, Share2, Trash2, Server, Download,
-  Upload, FolderOpen, PanelRight, X, Eye, Pencil,
+  Upload, FolderOpen, PanelRight, PanelLeft, X, Eye, Pencil,
 } from 'lucide-react'
 import './App.css'
 
@@ -57,8 +58,11 @@ function UserMenu({ onNavigate, onLogout, hasVaultSelected, onImportFile, onImpo
   onExportVault: () => void
 }) {
   const { authState } = useAuthContext()
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({})
 
   const user = authState.user
   if (!user) return null
@@ -77,15 +81,31 @@ function UserMenu({ onNavigate, onLogout, hasVaultSelected, onImportFile, onImpo
     return () => document.removeEventListener('mousedown', handleClick)
   }, [open])
 
+  // Calculate dropdown position when opened
+  useEffect(() => {
+    if (open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      const dropdownWidth = 210
+      // Position below the trigger, aligned to the right edge
+      let left = rect.right - dropdownWidth
+      // Ensure it doesn't go off-screen to the left
+      if (left < 8) left = 8
+      setDropdownStyle({
+        top: rect.bottom + 8,
+        left,
+      })
+    }
+  }, [open])
+
   return (
     <div className="user-menu" ref={menuRef}>
       <button
+        ref={triggerRef}
         className="user-menu-trigger"
         onClick={() => setOpen(!open)}
         type="button"
-        aria-label="Benutzermenü"
+        aria-label={t('userMenu.ariaLabel')}
         aria-expanded={open}
-        title={displayName}
       >
         {user.avatarUrl ? (
           <img className="user-menu-avatar" src={user.avatarUrl} alt={displayName} />
@@ -94,60 +114,60 @@ function UserMenu({ onNavigate, onLogout, hasVaultSelected, onImportFile, onImpo
         )}
       </button>
       {open && (
-        <div className="user-menu-dropdown" role="menu">
+        <div className="user-menu-dropdown" role="menu" style={dropdownStyle}>
           <div className="user-menu-info">
             <span className="user-menu-name">{displayName}</span>
-            <span className="user-menu-role">{user.role === 'admin' ? 'Administrator' : 'Benutzer'}</span>
+            <span className="user-menu-role">{user.role === 'admin' ? t('userMenu.roleAdmin') : t('userMenu.roleUser')}</span>
           </div>
           {hasVaultSelected && (
             <>
               <div className="user-menu-divider" />
-              <span className="user-menu-section-label">Vault</span>
+              <span className="user-menu-section-label">{t('vault.label')}</span>
               <button className="user-menu-item" role="menuitem" onClick={() => { onImportFile(); setOpen(false) }}>
-                <Upload size={14} /> Datei importieren
+                <Upload size={14} /> {t('files.importFile')}
               </button>
               <button className="user-menu-item" role="menuitem" onClick={() => { onImportFolder(); setOpen(false) }}>
-                <FolderOpen size={14} /> Ordner importieren
+                <FolderOpen size={14} /> {t('files.importFolder')}
               </button>
               <button className="user-menu-item" role="menuitem" onClick={() => { onExportVault(); setOpen(false) }}>
-                <Download size={14} /> Vault exportieren
+                <Download size={14} /> {t('files.exportVault')}
               </button>
               <button className="user-menu-item" role="menuitem" onClick={() => { onNavigate('vault-sharing'); setOpen(false) }}>
-                <Share2 size={14} /> Freigaben
+                <Share2 size={14} /> {t('userMenu.sharing')}
               </button>
               <button className="user-menu-item user-menu-item--danger" role="menuitem" onClick={() => { onNavigate('vault-deletion'); setOpen(false) }}>
-                <Trash2 size={14} /> Vault löschen
+                <Trash2 size={14} /> {t('vault.deleteVault')}
               </button>
             </>
           )}
           <div className="user-menu-divider" />
           <button className="user-menu-item" role="menuitem" onClick={() => { onNavigate('profile'); setOpen(false) }}>
-            <User size={14} /> Profil
+            <User size={14} /> {t('userMenu.profile')}
           </button>
           <button className="user-menu-item" role="menuitem" onClick={() => { onNavigate('sessions'); setOpen(false) }}>
-            <Clock size={14} /> Sitzungen
+            <Clock size={14} /> {t('userMenu.sessions')}
           </button>
           {user.role === 'admin' && (
             <>
               <div className="user-menu-divider" />
-              <span className="user-menu-section-label">Administration</span>
+              <span className="user-menu-section-label">{t('userMenu.administration')}</span>
               <button className="user-menu-item" role="menuitem" onClick={() => { onNavigate('admin-users'); setOpen(false) }}>
-                <Shield size={14} /> Benutzerverwaltung
+                <Shield size={14} /> {t('userMenu.userManagement')}
               </button>
               <button className="user-menu-item" role="menuitem" onClick={() => { onNavigate('admin-vaults'); setOpen(false) }}>
-                <Database size={14} /> Vault-Übersicht
+                <Database size={14} /> {t('userMenu.vaultOverview')}
               </button>
               <button className="user-menu-item" role="menuitem" onClick={() => { onNavigate('admin-config'); setOpen(false) }}>
-                <Settings size={14} /> Serverkonfiguration
+                <Settings size={14} /> {t('userMenu.serverConfig')}
               </button>
               <button className="user-menu-item" role="menuitem" onClick={() => { onNavigate('admin-audit'); setOpen(false) }}>
-                <FileText size={14} /> Audit-Log
+                <FileText size={14} /> {t('userMenu.auditLog')}
               </button>
             </>
           )}
           <div className="user-menu-divider" />
           <button className="user-menu-item user-menu-item--danger" role="menuitem" onClick={() => { onLogout(); setOpen(false) }}>
-            <LogOut size={14} /> Abmelden
+            <LogOut size={14} /> {t('auth.logout')}
           </button>
         </div>
       )}
@@ -194,18 +214,18 @@ function useResize(initialWidth: number, min: number, max: number, side: 'left' 
   return { width, onMouseDown }
 }
 
-/** Human-readable labels for settings pages. */
-const PAGE_LABELS: Record<AppPage, string> = {
-  vaults: 'Tresore',
-  'my-vaults': 'Meine Vaults',
-  profile: 'Profil',
-  sessions: 'Sitzungen',
-  'admin-users': 'Benutzer',
-  'admin-vaults': 'Vault-Übersicht',
-  'admin-config': 'Serverkonfiguration',
-  'admin-audit': 'Audit-Log',
-  'vault-sharing': 'Freigaben',
-  'vault-deletion': 'Vault löschen',
+/** Translation keys for settings pages. */
+const PAGE_LABEL_KEYS: Record<AppPage, string> = {
+  vaults: 'pages.vaults',
+  'my-vaults': 'pages.myVaults',
+  profile: 'pages.profile',
+  sessions: 'pages.sessions',
+  'admin-users': 'pages.adminUsers',
+  'admin-vaults': 'pages.adminVaults',
+  'admin-config': 'pages.adminConfig',
+  'admin-audit': 'pages.adminAudit',
+  'vault-sharing': 'pages.vaultSharing',
+  'vault-deletion': 'pages.vaultDeletion',
 }
 
 /** Icons for settings pages. */
@@ -228,11 +248,13 @@ function AppContent() {
   const { state, dispatch } = useAppContext()
   const { authState, authDispatch } = useAuthContext()
   const { tabState, tabDispatch } = useTabContext()
+  const { t } = useTranslation()
   const prevVaultId = useRef<string | null>(null)
   // Settings tabs: list of open pages + which is active
   const [openSettingsPages, setOpenSettingsPages] = useState<AppPage[]>([])
   const [activeSettingsPage, setActiveSettingsPage] = useState<AppPage | null>(null)
   const [showRightPanel, setShowRightPanel] = useState(true)
+  const [showSidebar, setShowSidebar] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
 
@@ -275,7 +297,7 @@ function AppContent() {
           const error =
             err && typeof err === 'object' && 'code' in err && 'message' in err
               ? { code: err.code as string, message: err.message as string }
-              : { code: 'INTERNAL_ERROR', message: 'Fehler beim Laden der Verzeichnisstruktur' }
+              : { code: 'INTERNAL_ERROR', message: t('vault.treeLoadError') }
           dispatch({ type: 'ERROR_OCCURRED', payload: error })
         },
       )
@@ -346,7 +368,7 @@ function AppContent() {
       case 'vault-sharing':
         return state.selectedVaultId
           ? <VaultSharing apiClient={apiClient} vaultId={state.selectedVaultId} />
-          : <div style={{ padding: 24, color: 'var(--text-muted)' }}>Kein Vault ausgewählt.</div>
+          : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
       case 'vault-deletion':
         return state.selectedVaultId
           ? <VaultDeletionWorkflow
@@ -357,7 +379,7 @@ function AppContent() {
                 handleCloseSettingsTab('vault-deletion')
               }}
             />
-          : <div style={{ padding: 24, color: 'var(--text-muted)' }}>Kein Vault ausgewählt.</div>
+          : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
       default: return null
     }
   }
@@ -376,12 +398,12 @@ function AppContent() {
       {state.loading && (
         <div className="app-loading" role="status" aria-live="polite">
           <span className="app-loading-spinner" aria-hidden="true" />
-          <span>Laden…</span>
+          <span>{t('common.loading')}</span>
         </div>
       )}
       {state.error && (
         <div className="app-error" role="alert">
-          Fehler: [{state.error.code}] {state.error.message}
+          {t('common.errorWithCode', { code: state.error.code, message: state.error.message })}
         </div>
       )}
 
@@ -389,45 +411,49 @@ function AppContent() {
         <div className="app-vault-layout">
 
           {/* ── Sidebar ── */}
-          <aside className="app-sidebar" style={{ width: sidebar.width }}>
-            <div className="app-sidebar-header">
-              <div className="app-logo">
-                <SlatebaseLogo size={26} className="app-logo-icon" />
-                <span className="app-title">Slatebase</span>
-              </div>
-              <UserMenu
-                onNavigate={handleNavigate}
-                onLogout={handleLogout}
-                hasVaultSelected={state.selectedVaultId !== null}
-                onImportFile={handleImportFile}
-                onImportFolder={handleImportFolder}
-                onExportVault={handleExportVault}
-              />
-            </div>
-
-            <div className="app-sidebar-body">
-              <div className="app-sidebar-section">
-                <span className="app-sidebar-section-label">Vault</span>
-                <VaultList />
-              </div>
-
-              {state.selectedVaultId && (
-                <div className="app-sidebar-section">
-                  <span className="app-sidebar-section-label">Dateien</span>
-                  <FileExplorer />
+          {showSidebar && (
+            <aside className="app-sidebar" style={{ width: sidebar.width }}>
+              <div className="app-sidebar-header">
+                <div className="app-logo">
+                  <SlatebaseLogo size={26} className="app-logo-icon" />
+                  <span className="app-title">Slatebase</span>
                 </div>
-              )}
-            </div>
-          </aside>
+                <UserMenu
+                  onNavigate={handleNavigate}
+                  onLogout={handleLogout}
+                  hasVaultSelected={state.selectedVaultId !== null}
+                  onImportFile={handleImportFile}
+                  onImportFolder={handleImportFolder}
+                  onExportVault={handleExportVault}
+                />
+              </div>
+
+              <div className="app-sidebar-body">
+                <div className="app-sidebar-section">
+                  <span className="app-sidebar-section-label">{t('vault.label')}</span>
+                  <VaultList />
+                </div>
+
+                {state.selectedVaultId && (
+                  <div className="app-sidebar-section">
+                    <span className="app-sidebar-section-label">{t('files.label')}</span>
+                    <FileExplorer />
+                  </div>
+                )}
+              </div>
+            </aside>
+          )}
 
           {/* ── Sidebar Resize Handle ── */}
-          <div
-            className="resize-handle"
-            onMouseDown={sidebar.onMouseDown}
-            title="Breite anpassen"
-            role="separator"
-            aria-orientation="vertical"
-          />
+          {showSidebar && (
+            <div
+              className="resize-handle"
+              onMouseDown={sidebar.onMouseDown}
+              title={t('resize.adjustWidth')}
+              role="separator"
+              aria-orientation="vertical"
+            />
+          )}
 
           {/* ── Toolbar ── */}
           <SidebarToolbar
@@ -443,10 +469,11 @@ function AppContent() {
           <section className="app-content">
             {/* Unified tab bar: settings tabs + file tabs in one row */}
             {(openSettingsPages.length > 0 || tabState.tabs.length > 0) && (
-              <div className="tab-bar" role="tablist" aria-label="Geöffnete Tabs">
+              <div className="tab-bar" role="tablist" aria-label={t('tabs.ariaLabel')}>
                 {/* Settings tabs */}
                 {openSettingsPages.map((page) => {
                   const isActive = isShowingSettings && page === activeSettingsPage
+                  const pageLabel = t(PAGE_LABEL_KEYS[page] as Parameters<typeof t>[0])
                   return (
                     <div
                       key={`settings-${page}`}
@@ -454,16 +481,16 @@ function AppContent() {
                       aria-selected={isActive}
                       className={`tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}`}
                       onClick={() => setActiveSettingsPage(page)}
-                      title={PAGE_LABELS[page]}
+                      title={pageLabel}
                       tabIndex={isActive ? 0 : -1}
                     >
                       {PAGE_ICONS[page] && <span style={{ flexShrink: 0 }}>{PAGE_ICONS[page]}</span>}
-                      <span className="tab-bar-tab-label">{PAGE_LABELS[page]}</span>
+                      <span className="tab-bar-tab-label">{pageLabel}</span>
                       <button
                         type="button"
                         className="tab-bar-close-btn"
-                        aria-label={`${PAGE_LABELS[page]} schließen`}
-                        title="Schließen"
+                        aria-label={t('tabs.closePageAriaLabel', { name: pageLabel })}
+                        title={t('common.close')}
                         onClick={(e) => { e.stopPropagation(); handleCloseSettingsTab(page) }}
                       >
                         <X size={12} />
@@ -475,7 +502,7 @@ function AppContent() {
                 {tabState.tabs.map((tab) => {
                   const isActive = !isShowingSettings && tab.id === tabState.activeTabId
                   const hasUnsaved = tab.editBuffer !== null && tab.editBuffer !== tab.content
-                  const modeLabel = tab.mode === 'edit' ? 'Vorschau anzeigen' : 'Bearbeiten'
+                  const modeLabel = tab.mode === 'edit' ? t('tabs.showPreview') : t('tabs.edit')
                   const ModeIcon = tab.mode === 'edit' ? Eye : Pencil
                   return (
                     <div
@@ -505,8 +532,8 @@ function AppContent() {
                       <button
                         type="button"
                         className="tab-bar-close-btn"
-                        aria-label={`Tab schließen: ${tab.fileName}`}
-                        title="Tab schließen"
+                        aria-label={t('tabs.closeTabAriaLabel', { name: tab.fileName })}
+                        title={t('tabs.closeTab')}
                         onClick={(e) => { e.stopPropagation(); tabDispatch({ type: 'CLOSE_TAB', payload: { tabId: tab.id } }) }}
                       >
                         <X size={12} />
@@ -533,19 +560,19 @@ function AppContent() {
               <div
                 className="resize-handle"
                 onMouseDown={rightPanel.onMouseDown}
-                title="Breite anpassen"
+                title={t('resize.adjustWidth')}
                 role="separator"
                 aria-orientation="vertical"
               />
               <aside className="app-right-panel" style={{ width: rightPanel.width }}>
                 <div className="app-right-panel-header">
                   <PanelRight size={13} />
-                  Kontext
+                  {t('rightPanel.title')}
                 </div>
                 <div className="app-right-panel-body">
                   <p className="app-right-panel-placeholder">
-                    Dieser Bereich ist für zukünftige Features reserviert.<br /><br />
-                    Geplant: Outline, Backlinks, Tags, MCP-Kontext.
+                    {t('rightPanel.placeholder')}<br /><br />
+                    {t('rightPanel.plannedFeatures')}
                   </p>
                 </div>
               </aside>
@@ -556,15 +583,48 @@ function AppContent() {
           <button
             className={`right-panel-toggle${showRightPanel ? ' right-panel-toggle--active' : ''}`}
             onClick={() => setShowRightPanel((v) => !v)}
-            title={showRightPanel ? 'Rechten Bereich ausblenden' : 'Rechten Bereich einblenden'}
+            title={showRightPanel ? t('rightPanel.hide') : t('rightPanel.show')}
             type="button"
             aria-pressed={showRightPanel}
           >
             <PanelRight size={15} />
           </button>
+
+          {/* Toggle left panel (sidebar) */}
+          <button
+            className={`left-panel-toggle${showSidebar ? ' left-panel-toggle--active' : ''}`}
+            onClick={() => setShowSidebar((v) => !v)}
+            title={showSidebar ? t('rightPanel.hide') : t('rightPanel.show')}
+            type="button"
+            aria-pressed={showSidebar}
+          >
+            <PanelLeft size={15} />
+          </button>
         </div>
       </main>
     </div>
+  )
+}
+
+/**
+ * Connects I18nProvider to the auth state so locale follows the user's profile.
+ * Also applies the user's color scheme preference to the document root.
+ * Before login: browser language detection. After login: user.preferredLanguage.
+ */
+function I18nBridge({ children }: { children: React.ReactNode }) {
+  const { authState } = useAuthContext()
+  const userLocale = authState.user?.preferredLanguage ?? null
+  const colorScheme = authState.user?.colorScheme ?? 'system'
+
+  // Apply color scheme to <html> element
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', colorScheme)
+  }, [colorScheme])
+
+  return (
+    <I18nProvider userLocale={userLocale}>
+      {children}
+    </I18nProvider>
   )
 }
 
@@ -612,11 +672,14 @@ function AuthGuard() {
 
 /**
  * Root App component.
+ * Provider hierarchy: AuthProvider → I18nBridge (reads user locale) → AuthGuard → App content.
  */
 export function App() {
   return (
     <AuthProvider>
-      <AuthGuard />
+      <I18nBridge>
+        <AuthGuard />
+      </I18nBridge>
     </AuthProvider>
   )
 }

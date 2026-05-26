@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import type { IApiClient } from '../api'
+import { useTranslation } from '../i18n'
 import { Settings, RefreshCw, Save, AlertTriangle } from 'lucide-react'
 
 /**
@@ -35,9 +36,10 @@ interface ConfigFormErrors {
 /**
  * Admin server configuration page.
  * Displays current config in a card-based layout with clear sections.
- * UI labels are in German as per project conventions.
  */
 export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
+  const { t } = useTranslation()
+
   const [config, setConfig] = useState<ServerConfigData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -70,7 +72,7 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
           headers: buildAuthHeaders(apiClient),
         })
         if (!response.ok) {
-          const body = await response.json().catch(() => ({ message: 'Fehler beim Laden der Konfiguration' }))
+          const body = await response.json().catch(() => ({ message: t('admin.config.loadError') }))
           throw new Error(body.message ?? `HTTP ${response.status}`)
         }
         const data: ServerConfigData = await response.json()
@@ -84,7 +86,7 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
         }
       } catch (err: unknown) {
         if (!cancelled) {
-          setLoadError(err instanceof Error ? err.message : 'Unbekannter Fehler')
+          setLoadError(err instanceof Error ? err.message : t('admin.config.unknownError'))
         }
       } finally {
         if (!cancelled) setIsLoading(false)
@@ -99,17 +101,17 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
     const newErrors: ConfigFormErrors = {}
     const portNum = parseInt(port, 10)
     if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
-      newErrors.port = 'Port muss zwischen 1 und 65535 liegen.'
+      newErrors.port = t('admin.config.portError')
     }
     if (host.trim() === '') {
-      newErrors.host = 'Host darf nicht leer sein.'
+      newErrors.host = t('admin.config.hostError')
     }
     if (!VALID_LOG_LEVELS.includes(logLevel)) {
-      newErrors.logLevel = 'Ungültiges Log-Level.'
+      newErrors.logLevel = t('admin.config.logLevelError')
     }
     const maxFileSizeNum = parseInt(maxFileSize, 10)
     if (isNaN(maxFileSizeNum) || maxFileSizeNum <= 0) {
-      newErrors.maxFileSize = 'Muss eine positive Ganzzahl sein.'
+      newErrors.maxFileSize = t('admin.config.maxFileSizeError')
     }
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -138,19 +140,19 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
         body: JSON.stringify(payload),
       })
       if (!response.ok) {
-        const body = await response.json().catch(() => ({ message: 'Fehler beim Speichern' }))
+        const body = await response.json().catch(() => ({ message: t('admin.config.saveError') }))
         throw new Error(body.message ?? `HTTP ${response.status}`)
       }
-      setSaveMessage('Konfiguration gespeichert. Neustart erforderlich.')
+      setSaveMessage(t('admin.config.saveSuccess'))
     } catch (err: unknown) {
-      setSaveError(err instanceof Error ? err.message : 'Unbekannter Fehler')
+      setSaveError(err instanceof Error ? err.message : t('admin.config.unknownError'))
     } finally {
       setIsSaving(false)
     }
   }
 
   async function handleRestart(): Promise<void> {
-    if (!window.confirm('Server wirklich neustarten? Alle aktiven Verbindungen werden unterbrochen.')) return
+    if (!window.confirm(t('admin.config.restartConfirm'))) return
     setRestartMessage(null)
     setRestartError(null)
     setIsRestarting(true)
@@ -160,19 +162,19 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
         headers: buildAuthHeaders(apiClient),
       })
       if (!response.ok) {
-        const body = await response.json().catch(() => ({ message: 'Fehler beim Neustart' }))
+        const body = await response.json().catch(() => ({ message: t('admin.config.restartError') }))
         throw new Error(body.message ?? `HTTP ${response.status}`)
       }
-      setRestartMessage('Server wird neu gestartet…')
+      setRestartMessage(t('admin.config.restartSuccess'))
     } catch (err: unknown) {
-      setRestartError(err instanceof Error ? err.message : 'Unbekannter Fehler')
+      setRestartError(err instanceof Error ? err.message : t('admin.config.unknownError'))
     } finally {
       setIsRestarting(false)
     }
   }
 
   if (isLoading) {
-    return <div className="admin-config-page"><p className="admin-config-loading">Laden…</p></div>
+    return <div className="admin-config-page"><p className="admin-config-loading">{t('common.loading')}</p></div>
   }
 
   if (loadError) {
@@ -189,16 +191,16 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
     <div className="admin-config-page">
       <div className="admin-config-header">
         <Settings size={22} color="var(--accent-text)" />
-        <h1 className="admin-config-title">Serverkonfiguration</h1>
+        <h1 className="admin-config-title">{t('admin.config.title')}</h1>
       </div>
 
       {/* Network section */}
       <form className="admin-config-form" onSubmit={handleSubmit} noValidate>
         <section className="admin-config-card">
-          <h2 className="admin-config-card-title">Netzwerk</h2>
+          <h2 className="admin-config-card-title">{t('admin.config.networkTitle')}</h2>
           <div className="admin-config-grid">
             <div className="admin-config-field">
-              <label htmlFor="config-port">Port</label>
+              <label htmlFor="config-port">{t('admin.config.portLabel')}</label>
               <input
                 id="config-port"
                 type="number"
@@ -211,7 +213,7 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
               {errors.port && <p className="admin-config-field-error">{errors.port}</p>}
             </div>
             <div className="admin-config-field">
-              <label htmlFor="config-host">Host</label>
+              <label htmlFor="config-host">{t('admin.config.hostLabel')}</label>
               <input
                 id="config-host"
                 type="text"
@@ -223,7 +225,7 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
             </div>
           </div>
           <div className="admin-config-field">
-            <label htmlFor="config-allowed-origins">Erlaubte Origins</label>
+            <label htmlFor="config-allowed-origins">{t('admin.config.allowedOriginsLabel')}</label>
             <input
               id="config-allowed-origins"
               type="text"
@@ -231,16 +233,16 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
               onChange={(e) => setAllowedOrigins(e.target.value)}
               placeholder="http://localhost:5173, https://example.com"
             />
-            <p className="admin-config-hint">Kommagetrennte Liste der erlaubten CORS-Origins</p>
+            <p className="admin-config-hint">{t('admin.config.allowedOriginsHint')}</p>
           </div>
         </section>
 
         {/* Limits section */}
         <section className="admin-config-card">
-          <h2 className="admin-config-card-title">Limits & Logging</h2>
+          <h2 className="admin-config-card-title">{t('admin.config.limitsTitle')}</h2>
           <div className="admin-config-grid">
             <div className="admin-config-field">
-              <label htmlFor="config-max-file-size">Max. Dateigröße (Bytes)</label>
+              <label htmlFor="config-max-file-size">{t('admin.config.maxFileSizeLabel')}</label>
               <input
                 id="config-max-file-size"
                 type="number"
@@ -252,7 +254,7 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
               {errors.maxFileSize && <p className="admin-config-field-error">{errors.maxFileSize}</p>}
             </div>
             <div className="admin-config-field">
-              <label htmlFor="config-log-level">Log-Level</label>
+              <label htmlFor="config-log-level">{t('admin.config.logLevelLabel')}</label>
               <select
                 id="config-log-level"
                 value={logLevel}
@@ -275,17 +277,17 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
 
         <button type="submit" className="admin-config-btn admin-config-btn--primary" disabled={isSaving}>
           <Save size={14} />
-          {isSaving ? 'Speichern…' : 'Konfiguration speichern'}
+          {isSaving ? t('admin.config.saving') : t('admin.config.saveConfig')}
         </button>
       </form>
 
       {/* Restart section */}
       <section className="admin-config-card admin-config-card--danger">
         <h2 className="admin-config-card-title">
-          <AlertTriangle size={15} /> Gefahrenzone
+          <AlertTriangle size={15} /> {t('admin.config.dangerZone')}
         </h2>
         <p className="admin-config-card-desc">
-          Ein Neustart unterbricht alle aktiven Verbindungen. Gespeicherte Konfigurationsänderungen werden erst nach dem Neustart wirksam.
+          {t('admin.config.dangerDesc')}
         </p>
         {restartMessage && <div className="admin-config-message admin-config-message--success">{restartMessage}</div>}
         {restartError && <div className="admin-config-message admin-config-message--error">{restartError}</div>}
@@ -296,7 +298,7 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
           disabled={isRestarting}
         >
           <RefreshCw size={14} />
-          {isRestarting ? 'Neustart…' : 'Server neustarten'}
+          {isRestarting ? t('admin.config.restarting') : t('admin.config.restart')}
         </button>
       </section>
     </div>

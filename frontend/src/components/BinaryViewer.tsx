@@ -1,14 +1,15 @@
 import { useState } from 'react'
+import { useTranslation } from '../i18n'
 
 /**
  * BinaryViewer displays binary file content.
  * For supported image formats (PNG, JPEG, JPG, GIF, AVIF, WebP, SVG):
  *   renders an <img> element with src pointing to the raw file endpoint.
+ * For PDF files:
+ *   renders an embedded <iframe> viewer.
  * For unsupported binary formats:
  *   shows a notice with filename and file type.
  * Handles image load errors with a fallback notice.
- *
- * Validates: Requirements 7.1, 7.2, 7.3, 7.4
  */
 
 export interface BinaryViewerProps {
@@ -25,40 +26,47 @@ function isSupportedImage(extension: string): boolean {
   return SUPPORTED_IMAGE_EXTENSIONS.includes(extension.toLowerCase())
 }
 
+function isPdf(extension: string): boolean {
+  return extension.toLowerCase() === '.pdf'
+}
+
 export function BinaryViewer({ fileName, fileExtension, vaultId, filePath, token }: BinaryViewerProps) {
+  const { t } = useTranslation()
   const [imageError, setImageError] = useState(false)
 
   const normalizedExtension = fileExtension.toLowerCase()
   const isImage = isSupportedImage(normalizedExtension)
+  const isPdfFile = isPdf(normalizedExtension)
 
-  // Req 7.3: Image load error fallback
+  // Build raw file URL
+  let rawSrc = `/api/v1/vaults/${vaultId}/files?path=${encodeURIComponent(filePath)}&raw=true`
+  if (token) {
+    rawSrc += `&token=${encodeURIComponent(token)}`
+  }
+
+  // Image load error fallback
   if (isImage && imageError) {
     return (
       <section
-        aria-label="Binärdatei-Ansicht"
+        aria-label={t('common.error')}
         style={{ padding: '2rem', textAlign: 'center' }}
       >
         <p role="status" style={{ color: '#888', fontSize: '0.95rem' }}>
-          Das Bild „{fileName}" konnte nicht geladen werden.
+          {t('binaryViewer.imageLoadError', { name: fileName })}
         </p>
       </section>
     )
   }
 
-  // Req 7.2: Render image preview for supported formats
+  // Render image preview for supported formats
   if (isImage) {
-    let src = `/api/v1/vaults/${vaultId}/files?path=${encodeURIComponent(filePath)}&raw=true`
-    if (token) {
-      src += `&token=${encodeURIComponent(token)}`
-    }
-
     return (
       <section
-        aria-label="Binärdatei-Ansicht"
+        aria-label={fileName}
         style={{ padding: '1rem', textAlign: 'center' }}
       >
         <img
-          src={src}
+          src={rawSrc}
           alt={fileName}
           onError={() => setImageError(true)}
           style={{ maxWidth: '100%', height: 'auto', display: 'inline-block' }}
@@ -67,14 +75,30 @@ export function BinaryViewer({ fileName, fileExtension, vaultId, filePath, token
     )
   }
 
-  // Req 7.4: Unsupported binary format notice
+  // Render embedded PDF viewer
+  if (isPdfFile) {
+    return (
+      <section
+        aria-label={fileName}
+        style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: '500px' }}
+      >
+        <iframe
+          src={rawSrc}
+          title={fileName}
+          style={{ flex: 1, width: '100%', border: 'none', minHeight: '500px' }}
+        />
+      </section>
+    )
+  }
+
+  // Unsupported binary format notice
   return (
     <section
-      aria-label="Binärdatei-Ansicht"
+      aria-label={fileName}
       style={{ padding: '2rem', textAlign: 'center' }}
     >
       <p role="status" style={{ color: '#888', fontSize: '0.95rem' }}>
-        Datei „{fileName}" ({normalizedExtension || 'unbekannter Typ'}) kann nicht angezeigt werden.
+        {t('binaryViewer.unsupported', { name: fileName, type: normalizedExtension || '?' })}
       </p>
     </section>
   )

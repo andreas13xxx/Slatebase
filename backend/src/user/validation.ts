@@ -28,11 +28,15 @@ export const passwordSchema = z
 
 /**
  * Email schema: RFC 5322 format, max 254 characters.
+ * Empty string is allowed (clears the email).
  */
 export const emailSchema = z
   .string()
   .max(254, 'Email must be at most 254 characters')
-  .email('Email must be a valid RFC 5322 address')
+  .refine(
+    (val) => val === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val),
+    'Email must be a valid email address',
+  )
 
 // --- Display Name Validation ---
 
@@ -48,11 +52,15 @@ export const displayNameSchema = z
 
 /**
  * Avatar URL schema: max 2048 characters, must start with http:// or https://.
+ * Empty string is allowed (clears the avatar URL).
  */
 export const avatarUrlSchema = z
   .string()
   .max(2048, 'Avatar URL must be at most 2048 characters')
-  .regex(/^https?:\/\//, 'Avatar URL must start with http:// or https://')
+  .refine(
+    (val) => val === '' || /^https?:\/\//.test(val),
+    'Avatar URL must start with http:// or https://',
+  )
 
 // --- Enum Schemas ---
 

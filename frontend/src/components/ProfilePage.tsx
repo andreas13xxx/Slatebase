@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { useAuthContext } from '../state/authContext'
+import { useTranslation } from '../i18n'
 import type { IApiClient, UpdateProfileData } from '../api'
 import type { PublicUserInfo } from '../state/authState'
 
@@ -59,6 +60,7 @@ function isValidHttpUrl(url: string): boolean {
  */
 export function ProfilePage({ apiClient }: ProfilePageProps) {
   const { authDispatch } = useAuthContext()
+  const { t } = useTranslation()
 
   // --- Profile state ---
   const [displayName, setDisplayName] = useState('')
@@ -97,17 +99,17 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
       try {
         const profile: PublicUserInfo = await apiClient.getProfile()
         if (cancelled) return
-        setDisplayName(profile.displayName)
-        setEmail(profile.email)
-        setAvatarUrl(profile.avatarUrl)
-        setPreferredLanguage(profile.preferredLanguage)
-        setColorScheme(profile.colorScheme)
+        setDisplayName(profile.displayName ?? '')
+        setEmail(profile.email ?? '')
+        setAvatarUrl(profile.avatarUrl ?? '')
+        setPreferredLanguage(profile.preferredLanguage ?? 'de')
+        setColorScheme(profile.colorScheme ?? 'system')
       } catch (err: unknown) {
         if (cancelled) return
         if (err !== null && typeof err === 'object' && 'message' in err) {
           setProfileApiError((err as { message: string }).message)
         } else {
-          setProfileApiError('Profil konnte nicht geladen werden.')
+          setProfileApiError(t('profile.profileLoadError'))
         }
       } finally {
         if (!cancelled) {
@@ -133,20 +135,20 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
 
     // Display name: 1-50 chars
     if (displayName.length < 1) {
-      errors.displayName = 'Anzeigename darf nicht leer sein.'
+      errors.displayName = t('profile.displayNameRequired')
       valid = false
     } else if (displayName.length > 50) {
-      errors.displayName = 'Anzeigename darf maximal 50 Zeichen lang sein.'
+      errors.displayName = t('profile.displayNameTooLong')
       valid = false
     }
 
     // Email: RFC 5322, max 254 chars (empty is allowed)
     if (email !== '') {
       if (email.length > 254) {
-        errors.email = 'E-Mail-Adresse darf maximal 254 Zeichen lang sein.'
+        errors.email = t('profile.emailTooLong')
         valid = false
       } else if (!EMAIL_REGEX.test(email)) {
-        errors.email = 'E-Mail-Adresse ist nicht gültig.'
+        errors.email = t('profile.emailInvalid')
         valid = false
       }
     }
@@ -154,23 +156,23 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
     // Avatar URL: max 2048 chars, must start with http:// or https:// (empty is allowed)
     if (avatarUrl !== '') {
       if (avatarUrl.length > 2048) {
-        errors.avatarUrl = 'Avatar-URL darf maximal 2048 Zeichen lang sein.'
+        errors.avatarUrl = t('profile.avatarUrlTooLong')
         valid = false
       } else if (!isValidHttpUrl(avatarUrl)) {
-        errors.avatarUrl = 'Avatar-URL muss mit http:// oder https:// beginnen.'
+        errors.avatarUrl = t('profile.avatarUrlInvalid')
         valid = false
       }
     }
 
     // Preferred language: must be 'de' or 'en'
     if (preferredLanguage !== 'de' && preferredLanguage !== 'en') {
-      errors.preferredLanguage = 'Ungültige Sprache.'
+      errors.preferredLanguage = t('profile.invalidLanguage')
       valid = false
     }
 
     // Color scheme: must be 'light', 'dark', or 'system'
     if (colorScheme !== 'light' && colorScheme !== 'dark' && colorScheme !== 'system') {
-      errors.colorScheme = 'Ungültiges Farbschema.'
+      errors.colorScheme = t('profile.invalidColorScheme')
       valid = false
     }
 
@@ -200,13 +202,14 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
         preferredLanguage,
         colorScheme,
       }
-      await apiClient.updateProfile(data)
-      setProfileSuccess('Profil erfolgreich aktualisiert.')
+      const updatedUser = await apiClient.updateProfile(data)
+      authDispatch({ type: 'PROFILE_UPDATED', payload: { user: updatedUser } })
+      setProfileSuccess(t('profile.profileSaved'))
     } catch (err: unknown) {
       if (err !== null && typeof err === 'object' && 'message' in err) {
         setProfileApiError((err as { message: string }).message)
       } else {
-        setProfileApiError('Profil konnte nicht aktualisiert werden.')
+        setProfileApiError(t('profile.profileSaveError'))
       }
     } finally {
       setProfilePending(false)
@@ -222,12 +225,12 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
     let valid = true
 
     if (currentPassword === '') {
-      errors.currentPassword = 'Aktuelles Passwort darf nicht leer sein.'
+      errors.currentPassword = t('auth.currentPasswordRequired')
       valid = false
     }
 
     if (newPassword.length < 8) {
-      errors.newPassword = 'Neues Passwort muss mindestens 8 Zeichen lang sein.'
+      errors.newPassword = t('auth.newPasswordTooShort')
       valid = false
     }
 
@@ -251,14 +254,14 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
 
     try {
       await apiClient.changePassword(currentPassword, newPassword)
-      setPasswordSuccess('Passwort erfolgreich geändert.')
+      setPasswordSuccess(t('auth.passwordChanged'))
       setCurrentPassword('')
       setNewPassword('')
     } catch (err: unknown) {
       if (err !== null && typeof err === 'object' && 'message' in err) {
         setPasswordApiError((err as { message: string }).message)
       } else {
-        setPasswordApiError('Passwortänderung fehlgeschlagen.')
+        setPasswordApiError(t('profile.passwordChangeError'))
       }
     } finally {
       setPasswordPending(false)
@@ -274,7 +277,7 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
     setDeletePasswordError(null)
 
     if (deletePassword === '') {
-      setDeletePasswordError('Passwort zur Bestätigung darf nicht leer sein.')
+      setDeletePasswordError(t('profile.deletePasswordRequired'))
       return
     }
 
@@ -292,7 +295,7 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
       if (err !== null && typeof err === 'object' && 'message' in err) {
         setDeleteApiError((err as { message: string }).message)
       } else {
-        setDeleteApiError('Kontolöschung fehlgeschlagen.')
+        setDeleteApiError(t('profile.deleteAccountFailed'))
       }
       setDeleteConfirm(false)
     } finally {
@@ -303,22 +306,22 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
   if (profileLoading) {
     return (
       <div className="profile-page" aria-busy="true">
-        <p>Profil wird geladen…</p>
+        <p>{t('profile.profileLoading')}</p>
       </div>
     )
   }
 
   return (
     <div className="profile-page">
-      <h1 className="profile-title">Profil</h1>
+      <h1 className="profile-title">{t('profile.title')}</h1>
 
       {/* --- Profile Section --- */}
       <section className="profile-section" aria-labelledby="profile-section-heading">
-        <h2 id="profile-section-heading" className="profile-section-title">Profildaten</h2>
+        <h2 id="profile-section-heading" className="profile-section-title">{t('profile.sectionProfile')}</h2>
         <form className="profile-form" onSubmit={handleProfileSubmit} noValidate>
           <div className="profile-field">
             <label className="profile-label" htmlFor="profile-display-name">
-              Anzeigename
+              {t('profile.displayName')}
             </label>
             <input
               id="profile-display-name"
@@ -342,7 +345,7 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
 
           <div className="profile-field">
             <label className="profile-label" htmlFor="profile-email">
-              E-Mail
+              {t('profile.email')}
             </label>
             <input
               id="profile-email"
@@ -366,7 +369,7 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
 
           <div className="profile-field">
             <label className="profile-label" htmlFor="profile-avatar-url">
-              Avatar-URL
+              {t('profile.avatarUrl')}
             </label>
             <input
               id="profile-avatar-url"
@@ -391,7 +394,7 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
 
           <div className="profile-field">
             <label className="profile-label" htmlFor="profile-language">
-              Bevorzugte Sprache
+              {t('profile.preferredLanguage')}
             </label>
             <select
               id="profile-language"
@@ -404,8 +407,8 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
               aria-invalid={profileErrors.preferredLanguage !== null}
               aria-describedby={profileErrors.preferredLanguage ? 'profile-language-error' : undefined}
             >
-              <option value="de">Deutsch</option>
-              <option value="en">English</option>
+              <option value="de">{t('profile.languageDe')}</option>
+              <option value="en">{t('profile.languageEn')}</option>
             </select>
             {profileErrors.preferredLanguage && (
               <p id="profile-language-error" className="profile-field-error" role="alert">
@@ -416,7 +419,7 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
 
           <div className="profile-field">
             <label className="profile-label" htmlFor="profile-color-scheme">
-              Farbschema
+              {t('profile.colorScheme')}
             </label>
             <select
               id="profile-color-scheme"
@@ -429,9 +432,9 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
               aria-invalid={profileErrors.colorScheme !== null}
               aria-describedby={profileErrors.colorScheme ? 'profile-color-scheme-error' : undefined}
             >
-              <option value="light">Hell</option>
-              <option value="dark">Dunkel</option>
-              <option value="system">System</option>
+              <option value="light">{t('profile.colorSchemeLight')}</option>
+              <option value="dark">{t('profile.colorSchemeDark')}</option>
+              <option value="system">{t('profile.colorSchemeSystem')}</option>
             </select>
             {profileErrors.colorScheme && (
               <p id="profile-color-scheme-error" className="profile-field-error" role="alert">
@@ -457,18 +460,18 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
             className="profile-submit"
             disabled={profilePending}
           >
-            {profilePending ? 'Speichern…' : 'Profil speichern'}
+            {profilePending ? t('profile.savingProfile') : t('profile.saveProfile')}
           </button>
         </form>
       </section>
 
       {/* --- Password Change Section --- */}
       <section className="profile-section" aria-labelledby="password-section-heading">
-        <h2 id="password-section-heading" className="profile-section-title">Passwort ändern</h2>
+        <h2 id="password-section-heading" className="profile-section-title">{t('profile.sectionPassword')}</h2>
         <form className="profile-form" onSubmit={handlePasswordSubmit} noValidate>
           <div className="profile-field">
             <label className="profile-label" htmlFor="profile-current-password">
-              Aktuelles Passwort
+              {t('auth.currentPassword')}
             </label>
             <input
               id="profile-current-password"
@@ -493,7 +496,7 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
 
           <div className="profile-field">
             <label className="profile-label" htmlFor="profile-new-password">
-              Neues Passwort
+              {t('auth.newPassword')}
             </label>
             <input
               id="profile-new-password"
@@ -533,21 +536,21 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
             className="profile-submit"
             disabled={passwordPending}
           >
-            {passwordPending ? 'Passwort ändern…' : 'Passwort ändern'}
+            {passwordPending ? t('auth.changingPassword') : t('auth.changePassword')}
           </button>
         </form>
       </section>
 
       {/* --- Account Deletion Section --- */}
       <section className="profile-section profile-section--danger" aria-labelledby="delete-section-heading">
-        <h2 id="delete-section-heading" className="profile-section-title">Konto löschen</h2>
+        <h2 id="delete-section-heading" className="profile-section-title">{t('profile.sectionDelete')}</h2>
         <p className="profile-danger-info">
-          Diese Aktion kann nicht rückgängig gemacht werden. Ihr Konto und alle zugehörigen Daten werden dauerhaft gelöscht.
+          {t('profile.deleteWarning')}
         </p>
         <form className="profile-form" onSubmit={handleDeleteSubmit} noValidate>
           <div className="profile-field">
             <label className="profile-label" htmlFor="profile-delete-password">
-              Passwort zur Bestätigung
+              {t('profile.deletePasswordLabel')}
             </label>
             <input
               id="profile-delete-password"
@@ -581,13 +584,13 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
             type="submit"
             className="profile-submit profile-submit--danger"
             disabled={deletePending}
-            aria-label={deleteConfirm ? 'Konto endgültig löschen' : 'Konto löschen'}
+            aria-label={deleteConfirm ? t('profile.deleteAccountAriaConfirm') : t('profile.deleteAccount')}
           >
             {deletePending
-              ? 'Konto wird gelöscht…'
+              ? t('profile.deletingAccount')
               : deleteConfirm
-                ? 'Wirklich löschen — Klicken zur Bestätigung'
-                : 'Konto löschen'}
+                ? t('profile.deleteAccountConfirm')
+                : t('profile.deleteAccount')}
           </button>
         </form>
       </section>

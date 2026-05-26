@@ -112,14 +112,14 @@ describe('AdminAuditPage', () => {
     render(React.createElement(AdminAuditPage, { apiClient: createMockApiClient() }))
 
     await waitFor(() => {
-      expect(screen.getByText('LOGIN_SUCCESS')).toBeInTheDocument()
+      expect(screen.getByText('LOGIN SUCCESS')).toBeInTheDocument()
     })
 
     // user-1 appears as both userId and target in the first row
     expect(screen.getAllByText('user-1')).toHaveLength(2)
     expect(screen.getByText('192.168.1.1')).toBeInTheDocument()
-    // LOGIN_FAILED appears in both the dropdown and the table
-    expect(screen.getAllByText('LOGIN_FAILED')).toHaveLength(2)
+    // LOGIN_FAILED appears in the dropdown, LOGIN FAILED (formatted) in the table
+    expect(screen.getByText('LOGIN FAILED')).toBeInTheDocument()
     expect(screen.getByText('10.0.0.1')).toBeInTheDocument()
   })
 
@@ -261,6 +261,6 @@ describe('AdminAuditPage', () => {
     expect(screen.getByText('Aktion')).toBeInTheDocument()
     expect(screen.getByText('Ziel')).toBeInTheDocument()
     expect(screen.getByText('IP-Adresse')).toBeInTheDocument()
-    expect(screen.getByText('Erfolg')).toBeInTheDocument()
+    expect(screen.getByText('Status')).toBeInTheDocument()
   })
 })

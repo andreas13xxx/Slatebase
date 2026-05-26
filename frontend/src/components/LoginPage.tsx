@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useAuthContext } from '../state/authContext'
+import { useTranslation } from '../i18n'
 import type { IApiClient } from '../api'
 import { SlatebaseLogo } from './SlatebaseLogo'
 
@@ -41,6 +42,7 @@ function extractRetryAfter(err: unknown): number {
  */
 export function LoginPage({ apiClient }: LoginPageProps) {
   const { authState, authDispatch } = useAuthContext()
+  const { t } = useTranslation()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [usernameError, setUsernameError] = useState<string | null>(null)
@@ -50,13 +52,13 @@ export function LoginPage({ apiClient }: LoginPageProps) {
   function validate(): boolean {
     let valid = true
     if (username.trim() === '') {
-      setUsernameError('Benutzername darf nicht leer sein.')
+      setUsernameError(t('auth.usernameRequired'))
       valid = false
     } else {
       setUsernameError(null)
     }
     if (password === '') {
-      setPasswordError('Passwort darf nicht leer sein.')
+      setPasswordError(t('auth.passwordRequired'))
       valid = false
     } else {
       setPasswordError(null)
@@ -80,13 +82,13 @@ export function LoginPage({ apiClient }: LoginPageProps) {
     } catch (err: unknown) {
       if (isRateLimitError(err)) {
         const retryAfter = extractRetryAfter(err)
-        const msg = `Zu viele Anmeldeversuche. Bitte warten Sie ${retryAfter} Sekunden.`
+        const msg = t('auth.rateLimited', { seconds: retryAfter })
         setRateLimitMessage(msg)
         authDispatch({ type: 'LOGIN_FAILED', payload: { message: msg } })
       } else {
         authDispatch({
           type: 'LOGIN_FAILED',
-          payload: { message: 'Anmeldung fehlgeschlagen. Bitte überprüfen Sie Ihre Zugangsdaten.' },
+          payload: { message: t('auth.loginFailed') },
         })
       }
     }
@@ -102,7 +104,7 @@ export function LoginPage({ apiClient }: LoginPageProps) {
 
         <form className="login-form" onSubmit={handleSubmit} noValidate>
           <div className="login-field">
-            <label className="login-label" htmlFor="login-username">Benutzername</label>
+            <label className="login-label" htmlFor="login-username">{t('auth.username')}</label>
             <input
               id="login-username"
               className="login-input"
@@ -121,7 +123,7 @@ export function LoginPage({ apiClient }: LoginPageProps) {
           </div>
 
           <div className="login-field">
-            <label className="login-label" htmlFor="login-password">Passwort</label>
+            <label className="login-label" htmlFor="login-password">{t('auth.password')}</label>
             <input
               id="login-password"
               className="login-input"
@@ -142,11 +144,13 @@ export function LoginPage({ apiClient }: LoginPageProps) {
             <p className="login-error login-error--rate-limit" role="alert">{rateLimitMessage}</p>
           )}
           {authState.error && !rateLimitMessage && (
-            <p className="login-error" role="alert">{authState.error}</p>
+            <p className="login-error" role="alert">{
+              authState.error.startsWith('auth.') ? t(authState.error as Parameters<typeof t>[0]) : authState.error
+            }</p>
           )}
 
           <button type="submit" className="login-submit" disabled={authState.isLoading}>
-            {authState.isLoading ? 'Anmelden…' : 'Anmelden'}
+            {authState.isLoading ? t('auth.loggingIn') : t('auth.login')}
           </button>
         </form>
       </div>

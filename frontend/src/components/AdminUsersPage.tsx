@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, type FormEvent } from 'react'
 import type { IApiClient } from '../api'
 import type { UserRole } from '../state/authState'
+import { useTranslation } from '../i18n'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -37,9 +38,10 @@ export interface AdminUsersPageProps {
  * Admin user management page.
  * Displays a paginated user list with actions to create, delete,
  * change role, reset password, and suspend/unsuspend users.
- * All labels are in German. Accepts apiClient as a prop.
  */
 export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
+  const { t, locale } = useTranslation()
+
   // ─── User list state ─────────────────────────────────────────────────────
   const [users, setUsers] = useState<AdminUserInfo[]>([])
   const [page, setPage] = useState(1)
@@ -113,7 +115,7 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
     const data = text ? JSON.parse(text) : undefined
 
     if (!response.ok) {
-      const errorMessage = data?.message ?? `Anfrage fehlgeschlagen (Status ${response.status})`
+      const errorMessage = data?.message ?? t('admin.users.requestFailed', { status: String(response.status) })
       throw { code: data?.code ?? 'UNKNOWN', message: errorMessage }
     }
 
@@ -135,7 +137,7 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
       setTotalPages(result.totalPages)
       setTotal(result.total)
     } catch (err: unknown) {
-      const message = extractErrorMessage(err)
+      const message = extractErrorMessage(err, t)
       setListError(message)
     } finally {
       setListLoading(false)
@@ -160,13 +162,13 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
         password: newPassword,
         role: newRole,
       })
-      setCreateSuccess(`Benutzer „${newUsername}" wurde erstellt.`)
+      setCreateSuccess(t('admin.users.createSuccess', { username: newUsername }))
       setNewUsername('')
       setNewPassword('')
       setNewRole('user')
       void loadUsers(page)
     } catch (err: unknown) {
-      setCreateError(extractErrorMessage(err))
+      setCreateError(extractErrorMessage(err, t))
     } finally {
       setCreateLoading(false)
     }
@@ -176,17 +178,17 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
 
   function handleDeleteUser(user: AdminUserInfo): void {
     setConfirmDialog({
-      message: `Benutzer „${user.username}" wirklich löschen?`,
+      message: t('admin.users.deleteConfirm', { username: user.username }),
       onConfirm: async () => {
         setConfirmDialog(null)
         setActionError(null)
         setActionSuccess(null)
         try {
           await adminFetch<void>('DELETE', `/api/v1/admin/users/${user.userId}`)
-          setActionSuccess(`Benutzer „${user.username}" wurde gelöscht.`)
+          setActionSuccess(t('admin.users.deleteSuccess', { username: user.username }))
           void loadUsers(page)
         } catch (err: unknown) {
-          setActionError(extractErrorMessage(err))
+          setActionError(extractErrorMessage(err, t))
         }
       },
     })
@@ -201,11 +203,11 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
         role: newRoleValue,
       })
       setActionSuccess(
-        `Rolle von „${user.username}" auf „${newRoleValue}" geändert.`,
+        t('admin.users.roleChangeSuccess', { username: user.username, role: newRoleValue }),
       )
       void loadUsers(page)
     } catch (err: unknown) {
-      setActionError(extractErrorMessage(err))
+      setActionError(extractErrorMessage(err, t))
     }
   }
 
@@ -220,10 +222,10 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
       )
       setTempPassword(result.temporaryPassword)
       setActionSuccess(
-        `Passwort von „${user.username}" wurde zurückgesetzt.`,
+        t('admin.users.passwordResetSuccess', { username: user.username }),
       )
     } catch (err: unknown) {
-      setActionError(extractErrorMessage(err))
+      setActionError(extractErrorMessage(err, t))
     }
   }
 
@@ -236,11 +238,29 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
         'PUT',
         `/api/v1/admin/users/${user.userId}/${endpoint}`,
       )
-      const action = user.suspended ? 'entsperrt' : 'gesperrt'
-      setActionSuccess(`Benutzer „${user.username}" wurde ${action}.`)
+      setActionSuccess(
+        user.suspended
+          ? t('admin.users.unsuspendSuccess', { username: user.username })
+          : t('admin.users.suspendSuccess', { username: user.username }),
+      )
       void loadUsers(page)
     } catch (err: unknown) {
-      setActionError(extractErrorMessage(err))
+      setActionError(extractErrorMessage(err, t))
+    }
+  }
+
+  /**
+   * Formats an ISO 8601 date string to a localized date.
+   */
+  function formatDate(isoDate: string): string {
+    try {
+      return new Date(isoDate).toLocaleDateString(locale === 'de' ? 'de-DE' : 'en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      })
+    } catch {
+      return isoDate
     }
   }
 
@@ -248,7 +268,7 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
 
   return (
     <div className="admin-users-page">
-      <h1 className="admin-users-title">Benutzerverwaltung</h1>
+      <h1 className="admin-users-title">{t('admin.users.title')}</h1>
 
       {/* Action feedback */}
       {actionError && (
@@ -263,47 +283,47 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
       )}
       {tempPassword && (
         <div className="admin-users-message admin-users-message--info" role="status">
-          Temporäres Passwort: <code>{tempPassword}</code>
+          {t('admin.users.tempPassword')} <code>{tempPassword}</code>
         </div>
       )}
 
       {/* Create user form */}
       <section className="admin-users-create">
-        <h2 className="admin-users-section-title">Benutzer erstellen</h2>
+        <h2 className="admin-users-section-title">{t('admin.users.createTitle')}</h2>
         <form className="admin-users-create-form" onSubmit={handleCreateUser} noValidate>
           <div className="admin-users-form-field">
-            <label htmlFor="admin-create-username">Benutzername</label>
+            <label htmlFor="admin-create-username">{t('admin.users.usernameLabel')}</label>
             <input
               id="admin-create-username"
               type="text"
               value={newUsername}
               onChange={(e) => setNewUsername(e.target.value)}
-              placeholder="3–64 Zeichen"
+              placeholder={t('admin.users.usernamePlaceholder')}
               maxLength={64}
               required
             />
           </div>
           <div className="admin-users-form-field">
-            <label htmlFor="admin-create-password">Passwort</label>
+            <label htmlFor="admin-create-password">{t('admin.users.passwordLabel')}</label>
             <input
               id="admin-create-password"
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Mindestens 8 Zeichen"
+              placeholder={t('admin.users.passwordPlaceholder')}
               maxLength={128}
               required
             />
           </div>
           <div className="admin-users-form-field">
-            <label htmlFor="admin-create-role">Rolle</label>
+            <label htmlFor="admin-create-role">{t('admin.users.roleLabel')}</label>
             <select
               id="admin-create-role"
               value={newRole}
               onChange={(e) => setNewRole(e.target.value as UserRole)}
             >
-              <option value="user">Benutzer</option>
-              <option value="admin">Administrator</option>
+              <option value="user">{t('admin.users.roleUser')}</option>
+              <option value="admin">{t('admin.users.roleAdmin')}</option>
             </select>
           </div>
           <button
@@ -311,7 +331,7 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
             className="admin-users-btn admin-users-btn--primary"
             disabled={createLoading}
           >
-            {createLoading ? 'Erstellen…' : 'Erstellen'}
+            {createLoading ? t('admin.users.creating') : t('admin.users.create')}
           </button>
         </form>
         {createError && (
@@ -329,10 +349,10 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
       {/* User list */}
       <section className="admin-users-list-section">
         <h2 className="admin-users-section-title">
-          Benutzer ({total})
+          {t('admin.users.listTitle')} ({total})
         </h2>
 
-        {listLoading && <p className="admin-users-loading">Laden…</p>}
+        {listLoading && <p className="admin-users-loading">{t('admin.users.loading')}</p>}
         {listError && (
           <p className="admin-users-message admin-users-message--error" role="alert">
             {listError}
@@ -340,7 +360,7 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
         )}
 
         {!listLoading && users.length === 0 && !listError && (
-          <p>Keine Benutzer vorhanden.</p>
+          <p>{t('admin.users.empty')}</p>
         )}
 
         {users.length > 0 && (
@@ -348,13 +368,13 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
             <table className="admin-users-table">
               <thead>
                 <tr>
-                  <th>Benutzername</th>
-                  <th>Anzeigename</th>
-                  <th>E-Mail</th>
-                  <th>Rolle</th>
-                  <th>Status</th>
-                  <th>Erstellt</th>
-                  <th>Aktionen</th>
+                  <th>{t('admin.users.tableUsername')}</th>
+                  <th>{t('admin.users.tableDisplayName')}</th>
+                  <th>{t('admin.users.tableEmail')}</th>
+                  <th>{t('admin.users.tableRole')}</th>
+                  <th>{t('admin.users.tableStatus')}</th>
+                  <th>{t('admin.users.tableCreated')}</th>
+                  <th>{t('admin.users.tableActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -363,37 +383,37 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
                     <td>{user.username}</td>
                     <td>{user.displayName}</td>
                     <td>{user.email || '—'}</td>
-                    <td>{user.role === 'admin' ? 'Administrator' : 'Benutzer'}</td>
-                    <td>{user.suspended ? 'Gesperrt' : 'Aktiv'}</td>
+                    <td>{user.role === 'admin' ? t('admin.users.roleAdmin') : t('admin.users.roleUser')}</td>
+                    <td>{user.suspended ? t('admin.users.statusSuspended') : t('admin.users.statusActive')}</td>
                     <td>{formatDate(user.createdAt)}</td>
                     <td className="admin-users-actions">
                       <button
                         className="admin-users-btn admin-users-btn--small"
                         onClick={() => void handleChangeRole(user)}
-                        title={user.role === 'admin' ? 'Zu Benutzer herabstufen' : 'Zum Administrator befördern'}
+                        title={user.role === 'admin' ? t('admin.users.changeRoleToUser') : t('admin.users.changeRoleToAdmin')}
                       >
-                        Rolle ändern
+                        {t('admin.users.changeRole')}
                       </button>
                       <button
                         className="admin-users-btn admin-users-btn--small"
                         onClick={() => void handleResetPassword(user)}
-                        title="Passwort zurücksetzen"
+                        title={t('admin.users.resetPassword')}
                       >
-                        Passwort zurücksetzen
+                        {t('admin.users.resetPassword')}
                       </button>
                       <button
                         className="admin-users-btn admin-users-btn--small"
                         onClick={() => void handleToggleSuspend(user)}
-                        title={user.suspended ? 'Konto entsperren' : 'Konto sperren'}
+                        title={user.suspended ? t('admin.users.unsuspendTitle') : t('admin.users.suspendTitle')}
                       >
-                        {user.suspended ? 'Entsperren' : 'Sperren'}
+                        {user.suspended ? t('admin.users.unsuspend') : t('admin.users.suspend')}
                       </button>
                       <button
                         className="admin-users-btn admin-users-btn--small admin-users-btn--danger"
                         onClick={() => handleDeleteUser(user)}
-                        title="Benutzer löschen"
+                        title={t('admin.users.deleteUserTitle')}
                       >
-                        Löschen
+                        {t('admin.users.deleteUser')}
                       </button>
                     </td>
                   </tr>
@@ -411,17 +431,17 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
               disabled={page <= 1}
               onClick={() => void loadUsers(page - 1)}
             >
-              Vorherige
+              {t('admin.users.previousPage')}
             </button>
             <span className="admin-users-pagination-info">
-              Seite {page} von {totalPages}
+              {t('admin.users.pageInfo', { page: String(page), totalPages: String(totalPages) })}
             </span>
             <button
               className="admin-users-btn admin-users-btn--small"
               disabled={page >= totalPages}
               onClick={() => void loadUsers(page + 1)}
             >
-              Nächste
+              {t('admin.users.nextPage')}
             </button>
           </div>
         )}
@@ -437,13 +457,13 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
                 className="admin-users-btn admin-users-btn--danger"
                 onClick={confirmDialog.onConfirm}
               >
-                Bestätigen
+                {t('admin.users.confirm')}
               </button>
               <button
                 className="admin-users-btn"
                 onClick={() => setConfirmDialog(null)}
               >
-                Abbrechen
+                {t('common.cancel')}
               </button>
             </div>
           </div>
@@ -458,24 +478,9 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
 /**
  * Extracts a user-friendly error message from an unknown error.
  */
-function extractErrorMessage(err: unknown): string {
+function extractErrorMessage(err: unknown, t: (key: string, params?: Record<string, string | number>) => string): string {
   if (err !== null && typeof err === 'object' && 'message' in err) {
     return (err as { message: string }).message
   }
-  return 'Ein unbekannter Fehler ist aufgetreten.'
-}
-
-/**
- * Formats an ISO 8601 date string to a localized German date.
- */
-function formatDate(isoDate: string): string {
-  try {
-    return new Date(isoDate).toLocaleDateString('de-DE', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    })
-  } catch {
-    return isoDate
-  }
+  return t('admin.users.unknownError')
 }

@@ -171,7 +171,7 @@ describe('SessionsPage', () => {
     render(React.createElement(SessionsPage, { apiClient }))
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Alle anderen beenden' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Alle anderen Sitzungen beenden' })).toBeInTheDocument()
     })
   })
 
@@ -185,7 +185,7 @@ describe('SessionsPage', () => {
       expect(screen.getByText(sampleSessions[0]!.userAgent)).toBeInTheDocument()
     })
 
-    expect(screen.queryByRole('button', { name: 'Alle anderen beenden' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Alle anderen Sitzungen beenden' })).not.toBeInTheDocument()
   })
 
   it('calls apiClient.invalidateAllOtherSessions when "Alle anderen beenden" is clicked', async () => {
@@ -196,10 +196,10 @@ describe('SessionsPage', () => {
     render(React.createElement(SessionsPage, { apiClient }))
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Alle anderen beenden' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Alle anderen Sitzungen beenden' })).toBeInTheDocument()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Alle anderen beenden' }))
+    await user.click(screen.getByRole('button', { name: 'Alle anderen Sitzungen beenden' }))
 
     await waitFor(() => {
       expect(apiClient.invalidateAllOtherSessions).toHaveBeenCalledTimes(1)
@@ -257,10 +257,10 @@ describe('SessionsPage', () => {
     render(React.createElement(SessionsPage, { apiClient }))
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Alle anderen beenden' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Alle anderen Sitzungen beenden' })).toBeInTheDocument()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Alle anderen beenden' }))
+    await user.click(screen.getByRole('button', { name: 'Alle anderen Sitzungen beenden' }))
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Alle anderen beenden…' })).toBeDisabled()

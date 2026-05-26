@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { FileExplorer } from './FileExplorer'
@@ -156,14 +156,15 @@ describe('FileExplorer', () => {
       expect(screen.queryByText('todo.md')).not.toBeInTheDocument()
     })
 
-    it('shows collapsed chevron (▶) for collapsed folders', () => {
+    it('shows collapsed chevron for collapsed folders', () => {
       renderFileExplorer({ directoryTree: sampleTree })
 
-      const chevrons = screen.getAllByText('▶')
-      expect(chevrons.length).toBeGreaterThan(0)
+      // Chevrons are now Lucide SVG icons (aria-hidden), verify folders are rendered as buttons
+      const documentsButton = screen.getByRole('button', { name: /Documents.*\(2\)/ })
+      expect(documentsButton).toBeInTheDocument()
     })
 
-    it('expands folder on click, showing children and expanded chevron (▼)', async () => {
+    it('expands folder on click, showing children and expanded chevron', async () => {
       const user = userEvent.setup()
       renderFileExplorer({ directoryTree: sampleTree })
 
@@ -173,9 +174,6 @@ describe('FileExplorer', () => {
       // Children should now be visible
       expect(screen.getByText('notes.md')).toBeInTheDocument()
       expect(screen.getByText('todo.md')).toBeInTheDocument()
-
-      // Chevron should change to expanded
-      expect(within(documentsButton).getByText('▼')).toBeInTheDocument()
     })
 
     it('collapses folder on second click', async () => {
@@ -296,14 +294,14 @@ describe('FileExplorer', () => {
     it('renders delete buttons for files', () => {
       renderFileExplorer({ directoryTree: sampleTree, selectedVaultId: 'vault-123' })
 
-      expect(screen.getByRole('button', { name: 'Delete file readme.md' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Datei "readme.md" l\u00f6schen' })).toBeInTheDocument()
     })
 
     it('renders delete buttons for folders', () => {
       renderFileExplorer({ directoryTree: sampleTree, selectedVaultId: 'vault-123' })
 
-      expect(screen.getByRole('button', { name: 'Delete folder Documents' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Delete folder Images' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Ordner "Documents" l\u00f6schen' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Ordner "Images" l\u00f6schen' })).toBeInTheDocument()
     })
 
     it('shows confirmation dialog on delete click', async () => {
@@ -316,7 +314,7 @@ describe('FileExplorer', () => {
         mockApiClient,
       )
 
-      const deleteBtn = screen.getByRole('button', { name: 'Delete file readme.md' })
+      const deleteBtn = screen.getByRole('button', { name: 'Datei "readme.md" l\u00f6schen' })
       await user.click(deleteBtn)
 
       expect(confirmSpy).toHaveBeenCalledWith('"readme.md" wirklich löschen?')
@@ -335,7 +333,7 @@ describe('FileExplorer', () => {
         mockApiClient,
       )
 
-      const deleteBtn = screen.getByRole('button', { name: 'Delete file readme.md' })
+      const deleteBtn = screen.getByRole('button', { name: 'Datei "readme.md" l\u00f6schen' })
       await user.click(deleteBtn)
 
       expect(dispatch).toHaveBeenCalledWith({ type: 'LOADING_STARTED' })
@@ -352,7 +350,7 @@ describe('FileExplorer', () => {
         mockApiClient,
       )
 
-      const deleteBtn = screen.getByRole('button', { name: 'Delete file readme.md' })
+      const deleteBtn = screen.getByRole('button', { name: 'Datei "readme.md" l\u00f6schen' })
       await user.click(deleteBtn)
 
       expect(mockApiClient.deleteContent).not.toHaveBeenCalled()

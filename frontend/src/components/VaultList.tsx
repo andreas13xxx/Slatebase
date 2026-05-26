@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAppContext, createVault, deleteVault } from '../state'
+import { useTranslation } from '../i18n'
 import { ChevronDown, ChevronUp, Plus, Trash2, Database, Eye, Pencil } from 'lucide-react'
 
 /**
@@ -14,6 +15,7 @@ const MAX_VAULT_NAME_LENGTH = 128
  */
 export function VaultList() {
   const { state, dispatch, apiClient } = useAppContext()
+  const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [newVaultName, setNewVaultName] = useState('')
@@ -56,15 +58,15 @@ export function VaultList() {
 
     const trimmed = newVaultName
     if (trimmed.length === 0 || trimmed.trim().length === 0) {
-      setValidationError('Vault-Name darf nicht leer sein')
+      setValidationError(t('vault.nameEmpty'))
       return
     }
     if (trimmed.length > MAX_VAULT_NAME_LENGTH) {
-      setValidationError(`Vault-Name darf maximal ${MAX_VAULT_NAME_LENGTH} Zeichen lang sein`)
+      setValidationError(t('vault.nameTooLong', { max: MAX_VAULT_NAME_LENGTH }))
       return
     }
     if (state.vaults.some((v) => v.name === trimmed)) {
-      setValidationError(`Ein Vault mit dem Namen "${trimmed}" existiert bereits`)
+      setValidationError(t('vault.nameExists', { name: trimmed }))
       return
     }
 
@@ -80,7 +82,7 @@ export function VaultList() {
   async function handleDelete(e: React.MouseEvent, vaultId: string, vaultName: string) {
     e.stopPropagation()
     const confirmed = window.confirm(
-      `Vault "${vaultName}" wirklich löschen? Alle Dateien werden unwiderruflich entfernt.`,
+      t('vault.deleteConfirm', { name: vaultName }),
     )
     if (!confirmed) return
     if (!apiClient) return
@@ -97,12 +99,12 @@ export function VaultList() {
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
-        aria-label="Vault auswählen"
+        aria-label={t('vault.selectAriaLabel')}
       >
         <span className="vault-dropdown-label">
           {selectedVault
             ? <><Database size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 5 }} />{selectedVault.name}</>
-            : 'Vault auswählen…'}
+            : t('vault.select')}
         </span>
         <span className="vault-dropdown-chevron" aria-hidden="true">
           {isOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
@@ -113,7 +115,7 @@ export function VaultList() {
       {isOpen && (
         <div className="vault-dropdown-menu" role="listbox">
           {state.vaults.length === 0 ? (
-            <p className="vault-dropdown-empty">Keine Vaults vorhanden</p>
+            <p className="vault-dropdown-empty">{t('vault.noVaults')}</p>
           ) : (
             <ul className="vault-dropdown-list">
               {state.vaults.map((vault) => (
@@ -131,12 +133,12 @@ export function VaultList() {
                   >
                     {vault.name}
                     {vault.permission === 'read' && (
-                      <span className="vault-permission-badge vault-permission-badge--read" title="Nur Lesen">
+                      <span className="vault-permission-badge vault-permission-badge--read" title={t('vault.permissionRead')}>
                         <Eye size={11} />
                       </span>
                     )}
                     {vault.permission === 'write' && (
-                      <span className="vault-permission-badge vault-permission-badge--write" title="Bearbeiten">
+                      <span className="vault-permission-badge vault-permission-badge--write" title={t('vault.permissionWrite')}>
                         <Pencil size={11} />
                       </span>
                     )}
@@ -145,8 +147,8 @@ export function VaultList() {
                     <button
                       type="button"
                       className="vault-dropdown-item-delete"
-                      aria-label={`Vault "${vault.name}" löschen`}
-                      title={`"${vault.name}" löschen`}
+                      aria-label={t('vault.deleteVaultAriaLabel', { name: vault.name })}
+                      title={t('files.deleteTitle', { name: vault.name })}
                       onClick={(e) => handleDelete(e, vault.id, vault.name)}
                     >
                       <Trash2 size={13} />
@@ -165,18 +167,18 @@ export function VaultList() {
                 className="vault-dropdown-create-btn"
                 onClick={handleShowCreateForm}
               >
-                <Plus size={13} /> Neuer Vault
+                <Plus size={13} /> {t('vault.newVault')}
               </button>
             ) : (
               <form className="vault-dropdown-create-form" onSubmit={handleCreateSubmit}>
                 <input
                   type="text"
                   className="vault-dropdown-create-input"
-                  placeholder="Vault-Name…"
+                  placeholder={t('vault.vaultNamePlaceholder')}
                   value={newVaultName}
                   onChange={(e) => setNewVaultName(e.target.value)}
                   maxLength={MAX_VAULT_NAME_LENGTH}
-                  aria-label="Vault-Name"
+                  aria-label={t('vault.vaultNameLabel')}
                   autoFocus
                 />
                 <div className="vault-dropdown-create-actions">

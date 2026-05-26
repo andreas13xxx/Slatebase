@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { IApiClient } from '../api'
+import { useTranslation } from '../i18n'
 
 /**
  * All auditable actions in the system.
@@ -73,6 +74,8 @@ export interface AdminAuditPageProps {
  * Fetches data from GET /api/v1/admin/audit with query params.
  */
 export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
+  const { t, locale } = useTranslation()
+
   const [entries, setEntries] = useState<AuditEntry[]>([])
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -114,8 +117,8 @@ export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
       })
 
       if (!response.ok) {
-        const body = await response.json().catch(() => ({ message: `Fehler ${response.status}` }))
-        throw new Error((body as { message?: string }).message ?? `Fehler ${response.status}`)
+        const body = await response.json().catch(() => ({ message: t('admin.audit.errorStatus', { status: String(response.status) }) }))
+        throw new Error((body as { message?: string }).message ?? t('admin.audit.errorStatus', { status: String(response.status) }))
       }
 
       const data = (await response.json()) as AuditResponse
@@ -127,7 +130,7 @@ export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
       if (err instanceof Error) {
         setError(err.message)
       } else {
-        setError('Audit-Log konnte nicht geladen werden.')
+        setError(t('admin.audit.loadError'))
       }
     } finally {
       setIsLoading(false)
@@ -146,13 +149,31 @@ export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
     setPage(1)
   }
 
+  /**
+   * Formats an ISO 8601 timestamp to a human-readable locale string.
+   */
+  function formatTimestamp(iso: string): string {
+    try {
+      return new Date(iso).toLocaleString(locale === 'de' ? 'de-DE' : 'en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+    } catch {
+      return iso
+    }
+  }
+
   return (
     <div className="admin-audit-page">
-      <h1>Audit-Log</h1>
+      <h1>{t('admin.audit.title')}</h1>
 
       <div className="audit-filters">
         <div className="audit-filter-field">
-          <label htmlFor="audit-action-filter">Aktionstyp</label>
+          <label htmlFor="audit-action-filter">{t('admin.audit.actionFilterLabel')}</label>
           <select
             id="audit-action-filter"
             value={actionFilter}
@@ -161,7 +182,7 @@ export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
               handleFilterChange()
             }}
           >
-            <option value="">Alle</option>
+            <option value="">{t('admin.audit.actionFilterAll')}</option>
             {AUDIT_ACTIONS.map((action) => (
               <option key={action} value={action}>
                 {action}
@@ -171,7 +192,7 @@ export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
         </div>
 
         <div className="audit-filter-field">
-          <label htmlFor="audit-start-date">Von</label>
+          <label htmlFor="audit-start-date">{t('admin.audit.startDateLabel')}</label>
           <input
             id="audit-start-date"
             type="date"
@@ -184,7 +205,7 @@ export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
         </div>
 
         <div className="audit-filter-field">
-          <label htmlFor="audit-end-date">Bis</label>
+          <label htmlFor="audit-end-date">{t('admin.audit.endDateLabel')}</label>
           <input
             id="audit-end-date"
             type="date"
@@ -204,39 +225,43 @@ export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
       )}
 
       {isLoading ? (
-        <p className="audit-loading">Laden…</p>
+        <p className="audit-loading">{t('admin.audit.loading')}</p>
       ) : (
         <>
-          <p className="audit-summary">{total} Einträge</p>
+          <p className="audit-summary">{t('admin.audit.summary', { total: String(total) })}</p>
 
           <div className="audit-table-container">
             <table className="audit-table">
               <thead>
                 <tr>
-                  <th>Zeitpunkt</th>
-                  <th>Benutzer-ID</th>
-                  <th>Aktion</th>
-                  <th>Ziel</th>
-                  <th>IP-Adresse</th>
-                  <th>Erfolg</th>
+                  <th>{t('admin.audit.tableTimestamp')}</th>
+                  <th>{t('admin.audit.tableUserId')}</th>
+                  <th>{t('admin.audit.tableAction')}</th>
+                  <th>{t('admin.audit.tableTarget')}</th>
+                  <th>{t('admin.audit.tableIpAddress')}</th>
+                  <th>{t('admin.audit.tableStatus')}</th>
                 </tr>
               </thead>
               <tbody>
                 {entries.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="audit-empty">
-                      Keine Einträge gefunden.
+                      {t('admin.audit.empty')}
                     </td>
                   </tr>
                 ) : (
                   entries.map((entry, index) => (
                     <tr key={`${entry.timestamp}-${index}`}>
                       <td>{formatTimestamp(entry.timestamp)}</td>
-                      <td>{entry.userId ?? '—'}</td>
-                      <td>{entry.action}</td>
-                      <td>{entry.target}</td>
+                      <td title={entry.userId ?? undefined}>{entry.userId ? truncateId(entry.userId) : '—'}</td>
+                      <td><span className="audit-action-badge">{formatAction(entry.action)}</span></td>
+                      <td title={entry.target}>{entry.target || '—'}</td>
                       <td>{entry.ipAddress}</td>
-                      <td>{entry.success ? '✓' : '✗'}</td>
+                      <td>
+                        <span className={`audit-status ${entry.success ? 'audit-status--success' : 'audit-status--failure'}`}>
+                          {entry.success ? '✓' : '✗'}
+                        </span>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -250,17 +275,17 @@ export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
             >
-              Vorherige
+              {t('admin.audit.previousPage')}
             </button>
             <span className="audit-page-info">
-              Seite {page} von {totalPages}
+              {t('admin.audit.pageInfo', { page: String(page), totalPages: String(totalPages) })}
             </span>
             <button
               type="button"
               disabled={page >= totalPages}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             >
-              Nächste
+              {t('admin.audit.nextPage')}
             </button>
           </div>
         </>
@@ -270,21 +295,18 @@ export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
 }
 
 /**
- * Formats an ISO 8601 timestamp to a human-readable German locale string.
+ * Truncates a user ID for display, showing first 8 characters.
  */
-function formatTimestamp(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString('de-DE', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    })
-  } catch {
-    return iso
-  }
+function truncateId(id: string): string {
+  return id.length > 12 ? `${id.slice(0, 8)}…` : id
+}
+
+/**
+ * Formats an audit action into a more readable label.
+ * Replaces underscores with spaces and converts to title case.
+ */
+function formatAction(action: string): string {
+  return action.replace(/_/g, ' ')
 }
 
 /**

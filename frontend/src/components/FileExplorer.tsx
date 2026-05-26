@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAppContext, deleteContent } from '../state'
 import { useTabContext } from '../state/tabContext'
+import { useTranslation } from '../i18n'
 import { openTab } from '../state/tabActions'
 import type { DirectoryTree } from '../types'
 import { ChevronRight, ChevronDown, Folder, FolderOpen, FileText, Trash2 } from 'lucide-react'
@@ -23,6 +24,7 @@ interface TreeNodeProps {
  * Each node has a delete button for content management.
  */
 function TreeNode({ node, selectedFilePath, expandedPaths, onToggleFolder, onSelectFile, onDelete }: TreeNodeProps) {
+  const { t } = useTranslation()
   const isDirectory = node.type === 'directory'
   const isExpanded = expandedPaths.has(node.path)
   const isSelected = !isDirectory && node.path === selectedFilePath
@@ -52,8 +54,8 @@ function TreeNode({ node, selectedFilePath, expandedPaths, onToggleFolder, onSel
           <button
             type="button"
             className="tree-node-delete"
-            aria-label={`Ordner "${node.name}" löschen`}
-            title={`"${node.name}" löschen`}
+            aria-label={t('files.deleteFolderAriaLabel', { name: node.name })}
+            title={t('files.deleteTitle', { name: node.name })}
             onClick={() => onDelete(node.path, node.name)}
           >
             <Trash2 size={12} />
@@ -95,8 +97,8 @@ function TreeNode({ node, selectedFilePath, expandedPaths, onToggleFolder, onSel
         <button
           type="button"
           className="tree-node-delete"
-          aria-label={`Datei "${node.name}" löschen`}
-          title={`"${node.name}" löschen`}
+          aria-label={t('files.deleteFileAriaLabel', { name: node.name })}
+          title={t('files.deleteTitle', { name: node.name })}
           onClick={() => onDelete(node.path, node.name)}
         >
           <Trash2 size={12} />
@@ -117,6 +119,7 @@ function TreeNode({ node, selectedFilePath, expandedPaths, onToggleFolder, onSel
 export function FileExplorer() {
   const { state, dispatch, apiClient } = useAppContext()
   const { tabDispatch } = useTabContext()
+  const { t } = useTranslation()
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
 
   const tree = state.directoryTree
@@ -143,7 +146,7 @@ export function FileExplorer() {
 
   function handleDelete(path: string, name: string) {
     if (!vaultId || !apiClient) return
-    const confirmed = window.confirm(`"${name}" wirklich löschen?`)
+    const confirmed = window.confirm(t('files.deleteConfirm', { name }))
     if (confirmed) {
       deleteContent(dispatch, apiClient, vaultId, path)
     }
@@ -160,7 +163,7 @@ export function FileExplorer() {
 
       {/* Tree content */}
       {!tree || !tree.children || tree.children.length === 0 ? (
-        <p className="file-explorer-empty">Vault ist leer</p>
+        <p className="file-explorer-empty">{t('vault.empty')}</p>
       ) : (
         <nav className="file-explorer" aria-label="File explorer">
           <ul className="file-explorer-tree" role="tree">

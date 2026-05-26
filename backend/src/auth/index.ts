@@ -550,6 +550,7 @@ export class AuthService implements IAuthService {
       username: user.username,
       displayName: user.displayName,
       email: user.email,
+      avatarUrl: user.avatarUrl,
       role: user.role,
       preferredLanguage: user.preferredLanguage,
       colorScheme: user.colorScheme,

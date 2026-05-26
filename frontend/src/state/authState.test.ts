@@ -142,7 +142,7 @@ describe('authReducer', () => {
       expect(result.user).toBeNull()
       expect(result.token).toBeNull()
       expect(result.csrfToken).toBeNull()
-      expect(result.error).toBe('Session abgelaufen. Bitte erneut anmelden.')
+      expect(result.error).toBe('auth.sessionExpired')
     })
   })
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { IApiClient } from '../api'
+import { useTranslation } from '../i18n'
 
 /** A single vault share entry as returned by the backend. */
 export interface VaultShareEntry {
@@ -33,10 +34,10 @@ export interface VaultDeletionWorkflowProps {
  * 3. If shares exist: present two options (force delete or transfer ownership)
  * 4. For force delete: confirm dialog, then call DELETE with force revocation
  * 5. For transfer: input target user, validate, call POST /vaults/:vaultId/transfer
- *
- * UI labels are in German.
  */
 export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultDeletionWorkflowProps) {
+  const { t } = useTranslation()
+
   const [step, setStep] = useState<WorkflowStep>('loading')
   const [shares, setShares] = useState<VaultShareEntry[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -81,7 +82,7 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
       })
 
       if (!response.ok) {
-        const body = await response.json().catch(() => ({ message: 'Fehler beim Laden der Freigaben' }))
+        const body = await response.json().catch(() => ({ message: t('vaultDeletion.loadError') }))
         throw new Error(body.message || `HTTP ${response.status}`)
       }
 
@@ -94,7 +95,7 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
         setStep('choose-action')
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Fehler beim Laden der Freigaben'
+      const message = err instanceof Error ? err.message : t('vaultDeletion.loadError')
       setError(message)
       setStep('error')
     }
@@ -114,7 +115,7 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
       await apiClient.deleteVault(vaultId)
       setStep('done')
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : (err as { message?: string })?.message ?? 'Fehler beim Löschen'
+      const message = err instanceof Error ? err.message : (err as { message?: string })?.message ?? t('vaultDeletion.deleteError')
       setError(message)
       setStep('error')
     } finally {
@@ -137,8 +138,8 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
           headers: buildHeaders(false),
         })
         if (!response.ok) {
-          const body = await response.json().catch(() => ({ message: 'Fehler beim Widerrufen' }))
-          throw new Error(body.message || `Fehler beim Widerrufen der Freigabe für ${share.userId}`)
+          const body = await response.json().catch(() => ({ message: t('vaultDeletion.revokeError') }))
+          throw new Error(body.message || t('vaultDeletion.revokeShareError', { userId: share.userId }))
         }
       }
 
@@ -146,7 +147,7 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
       await apiClient.deleteVault(vaultId)
       setStep('done')
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : (err as { message?: string })?.message ?? 'Fehler beim Löschen'
+      const message = err instanceof Error ? err.message : (err as { message?: string })?.message ?? t('vaultDeletion.deleteError')
       setError(message)
       setStep('error')
     } finally {
@@ -161,7 +162,7 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
   async function handleTransfer(): Promise<void> {
     const trimmedUser = targetUser.trim()
     if (trimmedUser === '') {
-      setTransferError('Benutzername darf nicht leer sein.')
+      setTransferError(t('vaultDeletion.usernameRequired'))
       return
     }
 
@@ -177,8 +178,8 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
           headers: buildHeaders(false),
         })
         if (!response.ok) {
-          const body = await response.json().catch(() => ({ message: 'Fehler beim Widerrufen' }))
-          throw new Error(body.message || `Fehler beim Widerrufen der Freigabe für ${share.userId}`)
+          const body = await response.json().catch(() => ({ message: t('vaultDeletion.revokeError') }))
+          throw new Error(body.message || t('vaultDeletion.revokeShareError', { userId: share.userId }))
         }
       }
 
@@ -190,13 +191,13 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
       })
 
       if (!transferResponse.ok) {
-        const body = await transferResponse.json().catch(() => ({ message: 'Fehler bei der Übertragung' }))
-        throw new Error(mapTransferError(body.code, body.message))
+        const body = await transferResponse.json().catch(() => ({ message: t('vaultDeletion.transferError') }))
+        throw new Error(mapTransferError(body.code, body.message, t))
       }
 
       setStep('done')
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Fehler bei der Besitzübertragung'
+      const message = err instanceof Error ? err.message : t('vaultDeletion.transferError')
       setTransferError(message)
     } finally {
       setActionLoading(false)
@@ -208,7 +209,7 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
   if (step === 'loading') {
     return (
       <div className="vault-deletion-workflow" role="status" aria-live="polite">
-        <p>Laden…</p>
+        <p>{t('vaultDeletion.loading')}</p>
       </div>
     )
   }
@@ -216,13 +217,13 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
   if (step === 'done') {
     return (
       <div className="vault-deletion-workflow" role="status" aria-live="polite">
-        <p className="vault-deletion-success">Vorgang abgeschlossen.</p>
+        <p className="vault-deletion-success">{t('vaultDeletion.done')}</p>
         <button
           type="button"
           className="vault-deletion-btn vault-deletion-btn--primary"
           onClick={onComplete}
         >
-          Schließen
+          {t('vaultDeletion.close')}
         </button>
       </div>
     )
@@ -238,14 +239,14 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
             className="vault-deletion-btn"
             onClick={() => void loadShares()}
           >
-            Erneut versuchen
+            {t('vaultDeletion.retry')}
           </button>
           <button
             type="button"
             className="vault-deletion-btn"
             onClick={onComplete}
           >
-            Abbrechen
+            {t('vaultDeletion.cancel')}
           </button>
         </div>
       </div>
@@ -255,10 +256,10 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
   if (step === 'no-shares') {
     return (
       <div className="vault-deletion-workflow">
-        <h3 className="vault-deletion-title">Vault löschen</h3>
-        <p>Dieser Vault hat keine aktiven Freigaben. Möchten Sie ihn endgültig löschen?</p>
+        <h3 className="vault-deletion-title">{t('vaultDeletion.title')}</h3>
+        <p>{t('vaultDeletion.noSharesInfo')}</p>
         <p className="vault-deletion-warning" role="alert">
-          Alle Dateien werden unwiderruflich entfernt.
+          {t('vaultDeletion.noSharesWarning')}
         </p>
         <div className="vault-deletion-actions">
           <button
@@ -267,7 +268,7 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
             onClick={() => void handleSimpleDelete()}
             disabled={actionLoading}
           >
-            {actionLoading ? 'Löschen…' : 'Vault löschen'}
+            {actionLoading ? t('vaultDeletion.deleting') : t('vaultDeletion.deleteVault')}
           </button>
           <button
             type="button"
@@ -275,7 +276,7 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
             onClick={onComplete}
             disabled={actionLoading}
           >
-            Abbrechen
+            {t('vaultDeletion.cancel')}
           </button>
         </div>
       </div>
@@ -285,22 +286,22 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
   if (step === 'choose-action') {
     return (
       <div className="vault-deletion-workflow">
-        <h3 className="vault-deletion-title">Vault löschen</h3>
+        <h3 className="vault-deletion-title">{t('vaultDeletion.title')}</h3>
 
         {hasWriteShares && (
           <p className="vault-deletion-warning" role="alert">
-            Achtung: Dieser Vault hat aktive Schreibfreigaben. Andere Benutzer bearbeiten möglicherweise Inhalte.
+            {t('vaultDeletion.writeSharesWarning')}
           </p>
         )}
 
         <div className="vault-deletion-shares">
-          <h4>Aktive Freigaben ({shares.length})</h4>
-          <ul className="vault-deletion-share-list" aria-label="Aktive Freigaben">
+          <h4>{t('vaultDeletion.activeShares', { count: String(shares.length) })}</h4>
+          <ul className="vault-deletion-share-list" aria-label={t('vaultDeletion.activeSharesAriaLabel')}>
             {shares.map((share) => (
               <li key={share.userId} className="vault-deletion-share-item">
                 <span className="vault-deletion-share-user">{share.userId}</span>
                 <span className="vault-deletion-share-permission">
-                  {share.permission === 'write' ? 'Schreiben' : 'Lesen'}
+                  {share.permission === 'write' ? t('vaultDeletion.permissionWrite') : t('vaultDeletion.permissionRead')}
                 </span>
               </li>
             ))}
@@ -313,14 +314,14 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
             className="vault-deletion-btn vault-deletion-btn--danger"
             onClick={() => setStep('confirm-force')}
           >
-            Alle Freigaben widerrufen und Vault löschen
+            {t('vaultDeletion.forceDeleteBtn')}
           </button>
           <button
             type="button"
             className="vault-deletion-btn vault-deletion-btn--secondary"
             onClick={() => setStep('transfer')}
           >
-            Besitz übertragen
+            {t('vaultDeletion.transferBtn')}
           </button>
         </div>
 
@@ -329,7 +330,7 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
           className="vault-deletion-btn vault-deletion-btn--cancel"
           onClick={onComplete}
         >
-          Abbrechen
+          {t('vaultDeletion.cancel')}
         </button>
       </div>
     )
@@ -338,17 +339,16 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
   if (step === 'confirm-force') {
     return (
       <div className="vault-deletion-workflow">
-        <h3 className="vault-deletion-title">Löschung bestätigen</h3>
+        <h3 className="vault-deletion-title">{t('vaultDeletion.confirmTitle')}</h3>
 
         {hasWriteShares && (
           <p className="vault-deletion-warning" role="alert">
-            Warnung: Benutzer mit Schreibzugriff verlieren sofort den Zugang. Nicht gespeicherte Änderungen gehen verloren.
+            {t('vaultDeletion.confirmWriteWarning')}
           </p>
         )}
 
         <p>
-          Alle {shares.length} Freigabe(n) werden widerrufen und der Vault wird endgültig gelöscht.
-          Dieser Vorgang kann nicht rückgängig gemacht werden.
+          {t('vaultDeletion.confirmInfo', { count: String(shares.length) })}
         </p>
 
         <div className="vault-deletion-actions">
@@ -358,7 +358,7 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
             onClick={() => void handleForceDelete()}
             disabled={actionLoading}
           >
-            {actionLoading ? 'Löschen…' : 'Endgültig löschen'}
+            {actionLoading ? t('vaultDeletion.deleting') : t('vaultDeletion.confirmDelete')}
           </button>
           <button
             type="button"
@@ -366,7 +366,7 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
             onClick={() => setStep('choose-action')}
             disabled={actionLoading}
           >
-            Zurück
+            {t('vaultDeletion.back')}
           </button>
         </div>
       </div>
@@ -376,16 +376,14 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
   if (step === 'transfer') {
     return (
       <div className="vault-deletion-workflow">
-        <h3 className="vault-deletion-title">Besitz übertragen</h3>
+        <h3 className="vault-deletion-title">{t('vaultDeletion.transferTitle')}</h3>
 
         <p>
-          Geben Sie den Benutzernamen (User-ID) des neuen Besitzers ein.
-          Alle anderen Freigaben werden automatisch widerrufen.
-          Nach der Übertragung verlieren Sie jeglichen Zugriff auf diesen Vault.
+          {t('vaultDeletion.transferInfo')}
         </p>
 
         <div className="vault-deletion-transfer-form">
-          <label htmlFor="vault-deletion-target-user">Neuer Besitzer</label>
+          <label htmlFor="vault-deletion-target-user">{t('vaultDeletion.newOwnerLabel')}</label>
           <input
             id="vault-deletion-target-user"
             className="vault-deletion-input"
@@ -395,7 +393,7 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
               setTargetUser(e.target.value)
               if (transferError) setTransferError(null)
             }}
-            placeholder="Benutzer-ID"
+            placeholder={t('vaultDeletion.newOwnerPlaceholder')}
             aria-invalid={transferError !== null}
             aria-describedby={transferError ? 'vault-deletion-transfer-error' : undefined}
             disabled={actionLoading}
@@ -415,7 +413,7 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
             onClick={() => void handleTransfer()}
             disabled={actionLoading || targetUser.trim() === ''}
           >
-            {actionLoading ? 'Übertragen…' : 'Besitz übertragen'}
+            {actionLoading ? t('vaultDeletion.transferring') : t('vaultDeletion.transfer')}
           </button>
           <button
             type="button"
@@ -423,7 +421,7 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
             onClick={() => setStep('choose-action')}
             disabled={actionLoading}
           >
-            Zurück
+            {t('vaultDeletion.back')}
           </button>
         </div>
       </div>
@@ -435,24 +433,24 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
 }
 
 /**
- * Maps backend error codes from the transfer endpoint to user-friendly German messages.
+ * Maps backend error codes from the transfer endpoint to user-friendly messages via i18n.
  */
-function mapTransferError(code: string | undefined, fallbackMessage: string): string {
+function mapTransferError(code: string | undefined, fallbackMessage: string, t: (key: string) => string): string {
   switch (code) {
     case 'SHARES_NOT_REVOKED':
-      return 'Es bestehen noch Freigaben an andere Benutzer. Bitte widerrufen Sie diese zuerst.'
+      return t('vaultDeletion.errorSharesNotRevoked')
     case 'VAULT_NOT_FOUND':
-      return 'Vault nicht gefunden.'
+      return t('vaultDeletion.errorVaultNotFound')
     case 'ACCESS_DENIED':
-      return 'Zugriff verweigert. Nur der Besitzer kann den Vault übertragen.'
+      return t('vaultDeletion.errorAccessDenied')
     case 'VALIDATION_ERROR':
       if (fallbackMessage.includes('newOwnerId')) {
-        return 'Benutzer nicht gefunden.'
+        return t('vaultDeletion.errorUserNotFound')
       }
       return fallbackMessage
     case 'USER_NOT_FOUND':
-      return 'Benutzer nicht gefunden.'
+      return t('vaultDeletion.errorUserNotFound')
     default:
-      return fallbackMessage || 'Fehler bei der Besitzübertragung.'
+      return fallbackMessage || t('vaultDeletion.transferError')
   }
 }

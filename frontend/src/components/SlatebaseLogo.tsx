@@ -13,10 +13,10 @@ export function SlatebaseLogo({ size = 28, className }: { size?: number; classNa
       className={className}
       aria-hidden="true"
     >
-      <rect width="32" height="32" rx="8" fill="#6d28d9" />
+      <rect width="32" height="32" rx="8" fill="#0f766e" />
       <ellipse cx="16" cy="11" rx="8" ry="3" fill="white" opacity="0.9" />
-      <path d="M8 11v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4" fill="#a78bfa" />
-      <path d="M8 15v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4" fill="#7c3aed" />
+      <path d="M8 11v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4" fill="#5eead4" />
+      <path d="M8 15v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4" fill="#14b8a6" />
       <ellipse cx="16" cy="11" rx="8" ry="3" fill="none" stroke="white" strokeWidth="1" opacity="0.6" />
     </svg>
   )

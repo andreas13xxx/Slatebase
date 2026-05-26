@@ -67,3 +67,4 @@ Monorepo with two independent packages: `backend/` and `frontend/`. No shared wo
 - **vitest** — Test runner (both packages)
 - **highlight.js** — Syntax highlighting in Markdown code blocks
 - **unified / remark-parse / remark-gfm** — Markdown parsing (MDAST)
+- **jszip** — Client-side ZIP creation (vault export fallback for Firefox)

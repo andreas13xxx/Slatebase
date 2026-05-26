@@ -6,8 +6,8 @@
   --font-mono: ui-monospace, 'Cascadia Code', 'Fira Code', Consolas, monospace;
 
   /* Color Palette — Light */
-  --bg-base: #ffffff;
-  --bg-surface: #f8f9fb;
+  --bg-base: #f8fafc;
+  --bg-surface: #f1f5f9;
   --bg-elevated: #ffffff;
   --bg-overlay: rgba(0, 0, 0, 0.4);
 
@@ -20,10 +20,11 @@
   --border-default: #cbd5e1;
   --border-strong: #94a3b8;
 
-  --accent: #6d28d9;
-  --accent-hover: #5b21b6;
-  --accent-light: #ede9fe;
-  --accent-text: #6d28d9;
+  /* Accent — Teal */
+  --accent: #0d9488;
+  --accent-hover: #0f766e;
+  --accent-light: #f0fdfa;
+  --accent-text: #0d9488;
 
   --success: #16a34a;
   --success-bg: #f0fdf4;
@@ -39,18 +40,25 @@
   --danger-border: #fecaca;
   --danger-text: #dc2626;
 
-  --info-bg: #eff6ff;
-  --info-border: #bfdbfe;
-  --info-text: #1d4ed8;
+  --info-bg: #f0fdfa;
+  --info-border: #99f6e4;
+  --info-text: #0f766e;
 
-  /* Sidebar */
-  --sidebar-bg: #1e1b4b;
-  --sidebar-text: #c4b5fd;
-  --sidebar-text-active: #ffffff;
-  --sidebar-hover: rgba(167, 139, 250, 0.12);
-  --sidebar-active: rgba(167, 139, 250, 0.2);
-  --sidebar-border: rgba(167, 139, 250, 0.15);
+  /* Sidebar (light slate — subtle contrast to content) */
+  --sidebar-bg: #f1f5f9;
+  --sidebar-text: #475569;
+  --sidebar-text-active: #0f172a;
+  --sidebar-hover: rgba(15, 23, 42, 0.05);
+  --sidebar-active: rgba(15, 23, 42, 0.08);
+  --sidebar-border: #e2e8f0;
   --sidebar-width: 260px;
+
+  /* Right Panel (matches sidebar — symmetric framing) */
+  --right-panel-bg: #f1f5f9;
+  --right-panel-border: #e2e8f0;
+  --right-panel-header-bg: rgba(15, 23, 42, 0.03);
+  --right-panel-text: #0f172a;
+  --right-panel-text-muted: #64748b;
 
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -81,11 +89,11 @@
 }
 
 /* ===== Dark Mode ===== */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-base: #0f0f14;
-    --bg-surface: #16171d;
-    --bg-elevated: #1f2028;
+/* Explicit dark mode — user chose "dark" in profile */
+:root[data-theme="dark"] {
+    --bg-base: #0d1117;
+    --bg-surface: #131921;
+    --bg-elevated: #1a2130;
     --bg-overlay: rgba(0, 0, 0, 0.6);
 
     --text-primary: #f1f5f9;
@@ -93,14 +101,15 @@
     --text-muted: #64748b;
     --text-inverse: #0f172a;
 
-    --border-subtle: #1e2030;
-    --border-default: #2e303a;
-    --border-strong: #4b5563;
+    --border-subtle: #1e293b;
+    --border-default: #334155;
+    --border-strong: #475569;
 
-    --accent: #a78bfa;
-    --accent-hover: #c4b5fd;
-    --accent-light: #1e1b4b;
-    --accent-text: #a78bfa;
+    /* Accent — Teal (brighter in dark) */
+    --accent: #2dd4bf;
+    --accent-hover: #5eead4;
+    --accent-light: #0f2b2b;
+    --accent-text: #2dd4bf;
 
     --success: #4ade80;
     --success-bg: #052e16;
@@ -116,16 +125,86 @@
     --danger-border: #7f1d1d;
     --danger-text: #f87171;
 
-    --info-bg: #0c1929;
-    --info-border: #1e40af;
-    --info-text: #93c5fd;
+    --info-bg: #0f2b2b;
+    --info-border: #115e59;
+    --info-text: #5eead4;
 
-    --sidebar-bg: #0d0b1e;
-    --sidebar-text: #a78bfa;
+    /* Sidebar (darker slate) */
+    --sidebar-bg: #0b1120;
+    --sidebar-text: #64748b;
     --sidebar-text-active: #f1f5f9;
-    --sidebar-hover: rgba(167, 139, 250, 0.1);
-    --sidebar-active: rgba(167, 139, 250, 0.18);
-    --sidebar-border: rgba(167, 139, 250, 0.12);
+    --sidebar-hover: rgba(100, 116, 139, 0.12);
+    --sidebar-active: rgba(100, 116, 139, 0.2);
+    --sidebar-border: rgba(100, 116, 139, 0.1);
+
+    /* Right Panel — Dark (matches sidebar) */
+    --right-panel-bg: #0b1120;
+    --right-panel-border: rgba(100, 116, 139, 0.1);
+    --right-panel-header-bg: rgba(100, 116, 139, 0.08);
+    --right-panel-text: #f1f5f9;
+    --right-panel-text-muted: #64748b;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+}
+
+/* System preference: dark mode when OS prefers dark AND user chose "system" (or no explicit choice) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg-base: #0d1117;
+    --bg-surface: #131921;
+    --bg-elevated: #1a2130;
+    --bg-overlay: rgba(0, 0, 0, 0.6);
+
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --text-inverse: #0f172a;
+
+    --border-subtle: #1e293b;
+    --border-default: #334155;
+    --border-strong: #475569;
+
+    /* Accent — Teal (brighter in dark) */
+    --accent: #2dd4bf;
+    --accent-hover: #5eead4;
+    --accent-light: #0f2b2b;
+    --accent-text: #2dd4bf;
+
+    --success: #4ade80;
+    --success-bg: #052e16;
+    --success-border: #166534;
+
+    --warning: #fbbf24;
+    --warning-bg: #1c1400;
+    --warning-border: #854d0e;
+
+    --danger: #f87171;
+    --danger-hover: #fca5a5;
+    --danger-bg: #1c0a0a;
+    --danger-border: #7f1d1d;
+    --danger-text: #f87171;
+
+    --info-bg: #0f2b2b;
+    --info-border: #115e59;
+    --info-text: #5eead4;
+
+    /* Sidebar (darker slate) */
+    --sidebar-bg: #0b1120;
+    --sidebar-text: #64748b;
+    --sidebar-text-active: #f1f5f9;
+    --sidebar-hover: rgba(100, 116, 139, 0.12);
+    --sidebar-active: rgba(100, 116, 139, 0.2);
+    --sidebar-border: rgba(100, 116, 139, 0.1);
+
+    /* Right Panel — Dark (matches sidebar) */
+    --right-panel-bg: #0b1120;
+    --right-panel-border: rgba(100, 116, 139, 0.1);
+    --right-panel-header-bg: rgba(100, 116, 139, 0.08);
+    --right-panel-text: #f1f5f9;
+    --right-panel-text-muted: #64748b;
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
