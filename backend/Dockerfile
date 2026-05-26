@@ -1,7 +1,8 @@
 # Slatebase Backend — Production Dockerfile
-# Node.js 22 with native TypeScript stripping (no build step needed)
+# Multi-stage: build TypeScript, then run compiled JavaScript
 
-FROM node:22-slim AS base
+# --- Build Stage ---
+FROM node:22-slim AS build
 
 # argon2 requires build tools for native compilation
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -12,12 +13,37 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install dependencies first (layer caching)
+# Install all dependencies (including devDependencies for tsc)
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci
 
-# Copy source and config
+# Copy source and compile
 COPY src/ ./src/
+COPY tsconfig.json ./
+RUN npx tsc
+
+# --- Production Stage ---
+FROM node:22-slim AS production
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install production dependencies only
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && rm -rf /root/.npm
+
+# Remove build tools after argon2 is compiled
+RUN apt-get purge -y python3 make g++ && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+
+# Copy compiled JavaScript from build stage
+COPY --from=build /app/dist/ ./dist/
+
+# Copy config
 COPY config/ ./config/
 
 # Create data directory (will be overridden by volume mount)
@@ -36,5 +62,5 @@ ENV NODE_ENV=production
 
 EXPOSE 3000
 
-# Start with native TypeScript stripping (Node.js 22+)
-CMD ["node", "--experimental-strip-types", "src/index.ts"]
+# Run compiled JavaScript
+CMD ["node", "dist/index.js"]
