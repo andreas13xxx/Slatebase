@@ -1,32 +1,32 @@
 # Slatebase — Docker Deployment
 
-## Voraussetzungen
+## Prerequisites
 
 - Docker Engine ≥ 24
 - Docker Compose ≥ 2.20
 
-## Schnellstart
+## Quick Start
 
 ```bash
-# 1. Environment-Datei erstellen
+# 1. Create environment file
 cp docker.env.example docker.env
 
-# 2. CSRF-Secret generieren und in docker.env eintragen
+# 2. Generate a CSRF secret and add it to docker.env
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
-# 3. SLATEBASE_ALLOWED_ORIGINS in docker.env auf deine Domain setzen
-#    z.B. https://slatebase.example.com
+# 3. Set SLATEBASE_ALLOWED_ORIGINS in docker.env to your domain
+#    e.g. https://slatebase.example.com
 
-# 4. Container bauen und starten
+# 4. Build and start containers
 docker compose up -d --build
 
-# 5. Logs prüfen
+# 5. Check logs
 docker compose logs -f
 ```
 
-Slatebase ist danach unter `http://<server-ip>:8080` erreichbar.
+Slatebase will be available at `http://<server-ip>:8080`.
 
-## Architektur
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -45,47 +45,47 @@ Slatebase ist danach unter `http://<server-ip>:8080` erreichbar.
 └─────────────────────────────────────────────┘
 ```
 
-- **frontend**: Nginx serviert das React-SPA und proxied `/api/` zum Backend
-- **backend**: Node.js 22 mit nativem TypeScript-Stripping, lauscht auf Port 3000
-- **slatebase-data**: Persistentes Docker-Volume für Vault-Daten, User, Sessions, Audit-Logs
+- **frontend**: Nginx serves the React SPA and proxies `/api/` to the backend
+- **backend**: Node.js 22 with native TypeScript stripping, listens on port 3000
+- **slatebase-data**: Persistent Docker volume for vault data, users, sessions, and audit logs
 
-## Konfiguration
+## Configuration
 
-Alle Einstellungen werden über `docker.env` gesteuert:
+All settings are controlled via `docker.env`:
 
-| Variable | Default | Beschreibung |
-|----------|---------|--------------|
-| `SLATEBASE_PORT` | `3000` | Interner Backend-Port (nicht ändern) |
-| `SLATEBASE_HOST` | `0.0.0.0` | Backend bindet auf alle Interfaces |
-| `SLATEBASE_LOG_LEVEL` | `info` | Log-Level: debug, info, warn, error |
-| `SLATEBASE_ALLOWED_ORIGINS` | `http://localhost:8080` | CORS-Origins (kommasepariert) |
-| `SLATEBASE_CSRF_SECRET` | (random) | Persistentes CSRF-Secret |
-| `SLATEBASE_MAX_FILE_SIZE` | `5242880` | Max. Dateigröße in Bytes (5 MB) |
-| `SLATEBASE_EXTERNAL_PORT` | `8080` | Externer Port auf dem Host |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SLATEBASE_PORT` | `3000` | Internal backend port (do not change) |
+| `SLATEBASE_HOST` | `0.0.0.0` | Backend binds to all interfaces |
+| `SLATEBASE_LOG_LEVEL` | `info` | Log level: debug, info, warn, error |
+| `SLATEBASE_ALLOWED_ORIGINS` | `http://localhost:8080` | CORS origins (comma-separated) |
+| `SLATEBASE_CSRF_SECRET` | (random) | Persistent CSRF secret |
+| `SLATEBASE_MAX_FILE_SIZE` | `5242880` | Max file size in bytes (5 MB) |
+| `SLATEBASE_EXTERNAL_PORT` | `8080` | External port on the host |
 
-## Wichtig: CSRF-Secret
+## Important: CSRF Secret
 
-Ohne ein persistiertes `SLATEBASE_CSRF_SECRET` wird bei jedem Container-Neustart ein neues Secret generiert. Das invalidiert alle bestehenden Sessions. Generiere ein Secret und trage es in `docker.env` ein:
+Without a persisted `SLATEBASE_CSRF_SECRET`, a new secret is generated on every container restart. This invalidates all existing sessions. Generate a secret and add it to `docker.env`:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-## Daten-Persistenz
+## Data Persistence
 
-Alle Daten liegen im Docker-Volume `slatebase-data`:
+All data resides in the Docker volume `slatebase-data`:
 
-- `vaults/` — Vault-Dateien
-- `vaults.json` — Vault-Registry
-- `users/` — Benutzerkonten
-- `sessions/` — Aktive Sessions
-- `shares.json` — Vault-Freigaben
-- `audit/` — Audit-Logs
+- `vaults/` — Vault files
+- `vaults.json` — Vault registry
+- `users/` — User accounts
+- `sessions/` — Active sessions
+- `shares.json` — Vault shares
+- `audit/` — Audit logs
 
 ### Backup
 
 ```bash
-# Volume-Inhalt sichern
+# Back up volume contents
 docker run --rm -v slatebase_slatebase-data:/data -v $(pwd):/backup alpine \
   tar czf /backup/slatebase-backup-$(date +%Y%m%d).tar.gz -C /data .
 ```
@@ -93,7 +93,7 @@ docker run --rm -v slatebase_slatebase-data:/data -v $(pwd):/backup alpine \
 ### Restore
 
 ```bash
-# Volume-Inhalt wiederherstellen
+# Restore volume contents
 docker compose down
 docker run --rm -v slatebase_slatebase-data:/data -v $(pwd):/backup alpine \
   sh -c "rm -rf /data/* && tar xzf /backup/slatebase-backup-YYYYMMDD.tar.gz -C /data"
@@ -103,22 +103,22 @@ docker compose up -d
 ## Update
 
 ```bash
-# Neuen Code pullen
+# Pull latest code
 git pull
 
-# Container neu bauen und starten (Daten bleiben erhalten)
+# Rebuild and restart containers (data is preserved)
 docker compose up -d --build
 ```
 
 ## Reverse Proxy (optional)
 
-Wenn du Slatebase hinter einem externen Reverse Proxy (Traefik, Caddy, nginx) betreibst:
+If you run Slatebase behind an external reverse proxy (Traefik, Caddy, nginx):
 
-1. `SLATEBASE_EXTERNAL_PORT` auf einen internen Port setzen (z.B. `3080`)
-2. `SLATEBASE_ALLOWED_ORIGINS` auf die öffentliche URL setzen
-3. Im externen Proxy: HTTPS terminieren und an `localhost:3080` weiterleiten
+1. Set `SLATEBASE_EXTERNAL_PORT` to an internal port (e.g. `3080`)
+2. Set `SLATEBASE_ALLOWED_ORIGINS` to the public URL
+3. In the external proxy: terminate HTTPS and forward to `localhost:3080`
 
-### Beispiel: Caddy
+### Example: Caddy
 
 ```
 slatebase.example.com {
@@ -126,7 +126,7 @@ slatebase.example.com {
 }
 ```
 
-### Beispiel: Traefik (docker-compose Labels)
+### Example: Traefik (docker-compose labels)
 
 ```yaml
 services:
@@ -140,24 +140,24 @@ services:
 
 ## Troubleshooting
 
-### Container startet nicht
+### Container fails to start
 
 ```bash
 docker compose logs backend
 ```
 
-Häufige Ursachen:
-- `argon2` Build schlägt fehl → Image muss auf `node:22-slim` basieren (Build-Tools sind im Dockerfile enthalten)
-- Port bereits belegt → `SLATEBASE_EXTERNAL_PORT` ändern
+Common causes:
+- `argon2` build fails → image must be based on `node:22-slim` (build tools are included in the Dockerfile)
+- Port already in use → change `SLATEBASE_EXTERNAL_PORT`
 
-### Sessions werden nach Neustart ungültig
+### Sessions invalidated after restart
 
-→ `SLATEBASE_CSRF_SECRET` in `docker.env` setzen (siehe oben)
+→ Set `SLATEBASE_CSRF_SECRET` in `docker.env` (see above)
 
 ### 502 Bad Gateway
 
-→ Backend ist noch nicht bereit. Healthcheck prüft automatisch — nach ~10s sollte es funktionieren.
+→ Backend is not ready yet. The healthcheck verifies automatically — it should work after ~10s.
 
-### Dateien hochladen schlägt fehl (413)
+### File upload fails (413)
 
-→ Nginx `client_max_body_size` ist auf 512 MB gesetzt. Falls das nicht reicht, in `frontend/nginx.conf` anpassen.
+→ Nginx `client_max_body_size` is set to 512 MB. If that's not enough, adjust it in `frontend/nginx.conf`.

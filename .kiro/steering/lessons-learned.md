@@ -520,3 +520,71 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - Felder die vom Server kommen immer mit `?? ''` oder `?? defaultValue` initialisieren
 - Schützt gegen alte Sessions/Caches die das neue Feld noch nicht haben
 - Besonders wichtig nach Interface-Erweiterungen (alte Daten im sessionStorage)
+
+## Docker-Deployment
+
+### Node.js `--experimental-strip-types` funktioniert NICHT mit `.js`-Extension-Imports
+- Backend verwendet `.js`-Extensions in allen relativen Imports (ESM-Konvention für kompilierten Code)
+- `--experimental-strip-types` entfernt nur Typ-Annotationen, löst aber KEINE `.js` → `.ts` Umschreibung auf
+- Ergebnis: `ERR_MODULE_NOT_FOUND: Cannot find module '/app/src/config/index.js'`
+- **Lösung für Docker:** Multi-Stage-Build mit `tsc` → kompiliertes JavaScript in `dist/` ausführen (`node dist/index.js`)
+- **Lokal (Dev):** `tsx watch` funktioniert weiterhin, da tsx die Auflösung übernimmt
+- **Regel:** Für Production-Deployments immer den `tsc`-Build verwenden, nicht `--experimental-strip-types`
+
+### Multi-Stage Dockerfile für Backend
+- Stage 1 (build): `npm ci` (alle Deps inkl. devDeps) → `npx tsc` → `dist/` entsteht
+- Stage 2 (production): `npm ci --omit=dev` → `COPY --from=build dist/` → `node dist/index.js`
+- argon2 braucht Build-Tools (python3, make, g++) in BEIDEN Stages (native Compilation bei `npm ci`)
+- Build-Tools nach `npm ci` wieder entfernen um Image-Größe zu reduzieren
+- Non-Root-User (`slatebase:slatebase`) für Security
+
+### Config-Pfad-Auflösung nach tsc-Build
+- `config/index.ts` verwendet `resolve(__dirname, '../../config/default.json')`
+- Nach Kompilierung: `dist/config/index.js` → `__dirname` = `/app/dist/config`
+- `../../config/default.json` → `/app/config/default.json` ✓
+- **Regel:** Bei Pfad-Berechnungen mit `__dirname` immer prüfen ob sie nach Kompilierung noch stimmen
+
+### Docker-Env-Vars statt .env-Datei
+- Im Container werden Env-Vars über `docker-compose.yml` → `env_file: docker.env` injiziert
+- Kein `--env-file=.env` im CMD nötig — `process.env` wird direkt von Docker befüllt
+- `ConfigService.loadEnvOverlay()` liest aus `process.env` — funktioniert unabhängig von der Quelle
+
+### Healthcheck für Backend-Container
+- Prüft ob der Server antwortet: `fetch('http://localhost:3000/api/v1/vaults')`
+- Erwartet 401 (Unauthorized) als "healthy" — beweist dass der Server läuft und Auth aktiv ist
+- `start_period: 10s` gibt dem Backend Zeit für Initialisierung (Sessions laden, Admin erstellen, Vaults init)
+
+### Frontend: Nginx als Reverse Proxy im Container
+- Nginx serviert statische Dateien aus `/usr/share/nginx/html` (Vite-Build-Output)
+- `/api/` wird an `http://backend:3000` geproxied (Docker-internes Netzwerk, Container-Name als Hostname)
+- SPA-Fallback: `try_files $uri $uri/ /index.html` für Client-Side-Routing
+- `client_max_body_size 512m` für große File-Uploads
+
+### SLATEBASE_HOST muss 0.0.0.0 sein im Container
+- Default in `config/default.json` ist `127.0.0.1` (nur localhost)
+- Im Docker-Container muss der Server auf `0.0.0.0` lauschen, sonst ist er von außen (auch vom Nginx-Container) nicht erreichbar
+- `docker.env` setzt `SLATEBASE_HOST=0.0.0.0`
+
+## i18n-Typsystem
+
+### `typeof de` erzeugt literale String-Typen
+- `export const de = { common: { loading: 'Laden…' } }` → TypeScript leitet `"Laden…"` als Literal-Typ ab
+- `Translations = typeof de` → alle Werte sind Literal-Typen, nicht `string`
+- `en: Translations` erzwingt dann exakt die gleichen String-Werte → unmöglich für andere Sprachen
+
+### TranslationShape: Struktur prüfen, Werte frei lassen
+- Rekursiver Mapped Type der die Schlüssel-Struktur von `de` spiegelt, aber `string` als Blatt-Typ verwendet
+- `en.ts` importiert `type { de }` direkt aus `./de` (kein zirkulärer Import über `index.ts`)
+- Definiert `TranslationShape` lokal basierend auf `typeof de`
+- **Regel:** Neue Übersetzungsdateien immer mit `TranslationShape` typisieren, nie mit `Translations`
+
+### TranslateFn-Typ für Hilfsfunktionen
+- `export type TranslateFn = (key: TranslationKey, params?: Record<string, string | number>) => string`
+- Hilfsfunktionen die `t` als Parameter akzeptieren müssen `TranslateFn` verwenden
+- NICHT `(key: string) => string` — das ist kontravariant inkompatibel mit dem engeren `TranslationKey`-Typ
+- **Betroffene Funktionen:** `extractErrorMessage`, `mapTransferError`, `mapShareError`
+
+### test-setup.ts vom Production-Build ausschließen
+- `test-setup.ts` matcht NICHT auf `*.test.ts` Pattern
+- Muss explizit in `tsconfig.app.json` exclude aufgenommen werden: `"src/test-setup.ts"`
+- Sonst: `Cannot find name 'beforeEach'` weil Test-Runner-Typen im App-Build nicht verfügbar sind
