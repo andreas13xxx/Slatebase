@@ -9,7 +9,7 @@
 <p align="center">
   <a href="#quick-start">Quick Start</a> •
   <a href="#features">Features</a> •
-  <a href="#screenshots">Screenshots</a> •
+  <a href="#demo">Demo</a> •
   <a href="#configuration">Configuration</a> •
   <a href="#api">API</a>
 </p>
@@ -81,13 +81,11 @@ npm run dev
 | 🛡️ **Admin Panel** | User management, audit log, server configuration |
 | 🐳 **Docker Ready** | Multi-stage Dockerfile, runs as non-root user |
 
-## Screenshots
+## Demo
 
-<!-- TODO: Add screenshots here -->
-<!-- ![Dashboard](docs/screenshots/dashboard.png) -->
-<!-- ![Editor](docs/screenshots/editor.png) -->
-
-*Screenshots coming soon — or run it yourself in 30 seconds with Docker!*
+<p align="center">
+  <img src="demo.gif" alt="Slatebase Demo — Login, Vault-Navigation, Markdown-Editor, Sharing, Admin-Panel" width="800" />
+</p>
 
 ## Tech Stack
 
