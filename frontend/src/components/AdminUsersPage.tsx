@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, type FormEvent } from 'react'
 import type { IApiClient } from '../api'
 import type { UserRole } from '../state/authState'
-import { useTranslation } from '../i18n'
+import { useTranslation, type TranslateFn } from '../i18n'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -478,7 +478,7 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
 /**
  * Extracts a user-friendly error message from an unknown error.
  */
-function extractErrorMessage(err: unknown, t: (key: string, params?: Record<string, string | number>) => string): string {
+function extractErrorMessage(err: unknown, t: TranslateFn): string {
   if (err !== null && typeof err === 'object' && 'message' in err) {
     return (err as { message: string }).message
   }

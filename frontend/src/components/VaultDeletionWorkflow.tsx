@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { IApiClient } from '../api'
-import { useTranslation } from '../i18n'
+import { useTranslation, type TranslateFn } from '../i18n'
 
 /** A single vault share entry as returned by the backend. */
 export interface VaultShareEntry {
@@ -435,7 +435,7 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
 /**
  * Maps backend error codes from the transfer endpoint to user-friendly messages via i18n.
  */
-function mapTransferError(code: string | undefined, fallbackMessage: string, t: (key: string) => string): string {
+function mapTransferError(code: string | undefined, fallbackMessage: string, t: TranslateFn): string {
   switch (code) {
     case 'SHARES_NOT_REVOKED':
       return t('vaultDeletion.errorSharesNotRevoked')

@@ -1,10 +1,14 @@
-import type { Translations } from './index'
+import type { de } from './de'
+
+/** Structural type: mirrors de's shape but allows any string values. */
+type DeTranslations = typeof de
+type TranslationShape = { [K in keyof DeTranslations]: DeTranslations[K] extends string ? string : { [K2 in keyof DeTranslations[K]]: DeTranslations[K][K2] extends string ? string : { [K3 in keyof DeTranslations[K][K2]]: string } } }
 
 /**
  * English translations.
  * Must mirror the structure of the German (de) translations exactly.
  */
-export const en: Translations = {
+export const en: TranslationShape = {
   common: {
     loading: 'Loading…',
     error: 'Error',

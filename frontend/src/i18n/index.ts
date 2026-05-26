@@ -13,7 +13,7 @@ export type Locale = 'de' | 'en'
 export type Translations = typeof de
 
 /** All available translations keyed by locale. */
-const translations: Record<Locale, Translations> = { de, en }
+const translations: Record<Locale, Record<string, unknown>> = { de, en }
 
 /** Default locale (German, as per product spec). */
 const DEFAULT_LOCALE: Locale = 'de'
@@ -70,6 +70,9 @@ function interpolate(template: string, params?: Record<string, string | number>)
     return value !== undefined ? String(value) : `{${key}}`
   })
 }
+
+/** Translation function type for use as parameter in helper functions. */
+export type TranslateFn = (key: TranslationKey, params?: Record<string, string | number>) => string
 
 /** Context value shape for i18n. */
 export interface I18nContextValue {

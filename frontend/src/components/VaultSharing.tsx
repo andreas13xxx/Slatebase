@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react'
 import type { IApiClient, UserSearchResult } from '../api'
-import { useTranslation } from '../i18n'
+import { useTranslation, type TranslateFn } from '../i18n'
 
 /** A single vault share entry as returned by the backend. */
 export interface VaultShareEntry {
@@ -483,7 +483,7 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
 /**
  * Maps backend error codes to user-friendly messages via i18n.
  */
-function mapShareError(code: string | undefined, fallbackMessage: string, t: (key: string) => string): string {
+function mapShareError(code: string | undefined, fallbackMessage: string, t: TranslateFn): string {
   switch (code) {
     case 'INVALID_SHARE_TARGET':
       if (fallbackMessage.includes('self')) {
