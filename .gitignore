@@ -52,3 +52,6 @@ skills-lock.json
 # Kiro agents/skills (auto-generated)
 .agents/
 .kiro/skills/
+
+# Docker environment (contains secrets)
+docker.env

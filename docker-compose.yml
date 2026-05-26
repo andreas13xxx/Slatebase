@@ -1,0 +1,41 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: slatebase-backend
+    restart: unless-stopped
+    env_file:
+      - ./docker.env
+    volumes:
+      - slatebase-data:/app/data
+    networks:
+      - slatebase-net
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/v1/vaults').then(r => process.exit(r.status === 401 ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: slatebase-frontend
+    restart: unless-stopped
+    ports:
+      - "${SLATEBASE_EXTERNAL_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - slatebase-net
+
+volumes:
+  slatebase-data:
+    driver: local
+
+networks:
+  slatebase-net:
+    driver: bridge
