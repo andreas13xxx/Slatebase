@@ -136,7 +136,7 @@ describe('FileExplorer', () => {
     it('renders top-level files', () => {
       renderFileExplorer({ directoryTree: sampleTree })
 
-      expect(screen.getByText('readme.md')).toBeInTheDocument()
+      expect(screen.getByText('readme')).toBeInTheDocument()
     })
 
     it('renders folders as buttons', () => {
@@ -152,8 +152,8 @@ describe('FileExplorer', () => {
       renderFileExplorer({ directoryTree: sampleTree })
 
       // Nested files should not be visible initially
-      expect(screen.queryByText('notes.md')).not.toBeInTheDocument()
-      expect(screen.queryByText('todo.md')).not.toBeInTheDocument()
+      expect(screen.queryByText('notes')).not.toBeInTheDocument()
+      expect(screen.queryByText('todo')).not.toBeInTheDocument()
     })
 
     it('shows collapsed chevron for collapsed folders', () => {
@@ -172,8 +172,8 @@ describe('FileExplorer', () => {
       await user.click(documentsButton)
 
       // Children should now be visible
-      expect(screen.getByText('notes.md')).toBeInTheDocument()
-      expect(screen.getByText('todo.md')).toBeInTheDocument()
+      expect(screen.getByText('notes')).toBeInTheDocument()
+      expect(screen.getByText('todo')).toBeInTheDocument()
     })
 
     it('collapses folder on second click', async () => {
@@ -184,11 +184,11 @@ describe('FileExplorer', () => {
 
       // Expand
       await user.click(documentsButton)
-      expect(screen.getByText('notes.md')).toBeInTheDocument()
+      expect(screen.getByText('notes')).toBeInTheDocument()
 
       // Collapse
       await user.click(documentsButton)
-      expect(screen.queryByText('notes.md')).not.toBeInTheDocument()
+      expect(screen.queryByText('notes')).not.toBeInTheDocument()
     })
 
     it('sets aria-expanded attribute on folder buttons', async () => {
@@ -226,7 +226,7 @@ describe('FileExplorer', () => {
       )
 
       // Click on a top-level file
-      await user.click(screen.getByText('readme.md'))
+      await user.click(screen.getByText('readme'))
 
       // openTab fetches file content via the API client
       expect(mockApiClient.fetchFileContent).toHaveBeenCalledWith('vault-123', 'readme.md')
@@ -247,7 +247,7 @@ describe('FileExplorer', () => {
         },
       })
 
-      const fileButton = screen.getByText('readme.md')
+      const fileButton = screen.getByText('readme')
       expect(fileButton).toHaveAttribute('aria-current', 'true')
     })
 
@@ -266,7 +266,7 @@ describe('FileExplorer', () => {
         },
       })
 
-      const readmeButton = screen.getByText('readme.md')
+      const readmeButton = screen.getByText('readme')
       expect(readmeButton).toHaveAttribute('aria-current', 'true')
     })
 
@@ -285,7 +285,7 @@ describe('FileExplorer', () => {
         },
       })
 
-      const fileButton = screen.getByText('readme.md')
+      const fileButton = screen.getByText('readme')
       expect(fileButton).toHaveClass('tree-node-file--selected')
     })
   })

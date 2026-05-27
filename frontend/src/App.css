@@ -373,7 +373,7 @@
   color: var(--text-secondary);
   white-space: nowrap;
   min-width: 0;
-  max-width: 180px;
+  max-width: 220px;
   flex: 0 1 auto;
   transition: color var(--transition-fast), background var(--transition-fast);
   position: relative;
@@ -389,6 +389,12 @@
   background: var(--bg-elevated);
   color: var(--text-primary);
   font-weight: 500;
+}
+
+.tab-bar-tab-icon {
+  flex-shrink: 0;
+  opacity: 0.6;
+  display: inline-flex;
 }
 
 .tab-bar-tab-label {

@@ -1,5 +1,6 @@
 import { useTabContext } from '../state/tabContext'
 import { Eye, Pencil, X } from 'lucide-react'
+import { getFileIcon, getDisplayName } from '../utils/fileIcons'
 
 /**
  * TabBar renders the horizontal tab strip showing all open tabs.
@@ -55,6 +56,8 @@ export function TabBar() {
         const hasUnsaved = tab.editBuffer !== null && tab.editBuffer !== tab.content
 
         const tabClassName = `tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}`
+        const TabFileIcon = getFileIcon(tab.fileName)
+        const displayName = getDisplayName(tab.fileName)
 
         return (
           <div
@@ -67,8 +70,9 @@ export function TabBar() {
             title={tooltip}
             tabIndex={isActive ? 0 : -1}
           >
+            <TabFileIcon size={13} className="tab-bar-tab-icon" />
             <span className="tab-bar-tab-label">
-              {hasUnsaved ? '● ' : ''}{tab.fileName}
+              {hasUnsaved ? '● ' : ''}{displayName}
             </span>
 
             <button

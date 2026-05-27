@@ -4,7 +4,8 @@ import { useTabContext } from '../state/tabContext'
 import { useTranslation } from '../i18n'
 import { openTab } from '../state/tabActions'
 import type { DirectoryTree } from '../types'
-import { ChevronRight, ChevronDown, Folder, FolderOpen, FileText, Trash2 } from 'lucide-react'
+import { ChevronRight, ChevronDown, Folder, FolderOpen, Trash2 } from 'lucide-react'
+import { getFileIcon, getDisplayName } from '../utils/fileIcons'
 
 /**
  * Props for the recursive TreeNode component.
@@ -80,6 +81,8 @@ function TreeNode({ node, selectedFilePath, expandedPaths, onToggleFolder, onSel
     )
   }
 
+  const FileIcon = getFileIcon(node.name)
+
   return (
     <li className="tree-node tree-node--file">
       <div className="tree-node-row">
@@ -91,8 +94,8 @@ function TreeNode({ node, selectedFilePath, expandedPaths, onToggleFolder, onSel
           title={node.path}
           style={{ display: 'flex', alignItems: 'center', gap: 5 }}
         >
-          <FileText size={13} style={{ flexShrink: 0, opacity: 0.6 }} />
-          {node.name}
+          <FileIcon size={13} style={{ flexShrink: 0, opacity: 0.7 }} />
+          {getDisplayName(node.name)}
         </button>
         <button
           type="button"

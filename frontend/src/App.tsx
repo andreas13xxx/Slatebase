@@ -25,6 +25,7 @@ import {
   Database, Share2, Trash2, Server, Download,
   Upload, FolderOpen, PanelRight, PanelLeft, X, Eye, Pencil,
 } from 'lucide-react'
+import { getFileIcon, getDisplayName } from './utils/fileIcons'
 import './App.css'
 
 /** Singleton ApiClient instance shared across the app. */
@@ -504,6 +505,8 @@ function AppContent() {
                   const hasUnsaved = tab.editBuffer !== null && tab.editBuffer !== tab.content
                   const modeLabel = tab.mode === 'edit' ? t('tabs.showPreview') : t('tabs.edit')
                   const ModeIcon = tab.mode === 'edit' ? Eye : Pencil
+                  const TabFileIcon = getFileIcon(tab.fileName)
+                  const displayName = getDisplayName(tab.fileName)
                   return (
                     <div
                       key={tab.id}
@@ -515,8 +518,9 @@ function AppContent() {
                       title={tab.filePath}
                       tabIndex={isActive ? 0 : -1}
                     >
+                      <TabFileIcon size={13} className="tab-bar-tab-icon" />
                       <span className="tab-bar-tab-label">
-                        {hasUnsaved ? '● ' : ''}{tab.fileName}
+                        {hasUnsaved ? '● ' : ''}{displayName}
                       </span>
                       {!tab.isBinary && (
                         <button
