@@ -299,6 +299,29 @@ export async function deleteContent(
 }
 
 /**
+ * Creates a new file in a vault with empty content, then refreshes the tree.
+ * Returns the file path on success (so the caller can open it in a tab), or null on failure.
+ */
+export async function createFile(
+  dispatch: Dispatch<AppAction>,
+  apiClient: IApiClient,
+  vaultId: string,
+  filePath: string,
+): Promise<string | null> {
+  dispatch({ type: 'LOADING_STARTED' })
+  try {
+    await apiClient.saveFile(vaultId, filePath, '')
+    const tree = await apiClient.fetchVaultTree(vaultId)
+    dispatch({ type: 'TREE_LOADED', payload: tree })
+    return filePath
+  } catch (err: unknown) {
+    const error = toAppError(err)
+    dispatch({ type: 'ERROR_OCCURRED', payload: error })
+    return null
+  }
+}
+
+/**
  * Exports a vault to a local directory.
  *
  * Strategy:

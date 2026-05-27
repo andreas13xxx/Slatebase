@@ -180,6 +180,7 @@ export function TabContent() {
           saving={saving}
           error={activeTab.error}
           readOnly={isReadOnly}
+          filePath={activeTab.filePath}
         />
       </div>
     )

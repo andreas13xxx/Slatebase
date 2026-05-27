@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import {
   Upload, FolderOpen, Download, Settings, Shield,
-  Database, FileText, Clock, User, Server,
+  Database, FileText, Clock, User, Server, FilePlus,
 } from 'lucide-react'
 
 type AppPage =
@@ -20,6 +20,7 @@ interface ToolbarItem {
 
 interface SidebarToolbarProps {
   vaultId: string | null
+  onCreateFile: () => void
   onImportFile: () => void
   onImportFolder: () => void
   onExportVault: () => void
@@ -32,8 +33,9 @@ interface SidebarToolbarProps {
  * Buttons can be reordered by drag-and-drop.
  * Tooltips show on hover.
  */
-export function SidebarToolbar({ vaultId, onImportFile, onImportFolder, onExportVault, onNavigate, isAdmin }: SidebarToolbarProps) {
+export function SidebarToolbar({ vaultId, onCreateFile, onImportFile, onImportFolder, onExportVault, onNavigate, isAdmin }: SidebarToolbarProps) {
   const allItems: ToolbarItem[] = [
+    { id: 'create-file', icon: <FilePlus size={15} />, label: 'Neue Datei', action: onCreateFile, requiresVault: true },
     { id: 'import-file', icon: <Upload size={15} />, label: 'Datei importieren', action: onImportFile, requiresVault: true },
     { id: 'import-folder', icon: <FolderOpen size={15} />, label: 'Ordner importieren', action: onImportFolder, requiresVault: true },
     { id: 'export-vault', icon: <Download size={15} />, label: 'Vault exportieren', action: onExportVault, requiresVault: true },

@@ -72,6 +72,9 @@ export const de = {
     importFile: 'Datei importieren',
     importFolder: 'Ordner importieren',
     exportVault: 'Vault exportieren',
+    newFile: 'Neue Datei',
+    newFilePrompt: 'Dateiname (z.B. Notizen/Idee.md):',
+    newFileNameEmpty: 'Dateiname darf nicht leer sein.',
   },
 
   editor: {
@@ -365,6 +368,33 @@ export const de = {
     errorSelfShare: 'Sie können einen Vault nicht mit sich selbst teilen.',
     errorUserNotFound: 'Benutzer nicht gefunden.',
     errorLimitReached: 'Maximale Anzahl an Freigaben erreicht (20).',
+  },
+
+  contextMenu: {
+    ariaLabel: 'Kontextmenü',
+    newFile: 'Neue Datei',
+    rename: 'Umbenennen',
+    delete: 'Löschen',
+    noActions: 'Keine Aktionen verfügbar',
+  },
+
+  fileOps: {
+    deleteConfirmTitle: 'Löschen bestätigen',
+    deleteConfirmMessage: 'Möchten Sie \'{name}\' wirklich löschen?',
+    deleteConfirmFolder: 'Möchten Sie den Ordner \'{name}\' und seinen gesamten Inhalt wirklich löschen?',
+    confirm: 'Bestätigen',
+    cancel: 'Abbrechen',
+    moving: 'Verschieben…',
+    renaming: 'Umbenennen…',
+    creating: 'Erstellen…',
+    moveError: 'Fehler beim Verschieben',
+    renameError: 'Fehler beim Umbenennen',
+    createError: 'Fehler beim Erstellen',
+    deleteError: 'Fehler beim Löschen',
+    nameEmpty: 'Dateiname darf nicht leer sein',
+    nameInvalidChars: 'Dateiname enthält ungültige Zeichen',
+    nameTooLong: 'Dateiname ist zu lang',
+    dropToRoot: 'Ins Stammverzeichnis verschieben',
   },
 
   vaultDeletion: {

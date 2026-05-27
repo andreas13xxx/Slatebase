@@ -393,7 +393,7 @@
 
 .tab-bar-tab-icon {
   flex-shrink: 0;
-  opacity: 0.6;
+  opacity: 0.85;
   display: inline-flex;
 }
 
@@ -817,6 +817,20 @@
   margin: 0;
 }
 
+.file-explorer-root-drop-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 8px;
+  margin-top: 4px;
+  background: var(--accent-light);
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius-md);
+  font-size: 11px;
+  color: var(--accent-text, var(--accent));
+  cursor: default;
+}
+
 /* ===== Tree Nodes ===== */
 .tree-node {
   list-style: none;
@@ -929,6 +943,36 @@
   list-style: none;
   padding-left: 14px;
   margin: 0;
+}
+
+/* ===== Drag & Drop States ===== */
+.tree-node--dragging {
+  opacity: 0.5;
+}
+
+.tree-node--drop-target {
+  background: var(--accent-light);
+  border-radius: var(--radius-md);
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+}
+
+.file-explorer--moving {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.file-explorer-moving-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--accent-light);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  color: var(--accent-text);
+  margin-bottom: 4px;
 }
 
 /* ===== User Menu ===== */
@@ -1637,6 +1681,12 @@
   white-space: pre;
   overflow-wrap: normal;
   overflow: auto;
+}
+
+.edit-mode-textarea--drag-over {
+  background: var(--accent-bg, rgba(99, 102, 241, 0.05));
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
 }
 
 .edit-mode-status {
@@ -2563,4 +2613,169 @@
   background: var(--accent-light);
   color: var(--accent-text);
   border-color: var(--accent);
+}
+
+/* ─── File Icon Colors ─── */
+
+.file-icon--markdown { color: #42a5f5; }
+.file-icon--text { color: #90a4ae; }
+.file-icon--typescript { color: #3178c6; }
+.file-icon--javascript { color: #f5c842; }
+.file-icon--python { color: #3572a5; }
+.file-icon--ruby { color: #cc342d; }
+.file-icon--rust { color: #dea584; }
+.file-icon--go { color: #00add8; }
+.file-icon--java { color: #b07219; }
+.file-icon--swift { color: #f05138; }
+.file-icon--c { color: #555555; }
+.file-icon--csharp { color: #68217a; }
+.file-icon--php { color: #777bb4; }
+.file-icon--lua { color: #000080; }
+.file-icon--dart { color: #00b4ab; }
+.file-icon--shell { color: #89e051; }
+.file-icon--code { color: #78909c; }
+.file-icon--html { color: #e44d26; }
+.file-icon--css { color: #563d7c; }
+.file-icon--sql { color: #e38c00; }
+.file-icon--graphql { color: #e535ab; }
+.file-icon--json { color: #f5c842; }
+.file-icon--yaml { color: #cb171e; }
+.file-icon--config { color: #6d8086; }
+.file-icon--xml { color: #f26522; }
+.file-icon--image { color: #26a69a; }
+.file-icon--gif { color: #7b1fa2; }
+.file-icon--svg { color: #ffb13b; }
+.file-icon--video { color: #9c27b0; }
+.file-icon--audio { color: #f06292; }
+.file-icon--archive { color: #8d6e63; }
+.file-icon--pdf { color: #e53935; }
+.file-icon--word { color: #2b579a; }
+.file-icon--spreadsheet { color: #217346; }
+.file-icon--presentation { color: #d24726; }
+.file-icon--font { color: #b0bec5; }
+.file-icon--log { color: #78909c; }
+.file-icon--lock { color: #607d8b; }
+.file-icon--binary { color: #546e7a; }
+.file-icon--default { color: #90a4ae; }
+
+/* Dark mode adjustments for file icons — slightly brighter */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .file-icon--c { color: #9e9e9e; }
+  :root:not([data-theme="light"]) .file-icon--lua { color: #6666cc; }
+  :root:not([data-theme="light"]) .file-icon--text { color: #b0bec5; }
+  :root:not([data-theme="light"]) .file-icon--code { color: #b0bec5; }
+  :root:not([data-theme="light"]) .file-icon--config { color: #90a4ae; }
+  :root:not([data-theme="light"]) .file-icon--default { color: #b0bec5; }
+}
+
+:root[data-theme="dark"] .file-icon--c { color: #9e9e9e; }
+:root[data-theme="dark"] .file-icon--lua { color: #6666cc; }
+:root[data-theme="dark"] .file-icon--text { color: #b0bec5; }
+:root[data-theme="dark"] .file-icon--code { color: #b0bec5; }
+:root[data-theme="dark"] .file-icon--config { color: #90a4ae; }
+:root[data-theme="dark"] .file-icon--default { color: #b0bec5; }
+
+/* ===== Context Menu ===== */
+.context-menu {
+  z-index: 1000;
+  min-width: 180px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  padding: 4px;
+  user-select: none;
+}
+
+.context-menu-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.context-menu-item {
+  list-style: none;
+}
+
+.context-menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+  text-align: left;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.context-menu-btn:hover {
+  background: var(--bg-surface);
+}
+
+.context-menu-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.context-menu-btn--danger:hover {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.context-menu-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.context-menu-btn:hover .context-menu-icon {
+  color: var(--text-primary);
+}
+
+.context-menu-btn--danger:hover .context-menu-icon {
+  color: var(--danger-text);
+}
+
+.context-menu-empty {
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ===== Inline Input (File Tree) ===== */
+.inline-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 6px 2px 24px;
+  min-width: 0;
+}
+
+.inline-input {
+  width: 100%;
+  padding: 2px 6px;
+  font-size: 13px;
+  font-family: var(--font-sans);
+  color: var(--sidebar-text-active);
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  outline: none;
+  line-height: 1.4;
+}
+
+.inline-input:focus {
+  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.2);
+}
+
+.inline-input-error {
+  display: block;
+  font-size: 11px;
+  color: var(--danger-text);
+  margin-top: 2px;
+  line-height: 1.3;
 }

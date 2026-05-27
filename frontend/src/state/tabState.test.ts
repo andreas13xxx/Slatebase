@@ -412,6 +412,230 @@ describe('tabReducer', () => {
       expect(state.tabs[0].editBuffer).toBe('unsaved work') // preserved
     })
   })
+
+  describe('UPDATE_TAB_PATHS', () => {
+    it('updates filePath for exact match', () => {
+      const stateWithTab: TabState = {
+        tabs: [createTab('v1', 'docs/readme.md', 'readme.md')],
+        activeTabId: 'v1::docs/readme.md',
+      }
+
+      const state = tabReducer(stateWithTab, {
+        type: 'UPDATE_TAB_PATHS',
+        payload: { oldPathPrefix: 'docs/readme.md', newPathPrefix: 'notes/readme.md' },
+      })
+
+      expect(state.tabs[0].filePath).toBe('notes/readme.md')
+      expect(state.tabs[0].fileName).toBe('readme.md')
+      expect(state.tabs[0].id).toBe('v1::notes/readme.md')
+    })
+
+    it('updates filePath for prefix match (folder rename)', () => {
+      const stateWithTabs: TabState = {
+        tabs: [
+          createTab('v1', 'docs/guide.md', 'guide.md'),
+          createTab('v1', 'docs/sub/deep.md', 'deep.md'),
+        ],
+        activeTabId: 'v1::docs/guide.md',
+      }
+
+      const state = tabReducer(stateWithTabs, {
+        type: 'UPDATE_TAB_PATHS',
+        payload: { oldPathPrefix: 'docs', newPathPrefix: 'notes' },
+      })
+
+      expect(state.tabs[0].filePath).toBe('notes/guide.md')
+      expect(state.tabs[0].id).toBe('v1::notes/guide.md')
+      expect(state.tabs[1].filePath).toBe('notes/sub/deep.md')
+      expect(state.tabs[1].id).toBe('v1::notes/sub/deep.md')
+    })
+
+    it('leaves non-matching tabs unchanged', () => {
+      const stateWithTabs: TabState = {
+        tabs: [
+          createTab('v1', 'docs/guide.md', 'guide.md'),
+          createTab('v1', 'other/file.md', 'file.md'),
+        ],
+        activeTabId: 'v1::other/file.md',
+      }
+
+      const state = tabReducer(stateWithTabs, {
+        type: 'UPDATE_TAB_PATHS',
+        payload: { oldPathPrefix: 'docs', newPathPrefix: 'notes' },
+      })
+
+      expect(state.tabs[0].filePath).toBe('notes/guide.md')
+      expect(state.tabs[1].filePath).toBe('other/file.md') // unchanged
+      expect(state.tabs[1].id).toBe('v1::other/file.md')
+    })
+
+    it('updates activeTabId when active tab path changes', () => {
+      const stateWithTab: TabState = {
+        tabs: [createTab('v1', 'docs/active.md', 'active.md')],
+        activeTabId: 'v1::docs/active.md',
+      }
+
+      const state = tabReducer(stateWithTab, {
+        type: 'UPDATE_TAB_PATHS',
+        payload: { oldPathPrefix: 'docs', newPathPrefix: 'notes' },
+      })
+
+      expect(state.activeTabId).toBe('v1::notes/active.md')
+    })
+
+    it('does not update activeTabId when active tab is unaffected', () => {
+      const stateWithTabs: TabState = {
+        tabs: [
+          createTab('v1', 'docs/guide.md', 'guide.md'),
+          createTab('v1', 'other/file.md', 'file.md'),
+        ],
+        activeTabId: 'v1::other/file.md',
+      }
+
+      const state = tabReducer(stateWithTabs, {
+        type: 'UPDATE_TAB_PATHS',
+        payload: { oldPathPrefix: 'docs', newPathPrefix: 'notes' },
+      })
+
+      expect(state.activeTabId).toBe('v1::other/file.md')
+    })
+
+    it('updates fileName when file is renamed', () => {
+      const stateWithTab: TabState = {
+        tabs: [createTab('v1', 'docs/old-name.md', 'old-name.md')],
+        activeTabId: 'v1::docs/old-name.md',
+      }
+
+      const state = tabReducer(stateWithTab, {
+        type: 'UPDATE_TAB_PATHS',
+        payload: { oldPathPrefix: 'docs/old-name.md', newPathPrefix: 'docs/new-name.md' },
+      })
+
+      expect(state.tabs[0].filePath).toBe('docs/new-name.md')
+      expect(state.tabs[0].fileName).toBe('new-name.md')
+    })
+
+    it('does not match partial path segments', () => {
+      const stateWithTab: TabState = {
+        tabs: [createTab('v1', 'documents/file.md', 'file.md')],
+        activeTabId: 'v1::documents/file.md',
+      }
+
+      const state = tabReducer(stateWithTab, {
+        type: 'UPDATE_TAB_PATHS',
+        payload: { oldPathPrefix: 'doc', newPathPrefix: 'notes' },
+      })
+
+      // 'documents/file.md' does NOT start with 'doc/' and does NOT equal 'doc'
+      expect(state.tabs[0].filePath).toBe('documents/file.md')
+    })
+  })
+
+  describe('CLOSE_TABS_BY_PATH', () => {
+    it('removes tab with exact path match', () => {
+      const stateWithTabs: TabState = {
+        tabs: [
+          createTab('v1', 'docs/file.md', 'file.md'),
+          createTab('v1', 'other/file.md', 'file.md'),
+        ],
+        activeTabId: 'v1::other/file.md',
+      }
+
+      const state = tabReducer(stateWithTabs, {
+        type: 'CLOSE_TABS_BY_PATH',
+        payload: { pathPrefix: 'docs/file.md' },
+      })
+
+      expect(state.tabs).toHaveLength(1)
+      expect(state.tabs[0].filePath).toBe('other/file.md')
+    })
+
+    it('removes all tabs within a deleted folder', () => {
+      const stateWithTabs: TabState = {
+        tabs: [
+          createTab('v1', 'docs/a.md', 'a.md'),
+          createTab('v1', 'docs/sub/b.md', 'b.md'),
+          createTab('v1', 'other/c.md', 'c.md'),
+        ],
+        activeTabId: 'v1::docs/a.md',
+      }
+
+      const state = tabReducer(stateWithTabs, {
+        type: 'CLOSE_TABS_BY_PATH',
+        payload: { pathPrefix: 'docs' },
+      })
+
+      expect(state.tabs).toHaveLength(1)
+      expect(state.tabs[0].filePath).toBe('other/c.md')
+    })
+
+    it('selects next available tab when active tab is removed', () => {
+      const stateWithTabs: TabState = {
+        tabs: [
+          createTab('v1', 'docs/a.md', 'a.md'),
+          createTab('v1', 'other/b.md', 'b.md'),
+        ],
+        activeTabId: 'v1::docs/a.md',
+      }
+
+      const state = tabReducer(stateWithTabs, {
+        type: 'CLOSE_TABS_BY_PATH',
+        payload: { pathPrefix: 'docs' },
+      })
+
+      expect(state.activeTabId).toBe('v1::other/b.md')
+    })
+
+    it('sets activeTabId to null when all tabs are removed', () => {
+      const stateWithTabs: TabState = {
+        tabs: [
+          createTab('v1', 'docs/a.md', 'a.md'),
+          createTab('v1', 'docs/b.md', 'b.md'),
+        ],
+        activeTabId: 'v1::docs/a.md',
+      }
+
+      const state = tabReducer(stateWithTabs, {
+        type: 'CLOSE_TABS_BY_PATH',
+        payload: { pathPrefix: 'docs' },
+      })
+
+      expect(state.tabs).toHaveLength(0)
+      expect(state.activeTabId).toBeNull()
+    })
+
+    it('keeps activeTabId unchanged when active tab is not affected', () => {
+      const stateWithTabs: TabState = {
+        tabs: [
+          createTab('v1', 'docs/a.md', 'a.md'),
+          createTab('v1', 'other/b.md', 'b.md'),
+        ],
+        activeTabId: 'v1::other/b.md',
+      }
+
+      const state = tabReducer(stateWithTabs, {
+        type: 'CLOSE_TABS_BY_PATH',
+        payload: { pathPrefix: 'docs' },
+      })
+
+      expect(state.activeTabId).toBe('v1::other/b.md')
+    })
+
+    it('does not match partial path segments', () => {
+      const stateWithTab: TabState = {
+        tabs: [createTab('v1', 'documents/file.md', 'file.md')],
+        activeTabId: 'v1::documents/file.md',
+      }
+
+      const state = tabReducer(stateWithTab, {
+        type: 'CLOSE_TABS_BY_PATH',
+        payload: { pathPrefix: 'doc' },
+      })
+
+      // 'documents/file.md' does NOT equal 'doc' and does NOT start with 'doc/'
+      expect(state.tabs).toHaveLength(1)
+    })
+  })
 })
 
 // --- Helper ---

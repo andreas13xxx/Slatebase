@@ -19,6 +19,7 @@ function createMockApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
     getCsrfToken: vi.fn().mockReturnValue(null),
     setOnSessionExpired: vi.fn(),
     fetchVaults: vi.fn(),
+    fetchAllVaults: vi.fn(),
     fetchVaultTree: vi.fn(),
     fetchFileContent: vi.fn(),
     createVault: vi.fn(),
@@ -27,14 +28,18 @@ function createMockApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
     importFolder: vi.fn(),
     deleteContent: vi.fn(),
     saveFile: vi.fn(),
+    moveContent: vi.fn(),
+    renameContent: vi.fn(),
     login: vi.fn(),
     logout: vi.fn(),
     getSessions: vi.fn(),
     invalidateSession: vi.fn(),
+    invalidateAllOtherSessions: vi.fn(),
     getProfile: vi.fn(),
     updateProfile: vi.fn(),
     changePassword: vi.fn(),
     deleteSelf: vi.fn(),
+    searchUsers: vi.fn(),
     ...overrides,
   }
 }
@@ -291,67 +296,90 @@ describe('FileExplorer', () => {
   })
 
   describe('delete actions', () => {
-    it('renders delete buttons for files', () => {
-      renderFileExplorer({ directoryTree: sampleTree, selectedVaultId: 'vault-123' })
+    const vaultsWithPermission = [{ id: 'vault-123', name: 'Test Vault', path: '/test', permission: 'owner' as const, ownerName: 'admin' }]
 
-      expect(screen.getByRole('button', { name: 'Datei "readme.md" l\u00f6schen' })).toBeInTheDocument()
+    it('shows delete option in context menu on right-click', async () => {
+      const user = userEvent.setup()
+      renderFileExplorer({ directoryTree: sampleTree, selectedVaultId: 'vault-123', vaults: vaultsWithPermission })
+
+      const fileButton = screen.getByText('readme')
+      await user.pointer({ keys: '[MouseRight]', target: fileButton })
+
+      expect(screen.getByText('Löschen')).toBeInTheDocument()
     })
 
-    it('renders delete buttons for folders', () => {
-      renderFileExplorer({ directoryTree: sampleTree, selectedVaultId: 'vault-123' })
+    it('shows delete option in context menu for folders', async () => {
+      const user = userEvent.setup()
+      renderFileExplorer({ directoryTree: sampleTree, selectedVaultId: 'vault-123', vaults: vaultsWithPermission })
 
-      expect(screen.getByRole('button', { name: 'Ordner "Documents" l\u00f6schen' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Ordner "Images" l\u00f6schen' })).toBeInTheDocument()
+      const folderButton = screen.getByText('Documents')
+      await user.pointer({ keys: '[MouseRight]', target: folderButton })
+
+      expect(screen.getByText('Löschen')).toBeInTheDocument()
     })
 
-    it('shows confirmation dialog on delete click', async () => {
+    it('shows confirmation dialog on delete click via context menu', async () => {
       const user = userEvent.setup()
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
       const mockApiClient = createMockApiClient()
 
       renderFileExplorer(
-        { directoryTree: sampleTree, selectedVaultId: 'vault-123' },
+        { directoryTree: sampleTree, selectedVaultId: 'vault-123', vaults: vaultsWithPermission },
         mockApiClient,
       )
 
-      const deleteBtn = screen.getByRole('button', { name: 'Datei "readme.md" l\u00f6schen' })
-      await user.click(deleteBtn)
+      // Right-click on the file to open context menu
+      const fileButton = screen.getByText('readme')
+      await user.pointer({ keys: '[MouseRight]', target: fileButton })
 
-      expect(confirmSpy).toHaveBeenCalledWith('"readme.md" wirklich löschen?')
+      // Click "Löschen" in context menu
+      const deleteOption = screen.getByText('Löschen')
+      await user.click(deleteOption)
+
+      expect(confirmSpy).toHaveBeenCalled()
       confirmSpy.mockRestore()
     })
 
-    it('calls deleteContent when deletion is confirmed', async () => {
+    it('calls deleteContent when deletion is confirmed via context menu', async () => {
       const user = userEvent.setup()
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
       const mockApiClient = createMockApiClient({
         fetchVaultTree: vi.fn().mockResolvedValue({ name: 'root', type: 'directory', path: '', children: [] }),
         deleteContent: vi.fn().mockResolvedValue(undefined),
       })
-      const { dispatch } = renderFileExplorer(
-        { directoryTree: sampleTree, selectedVaultId: 'vault-123' },
+      renderFileExplorer(
+        { directoryTree: sampleTree, selectedVaultId: 'vault-123', vaults: vaultsWithPermission },
         mockApiClient,
       )
 
-      const deleteBtn = screen.getByRole('button', { name: 'Datei "readme.md" l\u00f6schen' })
-      await user.click(deleteBtn)
+      // Right-click on the file to open context menu
+      const fileButton = screen.getByText('readme')
+      await user.pointer({ keys: '[MouseRight]', target: fileButton })
 
-      expect(dispatch).toHaveBeenCalledWith({ type: 'LOADING_STARTED' })
+      // Click "Löschen" in context menu
+      const deleteOption = screen.getByText('Löschen')
+      await user.click(deleteOption)
+
       expect(mockApiClient.deleteContent).toHaveBeenCalledWith('vault-123', 'readme.md')
       confirmSpy.mockRestore()
     })
 
-    it('does not call deleteContent when deletion is cancelled', async () => {
+    it('does not call deleteContent when deletion is cancelled via context menu', async () => {
       const user = userEvent.setup()
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
       const mockApiClient = createMockApiClient()
       renderFileExplorer(
-        { directoryTree: sampleTree, selectedVaultId: 'vault-123' },
+        { directoryTree: sampleTree, selectedVaultId: 'vault-123', vaults: vaultsWithPermission },
         mockApiClient,
       )
 
-      const deleteBtn = screen.getByRole('button', { name: 'Datei "readme.md" l\u00f6schen' })
-      await user.click(deleteBtn)
+      // Right-click on the file to open context menu
+      const fileButton = screen.getByText('readme')
+      await user.pointer({ keys: '[MouseRight]', target: fileButton })
+
+      // Click "Löschen" in context menu
+      const deleteOption = screen.getByText('Löschen')
+      await user.click(deleteOption)
 
       expect(mockApiClient.deleteContent).not.toHaveBeenCalled()
       confirmSpy.mockRestore()

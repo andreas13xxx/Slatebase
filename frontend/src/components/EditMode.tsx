@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTranslation } from '../i18n'
+import { computeRelativePath, isImageFile } from '../utils/pathUtils'
 import {
   Heading1, Heading2, Heading3, Bold, Italic, Strikethrough,
   Code, Link, List, ListOrdered, CheckSquare, Table,
@@ -17,6 +18,8 @@ export interface EditModeProps {
   saving: boolean
   error: string | null
   readOnly?: boolean
+  /** Path of the currently open file (used for relative link computation on drop). */
+  filePath?: string
 }
 
 type SaveStatus = 'idle' | 'unsaved' | 'saving' | 'saved' | 'error'
@@ -78,12 +81,14 @@ const TOOLBAR_ACTIONS: (ToolbarAction | 'sep')[] = [
 /**
  * EditMode renders a plain-text editor with toolbar and auto-save.
  */
-export function EditMode({ content, onChange, onSave, onCancel: _onCancel, saving, error, readOnly }: EditModeProps) {
+export function EditMode({ content, onChange, onSave, onCancel: _onCancel, saving, error, readOnly, filePath }: EditModeProps) {
   const { t } = useTranslation()
   const [status, setStatus] = useState<SaveStatus>('idle')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wasSavingRef = useRef(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const onSaveRef = useRef(onSave)
+  onSaveRef.current = onSave
 
   useEffect(() => {
     if (wasSavingRef.current && !saving) {
@@ -101,12 +106,95 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
 
   const triggerAutoSave = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => { onSave() }, 1500)
-  }, [onSave])
+    debounceRef.current = setTimeout(() => { onSaveRef.current() }, 1500)
+  }, [])
 
   useEffect(() => {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [])
+
+  const [isDragOver, setIsDragOver] = useState(false)
+
+  /** Handles dragOver on the textarea — shows visual indicator for valid drops. */
+  const handleTextareaDragOver = useCallback((e: React.DragEvent<HTMLTextAreaElement>) => {
+    // Ignore if read-only or no file open
+    if (readOnly || !filePath) return
+
+    // Check if the drag contains our custom MIME type
+    if (!e.dataTransfer.types.includes('application/x-slatebase-path')) return
+
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+    setIsDragOver(true)
+  }, [readOnly, filePath])
+
+  /** Handles dragLeave on the textarea — removes visual indicator. */
+  const handleTextareaDragLeave = useCallback(() => {
+    setIsDragOver(false)
+  }, [])
+
+  /** Handles drop on the textarea — inserts Markdown link at drop position. */
+  const handleTextareaDrop = useCallback((e: React.DragEvent<HTMLTextAreaElement>) => {
+    setIsDragOver(false)
+
+    // Ignore if read-only or no file open
+    if (readOnly || !filePath) return
+
+    const droppedPath = e.dataTransfer.getData('application/x-slatebase-path')
+    const droppedType = e.dataTransfer.getData('application/x-slatebase-type')
+
+    // Ignore if not from FileExplorer or if it's a folder
+    if (!droppedPath) return
+    if (droppedType === 'directory') return
+
+    e.preventDefault()
+
+    // Get the filename from the dropped path
+    const fileName = droppedPath.split('/').pop() ?? droppedPath
+
+    // Compute relative path from current file to dropped file
+    const relativePath = computeRelativePath(filePath, droppedPath)
+
+    // Determine link format based on whether it's an image
+    const linkText = isImageFile(fileName)
+      ? `![${fileName}](${relativePath})`
+      : `[${fileName}](${relativePath})`
+
+    // Determine insertion position from drop coordinates
+    const ta = textareaRef.current
+    if (!ta) return
+
+    // Use caretRangeFromPoint to find the character position at the drop coordinates
+    let insertPos = ta.selectionStart
+    if (document.caretRangeFromPoint) {
+      const range = document.caretRangeFromPoint(e.clientX, e.clientY)
+      if (range && ta.contains(range.startContainer)) {
+        // For textarea, we need to calculate position differently
+        // The drop event sets the cursor position, so we can use selectionStart after focus
+        ta.focus()
+        insertPos = ta.selectionStart
+      }
+    } else {
+      // Fallback: focus and use current selection
+      ta.focus()
+      insertPos = ta.selectionStart
+    }
+
+    // Insert the link at the computed position
+    const newContent = content.slice(0, insertPos) + linkText + content.slice(insertPos)
+    onChange(newContent)
+
+    // Trigger auto-save
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => { onSaveRef.current() }, 1500)
+
+    // Position cursor after the inserted link
+    const newCursorPos = insertPos + linkText.length
+    requestAnimationFrame(() => {
+      ta.focus()
+      ta.setSelectionRange(newCursorPos, newCursorPos)
+    })
+  }, [readOnly, filePath, content, onChange])
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     onChange(e.target.value)
@@ -184,10 +272,13 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
       {/* Editor */}
       <textarea
         ref={textareaRef}
-        className="edit-mode-textarea"
+        className={`edit-mode-textarea${isDragOver ? ' edit-mode-textarea--drag-over' : ''}`}
         value={content}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
+        onDragOver={handleTextareaDragOver}
+        onDragLeave={handleTextareaDragLeave}
+        onDrop={handleTextareaDrop}
         disabled={saving}
         readOnly={readOnly}
         aria-label={t('editor.textareaAriaLabel')}

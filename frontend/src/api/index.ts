@@ -70,6 +70,12 @@ export interface IApiClient {
   deleteContent(vaultId: string, path: string): Promise<void>
   saveFile(vaultId: string, filePath: string, content: string): Promise<FileSaveResult>
 
+  /** Moves a file or folder within a vault. */
+  moveContent(vaultId: string, sourcePath: string, destinationPath: string): Promise<{ newPath: string }>
+
+  /** Renames a file or folder within a vault. */
+  renameContent(vaultId: string, path: string, newName: string): Promise<{ newPath: string }>
+
   // --- Auth methods ---
   login(username: string, password: string): Promise<LoginResponse>
   logout(): Promise<void>
@@ -190,6 +196,16 @@ export class ApiClient implements IApiClient {
 
   async saveFile(vaultId: string, filePath: string, content: string): Promise<FileSaveResult> {
     return this.request<FileSaveResult>('PUT', `/api/v1/vaults/${vaultId}/files`, { path: filePath, content })
+  }
+
+  /** Moves a file or folder within a vault. */
+  async moveContent(vaultId: string, sourcePath: string, destinationPath: string): Promise<{ newPath: string }> {
+    return this.request<{ newPath: string }>('PUT', `/api/v1/vaults/${vaultId}/move`, { sourcePath, destinationPath })
+  }
+
+  /** Renames a file or folder within a vault. */
+  async renameContent(vaultId: string, path: string, newName: string): Promise<{ newPath: string }> {
+    return this.request<{ newPath: string }>('PUT', `/api/v1/vaults/${vaultId}/rename`, { path, newName })
   }
 
   // --- Auth methods ---

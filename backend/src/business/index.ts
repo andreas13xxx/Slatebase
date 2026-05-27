@@ -15,7 +15,7 @@ import { validateFilePath, generateVaultId, computeEtag } from '../vault/index.j
 import type { IVaultRegistry, IVaultShareRegistry, VaultShareEntry } from '../vault/registry.js'
 import type { IUserRepository } from '../user/index.js'
 import type { IAuditService } from '../audit/index.js'
-import { validateVaultName } from './validation.js'
+import { validateVaultName, validateContentName } from './validation.js'
 
 // --- Custom Errors ---
 
@@ -145,6 +145,32 @@ export class InvalidShareTargetError extends Error {
   }
 }
 
+/**
+ * Thrown when a move destination is a subdirectory of the source.
+ */
+export class InvalidMoveError extends Error {
+  constructor(
+    public readonly sourcePath: string,
+    public readonly destinationPath: string,
+  ) {
+    super(`Cannot move '${sourcePath}' into its own subdirectory '${destinationPath}'`)
+    this.name = 'InvalidMoveError'
+  }
+}
+
+/**
+ * Thrown when a file/folder already exists at the target path.
+ */
+export class FileConflictError extends Error {
+  constructor(public readonly targetPath: string) {
+    super(`A file or folder already exists at: ${targetPath}`)
+    this.name = 'FileConflictError'
+  }
+}
+
+// Re-export InvalidNameError and validateContentName from validation module (defined there to avoid circular dependency)
+export { InvalidNameError, validateContentName } from './validation.js'
+
 // --- Types ---
 
 export interface FileSaveResult {
@@ -168,6 +194,31 @@ export interface IVaultService {
   deleteVaultWithChecks(vaultId: string, ownerId: string, force?: boolean): Promise<void>
   transferOwnership(vaultId: string, currentOwnerId: string, newOwnerId: string): Promise<void>
   deleteContent(vaultId: string, relativePath: string): Promise<void>
+
+  /**
+   * Moves a file or folder within a vault.
+   * Creates missing intermediate directories automatically.
+   * Updates the in-memory directory tree.
+   *
+   * @throws VaultNotFoundError - Vault does not exist
+   * @throws PathTraversalError - Path traversal detected
+   * @throws InvalidMoveError - Destination is subdirectory of source
+   * @throws FileConflictError - File/folder already exists at destination
+   * @throws StorageError - Filesystem error
+   */
+  moveContent(vaultId: string, sourcePath: string, destinationPath: string): Promise<{ newPath: string }>
+
+  /**
+   * Renames a file or folder within a vault.
+   * Updates the in-memory directory tree.
+   *
+   * @throws VaultNotFoundError - Vault does not exist
+   * @throws PathTraversalError - Path traversal detected
+   * @throws InvalidNameError - Invalid characters in new name
+   * @throws FileConflictError - File/folder already exists at target path
+   * @throws StorageError - Filesystem error
+   */
+  renameContent(vaultId: string, filePath: string, newName: string): Promise<{ newPath: string }>
 }
 
 /** Maximum number of shares allowed per vault. */
@@ -816,6 +867,167 @@ export class VaultService implements IVaultService {
     })
 
     this.logger.info('Content deleted', { vaultId, path: relativePath, resolvedPath })
+  }
+
+  /**
+   * Moves a file or folder within a vault.
+   * 1. Verifies the vault exists (throws VaultNotFoundError if not)
+   * 2. Validates source and destination paths with validateFilePath (path traversal protection)
+   * 3. Checks for circular move (destination is subdirectory of source)
+   * 4. Checks for file conflict at destination
+   * 5. Creates intermediate directories at destination
+   * 6. Moves via fs.rename()
+   * 7. Refreshes the vault's in-memory directory tree
+   * 8. Returns { newPath: destinationPath }
+   */
+  async moveContent(vaultId: string, sourcePath: string, destinationPath: string): Promise<{ newPath: string }> {
+    // 1. Verify vault exists
+    const vault = this.vaultManager.getVault(vaultId)
+    if (!vault) {
+      throw new VaultNotFoundError(vaultId)
+    }
+
+    // 2. Validate both paths (path traversal protection)
+    const absoluteSourcePath = validateFilePath(vault.info.path, sourcePath)
+    const absoluteDestPath = validateFilePath(vault.info.path, destinationPath)
+
+    // 3. Check for circular move (destination is subdirectory of source)
+    // Normalize paths for comparison using forward slashes
+    const normalizedSource = sourcePath.replace(/\\/g, '/')
+    const normalizedDest = destinationPath.replace(/\\/g, '/')
+    if (normalizedDest.startsWith(normalizedSource + '/')) {
+      throw new InvalidMoveError(sourcePath, destinationPath)
+    }
+
+    // 4. Check for file conflict at destination
+    try {
+      await fs.access(absoluteDestPath)
+      // If access succeeds, something already exists at the destination
+      throw new FileConflictError(destinationPath)
+    } catch (error) {
+      if (error instanceof FileConflictError) {
+        throw error
+      }
+      // ENOENT means nothing exists at destination — this is the expected case
+    }
+
+    // 5. Check source exists
+    try {
+      await fs.access(absoluteSourcePath)
+    } catch {
+      const error = new Error(`File or folder not found at path: ${sourcePath}`)
+      ;(error as NodeJS.ErrnoException).code = 'ENOENT'
+      throw error
+    }
+
+    // 6. Create intermediate directories at destination
+    const destDir = path.dirname(absoluteDestPath)
+    await fs.mkdir(destDir, { recursive: true })
+
+    // 7. Move via fs.rename()
+    try {
+      await fs.rename(absoluteSourcePath, absoluteDestPath)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.logger.error('Failed to move content', { vaultId, sourcePath, destinationPath, error: message })
+      throw new StorageError(`Failed to move content: ${message}`)
+    }
+
+    // 8. Refresh the vault's in-memory directory tree
+    const updatedTree = await this.vaultReader.readDirectory(
+      vault.info.path,
+      this.configService.getServerConfig().maxDirectoryDepth,
+    )
+
+    this.vaultManager.addVault({
+      info: vault.info,
+      tree: updatedTree,
+    })
+
+    this.logger.info('Content moved', { vaultId, sourcePath, destinationPath })
+
+    return { newPath: destinationPath }
+  }
+
+  /**
+   * Renames a file or folder within a vault.
+   * 1. Verifies the vault exists (throws VaultNotFoundError if not)
+   * 2. Validates the file path with validateFilePath (path traversal protection)
+   * 3. Validates the new name with validateContentName (invalid characters, length)
+   * 4. Computes the target path (same directory, new name)
+   * 5. Checks if target already exists (throws FileConflictError if it does)
+   * 6. Checks if source exists (throws ENOENT error if not)
+   * 7. Renames via fs.rename()
+   * 8. Refreshes the vault's in-memory directory tree
+   * 9. Returns { newPath } — the new relative path
+   */
+  async renameContent(vaultId: string, filePath: string, newName: string): Promise<{ newPath: string }> {
+    // 1. Verify vault exists
+    const vault = this.vaultManager.getVault(vaultId)
+    if (!vault) {
+      throw new VaultNotFoundError(vaultId)
+    }
+
+    // 2. Validate file path (path traversal protection)
+    const resolvedSourcePath = validateFilePath(vault.info.path, filePath)
+
+    // 3. Validate new name (invalid characters, length)
+    validateContentName(newName)
+
+    // 4. Compute target path: same directory as source, but with new name
+    const sourceDir = path.dirname(resolvedSourcePath)
+    const resolvedTargetPath = path.join(sourceDir, newName)
+
+    // 5. Check if target already exists → FileConflictError
+    try {
+      await fs.access(resolvedTargetPath)
+      // If access succeeds, the target exists — conflict
+      const relativeTargetPath = path.relative(vault.info.path, resolvedTargetPath).replace(/\\/g, '/')
+      throw new FileConflictError(relativeTargetPath)
+    } catch (error) {
+      // If it's already a FileConflictError, re-throw
+      if (error instanceof FileConflictError) {
+        throw error
+      }
+      // Otherwise, target doesn't exist — proceed
+    }
+
+    // 6. Check if source exists
+    try {
+      await fs.access(resolvedSourcePath)
+    } catch {
+      const error = new Error(`File or folder not found at path: ${filePath}`)
+      ;(error as NodeJS.ErrnoException).code = 'ENOENT'
+      throw error
+    }
+
+    // 7. Rename via fs.rename()
+    try {
+      await fs.rename(resolvedSourcePath, resolvedTargetPath)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.logger.error('Failed to rename content', { vaultId, filePath, newName, error: message })
+      throw new StorageError(`Failed to rename: ${message}`)
+    }
+
+    // 8. Refresh the vault's in-memory directory tree
+    const updatedTree = await this.vaultReader.readDirectory(
+      vault.info.path,
+      this.configService.getServerConfig().maxDirectoryDepth,
+    )
+
+    this.vaultManager.addVault({
+      info: vault.info,
+      tree: updatedTree,
+    })
+
+    // 9. Compute and return the new relative path
+    const sourceRelativeDir = path.dirname(filePath).replace(/\\/g, '/')
+    const newRelativePath = sourceRelativeDir === '.' ? newName : `${sourceRelativeDir}/${newName}`
+
+    this.logger.info('Content renamed', { vaultId, oldPath: filePath, newName, newPath: newRelativePath })
+
+    return { newPath: newRelativePath }
   }
 }
 

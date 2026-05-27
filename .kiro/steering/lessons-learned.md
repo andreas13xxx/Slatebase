@@ -284,6 +284,12 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 
 ## Frontend UX-Patterns
 
+### Keine Browser-Popups (window.alert / window.confirm / window.prompt)
+- Warnmeldungen, Bestätigungen und Eingabeaufforderungen direkt in der Oberfläche lösen (Inline-Banner, Modals, Toast-Notifications)
+- **Kein** `window.alert()`, `window.confirm()`, `window.prompt()` verwenden
+- Akzeptable Ausnahmen: native Browser-Dialoge die nicht ersetzbar sind (z.B. `<input type="file">`, `showDirectoryPicker`, Download-Speicherort)
+- **Regel:** Für Bestätigungen eigene Confirm-Komponente (Modal/Inline) nutzen, für Warnungen Toast oder Banner
+
 ### Auto-Save statt expliziter Save-Buttons
 - Debounced Auto-Save (1,5s Inaktivität) mit Ctrl+S als Sofort-Shortcut
 - Status-Indikator am unteren Rand: `● Ungespeichert` → `Speichern…` → `✓ Gespeichert` → `✗ Fehler`

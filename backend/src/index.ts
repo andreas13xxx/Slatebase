@@ -62,7 +62,7 @@ const vaultService = new VaultService(vaultManager, vaultReader, config, logger,
 const importService = new ImportService(vaultManager, vaultReader, config, logger)
 
 // 5. Controllers
-const vaultController = new VaultController(vaultService, logger, importService, userRepository)
+const vaultController = new VaultController(vaultService, logger, importService, userRepository, vaultAccessControl)
 const authController = new AuthController(authService, logger)
 const userController = new UserController(userService, logger)
 

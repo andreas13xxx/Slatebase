@@ -44,6 +44,8 @@ export type TabAction =
   | { type: 'SAVE_SUCCESS'; payload: { tabId: string; content: string } }
   | { type: 'SAVE_ERROR'; payload: { tabId: string; error: string } }
   | { type: 'CLEAR_ALL_TABS' }
+  | { type: 'UPDATE_TAB_PATHS'; payload: { oldPathPrefix: string; newPathPrefix: string } }
+  | { type: 'CLOSE_TABS_BY_PATH'; payload: { pathPrefix: string } }
 
 /** Initial tab state with no open tabs. */
 export const initialTabState: TabState = {
@@ -249,6 +251,93 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
 
     case 'CLEAR_ALL_TABS': {
       return initialTabState
+    }
+
+    case 'UPDATE_TAB_PATHS': {
+      const { oldPathPrefix, newPathPrefix } = action.payload
+
+      const updatedTabs = state.tabs.map((tab) => {
+        if (tab.filePath === oldPathPrefix) {
+          // Exact match: replace entire path
+          const newFilePath = newPathPrefix
+          const newFileName = newFilePath.split('/').pop() ?? newFilePath
+          return {
+            ...tab,
+            filePath: newFilePath,
+            fileName: newFileName,
+            id: generateTabId(tab.vaultId, newFilePath),
+          }
+        }
+        if (tab.filePath.startsWith(oldPathPrefix + '/')) {
+          // Prefix match: replace prefix portion
+          const newFilePath = newPathPrefix + tab.filePath.slice(oldPathPrefix.length)
+          const newFileName = newFilePath.split('/').pop() ?? newFilePath
+          return {
+            ...tab,
+            filePath: newFilePath,
+            fileName: newFileName,
+            id: generateTabId(tab.vaultId, newFilePath),
+          }
+        }
+        return tab
+      })
+
+      // Update activeTabId if it was affected
+      let newActiveTabId = state.activeTabId
+      if (state.activeTabId !== null) {
+        const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
+        if (activeTab) {
+          const updatedActiveTab = updatedTabs.find(
+            (t) => t.vaultId === activeTab.vaultId && (
+              activeTab.filePath === t.filePath ||
+              t.id === generateTabId(activeTab.vaultId,
+                activeTab.filePath === oldPathPrefix
+                  ? newPathPrefix
+                  : activeTab.filePath.startsWith(oldPathPrefix + '/')
+                    ? newPathPrefix + activeTab.filePath.slice(oldPathPrefix.length)
+                    : activeTab.filePath
+              )
+            )
+          )
+          newActiveTabId = updatedActiveTab?.id ?? state.activeTabId
+        }
+      }
+
+      return {
+        ...state,
+        tabs: updatedTabs,
+        activeTabId: newActiveTabId,
+      }
+    }
+
+    case 'CLOSE_TABS_BY_PATH': {
+      const { pathPrefix } = action.payload
+
+      const newTabs = state.tabs.filter((tab) =>
+        tab.filePath !== pathPrefix && !tab.filePath.startsWith(pathPrefix + '/')
+      )
+
+      // If the active tab was removed, select the next available tab
+      let newActiveTabId = state.activeTabId
+      if (state.activeTabId !== null && !newTabs.some((t) => t.id === state.activeTabId)) {
+        if (newTabs.length === 0) {
+          newActiveTabId = null
+        } else {
+          // Find the index of the first removed tab to pick a neighbor
+          const removedIndex = state.tabs.findIndex((t) => t.id === state.activeTabId)
+          if (removedIndex >= newTabs.length) {
+            newActiveTabId = newTabs[newTabs.length - 1]?.id ?? null
+          } else {
+            newActiveTabId = newTabs[removedIndex]?.id ?? newTabs[0]?.id ?? null
+          }
+        }
+      }
+
+      return {
+        ...state,
+        tabs: newTabs,
+        activeTabId: newActiveTabId,
+      }
     }
   }
 }

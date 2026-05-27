@@ -1,4 +1,19 @@
-// Vault Name Validation Module
+// Vault Name & Content Name Validation Module
+
+// --- Error Classes ---
+
+/**
+ * Thrown when a rename target name contains invalid characters.
+ */
+export class InvalidNameError extends Error {
+  constructor(
+    public readonly invalidName: string,
+    public readonly reason: string,
+  ) {
+    super(`Invalid name '${invalidName}': ${reason}`)
+    this.name = 'InvalidNameError'
+  }
+}
 
 // --- Types ---
 
@@ -64,4 +79,35 @@ export function validateVaultName(name: string, existingNames: string[]): Valida
   }
 
   return { valid: true }
+}
+
+/**
+ * Validates a content name (file or folder name) against the following rules:
+ * - Must not be empty or whitespace-only
+ * - Must not contain path separators (`/` or `\`)
+ * - Must not contain null bytes (`\0`)
+ * - Must not exceed maxLength characters (default: 255)
+ *
+ * Throws InvalidNameError with a descriptive reason on failure.
+ */
+export function validateContentName(name: string, maxLength: number = 255): void {
+  if (name.length === 0) {
+    throw new InvalidNameError(name, 'Name must not be empty')
+  }
+
+  if (name.trim().length === 0) {
+    throw new InvalidNameError(name, 'Name must contain at least one non-whitespace character')
+  }
+
+  if (name.includes('/') || name.includes('\\')) {
+    throw new InvalidNameError(name, 'Name must not contain path separators (/ or \\)')
+  }
+
+  if (name.includes('\0')) {
+    throw new InvalidNameError(name, 'Name must not contain null bytes')
+  }
+
+  if (name.length > maxLength) {
+    throw new InvalidNameError(name, `Name must not exceed ${maxLength} characters`)
+  }
 }

@@ -58,6 +58,8 @@ function createMockVaultService(overrides?: Partial<IVaultService>): IVaultServi
     deleteVaultWithChecks: async () => {},
     transferOwnership: async () => {},
     deleteContent: async () => {},
+    moveContent: async () => ({ newPath: '' }),
+    renameContent: async () => ({ newPath: '' }),
     ...overrides,
   }
 }

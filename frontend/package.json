@@ -13,6 +13,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@react-symbols/icons": "1.2.0",
     "highlight.js": "11.11.1",
     "jszip": "3.10.1",
     "lucide-react": "0.511.0",

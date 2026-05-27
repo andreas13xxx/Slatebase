@@ -4,12 +4,24 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { Context } from 'hono'
 import { Hono } from 'hono'
+import { z } from 'zod'
 
 export { UserController, UserRouteModule } from './userRoutes.js'
 import type { IVaultService } from '../business/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
-import { VaultNotFoundError, VaultValidationError, StorageError, FileTooLargeError as BusinessFileTooLargeError, ConflictError } from '../business/index.js'
+import {
+  VaultNotFoundError,
+  VaultValidationError,
+  StorageError,
+  FileTooLargeError as BusinessFileTooLargeError,
+  ConflictError,
+  InvalidMoveError,
+  FileConflictError as BusinessFileConflictError,
+  InvalidNameError,
+  VaultAccessDeniedError,
+} from '../business/index.js'
+import type { IVaultAccessControl } from '../business/index.js'
 import { PathTraversalError } from '../vault/index.js'
 import type { IImportService, UploadedFile } from '../import/index.js'
 import type { IUserRepository } from '../user/index.js'
@@ -37,6 +49,26 @@ function createApiError(code: string, message: string): ApiError {
   }
 }
 
+// --- Zod Schemas for Request Validation ---
+
+/**
+ * Schema for move request body.
+ * Both sourcePath and destinationPath must be non-empty strings.
+ */
+export const moveRequestSchema = z.object({
+  sourcePath: z.string().min(1, 'sourcePath must not be empty'),
+  destinationPath: z.string().min(1, 'destinationPath must not be empty'),
+})
+
+/**
+ * Schema for rename request body.
+ * path must be a non-empty string, newName must be non-empty and at most 255 characters.
+ */
+export const renameRequestSchema = z.object({
+  path: z.string().min(1, 'path must not be empty'),
+  newName: z.string().min(1, 'newName must not be empty').max(255, 'newName must be at most 255 characters'),
+})
+
 // --- IVaultController Interface ---
 
 export interface IVaultController {
@@ -49,6 +81,8 @@ export interface IVaultController {
   importFile(c: Context): Promise<Response>
   importFolder(c: Context): Promise<Response>
   deleteContent(c: Context): Promise<Response>
+  moveContent(c: Context): Promise<Response>
+  renameContent(c: Context): Promise<Response>
 }
 
 // --- VaultController Implementation ---
@@ -59,6 +93,7 @@ export class VaultController implements IVaultController {
     private readonly logger: ILogger,
     private readonly importService?: IImportService,
     private readonly userRepository?: IUserRepository,
+    private readonly accessControl?: IVaultAccessControl,
   ) {}
 
   /**
@@ -129,6 +164,7 @@ export class VaultController implements IVaultController {
           status: 200,
           headers: {
             'Content-Type': contentType,
+            'Content-Disposition': 'inline',
             'Content-Length': buffer.length.toString(),
           },
         })
@@ -355,9 +391,86 @@ export class VaultController implements IVaultController {
   }
 
   /**
+   * PUT /vaults/:vaultId/move — Moves a file or folder within a vault.
+   * Parses JSON body { sourcePath, destinationPath }, validates with Zod,
+   * checks write access via VaultAccessControlService,
+   * calls vaultService.moveContent(vaultId, sourcePath, destinationPath),
+   * returns 200 with { newPath }.
+   */
+  async moveContent(c: Context): Promise<Response> {
+    const vaultId = c.req.param('vaultId') as string
+
+    try {
+      // Check write access before executing the operation
+      if (this.accessControl) {
+        const session = c.get('session') as SessionContext
+        await this.accessControl.checkWriteAccess(vaultId, session.userId)
+      }
+
+      const body = await c.req.json()
+      const parsed = moveRequestSchema.safeParse(body)
+
+      if (!parsed.success) {
+        const firstError = parsed.error.errors[0]
+        const message = firstError ? firstError.message : 'Invalid request body'
+        const apiError = createApiError('VALIDATION_ERROR', message)
+        return c.json(apiError, 400)
+      }
+
+      const { sourcePath, destinationPath } = parsed.data
+      const result = await this.vaultService.moveContent(vaultId, sourcePath, destinationPath)
+      return c.json(result, 200)
+    } catch (error) {
+      return this.handleError(c, error)
+    }
+  }
+
+  /**
+   * PUT /vaults/:vaultId/rename — Renames a file or folder within a vault.
+   * Parses JSON body { path, newName }, validates with Zod,
+   * checks write access via VaultAccessControlService,
+   * calls vaultService.renameContent(vaultId, path, newName),
+   * returns 200 with { newPath }.
+   */
+  async renameContent(c: Context): Promise<Response> {
+    const vaultId = c.req.param('vaultId') as string
+
+    try {
+      // Check write access before executing the operation
+      if (this.accessControl) {
+        const session = c.get('session') as SessionContext
+        await this.accessControl.checkWriteAccess(vaultId, session.userId)
+      }
+
+      const body = await c.req.json()
+      const parsed = renameRequestSchema.safeParse(body)
+
+      if (!parsed.success) {
+        const firstError = parsed.error.errors[0]
+        const message = firstError ? firstError.message : 'Invalid request body'
+        const apiError = createApiError('VALIDATION_ERROR', message)
+        return c.json(apiError, 400)
+      }
+
+      const { path: filePath, newName } = parsed.data
+      const result = await this.vaultService.renameContent(vaultId, filePath, newName)
+      return c.json(result, 200)
+    } catch (error) {
+      return this.handleError(c, error)
+    }
+  }
+
+  /**
    * Maps domain errors to HTTP status codes and structured ApiError responses.
    */
   private handleError(c: Context, error: unknown): Response {
+    // VaultAccessDeniedError — 403 (no write permission)
+    if (error instanceof VaultAccessDeniedError) {
+      this.logger.warn('Vault access denied', { vaultId: error.vaultId, userId: error.userId, requiredPermission: error.requiredPermission })
+      const apiError = createApiError('FORBIDDEN', error.message)
+      return c.json(apiError, 403)
+    }
+
     // VaultValidationError — 400 or 409 depending on code
     if (error instanceof VaultValidationError) {
       if (error.code === 'VAULT_NAME_CONFLICT') {
@@ -426,6 +539,27 @@ export class VaultController implements IVaultController {
       return c.json(apiError, 409)
     }
 
+    // InvalidMoveError — 400 (destination is subdirectory of source)
+    if (error instanceof InvalidMoveError) {
+      this.logger.warn('Invalid move operation', { sourcePath: error.sourcePath, destinationPath: error.destinationPath })
+      const apiError = createApiError('INVALID_MOVE', error.message)
+      return c.json(apiError, 400)
+    }
+
+    // BusinessFileConflictError — 409 (file/folder already exists at target)
+    if (error instanceof BusinessFileConflictError) {
+      this.logger.warn('File conflict at target path', { targetPath: error.targetPath })
+      const apiError = createApiError('CONFLICT', error.message)
+      return c.json(apiError, 409)
+    }
+
+    // InvalidNameError — 400 (invalid characters in name)
+    if (error instanceof InvalidNameError) {
+      this.logger.warn('Invalid name', { name: error.invalidName, reason: error.reason })
+      const apiError = createApiError('VALIDATION_ERROR', error.message)
+      return c.json(apiError, 400)
+    }
+
     // StorageError — 500
     if (error instanceof StorageError) {
       this.logger.error('Storage error', { message: error.message })
@@ -478,6 +612,21 @@ const CONTENT_TYPE_MAP: Record<string, string> = {
   '.avif': 'image/avif',
   '.webp': 'image/webp',
   '.pdf': 'application/pdf',
+  '.md': 'text/markdown; charset=utf-8',
+  '.txt': 'text/plain; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
+  '.mp3': 'audio/mpeg',
+  '.mp4': 'video/mp4',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.ico': 'image/x-icon',
+  '.bmp': 'image/bmp',
+  '.tiff': 'image/tiff',
+  '.tif': 'image/tiff',
 }
 
 function getContentTypeFromExtension(filePath: string): string {
@@ -504,6 +653,8 @@ export class VaultRouteModule implements RouteModule {
 
     // PUT routes
     router.put('/vaults/:vaultId/files', (c) => this.controller.saveFile(c))
+    router.put('/vaults/:vaultId/move', (c) => this.controller.moveContent(c))
+    router.put('/vaults/:vaultId/rename', (c) => this.controller.renameContent(c))
 
     // POST routes (new)
     router.post('/vaults', (c) => this.controller.createVault(c))

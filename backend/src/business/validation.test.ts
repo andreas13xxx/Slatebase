@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validateVaultName } from './validation'
+import { validateVaultName, validateContentName, InvalidNameError } from './validation'
 
 describe('validateVaultName', () => {
   describe('valid names', () => {
@@ -86,6 +86,91 @@ describe('validateVaultName', () => {
       // "research" should NOT conflict with "Research"
       const result = validateVaultName('research', ['Research'])
       expect(result).toEqual({ valid: true })
+    })
+  })
+})
+
+describe('validateContentName', () => {
+  describe('valid names', () => {
+    it('accepts a simple name', () => {
+      expect(() => validateContentName('hello.md')).not.toThrow()
+    })
+
+    it('accepts a name with spaces', () => {
+      expect(() => validateContentName('my file.md')).not.toThrow()
+    })
+
+    it('accepts a name at the 255-character limit', () => {
+      const name = 'x'.repeat(255)
+      expect(() => validateContentName(name)).not.toThrow()
+    })
+
+    it('accepts a name with a custom maxLength', () => {
+      const name = 'x'.repeat(128)
+      expect(() => validateContentName(name, 128)).not.toThrow()
+    })
+  })
+
+  describe('rejects empty or whitespace-only names', () => {
+    it('throws for an empty string', () => {
+      expect(() => validateContentName('')).toThrow(InvalidNameError)
+      expect(() => validateContentName('')).toThrow('Name must not be empty')
+    })
+
+    it('throws for whitespace-only string', () => {
+      expect(() => validateContentName('   ')).toThrow(InvalidNameError)
+      expect(() => validateContentName('   ')).toThrow('Name must contain at least one non-whitespace character')
+    })
+
+    it('throws for tabs and newlines only', () => {
+      expect(() => validateContentName('\t\n')).toThrow(InvalidNameError)
+    })
+  })
+
+  describe('rejects path separators', () => {
+    it('throws for forward slash', () => {
+      expect(() => validateContentName('path/file.md')).toThrow(InvalidNameError)
+      expect(() => validateContentName('path/file.md')).toThrow('path separators')
+    })
+
+    it('throws for backslash', () => {
+      expect(() => validateContentName('path\\file.md')).toThrow(InvalidNameError)
+      expect(() => validateContentName('path\\file.md')).toThrow('path separators')
+    })
+  })
+
+  describe('rejects null bytes', () => {
+    it('throws for a name containing a null byte', () => {
+      expect(() => validateContentName('file\0.md')).toThrow(InvalidNameError)
+      expect(() => validateContentName('file\0.md')).toThrow('null bytes')
+    })
+  })
+
+  describe('rejects names exceeding maxLength', () => {
+    it('throws for a name exceeding default 255 characters', () => {
+      const name = 'a'.repeat(256)
+      expect(() => validateContentName(name)).toThrow(InvalidNameError)
+      expect(() => validateContentName(name)).toThrow('must not exceed 255 characters')
+    })
+
+    it('throws for a name exceeding custom maxLength', () => {
+      const name = 'a'.repeat(129)
+      expect(() => validateContentName(name, 128)).toThrow(InvalidNameError)
+      expect(() => validateContentName(name, 128)).toThrow('must not exceed 128 characters')
+    })
+  })
+
+  describe('InvalidNameError properties', () => {
+    it('includes the invalid name and reason', () => {
+      try {
+        validateContentName('bad/name')
+      } catch (error) {
+        expect(error).toBeInstanceOf(InvalidNameError)
+        const nameError = error as InvalidNameError
+        expect(nameError.invalidName).toBe('bad/name')
+        expect(nameError.reason).toBe('Name must not contain path separators (/ or \\)')
+        expect(nameError.name).toBe('InvalidNameError')
+      }
     })
   })
 })

@@ -25,7 +25,7 @@ import {
   Database, Share2, Trash2, Server, Download,
   Upload, FolderOpen, PanelRight, PanelLeft, X, Eye, Pencil,
 } from 'lucide-react'
-import { getFileIcon, getDisplayName } from './utils/fileIcons'
+import { getFileIcon, getFileIconClass, getDisplayName } from './utils/fileIcons'
 import './App.css'
 
 /** Singleton ApiClient instance shared across the app. */
@@ -258,6 +258,7 @@ function AppContent() {
   const [showSidebar, setShowSidebar] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
+  const createFileTriggerRef = useRef<(() => void) | null>(null)
 
   const sidebar = useResize(260, 180, 400, 'left')
   const rightPanel = useResize(240, 160, 500, 'right')
@@ -316,6 +317,14 @@ function AppContent() {
 
   function handleImportFile() { fileInputRef.current?.click() }
   function handleImportFolder() { folderInputRef.current?.click() }
+
+  function handleCreateFile() {
+    if (!state.selectedVaultId) return
+    // Trigger inline file creation in the FileExplorer
+    if (createFileTriggerRef.current) {
+      createFileTriggerRef.current()
+    }
+  }
 
   function handleExportVault() {
     if (state.selectedVaultId) {
@@ -438,7 +447,7 @@ function AppContent() {
                 {state.selectedVaultId && (
                   <div className="app-sidebar-section">
                     <span className="app-sidebar-section-label">{t('files.label')}</span>
-                    <FileExplorer />
+                    <FileExplorer onRegisterCreateFile={(trigger) => { createFileTriggerRef.current = trigger }} />
                   </div>
                 )}
               </div>
@@ -459,6 +468,7 @@ function AppContent() {
           {/* ── Toolbar ── */}
           <SidebarToolbar
             vaultId={state.selectedVaultId}
+            onCreateFile={handleCreateFile}
             onImportFile={handleImportFile}
             onImportFolder={handleImportFolder}
             onExportVault={handleExportVault}
@@ -506,6 +516,7 @@ function AppContent() {
                   const modeLabel = tab.mode === 'edit' ? t('tabs.showPreview') : t('tabs.edit')
                   const ModeIcon = tab.mode === 'edit' ? Eye : Pencil
                   const TabFileIcon = getFileIcon(tab.fileName)
+                  const tabFileIconClass = getFileIconClass(tab.fileName)
                   const displayName = getDisplayName(tab.fileName)
                   return (
                     <div
@@ -518,7 +529,7 @@ function AppContent() {
                       title={tab.filePath}
                       tabIndex={isActive ? 0 : -1}
                     >
-                      <TabFileIcon size={13} className="tab-bar-tab-icon" />
+                      <TabFileIcon size={13} className={`tab-bar-tab-icon ${tabFileIconClass}`} />
                       <span className="tab-bar-tab-label">
                         {hasUnsaved ? '● ' : ''}{displayName}
                       </span>

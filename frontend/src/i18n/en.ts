@@ -78,6 +78,9 @@ export const en: TranslationShape = {
     importFile: 'Import file',
     importFolder: 'Import folder',
     exportVault: 'Export vault',
+    newFile: 'New file',
+    newFilePrompt: 'File name (e.g. Notes/Idea.md):',
+    newFileNameEmpty: 'File name must not be empty.',
   },
 
   editor: {
@@ -371,6 +374,33 @@ export const en: TranslationShape = {
     errorSelfShare: 'You cannot share a vault with yourself.',
     errorUserNotFound: 'User not found.',
     errorLimitReached: 'Maximum number of shares reached (20).',
+  },
+
+  contextMenu: {
+    ariaLabel: 'Context menu',
+    newFile: 'New File',
+    rename: 'Rename',
+    delete: 'Delete',
+    noActions: 'No actions available',
+  },
+
+  fileOps: {
+    deleteConfirmTitle: 'Confirm Delete',
+    deleteConfirmMessage: 'Are you sure you want to delete \'{name}\'?',
+    deleteConfirmFolder: 'Are you sure you want to delete the folder \'{name}\' and all its contents?',
+    confirm: 'Confirm',
+    cancel: 'Cancel',
+    moving: 'Moving…',
+    renaming: 'Renaming…',
+    creating: 'Creating…',
+    moveError: 'Error moving file',
+    renameError: 'Error renaming',
+    createError: 'Error creating file',
+    deleteError: 'Error deleting',
+    nameEmpty: 'Filename must not be empty',
+    nameInvalidChars: 'Filename contains invalid characters',
+    nameTooLong: 'Filename is too long',
+    dropToRoot: 'Move to root directory',
   },
 
   vaultDeletion: {

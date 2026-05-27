@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from '../i18n'
 
 /**
@@ -75,19 +75,10 @@ export function BinaryViewer({ fileName, fileExtension, vaultId, filePath, token
     )
   }
 
-  // Render embedded PDF viewer
+  // Render embedded PDF viewer using Blob URL for Firefox compatibility
   if (isPdfFile) {
     return (
-      <section
-        aria-label={fileName}
-        style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: '500px' }}
-      >
-        <iframe
-          src={rawSrc}
-          title={fileName}
-          style={{ flex: 1, width: '100%', border: 'none', minHeight: '500px' }}
-        />
-      </section>
+      <PdfViewer rawSrc={rawSrc} fileName={fileName} />
     )
   }
 
@@ -100,6 +91,78 @@ export function BinaryViewer({ fileName, fileExtension, vaultId, filePath, token
       <p role="status" style={{ color: '#888', fontSize: '0.95rem' }}>
         {t('binaryViewer.unsupported', { name: fileName, type: normalizedExtension || '?' })}
       </p>
+    </section>
+  )
+}
+
+/**
+ * PdfViewer fetches the PDF as a Blob and renders it via an <object> element.
+ * Using <object type="application/pdf"> forces Firefox to use its built-in pdf.js
+ * viewer regardless of the user's download preferences for PDF files.
+ */
+function PdfViewer({ rawSrc, fileName }: { rawSrc: string; fileName: string }) {
+  const { t } = useTranslation()
+  const [blobUrl, setBlobUrl] = useState<string | null>(null)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    let revoked = false
+    let url: string | undefined
+
+    fetch(rawSrc)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.blob()
+      })
+      .then((blob) => {
+        if (revoked) return
+        const pdfBlob = new Blob([blob], { type: 'application/pdf' })
+        url = URL.createObjectURL(pdfBlob)
+        setBlobUrl(url)
+      })
+      .catch(() => {
+        if (!revoked) setError(true)
+      })
+
+    return () => {
+      revoked = true
+      if (url) URL.revokeObjectURL(url)
+    }
+  }, [rawSrc])
+
+  if (error) {
+    return (
+      <section aria-label={fileName} style={{ padding: '2rem', textAlign: 'center' }}>
+        <p role="status" style={{ color: '#888', fontSize: '0.95rem' }}>
+          {t('binaryViewer.unsupported', { name: fileName, type: '.pdf' })}
+        </p>
+      </section>
+    )
+  }
+
+  if (!blobUrl) {
+    return (
+      <section aria-label={fileName} style={{ padding: '2rem', textAlign: 'center' }}>
+        <p style={{ color: '#888', fontSize: '0.95rem' }}>{t('common.loading')}</p>
+      </section>
+    )
+  }
+
+  return (
+    <section
+      aria-label={fileName}
+      style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: '500px' }}
+    >
+      <object
+        data={blobUrl}
+        type="application/pdf"
+        aria-label={fileName}
+        style={{ flex: 1, width: '100%', minHeight: '500px' }}
+      >
+        <p style={{ padding: '2rem', textAlign: 'center', color: '#888' }}>
+          {t('binaryViewer.unsupported', { name: fileName, type: '.pdf' })}
+        </p>
+      </object>
     </section>
   )
 }
