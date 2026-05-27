@@ -18,13 +18,14 @@ import { AdminAuditPage } from './components/AdminAuditPage'
 import { AdminVaultsPage } from './components/AdminVaultsPage'
 import { VaultSharing } from './components/VaultSharing'
 import { VaultDeletionWorkflow } from './components/VaultDeletionWorkflow'
+import { ChatPage } from './components/ChatPage'
 import { SlatebaseLogo } from './components/SlatebaseLogo'
 import { SidebarToolbar } from './components/SidebarToolbar'
 import { MyVaultsPage } from './components/MyVaultsPage'
 import {
   User, LogOut, Settings, Shield, FileText, Clock,
   Database, Share2, Trash2, Server, Download,
-  Upload, FolderOpen, PanelRight, PanelLeft, X, Eye, Pencil,
+  Upload, FolderOpen, PanelRight, PanelLeft, X, Eye, Pencil, MessageCircle,
 } from 'lucide-react'
 import { getFileIcon, getFileIconClass, getDisplayName } from './utils/fileIcons'
 import './App.css'
@@ -41,6 +42,7 @@ type AppPage =
   | 'my-vaults'
   | 'profile'
   | 'sessions'
+  | 'chat'
   | 'admin-users'
   | 'admin-vaults'
   | 'admin-config'
@@ -222,6 +224,7 @@ const PAGE_LABEL_KEYS: Record<AppPage, string> = {
   'my-vaults': 'pages.myVaults',
   profile: 'pages.profile',
   sessions: 'pages.sessions',
+  chat: 'pages.chat',
   'admin-users': 'pages.adminUsers',
   'admin-vaults': 'pages.adminVaults',
   'admin-config': 'pages.adminConfig',
@@ -235,6 +238,7 @@ const PAGE_ICONS: Partial<Record<AppPage, React.ReactNode>> = {
   'my-vaults': <Database size={13} />,
   profile: <User size={13} />,
   sessions: <Clock size={13} />,
+  chat: <MessageCircle size={13} />,
   'admin-users': <Shield size={13} />,
   'admin-vaults': <Server size={13} />,
   'admin-config': <Settings size={13} />,
@@ -263,6 +267,35 @@ function AppContent() {
 
   const sidebar = useResize(260, 180, 400, 'left')
   const rightPanel = useResize(240, 160, 500, 'right')
+
+  // Global unread count polling (30-second interval)
+  const [globalUnreadCount, setGlobalUnreadCount] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+
+    const poll = async () => {
+      try {
+        const result = await apiClient.getUnreadTotal()
+        if (!cancelled) {
+          setGlobalUnreadCount(result.total)
+        }
+      } catch {
+        // Silently ignore polling errors (e.g. network issues, 401)
+      }
+    }
+
+    // Initial poll
+    poll()
+
+    // Set up 30-second interval
+    const intervalId = setInterval(poll, 30_000)
+
+    return () => {
+      cancelled = true
+      clearInterval(intervalId)
+    }
+  }, [])
 
   // Fetch vaults on mount
   useEffect(() => {
@@ -372,6 +405,7 @@ function AppContent() {
       case 'my-vaults': return <MyVaultsPage apiClient={apiClient} />
       case 'profile': return <ProfilePage apiClient={apiClient} />
       case 'sessions': return <SessionsPage apiClient={apiClient} />
+      case 'chat': return <ChatPage />
       case 'admin-users': return <AdminUsersPage apiClient={apiClient} />
       case 'admin-vaults': return <AdminVaultsPage apiClient={apiClient} />
       case 'admin-config': return <AdminConfigPage apiClient={apiClient} />
@@ -475,6 +509,7 @@ function AppContent() {
             onExportVault={handleExportVault}
             onNavigate={handleNavigate}
             isAdmin={user?.role === 'admin'}
+            globalUnreadCount={globalUnreadCount}
           />
 
           {/* ── Main Content ── */}

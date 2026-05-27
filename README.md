@@ -77,6 +77,7 @@ npm run dev
 | 🔒 **Authentication** | Session-based auth with argon2id hashing, CSRF protection, rate limiting |
 | 📦 **Import & Export** | Import files/folders, export vaults as ZIP or to a local directory |
 | 🌙 **Dark Mode** | Automatic light/dark theme based on system preference (or manual override) |
+| 💬 **User Chat** | Real-time messaging between users with unread badges and conversation management |
 | 🌐 **i18n** | German and English UI, switchable per user |
 | 🛡️ **Admin Panel** | User management, audit log, server configuration |
 | 🐳 **Docker Ready** | Multi-stage Dockerfile, runs as non-root user |
@@ -190,6 +191,18 @@ All routes under `/api/v1`. Authentication required (Bearer token via `Authoriza
 | GET | `/admin/audit` | Audit log |
 | GET | `/admin/config` | Server config |
 
+### Chat
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/chat/conversations` | List conversations (paginated) |
+| POST | `/chat/conversations` | Create conversation |
+| POST | `/chat/conversations/:id/leave` | Leave conversation |
+| GET | `/chat/conversations/:id/messages` | Get messages (paginated) |
+| POST | `/chat/conversations/:id/messages` | Send message |
+| GET | `/chat/unread` | Get global unread count |
+| POST | `/chat/conversations/:id/read` | Mark as read |
+
 </details>
 
 ## Project Structure
@@ -197,13 +210,15 @@ All routes under `/api/v1`. Authentication required (Bearer token via `Authoriza
 ```
 backend/           — Node.js REST API (Hono + TypeScript)
 ├── src/           — Source code (layered architecture)
+│   └── chat/      — Chat module (conversations, messages, unread)
 ├── config/        — Default configuration
-└── data/          — Runtime data (vaults, users, sessions, audit)
+└── data/          — Runtime data (vaults, users, sessions, chat, audit)
 
 frontend/          — React SPA (Vite + TypeScript)
 ├── src/
 │   ├── components/  — React components
 │   ├── state/       — Reducers, contexts, action creators
+│   ├── i18n/        — Internationalization (de, en)
 │   └── api/         — API client
 └── public/        — Static assets
 ```

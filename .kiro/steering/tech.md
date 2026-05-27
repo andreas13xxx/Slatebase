@@ -25,6 +25,7 @@ Monorepo with two independent packages: `backend/` and `frontend/`. No shared wo
 - **Fonts**: Inter (Google Fonts, loaded in index.html)
 - **Styling**: Custom CSS with Design Tokens (CSS Custom Properties), Dark Mode via `prefers-color-scheme`
 - **Testing**: Vitest + Testing Library (jsdom environment) + Playwright (e2e)
+- **Property-Based Testing**: fast-check (both packages, devDependency)
 - **Linting**: ESLint with react-hooks and react-refresh plugins
 - **Dev proxy**: Vite proxies `/api` to `http://localhost:3000`
 

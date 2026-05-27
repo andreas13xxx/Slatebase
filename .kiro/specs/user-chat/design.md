@@ -65,7 +65,33 @@ Die Chat-Komponenten integrieren sich in die bestehende Architektur:
 - **Data Layer**: `ConversationStore` + `MessageStore` (neue Module unter `src/chat/`)
 - **Business Layer**: `ChatService` orchestriert Stores, validiert Berechtigungen
 - **API Layer**: `chatRoutes.ts` mit `ChatController`, geschützt durch bestehende Auth/CSRF-Middleware
-- **Composition Root**: Neue Instanzen in `src/index.ts` verdrahtet
+- **Composition Root**: Neue Instanzen in `src/index.ts` verdrahtet (nach VaultAccessControlService, vor Controllers)
+
+### Composition Root Einordnung
+
+```typescript
+// In src/index.ts — nach Schritt 3 (Business Layer), vor Schritt 5 (Controllers):
+
+// 3b. Chat Data Layer
+const conversationStore = new ConversationStore(serverConfig.dataDir, logger)
+const messageStore = new MessageStore(serverConfig.dataDir, logger)
+
+// 3c. Chat Business Layer
+const chatRateLimiter = new ChatRateLimiter()
+const chatService = new ChatService(conversationStore, messageStore, userRepository, logger)
+
+// 5b. Chat Controller
+const chatController = new ChatController(chatService, chatRateLimiter, logger)
+
+// 6. Route Modules — ChatRouteModule hinzufügen:
+const routeModules = [
+  // ... bestehende Module ...
+  new ChatRouteModule(chatController),
+]
+
+// Startup — nach sessionStore.loadIndex():
+await conversationStore.loadIndex()
+```
 
 ## Components and Interfaces
 
@@ -92,6 +118,7 @@ interface Message {
 interface ConversationListItem {
   id: string
   participants: string[]
+  participantNames: string[]        // Aufgelöste Anzeigenamen (gleiche Reihenfolge wie participants)
   lastMessageTimestamp: string | null
   lastMessagePreview: string | null  // max 100 Zeichen
 }
@@ -193,8 +220,72 @@ src/
 │   ├── ConversationList.tsx  — Liste der Konversationen
 │   ├── MessageView.tsx       — Nachrichtenanzeige einer Konversation
 │   ├── MessageInput.tsx      — Eingabefeld für neue Nachrichten
-│   └── NewConversation.tsx   — Dialog zum Erstellen neuer Konversationen
+│   └── NewConversation.tsx   — Dialog zum Erstellen neuer Konversationen (nutzt bestehende User-Suche)
 ```
+
+### IApiClient-Erweiterung (Frontend)
+
+Das bestehende `IApiClient`-Interface in `frontend/src/api/index.ts` wird um Chat-Methoden erweitert:
+
+```typescript
+// Ergänzungen zum IApiClient-Interface:
+
+/** Create a new conversation with the given participant user IDs. */
+createConversation(participantIds: string[]): Promise<Conversation>
+
+/** List the current user's conversations (paginated). */
+listConversations(page?: number): Promise<PaginatedConversations>
+
+/** Get messages for a conversation (paginated). */
+getMessages(conversationId: string, page?: number): Promise<PaginatedMessages>
+
+/** Send a message to a conversation. */
+sendMessage(conversationId: string, content: string): Promise<Message>
+```
+
+### Wiederverwendbare UI-Komponenten
+
+Das Chat-Frontend nutzt bestehende wiederverwendbare Komponenten:
+
+- **`ConfirmModal`** — Bestätigungsdialog beim Verlassen einer Konversation (falls zukünftig implementiert)
+- **`Toast`** — Fehler-Feedback bei Rate-Limiting (429) und Netzwerkfehlern
+- **`InlineInput`** — Für schnelle Konversations-Erstellung (Teilnehmer-Eingabe)
+- **User-Suche** — Bestehender `/api/v1/users/search?q=...` Endpoint + Autocomplete-Pattern aus `VaultSharing.tsx` wiederverwendbar
+
+### i18n-Integration
+
+Neuer Übersetzungs-Namespace `chat.*` in `frontend/src/i18n/de.ts` und `en.ts`:
+
+```typescript
+chat: {
+  title: 'Chat',
+  newConversation: 'Neue Konversation',
+  noConversations: 'Noch keine Konversationen',
+  noMessages: 'Noch keine Nachrichten',
+  sendPlaceholder: 'Nachricht schreiben…',
+  send: 'Senden',
+  participants: 'Teilnehmer',
+  addParticipant: 'Teilnehmer hinzufügen',
+  rateLimited: 'Zu viele Nachrichten. Bitte {seconds} Sekunden warten.',
+  messageTooLong: 'Nachricht zu lang (max. 4000 Zeichen)',
+  messageEmpty: 'Nachricht darf nicht leer sein',
+  conversationCreated: 'Konversation erstellt',
+  errorSending: 'Nachricht konnte nicht gesendet werden',
+  errorLoading: 'Konversationen konnten nicht geladen werden',
+  participantNotFound: 'Benutzer nicht gefunden: {username}',
+  participantSuspended: 'Benutzer ist gesperrt: {username}',
+  tooManyParticipants: 'Maximal 50 Teilnehmer erlaubt',
+  tooFewParticipants: 'Mindestens ein weiterer Teilnehmer nötig',
+}
+```
+
+### ChatProvider-Einordnung in Provider-Hierarchie
+
+```
+AuthProvider → I18nBridge → I18nProvider → AuthGuard → AppProvider → TabProvider → ChatProvider → App
+```
+
+Der `ChatProvider` wird innerhalb der authentifizierten App eingebunden (nach `TabProvider`), da Chat nur für eingeloggte Benutzer verfügbar ist. Er ist optional — wird nur gemountet wenn der Chat-Bereich aktiv ist (Lazy Loading möglich).
 
 ## Data Models
 
@@ -449,6 +540,22 @@ Alle Fehler folgen dem Standard-API-Format: `{ code: string, message: string, ti
 - **Korrupte Konversationsdatei beim Start**: Überspringen, Fehler loggen, andere Konversationen normal laden
 - **Korrupte JSONL-Zeile**: Zeile überspringen, Warnung loggen, restliche Nachrichten normal laden
 - **Fehlender Chat-Datenordner**: Automatisch erstellen beim ersten Zugriff
+
+## Frontend-Integration
+
+### Navigation zum Chat
+
+- Chat wird als Settings-Tab geöffnet (wie Profil, Sitzungen, Admin-Seiten)
+- Toolbar-Button mit `MessageCircle`-Icon (Lucide) in der `SidebarToolbar`
+- Button ist für alle authentifizierten Benutzer sichtbar (nicht nur Admins)
+- Badge mit Ungelesen-Zähler ist als optionale Erweiterung (Req. 15) vorgesehen, initial ohne Badge
+
+### Participants-Auflösung
+
+- `ConversationListItem.participants` enthält User-IDs
+- Frontend löst User-IDs zu Anzeigenamen auf via bestehenden `/api/v1/users/search` oder einen neuen Batch-Endpoint
+- Alternativ: Backend liefert `participantNames: string[]` direkt mit (einfacher, aber denormalisiert)
+- **Entscheidung**: Backend liefert `participantNames` mit — vermeidet N+1-Requests im Frontend und ist konsistent mit `ownerName` bei Vaults
 
 ## Testing Strategy
 

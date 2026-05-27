@@ -1,4 +1,4 @@
-import type { VaultInfo, DirectoryTree, FileContent, FileSaveResult, AppError } from '../types'
+import type { VaultInfo, DirectoryTree, FileContent, FileSaveResult, AppError, Conversation, PaginatedConversations, PaginatedMessages, Message } from '../types'
 import type { PublicUserInfo } from '../state/authState'
 
 /**
@@ -89,6 +89,20 @@ export interface IApiClient {
 
   // --- User search ---
   searchUsers(query: string): Promise<UserSearchResult[]>
+
+  // --- Chat methods ---
+  /** Create a new conversation with the given participant user IDs. */
+  createConversation(participantIds: string[]): Promise<Conversation>
+  /** List the current user's conversations (paginated). */
+  listConversations(page?: number): Promise<PaginatedConversations>
+  /** Get messages for a conversation (paginated). */
+  getMessages(conversationId: string, page?: number): Promise<PaginatedMessages>
+  /** Send a message to a conversation. */
+  sendMessage(conversationId: string, content: string): Promise<Message>
+  /** Leave a conversation (removes the current user from participants). */
+  leaveConversation(conversationId: string): Promise<void>
+  /** Get total unread count across all conversations for the current user. */
+  getUnreadTotal(): Promise<{ total: number }>
 }
 
 /**
@@ -272,6 +286,40 @@ export class ApiClient implements IApiClient {
   async searchUsers(query: string): Promise<UserSearchResult[]> {
     const encoded = encodeURIComponent(query)
     return this.request<UserSearchResult[]>('GET', `/api/v1/users/search?q=${encoded}`)
+  }
+
+  // --- Chat methods ---
+
+  /** Create a new conversation with the given participant user IDs. */
+  async createConversation(participantIds: string[]): Promise<Conversation> {
+    return this.request<Conversation>('POST', '/api/v1/chat/conversations', { participants: participantIds })
+  }
+
+  /** List the current user's conversations (paginated). */
+  async listConversations(page?: number): Promise<PaginatedConversations> {
+    const query = page !== undefined ? `?page=${page}` : ''
+    return this.request<PaginatedConversations>('GET', `/api/v1/chat/conversations${query}`)
+  }
+
+  /** Get messages for a conversation (paginated). */
+  async getMessages(conversationId: string, page?: number): Promise<PaginatedMessages> {
+    const query = page !== undefined ? `?page=${page}` : ''
+    return this.request<PaginatedMessages>('GET', `/api/v1/chat/conversations/${conversationId}/messages${query}`)
+  }
+
+  /** Send a message to a conversation. */
+  async sendMessage(conversationId: string, content: string): Promise<Message> {
+    return this.request<Message>('POST', `/api/v1/chat/conversations/${conversationId}/messages`, { content })
+  }
+
+  /** Leave a conversation (removes the current user from participants). */
+  async leaveConversation(conversationId: string): Promise<void> {
+    await this.request<void>('DELETE', `/api/v1/chat/conversations/${conversationId}/participants/me`)
+  }
+
+  /** Get total unread count across all conversations for the current user. */
+  async getUnreadTotal(): Promise<{ total: number }> {
+    return this.request<{ total: number }>('GET', '/api/v1/chat/unread/total')
   }
 
   // --- Internal helpers ---

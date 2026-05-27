@@ -74,6 +74,52 @@ export interface AppState {
   error: AppError | null
 }
 
+/** Chat conversation metadata. */
+export interface Conversation {
+  id: string
+  participants: string[]
+  createdAt: string
+  createdBy: string
+}
+
+/** A single chat message. */
+export interface Message {
+  id: string
+  conversationId: string
+  senderId: string
+  content: string
+  timestamp: string
+}
+
+/** Conversation list item with resolved names and last message preview. */
+export interface ConversationListItem {
+  id: string
+  participants: string[]
+  participantNames: string[]
+  lastMessageTimestamp: string | null
+  lastMessagePreview: string | null
+  unreadCount: number
+  archived?: boolean
+}
+
+/** Paginated messages response. */
+export interface PaginatedMessages {
+  messages: Message[]
+  total: number
+  page: number
+  pageSize: number
+  hasMore: boolean
+}
+
+/** Paginated conversations response. */
+export interface PaginatedConversations {
+  conversations: ConversationListItem[]
+  total: number
+  page: number
+  pageSize: number
+  hasMore: boolean
+}
+
 /** Discriminated union of all actions dispatched to the app reducer. */
 export type AppAction =
   | { type: 'VAULTS_LOADED'; payload: VaultInfo[] }

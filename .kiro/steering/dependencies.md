@@ -37,7 +37,8 @@
 - **jszip** — Client-seitiges ZIP-Erstellen (Vault-Export-Fallback für Firefox)
 
 ### Shared (devDependencies)
-- **fast-check** — Property-Based Testing (universelle Invarianten verifizieren)
+- **fast-check** — Property-Based Testing (universelle Invarianten verifizieren, Reducer-Korrektheit)
+- **vitest** — Test-Runner (beide Packages)
 
 ## Was NICHT eingeführt werden soll
 

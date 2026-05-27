@@ -23,6 +23,8 @@ import { createAuthMiddleware, createCsrfMiddleware, createRateLimitMiddleware, 
 import { RateLimiter } from './auth/ratelimit.js'
 import { UserRepository, UserService, RoleService, ensureDefaultAdmin } from './user/index.js'
 import { AuditLogger, AuditService } from './audit/index.js'
+import { ConversationStore, MessageStore, ChatRateLimiter, ChatService, UnreadStore } from './chat/index.js'
+import { ChatController, ChatRouteModule } from './api/chatRoutes.js'
 
 // --- Composition Root ---
 
@@ -57,6 +59,15 @@ const roleService = new RoleService(userRepository, sessionStore, logger, auditS
 
 const vaultAccessControl = new VaultAccessControlService(vaultRegistry, vaultShareRegistry, userRepository, logger, auditService)
 
+// 3b. Chat Data Layer
+const conversationStore = new ConversationStore(serverConfig.dataDir, logger)
+const messageStore = new MessageStore(serverConfig.dataDir, logger)
+const unreadStore = new UnreadStore(serverConfig.dataDir, logger)
+
+// 3c. Chat Business Layer
+const chatRateLimiter = new ChatRateLimiter()
+const chatService = new ChatService(conversationStore, messageStore, unreadStore, userRepository, logger)
+
 // 4. VaultService (extend existing vault setup with share registry and user repository)
 const vaultService = new VaultService(vaultManager, vaultReader, config, logger, vaultRegistry, vaultShareRegistry, userRepository, auditService)
 const importService = new ImportService(vaultManager, vaultReader, config, logger)
@@ -65,6 +76,7 @@ const importService = new ImportService(vaultManager, vaultReader, config, logge
 const vaultController = new VaultController(vaultService, logger, importService, userRepository, vaultAccessControl)
 const authController = new AuthController(authService, logger)
 const userController = new UserController(userService, logger)
+const chatController = new ChatController(chatService, chatRateLimiter, logger, userRepository)
 
 // 6. Route Modules
 const routeModules = [
@@ -80,6 +92,7 @@ const routeModules = [
     logger,
   }),
   new VaultShareRouteModule(vaultAccessControl, vaultService, vaultRegistry, logger, vaultShareRegistry, userRepository),
+  new ChatRouteModule(chatController),
 ]
 const router = createRouter(routeModules)
 
@@ -111,6 +124,12 @@ app.route('/api/v1', router)
 
 // Load session index from filesystem
 await sessionStore.loadIndex()
+
+// Load conversation index from filesystem
+await conversationStore.loadIndex()
+
+// Load unread index from filesystem
+await unreadStore.loadIndex()
 
 // Ensure default admin account exists
 await ensureDefaultAdmin(userRepository, logger)

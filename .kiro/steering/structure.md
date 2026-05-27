@@ -34,7 +34,19 @@ src/
 │   ├── index.ts          — VaultController, route modules, error mapping
 │   ├── authRoutes.ts     — AuthController + login/logout/session routes
 │   ├── userRoutes.ts     — UserController + profile/password routes
-│   └── adminRoutes.ts    — AdminController + user management/config routes
+│   ├── adminRoutes.ts    — AdminController + user management/config routes
+│   ├── chatRoutes.ts     — ChatController + conversation/message routes
+│   └── vaultShareRoutes.ts — ShareController + share/transfer routes
+├── chat/
+│   ├── types.ts          — Chat data models (Conversation, Message, etc.)
+│   ├── errors.ts         — Chat-specific error classes
+│   ├── validation.ts     — Zod schemas for chat input validation
+│   ├── index.ts          — ChatService (business logic)
+│   ├── conversation-store.ts — ConversationStore (filesystem persistence)
+│   ├── message-store.ts  — MessageStore (filesystem persistence)
+│   ├── unread-store.ts   — UnreadStore (per-user unread counts)
+│   ├── rate-limiter.ts   — ChatRateLimiter (in-memory)
+│   └── chat-service.ts   — ChatService orchestration
 ├── import/index.ts       — ImportService (file/folder import logic)
 └── integration.test.ts   — Integration tests
 config/
@@ -60,7 +72,10 @@ src/
 │   ├── authContext.ts    — AuthProvider + useAuthContext hook
 │   ├── tabState.ts       — Tab reducer + types
 │   ├── tabContext.ts     — TabProvider + useTabContext hook
-│   └── tabActions.ts     — openTab, saveTab action creators
+│   ├── tabActions.ts     — openTab, saveTab action creators
+│   ├── chatState.ts      — Chat reducer + types (conversations, messages, unread)
+│   ├── chatContext.ts    — ChatProvider + useChatContext hook
+│   └── chatActions.ts    — loadConversations, sendMessage, leaveConversation, etc.
 ├── components/
 │   ├── SlatebaseLogo.tsx — SVG logo component
 │   ├── SidebarToolbar.tsx — Draggable vertical toolbar
@@ -76,8 +91,13 @@ src/
 │   ├── ProfilePage.tsx   — User profile settings (card layout)
 │   ├── SessionsPage.tsx  — Session management
 │   ├── MyVaultsPage.tsx  — User vault overview with inline sharing + transfer + delete
-│   ├── VaultSharing.tsx  — Standalone vault share management (legacy, replaced by MyVaultsPage)
 │   ├── VaultDeletionWorkflow.tsx — Guided vault deletion
+│   ├── ChatPage.tsx      — Chat page (two-panel: conversation list + messages)
+│   ├── ConversationList.tsx — Conversation list with leave/archive indicators
+│   ├── MessageView.tsx   — Message display with pagination
+│   ├── MessageInput.tsx  — Message input with validation + rate limit handling
+│   ├── NewConversation.tsx — Create conversation dialog with user search
+│   ├── ConfirmModal.tsx  — Reusable confirmation modal
 │   ├── AdminUsersPage.tsx — User administration
 │   ├── AdminVaultsPage.tsx — Admin: all vaults overview with delete
 │   ├── AdminConfigPage.tsx — Server configuration (card-based layout)
@@ -137,6 +157,18 @@ All routes are prefixed with `/api/v1`:
 | PUT | /vaults/:vaultId/shares/:userId | Update permission (owner) |
 | POST | /vaults/:vaultId/transfer | Transfer ownership (owner) |
 
+### Chat
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | /chat/conversations | List user's conversations (paginated) |
+| POST | /chat/conversations | Create a new conversation |
+| POST | /chat/conversations/:conversationId/leave | Leave a conversation |
+| GET | /chat/conversations/:conversationId/messages | Get messages (paginated) |
+| POST | /chat/conversations/:conversationId/messages | Send a message |
+| GET | /chat/unread | Get global unread count |
+| POST | /chat/conversations/:conversationId/read | Mark conversation as read |
+
 ## Data Storage
 
 Vaults are stored on disk under `backend/data/vaults/<vaultId>/`. The vault registry (`data/vaults.json`) maps vault IDs to names and storage paths. No database — all persistence is filesystem-based.
@@ -159,3 +191,20 @@ data/
 - **Sessions**: One JSON file per session. In-memory `Map<token, sessionId>` for fast validation, filesystem as source of truth.
 - **Shares**: Single JSON file with all vault share entries. Atomic writes.
 - **Audit**: Append-only JSONL files rotated daily. Never overwritten or deleted.
+
+### Chat Data
+
+```
+data/chat/
+├── conversations/
+│   ├── _index.json           — Conversation index (fast lookup)
+│   └── <conversationId>.json — Individual conversation records
+├── messages/
+│   └── <conversationId>/     — Messages per conversation (paginated JSON files)
+└── unread/
+    └── <userId>.json         — Per-user unread counts per conversation
+```
+
+- **Conversations**: One JSON file per conversation. Index file for listing.
+- **Messages**: Stored per conversation in paginated chunks.
+- **Unread**: Per-user JSON tracking unread counts per conversation.

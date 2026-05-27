@@ -27,7 +27,7 @@ Config → Logger → Vault (Data Access) → Business → API (Controller)
 
 ### Frontend (React + useReducer)
 
-- Separate reducers for separate concerns (`appReducer`, `tabReducer`)
+- Separate reducers for separate concerns (`appReducer`, `tabReducer`, `chatReducer`)
 - Action creators are standalone async functions (not hooks)
 - `IApiClient` interface with fetch implementation
 - Relative URLs — Vite proxy forwards `/api` to the backend

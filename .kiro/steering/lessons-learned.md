@@ -594,3 +594,38 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - `test-setup.ts` matcht NICHT auf `*.test.ts` Pattern
 - Muss explizit in `tsconfig.app.json` exclude aufgenommen werden: `"src/test-setup.ts"`
 - Sonst: `Cannot find name 'beforeEach'` weil Test-Runner-Typen im App-Build nicht verfügbar sind
+
+
+## Chat-System
+
+### chatReducer: State-Konsistenz bei Konversations-Aktionen
+- `CONVERSATION_LEFT` muss `currentConversation` auf `null` und `messages` auf `[]` setzen, wenn die verlassene Konversation die aktuell angezeigte ist
+- Sonst bleibt der Chat-Inhalt sichtbar obwohl die Konversation nicht mehr existiert
+- **Regel:** Bei jeder Aktion die eine Konversation entfernt prüfen ob sie die aktuelle ist
+
+### Konversationsliste braucht aktive Aktualisierung
+- Einmaliges Laden beim Mount reicht nicht — Server-Änderungen (neue Nachrichten, Archivierung) werden nicht reflektiert
+- Lösung: Dreifacher Mechanismus:
+  1. **Optimistisches lokales Update** bei `MESSAGE_SENT` (Preview, Timestamp, Sortierung)
+  2. **Periodischer Refresh** alle 30 Sekunden via `setInterval`
+  3. **Visibility-Change-Handler** für sofortigen Refresh bei Tab-Fokus
+- Cleanup bei Unmount: `clearInterval` + `removeEventListener` (Memory Leaks verhindern)
+- **Regel:** Langlebige Seiten mit Server-Daten brauchen immer einen Refresh-Mechanismus
+
+### MESSAGE_SENT muss Konversationsliste aktualisieren
+- Der Reducer muss bei `MESSAGE_SENT` nicht nur `messages` erweitern, sondern auch:
+  - `lastMessagePreview` auf `content.slice(0, 100) + '…'` setzen (wenn > 100 Zeichen)
+  - `lastMessageTimestamp` auf den Nachrichten-Timestamp setzen
+  - Die Konversation an Index 0 verschieben (neueste zuerst)
+- Wenn keine passende Konversation gefunden wird: graceful ignorieren (kein Crash)
+
+### ChatProvider-Hierarchie
+- `ChatProvider` sitzt in `App.tsx` (nicht in `ChatPage`) damit `SidebarToolbar` auf `globalUnreadCount` zugreifen kann
+- `ChatPage` nutzt `useChatContext()` direkt ohne eigenen Provider
+- 30s-Polling für `globalUnreadCount` läuft im `ChatProvider` (nicht in App.tsx)
+
+### Property-Based Testing für Reducer
+- `chatReducer` ist eine pure Funktion → ideal für PBT ohne Mocking
+- `fast-check` generiert beliebige State + Action Kombinationen
+- Preservation-Tests: Verhalten für alle Nicht-Bug-Actions muss identisch bleiben nach einem Fix
+- Bug-Condition-Tests: Schreiben VOR dem Fix, erwarten Failure → nach Fix erwarten sie Pass
