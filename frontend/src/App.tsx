@@ -4,6 +4,7 @@ import { ApiClient } from './api'
 import { AuthProvider, useAuthContext } from './state/authContext'
 import { TabProvider, useTabContext } from './state/tabContext'
 import { I18nProvider, useTranslation } from './i18n'
+import { ToastProvider } from './components/Toast'
 import { VaultList } from './components/VaultList'
 import { FileExplorer } from './components/FileExplorer'
 import { TabContent } from './components/TabContent'
@@ -638,7 +639,9 @@ function I18nBridge({ children }: { children: React.ReactNode }) {
 
   return (
     <I18nProvider userLocale={userLocale}>
-      {children}
+      <ToastProvider>
+        {children}
+      </ToastProvider>
     </I18nProvider>
   )
 }

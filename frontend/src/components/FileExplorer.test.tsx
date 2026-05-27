@@ -320,7 +320,6 @@ describe('FileExplorer', () => {
 
     it('shows confirmation dialog on delete click via context menu', async () => {
       const user = userEvent.setup()
-      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
       const mockApiClient = createMockApiClient()
 
       renderFileExplorer(
@@ -336,13 +335,13 @@ describe('FileExplorer', () => {
       const deleteOption = screen.getByText('Löschen')
       await user.click(deleteOption)
 
-      expect(confirmSpy).toHaveBeenCalled()
-      confirmSpy.mockRestore()
+      // ConfirmModal should be visible
+      expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+      expect(screen.getByText(/readme\.md/)).toBeInTheDocument()
     })
 
     it('calls deleteContent when deletion is confirmed via context menu', async () => {
       const user = userEvent.setup()
-      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
       const mockApiClient = createMockApiClient({
         fetchVaultTree: vi.fn().mockResolvedValue({ name: 'root', type: 'directory', path: '', children: [] }),
         deleteContent: vi.fn().mockResolvedValue(undefined),
@@ -360,13 +359,15 @@ describe('FileExplorer', () => {
       const deleteOption = screen.getByText('Löschen')
       await user.click(deleteOption)
 
+      // Confirm in the modal
+      const confirmBtn = screen.getByRole('button', { name: 'Löschen' })
+      await user.click(confirmBtn)
+
       expect(mockApiClient.deleteContent).toHaveBeenCalledWith('vault-123', 'readme.md')
-      confirmSpy.mockRestore()
     })
 
     it('does not call deleteContent when deletion is cancelled via context menu', async () => {
       const user = userEvent.setup()
-      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
       const mockApiClient = createMockApiClient()
       renderFileExplorer(
         { directoryTree: sampleTree, selectedVaultId: 'vault-123', vaults: vaultsWithPermission },
@@ -381,8 +382,11 @@ describe('FileExplorer', () => {
       const deleteOption = screen.getByText('Löschen')
       await user.click(deleteOption)
 
+      // Cancel in the modal
+      const cancelBtn = screen.getByRole('button', { name: 'Abbrechen' })
+      await user.click(cancelBtn)
+
       expect(mockApiClient.deleteContent).not.toHaveBeenCalled()
-      confirmSpy.mockRestore()
     })
   })
 

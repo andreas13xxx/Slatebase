@@ -2,6 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react'
 import type { IApiClient } from '../api'
 import { useTranslation } from '../i18n'
 import { Settings, RefreshCw, Save, AlertTriangle } from 'lucide-react'
+import { ConfirmModal } from './ConfirmModal'
 
 /**
  * Shape of the server configuration returned by GET /api/v1/admin/config.
@@ -57,6 +58,7 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [isRestarting, setIsRestarting] = useState(false)
+  const [restartConfirmOpen, setRestartConfirmOpen] = useState(false)
   const [restartMessage, setRestartMessage] = useState<string | null>(null)
   const [restartError, setRestartError] = useState<string | null>(null)
 
@@ -152,7 +154,11 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
   }
 
   async function handleRestart(): Promise<void> {
-    if (!window.confirm(t('admin.config.restartConfirm'))) return
+    setRestartConfirmOpen(true)
+  }
+
+  async function handleRestartConfirmed(): Promise<void> {
+    setRestartConfirmOpen(false)
     setRestartMessage(null)
     setRestartError(null)
     setIsRestarting(true)
@@ -301,6 +307,17 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
           {isRestarting ? t('admin.config.restarting') : t('admin.config.restart')}
         </button>
       </section>
+
+      {/* Restart Confirmation Modal */}
+      <ConfirmModal
+        open={restartConfirmOpen}
+        title={t('admin.config.restart')}
+        message={t('admin.config.restartConfirm')}
+        confirmLabel={t('admin.config.restart')}
+        variant="danger"
+        onConfirm={handleRestartConfirmed}
+        onCancel={() => setRestartConfirmOpen(false)}
+      />
     </div>
   )
 }

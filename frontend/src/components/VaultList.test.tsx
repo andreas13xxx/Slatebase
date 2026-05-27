@@ -188,7 +188,6 @@ describe('VaultList (Dropdown)', () => {
   it('calls deleteVault API after confirmation', async () => {
     const user = userEvent.setup()
     const mockDeleteVault = vi.fn().mockResolvedValue(undefined)
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
 
     const { dispatch } = renderVaultList(
       { vaults: [{ id: 'v1', name: 'To Delete' }] },
@@ -198,7 +197,13 @@ describe('VaultList (Dropdown)', () => {
     await user.click(screen.getByRole('button', { name: 'Vault auswählen' }))
     await user.click(screen.getByRole('button', { name: /Vault "To Delete" löschen/ }))
 
-    expect(window.confirm).toHaveBeenCalled()
+    // ConfirmModal should be visible
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+    expect(screen.getByText(/Vault "To Delete" wirklich löschen/)).toBeInTheDocument()
+
+    // Click confirm button in the modal
+    await user.click(screen.getByRole('button', { name: 'Löschen' }))
+
     expect(mockDeleteVault).toHaveBeenCalledWith('v1')
     expect(dispatch).toHaveBeenCalledWith({ type: 'LOADING_STARTED' })
   })
@@ -206,7 +211,6 @@ describe('VaultList (Dropdown)', () => {
   it('does not call deleteVault when confirmation is cancelled', async () => {
     const user = userEvent.setup()
     const mockDeleteVault = vi.fn().mockResolvedValue(undefined)
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
 
     renderVaultList(
       { vaults: [{ id: 'v1', name: 'Keep Me' }] },
@@ -216,7 +220,12 @@ describe('VaultList (Dropdown)', () => {
     await user.click(screen.getByRole('button', { name: 'Vault auswählen' }))
     await user.click(screen.getByRole('button', { name: /Vault "Keep Me" löschen/ }))
 
-    expect(window.confirm).toHaveBeenCalled()
+    // ConfirmModal should be visible
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+
+    // Click cancel button in the modal
+    await user.click(screen.getByRole('button', { name: 'Abbrechen' }))
+
     expect(mockDeleteVault).not.toHaveBeenCalled()
   })
 })

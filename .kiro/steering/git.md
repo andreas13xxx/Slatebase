@@ -16,6 +16,16 @@ git config user.email "gewuenschte@email.de"
 
 Außerdem vor dem Commit prüfen, ob alle Dateien, die nicht in ein Commit gehören ausgeschlossen sind und es entsprechende Regeln in .gitignore gibt.
 
+## Vor jedem Push
+
+**WICHTIG:** Vor dem Ausführen von `git push` MUSS geprüft werden, ob es noch ungestagte oder nicht-committete Änderungen gibt:
+
+1. `git status` ausführen
+2. Falls ungestagte Änderungen vorhanden sind: Den Nutzer darauf hinweisen und fragen, ob diese noch committet werden sollen oder ob sie bewusst zurückgelassen werden
+3. Erst nach Bestätigung den Push ausführen
+
+Dies verhindert, dass versehentlich unvollständige Arbeit gepusht wird, während lokale Änderungen vergessen werden.
+
 ## Branching
 
 - Niemals direkt auf `main` pushen

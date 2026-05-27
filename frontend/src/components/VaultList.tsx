@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useAppContext, createVault, deleteVault } from '../state'
 import { useTranslation } from '../i18n'
 import { ChevronDown, ChevronUp, Plus, Trash2, Database, Eye, Pencil } from 'lucide-react'
+import { ConfirmModal } from './ConfirmModal'
 
 /**
  * Maximum vault name length as defined in the spec.
@@ -20,6 +21,9 @@ export function VaultList() {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [newVaultName, setNewVaultName] = useState('')
   const [validationError, setValidationError] = useState<string | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; vaultId: string; vaultName: string }>({
+    open: false, vaultId: '', vaultName: '',
+  })
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const selectedVault = state.vaults.find((v) => v.id === state.selectedVaultId)
@@ -81,12 +85,13 @@ export function VaultList() {
 
   async function handleDelete(e: React.MouseEvent, vaultId: string, vaultName: string) {
     e.stopPropagation()
-    const confirmed = window.confirm(
-      t('vault.deleteConfirm', { name: vaultName }),
-    )
-    if (!confirmed) return
-    if (!apiClient) return
+    setDeleteConfirm({ open: true, vaultId, vaultName })
+  }
 
+  async function handleDeleteConfirmed() {
+    const { vaultId } = deleteConfirm
+    setDeleteConfirm({ open: false, vaultId: '', vaultName: '' })
+    if (!apiClient) return
     await deleteVault(dispatch, apiClient, vaultId)
   }
 
@@ -199,6 +204,17 @@ export function VaultList() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        open={deleteConfirm.open}
+        title={t('vault.deleteVault')}
+        message={t('vault.deleteConfirm', { name: deleteConfirm.vaultName })}
+        confirmLabel={t('common.delete')}
+        variant="danger"
+        onConfirm={handleDeleteConfirmed}
+        onCancel={() => setDeleteConfirm({ open: false, vaultId: '', vaultName: '' })}
+      />
     </div>
   )
 }

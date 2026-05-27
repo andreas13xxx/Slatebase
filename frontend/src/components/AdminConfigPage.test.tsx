@@ -247,7 +247,6 @@ describe('AdminConfigPage', () => {
     fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify(SAMPLE_CONFIG), { status: 200 }))
     const apiClient = createMockApiClient()
     const user = userEvent.setup()
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
 
     render(React.createElement(AdminConfigPage, { apiClient }))
 
@@ -257,8 +256,12 @@ describe('AdminConfigPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Server neustarten' }))
 
-    expect(confirmSpy).toHaveBeenCalledWith('Server wirklich neustarten? Alle aktiven Verbindungen werden unterbrochen.')
-    // Should not have made a POST request since user cancelled
+    // ConfirmModal should be visible
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+    expect(screen.getByText('Server wirklich neustarten? Alle aktiven Verbindungen werden unterbrochen.')).toBeInTheDocument()
+
+    // Cancel — should not have made a POST request
+    await user.click(screen.getByRole('button', { name: 'Abbrechen' }))
     expect(fetchSpy).toHaveBeenCalledTimes(1) // only the initial GET
   })
 
@@ -268,7 +271,6 @@ describe('AdminConfigPage', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ message: 'Restart initiated' }), { status: 202 }))
     const apiClient = createMockApiClient()
     const user = userEvent.setup()
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
 
     render(React.createElement(AdminConfigPage, { apiClient }))
 
@@ -277,6 +279,11 @@ describe('AdminConfigPage', () => {
     })
 
     await user.click(screen.getByRole('button', { name: 'Server neustarten' }))
+
+    // Confirm in the modal
+    const confirmBtns = screen.getAllByRole('button', { name: 'Server neustarten' })
+    const modalConfirmBtn = confirmBtns[confirmBtns.length - 1]!
+    await user.click(modalConfirmBtn)
 
     await waitFor(() => {
       expect(fetchSpy).toHaveBeenCalledWith('/api/v1/admin/restart', expect.objectContaining({
@@ -291,7 +298,6 @@ describe('AdminConfigPage', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ message: 'Restart initiated' }), { status: 202 }))
     const apiClient = createMockApiClient()
     const user = userEvent.setup()
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
 
     render(React.createElement(AdminConfigPage, { apiClient }))
 
@@ -300,6 +306,11 @@ describe('AdminConfigPage', () => {
     })
 
     await user.click(screen.getByRole('button', { name: 'Server neustarten' }))
+
+    // Confirm in the modal
+    const confirmBtns = screen.getAllByRole('button', { name: 'Server neustarten' })
+    const modalConfirmBtn = confirmBtns[confirmBtns.length - 1]!
+    await user.click(modalConfirmBtn)
 
     await waitFor(() => {
       expect(screen.getByText('Server wird neu gestartet…')).toBeInTheDocument()

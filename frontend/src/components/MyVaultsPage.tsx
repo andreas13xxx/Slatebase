@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react'
 import { useAppContext, loadVaults, deleteVault, exportVault } from '../state'
+import { useTranslation } from '../i18n'
 import type { IApiClient, UserSearchResult } from '../api'
 import type { VaultInfo } from '../types'
 import { Database, Eye, Pencil, Crown, Trash2, Share2, RefreshCw, X, ArrowRightLeft, Download } from 'lucide-react'
+import { ConfirmModal } from './ConfirmModal'
 
 interface ShareInfo {
   userId: string
@@ -25,10 +27,14 @@ const SEARCH_DEBOUNCE_MS = 300
  */
 export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
   const { state, dispatch } = useAppContext()
+  const { t } = useTranslation()
   const [sharesMap, setSharesMap] = useState<Map<string, ShareInfo[]>>(new Map())
   const [expandedVault, setExpandedVault] = useState<string | null>(null)
   const [transferVault, setTransferVault] = useState<string | null>(null)
   const [vaultStats, setVaultStats] = useState<Map<string, { fileCount: number; sizeBytes: number }>>(new Map())
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; vault: VaultInfo | null }>({
+    open: false, vault: null,
+  })
 
   const ownedVaults = state.vaults.filter((v) => v.permission === 'owner')
   const sharedVaults = state.vaults.filter((v) => v.permission === 'read' || v.permission === 'write')
@@ -83,12 +89,13 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
   useEffect(() => { void loadStats() }, [loadStats])
 
   async function handleDelete(vault: VaultInfo): Promise<void> {
-    const shares = sharesMap.get(vault.id) ?? []
-    let msg = `Vault "${vault.name}" wirklich löschen? Alle Dateien werden unwiderruflich entfernt.`
-    if (shares.length > 0) {
-      msg = `⚠️ Dieser Vault ist mit ${shares.length} ${shares.length === 1 ? 'Person' : 'Personen'} geteilt.\n\n${msg}`
-    }
-    if (!window.confirm(msg)) return
+    setDeleteConfirm({ open: true, vault })
+  }
+
+  async function handleDeleteConfirmed(): Promise<void> {
+    const vault = deleteConfirm.vault
+    setDeleteConfirm({ open: false, vault: null })
+    if (!vault) return
     await deleteVault(dispatch, apiClient, vault.id)
   }
 
@@ -319,6 +326,26 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
           </ul>
         )}
       </section>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        open={deleteConfirm.open}
+        title={t('vault.deleteVault')}
+        message={(() => {
+          const vault = deleteConfirm.vault
+          if (!vault) return ''
+          const shares = sharesMap.get(vault.id) ?? []
+          let msg = t('vault.deleteConfirm', { name: vault.name })
+          if (shares.length > 0) {
+            msg = `⚠️ Dieser Vault ist mit ${shares.length} ${shares.length === 1 ? 'Person' : 'Personen'} geteilt.\n\n${msg}`
+          }
+          return msg
+        })()}
+        confirmLabel={t('common.delete')}
+        variant="danger"
+        onConfirm={handleDeleteConfirmed}
+        onCancel={() => setDeleteConfirm({ open: false, vault: null })}
+      />
     </div>
   )
 }

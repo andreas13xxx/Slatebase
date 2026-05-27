@@ -3,6 +3,7 @@ import type { IApiClient } from '../api'
 import type { VaultInfo } from '../types'
 import { useTranslation } from '../i18n'
 import { Server, RefreshCw, Users, FileText, HardDrive, Trash2 } from 'lucide-react'
+import { ConfirmModal } from './ConfirmModal'
 
 interface VaultAdminEntry extends VaultInfo {
   fileCount?: number
@@ -31,6 +32,9 @@ export function AdminVaultsPage({ apiClient }: AdminVaultsPageProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; vaultId: string; vaultName: string }>({
+    open: false, vaultId: '', vaultName: '',
+  })
 
   const loadVaults = useCallback(async () => {
     setLoading(true)
@@ -76,7 +80,12 @@ export function AdminVaultsPage({ apiClient }: AdminVaultsPageProps) {
   useEffect(() => { void loadVaults() }, [loadVaults])
 
   async function handleDelete(vaultId: string, vaultName: string): Promise<void> {
-    if (!window.confirm(t('admin.vaults.deleteConfirm', { name: vaultName }))) return
+    setDeleteConfirm({ open: true, vaultId, vaultName })
+  }
+
+  async function handleDeleteConfirmed(): Promise<void> {
+    const { vaultId, vaultName } = deleteConfirm
+    setDeleteConfirm({ open: false, vaultId: '', vaultName: '' })
     try {
       await apiClient.deleteVault(vaultId)
       setMessage({ type: 'success', text: t('admin.vaults.deleteSuccess', { name: vaultName }) })
@@ -153,6 +162,17 @@ export function AdminVaultsPage({ apiClient }: AdminVaultsPageProps) {
           </table>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        open={deleteConfirm.open}
+        title={t('admin.vaults.deleteTitle', { name: deleteConfirm.vaultName })}
+        message={t('admin.vaults.deleteConfirm', { name: deleteConfirm.vaultName })}
+        confirmLabel={t('common.delete')}
+        variant="danger"
+        onConfirm={handleDeleteConfirmed}
+        onCancel={() => setDeleteConfirm({ open: false, vaultId: '', vaultName: '' })}
+      />
     </div>
   )
 }

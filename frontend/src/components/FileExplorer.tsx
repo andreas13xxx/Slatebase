@@ -9,6 +9,8 @@ import { getFileIcon, getFileIconClass, getDisplayName } from '../utils/fileIcon
 import { getValidDropTargets } from '../utils/pathUtils'
 import { ContextMenu } from './ContextMenu'
 import { InlineInput } from './InlineInput'
+import { ConfirmModal } from './ConfirmModal'
+import { useToast } from './Toast'
 import { validateFileName, normalizeFileName, getSelectionRange } from '../utils/fileValidation'
 
 /**
@@ -254,6 +256,7 @@ export function FileExplorer({ onRegisterCreateFile }: FileExplorerProps = {}) {
   const { state, dispatch, apiClient } = useAppContext()
   const { tabDispatch } = useTabContext()
   const { t } = useTranslation()
+  const { showToast } = useToast()
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
   const [dragState, setDragState] = useState<DragState>({
     draggedPath: null,
@@ -270,6 +273,10 @@ export function FileExplorer({ onRegisterCreateFile }: FileExplorerProps = {}) {
     visible: false,
     mode: 'newFile',
     parentPath: '',
+    node: null,
+  })
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; node: DirectoryTree | null }>({
+    open: false,
     node: null,
   })
 
@@ -354,13 +361,13 @@ export function FileExplorer({ onRegisterCreateFile }: FileExplorerProps = {}) {
 
   function handleDelete(node: DirectoryTree) {
     if (!vaultId || !apiClient) return
+    setDeleteConfirm({ open: true, node })
+  }
 
-    const message = node.type === 'directory'
-      ? t('fileOps.deleteConfirmFolder', { name: node.name })
-      : t('fileOps.deleteConfirmMessage', { name: node.name })
-
-    const confirmed = window.confirm(message)
-    if (!confirmed) return
+  function handleDeleteConfirmed() {
+    const node = deleteConfirm.node
+    setDeleteConfirm({ open: false, node: null })
+    if (!node || !vaultId || !apiClient) return
 
     // Call delete API
     apiClient.deleteContent(vaultId, node.path).then(async () => {
@@ -377,8 +384,12 @@ export function FileExplorer({ onRegisterCreateFile }: FileExplorerProps = {}) {
       const message = err !== null && typeof err === 'object' && 'message' in err
         ? (err as { message: string }).message
         : t('fileOps.deleteError')
-      window.alert(message)
+      showToast(message, 'error')
     })
+  }
+
+  function handleDeleteCancelled() {
+    setDeleteConfirm({ open: false, node: null })
   }
 
   // --- Inline Input Handlers ---
@@ -412,7 +423,7 @@ export function FileExplorer({ onRegisterCreateFile }: FileExplorerProps = {}) {
         const msg = err !== null && typeof err === 'object' && 'message' in err
           ? (err as { message: string }).message
           : t('fileOps.createError')
-        window.alert(msg)
+        showToast(msg, 'error')
       }
     } else if (inlineInputState.mode === 'rename') {
       // Rename flow
@@ -468,7 +479,7 @@ export function FileExplorer({ onRegisterCreateFile }: FileExplorerProps = {}) {
         const msg = err !== null && typeof err === 'object' && 'message' in err
           ? (err as { message: string }).message
           : t('fileOps.renameError')
-        window.alert(msg)
+        showToast(msg, 'error')
       }
     }
 
@@ -572,7 +583,7 @@ export function FileExplorer({ onRegisterCreateFile }: FileExplorerProps = {}) {
       const message = err !== null && typeof err === 'object' && 'message' in err
         ? (err as { message: string }).message
         : t('fileOps.moveError')
-      window.alert(message)
+      showToast(message, 'error')
     } finally {
       setDragState({
         draggedPath: null,
@@ -689,6 +700,21 @@ export function FileExplorer({ onRegisterCreateFile }: FileExplorerProps = {}) {
           onDelete={handleDelete}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        open={deleteConfirm.open}
+        title={t('fileOps.deleteConfirmTitle')}
+        message={
+          deleteConfirm.node?.type === 'directory'
+            ? t('fileOps.deleteConfirmFolder', { name: deleteConfirm.node?.name ?? '' })
+            : t('fileOps.deleteConfirmMessage', { name: deleteConfirm.node?.name ?? '' })
+        }
+        confirmLabel={t('common.delete')}
+        variant="danger"
+        onConfirm={handleDeleteConfirmed}
+        onCancel={handleDeleteCancelled}
+      />
     </div>
   )
 }

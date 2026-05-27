@@ -2779,3 +2779,185 @@
   margin-top: 2px;
   line-height: 1.3;
 }
+
+/* ===== Confirm Modal ===== */
+.confirm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-overlay);
+  backdrop-filter: blur(2px);
+  animation: confirm-modal-fade-in var(--transition-fast) ease;
+}
+
+@keyframes confirm-modal-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.confirm-modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  padding: 24px;
+  max-width: 420px;
+  width: calc(100% - 32px);
+  animation: confirm-modal-scale-in var(--transition-base) ease;
+}
+
+@keyframes confirm-modal-scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.confirm-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.confirm-modal-icon--danger {
+  color: var(--danger-text);
+  display: flex;
+  align-items: center;
+}
+
+.confirm-modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.confirm-modal-message {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0 0 20px 0;
+  white-space: pre-line;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.confirm-modal-btn {
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.confirm-modal-btn--cancel {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.confirm-modal-btn--cancel:hover {
+  background: var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.confirm-modal-btn--danger {
+  background: var(--danger);
+  color: var(--text-inverse);
+}
+
+.confirm-modal-btn--danger:hover {
+  background: var(--danger-hover);
+}
+
+.confirm-modal-btn--primary {
+  background: var(--accent);
+  color: var(--text-inverse);
+}
+
+.confirm-modal-btn--primary:hover {
+  background: var(--accent-hover);
+}
+
+/* ===== Toast Notifications ===== */
+.toast-container {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 380px;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+  animation: toast-slide-in var(--transition-base) ease;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+@keyframes toast-slide-in {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.toast--error {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger-text);
+}
+
+.toast--success {
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  color: var(--success);
+}
+
+.toast--info {
+  background: var(--info-bg);
+  border: 1px solid var(--info-border);
+  color: var(--info-text);
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.toast-message {
+  flex: 1;
+  word-break: break-word;
+}
+
+.toast-dismiss {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  opacity: 0.6;
+  transition: opacity var(--transition-fast);
+}
+
+.toast-dismiss:hover {
+  opacity: 1;
+}
