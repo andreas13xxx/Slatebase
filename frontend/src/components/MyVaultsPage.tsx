@@ -5,6 +5,7 @@ import type { IApiClient, UserSearchResult } from '../api'
 import type { VaultInfo } from '../types'
 import { Database, Eye, Pencil, Crown, Trash2, Share2, RefreshCw, X, ArrowRightLeft, Download } from 'lucide-react'
 import { ConfirmModal } from './ConfirmModal'
+import { VaultDeletionWorkflow } from './VaultDeletionWorkflow'
 
 interface ShareInfo {
   userId: string
@@ -15,6 +16,7 @@ interface ShareInfo {
 
 interface MyVaultsPageProps {
   apiClient: IApiClient
+  onOpenSync?: (vaultId: string) => void
 }
 
 /** Debounce delay for user search. */
@@ -25,7 +27,7 @@ const SEARCH_DEBOUNCE_MS = 300
  * Shows owned vaults with inline share management, transfer, delete,
  * and shared vaults with owner and permission info.
  */
-export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
+export function MyVaultsPage({ apiClient, onOpenSync }: MyVaultsPageProps) {
   const { state, dispatch } = useAppContext()
   const { t } = useTranslation()
   const [sharesMap, setSharesMap] = useState<Map<string, ShareInfo[]>>(new Map())
@@ -35,6 +37,7 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; vault: VaultInfo | null }>({
     open: false, vault: null,
   })
+  const [deletionWorkflow, setDeletionWorkflow] = useState<{ open: boolean; vaultId: string } | null>(null)
 
   const ownedVaults = state.vaults.filter((v) => v.permission === 'owner')
   const sharedVaults = state.vaults.filter((v) => v.permission === 'read' || v.permission === 'write')
@@ -89,7 +92,14 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
   useEffect(() => { void loadStats() }, [loadStats])
 
   async function handleDelete(vault: VaultInfo): Promise<void> {
-    setDeleteConfirm({ open: true, vault })
+    const shares = sharesMap.get(vault.id) ?? []
+    if (shares.length > 0) {
+      // Vault has shares — open the guided deletion workflow
+      setDeletionWorkflow({ open: true, vaultId: vault.id })
+    } else {
+      // No shares — simple confirmation
+      setDeleteConfirm({ open: true, vault })
+    }
   }
 
   async function handleDeleteConfirmed(): Promise<void> {
@@ -97,6 +107,12 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
     setDeleteConfirm({ open: false, vault: null })
     if (!vault) return
     await deleteVault(dispatch, apiClient, vault.id)
+  }
+
+  function handleDeletionWorkflowComplete(): void {
+    setDeletionWorkflow(null)
+    void loadVaults(dispatch, apiClient)
+    void loadAllShares()
   }
 
   function handleRefresh(): void {
@@ -209,6 +225,14 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
                       aria-label={`Vault "${vault.name}" exportieren`}
                     >
                       <Download size={12} />
+                    </button>
+                    <button
+                      className="my-vaults-action-btn"
+                      onClick={() => onOpenSync?.(vault.id)}
+                      title="Vault-Sync konfigurieren"
+                      aria-label={`Sync für "${vault.name}" konfigurieren`}
+                    >
+                      <RefreshCw size={12} />
                     </button>
                     <button
                       className={`my-vaults-action-btn${transferVault === vault.id ? ' my-vaults-action-btn--active' : ''}`}
@@ -327,25 +351,29 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
         )}
       </section>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal (only for vaults without shares) */}
       <ConfirmModal
         open={deleteConfirm.open}
         title={t('vault.deleteVault')}
-        message={(() => {
-          const vault = deleteConfirm.vault
-          if (!vault) return ''
-          const shares = sharesMap.get(vault.id) ?? []
-          let msg = t('vault.deleteConfirm', { name: vault.name })
-          if (shares.length > 0) {
-            msg = `⚠️ Dieser Vault ist mit ${shares.length} ${shares.length === 1 ? 'Person' : 'Personen'} geteilt.\n\n${msg}`
-          }
-          return msg
-        })()}
+        message={deleteConfirm.vault ? t('vault.deleteConfirm', { name: deleteConfirm.vault.name }) : ''}
         confirmLabel={t('common.delete')}
         variant="danger"
         onConfirm={handleDeleteConfirmed}
         onCancel={() => setDeleteConfirm({ open: false, vault: null })}
       />
+
+      {/* Vault Deletion Workflow (shown when vault has active shares) */}
+      {deletionWorkflow?.open && (
+        <div className="vault-deletion-workflow-overlay">
+          <div className="vault-deletion-workflow-modal">
+            <VaultDeletionWorkflow
+              apiClient={apiClient}
+              vaultId={deletionWorkflow.vaultId}
+              onComplete={handleDeletionWorkflowComplete}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

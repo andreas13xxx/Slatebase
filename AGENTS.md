@@ -27,7 +27,7 @@ Config → Logger → Vault (Data Access) → Business → API (Controller)
 
 ### Frontend (React + useReducer)
 
-- Separate reducers for separate concerns (`appReducer`, `tabReducer`, `chatReducer`)
+- Separate reducers for separate concerns (`appReducer`, `tabReducer`, `chatReducer`, `syncReducer`)
 - Action creators are standalone async functions (not hooks)
 - `IApiClient` interface with fetch implementation
 - Relative URLs — Vite proxy forwards `/api` to the backend
@@ -121,10 +121,22 @@ All under `/api/v1`:
 | POST | /vaults/:vaultId/import/file | Import a single file |
 | POST | /vaults/:vaultId/import/folder | Import a folder |
 | DELETE | /vaults/:vaultId/content?path= | Delete file/folder |
+| POST | /vaults/:vaultId/sync/config | Create sync configuration |
+| GET | /vaults/:vaultId/sync/config | Get sync configuration |
+| PUT | /vaults/:vaultId/sync/config | Update sync configuration |
+| DELETE | /vaults/:vaultId/sync/config | Remove sync configuration |
+| PUT | /vaults/:vaultId/sync/config/disable | Disable sync |
+| PUT | /vaults/:vaultId/sync/config/enable | Enable sync |
+| POST | /vaults/:vaultId/sync/trigger | Trigger manual sync |
+| POST | /vaults/:vaultId/sync/analyze | Start analysis mode |
+| GET | /vaults/:vaultId/sync/log | Get sync log (paginated) |
+| GET | /vaults/:vaultId/sync/conflicts | Get open conflicts |
+| POST | /vaults/:vaultId/sync/conflicts/:path/resolve | Resolve conflict |
 
 ## Data Storage
 
 - Filesystem-based, no database
 - Vault data: `backend/data/vaults/<vaultId>/`
 - Vault registry: `backend/data/vaults.json`
+- Sync data: `backend/data/sync/<vaultId>/` (config, checkpoint, conflicts, log)
 - Config: `backend/config/default.json` + `SLATEBASE_*` env vars

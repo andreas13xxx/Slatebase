@@ -78,6 +78,7 @@ npm run dev
 | 📦 **Import & Export** | Import files/folders, export vaults as ZIP or to a local directory |
 | 🌙 **Dark Mode** | Automatic light/dark theme based on system preference (or manual override) |
 | 💬 **User Chat** | Real-time messaging between users with unread badges and conversation management |
+| 🔄 **Vault Sync** | CouchDB/obsidian-livesync compatible synchronization with conflict resolution |
 | 🌐 **i18n** | German and English UI, switchable per user |
 | 🛡️ **Admin Panel** | User management, audit log, server configuration |
 | 🐳 **Docker Ready** | Multi-stage Dockerfile, runs as non-root user |
@@ -111,6 +112,7 @@ Backend configuration via `backend/config/default.json`, overridden by environme
 | `SLATEBASE_MAX_FILE_SIZE` | Max file size in bytes | `5242880` (5 MB) |
 | `SLATEBASE_ALLOWED_ORIGINS` | CORS origins (comma-separated) | `http://localhost:5173` |
 | `SLATEBASE_CSRF_SECRET` | CSRF token secret (set for persistence across restarts) | random |
+| `SLATEBASE_SYNC_SECRET` | Sync credential encryption secret (set for persistence) | random |
 
 ## Development
 
@@ -203,6 +205,22 @@ All routes under `/api/v1`. Authentication required (Bearer token via `Authoriza
 | GET | `/chat/unread` | Get global unread count |
 | POST | `/chat/conversations/:id/read` | Mark as read |
 
+### Sync
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/vaults/:vaultId/sync/config` | Create sync configuration |
+| GET | `/vaults/:vaultId/sync/config` | Get sync configuration |
+| PUT | `/vaults/:vaultId/sync/config` | Update sync configuration |
+| DELETE | `/vaults/:vaultId/sync/config` | Remove sync configuration |
+| PUT | `/vaults/:vaultId/sync/config/disable` | Disable sync |
+| PUT | `/vaults/:vaultId/sync/config/enable` | Enable sync |
+| POST | `/vaults/:vaultId/sync/trigger` | Trigger manual sync |
+| POST | `/vaults/:vaultId/sync/analyze` | Start analysis mode |
+| GET | `/vaults/:vaultId/sync/log` | Get sync log (paginated) |
+| GET | `/vaults/:vaultId/sync/conflicts` | Get open conflicts |
+| POST | `/vaults/:vaultId/sync/conflicts/:path/resolve` | Resolve conflict |
+
 </details>
 
 ## Project Structure
@@ -210,9 +228,10 @@ All routes under `/api/v1`. Authentication required (Bearer token via `Authoriza
 ```
 backend/           — Node.js REST API (Hono + TypeScript)
 ├── src/           — Source code (layered architecture)
-│   └── chat/      — Chat module (conversations, messages, unread)
+│   ├── chat/      — Chat module (conversations, messages, unread)
+│   └── sync/      — Sync module (CouchDB sync, conflicts, scheduling)
 ├── config/        — Default configuration
-└── data/          — Runtime data (vaults, users, sessions, chat, audit)
+└── data/          — Runtime data (vaults, users, sessions, chat, sync, audit)
 
 frontend/          — React SPA (Vite + TypeScript)
 ├── src/

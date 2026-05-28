@@ -37,6 +37,8 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - `appReducer` für globalen App-State (Vaults, Tree, Loading)
 - `tabReducer` für Tab-spezifischen State (offene Tabs, Modi, Edit-Buffer)
 - `authReducer` für Auth-State (Token, User, mustChangePassword, isLoading, error)
+- `chatReducer` für Chat-State (Konversationen, Nachrichten, Unread)
+- `syncReducer` für Sync-State (Config, Log, Konflikte, Analyse)
 - **Nicht** alles in einen Mega-Reducer packen — lieber neue Provider/Reducer für neue Feature-Bereiche
 
 ## Code-Konventionen
@@ -629,3 +631,57 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - `fast-check` generiert beliebige State + Action Kombinationen
 - Preservation-Tests: Verhalten für alle Nicht-Bug-Actions muss identisch bleiben nach einem Fix
 - Bug-Condition-Tests: Schreiben VOR dem Fix, erwarten Failure → nach Fix erwarten sie Pass
+
+## Vault-Sync
+
+### Modulstruktur analog zum Chat-Modul
+- Eigenes Verzeichnis `backend/src/sync/` mit Types, Errors, Validation, Stores, Engine, Service
+- Barrel-Export über `index.ts` — alle öffentlichen Interfaces und Klassen
+- Gleiche Schichtung: Utility → Store → Engine → Service → API
+- **Regel:** Neue Feature-Module immer nach diesem Pattern aufbauen
+
+### CryptoService: Server-Secret für Credential-Verschlüsselung
+- `SLATEBASE_SYNC_SECRET` Env-Var (min 32 Zeichen) für AES-256-GCM Verschlüsselung
+- Wenn nicht gesetzt: Random-Secret bei jedem Start → verschlüsselte Credentials überleben Neustarts nicht
+- **Empfehlung:** Secret in `.env` / `docker.env` setzen für Persistenz
+- Separates Secret von `SLATEBASE_CSRF_SECRET` — unterschiedliche Zwecke
+
+### SyncLock: In-Memory Mutex reicht für Single-Process
+- `Map<string, boolean>` — kein TOCTOU-Problem da Node.js single-threaded
+- Schützt gegen parallele Syncs, Analysen UND Konfliktauflösungen pro Vault
+- Scheduler-Callback prüft `isLocked()` — überspringt wenn gelockt (kein Queuing)
+- Lock wird im `finally`-Block freigegeben — auch bei Exceptions
+
+### Checkpoint-Strategie: Nur bei Erfolg aktualisieren
+- `last_seq` aus CouchDB Changes Feed wird erst am Ende in Checkpoint geschrieben
+- Bei `failed` (Verbindungsabbruch): Checkpoint bleibt unverändert → nächster Sync wiederholt alles
+- Bei `partial_success` (einzelne Dokumente fehlgeschlagen): Checkpoint wird aktualisiert, da CouchDB sonst Endlos-Schleifen erzeugt
+- **Regel:** Checkpoint-Update immer atomar (temp → rename)
+
+### Pre-Write mtime Check für Konflikterkennung
+- Vor dem Schreiben einer gepullten Datei: aktuelle `mtime` mit Checkpoint vergleichen
+- Wenn `aktuelle mtime > checkpoint mtime` → lokale Änderung seit letztem Sync → Konflikt erzeugen
+- Wenn Datei nicht existiert → normal schreiben (neue Remote-Datei)
+- Verhindert Datenverlust bei gleichzeitiger Bearbeitung
+
+### obsidian-livesync Chunk-Reassembly
+- Große Dokumente werden von obsidian-livesync in Chunks fragmentiert
+- Chunks müssen beim Pull reassembliert werden bevor sie als Datei geschrieben werden
+- Chunk-Reihenfolge aus CouchDB-Dokument-Metadaten ableiten
+
+### Sync-Konfiguration: Owner-Only Zugriff
+- Nur der Vault-Besitzer darf Sync konfigurieren/auslösen — Admin-Rolle hat KEINEN Bypass
+- Prüfreihenfolge: Auth (401) → Vault-Existenz (404) → Owner (403)
+- Verhindert Information Leakage über Vault-Existenz an nicht-authentifizierte Requests
+
+### Config-Änderung während Sync
+- `updateConfig()` prüft Lock → 409 wenn Sync läuft
+- Laufender Sync verwendet Snapshot-Kopie der Config (keine Live-Referenz)
+- `disableConfig()` setzt nur Status-Flag — laufender Sync läuft zu Ende
+
+### SyncScheduler: Wiederherstellung nach Neustart
+- `initializeSchedulers()` wird im Composition Root nach Vault-Init aufgerufen
+- Lädt alle aktiven Configs mit Intervall und startet Timer
+- Erster Sync nach vollem Intervall ab Startzeitpunkt (nicht sofort)
+- `stopAll()` für graceful Shutdown
+

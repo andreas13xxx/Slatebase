@@ -15,7 +15,7 @@
 | 7 | `user-chat` | Feature | 🟡 Kern fertig | Echtzeit-Chat zwischen Benutzern (optionale PBT-Tests offen) |
 | 8 | `chat-enhancements` | Feature | ✅ Fertig | Unread-Badges, Archivierung, Leave-Funktion, Pagination |
 | 9 | `chat-list-refresh-fix` | Bugfix | ✅ Fertig | Konversationsliste aktualisiert sich nach Senden/Tab-Wechsel |
-| 10 | `vault-sync` | Feature | 📋 Geplant | Vault-Synchronisation (nur Requirements, keine Tasks) |
+| 10 | `vault-sync` | Feature | ✅ Kern fertig | CouchDB-basierte Vault-Synchronisation (optionale PBT-Tests offen) |
 | 11 | `obsidian-markdown-compat` | Feature | 📋 Geplant | Wikilinks, Embeds, Obsidian-kompatibles Rendering |
 | 12 | `mcp-context-server` | Feature | 📋 Geplant | AI Context Server mit MCP-Integration (Kern-Feature) |
 | 13 | `knowledge-graph` | Feature | 📋 Geplant | Visuelle Darstellung der Verlinkungen zwischen Notizen |
@@ -36,7 +36,7 @@ slatebase-overview (Architektur-Grundlage)
         │     ├── user-chat (Chat braucht Auth + User)
         │     │     ├── chat-enhancements (Erweiterungen auf Chat)
         │     │     └── chat-list-refresh-fix (Bugfix auf Chat)
-        │     ├── vault-sync (geplant, braucht Auth)
+        │     ├── vault-sync (CouchDB-Sync, braucht Auth)
         │     └── mcp-context-server (braucht Auth + Vault-Zugriff)
         ├── obsidian-markdown-compat (braucht Markdown-Rendering aus MVP)
         │     ├── knowledge-graph (braucht Wikilink-Parsing)
@@ -46,10 +46,10 @@ slatebase-overview (Architektur-Grundlage)
 
 ## Offene Specs
 
-### vault-sync
-- **Status**: Nur Requirements vorhanden, kein Design, keine Tasks
-- **Beschreibung**: LiveSync/CouchDB-kompatible Vault-Synchronisation
-- **Abhängigkeit**: Braucht auth-and-user-management
+### vault-sync — Optionale Tasks
+- **Offen**: Property-Based Tests (Tasks 2.2, 2.3, 2.5, 4.3, 6.3, 6.4, 8.2, 8.5, 10.2, 10.3)
+- **Kern-Implementierung**: Vollständig (Backend Sync-Modul + Frontend UI + Composition Root)
+- **Priorität**: Niedrig (optionale Qualitätssicherung)
 
 ### user-chat — Optionale Tasks
 - **Offen**: Property-Based Tests (Task 12) und Integration Tests (Task 13)

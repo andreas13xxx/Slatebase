@@ -6,6 +6,8 @@ import { useTranslation, type TranslateFn } from '../i18n'
 export interface VaultShareEntry {
   vaultId: string
   userId: string
+  username?: string
+  displayName?: string
   permission: 'read' | 'write'
   grantedBy: string
   grantedAt: string
@@ -299,7 +301,7 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
           <ul className="vault-deletion-share-list" aria-label={t('vaultDeletion.activeSharesAriaLabel')}>
             {shares.map((share) => (
               <li key={share.userId} className="vault-deletion-share-item">
-                <span className="vault-deletion-share-user">{share.userId}</span>
+                <span className="vault-deletion-share-user">{share.username ?? share.userId}</span>
                 <span className="vault-deletion-share-permission">
                   {share.permission === 'write' ? t('vaultDeletion.permissionWrite') : t('vaultDeletion.permissionRead')}
                 </span>

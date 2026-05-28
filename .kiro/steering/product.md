@@ -4,7 +4,7 @@ Slatebase is a self-hosted Knowledge-Context-Server for Markdown vaults. It allo
 
 ## Current State
 
-Slatebase is feature-complete for its core use case: multi-user Markdown vault management with web-based editing, sharing, and real-time chat.
+Slatebase is feature-complete for its core use case: multi-user Markdown vault management with web-based editing, sharing, real-time chat, and CouchDB-based vault synchronization.
 
 ### Implemented Features
 
@@ -21,11 +21,12 @@ Slatebase is feature-complete for its core use case: multi-user Markdown vault m
 - **Internationalization (i18n)** — German and English UI, per-user preference
 - **Dark mode** — System-preference-based or manual override (light/dark/system)
 - **Docker deployment** — Multi-stage build, Nginx reverse proxy, non-root user
+- **Vault synchronization** — CouchDB/obsidian-livesync compatible sync (bidirectional & read-only, manual & interval-based, conflict detection & resolution, analysis mode, optional E2E encryption)
 
 ### Planned Features
 
-- Vault synchronization (LiveSync/CouchDB compatible)
 - Knowledge graph visualization
+- Obsidian-compatible Markdown rendering (Wikilinks, Embeds, Callouts)
 - AI Context Server with MCP (Model Context Protocol) integration
 - Obsidian Community Plugin compatibility layer
 - Accessibility (a11y) — WCAG 2.1 AA compliance

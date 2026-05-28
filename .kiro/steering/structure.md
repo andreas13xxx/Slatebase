@@ -36,6 +36,7 @@ src/
 │   ├── userRoutes.ts     — UserController + profile/password routes
 │   ├── adminRoutes.ts    — AdminController + user management/config routes
 │   ├── chatRoutes.ts     — ChatController + conversation/message routes
+│   ├── syncRoutes.ts     — SyncController + sync config/trigger/log/conflict routes
 │   └── vaultShareRoutes.ts — ShareController + share/transfer routes
 ├── chat/
 │   ├── types.ts          — Chat data models (Conversation, Message, etc.)
@@ -47,6 +48,21 @@ src/
 │   ├── unread-store.ts   — UnreadStore (per-user unread counts)
 │   ├── rate-limiter.ts   — ChatRateLimiter (in-memory)
 │   └── chat-service.ts   — ChatService orchestration
+├── sync/
+│   ├── types.ts          — Sync data models (SyncConfig, SyncLogEntry, ConflictEntry, etc.)
+│   ├── errors.ts         — Sync-specific error classes
+│   ├── validation.ts     — Zod schemas for sync input validation
+│   ├── index.ts          — Barrel export for sync module
+│   ├── crypto-service.ts — CryptoService (AES-256-GCM credential & document encryption)
+│   ├── setup-uri-parser.ts — SetupUriParser (obsidian-livesync URI format)
+│   ├── sync-lock.ts      — SyncLock (in-memory mutex per vault)
+│   ├── sync-config-store.ts — SyncConfigStore (filesystem persistence)
+│   ├── sync-log-store.ts — SyncLogStore (JSONL append-only, rotation)
+│   ├── conflict-store.ts — ConflictStore (filesystem persistence)
+│   ├── checkpoint-store.ts — CheckpointStore (filesystem persistence)
+│   ├── sync-engine.ts    — SyncEngine (CouchDB communication, pull/push/analyze)
+│   ├── sync-scheduler.ts — SyncScheduler (setInterval management)
+│   └── sync-service.ts   — SyncService (business logic orchestrator)
 ├── import/index.ts       — ImportService (file/folder import logic)
 └── integration.test.ts   — Integration tests
 config/
@@ -75,7 +91,10 @@ src/
 │   ├── tabActions.ts     — openTab, saveTab action creators
 │   ├── chatState.ts      — Chat reducer + types (conversations, messages, unread)
 │   ├── chatContext.ts    — ChatProvider + useChatContext hook
-│   └── chatActions.ts    — loadConversations, sendMessage, leaveConversation, etc.
+│   ├── chatActions.ts    — loadConversations, sendMessage, leaveConversation, etc.
+│   ├── syncState.ts      — Sync reducer + types (config, log, conflicts, analysis)
+│   ├── syncContext.ts    — SyncProvider + useSyncContext hook
+│   └── syncActions.ts    — loadSyncConfig, triggerSync, resolveConflict, etc.
 ├── components/
 │   ├── SlatebaseLogo.tsx — SVG logo component
 │   ├── SidebarToolbar.tsx — Draggable vertical toolbar
@@ -98,6 +117,10 @@ src/
 │   ├── MessageInput.tsx  — Message input with validation + rate limit handling
 │   ├── NewConversation.tsx — Create conversation dialog with user search
 │   ├── ConfirmModal.tsx  — Reusable confirmation modal
+│   ├── SyncConfigPage.tsx — Sync configuration (Setup-URI, manual config, mode, interval, E2E)
+│   ├── SyncStatusPanel.tsx — Sync status display with trigger buttons
+│   ├── SyncAnalysisView.tsx — Analysis results (category counters + detail list)
+│   ├── ConflictResolutionView.tsx — Conflict list with resolution options
 │   ├── AdminUsersPage.tsx — User administration
 │   ├── AdminVaultsPage.tsx — Admin: all vaults overview with delete
 │   ├── AdminConfigPage.tsx — Server configuration (card-based layout)
@@ -169,6 +192,22 @@ All routes are prefixed with `/api/v1`:
 | GET | /chat/unread | Get global unread count |
 | POST | /chat/conversations/:conversationId/read | Mark conversation as read |
 
+### Sync
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | /vaults/:vaultId/sync/config | Create sync configuration |
+| GET | /vaults/:vaultId/sync/config | Get sync configuration |
+| PUT | /vaults/:vaultId/sync/config | Update sync configuration |
+| DELETE | /vaults/:vaultId/sync/config | Remove sync configuration |
+| PUT | /vaults/:vaultId/sync/config/disable | Disable sync |
+| PUT | /vaults/:vaultId/sync/config/enable | Enable sync |
+| POST | /vaults/:vaultId/sync/trigger | Trigger manual sync |
+| POST | /vaults/:vaultId/sync/analyze | Start analysis mode |
+| GET | /vaults/:vaultId/sync/log | Get sync log (paginated) |
+| GET | /vaults/:vaultId/sync/conflicts | Get open conflicts |
+| POST | /vaults/:vaultId/sync/conflicts/:path/resolve | Resolve conflict |
+
 ## Data Storage
 
 Vaults are stored on disk under `backend/data/vaults/<vaultId>/`. The vault registry (`data/vaults.json`) maps vault IDs to names and storage paths. No database — all persistence is filesystem-based.
@@ -208,3 +247,19 @@ data/chat/
 - **Conversations**: One JSON file per conversation. Index file for listing.
 - **Messages**: Stored per conversation in paginated chunks.
 - **Unread**: Per-user JSON tracking unread counts per conversation.
+
+### Sync Data
+
+```
+data/sync/
+└── <vaultId>/
+    ├── config.json           — Encrypted sync configuration
+    ├── checkpoint.json       — Last sync checkpoint (last_seq + local mtimes)
+    ├── conflicts.json        — Open conflicts
+    └── sync-log.jsonl        — Sync log (append-only JSONL, max 1000 entries)
+```
+
+- **Config**: One JSON file per vault with encrypted credentials. Atomic writes.
+- **Checkpoint**: CouchDB sequence number + local file mtimes. Atomic writes.
+- **Conflicts**: Open conflict entries per vault. Atomic writes.
+- **Sync Log**: Append-only JSONL with rotation at 1000 entries.

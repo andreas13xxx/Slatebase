@@ -1,13 +1,13 @@
 import { useState, useRef, useCallback } from 'react'
 import {
   Upload, FolderOpen, Download, Settings, Shield,
-  Database, FileText, Clock, User, Server, FilePlus, MessageCircle,
+  Database, FileText, Clock, User, Server, FilePlus, MessageCircle, RefreshCw,
 } from 'lucide-react'
 
 type AppPage =
   | 'vaults' | 'my-vaults' | 'profile' | 'sessions' | 'chat'
   | 'admin-users' | 'admin-vaults' | 'admin-config' | 'admin-audit'
-  | 'vault-sharing' | 'vault-deletion'
+  | 'vault-sharing' | 'vault-deletion' | 'sync-config'
 
 interface ToolbarItem {
   id: string
@@ -15,6 +15,7 @@ interface ToolbarItem {
   label: string
   action: () => void
   adminOnly?: boolean
+  ownerOnly?: boolean
   requiresVault?: boolean
 }
 
@@ -26,6 +27,7 @@ interface SidebarToolbarProps {
   onExportVault: () => void
   onNavigate: (page: AppPage) => void
   isAdmin: boolean
+  isVaultOwner?: boolean
   globalUnreadCount?: number
 }
 
@@ -34,12 +36,13 @@ interface SidebarToolbarProps {
  * Buttons can be reordered by drag-and-drop.
  * Tooltips show on hover.
  */
-export function SidebarToolbar({ vaultId, onCreateFile, onImportFile, onImportFolder, onExportVault, onNavigate, isAdmin, globalUnreadCount }: SidebarToolbarProps) {
+export function SidebarToolbar({ vaultId, onCreateFile, onImportFile, onImportFolder, onExportVault, onNavigate, isAdmin, isVaultOwner, globalUnreadCount }: SidebarToolbarProps) {
   const allItems: ToolbarItem[] = [
     { id: 'create-file', icon: <FilePlus size={15} />, label: 'Neue Datei', action: onCreateFile, requiresVault: true },
     { id: 'import-file', icon: <Upload size={15} />, label: 'Datei importieren', action: onImportFile, requiresVault: true },
     { id: 'import-folder', icon: <FolderOpen size={15} />, label: 'Ordner importieren', action: onImportFolder, requiresVault: true },
     { id: 'export-vault', icon: <Download size={15} />, label: 'Vault exportieren', action: onExportVault, requiresVault: true },
+    { id: 'sync-config', icon: <RefreshCw size={15} />, label: 'Vault-Sync', action: () => onNavigate('sync-config'), requiresVault: true, ownerOnly: true },
     { id: 'my-vaults', icon: <Database size={15} />, label: 'Meine Vaults', action: () => onNavigate('my-vaults') },
     { id: 'profile', icon: <User size={15} />, label: 'Profil', action: () => onNavigate('profile') },
     { id: 'sessions', icon: <Clock size={15} />, label: 'Sitzungen', action: () => onNavigate('sessions') },
@@ -52,6 +55,7 @@ export function SidebarToolbar({ vaultId, onCreateFile, onImportFile, onImportFo
 
   const visibleItems = allItems.filter((item) => {
     if (item.adminOnly && !isAdmin) return false
+    if (item.ownerOnly && !isVaultOwner) return false
     return true
   })
 

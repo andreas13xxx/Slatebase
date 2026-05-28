@@ -20,11 +20,14 @@ import {
   FileConflictError as BusinessFileConflictError,
   InvalidNameError,
   VaultAccessDeniedError,
+  VaultHasActiveSharesError,
 } from '../business/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
 import { PathTraversalError } from '../vault/index.js'
+import type { IVaultShareRegistry } from '../vault/registry.js'
 import type { IImportService, UploadedFile } from '../import/index.js'
 import type { IUserRepository } from '../user/index.js'
+import type { ISyncConfigStore } from '../sync/index.js'
 import {
   InvalidFilenameError,
   FileTooLargeError,
@@ -94,6 +97,8 @@ export class VaultController implements IVaultController {
     private readonly importService?: IImportService,
     private readonly userRepository?: IUserRepository,
     private readonly accessControl?: IVaultAccessControl,
+    private readonly syncConfigStore?: ISyncConfigStore,
+    private readonly shareRegistry?: IVaultShareRegistry,
   ) {}
 
   /**
@@ -106,6 +111,17 @@ export class VaultController implements IVaultController {
     const session = c.get('session') as SessionContext
     const showAll = c.req.query('all') === 'true' && session.role === 'admin'
     const vaults = await this.vaultService.getVaultList(showAll ? undefined : session.userId)
+
+    // Load sync configs to determine which vaults have sync enabled
+    const syncConfigs = this.syncConfigStore
+      ? await this.syncConfigStore.loadAll()
+      : []
+    const syncEnabledSet = new Set(
+      syncConfigs
+        .filter((sc) => sc.config.status === 'active')
+        .map((sc) => sc.vaultId),
+    )
+
     // Strip internal `path` field and resolve ownerName
     const publicVaults = await Promise.all(
       vaults.map(async ({ path, ...rest }) => {
@@ -114,7 +130,16 @@ export class VaultController implements IVaultController {
           const owner = await this.userRepository.findById(rest.ownerId)
           if (owner) ownerName = owner.username
         }
-        return { ...rest, ownerName }
+        const syncEnabled = syncEnabledSet.has(rest.id)
+
+        // Include share count for owned vaults
+        let shareCount = 0
+        if (rest.permission === 'owner' && this.shareRegistry) {
+          const shares = await this.shareRegistry.getSharesForVault(rest.id)
+          shareCount = shares.length
+        }
+
+        return { ...rest, ownerName, syncEnabled, shareCount }
       }),
     )
     return c.json(publicVaults, 200)
@@ -247,13 +272,15 @@ export class VaultController implements IVaultController {
 
   /**
    * DELETE /vaults/:vaultId — Deletes a vault.
-   * Extracts vaultId param, calls vaultService.deleteVault(vaultId), returns 204.
+   * Validates ownership and checks for active shares before deletion.
+   * Returns 409 if the vault has active shares (use force deletion workflow).
    */
   async deleteVault(c: Context): Promise<Response> {
     const vaultId = c.req.param('vaultId') as string
+    const session = c.get('session') as SessionContext
 
     try {
-      await this.vaultService.deleteVault(vaultId)
+      await this.vaultService.deleteVaultWithChecks(vaultId, session.userId)
       return c.body(null, 204)
     } catch (error) {
       return this.handleError(c, error)
@@ -565,6 +592,13 @@ export class VaultController implements IVaultController {
       this.logger.error('Storage error', { message: error.message })
       const apiError = createApiError('STORAGE_ERROR', error.message)
       return c.json(apiError, 500)
+    }
+
+    // VaultHasActiveSharesError — 409 (vault still shared)
+    if (error instanceof VaultHasActiveSharesError) {
+      this.logger.warn('Vault has active shares', { vaultId: error.vaultId, shareCount: error.activeShares.length })
+      const apiError = createApiError('VAULT_HAS_ACTIVE_SHARES', error.message)
+      return c.json(apiError, 409)
     }
 
     // File not found (ENOENT)

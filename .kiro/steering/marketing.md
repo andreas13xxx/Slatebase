@@ -12,7 +12,7 @@ Slatebase als Self-Hosted-Alternative für Obsidian-Vault-Zugriff in der Communi
 |---|----------|--------|---------|
 | 1 | GitHub Repo auf public setzen | ✅ Fertig | Sichtbarkeit geändert |
 | 2 | README aufpolieren (Hero, Quick Start, Features) | ✅ Fertig | Docker-Compose-Beispiel, Feature-Tabelle, Tech Stack |
-| 3 | GitHub About-Bereich füllen (Description + Topics) | ✅ Fertig | Topics: obsidian, markdown, self-hosted, knowledge-management, etc. |
+| 3 | GitHub About-Bereich füllen (Description + Topics) | ✅ Fertig | Topics: obsidian, markdown, self-hosted, knowledge-management, collaboration, real-time-chat, team, etc. |
 | 4 | Screenshots / Demo-GIF erstellen | ✅ Fertig | `demo.gif` im Projekt-Root vorhanden |
 | 5 | LICENSE-Datei hinzufügen (MIT) | ✅ Fertig | `LICENSE` im Projekt-Root vorhanden |
 | 6 | CONTRIBUTING.md erstellen | 📋 Geplant | Kurze Anleitung: Issues first, Dev-Setup, Code-Konventionen |
@@ -23,9 +23,9 @@ Slatebase als Self-Hosted-Alternative für Obsidian-Vault-Zugriff in der Communi
 
 | # | Maßnahme | Status | Details |
 |---|----------|--------|---------|
-| 9 | Post auf r/selfhosted | ✍️ Entwurf fertig | Flair: "Self-Hosted Alternatives", englisch, mit demo.gif + GitHub-Link |
-| 10 | Post auf r/ObsidianMD | ✍️ Entwurf fertig | Flair: "Resources & Workflows", englisch, mit demo.gif + GitHub-Link |
-| 11 | Show HN (Hacker News) | 📋 Geplant | Kurzer Pitch: Self-hosted, no DB, Obsidian-kompatibel, MCP-ready |
+| 9 | Post auf r/selfhosted | ✍️ Entwurf fertig | Flair: "Self-Hosted Alternatives", englisch, mit demo.gif + GitHub-Link. Collaboration hervorheben: Chat, Sharing, Multi-User |
+| 10 | Post auf r/ObsidianMD | ✍️ Entwurf fertig | Flair: "Resources & Workflows", englisch, mit demo.gif + GitHub-Link. Fokus: Vault-Sharing + Chat als Team-Feature |
+| 11 | Show HN (Hacker News) | 📋 Geplant | Kurzer Pitch: Self-hosted, no DB, Obsidian-kompatibel, Collaboration (Chat + Sharing), MCP-ready |
 | 12 | PR an awesome-selfhosted | 📋 Geplant | Kategorie: Knowledge Management / Wikis |
 | 13 | Obsidian Discord/Forum Post | 📋 Geplant | Kanal: #third-party-tools oder Plugin-Showcase |
 | 14 | PR an awesome-obsidian | 📋 Geplant | Unter "Tools" oder "Web Access" |
@@ -36,7 +36,7 @@ Slatebase als Self-Hosted-Alternative für Obsidian-Vault-Zugriff in der Communi
 |---|----------|--------|---------|
 | 15 | Dev.to / Blog-Artikel: Architektur-Entscheidungen | 📋 Geplant | "Why no database?", Filesystem-basiert, opake Tokens statt JWT |
 | 16 | Dev.to / Blog-Artikel: MCP-Integration | 📋 Geplant | Sobald `mcp-context-server` Spec umgesetzt — AI-Community ansprechen |
-| 17 | Kurzes YouTube/Loom-Video (2–3 Min) | 📋 Geplant | Setup → Login → Vault browsen → Datei editieren → Sharing |
+| 17 | Kurzes YouTube/Loom-Video (2–3 Min) | 📋 Geplant | Setup → Login → Vault browsen → Datei editieren → Vault teilen → Chat-Nachricht senden |
 | 18 | Twitter/X Thread: "Building a self-hosted Obsidian web UI" | 📋 Geplant | Build-in-public Narrative, Screenshots, Learnings |
 
 ### Phase 4: Ökosystem & Wachstum
@@ -44,9 +44,9 @@ Slatebase als Self-Hosted-Alternative für Obsidian-Vault-Zugriff in der Communi
 | # | Maßnahme | Status | Details |
 |---|----------|--------|---------|
 | 19 | Docker Hub Listing (zusätzlich zu GHCR) | 📋 Geplant | Breitere Sichtbarkeit, gute Beschreibung |
-| 20 | Obsidian Community Plugin (Sync zu Slatebase) | 📋 Geplant | Abhängig von `vault-sync` Spec — starker Wachstumshebel |
+| 20 | Obsidian Community Plugin (Sync zu Slatebase) | 🟡 Teilweise | `vault-sync` Backend+Frontend implementiert — Plugin-Seite noch offen |
 | 21 | MCP-Server im MCP-Verzeichnis listen | 📋 Geplant | Abhängig von `mcp-context-server` Spec — AI-Tool-Ökosystem |
-| 22 | Vergleichsseite: Slatebase vs. Obsidian Publish vs. Quartz | 📋 Geplant | Faire Gegenüberstellung, Stärken hervorheben |
+| 22 | Vergleichsseite: Slatebase vs. Obsidian Publish vs. Quartz | 📋 Geplant | Faire Gegenüberstellung — Differenzierung: Multi-User, Chat, granulare Rechte, Vault-Transfer, Sync (alles was die anderen nicht haben) |
 | 23 | Localization: Englische UI als Default für internationale Reichweite | 📋 Geplant | i18n ist vorhanden — English als Default für breitere Adoption |
 
 ## Priorisierung
@@ -69,8 +69,32 @@ Slatebase als Self-Hosted-Alternative für Obsidian-Vault-Zugriff in der Communi
 
 **Langfristig (abhängig von Feature-Entwicklung):**
 - MCP-Artikel + Listing (#16, #21) — nach `mcp-context-server` Umsetzung
-- Obsidian Plugin (#20) — nach `vault-sync` Umsetzung
+- Obsidian Plugin (#20) — Sync-Backend steht, Plugin-Seite noch offen
 - Vergleichsseite (#22) — wenn genug Differenzierung vorhanden
+
+## Collaboration als Differenzierungsmerkmal
+
+Die Collaboration-Features sind Slatebase's stärkstes Alleinstellungsmerkmal gegenüber allen Alternativen. Sie sollten in JEDEM Post, jeder README-Feature-Tabelle und jedem Video prominent vorkommen.
+
+### Implementierte Collaboration-Features (sofort bewerbbar)
+
+| Feature | Differenzierung vs. Alternativen |
+|---------|----------------------------------|
+| **Echtzeit-Chat** | Obsidian Publish, Quartz, MkDocs — keines hat Chat |
+| **Granulare Vault-Freigaben (Read/Write)** | Obsidian Publish: nur read-only, keine Rechte-Granularität |
+| **Vault-Besitz-Transfer** | Nirgends sonst vorhanden — Team-Übergaben ohne Datenverlust |
+| **Multi-User mit Rollen (Admin/User)** | Quartz/MkDocs: Single-User; Obsidian Publish: kein Multi-User |
+| **Unread-Badges & Archivierung** | Vollwertiges Messaging, nicht nur Kommentare |
+| **Multi-Session / Multi-Device** | Gleichzeitig auf Handy und Desktop — ohne Sync-Dienst |
+| **User-Suche mit Autocomplete** | Einfaches Teilen ohne E-Mail-Einladungen oder externe Accounts |
+| **CouchDB/LiveSync Vault-Synchronisation** | Bidirektional & Read-Only, Intervall-basiert, Konflikterkennung, E2E-Verschlüsselung — kompatibel mit obsidian-livesync |
+
+### Messaging für Posts & Content
+
+- **r/selfhosted:** "Collaboration without SaaS" — viele suchen self-hosted Notion/Confluence-Alternativen mit Team-Features. Sync mit CouchDB/LiveSync als Killer-Feature für bestehende Obsidian-Nutzer.
+- **r/ObsidianMD:** "Share your vault with teammates, chat about notes, sync via LiveSync — all self-hosted" — Pain Point der Community. LiveSync-Kompatibilität ist ein starker Hook.
+- **Show HN:** "Not just a viewer — a collaborative knowledge platform with CouchDB sync" — hebt sich von Static-Site-Generatoren ab
+- **Vergleichsseite:** Tabelle mit ✅/❌ pro Feature vs. Obsidian Publish, Quartz, BookStack, Wiki.js
 
 ## Erfolgskriterien
 
@@ -88,4 +112,6 @@ Slatebase als Self-Hosted-Alternative für Obsidian-Vault-Zugriff in der Communi
 2. **"Obsidian-kompatibel, ohne Obsidian."** — Kein Vendor-Lock-in
 3. **"Kein Sync-Dienst, keine Datenbank, keine Magie."** — Transparenz, Plain Files
 4. **"Teile Wissen, nicht Accounts."** — Multi-User mit granularen Rechten
-5. **"AI-ready: MCP-Integration für deine Wissensbasis."** — Zukunfts-Feature als Differenzierung
+5. **"Zusammenarbeiten, nicht nur speichern."** — Built-in Chat, Vault-Sharing, Echtzeit-Kollaboration ohne dritte App
+6. **"Sync mit CouchDB/LiveSync — bidirektional, verschlüsselt, konfliktfrei."** — Nahtlose Integration mit obsidian-livesync
+7. **"AI-ready: MCP-Integration für deine Wissensbasis."** — Zukunfts-Feature als Differenzierung

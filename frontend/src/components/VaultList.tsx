@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { useAppContext, createVault, deleteVault } from '../state'
+import { useAppContext, createVault, deleteVault, loadVaults } from '../state'
 import { useTranslation } from '../i18n'
-import { ChevronDown, ChevronUp, Plus, Trash2, Database, Eye, Pencil } from 'lucide-react'
+import { ChevronDown, ChevronUp, Plus, Trash2, Database, Eye, Pencil, RefreshCw, Users } from 'lucide-react'
 import { ConfirmModal } from './ConfirmModal'
+import { VaultDeletionWorkflow } from './VaultDeletionWorkflow'
 
 /**
  * Maximum vault name length as defined in the spec.
@@ -24,6 +25,7 @@ export function VaultList() {
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; vaultId: string; vaultName: string }>({
     open: false, vaultId: '', vaultName: '',
   })
+  const [deletionWorkflow, setDeletionWorkflow] = useState<{ open: boolean; vaultId: string } | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const selectedVault = state.vaults.find((v) => v.id === state.selectedVaultId)
@@ -92,7 +94,27 @@ export function VaultList() {
     const { vaultId } = deleteConfirm
     setDeleteConfirm({ open: false, vaultId: '', vaultName: '' })
     if (!apiClient) return
-    await deleteVault(dispatch, apiClient, vaultId)
+
+    try {
+      await apiClient.deleteVault(vaultId)
+      dispatch({ type: 'VAULT_DELETED', payload: vaultId })
+    } catch (err: unknown) {
+      const error = err as { code?: string; message?: string }
+      if (error.code === 'VAULT_HAS_ACTIVE_SHARES') {
+        // Vault has active shares — open the guided deletion workflow
+        setDeletionWorkflow({ open: true, vaultId })
+      } else {
+        // Fallback: use the standard error dispatch
+        await deleteVault(dispatch, apiClient, vaultId)
+      }
+    }
+  }
+
+  function handleDeletionWorkflowComplete() {
+    setDeletionWorkflow(null)
+    if (apiClient) {
+      void loadVaults(dispatch, apiClient)
+    }
   }
 
   return (
@@ -108,7 +130,25 @@ export function VaultList() {
       >
         <span className="vault-dropdown-label">
           {selectedVault
-            ? <><Database size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 5 }} />{selectedVault.name}</>
+            ? <>
+                <Database size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 5 }} />
+                {selectedVault.name}
+                {selectedVault.permission === 'read' && (
+                  <span className="vault-status-icon vault-status-icon--read" title={t('vault.permissionRead')}>
+                    <Eye size={12} />
+                  </span>
+                )}
+                {(selectedVault.shareCount ?? 0) > 0 && (
+                  <span className="vault-status-icon vault-status-icon--shared" title={t('vault.shared', { count: selectedVault.shareCount ?? 0 })}>
+                    <Users size={12} />
+                  </span>
+                )}
+                {selectedVault.syncEnabled && (
+                  <span className="vault-status-icon vault-status-icon--sync" title={t('vault.syncActive')}>
+                    <RefreshCw size={12} />
+                  </span>
+                )}
+              </>
             : t('vault.select')}
         </span>
         <span className="vault-dropdown-chevron" aria-hidden="true">
@@ -145,6 +185,16 @@ export function VaultList() {
                     {vault.permission === 'write' && (
                       <span className="vault-permission-badge vault-permission-badge--write" title={t('vault.permissionWrite')}>
                         <Pencil size={11} />
+                      </span>
+                    )}
+                    {vault.syncEnabled && (
+                      <span className="vault-permission-badge vault-permission-badge--sync" title={t('vault.syncActive')}>
+                        <RefreshCw size={11} />
+                      </span>
+                    )}
+                    {(vault.shareCount ?? 0) > 0 && (
+                      <span className="vault-permission-badge vault-permission-badge--shared" title={t('vault.shared', { count: vault.shareCount ?? 0 })}>
+                        <Users size={11} />
                       </span>
                     )}
                   </button>
@@ -215,6 +265,19 @@ export function VaultList() {
         onConfirm={handleDeleteConfirmed}
         onCancel={() => setDeleteConfirm({ open: false, vaultId: '', vaultName: '' })}
       />
+
+      {/* Vault Deletion Workflow (shown when vault has active shares) */}
+      {deletionWorkflow?.open && apiClient && (
+        <div className="vault-deletion-workflow-overlay">
+          <div className="vault-deletion-workflow-modal">
+            <VaultDeletionWorkflow
+              apiClient={apiClient}
+              vaultId={deletionWorkflow.vaultId}
+              onComplete={handleDeletionWorkflowComplete}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

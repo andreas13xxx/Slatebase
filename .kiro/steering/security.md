@@ -51,6 +51,15 @@
 - Passwort-Hashing: argon2id (memory-hard, Timing-Attack-resistent)
 - **Niemals** Passwörter oder Token-Werte in Logs oder API-Responses
 
+## Sync-Credentials
+
+- Sync-Credentials (CouchDB-Benutzername, Passwort, E2E-Passphrase) werden mit AES-256-GCM verschlüsselt auf dem Dateisystem gespeichert
+- Verschlüsselungs-Secret: `SLATEBASE_SYNC_SECRET` Env-Var (min 32 Zeichen)
+- Wenn nicht gesetzt: Random-Secret bei jedem Start → verschlüsselte Credentials überleben Neustarts nicht
+- Passwort in API-Responses immer maskiert (alle `*` außer letzte 4 Zeichen; bei < 4 Zeichen vollständig maskiert)
+- Sync-Log enthält niemals Credentials oder Dokumentinhalte — nur relative Pfade
+- Nur Vault-Besitzer darf Sync konfigurieren — Admin-Rolle hat keinen Bypass
+
 ## Audit-Logging
 
 - Append-Only JSONL-Dateien unter `data/audit/YYYY-MM-DD.jsonl`

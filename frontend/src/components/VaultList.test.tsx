@@ -205,7 +205,7 @@ describe('VaultList (Dropdown)', () => {
     await user.click(screen.getByRole('button', { name: 'Löschen' }))
 
     expect(mockDeleteVault).toHaveBeenCalledWith('v1')
-    expect(dispatch).toHaveBeenCalledWith({ type: 'LOADING_STARTED' })
+    expect(dispatch).toHaveBeenCalledWith({ type: 'VAULT_DELETED', payload: 'v1' })
   })
 
   it('does not call deleteVault when confirmation is cancelled', async () => {

@@ -25,6 +25,20 @@ import { UserRepository, UserService, RoleService, ensureDefaultAdmin } from './
 import { AuditLogger, AuditService } from './audit/index.js'
 import { ConversationStore, MessageStore, ChatRateLimiter, ChatService, UnreadStore } from './chat/index.js'
 import { ChatController, ChatRouteModule } from './api/chatRoutes.js'
+import {
+  CryptoService,
+  SetupUriParser,
+  SyncLock,
+  SyncConfigStore,
+  SyncLogStore,
+  ConflictStore,
+  CheckpointStore,
+  SyncEngine,
+  SyncScheduler,
+  SyncService,
+} from './sync/index.js'
+import type { VaultPathResolver } from './sync/index.js'
+import { createSyncRoutes } from './api/syncRoutes.js'
 
 // --- Composition Root ---
 
@@ -68,12 +82,52 @@ const unreadStore = new UnreadStore(serverConfig.dataDir, logger)
 const chatRateLimiter = new ChatRateLimiter()
 const chatService = new ChatService(conversationStore, messageStore, unreadStore, userRepository, logger)
 
+// 3d. Sync Module
+const syncSecret = process.env['SLATEBASE_SYNC_SECRET']
+let resolvedSyncSecret: string
+if (syncSecret && syncSecret.length >= 32) {
+  resolvedSyncSecret = syncSecret
+} else {
+  resolvedSyncSecret = crypto.randomBytes(32).toString('hex')
+  logger.warn('SLATEBASE_SYNC_SECRET not set or too short — using random secret (sync credentials will not survive restarts)')
+}
+
+const cryptoService = new CryptoService(resolvedSyncSecret)
+const setupUriParser = new SetupUriParser()
+const syncLock = new SyncLock()
+const syncConfigStore = new SyncConfigStore(serverConfig.dataDir, cryptoService, logger)
+const syncLogStore = new SyncLogStore(serverConfig.dataDir, logger)
+const conflictStore = new ConflictStore(serverConfig.dataDir, logger)
+const checkpointStore = new CheckpointStore(serverConfig.dataDir, logger)
+const syncEngine = new SyncEngine(cryptoService)
+const syncScheduler = new SyncScheduler()
+
 // 4. VaultService (extend existing vault setup with share registry and user repository)
 const vaultService = new VaultService(vaultManager, vaultReader, config, logger, vaultRegistry, vaultShareRegistry, userRepository, auditService)
 const importService = new ImportService(vaultManager, vaultReader, config, logger)
 
+// 4b. SyncService (needs VaultPathResolver)
+const vaultPathResolver: VaultPathResolver = (vaultId: string): string | null => {
+  const entry = vaultRegistry.findById(vaultId)
+  return entry ? entry.storagePath : null
+}
+
+const syncService = new SyncService(
+  syncConfigStore,
+  syncLogStore,
+  conflictStore,
+  checkpointStore,
+  cryptoService,
+  setupUriParser,
+  syncEngine,
+  syncScheduler,
+  syncLock,
+  logger,
+  vaultPathResolver,
+)
+
 // 5. Controllers
-const vaultController = new VaultController(vaultService, logger, importService, userRepository, vaultAccessControl)
+const vaultController = new VaultController(vaultService, logger, importService, userRepository, vaultAccessControl, syncConfigStore, vaultShareRegistry)
 const authController = new AuthController(authService, logger)
 const userController = new UserController(userService, logger)
 const chatController = new ChatController(chatService, chatRateLimiter, logger, userRepository)
@@ -93,6 +147,7 @@ const routeModules = [
   }),
   new VaultShareRouteModule(vaultAccessControl, vaultService, vaultRegistry, logger, vaultShareRegistry, userRepository),
   new ChatRouteModule(chatController),
+  createSyncRoutes({ syncService, vaultRegistry, logger }),
 ]
 const router = createRouter(routeModules)
 
@@ -136,6 +191,14 @@ await ensureDefaultAdmin(userRepository, logger)
 
 // Initialize vaults
 await vaultService.initializeVaults()
+
+// Initialize sync schedulers
+try {
+  await syncService.initializeSchedulers()
+} catch (error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  logger.error('Failed to initialize sync schedulers', { error: message })
+}
 
 serve(
   {

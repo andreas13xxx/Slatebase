@@ -1,5 +1,6 @@
 import type { VaultInfo, DirectoryTree, FileContent, FileSaveResult, AppError, Conversation, PaginatedConversations, PaginatedMessages, Message } from '../types'
 import type { PublicUserInfo } from '../state/authState'
+import type { SyncConfigResponse, SyncConfigResult, CreateSyncConfigInput, UpdateSyncConfigInput, SyncResult, AnalysisResult, PaginatedSyncLog, ConflictEntry } from '../state/syncState'
 
 /**
  * Login response returned by the backend on successful authentication.
@@ -103,6 +104,30 @@ export interface IApiClient {
   leaveConversation(conversationId: string): Promise<void>
   /** Get total unread count across all conversations for the current user. */
   getUnreadTotal(): Promise<{ total: number }>
+
+  // --- Sync methods ---
+  /** Get the sync configuration for a vault. */
+  getSyncConfig(vaultId: string): Promise<SyncConfigResponse>
+  /** Create a new sync configuration for a vault. */
+  createSyncConfig(vaultId: string, input: CreateSyncConfigInput): Promise<SyncConfigResult>
+  /** Update an existing sync configuration. */
+  updateSyncConfig(vaultId: string, input: UpdateSyncConfigInput): Promise<SyncConfigResult>
+  /** Remove the sync configuration for a vault. */
+  removeSyncConfig(vaultId: string): Promise<void>
+  /** Disable the sync configuration for a vault. */
+  disableSyncConfig(vaultId: string): Promise<void>
+  /** Enable the sync configuration for a vault. */
+  enableSyncConfig(vaultId: string): Promise<void>
+  /** Trigger a manual sync for a vault. */
+  triggerSync(vaultId: string): Promise<SyncResult>
+  /** Trigger an analysis for a vault. */
+  triggerAnalysis(vaultId: string): Promise<AnalysisResult>
+  /** Get the sync log for a vault (paginated). */
+  getSyncLog(vaultId: string, page?: number, pageSize?: number): Promise<PaginatedSyncLog>
+  /** Get all open sync conflicts for a vault. */
+  getSyncConflicts(vaultId: string): Promise<ConflictEntry[]>
+  /** Resolve a sync conflict for a specific document. */
+  resolveSyncConflict(vaultId: string, documentPath: string, resolution: string): Promise<void>
 }
 
 /**
@@ -320,6 +345,68 @@ export class ApiClient implements IApiClient {
   /** Get total unread count across all conversations for the current user. */
   async getUnreadTotal(): Promise<{ total: number }> {
     return this.request<{ total: number }>('GET', '/api/v1/chat/unread/total')
+  }
+
+  // --- Sync methods ---
+
+  /** Get the sync configuration for a vault. */
+  async getSyncConfig(vaultId: string): Promise<SyncConfigResponse> {
+    return this.request<SyncConfigResponse>('GET', `/api/v1/vaults/${vaultId}/sync/config`)
+  }
+
+  /** Create a new sync configuration for a vault. */
+  async createSyncConfig(vaultId: string, input: CreateSyncConfigInput): Promise<SyncConfigResult> {
+    return this.request<SyncConfigResult>('POST', `/api/v1/vaults/${vaultId}/sync/config`, input)
+  }
+
+  /** Update an existing sync configuration. */
+  async updateSyncConfig(vaultId: string, input: UpdateSyncConfigInput): Promise<SyncConfigResult> {
+    return this.request<SyncConfigResult>('PUT', `/api/v1/vaults/${vaultId}/sync/config`, input)
+  }
+
+  /** Remove the sync configuration for a vault. */
+  async removeSyncConfig(vaultId: string): Promise<void> {
+    await this.request<void>('DELETE', `/api/v1/vaults/${vaultId}/sync/config`)
+  }
+
+  /** Disable the sync configuration for a vault. */
+  async disableSyncConfig(vaultId: string): Promise<void> {
+    await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/sync/config/disable`)
+  }
+
+  /** Enable the sync configuration for a vault. */
+  async enableSyncConfig(vaultId: string): Promise<void> {
+    await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/sync/config/enable`)
+  }
+
+  /** Trigger a manual sync for a vault. */
+  async triggerSync(vaultId: string): Promise<SyncResult> {
+    return this.request<SyncResult>('POST', `/api/v1/vaults/${vaultId}/sync/trigger`)
+  }
+
+  /** Trigger an analysis for a vault. */
+  async triggerAnalysis(vaultId: string): Promise<AnalysisResult> {
+    return this.request<AnalysisResult>('POST', `/api/v1/vaults/${vaultId}/sync/analyze`)
+  }
+
+  /** Get the sync log for a vault (paginated). */
+  async getSyncLog(vaultId: string, page?: number, pageSize?: number): Promise<PaginatedSyncLog> {
+    const params: string[] = []
+    if (page !== undefined) params.push(`page=${page}`)
+    if (pageSize !== undefined) params.push(`pageSize=${pageSize}`)
+    const query = params.length > 0 ? `?${params.join('&')}` : ''
+    return this.request<PaginatedSyncLog>('GET', `/api/v1/vaults/${vaultId}/sync/log${query}`)
+  }
+
+  /** Get all open sync conflicts for a vault. */
+  async getSyncConflicts(vaultId: string): Promise<ConflictEntry[]> {
+    return this.request<ConflictEntry[]>('GET', `/api/v1/vaults/${vaultId}/sync/conflicts`)
+  }
+
+  /** Resolve a sync conflict for a specific document. */
+  async resolveSyncConflict(vaultId: string, documentPath: string, resolution: string): Promise<void> {
+    const encodedPath = encodeURIComponent(documentPath)
+    await this.request<void>('POST', `/api/v1/vaults/${vaultId}/sync/conflicts/${encodedPath}/resolve`, { resolution })
   }
 
   // --- Internal helpers ---

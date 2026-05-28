@@ -22,10 +22,12 @@ import { ChatPage } from './components/ChatPage'
 import { SlatebaseLogo } from './components/SlatebaseLogo'
 import { SidebarToolbar } from './components/SidebarToolbar'
 import { MyVaultsPage } from './components/MyVaultsPage'
+import { SyncConfigPage } from './components/SyncConfigPage'
+import { SyncProvider } from './state/syncContext'
 import {
   User, LogOut, Settings, Shield, FileText, Clock,
   Database, Share2, Trash2, Server, Download,
-  Upload, FolderOpen, PanelRight, PanelLeft, X, Eye, Pencil, MessageCircle,
+  Upload, FolderOpen, PanelRight, PanelLeft, X, Eye, Pencil, MessageCircle, RefreshCw,
 } from 'lucide-react'
 import { getFileIcon, getFileIconClass, getDisplayName } from './utils/fileIcons'
 import './App.css'
@@ -49,6 +51,7 @@ type AppPage =
   | 'admin-audit'
   | 'vault-sharing'
   | 'vault-deletion'
+  | 'sync-config'
 
 /**
  * User avatar and dropdown menu component.
@@ -231,6 +234,7 @@ const PAGE_LABEL_KEYS: Record<AppPage, string> = {
   'admin-audit': 'pages.adminAudit',
   'vault-sharing': 'pages.vaultSharing',
   'vault-deletion': 'pages.vaultDeletion',
+  'sync-config': 'pages.syncConfig',
 }
 
 /** Icons for settings pages. */
@@ -245,6 +249,7 @@ const PAGE_ICONS: Partial<Record<AppPage, React.ReactNode>> = {
   'admin-audit': <FileText size={13} />,
   'vault-sharing': <Share2 size={13} />,
   'vault-deletion': <Trash2 size={13} />,
+  'sync-config': <RefreshCw size={13} />,
 }
 
 /**
@@ -402,7 +407,10 @@ function AppContent() {
 
   function renderSettingsPage(page: AppPage) {
     switch (page) {
-      case 'my-vaults': return <MyVaultsPage apiClient={apiClient} />
+      case 'my-vaults': return <MyVaultsPage apiClient={apiClient} onOpenSync={(vaultId) => {
+        dispatch({ type: 'VAULT_SELECTED', payload: vaultId })
+        handleNavigate('sync-config')
+      }} />
       case 'profile': return <ProfilePage apiClient={apiClient} />
       case 'sessions': return <SessionsPage apiClient={apiClient} />
       case 'chat': return <ChatPage />
@@ -425,12 +433,17 @@ function AppContent() {
               }}
             />
           : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
+      case 'sync-config':
+        return state.selectedVaultId
+          ? <SyncProvider><SyncConfigPage vaultId={state.selectedVaultId} /></SyncProvider>
+          : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
       default: return null
     }
   }
 
   const isShowingSettings = activeSettingsPage !== null
   const user = authState.user
+  const selectedVault = state.vaults.find((v) => v.id === state.selectedVaultId) ?? null
 
   return (
     <div className="app">
@@ -509,6 +522,7 @@ function AppContent() {
             onExportVault={handleExportVault}
             onNavigate={handleNavigate}
             isAdmin={user?.role === 'admin'}
+            isVaultOwner={selectedVault?.permission === 'owner'}
             globalUnreadCount={globalUnreadCount}
           />
 
