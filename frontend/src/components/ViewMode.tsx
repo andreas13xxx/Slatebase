@@ -1,12 +1,40 @@
-import { type ReactNode, createElement, useMemo } from 'react'
+import { type ReactNode, createElement, useMemo, useState, useEffect, useContext } from 'react'
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
 import remarkGfm from 'remark-gfm'
 import remarkFrontmatter from 'remark-frontmatter'
 import { parse as parseYaml } from 'yaml'
 import hljs from 'highlight.js'
+import {
+  Hash, Pencil as PencilIcon, Info, Lightbulb, AlertTriangle, Zap, Bug, List as ListIcon,
+  Quote, Check, HelpCircle, X as XIcon, ClipboardList,
+} from 'lucide-react'
+import type { Plugin } from 'unified'
 import type { Root, RootContent, PhrasingContent, AlignType } from 'mdast'
 import type { DirectoryTree } from '../types'
+import { AppContext } from '../state'
+import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, createAnchorTracker } from '../plugins'
+import type { WikilinkNode, EmbedNode, CalloutNode, TagNode } from '../plugins'
+
+/**
+ * Mapping of callout types to their Lucide icon component and CSS color token.
+ * Unknown types fall back to 'note' configuration.
+ * Validates: Requirement 7.1, 7.6
+ */
+const CALLOUT_TYPE_MAP: Record<string, { icon: typeof PencilIcon; colorToken: string }> = {
+  note:     { icon: PencilIcon,    colorToken: '--callout-note' },
+  info:     { icon: Info,          colorToken: '--callout-info' },
+  tip:      { icon: Lightbulb,     colorToken: '--callout-tip' },
+  warning:  { icon: AlertTriangle, colorToken: '--callout-warning' },
+  danger:   { icon: Zap,           colorToken: '--callout-danger' },
+  bug:      { icon: Bug,           colorToken: '--callout-bug' },
+  example:  { icon: ListIcon,      colorToken: '--callout-example' },
+  quote:    { icon: Quote,         colorToken: '--callout-quote' },
+  success:  { icon: Check,         colorToken: '--callout-success' },
+  question: { icon: HelpCircle,    colorToken: '--callout-question' },
+  failure:  { icon: XIcon,         colorToken: '--callout-failure' },
+  abstract: { icon: ClipboardList, colorToken: '--callout-abstract' },
+}
 
 /**
  * Props for the ViewMode (Markdown renderer) component.
@@ -16,6 +44,7 @@ export interface ViewModeProps {
   vaultId: string
   directoryTree: DirectoryTree | null
   onInternalLinkClick?: (targetPath: string) => void
+  onTagClick?: (tag: string) => void
   token?: string
 }
 
@@ -69,6 +98,57 @@ function collectFiles(node: DirectoryTree, result: { name: string; path: string 
 
 
 /**
+ * Obsidian remark plugins in the required pipeline order.
+ * Order: Wikilink → Embed → Callout → Tag
+ * Validates: Requirement 11.5
+ */
+const OBSIDIAN_PLUGINS: Array<Plugin<[], Root>> = [
+  remarkWikilink,
+  remarkEmbed,
+  remarkCallout,
+  remarkTag,
+]
+
+/**
+ * Creates a unified pipeline with graceful degradation.
+ * If an individual Obsidian plugin fails to register or causes a parse error,
+ * it is skipped and the remaining plugins continue to function.
+ *
+ * The pipeline uses `.parse()` followed by `.runSync()` to execute both
+ * micromark-based plugins (wikilink, embed, tag) and MDAST transformers (callout).
+ *
+ * Validates: Requirements 11.5, 11.6
+ */
+function createSafePipeline(content: string): Root {
+  let pipeline = unified()
+    .use(remarkParse)
+    .use(remarkFrontmatter, ['yaml'])
+    .use(remarkGfm)
+
+  for (const plugin of OBSIDIAN_PLUGINS) {
+    try {
+      pipeline = pipeline.use(plugin) as unknown as typeof pipeline
+    } catch (err) {
+      console.warn('Obsidian plugin failed to register, skipping:', err)
+    }
+  }
+
+  try {
+    const tree = pipeline.parse(content)
+    // runSync executes transformers (e.g., remarkCallout) on the parsed tree
+    return pipeline.runSync(tree) as Root
+  } catch (err) {
+    console.warn('Pipeline parse/run failed, falling back to base pipeline:', err)
+    // Fallback: parse without any Obsidian plugins
+    return unified()
+      .use(remarkParse)
+      .use(remarkFrontmatter, ['yaml'])
+      .use(remarkGfm)
+      .parse(content)
+  }
+}
+
+/**
  * ViewMode renders Markdown content as formatted React elements.
  *
  * Features:
@@ -78,28 +158,146 @@ function collectFiles(node: DirectoryTree, result: { name: string; path: string 
  * - Code blocks with highlight.js syntax highlighting
  * - GFM tables, blockquotes, horizontal rules
  * - Wikilinks [[target]] and [[target|display]] with resolution against DirectoryTree
+ * - Obsidian embeds ![[file]], callouts > [!type], and inline tags #tag
  * - Standard Markdown links with external/internal/broken classification
  * - Invalid/unparsable syntax rendered as plain text without crashing
  *
- * Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6
+ * Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 11.5, 11.6
  */
-export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick, token }: ViewModeProps) {
+export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick, onTagClick, token }: ViewModeProps) {
   const rendered = useMemo(() => {
     try {
-      const tree = unified()
-        .use(remarkParse)
-        .use(remarkFrontmatter, ['yaml'])
-        .use(remarkGfm)
-        .parse(content)
+      const tree = createSafePipeline(content)
+      const anchorTracker = createAnchorTracker()
 
-      return renderRoot(tree, vaultId, directoryTree, onInternalLinkClick, token)
+      return renderRoot(tree, vaultId, directoryTree, onInternalLinkClick, onTagClick, token, anchorTracker)
     } catch {
       // Req 5.7: Invalid/unparsable syntax rendered as plain text without crashing
       return createElement('pre', { className: 'view-mode-fallback' }, content)
     }
-  }, [content, vaultId, directoryTree, onInternalLinkClick, token])
+  }, [content, vaultId, directoryTree, onInternalLinkClick, onTagClick, token])
 
   return createElement('article', { className: 'view-mode', 'aria-label': 'Markdown-Ansicht' }, rendered)
+}
+
+/**
+ * Props for the NoteEmbed component.
+ */
+interface NoteEmbedProps {
+  vaultId: string
+  filePath: string
+  target: string
+  heading: string | null
+  directoryTree: DirectoryTree | null
+  token?: string
+  embedDepth: number
+}
+
+/**
+ * Component that fetches and renders an embedded note's Markdown content.
+ * Supports heading-based section filtering (e.g. ![[note#heading]]).
+ * Respects MAX_EMBED_DEPTH to prevent infinite recursion.
+ */
+function NoteEmbed({ vaultId, filePath, target, heading, directoryTree, token, embedDepth }: NoteEmbedProps) {
+  const [noteContent, setNoteContent] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const appContext = useContext(AppContext)
+  const apiClient = appContext?.apiClient ?? null
+
+  useEffect(() => {
+    if (!apiClient) {
+      setError('Kein API-Client verfügbar')
+      return
+    }
+
+    let cancelled = false
+
+    apiClient.fetchFileContent(vaultId, filePath)
+      .then(file => {
+        if (cancelled) return
+        let content = file.content
+
+        // If a heading is specified, extract only that section
+        if (heading && content) {
+          content = extractHeadingSection(content, heading)
+        }
+
+        setNoteContent(content)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setError(`Fehler beim Laden: ${target}`)
+      })
+
+    return () => { cancelled = true }
+  }, [apiClient, vaultId, filePath, heading, target])
+
+  if (error) {
+    return createElement('span', { className: 'view-mode-embed view-mode-embed--missing' }, error)
+  }
+
+  if (noteContent === null) {
+    return createElement('span', { className: 'view-mode-embed view-mode-embed--note' },
+      createElement('span', { className: 'view-mode-embed-loading' }, 'Laden…')
+    )
+  }
+
+  // Render the embedded note content using ViewMode (recursive)
+  return createElement('div', { className: 'view-mode-embed view-mode-embed--note' },
+    createElement('span', { className: 'view-mode-embed-header' },
+      createElement('span', { className: 'view-mode-embed-title' }, target)
+    ),
+    createElement(ViewMode, {
+      content: noteContent,
+      vaultId,
+      directoryTree,
+      token,
+    })
+  )
+}
+
+/**
+ * Extracts the content under a specific heading from Markdown text.
+ * Returns all content from the heading until the next heading of same or higher level.
+ * If the heading is not found, returns the full content.
+ */
+function extractHeadingSection(content: string, heading: string): string {
+  const lines = content.split('\n')
+  const headingLower = heading.toLowerCase().trim()
+
+  let startIndex = -1
+  let startLevel = 0
+
+  // Find the target heading
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!
+    const match = line.match(/^(#{1,6})\s+(.+)$/)
+    if (match) {
+      const level = match[1]!.length
+      const text = match[2]!.trim().toLowerCase()
+      if (text === headingLower) {
+        startIndex = i
+        startLevel = level
+        break
+      }
+    }
+  }
+
+  if (startIndex === -1) return content
+
+  // Find the end: next heading of same or higher level
+  let endIndex = lines.length
+  for (let i = startIndex + 1; i < lines.length; i++) {
+    const line = lines[i]!
+    const match = line.match(/^(#{1,6})\s+/)
+    if (match && match[1]!.length <= startLevel) {
+      endIndex = i
+      break
+    }
+  }
+
+  return lines.slice(startIndex, endIndex).join('\n')
 }
 
 /**
@@ -111,7 +309,9 @@ function renderRoot(
   vaultId: string,
   directoryTree: DirectoryTree | null,
   onInternalLinkClick?: (targetPath: string) => void,
-  token?: string
+  onTagClick?: (tag: string) => void,
+  token?: string,
+  anchorTracker?: ReturnType<typeof createAnchorTracker>
 ): ReactNode {
   const children = root.children
   const sections = groupByHeadings(children)
@@ -119,9 +319,9 @@ function renderRoot(
   const elements: ReactNode[] = []
   sections.forEach((section, i) => {
     if (section.type === 'content') {
-      elements.push(...renderBlockNodes(section.nodes, vaultId, directoryTree, onInternalLinkClick, `root-${i}`, token))
+      elements.push(...renderBlockNodes(section.nodes, vaultId, directoryTree, onInternalLinkClick, `root-${i}`, token, anchorTracker, onTagClick))
     } else {
-      elements.push(renderHeadingSection(section, vaultId, directoryTree, onInternalLinkClick, `section-${i}`, token))
+      elements.push(renderHeadingSection(section, vaultId, directoryTree, onInternalLinkClick, `section-${i}`, token, anchorTracker, onTagClick))
     }
   })
 
@@ -198,8 +398,28 @@ function groupByHeadings(nodes: RootContent[]): SectionGroup[] {
 }
 
 /**
+ * Extracts plain text from an array of phrasing content nodes.
+ * Used for generating heading anchor IDs from heading children.
+ */
+function extractPlainText(nodes: PhrasingContent[]): string {
+  let text = ''
+  for (const node of nodes) {
+    if (node.type === 'text') {
+      text += node.value
+    } else if (node.type === 'inlineCode') {
+      text += node.value
+    } else if ('children' in node && Array.isArray(node.children)) {
+      text += extractPlainText(node.children as PhrasingContent[])
+    }
+  }
+  return text
+}
+
+/**
  * Renders a heading section as a collapsible <details>/<summary> element.
  * Default expanded (open attribute).
+ * Adds id attribute to heading elements for anchor navigation.
+ * Validates: Requirements 3.1, 3.2, 3.3, 3.4
  */
 function renderHeadingSection(
   section: HeadingSection,
@@ -207,25 +427,31 @@ function renderHeadingSection(
   directoryTree: DirectoryTree | null,
   onInternalLinkClick: ((targetPath: string) => void) | undefined,
   key: string,
-  token?: string
+  token?: string,
+  anchorTracker?: ReturnType<typeof createAnchorTracker>,
+  onTagClick?: (tag: string) => void
 ): ReactNode {
   const HeadingTag = `h${section.depth}` as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
-  const headingContent = renderPhrasingNodes(section.headingChildren, vaultId, directoryTree, onInternalLinkClick, `${key}-heading`, token)
+  const headingContent = renderPhrasingNodes(section.headingChildren, vaultId, directoryTree, onInternalLinkClick, `${key}-heading`, token, onTagClick)
+
+  // Extract plain text from heading children for anchor generation
+  const headingText = extractPlainText(section.headingChildren)
+  const anchorId = anchorTracker ? anchorTracker.getAnchor(headingText) : undefined
 
   // Recursively group the body content for nested headings
   const bodyGroups = groupByHeadings(section.body)
   const bodyElements: ReactNode[] = []
   bodyGroups.forEach((group, i) => {
     if (group.type === 'content') {
-      bodyElements.push(...renderBlockNodes(group.nodes, vaultId, directoryTree, onInternalLinkClick, `${key}-body-${i}`, token))
+      bodyElements.push(...renderBlockNodes(group.nodes, vaultId, directoryTree, onInternalLinkClick, `${key}-body-${i}`, token, anchorTracker, onTagClick))
     } else {
-      bodyElements.push(renderHeadingSection(group, vaultId, directoryTree, onInternalLinkClick, `${key}-body-${i}`, token))
+      bodyElements.push(renderHeadingSection(group, vaultId, directoryTree, onInternalLinkClick, `${key}-body-${i}`, token, anchorTracker, onTagClick))
     }
   })
 
   return createElement('details', { key, open: true, className: `view-mode-section view-mode-section--h${section.depth}` },
     createElement('summary', { className: 'view-mode-section-summary' },
-      createElement(HeadingTag, null, headingContent)
+      createElement(HeadingTag, { id: anchorId }, headingContent)
     ),
     ...bodyElements
   )
@@ -240,9 +466,12 @@ function renderBlockNodes(
   directoryTree: DirectoryTree | null,
   onInternalLinkClick: ((targetPath: string) => void) | undefined,
   keyPrefix: string,
-  token?: string
+  token?: string,
+  anchorTracker?: ReturnType<typeof createAnchorTracker>,
+  onTagClick?: (tag: string) => void,
+  embedDepth: number = 0
 ): ReactNode[] {
-  return nodes.map((node, i) => renderBlockNode(node, vaultId, directoryTree, onInternalLinkClick, `${keyPrefix}-${i}`, token))
+  return nodes.map((node, i) => renderBlockNode(node, vaultId, directoryTree, onInternalLinkClick, `${keyPrefix}-${i}`, token, anchorTracker, onTagClick, embedDepth))
 }
 
 /**
@@ -254,34 +483,43 @@ function renderBlockNode(
   directoryTree: DirectoryTree | null,
   onInternalLinkClick: ((targetPath: string) => void) | undefined,
   key: string,
-  token?: string
+  token?: string,
+  anchorTracker?: ReturnType<typeof createAnchorTracker>,
+  onTagClick?: (tag: string) => void,
+  embedDepth: number = 0
 ): ReactNode {
   switch (node.type) {
     case 'paragraph':
       return createElement('p', { key },
-        renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token)
+        renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token, onTagClick)
       )
 
     case 'heading':
       // Standalone heading (shouldn't normally appear here due to grouping, but handle gracefully)
       return renderHeadingSection(
         { type: 'heading', depth: node.depth, headingChildren: node.children, body: [] },
-        vaultId, directoryTree, onInternalLinkClick, key, token
+        vaultId, directoryTree, onInternalLinkClick, key, token, anchorTracker, onTagClick
       )
 
     case 'blockquote':
       return createElement('blockquote', { key },
-        renderBlockNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token)
+        renderBlockNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token, anchorTracker, onTagClick, embedDepth)
       )
+
+    case 'callout':
+      return renderCalloutNode(node as unknown as CalloutNode, vaultId, directoryTree, onInternalLinkClick, key, token, anchorTracker, onTagClick, embedDepth)
+
+    case 'embed':
+      return renderEmbedNode(node as unknown as EmbedNode, vaultId, directoryTree, key, token, embedDepth)
 
     case 'code':
       return renderCodeBlock(node.value, node.lang, key)
 
     case 'list':
-      return renderList(node, vaultId, directoryTree, onInternalLinkClick, key, token)
+      return renderList(node, vaultId, directoryTree, onInternalLinkClick, key, token, anchorTracker, onTagClick)
 
     case 'table':
-      return renderTable(node, vaultId, directoryTree, onInternalLinkClick, key, token)
+      return renderTable(node, vaultId, directoryTree, onInternalLinkClick, key, token, onTagClick)
 
     case 'thematicBreak':
       return createElement('hr', { key })
@@ -390,7 +628,9 @@ function renderList(
   directoryTree: DirectoryTree | null,
   onInternalLinkClick: ((targetPath: string) => void) | undefined,
   key: string,
-  token?: string
+  token?: string,
+  anchorTracker?: ReturnType<typeof createAnchorTracker>,
+  onTagClick?: (tag: string) => void
 ): ReactNode {
   const Tag = node.ordered ? 'ol' : 'ul'
   const attrs: Record<string, unknown> = { key }
@@ -411,12 +651,12 @@ function renderList(
           readOnly: true,
           'aria-label': item.checked ? 'Erledigt' : 'Offen',
         }),
-        renderBlockNodes(item.children as RootContent[], vaultId, directoryTree, onInternalLinkClick, itemKey, token)
+        renderBlockNodes(item.children as RootContent[], vaultId, directoryTree, onInternalLinkClick, itemKey, token, anchorTracker, onTagClick)
       )
     }
 
     return createElement('li', { key: itemKey },
-      renderBlockNodes(item.children as RootContent[], vaultId, directoryTree, onInternalLinkClick, itemKey, token)
+      renderBlockNodes(item.children as RootContent[], vaultId, directoryTree, onInternalLinkClick, itemKey, token, anchorTracker, onTagClick)
     )
   })
 
@@ -433,7 +673,8 @@ function renderTable(
   directoryTree: DirectoryTree | null,
   onInternalLinkClick: ((targetPath: string) => void) | undefined,
   key: string,
-  token?: string
+  token?: string,
+  onTagClick?: (tag: string) => void
 ): ReactNode {
   const align = node.align ?? []
   const rows = node.children
@@ -453,7 +694,7 @@ function renderTable(
           key: `${key}-th-${ci}`,
           style: align[ci] ? { textAlign: align[ci] as string } : undefined,
         },
-          renderPhrasingNodes(cell.children, vaultId, directoryTree, onInternalLinkClick, `${key}-th-${ci}`, token)
+          renderPhrasingNodes(cell.children, vaultId, directoryTree, onInternalLinkClick, `${key}-th-${ci}`, token, onTagClick)
         )
       )
     )
@@ -468,7 +709,7 @@ function renderTable(
                 key: `${key}-td-${ri}-${ci}`,
                 style: align[ci] ? { textAlign: align[ci] as string } : undefined,
               },
-                renderPhrasingNodes(cell.children, vaultId, directoryTree, onInternalLinkClick, `${key}-td-${ri}-${ci}`, token)
+                renderPhrasingNodes(cell.children, vaultId, directoryTree, onInternalLinkClick, `${key}-td-${ri}-${ci}`, token, onTagClick)
               )
             )
           )
@@ -488,9 +729,10 @@ function renderPhrasingNodes(
   directoryTree: DirectoryTree | null,
   onInternalLinkClick: ((targetPath: string) => void) | undefined,
   keyPrefix: string,
-  token?: string
+  token?: string,
+  onTagClick?: (tag: string) => void
 ): ReactNode[] {
-  return nodes.map((node, i) => renderPhrasingNode(node, vaultId, directoryTree, onInternalLinkClick, `${keyPrefix}-${i}`, token))
+  return nodes.map((node, i) => renderPhrasingNode(node, vaultId, directoryTree, onInternalLinkClick, `${keyPrefix}-${i}`, token, onTagClick))
 }
 
 /**
@@ -503,7 +745,8 @@ function renderPhrasingNode(
   directoryTree: DirectoryTree | null,
   onInternalLinkClick: ((targetPath: string) => void) | undefined,
   key: string,
-  token?: string
+  token?: string,
+  onTagClick?: (tag: string) => void
 ): ReactNode {
   switch (node.type) {
     case 'text':
@@ -511,17 +754,17 @@ function renderPhrasingNode(
 
     case 'strong':
       return createElement('strong', { key },
-        renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token)
+        renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token, onTagClick)
       )
 
     case 'emphasis':
       return createElement('em', { key },
-        renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token)
+        renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token, onTagClick)
       )
 
     case 'delete':
       return createElement('del', { key },
-        renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token)
+        renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token, onTagClick)
       )
 
     case 'inlineCode':
@@ -532,6 +775,16 @@ function renderPhrasingNode(
 
     case 'link':
       return renderLink(node, vaultId, directoryTree, onInternalLinkClick, key, token)
+
+    case 'wikilink':
+      return renderWikilinkNode(node as unknown as WikilinkNode, vaultId, directoryTree, onInternalLinkClick, key)
+
+    case 'tag':
+      return renderTagNode(node as unknown as TagNode, key, onTagClick)
+
+    case 'embed' as PhrasingContent['type']:
+      // Embeds can appear as phrasing content inside paragraphs
+      return renderEmbedNode(node as unknown as EmbedNode, vaultId, directoryTree, key, token)
 
     case 'image':
       // Req 7.5: Render inline images with max-width 100%
@@ -553,7 +806,7 @@ function renderPhrasingNode(
     case 'linkReference':
       // Render link reference as plain text (definitions not resolved here)
       return createElement('span', { key },
-        renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token)
+        renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token, onTagClick)
       )
 
     default:
@@ -599,12 +852,36 @@ export function findFileInTree(tree: DirectoryTree | null, filename: string): st
 }
 
 /**
+ * Normalizes a file path for comparison and API usage:
+ * - URL-decodes percent-encoded characters (e.g. %20 → space)
+ * - Replaces backslashes with forward slashes
+ * - Strips leading `./` prefix
+ * - Collapses duplicate slashes
+ */
+function normalizeImagePath(filePath: string): string {
+  let normalized: string
+  try {
+    normalized = decodeURIComponent(filePath)
+  } catch {
+    normalized = filePath
+  }
+  normalized = normalized.replace(/\\/g, '/')
+  // Strip leading ./
+  if (normalized.startsWith('./')) {
+    normalized = normalized.slice(2)
+  }
+  // Collapse duplicate slashes
+  normalized = normalized.replace(/\/+/g, '/')
+  return normalized
+}
+
+/**
  * Checks if a path exists in the DirectoryTree.
  */
 function pathExistsInTree(tree: DirectoryTree | null, filePath: string): boolean {
   if (!tree) return false
 
-  const normalizedPath = filePath.replace(/\\/g, '/')
+  const normalizedPath = normalizeImagePath(filePath)
 
   function search(node: DirectoryTree): boolean {
     const nodePath = node.path.replace(/\\/g, '/')
@@ -644,8 +921,11 @@ function renderImage(
   key: string,
   token?: string
 ): ReactNode {
+  // Normalize the path (backslashes → forward slashes, strip ./ prefix)
+  const normalizedUrl = normalizeImagePath(url)
+
   // Check if the image exists in the vault tree
-  const exists = pathExistsInTree(directoryTree, url)
+  const exists = pathExistsInTree(directoryTree, normalizedUrl)
 
   if (!exists) {
     // Req 7.6: Show placeholder notice for images not found
@@ -656,7 +936,7 @@ function renderImage(
 
   return createElement('img', {
     key,
-    src: buildImageSrc(vaultId, url, token),
+    src: buildImageSrc(vaultId, normalizedUrl, token),
     alt: alt ?? '',
     style: { maxWidth: '100%', height: 'auto' },
     className: 'view-mode-image',
@@ -768,6 +1048,231 @@ function renderTextWithEmbeds(
 
   if (parts.length === 0) return text
   return parts.length === 1 ? parts[0] : parts
+}
+
+/**
+ * Renders a WikilinkNode as an internal link.
+ * Resolves the target against the DirectoryTree and applies broken-link styling if not found.
+ * Handles heading-fragment navigation:
+ * - [[Page#Heading]]: navigates to page, then scrolls to heading anchor
+ * - [[#Heading]]: scrolls to heading anchor on current page
+ * Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5
+ */
+function renderWikilinkNode(
+  node: WikilinkNode,
+  _vaultId: string,
+  directoryTree: DirectoryTree | null,
+  onInternalLinkClick: ((targetPath: string) => void) | undefined,
+  key: string
+): ReactNode {
+  const target = node.target
+  const displayText = node.display
+  const heading = node.heading
+
+  // Same-page heading link: [[#Heading]]
+  if (!target && heading) {
+    return createElement('a', {
+      key,
+      href: '#',
+      className: 'view-mode-link view-mode-link--internal',
+      onClick: (e: React.MouseEvent) => {
+        e.preventDefault()
+        scrollToHeadingAnchor(heading)
+      },
+    }, displayText)
+  }
+
+  // Resolve the wikilink target against the directory tree
+  const resolvedPath = resolveWikilinkTarget(target, directoryTree)
+  const isBroken = resolvedPath === null
+
+  const linkPath = resolvedPath ?? `${target}.md`
+  const className = isBroken
+    ? 'view-mode-link view-mode-link--internal view-mode-link--broken'
+    : 'view-mode-link view-mode-link--internal'
+
+  return createElement('a', {
+    key,
+    href: '#',
+    className,
+    onClick: (e: React.MouseEvent) => {
+      e.preventDefault()
+      onInternalLinkClick?.(linkPath)
+      // If there's a heading fragment and link is resolved, scroll to it after navigation
+      if (heading && !isBroken) {
+        // Use setTimeout to allow the target page to render before scrolling
+        setTimeout(() => scrollToHeadingAnchor(heading), 100)
+      }
+    },
+  }, displayText)
+}
+
+/**
+ * Scrolls to a heading anchor element on the current page.
+ * Generates the normalized anchor from the heading text and scrolls to the matching element.
+ * Validates: Requirements 2.4, 2.5
+ */
+function scrollToHeadingAnchor(heading: string): void {
+  // Generate the anchor ID using the same normalization as createAnchorTracker
+  const anchorId = heading
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9äöüß\-_]/g, '')
+
+  const element = document.getElementById(anchorId)
+  if (element) {
+    element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+}
+
+/**
+ * Renders a TagNode as an inline element with tag styling and Hash icon.
+ * Validates: Requirements 9.1, 9.2, 9.3
+ */
+function renderTagNode(
+  node: TagNode,
+  key: string,
+  onTagClick?: (tag: string) => void
+): ReactNode {
+  return createElement('span', {
+    key,
+    className: 'view-mode-tag',
+    onClick: () => onTagClick?.(node.tag),
+  },
+    createElement(Hash, { size: 12 }),
+    node.tag
+  )
+}
+
+/**
+ * Maximum recursion depth for nested note embeds.
+ * Prevents infinite loops from circular references (A embeds B, B embeds A).
+ * Validates: Requirement 5.7
+ */
+const MAX_EMBED_DEPTH = 3
+
+/**
+ * Renders an EmbedNode as an image or note embed.
+ *
+ * Image embeds: Resolves target using resolveWikilinkTarget, renders <img> with vault API URL.
+ * Shows placeholder if image not found in DirectoryTree.
+ *
+ * Note embeds: Renders a visually distinct container with target info.
+ * If heading fragment exists, shows the section reference.
+ * Enforces recursion depth limit (max 3 levels) to prevent circular reference loops.
+ *
+ * Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7
+ */
+function renderEmbedNode(
+  node: EmbedNode,
+  vaultId: string,
+  directoryTree: DirectoryTree | null,
+  key: string,
+  token?: string,
+  embedDepth: number = 0
+): ReactNode {
+  // Requirement 5.7: Recursion depth check — stop at max 3 levels
+  if (embedDepth > MAX_EMBED_DEPTH) {
+    return createElement('span', {
+      key,
+      className: 'view-mode-embed view-mode-embed--depth-limit',
+    }, 'Maximale Einbettungstiefe erreicht')
+  }
+
+  if (node.embedType === 'image') {
+    // Requirement 5.1: Resolve image target using resolveWikilinkTarget
+    const resolvedPath = resolveWikilinkTarget(node.target, directoryTree)
+    if (resolvedPath) {
+      // Render <img> with vault API URL
+      return createElement('img', {
+        key,
+        src: buildImageSrc(vaultId, resolvedPath, token),
+        alt: node.target,
+        style: { maxWidth: '100%', height: 'auto' },
+        className: 'view-mode-image view-mode-embed view-mode-embed--image',
+      })
+    }
+    // Requirement 5.2: Placeholder if image not found
+    return createElement('span', {
+      key,
+      className: 'view-mode-embed view-mode-embed--missing',
+    }, `Bild nicht gefunden: ${node.target}`)
+  }
+
+  // Note embed — render as styled placeholder container
+  // Requirement 5.3: Visually distinct container for note embeds
+  const resolvedNotePath = resolveWikilinkTarget(node.target, directoryTree)
+  const noteExists = resolvedNotePath !== null
+
+  if (!noteExists) {
+    // Requirement 5.5: Placeholder if note not found
+    return createElement('span', {
+      key,
+      className: 'view-mode-embed view-mode-embed--missing',
+    }, `Notiz nicht gefunden: ${node.target}`)
+  }
+
+  // Render note embed as a component that fetches and displays the content
+  return createElement(NoteEmbed, {
+    key,
+    vaultId,
+    filePath: resolvedNotePath,
+    target: node.target,
+    heading: node.heading,
+    directoryTree,
+    token,
+    embedDepth: embedDepth + 1,
+  })
+}
+
+/**
+ * Renders a CalloutNode as a styled callout box with type-specific icon and color.
+ * Uses CALLOUT_TYPE_MAP for icon/color lookup, falls back to 'note' for unknown types.
+ * Foldable callouts use <details>/<summary>, non-foldable use plain <div>.
+ * Validates: Requirements 7.1, 7.2, 7.3, 7.4, 7.5, 7.6
+ */
+function renderCalloutNode(
+  node: CalloutNode,
+  vaultId: string,
+  directoryTree: DirectoryTree | null,
+  onInternalLinkClick: ((targetPath: string) => void) | undefined,
+  key: string,
+  token?: string,
+  anchorTracker?: ReturnType<typeof createAnchorTracker>,
+  _onTagClick?: (tag: string) => void,
+  embedDepth: number = 0
+): ReactNode {
+  // Requirement 7.6: Unknown callout types fall back to 'note' configuration
+  const config = CALLOUT_TYPE_MAP[node.calloutType] ?? CALLOUT_TYPE_MAP['note']!
+  const Icon = config.icon
+
+  const header = createElement('div', { className: 'view-mode-callout-header' },
+    createElement(Icon, { size: 16, className: 'view-mode-callout-icon' }),
+    createElement('span', { className: 'view-mode-callout-title' }, node.title)
+  )
+
+  const body = createElement('div', { className: 'view-mode-callout-body' },
+    renderBlockNodes(node.body, vaultId, directoryTree, onInternalLinkClick, `${key}-body`, token, anchorTracker, _onTagClick, embedDepth)
+  )
+
+  // Requirement 7.2: Foldable callouts use <details>/<summary>
+  if (node.foldable) {
+    return createElement('details', {
+      key,
+      className: `view-mode-callout view-mode-callout--${node.calloutType}`,
+      // Requirement 7.3: defaultOpen: true sets the open attribute
+      open: node.defaultOpen,
+    },
+      createElement('summary', null, header),
+      body
+    )
+  }
+
+  // Requirement 7.4: Non-foldable callouts are always visible (no <details>)
+  return createElement('div', {
+    key,
+    className: `view-mode-callout view-mode-callout--${node.calloutType}`,
+  }, header, body)
 }
 
 /**

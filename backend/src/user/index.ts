@@ -679,6 +679,12 @@ const TEMP_PASSWORD_LENGTH = 12
  */
 export type CheckVaultOwnershipFn = (userId: string) => Promise<boolean>
 
+/**
+ * Callback invoked when a user is deleted or suspended.
+ * Used to invalidate external resources (e.g., MCP tokens).
+ */
+export type OnUserInvalidatedFn = (userId: string) => Promise<void>
+
 // ─── UserService Implementation ──────────────────────────────────────────────
 
 /**
@@ -693,7 +699,8 @@ export class UserService implements IUserService {
     private readonly sessionStore: ISessionStore,
     private readonly logger: ILogger,
     private readonly checkVaultOwnership?: CheckVaultOwnershipFn,
-    private readonly auditService?: IAuditService
+    private readonly auditService?: IAuditService,
+    private readonly onUserInvalidated?: OnUserInvalidatedFn
   ) {}
 
   /**
@@ -779,6 +786,9 @@ export class UserService implements IUserService {
 
     // Invalidate all sessions for this user
     await this.sessionStore.invalidateAllForUser(userId)
+
+    // Notify external services (e.g., MCP token invalidation)
+    await this.onUserInvalidated?.(userId)
 
     // Delete the user record
     await this.userRepository.delete(userId)
@@ -1008,6 +1018,10 @@ export class UserService implements IUserService {
 
     // Invalidate all sessions for the suspended user
     await this.sessionStore.invalidateAllForUser(userId)
+
+    // Notify external services (e.g., MCP token invalidation)
+    await this.onUserInvalidated?.(userId)
+
     this.logger.info('User suspended', { userId })
 
     await this.auditService?.log({
@@ -1086,6 +1100,9 @@ export class UserService implements IUserService {
 
     // Invalidate all sessions
     await this.sessionStore.invalidateAllForUser(userId)
+
+    // Notify external services (e.g., MCP token invalidation)
+    await this.onUserInvalidated?.(userId)
 
     // Delete the user record
     await this.userRepository.delete(userId)

@@ -44,6 +44,29 @@ export interface UserSearchResult {
 }
 
 /**
+ * Public API token info returned by the backend (no raw token value).
+ */
+export interface McpTokenInfo {
+  tokenId: string
+  name: string
+  createdAt: string
+  expiresAt: string
+  lastUsedAt: string | null
+  status: 'active' | 'expired' | 'revoked'
+  maskedToken: string
+}
+
+/**
+ * Result of creating a new API token (includes raw token, shown only once).
+ */
+export interface McpTokenCreateResult {
+  token: string
+  tokenId: string
+  name: string
+  expiresAt: string
+}
+
+/**
  * Interface for the Slatebase API client.
  * All methods throw an AppError on non-2xx responses.
  */
@@ -128,6 +151,14 @@ export interface IApiClient {
   getSyncConflicts(vaultId: string): Promise<ConflictEntry[]>
   /** Resolve a sync conflict for a specific document. */
   resolveSyncConflict(vaultId: string, documentPath: string, resolution: string): Promise<void>
+
+  // --- MCP Token methods ---
+  /** List the current user's API tokens. */
+  listMcpTokens(): Promise<McpTokenInfo[]>
+  /** Create a new API token. */
+  createMcpToken(name: string, expiryDays: number): Promise<McpTokenCreateResult>
+  /** Revoke an API token by ID. */
+  revokeMcpToken(tokenId: string): Promise<void>
 }
 
 /**
@@ -407,6 +438,23 @@ export class ApiClient implements IApiClient {
   async resolveSyncConflict(vaultId: string, documentPath: string, resolution: string): Promise<void> {
     const encodedPath = encodeURIComponent(documentPath)
     await this.request<void>('POST', `/api/v1/vaults/${vaultId}/sync/conflicts/${encodedPath}/resolve`, { resolution })
+  }
+
+  // --- MCP Token methods ---
+
+  /** List the current user's API tokens. */
+  async listMcpTokens(): Promise<McpTokenInfo[]> {
+    return this.request<McpTokenInfo[]>('GET', '/api/v1/mcp/tokens')
+  }
+
+  /** Create a new API token. */
+  async createMcpToken(name: string, expiryDays: number): Promise<McpTokenCreateResult> {
+    return this.request<McpTokenCreateResult>('POST', '/api/v1/mcp/tokens', { name, expiryDays })
+  }
+
+  /** Revoke an API token by ID. */
+  async revokeMcpToken(tokenId: string): Promise<void> {
+    await this.request<void>('DELETE', `/api/v1/mcp/tokens/${tokenId}`)
   }
 
   // --- Internal helpers ---

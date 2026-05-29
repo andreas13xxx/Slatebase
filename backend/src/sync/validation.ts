@@ -108,7 +108,7 @@ export const setupUriSchema = z
   .string()
   .trim()
   .min(1, 'Setup-URI must not be empty')
-  .max(4096, 'Setup-URI must be at most 4096 characters')
+  .max(16384, 'Setup-URI must be at most 16384 characters')
 
 // ─── Composite Schemas ───────────────────────────────────────────────────────
 

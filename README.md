@@ -79,6 +79,7 @@ npm run dev
 | 🌙 **Dark Mode** | Automatic light/dark theme based on system preference (or manual override) |
 | 💬 **User Chat** | Real-time messaging between users with unread badges and conversation management |
 | 🔄 **Vault Sync** | CouchDB/obsidian-livesync compatible synchronization with conflict resolution |
+| 🤖 **MCP Context Server** | AI assistants (Claude, Cursor, etc.) access your vaults via Model Context Protocol |
 | 🌐 **i18n** | German and English UI, switchable per user |
 | 🛡️ **Admin Panel** | User management, audit log, server configuration |
 | 🐳 **Docker Ready** | Multi-stage Dockerfile, runs as non-root user |
@@ -113,6 +114,9 @@ Backend configuration via `backend/config/default.json`, overridden by environme
 | `SLATEBASE_ALLOWED_ORIGINS` | CORS origins (comma-separated) | `http://localhost:5173` |
 | `SLATEBASE_CSRF_SECRET` | CSRF token secret (set for persistence across restarts) | random |
 | `SLATEBASE_SYNC_SECRET` | Sync credential encryption secret (set for persistence) | random |
+| `SLATEBASE_MCP_ENABLED` | Enable/disable MCP server | `true` |
+| `SLATEBASE_MCP_MAX_FILE_SIZE` | Max file size for MCP reads (bytes) | `5242880` (5 MB) |
+| `SLATEBASE_MCP_RATE_LIMIT` | Max MCP requests per minute per token | `60` |
 
 ## Development
 
@@ -221,17 +225,120 @@ All routes under `/api/v1`. Authentication required (Bearer token via `Authoriza
 | GET | `/vaults/:vaultId/sync/conflicts` | Get open conflicts |
 | POST | `/vaults/:vaultId/sync/conflicts/:path/resolve` | Resolve conflict |
 
+### MCP (Model Context Protocol)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST/GET/DELETE | `/api/v1/mcp` | Bearer Token | MCP Streamable HTTP transport |
+| GET | `/api/v1/mcp/tokens` | Session | List user's API tokens |
+| POST | `/api/v1/mcp/tokens` | Session + CSRF | Create new API token |
+| DELETE | `/api/v1/mcp/tokens/:tokenId` | Session + CSRF | Revoke a token |
+| GET | `/.well-known/mcp.json` | None | MCP discovery metadata |
+
 </details>
+
+## MCP — AI Assistant Integration
+
+Slatebase includes a built-in [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that allows AI assistants like Claude, Cursor, or Continue to access your vault contents as context.
+
+### How it works
+
+1. **Create an API token** via the Slatebase web UI (Profile → MCP Tokens) or the API
+2. **Configure your MCP client** to connect to your Slatebase instance
+3. **AI assistants can now** list your vaults, read files, search content, and browse directory structures
+
+### Quick Setup
+
+#### 1. Create an API Token
+
+```bash
+# Via API (replace with your session cookie)
+curl -X POST http://localhost:3000/api/v1/mcp/tokens \
+  -H "Content-Type: application/json" \
+  -H "X-CSRF-Token: <your-csrf-token>" \
+  -H "Cookie: session=<your-session-token>" \
+  -d '{"name": "Claude Desktop", "expiryDays": 90}'
+
+# Response: { "token": "abc123...def456", "tokenId": "...", "expiresAt": "..." }
+# ⚠️ Save the token — it's shown only once!
+```
+
+#### 2. Configure your MCP Client
+
+**Claude Desktop** (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "slatebase": {
+      "url": "http://localhost:3000/api/v1/mcp",
+      "headers": {
+        "Authorization": "Bearer <your-api-token>"
+      }
+    }
+  }
+}
+```
+
+**Cursor / Continue** (or any MCP-compatible client):
+
+Use the discovery endpoint to auto-detect capabilities:
+```
+GET http://localhost:3000/.well-known/mcp.json
+```
+
+### Available MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_vaults` | List all vaults you have access to (with name, permission, file count) |
+| `get_vault_structure` | Get the directory tree of a vault as JSON |
+| `search_vault` | Full-text search across all files in a vault |
+| `read_file` | Read the content of a specific file |
+
+### Available MCP Resources
+
+| URI Pattern | Description |
+|-------------|-------------|
+| `vault://<vaultId>/` | Directory tree as JSON |
+| `vault://<vaultId>/<path>` | File content (Markdown as `text/markdown`, others as `text/plain`) |
+
+### Token Management
+
+- Each user can have up to **10 active tokens**
+- Tokens expire after the configured period (7–365 days, default: 90)
+- Tokens can be revoked immediately via the web UI or API
+- Token usage is logged (last used timestamp visible in token list)
+- Tokens are invalidated automatically when a user is deleted or suspended
+
+### Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SLATEBASE_MCP_ENABLED` | Enable/disable the MCP server | `true` |
+| `SLATEBASE_MCP_MAX_FILE_SIZE` | Max file size for MCP reads | `5242880` (5 MB) |
+| `SLATEBASE_MCP_RATE_LIMIT` | Max requests per minute per token | `60` |
+
+Set `SLATEBASE_MCP_ENABLED=false` to completely disable the MCP server (no routes registered, `.well-known/mcp.json` returns 404).
+
+### Security
+
+- Tokens are stored as SHA-256 hashes (raw value never persisted)
+- Each token is scoped to the creating user's vault permissions
+- Rate limiting prevents abuse (HTTP 429 with `Retry-After` header)
+- All MCP access is logged in the audit trail
+- Path traversal protection on all file operations
 
 ## Project Structure
 
 ```
 backend/           — Node.js REST API (Hono + TypeScript)
 ├── src/           — Source code (layered architecture)
+│   ├── mcp/       — MCP Context Server (token auth, resources, tools)
 │   ├── chat/      — Chat module (conversations, messages, unread)
 │   └── sync/      — Sync module (CouchDB sync, conflicts, scheduling)
 ├── config/        — Default configuration
-└── data/          — Runtime data (vaults, users, sessions, chat, sync, audit)
+└── data/          — Runtime data (vaults, users, sessions, chat, sync, mcp, audit)
 
 frontend/          — React SPA (Vite + TypeScript)
 ├── src/

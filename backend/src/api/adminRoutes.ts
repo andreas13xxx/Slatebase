@@ -15,6 +15,7 @@ import type { IAuthService, SessionContext } from '../auth/index.js'
 import type { IAuditService, AuditAction } from '../audit/index.js'
 import type { IConfigService } from '../config/index.js'
 import type { ILogger } from '../logger/index.js'
+import type { IServerLogStore, LogLevel } from '../logger/index.js'
 import { createUserSchema, roleSchema } from '../user/validation.js'
 import { serverConfigUpdateSchema } from '../auth/validation.js'
 import type { RouteModule } from './index.js'
@@ -75,6 +76,8 @@ export interface IAdminController {
   restart(c: Context): Promise<Response>
   /** GET /admin/audit — Paginated audit log with filters. */
   getAuditLog(c: Context): Promise<Response>
+  /** GET /admin/logs — Paginated server log with filters. */
+  getServerLogs(c: Context): Promise<Response>
 }
 
 // ─── AdminController Implementation ─────────────────────────────────────────
@@ -91,6 +94,7 @@ export class AdminController implements IAdminController {
     private readonly auditService: IAuditService,
     private readonly configService: IConfigService,
     private readonly logger: ILogger,
+    private readonly serverLogStore?: IServerLogStore,
   ) {}
 
   /**
@@ -390,6 +394,65 @@ export class AdminController implements IAdminController {
   }
 
   /**
+   * GET /admin/logs — Returns paginated server log entries with optional filters.
+   * Accepts query params: level, startDate, endDate, search, page, pageSize.
+   */
+  async getServerLogs(c: Context): Promise<Response> {
+    if (!this.serverLogStore) {
+      return c.json(createApiError('INTERNAL_ERROR', 'Server log store not configured'), 500)
+    }
+
+    try {
+      const levelParam = c.req.query('level')
+      const startDate = c.req.query('startDate')
+      const endDate = c.req.query('endDate')
+      const search = c.req.query('search')
+      const pageParam = c.req.query('page')
+      const pageSizeParam = c.req.query('pageSize')
+
+      const page = pageParam !== undefined ? parseInt(pageParam, 10) : 1
+      const pageSize = pageSizeParam !== undefined ? parseInt(pageSizeParam, 10) : 50
+
+      if (isNaN(page) || page < 1) {
+        return c.json(createApiError('VALIDATION_ERROR', 'Page must be a positive integer'), 400)
+      }
+
+      if (isNaN(pageSize) || pageSize < 1 || pageSize > 100) {
+        return c.json(createApiError('VALIDATION_ERROR', 'Page size must be between 1 and 100'), 400)
+      }
+
+      const validLevels = new Set(['debug', 'info', 'warn', 'error'])
+      if (levelParam !== undefined && !validLevels.has(levelParam)) {
+        return c.json(createApiError('VALIDATION_ERROR', 'Level must be one of: debug, info, warn, error'), 400)
+      }
+
+      const filter: { level?: LogLevel; startDate?: string; endDate?: string; search?: string; page: number; pageSize: number } = {
+        page,
+        pageSize,
+      }
+
+      if (levelParam !== undefined) {
+        filter.level = levelParam as LogLevel
+      }
+      if (startDate !== undefined) {
+        filter.startDate = startDate
+      }
+      if (endDate !== undefined) {
+        filter.endDate = endDate
+      }
+      if (search !== undefined) {
+        filter.search = search
+      }
+
+      const result = await this.serverLogStore.query(filter)
+
+      return c.json(result, 200)
+    } catch (error) {
+      return this.handleError(c, error)
+    }
+  }
+
+  /**
    * Maps domain errors to HTTP status codes and structured ApiError responses.
    */
   private handleError(c: Context, error: unknown): Response {
@@ -444,6 +507,8 @@ export interface AdminRouteDependencies {
   auditService: IAuditService
   configService: IConfigService
   logger: ILogger
+  /** Optional server log store for the admin log viewer. */
+  serverLogStore?: IServerLogStore
   /** Callback that performs a graceful server restart. */
   restartFn?: () => Promise<void>
 }
@@ -462,6 +527,7 @@ export function createAdminRoutes(deps: AdminRouteDependencies): Hono {
     deps.auditService,
     deps.configService,
     deps.logger,
+    deps.serverLogStore,
   )
 
   // Admin-only middleware: reject non-admin users with 403
@@ -496,6 +562,9 @@ export function createAdminRoutes(deps: AdminRouteDependencies): Hono {
 
   // Audit log
   app.get('/audit', (c) => controller.getAuditLog(c))
+
+  // Server logs
+  app.get('/logs', (c) => controller.getServerLogs(c))
 
   return app
 }

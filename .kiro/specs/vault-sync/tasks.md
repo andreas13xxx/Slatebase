@@ -35,12 +35,12 @@ Implementierung der CouchDB-basierten Vault-Synchronisation für Slatebase. Das 
     - Use Node.js `crypto` module (no external dependencies)
     - _Requirements: 1.9, 8.1, 8.2, 8.5_
 
-  - [ ]* 2.2 Write property test for E2E encryption round-trip
+  - [x]* 2.2 Write property test for E2E encryption round-trip
     - **Property 21: E2E Encryption Round-Trip**
     - For any valid document content (arbitrary bytes) and any valid passphrase (8-256 characters), encrypting then decrypting SHALL produce identical content
     - **Validates: Requirements 8.1, 8.2**
 
-  - [ ]* 2.3 Write property test for credential encryption in storage
+  - [x]* 2.3 Write property test for credential encryption in storage
     - **Property 4: Credential Encryption in Storage**
     - For any stored credentials, reading the raw file SHALL never reveal plaintext values
     - **Validates: Requirements 1.9, 8.5**
@@ -53,7 +53,7 @@ Implementierung der CouchDB-basierten Vault-Synchronisation für Slatebase. Das 
     - Throw `InvalidSetupUriError` on parse failure
     - _Requirements: 1.1, 1.7, 10.4_
 
-  - [ ]* 2.5 Write property test for Setup-URI parsing round-trip
+  - [x]* 2.5 Write property test for Setup-URI parsing round-trip
     - **Property 1: Setup-URI Parsing Round-Trip**
     - For any valid connection parameters, encoding into Setup-URI format and parsing back SHALL produce the same parameters
     - **Validates: Requirements 1.1**
@@ -90,7 +90,7 @@ Implementierung der CouchDB-basierten Vault-Synchronisation für Slatebase. Das 
     - Handle corrupt/unreadable files gracefully (return empty response, log error)
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8_
 
-  - [ ]* 4.3 Write property tests for log pagination and rotation
+  - [x]* 4.3 Write property tests for log pagination and rotation
     - **Property 12: Log Pagination Consistency**
     - For any log with N entries queried with page P and pageSize S: `totalPages = ceil(N/S)`, `items.length <= S`, `total = N`
     - **Property 13: Log Rotation Cap**
@@ -137,7 +137,7 @@ Implementierung der CouchDB-basierten Vault-Synchronisation für Slatebase. Das 
     - 120s timeout for analysis operations
     - _Requirements: 4.3, 4.10, 4.11, 6.1, 6.2, 6.3_
 
-  - [ ]* 6.3 Write property tests for SyncEngine pure functions
+  - [x]* 6.3 Write property tests for SyncEngine pure functions
     - **Property 7: Readonly Mode Prevents Push**
     - For any sync in `readonly` mode, zero push operations SHALL occur
     - **Property 8: Chunk Reassembly Integrity**
@@ -148,7 +148,7 @@ Implementierung der CouchDB-basierten Vault-Synchronisation für Slatebase. Das 
     - If a subset of documents fails, remaining documents SHALL still be processed
     - **Validates: Requirements 3.3, 4.2, 4.3, 4.8**
 
-  - [ ]* 6.4 Write property tests for analysis categorization
+  - [x]* 6.4 Write property tests for analysis categorization
     - **Property 16: Analysis Categorization Correctness**
     - For any pair of local/remote state, exactly one correct category SHALL be assigned
     - **Property 17: Analysis Summary Aggregation**
@@ -179,7 +179,7 @@ Implementierung der CouchDB-basierten Vault-Synchronisation für Slatebase. Das 
     - `removeConfig()`: delete config + checkpoint + credentials, stop scheduler, keep sync log
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.6, 1.9, 2.1, 2.2, 2.3, 2.4, 2.6, 2.7_
 
-  - [ ]* 8.2 Write property tests for password masking and interval validation
+  - [x]* 8.2 Write property tests for password masking and interval validation
     - **Property 5: Password Masking in API Responses**
     - Masking replaces all chars with `*` except last 4 (or fully masks if length < 4), preserving length
     - **Property 6: Sync Interval Validation**
@@ -203,7 +203,7 @@ Implementierung der CouchDB-basierten Vault-Synchronisation für Slatebase. Das 
     - Reject `use_local` in readonly mode
     - _Requirements: 7.1, 7.4, 7.5, 7.6, 7.8, 7.9_
 
-  - [ ]* 8.5 Write property tests for conflict and data safety
+  - [x]* 8.5 Write property tests for conflict and data safety
     - **Property 18: Conflict Detection — No Auto-Overwrite**
     - Documents modified both locally and remotely SHALL never be auto-overwritten
     - **Property 19: Conflict Recommendation Logic**
@@ -232,7 +232,7 @@ Implementierung der CouchDB-basierten Vault-Synchronisation für Slatebase. Das 
     - Map domain errors to HTTP responses (error-to-HTTP mapping table from design)
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 1.5, 2.5_
 
-  - [ ]* 10.2 Write property tests for access control and input validation
+  - [x]* 10.2 Write property tests for access control and input validation
     - **Property 2: Input Validation Correctness**
     - Zod schemas SHALL accept conforming inputs and reject violating inputs
     - **Property 3: Access Control Enforcement**
@@ -243,7 +243,7 @@ Implementierung der CouchDB-basierten Vault-Synchronisation für Slatebase. Das 
     - Leading/trailing whitespace SHALL be removed; empty-after-trim SHALL be rejected
     - **Validates: Requirements 1.5, 2.5, 9.3, 9.5, 9.6, 9.7, 10.1, 10.6**
 
-  - [ ]* 10.3 Write property test for log security
+  - [x]* 10.3 Write property test for log security
     - **Property 11: Log Error Truncation**
     - Each error description SHALL be max 500 chars, max 100 error entries per operation
     - **Property 14: No Credentials in Log Entries**

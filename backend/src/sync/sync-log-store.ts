@@ -11,9 +11,6 @@ import type { ISyncLogStore, SyncLogEntry, PaginatedSyncLog } from './types.js'
 /** Maximum number of log entries before rotation removes oldest entries. */
 const MAX_ENTRIES = 1000
 
-/** Default page size for paginated reads. */
-const DEFAULT_PAGE_SIZE = 50
-
 /** Maximum allowed page size. */
 const MAX_PAGE_SIZE = 100
 

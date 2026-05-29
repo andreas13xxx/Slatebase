@@ -1,13 +1,54 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, waitFor } from '@testing-library/react'
+import React from 'react'
 import { ViewMode, resolveWikilinkTarget } from './ViewMode'
-import type { DirectoryTree } from '../types'
+import { AppContext } from '../state'
+import type { AppContextValue } from '../state'
+import type { DirectoryTree, AppState } from '../types'
+import type { IApiClient } from '../api'
 
 describe('ViewMode', () => {
   const defaultProps = {
     content: '',
     vaultId: 'test-vault',
     directoryTree: null,
+  }
+
+  /** Creates a mock API client that returns the given content for fetchFileContent. */
+  function createMockApiClient(fileContent = '# Embedded\n\nSome content'): IApiClient {
+    return {
+      fetchFileContent: vi.fn().mockResolvedValue({ content: fileContent, isBinary: false }),
+      fetchVaults: vi.fn(),
+      fetchAllVaults: vi.fn(),
+      fetchVaultTree: vi.fn(),
+      createVault: vi.fn(),
+      deleteVault: vi.fn(),
+      saveFile: vi.fn(),
+      importFile: vi.fn(),
+      importFolder: vi.fn(),
+      deleteContent: vi.fn(),
+      renameContent: vi.fn(),
+      moveContent: vi.fn(),
+      getToken: vi.fn().mockReturnValue(null),
+      setToken: vi.fn(),
+      getCsrfToken: vi.fn().mockReturnValue(null),
+      setCsrfToken: vi.fn(),
+      setOnSessionExpired: vi.fn(),
+    } as unknown as IApiClient
+  }
+
+  /** Wraps a component with AppContext providing a mock apiClient. */
+  function renderWithContext(ui: React.ReactElement, apiClient?: IApiClient) {
+    const mockContext: AppContextValue = {
+      state: { vaults: [], directoryTree: null, loading: false, error: null } as unknown as AppState,
+      dispatch: vi.fn(),
+      apiClient: apiClient ?? createMockApiClient(),
+    }
+    return render(
+      <AppContext.Provider value={mockContext}>
+        {ui}
+      </AppContext.Provider>
+    )
   }
 
   it('renders an article element with aria-label', () => {
@@ -342,6 +383,117 @@ def hello():
       const link = container.querySelector('a.view-mode-link--broken')
       expect(link).not.toBeNull()
       expect(link?.textContent).toBe('Link')
+    })
+  })
+
+  describe('Embed rendering (Req 5.1, 5.2, 5.3, 5.4, 5.5, 5.7)', () => {
+    const treeWithFiles: DirectoryTree = {
+      name: 'root',
+      type: 'directory',
+      path: '',
+      children: [
+        { name: 'photo.png', type: 'file', path: 'photo.png' },
+        { name: 'diagram.svg', type: 'file', path: 'diagram.svg' },
+        { name: 'Notes.md', type: 'file', path: 'Notes.md' },
+        {
+          name: 'subfolder',
+          type: 'directory',
+          path: 'subfolder',
+          children: [
+            { name: 'deep-image.jpg', type: 'file', path: 'subfolder/deep-image.jpg' },
+            { name: 'Other.md', type: 'file', path: 'subfolder/Other.md' },
+          ],
+        },
+      ],
+    }
+
+    it('renders image embed as <img> when file exists (Req 5.1)', () => {
+      const { container } = render(
+        <ViewMode content="![[photo.png]]" vaultId="v1" directoryTree={treeWithFiles} />
+      )
+      const img = container.querySelector('img.view-mode-embed--image')
+      expect(img).not.toBeNull()
+      expect(img?.getAttribute('src')).toContain('/api/v1/vaults/v1/files?path=')
+      expect(img?.getAttribute('src')).toContain('photo.png')
+      expect(img?.getAttribute('alt')).toBe('photo.png')
+    })
+
+    it('renders image embed with token in URL when provided', () => {
+      const { container } = render(
+        <ViewMode content="![[photo.png]]" vaultId="v1" directoryTree={treeWithFiles} token="my-token" />
+      )
+      const img = container.querySelector('img.view-mode-embed--image')
+      expect(img).not.toBeNull()
+      expect(img?.getAttribute('src')).toContain('token=my-token')
+    })
+
+    it('renders missing image placeholder when file not found (Req 5.2)', () => {
+      const { container } = render(
+        <ViewMode content="![[nonexistent.png]]" vaultId="v1" directoryTree={treeWithFiles} />
+      )
+      const placeholder = container.querySelector('.view-mode-embed--missing')
+      expect(placeholder).not.toBeNull()
+      expect(placeholder?.textContent).toBe('Bild nicht gefunden: nonexistent.png')
+    })
+
+    it('renders note embed as styled container when file exists (Req 5.3)', async () => {
+      const mockApi = createMockApiClient('# Embedded Note\n\nContent here')
+      const { container } = renderWithContext(
+        <ViewMode content="![[Notes]]" vaultId="v1" directoryTree={treeWithFiles} />,
+        mockApi
+      )
+      await waitFor(() => {
+        const embed = container.querySelector('.view-mode-embed--note')
+        expect(embed).not.toBeNull()
+        const title = embed?.querySelector('.view-mode-embed-title')
+        expect(title?.textContent).toBe('Notes')
+      })
+    })
+
+    it('renders note embed with heading section info (Req 5.4)', async () => {
+      const mockApi = createMockApiClient('# Intro\n\nBefore\n\n## Introduction\n\nTarget content\n\n## Other\n\nAfter')
+      const { container } = renderWithContext(
+        <ViewMode content="![[Notes#Introduction]]" vaultId="v1" directoryTree={treeWithFiles} />,
+        mockApi
+      )
+      await waitFor(() => {
+        const embed = container.querySelector('.view-mode-embed--note')
+        expect(embed).not.toBeNull()
+        // The embedded content should contain the heading section
+        const article = embed?.querySelector('.view-mode')
+        expect(article).not.toBeNull()
+      })
+    })
+
+    it('renders missing note placeholder when file not found (Req 5.5)', () => {
+      const { container } = render(
+        <ViewMode content="![[NonExistent]]" vaultId="v1" directoryTree={treeWithFiles} />
+      )
+      const placeholder = container.querySelector('.view-mode-embed--missing')
+      expect(placeholder).not.toBeNull()
+      expect(placeholder?.textContent).toBe('Notiz nicht gefunden: NonExistent')
+    })
+
+    it('shows loading indicator for note embeds (Req 5.6)', () => {
+      // With a slow API client, NoteEmbed shows loading state initially
+      const slowApi = createMockApiClient()
+      ;(slowApi.fetchFileContent as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {})) // never resolves
+      const { container } = renderWithContext(
+        <ViewMode content="![[Notes]]" vaultId="v1" directoryTree={treeWithFiles} />,
+        slowApi
+      )
+      const loading = container.querySelector('.view-mode-embed-loading')
+      expect(loading).not.toBeNull()
+      expect(loading?.textContent).toBe('Laden…')
+    })
+
+    it('resolves image embeds in subdirectories', () => {
+      const { container } = render(
+        <ViewMode content="![[deep-image.jpg]]" vaultId="v1" directoryTree={treeWithFiles} />
+      )
+      const img = container.querySelector('img.view-mode-embed--image')
+      expect(img).not.toBeNull()
+      expect(img?.getAttribute('src')).toContain('subfolder%2Fdeep-image.jpg')
     })
   })
 })

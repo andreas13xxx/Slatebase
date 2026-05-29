@@ -13,6 +13,9 @@ import type { IUserRepository } from '../user/index.js'
 /** The login endpoint path that bypasses auth middleware. */
 const LOGIN_PATH = '/api/v1/auth/login'
 
+/** The MCP transport endpoint path that uses its own Bearer token auth. */
+const MCP_TRANSPORT_PATH = '/api/v1/mcp'
+
 /** The password change endpoint path allowed during mustChangePassword. */
 const PASSWORD_CHANGE_PATH = '/api/v1/users/me/password'
 
@@ -78,6 +81,12 @@ export function createAuthMiddleware(
       return next()
     }
 
+    // Skip session auth for the MCP transport endpoint (uses its own Bearer token auth)
+    // But NOT for /api/v1/mcp/tokens (which needs session auth)
+    if (c.req.path === MCP_TRANSPORT_PATH) {
+      return next()
+    }
+
     const token = extractBearerToken(c)
     if (token === null) {
       return createErrorResponse(c, 401, 'UNAUTHORIZED', 'Missing or invalid authorization token')
@@ -116,6 +125,11 @@ export function createCsrfMiddleware(
 
     // Skip CSRF for login endpoint (no session yet)
     if (c.req.method === 'POST' && c.req.path === LOGIN_PATH) {
+      return next()
+    }
+
+    // Skip CSRF for MCP transport endpoint (uses its own auth)
+    if (c.req.path === MCP_TRANSPORT_PATH) {
       return next()
     }
 
@@ -221,6 +235,11 @@ export function createMustChangePasswordMiddleware(
 
     // Allow the password change endpoint through
     if (c.req.method === 'PUT' && c.req.path === PASSWORD_CHANGE_PATH) {
+      return next()
+    }
+
+    // Skip for MCP transport endpoint (uses its own auth)
+    if (c.req.path === MCP_TRANSPORT_PATH) {
       return next()
     }
 

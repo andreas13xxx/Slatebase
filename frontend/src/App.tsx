@@ -15,6 +15,7 @@ import { SessionsPage } from './components/SessionsPage'
 import { AdminUsersPage } from './components/AdminUsersPage'
 import { AdminConfigPage } from './components/AdminConfigPage'
 import { AdminAuditPage } from './components/AdminAuditPage'
+import { AdminLogsPage } from './components/AdminLogsPage'
 import { AdminVaultsPage } from './components/AdminVaultsPage'
 import { VaultSharing } from './components/VaultSharing'
 import { VaultDeletionWorkflow } from './components/VaultDeletionWorkflow'
@@ -23,11 +24,12 @@ import { SlatebaseLogo } from './components/SlatebaseLogo'
 import { SidebarToolbar } from './components/SidebarToolbar'
 import { MyVaultsPage } from './components/MyVaultsPage'
 import { SyncConfigPage } from './components/SyncConfigPage'
+import { McpTokensPage } from './components/McpTokensPage'
 import { SyncProvider } from './state/syncContext'
 import {
   User, LogOut, Settings, Shield, FileText, Clock,
   Database, Share2, Trash2, Server, Download,
-  Upload, FolderOpen, PanelRight, PanelLeft, X, Eye, Pencil, MessageCircle, RefreshCw,
+  Upload, FolderOpen, PanelRight, PanelLeft, X, Eye, Pencil, MessageCircle, RefreshCw, Key, ScrollText,
 } from 'lucide-react'
 import { getFileIcon, getFileIconClass, getDisplayName } from './utils/fileIcons'
 import './App.css'
@@ -49,9 +51,11 @@ type AppPage =
   | 'admin-vaults'
   | 'admin-config'
   | 'admin-audit'
+  | 'admin-logs'
   | 'vault-sharing'
   | 'vault-deletion'
   | 'sync-config'
+  | 'mcp-tokens'
 
 /**
  * User avatar and dropdown menu component.
@@ -170,6 +174,9 @@ function UserMenu({ onNavigate, onLogout, hasVaultSelected, onImportFile, onImpo
               <button className="user-menu-item" role="menuitem" onClick={() => { onNavigate('admin-audit'); setOpen(false) }}>
                 <FileText size={14} /> {t('userMenu.auditLog')}
               </button>
+              <button className="user-menu-item" role="menuitem" onClick={() => { onNavigate('admin-logs'); setOpen(false) }}>
+                <ScrollText size={14} /> {t('userMenu.serverLogs')}
+              </button>
             </>
           )}
           <div className="user-menu-divider" />
@@ -232,9 +239,11 @@ const PAGE_LABEL_KEYS: Record<AppPage, string> = {
   'admin-vaults': 'pages.adminVaults',
   'admin-config': 'pages.adminConfig',
   'admin-audit': 'pages.adminAudit',
+  'admin-logs': 'pages.adminLogs',
   'vault-sharing': 'pages.vaultSharing',
   'vault-deletion': 'pages.vaultDeletion',
   'sync-config': 'pages.syncConfig',
+  'mcp-tokens': 'pages.mcpTokens',
 }
 
 /** Icons for settings pages. */
@@ -247,9 +256,11 @@ const PAGE_ICONS: Partial<Record<AppPage, React.ReactNode>> = {
   'admin-vaults': <Server size={13} />,
   'admin-config': <Settings size={13} />,
   'admin-audit': <FileText size={13} />,
+  'admin-logs': <ScrollText size={13} />,
   'vault-sharing': <Share2 size={13} />,
   'vault-deletion': <Trash2 size={13} />,
   'sync-config': <RefreshCw size={13} />,
+  'mcp-tokens': <Key size={13} />,
 }
 
 /**
@@ -418,6 +429,7 @@ function AppContent() {
       case 'admin-vaults': return <AdminVaultsPage apiClient={apiClient} />
       case 'admin-config': return <AdminConfigPage apiClient={apiClient} />
       case 'admin-audit': return <AdminAuditPage apiClient={apiClient} />
+      case 'admin-logs': return <AdminLogsPage apiClient={apiClient} />
       case 'vault-sharing':
         return state.selectedVaultId
           ? <VaultSharing apiClient={apiClient} vaultId={state.selectedVaultId} />
@@ -437,6 +449,7 @@ function AppContent() {
         return state.selectedVaultId
           ? <SyncProvider><SyncConfigPage vaultId={state.selectedVaultId} /></SyncProvider>
           : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
+      case 'mcp-tokens': return <McpTokensPage apiClient={apiClient} />
       default: return null
     }
   }
@@ -523,6 +536,7 @@ function AppContent() {
             onNavigate={handleNavigate}
             isAdmin={user?.role === 'admin'}
             isVaultOwner={selectedVault?.permission === 'owner'}
+            syncEnabled={selectedVault?.syncEnabled}
             globalUnreadCount={globalUnreadCount}
           />
 

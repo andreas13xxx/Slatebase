@@ -41,6 +41,31 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - `syncReducer` für Sync-State (Config, Log, Konflikte, Analyse)
 - **Nicht** alles in einen Mega-Reducer packen — lieber neue Provider/Reducer für neue Feature-Bereiche
 
+### Filesystem statt Datenbank — bewusste Entscheidung
+- **Warum kein DB-Wechsel zum jetzigen Zeitpunkt:**
+  - Architektur-Konsistenz mit Obsidian (Plain Files = 1:1 Kompatibilität)
+  - Deployment-Einfachheit für Self-Hoster (kein DB-Setup, kein Connection-Pooling, kein Schema-Migration-Tooling)
+  - Datenvolumen ist überschaubar (typische Vaults: hunderte bis wenige tausend Dateien)
+  - Atomare Schreiboperationen (temp → rename) geben Crash-Safety ohne WAL
+  - Marketing-Argument: "Keine Datenbank, keine Magie"
+- **Wann eine DB sinnvoll würde:** Volltextsuche über alle Vaults bei vielen gleichzeitigen Nutzern, hunderte gleichzeitige Nutzer (File-Locking wird Bottleneck), Audit-Log-Abfragen mit komplexen Filtern, Echtzeit-Collaboration (CRDT/OT)
+- **Interface-Abstraktion hält die Tür offen:** Durch `I*`-Interfaces kann jederzeit eine DB-Implementierung dahinter geschoben werden, ohne Business-Logik anzufassen
+- **Regel:** Keine DB-Migration ohne konkreten, messbaren Performance-Engpass
+
+### SQLite als ergänzender Index (nicht als Ersatz)
+- **Anwendungsfall:** Knowledge Graph Link-Index, optional Volltextsuche (FTS5), Metadaten-Cache (Tags, Wortanzahl)
+- **Warum SQLite statt CouchDB:**
+  - Embedded — keine separate Instanz, kein Container, kein Netzwerk-Overhead
+  - Self-Hoster-Aufwand: Null (eine Datei im Data-Verzeichnis)
+  - Recursive CTEs für Graph-Traversierung (Pfade, Backlinks mit Tiefenbegrenzung)
+  - ~2 MB Library vs. ~200 MB CouchDB-Container
+  - Backup = eine Datei kopieren
+- **CouchDB bleibt externer Sync-Partner** — nicht als interner Datenspeicher verwenden (würde Deployment-Komplexität verdoppeln und "keine DB"-Versprechen brechen)
+- **Speicherort:** `data/vaults/<vaultId>/_index.sqlite` — pro Vault, jederzeit aus Markdown-Dateien regenerierbar
+- **Library:** `better-sqlite3` (synchron, schnell, kein Connection-Pool nötig)
+- **Zeitpunkt:** Erst einführen wenn In-Memory-Index (JSON-persistiert) nicht mehr ausreicht — voraussichtlich bei Vaults mit 10.000+ Dateien oder wenn Graph-Queries >2–3s dauern
+- **Regel:** SQLite ist ein abgeleiteter Index, NICHT die Source of Truth. Geht die Datei verloren → beim nächsten Start aus Vault-Dateien regenerieren
+
 ## Code-Konventionen
 
 ### Imports
@@ -99,6 +124,13 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - Echtes Filesystem mit Temp-Directories
 - Cleanup in `afterAll` (nicht `afterEach` — Performance)
 - Separate Datei: `integration.test.ts`
+
+### Property-Based Tests (PBT) — Ausführung
+- PBT-Tests (`*.pbt.test.ts`) werden während der Entwicklung **nur auf explizite Anforderung** oder wenn zwingend notwendig ausgeführt
+- Grund: PBT-Tests sind rechenintensiv (viele Iterationen, große Eingaben) und verlangsamen den Entwicklungszyklus erheblich
+- Bei Checkpoints und CI: reguläre Unit-/Integrationstests reichen aus (`npm run test`)
+- PBT-Tests gezielt ausführen: `npx vitest --run <datei>.pbt.test.ts`
+- **Regel:** Kein automatisches Ausführen von PBT-Tests bei Checkpoints, Code-Änderungen oder allgemeinen Test-Läufen — nur wenn der Nutzer es explizit verlangt oder ein PBT-Test gerade geschrieben/gefixt wird
 
 ## Filesystem & Persistenz
 
@@ -685,3 +717,104 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - Erster Sync nach vollem Intervall ab Startzeitpunkt (nicht sofort)
 - `stopAll()` für graceful Shutdown
 
+
+## MCP Context Server
+
+### Modulstruktur analog zu Sync/Chat
+- Eigenes Verzeichnis `backend/src/mcp/` mit Types, Config, Errors, Validation, Stores, Service, Handlers, Factory
+- Barrel-Export über `index.ts` — alle öffentlichen Interfaces und Klassen
+- Gleiche Schichtung: Types/Errors → TokenStore (Data) → McpTokenService (Business) → McpHandlers/McpServerFactory (Protocol) → Routes (API)
+- **Regel:** Folgt dem gleichen Layered-Pattern wie alle anderen Module
+
+### Token-Authentifizierung (Bearer Token, nicht Session)
+- MCP-Clients nutzen `Authorization: Bearer <token>` — unabhängig von Browser-Sessions
+- Token-Format: 128 Hex-Zeichen (`crypto.randomBytes(64).toString('hex')`)
+- Gespeichert als SHA-256-Hash (Klartext-Token wird nur einmal bei Erstellung zurückgegeben)
+- In-Memory-Index (`Map<tokenHash, tokenId>`) für O(1) Validierung — analog zu SessionStore
+- Token-Verwaltung (CRUD) über Session-Auth-geschützte Endpoints (`/api/v1/mcp/tokens`)
+
+### MCP SDK Integration
+- `@modelcontextprotocol/sdk` stellt `McpServer` und `StreamableHTTPServerTransport` bereit
+- Hono nutzt `@hono/node-server` → Zugriff auf raw `IncomingMessage`/`ServerResponse` via `c.env.incoming`/`c.env.outgoing`
+- Pro POST-Request wird ein neuer Transport + Server erstellt (stateless per-request)
+- Sessions werden in einer In-Memory-Map verwaltet (für GET/DELETE SSE-Streams)
+- **Regel:** `StreamableHTTPServerTransport` (nicht `WebStandardStreamableHTTPServerTransport`) verwenden, da wir raw Node.js HTTP-Objekte brauchen
+
+### User-Invalidierung Hook
+- `UserService` akzeptiert optionalen `onUserInvalidated`-Callback
+- Wird bei `deleteUser()`, `suspendUser()`, `deleteSelf()` aufgerufen
+- MCP-Modul registriert `mcpTokenService.invalidateAllForUser` als Callback
+- Mutable-Reference-Pattern: Callback wird nach MCP-Init gesetzt (Composition Root Reihenfolge)
+
+### Rate Limiting per Token
+- Sliding-Window-Algorithmus (In-Memory, resets bei Neustart — akzeptabel)
+- Konfigurierbar via `SLATEBASE_MCP_RATE_LIMIT` (Standard: 60 req/min/token)
+- HTTP 429 mit `Retry-After`-Header bei Überschreitung
+- Automatische Cleanup alter Einträge verhindert Memory Leaks
+
+### .well-known/mcp.json Discovery
+- Öffentlich zugänglich (keine Auth) — ermöglicht Auto-Discovery durch MCP-Clients
+- Gibt 404 zurück wenn MCP deaktiviert ist
+- Registriert außerhalb der `/api/v1/*` Middleware-Chain
+
+
+## Obsidian Markdown Kompatibilität
+
+### Drei-Schichten-Pattern für micromark-Plugins
+- Jedes Plugin mit eigener Inline-Syntax (Wikilink, Embed, Tag) folgt dem gleichen Muster:
+  1. `syntax.ts` — micromark Tokenizer-Extension (registriert auf Character-Code)
+  2. `mdast-util.ts` — fromMarkdown + toMarkdown Handler (Token → MDAST-Node und zurück)
+  3. `plugin.ts` — remark Plugin-Wrapper (registriert Extensions auf `this.data()`)
+- Callout-Plugin ist anders: MDAST-Transformer der existierende `blockquote`-Nodes transformiert
+- **Regel:** Neue Obsidian-Syntax-Elemente immer nach diesem Pattern implementieren
+
+### micromark Tokenizer: `Effects` statt `Parameters<Tokenizer>[1]`
+- TypeScript's `Parameters<>` zählt den `this`-Parameter NICHT mit
+- `Parameters<Tokenizer>[1]` ergibt `State` (der `ok`-Parameter), nicht `Effects`
+- **Immer** den `Effects`-Typ direkt importieren und verwenden:
+  ```typescript
+  function tokenize(this: TokenizeContext, effects: Effects, ok: State, nok: State): State
+  ```
+
+### Plugin-Array-Typisierung in unified Pipeline
+- `Plugin[]` (ohne Generics) ist inkompatibel mit `Plugin<[], Root>`
+- Lösung: `Array<Plugin<[], Root>>` für das Plugin-Array
+- `pipeline.use(plugin)` ändert den Processor-Typ → `as unknown as typeof pipeline` bei Reassignment
+
+### Embed-Nodes als PhrasingContent
+- micromark parsed `![[...]]` als Inline-Syntax → Embed-Nodes landen in Paragraphen
+- TypeScript's `PhrasingContentMap` enthält `embed` nicht (ist in `BlockContentMap`)
+- Workaround: `case 'embed' as PhrasingContent['type']:` im Switch
+
+### Callout-Plugin: Transformer statt Syntax-Extension
+- Callouts bauen auf existierenden `blockquote`-Nodes auf — kein neuer Token nötig
+- Plugin gibt eine Transformer-Funktion zurück: `return (tree: Root) => { transformCallouts(tree) }`
+- `pipeline.runSync(tree)` nach `.parse()` führt den Transformer aus
+- **Regel:** Wenn Syntax auf existierenden MDAST-Nodes aufbaut → Transformer-Pattern verwenden
+
+### Graceful Degradation bei Plugin-Fehlern
+- Jedes Plugin wird einzeln in try/catch registriert
+- Bei Parse/Run-Fehler: Fallback auf Base-Pipeline (remarkParse + remarkFrontmatter + remarkGfm)
+- Verhindert dass ein fehlerhaftes Plugin die gesamte Markdown-Anzeige blockiert
+
+### Heading-Anchor-Normalisierung
+- Umlaute (äöüß) werden beibehalten — nicht entfernt oder transliteriert
+- Duplikate bekommen numerisches Suffix (-1, -2, etc.)
+- `createAnchorTracker()` ist stateful → muss pro Render-Pass neu erstellt werden
+- Gleiche Normalisierung in `scrollToHeadingAnchor()` verwenden wie in `generateHeadingAnchor()`
+
+### Link-Resolver: Depth-First Alphabetical
+- Bei mehrdeutigen Dateinamen (gleicher Name in verschiedenen Ordnern): erste Datei in Tiefensuche, alphabetisch sortiert
+- Case-insensitive Suche + `.md`-Extension-Fallback
+- Pfad-basierte Targets (`ordner/datei`) werden als relative Pfade aufgelöst
+
+### CSS Design Tokens für Obsidian-Elemente
+- 12 Callout-Typen × 3 Tokens (bg, border, icon) = 36 neue Tokens
+- Alle in `:root`, `:root[data-theme="dark"]` UND `@media (prefers-color-scheme: dark)` definieren
+- Tags, Embeds, Broken Links haben eigene Token-Gruppen
+- **Regel:** Keine hartcodierten Farben in Obsidian-Element-Styles — immer Tokens verwenden
+
+### Keine neuen npm-Dependencies nötig
+- `micromark`, `mdast-util-from-markdown`, `unist-util-visit` sind transitive Dependencies von `remark-parse`/`unified`
+- Direkt importierbar ohne Installation
+- **Regel:** Vor dem Installieren neuer Packages prüfen ob sie bereits transitiv verfügbar sind

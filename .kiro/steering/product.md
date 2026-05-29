@@ -11,7 +11,7 @@ Slatebase is feature-complete for its core use case: multi-user Markdown vault m
 - **Multi-vault management** — Create, delete, import/export, switch between vaults
 - **File explorer** — Directory tree navigation with Lucide icons
 - **Tabbed editor/viewer** — Multiple files open simultaneously, auto-save, View/Edit modes
-- **Markdown rendering** — GFM, syntax highlighting, frontmatter, collapsible headings
+- **Markdown rendering** — GFM, syntax highlighting, frontmatter, collapsible headings, Obsidian-compatible (Wikilinks, Embeds, Callouts, Tags)
 - **Authentication** — Session-based auth (opaque tokens, argon2id, CSRF, rate limiting)
 - **Multi-user & sharing** — Granular read/write vault permissions, ownership transfer
 - **User chat** — Real-time messaging between users with unread badges, archiving, pagination
@@ -22,13 +22,13 @@ Slatebase is feature-complete for its core use case: multi-user Markdown vault m
 - **Dark mode** — System-preference-based or manual override (light/dark/system)
 - **Docker deployment** — Multi-stage build, Nginx reverse proxy, non-root user
 - **Vault synchronization** — CouchDB/obsidian-livesync compatible sync (bidirectional & read-only, manual & interval-based, conflict detection & resolution, analysis mode, optional E2E encryption)
+- **MCP Context Server** — Model Context Protocol integration for AI assistants (Claude, Cursor, etc.) to access vault contents via standardized MCP tools and resources
 
 ### Planned Features
 
 - Knowledge graph visualization
-- Obsidian-compatible Markdown rendering (Wikilinks, Embeds, Callouts)
-- AI Context Server with MCP (Model Context Protocol) integration
 - Obsidian Community Plugin compatibility layer
+- Live Preview Editor (Side-by-Side or WYSIWYG)
 - Accessibility (a11y) — WCAG 2.1 AA compliance
 
 ## Language

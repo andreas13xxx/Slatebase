@@ -31,6 +31,8 @@
 - **@testing-library/react** — Component Testing
 - **playwright** — E2E Testing
 - **unified / remark-parse / remark-gfm / remark-frontmatter** — Markdown-Parsing (MDAST)
+- **micromark / mdast-util-from-markdown / mdast-util-to-markdown** — Transitive Dependencies von remark-parse (direkt genutzt für Obsidian-Plugins)
+- **unist-util-visit** — Transitive Dependency von unified (direkt genutzt für Callout-Transformer)
 - **yaml** — YAML-Parser für Frontmatter-Darstellung
 - **highlight.js** — Syntax-Highlighting in Code-Blöcken
 - **lucide-react** — Icon-Library (SVG-basiert, tree-shakeable, konsistente Lucide-Icons)
@@ -39,6 +41,9 @@
 ### Shared (devDependencies)
 - **fast-check** — Property-Based Testing (universelle Invarianten verifizieren, Reducer-Korrektheit)
 - **vitest** — Test-Runner (beide Packages)
+
+### Geplant (noch nicht installiert)
+- **better-sqlite3** — Embedded SQLite für Knowledge-Graph-Index (Backend, erst bei Performance-Bedarf einführen). Synchrone API, kein Connection-Pool nötig. Nur als ergänzender Index, nicht als primärer Datenspeicher.
 
 ## Was NICHT eingeführt werden soll
 
@@ -53,6 +58,7 @@
 - Kein Next.js (SPA mit eigenem Backend, kein SSR nötig)
 - Kein shadcn/ui (setzt Tailwind voraus)
 - Kein Framer Motion (kein klarer Mehrwert für Knowledge-Management-Tool)
+- Kein CouchDB als interner Datenspeicher (bleibt externer Sync-Partner — würde Deployment-Komplexität verdoppeln und "keine DB"-Versprechen brechen)
 
 ## Updates
 

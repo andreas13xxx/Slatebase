@@ -6,18 +6,47 @@ import { InvalidSetupUriError } from './errors.js'
 // ─── Test Helpers ────────────────────────────────────────────────────────────
 
 /**
- * Encrypts a JSON payload into the obsidian-livesync Setup-URI format.
- * This mirrors the encryption logic to create valid test URIs.
+ * Encrypts a JSON payload into the obsidian-livesync V2 Setup-URI format.
+ * Format: `%` + hex(IV, 16 bytes) + hex(Salt, 16 bytes) + base64(encrypted data)
+ *
+ * Key derivation matches octagonal-wheels:
+ * 1. SHA-256(passphrase) → digest
+ * 2. PBKDF2(digest, salt, 100000, 32, SHA-256) → AES-256-GCM key
  */
-function encryptSetupUri(payload: Record<string, unknown>, passphrase: string): string {
+function encryptSetupUriV2(payload: Record<string, unknown>, passphrase: string): string {
   const json = JSON.stringify(payload)
-  const iv = crypto.randomBytes(12)
-  const key = crypto.pbkdf2Sync(passphrase, iv, 100000, 32, 'sha256')
+  const iv = crypto.randomBytes(16)
+  const salt = crypto.randomBytes(16)
+
+  // Key derivation: SHA-256(passphrase) → PBKDF2
+  const passphraseHash = crypto.createHash('sha256').update(passphrase, 'utf8').digest()
+  const key = crypto.pbkdf2Sync(passphraseHash, salt, 100000, 32, 'sha256')
+
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv)
   const encrypted = Buffer.concat([cipher.update(json, 'utf8'), cipher.final()])
   const authTag = cipher.getAuthTag()
-  const combined = Buffer.concat([iv, encrypted, authTag])
-  return combined.toString('base64')
+  const encryptedWithTag = Buffer.concat([encrypted, authTag])
+
+  // V2 format: % + hex(iv) + hex(salt) + base64(encrypted+authTag)
+  return `%${iv.toString('hex')}${salt.toString('hex')}${encryptedWithTag.toString('base64')}`
+}
+
+/**
+ * Encrypts a raw string (not JSON-wrapped) into V2 format for testing decryption of non-JSON content.
+ */
+function encryptRawStringV2(content: string, passphrase: string): string {
+  const iv = crypto.randomBytes(16)
+  const salt = crypto.randomBytes(16)
+
+  const passphraseHash = crypto.createHash('sha256').update(passphrase, 'utf8').digest()
+  const key = crypto.pbkdf2Sync(passphraseHash, salt, 100000, 32, 'sha256')
+
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv)
+  const encrypted = Buffer.concat([cipher.update(content, 'utf8'), cipher.final()])
+  const authTag = cipher.getAuthTag()
+  const encryptedWithTag = Buffer.concat([encrypted, authTag])
+
+  return `%${iv.toString('hex')}${salt.toString('hex')}${encryptedWithTag.toString('base64')}`
 }
 
 const validPayload = {
@@ -37,8 +66,8 @@ describe('SetupUriParser', () => {
   const parser = new SetupUriParser()
 
   describe('successful parsing', () => {
-    it('parses a valid URI with all fields', () => {
-      const uri = encryptSetupUri(validPayload, passphrase)
+    it('parses a valid V2 URI with all fields', () => {
+      const uri = encryptSetupUriV2(validPayload, passphrase)
       const result = parser.parse(uri, passphrase)
 
       expect(result.endpoint).toBe('https://couch.example.com')
@@ -56,7 +85,7 @@ describe('SetupUriParser', () => {
         couchDB_USER: 'user',
         couchDB_PASSWORD: 'pass',
       }
-      const uri = encryptSetupUri(payload, passphrase)
+      const uri = encryptSetupUriV2(payload, passphrase)
       const result = parser.parse(uri, passphrase)
 
       expect(result.endpoint).toBe('http://localhost:5984')
@@ -68,7 +97,7 @@ describe('SetupUriParser', () => {
     })
 
     it('trims whitespace from the URI before parsing', () => {
-      const uri = encryptSetupUri(validPayload, passphrase)
+      const uri = encryptSetupUriV2(validPayload, passphrase)
       const result = parser.parse(`  ${uri}  `, passphrase)
 
       expect(result.endpoint).toBe('https://couch.example.com')
@@ -81,7 +110,7 @@ describe('SetupUriParser', () => {
         couchDB_USER: '  admin  ',
         couchDB_PASSWORD: '  secret  ',
       }
-      const uri = encryptSetupUri(payload, passphrase)
+      const uri = encryptSetupUriV2(payload, passphrase)
       const result = parser.parse(uri, passphrase)
 
       expect(result.endpoint).toBe('https://couch.example.com')
@@ -89,11 +118,43 @@ describe('SetupUriParser', () => {
       expect(result.username).toBe('admin')
       expect(result.password).toBe('secret')
     })
+
+    it('parses a full obsidian:// URI with URL-encoded V2 payload', () => {
+      const encrypted = encryptSetupUriV2(validPayload, passphrase)
+      const fullUri = `obsidian://setuplivesync?settings=${encodeURIComponent(encrypted)}`
+      const result = parser.parse(fullUri, passphrase)
+
+      expect(result.endpoint).toBe('https://couch.example.com')
+      expect(result.database).toBe('mydb')
+    })
+
+    it('handles %$ prefix variant (HKDF ephemeral salt format)', () => {
+      // %$ format: Base64(PBKDF2_Salt[32] + IV[12] + HKDF_Salt[32] + encrypted data)
+      const pbkdf2Salt = crypto.randomBytes(32)
+      const iv = crypto.randomBytes(12)
+      const hkdfSalt = crypto.randomBytes(32)
+
+      // Key derivation: PBKDF2 → HKDF
+      const masterKey = crypto.pbkdf2Sync(Buffer.from(passphrase, 'utf8'), pbkdf2Salt, 310000, 32, 'sha256')
+      const chunkKey = Buffer.from(crypto.hkdfSync('sha256', masterKey, hkdfSalt, Buffer.alloc(0), 32))
+
+      const json = JSON.stringify(validPayload)
+      const cipher = crypto.createCipheriv('aes-256-gcm', chunkKey, iv)
+      const encrypted = Buffer.concat([cipher.update(json, 'utf8'), cipher.final()])
+      const authTag = cipher.getAuthTag()
+      const combined = Buffer.concat([pbkdf2Salt, iv, hkdfSalt, encrypted, authTag])
+      const binaryPayload = '%$' + combined.toString('base64')
+      const fullUri = `obsidian://setuplivesync?settings=${encodeURIComponent(binaryPayload)}`
+      const result = parser.parse(fullUri, passphrase)
+
+      expect(result.endpoint).toBe('https://couch.example.com')
+      expect(result.database).toBe('mydb')
+    })
   })
 
   describe('URI length validation', () => {
-    it('rejects URI exceeding 4096 characters', () => {
-      const longUri = 'a'.repeat(4097)
+    it('rejects URI exceeding 16384 characters', () => {
+      const longUri = '%' + 'a'.repeat(16384)
       expect(() => parser.parse(longUri, passphrase)).toThrow(InvalidSetupUriError)
       expect(() => parser.parse(longUri, passphrase)).toThrow(/exceeds maximum length/)
     })
@@ -109,16 +170,21 @@ describe('SetupUriParser', () => {
     })
   })
 
-  describe('Base64 validation', () => {
-    it('rejects invalid Base64 characters', () => {
-      expect(() => parser.parse('not!valid@base64#', passphrase)).toThrow(InvalidSetupUriError)
-      expect(() => parser.parse('not!valid@base64#', passphrase)).toThrow(/invalid Base64/)
+  describe('format validation', () => {
+    it('rejects unrecognized format (no %$, % or [ prefix)', () => {
+      expect(() => parser.parse('abcdef1234567890', passphrase)).toThrow(InvalidSetupUriError)
+      expect(() => parser.parse('abcdef1234567890', passphrase)).toThrow(/unrecognized encryption format/)
+    })
+
+    it('rejects too-short V2 payload', () => {
+      expect(() => parser.parse('%abcd', passphrase)).toThrow(InvalidSetupUriError)
+      expect(() => parser.parse('%abcd', passphrase)).toThrow(/too short/)
     })
   })
 
   describe('decryption failure', () => {
     it('rejects wrong passphrase', () => {
-      const uri = encryptSetupUri(validPayload, passphrase)
+      const uri = encryptSetupUriV2(validPayload, passphrase)
       expect(() => parser.parse(uri, 'wrong-passphrase')).toThrow(InvalidSetupUriError)
       expect(() => parser.parse(uri, 'wrong-passphrase')).toThrow(/Decryption failed/)
     })
@@ -126,30 +192,13 @@ describe('SetupUriParser', () => {
 
   describe('invalid JSON after decryption', () => {
     it('rejects non-JSON decrypted content', () => {
-      // Encrypt a non-JSON string
-      const nonJson = 'this is not json'
-      const iv = crypto.randomBytes(12)
-      const key = crypto.pbkdf2Sync(passphrase, iv, 100000, 32, 'sha256')
-      const cipher = crypto.createCipheriv('aes-256-gcm', key, iv)
-      const encrypted = Buffer.concat([cipher.update(nonJson, 'utf8'), cipher.final()])
-      const authTag = cipher.getAuthTag()
-      const combined = Buffer.concat([iv, encrypted, authTag])
-      const uri = combined.toString('base64')
-
+      const uri = encryptRawStringV2('this is not json', passphrase)
       expect(() => parser.parse(uri, passphrase)).toThrow(InvalidSetupUriError)
       expect(() => parser.parse(uri, passphrase)).toThrow(/not valid JSON/)
     })
 
     it('rejects JSON array after decryption', () => {
-      const arrayJson = '[1, 2, 3]'
-      const iv = crypto.randomBytes(12)
-      const key = crypto.pbkdf2Sync(passphrase, iv, 100000, 32, 'sha256')
-      const cipher = crypto.createCipheriv('aes-256-gcm', key, iv)
-      const encrypted = Buffer.concat([cipher.update(arrayJson, 'utf8'), cipher.final()])
-      const authTag = cipher.getAuthTag()
-      const combined = Buffer.concat([iv, encrypted, authTag])
-      const uri = combined.toString('base64')
-
+      const uri = encryptRawStringV2('[1, 2, 3]', passphrase)
       expect(() => parser.parse(uri, passphrase)).toThrow(InvalidSetupUriError)
       expect(() => parser.parse(uri, passphrase)).toThrow(/not a valid JSON object/)
     })
@@ -162,7 +211,7 @@ describe('SetupUriParser', () => {
         couchDB_USER: 'admin',
         couchDB_PASSWORD: 'secret',
       }
-      const uri = encryptSetupUri(payload, passphrase)
+      const uri = encryptSetupUriV2(payload, passphrase)
       expect(() => parser.parse(uri, passphrase)).toThrow(InvalidSetupUriError)
       expect(() => parser.parse(uri, passphrase)).toThrow(/couchDB_URI/)
     })
@@ -173,7 +222,7 @@ describe('SetupUriParser', () => {
         couchDB_USER: 'admin',
         couchDB_PASSWORD: 'secret',
       }
-      const uri = encryptSetupUri(payload, passphrase)
+      const uri = encryptSetupUriV2(payload, passphrase)
       expect(() => parser.parse(uri, passphrase)).toThrow(InvalidSetupUriError)
       expect(() => parser.parse(uri, passphrase)).toThrow(/couchDB_DBNAME/)
     })
@@ -184,7 +233,7 @@ describe('SetupUriParser', () => {
         couchDB_DBNAME: 'mydb',
         couchDB_PASSWORD: 'secret',
       }
-      const uri = encryptSetupUri(payload, passphrase)
+      const uri = encryptSetupUriV2(payload, passphrase)
       expect(() => parser.parse(uri, passphrase)).toThrow(InvalidSetupUriError)
       expect(() => parser.parse(uri, passphrase)).toThrow(/couchDB_USER/)
     })
@@ -195,7 +244,7 @@ describe('SetupUriParser', () => {
         couchDB_DBNAME: 'mydb',
         couchDB_USER: 'admin',
       }
-      const uri = encryptSetupUri(payload, passphrase)
+      const uri = encryptSetupUriV2(payload, passphrase)
       expect(() => parser.parse(uri, passphrase)).toThrow(InvalidSetupUriError)
       expect(() => parser.parse(uri, passphrase)).toThrow(/couchDB_PASSWORD/)
     })
@@ -207,7 +256,7 @@ describe('SetupUriParser', () => {
         couchDB_USER: 'admin',
         couchDB_PASSWORD: 'secret',
       }
-      const uri = encryptSetupUri(payload, passphrase)
+      const uri = encryptSetupUriV2(payload, passphrase)
       expect(() => parser.parse(uri, passphrase)).toThrow(InvalidSetupUriError)
       expect(() => parser.parse(uri, passphrase)).toThrow(/couchDB_URI/)
     })

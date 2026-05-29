@@ -60,6 +60,68 @@
   --right-panel-text: #0f172a;
   --right-panel-text-muted: #64748b;
 
+  /* Callout Tokens — Light */
+  --callout-note-bg: #eff6ff;
+  --callout-note-border: #bfdbfe;
+  --callout-note-icon: #3b82f6;
+
+  --callout-info-bg: #eff6ff;
+  --callout-info-border: #bfdbfe;
+  --callout-info-icon: #3b82f6;
+
+  --callout-tip-bg: #f0fdf4;
+  --callout-tip-border: #bbf7d0;
+  --callout-tip-icon: #22c55e;
+
+  --callout-warning-bg: #fffbeb;
+  --callout-warning-border: #fde68a;
+  --callout-warning-icon: #f59e0b;
+
+  --callout-danger-bg: #fef2f2;
+  --callout-danger-border: #fecaca;
+  --callout-danger-icon: #ef4444;
+
+  --callout-bug-bg: #fef2f2;
+  --callout-bug-border: #fecaca;
+  --callout-bug-icon: #dc2626;
+
+  --callout-example-bg: #faf5ff;
+  --callout-example-border: #e9d5ff;
+  --callout-example-icon: #a855f7;
+
+  --callout-quote-bg: #f8fafc;
+  --callout-quote-border: #e2e8f0;
+  --callout-quote-icon: #64748b;
+
+  --callout-success-bg: #f0fdf4;
+  --callout-success-border: #bbf7d0;
+  --callout-success-icon: #16a34a;
+
+  --callout-question-bg: #fefce8;
+  --callout-question-border: #fef08a;
+  --callout-question-icon: #eab308;
+
+  --callout-failure-bg: #fef2f2;
+  --callout-failure-border: #fecaca;
+  --callout-failure-icon: #ef4444;
+
+  --callout-abstract-bg: #f0fdfa;
+  --callout-abstract-border: #99f6e4;
+  --callout-abstract-icon: #14b8a6;
+
+  /* Tag Tokens — Light */
+  --tag-bg: #f1f5f9;
+  --tag-text: #475569;
+  --tag-border: #e2e8f0;
+
+  /* Embed Tokens — Light */
+  --embed-bg: #f8fafc;
+  --embed-border: #e2e8f0;
+
+  /* Broken Link Tokens — Light */
+  --broken-link-color: #94a3b8;
+  --broken-link-text-decoration: line-through;
+
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
@@ -144,6 +206,68 @@
     --right-panel-text: #f1f5f9;
     --right-panel-text-muted: #64748b;
 
+    /* Callout Tokens — Dark */
+    --callout-note-bg: #1e293b;
+    --callout-note-border: #1e3a5f;
+    --callout-note-icon: #60a5fa;
+
+    --callout-info-bg: #1e293b;
+    --callout-info-border: #1e3a5f;
+    --callout-info-icon: #60a5fa;
+
+    --callout-tip-bg: #052e16;
+    --callout-tip-border: #166534;
+    --callout-tip-icon: #4ade80;
+
+    --callout-warning-bg: #1c1400;
+    --callout-warning-border: #854d0e;
+    --callout-warning-icon: #fbbf24;
+
+    --callout-danger-bg: #1c0a0a;
+    --callout-danger-border: #7f1d1d;
+    --callout-danger-icon: #f87171;
+
+    --callout-bug-bg: #1c0a0a;
+    --callout-bug-border: #7f1d1d;
+    --callout-bug-icon: #f87171;
+
+    --callout-example-bg: #1a0a2e;
+    --callout-example-border: #581c87;
+    --callout-example-icon: #c084fc;
+
+    --callout-quote-bg: #1e293b;
+    --callout-quote-border: #334155;
+    --callout-quote-icon: #94a3b8;
+
+    --callout-success-bg: #052e16;
+    --callout-success-border: #166534;
+    --callout-success-icon: #4ade80;
+
+    --callout-question-bg: #1c1400;
+    --callout-question-border: #854d0e;
+    --callout-question-icon: #facc15;
+
+    --callout-failure-bg: #1c0a0a;
+    --callout-failure-border: #7f1d1d;
+    --callout-failure-icon: #f87171;
+
+    --callout-abstract-bg: #0f2b2b;
+    --callout-abstract-border: #115e59;
+    --callout-abstract-icon: #2dd4bf;
+
+    /* Tag Tokens — Dark */
+    --tag-bg: #1e293b;
+    --tag-text: #94a3b8;
+    --tag-border: #334155;
+
+    /* Embed Tokens — Dark */
+    --embed-bg: #131921;
+    --embed-border: #1e293b;
+
+    /* Broken Link Tokens — Dark */
+    --broken-link-color: #64748b;
+    --broken-link-text-decoration: line-through;
+
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
@@ -205,6 +329,68 @@
     --right-panel-header-bg: rgba(100, 116, 139, 0.08);
     --right-panel-text: #f1f5f9;
     --right-panel-text-muted: #64748b;
+
+    /* Callout Tokens — Dark */
+    --callout-note-bg: #1e293b;
+    --callout-note-border: #1e3a5f;
+    --callout-note-icon: #60a5fa;
+
+    --callout-info-bg: #1e293b;
+    --callout-info-border: #1e3a5f;
+    --callout-info-icon: #60a5fa;
+
+    --callout-tip-bg: #052e16;
+    --callout-tip-border: #166534;
+    --callout-tip-icon: #4ade80;
+
+    --callout-warning-bg: #1c1400;
+    --callout-warning-border: #854d0e;
+    --callout-warning-icon: #fbbf24;
+
+    --callout-danger-bg: #1c0a0a;
+    --callout-danger-border: #7f1d1d;
+    --callout-danger-icon: #f87171;
+
+    --callout-bug-bg: #1c0a0a;
+    --callout-bug-border: #7f1d1d;
+    --callout-bug-icon: #f87171;
+
+    --callout-example-bg: #1a0a2e;
+    --callout-example-border: #581c87;
+    --callout-example-icon: #c084fc;
+
+    --callout-quote-bg: #1e293b;
+    --callout-quote-border: #334155;
+    --callout-quote-icon: #94a3b8;
+
+    --callout-success-bg: #052e16;
+    --callout-success-border: #166534;
+    --callout-success-icon: #4ade80;
+
+    --callout-question-bg: #1c1400;
+    --callout-question-border: #854d0e;
+    --callout-question-icon: #facc15;
+
+    --callout-failure-bg: #1c0a0a;
+    --callout-failure-border: #7f1d1d;
+    --callout-failure-icon: #f87171;
+
+    --callout-abstract-bg: #0f2b2b;
+    --callout-abstract-border: #115e59;
+    --callout-abstract-icon: #2dd4bf;
+
+    /* Tag Tokens — Dark */
+    --tag-bg: #1e293b;
+    --tag-text: #94a3b8;
+    --tag-border: #334155;
+
+    /* Embed Tokens — Dark */
+    --embed-bg: #131921;
+    --embed-border: #1e293b;
+
+    /* Broken Link Tokens — Dark */
+    --broken-link-color: #64748b;
+    --broken-link-text-decoration: line-through;
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);

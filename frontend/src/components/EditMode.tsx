@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTranslation } from '../i18n'
-import { computeRelativePath, isImageFile } from '../utils/pathUtils'
+import { isImageFile } from '../utils/pathUtils'
 import {
   Heading1, Heading2, Heading3, Bold, Italic, Strikethrough,
   Code, Link, List, ListOrdered, CheckSquare, Table,
@@ -149,16 +149,27 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
 
     e.preventDefault()
 
-    // Get the filename from the dropped path
-    const fileName = droppedPath.split('/').pop() ?? droppedPath
+    // Get the filename from the dropped path (handle both / and \ separators)
+    const normalizedDroppedPath = droppedPath.replace(/\\/g, '/')
+    const fileName = normalizedDroppedPath.split('/').pop() ?? normalizedDroppedPath
 
-    // Compute relative path from current file to dropped file
-    const relativePath = computeRelativePath(filePath, droppedPath)
+    // Display name: filename without extension
+    const displayName = fileName.includes('.')
+      ? fileName.slice(0, fileName.lastIndexOf('.'))
+      : fileName
 
-    // Determine link format based on whether it's an image
-    const linkText = isImageFile(fileName)
-      ? `![${fileName}](${relativePath})`
-      : `[${fileName}](${relativePath})`
+    // Determine link format using Obsidian conventions:
+    // - Images/attachments: ![[filename.ext]] (embed with extension)
+    // - Markdown files: [[filename]] (wikilink without .md extension)
+    // - Other files: [[filename.ext]] (wikilink with extension)
+    let linkText: string
+    if (isImageFile(fileName)) {
+      linkText = `![[${fileName}]]`
+    } else if (fileName.toLowerCase().endsWith('.md')) {
+      linkText = `[[${displayName}]]`
+    } else {
+      linkText = `[[${fileName}]]`
+    }
 
     // Determine insertion position from drop coordinates
     const ta = textareaRef.current

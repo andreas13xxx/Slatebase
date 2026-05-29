@@ -227,9 +227,9 @@ export function MyVaultsPage({ apiClient, onOpenSync }: MyVaultsPageProps) {
                       <Download size={12} />
                     </button>
                     <button
-                      className="my-vaults-action-btn"
+                      className={`my-vaults-action-btn${vault.syncEnabled ? ' my-vaults-action-btn--sync-active' : ''}`}
                       onClick={() => onOpenSync?.(vault.id)}
-                      title="Vault-Sync konfigurieren"
+                      title={vault.syncEnabled ? 'Vault-Sync aktiv — konfigurieren' : 'Vault-Sync konfigurieren'}
                       aria-label={`Sync für "${vault.name}" konfigurieren`}
                     >
                       <RefreshCw size={12} />

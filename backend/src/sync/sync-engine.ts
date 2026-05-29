@@ -307,7 +307,7 @@ export class SyncEngine implements ISyncEngine {
 
       try {
         const absolutePath = join(vaultPath, filePath)
-        let content = await readFile(absolutePath)
+        let content: Buffer = await readFile(absolutePath)
 
         // Encrypt content if E2E is enabled
         if (e2eEnabled && e2ePassphrase) {
@@ -730,13 +730,16 @@ function categorizeDocuments(results: CouchDBChange[]): {
       // Regular document
       const path = doc.path ?? derivePathFromId(id)
       if (path) {
-        regularDocs.push({
+        const docEntry: ProcessedDocument = {
           path,
           content: doc.data,
           rev: doc._rev,
-          mtime: doc.mtime,
           deleted: change.deleted ?? doc._deleted ?? false,
-        })
+        }
+        if (doc.mtime !== undefined) {
+          docEntry.mtime = doc.mtime
+        }
+        regularDocs.push(docEntry)
       }
     }
   }
@@ -769,22 +772,28 @@ function reassembleChunkedDocuments(
       const sortedIndices = [...docChunks.keys()].sort((a, b) => a - b)
       const content = sortedIndices.map(idx => docChunks.get(idx) ?? '').join('')
 
-      reassembled.push({
+      const entry: ProcessedDocument = {
         path: headerDoc.path ?? path,
         content,
         rev: headerDoc._rev,
-        mtime: headerDoc.mtime,
         deleted: headerDoc._deleted ?? false,
-      })
+      }
+      if (headerDoc.mtime !== undefined) {
+        entry.mtime = headerDoc.mtime
+      }
+      reassembled.push(entry)
     } else {
       // Header without chunks — use header data directly
-      reassembled.push({
+      const entry: ProcessedDocument = {
         path: headerDoc.path ?? path,
         content: headerDoc.data,
         rev: headerDoc._rev,
-        mtime: headerDoc.mtime,
         deleted: headerDoc._deleted ?? false,
-      })
+      }
+      if (headerDoc.mtime !== undefined) {
+        entry.mtime = headerDoc.mtime
+      }
+      reassembled.push(entry)
     }
   }
 
@@ -866,13 +875,16 @@ function categorizeDocument(
 ): AnalysisDetail {
   // Remote only (exists in CouchDB but not locally)
   if (remote && !remote.deleted && !local) {
-    return {
+    const detail: AnalysisDetail = {
       path,
       category: 'remote_only',
       remoteRevision: remote.rev,
-      remoteModifiedAt: remote.mtime ? new Date(remote.mtime).toISOString() : undefined,
       remoteSize: remote.size,
     }
+    if (remote.mtime) {
+      detail.remoteModifiedAt = new Date(remote.mtime).toISOString()
+    }
+    return detail
   }
 
   // Local only (exists locally but not in CouchDB)

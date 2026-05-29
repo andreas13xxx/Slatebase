@@ -3,7 +3,7 @@
 import type { Context } from 'hono'
 import { Hono } from 'hono'
 import { z } from 'zod'
-import type { ISyncService } from '../sync/types.js'
+import type { CreateSyncConfigInput, ISyncService, UpdateSyncConfigInput } from '../sync/types.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
@@ -227,7 +227,7 @@ export class SyncRouteModule implements RouteModule {
         return c.json(apiError, 400)
       }
 
-      const result = await this.syncService.createConfig(vaultId, ownerCheck.session.userId, parsed.data)
+      const result = await this.syncService.createConfig(vaultId, ownerCheck.session.userId, parsed.data as CreateSyncConfigInput)
       return c.json(result, 201)
     } catch (error) {
       return handleSyncError(c, error, this.logger)
@@ -282,7 +282,7 @@ export class SyncRouteModule implements RouteModule {
         return c.json(apiError, 400)
       }
 
-      const result = await this.syncService.updateConfig(vaultId, parsed.data)
+      const result = await this.syncService.updateConfig(vaultId, parsed.data as UpdateSyncConfigInput)
       return c.json(result, 200)
     } catch (error) {
       return handleSyncError(c, error, this.logger)

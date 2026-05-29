@@ -280,8 +280,8 @@ describe('setupUriSchema', () => {
     expect(setupUriSchema.safeParse('').success).toBe(false)
   })
 
-  it('rejects string exceeding 4096 chars', () => {
-    expect(setupUriSchema.safeParse('a'.repeat(4097)).success).toBe(false)
+  it('rejects string exceeding 16384 chars', () => {
+    expect(setupUriSchema.safeParse('a'.repeat(16385)).success).toBe(false)
   })
 })
 

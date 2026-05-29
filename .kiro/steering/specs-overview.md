@@ -12,12 +12,12 @@
 | 4 | `tabbed-editor-viewer` | Feature | ✅ Fertig | Tab-System, Markdown-Editor mit Auto-Save, View/Edit-Modi |
 | 5 | `auth-and-user-management` | Feature | ✅ Fertig | Auth (opake Tokens, argon2id), User-CRUD, Admin-Panel, Sharing |
 | 6 | `advanced-file-operations` | Feature | ✅ Fertig | Datei-/Ordner-Löschung, Umbenennung, Export (ZIP + FSA API) |
-| 7 | `user-chat` | Feature | 🟡 Kern fertig | Echtzeit-Chat zwischen Benutzern (optionale PBT-Tests offen) |
+| 7 | `user-chat` | Feature | ✅ Fertig | Echtzeit-Chat zwischen Benutzern |
 | 8 | `chat-enhancements` | Feature | ✅ Fertig | Unread-Badges, Archivierung, Leave-Funktion, Pagination |
 | 9 | `chat-list-refresh-fix` | Bugfix | ✅ Fertig | Konversationsliste aktualisiert sich nach Senden/Tab-Wechsel |
-| 10 | `vault-sync` | Feature | ✅ Kern fertig | CouchDB-basierte Vault-Synchronisation (optionale PBT-Tests offen) |
-| 11 | `obsidian-markdown-compat` | Feature | 📋 Geplant | Wikilinks, Embeds, Obsidian-kompatibles Rendering |
-| 12 | `mcp-context-server` | Feature | 📋 Geplant | AI Context Server mit MCP-Integration (Kern-Feature) |
+| 10 | `vault-sync` | Feature | ✅ Fertig | CouchDB-basierte Vault-Synchronisation |
+| 11 | `obsidian-markdown-compat` | Feature | ✅ Fertig | Wikilinks, Embeds, Callouts, Tags — Obsidian-kompatibles Rendering |
+| 12 | `mcp-context-server` | Feature | ✅ Fertig | AI Context Server mit MCP-Integration (Kern-Feature) |
 | 13 | `knowledge-graph` | Feature | 📋 Geplant | Visuelle Darstellung der Verlinkungen zwischen Notizen |
 | 14 | `live-preview-editor` | Feature | 📋 Geplant | Side-by-Side oder WYSIWYG Live-Preview im Editor |
 | 15 | `obsidian-plugin-compat` | Feature | 📋 Geplant | Obsidian Community Plugin Compatibility Layer |
@@ -44,37 +44,21 @@ slatebase-overview (Architektur-Grundlage)
         └── accessibility-audit (querschnittlich, alle UI-Komponenten)
 ```
 
-## Offene Specs
-
-### vault-sync — Optionale Tasks
-- **Offen**: Property-Based Tests (Tasks 2.2, 2.3, 2.5, 4.3, 6.3, 6.4, 8.2, 8.5, 10.2, 10.3)
-- **Kern-Implementierung**: Vollständig (Backend Sync-Modul + Frontend UI + Composition Root)
-- **Priorität**: Niedrig (optionale Qualitätssicherung)
-
-### user-chat — Optionale Tasks
-- **Offen**: Property-Based Tests (Task 12) und Integration Tests (Task 13)
-- **Kern-Implementierung**: Vollständig (Backend + Frontend + Composition Root)
-- **Priorität**: Niedrig (optionale Qualitätssicherung)
-
 ## Geplante Specs (noch keine Spec-Dateien vorhanden)
-
-### obsidian-markdown-compat
-- **Beschreibung**: Wikilinks (`[[Link]]`), Embeds (`![[Datei]]`), Callouts, Tags — Obsidian-kompatibles Markdown-Rendering
-- **Abhängigkeit**: Braucht Markdown-Rendering-Infrastruktur aus MVP (remark-parse, remark-gfm)
-- **Priorität**: Hoch — Kern-Feature für Obsidian-Vault-Kompatibilität
-- **Aufwand**: Mittel
-
-### mcp-context-server
-- **Beschreibung**: AI Context Server mit Model Context Protocol (MCP) Integration. Ermöglicht KI-Assistenten den Zugriff auf Vault-Inhalte über standardisierte MCP-Endpunkte.
-- **Abhängigkeit**: Braucht auth-and-user-management + Vault-Zugriff
-- **Priorität**: Hoch — namensgebendes Feature ("Knowledge-Context-Server")
-- **Aufwand**: Mittel-Groß
 
 ### knowledge-graph
 - **Beschreibung**: Visuelle Darstellung der Verlinkungen zwischen Notizen (interaktiver Graph mit Nodes und Edges)
 - **Abhängigkeit**: Braucht obsidian-markdown-compat (Wikilink-Parsing für Link-Extraktion)
 - **Priorität**: Mittel
 - **Aufwand**: Groß
+- **Technischer Ansatz (entschieden):**
+  - Phase 1: In-Memory-Index (`Map<filePath, Set<linkedPath>>` + Reverse-Map für Backlinks), persistiert als JSON (`data/vaults/<vaultId>/_link-index.json`)
+  - Inkrementelles Update: Datei gespeichert → nur diese Datei neu parsen → Index updaten
+  - Kein DB-Wechsel nötig — reicht für typische Vaults (hunderte bis wenige tausend Dateien, 5.000–20.000 Kanten)
+  - Phase 2 (optional, nur bei Performance-Problemen): SQLite als ergänzender Index (`data/vaults/<vaultId>/_index.sqlite`) mit `better-sqlite3`, Recursive CTEs für Pfad-Traversierung
+  - SQLite-Trigger: Index-Aufbau beim Start >2–3s, Vaults mit 10.000+ Dateien, komplexe transitive Queries
+  - **Keine CouchDB als internen Store** — bleibt externer Sync-Partner
+  - Interface `ILinkIndex` abstrahiert die Implementierung → Wechsel von JSON zu SQLite ohne API-Änderung
 
 ### live-preview-editor
 - **Beschreibung**: Side-by-Side oder WYSIWYG Live-Preview im Markdown-Editor (aktuell nur getrennter View/Edit-Modus)

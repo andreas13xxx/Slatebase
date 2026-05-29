@@ -3,12 +3,13 @@
 // Or dev mode: tsx watch --env-file=.env src/index.ts
 
 import crypto from 'node:crypto'
+import { createServer as createHttpServer } from 'node:http'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import { serve } from '@hono/node-server'
+import { getRequestListener } from '@hono/node-server'
 
 import { ConfigService } from './config/index.js'
-import { createLogger } from './logger/index.js'
+import { createLogger, ServerLogStore } from './logger/index.js'
 import { VaultReader, VaultManager } from './vault/index.js'
 import { VaultRegistry, VaultShareRegistry } from './vault/registry.js'
 import { VaultService, VaultAccessControlService } from './business/index.js'
@@ -39,6 +40,15 @@ import {
 } from './sync/index.js'
 import type { VaultPathResolver } from './sync/index.js'
 import { createSyncRoutes } from './api/syncRoutes.js'
+import { loadMcpConfig } from './mcp/config.js'
+import { TokenStore } from './mcp/token-store.js'
+import { McpTokenService } from './mcp/token-service.js'
+import { McpRateLimiter } from './mcp/rate-limiter.js'
+import { McpHandlers } from './mcp/handlers.js'
+import { McpServerFactory } from './mcp/server-factory.js'
+import { createMcpRoutes, createMcpHttpHandler } from './api/mcpRoutes.js'
+import { createMcpTokenRoutes } from './api/mcpTokenRoutes.js'
+import { createMcpWellKnownHandler } from './api/mcpWellKnownRoute.js'
 
 // --- Composition Root ---
 
@@ -46,6 +56,10 @@ import { createSyncRoutes } from './api/syncRoutes.js'
 const config = new ConfigService()
 const logger = createLogger(config)
 const serverConfig = config.getServerConfig()
+
+// 1b. Server Log Store (file persistence for admin log viewer)
+const serverLogStore = new ServerLogStore(serverConfig.dataDir)
+logger.setLogStore(serverLogStore)
 
 // 2. Data Layer: VaultReader, VaultManager, VaultRegistry, VaultShareRegistry
 const vaultReader = new VaultReader()
@@ -68,7 +82,20 @@ const checkVaultOwnership = async (userId: string): Promise<boolean> => {
   const entries = await vaultRegistry.load()
   return entries.some((e) => e.ownerId === userId)
 }
-const userService = new UserService(userRepository, sessionStore, logger, checkVaultOwnership, auditService)
+
+// MCP config (loaded early to wire onUserInvalidated callback)
+const mcpConfig = loadMcpConfig(config)
+
+// Mutable reference for MCP token invalidation hook (set after MCP module init)
+let mcpTokenInvalidator: ((userId: string) => Promise<void>) | undefined
+
+const onUserInvalidated = async (userId: string): Promise<void> => {
+  if (mcpTokenInvalidator !== undefined) {
+    await mcpTokenInvalidator(userId)
+  }
+}
+
+const userService = new UserService(userRepository, sessionStore, logger, checkVaultOwnership, auditService, onUserInvalidated)
 const roleService = new RoleService(userRepository, sessionStore, logger, auditService)
 
 const vaultAccessControl = new VaultAccessControlService(vaultRegistry, vaultShareRegistry, userRepository, logger, auditService)
@@ -126,6 +153,69 @@ const syncService = new SyncService(
   vaultPathResolver,
 )
 
+// 4c. MCP Module (conditional on config)
+let mcpTokenService: McpTokenService | undefined
+let mcpRoutes: ReturnType<typeof createMcpRoutes> | undefined
+let mcpTokenRoutes: ReturnType<typeof createMcpTokenRoutes> | undefined
+let mcpHttpHandler: ReturnType<typeof createMcpHttpHandler> = null
+
+if (mcpConfig.enabled) {
+  const tokenStore = new TokenStore(serverConfig.dataDir, logger)
+  await tokenStore.loadIndex()
+
+  mcpTokenService = new McpTokenService(tokenStore, mcpConfig, logger, auditService)
+  const mcpRateLimiter = new McpRateLimiter(mcpConfig.rateLimit)
+
+  const mcpHandlers = new McpHandlers({
+    vaultService,
+    vaultAccessControl,
+    vaultReader,
+    logger,
+    mcpConfig,
+  })
+
+  // getUserId is set per-request by the transport layer via authInfo.extra.userId
+  // Tool handlers use a mutable reference that gets updated per-request
+  let currentUserId = ''
+  const mcpServerFactory = new McpServerFactory({
+    handlers: mcpHandlers,
+    toolHandlerDeps: {
+      vaultService,
+      vaultAccessControl,
+      logger,
+      mcpConfig,
+      getUserId: () => currentUserId,
+    },
+    logger,
+  })
+
+  mcpRoutes = createMcpRoutes({
+    tokenService: mcpTokenService,
+    rateLimiter: mcpRateLimiter,
+    serverFactory: mcpServerFactory,
+    mcpConfig,
+    logger,
+  })
+  mcpHttpHandler = createMcpHttpHandler({
+    tokenService: mcpTokenService,
+    rateLimiter: mcpRateLimiter,
+    serverFactory: mcpServerFactory,
+    mcpConfig,
+    logger,
+    onAuthenticated: (userId: string) => { currentUserId = userId },
+  })
+  mcpTokenRoutes = createMcpTokenRoutes({ tokenService: mcpTokenService, logger })
+
+  // Wire the MCP token invalidation hook
+  mcpTokenInvalidator = async (userId: string) => {
+    await mcpTokenService!.invalidateAllForUser(userId)
+  }
+
+  logger.info('MCP server initialized', { rateLimit: mcpConfig.rateLimit, maxTokensPerUser: mcpConfig.maxTokensPerUser })
+} else {
+  logger.info('MCP server disabled')
+}
+
 // 5. Controllers
 const vaultController = new VaultController(vaultService, logger, importService, userRepository, vaultAccessControl, syncConfigStore, vaultShareRegistry)
 const authController = new AuthController(authService, logger)
@@ -144,6 +234,7 @@ const routeModules = [
     auditService,
     configService: config,
     logger,
+    serverLogStore,
   }),
   new VaultShareRouteModule(vaultAccessControl, vaultService, vaultRegistry, logger, vaultShareRegistry, userRepository),
   new ChatRouteModule(chatController),
@@ -175,6 +266,15 @@ app.use('/api/v1/*', createMustChangePasswordMiddleware(userRepository))
 // Route registration
 app.route('/api/v1', router)
 
+// MCP route registration (after main routes, before server start)
+// Token routes use session auth (registered under /api/v1/mcp/tokens — session middleware applies)
+// MCP transport routes are handled OUTSIDE Hono to avoid double-response issues
+// .well-known/mcp.json is public (no auth)
+if (mcpConfig.enabled && mcpRoutes !== undefined && mcpTokenRoutes !== undefined) {
+  app.route('/api/v1/mcp/tokens', mcpTokenRoutes)
+}
+app.get('/.well-known/mcp.json', createMcpWellKnownHandler(mcpConfig))
+
 // --- Initialize & Start Server ---
 
 // Load session index from filesystem
@@ -200,13 +300,21 @@ try {
   logger.error('Failed to initialize sync schedulers', { error: message })
 }
 
-serve(
-  {
-    fetch: app.fetch,
-    hostname: serverConfig.host,
-    port: serverConfig.port,
-  },
-  (info) => {
-    logger.info('Server started', { host: info.address, port: info.port })
-  },
-)
+// Create the Hono request listener for non-MCP requests
+const honoListener = getRequestListener(app.fetch)
+
+// Create HTTP server with MCP interception
+const server = createHttpServer(async (req, res) => {
+  // Intercept MCP transport requests — handle directly to avoid Hono double-response
+  if (req.url === '/api/v1/mcp' && mcpHttpHandler !== null) {
+    await mcpHttpHandler(req, res)
+    return
+  }
+
+  // All other requests go through Hono
+  await honoListener(req, res)
+})
+
+server.listen(serverConfig.port, serverConfig.host, () => {
+  logger.info('Server started', { host: serverConfig.host, port: serverConfig.port })
+})

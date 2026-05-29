@@ -60,6 +60,18 @@
 - Sync-Log enthält niemals Credentials oder Dokumentinhalte — nur relative Pfade
 - Nur Vault-Besitzer darf Sync konfigurieren — Admin-Rolle hat keinen Bypass
 
+## MCP-Tokens
+
+- Token-Wert wird als SHA-256-Hash gespeichert — Klartext nur einmal bei Erstellung zurückgegeben
+- Token-Format: 128 Hex-Zeichen (`crypto.randomBytes(64).toString('hex')`)
+- In-Memory-Index für O(1) Validierung — kein Dateisystemzugriff pro Request
+- Maximale Token-Anzahl pro Benutzer: 10 (verhindert Token-Spam)
+- Rate-Limiting pro Token: Sliding Window, konfigurierbar (Standard: 60 req/min)
+- Token-Invalidierung bei User-Löschung/Sperrung (automatisch via `onUserInvalidated`-Hook)
+- MCP-Zugriffe werden im Audit-Log protokolliert (userId, tokenId, Aktion, vaultId)
+- Vault-Zugriffskontrolle wird pro Request geprüft (VaultAccessControlService) — Token gewährt nur Zugriff auf eigene/geteilte Vaults
+- **Niemals** den rohen Token-Wert loggen oder in Responses zurückgeben (außer bei Erstellung)
+
 ## Audit-Logging
 
 - Append-Only JSONL-Dateien unter `data/audit/YYYY-MM-DD.jsonl`

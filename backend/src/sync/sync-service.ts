@@ -40,6 +40,22 @@ import type { ILogger } from '../logger/index.js'
  */
 export type VaultPathResolver = (vaultId: string) => string | null
 
+// ─── Exported Utilities ───────────────────────────────────────────────────────
+
+/**
+ * Masks a password: all characters replaced with `*` except the last 4.
+ * If the password has fewer than 4 characters, it is fully masked.
+ * The masked string always has the same length as the original.
+ */
+export function maskPassword(password: string): string {
+  if (password.length <= 4) {
+    return '*'.repeat(password.length)
+  }
+  const visiblePart = password.slice(-4)
+  const maskedPart = '*'.repeat(password.length - 4)
+  return maskedPart + visiblePart
+}
+
 // ─── SyncService ─────────────────────────────────────────────────────────────
 
 /**
@@ -627,17 +643,10 @@ export class SyncService implements ISyncService {
   // ─── Private Helpers ─────────────────────────────────────────────────────
 
   /**
-   * Masks a password: all characters replaced with `*` except the last 4.
-   * If the password has fewer than 4 characters, it is fully masked.
-   * The masked string always has the same length as the original.
+   * Masks a password using the module-level maskPassword utility.
    */
   private maskPassword(password: string): string {
-    if (password.length <= 4) {
-      return '*'.repeat(password.length)
-    }
-    const visiblePart = password.slice(-4)
-    const maskedPart = '*'.repeat(password.length - 4)
-    return maskedPart + visiblePart
+    return maskPassword(password)
   }
 
   /**

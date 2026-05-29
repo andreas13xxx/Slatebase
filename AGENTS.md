@@ -133,10 +133,21 @@ All under `/api/v1`:
 | GET | /vaults/:vaultId/sync/conflicts | Get open conflicts |
 | POST | /vaults/:vaultId/sync/conflicts/:path/resolve | Resolve conflict |
 
+### MCP (Model Context Protocol)
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| POST/GET/DELETE | /api/v1/mcp | Bearer Token | MCP Streamable HTTP transport |
+| GET | /api/v1/mcp/tokens | Session | List user's API tokens |
+| POST | /api/v1/mcp/tokens | Session + CSRF | Create new API token |
+| DELETE | /api/v1/mcp/tokens/:tokenId | Session + CSRF | Revoke a token |
+| GET | /.well-known/mcp.json | None | MCP discovery metadata |
+
 ## Data Storage
 
 - Filesystem-based, no database
 - Vault data: `backend/data/vaults/<vaultId>/`
 - Vault registry: `backend/data/vaults.json`
 - Sync data: `backend/data/sync/<vaultId>/` (config, checkpoint, conflicts, log)
+- MCP data: `backend/data/mcp/tokens/` (API tokens, per-user index)
 - Config: `backend/config/default.json` + `SLATEBASE_*` env vars

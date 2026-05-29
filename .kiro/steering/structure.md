@@ -37,6 +37,9 @@ src/
 │   ├── adminRoutes.ts    — AdminController + user management/config routes
 │   ├── chatRoutes.ts     — ChatController + conversation/message routes
 │   ├── syncRoutes.ts     — SyncController + sync config/trigger/log/conflict routes
+│   ├── mcpRoutes.ts      — MCP Streamable HTTP transport endpoint (Bearer token auth)
+│   ├── mcpTokenRoutes.ts — MCP token CRUD routes (session auth)
+│   ├── mcpWellKnownRoute.ts — .well-known/mcp.json discovery endpoint (public)
 │   └── vaultShareRoutes.ts — ShareController + share/transfer routes
 ├── chat/
 │   ├── types.ts          — Chat data models (Conversation, Message, etc.)
@@ -63,6 +66,18 @@ src/
 │   ├── sync-engine.ts    — SyncEngine (CouchDB communication, pull/push/analyze)
 │   ├── sync-scheduler.ts — SyncScheduler (setInterval management)
 │   └── sync-service.ts   — SyncService (business logic orchestrator)
+├── mcp/
+│   ├── index.ts          — Barrel export for MCP module
+│   ├── types.ts          — MCP data models (TokenRecord, ApiTokenInfo, McpTokenContext, etc.)
+│   ├── config.ts         — McpConfig interface + loadMcpConfig() from env/config
+│   ├── errors.ts         — MCP-specific error classes (McpAuthenticationError, TokenLimitError, etc.)
+│   ├── validation.ts     — Zod schemas for token creation + tool parameters
+│   ├── token-store.ts    — TokenStore (filesystem persistence, in-memory hash index)
+│   ├── token-service.ts  — McpTokenService (token lifecycle: create, validate, revoke, list)
+│   ├── rate-limiter.ts   — McpRateLimiter (sliding window per token)
+│   ├── handlers.ts       — McpHandlers (MCP resource handlers: list, read)
+│   ├── tool-handlers.ts  — MCP tool handlers (list_vaults, get_vault_structure, search_vault, read_file)
+│   └── server-factory.ts — McpServerFactory (creates configured McpServer instance)
 ├── import/index.ts       — ImportService (file/folder import logic)
 └── integration.test.ts   — Integration tests
 config/
@@ -82,6 +97,28 @@ src/
 ├── index.css             — CSS Custom Properties (Design Tokens, Dark Mode)
 ├── types.ts              — Shared TypeScript interfaces (VaultInfo, DirectoryTree, etc.)
 ├── api/index.ts          — ApiClient (IApiClient interface + fetch implementation)
+├── plugins/
+│   ├── index.ts          — Barrel export (all plugins, types, utilities)
+│   ├── types.ts          — MDAST node types (WikilinkNode, EmbedNode, CalloutNode, TagNode)
+│   ├── link-resolver.ts  — Wikilink target resolution against DirectoryTree
+│   ├── heading-anchor.ts — Heading anchor generation + deduplication tracker
+│   ├── wikilink/
+│   │   ├── syntax.ts     — micromark tokenizer extension for [[...]] syntax
+│   │   ├── mdast-util.ts — fromMarkdown + toMarkdown handlers
+│   │   ├── plugin.ts     — remark plugin wrapper (remarkWikilink)
+│   │   └── extract.ts    — extractWikilinks() utility for knowledge graph
+│   ├── embed/
+│   │   ├── syntax.ts     — micromark tokenizer extension for ![[...]] syntax
+│   │   ├── mdast-util.ts — fromMarkdown + toMarkdown handlers
+│   │   └── plugin.ts     — remark plugin wrapper (remarkEmbed)
+│   ├── callout/
+│   │   ├── transform.ts  — MDAST transformer (blockquote → CalloutNode)
+│   │   ├── serializer.ts — toMarkdown serializer
+│   │   └── plugin.ts     — remark plugin wrapper (remarkCallout)
+│   └── tag/
+│       ├── syntax.ts     — micromark tokenizer extension for #tag syntax
+│       ├── mdast-util.ts — fromMarkdown + toMarkdown handlers
+│       └── plugin.ts     — remark plugin wrapper (remarkTag)
 ├── state/
 │   ├── index.ts          — AppProvider, appReducer, action creators
 │   ├── authState.ts      — Auth reducer + types
@@ -103,7 +140,7 @@ src/
 │   ├── TabBar.tsx        — Horizontal tab strip (file tabs)
 │   ├── TabContent.tsx    — Tab content orchestrator (Edit/View/Binary)
 │   ├── EditMode.tsx      — Plain-text editor with toolbar + auto-save + read-only mode
-│   ├── ViewMode.tsx      — Markdown renderer (remark + highlight.js)
+│   ├── ViewMode.tsx      — Markdown renderer (remark + highlight.js + Obsidian plugins)
 │   ├── BinaryViewer.tsx  — Binary file preview
 │   ├── LoginPage.tsx     — Login with logo + card design
 │   ├── ChangePasswordPage.tsx — Forced password change
@@ -208,6 +245,16 @@ All routes are prefixed with `/api/v1`:
 | GET | /vaults/:vaultId/sync/conflicts | Get open conflicts |
 | POST | /vaults/:vaultId/sync/conflicts/:path/resolve | Resolve conflict |
 
+### MCP (Model Context Protocol)
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| POST/GET/DELETE | /api/v1/mcp | Bearer Token | MCP Streamable HTTP transport |
+| GET | /api/v1/mcp/tokens | Session | List user's API tokens |
+| POST | /api/v1/mcp/tokens | Session + CSRF | Create new API token |
+| DELETE | /api/v1/mcp/tokens/:tokenId | Session + CSRF | Revoke a token |
+| GET | /.well-known/mcp.json | None | MCP discovery metadata |
+
 ## Data Storage
 
 Vaults are stored on disk under `backend/data/vaults/<vaultId>/`. The vault registry (`data/vaults.json`) maps vault IDs to names and storage paths. No database — all persistence is filesystem-based.
@@ -263,3 +310,17 @@ data/sync/
 - **Checkpoint**: CouchDB sequence number + local file mtimes. Atomic writes.
 - **Conflicts**: Open conflict entries per vault. Atomic writes.
 - **Sync Log**: Append-only JSONL with rotation at 1000 entries.
+
+### MCP Data
+
+```
+data/mcp/
+└── tokens/
+    ├── <tokenId>.json        — Individual API token records (hash, userId, name, expiry, status)
+    └── _by-user/
+        └── <userId>.json     — Per-user token ID index (fast listing)
+```
+
+- **Tokens**: One JSON file per API token. SHA-256 hash stored (never raw token). Atomic writes.
+- **User Index**: Per-user JSON listing their token IDs. Atomic writes.
+- **In-Memory Index**: `Map<tokenHash, tokenId>` loaded at startup for O(1) token validation.

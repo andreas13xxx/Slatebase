@@ -12,5 +12,11 @@
   "dataDir": "./data",
   "maxImportFileSize": 524288000,
   "maxImportFiles": 500,
-  "maxImportDepth": 10
+  "maxImportDepth": 10,
+  "mcp": {
+    "enabled": true,
+    "maxFileSize": 5242880,
+    "rateLimit": 60,
+    "maxTokensPerUser": 10
+  }
 }

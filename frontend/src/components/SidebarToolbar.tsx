@@ -1,13 +1,13 @@
 import { useState, useRef, useCallback } from 'react'
 import {
   Upload, FolderOpen, Download, Settings, Shield,
-  Database, FileText, Clock, User, Server, FilePlus, MessageCircle, RefreshCw,
+  Database, FileText, Clock, User, Server, FilePlus, MessageCircle, RefreshCw, Key, ScrollText,
 } from 'lucide-react'
 
 type AppPage =
   | 'vaults' | 'my-vaults' | 'profile' | 'sessions' | 'chat'
-  | 'admin-users' | 'admin-vaults' | 'admin-config' | 'admin-audit'
-  | 'vault-sharing' | 'vault-deletion' | 'sync-config'
+  | 'admin-users' | 'admin-vaults' | 'admin-config' | 'admin-audit' | 'admin-logs'
+  | 'vault-sharing' | 'vault-deletion' | 'sync-config' | 'mcp-tokens'
 
 interface ToolbarItem {
   id: string
@@ -28,6 +28,7 @@ interface SidebarToolbarProps {
   onNavigate: (page: AppPage) => void
   isAdmin: boolean
   isVaultOwner?: boolean
+  syncEnabled?: boolean
   globalUnreadCount?: number
 }
 
@@ -36,7 +37,7 @@ interface SidebarToolbarProps {
  * Buttons can be reordered by drag-and-drop.
  * Tooltips show on hover.
  */
-export function SidebarToolbar({ vaultId, onCreateFile, onImportFile, onImportFolder, onExportVault, onNavigate, isAdmin, isVaultOwner, globalUnreadCount }: SidebarToolbarProps) {
+export function SidebarToolbar({ vaultId, onCreateFile, onImportFile, onImportFolder, onExportVault, onNavigate, isAdmin, isVaultOwner, syncEnabled, globalUnreadCount }: SidebarToolbarProps) {
   const allItems: ToolbarItem[] = [
     { id: 'create-file', icon: <FilePlus size={15} />, label: 'Neue Datei', action: onCreateFile, requiresVault: true },
     { id: 'import-file', icon: <Upload size={15} />, label: 'Datei importieren', action: onImportFile, requiresVault: true },
@@ -46,11 +47,13 @@ export function SidebarToolbar({ vaultId, onCreateFile, onImportFile, onImportFo
     { id: 'my-vaults', icon: <Database size={15} />, label: 'Meine Vaults', action: () => onNavigate('my-vaults') },
     { id: 'profile', icon: <User size={15} />, label: 'Profil', action: () => onNavigate('profile') },
     { id: 'sessions', icon: <Clock size={15} />, label: 'Sitzungen', action: () => onNavigate('sessions') },
+    { id: 'mcp-tokens', icon: <Key size={15} />, label: 'API-Tokens', action: () => onNavigate('mcp-tokens') },
     { id: 'chat', icon: <MessageCircle size={15} />, label: 'Chat', action: () => onNavigate('chat') },
     { id: 'admin-users', icon: <Shield size={15} />, label: 'Benutzerverwaltung', action: () => onNavigate('admin-users'), adminOnly: true },
     { id: 'admin-vaults', icon: <Server size={15} />, label: 'Vault-Übersicht (Admin)', action: () => onNavigate('admin-vaults'), adminOnly: true },
     { id: 'admin-config', icon: <Settings size={15} />, label: 'Serverkonfiguration', action: () => onNavigate('admin-config'), adminOnly: true },
     { id: 'admin-audit', icon: <FileText size={15} />, label: 'Audit-Log', action: () => onNavigate('admin-audit'), adminOnly: true },
+    { id: 'admin-logs', icon: <ScrollText size={15} />, label: 'Server-Logs', action: () => onNavigate('admin-logs'), adminOnly: true },
   ]
 
   const visibleItems = allItems.filter((item) => {
@@ -106,11 +109,12 @@ export function SidebarToolbar({ vaultId, onCreateFile, onImportFile, onImportFo
       {orderedItems.map((item) => {
         const disabled = item.requiresVault && !vaultId
         const showBadge = item.id === 'chat' && globalUnreadCount !== undefined && globalUnreadCount > 0
+        const showSyncActive = item.id === 'sync-config' && syncEnabled === true
         return (
           <button
             key={item.id}
-            className="toolbar-btn"
-            title={item.label}
+            className={`toolbar-btn${showSyncActive ? ' toolbar-btn--sync-active' : ''}`}
+            title={showSyncActive ? `${item.label} (aktiv)` : item.label}
             aria-label={item.label}
             onClick={disabled ? undefined : item.action}
             disabled={disabled}
@@ -126,6 +130,9 @@ export function SidebarToolbar({ vaultId, onCreateFile, onImportFile, onImportFo
               <span className="toolbar-btn-badge" aria-label={`${globalUnreadCount} ungelesene Nachrichten`}>
                 {globalUnreadCount}
               </span>
+            )}
+            {showSyncActive && (
+              <span className="toolbar-btn-sync-dot" aria-hidden="true" />
             )}
           </button>
         )

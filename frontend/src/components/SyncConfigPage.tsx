@@ -4,6 +4,7 @@ import { useSyncContext } from '../state/syncContext'
 import { useAppContext } from '../state/index'
 import { useTranslation } from '../i18n'
 import { ConfirmModal } from './ConfirmModal'
+import { SyncStatusPanel } from './SyncStatusPanel'
 import {
   loadSyncConfig,
   createSyncConfig,
@@ -869,6 +870,9 @@ export function SyncConfigPage({ vaultId }: SyncConfigPageProps) {
       {viewMode === 'create' && renderCreateForm()}
       {viewMode === 'edit' && renderEditForm()}
       {viewMode === 'view' && state.config && renderConfigView()}
+      {viewMode === 'view' && state.config && (
+        <SyncStatusPanel vaultId={vaultId} />
+      )}
 
       <ConfirmModal
         open={showRemoveConfirm}

@@ -19,7 +19,7 @@ export class SyncConfigStore implements ISyncConfigStore {
 
   constructor(
     dataDir: string,
-    private readonly cryptoService: ICryptoService,
+    _cryptoService: ICryptoService,
     private readonly logger: ILogger,
   ) {
     this.syncDir = path.join(dataDir, 'sync')

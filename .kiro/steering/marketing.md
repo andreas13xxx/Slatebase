@@ -35,7 +35,7 @@ Slatebase als Self-Hosted-Alternative für Obsidian-Vault-Zugriff in der Communi
 | # | Maßnahme | Status | Details |
 |---|----------|--------|---------|
 | 15 | Dev.to / Blog-Artikel: Architektur-Entscheidungen | 📋 Geplant | "Why no database?", Filesystem-basiert, opake Tokens statt JWT |
-| 16 | Dev.to / Blog-Artikel: MCP-Integration | 📋 Geplant | Sobald `mcp-context-server` Spec umgesetzt — AI-Community ansprechen |
+| 16 | Dev.to / Blog-Artikel: MCP-Integration | 📋 Geplant | MCP-Server ist implementiert — AI-Community ansprechen |
 | 17 | Kurzes YouTube/Loom-Video (2–3 Min) | 📋 Geplant | Setup → Login → Vault browsen → Datei editieren → Vault teilen → Chat-Nachricht senden |
 | 18 | Twitter/X Thread: "Building a self-hosted Obsidian web UI" | 📋 Geplant | Build-in-public Narrative, Screenshots, Learnings |
 
@@ -45,7 +45,7 @@ Slatebase als Self-Hosted-Alternative für Obsidian-Vault-Zugriff in der Communi
 |---|----------|--------|---------|
 | 19 | Docker Hub Listing (zusätzlich zu GHCR) | 📋 Geplant | Breitere Sichtbarkeit, gute Beschreibung |
 | 20 | Obsidian Community Plugin (Sync zu Slatebase) | 🟡 Teilweise | `vault-sync` Backend+Frontend implementiert — Plugin-Seite noch offen |
-| 21 | MCP-Server im MCP-Verzeichnis listen | 📋 Geplant | Abhängig von `mcp-context-server` Spec — AI-Tool-Ökosystem |
+| 21 | MCP-Server im MCP-Verzeichnis listen | 📋 Geplant | MCP-Server implementiert — Listing vorbereiten |
 | 22 | Vergleichsseite: Slatebase vs. Obsidian Publish vs. Quartz | 📋 Geplant | Faire Gegenüberstellung — Differenzierung: Multi-User, Chat, granulare Rechte, Vault-Transfer, Sync (alles was die anderen nicht haben) |
 | 23 | Localization: Englische UI als Default für internationale Reichweite | 📋 Geplant | i18n ist vorhanden — English als Default für breitere Adoption |
 
@@ -68,7 +68,7 @@ Slatebase als Self-Hosted-Alternative für Obsidian-Vault-Zugriff in der Communi
 - Video (#17)
 
 **Langfristig (abhängig von Feature-Entwicklung):**
-- MCP-Artikel + Listing (#16, #21) — nach `mcp-context-server` Umsetzung
+- MCP-Artikel + Listing (#16, #21) — MCP-Server ist implementiert, Artikel und Listing vorbereiten
 - Obsidian Plugin (#20) — Sync-Backend steht, Plugin-Seite noch offen
 - Vergleichsseite (#22) — wenn genug Differenzierung vorhanden
 
