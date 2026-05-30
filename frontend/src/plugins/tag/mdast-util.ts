@@ -18,7 +18,6 @@ export function tagFromMarkdown(): FromMarkdownExtension {
       value: '',
     }
     this.enter(node, token)
-    this.buffer()
   }
 
   const exitTagValue: FromMarkdownHandle = function (token) {
@@ -30,15 +29,12 @@ export function tagFromMarkdown(): FromMarkdownExtension {
   }
 
   const exitTag: FromMarkdownHandle = function (token) {
-    const data = this.resume()
     const current = this.stack[this.stack.length - 1] as TagNode | undefined
     if (current && current.type === 'tag') {
       // The value field (from Literal) is the full string including #
       current.value = '#' + current.tag
     }
     this.exit(token)
-    // data is unused but resume() must be called to match buffer()
-    void data
   }
 
   return {

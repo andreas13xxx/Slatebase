@@ -6,6 +6,8 @@ import type { DirectoryTree } from '../types'
 import { EditMode } from './EditMode'
 import { ViewMode } from './ViewMode'
 import { BinaryViewer } from './BinaryViewer'
+import { GraphView } from './GraphView'
+import { useTranslation } from '../i18n'
 
 /**
  * Extracts the file extension from a filename (including the dot).
@@ -56,6 +58,7 @@ function pathExistsInTree(tree: DirectoryTree | null, filePath: string): boolean
 export function TabContent() {
   const { tabState, tabDispatch } = useTabContext()
   const { state: appState, dispatch: appDispatch, apiClient } = useAppContext()
+  const { t } = useTranslation()
   const [saving, setSaving] = useState(false)
   const [linkError, setLinkError] = useState<string | null>(null)
 
@@ -124,6 +127,22 @@ export function TabContent() {
     return (
       <div className="tab-content tab-content--empty" style={emptyStyle}>
         <p style={emptyTextStyle}>Keine Datei geöffnet. Wähle eine Datei im Datei-Explorer aus.</p>
+      </div>
+    )
+  }
+
+  // Graph tab — render GraphView
+  if (activeTab.filePath === '__graph__') {
+    if (!appState.selectedVaultId) {
+      return (
+        <div className="tab-content tab-content--empty" style={emptyStyle}>
+          <p style={emptyTextStyle}>{t('graph.noVault')}</p>
+        </div>
+      )
+    }
+    return (
+      <div className="tab-content tab-content--graph" style={contentStyle}>
+        <GraphView vaultId={appState.selectedVaultId} />
       </div>
     )
   }

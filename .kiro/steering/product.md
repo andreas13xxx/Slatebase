@@ -11,7 +11,7 @@ Slatebase is feature-complete for its core use case: multi-user Markdown vault m
 - **Multi-vault management** — Create, delete, import/export, switch between vaults
 - **File explorer** — Directory tree navigation with Lucide icons
 - **Tabbed editor/viewer** — Multiple files open simultaneously, auto-save, View/Edit modes
-- **Markdown rendering** — GFM, syntax highlighting, frontmatter, collapsible headings, Obsidian-compatible (Wikilinks, Embeds, Callouts, Tags)
+- **Markdown rendering** — GFM, syntax highlighting, frontmatter, collapsible headings, Obsidian-compatible (Wikilinks, Embeds with size/display, Callouts, Tags)
 - **Authentication** — Session-based auth (opaque tokens, argon2id, CSRF, rate limiting)
 - **Multi-user & sharing** — Granular read/write vault permissions, ownership transfer
 - **User chat** — Real-time messaging between users with unread badges, archiving, pagination
@@ -23,10 +23,11 @@ Slatebase is feature-complete for its core use case: multi-user Markdown vault m
 - **Docker deployment** — Multi-stage build, Nginx reverse proxy, non-root user
 - **Vault synchronization** — CouchDB/obsidian-livesync compatible sync (bidirectional & read-only, manual & interval-based, conflict detection & resolution, analysis mode, optional E2E encryption)
 - **MCP Context Server** — Model Context Protocol integration for AI assistants (Claude, Cursor, etc.) to access vault contents via standardized MCP tools and resources
+- **Context Panel** — Right-side panel with four views (Outline, Links, Tags, Properties), icon-only tab navigation with Drag & Drop reordering, panel splitting with per-section tab bars, cross-section tab movement, and auto-close of empty sections
+- **Knowledge Graph** — Interactive force-directed graph visualization of vault link structure (SVG + d3-force, zoom/pan/drag, search, node highlighting, tab integration, backend link-index with JSON persistence and incremental updates)
 
 ### Planned Features
 
-- Knowledge graph visualization
 - Obsidian Community Plugin compatibility layer
 - Live Preview Editor (Side-by-Side or WYSIWYG)
 - Accessibility (a11y) — WCAG 2.1 AA compliance

@@ -37,6 +37,7 @@
 - **highlight.js** — Syntax-Highlighting in Code-Blöcken
 - **lucide-react** — Icon-Library (SVG-basiert, tree-shakeable, konsistente Lucide-Icons)
 - **jszip** — Client-seitiges ZIP-Erstellen (Vault-Export-Fallback für Firefox)
+- **d3-force** — Force-Directed Graph Layout für Knowledge Graph (+ `@types/d3-force` als devDep)
 
 ### Shared (devDependencies)
 - **fast-check** — Property-Based Testing (universelle Invarianten verifizieren, Reducer-Korrektheit)

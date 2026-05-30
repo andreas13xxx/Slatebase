@@ -321,13 +321,13 @@ export class ChatController {
       return c.json(createApiError('CONVERSATION_ARCHIVED', error.message), 403)
     }
 
-    // Unknown errors — log and re-throw
+    // Unknown errors — log and return 500
     this.logger.error('Unexpected error in ChatController', {
       message: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
     })
 
-    throw error
+    return c.json(createApiError('INTERNAL_ERROR', 'Internal server error'), 500)
   }
 }
 

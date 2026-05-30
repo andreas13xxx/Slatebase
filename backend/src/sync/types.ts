@@ -121,6 +121,7 @@ export interface AnalysisResult {
     local_newer: CategorySummary
     remote_only: CategorySummary
     local_only: CategorySummary
+    remote_deleted: CategorySummary
     conflict: CategorySummary
     identical: CategorySummary
   }
@@ -147,7 +148,7 @@ export interface AnalysisDetail {
   /** Relative path. */
   path: string
   /** Category. */
-  category: 'remote_newer' | 'local_newer' | 'remote_only' | 'local_only' | 'conflict' | 'identical'
+  category: 'remote_newer' | 'local_newer' | 'remote_only' | 'local_only' | 'remote_deleted' | 'conflict' | 'identical'
   /** Remote revision number (if available). */
   remoteRevision?: string
   /** Local modification date (ISO 8601, if available). */
@@ -179,7 +180,7 @@ export interface CreateSyncConfigInput {
   username?: string
   /** Manual configuration: CouchDB password. */
   password?: string
-  /** Sync mode (default: bidirectional). */
+  /** Sync mode (default: readonly). */
   mode?: 'bidirectional' | 'readonly'
   /** Sync trigger (default: manual). */
   trigger?: 'manual' | 'interval'
@@ -456,6 +457,14 @@ export interface ISyncService {
 
   /** Resolves a conflict. */
   resolveConflict(vaultId: string, documentPath: string, resolution: ConflictResolution): Promise<void>
+
+  /**
+   * Resets the sync checkpoint for a vault.
+   * The next sync will perform a full pull from CouchDB (since=0),
+   * re-processing all documents including tombstones for deleted/moved files.
+   * Use this to clean up stale files from previous sync bugs.
+   */
+  resetCheckpoint(vaultId: string): Promise<void>
 
   /** Initializes sync intervals after server restart. */
   initializeSchedulers(): Promise<void>

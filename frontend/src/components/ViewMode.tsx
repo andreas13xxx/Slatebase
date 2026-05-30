@@ -198,7 +198,7 @@ interface NoteEmbedProps {
  * Supports heading-based section filtering (e.g. ![[note#heading]]).
  * Respects MAX_EMBED_DEPTH to prevent infinite recursion.
  */
-function NoteEmbed({ vaultId, filePath, target, heading, directoryTree, token, embedDepth }: NoteEmbedProps) {
+function NoteEmbed({ vaultId, filePath, target, heading, directoryTree, token, embedDepth: _embedDepth }: NoteEmbedProps) {
   const [noteContent, setNoteContent] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -408,6 +408,9 @@ function extractPlainText(nodes: PhrasingContent[]): string {
       text += node.value
     } else if (node.type === 'inlineCode') {
       text += node.value
+    } else if (node.type === 'wikilink') {
+      // Extract display text from wikilink nodes
+      text += (node as unknown as WikilinkNode).display
     } else if ('children' in node && Array.isArray(node.children)) {
       text += extractPlainText(node.children as PhrasingContent[])
     }
@@ -972,9 +975,10 @@ function renderTextWithEmbeds(
   const parts: ReactNode[] = []
   let lastIndex = 0
 
-  // Combined regex: matches ![[...]] (embeds) and [[...|...]] or [[...]] (wikilinks)
+  // Combined regex: matches ![[...|...]] or ![[...]] (embeds) and [[...|...]] or [[...]] (wikilinks)
   // The embed regex must come first to avoid matching ![[...]] as a wikilink
-  const COMBINED_REGEX = /!\[\[([^\]]+)\]\]|\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g
+  // Embed: ![[target|display]] or ![[target]] — target cannot contain ] but can contain |
+  const COMBINED_REGEX = /!\[\[([^\]|]+?)(?:\|([^\]]*?))?\]\]|\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g
   COMBINED_REGEX.lastIndex = 0
 
   let match: RegExpExecArray | null
@@ -988,18 +992,22 @@ function renderTextWithEmbeds(
     }
 
     if (match[1] !== undefined) {
-      // This is an embed: ![[filename]]
+      // This is an embed: ![[filename]] or ![[filename|size]]
       const filename = match[1]
+      const embedDisplay = match[2] ?? null
 
       if (isImageFile(filename)) {
         const resolvedPath = findFileInTree(directoryTree, filename)
 
         if (resolvedPath) {
+          const imageStyle = parseEmbedImageStyle(embedDisplay)
+          const altText = parseEmbedAltText(embedDisplay) ?? filename
+
           parts.push(createElement('img', {
             key: `${key}-embed-${matchStart}`,
             src: buildImageSrc(vaultId, resolvedPath, token),
-            alt: filename,
-            style: { maxWidth: '100%', height: 'auto' },
+            alt: altText,
+            style: imageStyle,
             className: 'view-mode-image',
           }))
         } else {
@@ -1015,8 +1023,8 @@ function renderTextWithEmbeds(
       }
     } else {
       // This is a wikilink: [[target]] or [[target|display]]
-      const target = match[2]
-      const displayText = match[3] ?? target
+      const target = match[3]
+      const displayText = match[4] ?? target
 
       // Resolve the wikilink target against the directory tree
       const resolvedPath = resolveWikilinkTarget(target, directoryTree)
@@ -1152,6 +1160,86 @@ function renderTagNode(
 const MAX_EMBED_DEPTH = 3
 
 /**
+ * Parses the display field of an image embed for sizing information.
+ * Supports Obsidian-compatible formats:
+ * - `300` → width: 300px (height auto)
+ * - `300x200` → width: 300px, height: 200px
+ * - `100%` → width: 100% (height auto)
+ * - `x200` → height: 200px (width auto)
+ * - Non-numeric text → treated as alt text, default sizing (maxWidth: 100%)
+ *
+ * @returns CSS style object for the image element
+ */
+function parseEmbedImageStyle(display: string | null): React.CSSProperties {
+  if (!display) {
+    return { maxWidth: '100%', height: 'auto' }
+  }
+
+  const trimmed = display.trim()
+
+  // Format: 300x200 (width x height in pixels)
+  const dimensionMatch = trimmed.match(/^(\d+)\s*x\s*(\d+)$/)
+  if (dimensionMatch) {
+    return {
+      width: `${dimensionMatch[1]}px`,
+      height: `${dimensionMatch[2]}px`,
+    }
+  }
+
+  // Format: x200 (height only)
+  const heightOnlyMatch = trimmed.match(/^x\s*(\d+)$/)
+  if (heightOnlyMatch) {
+    return {
+      height: `${heightOnlyMatch[1]}px`,
+      width: 'auto',
+      maxWidth: '100%',
+    }
+  }
+
+  // Format: 100% (percentage width)
+  const percentMatch = trimmed.match(/^(\d+)%$/)
+  if (percentMatch) {
+    return {
+      width: `${percentMatch[1]}%`,
+      height: 'auto',
+    }
+  }
+
+  // Format: 300 (width only in pixels)
+  const widthMatch = trimmed.match(/^(\d+)$/)
+  if (widthMatch) {
+    return {
+      width: `${widthMatch[1]}px`,
+      height: 'auto',
+      maxWidth: '100%',
+    }
+  }
+
+  // Non-numeric: treat as alt text, use default sizing
+  return { maxWidth: '100%', height: 'auto' }
+}
+
+/**
+ * Extracts alt text from the display field of an image embed.
+ * Returns null if the display field is a sizing value (numeric/dimension).
+ * Returns the display text if it's non-numeric (used as alt text).
+ */
+function parseEmbedAltText(display: string | null): string | null {
+  if (!display) return null
+
+  const trimmed = display.trim()
+
+  // If it matches any sizing pattern, it's not alt text
+  if (/^(\d+)$/.test(trimmed)) return null
+  if (/^(\d+)\s*x\s*(\d+)$/.test(trimmed)) return null
+  if (/^x\s*(\d+)$/.test(trimmed)) return null
+  if (/^(\d+)%$/.test(trimmed)) return null
+
+  // Non-numeric: it's alt text
+  return trimmed
+}
+
+/**
  * Renders an EmbedNode as an image or note embed.
  *
  * Image embeds: Resolves target using resolveWikilinkTarget, renders <img> with vault API URL.
@@ -1183,12 +1271,16 @@ function renderEmbedNode(
     // Requirement 5.1: Resolve image target using resolveWikilinkTarget
     const resolvedPath = resolveWikilinkTarget(node.target, directoryTree)
     if (resolvedPath) {
-      // Render <img> with vault API URL
+      // Parse display field for sizing/formatting
+      const imageStyle = parseEmbedImageStyle(node.display)
+      const altText = parseEmbedAltText(node.display) ?? node.target
+
+      // Render <img> with vault API URL and optional sizing
       return createElement('img', {
         key,
         src: buildImageSrc(vaultId, resolvedPath, token),
-        alt: node.target,
-        style: { maxWidth: '100%', height: 'auto' },
+        alt: altText,
+        style: imageStyle,
         className: 'view-mode-image view-mode-embed view-mode-embed--image',
       })
     }

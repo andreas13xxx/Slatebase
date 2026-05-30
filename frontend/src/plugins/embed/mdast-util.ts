@@ -4,8 +4,8 @@
  * Provides fromMarkdown and toMarkdown handlers that convert between
  * micromark tokens and EmbedNode MDAST nodes.
  *
- * fromMarkdown: Converts embed tokens into EmbedNode with target, heading, embedType.
- * toMarkdown: Serializes EmbedNode back to `![[target]]` or `![[target#heading]]`.
+ * fromMarkdown: Converts embed tokens into EmbedNode with target, heading, display, embedType.
+ * toMarkdown: Serializes EmbedNode back to `![[target]]`, `![[target#heading]]`, or `![[target|display]]`.
  */
 import type { Extension as FromMarkdownExtension } from 'mdast-util-from-markdown'
 import type { Options as ToMarkdownExtension } from 'mdast-util-to-markdown'
@@ -21,6 +21,8 @@ import { detectEmbedType } from './syntax'
  * - `embedTarget` (the target text)
  * - `embedHeadingMarker` (the `#` separator)
  * - `embedHeading` (the heading text after `#`)
+ * - `embedSeparator` (the `|` separator)
+ * - `embedDisplay` (the display/size text after `|`)
  */
 export function embedFromMarkdown(): FromMarkdownExtension {
   return {
@@ -30,6 +32,7 @@ export function embedFromMarkdown(): FromMarkdownExtension {
           type: 'embed',
           target: '',
           heading: null,
+          display: null,
           embedType: 'note',
           value: '',
         }
@@ -54,16 +57,28 @@ export function embedFromMarkdown(): FromMarkdownExtension {
           node.heading = heading
         }
       },
+      embedDisplay(token) {
+        const display = this.sliceSerialize(token)
+        const current = this.stack[this.stack.length - 1]
+        if (current && current.type === 'embed') {
+          const node = current as unknown as EmbedNode
+          node.display = display
+        }
+      },
       embed(token) {
         const node = this.stack[this.stack.length - 1]
         if (node && node.type === 'embed') {
           const embedNode = node as unknown as EmbedNode
           // Build the value (raw text representation)
+          let value = `![[${embedNode.target}`
           if (embedNode.heading) {
-            embedNode.value = `![[${embedNode.target}#${embedNode.heading}]]`
-          } else {
-            embedNode.value = `![[${embedNode.target}]]`
+            value += `#${embedNode.heading}`
           }
+          if (embedNode.display) {
+            value += `|${embedNode.display}`
+          }
+          value += ']]'
+          embedNode.value = value
         }
         this.exit(token)
       },
@@ -75,17 +90,24 @@ export function embedFromMarkdown(): FromMarkdownExtension {
  * Creates a toMarkdown extension that serializes EmbedNode back to markdown.
  *
  * Produces:
- * - `![[target]]` when no heading is present
+ * - `![[target]]` when no heading or display is present
  * - `![[target#heading]]` when a heading fragment exists
+ * - `![[target|display]]` when a display/size is present
+ * - `![[target#heading|display]]` when both exist
  */
 export function embedToMarkdown(): ToMarkdownExtension {
   return {
     handlers: {
       embed(node: EmbedNode): string {
+        let value = `![[${node.target}`
         if (node.heading) {
-          return `![[${node.target}#${node.heading}]]`
+          value += `#${node.heading}`
         }
-        return `![[${node.target}]]`
+        if (node.display) {
+          value += `|${node.display}`
+        }
+        value += ']]'
+        return value
       },
     },
   }

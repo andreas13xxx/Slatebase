@@ -224,6 +224,9 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 11. **Vault-Ownership** — `createVault` im Backend muss `ownerId` aus der Session setzen, sonst funktionieren Sharing-Endpoints nicht (403 "Only the vault owner can manage shares")
 12. **Client vs. Server Filesystem** — Bei Features die auf das lokale Dateisystem des Users zugreifen (Export, Download), NIEMALS einen Backend-Endpoint verwenden der auf dem Server-Filesystem schreibt. Der Browser kann remote auf den Server zugreifen → Client- und Server-Filesystem sind unterschiedlich. Stattdessen Browser-APIs nutzen (File System Access API, Download via Blob, etc.)
 13. **File System Access API** — `showDirectoryPicker` ist nur in Chromium-Browsern verfügbar (Chrome, Edge, Brave). Firefox unterstützt es nicht und wird es absehbar nicht. Immer einen Fallback bereitstellen (z.B. ZIP-Download via JSZip).
+14. **mdast-util `this.buffer()` vergiftet den Stack** — Nach `this.buffer()` ist `this.stack[this.stack.length - 1]` ein leerer String, nicht der zuletzt gepushte Node. `exitHandler` die per Stack-Index auf den Node zugreifen, finden ihn nicht mehr. Nur `buffer()` verwenden wenn `resume()` den gesammelten Text braucht.
+15. **Broken Links sehen aus wie Strikethrough** — `text-decoration: line-through` auf unresolved Links wird von Benutzern als `~~durchgestrichen~~` interpretiert. Immer `underline dashed` verwenden.
+16. **Embed-Syntax ohne Pipe-Support** — Obsidian-Embeds unterstützen `![[file|size]]` und `![[file|alt]]`. Der Embed-Tokenizer muss den Pipe-Character (`|`, Code 124) als Separator erkennen, sonst wird `|300` als Teil des Dateinamens interpretiert und die Datei nicht gefunden.
 
 ## Vault-Besitz & Löschregeln
 
@@ -818,3 +821,128 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - `micromark`, `mdast-util-from-markdown`, `unist-util-visit` sind transitive Dependencies von `remark-parse`/`unified`
 - Direkt importierbar ohne Installation
 - **Regel:** Vor dem Installieren neuer Packages prüfen ob sie bereits transitiv verfügbar sind
+
+### mdast-util-from-markdown: buffer()/resume() vs. sliceSerialize()
+- `this.buffer()` in einem `enter`-Handler pusht einen leeren String auf `this.stack`
+- Danach ist `this.stack[this.stack.length - 1]` der Buffer-String, NICHT der Node
+- `this.sliceSerialize(token)` liest direkt aus dem Source-Text — unabhängig vom Buffer
+- **Fehler-Pattern:** `enterTag` ruft `this.buffer()` auf → `exitTagValue` findet den TagNode nicht mehr auf dem Stack → `node.tag` bleibt leer → Tag-Text fehlt im Rendering
+- **Regel:** `this.buffer()`/`this.resume()` nur verwenden wenn man den gesamten Text-Content eines Tokens als String sammeln will. Wenn man Token-Werte per `sliceSerialize()` liest, ist `buffer()` unnötig und schädlich.
+- **Regel:** Nach Änderungen an mdast-util-Handlern immer prüfen ob der Stack-Zugriff (`this.stack[this.stack.length - 1]`) den erwarteten Node-Typ zurückgibt
+
+### Embed-Syntax: Pipe-Separator für Größe/Display
+- Obsidian unterstützt `![[bild.jpg|300]]`, `![[bild.jpg|300x200]]`, `![[bild.jpg|100%]]`, `![[bild.jpg|x200]]`
+- Der Pipe-Character `|` muss im Embed-Tokenizer als `embedSeparator`-Token erkannt werden
+- `EmbedNode` hat ein `display: string | null` Feld für den Text nach dem Pipe
+- Größen-Parsing im Renderer: `parseEmbedImageStyle(display)` → CSS-Properties
+- Nicht-numerischer Display-Text wird als Alt-Text interpretiert
+- **Regel:** Bei neuen Obsidian-Syntax-Elementen immer die Obsidian-Dokumentation auf Pipe-Varianten prüfen
+
+### Broken Links: Kein Durchstreichen (line-through)
+- `text-decoration: line-through` für broken/unresolved Links ist visuell identisch mit Markdown-Strikethrough (`~~text~~`)
+- Benutzer verwechseln broken Links mit durchgestrichenem Text
+- **Lösung:** `--broken-link-text-decoration: underline dashed` — dezente gestrichelte Unterstreichung
+- Obsidian selbst zeigt unresolved Links nur in einer anderen Farbe, ohne Dekoration
+- **Regel:** Broken Links nie mit `line-through` stylen — immer `underline dashed` oder nur Farbänderung
+
+### extractPlainText() muss alle Inline-Node-Typen kennen
+- `extractPlainText()` wird für Heading-Anchor-Generierung verwendet
+- Muss ALLE PhrasingContent-Typen behandeln die Text enthalten: `text`, `inlineCode`, `wikilink` (→ `display`), `tag` (→ `tag`)
+- Fehlende Typen → Anchor-IDs stimmen nicht mit dem sichtbaren Heading-Text überein
+- **Regel:** Bei neuen Inline-Node-Typen immer `extractPlainText()` erweitern
+
+## Context Panel
+
+### Split-Modus: Jede Section hat eigene Tab-Leiste
+- Im Split-Modus (`sections.length > 1`) zeigt jede Section ihre eigene `ContextPanelTabBar`
+- Im Single-Section-Modus wird die Tab-Leiste separat über dem Content gerendert (in `ContextPanel.tsx`)
+- `SplitSectionContainer` rendert Tab-Leisten nur im Split-Modus — Single-Section-Rendering liegt bei `ContextPanel`
+
+### Tab-Leiste: Nur Icons, Text als Tooltip
+- `ContextPanelTabBar` rendert immer nur Icons (14px Lucide-Icons)
+- Labels werden als `title`-Attribut (nativer Browser-Tooltip) und `aria-label` (Accessibility) beibehalten
+- CSS-Klasse `context-panel-tab-bar--icon-only` wird immer angewendet
+- Kein `panelWidth`-basierter Wechsel zwischen Icon-Only und Icon+Text mehr
+
+### Cross-Section Tab-Verschiebung
+- Tabs können per Drag & Drop von einer Section in eine andere verschoben werden
+- Neuer Reducer-Action: `MOVE_VIEW_TO_SECTION` — verschiebt View und entfernt leere Source-Section
+- `ContextPanelTabBar` akzeptiert `onTabReceive`-Prop für eingehende Drops aus anderen Sections
+- `sectionId`-Prop identifiziert die Section für Cross-Section-Drops
+- Tabs sind auch in Single-Tab-Sections draggable (wenn `sectionId` gesetzt ist)
+
+### Letzte Tab rausgezogen → Section schließt sich
+- Wenn die letzte View aus einer Section verschoben wird, wird die Section automatisch entfernt
+- Höhen werden gleichmäßig auf die verbleibenden Sections umverteilt (`1 / newSections.length`)
+- Verhindert leere Sections ohne Inhalt
+
+### ContextPanelProvider: Layout-Persistenz per User
+- Layout (tabOrder, sections mit viewIds/activeViewId/heightFraction) wird in localStorage gespeichert
+- Scoped per `userId` — verschiedene Benutzer haben verschiedene Layouts
+- Debounced (500ms) um excessive Writes zu vermeiden
+- Beim Laden: Section-IDs werden frisch generiert (nicht aus localStorage übernommen)
+
+## Knowledge Graph
+
+### SVG-Text in transformierten Gruppen wird unscharf
+- SVG `<text>`-Elemente innerhalb einer `<g transform="scale(...)">` Gruppe werden vom Browser mit Subpixel-Rendering gezeichnet
+- Ergebnis: chromatische Aberrationen (farbige Ränder an Buchstaben), pixeliger Text
+- CSS-Fixes (`text-rendering`, `-webkit-font-smoothing`) helfen nur minimal
+- **Lösung:** Labels AUSSERHALB der Zoom-Transform-Gruppe rendern und Position manuell berechnen:
+  ```tsx
+  // Labels in separater <g> ohne scale(), Position = node.x * zoom + panX
+  <g className="graph-view__labels">
+    {nodes.map(node => (
+      <text x={node.x * zoom + panX} y={(node.y + radius + 12) * zoom + panY}>
+        {label}
+      </text>
+    ))}
+  </g>
+  ```
+- **Regel:** SVG-Text niemals innerhalb einer `scale()`-Transform-Gruppe rendern — immer in nativer Auflösung zeichnen
+
+### LinkIndexService: Per-Vault-Instanz im Composition Root
+- `Map<string, LinkIndexService>` im Composition Root (`linkIndexMap`)
+- Neue Instanz bei Vault-Erstellung, Entfernung bei Vault-Löschung
+- Lazy-Init: Wenn Graph-API aufgerufen wird und Index nicht ready → `loadFromDisk()` oder `rebuild()`
+- Fire-and-forget beim Startup: `loadFromDisk()` im Hintergrund (blockiert nicht den Server-Start)
+- **Regel:** Keine synchrone Initialisierung im Startup-Pfad — Index-Aufbau kann bei großen Vaults mehrere Sekunden dauern
+
+### LinkIndexService: Hook in VaultController für inkrementelle Updates
+- `vaultController.setLinkIndexHook({ onFileSaved, onFileDeleted, onFileRenamed })`
+- Nur `.md`-Dateien triggern Index-Updates (Bilder, PDFs etc. werden ignoriert)
+- Hook-Callbacks sind fire-and-forget (kein `await` im Save-Pfad — User wartet nicht auf Index-Update)
+- **Regel:** Index-Updates dürfen die Datei-Save-Latenz nicht erhöhen
+
+### Graph-Tab: Virtueller Pfad `__graph__`
+- Tab-ID: `${vaultId}::__graph__`
+- `TabContent` prüft `filePath === '__graph__'` → rendert `GraphView` statt Editor/Viewer
+- Maximal ein Graph-Tab gleichzeitig (bei Klick auf Graph-Button: existierenden Tab aktivieren)
+- Bei Vault-Wechsel: Graph-Tab bleibt offen, `vaultId`-Prop ändert sich → GraphView re-fetcht automatisch
+- **Regel:** Spezial-Tabs mit virtuellen Pfaden immer mit `__` Prefix markieren (Kollisionsvermeidung mit echten Dateien)
+
+### d3-force: Simulation-Referenz als useRef
+- `simulationRef.current` hält die aktive Simulation
+- Simulation wird bei `graphData`-Änderung neu erstellt (nicht bei jedem Render)
+- `simulation.on('tick')` setzt State → Re-Render → neue Node-Positionen
+- Bei Drag: `node.fx`/`node.fy` fixieren Position, `simulation.alpha(0.1).restart()` für sanftes Update
+- **Regel:** d3-force-Simulation nie in einem `useEffect` mit häufig wechselnden Dependencies erstellen — nur bei Datenänderung
+
+### Graph CSS Design Tokens
+- 7 Tokens: `--graph-bg`, `--graph-node-fill`, `--graph-node-unresolved`, `--graph-edge-color`, `--graph-edge-highlight`, `--graph-label-color`, `--graph-search-highlight`
+- Definiert in allen drei Blöcken: `:root`, `:root[data-theme="dark"]`, `@media (prefers-color-scheme: dark)`
+- **Regel:** Neue Graph-Farben immer als Token definieren, nie inline
+
+### Wikilink-Parser: Backend-Äquivalenz zum Frontend
+- Backend `extractWikilinks()` in `backend/src/link-index/wikilink-parser.ts`
+- Muss identische Targets liefern wie Frontend `extractWikilinks()` in `frontend/src/plugins/wikilink/extract.ts`
+- Code-Block-Exclusion: Fenced (``` / ~~~), Indented (4 Spaces / 1 Tab), Inline (Backticks)
+- Formate: `[[target]]`, `[[folder/file]]`, `[[file#heading]]`, `[[file#heading|display]]`, `[[#heading]]`
+- **Regel:** Bei Änderungen am Frontend-Parser immer Backend-Parser synchron halten (Property 9 validiert Äquivalenz)
+
+### JSON-Persistierung: Atomarer Schreibvorgang
+- Link-Index wird als `_link-index.json` im Vault-Verzeichnis gespeichert
+- Atomares Schreiben: temp-Datei → `rename()` (konsistent mit allen anderen Persistierungen)
+- Schema: `{ version: 1, updatedAt: ISO-String, forwardLinks: Record<path, targets[]> }`
+- Reverse-Map wird beim Laden aus Forward-Links berechnet (nicht persistiert)
+- Bei ungültigem JSON oder Schema-Fehler → automatischer Full-Rebuild

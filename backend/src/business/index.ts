@@ -185,7 +185,7 @@ export interface FileSaveResult {
 export interface IVaultService {
   initializeVaults(): Promise<void>
   getVaultList(userId?: string): VaultInfo[] | Promise<VaultInfo[]>
-  getVaultTree(vaultId: string): DirectoryTree
+  getVaultTree(vaultId: string): DirectoryTree | Promise<DirectoryTree>
   getFileContent(vaultId: string, filePath: string): Promise<FileContent>
   resolveFilePath(vaultId: string, filePath: string): string
   saveFile(vaultId: string, filePath: string, content: string, ifMatch?: string): Promise<FileSaveResult>
@@ -406,15 +406,23 @@ export class VaultService implements IVaultService {
   }
 
   /**
-   * Retrieves the cached directory tree for a vault.
+   * Retrieves the directory tree for a vault, freshly read from disk.
+   * Updates the in-memory cache so subsequent calls reflect filesystem changes.
    * Throws VaultNotFoundError if the vault does not exist.
    */
-  getVaultTree(vaultId: string): DirectoryTree {
+  getVaultTree(vaultId: string): DirectoryTree | Promise<DirectoryTree> {
     const vault = this.vaultManager.getVault(vaultId)
     if (!vault) {
       throw new VaultNotFoundError(vaultId)
     }
-    return vault.tree
+    // Always read fresh from disk to reflect external changes (e.g. sync)
+    return this.vaultReader.readDirectory(
+      vault.info.path,
+      this.configService.getServerConfig().maxDirectoryDepth,
+    ).then((tree) => {
+      vault.tree = tree
+      return tree
+    })
   }
 
   /**
@@ -629,6 +637,7 @@ export class VaultService implements IVaultService {
       path: finalStoragePath,
       status: 'loaded',
       ownerId,
+      permission: 'owner',
     }
 
     this.vaultManager.addVault({

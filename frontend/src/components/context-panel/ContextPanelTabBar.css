@@ -1,0 +1,81 @@
+/* ===== Context Panel Tab Bar ===== */
+
+.context-panel-tab-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--right-panel-header-bg);
+  padding: 0 4px;
+  flex-shrink: 0;
+  min-height: 36px;
+}
+
+.context-panel-tab-bar--icon-only {
+  justify-content: center;
+}
+
+.context-panel-tab-wrapper {
+  display: flex;
+  align-items: stretch;
+  position: relative;
+}
+
+.context-panel-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: var(--right-panel-text-muted);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.context-panel-tab:hover {
+  color: var(--right-panel-text);
+  background: var(--sidebar-hover);
+}
+
+.context-panel-tab--active {
+  color: var(--accent-text);
+  border-bottom-color: var(--accent);
+}
+
+.context-panel-tab--active:hover {
+  color: var(--accent-text);
+}
+
+.context-panel-tab--dragging {
+  opacity: 0.4;
+}
+
+.context-panel-tab-icon {
+  flex-shrink: 0;
+}
+
+.context-panel-tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Insertion line indicator during drag */
+.context-panel-tab-insert-line {
+  width: 2px;
+  background: var(--accent);
+  align-self: stretch;
+  border-radius: 1px;
+  margin: 4px 0;
+}
+
+/* Icon-only mode adjustments */
+.context-panel-tab-bar--icon-only .context-panel-tab {
+  padding: 6px 8px;
+}

@@ -3,12 +3,14 @@ import { RefreshCw, Search, AlertTriangle, CheckCircle, XCircle, ChevronLeft, Ch
 import { useSyncContext } from '../state/syncContext'
 import { useAppContext } from '../state'
 import { loadSyncLog, loadConflicts, triggerSync, triggerAnalysis } from '../state/syncActions'
+import type { AnalysisResult } from '../state/syncState'
 
 /**
  * Props for the SyncStatusPanel component.
  */
 export interface SyncStatusPanelProps {
   vaultId: string
+  onOpenFullLog?: () => void
 }
 
 /** Number of log entries per page. */
@@ -18,9 +20,9 @@ const LOG_PAGE_SIZE = 10
  * Panel showing sync status, action buttons, and a paginated sync log.
  * Displays sync state, last sync time, conflict count, and full log history.
  */
-export function SyncStatusPanel({ vaultId }: SyncStatusPanelProps) {
+export function SyncStatusPanel({ vaultId, onOpenFullLog }: SyncStatusPanelProps) {
   const { state, dispatch } = useSyncContext()
-  const { apiClient } = useAppContext()
+  const { apiClient, dispatch: appDispatch } = useAppContext()
   const [logPage, setLogPage] = useState(1)
 
   useEffect(() => {
@@ -43,6 +45,10 @@ export function SyncStatusPanel({ vaultId }: SyncStatusPanelProps) {
           loadSyncLog(dispatch, apiClient, vaultId, 1, LOG_PAGE_SIZE)
           loadConflicts(dispatch, apiClient, vaultId)
           setLogPage(1)
+          // Refresh the file explorer tree after sync
+          apiClient.fetchVaultTree(vaultId).then((tree) => {
+            appDispatch({ type: 'TREE_LOADED', payload: tree })
+          }).catch(() => { /* ignore — tree refresh is best-effort */ })
         }
       })
     }
@@ -51,6 +57,26 @@ export function SyncStatusPanel({ vaultId }: SyncStatusPanelProps) {
   function handleTriggerAnalysis() {
     if (apiClient && !state.isAnalyzing) {
       triggerAnalysis(dispatch, apiClient, vaultId)
+    }
+  }
+
+  function handleResetCheckpoint() {
+    if (apiClient && !state.isSyncing) {
+      apiClient.resetSyncCheckpoint(vaultId).then(() => {
+        // After reset, trigger a full sync immediately
+        triggerSync(dispatch, apiClient, vaultId).then(() => {
+          if (apiClient) {
+            loadSyncLog(dispatch, apiClient, vaultId, 1, LOG_PAGE_SIZE)
+            loadConflicts(dispatch, apiClient, vaultId)
+            setLogPage(1)
+            apiClient.fetchVaultTree(vaultId).then((tree) => {
+              appDispatch({ type: 'TREE_LOADED', payload: tree })
+            }).catch(() => {})
+          }
+        })
+      }).catch(() => {
+        dispatch({ type: 'SYNC_ERROR_OCCURRED', payload: 'Checkpoint-Reset fehlgeschlagen' })
+      })
     }
   }
 
@@ -142,6 +168,15 @@ export function SyncStatusPanel({ vaultId }: SyncStatusPanelProps) {
           <Search size={14} className={state.isAnalyzing ? 'sync-status-panel-spinner' : ''} />
           <span>{state.isAnalyzing ? 'Analysiere…' : 'Analyse'}</span>
         </button>
+        <button
+          className="sync-status-panel-btn sync-status-panel-btn--resync"
+          onClick={handleResetCheckpoint}
+          disabled={state.isSyncing || !isActive}
+          title="Checkpoint zurücksetzen und Voll-Sync durchführen — entfernt verwaiste Dateien von verschobenen/gelöschten Dokumenten"
+        >
+          <RefreshCw size={14} />
+          <span>Voll-Sync</span>
+        </button>
       </div>
 
       {/* ── Sync Result (after manual sync) ── */}
@@ -177,54 +212,7 @@ export function SyncStatusPanel({ vaultId }: SyncStatusPanelProps) {
 
       {/* ── Analysis Result ── */}
       {state.analysisResult && (
-        <div className="sync-analysis-box">
-          <div className="sync-analysis-box-header">
-            <Search size={14} />
-            <span className="sync-analysis-box-title">Analyse-Ergebnis</span>
-            <span className="sync-result-duration">{formatDuration(state.analysisResult.durationMs)}</span>
-          </div>
-          <div className="sync-analysis-summary">
-            {state.analysisResult.summary.remote_newer.count > 0 && (
-              <span className="sync-analysis-category">↓ {state.analysisResult.summary.remote_newer.count} Remote neuer</span>
-            )}
-            {state.analysisResult.summary.local_newer.count > 0 && (
-              <span className="sync-analysis-category">↑ {state.analysisResult.summary.local_newer.count} Lokal neuer</span>
-            )}
-            {state.analysisResult.summary.remote_only.count > 0 && (
-              <span className="sync-analysis-category">+ {state.analysisResult.summary.remote_only.count} Nur remote</span>
-            )}
-            {state.analysisResult.summary.local_only.count > 0 && (
-              <span className="sync-analysis-category">+ {state.analysisResult.summary.local_only.count} Nur lokal</span>
-            )}
-            {state.analysisResult.summary.conflict.count > 0 && (
-              <span className="sync-analysis-category sync-analysis-category--conflict">⚠ {state.analysisResult.summary.conflict.count} Konflikte</span>
-            )}
-            {state.analysisResult.summary.identical.count > 0 && (
-              <span className="sync-analysis-category sync-analysis-category--ok">✓ {state.analysisResult.summary.identical.count} Identisch</span>
-            )}
-            {Object.values(state.analysisResult.summary).every(c => c.count === 0) && (
-              <span className="sync-analysis-category sync-analysis-category--ok">Keine Unterschiede gefunden.</span>
-            )}
-          </div>
-          {state.analysisResult.details.length > 0 && (
-            <details className="sync-analysis-details-toggle">
-              <summary>Details ({state.analysisResult.details.length} Dateien)</summary>
-              <div className="sync-analysis-detail-list">
-                {state.analysisResult.details.slice(0, 50).map((d, i) => (
-                  <div key={i} className="sync-analysis-detail-item">
-                    <span className={`sync-analysis-detail-cat sync-analysis-detail-cat--${d.category}`}>
-                      {d.category === 'remote_newer' ? '↓' : d.category === 'local_newer' ? '↑' : d.category === 'conflict' ? '⚠' : d.category === 'remote_only' ? '+R' : d.category === 'local_only' ? '+L' : '='}
-                    </span>
-                    <span className="sync-analysis-detail-path">{d.path}</span>
-                  </div>
-                ))}
-                {state.analysisResult.details.length > 50 && (
-                  <div className="sync-analysis-detail-item">…und {state.analysisResult.details.length - 50} weitere</div>
-                )}
-              </div>
-            </details>
-          )}
-        </div>
+        <AnalysisResultView analysisResult={state.analysisResult} />
       )}
 
       {/* ── Error display ── */}
@@ -242,14 +230,26 @@ export function SyncStatusPanel({ vaultId }: SyncStatusPanelProps) {
             <Clock size={14} />
             Sync-Protokoll
           </h3>
-          <button
-            className="sync-log-refresh-btn"
-            onClick={handleRefreshLog}
-            title="Protokoll aktualisieren"
-            aria-label="Protokoll aktualisieren"
-          >
-            <RefreshCw size={12} />
-          </button>
+          <div className="sync-log-header-actions">
+            {onOpenFullLog && (
+              <button
+                className="sync-log-open-full-btn"
+                onClick={onOpenFullLog}
+                title="Vollständiges Protokoll in eigenem Tab öffnen"
+                aria-label="Vollständiges Protokoll öffnen"
+              >
+                Vollansicht
+              </button>
+            )}
+            <button
+              className="sync-log-refresh-btn"
+              onClick={handleRefreshLog}
+              title="Protokoll aktualisieren"
+              aria-label="Protokoll aktualisieren"
+            >
+              <RefreshCw size={12} />
+            </button>
+          </div>
         </div>
 
         {logItems.length === 0 ? (
@@ -320,6 +320,92 @@ export function SyncStatusPanel({ vaultId }: SyncStatusPanelProps) {
           </>
         )}
       </div>
+    </div>
+  )
+}
+
+// ─── Analysis Result Sub-Component ───────────────────────────────────────────
+
+/** Number of detail items to show per page. */
+const DETAILS_PAGE_SIZE = 50
+
+/**
+ * Displays the analysis result with summary and a paginated detail list.
+ * Identical files are excluded from the detail list (only shown in summary count).
+ */
+function AnalysisResultView({ analysisResult }: { analysisResult: AnalysisResult }) {
+  const [visibleCount, setVisibleCount] = useState(DETAILS_PAGE_SIZE)
+
+  // Filter out identical entries — they don't need to be listed individually
+  const nonIdenticalDetails = analysisResult.details.filter(d => d.category !== 'identical')
+  const visibleDetails = nonIdenticalDetails.slice(0, visibleCount)
+  const hasMore = visibleCount < nonIdenticalDetails.length
+
+  function formatDuration(ms?: number): string {
+    if (ms === undefined) return '–'
+    if (ms < 1000) return `${ms}ms`
+    return `${(ms / 1000).toFixed(1)}s`
+  }
+
+  return (
+    <div className="sync-analysis-box">
+      <div className="sync-analysis-box-header">
+        <Search size={14} />
+        <span className="sync-analysis-box-title">Analyse-Ergebnis</span>
+        <span className="sync-result-duration">{formatDuration(analysisResult.durationMs)}</span>
+      </div>
+      <div className="sync-analysis-summary">
+        {analysisResult.summary.remote_newer.count > 0 && (
+          <span className="sync-analysis-category">↓ {analysisResult.summary.remote_newer.count} Remote neuer</span>
+        )}
+        {analysisResult.summary.local_newer.count > 0 && (
+          <span className="sync-analysis-category">↑ {analysisResult.summary.local_newer.count} Lokal neuer</span>
+        )}
+        {analysisResult.summary.remote_only.count > 0 && (
+          <span className="sync-analysis-category">+ {analysisResult.summary.remote_only.count} Nur remote</span>
+        )}
+        {analysisResult.summary.local_only.count > 0 && (
+          <span className="sync-analysis-category">+ {analysisResult.summary.local_only.count} Nur lokal</span>
+        )}
+        {analysisResult.summary.remote_deleted.count > 0 && (
+          <span className="sync-analysis-category sync-analysis-category--deleted">✗ {analysisResult.summary.remote_deleted.count} Remote gelöscht</span>
+        )}
+        {analysisResult.summary.conflict.count > 0 && (
+          <span className="sync-analysis-category sync-analysis-category--conflict">⚠ {analysisResult.summary.conflict.count} Konflikte</span>
+        )}
+        {analysisResult.summary.identical.count > 0 && (
+          <span className="sync-analysis-category sync-analysis-category--ok">✓ {analysisResult.summary.identical.count} Identisch</span>
+        )}
+        {Object.values(analysisResult.summary).every(c => c.count === 0) && (
+          <span className="sync-analysis-category sync-analysis-category--ok">Keine Unterschiede gefunden.</span>
+        )}
+      </div>
+      {nonIdenticalDetails.length > 0 && (
+        <details className="sync-analysis-details-toggle">
+          <summary>Unterschiede ({nonIdenticalDetails.length} Dateien)</summary>
+          <div className="sync-analysis-detail-list">
+            {visibleDetails.map((d, i) => (
+              <div key={i} className="sync-analysis-detail-item">
+                <span className={`sync-analysis-detail-cat sync-analysis-detail-cat--${d.category}`}>
+                  {d.category === 'remote_newer' ? '↓' : d.category === 'local_newer' ? '↑' : d.category === 'conflict' ? '⚠' : d.category === 'remote_only' ? '+R' : d.category === 'remote_deleted' ? '✗' : '+L'}
+                </span>
+                <span className="sync-analysis-detail-path">{d.path}</span>
+              </div>
+            ))}
+            {hasMore && (
+              <button
+                className="sync-analysis-load-more-btn"
+                onClick={() => setVisibleCount(c => c + DETAILS_PAGE_SIZE)}
+              >
+                Weitere laden ({nonIdenticalDetails.length - visibleCount} verbleibend)
+              </button>
+            )}
+          </div>
+        </details>
+      )}
+      {nonIdenticalDetails.length === 0 && analysisResult.summary.identical.count > 0 && (
+        <p className="sync-analysis-all-synced">Alle Dateien sind synchron.</p>
+      )}
     </div>
   )
 }

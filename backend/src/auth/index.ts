@@ -394,12 +394,34 @@ export class SessionStore implements ISessionStore {
 
   /**
    * Write data atomically: write to a temp file, then rename to target.
+   * On Windows, rename can fail with EPERM if the target is briefly locked
+   * (e.g. by antivirus or file watchers). Retries with unlink-before-rename.
    */
   private async atomicWrite(targetPath: string, data: string): Promise<void> {
     const tempName = `${randomBytes(16).toString('hex')}.tmp`
     const tempPath = join(this.sessionsDir, tempName)
     await writeFile(tempPath, data, 'utf-8')
-    await rename(tempPath, targetPath)
+
+    try {
+      await rename(tempPath, targetPath)
+    } catch (err: unknown) {
+      const code = (err as NodeJS.ErrnoException).code
+      if (code === 'EPERM' || code === 'EACCES') {
+        // Windows: target may be locked — try unlinking first, then retry
+        try { await unlink(targetPath) } catch { /* may not exist */ }
+        try {
+          await rename(tempPath, targetPath)
+        } catch {
+          // Last resort: direct overwrite (loses atomicity but avoids crash)
+          await writeFile(targetPath, data, 'utf-8')
+          try { await unlink(tempPath) } catch { /* cleanup */ }
+        }
+      } else {
+        // Clean up temp file and rethrow
+        try { await unlink(tempPath) } catch { /* ignore */ }
+        throw err
+      }
+    }
   }
 
   /**

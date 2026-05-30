@@ -78,8 +78,9 @@ npm run dev
 | 📦 **Import & Export** | Import files/folders, export vaults as ZIP or to a local directory |
 | 🌙 **Dark Mode** | Automatic light/dark theme based on system preference (or manual override) |
 | 💬 **User Chat** | Real-time messaging between users with unread badges and conversation management |
-| 🔄 **Vault Sync** | CouchDB/obsidian-livesync compatible synchronization with conflict resolution |
+| 🔄 **Vault Sync** | CouchDB/obsidian-livesync compatible synchronization with conflict resolution ⚠️ *experimental* |
 | 🤖 **MCP Context Server** | AI assistants (Claude, Cursor, etc.) access your vaults via Model Context Protocol |
+| 📑 **Context Panel** | Right-side panel with document outline, links, tags, and frontmatter properties |
 | 🌐 **i18n** | German and English UI, switchable per user |
 | 🛡️ **Admin Panel** | User management, audit log, server configuration |
 | 🐳 **Docker Ready** | Multi-stage Dockerfile, runs as non-root user |
@@ -211,6 +212,8 @@ All routes under `/api/v1`. Authentication required (Bearer token via `Authoriza
 
 ### Sync
 
+> ⚠️ **Experimental — Use at your own risk.** Synchronization with CouchDB/obsidian-livesync may lead to data loss. Always maintain a backup of your vault before enabling sync.
+
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/vaults/:vaultId/sync/config` | Create sync configuration |
@@ -221,6 +224,7 @@ All routes under `/api/v1`. Authentication required (Bearer token via `Authoriza
 | PUT | `/vaults/:vaultId/sync/config/enable` | Enable sync |
 | POST | `/vaults/:vaultId/sync/trigger` | Trigger manual sync |
 | POST | `/vaults/:vaultId/sync/analyze` | Start analysis mode |
+| POST | `/vaults/:vaultId/sync/reset-checkpoint` | Reset checkpoint (full resync) |
 | GET | `/vaults/:vaultId/sync/log` | Get sync log (paginated) |
 | GET | `/vaults/:vaultId/sync/conflicts` | Get open conflicts |
 | POST | `/vaults/:vaultId/sync/conflicts/:path/resolve` | Resolve conflict |

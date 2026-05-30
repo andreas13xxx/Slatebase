@@ -3,6 +3,8 @@
 // Or dev mode: tsx watch --env-file=.env src/index.ts
 
 import crypto from 'node:crypto'
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import { createServer as createHttpServer } from 'node:http'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
@@ -49,6 +51,8 @@ import { McpServerFactory } from './mcp/server-factory.js'
 import { createMcpRoutes, createMcpHttpHandler } from './api/mcpRoutes.js'
 import { createMcpTokenRoutes } from './api/mcpTokenRoutes.js'
 import { createMcpWellKnownHandler } from './api/mcpWellKnownRoute.js'
+import { LinkIndexService } from './link-index/index.js'
+import { createGraphRoutes } from './api/graphRoutes.js'
 
 // --- Composition Root ---
 
@@ -216,6 +220,16 @@ if (mcpConfig.enabled) {
   logger.info('MCP server disabled')
 }
 
+// 4d. Link Index Module (per-vault instances)
+const linkIndexMap = new Map<string, LinkIndexService>()
+
+/**
+ * Returns the LinkIndexService instance for a given vault, or undefined if not found.
+ */
+function getLinkIndex(vaultId: string): LinkIndexService | undefined {
+  return linkIndexMap.get(vaultId)
+}
+
 // 5. Controllers
 const vaultController = new VaultController(vaultService, logger, importService, userRepository, vaultAccessControl, syncConfigStore, vaultShareRegistry)
 const authController = new AuthController(authService, logger)
@@ -239,6 +253,7 @@ const routeModules = [
   new VaultShareRouteModule(vaultAccessControl, vaultService, vaultRegistry, logger, vaultShareRegistry, userRepository),
   new ChatRouteModule(chatController),
   createSyncRoutes({ syncService, vaultRegistry, logger }),
+  createGraphRoutes({ getLinkIndex, accessControl: vaultAccessControl, vaultRegistry, vaultReader, logger }),
 ]
 const router = createRouter(routeModules)
 
@@ -262,6 +277,17 @@ app.use('/api/v1/*', createAuthMiddleware(authService))
 app.use('/api/v1/*', createCsrfMiddleware(authService))
 app.use('/api/v1/*', createRateLimitMiddleware(rateLimiter))
 app.use('/api/v1/*', createMustChangePasswordMiddleware(userRepository))
+
+// Global error handler — catches unhandled exceptions and returns proper JSON
+app.onError((err, c) => {
+  logger.error('Unhandled error', {
+    message: err.message,
+    stack: err.stack,
+    path: c.req.path,
+    method: c.req.method,
+  })
+  return c.json({ code: 'INTERNAL_ERROR', message: 'Internal server error', timestamp: new Date().toISOString() }, 500)
+})
 
 // Route registration
 app.route('/api/v1', router)
@@ -291,6 +317,64 @@ await ensureDefaultAdmin(userRepository, logger)
 
 // Initialize vaults
 await vaultService.initializeVaults()
+
+// Initialize link indexes for all vaults (load from disk or rebuild)
+const vaultEntries = await vaultRegistry.load()
+for (const entry of vaultEntries) {
+  const linkIndex = new LinkIndexService(entry.storagePath, entry.id, logger)
+  linkIndexMap.set(entry.id, linkIndex)
+  // Fire-and-forget: load index in background (don't block server startup)
+  linkIndex.loadFromDisk().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error)
+    logger.error('Failed to initialize link index', { vaultId: entry.id, error: message })
+  })
+}
+
+// Set up link index hook on VaultController for incremental updates
+vaultController.setLinkIndexHook({
+  onFileSaved(vaultId: string, filePath: string, content: string): void {
+    let linkIndex = getLinkIndex(vaultId)
+    // Create link index on-demand for newly created vaults
+    if (!linkIndex) {
+      const entry = vaultRegistry.findById(vaultId)
+      if (entry) {
+        linkIndex = new LinkIndexService(entry.storagePath, entry.id, logger)
+        linkIndexMap.set(entry.id, linkIndex)
+      }
+    }
+    if (linkIndex) {
+      linkIndex.updateFile(filePath, content).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error)
+        logger.error('Link index updateFile failed', { vaultId, filePath, error: message })
+      })
+    }
+  },
+  onFileDeleted(vaultId: string, filePath: string): void {
+    const linkIndex = getLinkIndex(vaultId)
+    if (linkIndex) {
+      linkIndex.removeFile(filePath).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error)
+        logger.error('Link index removeFile failed', { vaultId, filePath, error: message })
+      })
+    }
+  },
+  onFileRenamed(vaultId: string, oldPath: string, newPath: string): void {
+    const linkIndex = getLinkIndex(vaultId)
+    if (linkIndex) {
+      // Read the file content at the new path, then update the index
+      const entry = vaultRegistry.findById(vaultId)
+      if (entry) {
+        const absolutePath = path.join(entry.storagePath, newPath)
+        fs.readFile(absolutePath, 'utf-8')
+          .then((content) => linkIndex.renameFile(oldPath, newPath, content))
+          .catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : String(error)
+            logger.error('Link index renameFile failed', { vaultId, oldPath, newPath, error: message })
+          })
+      }
+    }
+  },
+})
 
 // Initialize sync schedulers
 try {

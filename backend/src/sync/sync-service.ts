@@ -32,6 +32,7 @@ import {
   ConnectionTestFailedError,
   ConflictResolutionError,
 } from './errors.js'
+import { scanVaultFiles } from './sync-engine.js'
 import type { ILogger } from '../logger/index.js'
 
 /**
@@ -121,7 +122,7 @@ export class SyncService implements ISyncService {
     const passwordEncrypted = this.cryptoService.encrypt(password)
 
     const now = new Date().toISOString()
-    const mode = input.mode ?? 'bidirectional'
+    const mode = input.mode ?? 'readonly'
     const trigger = input.trigger ?? 'manual'
     const intervalMinutes = trigger === 'interval' ? input.intervalMinutes : undefined
 
@@ -470,10 +471,22 @@ export class SyncService implements ISyncService {
 
       // Update checkpoint on success/partial_success (NOT on failed)
       if (status === 'success' || status === 'partial_success') {
+        // Scan current vault file mtimes AFTER pull+push to capture the actual state.
+        // This ensures the next sync correctly detects only truly new local changes,
+        // not files that were just written by the pull.
+        let currentMtimes: Record<string, number> = { ...localMtimes }
+        try {
+          const scanned = await scanVaultFiles(vaultPath)
+          currentMtimes = Object.fromEntries(scanned)
+        } catch {
+          // If scan fails, fall back to old mtimes — next sync may re-push some files
+          this.logger.warn('Failed to scan vault files for checkpoint update', { vaultId })
+        }
+
         const newCheckpoint: SyncCheckpoint = {
           lastSeq: pullResult.newLastSeq,
           lastSyncAt: new Date().toISOString(),
-          localMtimes: { ...localMtimes },
+          localMtimes: currentMtimes,
         }
         await this.checkpointStore.save(vaultId, newCheckpoint)
       }
@@ -539,17 +552,19 @@ export class SyncService implements ISyncService {
         password,
       }
 
-      // Load checkpoint
+      // Load checkpoint for localMtimes (used for conflict detection)
       const checkpoint = await this.checkpointStore.load(vaultId)
-      const since = checkpoint?.lastSeq ?? null
       const localMtimes = checkpoint?.localMtimes ?? {}
 
-      // Call engine.analyze()
+      // Analysis always uses since=null (fetches ALL documents from CouchDB)
+      // to build the complete remote state for comparison.
+      // Using the checkpoint's lastSeq would only show changes SINCE the last sync,
+      // which after a successful sync is empty → everything appears "local_only".
       return await this.syncEngine.analyze({
         connection,
         vaultId,
         vaultPath,
-        since,
+        since: null,
         localMtimes,
       })
     } finally {
@@ -563,6 +578,32 @@ export class SyncService implements ISyncService {
    */
   async getLog(vaultId: string, page: number, pageSize: number): Promise<PaginatedSyncLog> {
     return this.logStore.read(vaultId, page, pageSize)
+  }
+
+  /**
+   * Resets the sync checkpoint for a vault.
+   * Removes the stored checkpoint so the next sync performs a full pull (since=0),
+   * re-processing all documents including tombstones for deleted/moved files.
+   * Requires that no sync is currently in progress.
+   */
+  async resetCheckpoint(vaultId: string): Promise<void> {
+    // Verify config exists
+    const config = await this.configStore.load(vaultId)
+    if (!config) {
+      throw new SyncNotConfiguredError()
+    }
+
+    // Ensure no sync is running
+    if (!this.syncLock.acquire(vaultId)) {
+      throw new SyncInProgressError()
+    }
+
+    try {
+      await this.checkpointStore.remove(vaultId)
+      this.logger.info('Sync checkpoint reset — next sync will be a full pull', { vaultId })
+    } finally {
+      this.syncLock.release(vaultId)
+    }
   }
 
   /**
@@ -814,10 +855,19 @@ export class SyncService implements ISyncService {
 
       // Update checkpoint on success/partial_success (NOT on failed)
       if (status === 'success' || status === 'partial_success') {
+        // Scan current vault file mtimes AFTER pull+push to capture the actual state.
+        let currentMtimes: Record<string, number> = { ...localMtimes }
+        try {
+          const scanned = await scanVaultFiles(vaultPath)
+          currentMtimes = Object.fromEntries(scanned)
+        } catch {
+          this.logger.warn('Failed to scan vault files for checkpoint update (scheduled)', { vaultId })
+        }
+
         const newCheckpoint: SyncCheckpoint = {
           lastSeq: pullResult.newLastSeq,
           lastSyncAt: new Date().toISOString(),
-          localMtimes: { ...localMtimes },
+          localMtimes: currentMtimes,
         }
         await this.checkpointStore.save(vaultId, newCheckpoint)
       }

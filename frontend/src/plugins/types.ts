@@ -11,12 +11,19 @@ export interface WikilinkNode extends Literal {
 }
 
 /**
- * Embed node: ![[target]], ![[target#heading]]
+ * Embed node: ![[target]], ![[target#heading]], ![[target|display]]
+ *
+ * For image embeds, the display field can contain sizing/formatting info:
+ * - `![[image.jpg|300]]` → width=300
+ * - `![[image.jpg|300x200]]` → width=300, height=200
+ * - `![[image.jpg|100%]]` → width=100%
+ * - `![[image.jpg|alt text]]` → alt text (non-numeric)
  */
 export interface EmbedNode extends Literal {
   type: 'embed'
   target: string
   heading: string | null
+  display: string | null
   embedType: 'image' | 'note'
 }
 

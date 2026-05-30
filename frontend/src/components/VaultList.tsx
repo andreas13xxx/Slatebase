@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useAppContext, createVault, deleteVault, loadVaults } from '../state'
 import { useTranslation } from '../i18n'
 import { ChevronDown, ChevronUp, Plus, Trash2, Database, Eye, Pencil, RefreshCw, Users } from 'lucide-react'
@@ -10,12 +10,16 @@ import { VaultDeletionWorkflow } from './VaultDeletionWorkflow'
  */
 const MAX_VAULT_NAME_LENGTH = 128
 
+interface VaultListProps {
+  onRegisterCreateVault?: (trigger: () => void) => void
+}
+
 /**
  * Renders a dropdown menu for vault selection, creation, and deletion.
  * The dropdown shows the currently selected vault name (or a placeholder).
  * Clicking opens a list of vaults with delete buttons and a create option.
  */
-export function VaultList() {
+export function VaultList({ onRegisterCreateVault }: VaultListProps) {
   const { state, dispatch, apiClient } = useAppContext()
   const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
@@ -27,6 +31,16 @@ export function VaultList() {
   })
   const [deletionWorkflow, setDeletionWorkflow] = useState<{ open: boolean; vaultId: string } | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  const triggerCreateVault = useCallback(() => {
+    setIsOpen(true)
+    setShowCreateForm(true)
+    setValidationError(null)
+  }, [])
+
+  useEffect(() => {
+    onRegisterCreateVault?.(triggerCreateVault)
+  }, [onRegisterCreateVault, triggerCreateVault])
 
   const selectedVault = state.vaults.find((v) => v.id === state.selectedVaultId)
 

@@ -1,5 +1,5 @@
 import { useTabContext } from '../state/tabContext'
-import { Eye, Pencil, X } from 'lucide-react'
+import { Eye, Pencil, X, Share2 } from 'lucide-react'
 import { getFileIcon, getFileIconClass, getDisplayName } from '../utils/fileIcons'
 
 /**
@@ -56,9 +56,10 @@ export function TabBar() {
         const hasUnsaved = tab.editBuffer !== null && tab.editBuffer !== tab.content
 
         const tabClassName = `tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}`
-        const TabFileIcon = getFileIcon(tab.fileName)
-        const tabFileIconClass = getFileIconClass(tab.fileName)
-        const displayName = getDisplayName(tab.fileName)
+        const isGraphTab = tab.filePath === '__graph__'
+        const TabFileIcon = isGraphTab ? Share2 : getFileIcon(tab.fileName)
+        const tabFileIconClass = isGraphTab ? 'tab-icon-graph' : getFileIconClass(tab.fileName)
+        const displayName = isGraphTab ? 'Graph' : getDisplayName(tab.fileName)
 
         return (
           <div
@@ -83,8 +84,9 @@ export function TabBar() {
               title={modeLabel}
               onClick={(e) => handleToggleMode(e, tab.id)}
               onKeyDown={(e) => handleToggleModeKeyDown(e, tab.id)}
-              disabled={tab.isBinary}
+              disabled={tab.isBinary || isGraphTab}
               tabIndex={0}
+              style={isGraphTab ? { display: 'none' } : undefined}
             >
               <ModeIcon size={12} />
             </button>

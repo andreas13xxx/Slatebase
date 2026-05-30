@@ -18,6 +18,7 @@ import type { CreateSyncConfigInput, UpdateSyncConfigInput, ConnectionTestResult
 /** Props for the SyncConfigPage component. */
 export interface SyncConfigPageProps {
   vaultId: string
+  onOpenSyncLog?: () => void
 }
 
 /** Form validation errors. */
@@ -53,7 +54,7 @@ type ViewMode = 'view' | 'create' | 'edit'
  * Main configuration page for vault synchronization.
  * Shows setup form when no config exists, or current config with edit/disable/remove actions.
  */
-export function SyncConfigPage({ vaultId }: SyncConfigPageProps) {
+export function SyncConfigPage({ vaultId, onOpenSyncLog }: SyncConfigPageProps) {
   const { state, dispatch } = useSyncContext()
   const { apiClient } = useAppContext()
   const { t } = useTranslation()
@@ -69,7 +70,7 @@ export function SyncConfigPage({ vaultId }: SyncConfigPageProps) {
   const [database, setDatabase] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [mode, setMode] = useState<'bidirectional' | 'readonly'>('bidirectional')
+  const [mode, setMode] = useState<'bidirectional' | 'readonly'>('readonly')
   const [trigger, setTrigger] = useState<'manual' | 'interval'>('manual')
   const [intervalMinutes, setIntervalMinutes] = useState('60')
   const [e2eEnabled, setE2eEnabled] = useState(false)
@@ -867,11 +868,20 @@ export function SyncConfigPage({ vaultId }: SyncConfigPageProps) {
         {t('sync.title')}
       </h1>
 
+      {/* Experimental warning banner */}
+      <div className="sync-config-warning" role="alert">
+        <Shield size={16} />
+        <div>
+          <strong>{t('sync.warningTitle')}</strong>
+          <p>{t('sync.warningMessage')}</p>
+        </div>
+      </div>
+
       {viewMode === 'create' && renderCreateForm()}
       {viewMode === 'edit' && renderEditForm()}
       {viewMode === 'view' && state.config && renderConfigView()}
       {viewMode === 'view' && state.config && (
-        <SyncStatusPanel vaultId={vaultId} />
+        <SyncStatusPanel vaultId={vaultId} onOpenFullLog={onOpenSyncLog} />
       )}
 
       <ConfirmModal

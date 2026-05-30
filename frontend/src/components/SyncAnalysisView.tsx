@@ -9,7 +9,7 @@ export interface SyncAnalysisViewProps {
 }
 
 /** Category keys for filtering and display. */
-type CategoryKey = 'remote_newer' | 'local_newer' | 'remote_only' | 'local_only' | 'conflict' | 'identical'
+type CategoryKey = 'remote_newer' | 'local_newer' | 'remote_only' | 'local_only' | 'remote_deleted' | 'conflict' | 'identical'
 
 /** German labels for each analysis category. */
 const CATEGORY_LABELS: Record<CategoryKey, string> = {
@@ -17,6 +17,7 @@ const CATEGORY_LABELS: Record<CategoryKey, string> = {
   local_newer: 'Lokal neuer',
   remote_only: 'Nur remote',
   local_only: 'Nur lokal',
+  remote_deleted: 'Remote gelöscht',
   conflict: 'Konflikt',
   identical: 'Identisch',
 }
@@ -27,6 +28,7 @@ const CATEGORY_KEYS: CategoryKey[] = [
   'local_newer',
   'remote_only',
   'local_only',
+  'remote_deleted',
   'conflict',
   'identical',
 ]

@@ -133,6 +133,13 @@ All under `/api/v1`:
 | GET | /vaults/:vaultId/sync/conflicts | Get open conflicts |
 | POST | /vaults/:vaultId/sync/conflicts/:path/resolve | Resolve conflict |
 
+### Graph (Knowledge Graph)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | /vaults/:vaultId/graph | Get full link graph (nodes + edges) |
+| GET | /vaults/:vaultId/backlinks?path= | Get backlinks for a file |
+
 ### MCP (Model Context Protocol)
 
 | Method | Path | Auth | Purpose |
@@ -148,6 +155,7 @@ All under `/api/v1`:
 - Filesystem-based, no database
 - Vault data: `backend/data/vaults/<vaultId>/`
 - Vault registry: `backend/data/vaults.json`
+- Link index: `backend/data/vaults/<vaultId>/_link-index.json` (per-vault, auto-regenerated)
 - Sync data: `backend/data/sync/<vaultId>/` (config, checkpoint, conflicts, log)
 - MCP data: `backend/data/mcp/tokens/` (API tokens, per-user index)
 - Config: `backend/config/default.json` + `SLATEBASE_*` env vars

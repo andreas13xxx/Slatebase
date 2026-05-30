@@ -134,10 +134,10 @@ function registerListVaults(server: McpServer, deps: ToolHandlerDeps): void {
         const userId = deps.getUserId()
         const vaults = await deps.vaultService.getVaultList(userId)
 
-        const results = vaults.map((vault) => {
+        const results = await Promise.all(vaults.map(async (vault) => {
           let fileCount = 0
           try {
-            const tree = deps.vaultService.getVaultTree(vault.id)
+            const tree = await deps.vaultService.getVaultTree(vault.id)
             fileCount = countFiles(tree)
           } catch {
             // Vault tree not available — report 0 files
@@ -149,7 +149,7 @@ function registerListVaults(server: McpServer, deps: ToolHandlerDeps): void {
             permission: vault.permission ?? 'owner',
             fileCount,
           }
-        })
+        }))
 
         return mcpToolSuccess(results)
       } catch (error) {
@@ -184,7 +184,7 @@ function registerGetVaultStructure(server: McpServer, deps: ToolHandlerDeps): vo
         }
 
         // Get tree
-        const tree = deps.vaultService.getVaultTree(args.vaultId)
+        const tree = await deps.vaultService.getVaultTree(args.vaultId)
         return mcpToolSuccess(tree)
       } catch (error) {
         if (error instanceof VaultNotFoundError) {
@@ -243,7 +243,7 @@ function registerSearchVault(server: McpServer, deps: ToolHandlerDeps): void {
         let tree: DirectoryTree
         let vaultPath: string
         try {
-          tree = deps.vaultService.getVaultTree(args.vaultId)
+          tree = await deps.vaultService.getVaultTree(args.vaultId)
           // Resolve vault path from the service
           vaultPath = deps.vaultService.resolveFilePath(args.vaultId, 'dummy')
           // resolveFilePath returns the resolved absolute path for 'dummy', so get the parent

@@ -67,6 +67,7 @@ function createMockApiClient(): IApiClient {
     removeSyncConfig: vi.fn(),
     triggerSync: vi.fn(),
     triggerAnalysis: vi.fn(),
+    resetSyncCheckpoint: vi.fn().mockResolvedValue(undefined),
     getSyncLog: vi.fn(),
     getSyncConflicts: vi.fn(),
     resolveSyncConflict: vi.fn().mockResolvedValue(undefined),

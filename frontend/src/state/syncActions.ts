@@ -22,6 +22,16 @@ export async function loadSyncConfig(
     const config = await apiClient.getSyncConfig(vaultId)
     dispatch({ type: 'SYNC_CONFIG_LOADED', payload: config })
   } catch (err: unknown) {
+    // SYNC_NOT_CONFIGURED is a normal state — not an error
+    if (
+      err !== null &&
+      typeof err === 'object' &&
+      'code' in err &&
+      (err as { code: unknown }).code === 'SYNC_NOT_CONFIGURED'
+    ) {
+      dispatch({ type: 'SYNC_CONFIG_REMOVED' })
+      return
+    }
     const message = extractErrorMessage(err)
     dispatch({ type: 'SYNC_ERROR_OCCURRED', payload: message })
   }

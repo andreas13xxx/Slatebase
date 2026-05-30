@@ -8,6 +8,8 @@ declare module 'micromark-util-types' {
     embedTarget: 'embedTarget'
     embedHeadingMarker: 'embedHeadingMarker'
     embedHeading: 'embedHeading'
+    embedSeparator: 'embedSeparator'
+    embedDisplay: 'embedDisplay'
   }
 }
 
@@ -88,7 +90,7 @@ function tokenizeEmbed(
   }
 
   /**
-   * Inside target: consume characters until `#`, `]`, or end of line.
+   * Inside target: consume characters until `#`, `|`, `]`, or end of line.
    * Empty targets are not valid.
    */
   function insideTarget(code: Code): State | undefined {
@@ -107,6 +109,16 @@ function tokenizeEmbed(
       return insideHeading
     }
 
+    // Found `|` — switch to display/size text
+    if (code === 124) { // '|'
+      effects.exit('embedTarget')
+      effects.enter('embedSeparator')
+      effects.consume(code)
+      effects.exit('embedSeparator')
+      effects.enter('embedDisplay')
+      return insideDisplay
+    }
+
     // Found `]` — potential end of embed
     if (code === 93) { // ']'
       effects.exit('embedTarget')
@@ -120,12 +132,22 @@ function tokenizeEmbed(
   }
 
   /**
-   * Inside heading fragment: consume characters until `]` or end of line.
+   * Inside heading fragment: consume characters until `|`, `]`, or end of line.
    */
   function insideHeading(code: Code): State | undefined {
     // End of line or end of file — invalid embed
     if (code === null || code === -3 || code === -4 || code === -5 || code === 10 || code === 13) {
       return nok(code)
+    }
+
+    // Found `|` — switch to display/size text
+    if (code === 124) { // '|'
+      effects.exit('embedHeading')
+      effects.enter('embedSeparator')
+      effects.consume(code)
+      effects.exit('embedSeparator')
+      effects.enter('embedDisplay')
+      return insideDisplay
     }
 
     // Found `]` — potential end of embed
@@ -138,6 +160,28 @@ function tokenizeEmbed(
 
     effects.consume(code)
     return insideHeading
+  }
+
+  /**
+   * Inside display/size text: consume characters until `]` or end of line.
+   * Handles formats like: 300, 300x200, 100%, alt text
+   */
+  function insideDisplay(code: Code): State | undefined {
+    // End of line or end of file — invalid embed
+    if (code === null || code === -3 || code === -4 || code === -5 || code === 10 || code === 13) {
+      return nok(code)
+    }
+
+    // Found `]` — potential end of embed
+    if (code === 93) { // ']'
+      effects.exit('embedDisplay')
+      effects.enter('embedMarker')
+      effects.consume(code)
+      return afterFirstClose
+    }
+
+    effects.consume(code)
+    return insideDisplay
   }
 
   /**

@@ -1,4 +1,4 @@
-import { mkdir, appendFile, readFile, rename, writeFile } from 'node:fs/promises'
+import { mkdir, appendFile, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
@@ -48,7 +48,23 @@ export class MessageStore implements IMessageStore {
       // Atomic write for new files: write to temp, then rename
       const tempPath = `${filePath}.${crypto.randomBytes(8).toString('hex')}.tmp`
       await writeFile(tempPath, line, 'utf-8')
-      await rename(tempPath, filePath)
+      try {
+        await rename(tempPath, filePath)
+      } catch (err: unknown) {
+        const code = (err as NodeJS.ErrnoException).code
+        if (code === 'EPERM' || code === 'EACCES') {
+          try { await unlink(filePath) } catch { /* may not exist */ }
+          try {
+            await rename(tempPath, filePath)
+          } catch {
+            await writeFile(filePath, line, 'utf-8')
+            try { await unlink(tempPath) } catch { /* cleanup */ }
+          }
+        } else {
+          try { await unlink(tempPath) } catch { /* ignore */ }
+          throw err
+        }
+      }
     }
 
     this.lastMessageCache.set(message.conversationId, message)

@@ -18,10 +18,11 @@
 | 10 | `vault-sync` | Feature | ✅ Fertig | CouchDB-basierte Vault-Synchronisation |
 | 11 | `obsidian-markdown-compat` | Feature | ✅ Fertig | Wikilinks, Embeds, Callouts, Tags — Obsidian-kompatibles Rendering |
 | 12 | `mcp-context-server` | Feature | ✅ Fertig | AI Context Server mit MCP-Integration (Kern-Feature) |
-| 13 | `knowledge-graph` | Feature | 📋 Geplant | Visuelle Darstellung der Verlinkungen zwischen Notizen |
-| 14 | `live-preview-editor` | Feature | 📋 Geplant | Side-by-Side oder WYSIWYG Live-Preview im Editor |
-| 15 | `obsidian-plugin-compat` | Feature | 📋 Geplant | Obsidian Community Plugin Compatibility Layer |
-| 16 | `accessibility-audit` | Feature | 📋 Geplant | WCAG 2.1 AA Compliance (systematischer Audit + Fixes) |
+| 13 | `context-panel` | Feature | ✅ Fertig | Rechtes Seitenpanel mit Outline, Links, Tags, Properties (Tab-Navigation, Drag & Drop, Split-Sections) |
+| 14 | `knowledge-graph` | Feature | ✅ Fertig | Visuelle Darstellung der Verlinkungen zwischen Notizen (interaktiver Graph mit Nodes und Edges) |
+| 15 | `live-preview-editor` | Feature | 📋 Geplant | Side-by-Side oder WYSIWYG Live-Preview im Editor |
+| 16 | `obsidian-plugin-compat` | Feature | 📋 Geplant | Obsidian Community Plugin Compatibility Layer |
+| 17 | `accessibility-audit` | Feature | 📋 Geplant | WCAG 2.1 AA Compliance (systematischer Audit + Fixes) |
 
 ## Abhängigkeiten zwischen Specs
 
@@ -39,26 +40,13 @@ slatebase-overview (Architektur-Grundlage)
         │     ├── vault-sync (CouchDB-Sync, braucht Auth)
         │     └── mcp-context-server (braucht Auth + Vault-Zugriff)
         ├── obsidian-markdown-compat (braucht Markdown-Rendering aus MVP)
+        │     ├── context-panel (braucht Wikilink-Parsing + Heading-Anchors)
         │     ├── knowledge-graph (braucht Wikilink-Parsing)
         │     └── obsidian-plugin-compat (braucht Obsidian-Kompatibilität)
         └── accessibility-audit (querschnittlich, alle UI-Komponenten)
 ```
 
 ## Geplante Specs (noch keine Spec-Dateien vorhanden)
-
-### knowledge-graph
-- **Beschreibung**: Visuelle Darstellung der Verlinkungen zwischen Notizen (interaktiver Graph mit Nodes und Edges)
-- **Abhängigkeit**: Braucht obsidian-markdown-compat (Wikilink-Parsing für Link-Extraktion)
-- **Priorität**: Mittel
-- **Aufwand**: Groß
-- **Technischer Ansatz (entschieden):**
-  - Phase 1: In-Memory-Index (`Map<filePath, Set<linkedPath>>` + Reverse-Map für Backlinks), persistiert als JSON (`data/vaults/<vaultId>/_link-index.json`)
-  - Inkrementelles Update: Datei gespeichert → nur diese Datei neu parsen → Index updaten
-  - Kein DB-Wechsel nötig — reicht für typische Vaults (hunderte bis wenige tausend Dateien, 5.000–20.000 Kanten)
-  - Phase 2 (optional, nur bei Performance-Problemen): SQLite als ergänzender Index (`data/vaults/<vaultId>/_index.sqlite`) mit `better-sqlite3`, Recursive CTEs für Pfad-Traversierung
-  - SQLite-Trigger: Index-Aufbau beim Start >2–3s, Vaults mit 10.000+ Dateien, komplexe transitive Queries
-  - **Keine CouchDB als internen Store** — bleibt externer Sync-Partner
-  - Interface `ILinkIndex` abstrahiert die Implementierung → Wechsel von JSON zu SQLite ohne API-Änderung
 
 ### live-preview-editor
 - **Beschreibung**: Side-by-Side oder WYSIWYG Live-Preview im Markdown-Editor (aktuell nur getrennter View/Edit-Modus)
@@ -83,6 +71,15 @@ slatebase-overview (Architektur-Grundlage)
 | Spec | Grund |
 |------|-------|
 | `unread-badge-reset-fix` | Obsolet — durch `chat-list-refresh-fix` und nachfolgende Fixes abgedeckt |
+
+## Bekannte Limitierungen (kein eigener Spec nötig)
+
+### vault-sync: Push ohne Chunking (>8MB-Limit)
+- **Problem**: Slatebase pusht Dateien als einzelnes `data`-Feld im CouchDB-Dokument. CouchDB hat ein `max_document_size` (default 8MB). Dateien über diesem Limit schlagen beim Push fehl.
+- **Betrifft**: Nur bidirektionalen Sync bei sehr großen Einzeldateien (>8MB). Pull funktioniert korrekt (Chunks werden reassembliert).
+- **Workaround**: CouchDB `max_document_size` erhöhen oder große Dateien vom Sync ausschließen.
+- **Langfristige Lösung**: Beim Push ebenfalls Leaf-Dokumente erzeugen und `children`-Array verwenden (wie livesync es macht). Aufwand: Mittel — erfordert Content-Splitting, Hash-basierte Chunk-IDs, Bulk-Write der Leaves.
+- **Priorität**: Niedrig — betrifft nur Edge-Cases mit sehr großen Dateien (PDFs, Videos). Typische Vault-Dateien (Markdown, Bilder) sind weit unter 8MB.
 
 ## Konventionen
 

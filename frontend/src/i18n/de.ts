@@ -172,6 +172,7 @@ export const de = {
     vaultSharing: 'Freigaben',
     vaultDeletion: 'Vault löschen',
     syncConfig: 'Vault-Sync',
+    syncLog: 'Sync-Protokoll',
     mcpTokens: 'API-Tokens',
   },
 
@@ -456,6 +457,8 @@ export const de = {
 
   sync: {
     title: 'Synchronisation',
+    warningTitle: 'Experimentelles Feature — Nutzung auf eigenes Risiko',
+    warningMessage: 'Die Synchronisation mit CouchDB/obsidian-livesync kann zu Datenverlust führen. Erstelle vor der Nutzung ein Backup deines Vaults. Slatebase übernimmt keine Haftung für verlorene oder beschädigte Daten.',
     configTitle: 'Sync-Konfiguration',
     tabSetupUri: 'Setup-URI',
     tabManual: 'Manuell',
@@ -563,6 +566,49 @@ export const de = {
     tableActionsHeader: 'Aktionen',
     neverUsed: 'Nie',
     limitReached: 'Maximale Anzahl an Tokens erreicht (10).',
+  },
+
+  graph: {
+    title: 'Graph',
+    empty: 'Keine Verlinkungen gefunden.',
+    retry: 'Erneut laden',
+    errorLoading: 'Graph konnte nicht geladen werden.',
+    noVault: 'Bitte wähle einen Vault aus, um den Graphen anzuzeigen.',
+  },
+
+  contextPanel: {
+    tabs: {
+      outline: 'Gliederung',
+      links: 'Links',
+      tags: 'Tags',
+      properties: 'Eigenschaften',
+    },
+    outline: {
+      empty: 'Keine Überschriften gefunden.',
+      noDocument: 'Kein Dokument geöffnet.',
+    },
+    links: {
+      forward: 'Ausgehende Links',
+      backlinks: 'Eingehende Links',
+      emptyForward: 'Keine ausgehenden Links.',
+      emptyBacklinks: 'Keine eingehenden Links.',
+      error: 'Eingehende Links konnten nicht geladen werden.',
+      backlinksError: 'Eingehende Links konnten nicht geladen werden.',
+      backlinksLoading: 'Laden…',
+      noDocument: 'Kein Dokument geöffnet.',
+    },
+    tags: {
+      empty: 'Keine Tags gefunden.',
+      loading: 'Tags werden geladen…',
+    },
+    properties: {
+      empty: 'Keine Eigenschaften gefunden.',
+      parseError: 'Frontmatter konnte nicht geparst werden.',
+      noDocument: 'Kein Dokument geöffnet.',
+    },
+    noDocument: 'Kein Dokument geöffnet',
+    noHeadings: 'Keine Überschriften gefunden',
+    outlineAriaLabel: 'Dokumentgliederung',
   },
 
   vaultDeletion: {

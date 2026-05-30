@@ -24,8 +24,11 @@ import { SlatebaseLogo } from './components/SlatebaseLogo'
 import { SidebarToolbar } from './components/SidebarToolbar'
 import { MyVaultsPage } from './components/MyVaultsPage'
 import { SyncConfigPage } from './components/SyncConfigPage'
+import { SyncLogPage } from './components/SyncLogPage'
 import { McpTokensPage } from './components/McpTokensPage'
 import { SyncProvider } from './state/syncContext'
+import { ContextPanelProvider } from './state/contextPanelContext'
+import { ContextPanel } from './components/context-panel/ContextPanel'
 import {
   User, LogOut, Settings, Shield, FileText, Clock,
   Database, Share2, Trash2, Server, Download,
@@ -55,6 +58,7 @@ type AppPage =
   | 'vault-sharing'
   | 'vault-deletion'
   | 'sync-config'
+  | 'sync-log'
   | 'mcp-tokens'
 
 /**
@@ -243,6 +247,7 @@ const PAGE_LABEL_KEYS: Record<AppPage, string> = {
   'vault-sharing': 'pages.vaultSharing',
   'vault-deletion': 'pages.vaultDeletion',
   'sync-config': 'pages.syncConfig',
+  'sync-log': 'pages.syncLog',
   'mcp-tokens': 'pages.mcpTokens',
 }
 
@@ -260,6 +265,7 @@ const PAGE_ICONS: Partial<Record<AppPage, React.ReactNode>> = {
   'vault-sharing': <Share2 size={13} />,
   'vault-deletion': <Trash2 size={13} />,
   'sync-config': <RefreshCw size={13} />,
+  'sync-log': <Clock size={13} />,
   'mcp-tokens': <Key size={13} />,
 }
 
@@ -280,6 +286,7 @@ function AppContent() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
   const createFileTriggerRef = useRef<(() => void) | null>(null)
+  const createVaultTriggerRef = useRef<(() => void) | null>(null)
 
   const sidebar = useResize(260, 180, 400, 'left')
   const rightPanel = useResize(240, 160, 500, 'right')
@@ -340,7 +347,21 @@ function AppContent() {
     const vaultId = state.selectedVaultId
     if (vaultId && vaultId !== prevVaultId.current) {
       if (prevVaultId.current !== null) {
+        // Check if a graph tab is open — keep it across vault switches
+        const graphTab = tabState.tabs.find((t) => t.filePath === '__graph__')
         tabDispatch({ type: 'CLEAR_ALL_TABS' })
+        if (graphTab) {
+          // Re-open graph tab for the new vault
+          tabDispatch({
+            type: 'OPEN_TAB',
+            payload: { vaultId, filePath: '__graph__', fileName: 'Graph' },
+          })
+          const graphTabId = `${vaultId}::__graph__`
+          tabDispatch({
+            type: 'TAB_CONTENT_LOADED',
+            payload: { tabId: graphTabId, content: '', isBinary: false },
+          })
+        }
       }
       dispatch({ type: 'LOADING_STARTED' })
       apiClient.fetchVaultTree(vaultId).then(
@@ -355,6 +376,7 @@ function AppContent() {
       )
     }
     prevVaultId.current = vaultId
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.selectedVaultId, dispatch, tabDispatch])
 
   const handleLogout = useCallback(async () => {
@@ -368,6 +390,12 @@ function AppContent() {
   function handleImportFile() { fileInputRef.current?.click() }
   function handleImportFolder() { folderInputRef.current?.click() }
 
+  function handleCreateVault() {
+    if (createVaultTriggerRef.current) {
+      createVaultTriggerRef.current()
+    }
+  }
+
   function handleCreateFile() {
     if (!state.selectedVaultId) return
     // Trigger inline file creation in the FileExplorer
@@ -380,6 +408,30 @@ function AppContent() {
     if (state.selectedVaultId) {
       const vault = state.vaults.find((v) => v.id === state.selectedVaultId)
       void exportVault(dispatch, apiClient, state.selectedVaultId, vault?.name)
+    }
+  }
+
+  function handleOpenGraph() {
+    if (!state.selectedVaultId) return
+    // Check if a graph tab already exists
+    const existingGraphTab = tabState.tabs.find((t) => t.filePath === '__graph__')
+    if (existingGraphTab) {
+      // Activate existing graph tab
+      setActiveSettingsPage(null)
+      tabDispatch({ type: 'ACTIVATE_TAB', payload: { tabId: existingGraphTab.id } })
+    } else {
+      // Open new graph tab
+      setActiveSettingsPage(null)
+      tabDispatch({
+        type: 'OPEN_TAB',
+        payload: { vaultId: state.selectedVaultId, filePath: '__graph__', fileName: 'Graph' },
+      })
+      // Mark as loaded immediately (no content to fetch)
+      const graphTabId = `${state.selectedVaultId}::__graph__`
+      tabDispatch({
+        type: 'TAB_CONTENT_LOADED',
+        payload: { tabId: graphTabId, content: '', isBinary: false },
+      })
     }
   }
 
@@ -447,7 +499,11 @@ function AppContent() {
           : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
       case 'sync-config':
         return state.selectedVaultId
-          ? <SyncProvider><SyncConfigPage vaultId={state.selectedVaultId} /></SyncProvider>
+          ? <SyncProvider><SyncConfigPage vaultId={state.selectedVaultId} onOpenSyncLog={() => handleNavigate('sync-log')} /></SyncProvider>
+          : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
+      case 'sync-log':
+        return state.selectedVaultId
+          ? <SyncProvider><SyncLogPage vaultId={state.selectedVaultId} /></SyncProvider>
           : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
       case 'mcp-tokens': return <McpTokensPage apiClient={apiClient} />
       default: return null
@@ -457,6 +513,7 @@ function AppContent() {
   const isShowingSettings = activeSettingsPage !== null
   const user = authState.user
   const selectedVault = state.vaults.find((v) => v.id === state.selectedVaultId) ?? null
+  const activeTab = tabState.tabs.find((tab) => tab.id === tabState.activeTabId) ?? null
 
   return (
     <div className="app">
@@ -502,7 +559,7 @@ function AppContent() {
               <div className="app-sidebar-body">
                 <div className="app-sidebar-section">
                   <span className="app-sidebar-section-label">{t('vault.label')}</span>
-                  <VaultList />
+                  <VaultList onRegisterCreateVault={(trigger) => { createVaultTriggerRef.current = trigger }} />
                 </div>
 
                 {state.selectedVaultId && (
@@ -529,11 +586,13 @@ function AppContent() {
           {/* ── Toolbar ── */}
           <SidebarToolbar
             vaultId={state.selectedVaultId}
+            onCreateVault={handleCreateVault}
             onCreateFile={handleCreateFile}
             onImportFile={handleImportFile}
             onImportFolder={handleImportFolder}
             onExportVault={handleExportVault}
             onNavigate={handleNavigate}
+            onOpenGraph={handleOpenGraph}
             isAdmin={user?.role === 'admin'}
             isVaultOwner={selectedVault?.permission === 'owner'}
             syncEnabled={selectedVault?.syncEnabled}
@@ -579,9 +638,10 @@ function AppContent() {
                   const hasUnsaved = tab.editBuffer !== null && tab.editBuffer !== tab.content
                   const modeLabel = tab.mode === 'edit' ? t('tabs.showPreview') : t('tabs.edit')
                   const ModeIcon = tab.mode === 'edit' ? Eye : Pencil
-                  const TabFileIcon = getFileIcon(tab.fileName)
-                  const tabFileIconClass = getFileIconClass(tab.fileName)
-                  const displayName = getDisplayName(tab.fileName)
+                  const isGraphTab = tab.filePath === '__graph__'
+                  const TabFileIcon = isGraphTab ? Share2 : getFileIcon(tab.fileName)
+                  const tabFileIconClass = isGraphTab ? 'tab-icon-graph' : getFileIconClass(tab.fileName)
+                  const displayName = isGraphTab ? 'Graph' : getDisplayName(tab.fileName)
                   return (
                     <div
                       key={tab.id}
@@ -590,14 +650,14 @@ function AppContent() {
                       aria-label={tab.filePath}
                       className={`tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}`}
                       onClick={() => { setActiveSettingsPage(null); tabDispatch({ type: 'ACTIVATE_TAB', payload: { tabId: tab.id } }) }}
-                      title={tab.filePath}
+                      title={isGraphTab ? 'Graph' : tab.filePath}
                       tabIndex={isActive ? 0 : -1}
                     >
                       <TabFileIcon size={13} className={`tab-bar-tab-icon ${tabFileIconClass}`} />
                       <span className="tab-bar-tab-label">
                         {hasUnsaved ? '● ' : ''}{displayName}
                       </span>
-                      {!tab.isBinary && (
+                      {!tab.isBinary && !isGraphTab && (
                         <button
                           type="button"
                           className="tab-bar-mode-btn"
@@ -644,16 +704,12 @@ function AppContent() {
                 aria-orientation="vertical"
               />
               <aside className="app-right-panel" style={{ width: rightPanel.width }}>
-                <div className="app-right-panel-header">
-                  <PanelRight size={13} />
-                  {t('rightPanel.title')}
-                </div>
-                <div className="app-right-panel-body">
-                  <p className="app-right-panel-placeholder">
-                    {t('rightPanel.placeholder')}<br /><br />
-                    {t('rightPanel.plannedFeatures')}
-                  </p>
-                </div>
+                <ContextPanel
+                  documentContent={activeTab && !activeTab.isBinary && activeTab.filePath !== '__graph__' ? (activeTab.editBuffer ?? activeTab.content) : null}
+                  documentPath={activeTab && !activeTab.isBinary && activeTab.filePath !== '__graph__' ? activeTab.filePath : null}
+                  vaultId={state.selectedVaultId}
+                  width={rightPanel.width}
+                />
               </aside>
             </>
           )}
@@ -745,7 +801,9 @@ function AuthGuard() {
   return (
     <AppProvider apiClient={apiClient}>
       <TabProvider>
-        <AppContent />
+        <ContextPanelProvider>
+          <AppContent />
+        </ContextPanelProvider>
       </TabProvider>
     </AppProvider>
   )

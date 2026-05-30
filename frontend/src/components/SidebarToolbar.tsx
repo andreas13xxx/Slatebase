@@ -2,12 +2,13 @@ import { useState, useRef, useCallback } from 'react'
 import {
   Upload, FolderOpen, Download, Settings, Shield,
   Database, FileText, Clock, User, Server, FilePlus, MessageCircle, RefreshCw, Key, ScrollText,
+  ClipboardList, Plus, Share2,
 } from 'lucide-react'
 
 type AppPage =
   | 'vaults' | 'my-vaults' | 'profile' | 'sessions' | 'chat'
   | 'admin-users' | 'admin-vaults' | 'admin-config' | 'admin-audit' | 'admin-logs'
-  | 'vault-sharing' | 'vault-deletion' | 'sync-config' | 'mcp-tokens'
+  | 'vault-sharing' | 'vault-deletion' | 'sync-config' | 'sync-log' | 'mcp-tokens'
 
 interface ToolbarItem {
   id: string
@@ -21,11 +22,13 @@ interface ToolbarItem {
 
 interface SidebarToolbarProps {
   vaultId: string | null
+  onCreateVault: () => void
   onCreateFile: () => void
   onImportFile: () => void
   onImportFolder: () => void
   onExportVault: () => void
   onNavigate: (page: AppPage) => void
+  onOpenGraph: () => void
   isAdmin: boolean
   isVaultOwner?: boolean
   syncEnabled?: boolean
@@ -37,13 +40,16 @@ interface SidebarToolbarProps {
  * Buttons can be reordered by drag-and-drop.
  * Tooltips show on hover.
  */
-export function SidebarToolbar({ vaultId, onCreateFile, onImportFile, onImportFolder, onExportVault, onNavigate, isAdmin, isVaultOwner, syncEnabled, globalUnreadCount }: SidebarToolbarProps) {
+export function SidebarToolbar({ vaultId, onCreateVault, onCreateFile, onImportFile, onImportFolder, onExportVault, onNavigate, onOpenGraph, isAdmin, isVaultOwner, syncEnabled, globalUnreadCount }: SidebarToolbarProps) {
   const allItems: ToolbarItem[] = [
+    { id: 'create-vault', icon: <Plus size={15} />, label: 'Neuer Vault', action: onCreateVault },
     { id: 'create-file', icon: <FilePlus size={15} />, label: 'Neue Datei', action: onCreateFile, requiresVault: true },
     { id: 'import-file', icon: <Upload size={15} />, label: 'Datei importieren', action: onImportFile, requiresVault: true },
     { id: 'import-folder', icon: <FolderOpen size={15} />, label: 'Ordner importieren', action: onImportFolder, requiresVault: true },
     { id: 'export-vault', icon: <Download size={15} />, label: 'Vault exportieren', action: onExportVault, requiresVault: true },
+    { id: 'graph', icon: <Share2 size={15} />, label: 'Graph', action: onOpenGraph, requiresVault: true },
     { id: 'sync-config', icon: <RefreshCw size={15} />, label: 'Vault-Sync', action: () => onNavigate('sync-config'), requiresVault: true, ownerOnly: true },
+    { id: 'sync-log', icon: <ClipboardList size={15} />, label: 'Sync-Protokoll', action: () => onNavigate('sync-log'), requiresVault: true, ownerOnly: true },
     { id: 'my-vaults', icon: <Database size={15} />, label: 'Meine Vaults', action: () => onNavigate('my-vaults') },
     { id: 'profile', icon: <User size={15} />, label: 'Profil', action: () => onNavigate('profile') },
     { id: 'sessions', icon: <Clock size={15} />, label: 'Sitzungen', action: () => onNavigate('sessions') },

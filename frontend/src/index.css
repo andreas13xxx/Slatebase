@@ -120,7 +120,16 @@
 
   /* Broken Link Tokens — Light */
   --broken-link-color: #94a3b8;
-  --broken-link-text-decoration: line-through;
+  --broken-link-text-decoration: underline dashed;
+
+  /* Graph Tokens — Light */
+  --graph-bg: #f8fafc;
+  --graph-node-fill: #6366f1;
+  --graph-node-unresolved: #94a3b8;
+  --graph-edge-color: #cbd5e1;
+  --graph-edge-highlight: #6366f1;
+  --graph-label-color: #334155;
+  --graph-search-highlight: #f59e0b;
 
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -266,7 +275,16 @@
 
     /* Broken Link Tokens — Dark */
     --broken-link-color: #64748b;
-    --broken-link-text-decoration: line-through;
+    --broken-link-text-decoration: underline dashed;
+
+    /* Graph Tokens — Dark */
+    --graph-bg: #0f172a;
+    --graph-node-fill: #818cf8;
+    --graph-node-unresolved: #64748b;
+    --graph-edge-color: #334155;
+    --graph-edge-highlight: #818cf8;
+    --graph-label-color: #e2e8f0;
+    --graph-search-highlight: #fbbf24;
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
@@ -390,7 +408,16 @@
 
     /* Broken Link Tokens — Dark */
     --broken-link-color: #64748b;
-    --broken-link-text-decoration: line-through;
+    --broken-link-text-decoration: underline dashed;
+
+    /* Graph Tokens — Dark */
+    --graph-bg: #0f172a;
+    --graph-node-fill: #818cf8;
+    --graph-node-unresolved: #64748b;
+    --graph-edge-color: #334155;
+    --graph-edge-highlight: #818cf8;
+    --graph-label-color: #e2e8f0;
+    --graph-search-highlight: #fbbf24;
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);

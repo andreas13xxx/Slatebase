@@ -40,6 +40,7 @@ src/
 │   ├── mcpRoutes.ts      — MCP Streamable HTTP transport endpoint (Bearer token auth)
 │   ├── mcpTokenRoutes.ts — MCP token CRUD routes (session auth)
 │   ├── mcpWellKnownRoute.ts — .well-known/mcp.json discovery endpoint (public)
+│   ├── graphRoutes.ts    — Graph API routes (GET graph, GET backlinks)
 │   └── vaultShareRoutes.ts — ShareController + share/transfer routes
 ├── chat/
 │   ├── types.ts          — Chat data models (Conversation, Message, etc.)
@@ -78,6 +79,12 @@ src/
 │   ├── handlers.ts       — McpHandlers (MCP resource handlers: list, read)
 │   ├── tool-handlers.ts  — MCP tool handlers (list_vaults, get_vault_structure, search_vault, read_file)
 │   └── server-factory.ts — McpServerFactory (creates configured McpServer instance)
+├── link-index/
+│   ├── index.ts              — Barrel export for link-index module
+│   ├── types.ts              — ILinkIndex interface, GraphData, GraphNode, GraphEdge, ParsedWikilink
+│   ├── wikilink-parser.ts    — Backend extractWikilinks() (code-block-aware, all formats)
+│   ├── wikilink-parser.test.ts — Unit tests for parser
+│   └── link-index-service.ts — LinkIndexService (rebuild, incremental updates, JSON persistence, queries)
 ├── import/index.ts       — ImportService (file/folder import logic)
 └── integration.test.ts   — Integration tests
 config/
@@ -108,8 +115,8 @@ src/
 │   │   ├── plugin.ts     — remark plugin wrapper (remarkWikilink)
 │   │   └── extract.ts    — extractWikilinks() utility for knowledge graph
 │   ├── embed/
-│   │   ├── syntax.ts     — micromark tokenizer extension for ![[...]] syntax
-│   │   ├── mdast-util.ts — fromMarkdown + toMarkdown handlers
+│   │   ├── syntax.ts     — micromark tokenizer extension for ![[...|...]] syntax (with pipe separator for size/display)
+│   │   ├── mdast-util.ts — fromMarkdown + toMarkdown handlers (target, heading, display fields)
 │   │   └── plugin.ts     — remark plugin wrapper (remarkEmbed)
 │   ├── callout/
 │   │   ├── transform.ts  — MDAST transformer (blockquote → CalloutNode)
@@ -131,7 +138,10 @@ src/
 │   ├── chatActions.ts    — loadConversations, sendMessage, leaveConversation, etc.
 │   ├── syncState.ts      — Sync reducer + types (config, log, conflicts, analysis)
 │   ├── syncContext.ts    — SyncProvider + useSyncContext hook
-│   └── syncActions.ts    — loadSyncConfig, triggerSync, resolveConflict, etc.
+│   ├── syncActions.ts    — loadSyncConfig, triggerSync, resolveConflict, etc.
+│   ├── contextPanelState.ts — Context panel reducer + types (sections, views, outline, links, tags, properties)
+│   ├── contextPanelContext.ts — ContextPanelProvider + useContextPanelContext hook
+│   └── contextPanelActions.ts — loadOutline, loadForwardLinks, loadBacklinks, loadTags, loadProperties, expandTag
 ├── components/
 │   ├── SlatebaseLogo.tsx — SVG logo component
 │   ├── SidebarToolbar.tsx — Draggable vertical toolbar
@@ -158,6 +168,23 @@ src/
 │   ├── SyncStatusPanel.tsx — Sync status display with trigger buttons
 │   ├── SyncAnalysisView.tsx — Analysis results (category counters + detail list)
 │   ├── ConflictResolutionView.tsx — Conflict list with resolution options
+│   ├── GraphView.tsx     — Knowledge graph SVG visualization (d3-force, zoom/pan/drag/search)
+│   ├── graph-utils.ts    — Pure graph utility functions (truncateLabel, clampZoom, computeNodeSize, filterNodes)
+│   ├── context-panel/
+│   │   ├── ContextPanel.tsx      — Main orchestrator (data loading, debounce, view wiring)
+│   │   ├── ContextPanel.css      — All context panel styles (Design Tokens)
+│   │   ├── ContextPanelTabBar.tsx — Tab bar with Drag & Drop reordering + split detection
+│   │   ├── ContextPanelTabBar.css — Tab bar styles
+│   │   ├── SplitSectionContainer.tsx — Vertically stacked sections with resize handles
+│   │   ├── SplitSectionContainer.css — Split section styles
+│   │   ├── OutlineView.tsx       — Document heading hierarchy (navigable)
+│   │   ├── LinksView.tsx         — Forward links + backlinks (resolved/unresolved)
+│   │   ├── TagsView.tsx          — Vault-wide tags with expand/collapse
+│   │   ├── PropertiesView.tsx    — YAML frontmatter as key-value table
+│   │   └── utils/
+│   │       ├── extractHeadings.ts — Heading extraction from markdown
+│   │       ├── parseFrontmatter.ts — YAML frontmatter parsing
+│   │       └── persistence.ts    — localStorage layout persistence
 │   ├── AdminUsersPage.tsx — User administration
 │   ├── AdminVaultsPage.tsx — Admin: all vaults overview with delete
 │   ├── AdminConfigPage.tsx — Server configuration (card-based layout)
@@ -244,6 +271,14 @@ All routes are prefixed with `/api/v1`:
 | GET | /vaults/:vaultId/sync/log | Get sync log (paginated) |
 | GET | /vaults/:vaultId/sync/conflicts | Get open conflicts |
 | POST | /vaults/:vaultId/sync/conflicts/:path/resolve | Resolve conflict |
+
+### Graph & Context Panel
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | /vaults/:vaultId/graph | Get full link graph (nodes + edges) |
+| GET | /vaults/:vaultId/backlinks?path= | Get backlinks for a file |
+| GET | /vaults/:vaultId/tags | Get all tags in the vault with file counts |
 
 ### MCP (Model Context Protocol)
 

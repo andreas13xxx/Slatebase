@@ -1,4 +1,4 @@
-import type { VaultInfo, DirectoryTree, FileContent, FileSaveResult, AppError, Conversation, PaginatedConversations, PaginatedMessages, Message } from '../types'
+import type { VaultInfo, DirectoryTree, FileContent, FileSaveResult, AppError, Conversation, PaginatedConversations, PaginatedMessages, Message, GraphData, BacklinksResponse } from '../types'
 import type { PublicUserInfo } from '../state/authState'
 import type { SyncConfigResponse, SyncConfigResult, CreateSyncConfigInput, UpdateSyncConfigInput, SyncResult, AnalysisResult, PaginatedSyncLog, ConflictEntry } from '../state/syncState'
 
@@ -64,6 +64,22 @@ export interface McpTokenCreateResult {
   tokenId: string
   name: string
   expiresAt: string
+}
+
+/**
+ * Tag information returned by the vault tags endpoint.
+ */
+export interface VaultTagInfo {
+  name: string
+  count: number
+  files: string[]
+}
+
+/**
+ * Response from the vault tags API endpoint.
+ */
+export interface VaultTagsResponse {
+  tags: VaultTagInfo[]
 }
 
 /**
@@ -145,6 +161,8 @@ export interface IApiClient {
   triggerSync(vaultId: string): Promise<SyncResult>
   /** Trigger an analysis for a vault. */
   triggerAnalysis(vaultId: string): Promise<AnalysisResult>
+  /** Reset the sync checkpoint so the next sync performs a full pull. */
+  resetSyncCheckpoint(vaultId: string): Promise<void>
   /** Get the sync log for a vault (paginated). */
   getSyncLog(vaultId: string, page?: number, pageSize?: number): Promise<PaginatedSyncLog>
   /** Get all open sync conflicts for a vault. */
@@ -159,6 +177,14 @@ export interface IApiClient {
   createMcpToken(name: string, expiryDays: number): Promise<McpTokenCreateResult>
   /** Revoke an API token by ID. */
   revokeMcpToken(tokenId: string): Promise<void>
+
+  // --- Graph methods ---
+  /** Get the full knowledge graph for a vault. */
+  getGraph(vaultId: string): Promise<GraphData>
+  /** Get backlinks for a specific file in a vault. */
+  getBacklinks(vaultId: string, filePath: string): Promise<BacklinksResponse>
+  /** Get all tags for a vault with occurrence counts and file lists. */
+  getVaultTags(vaultId: string): Promise<VaultTagsResponse>
 }
 
 /**
@@ -420,6 +446,11 @@ export class ApiClient implements IApiClient {
     return this.request<AnalysisResult>('POST', `/api/v1/vaults/${vaultId}/sync/analyze`)
   }
 
+  /** Reset the sync checkpoint so the next sync performs a full pull. */
+  async resetSyncCheckpoint(vaultId: string): Promise<void> {
+    await this.request<unknown>('POST', `/api/v1/vaults/${vaultId}/sync/reset-checkpoint`)
+  }
+
   /** Get the sync log for a vault (paginated). */
   async getSyncLog(vaultId: string, page?: number, pageSize?: number): Promise<PaginatedSyncLog> {
     const params: string[] = []
@@ -455,6 +486,24 @@ export class ApiClient implements IApiClient {
   /** Revoke an API token by ID. */
   async revokeMcpToken(tokenId: string): Promise<void> {
     await this.request<void>('DELETE', `/api/v1/mcp/tokens/${tokenId}`)
+  }
+
+  // --- Graph methods ---
+
+  /** Get the full knowledge graph for a vault. */
+  async getGraph(vaultId: string): Promise<GraphData> {
+    return this.request<GraphData>('GET', `/api/v1/vaults/${vaultId}/graph`)
+  }
+
+  /** Get backlinks for a specific file in a vault. */
+  async getBacklinks(vaultId: string, filePath: string): Promise<BacklinksResponse> {
+    const encodedPath = encodeURIComponent(filePath)
+    return this.request<BacklinksResponse>('GET', `/api/v1/vaults/${vaultId}/backlinks?path=${encodedPath}`)
+  }
+
+  /** Get all tags for a vault with occurrence counts and file lists. */
+  async getVaultTags(vaultId: string): Promise<VaultTagsResponse> {
+    return this.request<VaultTagsResponse>('GET', `/api/v1/vaults/${vaultId}/tags`)
   }
 
   // --- Internal helpers ---

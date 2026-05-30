@@ -89,7 +89,7 @@ function handleSyncError(c: Context, error: unknown, logger: ILogger): Response 
   }
 
   if (error instanceof SyncNotConfiguredError) {
-    logger.warn('Sync not configured', { code: error.code })
+    logger.debug('Sync not configured', { code: error.code })
     const apiError = createApiError(error.code, error.message)
     return c.json(apiError, 409)
   }
@@ -192,6 +192,7 @@ export class SyncRouteModule implements RouteModule {
     // Sync operations
     router.post('/vaults/:vaultId/sync/trigger', (c) => this.triggerSync(c))
     router.post('/vaults/:vaultId/sync/analyze', (c) => this.analyze(c))
+    router.post('/vaults/:vaultId/sync/reset-checkpoint', (c) => this.resetCheckpoint(c))
 
     // Sync log
     router.get('/vaults/:vaultId/sync/log', (c) => this.getLog(c))
@@ -393,6 +394,29 @@ export class SyncRouteModule implements RouteModule {
     try {
       const result = await this.syncService.analyze(vaultId)
       return c.json(result, 200)
+    } catch (error) {
+      return handleSyncError(c, error, this.logger)
+    }
+  }
+
+  /**
+   * POST /vaults/:vaultId/sync/reset-checkpoint
+   * Resets the sync checkpoint so the next sync performs a full pull (since=0).
+   * This re-processes all documents including tombstones for deleted/moved files,
+   * cleaning up stale files that were incorrectly preserved by previous sync bugs.
+   * Returns 200 on success.
+   */
+  private async resetCheckpoint(c: Context): Promise<Response> {
+    const vaultId = c.req.param('vaultId') as string
+
+    const ownerCheck = checkOwnership(c, vaultId, this.vaultRegistry)
+    if (!ownerCheck.authorized) {
+      return ownerCheck.response
+    }
+
+    try {
+      await this.syncService.resetCheckpoint(vaultId)
+      return c.json({ status: 'checkpoint_reset', message: 'Next sync will perform a full pull' }, 200)
     } catch (error) {
       return handleSyncError(c, error, this.logger)
     }

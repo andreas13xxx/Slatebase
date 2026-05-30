@@ -94,6 +94,7 @@ export interface AnalysisResult {
     local_newer: CategorySummary
     remote_only: CategorySummary
     local_only: CategorySummary
+    remote_deleted: CategorySummary
     conflict: CategorySummary
     identical: CategorySummary
   }
@@ -110,7 +111,7 @@ export interface CategorySummary {
 /** Detail entry for a single document in the analysis result. */
 export interface AnalysisDetail {
   path: string
-  category: 'remote_newer' | 'local_newer' | 'remote_only' | 'local_only' | 'conflict' | 'identical'
+  category: 'remote_newer' | 'local_newer' | 'remote_only' | 'local_only' | 'remote_deleted' | 'conflict' | 'identical'
   remoteRevision?: string
   localModifiedAt?: string
   remoteModifiedAt?: string

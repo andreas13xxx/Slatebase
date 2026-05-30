@@ -42,9 +42,13 @@ export function MyVaultsPage({ apiClient, onOpenSync }: MyVaultsPageProps) {
   const ownedVaults = state.vaults.filter((v) => v.permission === 'owner')
   const sharedVaults = state.vaults.filter((v) => v.permission === 'read' || v.permission === 'write')
 
+  // Stable identity strings for dependency tracking (re-fire when vault list changes)
+  const ownedVaultIds = ownedVaults.map((v) => v.id).join(',')
+  const sharedVaultIds = sharedVaults.map((v) => v.id).join(',')
+
   /** Load shares for all owned vaults. */
   const loadAllShares = useCallback(async () => {
-    if (ownedVaults.length === 0) return
+    if (ownedVaults.length === 0) { setSharesMap(new Map()); return }
     const map = new Map<string, ShareInfo[]>()
     const token = apiClient.getToken()
     const headers: Record<string, string> = {}
@@ -62,12 +66,13 @@ export function MyVaultsPage({ apiClient, onOpenSync }: MyVaultsPageProps) {
       }),
     )
     setSharesMap(map)
-  }, [apiClient, ownedVaults.length])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiClient, ownedVaultIds])
 
   /** Load file count and size for all vaults. */
   const loadStats = useCallback(async () => {
     const allVaults = [...ownedVaults, ...sharedVaults]
-    if (allVaults.length === 0) return
+    if (allVaults.length === 0) { setVaultStats(new Map()); return }
     const stats = new Map<string, { fileCount: number; sizeBytes: number }>()
 
     await Promise.all(
@@ -86,7 +91,8 @@ export function MyVaultsPage({ apiClient, onOpenSync }: MyVaultsPageProps) {
       }),
     )
     setVaultStats(stats)
-  }, [apiClient, ownedVaults.length, sharedVaults.length])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiClient, ownedVaultIds, sharedVaultIds])
 
   useEffect(() => { void loadAllShares() }, [loadAllShares])
   useEffect(() => { void loadStats() }, [loadStats])

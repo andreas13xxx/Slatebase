@@ -178,6 +178,7 @@ export const en: TranslationShape = {
     vaultSharing: 'Shares',
     vaultDeletion: 'Delete vault',
     syncConfig: 'Vault sync',
+    syncLog: 'Sync log',
     mcpTokens: 'API Tokens',
   },
 
@@ -462,6 +463,8 @@ export const en: TranslationShape = {
 
   sync: {
     title: 'Synchronization',
+    warningTitle: 'Experimental Feature — Use at Your Own Risk',
+    warningMessage: 'Synchronization with CouchDB/obsidian-livesync may lead to data loss. Create a backup of your vault before using this feature. Slatebase assumes no liability for lost or corrupted data.',
     configTitle: 'Sync Configuration',
     tabSetupUri: 'Setup URI',
     tabManual: 'Manual',
@@ -571,6 +574,49 @@ export const en: TranslationShape = {
     limitReached: 'Maximum number of tokens reached (10).',
   },
 
+  graph: {
+    title: 'Graph',
+    empty: 'No links found.',
+    retry: 'Retry',
+    errorLoading: 'Failed to load graph.',
+    noVault: 'Please select a vault to display the graph.',
+  },
+
+  contextPanel: {
+    tabs: {
+      outline: 'Outline',
+      links: 'Links',
+      tags: 'Tags',
+      properties: 'Properties',
+    },
+    outline: {
+      empty: 'No headings found.',
+      noDocument: 'No document open.',
+    },
+    links: {
+      forward: 'Outgoing Links',
+      backlinks: 'Incoming Links',
+      emptyForward: 'No outgoing links.',
+      emptyBacklinks: 'No incoming links.',
+      error: 'Could not load incoming links.',
+      backlinksError: 'Incoming links could not be loaded.',
+      backlinksLoading: 'Loading…',
+      noDocument: 'No document open.',
+    },
+    tags: {
+      empty: 'No tags found.',
+      loading: 'Loading tags…',
+    },
+    properties: {
+      empty: 'No properties found.',
+      parseError: 'Frontmatter could not be parsed.',
+      noDocument: 'No document open.',
+    },
+    noDocument: 'No document open',
+    noHeadings: 'No headings found',
+    outlineAriaLabel: 'Document outline',
+  },
+
   vaultDeletion: {
     loading: 'Loading…',
     loadError: 'Failed to load shares',
@@ -611,4 +657,5 @@ export const en: TranslationShape = {
     errorAccessDenied: 'Access denied. Only the owner can transfer the vault.',
     errorUserNotFound: 'User not found.',
   },
+
 } as const

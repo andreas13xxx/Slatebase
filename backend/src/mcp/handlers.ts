@@ -184,7 +184,7 @@ export class McpHandlers implements IMcpHandlers {
   ): Promise<{ contents: Array<{ uri: string; text: string; mimeType?: string }> }> {
     let tree: DirectoryTree
     try {
-      tree = this.vaultService.getVaultTree(vaultId)
+      tree = await this.vaultService.getVaultTree(vaultId)
     } catch (error) {
       if (error instanceof VaultNotFoundError) {
         throw new McpError(MCP_ERROR_NOT_FOUND, `Vault not found: ${vaultId}`)

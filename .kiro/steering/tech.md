@@ -24,7 +24,7 @@ Monorepo with two independent packages: `backend/` and `frontend/`. No shared wo
 - **Icons**: Lucide React (SVG-based, tree-shakeable)
 - **Fonts**: Inter (Google Fonts, loaded in index.html)
 - **Styling**: Custom CSS with Design Tokens (CSS Custom Properties), Dark Mode via `prefers-color-scheme`
-- **Markdown**: unified + remark-parse + remark-gfm + remark-frontmatter + custom Obsidian plugins (Wikilinks, Embeds, Callouts, Tags)
+- **Markdown**: unified + remark-parse + remark-gfm + remark-frontmatter + custom Obsidian plugins (Wikilinks, Embeds with size/display, Callouts, Tags)
 - **Testing**: Vitest + Testing Library (jsdom environment) + Playwright (e2e)
 - **Property-Based Testing**: fast-check (both packages, devDependency)
 - **Linting**: ESLint with react-hooks and react-refresh plugins

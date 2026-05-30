@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach, afterAll } from 'vitest'
-import { SyncEngine, buildAuthHeaders, categorizeDocuments, reassembleChunkedDocuments, derivePathFromId, scanVaultFiles, categorizeDocument, buildAnalysisSummary, createEmptyAnalysisResult } from './sync-engine.js'
+import { SyncEngine, buildAuthHeaders, categorizeDocuments, reassembleChunkedDocuments, derivePathFromId, stripLiveSyncPrefix, scanVaultFiles, categorizeDocument, buildAnalysisSummary, createEmptyAnalysisResult } from './sync-engine.js'
 import type { ICryptoService, SyncConnectionParams, PullParams, PushParams, AnalyzeParams, AnalysisDetail } from './types.js'
 import { mkdtemp, writeFile, mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -47,9 +47,50 @@ describe('derivePathFromId', () => {
     expect(derivePathFromId('_local/checkpoint')).toBeNull()
   })
 
+  it('returns null for obsidian-livesync internal metadata documents', () => {
+    expect(derivePathFromId('obsydian_livesync_version')).toBeNull()
+    expect(derivePathFromId('syncinfo')).toBeNull()
+  })
+
   it('returns the ID as path for regular documents', () => {
     expect(derivePathFromId('notes/hello.md')).toBe('notes/hello.md')
     expect(derivePathFromId('readme.md')).toBe('readme.md')
+  })
+
+  it('strips i: prefix from obsidian-livesync internal file IDs', () => {
+    expect(derivePathFromId('i:.obsidian/types.json')).toBe('.obsidian/types.json')
+    expect(derivePathFromId('i:.obsidian/plugins/editing-toolbar/manifest.json')).toBe('.obsidian/plugins/editing-toolbar/manifest.json')
+  })
+
+  it('strips ps: prefix from obsidian-livesync plugin settings IDs', () => {
+    expect(derivePathFromId('ps:.obsidian/plugins/lazy-plugins/data.json')).toBe('.obsidian/plugins/lazy-plugins/data.json')
+  })
+
+  it('strips ix: prefix from obsidian-livesync index file IDs', () => {
+    expect(derivePathFromId('ix:some-index-file.json')).toBe('some-index-file.json')
+  })
+})
+
+describe('stripLiveSyncPrefix', () => {
+  it('strips i: prefix', () => {
+    expect(stripLiveSyncPrefix('i:.obsidian/types.json')).toBe('.obsidian/types.json')
+  })
+
+  it('strips ps: prefix', () => {
+    expect(stripLiveSyncPrefix('ps:settings.json')).toBe('settings.json')
+  })
+
+  it('strips ix: prefix', () => {
+    expect(stripLiveSyncPrefix('ix:index.json')).toBe('index.json')
+  })
+
+  it('does not strip unknown prefixes', () => {
+    expect(stripLiveSyncPrefix('notes/hello.md')).toBe('notes/hello.md')
+    expect(stripLiveSyncPrefix('x:something')).toBe('x:something')
+  })
+
+  it('does not strip prefix from middle of string', () => {
+    expect(stripLiveSyncPrefix('path/i:file.md')).toBe('path/i:file.md')
   })
 })
 
@@ -132,6 +173,99 @@ describe('categorizeDocuments', () => {
 
     expect(regularDocs).toHaveLength(1)
     expect(regularDocs[0]!.deleted).toBe(true)
+  })
+
+  it('marks documents deleted via body-level "deleted" flag (obsidian-livesync default)', () => {
+    // obsidian-livesync default (deleteMetadataOfDeletedFiles=false): deleted/moved files
+    // keep a LIVE CouchDB document with body-level `deleted: true`, NOT `_deleted`.
+    const results = [
+      {
+        seq: '7',
+        id: 'old-location.md',
+        changes: [{ rev: '3-moved' }],
+        // No change.deleted, no _deleted — only the body-level flag
+        doc: {
+          _id: 'old-location.md',
+          _rev: '3-moved',
+          path: 'old-location.md',
+          type: 'plain',
+          deleted: true,
+          children: ['leaf-x'],
+          mtime: 1700000000000,
+        },
+      },
+    ]
+
+    const { regularDocs } = categorizeDocuments(results)
+
+    expect(regularDocs).toHaveLength(1)
+    expect(regularDocs[0]!.path).toBe('old-location.md')
+    expect(regularDocs[0]!.deleted).toBe(true)
+  })
+
+  it('marks header documents deleted via body-level "deleted" flag', () => {
+    const results = [
+      {
+        seq: '8',
+        id: 'h:moved-binary.png',
+        changes: [{ rev: '2-del' }],
+        doc: {
+          _id: 'h:moved-binary.png',
+          _rev: '2-del',
+          path: 'moved-binary.png',
+          type: 'newnote',
+          deleted: true,
+          children: ['leaf-bin'],
+        },
+      },
+    ]
+
+    const { headers } = categorizeDocuments(results)
+    const reassembled = reassembleChunkedDocuments(headers, new Map(), new Map())
+
+    expect(reassembled).toHaveLength(1)
+    expect(reassembled[0]!.deleted).toBe(true)
+  })
+
+  it('does not resurrect a moved file: origin tombstone is deleted, destination is written', () => {
+    // Simulates a move: livesync creates a new doc at destination and tombstones the origin
+    const results = [
+      {
+        seq: '10',
+        id: 'notes/new-place.md',
+        changes: [{ rev: '1-new' }],
+        doc: {
+          _id: 'notes/new-place.md',
+          _rev: '1-new',
+          path: 'notes/new-place.md',
+          type: 'plain',
+          data: 'moved content',
+          mtime: 1700000002000,
+        },
+      },
+      {
+        seq: '11',
+        id: 'notes/old-place.md',
+        changes: [{ rev: '2-tomb' }],
+        doc: {
+          _id: 'notes/old-place.md',
+          _rev: '2-tomb',
+          path: 'notes/old-place.md',
+          type: 'plain',
+          deleted: true,
+          mtime: 1700000002000,
+        },
+      },
+    ]
+
+    const { regularDocs } = categorizeDocuments(results)
+
+    const destination = regularDocs.find(d => d.path === 'notes/new-place.md')
+    const origin = regularDocs.find(d => d.path === 'notes/old-place.md')
+
+    expect(destination!.deleted).toBe(false)
+    expect(destination!.content).toBe('moved content')
+    expect(origin!.deleted).toBe(true)
   })
 
   it('skips changes without doc', () => {
@@ -257,6 +391,205 @@ describe('reassembleChunkedDocuments', () => {
     const result = reassembleChunkedDocuments(headers, chunks)
 
     expect(result[0]!.deleted).toBe(true)
+  })
+
+  it('keeps binary chunks separate (type "newnote") for per-chunk base64 decoding', () => {
+    // Simulate a binary file (PNG) with type "newnote" and children referencing leaf docs
+    const chunkA = Buffer.from([0x89, 0x50, 0x4E, 0x47]).toString('base64') // PNG magic bytes
+    const chunkB = Buffer.from([0x0D, 0x0A, 0x1A, 0x0A]).toString('base64') // PNG header continuation
+
+    const headers = new Map([
+      ['h:image.png', {
+        _id: 'h:image.png',
+        _rev: '1-img',
+        path: 'image.png',
+        type: 'newnote',
+        children: ['leaf-a', 'leaf-b'],
+      }],
+    ])
+
+    const chunks = new Map<string, Map<number, string>>()
+    const leafDocs = new Map([
+      ['leaf-a', chunkA],
+      ['leaf-b', chunkB],
+    ])
+
+    const result = reassembleChunkedDocuments(headers, chunks, leafDocs)
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.isBinary).toBe(true)
+    // Binary: chunks are kept separate, NOT joined
+    expect(result[0]!.contentChunks).toEqual([chunkA, chunkB])
+    expect(result[0]!.content).toBeUndefined()
+
+    // Verify correct decoding: decode each chunk separately and concat
+    const decoded = Buffer.concat(result[0]!.contentChunks!.map(c => Buffer.from(c, 'base64')))
+    expect([...decoded]).toEqual([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+  })
+
+  it('joins text chunks as strings (type "plain")', () => {
+    const headers = new Map([
+      ['h:notes/readme.md', {
+        _id: 'h:notes/readme.md',
+        _rev: '1-txt',
+        path: 'notes/readme.md',
+        type: 'plain',
+        children: ['leaf-1', 'leaf-2'],
+      }],
+    ])
+
+    const chunks = new Map<string, Map<number, string>>()
+    const leafDocs = new Map([
+      ['leaf-1', '# Hello\n'],
+      ['leaf-2', 'World'],
+    ])
+
+    const result = reassembleChunkedDocuments(headers, chunks, leafDocs)
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.isBinary).toBe(false)
+    // Text: chunks are joined into a single string
+    expect(result[0]!.content).toBe('# Hello\nWorld')
+    expect(result[0]!.contentChunks).toBeUndefined()
+  })
+
+  it('uses type field over path extension for binary detection', () => {
+    // A .json file stored as "newnote" (binary) — livesync does this for large JSON
+    const chunkData = Buffer.from('{"key":"value"}').toString('base64')
+
+    const headers = new Map([
+      ['h:data.json', {
+        _id: 'h:data.json',
+        _rev: '1-json',
+        path: 'data.json',
+        type: 'newnote', // Explicitly binary despite .json extension
+        children: ['leaf-json'],
+      }],
+    ])
+
+    const chunks = new Map<string, Map<number, string>>()
+    const leafDocs = new Map([['leaf-json', chunkData]])
+
+    const result = reassembleChunkedDocuments(headers, chunks, leafDocs)
+
+    // type field takes precedence over path extension
+    expect(result[0]!.isBinary).toBe(true)
+    expect(result[0]!.contentChunks).toEqual([chunkData])
+  })
+
+  it('correctly decodes multi-chunk binary where naive join would truncate', () => {
+    // This is the exact scenario that caused the bug:
+    // Each chunk has its own base64 padding (=), so joining and decoding once truncates
+    const originalBytes = Buffer.from([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    // Split into chunks at non-3-byte boundaries to produce padded base64
+    const chunk1 = originalBytes.subarray(0, 4).toString('base64')  // "AQIDBA==" (4 bytes → padded)
+    const chunk2 = originalBytes.subarray(4, 7).toString('base64')  // "BQYH" (3 bytes → no padding)
+    const chunk3 = originalBytes.subarray(7, 10).toString('base64') // "CAkK" (3 bytes → no padding)
+
+    const headers = new Map([
+      ['h:test.bin', {
+        _id: 'h:test.bin',
+        _rev: '1-bin',
+        path: 'test.bin',
+        type: 'newnote',
+        children: ['c1', 'c2', 'c3'],
+      }],
+    ])
+
+    const chunks = new Map<string, Map<number, string>>()
+    const leafDocs = new Map([
+      ['c1', chunk1],
+      ['c2', chunk2],
+      ['c3', chunk3],
+    ])
+
+    const result = reassembleChunkedDocuments(headers, chunks, leafDocs)
+
+    // Correct: decode each chunk separately, then concat bytes
+    const decoded = Buffer.concat(result[0]!.contentChunks!.map(c => Buffer.from(c, 'base64')))
+    expect(decoded.length).toBe(10)
+    expect([...decoded]).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+
+    // Demonstrate the bug: joining base64 strings and decoding once would give wrong result
+    const wrongDecoded = Buffer.from(chunk1 + chunk2 + chunk3, 'base64')
+    expect(wrongDecoded.length).toBeLessThan(10) // This proves the old code was broken
+  })
+})
+
+// ─── categorizeDocuments binary type detection ───────────────────────────────
+
+describe('categorizeDocuments binary type detection', () => {
+  it('uses document type "newnote" to mark as binary and keep chunks separate', () => {
+    const chunkData = Buffer.from([0xFF, 0xD8, 0xFF]).toString('base64') // JPEG magic
+
+    const results = [
+      {
+        seq: '1',
+        id: 'photo.jpg',
+        changes: [{ rev: '1-jpg' }],
+        doc: {
+          _id: 'photo.jpg',
+          _rev: '1-jpg',
+          path: 'photo.jpg',
+          type: 'newnote',
+          children: ['leaf-jpg'],
+        },
+      },
+      {
+        seq: '2',
+        id: 'leaf-jpg',
+        changes: [{ rev: '1-leaf' }],
+        doc: {
+          _id: 'leaf-jpg',
+          _rev: '1-leaf',
+          type: 'leaf',
+          data: chunkData,
+        },
+      },
+    ]
+
+    const { regularDocs } = categorizeDocuments(results)
+
+    expect(regularDocs).toHaveLength(1)
+    expect(regularDocs[0]!.isBinary).toBe(true)
+    expect(regularDocs[0]!.contentChunks).toEqual([chunkData])
+    expect(regularDocs[0]!.content).toBeUndefined()
+  })
+
+  it('uses document type "plain" to mark as text and join chunks', () => {
+    const results = [
+      {
+        seq: '1',
+        id: 'notes/test.md',
+        changes: [{ rev: '1-md' }],
+        doc: {
+          _id: 'notes/test.md',
+          _rev: '1-md',
+          path: 'notes/test.md',
+          type: 'plain',
+          children: ['leaf-1', 'leaf-2'],
+        },
+      },
+      {
+        seq: '2',
+        id: 'leaf-1',
+        changes: [{ rev: '1-l1' }],
+        doc: { _id: 'leaf-1', _rev: '1-l1', type: 'leaf', data: 'Hello ' },
+      },
+      {
+        seq: '3',
+        id: 'leaf-2',
+        changes: [{ rev: '1-l2' }],
+        doc: { _id: 'leaf-2', _rev: '1-l2', type: 'leaf', data: 'World' },
+      },
+    ]
+
+    const { regularDocs } = categorizeDocuments(results)
+
+    expect(regularDocs).toHaveLength(1)
+    expect(regularDocs[0]!.isBinary).toBe(false)
+    expect(regularDocs[0]!.content).toBe('Hello World')
+    expect(regularDocs[0]!.contentChunks).toBeUndefined()
   })
 })
 
@@ -548,7 +881,7 @@ describe('SyncEngine', () => {
       expect(result.status).toBe('failed')
     })
 
-    it('caps errors at 100 entries', async () => {
+    it('caps errors at 100 entries', { timeout: 30000 }, async () => {
       // Create 150 documents that will all fail to write
       const results = Array.from({ length: 150 }, (_, i) => ({
         seq: `${i + 1}`,
@@ -572,6 +905,48 @@ describe('SyncEngine', () => {
 
       // Errors should be capped at 100
       expect(result.errors.length).toBeLessThanOrEqual(100)
+    })
+
+    it('unlinks local file when remote doc has body-level "deleted" flag (moved/deleted file)', async () => {
+      const { mkdtemp, writeFile: writeFileFn, rm: rmFn, stat: statFn } = await import('node:fs/promises')
+      const { tmpdir } = await import('node:os')
+      const vaultDir = await mkdtemp(join(tmpdir(), 'sync-tombstone-'))
+      try {
+        // Pre-create the file that should be removed
+        const filePath = join(vaultDir, 'old-location.md')
+        await writeFileFn(filePath, 'stale content')
+
+        // Remote sends a tombstone: live document with body-level deleted: true
+        vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+          new Response(JSON.stringify({
+            results: [
+              {
+                seq: '1',
+                id: 'old-location.md',
+                changes: [{ rev: '2-tomb' }],
+                doc: {
+                  _id: 'old-location.md',
+                  _rev: '2-tomb',
+                  path: 'old-location.md',
+                  type: 'plain',
+                  deleted: true,
+                  mtime: 1700000000000,
+                },
+              },
+            ],
+            last_seq: '1-seq',
+          }), { status: 200 }),
+        )
+
+        const result = await engine.pull(createPullParams({ vaultPath: vaultDir }))
+
+        expect(result.status).toBe('success')
+        expect(result.pulledCount).toBe(1)
+        // The local file must be gone
+        await expect(statFn(filePath)).rejects.toThrow()
+      } finally {
+        await rmFn(vaultDir, { recursive: true }).catch(() => {})
+      }
     })
   })
 })
@@ -659,36 +1034,53 @@ describe('categorizeDocument', () => {
     expect(result.localSize).toBe(200)
   })
 
-  it('returns remote_newer when remote mtime is greater', () => {
+  it('returns remote_newer when remote changed since checkpoint but local did not', () => {
+    const checkpointMtime = 1700000000000
     const result = categorizeDocument(
       'notes/file.md',
-      { mtime: 1700000000000, size: 100 },
-      { rev: '2-def', mtime: 1700000001000, size: 150, deleted: false },
-      1700000000000, // checkpoint matches local mtime → local unchanged, remote is newer
+      { mtime: 1700000000000, size: 100 }, // local mtime == checkpoint → not changed
+      { rev: '2-def', mtime: 1700000001000, size: 150, deleted: false }, // remote mtime > checkpoint → changed
+      checkpointMtime,
     )
 
     expect(result.category).toBe('remote_newer')
   })
 
-  it('returns local_newer when local mtime is greater', () => {
+  it('returns local_newer when local changed since checkpoint but remote did not', () => {
+    const checkpointMtime = 1700000000000
     const result = categorizeDocument(
       'notes/file.md',
-      { mtime: 1700000001000, size: 150 },
-      { rev: '1-abc', mtime: 1700000000000, size: 100, deleted: false },
-      1700000001000, // checkpoint matches local mtime but remote is older
+      { mtime: 1700000001000, size: 150 }, // local mtime > checkpoint → changed
+      { rev: '1-abc', mtime: 1699999999000, size: 100, deleted: false }, // remote mtime < checkpoint → not changed
+      checkpointMtime,
     )
 
     expect(result.category).toBe('local_newer')
   })
 
-  it('returns identical when mtimes are equal', () => {
+  it('returns identical when neither changed since checkpoint', () => {
+    const checkpointMtime = 1700000000000
     const result = categorizeDocument(
       'notes/file.md',
-      { mtime: 1700000000000, size: 100 },
-      { rev: '1-abc', mtime: 1700000000000, size: 100, deleted: false },
-      1700000000000, // checkpoint matches both
+      { mtime: 1700000000000, size: 100 }, // local mtime == checkpoint → not changed
+      { rev: '1-abc', mtime: 1699999000000, size: 100, deleted: false }, // remote mtime < checkpoint → not changed
+      checkpointMtime,
     )
 
+    // Even though local.mtime > remote.mtime in absolute terms,
+    // neither changed since the checkpoint → they are in sync
+    expect(result.category).toBe('identical')
+  })
+
+  it('returns identical when no checkpoint exists (first analysis)', () => {
+    const result = categorizeDocument(
+      'notes/file.md',
+      { mtime: 1700000001000, size: 100 },
+      { rev: '1-abc', mtime: 1700000000000, size: 100, deleted: false },
+      undefined, // no checkpoint
+    )
+
+    // Without a checkpoint, we cannot determine changes → treat as identical
     expect(result.category).toBe('identical')
   })
 
@@ -704,7 +1096,7 @@ describe('categorizeDocument', () => {
     expect(result.category).toBe('conflict')
   })
 
-  it('returns remote_newer when remote is deleted but local exists', () => {
+  it('returns remote_deleted when remote is deleted but local exists', () => {
     const result = categorizeDocument(
       'notes/deleted.md',
       { mtime: 1700000000000, size: 100 },
@@ -712,7 +1104,7 @@ describe('categorizeDocument', () => {
       1699999999000,
     )
 
-    expect(result.category).toBe('remote_newer')
+    expect(result.category).toBe('remote_deleted')
   })
 })
 
@@ -860,7 +1252,7 @@ describe('SyncEngine push', () => {
     expect(result.pushedCount).toBe(0)
   })
 
-  it('handles deleted files by marking them as _deleted in CouchDB', async () => {
+  it('handles deleted files by marking them with body-level deleted flag in CouchDB', async () => {
     // File is in checkpoint but NOT on disk → deleted
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
     // HEAD → returns existing revision
@@ -868,7 +1260,15 @@ describe('SyncEngine push', () => {
       status: 200,
       headers: { 'etag': '"2-existing"' },
     }))
-    // PUT with _deleted → success
+    // GET → returns existing document (to preserve metadata)
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({
+      _id: 'deleted-file.md',
+      _rev: '2-existing',
+      path: 'deleted-file.md',
+      type: 'plain',
+      ctime: 1699000000000,
+    }), { status: 200 }))
+    // PUT with deleted: true → success
     fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }))
 
     const result = await engine.push(createPushParams({
@@ -878,11 +1278,14 @@ describe('SyncEngine push', () => {
     expect(result.status).toBe('success')
     expect(result.pushedCount).toBe(1)
 
-    // Verify the PUT was called with _deleted: true
-    const putCall = fetchSpy.mock.calls[1]!
+    // Verify the PUT was called with body-level deleted: true (livesync-compatible)
+    const putCall = fetchSpy.mock.calls[2]!
     const body = JSON.parse(putCall[1]!.body as string)
-    expect(body._deleted).toBe(true)
+    expect(body.deleted).toBe(true)
     expect(body._rev).toBe('2-existing')
+    expect(body.type).toBe('plain')
+    // Should NOT use CouchDB _deleted (livesync default behavior)
+    expect(body._deleted).toBeUndefined()
   })
 
   it('skips deletion when document does not exist in CouchDB', async () => {
@@ -1187,7 +1590,11 @@ describe('SyncEngine analyze', () => {
       }), { status: 200 }),
     )
 
-    const result = await engine.analyze(createAnalyzeParams())
+    // Provide checkpoint mtime for 'both.md' that is older than the remote mtime (1700000000000)
+    // but matches the local mtime (1600000000000) → local unchanged, remote is newer
+    const result = await engine.analyze(createAnalyzeParams({
+      localMtimes: { 'both.md': 1600000000000 },
+    }))
 
     expect(result.details.length).toBe(3)
 

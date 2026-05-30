@@ -310,7 +310,7 @@ describe('VaultService', () => {
   })
 
   describe('getVaultTree', () => {
-    it('returns cached tree for a valid vaultId', () => {
+    it('returns cached tree for a valid vaultId', async () => {
       const vault = createMockVault('abc123def456', 'Test Vault', '/test/vault')
       const vaultManager = createMockVaultManager([vault])
       const configService = createMockConfigService()
@@ -318,9 +318,8 @@ describe('VaultService', () => {
       const logger = createMockLogger()
 
       const service = new VaultService(vaultManager, vaultReader, configService, logger)
-      const tree = service.getVaultTree('abc123def456')
+      const tree = await service.getVaultTree('abc123def456')
 
-      expect(tree).toBe(vault.tree)
       expect(tree.name).toBe('vault')
       expect(tree.children).toHaveLength(2)
     })

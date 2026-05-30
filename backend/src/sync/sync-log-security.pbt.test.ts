@@ -265,7 +265,9 @@ describe('Property 11: Log Error Truncation', () => {
               return { status: 'success', pushedCount: 0, errors: [] }
             },
             async analyze(): Promise<AnalysisResult> {
-              return { summary: { remote_newer: { count: 0, totalBytes: 0 }, local_newer: { count: 0, totalBytes: 0 }, remote_only: { count: 0, totalBytes: 0 }, local_only: { count: 0, totalBytes: 0 }, conflict: { count: 0, totalBytes: 0 }, identical: { count: 0, totalBytes: 0 } }, details: [], durationMs: 0 }
+              return { summary: { remote_newer: { count: 0, totalBytes: 0 }, local_newer: { count: 0, totalBytes: 0 }, remote_only: { count: 0, totalBytes: 0 }, local_only: { count: 0, totalBytes: 0 },
+                    remote_deleted: { count: 0, totalBytes: 0 },
+                    conflict: { count: 0, totalBytes: 0 }, identical: { count: 0, totalBytes: 0 } }, details: [], durationMs: 0 }
             },
           }
 
@@ -363,7 +365,9 @@ describe('Property 14: No Credentials in Log Entries', () => {
               return { status: 'success', pushedCount: 1, errors: [] }
             },
             async analyze(): Promise<AnalysisResult> {
-              return { summary: { remote_newer: { count: 0, totalBytes: 0 }, local_newer: { count: 0, totalBytes: 0 }, remote_only: { count: 0, totalBytes: 0 }, local_only: { count: 0, totalBytes: 0 }, conflict: { count: 0, totalBytes: 0 }, identical: { count: 0, totalBytes: 0 } }, details: [], durationMs: 0 }
+              return { summary: { remote_newer: { count: 0, totalBytes: 0 }, local_newer: { count: 0, totalBytes: 0 }, remote_only: { count: 0, totalBytes: 0 }, local_only: { count: 0, totalBytes: 0 },
+                    remote_deleted: { count: 0, totalBytes: 0 },
+                    conflict: { count: 0, totalBytes: 0 }, identical: { count: 0, totalBytes: 0 } }, details: [], durationMs: 0 }
             },
           }
 
@@ -442,7 +446,9 @@ describe('Property 14: No Credentials in Log Entries', () => {
               return { status: 'success', pushedCount: 0, errors: [] }
             },
             async analyze(): Promise<AnalysisResult> {
-              return { summary: { remote_newer: { count: 0, totalBytes: 0 }, local_newer: { count: 0, totalBytes: 0 }, remote_only: { count: 0, totalBytes: 0 }, local_only: { count: 0, totalBytes: 0 }, conflict: { count: 0, totalBytes: 0 }, identical: { count: 0, totalBytes: 0 } }, details: [], durationMs: 0 }
+              return { summary: { remote_newer: { count: 0, totalBytes: 0 }, local_newer: { count: 0, totalBytes: 0 }, remote_only: { count: 0, totalBytes: 0 }, local_only: { count: 0, totalBytes: 0 },
+                    remote_deleted: { count: 0, totalBytes: 0 },
+                    conflict: { count: 0, totalBytes: 0 }, identical: { count: 0, totalBytes: 0 } }, details: [], durationMs: 0 }
             },
           }
 
@@ -545,7 +551,8 @@ describe('Property 15: Analysis is Read-Only', () => {
                   local_newer: { count: 0, totalBytes: 0 },
                   remote_only: { count: 0, totalBytes: 0 },
                   local_only: { count: 0, totalBytes: 0 },
-                  conflict: { count: 0, totalBytes: 0 },
+                    remote_deleted: { count: 0, totalBytes: 0 },
+                    conflict: { count: 0, totalBytes: 0 },
                   identical: { count: remoteDocCount + localFileCount, totalBytes: (remoteDocCount + localFileCount) * 100 },
                 },
                 details,
@@ -665,7 +672,8 @@ describe('Property 15: Analysis is Read-Only', () => {
                   local_newer: { count: 0, totalBytes: 0 },
                   remote_only: { count: 0, totalBytes: 0 },
                   local_only: { count: 0, totalBytes: 0 },
-                  conflict: { count: 0, totalBytes: 0 },
+                    remote_deleted: { count: 0, totalBytes: 0 },
+                    conflict: { count: 0, totalBytes: 0 },
                   identical: { count: 0, totalBytes: 0 },
                 },
                 details: [{ path: 'test.md', category: 'remote_newer', remoteSize: 500 }],

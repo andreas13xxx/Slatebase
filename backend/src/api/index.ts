@@ -72,11 +72,26 @@ export const renameRequestSchema = z.object({
   newName: z.string().min(1, 'newName must not be empty').max(255, 'newName must be at most 255 characters'),
 })
 
+// --- Link Index Hook Interface ---
+
+/**
+ * Callback interface for notifying the link index about file operations.
+ * Used by VaultController to trigger incremental index updates after successful file ops.
+ */
+export interface LinkIndexHook {
+  /** Called after a markdown file is saved (created or updated). */
+  onFileSaved(vaultId: string, filePath: string, content: string): void
+  /** Called after a file or folder is deleted. */
+  onFileDeleted(vaultId: string, filePath: string): void
+  /** Called after a file is renamed/moved (content may not be available). */
+  onFileRenamed(vaultId: string, oldPath: string, newPath: string): void
+}
+
 // --- IVaultController Interface ---
 
 export interface IVaultController {
   listVaults(c: Context): Promise<Response>
-  getVaultTree(c: Context): Response | Promise<Response>
+  getVaultTree(c: Context): Promise<Response>
   getFileContent(c: Context): Response | Promise<Response>
   saveFile(c: Context): Promise<Response>
   createVault(c: Context): Promise<Response>
@@ -91,6 +106,8 @@ export interface IVaultController {
 // --- VaultController Implementation ---
 
 export class VaultController implements IVaultController {
+  private linkIndexHook?: LinkIndexHook
+
   constructor(
     private readonly vaultService: IVaultService,
     private readonly logger: ILogger,
@@ -100,6 +117,14 @@ export class VaultController implements IVaultController {
     private readonly syncConfigStore?: ISyncConfigStore,
     private readonly shareRegistry?: IVaultShareRegistry,
   ) {}
+
+  /**
+   * Sets the link index hook for incremental index updates.
+   * Called from the composition root after LinkIndexService is initialized.
+   */
+  setLinkIndexHook(hook: LinkIndexHook): void {
+    this.linkIndexHook = hook
+  }
 
   /**
    * GET /vaults — Returns 200 with VaultInfo[] JSON.
@@ -149,11 +174,11 @@ export class VaultController implements IVaultController {
    * GET /vaults/:vaultId/tree — Returns 200 with DirectoryTree JSON
    * or structured ApiError on failure.
    */
-  getVaultTree(c: Context): Response {
+  async getVaultTree(c: Context): Promise<Response> {
     const vaultId = c.req.param('vaultId') as string
 
     try {
-      const tree = this.vaultService.getVaultTree(vaultId)
+      const tree = await this.vaultService.getVaultTree(vaultId)
       return c.json(tree, 200)
     } catch (error) {
       return this.handleError(c, error)
@@ -234,6 +259,12 @@ export class VaultController implements IVaultController {
       const ifMatch = c.req.header('If-Match')
 
       const result = await this.vaultService.saveFile(vaultId, filePath, content, ifMatch)
+
+      // Notify link index hook for markdown files (fire-and-forget)
+      if (this.linkIndexHook && filePath.endsWith('.md')) {
+        this.linkIndexHook.onFileSaved(vaultId, filePath, content)
+      }
+
       return c.json(result, 200)
     } catch (error) {
       return this.handleError(c, error)
@@ -411,6 +442,12 @@ export class VaultController implements IVaultController {
 
     try {
       await this.vaultService.deleteContent(vaultId, decodedPath)
+
+      // Notify link index hook for markdown files (fire-and-forget)
+      if (this.linkIndexHook && decodedPath.endsWith('.md')) {
+        this.linkIndexHook.onFileDeleted(vaultId, decodedPath)
+      }
+
       return c.body(null, 204)
     } catch (error) {
       return this.handleError(c, error)
@@ -446,6 +483,12 @@ export class VaultController implements IVaultController {
 
       const { sourcePath, destinationPath } = parsed.data
       const result = await this.vaultService.moveContent(vaultId, sourcePath, destinationPath)
+
+      // Notify link index hook for markdown file moves (fire-and-forget)
+      if (this.linkIndexHook && sourcePath.endsWith('.md')) {
+        this.linkIndexHook.onFileRenamed(vaultId, sourcePath, result.newPath)
+      }
+
       return c.json(result, 200)
     } catch (error) {
       return this.handleError(c, error)
@@ -481,6 +524,12 @@ export class VaultController implements IVaultController {
 
       const { path: filePath, newName } = parsed.data
       const result = await this.vaultService.renameContent(vaultId, filePath, newName)
+
+      // Notify link index hook for markdown file renames (fire-and-forget)
+      if (this.linkIndexHook && filePath.endsWith('.md')) {
+        this.linkIndexHook.onFileRenamed(vaultId, filePath, result.newPath)
+      }
+
       return c.json(result, 200)
     } catch (error) {
       return this.handleError(c, error)

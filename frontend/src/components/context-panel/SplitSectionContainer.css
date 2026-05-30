@@ -1,0 +1,89 @@
+/* ===== Split Section Container ===== */
+
+.split-section-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  height: 100%;
+}
+
+.split-section-container--resizing {
+  cursor: row-resize;
+  user-select: none;
+}
+
+/* ─── Section Wrapper ─────────────────────────────────────────────────────── */
+
+.split-section-wrapper {
+  display: contents;
+}
+
+/* ─── Section ─────────────────────────────────────────────────────────────── */
+
+.split-section {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 80px;
+}
+
+.split-section-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+
+/* ─── Resize Handle ───────────────────────────────────────────────────────── */
+
+.split-section-resize-handle {
+  height: 4px;
+  width: 100%;
+  cursor: row-resize;
+  background: var(--border-subtle);
+  flex-shrink: 0;
+  position: relative;
+  transition: background-color 0.15s ease;
+}
+
+.split-section-resize-handle:hover,
+.split-section-resize-handle--active {
+  background: var(--accent);
+}
+
+/* Larger hit area for easier grabbing */
+.split-section-resize-handle::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: 0;
+  right: 0;
+}
+
+/* ─── Drop Indicator ──────────────────────────────────────────────────────── */
+
+.split-section-drop-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-light);
+  border: 2px dashed var(--accent);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.split-section-drop-indicator-line {
+  width: 60%;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+}

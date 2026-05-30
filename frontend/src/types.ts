@@ -124,6 +124,38 @@ export interface PaginatedConversations {
   hasMore: boolean
 }
 
+/** A node in the knowledge graph (represents a file or unresolved link target). */
+export interface GraphNode {
+  /** Relative file path from vault root. */
+  path: string
+  /** Filename without extension (display label). */
+  label: string
+  /** Whether the file physically exists in the vault. */
+  exists: boolean
+}
+
+/** An edge in the knowledge graph (represents a wikilink between two files). */
+export interface GraphEdge {
+  /** Source file path (the file containing the wikilink). */
+  source: string
+  /** Target file path (the linked file). */
+  target: string
+}
+
+/** Full graph structure returned by the graph API endpoint. */
+export interface GraphData {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+}
+
+/** Response from the backlinks API endpoint. */
+export interface BacklinksResponse {
+  /** File path that was queried. */
+  path: string
+  /** Files that link to this path. */
+  backlinks: string[]
+}
+
 /** Discriminated union of all actions dispatched to the app reducer. */
 export type AppAction =
   | { type: 'VAULTS_LOADED'; payload: VaultInfo[] }

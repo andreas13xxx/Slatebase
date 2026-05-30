@@ -1,0 +1,439 @@
+/* ===== Context Panel — Component Styles ===== */
+
+/* ─── Container ───────────────────────────────────────────────────────────── */
+
+.context-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--right-panel-bg);
+  color: var(--right-panel-text);
+  font-family: var(--font-sans);
+}
+
+.context-panel__body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ─── Outline View ────────────────────────────────────────────────────────── */
+
+.outline-view {
+  padding: 0.5rem;
+  overflow-y: auto;
+}
+
+.outline-view--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+}
+
+.outline-view__placeholder {
+  font-size: 0.8125rem;
+  color: var(--right-panel-text-muted);
+  font-style: italic;
+  margin: 0;
+  padding: 0.5rem;
+  text-align: center;
+}
+
+.outline-view__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.outline-view__item {
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.outline-view__item--active {
+  background: var(--sidebar-active);
+}
+
+.outline-view__item--active .outline-view__button {
+  font-weight: 600;
+  color: var(--accent-text);
+}
+
+.outline-view__button {
+  display: block;
+  width: 100%;
+  padding: 0.25rem 0.5rem;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--right-panel-text);
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outline-view__button:hover {
+  background: var(--sidebar-hover);
+  color: var(--accent-text);
+}
+
+.outline-view__button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* ─── Links View ──────────────────────────────────────────────────────────── */
+
+.context-panel-links-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0.5rem;
+}
+
+.context-panel-links-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.context-panel-links-section-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--right-panel-text-muted);
+  margin: 0 0 0.25rem 0;
+  padding: 0;
+}
+
+.context-panel-links-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.context-panel-link-item {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--right-panel-text);
+}
+
+.context-panel-link-resolved {
+  cursor: pointer;
+  opacity: 1;
+}
+
+.context-panel-link-resolved:hover {
+  background: var(--sidebar-hover);
+  color: var(--accent-text);
+}
+
+.context-panel-link-resolved:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.context-panel-link-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-panel-link-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 2px;
+}
+
+.context-panel-link-unresolved {
+  opacity: 0.5;
+  text-decoration: underline dashed;
+  cursor: default;
+}
+
+.context-panel-links-placeholder {
+  font-size: 0.8125rem;
+  color: var(--right-panel-text-muted);
+  font-style: italic;
+  margin: 0;
+  padding: 0.25rem 0.5rem;
+}
+
+.context-panel-links-loading {
+  font-size: 0.8125rem;
+  color: var(--right-panel-text-muted);
+  margin: 0;
+  padding: 0.25rem 0.5rem;
+}
+
+.context-panel-links-error {
+  font-size: 0.8125rem;
+  color: var(--danger-text);
+  margin: 0;
+  padding: 0.25rem 0.5rem;
+}
+
+/* ─── Tags View ───────────────────────────────────────────────────────────── */
+
+.context-panel-tags-view {
+  padding: 0.5rem;
+  overflow-y: auto;
+}
+
+.context-panel-tags-view--loading,
+.context-panel-tags-view--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+}
+
+.context-panel-tags-placeholder {
+  font-size: 0.8125rem;
+  color: var(--right-panel-text-muted);
+  font-style: italic;
+  margin: 0;
+  padding: 0.5rem;
+  text-align: center;
+}
+
+.context-panel-tags-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.context-panel-tags-item {
+  border-radius: 4px;
+}
+
+.context-panel-tags-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 0.25rem 0.5rem;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--right-panel-text);
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.context-panel-tags-button:hover {
+  background: var(--sidebar-hover);
+  color: var(--accent-text);
+}
+
+.context-panel-tags-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.context-panel-tags-button--expanded {
+  background: var(--sidebar-active);
+  font-weight: 500;
+}
+
+.context-panel-tags-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.context-panel-tags-count {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--right-panel-text-muted);
+}
+
+.context-panel-tags-files {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.context-panel-tags-file-item {
+  border-radius: 4px;
+}
+
+.context-panel-tags-file-button {
+  display: block;
+  width: 100%;
+  padding: 0.2rem 0.5rem;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--right-panel-text-muted);
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.context-panel-tags-file-button:hover {
+  background: var(--sidebar-hover);
+  color: var(--accent-text);
+}
+
+.context-panel-tags-file-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* ─── Properties View ─────────────────────────────────────────────────────── */
+
+.properties-view {
+  padding: 0.5rem;
+  overflow-y: auto;
+}
+
+.properties-view--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+}
+
+.properties-view--error {
+  padding: 0.5rem;
+}
+
+.properties-view__placeholder {
+  font-size: 0.8125rem;
+  color: var(--right-panel-text-muted);
+  font-style: italic;
+  margin: 0;
+  padding: 0.5rem;
+  text-align: center;
+}
+
+.properties-view__error-message {
+  font-size: 0.8125rem;
+  color: var(--danger-text);
+  margin: 0 0 0.5rem 0;
+  padding: 0;
+}
+
+.properties-view__raw-frontmatter {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  background: var(--sidebar-hover);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 0.5rem;
+  margin: 0;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--right-panel-text);
+}
+
+.properties-view__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  table-layout: fixed;
+}
+
+.properties-view__row {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.properties-view__row:last-child {
+  border-bottom: none;
+}
+
+.properties-view__row--group > .properties-view__key {
+  font-weight: 600;
+  color: var(--right-panel-text);
+}
+
+.properties-view__key {
+  padding: 0.3rem 0.5rem 0.3rem 0;
+  vertical-align: top;
+  font-weight: 500;
+  color: var(--right-panel-text-muted);
+  width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.properties-view__value {
+  padding: 0.3rem 0;
+  vertical-align: top;
+  color: var(--right-panel-text);
+  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Single View Container ───────────────────────────────────────────────── */
+
+.context-panel__single-view {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+
+/* ─── Common Utilities ────────────────────────────────────────────────────── */
+
+.context-panel-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

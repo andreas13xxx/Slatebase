@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
@@ -227,12 +227,30 @@ export class TokenStore implements ITokenStore {
 
   /**
    * Write data atomically: write to a temp file with random hex suffix, then rename to target.
+   * On Windows, retries with unlink-before-rename on EPERM/EACCES.
    */
   private async atomicWrite(targetPath: string, data: string): Promise<void> {
     const tempSuffix = randomBytes(8).toString('hex')
     const tempPath = `${targetPath}.${tempSuffix}.tmp`
     await writeFile(tempPath, data, 'utf-8')
-    await rename(tempPath, targetPath)
+
+    try {
+      await rename(tempPath, targetPath)
+    } catch (err: unknown) {
+      const code = (err as NodeJS.ErrnoException).code
+      if (code === 'EPERM' || code === 'EACCES') {
+        try { await unlink(targetPath) } catch { /* may not exist */ }
+        try {
+          await rename(tempPath, targetPath)
+        } catch {
+          await writeFile(targetPath, data, 'utf-8')
+          try { await unlink(tempPath) } catch { /* cleanup */ }
+        }
+      } else {
+        try { await unlink(tempPath) } catch { /* ignore */ }
+        throw err
+      }
+    }
   }
 
   /**

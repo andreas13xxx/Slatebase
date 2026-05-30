@@ -88,6 +88,8 @@ Die Collaboration-Features sind Slatebase's stärkstes Alleinstellungsmerkmal ge
 | **Multi-Session / Multi-Device** | Gleichzeitig auf Handy und Desktop — ohne Sync-Dienst |
 | **User-Suche mit Autocomplete** | Einfaches Teilen ohne E-Mail-Einladungen oder externe Accounts |
 | **CouchDB/LiveSync Vault-Synchronisation** | Bidirektional & Read-Only, Intervall-basiert, Konflikterkennung, E2E-Verschlüsselung — kompatibel mit obsidian-livesync |
+| **Knowledge Graph** | Interaktive Visualisierung der Vault-Verlinkungsstruktur — Obsidian Publish/Quartz haben keinen interaktiven Graph mit Zoom/Pan/Drag |
+| **Context Panel (Outline, Links, Tags, Properties)** | Obsidian Publish: kein Outline/Tags-Panel; Quartz: nur statisch. Slatebase: interaktiv, splittbar, Drag & Drop |
 
 ### Messaging für Posts & Content
 
