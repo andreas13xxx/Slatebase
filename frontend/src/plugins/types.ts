@@ -24,7 +24,7 @@ export interface EmbedNode extends Literal {
   target: string
   heading: string | null
   display: string | null
-  embedType: 'image' | 'note'
+  embedType: 'image' | 'pdf' | 'note'
 }
 
 /**
@@ -72,6 +72,11 @@ export interface CalloutTypeConfig {
 export const IMAGE_EXTENSIONS: readonly string[] = [
   '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.avif', '.bmp'
 ]
+
+/**
+ * Supported PDF extensions for embed type detection.
+ */
+export const PDF_EXTENSIONS: readonly string[] = ['.pdf']
 
 declare module 'mdast' {
   interface PhrasingContentMap {

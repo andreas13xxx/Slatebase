@@ -31,6 +31,8 @@ Config → Logger → Vault (Data Access) → Business → API (Controller)
 - Action creators are standalone async functions (not hooks)
 - `IApiClient` interface with fetch implementation
 - Relative URLs — Vite proxy forwards `/api` to the backend
+- Unified file explorer: all vaults as expandable root entries, lazy-loading trees into `vaultTrees: Record<string, DirectoryTree | null>`
+- No separate vault dropdown — vault selection is implicit (clicking a file selects its vault)
 
 ## Conventions
 
@@ -84,6 +86,9 @@ Config → Logger → Vault (Data Access) → Business → API (Controller)
 - `exactOptionalPropertyTypes` → `undefined` must be explicitly assigned for optional props
 - Vite proxy → backend must be running on port 3000 for frontend dev
 - Vault IDs are deterministic SHA-256 hashes (first 12 hex characters), not random
+- Internal files with `_` prefix (e.g. `_link-index.json`) are filtered from the directory tree by `VaultReader.scanDirectory()`
+- `AppState.directoryTree` is legacy — new code should use `state.vaultTrees[vaultId]` for per-vault trees
+- FileExplorer uses `${vaultId}::${path}` as expanded-path keys to avoid collisions between vaults
 
 ## Commands
 

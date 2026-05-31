@@ -209,6 +209,14 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - Icons als React-Komponenten: `<Upload size={14} />`, `<Trash2 size={12} />`
 - Ersetzt alle Unicode-Zeichen (▼, ▶, ×, ✏️, 👁️) durch Lucide-Äquivalente
 
+### Custom Checkboxen (Task Lists)
+- Browser-Default-Checkboxen mit `appearance: none` + `disabled` werden in manchen Browsern unsichtbar
+- **Immer** `opacity: 1` explizit auf `:disabled` setzen wenn `appearance: none` verwendet wird
+- Custom Checkbox-Pattern: `appearance: none` → eigene `width/height/border/border-radius/background` → `:checked` mit Accent-Farbe → `::after` Pseudo-Element als Häkchen
+- Checked-Items: `text-decoration: line-through` + `color: var(--text-muted)` für visuelle Unterscheidung (wie Obsidian)
+- Task-Listen brauchen eine eigene Klasse auf dem Parent-`<ul>` (`view-mode-task-list`) mit `list-style: none` und reduziertem Padding — nur `list-style: none` auf dem `<li>` reicht nicht (Bullet-Platz bleibt)
+- Content nach der Checkbox in einen `<span>`-Wrapper packen damit `line-through` nur den Text betrifft, nicht die Checkbox
+
 ## Häufige Stolperfallen
 
 1. **`.js`-Extension vergessen** bei Backend-Imports → Runtime-Error unter Node.js ESM
@@ -227,6 +235,13 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 14. **mdast-util `this.buffer()` vergiftet den Stack** — Nach `this.buffer()` ist `this.stack[this.stack.length - 1]` ein leerer String, nicht der zuletzt gepushte Node. `exitHandler` die per Stack-Index auf den Node zugreifen, finden ihn nicht mehr. Nur `buffer()` verwenden wenn `resume()` den gesammelten Text braucht.
 15. **Broken Links sehen aus wie Strikethrough** — `text-decoration: line-through` auf unresolved Links wird von Benutzern als `~~durchgestrichen~~` interpretiert. Immer `underline dashed` verwenden.
 16. **Embed-Syntax ohne Pipe-Support** — Obsidian-Embeds unterstützen `![[file|size]]` und `![[file|alt]]`. Der Embed-Tokenizer muss den Pipe-Character (`|`, Code 124) als Separator erkennen, sonst wird `|300` als Teil des Dateinamens interpretiert und die Datei nicht gefunden.
+17. **EADDRINUSE nach Prozess-Kill** — Nach abruptem Beenden des Backend-Dev-Servers (tsx watch) bleiben TCP-Verbindungen im TIME_WAIT-Status. Nächster Start schlägt mit `EADDRINUSE` fehl. Lösung: 5–10s warten, dann erneut starten. Nicht sofort Code-Änderungen vermuten.
+18. **Wiederverwendete Background-Prozesse** — Wenn ein Dev-Server-Prozess "reused" wird, kann der Output vom vorherigen Lauf stammen. Bei unerklärlichen Fehlern: Prozess explizit stoppen und frisch starten.
+19. **`_`-Prefix-Dateien im Vault** — Dateien mit `_`-Prefix (z.B. `_link-index.json`) werden von `VaultReader.scanDirectory()` aus dem Directory Tree gefiltert. Wenn eine interne Datei im Explorer auftaucht, fehlt der Filter oder der Dateiname hat keinen `_`-Prefix.
+20. **`state.directoryTree` vs. `state.vaultTrees`** — `directoryTree` ist Legacy (einzelner Tree für den ausgewählten Vault). Neue Komponenten sollten `state.vaultTrees[vaultId]` verwenden. Beide werden synchron gehalten durch den Reducer.
+21. **FileExplorer expandedPaths mit Vault-Scope** — Folder-Expand-Keys sind `${vaultId}::${path}`, nicht nur `path`. Ohne Vault-Prefix kollidieren identische Ordnernamen in verschiedenen Vaults.
+22. **`--bg-primary` existiert nicht** — Wird in vielen Stellen in `App.css` referenziert, ist aber in `index.css` nirgends definiert. Resultat: `var(--bg-primary)` evaluiert zu nichts (transparent). Korrekte Tokens: `--bg-base` (Seiten-Hintergrund), `--bg-surface` (Panel-Hintergrund), `--bg-elevated` (Karten/Inputs, weiß im Light Mode). Bei neuen Styles immer prüfen ob der Token in `index.css` tatsächlich definiert ist.
+23. **PDF-Embeds als Note-Embed behandelt** — `detectEmbedType()` kannte nur `'image'` und `'note'`. PDFs (`![[datei.pdf]]`) wurden als Markdown-Notiz geladen → Binär-Müll oder Fehler. Lösung: Dritten Typ `'pdf'` einführen mit eigenem Rendering-Pfad (`PdfViewer`-Komponente). Betrifft BEIDE Render-Pfade: `renderEmbedNode()` und `renderTextWithEmbeds()`.
 
 ## Vault-Besitz & Löschregeln
 
@@ -459,6 +474,13 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - Sektionen in Cards (`.admin-config-card`) mit Titel, optionalem Grid für Felder
 - Gefahrenzone: eigene Card mit rotem Rahmen (`--danger` Tokens)
 - Buttons mit Icons (Lucide) + Text, Primary/Danger-Varianten
+
+### appearance: none + disabled = unsichtbar
+- `appearance: none` entfernt den Browser-Default-Style komplett
+- `disabled`-Attribute setzt in manchen Browsern `opacity: 0.4` oder blendet das Element aus
+- Kombination: Element wird unsichtbar wenn kein explizites `opacity: 1` auf `:disabled` gesetzt ist
+- **Regel:** Bei jedem `appearance: none` auf einem `disabled`-Element immer `opacity: 1` explizit setzen
+- Betrifft: Checkboxen, Radio-Buttons, Select-Elemente mit Custom-Styling
 
 ## Vault Import/Export
 
@@ -838,6 +860,14 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - Nicht-numerischer Display-Text wird als Alt-Text interpretiert
 - **Regel:** Bei neuen Obsidian-Syntax-Elementen immer die Obsidian-Dokumentation auf Pipe-Varianten prüfen
 
+### Embed-Typ-Erkennung: Drei Kategorien
+- `detectEmbedType(target)` in `plugins/embed/syntax.ts` gibt `'image' | 'pdf' | 'note'` zurück
+- `IMAGE_EXTENSIONS` und `PDF_EXTENSIONS` sind in `plugins/types.ts` definiert
+- PDFs (`![[datei.pdf]]`) werden als inline `<object type="application/pdf">` gerendert (via `PdfViewer`)
+- Nicht-Bild/Nicht-PDF-Embeds werden als Markdown-Notiz geladen und rekursiv gerendert
+- **Fehler-Pattern:** Neuen Dateityp vergessen → wird als Note-Embed behandelt → versucht Binärdaten als Markdown zu rendern
+- **Regel:** Bei neuen einbettbaren Dateitypen: (1) Extension-Liste erweitern, (2) `detectEmbedType` anpassen, (3) `renderEmbedNode()` erweitern, (4) `renderTextWithEmbeds()` erweitern
+
 ### Broken Links: Kein Durchstreichen (line-through)
 - `text-decoration: line-through` für broken/unresolved Links ist visuell identisch mit Markdown-Strikethrough (`~~text~~`)
 - Benutzer verwechseln broken Links mit durchgestrichenem Text
@@ -850,6 +880,14 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - Muss ALLE PhrasingContent-Typen behandeln die Text enthalten: `text`, `inlineCode`, `wikilink` (→ `display`), `tag` (→ `tag`)
 - Fehlende Typen → Anchor-IDs stimmen nicht mit dem sichtbaren Heading-Text überein
 - **Regel:** Bei neuen Inline-Node-Typen immer `extractPlainText()` erweitern
+
+### Task-Listen (GFM Checkboxen)
+- `remark-gfm` parsed `- [ ]` / `- [x]` als `listItem` mit `checked: boolean | null`
+- `checked === null` → normales List-Item, `checked === true/false` → Task-Item
+- Parent-`<ul>` braucht eigene CSS-Klasse (`view-mode-task-list`) mit `list-style: none` + reduziertem Padding
+- Nur `list-style: none` auf dem `<li>` reicht NICHT — der Bullet-Platz (padding-left) bleibt auf dem `<ul>`
+- Checkbox-Content in `<span class="view-mode-task-item__content">` wrappen für gezielte Styles (line-through nur auf Text, nicht auf Checkbox)
+- `hasTaskItems`-Check auf `node.children.some(item => item.checked != null)` für die Parent-Klasse
 
 ## Context Panel
 
@@ -946,3 +984,111 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - Schema: `{ version: 1, updatedAt: ISO-String, forwardLinks: Record<path, targets[]> }`
 - Reverse-Map wird beim Laden aus Forward-Links berechnet (nicht persistiert)
 - Bei ungültigem JSON oder Schema-Fehler → automatischer Full-Rebuild
+
+## Entwicklungsumgebung: Dev-Server-Management
+
+### Port-Belegung nach Prozess-Abbruch (EADDRINUSE)
+- Wenn ein `tsx watch`-Prozess abrupt beendet wird (Timeout, Kill, Crash), bleiben TCP-Verbindungen im `TIME_WAIT`-Status (PID 0 unter Windows)
+- Der nächste Start schlägt fehl mit `Error: listen EADDRINUSE: address already in use 127.0.0.1:3000`
+- **Lösung:** 5–10 Sekunden warten bis TIME_WAIT-Verbindungen ablaufen, dann erneut starten
+- **Diagnose:** `netstat -ano | findstr ":3000"` — Einträge mit PID 0 und Status WARTEND/TIME_WAIT sind harmlos und lösen sich von selbst
+- **Regel:** Nach dem Stoppen eines Dev-Servers immer kurz warten bevor ein Neustart versucht wird
+
+### Wiederverwendete Prozesse können veralteten State haben
+- Wenn ein Background-Prozess "reused" wird (gleicher Befehl + Arbeitsverzeichnis), kann der angezeigte Output vom vorherigen Lauf stammen
+- Fehler wie `'@hono/node-server' does not provide an export named 'getConnInfo'` können Artefakte eines alten Prozesses sein
+- **Regel:** Bei unerklärlichen Import-Fehlern den Prozess explizit stoppen und neu starten (nicht wiederverwenden)
+- **Verifikation:** Import direkt testen mit `node -e "import('...').then(m => console.log(Object.keys(m)))"` bevor Code geändert wird
+
+### Node.js v24 Kompatibilität
+- Projekt läuft auf Node.js v24.16.0 (Entwicklungsmaschine)
+- `@hono/node-server@1.19.14` funktioniert korrekt mit Node.js v24
+- Subpath-Import `@hono/node-server/conninfo` exportiert `getConnInfo` wie erwartet
+- `--experimental-strip-types` ist in v24 weiterhin experimental — für Production den `tsc`-Build verwenden
+
+
+## Unified File Explorer (Multi-Vault-Ansicht)
+
+### Alle Vaults als aufklappbare Root-Einträge statt Dropdown
+- Kein separates VaultList-Dropdown mehr — alle Vaults werden direkt im FileExplorer als Root-Level-Einträge angezeigt
+- Jeder Vault ist ein aufklappbarer Eintrag mit Database-Icon, Name und Status-Badges (Read/Write/Sync/Shared)
+- Aufklappen eines Vaults lädt den Tree lazy (nur bei Bedarf)
+- Klick auf eine Datei setzt implizit `selectedVaultId` (kein expliziter Vault-Wechsel nötig)
+- **Vorteil:** Benutzer sieht alle Vaults auf einen Blick, kann zwischen Vaults navigieren ohne Dropdown-Interaktion
+
+### AppState-Erweiterung für Multi-Vault-Trees
+- `vaultTrees: Record<string, DirectoryTree | null>` — pro Vault ein gecachter Tree
+- `vaultTreesLoading: Set<string>` — Vault-IDs deren Tree gerade geladen wird
+- `VAULT_TREE_LOADED` Action: setzt Tree für einen spezifischen Vault
+- `VAULT_TREE_LOADING` Action: markiert einen Vault als "wird geladen"
+- Legacy `directoryTree` bleibt bestehen für Abwärtskompatibilität (Context Panel, Graph, etc.)
+- `TREE_LOADED` aktualisiert auch `vaultTrees[selectedVaultId]` für Konsistenz
+- **Regel:** Neue Komponenten sollten `vaultTrees[vaultId]` nutzen, nicht das globale `directoryTree`
+
+### Lazy-Loading der Vault-Trees
+- Tree wird erst beim Aufklappen eines Vaults geladen (nicht beim App-Start)
+- Wenn Tree bereits in `vaultTrees` gecacht ist, wird kein erneuter Fetch ausgelöst
+- Loading-Indikator pro Vault während des Fetches
+- Bei Fehler: Vault zeigt sich als leer (kein globaler Error-State)
+- **Regel:** Kein Preloading aller Vault-Trees — bei vielen Vaults wäre das zu viel Traffic
+
+### Vault-Erstellung im FileExplorer integriert
+- `onRegisterCreateVault` Prop am FileExplorer (analog zu `onRegisterCreateFile`)
+- Inline-Formular am unteren Rand des Explorers (Input + OK/Cancel)
+- Nach Erstellung: Vault wird automatisch expanded und selected
+- Validierung: Leerer Name, zu lang (>128), Duplikat — alles inline angezeigt
+
+### expandedPaths mit Vault-Scope
+- Folder-Expand-State verwendet `${vaultId}::${path}` als Key (nicht nur `path`)
+- Verhindert Kollisionen wenn zwei Vaults identische Ordnernamen haben
+- Vault-Expand-State (`expandedVaults: Set<string>`) ist separat von Folder-Expand-State
+
+### Drag & Drop: Vault-Scoped
+- `DragState` enthält `draggedVaultId` — Drag & Drop funktioniert nur innerhalb eines Vaults
+- Cross-Vault-Drag ist nicht möglich (validTargets werden nur für den Quell-Vault berechnet)
+- **Regel:** Dateien können nicht per Drag & Drop zwischen Vaults verschoben werden
+
+### VaultList-Komponente bleibt erhalten
+- `VaultList.tsx` wird nicht gelöscht — wird noch von `VaultList.test.tsx` referenziert
+- Langfristig kann die Datei entfernt werden wenn die Tests migriert sind
+- Import in `App.tsx` wurde entfernt — Komponente wird nicht mehr gerendert
+
+## Backend: Interne Dateien im Tree filtern
+
+### `_`-Prefix-Dateien werden aus dem Directory Tree ausgeschlossen
+- `VaultReader.scanDirectory()` filtert Dateien deren Name mit `_` beginnt
+- Betrifft: `_link-index.json` (Knowledge Graph Index)
+- Nur Dateien werden gefiltert, nicht Verzeichnisse (Ordner mit `_`-Prefix bleiben sichtbar)
+- `itemCount` zählt nur sichtbare Einträge (nach Filter)
+- **Regel:** Interne Slatebase-Dateien im Vault-Verzeichnis immer mit `_`-Prefix benennen — sie werden automatisch aus dem Tree gefiltert
+- **Betroffene Stellen:** `backend/src/vault/index.ts` → `scanDirectory()` Methode
+
+
+## Embed-Typ-Erkennung: Drei Kategorien (image / pdf / note)
+
+### detectEmbedType() unterscheidet drei Typen
+- `'image'` — Bild-Extensions (`.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.webp`, `.avif`, `.bmp`)
+- `'pdf'` — PDF-Extension (`.pdf`)
+- `'note'` — alles andere (wird als Markdown-Notiz geladen und gerendert)
+- Definiert in `frontend/src/plugins/embed/syntax.ts`
+- `EmbedNode.embedType` ist ein Union-Typ: `'image' | 'pdf' | 'note'`
+
+### PDF-Embeds werden inline als Viewer gerendert
+- `![[dokument.pdf]]` in Markdown → `renderEmbedNode()` erkennt `embedType === 'pdf'`
+- Rendert den exportierten `PdfViewer` aus `BinaryViewer.tsx` (Blob-Fetch + `<object type="application/pdf">`)
+- Gleicher Viewer wie beim direkten Öffnen einer PDF im BinaryViewer-Tab
+- CSS-Klasse: `.view-mode-embed--pdf` mit `min-height: 500px` und Flex-Layout
+- **Regel:** Neue Dateitypen die inline eingebettet werden sollen, brauchen einen eigenen `embedType`-Wert + Rendering-Logik in `renderEmbedNode()` UND `renderTextWithEmbeds()`
+
+### PdfViewer ist exportiert (nicht mehr intern)
+- `PdfViewer` in `BinaryViewer.tsx` ist jetzt `export function` (vorher nur `function`)
+- Wird von `ViewMode.tsx` importiert für Inline-PDF-Embeds
+- Akzeptiert `{ rawSrc: string; fileName: string }` als Props
+- Fetcht PDF als Blob → `URL.createObjectURL()` → `<object data={blobUrl} type="application/pdf">`
+- Firefox-kompatibel: Blob mit explizitem `type: 'application/pdf'` erzwingt pdf.js-Viewer
+
+### Zwei Stellen für Embed-Rendering beachten
+- `renderEmbedNode()` — für Embed-Nodes die vom micromark-Parser als eigene MDAST-Nodes erkannt werden
+- `renderTextWithEmbeds()` — Fallback-Regex für `![[...]]`-Syntax in Text-Nodes (wenn Parser sie nicht als Embed erkennt)
+- **Beide** müssen bei neuen Embed-Typen aktualisiert werden
+- **Regel:** Bei Änderungen an der Embed-Logik immer BEIDE Funktionen synchron halten

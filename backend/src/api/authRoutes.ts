@@ -98,7 +98,7 @@ export class AuthController implements IAuthController {
 
     const { username, password } = parseResult.data
 
-    const ipAddress = c.req.header('X-Forwarded-For') ?? c.req.header('X-Real-IP') ?? '0.0.0.0'
+    const ipAddress = (c.get('clientIp') as string | undefined) ?? '0.0.0.0'
     const userAgent = c.req.header('User-Agent') ?? 'unknown'
 
     try {

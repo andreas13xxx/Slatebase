@@ -42,6 +42,7 @@ function createMockConfig(overrides?: Partial<ServerConfig>): IConfigService {
     maxImportFileSize: 524288000, // 500 MB
     maxImportFiles: 500,
     maxImportDepth: 10,
+    trustedProxies: [],
     ...overrides,
   }
   return {

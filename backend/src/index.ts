@@ -23,6 +23,7 @@ import { AdminRouteModule } from './api/adminRoutes.js'
 import { VaultShareRouteModule } from './api/vaultShareRoutes.js'
 import { SessionStore, AuthService } from './auth/index.js'
 import { createAuthMiddleware, createCsrfMiddleware, createRateLimitMiddleware, createMustChangePasswordMiddleware } from './auth/middleware.js'
+import { createClientIpMiddleware } from './api/client-ip.js'
 import { RateLimiter } from './auth/ratelimit.js'
 import { UserRepository, UserService, RoleService, ensureDefaultAdmin } from './user/index.js'
 import { AuditLogger, AuditService } from './audit/index.js'
@@ -273,6 +274,7 @@ app.use(
 
 // Auth middleware (skips login endpoint internally)
 const rateLimiter = new RateLimiter()
+app.use('*', createClientIpMiddleware({ trustedProxies: serverConfig.trustedProxies }))
 app.use('/api/v1/*', createAuthMiddleware(authService))
 app.use('/api/v1/*', createCsrfMiddleware(authService))
 app.use('/api/v1/*', createRateLimitMiddleware(rateLimiter))

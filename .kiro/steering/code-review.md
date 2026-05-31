@@ -43,3 +43,11 @@ Bevor Code als "fertig" gilt, diese Punkte prüfen:
 - [ ] Barrel-Export in `index.ts` aktualisiert
 - [ ] API-Error-Format eingehalten (`{ code, message, timestamp }`)
 - [ ] Frontend `IApiClient`-Interface erweitert falls neuer Endpoint
+
+## CSS & Styling
+
+- [ ] Alle verwendeten CSS Custom Properties (`var(--token)`) existieren in `index.css`
+- [ ] Neue Farben als Token in `index.css` definiert (nicht hartcodiert in `App.css`)
+- [ ] Dark Mode: Token-Overrides in `:root[data-theme="dark"]` UND `@media (prefers-color-scheme: dark)` vorhanden
+- [ ] `appearance: none` + `disabled` → explizites `opacity: 1` gesetzt
+- [ ] Keine `overflow: hidden` auf Containern mit absolut positionierten Kindern (Dropdowns, Tooltips)

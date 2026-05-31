@@ -1041,6 +1041,107 @@
   margin-bottom: 4px;
 }
 
+/* Vault root entries in the explorer */
+.tree-node--vault > .tree-node-row--vault {
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 1px;
+}
+
+.tree-node-row--vault-selected {
+  background: var(--sidebar-active);
+}
+
+.tree-node-toggle--vault {
+  font-weight: 600;
+}
+
+.tree-node-name--vault {
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+}
+
+.tree-node-children--vault {
+  padding-left: 8px;
+}
+
+.tree-node--loading .tree-node-loading-text,
+.tree-node--empty .tree-node-empty-text {
+  color: var(--sidebar-text);
+  opacity: 0.5;
+  font-size: 12px;
+  padding: 4px 8px;
+  font-style: italic;
+}
+
+/* Vault status badges in explorer */
+.tree-node-row--vault .vault-status-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  opacity: 0.7;
+}
+
+.tree-node-row--vault .vault-status-icon--read { color: var(--warning); }
+.tree-node-row--vault .vault-status-icon--write { color: var(--accent); }
+.tree-node-row--vault .vault-status-icon--sync { color: var(--success); }
+.tree-node-row--vault .vault-status-icon--shared { color: var(--accent); }
+
+/* Create vault form in explorer */
+.file-explorer-create-vault {
+  padding: 6px 8px;
+  border-top: 1px solid var(--sidebar-border);
+  margin-top: 4px;
+}
+
+.file-explorer-create-vault-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.file-explorer-create-vault-input {
+  padding: 4px 8px;
+  border: 1px solid var(--sidebar-border);
+  border-radius: var(--radius-sm);
+  background: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  font-size: 12px;
+  outline: none;
+}
+
+.file-explorer-create-vault-input:focus {
+  border-color: var(--accent);
+}
+
+.file-explorer-create-vault-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.file-explorer-create-vault-submit,
+.file-explorer-create-vault-cancel {
+  padding: 2px 8px;
+  border: 1px solid var(--sidebar-border);
+  border-radius: var(--radius-sm);
+  background: var(--sidebar-hover);
+  color: var(--sidebar-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.file-explorer-create-vault-submit:hover,
+.file-explorer-create-vault-cancel:hover {
+  background: var(--sidebar-active);
+}
+
+.file-explorer-create-vault-error {
+  color: var(--danger);
+  font-size: 11px;
+  margin: 0;
+}
+
 /* ===== User Menu ===== */
 .user-menu {
   position: relative;
@@ -1947,8 +2048,48 @@
   font-size: 12px;
   margin: 4px 0;
 }
-.view-mode-task-item { list-style: none; display: flex; align-items: flex-start; gap: 6px; }
-.view-mode-task-item input[type="checkbox"] { margin-top: 3px; flex-shrink: 0; }
+.view-mode-task-item { list-style: none; display: flex; align-items: flex-start; gap: 8px; }
+.view-mode-task-item input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  margin-top: 4px;
+  flex-shrink: 0;
+  border: 2px solid var(--border-default);
+  border-radius: 3px;
+  background: var(--bg-elevated);
+  cursor: default;
+  position: relative;
+  opacity: 1;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.view-mode-task-item input[type="checkbox"]:disabled {
+  opacity: 1;
+}
+.view-mode-task-item input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.view-mode-task-item input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 9px;
+  border: solid var(--text-inverse);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.view-mode-task-item__content { flex: 1; min-width: 0; }
+.view-mode-task-item__content p { margin: 0; }
+.view-mode-task-item--checked .view-mode-task-item__content {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+.view-mode-task-list { list-style: none; padding-left: 0.4em; }
 
 /* ===== Auto-save status ===== */
 .edit-mode-status {
@@ -5436,6 +5577,26 @@
 .view-mode-embed-loading {
   color: var(--text-muted);
   font-style: italic;
+}
+
+.view-mode-embed--pdf {
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
+.view-mode-embed--pdf section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 500px;
+}
+
+.view-mode-embed--pdf object {
+  flex: 1;
+  width: 100%;
+  min-height: 500px;
+  border: none;
 }
 
 /* ─── MCP Tokens Page ─────────────────────────────────────────────────────── */

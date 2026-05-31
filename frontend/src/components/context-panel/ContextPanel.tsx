@@ -282,6 +282,26 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
     handleFileClick,
   ])
 
+  // ─── Single-Section Body Drop (split trigger) ───────────────────────────────
+
+  const handleBodyDragOver = useCallback((e: React.DragEvent) => {
+    // Only handle in single-section mode — allows dropping a tab onto the body to split
+    if (state.sections.length !== 1) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }, [state.sections.length])
+
+  const handleBodyDrop = useCallback((e: React.DragEvent) => {
+    // Only handle in single-section mode
+    if (state.sections.length !== 1) return
+    e.preventDefault()
+
+    const viewId = e.dataTransfer.getData('text/plain') as ContextPanelViewId
+    if (viewId && state.sections[0]?.viewIds.includes(viewId)) {
+      handleTabSplit(viewId)
+    }
+  }, [state.sections, handleTabSplit])
+
   // ─── Render ────────────────────────────────────────────────────────────────
 
   const isSingleSection = state.sections.length === 1
@@ -299,7 +319,12 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
           panelWidth={width}
         />
       )}
-      <div className="context-panel__body" ref={panelBodyRef}>
+      <div
+        className="context-panel__body"
+        ref={panelBodyRef}
+        onDragOver={handleBodyDragOver}
+        onDrop={handleBodyDrop}
+      >
         {isSingleSection && state.sections[0] ? (
           <div className="context-panel__single-view">
             {renderView(state.sections[0].activeViewId)}

@@ -195,7 +195,8 @@ export class VaultReader implements IVaultReader {
       // Still read the directory to get itemCount
       try {
         const entries = await fs.readdir(dirPath, { withFileTypes: true })
-        node.itemCount = entries.length
+        // Exclude internal files (starting with _) from the count
+        node.itemCount = entries.filter((e) => !(e.name.startsWith('_') && e.isFile())).length
       } catch {
         node.itemCount = 0
       }
@@ -205,11 +206,15 @@ export class VaultReader implements IVaultReader {
     const entries = await fs.readdir(dirPath, { withFileTypes: true })
     const children: DirectoryTree[] = []
 
-    // Separate directories and files
+    // Separate directories and files, filtering out internal Slatebase files
     const directories: { name: string; dirent: import('node:fs').Dirent }[] = []
     const files: { name: string; dirent: import('node:fs').Dirent }[] = []
 
     for (const entry of entries) {
+      // Skip internal files (e.g. _link-index.json)
+      if (entry.name.startsWith('_') && entry.isFile()) {
+        continue
+      }
       if (entry.isDirectory()) {
         directories.push({ name: entry.name, dirent: entry })
       } else if (entry.isFile()) {
@@ -255,7 +260,7 @@ export class VaultReader implements IVaultReader {
     }
 
     node.children = children
-    node.itemCount = entries.length
+    node.itemCount = children.length
 
     return node
   }

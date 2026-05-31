@@ -102,11 +102,11 @@ src/
 ├── App.tsx               — Root component, 3-panel layout, routing, resize
 ├── App.css               — Global styles (Design Tokens in index.css)
 ├── index.css             — CSS Custom Properties (Design Tokens, Dark Mode)
-├── types.ts              — Shared TypeScript interfaces (VaultInfo, DirectoryTree, etc.)
+├── types.ts              — Shared TypeScript interfaces (VaultInfo, DirectoryTree, AppState with vaultTrees, etc.)
 ├── api/index.ts          — ApiClient (IApiClient interface + fetch implementation)
 ├── plugins/
 │   ├── index.ts          — Barrel export (all plugins, types, utilities)
-│   ├── types.ts          — MDAST node types (WikilinkNode, EmbedNode, CalloutNode, TagNode)
+│   ├── types.ts          — MDAST node types (WikilinkNode, EmbedNode, CalloutNode, TagNode), IMAGE_EXTENSIONS, PDF_EXTENSIONS
 │   ├── link-resolver.ts  — Wikilink target resolution against DirectoryTree
 │   ├── heading-anchor.ts — Heading anchor generation + deduplication tracker
 │   ├── wikilink/
@@ -115,7 +115,7 @@ src/
 │   │   ├── plugin.ts     — remark plugin wrapper (remarkWikilink)
 │   │   └── extract.ts    — extractWikilinks() utility for knowledge graph
 │   ├── embed/
-│   │   ├── syntax.ts     — micromark tokenizer extension for ![[...|...]] syntax (with pipe separator for size/display)
+│   │   ├── syntax.ts     — micromark tokenizer extension for ![[...|...]] syntax (with pipe separator for size/display), detectEmbedType() (image/pdf/note)
 │   │   ├── mdast-util.ts — fromMarkdown + toMarkdown handlers (target, heading, display fields)
 │   │   └── plugin.ts     — remark plugin wrapper (remarkEmbed)
 │   ├── callout/
@@ -145,13 +145,13 @@ src/
 ├── components/
 │   ├── SlatebaseLogo.tsx — SVG logo component
 │   ├── SidebarToolbar.tsx — Draggable vertical toolbar
-│   ├── VaultList.tsx     — Vault selector/manager dropdown (with permission badges)
-│   ├── FileExplorer.tsx  — Directory tree navigation (Lucide icons)
+│   ├── VaultList.tsx     — Vault selector/manager dropdown (legacy, no longer rendered in App.tsx)
+│   ├── FileExplorer.tsx  — Unified multi-vault explorer (all vaults as expandable root entries, lazy-loading, DnD, context menu)
 │   ├── TabBar.tsx        — Horizontal tab strip (file tabs)
 │   ├── TabContent.tsx    — Tab content orchestrator (Edit/View/Binary)
 │   ├── EditMode.tsx      — Plain-text editor with toolbar + auto-save + read-only mode
 │   ├── ViewMode.tsx      — Markdown renderer (remark + highlight.js + Obsidian plugins)
-│   ├── BinaryViewer.tsx  — Binary file preview
+│   ├── BinaryViewer.tsx  — Binary file preview (images, PDF via PdfViewer, unsupported fallback)
 │   ├── LoginPage.tsx     — Login with logo + card design
 │   ├── ChangePasswordPage.tsx — Forced password change
 │   ├── ProfilePage.tsx   — User profile settings (card layout)
@@ -199,7 +199,7 @@ src/
 - **Composition root**: All dependencies wired in `backend/src/index.ts` (manual DI, no container)
 - **Interface-driven**: Each layer exposes an `I*` interface (IVaultReader, IVaultService, ILogger, etc.)
 - **Custom error classes**: Domain errors (VaultNotFoundError, PathTraversalError, etc.) mapped to HTTP status codes in the controller layer
-- **Frontend state**: Single reducer with discriminated union actions, async action creators that call ApiClient then dispatch
+- **Frontend state**: Single reducer with discriminated union actions, async action creators that call ApiClient then dispatch. Multi-vault trees cached in `vaultTrees: Record<string, DirectoryTree | null>` with lazy-loading on vault expand.
 - **Co-located tests**: Test files sit next to their source files (`*.test.ts` / `*.test.tsx`)
 
 ## API Routes

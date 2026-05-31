@@ -8,6 +8,8 @@ export const initialState: AppState = {
   vaults: [],
   selectedVaultId: null,
   directoryTree: null,
+  vaultTrees: {},
+  vaultTreesLoading: new Set(),
   selectedFile: null,
   loading: false,
   error: null,
@@ -49,8 +51,34 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         directoryTree: action.payload,
+        // Also update the per-vault tree if a vault is selected
+        vaultTrees: state.selectedVaultId
+          ? { ...state.vaultTrees, [state.selectedVaultId]: action.payload }
+          : state.vaultTrees,
+        vaultTreesLoading: state.selectedVaultId
+          ? new Set([...state.vaultTreesLoading].filter((id) => id !== state.selectedVaultId))
+          : state.vaultTreesLoading,
         loading: false,
       }
+    case 'VAULT_TREE_LOADED': {
+      const { vaultId, tree } = action.payload
+      const newLoading = new Set([...state.vaultTreesLoading].filter((id) => id !== vaultId))
+      return {
+        ...state,
+        vaultTrees: { ...state.vaultTrees, [vaultId]: tree },
+        vaultTreesLoading: newLoading,
+        // Also update the legacy directoryTree if this is the selected vault
+        directoryTree: state.selectedVaultId === vaultId ? tree : state.directoryTree,
+      }
+    }
+    case 'VAULT_TREE_LOADING': {
+      const newLoading = new Set(state.vaultTreesLoading)
+      newLoading.add(action.payload)
+      return {
+        ...state,
+        vaultTreesLoading: newLoading,
+      }
+    }
     case 'FILE_LOADED':
       return {
         ...state,
@@ -78,11 +106,13 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     case 'VAULT_DELETED': {
       const deletedId = action.payload
       const isSelectedDeleted = state.selectedVaultId === deletedId
+      const { [deletedId]: _removed, ...remainingTrees } = state.vaultTrees
       return {
         ...state,
         vaults: state.vaults.filter((v) => v.id !== deletedId),
         selectedVaultId: isSelectedDeleted ? null : state.selectedVaultId,
         directoryTree: isSelectedDeleted ? null : state.directoryTree,
+        vaultTrees: remainingTrees,
         selectedFile: isSelectedDeleted ? null : state.selectedFile,
         loading: false,
       }

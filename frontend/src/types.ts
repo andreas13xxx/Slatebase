@@ -73,6 +73,10 @@ export interface AppState {
   vaults: VaultInfo[]
   selectedVaultId: string | null
   directoryTree: DirectoryTree | null
+  /** Per-vault directory trees for the unified explorer view. */
+  vaultTrees: Record<string, DirectoryTree | null>
+  /** Vault IDs currently being loaded (tree fetch in progress). */
+  vaultTreesLoading: Set<string>
   selectedFile: FileContent | null
   loading: boolean
   error: AppError | null
@@ -162,6 +166,8 @@ export type AppAction =
   | { type: 'VAULT_SELECTED'; payload: string }
   | { type: 'VAULT_DESELECTED' }
   | { type: 'TREE_LOADED'; payload: DirectoryTree }
+  | { type: 'VAULT_TREE_LOADED'; payload: { vaultId: string; tree: DirectoryTree } }
+  | { type: 'VAULT_TREE_LOADING'; payload: string }
   | { type: 'FILE_LOADED'; payload: FileContent }
   | { type: 'LOADING_STARTED' }
   | { type: 'ERROR_OCCURRED'; payload: AppError }

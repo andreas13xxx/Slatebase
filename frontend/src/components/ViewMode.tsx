@@ -15,6 +15,7 @@ import type { DirectoryTree } from '../types'
 import { AppContext } from '../state'
 import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, createAnchorTracker } from '../plugins'
 import type { WikilinkNode, EmbedNode, CalloutNode, TagNode } from '../plugins'
+import { PdfViewer } from './BinaryViewer'
 
 /**
  * Mapping of callout types to their Lucide icon component and CSS color token.
@@ -636,7 +637,11 @@ function renderList(
   onTagClick?: (tag: string) => void
 ): ReactNode {
   const Tag = node.ordered ? 'ol' : 'ul'
+  const hasTaskItems = node.children.some(item => item.checked != null)
   const attrs: Record<string, unknown> = { key }
+  if (hasTaskItems) {
+    attrs.className = 'view-mode-task-list'
+  }
   if (node.ordered && node.start != null && node.start !== 1) {
     attrs.start = node.start
   }
@@ -646,7 +651,8 @@ function renderList(
 
     if (item.checked != null) {
       // Task list item — render with non-interactive checkbox
-      return createElement('li', { key: itemKey, className: 'view-mode-task-item' },
+      const liClassName = item.checked ? 'view-mode-task-item view-mode-task-item--checked' : 'view-mode-task-item'
+      return createElement('li', { key: itemKey, className: liClassName },
         createElement('input', {
           type: 'checkbox',
           checked: item.checked,
@@ -654,7 +660,9 @@ function renderList(
           readOnly: true,
           'aria-label': item.checked ? 'Erledigt' : 'Offen',
         }),
-        renderBlockNodes(item.children as RootContent[], vaultId, directoryTree, onInternalLinkClick, itemKey, token, anchorTracker, onTagClick)
+        createElement('span', { className: 'view-mode-task-item__content' },
+          renderBlockNodes(item.children as RootContent[], vaultId, directoryTree, onInternalLinkClick, itemKey, token, anchorTracker, onTagClick)
+        )
       )
     }
 
@@ -827,6 +835,13 @@ const IMAGE_EXTENSIONS = ['.png', '.jpeg', '.jpg', '.gif', '.avif', '.webp', '.s
 function isImageFile(filename: string): boolean {
   const lower = filename.toLowerCase()
   return IMAGE_EXTENSIONS.some(ext => lower.endsWith(ext))
+}
+
+/**
+ * Checks if a filename has a PDF extension.
+ */
+function isPdfFile(filename: string): boolean {
+  return filename.toLowerCase().endsWith('.pdf')
 }
 
 /**
@@ -1017,8 +1032,23 @@ function renderTextWithEmbeds(
             className: 'view-mode-image-not-found',
           }, `Bild nicht gefunden: ${filename}`))
         }
+      } else if (isPdfFile(filename)) {
+        const resolvedPath = findFileInTree(directoryTree, filename)
+
+        if (resolvedPath) {
+          const rawSrc = buildImageSrc(vaultId, resolvedPath, token)
+          parts.push(createElement('div', {
+            key: `${key}-embed-${matchStart}`,
+            className: 'view-mode-embed view-mode-embed--pdf',
+          }, createElement(PdfViewer, { rawSrc, fileName: filename })))
+        } else {
+          parts.push(createElement('span', {
+            key: `${key}-embed-${matchStart}`,
+            className: 'view-mode-embed view-mode-embed--missing',
+          }, `PDF nicht gefunden: ${filename}`))
+        }
       } else {
-        // Not an image embed — leave as-is
+        // Not an image or PDF embed — leave as-is
         parts.push(fullMatch)
       }
     } else {
@@ -1289,6 +1319,22 @@ function renderEmbedNode(
       key,
       className: 'view-mode-embed view-mode-embed--missing',
     }, `Bild nicht gefunden: ${node.target}`)
+  }
+
+  if (node.embedType === 'pdf') {
+    // Resolve PDF target in the directory tree
+    const resolvedPath = resolveWikilinkTarget(node.target, directoryTree)
+    if (resolvedPath) {
+      const rawSrc = buildImageSrc(vaultId, resolvedPath, token)
+      return createElement('div', {
+        key,
+        className: 'view-mode-embed view-mode-embed--pdf',
+      }, createElement(PdfViewer, { rawSrc, fileName: node.target }))
+    }
+    return createElement('span', {
+      key,
+      className: 'view-mode-embed view-mode-embed--missing',
+    }, `PDF nicht gefunden: ${node.target}`)
   }
 
   // Note embed — render as styled placeholder container

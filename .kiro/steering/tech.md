@@ -6,7 +6,7 @@ Monorepo with two independent packages: `backend/` and `frontend/`. No shared wo
 
 ## Backend
 
-- **Runtime**: Node.js ≥ 22 (uses native `--experimental-strip-types` for production)
+- **Runtime**: Node.js ≥ 22 (dev machine: v24.16.0; uses native `--experimental-strip-types` for local dev, `tsc` build for production/Docker)
 - **Language**: TypeScript (strict mode, ES2022 target, ESNext modules)
 - **Framework**: Hono (lightweight HTTP framework with `@hono/node-server`)
 - **Validation**: Zod (config schemas, request validation)

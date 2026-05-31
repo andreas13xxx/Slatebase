@@ -25,6 +25,7 @@ export const ServerConfigSchema = z.object({
   maxImportFileSize: z.number().int().positive().default(524288000),
   maxImportFiles: z.number().int().positive().default(500),
   maxImportDepth: z.number().int().positive().default(10),
+  trustedProxies: z.array(z.string()).default([]),
 })
 
 // --- Types ---
@@ -123,6 +124,14 @@ export class ConfigService implements IConfigService {
 
     if (process.env['SLATEBASE_MAX_IMPORT_DEPTH'] !== undefined) {
       overlay['maxImportDepth'] = Number(process.env['SLATEBASE_MAX_IMPORT_DEPTH'])
+    }
+
+    if (process.env['SLATEBASE_TRUSTED_PROXIES'] !== undefined) {
+      const proxies = process.env['SLATEBASE_TRUSTED_PROXIES']
+      overlay['trustedProxies'] = proxies
+        .split(',')
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0)
     }
 
     return overlay

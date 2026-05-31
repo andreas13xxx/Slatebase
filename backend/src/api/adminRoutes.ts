@@ -300,7 +300,7 @@ export class AdminController implements IAdminController {
         userId: session.userId,
         action: 'CONFIG_CHANGED' as AuditAction,
         target: 'server-config',
-        ipAddress: c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? 'unknown',
+        ipAddress: (c.get('clientIp') as string | undefined) ?? '0.0.0.0',
         success: true,
         details: JSON.stringify({ updatedFields: Object.keys(parsed.data) }),
       })
@@ -332,7 +332,7 @@ export class AdminController implements IAdminController {
         userId: session.userId,
         action: 'CONFIG_CHANGED' as AuditAction,
         target: 'server-restart',
-        ipAddress: c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? 'unknown',
+        ipAddress: (c.get('clientIp') as string | undefined) ?? '0.0.0.0',
         success: true,
         details: 'Graceful restart requested',
       })

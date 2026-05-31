@@ -5,7 +5,6 @@ import { AuthProvider, useAuthContext } from './state/authContext'
 import { TabProvider, useTabContext } from './state/tabContext'
 import { I18nProvider, useTranslation } from './i18n'
 import { ToastProvider } from './components/Toast'
-import { VaultList } from './components/VaultList'
 import { FileExplorer } from './components/FileExplorer'
 import { TabContent } from './components/TabContent'
 import { LoginPage } from './components/LoginPage'
@@ -342,7 +341,7 @@ function AppContent() {
     }
   }, [state.selectedVaultId])
 
-  // When selectedVaultId changes, fetch the vault tree and clear old tabs
+  // When selectedVaultId changes, update directoryTree from vaultTrees and clear old tabs
   useEffect(() => {
     const vaultId = state.selectedVaultId
     if (vaultId && vaultId !== prevVaultId.current) {
@@ -363,17 +362,27 @@ function AppContent() {
           })
         }
       }
-      dispatch({ type: 'LOADING_STARTED' })
-      apiClient.fetchVaultTree(vaultId).then(
-        (tree) => dispatch({ type: 'TREE_LOADED', payload: tree }),
-        (err) => {
-          const error =
-            err && typeof err === 'object' && 'code' in err && 'message' in err
-              ? { code: err.code as string, message: err.message as string }
-              : { code: 'INTERNAL_ERROR', message: t('vault.treeLoadError') }
-          dispatch({ type: 'ERROR_OCCURRED', payload: error })
-        },
-      )
+      // If the tree is already loaded in vaultTrees, use it
+      const existingTree = state.vaultTrees[vaultId]
+      if (existingTree) {
+        dispatch({ type: 'TREE_LOADED', payload: existingTree })
+      } else if (apiClient) {
+        // Fetch the tree
+        dispatch({ type: 'LOADING_STARTED' })
+        apiClient.fetchVaultTree(vaultId).then(
+          (tree) => {
+            dispatch({ type: 'TREE_LOADED', payload: tree })
+            dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree } })
+          },
+          (err) => {
+            const error =
+              err && typeof err === 'object' && 'code' in err && 'message' in err
+                ? { code: err.code as string, message: err.message as string }
+                : { code: 'INTERNAL_ERROR', message: t('vault.treeLoadError') }
+            dispatch({ type: 'ERROR_OCCURRED', payload: error })
+          },
+        )
+      }
     }
     prevVaultId.current = vaultId
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -558,16 +567,12 @@ function AppContent() {
 
               <div className="app-sidebar-body">
                 <div className="app-sidebar-section">
-                  <span className="app-sidebar-section-label">{t('vault.label')}</span>
-                  <VaultList onRegisterCreateVault={(trigger) => { createVaultTriggerRef.current = trigger }} />
+                  <span className="app-sidebar-section-label">{t('files.label')}</span>
+                  <FileExplorer
+                    onRegisterCreateFile={(trigger) => { createFileTriggerRef.current = trigger }}
+                    onRegisterCreateVault={(trigger) => { createVaultTriggerRef.current = trigger }}
+                  />
                 </div>
-
-                {state.selectedVaultId && (
-                  <div className="app-sidebar-section">
-                    <span className="app-sidebar-section-label">{t('files.label')}</span>
-                    <FileExplorer onRegisterCreateFile={(trigger) => { createFileTriggerRef.current = trigger }} />
-                  </div>
-                )}
               </div>
             </aside>
           )}

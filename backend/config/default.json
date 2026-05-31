@@ -13,6 +13,7 @@
   "maxImportFileSize": 524288000,
   "maxImportFiles": 500,
   "maxImportDepth": 10,
+  "trustedProxies": [],
   "mcp": {
     "enabled": true,
     "maxFileSize": 5242880,

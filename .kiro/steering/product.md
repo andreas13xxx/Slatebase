@@ -9,9 +9,9 @@ Slatebase is feature-complete for its core use case: multi-user Markdown vault m
 ### Implemented Features
 
 - **Multi-vault management** — Create, delete, import/export, switch between vaults
-- **File explorer** — Directory tree navigation with Lucide icons
+- **Unified file explorer** — All vaults displayed as expandable root entries in a single tree view, lazy-loading of vault contents, inline vault creation, permission badges, drag & drop within vaults
 - **Tabbed editor/viewer** — Multiple files open simultaneously, auto-save, View/Edit modes
-- **Markdown rendering** — GFM, syntax highlighting, frontmatter, collapsible headings, Obsidian-compatible (Wikilinks, Embeds with size/display, Callouts, Tags)
+- **Markdown rendering** — GFM, syntax highlighting, frontmatter, collapsible headings, Obsidian-compatible (Wikilinks, Embeds with size/display including inline PDF viewer, Callouts, Tags)
 - **Authentication** — Session-based auth (opaque tokens, argon2id, CSRF, rate limiting)
 - **Multi-user & sharing** — Granular read/write vault permissions, ownership transfer
 - **User chat** — Real-time messaging between users with unread badges, archiving, pagination
