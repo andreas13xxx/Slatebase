@@ -58,6 +58,54 @@ export const readFileParamsSchema = z.object({
   path: z.string().min(1, 'File path is required'),
 })
 
+/**
+ * Schema for validating `write_file` tool parameters.
+ * Content is the full file content (UTF-8 text).
+ * ifMatch is an optional ETag for conflict detection.
+ */
+export const writeFileParamsSchema = z.object({
+  vaultId: z.string().min(1, 'vaultId is required'),
+  path: z.string().min(1, 'File path is required'),
+  content: z.string(),
+  ifMatch: z.string().optional(),
+})
+
+/**
+ * Schema for validating `create_directory` tool parameters.
+ */
+export const createDirectoryParamsSchema = z.object({
+  vaultId: z.string().min(1, 'vaultId is required'),
+  path: z.string().min(1, 'Directory path is required'),
+})
+
+/**
+ * Schema for validating `delete_file` tool parameters.
+ */
+export const deleteFileParamsSchema = z.object({
+  vaultId: z.string().min(1, 'vaultId is required'),
+  path: z.string().min(1, 'Path to delete is required'),
+})
+
+/**
+ * Schema for validating `move_file` tool parameters.
+ */
+export const moveFileParamsSchema = z.object({
+  vaultId: z.string().min(1, 'vaultId is required'),
+  sourcePath: z.string().min(1, 'Source path is required'),
+  destinationPath: z.string().min(1, 'Destination path is required'),
+})
+
+/**
+ * Schema for validating `rename_file` tool parameters.
+ */
+export const renameFileParamsSchema = z.object({
+  vaultId: z.string().min(1, 'vaultId is required'),
+  path: z.string().min(1, 'Path of the file or folder to rename is required'),
+  newName: z.string()
+    .min(1, 'New name must not be empty')
+    .max(255, 'New name must not exceed 255 characters'),
+})
+
 // ─── Inferred Types ──────────────────────────────────────────────────────────
 
 export type CreateTokenInput = z.infer<typeof createTokenSchema>
@@ -65,3 +113,8 @@ export type VaultIdParam = z.infer<typeof vaultIdParamSchema>
 export type GetVaultStructureParams = z.infer<typeof getVaultStructureParamsSchema>
 export type SearchVaultParams = z.infer<typeof searchVaultParamsSchema>
 export type ReadFileParams = z.infer<typeof readFileParamsSchema>
+export type WriteFileParams = z.infer<typeof writeFileParamsSchema>
+export type CreateDirectoryParams = z.infer<typeof createDirectoryParamsSchema>
+export type DeleteFileParams = z.infer<typeof deleteFileParamsSchema>
+export type MoveFileParams = z.infer<typeof moveFileParamsSchema>
+export type RenameFileParams = z.infer<typeof renameFileParamsSchema>

@@ -155,6 +155,35 @@ All under `/api/v1`:
 | DELETE | /api/v1/mcp/tokens/:tokenId | Session + CSRF | Revoke a token |
 | GET | /.well-known/mcp.json | None | MCP discovery metadata |
 
+### MCP Tools (exposed via MCP protocol)
+
+| Tool | Access | Description |
+|------|--------|-------------|
+| `list_vaults` | Read | List accessible vaults with ID, name, permission, file count |
+| `get_vault_structure` | Read | Get directory tree of a vault as JSON |
+| `search_vault` | Read | Case-insensitive text search across vault files |
+| `read_file` | Read | Read content of a single text file |
+| `write_file` | Write | Create or overwrite a text file (supports ETag conflict detection) |
+| `create_directory` | Write | Create a directory (with intermediate dirs) |
+| `delete_file` | Write | Delete a file or folder recursively |
+| `move_file` | Write | Move a file or folder to a new location |
+| `rename_file` | Write | Rename a file or folder (stays in same directory) |
+
+### Plugins
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | /vaults/:vaultId/plugins | List installed plugins |
+| POST | /vaults/:vaultId/plugins | Upload/install plugin (ZIP multipart) |
+| GET | /vaults/:vaultId/plugins/registry | Load plugin registry |
+| PUT | /vaults/:vaultId/plugins/registry | Save plugin registry |
+| GET | /vaults/:vaultId/plugins/:pluginId | Get plugin manifest |
+| DELETE | /vaults/:vaultId/plugins/:pluginId | Uninstall plugin |
+| GET | /vaults/:vaultId/plugins/:pluginId/bundle | Download JS bundle |
+| GET | /vaults/:vaultId/plugins/:pluginId/styles | Download CSS styles |
+| GET | /vaults/:vaultId/plugins/:pluginId/settings | Load settings |
+| PUT | /vaults/:vaultId/plugins/:pluginId/settings | Save settings (max 1 MB) |
+
 ## Data Storage
 
 - Filesystem-based, no database
@@ -163,4 +192,5 @@ All under `/api/v1`:
 - Link index: `backend/data/vaults/<vaultId>/_link-index.json` (per-vault, auto-regenerated)
 - Sync data: `backend/data/sync/<vaultId>/` (config, checkpoint, conflicts, log)
 - MCP data: `backend/data/mcp/tokens/` (API tokens, per-user index)
+- Plugin data: `backend/data/plugins/<vaultId>/<pluginId>/` (manifest, bundle, styles, settings)
 - Config: `backend/config/default.json` + `SLATEBASE_*` env vars

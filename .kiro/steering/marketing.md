@@ -88,8 +88,10 @@ Die Collaboration-Features sind Slatebase's stärkstes Alleinstellungsmerkmal ge
 | **Multi-Session / Multi-Device** | Gleichzeitig auf Handy und Desktop — ohne Sync-Dienst |
 | **User-Suche mit Autocomplete** | Einfaches Teilen ohne E-Mail-Einladungen oder externe Accounts |
 | **CouchDB/LiveSync Vault-Synchronisation** | Bidirektional & Read-Only, Intervall-basiert, Konflikterkennung, E2E-Verschlüsselung — kompatibel mit obsidian-livesync |
+| **Obsidian Plugin Compatibility** | Obsidian Community Plugins direkt im Web-Frontend ausführen — keine Alternative unterstützt das (Obsidian Publish: kein Plugin-Support; Quartz/MkDocs: statisch, keine Runtime) |
 | **Knowledge Graph** | Interaktive Visualisierung der Vault-Verlinkungsstruktur — Obsidian Publish/Quartz haben keinen interaktiven Graph mit Zoom/Pan/Drag |
 | **Context Panel (Outline, Links, Tags, Properties)** | Obsidian Publish: kein Outline/Tags-Panel; Quartz: nur statisch. Slatebase: interaktiv, splittbar, Drag & Drop |
+| **MCP-Server mit Lese- UND Schreibzugriff** | AI-Assistenten (Claude, Cursor, etc.) können Vaults durchsuchen, Dateien erstellen/bearbeiten/löschen/verschieben — keine Alternative bietet das |
 
 ### Messaging für Posts & Content
 
@@ -116,4 +118,4 @@ Die Collaboration-Features sind Slatebase's stärkstes Alleinstellungsmerkmal ge
 4. **"Teile Wissen, nicht Accounts."** — Multi-User mit granularen Rechten
 5. **"Zusammenarbeiten, nicht nur speichern."** — Built-in Chat, Vault-Sharing, Echtzeit-Kollaboration ohne dritte App
 6. **"Sync mit CouchDB/LiveSync — bidirektional, verschlüsselt, konfliktfrei."** — Nahtlose Integration mit obsidian-livesync
-7. **"AI-ready: MCP-Integration für deine Wissensbasis."** — Zukunfts-Feature als Differenzierung
+7. **"AI-ready: MCP-Integration für deine Wissensbasis."** — Lesen UND Schreiben via MCP — AI-Assistenten können Vaults durchsuchen, Dateien erstellen, bearbeiten und organisieren

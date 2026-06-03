@@ -13,7 +13,7 @@ import type { Plugin } from 'unified'
 import type { Root, RootContent, PhrasingContent, AlignType } from 'mdast'
 import type { DirectoryTree } from '../types'
 import { AppContext } from '../state'
-import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, createAnchorTracker } from '../plugins'
+import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, remarkBreaks, createAnchorTracker } from '../plugins'
 import type { WikilinkNode, EmbedNode, CalloutNode, TagNode } from '../plugins'
 import { PdfViewer } from './BinaryViewer'
 
@@ -108,7 +108,46 @@ const OBSIDIAN_PLUGINS: Array<Plugin<[], Root>> = [
   remarkEmbed,
   remarkCallout,
   remarkTag,
+  remarkBreaks,
 ]
+
+/**
+ * Pre-processes Markdown content to preserve tab indentation that would
+ * otherwise be stripped by the Markdown parser. Replaces leading tabs with
+ * non-breaking spaces (U+00A0) outside of fenced code blocks.
+ * This matches Obsidian's behavior where tabs create visible indentation.
+ */
+function preserveTabIndentation(content: string): string {
+  const lines = content.split('\n')
+  const result: string[] = []
+  let inFencedBlock = false
+
+  for (const line of lines) {
+    // Detect fenced code block boundaries
+    if (/^(`{3,}|~{3,})/.test(line.trimStart())) {
+      inFencedBlock = !inFencedBlock
+      result.push(line)
+      continue
+    }
+
+    if (inFencedBlock) {
+      result.push(line)
+      continue
+    }
+
+    // Replace leading tabs with 4 non-breaking spaces each (outside code blocks)
+    const match = line.match(/^(\t+)/)
+    if (match) {
+      const tabCount = match[1]!.length
+      const indent = '\u00A0\u00A0\u00A0\u00A0'.repeat(tabCount)
+      result.push(indent + line.slice(tabCount))
+    } else {
+      result.push(line)
+    }
+  }
+
+  return result.join('\n')
+}
 
 /**
  * Creates a unified pipeline with graceful degradation.
@@ -116,11 +155,13 @@ const OBSIDIAN_PLUGINS: Array<Plugin<[], Root>> = [
  * it is skipped and the remaining plugins continue to function.
  *
  * The pipeline uses `.parse()` followed by `.runSync()` to execute both
- * micromark-based plugins (wikilink, embed, tag) and MDAST transformers (callout).
+ * micromark-based plugins (wikilink, embed, tag) and MDAST transformers (callout, breaks).
  *
  * Validates: Requirements 11.5, 11.6
  */
 function createSafePipeline(content: string): Root {
+  const preprocessed = preserveTabIndentation(content)
+
   let pipeline = unified()
     .use(remarkParse)
     .use(remarkFrontmatter, ['yaml'])
@@ -135,8 +176,8 @@ function createSafePipeline(content: string): Root {
   }
 
   try {
-    const tree = pipeline.parse(content)
-    // runSync executes transformers (e.g., remarkCallout) on the parsed tree
+    const tree = pipeline.parse(preprocessed)
+    // runSync executes transformers (e.g., remarkCallout, remarkBreaks) on the parsed tree
     return pipeline.runSync(tree) as Root
   } catch (err) {
     console.warn('Pipeline parse/run failed, falling back to base pipeline:', err)
@@ -145,7 +186,7 @@ function createSafePipeline(content: string): Root {
       .use(remarkParse)
       .use(remarkFrontmatter, ['yaml'])
       .use(remarkGfm)
-      .parse(content)
+      .parse(preprocessed)
   }
 }
 

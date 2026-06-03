@@ -88,7 +88,7 @@ export class McpServerFactory implements IMcpServerFactory {
     // Register resource handlers (vault directory trees, file reads)
     this.handlers.register(server)
 
-    // Register tool handlers (list_vaults, get_vault_structure, search_vault, read_file)
+    // Register tool handlers (list_vaults, get_vault_structure, search_vault, read_file, write_file, create_directory, delete_file, move_file, rename_file)
     registerToolHandlers(server, this.toolHandlerDeps)
 
     this.logger.debug('McpServer instance created', { name: SERVER_NAME, version: SERVER_VERSION })

@@ -54,6 +54,8 @@ import { createMcpTokenRoutes } from './api/mcpTokenRoutes.js'
 import { createMcpWellKnownHandler } from './api/mcpWellKnownRoute.js'
 import { LinkIndexService } from './link-index/index.js'
 import { createGraphRoutes } from './api/graphRoutes.js'
+import { PluginStore, PluginInstaller } from './plugin/index.js'
+import { createPluginRoutes } from './api/pluginRoutes.js'
 
 // --- Composition Root ---
 
@@ -224,6 +226,10 @@ if (mcpConfig.enabled) {
 // 4d. Link Index Module (per-vault instances)
 const linkIndexMap = new Map<string, LinkIndexService>()
 
+// 4e. Plugin Module
+const pluginStore = new PluginStore(serverConfig.dataDir)
+const pluginInstaller = new PluginInstaller(pluginStore)
+
 /**
  * Returns the LinkIndexService instance for a given vault, or undefined if not found.
  */
@@ -303,6 +309,16 @@ if (mcpConfig.enabled && mcpRoutes !== undefined && mcpTokenRoutes !== undefined
 }
 app.get('/.well-known/mcp.json', createMcpWellKnownHandler(mcpConfig))
 
+// Plugin route registration (auth middleware applies via /api/v1/* pattern)
+const pluginRoutes = createPluginRoutes({
+  pluginStore,
+  pluginInstaller,
+  accessControl: vaultAccessControl,
+  vaultRegistry,
+  logger,
+})
+app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)
+
 // --- Initialize & Start Server ---
 
 // Load session index from filesystem
@@ -375,6 +391,20 @@ vaultController.setLinkIndexHook({
           })
       }
     }
+  },
+})
+
+// Set up vault deletion hook for resource cleanup (plugin data, link index)
+vaultController.setVaultDeletionHook({
+  onVaultDeleted(vaultId: string): void {
+    // Clean up plugin data for the deleted vault (fire-and-forget)
+    pluginStore.deleteAllForVault(vaultId).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error)
+      logger.error('Plugin cleanup failed after vault deletion', { vaultId, error: message })
+    })
+
+    // Clean up link index for the deleted vault
+    linkIndexMap.delete(vaultId)
   },
 })
 

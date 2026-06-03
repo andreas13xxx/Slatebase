@@ -350,6 +350,11 @@ export interface IMcpHandlers {
 - `get_vault_structure` — Get directory tree for a vault
 - `search_vault` — Full-text search across vault files
 - `read_file` — Read a single file's content
+- `write_file` — Create or overwrite a text file (with optional ETag conflict detection)
+- `create_directory` — Create a directory (with intermediate directories)
+- `delete_file` — Delete a file or folder recursively
+- `move_file` — Move a file or folder to a new location within the vault
+- `rename_file` — Rename a file or folder (stays in same directory)
 
 ### 7. Server Factory (`server-factory.ts`)
 
@@ -477,6 +482,11 @@ New environment variables:
 | `get_vault_structure` | `vaultId: string` | Directory tree JSON |
 | `search_vault` | `vaultId: string, query: string, maxResults?: number` | Array of `{ path, name, snippet }` |
 | `read_file` | `vaultId: string, path: string` | File content as text |
+| `write_file` | `vaultId: string, path: string, content: string, ifMatch?: string` | `{ path, name, size, etag, message }` |
+| `create_directory` | `vaultId: string, path: string` | `{ path, message }` |
+| `delete_file` | `vaultId: string, path: string` | `{ path, message }` |
+| `move_file` | `vaultId: string, sourcePath: string, destinationPath: string` | `{ sourcePath, newPath, message }` |
+| `rename_file` | `vaultId: string, path: string, newName: string` | `{ oldPath, newPath, message }` |
 
 ## Data Flow
 
@@ -628,9 +638,9 @@ The SDK provides `McpServer`, `StreamableHTTPServerTransport` (or `WebStandardSt
 
 ### Property 7: Read-only permission blocks write operations
 
-*For any* vault where the authenticated user has only read permission, all write operations (if any are exposed as MCP tools in the future) SHALL be rejected with MCP error code -32001.
+*For any* vault where the authenticated user has only read permission, all write operations (`write_file`, `create_directory`, `delete_file`, `move_file`, `rename_file`) SHALL be rejected with MCP error code -32001.
 
-**Validates: Requirements 3.2**
+**Validates: Requirements 3.2, 8b.12**
 
 ### Property 8: File read round-trip preserves content
 
@@ -733,6 +743,8 @@ The SDK provides `McpServer`, `StreamableHTTPServerTransport` (or `WebStandardSt
 | Business | Resource not found | MCP error -32002 |
 | Business | Binary file / invalid path | MCP error -32003 |
 | Business | File too large | MCP error -32004 |
+| Business | Conflict (ETag mismatch / file exists) | MCP error -32005 |
+| Business | Storage error (write failure) | MCP error -32006 |
 | Internal | Unexpected error | JSON-RPC -32603 (no details) |
 
 ### Error Response Format

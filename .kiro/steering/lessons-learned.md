@@ -125,12 +125,20 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - Cleanup in `afterAll` (nicht `afterEach` — Performance)
 - Separate Datei: `integration.test.ts`
 
-### Property-Based Tests (PBT) — Ausführung
-- PBT-Tests (`*.pbt.test.ts`) werden während der Entwicklung **nur auf explizite Anforderung** oder wenn zwingend notwendig ausgeführt
-- Grund: PBT-Tests sind rechenintensiv (viele Iterationen, große Eingaben) und verlangsamen den Entwicklungszyklus erheblich
-- Bei Checkpoints und CI: reguläre Unit-/Integrationstests reichen aus (`npm run test`)
-- PBT-Tests gezielt ausführen: `npx vitest --run <datei>.pbt.test.ts`
-- **Regel:** Kein automatisches Ausführen von PBT-Tests bei Checkpoints, Code-Änderungen oder allgemeinen Test-Läufen — nur wenn der Nutzer es explizit verlangt oder ein PBT-Test gerade geschrieben/gefixt wird
+### Property-Based Tests (PBT) — Entfernt (Entscheidung Juni 2026)
+- PBT-Tests wurden aus dem Projekt entfernt (chat + plugin-compat Specs)
+- **Grund:** Unverhältnismäßiger Aufwand für den Mehrwert in diesem Projektkontext
+  - PBT-Tests sind rechenintensiv (viele Iterationen, große Eingaben) und verlangsamen den Entwicklungszyklus
+  - Die Implementierungen haben bereits co-located Unit Tests die alle Requirements abdecken
+  - fast-check-basierte Tests waren oft redundant zu den handgeschriebenen Unit Tests
+  - Der Wartungsaufwand für PBT-Tests bei API-Änderungen ist hoch
+- **Gelöschte Dateien:**
+  - `backend/src/chat/chat.pbt.test.ts` (Properties 1–8: Session, Message, Access Control)
+  - `backend/src/chat/chat-validation.pbt.test.ts` (Properties 9–16: Filtering, Rate Limiter, Validation)
+  - Alle PBT-Tasks aus `obsidian-plugin-compat` tasks.md (18 Tasks entfernt)
+- **Was bleibt:** Reguläre Unit Tests (`*.test.ts`) und Integration Tests decken alle Anforderungen ab
+- **Regel:** Keine neuen PBT-Tests schreiben. Stattdessen gründliche Unit Tests mit Edge Cases.
+- **Ausnahme:** Falls ein Bug auftritt der nur durch randomisierte Eingaben reproduzierbar ist, kann ein gezielter PBT-Test geschrieben werden
 
 ## Filesystem & Persistenz
 
@@ -630,6 +638,23 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - Im Docker-Container muss der Server auf `0.0.0.0` lauschen, sonst ist er von außen (auch vom Nginx-Container) nicht erreichbar
 - `docker.env` setzt `SLATEBASE_HOST=0.0.0.0`
 
+### Reverse Proxy: Trusted Proxies für echte Client-IPs
+- Ohne `SLATEBASE_TRUSTED_PROXIES` ignoriert das Backend `X-Forwarded-For` komplett → Audit-Log zeigt die Docker-interne Proxy-IP
+- `createClientIpMiddleware` in `src/api/client-ip.ts` setzt `c.set('clientIp', ip)` für alle Handler
+- Middleware wird VOR Auth-Middleware registriert (auch Login-Requests bekommen die echte IP)
+- Logik: Socket-IP via `getConnInfo` (aus `@hono/node-server/conninfo`) → prüfe ob in `trustedProxies` → wenn ja: `X-Forwarded-For` leftmost IP, sonst Socket-IP
+- CIDR-Matching für Subnet-Ranges (z.B. `172.19.0.0/16` für ein Docker-Netzwerk)
+- IPv6-Loopback `::1` wird automatisch auf `127.0.0.1` normalisiert
+- Wildcard `*` vertraut allen Verbindungen — nur für Debugging, nicht für Production
+- **Regel:** Bei Docker-Setups mit externem Reverse Proxy (NPM, Traefik, Caddy) immer das Proxy-Netzwerk-Subnet als `SLATEBASE_TRUSTED_PROXIES` setzen
+- **Subnet ermitteln:** `docker network inspect <netzwerk-name> --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}'`
+
+### Reverse Proxy: Frontend-Port nur intern exponieren
+- Wenn ein externer Reverse Proxy (NPM) den Traffic weiterleitet, braucht der Frontend-Container keinen nach außen offenen Port
+- `ports: - "8080:80"` → `expose: - "80"` (nur Docker-intern sichtbar)
+- Verhindert unverschlüsselten Zugriff am Proxy vorbei
+- **Regel:** In Production mit Reverse Proxy niemals den Frontend-Port direkt nach außen exponieren
+
 ## i18n-Typsystem
 
 ### `typeof de` erzeugt literale String-Typen
@@ -781,6 +806,14 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - Öffentlich zugänglich (keine Auth) — ermöglicht Auto-Discovery durch MCP-Clients
 - Gibt 404 zurück wenn MCP deaktiviert ist
 - Registriert außerhalb der `/api/v1/*` Middleware-Chain
+
+### MCP Write Tools (Schreibzugriff)
+- 5 Write-Tools ergänzen die 4 Read-Tools: `write_file`, `create_directory`, `delete_file`, `move_file`, `rename_file`
+- Alle Write-Tools prüfen `checkWriteAccess()` — nur Vault-Besitzer und Benutzer mit Write-Share haben Zugriff
+- Delegieren an bestehende `VaultService`-Methoden (kein duplizierter Code)
+- `write_file` unterstützt optionalen `ifMatch`-Parameter für ETag-basierte Konflikterkennung
+- Fehler-Mapping: Domain-Errors → MCP-Error-Codes (`-32005` Conflict, `-32006` Storage, `-32001` Access Denied, etc.)
+- **Regel:** Neue MCP-Tools immer über die Business-Schicht (`VaultService`) implementieren, nie direkt auf das Filesystem zugreifen
 
 
 ## Obsidian Markdown Kompatibilität
@@ -1092,3 +1125,169 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - `renderTextWithEmbeds()` — Fallback-Regex für `![[...]]`-Syntax in Text-Nodes (wenn Parser sie nicht als Embed erkennt)
 - **Beide** müssen bei neuen Embed-Typen aktualisiert werden
 - **Regel:** Bei Änderungen an der Embed-Logik immer BEIDE Funktionen synchron halten
+
+
+## Obsidian Plugin Compatibility Layer
+
+### Architektur: Proxy-basiertes API-Shimming statt vollständiger Emulation
+- ES6 `Proxy`-Objekte auf den Shim-Layern (AppShim) ermöglichen automatische Erkennung nicht-emulierter API-Zugriffe
+- Proxy gibt `undefined` zurück (Properties) oder No-Op-Funktion (Methods) und loggt einmal pro Property pro Plugin eine Warnung
+- **Vorteil:** Neues Plugin verwendet unbekannte API → statt Crash wird graceful degraded mit Konsolenwarnung
+- **Vorteil:** Kein manuelles Pflegen einer "Null-Return-Map" für hunderte Obsidian-API-Methods nötig
+
+### Architektur: Kein Web Worker für Sandboxing
+- Obsidian-Plugins erwarten **synchronen DOM-Zugriff** (`document.createElement`, direkte DOM-Manipulation)
+- Web Workers haben keinen DOM-Zugang → wäre API-inkompatibel
+- Stattdessen: Proxy-basierter Sandbox mit API-Interception und Main-Thread-Blocking-Monitoring
+- **Trade-off:** Weniger echte Isolation, aber volle API-Kompatibilität
+- **Schutzmaßnahmen:** Vault-Isolation (kein Cross-Vault), Storage-Namespace-Prefix, Network-Allowlist, Auto-Deaktivierung bei >5s Blocking
+
+### Architektur: Vault-scoped Plugin-Instanzen
+- Jedes Plugin bekommt **pro Vault** eine eigene AppShim-Instanz
+- Bei Vault-Wechsel: `onunload()` aller Plugins → Cleanup → neue Instanzen → `onload()`
+- WorkspaceShim und MetadataCacheShim sind **shared** innerhalb eines Vaults (alle Plugins eines Vaults empfangen die gleichen Events)
+- VaultShim ist pro Plugin (mit Vault-ID-Bindung für Isolation)
+
+### Architektur: Emulierte API-Version als Gate
+- Feste emulierte Obsidian-API-Version: `1.4.0`
+- Plugins mit höherer `minAppVersion` werden als inkompatibel markiert (nicht geladen)
+- Ermöglicht kontrollierte Erweiterung: neue API-Methods hinzufügen → Version hochsetzen
+
+### Plugin-Loader: Post-FCP Loading
+- Plugin-Bundles werden erst **nach First Contentful Paint** geladen (`requestIdleCallback` mit 2s timeout, `setTimeout(50)` Fallback)
+- Verhindert dass Plugin-Evaluation die initiale Seitenlade-Performance beeinträchtigt
+- Max 50ms FCP-Delay laut Requirement — durch asynchrones Laden nach Paint trivial eingehalten
+
+### Plugin-Loader: onPluginInstantiated Hook
+- `PluginLoaderDeps.onPluginInstantiated(pluginId, instance)` wird **nach Instanziierung, vor `onload()`** aufgerufen
+- Ermöglicht Wiring von `addCommand`, `registerEvent`, etc. auf die shared Registries
+- Im PluginProvider: `instance.addCommand = (command) => commandRegistry.addCommand(pluginId, command)`
+- **Regel:** Neue Plugin-API-Methoden die auf shared Infrastruktur zugreifen, hier wiren
+
+### Plugin-Installer: adm-zip für ZIP-Verarbeitung
+- `adm-zip` (nicht `jszip`) im Backend — synchrone API, gut für serverseitige Einmal-Extraktion
+- `jszip` bleibt ausschließlich im Frontend (Vault-Export)
+- **Grund:** `adm-zip` hat bessere Node.js-Buffer-Integration und braucht kein async/await für einfache Extraktion
+
+### Plugin-Installer: Zwei ZIP-Layouts unterstützt
+- **Root-Layout:** `manifest.json` + `main.js` direkt im ZIP-Root
+- **Subdirectory-Layout:** Ein einziges Unterverzeichnis enthält `manifest.json` + `main.js`
+- Beide werden automatisch erkannt (Root wird zuerst geprüft)
+- **Hintergrund:** Obsidian-Plugins werden oft als GitHub-Release-ZIP heruntergeladen (mit Ordner-Wrapper)
+
+### Plugin-Installer: Version-Upgrade bewahrt data.json
+- `savePlugin(vaultId, pluginId, files)` schreibt nur `manifest.json`, `main.js`, `styles.css`
+- `data.json` (Plugin-Settings) wird NIE von `savePlugin` überschrieben
+- **Design-Entscheidung:** Settings-Persistenz ist unabhängig vom Bundle-Upgrade
+
+### Plugin-Installer: Bundle-Integrity-Check ist String-basiert
+- Einfacher `String.includes()` Check auf `eval(`, `new Function(`, `document.write(`
+- Kein AST-Parsing — bewusste Trade-off-Entscheidung:
+  - False Positives möglich (z.B. `// eval(` in Kommentar) — akzeptabel als konservative Heuristik
+  - False Negatives bei Obfuskation — akzeptabel da Sandbox als zweite Schutzschicht
+- **Regel:** Bei Bedarf auf AST-basiertes Scanning upgraden (z.B. mit `acorn`)
+
+### Vault Deletion Hook: Generischer Mechanismus
+- `VaultController.setVaultDeletionHook({ onVaultDeleted(vaultId) })` — nicht Plugin-spezifisch
+- Wird für Plugin-Cleanup UND Link-Index-Cleanup verwendet
+- Fire-and-forget (`.catch()`) — Vault-Löschung wartet nicht auf Cleanup
+- **Regel:** Neue Module die Vault-scoped-Daten speichern, ebenfalls in den Hook einhängen
+
+### Event Bridge: Tab-State → Plugin-Events
+- `usePluginEventBridge()` Hook sitzt **im PluginProvider** (nicht als separate Komponente)
+- Erkennt Tab-Wechsel → `workspaceShim.setActiveFile(tFile)` → emittiert `file-open` + `active-leaf-change`
+- Erkennt File-Save (content geändert + editBuffer===null) → `metadataCacheShim.trigger('changed', tFile, {})`
+- Erkennt initiales Tree-Load → `metadataCacheShim.trigger('resolved')` (einmalig pro Vault)
+- **Binary/Graph-Tabs:** Werden als `null` activeFile behandelt (Requirement 6.2)
+
+### Command Palette: Custom Event statt direkter State-Kopplung
+- `PluginProvider` dispatcht `window.dispatchEvent(new CustomEvent('slatebase:open-command-palette'))` bei Ctrl+P/Cmd+P
+- `CommandPaletteContainer` hört auf dieses Event → setzt `isOpen(true)`
+- **Vorteil:** Keine direkte Kopplung zwischen Provider und UI-Komponente
+- **Vorteil:** Command Palette kann auch von anderen Stellen geöffnet werden (z.B. Button)
+
+### CSS Injection: Selector-Scoping mit Prefix
+- Alle CSS-Selektoren werden mit `[data-plugin-id="<pluginId>"]` prefixed
+- Verhindert CSS-Leaking zwischen Plugins und in die Hauptanwendung
+- Browser ignoriert ungültiges CSS automatisch — trotzdem wird eine `console.warn` ausgegeben
+- Max 512 KB pro `styles.css` — darüber wird nicht injiziert
+
+### PluginRegistry: Zwei Interfaces für zwei Schichten
+- `IRegistryApiClient` — minimales Interface für Backend-Kommunikation (loadRegistry/saveRegistry)
+- `PluginRegistry` — Frontend-Klasse die den In-Memory-State verwaltet und bei Änderungen persisted
+- Adapter-Pattern im PluginProvider: `createRegistryApiAdapter(apiClient)` konvertiert `IApiClient` → `IRegistryApiClient`
+- **Grund:** Entkopplung von der großen IApiClient-Schnittstelle — Tests brauchen nur das schmale Interface
+
+### Frontend API Client: Plugin-Endpoints folgen bestehendem Pattern
+- 10 neue Methoden auf `IApiClient` + `ApiClient` (list, upload, get, delete, bundle, styles, settings R/W, registry R/W)
+- `loadBundle` und `loadStyles` geben **raw text** zurück (kein JSON-Parse) — spezielles `response.text()` Handling
+- `loadStyles` gibt `null` bei 404 zurück (Plugin hat optional keine styles.css)
+- `uploadPlugin` verwendet `FormData` ohne manuellen Content-Type-Header (Browser setzt Boundary)
+- **Regel:** Neue Endpoints die Nicht-JSON zurückgeben → eigene fetch-Logik statt `this.request<T>()`
+
+### Compatibility Analyzer: Statische Pattern-Erkennung
+- Regex-basiertes Pattern-Matching auf API-Zugriffsmuster im Bundle-Source
+- Erkennt: `this.app.vault.*`, `this.app.workspace.*`, `this.app.metadataCache.*`, etc.
+- Klassifiziert jeden Zugriff als `supported`/`partial`/`unsupported`
+- Berechnet Gesamt-Level: `full`/`partial`/`unsupported`/`unknown`
+- Max 10 Sekunden Analyse-Zeit — bei Timeout oder Fehler → `unknown`
+- **Limitation:** Obfuskierter Code → `unknown` (kein Versuch der Deobfuskation)
+
+### Plugin Management UI: Optimistisches Toggle
+- Toggle-Switch ändert sofort den lokalen State (optimistic update)
+- Bei Backend-Fehler: Rollback auf vorherigen Zustand
+- Verhindert UI-Flackern bei schnellen Klicks
+- **Pattern:** Set toggling → optimistic update → API call → on error rollback → clear toggling
+
+### Bekannte Limitierung: Kein Plugin-Hot-Reload
+- Plugin-Activation startet `onload()` immer von vorn — kein HMR
+- Bei Code-Änderung: Deaktivieren → Neues ZIP hochladen → Aktivieren
+- **Akzeptabel:** Obsidian selbst macht es genauso (Community Plugins brauchen Restart)
+
+### Test-Abdeckung: 371 Tests im Compat-Verzeichnis
+- EventSystem, ManifestParser, VaultShim, WorkspaceShim, MetadataCacheShim, AppShim, Sandbox
+- PluginLoader, PluginRegistry, SettingsManager, CommandRegistry, CSSInjector, CompatibilityAnalyzer
+- PluginEventBridge (12 Tests), CommandPalette (25 Tests)
+- Backend: PluginStore (24), PluginInstaller (26), PluginRoutes (50)
+- **Gesamtzahl nach Implementierung:** 990 Backend + 1027 Frontend = 2017 Tests
+
+## Obsidian Plugin Compat: Implementierungs-Fortschritt (Juni 2026)
+
+### Fertiggestellte Komponenten (Frontend)
+- **Types & Errors** — TFile, TFolder, CachedMetadata, PluginManifest, PluginRegistryEntry, alle Error-Klassen
+- **EventSystem** — on/off/trigger/offref/removeAllListeners, Snapshot-Iteration, Exception-Isolation
+- **ManifestParser** — Zod-Validierung, Semver-Vergleich, Round-Trip-Kompatibilität, Größenlimit
+- **VaultShim** — read/modify/create/delete über IApiClient, Event-Emission, Path-Traversal-Schutz
+- **WorkspaceShim** — getActiveFile, file-open/active-leaf-change Events, Proxy für Non-Emulated-Methoden
+- **MetadataCacheShim** — getFileCache, getFirstLinkpathDest, resolvedLinks, changed/resolved Events
+- **AppShim** — Proxy-basiert, vault/workspace/metadataCache/plugins Properties, Warning-once-per-property
+- **PluginSandbox** — Vault-Isolation, Storage-Namespace, Network-Allowlist, Blocking-Detection, Resource-Cleanup
+- **PluginLoader** — Blob-URL-Evaluation, onload-Timeout (10s), Deaktivierung mit Cleanup, loadAllActive
+- **PluginRegistry** — Frontend-State, Backend-Persistenz, Deny-by-Default-Permissions
+- **SettingsManager** — loadData/saveData mit 1MB-Limit, Circular-Ref-Erkennung, per-Plugin-per-Vault-Isolation
+- **CommandRegistry** — Namespaced IDs, Case-Insensitive-Suche, Hotkey-Konflikt-Erkennung, Exception-Handling
+- **CommandPalette** — Ctrl+P Modal, Keyboard-Navigation, ARIA-Accessible, max 50 Results
+- **CSSInjector** — Scoped Selectors, data-plugin-id Attribut, @keyframes/@font-face unverändert, 512KB-Limit
+- **CompatibilityAnalyzer** — Regex-basierte API-Erkennung, Klassifizierung, Timeout-Schutz
+
+### Fertiggestellte Komponenten (Backend)
+- **PluginStore** — Filesystem-Persistenz, atomare Writes, per-Vault-per-Plugin-Verzeichnisse
+- **Error-Klassen** — PluginNotFoundError, PluginFileTooLargeError, PluginSettingsTooLargeError
+- **Validation** — Zod-Schemas für Manifest, Settings, Registry, Upload-Constraints
+
+### Noch offene Tasks
+- Backend Plugin API Routes (CRUD + Upload)
+- ZIP Upload Processing (Extraktion, Integrity-Check, Version-Upgrade)
+- Composition-Root-Integration (PluginStore + Routes registrieren)
+- Frontend IApiClient Extension (Plugin-Endpoints hinzufügen)
+- Plugin Management UI (Verwaltungsseite + Upload)
+- PluginProvider + App-Wiring (Context, Keyboard-Shortcuts, Event-Bridge)
+
+### Architektur-Entscheidungen im Plugin Compat Layer
+- **ES6 Proxy für API Shimming** — statt manueller Methoden-Implementierung. Proxy fängt alle Zugriffe ab, erlaubt automatische Detection nicht-emulierter APIs, einmaliges Warning pro Property
+- **Kein Web Worker für Sandboxing** — Obsidian-Plugins erwarten synchronen DOM-Zugriff, Web Workers haben keinen DOM-Zugang. Stattdessen Proxy-basierter Ansatz mit API-Interception
+- **Blob URL + dynamic import() für Bundle-Evaluation** — Browser-kompatibel, ermöglicht ES-Module-Syntax in Plugins, mit injectable BundleEvaluator für Tests
+- **Emulierte Version: 1.4.0** — Fixe API-Version, Plugins mit höherer minAppVersion werden als inkompatibel markiert
+- **Vault-scoped Plugin-Instanzen** — Jedes Plugin bekommt pro Vault eine eigene AppShim-Instanz. Bei Vault-Wechsel: onunload → onload mit neuem Kontext
+- **CSS Scoping via Attribut-Selektor** — `[data-plugin-id="<id>"]` Prefix auf allen Selektoren, keine Shadow-DOM-Isolation (wäre zu restriktiv für bestehende Plugins)
+- **Zod für Backend UND Frontend Manifest-Validierung** — Gleiche Schema-Definition, konsistente Fehlermeldungen

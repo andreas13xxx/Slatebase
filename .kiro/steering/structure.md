@@ -41,6 +41,8 @@ src/
 │   ├── mcpTokenRoutes.ts — MCP token CRUD routes (session auth)
 │   ├── mcpWellKnownRoute.ts — .well-known/mcp.json discovery endpoint (public)
 │   ├── graphRoutes.ts    — Graph API routes (GET graph, GET backlinks)
+│   ├── client-ip.ts     — Centralized client IP extraction with trusted proxy support
+│   ├── pluginRoutes.ts  — Plugin management CRUD routes (list, install, delete, bundle, styles, settings, registry)
 │   └── vaultShareRoutes.ts — ShareController + share/transfer routes
 ├── chat/
 │   ├── types.ts          — Chat data models (Conversation, Message, etc.)
@@ -77,7 +79,7 @@ src/
 │   ├── token-service.ts  — McpTokenService (token lifecycle: create, validate, revoke, list)
 │   ├── rate-limiter.ts   — McpRateLimiter (sliding window per token)
 │   ├── handlers.ts       — McpHandlers (MCP resource handlers: list, read)
-│   ├── tool-handlers.ts  — MCP tool handlers (list_vaults, get_vault_structure, search_vault, read_file)
+│   ├── tool-handlers.ts  — MCP tool handlers (list_vaults, get_vault_structure, search_vault, read_file, write_file, create_directory, delete_file, move_file, rename_file)
 │   └── server-factory.ts — McpServerFactory (creates configured McpServer instance)
 ├── link-index/
 │   ├── index.ts              — Barrel export for link-index module
@@ -85,6 +87,15 @@ src/
 │   ├── wikilink-parser.ts    — Backend extractWikilinks() (code-block-aware, all formats)
 │   ├── wikilink-parser.test.ts — Unit tests for parser
 │   └── link-index-service.ts — LinkIndexService (rebuild, incremental updates, JSON persistence, queries)
+├── plugin/
+│   ├── index.ts              — Barrel export for plugin module
+│   ├── types.ts              — IPluginStore, PluginManifest, PluginFiles, PluginRegistryData interfaces
+│   ├── errors.ts             — PluginNotFoundError, PluginFileTooLargeError, PluginSettingsTooLargeError
+│   ├── validation.ts         — Zod schemas (pluginManifestSchema, pluginRegistrySchema)
+│   ├── plugin-store.ts       — PluginStore (filesystem persistence, atomic writes, per-vault per-plugin dirs)
+│   ├── plugin-store.test.ts  — Unit tests for PluginStore
+│   ├── plugin-installer.ts   — PluginInstaller (ZIP extraction, manifest validation, bundle integrity, version comparison)
+│   └── plugin-installer.test.ts — Unit tests for PluginInstaller
 ├── import/index.ts       — ImportService (file/folder import logic)
 └── integration.test.ts   — Integration tests
 config/
@@ -126,6 +137,25 @@ src/
 │       ├── syntax.ts     — micromark tokenizer extension for #tag syntax
 │       ├── mdast-util.ts — fromMarkdown + toMarkdown handlers
 │       └── plugin.ts     — remark plugin wrapper (remarkTag)
+│   └── compat/           — Obsidian Plugin Compatibility Layer
+│       ├── types.ts      — TFile, TFolder, TAbstractFile, CachedMetadata, PluginManifest, PluginRegistryEntry, etc.
+│       ├── errors.ts     — PluginError, ManifestValidationError, BundleEvaluationError, LifecycleError, etc.
+│       ├── event-system.ts — IEventEmitter (on/off/trigger/offref/removeAllListeners)
+│       ├── manifest-parser.ts — Manifest parsing with Zod validation + semver comparison
+│       ├── plugin-loader.ts — PluginLoader (bundle evaluation, lifecycle, timeout, cleanup)
+│       ├── plugin-registry.ts — PluginRegistry (frontend state, backend persistence)
+│       ├── sandbox.ts    — PluginSandbox (vault isolation, storage namespace, network allowlist, blocking detection)
+│       ├── settings-manager.ts — SettingsManager (loadData/saveData per plugin per vault)
+│       ├── command-registry.ts — CommandRegistry (addCommand, removeAll, search, hotkeys)
+│       ├── css-injector.ts — CSS injection with scoped selectors (data-plugin-id prefix)
+│       ├── compatibility-analyzer.ts — Static analysis of API usage (supported/partial/unsupported)
+│       ├── plugin-context.ts — PluginProvider + usePluginContext hook (vault-scoped instances, FCP loading)
+│       ├── plugin-event-bridge.ts — usePluginEventBridge hook (tab→workspace, save→cache, tree→resolved)
+│       └── shims/
+│           ├── app-shim.ts — AppShim (Proxy-based, vault/workspace/metadataCache/plugins properties)
+│           ├── vault-shim.ts — VaultShim (read/modify/create/delete/getAbstractFileByPath/events)
+│           ├── workspace-shim.ts — WorkspaceShim (getActiveFile, file-open, active-leaf-change)
+│           └── metadata-cache-shim.ts — MetadataCacheShim (getFileCache, resolvedLinks, changed/resolved events)
 ├── state/
 │   ├── index.ts          — AppProvider, appReducer, action creators
 │   ├── authState.ts      — Auth reducer + types
@@ -188,7 +218,11 @@ src/
 │   ├── AdminUsersPage.tsx — User administration
 │   ├── AdminVaultsPage.tsx — Admin: all vaults overview with delete
 │   ├── AdminConfigPage.tsx — Server configuration (card-based layout)
-│   └── AdminAuditPage.tsx — Audit log viewer
+│   ├── AdminAuditPage.tsx — Audit log viewer
+│   ├── PluginManagementPage.tsx — Plugin list with activation toggle, compatibility, error display
+│   ├── PluginUpload.tsx  — Plugin ZIP upload + detected plugins from .obsidian/plugins/
+│   ├── CommandPalette.tsx — Modal command palette (search, execute, keyboard nav)
+│   └── CommandPaletteContainer.tsx — Wires CommandPalette to PluginContext CommandRegistry
 ├── assets/               — Static images
 └── test-setup.ts         — Vitest/Testing Library setup
 ```
@@ -290,6 +324,21 @@ All routes are prefixed with `/api/v1`:
 | DELETE | /api/v1/mcp/tokens/:tokenId | Session + CSRF | Revoke a token |
 | GET | /.well-known/mcp.json | None | MCP discovery metadata |
 
+### Plugins
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | /vaults/:vaultId/plugins | List installed plugins |
+| POST | /vaults/:vaultId/plugins | Upload/install plugin (ZIP multipart) |
+| GET | /vaults/:vaultId/plugins/registry | Load plugin registry state |
+| PUT | /vaults/:vaultId/plugins/registry | Save plugin registry state |
+| GET | /vaults/:vaultId/plugins/:pluginId | Get plugin details (manifest) |
+| DELETE | /vaults/:vaultId/plugins/:pluginId | Uninstall plugin |
+| GET | /vaults/:vaultId/plugins/:pluginId/bundle | Download plugin bundle (JS) |
+| GET | /vaults/:vaultId/plugins/:pluginId/styles | Download plugin styles (CSS) |
+| GET | /vaults/:vaultId/plugins/:pluginId/settings | Load plugin settings |
+| PUT | /vaults/:vaultId/plugins/:pluginId/settings | Save plugin settings (max 1 MB) |
+
 ## Data Storage
 
 Vaults are stored on disk under `backend/data/vaults/<vaultId>/`. The vault registry (`data/vaults.json`) maps vault IDs to names and storage paths. No database — all persistence is filesystem-based.
@@ -359,3 +408,21 @@ data/mcp/
 - **Tokens**: One JSON file per API token. SHA-256 hash stored (never raw token). Atomic writes.
 - **User Index**: Per-user JSON listing their token IDs. Atomic writes.
 - **In-Memory Index**: `Map<tokenHash, tokenId>` loaded at startup for O(1) token validation.
+
+### Plugin Data
+
+```
+data/plugins/
+└── <vaultId>/
+    ├── _registry.json        — Plugin registry (status, permissions, compatibility per plugin)
+    └── <pluginId>/
+        ├── manifest.json     — Plugin manifest (original from ZIP)
+        ├── main.js           — Plugin bundle (JavaScript, max 5 MB)
+        ├── styles.css        — Plugin styles (optional, max 512 KB)
+        └── data.json         — Plugin settings (max 1 MB, preserved across upgrades)
+```
+
+- **Registry**: One JSON file per vault with all plugin states. Atomic writes.
+- **Plugin Files**: Per-vault, per-plugin directory. Atomic writes (temp → rename).
+- **Settings**: Preserved across version upgrades (savePlugin only touches manifest/bundle/styles).
+- **Vault Deletion Hook**: `deleteAllForVault(vaultId)` removes entire `data/plugins/<vaultId>/` directory.

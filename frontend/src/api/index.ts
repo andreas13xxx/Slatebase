@@ -83,6 +83,53 @@ export interface VaultTagsResponse {
 }
 
 /**
+ * Obsidian-compatible plugin manifest.
+ */
+export interface PluginManifest {
+  id: string
+  name: string
+  version: string
+  minAppVersion?: string
+  author?: string
+  description?: string
+  [key: string]: unknown
+}
+
+/**
+ * Result of uploading/installing a plugin.
+ */
+export interface PluginInstallResult {
+  pluginId: string
+  manifest: PluginManifest
+  isUpgrade: boolean
+}
+
+/**
+ * Plugin permissions configuration.
+ */
+export interface PluginPermissions {
+  network: boolean
+  networkAllowlist: string[]
+  filesystemWrite: boolean
+  domManipulation: boolean
+}
+
+/**
+ * Plugin registry data (persisted activation state and permissions).
+ */
+export interface PluginRegistryData {
+  version: 1
+  plugins: Record<string, {
+    status: string
+    permissions: PluginPermissions
+    compatibilityLevel: string
+    installedAt: string
+    updatedAt: string
+    error?: string
+  }>
+}
+
+/**
  * Interface for the Slatebase API client.
  * All methods throw an AppError on non-2xx responses.
  */
@@ -185,6 +232,28 @@ export interface IApiClient {
   getBacklinks(vaultId: string, filePath: string): Promise<BacklinksResponse>
   /** Get all tags for a vault with occurrence counts and file lists. */
   getVaultTags(vaultId: string): Promise<VaultTagsResponse>
+
+  // --- Plugin methods ---
+  /** List all installed plugins for a vault. */
+  listPlugins(vaultId: string): Promise<{ plugins: PluginManifest[] }>
+  /** Upload/install a plugin (ZIP file). */
+  uploadPlugin(vaultId: string, file: File): Promise<PluginInstallResult>
+  /** Get a specific plugin's manifest. */
+  getPlugin(vaultId: string, pluginId: string): Promise<PluginManifest>
+  /** Delete/uninstall a plugin. */
+  deletePlugin(vaultId: string, pluginId: string): Promise<void>
+  /** Load a plugin's JavaScript bundle. */
+  loadBundle(vaultId: string, pluginId: string): Promise<string>
+  /** Load a plugin's styles (returns null if none exist). */
+  loadStyles(vaultId: string, pluginId: string): Promise<string | null>
+  /** Load a plugin's settings. */
+  loadSettings(vaultId: string, pluginId: string): Promise<unknown | null>
+  /** Save a plugin's settings. */
+  saveSettings(vaultId: string, pluginId: string, data: unknown): Promise<void>
+  /** Load the plugin registry for a vault. */
+  loadRegistry(vaultId: string): Promise<PluginRegistryData>
+  /** Save the plugin registry for a vault. */
+  saveRegistry(vaultId: string, registry: PluginRegistryData): Promise<void>
 }
 
 /**
@@ -504,6 +573,137 @@ export class ApiClient implements IApiClient {
   /** Get all tags for a vault with occurrence counts and file lists. */
   async getVaultTags(vaultId: string): Promise<VaultTagsResponse> {
     return this.request<VaultTagsResponse>('GET', `/api/v1/vaults/${vaultId}/tags`)
+  }
+
+  // --- Plugin methods ---
+
+  /** List all installed plugins for a vault. */
+  async listPlugins(vaultId: string): Promise<{ plugins: PluginManifest[] }> {
+    return this.request<{ plugins: PluginManifest[] }>('GET', `/api/v1/vaults/${vaultId}/plugins`)
+  }
+
+  /** Upload/install a plugin (ZIP file). */
+  async uploadPlugin(vaultId: string, file: File): Promise<PluginInstallResult> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const headers: Record<string, string> = {}
+
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`
+    }
+
+    if (this.csrfToken) {
+      headers['X-CSRF-Token'] = this.csrfToken
+    }
+
+    const response = await fetch(`/api/v1/vaults/${vaultId}/plugins`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    })
+    return this.handleResponse<PluginInstallResult>(response)
+  }
+
+  /** Get a specific plugin's manifest. */
+  async getPlugin(vaultId: string, pluginId: string): Promise<PluginManifest> {
+    return this.request<PluginManifest>('GET', `/api/v1/vaults/${vaultId}/plugins/${pluginId}`)
+  }
+
+  /** Delete/uninstall a plugin. */
+  async deletePlugin(vaultId: string, pluginId: string): Promise<void> {
+    await this.request<void>('DELETE', `/api/v1/vaults/${vaultId}/plugins/${pluginId}`)
+  }
+
+  /** Load a plugin's JavaScript bundle. */
+  async loadBundle(vaultId: string, pluginId: string): Promise<string> {
+    const headers = this.buildHeaders('GET', false)
+    const response = await fetch(`/api/v1/vaults/${vaultId}/plugins/${pluginId}/bundle`, { method: 'GET', headers })
+
+    if (response.status === 401) {
+      this.token = null
+      this.csrfToken = null
+      if (this.onSessionExpired) {
+        this.onSessionExpired()
+      }
+      await handleErrorResponse(response)
+    }
+
+    if (!response.ok) {
+      await handleErrorResponse(response)
+    }
+
+    return response.text()
+  }
+
+  /** Load a plugin's styles (returns null if none exist). */
+  async loadStyles(vaultId: string, pluginId: string): Promise<string | null> {
+    const headers = this.buildHeaders('GET', false)
+    const response = await fetch(`/api/v1/vaults/${vaultId}/plugins/${pluginId}/styles`, { method: 'GET', headers })
+
+    if (response.status === 401) {
+      this.token = null
+      this.csrfToken = null
+      if (this.onSessionExpired) {
+        this.onSessionExpired()
+      }
+      await handleErrorResponse(response)
+    }
+
+    if (response.status === 404) {
+      return null
+    }
+
+    if (!response.ok) {
+      await handleErrorResponse(response)
+    }
+
+    return response.text()
+  }
+
+  /** Load a plugin's settings. */
+  async loadSettings(vaultId: string, pluginId: string): Promise<unknown | null> {
+    const headers = this.buildHeaders('GET', false)
+    const response = await fetch(`/api/v1/vaults/${vaultId}/plugins/${pluginId}/settings`, { method: 'GET', headers })
+
+    if (response.status === 401) {
+      this.token = null
+      this.csrfToken = null
+      if (this.onSessionExpired) {
+        this.onSessionExpired()
+      }
+      await handleErrorResponse(response)
+    }
+
+    if (response.status === 404) {
+      return null
+    }
+
+    if (!response.ok) {
+      await handleErrorResponse(response)
+    }
+
+    const text = await response.text()
+    if (!text) {
+      return null
+    }
+
+    return JSON.parse(text) as unknown
+  }
+
+  /** Save a plugin's settings. */
+  async saveSettings(vaultId: string, pluginId: string, data: unknown): Promise<void> {
+    await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/plugins/${pluginId}/settings`, data)
+  }
+
+  /** Load the plugin registry for a vault. */
+  async loadRegistry(vaultId: string): Promise<PluginRegistryData> {
+    return this.request<PluginRegistryData>('GET', `/api/v1/vaults/${vaultId}/plugins/registry`)
+  }
+
+  /** Save the plugin registry for a vault. */
+  async saveRegistry(vaultId: string, registry: PluginRegistryData): Promise<void> {
+    await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/plugins/registry`, registry)
   }
 
   // --- Internal helpers ---

@@ -17,11 +17,11 @@
 | 9 | `chat-list-refresh-fix` | Bugfix | ✅ Fertig | Konversationsliste aktualisiert sich nach Senden/Tab-Wechsel |
 | 10 | `vault-sync` | Feature | ✅ Fertig | CouchDB-basierte Vault-Synchronisation |
 | 11 | `obsidian-markdown-compat` | Feature | ✅ Fertig | Wikilinks, Embeds (Bilder, PDFs inline, Notizen), Callouts, Tags — Obsidian-kompatibles Rendering |
-| 12 | `mcp-context-server` | Feature | ✅ Fertig | AI Context Server mit MCP-Integration (Kern-Feature) |
+| 12 | `mcp-context-server` | Feature | ✅ Fertig | AI Context Server mit MCP-Integration (Lese- und Schreib-Tools für Vault-Zugriff) |
 | 13 | `context-panel` | Feature | ✅ Fertig | Rechtes Seitenpanel mit Outline, Links, Tags, Properties (Tab-Navigation, Drag & Drop, Split-Sections) |
 | 14 | `knowledge-graph` | Feature | ✅ Fertig | Visuelle Darstellung der Verlinkungen zwischen Notizen (interaktiver Graph mit Nodes und Edges) |
 | 15 | `live-preview-editor` | Feature | 📋 Geplant | Side-by-Side oder WYSIWYG Live-Preview im Editor |
-| 16 | `obsidian-plugin-compat` | Feature | 📋 Geplant | Obsidian Community Plugin Compatibility Layer |
+| 16 | `obsidian-plugin-compat` | Feature | 🔧 In Arbeit | Obsidian Community Plugin Compatibility Layer (API-Shims, Plugin-Loader, Sandbox, Verwaltungs-UI, Backend-Persistenz) |
 | 17 | `accessibility-audit` | Feature | 📋 Geplant | WCAG 2.1 AA Compliance (systematischer Audit + Fixes) |
 
 ## Abhängigkeiten zwischen Specs
@@ -54,11 +54,11 @@ slatebase-overview (Architektur-Grundlage)
 - **Priorität**: Mittel
 - **Aufwand**: Mittel
 
-### obsidian-plugin-compat
-- **Beschreibung**: Compatibility Layer für Obsidian Community Plugins (Plugin-API-Subset, Plugin-Loader)
+### obsidian-plugin-compat (🔧 in Arbeit)
+- **Beschreibung**: Compatibility Layer für Obsidian Community Plugins (Plugin-API-Subset, Plugin-Loader, Sandbox, Verwaltungs-UI, Backend-Persistenz)
 - **Abhängigkeit**: Braucht obsidian-markdown-compat
-- **Priorität**: Niedrig — sehr großer Scope, langfristiges Ziel
-- **Aufwand**: Sehr groß
+- **Status**: Frontend-Shims (Vault, Workspace, MetadataCache, App), Plugin-Loader, Sandbox, Registry, Settings, CommandRegistry, CSS-Injector, CompatibilityAnalyzer fertig. Backend PluginStore + Error/Validation fertig. Noch offen: API-Routes, ZIP-Upload, Composition-Root-Integration, Frontend-API-Client, Plugin-Management-UI, PluginProvider-Wiring.
+- **PBT-Entscheidung**: Alle Property-Based Tests entfernt — reguläre Unit Tests decken Requirements ab
 
 ### accessibility-audit
 - **Beschreibung**: Systematischer WCAG 2.1 AA Audit aller UI-Komponenten mit anschließenden Fixes (Keyboard-Navigation, Screen-Reader, Kontraste, ARIA)
@@ -86,4 +86,4 @@ slatebase-overview (Architektur-Grundlage)
 - Spec-Verzeichnis: `.kiro/specs/<feature-name>/`
 - Pflichtdateien: `requirements.md` (oder `bugfix.md`), `design.md`, `tasks.md`
 - Config: `.config.kiro` mit `specId`, `workflowType`, `specType`
-- Task-Status: `- [x]` = fertig, `- [ ]` = offen, `- [ ]*` = optional
+- Task-Status: `- [x]` = fertig, `- [ ]` = offen

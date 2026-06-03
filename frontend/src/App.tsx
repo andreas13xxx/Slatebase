@@ -28,6 +28,8 @@ import { McpTokensPage } from './components/McpTokensPage'
 import { SyncProvider } from './state/syncContext'
 import { ContextPanelProvider } from './state/contextPanelContext'
 import { ContextPanel } from './components/context-panel/ContextPanel'
+import { PluginProvider } from './plugins/compat/plugin-context'
+import { CommandPaletteContainer } from './components/CommandPaletteContainer'
 import {
   User, LogOut, Settings, Shield, FileText, Clock,
   Database, Share2, Trash2, Server, Download,
@@ -344,13 +346,13 @@ function AppContent() {
   // When selectedVaultId changes, update directoryTree from vaultTrees and clear old tabs
   useEffect(() => {
     const vaultId = state.selectedVaultId
-    if (vaultId && vaultId !== prevVaultId.current) {
+    if (vaultId !== prevVaultId.current) {
       if (prevVaultId.current !== null) {
-        // Check if a graph tab is open — keep it across vault switches
+        // Vault changed or was deleted — clear all tabs
         const graphTab = tabState.tabs.find((t) => t.filePath === '__graph__')
         tabDispatch({ type: 'CLEAR_ALL_TABS' })
-        if (graphTab) {
-          // Re-open graph tab for the new vault
+        if (graphTab && vaultId) {
+          // Re-open graph tab for the new vault (only if a new vault is selected)
           tabDispatch({
             type: 'OPEN_TAB',
             payload: { vaultId, filePath: '__graph__', fileName: 'Graph' },
@@ -362,26 +364,28 @@ function AppContent() {
           })
         }
       }
-      // If the tree is already loaded in vaultTrees, use it
-      const existingTree = state.vaultTrees[vaultId]
-      if (existingTree) {
-        dispatch({ type: 'TREE_LOADED', payload: existingTree })
-      } else if (apiClient) {
-        // Fetch the tree
-        dispatch({ type: 'LOADING_STARTED' })
-        apiClient.fetchVaultTree(vaultId).then(
-          (tree) => {
-            dispatch({ type: 'TREE_LOADED', payload: tree })
-            dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree } })
-          },
-          (err) => {
-            const error =
-              err && typeof err === 'object' && 'code' in err && 'message' in err
-                ? { code: err.code as string, message: err.message as string }
-                : { code: 'INTERNAL_ERROR', message: t('vault.treeLoadError') }
-            dispatch({ type: 'ERROR_OCCURRED', payload: error })
-          },
-        )
+      if (vaultId) {
+        // If the tree is already loaded in vaultTrees, use it
+        const existingTree = state.vaultTrees[vaultId]
+        if (existingTree) {
+          dispatch({ type: 'TREE_LOADED', payload: existingTree })
+        } else if (apiClient) {
+          // Fetch the tree
+          dispatch({ type: 'LOADING_STARTED' })
+          apiClient.fetchVaultTree(vaultId).then(
+            (tree) => {
+              dispatch({ type: 'TREE_LOADED', payload: tree })
+              dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree } })
+            },
+            (err) => {
+              const error =
+                err && typeof err === 'object' && 'code' in err && 'message' in err
+                  ? { code: err.code as string, message: err.message as string }
+                  : { code: 'INTERNAL_ERROR', message: t('vault.treeLoadError') }
+              dispatch({ type: 'ERROR_OCCURRED', payload: error })
+            },
+          )
+        }
       }
     }
     prevVaultId.current = vaultId
@@ -523,9 +527,18 @@ function AppContent() {
   const user = authState.user
   const selectedVault = state.vaults.find((v) => v.id === state.selectedVaultId) ?? null
   const activeTab = tabState.tabs.find((tab) => tab.id === tabState.activeTabId) ?? null
+  const selectedVaultName = selectedVault?.name ?? ''
 
   return (
+    <PluginProvider
+      vaultId={state.selectedVaultId}
+      vaultName={selectedVaultName}
+      apiClient={apiClient}
+      directoryTree={state.directoryTree}
+      tabState={tabState}
+    >
     <div className="app">
+      <CommandPaletteContainer />
       <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleFileSelected} aria-hidden="true" tabIndex={-1} />
       <input ref={folderInputRef} type="file"
         // @ts-expect-error webkitdirectory is non-standard
@@ -743,6 +756,7 @@ function AppContent() {
         </div>
       </main>
     </div>
+    </PluginProvider>
   )
 }
 

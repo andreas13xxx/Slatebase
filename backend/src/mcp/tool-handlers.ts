@@ -1,4 +1,5 @@
-// MCP Tool Handlers — list_vaults, get_vault_structure, search_vault, read_file
+// MCP Tool Handlers — list_vaults, get_vault_structure, search_vault, read_file,
+//                     write_file, create_directory, delete_file, move_file, rename_file
 
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -6,7 +7,16 @@ import { z } from 'zod'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import type { IVaultService, IVaultAccessControl } from '../business/index.js'
-import { VaultNotFoundError, VaultAccessDeniedError } from '../business/index.js'
+import {
+  VaultNotFoundError,
+  VaultAccessDeniedError,
+  FileTooLargeError,
+  ConflictError,
+  StorageError,
+  InvalidMoveError,
+  FileConflictError,
+  InvalidNameError,
+} from '../business/index.js'
 import type { DirectoryTree } from '../vault/index.js'
 import { PathTraversalError, isBinaryContent } from '../vault/index.js'
 import type { ILogger } from '../logger/index.js'
@@ -19,6 +29,8 @@ const MCP_ERROR_NOT_FOUND = -32002
 const MCP_ERROR_BINARY_FILE = -32003
 const MCP_ERROR_FILE_TOO_LARGE = -32004
 const MCP_ERROR_INVALID_PARAMS = -32602
+const MCP_ERROR_CONFLICT = -32005
+const MCP_ERROR_STORAGE = -32006
 
 // ─── Helper: Count files recursively in a DirectoryTree ──────────────────────
 
@@ -111,16 +123,24 @@ export interface ToolHandlerDeps {
 
 /**
  * Registers all MCP tool handlers on the given McpServer instance.
- * Tools: list_vaults, get_vault_structure, search_vault, read_file
+ * Tools: list_vaults, get_vault_structure, search_vault, read_file,
+ *        write_file, create_directory, delete_file, move_file, rename_file
  *
  * All tools check vault access via VaultAccessControlService before execution.
  * Returns appropriate MCP error codes on failure.
  */
 export function registerToolHandlers(server: McpServer, deps: ToolHandlerDeps): void {
+  // Read tools
   registerListVaults(server, deps)
   registerGetVaultStructure(server, deps)
   registerSearchVault(server, deps)
   registerReadFile(server, deps)
+  // Write tools
+  registerWriteFile(server, deps)
+  registerCreateDirectory(server, deps)
+  registerDeleteFile(server, deps)
+  registerMoveFile(server, deps)
+  registerRenameFile(server, deps)
 }
 
 // ─── list_vaults ─────────────────────────────────────────────────────────────
@@ -449,6 +469,291 @@ function registerReadFile(server: McpServer, deps: ToolHandlerDeps): void {
         }
         deps.logger.error('read_file failed', { error: error instanceof Error ? error.message : String(error) })
         return mcpToolError(MCP_ERROR_NOT_FOUND, 'Resource not found')
+      }
+    },
+  )
+}
+
+// ─── write_file ──────────────────────────────────────────────────────────────
+
+function registerWriteFile(server: McpServer, deps: ToolHandlerDeps): void {
+  server.tool(
+    'write_file',
+    'Create or overwrite a text file in a vault. Supports ETag-based conflict detection via optional ifMatch parameter.',
+    {
+      vaultId: z.string().min(1, 'vaultId is required'),
+      path: z.string().min(1, 'File path is required'),
+      content: z.string().describe('File content (UTF-8 text)'),
+      ifMatch: z.string()
+        .optional()
+        .describe('Optional ETag for conflict detection. If provided, the write will fail with a conflict error if the file has been modified since the ETag was obtained.'),
+    },
+    async (args) => {
+      try {
+        const userId = deps.getUserId()
+
+        // Check write access
+        try {
+          await deps.vaultAccessControl.checkWriteAccess(args.vaultId, userId)
+        } catch (error) {
+          if (error instanceof VaultAccessDeniedError || error instanceof VaultNotFoundError) {
+            return mcpToolError(MCP_ERROR_ACCESS_DENIED, 'Access denied: write permission required')
+          }
+          throw error
+        }
+
+        // Save file via VaultService (handles path validation, size check, atomic write, tree refresh)
+        const result = await deps.vaultService.saveFile(args.vaultId, args.path, args.content, args.ifMatch)
+
+        return mcpToolSuccess({
+          path: result.path,
+          name: result.name,
+          size: result.size,
+          etag: result.etag,
+          message: 'File saved successfully',
+        })
+      } catch (error) {
+        if (error instanceof VaultNotFoundError) {
+          return mcpToolError(MCP_ERROR_ACCESS_DENIED, 'Access denied')
+        }
+        if (error instanceof PathTraversalError) {
+          return mcpToolError(MCP_ERROR_INVALID_PARAMS, 'Invalid file path')
+        }
+        if (error instanceof FileTooLargeError) {
+          return mcpToolError(MCP_ERROR_FILE_TOO_LARGE, `File too large: ${error.actualSize} bytes (max: ${error.maxSize} bytes)`)
+        }
+        if (error instanceof ConflictError) {
+          return mcpToolError(MCP_ERROR_CONFLICT, `Conflict: file has been modified (current ETag: ${error.currentEtag}, provided: ${error.providedEtag})`)
+        }
+        if (error instanceof StorageError) {
+          return mcpToolError(MCP_ERROR_STORAGE, `Storage error: ${error.message}`)
+        }
+        deps.logger.error('write_file failed', { error: error instanceof Error ? error.message : String(error) })
+        return mcpToolError(MCP_ERROR_STORAGE, 'Failed to write file')
+      }
+    },
+  )
+}
+
+// ─── create_directory ────────────────────────────────────────────────────────
+
+function registerCreateDirectory(server: McpServer, deps: ToolHandlerDeps): void {
+  server.tool(
+    'create_directory',
+    'Create a directory (and any missing intermediate directories) in a vault',
+    {
+      vaultId: z.string().min(1, 'vaultId is required'),
+      path: z.string().min(1, 'Directory path is required'),
+    },
+    async (args) => {
+      try {
+        const userId = deps.getUserId()
+
+        // Check write access
+        try {
+          await deps.vaultAccessControl.checkWriteAccess(args.vaultId, userId)
+        } catch (error) {
+          if (error instanceof VaultAccessDeniedError || error instanceof VaultNotFoundError) {
+            return mcpToolError(MCP_ERROR_ACCESS_DENIED, 'Access denied: write permission required')
+          }
+          throw error
+        }
+
+        // Resolve and validate path
+        let resolvedPath: string
+        try {
+          resolvedPath = deps.vaultService.resolveFilePath(args.vaultId, args.path)
+        } catch (error) {
+          if (error instanceof PathTraversalError) {
+            return mcpToolError(MCP_ERROR_INVALID_PARAMS, 'Invalid directory path')
+          }
+          if (error instanceof VaultNotFoundError) {
+            return mcpToolError(MCP_ERROR_ACCESS_DENIED, 'Access denied')
+          }
+          throw error
+        }
+
+        // Create directory (recursive — creates intermediate dirs)
+        await fs.mkdir(resolvedPath, { recursive: true })
+
+        return mcpToolSuccess({
+          path: args.path,
+          message: 'Directory created successfully',
+        })
+      } catch (error) {
+        if (error instanceof VaultNotFoundError) {
+          return mcpToolError(MCP_ERROR_ACCESS_DENIED, 'Access denied')
+        }
+        deps.logger.error('create_directory failed', { error: error instanceof Error ? error.message : String(error) })
+        return mcpToolError(MCP_ERROR_STORAGE, 'Failed to create directory')
+      }
+    },
+  )
+}
+
+// ─── delete_file ─────────────────────────────────────────────────────────────
+
+function registerDeleteFile(server: McpServer, deps: ToolHandlerDeps): void {
+  server.tool(
+    'delete_file',
+    'Delete a file or folder (recursively) from a vault',
+    {
+      vaultId: z.string().min(1, 'vaultId is required'),
+      path: z.string().min(1, 'Path to delete is required'),
+    },
+    async (args) => {
+      try {
+        const userId = deps.getUserId()
+
+        // Check write access
+        try {
+          await deps.vaultAccessControl.checkWriteAccess(args.vaultId, userId)
+        } catch (error) {
+          if (error instanceof VaultAccessDeniedError || error instanceof VaultNotFoundError) {
+            return mcpToolError(MCP_ERROR_ACCESS_DENIED, 'Access denied: write permission required')
+          }
+          throw error
+        }
+
+        // Delete via VaultService (handles path validation, existence check, tree refresh)
+        await deps.vaultService.deleteContent(args.vaultId, args.path)
+
+        return mcpToolSuccess({
+          path: args.path,
+          message: 'Deleted successfully',
+        })
+      } catch (error) {
+        if (error instanceof VaultNotFoundError) {
+          return mcpToolError(MCP_ERROR_ACCESS_DENIED, 'Access denied')
+        }
+        if (error instanceof PathTraversalError) {
+          return mcpToolError(MCP_ERROR_INVALID_PARAMS, 'Invalid file path')
+        }
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          return mcpToolError(MCP_ERROR_NOT_FOUND, 'File or folder not found')
+        }
+        deps.logger.error('delete_file failed', { error: error instanceof Error ? error.message : String(error) })
+        return mcpToolError(MCP_ERROR_STORAGE, 'Failed to delete')
+      }
+    },
+  )
+}
+
+// ─── move_file ───────────────────────────────────────────────────────────────
+
+function registerMoveFile(server: McpServer, deps: ToolHandlerDeps): void {
+  server.tool(
+    'move_file',
+    'Move a file or folder to a new location within the same vault. Creates intermediate directories automatically.',
+    {
+      vaultId: z.string().min(1, 'vaultId is required'),
+      sourcePath: z.string().min(1, 'Source path is required'),
+      destinationPath: z.string().min(1, 'Destination path is required'),
+    },
+    async (args) => {
+      try {
+        const userId = deps.getUserId()
+
+        // Check write access
+        try {
+          await deps.vaultAccessControl.checkWriteAccess(args.vaultId, userId)
+        } catch (error) {
+          if (error instanceof VaultAccessDeniedError || error instanceof VaultNotFoundError) {
+            return mcpToolError(MCP_ERROR_ACCESS_DENIED, 'Access denied: write permission required')
+          }
+          throw error
+        }
+
+        // Move via VaultService (handles path validation, conflict check, tree refresh)
+        const result = await deps.vaultService.moveContent(args.vaultId, args.sourcePath, args.destinationPath)
+
+        return mcpToolSuccess({
+          sourcePath: args.sourcePath,
+          newPath: result.newPath,
+          message: 'Moved successfully',
+        })
+      } catch (error) {
+        if (error instanceof VaultNotFoundError) {
+          return mcpToolError(MCP_ERROR_ACCESS_DENIED, 'Access denied')
+        }
+        if (error instanceof PathTraversalError) {
+          return mcpToolError(MCP_ERROR_INVALID_PARAMS, 'Invalid file path')
+        }
+        if (error instanceof InvalidMoveError) {
+          return mcpToolError(MCP_ERROR_INVALID_PARAMS, `Invalid move: ${error.message}`)
+        }
+        if (error instanceof FileConflictError) {
+          return mcpToolError(MCP_ERROR_CONFLICT, `Conflict: a file or folder already exists at ${error.targetPath}`)
+        }
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          return mcpToolError(MCP_ERROR_NOT_FOUND, 'Source file or folder not found')
+        }
+        if (error instanceof StorageError) {
+          return mcpToolError(MCP_ERROR_STORAGE, `Storage error: ${error.message}`)
+        }
+        deps.logger.error('move_file failed', { error: error instanceof Error ? error.message : String(error) })
+        return mcpToolError(MCP_ERROR_STORAGE, 'Failed to move')
+      }
+    },
+  )
+}
+
+// ─── rename_file ─────────────────────────────────────────────────────────────
+
+function registerRenameFile(server: McpServer, deps: ToolHandlerDeps): void {
+  server.tool(
+    'rename_file',
+    'Rename a file or folder within a vault (stays in the same directory)',
+    {
+      vaultId: z.string().min(1, 'vaultId is required'),
+      path: z.string().min(1, 'Path of the file or folder to rename is required'),
+      newName: z.string()
+        .min(1, 'New name must not be empty')
+        .max(255, 'New name must not exceed 255 characters'),
+    },
+    async (args) => {
+      try {
+        const userId = deps.getUserId()
+
+        // Check write access
+        try {
+          await deps.vaultAccessControl.checkWriteAccess(args.vaultId, userId)
+        } catch (error) {
+          if (error instanceof VaultAccessDeniedError || error instanceof VaultNotFoundError) {
+            return mcpToolError(MCP_ERROR_ACCESS_DENIED, 'Access denied: write permission required')
+          }
+          throw error
+        }
+
+        // Rename via VaultService (handles path validation, name validation, conflict check, tree refresh)
+        const result = await deps.vaultService.renameContent(args.vaultId, args.path, args.newName)
+
+        return mcpToolSuccess({
+          oldPath: args.path,
+          newPath: result.newPath,
+          message: 'Renamed successfully',
+        })
+      } catch (error) {
+        if (error instanceof VaultNotFoundError) {
+          return mcpToolError(MCP_ERROR_ACCESS_DENIED, 'Access denied')
+        }
+        if (error instanceof PathTraversalError) {
+          return mcpToolError(MCP_ERROR_INVALID_PARAMS, 'Invalid file path')
+        }
+        if (error instanceof InvalidNameError) {
+          return mcpToolError(MCP_ERROR_INVALID_PARAMS, `Invalid name: ${error.message}`)
+        }
+        if (error instanceof FileConflictError) {
+          return mcpToolError(MCP_ERROR_CONFLICT, `Conflict: a file or folder already exists at ${error.targetPath}`)
+        }
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          return mcpToolError(MCP_ERROR_NOT_FOUND, 'File or folder not found')
+        }
+        if (error instanceof StorageError) {
+          return mcpToolError(MCP_ERROR_STORAGE, `Storage error: ${error.message}`)
+        }
+        deps.logger.error('rename_file failed', { error: error instanceof Error ? error.message : String(error) })
+        return mcpToolError(MCP_ERROR_STORAGE, 'Failed to rename')
       }
     },
   )

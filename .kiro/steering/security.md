@@ -70,6 +70,7 @@
 - Token-Invalidierung bei User-Löschung/Sperrung (automatisch via `onUserInvalidated`-Hook)
 - MCP-Zugriffe werden im Audit-Log protokolliert (userId, tokenId, Aktion, vaultId)
 - Vault-Zugriffskontrolle wird pro Request geprüft (VaultAccessControlService) — Token gewährt nur Zugriff auf eigene/geteilte Vaults
+- Write-Tools (`write_file`, `create_directory`, `delete_file`, `move_file`, `rename_file`) prüfen `checkWriteAccess()` — Read-Only-Shares reichen nicht aus
 - **Niemals** den rohen Token-Wert loggen oder in Responses zurückgeben (außer bei Erstellung)
 
 ## Audit-Logging

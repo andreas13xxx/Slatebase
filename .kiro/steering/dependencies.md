@@ -23,6 +23,7 @@
 - **pino** — Structured Logging
 - **tsx** — Dev-Server mit TypeScript
 - **argon2** — Passwort-Hashing (argon2id, memory-hard, OWASP-empfohlen)
+- **adm-zip** — ZIP-Datei-Verarbeitung (Plugin-Upload: Extraktion, Validierung, Datei-Suche)
 
 ### Frontend
 - **react / react-dom** — UI-Framework
@@ -40,7 +41,7 @@
 - **d3-force** — Force-Directed Graph Layout für Knowledge Graph (+ `@types/d3-force` als devDep)
 
 ### Shared (devDependencies)
-- **fast-check** — Property-Based Testing (universelle Invarianten verifizieren, Reducer-Korrektheit)
+- **fast-check** — Installiert aber nicht mehr aktiv genutzt (PBT-Tests wurden entfernt, Juni 2026). Kann bei nächster Gelegenheit deinstalliert werden.
 - **vitest** — Test-Runner (beide Packages)
 
 ### Geplant (noch nicht installiert)

@@ -6,6 +6,8 @@ Implementierung des MCP Context Servers als eigenständiges Backend-Modul (`src/
 
 Die Implementierung folgt dem bewährten Layered-Pattern: Types/Errors → TokenStore (Data) → McpTokenService (Business) → McpHandlers/McpServerFactory (Protocol) → mcpRoutes/mcpTokenRoutes (API).
 
+MCP-Tools umfassen sowohl Lese-Tools (list_vaults, get_vault_structure, search_vault, read_file) als auch Schreib-Tools (write_file, create_directory, delete_file, move_file, rename_file). Schreib-Tools delegieren an die bestehende VaultService-Schicht und prüfen Write-Berechtigungen über VaultAccessControlService.
+
 ## Tasks
 
 - [x] 1. Set up MCP module structure, types, and error classes
@@ -316,7 +318,29 @@ Die Implementierung folgt dem bewährten Layered-Pattern: Types/Errors → Token
     - For any vault with read-only permission, write operations are rejected with -32001
     - **Validates: Requirements 3.2**
 
-- [x] 13. Final checkpoint — Ensure all tests pass
+- [x] 13. Implement MCP write tools (vault modification)
+  - [x] 13.1 Implement write tool handlers
+    - Add `write_file` tool: create/overwrite text file with optional ETag conflict detection via `ifMatch` parameter, delegates to `VaultService.saveFile()`
+    - Add `create_directory` tool: create directory (with intermediate dirs) via `fs.mkdir(recursive: true)` after path validation
+    - Add `delete_file` tool: delete file/folder recursively via `VaultService.deleteContent()`
+    - Add `move_file` tool: move file/folder via `VaultService.moveContent()`, validates circular moves and conflicts
+    - Add `rename_file` tool: rename file/folder via `VaultService.renameContent()`, validates name characters and conflicts
+    - All write tools check `VaultAccessControlService.checkWriteAccess()` before execution
+    - All write tools validate paths via `validateFilePath()` / `resolveFilePath()`
+    - Error mapping: `ConflictError` → -32005, `StorageError` → -32006, `InvalidMoveError`/`InvalidNameError` → -32602, `FileConflictError` → -32005
+    - _Requirements: 3.2, 8b.1–8b.14_
+
+  - [x] 13.2 Add Zod validation schemas for write tools
+    - Add `writeFileParamsSchema`, `createDirectoryParamsSchema`, `deleteFileParamsSchema`, `moveFileParamsSchema`, `renameFileParamsSchema` to `validation.ts`
+    - Export new types from barrel `index.ts`
+    - _Requirements: 8b.1, 8b.4, 8b.5, 8b.7, 8b.10_
+
+  - [x] 13.3 Update server factory and documentation
+    - Update `McpServerFactory` comment to list all 9 tools
+    - Update `registerToolHandlers()` JSDoc to list all tools
+    - _Requirements: (structural)_
+
+- [x] 14. Final checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes
@@ -343,7 +367,8 @@ Die Implementierung folgt dem bewährten Layered-Pattern: Types/Errors → Token
     { "id": 5, "tasks": ["6.3", "6.4", "6.5", "6.6", "6.7", "6.8", "6.9", "6.10", "6.11", "6.12", "6.13", "7.1"] },
     { "id": 6, "tasks": ["7.2", "9.1", "9.2", "9.3"] },
     { "id": 7, "tasks": ["9.4", "9.5", "9.6", "10.1", "10.2", "10.3"] },
-    { "id": 8, "tasks": ["12.1", "12.2"] }
+    { "id": 8, "tasks": ["12.1", "12.2"] },
+    { "id": 9, "tasks": ["13.1", "13.2", "13.3"] }
   ]
 }
 ```

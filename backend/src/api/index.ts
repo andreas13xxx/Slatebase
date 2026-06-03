@@ -87,6 +87,15 @@ export interface LinkIndexHook {
   onFileRenamed(vaultId: string, oldPath: string, newPath: string): void
 }
 
+/**
+ * Callback interface for cleanup actions after a vault is deleted.
+ * Used by VaultController to trigger associated resource cleanup (plugins, link index, etc.).
+ */
+export interface VaultDeletionHook {
+  /** Called after a vault has been successfully deleted. */
+  onVaultDeleted(vaultId: string): void
+}
+
 // --- IVaultController Interface ---
 
 export interface IVaultController {
@@ -107,6 +116,7 @@ export interface IVaultController {
 
 export class VaultController implements IVaultController {
   private linkIndexHook?: LinkIndexHook
+  private vaultDeletionHook?: VaultDeletionHook
 
   constructor(
     private readonly vaultService: IVaultService,
@@ -124,6 +134,14 @@ export class VaultController implements IVaultController {
    */
   setLinkIndexHook(hook: LinkIndexHook): void {
     this.linkIndexHook = hook
+  }
+
+  /**
+   * Sets the vault deletion hook for resource cleanup after vault deletion.
+   * Called from the composition root to wire plugin cleanup and other post-deletion actions.
+   */
+  setVaultDeletionHook(hook: VaultDeletionHook): void {
+    this.vaultDeletionHook = hook
   }
 
   /**
@@ -312,6 +330,12 @@ export class VaultController implements IVaultController {
 
     try {
       await this.vaultService.deleteVaultWithChecks(vaultId, session.userId)
+
+      // Fire-and-forget: notify vault deletion hook for resource cleanup (plugins, link index, etc.)
+      if (this.vaultDeletionHook) {
+        this.vaultDeletionHook.onVaultDeleted(vaultId)
+      }
+
       return c.body(null, 204)
     } catch (error) {
       return this.handleError(c, error)

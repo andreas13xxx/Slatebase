@@ -152,6 +152,29 @@ Der MCP-Server wird als HTTP-basierter Transport (Streamable HTTP) in den besteh
 
 ---
 
+### Requirement 8b: MCP-Tools — Schreibzugriff auf Vaults
+
+**User Story:** Als KI-Assistent-Benutzer möchte ich über MCP-Tools Dateien in meinen Vaults erstellen, bearbeiten, löschen, verschieben und umbenennen können, damit der KI-Assistent meine Wissensbasis aktiv pflegen und erweitern kann.
+
+#### Acceptance Criteria
+
+1. THE MCP_Server SHALL ein Tool `write_file` mit den Parametern `vaultId` (string, required), `path` (string, required), `content` (string, required) und `ifMatch` (string, optional) bereitstellen.
+2. WHEN ein MCP_Client das Tool `write_file` aufruft und der Benutzer Schreibberechtigung für den Vault hat, THE MCP_Server SHALL die Datei erstellen oder überschreiben und `{ path, name, size, etag, message }` zurückgeben.
+3. IF der optionale `ifMatch`-Parameter angegeben ist und der aktuelle ETag der Datei nicht übereinstimmt, THEN THE MCP_Server SHALL einen MCP-Fehler mit Code -32005 ("Conflict") zurückgeben.
+4. THE MCP_Server SHALL ein Tool `create_directory` mit den Parametern `vaultId` (string, required) und `path` (string, required) bereitstellen, das ein Verzeichnis (inkl. Zwischenverzeichnisse) erstellt.
+5. THE MCP_Server SHALL ein Tool `delete_file` mit den Parametern `vaultId` (string, required) und `path` (string, required) bereitstellen, das eine Datei oder einen Ordner rekursiv löscht.
+6. IF die zu löschende Datei oder der Ordner nicht existiert, THEN THE MCP_Server SHALL einen MCP-Fehler mit Code -32002 ("Not found") zurückgeben.
+7. THE MCP_Server SHALL ein Tool `move_file` mit den Parametern `vaultId` (string, required), `sourcePath` (string, required) und `destinationPath` (string, required) bereitstellen, das eine Datei oder einen Ordner innerhalb des Vaults verschiebt.
+8. IF am Zielpfad bereits eine Datei oder ein Ordner existiert, THEN THE MCP_Server SHALL einen MCP-Fehler mit Code -32005 ("Conflict") zurückgeben.
+9. IF der Zielpfad ein Unterverzeichnis des Quellpfads ist, THEN THE MCP_Server SHALL einen MCP-Fehler mit Code -32602 ("Invalid params") zurückgeben.
+10. THE MCP_Server SHALL ein Tool `rename_file` mit den Parametern `vaultId` (string, required), `path` (string, required) und `newName` (string, required, 1–255 Zeichen) bereitstellen, das eine Datei oder einen Ordner umbenennt (im selben Verzeichnis).
+11. IF der neue Name ungültige Zeichen enthält, THEN THE MCP_Server SHALL einen MCP-Fehler mit Code -32602 ("Invalid params") zurückgeben.
+12. ALL write tools SHALL die Schreibberechtigung des Benutzers über `VaultAccessControlService.checkWriteAccess()` prüfen und bei fehlender Berechtigung einen MCP-Fehler mit Code -32001 ("Access denied") zurückgeben.
+13. ALL write tools SHALL den Dateipfad mit `validateFilePath()` gegen Path-Traversal-Angriffe validieren.
+14. IF ein Schreibvorgang aufgrund eines Dateisystem-Fehlers fehlschlägt, THEN THE MCP_Server SHALL einen MCP-Fehler mit Code -32006 ("Storage error") zurückgeben.
+
+---
+
 ### Requirement 9: API-Token-Verwaltung
 
 **User Story:** Als Benutzer möchte ich meine API-Tokens über die Web-Oberfläche verwalten können, damit ich den Zugriff von KI-Assistenten kontrollieren und bei Bedarf widerrufen kann.

@@ -33,6 +33,11 @@ export {
   getVaultStructureParamsSchema,
   searchVaultParamsSchema,
   readFileParamsSchema,
+  writeFileParamsSchema,
+  createDirectoryParamsSchema,
+  deleteFileParamsSchema,
+  moveFileParamsSchema,
+  renameFileParamsSchema,
 } from './validation.js'
 
 export type {
@@ -41,6 +46,11 @@ export type {
   GetVaultStructureParams,
   SearchVaultParams,
   ReadFileParams,
+  WriteFileParams,
+  CreateDirectoryParams,
+  DeleteFileParams,
+  MoveFileParams,
+  RenameFileParams,
 } from './validation.js'
 
 // Token store

@@ -138,6 +138,9 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
     if (vaultId !== prevVaultIdRef.current) {
       if (vaultId !== null && apiClient) {
         void loadTags(dispatch, apiClient, vaultId)
+      } else {
+        // Vault deselected or deleted — clear stale tags
+        dispatch({ type: 'SET_TAGS', entries: [] })
       }
       prevVaultIdRef.current = vaultId
     }

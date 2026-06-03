@@ -79,8 +79,9 @@ npm run dev
 | 🌙 **Dark Mode** | Automatic light/dark theme based on system preference (or manual override) |
 | 💬 **User Chat** | Real-time messaging between users with unread badges and conversation management |
 | 🔄 **Vault Sync** | CouchDB/obsidian-livesync compatible synchronization with conflict resolution ⚠️ *experimental* |
-| 🤖 **MCP Context Server** | AI assistants (Claude, Cursor, etc.) access your vaults via Model Context Protocol |
+| 🤖 **MCP Context Server** | AI assistants (Claude, Cursor, etc.) read and write your vaults via Model Context Protocol |
 | 📑 **Context Panel** | Right-side panel with document outline, links, tags, and frontmatter properties |
+| 🕸️ **Knowledge Graph** | Interactive visualization of vault link structure with zoom, pan, drag, and search |
 | 🌐 **i18n** | German and English UI, switchable per user |
 | 🛡️ **Admin Panel** | User management, audit log, server configuration |
 | 🐳 **Docker Ready** | Multi-stage Dockerfile, runs as non-root user |
@@ -113,11 +114,71 @@ Backend configuration via `backend/config/default.json`, overridden by environme
 | `SLATEBASE_LOG_LEVEL` | Log level (debug/info/warn/error) | `info` |
 | `SLATEBASE_MAX_FILE_SIZE` | Max file size in bytes | `5242880` (5 MB) |
 | `SLATEBASE_ALLOWED_ORIGINS` | CORS origins (comma-separated) | `http://localhost:5173` |
+| `SLATEBASE_TRUSTED_PROXIES` | Trusted reverse proxy IPs/CIDRs (comma-separated) | *(empty)* |
 | `SLATEBASE_CSRF_SECRET` | CSRF token secret (set for persistence across restarts) | random |
 | `SLATEBASE_SYNC_SECRET` | Sync credential encryption secret (set for persistence) | random |
 | `SLATEBASE_MCP_ENABLED` | Enable/disable MCP server | `true` |
 | `SLATEBASE_MCP_MAX_FILE_SIZE` | Max file size for MCP reads (bytes) | `5242880` (5 MB) |
 | `SLATEBASE_MCP_RATE_LIMIT` | Max MCP requests per minute per token | `60` |
+
+## Reverse Proxy (Nginx Proxy Manager, Caddy, Traefik)
+
+Slatebase is designed to run behind a reverse proxy for TLS termination. Here's how to set it up with **Nginx Proxy Manager** (NPM) on the same Docker host:
+
+### 1. Add the NPM network to your `docker-compose.yml`
+
+```yaml
+networks:
+  slatebase-net:
+    driver: bridge
+  npm-net:
+    external: true
+    name: nginx-proxy-manager_default
+```
+
+Add `npm-net` to the `frontend` service:
+
+```yaml
+  frontend:
+    networks:
+      - slatebase-net
+      - npm-net
+    expose:
+      - "80"
+    # Remove "ports:" — access only via NPM
+```
+
+### 2. Configure environment variables in `docker.env`
+
+```env
+# Your public domain
+SLATEBASE_ALLOWED_ORIGINS=https://slatebase.example.com
+
+# Trust the NPM Docker network (find subnet with:
+# docker network inspect nginx-proxy-manager_default --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}')
+SLATEBASE_TRUSTED_PROXIES=172.19.0.0/16
+```
+
+### 3. Create a Proxy Host in NPM
+
+| Field | Value |
+|-------|-------|
+| Domain Names | `slatebase.example.com` |
+| Scheme | `http` |
+| Forward Hostname | `slatebase-frontend` |
+| Forward Port | `80` |
+| Block Common Exploits | ✅ |
+| Websockets Support | ✅ |
+| SSL | Request new Let's Encrypt certificate, Force SSL, HTTP/2 |
+
+### Trusted Proxy — Why it matters
+
+Without `SLATEBASE_TRUSTED_PROXIES`, the backend ignores `X-Forwarded-For` headers and logs the proxy's internal IP instead of the real client IP. With it configured, the audit log shows actual client addresses.
+
+Supported formats:
+- Exact IP: `172.19.0.2`
+- CIDR range: `172.19.0.0/16`
+- Wildcard: `*` (trusts all — **not recommended** for production)
 
 ## Development
 
@@ -229,6 +290,29 @@ All routes under `/api/v1`. Authentication required (Bearer token via `Authoriza
 | GET | `/vaults/:vaultId/sync/conflicts` | Get open conflicts |
 | POST | `/vaults/:vaultId/sync/conflicts/:path/resolve` | Resolve conflict |
 
+### Graph (Knowledge Graph)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/vaults/:vaultId/graph` | Get full link graph (nodes + edges) |
+| GET | `/vaults/:vaultId/backlinks?path=` | Get backlinks for a file |
+| GET | `/vaults/:vaultId/tags` | Get all tags in the vault |
+
+### Plugins ⚠️ *experimental*
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/vaults/:vaultId/plugins` | List installed plugins |
+| POST | `/vaults/:vaultId/plugins` | Upload/install plugin (ZIP) |
+| GET | `/vaults/:vaultId/plugins/:pluginId` | Get plugin manifest |
+| DELETE | `/vaults/:vaultId/plugins/:pluginId` | Uninstall plugin |
+| GET | `/vaults/:vaultId/plugins/:pluginId/bundle` | Download JS bundle |
+| GET | `/vaults/:vaultId/plugins/:pluginId/styles` | Download CSS styles |
+| GET | `/vaults/:vaultId/plugins/:pluginId/settings` | Load plugin settings |
+| PUT | `/vaults/:vaultId/plugins/:pluginId/settings` | Save plugin settings |
+| GET | `/vaults/:vaultId/plugins/registry` | Load plugin registry |
+| PUT | `/vaults/:vaultId/plugins/registry` | Save plugin registry |
+
 ### MCP (Model Context Protocol)
 
 | Method | Path | Auth | Description |
@@ -249,7 +333,7 @@ Slatebase includes a built-in [Model Context Protocol (MCP)](https://modelcontex
 
 1. **Create an API token** via the Slatebase web UI (Profile → MCP Tokens) or the API
 2. **Configure your MCP client** to connect to your Slatebase instance
-3. **AI assistants can now** list your vaults, read files, search content, and browse directory structures
+3. **AI assistants can now** list your vaults, read files, search content, browse directory structures, and create, edit, delete, move, or rename files
 
 ### Quick Setup
 
@@ -293,12 +377,17 @@ GET http://localhost:3000/.well-known/mcp.json
 
 ### Available MCP Tools
 
-| Tool | Description |
-|------|-------------|
-| `list_vaults` | List all vaults you have access to (with name, permission, file count) |
-| `get_vault_structure` | Get the directory tree of a vault as JSON |
-| `search_vault` | Full-text search across all files in a vault |
-| `read_file` | Read the content of a specific file |
+| Tool | Access | Description |
+|------|--------|-------------|
+| `list_vaults` | Read | List all vaults you have access to (with name, permission, file count) |
+| `get_vault_structure` | Read | Get the directory tree of a vault as JSON |
+| `search_vault` | Read | Full-text search across all files in a vault |
+| `read_file` | Read | Read the content of a specific file |
+| `write_file` | Write | Create or overwrite a text file (supports ETag conflict detection) |
+| `create_directory` | Write | Create a directory (with intermediate directories) |
+| `delete_file` | Write | Delete a file or folder recursively |
+| `move_file` | Write | Move a file or folder to a new location |
+| `rename_file` | Write | Rename a file or folder (stays in same directory) |
 
 ### Available MCP Resources
 

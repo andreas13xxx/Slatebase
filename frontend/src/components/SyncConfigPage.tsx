@@ -56,8 +56,11 @@ type ViewMode = 'view' | 'create' | 'edit'
  */
 export function SyncConfigPage({ vaultId, onOpenSyncLog }: SyncConfigPageProps) {
   const { state, dispatch } = useSyncContext()
-  const { apiClient } = useAppContext()
+  const { apiClient, state: appState } = useAppContext()
   const { t } = useTranslation()
+
+  // Resolve vault name from app state
+  const vaultName = appState.vaults.find((v) => v.id === vaultId)?.name ?? vaultId
 
   // --- View mode ---
   const [viewMode, setViewMode] = useState<ViewMode>('view')
@@ -866,6 +869,7 @@ export function SyncConfigPage({ vaultId, onOpenSyncLog }: SyncConfigPageProps) 
       <h1 className="sync-config-page-title">
         <RefreshCw size={20} />
         {t('sync.title')}
+        <span className="sync-config-vault-name">{vaultName}</span>
       </h1>
 
       {/* Experimental warning banner */}
