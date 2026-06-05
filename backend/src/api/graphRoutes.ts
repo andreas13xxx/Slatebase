@@ -93,6 +93,7 @@ export class GraphRouteModule implements RouteModule {
    * GET /vaults/:vaultId/graph
    * Returns the full graph structure (nodes + edges) for the vault.
    * Requires read or write permission. Triggers lazy-init if index not ready.
+   * Returns empty graph for vaults without a link index (e.g. newly created vaults).
    */
   private async getGraph(c: Context): Promise<Response> {
     const vaultId = c.req.param('vaultId') as string
@@ -104,8 +105,9 @@ export class GraphRouteModule implements RouteModule {
 
     const linkIndex = this.getLinkIndex(vaultId)
     if (linkIndex === undefined) {
-      const apiError = createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`)
-      return c.json(apiError, 404)
+      // Vault exists (checkAccess passed) but no link index yet (e.g. newly created empty vault).
+      // Return an empty graph instead of 404.
+      return c.json({ nodes: [], edges: [] }, 200)
     }
 
     // Lazy-init: if index not ready, trigger rebuild then respond
@@ -147,8 +149,8 @@ export class GraphRouteModule implements RouteModule {
 
     const linkIndex = this.getLinkIndex(vaultId)
     if (linkIndex === undefined) {
-      const apiError = createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`)
-      return c.json(apiError, 404)
+      // Vault exists (checkAccess passed) but no link index yet — return empty backlinks.
+      return c.json({ path: filePath, backlinks: [] }, 200)
     }
 
     // Lazy-init: if index not ready, trigger rebuild then respond

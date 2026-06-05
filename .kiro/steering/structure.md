@@ -148,7 +148,7 @@ src/
 │       ├── settings-manager.ts — SettingsManager (loadData/saveData per plugin per vault)
 │       ├── command-registry.ts — CommandRegistry (addCommand, removeAll, search, hotkeys)
 │       ├── css-injector.ts — CSS injection with scoped selectors (data-plugin-id prefix)
-│       ├── compatibility-analyzer.ts — Static analysis of API usage (supported/partial/unsupported)
+│       ├── compatibility-analyzer.ts — Multi-layer browser compatibility analysis (isDesktopOnly gate, Node.js module detection, Obsidian API pattern matching)
 │       ├── plugin-context.ts — PluginProvider + usePluginContext hook (vault-scoped instances, FCP loading)
 │       ├── plugin-event-bridge.ts — usePluginEventBridge hook (tab→workspace, save→cache, tree→resolved)
 │       └── shims/

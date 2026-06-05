@@ -378,6 +378,16 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault }: Fi
 
   /** Toggle a vault's expanded state and lazy-load its tree. */
   function handleToggleVault(vaultId: string) {
+    // Select this vault on click
+    if (state.selectedVaultId !== vaultId) {
+      dispatch({ type: 'VAULT_SELECTED', payload: vaultId })
+      // Update legacy directoryTree
+      const tree = state.vaultTrees[vaultId]
+      if (tree) {
+        dispatch({ type: 'TREE_LOADED', payload: tree })
+      }
+    }
+
     setExpandedVaults((prev) => {
       const next = new Set(prev)
       if (next.has(vaultId)) {
@@ -434,6 +444,55 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault }: Fi
       x: e.clientX,
       y: e.clientY,
       targetNode: node,
+      vaultId,
+    })
+  }
+
+  /** Handle right-click on vault row (show context menu with vault root as target). */
+  function handleVaultContextMenu(e: React.MouseEvent, vault: VaultInfo) {
+    e.preventDefault()
+    e.stopPropagation()
+    // Create a synthetic root node representing the vault root
+    const rootNode: DirectoryTree = {
+      name: vault.name,
+      path: '',
+      type: 'directory',
+      children: [],
+    }
+    setContextMenuState({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      targetNode: rootNode,
+      vaultId: vault.id,
+    })
+  }
+
+  /** Handle right-click on empty area of the file explorer. */
+  function handleEmptyAreaContextMenu(e: React.MouseEvent) {
+    // Don't override context menu if it bubbled from a child node
+    // (child handlers call stopPropagation, so if we get here, it's the empty area)
+    e.preventDefault()
+
+    // Use selected vault, or fall back to first vault
+    const vaultId = state.selectedVaultId ?? state.vaults[0]?.id
+    if (!vaultId) return
+
+    const vault = state.vaults.find((v) => v.id === vaultId)
+    if (!vault) return
+
+    // Create a synthetic root node for the selected vault
+    const rootNode: DirectoryTree = {
+      name: vault.name,
+      path: '',
+      type: 'directory',
+      children: [],
+    }
+    setContextMenuState({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      targetNode: rootNode,
       vaultId,
     })
   }
@@ -730,7 +789,10 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault }: Fi
   }
 
   return (
-    <div className={`file-explorer-container${dragState.isMoving ? ' file-explorer--moving' : ''}`}>
+    <div
+      className={`file-explorer-container${dragState.isMoving ? ' file-explorer--moving' : ''}`}
+      onContextMenu={handleEmptyAreaContextMenu}
+    >
       {/* Loading indicator while moving */}
       {dragState.isMoving && (
         <div className="file-explorer-moving-indicator">
@@ -763,7 +825,10 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault }: Fi
 
               return (
                 <li key={vault.id} className="tree-node tree-node--vault">
-                  <div className={`tree-node-row tree-node-row--vault${isSelected ? ' tree-node-row--vault-selected' : ''}`}>
+                  <div
+                    className={`tree-node-row tree-node-row--vault${isSelected ? ' tree-node-row--vault-selected' : ''}`}
+                    onContextMenu={(e) => handleVaultContextMenu(e, vault)}
+                  >
                     <button
                       type="button"
                       className="tree-node-toggle tree-node-toggle--vault"
@@ -890,6 +955,11 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault }: Fi
           onNewFile={handleNewFile}
           onRename={handleRename}
           onDelete={handleDelete}
+          onNewVault={() => {
+            setShowCreateVaultForm(true)
+            setNewVaultName('')
+            setVaultValidationError(null)
+          }}
         />
       )}
 

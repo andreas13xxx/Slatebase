@@ -204,11 +204,11 @@ export function GraphView({ vaultId }: GraphViewProps) {
         'link',
         forceLink<SimNode, SimLink>(links)
           .id((d) => d.id)
-          .distance(80),
+          .distance(30),
       )
-      .force('charge', forceManyBody<SimNode>().strength(-200))
-      .force('center', forceCenter(dimensions.width / 2, dimensions.height / 2))
-      .force('collide', forceCollide<SimNode>().radius((d) => d.radius + 5))
+      .force('charge', forceManyBody<SimNode>().strength(-50))
+      .force('center', forceCenter(dimensions.width / 2, dimensions.height / 2).strength(0.1))
+      .force('collide', forceCollide<SimNode>().radius((d) => d.radius + 2))
       .alpha(1)
       .alphaDecay(0.02)
 
@@ -611,15 +611,13 @@ export function GraphView({ vaultId }: GraphViewProps) {
       <svg
         ref={svgRef}
         className="graph-view-svg"
-        width={dimensions.width}
-        height={dimensions.height}
         viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
-        style={{ cursor: isPanningRef.current ? 'grabbing' : 'grab' }}
+        style={{ cursor: isPanningRef.current ? 'grabbing' : 'grab', width: '100%', height: '100%' }}
       >
         {/* Transform group for zoom and pan */}
         <g transform={`translate(${panX}, ${panY}) scale(${zoom})`}>
@@ -695,6 +693,10 @@ export function GraphView({ vaultId }: GraphViewProps) {
             // Calculate screen position: apply zoom and pan manually
             const screenX = node.x * zoom + panX
             const screenY = (node.y + displayRadius + 12) * zoom + panY
+            // Scale font size with zoom so labels don't dominate when zoomed out
+            const fontSize = 11 * zoom
+            // Hide labels when they'd be too small to read
+            if (fontSize < 3) return null
             return (
               <text
                 key={`label-${node.id}`}
@@ -702,7 +704,7 @@ export function GraphView({ vaultId }: GraphViewProps) {
                 y={screenY}
                 className="graph-label"
                 textAnchor="middle"
-                style={{ opacity: nodeOpacity }}
+                style={{ opacity: nodeOpacity, fontSize: `${fontSize}px` }}
               >
                 {label}
               </text>

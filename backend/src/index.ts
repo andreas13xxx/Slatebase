@@ -35,6 +35,7 @@ import {
   SyncLock,
   SyncConfigStore,
   SyncLogStore,
+  SyncProtocolStore,
   ConflictStore,
   CheckpointStore,
   SyncEngine,
@@ -131,6 +132,7 @@ const setupUriParser = new SetupUriParser()
 const syncLock = new SyncLock()
 const syncConfigStore = new SyncConfigStore(serverConfig.dataDir, cryptoService, logger)
 const syncLogStore = new SyncLogStore(serverConfig.dataDir, logger)
+const syncProtocolStore = new SyncProtocolStore(serverConfig.dataDir, logger)
 const conflictStore = new ConflictStore(serverConfig.dataDir, logger)
 const checkpointStore = new CheckpointStore(serverConfig.dataDir, logger)
 const syncEngine = new SyncEngine(cryptoService)
@@ -158,6 +160,7 @@ const syncService = new SyncService(
   syncLock,
   logger,
   vaultPathResolver,
+  syncProtocolStore,
 )
 
 // 4c. MCP Module (conditional on config)
@@ -339,7 +342,7 @@ await vaultService.initializeVaults()
 // Initialize link indexes for all vaults (load from disk or rebuild)
 const vaultEntries = await vaultRegistry.load()
 for (const entry of vaultEntries) {
-  const linkIndex = new LinkIndexService(entry.storagePath, entry.id, logger)
+  const linkIndex = new LinkIndexService(entry.storagePath, entry.id, entry.name, logger)
   linkIndexMap.set(entry.id, linkIndex)
   // Fire-and-forget: load index in background (don't block server startup)
   linkIndex.loadFromDisk().catch((error: unknown) => {
@@ -356,7 +359,7 @@ vaultController.setLinkIndexHook({
     if (!linkIndex) {
       const entry = vaultRegistry.findById(vaultId)
       if (entry) {
-        linkIndex = new LinkIndexService(entry.storagePath, entry.id, logger)
+        linkIndex = new LinkIndexService(entry.storagePath, entry.id, entry.name, logger)
         linkIndexMap.set(entry.id, linkIndex)
       }
     }
@@ -415,6 +418,18 @@ try {
   const message = error instanceof Error ? error.message : String(error)
   logger.error('Failed to initialize sync schedulers', { error: message })
 }
+
+// Set up sync-to-link-index hook: rebuild link index after successful pull
+syncService.setOnPullComplete((vaultId: string) => {
+  const linkIndex = getLinkIndex(vaultId)
+  if (linkIndex) {
+    // Fire-and-forget: rebuild in background (don't block sync response)
+    linkIndex.rebuild().catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error)
+      logger.error('Link index rebuild after sync failed', { vaultId, error: message })
+    })
+  }
+})
 
 // Create the Hono request listener for non-MCP requests
 const honoListener = getRequestListener(app.fetch)

@@ -228,7 +228,9 @@ export interface PluginInstance {
   loadData(): Promise<unknown>;
   saveData(data: unknown): Promise<void>;
   addCommand(command: { id: string; name: string; callback: () => void; hotkeys?: Hotkey[] }): void;
+  addSettingTab(tab: unknown): void;
   registerEvent(eventRef: EventRef): void;
+  registerView(viewType: string, creator: unknown): void;
 }
 
 /**

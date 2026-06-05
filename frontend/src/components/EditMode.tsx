@@ -290,8 +290,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
         onDragOver={handleTextareaDragOver}
         onDragLeave={handleTextareaDragLeave}
         onDrop={handleTextareaDrop}
-        disabled={saving}
-        readOnly={readOnly}
+        readOnly={readOnly || saving}
         aria-label={t('editor.textareaAriaLabel')}
         spellCheck={false}
       />

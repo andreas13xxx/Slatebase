@@ -35,13 +35,19 @@ import { CommandRegistry } from './command-registry'
 import type { ICommandRegistry } from './command-registry'
 import { SettingsManager } from './settings-manager'
 import type { ISettingsApiClient } from './settings-manager'
+import { SettingTabRegistry } from './setting-tab-registry'
+import type { ISettingTabRegistry } from './setting-tab-registry'
 import { CompatibilityAnalyzer } from './compatibility-analyzer'
+// Import setting-tab module to register global obsidian shims (PluginSettingTab, Setting)
+import './setting-tab'
 import type { ICompatibilityAnalyzer } from './compatibility-analyzer'
 import { VaultShim } from './shims/vault-shim'
 import { WorkspaceShim } from './shims/workspace-shim'
 import { MetadataCacheShim } from './shims/metadata-cache-shim'
 import { AppShim } from './shims/app-shim'
 import { usePluginEventBridge } from './plugin-event-bridge'
+import { ViewRegistry } from './view-registry'
+import type { ItemView } from './view-registry'
 import type { TabState } from '../../state/tabState'
 
 // ─── Context Value ───────────────────────────────────────────────────────────
@@ -52,6 +58,8 @@ export interface PluginContextValue {
   commandRegistry: ICommandRegistry
   /** Plugin registry for the Plugin Management Page */
   pluginRegistry: PluginRegistry
+  /** Setting tab registry for native plugin settings UI */
+  settingTabRegistry: ISettingTabRegistry
   /** Currently registered plugin entries */
   plugins: PluginRegistryEntry[]
   /** Whether plugins are still loading */
@@ -60,6 +68,8 @@ export interface PluginContextValue {
   reload(): Promise<void>
   /** Compatibility analyzer for plugin analysis */
   analyzer: ICompatibilityAnalyzer
+  /** Active plugin views (view type → DOM container element) */
+  activeViews: Map<string, { viewType: string; displayText: string; containerEl: HTMLElement }>
 }
 
 // ─── React Context ───────────────────────────────────────────────────────────
@@ -144,10 +154,13 @@ export function PluginProvider({
 }: PluginProviderProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [plugins, setPlugins] = useState<PluginRegistryEntry[]>([])
+  const [activeViews, setActiveViews] = useState<Map<string, { viewType: string; displayText: string; containerEl: HTMLElement }>>(new Map())
 
   // Refs for mutable system instances (stable across renders)
   const commandRegistryRef = useRef<CommandRegistry>(new CommandRegistry())
+  const settingTabRegistryRef = useRef<SettingTabRegistry>(new SettingTabRegistry())
   const analyzerRef = useRef<CompatibilityAnalyzer>(new CompatibilityAnalyzer())
+  const viewRegistryRef = useRef<ViewRegistry>(new ViewRegistry())
 
   // Vault-scoped refs (recreated on vault switch)
   const pluginRegistryRef = useRef<PluginRegistry | null>(null)
@@ -175,7 +188,9 @@ export function PluginProvider({
         settingsManagerRef.current = null
         workspaceShimRef.current = null
         metadataCacheShimRef.current = null
+        void viewRegistryRef.current.clear()
         setPlugins([])
+        setActiveViews(new Map())
         loadedRef.current = false
       }
       prevVaultIdRef.current = null
@@ -204,6 +219,11 @@ export function PluginProvider({
     for (const entry of oldPlugins) {
       commandRegistryRef.current.removeAllForPlugin(entry.pluginId)
     }
+    // Clear setting tab registry (tabs are plugin-scoped)
+    settingTabRegistryRef.current.clear()
+    // Clear active views and view registry
+    await viewRegistryRef.current.clear()
+    setActiveViews(new Map())
 
     // 3. Create new vault-scoped instances
     const registryAdapter = createRegistryApiAdapter(apiClient)
@@ -223,6 +243,36 @@ export function PluginProvider({
     const newMetadataCacheShim = new MetadataCacheShim(directoryTree)
     workspaceShimRef.current = newWorkspaceShim
     metadataCacheShimRef.current = newMetadataCacheShim
+
+    // Create a fresh ViewRegistry for this vault and wire it to the WorkspaceShim
+    const newViewRegistry = new ViewRegistry()
+    viewRegistryRef.current = newViewRegistry
+    newViewRegistry.setOnViewActivated((viewType: string, view: ItemView) => {
+      setActiveViews(prev => {
+        const next = new Map(prev)
+        next.set(viewType, {
+          viewType,
+          displayText: view.getDisplayText(),
+          containerEl: view.containerEl,
+        })
+        return next
+      })
+    })
+    newViewRegistry.setOnViewDeactivated((viewType: string) => {
+      setActiveViews(prev => {
+        const next = new Map(prev)
+        next.delete(viewType)
+        return next
+      })
+    })
+    // Attach registry to workspace shim (needs a dummy app reference for leaf creation)
+    // The app reference will be a minimal shared object — all plugins see the same vault/workspace/metadataCache
+    const sharedApp = {
+      vault: new VaultShim(newVaultId, vaultName, apiClient, directoryTree ?? { name: vaultName, type: 'directory' as const, children: [], itemCount: 0, path: '' }),
+      workspace: newWorkspaceShim,
+      metadataCache: newMetadataCacheShim,
+    }
+    newWorkspaceShim.setViewRegistry(newViewRegistry, sharedApp)
 
     const newLoader = new PluginLoader({
       appShimFactory: (pluginId: string) => {
@@ -251,6 +301,16 @@ export function PluginProvider({
         // Wire addCommand to route to the shared CommandRegistry
         instance.addCommand = (command) => {
           commandRegistryRef.current.addCommand(pluginId, command)
+        }
+        // Wire addSettingTab to route to the shared SettingTabRegistry
+        instance.addSettingTab = (tab: unknown) => {
+          settingTabRegistryRef.current.register(pluginId, tab as import('./setting-tab').PluginSettingTab)
+        }
+        // Wire registerView to route to the workspace shim's view registry
+        ;(instance as unknown as { registerView: (viewType: string, creator: unknown) => void }).registerView = (viewType: string, creator: unknown) => {
+          if (workspaceShimRef.current) {
+            workspaceShimRef.current.registerView(viewType, creator as (leaf: import('./view-registry').WorkspaceLeaf) => unknown)
+          }
         }
       },
     })
@@ -315,12 +375,12 @@ export function PluginProvider({
             pluginId: entry.pluginId,
             bundle,
             manifest: {
-              id: entry.manifest.id,
-              name: entry.manifest.name,
-              version: entry.manifest.version,
-              minAppVersion: entry.manifest.minAppVersion,
-              author: entry.manifest.author,
-              description: entry.manifest.description,
+              id: entry.manifest?.id ?? entry.pluginId,
+              name: entry.manifest?.name ?? entry.pluginId,
+              version: entry.manifest?.version ?? '0.0.0',
+              minAppVersion: entry.manifest?.minAppVersion,
+              author: entry.manifest?.author,
+              description: entry.manifest?.description,
             },
           })
         } catch (err) {
@@ -412,10 +472,12 @@ export function PluginProvider({
   const contextValue: PluginContextValue = {
     commandRegistry: commandRegistryRef.current,
     pluginRegistry: pluginRegistryRef.current ?? new PluginRegistry(createRegistryApiAdapter(apiClient), vaultId ?? ''),
+    settingTabRegistry: settingTabRegistryRef.current,
     plugins,
     isLoading,
     reload,
     analyzer: analyzerRef.current,
+    activeViews,
   }
 
   return React.createElement(

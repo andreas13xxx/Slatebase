@@ -23,14 +23,14 @@ export function truncateLabel(filename: string): string {
 }
 
 /**
- * Clamps the resulting zoom level (currentZoom + delta) to the range [0.1, 5.0].
+ * Clamps the resulting zoom level (currentZoom + delta) to the range [0.02, 5.0].
  *
  * @param currentZoom - The current zoom level
  * @param delta - The zoom delta to apply (positive = zoom in, negative = zoom out)
- * @returns The clamped zoom level within [0.1, 5.0]
+ * @returns The clamped zoom level within [0.02, 5.0]
  */
 export function clampZoom(currentZoom: number, delta: number): number {
-  return Math.min(5.0, Math.max(0.1, currentZoom + delta))
+  return Math.min(5.0, Math.max(0.02, currentZoom + delta))
 }
 
 /**

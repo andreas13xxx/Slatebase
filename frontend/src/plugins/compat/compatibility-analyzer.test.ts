@@ -1,11 +1,137 @@
 import { describe, it, expect } from 'vitest';
 import { CompatibilityAnalyzer, calculateLevel } from './compatibility-analyzer';
 import type { CompatibilityReport, ApiCallClassification } from './compatibility-analyzer';
+import type { PluginManifestData } from './types';
 
 describe('CompatibilityAnalyzer', () => {
   const analyzer = new CompatibilityAnalyzer();
 
-  describe('analyze() — API pattern detection', () => {
+  describe('analyze() — isDesktopOnly manifest check (Layer 1)', () => {
+    it('returns unsupported when isDesktopOnly is true', () => {
+      const manifest: PluginManifestData = { id: 'test', name: 'Test', version: '1.0.0', isDesktopOnly: true };
+      const source = `class MyPlugin { async onload() { this.app.vault.read(file); } }`;
+      const report = analyzer.analyze(source, manifest);
+      expect(report.level).toBe('unsupported');
+      expect(report.isDesktopOnly).toBe(true);
+      expect(report.reasons[0]).toContain('isDesktopOnly');
+    });
+
+    it('proceeds to deeper analysis when isDesktopOnly is false', () => {
+      const manifest: PluginManifestData = { id: 'test', name: 'Test', version: '1.0.0', isDesktopOnly: false };
+      const source = `class MyPlugin { async onload() { this.app.vault.read(file); } }`;
+      const report = analyzer.analyze(source, manifest);
+      expect(report.level).toBe('full');
+      expect(report.isDesktopOnly).toBe(false);
+    });
+
+    it('proceeds to deeper analysis when isDesktopOnly is absent', () => {
+      const manifest: PluginManifestData = { id: 'test', name: 'Test', version: '1.0.0' };
+      const source = `class MyPlugin { async onload() { this.app.vault.read(file); } }`;
+      const report = analyzer.analyze(source, manifest);
+      expect(report.level).toBe('full');
+      expect(report.isDesktopOnly).toBe(false);
+    });
+
+    it('does not run bundle analysis when isDesktopOnly is true (fast path)', () => {
+      const manifest: PluginManifestData = { id: 'test', name: 'Test', version: '1.0.0', isDesktopOnly: true };
+      // Even with perfectly compatible code, isDesktopOnly gates the result
+      const source = `class MyPlugin { async onload() { console.log('hello'); } }`;
+      const report = analyzer.analyze(source, manifest);
+      expect(report.level).toBe('unsupported');
+      expect(report.apiCalls).toHaveLength(0);
+      expect(report.nodeModules).toHaveLength(0);
+    });
+
+    it('works without manifest parameter (backward compatibility)', () => {
+      const source = `class MyPlugin { async onload() { this.app.vault.read(file); } }`;
+      const report = analyzer.analyze(source);
+      expect(report.level).toBe('full');
+      expect(report.isDesktopOnly).toBe(false);
+    });
+  });
+
+  describe('analyze() — Node.js module detection (Layer 2)', () => {
+    it('detects require("fs") and returns unsupported', () => {
+      const source = `const fs = require('fs'); class MyPlugin { onload() { fs.readFileSync('/tmp/x'); } }`;
+      const report = analyzer.analyze(source);
+      expect(report.level).toBe('unsupported');
+      expect(report.nodeModules).toContain('fs');
+      expect(report.reasons[0]).toContain('Node.js');
+    });
+
+    it('detects require("child_process")', () => {
+      const source = `const { exec } = require('child_process'); class MyPlugin { onload() {} }`;
+      const report = analyzer.analyze(source);
+      expect(report.level).toBe('unsupported');
+      expect(report.nodeModules).toContain('child_process');
+    });
+
+    it('detects require("net")', () => {
+      const source = `const net = require("net"); class MyPlugin { onload() {} }`;
+      const report = analyzer.analyze(source);
+      expect(report.level).toBe('unsupported');
+      expect(report.nodeModules).toContain('net');
+    });
+
+    it('detects require("electron")', () => {
+      const source = `const { remote } = require('electron'); class MyPlugin { onload() {} }`;
+      const report = analyzer.analyze(source);
+      expect(report.level).toBe('unsupported');
+      expect(report.nodeModules).toContain('electron');
+    });
+
+    it('detects node: prefixed imports', () => {
+      const source = `const fs = require('node:fs'); class MyPlugin { onload() {} }`;
+      const report = analyzer.analyze(source);
+      expect(report.level).toBe('unsupported');
+      expect(report.nodeModules).toContain('fs');
+    });
+
+    it('detects ESM import from node builtins', () => {
+      const source = `import { readFile } from 'fs'; class MyPlugin { onload() {} }`;
+      const report = analyzer.analyze(source);
+      expect(report.level).toBe('unsupported');
+      expect(report.nodeModules).toContain('fs');
+    });
+
+    it('detects dynamic import of node builtins', () => {
+      const source = `class MyPlugin { async onload() { const fs = await import('fs'); } }`;
+      const report = analyzer.analyze(source);
+      expect(report.level).toBe('unsupported');
+      expect(report.nodeModules).toContain('fs');
+    });
+
+    it('detects multiple Node.js modules', () => {
+      const source = `const fs = require('fs'); const path = require('path'); const net = require('net');`;
+      const report = analyzer.analyze(source);
+      expect(report.level).toBe('unsupported');
+      expect(report.nodeModules).toContain('fs');
+      expect(report.nodeModules).toContain('path');
+      expect(report.nodeModules).toContain('net');
+    });
+
+    it('does not flag non-Node.js requires (e.g. obsidian)', () => {
+      const source = `const { Plugin } = require('obsidian'); class MyPlugin extends Plugin { onload() {} }`;
+      const report = analyzer.analyze(source);
+      expect(report.level).not.toBe('unsupported');
+      expect(report.nodeModules).toHaveLength(0);
+    });
+
+    it('does not flag npm package requires', () => {
+      const source = `const lodash = require('lodash'); class MyPlugin { onload() {} }`;
+      const report = analyzer.analyze(source);
+      expect(report.nodeModules).toHaveLength(0);
+    });
+
+    it('detects original-fs (Electron-specific)', () => {
+      const source = `const fs = require('original-fs'); class MyPlugin { onload() {} }`;
+      const report = analyzer.analyze(source);
+      expect(report.level).toBe('unsupported');
+      expect(report.nodeModules).toContain('original-fs');
+    });
+  });
+
+  describe('analyze() — API pattern detection (Layer 3)', () => {
     it('detects vault.read access', () => {
       const source = `
         class MyPlugin {
@@ -328,6 +454,8 @@ describe('CompatibilityAnalyzer', () => {
       const report = analyzer.analyze('');
       expect(report.level).toBe('unknown');
       expect(report.apiCalls).toHaveLength(0);
+      expect(report.nodeModules).toHaveLength(0);
+      expect(report.isDesktopOnly).toBe(false);
     });
 
     it('returns unknown for whitespace-only bundle', () => {

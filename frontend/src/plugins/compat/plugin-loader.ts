@@ -346,7 +346,21 @@ export class PluginLoader implements IPluginLoader {
     }
 
     // Default: browser-based evaluation via Blob URL + dynamic import()
-    const blob = new Blob([bundle], { type: 'application/javascript' });
+    // Obsidian plugin bundles are CJS format (esbuild output) with require('obsidian').
+    // We wrap the bundle in a CJS-to-ESM adapter that provides require() and module.exports.
+    const wrappedBundle = `
+const module = { exports: {} };
+const exports = module.exports;
+function require(id) {
+  if (id === 'obsidian') return window.obsidian || {};
+  if (id === 'obsidian-daily-notes-interface') return window.__obsidianDailyNotesInterface || {};
+  console.warn('[PluginLoader] Unknown require:', id);
+  return {};
+}
+${bundle}
+export default module.exports.default || module.exports;
+`;
+    const blob = new Blob([wrappedBundle], { type: 'application/javascript' });
     const url = URL.createObjectURL(blob);
     try {
       const module = await import(/* @vite-ignore */ url);

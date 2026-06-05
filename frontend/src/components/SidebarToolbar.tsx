@@ -2,13 +2,13 @@ import { useState, useRef, useCallback } from 'react'
 import {
   Upload, FolderOpen, Download, Settings, Shield,
   Database, FileText, Clock, User, Server, FilePlus, MessageCircle, RefreshCw, Key, ScrollText,
-  ClipboardList, Plus, Share2,
+  ClipboardList, Plus, Share2, Plug,
 } from 'lucide-react'
 
 type AppPage =
   | 'vaults' | 'my-vaults' | 'profile' | 'sessions' | 'chat'
   | 'admin-users' | 'admin-vaults' | 'admin-config' | 'admin-audit' | 'admin-logs'
-  | 'vault-sharing' | 'vault-deletion' | 'sync-config' | 'sync-log' | 'mcp-tokens'
+  | 'vault-sharing' | 'vault-deletion' | 'sync-config' | 'sync-log' | 'mcp-tokens' | 'plugins'
 
 interface ToolbarItem {
   id: string
@@ -50,6 +50,7 @@ export function SidebarToolbar({ vaultId, onCreateVault, onCreateFile, onImportF
     { id: 'graph', icon: <Share2 size={15} />, label: 'Graph', action: onOpenGraph, requiresVault: true },
     { id: 'sync-config', icon: <RefreshCw size={15} />, label: 'Vault-Sync', action: () => onNavigate('sync-config'), requiresVault: true, ownerOnly: true },
     { id: 'sync-log', icon: <ClipboardList size={15} />, label: 'Sync-Protokoll', action: () => onNavigate('sync-log'), requiresVault: true, ownerOnly: true },
+    { id: 'plugins', icon: <Plug size={15} />, label: 'Plugins', action: () => onNavigate('plugins'), requiresVault: true },
     { id: 'my-vaults', icon: <Database size={15} />, label: 'Meine Vaults', action: () => onNavigate('my-vaults') },
     { id: 'profile', icon: <User size={15} />, label: 'Profil', action: () => onNavigate('profile') },
     { id: 'sessions', icon: <Clock size={15} />, label: 'Sitzungen', action: () => onNavigate('sessions') },

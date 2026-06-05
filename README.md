@@ -80,6 +80,7 @@ npm run dev
 | 💬 **User Chat** | Real-time messaging between users with unread badges and conversation management |
 | 🔄 **Vault Sync** | CouchDB/obsidian-livesync compatible synchronization with conflict resolution ⚠️ *experimental* |
 | 🤖 **MCP Context Server** | AI assistants (Claude, Cursor, etc.) read and write your vaults via Model Context Protocol |
+| 🧩 **Obsidian Plugin Compat** | Run browser-compatible Obsidian Community Plugins in the web UI ⚠️ *experimental* |
 | 📑 **Context Panel** | Right-side panel with document outline, links, tags, and frontmatter properties |
 | 🕸️ **Knowledge Graph** | Interactive visualization of vault link structure with zoom, pan, drag, and search |
 | 🌐 **i18n** | German and English UI, switchable per user |
@@ -299,6 +300,8 @@ All routes under `/api/v1`. Authentication required (Bearer token via `Authoriza
 | GET | `/vaults/:vaultId/tags` | Get all tags in the vault |
 
 ### Plugins ⚠️ *experimental*
+
+> ⚠️ **Experimental — Use at your own risk.** The Obsidian Plugin Compatibility Layer is under active development. Only browser-compatible plugins are supported. Expect breaking changes and potential instability.
 
 | Method | Path | Description |
 |--------|------|-------------|

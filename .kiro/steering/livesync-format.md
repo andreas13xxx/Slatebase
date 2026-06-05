@@ -103,8 +103,18 @@ Das `type`-Feld im Dokument hat immer Vorrang vor der Pfad-basierten Erkennung.
 Diese Dokument-IDs sind KEINE Dateipfade und dürfen nicht als Vault-Dateien geschrieben werden:
 - `obsydian_livesync_version` (Chunk-Format-Version, Typo ist Original)
 - `syncinfo` (Sync-Metadaten)
+- `client-config` (Client-Konfiguration, Sync-Settings zwischen Geräten)
+- `client-config.yml` (P2P-Netzwerkkonfiguration: peerId, networkId, Peer-Adressen — seit livesync 0.25.x mit P2P-Feature)
 - `_local/*` (CouchDB-lokal, werden ohnehin nicht repliziert)
 - `_design/*` (CouchDB Design-Docs)
+
+## Obsidian-Konfigurationsdateien (.obsidian/)
+
+Dateien unter `.obsidian/` (Plugin-Settings, App-Konfiguration, Workspace-Layouts, Themes) werden **mitgesynct**. Die Dokument-ID-Prefixes `i:` und `ps:` werden gestrippt, der resultierende Pfad (z.B. `.obsidian/app.json`) wird normal als Datei ins Vault geschrieben.
+
+**Ausgeschlossene Verzeichnisse** (werden NICHT gesynct):
+- `.trash/` — Obsidian-Papierkorb (lokale Löschungen, nicht relevant für Sync)
+- `.mobile/` — Mobile-App-spezifische Daten
 
 ## Eden-Chunks (Legacy)
 

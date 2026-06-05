@@ -35,7 +35,19 @@ export type {
   PushResult,
   AnalyzeParams,
   SetupUriParams,
+  PulledFileDetail,
+  PushedFileDetail,
 } from './types.js'
+
+// Protocol types
+export type {
+  ISyncProtocolStore,
+  SyncProtocolEntry,
+  SyncProtocolLevel,
+  SyncProtocolEventType,
+  SyncProtocolFilter,
+  PaginatedSyncProtocol,
+} from './protocol-types.js'
 
 // Error classes
 export {
@@ -55,6 +67,8 @@ export { SetupUriParser } from './setup-uri-parser.js'
 export { SyncLock } from './sync-lock.js'
 export { SyncConfigStore } from './sync-config-store.js'
 export { SyncLogStore } from './sync-log-store.js'
+export { SyncProtocolStore } from './protocol-store.js'
+export { SyncProtocolLogger, createProtocolEntry } from './protocol-logger.js'
 export { ConflictStore } from './conflict-store.js'
 export { CheckpointStore } from './checkpoint-store.js'
 export { SyncEngine } from './sync-engine.js'

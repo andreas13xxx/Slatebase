@@ -3,6 +3,8 @@
 // version upgrade logic, and plugin installation.
 
 import AdmZip from 'adm-zip'
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import type { IPluginStore, PluginManifest } from './types.js'
 import { pluginManifestSchema } from './validation.js'
 
@@ -34,6 +36,8 @@ export interface PluginInstallResult {
 export interface IPluginInstaller {
   /** Install a plugin from a ZIP buffer */
   installFromZip(vaultId: string, zipBuffer: Buffer): Promise<PluginInstallResult>
+  /** Install a plugin from .obsidian/plugins/ directory within the vault */
+  installFromDetected(vaultId: string, pluginId: string, vaultStoragePath: string): Promise<PluginInstallResult>
 }
 
 /** Error thrown when plugin installation fails */
@@ -133,6 +137,107 @@ export class PluginInstaller implements IPluginInstaller {
     await this.pluginStore.savePlugin(vaultId, manifest.id, files)
 
     // Step 9: Return install result
+    return {
+      pluginId: manifest.id,
+      manifest,
+      isUpgrade,
+    }
+  }
+
+  /**
+   * Install a plugin from the .obsidian/plugins/ directory within a vault.
+   * Reads manifest.json, main.js, and optionally styles.css from the vault filesystem,
+   * validates them, and saves to the plugin store.
+   *
+   * @param vaultId - The vault to install the plugin into
+   * @param pluginId - The plugin folder name in .obsidian/plugins/
+   * @param vaultStoragePath - Absolute path to the vault's storage directory
+   * @returns Installation result with plugin ID, manifest, and upgrade status
+   * @throws PluginInstallError on validation or installation failure
+   */
+  async installFromDetected(vaultId: string, pluginId: string, vaultStoragePath: string): Promise<PluginInstallResult> {
+    const pluginDir = path.join(vaultStoragePath, '.obsidian', 'plugins', pluginId)
+
+    // Step 1: Read manifest.json
+    let manifestContent: string
+    try {
+      manifestContent = await fs.readFile(path.join(pluginDir, 'manifest.json'), 'utf-8')
+    } catch {
+      throw new PluginInstallError(
+        `Plugin "${pluginId}": manifest.json not found in .obsidian/plugins/${pluginId}/`,
+        'MISSING_FILES',
+      )
+    }
+
+    // Step 2: Read main.js (bundle)
+    let bundleContent: string
+    try {
+      bundleContent = await fs.readFile(path.join(pluginDir, 'main.js'), 'utf-8')
+    } catch {
+      throw new PluginInstallError(
+        `Plugin "${pluginId}": main.js not found in .obsidian/plugins/${pluginId}/`,
+        'MISSING_FILES',
+      )
+    }
+
+    // Step 3: Read optional styles.css
+    let stylesContent: string | undefined
+    try {
+      stylesContent = await fs.readFile(path.join(pluginDir, 'styles.css'), 'utf-8')
+    } catch {
+      // styles.css is optional — ignore
+    }
+
+    // Step 4: Validate manifest
+    const manifest = this.validateManifest(manifestContent)
+
+    // Step 5: Check bundle integrity
+    this.checkBundleIntegrity(bundleContent, manifest.id)
+
+    // Step 6: Check file sizes
+    const bundleSize = Buffer.byteLength(bundleContent, 'utf-8')
+    if (bundleSize > MAX_EXTRACTED_SIZE) {
+      throw new PluginInstallError(
+        `Plugin "${pluginId}" bundle exceeds maximum size of 10 MB (actual: ${(bundleSize / 1024 / 1024).toFixed(2)} MB)`,
+        'EXTRACTED_TOO_LARGE',
+      )
+    }
+
+    // Step 7: Check existing installation (version comparison)
+    const existingManifest = await this.pluginStore.loadManifest(vaultId, manifest.id)
+    let isUpgrade = false
+
+    if (existingManifest !== null) {
+      const comparison = compareSemver(manifest.version, existingManifest.version)
+      if (comparison <= 0) {
+        throw new PluginInstallError(
+          `Plugin "${manifest.id}" is already installed with version ${existingManifest.version}. ` +
+          `Detected version ${manifest.version} is not higher.`,
+          'VERSION_NOT_HIGHER',
+        )
+      }
+      isUpgrade = true
+    }
+
+    // Step 8: Save files to PluginStore
+    const files = stylesContent !== undefined
+      ? { manifest: manifestContent, bundle: bundleContent, styles: stylesContent }
+      : { manifest: manifestContent, bundle: bundleContent }
+    await this.pluginStore.savePlugin(vaultId, manifest.id, files)
+
+    // Step 9: Copy data.json (settings) if it exists and plugin is fresh install
+    if (!isUpgrade) {
+      try {
+        const dataJson = await fs.readFile(path.join(pluginDir, 'data.json'), 'utf-8')
+        // Validate it's valid JSON before saving
+        JSON.parse(dataJson)
+        await this.pluginStore.saveSettings(vaultId, manifest.id, dataJson)
+      } catch {
+        // data.json is optional or invalid — ignore
+      }
+    }
+
+    // Step 10: Return install result
     return {
       pluginId: manifest.id,
       manifest,

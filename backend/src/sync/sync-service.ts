@@ -25,6 +25,8 @@ import type {
   SyncCheckpoint,
   SyncErrorDetail,
 } from './types.js'
+import type { ISyncProtocolStore, PaginatedSyncProtocol, SyncProtocolFilter } from './protocol-types.js'
+import { SyncProtocolLogger } from './protocol-logger.js'
 import {
   SyncAlreadyConfiguredError,
   SyncNotConfiguredError,
@@ -64,6 +66,12 @@ export function maskPassword(password: string): string {
  * Coordinates all sync operations, manages configuration, and handles conflicts.
  */
 export class SyncService implements ISyncService {
+  /**
+   * Optional callback invoked after a successful pull that modified files.
+   * Used to trigger link-index rebuild without coupling SyncService to LinkIndexService.
+   */
+  private onPullComplete?: (vaultId: string) => void
+
   constructor(
     private readonly configStore: ISyncConfigStore,
     private readonly logStore: ISyncLogStore,
@@ -76,7 +84,16 @@ export class SyncService implements ISyncService {
     private readonly syncLock: ISyncLock,
     private readonly logger: ILogger,
     private readonly vaultPathResolver: VaultPathResolver,
+    private readonly protocolStore?: ISyncProtocolStore,
   ) {}
+
+  /**
+   * Registers a callback to be invoked after a successful pull that wrote files to disk.
+   * Typically used to rebuild the link index after sync.
+   */
+  setOnPullComplete(callback: (vaultId: string) => void): void {
+    this.onPullComplete = callback
+  }
 
   // ─── Configuration Management ────────────────────────────────────────────
 
@@ -349,6 +366,9 @@ export class SyncService implements ISyncService {
       throw new SyncInProgressError()
     }
 
+    // Create protocol logger for this run
+    const protocol = this.protocolStore ? new SyncProtocolLogger(this.protocolStore, vaultId) : undefined
+
     try {
       // Load config
       const config = await this.configStore.load(vaultId)
@@ -361,6 +381,9 @@ export class SyncService implements ISyncService {
       if (!vaultPath) {
         throw new SyncNotConfiguredError()
       }
+
+      // Protocol: sync start
+      protocol?.syncStart('manual', config.mode)
 
       // Decrypt credentials
       const username = this.cryptoService.decrypt(config.usernameEncrypted)
@@ -392,6 +415,9 @@ export class SyncService implements ISyncService {
       }
       await this.logStore.append(vaultId, logEntry)
 
+      // Protocol: connecting
+      protocol?.connecting(config.endpoint, config.database)
+
       // Execute pull
       const pullResult = await this.syncEngine.pull({
         connection,
@@ -406,6 +432,15 @@ export class SyncService implements ISyncService {
       // Handle connection/auth failures
       if (pullResult.status === 'connection_failed' || pullResult.status === 'auth_failed') {
         const durationMs = Date.now() - startTime
+
+        // Protocol: connection/auth failure
+        if (pullResult.status === 'connection_failed') {
+          protocol?.connectionFailed(pullResult.errors[0]?.description ?? 'Unbekannter Fehler')
+        } else {
+          protocol?.authFailed()
+        }
+        protocol?.syncComplete(durationMs, 0, 0, 0, pullResult.errors.length)
+
         const result: SyncResult = {
           status: pullResult.status,
           pulledCount: 0,
@@ -423,8 +458,37 @@ export class SyncService implements ISyncService {
           ...(pullResult.errors.length > 0 ? { errors: pullResult.errors } : {}),
         })
 
+        // Flush protocol before returning
+        await protocol?.flush()
         return result
       }
+
+      // Protocol: connected + pull start
+      protocol?.connected(since)
+      protocol?.pullStart(pullResult.changeCount ?? 0, since)
+
+      // Protocol: log individual pulled files
+      if (pullResult.pulledFiles) {
+        for (const file of pullResult.pulledFiles) {
+          protocol?.filePulled(file.path, file.size, file.isBinary, file.chunkCount)
+        }
+      }
+      // Protocol: log deleted files
+      if (pullResult.deletedFiles) {
+        for (const filePath of pullResult.deletedFiles) {
+          protocol?.fileDeleted(filePath)
+        }
+      }
+      // Protocol: log conflicts
+      for (const conflict of pullResult.conflicts) {
+        protocol?.conflict(conflict.documentPath)
+      }
+      // Protocol: log file errors
+      for (const error of pullResult.errors) {
+        protocol?.fileFailed(error.documentPath, error.errorType, error.description)
+      }
+
+      protocol?.pullComplete(pullResult.pulledCount, pullResult.conflicts.length, pullResult.errors.length)
 
       // Store conflicts from pull (only for documents without existing conflicts)
       let conflictsDetected = 0
@@ -452,6 +516,23 @@ export class SyncService implements ISyncService {
 
         pushedCount = pushResult.pushedCount
         pushErrors.push(...pushResult.errors)
+
+        // Protocol: push events
+        protocol?.pushStart(pushResult.changedFileCount ?? 0, pushResult.deletedFileCount ?? 0)
+        if (pushResult.pushedFiles) {
+          for (const file of pushResult.pushedFiles) {
+            protocol?.filePushed(file.path, file.size)
+          }
+        }
+        if (pushResult.deletedFiles) {
+          for (const filePath of pushResult.deletedFiles) {
+            protocol?.filePushDeleted(filePath)
+          }
+        }
+        for (const error of pushResult.errors) {
+          protocol?.fileFailed(error.documentPath, error.errorType, error.description)
+        }
+        protocol?.pushComplete(pushedCount, pushResult.errors.length)
       }
 
       // Combine errors
@@ -489,6 +570,9 @@ export class SyncService implements ISyncService {
           localMtimes: currentMtimes,
         }
         await this.checkpointStore.save(vaultId, newCheckpoint)
+
+        // Protocol: checkpoint
+        protocol?.checkpoint(pullResult.newLastSeq)
       }
 
       // Update log entry
@@ -509,8 +593,24 @@ export class SyncService implements ISyncService {
         errors: allErrors,
       }
 
+      // Protocol: sync complete
+      protocol?.syncComplete(durationMs, pullResult.pulledCount, pushedCount, conflictsDetected, allErrors.length)
+
+      // Flush protocol
+      await protocol?.flush()
+
       // Reset scheduler timer (so next interval starts fresh after manual sync)
       this.scheduler.reset(vaultId)
+
+      // Trigger link index rebuild if files were pulled
+      if (pullResult.pulledCount > 0 && this.onPullComplete) {
+        try {
+          this.onPullComplete(vaultId)
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error)
+          this.logger.error('onPullComplete hook failed', { vaultId, error: message })
+        }
+      }
 
       return result
     } finally {
@@ -578,6 +678,17 @@ export class SyncService implements ISyncService {
    */
   async getLog(vaultId: string, page: number, pageSize: number): Promise<PaginatedSyncLog> {
     return this.logStore.read(vaultId, page, pageSize)
+  }
+
+  /**
+   * Returns the sync protocol (event log) paginated with optional filters.
+   * Returns empty result if no protocol store is configured.
+   */
+  async getProtocol(vaultId: string, page: number, pageSize: number, filter?: SyncProtocolFilter): Promise<PaginatedSyncProtocol> {
+    if (!this.protocolStore) {
+      return { items: [], total: 0, page: 1, pageSize, totalPages: 0 }
+    }
+    return this.protocolStore.read(vaultId, page, pageSize, filter)
   }
 
   /**
@@ -745,6 +856,9 @@ export class SyncService implements ISyncService {
       return // Already in progress — skip silently
     }
 
+    // Create protocol logger for this run
+    const protocol = this.protocolStore ? new SyncProtocolLogger(this.protocolStore, vaultId) : undefined
+
     try {
       // Load config
       const config = await this.configStore.load(vaultId)
@@ -757,6 +871,9 @@ export class SyncService implements ISyncService {
       if (!vaultPath) {
         return
       }
+
+      // Protocol: sync start
+      protocol?.syncStart('interval', config.mode)
 
       // Decrypt credentials
       const username = this.cryptoService.decrypt(config.usernameEncrypted)
@@ -788,6 +905,9 @@ export class SyncService implements ISyncService {
       }
       await this.logStore.append(vaultId, logEntry)
 
+      // Protocol: connecting
+      protocol?.connecting(config.endpoint, config.database)
+
       // Execute pull
       const pullResult = await this.syncEngine.pull({
         connection,
@@ -802,6 +922,15 @@ export class SyncService implements ISyncService {
       // Handle connection/auth failures
       if (pullResult.status === 'connection_failed' || pullResult.status === 'auth_failed') {
         const durationMs = Date.now() - startTime
+
+        if (pullResult.status === 'connection_failed') {
+          protocol?.connectionFailed(pullResult.errors[0]?.description ?? 'Unbekannter Fehler')
+        } else {
+          protocol?.authFailed()
+        }
+        protocol?.syncComplete(durationMs, 0, 0, 0, pullResult.errors.length)
+        await protocol?.flush()
+
         await this.logStore.updateLast(vaultId, {
           status: pullResult.status,
           pulledCount: 0,
@@ -811,6 +940,27 @@ export class SyncService implements ISyncService {
         })
         return
       }
+
+      // Protocol: connected + pull
+      protocol?.connected(since)
+      protocol?.pullStart(pullResult.changeCount ?? 0, since)
+      if (pullResult.pulledFiles) {
+        for (const file of pullResult.pulledFiles) {
+          protocol?.filePulled(file.path, file.size, file.isBinary, file.chunkCount)
+        }
+      }
+      if (pullResult.deletedFiles) {
+        for (const filePath of pullResult.deletedFiles) {
+          protocol?.fileDeleted(filePath)
+        }
+      }
+      for (const conflict of pullResult.conflicts) {
+        protocol?.conflict(conflict.documentPath)
+      }
+      for (const error of pullResult.errors) {
+        protocol?.fileFailed(error.documentPath, error.errorType, error.description)
+      }
+      protocol?.pullComplete(pullResult.pulledCount, pullResult.conflicts.length, pullResult.errors.length)
 
       // Store conflicts from pull (only for documents without existing conflicts)
       for (const conflict of pullResult.conflicts) {
@@ -836,6 +986,22 @@ export class SyncService implements ISyncService {
 
         pushedCount = pushResult.pushedCount
         pushErrors.push(...pushResult.errors)
+
+        protocol?.pushStart(pushResult.changedFileCount ?? 0, pushResult.deletedFileCount ?? 0)
+        if (pushResult.pushedFiles) {
+          for (const file of pushResult.pushedFiles) {
+            protocol?.filePushed(file.path, file.size)
+          }
+        }
+        if (pushResult.deletedFiles) {
+          for (const filePath of pushResult.deletedFiles) {
+            protocol?.filePushDeleted(filePath)
+          }
+        }
+        for (const error of pushResult.errors) {
+          protocol?.fileFailed(error.documentPath, error.errorType, error.description)
+        }
+        protocol?.pushComplete(pushedCount, pushResult.errors.length)
       }
 
       // Combine errors
@@ -870,6 +1036,8 @@ export class SyncService implements ISyncService {
           localMtimes: currentMtimes,
         }
         await this.checkpointStore.save(vaultId, newCheckpoint)
+
+        protocol?.checkpoint(pullResult.newLastSeq)
       }
 
       // Update log entry
@@ -880,6 +1048,20 @@ export class SyncService implements ISyncService {
         durationMs,
         ...(allErrors.length > 0 ? { errors: allErrors } : {}),
       })
+
+      // Protocol: sync complete + flush
+      protocol?.syncComplete(durationMs, pullResult.pulledCount, pushedCount, pullResult.conflicts.length, allErrors.length)
+      await protocol?.flush()
+
+      // Trigger link index rebuild if files were pulled
+      if (pullResult.pulledCount > 0 && this.onPullComplete) {
+        try {
+          this.onPullComplete(vaultId)
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error)
+          this.logger.error('onPullComplete hook failed (scheduled)', { vaultId, error: message })
+        }
+      }
     } finally {
       this.syncLock.release(vaultId)
     }

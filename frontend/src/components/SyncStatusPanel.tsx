@@ -223,7 +223,7 @@ export function SyncStatusPanel({ vaultId, onOpenFullLog }: SyncStatusPanelProps
         </div>
       )}
 
-      {/* ── Sync Log ── */}
+      {/* ── Sync Protocol (Event Log) ── */}
       <div className="sync-log-section">
         <div className="sync-log-header">
           <h3 className="sync-log-title">
@@ -235,8 +235,8 @@ export function SyncStatusPanel({ vaultId, onOpenFullLog }: SyncStatusPanelProps
               <button
                 className="sync-log-open-full-btn"
                 onClick={onOpenFullLog}
-                title="Vollständiges Protokoll in eigenem Tab öffnen"
-                aria-label="Vollständiges Protokoll öffnen"
+                title="Sync-Protokoll in eigenem Tab öffnen"
+                aria-label="Sync-Protokoll öffnen"
               >
                 Vollansicht
               </button>
@@ -244,8 +244,8 @@ export function SyncStatusPanel({ vaultId, onOpenFullLog }: SyncStatusPanelProps
             <button
               className="sync-log-refresh-btn"
               onClick={handleRefreshLog}
-              title="Protokoll aktualisieren"
-              aria-label="Protokoll aktualisieren"
+              title="Status aktualisieren"
+              aria-label="Status aktualisieren"
             >
               <RefreshCw size={12} />
             </button>

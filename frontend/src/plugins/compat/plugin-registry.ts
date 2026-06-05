@@ -183,7 +183,7 @@ export class PluginRegistry implements IPluginRegistry {
       for (const [pluginId, pluginData] of Object.entries(data.plugins)) {
         const entry: PluginRegistryEntry = {
           pluginId,
-          manifest: pluginData.manifest,
+          manifest: pluginData.manifest ?? { id: pluginId, name: pluginId, version: '0.0.0' },
           status: pluginData.status,
           permissions: pluginData.permissions,
           compatibilityLevel: pluginData.compatibilityLevel,
@@ -212,13 +212,17 @@ export class PluginRegistry implements IPluginRegistry {
         plugins: {},
       };
       for (const [pluginId, entry] of this.entries) {
-        data.plugins[pluginId] = {
+        const pluginData: Record<string, unknown> = {
           status: entry.status,
           permissions: entry.permissions,
           compatibilityLevel: entry.compatibilityLevel,
-          manifest: entry.manifest,
-          error: entry.error,
+          installedAt: (entry as unknown as Record<string, unknown>).installedAt ?? new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         };
+        if (entry.error) {
+          pluginData.error = entry.error;
+        }
+        data.plugins[pluginId] = pluginData as PluginRegistryData['plugins'][string];
       }
       await this.apiClient.saveRegistry(this.vaultId, data);
     } catch {

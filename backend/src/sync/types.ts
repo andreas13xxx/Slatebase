@@ -339,6 +339,30 @@ export interface PullParams {
 }
 
 /**
+ * Detail of a single successfully pulled file.
+ */
+export interface PulledFileDetail {
+  /** Relative file path. */
+  path: string
+  /** File size in bytes (after decoding/decryption). */
+  size: number
+  /** Whether the file is binary. */
+  isBinary: boolean
+  /** Number of chunks reassembled (if > 1). */
+  chunkCount?: number
+}
+
+/**
+ * Detail of a single successfully pushed file.
+ */
+export interface PushedFileDetail {
+  /** Relative file path. */
+  path: string
+  /** File size in bytes. */
+  size: number
+}
+
+/**
  * Result of a pull operation.
  */
 export interface PullResult {
@@ -352,6 +376,12 @@ export interface PullResult {
   conflicts: ConflictEntry[]
   /** Errors encountered during pull. */
   errors: SyncErrorDetail[]
+  /** Details of successfully pulled files (for protocol logging). */
+  pulledFiles?: PulledFileDetail[]
+  /** Paths of deleted files (for protocol logging). */
+  deletedFiles?: string[]
+  /** Number of changes received from CouchDB (before filtering). */
+  changeCount?: number
 }
 
 /**
@@ -382,6 +412,14 @@ export interface PushResult {
   pushedCount: number
   /** Errors encountered during push. */
   errors: SyncErrorDetail[]
+  /** Details of successfully pushed files (for protocol logging). */
+  pushedFiles?: PushedFileDetail[]
+  /** Paths of files deleted from CouchDB (for protocol logging). */
+  deletedFiles?: string[]
+  /** Total number of changed files detected locally. */
+  changedFileCount?: number
+  /** Total number of deleted files detected locally. */
+  deletedFileCount?: number
 }
 
 /**
@@ -451,6 +489,9 @@ export interface ISyncService {
 
   /** Returns the sync log paginated. */
   getLog(vaultId: string, page: number, pageSize: number): Promise<PaginatedSyncLog>
+
+  /** Returns the sync protocol (event log) paginated with optional filters. */
+  getProtocol(vaultId: string, page: number, pageSize: number, filter?: import('./protocol-types.js').SyncProtocolFilter): Promise<import('./protocol-types.js').PaginatedSyncProtocol>
 
   /** Returns all open conflicts. */
   getConflicts(vaultId: string): Promise<ConflictEntry[]>

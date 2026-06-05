@@ -311,7 +311,8 @@ export function SyncConfigPage({ vaultId, onOpenSyncLog }: SyncConfigPageProps) 
     setPending(true)
     await removeSyncConfig(dispatch, apiClient, vaultId)
     setPending(false)
-    setViewMode('create')
+    // Only switch to create mode if config was actually removed
+    // (dispatch will set state.config to null on success)
   }
 
   // --- Update connection test from state ---

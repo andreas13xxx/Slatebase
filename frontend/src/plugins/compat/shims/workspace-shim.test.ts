@@ -169,9 +169,9 @@ describe('WorkspaceShim', () => {
       const proxied = WorkspaceShim.createProxied();
 
       // Access the same non-emulated method multiple times
-      (proxied as Record<string, unknown>)['getLeaf'];
-      (proxied as Record<string, unknown>)['getLeaf'];
-      (proxied as Record<string, unknown>)['getLeaf'];
+      (proxied as Record<string, unknown>)['iterateAllLeaves'];
+      (proxied as Record<string, unknown>)['iterateAllLeaves'];
+      (proxied as Record<string, unknown>)['iterateAllLeaves'];
 
       // Should have logged only once
       expect(warnSpy).toHaveBeenCalledTimes(1);
@@ -184,7 +184,7 @@ describe('WorkspaceShim', () => {
       const proxied = WorkspaceShim.createProxied();
 
       (proxied as Record<string, unknown>)['createLeafBySplit'];
-      (proxied as Record<string, unknown>)['getLeaf'];
+      (proxied as Record<string, unknown>)['iterateAllLeaves'];
       (proxied as Record<string, unknown>)['setActiveLeaf'];
 
       expect(warnSpy).toHaveBeenCalledTimes(3);

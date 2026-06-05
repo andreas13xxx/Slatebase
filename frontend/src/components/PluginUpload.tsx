@@ -1,7 +1,6 @@
-import { useState, useRef, useCallback } from 'react'
-import { Upload, CheckCircle, AlertTriangle, Package, Loader } from 'lucide-react'
+import { useState, useRef, useCallback, useEffect } from 'react'
+import { Upload, CheckCircle, AlertTriangle, Package, Loader, Download } from 'lucide-react'
 import type { IApiClient, PluginInstallResult } from '../api'
-import type { DirectoryTree } from '../types'
 
 /** Maximum ZIP file size in bytes (5 MB). */
 const MAX_ZIP_SIZE = 5 * 1024 * 1024
@@ -12,8 +11,6 @@ export interface PluginUploadProps {
   apiClient: IApiClient
   /** Current vault ID. */
   vaultId: string
-  /** Directory tree for detecting .obsidian/plugins/ entries. */
-  directoryTree: DirectoryTree | null
   /** Callback invoked after successful upload to refresh the plugin list. */
   onPluginInstalled?: (result: PluginInstallResult) => void
 }
@@ -33,13 +30,38 @@ interface DetectedPlugin {
  * Provides a button to upload ZIP files and displays detected plugins
  * from the .obsidian/plugins/ directory in synced vaults.
  */
-export function PluginUpload({ apiClient, vaultId, directoryTree, onPluginInstalled }: PluginUploadProps) {
+export function PluginUpload({ apiClient, vaultId, onPluginInstalled }: PluginUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Upload state
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploadSuccess, setUploadSuccess] = useState<PluginInstallResult | null>(null)
+
+  // Detected plugins state (fetched from backend)
+  const [detectedPlugins, setDetectedPlugins] = useState<DetectedPlugin[]>([])
+  const [installingPlugins, setInstallingPlugins] = useState<Set<string>>(new Set())
+  const [installErrors, setInstallErrors] = useState<Record<string, string>>({})
+
+  /** Fetch detected plugins from .obsidian/plugins/ via backend endpoint. */
+  useEffect(() => {
+    let cancelled = false
+    async function fetchDetected() {
+      try {
+        const result = await apiClient.getDetectedPlugins(vaultId)
+        if (!cancelled) {
+          setDetectedPlugins(result.plugins)
+        }
+      } catch {
+        // Silently ignore — detected plugins are optional info
+        if (!cancelled) {
+          setDetectedPlugins([])
+        }
+      }
+    }
+    void fetchDetected()
+    return () => { cancelled = true }
+  }, [apiClient, vaultId])
 
   /** Trigger the hidden file input. */
   const handleUploadClick = useCallback(() => {
@@ -87,8 +109,33 @@ export function PluginUpload({ apiClient, vaultId, directoryTree, onPluginInstal
     }
   }, [apiClient, vaultId, onPluginInstalled])
 
-  /** Detect plugins from .obsidian/plugins/ in the directory tree. */
-  const detectedPlugins = detectPluginsFromTree(directoryTree)
+  /** Handle installing a detected plugin from .obsidian/plugins/. */
+  const handleInstallDetected = useCallback(async (pluginId: string) => {
+    setInstallingPlugins(prev => new Set([...prev, pluginId]))
+    setInstallErrors(prev => {
+      const next = { ...prev }
+      delete next[pluginId]
+      return next
+    })
+
+    try {
+      const result = await apiClient.installDetectedPlugin(vaultId, pluginId)
+      // Remove from detected list (now installed)
+      setDetectedPlugins(prev => prev.filter(p => p.id !== pluginId))
+      onPluginInstalled?.(result)
+    } catch (err: unknown) {
+      const message = err && typeof err === 'object' && 'message' in err
+        ? (err as { message: string }).message
+        : 'Installation fehlgeschlagen.'
+      setInstallErrors(prev => ({ ...prev, [pluginId]: mapUploadError(message) }))
+    } finally {
+      setInstallingPlugins(prev => {
+        const next = new Set(prev)
+        next.delete(pluginId)
+        return next
+      })
+    }
+  }, [apiClient, vaultId, onPluginInstalled])
 
   return (
     <div className="plugin-upload">
@@ -161,24 +208,52 @@ export function PluginUpload({ apiClient, vaultId, directoryTree, onPluginInstal
           </h3>
           <p className="plugin-upload__hint">
             Diese Plugins wurden im .obsidian/plugins/-Verzeichnis des Vaults erkannt (z.B. durch Sync).
+            Installierbare Plugins können direkt aktiviert werden.
           </p>
           <ul className="plugin-upload__detected-list">
-            {detectedPlugins.map(plugin => (
-              <li key={plugin.id} className="plugin-upload__detected-item">
-                <span className="plugin-upload__detected-name">{plugin.id}</span>
-                {plugin.hasManifest && plugin.hasMainJs ? (
-                  <span className="plugin-upload__detected-status plugin-upload__detected-status--valid">
-                    Installierbar
-                  </span>
-                ) : (
-                  <span className="plugin-upload__detected-status plugin-upload__detected-status--incomplete">
-                    Unvollständig
-                    {!plugin.hasManifest && ' (manifest.json fehlt)'}
-                    {!plugin.hasMainJs && ' (main.js fehlt)'}
-                  </span>
-                )}
-              </li>
-            ))}
+            {detectedPlugins.map(plugin => {
+              const isInstallable = plugin.hasManifest && plugin.hasMainJs
+              const isInstalling = installingPlugins.has(plugin.id)
+              const installError = installErrors[plugin.id]
+
+              return (
+                <li key={plugin.id} className="plugin-upload__detected-item">
+                  <span className="plugin-upload__detected-name">{plugin.id}</span>
+                  {isInstallable ? (
+                    <button
+                      className="plugin-upload__install-button"
+                      onClick={() => void handleInstallDetected(plugin.id)}
+                      disabled={isInstalling}
+                      aria-label={`Plugin ${plugin.id} installieren`}
+                    >
+                      {isInstalling ? (
+                        <>
+                          <Loader size={12} className="plugin-upload__spinner" />
+                          <span>Installieren…</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download size={12} />
+                          <span>Installieren</span>
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <span className="plugin-upload__detected-status plugin-upload__detected-status--incomplete">
+                      Unvollständig
+                      {!plugin.hasManifest && ' (manifest.json fehlt)'}
+                      {!plugin.hasMainJs && ' (main.js fehlt)'}
+                    </span>
+                  )}
+                  {installError && (
+                    <span className="plugin-upload__detected-error">
+                      <AlertTriangle size={11} />
+                      {installError}
+                    </span>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         </div>
       )}
@@ -210,45 +285,4 @@ function mapUploadError(message: string): string {
     return 'Der extrahierte Inhalt überschreitet die maximale Größe von 10 MB.'
   }
   return message
-}
-
-/**
- * Scans the directory tree for .obsidian/plugins/ subdirectories containing
- * manifest.json and main.js files.
- */
-function detectPluginsFromTree(tree: DirectoryTree | null): DetectedPlugin[] {
-  if (!tree || !tree.children) return []
-
-  // Find .obsidian directory
-  const obsidianDir = tree.children.find(
-    child => child.type === 'directory' && child.name === '.obsidian'
-  )
-  if (!obsidianDir || !obsidianDir.children) return []
-
-  // Find plugins directory
-  const pluginsDir = obsidianDir.children.find(
-    child => child.type === 'directory' && child.name === 'plugins'
-  )
-  if (!pluginsDir || !pluginsDir.children) return []
-
-  // Each subdirectory is a potential plugin
-  const detected: DetectedPlugin[] = []
-  for (const child of pluginsDir.children) {
-    if (child.type !== 'directory' || !child.children) continue
-
-    const hasManifest = child.children.some(
-      f => f.type === 'file' && f.name === 'manifest.json'
-    )
-    const hasMainJs = child.children.some(
-      f => f.type === 'file' && f.name === 'main.js'
-    )
-
-    detected.push({
-      id: child.name,
-      hasManifest,
-      hasMainJs,
-    })
-  }
-
-  return detected
 }

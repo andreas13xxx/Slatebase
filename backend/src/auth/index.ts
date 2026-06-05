@@ -395,7 +395,7 @@ export class SessionStore implements ISessionStore {
   /**
    * Write data atomically: write to a temp file, then rename to target.
    * On Windows, rename can fail with EPERM if the target is briefly locked
-   * (e.g. by antivirus or file watchers). Retries with unlink-before-rename.
+   * (e.g. by antivirus or file watchers). Retries with delay and unlink-before-rename.
    */
   private async atomicWrite(targetPath: string, data: string): Promise<void> {
     const tempName = `${randomBytes(16).toString('hex')}.tmp`
@@ -407,14 +407,21 @@ export class SessionStore implements ISessionStore {
     } catch (err: unknown) {
       const code = (err as NodeJS.ErrnoException).code
       if (code === 'EPERM' || code === 'EACCES') {
-        // Windows: target may be locked — try unlinking first, then retry
+        // Windows: target may be locked — wait briefly for lock release, then retry
+        await new Promise(resolve => setTimeout(resolve, 50))
         try { await unlink(targetPath) } catch { /* may not exist */ }
         try {
           await rename(tempPath, targetPath)
         } catch {
-          // Last resort: direct overwrite (loses atomicity but avoids crash)
-          await writeFile(targetPath, data, 'utf-8')
-          try { await unlink(tempPath) } catch { /* cleanup */ }
+          // Second retry after another short delay
+          await new Promise(resolve => setTimeout(resolve, 100))
+          try {
+            await rename(tempPath, targetPath)
+          } catch {
+            // Last resort: direct overwrite (loses atomicity but avoids crash)
+            await writeFile(targetPath, data, 'utf-8')
+            try { await unlink(tempPath) } catch { /* cleanup */ }
+          }
         }
       } else {
         // Clean up temp file and rethrow
@@ -628,13 +635,22 @@ export class AuthService implements IAuthService {
       return null
     }
 
-    // Update lastActivity timestamp
+    // Update lastActivity timestamp (non-critical — don't fail the request if write fails)
     const updatedSession: Session = {
       ...session,
       lastActivity: new Date().toISOString(),
       role: user.role, // Always use current role from user record
     }
-    await this.sessionStore.update(updatedSession)
+    try {
+      await this.sessionStore.update(updatedSession)
+    } catch (err: unknown) {
+      // On Windows, EPERM can occur if antivirus or file watchers lock the session file.
+      // This is a non-critical update (only lastActivity/role sync) — log and continue.
+      this.logger.warn('Failed to update session lastActivity', {
+        sessionId: session.sessionId,
+        error: (err as Error).message,
+      })
+    }
 
     return {
       userId: user.userId,

@@ -1,6 +1,6 @@
 import type { VaultInfo, DirectoryTree, FileContent, FileSaveResult, AppError, Conversation, PaginatedConversations, PaginatedMessages, Message, GraphData, BacklinksResponse } from '../types'
 import type { PublicUserInfo } from '../state/authState'
-import type { SyncConfigResponse, SyncConfigResult, CreateSyncConfigInput, UpdateSyncConfigInput, SyncResult, AnalysisResult, PaginatedSyncLog, ConflictEntry } from '../state/syncState'
+import type { SyncConfigResponse, SyncConfigResult, CreateSyncConfigInput, UpdateSyncConfigInput, SyncResult, AnalysisResult, PaginatedSyncLog, PaginatedSyncProtocol, ConflictEntry } from '../state/syncState'
 
 /**
  * Login response returned by the backend on successful authentication.
@@ -212,6 +212,8 @@ export interface IApiClient {
   resetSyncCheckpoint(vaultId: string): Promise<void>
   /** Get the sync log for a vault (paginated). */
   getSyncLog(vaultId: string, page?: number, pageSize?: number): Promise<PaginatedSyncLog>
+  /** Get the sync protocol (event log) for a vault (paginated, filterable). */
+  getSyncProtocol(vaultId: string, page?: number, pageSize?: number, filter?: { level?: string; search?: string; runId?: string }): Promise<PaginatedSyncProtocol>
   /** Get all open sync conflicts for a vault. */
   getSyncConflicts(vaultId: string): Promise<ConflictEntry[]>
   /** Resolve a sync conflict for a specific document. */
@@ -254,6 +256,22 @@ export interface IApiClient {
   loadRegistry(vaultId: string): Promise<PluginRegistryData>
   /** Save the plugin registry for a vault. */
   saveRegistry(vaultId: string, registry: PluginRegistryData): Promise<void>
+  /** Get detected plugins from .obsidian/plugins/ in the vault filesystem. */
+  getDetectedPlugins(vaultId: string): Promise<{ plugins: DetectedPluginInfo[] }>
+  /** Install a detected plugin from .obsidian/plugins/ into the plugin store. */
+  installDetectedPlugin(vaultId: string, pluginId: string): Promise<PluginInstallResult>
+}
+
+/**
+ * Detected plugin from .obsidian/plugins/ directory (returned by backend).
+ */
+export interface DetectedPluginInfo {
+  /** Plugin folder name (used as plugin ID). */
+  id: string
+  /** Whether a manifest.json was found. */
+  hasManifest: boolean
+  /** Whether a main.js was found. */
+  hasMainJs: boolean
 }
 
 /**
@@ -529,6 +547,18 @@ export class ApiClient implements IApiClient {
     return this.request<PaginatedSyncLog>('GET', `/api/v1/vaults/${vaultId}/sync/log${query}`)
   }
 
+  /** Get the sync protocol (event log) for a vault (paginated, filterable). */
+  async getSyncProtocol(vaultId: string, page?: number, pageSize?: number, filter?: { level?: string; search?: string; runId?: string }): Promise<PaginatedSyncProtocol> {
+    const params: string[] = []
+    if (page !== undefined) params.push(`page=${page}`)
+    if (pageSize !== undefined) params.push(`pageSize=${pageSize}`)
+    if (filter?.level) params.push(`level=${encodeURIComponent(filter.level)}`)
+    if (filter?.search) params.push(`search=${encodeURIComponent(filter.search)}`)
+    if (filter?.runId) params.push(`runId=${encodeURIComponent(filter.runId)}`)
+    const query = params.length > 0 ? `?${params.join('&')}` : ''
+    return this.request<PaginatedSyncProtocol>('GET', `/api/v1/vaults/${vaultId}/sync/protocol${query}`)
+  }
+
   /** Get all open sync conflicts for a vault. */
   async getSyncConflicts(vaultId: string): Promise<ConflictEntry[]> {
     return this.request<ConflictEntry[]>('GET', `/api/v1/vaults/${vaultId}/sync/conflicts`)
@@ -704,6 +734,16 @@ export class ApiClient implements IApiClient {
   /** Save the plugin registry for a vault. */
   async saveRegistry(vaultId: string, registry: PluginRegistryData): Promise<void> {
     await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/plugins/registry`, registry)
+  }
+
+  /** Get detected plugins from .obsidian/plugins/ in the vault filesystem. */
+  async getDetectedPlugins(vaultId: string): Promise<{ plugins: DetectedPluginInfo[] }> {
+    return this.request<{ plugins: DetectedPluginInfo[] }>('GET', `/api/v1/vaults/${vaultId}/plugins/detected`)
+  }
+
+  /** Install a detected plugin from .obsidian/plugins/ into the plugin store. */
+  async installDetectedPlugin(vaultId: string, pluginId: string): Promise<PluginInstallResult> {
+    return this.request<PluginInstallResult>('POST', `/api/v1/vaults/${vaultId}/plugins/detected/${pluginId}/install`)
   }
 
   // --- Internal helpers ---

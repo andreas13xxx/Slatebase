@@ -50,6 +50,12 @@ export class AppShim implements IAppShim {
     getPlugin(id: string): PluginInstance | undefined;
   };
 
+  /** Internal plugins stub (used by obsidian-daily-notes-interface and other plugins) */
+  readonly internalPlugins: {
+    plugins: Record<string, { enabled: boolean; instance: unknown }>;
+    getPluginById(id: string): { enabled: boolean; instance: unknown } | undefined;
+  };
+
   /** Plugin ID used for scoping console warnings */
   private readonly pluginId: string;
 
@@ -90,6 +96,17 @@ export class AppShim implements IAppShim {
       enabledPlugins: this.enabledPluginsSet,
       getPlugin: (id: string): PluginInstance | undefined => {
         return this.pluginsMap[id];
+      },
+    };
+
+    // Internal plugins stub — simulates Obsidian's built-in plugins like "daily-notes"
+    this.internalPlugins = {
+      plugins: {
+        'daily-notes': { enabled: true, instance: { options: { format: 'YYYY-MM-DD', folder: '', template: '' } } },
+      },
+      getPluginById: (id: string) => {
+        const p = this.internalPlugins.plugins[id];
+        return p ?? undefined;
       },
     };
   }
@@ -150,6 +167,7 @@ export class AppShim implements IAppShim {
       'workspace',
       'metadataCache',
       'plugins',
+      'internalPlugins',
       // Internal/utility properties
       'pluginId',
       'warnedProperties',

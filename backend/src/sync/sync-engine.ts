@@ -15,6 +15,8 @@ import type {
   AnalysisDetail,
   SyncErrorDetail,
   ConflictEntry,
+  PulledFileDetail,
+  PushedFileDetail,
 } from './types.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -33,22 +35,20 @@ const ANALYSIS_TIMEOUT_MS = 120_000
 
 /**
  * Paths and patterns that should be excluded from sync.
- * These are Obsidian internal configuration files and directories
- * that should not be written to the vault during pull operations.
+ * These are directories that should not be written to the vault during pull operations.
+ * Note: .obsidian/ is intentionally NOT excluded — Obsidian config files are synced
+ * to maintain plugin settings, themes, and workspace configuration across devices.
  */
 const EXCLUDED_PATH_PREFIXES = [
-  '.obsidian/',
   '.trash/',
   '.mobile/',
 ] as const
 
 /**
- * File patterns that indicate internal/metadata documents
+ * Exact file paths that indicate internal/metadata documents
  * which should not be synced as vault files.
  */
-const EXCLUDED_EXACT_PATHS = [
-  '.obsidian',
-] as const
+const EXCLUDED_EXACT_PATHS = [] as const
 
 /**
  * obsidian-livesync internal document IDs that are NOT file paths.
@@ -58,6 +58,8 @@ const EXCLUDED_EXACT_PATHS = [
 const LIVESYNC_INTERNAL_DOC_IDS = new Set([
   'obsydian_livesync_version',  // Chunk format version (note: original typo in livesync)
   'syncinfo',                    // Sync state metadata
+  'client-config',              // Client configuration (sync settings shared between devices)
+  'client-config.yml',          // P2P network configuration (peerId, networkId, addresses)
 ])
 
 // ─── Helper Types ────────────────────────────────────────────────────────────
@@ -118,6 +120,7 @@ export class SyncEngine implements ISyncEngine {
   /**
    * Tests the connection to a CouchDB instance.
    * Performs a GET request to the database endpoint with a 10s timeout.
+   * If the database does not exist (404), attempts to create it via PUT.
    * @param config - Connection parameters (endpoint, database, username, password).
    * @returns Connection test result indicating reachability and authentication status.
    */
@@ -145,10 +148,71 @@ export class SyncEngine implements ISyncEngine {
         return { reachable: true, authenticated: true }
       }
 
+      // Database does not exist — attempt to create it
+      if (response.status === 404) {
+        return this.createDatabase(config)
+      }
+
       return {
         reachable: true,
         authenticated: false,
         error: `Unexpected status code: ${response.status}`,
+      }
+    } catch (error: unknown) {
+      clearTimeout(timeoutId)
+
+      if (error instanceof Error && error.name === 'AbortError') {
+        return { reachable: false, authenticated: false, error: 'Connection timed out (10s)' }
+      }
+
+      const message = error instanceof Error ? error.message : 'Unknown connection error'
+      return { reachable: false, authenticated: false, error: message }
+    }
+  }
+
+  /**
+   * Attempts to create a CouchDB database via PUT.
+   * Called when testConnection receives a 404 (database does not exist).
+   * @param config - Connection parameters.
+   * @returns Connection test result — success if database was created, error otherwise.
+   */
+  private async createDatabase(config: SyncConnectionParams): Promise<ConnectionTestResult> {
+    const url = `${config.endpoint}/${config.database}`
+    const headers = buildAuthHeaders(config.username, config.password)
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), CONNECTION_TEST_TIMEOUT_MS)
+
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers,
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (response.status === 401 || response.status === 403) {
+        return {
+          reachable: true,
+          authenticated: false,
+          error: 'Database does not exist and user lacks permission to create it',
+        }
+      }
+
+      if (response.ok || response.status === 201) {
+        return { reachable: true, authenticated: true }
+      }
+
+      // 412 = database already exists (race condition — fine)
+      if (response.status === 412) {
+        return { reachable: true, authenticated: true }
+      }
+
+      return {
+        reachable: true,
+        authenticated: false,
+        error: `Database does not exist and creation failed (status ${response.status})`,
       }
     } catch (error: unknown) {
       clearTimeout(timeoutId)
@@ -248,13 +312,15 @@ export class SyncEngine implements ISyncEngine {
     let pulledCount = 0
     const errors: SyncErrorDetail[] = []
     const conflicts: ConflictEntry[] = []
+    const pulledFiles: PulledFileDetail[] = []
+    const deletedFilePaths: string[] = []
 
     for (const doc of allDocs) {
       if (!doc.path) {
         continue
       }
 
-      const relativePath = doc.path
+      const relativePath = sanitizePathForPlatform(doc.path)
       const localPath = join(vaultPath, relativePath)
 
       // Handle deleted documents
@@ -262,6 +328,7 @@ export class SyncEngine implements ISyncEngine {
         try {
           await unlink(localPath)
           pulledCount++
+          deletedFilePaths.push(relativePath)
         } catch {
           // File doesn't exist locally — not an error
         }
@@ -333,6 +400,12 @@ export class SyncEngine implements ISyncEngine {
         const { rename } = await import('node:fs/promises')
         await rename(tempPath, localPath)
         pulledCount++
+        pulledFiles.push({
+          path: relativePath,
+          size: content.length,
+          isBinary: doc.isBinary ?? false,
+          ...(doc.contentChunks && doc.contentChunks.length > 1 ? { chunkCount: doc.contentChunks.length } : {}),
+        })
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : 'Write failed'
         errors.push({
@@ -355,6 +428,9 @@ export class SyncEngine implements ISyncEngine {
       pulledCount,
       conflicts,
       errors: errors.slice(0, 100),
+      pulledFiles,
+      deletedFiles: deletedFilePaths,
+      changeCount: results.length,
     }
   }
 
@@ -400,6 +476,8 @@ export class SyncEngine implements ISyncEngine {
 
     let pushedCount = 0
     const errors: SyncErrorDetail[] = []
+    const pushedFiles: PushedFileDetail[] = []
+    const pushDeletedFiles: string[] = []
 
     // Push changed files
     for (const filePath of changedFiles) {
@@ -408,6 +486,7 @@ export class SyncEngine implements ISyncEngine {
       try {
         const absolutePath = join(vaultPath, filePath)
         let content: Buffer = await readFile(absolutePath)
+        const originalSize = content.length
 
         // Encrypt content if E2E is enabled
         if (e2eEnabled && e2ePassphrase) {
@@ -424,13 +503,17 @@ export class SyncEngine implements ISyncEngine {
           }
         }
 
+        // Convert local (possibly sanitized) path back to original CouchDB document ID
+        const couchDbPath = desanitizePathForCouchDB(filePath)
+
         // First, get the current revision from CouchDB (if document exists)
-        const rev = await this.getDocumentRevision(connection, filePath)
+        const rev = await this.getDocumentRevision(connection, couchDbPath)
 
         // Push to CouchDB via PUT
-        const pushResult = await this.putDocument(connection, filePath, content, rev, e2eEnabled)
+        const pushResult = await this.putDocument(connection, couchDbPath, content, rev, e2eEnabled)
         if (pushResult.success) {
           pushedCount++
+          pushedFiles.push({ path: filePath, size: originalSize })
         } else {
           errors.push({
             documentPath: filePath,
@@ -453,12 +536,15 @@ export class SyncEngine implements ISyncEngine {
       if (errors.length >= 100) break
 
       try {
-        const rev = await this.getDocumentRevision(connection, filePath)
+        // Convert local (possibly sanitized) path back to original CouchDB document ID
+        const couchDbPath = desanitizePathForCouchDB(filePath)
+        const rev = await this.getDocumentRevision(connection, couchDbPath)
         if (rev) {
           // Document exists in CouchDB — mark as deleted
-          const deleteResult = await this.deleteDocument(connection, filePath, rev)
+          const deleteResult = await this.deleteDocument(connection, couchDbPath, rev)
           if (deleteResult.success) {
             pushedCount++
+            pushDeletedFiles.push(filePath)
           } else {
             errors.push({
               documentPath: filePath,
@@ -490,6 +576,10 @@ export class SyncEngine implements ISyncEngine {
       status,
       pushedCount,
       errors: errors.slice(0, 100),
+      pushedFiles,
+      deletedFiles: pushDeletedFiles,
+      changedFileCount: changedFiles.length,
+      deletedFileCount: deletedFiles.length,
     }
   }
 
@@ -535,10 +625,12 @@ export class SyncEngine implements ISyncEngine {
       const allRemoteDocs = [...regularDocs, ...reassembled]
 
       // Build remote state: path → { rev, mtime, size, deleted }
+      // Paths are sanitized for the current platform so they match local filesystem paths.
       const remoteState = new Map<string, { rev: string; mtime: number; size: number; deleted: boolean }>()
       for (const doc of allRemoteDocs) {
         if (!doc.path) continue
-        remoteState.set(doc.path, {
+        const sanitizedPath = sanitizePathForPlatform(doc.path)
+        remoteState.set(sanitizedPath, {
           rev: doc.rev,
           mtime: doc.mtime ?? 0,
           size: estimateDocSize(doc),
@@ -594,6 +686,7 @@ export class SyncEngine implements ISyncEngine {
 
   /**
    * Fetches the CouchDB Changes Feed.
+   * If the database does not exist (404), attempts to create it and retries.
    */
   private async fetchChanges(
     connection: SyncConnectionParams,
@@ -617,6 +710,16 @@ export class SyncEngine implements ISyncEngine {
 
       if (response.status === 401 || response.status === 403) {
         return { error: 'auth_failed' }
+      }
+
+      // Database does not exist — attempt to create it, then retry
+      if (response.status === 404) {
+        const createResult = await this.createDatabase(connection)
+        if (!createResult.reachable || !createResult.authenticated) {
+          return { error: 'connection_failed' }
+        }
+        // After creation, the database is empty — return empty results
+        return { results: [], lastSeq: '0' }
       }
 
       if (!response.ok) {
@@ -1273,6 +1376,11 @@ function isExcludedPath(path: string): boolean {
   for (const prefix of EXCLUDED_PATH_PREFIXES) {
     if (path.startsWith(prefix)) return true
   }
+  // Exclude internal Slatebase files (underscore-prefixed filenames).
+  // These are derived indexes (e.g. _link-index.json) that should not be synced.
+  // CouchDB also rejects document IDs starting with underscore (reserved for _design, _local, etc.)
+  const fileName = path.includes('/') ? path.slice(path.lastIndexOf('/') + 1) : path
+  if (fileName.startsWith('_')) return true
   return false
 }
 
@@ -1299,6 +1407,70 @@ function isBinaryPath(path: string): boolean {
 }
 
 /**
+ * Characters that are illegal in Windows file/directory names.
+ * On Linux/macOS only `/` and null are illegal, but since Slatebase may run on Windows,
+ * we sanitize these characters when detected in paths coming from CouchDB.
+ *
+ * The replacement uses Unicode full-width equivalents (like Obsidian does on Windows):
+ * `|` → `｜` (U+FF5C), `<` → `＜` (U+FF1C), `>` → `＞` (U+FF1E),
+ * `:` → `：` (U+FF1A), `"` → `＂` (U+FF02), `?` → `？` (U+FF1F), `*` → `＊` (U+FF0A)
+ *
+ * Note: `/` and `\` are path separators and handled by `join()`.
+ * Colon `:` is only illegal in the filename portion (not as drive letter prefix),
+ * so we only sanitize it within individual path segments.
+ */
+const WINDOWS_ILLEGAL_CHARS: ReadonlyMap<string, string> = new Map([
+  ['|', '\uFF5C'],  // ｜
+  ['<', '\uFF1C'],  // ＜
+  ['>', '\uFF1E'],  // ＞
+  [':', '\uFF1A'],  // ：
+  ['"', '\uFF02'],  // ＂
+  ['?', '\uFF1F'],  // ？
+  ['*', '\uFF0A'],  // ＊
+])
+
+/**
+ * Sanitizes a relative file path for the current platform.
+ * On Windows, replaces illegal characters in each path segment with Unicode full-width equivalents.
+ * On Linux/macOS, returns the path unchanged.
+ */
+function sanitizePathForPlatform(relativePath: string): string {
+  if (process.platform !== 'win32') {
+    return relativePath
+  }
+  // Split by forward slash (CouchDB paths always use forward slash)
+  const segments = relativePath.split('/')
+  const sanitized = segments.map(segment => {
+    let result = segment
+    for (const [illegal, replacement] of WINDOWS_ILLEGAL_CHARS) {
+      result = result.replaceAll(illegal, replacement)
+    }
+    return result
+  })
+  return sanitized.join('/')
+}
+
+/**
+ * Reverses sanitizePathForPlatform: converts full-width Unicode replacements back to
+ * their ASCII originals for use as CouchDB document IDs when pushing.
+ * On Linux/macOS, returns the path unchanged.
+ */
+function desanitizePathForCouchDB(localRelativePath: string): string {
+  if (process.platform !== 'win32') {
+    return localRelativePath
+  }
+  const segments = localRelativePath.split('/')
+  const desanitized = segments.map(segment => {
+    let result = segment
+    for (const [original, fullWidth] of WINDOWS_ILLEGAL_CHARS) {
+      result = result.replaceAll(fullWidth, original)
+    }
+    return result
+  })
+  return desanitized.join('/')
+}
+
+/**
  * Recursively scans a vault directory and returns a map of relative paths to mtimes.
  */
 async function scanVaultFiles(vaultPath: string): Promise<Map<string, number>> {
@@ -1318,7 +1490,7 @@ async function scanVaultFilesWithSize(vaultPath: string): Promise<Map<string, { 
 
 /**
  * Recursively scans a directory, populating the files map with relative paths and mtimes.
- * Skips excluded directories (.obsidian, .trash, .mobile).
+ * Skips excluded directories (.trash, .mobile).
  */
 async function scanDirectory(basePath: string, currentPath: string, files: Map<string, number>): Promise<void> {
   const entries = await readdir(currentPath, { withFileTypes: true })
@@ -1340,7 +1512,7 @@ async function scanDirectory(basePath: string, currentPath: string, files: Map<s
 
 /**
  * Recursively scans a directory, populating the files map with relative paths, mtimes, and sizes.
- * Skips excluded directories (.obsidian, .trash, .mobile).
+ * Skips excluded directories (.trash, .mobile).
  */
 async function scanDirectoryWithSize(basePath: string, currentPath: string, files: Map<string, { mtime: number; size: number }>): Promise<void> {
   const entries = await readdir(currentPath, { withFileTypes: true })
@@ -1393,8 +1565,19 @@ function categorizeDocument(
     }
   }
 
-  // Remote deleted but local exists — file should be removed on next sync
+  // Remote deleted but local exists
   if (remote?.deleted && local) {
+    // If there's no checkpoint entry for this file, it was created locally after the last sync.
+    // In that case, it's effectively "local only" — not "remote deleted".
+    if (checkpointMtime === undefined) {
+      return {
+        path,
+        category: 'local_only',
+        localModifiedAt: new Date(local.mtime).toISOString(),
+        localSize: local.size,
+      }
+    }
+    // File existed at last checkpoint and was deleted remotely — should be removed on next sync
     return {
       path,
       category: 'remote_deleted',

@@ -104,6 +104,9 @@ export function TabContent() {
         // Validates: Requirements 6.4, 6.5
         try {
           await apiClient.saveFile(activeTab.vaultId, targetPath, '')
+          // Refresh the directory tree so the new file appears in the Explorer
+          const tree = await apiClient.fetchVaultTree(activeTab.vaultId)
+          appDispatch({ type: 'TREE_LOADED', payload: tree })
         } catch (err: unknown) {
           // File creation failed — show error notification, maintain current view
           const message =
@@ -237,7 +240,7 @@ const emptyStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  height: '100%',
+  flex: 1,
   padding: '2rem',
 }
 
@@ -251,7 +254,7 @@ const loadingStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   gap: '8px',
-  height: '100%',
+  flex: 1,
   padding: '2rem',
   color: '#4a5568',
 }
@@ -260,7 +263,7 @@ const errorStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  height: '100%',
+  flex: 1,
   padding: '2rem',
 }
 
@@ -272,7 +275,7 @@ const errorTextStyle: React.CSSProperties = {
 const contentStyle: React.CSSProperties = {
   flex: 1,
   overflow: 'auto',
-  height: '100%',
+  minHeight: 0,
 }
 
 const linkErrorStyle: React.CSSProperties = {

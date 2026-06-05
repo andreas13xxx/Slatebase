@@ -15,14 +15,16 @@
 | 7 | `user-chat` | Feature | ✅ Fertig | Echtzeit-Chat zwischen Benutzern |
 | 8 | `chat-enhancements` | Feature | ✅ Fertig | Unread-Badges, Archivierung, Leave-Funktion, Pagination |
 | 9 | `chat-list-refresh-fix` | Bugfix | ✅ Fertig | Konversationsliste aktualisiert sich nach Senden/Tab-Wechsel |
-| 10 | `vault-sync` | Feature | ✅ Fertig | CouchDB-basierte Vault-Synchronisation |
+| 10 | `vault-sync` | Feature | ✅ Fertig ⚠️ experimental | CouchDB-basierte Vault-Synchronisation — experimentell, kann zu Datenverlust führen |
 | 11 | `obsidian-markdown-compat` | Feature | ✅ Fertig | Wikilinks, Embeds (Bilder, PDFs inline, Notizen), Callouts, Tags — Obsidian-kompatibles Rendering |
 | 12 | `mcp-context-server` | Feature | ✅ Fertig | AI Context Server mit MCP-Integration (Lese- und Schreib-Tools für Vault-Zugriff) |
 | 13 | `context-panel` | Feature | ✅ Fertig | Rechtes Seitenpanel mit Outline, Links, Tags, Properties (Tab-Navigation, Drag & Drop, Split-Sections) |
 | 14 | `knowledge-graph` | Feature | ✅ Fertig | Visuelle Darstellung der Verlinkungen zwischen Notizen (interaktiver Graph mit Nodes und Edges) |
 | 15 | `live-preview-editor` | Feature | 📋 Geplant | Side-by-Side oder WYSIWYG Live-Preview im Editor |
-| 16 | `obsidian-plugin-compat` | Feature | 🔧 In Arbeit | Obsidian Community Plugin Compatibility Layer (API-Shims, Plugin-Loader, Sandbox, Verwaltungs-UI, Backend-Persistenz) |
-| 17 | `accessibility-audit` | Feature | 📋 Geplant | WCAG 2.1 AA Compliance (systematischer Audit + Fixes) |
+| 16 | `obsidian-plugin-compat` | Feature | 🔧 In Arbeit ⚠️ experimental | Obsidian Community Plugin Compatibility Layer (API-Shims, Plugin-Loader, Sandbox, Verwaltungs-UI, Backend-Persistenz) — experimentell, nur browser-kompatible Plugins; serverseitige Plugins erfordern `server-side-plugins` |
+| 17 | `mermaid-rendering` | Feature | 📋 Requirements | Mermaid-Diagramme in Fenced Code Blocks als SVG rendern (Dark/Light Mode, Lazy Loading, Fehlerbehandlung) |
+| 18 | `accessibility-audit` | Feature | 📋 Geplant | WCAG 2.1 AA Compliance (systematischer Audit + Fixes) |
+| 19 | `server-side-plugins` | Feature | 📋 Geplant | Serverseitige Ausführung von Obsidian-Plugins die Node.js-APIs benötigen (tls, net, crypto, etc.) |
 
 ## Abhängigkeiten zwischen Specs
 
@@ -42,7 +44,9 @@ slatebase-overview (Architektur-Grundlage)
         ├── obsidian-markdown-compat (braucht Markdown-Rendering aus MVP)
         │     ├── context-panel (braucht Wikilink-Parsing + Heading-Anchors)
         │     ├── knowledge-graph (braucht Wikilink-Parsing)
+        │     ├── mermaid-rendering (braucht Fenced Code Block-Rendering)
         │     └── obsidian-plugin-compat (braucht Obsidian-Kompatibilität)
+        │           └── server-side-plugins (braucht Plugin-Infrastruktur)
         └── accessibility-audit (querschnittlich, alle UI-Komponenten)
 ```
 
@@ -54,11 +58,18 @@ slatebase-overview (Architektur-Grundlage)
 - **Priorität**: Mittel
 - **Aufwand**: Mittel
 
-### obsidian-plugin-compat (🔧 in Arbeit)
-- **Beschreibung**: Compatibility Layer für Obsidian Community Plugins (Plugin-API-Subset, Plugin-Loader, Sandbox, Verwaltungs-UI, Backend-Persistenz)
-- **Abhängigkeit**: Braucht obsidian-markdown-compat
-- **Status**: Frontend-Shims (Vault, Workspace, MetadataCache, App), Plugin-Loader, Sandbox, Registry, Settings, CommandRegistry, CSS-Injector, CompatibilityAnalyzer fertig. Backend PluginStore + Error/Validation fertig. Noch offen: API-Routes, ZIP-Upload, Composition-Root-Integration, Frontend-API-Client, Plugin-Management-UI, PluginProvider-Wiring.
-- **PBT-Entscheidung**: Alle Property-Based Tests entfernt — reguläre Unit Tests decken Requirements ab
+### mermaid-rendering
+- **Beschreibung**: Mermaid-Diagramme in Fenced Code Blocks (`\`\`\`mermaid`) als interaktive SVG-Grafiken rendern. Dark/Light Mode, Lazy Loading per dynamic import(), Fehlerbehandlung mit Fallback, Obsidian-kompatible Syntax.
+- **Abhängigkeit**: Braucht obsidian-markdown-compat (Fenced Code Block Rendering in ViewMode)
+- **Priorität**: Mittel
+- **Aufwand**: Niedrig–Mittel (rein Frontend, eine neue Dependency `mermaid`)
+- **Status**: Requirements fertig, Design + Tasks ausstehend
+
+### server-side-plugins
+- **Beschreibung**: Serverseitige Ausführung von Obsidian-Plugins die Node.js-APIs benötigen (tls, net, crypto, fs, etc.). Isolierte vm-Sandbox, Vault-I/O-Shims, Settings-Bridge zum Frontend, Plugin-Logs und Monitoring.
+- **Abhängigkeit**: Braucht obsidian-plugin-compat (Plugin-Store, Registry, Installer)
+- **Priorität**: Hoch (blockiert IMAP-Importer und andere Node.js-basierte Plugins)
+- **Aufwand**: Hoch (7 Phasen, 36 Tasks)
 
 ### accessibility-audit
 - **Beschreibung**: Systematischer WCAG 2.1 AA Audit aller UI-Komponenten mit anschließenden Fixes (Keyboard-Navigation, Screen-Reader, Kontraste, ARIA)

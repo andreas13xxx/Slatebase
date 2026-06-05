@@ -1,5 +1,7 @@
 // Plugin Routes — Route module for plugin management endpoints (CRUD + upload)
 
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import type { Context } from 'hono'
 import { Hono } from 'hono'
 import type { IPluginStore, PluginRegistryData } from '../plugin/types.js'
@@ -58,6 +60,53 @@ export interface PluginRouteDependencies {
 export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
   const { pluginStore, pluginInstaller, accessControl, vaultRegistry, logger } = deps
   const app = new Hono()
+
+  // ─── Detected plugins route (scans .obsidian/plugins/ inside vault filesystem) ───
+
+  // GET /detected — List plugins detected in .obsidian/plugins/ directory
+  app.get('/detected', async (c: Context): Promise<Response> => {
+    const vaultId = c.req.param('vaultId') as string
+
+    const authResult = await checkAccess(c, vaultId, vaultRegistry, accessControl)
+    if (!authResult.authorized) {
+      return authResult.response
+    }
+
+    try {
+      const entry = vaultRegistry.findById(vaultId)
+      if (entry === null) {
+        return c.json(createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`), 404)
+      }
+
+      const detected = await scanObsidianPlugins(entry.storagePath)
+      return c.json({ plugins: detected }, 200)
+    } catch (error) {
+      return handlePluginError(c, error, logger)
+    }
+  })
+
+  // POST /detected/:pluginId/install — Install a detected plugin from .obsidian/plugins/
+  app.post('/detected/:pluginId/install', async (c: Context): Promise<Response> => {
+    const vaultId = c.req.param('vaultId') as string
+    const pluginId = c.req.param('pluginId') as string
+
+    const authResult = await checkAccess(c, vaultId, vaultRegistry, accessControl)
+    if (!authResult.authorized) {
+      return authResult.response
+    }
+
+    try {
+      const entry = vaultRegistry.findById(vaultId)
+      if (entry === null) {
+        return c.json(createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`), 404)
+      }
+
+      const result = await pluginInstaller.installFromDetected(vaultId, pluginId, entry.storagePath)
+      return c.json(result, 201)
+    } catch (error) {
+      return handlePluginError(c, error, logger)
+    }
+  })
 
   // ─── Registry Routes (BEFORE :pluginId to avoid "registry" being parsed as param) ───
 
@@ -410,4 +459,78 @@ function handlePluginError(c: Context, error: unknown, logger: ILogger): Respons
     stack: error instanceof Error ? error.stack : undefined,
   })
   return c.json(createApiError('INTERNAL_ERROR', 'Internal server error'), 500)
+}
+
+// ─── Detected Plugin Scanner ─────────────────────────────────────────────────
+
+/** Detected plugin from .obsidian/plugins/ directory. */
+interface DetectedPluginInfo {
+  /** Plugin folder name (used as plugin ID). */
+  id: string
+  /** Whether a manifest.json was found. */
+  hasManifest: boolean
+  /** Whether a main.js was found. */
+  hasMainJs: boolean
+}
+
+/**
+ * Scans the .obsidian/plugins/ directory inside a vault's storage path
+ * and returns information about detected plugins (folder name, presence of manifest/bundle).
+ * Returns empty array if .obsidian/plugins/ does not exist.
+ */
+async function scanObsidianPlugins(vaultStoragePath: string): Promise<DetectedPluginInfo[]> {
+  const pluginsDir = path.join(vaultStoragePath, '.obsidian', 'plugins')
+
+  let entries: string[]
+  try {
+    entries = await fs.readdir(pluginsDir)
+  } catch (error: unknown) {
+    if (isNodeError(error) && error.code === 'ENOENT') {
+      return []
+    }
+    throw error
+  }
+
+  const detected: DetectedPluginInfo[] = []
+
+  for (const entry of entries) {
+    const entryPath = path.join(pluginsDir, entry)
+
+    let stat: import('node:fs').Stats
+    try {
+      stat = await fs.stat(entryPath)
+    } catch {
+      continue
+    }
+
+    if (!stat.isDirectory()) continue
+
+    // Check for manifest.json and main.js
+    let hasManifest = false
+    let hasMainJs = false
+
+    try {
+      await fs.access(path.join(entryPath, 'manifest.json'))
+      hasManifest = true
+    } catch {
+      // not found
+    }
+
+    try {
+      await fs.access(path.join(entryPath, 'main.js'))
+      hasMainJs = true
+    } catch {
+      // not found
+    }
+
+    detected.push({ id: entry, hasManifest, hasMainJs })
+  }
+
+  return detected
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && 'code' in error
 }

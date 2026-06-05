@@ -195,8 +195,11 @@ export class VaultReader implements IVaultReader {
       // Still read the directory to get itemCount
       try {
         const entries = await fs.readdir(dirPath, { withFileTypes: true })
-        // Exclude internal files (starting with _) from the count
-        node.itemCount = entries.filter((e) => !(e.name.startsWith('_') && e.isFile())).length
+        // Exclude internal files (starting with _) and hidden directories (starting with .) from the count
+        node.itemCount = entries.filter((e) =>
+          !(e.name.startsWith('_') && e.isFile()) &&
+          !(e.name.startsWith('.') && e.isDirectory())
+        ).length
       } catch {
         node.itemCount = 0
       }
@@ -213,6 +216,10 @@ export class VaultReader implements IVaultReader {
     for (const entry of entries) {
       // Skip internal files (e.g. _link-index.json)
       if (entry.name.startsWith('_') && entry.isFile()) {
+        continue
+      }
+      // Skip hidden directories (e.g. .obsidian, .trash, .mobile)
+      if (entry.name.startsWith('.') && entry.isDirectory()) {
         continue
       }
       if (entry.isDirectory()) {

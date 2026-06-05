@@ -72,6 +72,62 @@ export interface PaginatedSyncLog {
   totalPages: number
 }
 
+// ─── Sync Protocol (Event Log) Types ─────────────────────────────────────────
+
+/** Log level for a protocol entry. */
+export type SyncProtocolLevel = 'info' | 'warn' | 'error'
+
+/** Event type for a protocol entry. */
+export type SyncProtocolEventType =
+  | 'sync_start'
+  | 'sync_complete'
+  | 'connecting'
+  | 'connected'
+  | 'connection_failed'
+  | 'auth_failed'
+  | 'pull_start'
+  | 'pull_complete'
+  | 'push_start'
+  | 'push_complete'
+  | 'file_pulled'
+  | 'file_pushed'
+  | 'file_deleted'
+  | 'file_push_deleted'
+  | 'file_failed'
+  | 'conflict'
+  | 'checkpoint'
+  | 'scheduler_start'
+  | 'scheduler_stop'
+  | 'config_changed'
+
+/** A single event entry in the sync protocol (server-log style). */
+export interface SyncProtocolEntry {
+  timestamp: string
+  level: SyncProtocolLevel
+  event: SyncProtocolEventType
+  message: string
+  runId?: string
+  path?: string
+  size?: number
+  durationMs?: number
+}
+
+/** Paginated sync protocol response. */
+export interface PaginatedSyncProtocol {
+  items: SyncProtocolEntry[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+/** Filter options for the sync protocol. */
+export interface SyncProtocolFilter {
+  level?: SyncProtocolLevel
+  search?: string
+  runId?: string
+}
+
 /** A conflict entry for a document modified both locally and remotely. */
 export interface ConflictEntry {
   documentPath: string
@@ -153,6 +209,7 @@ export interface UpdateSyncConfigInput {
 export interface SyncState {
   config: SyncConfigResponse | null
   log: PaginatedSyncLog | null
+  protocol: PaginatedSyncProtocol | null
   conflicts: ConflictEntry[]
   analysisResult: AnalysisResult | null
   syncResult: SyncResult | null
@@ -166,6 +223,7 @@ export interface SyncState {
 export const initialSyncState: SyncState = {
   config: null,
   log: null,
+  protocol: null,
   conflicts: [],
   analysisResult: null,
   syncResult: null,
@@ -191,6 +249,7 @@ export type SyncAction =
   | { type: 'ANALYSIS_STARTED' }
   | { type: 'ANALYSIS_COMPLETED'; payload: AnalysisResult }
   | { type: 'SYNC_LOG_LOADED'; payload: PaginatedSyncLog }
+  | { type: 'SYNC_PROTOCOL_LOADED'; payload: PaginatedSyncProtocol }
   | { type: 'CONFLICTS_LOADED'; payload: ConflictEntry[] }
   | { type: 'CONFLICT_RESOLVED'; payload: string }
   | { type: 'SYNC_ERROR_OCCURRED'; payload: string }
@@ -236,6 +295,7 @@ export function syncReducer(state: SyncState, action: SyncAction): SyncState {
         ...state,
         config: null,
         log: null,
+        protocol: null,
         conflicts: [],
         analysisResult: null,
         syncResult: null,
@@ -288,6 +348,13 @@ export function syncReducer(state: SyncState, action: SyncAction): SyncState {
       return {
         ...state,
         log: action.payload,
+        isLoading: false,
+      }
+
+    case 'SYNC_PROTOCOL_LOADED':
+      return {
+        ...state,
+        protocol: action.payload,
         isLoading: false,
       }
 

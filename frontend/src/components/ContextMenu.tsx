@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import ReactDOM from 'react-dom'
-import { FilePlus, Pencil, Trash2 } from 'lucide-react'
+import { Database, FilePlus, Pencil, Trash2 } from 'lucide-react'
 import { useTranslation } from '../i18n'
 import { clampMenuPosition } from '../utils/pathUtils'
 import type { DirectoryTree } from '../types'
@@ -25,6 +25,8 @@ export interface ContextMenuProps {
   onRename: (node: DirectoryTree) => void
   /** Callback when "Löschen" is selected. Receives the target node. */
   onDelete: (node: DirectoryTree) => void
+  /** Optional callback when "Neuer Vault" is selected. Only shown when provided. */
+  onNewVault?: () => void
 }
 
 /**
@@ -42,6 +44,7 @@ export function ContextMenu({
   onNewFile,
   onRename,
   onDelete,
+  onNewVault,
 }: ContextMenuProps) {
   const { t } = useTranslation()
   const menuRef = useRef<HTMLDivElement>(null)
@@ -113,6 +116,11 @@ export function ContextMenu({
     onClose()
   }
 
+  function handleNewVault() {
+    if (onNewVault) onNewVault()
+    onClose()
+  }
+
   function handleRename() {
     onRename(node)
     onClose()
@@ -124,6 +132,7 @@ export function ContextMenu({
   }
 
   const isReadOnly = permission === 'read'
+  const isRoot = node.path === ''
 
   const menu = (
     <div
@@ -153,26 +162,42 @@ export function ContextMenu({
               <span>{t('contextMenu.newFile')}</span>
             </button>
           </li>
-          <li className="context-menu-item" role="menuitem">
-            <button
-              type="button"
-              className="context-menu-btn"
-              onClick={handleRename}
-            >
-              <Pencil size={14} className="context-menu-icon" />
-              <span>{t('contextMenu.rename')}</span>
-            </button>
-          </li>
-          <li className="context-menu-item" role="menuitem">
-            <button
-              type="button"
-              className="context-menu-btn context-menu-btn--danger"
-              onClick={handleDelete}
-            >
-              <Trash2 size={14} className="context-menu-icon" />
-              <span>{t('contextMenu.delete')}</span>
-            </button>
-          </li>
+          {isRoot && onNewVault && (
+            <li className="context-menu-item" role="menuitem">
+              <button
+                type="button"
+                className="context-menu-btn"
+                onClick={handleNewVault}
+              >
+                <Database size={14} className="context-menu-icon" />
+                <span>{t('contextMenu.newVault')}</span>
+              </button>
+            </li>
+          )}
+          {!isRoot && (
+            <li className="context-menu-item" role="menuitem">
+              <button
+                type="button"
+                className="context-menu-btn"
+                onClick={handleRename}
+              >
+                <Pencil size={14} className="context-menu-icon" />
+                <span>{t('contextMenu.rename')}</span>
+              </button>
+            </li>
+          )}
+          {!isRoot && (
+            <li className="context-menu-item" role="menuitem">
+              <button
+                type="button"
+                className="context-menu-btn context-menu-btn--danger"
+                onClick={handleDelete}
+              >
+                <Trash2 size={14} className="context-menu-icon" />
+                <span>{t('contextMenu.delete')}</span>
+              </button>
+            </li>
+          )}
         </ul>
       )}
     </div>

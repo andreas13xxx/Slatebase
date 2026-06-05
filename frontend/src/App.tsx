@@ -25,6 +25,8 @@ import { MyVaultsPage } from './components/MyVaultsPage'
 import { SyncConfigPage } from './components/SyncConfigPage'
 import { SyncLogPage } from './components/SyncLogPage'
 import { McpTokensPage } from './components/McpTokensPage'
+import { PluginManagementPage } from './components/PluginManagementPage'
+import { PluginViewPanel } from './components/PluginViewPanel'
 import { SyncProvider } from './state/syncContext'
 import { ContextPanelProvider } from './state/contextPanelContext'
 import { ContextPanel } from './components/context-panel/ContextPanel'
@@ -33,7 +35,7 @@ import { CommandPaletteContainer } from './components/CommandPaletteContainer'
 import {
   User, LogOut, Settings, Shield, FileText, Clock,
   Database, Share2, Trash2, Server, Download,
-  Upload, FolderOpen, PanelRight, PanelLeft, X, Eye, Pencil, MessageCircle, RefreshCw, Key, ScrollText,
+  Upload, FolderOpen, PanelRight, PanelLeft, X, Eye, Pencil, MessageCircle, RefreshCw, Key, ScrollText, Plug,
 } from 'lucide-react'
 import { getFileIcon, getFileIconClass, getDisplayName } from './utils/fileIcons'
 import './App.css'
@@ -61,6 +63,7 @@ type AppPage =
   | 'sync-config'
   | 'sync-log'
   | 'mcp-tokens'
+  | 'plugins'
 
 /**
  * User avatar and dropdown menu component.
@@ -250,6 +253,7 @@ const PAGE_LABEL_KEYS: Record<AppPage, string> = {
   'sync-config': 'pages.syncConfig',
   'sync-log': 'pages.syncLog',
   'mcp-tokens': 'pages.mcpTokens',
+  plugins: 'pages.plugins',
 }
 
 /** Icons for settings pages. */
@@ -268,6 +272,7 @@ const PAGE_ICONS: Partial<Record<AppPage, React.ReactNode>> = {
   'sync-config': <RefreshCw size={13} />,
   'sync-log': <Clock size={13} />,
   'mcp-tokens': <Key size={13} />,
+  plugins: <Plug size={13} />,
 }
 
 /**
@@ -342,6 +347,13 @@ function AppContent() {
       localStorage.setItem(LAST_VAULT_KEY, state.selectedVaultId)
     }
   }, [state.selectedVaultId])
+
+  // When a file tab becomes active (e.g. from FileExplorer click), deactivate settings page
+  useEffect(() => {
+    if (tabState.activeTabId && activeSettingsPage !== null) {
+      setActiveSettingsPage(null)
+    }
+  }, [tabState.activeTabId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // When selectedVaultId changes, update directoryTree from vaultTrees and clear old tabs
   useEffect(() => {
@@ -519,6 +531,10 @@ function AppContent() {
           ? <SyncProvider><SyncLogPage vaultId={state.selectedVaultId} /></SyncProvider>
           : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
       case 'mcp-tokens': return <McpTokensPage apiClient={apiClient} />
+      case 'plugins':
+        return state.selectedVaultId
+          ? <PluginManagementPage apiClient={apiClient} vaultId={state.selectedVaultId} />
+          : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
       default: return null
     }
   }
@@ -722,6 +738,7 @@ function AppContent() {
                 aria-orientation="vertical"
               />
               <aside className="app-right-panel" style={{ width: rightPanel.width }}>
+                <PluginViewPanel />
                 <ContextPanel
                   documentContent={activeTab && !activeTab.isBinary && activeTab.filePath !== '__graph__' ? (activeTab.editBuffer ?? activeTab.content) : null}
                   documentPath={activeTab && !activeTab.isBinary && activeTab.filePath !== '__graph__' ? activeTab.filePath : null}

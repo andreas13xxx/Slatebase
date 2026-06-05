@@ -180,6 +180,7 @@ export const en: TranslationShape = {
     syncConfig: 'Vault sync',
     syncLog: 'Sync log',
     mcpTokens: 'API Tokens',
+    plugins: 'Plugins',
   },
 
   rightPanel: {
@@ -437,6 +438,7 @@ export const en: TranslationShape = {
   contextMenu: {
     ariaLabel: 'Context menu',
     newFile: 'New File',
+    newVault: 'New Vault',
     rename: 'Rename',
     delete: 'Delete',
     noActions: 'No actions available',

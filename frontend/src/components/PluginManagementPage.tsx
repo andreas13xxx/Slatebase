@@ -1,9 +1,13 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef, useContext } from 'react'
 import type { IApiClient, PluginManifest, PluginRegistryData } from '../api'
+import { PluginUpload } from './PluginUpload'
+import { CompatibilityAnalyzer } from '../plugins/compat/compatibility-analyzer'
+import { PluginContext } from '../plugins/compat/plugin-context'
 import {
   Plug, Settings, AlertTriangle, RefreshCw, ChevronDown, ChevronRight,
-  CheckCircle2, AlertCircle, HelpCircle, XCircle,
+  CheckCircle2, AlertCircle, HelpCircle, XCircle, X, Save, Trash2,
 } from 'lucide-react'
+import { ConfirmModal } from './ConfirmModal'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -48,6 +52,87 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
   const [togglingPlugins, setTogglingPlugins] = useState<Set<string>>(new Set())
   const [reloadingPlugins, setReloadingPlugins] = useState<Set<string>>(new Set())
   const [registryData, setRegistryData] = useState<PluginRegistryData | null>(null)
+  const [settingsModal, setSettingsModal] = useState<{ pluginId: string; pluginName: string } | null>(null)
+  const [settingsJson, setSettingsJson] = useState('')
+  const [settingsSaving, setSettingsSaving] = useState(false)
+  const [settingsError, setSettingsError] = useState<string | null>(null)
+  const [settingsLoading, setSettingsLoading] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<{ pluginId: string; pluginName: string } | null>(null)
+  const [deletingPlugins, setDeletingPlugins] = useState<Set<string>>(new Set())
+
+  const analyzerRef = useRef(new CompatibilityAnalyzer())
+  const settingsContainerRef = useRef<HTMLDivElement>(null)
+  const pluginContext = useContext(PluginContext)
+
+  // ─── Background: Analyze compatibility + detect settings ───────────────
+
+  /**
+   * Fetches bundles for all plugins, runs compatibility analysis, and checks
+   * if settings exist. Updates both the display list and the persisted registry.
+   */
+  const analyzeAndDetectSettings = useCallback(async (
+    manifests: PluginManifest[],
+    registry: PluginRegistryData | null,
+  ): Promise<void> => {
+    const updates: Array<{ pluginId: string; compatibilityLevel?: CompatibilityLevel; hasSettings?: boolean }> = []
+
+    await Promise.all(manifests.map(async (manifest) => {
+      const update: { pluginId: string; compatibilityLevel?: CompatibilityLevel; hasSettings?: boolean } = {
+        pluginId: manifest.id,
+      }
+
+      // 1. Compatibility analysis (only if currently 'unknown')
+      const existingLevel = registry?.plugins?.[manifest.id]?.compatibilityLevel
+      if (!existingLevel || existingLevel === 'unknown') {
+        try {
+          const bundle = await apiClient.loadBundle(vaultId, manifest.id)
+          const report = analyzerRef.current.analyze(bundle, manifest)
+          update.compatibilityLevel = report.level
+        } catch {
+          // Bundle load failed — leave as unknown
+        }
+      }
+
+      // 2. Settings: always available for installed plugins
+      // Plugins can always be configured (empty {} if no data.json exists yet)
+      update.hasSettings = true
+
+      updates.push(update)
+    }))
+
+    // Apply updates to display list
+    if (updates.length > 0) {
+      setPlugins(prev => prev.map(p => {
+        const upd = updates.find(u => u.pluginId === p.pluginId)
+        if (!upd) return p
+        return {
+          ...p,
+          compatibilityLevel: upd.compatibilityLevel ?? p.compatibilityLevel,
+          hasSettings: upd.hasSettings ?? p.hasSettings,
+        }
+      }))
+
+      // Persist updated compatibility levels to registry
+      const compatUpdates = updates.filter(u => u.compatibilityLevel && u.compatibilityLevel !== 'unknown')
+      if (compatUpdates.length > 0 && registry) {
+        const updatedRegistry: PluginRegistryData = { ...registry, plugins: { ...registry.plugins } }
+        for (const upd of compatUpdates) {
+          if (upd.compatibilityLevel && updatedRegistry.plugins[upd.pluginId]) {
+            updatedRegistry.plugins[upd.pluginId] = {
+              ...updatedRegistry.plugins[upd.pluginId]!,
+              compatibilityLevel: upd.compatibilityLevel,
+            }
+          }
+        }
+        try {
+          await apiClient.saveRegistry(vaultId, updatedRegistry)
+          setRegistryData(updatedRegistry)
+        } catch {
+          // Non-critical — next load will re-analyze
+        }
+      }
+    }
+  }, [apiClient, vaultId])
 
   // ─── Load plugins ──────────────────────────────────────────────────────
 
@@ -74,11 +159,14 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
           status: (regEntry?.status as PluginStatus) ?? 'inactive',
           compatibilityLevel: (regEntry?.compatibilityLevel as CompatibilityLevel) ?? 'unknown',
           error: regEntry?.error,
-          hasSettings: false, // Will be determined by actual plugin loading
+          hasSettings: true, // All installed plugins can be configured
         }
       })
 
       setPlugins(merged)
+
+      // Background: Analyze compatibility and detect settings for each plugin
+      void analyzeAndDetectSettings(manifests, registry)
     } catch (err: unknown) {
       const message = err && typeof err === 'object' && 'message' in err
         ? (err as { message: string }).message
@@ -87,11 +175,74 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
     } finally {
       setLoading(false)
     }
-  }, [apiClient, vaultId])
+  }, [apiClient, vaultId, analyzeAndDetectSettings])
 
   useEffect(() => {
     void loadPlugins()
   }, [loadPlugins])
+
+  // ─── Settings modal handlers ───────────────────────────────────────────
+
+  async function openSettings(pluginId: string, pluginName: string): Promise<void> {
+    setSettingsModal({ pluginId, pluginName })
+    setSettingsError(null)
+    setSettingsLoading(true)
+
+    // Check if the plugin has a native settings tab registered
+    const settingTab = pluginContext?.settingTabRegistry.get(pluginId)
+    if (settingTab) {
+      // Native settings: call display() to populate containerEl
+      try {
+        settingTab.containerEl.innerHTML = ''
+        settingTab.display()
+      } catch (err) {
+        console.error(`[PluginSettings] Error rendering settings for "${pluginId}":`, err)
+        setSettingsError('Plugin-Einstellungen konnten nicht gerendert werden.')
+      }
+      setSettingsLoading(false)
+      // Mount containerEl in the next render via ref
+      requestAnimationFrame(() => {
+        if (settingsContainerRef.current && settingTab.containerEl) {
+          settingsContainerRef.current.innerHTML = ''
+          settingsContainerRef.current.appendChild(settingTab.containerEl)
+        }
+      })
+      return
+    }
+
+    // Fallback: JSON editor
+    try {
+      const data = await apiClient.loadSettings(vaultId, pluginId)
+      setSettingsJson(data !== null && data !== undefined ? JSON.stringify(data, null, 2) : '{}')
+    } catch {
+      setSettingsJson('{}')
+      setSettingsError('Einstellungen konnten nicht geladen werden.')
+    } finally {
+      setSettingsLoading(false)
+    }
+  }
+
+  async function saveSettings(): Promise<void> {
+    if (!settingsModal) return
+    setSettingsSaving(true)
+    setSettingsError(null)
+    try {
+      const parsed = JSON.parse(settingsJson)
+      await apiClient.saveSettings(vaultId, settingsModal.pluginId, parsed)
+      setSettingsModal(null)
+    } catch (err: unknown) {
+      if (err instanceof SyntaxError) {
+        setSettingsError('Ungültiges JSON-Format.')
+      } else {
+        const message = err && typeof err === 'object' && 'message' in err
+          ? (err as { message: string }).message
+          : 'Speichern fehlgeschlagen.'
+        setSettingsError(message)
+      }
+    } finally {
+      setSettingsSaving(false)
+    }
+  }
 
   // ─── Toggle activation ────────────────────────────────────────────────
 
@@ -202,6 +353,44 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
     }
   }
 
+  // ─── Delete plugin ──────────────────────────────────────────────────────
+
+  async function handleDelete(pluginId: string): Promise<void> {
+    if (deletingPlugins.has(pluginId)) return
+
+    setDeletingPlugins((prev) => new Set([...prev, pluginId]))
+
+    try {
+      await apiClient.deletePlugin(vaultId, pluginId)
+
+      // Remove from registry
+      if (registryData) {
+        const updatedRegistry: PluginRegistryData = {
+          ...registryData,
+          plugins: { ...registryData.plugins },
+        }
+        delete updatedRegistry.plugins[pluginId]
+        await apiClient.saveRegistry(vaultId, updatedRegistry).catch(() => { /* non-critical */ })
+        setRegistryData(updatedRegistry)
+      }
+
+      // Remove from display list
+      setPlugins((prev) => prev.filter((p) => p.pluginId !== pluginId))
+    } catch (err: unknown) {
+      const message = err && typeof err === 'object' && 'message' in err
+        ? (err as { message: string }).message
+        : 'Deinstallation fehlgeschlagen.'
+      setError(message)
+    } finally {
+      setDeletingPlugins((prev) => {
+        const next = new Set(prev)
+        next.delete(pluginId)
+        return next
+      })
+      setDeleteConfirm(null)
+    }
+  }
+
   // ─── Compatibility level helpers ───────────────────────────────────────
 
   function getCompatibilityIcon(level: CompatibilityLevel) {
@@ -286,6 +475,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
             Plugins
           </h1>
         </div>
+        <PluginUploadSection apiClient={apiClient} vaultId={vaultId} onPluginInstalled={() => void loadPlugins()} />
         <div className="plugin-management-empty">
           <Plug size={32} className="plugin-management-empty-icon" />
           <p className="plugin-management-empty-title">Keine Plugins installiert</p>
@@ -306,6 +496,17 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
           Plugins
         </h1>
         <span className="plugin-management-count">{plugins.length} installiert</span>
+      </div>
+
+      <PluginUploadSection apiClient={apiClient} vaultId={vaultId} onPluginInstalled={() => void loadPlugins()} />
+
+      <div className="plugin-management-warning" role="status">
+        <AlertTriangle size={14} />
+        <span>
+          <strong>Experimentell:</strong> Die Plugin-Kompatibilitätsschicht befindet sich in aktiver Entwicklung.
+          Nur browser-kompatible Plugins können ausgeführt werden. Plugins die Node.js-Module benötigen
+          (z.B. IMAP, Git, Datenbank-Zugriff) werden erst mit serverseitiger Plugin-Ausführung unterstützt.
+        </span>
       </div>
 
       <div className="plugin-management-list">
@@ -339,10 +540,20 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
                     className="plugin-card-btn plugin-card-btn--settings"
                     title="Einstellungen"
                     aria-label={`Einstellungen für ${plugin.name}`}
+                    onClick={() => void openSettings(plugin.pluginId, plugin.name)}
                   >
                     <Settings size={14} />
                   </button>
                 )}
+                <button
+                  className="plugin-card-btn plugin-card-btn--delete"
+                  title="Deinstallieren"
+                  aria-label={`${plugin.name} deinstallieren`}
+                  onClick={() => setDeleteConfirm({ pluginId: plugin.pluginId, pluginName: plugin.name })}
+                  disabled={deletingPlugins.has(plugin.pluginId)}
+                >
+                  <Trash2 size={14} />
+                </button>
                 <label className="plugin-card-toggle" aria-label={`${plugin.name} ${plugin.status === 'active' ? 'deaktivieren' : 'aktivieren'}`}>
                   <input
                     type="checkbox"
@@ -423,6 +634,114 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
           </div>
         ))}
       </div>
+
+      {/* Settings modal */}
+      {settingsModal && (
+        <div className="plugin-settings-overlay" onClick={() => setSettingsModal(null)}>
+          <div className="plugin-settings-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="plugin-settings-modal-header">
+              <h2 className="plugin-settings-modal-title">
+                <Settings size={16} />
+                Einstellungen: {settingsModal.pluginName}
+              </h2>
+              <button
+                className="plugin-settings-modal-close"
+                onClick={() => setSettingsModal(null)}
+                aria-label="Schließen"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="plugin-settings-modal-body">
+              {settingsLoading ? (
+                <div className="plugin-settings-loading">
+                  <span className="plugin-management-spinner" aria-hidden="true" />
+                  <span>Einstellungen werden geladen…</span>
+                </div>
+              ) : pluginContext?.settingTabRegistry.has(settingsModal.pluginId) ? (
+                /* Native plugin settings tab UI */
+                <div ref={settingsContainerRef} className="plugin-settings-native" />
+              ) : (
+                /* Fallback: JSON editor */
+                <>
+                  <label className="plugin-settings-label" htmlFor="plugin-settings-editor">
+                    Plugin-Daten (JSON):
+                  </label>
+                  <textarea
+                    id="plugin-settings-editor"
+                    className="plugin-settings-textarea"
+                    value={settingsJson}
+                    onChange={(e) => setSettingsJson(e.target.value)}
+                    spellCheck={false}
+                    rows={16}
+                  />
+                </>
+              )}
+              {settingsError && (
+                <div className="plugin-settings-error" role="alert">
+                  <AlertTriangle size={13} />
+                  <span>{settingsError}</span>
+                </div>
+              )}
+            </div>
+            <div className="plugin-settings-modal-footer">
+              <button
+                className="plugin-management-btn plugin-management-btn--secondary"
+                onClick={() => {
+                  // Call hide() on the setting tab if it exists
+                  const tab = pluginContext?.settingTabRegistry.get(settingsModal.pluginId)
+                  if (tab) { try { tab.hide() } catch { /* ignore */ } }
+                  setSettingsModal(null)
+                }}
+              >
+                {pluginContext?.settingTabRegistry.has(settingsModal.pluginId) ? 'Schließen' : 'Abbrechen'}
+              </button>
+              {!pluginContext?.settingTabRegistry.has(settingsModal.pluginId) && (
+                <button
+                  className="plugin-management-btn plugin-management-btn--primary"
+                  onClick={() => void saveSettings()}
+                  disabled={settingsSaving || settingsLoading}
+                >
+                  <Save size={13} />
+                  {settingsSaving ? 'Speichern…' : 'Speichern'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Delete confirmation modal */}
+      <ConfirmModal
+        open={deleteConfirm !== null}
+        title="Plugin deinstallieren"
+        message={`Möchtest du das Plugin „${deleteConfirm?.pluginName ?? ''}" wirklich deinstallieren? Alle Plugin-Daten (Bundle, Styles, Einstellungen) werden unwiderruflich gelöscht.`}
+        confirmLabel="Deinstallieren"
+        variant="danger"
+        onConfirm={() => { if (deleteConfirm) void handleDelete(deleteConfirm.pluginId) }}
+        onCancel={() => setDeleteConfirm(null)}
+      />
     </div>
+  )
+}
+
+// ─── Helper: Upload section with directory tree from context ─────────────────
+
+/** Props for the upload section wrapper. */
+interface PluginUploadSectionProps {
+  apiClient: IApiClient
+  vaultId: string
+  onPluginInstalled: () => void
+}
+
+/**
+ * Wraps PluginUpload with access to the API client.
+ */
+function PluginUploadSection({ apiClient, vaultId, onPluginInstalled }: PluginUploadSectionProps) {
+  return (
+    <PluginUpload
+      apiClient={apiClient}
+      vaultId={vaultId}
+      onPluginInstalled={onPluginInstalled}
+    />
   )
 }

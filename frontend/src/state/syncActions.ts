@@ -124,6 +124,16 @@ export async function removeSyncConfig(
     await apiClient.removeSyncConfig(vaultId)
     dispatch({ type: 'SYNC_CONFIG_REMOVED' })
   } catch (err: unknown) {
+    // If config is already gone, treat as success
+    if (
+      err !== null &&
+      typeof err === 'object' &&
+      'code' in err &&
+      (err as { code: unknown }).code === 'SYNC_NOT_CONFIGURED'
+    ) {
+      dispatch({ type: 'SYNC_CONFIG_REMOVED' })
+      return
+    }
     const message = extractErrorMessage(err)
     dispatch({ type: 'SYNC_ERROR_OCCURRED', payload: message })
   }
@@ -179,6 +189,27 @@ export async function loadSyncLog(
   try {
     const log = await apiClient.getSyncLog(vaultId, page, pageSize)
     dispatch({ type: 'SYNC_LOG_LOADED', payload: log })
+  } catch (err: unknown) {
+    const message = extractErrorMessage(err)
+    dispatch({ type: 'SYNC_ERROR_OCCURRED', payload: message })
+  }
+}
+
+/**
+ * Loads the sync protocol (event log) paginated with optional filters.
+ */
+export async function loadSyncProtocol(
+  dispatch: Dispatch<SyncAction>,
+  apiClient: IApiClient,
+  vaultId: string,
+  page?: number,
+  pageSize?: number,
+  filter?: { level?: string; search?: string; runId?: string },
+): Promise<void> {
+  dispatch({ type: 'SYNC_LOADING_STARTED' })
+  try {
+    const protocol = await apiClient.getSyncProtocol(vaultId, page, pageSize, filter)
+    dispatch({ type: 'SYNC_PROTOCOL_LOADED', payload: protocol })
   } catch (err: unknown) {
     const message = extractErrorMessage(err)
     dispatch({ type: 'SYNC_ERROR_OCCURRED', payload: message })

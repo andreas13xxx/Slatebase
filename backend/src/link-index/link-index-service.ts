@@ -58,6 +58,7 @@ export class LinkIndexService implements ILinkIndex {
   constructor(
     private readonly vaultPath: string,
     private readonly vaultId: string,
+    private readonly vaultName: string,
     private readonly logger: ILogger,
   ) {
     // Persistence file lives inside the vault storage directory:
@@ -271,6 +272,7 @@ export class LinkIndexService implements ILinkIndex {
       if (!this.validateSchema(parsed)) {
         this.logger.warn('Link index file has invalid schema, triggering rebuild', {
           vaultId: this.vaultId,
+          vaultName: this.vaultName,
         })
         await this.rebuild()
         return
@@ -292,12 +294,14 @@ export class LinkIndexService implements ILinkIndex {
       this.ready = true
       this.logger.info('Link index loaded from disk', {
         vaultId: this.vaultId,
+        vaultName: this.vaultName,
         fileCount: this.forwardLinks.size,
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       this.logger.warn('Failed to load link index from disk, triggering rebuild', {
         vaultId: this.vaultId,
+        vaultName: this.vaultName,
         error: message,
       })
       await this.rebuild()
@@ -320,6 +324,8 @@ export class LinkIndexService implements ILinkIndex {
         const fullPath = path.join(dirPath, entry.name)
 
         if (entry.isDirectory()) {
+          // Skip hidden directories (.obsidian, .trash, .mobile, etc.)
+          if (entry.name.startsWith('.')) continue
           const subFiles = await this.findMarkdownFiles(fullPath)
           results.push(...subFiles)
         } else if (entry.isFile() && entry.name.endsWith('.md')) {
@@ -407,6 +413,7 @@ export class LinkIndexService implements ILinkIndex {
       const message = error instanceof Error ? error.message : String(error)
       this.logger.error('Failed to persist link index', {
         vaultId: this.vaultId,
+        vaultName: this.vaultName,
         error: message,
       })
     }

@@ -197,6 +197,9 @@ export class SyncRouteModule implements RouteModule {
     // Sync log
     router.get('/vaults/:vaultId/sync/log', (c) => this.getLog(c))
 
+    // Sync protocol (event log)
+    router.get('/vaults/:vaultId/sync/protocol', (c) => this.getProtocol(c))
+
     // Conflicts
     router.get('/vaults/:vaultId/sync/conflicts', (c) => this.getConflicts(c))
     router.post('/vaults/:vaultId/sync/conflicts/:path{.+}/resolve', (c) => this.resolveConflict(c))
@@ -455,6 +458,43 @@ export class SyncRouteModule implements RouteModule {
 
       const { page, pageSize } = parsed.data
       const result = await this.syncService.getLog(vaultId, page, pageSize)
+      return c.json(result, 200)
+    } catch (error) {
+      return handleSyncError(c, error, this.logger)
+    }
+  }
+
+  /**
+   * GET /vaults/:vaultId/sync/protocol
+   * Returns the sync protocol (event log) paginated with optional filters.
+   * Query params: page (default 1), pageSize (default 100, max 200),
+   *   level (info|warn|error), search (text filter), runId (filter by run).
+   */
+  private async getProtocol(c: Context): Promise<Response> {
+    const vaultId = c.req.param('vaultId') as string
+
+    const ownerCheck = checkOwnership(c, vaultId, this.vaultRegistry)
+    if (!ownerCheck.authorized) {
+      return ownerCheck.response
+    }
+
+    try {
+      const rawPage = c.req.query('page')
+      const rawPageSize = c.req.query('pageSize')
+      const level = c.req.query('level') as 'info' | 'warn' | 'error' | undefined
+      const search = c.req.query('search')
+      const runId = c.req.query('runId')
+
+      const page = rawPage ? Math.max(1, parseInt(rawPage, 10) || 1) : 1
+      const pageSize = rawPageSize ? Math.min(200, Math.max(1, parseInt(rawPageSize, 10) || 100)) : 100
+
+      const filter = {
+        ...(level && ['info', 'warn', 'error'].includes(level) ? { level } : {}),
+        ...(search ? { search } : {}),
+        ...(runId ? { runId } : {}),
+      }
+
+      const result = await this.syncService.getProtocol(vaultId, page, pageSize, Object.keys(filter).length > 0 ? filter : undefined)
       return c.json(result, 200)
     } catch (error) {
       return handleSyncError(c, error, this.logger)

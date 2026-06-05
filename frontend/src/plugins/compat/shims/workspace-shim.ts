@@ -1,5 +1,6 @@
 import { EventSystem } from '../event-system';
 import type { EventRef, IWorkspaceShim, TFile } from '../types';
+import type { ViewRegistry, WorkspaceLeaf } from '../view-registry';
 
 /**
  * WorkspaceShim — Obsidian Workspace API emulation.
@@ -8,6 +9,9 @@ import type { EventRef, IWorkspaceShim, TFile } from '../types';
  * - `getActiveFile()`: returns the currently active TFile or null
  * - Event system: `on`, `off`, `trigger` for workspace events (file-open, active-leaf-change)
  * - `setActiveFile(file)`: external method to update the active file state
+ * - `registerView(type, creator)`: register a custom view type (Calendar, Kanban, etc.)
+ * - `getLeaf()` / `getRightLeaf()` / `revealLeaf()`: leaf management for plugin views
+ * - `getLeavesOfType()` / `detachLeavesOfType()`: view instance queries
  * - ES6 Proxy for non-emulated property/method access (returns no-op with console.warn, once per property)
  *
  * @example
@@ -21,9 +25,20 @@ export class WorkspaceShim implements IWorkspaceShim {
   private events: EventSystem;
   private activeFile: TFile | null = null;
   private warnedProperties: Set<string> = new Set();
+  private viewRegistry: ViewRegistry | null = null;
+  private app: unknown = null;
 
   constructor() {
     this.events = new EventSystem();
+  }
+
+  /**
+   * Attach a ViewRegistry instance for view management.
+   * Called by the PluginProvider after constructing both the WorkspaceShim and ViewRegistry.
+   */
+  setViewRegistry(registry: ViewRegistry, app: unknown): void {
+    this.viewRegistry = registry;
+    this.app = app;
   }
 
   /**
@@ -74,6 +89,79 @@ export class WorkspaceShim implements IWorkspaceShim {
     }
   }
 
+  // ─── View Registration & Leaf Management ──────────────────────────────────
+
+  /**
+   * Register a custom view type with its factory function.
+   * Plugins call this in onload() to register their views.
+   *
+   * @param viewType - Unique string identifier for the view type
+   * @param creator - Factory function that creates a view instance given a leaf
+   */
+  registerView(viewType: string, creator: (leaf: WorkspaceLeaf) => unknown): void {
+    if (!this.viewRegistry) {
+      console.warn(`[WorkspaceShim] registerView("${viewType}") called before ViewRegistry attached — no-op.`);
+      return;
+    }
+    this.viewRegistry.registerView(viewType, creator);
+  }
+
+  /**
+   * Get a leaf to host a view. Creates a new leaf in the right panel.
+   * Obsidian supports 'split', 'tab', 'window' — we always create in the right panel.
+   */
+  getLeaf(_newLeaf?: boolean | string): WorkspaceLeaf | undefined {
+    if (!this.viewRegistry) return undefined;
+    return this.viewRegistry.createLeaf(this.app);
+  }
+
+  /**
+   * Get or create a leaf in the right panel (sidebar).
+   * This is what most sidebar-plugins (Calendar, Outline) use.
+   */
+  getRightLeaf(_split?: boolean): WorkspaceLeaf | undefined {
+    if (!this.viewRegistry) return undefined;
+    return this.viewRegistry.createLeaf(this.app);
+  }
+
+  /**
+   * Get or create a leaf in the left panel (sidebar).
+   */
+  getLeftLeaf(_split?: boolean): WorkspaceLeaf | undefined {
+    if (!this.viewRegistry) return undefined;
+    return this.viewRegistry.createLeaf(this.app);
+  }
+
+  /**
+   * Reveal (activate/focus) a leaf. In Slatebase this is a no-op since we auto-show plugin views.
+   */
+  revealLeaf(_leaf: WorkspaceLeaf): void {
+    // Views are automatically shown when setViewState is called
+  }
+
+  /**
+   * Get all leaves that have a view of the given type.
+   */
+  getLeavesOfType(viewType: string): WorkspaceLeaf[] {
+    if (!this.viewRegistry) return [];
+    return this.viewRegistry.getLeavesOfType(viewType);
+  }
+
+  /**
+   * Detach (close) all leaves of the given view type.
+   */
+  detachLeavesOfType(viewType: string): void {
+    if (!this.viewRegistry) return;
+    void this.viewRegistry.detachLeavesOfType(viewType);
+  }
+
+  /**
+   * Get the ViewRegistry instance (for external access by PluginProvider).
+   */
+  getViewRegistry(): ViewRegistry | null {
+    return this.viewRegistry;
+  }
+
   /**
    * Remove all event listeners. Used during cleanup/deactivation.
    */
@@ -101,10 +189,21 @@ export class WorkspaceShim implements IWorkspaceShim {
       'trigger',
       'setActiveFile',
       'removeAllListeners',
+      'setViewRegistry',
+      'registerView',
+      'getLeaf',
+      'getRightLeaf',
+      'getLeftLeaf',
+      'revealLeaf',
+      'getLeavesOfType',
+      'detachLeavesOfType',
+      'getViewRegistry',
       // Internal properties that should not trigger warnings
       'events',
       'activeFile',
       'warnedProperties',
+      'viewRegistry',
+      'app',
     ]);
 
     return new Proxy(instance, {

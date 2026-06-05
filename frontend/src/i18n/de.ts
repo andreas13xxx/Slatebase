@@ -174,6 +174,7 @@ export const de = {
     syncConfig: 'Vault-Sync',
     syncLog: 'Sync-Protokoll',
     mcpTokens: 'API-Tokens',
+    plugins: 'Plugins',
   },
 
   rightPanel: {
@@ -431,6 +432,7 @@ export const de = {
   contextMenu: {
     ariaLabel: 'Kontextmenü',
     newFile: 'Neue Datei',
+    newVault: 'Neuer Vault',
     rename: 'Umbenennen',
     delete: 'Löschen',
     noActions: 'Keine Aktionen verfügbar',

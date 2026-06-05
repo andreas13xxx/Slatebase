@@ -1,10 +1,22 @@
 /**
  * CompatibilityAnalyzer — Static analysis of Obsidian plugin bundles.
  *
- * Pattern-matches Obsidian API accesses in bundle source code to determine
- * which API methods a plugin uses. Classifies each detected call as
- * supported/partial/unsupported and calculates an overall compatibility level.
+ * Determines browser compatibility through a multi-layered approach:
+ * 1. **Manifest-based check** (primary): `isDesktopOnly` from manifest.json
+ *    - `isDesktopOnly: true` → immediately classified as 'unsupported'
+ *    - `isDesktopOnly: false` or absent → proceed to deeper analysis
+ * 2. **Node.js API detection**: Scans for require('fs'), require('net'), etc.
+ *    - Presence of Node.js imports → 'unsupported' (cannot run in browser)
+ * 3. **Obsidian API pattern matching**: Classifies API accesses against
+ *    Slatebase shim coverage (supported/partial/unsupported)
+ *
+ * Rationale: Plugins that work on Obsidian Mobile (iOS/Android WebView)
+ * are very likely browser-compatible, since Mobile also lacks Node.js access.
+ * `isDesktopOnly: false` (or absent) is the strongest signal that a plugin
+ * avoids platform-specific APIs.
  */
+
+import type { PluginManifestData } from './types';
 
 // ─── Interfaces ────────────────────────────────────────────────────────────────
 
@@ -12,7 +24,7 @@
  * ICompatibilityAnalyzer — Interface for static compatibility analysis.
  */
 export interface ICompatibilityAnalyzer {
-  analyze(bundleSource: string): CompatibilityReport;
+  analyze(bundleSource: string, manifest?: PluginManifestData): CompatibilityReport;
 }
 
 /**
@@ -22,6 +34,12 @@ export interface CompatibilityReport {
   level: 'full' | 'partial' | 'unsupported' | 'unknown';
   apiCalls: ApiCallClassification[];
   lifecycleCritical: ApiCallClassification[];
+  /** Node.js modules detected in the bundle (e.g. 'fs', 'child_process') */
+  nodeModules: string[];
+  /** Whether the plugin declares itself as desktop-only in manifest.json */
+  isDesktopOnly: boolean;
+  /** Human-readable reasons for the determined level */
+  reasons: string[];
 }
 
 /**
@@ -30,6 +48,60 @@ export interface CompatibilityReport {
 export interface ApiCallClassification {
   method: string;
   classification: 'supported' | 'partial' | 'unsupported';
+}
+
+// ─── Node.js Module Detection ──────────────────────────────────────────────────
+
+/**
+ * Node.js built-in modules that indicate desktop-only functionality.
+ * Plugins importing these cannot run in a browser environment.
+ */
+const NODE_BUILTIN_MODULES: ReadonlySet<string> = new Set([
+  'fs', 'path', 'os', 'child_process', 'net', 'tls', 'http', 'https',
+  'crypto', 'stream', 'dgram', 'dns', 'cluster', 'worker_threads',
+  'vm', 'v8', 'perf_hooks', 'readline', 'zlib', 'buffer',
+  'electron', 'original-fs',
+]);
+
+/**
+ * Patterns to detect Node.js module usage in bundle source code.
+ * Covers CommonJS require() and ESM import patterns.
+ */
+const NODE_REQUIRE_PATTERNS: readonly RegExp[] = [
+  // require('fs'), require("path"), require('child_process')
+  /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+  // require("node:fs"), require('node:path')
+  /require\s*\(\s*['"]node:([^'"]+)['"]\s*\)/g,
+  // import ... from 'fs', import ... from "electron"
+  /(?:import|from)\s+['"]([^'"]+)['"]/g,
+  // import('fs'), import("electron")
+  /import\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+];
+
+/**
+ * Detect Node.js built-in module usage in bundle source.
+ * Returns the set of detected module names.
+ */
+function detectNodeModules(bundleSource: string): Set<string> {
+  const detected = new Set<string>();
+
+  for (const pattern of NODE_REQUIRE_PATTERNS) {
+    pattern.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(bundleSource)) !== null) {
+      const moduleName = match[1];
+      if (!moduleName) continue;
+
+      // Strip 'node:' prefix if present
+      const cleanName = moduleName.startsWith('node:') ? moduleName.slice(5) : moduleName;
+
+      if (NODE_BUILTIN_MODULES.has(cleanName)) {
+        detected.add(cleanName);
+      }
+    }
+  }
+
+  return detected;
 }
 
 // ─── Classification Lookup Tables ──────────────────────────────────────────────
@@ -252,32 +324,88 @@ export function calculateLevel(apiCalls: ApiCallClassification[]): 'full' | 'par
 /**
  * CompatibilityAnalyzer — Analyzes plugin bundles for Obsidian API compatibility.
  *
- * Performs static analysis via regex pattern matching to detect API accesses,
- * classifies them against the Slatebase shim coverage, and calculates an
- * overall compatibility level.
+ * Performs a multi-layered analysis:
+ * 1. Manifest check: `isDesktopOnly: true` → immediately 'unsupported'
+ * 2. Node.js module detection: presence of Node.js imports → 'unsupported'
+ * 3. Obsidian API pattern matching: classifies API accesses against shim coverage
+ *
+ * The key insight: plugins that run on Obsidian Mobile (isDesktopOnly: false)
+ * are highly likely to be browser-compatible, since Mobile uses a WebView
+ * without Node.js access — the same constraint as Slatebase.
  */
 export class CompatibilityAnalyzer implements ICompatibilityAnalyzer {
   /**
-   * Analyze a plugin bundle source for Obsidian API compatibility.
+   * Analyze a plugin bundle source for browser compatibility.
    *
    * @param bundleSource - The raw JavaScript source code of the plugin bundle
-   * @returns CompatibilityReport with level, detected API calls, and lifecycle-critical calls
+   * @param manifest - Optional plugin manifest for isDesktopOnly check
+   * @returns CompatibilityReport with level, detected API calls, Node.js modules, and reasons
    */
-  analyze(bundleSource: string): CompatibilityReport {
+  analyze(bundleSource: string, manifest?: PluginManifestData): CompatibilityReport {
     const startTime = performance.now();
+    const reasons: string[] = [];
+    const desktopOnly = manifest?.isDesktopOnly === true;
 
-    // Handle empty/obfuscated bundles
+    // ── Layer 1: Manifest-based gate ────────────────────────────────────────
+    if (desktopOnly) {
+      reasons.push(
+        'Plugin declares "isDesktopOnly": true in manifest.json — ' +
+        'uses Node.js or Electron APIs that are not available in a browser environment'
+      );
+      return {
+        level: 'unsupported',
+        apiCalls: [],
+        lifecycleCritical: [],
+        nodeModules: [],
+        isDesktopOnly: true,
+        reasons,
+      };
+    }
+
+    // ── Layer 2: Handle empty/obfuscated bundles ────────────────────────────
     if (isLikelyObfuscated(bundleSource)) {
-      return { level: 'unknown', apiCalls: [], lifecycleCritical: [] };
+      reasons.push('Bundle appears to be empty or heavily obfuscated — cannot determine compatibility');
+      return {
+        level: 'unknown',
+        apiCalls: [],
+        lifecycleCritical: [],
+        nodeModules: [],
+        isDesktopOnly: false,
+        reasons,
+      };
     }
 
     try {
-      // Detect API accesses
+      // ── Layer 3: Node.js module detection ───────────────────────────────────
+      const nodeModules = detectNodeModules(bundleSource);
+
+      if (performance.now() - startTime > ANALYSIS_TIMEOUT_MS) {
+        reasons.push('Analysis timed out');
+        return { level: 'unknown', apiCalls: [], lifecycleCritical: [], nodeModules: [...nodeModules], isDesktopOnly: false, reasons };
+      }
+
+      if (nodeModules.size > 0) {
+        const moduleList = [...nodeModules].sort().join(', ');
+        reasons.push(
+          `Plugin imports Node.js built-in modules: ${moduleList} — ` +
+          'these are not available in a browser environment'
+        );
+        return {
+          level: 'unsupported',
+          apiCalls: [],
+          lifecycleCritical: [],
+          nodeModules: [...nodeModules],
+          isDesktopOnly: false,
+          reasons,
+        };
+      }
+
+      // ── Layer 4: Obsidian API pattern matching ──────────────────────────────
       const detectedMethods = detectApiCalls(bundleSource);
 
-      // Check timeout after detection phase
       if (performance.now() - startTime > ANALYSIS_TIMEOUT_MS) {
-        return { level: 'unknown', apiCalls: [], lifecycleCritical: [] };
+        reasons.push('Analysis timed out');
+        return { level: 'unknown', apiCalls: [], lifecycleCritical: [], nodeModules: [], isDesktopOnly: false, reasons };
       }
 
       // Classify each detected method
@@ -289,9 +417,9 @@ export class CompatibilityAnalyzer implements ICompatibilityAnalyzer {
         });
       }
 
-      // Check timeout after classification phase
       if (performance.now() - startTime > ANALYSIS_TIMEOUT_MS) {
-        return { level: 'unknown', apiCalls: [], lifecycleCritical: [] };
+        reasons.push('Analysis timed out');
+        return { level: 'unknown', apiCalls: [], lifecycleCritical: [], nodeModules: [], isDesktopOnly: false, reasons };
       }
 
       // Extract lifecycle-critical calls
@@ -300,10 +428,41 @@ export class CompatibilityAnalyzer implements ICompatibilityAnalyzer {
       // Calculate overall compatibility level
       const level = calculateLevel(apiCalls);
 
-      return { level, apiCalls, lifecycleCritical };
+      // Build human-readable reasons
+      if (level === 'full') {
+        if (!desktopOnly) {
+          reasons.push('Plugin is mobile-compatible (isDesktopOnly is not set or false) — strong indicator for browser compatibility');
+        }
+        if (apiCalls.length === 0) {
+          reasons.push('No Obsidian API accesses detected — plugin likely uses only standard DOM/Web APIs');
+        } else {
+          reasons.push('All detected Obsidian API accesses are fully emulated by Slatebase shims');
+        }
+      } else if (level === 'partial') {
+        const unsupportedCalls = apiCalls.filter(c => c.classification === 'unsupported').map(c => c.method);
+        const partialCalls = apiCalls.filter(c => c.classification === 'partial').map(c => c.method);
+        if (unsupportedCalls.length > 0) {
+          reasons.push(`Unsupported API methods detected: ${unsupportedCalls.join(', ')} — these may not function correctly`);
+        }
+        if (partialCalls.length > 0) {
+          reasons.push(`Partially supported API methods detected: ${partialCalls.join(', ')} — limited functionality`);
+        }
+        if (!desktopOnly) {
+          reasons.push('Plugin is mobile-compatible — core functionality likely works despite unsupported methods');
+        }
+      }
+
+      return { level, apiCalls, lifecycleCritical, nodeModules: [], isDesktopOnly: false, reasons };
     } catch {
       // Analysis failure → unknown
-      return { level: 'unknown', apiCalls: [], lifecycleCritical: [] };
+      return {
+        level: 'unknown',
+        apiCalls: [],
+        lifecycleCritical: [],
+        nodeModules: [],
+        isDesktopOnly: false,
+        reasons: ['Analysis failed due to an unexpected error'],
+      };
     }
   }
 }

@@ -1226,12 +1226,20 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - **Regel:** Neue Endpoints die Nicht-JSON zurückgeben → eigene fetch-Logik statt `this.request<T>()`
 
 ### Compatibility Analyzer: Statische Pattern-Erkennung
-- Regex-basiertes Pattern-Matching auf API-Zugriffsmuster im Bundle-Source
-- Erkennt: `this.app.vault.*`, `this.app.workspace.*`, `this.app.metadataCache.*`, etc.
-- Klassifiziert jeden Zugriff als `supported`/`partial`/`unsupported`
+- **Multi-Layer-Ansatz** (Prioritätsreihenfolge):
+  1. **Manifest-Gate:** `isDesktopOnly: true` → sofort `'unsupported'` (kein Bundle-Scan nötig)
+  2. **Node.js-Modul-Erkennung:** `require('fs')`, `require('net')`, `import 'electron'`, etc. → `'unsupported'`
+  3. **Obsidian-API-Pattern-Matching:** Regex auf `this.app.vault.*`, `this.app.workspace.*`, etc.
+- **Schlüsselerkenntnis:** Plugins mit `isDesktopOnly: false` (oder Feld absent) laufen auf Obsidian Mobile (iOS/Android WebView) — gleiche Einschränkung wie Slatebase (kein Node.js). Das ist der stärkste Indikator für Browser-Kompatibilität.
+- **Node.js-Module die erkannt werden:** fs, path, os, child_process, net, tls, http, https, crypto, stream, dgram, dns, cluster, worker_threads, vm, v8, perf_hooks, readline, zlib, buffer, electron, original-fs
+- **Erkennungsmuster:** CommonJS `require('...')`, node-prefixed `require('node:...')`, ESM `import ... from '...'`, dynamic `import('...')`
+- Klassifiziert jeden Obsidian-API-Zugriff als `supported`/`partial`/`unsupported`
 - Berechnet Gesamt-Level: `full`/`partial`/`unsupported`/`unknown`
 - Max 10 Sekunden Analyse-Zeit — bei Timeout oder Fehler → `unknown`
 - **Limitation:** Obfuskierter Code → `unknown` (kein Versuch der Deobfuskation)
+- **Report enthält:** `level`, `apiCalls`, `lifecycleCritical`, `nodeModules`, `isDesktopOnly`, `reasons` (menschenlesbare Begründungen)
+- **Beispiele browser-kompatibler Plugins:** Calendar, Dataview, Tasks, Kanban, Excalidraw, Outliner, Style Settings
+- **Beispiele NICHT-kompatibler Plugins:** Git (child_process), Shell Commands (child_process), Local REST API (net/http)
 
 ### Plugin Management UI: Optimistisches Toggle
 - Toggle-Switch ändert sofort den lokalen State (optimistic update)
@@ -1243,6 +1251,16 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - Plugin-Activation startet `onload()` immer von vorn — kein HMR
 - Bei Code-Änderung: Deaktivieren → Neues ZIP hochladen → Aktivieren
 - **Akzeptabel:** Obsidian selbst macht es genauso (Community Plugins brauchen Restart)
+
+### Browser-Kompatibilität: isDesktopOnly als Primärindikator
+- **Erkenntnis:** `isDesktopOnly` im manifest.json ist der zuverlässigste Indikator ob ein Plugin browser-kompatibel ist
+- **Logik:** Obsidian Mobile läuft in einem WebView (iOS/Android) OHNE Node.js-Zugang — exakt die gleiche Einschränkung wie Slatebase
+- Plugins mit `isDesktopOnly: false` (oder Feld absent) laufen auf Mobile → laufen sehr wahrscheinlich auch in Slatebase
+- Plugins mit `isDesktopOnly: true` nutzen Node.js/Electron-APIs → können nicht im Browser laufen
+- **Mehrheit der populären Plugins ist mobile-kompatibel:** Calendar, Dataview, Tasks, Kanban, Excalidraw, Outliner, Style Settings, Icon Folder, Admonitions
+- **Desktop-only Plugins (brauchen Node.js):** Git (child_process), Shell Commands (child_process), Local REST API (net/http), IMAP Importer (tls/net)
+- **Implementierung:** CompatibilityAnalyzer prüft `isDesktopOnly` als erstes Gate (Layer 1), dann Node.js-Module (Layer 2), dann API-Patterns (Layer 3)
+- **Faustregel für Nutzer:** Wenn ein Plugin auf dem Handy funktioniert, funktioniert es auch in Slatebase
 
 ### Test-Abdeckung: 371 Tests im Compat-Verzeichnis
 - EventSystem, ManifestParser, VaultShim, WorkspaceShim, MetadataCacheShim, AppShim, Sandbox
@@ -1268,7 +1286,7 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - **CommandRegistry** — Namespaced IDs, Case-Insensitive-Suche, Hotkey-Konflikt-Erkennung, Exception-Handling
 - **CommandPalette** — Ctrl+P Modal, Keyboard-Navigation, ARIA-Accessible, max 50 Results
 - **CSSInjector** — Scoped Selectors, data-plugin-id Attribut, @keyframes/@font-face unverändert, 512KB-Limit
-- **CompatibilityAnalyzer** — Regex-basierte API-Erkennung, Klassifizierung, Timeout-Schutz
+- **CompatibilityAnalyzer** — Multi-Layer-Analyse: isDesktopOnly-Gate, Node.js-Modul-Erkennung (fs/net/electron/etc.), Regex-basierte API-Erkennung, Klassifizierung, Timeout-Schutz, menschenlesbare Reasons
 
 ### Fertiggestellte Komponenten (Backend)
 - **PluginStore** — Filesystem-Persistenz, atomare Writes, per-Vault-per-Plugin-Verzeichnisse

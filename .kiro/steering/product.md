@@ -21,16 +21,16 @@ Slatebase is feature-complete for its core use case: multi-user Markdown vault m
 - **Internationalization (i18n)** — German and English UI, per-user preference
 - **Dark mode** — System-preference-based or manual override (light/dark/system)
 - **Docker deployment** — Multi-stage build, Nginx reverse proxy, non-root user
-- **Vault synchronization** — CouchDB/obsidian-livesync compatible sync (bidirectional & read-only, manual & interval-based, conflict detection & resolution, analysis mode, optional E2E encryption)
+- **Vault synchronization** ⚠️ *experimental* — CouchDB/obsidian-livesync compatible sync (bidirectional & read-only, manual & interval-based, conflict detection & resolution, analysis mode, optional E2E encryption)
 - **MCP Context Server** — Model Context Protocol integration for AI assistants (Claude, Cursor, etc.) to read and write vault contents via standardized MCP tools and resources (read: list, search, read; write: create, edit, delete, move, rename)
 - **Context Panel** — Right-side panel with four views (Outline, Links, Tags, Properties), icon-only tab navigation with Drag & Drop reordering, panel splitting with per-section tab bars, cross-section tab movement, and auto-close of empty sections
 - **Knowledge Graph** — Interactive force-directed graph visualization of vault link structure (SVG + d3-force, zoom/pan/drag, search, node highlighting, tab integration, backend link-index with JSON persistence and incremental updates)
 
-- **Obsidian Plugin Compatibility (partial)** — Compatibility layer for Obsidian Community Plugins: API shims (App, Vault, Workspace, MetadataCache), plugin loader with lifecycle management (onload/onunload), security sandbox (vault isolation, storage namespace, network allowlist, main-thread blocking detection), Command Palette (Ctrl+P), CSS injection with scoped styles, compatibility analyzer, plugin settings persistence, backend plugin store. Still in progress: API routes, ZIP upload, UI, full integration.
+- **Obsidian Plugin Compatibility (work-in-progress)** ⚠️ *experimental* — Compatibility layer for Obsidian Community Plugins: API shims (App, Vault, Workspace, MetadataCache), plugin loader with lifecycle management (onload/onunload), security sandbox (vault isolation, storage namespace, network allowlist, main-thread blocking detection), Command Palette (Ctrl+P), CSS injection with scoped styles, compatibility analyzer, plugin settings persistence, backend plugin store. **Limitation:** Only browser-compatible plugins can run. Plugins requiring Node.js modules (tls, net, crypto, fs, etc.) cannot be executed — server-side plugin execution is planned as a separate feature.
 
 ### Planned Features
 
-- Obsidian Plugin Compatibility (in progress) — Backend API routes, ZIP upload, Composition Root wiring, Frontend API client extension, Plugin Management UI, PluginProvider integration still pending
+- Server-Side Plugin Execution — Run Obsidian plugins that require Node.js APIs on the backend (vm sandbox, Vault I/O shims, settings bridge, plugin logs)
 - Live Preview Editor (Side-by-Side or WYSIWYG)
 - Accessibility (a11y) — WCAG 2.1 AA compliance
 

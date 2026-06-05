@@ -126,6 +126,11 @@ All under `/api/v1`:
 | POST | /vaults/:vaultId/import/file | Import a single file |
 | POST | /vaults/:vaultId/import/folder | Import a folder |
 | DELETE | /vaults/:vaultId/content?path= | Delete file/folder |
+
+### Sync ⚠️ *experimental*
+
+| Method | Path | Purpose |
+|--------|------|---------|
 | POST | /vaults/:vaultId/sync/config | Create sync configuration |
 | GET | /vaults/:vaultId/sync/config | Get sync configuration |
 | PUT | /vaults/:vaultId/sync/config | Update sync configuration |
@@ -169,7 +174,7 @@ All under `/api/v1`:
 | `move_file` | Write | Move a file or folder to a new location |
 | `rename_file` | Write | Rename a file or folder (stays in same directory) |
 
-### Plugins
+### Plugins ⚠️ *experimental*
 
 | Method | Path | Purpose |
 |--------|------|---------|
