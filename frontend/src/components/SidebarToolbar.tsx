@@ -4,6 +4,7 @@ import {
   Database, FileText, Clock, User, Server, FilePlus, MessageCircle, RefreshCw, Key, ScrollText,
   ClipboardList, Plus, Share2, Plug,
 } from 'lucide-react'
+import { useFeatureContext } from '../state/featureContext'
 
 type AppPage =
   | 'vaults' | 'my-vaults' | 'profile' | 'sessions' | 'chat'
@@ -18,6 +19,7 @@ interface ToolbarItem {
   adminOnly?: boolean
   ownerOnly?: boolean
   requiresVault?: boolean
+  feature?: string
 }
 
 interface SidebarToolbarProps {
@@ -41,21 +43,23 @@ interface SidebarToolbarProps {
  * Tooltips show on hover.
  */
 export function SidebarToolbar({ vaultId, onCreateVault, onCreateFile, onImportFile, onImportFolder, onExportVault, onNavigate, onOpenGraph, isAdmin, isVaultOwner, syncEnabled, globalUnreadCount }: SidebarToolbarProps) {
+  const { isEnabled } = useFeatureContext()
+
   const allItems: ToolbarItem[] = [
     { id: 'create-vault', icon: <Plus size={15} />, label: 'Neuer Vault', action: onCreateVault },
     { id: 'create-file', icon: <FilePlus size={15} />, label: 'Neue Datei', action: onCreateFile, requiresVault: true },
     { id: 'import-file', icon: <Upload size={15} />, label: 'Datei importieren', action: onImportFile, requiresVault: true },
     { id: 'import-folder', icon: <FolderOpen size={15} />, label: 'Ordner importieren', action: onImportFolder, requiresVault: true },
     { id: 'export-vault', icon: <Download size={15} />, label: 'Vault exportieren', action: onExportVault, requiresVault: true },
-    { id: 'graph', icon: <Share2 size={15} />, label: 'Graph', action: onOpenGraph, requiresVault: true },
-    { id: 'sync-config', icon: <RefreshCw size={15} />, label: 'Vault-Sync', action: () => onNavigate('sync-config'), requiresVault: true, ownerOnly: true },
-    { id: 'sync-log', icon: <ClipboardList size={15} />, label: 'Sync-Protokoll', action: () => onNavigate('sync-log'), requiresVault: true, ownerOnly: true },
-    { id: 'plugins', icon: <Plug size={15} />, label: 'Plugins', action: () => onNavigate('plugins'), requiresVault: true },
+    { id: 'graph', icon: <Share2 size={15} />, label: 'Graph', action: onOpenGraph, requiresVault: true, feature: 'knowledge-graph' },
+    { id: 'sync-config', icon: <RefreshCw size={15} />, label: 'Vault-Sync', action: () => onNavigate('sync-config'), requiresVault: true, ownerOnly: true, feature: 'vault-sync' },
+    { id: 'sync-log', icon: <ClipboardList size={15} />, label: 'Sync-Protokoll', action: () => onNavigate('sync-log'), requiresVault: true, ownerOnly: true, feature: 'vault-sync' },
+    { id: 'plugins', icon: <Plug size={15} />, label: 'Plugins', action: () => onNavigate('plugins'), requiresVault: true, feature: 'obsidian-plugin-compat' },
     { id: 'my-vaults', icon: <Database size={15} />, label: 'Meine Vaults', action: () => onNavigate('my-vaults') },
     { id: 'profile', icon: <User size={15} />, label: 'Profil', action: () => onNavigate('profile') },
     { id: 'sessions', icon: <Clock size={15} />, label: 'Sitzungen', action: () => onNavigate('sessions') },
-    { id: 'mcp-tokens', icon: <Key size={15} />, label: 'API-Tokens', action: () => onNavigate('mcp-tokens') },
-    { id: 'chat', icon: <MessageCircle size={15} />, label: 'Chat', action: () => onNavigate('chat') },
+    { id: 'mcp-tokens', icon: <Key size={15} />, label: 'API-Tokens', action: () => onNavigate('mcp-tokens'), feature: 'mcp' },
+    { id: 'chat', icon: <MessageCircle size={15} />, label: 'Chat', action: () => onNavigate('chat'), feature: 'chat' },
     { id: 'admin-users', icon: <Shield size={15} />, label: 'Benutzerverwaltung', action: () => onNavigate('admin-users'), adminOnly: true },
     { id: 'admin-vaults', icon: <Server size={15} />, label: 'Vault-Übersicht (Admin)', action: () => onNavigate('admin-vaults'), adminOnly: true },
     { id: 'admin-config', icon: <Settings size={15} />, label: 'Serverkonfiguration', action: () => onNavigate('admin-config'), adminOnly: true },
@@ -66,6 +70,7 @@ export function SidebarToolbar({ vaultId, onCreateVault, onCreateFile, onImportF
   const visibleItems = allItems.filter((item) => {
     if (item.adminOnly && !isAdmin) return false
     if (item.ownerOnly && !isVaultOwner) return false
+    if (item.feature && !isEnabled(item.feature)) return false
     return true
   })
 

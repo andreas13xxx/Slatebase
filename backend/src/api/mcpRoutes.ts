@@ -78,7 +78,8 @@ const sessions = new Map<string, {
  * - Rate limiting per token
  * - Forwarding to StreamableHTTPServerTransport
  *
- * If MCP is disabled via config, returns an empty Hono instance (no routes registered).
+ * Note: MCP enabled/disabled is now controlled by the FeatureToggleService at a higher level.
+ * This function assumes MCP is enabled when called (guarded by the composition root).
  *
  * @param deps - Dependencies for the MCP route module.
  * @returns A Hono instance with MCP routes registered.
@@ -86,12 +87,6 @@ const sessions = new Map<string, {
 export function createMcpRoutes(deps: McpRouteDependencies): Hono {
   const { tokenService, rateLimiter, serverFactory, mcpConfig, logger } = deps
   const app = new Hono()
-
-  // If MCP is disabled, don't register any routes
-  if (!mcpConfig.enabled) {
-    logger.info('MCP routes not registered (MCP disabled)')
-    return app
-  }
 
   /**
    * Authenticates the request by extracting and validating the Bearer token.
@@ -379,11 +374,7 @@ export type McpHttpHandler = (req: IncomingMessage, res: ServerResponse) => Prom
  * @returns A raw HTTP handler function, or null if MCP is disabled.
  */
 export function createMcpHttpHandler(deps: McpRouteDependencies & { onAuthenticated?: (userId: string) => void }): McpHttpHandler | null {
-  const { tokenService, rateLimiter, serverFactory, mcpConfig, logger, onAuthenticated } = deps
-
-  if (!mcpConfig.enabled) {
-    return null
-  }
+  const { tokenService, rateLimiter, serverFactory, logger, onAuthenticated } = deps
 
   /** In-memory map of active sessions for this handler. */
   const httpSessions = new Map<string, {

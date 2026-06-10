@@ -18,11 +18,13 @@ function createMockConfigService(overrides: Partial<ServerConfig> = {}): IConfig
     maxImportFiles: 500,
     maxImportDepth: 10,
     trustedProxies: [],
+    features: {},
     ...overrides,
   }
   return {
     getServerConfig: () => config,
     getVaultConfigs: () => config.vaults,
+    getFeaturesConfig: () => ({}),
   }
 }
 
@@ -31,7 +33,6 @@ describe('loadMcpConfig', () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv }
-    delete process.env['SLATEBASE_MCP_ENABLED']
     delete process.env['SLATEBASE_MCP_MAX_FILE_SIZE']
     delete process.env['SLATEBASE_MCP_RATE_LIMIT']
   })
@@ -43,50 +44,15 @@ describe('loadMcpConfig', () => {
   it('returns defaults when no env vars are set', () => {
     const config = loadMcpConfig(createMockConfigService())
 
-    expect(config.enabled).toBe(true)
     expect(config.maxFileSize).toBe(5242880)
     expect(config.rateLimit).toBe(60)
     expect(config.maxTokensPerUser).toBe(10)
   })
 
-  it('reads SLATEBASE_MCP_ENABLED=false', () => {
-    process.env['SLATEBASE_MCP_ENABLED'] = 'false'
-
+  it('does not have an enabled property', () => {
     const config = loadMcpConfig(createMockConfigService())
 
-    expect(config.enabled).toBe(false)
-  })
-
-  it('reads SLATEBASE_MCP_ENABLED=0 as false', () => {
-    process.env['SLATEBASE_MCP_ENABLED'] = '0'
-
-    const config = loadMcpConfig(createMockConfigService())
-
-    expect(config.enabled).toBe(false)
-  })
-
-  it('reads SLATEBASE_MCP_ENABLED=true', () => {
-    process.env['SLATEBASE_MCP_ENABLED'] = 'true'
-
-    const config = loadMcpConfig(createMockConfigService())
-
-    expect(config.enabled).toBe(true)
-  })
-
-  it('reads SLATEBASE_MCP_ENABLED=1 as true', () => {
-    process.env['SLATEBASE_MCP_ENABLED'] = '1'
-
-    const config = loadMcpConfig(createMockConfigService())
-
-    expect(config.enabled).toBe(true)
-  })
-
-  it('falls back to default for invalid SLATEBASE_MCP_ENABLED', () => {
-    process.env['SLATEBASE_MCP_ENABLED'] = 'maybe'
-
-    const config = loadMcpConfig(createMockConfigService())
-
-    expect(config.enabled).toBe(true)
+    expect('enabled' in config).toBe(false)
   })
 
   it('reads SLATEBASE_MCP_MAX_FILE_SIZE from env', () => {

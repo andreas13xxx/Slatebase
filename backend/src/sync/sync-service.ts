@@ -505,11 +505,29 @@ export class SyncService implements ISyncService {
       const pushErrors: SyncErrorDetail[] = []
 
       if (config.mode === 'bidirectional') {
+        // Update localMtimes with fresh mtimes ONLY for files that were written by the pull.
+        // This prevents re-pushing pulled files (they have new mtimes from utimes/write),
+        // while still detecting genuinely new local files (not in checkpoint = not in localMtimes).
+        const pushMtimes: Record<string, number> = { ...localMtimes }
+        if (pullResult.pulledFiles && pullResult.pulledFiles.length > 0) {
+          try {
+            const freshScan = await scanVaultFiles(vaultPath)
+            for (const pulled of pullResult.pulledFiles) {
+              const freshMtime = freshScan.get(pulled.path)
+              if (freshMtime !== undefined) {
+                pushMtimes[pulled.path] = freshMtime
+              }
+            }
+          } catch {
+            this.logger.warn('Failed to scan vault files for push mtime update', { vaultId })
+          }
+        }
+
         const pushResult = await this.syncEngine.push({
           connection,
           vaultId,
           vaultPath,
-          localMtimes,
+          localMtimes: pushMtimes,
           e2eEnabled: config.e2eEnabled,
           ...(e2ePassphrase !== undefined ? { e2ePassphrase } : {}),
         })
@@ -975,11 +993,27 @@ export class SyncService implements ISyncService {
       const pushErrors: SyncErrorDetail[] = []
 
       if (config.mode === 'bidirectional') {
+        // Update localMtimes with fresh mtimes ONLY for files that were written by the pull.
+        const scheduledPushMtimes: Record<string, number> = { ...localMtimes }
+        if (pullResult.pulledFiles && pullResult.pulledFiles.length > 0) {
+          try {
+            const freshScan = await scanVaultFiles(vaultPath)
+            for (const pulled of pullResult.pulledFiles) {
+              const freshMtime = freshScan.get(pulled.path)
+              if (freshMtime !== undefined) {
+                scheduledPushMtimes[pulled.path] = freshMtime
+              }
+            }
+          } catch {
+            this.logger.warn('Failed to scan vault files for scheduled push mtime update', { vaultId })
+          }
+        }
+
         const pushResult = await this.syncEngine.push({
           connection,
           vaultId,
           vaultPath,
-          localMtimes,
+          localMtimes: scheduledPushMtimes,
           e2eEnabled: config.e2eEnabled,
           ...(e2ePassphrase !== undefined ? { e2ePassphrase } : {}),
         })

@@ -83,10 +83,9 @@ export interface McpTokenContext {
 /**
  * MCP module configuration.
  * Loaded from environment variables with sensible defaults.
+ * Note: The MCP enabled/disabled toggle is managed by the FeatureToggleService.
  */
 export interface McpConfig {
-  /** Whether MCP functionality is enabled. Default: true. */
-  enabled: boolean
   /** Maximum file size in bytes for MCP reads. Default: from server config. */
   maxFileSize: number
   /** Maximum requests per minute per token. Default: 60. */

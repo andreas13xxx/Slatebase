@@ -129,6 +129,27 @@ export interface PluginRegistryData {
   }>
 }
 
+/** Feature toggle info returned by the public endpoint (name + enabled only). */
+export interface FeatureTogglePublicInfo {
+  name: string
+  enabled: boolean
+}
+
+/** Feature toggle state returned by the admin endpoint (full details). */
+export interface FeatureToggleState {
+  name: string
+  enabled: boolean
+  type: 'hot' | 'cold'
+  description: string
+}
+
+/** Result of toggling a feature via admin API. */
+export interface FeatureToggleUpdateResult {
+  name: string
+  enabled: boolean
+  restartRequired: boolean
+}
+
 /**
  * Interface for the Slatebase API client.
  * All methods throw an AppError on non-2xx responses.
@@ -260,6 +281,14 @@ export interface IApiClient {
   getDetectedPlugins(vaultId: string): Promise<{ plugins: DetectedPluginInfo[] }>
   /** Install a detected plugin from .obsidian/plugins/ into the plugin store. */
   installDetectedPlugin(vaultId: string, pluginId: string): Promise<PluginInstallResult>
+
+  // --- Feature Toggle methods ---
+  /** Load features visible to the current user (name + enabled). */
+  loadFeatures(): Promise<FeatureTogglePublicInfo[]>
+  /** Load all features with admin details (name, enabled, type, description). */
+  loadAdminFeatures(): Promise<FeatureToggleState[]>
+  /** Toggle a feature's enabled state (admin only). */
+  toggleAdminFeature(name: string, enabled: boolean): Promise<FeatureToggleUpdateResult>
 }
 
 /**
@@ -744,6 +773,23 @@ export class ApiClient implements IApiClient {
   /** Install a detected plugin from .obsidian/plugins/ into the plugin store. */
   async installDetectedPlugin(vaultId: string, pluginId: string): Promise<PluginInstallResult> {
     return this.request<PluginInstallResult>('POST', `/api/v1/vaults/${vaultId}/plugins/detected/${pluginId}/install`)
+  }
+
+  // --- Feature Toggle methods ---
+
+  /** Load features visible to the current user (name + enabled). */
+  async loadFeatures(): Promise<FeatureTogglePublicInfo[]> {
+    return this.request<FeatureTogglePublicInfo[]>('GET', '/api/v1/features')
+  }
+
+  /** Load all features with admin details (name, enabled, type, description). */
+  async loadAdminFeatures(): Promise<FeatureToggleState[]> {
+    return this.request<FeatureToggleState[]>('GET', '/api/v1/admin/features')
+  }
+
+  /** Toggle a feature's enabled state (admin only). */
+  async toggleAdminFeature(name: string, enabled: boolean): Promise<FeatureToggleUpdateResult> {
+    return this.request<FeatureToggleUpdateResult>('PUT', `/api/v1/admin/features/${encodeURIComponent(name)}`, { enabled })
   }
 
   // --- Internal helpers ---

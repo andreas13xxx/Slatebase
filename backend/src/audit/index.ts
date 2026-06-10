@@ -23,6 +23,7 @@ export type AuditAction =
   | 'VAULT_SHARE_UPDATED'
   | 'VAULT_OWNERSHIP_TRANSFERRED'
   | 'CONFIG_CHANGED'
+  | 'FEATURE_TOGGLED'
 
 /**
  * A single audit log entry.

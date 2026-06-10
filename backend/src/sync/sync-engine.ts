@@ -1,4 +1,4 @@
-import { writeFile, mkdir, stat, unlink, readdir, readFile } from 'node:fs/promises'
+import { writeFile, mkdir, stat, unlink, readdir, readFile, utimes } from 'node:fs/promises'
 import { join, dirname, relative } from 'node:path'
 import crypto from 'node:crypto'
 import type {
@@ -392,20 +392,46 @@ export class SyncEngine implements ISyncEngine {
         continue
       }
 
-      // Write file atomically (temp → rename)
+      // Write file atomically (temp → rename), but skip if content is identical
       try {
-        await mkdir(dirname(localPath), { recursive: true })
-        const tempPath = `${localPath}.${crypto.randomBytes(8).toString('hex')}.tmp`
-        await writeFile(tempPath, content)
-        const { rename } = await import('node:fs/promises')
-        await rename(tempPath, localPath)
-        pulledCount++
-        pulledFiles.push({
-          path: relativePath,
-          size: content.length,
-          isBinary: doc.isBinary ?? false,
-          ...(doc.contentChunks && doc.contentChunks.length > 1 ? { chunkCount: doc.contentChunks.length } : {}),
-        })
+        // Content comparison: skip writing if local file already has identical content
+        // (matches livesync's isDocContentSame check in dbToStorage)
+        let shouldWrite = true
+        try {
+          const existingContent = await readFile(localPath)
+          if (existingContent.equals(content)) {
+            shouldWrite = false
+            // Content identical — only update mtime if CouchDB has a different one
+            if (doc.mtime) {
+              const mtimeSec = doc.mtime / 1000
+              await utimes(localPath, mtimeSec, mtimeSec)
+            }
+          }
+        } catch {
+          // File doesn't exist locally — proceed with write
+        }
+
+        if (shouldWrite) {
+          await mkdir(dirname(localPath), { recursive: true })
+          const tempPath = `${localPath}.${crypto.randomBytes(8).toString('hex')}.tmp`
+          await writeFile(tempPath, content)
+          const { rename } = await import('node:fs/promises')
+          await rename(tempPath, localPath)
+
+          // Set file mtime to match the CouchDB document's mtime (like livesync does)
+          if (doc.mtime) {
+            const mtimeSec = doc.mtime / 1000
+            await utimes(localPath, mtimeSec, mtimeSec)
+          }
+
+          pulledCount++
+          pulledFiles.push({
+            path: relativePath,
+            size: content.length,
+            isBinary: doc.isBinary ?? false,
+            ...(doc.contentChunks && doc.contentChunks.length > 1 ? { chunkCount: doc.contentChunks.length } : {}),
+          })
+        }
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : 'Write failed'
         errors.push({
@@ -457,12 +483,20 @@ export class SyncEngine implements ISyncEngine {
       }
     }
 
-    // Determine changed files (mtime > checkpoint mtime)
+    // Determine changed files (mtime > checkpoint mtime) OR new files (not in checkpoint)
     const changedFiles: string[] = []
+    // Also track files that are in checkpoint but may need verification against CouchDB.
+    // These are files whose mtime matches the checkpoint (unchanged locally) but might
+    // be missing from CouchDB (e.g. if a previous push was recorded in checkpoint but
+    // the document was later deleted from CouchDB, or the database was recreated).
+    const verifyFiles: string[] = []
     for (const [filePath, mtime] of currentFiles) {
       const checkpointMtime = localMtimes[filePath]
       if (checkpointMtime === undefined || mtime > checkpointMtime) {
         changedFiles.push(filePath)
+      } else {
+        // File exists locally and in checkpoint with matching mtime — verify it's actually in CouchDB
+        verifyFiles.push(filePath)
       }
     }
 
@@ -488,6 +522,9 @@ export class SyncEngine implements ISyncEngine {
         let content: Buffer = await readFile(absolutePath)
         const originalSize = content.length
 
+        // Get the local file's mtime for the CouchDB document
+        const fileMtime = currentFiles.get(filePath)
+
         // Encrypt content if E2E is enabled
         if (e2eEnabled && e2ePassphrase) {
           try {
@@ -509,8 +546,8 @@ export class SyncEngine implements ISyncEngine {
         // First, get the current revision from CouchDB (if document exists)
         const rev = await this.getDocumentRevision(connection, couchDbPath)
 
-        // Push to CouchDB via PUT
-        const pushResult = await this.putDocument(connection, couchDbPath, content, rev, e2eEnabled)
+        // Push to CouchDB via PUT (using local file's mtime, not Date.now())
+        const pushResult = await this.putDocument(connection, couchDbPath, content, rev, e2eEnabled, fileMtime)
         if (pushResult.success) {
           pushedCount++
           pushedFiles.push({ path: filePath, size: originalSize })
@@ -564,11 +601,64 @@ export class SyncEngine implements ISyncEngine {
       }
     }
 
+    // Verify files that are in checkpoint (mtime unchanged) but might be missing from CouchDB.
+    // This handles the case where a file was previously synced (checkpoint has it) but CouchDB
+    // lost the document (database recreated, compaction issue, or previous push not actually committed).
+    for (const filePath of verifyFiles) {
+      if (errors.length >= 100) break
+
+      try {
+        const couchDbPath = desanitizePathForCouchDB(filePath)
+        const rev = await this.getDocumentRevision(connection, couchDbPath)
+        if (rev === null) {
+          // File is in checkpoint but NOT in CouchDB — push it
+          const absolutePath = join(vaultPath, filePath)
+          let content: Buffer = await readFile(absolutePath)
+          const originalSize = content.length
+          const fileMtime = currentFiles.get(filePath)
+
+          if (e2eEnabled && e2ePassphrase) {
+            try {
+              content = this.cryptoService.encryptDocument(content, e2ePassphrase)
+            } catch (error: unknown) {
+              const message = error instanceof Error ? error.message : 'Encryption failed'
+              errors.push({
+                documentPath: filePath,
+                errorType: 'encryption_failed',
+                description: message.slice(0, 500),
+              })
+              continue
+            }
+          }
+
+          const pushResult = await this.putDocument(connection, couchDbPath, content, null, e2eEnabled, fileMtime)
+          if (pushResult.success) {
+            pushedCount++
+            pushedFiles.push({ path: filePath, size: originalSize })
+          } else {
+            errors.push({
+              documentPath: filePath,
+              errorType: 'write_failed',
+              description: pushResult.error.slice(0, 500),
+            })
+          }
+        }
+        // If rev exists, file is in CouchDB and mtime is unchanged — nothing to do
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Verify failed'
+        errors.push({
+          documentPath: filePath,
+          errorType: 'read_failed',
+          description: message.slice(0, 500),
+        })
+      }
+    }
+
     const status = errors.length === 0
       ? 'success'
       : pushedCount > 0
         ? 'partial_success'
-        : (changedFiles.length === 0 && deletedFiles.length === 0)
+        : (changedFiles.length === 0 && deletedFiles.length === 0 && verifyFiles.length === 0)
           ? 'success'
           : 'failed'
 
@@ -845,6 +935,7 @@ export class SyncEngine implements ISyncEngine {
     content: Buffer,
     rev: string | null,
     e2eEnabled: boolean,
+    fileMtime?: number,
   ): Promise<{ success: boolean; error: string }> {
     const url = `${connection.endpoint}/${connection.database}/${encodeURIComponent(docId)}`
     const headers = buildAuthHeaders(connection.username, connection.password)
@@ -869,7 +960,10 @@ export class SyncEngine implements ISyncEngine {
       data = content.toString('utf8')
     }
 
-    const now = Date.now()
+    // Use the local file's mtime (like livesync does) instead of Date.now()
+    // This ensures the CouchDB document reflects the actual file modification time,
+    // preventing the analysis from incorrectly flagging it as "remote_newer" after push.
+    const mtime = fileMtime ?? Date.now()
 
     // Build the CouchDB document body (livesync-compatible format)
     const body: Record<string, unknown> = {
@@ -878,8 +972,8 @@ export class SyncEngine implements ISyncEngine {
       type,
       data,
       children: [],
-      ctime: now,
-      mtime: now,
+      ctime: mtime,
+      mtime,
       size: content.length,
       eden: {},
     }

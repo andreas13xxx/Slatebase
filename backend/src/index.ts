@@ -44,6 +44,8 @@ import {
 } from './sync/index.js'
 import type { VaultPathResolver } from './sync/index.js'
 import { createSyncRoutes } from './api/syncRoutes.js'
+import { FeatureRegistry, FeatureToggleService, createFeatureGuard } from './feature-toggle/index.js'
+import { createAdminFeatureRoutes, createPublicFeatureRoutes } from './api/featureRoutes.js'
 import { loadMcpConfig } from './mcp/config.js'
 import { TokenStore } from './mcp/token-store.js'
 import { McpTokenService } from './mcp/token-service.js'
@@ -68,6 +70,16 @@ const serverConfig = config.getServerConfig()
 // 1b. Server Log Store (file persistence for admin log viewer)
 const serverLogStore = new ServerLogStore(serverConfig.dataDir)
 logger.setLogStore(serverLogStore)
+
+// 1c. Feature Toggle System
+const featureRegistry = new FeatureRegistry()
+featureRegistry.register({ name: 'vault-sync', description: 'CouchDB-basierte Vault-Synchronisation', defaultEnabled: false, type: 'hot' })
+featureRegistry.register({ name: 'obsidian-plugin-compat', description: 'Obsidian Community Plugin Compatibility Layer', defaultEnabled: false, type: 'cold' })
+featureRegistry.register({ name: 'chat', description: 'Echtzeit-Chat zwischen Benutzern', defaultEnabled: true, type: 'hot' })
+featureRegistry.register({ name: 'mcp', description: 'AI Context Server (MCP Integration)', defaultEnabled: true, type: 'cold' })
+featureRegistry.register({ name: 'knowledge-graph', description: 'Interaktive Vault-Verlinkungsvisualisierung', defaultEnabled: true, type: 'hot' })
+
+const featureToggleService = new FeatureToggleService(featureRegistry, config.getFeaturesConfig())
 
 // 2. Data Layer: VaultReader, VaultManager, VaultRegistry, VaultShareRegistry
 const vaultReader = new VaultReader()
@@ -169,7 +181,7 @@ let mcpRoutes: ReturnType<typeof createMcpRoutes> | undefined
 let mcpTokenRoutes: ReturnType<typeof createMcpTokenRoutes> | undefined
 let mcpHttpHandler: ReturnType<typeof createMcpHttpHandler> = null
 
-if (mcpConfig.enabled) {
+if (featureToggleService.isEnabled('mcp')) {
   const tokenStore = new TokenStore(serverConfig.dataDir, logger)
   await tokenStore.loadIndex()
 
@@ -300,17 +312,34 @@ app.onError((err, c) => {
   return c.json({ code: 'INTERNAL_ERROR', message: 'Internal server error', timestamp: new Date().toISOString() }, 500)
 })
 
+// Feature guards for route protection
+app.use('/api/v1/chat/*', createFeatureGuard('chat', featureToggleService))
+app.use('/api/v1/vaults/:vaultId/sync/*', createFeatureGuard('vault-sync', featureToggleService))
+app.use('/api/v1/vaults/:vaultId/graph', createFeatureGuard('knowledge-graph', featureToggleService))
+app.use('/api/v1/vaults/:vaultId/backlinks', createFeatureGuard('knowledge-graph', featureToggleService))
+app.use('/api/v1/vaults/:vaultId/plugins/*', createFeatureGuard('obsidian-plugin-compat', featureToggleService))
+app.use('/api/v1/vaults/:vaultId/plugins', createFeatureGuard('obsidian-plugin-compat', featureToggleService))
+app.use('/api/v1/mcp/tokens', createFeatureGuard('mcp', featureToggleService))
+app.use('/api/v1/mcp/tokens/*', createFeatureGuard('mcp', featureToggleService))
+
 // Route registration
 app.route('/api/v1', router)
+
+// Feature toggle routes (admin + public)
+const adminFeatureApp = createAdminFeatureRoutes({ featureToggleService, auditService })
+app.route('/api/v1/admin', adminFeatureApp)
+
+const publicFeatureApp = createPublicFeatureRoutes({ featureToggleService })
+app.route('/api/v1', publicFeatureApp)
 
 // MCP route registration (after main routes, before server start)
 // Token routes use session auth (registered under /api/v1/mcp/tokens — session middleware applies)
 // MCP transport routes are handled OUTSIDE Hono to avoid double-response issues
 // .well-known/mcp.json is public (no auth)
-if (mcpConfig.enabled && mcpRoutes !== undefined && mcpTokenRoutes !== undefined) {
+if (featureToggleService.isEnabled('mcp') && mcpRoutes !== undefined && mcpTokenRoutes !== undefined) {
   app.route('/api/v1/mcp/tokens', mcpTokenRoutes)
 }
-app.get('/.well-known/mcp.json', createMcpWellKnownHandler(mcpConfig))
+app.get('/.well-known/mcp.json', createMcpWellKnownHandler(featureToggleService))
 
 // Plugin route registration (auth middleware applies via /api/v1/* pattern)
 const pluginRoutes = createPluginRoutes({
@@ -411,13 +440,35 @@ vaultController.setVaultDeletionHook({
   },
 })
 
-// Initialize sync schedulers
-try {
-  await syncService.initializeSchedulers()
-} catch (error: unknown) {
-  const message = error instanceof Error ? error.message : String(error)
-  logger.error('Failed to initialize sync schedulers', { error: message })
+// Initialize sync schedulers (only if vault-sync feature is enabled)
+if (featureToggleService.isEnabled('vault-sync')) {
+  try {
+    await syncService.initializeSchedulers()
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    logger.error('Failed to initialize sync schedulers', { error: message })
+  }
+} else {
+  logger.info('Vault-sync feature disabled — skipping scheduler initialization')
 }
+
+// Register feature toggle listener for vault-sync scheduler control
+featureToggleService.onChange((featureName: string, enabled: boolean) => {
+  if (featureName !== 'vault-sync') return
+
+  if (!enabled) {
+    // Deactivated: stop the scheduler (no new cycles; running cycles finish naturally)
+    syncScheduler.stopAll()
+    logger.info('Vault-sync disabled — scheduler stopped')
+  } else {
+    // Activated: restart schedulers from stored config
+    syncService.initializeSchedulers().catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error)
+      logger.error('Failed to restart sync schedulers after toggle activation', { error: message })
+    })
+    logger.info('Vault-sync enabled — scheduler restarted')
+  }
+})
 
 // Set up sync-to-link-index hook: rebuild link index after successful pull
 syncService.setOnPullComplete((vaultId: string) => {

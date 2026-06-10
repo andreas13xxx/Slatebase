@@ -3,6 +3,7 @@ import { AppProvider, useAppContext, loadVaults, importFile, importFolder, expor
 import { ApiClient } from './api'
 import { AuthProvider, useAuthContext } from './state/authContext'
 import { TabProvider, useTabContext } from './state/tabContext'
+import { FeatureProvider, useFeatureContext } from './state/featureContext'
 import { I18nProvider, useTranslation } from './i18n'
 import { ToastProvider } from './components/Toast'
 import { FileExplorer } from './components/FileExplorer'
@@ -276,12 +277,24 @@ const PAGE_ICONS: Partial<Record<AppPage, React.ReactNode>> = {
 }
 
 /**
+ * Hint shown when navigating directly to a disabled feature page.
+ */
+function FeatureDisabledHint({ featureName }: { featureName: string }) {
+  return (
+    <div style={{ padding: 32, color: 'var(--text-muted)', textAlign: 'center' }}>
+      <p>Das Feature „{featureName}" ist derzeit deaktiviert.</p>
+    </div>
+  )
+}
+
+/**
  * Inner component that uses AppContext and TabContext to render the main vault view.
  */
 function AppContent() {
   const { state, dispatch } = useAppContext()
   const { authState, authDispatch } = useAuthContext()
   const { tabState, tabDispatch } = useTabContext()
+  const { isEnabled } = useFeatureContext()
   const { t } = useTranslation()
   const prevVaultId = useRef<string | null>(null)
   // Settings tabs: list of open pages + which is active
@@ -438,6 +451,7 @@ function AppContent() {
 
   function handleOpenGraph() {
     if (!state.selectedVaultId) return
+    if (!isEnabled('knowledge-graph')) return
     // Check if a graph tab already exists
     const existingGraphTab = tabState.tabs.find((t) => t.filePath === '__graph__')
     if (existingGraphTab) {
@@ -501,7 +515,9 @@ function AppContent() {
       }} />
       case 'profile': return <ProfilePage apiClient={apiClient} />
       case 'sessions': return <SessionsPage apiClient={apiClient} />
-      case 'chat': return <ChatPage />
+      case 'chat':
+        if (!isEnabled('chat')) return <FeatureDisabledHint featureName="Chat" />
+        return <ChatPage />
       case 'admin-users': return <AdminUsersPage apiClient={apiClient} />
       case 'admin-vaults': return <AdminVaultsPage apiClient={apiClient} />
       case 'admin-config': return <AdminConfigPage apiClient={apiClient} />
@@ -523,15 +539,20 @@ function AppContent() {
             />
           : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
       case 'sync-config':
+        if (!isEnabled('vault-sync')) return <FeatureDisabledHint featureName="Vault-Sync" />
         return state.selectedVaultId
           ? <SyncProvider><SyncConfigPage vaultId={state.selectedVaultId} onOpenSyncLog={() => handleNavigate('sync-log')} /></SyncProvider>
           : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
       case 'sync-log':
+        if (!isEnabled('vault-sync')) return <FeatureDisabledHint featureName="Vault-Sync" />
         return state.selectedVaultId
           ? <SyncProvider><SyncLogPage vaultId={state.selectedVaultId} /></SyncProvider>
           : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
-      case 'mcp-tokens': return <McpTokensPage apiClient={apiClient} />
+      case 'mcp-tokens':
+        if (!isEnabled('mcp')) return <FeatureDisabledHint featureName="MCP" />
+        return <McpTokensPage apiClient={apiClient} />
       case 'plugins':
+        if (!isEnabled('obsidian-plugin-compat')) return <FeatureDisabledHint featureName="Plugin-Kompatibilität" />
         return state.selectedVaultId
           ? <PluginManagementPage apiClient={apiClient} vaultId={state.selectedVaultId} />
           : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
@@ -835,14 +856,49 @@ function AuthGuard() {
   }
 
   return (
-    <AppProvider apiClient={apiClient}>
-      <TabProvider>
-        <ContextPanelProvider>
-          <AppContent />
-        </ContextPanelProvider>
-      </TabProvider>
-    </AppProvider>
+    <FeatureProvider>
+      <FeatureLoader />
+      <AppProvider apiClient={apiClient}>
+        <TabProvider>
+          <ContextPanelProvider>
+            <AppContent />
+          </ContextPanelProvider>
+        </TabProvider>
+      </AppProvider>
+    </FeatureProvider>
   )
+}
+
+/**
+ * Loads feature toggles from the public API on mount.
+ * Placed inside FeatureProvider to access dispatch, and renders nothing.
+ */
+function FeatureLoader() {
+  const { dispatch } = useFeatureContext()
+
+  useEffect(() => {
+    dispatch({ type: 'FEATURES_LOADING' })
+    apiClient.loadFeatures()
+      .then(features => {
+        dispatch({
+          type: 'FEATURES_LOADED',
+          features: features.map(f => ({
+            name: f.name,
+            enabled: f.enabled,
+            type: 'hot' as const,
+            description: '',
+          })),
+        })
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message :
+          (typeof error === 'object' && error !== null && 'message' in error) ?
+            String((error as { message: unknown }).message) : 'Fehler beim Laden der Features'
+        dispatch({ type: 'FEATURES_ERROR', error: message })
+      })
+  }, [dispatch])
+
+  return null
 }
 
 /**

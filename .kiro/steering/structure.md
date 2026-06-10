@@ -43,6 +43,7 @@ src/
 │   ├── graphRoutes.ts    — Graph API routes (GET graph, GET backlinks)
 │   ├── client-ip.ts     — Centralized client IP extraction with trusted proxy support
 │   ├── pluginRoutes.ts  — Plugin management CRUD routes (list, install, delete, bundle, styles, settings, registry)
+│   ├── featureRoutes.ts — Feature toggle admin + public routes (GET/PUT /admin/features, GET /features)
 │   └── vaultShareRoutes.ts — ShareController + share/transfer routes
 ├── chat/
 │   ├── types.ts          — Chat data models (Conversation, Message, etc.)
@@ -96,6 +97,13 @@ src/
 │   ├── plugin-store.test.ts  — Unit tests for PluginStore
 │   ├── plugin-installer.ts   — PluginInstaller (ZIP extraction, manifest validation, bundle integrity, version comparison)
 │   └── plugin-installer.test.ts — Unit tests for PluginInstaller
+├── feature-toggle/
+│   ├── index.ts              — Barrel export for feature-toggle module
+│   ├── types.ts              — IFeatureToggleService, IFeatureRegistry, FeatureToggleDefinition, FeatureToggleState, etc.
+│   ├── errors.ts             — FeatureNotFoundError, FeatureAlreadyRegisteredError, InvalidFeatureNameError
+│   ├── feature-registry.ts   — FeatureRegistry (declarative registration with validation)
+│   ├── feature-toggle-service.ts — FeatureToggleService (in-memory state, env-var overlay, onChange listeners)
+│   └── middleware.ts         — createFeatureGuard() factory (Hono middleware, 403 on disabled features)
 ├── import/index.ts       — ImportService (file/folder import logic)
 └── integration.test.ts   — Integration tests
 config/
@@ -171,7 +179,10 @@ src/
 │   ├── syncActions.ts    — loadSyncConfig, triggerSync, resolveConflict, etc.
 │   ├── contextPanelState.ts — Context panel reducer + types (sections, views, outline, links, tags, properties)
 │   ├── contextPanelContext.ts — ContextPanelProvider + useContextPanelContext hook
-│   └── contextPanelActions.ts — loadOutline, loadForwardLinks, loadBacklinks, loadTags, loadProperties, expandTag
+│   ├── contextPanelActions.ts — loadOutline, loadForwardLinks, loadBacklinks, loadTags, loadProperties, expandTag
+│   ├── featureState.ts   — Feature toggle reducer + types (FeatureToggleInfo, optimistic update/rollback)
+│   ├── featureContext.ts — FeatureProvider + useFeatureContext hook (isEnabled helper)
+│   └── featureActions.ts — loadFeatures, toggleFeature action creators
 ├── components/
 │   ├── SlatebaseLogo.tsx — SVG logo component
 │   ├── SidebarToolbar.tsx — Draggable vertical toolbar
@@ -338,6 +349,14 @@ All routes are prefixed with `/api/v1`:
 | GET | /vaults/:vaultId/plugins/:pluginId/styles | Download plugin styles (CSS) |
 | GET | /vaults/:vaultId/plugins/:pluginId/settings | Load plugin settings |
 | PUT | /vaults/:vaultId/plugins/:pluginId/settings | Save plugin settings (max 1 MB) |
+
+### Feature Toggles
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | /admin/features | List all feature toggles with details (admin) |
+| PUT | /admin/features/:featureName | Toggle a feature (admin) |
+| GET | /features | List features with name + enabled (all authenticated users) |
 
 ## Data Storage
 

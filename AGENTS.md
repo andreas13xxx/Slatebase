@@ -189,6 +189,14 @@ All under `/api/v1`:
 | GET | /vaults/:vaultId/plugins/:pluginId/settings | Load settings |
 | PUT | /vaults/:vaultId/plugins/:pluginId/settings | Save settings (max 1 MB) |
 
+### Feature Toggles
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | /admin/features | List all feature toggles with details (admin) |
+| PUT | /admin/features/:featureName | Toggle a feature's enabled state (admin) |
+| GET | /features | List features with name + enabled (all authenticated users) |
+
 ## Data Storage
 
 - Filesystem-based, no database

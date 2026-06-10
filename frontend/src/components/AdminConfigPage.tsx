@@ -1,8 +1,9 @@
-import { useState, useEffect, type FormEvent } from 'react'
-import type { IApiClient } from '../api'
+import { useState, useEffect, useCallback, type FormEvent } from 'react'
+import type { IApiClient, FeatureToggleState } from '../api'
 import { useTranslation } from '../i18n'
-import { Settings, RefreshCw, Save, AlertTriangle } from 'lucide-react'
+import { Settings, RefreshCw, Save, AlertTriangle, Loader, AlertCircle } from 'lucide-react'
 import { ConfirmModal } from './ConfirmModal'
+import { useFeatureContext } from '../state/featureContext'
 
 /**
  * Shape of the server configuration returned by GET /api/v1/admin/config.
@@ -40,6 +41,13 @@ interface ConfigFormErrors {
  */
 export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
   const { t } = useTranslation()
+  const { dispatch: featureDispatch } = useFeatureContext()
+
+  // Feature-toggle admin state
+  const [adminFeatures, setAdminFeatures] = useState<FeatureToggleState[]>([])
+  const [featuresLoading, setFeaturesLoading] = useState(true)
+  const [featuresError, setFeaturesError] = useState<string | null>(null)
+  const [toggleError, setToggleError] = useState<string | null>(null)
 
   const [config, setConfig] = useState<ServerConfigData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -98,6 +106,56 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
     void loadConfig()
     return () => { cancelled = true }
   }, [apiClient])
+
+  // Feature toggle loading
+  const loadAdminFeatures = useCallback(async () => {
+    setFeaturesLoading(true)
+    setFeaturesError(null)
+    try {
+      const features = await apiClient.loadAdminFeatures()
+      setAdminFeatures(features)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message :
+        (typeof err === 'object' && err !== null && 'message' in err) ?
+          String((err as { message: unknown }).message) : 'Fehler beim Laden der Feature-Toggles'
+      setFeaturesError(message)
+    } finally {
+      setFeaturesLoading(false)
+    }
+  }, [apiClient])
+
+  useEffect(() => {
+    void loadAdminFeatures()
+  }, [loadAdminFeatures])
+
+  async function handleToggle(featureName: string, currentEnabled: boolean): Promise<void> {
+    setToggleError(null)
+    const newEnabled = !currentEnabled
+
+    // Optimistic update on local admin features list
+    setAdminFeatures(prev => prev.map(f =>
+      f.name === featureName ? { ...f, enabled: newEnabled } : f
+    ))
+
+    // Also update the global feature context optimistically
+    featureDispatch({ type: 'FEATURE_UPDATED', name: featureName, enabled: newEnabled })
+
+    try {
+      await apiClient.toggleAdminFeature(featureName, newEnabled)
+    } catch (err: unknown) {
+      // Rollback local admin features
+      setAdminFeatures(prev => prev.map(f =>
+        f.name === featureName ? { ...f, enabled: currentEnabled } : f
+      ))
+      // Rollback global feature context
+      featureDispatch({ type: 'FEATURE_UPDATED', name: featureName, enabled: currentEnabled })
+
+      const message = err instanceof Error ? err.message :
+        (typeof err === 'object' && err !== null && 'message' in err) ?
+          String((err as { message: unknown }).message) : 'Fehler beim Ändern des Features'
+      setToggleError(message)
+    }
+  }
 
   function validate(): boolean {
     const newErrors: ConfigFormErrors = {}
@@ -199,6 +257,70 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
         <Settings size={22} color="var(--accent-text)" />
         <h1 className="admin-config-title">{t('admin.config.title')}</h1>
       </div>
+
+      {/* Feature-Toggles section */}
+      <section className="admin-config-card">
+        <h2 className="admin-config-card-title">Feature-Toggles</h2>
+        {featuresLoading && (
+          <div className="feature-toggle-loading">
+            <Loader size={16} className="feature-toggle-spinner" />
+            <span>Laden…</span>
+          </div>
+        )}
+        {featuresError && !featuresLoading && (
+          <div className="feature-toggle-error">
+            <AlertCircle size={14} />
+            <span>{featuresError}</span>
+            <button
+              type="button"
+              className="feature-toggle-retry-btn"
+              onClick={() => void loadAdminFeatures()}
+            >
+              Erneut versuchen
+            </button>
+          </div>
+        )}
+        {toggleError && (
+          <div className="feature-toggle-toast">
+            <AlertCircle size={14} />
+            <span>{toggleError}</span>
+            <button
+              type="button"
+              className="feature-toggle-toast-close"
+              onClick={() => setToggleError(null)}
+              aria-label="Schließen"
+            >
+              ×
+            </button>
+          </div>
+        )}
+        {!featuresLoading && !featuresError && adminFeatures.map(feature => (
+          <div
+            key={feature.name}
+            className={`feature-toggle-item${!feature.enabled ? ' feature-toggle-item--disabled' : ''}`}
+          >
+            <div className="feature-toggle-info">
+              <div className="feature-toggle-name">{feature.name}</div>
+              <div className="feature-toggle-description">{feature.description}</div>
+              {feature.type === 'cold' && (
+                <div className="feature-toggle-cold-hint">
+                  <AlertTriangle size={12} />
+                  Neustart erforderlich
+                </div>
+              )}
+            </div>
+            <label className="feature-toggle-switch">
+              <input
+                type="checkbox"
+                checked={feature.enabled}
+                onChange={() => void handleToggle(feature.name, feature.enabled)}
+                aria-label={`${feature.name} ${feature.enabled ? 'deaktivieren' : 'aktivieren'}`}
+              />
+              <span className="feature-toggle-switch__slider" />
+            </label>
+          </div>
+        ))}
+      </section>
 
       {/* Network section */}
       <form className="admin-config-form" onSubmit={handleSubmit} noValidate>

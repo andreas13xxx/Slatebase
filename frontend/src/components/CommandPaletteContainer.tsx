@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { CommandPalette } from './CommandPalette'
 import { usePluginContext } from '../plugins/compat/plugin-context'
+import { useFeatureContext } from '../state/featureContext'
 
 /**
  * CommandPaletteContainer — Listens to the `slatebase:open-command-palette` custom event
@@ -13,10 +14,15 @@ import { usePluginContext } from '../plugins/compat/plugin-context'
  */
 export function CommandPaletteContainer() {
   const { commandRegistry } = usePluginContext()
+  const { isEnabled } = useFeatureContext()
   const [isOpen, setIsOpen] = useState(false)
+
+  const pluginCompatEnabled = isEnabled('obsidian-plugin-compat')
 
   // Listen to custom event dispatched by PluginProvider's Ctrl+P / Cmd+P handler
   useEffect(() => {
+    if (!pluginCompatEnabled) return
+
     function handleOpen() {
       setIsOpen(true)
     }
@@ -25,7 +31,7 @@ export function CommandPaletteContainer() {
     return () => {
       window.removeEventListener('slatebase:open-command-palette', handleOpen)
     }
-  }, [])
+  }, [pluginCompatEnabled])
 
   const handleClose = useCallback(() => {
     setIsOpen(false)
@@ -34,6 +40,8 @@ export function CommandPaletteContainer() {
   const handleExecute = useCallback((commandId: string) => {
     commandRegistry.executeCommand(commandId)
   }, [commandRegistry])
+
+  if (!pluginCompatEnabled) return null
 
   const commands = commandRegistry.getCommands()
 

@@ -6,7 +6,6 @@ import type { IConfigService } from '../config/index.js'
 // --- Zod Schema ---
 
 const McpConfigSchema = z.object({
-  enabled: z.boolean().default(true),
   maxFileSize: z.number().int().positive(),
   rateLimit: z.number().int().min(1).default(60),
   maxTokensPerUser: z.literal(10),
@@ -16,8 +15,6 @@ const McpConfigSchema = z.object({
 
 /** MCP module configuration. */
 export interface McpConfig {
-  /** Whether the MCP server is enabled. Env: SLATEBASE_MCP_ENABLED, default: true. */
-  enabled: boolean
   /** Maximum file size in bytes for MCP reads. Env: SLATEBASE_MCP_MAX_FILE_SIZE, default: from server config maxFileSize. */
   maxFileSize: number
   /** Maximum MCP requests per minute per token. Env: SLATEBASE_MCP_RATE_LIMIT, default: 60. */
@@ -32,6 +29,9 @@ export interface McpConfig {
  * Load MCP configuration from environment variables with fallback to server config defaults.
  * Uses Zod for validation and type coercion.
  *
+ * Note: The MCP enabled/disabled toggle is now managed by the FeatureToggleService
+ * via `isEnabled('mcp')`. This loader only handles MCP-specific operational settings.
+ *
  * @param configService - The server config service (provides maxFileSize default)
  * @returns Validated MCP configuration
  */
@@ -39,7 +39,6 @@ export function loadMcpConfig(configService: IConfigService): McpConfig {
   const serverConfig = configService.getServerConfig()
 
   const raw: Record<string, unknown> = {
-    enabled: parseBoolean(process.env['SLATEBASE_MCP_ENABLED'], true),
     maxFileSize: parsePositiveInt(process.env['SLATEBASE_MCP_MAX_FILE_SIZE'], serverConfig.maxFileSize),
     rateLimit: parsePositiveInt(process.env['SLATEBASE_MCP_RATE_LIMIT'], 60),
     maxTokensPerUser: 10,
@@ -49,17 +48,6 @@ export function loadMcpConfig(configService: IConfigService): McpConfig {
 }
 
 // --- Helpers ---
-
-/**
- * Parse a string env var as boolean. Accepts "true"/"1" as true, "false"/"0" as false.
- */
-function parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
-  if (value === undefined || value === '') return defaultValue
-  const lower = value.toLowerCase().trim()
-  if (lower === 'true' || lower === '1') return true
-  if (lower === 'false' || lower === '0') return false
-  return defaultValue
-}
 
 /**
  * Parse a string env var as a positive integer.

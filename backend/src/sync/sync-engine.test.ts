@@ -1244,6 +1244,13 @@ describe('SyncEngine push', () => {
     const { stat: statFn } = await import('node:fs/promises')
     const fileStat = await statFn(join(tempDir, 'unchanged.md'))
 
+    // Mock: HEAD request to verify file exists in CouchDB (returns existing revision)
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    fetchSpy.mockResolvedValueOnce(new Response('', {
+      status: 200,
+      headers: { 'etag': '"1-existing"' },
+    }))
+
     const result = await engine.push(createPushParams({
       localMtimes: { 'unchanged.md': fileStat.mtimeMs }, // Same mtime → unchanged
     }))

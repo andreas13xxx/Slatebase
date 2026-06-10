@@ -43,11 +43,13 @@ function createMockConfig(overrides?: Partial<ServerConfig>): IConfigService {
     maxImportFiles: 500,
     maxImportDepth: 10,
     trustedProxies: [],
+    features: {},
     ...overrides,
   }
   return {
     getServerConfig: () => config,
     getVaultConfigs: () => config.vaults,
+    getFeaturesConfig: () => config.features,
   }
 }
 

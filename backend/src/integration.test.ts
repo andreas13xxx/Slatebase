@@ -70,10 +70,14 @@ beforeAll(async () => {
         maxImportFiles: 500,
         maxImportDepth: 10,
         trustedProxies: [],
+        features: {},
       }
     },
     getVaultConfigs(): VaultConfig[] {
       return [{ path: fixtureDir }]
+    },
+    getFeaturesConfig() {
+      return {}
     },
   }
 

@@ -12,6 +12,12 @@ const VaultConfigSchema = z.object({
   name: z.string().max(128).optional(),
 })
 
+const FeatureEntrySchema = z.object({
+  enabled: z.boolean(),
+})
+
+const FeaturesConfigSchema = z.record(z.string(), FeatureEntrySchema).default({})
+
 export const ServerConfigSchema = z.object({
   port: z.number().int().min(1).max(65535).default(3000),
   host: z.string().default('127.0.0.1'),
@@ -26,6 +32,7 @@ export const ServerConfigSchema = z.object({
   maxImportFiles: z.number().int().positive().default(500),
   maxImportDepth: z.number().int().positive().default(10),
   trustedProxies: z.array(z.string()).default([]),
+  features: FeaturesConfigSchema,
 })
 
 // --- Types ---
@@ -38,6 +45,8 @@ export type VaultConfig = z.infer<typeof VaultConfigSchema>
 export interface IConfigService {
   getServerConfig(): ServerConfig
   getVaultConfigs(): VaultConfig[]
+  /** Returns the features configuration section (feature name → { enabled }) */
+  getFeaturesConfig(): Record<string, { enabled: boolean }>
 }
 
 // --- Implementation ---
@@ -58,6 +67,10 @@ export class ConfigService implements IConfigService {
 
   getVaultConfigs(): VaultConfig[] {
     return this.config.vaults
+  }
+
+  getFeaturesConfig(): Record<string, { enabled: boolean }> {
+    return this.config.features
   }
 
   private loadConfigFile(): Record<string, unknown> {

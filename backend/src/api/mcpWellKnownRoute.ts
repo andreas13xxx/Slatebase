@@ -5,7 +5,7 @@
  */
 
 import type { Context } from 'hono'
-import type { McpConfig } from '../mcp/config.js'
+import type { IFeatureToggleService } from '../feature-toggle/types.js'
 
 /**
  * MCP discovery metadata response shape.
@@ -23,12 +23,12 @@ export interface McpDiscoveryResponse {
  * Creates a handler for `GET /.well-known/mcp.json`.
  * Returns MCP server discovery metadata or HTTP 404 if MCP is disabled.
  *
- * @param mcpConfig - The MCP configuration (used to check enabled state)
+ * @param featureToggleService - The feature toggle service (used to check if MCP is enabled)
  * @returns Hono route handler
  */
-export function createMcpWellKnownHandler(mcpConfig: McpConfig): (c: Context) => Response {
+export function createMcpWellKnownHandler(featureToggleService: IFeatureToggleService): (c: Context) => Response {
   return (c: Context): Response => {
-    if (!mcpConfig.enabled) {
+    if (!featureToggleService.isEnabled('mcp')) {
       return c.json({ code: 'NOT_FOUND', message: 'Not found', timestamp: new Date().toISOString() }, 404)
     }
 

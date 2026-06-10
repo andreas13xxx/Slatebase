@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-const { mockFetchVaults, mockFetchVaultTree, mockFetchFileContent, mockCreateVault, mockDeleteVault, mockImportFile, mockImportFolder, mockDeleteContent, mockLogin, mockLogout, mockSetToken, mockSetCsrfToken, mockSetOnSessionExpired } = vi.hoisted(() => ({
+const { mockFetchVaults, mockFetchVaultTree, mockFetchFileContent, mockCreateVault, mockDeleteVault, mockImportFile, mockImportFolder, mockDeleteContent, mockLogin, mockLogout, mockSetToken, mockSetCsrfToken, mockSetOnSessionExpired, mockLoadFeatures } = vi.hoisted(() => ({
   mockFetchVaults: vi.fn(),
   mockFetchVaultTree: vi.fn(),
   mockFetchFileContent: vi.fn(),
@@ -16,6 +16,7 @@ const { mockFetchVaults, mockFetchVaultTree, mockFetchFileContent, mockCreateVau
   mockSetToken: vi.fn(),
   mockSetCsrfToken: vi.fn(),
   mockSetOnSessionExpired: vi.fn(),
+  mockLoadFeatures: vi.fn(),
 }))
 
 // Mock the API client with a class that uses shared mock functions
@@ -34,6 +35,7 @@ vi.mock('./api', () => {
     setToken = mockSetToken
     setCsrfToken = mockSetCsrfToken
     setOnSessionExpired = mockSetOnSessionExpired
+    loadFeatures = mockLoadFeatures
     getToken = vi.fn().mockReturnValue(null)
     getCsrfToken = vi.fn().mockReturnValue(null)
   }
@@ -46,6 +48,13 @@ import { App } from './App'
 describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockLoadFeatures.mockResolvedValue([
+      { name: 'chat', enabled: true },
+      { name: 'vault-sync', enabled: false },
+      { name: 'mcp', enabled: true },
+      { name: 'knowledge-graph', enabled: true },
+      { name: 'obsidian-plugin-compat', enabled: false },
+    ])
     mockFetchVaults.mockResolvedValue([
       { id: 'vault1', name: 'My Notes' },
       { id: 'vault2', name: 'Work Vault' },

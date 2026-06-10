@@ -5,35 +5,27 @@
 import { describe, it, expect } from 'vitest'
 import { Hono } from 'hono'
 import { createMcpWellKnownHandler } from './mcpWellKnownRoute.js'
-import type { McpConfig } from '../mcp/config.js'
+import type { IFeatureToggleService } from '../feature-toggle/types.js'
 
-function createTestApp(mcpConfig: McpConfig): Hono {
+function createMockFeatureToggleService(mcpEnabled: boolean): IFeatureToggleService {
+  return {
+    isEnabled: (name: string) => name === 'mcp' ? mcpEnabled : false,
+    setEnabled: () => ({ name: 'mcp', enabled: mcpEnabled, restartRequired: false }),
+    getAll: () => [],
+    get: () => undefined,
+    onChange: () => {},
+  }
+}
+
+function createTestApp(mcpEnabled: boolean): Hono {
   const app = new Hono()
-  app.get('/.well-known/mcp.json', createMcpWellKnownHandler(mcpConfig))
+  app.get('/.well-known/mcp.json', createMcpWellKnownHandler(createMockFeatureToggleService(mcpEnabled)))
   return app
-}
-
-function createEnabledConfig(): McpConfig {
-  return {
-    enabled: true,
-    maxFileSize: 5242880,
-    rateLimit: 60,
-    maxTokensPerUser: 10,
-  }
-}
-
-function createDisabledConfig(): McpConfig {
-  return {
-    enabled: false,
-    maxFileSize: 5242880,
-    rateLimit: 60,
-    maxTokensPerUser: 10,
-  }
 }
 
 describe('GET /.well-known/mcp.json', () => {
   it('returns 200 with discovery metadata when MCP is enabled', async () => {
-    const app = createTestApp(createEnabledConfig())
+    const app = createTestApp(true)
 
     const res = await app.request('/.well-known/mcp.json')
 
@@ -52,7 +44,7 @@ describe('GET /.well-known/mcp.json', () => {
   })
 
   it('returns 404 when MCP is disabled', async () => {
-    const app = createTestApp(createDisabledConfig())
+    const app = createTestApp(false)
 
     const res = await app.request('/.well-known/mcp.json')
 
@@ -65,7 +57,7 @@ describe('GET /.well-known/mcp.json', () => {
   })
 
   it('returns correct content-type header', async () => {
-    const app = createTestApp(createEnabledConfig())
+    const app = createTestApp(true)
 
     const res = await app.request('/.well-known/mcp.json')
 
@@ -73,7 +65,7 @@ describe('GET /.well-known/mcp.json', () => {
   })
 
   it('does not require authentication', async () => {
-    const app = createTestApp(createEnabledConfig())
+    const app = createTestApp(true)
 
     // No Authorization header — should still succeed
     const res = await app.request('/.well-known/mcp.json')

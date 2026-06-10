@@ -25,6 +25,7 @@
 | 17 | `mermaid-rendering` | Feature | 📋 Requirements | Mermaid-Diagramme in Fenced Code Blocks als SVG rendern (Dark/Light Mode, Lazy Loading, Fehlerbehandlung) |
 | 18 | `accessibility-audit` | Feature | 📋 Geplant | WCAG 2.1 AA Compliance (systematischer Audit + Fixes) |
 | 19 | `server-side-plugins` | Feature | 📋 Geplant | Serverseitige Ausführung von Obsidian-Plugins die Node.js-APIs benötigen (tls, net, crypto, etc.) |
+| 20 | `feature-toggles` | Feature | ✅ Fertig | Zentrale Feature-Toggles in der Serverkonfiguration (vault-sync, obsidian-plugin-compat, chat, mcp, knowledge-graph) mit Admin-UI und Hot-Toggle-Support |
 
 ## Abhängigkeiten zwischen Specs
 
@@ -48,6 +49,7 @@ slatebase-overview (Architektur-Grundlage)
         │     └── obsidian-plugin-compat (braucht Obsidian-Kompatibilität)
         │           └── server-side-plugins (braucht Plugin-Infrastruktur)
         └── accessibility-audit (querschnittlich, alle UI-Komponenten)
+        └── feature-toggles (querschnittlich, braucht Auth + Config + alle Feature-Module)
 ```
 
 ## Geplante Specs (noch keine Spec-Dateien vorhanden)
@@ -76,6 +78,13 @@ slatebase-overview (Architektur-Grundlage)
 - **Abhängigkeit**: Querschnittlich — betrifft alle Frontend-Komponenten
 - **Priorität**: Niedrig (laufend bei neuen Features beachten)
 - **Aufwand**: Mittel
+
+### feature-toggles
+- **Beschreibung**: Zentrale Feature-Toggles in der Serverkonfiguration. Administratoren können Features (vault-sync, obsidian-plugin-compat, chat, mcp, knowledge-graph) an/abschalten. Defaults in `default.json`, Env-Var-Overrides, Hot-Toggle über Admin-API, Frontend-UI-Ausblendung deaktivierter Features. Entfernung von `mcp.enabled` zugunsten des einheitlichen Toggle-Systems.
+- **Abhängigkeit**: Querschnittlich — braucht Auth (Admin-Only), Config-System, berührt alle Feature-Module
+- **Priorität**: Mittel-Hoch (ermöglicht saubere Konfiguration für Self-Hoster)
+- **Aufwand**: Mittel (Backend-Service + Middleware + Admin-API + Frontend-Integration)
+- **Status**: ✅ Fertig
 
 ## Gelöschte/Obsolete Specs
 

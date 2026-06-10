@@ -26,6 +26,8 @@ Slatebase is feature-complete for its core use case: multi-user Markdown vault m
 - **Context Panel** — Right-side panel with four views (Outline, Links, Tags, Properties), icon-only tab navigation with Drag & Drop reordering, panel splitting with per-section tab bars, cross-section tab movement, and auto-close of empty sections
 - **Knowledge Graph** — Interactive force-directed graph visualization of vault link structure (SVG + d3-force, zoom/pan/drag, search, node highlighting, tab integration, backend link-index with JSON persistence and incremental updates)
 
+- **Feature Toggles** — Centralized feature toggle system for administrators. Toggle features (vault-sync, obsidian-plugin-compat, chat, mcp, knowledge-graph) via config, environment variables, or Admin API at runtime. Hot-toggles take effect immediately, cold-toggles show restart-required hint. Feature guards block API routes for disabled features. Frontend hides UI elements for disabled features. Replaces the old `mcp.enabled` config.
+
 - **Obsidian Plugin Compatibility (work-in-progress)** ⚠️ *experimental* — Compatibility layer for Obsidian Community Plugins: API shims (App, Vault, Workspace, MetadataCache), plugin loader with lifecycle management (onload/onunload), security sandbox (vault isolation, storage namespace, network allowlist, main-thread blocking detection), Command Palette (Ctrl+P), CSS injection with scoped styles, compatibility analyzer, plugin settings persistence, backend plugin store. **Limitation:** Only browser-compatible plugins can run. Plugins requiring Node.js modules (tls, net, crypto, fs, etc.) cannot be executed — server-side plugin execution is planned as a separate feature.
 
 ### Planned Features
