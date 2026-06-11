@@ -79,13 +79,6 @@ slatebase-overview (Architektur-Grundlage)
 - **Priorität**: Niedrig (laufend bei neuen Features beachten)
 - **Aufwand**: Mittel
 
-### feature-toggles
-- **Beschreibung**: Zentrale Feature-Toggles in der Serverkonfiguration. Administratoren können Features (vault-sync, obsidian-plugin-compat, chat, mcp, knowledge-graph) an/abschalten. Defaults in `default.json`, Env-Var-Overrides, Hot-Toggle über Admin-API, Frontend-UI-Ausblendung deaktivierter Features. Entfernung von `mcp.enabled` zugunsten des einheitlichen Toggle-Systems.
-- **Abhängigkeit**: Querschnittlich — braucht Auth (Admin-Only), Config-System, berührt alle Feature-Module
-- **Priorität**: Mittel-Hoch (ermöglicht saubere Konfiguration für Self-Hoster)
-- **Aufwand**: Mittel (Backend-Service + Middleware + Admin-API + Frontend-Integration)
-- **Status**: ✅ Fertig
-
 ## Gelöschte/Obsolete Specs
 
 | Spec | Grund |
