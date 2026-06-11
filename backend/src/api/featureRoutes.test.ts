@@ -7,6 +7,16 @@ import { FeatureNotFoundError } from '../feature-toggle/index.js'
 import type { IAuditService } from '../audit/index.js'
 import type { SessionContext } from '../auth/index.js'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyHono = Hono<any, any, any>
+
+/** API error response shape for type assertions in tests */
+interface ApiErrorBody {
+  code: string
+  message: string
+  timestamp: string
+}
+
 // ─── Mock Factories ──────────────────────────────────────────────────────────
 
 function createMockFeatureToggleService(overrides: Partial<IFeatureToggleService> = {}): IFeatureToggleService {
@@ -27,17 +37,19 @@ function createMockAuditService(): IAuditService {
   }
 }
 
-function createAdminApp(deps: FeatureRouteDeps): Hono {
+function createAdminApp(deps: FeatureRouteDeps): AnyHono {
   const app = new Hono()
 
   // Simulate session middleware that sets session context
   app.use('*', async (c, next) => {
+    // @ts-expect-error — test-only context variables without Hono type registration
     c.set('session', {
       userId: 'admin-user-1',
       username: 'admin',
       role: 'admin',
       sessionId: 'session-1',
     } satisfies SessionContext)
+    // @ts-expect-error — test-only context variables
     c.set('clientIp', '192.168.1.100')
     await next()
   })
@@ -47,11 +59,12 @@ function createAdminApp(deps: FeatureRouteDeps): Hono {
   return app
 }
 
-function createPublicApp(deps: FeatureRouteDeps): Hono {
+function createPublicApp(deps: FeatureRouteDeps): AnyHono {
   const app = new Hono()
 
   // Simulate session middleware
   app.use('*', async (c, next) => {
+    // @ts-expect-error — test-only context variables without Hono type registration
     c.set('session', {
       userId: 'user-1',
       username: 'user',
@@ -161,7 +174,7 @@ describe('featureRoutes', () => {
       })
 
       expect(res.status).toBe(404)
-      const body = await res.json()
+      const body = await res.json() as ApiErrorBody
       expect(body.code).toBe('FEATURE_NOT_FOUND')
     })
 
@@ -176,7 +189,7 @@ describe('featureRoutes', () => {
       })
 
       expect(res.status).toBe(400)
-      const body = await res.json()
+      const body = await res.json() as ApiErrorBody
       expect(body.code).toBe('VALIDATION_ERROR')
     })
 
@@ -191,7 +204,7 @@ describe('featureRoutes', () => {
       })
 
       expect(res.status).toBe(400)
-      const body = await res.json()
+      const body = await res.json() as ApiErrorBody
       expect(body.code).toBe('VALIDATION_ERROR')
     })
 
@@ -206,7 +219,7 @@ describe('featureRoutes', () => {
       })
 
       expect(res.status).toBe(400)
-      const body = await res.json()
+      const body = await res.json() as ApiErrorBody
       expect(body.code).toBe('VALIDATION_ERROR')
     })
 
@@ -225,7 +238,7 @@ describe('featureRoutes', () => {
       })
 
       expect(res.status).toBe(200)
-      const body = await res.json()
+      const body = await res.json() as FeatureToggleUpdateResult
       expect(body.restartRequired).toBe(true)
     })
 
@@ -280,7 +293,7 @@ describe('featureRoutes', () => {
       const res = await app.request('/features', { method: 'GET' })
 
       expect(res.status).toBe(200)
-      const body = await res.json()
+      const body = await res.json() as Array<{ name: string; enabled: boolean }>
       expect(body[0]).not.toHaveProperty('type')
       expect(body[0]).not.toHaveProperty('description')
     })
