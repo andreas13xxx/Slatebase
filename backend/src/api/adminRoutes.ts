@@ -319,8 +319,8 @@ export class AdminController implements IAdminController {
 
   /**
    * POST /admin/restart — Initiates a graceful server restart.
-   * This is a placeholder that logs the request and returns 202 Accepted.
-   * In production, this would complete pending requests within 10s before restarting.
+   * Responds with 202 Accepted, then exits the process after a short delay.
+   * In Docker with `restart: unless-stopped`, this triggers a container restart.
    */
   async restart(c: Context): Promise<Response> {
     try {
@@ -336,6 +336,12 @@ export class AdminController implements IAdminController {
         success: true,
         details: 'Graceful restart requested',
       })
+
+      // Schedule process exit after response is sent
+      setTimeout(() => {
+        this.logger.info('Server shutting down for restart')
+        process.exit(0)
+      }, 1000)
 
       return c.json({ message: 'Restart initiated. Server will restart within 10 seconds.' }, 202)
     } catch (error) {
