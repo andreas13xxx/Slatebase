@@ -16,8 +16,8 @@ Slatebase als Self-Hosted-Alternative für Obsidian-Vault-Zugriff in der Communi
 | 4 | Screenshots / Demo-GIF erstellen | ✅ Fertig | `demo.gif` im Projekt-Root vorhanden |
 | 5 | LICENSE-Datei hinzufügen (MIT) | ✅ Fertig | `LICENSE` im Projekt-Root vorhanden |
 | 6 | CONTRIBUTING.md erstellen | 📋 Geplant | Kurze Anleitung: Issues first, Dev-Setup, Code-Konventionen |
-| 7 | Docker Images auf GHCR veröffentlichen | 📋 Geplant | `ghcr.io/andreas13xxx/slatebase-backend` + `-frontend` |
-| 8 | GitHub Releases mit Changelog starten | 📋 Geplant | Semantic Versioning, erster Release als v0.1.0 |
+| 7 | Docker Images auf GHCR veröffentlichen | ✅ Pipeline fertig | CI/CD-Pipeline konfiguriert — `ghcr.io/andreas13xxx/slatebase-backend` + `-frontend`, automatischer Push bei Release |
+| 8 | GitHub Releases mit Changelog starten | ✅ Pipeline fertig | Release Please konfiguriert, erster Release bei Merge auf `main` |
 
 ### Phase 2: Community-Reichweite
 

@@ -197,6 +197,12 @@ All under `/api/v1`:
 | PUT | /admin/features/:featureName | Toggle a feature's enabled state (admin) |
 | GET | /features | List features with name + enabled (all authenticated users) |
 
+### Version
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | /version | Get installed Slatebase version (public, no auth) |
+
 ## Data Storage
 
 - Filesystem-based, no database

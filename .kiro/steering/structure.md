@@ -14,6 +14,7 @@ frontend/         — React SPA (Vite)
 ```
 src/
 ├── index.ts              — Composition root (DI wiring, server startup)
+├── version.ts            — getVersion() utility (env → version.json → 'development' fallback)
 ├── config/index.ts       — Zod-validated config (file + env overlay)
 ├── logger/index.ts       — Pino logger with ILogger interface
 ├── vault/
@@ -24,7 +25,8 @@ src/
 │   └── validation.ts     — Vault name validation rules
 ├── auth/
 │   ├── index.ts          — AuthService, SessionStore, interfaces, error classes
-│   └── middleware.ts     — authMiddleware, csrfMiddleware, rateLimitMiddleware
+│   ├── middleware.ts     — authMiddleware, csrfMiddleware, rateLimitMiddleware
+│   └── csrf-secret.ts   — CsrfSecretManager (persistent CSRF secret: env → file → generate)
 ├── user/
 │   ├── index.ts          — UserService, UserRepository, RoleService, interfaces
 │   └── validation.ts     — Profile/password validation (Zod schemas)
@@ -44,6 +46,7 @@ src/
 │   ├── client-ip.ts     — Centralized client IP extraction with trusted proxy support
 │   ├── pluginRoutes.ts  — Plugin management CRUD routes (list, install, delete, bundle, styles, settings, registry)
 │   ├── featureRoutes.ts — Feature toggle admin + public routes (GET/PUT /admin/features, GET /features)
+│   ├── versionRoutes.ts — GET /api/v1/version (public, no auth, returns installed version)
 │   └── vaultShareRoutes.ts — ShareController + share/transfer routes
 ├── chat/
 │   ├── types.ts          — Chat data models (Conversation, Message, etc.)
@@ -122,7 +125,9 @@ src/
 ├── App.css               — Global styles (Design Tokens in index.css)
 ├── index.css             — CSS Custom Properties (Design Tokens, Dark Mode)
 ├── types.ts              — Shared TypeScript interfaces (VaultInfo, DirectoryTree, AppState with vaultTrees, etc.)
-├── api/index.ts          — ApiClient (IApiClient interface + fetch implementation)
+├── api/index.ts          — ApiClient (IApiClient interface + fetch implementation, includes getVersion())
+├── utils/
+│   └── semver.ts         — compareSemver() utility (X.Y.Z comparison, v-prefix stripping)
 ├── plugins/
 │   ├── index.ts          — Barrel export (all plugins, types, utilities)
 │   ├── types.ts          — MDAST node types (WikilinkNode, EmbedNode, CalloutNode, TagNode), IMAGE_EXTENSIONS, PDF_EXTENSIONS
@@ -232,6 +237,7 @@ src/
 │   ├── AdminAuditPage.tsx — Audit log viewer
 │   ├── PluginManagementPage.tsx — Plugin list with activation toggle, compatibility, error display
 │   ├── PluginUpload.tsx  — Plugin ZIP upload + detected plugins from .obsidian/plugins/
+│   ├── VersionCheckCard.tsx — Admin version check (installed vs. latest, GitHub API, update notification)
 │   ├── CommandPalette.tsx — Modal command palette (search, execute, keyboard nav)
 │   └── CommandPaletteContainer.tsx — Wires CommandPalette to PluginContext CommandRegistry
 ├── assets/               — Static images
@@ -357,6 +363,12 @@ All routes are prefixed with `/api/v1`:
 | GET | /admin/features | List all feature toggles with details (admin) |
 | PUT | /admin/features/:featureName | Toggle a feature (admin) |
 | GET | /features | List features with name + enabled (all authenticated users) |
+
+### Version
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | /version | Get installed Slatebase version (public, no auth) |
 
 ## Data Storage
 
