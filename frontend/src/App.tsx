@@ -28,6 +28,7 @@ import { SyncLogPage } from './components/SyncLogPage'
 import { McpTokensPage } from './components/McpTokensPage'
 import { PluginManagementPage } from './components/PluginManagementPage'
 import { PluginViewPanel } from './components/PluginViewPanel'
+import { useVersionInfo } from './hooks/useVersionInfo'
 import { SyncProvider } from './state/syncContext'
 import { ContextPanelProvider } from './state/contextPanelContext'
 import { ContextPanel } from './components/context-panel/ContextPanel'
@@ -391,6 +392,7 @@ function AppContent() {
 
   const sidebar = useResize(260, 180, 400, 'left')
   const rightPanel = useResize(240, 160, 500, 'right')
+  const versionInfo = useVersionInfo()
 
   // Global unread count polling (30-second interval)
   const [globalUnreadCount, setGlobalUnreadCount] = useState(0)
@@ -732,6 +734,20 @@ function AppContent() {
                 <div className="app-logo">
                   <SlatebaseLogo size={26} className="app-logo-icon" />
                   <span className="app-title">Slatebase</span>
+                  {!versionInfo.loading && versionInfo.installed && versionInfo.installed !== 'development' && (
+                    <span className="app-version">v{versionInfo.installed}</span>
+                  )}
+                  {versionInfo.latest && (
+                    <a
+                      href={versionInfo.latestUrl ?? '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="app-version-update"
+                      title={`Update auf v${versionInfo.latest} verfügbar`}
+                    >
+                      (neu: v{versionInfo.latest})
+                    </a>
+                  )}
                 </div>
                 <UserMenu
                   onNavigate={handleNavigate}

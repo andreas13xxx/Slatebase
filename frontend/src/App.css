@@ -77,6 +77,28 @@
   text-overflow: ellipsis;
 }
 
+.app-version {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--sidebar-text);
+  opacity: 0.6;
+  white-space: nowrap;
+}
+
+.app-version-update {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--accent);
+  white-space: nowrap;
+  text-decoration: none;
+  opacity: 0.9;
+}
+
+.app-version-update:hover {
+  text-decoration: underline;
+  opacity: 1;
+}
+
 .app-sidebar-body {
   flex: 1;
   display: flex;
