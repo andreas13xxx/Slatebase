@@ -29,5 +29,9 @@ export { FeatureRegistry } from './feature-registry.js'
 // Re-export service + helpers
 export { FeatureToggleService, featureNameToEnvVar, parseBooleanEnvValue } from './feature-toggle-service.js'
 
+// Re-export store
+export { FeatureToggleStore } from './feature-toggle-store.js'
+export type { IFeatureToggleStore } from './feature-toggle-store.js'
+
 // Re-export middleware
 export { createFeatureGuard } from './middleware.js'

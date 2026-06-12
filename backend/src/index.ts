@@ -45,7 +45,7 @@ import {
 } from './sync/index.js'
 import type { VaultPathResolver } from './sync/index.js'
 import { createSyncRoutes } from './api/syncRoutes.js'
-import { FeatureRegistry, FeatureToggleService, createFeatureGuard } from './feature-toggle/index.js'
+import { FeatureRegistry, FeatureToggleService, FeatureToggleStore, createFeatureGuard } from './feature-toggle/index.js'
 import { createAdminFeatureRoutes, createPublicFeatureRoutes } from './api/featureRoutes.js'
 import { loadMcpConfig } from './mcp/config.js'
 import { TokenStore } from './mcp/token-store.js'
@@ -81,7 +81,13 @@ featureRegistry.register({ name: 'chat', description: 'Echtzeit-Chat zwischen Be
 featureRegistry.register({ name: 'mcp', description: 'AI Context Server (MCP Integration)', defaultEnabled: true, type: 'cold' })
 featureRegistry.register({ name: 'knowledge-graph', description: 'Interaktive Vault-Verlinkungsvisualisierung', defaultEnabled: true, type: 'hot' })
 
-const featureToggleService = new FeatureToggleService(featureRegistry, config.getFeaturesConfig())
+const featureToggleStore = new FeatureToggleStore(serverConfig.dataDir, logger)
+const persistedFeatureState = await featureToggleStore.load()
+
+const featureToggleService = new FeatureToggleService(featureRegistry, config.getFeaturesConfig(), persistedFeatureState)
+featureToggleService.setPersistCallback(async (toggles) => {
+  await featureToggleStore.save(toggles)
+})
 
 // 2. Data Layer: VaultReader, VaultManager, VaultRegistry, VaultShareRegistry
 const vaultReader = new VaultReader()

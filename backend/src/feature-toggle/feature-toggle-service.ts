@@ -84,26 +84,42 @@ function isValidQueryName(name: string): boolean {
  * In-memory feature toggle service.
  *
  * Initializes state from registry definitions, config file values,
- * and environment variable overrides. Supports runtime changes via
- * setEnabled() with listener notification on actual value changes.
+ * persisted overrides, and environment variable overrides.
+ * Supports runtime changes via setEnabled() with listener notification
+ * and optional persistence callback.
+ *
+ * Priority order (highest wins): env > persisted > config > default
  */
 export class FeatureToggleService implements IFeatureToggleService {
   private readonly toggles: Map<string, ToggleEntry> = new Map()
   private readonly listeners: FeatureChangeListener[] = []
+  private onPersist: ((toggles: Record<string, boolean>) => Promise<void>) | undefined
 
   /**
    * Creates a new FeatureToggleService.
    *
    * @param registry - The feature registry containing all definitions
    * @param featuresConfig - The features section from default.json
+   * @param persistedState - Previously persisted toggle overrides (from features.json)
    * @param env - Environment variables (defaults to process.env for testability)
    */
   constructor(
     registry: IFeatureRegistry,
     featuresConfig: Record<string, { enabled: boolean }>,
+    persistedState: Record<string, boolean> = {},
     env: Record<string, string | undefined> = process.env,
   ) {
-    this.initialize(registry, featuresConfig, env)
+    this.initialize(registry, featuresConfig, persistedState, env)
+  }
+
+  /**
+   * Registers a persistence callback invoked after every setEnabled() call.
+   * The callback receives all current runtime-overridden toggle states.
+   *
+   * @param fn - Async function that persists the toggle map to disk
+   */
+  setPersistCallback(fn: (toggles: Record<string, boolean>) => Promise<void>): void {
+    this.onPersist = fn
   }
 
   /**
@@ -130,6 +146,7 @@ export class FeatureToggleService implements IFeatureToggleService {
   /**
    * Changes the toggle state at runtime.
    * Notifies registered listeners if the value actually changes.
+   * Persists the new state to disk via the persist callback (fire-and-forget).
    *
    * @param featureName - The feature name to change
    * @param enabled - The new enabled state
@@ -149,6 +166,14 @@ export class FeatureToggleService implements IFeatureToggleService {
     // Notify listeners only if the value actually changed
     if (previousEnabled !== enabled) {
       this.notifyListeners(featureName, enabled)
+    }
+
+    // Persist the current runtime overrides (fire-and-forget)
+    if (this.onPersist) {
+      const runtimeToggles = this.getRuntimeToggles()
+      this.onPersist(runtimeToggles).catch(() => {
+        // Swallow persistence errors — in-memory state is authoritative
+      })
     }
 
     return {
@@ -207,12 +232,13 @@ export class FeatureToggleService implements IFeatureToggleService {
   }
 
   /**
-   * Initializes toggle state from registry definitions, config, and environment.
-   * Priority: default < config < env (runtime overrides all via setEnabled).
+   * Initializes toggle state from registry definitions, config, persisted state, and environment.
+   * Priority: default < config < persisted < env (runtime overrides all via setEnabled).
    */
   private initialize(
     registry: IFeatureRegistry,
     featuresConfig: Record<string, { enabled: boolean }>,
+    persistedState: Record<string, boolean>,
     env: Record<string, string | undefined>,
   ): void {
     const definitions = registry.getAll()
@@ -229,7 +255,14 @@ export class FeatureToggleService implements IFeatureToggleService {
         source = 'config'
       }
 
-      // Apply env-var override if present and valid
+      // Apply persisted override if present
+      const persistedValue = persistedState[definition.name]
+      if (persistedValue !== undefined) {
+        currentEnabled = persistedValue
+        source = 'runtime'
+      }
+
+      // Apply env-var override if present and valid (highest priority)
       const envVarName = featureNameToEnvVar(definition.name)
       const envValue = env[envVarName]
       if (envValue !== undefined) {
@@ -247,6 +280,20 @@ export class FeatureToggleService implements IFeatureToggleService {
         source,
       })
     }
+  }
+
+  /**
+   * Returns a map of all toggles that have been set at runtime (source === 'runtime').
+   * Used for persistence — only runtime overrides need to be saved.
+   */
+  private getRuntimeToggles(): Record<string, boolean> {
+    const result: Record<string, boolean> = {}
+    for (const [name, entry] of this.toggles.entries()) {
+      if (entry.source === 'runtime') {
+        result[name] = entry.currentEnabled
+      }
+    }
+    return result
   }
 
   /**
