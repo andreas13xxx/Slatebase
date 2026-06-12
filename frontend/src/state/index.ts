@@ -106,7 +106,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     case 'VAULT_DELETED': {
       const deletedId = action.payload
       const isSelectedDeleted = state.selectedVaultId === deletedId
-      const { [deletedId]: _removed, ...remainingTrees } = state.vaultTrees
+      const { [deletedId]: _removed, ...remainingTrees } = state.vaultTrees // eslint-disable-line @typescript-eslint/no-unused-vars
       return {
         ...state,
         vaults: state.vaults.filter((v) => v.id !== deletedId),

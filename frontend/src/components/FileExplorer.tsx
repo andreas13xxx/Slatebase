@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { useAppContext } from '../state'
 import { useTabContext } from '../state/tabContext'
 import { useTranslation } from '../i18n'
@@ -202,7 +202,7 @@ function TreeNode({
     )
   }
 
-  const FileIcon = getFileIcon(node.name)
+  const FileIconComponent = getFileIcon(node.name)
   const fileIconClass = getFileIconClass(node.name)
 
   return (
@@ -216,7 +216,7 @@ function TreeNode({
       >
         {isRenaming ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, flex: 1 }}>
-            <FileIcon size={13} className={fileIconClass} style={{ flexShrink: 0 }} />
+            {React.createElement(FileIconComponent, { size: 13, className: fileIconClass, style: { flexShrink: 0 } })}
             <InlineInput
               initialValue={node.name}
               selectRange={getSelectionRange(node.name, false)}
@@ -234,7 +234,7 @@ function TreeNode({
             title={node.path}
             style={{ display: 'flex', alignItems: 'center', gap: 5 }}
           >
-            <FileIcon size={13} className={fileIconClass} style={{ flexShrink: 0 }} />
+            {React.createElement(FileIconComponent, { size: 13, className: fileIconClass, style: { flexShrink: 0 } })}
             {getDisplayName(node.name)}
           </button>
         )}
@@ -697,7 +697,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault }: Fi
     }
   }, [dragState.validTargets])
 
-  const handleDragLeave = useCallback((_e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragLeave = useCallback((_e: React.DragEvent<HTMLDivElement>) => { // eslint-disable-line @typescript-eslint/no-unused-vars
     // No-op
   }, [])
 

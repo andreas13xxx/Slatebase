@@ -57,7 +57,7 @@ const arbConversationListItem = (id: string): fc.Arbitrary<ConversationListItem>
  */
 const arbStateWithTargetConversation = fc.gen().chain(() => {
   const targetId = fc.uuid()
-  const otherId = fc.uuid().filter(id => true) // will be filtered below
+  const otherId = fc.uuid().filter(() => true) // will be filtered below
 
   return fc.tuple(targetId, otherId).chain(([tId, oId]) => {
     if (tId === oId) return fc.constant(null) as fc.Arbitrary<{ state: ChatState; targetConversationId: string; message: Message } | null>

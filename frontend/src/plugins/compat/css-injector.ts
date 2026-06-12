@@ -35,7 +35,7 @@ export function scopeCss(css: string, pluginId: string): string {
 /**
  * Process a CSS block, scoping selectors while respecting at-rules.
  */
-function processBlock(css: string, scope: string, _insideScopedAtRule: boolean): string {
+function processBlock(css: string, scope: string, _insideScopedAtRule: boolean): string { // eslint-disable-line @typescript-eslint/no-unused-vars
   let result = '';
   let i = 0;
 

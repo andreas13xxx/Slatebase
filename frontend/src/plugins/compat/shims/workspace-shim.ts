@@ -110,7 +110,7 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Get a leaf to host a view. Creates a new leaf in the right panel.
    * Obsidian supports 'split', 'tab', 'window' — we always create in the right panel.
    */
-  getLeaf(_newLeaf?: boolean | string): WorkspaceLeaf | undefined {
+  getLeaf(_newLeaf?: boolean | string): WorkspaceLeaf | undefined { // eslint-disable-line @typescript-eslint/no-unused-vars
     if (!this.viewRegistry) return undefined;
     return this.viewRegistry.createLeaf(this.app);
   }
@@ -119,7 +119,7 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Get or create a leaf in the right panel (sidebar).
    * This is what most sidebar-plugins (Calendar, Outline) use.
    */
-  getRightLeaf(_split?: boolean): WorkspaceLeaf | undefined {
+  getRightLeaf(_split?: boolean): WorkspaceLeaf | undefined { // eslint-disable-line @typescript-eslint/no-unused-vars
     if (!this.viewRegistry) return undefined;
     return this.viewRegistry.createLeaf(this.app);
   }
@@ -127,7 +127,7 @@ export class WorkspaceShim implements IWorkspaceShim {
   /**
    * Get or create a leaf in the left panel (sidebar).
    */
-  getLeftLeaf(_split?: boolean): WorkspaceLeaf | undefined {
+  getLeftLeaf(_split?: boolean): WorkspaceLeaf | undefined { // eslint-disable-line @typescript-eslint/no-unused-vars
     if (!this.viewRegistry) return undefined;
     return this.viewRegistry.createLeaf(this.app);
   }
@@ -135,7 +135,7 @@ export class WorkspaceShim implements IWorkspaceShim {
   /**
    * Reveal (activate/focus) a leaf. In Slatebase this is a no-op since we auto-show plugin views.
    */
-  revealLeaf(_leaf: WorkspaceLeaf): void {
+  revealLeaf(_leaf: WorkspaceLeaf): void { // eslint-disable-line @typescript-eslint/no-unused-vars
     // Views are automatically shown when setViewState is called
   }
 

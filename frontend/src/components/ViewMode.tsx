@@ -56,6 +56,7 @@ export interface ViewModeProps {
  *
  * Validates: Requirements 6.1, 6.6
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function resolveWikilinkTarget(target: string, tree: DirectoryTree | null): string | null {
   if (!tree) return null
 
@@ -240,7 +241,7 @@ interface NoteEmbedProps {
  * Supports heading-based section filtering (e.g. ![[note#heading]]).
  * Respects MAX_EMBED_DEPTH to prevent infinite recursion.
  */
-function NoteEmbed({ vaultId, filePath, target, heading, directoryTree, token, embedDepth: _embedDepth }: NoteEmbedProps) {
+function NoteEmbed({ vaultId, filePath, target, heading, directoryTree, token, embedDepth: _embedDepth }: NoteEmbedProps) { // eslint-disable-line @typescript-eslint/no-unused-vars
   const [noteContent, setNoteContent] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -249,6 +250,7 @@ function NoteEmbed({ vaultId, filePath, target, heading, directoryTree, token, e
 
   useEffect(() => {
     if (!apiClient) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError('Kein API-Client verfügbar')
       return
     }
@@ -400,6 +402,7 @@ function groupByHeadings(nodes: RootContent[]): SectionGroup[] {
       // If there's a current section and this heading is same-or-higher level, close it
       if (currentSection && node.depth <= currentSection.depth) {
         groups.push(currentSection)
+        // eslint-disable-next-line no-useless-assignment
         currentSection = null
       } else if (currentSection) {
         // This heading is deeper — it belongs inside the current section body
@@ -889,6 +892,7 @@ function isPdfFile(filename: string): boolean {
  * Recursively searches the DirectoryTree for a file by name (case-insensitive).
  * Returns the full relative path if found, or null otherwise.
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function findFileInTree(tree: DirectoryTree | null, filename: string): string | null {
   if (!tree) return null
 

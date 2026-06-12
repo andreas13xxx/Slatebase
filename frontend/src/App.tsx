@@ -166,10 +166,6 @@ function UserMenu({ onNavigate, onLogout, hasVaultSelected, onImportFile, onImpo
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({})
 
   const user = authState.user
-  if (!user) return null
-
-  const initials = (user.displayName || user.username).slice(0, 2).toUpperCase()
-  const displayName = user.displayName || user.username
 
   useEffect(() => {
     if (!open) return
@@ -197,6 +193,11 @@ function UserMenu({ onNavigate, onLogout, hasVaultSelected, onImportFile, onImpo
       })
     }
   }, [open])
+
+  if (!user) return null
+
+  const initials = (user.displayName || user.username).slice(0, 2).toUpperCase()
+  const displayName = user.displayName || user.username
 
   return (
     <div className="user-menu" ref={menuRef}>
@@ -490,6 +491,7 @@ function AppContent() {
   // When a file tab becomes active (e.g. from FileExplorer click), deactivate settings page
   useEffect(() => {
     if (tabState.activeTabId && activeSettingsPage !== null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveSettingsPage(null)
     }
   }, [tabState.activeTabId]) // eslint-disable-line react-hooks/exhaustive-deps

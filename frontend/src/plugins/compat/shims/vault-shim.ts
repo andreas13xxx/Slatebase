@@ -169,7 +169,8 @@ export class VaultShim implements IVaultShim {
     } catch (err: unknown) {
       const appErr = err as { code?: string; message?: string };
       throw new Error(
-        `Failed to read "${file.path}": ${appErr.message ?? 'unknown error'} (code: ${appErr.code ?? 'UNKNOWN'})`
+        `Failed to read "${file.path}": ${appErr.message ?? 'unknown error'} (code: ${appErr.code ?? 'UNKNOWN'})`,
+        { cause: err }
       );
     }
   }
@@ -192,7 +193,8 @@ export class VaultShim implements IVaultShim {
     } catch (err: unknown) {
       const appErr = err as { code?: string; message?: string };
       throw new Error(
-        `Failed to modify "${file.path}": ${appErr.message ?? 'unknown error'} (code: ${appErr.code ?? 'UNKNOWN'})`
+        `Failed to modify "${file.path}": ${appErr.message ?? 'unknown error'} (code: ${appErr.code ?? 'UNKNOWN'})`,
+        { cause: err }
       );
     }
   }
@@ -237,7 +239,8 @@ export class VaultShim implements IVaultShim {
     } catch (err: unknown) {
       const appErr = err as { code?: string; message?: string };
       throw new Error(
-        `Failed to create "${path}": ${appErr.message ?? 'unknown error'} (code: ${appErr.code ?? 'UNKNOWN'})`
+        `Failed to create "${path}": ${appErr.message ?? 'unknown error'} (code: ${appErr.code ?? 'UNKNOWN'})`,
+        { cause: err }
       );
     }
   }
@@ -260,7 +263,8 @@ export class VaultShim implements IVaultShim {
     } catch (err: unknown) {
       const appErr = err as { code?: string; message?: string };
       throw new Error(
-        `Failed to delete "${file.path}": ${appErr.message ?? 'unknown error'} (code: ${appErr.code ?? 'UNKNOWN'})`
+        `Failed to delete "${file.path}": ${appErr.message ?? 'unknown error'} (code: ${appErr.code ?? 'UNKNOWN'})`,
+        { cause: err }
       );
     }
   }

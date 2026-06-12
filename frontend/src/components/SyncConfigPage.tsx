@@ -95,6 +95,7 @@ export function SyncConfigPage({ vaultId, onOpenSyncLog }: SyncConfigPageProps) 
   // --- Determine view mode based on config state ---
   useEffect(() => {
     if (state.config === null && !state.isLoading && viewMode === 'view') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setViewMode('create')
     } else if (state.config !== null && viewMode === 'create') {
       setViewMode('view')

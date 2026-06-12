@@ -101,6 +101,7 @@ function ToastItem({ toast, onDismiss }: { toast: ToastEntry; onDismiss: (id: nu
  * Hook to show toast notifications.
  * Falls back to console.error if used outside ToastProvider (e.g. in tests).
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useToast(): ToastContextValue {
   const context = useContext(ToastContext)
   if (context === null) {

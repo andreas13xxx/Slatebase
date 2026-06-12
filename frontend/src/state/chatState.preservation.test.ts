@@ -116,6 +116,7 @@ const arbNonMessageSentAction: fc.Arbitrary<ChatAction> = fc.oneof(
 )
 
 /** Arbitrary for MESSAGE_SENT action. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const arbMessageSentAction: fc.Arbitrary<ChatAction> = arbMessage.map(payload => ({
   type: 'MESSAGE_SENT' as const,
   payload,

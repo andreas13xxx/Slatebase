@@ -93,6 +93,7 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
   }, [apiClient, vaultId])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadShares()
   }, [loadShares])
 

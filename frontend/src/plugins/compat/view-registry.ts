@@ -54,19 +54,15 @@ export class ItemView {
   }
 
   /** Called when the view is opened/mounted. Plugins override to build UI. */
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
   async onOpen(): Promise<void> {}
 
   /** Called when the view is closed/unmounted. Plugins override for cleanup. */
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
   async onClose(): Promise<void> {}
 
   /** Called when the view is loaded. */
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
   onload(): void {}
 
   /** Called when the view is unloaded. */
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
   onunload(): void {}
 }
 

@@ -145,6 +145,7 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
   }, [apiClient])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadUsers(1)
   }, [loadUsers])
 

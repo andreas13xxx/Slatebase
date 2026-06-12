@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { CompatibilityAnalyzer, calculateLevel } from './compatibility-analyzer';
-import type { CompatibilityReport, ApiCallClassification } from './compatibility-analyzer';
+import type { ApiCallClassification } from './compatibility-analyzer';
 import type { PluginManifestData } from './types';
 
 describe('CompatibilityAnalyzer', () => {

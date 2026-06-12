@@ -104,6 +104,7 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
   }, [vaultId, buildHeaders])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadShares()
   }, [loadShares])
 

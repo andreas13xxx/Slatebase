@@ -77,7 +77,7 @@ export function AdminVaultsPage({ apiClient }: AdminVaultsPageProps) {
     }
   }, [apiClient])
 
-  useEffect(() => { void loadVaults() }, [loadVaults])
+  useEffect(() => { void loadVaults() }, [loadVaults]) // eslint-disable-line react-hooks/set-state-in-effect
 
   async function handleDelete(vaultId: string, vaultName: string): Promise<void> {
     setDeleteConfirm({ open: true, vaultId, vaultName })

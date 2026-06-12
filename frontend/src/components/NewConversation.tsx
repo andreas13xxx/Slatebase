@@ -50,31 +50,6 @@ export function NewConversation({ onClose }: NewConversationProps) {
   const currentUserId = authState.user?.userId ?? ''
 
   /**
-   * Debounced user search via API.
-   */
-  useEffect(() => {
-    if (searchQuery.trim().length === 0) {
-      setSearchResults([])
-      setShowResults(false)
-      return
-    }
-
-    if (debounceRef.current !== null) {
-      clearTimeout(debounceRef.current)
-    }
-
-    debounceRef.current = setTimeout(() => {
-      void performSearch(searchQuery.trim())
-    }, SEARCH_DEBOUNCE_MS)
-
-    return () => {
-      if (debounceRef.current !== null) {
-        clearTimeout(debounceRef.current)
-      }
-    }
-  }, [searchQuery])
-
-  /**
    * Performs the user search and filters out already-selected and current user.
    */
   async function performSearch(query: string): Promise<void> {
@@ -93,6 +68,32 @@ export function NewConversation({ onClose }: NewConversationProps) {
       setShowResults(false)
     }
   }
+
+  /**
+   * Debounced user search via API.
+   */
+  useEffect(() => {
+    if (searchQuery.trim().length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSearchResults([])
+      setShowResults(false)
+      return
+    }
+
+    if (debounceRef.current !== null) {
+      clearTimeout(debounceRef.current)
+    }
+
+    debounceRef.current = setTimeout(() => {
+      void performSearch(searchQuery.trim())
+    }, SEARCH_DEBOUNCE_MS)
+
+    return () => {
+      if (debounceRef.current !== null) {
+        clearTimeout(debounceRef.current)
+      }
+    }
+  }, [searchQuery]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * Adds a user to the selected participants.

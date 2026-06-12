@@ -178,6 +178,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
   }, [apiClient, vaultId, analyzeAndDetectSettings])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadPlugins()
   }, [loadPlugins])
 

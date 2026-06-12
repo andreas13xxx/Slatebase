@@ -38,6 +38,7 @@ export function CommandPalette({ commands, isOpen, onClose, onExecute }: Command
   // Reset state when palette opens
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setQuery('')
       setSelectedIndex(0)
       // Autofocus the input after render
@@ -50,6 +51,7 @@ export function CommandPalette({ commands, isOpen, onClose, onExecute }: Command
   // Clamp selectedIndex when filtered results change
   useEffect(() => {
     if (selectedIndex >= filteredCommands.length) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedIndex(Math.max(0, filteredCommands.length - 1))
     }
   }, [filteredCommands.length, selectedIndex])

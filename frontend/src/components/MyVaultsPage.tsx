@@ -94,8 +94,8 @@ export function MyVaultsPage({ apiClient, onOpenSync }: MyVaultsPageProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiClient, ownedVaultIds, sharedVaultIds])
 
-  useEffect(() => { void loadAllShares() }, [loadAllShares])
-  useEffect(() => { void loadStats() }, [loadStats])
+  useEffect(() => { void loadAllShares() }, [loadAllShares]) // eslint-disable-line react-hooks/set-state-in-effect
+  useEffect(() => { void loadStats() }, [loadStats]) // eslint-disable-line react-hooks/set-state-in-effect
 
   async function handleDelete(vault: VaultInfo): Promise<void> {
     const shares = sharesMap.get(vault.id) ?? []

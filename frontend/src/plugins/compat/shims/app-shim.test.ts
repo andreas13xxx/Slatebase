@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-expressions */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AppShim } from './app-shim';
 import type {
@@ -5,10 +6,6 @@ import type {
   IWorkspaceShim,
   IMetadataCacheShim,
   PluginInstance,
-  TFile,
-  TAbstractFile,
-  EventRef,
-  CachedMetadata,
 } from '../types';
 
 /** Creates a minimal mock VaultShim */

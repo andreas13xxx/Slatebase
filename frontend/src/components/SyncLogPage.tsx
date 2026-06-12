@@ -16,6 +16,20 @@ export interface SyncLogPageProps {
 /** Number of log entries per page. */
 const LOG_PAGE_SIZE = 20
 
+/** Formats a relative time string from an ISO date. */
+function formatRelativeTime(iso: string): string {
+  const now = Date.now()
+  const then = new Date(iso).getTime()
+  const diffMs = now - then
+  const diffMin = Math.floor(diffMs / 60_000)
+  if (diffMin < 1) return 'Gerade eben'
+  if (diffMin < 60) return `Vor ${diffMin} Min.`
+  const diffHours = Math.floor(diffMin / 60)
+  if (diffHours < 24) return `Vor ${diffHours} Std.`
+  const diffDays = Math.floor(diffHours / 24)
+  return `Vor ${diffDays} Tag${diffDays > 1 ? 'en' : ''}`
+}
+
 /**
  * Standalone page showing the paginated sync log for a vault.
  * Displays a summary section with statistics and a detailed log history.
@@ -76,19 +90,6 @@ export function SyncLogPage({ vaultId }: SyncLogPageProps) {
       minute: '2-digit',
       second: '2-digit',
     })
-  }
-
-  function formatRelativeTime(iso: string): string {
-    const now = Date.now()
-    const then = new Date(iso).getTime()
-    const diffMs = now - then
-    const diffMin = Math.floor(diffMs / 60_000)
-    if (diffMin < 1) return 'Gerade eben'
-    if (diffMin < 60) return `Vor ${diffMin} Min.`
-    const diffHours = Math.floor(diffMin / 60)
-    if (diffHours < 24) return `Vor ${diffHours} Std.`
-    const diffDays = Math.floor(diffHours / 24)
-    return `Vor ${diffDays} Tag${diffDays > 1 ? 'en' : ''}`
   }
 
   function formatDuration(ms?: number): string {

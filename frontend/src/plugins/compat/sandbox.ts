@@ -344,9 +344,9 @@ export class PluginSandbox implements IPluginSandbox {
     }
 
     const { permissions } = context;
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const sandbox = this;
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const ProxiedXHR = class extends XMLHttpRequest {
       private _blockedUrl: string | null = null;
 

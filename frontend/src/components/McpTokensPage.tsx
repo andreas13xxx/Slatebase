@@ -52,6 +52,7 @@ export function McpTokensPage({ apiClient }: McpTokensPageProps) {
   }, [apiClient, t])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadTokens()
   }, [loadTokens])
 

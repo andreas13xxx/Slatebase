@@ -443,7 +443,7 @@ if (typeof window !== 'undefined') {
 
   // Obsidian extends HTMLElement with convenience methods.
   // Plugins use these everywhere (containerEl.empty(), containerEl.createEl(), etc.)
-  if (!HTMLElement.prototype.hasOwnProperty('empty')) {
+  if (!Object.hasOwn(HTMLElement.prototype, 'empty')) {
     Object.defineProperty(HTMLElement.prototype, 'empty', {
       value: function (this: HTMLElement) {
         this.innerHTML = ''
@@ -453,7 +453,7 @@ if (typeof window !== 'undefined') {
       configurable: true,
     })
   }
-  if (!HTMLElement.prototype.hasOwnProperty('createEl')) {
+  if (!Object.hasOwn(HTMLElement.prototype, 'createEl')) {
     Object.defineProperty(HTMLElement.prototype, 'createEl', {
       value: function (this: HTMLElement, tag: string, options?: { cls?: string; text?: string; attr?: Record<string, string>; type?: string; href?: string; placeholder?: string; value?: string }) {
         const el = document.createElement(tag)
@@ -477,7 +477,7 @@ if (typeof window !== 'undefined') {
       configurable: true,
     })
   }
-  if (!HTMLElement.prototype.hasOwnProperty('createDiv')) {
+  if (!Object.hasOwn(HTMLElement.prototype, 'createDiv')) {
     Object.defineProperty(HTMLElement.prototype, 'createDiv', {
       value: function (this: HTMLElement, options?: { cls?: string; text?: string }) {
         return (this as unknown as { createEl: (tag: string, opts?: unknown) => HTMLElement }).createEl('div', options)
@@ -486,7 +486,7 @@ if (typeof window !== 'undefined') {
       configurable: true,
     })
   }
-  if (!HTMLElement.prototype.hasOwnProperty('createSpan')) {
+  if (!Object.hasOwn(HTMLElement.prototype, 'createSpan')) {
     Object.defineProperty(HTMLElement.prototype, 'createSpan', {
       value: function (this: HTMLElement, options?: { cls?: string; text?: string }) {
         return (this as unknown as { createEl: (tag: string, opts?: unknown) => HTMLElement }).createEl('span', options)
@@ -495,7 +495,7 @@ if (typeof window !== 'undefined') {
       configurable: true,
     })
   }
-  if (!HTMLElement.prototype.hasOwnProperty('addClass')) {
+  if (!Object.hasOwn(HTMLElement.prototype, 'addClass')) {
     Object.defineProperty(HTMLElement.prototype, 'addClass', {
       value: function (this: HTMLElement, ...classes: string[]) {
         this.classList.add(...classes)
@@ -505,7 +505,7 @@ if (typeof window !== 'undefined') {
       configurable: true,
     })
   }
-  if (!HTMLElement.prototype.hasOwnProperty('removeClass')) {
+  if (!Object.hasOwn(HTMLElement.prototype, 'removeClass')) {
     Object.defineProperty(HTMLElement.prototype, 'removeClass', {
       value: function (this: HTMLElement, ...classes: string[]) {
         this.classList.remove(...classes)
@@ -515,7 +515,7 @@ if (typeof window !== 'undefined') {
       configurable: true,
     })
   }
-  if (!HTMLElement.prototype.hasOwnProperty('toggleClass')) {
+  if (!Object.hasOwn(HTMLElement.prototype, 'toggleClass')) {
     Object.defineProperty(HTMLElement.prototype, 'toggleClass', {
       value: function (this: HTMLElement, cls: string, force?: boolean) {
         this.classList.toggle(cls, force)
@@ -525,7 +525,7 @@ if (typeof window !== 'undefined') {
       configurable: true,
     })
   }
-  if (!HTMLElement.prototype.hasOwnProperty('hasClass')) {
+  if (!Object.hasOwn(HTMLElement.prototype, 'hasClass')) {
     Object.defineProperty(HTMLElement.prototype, 'hasClass', {
       value: function (this: HTMLElement, cls: string) {
         return this.classList.contains(cls)
@@ -534,7 +534,7 @@ if (typeof window !== 'undefined') {
       configurable: true,
     })
   }
-  if (!HTMLElement.prototype.hasOwnProperty('setText')) {
+  if (!Object.hasOwn(HTMLElement.prototype, 'setText')) {
     Object.defineProperty(HTMLElement.prototype, 'setText', {
       value: function (this: HTMLElement, text: string) {
         this.textContent = text
@@ -559,20 +559,18 @@ if (typeof window !== 'undefined') {
         this._intervals = []
         this._events = []
       }
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
       onload() {}
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
       onunload() {}
       async loadData(): Promise<unknown> { return null }
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       async saveData(_data: unknown): Promise<void> {}
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       addCommand(_cmd: unknown): void {}
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       addSettingTab(_tab: unknown): void {}
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       registerEvent(_ref: unknown): void {}
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       registerView(_viewType: string, _creator: unknown): void {}
       /** Register a callback that runs on an interval (auto-cleared on unload) */
       registerInterval(interval: number): number {
@@ -593,6 +591,7 @@ if (typeof window !== 'undefined') {
           this._intervals.push(cb as unknown as number)
         }
       }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       addRibbonIcon(_icon: string, _title: string, _callback: () => void): HTMLElement {
         return document.createElement('div')
       }
@@ -631,9 +630,7 @@ if (typeof window !== 'undefined') {
       getIcon(): string { return 'file' }
       async onOpen(): Promise<void> { /* plugins override */ }
       async onClose(): Promise<void> { /* plugins override */ }
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
       onload(): void {}
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
       onunload(): void {}
     } as unknown as Record<string, unknown>
   }
@@ -712,10 +709,10 @@ if (typeof window !== 'undefined') {
   // Common Obsidian API stubs that plugins may reference
   if (!window.obsidian.Notice) {
     window.obsidian.Notice = class Notice {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       constructor(message: string, _timeout?: number) {
         console.log('[Obsidian Notice]', message)
       }
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
       hide() {}
     } as unknown as Record<string, unknown>
   }
@@ -729,13 +726,9 @@ if (typeof window !== 'undefined') {
         this.containerEl = document.createElement('div')
         this.contentEl = document.createElement('div')
       }
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
       open() {}
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
       close() {}
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
       onOpen() {}
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
       onClose() {}
     } as unknown as Record<string, unknown>
   }

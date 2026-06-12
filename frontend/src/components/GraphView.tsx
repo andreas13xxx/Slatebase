@@ -121,6 +121,7 @@ export function GraphView({ vaultId }: GraphViewProps) {
 
   // Fetch graph data on mount and vault change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchGraph()
   }, [fetchGraph])
 
@@ -146,6 +147,7 @@ export function GraphView({ vaultId }: GraphViewProps) {
   // Build simulation nodes and links when graphData changes
   useEffect(() => {
     if (!graphData) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setNodes([])
       setLinks([])
       return
@@ -617,7 +619,7 @@ export function GraphView({ vaultId }: GraphViewProps) {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
-        style={{ cursor: isPanningRef.current ? 'grabbing' : 'grab', width: '100%', height: '100%' }}
+        style={{ cursor: isPanningRef.current ? 'grabbing' : 'grab', width: '100%', height: '100%' }} // eslint-disable-line react-hooks/refs
       >
         {/* Transform group for zoom and pan */}
         <g transform={`translate(${panX}, ${panY}) scale(${zoom})`}>

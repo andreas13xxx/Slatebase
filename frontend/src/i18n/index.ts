@@ -113,6 +113,7 @@ export function I18nProvider({ children, userLocale, initialLocale }: I18nProvid
   // Sync locale when user profile changes (login, profile update, logout)
   useEffect(() => {
     if (userLocale !== undefined && userLocale !== null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLocaleState(userLocale)
     }
   }, [userLocale])

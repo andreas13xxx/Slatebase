@@ -139,6 +139,7 @@ export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
 
   // Fetch on mount and when filters or page change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchAuditEntries(page)
   }, [fetchAuditEntries, page])
 
