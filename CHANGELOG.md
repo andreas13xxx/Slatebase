@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.3](https://github.com/andreas13xxx/Slatebase/compare/v0.3.2...v0.3.3) (2026-06-12)
+
+
+### Bugfixes
+
+* knowledge graph shows stale data when switching vaults ([ba7e7b6](https://github.com/andreas13xxx/Slatebase/commit/ba7e7b6db214c321423429f99902679b5f34a97f))
+
 ## [0.3.2](https://github.com/andreas13xxx/Slatebase/compare/v0.3.1...v0.3.2) (2026-06-12)
 
 
