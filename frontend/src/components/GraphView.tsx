@@ -144,12 +144,16 @@ export function GraphView({ vaultId }: GraphViewProps) {
     return () => observer.disconnect()
   }, [])
 
-  // Build simulation nodes and links when graphData changes
+  // Build simulation nodes/links and run d3-force when graphData or dimensions change
   useEffect(() => {
-    if (!graphData) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setNodes([])
-      setLinks([])
+    if (simulationRef.current) {
+      simulationRef.current.stop()
+      simulationRef.current = null
+    }
+
+    if (!graphData || graphData.nodes.length === 0) {
+      setNodes([]) // eslint-disable-line react-hooks/set-state-in-effect
+      setLinks([]) // eslint-disable-line react-hooks/set-state-in-effect
       return
     }
 
@@ -187,24 +191,15 @@ export function GraphView({ vaultId }: GraphViewProps) {
         target: edge.target,
       }))
 
-    setNodes(simNodes)
-    setLinks(simLinks)
-  }, [graphData])
+    // Initialize state
+    setNodes(simNodes) // eslint-disable-line react-hooks/set-state-in-effect
+    setLinks(simLinks) // eslint-disable-line react-hooks/set-state-in-effect
 
-  // Run d3-force simulation
-  useEffect(() => {
-    if (nodes.length === 0) {
-      if (simulationRef.current) {
-        simulationRef.current.stop()
-        simulationRef.current = null
-      }
-      return
-    }
-
-    const simulation = forceSimulation<SimNode>(nodes)
+    // Run d3-force simulation
+    const simulation = forceSimulation<SimNode>(simNodes)
       .force(
         'link',
-        forceLink<SimNode, SimLink>(links)
+        forceLink<SimNode, SimLink>(simLinks)
           .id((d) => d.id)
           .distance(30),
       )
@@ -216,8 +211,8 @@ export function GraphView({ vaultId }: GraphViewProps) {
 
     simulation.on('tick', () => {
       // Force re-render by creating new array references
-      setNodes([...nodes])
-      setLinks([...links])
+      setNodes([...simNodes])
+      setLinks([...simLinks])
     })
 
     simulationRef.current = simulation
@@ -225,7 +220,6 @@ export function GraphView({ vaultId }: GraphViewProps) {
     return () => {
       simulation.stop()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graphData, dimensions.width, dimensions.height])
 
   /**
