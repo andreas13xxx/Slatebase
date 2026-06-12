@@ -16,6 +16,9 @@ const LOGIN_PATH = '/api/v1/auth/login'
 /** The MCP transport endpoint path that uses its own Bearer token auth. */
 const MCP_TRANSPORT_PATH = '/api/v1/mcp'
 
+/** The version endpoint path (public, no auth required). */
+const VERSION_PATH = '/api/v1/version'
+
 /** The password change endpoint path allowed during mustChangePassword. */
 const PASSWORD_CHANGE_PATH = '/api/v1/users/me/password'
 
@@ -84,6 +87,11 @@ export function createAuthMiddleware(
     // Skip session auth for the MCP transport endpoint (uses its own Bearer token auth)
     // But NOT for /api/v1/mcp/tokens (which needs session auth)
     if (c.req.path === MCP_TRANSPORT_PATH) {
+      return next()
+    }
+
+    // Skip auth for the public version endpoint
+    if (c.req.method === 'GET' && c.req.path === VERSION_PATH) {
       return next()
     }
 
