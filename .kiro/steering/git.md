@@ -35,8 +35,9 @@ Dies verhindert, dass versehentlich unvollständige Arbeit gepusht wird, währen
 
 ## Commits
 
-- Commit-Messages auf Deutsch mit Typ-Prefix: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`
+- Commit-Messages auf **Englisch** mit Typ-Prefix: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`
 - Kurzer Titel (max. 70 Zeichen), optionaler Body nach Leerzeile
+- Body darf mehrere Bullet-Points enthalten (mit `-` Prefix)
 - Nach jedem abgeschlossenen logischen Schritt committen, nicht erst am Session-Ende
 - Spezifische Dateien stagen (`git add <datei>`) statt `git add .`
 - Keine Secrets committen (`.env`, Credentials, Tokens)
