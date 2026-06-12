@@ -1,0 +1,17 @@
+{
+  "packages": {
+    ".": {
+      "release-type": "node",
+      "changelog-sections": [
+        { "type": "feat", "section": "Features" },
+        { "type": "fix", "section": "Bugfixes" },
+        { "type": "refactor", "section": "Sonstige Änderungen" },
+        { "type": "docs", "section": "Sonstige Änderungen" },
+        { "type": "chore", "section": "Sonstige Änderungen" },
+        { "type": "test", "section": "Sonstige Änderungen" }
+      ],
+      "bump-minor-pre-major": true,
+      "initial-version": "0.1.0"
+    }
+  }
+}

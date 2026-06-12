@@ -1435,6 +1435,17 @@
   color: var(--warning);
 }
 
+.login-session-expired-banner {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: var(--warning);
+  text-align: center;
+}
+
 .login-submit {
   width: 100%;
   padding: 10px 16px;
@@ -7181,4 +7192,106 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+/* ===== Version Check Card ===== */
+.version-check-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  font-size: 13px;
+}
+
+.version-check-card--loading {
+  color: var(--text-muted);
+}
+
+.version-check-card--loading .version-check-card__spinner {
+  animation: spin 0.8s linear infinite;
+  color: var(--accent);
+}
+
+.version-check-card--current {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+}
+
+.version-check-card--current .version-check-card__icon {
+  color: var(--success);
+}
+
+.version-check-card--current .version-check-card__text {
+  color: var(--success);
+  font-weight: 500;
+}
+
+.version-check-card--update {
+  border-color: var(--info-border);
+  background: var(--info-bg);
+}
+
+.version-check-card--update .version-check-card__icon {
+  color: var(--accent);
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+.version-check-card--update .version-check-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.version-check-card--update .version-check-card__text {
+  color: var(--info-text);
+  font-weight: 600;
+}
+
+.version-check-card--update .version-check-card__installed {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.version-check-card__link {
+  font-size: 12px;
+  color: var(--accent-text);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.version-check-card__link:hover {
+  text-decoration: underline;
+}
+
+.version-check-card--development {
+  border-color: var(--border-subtle);
+  background: var(--bg-surface);
+}
+
+.version-check-card--development .version-check-card__icon {
+  color: var(--text-muted);
+}
+
+.version-check-card--development .version-check-card__text {
+  color: var(--text-muted);
+}
+
+.version-check-card--error {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+}
+
+.version-check-card--error .version-check-card__icon {
+  color: var(--warning);
+}
+
+.version-check-card--error .version-check-card__text {
+  color: var(--warning);
+  font-weight: 500;
 }

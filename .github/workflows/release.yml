@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+  packages: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      major: ${{ steps.release.outputs.major }}
+    steps:
+      - uses: google-github-actions/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Mark as pre-release
+        if: steps.release.outputs.release_created == 'true' && steps.release.outputs.major == '0'
+        run: gh release edit ${{ steps.release.outputs.tag_name }} --prerelease
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+
+  docker-build:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image: slatebase-backend
+            context: ./backend
+            dockerfile: ./backend/Dockerfile
+            description: Slatebase Backend API Server
+          - image: slatebase-frontend
+            context: ./frontend
+            dockerfile: ./frontend/Dockerfile
+            description: Slatebase Frontend Web Application
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to DockerHub
+        if: vars.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        continue-on-error: true
+        id: dockerhub-login
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/andreas13xxx/${{ matrix.image }}:${{ needs.release-please.outputs.tag_name }}
+            ghcr.io/andreas13xxx/${{ matrix.image }}:latest
+            ${{ steps.dockerhub-login.outcome == 'success' && format('{0}/{1}:{2}', vars.DOCKERHUB_USERNAME, matrix.image, needs.release-please.outputs.tag_name) || '' }}
+            ${{ steps.dockerhub-login.outcome == 'success' && format('{0}/{1}:latest', vars.DOCKERHUB_USERNAME, matrix.image) || '' }}
+          labels: |
+            org.opencontainers.image.version=${{ needs.release-please.outputs.tag_name }}
+            org.opencontainers.image.description=${{ matrix.description }}
+            org.opencontainers.image.source=https://github.com/andreas13xxx/Slatebase
+            org.opencontainers.image.licenses=MIT
+
+      - name: Set GHCR package visibility to public
+        run: |
+          gh api \
+            --method PUT \
+            /user/packages/container/${{ matrix.image }}/visibility \
+            -f visibility=public || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

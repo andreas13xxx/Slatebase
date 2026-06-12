@@ -3,6 +3,7 @@ import type { IApiClient, FeatureToggleState } from '../api'
 import { useTranslation } from '../i18n'
 import { Settings, RefreshCw, Save, AlertTriangle, Loader, AlertCircle } from 'lucide-react'
 import { ConfirmModal } from './ConfirmModal'
+import { VersionCheckCard } from './VersionCheckCard'
 import { useFeatureContext } from '../state/featureContext'
 
 /**
@@ -257,6 +258,9 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
         <Settings size={22} color="var(--accent-text)" />
         <h1 className="admin-config-title">{t('admin.config.title')}</h1>
       </div>
+
+      {/* Version Check */}
+      <VersionCheckCard />
 
       {/* Feature-Toggles section */}
       <section className="admin-config-card">

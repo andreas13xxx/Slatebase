@@ -208,6 +208,151 @@ describe('ApiClient', () => {
     })
   })
 
+  describe('403 CSRF_INVALID recovery', () => {
+    it('calls checkSessionAlive on 403 CSRF_INVALID and triggers onSessionExpired if session is dead', async () => {
+      const onExpired = vi.fn()
+      client.setToken('my-token')
+      client.setCsrfToken('old-csrf')
+      client.setOnSessionExpired(onExpired)
+
+      // First call: the actual request returns 403 CSRF_INVALID
+      // Second call: checkSessionAlive GET /auth/sessions returns 401 (session dead)
+      fetchMock
+        .mockResolvedValueOnce(new Response(
+          JSON.stringify({ code: 'CSRF_INVALID', message: 'CSRF token invalid' }),
+          { status: 403 },
+        ))
+        .mockResolvedValueOnce(new Response(
+          JSON.stringify({ code: 'SESSION_EXPIRED', message: 'Expired' }),
+          { status: 401 },
+        ))
+
+      await expect(client.fetchVaults()).rejects.toEqual({
+        code: 'CSRF_INVALID',
+        message: 'CSRF token invalid',
+      })
+
+      expect(onExpired).toHaveBeenCalledOnce()
+      expect(client.getToken()).toBeNull()
+      expect(client.getCsrfToken()).toBeNull()
+      // Verify checkSessionAlive was called
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/auth/sessions')
+    })
+
+    it('does NOT call onSessionExpired on 403 CSRF_INVALID if session is alive', async () => {
+      const onExpired = vi.fn()
+      client.setToken('my-token')
+      client.setCsrfToken('old-csrf')
+      client.setOnSessionExpired(onExpired)
+
+      // First call: 403 CSRF_INVALID
+      // Second call: checkSessionAlive returns 200 (session alive)
+      fetchMock
+        .mockResolvedValueOnce(new Response(
+          JSON.stringify({ code: 'CSRF_INVALID', message: 'CSRF token invalid' }),
+          { status: 403 },
+        ))
+        .mockResolvedValueOnce(new Response(
+          JSON.stringify([]),
+          { status: 200 },
+        ))
+
+      await expect(client.fetchVaults()).rejects.toEqual({
+        code: 'CSRF_INVALID',
+        message: 'CSRF token invalid',
+      })
+
+      // Session is alive — should NOT trigger logout
+      expect(onExpired).not.toHaveBeenCalled()
+      // Tokens should NOT be cleared (session is still valid)
+      expect(client.getToken()).toBe('my-token')
+      expect(client.getCsrfToken()).toBe('old-csrf')
+    })
+
+    it('re-throws CSRF_INVALID error regardless of session liveness', async () => {
+      client.setToken('my-token')
+      client.setCsrfToken('csrf')
+      client.setOnSessionExpired(vi.fn())
+
+      // Session alive case: still throws
+      fetchMock
+        .mockResolvedValueOnce(new Response(
+          JSON.stringify({ code: 'CSRF_INVALID', message: 'Token mismatch' }),
+          { status: 403 },
+        ))
+        .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
+
+      await expect(client.fetchVaults()).rejects.toEqual({
+        code: 'CSRF_INVALID',
+        message: 'Token mismatch',
+      })
+    })
+
+    it('handles non-CSRF 403 responses normally without calling checkSessionAlive', async () => {
+      const onExpired = vi.fn()
+      client.setToken('token')
+      client.setCsrfToken('csrf')
+      client.setOnSessionExpired(onExpired)
+
+      fetchMock.mockResolvedValue(new Response(
+        JSON.stringify({ code: 'ACCESS_DENIED', message: 'Not allowed' }),
+        { status: 403 },
+      ))
+
+      await expect(client.fetchVaults()).rejects.toEqual({
+        code: 'ACCESS_DENIED',
+        message: 'Not allowed',
+      })
+
+      // Only the original request should have been made (no session check)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(onExpired).not.toHaveBeenCalled()
+    })
+
+    it('handles 403 with unparseable body without calling checkSessionAlive', async () => {
+      client.setToken('token')
+      client.setCsrfToken('csrf')
+      client.setOnSessionExpired(vi.fn())
+
+      fetchMock.mockResolvedValue(new Response('not json', { status: 403 }))
+
+      await expect(client.fetchVaults()).rejects.toEqual({
+        code: 'INTERNAL_ERROR',
+        message: 'Request failed with status 403',
+      })
+
+      // Only the original request (no session check since body could not be parsed)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('clears tokens when checkSessionAlive fails with network error', async () => {
+      const onExpired = vi.fn()
+      client.setToken('my-token')
+      client.setCsrfToken('old-csrf')
+      client.setOnSessionExpired(onExpired)
+
+      // First call: 403 CSRF_INVALID
+      // Second call: network error (checkSessionAlive returns false)
+      fetchMock
+        .mockResolvedValueOnce(new Response(
+          JSON.stringify({ code: 'CSRF_INVALID', message: 'CSRF token invalid' }),
+          { status: 403 },
+        ))
+        .mockRejectedValueOnce(new Error('Network error'))
+
+      await expect(client.fetchVaults()).rejects.toEqual({
+        code: 'CSRF_INVALID',
+        message: 'CSRF token invalid',
+      })
+
+      // Network error means session cannot be verified → treat as dead
+      expect(onExpired).toHaveBeenCalledOnce()
+      expect(client.getToken()).toBeNull()
+      expect(client.getCsrfToken()).toBeNull()
+    })
+  })
+
   describe('login', () => {
     it('sends POST to /api/v1/auth/login without Authorization header', async () => {
       client.setToken('existing-token')

@@ -289,6 +289,9 @@ export interface IApiClient {
   loadAdminFeatures(): Promise<FeatureToggleState[]>
   /** Toggle a feature's enabled state (admin only). */
   toggleAdminFeature(name: string, enabled: boolean): Promise<FeatureToggleUpdateResult>
+
+  // --- Version methods ---
+  getVersion(): Promise<{ version: string }>
 }
 
 /**
@@ -792,6 +795,16 @@ export class ApiClient implements IApiClient {
     return this.request<FeatureToggleUpdateResult>('PUT', `/api/v1/admin/features/${encodeURIComponent(name)}`, { enabled })
   }
 
+  // --- Version methods ---
+
+  async getVersion(): Promise<{ version: string }> {
+    const response = await fetch('/api/v1/version')
+    if (!response.ok) {
+      await handleErrorResponse(response)
+    }
+    return response.json() as Promise<{ version: string }>
+  }
+
   // --- Internal helpers ---
 
   /**
@@ -816,7 +829,8 @@ export class ApiClient implements IApiClient {
   }
 
   /**
-   * Handles a response, checking for 401 (session expired) and other errors.
+   * Handles a response, checking for 401 (session expired), 403 CSRF_INVALID
+   * (with session liveness check), and other errors.
    * Returns the parsed JSON body for successful responses, or undefined for 204.
    */
   private async handleResponse<T>(response: Response): Promise<T> {
@@ -827,6 +841,21 @@ export class ApiClient implements IApiClient {
         this.onSessionExpired()
       }
       await handleErrorResponse(response)
+    }
+
+    if (response.status === 403) {
+      const body = await response.clone().json().catch(() => null) as { code?: string } | null
+      if (body?.code === 'CSRF_INVALID') {
+        // Attempt session validation before giving up
+        const isAlive = await this.checkSessionAlive()
+        if (!isAlive) {
+          this.token = null
+          this.csrfToken = null
+          if (this.onSessionExpired) this.onSessionExpired()
+        }
+        // Re-throw the original error either way (caller gets CSRF_INVALID)
+        await handleErrorResponse(response)
+      }
     }
 
     if (!response.ok) {
@@ -880,5 +909,26 @@ export class ApiClient implements IApiClient {
 
     const response = await fetch(url, { method, headers, body: formData })
     await this.handleResponse<void>(response)
+  }
+
+  /**
+   * Lightweight session check: GET /api/v1/auth/sessions.
+   * Returns true if session is still valid (2xx), false on 401 or network error.
+   * Uses raw fetch to avoid recursion through this.request().
+   */
+  private async checkSessionAlive(): Promise<boolean> {
+    try {
+      const headers: Record<string, string> = {}
+      if (this.token) {
+        headers['Authorization'] = `Bearer ${this.token}`
+      }
+      const resp = await fetch('/api/v1/auth/sessions', {
+        method: 'GET',
+        headers,
+      })
+      return resp.ok
+    } catch {
+      return false
+    }
   }
 }
