@@ -508,9 +508,11 @@ function AppContent() {
         tabDispatch({ type: 'CLEAR_ALL_TABS' })
         if (graphTab && vaultId) {
           // Re-open graph tab for the new vault (only if a new vault is selected)
+          const vault = state.vaults.find((v) => v.id === vaultId)
+          const graphTabName = vault ? `Graph — ${vault.name}` : 'Graph'
           tabDispatch({
             type: 'OPEN_TAB',
-            payload: { vaultId, filePath: '__graph__', fileName: 'Graph' },
+            payload: { vaultId, filePath: '__graph__', fileName: graphTabName },
           })
           const graphTabId = `${vaultId}::__graph__`
           tabDispatch({
@@ -582,8 +584,8 @@ function AppContent() {
   function handleOpenGraph() {
     if (!state.selectedVaultId) return
     if (!isEnabled('knowledge-graph')) return
-    // Check if a graph tab already exists
-    const existingGraphTab = tabState.tabs.find((t) => t.filePath === '__graph__')
+    // Check if a graph tab already exists for the current vault
+    const existingGraphTab = tabState.tabs.find((t) => t.filePath === '__graph__' && t.vaultId === state.selectedVaultId)
     if (existingGraphTab) {
       // Activate existing graph tab
       setActiveSettingsPage(null)
@@ -591,9 +593,11 @@ function AppContent() {
     } else {
       // Open new graph tab
       setActiveSettingsPage(null)
+      const vault = state.vaults.find((v) => v.id === state.selectedVaultId)
+      const graphTabName = vault ? `Graph — ${vault.name}` : 'Graph'
       tabDispatch({
         type: 'OPEN_TAB',
-        payload: { vaultId: state.selectedVaultId, filePath: '__graph__', fileName: 'Graph' },
+        payload: { vaultId: state.selectedVaultId, filePath: '__graph__', fileName: graphTabName },
       })
       // Mark as loaded immediately (no content to fetch)
       const graphTabId = `${state.selectedVaultId}::__graph__`

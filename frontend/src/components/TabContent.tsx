@@ -136,7 +136,7 @@ export function TabContent() {
 
   // Graph tab — render GraphView
   if (activeTab.filePath === '__graph__') {
-    if (!appState.selectedVaultId) {
+    if (!activeTab.vaultId) {
       return (
         <div className="tab-content tab-content--empty" style={emptyStyle}>
           <p style={emptyTextStyle}>{t('graph.noVault')}</p>
@@ -145,7 +145,7 @@ export function TabContent() {
     }
     return (
       <div className="tab-content tab-content--graph" style={contentStyle}>
-        <GraphView vaultId={appState.selectedVaultId} />
+        <GraphView vaultId={activeTab.vaultId} />
       </div>
     )
   }
