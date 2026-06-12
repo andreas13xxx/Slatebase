@@ -298,4 +298,16 @@ describe('LoginPage', () => {
     // If we get here without error, form submission was prevented
     expect(true).toBe(true)
   })
+
+  it('shows session expired banner when authState.error is auth.sessionExpired', () => {
+    renderLoginPage({ error: 'auth.sessionExpired' })
+
+    expect(screen.getByText('Sitzung abgelaufen — bitte erneut anmelden')).toBeInTheDocument()
+  })
+
+  it('does not show session expired banner for other errors', () => {
+    renderLoginPage({ error: 'Some other error' })
+
+    expect(screen.queryByText('Sitzung abgelaufen — bitte erneut anmelden')).not.toBeInTheDocument()
+  })
 })

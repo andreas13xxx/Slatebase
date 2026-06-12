@@ -44,8 +44,89 @@ import './App.css'
 /** Singleton ApiClient instance shared across the app. */
 const apiClient = new ApiClient()
 
+// Synchronous token restore from localStorage — eliminates race condition
+// where API calls fire before the useEffect in AuthGuard sets the token.
+const _storedToken = localStorage.getItem('slatebase_token')
+const _storedCsrf = localStorage.getItem('slatebase_csrf')
+if (_storedToken) apiClient.setToken(_storedToken)
+if (_storedCsrf) apiClient.setCsrfToken(_storedCsrf)
+
 /** LocalStorage key for persisting the last selected vault. */
 const LAST_VAULT_KEY = 'slatebase_last_vault'
+
+/** LocalStorage key for preserving UI state across session expiry. */
+const RESTORE_STATE_KEY = 'slatebase_restore_state'
+
+/** Stale guard: discard restore state older than 5 minutes. */
+const RESTORE_STATE_MAX_AGE_MS = 5 * 60 * 1000
+
+/**
+ * Module-level snapshot of the current UI state (vault + tabs).
+ * Updated by AppContent via useEffect. Read by the onSessionExpired callback.
+ */
+let _currentUiSnapshot: {
+  selectedVaultId: string | null
+  tabs: Array<{ vaultId: string; filePath: string }>
+  activeTabId: string | null
+} = { selectedVaultId: null, tabs: [], activeTabId: null }
+
+/**
+ * Saves the current UI state snapshot to localStorage for restoration after re-login.
+ */
+function saveRestoreState(): void {
+  try {
+    const restoreState = {
+      selectedVaultId: _currentUiSnapshot.selectedVaultId,
+      tabs: _currentUiSnapshot.tabs,
+      activeTabId: _currentUiSnapshot.activeTabId,
+      savedAt: Date.now(),
+    }
+    localStorage.setItem(RESTORE_STATE_KEY, JSON.stringify(restoreState))
+  } catch {
+    // Storage full or unavailable — silently skip
+  }
+}
+
+/**
+ * Reads and validates the stored restore state. Returns null if missing, stale, or invalid.
+ */
+function readRestoreState(): {
+  selectedVaultId: string | null
+  tabs: Array<{ vaultId: string; filePath: string }>
+  activeTabId: string | null
+} | null {
+  try {
+    const raw = localStorage.getItem(RESTORE_STATE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as {
+      selectedVaultId?: string | null
+      tabs?: Array<{ vaultId: string; filePath: string }>
+      activeTabId?: string | null
+      savedAt?: number
+    }
+    // Stale guard: discard if older than 5 minutes
+    if (typeof parsed.savedAt !== 'number' || Date.now() - parsed.savedAt > RESTORE_STATE_MAX_AGE_MS) {
+      localStorage.removeItem(RESTORE_STATE_KEY)
+      return null
+    }
+    if (!Array.isArray(parsed.tabs)) return null
+    return {
+      selectedVaultId: parsed.selectedVaultId ?? null,
+      tabs: parsed.tabs,
+      activeTabId: parsed.activeTabId ?? null,
+    }
+  } catch {
+    localStorage.removeItem(RESTORE_STATE_KEY)
+    return null
+  }
+}
+
+/**
+ * Clears stored restore state (called after successful restoration or on stale guard).
+ */
+function clearRestoreState(): void {
+  localStorage.removeItem(RESTORE_STATE_KEY)
+}
 
 /** Available pages in the app. */
 type AppPage =
@@ -348,6 +429,8 @@ function AppContent() {
   useEffect(() => {
     if (state.vaults.length === 0) return
     if (state.selectedVaultId !== null) return
+    // Skip if session restore state is pending — the restore effect handles vault selection
+    if (localStorage.getItem(RESTORE_STATE_KEY)) return
     const lastId = localStorage.getItem(LAST_VAULT_KEY)
     if (lastId && state.vaults.some((v) => v.id === lastId)) {
       dispatch({ type: 'VAULT_SELECTED', payload: lastId })
@@ -360,6 +443,49 @@ function AppContent() {
       localStorage.setItem(LAST_VAULT_KEY, state.selectedVaultId)
     }
   }, [state.selectedVaultId])
+
+  // Keep module-level UI snapshot updated for session expiry preservation
+  useEffect(() => {
+    _currentUiSnapshot = {
+      selectedVaultId: state.selectedVaultId,
+      tabs: tabState.tabs.map((t) => ({ vaultId: t.vaultId, filePath: t.filePath })),
+      activeTabId: tabState.activeTabId,
+    }
+  }, [state.selectedVaultId, tabState.tabs, tabState.activeTabId])
+
+  // Restore UI state after re-login (from session expiry)
+  const hasRestoredRef = useRef(false)
+  useEffect(() => {
+    if (hasRestoredRef.current) return
+    if (state.vaults.length === 0) return
+
+    const restoreState = readRestoreState()
+    if (!restoreState) return
+
+    hasRestoredRef.current = true
+    clearRestoreState()
+
+    // Restore vault selection
+    if (restoreState.selectedVaultId && state.vaults.some((v) => v.id === restoreState.selectedVaultId)) {
+      dispatch({ type: 'VAULT_SELECTED', payload: restoreState.selectedVaultId })
+    }
+
+    // Restore tabs — only if the vaults still exist
+    const validVaultIds = new Set(state.vaults.map((v) => v.id))
+    for (const tab of restoreState.tabs) {
+      if (!validVaultIds.has(tab.vaultId)) continue
+      const fileName = tab.filePath.split('/').pop() ?? tab.filePath
+      tabDispatch({
+        type: 'OPEN_TAB',
+        payload: { vaultId: tab.vaultId, filePath: tab.filePath, fileName },
+      })
+    }
+
+    // Restore active tab
+    if (restoreState.activeTabId) {
+      tabDispatch({ type: 'ACTIVATE_TAB', payload: { tabId: restoreState.activeTabId } })
+    }
+  }, [state.vaults, dispatch, tabDispatch])
 
   // When a file tab becomes active (e.g. from FileExplorer click), deactivate settings page
   useEffect(() => {
@@ -840,6 +966,8 @@ function AuthGuard() {
 
   useEffect(() => {
     apiClient.setOnSessionExpired(() => {
+      // Preserve UI state before clearing auth — enables restoration after re-login
+      saveRestoreState()
       apiClient.setToken(null)
       apiClient.setCsrfToken(null)
       authDispatch({ type: 'SESSION_EXPIRED' })

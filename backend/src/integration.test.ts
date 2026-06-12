@@ -70,6 +70,8 @@ beforeAll(async () => {
         maxImportFiles: 500,
         maxImportDepth: 10,
         trustedProxies: [],
+        sessionDurationHours: 24,
+        sessionMaxLifetimeDays: 7,
         features: {},
       }
     },

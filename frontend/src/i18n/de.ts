@@ -29,6 +29,7 @@ export const de = {
     usernameRequired: 'Benutzername darf nicht leer sein.',
     passwordRequired: 'Passwort darf nicht leer sein.',
     sessionExpired: 'Sitzung abgelaufen. Bitte erneut anmelden.',
+    sessionExpiredBanner: 'Sitzung abgelaufen — bitte erneut anmelden',
     changePassword: 'Passwort ändern',
     changingPassword: 'Passwort ändern…',
     changePasswordInfo: 'Sie müssen Ihr Passwort ändern, bevor Sie fortfahren können.',

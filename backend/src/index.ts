@@ -22,6 +22,7 @@ import { UserController, UserRouteModule } from './api/userRoutes.js'
 import { AdminRouteModule } from './api/adminRoutes.js'
 import { VaultShareRouteModule } from './api/vaultShareRoutes.js'
 import { SessionStore, AuthService } from './auth/index.js'
+import { CsrfSecretManager } from './auth/csrf-secret.js'
 import { createAuthMiddleware, createCsrfMiddleware, createRateLimitMiddleware, createMustChangePasswordMiddleware } from './auth/middleware.js'
 import { createClientIpMiddleware } from './api/client-ip.js'
 import { RateLimiter } from './auth/ratelimit.js'
@@ -59,6 +60,7 @@ import { LinkIndexService } from './link-index/index.js'
 import { createGraphRoutes } from './api/graphRoutes.js'
 import { PluginStore, PluginInstaller } from './plugin/index.js'
 import { createPluginRoutes } from './api/pluginRoutes.js'
+import { versionRoutes } from './api/versionRoutes.js'
 
 // --- Composition Root ---
 
@@ -95,8 +97,11 @@ const auditLogger = new AuditLogger(serverConfig.dataDir)
 // 3. Business Layer: AuditService, AuthService, UserService, RoleService, VaultAccessControlService
 const auditService = new AuditService(auditLogger)
 
-const csrfSecret = process.env['SLATEBASE_CSRF_SECRET'] ?? crypto.randomBytes(32).toString('hex')
-const authService = new AuthService(sessionStore, userRepository, logger, csrfSecret, auditService)
+const csrfSecretManager = new CsrfSecretManager(serverConfig.dataDir, logger)
+const csrfSecret = await csrfSecretManager.loadOrCreate()
+const sessionDurationMs = serverConfig.sessionDurationHours * 60 * 60 * 1000
+const maxLifetimeMs = serverConfig.sessionMaxLifetimeDays * 24 * 60 * 60 * 1000
+const authService = new AuthService(sessionStore, userRepository, logger, csrfSecret, auditService, sessionDurationMs, maxLifetimeMs)
 
 const checkVaultOwnership = async (userId: string): Promise<boolean> => {
   const entries = await vaultRegistry.load()
@@ -340,6 +345,7 @@ if (featureToggleService.isEnabled('mcp') && mcpRoutes !== undefined && mcpToken
   app.route('/api/v1/mcp/tokens', mcpTokenRoutes)
 }
 app.get('/.well-known/mcp.json', createMcpWellKnownHandler(featureToggleService))
+app.route('', versionRoutes)
 
 // Plugin route registration (auth middleware applies via /api/v1/* pattern)
 const pluginRoutes = createPluginRoutes({

@@ -35,6 +35,7 @@ export const en: TranslationShape = {
     usernameRequired: 'Username must not be empty.',
     passwordRequired: 'Password must not be empty.',
     sessionExpired: 'Session expired. Please log in again.',
+    sessionExpiredBanner: 'Session expired — please log in again',
     changePassword: 'Change password',
     changingPassword: 'Changing password…',
     changePasswordInfo: 'You must change your password before you can continue.',

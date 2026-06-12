@@ -10,7 +10,8 @@ global.ResizeObserver = class ResizeObserver {
   disconnect() {}
 } as unknown as typeof ResizeObserver
 
-// Clear sessionStorage before each test to prevent auth state leaking between tests
+// Clear sessionStorage and localStorage before each test to prevent auth state leaking between tests
 beforeEach(() => {
   sessionStorage.clear()
+  localStorage.clear()
 })

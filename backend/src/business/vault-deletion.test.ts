@@ -41,6 +41,8 @@ function createMockConfigService(overrides?: Partial<ServerConfig>): IConfigServ
     maxImportFiles: 500,
     maxImportDepth: 10,
     trustedProxies: [],
+    sessionDurationHours: 24,
+    sessionMaxLifetimeDays: 7,
     features: {},
     ...overrides,
   }

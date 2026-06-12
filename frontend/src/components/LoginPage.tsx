@@ -102,6 +102,12 @@ export function LoginPage({ apiClient }: LoginPageProps) {
           <span className="login-logo-text">Slatebase</span>
         </div>
 
+        {authState.error === 'auth.sessionExpired' && (
+          <div className="login-session-expired-banner" role="alert">
+            {t('auth.sessionExpiredBanner')}
+          </div>
+        )}
+
         <form className="login-form" onSubmit={handleSubmit} noValidate>
           <div className="login-field">
             <label className="login-label" htmlFor="login-username">{t('auth.username')}</label>

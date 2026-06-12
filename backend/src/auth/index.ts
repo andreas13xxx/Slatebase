@@ -457,8 +457,11 @@ export class SessionStore implements ISessionStore {
 
 // ─── AuthService Implementation ──────────────────────────────────────────────
 
-/** Duration of a session in milliseconds (24 hours). */
-const SESSION_DURATION_MS = 24 * 60 * 60 * 1000
+/** Default duration of a session in milliseconds (24 hours). */
+const DEFAULT_SESSION_DURATION_MS = 24 * 60 * 60 * 1000
+
+/** Default max lifetime of a session in milliseconds (7 days). */
+const DEFAULT_MAX_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000
 
 /**
  * Core authentication service.
@@ -466,13 +469,21 @@ const SESSION_DURATION_MS = 24 * 60 * 60 * 1000
  * Uses argon2id for password verification and HMAC-SHA256 for CSRF tokens.
  */
 export class AuthService implements IAuthService {
+  private readonly sessionDurationMs: number
+  private readonly maxLifetimeMs: number
+
   constructor(
     private readonly sessionStore: ISessionStore,
     private readonly userRepository: IUserRepository,
     private readonly logger: ILogger,
     private readonly csrfSecret: string,
-    private readonly auditService?: IAuditService
-  ) {}
+    private readonly auditService?: IAuditService,
+    sessionDurationMs?: number,
+    maxLifetimeMs?: number
+  ) {
+    this.sessionDurationMs = sessionDurationMs ?? DEFAULT_SESSION_DURATION_MS
+    this.maxLifetimeMs = maxLifetimeMs ?? DEFAULT_MAX_LIFETIME_MS
+  }
 
   /**
    * Authenticate a user with username and password.
@@ -544,7 +555,7 @@ export class AuthService implements IAuthService {
     const token = randomBytes(64).toString('hex') // 128 chars
     const sessionId = randomUUID()
     const now = new Date()
-    const expiresAt = new Date(now.getTime() + SESSION_DURATION_MS)
+    const expiresAt = new Date(now.getTime() + this.sessionDurationMs)
 
     // CSRF token is HMAC-based (deterministic from sessionId + csrfSecret)
     const csrfToken = this.generateCsrfToken(sessionId)
@@ -619,11 +630,19 @@ export class AuthService implements IAuthService {
   /**
    * Validate a session token and return the session context.
    * Returns null if the token is invalid or the session has expired.
-   * Updates the lastActivity timestamp on the session file.
+   * Implements sliding expiry: extends expiresAt on each validated request.
+   * Enforces absolute max lifetime from createdAt.
    */
   async validateSession(token: string): Promise<SessionContext | null> {
     const session = await this.sessionStore.findByToken(token)
     if (session === null) {
+      return null
+    }
+
+    // Enforce absolute max lifetime
+    const createdAt = new Date(session.createdAt).getTime()
+    if (Date.now() - createdAt > this.maxLifetimeMs) {
+      await this.sessionStore.invalidate(token)
       return null
     }
 
@@ -635,10 +654,13 @@ export class AuthService implements IAuthService {
       return null
     }
 
-    // Update lastActivity timestamp (non-critical — don't fail the request if write fails)
+    // Sliding expiry: extend expiresAt and update lastActivity
+    const now = new Date()
+    const newExpiresAt = new Date(now.getTime() + this.sessionDurationMs)
     const updatedSession: Session = {
       ...session,
-      lastActivity: new Date().toISOString(),
+      lastActivity: now.toISOString(),
+      expiresAt: newExpiresAt.toISOString(),
       role: user.role, // Always use current role from user record
     }
     try {
