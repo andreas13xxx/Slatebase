@@ -1,6 +1,8 @@
 services:
   backend:
-    image: ghcr.io/andreas13xxx/slatebase-backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: slatebase-backend
     restart: unless-stopped
     env_file:
@@ -17,7 +19,9 @@ services:
       start_period: 10s
 
   frontend:
-    image: ghcr.io/andreas13xxx/slatebase-frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     container_name: slatebase-frontend
     restart: unless-stopped
     ports:
