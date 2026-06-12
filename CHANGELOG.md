@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.0](https://github.com/andreas13xxx/Slatebase/compare/v0.2.0...v0.3.0) (2026-06-12)
+
+
+### Features
+
+* persist feature toggle state across container restarts ([2d384b9](https://github.com/andreas13xxx/Slatebase/commit/2d384b981f44bf4a13ce38345b9c2748bdadb23f))
+* show version badge and update hint in sidebar header ([68d2711](https://github.com/andreas13xxx/Slatebase/commit/68d2711fed984f9538600a85909e587463ea9f9d))
+
+
+### Bugfixes
+
+* copy version.json into Docker image ([084377b](https://github.com/andreas13xxx/Slatebase/commit/084377b2f165344c9e2d93fe274d582278bca1a8))
+* server restart endpoint now actually exits the process ([fc8de04](https://github.com/andreas13xxx/Slatebase/commit/fc8de04a714b76d3fe5ae6bbacc8084f8a4d46ed))
+
+
+### Sonstige Änderungen
+
+* split docker-compose into production and dev variants ([3f9346f](https://github.com/andreas13xxx/Slatebase/commit/3f9346ffcb58b5004fe15fb63850ca22b0b4b117))
+
 ## [0.2.0](https://github.com/andreas13xxx/Slatebase/compare/v0.1.0...v0.2.0) (2026-06-12)
 
 
