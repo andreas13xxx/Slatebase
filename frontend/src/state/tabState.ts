@@ -70,11 +70,14 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
       const { vaultId, filePath, fileName } = action.payload
       const tabId = generateTabId(vaultId, filePath)
 
-      // If tab already exists, just activate it
+      // If tab already exists, activate it and update fileName
       const existingTab = state.tabs.find((t) => t.id === tabId)
       if (existingTab) {
         return {
           ...state,
+          tabs: existingTab.fileName !== fileName
+            ? state.tabs.map((t) => t.id === tabId ? { ...t, fileName } : t)
+            : state.tabs,
           activeTabId: tabId,
         }
       }

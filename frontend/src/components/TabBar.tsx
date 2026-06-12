@@ -59,7 +59,7 @@ export function TabBar() {
         const isGraphTab = tab.filePath === '__graph__'
         const TabFileIcon = isGraphTab ? Share2 : getFileIcon(tab.fileName)
         const tabFileIconClass = isGraphTab ? 'tab-icon-graph' : getFileIconClass(tab.fileName)
-        const displayName = isGraphTab ? 'Graph' : getDisplayName(tab.fileName)
+        const displayName = isGraphTab ? tab.fileName : getDisplayName(tab.fileName)
 
         return (
           <div
