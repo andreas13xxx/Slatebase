@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/andreas13xxx/Slatebase/compare/v0.3.0...v0.3.1) (2026-06-12)
+
+
+### Bugfixes
+
+* graph tab now shows correct vault and includes vault name in tab title ([22ce71e](https://github.com/andreas13xxx/Slatebase/commit/22ce71ea0eab27a025998a98d64d793195365cdb))
+
 ## [0.3.0](https://github.com/andreas13xxx/Slatebase/compare/v0.2.0...v0.3.0) (2026-06-12)
 
 
