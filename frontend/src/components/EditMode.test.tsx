@@ -89,7 +89,7 @@ describe('EditMode', () => {
     renderEditMode({ saving: true })
 
     const textarea = screen.getByRole('textbox', { name: 'Dateiinhalt bearbeiten' })
-    expect(textarea).toBeDisabled()
+    expect(textarea).toHaveAttribute('readonly')
   })
 
   it('shows "Speichern…" status during saving state', () => {

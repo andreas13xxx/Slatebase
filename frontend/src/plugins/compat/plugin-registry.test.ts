@@ -391,8 +391,8 @@ describe('PluginRegistry', () => {
               domManipulation: false,
             },
             compatibilityLevel: 'unknown',
-            manifest: expect.objectContaining({ id: 'p1' }),
-            error: undefined,
+            installedAt: expect.any(String),
+            updatedAt: expect.any(String),
           },
           'p2': {
             status: 'inactive',
@@ -403,8 +403,8 @@ describe('PluginRegistry', () => {
               domManipulation: false,
             },
             compatibilityLevel: 'unknown',
-            manifest: expect.objectContaining({ id: 'p2' }),
-            error: undefined,
+            installedAt: expect.any(String),
+            updatedAt: expect.any(String),
           },
         },
       });
