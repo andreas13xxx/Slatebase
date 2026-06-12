@@ -46,6 +46,9 @@ COPY --from=build /app/dist/ ./dist/
 # Copy config
 COPY config/ ./config/
 
+# Copy version file (updated by Release Please)
+COPY version.json ./version.json
+
 # Create data directory (will be overridden by volume mount)
 RUN mkdir -p ./data
 
