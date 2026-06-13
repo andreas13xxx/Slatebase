@@ -35,7 +35,6 @@ export function SearchPanel({
   const { apiClient } = useAppContext()
   const [replaceExpanded, setReplaceExpanded] = useState(false)
   const [showReplaceConfirm, setShowReplaceConfirm] = useState(false)
-  const [replaceFeedback, setReplaceFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -61,15 +60,15 @@ export function SearchPanel({
 
     // Use the authenticated ApiClient from AppContext as ISearchApiClient adapter
     const searchApiClient: ISearchApiClient = {
-      searchVault: async (vaultId: string, params: Record<string, string>) => {
-        return apiClient.searchVault(vaultId, params)
-      },
-      searchMultiVault: async (params: Record<string, string>) => {
-        return apiClient.searchMultiVault(params)
-      },
-      replaceInVault: async (vaultId: string, body) => {
-        return apiClient.replaceInVault(vaultId, body as object)
-      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      searchVault: (vaultId: string, params: Record<string, string>) =>
+        apiClient!.searchVault(vaultId, params) as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      searchMultiVault: (params: Record<string, string>) =>
+        apiClient!.searchMultiVault(params) as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      replaceInVault: (vaultId: string, body) =>
+        apiClient!.replaceInVault(vaultId, body as object) as any,
     }
 
     const searchOptions = {
@@ -90,15 +89,15 @@ export function SearchPanel({
    */
   const buildReplaceApiClient = useCallback((): ISearchApiClient => {
     return {
-      searchVault: async (vaultId: string, params: Record<string, string>) => {
-        return apiClient.searchVault(vaultId, params)
-      },
-      searchMultiVault: async (params: Record<string, string>) => {
-        return apiClient.searchMultiVault(params)
-      },
-      replaceInVault: async (vaultId: string, body) => {
-        return apiClient.replaceInVault(vaultId, body as object)
-      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      searchVault: (vaultId: string, params: Record<string, string>) =>
+        apiClient!.searchVault(vaultId, params) as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      searchMultiVault: (params: Record<string, string>) =>
+        apiClient!.searchMultiVault(params) as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      replaceInVault: (vaultId: string, body) =>
+        apiClient!.replaceInVault(vaultId, body as object) as any,
     }
   }, [apiClient])
 
@@ -108,7 +107,6 @@ export function SearchPanel({
   const handleSingleReplace = useCallback(async (filePath: string) => {
     if (!selectedVaultId || !state.query.trim()) return
 
-    setReplaceFeedback(null)
     const apiClient = buildReplaceApiClient()
 
     await performSingleReplace(dispatch, apiClient, selectedVaultId, {
@@ -132,7 +130,6 @@ export function SearchPanel({
     if (!selectedVaultId || !state.query.trim()) return
 
     setShowReplaceConfirm(false)
-    setReplaceFeedback(null)
     const apiClient = buildReplaceApiClient()
 
     await performReplace(dispatch, apiClient, selectedVaultId, {
@@ -149,36 +146,19 @@ export function SearchPanel({
   }, [selectedVaultId, state.query, state.replacement, state.caseSensitive, state.regex, dispatch, buildReplaceApiClient, triggerSearch])
 
   /**
-   * Shows success feedback after a successful replace operation.
+   * Derives replace feedback directly from state — no useEffect needed.
    */
-  useEffect(() => {
-    if (state.lastReplaceResult) {
-      const { totalReplacements, fileCount } = state.lastReplaceResult
-      if (totalReplacements > 0) {
-        setReplaceFeedback({
-          type: 'success',
-          message: `${totalReplacements} Ersetzung${totalReplacements !== 1 ? 'en' : ''} in ${fileCount} Datei${fileCount !== 1 ? 'en' : ''} durchgeführt`,
-        })
-      } else {
-        setReplaceFeedback({
-          type: 'success',
-          message: 'Keine Treffer zum Ersetzen gefunden',
-        })
-      }
-    }
-  }, [state.lastReplaceResult])
-
-  /**
-   * Shows error feedback after a failed replace operation.
-   */
-  useEffect(() => {
-    if (state.replaceError) {
-      setReplaceFeedback({
-        type: 'error',
-        message: state.replaceError,
-      })
-    }
-  }, [state.replaceError])
+  const replaceFeedback: { type: 'success' | 'error'; message: string } | null =
+    state.replaceError
+      ? { type: 'error', message: state.replaceError }
+      : state.lastReplaceResult
+        ? {
+            type: 'success',
+            message: state.lastReplaceResult.totalReplacements > 0
+              ? `${state.lastReplaceResult.totalReplacements} Ersetzung${state.lastReplaceResult.totalReplacements !== 1 ? 'en' : ''} in ${state.lastReplaceResult.fileCount} Datei${state.lastReplaceResult.fileCount !== 1 ? 'en' : ''} durchgeführt`
+              : 'Keine Treffer zum Ersetzen gefunden',
+          }
+        : null
 
   /**
    * Computes the replace preview counts for the confirmation dialog.
