@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/andreas13xxx/Slatebase/compare/v0.3.3...v0.4.0) (2026-06-13)
+
+
+### Features
+
+* add vault-wide full-text search and replace (Phase 1) ([2845f0d](https://github.com/andreas13xxx/Slatebase/commit/2845f0dae6a7825e52c5fcfd69b416c952197a66))
+
+
+### Bugfixes
+
+* remove any casts in search adapter, use unknown return types ([88dd8a6](https://github.com/andreas13xxx/Slatebase/commit/88dd8a6fcc60b12fc793de34b31879cfaf12617b))
+* resolve lint errors in search panel and related files ([36e6e99](https://github.com/andreas13xxx/Slatebase/commit/36e6e99b0a671026563d8cf5afea63ed599aca0d))
+
 ## [0.3.3](https://github.com/andreas13xxx/Slatebase/compare/v0.3.2...v0.3.3) (2026-06-12)
 
 
