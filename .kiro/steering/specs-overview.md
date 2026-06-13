@@ -21,7 +21,7 @@
 | 13 | `context-panel` | Feature | ✅ Fertig | Rechtes Seitenpanel mit Outline, Links, Tags, Properties (Tab-Navigation, Drag & Drop, Split-Sections) |
 | 14 | `knowledge-graph` | Feature | ✅ Fertig | Visuelle Darstellung der Verlinkungen zwischen Notizen (interaktiver Graph mit Nodes und Edges) |
 | 15 | `live-preview-editor` | Feature | 📋 Geplant | Side-by-Side oder WYSIWYG Live-Preview im Editor |
-| 16 | `obsidian-plugin-compat` | Feature | 🔧 In Arbeit ⚠️ experimental | Obsidian Community Plugin Compatibility Layer (API-Shims, Plugin-Loader, Sandbox, Verwaltungs-UI, Backend-Persistenz) — experimentell, nur browser-kompatible Plugins; serverseitige Plugins erfordern `server-side-plugins` |
+| 16 | `obsidian-plugin-compat` | Feature | ✅ Fertig ⚠️ experimental | Obsidian Community Plugin Compatibility Layer (API-Shims, Plugin-Loader, Sandbox, Verwaltungs-UI, Backend-Persistenz) — experimentell, nur browser-kompatible Plugins; serverseitige Plugins erfordern `server-side-plugins` |
 | 17 | `mermaid-rendering` | Feature | 📋 Requirements | Mermaid-Diagramme in Fenced Code Blocks als SVG rendern (Dark/Light Mode, Lazy Loading, Fehlerbehandlung) |
 | 18 | `accessibility-audit` | Feature | 📋 Geplant | WCAG 2.1 AA Compliance (systematischer Audit + Fixes) |
 | 19 | `server-side-plugins` | Feature | 📋 Geplant | Serverseitige Ausführung von Obsidian-Plugins die Node.js-APIs benötigen (tls, net, crypto, etc.) |
@@ -32,7 +32,7 @@
 | 24 | `vault-explorer-enhancements` | Feature | 📋 Geplant | Vault-Statistiken, Custom Context-Menu, Drag & Drop Upload |
 | 25 | `unified-settings` | Feature | 📋 Geplant | Zentrale Einstellungsseite mit Kategorien, Log-Verwaltung, Keybindings |
 | 26 | `realtime-infrastructure` | Feature | 📋 Geplant | SSE-basierte Echtzeit-Updates (Chat, Online-Status, Vault-Änderungen) |
-| 27 | `search-and-discovery` | Feature | 📋 Geplant | Volltextsuche + Replace (Phase 1), optional semantische Suche mit Embeddings (Phase 2) |
+| 27 | `search-and-discovery` | Feature | ✅ Fertig | Volltextsuche + Replace (Phase 1): Vault-weite Suche mit Regex, Kontext-Zeilen, Multi-Vault, Find & Replace mit atomaren Schreiboperationen, SearchPanel als Seitenpanel |
 | 28 | `responsive-mobile` | Feature | 📋 Geplant | Responsive Design für Smartphones und Tablets |
 | 29 | `obsidian-themes` | Feature | 📋 Geplant | Obsidian Community Themes laden und anwenden (CSS-Variable-Mapping) |
 | 30 | `ci-cd-release` | Feature | ✅ Fertig | GitHub Actions CI/CD, Auto-Release (Release Please), Multi-Arch Docker (GHCR + optional DockerHub), Version-Check in Admin-UI |
@@ -88,13 +88,13 @@ Priorisiert nach: Blockierungen auflösen → Nutzerwert maximieren → Quick Wi
 |------|------|---------|------------|
 | 1 | `session-expiry-fix` | ✅ Fertig | Behoben: CSRF-Persistenz, Sliding Expiry, localStorage, synchrone Wiederherstellung. |
 | 2 | `ci-cd-release` | ✅ Fertig | Pipeline konfiguriert. Erster Release bei nächstem Merge auf `main`. |
-| 3 | `obsidian-plugin-compat` (fertigstellen) | Mittel | Bereits in Arbeit. Entblockt 3 weitere Specs (workspace-leaf, themes, server-side). |
+| 3 | `obsidian-plugin-compat` (fertigstellen) | ✅ Fertig | Alle Tasks abgeschlossen. Frontend + Backend komplett integriert. |
 
 ### Tier 2: Kurzfristig (Kern-Features für tägliche Nutzung)
 
 | Prio | Spec | Aufwand | Begründung |
 |------|------|---------|------------|
-| 4 | `search-and-discovery` (Phase 1) | Mittel | Kern-Feature. Ohne Suche bei >50 Dateien kaum nutzbar. |
+| 4 | `search-and-discovery` (Phase 1) | ✅ Fertig | Kern-Feature. Ohne Suche bei >50 Dateien kaum nutzbar. |
 | 5 | `vault-explorer-enhancements` | Niedrig–Mittel | Quick Win: Context-Menu + Stats + DnD. Großer UX-Impact. |
 | 6 | `editor-improvements` | Mittel | Templates + Daily Notes + Bild-Paste = Obsidian-Parität für Kern-Workflows. |
 | 7 | `trash-and-versioning` | Mittel | Vertrauens-Feature. Schützt vor Datenverlust bei Multi-User + Auto-Save. |

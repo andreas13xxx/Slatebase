@@ -61,6 +61,8 @@ import { createGraphRoutes } from './api/graphRoutes.js'
 import { PluginStore, PluginInstaller } from './plugin/index.js'
 import { createPluginRoutes } from './api/pluginRoutes.js'
 import { versionRoutes } from './api/versionRoutes.js'
+import { SearchService, ReplaceService } from './search/index.js'
+import { createSearchRoutes } from './api/searchRoutes.js'
 
 // --- Composition Root ---
 
@@ -256,6 +258,10 @@ const linkIndexMap = new Map<string, LinkIndexService>()
 const pluginStore = new PluginStore(serverConfig.dataDir)
 const pluginInstaller = new PluginInstaller(pluginStore)
 
+// 4f. Search Module
+const searchService = new SearchService(vaultService, vaultAccessControl, logger)
+const replaceService = new ReplaceService(vaultService, vaultAccessControl, logger)
+
 /**
  * Returns the LinkIndexService instance for a given vault, or undefined if not found.
  */
@@ -362,6 +368,10 @@ const pluginRoutes = createPluginRoutes({
   logger,
 })
 app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)
+
+// Search route registration (auth middleware applies via /api/v1/* pattern)
+const searchRoutes = createSearchRoutes({ searchService, replaceService, vaultAccessControl, logger })
+app.route('/api/v1', searchRoutes)
 
 // --- Initialize & Start Server ---
 

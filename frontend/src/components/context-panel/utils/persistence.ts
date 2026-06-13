@@ -3,8 +3,8 @@
  * Handles serialization, deserialization, and validation of persisted layout data.
  */
 
-/** Identifiers for the four context panel views */
-export type ContextPanelViewId = 'outline' | 'links' | 'tags' | 'properties';
+/** Identifiers for the context panel views */
+export type ContextPanelViewId = 'outline' | 'links' | 'tags' | 'properties' | 'search';
 
 /** Persisted layout structure stored in localStorage */
 export interface PersistedContextPanelLayout {
@@ -21,6 +21,7 @@ const VALID_VIEW_IDS: ReadonlySet<string> = new Set<ContextPanelViewId>([
   'links',
   'tags',
   'properties',
+  'search',
 ]);
 
 /**

@@ -1309,3 +1309,52 @@ Erkenntnisse aus der bisherigen Entwicklung, die in zukünftigen Sessions beacht
 - **Vault-scoped Plugin-Instanzen** — Jedes Plugin bekommt pro Vault eine eigene AppShim-Instanz. Bei Vault-Wechsel: onunload → onload mit neuem Kontext
 - **CSS Scoping via Attribut-Selektor** — `[data-plugin-id="<id>"]` Prefix auf allen Selektoren, keine Shadow-DOM-Isolation (wäre zu restriktiv für bestehende Plugins)
 - **Zod für Backend UND Frontend Manifest-Validierung** — Gleiche Schema-Definition, konsistente Fehlermeldungen
+
+
+## Search & Discovery
+
+### SearchService: Lineare Datei-Iteration reicht für Phase 1
+- Kein Index/Datenbank nötig bei ≤1000 Dateien pro Vault
+- Dateien alphabetisch sortiert, max 1000 gesucht, Rest wird als `truncated` gemeldet
+- Per-File-Regex-Timeout (5s) schützt vor ReDoS-artigen Patterns
+- Globaler Timeout (30s) begrenzt die Gesamtdauer
+- **Wann upgraden:** Erst bei Vaults mit >10.000 Dateien oder wenn Suchzeiten regelmäßig >5s werden → SQLite FTS5
+
+### Context-Lines-Merging bei nahen Treffern
+- Wenn zwei Treffer weniger als `2 * contextLines + 1` Zeilen auseinander liegen, werden ihre Kontextblöcke zusammengeführt
+- Verhindert doppelte Zeilen in der Ergebnisanzeige
+- Implementierung: Treffer werden in "Blöcke" gruppiert, innerhalb jedes Blocks wird der Kontext individuell berechnet mit Midpoint-Logik zwischen aufeinanderfolgenden Treffern
+
+### Multi-Vault-Suche: Shared Budget statt separater Limits
+- Globales Dateilimit (1000) und Zeitlimit (30s) gelten über ALLE Vaults hinweg
+- Nicht pro Vault — sonst könnte die Suche bei 20 Vaults theoretisch 20*30s = 10 Minuten dauern
+- Partial Success: Wenn ein Vault fehlschlägt, werden Ergebnisse der erfolgreichen Vaults trotzdem zurückgegeben
+- `failedVaults` Array enthält ID, Name und Fehlergrund für jede gescheiterte Vault
+
+### ReplaceService: 100-Dateien-Limit und partielle Fehlerbehandlung
+- Max 100 Dateien pro Replace-Operation (verhindert versehentliche Massenänderungen)
+- Sequentielle Verarbeitung — keine Parallelisierung (Race Conditions vermeiden)
+- Partial Failure: Erfolgreich ersetzte Dateien bleiben, fehlgeschlagene werden in `failed[]` gemeldet
+- Kein Rollback — das ist bewusst (Atomarität nur pro Datei, nicht über die gesamte Operation)
+
+### SearchPanel: Debounce + AbortController zusammen verwenden
+- 300ms Debounce auf der Eingabe: verhindert Spam-Requests beim Tippen
+- AbortController: bricht den vorherigen Request ab wenn ein neuer kommt
+- Zusammen verhindern sie Race Conditions bei schnellem Tippen (alter Response überschreibt neueren)
+- **Regel:** Bei debounced API-Calls IMMER auch AbortController verwenden
+
+### SearchProvider-State überlebt Panel-Öffnen/Schließen
+- `SearchProvider` wraps the entire AppContent → State bleibt beim Schließen/Öffnen des Panels erhalten
+- Requirement 8.4: "Letzten Query und Optionen beibehalten"
+- Kein localStorage nötig — Provider-Lifetime = App-Lifetime
+
+### Design Tokens für Search-spezifische Farben
+- 5 neue Tokens: `--search-match-bg`, `--search-match-text`, `--search-active-bg`, `--search-file-header-bg`, `--search-hit-hover-bg`
+- Definiert in allen 3 Blöcken: `:root`, `:root[data-theme="dark"]`, `@media (prefers-color-scheme: dark)`
+- Match-Highlighting: Gelb/Amber im Light Mode, dunkles Gold im Dark Mode
+- **Regel:** Neue Feature-spezifische Farben als Token-Gruppe mit Feature-Prefix definieren
+
+### Ctrl+Shift+F: Browser-Default verhindern
+- Einige Browser öffnen bei Ctrl+Shift+F ein eigenes Such-Fenster
+- `e.preventDefault()` im Keydown-Handler verhindert das
+- macOS: `Cmd+Shift+F` gleichberechtigt zu `Ctrl+Shift+F` prüfen (`e.metaKey || e.ctrlKey`)

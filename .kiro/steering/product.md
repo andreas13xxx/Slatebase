@@ -32,6 +32,8 @@ Slatebase is feature-complete for its core use case: multi-user Markdown vault m
 
 - **CI/CD Release Pipeline** — Automated release pipeline with GitHub Actions: CI workflow (lint, test, build on every push/PR), automatic Semantic Versioning via Release Please (Conventional Commits), multi-arch Docker image builds (amd64 + arm64), push to GHCR (+ optional DockerHub), version check in Admin UI (installed vs. latest on GitHub, update notification). Version endpoint at `GET /api/v1/version` (public, no auth).
 
+- **Search and Discovery (Phase 1)** — Vault-wide full-text search with Find & Replace. Linear file iteration with string matching (plain-text and regex), case-sensitive/insensitive toggle, context lines with nearby-hit merging, multi-vault search with per-vault access control, result truncation (file limit 1000, time limit 30s, result limit 500). Replace with atomic writes (temp → rename), max 100 files per operation, partial failure handling. Frontend SearchPanel replaces FileExplorer when open (Ctrl+Shift+F), 300ms debounced search, collapsible file groups with highlighted matches, per-hit navigation (click → open file at line), "Alle ersetzen" with confirmation modal. German UI labels throughout.
+
 ### Planned Features
 
 - Server-Side Plugin Execution — Run Obsidian plugins that require Node.js APIs on the backend (vm sandbox, Vault I/O shims, settings bridge, plugin logs)

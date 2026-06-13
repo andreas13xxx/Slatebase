@@ -55,23 +55,44 @@ function createInitialStateWithPersistence(userId: string | null): ContextPanelS
 }
 
 /**
+ * All view IDs that should always be present.
+ * Used for forward-compatibility migration when new views are added.
+ */
+const ALL_VIEW_IDS: ContextPanelViewId[] = ['outline', 'links', 'tags', 'properties', 'search']
+
+/**
  * Applies a persisted layout to the base state.
  * Reconstructs sections with fresh IDs while preserving view assignments and heights.
+ * Migrates old layouts by adding any missing view IDs to the first section and tabOrder.
  */
 function applyPersistedLayout(
   baseState: ContextPanelState,
   persisted: PersistedContextPanelLayout
 ): ContextPanelState {
-  const sections: SplitSection[] = persisted.sections.map((s) => ({
+  // Migrate: add any new view IDs that are missing from the persisted layout
+  const persistedViewIds = new Set<string>(persisted.tabOrder)
+  const missingViewIds = ALL_VIEW_IDS.filter(id => !persistedViewIds.has(id))
+
+  const migratedTabOrder = [...persisted.tabOrder as ContextPanelViewId[], ...missingViewIds]
+
+  // Add missing view IDs to the first section
+  const migratedSections = persisted.sections.map((s, i) => ({
+    ...s,
+    viewIds: i === 0
+      ? [...s.viewIds as ContextPanelViewId[], ...missingViewIds]
+      : s.viewIds as ContextPanelViewId[],
+  }))
+
+  const sections: SplitSection[] = migratedSections.map((s) => ({
     id: generateSectionId(),
-    viewIds: s.viewIds as ContextPanelViewId[],
+    viewIds: s.viewIds,
     activeViewId: s.activeViewId as ContextPanelViewId,
     heightFraction: s.heightFraction,
   }))
 
   return {
     ...baseState,
-    tabOrder: persisted.tabOrder as ContextPanelViewId[],
+    tabOrder: migratedTabOrder,
     sections,
   }
 }

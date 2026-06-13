@@ -197,6 +197,11 @@
   color: var(--success);
 }
 
+.toolbar-btn--active {
+  background: var(--sidebar-active);
+  color: var(--sidebar-text-active);
+}
+
 .toolbar-btn-sync-dot {
   position: absolute;
   bottom: 3px;

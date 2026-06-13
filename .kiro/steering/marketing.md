@@ -92,6 +92,7 @@ Die Collaboration-Features sind Slatebase's stärkstes Alleinstellungsmerkmal ge
 | **Knowledge Graph** | Interaktive Visualisierung der Vault-Verlinkungsstruktur — Obsidian Publish/Quartz haben keinen interaktiven Graph mit Zoom/Pan/Drag |
 | **Context Panel (Outline, Links, Tags, Properties)** | Obsidian Publish: kein Outline/Tags-Panel; Quartz: nur statisch. Slatebase: interaktiv, splittbar, Drag & Drop |
 | **MCP-Server mit Lese- UND Schreibzugriff** | AI-Assistenten (Claude, Cursor, etc.) können Vaults durchsuchen, Dateien erstellen/bearbeiten/löschen/verschieben — keine Alternative bietet das |
+| **Volltextsuche mit Find & Replace** | Vault-weite Suche (Plain-Text + Regex), Multi-Vault-Suche, Kontext-Zeilen, Replace mit Bestätigung — Obsidian Publish/Quartz haben keine Suche, nur statische Indizes |
 
 ### Messaging für Posts & Content
 

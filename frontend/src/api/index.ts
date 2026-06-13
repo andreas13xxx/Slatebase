@@ -290,6 +290,14 @@ export interface IApiClient {
   /** Toggle a feature's enabled state (admin only). */
   toggleAdminFeature(name: string, enabled: boolean): Promise<FeatureToggleUpdateResult>
 
+  // --- Search methods ---
+  /** Search text files within a single vault. */
+  searchVault(vaultId: string, params: Record<string, string>): Promise<unknown>
+  /** Search text files across multiple vaults. */
+  searchMultiVault(params: Record<string, string>): Promise<unknown>
+  /** Replace text occurrences within a vault. */
+  replaceInVault(vaultId: string, body: object): Promise<unknown>
+
   // --- Version methods ---
   getVersion(): Promise<{ version: string }>
 }
@@ -793,6 +801,25 @@ export class ApiClient implements IApiClient {
   /** Toggle a feature's enabled state (admin only). */
   async toggleAdminFeature(name: string, enabled: boolean): Promise<FeatureToggleUpdateResult> {
     return this.request<FeatureToggleUpdateResult>('PUT', `/api/v1/admin/features/${encodeURIComponent(name)}`, { enabled })
+  }
+
+  // --- Search methods ---
+
+  /** Search text files within a single vault. */
+  async searchVault(vaultId: string, params: Record<string, string>): Promise<unknown> {
+    const query = new URLSearchParams(params).toString()
+    return this.request<unknown>('GET', `/api/v1/vaults/${vaultId}/search?${query}`)
+  }
+
+  /** Search text files across multiple vaults. */
+  async searchMultiVault(params: Record<string, string>): Promise<unknown> {
+    const query = new URLSearchParams(params).toString()
+    return this.request<unknown>('GET', `/api/v1/search?${query}`)
+  }
+
+  /** Replace text occurrences within a vault. */
+  async replaceInVault(vaultId: string, body: object): Promise<unknown> {
+    return this.request<unknown>('POST', `/api/v1/vaults/${vaultId}/replace`, body)
   }
 
   // --- Version methods ---

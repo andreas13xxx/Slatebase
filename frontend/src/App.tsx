@@ -3,7 +3,9 @@ import { AppProvider, useAppContext, loadVaults, importFile, importFolder, expor
 import { ApiClient } from './api'
 import { AuthProvider, useAuthContext } from './state/authContext'
 import { TabProvider, useTabContext } from './state/tabContext'
+import { openTab } from './state/tabActions'
 import { FeatureProvider, useFeatureContext } from './state/featureContext'
+import { SearchProvider } from './state/searchContext'
 import { I18nProvider, useTranslation } from './i18n'
 import { ToastProvider } from './components/Toast'
 import { FileExplorer } from './components/FileExplorer'
@@ -549,6 +551,29 @@ function AppContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.selectedVaultId, dispatch, tabDispatch])
 
+  // Global keyboard shortcut: Ctrl+Shift+F (Win/Linux) / Cmd+Shift+F (macOS) opens search in right panel
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Shift+F (Win/Linux) or Cmd+Shift+F (macOS)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+        e.preventDefault()
+        // Open right panel and focus search input
+        setShowRightPanel(true)
+        // Focus the search input after the panel renders
+        setTimeout(() => {
+          const input = document.querySelector('.search-panel__input') as HTMLInputElement | null
+          if (input) {
+            input.focus()
+            input.select()
+          }
+        }, 50)
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   const handleLogout = useCallback(async () => {
     try { await apiClient.logout() } catch { /* ignore */ }
     apiClient.setToken(null)
@@ -764,13 +789,13 @@ function AppContent() {
               </div>
 
               <div className="app-sidebar-body">
-                <div className="app-sidebar-section">
-                  <span className="app-sidebar-section-label">{t('files.label')}</span>
-                  <FileExplorer
-                    onRegisterCreateFile={(trigger) => { createFileTriggerRef.current = trigger }}
-                    onRegisterCreateVault={(trigger) => { createVaultTriggerRef.current = trigger }}
-                  />
-                </div>
+                  <div className="app-sidebar-section">
+                    <span className="app-sidebar-section-label">{t('files.label')}</span>
+                    <FileExplorer
+                      onRegisterCreateFile={(trigger) => { createFileTriggerRef.current = trigger }}
+                      onRegisterCreateVault={(trigger) => { createVaultTriggerRef.current = trigger }}
+                    />
+                  </div>
               </div>
             </aside>
           )}
@@ -796,6 +821,7 @@ function AppContent() {
             onExportVault={handleExportVault}
             onNavigate={handleNavigate}
             onOpenGraph={handleOpenGraph}
+            onToggleSearch={() => setShowRightPanel(true)}
             isAdmin={user?.role === 'admin'}
             isVaultOwner={selectedVault?.permission === 'owner'}
             syncEnabled={selectedVault?.syncEnabled}
@@ -1009,11 +1035,13 @@ function AuthGuard() {
     <FeatureProvider>
       <FeatureLoader />
       <AppProvider apiClient={apiClient}>
-        <TabProvider>
-          <ContextPanelProvider>
-            <AppContent />
-          </ContextPanelProvider>
-        </TabProvider>
+        <SearchProvider>
+          <TabProvider>
+            <ContextPanelProvider>
+              <AppContent />
+            </ContextPanelProvider>
+          </TabProvider>
+        </SearchProvider>
       </AppProvider>
     </FeatureProvider>
   )

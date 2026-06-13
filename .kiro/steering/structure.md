@@ -46,6 +46,8 @@ src/
 │   ├── client-ip.ts     — Centralized client IP extraction with trusted proxy support
 │   ├── pluginRoutes.ts  — Plugin management CRUD routes (list, install, delete, bundle, styles, settings, registry)
 │   ├── featureRoutes.ts — Feature toggle admin + public routes (GET/PUT /admin/features, GET /features)
+│   ├── searchRoutes.ts — Search routes (GET /vaults/:vaultId/search, GET /search, POST /vaults/:vaultId/replace)
+│   ├── searchRoutes.test.ts — Integration tests for search routes
 │   ├── versionRoutes.ts — GET /api/v1/version (public, no auth, returns installed version)
 │   └── vaultShareRoutes.ts — ShareController + share/transfer routes
 ├── chat/
@@ -85,6 +87,15 @@ src/
 │   ├── handlers.ts       — McpHandlers (MCP resource handlers: list, read)
 │   ├── tool-handlers.ts  — MCP tool handlers (list_vaults, get_vault_structure, search_vault, read_file, write_file, create_directory, delete_file, move_file, rename_file)
 │   └── server-factory.ts — McpServerFactory (creates configured McpServer instance)
+├── search/
+│   ├── index.ts              — Barrel export for search module
+│   ├── types.ts              — ISearchService, IReplaceService, SearchResponse, SearchHit, etc.
+│   ├── errors.ts             — SearchQueryValidationError, RegexValidationError, RegexTooLongError, SearchTimeoutError, ReplaceValidationError, FileChangedError
+│   ├── validation.ts         — Zod schemas (searchQuerySchema, multiVaultSearchSchema, replaceBodySchema)
+│   ├── search-service.ts     — SearchService (linear file iteration, plain-text + regex, context lines, multi-vault)
+│   ├── replace-service.ts    — ReplaceService (atomic write, max 100 files, partial failure)
+│   ├── replace-service.test.ts — Unit tests for ReplaceService
+│   └── (search-service.test.ts) — Optional: Unit tests for SearchService
 ├── link-index/
 │   ├── index.ts              — Barrel export for link-index module
 │   ├── types.ts              — ILinkIndex interface, GraphData, GraphNode, GraphEdge, ParsedWikilink
@@ -187,12 +198,17 @@ src/
 │   ├── contextPanelActions.ts — loadOutline, loadForwardLinks, loadBacklinks, loadTags, loadProperties, expandTag
 │   ├── featureState.ts   — Feature toggle reducer + types (FeatureToggleInfo, optimistic update/rollback)
 │   ├── featureContext.ts — FeatureProvider + useFeatureContext hook (isEnabled helper)
-│   └── featureActions.ts — loadFeatures, toggleFeature action creators
+│   ├── featureActions.ts — loadFeatures, toggleFeature action creators
+│   ├── searchState.ts    — Search reducer + types (query, results, replace, activeResultId)
+│   ├── searchContext.ts  — SearchProvider + useSearchContext hook
+│   └── searchActions.ts  — performSearch, performMultiVaultSearch, performReplace, performSingleReplace
 ├── components/
 │   ├── SlatebaseLogo.tsx — SVG logo component
 │   ├── SidebarToolbar.tsx — Draggable vertical toolbar
 │   ├── VaultList.tsx     — Vault selector/manager dropdown (legacy, no longer rendered in App.tsx)
 │   ├── FileExplorer.tsx  — Unified multi-vault explorer (all vaults as expandable root entries, lazy-loading, DnD, context menu)
+│   ├── SearchPanel.tsx   — Vault-wide search + replace panel (replaces FileExplorer when open, debounced search, result navigation)
+│   ├── SearchPanel.css   — SearchPanel styles with design tokens
 │   ├── TabBar.tsx        — Horizontal tab strip (file tabs)
 │   ├── TabContent.tsx    — Tab content orchestrator (Edit/View/Binary)
 │   ├── EditMode.tsx      — Plain-text editor with toolbar + auto-save + read-only mode
@@ -330,6 +346,14 @@ All routes are prefixed with `/api/v1`:
 | GET | /vaults/:vaultId/graph | Get full link graph (nodes + edges) |
 | GET | /vaults/:vaultId/backlinks?path= | Get backlinks for a file |
 | GET | /vaults/:vaultId/tags | Get all tags in the vault with file counts |
+
+### Search & Replace
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | /vaults/:vaultId/search | Single-vault full-text search (query params: query, caseSensitive, regex, contextLines, maxResults) |
+| GET | /search | Multi-vault search (additional: vaultIds comma-separated) |
+| POST | /vaults/:vaultId/replace | Replace occurrences (JSON body: query, replacement, caseSensitive, regex, paths) |
 
 ### MCP (Model Context Protocol)
 

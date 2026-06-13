@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react'
 import {
   Upload, FolderOpen, Download, Settings, Shield,
   Database, FileText, Clock, User, Server, FilePlus, MessageCircle, RefreshCw, Key, ScrollText,
-  ClipboardList, Plus, Share2, Plug,
+  ClipboardList, Plus, Share2, Plug, Search,
 } from 'lucide-react'
 import { useFeatureContext } from '../state/featureContext'
 
@@ -31,6 +31,8 @@ interface SidebarToolbarProps {
   onExportVault: () => void
   onNavigate: (page: AppPage) => void
   onOpenGraph: () => void
+  onToggleSearch?: () => void
+  searchPanelOpen?: boolean
   isAdmin: boolean
   isVaultOwner?: boolean
   syncEnabled?: boolean
@@ -42,10 +44,11 @@ interface SidebarToolbarProps {
  * Buttons can be reordered by drag-and-drop.
  * Tooltips show on hover.
  */
-export function SidebarToolbar({ vaultId, onCreateVault, onCreateFile, onImportFile, onImportFolder, onExportVault, onNavigate, onOpenGraph, isAdmin, isVaultOwner, syncEnabled, globalUnreadCount }: SidebarToolbarProps) {
+export function SidebarToolbar({ vaultId, onCreateVault, onCreateFile, onImportFile, onImportFolder, onExportVault, onNavigate, onOpenGraph, onToggleSearch, searchPanelOpen, isAdmin, isVaultOwner, syncEnabled, globalUnreadCount }: SidebarToolbarProps) {
   const { isEnabled } = useFeatureContext()
 
   const allItems: ToolbarItem[] = [
+    { id: 'search', icon: <Search size={15} />, label: 'Suche', action: () => onToggleSearch?.() },
     { id: 'create-vault', icon: <Plus size={15} />, label: 'Neuer Vault', action: onCreateVault },
     { id: 'create-file', icon: <FilePlus size={15} />, label: 'Neue Datei', action: onCreateFile, requiresVault: true },
     { id: 'import-file', icon: <Upload size={15} />, label: 'Datei importieren', action: onImportFile, requiresVault: true },
@@ -122,10 +125,11 @@ export function SidebarToolbar({ vaultId, onCreateVault, onCreateFile, onImportF
         const disabled = item.requiresVault && !vaultId
         const showBadge = item.id === 'chat' && globalUnreadCount !== undefined && globalUnreadCount > 0
         const showSyncActive = item.id === 'sync-config' && syncEnabled === true
+        const showSearchActive = item.id === 'search' && searchPanelOpen === true
         return (
           <button
             key={item.id}
-            className={`toolbar-btn${showSyncActive ? ' toolbar-btn--sync-active' : ''}`}
+            className={`toolbar-btn${showSyncActive ? ' toolbar-btn--sync-active' : ''}${showSearchActive ? ' toolbar-btn--active' : ''}`}
             title={showSyncActive ? `${item.label} (aktiv)` : item.label}
             aria-label={item.label}
             onClick={disabled ? undefined : item.action}

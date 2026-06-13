@@ -28,6 +28,7 @@ import { OutlineView } from './OutlineView'
 import { LinksView } from './LinksView'
 import { TagsView } from './TagsView'
 import { PropertiesView } from './PropertiesView'
+import { SearchPanel } from '../SearchPanel'
 import type { ContextPanelViewId } from '../../state/contextPanelState'
 import './ContextPanel.css'
 
@@ -226,6 +227,26 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
     void openTab(tabDispatch, appDispatch, apiClient, vaultId, filePath, fileName)
   }, [vaultId, apiClient, tabDispatch, appDispatch])
 
+  // ─── Search Navigate: Open file at line ────────────────────────────────────
+
+  const handleSearchNavigate = useCallback((targetVaultId: string, filePath: string, _line: number) => {
+    if (!apiClient) return
+
+    // Switch vault if needed
+    if (targetVaultId !== appState.selectedVaultId) {
+      appDispatch({ type: 'VAULT_SELECTED', payload: targetVaultId })
+    }
+
+    const parts = filePath.split('/')
+    const fileName = parts[parts.length - 1] ?? filePath
+
+    void openTab(tabDispatch, appDispatch, apiClient, targetVaultId, filePath, fileName)
+  }, [apiClient, appState.selectedVaultId, appDispatch, tabDispatch])
+
+  // ─── Selected vault info for search panel ──────────────────────────────────
+
+  const selectedVault = appState.vaults.find(v => v.id === appState.selectedVaultId)
+
   // ─── Render View ───────────────────────────────────────────────────────────
 
   const renderView = useCallback((viewId: ContextPanelViewId) => {
@@ -272,6 +293,15 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
             hasDocument={hasDocument}
           />
         )
+      case 'search':
+        return (
+          <SearchPanel
+            vaults={appState.vaults}
+            selectedVaultId={appState.selectedVaultId}
+            hasWriteAccess={selectedVault?.permission === 'owner' || selectedVault?.permission === 'write'}
+            onNavigateToResult={handleSearchNavigate}
+          />
+        )
     }
   }, [
     documentContent,
@@ -283,6 +313,10 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
     handleLinkClick,
     handleTagClick,
     handleFileClick,
+    handleSearchNavigate,
+    selectedVault,
+    appState.vaults,
+    appState.selectedVaultId,
   ])
 
   // ─── Single-Section Body Drop (split trigger) ───────────────────────────────

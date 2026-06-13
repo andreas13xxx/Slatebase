@@ -150,6 +150,14 @@ All under `/api/v1`:
 | GET | /vaults/:vaultId/graph | Get full link graph (nodes + edges) |
 | GET | /vaults/:vaultId/backlinks?path= | Get backlinks for a file |
 
+### Search & Replace
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | /vaults/:vaultId/search | Single-vault full-text search |
+| GET | /search | Multi-vault search (vaultIds param) |
+| POST | /vaults/:vaultId/replace | Replace occurrences in vault files |
+
 ### MCP (Model Context Protocol)
 
 | Method | Path | Auth | Purpose |

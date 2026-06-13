@@ -14,8 +14,8 @@ export const MIN_HEIGHT_FRACTION = 0.1
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-/** Identifiers for the four context panel views. */
-export type ContextPanelViewId = 'outline' | 'links' | 'tags' | 'properties'
+/** Identifiers for the context panel views. */
+export type ContextPanelViewId = 'outline' | 'links' | 'tags' | 'properties' | 'search'
 
 /** A single split section within the context panel. */
 export interface SplitSection {
@@ -115,7 +115,7 @@ export function resetSectionIdCounter(): void {
 // ─── Default Tab Order ───────────────────────────────────────────────────────
 
 /** Default tab order for the context panel. */
-export const DEFAULT_TAB_ORDER: ContextPanelViewId[] = ['outline', 'links', 'tags', 'properties']
+export const DEFAULT_TAB_ORDER: ContextPanelViewId[] = ['outline', 'links', 'tags', 'properties', 'search']
 
 // ─── Initial State ───────────────────────────────────────────────────────────
 
@@ -125,7 +125,7 @@ export function createInitialState(): ContextPanelState {
     sections: [
       {
         id: generateSectionId(),
-        viewIds: ['outline', 'links', 'tags', 'properties'],
+        viewIds: ['outline', 'links', 'tags', 'properties', 'search'],
         activeViewId: 'outline',
         heightFraction: 1,
       },

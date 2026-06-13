@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { List, Link, Tag, FileText } from 'lucide-react'
+import { List, Link, Tag, FileText, Search } from 'lucide-react'
 import type { ContextPanelViewId } from '../../state/contextPanelState'
 import './ContextPanelTabBar.css'
 
@@ -9,6 +9,7 @@ const TAB_CONFIG: Record<ContextPanelViewId, { icon: typeof List; label: string 
   links: { icon: Link, label: 'Links' },
   tags: { icon: Tag, label: 'Tags' },
   properties: { icon: FileText, label: 'Eigenschaften' },
+  search: { icon: Search, label: 'Suche' },
 }
 
 export interface ContextPanelTabBarProps {
