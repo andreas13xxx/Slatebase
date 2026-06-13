@@ -10,13 +10,13 @@ import type { Dispatch } from 'react'
 import type { SearchAction, SearchFileResult, ReplaceResponse } from './searchState'
 
 /**
- * Temporary interface for search-related API methods.
- * Will be replaced by IApiClient extension in task 7.1.
+ * Interface for search-related API methods.
+ * Returns Promise<unknown> to be compatible with the IApiClient implementation.
  */
 export interface ISearchApiClient {
-  searchVault(vaultId: string, params: Record<string, string>): Promise<SearchVaultResponse>
-  searchMultiVault(params: Record<string, string>): Promise<SearchVaultResponse>
-  replaceInVault(vaultId: string, body: ReplaceRequestBody): Promise<ReplaceResponse>
+  searchVault(vaultId: string, params: Record<string, string>): Promise<unknown>
+  searchMultiVault(params: Record<string, string>): Promise<unknown>
+  replaceInVault(vaultId: string, body: ReplaceRequestBody): Promise<unknown>
 }
 
 /** Response shape from the search endpoints. */
@@ -86,10 +86,11 @@ export async function performSearch(
 
     if (signal?.aborted) return
 
-    const result = await apiClient.searchVault(vaultId, params)
+    const rawResult = await apiClient.searchVault(vaultId, params)
 
     if (signal?.aborted) return
 
+    const result = rawResult as SearchVaultResponse
     dispatch({
       type: 'SEARCH_SUCCESS',
       payload: {
@@ -135,10 +136,11 @@ export async function performMultiVaultSearch(
 
     if (signal?.aborted) return
 
-    const result = await apiClient.searchMultiVault(params)
+    const rawResult = await apiClient.searchMultiVault(params)
 
     if (signal?.aborted) return
 
+    const result = rawResult as SearchVaultResponse
     dispatch({
       type: 'SEARCH_SUCCESS',
       payload: {
@@ -176,8 +178,8 @@ export async function performReplace(
       body.paths = options.paths
     }
 
-    const result = await apiClient.replaceInVault(vaultId, body)
-    dispatch({ type: 'REPLACE_SUCCESS', payload: result })
+    const rawResult = await apiClient.replaceInVault(vaultId, body)
+    dispatch({ type: 'REPLACE_SUCCESS', payload: rawResult as ReplaceResponse })
   } catch (err: unknown) {
     const message = extractErrorMessage(err)
     dispatch({ type: 'REPLACE_ERROR', payload: message })

@@ -60,15 +60,12 @@ export function SearchPanel({
 
     // Use the authenticated ApiClient from AppContext as ISearchApiClient adapter
     const searchApiClient: ISearchApiClient = {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       searchVault: (vaultId: string, params: Record<string, string>) =>
-        apiClient!.searchVault(vaultId, params) as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        apiClient!.searchVault(vaultId, params),
       searchMultiVault: (params: Record<string, string>) =>
-        apiClient!.searchMultiVault(params) as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        apiClient!.searchMultiVault(params),
       replaceInVault: (vaultId: string, body) =>
-        apiClient!.replaceInVault(vaultId, body as object) as any,
+        apiClient!.replaceInVault(vaultId, body as object),
     }
 
     const searchOptions = {
@@ -89,15 +86,12 @@ export function SearchPanel({
    */
   const buildReplaceApiClient = useCallback((): ISearchApiClient => {
     return {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       searchVault: (vaultId: string, params: Record<string, string>) =>
-        apiClient!.searchVault(vaultId, params) as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        apiClient!.searchVault(vaultId, params),
       searchMultiVault: (params: Record<string, string>) =>
-        apiClient!.searchMultiVault(params) as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        apiClient!.searchMultiVault(params),
       replaceInVault: (vaultId: string, body) =>
-        apiClient!.replaceInVault(vaultId, body as object) as any,
+        apiClient!.replaceInVault(vaultId, body as object),
     }
   }, [apiClient])
 
