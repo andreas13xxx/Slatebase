@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/andreas13xxx/Slatebase/compare/v0.4.0...v0.5.0) (2026-06-14)
+
+
+### Features
+
+* realtime infrastructure with SSE push notifications ([45a6488](https://github.com/andreas13xxx/Slatebase/commit/45a648855a737cc8e4365c2e06be9798e184c275))
+
 ## [0.4.0](https://github.com/andreas13xxx/Slatebase/compare/v0.3.3...v0.4.0) (2026-06-13)
 
 
