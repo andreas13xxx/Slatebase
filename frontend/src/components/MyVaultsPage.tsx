@@ -3,7 +3,7 @@ import { useAppContext, loadVaults, deleteVault, exportVault } from '../state'
 import { useTranslation } from '../i18n'
 import type { IApiClient, UserSearchResult } from '../api'
 import type { VaultInfo } from '../types'
-import { Database, Eye, Pencil, Crown, Trash2, Share2, RefreshCw, X, ArrowRightLeft, Download } from 'lucide-react'
+import { Database, Eye, Pencil, Crown, Trash2, Users, RefreshCw, X, ArrowRightLeft, Download } from 'lucide-react'
 import { ConfirmModal } from './ConfirmModal'
 import { VaultDeletionWorkflow } from './VaultDeletionWorkflow'
 
@@ -221,7 +221,7 @@ export function MyVaultsPage({ apiClient, onOpenSync }: MyVaultsPageProps) {
                       title="Freigaben verwalten"
                       aria-label={`Freigaben für "${vault.name}" verwalten`}
                     >
-                      <Share2 size={12} />
+                      <Users size={12} />
                       {shares.length > 0 && <span className="my-vaults-share-count">{shares.length}</span>}
                     </button>
                     <button

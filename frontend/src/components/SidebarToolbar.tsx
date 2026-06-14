@@ -19,11 +19,13 @@ interface ToolbarItem {
   adminOnly?: boolean
   ownerOnly?: boolean
   requiresVault?: boolean
+  requiresWrite?: boolean
   feature?: string
 }
 
 interface SidebarToolbarProps {
   vaultId: string | null
+  vaultPermission?: string | null
   onCreateVault: () => void
   onCreateFile: () => void
   onImportFile: () => void
@@ -44,15 +46,15 @@ interface SidebarToolbarProps {
  * Buttons can be reordered by drag-and-drop.
  * Tooltips show on hover.
  */
-export function SidebarToolbar({ vaultId, onCreateVault, onCreateFile, onImportFile, onImportFolder, onExportVault, onNavigate, onOpenGraph, onToggleSearch, searchPanelOpen, isAdmin, isVaultOwner, syncEnabled, globalUnreadCount }: SidebarToolbarProps) {
+export function SidebarToolbar({ vaultId, vaultPermission, onCreateVault, onCreateFile, onImportFile, onImportFolder, onExportVault, onNavigate, onOpenGraph, onToggleSearch, searchPanelOpen, isAdmin, isVaultOwner, syncEnabled, globalUnreadCount }: SidebarToolbarProps) {
   const { isEnabled } = useFeatureContext()
 
   const allItems: ToolbarItem[] = [
     { id: 'search', icon: <Search size={15} />, label: 'Suche', action: () => onToggleSearch?.() },
     { id: 'create-vault', icon: <Plus size={15} />, label: 'Neuer Vault', action: onCreateVault },
-    { id: 'create-file', icon: <FilePlus size={15} />, label: 'Neue Datei', action: onCreateFile, requiresVault: true },
-    { id: 'import-file', icon: <Upload size={15} />, label: 'Datei importieren', action: onImportFile, requiresVault: true },
-    { id: 'import-folder', icon: <FolderOpen size={15} />, label: 'Ordner importieren', action: onImportFolder, requiresVault: true },
+    { id: 'create-file', icon: <FilePlus size={15} />, label: 'Neue Datei', action: onCreateFile, requiresVault: true, requiresWrite: true },
+    { id: 'import-file', icon: <Upload size={15} />, label: 'Datei importieren', action: onImportFile, requiresVault: true, requiresWrite: true },
+    { id: 'import-folder', icon: <FolderOpen size={15} />, label: 'Ordner importieren', action: onImportFolder, requiresVault: true, requiresWrite: true },
     { id: 'export-vault', icon: <Download size={15} />, label: 'Vault exportieren', action: onExportVault, requiresVault: true },
     { id: 'graph', icon: <Share2 size={15} />, label: 'Graph', action: onOpenGraph, requiresVault: true, feature: 'knowledge-graph' },
     { id: 'sync-config', icon: <RefreshCw size={15} />, label: 'Vault-Sync', action: () => onNavigate('sync-config'), requiresVault: true, ownerOnly: true, feature: 'vault-sync' },
@@ -122,7 +124,7 @@ export function SidebarToolbar({ vaultId, onCreateVault, onCreateFile, onImportF
   return (
     <div className="app-toolbar" role="toolbar" aria-label="Werkzeugleiste">
       {orderedItems.map((item) => {
-        const disabled = item.requiresVault && !vaultId
+        const disabled = (item.requiresVault && !vaultId) || (item.requiresWrite && vaultPermission === 'read')
         const showBadge = item.id === 'chat' && globalUnreadCount !== undefined && globalUnreadCount > 0
         const showSyncActive = item.id === 'sync-config' && syncEnabled === true
         const showSearchActive = item.id === 'search' && searchPanelOpen === true

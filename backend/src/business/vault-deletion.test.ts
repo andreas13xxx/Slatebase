@@ -44,12 +44,14 @@ function createMockConfigService(overrides?: Partial<ServerConfig>): IConfigServ
     sessionDurationHours: 24,
     sessionMaxLifetimeDays: 7,
     features: {},
+    sse: { maxConnections: 1000, maxPerUser: 3, heartbeatInterval: 30000, replayBufferSize: 100, replayTtl: 300000, batchWindow: 100, batchMax: 20 },
     ...overrides,
   }
   return {
     getServerConfig: () => config,
     getVaultConfigs: () => config.vaults,
     getFeaturesConfig: () => config.features,
+    getSseConfig: () => config.sse,
   }
 }
 

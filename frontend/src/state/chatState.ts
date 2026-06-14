@@ -104,6 +104,9 @@ export type ChatAction =
   | { type: 'CONVERSATION_LEFT'; payload: { conversationId: string; unreadCount: number } }
   | { type: 'GLOBAL_UNREAD_UPDATED'; payload: number }
   | { type: 'CONVERSATION_UNREAD_RESET'; payload: string }
+  | { type: 'REALTIME_MESSAGE_RECEIVED'; payload: Message }
+  | { type: 'REALTIME_UNREAD_UPDATED'; payload: number }
+  | { type: 'REALTIME_CONVERSATION_PREVIEW_UPDATED'; payload: { conversationId: string; preview: string; timestamp: string } }
 
 // ─── Reducer ─────────────────────────────────────────────────────────────────
 
@@ -210,12 +213,62 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         globalUnreadCount: action.payload,
       }
 
-    case 'CONVERSATION_UNREAD_RESET':
+    case 'CONVERSATION_UNREAD_RESET': {
+      const resetConv = state.conversations.find(c => c.id === action.payload)
+      const previousUnread = resetConv?.unreadCount ?? 0
       return {
         ...state,
         conversations: state.conversations.map(c =>
           c.id === action.payload ? { ...c, unreadCount: 0 } : c
         ),
+        globalUnreadCount: Math.max(0, state.globalUnreadCount - previousUnread),
       }
+    }
+
+    case 'REALTIME_MESSAGE_RECEIVED': {
+      // Only insert if the message belongs to the current conversation
+      if (state.currentConversation !== action.payload.conversationId) {
+        return state
+      }
+      // Deduplicate by messageId
+      if (state.messages.some(m => m.id === action.payload.id)) {
+        return state
+      }
+      return {
+        ...state,
+        messages: [...state.messages, action.payload],
+      }
+    }
+
+    case 'REALTIME_UNREAD_UPDATED':
+      return {
+        ...state,
+        globalUnreadCount: action.payload,
+      }
+
+    case 'REALTIME_CONVERSATION_PREVIEW_UPDATED': {
+      const { conversationId, preview, timestamp } = action.payload
+      const idx = state.conversations.findIndex(c => c.id === conversationId)
+      if (idx === -1) {
+        return state
+      }
+      const truncatedPreview = preview.length > 100
+        ? preview.slice(0, 100) + '\u2026'
+        : preview
+      const updatedConv = {
+        ...state.conversations[idx]!,
+        lastMessagePreview: truncatedPreview,
+        lastMessageTimestamp: timestamp,
+      }
+      const reorderedConversations = [
+        updatedConv,
+        ...state.conversations.slice(0, idx),
+        ...state.conversations.slice(idx + 1),
+      ]
+      return {
+        ...state,
+        conversations: reorderedConversations,
+      }
+    }
   }
 }

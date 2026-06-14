@@ -62,6 +62,9 @@ import { PluginStore, PluginInstaller } from './plugin/index.js'
 import { createPluginRoutes } from './api/pluginRoutes.js'
 import { versionRoutes } from './api/versionRoutes.js'
 import { SearchService, ReplaceService } from './search/index.js'
+import type { IConnectionManager, SseEvent } from './realtime/index.js'
+import { EventReplayBuffer, RateLimiter as SseRateLimiter, ConnectionManager, PresenceService, EventBus, ConnectionLimitError } from './realtime/index.js'
+import { createSseRoutes } from './api/sseRoutes.js'
 import { createSearchRoutes } from './api/searchRoutes.js'
 
 // --- Composition Root ---
@@ -82,6 +85,7 @@ featureRegistry.register({ name: 'obsidian-plugin-compat', description: 'Obsidia
 featureRegistry.register({ name: 'chat', description: 'Echtzeit-Chat zwischen Benutzern', defaultEnabled: true, type: 'hot' })
 featureRegistry.register({ name: 'mcp', description: 'AI Context Server (MCP Integration)', defaultEnabled: true, type: 'cold' })
 featureRegistry.register({ name: 'knowledge-graph', description: 'Interaktive Vault-Verlinkungsvisualisierung', defaultEnabled: true, type: 'hot' })
+featureRegistry.register({ name: 'realtime', description: 'SSE-based realtime push infrastructure for chat, presence, and vault changes', defaultEnabled: true, type: 'hot' })
 
 const featureToggleStore = new FeatureToggleStore(serverConfig.dataDir, logger)
 const persistedFeatureState = await featureToggleStore.load()
@@ -121,6 +125,9 @@ const mcpConfig = loadMcpConfig(config)
 
 // Mutable reference for MCP token invalidation hook (set after MCP module init)
 let mcpTokenInvalidator: ((userId: string) => Promise<void>) | undefined
+
+// Mutable reference for ConnectionManager (set when realtime module is wired in task 10.1)
+let connectionManager: IConnectionManager | undefined
 
 const onUserInvalidated = async (userId: string): Promise<void> => {
   if (mcpTokenInvalidator !== undefined) {
@@ -262,6 +269,47 @@ const pluginInstaller = new PluginInstaller(pluginStore)
 const searchService = new SearchService(vaultService, vaultAccessControl, logger)
 const replaceService = new ReplaceService(vaultService, vaultAccessControl, logger)
 
+// 4g. Realtime Services (SSE)
+const sseConfig = config.getSseConfig()
+const replayBuffer = new EventReplayBuffer({ bufferSize: sseConfig.replayBufferSize, ttlMs: sseConfig.replayTtl })
+const sseRateLimiter = new SseRateLimiter({ maxPerSecond: 10 })
+const realtimeConnectionManager = new ConnectionManager(
+  { maxConnections: sseConfig.maxConnections, maxPerUser: sseConfig.maxPerUser, heartbeatInterval: sseConfig.heartbeatInterval },
+  logger,
+)
+// Assign to the mutable reference for feature toggle listener
+connectionManager = realtimeConnectionManager
+
+const presenceService = new PresenceService({ logger, gracePeriodMs: 60000 })
+const eventBus = new EventBus({
+  connectionManager: realtimeConnectionManager,
+  replayBuffer,
+  rateLimiter: sseRateLimiter,
+  logger,
+  batchWindow: sseConfig.batchWindow,
+  batchMax: sseConfig.batchMax,
+})
+
+// Wire ConnectionManager callbacks to PresenceService
+realtimeConnectionManager.onUserConnected((userId) => presenceService.markOnline(userId))
+realtimeConnectionManager.onUserDisconnected((userId) => presenceService.startGracePeriod(userId))
+
+// Publish presence:update events on status changes
+presenceService.onStatusChange((userId, status) => {
+  eventBus.publish({
+    type: 'presence:update',
+    payload: { userId, status },
+    target: { kind: 'broadcast' },
+    excludeUserId: userId,
+  })
+})
+
+// Start heartbeat
+realtimeConnectionManager.startHeartbeat()
+
+// Wire EventBus to ChatService for realtime message/unread push
+chatService.setEventBus(eventBus)
+
 /**
  * Returns the LinkIndexService instance for a given vault, or undefined if not found.
  */
@@ -274,6 +322,9 @@ const vaultController = new VaultController(vaultService, logger, importService,
 const authController = new AuthController(authService, logger)
 const userController = new UserController(userService, logger)
 const chatController = new ChatController(chatService, chatRateLimiter, logger, userRepository)
+
+// Wire EventBus to VaultController for vault:change events
+vaultController.setEventBus(eventBus)
 
 // 6. Route Modules
 const routeModules = [
@@ -312,8 +363,9 @@ app.use(
 
 // Auth middleware (skips login endpoint internally)
 const rateLimiter = new RateLimiter()
+const authMiddleware = createAuthMiddleware(authService)
 app.use('*', createClientIpMiddleware({ trustedProxies: serverConfig.trustedProxies }))
-app.use('/api/v1/*', createAuthMiddleware(authService))
+app.use('/api/v1/*', authMiddleware)
 app.use('/api/v1/*', createCsrfMiddleware(authService))
 app.use('/api/v1/*', createRateLimitMiddleware(rateLimiter))
 app.use('/api/v1/*', createMustChangePasswordMiddleware(userRepository))
@@ -372,6 +424,17 @@ app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)
 // Search route registration (auth middleware applies via /api/v1/* pattern)
 const searchRoutes = createSearchRoutes({ searchService, replaceService, vaultAccessControl, logger })
 app.route('/api/v1', searchRoutes)
+
+// SSE route registration (realtime events endpoint)
+const sseRoutes = createSseRoutes({
+  connectionManager: realtimeConnectionManager,
+  eventBus,
+  presenceService,
+  authMiddleware,
+  featureGuard: createFeatureGuard('realtime', featureToggleService),
+  logger,
+})
+app.route('/api/v1', sseRoutes)
 
 // --- Initialize & Start Server ---
 
@@ -492,6 +555,33 @@ featureToggleService.onChange((featureName: string, enabled: boolean) => {
   }
 })
 
+// Register feature toggle listener for realtime (SSE) graceful shutdown
+featureToggleService.onChange((featureName: string, enabled: boolean) => {
+  if (featureName !== 'realtime') return
+
+  if (!enabled && connectionManager) {
+    // Send feature-disabled event to all connected clients
+    connectionManager.broadcast({
+      type: 'server:feature-disabled',
+      id: '0',
+      data: { reason: 'feature_disabled' },
+      timestamp: new Date().toISOString(),
+    })
+    // Close all connections after 10s delay
+    setTimeout(() => {
+      if (connectionManager) {
+        connectionManager.shutdown().catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : String(error)
+          logger.error('Failed to shutdown connections after realtime toggle disabled', { error: message })
+        })
+      }
+    }, 10000)
+    logger.info('Realtime disabled — broadcasting feature-disabled, connections will close in 10s')
+  } else if (enabled) {
+    logger.info('Realtime enabled — clients will connect on next feature state poll')
+  }
+})
+
 // Set up sync-to-link-index hook: rebuild link index after successful pull
 syncService.setOnPullComplete((vaultId: string) => {
   const linkIndex = getLinkIndex(vaultId)
@@ -507,11 +597,100 @@ syncService.setOnPullComplete((vaultId: string) => {
 // Create the Hono request listener for non-MCP requests
 const honoListener = getRequestListener(app.fetch)
 
-// Create HTTP server with MCP interception
+// Create HTTP server with MCP and SSE interception
 const server = createHttpServer(async (req, res) => {
   // Intercept MCP transport requests — handle directly to avoid Hono double-response
   if (req.url === '/api/v1/mcp' && mcpHttpHandler !== null) {
     await mcpHttpHandler(req, res)
+    return
+  }
+
+  // Intercept SSE events endpoint — handle directly to avoid Hono double-response (ERR_HTTP_HEADERS_SENT)
+  const parsedUrl = new URL(req.url ?? '', `http://${req.headers.host ?? 'localhost'}`)
+  if (parsedUrl.pathname === '/api/v1/events' && req.method === 'GET') {
+    // Check if realtime feature is enabled
+    if (!featureToggleService.isEnabled('realtime')) {
+      res.writeHead(404, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ code: 'FEATURE_DISABLED', message: 'Feature realtime is disabled', timestamp: new Date().toISOString() }))
+      return
+    }
+
+    // Authenticate via token query param
+    const token = parsedUrl.searchParams.get('token')
+    if (!token) {
+      res.writeHead(401, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ code: 'UNAUTHORIZED', message: 'Missing token', timestamp: new Date().toISOString() }))
+      return
+    }
+
+    const session = await authService.validateSession(token)
+    if (!session) {
+      res.writeHead(401, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ code: 'UNAUTHORIZED', message: 'Invalid or expired token', timestamp: new Date().toISOString() }))
+      return
+    }
+
+    const userId = session.userId
+    const lastEventId = req.headers['last-event-id'] as string | undefined
+
+    // Register connection
+    let connectionId: string
+    try {
+      connectionId = realtimeConnectionManager.register(userId, res, lastEventId)
+    } catch (error) {
+      if (error instanceof ConnectionLimitError) {
+        res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' })
+        res.end(JSON.stringify({ code: error.code, message: error.message, timestamp: new Date().toISOString() }))
+        return
+      }
+      throw error
+    }
+
+    logger.info('SSE connection established', { connectionId, userId })
+
+    // Set SSE headers and keep alive
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    })
+
+    // Send presence:init
+    try {
+      const visibleUsers = await presenceService.getVisibleOnlineUsers(userId)
+      const initEvent: SseEvent = {
+        type: 'presence:init',
+        id: eventBus.nextEventId(),
+        data: { type: 'presence:init', payload: { onlineUsers: visibleUsers }, timestamp: new Date().toISOString() },
+        timestamp: new Date().toISOString(),
+      }
+      const json = JSON.stringify(initEvent.data)
+      res.write(`event: ${initEvent.type}\nid: ${initEvent.id}\ndata: ${json}\n\n`)
+    } catch (err) {
+      logger.error('Failed to send presence:init', { connectionId, userId, error: String(err) })
+    }
+
+    // Replay missed events
+    if (lastEventId) {
+      try {
+        const missedEvents = eventBus.getEventsSince(userId, lastEventId)
+        for (const event of missedEvents) {
+          const json = JSON.stringify(event.data)
+          res.write(`event: ${event.type}\nid: ${event.id}\ndata: ${json}\n\n`)
+        }
+      } catch (err) {
+        logger.error('Failed to replay events', { connectionId, userId, error: String(err) })
+      }
+    }
+
+    // Cleanup on disconnect
+    res.on('close', () => {
+      logger.debug('SSE connection closed', { connectionId, userId })
+      realtimeConnectionManager.remove(connectionId)
+    })
+
+    // Do NOT call res.end() — connection stays open
     return
   }
 
@@ -522,3 +701,20 @@ const server = createHttpServer(async (req, res) => {
 server.listen(serverConfig.port, serverConfig.host, () => {
   logger.info('Server started', { host: serverConfig.host, port: serverConfig.port })
 })
+
+// --- Graceful Shutdown ---
+
+const gracefulShutdown = async (signal: string): Promise<void> => {
+  logger.info('Received shutdown signal', { signal })
+
+  // Shutdown realtime connections (sends server:shutdown event, closes all streams)
+  await realtimeConnectionManager.shutdown()
+
+  server.close(() => {
+    logger.info('Server closed')
+    process.exit(0)
+  })
+}
+
+process.on('SIGTERM', () => { gracefulShutdown('SIGTERM').catch(() => process.exit(1)) })
+process.on('SIGINT', () => { gracefulShutdown('SIGINT').catch(() => process.exit(1)) })

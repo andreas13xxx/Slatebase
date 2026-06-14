@@ -211,6 +211,12 @@ All under `/api/v1`:
 |--------|------|---------|
 | GET | /version | Get installed Slatebase version (public, no auth) |
 
+### Realtime (SSE)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | /events | SSE stream for real-time push (chat, presence, vault changes, toasts) |
+
 ## Data Storage
 
 - Filesystem-based, no database

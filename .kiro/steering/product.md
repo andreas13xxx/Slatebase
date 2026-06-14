@@ -34,6 +34,8 @@ Slatebase is feature-complete for its core use case: multi-user Markdown vault m
 
 - **Search and Discovery (Phase 1)** — Vault-wide full-text search with Find & Replace. Linear file iteration with string matching (plain-text and regex), case-sensitive/insensitive toggle, context lines with nearby-hit merging, multi-vault search with per-vault access control, result truncation (file limit 1000, time limit 30s, result limit 500). Replace with atomic writes (temp → rename), max 100 files per operation, partial failure handling. Frontend SearchPanel replaces FileExplorer when open (Ctrl+Shift+F), 300ms debounced search, collapsible file groups with highlighted matches, per-hit navigation (click → open file at line), "Alle ersetzen" with confirmation modal. German UI labels throughout.
 
+- **Realtime Infrastructure (SSE)** — Server-Sent Events for real-time push notifications. Replaces polling for chat messages, unread counts, and vault changes. Features: EventSource connection with exponential backoff reconnect (5 attempts → fallback to polling), Page Visibility API integration (5-min idle disconnect), Last-Event-ID replay for missed events, presence system (online/offline status), vault change notifications with automatic file explorer tree refresh and open tab content reload, sync conflict toasts, server shutdown warnings. Architecture: EventBus with per-user replay buffer, ConnectionManager with per-user connection limits (5), global limit (1000) with 80% threshold 503, rate limiting per event type.
+
 ### Planned Features
 
 - Server-Side Plugin Execution — Run Obsidian plugins that require Node.js APIs on the backend (vm sandbox, Vault I/O shims, settings bridge, plugin logs)

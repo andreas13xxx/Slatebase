@@ -168,6 +168,7 @@ export type AppAction =
   | { type: 'TREE_LOADED'; payload: DirectoryTree }
   | { type: 'VAULT_TREE_LOADED'; payload: { vaultId: string; tree: DirectoryTree } }
   | { type: 'VAULT_TREE_LOADING'; payload: string }
+  | { type: 'VAULT_TREE_RELOAD_REQUESTED'; payload: { vaultId: string } }
   | { type: 'FILE_LOADED'; payload: FileContent }
   | { type: 'LOADING_STARTED' }
   | { type: 'ERROR_OCCURRED'; payload: AppError }

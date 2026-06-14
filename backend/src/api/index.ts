@@ -28,6 +28,7 @@ import type { IVaultShareRegistry } from '../vault/registry.js'
 import type { IImportService, UploadedFile } from '../import/index.js'
 import type { IUserRepository } from '../user/index.js'
 import type { ISyncConfigStore } from '../sync/index.js'
+import type { IEventBus } from '../realtime/types.js'
 import {
   InvalidFilenameError,
   FileTooLargeError,
@@ -117,6 +118,7 @@ export interface IVaultController {
 export class VaultController implements IVaultController {
   private linkIndexHook?: LinkIndexHook
   private vaultDeletionHook?: VaultDeletionHook
+  private eventBus?: IEventBus
 
   constructor(
     private readonly vaultService: IVaultService,
@@ -127,6 +129,14 @@ export class VaultController implements IVaultController {
     private readonly syncConfigStore?: ISyncConfigStore,
     private readonly shareRegistry?: IVaultShareRegistry,
   ) {}
+
+  /**
+   * Sets the event bus for publishing realtime events after file operations.
+   * Called from the composition root when the realtime infrastructure is enabled.
+   */
+  setEventBus(eventBus: IEventBus): void {
+    this.eventBus = eventBus
+  }
 
   /**
    * Sets the link index hook for incremental index updates.
@@ -259,6 +269,12 @@ export class VaultController implements IVaultController {
     const vaultId = c.req.param('vaultId') as string
 
     try {
+      // Check write access before saving
+      if (this.accessControl) {
+        const session = c.get('session') as SessionContext
+        await this.accessControl.checkWriteAccess(vaultId, session.userId)
+      }
+
       const body = await c.req.json()
       const filePath = body?.path
       const content = body?.content
@@ -282,6 +298,10 @@ export class VaultController implements IVaultController {
       if (this.linkIndexHook && filePath.endsWith('.md')) {
         this.linkIndexHook.onFileSaved(vaultId, filePath, content)
       }
+
+      // Publish vault:change event (exclude triggering user)
+      const session = c.get('session') as SessionContext
+      this.publishVaultChange(vaultId, 'saved', filePath, session.userId, session.username)
 
       return c.json(result, 200)
     } catch (error) {
@@ -356,6 +376,12 @@ export class VaultController implements IVaultController {
     const vaultId = c.req.param('vaultId') as string
 
     try {
+      // Check write access before importing
+      if (this.accessControl) {
+        const session = c.get('session') as SessionContext
+        await this.accessControl.checkWriteAccess(vaultId, session.userId)
+      }
+
       const body = await c.req.parseBody()
       const file = body['file']
 
@@ -393,6 +419,12 @@ export class VaultController implements IVaultController {
     const vaultId = c.req.param('vaultId') as string
 
     try {
+      // Check write access before importing
+      if (this.accessControl) {
+        const session = c.get('session') as SessionContext
+        await this.accessControl.checkWriteAccess(vaultId, session.userId)
+      }
+
       const body = await c.req.parseBody({ all: true })
 
       // Files can come as 'files' (array) or 'files[]'
@@ -465,12 +497,22 @@ export class VaultController implements IVaultController {
     const decodedPath = decodeURIComponent(rawPath)
 
     try {
+      // Check write access before deleting
+      if (this.accessControl) {
+        const session = c.get('session') as SessionContext
+        await this.accessControl.checkWriteAccess(vaultId, session.userId)
+      }
+
       await this.vaultService.deleteContent(vaultId, decodedPath)
 
       // Notify link index hook for markdown files (fire-and-forget)
       if (this.linkIndexHook && decodedPath.endsWith('.md')) {
         this.linkIndexHook.onFileDeleted(vaultId, decodedPath)
       }
+
+      // Publish vault:change event (exclude triggering user)
+      const session = c.get('session') as SessionContext
+      this.publishVaultChange(vaultId, 'deleted', decodedPath, session.userId, session.username)
 
       return c.body(null, 204)
     } catch (error) {
@@ -513,6 +555,10 @@ export class VaultController implements IVaultController {
         this.linkIndexHook.onFileRenamed(vaultId, sourcePath, result.newPath)
       }
 
+      // Publish vault:change event (exclude triggering user)
+      const session = c.get('session') as SessionContext
+      this.publishVaultChange(vaultId, 'renamed', result.newPath, session.userId, session.username)
+
       return c.json(result, 200)
     } catch (error) {
       return this.handleError(c, error)
@@ -554,10 +600,34 @@ export class VaultController implements IVaultController {
         this.linkIndexHook.onFileRenamed(vaultId, filePath, result.newPath)
       }
 
+      // Publish vault:change event (exclude triggering user)
+      const session = c.get('session') as SessionContext
+      this.publishVaultChange(vaultId, 'renamed', result.newPath, session.userId, session.username)
+
       return c.json(result, 200)
     } catch (error) {
       return this.handleError(c, error)
     }
+  }
+
+  /**
+   * Publishes a vault:change event via the event bus after a file operation.
+   * Uses broadcast targeting with sender exclusion for simplicity (MVP).
+   * The frontend will ignore events for vaults it doesn't have access to.
+   */
+  private publishVaultChange(
+    vaultId: string,
+    action: 'saved' | 'deleted' | 'renamed',
+    filePath: string,
+    userId: string,
+    username: string,
+  ): void {
+    this.eventBus?.publish({
+      type: 'vault:change',
+      payload: { vaultId, action, path: filePath, userId, username },
+      target: { kind: 'broadcast' },
+      excludeUserId: userId,
+    })
   }
 
   /**

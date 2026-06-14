@@ -1,6 +1,7 @@
 import crypto from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
 import type { IUserRepository } from '../user/index.js'
+import type { IEventBus } from '../realtime/types.js'
 import type {
   Conversation,
   ConversationListItem,
@@ -42,6 +43,8 @@ const MAX_CONTENT_LENGTH = 4000
  * and enforces business rules (participant limits, content validation, access control).
  */
 export class ChatService implements IChatService {
+  private eventBus?: IEventBus
+
   constructor(
     private readonly conversationStore: IConversationStore,
     private readonly messageStore: IMessageStore,
@@ -49,6 +52,11 @@ export class ChatService implements IChatService {
     private readonly userRepository: IUserRepository,
     private readonly logger: ILogger,
   ) {}
+
+  /** Set the optional EventBus for realtime event publishing. */
+  setEventBus(eventBus: IEventBus): void {
+    this.eventBus = eventBus
+  }
 
   /**
    * Remove the user from a conversation. Archives if only one participant remains.
@@ -219,12 +227,43 @@ export class ChatService implements IChatService {
     for (const participantId of conversation.participants) {
       if (participantId !== senderId) {
         await this.unreadStore.increment(participantId, conversationId)
+
+        // Publish chat:unread event to affected user
+        if (this.eventBus) {
+          const newTotal = await this.unreadStore.getTotal(participantId)
+          this.eventBus.publish({
+            type: 'chat:unread',
+            payload: { totalUnread: newTotal },
+            target: { kind: 'user', userId: participantId },
+          })
+        }
       }
     }
 
     this.logger.debug('Message sent', { messageId: id, conversationId, senderId })
 
-    // 9. Return
+    // 9. Publish chat:message event to conversation participants (exclude sender)
+    if (this.eventBus) {
+      const sender = await this.userRepository.findById(senderId)
+      const senderName = sender ? (sender.displayName || sender.username) : senderId
+      const participantIds = conversation.participants.filter((p) => p !== senderId)
+
+      this.eventBus.publish({
+        type: 'chat:message',
+        payload: {
+          conversationId,
+          messageId: message.id,
+          senderId,
+          senderName,
+          content: message.content,
+          timestamp: message.timestamp,
+        },
+        target: { kind: 'users', userIds: participantIds },
+        excludeUserId: senderId,
+      })
+    }
+
+    // 10. Return
     return message
   }
 

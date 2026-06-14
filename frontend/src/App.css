@@ -1180,6 +1180,25 @@
   margin: 0;
 }
 
+/* ===== Sidebar Header Actions (ConnectionIndicator + UserMenu) ===== */
+.app-sidebar-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ===== Connection Indicator ===== */
+.connection-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: default;
+}
+
 /* ===== User Menu ===== */
 .user-menu {
   position: relative;

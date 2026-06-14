@@ -1,0 +1,102 @@
+/* ===== Toast Notification (Realtime Infrastructure) ===== */
+
+.toast-notification-container {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 380px;
+  pointer-events: none;
+}
+
+.toast-notification-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+  animation: toast-notification-slide-in 300ms ease;
+  font-size: 13px;
+  line-height: 1.4;
+  opacity: 1;
+  transition: opacity 300ms ease;
+}
+
+.toast-notification-item--fading {
+  opacity: 0;
+}
+
+/* Variant: info */
+.toast-notification-item--info {
+  background: var(--toast-info-bg);
+  border: 1px solid var(--toast-info-border);
+  color: var(--toast-info-icon);
+}
+
+/* Variant: success */
+.toast-notification-item--success {
+  background: var(--toast-success-bg);
+  border: 1px solid var(--toast-success-border);
+  color: var(--toast-success-icon);
+}
+
+/* Variant: warning */
+.toast-notification-item--warning {
+  background: var(--toast-warning-bg);
+  border: 1px solid var(--toast-warning-border);
+  color: var(--toast-warning-icon);
+}
+
+/* Variant: error */
+.toast-notification-item--error {
+  background: var(--toast-error-bg);
+  border: 1px solid var(--toast-error-border);
+  color: var(--toast-error-icon);
+}
+
+/* Icon */
+.toast-notification-item__icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Message */
+.toast-notification-item__message {
+  flex: 1;
+  word-break: break-word;
+  color: var(--text-primary);
+}
+
+/* Close button */
+.toast-notification-item__close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  opacity: 0.6;
+  transition: opacity var(--transition-fast);
+}
+
+.toast-notification-item__close:hover {
+  opacity: 1;
+}
+
+/* Slide-in animation */
+@keyframes toast-notification-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}

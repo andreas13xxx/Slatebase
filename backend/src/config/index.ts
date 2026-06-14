@@ -18,6 +18,16 @@ const FeatureEntrySchema = z.object({
 
 const FeaturesConfigSchema = z.record(z.string(), FeatureEntrySchema).default({})
 
+const SseConfigSchema = z.object({
+  maxConnections: z.number().int().positive().default(1000),
+  maxPerUser: z.number().int().positive().default(3),
+  heartbeatInterval: z.number().int().positive().default(30000),
+  replayBufferSize: z.number().int().positive().default(100),
+  replayTtl: z.number().int().positive().default(300000),
+  batchWindow: z.number().int().positive().default(100),
+  batchMax: z.number().int().positive().default(20),
+})
+
 export const ServerConfigSchema = z.object({
   port: z.number().int().min(1).max(65535).default(3000),
   host: z.string().default('127.0.0.1'),
@@ -35,12 +45,14 @@ export const ServerConfigSchema = z.object({
   sessionDurationHours: z.number().positive().default(24),
   sessionMaxLifetimeDays: z.number().positive().default(7),
   features: FeaturesConfigSchema,
+  sse: SseConfigSchema.default({}),
 })
 
 // --- Types ---
 
 export type ServerConfig = z.infer<typeof ServerConfigSchema>
 export type VaultConfig = z.infer<typeof VaultConfigSchema>
+export type SseConfig = z.infer<typeof SseConfigSchema>
 
 // --- Interface ---
 
@@ -49,6 +61,8 @@ export interface IConfigService {
   getVaultConfigs(): VaultConfig[]
   /** Returns the features configuration section (feature name → { enabled }) */
   getFeaturesConfig(): Record<string, { enabled: boolean }>
+  /** Returns the SSE configuration section */
+  getSseConfig(): SseConfig
 }
 
 // --- Implementation ---
@@ -73,6 +87,10 @@ export class ConfigService implements IConfigService {
 
   getFeaturesConfig(): Record<string, { enabled: boolean }> {
     return this.config.features
+  }
+
+  getSseConfig(): SseConfig {
+    return this.config.sse
   }
 
   private loadConfigFile(): Record<string, unknown> {
@@ -155,6 +173,40 @@ export class ConfigService implements IConfigService {
 
     if (process.env['SLATEBASE_SESSION_MAX_LIFETIME_DAYS'] !== undefined) {
       overlay['sessionMaxLifetimeDays'] = Number(process.env['SLATEBASE_SESSION_MAX_LIFETIME_DAYS'])
+    }
+
+    const sseOverlay: Record<string, unknown> = {}
+
+    if (process.env['SLATEBASE_SSE_MAX_CONNECTIONS'] !== undefined) {
+      sseOverlay['maxConnections'] = parseInt(process.env['SLATEBASE_SSE_MAX_CONNECTIONS'], 10)
+    }
+
+    if (process.env['SLATEBASE_SSE_MAX_PER_USER'] !== undefined) {
+      sseOverlay['maxPerUser'] = parseInt(process.env['SLATEBASE_SSE_MAX_PER_USER'], 10)
+    }
+
+    if (process.env['SLATEBASE_SSE_HEARTBEAT_INTERVAL'] !== undefined) {
+      sseOverlay['heartbeatInterval'] = parseInt(process.env['SLATEBASE_SSE_HEARTBEAT_INTERVAL'], 10)
+    }
+
+    if (process.env['SLATEBASE_SSE_REPLAY_BUFFER_SIZE'] !== undefined) {
+      sseOverlay['replayBufferSize'] = parseInt(process.env['SLATEBASE_SSE_REPLAY_BUFFER_SIZE'], 10)
+    }
+
+    if (process.env['SLATEBASE_SSE_REPLAY_TTL'] !== undefined) {
+      sseOverlay['replayTtl'] = parseInt(process.env['SLATEBASE_SSE_REPLAY_TTL'], 10)
+    }
+
+    if (process.env['SLATEBASE_SSE_BATCH_WINDOW'] !== undefined) {
+      sseOverlay['batchWindow'] = parseInt(process.env['SLATEBASE_SSE_BATCH_WINDOW'], 10)
+    }
+
+    if (process.env['SLATEBASE_SSE_BATCH_MAX'] !== undefined) {
+      sseOverlay['batchMax'] = parseInt(process.env['SLATEBASE_SSE_BATCH_MAX'], 10)
+    }
+
+    if (Object.keys(sseOverlay).length > 0) {
+      overlay['sse'] = sseOverlay
     }
 
     return overlay

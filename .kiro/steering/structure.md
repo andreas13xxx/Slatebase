@@ -118,6 +118,14 @@ src/
 │   ├── feature-registry.ts   — FeatureRegistry (declarative registration with validation)
 │   ├── feature-toggle-service.ts — FeatureToggleService (in-memory state, env-var overlay, onChange listeners)
 │   └── middleware.ts         — createFeatureGuard() factory (Hono middleware, 403 on disabled features)
+├── realtime/
+│   ├── index.ts              — Barrel export for realtime module
+│   ├── types.ts              — SseEvent, SseEventType, ConnectionEntry, EventTarget, PublishOptions, ReplayBufferEntry
+│   ├── errors.ts             — ConnectionLimitError
+│   ├── connection-manager.ts — ConnectionManager (per-user connections, broadcast, drain, limits)
+│   ├── event-bus.ts          — EventBus (publish with targeting, rate limiting, replay buffer)
+│   ├── replay-buffer.ts      — ReplayBuffer (per-user circular buffer with TTL eviction)
+│   └── presence-service.ts   — PresenceService (online/offline tracking, heartbeat, visibility)
 ├── import/index.ts       — ImportService (file/folder import logic)
 └── integration.test.ts   — Integration tests
 config/
@@ -201,7 +209,13 @@ src/
 │   ├── featureActions.ts — loadFeatures, toggleFeature action creators
 │   ├── searchState.ts    — Search reducer + types (query, results, replace, activeResultId)
 │   ├── searchContext.ts  — SearchProvider + useSearchContext hook
-│   └── searchActions.ts  — performSearch, performMultiVaultSearch, performReplace, performSingleReplace
+│   ├── searchActions.ts  — performSearch, performMultiVaultSearch, performReplace, performSingleReplace
+│   ├── realtimeState.ts  — Realtime reducer + types (connectionStatus, reconnectAttempts, lastEventId)
+│   ├── realtimeContext.ts — RealtimeProvider + useRealtimeContext hook
+│   ├── realtimeActions.ts — computeReconnectDelay, RealtimeAction types
+│   ├── realtimeChatBridge.ts — Module-level bridge: SSE chat events → ChatProvider (cross-provider communication)
+│   ├── realtimeVaultBridge.ts — Module-level bridge: SSE vault:change events → AppProvider (tree refresh + tab reload)
+│   └── useEventSource.ts — Custom hook managing EventSource lifecycle (backoff, visibility, reconnect)
 ├── components/
 │   ├── SlatebaseLogo.tsx — SVG logo component
 │   ├── SidebarToolbar.tsx — Draggable vertical toolbar
@@ -255,7 +269,9 @@ src/
 │   ├── PluginUpload.tsx  — Plugin ZIP upload + detected plugins from .obsidian/plugins/
 │   ├── VersionCheckCard.tsx — Admin version check (installed vs. latest, GitHub API, update notification)
 │   ├── CommandPalette.tsx — Modal command palette (search, execute, keyboard nav)
-│   └── CommandPaletteContainer.tsx — Wires CommandPalette to PluginContext CommandRegistry
+│   ├── CommandPaletteContainer.tsx — Wires CommandPalette to PluginContext CommandRegistry
+│   ├── RealtimeProvider.tsx — SSE event routing (chat, presence, vault:change, toast, server events)
+│   └── ToastNotification.tsx — Toast notification system (module-level state, CSS transitions)
 ├── assets/               — Static images
 └── test-setup.ts         — Vitest/Testing Library setup
 ```
@@ -393,6 +409,12 @@ All routes are prefixed with `/api/v1`:
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | /version | Get installed Slatebase version (public, no auth) |
+
+### Realtime (SSE)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | /events | SSE stream (token via query param or Bearer header, presence init, event replay via Last-Event-ID) |
 
 ## Data Storage
 

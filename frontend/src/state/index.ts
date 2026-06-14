@@ -117,6 +117,14 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         loading: false,
       }
     }
+    case 'VAULT_TREE_RELOAD_REQUESTED': {
+      const newLoading = new Set(state.vaultTreesLoading)
+      newLoading.add(action.payload.vaultId)
+      return {
+        ...state,
+        vaultTreesLoading: newLoading,
+      }
+    }
     case 'CONTENT_DELETED':
       return {
         ...state,
@@ -186,6 +194,25 @@ export async function loadVaults(
   } catch (err: unknown) {
     const error = toAppError(err)
     dispatch({ type: 'ERROR_OCCURRED', payload: error })
+  }
+}
+
+/**
+ * Reloads the directory tree for a specific vault.
+ * On success, dispatches VAULT_TREE_LOADED to update state.
+ * On failure, logs the error and keeps existing tree state unchanged.
+ */
+export async function reloadVaultTree(
+  dispatch: Dispatch<AppAction>,
+  apiClient: IApiClient,
+  vaultId: string,
+): Promise<void> {
+  try {
+    const tree = await apiClient.fetchVaultTree(vaultId)
+    dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree } })
+  } catch (error: unknown) {
+    console.error('[reloadVaultTree] Failed to reload tree for vault', vaultId, error)
+    // On failure: keep existing tree state unchanged (no dispatch)
   }
 }
 

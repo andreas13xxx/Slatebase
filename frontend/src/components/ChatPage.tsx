@@ -1,8 +1,13 @@
 import { useEffect } from 'react'
 import { ChatProvider, useChatContext } from '../state/chatContext'
 import { useAppContext } from '../state'
+import { useRealtimeContext } from '../state/realtimeContext'
 import { useTranslation } from '../i18n'
 import { loadConversations } from '../state/chatActions'
+import {
+  onRealtimeChatMessage,
+  onRealtimeConversationPreview,
+} from '../state/realtimeChatBridge'
 import { ConversationList } from './ConversationList'
 import { MessageView } from './MessageView'
 import { MessageInput } from './MessageInput'
@@ -26,6 +31,7 @@ export function ChatPage() {
 function ChatPageContent() {
   const { state, dispatch } = useChatContext()
   const { apiClient } = useAppContext()
+  const { state: realtimeState } = useRealtimeContext()
   const { t } = useTranslation()
 
   useEffect(() => {
@@ -34,9 +40,51 @@ function ChatPageContent() {
     }
   }, [dispatch, apiClient])
 
+  // Register realtime chat message callback — dispatches incoming messages to chat state
+  useEffect(() => {
+    return onRealtimeChatMessage((message) => {
+      dispatch({ type: 'REALTIME_MESSAGE_RECEIVED', payload: message })
+    })
+  }, [dispatch])
+
+  // Redundant listener via CustomEvent — guarantees delivery regardless of callback registration timing
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const message = (e as CustomEvent).detail
+      dispatch({ type: 'REALTIME_MESSAGE_RECEIVED', payload: message })
+    }
+    window.addEventListener('slatebase:chat-message', handler)
+    return () => { window.removeEventListener('slatebase:chat-message', handler) }
+  }, [dispatch])
+
+  // Register realtime conversation preview callback — updates conversation list ordering
+  useEffect(() => {
+    return onRealtimeConversationPreview((conversationId, preview, timestamp) => {
+      dispatch({
+        type: 'REALTIME_CONVERSATION_PREVIEW_UPDATED',
+        payload: { conversationId, preview, timestamp },
+      })
+    })
+  }, [dispatch])
+
+  // Redundant listener for conversation preview updates
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { conversationId, preview, timestamp } = (e as CustomEvent).detail
+      dispatch({
+        type: 'REALTIME_CONVERSATION_PREVIEW_UPDATED',
+        payload: { conversationId, preview, timestamp },
+      })
+    }
+    window.addEventListener('slatebase:chat-preview', handler)
+    return () => { window.removeEventListener('slatebase:chat-preview', handler) }
+  }, [dispatch])
+
   // Periodic refresh of conversation list every 30 seconds
+  // Disabled when SSE is connected (realtime pushes conversation updates)
   useEffect(() => {
     if (!apiClient) return
+    if (realtimeState.connectionStatus === 'connected') return
 
     const intervalId = setInterval(() => {
       loadConversations(dispatch, apiClient)
@@ -45,10 +93,13 @@ function ChatPageContent() {
     return () => {
       clearInterval(intervalId)
     }
-  }, [dispatch, apiClient])
+  }, [dispatch, apiClient, realtimeState.connectionStatus])
 
   // Refresh conversation list immediately when tab becomes visible again
+  // Disabled when SSE is connected (realtime handles updates in real-time)
   useEffect(() => {
+    if (realtimeState.connectionStatus === 'connected') return
+
     const handler = () => {
       if (document.visibilityState === 'visible' && apiClient) {
         loadConversations(dispatch, apiClient)
@@ -58,7 +109,7 @@ function ChatPageContent() {
     return () => {
       document.removeEventListener('visibilitychange', handler)
     }
-  }, [dispatch, apiClient])
+  }, [dispatch, apiClient, realtimeState.connectionStatus])
 
   const currentConv = state.conversations.find(c => c.id === state.currentConversation)
   const isArchived = currentConv?.archived === true

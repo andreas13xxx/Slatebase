@@ -7,6 +7,12 @@ import { loadMessages, leaveConversation } from '../state/chatActions'
 import { NewConversation } from './NewConversation'
 import { ConfirmModal } from './ConfirmModal'
 
+/** Props for the ConversationList component. */
+export interface ConversationListProps {
+  /** Set of user IDs that are currently online. Used to display presence indicators. */
+  onlineUserIds?: Set<string>
+}
+
 /**
  * Formats a timestamp for display in the conversation list.
  * - Today: "HH:MM"
@@ -42,8 +48,9 @@ function formatTimestamp(isoString: string, locale: string): string {
  * Shows participant names, last message preview, and timestamp.
  * Includes a button to open the NewConversation dialog.
  * Shows leave button per conversation and archived label for archived conversations.
+ * Optionally shows green presence dots next to online participants.
  */
-export function ConversationList() {
+export function ConversationList({ onlineUserIds }: ConversationListProps) {
   const { state, dispatch } = useChatContext()
   const { apiClient } = useAppContext()
   const { t, locale } = useTranslation()
@@ -143,7 +150,31 @@ export function ConversationList() {
           >
             <div className="conversation-item-header">
               <span className="conversation-item-names">
-                {conversation.participantNames.join(', ')}
+                {conversation.participantNames.map((name, index) => {
+                  const participantId = conversation.participants[index]
+                  const isOnline = participantId != null && onlineUserIds?.has(participantId)
+                  return (
+                    <span key={participantId ?? index} className="conversation-item-participant">
+                      {index > 0 && ', '}
+                      {name}
+                      {isOnline && (
+                        <span
+                          className="presence-dot"
+                          aria-label="Online"
+                          style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            backgroundColor: 'var(--presence-online)',
+                            display: 'inline-block',
+                            marginLeft: '4px',
+                            flexShrink: 0,
+                          }}
+                        />
+                      )}
+                    </span>
+                  )
+                })}
               </span>
               {conversation.archived && (
                 <span className="conversation-item-archived">{t('chat.archived')}</span>

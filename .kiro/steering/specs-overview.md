@@ -31,7 +31,7 @@
 | 23 | `editor-improvements` | Feature | 📋 Geplant | Zeilennummern, Undo/Redo, Recent Files, Templates/Daily Notes, Bild-Paste, Favoriten |
 | 24 | `vault-explorer-enhancements` | Feature | 📋 Geplant | Vault-Statistiken, Custom Context-Menu, Drag & Drop Upload |
 | 25 | `unified-settings` | Feature | 📋 Geplant | Zentrale Einstellungsseite mit Kategorien, Log-Verwaltung, Keybindings |
-| 26 | `realtime-infrastructure` | Feature | 📋 Geplant | SSE-basierte Echtzeit-Updates (Chat, Online-Status, Vault-Änderungen) |
+| 26 | `realtime-infrastructure` | Feature | ✅ Fertig | SSE-basierte Echtzeit-Updates (Chat-Nachrichten, Online-Status/Presence, Vault-Änderungen mit Tree-Refresh + Tab-Reload, Sync-Konflikte, Toast-Notifications, Server-Shutdown-Warnung) |
 | 27 | `search-and-discovery` | Feature | ✅ Fertig | Volltextsuche + Replace (Phase 1): Vault-weite Suche mit Regex, Kontext-Zeilen, Multi-Vault, Find & Replace mit atomaren Schreiboperationen, SearchPanel als Seitenpanel |
 | 28 | `responsive-mobile` | Feature | 📋 Geplant | Responsive Design für Smartphones und Tablets |
 | 29 | `obsidian-themes` | Feature | 📋 Geplant | Obsidian Community Themes laden und anwenden (CSS-Variable-Mapping) |
@@ -103,7 +103,7 @@ Priorisiert nach: Blockierungen auflösen → Nutzerwert maximieren → Quick Wi
 
 | Prio | Spec | Aufwand | Begründung |
 |------|------|---------|------------|
-| 8 | `realtime-infrastructure` | Hoch | Transformiert Chat + Collaboration. Ersetzt Polling durch Push. |
+| 8 | `realtime-infrastructure` | ✅ Fertig | SSE implementiert: Chat-Push, Presence, Vault-Change-Events mit Tree-Refresh + Tab-Reload, Toast-Notifications. |
 | 9 | `unified-settings` | Mittel | Konsolidiert fragmentierte Settings nach vielen neuen Features. |
 | 10 | `public-sharing` | Mittel | Starkes Marketing-Feature. Differenziert gegen Obsidian Publish. |
 | 11 | `mermaid-rendering` | Niedrig | Requirements fertig. Quick Win zwischen größeren Features. |
@@ -123,7 +123,7 @@ Priorisiert nach: Blockierungen auflösen → Nutzerwert maximieren → Quick Wi
 ### Parallelisierbare Tracks
 
 ```
-Track A (Backend):     session-expiry-fix → realtime-infrastructure → security-hardening
+Track A (Backend):     session-expiry-fix ✅ → realtime-infrastructure ✅ → security-hardening
 Track B (Frontend):    vault-explorer-enhancements → editor-improvements → responsive-mobile
 Track C (Plugins):     obsidian-plugin-compat → workspace-leaf-compat → obsidian-themes
 Track D (DevOps):      ci-cd-release (unabhängig)
@@ -138,7 +138,7 @@ Woche 3–4:     obsidian-plugin-compat fertigstellen
 Woche 5–6:     search-and-discovery (Phase 1) + vault-explorer-enhancements
 Woche 7–8:     editor-improvements (Templates, Daily Notes, Bild-Paste)
 Woche 9–10:    trash-and-versioning
-Woche 11–14:   realtime-infrastructure (SSE)
+Woche 11–14:   realtime-infrastructure (SSE) ✅
 Woche 15–16:   unified-settings + mermaid-rendering
 Woche 17–18:   public-sharing
 Woche 19–22:   responsive-mobile
@@ -191,12 +191,10 @@ Danach:        workspace-leaf-compat, obsidian-themes, live-preview-editor, ...
 - **Priorität**: Mittel–Hoch (Templates + Daily Notes sind Obsidian-Kernfeatures, Bild-Paste ist häufig angefragt)
 - **Aufwand**: Mittel (rein Frontend außer Bild-Paste — das braucht einen Upload-Endpoint für Clipboard-Blobs)
 
-### realtime-infrastructure
-- **Beschreibung**: Server-Sent Events (SSE) als Push-Kanal für Echtzeit-Updates. Ersetzt das bisherige Polling (30s-Intervall im Chat, Visibility-Change-Refresh). Anwendungsfälle: Chat-Nachrichten sofort empfangen, Online-Status-Anzeige im Chat (Heartbeat-basiert), Unread-Count-Updates ohne Polling, Vault-Änderungs-Benachrichtigungen (Multi-User-Collaboration), Toast-Notifications bei Server-Events (neue Nachricht, Sync-Konflikt, Vault-Änderung durch anderen User).
-- **Abhängigkeit**: Braucht auth-and-user-management (Session-basierte SSE-Authentifizierung)
-- **Priorität**: Hoch (Performance + UX, besonders für Chat und Collaboration)
-- **Aufwand**: Hoch (neue Backend-Infrastruktur: SSE-Endpoint, Connection-Management, Event-Bus; Frontend: EventSource-Client, Reconnect-Logik, State-Integration, Toast-Notification-Komponente)
-- **Hinweis**: SSE statt WebSocket gewählt — einfacher (HTTP-basiert, kein Upgrade), Nginx-kompatibel ohne Extra-Config, ausreichend für Server→Client-Push. Bidirektionaler Kanal nicht nötig (Client sendet weiterhin per REST).
+### realtime-infrastructure ✅ Fertig
+- **Beschreibung**: Server-Sent Events (SSE) als Push-Kanal für Echtzeit-Updates. Ersetzt das bisherige Polling. Implementiert: Chat-Nachrichten sofort empfangen, Online-Status/Presence (Heartbeat-basiert), Unread-Count-Updates ohne Polling, Vault-Änderungs-Benachrichtigungen mit automatischem Tree-Refresh + Tab-Content-Reload, Toast-Notifications bei Server-Events, Sync-Konflikt-Warnungen, Server-Shutdown-Hinweis.
+- **Architektur**: SSE-Endpoint (`GET /api/v1/events`), Event-Bus mit Replay-Buffer, ConnectionManager (per-user), Exponential-Backoff-Reconnect (5 Versuche → Fallback auf Polling), Page Visibility API Integration, Last-Event-ID Replay.
+- **Hinweis**: SSE statt WebSocket gewählt — einfacher (HTTP-basiert, kein Upgrade), Nginx-kompatibel ohne Extra-Config, ausreichend für Server→Client-Push.
 
 ### vault-explorer-enhancements
 - **Beschreibung**: UX-Verbesserungen im File Explorer: Vault-Statistiken (Gesamtgröße, Anzahl Dateien/Ordner) als Badge oder Tooltip am Vault-Eintrag, Custom Context-Menu (Rechtsklick überall durch eigenes Menü ersetzen — Dateien: Umbenennen/Löschen/Kopieren/Verschieben; Vaults: Erstellen/Löschen/Export; Ordner: Neuer Ordner/Neue Datei/Löschen), Drag & Drop Datei-Upload (Dateien direkt in Explorer oder Editor droppen statt über Import-Dialog).

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useCallback, useState } from 'react'
-import { AppProvider, useAppContext, loadVaults, importFile, importFolder, exportVault } from './state'
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
+import { AppProvider, useAppContext, loadVaults, importFile, importFolder, exportVault, reloadVaultTree } from './state'
 import { ApiClient } from './api'
 import { AuthProvider, useAuthContext } from './state/authContext'
 import { TabProvider, useTabContext } from './state/tabContext'
@@ -7,6 +7,18 @@ import { FeatureProvider, useFeatureContext } from './state/featureContext'
 import { SearchProvider } from './state/searchContext'
 import { I18nProvider, useTranslation } from './i18n'
 import { ToastProvider } from './components/Toast'
+import { RealtimeProvider, type RealtimeEventHandlers } from './components/RealtimeProvider'
+import { ToastNotification } from './components/ToastNotification'
+import { ConnectionIndicator } from './components/ConnectionIndicator'
+import { useRealtimeContext } from './state/realtimeContext'
+import {
+  dispatchRealtimeChatMessage,
+  dispatchRealtimeUnreadUpdate,
+  dispatchRealtimeConversationPreview,
+  onRealtimeUnreadUpdate,
+} from './state/realtimeChatBridge'
+import { dispatchRealtimeVaultChange, onRealtimeVaultChange } from './state/realtimeVaultBridge'
+import type { VaultChangeEvent } from './state/realtimeVaultBridge'
 import { FileExplorer } from './components/FileExplorer'
 import { TabContent } from './components/TabContent'
 import { LoginPage } from './components/LoginPage'
@@ -372,6 +384,22 @@ function FeatureDisabledHint({ featureName }: { featureName: string }) {
 }
 
 /**
+ * Small wrapper that reads RealtimeContext and FeatureContext
+ * to render the ConnectionIndicator with the correct props.
+ */
+function RealtimeConnectionIndicator() {
+  const { state } = useRealtimeContext()
+  const { isEnabled } = useFeatureContext()
+
+  return (
+    <ConnectionIndicator
+      status={state.connectionStatus}
+      visible={isEnabled('realtime')}
+    />
+  )
+}
+
+/**
  * Inner component that uses AppContext and TabContext to render the main vault view.
  */
 function AppContent() {
@@ -396,9 +424,65 @@ function AppContent() {
   const versionInfo = useVersionInfo()
 
   // Global unread count polling (30-second interval)
+  // Disabled when SSE connection is active (realtime pushes unread counts)
+  const { state: realtimeState } = useRealtimeContext()
   const [globalUnreadCount, setGlobalUnreadCount] = useState(0)
 
+  // Register the unread update callback with the realtime bridge
   useEffect(() => {
+    return onRealtimeUnreadUpdate((totalUnread) => {
+      setGlobalUnreadCount(totalUnread)
+    })
+  }, [])
+
+  // Register the vault change callback with the realtime bridge
+  // Refreshes the file explorer tree and reloads affected open tabs
+  useEffect(() => {
+    return onRealtimeVaultChange((event) => {
+      const { vaultId, action, path } = event
+
+      // Refresh the file explorer tree for the affected vault
+      // Only refresh if the vault tree is already loaded (user has expanded it)
+      if (state.vaultTrees[vaultId] !== undefined) {
+        void reloadVaultTree(dispatch, apiClient, vaultId)
+      }
+
+      // Reload content of open tabs affected by this change
+      const affectedTabs = tabState.tabs.filter(
+        (tab) => tab.vaultId === vaultId && tab.filePath === path
+      )
+
+      for (const tab of affectedTabs) {
+        if (action === 'deleted') {
+          // File was deleted — close the tab
+          tabDispatch({ type: 'CLOSE_TAB', payload: { tabId: tab.id } })
+        } else if (action === 'saved' || action === 'renamed') {
+          // File was saved/renamed by another user — reload content if no unsaved edits
+          if (tab.editBuffer === null) {
+            // No local edits — safe to reload
+            tabDispatch({ type: 'TAB_CONTENT_LOADED', payload: { tabId: tab.id, content: '', isBinary: tab.isBinary } })
+            // Fetch fresh content
+            apiClient.fetchFileContent(vaultId, path).then((result) => {
+              tabDispatch({
+                type: 'TAB_CONTENT_LOADED',
+                payload: { tabId: tab.id, content: result.content, isBinary: result.isBinary },
+              })
+            }).catch(() => {
+              // If fetch fails (e.g. file no longer exists), close tab
+              tabDispatch({ type: 'CLOSE_TAB', payload: { tabId: tab.id } })
+            })
+          }
+          // If there are unsaved local edits, don't reload — user would lose their work
+          // The toast notification already informed them about the external change
+        }
+      }
+    })
+  }, [state.vaultTrees, tabState.tabs, dispatch, tabDispatch])
+
+  useEffect(() => {
+    // Skip polling when SSE is connected — unread updates come via realtime push
+    if (realtimeState.connectionStatus === 'connected') return
+
     let cancelled = false
 
     const poll = async () => {
@@ -422,7 +506,7 @@ function AppContent() {
       cancelled = true
       clearInterval(intervalId)
     }
-  }, [])
+  }, [realtimeState.connectionStatus])
 
   // Fetch vaults on mount
   useEffect(() => {
@@ -777,14 +861,17 @@ function AppContent() {
                     </a>
                   )}
                 </div>
-                <UserMenu
-                  onNavigate={handleNavigate}
-                  onLogout={handleLogout}
-                  hasVaultSelected={state.selectedVaultId !== null}
-                  onImportFile={handleImportFile}
-                  onImportFolder={handleImportFolder}
-                  onExportVault={handleExportVault}
-                />
+                <div className="app-sidebar-header-actions">
+                  <RealtimeConnectionIndicator />
+                  <UserMenu
+                    onNavigate={handleNavigate}
+                    onLogout={handleLogout}
+                    hasVaultSelected={state.selectedVaultId !== null}
+                    onImportFile={handleImportFile}
+                    onImportFolder={handleImportFolder}
+                    onExportVault={handleExportVault}
+                  />
+                </div>
               </div>
 
               <div className="app-sidebar-body">
@@ -813,6 +900,7 @@ function AppContent() {
           {/* ── Toolbar ── */}
           <SidebarToolbar
             vaultId={state.selectedVaultId}
+            vaultPermission={selectedVault?.permission}
             onCreateVault={handleCreateVault}
             onCreateFile={handleCreateFile}
             onImportFile={handleImportFile}
@@ -1033,16 +1121,74 @@ function AuthGuard() {
   return (
     <FeatureProvider>
       <FeatureLoader />
-      <AppProvider apiClient={apiClient}>
-        <SearchProvider>
-          <TabProvider>
-            <ContextPanelProvider>
-              <AppContent />
-            </ContextPanelProvider>
-          </TabProvider>
-        </SearchProvider>
-      </AppProvider>
+      <RealtimeBridge>
+        <AppProvider apiClient={apiClient}>
+          <SearchProvider>
+            <TabProvider>
+              <ContextPanelProvider>
+                <AppContent />
+              </ContextPanelProvider>
+            </TabProvider>
+          </SearchProvider>
+        </AppProvider>
+      </RealtimeBridge>
     </FeatureProvider>
+  )
+}
+
+/**
+ * Bridge component that connects the RealtimeProvider with auth and feature state.
+ * Sits inside both AuthProvider and FeatureProvider, wrapping the app content.
+ * Reads the session token from auth state and the realtime feature toggle.
+ * Wires SSE event handlers to the module-level chat bridge for cross-provider communication.
+ */
+function RealtimeBridge({ children }: { children: React.ReactNode }) {
+  const { authState } = useAuthContext()
+  const { isEnabled } = useFeatureContext()
+
+  const token = authState.token ?? null
+  const featureEnabled = isEnabled('realtime')
+
+  const handlers = useMemo<RealtimeEventHandlers>(() => ({
+    onChatMessage: (data: Record<string, unknown>) => {
+      const message = {
+        id: data.messageId as string,
+        conversationId: data.conversationId as string,
+        senderId: data.senderId as string,
+        content: data.content as string,
+        timestamp: data.timestamp as string,
+      }
+      dispatchRealtimeChatMessage(message)
+      // Also update conversation preview for the conversation list
+      dispatchRealtimeConversationPreview(
+        message.conversationId,
+        message.content,
+        message.timestamp,
+      )
+    },
+    onChatUnread: (totalUnread: number) => {
+      dispatchRealtimeUnreadUpdate(totalUnread)
+    },
+    onVaultChange: (vaultId: string, data?: Record<string, unknown>) => {
+      const event: VaultChangeEvent = {
+        vaultId,
+        action: (data?.action as 'saved' | 'deleted' | 'renamed') ?? 'saved',
+        path: (data?.path as string) ?? '',
+        userId: (data?.userId as string) ?? '',
+        username: (data?.username as string) ?? '',
+      }
+      dispatchRealtimeVaultChange(event)
+    },
+  }), [])
+
+  return (
+    <RealtimeProvider
+      token={token}
+      featureEnabled={featureEnabled}
+      handlers={handlers}
+    >
+      {children}
+    </RealtimeProvider>
   )
 }
 
@@ -1081,6 +1227,7 @@ function FeatureLoader() {
 /**
  * Root App component.
  * Provider hierarchy: AuthProvider → I18nBridge (reads user locale) → AuthGuard → App content.
+ * ToastNotification rendered at root level (uses module-level state, independent of providers).
  */
 export function App() {
   return (
@@ -1088,6 +1235,7 @@ export function App() {
       <I18nBridge>
         <AuthGuard />
       </I18nBridge>
+      <ToastNotification />
     </AuthProvider>
   )
 }
