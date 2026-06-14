@@ -1,47 +1,36 @@
 # Slatebase — Product Overview
 
-Slatebase is a self-hosted Knowledge-Context-Server for Markdown vaults. It allows users to manage, browse, and edit Markdown-based knowledge bases through a web interface. The system is designed to be compatible with Obsidian vaults.
+Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for Obsidian-compatible vaults — no database, no sync service, no desktop app required.
 
-## Current State
+## Implemented Features
 
-Slatebase is feature-complete for its core use case: multi-user Markdown vault management with web-based editing, sharing, real-time chat, and CouchDB-based vault synchronization.
+- Multi-vault management (CRUD, import/export, unified file explorer)
+- Tabbed Markdown editor/viewer (auto-save, GFM, syntax highlighting, collapsible headings)
+- Obsidian-compatible rendering (Wikilinks, Embeds with inline PDF, Callouts, Tags)
+- Authentication (opaque tokens, argon2id, CSRF, sliding sessions, rate limiting)
+- Multi-user & sharing (granular read/write, ownership transfer)
+- Real-time chat (unread badges, archiving, pagination)
+- Admin panel (user management, audit log, config, feature toggles)
+- Vault sync ⚠️ experimental (CouchDB/livesync, bidirectional, conflict resolution, E2E encryption)
+- MCP Context Server (AI read+write via Model Context Protocol)
+- Context Panel (Outline, Links, Tags, Properties — splittable, DnD)
+- Knowledge Graph (d3-force SVG, zoom/pan/drag/search)
+- Search & Replace (regex, context lines, multi-vault, atomic writes)
+- Realtime infrastructure (SSE: chat push, presence, vault changes, toasts, reconnect with replay)
+- Obsidian plugin compat ⚠️ experimental (API shims, sandbox, command palette, CSS injection)
+- Feature toggles (hot/cold toggle, env overlay, API + admin UI)
+- CI/CD (GitHub Actions, Release Please, multi-arch Docker, GHCR)
+- i18n (German/English), Dark Mode, Docker deployment
 
-### Implemented Features
+## Planned
 
-- **Multi-vault management** — Create, delete, import/export, switch between vaults
-- **Unified file explorer** — All vaults displayed as expandable root entries in a single tree view, lazy-loading of vault contents, inline vault creation, permission badges, drag & drop within vaults
-- **Tabbed editor/viewer** — Multiple files open simultaneously, auto-save, View/Edit modes
-- **Markdown rendering** — GFM, syntax highlighting, frontmatter, collapsible headings, Obsidian-compatible (Wikilinks, Embeds with size/display including inline PDF viewer, Callouts, Tags)
-- **Authentication** — Session-based auth (opaque tokens, argon2id, CSRF with persistent secret, rate limiting, sliding session expiry with configurable duration, localStorage token persistence, CSRF mismatch recovery)
-- **Multi-user & sharing** — Granular read/write vault permissions, ownership transfer
-- **User chat** — Real-time messaging between users with unread badges, archiving, pagination
-- **Admin panel** — User management, audit log, server configuration
-- **Import & export** — File/folder import, vault export (ZIP or File System Access API)
-- **Advanced file operations** — Delete, rename files/folders within vaults
-- **Internationalization (i18n)** — German and English UI, per-user preference
-- **Dark mode** — System-preference-based or manual override (light/dark/system)
-- **Docker deployment** — Multi-stage build, Nginx reverse proxy, non-root user
-- **Vault synchronization** ⚠️ *experimental* — CouchDB/obsidian-livesync compatible sync (bidirectional & read-only, manual & interval-based, conflict detection & resolution, analysis mode, optional E2E encryption)
-- **MCP Context Server** — Model Context Protocol integration for AI assistants (Claude, Cursor, etc.) to read and write vault contents via standardized MCP tools and resources (read: list, search, read; write: create, edit, delete, move, rename)
-- **Context Panel** — Right-side panel with four views (Outline, Links, Tags, Properties), icon-only tab navigation with Drag & Drop reordering, panel splitting with per-section tab bars, cross-section tab movement, and auto-close of empty sections
-- **Knowledge Graph** — Interactive force-directed graph visualization of vault link structure (SVG + d3-force, zoom/pan/drag, search, node highlighting, tab integration, backend link-index with JSON persistence and incremental updates)
+- Live Preview Editor (WYSIWYG/Side-by-Side)
+- Server-Side Plugins (Node.js APIs in vm sandbox)
+- Accessibility audit (WCAG 2.1 AA)
+- Responsive/mobile, public sharing, trash & versioning, unified settings
 
-- **Feature Toggles** — Centralized feature toggle system for administrators. Toggle features (vault-sync, obsidian-plugin-compat, chat, mcp, knowledge-graph) via config, environment variables, or Admin API at runtime. Hot-toggles take effect immediately, cold-toggles show restart-required hint. Feature guards block API routes for disabled features. Frontend hides UI elements for disabled features. Replaces the old `mcp.enabled` config.
+## Language Convention
 
-- **Obsidian Plugin Compatibility (work-in-progress)** ⚠️ *experimental* — Compatibility layer for Obsidian Community Plugins: API shims (App, Vault, Workspace, MetadataCache), plugin loader with lifecycle management (onload/onunload), security sandbox (vault isolation, storage namespace, network allowlist, main-thread blocking detection), Command Palette (Ctrl+P), CSS injection with scoped styles, compatibility analyzer, plugin settings persistence, backend plugin store. **Limitation:** Only browser-compatible plugins can run. Plugins requiring Node.js modules (tls, net, crypto, fs, etc.) cannot be executed — server-side plugin execution is planned as a separate feature.
-
-- **CI/CD Release Pipeline** — Automated release pipeline with GitHub Actions: CI workflow (lint, test, build on every push/PR), automatic Semantic Versioning via Release Please (Conventional Commits), multi-arch Docker image builds (amd64 + arm64), push to GHCR (+ optional DockerHub), version check in Admin UI (installed vs. latest on GitHub, update notification). Version endpoint at `GET /api/v1/version` (public, no auth).
-
-- **Search and Discovery (Phase 1)** — Vault-wide full-text search with Find & Replace. Linear file iteration with string matching (plain-text and regex), case-sensitive/insensitive toggle, context lines with nearby-hit merging, multi-vault search with per-vault access control, result truncation (file limit 1000, time limit 30s, result limit 500). Replace with atomic writes (temp → rename), max 100 files per operation, partial failure handling. Frontend SearchPanel replaces FileExplorer when open (Ctrl+Shift+F), 300ms debounced search, collapsible file groups with highlighted matches, per-hit navigation (click → open file at line), "Alle ersetzen" with confirmation modal. German UI labels throughout.
-
-- **Realtime Infrastructure (SSE)** — Server-Sent Events for real-time push notifications. Replaces polling for chat messages, unread counts, and vault changes. Features: EventSource connection with exponential backoff reconnect (5 attempts → fallback to polling), Page Visibility API integration (5-min idle disconnect), Last-Event-ID replay for missed events, presence system (online/offline status), vault change notifications with automatic file explorer tree refresh and open tab content reload, sync conflict toasts, server shutdown warnings. Architecture: EventBus with per-user replay buffer, ConnectionManager with per-user connection limits (5), global limit (1000) with 80% threshold 503, rate limiting per event type.
-
-### Planned Features
-
-- Server-Side Plugin Execution — Run Obsidian plugins that require Node.js APIs on the backend (vm sandbox, Vault I/O shims, settings bridge, plugin logs)
-- Live Preview Editor (Side-by-Side or WYSIWYG)
-- Accessibility (a11y) — WCAG 2.1 AA compliance
-
-## Language
-
-The product UI uses German labels (e.g., "Laden…", "Fehler"). Requirements and documentation are written in German. Code comments and identifiers are in English.
+- Product UI: German labels
+- Requirements/docs: German
+- Code/identifiers: English

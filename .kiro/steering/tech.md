@@ -1,72 +1,86 @@
-# Slatebase — Tech Stack & Build
+# Slatebase — Tech Stack & Dependencies
 
 ## Architecture
 
-Monorepo with two independent packages: `backend/` and `frontend/`. No shared workspace tooling — each package has its own `package.json` and `node_modules`.
+Monorepo: `backend/` + `frontend/`. Separate `package.json` + `node_modules` each. No workspace tooling.
 
 ## Backend
 
-- **Runtime**: Node.js ≥ 22 (dev machine: v24.16.0; uses native `--experimental-strip-types` for local dev, `tsc` build for production/Docker)
-- **Language**: TypeScript (strict mode, ES2022 target, ESNext modules)
-- **Framework**: Hono (lightweight HTTP framework with `@hono/node-server`)
-- **Validation**: Zod (config schemas, request validation)
-- **Logging**: Pino (structured JSON logging)
-- **Dev server**: tsx (watch mode with `--env-file=.env`)
-- **Test runner**: Vitest
-- **Module system**: ESM (`"type": "module"`, `.js` extensions in imports)
+- **Runtime**: Node.js ≥ 22 (dev: v24, `tsx watch`; prod: `tsc` build)
+- **Language**: TypeScript strict, ES2022, ESNext modules, `.js` extensions
+- **Framework**: Hono (`@hono/node-server`)
+- **Validation**: Zod
+- **Logging**: Pino (structured JSON)
+- **Test**: Vitest
+- **Module**: ESM (`"type": "module"`)
 
 ## Frontend
 
-- **Framework**: React 19 (functional components, hooks)
-- **Build tool**: Vite 8
-- **Language**: TypeScript (~6.0)
-- **State management**: useReducer + Context (no external state library)
-- **Icons**: Lucide React (SVG-based, tree-shakeable)
-- **Fonts**: Inter (Google Fonts, loaded in index.html)
-- **Styling**: Custom CSS with Design Tokens (CSS Custom Properties), Dark Mode via `prefers-color-scheme`
-- **Markdown**: unified + remark-parse + remark-gfm + remark-frontmatter + custom Obsidian plugins (Wikilinks, Embeds with size/display, Callouts, Tags)
-- **Testing**: Vitest + Testing Library (jsdom environment) + Playwright (e2e)
-- **Property-Based Testing**: fast-check (both packages, devDependency)
-- **Linting**: ESLint with react-hooks and react-refresh plugins
-- **Dev proxy**: Vite proxies `/api` to `http://localhost:3000`
+- **Framework**: React 19, functional components
+- **Build**: Vite 8
+- **Language**: TypeScript ~6.0
+- **State**: useReducer + Context (no external lib)
+- **Icons**: Lucide React
+- **Styling**: CSS Custom Properties (Design Tokens), Dark Mode
+- **Markdown**: unified + remark-parse + remark-gfm + remark-frontmatter + custom Obsidian plugins
+- **Test**: Vitest + Testing Library + Playwright (e2e)
+- **Lint**: ESLint (react-hooks, react-refresh)
+- **Proxy**: Vite → `http://localhost:3000`
 
-## Common Commands
+## Commands
 
-### Backend (`cd backend`)
+```bash
+# Backend
+npm run dev          # tsx watch (hot reload)
+npm run build        # tsc → dist/
+npm run test         # vitest --run
 
-| Command | Purpose |
+# Frontend
+npm run dev          # Vite (port 5173)
+npm run build        # Type-check + production build
+npm run test         # vitest --run
+npm run test:e2e     # Playwright
+npm run lint         # ESLint
+```
+
+## Dependencies
+
+### Backend
+| Package | Purpose |
 |---------|---------|
-| `npm run dev` | Start dev server with hot reload (tsx watch) |
-| `npm run start` | Start with Node.js native TS stripping |
-| `npm run build` | Compile TypeScript to `dist/` |
-| `npm run test` | Run tests once (vitest --run) |
-| `npm run test:watch` | Run tests in watch mode |
+| hono | HTTP framework |
+| zod | Schema validation |
+| pino | Structured logging |
+| tsx | Dev server |
+| argon2 | Password hashing (argon2id) |
+| adm-zip | ZIP extraction (plugin upload) |
 
-### Frontend (`cd frontend`)
-
-| Command | Purpose |
+### Frontend
+| Package | Purpose |
 |---------|---------|
-| `npm run dev` | Start Vite dev server (port 5173) |
-| `npm run build` | Type-check + Vite production build |
-| `npm run test` | Run unit tests once (vitest --run) |
-| `npm run test:watch` | Run tests in watch mode |
-| `npm run test:e2e` | Run Playwright end-to-end tests |
-| `npm run lint` | ESLint check |
+| react / react-dom | UI framework |
+| vite / vitest | Build + test |
+| @testing-library/react | Component testing |
+| playwright | E2E testing |
+| unified / remark-parse / remark-gfm / remark-frontmatter | Markdown (MDAST) |
+| micromark / mdast-util-from-markdown / mdast-util-to-markdown | Obsidian plugins (transitive, used directly) |
+| unist-util-visit | Callout transformer (transitive, used directly) |
+| yaml | Frontmatter display |
+| highlight.js | Syntax highlighting |
+| lucide-react | Icons |
+| jszip | ZIP export (Firefox fallback) |
+| d3-force | Knowledge graph layout |
 
-## Configuration
+### Geplant
+- **better-sqlite3** — SQLite für Graph-Index (erst bei Performance-Bedarf, >10k Dateien)
 
-- Backend config: `backend/config/default.json` (defaults), overridden by `SLATEBASE_*` env vars from `backend/.env`
-- Frontend proxy config: `frontend/vite.config.ts`
+## Dependency-Regeln
 
-## Key Dependencies
+- **Pinned Versions** (exakt, kein `^`/`~`)
+- Vor Installation: Downloads, Maintainer, letztes Update, Lizenz (MIT/Apache/BSD), `npm audit`
+- Frage: Kann das mit Vorhandenem gelöst werden?
+- `package-lock.json` immer committen
 
-- **hono** — HTTP routing and middleware
-- **zod** — Schema validation
-- **pino** — Structured logging
-- **react / react-dom** — UI framework
-- **lucide-react** — Icon library (SVG-based, consistent design)
-- **vite** — Build tooling and dev server
-- **vitest** — Test runner (both packages)
-- **highlight.js** — Syntax highlighting in Markdown code blocks
-- **unified / remark-parse / remark-gfm** — Markdown parsing (MDAST)
-- **jszip** — Client-side ZIP creation (vault export fallback for Firefox)
+## Verbotene Dependencies
+
+Kein Express/Fastify/Koa, kein Redux/Zustand, kein ORM, kein DI-Container, kein Tailwind/CSS-Framework, kein Mocking-Framework (Backend), kein JWT/Passport, kein Next.js, kein shadcn/ui, kein Framer Motion, kein CouchDB als interner Store.

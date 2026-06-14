@@ -1,3 +1,7 @@
+---
+inclusion: manual
+---
+
 # Slatebase — Spec-Übersicht & Reihenfolge
 
 Überblick über alle Specs, ihren Status, die Umsetzungsreihenfolge und Abhängigkeiten.

@@ -1,3 +1,8 @@
+---
+inclusion: fileMatch
+fileMatchPattern: '**/sync/**'
+---
+
 # obsidian-livesync — CouchDB-Dokumentformat & Sync-Algorithmus
 
 Erkenntnisse aus der Quellcode-Analyse von `vrtmrz/obsidian-livesync` (Plugin), `vrtmrz/livesync-commonlib` (Shared Library) und `vrtmrz/octagonal-wheels` (Binary/Crypto Utilities). Stand: Mai 2026.

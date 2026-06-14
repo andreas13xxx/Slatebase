@@ -287,134 +287,24 @@ src/
 
 ## API Routes
 
-All routes are prefixed with `/api/v1`:
+All routes prefixed with `/api/v1`. Full reference in README.md.
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | /vaults | List vaults (filtered by user; ?all=true for admin) |
-| POST | /vaults | Create a new vault |
-| DELETE | /vaults/:vaultId | Delete a vault |
-| GET | /vaults/:vaultId/tree | Get directory tree |
-| GET | /vaults/:vaultId/files?path= | Get file content |
-| PUT | /vaults/:vaultId/files | Save file content |
-| POST | /vaults/:vaultId/import/file | Import single file |
-| POST | /vaults/:vaultId/import/folder | Import folder |
-| DELETE | /vaults/:vaultId/content?path= | Delete file/folder |
-| POST | /auth/login | Authenticate user |
-| POST | /auth/logout | End session |
-| GET | /auth/sessions | List own sessions |
-| DELETE | /auth/sessions/:sessionId | Invalidate session |
-| DELETE | /auth/sessions | Invalidate all other sessions |
-| GET | /users/search?q= | Search users by username prefix |
-| GET | /users/me | Get own profile |
-| PUT | /users/me | Update own profile |
-| PUT | /users/me/password | Change own password |
-| DELETE | /users/me | Delete own account |
-| GET | /admin/users | List users (admin) |
-| POST | /admin/users | Create user (admin) |
-| DELETE | /admin/users/:userId | Delete user (admin) |
-| PUT | /admin/users/:userId/role | Change role (admin) |
-| PUT | /admin/users/:userId/password | Reset password (admin) |
-| PUT | /admin/users/:userId/suspend | Suspend user (admin) |
-| PUT | /admin/users/:userId/unsuspend | Unsuspend user (admin) |
-| GET | /admin/config | Get server config (admin) |
-| PUT | /admin/config | Update server config (admin) |
-| POST | /admin/restart | Restart server (admin) |
-| GET | /admin/audit | Get audit log (admin) |
-| GET | /vaults/:vaultId/shares | List vault shares (owner) |
-| POST | /vaults/:vaultId/shares | Create share (owner) |
-| DELETE | /vaults/:vaultId/shares/:userId | Revoke share (owner) |
-| PUT | /vaults/:vaultId/shares/:userId | Update permission (owner) |
-| POST | /vaults/:vaultId/transfer | Transfer ownership (owner) |
-
-### Chat
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | /chat/conversations | List user's conversations (paginated) |
-| POST | /chat/conversations | Create a new conversation |
-| POST | /chat/conversations/:conversationId/leave | Leave a conversation |
-| GET | /chat/conversations/:conversationId/messages | Get messages (paginated) |
-| POST | /chat/conversations/:conversationId/messages | Send a message |
-| GET | /chat/unread | Get global unread count |
-| POST | /chat/conversations/:conversationId/read | Mark conversation as read |
-
-### Sync
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| POST | /vaults/:vaultId/sync/config | Create sync configuration |
-| GET | /vaults/:vaultId/sync/config | Get sync configuration |
-| PUT | /vaults/:vaultId/sync/config | Update sync configuration |
-| DELETE | /vaults/:vaultId/sync/config | Remove sync configuration |
-| PUT | /vaults/:vaultId/sync/config/disable | Disable sync |
-| PUT | /vaults/:vaultId/sync/config/enable | Enable sync |
-| POST | /vaults/:vaultId/sync/trigger | Trigger manual sync |
-| POST | /vaults/:vaultId/sync/analyze | Start analysis mode |
-| GET | /vaults/:vaultId/sync/log | Get sync log (paginated) |
-| GET | /vaults/:vaultId/sync/conflicts | Get open conflicts |
-| POST | /vaults/:vaultId/sync/conflicts/:path/resolve | Resolve conflict |
-
-### Graph & Context Panel
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | /vaults/:vaultId/graph | Get full link graph (nodes + edges) |
-| GET | /vaults/:vaultId/backlinks?path= | Get backlinks for a file |
-| GET | /vaults/:vaultId/tags | Get all tags in the vault with file counts |
-
-### Search & Replace
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | /vaults/:vaultId/search | Single-vault full-text search (query params: query, caseSensitive, regex, contextLines, maxResults) |
-| GET | /search | Multi-vault search (additional: vaultIds comma-separated) |
-| POST | /vaults/:vaultId/replace | Replace occurrences (JSON body: query, replacement, caseSensitive, regex, paths) |
-
-### MCP (Model Context Protocol)
-
-| Method | Path | Auth | Purpose |
-|--------|------|------|---------|
-| POST/GET/DELETE | /api/v1/mcp | Bearer Token | MCP Streamable HTTP transport |
-| GET | /api/v1/mcp/tokens | Session | List user's API tokens |
-| POST | /api/v1/mcp/tokens | Session + CSRF | Create new API token |
-| DELETE | /api/v1/mcp/tokens/:tokenId | Session + CSRF | Revoke a token |
-| GET | /.well-known/mcp.json | None | MCP discovery metadata |
-
-### Plugins
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | /vaults/:vaultId/plugins | List installed plugins |
-| POST | /vaults/:vaultId/plugins | Upload/install plugin (ZIP multipart) |
-| GET | /vaults/:vaultId/plugins/registry | Load plugin registry state |
-| PUT | /vaults/:vaultId/plugins/registry | Save plugin registry state |
-| GET | /vaults/:vaultId/plugins/:pluginId | Get plugin details (manifest) |
-| DELETE | /vaults/:vaultId/plugins/:pluginId | Uninstall plugin |
-| GET | /vaults/:vaultId/plugins/:pluginId/bundle | Download plugin bundle (JS) |
-| GET | /vaults/:vaultId/plugins/:pluginId/styles | Download plugin styles (CSS) |
-| GET | /vaults/:vaultId/plugins/:pluginId/settings | Load plugin settings |
-| PUT | /vaults/:vaultId/plugins/:pluginId/settings | Save plugin settings (max 1 MB) |
-
-### Feature Toggles
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | /admin/features | List all feature toggles with details (admin) |
-| PUT | /admin/features/:featureName | Toggle a feature (admin) |
-| GET | /features | List features with name + enabled (all authenticated users) |
-
-### Version
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | /version | Get installed Slatebase version (public, no auth) |
-
-### Realtime (SSE)
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | /events | SSE stream (token via query param or Bearer header, presence init, event replay via Last-Event-ID) |
+Route modules in `src/api/`:
+- `authRoutes.ts` — login, logout, sessions
+- `userRoutes.ts` — profile, password, account deletion
+- `adminRoutes.ts` — user management, config, audit, restart
+- `vaultShareRoutes.ts` — shares, transfer
+- `chatRoutes.ts` — conversations, messages, unread
+- `syncRoutes.ts` — sync config, trigger, log, conflicts
+- `graphRoutes.ts` — graph, backlinks, tags
+- `searchRoutes.ts` — search, multi-vault search, replace
+- `mcpRoutes.ts` — MCP Streamable HTTP transport (Bearer auth)
+- `mcpTokenRoutes.ts` — token CRUD (session auth)
+- `mcpWellKnownRoute.ts` — `.well-known/mcp.json` (public)
+- `pluginRoutes.ts` — plugin CRUD, bundle, styles, settings, registry
+- `featureRoutes.ts` — feature toggles (admin + public)
+- `versionRoutes.ts` — `GET /version` (public)
+- `sseRoutes.ts` — `GET /events` (SSE stream)
 
 ## Data Storage
 

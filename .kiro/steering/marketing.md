@@ -1,3 +1,7 @@
+---
+inclusion: manual
+---
+
 # Slatebase — Marketingplan
 
 ## Ziel
