@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/andreas13xxx/Slatebase/compare/v0.5.0...v0.5.1) (2026-06-14)
+
+
+### Sonstige Änderungen
+
+* restructure documentation for end-users vs contributors ([7fdfcc8](https://github.com/andreas13xxx/Slatebase/commit/7fdfcc85296c65cf8734ff7164d9d12ad7b16975))
+
 ## [0.5.0](https://github.com/andreas13xxx/Slatebase/compare/v0.4.0...v0.5.0) (2026-06-14)
 
 
