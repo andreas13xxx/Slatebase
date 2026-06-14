@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import React from 'react'
 import { RealtimeProvider as RealtimeStateProvider, useRealtimeContext } from '../state/realtimeContext'
 import { useEventSource, type SseEventData } from '../state/useEventSource'
+import { dispatchPresenceChange, getOnlineUserIds } from '../state/realtimePresenceBridge'
 import { showToast } from './ToastNotification'
 import type { ConnectionStatus } from '../state/realtimeState'
 
@@ -116,6 +117,17 @@ function RealtimeInner({
             }
             return next
           })
+          // Dispatch updated online user IDs via bridge
+          const currentIds = getOnlineUserIds()
+          if (status === 'offline') {
+            const updated = new Set(currentIds)
+            updated.delete(userId)
+            dispatchPresenceChange(updated)
+          } else {
+            const updated = new Set(currentIds)
+            updated.add(userId)
+            dispatchPresenceChange(updated)
+          }
           handlersRef.current?.onPresenceUpdate?.(userId, username, status)
         }
         break
@@ -131,6 +143,7 @@ function RealtimeInner({
             }
             return next
           })
+          dispatchPresenceChange(new Set(onlineUsers.map(u => u.userId)))
           handlersRef.current?.onPresenceInit?.(onlineUsers)
         }
         break

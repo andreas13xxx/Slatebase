@@ -280,7 +280,30 @@ const realtimeConnectionManager = new ConnectionManager(
 // Assign to the mutable reference for feature toggle listener
 connectionManager = realtimeConnectionManager
 
-const presenceService = new PresenceService({ logger, gracePeriodMs: 60000 })
+const presenceService = new PresenceService({
+  logger,
+  gracePeriodMs: 60000,
+  conversationAccessor: {
+    async getUsersWithSharedConversations(userId: string): Promise<string[]> {
+      const conversations = await conversationStore.findByParticipant(userId)
+      const userIds = new Set<string>()
+      for (const conv of conversations) {
+        if (conv.archived) continue
+        for (const participantId of conv.participants) {
+          if (participantId !== userId) {
+            userIds.add(participantId)
+          }
+        }
+      }
+      return Array.from(userIds)
+    },
+    async getUsername(userId: string): Promise<string | undefined> {
+      const user = await userRepository.findById(userId)
+      if (!user) return undefined
+      return user.displayName || user.username
+    },
+  },
+})
 const eventBus = new EventBus({
   connectionManager: realtimeConnectionManager,
   replayBuffer,
