@@ -4,6 +4,7 @@ import { useChatContext } from '../state/chatContext'
 import { useAppContext } from '../state/index'
 import { useTranslation } from '../i18n'
 import { loadMessages, leaveConversation } from '../state/chatActions'
+import { dispatchRealtimeUnreadUpdate } from '../state/realtimeChatBridge'
 import { NewConversation } from './NewConversation'
 import { ConfirmModal } from './ConfirmModal'
 
@@ -64,7 +65,15 @@ export function ConversationList({ onlineUserIds }: ConversationListProps) {
   const handleSelectConversation = (conversationId: string) => {
     if (!apiClient) return
     loadMessages(dispatch, apiClient, conversationId)
+    // Calculate new global unread count before dispatch (reducer hasn't run yet)
+    const conversation = state.conversations.find(c => c.id === conversationId)
+    const unreadToSubtract = conversation?.unreadCount ?? 0
     dispatch({ type: 'CONVERSATION_UNREAD_RESET', payload: conversationId })
+    // Push updated global unread count to App.tsx via bridge
+    if (unreadToSubtract > 0) {
+      const newTotal = Math.max(0, state.globalUnreadCount - unreadToSubtract)
+      dispatchRealtimeUnreadUpdate(newTotal)
+    }
   }
 
   const handleLeaveClick = (e: React.MouseEvent, conversationId: string, unreadCount: number) => {

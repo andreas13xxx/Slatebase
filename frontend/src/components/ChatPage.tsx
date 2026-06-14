@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { ChatProvider, useChatContext } from '../state/chatContext'
 import { useAppContext } from '../state'
 import { useRealtimeContext } from '../state/realtimeContext'
@@ -8,6 +8,7 @@ import {
   onRealtimeChatMessage,
   onRealtimeConversationPreview,
 } from '../state/realtimeChatBridge'
+import { onPresenceChange, getOnlineUserIds } from '../state/realtimePresenceBridge'
 import { ConversationList } from './ConversationList'
 import { MessageView } from './MessageView'
 import { MessageInput } from './MessageInput'
@@ -33,6 +34,11 @@ function ChatPageContent() {
   const { apiClient } = useAppContext()
   const { state: realtimeState } = useRealtimeContext()
   const { t } = useTranslation()
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(() => getOnlineUserIds())
+
+  useEffect(() => {
+    return onPresenceChange(setOnlineUserIds)
+  }, [])
 
   useEffect(() => {
     if (apiClient) {
@@ -117,7 +123,7 @@ function ChatPageContent() {
   return (
     <div className="chat-page">
       <div className="chat-sidebar">
-        <ConversationList />
+        <ConversationList onlineUserIds={onlineUserIds} />
       </div>
       <div className="chat-main">
         {state.currentConversation ? (
