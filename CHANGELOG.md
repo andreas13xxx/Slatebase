@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/andreas13xxx/Slatebase/compare/v0.5.1...v0.5.2) (2026-06-14)
+
+
+### Bugfixes
+
+* wire presence indicators to ConversationList via module-level br… ([4deaa06](https://github.com/andreas13xxx/Slatebase/commit/4deaa064d6d014982413e8d12ee63e999413726b))
+
 ## [0.5.1](https://github.com/andreas13xxx/Slatebase/compare/v0.5.0...v0.5.1) (2026-06-14)
 
 
