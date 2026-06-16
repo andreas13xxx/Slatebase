@@ -26,7 +26,7 @@ inclusion: manual
 | 14 | `knowledge-graph` | Feature | ✅ Fertig | Visuelle Darstellung der Verlinkungen zwischen Notizen (interaktiver Graph mit Nodes und Edges) |
 | 15 | `live-preview-editor` | Feature | 📋 Geplant | Side-by-Side oder WYSIWYG Live-Preview im Editor |
 | 16 | `obsidian-plugin-compat` | Feature | ✅ Fertig ⚠️ experimental | Obsidian Community Plugin Compatibility Layer (API-Shims, Plugin-Loader, Sandbox, Verwaltungs-UI, Backend-Persistenz) — experimentell, nur browser-kompatible Plugins; serverseitige Plugins erfordern `server-side-plugins` |
-| 17 | `mermaid-rendering` | Feature | 📋 Requirements | Mermaid-Diagramme in Fenced Code Blocks als SVG rendern (Dark/Light Mode, Lazy Loading, Fehlerbehandlung) |
+| 17 | `mermaid-rendering` | Feature | ✅ Tasks | Mermaid-Diagramme in Fenced Code Blocks als SVG rendern (Dark/Light Mode, Lazy Loading, Fehlerbehandlung) |
 | 18 | `accessibility-audit` | Feature | 📋 Geplant | WCAG 2.1 AA Compliance (systematischer Audit + Fixes) |
 | 19 | `server-side-plugins` | Feature | 📋 Geplant | Serverseitige Ausführung von Obsidian-Plugins die Node.js-APIs benötigen (tls, net, crypto, etc.) |
 | 20 | `feature-toggles` | Feature | ✅ Fertig | Zentrale Feature-Toggles in der Serverkonfiguration (vault-sync, obsidian-plugin-compat, chat, mcp, knowledge-graph) mit Admin-UI und Hot-Toggle-Support |
@@ -110,7 +110,7 @@ Priorisiert nach: Blockierungen auflösen → Nutzerwert maximieren → Quick Wi
 | 8 | `realtime-infrastructure` | ✅ Fertig | SSE implementiert: Chat-Push, Presence, Vault-Change-Events mit Tree-Refresh + Tab-Reload, Toast-Notifications. |
 | 9 | `unified-settings` | Mittel | Konsolidiert fragmentierte Settings nach vielen neuen Features. |
 | 10 | `public-sharing` | Mittel | Starkes Marketing-Feature. Differenziert gegen Obsidian Publish. |
-| 11 | `mermaid-rendering` | Niedrig | Requirements fertig. Quick Win zwischen größeren Features. |
+| 11 | `mermaid-rendering` | Niedrig | Design + Tasks fertig. Quick Win zwischen größeren Features. |
 | 12 | `responsive-mobile` | Hoch | Erweitert Nutzerbasis. Setzt stabile Desktop-UX voraus (Tier 1–2). |
 
 ### Tier 4: Langfristig (Ökosystem + Advanced Features)
@@ -162,7 +162,7 @@ Danach:        workspace-leaf-compat, obsidian-themes, live-preview-editor, ...
 - **Abhängigkeit**: Braucht obsidian-markdown-compat (Fenced Code Block Rendering in ViewMode)
 - **Priorität**: Mittel
 - **Aufwand**: Niedrig–Mittel (rein Frontend, eine neue Dependency `mermaid`)
-- **Status**: Requirements fertig, Design + Tasks ausstehend
+- **Status**: ✅ Requirements + Design + Tasks fertig — bereit zur Implementierung
 
 ### workspace-leaf-compat
 - **Beschreibung**: Workspace Leaf API-Kompatibilitätsschicht — mappt Obsidians Workspace-Leaf-System (registerView, getLeaf, getLeavesOfType, revealLeaf, etc.) auf Slatebase's Tab-System und Context Panel. Ermöglicht Plugins wie Calendar, Kanban und Excalidraw ihre Custom Views in Slatebase anzuzeigen.
