@@ -177,7 +177,7 @@ export const de = {
     vaultDeletion: 'Vault löschen',
     syncConfig: 'Vault-Sync',
     syncLog: 'Sync-Protokoll',
-    mcpTokens: 'API-Tokens',
+    mcpTokens: 'MCP-Tokens',
     plugins: 'Plugins',
     trash: 'Papierkorb',
   },
@@ -553,11 +553,11 @@ export const de = {
   },
 
   mcpTokens: {
-    title: 'API-Tokens',
-    description: 'API-Tokens ermöglichen externen Anwendungen (z.B. AI-Assistenten) den Zugriff auf Ihre Vaults über das MCP-Protokoll.',
+    title: 'MCP-Tokens',
+    description: 'MCP-Tokens ermöglichen externen Anwendungen (z.B. AI-Assistenten) den Zugriff auf Ihre Vaults über das Model Context Protocol.',
     loading: 'Laden…',
     loadError: 'Tokens konnten nicht geladen werden.',
-    empty: 'Keine API-Tokens vorhanden.',
+    empty: 'Keine MCP-Tokens vorhanden.',
     createTitle: 'Neues Token erstellen',
     nameLabel: 'Token-Name',
     namePlaceholder: 'z.B. Claude Desktop, Cursor',

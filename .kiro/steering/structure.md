@@ -249,6 +249,10 @@ src/
 │   ├── favoritesStore.ts — Favorites per vault (localStorage, max 50, path tracking on rename/delete)
 │   ├── dailyNoteService.ts — Daily note open/create logic (YYYY-MM-DD.md, template support)
 │   └── vaultStatisticsCache.ts — Client-side vault statistics cache (invalidate on vault:change SSE)
+│   ├── settingsState.ts      — Settings reducer + types (categories, sections, nav state)
+│   ├── settingsRegistry.ts   — ISettingsRegistry, section definitions
+│   ├── settingsPersistence.ts — sessionStorage serialize/validate
+│   ├── settingsContext.ts    — SettingsProvider + useSettingsContext hook
 ├── hooks/
 │   ├── useHistoryStack.ts — Undo/Redo history stack hook (max 100, FIFO eviction, clear on file switch)
 │   ├── useLineNumbers.ts — Line numbers toggle state (localStorage persistence)
@@ -305,6 +309,18 @@ src/
 │   │       ├── extractHeadings.ts — Heading extraction from markdown
 │   │       ├── parseFrontmatter.ts — YAML frontmatter parsing
 │   │       └── persistence.ts    — localStorage layout persistence
+│   ├── settings/
+│   │   ├── SettingsPanel.tsx     — Unified settings overlay (Container Query, Ctrl+,, Escape/overlay close)
+│   │   ├── SettingsPanel.css     — Settings panel styles (responsive layout, embedded table overrides)
+│   │   ├── SettingsSidebar.tsx   — Sidebar: search + nav list
+│   │   ├── SettingsSearch.tsx    — Debounced search input (150ms)
+│   │   ├── SettingsSearch.css    — Search styles
+│   │   ├── SettingsNavList.tsx   — Category/section nav (keyboard nav, aria-current, disabled vault sections)
+│   │   ├── SettingsNavList.css   — Nav list styles
+│   │   ├── SettingsContent.tsx   — Section → Component mapping with focus management
+│   │   ├── AccountDeletionSection.tsx — Extracted account deletion form
+│   │   ├── FeatureTogglesSection.tsx  — Extracted feature toggle UI
+│   │   └── ServerRestartSection.tsx   — Server restart with confirmation
 │   ├── AdminUsersPage.tsx — User administration
 │   ├── AdminVaultsPage.tsx — Admin: all vaults overview with delete
 │   ├── AdminConfigPage.tsx — Server configuration (card-based layout)

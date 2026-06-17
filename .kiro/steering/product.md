@@ -25,13 +25,14 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for 
 - Editor improvements (line numbers, undo/redo history stack, recent files, templates, daily notes, image paste, favorites)
 - Trash & file versioning (soft-delete with retention, version browser with inline diff, configurable cleanup job)
 - Login version display (server version shown on login screen)
+- Unified Settings Panel (Ctrl+,, categorized sidebar, responsive, keyboard-navigable, search)
 
 ## Planned
 
 - Live Preview Editor (WYSIWYG/Side-by-Side)
 - Server-Side Plugins (Node.js APIs in vm sandbox)
 - Accessibility audit (WCAG 2.1 AA)
-- Responsive/mobile, public sharing, unified settings
+- Responsive/mobile, public sharing
 
 ## Language Convention
 

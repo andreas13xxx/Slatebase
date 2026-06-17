@@ -8,8 +8,8 @@ Das Unified Settings Feature konsolidiert alle verstreuten Einstellungsseiten in
 
 ## Tasks
 
-- [ ] 1. State Layer und Registry erstellen
-  - [ ] 1.1 Erstelle `frontend/src/state/settingsState.ts` — Types, State-Interface, Actions, Reducer
+- [x] 1. State Layer und Registry erstellen
+  - [x] 1.1 Erstelle `frontend/src/state/settingsState.ts` — Types, State-Interface, Actions, Reducer
     - Definiere `SettingsCategory`, `AccountSection`, `VaultSection`, `AdminSection`, `SettingsSection` Types
     - Definiere `SettingsNavState` Interface mit `category`, `section`, `selectedVaultId`, `searchQuery`, `mobileNavOpen`
     - Definiere `SettingsAction` discriminated union (NAVIGATE, SELECT_VAULT, SET_SEARCH, TOGGLE_MOBILE_NAV, CLOSE_MOBILE_NAV, RESTORE_STATE)
@@ -17,7 +17,7 @@ Das Unified Settings Feature konsolidiert alle verstreuten Einstellungsseiten in
     - Exportiere `initialSettingsState` und `SETTINGS_NAV_KEY` Konstante
     - _Requirements: 1.4, 1.6, 4.7, 4.8, 5.1, 6.3_
 
-  - [ ] 1.2 Erstelle `frontend/src/state/settingsRegistry.ts` — ISettingsRegistry, ISettingsSectionDef, statische Registry-Daten
+  - [x] 1.2 Erstelle `frontend/src/state/settingsRegistry.ts` — ISettingsRegistry, ISettingsSectionDef, statische Registry-Daten
     - Definiere `ISettingsSectionDef` Interface mit `id`, `labelKey`, `category`, `requiresAdmin`, `requiresVault`
     - Definiere `ISettingsRegistry` Interface mit `getCategories()`, `getSections()`, `getAllSections()`, `findSection()`
     - Implementiere `SETTINGS_SECTIONS` Array mit allen 11 Sektionsdefinitionen
@@ -25,14 +25,14 @@ Das Unified Settings Feature konsolidiert alle verstreuten Einstellungsseiten in
     - `getCategories(isAdmin)` gibt `['account', 'vault']` zurück, plus `'administration'` nur wenn `isAdmin === true`
     - _Requirements: 1.2, 1.3, 2.1, 3.1, 4.1, 4.2_
 
-  - [ ] 1.3 Erstelle `frontend/src/state/settingsPersistence.ts` — sessionStorage-Serialisierung und Validierung
+  - [x] 1.3 Erstelle `frontend/src/state/settingsPersistence.ts` — sessionStorage-Serialisierung und Validierung
     - Implementiere `persistSettingsNav(state: SettingsNavState): void` — schreibt in sessionStorage
     - Implementiere `restoreSettingsNav(isAdmin: boolean, vaultIds: string[]): SettingsNavState | null` — liest und validiert
     - Validierung: Kategorie gültig, Sektion passt zur Kategorie, Admin-Check, selectedVaultId existiert in vaultIds
     - Graceful Degradation bei sessionStorage-Fehler (QuotaExceeded, Private Browsing)
     - _Requirements: 5.1, 5.2, 5.3_
 
-  - [ ] 1.4 Erstelle `frontend/src/state/settingsContext.ts` — SettingsProvider und useSettingsContext Hook
+  - [x] 1.4 Erstelle `frontend/src/state/settingsContext.ts` — SettingsProvider und useSettingsContext Hook
     - Implementiere `SettingsProvider` mit `useReducer(settingsReducer, initialSettingsState)`
     - Lade gespeicherten State beim Mount via `restoreSettingsNav()` → `RESTORE_STATE` Action
     - Persistiere State bei jeder Änderung via `useEffect` → `persistSettingsNav()`
@@ -40,8 +40,8 @@ Das Unified Settings Feature konsolidiert alle verstreuten Einstellungsseiten in
     - `useSettingsContext()` Hook mit Error wenn außerhalb Provider
     - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 2. Checkpoint — State Layer Tests
-  - [ ] 2.1 Erstelle `frontend/src/state/settingsState.test.ts` — Unit Tests für settingsReducer
+- [x] 2. Checkpoint — State Layer Tests
+  - [x] 2.1 Erstelle `frontend/src/state/settingsState.test.ts` — Unit Tests für settingsReducer
     - NAVIGATE zu gültigen Kategorien/Sektionen
     - NAVIGATE zu Admin-Sektion ohne Admin-Rolle → Fallback auf account/profile
     - NAVIGATE mit ungültiger Section für Category → Fallback auf erste Section
@@ -52,7 +52,7 @@ Das Unified Settings Feature konsolidiert alle verstreuten Einstellungsseiten in
     - Mobile-Nav schließt bei NAVIGATE
     - _Requirements: 1.4, 1.6, 4.7, 4.8, 6.3_
 
-  - [ ] 2.2 Erstelle `frontend/src/state/settingsRegistry.test.ts` — Unit Tests für Registry
+  - [x] 2.2 Erstelle `frontend/src/state/settingsRegistry.test.ts` — Unit Tests für Registry
     - getCategories mit isAdmin=true enthält 'administration'
     - getCategories mit isAdmin=false enthält NICHT 'administration'
     - Reihenfolge: account, vault, administration
@@ -60,7 +60,7 @@ Das Unified Settings Feature konsolidiert alle verstreuten Einstellungsseiten in
     - findSection für existierende/nicht-existierende IDs
     - _Requirements: 1.2, 1.3, 4.1, 4.2_
 
-  - [ ] 2.3 Erstelle `frontend/src/state/settingsPersistence.test.ts` — Unit Tests für Persistenz
+  - [x] 2.3 Erstelle `frontend/src/state/settingsPersistence.test.ts` — Unit Tests für Persistenz
     - Round-Trip: serialize → deserialize ergibt identischen State
     - Ungültige Kategorie → null (Fallback)
     - Admin-Kategorie + isAdmin=false → null (Fallback)
@@ -117,10 +117,10 @@ Das Unified Settings Feature konsolidiert alle verstreuten Einstellungsseiten in
     - `fc.assert(fc.property(...), { numRuns: 100 })`
     - **Validates: Requirements 9.5**
 
-- [ ] 3. Checkpoint — Ensure all tests pass, ask the user if questions arise.
+- [x] 3. Checkpoint — Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 4. Settings-Panel Komponenten erstellen
-  - [ ] 4.1 Erstelle `frontend/src/components/settings/SettingsPanel.tsx` und `SettingsPanel.css` — Haupt-Container
+- [x] 4. Settings-Panel Komponenten erstellen
+  - [x] 4.1 Erstelle `frontend/src/components/settings/SettingsPanel.tsx` und `SettingsPanel.css` — Haupt-Container
     - Container-Query-fähiges Layout (`@container` mit 700px Schwellenwert)
     - Props: `open`, `onClose`, `initialNav?`
     - Rendert `SettingsProvider` → `SettingsSidebar` + `SettingsContent`
@@ -130,7 +130,7 @@ Das Unified Settings Feature konsolidiert alle verstreuten Einstellungsseiten in
     - ARIA: korrektes Landmark-Markup
     - _Requirements: 1.1, 5.4, 6.1, 6.2, 6.4, 6.5, 6.6, 8.1_
 
-  - [ ] 4.2 Erstelle `frontend/src/components/settings/SettingsSidebar.tsx` — Navigations-Seitenleiste
+  - [x] 4.2 Erstelle `frontend/src/components/settings/SettingsSidebar.tsx` — Navigations-Seitenleiste
     - `role="navigation"` mit geordneter Liste (`<ul>`/`<li>`)
     - Kategorien als Gruppen-Headers, Sektionen als navigierbare Einträge
     - `aria-current="page"` auf aktivem Eintrag
@@ -139,14 +139,14 @@ Das Unified Settings Feature konsolidiert alle verstreuten Einstellungsseiten in
     - Rendert `SettingsSearch`, `VaultSelector` (bei Vault-Kategorie), `SettingsNavList`
     - _Requirements: 1.1, 1.4, 3.2, 8.1, 8.2, 8.4_
 
-  - [ ] 4.3 Erstelle `frontend/src/components/settings/SettingsSearch.tsx` — Suchfeld mit Debounce
+  - [x] 4.3 Erstelle `frontend/src/components/settings/SettingsSearch.tsx` — Suchfeld mit Debounce
     - Suchfeld oberhalb der Kategorieliste
     - 150ms Debounce vor Filterung
     - Dispatch `SET_SEARCH` mit aktuellem Query
     - Leeres Feld → vollständige Navigation wiederherstellen
     - _Requirements: 9.1, 9.2, 9.4_
 
-  - [ ] 4.4 Erstelle `frontend/src/components/settings/SettingsNavList.tsx` — Kategorien- und Sektionsliste
+  - [x] 4.4 Erstelle `frontend/src/components/settings/SettingsNavList.tsx` — Kategorien- und Sektionsliste
     - Filtert Sektionen basierend auf `searchQuery` (case-insensitive Label-Matching)
     - Gruppiert gefilterte Ergebnisse unter Kategorie-Überschriften
     - Zeigt "Keine Ergebnisse"-Meldung bei leerem Filter
@@ -154,7 +154,7 @@ Das Unified Settings Feature konsolidiert alle verstreuten Einstellungsseiten in
     - Blendet Admin-Sektionen aus wenn `isAdmin === false`
     - _Requirements: 1.4, 3.3, 3.4, 4.2, 9.2, 9.3, 9.5_
 
-  - [ ] 4.5 Erstelle `frontend/src/components/settings/SettingsContent.tsx` — Inhaltsbereich
+  - [x] 4.5 Erstelle `frontend/src/components/settings/SettingsContent.tsx` — Inhaltsbereich
     - `role="main"` Container
     - Rendert die aktive eingebettete Komponente basierend auf `state.section`
     - Übergibt `apiClient` (Singleton) und ggf. `vaultId` als Props
@@ -162,36 +162,36 @@ Das Unified Settings Feature konsolidiert alle verstreuten Einstellungsseiten in
     - Mapping: section → Komponente (ProfilePage, ChangePasswordPage, SessionsPage, McpTokensPage, AccountDeletionSection, SyncConfigPage, PluginManagementPage, AdminConfigPage, AdminUsersPage, AdminVaultsPage, FeatureTogglesSection)
     - _Requirements: 1.5, 2.2–2.7, 3.5, 3.6, 4.3–4.6, 7.1, 7.2, 7.4, 8.3_
 
-  - [ ] 4.6 Erstelle `frontend/src/components/settings/VaultSelector.tsx` — Vault-Auswahl-Dropdown
+  - [x] 4.6 Erstelle `frontend/src/components/settings/VaultSelector.tsx` — Vault-Auswahl-Dropdown
     - Dropdown mit allen Vaults des aktuellen Benutzers
     - Dispatch `SELECT_VAULT` bei Auswahl
     - Hinweis-Text wenn kein Vault gewählt ("Bitte Vault auswählen")
     - Vault-Name als Kontextanzeige oberhalb der Vault-Sektionen wenn gewählt
     - _Requirements: 3.2, 3.3, 3.4, 3.7_
 
-- [ ] 5. Checkpoint — Ensure all tests pass, ask the user if questions arise.
+- [x] 5. Checkpoint — Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 6. Komponentenextraktion und Integration
-  - [ ] 6.1 Extrahiere `AccountDeletionSection` aus bestehender Account-Lösch-Logik
+- [x] 6. Komponentenextraktion und Integration
+  - [x] 6.1 Extrahiere `AccountDeletionSection` aus bestehender Account-Lösch-Logik
     - Erstelle `frontend/src/components/settings/AccountDeletionSection.tsx`
     - Wiederverwendet das bestehende Lösch-Formular (Passwortbestätigung, zweistufige Bestätigung)
     - Props: `{ apiClient: IApiClient }`
     - _Requirements: 2.7_
 
-  - [ ] 6.2 Extrahiere `FeatureTogglesSection` aus bestehender Admin-Feature-UI
+  - [x] 6.2 Extrahiere `FeatureTogglesSection` aus bestehender Admin-Feature-UI
     - Erstelle `frontend/src/components/settings/FeatureTogglesSection.tsx`
     - Wrapper um die bestehende Feature-Toggle-Verwaltung ohne äußeren Layout-Container
     - Props: `{ apiClient: IApiClient }`
     - _Requirements: 4.6_
 
-  - [ ] 6.3 Integriere SettingsPanel in die App-Hierarchie
+  - [x] 6.3 Integriere SettingsPanel in die App-Hierarchie
     - Füge `SettingsPanel`-Rendering in `App.tsx` hinzu (conditional, gesteuert durch App-State)
     - Registriere `Ctrl+,` globalen Shortcut zum Öffnen
     - Stelle sicher, dass bestehende Routen weiterhin funktionieren (kein Route-Entfernen)
     - Markiere bestehende Routen intern als deprecated (Kommentar)
     - _Requirements: 5.4, 7.5_
 
-  - [ ] 6.4 Responsive Layout implementieren (CSS Container Query)
+  - [x] 6.4 Responsive Layout implementieren (CSS Container Query)
     - `@container`-Rule mit 700px Schwellenwert in `SettingsPanel.css`
     - ≥700px: Sidebar permanent links, Content rechts
     - <700px: Navigation als einklappbares Menü oberhalb des Contents
@@ -200,10 +200,10 @@ Das Unified Settings Feature konsolidiert alle verstreuten Einstellungsseiten in
     - Navigation-Stand bleibt bei Breiten-Wechsel erhalten
     - _Requirements: 6.1, 6.2, 6.3, 6.6_
 
-- [ ] 7. Checkpoint — Ensure all tests pass, ask the user if questions arise.
+- [x] 7. Checkpoint — Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 8. Komponenten-Tests
-  - [ ] 8.1 Erstelle `frontend/src/components/settings/SettingsPanel.test.tsx` — Komponenten-Tests
+- [x] 8. Komponenten-Tests
+  - [x] 8.1 Erstelle `frontend/src/components/settings/SettingsPanel.test.tsx` — Komponenten-Tests
     - Panel rendert Sidebar + Content
     - Korrekte Komponente pro Sektion (Section → Component Mapping)
     - Tastaturnavigation (Tab, Pfeiltasten, Enter)
@@ -222,7 +222,7 @@ Das Unified Settings Feature konsolidiert alle verstreuten Einstellungsseiten in
     - `fc.assert(fc.property(...), { numRuns: 100 })`
     - **Validates: Requirements 3.3, 3.4**
 
-- [ ] 9. Final Checkpoint — Ensure all tests pass, ask the user if questions arise.
+- [x] 9. Final Checkpoint — Ensure all tests pass, ask the user if questions arise.
 
 ## Notes
 

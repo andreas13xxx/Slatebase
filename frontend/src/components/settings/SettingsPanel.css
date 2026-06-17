@@ -1,0 +1,224 @@
+/* ===== SettingsPanel — Unified Settings Container ===== */
+
+.settings-panel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-overlay);
+  animation: settings-overlay-fade-in var(--transition-base) forwards;
+}
+
+@keyframes settings-overlay-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.settings-panel {
+  container-type: inline-size;
+  position: relative;
+  width: 90vw;
+  max-width: 1000px;
+  height: 80vh;
+  max-height: 700px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: settings-panel-scale-in var(--transition-base) forwards;
+}
+
+@keyframes settings-panel-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.settings-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.settings-panel-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+.settings-panel-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.settings-panel-close-btn:hover {
+  background: var(--sidebar-hover);
+  color: var(--text-primary);
+}
+
+.settings-panel-close-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Layout container — vertical by default (mobile/narrow) */
+.settings-panel-layout {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Mobile: nav toggle button visible */
+.settings-panel-mobile-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--sidebar-bg);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--transition-fast);
+}
+
+.settings-panel-mobile-toggle:hover {
+  background: var(--sidebar-hover);
+}
+
+.settings-panel-mobile-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Sidebar area */
+.settings-panel-sidebar {
+  background: var(--sidebar-bg);
+  border-bottom: 1px solid var(--sidebar-border);
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+/* Mobile: sidebar hidden unless open */
+.settings-panel-sidebar[data-mobile-open="false"] {
+  display: none;
+}
+
+.settings-panel-sidebar[data-mobile-open="true"] {
+  display: block;
+  max-height: 50vh;
+}
+
+/* Content area */
+.settings-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  background: var(--bg-elevated);
+}
+
+/* ===== Container Query: wide layout (>= 700px) ===== */
+@container (min-width: 700px) {
+  .settings-panel-layout {
+    flex-direction: row;
+  }
+
+  .settings-panel-mobile-toggle {
+    display: none;
+  }
+
+  .settings-panel-sidebar {
+    display: block !important;
+    width: var(--sidebar-width);
+    min-width: 220px;
+    max-width: 280px;
+    border-bottom: none;
+    border-right: 1px solid var(--sidebar-border);
+    max-height: none;
+  }
+
+  .settings-panel-sidebar[data-mobile-open="false"],
+  .settings-panel-sidebar[data-mobile-open="true"] {
+    display: block;
+  }
+
+  .settings-panel-content {
+    flex: 1;
+  }
+}
+
+/* ===== Suppress duplicate headings from embedded components ===== */
+/* SettingsContent renders its own h2 section heading.
+   Embedded page components (ProfilePage, AdminConfigPage, SessionsPage, etc.)
+   have their own h1 titles that become redundant inside the settings panel. */
+.settings-panel-content h1 {
+  display: none;
+}
+
+/* Also suppress the admin-config-header which wraps the icon+h1 combo */
+.settings-panel-content .admin-config-header {
+  display: none;
+}
+
+
+/* ===== Responsive tables inside settings panel ===== */
+
+.settings-panel-content .admin-users-table-wrapper,
+.settings-panel-content .mcp-tokens-table-wrapper {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.settings-panel-content .admin-users-table,
+.settings-panel-content .mcp-tokens-table {
+  font-size: 0.75rem;
+  min-width: auto;
+}
+
+.settings-panel-content .admin-users-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.settings-panel-content .admin-users-btn--small {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+}
+
+.settings-panel-content .admin-users-create-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+}

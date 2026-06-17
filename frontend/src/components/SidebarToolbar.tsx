@@ -1,15 +1,15 @@
 import { useState, useRef, useCallback } from 'react'
 import {
-  Upload, FolderOpen, Download, Settings, Shield,
-  Database, FileText, Clock, User, Server, FilePlus, MessageCircle, RefreshCw, Key, ScrollText,
-  ClipboardList, Plus, Share2, Plug, Search, CalendarDays, Trash2,
+  Upload, FolderOpen, Download, Settings,
+  Database, FileText, FilePlus, MessageCircle, ScrollText,
+  ClipboardList, Plus, Share2, CalendarDays, Trash2,
 } from 'lucide-react'
 import { useFeatureContext } from '../state/featureContext'
 
 type AppPage =
-  | 'vaults' | 'my-vaults' | 'profile' | 'sessions' | 'chat'
-  | 'admin-users' | 'admin-vaults' | 'admin-config' | 'admin-audit' | 'admin-logs'
-  | 'vault-sharing' | 'vault-deletion' | 'sync-config' | 'sync-log' | 'mcp-tokens' | 'plugins'
+  | 'vaults' | 'my-vaults' | 'chat'
+  | 'admin-audit' | 'admin-logs'
+  | 'sync-log'
   | 'trash'
 
 interface ToolbarItem {
@@ -36,8 +36,7 @@ interface SidebarToolbarProps {
   onOpenGraph: () => void
   onOpenTrash?: () => void
   onDailyNote?: () => void
-  onToggleSearch?: () => void
-  searchPanelOpen?: boolean
+  onOpenSettings?: () => void
   isAdmin: boolean
   isVaultOwner?: boolean
   syncEnabled?: boolean
@@ -49,11 +48,10 @@ interface SidebarToolbarProps {
  * Buttons can be reordered by drag-and-drop.
  * Tooltips show on hover.
  */
-export function SidebarToolbar({ vaultId, vaultPermission, onCreateVault, onCreateFile, onImportFile, onImportFolder, onExportVault, onNavigate, onOpenGraph, onOpenTrash, onDailyNote, onToggleSearch, searchPanelOpen, isAdmin, isVaultOwner, syncEnabled, globalUnreadCount }: SidebarToolbarProps) {
+export function SidebarToolbar({ vaultId, vaultPermission, onCreateVault, onCreateFile, onImportFile, onImportFolder, onExportVault, onNavigate, onOpenGraph, onOpenTrash, onDailyNote, onOpenSettings, isAdmin, isVaultOwner, syncEnabled, globalUnreadCount }: SidebarToolbarProps) {
   const { isEnabled } = useFeatureContext()
 
   const allItems: ToolbarItem[] = [
-    { id: 'search', icon: <Search size={15} />, label: 'Suche', action: () => onToggleSearch?.() },
     { id: 'create-vault', icon: <Plus size={15} />, label: 'Neuer Vault', action: onCreateVault },
     { id: 'create-file', icon: <FilePlus size={15} />, label: 'Neue Datei', action: onCreateFile, requiresVault: true, requiresWrite: true },
     { id: 'daily-note', icon: <CalendarDays size={15} />, label: 'Tagesnotiz (Ctrl+Alt+D)', action: () => onDailyNote?.(), requiresVault: true, requiresWrite: true },
@@ -62,19 +60,12 @@ export function SidebarToolbar({ vaultId, vaultPermission, onCreateVault, onCrea
     { id: 'export-vault', icon: <Download size={15} />, label: 'Vault exportieren', action: onExportVault, requiresVault: true },
     { id: 'trash', icon: <Trash2 size={15} />, label: 'Papierkorb', action: () => onOpenTrash?.(), requiresVault: true },
     { id: 'graph', icon: <Share2 size={15} />, label: 'Graph', action: onOpenGraph, requiresVault: true, feature: 'knowledge-graph' },
-    { id: 'sync-config', icon: <RefreshCw size={15} />, label: 'Vault-Sync', action: () => onNavigate('sync-config'), requiresVault: true, ownerOnly: true, feature: 'vault-sync' },
     { id: 'sync-log', icon: <ClipboardList size={15} />, label: 'Sync-Protokoll', action: () => onNavigate('sync-log'), requiresVault: true, ownerOnly: true, feature: 'vault-sync' },
-    { id: 'plugins', icon: <Plug size={15} />, label: 'Plugins', action: () => onNavigate('plugins'), requiresVault: true, feature: 'obsidian-plugin-compat' },
     { id: 'my-vaults', icon: <Database size={15} />, label: 'Meine Vaults', action: () => onNavigate('my-vaults') },
-    { id: 'profile', icon: <User size={15} />, label: 'Profil', action: () => onNavigate('profile') },
-    { id: 'sessions', icon: <Clock size={15} />, label: 'Sitzungen', action: () => onNavigate('sessions') },
-    { id: 'mcp-tokens', icon: <Key size={15} />, label: 'API-Tokens', action: () => onNavigate('mcp-tokens'), feature: 'mcp' },
     { id: 'chat', icon: <MessageCircle size={15} />, label: 'Chat', action: () => onNavigate('chat'), feature: 'chat' },
-    { id: 'admin-users', icon: <Shield size={15} />, label: 'Benutzerverwaltung', action: () => onNavigate('admin-users'), adminOnly: true },
-    { id: 'admin-vaults', icon: <Server size={15} />, label: 'Vault-Übersicht (Admin)', action: () => onNavigate('admin-vaults'), adminOnly: true },
-    { id: 'admin-config', icon: <Settings size={15} />, label: 'Serverkonfiguration', action: () => onNavigate('admin-config'), adminOnly: true },
     { id: 'admin-audit', icon: <FileText size={15} />, label: 'Audit-Log', action: () => onNavigate('admin-audit'), adminOnly: true },
     { id: 'admin-logs', icon: <ScrollText size={15} />, label: 'Server-Logs', action: () => onNavigate('admin-logs'), adminOnly: true },
+    { id: 'settings', icon: <Settings size={15} />, label: 'Einstellungen (Ctrl+,)', action: () => onOpenSettings?.() },
   ]
 
   const visibleItems = allItems.filter((item) => {
@@ -132,11 +123,10 @@ export function SidebarToolbar({ vaultId, vaultPermission, onCreateVault, onCrea
         const disabled = (item.requiresVault && !vaultId) || (item.requiresWrite && vaultPermission === 'read')
         const showBadge = item.id === 'chat' && globalUnreadCount !== undefined && globalUnreadCount > 0
         const showSyncActive = item.id === 'sync-config' && syncEnabled === true
-        const showSearchActive = item.id === 'search' && searchPanelOpen === true
         return (
           <button
             key={item.id}
-            className={`toolbar-btn${showSyncActive ? ' toolbar-btn--sync-active' : ''}${showSearchActive ? ' toolbar-btn--active' : ''}`}
+            className={`toolbar-btn${showSyncActive ? ' toolbar-btn--sync-active' : ''}`}
             title={showSyncActive ? `${item.label} (aktiv)` : item.label}
             aria-label={item.label}
             onClick={disabled ? undefined : item.action}

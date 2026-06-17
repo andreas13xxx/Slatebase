@@ -115,20 +115,25 @@ Scope: ~4–5h. Frontend-only, baut auf ViewMode auf.
 
 ---
 
-### Task 5: Unified Settings — Implementierung
+### Task 5: Unified Settings — Implementierung ✅ ERLEDIGT
 
-Scope: ~8–12h. Spec ist vollständig (Requirements + Design + Tasks). Kann direkt nach den Quick Wins umgesetzt werden, Task-Liste liegt in `.kiro/specs/unified-settings/tasks.md`.
+Scope: ~8–12h. Implementiert.
 
-Zusammenfassung:
-
-- Eigener `SettingsProvider` mit `useReducer`
-- Statische `SettingsRegistry` für Sektionsdefinitionen
-- `SettingsPanel` mit Sidebar + Content (responsive 700px Container Query)
-- Wiederverwendung aller bestehenden Komponenten (ProfilePage, SessionsPage, etc.)
-- sessionStorage für Navigation-Persistenz
-- `Ctrl+,` Shortcut
-- Barrierefreiheit (ARIA landmarks, Tastaturnavigation)
-- Suchfeld mit Debounce-Filterung
+- ✅ SettingsProvider mit useReducer + createSettingsReducer(isAdmin) Factory
+- ✅ SettingsRegistry (12 Sektionsdefinitionen, 3 Kategorien)
+- ✅ SettingsPanel mit CSS Container Query (700px responsive threshold)
+- ✅ SettingsSidebar (Search + NavList)
+- ✅ SettingsContent (Section → Component Mapping, Fokus-Management)
+- ✅ sessionStorage-Persistenz mit Validierung
+- ✅ Ctrl+, Shortcut + Toolbar-Button (Zahnrad)
+- ✅ ARIA landmarks, Tastaturnavigation (Pfeiltasten, Enter)
+- ✅ Suche mit 150ms Debounce
+- ✅ ProfilePage mode="profile-only", ChangePasswordPage embedded
+- ✅ AdminConfigPage hideFeatureToggles
+- ✅ ServerRestartSection als eigene Admin-Sektion
+- ✅ AccountDeletionSection + FeatureTogglesSection extrahiert
+- ✅ Vault-Einstellungen nutzen aktives Vault aus AppState
+- ✅ 116 Unit/Integration-Tests, TypeScript clean
 
 **Demo:** Alle Einstellungen in einem kohärenten Panel. Tastatur-navigierbar, responsive, suchbar.
 
@@ -233,7 +238,7 @@ Phase A: Quick Wins (direkt)
 └── Task 4: Mermaid Rendering             (~4–5h)
 
 Phase B: UX-Verbesserungen
-├── Task 5: Unified Settings              (~8–12h, Spec fertig)
+├── Task 5: Unified Settings              (~8–12h, ✅ Fertig)
 ├── Task 6: Knowledge Graph v2            (~6–8h Design + ~12–16h Impl.)
 └── Task 7: Sync Conflict Resolution      (~4h Design + ~10–14h Impl.)
 

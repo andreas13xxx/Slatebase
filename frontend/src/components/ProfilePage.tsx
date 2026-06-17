@@ -8,6 +8,8 @@ import type { PublicUserInfo } from '../state/authState'
 export interface ProfilePageProps {
   /** API client instance for making profile requests. */
   apiClient: IApiClient
+  /** Rendering mode. 'profile-only' hides password and account deletion sections. */
+  mode?: 'full' | 'profile-only'
 }
 
 /** Validation errors for profile fields. */
@@ -58,7 +60,7 @@ function isValidHttpUrl(url: string): boolean {
  * Includes sections for profile data, password change, and account deletion.
  * All labels are in German. Validates fields per design constraints before submit.
  */
-export function ProfilePage({ apiClient }: ProfilePageProps) {
+export function ProfilePage({ apiClient, mode = 'full' }: ProfilePageProps) {
   const { authDispatch } = useAuthContext()
   const { t } = useTranslation()
 
@@ -466,6 +468,7 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
       </section>
 
       {/* --- Password Change Section --- */}
+      {mode === 'full' && (
       <section className="profile-section" aria-labelledby="password-section-heading">
         <h2 id="password-section-heading" className="profile-section-title">{t('profile.sectionPassword')}</h2>
         <form className="profile-form" onSubmit={handlePasswordSubmit} noValidate>
@@ -540,8 +543,10 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
           </button>
         </form>
       </section>
+      )}
 
       {/* --- Account Deletion Section --- */}
+      {mode === 'full' && (
       <section className="profile-section profile-section--danger" aria-labelledby="delete-section-heading">
         <h2 id="delete-section-heading" className="profile-section-title">{t('profile.sectionDelete')}</h2>
         <p className="profile-danger-info">
@@ -594,6 +599,7 @@ export function ProfilePage({ apiClient }: ProfilePageProps) {
           </button>
         </form>
       </section>
+      )}
     </div>
   )
 }

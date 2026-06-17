@@ -50,6 +50,7 @@ import { SyncProvider } from './state/syncContext'
 import { ContextPanelProvider } from './state/contextPanelContext'
 import { SidebarPanelProvider } from './state/sidebarPanelContext'
 import { ContextPanel } from './components/context-panel/ContextPanel'
+import { SettingsPanel } from './components/settings/SettingsPanel'
 import { SidebarPanel } from './components/sidebar-panel'
 import { PluginProvider } from './plugins/compat/plugin-context'
 import { CommandPaletteContainer } from './components/CommandPaletteContainer'
@@ -152,6 +153,7 @@ function clearRestoreState(): void {
 }
 
 /** Available pages in the app. */
+/* DEPRECATED: Settings pages will be consolidated into SettingsPanel */
 type AppPage =
   | 'vaults'
   | 'my-vaults'
@@ -419,6 +421,7 @@ function AppContent() {
   const { t } = useTranslation()
   const prevVaultId = useRef<string | null>(null)
   // Settings tabs: list of open pages + which is active
+  /* DEPRECATED: Settings pages will be consolidated into SettingsPanel */
   const [openSettingsPages, setOpenSettingsPages] = useState<AppPage[]>([])
   const [activeSettingsPage, setActiveSettingsPage] = useState<AppPage | null>(null)
   const [showRightPanel, setShowRightPanel] = useState(true)
@@ -437,6 +440,9 @@ function AppContent() {
 
   // Refresh key for sidebar panel views (favorites, recent files)
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0)
+
+  // Unified Settings Panel state
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Global unread count polling (30-second interval)
   // Disabled when SSE connection is active (realtime pushes unread counts)
@@ -672,6 +678,19 @@ function AppContent() {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  // Global keyboard shortcut: Ctrl+, opens the unified settings panel
+  useEffect(() => {
+    const handleSettingsShortcut = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === ',') {
+        e.preventDefault()
+        setSettingsOpen(true)
+      }
+    }
+
+    document.addEventListener('keydown', handleSettingsShortcut)
+    return () => document.removeEventListener('keydown', handleSettingsShortcut)
+  }, [])
+
   const handleLogout = useCallback(async () => {
     try { await apiClient.logout() } catch { /* ignore */ }
     apiClient.setToken(null)
@@ -790,6 +809,7 @@ function AppContent() {
   }
 
   /** Open a settings page as a tab (or activate if already open). */
+  /* DEPRECATED: Settings pages will be consolidated into SettingsPanel */
   function handleNavigate(page: AppPage) {
     if (page === 'vaults') {
       setActiveSettingsPage(null)
@@ -810,6 +830,7 @@ function AppContent() {
     })
   }
 
+  /* DEPRECATED: Settings pages will be consolidated into SettingsPanel */
   function renderSettingsPage(page: AppPage) {
     switch (page) {
       case 'my-vaults': return <MyVaultsPage apiClient={apiClient} onOpenSync={(vaultId) => {
@@ -883,6 +904,8 @@ function AppContent() {
     >
     <div className="app">
       <CommandPaletteContainer />
+      {/* Unified Settings Panel (renders as fixed overlay when open) */}
+      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       {/* Version Browser Modal */}
       {versionBrowserTarget && (
         <div className="version-browser-modal-overlay" onClick={() => setVersionBrowserTarget(null)}>
@@ -1021,7 +1044,7 @@ function AppContent() {
             onOpenGraph={handleOpenGraph}
             onOpenTrash={() => handleNavigate('trash')}
             onDailyNote={handleDailyNote}
-            onToggleSearch={() => setShowRightPanel(true)}
+            onOpenSettings={() => setSettingsOpen(true)}
             isAdmin={user?.role === 'admin'}
             isVaultOwner={selectedVault?.permission === 'owner'}
             syncEnabled={selectedVault?.syncEnabled}

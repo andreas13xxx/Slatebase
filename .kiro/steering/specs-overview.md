@@ -34,7 +34,7 @@ inclusion: manual
 | 22 | `session-expiry-fix` | Bugfix | ✅ Fertig | CSRF-Secret-Persistenz, Sliding Session Expiry, localStorage-Migration, synchroner Token-Restore, Expiry-UX, CSRF-Mismatch-Recovery |
 | 23 | `editor-improvements` | Feature | ✅ Fertig | Zeilennummern, Undo/Redo, Recent Files, Templates/Daily Notes, Bild-Paste, Favoriten (umgesetzt als Teil von `tier2-daily-workflow`) |
 | 24 | `vault-explorer-enhancements` | Feature | ✅ Fertig | Vault-Statistiken, Custom Context-Menu, Drag & Drop Upload (umgesetzt als Teil von `tier2-daily-workflow`) |
-| 25 | `unified-settings` | Feature | 📋 Geplant | Zentrale Einstellungsseite mit Kategorien, Log-Verwaltung, Keybindings |
+| 25 | `unified-settings` | Feature | ✅ Fertig | Zentrales Settings-Panel (Ctrl+,) mit Kategorien (Konto, Vault, Administration), Seitenleisten-Navigation, CSS Container Query Layout, Suche, Tastaturnavigation |
 | 26 | `realtime-infrastructure` | Feature | ✅ Fertig | SSE-basierte Echtzeit-Updates (Chat-Nachrichten, Online-Status/Presence, Vault-Änderungen mit Tree-Refresh + Tab-Reload, Sync-Konflikte, Toast-Notifications, Server-Shutdown-Warnung) |
 | 27 | `search-and-discovery` | Feature | ✅ Fertig | Volltextsuche + Replace (Phase 1): Vault-weite Suche mit Regex, Kontext-Zeilen, Multi-Vault, Find & Replace mit atomaren Schreiboperationen, SearchPanel als Seitenpanel |
 | 28 | `responsive-mobile` | Feature | 📋 Geplant | Responsive Design für Smartphones und Tablets |
@@ -168,7 +168,7 @@ Woche 7–9:     tier2-daily-workflow ✅ (Vault-Explorer + Editor + Trash & Ver
 Woche 10:      realtime-cleanup ✅
 Woche 11–12:   knowledge-graph-v2
 Woche 13–14:   sync-conflict-resolution
-Woche 15–16:   unified-settings + mermaid-rendering
+Woche 15–16:   unified-settings ✅ + mermaid-rendering
 Woche 17–18:   public-sharing + welcome-vault
 Woche 19–22:   responsive-mobile
 Woche 23–30:   collaborative-editing (CRDT/OT — größtes Feature)
@@ -209,11 +209,12 @@ Danach:        workspace-leaf-compat, obsidian-themes, live-preview-editor, ...
 - **Priorität**: Niedrig (laufend bei neuen Features beachten)
 - **Aufwand**: Mittel
 
-### unified-settings
-- **Beschreibung**: Zentrale Einstellungsseite mit Kategorien (Profil, Sicherheit, Editor, Sync, Plugins, Admin, Logs). Ersetzt die aktuell verteilten Settings-Seiten (Profile, Sessions, Admin-Seiten) durch eine einheitliche Oberfläche. Enthält: Log-Verwaltung (Audit-Log + Sync-Log löschen/archivieren), Sync-Log-Redesign (gleiche Darstellung wie Server-Log), anpassbare Keybindings (Hotkey-Editor mit Kollisionserkennung).
+### unified-settings ✅ Fertig
+- **Beschreibung**: Zentrales Settings-Panel (Ctrl+,) mit Kategorien (Konto, Vault, Administration), Seitenleisten-Navigation, CSS Container Query Layout (700px responsive), Suche mit 150ms Debounce, sessionStorage-Persistenz, ARIA landmarks, Tastaturnavigation.
 - **Abhängigkeit**: Braucht auth-and-user-management (bestehende Settings-Infrastruktur)
 - **Priorität**: Mittel (UX-Verbesserung, kein neues Feature)
-- **Aufwand**: Mittel (Frontend-Refactoring, neue Kategorien-Navigation, Backend: Log-Deletion-Endpoint)
+- **Aufwand**: Mittel (~8–12h)
+- **Status**: ✅ Fertig — SettingsProvider, SettingsRegistry, SettingsPanel mit Sidebar/Content, 116 Tests
 
 ### search-and-discovery
 - **Beschreibung**: Zwei-Phasen-Feature: Phase 1 — Vault-weite Volltextsuche mit Replace (case-insensitive, Regex-Support, Ergebnisvorschau mit Kontext-Zeilen, Suche über mehrere Vaults, Find & Replace für Refactoring: Tag umbenennen, Link-Target ändern). Phase 2 (optional, zukunftsfähig) — Semantische Suche mit Embedding-Modell (lokale oder API-basierte Embedding-Generierung, Vektor-Ähnlichkeitssuche, "ähnliche Notizen"-Feature).

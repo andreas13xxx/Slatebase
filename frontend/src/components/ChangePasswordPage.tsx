@@ -7,6 +7,8 @@ import type { IApiClient } from '../api'
 export interface ChangePasswordPageProps {
   /** API client instance for making password change requests. */
   apiClient: IApiClient
+  /** When true, uses profile-style classes instead of login-page wrapper (for settings panel embedding). */
+  embedded?: boolean
 }
 
 /**
@@ -14,7 +16,7 @@ export interface ChangePasswordPageProps {
  * Renders current password, new password, and confirm password fields.
  * Performs client-side validation before calling the API.
  */
-export function ChangePasswordPage({ apiClient }: ChangePasswordPageProps) {
+export function ChangePasswordPage({ apiClient, embedded }: ChangePasswordPageProps) {
   const { authDispatch } = useAuthContext()
   const { t } = useTranslation()
 
@@ -90,103 +92,116 @@ export function ChangePasswordPage({ apiClient }: ChangePasswordPageProps) {
     }
   }
 
-  return (
-    <div className="login-page">
-      <form className="login-form" onSubmit={handleSubmit} noValidate>
-        <h1 className="login-title">{t('auth.changePassword')}</h1>
-        <p className="change-password-info">
-          {t('auth.changePasswordInfo')}
-        </p>
+  const formClass = embedded ? 'profile-form' : 'login-form'
+  const fieldClass = embedded ? 'profile-field' : 'login-field'
+  const labelClass = embedded ? 'profile-label' : 'login-label'
+  const inputClass = embedded ? 'profile-input' : 'login-input'
 
-        <div className="login-field">
-          <label className="login-label" htmlFor="change-current-password">
-            {t('auth.currentPassword')}
-          </label>
-          <input
-            id="change-current-password"
-            className="login-input"
-            type="password"
-            maxLength={128}
-            value={currentPassword}
-            onChange={(e) => {
-              setCurrentPassword(e.target.value)
-              if (currentPasswordError) setCurrentPasswordError(null)
-            }}
-            aria-invalid={currentPasswordError !== null}
-            aria-describedby={currentPasswordError ? 'change-current-password-error' : undefined}
-            autoComplete="current-password"
-          />
-          {currentPasswordError && (
-            <p id="change-current-password-error" className="login-field-error" role="alert">
-              {currentPasswordError}
-            </p>
-          )}
-        </div>
+  const formContent = (
+    <form className={formClass} onSubmit={handleSubmit} noValidate>
+      {!embedded && <h1 className="login-title">{t('auth.changePassword')}</h1>}
+      <p className="change-password-info">
+        {t('auth.changePasswordInfo')}
+      </p>
 
-        <div className="login-field">
-          <label className="login-label" htmlFor="change-new-password">
-            {t('auth.newPassword')}
-          </label>
-          <input
-            id="change-new-password"
-            className="login-input"
-            type="password"
-            maxLength={128}
-            value={newPassword}
-            onChange={(e) => {
-              setNewPassword(e.target.value)
-              if (newPasswordError) setNewPasswordError(null)
-            }}
-            aria-invalid={newPasswordError !== null}
-            aria-describedby={newPasswordError ? 'change-new-password-error' : undefined}
-            autoComplete="new-password"
-          />
-          {newPasswordError && (
-            <p id="change-new-password-error" className="login-field-error" role="alert">
-              {newPasswordError}
-            </p>
-          )}
-        </div>
-
-        <div className="login-field">
-          <label className="login-label" htmlFor="change-confirm-password">
-            {t('auth.confirmPassword')}
-          </label>
-          <input
-            id="change-confirm-password"
-            className="login-input"
-            type="password"
-            maxLength={128}
-            value={confirmPassword}
-            onChange={(e) => {
-              setConfirmPassword(e.target.value)
-              if (confirmPasswordError) setConfirmPasswordError(null)
-            }}
-            aria-invalid={confirmPasswordError !== null}
-            aria-describedby={confirmPasswordError ? 'change-confirm-password-error' : undefined}
-            autoComplete="new-password"
-          />
-          {confirmPasswordError && (
-            <p id="change-confirm-password-error" className="login-field-error" role="alert">
-              {confirmPasswordError}
-            </p>
-          )}
-        </div>
-
-        {apiError && (
-          <p className="login-error" role="alert">
-            {apiError}
+      <div className={fieldClass}>
+        <label className={labelClass} htmlFor="change-current-password">
+          {t('auth.currentPassword')}
+        </label>
+        <input
+          id="change-current-password"
+          className={inputClass}
+          type="password"
+          maxLength={128}
+          value={currentPassword}
+          onChange={(e) => {
+            setCurrentPassword(e.target.value)
+            if (currentPasswordError) setCurrentPasswordError(null)
+          }}
+          aria-invalid={currentPasswordError !== null}
+          aria-describedby={currentPasswordError ? 'change-current-password-error' : undefined}
+          autoComplete="current-password"
+        />
+        {currentPasswordError && (
+          <p id="change-current-password-error" className="login-field-error" role="alert">
+            {currentPasswordError}
           </p>
         )}
+      </div>
 
-        <button
-          type="submit"
-          className="login-submit"
-          disabled={isPending}
-        >
-          {isPending ? t('auth.changingPassword') : t('auth.changePassword')}
-        </button>
-      </form>
+      <div className={fieldClass}>
+        <label className={labelClass} htmlFor="change-new-password">
+          {t('auth.newPassword')}
+        </label>
+        <input
+          id="change-new-password"
+          className={inputClass}
+          type="password"
+          maxLength={128}
+          value={newPassword}
+          onChange={(e) => {
+            setNewPassword(e.target.value)
+            if (newPasswordError) setNewPasswordError(null)
+          }}
+          aria-invalid={newPasswordError !== null}
+          aria-describedby={newPasswordError ? 'change-new-password-error' : undefined}
+          autoComplete="new-password"
+        />
+        {newPasswordError && (
+          <p id="change-new-password-error" className="login-field-error" role="alert">
+            {newPasswordError}
+          </p>
+        )}
+      </div>
+
+      <div className={fieldClass}>
+        <label className={labelClass} htmlFor="change-confirm-password">
+          {t('auth.confirmPassword')}
+        </label>
+        <input
+          id="change-confirm-password"
+          className={inputClass}
+          type="password"
+          maxLength={128}
+          value={confirmPassword}
+          onChange={(e) => {
+            setConfirmPassword(e.target.value)
+            if (confirmPasswordError) setConfirmPasswordError(null)
+          }}
+          aria-invalid={confirmPasswordError !== null}
+          aria-describedby={confirmPasswordError ? 'change-confirm-password-error' : undefined}
+          autoComplete="new-password"
+        />
+        {confirmPasswordError && (
+          <p id="change-confirm-password-error" className="login-field-error" role="alert">
+            {confirmPasswordError}
+          </p>
+        )}
+      </div>
+
+      {apiError && (
+        <p className="login-error" role="alert">
+          {apiError}
+        </p>
+      )}
+
+      <button
+        type="submit"
+        className="login-submit"
+        disabled={isPending}
+      >
+        {isPending ? t('auth.changingPassword') : t('auth.changePassword')}
+      </button>
+    </form>
+  )
+
+  if (embedded) {
+    return formContent
+  }
+
+  return (
+    <div className="login-page">
+      {formContent}
     </div>
   )
 }

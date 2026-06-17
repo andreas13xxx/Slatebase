@@ -44,7 +44,7 @@ export interface UserSearchResult {
 }
 
 /**
- * Public API token info returned by the backend (no raw token value).
+ * Public MCP token info returned by the backend (no raw token value).
  */
 export interface McpTokenInfo {
   tokenId: string
@@ -57,7 +57,7 @@ export interface McpTokenInfo {
 }
 
 /**
- * Result of creating a new API token (includes raw token, shown only once).
+ * Result of creating a new MCP token (includes raw token, shown only once).
  */
 export interface McpTokenCreateResult {
   token: string
@@ -255,11 +255,11 @@ export interface IApiClient {
   resolveSyncConflict(vaultId: string, documentPath: string, resolution: string): Promise<void>
 
   // --- MCP Token methods ---
-  /** List the current user's API tokens. */
+  /** List the current user's MCP tokens. */
   listMcpTokens(): Promise<McpTokenInfo[]>
-  /** Create a new API token. */
+  /** Create a new MCP token. */
   createMcpToken(name: string, expiryDays: number): Promise<McpTokenCreateResult>
-  /** Revoke an API token by ID. */
+  /** Revoke an MCP token by ID. */
   revokeMcpToken(tokenId: string): Promise<void>
 
   // --- Graph methods ---
