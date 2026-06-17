@@ -24,7 +24,6 @@ export interface SseRouteDeps {
   eventBus: IEventBus
   presenceService: IPresenceService
   authMiddleware: MiddlewareHandler
-  featureGuard: MiddlewareHandler
   logger: ILogger
 }
 
@@ -59,7 +58,7 @@ function serializeEvent(event: SseEvent): string {
  * @returns A Hono sub-app to be mounted on a parent router
  */
 export function createSseRoutes(deps: SseRouteDeps): Hono {
-  const { connectionManager, eventBus, presenceService, authMiddleware, featureGuard, logger } = deps
+  const { connectionManager, eventBus, presenceService, authMiddleware, logger } = deps
 
   const app = new Hono()
 
@@ -90,7 +89,6 @@ export function createSseRoutes(deps: SseRouteDeps): Hono {
     '/events',
     tokenQueryParamMiddleware,
     authMiddleware,
-    featureGuard,
     async (c: Context) => {
       const session = c.get('session') as SessionContext
       const userId = session.userId

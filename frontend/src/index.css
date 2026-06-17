@@ -156,7 +156,6 @@
   --connection-connected: #22c55e;
   --connection-connecting: #f59e0b;
   --connection-disconnected: #6b7280;
-  --connection-fallback: #f59e0b;
 
   /* Presence Tokens — Light */
   --presence-online: #22c55e;
@@ -341,7 +340,6 @@
     --connection-connected: #4ade80;
     --connection-connecting: #fbbf24;
     --connection-disconnected: #9ca3af;
-    --connection-fallback: #fbbf24;
 
     /* Presence Tokens — Dark */
     --presence-online: #4ade80;
@@ -504,7 +502,6 @@
     --connection-connected: #4ade80;
     --connection-connecting: #fbbf24;
     --connection-disconnected: #9ca3af;
-    --connection-fallback: #fbbf24;
 
     /* Presence Tokens — Dark */
     --presence-online: #4ade80;

@@ -50,6 +50,7 @@ function createMockApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
     updateProfile: vi.fn(),
     changePassword: vi.fn(),
     deleteSelf: vi.fn(),
+    getVersion: vi.fn().mockResolvedValue({ version: '1.2.3' }),
     ...overrides,
   } as IApiClient
 }
@@ -309,5 +310,40 @@ describe('LoginPage', () => {
     renderLoginPage({ error: 'Some other error' })
 
     expect(screen.queryByText('Sitzung abgelaufen — bitte erneut anmelden')).not.toBeInTheDocument()
+  })
+
+  describe('version display', () => {
+    it('displays the server version with v prefix', async () => {
+      renderLoginPage({}, { getVersion: vi.fn().mockResolvedValue({ version: '1.2.3' }) })
+
+      await waitFor(() => {
+        expect(screen.getByText('v1.2.3')).toBeInTheDocument()
+      })
+    })
+
+    it('displays "dev" when version is "development"', async () => {
+      renderLoginPage({}, { getVersion: vi.fn().mockResolvedValue({ version: 'development' }) })
+
+      await waitFor(() => {
+        expect(screen.getByText('dev')).toBeInTheDocument()
+      })
+    })
+
+    it('does not display version when getVersion fails', async () => {
+      renderLoginPage({}, { getVersion: vi.fn().mockRejectedValue(new Error('Network error')) })
+
+      // Wait a tick for the effect to settle
+      await waitFor(() => {
+        expect(screen.queryByText(/^v/)).not.toBeInTheDocument()
+        expect(screen.queryByText('dev')).not.toBeInTheDocument()
+      })
+    })
+
+    it('calls getVersion on mount', () => {
+      const getVersion = vi.fn().mockResolvedValue({ version: '2.0.0' })
+      renderLoginPage({}, { getVersion })
+
+      expect(getVersion).toHaveBeenCalledTimes(1)
+    })
   })
 })

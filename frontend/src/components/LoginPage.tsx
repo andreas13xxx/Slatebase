@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { useAuthContext } from '../state/authContext'
 import { useTranslation } from '../i18n'
 import type { IApiClient } from '../api'
@@ -48,6 +48,21 @@ export function LoginPage({ apiClient }: LoginPageProps) {
   const [usernameError, setUsernameError] = useState<string | null>(null)
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [rateLimitMessage, setRateLimitMessage] = useState<string | null>(null)
+  const [version, setVersion] = useState<string | null>(null)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    apiClient.getVersion()
+      .then((result) => {
+        if (!controller.signal.aborted) {
+          setVersion(result.version)
+        }
+      })
+      .catch(() => {
+        // Silently ignore — version display is non-critical
+      })
+    return () => { controller.abort() }
+  }, [apiClient])
 
   function validate(): boolean {
     let valid = true
@@ -159,6 +174,12 @@ export function LoginPage({ apiClient }: LoginPageProps) {
             {authState.isLoading ? t('auth.loggingIn') : t('auth.login')}
           </button>
         </form>
+
+        {version && (
+          <p className="login-version">
+            {version === 'development' ? 'dev' : `v${version}`}
+          </p>
+        )}
       </div>
     </div>
   )

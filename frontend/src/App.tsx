@@ -396,17 +396,14 @@ function FeatureDisabledHint({ featureName }: { featureName: string }) {
 }
 
 /**
- * Small wrapper that reads RealtimeContext and FeatureContext
- * to render the ConnectionIndicator with the correct props.
+ * Small wrapper that reads RealtimeContext to render the ConnectionIndicator.
  */
 function RealtimeConnectionIndicator() {
   const { state } = useRealtimeContext()
-  const { isEnabled } = useFeatureContext()
 
   return (
     <ConnectionIndicator
       status={state.connectionStatus}
-      visible={isEnabled('realtime')}
     />
   )
 }
@@ -1255,17 +1252,15 @@ function AuthGuard() {
 }
 
 /**
- * Bridge component that connects the RealtimeProvider with auth and feature state.
- * Sits inside both AuthProvider and FeatureProvider, wrapping the app content.
- * Reads the session token from auth state and the realtime feature toggle.
+ * Bridge component that connects the RealtimeProvider with auth state.
+ * Sits inside AuthProvider, wrapping the app content.
+ * Reads the session token from auth state.
  * Wires SSE event handlers to the module-level chat bridge for cross-provider communication.
  */
 function RealtimeBridge({ children }: { children: React.ReactNode }) {
   const { authState } = useAuthContext()
-  const { isEnabled } = useFeatureContext()
 
   const token = authState.token ?? null
-  const featureEnabled = isEnabled('realtime')
 
   const handlers = useMemo<RealtimeEventHandlers>(() => ({
     onChatMessage: (data: Record<string, unknown>) => {
@@ -1302,7 +1297,6 @@ function RealtimeBridge({ children }: { children: React.ReactNode }) {
   return (
     <RealtimeProvider
       token={token}
-      featureEnabled={featureEnabled}
       handlers={handlers}
     >
       {children}

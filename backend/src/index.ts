@@ -62,7 +62,7 @@ import { PluginStore, PluginInstaller } from './plugin/index.js'
 import { createPluginRoutes } from './api/pluginRoutes.js'
 import { versionRoutes } from './api/versionRoutes.js'
 import { SearchService, ReplaceService } from './search/index.js'
-import type { IConnectionManager, SseEvent, PublishOptions } from './realtime/index.js'
+import type { SseEvent, PublishOptions } from './realtime/index.js'
 import { EventReplayBuffer, RateLimiter as SseRateLimiter, ConnectionManager, PresenceService, EventBus, ConnectionLimitError } from './realtime/index.js'
 import { createSseRoutes } from './api/sseRoutes.js'
 import { createSearchRoutes } from './api/searchRoutes.js'
@@ -95,7 +95,6 @@ featureRegistry.register({ name: 'obsidian-plugin-compat', description: 'Obsidia
 featureRegistry.register({ name: 'chat', description: 'Echtzeit-Chat zwischen Benutzern', defaultEnabled: true, type: 'hot' })
 featureRegistry.register({ name: 'mcp', description: 'AI Context Server (MCP Integration)', defaultEnabled: true, type: 'cold' })
 featureRegistry.register({ name: 'knowledge-graph', description: 'Interaktive Vault-Verlinkungsvisualisierung', defaultEnabled: true, type: 'hot' })
-featureRegistry.register({ name: 'realtime', description: 'SSE-based realtime push infrastructure for chat, presence, and vault changes', defaultEnabled: true, type: 'hot' })
 
 const featureToggleStore = new FeatureToggleStore(serverConfig.dataDir, logger)
 const persistedFeatureState = await featureToggleStore.load()
@@ -135,9 +134,6 @@ const mcpConfig = loadMcpConfig(config)
 
 // Mutable reference for MCP token invalidation hook (set after MCP module init)
 let mcpTokenInvalidator: ((userId: string) => Promise<void>) | undefined
-
-// Mutable reference for ConnectionManager (set when realtime module is wired in task 10.1)
-let connectionManager: IConnectionManager | undefined
 
 const onUserInvalidated = async (userId: string): Promise<void> => {
   if (mcpTokenInvalidator !== undefined) {
@@ -298,8 +294,6 @@ const realtimeConnectionManager = new ConnectionManager(
   { maxConnections: sseConfig.maxConnections, maxPerUser: sseConfig.maxPerUser, heartbeatInterval: sseConfig.heartbeatInterval },
   logger,
 )
-// Assign to the mutable reference for feature toggle listener
-connectionManager = realtimeConnectionManager
 
 const presenceService = new PresenceService({
   logger,
@@ -533,7 +527,6 @@ const sseRoutes = createSseRoutes({
   eventBus,
   presenceService,
   authMiddleware,
-  featureGuard: createFeatureGuard('realtime', featureToggleService),
   logger,
 })
 app.route('/api/v1', sseRoutes)
@@ -667,33 +660,6 @@ featureToggleService.onChange((featureName: string, enabled: boolean) => {
   }
 })
 
-// Register feature toggle listener for realtime (SSE) graceful shutdown
-featureToggleService.onChange((featureName: string, enabled: boolean) => {
-  if (featureName !== 'realtime') return
-
-  if (!enabled && connectionManager) {
-    // Send feature-disabled event to all connected clients
-    connectionManager.broadcast({
-      type: 'server:feature-disabled',
-      id: '0',
-      data: { reason: 'feature_disabled' },
-      timestamp: new Date().toISOString(),
-    })
-    // Close all connections after 10s delay
-    setTimeout(() => {
-      if (connectionManager) {
-        connectionManager.shutdown().catch((error: unknown) => {
-          const message = error instanceof Error ? error.message : String(error)
-          logger.error('Failed to shutdown connections after realtime toggle disabled', { error: message })
-        })
-      }
-    }, 10000)
-    logger.info('Realtime disabled — broadcasting feature-disabled, connections will close in 10s')
-  } else if (enabled) {
-    logger.info('Realtime enabled — clients will connect on next feature state poll')
-  }
-})
-
 // Set up sync-to-link-index hook: rebuild link index after successful pull
 syncService.setOnPullComplete((vaultId: string) => {
   const linkIndex = getLinkIndex(vaultId)
@@ -720,13 +686,6 @@ const server = createHttpServer(async (req, res) => {
   // Intercept SSE events endpoint — handle directly to avoid Hono double-response (ERR_HTTP_HEADERS_SENT)
   const parsedUrl = new URL(req.url ?? '', `http://${req.headers.host ?? 'localhost'}`)
   if (parsedUrl.pathname === '/api/v1/events' && req.method === 'GET') {
-    // Check if realtime feature is enabled
-    if (!featureToggleService.isEnabled('realtime')) {
-      res.writeHead(404, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ code: 'FEATURE_DISABLED', message: 'Feature realtime is disabled', timestamp: new Date().toISOString() }))
-      return
-    }
-
     // Authenticate via token query param
     const token = parsedUrl.searchParams.get('token')
     if (!token) {
