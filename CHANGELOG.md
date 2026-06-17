@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.0](https://github.com/andreas13xxx/Slatebase/compare/v0.5.2...v0.6.0) (2026-06-17)
+
+
+### Features
+
+* tier2-daily-workflow (vault explorer, editor, trash, versioning) ([75a518d](https://github.com/andreas13xxx/Slatebase/commit/75a518d8b42d3453f358d6267fd0aaf1db928dd4))
+
+
+### Sonstige Änderungen
+
+* add specs for tier2-daily-workflow, login-version-display, welcome-vault, realtime-cleanup, knowledge-graph-v2, collaborative-editing, sync-conflict-resolution ([fe87849](https://github.com/andreas13xxx/Slatebase/commit/fe878495c7803745beb26bb68156330771e77199))
+
 ## [0.5.2](https://github.com/andreas13xxx/Slatebase/compare/v0.5.1...v0.5.2) (2026-06-14)
 
 
