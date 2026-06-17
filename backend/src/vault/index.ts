@@ -182,7 +182,7 @@ export class VaultReader implements IVaultReader {
     currentDepth: number,
   ): Promise<DirectoryTree> {
     const dirName = path.basename(dirPath)
-    const relativePath = path.relative(rootPath, dirPath)
+    const relativePath = path.relative(rootPath, dirPath).replaceAll('\\', '/')
 
     const node: DirectoryTree = {
       name: dirName,
@@ -246,7 +246,7 @@ export class VaultReader implements IVaultReader {
     // Then process files
     for (const file of files) {
       const filePath = path.join(dirPath, file.name)
-      const relativFilePath = path.relative(rootPath, filePath)
+      const relativFilePath = path.relative(rootPath, filePath).replaceAll('\\', '/')
       try {
         const stat = await fs.stat(filePath)
         children.push({

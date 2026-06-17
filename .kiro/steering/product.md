@@ -21,13 +21,16 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for 
 - Feature toggles (hot/cold toggle, env overlay, API + admin UI)
 - CI/CD (GitHub Actions, Release Please, multi-arch Docker, GHCR)
 - i18n (German/English), Dark Mode, Docker deployment
+- Vault Explorer enhancements (statistics tooltip, custom context menu, drag & drop file upload)
+- Editor improvements (line numbers, undo/redo history stack, recent files, templates, daily notes, image paste, favorites)
+- Trash & file versioning (soft-delete with retention, version browser with inline diff, configurable cleanup job)
 
 ## Planned
 
 - Live Preview Editor (WYSIWYG/Side-by-Side)
 - Server-Side Plugins (Node.js APIs in vm sandbox)
 - Accessibility audit (WCAG 2.1 AA)
-- Responsive/mobile, public sharing, trash & versioning, unified settings
+- Responsive/mobile, public sharing, unified settings
 
 ## Language Convention
 

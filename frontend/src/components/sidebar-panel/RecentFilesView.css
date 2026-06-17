@@ -1,0 +1,84 @@
+/* ===== Recent Files View ===== */
+
+.recent-files-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.recent-files-view--empty {
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 16px;
+  color: var(--sidebar-text);
+  opacity: 0.6;
+}
+
+.recent-files-view__empty-icon {
+  opacity: 0.4;
+}
+
+.recent-files-view__empty-text {
+  font-size: 12px;
+  text-align: center;
+}
+
+.recent-files-view__list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+
+.recent-files-view__item {
+  margin: 0;
+  padding: 0;
+}
+
+.recent-files-view__entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 12px;
+  border: none;
+  background: transparent;
+  color: var(--sidebar-text);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.recent-files-view__entry:hover {
+  background: var(--sidebar-hover);
+  color: var(--sidebar-text-active);
+}
+
+.recent-files-view__file-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--sidebar-text);
+  opacity: 0.7;
+}
+
+.recent-files-view__file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.recent-files-view__timestamp {
+  font-size: 10px;
+  color: var(--sidebar-text);
+  opacity: 0.5;
+  white-space: nowrap;
+  flex-shrink: 0;
+}

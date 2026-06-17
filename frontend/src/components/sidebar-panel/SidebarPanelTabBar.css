@@ -1,0 +1,76 @@
+/* ===== Sidebar Panel Tab Bar ===== */
+
+.sidebar-panel-tab-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--sidebar-bg);
+  padding: 0 4px;
+  flex-shrink: 0;
+  min-height: 32px;
+}
+
+.sidebar-panel-tab-bar--icon-only {
+  justify-content: center;
+}
+
+.sidebar-panel-tab-wrapper {
+  display: flex;
+  align-items: stretch;
+  position: relative;
+}
+
+.sidebar-panel-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: none;
+  background: transparent;
+  color: var(--sidebar-text);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.sidebar-panel-tab:hover {
+  color: var(--sidebar-text-active);
+  background: var(--sidebar-hover);
+}
+
+.sidebar-panel-tab--active {
+  color: var(--accent-text);
+  border-bottom-color: var(--accent);
+}
+
+.sidebar-panel-tab--active:hover {
+  color: var(--accent-text);
+}
+
+.sidebar-panel-tab--dragging {
+  opacity: 0.4;
+}
+
+.sidebar-panel-tab-icon {
+  flex-shrink: 0;
+}
+
+/* Insertion line indicator during drag */
+.sidebar-panel-tab-insert-line {
+  width: 2px;
+  background: var(--accent);
+  align-self: stretch;
+  border-radius: 1px;
+  margin: 4px 0;
+}
+
+/* Icon-only mode adjustments */
+.sidebar-panel-tab-bar--icon-only .sidebar-panel-tab {
+  padding: 5px 8px;
+}

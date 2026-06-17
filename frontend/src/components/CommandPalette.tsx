@@ -35,6 +35,8 @@ export function CommandPalette({ commands, isOpen, onClose, onExecute }: Command
   // Filter commands by case-insensitive substring match on name
   const filteredCommands = filterCommands(commands, query)
 
+  const totalItems = filteredCommands.length
+
   // Reset state when palette opens
   useEffect(() => {
     if (isOpen) {
@@ -50,11 +52,11 @@ export function CommandPalette({ commands, isOpen, onClose, onExecute }: Command
 
   // Clamp selectedIndex when filtered results change
   useEffect(() => {
-    if (selectedIndex >= filteredCommands.length) {
+    if (selectedIndex >= totalItems) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSelectedIndex(Math.max(0, filteredCommands.length - 1))
+      setSelectedIndex(Math.max(0, totalItems - 1))
     }
-  }, [filteredCommands.length, selectedIndex])
+  }, [totalItems, selectedIndex])
 
   // Scroll selected item into view
   useEffect(() => {
@@ -79,7 +81,7 @@ export function CommandPalette({ commands, isOpen, onClose, onExecute }: Command
       case 'ArrowDown':
         e.preventDefault()
         setSelectedIndex(prev =>
-          prev < filteredCommands.length - 1 ? prev + 1 : prev
+          prev < totalItems - 1 ? prev + 1 : prev
         )
         break
       case 'ArrowUp':
@@ -88,7 +90,7 @@ export function CommandPalette({ commands, isOpen, onClose, onExecute }: Command
         break
       case 'Enter':
         e.preventDefault()
-        if (filteredCommands.length > 0) {
+        if (totalItems > 0) {
           const selected = filteredCommands[selectedIndex]
           if (selected) {
             handleExecute(selected.id)
@@ -100,7 +102,7 @@ export function CommandPalette({ commands, isOpen, onClose, onExecute }: Command
         onClose()
         break
     }
-  }, [filteredCommands, selectedIndex, handleExecute, onClose])
+  }, [filteredCommands, selectedIndex, handleExecute, onClose, totalItems])
 
   const handleOverlayClick = useCallback((e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -110,7 +112,7 @@ export function CommandPalette({ commands, isOpen, onClose, onExecute }: Command
 
   if (!isOpen) return null
 
-  const activeDescendant = filteredCommands.length > 0
+  const activeDescendant = totalItems > 0
     ? `command-palette-item-${selectedIndex}`
     : undefined
 

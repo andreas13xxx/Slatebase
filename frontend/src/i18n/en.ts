@@ -114,6 +114,8 @@ export const en: TranslationShape = {
   },
 
   editor: {
+    undo: 'Undo',
+    redo: 'Redo',
     heading1: 'Heading 1',
     heading2: 'Heading 2',
     heading3: 'Heading 3',
@@ -128,6 +130,7 @@ export const en: TranslationShape = {
     quote: 'Quote',
     horizontalRule: 'Horizontal rule',
     table: 'Table',
+    lineNumbers: 'Line numbers',
     toolbarAriaLabel: 'Formatting toolbar',
     textareaAriaLabel: 'Edit file content',
     readOnlyBanner: 'Read only — this vault was shared with you as read-only.',
@@ -182,6 +185,7 @@ export const en: TranslationShape = {
     syncLog: 'Sync log',
     mcpTokens: 'API Tokens',
     plugins: 'Plugins',
+    trash: 'Trash',
   },
 
   rightPanel: {
@@ -343,6 +347,14 @@ export const en: TranslationShape = {
       hostError: 'Host must not be empty.',
       logLevelError: 'Invalid log level.',
       maxFileSizeError: 'Must be a positive integer.',
+      protectionTitle: 'Protection',
+      protectionHint: 'Trash and versioning settings. Changes take effect on the next cleanup run.',
+      trashRetentionDaysLabel: 'Trash retention (days)',
+      trashRetentionDaysHint: '0 = immediate permanent delete, 1–365 = days until permanent deletion',
+      trashRetentionDaysError: 'Must be between 0 and 365.',
+      versionsMaxPerFileLabel: 'Max versions per file',
+      versionsMaxPerFileHint: '0 = no versioning, 1–100 = versions kept per file',
+      versionsMaxPerFileError: 'Must be between 0 and 100.',
     },
     audit: {
       title: 'Audit log',
@@ -439,10 +451,16 @@ export const en: TranslationShape = {
   contextMenu: {
     ariaLabel: 'Context menu',
     newFile: 'New File',
+    newFolder: 'New Folder',
     newVault: 'New Vault',
     rename: 'Rename',
     delete: 'Delete',
+    copy: 'Copy',
+    move: 'Move',
+    export: 'Export',
     noActions: 'No actions available',
+    addFavorite: 'Add to Favorites',
+    removeFavorite: 'Remove from Favorites',
   },
 
   fileOps: {
@@ -462,6 +480,9 @@ export const en: TranslationShape = {
     nameInvalidChars: 'Filename contains invalid characters',
     nameTooLong: 'Filename is too long',
     dropToRoot: 'Move to root directory',
+    copyError: 'Error copying file',
+    copyPrompt: 'Target folder for the copy:',
+    movePrompt: 'Target folder for moving:',
   },
 
   sync: {

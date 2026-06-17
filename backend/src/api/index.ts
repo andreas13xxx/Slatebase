@@ -863,3 +863,6 @@ export function createRouter(registry: RouteModule[]): Hono {
 
 export { AuthController, AuthRouteModule } from './authRoutes.js'
 export type { IAuthController } from './authRoutes.js'
+
+export { createTrashRoutes } from './trashRoutes.js'
+export type { TrashRouteDependencies } from './trashRoutes.js'

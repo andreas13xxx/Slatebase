@@ -255,52 +255,67 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
     switch (viewId) {
       case 'outline':
         return (
-          <OutlineView
-            headings={state.outline.headings}
-            activeAnchor={state.outline.activeAnchor}
-            onHeadingClick={handleHeadingClick}
-            hasDocument={hasDocument}
-          />
+          <div className="context-panel__view-wrapper">
+            <h3 className="context-panel__view-header">Gliederung</h3>
+            <OutlineView
+              headings={state.outline.headings}
+              activeAnchor={state.outline.activeAnchor}
+              onHeadingClick={handleHeadingClick}
+              hasDocument={hasDocument}
+            />
+          </div>
         )
       case 'links':
         return (
-          <LinksView
-            forwardLinks={state.links.forward}
-            backlinks={state.links.backlinks}
-            backlinksLoading={state.links.backlinksLoading}
-            backlinksError={state.links.backlinksError}
-            onLinkClick={handleLinkClick}
-            hasDocument={hasDocument}
-          />
+          <div className="context-panel__view-wrapper">
+            <h3 className="context-panel__view-header">Links</h3>
+            <LinksView
+              forwardLinks={state.links.forward}
+              backlinks={state.links.backlinks}
+              backlinksLoading={state.links.backlinksLoading}
+              backlinksError={state.links.backlinksError}
+              onLinkClick={handleLinkClick}
+              hasDocument={hasDocument}
+            />
+          </div>
         )
       case 'tags':
         return (
-          <TagsView
-            tags={state.tags.entries}
-            loading={state.tags.loading}
-            expandedTag={state.tags.expandedTag}
-            tagFiles={state.tags.tagFiles}
-            onTagClick={handleTagClick}
-            onFileClick={handleFileClick}
-          />
+          <div className="context-panel__view-wrapper">
+            <h3 className="context-panel__view-header">Tags</h3>
+            <TagsView
+              tags={state.tags.entries}
+              loading={state.tags.loading}
+              expandedTag={state.tags.expandedTag}
+              tagFiles={state.tags.tagFiles}
+              onTagClick={handleTagClick}
+              onFileClick={handleFileClick}
+            />
+          </div>
         )
       case 'properties':
         return (
-          <PropertiesView
-            data={state.properties.data}
-            parseError={state.properties.parseError}
-            rawFrontmatter={state.properties.rawFrontmatter}
-            hasDocument={hasDocument}
-          />
+          <div className="context-panel__view-wrapper">
+            <h3 className="context-panel__view-header">Eigenschaften</h3>
+            <PropertiesView
+              data={state.properties.data}
+              parseError={state.properties.parseError}
+              rawFrontmatter={state.properties.rawFrontmatter}
+              hasDocument={hasDocument}
+            />
+          </div>
         )
       case 'search':
         return (
-          <SearchPanel
-            vaults={appState.vaults}
-            selectedVaultId={appState.selectedVaultId}
-            hasWriteAccess={selectedVault?.permission === 'owner' || selectedVault?.permission === 'write'}
-            onNavigateToResult={handleSearchNavigate}
-          />
+          <div className="context-panel__view-wrapper">
+            <h3 className="context-panel__view-header">Suche</h3>
+            <SearchPanel
+              vaults={appState.vaults}
+              selectedVaultId={appState.selectedVaultId}
+              hasWriteAccess={selectedVault?.permission === 'owner' || selectedVault?.permission === 'write'}
+              onNavigateToResult={handleSearchNavigate}
+            />
+          </div>
         )
     }
   }, [

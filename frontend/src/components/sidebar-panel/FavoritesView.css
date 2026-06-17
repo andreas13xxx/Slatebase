@@ -1,0 +1,76 @@
+/* ===== Favorites View ===== */
+
+.favorites-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.favorites-view--empty {
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 16px;
+  color: var(--sidebar-text);
+  opacity: 0.6;
+}
+
+.favorites-view__empty-icon {
+  opacity: 0.4;
+}
+
+.favorites-view__empty-text {
+  font-size: 12px;
+  text-align: center;
+}
+
+.favorites-view__list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+
+.favorites-view__item {
+  margin: 0;
+  padding: 0;
+}
+
+.favorites-view__entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 12px;
+  border: none;
+  background: transparent;
+  color: var(--sidebar-text);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.favorites-view__entry:hover {
+  background: var(--sidebar-hover);
+  color: var(--sidebar-text-active);
+}
+
+.favorites-view__file-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--sidebar-text);
+  opacity: 0.7;
+}
+
+.favorites-view__file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}

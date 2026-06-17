@@ -32,8 +32,8 @@ inclusion: manual
 | 20 | `feature-toggles` | Feature | ✅ Fertig | Zentrale Feature-Toggles in der Serverkonfiguration (vault-sync, obsidian-plugin-compat, chat, mcp, knowledge-graph) mit Admin-UI und Hot-Toggle-Support |
 | 21 | `workspace-leaf-compat` | Feature | 📋 Requirements | Workspace Leaf API-Kompatibilität — Obsidian-Plugin-Views als Tabs im Hauptbereich und Sections im Context Panel |
 | 22 | `session-expiry-fix` | Bugfix | ✅ Fertig | CSRF-Secret-Persistenz, Sliding Session Expiry, localStorage-Migration, synchroner Token-Restore, Expiry-UX, CSRF-Mismatch-Recovery |
-| 23 | `editor-improvements` | Feature | 📋 Geplant | Zeilennummern, Undo/Redo, Recent Files, Templates/Daily Notes, Bild-Paste, Favoriten |
-| 24 | `vault-explorer-enhancements` | Feature | 📋 Geplant | Vault-Statistiken, Custom Context-Menu, Drag & Drop Upload |
+| 23 | `editor-improvements` | Feature | ✅ Fertig | Zeilennummern, Undo/Redo, Recent Files, Templates/Daily Notes, Bild-Paste, Favoriten (umgesetzt als Teil von `tier2-daily-workflow`) |
+| 24 | `vault-explorer-enhancements` | Feature | ✅ Fertig | Vault-Statistiken, Custom Context-Menu, Drag & Drop Upload (umgesetzt als Teil von `tier2-daily-workflow`) |
 | 25 | `unified-settings` | Feature | 📋 Geplant | Zentrale Einstellungsseite mit Kategorien, Log-Verwaltung, Keybindings |
 | 26 | `realtime-infrastructure` | Feature | ✅ Fertig | SSE-basierte Echtzeit-Updates (Chat-Nachrichten, Online-Status/Presence, Vault-Änderungen mit Tree-Refresh + Tab-Reload, Sync-Konflikte, Toast-Notifications, Server-Shutdown-Warnung) |
 | 27 | `search-and-discovery` | Feature | ✅ Fertig | Volltextsuche + Replace (Phase 1): Vault-weite Suche mit Regex, Kontext-Zeilen, Multi-Vault, Find & Replace mit atomaren Schreiboperationen, SearchPanel als Seitenpanel |
@@ -41,8 +41,16 @@ inclusion: manual
 | 29 | `obsidian-themes` | Feature | 📋 Geplant | Obsidian Community Themes laden und anwenden (CSS-Variable-Mapping) |
 | 30 | `ci-cd-release` | Feature | ✅ Fertig | GitHub Actions CI/CD, Auto-Release (Release Please), Multi-Arch Docker (GHCR + optional DockerHub), Version-Check in Admin-UI |
 | 31 | `security-hardening` | Feature | 📋 Geplant | Security-Audit (OWASP), Race-Condition-Analyse, CSP-Header, Dependency-Audit |
-| 32 | `trash-and-versioning` | Feature | 📋 Geplant | Papierkorb (Soft-Delete + Wiederherstellung) + Datei-Versionierung (letzte N Versionen) |
+| 32 | `trash-and-versioning` | Feature | ✅ Fertig | Papierkorb (Soft-Delete + Wiederherstellung) + Datei-Versionierung (letzte N Versionen) (umgesetzt als Teil von `tier2-daily-workflow`) |
 | 33 | `public-sharing` | Feature | 📋 Geplant | Einzelne Notizen per öffentlichem Link teilen (ohne Login, mit Ablaufdatum) |
+| 34 | `presence-indicator-fix` | Bugfix | ✅ Fertig | Presence-Indikatoren (grüne Dots) im Chat — Module-Level Bridge verdrahtet RealtimeProvider → ConversationList |
+| 35 | `tier2-daily-workflow` | Feature | ✅ Fertig | Kombinierter Spec: Vault-Explorer (Statistiken, Context-Menu, DnD Upload), Editor (Zeilennummern, Undo/Redo, Recent Files, Templates, Daily Notes, Bild-Paste, Favoriten), Trash & Versionierung |
+| 36 | `login-version-display` | Feature | 📋 Requirements | Versionsnummer auf dem Login-Screen anzeigen (Quick Fix) |
+| 36 | `welcome-vault` | Feature | 📋 Requirements | Automatischer "Willkommen"-Vault mit Anleitungen für neue Benutzer |
+| 37 | `realtime-cleanup` | Feature | 📋 Requirements | Feature-Toggle für Realtime entfernen, Polling-Fallback entfernen, SSE immer aktiv |
+| 38 | `knowledge-graph-v2` | Feature | 📋 Requirements | Knowledge Graph konfigurierbar (Farben, Gewichte) + Tags/Properties als togglebare Knoten |
+| 39 | `collaborative-editing` | Feature | 📋 Requirements | Echtzeit-Multi-User-Editing mit CRDT/OT und Cursor-Presence |
+| 40 | `sync-conflict-resolution` | Feature | 📋 Requirements | Halbautomatisches Konfliktmanagement bei Sync (Diff-View, Batch-Auflösung, Auto-Strategien) |
 
 ## Abhängigkeiten zwischen Specs
 
@@ -53,7 +61,7 @@ slatebase-overview (Architektur-Grundlage)
         ├── tabbed-editor-viewer (Editor/Viewer)
         │     ├── advanced-file-operations (Datei-Ops brauchen Tabs)
         │     ├── live-preview-editor (braucht Editor-Infrastruktur)
-        │     └── editor-improvements (Zeilennummern, Undo/Redo, Recent Files)
+        │     └── editor-improvements ✅ (Zeilennummern, Undo/Redo, Recent Files — via tier2-daily-workflow)
         ├── auth-and-user-management (Auth-System)
         │     ├── user-chat (Chat braucht Auth + User)
         │     │     ├── chat-enhancements (Erweiterungen auf Chat)
@@ -71,15 +79,24 @@ slatebase-overview (Architektur-Grundlage)
         │           ├── workspace-leaf-compat (braucht Plugin-Infrastruktur + Tab-System)
         │           ├── server-side-plugins (braucht Plugin-Infrastruktur)
         │           └── obsidian-themes (braucht Plugin-Store + CSS-Injection)
-        ├── vault-explorer-enhancements (Statistiken, Context-Menu, DnD-Upload)
+        ├── vault-explorer-enhancements ✅ (Statistiken, Context-Menu, DnD-Upload — via tier2-daily-workflow)
         ├── search-and-discovery (Volltextsuche + Replace, optional semantisch)
-        ├── trash-and-versioning (Papierkorb + Datei-History, braucht advanced-file-operations)
+        ├── trash-and-versioning ✅ (Papierkorb + Datei-History — via tier2-daily-workflow)
         ├── public-sharing (öffentliche Links, braucht Auth + Markdown-Rendering)
         ├── accessibility-audit (querschnittlich, alle UI-Komponenten)
         ├── responsive-mobile (querschnittlich, alle UI-Komponenten)
         ├── security-hardening (querschnittlich, Backend + Frontend)
         ├── feature-toggles (querschnittlich, braucht Auth + Config + alle Feature-Module)
-        └── ci-cd-release (DevOps, keine Code-Abhängigkeit)
+        ├── ci-cd-release (DevOps, keine Code-Abhängigkeit)
+        ├── login-version-display (braucht versionRoutes, LoginPage)
+        ├── welcome-vault (braucht auth-and-user-management, VaultService)
+        ├── realtime-cleanup (braucht realtime-infrastructure ✅)
+        ├── knowledge-graph-v2 (braucht knowledge-graph ✅)
+        │     └── erweitert Link-Index um Tags + Properties
+        ├── sync-conflict-resolution (braucht vault-sync ✅)
+        │     └── erweitert Conflict UI um Diff-View, Batch, Auto-Strategien
+        └── collaborative-editing (braucht realtime-infrastructure ✅ + tabbed-editor-viewer ✅)
+              └── CRDT/OT-Engine, Cursor-Presence, Collaboration-Server
 ```
 
 ## Empfohlene Umsetzungsreihenfolge (ab jetzt)
@@ -99,53 +116,62 @@ Priorisiert nach: Blockierungen auflösen → Nutzerwert maximieren → Quick Wi
 | Prio | Spec | Aufwand | Begründung |
 |------|------|---------|------------|
 | 4 | `search-and-discovery` (Phase 1) | ✅ Fertig | Kern-Feature. Ohne Suche bei >50 Dateien kaum nutzbar. |
-| 5 | `vault-explorer-enhancements` | Niedrig–Mittel | Quick Win: Context-Menu + Stats + DnD. Großer UX-Impact. |
-| 6 | `editor-improvements` | Mittel | Templates + Daily Notes + Bild-Paste = Obsidian-Parität für Kern-Workflows. |
-| 7 | `trash-and-versioning` | Mittel | Vertrauens-Feature. Schützt vor Datenverlust bei Multi-User + Auto-Save. |
+| 5 | `tier2-daily-workflow` | ✅ Fertig | Kombinierter Spec: Vault-Explorer + Editor + Trash & Versionierung. 93 Tasks, alle implementiert. |
+| 6 | `login-version-display` | Niedrig | Quick Win: Version auf Login-Screen. 1–2h Aufwand. |
+| 7 | `realtime-cleanup` | Niedrig–Mittel | Technischer Cleanup: Toggle + Fallback entfernen, Code vereinfachen. |
 
 ### Tier 3: Mittelfristig (UX-Qualität + Differenzierung)
 
 | Prio | Spec | Aufwand | Begründung |
 |------|------|---------|------------|
-| 8 | `realtime-infrastructure` | ✅ Fertig | SSE implementiert: Chat-Push, Presence, Vault-Change-Events mit Tree-Refresh + Tab-Reload, Toast-Notifications. |
-| 9 | `unified-settings` | Mittel | Konsolidiert fragmentierte Settings nach vielen neuen Features. |
-| 10 | `public-sharing` | Mittel | Starkes Marketing-Feature. Differenziert gegen Obsidian Publish. |
-| 11 | `mermaid-rendering` | Niedrig | Requirements fertig. Quick Win zwischen größeren Features. |
-| 12 | `responsive-mobile` | Hoch | Erweitert Nutzerbasis. Setzt stabile Desktop-UX voraus (Tier 1–2). |
+| 10 | `realtime-infrastructure` | ✅ Fertig | SSE implementiert: Chat-Push, Presence, Vault-Change-Events mit Tree-Refresh + Tab-Reload, Toast-Notifications. |
+| 11 | `welcome-vault` | Mittel | Onboarding-Feature. Neue Nutzer bekommen sofort Orientierung. |
+| 12 | `knowledge-graph-v2` | Mittel | Differenzierung: Konfigurierbar + Tags/Properties als Knoten. Hebt den Graph auf nächstes Level. |
+| 13 | `sync-conflict-resolution` | Mittel | UX-kritisch für Sync-Nutzer: Geführter Prozess statt manueller Einzelauflösung. |
+| 14 | `unified-settings` | Mittel | Konsolidiert fragmentierte Settings nach vielen neuen Features. |
+| 15 | `public-sharing` | Mittel | Starkes Marketing-Feature. Differenziert gegen Obsidian Publish. |
+| 16 | `mermaid-rendering` | Niedrig | Requirements fertig. Quick Win zwischen größeren Features. |
+| 17 | `responsive-mobile` | Hoch | Erweitert Nutzerbasis. Setzt stabile Desktop-UX voraus (Tier 1–2). |
 
 ### Tier 4: Langfristig (Ökosystem + Advanced Features)
 
 | Prio | Spec | Aufwand | Begründung |
 |------|------|---------|------------|
-| 13 | `workspace-leaf-compat` | Mittel | Braucht fertiges Plugin-System. Hebt Plugins auf "full" Kompatibilität. |
-| 14 | `obsidian-themes` | Mittel | Visuelle Personalisierung, Community-Anschluss. |
-| 15 | `live-preview-editor` | Hoch | Nice-to-have. View/Edit-Modus funktioniert. CodeMirror-Migration nötig. |
-| 16 | `security-hardening` | Mittel | Systematischer Audit vor v1.0 oder wachsender Nutzerbasis. |
-| 17 | `server-side-plugins` | Hoch | Nur relevant für Desktop-only Plugins (Git, Shell Commands). |
-| 18 | `accessibility-audit` | Mittel | Laufende Verbesserung statt Big-Bang. |
+| 18 | `workspace-leaf-compat` | Mittel | Braucht fertiges Plugin-System. Hebt Plugins auf "full" Kompatibilität. |
+| 19 | `obsidian-themes` | Mittel | Visuelle Personalisierung, Community-Anschluss. |
+| 20 | `collaborative-editing` | Sehr Hoch | Echtzeit-Multi-User-Editing mit CRDT/OT. Technisch anspruchsvollstes Feature. |
+| 21 | `live-preview-editor` | Hoch | Nice-to-have. View/Edit-Modus funktioniert. CodeMirror-Migration nötig. |
+| 22 | `security-hardening` | Mittel | Systematischer Audit vor v1.0 oder wachsender Nutzerbasis. |
+| 23 | `server-side-plugins` | Hoch | Nur relevant für Desktop-only Plugins (Git, Shell Commands). |
+| 24 | `accessibility-audit` | Mittel | Laufende Verbesserung statt Big-Bang. |
 
 ### Parallelisierbare Tracks
 
 ```
-Track A (Backend):     session-expiry-fix ✅ → realtime-infrastructure ✅ → security-hardening
-Track B (Frontend):    vault-explorer-enhancements → editor-improvements → responsive-mobile
-Track C (Plugins):     obsidian-plugin-compat → workspace-leaf-compat → obsidian-themes
-Track D (DevOps):      ci-cd-release (unabhängig)
-Track E (Content):     search-and-discovery → trash-and-versioning → public-sharing
+Track A (Backend):     session-expiry-fix ✅ → realtime-infrastructure ✅ → realtime-cleanup → collaborative-editing
+Track B (Frontend):    tier2-daily-workflow ✅ → login-version-display → responsive-mobile
+Track C (Plugins):     obsidian-plugin-compat ✅ → workspace-leaf-compat → obsidian-themes
+Track D (DevOps):      ci-cd-release ✅ (unabhängig)
+Track E (Content):     search-and-discovery ✅ → trash-and-versioning ✅ → public-sharing
+Track F (Knowledge):   knowledge-graph ✅ → knowledge-graph-v2
+Track G (Sync):        vault-sync ✅ → sync-conflict-resolution
+Track H (Onboarding):  welcome-vault (unabhängig)
 ```
 
 ### Grobe Timeline (bei Vollzeit-Entwicklung)
 
 ```
 Woche 1–2:     session-expiry-fix ✅ + ci-cd-release ✅
-Woche 3–4:     obsidian-plugin-compat fertigstellen
-Woche 5–6:     search-and-discovery (Phase 1) + vault-explorer-enhancements
-Woche 7–8:     editor-improvements (Templates, Daily Notes, Bild-Paste)
-Woche 9–10:    trash-and-versioning
-Woche 11–14:   realtime-infrastructure (SSE) ✅
+Woche 3–4:     obsidian-plugin-compat fertigstellen ✅
+Woche 5–6:     search-and-discovery (Phase 1) ✅ + login-version-display
+Woche 7–9:     tier2-daily-workflow ✅ (Vault-Explorer + Editor + Trash & Versioning)
+Woche 10:      realtime-cleanup + login-version-display
+Woche 11–12:   knowledge-graph-v2
+Woche 13–14:   sync-conflict-resolution
 Woche 15–16:   unified-settings + mermaid-rendering
-Woche 17–18:   public-sharing
+Woche 17–18:   public-sharing + welcome-vault
 Woche 19–22:   responsive-mobile
+Woche 23–30:   collaborative-editing (CRDT/OT — größtes Feature)
 Danach:        workspace-leaf-compat, obsidian-themes, live-preview-editor, ...
 ```
 
@@ -189,23 +215,6 @@ Danach:        workspace-leaf-compat, obsidian-themes, live-preview-editor, ...
 - **Priorität**: Mittel (UX-Verbesserung, kein neues Feature)
 - **Aufwand**: Mittel (Frontend-Refactoring, neue Kategorien-Navigation, Backend: Log-Deletion-Endpoint)
 
-### editor-improvements
-- **Beschreibung**: Ergänzende Editor-Features: Zeilennummern (an/aus via Toggle), Undo/Redo-History (über Browser-native Textarea-Undo hinaus mit explizitem History-Stack für Toolbar-Aktionen), Recent Files (zuletzt geöffnete Dateien als Schnellzugriff in Sidebar oder Command Palette), Templates/Vorlagen (neue Notiz aus Vorlage erstellen — Daily Note, Meeting, etc.), Daily Notes (automatische Tagesnotiz YYYY-MM-DD.md per Klick/Shortcut), Bild-Paste (Ctrl+V Screenshot → automatisch als Bild-Datei speichern + Embed-Link einfügen), Favoriten/Bookmarks (Dateien pinnen für schnellen Zugriff).
-- **Abhängigkeit**: Braucht tabbed-editor-viewer (Editor-Infrastruktur)
-- **Priorität**: Mittel–Hoch (Templates + Daily Notes sind Obsidian-Kernfeatures, Bild-Paste ist häufig angefragt)
-- **Aufwand**: Mittel (rein Frontend außer Bild-Paste — das braucht einen Upload-Endpoint für Clipboard-Blobs)
-
-### realtime-infrastructure ✅ Fertig
-- **Beschreibung**: Server-Sent Events (SSE) als Push-Kanal für Echtzeit-Updates. Ersetzt das bisherige Polling. Implementiert: Chat-Nachrichten sofort empfangen, Online-Status/Presence (Heartbeat-basiert), Unread-Count-Updates ohne Polling, Vault-Änderungs-Benachrichtigungen mit automatischem Tree-Refresh + Tab-Content-Reload, Toast-Notifications bei Server-Events, Sync-Konflikt-Warnungen, Server-Shutdown-Hinweis.
-- **Architektur**: SSE-Endpoint (`GET /api/v1/events`), Event-Bus mit Replay-Buffer, ConnectionManager (per-user), Exponential-Backoff-Reconnect (5 Versuche → Fallback auf Polling), Page Visibility API Integration, Last-Event-ID Replay.
-- **Hinweis**: SSE statt WebSocket gewählt — einfacher (HTTP-basiert, kein Upgrade), Nginx-kompatibel ohne Extra-Config, ausreichend für Server→Client-Push.
-
-### vault-explorer-enhancements
-- **Beschreibung**: UX-Verbesserungen im File Explorer: Vault-Statistiken (Gesamtgröße, Anzahl Dateien/Ordner) als Badge oder Tooltip am Vault-Eintrag, Custom Context-Menu (Rechtsklick überall durch eigenes Menü ersetzen — Dateien: Umbenennen/Löschen/Kopieren/Verschieben; Vaults: Erstellen/Löschen/Export; Ordner: Neuer Ordner/Neue Datei/Löschen), Drag & Drop Datei-Upload (Dateien direkt in Explorer oder Editor droppen statt über Import-Dialog).
-- **Abhängigkeit**: Braucht slatebase-mvp (File Explorer Grundfunktion)
-- **Priorität**: Mittel (UX-Polish, macht Slatebase professioneller)
-- **Aufwand**: Niedrig–Mittel (Vault-Stats: Backend-Endpoint, Frontend-Badge. Context-Menu: ContextMenu-Komponente mit positioniertem Overlay. DnD-Upload: Drop-Zone + bestehender Import-Endpoint)
-
 ### search-and-discovery
 - **Beschreibung**: Zwei-Phasen-Feature: Phase 1 — Vault-weite Volltextsuche mit Replace (case-insensitive, Regex-Support, Ergebnisvorschau mit Kontext-Zeilen, Suche über mehrere Vaults, Find & Replace für Refactoring: Tag umbenennen, Link-Target ändern). Phase 2 (optional, zukunftsfähig) — Semantische Suche mit Embedding-Modell (lokale oder API-basierte Embedding-Generierung, Vektor-Ähnlichkeitssuche, "ähnliche Notizen"-Feature).
 - **Abhängigkeit**: Phase 1: Braucht slatebase-mvp (Vault-Dateizugriff). Phase 2: Braucht Phase 1 + externes Embedding-Modell (OpenAI/Ollama)
@@ -230,11 +239,52 @@ Danach:        workspace-leaf-compat, obsidian-themes, live-preview-editor, ...
 - **Priorität**: Mittel (keine bekannten kritischen Lücken, aber systematische Prüfung ausstehend)
 - **Aufwand**: Mittel (Analyse + gezielte Fixes, kein neues Feature)
 
-### trash-and-versioning
-- **Beschreibung**: Zwei zusammenhängende Schutzmaßnahmen gegen Datenverlust: (1) Papierkorb/Trash — gelöschte Dateien werden nicht sofort entfernt, sondern in einen `.trash/`-Ordner verschoben (analog Obsidian). Wiederherstellung per UI möglich. Automatische Bereinigung nach konfigurierbarer Frist (z.B. 30 Tage). (2) Datei-Versionierung — bei jedem Save wird die vorherige Version aufbewahrt (letzte N Versionen, konfigurierbar). Versions-Browser in der UI (Diff-Ansicht, Wiederherstellen einzelner Versionen). Speicherung als `.versions/<path>/<timestamp>.md` im Vault-Datenverzeichnis.
+### login-version-display
+- **Beschreibung**: Versionsnummer auf dem Login-Screen anzeigen. Der bestehende öffentliche Endpoint `GET /api/v1/version` wird beim Laden der LoginPage abgefragt und die Version dezent unterhalb des Login-Buttons dargestellt.
+- **Abhängigkeit**: Braucht versionRoutes (✅ vorhanden), LoginPage (✅ vorhanden)
+- **Priorität**: Hoch (Quick Fix, extrem niedriger Aufwand, sofort umsetzbar)
+- **Aufwand**: Sehr niedrig (1–2h, rein Frontend: ein `fetch`-Call + ein `<span>`)
+- **Status**: Requirements fertig
+
+### welcome-vault
+- **Beschreibung**: Neue Benutzer erhalten bei Account-Erstellung automatisch einen "Willkommen"-Vault mit Tutorial-Inhalten (Wikilinks, Callouts, Tags, Embeds, Ordnerstruktur). Template-Verzeichnis anpassbar, per Feature-Toggle steuerbar.
+- **Abhängigkeit**: Braucht auth-and-user-management (✅), VaultService (✅)
+- **Priorität**: Mittel (Onboarding-Verbesserung, kein Blocker)
+- **Aufwand**: Mittel (Backend: Template-Copy-Logik + Feature-Toggle. Content: 5–15 Markdown-Dateien schreiben)
+- **Status**: Requirements fertig
+
+### realtime-cleanup
+- **Beschreibung**: Feature-Toggle `realtime` entfernen (SSE immer aktiv), gesamte Polling-Fallback-Logik entfernen, Status `fallback` eliminieren, Code-Bereinigung aller Conditionals. SSE wird zur einzigen Methode für Push-Updates.
+- **Abhängigkeit**: Braucht realtime-infrastructure (✅ Fertig, stabil)
+- **Priorität**: Mittel–Hoch (vereinfacht Code signifikant, entfernt tote Pfade)
+- **Aufwand**: Niedrig–Mittel (primär Lösch-Arbeit: Toggle, Fallback-Code, Tests anpassen)
+- **Status**: Requirements fertig
+
+### knowledge-graph-v2
+- **Beschreibung**: Knowledge Graph Erweiterung: (1) Konfigurierbare Darstellung (Farben pro Knotentyp, Layout-Parameter wie Abstoßung/Anziehung/Distanz via Slider), (2) Tags als togglebare Knoten (verbunden mit allen Dateien die den Tag enthalten), (3) YAML-Properties als togglebare Knoten (wählbare Keys, verbunden mit Dateien die den Property-Wert haben). Erweitert den Link-Index und die Graph-API.
+- **Abhängigkeit**: Braucht knowledge-graph (✅ Fertig)
+- **Priorität**: Mittel (Differenzierungs-Feature, hebt den Graph deutlich über Obsidian-Niveau)
+- **Aufwand**: Mittel (Backend: Link-Index erweitern um Tags/Properties. Frontend: Settings-Panel, neue Node-Typen, API-Erweiterung)
+- **Status**: Requirements fertig
+
+### collaborative-editing
+- **Beschreibung**: Echtzeit-Multi-User-Editing für Markdown-Dokumente. CRDT oder OT-basiert, max 10 Teilnehmer pro Dokument, Cursor-Presence (farbige Remote-Cursors + Selektionen), Auto-Save alle 5s, lokaler Buffer bei Disconnect, Session-Awareness-UI. Technisch anspruchsvollstes geplantes Feature.
+- **Abhängigkeit**: Braucht realtime-infrastructure (✅, SSE als Event-Kanal), tabbed-editor-viewer (✅, Editor als Host)
+- **Priorität**: Niedrig–Mittel (Nice-to-have, aber starkes Differenzierungsmerkmal für Teams)
+- **Aufwand**: Sehr hoch (CRDT/OT-Engine, Collaboration-Server, Editor-Integration, Cursor-Rendering, Netzwerk-Resilienz)
+- **Status**: Requirements fertig
+
+### sync-conflict-resolution
+- **Beschreibung**: Halbautomatisches Sync-Konfliktmanagement. Erweitert den bestehenden vault-sync um: Konfliktkategorisierung (content/deleted/rename), Diff-View (Side-by-Side + Unified), Batch-Auflösung, konfigurierbare Auto-Resolution-Strategien (newer_wins, remote_wins, local_wins), Merge-Preview mit Editor, geführter Conflict-Wizard (mehrstufig).
+- **Abhängigkeit**: Braucht vault-sync (✅ Fertig)
+- **Priorität**: Mittel (UX-kritisch für alle Sync-Nutzer, aktuell nur manuelle Einzelauflösung)
+- **Aufwand**: Mittel (Backend: Kategorisierung + Strategien. Frontend: Diff-View, Wizard-UI, Batch-Logik)
+- **Status**: Requirements fertig
+
+### trash-and-versioning ✅ Fertig (via tier2-daily-workflow)
+- **Beschreibung**: Zwei zusammenhängende Schutzmaßnahmen gegen Datenverlust: (1) Papierkorb/Trash — gelöschte Dateien werden in `.trash/`-Ordner verschoben (konfigurierbare Aufbewahrungsfrist 0–365 Tage). Wiederherstellung per UI. (2) Datei-Versionierung — bei jedem Save wird die vorherige Version unter `.versions/<path>/<timestamp>.<ext>` aufbewahrt (konfigurierbar 0–100 Versionen). Versions-Browser mit Inline-Diff (grün/rot). Cleanup-Job entfernt abgelaufene Einträge periodisch.
 - **Abhängigkeit**: Braucht advanced-file-operations (Delete-Logik) + tabbed-editor-viewer (Save-Hook für Versionierung)
-- **Priorität**: Mittel–Hoch (schützt vor versehentlichem Datenverlust — besonders wichtig bei Multi-User und Auto-Save)
-- **Aufwand**: Mittel (Backend: Soft-Delete-Logik, Versions-Store, Cleanup-Job. Frontend: Trash-Ansicht, Versions-Browser, Diff-Darstellung)
+- **Status**: ✅ Fertig — implementiert als Teil von `tier2-daily-workflow` Spec
 
 ### public-sharing
 - **Beschreibung**: Einzelne Notizen per öffentlichem Link teilen ohne Login. Generiert einen einzigartigen, nicht erratbaren Share-Link (UUID-basiert). Optionen: Ablaufdatum (1h/24h/7d/30d/unbegrenzt), Passwort-Schutz (optional), Nur-Lesen (immer). Öffentliche Ansicht: minimales Layout, nur Markdown-Rendering, kein Editor/Explorer. Verwaltung: Liste aktiver Public-Links pro Vault, Widerruf jederzeit möglich.

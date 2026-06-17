@@ -1,0 +1,212 @@
+/**
+ * TrashView styles — Papierkorb-Ansicht.
+ * Uses Design Tokens from index.css for all colors.
+ */
+
+/* ===== Container ===== */
+
+.trash-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-surface);
+}
+
+/* ===== Header ===== */
+
+.trash-view__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-default);
+  flex-shrink: 0;
+  background: var(--bg-elevated);
+}
+
+.trash-view__header-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.trash-view__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.trash-view__count {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  margin-left: auto;
+}
+
+/* ===== Loading State ===== */
+
+.trash-view__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.trash-view__spinner {
+  animation: trash-view-spin 1s linear infinite;
+}
+
+@keyframes trash-view-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ===== Empty State ===== */
+
+.trash-view__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 16px;
+  flex: 1;
+}
+
+.trash-view__empty-icon {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.trash-view__empty-text {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* ===== Entry List ===== */
+
+.trash-view__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* ===== Entry Item ===== */
+
+.trash-view__entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background-color var(--transition-fast);
+}
+
+.trash-view__entry:hover {
+  background: var(--bg-elevated);
+}
+
+.trash-view__entry:last-child {
+  border-bottom: none;
+}
+
+/* ===== Entry Icon ===== */
+
+.trash-view__entry-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ===== Entry Info ===== */
+
+.trash-view__entry-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.trash-view__entry-path {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trash-view__entry-date {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ===== Entry Actions ===== */
+
+.trash-view__entry-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.trash-view__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.trash-view__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Restore button */
+.trash-view__btn--restore {
+  background: var(--accent-light);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+.trash-view__btn--restore:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--text-inverse);
+}
+
+/* Delete button */
+.trash-view__btn--delete {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border-color: var(--danger-border);
+}
+
+.trash-view__btn--delete:hover:not(:disabled) {
+  background: var(--danger);
+  color: var(--text-inverse);
+  border-color: var(--danger);
+}

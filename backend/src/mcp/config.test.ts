@@ -22,6 +22,11 @@ function createMockConfigService(overrides: Partial<ServerConfig> = {}): IConfig
     sessionMaxLifetimeDays: 7,
     features: {},
     sse: { maxConnections: 1000, maxPerUser: 3, heartbeatInterval: 30000, replayBufferSize: 100, replayTtl: 300000, batchWindow: 100, batchMax: 20 },
+    trash: { retentionDays: 30 },
+    versions: { maxPerFile: 20 },
+    cleanup: { intervalHours: 24 },
+    templates: { directory: '_templates' },
+    upload: { maxFileSizeBytes: 104857600, maxFilesPerDrop: 50, maxImagePasteSize: 10485760 },
     ...overrides,
   }
   return {
@@ -29,6 +34,11 @@ function createMockConfigService(overrides: Partial<ServerConfig> = {}): IConfig
     getVaultConfigs: () => config.vaults,
     getFeaturesConfig: () => ({}),
     getSseConfig: () => config.sse,
+    getTrashConfig: () => config.trash,
+    getVersionsConfig: () => config.versions,
+    getCleanupConfig: () => config.cleanup,
+    getTemplatesConfig: () => config.templates,
+    getUploadConfig: () => config.upload,
   }
 }
 

@@ -6,7 +6,10 @@
 import type { DirectoryTree } from '../types'
 
 /** Set of recognized image file extensions (lowercase, without dot). */
-const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif'])
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif', 'bmp'])
+
+/** Set of recognized PDF file extensions (lowercase, without dot). */
+const PDF_EXTENSIONS = new Set(['pdf'])
 
 /**
  * Computes the POSIX relative path from one file to another.
@@ -59,6 +62,32 @@ export function isImageFile(fileName: string): boolean {
   }
   const extension = fileName.slice(dotIndex + 1).toLowerCase()
   return IMAGE_EXTENSIONS.has(extension)
+}
+
+/**
+ * Determines whether a file is a PDF based on its extension.
+ *
+ * @param fileName - The filename (with extension) to check.
+ * @returns True if the file has a .pdf extension.
+ */
+export function isPdfFile(fileName: string): boolean {
+  const dotIndex = fileName.lastIndexOf('.')
+  if (dotIndex === -1 || dotIndex === fileName.length - 1) {
+    return false
+  }
+  const extension = fileName.slice(dotIndex + 1).toLowerCase()
+  return PDF_EXTENSIONS.has(extension)
+}
+
+/**
+ * Determines whether a file should get an embed link (![[...]]) when dropped on the editor.
+ * This includes images and PDFs.
+ *
+ * @param fileName - The filename (with extension) to check.
+ * @returns True if the file should be embedded with ![[filename]].
+ */
+export function isEmbeddableFile(fileName: string): boolean {
+  return isImageFile(fileName) || isPdfFile(fileName)
 }
 
 /**

@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react'
 import {
   Upload, FolderOpen, Download, Settings, Shield,
   Database, FileText, Clock, User, Server, FilePlus, MessageCircle, RefreshCw, Key, ScrollText,
-  ClipboardList, Plus, Share2, Plug, Search,
+  ClipboardList, Plus, Share2, Plug, Search, CalendarDays, Trash2,
 } from 'lucide-react'
 import { useFeatureContext } from '../state/featureContext'
 
@@ -10,6 +10,7 @@ type AppPage =
   | 'vaults' | 'my-vaults' | 'profile' | 'sessions' | 'chat'
   | 'admin-users' | 'admin-vaults' | 'admin-config' | 'admin-audit' | 'admin-logs'
   | 'vault-sharing' | 'vault-deletion' | 'sync-config' | 'sync-log' | 'mcp-tokens' | 'plugins'
+  | 'trash'
 
 interface ToolbarItem {
   id: string
@@ -33,6 +34,8 @@ interface SidebarToolbarProps {
   onExportVault: () => void
   onNavigate: (page: AppPage) => void
   onOpenGraph: () => void
+  onOpenTrash?: () => void
+  onDailyNote?: () => void
   onToggleSearch?: () => void
   searchPanelOpen?: boolean
   isAdmin: boolean
@@ -46,16 +49,18 @@ interface SidebarToolbarProps {
  * Buttons can be reordered by drag-and-drop.
  * Tooltips show on hover.
  */
-export function SidebarToolbar({ vaultId, vaultPermission, onCreateVault, onCreateFile, onImportFile, onImportFolder, onExportVault, onNavigate, onOpenGraph, onToggleSearch, searchPanelOpen, isAdmin, isVaultOwner, syncEnabled, globalUnreadCount }: SidebarToolbarProps) {
+export function SidebarToolbar({ vaultId, vaultPermission, onCreateVault, onCreateFile, onImportFile, onImportFolder, onExportVault, onNavigate, onOpenGraph, onOpenTrash, onDailyNote, onToggleSearch, searchPanelOpen, isAdmin, isVaultOwner, syncEnabled, globalUnreadCount }: SidebarToolbarProps) {
   const { isEnabled } = useFeatureContext()
 
   const allItems: ToolbarItem[] = [
     { id: 'search', icon: <Search size={15} />, label: 'Suche', action: () => onToggleSearch?.() },
     { id: 'create-vault', icon: <Plus size={15} />, label: 'Neuer Vault', action: onCreateVault },
     { id: 'create-file', icon: <FilePlus size={15} />, label: 'Neue Datei', action: onCreateFile, requiresVault: true, requiresWrite: true },
+    { id: 'daily-note', icon: <CalendarDays size={15} />, label: 'Tagesnotiz (Ctrl+Alt+D)', action: () => onDailyNote?.(), requiresVault: true, requiresWrite: true },
     { id: 'import-file', icon: <Upload size={15} />, label: 'Datei importieren', action: onImportFile, requiresVault: true, requiresWrite: true },
     { id: 'import-folder', icon: <FolderOpen size={15} />, label: 'Ordner importieren', action: onImportFolder, requiresVault: true, requiresWrite: true },
     { id: 'export-vault', icon: <Download size={15} />, label: 'Vault exportieren', action: onExportVault, requiresVault: true },
+    { id: 'trash', icon: <Trash2 size={15} />, label: 'Papierkorb', action: () => onOpenTrash?.(), requiresVault: true },
     { id: 'graph', icon: <Share2 size={15} />, label: 'Graph', action: onOpenGraph, requiresVault: true, feature: 'knowledge-graph' },
     { id: 'sync-config', icon: <RefreshCw size={15} />, label: 'Vault-Sync', action: () => onNavigate('sync-config'), requiresVault: true, ownerOnly: true, feature: 'vault-sync' },
     { id: 'sync-log', icon: <ClipboardList size={15} />, label: 'Sync-Protokoll', action: () => onNavigate('sync-log'), requiresVault: true, ownerOnly: true, feature: 'vault-sync' },

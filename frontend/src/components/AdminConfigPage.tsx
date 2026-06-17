@@ -15,6 +15,8 @@ export interface ServerConfigData {
   allowedOrigins: string[]
   maxFileSize: number
   logLevel: 'debug' | 'info' | 'warn' | 'error'
+  trash?: { retentionDays: number }
+  versions?: { maxPerFile: number }
 }
 
 /** Props for the AdminConfigPage component. */
@@ -34,6 +36,8 @@ interface ConfigFormErrors {
   host?: string
   logLevel?: string
   maxFileSize?: string
+  trashRetentionDays?: string
+  versionsMaxPerFile?: string
 }
 
 /**
@@ -60,6 +64,8 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
   const [allowedOrigins, setAllowedOrigins] = useState('')
   const [maxFileSize, setMaxFileSize] = useState('')
   const [logLevel, setLogLevel] = useState('')
+  const [trashRetentionDays, setTrashRetentionDays] = useState('')
+  const [versionsMaxPerFile, setVersionsMaxPerFile] = useState('')
 
   // UI state
   const [errors, setErrors] = useState<ConfigFormErrors>({})
@@ -94,6 +100,8 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
           setAllowedOrigins(data.allowedOrigins.join(', '))
           setMaxFileSize(String(data.maxFileSize))
           setLogLevel(data.logLevel)
+          setTrashRetentionDays(String(data.trash?.retentionDays ?? 30))
+          setVersionsMaxPerFile(String(data.versions?.maxPerFile ?? 20))
         }
       } catch (err: unknown) {
         if (!cancelled) {
@@ -175,6 +183,14 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
     if (isNaN(maxFileSizeNum) || maxFileSizeNum <= 0) {
       newErrors.maxFileSize = t('admin.config.maxFileSizeError')
     }
+    const retentionNum = parseInt(trashRetentionDays, 10)
+    if (isNaN(retentionNum) || retentionNum < 0 || retentionNum > 365) {
+      newErrors.trashRetentionDays = t('admin.config.trashRetentionDaysError')
+    }
+    const maxVersionsNum = parseInt(versionsMaxPerFile, 10)
+    if (isNaN(maxVersionsNum) || maxVersionsNum < 0 || maxVersionsNum > 100) {
+      newErrors.versionsMaxPerFile = t('admin.config.versionsMaxPerFileError')
+    }
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -193,6 +209,8 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
       logLevel: logLevel as 'debug' | 'info' | 'warn' | 'error',
       maxFileSize: parseInt(maxFileSize, 10),
       allowedOrigins: originsArray,
+      trash: { retentionDays: parseInt(trashRetentionDays, 10) },
+      versions: { maxPerFile: parseInt(versionsMaxPerFile, 10) },
     }
 
     try {
@@ -400,6 +418,42 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
                 <option value="error">Error</option>
               </select>
               {errors.logLevel && <p className="admin-config-field-error">{errors.logLevel}</p>}
+            </div>
+          </div>
+        </section>
+
+        {/* Protection / Schutzmaßnahmen section */}
+        <section className="admin-config-card">
+          <h2 className="admin-config-card-title">{t('admin.config.protectionTitle')}</h2>
+          <p className="admin-config-hint">{t('admin.config.protectionHint')}</p>
+          <div className="admin-config-grid">
+            <div className="admin-config-field">
+              <label htmlFor="config-trash-retention">{t('admin.config.trashRetentionDaysLabel')}</label>
+              <input
+                id="config-trash-retention"
+                type="number"
+                min={0}
+                max={365}
+                value={trashRetentionDays}
+                onChange={(e) => setTrashRetentionDays(e.target.value)}
+                aria-invalid={errors.trashRetentionDays !== undefined}
+              />
+              <p className="admin-config-hint">{t('admin.config.trashRetentionDaysHint')}</p>
+              {errors.trashRetentionDays && <p className="admin-config-field-error">{errors.trashRetentionDays}</p>}
+            </div>
+            <div className="admin-config-field">
+              <label htmlFor="config-versions-max">{t('admin.config.versionsMaxPerFileLabel')}</label>
+              <input
+                id="config-versions-max"
+                type="number"
+                min={0}
+                max={100}
+                value={versionsMaxPerFile}
+                onChange={(e) => setVersionsMaxPerFile(e.target.value)}
+                aria-invalid={errors.versionsMaxPerFile !== undefined}
+              />
+              <p className="admin-config-hint">{t('admin.config.versionsMaxPerFileHint')}</p>
+              {errors.versionsMaxPerFile && <p className="admin-config-field-error">{errors.versionsMaxPerFile}</p>}
             </div>
           </div>
         </section>
