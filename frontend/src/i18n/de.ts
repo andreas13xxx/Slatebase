@@ -108,6 +108,8 @@ export const de = {
   },
 
   editor: {
+    undo: 'Rückgängig',
+    redo: 'Wiederherstellen',
     heading1: 'Überschrift 1',
     heading2: 'Überschrift 2',
     heading3: 'Überschrift 3',
@@ -122,6 +124,7 @@ export const de = {
     quote: 'Zitat',
     horizontalRule: 'Trennlinie',
     table: 'Tabelle',
+    lineNumbers: 'Zeilennummern',
     toolbarAriaLabel: 'Formatierungsleiste',
     textareaAriaLabel: 'Dateiinhalt bearbeiten',
     readOnlyBanner: 'Nur Lesen — dieser Vault wurde schreibgeschützt mit dir geteilt.',
@@ -176,6 +179,7 @@ export const de = {
     syncLog: 'Sync-Protokoll',
     mcpTokens: 'API-Tokens',
     plugins: 'Plugins',
+    trash: 'Papierkorb',
   },
 
   rightPanel: {
@@ -337,6 +341,14 @@ export const de = {
       hostError: 'Host darf nicht leer sein.',
       logLevelError: 'Ungültiges Log-Level.',
       maxFileSizeError: 'Muss eine positive Ganzzahl sein.',
+      protectionTitle: 'Schutzmaßnahmen',
+      protectionHint: 'Papierkorb- und Versionierungs-Einstellungen. Änderungen werden beim nächsten Cleanup-Durchlauf wirksam.',
+      trashRetentionDaysLabel: 'Papierkorb-Aufbewahrung (Tage)',
+      trashRetentionDaysHint: '0 = sofort permanent löschen, 1–365 = Tage bis zur endgültigen Löschung',
+      trashRetentionDaysError: 'Muss zwischen 0 und 365 liegen.',
+      versionsMaxPerFileLabel: 'Max. Versionen pro Datei',
+      versionsMaxPerFileHint: '0 = keine Versionierung, 1–100 = aufbewahrte Versionen pro Datei',
+      versionsMaxPerFileError: 'Muss zwischen 0 und 100 liegen.',
     },
     audit: {
       title: 'Audit-Log',
@@ -433,10 +445,16 @@ export const de = {
   contextMenu: {
     ariaLabel: 'Kontextmenü',
     newFile: 'Neue Datei',
+    newFolder: 'Neuer Ordner',
     newVault: 'Neuer Vault',
     rename: 'Umbenennen',
     delete: 'Löschen',
+    copy: 'Kopieren',
+    move: 'Verschieben',
+    export: 'Export',
     noActions: 'Keine Aktionen verfügbar',
+    addFavorite: 'Als Favorit markieren',
+    removeFavorite: 'Favorit entfernen',
   },
 
   fileOps: {
@@ -456,6 +474,9 @@ export const de = {
     nameInvalidChars: 'Dateiname enthält ungültige Zeichen',
     nameTooLong: 'Dateiname ist zu lang',
     dropToRoot: 'Ins Stammverzeichnis verschieben',
+    copyError: 'Fehler beim Kopieren',
+    copyPrompt: 'Zielordner für die Kopie:',
+    movePrompt: 'Zielordner zum Verschieben:',
   },
 
   sync: {

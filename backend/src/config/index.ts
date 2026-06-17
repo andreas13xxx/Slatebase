@@ -28,6 +28,28 @@ const SseConfigSchema = z.object({
   batchMax: z.number().int().positive().default(20),
 })
 
+const TrashConfigSchema = z.object({
+  retentionDays: z.number().int().default(30),
+})
+
+const VersionsConfigSchema = z.object({
+  maxPerFile: z.number().int().default(20),
+})
+
+const CleanupConfigSchema = z.object({
+  intervalHours: z.number().default(24),
+})
+
+const TemplatesConfigSchema = z.object({
+  directory: z.string().default('_templates'),
+})
+
+const UploadConfigSchema = z.object({
+  maxFileSizeBytes: z.number().int().positive().default(104857600),
+  maxFilesPerDrop: z.number().int().positive().default(50),
+  maxImagePasteSize: z.number().int().positive().default(10485760),
+})
+
 export const ServerConfigSchema = z.object({
   port: z.number().int().min(1).max(65535).default(3000),
   host: z.string().default('127.0.0.1'),
@@ -46,6 +68,11 @@ export const ServerConfigSchema = z.object({
   sessionMaxLifetimeDays: z.number().positive().default(7),
   features: FeaturesConfigSchema,
   sse: SseConfigSchema.default({}),
+  trash: TrashConfigSchema.default({}),
+  versions: VersionsConfigSchema.default({}),
+  cleanup: CleanupConfigSchema.default({}),
+  templates: TemplatesConfigSchema.default({}),
+  upload: UploadConfigSchema.default({}),
 })
 
 // --- Types ---
@@ -53,6 +80,11 @@ export const ServerConfigSchema = z.object({
 export type ServerConfig = z.infer<typeof ServerConfigSchema>
 export type VaultConfig = z.infer<typeof VaultConfigSchema>
 export type SseConfig = z.infer<typeof SseConfigSchema>
+export type TrashConfig = z.infer<typeof TrashConfigSchema>
+export type VersionsConfig = z.infer<typeof VersionsConfigSchema>
+export type CleanupConfig = z.infer<typeof CleanupConfigSchema>
+export type TemplatesConfig = z.infer<typeof TemplatesConfigSchema>
+export type UploadConfig = z.infer<typeof UploadConfigSchema>
 
 // --- Interface ---
 
@@ -63,6 +95,16 @@ export interface IConfigService {
   getFeaturesConfig(): Record<string, { enabled: boolean }>
   /** Returns the SSE configuration section */
   getSseConfig(): SseConfig
+  /** Returns the trash configuration section */
+  getTrashConfig(): TrashConfig
+  /** Returns the versions configuration section */
+  getVersionsConfig(): VersionsConfig
+  /** Returns the cleanup configuration section */
+  getCleanupConfig(): CleanupConfig
+  /** Returns the templates configuration section */
+  getTemplatesConfig(): TemplatesConfig
+  /** Returns the upload configuration section */
+  getUploadConfig(): UploadConfig
 }
 
 // --- Implementation ---
@@ -75,6 +117,7 @@ export class ConfigService implements IConfigService {
     const envOverlay = this.loadEnvOverlay()
     const merged = { ...fileConfig, ...envOverlay }
     this.config = ServerConfigSchema.parse(merged)
+    this.validateRanges()
   }
 
   getServerConfig(): ServerConfig {
@@ -91,6 +134,56 @@ export class ConfigService implements IConfigService {
 
   getSseConfig(): SseConfig {
     return this.config.sse
+  }
+
+  getTrashConfig(): TrashConfig {
+    return this.config.trash
+  }
+
+  getVersionsConfig(): VersionsConfig {
+    return this.config.versions
+  }
+
+  getCleanupConfig(): CleanupConfig {
+    return this.config.cleanup
+  }
+
+  getTemplatesConfig(): TemplatesConfig {
+    return this.config.templates
+  }
+
+  getUploadConfig(): UploadConfig {
+    return this.config.upload
+  }
+
+  /**
+   * Validates config ranges and falls back to defaults with a warning
+   * for out-of-range values. Uses console.warn because ConfigService
+   * is instantiated before the Pino logger.
+   */
+  private validateRanges(): void {
+    const { trash, versions, cleanup } = this.config
+
+    if (trash.retentionDays < 0 || trash.retentionDays > 365) {
+      console.warn(
+        `[config] trash.retentionDays value ${trash.retentionDays} is out of range (0–365), falling back to default 30`
+      )
+      ;(this.config.trash as { retentionDays: number }).retentionDays = 30
+    }
+
+    if (versions.maxPerFile < 0 || versions.maxPerFile > 100) {
+      console.warn(
+        `[config] versions.maxPerFile value ${versions.maxPerFile} is out of range (0–100), falling back to default 20`
+      )
+      ;(this.config.versions as { maxPerFile: number }).maxPerFile = 20
+    }
+
+    if (cleanup.intervalHours < 1) {
+      console.warn(
+        `[config] cleanup.intervalHours value ${cleanup.intervalHours} is out of range (≥1), falling back to default 24`
+      )
+      ;(this.config.cleanup as { intervalHours: number }).intervalHours = 24
+    }
   }
 
   private loadConfigFile(): Record<string, unknown> {

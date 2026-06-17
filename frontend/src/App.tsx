@@ -5,10 +5,12 @@ import { AuthProvider, useAuthContext } from './state/authContext'
 import { TabProvider, useTabContext } from './state/tabContext'
 import { FeatureProvider, useFeatureContext } from './state/featureContext'
 import { SearchProvider } from './state/searchContext'
+import { createDailyNoteService, getDailyNotesConfig } from './state/dailyNoteService'
+import { openTab } from './state/tabActions'
 import { I18nProvider, useTranslation } from './i18n'
 import { ToastProvider } from './components/Toast'
 import { RealtimeProvider, type RealtimeEventHandlers } from './components/RealtimeProvider'
-import { ToastNotification } from './components/ToastNotification'
+import { ToastNotification, showToast } from './components/ToastNotification'
 import { ConnectionIndicator } from './components/ConnectionIndicator'
 import { useRealtimeContext } from './state/realtimeContext'
 import {
@@ -41,10 +43,14 @@ import { SyncLogPage } from './components/SyncLogPage'
 import { McpTokensPage } from './components/McpTokensPage'
 import { PluginManagementPage } from './components/PluginManagementPage'
 import { PluginViewPanel } from './components/PluginViewPanel'
+import { TrashView } from './components/TrashView'
+import { VersionBrowser } from './components/VersionBrowser'
 import { useVersionInfo } from './hooks/useVersionInfo'
 import { SyncProvider } from './state/syncContext'
 import { ContextPanelProvider } from './state/contextPanelContext'
+import { SidebarPanelProvider } from './state/sidebarPanelContext'
 import { ContextPanel } from './components/context-panel/ContextPanel'
+import { SidebarPanel } from './components/sidebar-panel'
 import { PluginProvider } from './plugins/compat/plugin-context'
 import { CommandPaletteContainer } from './components/CommandPaletteContainer'
 import {
@@ -57,6 +63,9 @@ import './App.css'
 
 /** Singleton ApiClient instance shared across the app. */
 const apiClient = new ApiClient()
+
+/** Singleton DailyNoteService instance. */
+const dailyNoteService = createDailyNoteService(apiClient)
 
 // Synchronous token restore from localStorage — eliminates race condition
 // where API calls fire before the useEffect in AuthGuard sets the token.
@@ -160,6 +169,7 @@ type AppPage =
   | 'sync-log'
   | 'mcp-tokens'
   | 'plugins'
+  | 'trash'
 
 /**
  * User avatar and dropdown menu component.
@@ -351,6 +361,7 @@ const PAGE_LABEL_KEYS: Record<AppPage, string> = {
   'sync-log': 'pages.syncLog',
   'mcp-tokens': 'pages.mcpTokens',
   plugins: 'pages.plugins',
+  trash: 'pages.trash',
 }
 
 /** Icons for settings pages. */
@@ -370,6 +381,7 @@ const PAGE_ICONS: Partial<Record<AppPage, React.ReactNode>> = {
   'sync-log': <Clock size={13} />,
   'mcp-tokens': <Key size={13} />,
   plugins: <Plug size={13} />,
+  trash: <Trash2 size={13} />,
 }
 
 /**
@@ -419,9 +431,15 @@ function AppContent() {
   const createFileTriggerRef = useRef<(() => void) | null>(null)
   const createVaultTriggerRef = useRef<(() => void) | null>(null)
 
+  // Version browser state: which file to show versions for
+  const [versionBrowserTarget, setVersionBrowserTarget] = useState<{ vaultId: string; filePath: string } | null>(null)
+
   const sidebar = useResize(260, 180, 400, 'left')
   const rightPanel = useResize(240, 160, 500, 'right')
   const versionInfo = useVersionInfo()
+
+  // Refresh key for sidebar panel views (favorites, recent files)
+  const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0)
 
   // Global unread count polling (30-second interval)
   // Disabled when SSE connection is active (realtime pushes unread counts)
@@ -716,6 +734,52 @@ function AppContent() {
     }
   }
 
+  /** Opens or creates today's daily note for the active vault. */
+  const handleDailyNote = useCallback(async () => {
+    if (!state.selectedVaultId) {
+      showToast('error', 'Bitte zuerst einen Vault auswählen')
+      return
+    }
+
+    const vaultId = state.selectedVaultId
+    const dailyDir = getDailyNotesConfig(vaultId)
+
+    try {
+      const filePath = await dailyNoteService.openOrCreate(vaultId, dailyDir)
+      const fileName = filePath.split('/').pop() ?? filePath
+      setActiveSettingsPage(null)
+      await openTab(tabDispatch, dispatch, apiClient, vaultId, filePath, fileName)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Tagesnotiz konnte nicht erstellt werden'
+      showToast('error', message)
+    }
+  }, [state.selectedVaultId, tabDispatch, dispatch])
+
+  // Global keyboard shortcut: Ctrl+Alt+D — open/create daily note
+  useEffect(() => {
+    const handleDailyNoteShortcut = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.altKey && (e.key === 'd' || e.key === 'D')) {
+        e.preventDefault()
+        handleDailyNote()
+      }
+    }
+
+    document.addEventListener('keydown', handleDailyNoteShortcut)
+    return () => document.removeEventListener('keydown', handleDailyNoteShortcut)
+  }, [handleDailyNote])
+
+  /** Open a file from the sidebar panel (favorites or recent files). */
+  const handleSidebarOpenFile = useCallback((vaultId: string, path: string) => {
+    const fileName = path.split('/').pop() ?? path
+    setActiveSettingsPage(null)
+    // Switch vault if needed
+    if (vaultId !== state.selectedVaultId) {
+      dispatch({ type: 'VAULT_SELECTED', payload: vaultId })
+    }
+    void openTab(tabDispatch, dispatch, apiClient, vaultId, path, fileName)
+    setSidebarRefreshKey((v) => v + 1)
+  }, [state.selectedVaultId, tabDispatch, dispatch])
+
   function handleFileSelected(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (file && state.selectedVaultId) importFile(dispatch, apiClient, state.selectedVaultId, file)
@@ -798,6 +862,10 @@ function AppContent() {
         return state.selectedVaultId
           ? <PluginManagementPage apiClient={apiClient} vaultId={state.selectedVaultId} />
           : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
+      case 'trash':
+        return state.selectedVaultId
+          ? <TrashView vaultId={state.selectedVaultId} apiClient={apiClient} />
+          : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
       default: return null
     }
   }
@@ -818,6 +886,46 @@ function AppContent() {
     >
     <div className="app">
       <CommandPaletteContainer />
+      {/* Version Browser Modal */}
+      {versionBrowserTarget && (
+        <div className="version-browser-modal-overlay" onClick={() => setVersionBrowserTarget(null)}>
+          <div className="version-browser-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="version-browser-modal__header">
+              <span className="version-browser-modal__title">Versionen — {versionBrowserTarget.filePath}</span>
+              <button
+                type="button"
+                className="version-browser-modal__close"
+                onClick={() => setVersionBrowserTarget(null)}
+                aria-label="Schließen"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <VersionBrowser
+              vaultId={versionBrowserTarget.vaultId}
+              filePath={versionBrowserTarget.filePath}
+              currentContent={
+                activeTab && activeTab.vaultId === versionBrowserTarget.vaultId && activeTab.filePath === versionBrowserTarget.filePath
+                  ? (activeTab.editBuffer ?? activeTab.content)
+                  : ''
+              }
+              apiClient={apiClient}
+              onRestore={() => {
+                // Reload the tab content after restore if it matches the active tab
+                if (activeTab && activeTab.vaultId === versionBrowserTarget.vaultId && activeTab.filePath === versionBrowserTarget.filePath) {
+                  apiClient.fetchFileContent(versionBrowserTarget.vaultId, versionBrowserTarget.filePath).then((result) => {
+                    tabDispatch({
+                      type: 'TAB_CONTENT_LOADED',
+                      payload: { tabId: activeTab.id, content: result.content, isBinary: result.isBinary },
+                    })
+                  }).catch(() => { /* ignore */ })
+                }
+                setVersionBrowserTarget(null)
+              }}
+            />
+          </div>
+        </div>
+      )}
       <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleFileSelected} aria-hidden="true" tabIndex={-1} />
       <input ref={folderInputRef} type="file"
         // @ts-expect-error webkitdirectory is non-standard
@@ -875,13 +983,19 @@ function AppContent() {
               </div>
 
               <div className="app-sidebar-body">
-                  <div className="app-sidebar-section">
-                    <span className="app-sidebar-section-label">{t('files.label')}</span>
+                <SidebarPanel
+                  width={sidebar.width}
+                  vaultId={state.selectedVaultId}
+                  onOpenFile={handleSidebarOpenFile}
+                  renderExplorer={() => (
                     <FileExplorer
                       onRegisterCreateFile={(trigger) => { createFileTriggerRef.current = trigger }}
                       onRegisterCreateVault={(trigger) => { createVaultTriggerRef.current = trigger }}
+                      onOpenVersions={(vaultId, filePath) => setVersionBrowserTarget({ vaultId, filePath })}
                     />
-                  </div>
+                  )}
+                  refreshKey={sidebarRefreshKey}
+                />
               </div>
             </aside>
           )}
@@ -908,6 +1022,8 @@ function AppContent() {
             onExportVault={handleExportVault}
             onNavigate={handleNavigate}
             onOpenGraph={handleOpenGraph}
+            onOpenTrash={() => handleNavigate('trash')}
+            onDailyNote={handleDailyNote}
             onToggleSearch={() => setShowRightPanel(true)}
             isAdmin={user?.role === 'admin'}
             isVaultOwner={selectedVault?.permission === 'owner'}
@@ -1005,7 +1121,7 @@ function AppContent() {
                 {renderSettingsPage(activeSettingsPage!)}
               </div>
             ) : (
-              <TabContent />
+              <TabContent onOpenVersions={(vaultId, filePath) => setVersionBrowserTarget({ vaultId, filePath })} />
             )}
           </section>
 
@@ -1126,7 +1242,9 @@ function AuthGuard() {
           <SearchProvider>
             <TabProvider>
               <ContextPanelProvider>
-                <AppContent />
+                <SidebarPanelProvider>
+                  <AppContent />
+                </SidebarPanelProvider>
               </ContextPanelProvider>
             </TabProvider>
           </SearchProvider>

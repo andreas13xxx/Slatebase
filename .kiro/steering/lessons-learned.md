@@ -119,6 +119,10 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 12. `__dirname` nach tsc prüfen (relative Pfade verschieben sich)
 13. Debounced API-Calls: IMMER AbortController (Race Conditions)
 14. `Ctrl+Shift+F`: `e.preventDefault()` für Browser-Suche
+15. `.trash/` + `.versions/` aus FileExplorer-Tree filtern (Backend filtert `.`-Prefixed Dirs, Frontend zusätzlich explizit)
+16. DropZone + internes DnD: `stopPropagation()` im internen Handler, damit DropZone-Overlay nicht triggert
+17. Favorites-Store: Zustandsänderungen erzwingen Re-Render über Counter-State (Store ist kein React-State)
+18. Image Paste: nur `image/*` MIME-Typen abfangen, Text-Paste NICHT intercepten (`preventDefault` nur bei Bild)
 
 ## Multi-User & Vault-Besitz
 

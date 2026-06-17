@@ -179,7 +179,7 @@ describe('VaultReader', () => {
 
       // Nested file
       const nestedFile = alpha.children!.find(c => c.name === 'nested.md')!
-      expect(nestedFile.path).toBe(path.join('Alpha', 'nested.md'))
+      expect(nestedFile.path).toBe('Alpha/nested.md')
     })
 
     it('stops recursion at maxDepth', async () => {

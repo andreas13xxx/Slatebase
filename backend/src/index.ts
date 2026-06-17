@@ -62,10 +62,20 @@ import { PluginStore, PluginInstaller } from './plugin/index.js'
 import { createPluginRoutes } from './api/pluginRoutes.js'
 import { versionRoutes } from './api/versionRoutes.js'
 import { SearchService, ReplaceService } from './search/index.js'
-import type { IConnectionManager, SseEvent } from './realtime/index.js'
+import type { IConnectionManager, SseEvent, PublishOptions } from './realtime/index.js'
 import { EventReplayBuffer, RateLimiter as SseRateLimiter, ConnectionManager, PresenceService, EventBus, ConnectionLimitError } from './realtime/index.js'
 import { createSseRoutes } from './api/sseRoutes.js'
 import { createSearchRoutes } from './api/searchRoutes.js'
+import { createUploadRoutes } from './api/uploadRoutes.js'
+import { createTemplateRoutes } from './api/templateRoutes.js'
+import { createStatisticsRoutes } from './api/statisticsRoutes.js'
+import { VaultStatisticsService } from './statistics/index.js'
+import { TemplateService } from './template/index.js'
+import { VersionService } from './version/index.js'
+import { createFileVersionRoutes } from './api/fileVersionRoutes.js'
+import { TrashService } from './trash/index.js'
+import { createTrashRoutes } from './api/trashRoutes.js'
+import { CleanupJob } from './cleanup/index.js'
 
 // --- Composition Root ---
 
@@ -171,15 +181,26 @@ const syncEngine = new SyncEngine(cryptoService)
 const syncScheduler = new SyncScheduler()
 
 // 4. VaultService (extend existing vault setup with share registry and user repository)
-const vaultService = new VaultService(vaultManager, vaultReader, config, logger, vaultRegistry, vaultShareRegistry, userRepository, auditService)
-const importService = new ImportService(vaultManager, vaultReader, config, logger)
-
-// 4b. SyncService (needs VaultPathResolver)
 const vaultPathResolver: VaultPathResolver = (vaultId: string): string | null => {
   const entry = vaultRegistry.findById(vaultId)
   return entry ? entry.storagePath : null
 }
 
+// Create version and trash services before VaultService (it uses them during file saves)
+const versionService = new VersionService(vaultPathResolver, config.getVersionsConfig().maxPerFile, logger)
+const trashService = new TrashService(
+  (vaultId: string) => {
+    const entry = vaultRegistry.findById(vaultId)
+    if (!entry) throw new Error(`Vault not found: ${vaultId}`)
+    return entry.storagePath
+  },
+  logger,
+)
+
+const vaultService = new VaultService(vaultManager, vaultReader, config, logger, vaultRegistry, vaultShareRegistry, userRepository, auditService, trashService, versionService)
+const importService = new ImportService(vaultManager, vaultReader, config, logger)
+
+// 4b. SyncService (needs VaultPathResolver)
 const syncService = new SyncService(
   syncConfigStore,
   syncLogStore,
@@ -448,6 +469,64 @@ app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)
 const searchRoutes = createSearchRoutes({ searchService, replaceService, vaultAccessControl, logger })
 app.route('/api/v1', searchRoutes)
 
+// Upload route registration (auth middleware applies via /api/v1/* pattern)
+const uploadRoutes = createUploadRoutes({
+  accessControl: vaultAccessControl,
+  vaultRegistry,
+  uploadConfig: config.getUploadConfig(),
+  eventBus,
+  logger,
+})
+app.route('/api/v1', uploadRoutes)
+
+// Template route registration (auth middleware applies via /api/v1/* pattern)
+const templatesConfig = config.getTemplatesConfig()
+const templateService = new TemplateService(templatesConfig.directory, vaultManager, logger)
+const templateRoutes = createTemplateRoutes({
+  templateService,
+  accessControl: vaultAccessControl,
+  vaultRegistry,
+  eventBus,
+  logger,
+})
+app.route('/api/v1', templateRoutes)
+
+// Statistics route registration (auth middleware applies via /api/v1/* pattern)
+const statisticsService = new VaultStatisticsService(
+  (vaultId: string) => vaultRegistry.findById(vaultId)?.storagePath,
+  logger,
+)
+const statisticsRoutes = createStatisticsRoutes({
+  accessControl: vaultAccessControl,
+  vaultRegistry,
+  statisticsService,
+  logger,
+})
+app.route('/api/v1', statisticsRoutes)
+
+// File version route registration (auth middleware applies via /api/v1/* pattern)
+const fileVersionRoutes = createFileVersionRoutes({
+  versionService,
+  accessControl: vaultAccessControl,
+  vaultRegistry,
+  eventBus,
+  logger,
+})
+app.route('/api/v1', fileVersionRoutes)
+
+// Trash routes registration (auth middleware applies via /api/v1/* pattern)
+const trashRoutes = createTrashRoutes({
+  trashService,
+  accessControl: vaultAccessControl,
+  vaultRegistry,
+  eventBus,
+  logger,
+})
+app.route('/api/v1', trashRoutes)
+
+// CleanupJob — periodic trash purge and version pruning
+const cleanupJob = new CleanupJob(trashService, versionService, vaultManager, config, logger)
+
 // SSE route registration (realtime events endpoint)
 const sseRoutes = createSseRoutes({
   connectionManager: realtimeConnectionManager,
@@ -458,6 +537,16 @@ const sseRoutes = createSseRoutes({
   logger,
 })
 app.route('/api/v1', sseRoutes)
+
+// Wire vault:change events → statistics cache invalidation
+// Wraps the EventBus.publish to intercept vault:change events and invalidate the stats cache.
+const originalPublish = eventBus.publish.bind(eventBus)
+eventBus.publish = (options: PublishOptions): void => {
+  originalPublish(options)
+  if (options.type === 'vault:change' && options.payload['vaultId']) {
+    statisticsService.invalidateCache(options.payload['vaultId'] as string)
+  }
+}
 
 // --- Initialize & Start Server ---
 
@@ -723,12 +812,18 @@ const server = createHttpServer(async (req, res) => {
 
 server.listen(serverConfig.port, serverConfig.host, () => {
   logger.info('Server started', { host: serverConfig.host, port: serverConfig.port })
+
+  // Start periodic cleanup job (trash purge + version pruning)
+  cleanupJob.start()
 })
 
 // --- Graceful Shutdown ---
 
 const gracefulShutdown = async (signal: string): Promise<void> => {
   logger.info('Received shutdown signal', { signal })
+
+  // Stop periodic cleanup job
+  cleanupJob.stop()
 
   // Shutdown realtime connections (sends server:shutdown event, closes all streams)
   await realtimeConnectionManager.shutdown()

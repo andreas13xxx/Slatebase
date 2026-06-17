@@ -129,6 +129,20 @@ export interface PluginRegistryData {
   }>
 }
 
+/**
+ * Trash entry info returned by the backend API.
+ */
+export interface TrashEntryInfo {
+  /** Unique ID of the trash entry. */
+  id: string
+  /** Original relative path within the vault. */
+  originalPath: string
+  /** ISO 8601 timestamp of deletion. */
+  deletedAt: string
+  /** Whether the entry is a directory. */
+  isDirectory: boolean
+}
+
 /** Feature toggle info returned by the public endpoint (name + enabled only). */
 export interface FeatureTogglePublicInfo {
   name: string
@@ -298,7 +312,39 @@ export interface IApiClient {
   /** Replace text occurrences within a vault. */
   replaceInVault(vaultId: string, body: object): Promise<unknown>
 
-  // --- Version methods ---
+  // --- Statistics methods ---
+  /** Get aggregated statistics for a vault (file count, folder count, total size). */
+  getVaultStatistics(vaultId: string): Promise<{ fileCount: number; folderCount: number; totalSizeBytes: number; formattedSize: string }>
+
+  // --- Upload methods ---
+  /** Upload files to a vault directory. Returns uploaded file info. */
+  uploadFiles(vaultId: string, files: File[], targetDir: string): Promise<{ uploaded: Array<{ fileName: string; path: string }> }>
+  /** Upload a single image from clipboard paste. Uses paste mode (10 MB limit, auto-generated filename). */
+  uploadImagePaste(vaultId: string, file: File, targetDir: string): Promise<{ uploaded: Array<{ fileName: string; path: string }> }>
+
+  // --- Template methods ---
+  /** List available templates for a vault. */
+  listTemplates(vaultId: string): Promise<{ templates: Array<{ name: string; path: string }> }>
+  /** Create a new file from a template. */
+  createFromTemplate(vaultId: string, templateName: string, targetDir: string, fileName: string): Promise<{ path: string; content: string }>
+
+  // --- Trash methods ---
+  /** List all trash entries for a vault (sorted by deletion date descending). */
+  listTrash(vaultId: string): Promise<{ entries: TrashEntryInfo[] }>
+  /** Restore a trash entry to its original path. */
+  restoreTrash(vaultId: string, entryId: string): Promise<{ restoredPath: string }>
+  /** Permanently delete a trash entry. */
+  deleteTrash(vaultId: string, entryId: string): Promise<void>
+
+  // --- File Version methods ---
+  /** List all stored versions for a file. */
+  listVersions(vaultId: string, filePath: string): Promise<{ versions: Array<{ timestamp: string; sizeBytes: number }> }>
+  /** Get the content of a specific file version. */
+  getVersionContent(vaultId: string, filePath: string, timestamp: string): Promise<{ content: string }>
+  /** Restore a file to a specific version. */
+  restoreVersion(vaultId: string, filePath: string, timestamp: string): Promise<void>
+
+  // --- Server Version methods ---
   getVersion(): Promise<{ version: string }>
 }
 
@@ -822,7 +868,112 @@ export class ApiClient implements IApiClient {
     return this.request<unknown>('POST', `/api/v1/vaults/${vaultId}/replace`, body)
   }
 
-  // --- Version methods ---
+  // --- Upload methods ---
+
+  // --- Statistics methods ---
+
+  /** Get aggregated statistics for a vault (file count, folder count, total size). */
+  async getVaultStatistics(vaultId: string): Promise<{ fileCount: number; folderCount: number; totalSizeBytes: number; formattedSize: string }> {
+    return this.request<{ fileCount: number; folderCount: number; totalSizeBytes: number; formattedSize: string }>('GET', `/api/v1/vaults/${vaultId}/statistics`)
+  }
+
+  // --- Upload methods ---
+
+  /** Upload files to a vault directory. Returns uploaded file info. */
+  async uploadFiles(vaultId: string, files: File[], targetDir: string): Promise<{ uploaded: Array<{ fileName: string; path: string }> }> {
+    const formData = new FormData()
+    for (const file of files) {
+      formData.append('file', file)
+    }
+    formData.append('targetDir', targetDir)
+
+    const headers: Record<string, string> = {}
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`
+    }
+    if (this.csrfToken) {
+      headers['X-CSRF-Token'] = this.csrfToken
+    }
+
+    const response = await fetch(`/api/v1/vaults/${vaultId}/upload`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    })
+    return this.handleResponse<{ uploaded: Array<{ fileName: string; path: string }> }>(response)
+  }
+
+  /** Upload a single image from clipboard paste. Uses paste mode (10 MB limit, auto-generated filename). */
+  async uploadImagePaste(vaultId: string, file: File, targetDir: string): Promise<{ uploaded: Array<{ fileName: string; path: string }> }> {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('targetDir', targetDir)
+
+    const headers: Record<string, string> = {}
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`
+    }
+    if (this.csrfToken) {
+      headers['X-CSRF-Token'] = this.csrfToken
+    }
+
+    const response = await fetch(`/api/v1/vaults/${vaultId}/upload?paste=true`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    })
+    return this.handleResponse<{ uploaded: Array<{ fileName: string; path: string }> }>(response)
+  }
+
+  // --- Template methods ---
+
+  /** List available templates for a vault. */
+  async listTemplates(vaultId: string): Promise<{ templates: Array<{ name: string; path: string }> }> {
+    return this.request<{ templates: Array<{ name: string; path: string }> }>('GET', `/api/v1/vaults/${vaultId}/templates`)
+  }
+
+  /** Create a new file from a template. */
+  async createFromTemplate(vaultId: string, templateName: string, targetDir: string, fileName: string): Promise<{ path: string; content: string }> {
+    return this.request<{ path: string; content: string }>('POST', `/api/v1/vaults/${vaultId}/templates/create`, { templateName, targetDir, fileName })
+  }
+
+  // --- File Version methods ---
+
+  /** List all stored versions for a file. */
+  async listVersions(vaultId: string, filePath: string): Promise<{ versions: Array<{ timestamp: string; sizeBytes: number }> }> {
+    const encodedPath = encodeURIComponent(filePath)
+    return this.request<{ versions: Array<{ timestamp: string; sizeBytes: number }> }>('GET', `/api/v1/vaults/${vaultId}/versions?path=${encodedPath}`)
+  }
+
+  /** Get the content of a specific file version. */
+  async getVersionContent(vaultId: string, filePath: string, timestamp: string): Promise<{ content: string }> {
+    const encodedPath = encodeURIComponent(filePath)
+    return this.request<{ content: string }>('GET', `/api/v1/vaults/${vaultId}/versions/content?path=${encodedPath}&timestamp=${encodeURIComponent(timestamp)}`)
+  }
+
+  /** Restore a file to a specific version. */
+  async restoreVersion(vaultId: string, filePath: string, timestamp: string): Promise<void> {
+    await this.request<void>('POST', `/api/v1/vaults/${vaultId}/versions/restore`, { path: filePath, timestamp })
+  }
+
+  // --- Trash methods ---
+
+  /** List all trash entries for a vault (sorted by deletion date descending). */
+  async listTrash(vaultId: string): Promise<{ entries: TrashEntryInfo[] }> {
+    return this.request<{ entries: TrashEntryInfo[] }>('GET', `/api/v1/vaults/${vaultId}/trash`)
+  }
+
+  /** Restore a trash entry to its original path. */
+  async restoreTrash(vaultId: string, entryId: string): Promise<{ restoredPath: string }> {
+    return this.request<{ restoredPath: string }>('POST', `/api/v1/vaults/${vaultId}/trash/${entryId}/restore`)
+  }
+
+  /** Permanently delete a trash entry. */
+  async deleteTrash(vaultId: string, entryId: string): Promise<void> {
+    await this.request<void>('DELETE', `/api/v1/vaults/${vaultId}/trash/${entryId}`)
+  }
+
+  // --- Server Version methods ---
 
   async getVersion(): Promise<{ version: string }> {
     const response = await fetch('/api/v1/version')

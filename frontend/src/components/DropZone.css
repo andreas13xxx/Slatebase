@@ -1,0 +1,55 @@
+/* ===== DropZone Component ===== */
+
+.drop-zone {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.drop-zone--active {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+  border-radius: var(--radius-md);
+}
+
+/* Overlay shown during drag-over */
+.drop-zone__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-light);
+  border-radius: var(--radius-md);
+  border: 2px dashed var(--accent);
+  pointer-events: none;
+  animation: drop-zone-fade-in var(--transition-fast);
+}
+
+.drop-zone__overlay-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.drop-zone__overlay-icon {
+  color: var(--accent-text);
+  opacity: 0.8;
+}
+
+.drop-zone__overlay-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--accent-text);
+}
+
+@keyframes drop-zone-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

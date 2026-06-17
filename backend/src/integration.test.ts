@@ -74,6 +74,11 @@ beforeAll(async () => {
         sessionMaxLifetimeDays: 7,
         features: {},
         sse: { maxConnections: 1000, maxPerUser: 3, heartbeatInterval: 30000, replayBufferSize: 100, replayTtl: 300000, batchWindow: 100, batchMax: 20 },
+        trash: { retentionDays: 30 },
+        versions: { maxPerFile: 20 },
+        cleanup: { intervalHours: 24 },
+        templates: { directory: '_templates' },
+        upload: { maxFileSizeBytes: 104857600, maxFilesPerDrop: 50, maxImagePasteSize: 10485760 },
       }
     },
     getVaultConfigs(): VaultConfig[] {
@@ -84,6 +89,21 @@ beforeAll(async () => {
     },
     getSseConfig() {
       return { maxConnections: 1000, maxPerUser: 3, heartbeatInterval: 30000, replayBufferSize: 100, replayTtl: 300000, batchWindow: 100, batchMax: 20 }
+    },
+    getTrashConfig() {
+      return { retentionDays: 30 }
+    },
+    getVersionsConfig() {
+      return { maxPerFile: 20 }
+    },
+    getCleanupConfig() {
+      return { intervalHours: 24 }
+    },
+    getTemplatesConfig() {
+      return { directory: '_templates' }
+    },
+    getUploadConfig() {
+      return { maxFileSizeBytes: 104857600, maxFilesPerDrop: 50, maxImagePasteSize: 10485760 }
     },
   }
 

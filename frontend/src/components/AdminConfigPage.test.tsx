@@ -13,6 +13,8 @@ const SAMPLE_CONFIG = {
   allowedOrigins: ['http://localhost:5173'],
   maxFileSize: 5242880,
   logLevel: 'info' as const,
+  trash: { retentionDays: 30 },
+  versions: { maxPerFile: 20 },
 }
 
 /** Creates a mock API client with token/csrf methods. */
@@ -228,6 +230,8 @@ describe('AdminConfigPage', () => {
           logLevel: 'info',
           maxFileSize: 5242880,
           allowedOrigins: ['http://localhost:5173'],
+          trash: { retentionDays: 30 },
+          versions: { maxPerFile: 20 },
         }),
       }))
     })

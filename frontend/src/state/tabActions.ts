@@ -2,6 +2,7 @@ import type { Dispatch } from 'react'
 import type { IApiClient } from '../api'
 import type { AppAction } from '../types'
 import { generateTabId, type TabAction } from './tabState'
+import { add as addRecentFile } from './recentFilesStore'
 
 /**
  * Opens a tab for the given file. If the tab already exists, it is activated.
@@ -19,6 +20,9 @@ export async function openTab(
   fileName: string,
 ): Promise<void> {
   tabDispatch({ type: 'OPEN_TAB', payload: { vaultId, filePath, fileName } })
+
+  // Track in recent files store (Requirements 6.1)
+  addRecentFile(vaultId, filePath)
 
   const tabId = generateTabId(vaultId, filePath)
 

@@ -49,7 +49,13 @@ src/
 │   ├── searchRoutes.ts — Search routes (GET /vaults/:vaultId/search, GET /search, POST /vaults/:vaultId/replace)
 │   ├── searchRoutes.test.ts — Integration tests for search routes
 │   ├── versionRoutes.ts — GET /api/v1/version (public, no auth, returns installed version)
-│   └── vaultShareRoutes.ts — ShareController + share/transfer routes
+│   ├── vaultShareRoutes.ts — ShareController + share/transfer routes
+│   ├── statisticsRoutes.ts — GET /vaults/:vaultId/statistics (vault file/folder/size stats)
+│   ├── trashRoutes.ts   — Trash CRUD routes (list, restore, permanent delete)
+│   ├── fileVersionRoutes.ts — File version routes (list, get content, restore)
+│   ├── templateRoutes.ts — Template routes (list, create from template)
+│   ├── uploadRoutes.ts   — File upload routes (multipart, image paste mode)
+│   └── sseRoutes.ts      — GET /events (SSE stream)
 ├── chat/
 │   ├── types.ts          — Chat data models (Conversation, Message, etc.)
 │   ├── errors.ts         — Chat-specific error classes
@@ -126,6 +132,29 @@ src/
 │   ├── event-bus.ts          — EventBus (publish with targeting, rate limiting, replay buffer)
 │   ├── replay-buffer.ts      — ReplayBuffer (per-user circular buffer with TTL eviction)
 │   └── presence-service.ts   — PresenceService (online/offline tracking, heartbeat, visibility)
+├── trash/
+│   ├── index.ts              — Barrel export for trash module
+│   ├── types.ts              — ITrashService, TrashEntry, TrashIndex interfaces
+│   ├── errors.ts             — TrashNotFoundError, TrashRestoreError
+│   └── trash-service.ts      — TrashService (soft-delete, restore, purgeExpired, atomic index)
+├── version/
+│   ├── index.ts              — Barrel export for version module
+│   ├── types.ts              — IVersionService, VersionEntry, VersionList interfaces
+│   ├── errors.ts             — VersionNotFoundError, VersionLimitError
+│   └── version-service.ts    — VersionService (createVersion, listVersions, restoreVersion, pruneVersions, moveVersions)
+├── template/
+│   ├── index.ts              — Barrel export for template module
+│   ├── types.ts              — ITemplateService, TemplateInfo interfaces
+│   ├── errors.ts             — TemplateNotFoundError, TemplateConflictError
+│   └── template-service.ts   — TemplateService (listTemplates, createFromTemplate, placeholder replacement)
+├── statistics/
+│   ├── index.ts              — Barrel export for statistics module
+│   ├── types.ts              — IVaultStatisticsService, VaultStatistics interfaces
+│   └── statistics-service.ts — VaultStatisticsService (recursive scan, in-memory cache, 5s timeout)
+├── cleanup/
+│   ├── index.ts              — Barrel export for cleanup module
+│   ├── types.ts              — ICleanupJob, CleanupConfig interfaces
+│   └── cleanup-job.ts        — CleanupJob (periodic trash purge + version prune, per-file error isolation)
 ├── import/index.ts       — ImportService (file/folder import logic)
 └── integration.test.ts   — Integration tests
 config/
@@ -194,7 +223,7 @@ src/
 │   ├── authContext.ts    — AuthProvider + useAuthContext hook
 │   ├── tabState.ts       — Tab reducer + types
 │   ├── tabContext.ts     — TabProvider + useTabContext hook
-│   ├── tabActions.ts     — openTab, saveTab action creators
+│   ├── tabActions.ts     — openTab, saveTab action creators (+ recentFilesStore.add on open)
 │   ├── chatState.ts      — Chat reducer + types (conversations, messages, unread)
 │   ├── chatContext.ts    — ChatProvider + useChatContext hook
 │   ├── chatActions.ts    — loadConversations, sendMessage, leaveConversation, etc.
@@ -215,17 +244,32 @@ src/
 │   ├── realtimeActions.ts — computeReconnectDelay, RealtimeAction types
 │   ├── realtimeChatBridge.ts — Module-level bridge: SSE chat events → ChatProvider (cross-provider communication)
 │   ├── realtimeVaultBridge.ts — Module-level bridge: SSE vault:change events → AppProvider (tree refresh + tab reload)
-│   └── useEventSource.ts — Custom hook managing EventSource lifecycle (backoff, visibility, reconnect)
+│   ├── useEventSource.ts — Custom hook managing EventSource lifecycle (backoff, visibility, reconnect)
+│   ├── recentFilesStore.ts — Recent files list (localStorage, max 20, dedup by vaultId+path)
+│   ├── favoritesStore.ts — Favorites per vault (localStorage, max 50, path tracking on rename/delete)
+│   ├── dailyNoteService.ts — Daily note open/create logic (YYYY-MM-DD.md, template support)
+│   └── vaultStatisticsCache.ts — Client-side vault statistics cache (invalidate on vault:change SSE)
+├── hooks/
+│   ├── useHistoryStack.ts — Undo/Redo history stack hook (max 100, FIFO eviction, clear on file switch)
+│   ├── useLineNumbers.ts — Line numbers toggle state (localStorage persistence)
+│   └── useDropZone.ts    — File drag-and-drop hook (drag counter, size/count validation, toast errors)
 ├── components/
 │   ├── SlatebaseLogo.tsx — SVG logo component
-│   ├── SidebarToolbar.tsx — Draggable vertical toolbar
+│   ├── SidebarToolbar.tsx — Draggable vertical toolbar (+ Daily Note, Papierkorb buttons)
 │   ├── VaultList.tsx     — Vault selector/manager dropdown (legacy, no longer rendered in App.tsx)
-│   ├── FileExplorer.tsx  — Unified multi-vault explorer (all vaults as expandable root entries, lazy-loading, DnD, context menu)
+│   ├── FileExplorer.tsx  — Unified multi-vault explorer (all vaults as expandable root entries, lazy-loading, DnD, context menu, favorites, statistics tooltip, .trash/.versions filtered)
+│   ├── FavoritesSection.tsx — Collapsible favorites section above file tree (star icon, click-to-open)
+│   ├── ContextMenu.tsx   — Generic positioned overlay menu (fixed positioning, keyboard nav, portal)
+│   ├── DropZone.tsx      — File drag-and-drop wrapper (visual overlay, validation, upload)
+│   ├── LineNumbers.tsx   — Line number gutter (scroll-synced with textarea)
+│   ├── TrashView.tsx     — Papierkorb view (list, restore, permanent delete with confirmation)
+│   ├── VersionBrowser.tsx — File version browser (version list, inline diff, restore)
+│   ├── TemplateSelector.tsx — Two-step modal (template selection → filename input)
 │   ├── SearchPanel.tsx   — Vault-wide search + replace panel (replaces FileExplorer when open, debounced search, result navigation)
 │   ├── SearchPanel.css   — SearchPanel styles with design tokens
 │   ├── TabBar.tsx        — Horizontal tab strip (file tabs)
-│   ├── TabContent.tsx    — Tab content orchestrator (Edit/View/Binary)
-│   ├── EditMode.tsx      — Plain-text editor with toolbar + auto-save + read-only mode
+│   ├── TabContent.tsx    — Tab content orchestrator (Edit/View/Binary, wires upload + image paste + versions)
+│   ├── EditMode.tsx      — Plain-text editor with toolbar + auto-save + undo/redo + line numbers + image paste + DnD + read-only mode
 │   ├── ViewMode.tsx      — Markdown renderer (remark + highlight.js + Obsidian plugins)
 │   ├── BinaryViewer.tsx  — Binary file preview (images, PDF via PdfViewer, unsupported fallback)
 │   ├── LoginPage.tsx     — Login with logo + card design
@@ -268,8 +312,8 @@ src/
 │   ├── PluginManagementPage.tsx — Plugin list with activation toggle, compatibility, error display
 │   ├── PluginUpload.tsx  — Plugin ZIP upload + detected plugins from .obsidian/plugins/
 │   ├── VersionCheckCard.tsx — Admin version check (installed vs. latest, GitHub API, update notification)
-│   ├── CommandPalette.tsx — Modal command palette (search, execute, keyboard nav)
-│   ├── CommandPaletteContainer.tsx — Wires CommandPalette to PluginContext CommandRegistry
+│   ├── CommandPalette.tsx — Modal command palette (search, execute, keyboard nav, recent files section)
+│   ├── CommandPaletteContainer.tsx — Wires CommandPalette to PluginContext CommandRegistry + recent files + template selector
 │   ├── RealtimeProvider.tsx — SSE event routing (chat, presence, vault:change, toast, server events)
 │   └── ToastNotification.tsx — Toast notification system (module-level state, CSS transitions)
 ├── assets/               — Static images
@@ -304,6 +348,11 @@ Route modules in `src/api/`:
 - `pluginRoutes.ts` — plugin CRUD, bundle, styles, settings, registry
 - `featureRoutes.ts` — feature toggles (admin + public)
 - `versionRoutes.ts` — `GET /version` (public)
+- `statisticsRoutes.ts` — vault statistics (file/folder count, total size)
+- `trashRoutes.ts` — trash CRUD (list, restore, permanent delete)
+- `fileVersionRoutes.ts` — file version management (list, get content, restore)
+- `templateRoutes.ts` — template listing and creation
+- `uploadRoutes.ts` — file upload (multipart, image paste mode)
 - `sseRoutes.ts` — `GET /events` (SSE stream)
 
 ## Data Storage
@@ -393,3 +442,25 @@ data/plugins/
 - **Plugin Files**: Per-vault, per-plugin directory. Atomic writes (temp → rename).
 - **Settings**: Preserved across version upgrades (savePlugin only touches manifest/bundle/styles).
 - **Vault Deletion Hook**: `deleteAllForVault(vaultId)` removes entire `data/plugins/<vaultId>/` directory.
+
+### Vault Internal Data (per vault directory)
+
+```
+data/vaults/<vaultId>/
+├── .trash/
+│   ├── _index.json           — Trash index (entries with id, originalPath, deletedAt, isDirectory)
+│   └── <entryId>/            — Moved file/folder per trash entry
+│       └── <originalName>    — The actual file/folder content
+├── .versions/
+│   └── <relativePath>/       — Version directory per file (mirrors file path structure)
+│       ├── 20240120T143000123.md  — Version snapshot (YYYYMMDDTHHmmssSSS UTC timestamp)
+│       └── ...
+└── _templates/               — Template directory (configurable, default: _templates/)
+    ├── daily.md              — Daily note template (optional)
+    └── meeting.md            — Other templates (any .md, not _-prefixed)
+```
+
+- **Trash**: Soft-deleted files moved to `.trash/<id>/`. Atomic index updates (temp → rename). Configurable retention (0–365 days, default 30).
+- **Versions**: Previous file content saved before each write. Configurable max per file (0–100, default 20). Timestamp format: `YYYYMMDDTHHmmssSSS` (UTC).
+- **Templates**: `.md` files (not `_`-prefixed) used for "New from template" feature. Placeholder replacement: `{{date}}`, `{{time}}`, `{{title}}`.
+- **Cleanup Job**: Periodic (default 24h interval). Purges expired trash + prunes excess versions. Per-file error isolation.

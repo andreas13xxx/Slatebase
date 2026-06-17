@@ -55,7 +55,7 @@ function pathExistsInTree(tree: DirectoryTree | null, filePath: string): boolean
  *
  * Validates: Requirements 1.1, 3.4, 3.5, 7.1
  */
-export function TabContent() {
+export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: string, filePath: string) => void } = {}) {
   const { tabState, tabDispatch } = useTabContext()
   const { state: appState, dispatch: appDispatch, apiClient } = useAppContext()
   const { t } = useTranslation()
@@ -124,6 +124,42 @@ export function TabContent() {
     },
     [activeTab, tabDispatch, appDispatch, appState.directoryTree, apiClient],
   )
+
+  /** Handle external file drops in EditMode — uploads to same directory as current file. */
+  const handleExternalFileDrop = useCallback(async (files: File[]) => {
+    if (!activeTab || !apiClient) {
+      return { uploaded: [] }
+    }
+
+    const filePath = activeTab.filePath
+    const targetDir = filePath.includes('/') ? filePath.slice(0, filePath.lastIndexOf('/')) : ''
+
+    const result = await apiClient.uploadFiles(activeTab.vaultId, files, targetDir)
+
+    // Refresh file tree after successful upload
+    const newTree = await apiClient.fetchVaultTree(activeTab.vaultId)
+    appDispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId: activeTab.vaultId, tree: newTree } })
+
+    return result
+  }, [activeTab, apiClient, appDispatch])
+
+  /** Handle image paste in EditMode — uploads single image via paste mode. */
+  const handleImagePaste = useCallback(async (file: File) => {
+    if (!activeTab || !apiClient) {
+      return { uploaded: [] }
+    }
+
+    const filePath = activeTab.filePath
+    const targetDir = filePath.includes('/') ? filePath.slice(0, filePath.lastIndexOf('/')) : ''
+
+    const result = await apiClient.uploadImagePaste(activeTab.vaultId, file, targetDir)
+
+    // Refresh file tree after successful upload
+    const newTree = await apiClient.fetchVaultTree(activeTab.vaultId)
+    appDispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId: activeTab.vaultId, tree: newTree } })
+
+    return result
+  }, [activeTab, apiClient, appDispatch])
 
   // No active tab — empty state
   if (!activeTab) {
@@ -203,6 +239,9 @@ export function TabContent() {
           error={activeTab.error}
           readOnly={isReadOnly}
           filePath={activeTab.filePath}
+          onExternalFileDrop={handleExternalFileDrop}
+          onImagePaste={handleImagePaste}
+          onOpenVersions={onOpenVersions ? () => onOpenVersions(activeTab.vaultId, activeTab.filePath) : undefined}
         />
       </div>
     )

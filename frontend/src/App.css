@@ -103,9 +103,8 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 8px 0;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .app-sidebar-section {
@@ -1020,6 +1019,46 @@
   font-weight: 500;
 }
 
+.tree-node-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.tree-node-star {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  opacity: 0;
+  color: var(--text-muted);
+  transition: opacity var(--transition-fast), color var(--transition-fast);
+  padding: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.tree-node-row:hover .tree-node-star,
+.tree-node-file:hover .tree-node-star {
+  opacity: 0.6;
+}
+
+.tree-node-star:hover {
+  opacity: 1 !important;
+  color: var(--warning);
+}
+
+.tree-node-star--active {
+  opacity: 1;
+  color: var(--warning);
+  fill: var(--warning);
+}
+
+.tree-node-star--active svg {
+  fill: var(--warning);
+}
+
 .tree-node-delete {
   background: none;
   border: none;
@@ -1905,12 +1944,36 @@
   color: var(--text-primary);
 }
 
+.edit-toolbar-btn--active {
+  background: var(--accent-light);
+  color: var(--accent-text);
+}
+
+.edit-toolbar-btn--active:hover {
+  background: var(--accent-light);
+  color: var(--accent-hover);
+}
+
 .edit-toolbar-separator {
   width: 1px;
   height: 18px;
   background: var(--border-subtle);
   margin: 0 3px;
   flex-shrink: 0;
+}
+
+.edit-mode-drop-zone {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.edit-mode-editor-area {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
 }
 
 .edit-mode-textarea {
@@ -6380,6 +6443,33 @@
   cursor: default;
 }
 
+.command-palette-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: default;
+}
+
+.command-palette-section-icon {
+  flex-shrink: 0;
+}
+
+.command-palette-item-path {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 50%;
+}
+
 /* ─── Plugin Upload ────────────────────────────────────────────────────────── */
 
 .plugin-upload {
@@ -7340,4 +7430,75 @@
 .version-check-card--error .version-check-card__text {
   color: var(--warning);
   font-weight: 500;
+}
+
+
+/* ===== Version Browser Modal ===== */
+.version-browser-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-overlay, rgba(0, 0, 0, 0.5));
+  backdrop-filter: blur(2px);
+  animation: confirm-modal-fade-in var(--transition-fast) ease;
+}
+
+.version-browser-modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  display: flex;
+  flex-direction: column;
+  width: calc(100% - 64px);
+  max-width: 900px;
+  max-height: 80vh;
+  overflow: hidden;
+  animation: confirm-modal-scale-in var(--transition-base) ease;
+}
+
+.version-browser-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.version-browser-modal__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.version-browser-modal__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.version-browser-modal__close:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.version-browser-modal > .version-browser {
+  flex: 1;
+  overflow: auto;
 }

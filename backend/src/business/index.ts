@@ -15,6 +15,9 @@ import { validateFilePath, generateVaultId, computeEtag } from '../vault/index.j
 import type { IVaultRegistry, IVaultShareRegistry, VaultShareEntry } from '../vault/registry.js'
 import type { IUserRepository } from '../user/index.js'
 import type { IAuditService } from '../audit/index.js'
+import type { ITrashService } from '../trash/types.js'
+import type { IVersionService } from '../version/types.js'
+import type { IEventBus } from '../realtime/types.js'
 import { validateVaultName, validateContentName } from './validation.js'
 
 // --- Custom Errors ---
@@ -257,6 +260,9 @@ export class VaultService implements IVaultService {
     private readonly shareRegistry?: IVaultShareRegistry,
     private readonly userRepository?: IUserRepository,
     private readonly auditService?: IAuditService,
+    private readonly trashService?: ITrashService,
+    private readonly versionService?: IVersionService,
+    private readonly eventBus?: IEventBus,
   ) {}
 
   /**
@@ -505,6 +511,26 @@ export class VaultService implements IVaultService {
     const maxFileSize = this.configService.getServerConfig().maxFileSize
     if (contentBytes > maxFileSize) {
       throw new FileTooLargeError(contentBytes, maxFileSize)
+    }
+
+    // 4b. Create version of existing file before overwriting
+    if (this.versionService) {
+      const maxPerFile = this.configService.getVersionsConfig().maxPerFile
+      if (maxPerFile > 0) {
+        try {
+          const currentContent = await fs.readFile(resolvedPath)
+          await this.versionService.createVersion(vaultId, filePath, currentContent)
+        } catch (error) {
+          // File doesn't exist yet — no version to create
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+            this.logger.warn('Failed to create version before save', {
+              vaultId,
+              filePath,
+              error: error instanceof Error ? error.message : String(error),
+            })
+          }
+        }
+      }
     }
 
     // 5. Create intermediate directories
@@ -861,8 +887,45 @@ export class VaultService implements IVaultService {
       throw error
     }
 
-    // 4. Remove the file or folder recursively
-    await fs.rm(resolvedPath, { recursive: true })
+    // 4. Delete using trash service or permanent deletion
+    const retentionDays = this.configService.getTrashConfig().retentionDays
+
+    if (this.trashService) {
+      if (retentionDays > 0) {
+        // Soft-delete: move to trash
+        await this.trashService.moveToTrash(vaultId, relativePath)
+      } else {
+        // Immediate permanent deletion (retentionDays === 0)
+        await this.trashService.deleteImmediately(vaultId, relativePath)
+        // Delete associated versions on permanent deletion
+        if (this.versionService) {
+          try {
+            await this.versionService.deleteVersions(vaultId, relativePath)
+          } catch (error) {
+            this.logger.warn('Failed to delete versions after permanent deletion', {
+              vaultId,
+              path: relativePath,
+              error: error instanceof Error ? error.message : String(error),
+            })
+          }
+        }
+      }
+    } else {
+      // Fallback: no trash service, delete directly (original behavior)
+      await fs.rm(resolvedPath, { recursive: true })
+      // Delete associated versions on permanent deletion
+      if (this.versionService) {
+        try {
+          await this.versionService.deleteVersions(vaultId, relativePath)
+        } catch (error) {
+          this.logger.warn('Failed to delete versions after permanent deletion', {
+            vaultId,
+            path: relativePath,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+      }
+    }
 
     // 5. Refresh the vault's in-memory directory tree
     const updatedTree = await this.vaultReader.readDirectory(
@@ -873,6 +936,13 @@ export class VaultService implements IVaultService {
     this.vaultManager.addVault({
       info: vault.info,
       tree: updatedTree,
+    })
+
+    // 6. Publish vault:change event
+    this.eventBus?.publish({
+      type: 'vault:change',
+      payload: { vaultId, action: 'deleted', path: relativePath },
+      target: { kind: 'broadcast' },
     })
 
     this.logger.info('Content deleted', { vaultId, path: relativePath, resolvedPath })
@@ -940,6 +1010,20 @@ export class VaultService implements IVaultService {
       const message = error instanceof Error ? error.message : String(error)
       this.logger.error('Failed to move content', { vaultId, sourcePath, destinationPath, error: message })
       throw new StorageError(`Failed to move content: ${message}`)
+    }
+
+    // 7b. Move associated versions
+    if (this.versionService) {
+      try {
+        await this.versionService.moveVersions(vaultId, sourcePath, destinationPath)
+      } catch (error) {
+        this.logger.warn('Failed to move versions after content move', {
+          vaultId,
+          sourcePath,
+          destinationPath,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
     }
 
     // 8. Refresh the vault's in-memory directory tree
@@ -1019,6 +1103,23 @@ export class VaultService implements IVaultService {
       throw new StorageError(`Failed to rename: ${message}`)
     }
 
+    // 7b. Move associated versions to reflect new path
+    const sourceRelativeDir = path.dirname(filePath).replace(/\\/g, '/')
+    const newRelativePath = sourceRelativeDir === '.' ? newName : `${sourceRelativeDir}/${newName}`
+
+    if (this.versionService) {
+      try {
+        await this.versionService.moveVersions(vaultId, filePath, newRelativePath)
+      } catch (error) {
+        this.logger.warn('Failed to move versions after rename', {
+          vaultId,
+          oldPath: filePath,
+          newPath: newRelativePath,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+
     // 8. Refresh the vault's in-memory directory tree
     const updatedTree = await this.vaultReader.readDirectory(
       vault.info.path,
@@ -1031,9 +1132,6 @@ export class VaultService implements IVaultService {
     })
 
     // 9. Compute and return the new relative path
-    const sourceRelativeDir = path.dirname(filePath).replace(/\\/g, '/')
-    const newRelativePath = sourceRelativeDir === '.' ? newName : `${sourceRelativeDir}/${newName}`
-
     this.logger.info('Content renamed', { vaultId, oldPath: filePath, newName, newPath: newRelativePath })
 
     return { newPath: newRelativePath }
