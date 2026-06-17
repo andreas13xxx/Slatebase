@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Frontend Lint Check",
+      "description": "Runs frontend ESLint when TypeScript/TSX files are edited, catching lint errors that would fail CI.",
+      "trigger": "PostFileSave",
+      "matcher": "(frontend/src/.*[^/]*\\.ts$|frontend/src/.*[^/]*\\.tsx$)",
+      "action": {
+        "type": "agent",
+        "prompt": "The edited frontend file may have lint errors. Run: cd frontend && npx eslint --no-warn-ignored [edited file path]. If there are errors (not warnings), fix them immediately."
+      },
+      "enabled": true
+    }
+  ]
+}
