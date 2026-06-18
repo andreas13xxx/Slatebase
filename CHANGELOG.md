@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.0](https://github.com/andreas13xxx/Slatebase/compare/v0.7.0...v0.8.0) (2026-06-18)
+
+
+### Features
+
+* add welcome vault for new users ([f41927d](https://github.com/andreas13xxx/Slatebase/commit/f41927dcda9118c35312962c110cd3b15bd9c866))
+* add welcome vault for new users ([efca592](https://github.com/andreas13xxx/Slatebase/commit/efca5920d05b8f320cb4c23351e322cedab33107))
+
 ## [0.7.0](https://github.com/andreas13xxx/Slatebase/compare/v0.6.0...v0.7.0) (2026-06-18)
 
 
