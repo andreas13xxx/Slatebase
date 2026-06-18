@@ -18,7 +18,7 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for 
 - Search & Replace (regex, context lines, multi-vault, atomic writes)
 - Realtime infrastructure (SSE: chat push, presence, vault changes, toasts, reconnect with replay — always active when authenticated)
 - Obsidian plugin compat ⚠️ experimental (API shims, sandbox, command palette, CSS injection)
-- Feature toggles (hot/cold toggle, env overlay, API + admin UI; toggles: vault-sync, obsidian-plugin-compat, chat, mcp, knowledge-graph)
+- Feature toggles (hot/cold toggle, env overlay, API + admin UI; toggles: vault-sync, obsidian-plugin-compat, chat, mcp, knowledge-graph, welcome-vault)
 - CI/CD (GitHub Actions, Release Please, multi-arch Docker, GHCR)
 - i18n (German/English), Dark Mode, Docker deployment
 - Vault Explorer enhancements (statistics tooltip, custom context menu, drag & drop file upload)
@@ -31,6 +31,7 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for 
 - Per-user preferences persistence (recent files, favorites synced to server with localStorage cache)
 - Per-vault configuration (templates directory, daily notes directory — owner-configurable via Settings)
 - Configurable keyboard shortcuts (per-user overrides, 14 commands, conflict detection, Settings UI)
+- Welcome Vault (automatic tutorial vault for new users, feature-toggled, configurable name + template content)
 
 ## Planned
 

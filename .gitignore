@@ -11,7 +11,10 @@ build/
 .env.*.local
 
 # Runtime data (vault storage)
-backend/data/
+backend/data/*
+!backend/data/templates/
+backend/data/templates/*
+!backend/data/templates/welcome-vault/
 
 # IDE / Editor
 .vscode/

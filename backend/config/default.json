@@ -42,5 +42,8 @@
     "maxFileSizeBytes": 104857600,
     "maxFilesPerDrop": 50,
     "maxImagePasteSize": 10485760
+  },
+  "welcomeVault": {
+    "name": "Willkommen"
   }
 }

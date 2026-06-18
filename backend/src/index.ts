@@ -80,6 +80,7 @@ import { PreferencesStore } from './preferences/index.js'
 import { createPreferencesRoutes } from './api/preferencesRoutes.js'
 import { VaultConfigStore } from './vault-config/index.js'
 import { createVaultConfigRoutes } from './api/vaultConfigRoutes.js'
+import { WelcomeVaultService } from './welcome-vault/index.js'
 
 // --- Composition Root ---
 
@@ -99,6 +100,7 @@ featureRegistry.register({ name: 'obsidian-plugin-compat', description: 'Obsidia
 featureRegistry.register({ name: 'chat', description: 'Echtzeit-Chat zwischen Benutzern', defaultEnabled: true, type: 'hot' })
 featureRegistry.register({ name: 'mcp', description: 'AI Context Server (MCP Integration)', defaultEnabled: true, type: 'cold' })
 featureRegistry.register({ name: 'knowledge-graph', description: 'Interaktive Vault-Verlinkungsvisualisierung', defaultEnabled: true, type: 'hot' })
+featureRegistry.register({ name: 'welcome-vault', description: 'Automatischer Welcome-Vault für neue Benutzer', defaultEnabled: true, type: 'hot' })
 
 const featureToggleStore = new FeatureToggleStore(serverConfig.dataDir, logger)
 const persistedFeatureState = await featureToggleStore.load()
@@ -145,7 +147,16 @@ const onUserInvalidated = async (userId: string): Promise<void> => {
   }
 }
 
-const userService = new UserService(userRepository, sessionStore, logger, checkVaultOwnership, auditService, onUserInvalidated)
+// Mutable reference for welcome vault hook (set after VaultService init)
+let welcomeVaultCreator: ((userId: string) => Promise<void>) | undefined
+
+const onUserCreated = async (userId: string): Promise<void> => {
+  if (welcomeVaultCreator !== undefined) {
+    await welcomeVaultCreator(userId)
+  }
+}
+
+const userService = new UserService(userRepository, sessionStore, logger, checkVaultOwnership, auditService, onUserInvalidated, onUserCreated)
 const roleService = new RoleService(userRepository, sessionStore, logger, auditService)
 
 const vaultAccessControl = new VaultAccessControlService(vaultRegistry, vaultShareRegistry, userRepository, logger, auditService)
@@ -199,6 +210,27 @@ const trashService = new TrashService(
 
 const vaultService = new VaultService(vaultManager, vaultReader, config, logger, vaultRegistry, vaultShareRegistry, userRepository, auditService, trashService, versionService)
 const importService = new ImportService(vaultManager, vaultReader, config, logger)
+
+// 4a. Welcome Vault Service (wires onUserCreated callback)
+const welcomeVaultService = new WelcomeVaultService(
+  vaultService,
+  featureToggleService,
+  config.getWelcomeVaultConfig(),
+  logger,
+  serverConfig.dataDir,
+)
+welcomeVaultCreator = async (userId: string): Promise<void> => {
+  const result = await welcomeVaultService.createWelcomeVault(userId)
+  // After welcome vault creation: initialize link index so Knowledge Graph is available
+  if (result) {
+    const linkIndex = new LinkIndexService(result.storagePath, result.vaultId, config.getWelcomeVaultConfig().name, logger)
+    linkIndexMap.set(result.vaultId, linkIndex)
+    linkIndex.rebuild().catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error)
+      logger.error('Failed to build link index for welcome vault', { vaultId: result.vaultId, error: message })
+    })
+  }
+}
 
 // 4b. SyncService (needs VaultPathResolver)
 const syncService = new SyncService(

@@ -50,6 +50,10 @@ const UploadConfigSchema = z.object({
   maxImagePasteSize: z.number().int().positive().default(10485760),
 })
 
+const WelcomeVaultConfigSchema = z.object({
+  name: z.string().min(1).max(128).default('Willkommen'),
+})
+
 export const ServerConfigSchema = z.object({
   port: z.number().int().min(1).max(65535).default(3000),
   host: z.string().default('127.0.0.1'),
@@ -73,6 +77,7 @@ export const ServerConfigSchema = z.object({
   cleanup: CleanupConfigSchema.default({}),
   templates: TemplatesConfigSchema.default({}),
   upload: UploadConfigSchema.default({}),
+  welcomeVault: WelcomeVaultConfigSchema.default({}),
 })
 
 // --- Types ---
@@ -85,6 +90,7 @@ export type VersionsConfig = z.infer<typeof VersionsConfigSchema>
 export type CleanupConfig = z.infer<typeof CleanupConfigSchema>
 export type TemplatesConfig = z.infer<typeof TemplatesConfigSchema>
 export type UploadConfig = z.infer<typeof UploadConfigSchema>
+export type WelcomeVaultConfig = z.infer<typeof WelcomeVaultConfigSchema>
 
 // --- Interface ---
 
@@ -105,6 +111,8 @@ export interface IConfigService {
   getTemplatesConfig(): TemplatesConfig
   /** Returns the upload configuration section */
   getUploadConfig(): UploadConfig
+  /** Returns the welcome vault configuration section */
+  getWelcomeVaultConfig(): WelcomeVaultConfig
 }
 
 // --- Implementation ---
@@ -154,6 +162,10 @@ export class ConfigService implements IConfigService {
 
   getUploadConfig(): UploadConfig {
     return this.config.upload
+  }
+
+  getWelcomeVaultConfig(): WelcomeVaultConfig {
+    return this.config.welcomeVault
   }
 
   /**
