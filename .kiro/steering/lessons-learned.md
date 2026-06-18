@@ -162,6 +162,16 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - Keybindings: `matchesShortcut(commandId, event)` statt manueller `e.ctrlKey && e.key ===` Checks
 - Keybindings `Mod` = plattformabhängig (Ctrl auf Win/Linux, Meta auf Mac)
 
+## Welcome Vault
+
+- `WelcomeVaultService` hat Never-Throw-Garantie (Top-Level try/catch)
+- Integration via `onUserCreated` Callback (nicht direkte Kopplung an UserService)
+- Mutable-Reference-Pattern in Composition Root (wie `mcpTokenInvalidator`) wegen Dependency-Order
+- Template-Verzeichnis: `data/templates/welcome-vault/` — Admins können Inhalte ohne Code-Änderung anpassen
+- Einzelne Datei-Fehler isoliert (partielle Kopie besser als keine)
+- Feature-Toggle: `welcome-vault` (hot, default: true)
+- Config: `serverConfig.welcomeVault.name` (default: "Willkommen")
+
 ## Dev-Umgebung
 
 - Git-Proxy: `git -c http.proxy="" push`

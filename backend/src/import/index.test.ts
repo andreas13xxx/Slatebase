@@ -52,6 +52,7 @@ function createMockConfig(overrides?: Partial<ServerConfig>): IConfigService {
     cleanup: { intervalHours: 24 },
     templates: { directory: '_templates' },
     upload: { maxFileSizeBytes: 104857600, maxFilesPerDrop: 50, maxImagePasteSize: 10485760 },
+    welcomeVault: { name: 'Willkommen' },
     ...overrides,
   }
   return {
@@ -64,6 +65,7 @@ function createMockConfig(overrides?: Partial<ServerConfig>): IConfigService {
     getCleanupConfig: () => config.cleanup,
     getTemplatesConfig: () => config.templates,
     getUploadConfig: () => config.upload,
+    getWelcomeVaultConfig: () => config.welcomeVault,
   }
 }
 

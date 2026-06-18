@@ -5,6 +5,7 @@ import { hash, verify } from 'argon2'
 import type { ISessionStore } from '../auth/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { IAuditService } from '../audit/index.js'
+import type { OnUserCreatedFn } from '../welcome-vault/types.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -700,7 +701,8 @@ export class UserService implements IUserService {
     private readonly logger: ILogger,
     private readonly checkVaultOwnership?: CheckVaultOwnershipFn,
     private readonly auditService?: IAuditService,
-    private readonly onUserInvalidated?: OnUserInvalidatedFn
+    private readonly onUserInvalidated?: OnUserInvalidatedFn,
+    private readonly onUserCreated?: OnUserCreatedFn
   ) {}
 
   /**
@@ -752,6 +754,19 @@ export class UserService implements IUserService {
     }
 
     await this.userRepository.save(user)
+
+    // Trigger post-creation callback (never throws)
+    if (this.onUserCreated) {
+      try {
+        await this.onUserCreated(user.userId)
+      } catch (error) {
+        this.logger.error('onUserCreated callback failed', {
+          userId: user.userId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+
     this.logger.info('User created', { userId: user.userId, username: user.username })
 
     await this.auditService?.log({

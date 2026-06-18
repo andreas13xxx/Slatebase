@@ -167,13 +167,17 @@ src/
 │   ├── types.ts              — IVaultConfigService, VaultConfig (templatesDirectory, dailyNotesDirectory)
 │   ├── validation.ts         — Zod schema (updateVaultConfigSchema)
 │   └── vault-config-store.ts — VaultConfigStore (per-vault .vault-config.json, atomic writes)
+├── welcome-vault/
+│   ├── index.ts              — IWelcomeVaultService, WelcomeVaultService (never-throw, template copy)
+│   └── types.ts              — WelcomeVaultConfig, OnUserCreatedFn
 ├── import/index.ts       — ImportService (file/folder import logic)
 └── integration.test.ts   — Integration tests
 config/
 └── default.json          — Default server configuration
 data/
 ├── vaults.json           — Persistent vault registry
-└── vaults/<id>/          — Vault storage directories (one per vault)
+├── vaults/<id>/          — Vault storage directories (one per vault)
+└── templates/welcome-vault/ — Welcome vault template files (copied for new users)
 ```
 
 ## Frontend (`frontend/`)
