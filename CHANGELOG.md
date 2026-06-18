@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.7.0](https://github.com/andreas13xxx/Slatebase/compare/v0.6.0...v0.7.0) (2026-06-18)
+
+
+### Features
+
+* add login version display and remove realtime feature toggle Task 1: Login Version Display - Add version fetch (useEffect + AbortController) to LoginPage - Display version below login form (v-prefix, 'dev' for development) - Add .login-version CSS class with design tokens - Add 4 unit tests for version display Task 2: Realtime Cleanup - Remove 'realtime' feature toggle registration from backend - Remove featureGuard from SSE route deps and middleware chain - Remove onChange listener for realtime toggle (broadcast + shutdown) - Remove isEnabled('realtime') check from HTTP handler - Remove dead connectionManager mutable reference - Remove 'fallback' from ConnectionStatus type - Remove featureEnabled prop from RealtimeProvider - Remove server:feature-disabled event handler - Remove onPollingEnabled/onPollingDisabled callbacks - Remove --connection-fallback CSS token - Simplify ConnectionIndicator (always visible, no visible prop) - Update RealtimeBridge (no isEnabled check needed) - Add EventSource mock to test-setup.ts (jsdom compat) - Add getVersion to App.test.tsx MockApiClient Documentation updated: implementation-plan, specs-overview, lessons-learned, product.md ([2f8eb99](https://github.com/andreas13xxx/Slatebase/commit/2f8eb99097fbd4d7c7ff882c36b57390c5db0a89))
+* add Mermaid diagram rendering to ViewMode ([0b4eb47](https://github.com/andreas13xxx/Slatebase/commit/0b4eb4799efe9da25523a212e67177b842291350))
+* decouple Command Palette from plugin-compat, add 40+ built-in commands ([f21d0c4](https://github.com/andreas13xxx/Slatebase/commit/f21d0c40aefcf759510001b79e0425f13e13bf52))
+* per-user preferences, per-vault config, configurable keybindings - Add server-persistent recent files & favorites (per user) - New backend module: preferences/ (types, store, validation) - API endpoints: GET/PUT /users/me/recent-files, /favorites, /keybindings - Frontend stores sync to backend with 2s debounce, localStorage as cache - Add per-vault configuration (templates dir, daily notes dir) - New backend module: vault-config/ (types, store, validation) - API endpoints: GET/PUT /vaults/:vaultId/config (owner-only write) - TemplateService reads per-vault templates directory (fallback to global) - DailyNoteService reads per-vault config from server - Add configurable keyboard shortcuts - New frontend module: keybindingsStore.ts (14 commands, 4 categories) - Platform-agnostic Mod key (Ctrl on Win/Linux, Meta on Mac) - matchesShortcut() replaces all hardcoded shortcut checks - Refactored: App.tsx, CommandPaletteContainer, SettingsPanel, EditMode - Settings UI additions - New section: Tastaturkuerzel (account category) - New section: Vault-Konfiguration (vault category) - Inline shortcut recording with conflict detection - Update docs: product.md, structure.md, specs-overview.md, lessons-learned.md, implementation-plan.md ([96c3966](https://github.com/andreas13xxx/Slatebase/commit/96c396678b9941fbef0e292efb1d04390e8cd511))
+* preferences, vault config, keybindings, mermaid, command palette, unified settings ([2501e70](https://github.com/andreas13xxx/Slatebase/commit/2501e70ef905930bdbeb4fdb2ee68e1580af37a6))
+* unified settings panel Consolidates all scattered settings pages into a single categorized panel. - SettingsProvider with useReducer + createSettingsReducer(isAdmin) factory - 3 categories: Konto, Vault, Administration (12 sections total) - CSS Container Query responsive layout (700px threshold) - Ctrl+, shortcut + toolbar gear button - Search with 150ms debounce, sessionStorage persistence - ARIA landmarks, keyboard navigation, focus management - Vault settings use active vault from app state - ProfilePage profile-only mode, embedded ChangePasswordPage - AdminConfigPage hideFeatureToggles, ServerRestartSection - AccountDeletionSection + FeatureTogglesSection extracted - Removed redundant toolbar buttons (profile, sessions, etc.) - Renamed API-Tokens to MCP-Tokens throughout - 116 settings-related tests, all passing ([04f81e2](https://github.com/andreas13xxx/Slatebase/commit/04f81e29a81e3fe3111affa9b194119b90595358))
+
+
+### Bugfixes
+
+* correct showToast argument order, remove unused React import ([bab577f](https://github.com/andreas13xxx/Slatebase/commit/bab577f5e34b6149bc99d868047c641efbce0669))
+
+
+### Sonstige Änderungen
+
+* add gitignore for vitest-output, add hook and unified-settings spec ([e1fa694](https://github.com/andreas13xxx/Slatebase/commit/e1fa694bf9875af184b161e310b1ccdb442ef539))
+
 ## [0.6.0](https://github.com/andreas13xxx/Slatebase/compare/v0.5.2...v0.6.0) (2026-06-17)
 
 
