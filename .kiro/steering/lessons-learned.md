@@ -79,7 +79,11 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - `savePlugin()` überschreibt nie `data.json`
 - `isDesktopOnly` = Primärindikator
 - CSS Scoping: `[data-plugin-id="<id>"]`, max 512 KB
-- Command Palette: CustomEvent `slatebase:open-command-palette`
+- Command Palette: Ctrl+P/Cmd+P in `CommandPaletteContainer` (NICHT in PluginProvider)
+- Command Palette immer aktiv (unabhängig von `obsidian-plugin-compat` Toggle)
+- Plugin-Commands nur wenn `obsidian-plugin-compat` aktiviert, Built-in-Commands immer
+- Editor-Commands via CustomEvent `slatebase:editor-command` (EditMode lauscht)
+- Legacy-Event `slatebase:open-command-palette` weiterhin unterstützt (Backward-Compat)
 
 ## Vault Sync
 
@@ -130,6 +134,7 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 17. Favorites-Store: Zustandsänderungen erzwingen Re-Render über Counter-State (Store ist kein React-State)
 18. Image Paste: nur `image/*` MIME-Typen abfangen, Text-Paste NICHT intercepten (`preventDefault` nur bei Bild)
 19. `EventSource` existiert nicht in jsdom — Mock in `test-setup.ts` erforderlich für Tests die RealtimeProvider rendern
+20. Command Palette Ctrl+P: lebt in `CommandPaletteContainer` (nicht in PluginProvider). Editor-Commands via `window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action } }))` — EditMode lauscht darauf
 
 ## Multi-User & Vault-Besitz
 

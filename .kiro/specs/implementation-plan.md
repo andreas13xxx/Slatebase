@@ -111,6 +111,26 @@ Scope: ~4–5h. Frontend-only, baut auf ViewMode auf. ✅ Implementiert.
 
 ---
 
+### Task 4b: Command Palette Built-in Commands ✅ ERLEDIGT
+
+Scope: ~3–4h. Frontend-only, erweitert bestehende CommandPaletteContainer.
+
+- Command Palette (Ctrl+P / Cmd+P) von `obsidian-plugin-compat` Feature-Toggle entkoppelt — immer aktiv
+- Ctrl+P-Shortcut von `PluginProvider` nach `CommandPaletteContainer` verschoben
+- 40+ Built-in-Befehle in Kategorien:
+  - **Navigation:** Einstellungen, Profil, Sitzungen, Meine Vaults, Chat, API-Tokens, Abmelden
+  - **Ansicht:** Seitenleiste/Kontextpanel ein-/ausblenden, Farbschema umschalten
+  - **Admin:** Benutzerverwaltung, Vault-Übersicht, Serverkonfiguration, Audit-Log, Server-Logs
+  - **Vault-Operationen:** Neuer Vault, Neue Datei, Tagesnotiz, Vorlage, Import, Export, Papierkorb, Graph, Sync, Plugins
+  - **Editor (kontextabhängig):** Überschrift 1–3, Fett, Kursiv, Durchgestrichen, Code, Link, Listen, Zitat, Tabelle, Undo/Redo, Zeilennummern
+- Editor-Commands über CustomEvent-Bridge (`slatebase:editor-command`) — EditMode lauscht und wendet Formatierung an
+- Plugin-Commands nur eingeblendet wenn `obsidian-plugin-compat` aktiv
+- Befehle kontextabhängig: Vault-Ops nur bei ausgewähltem Vault, Editor-Commands nur bei aktivem Edit-Tab, Admin nur für Admins
+
+**Demo:** Ctrl+P öffnet immer die Command Palette — unabhängig vom Plugin-Toggle. Alle wesentlichen App-Aktionen per Tastatur erreichbar.
+
+---
+
 ## Tier 2: UX-Verbesserungen (teilweise Spec-Vervollständigung nötig)
 
 ---

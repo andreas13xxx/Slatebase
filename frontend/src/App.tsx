@@ -903,7 +903,25 @@ function AppContent() {
       tabState={tabState}
     >
     <div className="app">
-      <CommandPaletteContainer />
+      <CommandPaletteContainer
+        onNavigate={handleNavigate}
+        onCreateVault={handleCreateVault}
+        onCreateFile={handleCreateFile}
+        onImportFile={handleImportFile}
+        onImportFolder={handleImportFolder}
+        onExportVault={handleExportVault}
+        onOpenGraph={handleOpenGraph}
+        onDailyNote={handleDailyNote}
+        onToggleSidebar={() => setShowSidebar((v) => !v)}
+        onToggleRightPanel={() => setShowRightPanel((v) => !v)}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onLogout={handleLogout}
+        onToggleTheme={() => {
+          const current = document.documentElement.getAttribute('data-theme') ?? 'system'
+          const next = current === 'dark' ? 'light' : 'dark'
+          document.documentElement.setAttribute('data-theme', next)
+        }}
+      />
       {/* Unified Settings Panel (renders as fixed overlay when open) */}
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       {/* Version Browser Modal */}

@@ -447,25 +447,8 @@ export function PluginProvider({
     }
   }, [directoryTree])
 
-  // ─── Keyboard shortcut: Ctrl+P / Cmd+P for Command Palette ──────────────
-
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent): void {
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
-      const modifier = isMac ? e.metaKey : e.ctrlKey
-
-      if (modifier && e.key === 'p') {
-        e.preventDefault()
-        // Dispatch a custom event that the CommandPalette component listens to
-        window.dispatchEvent(new CustomEvent('slatebase:open-command-palette'))
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [])
+  // NOTE: Ctrl+P / Cmd+P shortcut moved to CommandPaletteContainer (always active).
+  // PluginProvider no longer handles this shortcut to avoid duplicate event dispatches.
 
   // ─── Context value ─────────────────────────────────────────────────────────
 

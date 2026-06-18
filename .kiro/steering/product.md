@@ -27,6 +27,7 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for 
 - Login version display (server version shown on login screen)
 - Unified Settings Panel (Ctrl+,, categorized sidebar, responsive, keyboard-navigable, search)
 - Mermaid diagram rendering (lazy-loaded mermaid.js, SVG inline, Dark/Light mode, error fallback, 5s timeout)
+- Command Palette (Ctrl+P, always active, 40+ built-in commands: navigation, vault ops, editor formatting, admin; plugin commands when compat enabled)
 
 ## Planned
 

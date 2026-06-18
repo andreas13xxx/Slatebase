@@ -273,7 +273,7 @@ src/
 │   ├── SearchPanel.css   — SearchPanel styles with design tokens
 │   ├── TabBar.tsx        — Horizontal tab strip (file tabs)
 │   ├── TabContent.tsx    — Tab content orchestrator (Edit/View/Binary, wires upload + image paste + versions)
-│   ├── EditMode.tsx      — Plain-text editor with toolbar + auto-save + undo/redo + line numbers + image paste + DnD + read-only mode
+│   ├── EditMode.tsx      — Plain-text editor with toolbar + auto-save + undo/redo + line numbers + image paste + DnD + read-only mode + editor command event listener (slatebase:editor-command)
 │   ├── ViewMode.tsx      — Markdown renderer (remark + highlight.js + Obsidian plugins)
 │   ├── MermaidRenderer.tsx — Mermaid diagram renderer (lazy-loaded, SVG inline, theme-aware, timeout, error fallback)
 │   ├── MermaidRenderer.test.tsx — Unit tests for MermaidRenderer
@@ -330,8 +330,8 @@ src/
 │   ├── PluginManagementPage.tsx — Plugin list with activation toggle, compatibility, error display
 │   ├── PluginUpload.tsx  — Plugin ZIP upload + detected plugins from .obsidian/plugins/
 │   ├── VersionCheckCard.tsx — Admin version check (installed vs. latest, GitHub API, update notification)
-│   ├── CommandPalette.tsx — Modal command palette (search, execute, keyboard nav, recent files section)
-│   ├── CommandPaletteContainer.tsx — Wires CommandPalette to PluginContext CommandRegistry + recent files + template selector
+│   ├── CommandPalette.tsx — Modal command palette (search, execute, keyboard nav, Ctrl+P always active)
+│   ├── CommandPaletteContainer.tsx — Built-in commands (navigation, vault ops, editor formatting, view toggles) + plugin commands, Ctrl+P shortcut, CustomEvent bridge to EditMode
 │   ├── RealtimeProvider.tsx — SSE event routing (chat, presence, vault:change, toast, server events)
 │   └── ToastNotification.tsx — Toast notification system (module-level state, CSS transitions)
 ├── assets/               — Static images

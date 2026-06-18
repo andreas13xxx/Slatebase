@@ -546,6 +546,56 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
     })
   }
 
+  // ─── Listen for editor commands from the Command Palette ─────────────────
+  useEffect(() => {
+    function handleEditorCommand(e: Event) {
+      const detail = (e as CustomEvent<{ action: string }>).detail
+      if (!detail?.action) return
+      if (readOnly) return
+
+      const ta = textareaRef.current
+      if (!ta) return
+
+      switch (detail.action) {
+        case 'heading1': applyAction((txt, s, _e) => prependLine(txt, s, '# ')); break
+        case 'heading2': applyAction((txt, s, _e) => prependLine(txt, s, '## ')); break
+        case 'heading3': applyAction((txt, s, _e) => prependLine(txt, s, '### ')); break
+        case 'bold': applyAction((txt, s, end) => wrap(txt, s, end, '**')); break
+        case 'italic': applyAction((txt, s, end) => wrap(txt, s, end, '_')); break
+        case 'strikethrough': applyAction((txt, s, end) => wrap(txt, s, end, '~~')); break
+        case 'code': applyAction((txt, s, end) => wrap(txt, s, end, '`')); break
+        case 'link': applyAction((txt, s, end) => {
+          const selected = txt.slice(s, end) || 'Text'
+          const newText = txt.slice(0, s) + `[${selected}](url)` + txt.slice(end)
+          return { text: newText, cursor: s + selected.length + 3 }
+        }); break
+        case 'bulletList': applyAction((txt, s, _e) => prependLine(txt, s, '- ')); break
+        case 'numberedList': applyAction((txt, s, _e) => prependLine(txt, s, '1. ')); break
+        case 'task': applyAction((txt, s, _e) => prependLine(txt, s, '- [ ] ')); break
+        case 'quote': applyAction((txt, s, _e) => prependLine(txt, s, '> ')); break
+        case 'horizontalRule': applyAction((txt, s, end) => {
+          const ins = '\n---\n'
+          return { text: txt.slice(0, s) + ins + txt.slice(end), cursor: s + ins.length }
+        }); break
+        case 'table': applyAction((txt, s, end, translate) => {
+          const col = translate('editor.tableTemplate.column')
+          const cell = translate('editor.tableTemplate.cell')
+          const tbl = `\n| ${col} 1 | ${col} 2 |\n|----------|----------|\n| ${cell}    | ${cell}    |\n`
+          return { text: txt.slice(0, s) + tbl + txt.slice(end), cursor: s + tbl.length }
+        }); break
+        case 'undo': performUndo(); break
+        case 'redo': performRedo(); break
+        case 'toggleLineNumbers': toggleLineNumbers(); break
+      }
+    }
+
+    window.addEventListener('slatebase:editor-command', handleEditorCommand)
+    return () => {
+      window.removeEventListener('slatebase:editor-command', handleEditorCommand)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [content, readOnly, performUndo, performRedo, toggleLineNumbers])
+
   const statusText = (() => {
     switch (status) {
       case 'unsaved': return t('editor.statusUnsaved')

@@ -51,6 +51,7 @@ inclusion: manual
 | 38 | `knowledge-graph-v2` | Feature | 📋 Requirements | Knowledge Graph konfigurierbar (Farben, Gewichte) + Tags/Properties als togglebare Knoten |
 | 39 | `collaborative-editing` | Feature | 📋 Requirements | Echtzeit-Multi-User-Editing mit CRDT/OT und Cursor-Presence |
 | 40 | `sync-conflict-resolution` | Feature | 📋 Requirements | Halbautomatisches Konfliktmanagement bei Sync (Diff-View, Batch-Auflösung, Auto-Strategien) |
+| 41 | `command-palette-builtin` | Feature | ✅ Fertig | Command Palette (Ctrl+P) immer aktiv, 40+ Built-in-Befehle (Navigation, Vault-Ops, Editor-Formatierung, Admin, View-Toggles), Editor-Commands via CustomEvent-Bridge |
 
 ## Abhängigkeiten zwischen Specs
 
