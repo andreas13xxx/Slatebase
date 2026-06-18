@@ -183,7 +183,7 @@ export const en: TranslationShape = {
     vaultDeletion: 'Delete vault',
     syncConfig: 'Vault sync',
     syncLog: 'Sync log',
-    mcpTokens: 'API Tokens',
+    mcpTokens: 'MCP Tokens',
     plugins: 'Plugins',
     trash: 'Trash',
   },
@@ -559,11 +559,11 @@ export const en: TranslationShape = {
   },
 
   mcpTokens: {
-    title: 'API Tokens',
-    description: 'API tokens allow external applications (e.g. AI assistants) to access your vaults via the MCP protocol.',
+    title: 'MCP Tokens',
+    description: 'MCP tokens allow external applications (e.g. AI assistants) to access your vaults via the Model Context Protocol.',
     loading: 'Loading…',
     loadError: 'Failed to load tokens.',
-    empty: 'No API tokens found.',
+    empty: 'No MCP tokens found.',
     createTitle: 'Create new token',
     nameLabel: 'Token name',
     namePlaceholder: 'e.g. Claude Desktop, Cursor',

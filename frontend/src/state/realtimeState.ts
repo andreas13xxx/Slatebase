@@ -4,7 +4,7 @@
  */
 
 /** Possible SSE connection states. */
-export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected' | 'fallback'
+export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected'
 
 /** State for the realtime SSE connection. */
 export interface RealtimeState {

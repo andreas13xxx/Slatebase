@@ -44,7 +44,7 @@ export interface UserSearchResult {
 }
 
 /**
- * Public API token info returned by the backend (no raw token value).
+ * Public MCP token info returned by the backend (no raw token value).
  */
 export interface McpTokenInfo {
   tokenId: string
@@ -57,7 +57,7 @@ export interface McpTokenInfo {
 }
 
 /**
- * Result of creating a new API token (includes raw token, shown only once).
+ * Result of creating a new MCP token (includes raw token, shown only once).
  */
 export interface McpTokenCreateResult {
   token: string
@@ -164,6 +164,32 @@ export interface FeatureToggleUpdateResult {
   restartRequired: boolean
 }
 
+/** A recent file entry persisted on the server. */
+export interface RecentFileEntry {
+  vaultId: string
+  path: string
+  timestamp: string
+}
+
+/** A favorite entry persisted on the server. */
+export interface FavoriteEntry {
+  vaultId: string
+  path: string
+  addedAt: string
+}
+
+/** A keybinding override entry persisted on the server. */
+export interface KeybindingEntry {
+  commandId: string
+  shortcut: string
+}
+
+/** Per-vault configuration. */
+export interface VaultConfig {
+  templatesDirectory: string
+  dailyNotesDirectory: string
+}
+
 /**
  * Interface for the Slatebase API client.
  * All methods throw an AppError on non-2xx responses.
@@ -255,11 +281,11 @@ export interface IApiClient {
   resolveSyncConflict(vaultId: string, documentPath: string, resolution: string): Promise<void>
 
   // --- MCP Token methods ---
-  /** List the current user's API tokens. */
+  /** List the current user's MCP tokens. */
   listMcpTokens(): Promise<McpTokenInfo[]>
-  /** Create a new API token. */
+  /** Create a new MCP token. */
   createMcpToken(name: string, expiryDays: number): Promise<McpTokenCreateResult>
-  /** Revoke an API token by ID. */
+  /** Revoke an MCP token by ID. */
   revokeMcpToken(tokenId: string): Promise<void>
 
   // --- Graph methods ---
@@ -346,6 +372,26 @@ export interface IApiClient {
 
   // --- Server Version methods ---
   getVersion(): Promise<{ version: string }>
+
+  // --- Preferences methods ---
+  /** Get the current user's recent files list. */
+  getRecentFiles(): Promise<{ entries: RecentFileEntry[] }>
+  /** Save the current user's recent files list. */
+  saveRecentFiles(entries: RecentFileEntry[]): Promise<{ entries: RecentFileEntry[] }>
+  /** Get the current user's favorites. */
+  getFavorites(): Promise<{ entries: FavoriteEntry[] }>
+  /** Save the current user's favorites. */
+  saveFavorites(entries: FavoriteEntry[]): Promise<{ entries: FavoriteEntry[] }>
+  /** Get the current user's keybinding overrides. */
+  getKeybindings(): Promise<{ entries: KeybindingEntry[] }>
+  /** Save the current user's keybinding overrides. */
+  saveKeybindings(entries: KeybindingEntry[]): Promise<{ entries: KeybindingEntry[] }>
+
+  // --- Vault Config methods ---
+  /** Get the configuration for a vault. */
+  getVaultConfig(vaultId: string): Promise<VaultConfig>
+  /** Update the configuration for a vault (owner only). */
+  saveVaultConfig(vaultId: string, config: Partial<VaultConfig>): Promise<VaultConfig>
 }
 
 /**
@@ -981,6 +1027,50 @@ export class ApiClient implements IApiClient {
       await handleErrorResponse(response)
     }
     return response.json() as Promise<{ version: string }>
+  }
+
+  // --- Preferences methods ---
+
+  /** Get the current user's recent files list. */
+  async getRecentFiles(): Promise<{ entries: RecentFileEntry[] }> {
+    return this.request<{ entries: RecentFileEntry[] }>('GET', '/api/v1/users/me/recent-files')
+  }
+
+  /** Save the current user's recent files list. */
+  async saveRecentFiles(entries: RecentFileEntry[]): Promise<{ entries: RecentFileEntry[] }> {
+    return this.request<{ entries: RecentFileEntry[] }>('PUT', '/api/v1/users/me/recent-files', { entries })
+  }
+
+  /** Get the current user's favorites. */
+  async getFavorites(): Promise<{ entries: FavoriteEntry[] }> {
+    return this.request<{ entries: FavoriteEntry[] }>('GET', '/api/v1/users/me/favorites')
+  }
+
+  /** Save the current user's favorites. */
+  async saveFavorites(entries: FavoriteEntry[]): Promise<{ entries: FavoriteEntry[] }> {
+    return this.request<{ entries: FavoriteEntry[] }>('PUT', '/api/v1/users/me/favorites', { entries })
+  }
+
+  /** Get the current user's keybinding overrides. */
+  async getKeybindings(): Promise<{ entries: KeybindingEntry[] }> {
+    return this.request<{ entries: KeybindingEntry[] }>('GET', '/api/v1/users/me/keybindings')
+  }
+
+  /** Save the current user's keybinding overrides. */
+  async saveKeybindings(entries: KeybindingEntry[]): Promise<{ entries: KeybindingEntry[] }> {
+    return this.request<{ entries: KeybindingEntry[] }>('PUT', '/api/v1/users/me/keybindings', { entries })
+  }
+
+  // --- Vault Config methods ---
+
+  /** Get the configuration for a vault. */
+  async getVaultConfig(vaultId: string): Promise<VaultConfig> {
+    return this.request<VaultConfig>('GET', `/api/v1/vaults/${vaultId}/config`)
+  }
+
+  /** Update the configuration for a vault (owner only). */
+  async saveVaultConfig(vaultId: string, config: Partial<VaultConfig>): Promise<VaultConfig> {
+    return this.request<VaultConfig>('PUT', `/api/v1/vaults/${vaultId}/config`, config)
   }
 
   // --- Internal helpers ---

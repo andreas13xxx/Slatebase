@@ -47,11 +47,17 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 
 ## Realtime (SSE)
 
-- Events: `chat:message`, `chat:unread`, `presence:update/init`, `vault:change`, `sync:conflict`, `notification:toast`, `server:shutdown/feature-disabled`
+- Events: `chat:message`, `chat:unread`, `presence:update/init`, `vault:change`, `sync:conflict`, `notification:toast`, `server:shutdown`
+- SSE ist immer aktiv wenn authentifiziert (kein Feature-Toggle, kein Fallback-Modus)
+- `ConnectionStatus`: `'connected' | 'connecting' | 'disconnected'` (kein `'fallback'`)
+- `RealtimeProvider` braucht nur `token` (kein `featureEnabled` Prop)
+- `ConnectionIndicator` immer sichtbar (kein `visible` Prop)
 - Tree nur refreshen wenn `vaultTrees[id] !== undefined`
 - Tab-Content nur reloaden wenn `editBuffer === null`; bei `deleted` → Tab schließen
-- Reconnect: Exponential Backoff 1s→60s (×2, ±500ms Jitter), 5 Fehler → Polling-Fallback
+- Reconnect: Exponential Backoff 1s→60s (×2, ±500ms Jitter), 5 Fehler → `disconnected`
+- Reconnect von `disconnected` → `connected` triggert `onReconnect` (Full Refresh)
 - Neue Events: Bridge in `state/realtime*Bridge.ts`
+- Tests: `EventSource` Mock in `test-setup.ts` (jsdom hat kein natives EventSource)
 
 ## Obsidian Markdown Plugins
 
@@ -73,7 +79,11 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - `savePlugin()` überschreibt nie `data.json`
 - `isDesktopOnly` = Primärindikator
 - CSS Scoping: `[data-plugin-id="<id>"]`, max 512 KB
-- Command Palette: CustomEvent `slatebase:open-command-palette`
+- Command Palette: Ctrl+P/Cmd+P in `CommandPaletteContainer` (NICHT in PluginProvider)
+- Command Palette immer aktiv (unabhängig von `obsidian-plugin-compat` Toggle)
+- Plugin-Commands nur wenn `obsidian-plugin-compat` aktiviert, Built-in-Commands immer
+- Editor-Commands via CustomEvent `slatebase:editor-command` (EditMode lauscht)
+- Legacy-Event `slatebase:open-command-palette` weiterhin unterstützt (Backward-Compat)
 
 ## Vault Sync
 
@@ -123,6 +133,8 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 16. DropZone + internes DnD: `stopPropagation()` im internen Handler, damit DropZone-Overlay nicht triggert
 17. Favorites-Store: Zustandsänderungen erzwingen Re-Render über Counter-State (Store ist kein React-State)
 18. Image Paste: nur `image/*` MIME-Typen abfangen, Text-Paste NICHT intercepten (`preventDefault` nur bei Bild)
+19. `EventSource` existiert nicht in jsdom — Mock in `test-setup.ts` erforderlich für Tests die RealtimeProvider rendern
+20. Command Palette Ctrl+P: lebt in `CommandPaletteContainer` (nicht in PluginProvider). Editor-Commands via `window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action } }))` — EditMode lauscht darauf
 
 ## Multi-User & Vault-Besitz
 
@@ -137,6 +149,18 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - Keine PBT-Tests (entfernt). Gründliche Unit Tests mit Edge Cases.
 - Integration: echtes Filesystem, Temp-Dirs, Cleanup `afterAll`
 - ESLint vor Commit: `npx eslint . --quiet` im Frontend
+
+## User Preferences & Store-Sync-Pattern
+
+- Server-Persistenz pro User: `data/users/<userId>-preferences.json`
+- Frontend-Stores (`recentFilesStore`, `favoritesStore`, `keybindingsStore`): Module-Level State + localStorage Cache + Backend-Sync
+- Lifecycle: `initialize(apiClient)` bei Login/App-Mount, `disconnect()` bei Session-Expiry
+- Merge-Strategie: Server-Daten gewinnen bei Konflikten, lokale Einträge füllen leere Slots
+- Debounced Sync: 2s Timeout, keine doppelten Requests (`syncInProgress` Flag)
+- Neue Stores brauchen: `initialize()` in AppContent `useEffect`, `disconnect()` in `onSessionExpired`
+- Per-Vault Config: `.vault-config.json` im Vault-Verzeichnis, Owner-only write, read für alle mit Zugang
+- Keybindings: `matchesShortcut(commandId, event)` statt manueller `e.ctrlKey && e.key ===` Checks
+- Keybindings `Mod` = plattformabhängig (Ctrl auf Win/Linux, Meta auf Mac)
 
 ## Dev-Umgebung
 

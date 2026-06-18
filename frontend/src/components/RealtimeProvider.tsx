@@ -24,12 +24,8 @@ export interface RealtimeEventHandlers {
   onPresenceUpdate?: (userId: string, username: string, status: string) => void
   /** Called when a presence:init event is received with the initial online users list. */
   onPresenceInit?: (onlineUsers: Array<{ userId: string; username: string }>) => void
-  /** Called when transitioning from fallback to connected (full refresh needed). */
+  /** Called when transitioning from disconnected to connected (full refresh needed). */
   onReconnect?: () => void
-  /** Called when polling should be enabled (fallback/disconnected state). */
-  onPollingEnabled?: () => void
-  /** Called when polling should be disabled (connected state). */
-  onPollingDisabled?: () => void
 }
 
 /** Props for the RealtimeProvider component. */
@@ -37,8 +33,6 @@ export interface RealtimeProviderProps {
   children: React.ReactNode
   /** Session token for SSE authentication. */
   token: string | null
-  /** Whether the realtime feature is enabled (from FeatureProvider). */
-  featureEnabled: boolean
   /** Event handler callbacks for integration with other providers. */
   handlers?: RealtimeEventHandlers
   /** Set of message IDs already in chat state (for deduplication). */
@@ -53,7 +47,6 @@ export interface RealtimeProviderProps {
  */
 function RealtimeInner({
   token,
-  featureEnabled,
   handlers,
   knownMessageIds,
   currentConversationId,
@@ -191,11 +184,6 @@ function RealtimeInner({
         break
       }
 
-      case 'server:feature-disabled': {
-        showToast('warning', 'Echtzeit-Updates wurden vom Administrator deaktiviert.')
-        break
-      }
-
       default:
         // Unknown event type — log and skip
         console.warn('[RealtimeProvider] Unknown event type:', eventType)
@@ -206,12 +194,12 @@ function RealtimeInner({
   // Connect the EventSource hook
   useEventSource({
     token,
-    enabled: featureEnabled && token !== null,
+    enabled: token !== null,
     dispatch,
     onEvent: handleEvent,
   })
 
-  // Track connection status transitions for polling toggle and reconnect refresh
+  // Track connection status transitions for reconnect refresh
   useEffect(() => {
     const prevStatus = previousStatusRef.current
     const currentStatus = state.connectionStatus
@@ -219,17 +207,9 @@ function RealtimeInner({
 
     if (prevStatus === currentStatus) return
 
-    if (currentStatus === 'connected') {
-      // Disable polling when connected
-      handlersRef.current?.onPollingDisabled?.()
-
-      // On reconnect from fallback → connected: trigger full refresh
-      if (prevStatus === 'fallback') {
-        handlersRef.current?.onReconnect?.()
-      }
-    } else if (currentStatus === 'fallback' || currentStatus === 'disconnected') {
-      // Re-enable polling when not connected
-      handlersRef.current?.onPollingEnabled?.()
+    // On reconnect from disconnected → connected: trigger full refresh
+    if (currentStatus === 'connected' && prevStatus === 'disconnected') {
+      handlersRef.current?.onReconnect?.()
     }
   }, [state.connectionStatus])
 
@@ -238,7 +218,7 @@ function RealtimeInner({
 
 /**
  * RealtimeProvider wraps children with SSE connection management
- * and event routing. Place inside AuthProvider and FeatureProvider.
+ * and event routing. Place inside AuthProvider.
  *
  * Event routing:
  * - chat:message → onChatMessage callback
@@ -247,12 +227,11 @@ function RealtimeInner({
  * - vault:change → onVaultChange callback + toast
  * - sync:conflict → toast notification
  * - notification:toast → toast notification
- * - server:shutdown / server:feature-disabled → warning toast
+ * - server:shutdown → warning toast
  */
 export function RealtimeProviderComponent({
   children,
   token,
-  featureEnabled,
   handlers,
   knownMessageIds,
   currentConversationId,
@@ -262,7 +241,6 @@ export function RealtimeProviderComponent({
     null,
     React.createElement(RealtimeInner, {
       token,
-      featureEnabled,
       handlers,
       knownMessageIds,
       currentConversationId,

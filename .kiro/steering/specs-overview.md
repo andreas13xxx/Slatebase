@@ -26,15 +26,15 @@ inclusion: manual
 | 14 | `knowledge-graph` | Feature | ✅ Fertig | Visuelle Darstellung der Verlinkungen zwischen Notizen (interaktiver Graph mit Nodes und Edges) |
 | 15 | `live-preview-editor` | Feature | 📋 Geplant | Side-by-Side oder WYSIWYG Live-Preview im Editor |
 | 16 | `obsidian-plugin-compat` | Feature | ✅ Fertig ⚠️ experimental | Obsidian Community Plugin Compatibility Layer (API-Shims, Plugin-Loader, Sandbox, Verwaltungs-UI, Backend-Persistenz) — experimentell, nur browser-kompatible Plugins; serverseitige Plugins erfordern `server-side-plugins` |
-| 17 | `mermaid-rendering` | Feature | 📋 Requirements | Mermaid-Diagramme in Fenced Code Blocks als SVG rendern (Dark/Light Mode, Lazy Loading, Fehlerbehandlung) |
+| 17 | `mermaid-rendering` | Feature | ✅ Fertig | Mermaid-Diagramme in Fenced Code Blocks als SVG rendern (Dark/Light Mode, Lazy Loading, Fehlerbehandlung) |
 | 18 | `accessibility-audit` | Feature | 📋 Geplant | WCAG 2.1 AA Compliance (systematischer Audit + Fixes) |
 | 19 | `server-side-plugins` | Feature | 📋 Geplant | Serverseitige Ausführung von Obsidian-Plugins die Node.js-APIs benötigen (tls, net, crypto, etc.) |
-| 20 | `feature-toggles` | Feature | ✅ Fertig | Zentrale Feature-Toggles in der Serverkonfiguration (vault-sync, obsidian-plugin-compat, chat, mcp, knowledge-graph) mit Admin-UI und Hot-Toggle-Support |
+| 20 | `feature-toggles` | Feature | ✅ Fertig | Zentrale Feature-Toggles in der Serverkonfiguration (vault-sync, obsidian-plugin-compat, chat, mcp, knowledge-graph) mit Admin-UI und Hot-Toggle-Support. `realtime`-Toggle wurde nachträglich entfernt (siehe `realtime-cleanup`). |
 | 21 | `workspace-leaf-compat` | Feature | 📋 Requirements | Workspace Leaf API-Kompatibilität — Obsidian-Plugin-Views als Tabs im Hauptbereich und Sections im Context Panel |
 | 22 | `session-expiry-fix` | Bugfix | ✅ Fertig | CSRF-Secret-Persistenz, Sliding Session Expiry, localStorage-Migration, synchroner Token-Restore, Expiry-UX, CSRF-Mismatch-Recovery |
 | 23 | `editor-improvements` | Feature | ✅ Fertig | Zeilennummern, Undo/Redo, Recent Files, Templates/Daily Notes, Bild-Paste, Favoriten (umgesetzt als Teil von `tier2-daily-workflow`) |
 | 24 | `vault-explorer-enhancements` | Feature | ✅ Fertig | Vault-Statistiken, Custom Context-Menu, Drag & Drop Upload (umgesetzt als Teil von `tier2-daily-workflow`) |
-| 25 | `unified-settings` | Feature | 📋 Geplant | Zentrale Einstellungsseite mit Kategorien, Log-Verwaltung, Keybindings |
+| 25 | `unified-settings` | Feature | ✅ Fertig | Zentrales Settings-Panel (Ctrl+,) mit Kategorien (Konto, Vault, Administration), Seitenleisten-Navigation, CSS Container Query Layout, Suche, Tastaturnavigation |
 | 26 | `realtime-infrastructure` | Feature | ✅ Fertig | SSE-basierte Echtzeit-Updates (Chat-Nachrichten, Online-Status/Presence, Vault-Änderungen mit Tree-Refresh + Tab-Reload, Sync-Konflikte, Toast-Notifications, Server-Shutdown-Warnung) |
 | 27 | `search-and-discovery` | Feature | ✅ Fertig | Volltextsuche + Replace (Phase 1): Vault-weite Suche mit Regex, Kontext-Zeilen, Multi-Vault, Find & Replace mit atomaren Schreiboperationen, SearchPanel als Seitenpanel |
 | 28 | `responsive-mobile` | Feature | 📋 Geplant | Responsive Design für Smartphones und Tablets |
@@ -45,12 +45,16 @@ inclusion: manual
 | 33 | `public-sharing` | Feature | 📋 Geplant | Einzelne Notizen per öffentlichem Link teilen (ohne Login, mit Ablaufdatum) |
 | 34 | `presence-indicator-fix` | Bugfix | ✅ Fertig | Presence-Indikatoren (grüne Dots) im Chat — Module-Level Bridge verdrahtet RealtimeProvider → ConversationList |
 | 35 | `tier2-daily-workflow` | Feature | ✅ Fertig | Kombinierter Spec: Vault-Explorer (Statistiken, Context-Menu, DnD Upload), Editor (Zeilennummern, Undo/Redo, Recent Files, Templates, Daily Notes, Bild-Paste, Favoriten), Trash & Versionierung |
-| 36 | `login-version-display` | Feature | 📋 Requirements | Versionsnummer auf dem Login-Screen anzeigen (Quick Fix) |
+| 36 | `login-version-display` | Feature | ✅ Fertig | Versionsnummer auf dem Login-Screen anzeigen (Quick Fix) |
 | 36 | `welcome-vault` | Feature | 📋 Requirements | Automatischer "Willkommen"-Vault mit Anleitungen für neue Benutzer |
-| 37 | `realtime-cleanup` | Feature | 📋 Requirements | Feature-Toggle für Realtime entfernen, Polling-Fallback entfernen, SSE immer aktiv |
+| 37 | `realtime-cleanup` | Feature | ✅ Fertig | Feature-Toggle für Realtime entfernt, Polling-Fallback entfernt, SSE immer aktiv |
 | 38 | `knowledge-graph-v2` | Feature | 📋 Requirements | Knowledge Graph konfigurierbar (Farben, Gewichte) + Tags/Properties als togglebare Knoten |
 | 39 | `collaborative-editing` | Feature | 📋 Requirements | Echtzeit-Multi-User-Editing mit CRDT/OT und Cursor-Presence |
 | 40 | `sync-conflict-resolution` | Feature | 📋 Requirements | Halbautomatisches Konfliktmanagement bei Sync (Diff-View, Batch-Auflösung, Auto-Strategien) |
+| 41 | `command-palette-builtin` | Feature | ✅ Fertig | Command Palette (Ctrl+P) immer aktiv, 40+ Built-in-Befehle (Navigation, Vault-Ops, Editor-Formatierung, Admin, View-Toggles), Editor-Commands via CustomEvent-Bridge |
+| 42 | `user-preferences-persistence` | Feature | ✅ Fertig | Per-User Preferences (Recent Files, Favoriten, Keybindings) serverseitig persistiert mit localStorage-Cache + 2s-Debounce-Sync |
+| 43 | `vault-config` | Feature | ✅ Fertig | Per-Vault Konfiguration (Vorlagen-Verzeichnis, Tagesnotizen-Verzeichnis) — Owner-only, Settings-UI, TemplateService + DailyNoteService lesen daraus |
+| 44 | `configurable-keybindings` | Feature | ✅ Fertig | Konfigurierbare Tastaturkürzel (14 Commands, 4 Kategorien, Platform-agnostisch, Conflict Detection, Settings-UI mit Inline-Recording) |
 
 ## Abhängigkeiten zwischen Specs
 
@@ -117,8 +121,8 @@ Priorisiert nach: Blockierungen auflösen → Nutzerwert maximieren → Quick Wi
 |------|------|---------|------------|
 | 4 | `search-and-discovery` (Phase 1) | ✅ Fertig | Kern-Feature. Ohne Suche bei >50 Dateien kaum nutzbar. |
 | 5 | `tier2-daily-workflow` | ✅ Fertig | Kombinierter Spec: Vault-Explorer + Editor + Trash & Versionierung. 93 Tasks, alle implementiert. |
-| 6 | `login-version-display` | Niedrig | Quick Win: Version auf Login-Screen. 1–2h Aufwand. |
-| 7 | `realtime-cleanup` | Niedrig–Mittel | Technischer Cleanup: Toggle + Fallback entfernen, Code vereinfachen. |
+| 6 | `login-version-display` | Niedrig | ✅ Fertig. Version wird auf Login-Screen angezeigt (v-Prefix, dev-Modus). |
+| 7 | `realtime-cleanup` | Niedrig–Mittel | ✅ Fertig. Toggle entfernt, Fallback entfernt, SSE immer aktiv. |
 
 ### Tier 3: Mittelfristig (UX-Qualität + Differenzierung)
 
@@ -130,7 +134,7 @@ Priorisiert nach: Blockierungen auflösen → Nutzerwert maximieren → Quick Wi
 | 13 | `sync-conflict-resolution` | Mittel | UX-kritisch für Sync-Nutzer: Geführter Prozess statt manueller Einzelauflösung. |
 | 14 | `unified-settings` | Mittel | Konsolidiert fragmentierte Settings nach vielen neuen Features. |
 | 15 | `public-sharing` | Mittel | Starkes Marketing-Feature. Differenziert gegen Obsidian Publish. |
-| 16 | `mermaid-rendering` | Niedrig | Requirements fertig. Quick Win zwischen größeren Features. |
+| 16 | `mermaid-rendering` | ✅ Fertig | Implementiert: MermaidRenderer.tsx + ViewMode-Integration + 14 Tests. |
 | 17 | `responsive-mobile` | Hoch | Erweitert Nutzerbasis. Setzt stabile Desktop-UX voraus (Tier 1–2). |
 
 ### Tier 4: Langfristig (Ökosystem + Advanced Features)
@@ -148,8 +152,8 @@ Priorisiert nach: Blockierungen auflösen → Nutzerwert maximieren → Quick Wi
 ### Parallelisierbare Tracks
 
 ```
-Track A (Backend):     session-expiry-fix ✅ → realtime-infrastructure ✅ → realtime-cleanup → collaborative-editing
-Track B (Frontend):    tier2-daily-workflow ✅ → login-version-display → responsive-mobile
+Track A (Backend):     session-expiry-fix ✅ → realtime-infrastructure ✅ → realtime-cleanup ✅ → collaborative-editing
+Track B (Frontend):    tier2-daily-workflow ✅ → login-version-display ✅ → responsive-mobile
 Track C (Plugins):     obsidian-plugin-compat ✅ → workspace-leaf-compat → obsidian-themes
 Track D (DevOps):      ci-cd-release ✅ (unabhängig)
 Track E (Content):     search-and-discovery ✅ → trash-and-versioning ✅ → public-sharing
@@ -163,12 +167,12 @@ Track H (Onboarding):  welcome-vault (unabhängig)
 ```
 Woche 1–2:     session-expiry-fix ✅ + ci-cd-release ✅
 Woche 3–4:     obsidian-plugin-compat fertigstellen ✅
-Woche 5–6:     search-and-discovery (Phase 1) ✅ + login-version-display
+Woche 5–6:     search-and-discovery (Phase 1) ✅ + login-version-display ✅
 Woche 7–9:     tier2-daily-workflow ✅ (Vault-Explorer + Editor + Trash & Versioning)
-Woche 10:      realtime-cleanup + login-version-display
+Woche 10:      realtime-cleanup ✅
 Woche 11–12:   knowledge-graph-v2
 Woche 13–14:   sync-conflict-resolution
-Woche 15–16:   unified-settings + mermaid-rendering
+Woche 15–16:   unified-settings ✅ + mermaid-rendering ✅
 Woche 17–18:   public-sharing + welcome-vault
 Woche 19–22:   responsive-mobile
 Woche 23–30:   collaborative-editing (CRDT/OT — größtes Feature)
@@ -188,7 +192,7 @@ Danach:        workspace-leaf-compat, obsidian-themes, live-preview-editor, ...
 - **Abhängigkeit**: Braucht obsidian-markdown-compat (Fenced Code Block Rendering in ViewMode)
 - **Priorität**: Mittel
 - **Aufwand**: Niedrig–Mittel (rein Frontend, eine neue Dependency `mermaid`)
-- **Status**: Requirements fertig, Design + Tasks ausstehend
+- **Status**: ✅ Fertig — MermaidRenderer-Komponente mit lazy loading (dynamic import), Theme-aware re-rendering (MutationObserver), 5s Timeout, Error-Fallback, 14 Unit-Tests
 
 ### workspace-leaf-compat
 - **Beschreibung**: Workspace Leaf API-Kompatibilitätsschicht — mappt Obsidians Workspace-Leaf-System (registerView, getLeaf, getLeavesOfType, revealLeaf, etc.) auf Slatebase's Tab-System und Context Panel. Ermöglicht Plugins wie Calendar, Kanban und Excalidraw ihre Custom Views in Slatebase anzuzeigen.
@@ -209,11 +213,12 @@ Danach:        workspace-leaf-compat, obsidian-themes, live-preview-editor, ...
 - **Priorität**: Niedrig (laufend bei neuen Features beachten)
 - **Aufwand**: Mittel
 
-### unified-settings
-- **Beschreibung**: Zentrale Einstellungsseite mit Kategorien (Profil, Sicherheit, Editor, Sync, Plugins, Admin, Logs). Ersetzt die aktuell verteilten Settings-Seiten (Profile, Sessions, Admin-Seiten) durch eine einheitliche Oberfläche. Enthält: Log-Verwaltung (Audit-Log + Sync-Log löschen/archivieren), Sync-Log-Redesign (gleiche Darstellung wie Server-Log), anpassbare Keybindings (Hotkey-Editor mit Kollisionserkennung).
+### unified-settings ✅ Fertig
+- **Beschreibung**: Zentrales Settings-Panel (Ctrl+,) mit Kategorien (Konto, Vault, Administration), Seitenleisten-Navigation, CSS Container Query Layout (700px responsive), Suche mit 150ms Debounce, sessionStorage-Persistenz, ARIA landmarks, Tastaturnavigation.
 - **Abhängigkeit**: Braucht auth-and-user-management (bestehende Settings-Infrastruktur)
 - **Priorität**: Mittel (UX-Verbesserung, kein neues Feature)
-- **Aufwand**: Mittel (Frontend-Refactoring, neue Kategorien-Navigation, Backend: Log-Deletion-Endpoint)
+- **Aufwand**: Mittel (~8–12h)
+- **Status**: ✅ Fertig — SettingsProvider, SettingsRegistry, SettingsPanel mit Sidebar/Content, 116 Tests
 
 ### search-and-discovery
 - **Beschreibung**: Zwei-Phasen-Feature: Phase 1 — Vault-weite Volltextsuche mit Replace (case-insensitive, Regex-Support, Ergebnisvorschau mit Kontext-Zeilen, Suche über mehrere Vaults, Find & Replace für Refactoring: Tag umbenennen, Link-Target ändern). Phase 2 (optional, zukunftsfähig) — Semantische Suche mit Embedding-Modell (lokale oder API-basierte Embedding-Generierung, Vektor-Ähnlichkeitssuche, "ähnliche Notizen"-Feature).
@@ -239,12 +244,12 @@ Danach:        workspace-leaf-compat, obsidian-themes, live-preview-editor, ...
 - **Priorität**: Mittel (keine bekannten kritischen Lücken, aber systematische Prüfung ausstehend)
 - **Aufwand**: Mittel (Analyse + gezielte Fixes, kein neues Feature)
 
-### login-version-display
+### login-version-display ✅ Fertig
 - **Beschreibung**: Versionsnummer auf dem Login-Screen anzeigen. Der bestehende öffentliche Endpoint `GET /api/v1/version` wird beim Laden der LoginPage abgefragt und die Version dezent unterhalb des Login-Buttons dargestellt.
 - **Abhängigkeit**: Braucht versionRoutes (✅ vorhanden), LoginPage (✅ vorhanden)
 - **Priorität**: Hoch (Quick Fix, extrem niedriger Aufwand, sofort umsetzbar)
 - **Aufwand**: Sehr niedrig (1–2h, rein Frontend: ein `fetch`-Call + ein `<span>`)
-- **Status**: Requirements fertig
+- **Status**: ✅ Fertig — `getVersion()` war bereits in IApiClient vorhanden, LoginPage um useEffect + Versionsanzeige erweitert
 
 ### welcome-vault
 - **Beschreibung**: Neue Benutzer erhalten bei Account-Erstellung automatisch einen "Willkommen"-Vault mit Tutorial-Inhalten (Wikilinks, Callouts, Tags, Embeds, Ordnerstruktur). Template-Verzeichnis anpassbar, per Feature-Toggle steuerbar.
@@ -253,12 +258,12 @@ Danach:        workspace-leaf-compat, obsidian-themes, live-preview-editor, ...
 - **Aufwand**: Mittel (Backend: Template-Copy-Logik + Feature-Toggle. Content: 5–15 Markdown-Dateien schreiben)
 - **Status**: Requirements fertig
 
-### realtime-cleanup
-- **Beschreibung**: Feature-Toggle `realtime` entfernen (SSE immer aktiv), gesamte Polling-Fallback-Logik entfernen, Status `fallback` eliminieren, Code-Bereinigung aller Conditionals. SSE wird zur einzigen Methode für Push-Updates.
+### realtime-cleanup ✅ Fertig
+- **Beschreibung**: Feature-Toggle `realtime` entfernt (SSE immer aktiv), gesamte Polling-Fallback-Logik entfernt, Status `fallback` eliminiert, Code-Bereinigung aller Conditionals. SSE ist nun die einzige Methode für Push-Updates.
 - **Abhängigkeit**: Braucht realtime-infrastructure (✅ Fertig, stabil)
 - **Priorität**: Mittel–Hoch (vereinfacht Code signifikant, entfernt tote Pfade)
 - **Aufwand**: Niedrig–Mittel (primär Lösch-Arbeit: Toggle, Fallback-Code, Tests anpassen)
-- **Status**: Requirements fertig
+- **Status**: ✅ Fertig — Backend: Toggle-Registration, onChange-Listener, featureGuard, isEnabled-Check entfernt. Frontend: `'fallback'` ConnectionStatus, `featureEnabled` Prop, `server:feature-disabled` Handler, Polling-Callbacks, CSS-Token entfernt. EventSource Mock in test-setup hinzugefügt.
 
 ### knowledge-graph-v2
 - **Beschreibung**: Knowledge Graph Erweiterung: (1) Konfigurierbare Darstellung (Farben pro Knotentyp, Layout-Parameter wie Abstoßung/Anziehung/Distanz via Slider), (2) Tags als togglebare Knoten (verbunden mit allen Dateien die den Tag enthalten), (3) YAML-Properties als togglebare Knoten (wählbare Keys, verbunden mit Dateien die den Property-Wert haben). Erweitert den Link-Index und die Graph-API.

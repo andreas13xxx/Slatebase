@@ -5,8 +5,11 @@ import { AuthProvider, useAuthContext } from './state/authContext'
 import { TabProvider, useTabContext } from './state/tabContext'
 import { FeatureProvider, useFeatureContext } from './state/featureContext'
 import { SearchProvider } from './state/searchContext'
-import { createDailyNoteService, getDailyNotesConfig } from './state/dailyNoteService'
+import { createDailyNoteService, loadDailyNotesConfigFromServer } from './state/dailyNoteService'
 import { openTab } from './state/tabActions'
+import { initialize as initializeRecentFiles, disconnect as disconnectRecentFiles } from './state/recentFilesStore'
+import { initialize as initializeFavorites, disconnect as disconnectFavorites } from './state/favoritesStore'
+import { initialize as initializeKeybindings, disconnect as disconnectKeybindings, matchesShortcut } from './state/keybindingsStore'
 import { I18nProvider, useTranslation } from './i18n'
 import { ToastProvider } from './components/Toast'
 import { RealtimeProvider, type RealtimeEventHandlers } from './components/RealtimeProvider'
@@ -50,6 +53,7 @@ import { SyncProvider } from './state/syncContext'
 import { ContextPanelProvider } from './state/contextPanelContext'
 import { SidebarPanelProvider } from './state/sidebarPanelContext'
 import { ContextPanel } from './components/context-panel/ContextPanel'
+import { SettingsPanel } from './components/settings/SettingsPanel'
 import { SidebarPanel } from './components/sidebar-panel'
 import { PluginProvider } from './plugins/compat/plugin-context'
 import { CommandPaletteContainer } from './components/CommandPaletteContainer'
@@ -152,6 +156,7 @@ function clearRestoreState(): void {
 }
 
 /** Available pages in the app. */
+/* DEPRECATED: Settings pages will be consolidated into SettingsPanel */
 type AppPage =
   | 'vaults'
   | 'my-vaults'
@@ -396,17 +401,14 @@ function FeatureDisabledHint({ featureName }: { featureName: string }) {
 }
 
 /**
- * Small wrapper that reads RealtimeContext and FeatureContext
- * to render the ConnectionIndicator with the correct props.
+ * Small wrapper that reads RealtimeContext to render the ConnectionIndicator.
  */
 function RealtimeConnectionIndicator() {
   const { state } = useRealtimeContext()
-  const { isEnabled } = useFeatureContext()
 
   return (
     <ConnectionIndicator
       status={state.connectionStatus}
-      visible={isEnabled('realtime')}
     />
   )
 }
@@ -422,6 +424,7 @@ function AppContent() {
   const { t } = useTranslation()
   const prevVaultId = useRef<string | null>(null)
   // Settings tabs: list of open pages + which is active
+  /* DEPRECATED: Settings pages will be consolidated into SettingsPanel */
   const [openSettingsPages, setOpenSettingsPages] = useState<AppPage[]>([])
   const [activeSettingsPage, setActiveSettingsPage] = useState<AppPage | null>(null)
   const [showRightPanel, setShowRightPanel] = useState(true)
@@ -440,6 +443,9 @@ function AppContent() {
 
   // Refresh key for sidebar panel views (favorites, recent files)
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0)
+
+  // Unified Settings Panel state
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Global unread count polling (30-second interval)
   // Disabled when SSE connection is active (realtime pushes unread counts)
@@ -529,6 +535,10 @@ function AppContent() {
   // Fetch vaults on mount
   useEffect(() => {
     loadVaults(dispatch, apiClient)
+    // Initialize per-user server-synced stores
+    initializeRecentFiles(apiClient).catch(() => { /* ignore */ })
+    initializeFavorites(apiClient).catch(() => { /* ignore */ })
+    initializeKeybindings(apiClient).catch(() => { /* ignore */ })
   }, [dispatch])
 
   // Restore last selected vault after vaults are loaded
@@ -652,11 +662,10 @@ function AppContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.selectedVaultId, dispatch, tabDispatch])
 
-  // Global keyboard shortcut: Ctrl+Shift+F (Win/Linux) / Cmd+Shift+F (macOS) opens search in right panel
+  // Global keyboard shortcut: Vault search (default: Ctrl+Shift+F / Cmd+Shift+F)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+Shift+F (Win/Linux) or Cmd+Shift+F (macOS)
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+      if (matchesShortcut('slatebase:open-search', e)) {
         e.preventDefault()
         // Open right panel and focus search input
         setShowRightPanel(true)
@@ -673,6 +682,19 @@ function AppContent() {
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  // Global keyboard shortcut: Settings panel (default: Ctrl+,)
+  useEffect(() => {
+    const handleSettingsShortcut = (e: KeyboardEvent) => {
+      if (matchesShortcut('slatebase:open-settings', e)) {
+        e.preventDefault()
+        setSettingsOpen(true)
+      }
+    }
+
+    document.addEventListener('keydown', handleSettingsShortcut)
+    return () => document.removeEventListener('keydown', handleSettingsShortcut)
   }, [])
 
   const handleLogout = useCallback(async () => {
@@ -742,7 +764,8 @@ function AppContent() {
     }
 
     const vaultId = state.selectedVaultId
-    const dailyDir = getDailyNotesConfig(vaultId)
+    // Load config from server (updates localStorage cache), falls back to cache
+    const dailyDir = await loadDailyNotesConfigFromServer(apiClient, vaultId)
 
     try {
       const filePath = await dailyNoteService.openOrCreate(vaultId, dailyDir)
@@ -793,6 +816,7 @@ function AppContent() {
   }
 
   /** Open a settings page as a tab (or activate if already open). */
+  /* DEPRECATED: Settings pages will be consolidated into SettingsPanel */
   function handleNavigate(page: AppPage) {
     if (page === 'vaults') {
       setActiveSettingsPage(null)
@@ -813,6 +837,7 @@ function AppContent() {
     })
   }
 
+  /* DEPRECATED: Settings pages will be consolidated into SettingsPanel */
   function renderSettingsPage(page: AppPage) {
     switch (page) {
       case 'my-vaults': return <MyVaultsPage apiClient={apiClient} onOpenSync={(vaultId) => {
@@ -885,7 +910,27 @@ function AppContent() {
       tabState={tabState}
     >
     <div className="app">
-      <CommandPaletteContainer />
+      <CommandPaletteContainer
+        onNavigate={handleNavigate}
+        onCreateVault={handleCreateVault}
+        onCreateFile={handleCreateFile}
+        onImportFile={handleImportFile}
+        onImportFolder={handleImportFolder}
+        onExportVault={handleExportVault}
+        onOpenGraph={handleOpenGraph}
+        onDailyNote={handleDailyNote}
+        onToggleSidebar={() => setShowSidebar((v) => !v)}
+        onToggleRightPanel={() => setShowRightPanel((v) => !v)}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onLogout={handleLogout}
+        onToggleTheme={() => {
+          const current = document.documentElement.getAttribute('data-theme') ?? 'system'
+          const next = current === 'dark' ? 'light' : 'dark'
+          document.documentElement.setAttribute('data-theme', next)
+        }}
+      />
+      {/* Unified Settings Panel (renders as fixed overlay when open) */}
+      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       {/* Version Browser Modal */}
       {versionBrowserTarget && (
         <div className="version-browser-modal-overlay" onClick={() => setVersionBrowserTarget(null)}>
@@ -1024,7 +1069,7 @@ function AppContent() {
             onOpenGraph={handleOpenGraph}
             onOpenTrash={() => handleNavigate('trash')}
             onDailyNote={handleDailyNote}
-            onToggleSearch={() => setShowRightPanel(true)}
+            onOpenSettings={() => setSettingsOpen(true)}
             isAdmin={user?.role === 'admin'}
             isVaultOwner={selectedVault?.permission === 'owner'}
             syncEnabled={selectedVault?.syncEnabled}
@@ -1221,6 +1266,10 @@ function AuthGuard() {
       saveRestoreState()
       apiClient.setToken(null)
       apiClient.setCsrfToken(null)
+      // Disconnect server-synced stores
+      disconnectRecentFiles()
+      disconnectFavorites()
+      disconnectKeybindings()
       authDispatch({ type: 'SESSION_EXPIRED' })
     })
     return () => { apiClient.setOnSessionExpired(null) }
@@ -1255,17 +1304,15 @@ function AuthGuard() {
 }
 
 /**
- * Bridge component that connects the RealtimeProvider with auth and feature state.
- * Sits inside both AuthProvider and FeatureProvider, wrapping the app content.
- * Reads the session token from auth state and the realtime feature toggle.
+ * Bridge component that connects the RealtimeProvider with auth state.
+ * Sits inside AuthProvider, wrapping the app content.
+ * Reads the session token from auth state.
  * Wires SSE event handlers to the module-level chat bridge for cross-provider communication.
  */
 function RealtimeBridge({ children }: { children: React.ReactNode }) {
   const { authState } = useAuthContext()
-  const { isEnabled } = useFeatureContext()
 
   const token = authState.token ?? null
-  const featureEnabled = isEnabled('realtime')
 
   const handlers = useMemo<RealtimeEventHandlers>(() => ({
     onChatMessage: (data: Record<string, unknown>) => {
@@ -1302,7 +1349,6 @@ function RealtimeBridge({ children }: { children: React.ReactNode }) {
   return (
     <RealtimeProvider
       token={token}
-      featureEnabled={featureEnabled}
       handlers={handlers}
     >
       {children}

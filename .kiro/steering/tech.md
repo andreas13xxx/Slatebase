@@ -70,6 +70,7 @@ npm run lint         # ESLint
 | lucide-react | Icons |
 | jszip | ZIP export (Firefox fallback) |
 | d3-force | Knowledge graph layout |
+| mermaid | Diagram rendering (lazy-loaded) |
 
 ### Geplant
 - **better-sqlite3** — SQLite für Graph-Index (erst bei Performance-Bedarf, >10k Dateien)

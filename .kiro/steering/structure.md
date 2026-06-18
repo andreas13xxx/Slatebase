@@ -55,6 +55,8 @@ src/
 │   ├── fileVersionRoutes.ts — File version routes (list, get content, restore)
 │   ├── templateRoutes.ts — Template routes (list, create from template)
 │   ├── uploadRoutes.ts   — File upload routes (multipart, image paste mode)
+│   ├── preferencesRoutes.ts — User preferences routes (GET/PUT recent-files, favorites, keybindings)
+│   ├── vaultConfigRoutes.ts — Per-vault config routes (GET/PUT /vaults/:vaultId/config)
 │   └── sseRoutes.ts      — GET /events (SSE stream)
 ├── chat/
 │   ├── types.ts          — Chat data models (Conversation, Message, etc.)
@@ -155,6 +157,16 @@ src/
 │   ├── index.ts              — Barrel export for cleanup module
 │   ├── types.ts              — ICleanupJob, CleanupConfig interfaces
 │   └── cleanup-job.ts        — CleanupJob (periodic trash purge + version prune, per-file error isolation)
+├── preferences/
+│   ├── index.ts              — Barrel export for preferences module
+│   ├── types.ts              — IPreferencesService, UserPreferences, RecentFileEntry, FavoriteEntry, KeybindingEntry
+│   ├── validation.ts         — Zod schemas (saveRecentFilesSchema, saveFavoritesSchema, saveKeybindingsSchema)
+│   └── preferences-store.ts  — PreferencesStore (per-user JSON file, atomic writes)
+├── vault-config/
+│   ├── index.ts              — Barrel export for vault-config module
+│   ├── types.ts              — IVaultConfigService, VaultConfig (templatesDirectory, dailyNotesDirectory)
+│   ├── validation.ts         — Zod schema (updateVaultConfigSchema)
+│   └── vault-config-store.ts — VaultConfigStore (per-vault .vault-config.json, atomic writes)
 ├── import/index.ts       — ImportService (file/folder import logic)
 └── integration.test.ts   — Integration tests
 config/
@@ -245,10 +257,15 @@ src/
 │   ├── realtimeChatBridge.ts — Module-level bridge: SSE chat events → ChatProvider (cross-provider communication)
 │   ├── realtimeVaultBridge.ts — Module-level bridge: SSE vault:change events → AppProvider (tree refresh + tab reload)
 │   ├── useEventSource.ts — Custom hook managing EventSource lifecycle (backoff, visibility, reconnect)
-│   ├── recentFilesStore.ts — Recent files list (localStorage, max 20, dedup by vaultId+path)
-│   ├── favoritesStore.ts — Favorites per vault (localStorage, max 50, path tracking on rename/delete)
-│   ├── dailyNoteService.ts — Daily note open/create logic (YYYY-MM-DD.md, template support)
+│   ├── recentFilesStore.ts — Recent files list (server-synced + localStorage cache, max 20, dedup by vaultId+path)
+│   ├── favoritesStore.ts — Favorites per vault (server-synced + localStorage cache, max 50, path tracking on rename/delete)
+│   ├── dailyNoteService.ts — Daily note open/create logic (YYYY-MM-DD.md, template from vault config)
+│   ├── keybindingsStore.ts — Configurable keyboard shortcuts (server-synced, defaults + user overrides, matchesShortcut(), formatShortcut())
 │   └── vaultStatisticsCache.ts — Client-side vault statistics cache (invalidate on vault:change SSE)
+│   ├── settingsState.ts      — Settings reducer + types (categories, sections, nav state)
+│   ├── settingsRegistry.ts   — ISettingsRegistry, section definitions
+│   ├── settingsPersistence.ts — sessionStorage serialize/validate
+│   ├── settingsContext.ts    — SettingsProvider + useSettingsContext hook
 ├── hooks/
 │   ├── useHistoryStack.ts — Undo/Redo history stack hook (max 100, FIFO eviction, clear on file switch)
 │   ├── useLineNumbers.ts — Line numbers toggle state (localStorage persistence)
@@ -269,8 +286,10 @@ src/
 │   ├── SearchPanel.css   — SearchPanel styles with design tokens
 │   ├── TabBar.tsx        — Horizontal tab strip (file tabs)
 │   ├── TabContent.tsx    — Tab content orchestrator (Edit/View/Binary, wires upload + image paste + versions)
-│   ├── EditMode.tsx      — Plain-text editor with toolbar + auto-save + undo/redo + line numbers + image paste + DnD + read-only mode
+│   ├── EditMode.tsx      — Plain-text editor with toolbar + auto-save + undo/redo + line numbers + image paste + DnD + read-only mode + editor command event listener (slatebase:editor-command)
 │   ├── ViewMode.tsx      — Markdown renderer (remark + highlight.js + Obsidian plugins)
+│   ├── MermaidRenderer.tsx — Mermaid diagram renderer (lazy-loaded, SVG inline, theme-aware, timeout, error fallback)
+│   ├── MermaidRenderer.test.tsx — Unit tests for MermaidRenderer
 │   ├── BinaryViewer.tsx  — Binary file preview (images, PDF via PdfViewer, unsupported fallback)
 │   ├── LoginPage.tsx     — Login with logo + card design
 │   ├── ChangePasswordPage.tsx — Forced password change
@@ -305,6 +324,20 @@ src/
 │   │       ├── extractHeadings.ts — Heading extraction from markdown
 │   │       ├── parseFrontmatter.ts — YAML frontmatter parsing
 │   │       └── persistence.ts    — localStorage layout persistence
+│   ├── settings/
+│   │   ├── SettingsPanel.tsx     — Unified settings overlay (Container Query, Ctrl+,, Escape/overlay close)
+│   │   ├── SettingsPanel.css     — Settings panel styles (responsive layout, embedded table overrides)
+│   │   ├── SettingsSidebar.tsx   — Sidebar: search + nav list
+│   │   ├── SettingsSearch.tsx    — Debounced search input (150ms)
+│   │   ├── SettingsSearch.css    — Search styles
+│   │   ├── SettingsNavList.tsx   — Category/section nav (keyboard nav, aria-current, disabled vault sections)
+│   │   ├── SettingsNavList.css   — Nav list styles
+│   │   ├── SettingsContent.tsx   — Section → Component mapping with focus management
+│   │   ├── AccountDeletionSection.tsx — Extracted account deletion form
+│   │   ├── FeatureTogglesSection.tsx  — Extracted feature toggle UI
+│   │   ├── ServerRestartSection.tsx   — Server restart with confirmation
+│   │   ├── VaultConfigSection.tsx     — Per-vault config (templates dir, daily notes dir)
+│   │   └── KeybindingsSection.tsx     — Configurable keyboard shortcuts (table, inline recording, conflict detection)
 │   ├── AdminUsersPage.tsx — User administration
 │   ├── AdminVaultsPage.tsx — Admin: all vaults overview with delete
 │   ├── AdminConfigPage.tsx — Server configuration (card-based layout)
@@ -312,8 +345,8 @@ src/
 │   ├── PluginManagementPage.tsx — Plugin list with activation toggle, compatibility, error display
 │   ├── PluginUpload.tsx  — Plugin ZIP upload + detected plugins from .obsidian/plugins/
 │   ├── VersionCheckCard.tsx — Admin version check (installed vs. latest, GitHub API, update notification)
-│   ├── CommandPalette.tsx — Modal command palette (search, execute, keyboard nav, recent files section)
-│   ├── CommandPaletteContainer.tsx — Wires CommandPalette to PluginContext CommandRegistry + recent files + template selector
+│   ├── CommandPalette.tsx — Modal command palette (search, execute, keyboard nav, Ctrl+P always active)
+│   ├── CommandPaletteContainer.tsx — Built-in commands (navigation, vault ops, editor formatting, view toggles) + plugin commands, Ctrl+P shortcut, CustomEvent bridge to EditMode
 │   ├── RealtimeProvider.tsx — SSE event routing (chat, presence, vault:change, toast, server events)
 │   └── ToastNotification.tsx — Toast notification system (module-level state, CSS transitions)
 ├── assets/               — Static images
@@ -353,6 +386,8 @@ Route modules in `src/api/`:
 - `fileVersionRoutes.ts` — file version management (list, get content, restore)
 - `templateRoutes.ts` — template listing and creation
 - `uploadRoutes.ts` — file upload (multipart, image paste mode)
+- `preferencesRoutes.ts` — user preferences (recent files, favorites, keybindings)
+- `vaultConfigRoutes.ts` — per-vault config (templates dir, daily notes dir)
 - `sseRoutes.ts` — `GET /events` (SSE stream)
 
 ## Data Storage

@@ -1,7 +1,6 @@
 /**
  * Custom React hook managing an EventSource (SSE) connection with
- * exponential backoff reconnect, Page Visibility API integration,
- * and graceful degradation to fallback mode.
+ * exponential backoff reconnect and Page Visibility API integration.
  */
 
 import { useEffect, useRef, useCallback } from 'react'
@@ -28,7 +27,7 @@ export interface UseEventSourceOptions {
   onEvent: (eventType: string, data: SseEventData) => void
 }
 
-/** Maximum consecutive reconnect failures before switching to fallback. */
+/** Maximum consecutive reconnect failures before giving up. */
 const MAX_RECONNECT_ATTEMPTS = 5
 
 /** Duration (ms) the tab can remain hidden before closing the connection. */
@@ -44,7 +43,6 @@ const SSE_EVENT_TYPES = [
   'sync:conflict',
   'notification:toast',
   'server:shutdown',
-  'server:feature-disabled',
 ] as const
 
 /**
@@ -52,7 +50,7 @@ const SSE_EVENT_TYPES = [
  * - Connect to /api/v1/events?token=<sessionToken> when enabled
  * - Track Last-Event-ID from received events
  * - Exponential backoff reconnect on disconnect (1s initial, 60s max, factor 2, jitter ±500ms)
- * - After 5 consecutive failures: switch to fallback status
+ * - After 5 consecutive failures: stop reconnecting, set status disconnected
  * - On successful connection: reset counter, set status connected
  * - On 401/403: stop reconnecting, set status disconnected
  * - On event parse error: log and skip, continue listening
@@ -183,9 +181,9 @@ export function useEventSource(options: UseEventSourceOptions): void {
       attemptCountRef.current += 1
       dispatchRef.current({ type: 'RECONNECT_ATTEMPT' })
 
-      // After 5 consecutive failures: switch to fallback
+      // After 5 consecutive failures: stop reconnecting
       if (attemptCountRef.current >= MAX_RECONNECT_ATTEMPTS) {
-        setStatus('fallback')
+        setStatus('disconnected')
         return
       }
 

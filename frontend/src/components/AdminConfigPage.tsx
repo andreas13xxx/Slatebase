@@ -23,6 +23,8 @@ export interface ServerConfigData {
 export interface AdminConfigPageProps {
   /** API client instance for making admin requests. */
   apiClient: IApiClient
+  /** When true, hides the feature toggles section (used in unified settings where feature toggles have their own section). */
+  hideFeatureToggles?: boolean
 }
 
 /** Valid log level values. */
@@ -44,7 +46,7 @@ interface ConfigFormErrors {
  * Admin server configuration page.
  * Displays current config in a card-based layout with clear sections.
  */
-export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
+export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPageProps) {
   const { t } = useTranslation()
   const { dispatch: featureDispatch } = useFeatureContext()
 
@@ -282,6 +284,7 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
       <VersionCheckCard />
 
       {/* Feature-Toggles section */}
+      {!hideFeatureToggles && (
       <section className="admin-config-card">
         <h2 className="admin-config-card-title">Feature-Toggles</h2>
         {featuresLoading && (
@@ -344,6 +347,7 @@ export function AdminConfigPage({ apiClient }: AdminConfigPageProps) {
           </div>
         ))}
       </section>
+      )}
 
       {/* Network section */}
       <form className="admin-config-form" onSubmit={handleSubmit} noValidate>

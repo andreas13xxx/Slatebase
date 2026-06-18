@@ -3,6 +3,7 @@ import { useTranslation } from '../i18n'
 import { isEmbeddableFile } from '../utils/pathUtils'
 import { useHistoryStack } from '../hooks/useHistoryStack'
 import { useLineNumbers } from '../hooks/useLineNumbers'
+import { matchesShortcut } from '../state/keybindingsStore'
 import { LineNumbers } from './LineNumbers'
 import { DropZone } from './DropZone'
 import { showToast } from './ToastNotification'
@@ -509,18 +510,24 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
   }, [redo, onChange, triggerAutoSave])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    // Save: default Mod+S
+    if (matchesShortcut('slatebase:editor-save', e.nativeEvent)) {
       e.preventDefault()
       if (debounceRef.current) clearTimeout(debounceRef.current)
       onSave()
     }
-    // Undo: Ctrl+Z (but not Ctrl+Shift+Z which is redo)
-    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+    // Undo: default Mod+Z (but not Mod+Shift+Z which is redo)
+    if (matchesShortcut('slatebase:editor-undo', e.nativeEvent)) {
       e.preventDefault()
       performUndo()
     }
-    // Redo: Ctrl+Y or Ctrl+Shift+Z
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'Z' && e.shiftKey) || (e.key === 'z' && e.shiftKey))) {
+    // Redo: default Mod+Shift+Z
+    if (matchesShortcut('slatebase:editor-redo', e.nativeEvent)) {
+      e.preventDefault()
+      performRedo()
+    }
+    // Legacy redo: Ctrl+Y (always available, not configurable)
+    if ((e.ctrlKey || e.metaKey) && e.key === 'y' && !e.shiftKey) {
       e.preventDefault()
       performRedo()
     }
@@ -545,6 +552,56 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
       ta.setSelectionRange(result.cursor, result.cursor)
     })
   }
+
+  // ─── Listen for editor commands from the Command Palette ─────────────────
+  useEffect(() => {
+    function handleEditorCommand(e: Event) {
+      const detail = (e as CustomEvent<{ action: string }>).detail
+      if (!detail?.action) return
+      if (readOnly) return
+
+      const ta = textareaRef.current
+      if (!ta) return
+
+      switch (detail.action) {
+        case 'heading1': applyAction((txt, s, _e) => prependLine(txt, s, '# ')); break
+        case 'heading2': applyAction((txt, s, _e) => prependLine(txt, s, '## ')); break
+        case 'heading3': applyAction((txt, s, _e) => prependLine(txt, s, '### ')); break
+        case 'bold': applyAction((txt, s, end) => wrap(txt, s, end, '**')); break
+        case 'italic': applyAction((txt, s, end) => wrap(txt, s, end, '_')); break
+        case 'strikethrough': applyAction((txt, s, end) => wrap(txt, s, end, '~~')); break
+        case 'code': applyAction((txt, s, end) => wrap(txt, s, end, '`')); break
+        case 'link': applyAction((txt, s, end) => {
+          const selected = txt.slice(s, end) || 'Text'
+          const newText = txt.slice(0, s) + `[${selected}](url)` + txt.slice(end)
+          return { text: newText, cursor: s + selected.length + 3 }
+        }); break
+        case 'bulletList': applyAction((txt, s, _e) => prependLine(txt, s, '- ')); break
+        case 'numberedList': applyAction((txt, s, _e) => prependLine(txt, s, '1. ')); break
+        case 'task': applyAction((txt, s, _e) => prependLine(txt, s, '- [ ] ')); break
+        case 'quote': applyAction((txt, s, _e) => prependLine(txt, s, '> ')); break
+        case 'horizontalRule': applyAction((txt, s, end) => {
+          const ins = '\n---\n'
+          return { text: txt.slice(0, s) + ins + txt.slice(end), cursor: s + ins.length }
+        }); break
+        case 'table': applyAction((txt, s, end, translate) => {
+          const col = translate('editor.tableTemplate.column')
+          const cell = translate('editor.tableTemplate.cell')
+          const tbl = `\n| ${col} 1 | ${col} 2 |\n|----------|----------|\n| ${cell}    | ${cell}    |\n`
+          return { text: txt.slice(0, s) + tbl + txt.slice(end), cursor: s + tbl.length }
+        }); break
+        case 'undo': performUndo(); break
+        case 'redo': performRedo(); break
+        case 'toggleLineNumbers': toggleLineNumbers(); break
+      }
+    }
+
+    window.addEventListener('slatebase:editor-command', handleEditorCommand)
+    return () => {
+      window.removeEventListener('slatebase:editor-command', handleEditorCommand)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [content, readOnly, performUndo, performRedo, toggleLineNumbers])
 
   const statusText = (() => {
     switch (status) {

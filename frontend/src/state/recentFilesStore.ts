@@ -1,10 +1,12 @@
 /**
- * Recent Files Store — localStorage-based state for recently opened files.
+ * Recent Files Store — per-user persistence with localStorage cache.
  *
  * Stores the last 20 opened files with vault ID, path, and timestamp.
- * Persists to `localStorage` under key `slatebase:recentFiles`.
- * Falls back to in-memory storage if localStorage is not available.
+ * Uses localStorage as immediate cache for responsiveness.
+ * Syncs with backend API for cross-device persistence (debounced).
  */
+
+import type { IApiClient, RecentFileEntry as ApiRecentFileEntry } from '../api'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -20,10 +22,49 @@ export interface RecentFileEntry {
 
 const STORAGE_KEY = 'slatebase:recentFiles'
 const MAX_ENTRIES = 20
+const SYNC_DEBOUNCE_MS = 2000
 
 // ─── Internal State ──────────────────────────────────────────────────────────
 
 let entries: RecentFileEntry[] = loadFromStorage()
+let apiClient: IApiClient | null = null
+let syncTimer: ReturnType<typeof setTimeout> | null = null
+let syncInProgress = false
+
+// ─── Initialization ──────────────────────────────────────────────────────────
+
+/**
+ * Initialize the store with an API client and load server-side data.
+ * Merges server data with local cache (server wins for conflicts).
+ * Called on login / app mount.
+ */
+export async function initialize(client: IApiClient): Promise<void> {
+  apiClient = client
+  try {
+    const response = await client.getRecentFiles()
+    if (response.entries.length > 0) {
+      // Merge: server entries take priority, then local-only entries fill remaining slots
+      const serverPaths = new Set(response.entries.map(e => `${e.vaultId}::${e.path}`))
+      const localOnly = entries.filter(e => !serverPaths.has(`${e.vaultId}::${e.path}`))
+      entries = [...response.entries, ...localOnly].slice(0, MAX_ENTRIES)
+    }
+    persistLocal()
+  } catch {
+    // Server unavailable — continue with localStorage data
+  }
+}
+
+/**
+ * Disconnect from the backend (on logout).
+ * Flushes any pending sync immediately.
+ */
+export function disconnect(): void {
+  if (syncTimer !== null) {
+    clearTimeout(syncTimer)
+    syncTimer = null
+  }
+  apiClient = null
+}
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -50,7 +91,8 @@ export function add(vaultId: string, path: string): void {
     entries = entries.slice(0, MAX_ENTRIES)
   }
 
-  persist()
+  persistLocal()
+  scheduleSyncToServer()
 }
 
 /**
@@ -73,7 +115,8 @@ export function remove(vaultId: string, path: string): void {
   const before = entries.length
   entries = entries.filter(e => !(e.vaultId === vaultId && e.path === path))
   if (entries.length !== before) {
-    persist()
+    persistLocal()
+    scheduleSyncToServer()
   }
 }
 
@@ -91,7 +134,8 @@ export function updatePath(vaultId: string, oldPath: string, newPath: string): v
     }
   }
   if (updated) {
-    persist()
+    persistLocal()
+    scheduleSyncToServer()
   }
 }
 
@@ -120,11 +164,41 @@ function loadFromStorage(): RecentFileEntry[] {
 }
 
 /** Persist current entries to localStorage. Silently fails if unavailable. */
-function persist(): void {
+function persistLocal(): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
   } catch {
     // localStorage not available or full — work in-memory only
+  }
+}
+
+/** Schedule a debounced sync to the backend. */
+function scheduleSyncToServer(): void {
+  if (!apiClient) return
+  if (syncTimer !== null) {
+    clearTimeout(syncTimer)
+  }
+  syncTimer = setTimeout(() => {
+    syncTimer = null
+    syncToServer()
+  }, SYNC_DEBOUNCE_MS)
+}
+
+/** Sync current entries to the backend. */
+async function syncToServer(): Promise<void> {
+  if (!apiClient || syncInProgress) return
+  syncInProgress = true
+  try {
+    const apiEntries: ApiRecentFileEntry[] = entries.map(e => ({
+      vaultId: e.vaultId,
+      path: e.path,
+      timestamp: e.timestamp,
+    }))
+    await apiClient.saveRecentFiles(apiEntries)
+  } catch {
+    // Sync failed — data remains in localStorage, will retry on next change
+  } finally {
+    syncInProgress = false
   }
 }
 

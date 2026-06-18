@@ -29,6 +29,9 @@ Thumbs.db
 # Test coverage
 coverage/
 
+# Test output artifacts
+vitest-output.txt
+
 # Playwright
 playwright-report/
 test-results/

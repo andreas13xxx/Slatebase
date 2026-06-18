@@ -133,6 +133,7 @@ docker compose up -d
 | 🕸️ **Knowledge Graph** | Interactive visualization of vault link structure with zoom, pan, drag, and search |
 | 📑 **Context Panel** | Right-side panel with document outline, forward/backlinks, tags, and properties |
 | 🔍 **Search & Replace** | Vault-wide full-text search with regex, context lines, multi-vault, and find & replace |
+| 📊 **Mermaid Diagrams** | Render Mermaid code blocks as interactive SVG diagrams with dark mode support |
 | 🧩 **Plugin Compat** ⚠️ | Run browser-compatible Obsidian Community Plugins in the web UI |
 | 📦 **Import & Export** | Import files/folders, export vaults as ZIP or to a local directory |
 | 🌐 **Real-time Updates** | SSE-based push for chat messages, vault changes, presence, and notifications |
