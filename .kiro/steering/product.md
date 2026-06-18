@@ -26,6 +26,7 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for 
 - Trash & file versioning (soft-delete with retention, version browser with inline diff, configurable cleanup job)
 - Login version display (server version shown on login screen)
 - Unified Settings Panel (Ctrl+,, categorized sidebar, responsive, keyboard-navigable, search)
+- Mermaid diagram rendering (lazy-loaded mermaid.js, SVG inline, Dark/Light mode, error fallback, 5s timeout)
 
 ## Planned
 

@@ -86,9 +86,9 @@ Scope: ~3–4h. Neues Modul, aber begrenzte Komplexität.
 
 ---
 
-### Task 4: Mermaid Rendering
+### Task 4: Mermaid Rendering ✅ ERLEDIGT
 
-Scope: ~4–5h. Frontend-only, baut auf ViewMode auf.
+Scope: ~4–5h. Frontend-only, baut auf ViewMode auf. ✅ Implementiert.
 
 - Erstelle `frontend/src/components/MermaidRenderer.tsx` + `MermaidRenderer.css`:
   - Dynamic `import('mermaid')` — nur wenn ein Mermaid-Block vorhanden ist
@@ -107,7 +107,7 @@ Scope: ~4–5h. Frontend-only, baut auf ViewMode auf.
 - Tests: Unit-Test für Erkennung (case-insensitive), Error-Fallback, kein Rendering für andere langs
 - Dependency: `mermaid` als pinned version installieren
 
-**Demo:** Mermaid-Code-Blöcke werden als interaktive SVG-Diagramme gerendert, mit Dark-Mode-Support.
+**Demo:** Mermaid-Code-Blöcke (`\`\`\`mermaid`) werden als interaktive SVG-Diagramme gerendert. Lazy Loading (~1MB nur bei Bedarf), Dark-Mode-Support mit automatischem Re-Rendering, 5s-Timeout, Fehlermeldung + Quelltext bei ungültiger Syntax. 14 Unit-Tests.
 
 ---
 

@@ -7510,3 +7510,59 @@
   flex: 1;
   overflow: auto;
 }
+
+
+/* ===== Mermaid Renderer ===== */
+.view-mode-mermaid {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  padding: 16px;
+  text-align: center;
+  overflow: auto;
+  margin: 0.8em 0;
+}
+
+.view-mode-mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.mermaid-error {
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-md);
+  background: var(--danger-bg);
+  padding: 16px;
+  text-align: left;
+  overflow: auto;
+  margin: 0.8em 0;
+}
+
+.mermaid-error-message {
+  font-size: 13px;
+  color: var(--danger-text);
+  margin: 0 0 12px;
+}
+
+.mermaid-error pre {
+  margin: 0;
+  padding: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+}
+
+.mermaid-error pre code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.mermaid-loading {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 24px 16px;
+  font-size: 13px;
+}

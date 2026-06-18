@@ -275,6 +275,8 @@ src/
 │   ├── TabContent.tsx    — Tab content orchestrator (Edit/View/Binary, wires upload + image paste + versions)
 │   ├── EditMode.tsx      — Plain-text editor with toolbar + auto-save + undo/redo + line numbers + image paste + DnD + read-only mode
 │   ├── ViewMode.tsx      — Markdown renderer (remark + highlight.js + Obsidian plugins)
+│   ├── MermaidRenderer.tsx — Mermaid diagram renderer (lazy-loaded, SVG inline, theme-aware, timeout, error fallback)
+│   ├── MermaidRenderer.test.tsx — Unit tests for MermaidRenderer
 │   ├── BinaryViewer.tsx  — Binary file preview (images, PDF via PdfViewer, unsupported fallback)
 │   ├── LoginPage.tsx     — Login with logo + card design
 │   ├── ChangePasswordPage.tsx — Forced password change

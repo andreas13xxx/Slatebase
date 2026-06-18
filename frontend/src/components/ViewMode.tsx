@@ -16,6 +16,7 @@ import { AppContext } from '../state'
 import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, remarkBreaks, createAnchorTracker } from '../plugins'
 import type { WikilinkNode, EmbedNode, CalloutNode, TagNode } from '../plugins'
 import { PdfViewer } from './BinaryViewer'
+import { MermaidRenderer } from './MermaidRenderer'
 
 /**
  * Mapping of callout types to their Lucide icon component and CSS color token.
@@ -599,6 +600,11 @@ function renderBlockNode(
  * Req 5.5: Syntax highlighting with fallback to monospace for unknown languages.
  */
 function renderCodeBlock(code: string, lang: string | null | undefined, key: string): ReactNode {
+  // Route mermaid blocks to MermaidRenderer
+  if (lang && lang.toLowerCase() === 'mermaid') {
+    return createElement(MermaidRenderer, { code, diagramKey: key, key })
+  }
+
   let highlighted: string | null = null
 
   if (lang) {
