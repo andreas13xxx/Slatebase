@@ -8,7 +8,6 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import React from 'react'
 import type { IApiClient, VaultConfig } from '../../api'
 import { showToast } from '../ToastNotification'
 
@@ -67,13 +66,13 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
       setConfig(updated)
       setTemplatesDir(updated.templatesDirectory)
       setDailyNotesDir(updated.dailyNotesDirectory)
-      showToast('Vault-Konfiguration gespeichert', 'success')
+      showToast('success', 'Vault-Konfiguration gespeichert')
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'message' in err
         ? (err as { message: string }).message
         : 'Fehler beim Speichern'
       setError(msg)
-      showToast(msg, 'error')
+      showToast('error', msg)
     } finally {
       setSaving(false)
     }

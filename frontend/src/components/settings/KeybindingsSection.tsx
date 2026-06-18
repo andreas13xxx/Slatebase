@@ -108,7 +108,7 @@ export function KeybindingsSection() {
     if (conflict) {
       const conflictDef = DEFAULT_KEYBINDINGS.find(d => d.commandId === conflict)
       const conflictLabel = conflictDef?.label ?? conflict
-      showToast(`Konflikt: "${recordedKeys}" wird bereits für "${conflictLabel}" verwendet`, 'error')
+      showToast('error', `Konflikt: "${recordedKeys}" wird bereits für "${conflictLabel}" verwendet`)
       return
     }
 
@@ -116,7 +116,7 @@ export function KeybindingsSection() {
     setEditingId(null)
     setRecordedKeys('')
     refreshBindings()
-    showToast('Tastaturkürzel gespeichert', 'success')
+    showToast('success', 'Tastaturkürzel gespeichert')
   }, [editingId, recordedKeys, refreshBindings])
 
   /** Unbind a shortcut (set to empty). */
@@ -135,7 +135,7 @@ export function KeybindingsSection() {
   const handleResetAll = useCallback(() => {
     resetAll()
     refreshBindings()
-    showToast('Alle Tastaturkürzel zurückgesetzt', 'success')
+    showToast('success', 'Alle Tastaturkürzel zurückgesetzt')
   }, [refreshBindings])
 
   // Group bindings by category
