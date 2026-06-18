@@ -46,9 +46,9 @@ inclusion: manual
 | 34 | `presence-indicator-fix` | Bugfix | ✅ Fertig | Presence-Indikatoren (grüne Dots) im Chat — Module-Level Bridge verdrahtet RealtimeProvider → ConversationList |
 | 35 | `tier2-daily-workflow` | Feature | ✅ Fertig | Kombinierter Spec: Vault-Explorer (Statistiken, Context-Menu, DnD Upload), Editor (Zeilennummern, Undo/Redo, Recent Files, Templates, Daily Notes, Bild-Paste, Favoriten), Trash & Versionierung |
 | 36 | `login-version-display` | Feature | ✅ Fertig | Versionsnummer auf dem Login-Screen anzeigen (Quick Fix) |
-| 36 | `welcome-vault` | Feature | 📋 Requirements | Automatischer "Willkommen"-Vault mit Anleitungen für neue Benutzer |
+| 36 | `welcome-vault` | Feature | ✅ Fertig | Automatischer "Willkommen"-Vault mit Anleitungen für neue Benutzer |
 | 37 | `realtime-cleanup` | Feature | ✅ Fertig | Feature-Toggle für Realtime entfernt, Polling-Fallback entfernt, SSE immer aktiv |
-| 38 | `knowledge-graph-v2` | Feature | 📋 Requirements | Knowledge Graph konfigurierbar (Farben, Gewichte) + Tags/Properties als togglebare Knoten |
+| 38 | `knowledge-graph-v2` | Feature | ✅ Fertig | Knowledge Graph konfigurierbar (Farben, Layout-Parameter, Tag-Nodes, Property-Nodes, localStorage-Persistenz, GraphSettingsPanel) |
 | 39 | `collaborative-editing` | Feature | 📋 Requirements | Echtzeit-Multi-User-Editing mit CRDT/OT und Cursor-Presence |
 | 40 | `sync-conflict-resolution` | Feature | 📋 Requirements | Halbautomatisches Konfliktmanagement bei Sync (Diff-View, Batch-Auflösung, Auto-Strategien) |
 | 41 | `command-palette-builtin` | Feature | ✅ Fertig | Command Palette (Ctrl+P) immer aktiv, 40+ Built-in-Befehle (Navigation, Vault-Ops, Editor-Formatierung, Admin, View-Toggles), Editor-Commands via CustomEvent-Bridge |
@@ -129,7 +129,7 @@ Priorisiert nach: Blockierungen auflösen → Nutzerwert maximieren → Quick Wi
 | Prio | Spec | Aufwand | Begründung |
 |------|------|---------|------------|
 | 10 | `realtime-infrastructure` | ✅ Fertig | SSE implementiert: Chat-Push, Presence, Vault-Change-Events mit Tree-Refresh + Tab-Reload, Toast-Notifications. |
-| 11 | `welcome-vault` | Mittel | Onboarding-Feature. Neue Nutzer bekommen sofort Orientierung. |
+| 11 | `welcome-vault` | ✅ Fertig | Onboarding-Feature. Neue Nutzer bekommen sofort Orientierung. |
 | 12 | `knowledge-graph-v2` | Mittel | Differenzierung: Konfigurierbar + Tags/Properties als Knoten. Hebt den Graph auf nächstes Level. |
 | 13 | `sync-conflict-resolution` | Mittel | UX-kritisch für Sync-Nutzer: Geführter Prozess statt manueller Einzelauflösung. |
 | 14 | `unified-settings` | Mittel | Konsolidiert fragmentierte Settings nach vielen neuen Features. |
@@ -159,7 +159,7 @@ Track D (DevOps):      ci-cd-release ✅ (unabhängig)
 Track E (Content):     search-and-discovery ✅ → trash-and-versioning ✅ → public-sharing
 Track F (Knowledge):   knowledge-graph ✅ → knowledge-graph-v2
 Track G (Sync):        vault-sync ✅ → sync-conflict-resolution
-Track H (Onboarding):  welcome-vault (unabhängig)
+Track H (Onboarding):  welcome-vault ✅ (unabhängig)
 ```
 
 ### Grobe Timeline (bei Vollzeit-Entwicklung)
@@ -173,7 +173,7 @@ Woche 10:      realtime-cleanup ✅
 Woche 11–12:   knowledge-graph-v2
 Woche 13–14:   sync-conflict-resolution
 Woche 15–16:   unified-settings ✅ + mermaid-rendering ✅
-Woche 17–18:   public-sharing + welcome-vault
+Woche 17–18:   public-sharing + welcome-vault ✅
 Woche 19–22:   responsive-mobile
 Woche 23–30:   collaborative-editing (CRDT/OT — größtes Feature)
 Danach:        workspace-leaf-compat, obsidian-themes, live-preview-editor, ...
@@ -251,12 +251,12 @@ Danach:        workspace-leaf-compat, obsidian-themes, live-preview-editor, ...
 - **Aufwand**: Sehr niedrig (1–2h, rein Frontend: ein `fetch`-Call + ein `<span>`)
 - **Status**: ✅ Fertig — `getVersion()` war bereits in IApiClient vorhanden, LoginPage um useEffect + Versionsanzeige erweitert
 
-### welcome-vault
+### welcome-vault ✅ Fertig
 - **Beschreibung**: Neue Benutzer erhalten bei Account-Erstellung automatisch einen "Willkommen"-Vault mit Tutorial-Inhalten (Wikilinks, Callouts, Tags, Embeds, Ordnerstruktur). Template-Verzeichnis anpassbar, per Feature-Toggle steuerbar.
 - **Abhängigkeit**: Braucht auth-and-user-management (✅), VaultService (✅)
 - **Priorität**: Mittel (Onboarding-Verbesserung, kein Blocker)
-- **Aufwand**: Mittel (Backend: Template-Copy-Logik + Feature-Toggle. Content: 5–15 Markdown-Dateien schreiben)
-- **Status**: Requirements fertig
+- **Aufwand**: Mittel (Backend: Template-Copy-Logik + Feature-Toggle. Content: 10 Markdown-Dateien + 1 Bild)
+- **Status**: ✅ Fertig — WelcomeVaultService (Never-Throw), onUserCreated Callback, Feature-Toggle `welcome-vault` (hot, default: true), 10 Tutorial-Dateien auf Deutsch, Mutable-Reference-Pattern für DI-Order
 
 ### realtime-cleanup ✅ Fertig
 - **Beschreibung**: Feature-Toggle `realtime` entfernt (SSE immer aktiv), gesamte Polling-Fallback-Logik entfernt, Status `fallback` eliminiert, Code-Bereinigung aller Conditionals. SSE ist nun die einzige Methode für Push-Updates.

@@ -128,28 +128,56 @@ export interface PaginatedConversations {
   hasMore: boolean
 }
 
-/** A node in the knowledge graph (represents a file or unresolved link target). */
+/** Node type for the knowledge graph. */
+export type GraphNodeType = 'file' | 'tag' | 'property'
+
+/** Edge type for the knowledge graph. */
+export type GraphEdgeType = 'link' | 'tag' | 'property'
+
+/** A node in the knowledge graph (represents a file, tag, or property value). */
 export interface GraphNode {
-  /** Relative file path from vault root. */
-  path: string
-  /** Filename without extension (display label). */
+  /** Unique node identifier. */
+  id: string
+  /** Node type discriminator. */
+  type: GraphNodeType
+  /** Relative file path from vault root (only for type 'file'). */
+  path?: string
+  /** Display label. */
   label: string
-  /** Whether the file physically exists in the vault. */
+  /** Whether the node target exists (meaningful for type 'file'). */
   exists: boolean
 }
 
-/** An edge in the knowledge graph (represents a wikilink between two files). */
+/** An edge in the knowledge graph. */
 export interface GraphEdge {
-  /** Source file path (the file containing the wikilink). */
+  /** Source node ID. */
   source: string
-  /** Target file path (the linked file). */
+  /** Target node ID. */
   target: string
+  /** Edge type discriminator. */
+  type: GraphEdgeType
 }
 
 /** Full graph structure returned by the graph API endpoint. */
 export interface GraphData {
   nodes: GraphNode[]
   edges: GraphEdge[]
+}
+
+/** Options for querying the graph API with optional node types. */
+export interface GraphQueryOptions {
+  /** Include tag nodes and edges. */
+  includeTags?: boolean
+  /** Include property nodes for the specified keys. */
+  includeProperties?: string[]
+}
+
+/** Aggregated metadata about the knowledge graph (for settings panel). */
+export interface GraphMeta {
+  /** All tags across all files, sorted by count descending. */
+  tags: Array<{ name: string; count: number }>
+  /** All property keys across all files, sorted by count descending. */
+  propertyKeys: Array<{ key: string; count: number }>
 }
 
 /** Response from the backlinks API endpoint. */

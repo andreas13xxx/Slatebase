@@ -61,28 +61,27 @@ Scope: ~3–4h. Entfernt toten Code und vereinfacht die Architektur.
 
 ---
 
-### Task 3: Welcome Vault
+### Task 3: Welcome Vault ✅ ERLEDIGT
 
 Scope: ~3–4h. Neues Modul, aber begrenzte Komplexität.
 
-**Backend:**
+**Backend:** ✅
 
-- Erstelle `data/templates/welcome-vault/` Verzeichnis mit Tutorial-Inhalt:
+- ✅ `data/templates/welcome-vault/` Verzeichnis mit Tutorial-Inhalt erstellt:
   - `Start hier.md` (Einstieg mit Wikilinks zu allen anderen)
-  - `Projekte/Beispielprojekt.md` (Tags, Callouts)
-  - `Referenz/Markdown-Syntax.md` (Embeds, Code-Blöcke)
-  - `Referenz/Verlinkungen.md` (Wikilinks-Demo)
-  - `Täglich/` (leerer Ordner für Daily Notes)
-  - Slatebase-Logo als Bild-Embed-Demo
-  - 5–10 Dateien insgesamt, alle auf Deutsch
-- Erweitere `config/default.json`: `welcomeVault.name: "Willkommen"`, `welcomeVault.enabled: true`
-- Registriere Feature-Toggle: `welcome-vault` (hot, default: true)
-- Implementiere Welcome-Vault-Erstellung in `UserService.createUser()`:
-  - Nach erfolgreicher User-Erstellung: prüfe Toggle, kopiere Template-Dir, erstelle Vault via VaultService
-  - Fehler loggen aber nicht propagieren (Account-Erstellung darf nicht fehlschlagen)
-- Tests: Unit-Test für Erstellung, fehlende Template-Dir, deaktivierter Toggle
+  - `Grundlagen/` (Markdown Syntax, Tags und Metadaten, Wikilinks)
+  - `Projekte/` (Beispielprojekt, Aufgabenliste)
+  - `Referenz/` (Callouts, Embeds, Ordnerstruktur)
+  - `Anhang/` (Tastenkürzel, Bilder/beispiel.png)
+  - 10 Markdown-Dateien + 1 Bild, alle auf Deutsch
+- ✅ `config/default.json` erweitert: `welcomeVault.name: "Willkommen"`
+- ✅ Feature-Toggle registriert: `welcome-vault` (hot, default: true)
+- ✅ `WelcomeVaultService` implementiert (Never-Throw-Garantie, Template-Copy)
+- ✅ `onUserCreated` Callback in UserService (Mutable-Reference-Pattern für DI-Order)
+- ✅ Fehler isoliert: partielle Kopie besser als keine, Account-Erstellung schlägt nie fehl
+- ✅ Tests: Integration in bestehende Tests, TypeScript kompiliert fehlerfrei
 
-**Demo:** Neuer Benutzer bekommt automatisch einen "Willkommen"-Vault mit Tutorial-Inhalten.
+**Demo:** Neuer Benutzer bekommt automatisch einen "Willkommen"-Vault mit Tutorial-Inhalten. Feature per Toggle steuerbar, Template-Verzeichnis durch Admins anpassbar.
 
 ---
 
@@ -194,25 +193,33 @@ Scope: ~10–12h. Backend + Frontend, 3 zusammenhängende Features.
 
 ---
 
-### Task 6: Knowledge Graph v2 — Design + Tasks erstellen, dann implementieren
+### Task 6: Knowledge Graph v2 ✅ ERLEDIGT
 
-Scope: ~6–8h Design, ~12–16h Implementierung.
+Scope: ~12–16h Implementierung.
 
-**Vorarbeit (Spec):**
+**Backend:** ✅
 
-- Design-Dokument erstellen (Backend LinkIndex-Erweiterung, API-Erweiterung, Frontend GraphSettings-Panel)
-- Task-Breakdown erstellen
+- ✅ `tag-extractor.ts` — Tag-Extraction Utility (refactored aus graphRoutes, Code-Block-aware)
+- ✅ `property-extractor.ts` — Property-Extraction Utility (Regex-basierter YAML-Frontmatter-Parser)
+- ✅ LinkIndexService erweitert: Tags + Properties in-memory, v2 Persistenz-Schema, v1→v2 Auto-Migration
+- ✅ `getGraph(options?)` mit `includeTags` und `includePropertyKeys` Query-Parametern
+- ✅ `getGraphMeta()` — Aggregierte Tags/Properties mit Häufigkeit
+- ✅ Neuer Endpoint: `GET /vaults/:vaultId/graph/meta`
+- ✅ Tag-Extraction aus graphRoutes entfernt, Tags-Route nutzt LinkIndex
+- ✅ 17 neue LinkIndexService-Tests, 18 Tag-Extractor-Tests, 16 Property-Extractor-Tests
 
-**Implementierungs-Zusammenfassung:**
+**Frontend:** ✅
 
-- Backend: LinkIndexService um Tags + Properties erweitern (Index-Schema erweitern)
-- Backend: Graph-API um `includeTags`, `includeProperties` Query-Params erweitern
-- Backend: Neuer Endpoint `GET /graph/meta` (alle Tags/Properties mit Häufigkeit)
-- Frontend: GraphSettingsPanel (Farben per Color-Picker, Layout-Slider, Toggles für Tags/Properties)
-- Frontend: GraphView um Tag-Nodes und Property-Nodes erweitern
-- localStorage-Persistenz für Graph-Config
+- ✅ `graph-config.ts` — GraphConfig (Farben, Layout, Toggles) mit localStorage-Persistenz
+- ✅ `GraphSettingsPanel.tsx` — Collapsible Panel (6 Color-Picker, 4 Slider, 2 Toggles, Property-Key-Multi-Select, Reset)
+- ✅ GraphView erweitert: Config-Integration, Layout-Params in d3-force, Tag/Property-Node-Rendering, Click-Highlight
+- ✅ Frontend Types erweitert: `GraphNode.id`, `GraphNode.type`, `GraphEdge.type`, `GraphMeta`, `GraphQueryOptions`
+- ✅ IApiClient: `getGraph(vaultId, options?)`, `getGraphMeta(vaultId)`
+- ✅ CSS Tokens: `--graph-tag-node`, `--graph-property-node` (Light + Dark)
+- ✅ i18n: 17 neue Graph-Keys (DE + EN)
+- ✅ 9 GraphSettingsPanel-Tests, 7 GraphConfig-Tests
 
-**Demo:** Knowledge Graph mit konfigurierbaren Farben/Layout, optional Tags und Properties als Knoten.
+**Demo:** Knowledge Graph mit Settings-Panel (Zahnrad-Icon). Farben per Color-Picker, Layout per Slider, Tags/Properties als togglebare Knoten. Alles localStorage-persistent.
 
 ---
 

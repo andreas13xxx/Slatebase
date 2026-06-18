@@ -6245,7 +6245,7 @@
 .graph-search-container {
   position: absolute;
   top: 12px;
-  right: 12px;
+  right: 48px;
   z-index: 10;
   width: 220px;
 }

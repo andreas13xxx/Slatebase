@@ -42,7 +42,7 @@ src/
 │   ├── mcpRoutes.ts      — MCP Streamable HTTP transport endpoint (Bearer token auth)
 │   ├── mcpTokenRoutes.ts — MCP token CRUD routes (session auth)
 │   ├── mcpWellKnownRoute.ts — .well-known/mcp.json discovery endpoint (public)
-│   ├── graphRoutes.ts    — Graph API routes (GET graph, GET backlinks)
+│   ├── graphRoutes.ts    — Graph API routes (GET graph, GET graph/meta, GET backlinks, GET tags)
 │   ├── client-ip.ts     — Centralized client IP extraction with trusted proxy support
 │   ├── pluginRoutes.ts  — Plugin management CRUD routes (list, install, delete, bundle, styles, settings, registry)
 │   ├── featureRoutes.ts — Feature toggle admin + public routes (GET/PUT /admin/features, GET /features)
@@ -106,10 +106,15 @@ src/
 │   └── (search-service.test.ts) — Optional: Unit tests for SearchService
 ├── link-index/
 │   ├── index.ts              — Barrel export for link-index module
-│   ├── types.ts              — ILinkIndex interface, GraphData, GraphNode, GraphEdge, ParsedWikilink
+│   ├── types.ts              — ILinkIndex interface, GraphData, GraphNode, GraphEdge, GraphQueryOptions, GraphMeta, ParsedWikilink
 │   ├── wikilink-parser.ts    — Backend extractWikilinks() (code-block-aware, all formats)
 │   ├── wikilink-parser.test.ts — Unit tests for parser
-│   └── link-index-service.ts — LinkIndexService (rebuild, incremental updates, JSON persistence, queries)
+│   ├── tag-extractor.ts      — extractTags() (code-block-aware, nested tags, dedup)
+│   ├── tag-extractor.test.ts — Unit tests for tag extractor
+│   ├── property-extractor.ts — extractProperties() (YAML frontmatter, regex-based)
+│   ├── property-extractor.test.ts — Unit tests for property extractor
+│   ├── link-index-service.ts — LinkIndexService (rebuild, incremental updates, JSON v2 persistence, tags, properties, getGraph with options, getGraphMeta)
+│   └── link-index-service.test.ts — Unit tests for LinkIndexService v2
 ├── plugin/
 │   ├── index.ts              — Barrel export for plugin module
 │   ├── types.ts              — IPluginStore, PluginManifest, PluginFiles, PluginRegistryData interfaces
@@ -311,8 +316,13 @@ src/
 │   ├── SyncStatusPanel.tsx — Sync status display with trigger buttons
 │   ├── SyncAnalysisView.tsx — Analysis results (category counters + detail list)
 │   ├── ConflictResolutionView.tsx — Conflict list with resolution options
-│   ├── GraphView.tsx     — Knowledge graph SVG visualization (d3-force, zoom/pan/drag/search)
+│   ├── GraphView.tsx     — Knowledge graph SVG visualization (d3-force, zoom/pan/drag/search, config-driven colors/layout, tag/property nodes)
 │   ├── graph-utils.ts    — Pure graph utility functions (truncateLabel, clampZoom, computeNodeSize, filterNodes)
+│   ├── graph-config.ts   — GraphConfig interfaces + localStorage persistence (colors, layout, node toggles)
+│   ├── graph-config.test.ts — Unit tests for GraphConfig
+│   ├── GraphSettingsPanel.tsx — Collapsible graph settings (color pickers, sliders, toggles, property multi-select, reset)
+│   ├── GraphSettingsPanel.css — GraphSettingsPanel styles
+│   ├── GraphSettingsPanel.test.tsx — Unit tests for GraphSettingsPanel
 │   ├── context-panel/
 │   │   ├── ContextPanel.tsx      — Main orchestrator (data loading, debounce, view wiring)
 │   │   ├── ContextPanel.css      — All context panel styles (Design Tokens)

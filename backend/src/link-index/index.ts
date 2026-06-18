@@ -7,12 +7,22 @@ export type {
   GraphNode,
   GraphEdge,
   GraphData,
+  GraphNodeType,
+  GraphEdgeType,
+  GraphQueryOptions,
+  GraphMeta,
   BacklinksResponse,
   ParsedWikilink,
 } from './types.js'
 
 // Wikilink parser utility
 export { extractWikilinks } from './wikilink-parser.js'
+
+// Tag extraction utility
+export { extractTags } from './tag-extractor.js'
+
+// Property extraction utility
+export { extractProperties } from './property-extractor.js'
 
 // Link index service implementation
 export { LinkIndexService, normalizeLinkPath } from './link-index-service.js'

@@ -5,8 +5,11 @@ import { useAppContext } from '../state'
 import { useTabContext } from '../state/tabContext'
 import { openTab } from '../state/tabActions'
 import { useTranslation } from '../i18n'
-import type { GraphData, GraphNode } from '../types'
+import type { GraphData, GraphNode, GraphMeta } from '../types'
 import { truncateLabel, clampZoom, computeNodeSize, filterNodes } from './graph-utils'
+import { loadGraphConfig, saveGraphConfig, resetGraphConfig } from './graph-config'
+import type { GraphConfig } from './graph-config'
+import { GraphSettingsPanel } from './GraphSettingsPanel'
 import { RefreshCw, Search } from 'lucide-react'
 
 /**
@@ -19,9 +22,10 @@ interface GraphViewProps {
 /** Internal simulation node with position data. */
 interface SimNode extends SimulationNodeDatum {
   id: string
-  path: string
+  path: string | undefined
   label: string
   exists: boolean
+  type: string
   radius: number
   connections: number
 }
@@ -68,6 +72,10 @@ export function GraphView({ vaultId }: GraphViewProps) {
   const [links, setLinks] = useState<SimLink[]>([])
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
 
+  // Graph config state (persisted in localStorage)
+  const [config, setConfig] = useState<GraphConfig>(() => loadGraphConfig())
+  const [meta, setMeta] = useState<GraphMeta | null>(null)
+
   // Zoom and pan state
   const [zoom, setZoom] = useState(1)
   const [panX, setPanX] = useState(0)
@@ -92,12 +100,13 @@ export function GraphView({ vaultId }: GraphViewProps) {
   const [searchResults, setSearchResults] = useState<GraphNode[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
   const [highlightedSearchNodeId, setHighlightedSearchNodeId] = useState<string | null>(null)
+  const [clickedHighlightId, setClickedHighlightId] = useState<string | null>(null)
   const searchContainerRef = useRef<HTMLDivElement>(null)
 
   const simulationRef = useRef<ReturnType<typeof forceSimulation<SimNode>> | null>(null)
 
   /**
-   * Fetches graph data from the API.
+   * Fetches graph data from the API with current config options.
    */
   const fetchGraph = useCallback(async () => {
     if (!apiClient) return
@@ -106,7 +115,13 @@ export function GraphView({ vaultId }: GraphViewProps) {
     setError(null)
 
     try {
-      const data = await apiClient.getGraph(vaultId)
+      const options = {
+        includeTags: config.nodes.showTags || undefined,
+        includeProperties: config.nodes.showProperties && config.nodes.selectedPropertyKeys.length > 0
+          ? config.nodes.selectedPropertyKeys
+          : undefined,
+      }
+      const data = await apiClient.getGraph(vaultId, options)
       setGraphData(data)
     } catch (err: unknown) {
       const message =
@@ -117,7 +132,7 @@ export function GraphView({ vaultId }: GraphViewProps) {
     } finally {
       setLoading(false)
     }
-  }, [apiClient, vaultId, t])
+  }, [apiClient, vaultId, t, config.nodes.showTags, config.nodes.showProperties, config.nodes.selectedPropertyKeys])
 
   // Fetch graph data on mount and vault change
   useEffect(() => {
@@ -160,7 +175,7 @@ export function GraphView({ vaultId }: GraphViewProps) {
     // Count connections per node
     const connectionCount = new Map<string, number>()
     for (const node of graphData.nodes) {
-      connectionCount.set(node.path, 0)
+      connectionCount.set(node.id, 0)
     }
     for (const edge of graphData.edges) {
       connectionCount.set(edge.source, (connectionCount.get(edge.source) ?? 0) + 1)
@@ -171,13 +186,18 @@ export function GraphView({ vaultId }: GraphViewProps) {
 
     // Create simulation nodes
     const simNodes: SimNode[] = graphData.nodes.map((node) => {
-      const connections = connectionCount.get(node.path) ?? 0
+      const connections = connectionCount.get(node.id) ?? 0
+      // Tag/Property nodes have smaller base radius
+      const baseRadius = (node.type === 'tag' || node.type === 'property')
+        ? Math.max(3, computeNodeSize(connections, maxConnections) * 0.6)
+        : computeNodeSize(connections, maxConnections)
       return {
-        id: node.path,
+        id: node.id,
         path: node.path,
         label: node.label,
         exists: node.exists,
-        radius: computeNodeSize(connections, maxConnections),
+        type: node.type ?? 'file',
+        radius: baseRadius,
         connections,
       }
     })
@@ -201,10 +221,11 @@ export function GraphView({ vaultId }: GraphViewProps) {
         'link',
         forceLink<SimNode, SimLink>(simLinks)
           .id((d) => d.id)
-          .distance(30),
+          .distance(config.layout.linkDistance)
+          .strength(config.layout.linkStrength),
       )
-      .force('charge', forceManyBody<SimNode>().strength(-50))
-      .force('center', forceCenter(dimensions.width / 2, dimensions.height / 2).strength(0.1))
+      .force('charge', forceManyBody<SimNode>().strength(-config.layout.repulsion))
+      .force('center', forceCenter(dimensions.width / 2, dimensions.height / 2).strength(config.layout.centerGravity))
       .force('collide', forceCollide<SimNode>().radius((d) => d.radius + 2))
       .alpha(1)
       .alphaDecay(0.02)
@@ -280,6 +301,8 @@ export function GraphView({ vaultId }: GraphViewProps) {
         isPanningRef.current = true
         panStartRef.current = { x: e.clientX, y: e.clientY }
         panOffsetRef.current = { x: panX, y: panY }
+        // Clear click highlight when clicking background
+        setClickedHighlightId(null)
         e.preventDefault()
       }
     },
@@ -354,18 +377,28 @@ export function GraphView({ vaultId }: GraphViewProps) {
 
   /**
    * Handles click on a graph node.
-   * Opens the file in a tab if it exists; does nothing for unresolved links.
-   * Validates: Requirements 4.6, 4.7
+   * - File nodes: open in tab if exists
+   * - Tag/Property nodes: highlight connected file nodes (toggle on second click)
+   * Validates: Requirements 4.6, 4.7, 3.4, 4.5
    */
   const handleNodeClick = useCallback(
     (e: React.MouseEvent, node: SimNode) => {
       // Don't open tab if we were dragging
       if (didDragRef.current) return
-      if (!node.exists || !apiClient) return
 
       e.stopPropagation()
-      const fileName = node.path.split('/').pop() ?? node.path
-      void openTab(tabDispatch, appDispatch, apiClient, vaultId, node.path, fileName)
+
+      // Tag/Property nodes: toggle click highlight
+      if (node.type === 'tag' || node.type === 'property') {
+        setClickedHighlightId((prev) => prev === node.id ? null : node.id)
+        return
+      }
+
+      // File nodes: open in tab if they exist
+      if (!node.exists || !apiClient) return
+      const filePath = node.path ?? node.id
+      const fileName = filePath.split('/').pop() ?? filePath
+      void openTab(tabDispatch, appDispatch, apiClient, vaultId, filePath, fileName)
     },
     [apiClient, tabDispatch, appDispatch, vaultId],
   )
@@ -387,41 +420,53 @@ export function GraphView({ vaultId }: GraphViewProps) {
   }, [])
 
   /**
+   * Determines if an edge is connected to the hovered or clicked-highlighted node.
+   */
+  const isEdgeConnectedToFocused = useCallback(
+    (link: SimLink, focusId: string | null): boolean => {
+      if (!focusId) return false
+      const sourceId = typeof link.source === 'string' ? link.source : link.source.id
+      const targetId = typeof link.target === 'string' ? link.target : link.target.id
+      return sourceId === focusId || targetId === focusId
+    },
+    [],
+  )
+
+  /**
    * Determines if an edge is connected to the hovered node.
    */
   const isEdgeConnectedToHovered = useCallback(
     (link: SimLink): boolean => {
-      if (!hoveredNodeId) return false
-      const sourceId = typeof link.source === 'string' ? link.source : link.source.id
-      const targetId = typeof link.target === 'string' ? link.target : link.target.id
-      return sourceId === hoveredNodeId || targetId === hoveredNodeId
+      return isEdgeConnectedToFocused(link, hoveredNodeId)
     },
-    [hoveredNodeId],
+    [hoveredNodeId, isEdgeConnectedToFocused],
   )
 
   /**
-   * Gets the edge opacity based on hover state.
+   * Gets the edge opacity based on hover/click state.
    * Connected edges get full opacity; others get 20%.
    * Validates: Requirements 5.5, 5.6
    */
   const getEdgeOpacity = useCallback(
     (link: SimLink): number => {
-      if (!hoveredNodeId) return 0.6 // default opacity
-      return isEdgeConnectedToHovered(link) ? 1 : 0.2
+      const focusId = clickedHighlightId ?? hoveredNodeId
+      if (!focusId) return 0.6 // default opacity
+      return isEdgeConnectedToFocused(link, focusId) ? 1 : 0.2
     },
-    [hoveredNodeId, isEdgeConnectedToHovered],
+    [hoveredNodeId, clickedHighlightId, isEdgeConnectedToFocused],
   )
 
   /**
-   * Gets the edge stroke color based on hover state.
+   * Gets the edge stroke color based on hover/click state.
    * Connected edges get accent color; others keep default.
    */
   const getEdgeStroke = useCallback(
     (link: SimLink): string | undefined => {
-      if (!hoveredNodeId) return undefined
-      return isEdgeConnectedToHovered(link) ? 'var(--graph-edge-highlight, var(--accent))' : undefined
+      const focusId = clickedHighlightId ?? hoveredNodeId
+      if (!focusId) return undefined
+      return isEdgeConnectedToFocused(link, focusId) ? config.colors.highlight : undefined
     },
-    [hoveredNodeId, isEdgeConnectedToHovered],
+    [hoveredNodeId, clickedHighlightId, isEdgeConnectedToFocused, config.colors.highlight],
   )
 
   /**
@@ -454,7 +499,7 @@ export function GraphView({ vaultId }: GraphViewProps) {
   const handleSearchSelect = useCallback(
     (selectedNode: GraphNode) => {
       // Find the simulation node to get its current position
-      const simNode = nodes.find((n) => n.id === selectedNode.path)
+      const simNode = nodes.find((n) => n.id === selectedNode.id)
       if (!simNode || simNode.x == null || simNode.y == null) return
 
       // Center the graph on the selected node
@@ -464,7 +509,7 @@ export function GraphView({ vaultId }: GraphViewProps) {
       setPanY(newPanY)
 
       // Highlight the node
-      setHighlightedSearchNodeId(selectedNode.path)
+      setHighlightedSearchNodeId(selectedNode.id)
 
       // Close dropdown and clear search
       setShowDropdown(false)
@@ -501,41 +546,92 @@ export function GraphView({ vaultId }: GraphViewProps) {
   }, [])
 
   /**
-   * Determines if a node is directly connected to the hovered node.
-   * A node is connected if there's an edge between it and the hovered node,
-   * or if it IS the hovered node.
+   * Determines if a node is directly connected to the focused (hovered or clicked) node.
    */
-  const isNodeConnectedToHovered = useCallback(
+  const isNodeConnectedToFocused = useCallback(
     (nodeId: string): boolean => {
-      if (!hoveredNodeId) return true
-      if (nodeId === hoveredNodeId) return true
+      const focusId = clickedHighlightId ?? hoveredNodeId
+      if (!focusId) return true
+      if (nodeId === focusId) return true
       for (const link of links) {
         const sourceId = typeof link.source === 'string' ? link.source : link.source.id
         const targetId = typeof link.target === 'string' ? link.target : link.target.id
         if (
-          (sourceId === hoveredNodeId && targetId === nodeId) ||
-          (targetId === hoveredNodeId && sourceId === nodeId)
+          (sourceId === focusId && targetId === nodeId) ||
+          (targetId === focusId && sourceId === nodeId)
         ) {
           return true
         }
       }
       return false
     },
-    [hoveredNodeId, links],
+    [hoveredNodeId, clickedHighlightId, links],
   )
 
   /**
-   * Gets the node opacity based on hover state.
-   * Connected nodes and the hovered node get full opacity; others get 20%.
+   * Gets the node opacity based on hover/click state.
+   * Connected nodes and the focused node get full opacity; others get 20%.
    * Validates: Requirements 5.5, 5.6
    */
   const getNodeOpacity = useCallback(
     (nodeId: string): number => {
-      if (!hoveredNodeId) return 1
-      return isNodeConnectedToHovered(nodeId) ? 1 : 0.2
+      const focusId = clickedHighlightId ?? hoveredNodeId
+      if (!focusId) return 1
+      return isNodeConnectedToFocused(nodeId) ? 1 : 0.2
     },
-    [hoveredNodeId, isNodeConnectedToHovered],
+    [hoveredNodeId, clickedHighlightId, isNodeConnectedToFocused],
   )
+
+  /**
+   * Handles config changes from the GraphSettingsPanel.
+   * Persists to localStorage and triggers re-fetch when node toggles change.
+   */
+  const handleConfigChange = useCallback((newConfig: GraphConfig) => {
+    setConfig(newConfig)
+    saveGraphConfig(newConfig)
+  }, [])
+
+  /**
+   * Handles reset from the GraphSettingsPanel.
+   */
+  const handleConfigReset = useCallback(() => {
+    resetGraphConfig()
+    setConfig(loadGraphConfig())
+  }, [])
+
+  /**
+   * Fetches graph metadata (for the settings panel) when the panel needs it.
+   */
+  const fetchMeta = useCallback(async () => {
+    if (!apiClient || meta !== null) return
+    try {
+      const data = await apiClient.getGraphMeta(vaultId)
+      setMeta(data)
+    } catch {
+      // Silently ignore — meta is optional for the settings panel
+    }
+  }, [apiClient, vaultId, meta])
+
+  /**
+   * Returns the node fill color based on its type and config.
+   */
+  const getNodeFill = useCallback(
+    (node: SimNode): string => {
+      if (node.id === highlightedSearchNodeId) {
+        return config.colors.highlight
+      }
+      switch (node.type) {
+        case 'tag': return config.colors.tagNode
+        case 'property': return config.colors.propertyNode
+        default: return node.exists ? config.colors.fileNode : config.colors.unresolvedNode
+      }
+    },
+    [config.colors, highlightedSearchNodeId],
+  )
+
+  // Fetch meta once when needed (lazy)
+  // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
+  useEffect(() => { void fetchMeta() }, [apiClient, vaultId])
 
   // Loading state
   if (loading) {
@@ -571,6 +667,14 @@ export function GraphView({ vaultId }: GraphViewProps) {
 
   return (
     <div className="graph-view-container" ref={containerRef}>
+      {/* Settings Panel */}
+      <GraphSettingsPanel
+        config={config}
+        meta={meta}
+        onConfigChange={handleConfigChange}
+        onReset={handleConfigReset}
+      />
+
       {/* Search UI — positioned absolutely over the SVG */}
       <div className="graph-search-container" ref={searchContainerRef}>
         <div className="graph-search-input-wrapper">
@@ -589,7 +693,7 @@ export function GraphView({ vaultId }: GraphViewProps) {
             {searchResults.length > 0 ? (
               searchResults.map((result) => (
                 <button
-                  key={result.path}
+                  key={result.id}
                   className="graph-search-item"
                   onClick={() => handleSearchSelect(result)}
                   type="button"
@@ -634,8 +738,8 @@ export function GraphView({ vaultId }: GraphViewProps) {
                   x2={target.x}
                   y2={target.y}
                   style={{
+                    stroke: stroke ?? config.colors.edge,
                     strokeOpacity: opacity,
-                    ...(stroke ? { stroke } : {}),
                     ...(hoveredNodeId && isEdgeConnectedToHovered(link) ? { strokeWidth: 2 } : {}),
                   }}
                 />
@@ -665,12 +769,13 @@ export function GraphView({ vaultId }: GraphViewProps) {
                     cx={node.x}
                     cy={node.y}
                     r={displayRadius}
+                    fill={getNodeFill(node)}
                     style={isSearchHighlighted ? {
                       stroke: 'var(--graph-search-highlight)',
                       strokeWidth: 3,
                     } : undefined}
                   >
-                    <title>{node.path}</title>
+                    <title>{node.label}</title>
                   </circle>
                 </g>
               )
@@ -682,7 +787,7 @@ export function GraphView({ vaultId }: GraphViewProps) {
         <g className="graph-view__labels">
           {nodes.map((node) => {
             if (node.x == null || node.y == null) return null
-            const label = truncateLabel(node.path)
+            const label = truncateLabel(node.label)
             const nodeOpacity = getNodeOpacity(node.id)
             const isSearchHighlighted = highlightedSearchNodeId === node.id
             const displayRadius = isSearchHighlighted ? node.radius * 1.5 : node.radius

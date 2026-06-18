@@ -135,6 +135,10 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 18. Image Paste: nur `image/*` MIME-Typen abfangen, Text-Paste NICHT intercepten (`preventDefault` nur bei Bild)
 19. `EventSource` existiert nicht in jsdom — Mock in `test-setup.ts` erforderlich für Tests die RealtimeProvider rendern
 20. Command Palette Ctrl+P: lebt in `CommandPaletteContainer` (nicht in PluginProvider). Editor-Commands via `window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action } }))` — EditMode lauscht darauf
+21. Link-Index Persistenz v2: Tags + Properties werden neben forwardLinks gespeichert. v1→v2 Auto-Migration beim Laden (rebuild triggers). Schema-Feld `version: 2` als Diskriminator.
+22. GraphNode hat jetzt `id` (unique) + `type` ('file'|'tag'|'property') + optionales `path`. Frontend SimNode nutzt `node.id` als Identifier, `node.path ?? node.id` für File-Öffnung.
+23. Tag-Extraction: CSS Hex-Farben (`#fff`, `#bb7739`) werden als Tags erkannt — bekannter Edge-Case. Regex erfordert Buchstabe nach `#`, aber Hex `a-f` qualifiziert.
+24. GraphSettingsPanel: `position: absolute` im Container. Search-Container braucht `right: 48px` (statt 12px) um Platz für Settings-Toggle zu lassen.
 
 ## Multi-User & Vault-Besitz
 

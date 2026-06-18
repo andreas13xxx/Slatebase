@@ -14,7 +14,7 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for 
 - Vault sync ⚠️ experimental (CouchDB/livesync, bidirectional, conflict resolution, E2E encryption)
 - MCP Context Server (AI read+write via Model Context Protocol)
 - Context Panel (Outline, Links, Tags, Properties — splittable, DnD)
-- Knowledge Graph (d3-force SVG, zoom/pan/drag/search)
+- Knowledge Graph (d3-force SVG, zoom/pan/drag/search, konfigurierbare Farben/Layout, Tag-Nodes, Property-Nodes)
 - Search & Replace (regex, context lines, multi-vault, atomic writes)
 - Realtime infrastructure (SSE: chat push, presence, vault changes, toasts, reconnect with replay — always active when authenticated)
 - Obsidian plugin compat ⚠️ experimental (API shims, sandbox, command palette, CSS injection)

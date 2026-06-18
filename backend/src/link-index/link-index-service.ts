@@ -1,8 +1,9 @@
 /**
  * LinkIndexService — In-memory link index with JSON persistence.
  *
- * Maintains forward links (file → targets) and a derived reverse map (file → sources).
- * Persists the forward links as JSON; the reverse map is rebuilt on load.
+ * Maintains forward links (file → targets), tags (file → tags),
+ * properties (file → key → values), and derived reverse maps.
+ * Persists as JSON v2 schema; supports migration from v1.
  * Implements the ILinkIndex interface for abstraction.
  */
 
@@ -10,15 +11,29 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
-import type { ILinkIndex, GraphData, GraphNode, GraphEdge } from './types.js'
+import type { ILinkIndex, GraphData, GraphNode, GraphEdge, GraphQueryOptions, GraphMeta } from './types.js'
 import { extractWikilinks } from './wikilink-parser.js'
+import { extractTags } from './tag-extractor.js'
+import { extractProperties } from './property-extractor.js'
 
-/** JSON schema for the persisted link index file. */
-interface LinkIndexJson {
-  version: number
+/** JSON schema v1 for backward compatibility. */
+interface LinkIndexJsonV1 {
+  version: 1
   updatedAt: string
   forwardLinks: Record<string, string[]>
 }
+
+/** JSON schema v2 — includes tags and properties. */
+interface LinkIndexJsonV2 {
+  version: 2
+  updatedAt: string
+  forwardLinks: Record<string, string[]>
+  tags: Record<string, string[]>
+  properties: Record<string, Record<string, string[]>>
+}
+
+/** Union type for all supported persisted schemas. */
+type LinkIndexJson = LinkIndexJsonV1 | LinkIndexJsonV2
 
 /**
  * Normalizes a file path for index storage.
@@ -52,6 +67,8 @@ export function normalizeLinkPath(rawPath: string): string {
 export class LinkIndexService implements ILinkIndex {
   private readonly forwardLinks: Map<string, Set<string>> = new Map()
   private readonly backlinks: Map<string, Set<string>> = new Map()
+  private readonly fileTags: Map<string, Set<string>> = new Map()
+  private readonly fileProperties: Map<string, Map<string, string[]>> = new Map()
   private ready = false
   private readonly persistPath: string
 
@@ -68,12 +85,14 @@ export class LinkIndexService implements ILinkIndex {
 
   /**
    * Rebuilds the entire index by recursively finding all .md files,
-   * parsing each for wikilinks, and building forward + reverse maps.
+   * parsing each for wikilinks, tags, and properties.
    * Skips unreadable files (logs warning, continues).
    */
   async rebuild(): Promise<void> {
     this.forwardLinks.clear()
     this.backlinks.clear()
+    this.fileTags.clear()
+    this.fileProperties.clear()
 
     const mdFiles = await this.findMarkdownFiles(this.vaultPath)
 
@@ -83,17 +102,28 @@ export class LinkIndexService implements ILinkIndex {
 
       try {
         const content = await fs.readFile(absoluteFilePath, 'utf-8')
+
+        // Extract wikilinks
         const links = extractWikilinks(content)
         const targets = new Set<string>()
-
         for (const link of links) {
-          // Skip heading-only links (target is empty string)
           if (link.target === '') continue
           const normalizedTarget = normalizeLinkPath(link.target)
           targets.add(normalizedTarget)
         }
-
         this.forwardLinks.set(normalizedPath, targets)
+
+        // Extract tags
+        const tags = extractTags(content)
+        if (tags.length > 0) {
+          this.fileTags.set(normalizedPath, new Set(tags))
+        }
+
+        // Extract properties
+        const properties = extractProperties(content)
+        if (Object.keys(properties).length > 0) {
+          this.fileProperties.set(normalizedPath, new Map(Object.entries(properties)))
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         this.logger.warn('Skipping unreadable file during rebuild', {
@@ -108,13 +138,13 @@ export class LinkIndexService implements ILinkIndex {
 
     this.ready = true
 
-    // Persist to disk (fire-and-forget error handling)
+    // Persist to disk
     await this.persist()
   }
 
   /**
    * Updates the index for a single file (added or modified).
-   * Parses the content and updates forward links + reverse map.
+   * Parses the content and updates forward links, tags, properties, and reverse map.
    */
   async updateFile(filePath: string, content: string): Promise<void> {
     const normalizedPath = normalizeLinkPath(filePath)
@@ -122,17 +152,14 @@ export class LinkIndexService implements ILinkIndex {
     // Remove old forward links for this file from reverse map
     this.removeFromReverseMap(normalizedPath)
 
-    // Parse new content
+    // Parse new content — wikilinks
     const links = extractWikilinks(content)
     const targets = new Set<string>()
-
     for (const link of links) {
       if (link.target === '') continue
       const normalizedTarget = normalizeLinkPath(link.target)
       targets.add(normalizedTarget)
     }
-
-    // Update forward links
     this.forwardLinks.set(normalizedPath, targets)
 
     // Add new entries to reverse map
@@ -145,24 +172,41 @@ export class LinkIndexService implements ILinkIndex {
       }
     }
 
+    // Update tags
+    const tags = extractTags(content)
+    if (tags.length > 0) {
+      this.fileTags.set(normalizedPath, new Set(tags))
+    } else {
+      this.fileTags.delete(normalizedPath)
+    }
+
+    // Update properties
+    const properties = extractProperties(content)
+    if (Object.keys(properties).length > 0) {
+      this.fileProperties.set(normalizedPath, new Map(Object.entries(properties)))
+    } else {
+      this.fileProperties.delete(normalizedPath)
+    }
+
     await this.persist()
   }
 
   /**
    * Removes all index entries for a deleted file.
-   * Cleans up forward links and backlink references.
+   * Cleans up forward links, tags, properties, and backlink references.
    */
   async removeFile(filePath: string): Promise<void> {
     const normalizedPath = normalizeLinkPath(filePath)
 
-    // Remove from reverse map (entries where this file is a source)
+    // Remove from reverse map
     this.removeFromReverseMap(normalizedPath)
 
     // Remove forward links entry
     this.forwardLinks.delete(normalizedPath)
 
-    // Also remove this file as a source from any backlink entries
-    // (already handled by removeFromReverseMap above)
+    // Remove tags and properties
+    this.fileTags.delete(normalizedPath)
+    this.fileProperties.delete(normalizedPath)
 
     await this.persist()
   }
@@ -177,20 +221,21 @@ export class LinkIndexService implements ILinkIndex {
     // Remove old path from reverse map
     this.removeFromReverseMap(normalizedOld)
 
-    // Remove old forward links entry
+    // Remove old entries
     this.forwardLinks.delete(normalizedOld)
+    const oldTags = this.fileTags.get(normalizedOld)
+    const oldProps = this.fileProperties.get(normalizedOld)
+    this.fileTags.delete(normalizedOld)
+    this.fileProperties.delete(normalizedOld)
 
-    // Parse content for new path
+    // Parse content for new path — wikilinks
     const links = extractWikilinks(content)
     const targets = new Set<string>()
-
     for (const link of links) {
       if (link.target === '') continue
       const normalizedTarget = normalizeLinkPath(link.target)
       targets.add(normalizedTarget)
     }
-
-    // Set forward links for new path
     this.forwardLinks.set(normalizedNew, targets)
 
     // Add new entries to reverse map
@@ -201,6 +246,22 @@ export class LinkIndexService implements ILinkIndex {
       } else {
         this.backlinks.set(target, new Set([normalizedNew]))
       }
+    }
+
+    // Transfer tags (re-extract from content for correctness)
+    const tags = extractTags(content)
+    if (tags.length > 0) {
+      this.fileTags.set(normalizedNew, new Set(tags))
+    } else if (oldTags && oldTags.size > 0) {
+      this.fileTags.set(normalizedNew, oldTags)
+    }
+
+    // Transfer properties (re-extract from content for correctness)
+    const properties = extractProperties(content)
+    if (Object.keys(properties).length > 0) {
+      this.fileProperties.set(normalizedNew, new Map(Object.entries(properties)))
+    } else if (oldProps && oldProps.size > 0) {
+      this.fileProperties.set(normalizedNew, oldProps)
     }
 
     await this.persist()
@@ -226,30 +287,134 @@ export class LinkIndexService implements ILinkIndex {
 
   /**
    * Returns the full graph structure for visualization.
-   * Nodes include all files that exist on disk OR are referenced as link targets.
-   * Edges are a 1:1 mapping of forward links.
+   * Optionally includes tag nodes and property nodes based on query options.
    */
-  getGraph(): GraphData {
-    const nodeSet = new Set<string>()
+  getGraph(options?: GraphQueryOptions): GraphData {
+    const nodeMap = new Map<string, GraphNode>()
     const edges: GraphEdge[] = []
 
-    // Collect all nodes from forward links (sources and targets)
+    // Collect all file nodes from forward links (sources and targets)
     for (const [source, targets] of this.forwardLinks) {
-      nodeSet.add(source)
+      if (!nodeMap.has(source)) {
+        nodeMap.set(source, {
+          id: source,
+          type: 'file',
+          path: source,
+          label: this.extractLabel(source),
+          exists: true,
+        })
+      }
       for (const target of targets) {
-        nodeSet.add(target)
-        edges.push({ source, target })
+        if (!nodeMap.has(target)) {
+          nodeMap.set(target, {
+            id: target,
+            type: 'file',
+            path: target,
+            label: this.extractLabel(target),
+            exists: this.forwardLinks.has(target),
+          })
+        }
+        edges.push({ source, target, type: 'link' })
       }
     }
 
-    // Build nodes array with existence flag
-    const nodes: GraphNode[] = Array.from(nodeSet).map((filePath) => ({
-      path: filePath,
-      label: this.extractLabel(filePath),
-      exists: this.forwardLinks.has(filePath),
-    }))
+    // Include tag nodes if requested
+    if (options?.includeTags) {
+      for (const [filePath, tags] of this.fileTags) {
+        // Ensure the file node exists
+        if (!nodeMap.has(filePath)) {
+          nodeMap.set(filePath, {
+            id: filePath,
+            type: 'file',
+            path: filePath,
+            label: this.extractLabel(filePath),
+            exists: this.forwardLinks.has(filePath),
+          })
+        }
 
-    return { nodes, edges }
+        for (const tag of tags) {
+          const tagId = `tag:${tag}`
+          if (!nodeMap.has(tagId)) {
+            nodeMap.set(tagId, {
+              id: tagId,
+              type: 'tag',
+              label: `#${tag}`,
+              exists: true,
+            })
+          }
+          edges.push({ source: filePath, target: tagId, type: 'tag' })
+        }
+      }
+    }
+
+    // Include property nodes if requested
+    if (options?.includePropertyKeys && options.includePropertyKeys.length > 0) {
+      const requestedKeys = new Set(options.includePropertyKeys)
+
+      for (const [filePath, propsMap] of this.fileProperties) {
+        // Ensure the file node exists
+        if (!nodeMap.has(filePath)) {
+          nodeMap.set(filePath, {
+            id: filePath,
+            type: 'file',
+            path: filePath,
+            label: this.extractLabel(filePath),
+            exists: this.forwardLinks.has(filePath),
+          })
+        }
+
+        for (const [key, values] of propsMap) {
+          if (!requestedKeys.has(key)) continue
+
+          for (const value of values) {
+            const propId = `prop:${key}:${value}`
+            if (!nodeMap.has(propId)) {
+              nodeMap.set(propId, {
+                id: propId,
+                type: 'property',
+                label: `${key}:${value}`,
+                exists: true,
+              })
+            }
+            edges.push({ source: filePath, target: propId, type: 'property' })
+          }
+        }
+      }
+    }
+
+    return { nodes: Array.from(nodeMap.values()), edges }
+  }
+
+  /**
+   * Returns aggregated metadata about tags and property keys in the index.
+   */
+  getGraphMeta(): GraphMeta {
+    // Aggregate tags
+    const tagCounts = new Map<string, number>()
+    for (const tags of this.fileTags.values()) {
+      for (const tag of tags) {
+        tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1)
+      }
+    }
+
+    // Aggregate property keys
+    const propertyCounts = new Map<string, number>()
+    for (const propsMap of this.fileProperties.values()) {
+      for (const key of propsMap.keys()) {
+        propertyCounts.set(key, (propertyCounts.get(key) ?? 0) + 1)
+      }
+    }
+
+    // Sort descending by count
+    const tags = Array.from(tagCounts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+
+    const propertyKeys = Array.from(propertyCounts.entries())
+      .map(([key, count]) => ({ key, count }))
+      .sort((a, b) => b.count - a.count)
+
+    return { tags, propertyKeys }
   }
 
   /**
@@ -263,6 +428,7 @@ export class LinkIndexService implements ILinkIndex {
    * Attempts to load the index from disk.
    * On success, rebuilds the reverse map from persisted forward links.
    * On failure (missing file, invalid JSON, schema mismatch), triggers a full rebuild.
+   * Handles v1 → v2 migration by loading links and triggering rebuild for tags/properties.
    */
   async loadFromDisk(): Promise<void> {
     try {
@@ -280,12 +446,42 @@ export class LinkIndexService implements ILinkIndex {
 
       const data = parsed as LinkIndexJson
 
-      // Populate forward links from persisted data
+      // Clear all maps
       this.forwardLinks.clear()
       this.backlinks.clear()
+      this.fileTags.clear()
+      this.fileProperties.clear()
 
+      if (data.version === 1) {
+        // v1 → v2 migration: load forward links, then trigger full rebuild
+        // for tags and properties
+        this.logger.info('Link index v1 detected, triggering rebuild for v2 migration', {
+          vaultId: this.vaultId,
+          vaultName: this.vaultName,
+        })
+        await this.rebuild()
+        return
+      }
+
+      // v2: Load forward links, tags, and properties
       for (const [filePath, targets] of Object.entries(data.forwardLinks)) {
         this.forwardLinks.set(filePath, new Set(targets))
+      }
+
+      for (const [filePath, tags] of Object.entries(data.tags)) {
+        if (tags.length > 0) {
+          this.fileTags.set(filePath, new Set(tags))
+        }
+      }
+
+      for (const [filePath, properties] of Object.entries(data.properties)) {
+        const propsMap = new Map<string, string[]>()
+        for (const [key, values] of Object.entries(properties)) {
+          propsMap.set(key, values)
+        }
+        if (propsMap.size > 0) {
+          this.fileProperties.set(filePath, propsMap)
+        }
       }
 
       // Rebuild reverse map from forward links
@@ -296,6 +492,7 @@ export class LinkIndexService implements ILinkIndex {
         vaultId: this.vaultId,
         vaultName: this.vaultName,
         fileCount: this.forwardLinks.size,
+        version: 2,
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -326,6 +523,8 @@ export class LinkIndexService implements ILinkIndex {
         if (entry.isDirectory()) {
           // Skip hidden directories (.obsidian, .trash, .mobile, etc.)
           if (entry.name.startsWith('.')) continue
+          // Skip _ prefixed directories (_link-index.json, _templates)
+          if (entry.name.startsWith('_')) continue
           const subFiles = await this.findMarkdownFiles(fullPath)
           results.push(...subFiles)
         } else if (entry.isFile() && entry.name.endsWith('.md')) {
@@ -388,15 +587,17 @@ export class LinkIndexService implements ILinkIndex {
   }
 
   /**
-   * Persists the forward links to disk as JSON using atomic write (temp → rename).
+   * Persists the index to disk as JSON v2 using atomic write (temp → rename).
    * On failure, logs error and keeps in-memory index intact.
    */
   private async persist(): Promise<void> {
     try {
-      const data: LinkIndexJson = {
-        version: 1,
+      const data: LinkIndexJsonV2 = {
+        version: 2,
         updatedAt: new Date().toISOString(),
         forwardLinks: this.serializeForwardLinks(),
+        tags: this.serializeTags(),
+        properties: this.serializeProperties(),
       }
 
       const json = JSON.stringify(data, null, 2)
@@ -431,7 +632,33 @@ export class LinkIndexService implements ILinkIndex {
   }
 
   /**
-   * Validates that a parsed JSON value conforms to the expected LinkIndexJson schema.
+   * Serializes the file tags map to a plain object for JSON persistence.
+   */
+  private serializeTags(): Record<string, string[]> {
+    const result: Record<string, string[]> = {}
+    for (const [filePath, tags] of this.fileTags) {
+      result[filePath] = Array.from(tags)
+    }
+    return result
+  }
+
+  /**
+   * Serializes the file properties map to a plain object for JSON persistence.
+   */
+  private serializeProperties(): Record<string, Record<string, string[]>> {
+    const result: Record<string, Record<string, string[]>> = {}
+    for (const [filePath, propsMap] of this.fileProperties) {
+      const props: Record<string, string[]> = {}
+      for (const [key, values] of propsMap) {
+        props[key] = values
+      }
+      result[filePath] = props
+    }
+    return result
+  }
+
+  /**
+   * Validates that a parsed JSON value conforms to a supported schema (v1 or v2).
    */
   private validateSchema(data: unknown): data is LinkIndexJson {
     if (data === null || typeof data !== 'object') return false
@@ -439,7 +666,8 @@ export class LinkIndexService implements ILinkIndex {
     const obj = data as Record<string, unknown>
 
     // Check version field
-    if (typeof obj['version'] !== 'number' || obj['version'] !== 1) return false
+    if (typeof obj['version'] !== 'number') return false
+    if (obj['version'] !== 1 && obj['version'] !== 2) return false
 
     // Check updatedAt field
     if (typeof obj['updatedAt'] !== 'string') return false
@@ -456,6 +684,12 @@ export class LinkIndexService implements ILinkIndex {
       for (const item of value) {
         if (typeof item !== 'string') return false
       }
+    }
+
+    // v2 specific validation
+    if (obj['version'] === 2) {
+      if (obj['tags'] === null || typeof obj['tags'] !== 'object') return false
+      if (obj['properties'] === null || typeof obj['properties'] !== 'object') return false
     }
 
     return true

@@ -1,37 +1,68 @@
 // ─── Graph Data Models ───────────────────────────────────────────────────────
 
+/** Discriminated node type for knowledge graph nodes. */
+export type GraphNodeType = 'file' | 'tag' | 'property'
+
+/** Discriminated edge type for knowledge graph edges. */
+export type GraphEdgeType = 'link' | 'tag' | 'property'
+
 /**
- * A single node in the knowledge graph, representing a markdown file
- * or an unresolved link target.
+ * A single node in the knowledge graph.
+ * Can represent a markdown file, unresolved link target, tag, or property value.
  */
 export interface GraphNode {
-  /** Relative file path from vault root (normalized, forward slashes). */
-  path: string
-  /** Filename without extension, used as the display label. */
+  /** Unique node identifier (file path for files, `tag:<name>` for tags, `prop:<key>:<value>` for properties). */
+  id: string
+  /** Node type discriminator. */
+  type: GraphNodeType
+  /** Relative file path from vault root. Only present for type 'file'. */
+  path?: string
+  /** Display label for the node. */
   label: string
-  /** Whether the file physically exists in the vault. */
+  /** Whether the file physically exists in the vault. Only meaningful for type 'file'. */
   exists: boolean
 }
 
 /**
- * A single edge in the knowledge graph, representing a wikilink
- * from one file to another.
+ * A single edge in the knowledge graph.
  */
 export interface GraphEdge {
-  /** Source file path (the file containing the wikilink). */
+  /** Source node ID. */
   source: string
-  /** Target file path (the linked file). */
+  /** Target node ID. */
   target: string
+  /** Edge type discriminator. */
+  type: GraphEdgeType
 }
 
 /**
  * The full graph structure for visualization, consisting of nodes and edges.
  */
 export interface GraphData {
-  /** All nodes in the graph (existing files and unresolved link targets). */
+  /** All nodes in the graph. */
   nodes: GraphNode[]
-  /** All edges in the graph (one per forward link). */
+  /** All edges in the graph. */
   edges: GraphEdge[]
+}
+
+/**
+ * Options for querying the graph with optional tag/property inclusion.
+ */
+export interface GraphQueryOptions {
+  /** Include tag nodes and tag edges in the graph. */
+  includeTags?: boolean | undefined
+  /** Include property nodes and edges for the specified keys. */
+  includePropertyKeys?: string[] | undefined
+}
+
+/**
+ * Aggregated metadata about the graph (tags and property keys with counts).
+ */
+export interface GraphMeta {
+  /** All tags across all files, sorted by count descending. */
+  tags: Array<{ name: string; count: number }>
+  /** All property keys across all files, sorted by count descending. */
+  propertyKeys: Array<{ key: string; count: number }>
 }
 
 /**
@@ -120,9 +151,18 @@ export interface ILinkIndex {
 
   /**
    * Returns the full graph structure for visualization.
-   * @returns Nodes (with existence flag) and edges
+   * Optionally includes tag and property nodes based on query options.
+   * @param options - Optional query options for including tags/properties
+   * @returns Nodes (with type and existence flag) and edges (with type)
    */
-  getGraph(): GraphData
+  getGraph(options?: GraphQueryOptions): GraphData
+
+  /**
+   * Returns aggregated metadata about tags and property keys in the index.
+   * Useful for populating filter/settings UIs.
+   * @returns Tags with counts and property keys with counts, sorted descending
+   */
+  getGraphMeta(): GraphMeta
 
   /**
    * Whether the index has been initialized (loaded or rebuilt).

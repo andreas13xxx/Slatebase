@@ -1,0 +1,204 @@
+/* GraphSettingsPanel — Collapsible settings overlay for the knowledge graph */
+
+.graph-settings-toggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.graph-settings-toggle:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.graph-settings-toggle[aria-expanded="true"] {
+  background: var(--accent-light);
+  color: var(--accent-text);
+}
+
+.graph-settings-panel {
+  position: absolute;
+  top: 48px;
+  right: 8px;
+  z-index: 10;
+  width: 280px;
+  max-height: calc(100% - 60px);
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 12px;
+}
+
+.graph-settings-section {
+  margin-bottom: 16px;
+}
+
+.graph-settings-section:last-child {
+  margin-bottom: 0;
+}
+
+.graph-settings-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.graph-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.graph-settings-row:last-child {
+  margin-bottom: 0;
+}
+
+.graph-settings-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.graph-settings-color-input {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: 0;
+  background: none;
+}
+
+.graph-settings-slider-row {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+
+.graph-settings-slider-row:last-child {
+  margin-bottom: 0;
+}
+
+.graph-settings-slider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.graph-settings-slider-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.graph-settings-slider-value {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.graph-settings-slider {
+  width: 100%;
+  height: 4px;
+  appearance: none;
+  background: var(--border-default);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.graph-settings-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.graph-settings-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+}
+
+.graph-settings-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.graph-settings-toggle-row:last-child {
+  margin-bottom: 0;
+}
+
+.graph-settings-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.graph-settings-property-list {
+  margin-top: 8px;
+  padding-left: 4px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.graph-settings-property-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.graph-settings-property-item:last-child {
+  margin-bottom: 0;
+}
+
+.graph-settings-property-count {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.graph-settings-reset {
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.graph-settings-reset:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}

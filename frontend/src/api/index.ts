@@ -1,4 +1,4 @@
-import type { VaultInfo, DirectoryTree, FileContent, FileSaveResult, AppError, Conversation, PaginatedConversations, PaginatedMessages, Message, GraphData, BacklinksResponse } from '../types'
+import type { VaultInfo, DirectoryTree, FileContent, FileSaveResult, AppError, Conversation, PaginatedConversations, PaginatedMessages, Message, GraphData, GraphMeta, GraphQueryOptions, BacklinksResponse } from '../types'
 import type { PublicUserInfo } from '../state/authState'
 import type { SyncConfigResponse, SyncConfigResult, CreateSyncConfigInput, UpdateSyncConfigInput, SyncResult, AnalysisResult, PaginatedSyncLog, PaginatedSyncProtocol, ConflictEntry } from '../state/syncState'
 
@@ -289,12 +289,14 @@ export interface IApiClient {
   revokeMcpToken(tokenId: string): Promise<void>
 
   // --- Graph methods ---
-  /** Get the full knowledge graph for a vault. */
-  getGraph(vaultId: string): Promise<GraphData>
+  /** Get the full knowledge graph for a vault (optionally including tags/properties). */
+  getGraph(vaultId: string, options?: GraphQueryOptions): Promise<GraphData>
   /** Get backlinks for a specific file in a vault. */
   getBacklinks(vaultId: string, filePath: string): Promise<BacklinksResponse>
   /** Get all tags for a vault with occurrence counts and file lists. */
   getVaultTags(vaultId: string): Promise<VaultTagsResponse>
+  /** Get aggregated graph metadata (tag counts, property key counts). */
+  getGraphMeta(vaultId: string): Promise<GraphMeta>
 
   // --- Plugin methods ---
   /** List all installed plugins for a vault. */
@@ -722,8 +724,17 @@ export class ApiClient implements IApiClient {
   // --- Graph methods ---
 
   /** Get the full knowledge graph for a vault. */
-  async getGraph(vaultId: string): Promise<GraphData> {
-    return this.request<GraphData>('GET', `/api/v1/vaults/${vaultId}/graph`)
+  async getGraph(vaultId: string, options?: GraphQueryOptions): Promise<GraphData> {
+    const params = new URLSearchParams()
+    if (options?.includeTags) {
+      params.set('includeTags', 'true')
+    }
+    if (options?.includeProperties && options.includeProperties.length > 0) {
+      params.set('includeProperties', options.includeProperties.join(','))
+    }
+    const queryString = params.toString()
+    const url = `/api/v1/vaults/${vaultId}/graph${queryString ? '?' + queryString : ''}`
+    return this.request<GraphData>('GET', url)
   }
 
   /** Get backlinks for a specific file in a vault. */
@@ -735,6 +746,11 @@ export class ApiClient implements IApiClient {
   /** Get all tags for a vault with occurrence counts and file lists. */
   async getVaultTags(vaultId: string): Promise<VaultTagsResponse> {
     return this.request<VaultTagsResponse>('GET', `/api/v1/vaults/${vaultId}/tags`)
+  }
+
+  /** Get aggregated graph metadata (tag counts, property key counts). */
+  async getGraphMeta(vaultId: string): Promise<GraphMeta> {
+    return this.request<GraphMeta>('GET', `/api/v1/vaults/${vaultId}/graph/meta`)
   }
 
   // --- Plugin methods ---

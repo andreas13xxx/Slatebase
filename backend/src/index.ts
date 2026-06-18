@@ -417,7 +417,7 @@ const routeModules = [
   new VaultShareRouteModule(vaultAccessControl, vaultService, vaultRegistry, logger, vaultShareRegistry, userRepository),
   new ChatRouteModule(chatController),
   createSyncRoutes({ syncService, vaultRegistry, logger }),
-  createGraphRoutes({ getLinkIndex, accessControl: vaultAccessControl, vaultRegistry, vaultReader, logger }),
+  createGraphRoutes({ getLinkIndex, accessControl: vaultAccessControl, vaultRegistry, logger }),
 ]
 const router = createRouter(routeModules)
 

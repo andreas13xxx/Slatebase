@@ -137,6 +137,8 @@
   --graph-edge-highlight: #6366f1;
   --graph-label-color: #334155;
   --graph-search-highlight: #f59e0b;
+  --graph-tag-node: #10b981;
+  --graph-property-node: #f59e0b;
 
   /* Toast Notification Tokens — Light */
   --toast-info-bg: #eff6ff;
@@ -321,6 +323,8 @@
     --graph-edge-highlight: #818cf8;
     --graph-label-color: #e2e8f0;
     --graph-search-highlight: #fbbf24;
+ --graph-tag-node: #34d399;
+ --graph-property-node: #fbbf24;
 
     /* Toast Notification Tokens — Dark */
     --toast-info-bg: #1e293b;
@@ -483,6 +487,8 @@
     --graph-edge-highlight: #818cf8;
     --graph-label-color: #e2e8f0;
     --graph-search-highlight: #fbbf24;
+ --graph-tag-node: #34d399;
+ --graph-property-node: #fbbf24;
 
     /* Toast Notification Tokens — Dark */
     --toast-info-bg: #1e293b;
