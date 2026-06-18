@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   createDailyNoteService,
   getDailyNotesConfig,
-  setDailyNotesConfig,
+  cacheDailyNotesConfig,
   getTodayDateString,
   validateDirectoryPath,
   NoActiveVaultError,
@@ -84,6 +84,25 @@ function createMockApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
     searchMultiVault: vi.fn(),
     replaceInVault: vi.fn(),
     getVersion: vi.fn(),
+    getVaultStatistics: vi.fn(),
+    uploadFiles: vi.fn(),
+    uploadImagePaste: vi.fn(),
+    listTemplates: vi.fn(),
+    createFromTemplate: vi.fn(),
+    listTrash: vi.fn(),
+    restoreTrash: vi.fn(),
+    deleteTrash: vi.fn(),
+    listVersions: vi.fn(),
+    getVersionContent: vi.fn(),
+    restoreVersion: vi.fn(),
+    getRecentFiles: vi.fn().mockResolvedValue({ entries: [] }),
+    saveRecentFiles: vi.fn().mockResolvedValue({ entries: [] }),
+    getFavorites: vi.fn().mockResolvedValue({ entries: [] }),
+    saveFavorites: vi.fn().mockResolvedValue({ entries: [] }),
+    getKeybindings: vi.fn().mockResolvedValue({ entries: [] }),
+    saveKeybindings: vi.fn().mockResolvedValue({ entries: [] }),
+    getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: '_templates', dailyNotesDirectory: '' }),
+    saveVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: '_templates', dailyNotesDirectory: '' }),
     ...overrides,
   } as IApiClient
 }
@@ -122,7 +141,7 @@ describe('dailyNoteService', () => {
     })
   })
 
-  describe('getDailyNotesConfig / setDailyNotesConfig', () => {
+  describe('getDailyNotesConfig / cacheDailyNotesConfig', () => {
     beforeEach(() => {
       localStorage.clear()
     })
@@ -132,7 +151,7 @@ describe('dailyNoteService', () => {
     })
 
     it('returns configured directory after setting', () => {
-      setDailyNotesConfig('vault1', 'journal')
+      cacheDailyNotesConfig('vault1', 'journal')
       expect(getDailyNotesConfig('vault1')).toBe('journal')
     })
 
@@ -147,8 +166,8 @@ describe('dailyNoteService', () => {
     })
 
     it('scopes config per vault', () => {
-      setDailyNotesConfig('vault1', 'daily')
-      setDailyNotesConfig('vault2', 'journal')
+      cacheDailyNotesConfig('vault1', 'daily')
+      cacheDailyNotesConfig('vault2', 'journal')
       expect(getDailyNotesConfig('vault1')).toBe('daily')
       expect(getDailyNotesConfig('vault2')).toBe('journal')
     })

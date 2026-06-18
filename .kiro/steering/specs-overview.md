@@ -52,6 +52,9 @@ inclusion: manual
 | 39 | `collaborative-editing` | Feature | 📋 Requirements | Echtzeit-Multi-User-Editing mit CRDT/OT und Cursor-Presence |
 | 40 | `sync-conflict-resolution` | Feature | 📋 Requirements | Halbautomatisches Konfliktmanagement bei Sync (Diff-View, Batch-Auflösung, Auto-Strategien) |
 | 41 | `command-palette-builtin` | Feature | ✅ Fertig | Command Palette (Ctrl+P) immer aktiv, 40+ Built-in-Befehle (Navigation, Vault-Ops, Editor-Formatierung, Admin, View-Toggles), Editor-Commands via CustomEvent-Bridge |
+| 42 | `user-preferences-persistence` | Feature | ✅ Fertig | Per-User Preferences (Recent Files, Favoriten, Keybindings) serverseitig persistiert mit localStorage-Cache + 2s-Debounce-Sync |
+| 43 | `vault-config` | Feature | ✅ Fertig | Per-Vault Konfiguration (Vorlagen-Verzeichnis, Tagesnotizen-Verzeichnis) — Owner-only, Settings-UI, TemplateService + DailyNoteService lesen daraus |
+| 44 | `configurable-keybindings` | Feature | ✅ Fertig | Konfigurierbare Tastaturkürzel (14 Commands, 4 Kategorien, Platform-agnostisch, Conflict Detection, Settings-UI mit Inline-Recording) |
 
 ## Abhängigkeiten zwischen Specs
 

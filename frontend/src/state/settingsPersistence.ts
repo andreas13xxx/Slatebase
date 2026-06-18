@@ -24,8 +24,8 @@ const VALID_CATEGORIES: SettingsCategory[] = ['account', 'vault', 'administratio
 
 /** Valid sections per category for validation. */
 const CATEGORY_SECTIONS: Record<SettingsCategory, SettingsSection[]> = {
-  account: ['profile', 'password', 'sessions', 'mcp-tokens', 'delete-account'],
-  vault: ['sync', 'plugins'],
+  account: ['profile', 'password', 'sessions', 'mcp-tokens', 'keybindings', 'delete-account'],
+  vault: ['sync', 'plugins', 'vault-config'],
   administration: ['server-config', 'user-management', 'vault-management', 'feature-toggles'],
 }
 

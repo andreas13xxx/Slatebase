@@ -1,10 +1,15 @@
 /**
- * Favorites store — persists per-vault favorite file entries in localStorage.
- * Falls back to in-memory storage when localStorage is unavailable.
+ * Favorites store — per-user persistence with localStorage cache.
+ *
+ * Persists per-vault favorite file entries.
+ * Uses localStorage as immediate cache for responsiveness.
+ * Syncs with backend API for cross-device persistence (debounced).
  *
  * localStorage key format: `slatebase:favorites:<vaultId>`
  * Max 50 favorites per vault. Ordered by addedAt descending (newest first).
  */
+
+import type { IApiClient, FavoriteEntry as ApiFavoriteEntry } from '../api'
 
 // ─── Data Models ─────────────────────────────────────────────────────────────
 
@@ -35,15 +40,67 @@ export interface IFavoritesStore {
 
 const STORAGE_PREFIX = 'slatebase:favorites:'
 const MAX_FAVORITES_PER_VAULT = 50
+const SYNC_DEBOUNCE_MS = 2000
 
-// ─── Storage Helpers ─────────────────────────────────────────────────────────
+// ─── Internal State ──────────────────────────────────────────────────────────
 
 /** In-memory fallback when localStorage is unavailable. */
 const memoryStore = new Map<string, FavoriteEntry[]>()
 
+/** API client reference for backend sync. */
+let apiClient: IApiClient | null = null
+let syncTimer: ReturnType<typeof setTimeout> | null = null
+let syncInProgress = false
+
+// ─── Initialization ──────────────────────────────────────────────────────────
+
+/**
+ * Initialize the store with an API client and load server-side data.
+ * Merges server data with local cache (server wins for conflicts).
+ * Called on login / app mount.
+ */
+export async function initialize(client: IApiClient): Promise<void> {
+  apiClient = client
+  try {
+    const response = await client.getFavorites()
+    if (response.entries.length > 0) {
+      // Group server entries by vault
+      const serverByVault = new Map<string, FavoriteEntry[]>()
+      for (const entry of response.entries) {
+        const existing = serverByVault.get(entry.vaultId) ?? []
+        existing.push(entry)
+        serverByVault.set(entry.vaultId, existing)
+      }
+
+      // For each vault with server data, merge with local
+      for (const [vaultId, serverEntries] of serverByVault) {
+        const localEntries = loadFavorites(vaultId)
+        const serverPaths = new Set(serverEntries.map(e => e.path))
+        const localOnly = localEntries.filter(e => !serverPaths.has(e.path))
+        const merged = [...serverEntries, ...localOnly].slice(0, MAX_FAVORITES_PER_VAULT)
+        saveFavoritesLocal(vaultId, merged)
+      }
+    }
+  } catch {
+    // Server unavailable — continue with localStorage data
+  }
+}
+
+/**
+ * Disconnect from the backend (on logout).
+ */
+export function disconnect(): void {
+  if (syncTimer !== null) {
+    clearTimeout(syncTimer)
+    syncTimer = null
+  }
+  apiClient = null
+}
+
+// ─── Storage Helpers ─────────────────────────────────────────────────────────
+
 /**
  * Detect whether localStorage is available and functional.
- * Checks for SecurityError (private browsing) and QuotaExceededError.
  */
 function isLocalStorageAvailable(): boolean {
   try {
@@ -83,8 +140,8 @@ function loadFavorites(vaultId: string): FavoriteEntry[] {
   }
 }
 
-/** Write favorites for a vault to storage. */
-function saveFavorites(vaultId: string, entries: FavoriteEntry[]): void {
+/** Write favorites for a vault to local storage only. */
+function saveFavoritesLocal(vaultId: string, entries: FavoriteEntry[]): void {
   const key = STORAGE_PREFIX + vaultId
 
   if (!isLocalStorageAvailable()) {
@@ -98,6 +155,83 @@ function saveFavorites(vaultId: string, entries: FavoriteEntry[]): void {
     // Quota exceeded or other error — fall back to memory silently
     memoryStore.set(key, entries)
   }
+}
+
+/** Save favorites locally AND schedule backend sync. */
+function saveFavorites(vaultId: string, entries: FavoriteEntry[]): void {
+  saveFavoritesLocal(vaultId, entries)
+  scheduleSyncToServer()
+}
+
+// ─── Backend Sync ────────────────────────────────────────────────────────────
+
+/** Schedule a debounced sync of ALL favorites to the backend. */
+function scheduleSyncToServer(): void {
+  if (!apiClient) return
+  if (syncTimer !== null) {
+    clearTimeout(syncTimer)
+  }
+  syncTimer = setTimeout(() => {
+    syncTimer = null
+    syncToServer()
+  }, SYNC_DEBOUNCE_MS)
+}
+
+/** Sync all favorites across all vaults to the backend. */
+async function syncToServer(): Promise<void> {
+  if (!apiClient || syncInProgress) return
+  syncInProgress = true
+  try {
+    // Collect all favorites from all vault keys in localStorage
+    const allEntries = collectAllFavorites()
+    const apiEntries: ApiFavoriteEntry[] = allEntries.map(e => ({
+      vaultId: e.vaultId,
+      path: e.path,
+      addedAt: e.addedAt,
+    }))
+    await apiClient.saveFavorites(apiEntries)
+  } catch {
+    // Sync failed — data remains in localStorage, will retry on next change
+  } finally {
+    syncInProgress = false
+  }
+}
+
+/** Collect all favorites from localStorage across all vault keys. */
+function collectAllFavorites(): FavoriteEntry[] {
+  const all: FavoriteEntry[] = []
+
+  if (!isLocalStorageAvailable()) {
+    for (const entries of memoryStore.values()) {
+      all.push(...entries)
+    }
+    return all
+  }
+
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith(STORAGE_PREFIX)) {
+        const raw = localStorage.getItem(key)
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw) as FavoriteEntry[]
+            if (Array.isArray(parsed)) {
+              all.push(...parsed.filter(
+                (e): e is FavoriteEntry =>
+                  typeof e === 'object' && e !== null &&
+                  typeof e.vaultId === 'string' &&
+                  typeof e.path === 'string' &&
+                  typeof e.addedAt === 'string'
+              ))
+            }
+          } catch { /* skip malformed */ }
+        }
+      }
+    }
+  } catch { /* ignore */ }
+
+  return all
 }
 
 // ─── Store Implementation ────────────────────────────────────────────────────

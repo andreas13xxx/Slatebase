@@ -9,6 +9,7 @@
 import { useEffect, useCallback, useRef } from 'react'
 import React from 'react'
 import { useAuthContext } from '../../state/authContext'
+import { matchesShortcut } from '../../state/keybindingsStore'
 import { useAppContext } from '../../state'
 import { SettingsProvider } from '../../state/settingsContext'
 import { SettingsSidebar } from './SettingsSidebar'
@@ -99,7 +100,7 @@ export function SettingsPanel({ open, onClose, initialNav }: SettingsPanelProps)
   // Global Ctrl+, shortcut registration
   useEffect(() => {
     function handleGlobalKeyDown(e: KeyboardEvent) {
-      if (e.ctrlKey && e.key === ',') {
+      if (matchesShortcut('slatebase:open-settings', e)) {
         e.preventDefault()
         if (!open) {
           // The parent component is responsible for opening the panel.

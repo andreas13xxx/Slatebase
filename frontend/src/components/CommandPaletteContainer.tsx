@@ -7,6 +7,7 @@ import { useAppContext } from '../state/index'
 import { useAuthContext } from '../state/authContext'
 import { openTab } from '../state/tabActions'
 import { TemplateSelector } from './TemplateSelector'
+import { matchesShortcut } from '../state/keybindingsStore'
 import type { Command } from '../plugins/compat/command-registry'
 
 /** Pages the CommandPalette can navigate to. */
@@ -75,13 +76,10 @@ export function CommandPaletteContainer({
   const isVaultOwner = selectedVault?.permission === 'owner'
   const hasWriteAccess = selectedVault?.permission === 'owner' || selectedVault?.permission === 'write'
 
-  // ─── Keyboard shortcut: Ctrl+P / Cmd+P ─────────────────────────────────────
+  // ─── Keyboard shortcut: Command Palette (default: Ctrl+P / Cmd+P) ────────────
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent): void {
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
-      const modifier = isMac ? e.metaKey : e.ctrlKey
-
-      if (modifier && e.key === 'p') {
+      if (matchesShortcut('slatebase:open-command-palette', e)) {
         e.preventDefault()
         setIsOpen(true)
       }

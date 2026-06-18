@@ -8,6 +8,7 @@ import type { IVaultManager } from '../vault/index.js'
 import { validateFilePath } from '../vault/index.js'
 import type { ITemplateService, TemplateInfo } from './types.js'
 import { TemplateNotFoundError, TemplateConflictError } from './errors.js'
+import type { IVaultConfigService } from '../vault-config/index.js'
 
 // ─── Implementation ──────────────────────────────────────────────────────────
 
@@ -15,14 +16,17 @@ import { TemplateNotFoundError, TemplateConflictError } from './errors.js'
  * Service for managing note templates.
  * Reads `.md` files (without `_` prefix) from a configurable directory
  * and creates new files with placeholder substitution.
+ * Uses per-vault config (if available) to determine the templates directory,
+ * falling back to the global default from server configuration.
  */
 export class TemplateService implements ITemplateService {
   private static readonly MAX_TEMPLATES = 100
 
   constructor(
-    private readonly templatesDirectory: string,
+    private readonly defaultTemplatesDirectory: string,
     private readonly vaultManager: IVaultManager,
     private readonly logger: ILogger,
+    private readonly vaultConfigService?: IVaultConfigService,
   ) {}
 
   /**
@@ -32,7 +36,8 @@ export class TemplateService implements ITemplateService {
    */
   async listTemplates(vaultId: string): Promise<TemplateInfo[]> {
     const vaultDataDir = this.resolveVaultDataDir(vaultId)
-    const templatesPath = path.join(vaultDataDir, this.templatesDirectory)
+    const templatesDir = await this.resolveTemplatesDirectory(vaultId)
+    const templatesPath = path.join(vaultDataDir, templatesDir)
 
     try {
       const entries = await fs.readdir(templatesPath, { withFileTypes: true })
@@ -72,13 +77,14 @@ export class TemplateService implements ITemplateService {
     fileName: string,
   ): Promise<{ path: string; content: string }> {
     const vaultDataDir = this.resolveVaultDataDir(vaultId)
+    const templatesDir = await this.resolveTemplatesDirectory(vaultId)
 
     // 1. Read template content
     const templateFileName = templateName.endsWith('.md') ? templateName : `${templateName}.md`
-    const templatePath = path.join(vaultDataDir, this.templatesDirectory, templateFileName)
+    const templatePath = path.join(vaultDataDir, templatesDir, templateFileName)
 
     // Validate template path stays within vault (path traversal protection)
-    validateFilePath(vaultDataDir, path.join(this.templatesDirectory, templateFileName))
+    validateFilePath(vaultDataDir, path.join(templatesDir, templateFileName))
 
     let templateContent: string
     try {
@@ -158,6 +164,21 @@ export class TemplateService implements ITemplateService {
       .replace(/\{\{date\}\}/g, date)
       .replace(/\{\{time\}\}/g, time)
       .replace(/\{\{title\}\}/g, title)
+  }
+
+  /**
+   * Resolves the templates directory for a vault.
+   * Uses per-vault config if available, otherwise falls back to global default.
+   */
+  private async resolveTemplatesDirectory(vaultId: string): Promise<string> {
+    if (this.vaultConfigService) {
+      try {
+        return await this.vaultConfigService.getTemplatesDirectory(vaultId)
+      } catch {
+        // Fall back to default on error
+      }
+    }
+    return this.defaultTemplatesDirectory
   }
 
   /**

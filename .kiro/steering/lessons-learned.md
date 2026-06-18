@@ -150,6 +150,18 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - Integration: echtes Filesystem, Temp-Dirs, Cleanup `afterAll`
 - ESLint vor Commit: `npx eslint . --quiet` im Frontend
 
+## User Preferences & Store-Sync-Pattern
+
+- Server-Persistenz pro User: `data/users/<userId>-preferences.json`
+- Frontend-Stores (`recentFilesStore`, `favoritesStore`, `keybindingsStore`): Module-Level State + localStorage Cache + Backend-Sync
+- Lifecycle: `initialize(apiClient)` bei Login/App-Mount, `disconnect()` bei Session-Expiry
+- Merge-Strategie: Server-Daten gewinnen bei Konflikten, lokale Einträge füllen leere Slots
+- Debounced Sync: 2s Timeout, keine doppelten Requests (`syncInProgress` Flag)
+- Neue Stores brauchen: `initialize()` in AppContent `useEffect`, `disconnect()` in `onSessionExpired`
+- Per-Vault Config: `.vault-config.json` im Vault-Verzeichnis, Owner-only write, read für alle mit Zugang
+- Keybindings: `matchesShortcut(commandId, event)` statt manueller `e.ctrlKey && e.key ===` Checks
+- Keybindings `Mod` = plattformabhängig (Ctrl auf Win/Linux, Meta auf Mac)
+
 ## Dev-Umgebung
 
 - Git-Proxy: `git -c http.proxy="" push`

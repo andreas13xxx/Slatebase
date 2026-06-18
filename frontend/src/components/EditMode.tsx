@@ -3,6 +3,7 @@ import { useTranslation } from '../i18n'
 import { isEmbeddableFile } from '../utils/pathUtils'
 import { useHistoryStack } from '../hooks/useHistoryStack'
 import { useLineNumbers } from '../hooks/useLineNumbers'
+import { matchesShortcut } from '../state/keybindingsStore'
 import { LineNumbers } from './LineNumbers'
 import { DropZone } from './DropZone'
 import { showToast } from './ToastNotification'
@@ -509,18 +510,24 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
   }, [redo, onChange, triggerAutoSave])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    // Save: default Mod+S
+    if (matchesShortcut('slatebase:editor-save', e.nativeEvent)) {
       e.preventDefault()
       if (debounceRef.current) clearTimeout(debounceRef.current)
       onSave()
     }
-    // Undo: Ctrl+Z (but not Ctrl+Shift+Z which is redo)
-    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+    // Undo: default Mod+Z (but not Mod+Shift+Z which is redo)
+    if (matchesShortcut('slatebase:editor-undo', e.nativeEvent)) {
       e.preventDefault()
       performUndo()
     }
-    // Redo: Ctrl+Y or Ctrl+Shift+Z
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'Z' && e.shiftKey) || (e.key === 'z' && e.shiftKey))) {
+    // Redo: default Mod+Shift+Z
+    if (matchesShortcut('slatebase:editor-redo', e.nativeEvent)) {
+      e.preventDefault()
+      performRedo()
+    }
+    // Legacy redo: Ctrl+Y (always available, not configurable)
+    if ((e.ctrlKey || e.metaKey) && e.key === 'y' && !e.shiftKey) {
       e.preventDefault()
       performRedo()
     }

@@ -55,6 +55,8 @@ src/
 │   ├── fileVersionRoutes.ts — File version routes (list, get content, restore)
 │   ├── templateRoutes.ts — Template routes (list, create from template)
 │   ├── uploadRoutes.ts   — File upload routes (multipart, image paste mode)
+│   ├── preferencesRoutes.ts — User preferences routes (GET/PUT recent-files, favorites, keybindings)
+│   ├── vaultConfigRoutes.ts — Per-vault config routes (GET/PUT /vaults/:vaultId/config)
 │   └── sseRoutes.ts      — GET /events (SSE stream)
 ├── chat/
 │   ├── types.ts          — Chat data models (Conversation, Message, etc.)
@@ -155,6 +157,16 @@ src/
 │   ├── index.ts              — Barrel export for cleanup module
 │   ├── types.ts              — ICleanupJob, CleanupConfig interfaces
 │   └── cleanup-job.ts        — CleanupJob (periodic trash purge + version prune, per-file error isolation)
+├── preferences/
+│   ├── index.ts              — Barrel export for preferences module
+│   ├── types.ts              — IPreferencesService, UserPreferences, RecentFileEntry, FavoriteEntry, KeybindingEntry
+│   ├── validation.ts         — Zod schemas (saveRecentFilesSchema, saveFavoritesSchema, saveKeybindingsSchema)
+│   └── preferences-store.ts  — PreferencesStore (per-user JSON file, atomic writes)
+├── vault-config/
+│   ├── index.ts              — Barrel export for vault-config module
+│   ├── types.ts              — IVaultConfigService, VaultConfig (templatesDirectory, dailyNotesDirectory)
+│   ├── validation.ts         — Zod schema (updateVaultConfigSchema)
+│   └── vault-config-store.ts — VaultConfigStore (per-vault .vault-config.json, atomic writes)
 ├── import/index.ts       — ImportService (file/folder import logic)
 └── integration.test.ts   — Integration tests
 config/
@@ -245,9 +257,10 @@ src/
 │   ├── realtimeChatBridge.ts — Module-level bridge: SSE chat events → ChatProvider (cross-provider communication)
 │   ├── realtimeVaultBridge.ts — Module-level bridge: SSE vault:change events → AppProvider (tree refresh + tab reload)
 │   ├── useEventSource.ts — Custom hook managing EventSource lifecycle (backoff, visibility, reconnect)
-│   ├── recentFilesStore.ts — Recent files list (localStorage, max 20, dedup by vaultId+path)
-│   ├── favoritesStore.ts — Favorites per vault (localStorage, max 50, path tracking on rename/delete)
-│   ├── dailyNoteService.ts — Daily note open/create logic (YYYY-MM-DD.md, template support)
+│   ├── recentFilesStore.ts — Recent files list (server-synced + localStorage cache, max 20, dedup by vaultId+path)
+│   ├── favoritesStore.ts — Favorites per vault (server-synced + localStorage cache, max 50, path tracking on rename/delete)
+│   ├── dailyNoteService.ts — Daily note open/create logic (YYYY-MM-DD.md, template from vault config)
+│   ├── keybindingsStore.ts — Configurable keyboard shortcuts (server-synced, defaults + user overrides, matchesShortcut(), formatShortcut())
 │   └── vaultStatisticsCache.ts — Client-side vault statistics cache (invalidate on vault:change SSE)
 │   ├── settingsState.ts      — Settings reducer + types (categories, sections, nav state)
 │   ├── settingsRegistry.ts   — ISettingsRegistry, section definitions
@@ -322,7 +335,9 @@ src/
 │   │   ├── SettingsContent.tsx   — Section → Component mapping with focus management
 │   │   ├── AccountDeletionSection.tsx — Extracted account deletion form
 │   │   ├── FeatureTogglesSection.tsx  — Extracted feature toggle UI
-│   │   └── ServerRestartSection.tsx   — Server restart with confirmation
+│   │   ├── ServerRestartSection.tsx   — Server restart with confirmation
+│   │   ├── VaultConfigSection.tsx     — Per-vault config (templates dir, daily notes dir)
+│   │   └── KeybindingsSection.tsx     — Configurable keyboard shortcuts (table, inline recording, conflict detection)
 │   ├── AdminUsersPage.tsx — User administration
 │   ├── AdminVaultsPage.tsx — Admin: all vaults overview with delete
 │   ├── AdminConfigPage.tsx — Server configuration (card-based layout)
@@ -371,6 +386,8 @@ Route modules in `src/api/`:
 - `fileVersionRoutes.ts` — file version management (list, get content, restore)
 - `templateRoutes.ts` — template listing and creation
 - `uploadRoutes.ts` — file upload (multipart, image paste mode)
+- `preferencesRoutes.ts` — user preferences (recent files, favorites, keybindings)
+- `vaultConfigRoutes.ts` — per-vault config (templates dir, daily notes dir)
 - `sseRoutes.ts` — `GET /events` (SSE stream)
 
 ## Data Storage

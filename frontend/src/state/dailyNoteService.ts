@@ -1,15 +1,10 @@
 import type { IApiClient } from '../api'
 
-/** localStorage key pattern for daily notes config per vault. */
+/** localStorage key pattern for daily notes config per vault (cache). */
 const STORAGE_KEY_PREFIX = 'slatebase:dailyNotes:'
 
 /** Maximum allowed directory path length. */
 const MAX_DIRECTORY_PATH_LENGTH = 255
-
-/** Config shape stored in localStorage. */
-interface DailyNotesConfig {
-  directory: string
-}
 
 /** Error thrown when no vault is active. */
 export class NoActiveVaultError extends Error {
@@ -40,14 +35,15 @@ export function validateDirectoryPath(directory: string): void {
 }
 
 /**
- * Reads the daily notes directory config from localStorage.
+ * Reads the daily notes directory config from localStorage cache.
  * Returns the configured directory or empty string (vault root) as default.
+ * This is the synchronous fallback — the actual source of truth is the vault config API.
  */
 export function getDailyNotesConfig(vaultId: string): string {
   try {
     const raw = localStorage.getItem(`${STORAGE_KEY_PREFIX}${vaultId}`)
     if (!raw) return ''
-    const parsed = JSON.parse(raw) as DailyNotesConfig
+    const parsed = JSON.parse(raw) as { directory?: string }
     return parsed.directory ?? ''
   } catch {
     return ''
@@ -55,11 +51,30 @@ export function getDailyNotesConfig(vaultId: string): string {
 }
 
 /**
- * Saves the daily notes directory config to localStorage.
+ * Updates the localStorage cache for daily notes directory.
+ * Called when vault config is loaded from API to keep the synchronous cache fresh.
  */
-export function setDailyNotesConfig(vaultId: string, directory: string): void {
-  const config: DailyNotesConfig = { directory }
-  localStorage.setItem(`${STORAGE_KEY_PREFIX}${vaultId}`, JSON.stringify(config))
+export function cacheDailyNotesConfig(vaultId: string, directory: string): void {
+  try {
+    localStorage.setItem(`${STORAGE_KEY_PREFIX}${vaultId}`, JSON.stringify({ directory }))
+  } catch {
+    // Silently fail
+  }
+}
+
+/**
+ * Loads the daily notes directory from the vault config API and updates the local cache.
+ * Falls back to the cached value if the API call fails.
+ */
+export async function loadDailyNotesConfigFromServer(apiClient: IApiClient, vaultId: string): Promise<string> {
+  try {
+    const config = await apiClient.getVaultConfig(vaultId)
+    cacheDailyNotesConfig(vaultId, config.dailyNotesDirectory)
+    return config.dailyNotesDirectory
+  } catch {
+    // API unavailable — fall back to localStorage cache
+    return getDailyNotesConfig(vaultId)
+  }
 }
 
 /**
@@ -111,10 +126,19 @@ export function createDailyNoteService(apiClient: IApiClient): IDailyNoteService
         // File does not exist (404) — proceed to create
       }
 
-      // 2. Try loading _templates/daily.md template
+      // 2. Try loading daily.md template from the vault's template directory
+      // First get the template directory from vault config
+      let templateDir = '_templates'
+      try {
+        const vaultConfig = await apiClient.getVaultConfig(vaultId)
+        templateDir = vaultConfig.templatesDirectory || '_templates'
+      } catch {
+        // Use default if config unavailable
+      }
+
       let templateContent = ''
       try {
-        const templateFile = await apiClient.fetchFileContent(vaultId, '_templates/daily.md')
+        const templateFile = await apiClient.fetchFileContent(vaultId, `${templateDir}/daily.md`)
         templateContent = templateFile.content
       } catch {
         // No template found — use empty content

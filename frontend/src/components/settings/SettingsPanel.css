@@ -222,3 +222,256 @@
   gap: 8px;
   align-items: flex-end;
 }
+
+
+/* ===== Vault Config Section ===== */
+
+.vault-config-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-field-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-field-hint {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.settings-field-hint code {
+  background: var(--bg-surface);
+  border-radius: var(--radius-sm);
+  padding: 1px 4px;
+  font-size: 0.75rem;
+}
+
+.settings-field-input {
+  padding: 8px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: var(--font-mono);
+  width: 100%;
+  max-width: 400px;
+  transition: border-color var(--transition-base);
+}
+
+.settings-field-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-primary-faded);
+}
+
+.settings-field-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.settings-save-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--accent-primary);
+  color: var(--text-on-accent);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity var(--transition-base);
+}
+
+.settings-save-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.settings-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-save-btn--secondary {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+}
+
+.settings-save-btn--secondary:hover:not(:disabled) {
+  background: var(--bg-elevated);
+}
+
+.settings-loading {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.settings-error {
+  color: var(--text-danger);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+/* ===== Keybindings Section ===== */
+
+.keybindings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.keybindings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.keybindings-group-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+.keybindings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.keybindings-table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 0.8rem;
+}
+
+.keybindings-table td {
+  padding: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+
+.keybindings-col-command {
+  width: 45%;
+}
+
+.keybindings-col-shortcut {
+  width: 30%;
+}
+
+.keybindings-col-actions {
+  width: 25%;
+}
+
+.keybindings-cell-command {
+  color: var(--text-primary);
+}
+
+.keybindings-row--overridden .keybindings-cell-command {
+  font-weight: 500;
+}
+
+.keybindings-shortcut-btn {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  min-width: 80px;
+  text-align: center;
+  transition: border-color var(--transition-base);
+}
+
+.keybindings-shortcut-btn:hover {
+  border-color: var(--accent-primary);
+}
+
+.keybindings-unset {
+  color: var(--text-muted);
+}
+
+.keybindings-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.keybindings-input {
+  padding: 4px 8px;
+  border: 2px solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  width: 120px;
+  text-align: center;
+}
+
+.keybindings-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-primary-faded);
+}
+
+.keybindings-btn {
+  padding: 3px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-base), color var(--transition-base);
+}
+
+.keybindings-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.keybindings-btn--save {
+  color: var(--text-success);
+  font-weight: 600;
+}
+
+.keybindings-btn--cancel {
+  color: var(--text-danger);
+}
+
+.keybindings-btn--save:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.keybindings-cell-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}

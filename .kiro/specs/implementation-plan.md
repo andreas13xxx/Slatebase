@@ -159,6 +159,41 @@ Scope: ~8–12h. Implementiert.
 
 ---
 
+### Task 5b: Per-User Preferences & Vault Config & Keyboard Shortcuts ✅ ERLEDIGT
+
+Scope: ~10–12h. Backend + Frontend, 3 zusammenhängende Features.
+
+**Feature 1: Server-persistente Recent Files & Favoriten (pro User)**
+
+- ✅ Neues Backend-Modul `preferences/` (types, store, validation)
+- ✅ API-Endpoints: `GET/PUT /users/me/recent-files`, `GET/PUT /users/me/favorites`, `GET/PUT /users/me/keybindings`
+- ✅ Persistenz: `data/users/<userId>-preferences.json` (atomare Writes)
+- ✅ Frontend: `recentFilesStore` + `favoritesStore` refactored — Backend-Sync mit 2s Debounce, localStorage als Cache
+- ✅ Lifecycle: `initialize(apiClient)` bei Login, `disconnect()` bei Session-Expiry
+
+**Feature 2: Per-Vault Konfiguration (Vorlagen- & Tagesnotizen-Verzeichnis)**
+
+- ✅ Neues Backend-Modul `vault-config/` (types, store, validation)
+- ✅ API-Endpoints: `GET/PUT /vaults/:vaultId/config` (Owner-only write)
+- ✅ Persistenz: `.vault-config.json` im Vault-Verzeichnis
+- ✅ TemplateService liest per-vault Templates-Verzeichnis (Fallback auf global)
+- ✅ DailyNoteService liest per-vault Daily-Notes-Verzeichnis vom Server
+- ✅ Settings-UI: Neue Sektion „Vault-Konfiguration" unter Vault-Kategorie
+
+**Feature 3: Konfigurierbare Tastaturkürzel**
+
+- ✅ Neues Frontend-Modul `keybindingsStore.ts` — Registry mit 14 Commands in 4 Kategorien
+- ✅ `matchesShortcut()` für plattform-agnostisches Matching (Mod = Ctrl/Meta)
+- ✅ Alle hardcoded Shortcuts refactored: App.tsx, CommandPaletteContainer, SettingsPanel, EditMode
+- ✅ Per-User-Overrides sync mit Backend (`GET/PUT /users/me/keybindings`)
+- ✅ Settings-UI: Neue Sektion „Tastaturkürzel" mit Tabelle, Inline-Recording, Konflikt-Erkennung, Reset
+
+**Tests:** Backend 1238 Tests ✓, Frontend 1309 Tests ✓, TypeScript kompiliert fehlerfrei.
+
+**Demo:** Recent Files und Favoriten überleben Gerätewechsel. Vault-Besitzer konfigurieren Vorlagen-/Tagesnotizen-Verzeichnis pro Vault. Alle Tastaturkürzel individuell anpassbar über Settings.
+
+---
+
 ### Task 6: Knowledge Graph v2 — Design + Tasks erstellen, dann implementieren
 
 Scope: ~6–8h Design, ~12–16h Implementierung.

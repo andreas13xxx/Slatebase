@@ -76,6 +76,10 @@ import { createFileVersionRoutes } from './api/fileVersionRoutes.js'
 import { TrashService } from './trash/index.js'
 import { createTrashRoutes } from './api/trashRoutes.js'
 import { CleanupJob } from './cleanup/index.js'
+import { PreferencesStore } from './preferences/index.js'
+import { createPreferencesRoutes } from './api/preferencesRoutes.js'
+import { VaultConfigStore } from './vault-config/index.js'
+import { createVaultConfigRoutes } from './api/vaultConfigRoutes.js'
 
 // --- Composition Root ---
 
@@ -475,7 +479,12 @@ app.route('/api/v1', uploadRoutes)
 
 // Template route registration (auth middleware applies via /api/v1/* pattern)
 const templatesConfig = config.getTemplatesConfig()
-const templateService = new TemplateService(templatesConfig.directory, vaultManager, logger)
+const vaultConfigStore = new VaultConfigStore(
+  (vaultId: string) => vaultRegistry.findById(vaultId)?.storagePath ?? null,
+  templatesConfig.directory,
+  logger,
+)
+const templateService = new TemplateService(templatesConfig.directory, vaultManager, logger, vaultConfigStore)
 const templateRoutes = createTemplateRoutes({
   templateService,
   accessControl: vaultAccessControl,
@@ -517,6 +526,20 @@ const trashRoutes = createTrashRoutes({
   logger,
 })
 app.route('/api/v1', trashRoutes)
+
+// Preferences route registration (auth middleware applies via /api/v1/* pattern)
+const preferencesStore = new PreferencesStore(serverConfig.dataDir, logger)
+const preferencesRoutes = createPreferencesRoutes({ preferencesService: preferencesStore, logger })
+app.route('/api/v1', preferencesRoutes)
+
+// Vault config route registration (auth middleware applies via /api/v1/* pattern)
+const vaultConfigRoutes = createVaultConfigRoutes({
+  vaultConfigService: vaultConfigStore,
+  accessControl: vaultAccessControl,
+  vaultRegistry,
+  logger,
+})
+app.route('/api/v1', vaultConfigRoutes)
 
 // CleanupJob — periodic trash purge and version pruning
 const cleanupJob = new CleanupJob(trashService, versionService, vaultManager, config, logger)

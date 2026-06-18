@@ -5,8 +5,11 @@ import { AuthProvider, useAuthContext } from './state/authContext'
 import { TabProvider, useTabContext } from './state/tabContext'
 import { FeatureProvider, useFeatureContext } from './state/featureContext'
 import { SearchProvider } from './state/searchContext'
-import { createDailyNoteService, getDailyNotesConfig } from './state/dailyNoteService'
+import { createDailyNoteService, loadDailyNotesConfigFromServer } from './state/dailyNoteService'
 import { openTab } from './state/tabActions'
+import { initialize as initializeRecentFiles, disconnect as disconnectRecentFiles } from './state/recentFilesStore'
+import { initialize as initializeFavorites, disconnect as disconnectFavorites } from './state/favoritesStore'
+import { initialize as initializeKeybindings, disconnect as disconnectKeybindings, matchesShortcut } from './state/keybindingsStore'
 import { I18nProvider, useTranslation } from './i18n'
 import { ToastProvider } from './components/Toast'
 import { RealtimeProvider, type RealtimeEventHandlers } from './components/RealtimeProvider'
@@ -532,6 +535,10 @@ function AppContent() {
   // Fetch vaults on mount
   useEffect(() => {
     loadVaults(dispatch, apiClient)
+    // Initialize per-user server-synced stores
+    initializeRecentFiles(apiClient).catch(() => { /* ignore */ })
+    initializeFavorites(apiClient).catch(() => { /* ignore */ })
+    initializeKeybindings(apiClient).catch(() => { /* ignore */ })
   }, [dispatch])
 
   // Restore last selected vault after vaults are loaded
@@ -655,11 +662,10 @@ function AppContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.selectedVaultId, dispatch, tabDispatch])
 
-  // Global keyboard shortcut: Ctrl+Shift+F (Win/Linux) / Cmd+Shift+F (macOS) opens search in right panel
+  // Global keyboard shortcut: Vault search (default: Ctrl+Shift+F / Cmd+Shift+F)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+Shift+F (Win/Linux) or Cmd+Shift+F (macOS)
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+      if (matchesShortcut('slatebase:open-search', e)) {
         e.preventDefault()
         // Open right panel and focus search input
         setShowRightPanel(true)
@@ -678,10 +684,10 @@ function AppContent() {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Global keyboard shortcut: Ctrl+, opens the unified settings panel
+  // Global keyboard shortcut: Settings panel (default: Ctrl+,)
   useEffect(() => {
     const handleSettingsShortcut = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === ',') {
+      if (matchesShortcut('slatebase:open-settings', e)) {
         e.preventDefault()
         setSettingsOpen(true)
       }
@@ -758,7 +764,8 @@ function AppContent() {
     }
 
     const vaultId = state.selectedVaultId
-    const dailyDir = getDailyNotesConfig(vaultId)
+    // Load config from server (updates localStorage cache), falls back to cache
+    const dailyDir = await loadDailyNotesConfigFromServer(apiClient, vaultId)
 
     try {
       const filePath = await dailyNoteService.openOrCreate(vaultId, dailyDir)
@@ -1259,6 +1266,10 @@ function AuthGuard() {
       saveRestoreState()
       apiClient.setToken(null)
       apiClient.setCsrfToken(null)
+      // Disconnect server-synced stores
+      disconnectRecentFiles()
+      disconnectFavorites()
+      disconnectKeybindings()
       authDispatch({ type: 'SESSION_EXPIRED' })
     })
     return () => { apiClient.setOnSessionExpired(null) }

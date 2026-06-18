@@ -23,6 +23,8 @@ import { AdminVaultsPage } from '../AdminVaultsPage'
 import { AccountDeletionSection } from './AccountDeletionSection'
 import { FeatureTogglesSection } from './FeatureTogglesSection'
 import { ServerRestartSection } from './ServerRestartSection'
+import { VaultConfigSection } from './VaultConfigSection'
+import { KeybindingsSection } from './KeybindingsSection'
 
 /** German labels for each settings section heading. */
 const SECTION_LABELS: Record<SettingsSection, string> = {
@@ -30,9 +32,11 @@ const SECTION_LABELS: Record<SettingsSection, string> = {
   'password': 'Passwort ändern',
   'sessions': 'Sitzungen',
   'mcp-tokens': 'MCP-Tokens',
+  'keybindings': 'Tastaturkürzel',
   'delete-account': 'Konto löschen',
   'sync': 'Synchronisation',
   'plugins': 'Plugins',
+  'vault-config': 'Vault-Konfiguration',
   'server-config': 'Serverkonfiguration',
   'user-management': 'Benutzerverwaltung',
   'vault-management': 'Vault-Verwaltung',
@@ -92,6 +96,8 @@ function renderSection(
       return <McpTokensPage apiClient={apiClient} />
     case 'delete-account':
       return <AccountDeletionSection apiClient={apiClient} />
+    case 'keybindings':
+      return <KeybindingsSection />
     case 'sync':
       if (selectedVaultId === null) {
         return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>
@@ -102,6 +108,11 @@ function renderSection(
         return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>
       }
       return <PluginManagementPage apiClient={apiClient} vaultId={selectedVaultId} />
+    case 'vault-config':
+      if (selectedVaultId === null) {
+        return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>
+      }
+      return <VaultConfigSection apiClient={apiClient} vaultId={selectedVaultId} />
     case 'server-config':
       return <AdminConfigPage apiClient={apiClient} hideFeatureToggles />
     case 'user-management':

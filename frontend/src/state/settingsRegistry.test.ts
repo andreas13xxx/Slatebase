@@ -10,8 +10,8 @@ describe('settingsRegistry', () => {
   })
 
   describe('SETTINGS_SECTIONS', () => {
-    it('contains exactly 12 section definitions', () => {
-      expect(SETTINGS_SECTIONS).toHaveLength(12)
+    it('contains exactly 14 section definitions', () => {
+      expect(SETTINGS_SECTIONS).toHaveLength(14)
     })
 
     it('has unique ids across all sections', () => {
@@ -45,18 +45,18 @@ describe('settingsRegistry', () => {
   })
 
   describe('getSections', () => {
-    it('returns 5 account sections', () => {
+    it('returns 6 account sections', () => {
       const sections = registry.getSections('account', false)
-      expect(sections).toHaveLength(5)
+      expect(sections).toHaveLength(6)
       expect(sections.map((s) => s.id)).toEqual([
-        'profile', 'password', 'sessions', 'mcp-tokens', 'delete-account',
+        'profile', 'password', 'sessions', 'mcp-tokens', 'keybindings', 'delete-account',
       ])
     })
 
-    it('returns 2 vault sections', () => {
+    it('returns 3 vault sections', () => {
       const sections = registry.getSections('vault', false)
-      expect(sections).toHaveLength(2)
-      expect(sections.map((s) => s.id)).toEqual(['sync', 'plugins'])
+      expect(sections).toHaveLength(3)
+      expect(sections.map((s) => s.id)).toEqual(['vault-config', 'sync', 'plugins'])
     })
 
     it('returns 5 administration sections for admin', () => {
@@ -89,14 +89,14 @@ describe('settingsRegistry', () => {
   })
 
   describe('getAllSections', () => {
-    it('returns 7 sections for non-admin (account + vault)', () => {
+    it('returns 9 sections for non-admin (account + vault)', () => {
       const sections = registry.getAllSections(false)
-      expect(sections).toHaveLength(7)
+      expect(sections).toHaveLength(9)
     })
 
-    it('returns all 12 sections for admin', () => {
+    it('returns all 14 sections for admin', () => {
       const sections = registry.getAllSections(true)
-      expect(sections).toHaveLength(12)
+      expect(sections).toHaveLength(14)
     })
 
     it('does not include admin sections for non-admin', () => {
