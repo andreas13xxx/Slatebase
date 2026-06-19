@@ -148,11 +148,11 @@ const onUserInvalidated = async (userId: string): Promise<void> => {
 }
 
 // Mutable reference for welcome vault hook (set after VaultService init)
-let welcomeVaultCreator: ((userId: string) => Promise<void>) | undefined
+let welcomeVaultCreator: ((userId: string, language: 'de' | 'en') => Promise<void>) | undefined
 
-const onUserCreated = async (userId: string): Promise<void> => {
+const onUserCreated = async (userId: string, language: 'de' | 'en'): Promise<void> => {
   if (welcomeVaultCreator !== undefined) {
-    await welcomeVaultCreator(userId)
+    await welcomeVaultCreator(userId, language)
   }
 }
 
@@ -219,11 +219,11 @@ const welcomeVaultService = new WelcomeVaultService(
   logger,
   serverConfig.dataDir,
 )
-welcomeVaultCreator = async (userId: string): Promise<void> => {
-  const result = await welcomeVaultService.createWelcomeVault(userId)
+welcomeVaultCreator = async (userId: string, language: 'de' | 'en'): Promise<void> => {
+  const result = await welcomeVaultService.createWelcomeVault(userId, language)
   // After welcome vault creation: initialize link index so Knowledge Graph is available
   if (result) {
-    const linkIndex = new LinkIndexService(result.storagePath, result.vaultId, config.getWelcomeVaultConfig().name, logger)
+    const linkIndex = new LinkIndexService(result.storagePath, result.vaultId, result.vaultName, logger)
     linkIndexMap.set(result.vaultId, linkIndex)
     linkIndex.rebuild().catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error)

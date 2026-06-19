@@ -141,10 +141,19 @@ export class AdminController implements IAdminController {
         return c.json(createApiError('VALIDATION_ERROR', message), 400)
       }
 
+      // Default preferredLanguage to the creating admin's language
+      let preferredLanguage = parsed.data.preferredLanguage
+      if (preferredLanguage === undefined) {
+        const session = c.get('session') as SessionContext
+        const adminUser = await this.userService.getUser(session.userId)
+        preferredLanguage = adminUser.preferredLanguage
+      }
+
       const createData = {
         username: parsed.data.username,
         password: parsed.data.password,
         role: parsed.data.role,
+        preferredLanguage,
         ...(parsed.data.displayName !== undefined ? { displayName: parsed.data.displayName } : {}),
       }
 

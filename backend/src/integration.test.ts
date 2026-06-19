@@ -79,7 +79,7 @@ beforeAll(async () => {
         cleanup: { intervalHours: 24 },
         templates: { directory: '_templates' },
         upload: { maxFileSizeBytes: 104857600, maxFilesPerDrop: 50, maxImagePasteSize: 10485760 },
-        welcomeVault: { name: 'Willkommen' },
+        welcomeVault: { name: { de: 'Willkommen', en: 'Welcome' } },
       }
     },
     getVaultConfigs(): VaultConfig[] {
@@ -107,7 +107,7 @@ beforeAll(async () => {
       return { maxFileSizeBytes: 104857600, maxFilesPerDrop: 50, maxImagePasteSize: 10485760 }
     },
     getWelcomeVaultConfig() {
-      return { name: 'Willkommen' }
+      return { name: { de: 'Willkommen', en: 'Welcome' } }
     },
   }
 

@@ -54,6 +54,7 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
   const [newUsername, setNewUsername] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [newRole, setNewRole] = useState<UserRole>('user')
+  const [newLanguage, setNewLanguage] = useState<'de' | 'en'>(locale)
   const [createLoading, setCreateLoading] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [createSuccess, setCreateSuccess] = useState<string | null>(null)
@@ -162,11 +163,13 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
         username: newUsername,
         password: newPassword,
         role: newRole,
+        preferredLanguage: newLanguage,
       })
       setCreateSuccess(t('admin.users.createSuccess', { username: newUsername }))
       setNewUsername('')
       setNewPassword('')
       setNewRole('user')
+      setNewLanguage(locale)
       void loadUsers(page)
     } catch (err: unknown) {
       setCreateError(extractErrorMessage(err, t))
@@ -325,6 +328,17 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
             >
               <option value="user">{t('admin.users.roleUser')}</option>
               <option value="admin">{t('admin.users.roleAdmin')}</option>
+            </select>
+          </div>
+          <div className="admin-users-form-field">
+            <label htmlFor="admin-create-language">{t('profile.preferredLanguage')}</label>
+            <select
+              id="admin-create-language"
+              value={newLanguage}
+              onChange={(e) => setNewLanguage(e.target.value as 'de' | 'en')}
+            >
+              <option value="de">{t('profile.languageDe')}</option>
+              <option value="en">{t('profile.languageEn')}</option>
             </select>
           </div>
           <button

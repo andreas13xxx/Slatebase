@@ -15,6 +15,7 @@ backend/data/*
 !backend/data/templates/
 backend/data/templates/*
 !backend/data/templates/welcome-vault/
+!backend/data/templates/welcome-vault-en/
 
 # IDE / Editor
 .vscode/
@@ -24,6 +25,7 @@ backend/data/templates/*
 
 # Kiro local settings (MCP config etc.)
 .kiro/settings/
+.kiro/execution-profiles.json
 
 # OS files
 Thumbs.db
@@ -39,6 +41,7 @@ vitest-output.txt
 playwright-report/
 test-results/
 .playwright-mcp/
+.playwright-cli/
 
 # Screenshots (temporary/debug in project root)
 /*.png

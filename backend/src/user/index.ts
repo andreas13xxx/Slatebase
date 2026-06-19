@@ -58,6 +58,7 @@ export interface CreateUserData {
   password: string
   role: UserRole
   displayName?: string
+  preferredLanguage?: 'de' | 'en'
 }
 
 /**
@@ -745,7 +746,7 @@ export class UserService implements IUserService {
       displayName: data.displayName ?? data.username,
       email: '',
       avatarUrl: '',
-      preferredLanguage: 'de',
+      preferredLanguage: data.preferredLanguage ?? 'de',
       colorScheme: 'system',
       suspended: false,
       mustChangePassword: false,
@@ -758,7 +759,7 @@ export class UserService implements IUserService {
     // Trigger post-creation callback (never throws)
     if (this.onUserCreated) {
       try {
-        await this.onUserCreated(user.userId)
+        await this.onUserCreated(user.userId, user.preferredLanguage)
       } catch (error) {
         this.logger.error('onUserCreated callback failed', {
           userId: user.userId,

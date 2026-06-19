@@ -51,7 +51,10 @@ const UploadConfigSchema = z.object({
 })
 
 const WelcomeVaultConfigSchema = z.object({
-  name: z.string().min(1).max(128).default('Willkommen'),
+  name: z.object({
+    de: z.string().min(1).max(128).default('Willkommen'),
+    en: z.string().min(1).max(128).default('Welcome'),
+  }).default({}),
 })
 
 export const ServerConfigSchema = z.object({

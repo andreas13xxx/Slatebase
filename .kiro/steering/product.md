@@ -31,7 +31,7 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for 
 - Per-user preferences persistence (recent files, favorites synced to server with localStorage cache)
 - Per-vault configuration (templates directory, daily notes directory — owner-configurable via Settings)
 - Configurable keyboard shortcuts (per-user overrides, 14 commands, conflict detection, Settings UI)
-- Welcome Vault (automatic tutorial vault for new users, feature-toggled, configurable name + template content)
+- Welcome Vault (automatic tutorial vault for new users, feature-toggled, multi-language DE/EN, language defaults to admin's preference at user creation)
 
 ## Planned
 

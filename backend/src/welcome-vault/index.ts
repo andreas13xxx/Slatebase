@@ -11,7 +11,7 @@ import path from 'node:path'
 import type { ILogger } from '../logger/index.js'
 import type { IVaultService } from '../business/index.js'
 import type { IFeatureToggleService } from '../feature-toggle/types.js'
-import type { WelcomeVaultConfig } from './types.js'
+import type { WelcomeVaultConfig, WelcomeVaultLanguage } from './types.js'
 
 // --- Interface ---
 
@@ -22,6 +22,7 @@ import type { WelcomeVaultConfig } from './types.js'
 export interface WelcomeVaultResult {
   vaultId: string
   storagePath: string
+  vaultName: string
 }
 
 /**
@@ -30,14 +31,14 @@ export interface WelcomeVaultResult {
  */
 export interface IWelcomeVaultService {
   /**
-   * Creates a welcome vault for the given user.
+   * Creates a welcome vault for the given user in the specified language.
    * - Checks feature toggle first
    * - Creates vault via VaultService
-   * - Copies template files from template directory
+   * - Copies template files from the language-specific template directory
    * - Logs errors but never throws
-   * @returns Vault info (id + path) on success, undefined on skip/failure
+   * @returns Vault info (id + path + name) on success, undefined on skip/failure
    */
-  createWelcomeVault(userId: string): Promise<WelcomeVaultResult | undefined>
+  createWelcomeVault(userId: string, language: WelcomeVaultLanguage): Promise<WelcomeVaultResult | undefined>
 }
 
 // --- Implementation ---
@@ -49,7 +50,13 @@ export interface IWelcomeVaultService {
  * This ensures user account creation is never blocked by welcome vault issues.
  */
 export class WelcomeVaultService implements IWelcomeVaultService {
-  private readonly templateDir: string
+  private readonly baseTemplateDir: string
+
+  /** Maps language to template directory suffix */
+  private static readonly TEMPLATE_DIRS: Record<WelcomeVaultLanguage, string> = {
+    de: 'welcome-vault',
+    en: 'welcome-vault-en',
+  }
 
   constructor(
     private readonly vaultService: IVaultService,
@@ -58,28 +65,33 @@ export class WelcomeVaultService implements IWelcomeVaultService {
     private readonly logger: ILogger,
     dataDir: string,
   ) {
-    this.templateDir = path.join(path.resolve(dataDir), 'templates', 'welcome-vault')
+    this.baseTemplateDir = path.join(path.resolve(dataDir), 'templates')
   }
 
   /** @inheritdoc */
-  async createWelcomeVault(userId: string): Promise<WelcomeVaultResult | undefined> {
+  async createWelcomeVault(userId: string, language: WelcomeVaultLanguage): Promise<WelcomeVaultResult | undefined> {
     try {
       // 1. Check feature toggle
       if (!this.featureToggleService.isEnabled('welcome-vault')) {
         return undefined
       }
 
-      // 2. Create vault
-      const vault = await this.vaultService.createVault(this.config.name, userId)
+      // 2. Determine vault name and template directory based on language
+      const vaultName = this.config.name[language]
+      const templateDir = this.getTemplateDir(language)
 
-      // 3. Copy template files
-      await this.copyTemplateFiles(vault.path)
+      // 3. Create vault
+      const vault = await this.vaultService.createVault(vaultName, userId)
 
-      return { vaultId: vault.id, storagePath: vault.path }
+      // 4. Copy template files
+      await this.copyTemplateFiles(vault.path, templateDir)
+
+      return { vaultId: vault.id, storagePath: vault.path, vaultName }
     } catch (error) {
       // Never throw — log and return
       this.logger.error('Failed to create welcome vault', {
         userId,
+        language,
         error: error instanceof Error ? error.message : String(error),
       })
       return undefined
@@ -87,27 +99,36 @@ export class WelcomeVaultService implements IWelcomeVaultService {
   }
 
   /**
+   * Returns the template directory path for the given language.
+   * Falls back to German if the language-specific directory does not exist.
+   */
+  private getTemplateDir(language: WelcomeVaultLanguage): string {
+    const dirName = WelcomeVaultService.TEMPLATE_DIRS[language]
+    return path.join(this.baseTemplateDir, dirName)
+  }
+
+  /**
    * Copies all template files into the given vault path.
    * Missing or empty template directory is logged as a warning (not an error).
    * Each individual file copy is error-isolated.
    */
-  private async copyTemplateFiles(vaultPath: string): Promise<void> {
+  private async copyTemplateFiles(vaultPath: string, templateDir: string): Promise<void> {
     // Check if template directory exists
     try {
-      await fs.access(this.templateDir)
+      await fs.access(templateDir)
     } catch {
       this.logger.warn('Welcome vault template directory not found', {
-        templateDir: this.templateDir,
+        templateDir,
       })
       return
     }
 
     // Read all entries recursively
-    const entries = await this.readDirRecursive(this.templateDir)
+    const entries = await this.readDirRecursive(templateDir)
 
     if (entries.length === 0) {
       this.logger.warn('Welcome vault template directory is empty', {
-        templateDir: this.templateDir,
+        templateDir,
       })
       return
     }
@@ -115,7 +136,7 @@ export class WelcomeVaultService implements IWelcomeVaultService {
     // Copy each file individually (error-isolated)
     for (const relativePath of entries) {
       try {
-        const srcPath = path.join(this.templateDir, relativePath)
+        const srcPath = path.join(templateDir, relativePath)
         const destPath = path.join(vaultPath, relativePath)
 
         // Ensure destination directory exists
@@ -165,4 +186,4 @@ export class WelcomeVaultService implements IWelcomeVaultService {
 
 // --- Re-exports ---
 
-export type { WelcomeVaultConfig, OnUserCreatedFn } from './types.js'
+export type { WelcomeVaultConfig, WelcomeVaultLanguage, OnUserCreatedFn } from './types.js'

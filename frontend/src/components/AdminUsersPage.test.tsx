@@ -334,7 +334,7 @@ describe('AdminUsersPage', () => {
         '/api/v1/admin/users',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ username: 'newuser', password: 'securepass123', role: 'user' }),
+          body: JSON.stringify({ username: 'newuser', password: 'securepass123', role: 'user', preferredLanguage: 'de' }),
         }),
       )
     })

@@ -171,10 +171,13 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - `WelcomeVaultService` hat Never-Throw-Garantie (Top-Level try/catch)
 - Integration via `onUserCreated` Callback (nicht direkte Kopplung an UserService)
 - Mutable-Reference-Pattern in Composition Root (wie `mcpTokenInvalidator`) wegen Dependency-Order
-- Template-Verzeichnis: `data/templates/welcome-vault/` — Admins können Inhalte ohne Code-Änderung anpassen
+- Template-Verzeichnis: `data/templates/welcome-vault/` (DE) und `data/templates/welcome-vault-en/` (EN) — Admins können Inhalte ohne Code-Änderung anpassen
 - Einzelne Datei-Fehler isoliert (partielle Kopie besser als keine)
 - Feature-Toggle: `welcome-vault` (hot, default: true)
-- Config: `serverConfig.welcomeVault.name` (default: "Willkommen")
+- Config: `serverConfig.welcomeVault.name` ist jetzt `{ de: "Willkommen", en: "Welcome" }`
+- Sprache bei Nutzererstellung: `CreateUserData.preferredLanguage` (optional, Default = Admin-Sprache)
+- `OnUserCreatedFn(userId, language)` reicht Sprache an WelcomeVaultService weiter
+- Template-Verzeichnis-Auswahl: `WelcomeVaultService.TEMPLATE_DIRS` Map (de→`welcome-vault`, en→`welcome-vault-en`)
 
 ## Dev-Umgebung
 

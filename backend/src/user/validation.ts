@@ -99,6 +99,7 @@ export const createUserSchema = z.object({
   password: passwordSchema,
   role: roleSchema,
   displayName: displayNameSchema.optional(),
+  preferredLanguage: preferredLanguageSchema.optional(),
 })
 
 /**

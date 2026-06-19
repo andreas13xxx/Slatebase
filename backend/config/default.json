@@ -44,6 +44,9 @@
     "maxImagePasteSize": 10485760
   },
   "welcomeVault": {
-    "name": "Willkommen"
+    "name": {
+      "de": "Willkommen",
+      "en": "Welcome"
+    }
   }
 }
