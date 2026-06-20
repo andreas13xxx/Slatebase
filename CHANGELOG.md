@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.0](https://github.com/andreas13xxx/Slatebase/compare/v0.8.0...v0.9.0) (2026-06-20)
+
+
+### Features
+
+* Obsidian Canvas support with node editing and file-path search ([59c5929](https://github.com/andreas13xxx/Slatebase/commit/59c59291b367d9c4e81410f982d2244abd440bcf))
+
+
+### Bugfixes
+
+* close unclosed CSS rule in CanvasView.css causing production build failure ([dfa76ac](https://github.com/andreas13xxx/Slatebase/commit/dfa76aca398fe7cec29d76f614a0a77ed5f8d109))
+
 ## [0.8.0](https://github.com/andreas13xxx/Slatebase/compare/v0.7.0...v0.8.0) (2026-06-18)
 
 
