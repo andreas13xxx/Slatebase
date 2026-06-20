@@ -1119,11 +1119,9 @@
   overflow: auto;
 }
 
-.canvas-node__file-md-full-editor:focus {
+.canvas-node__file-md-editor:focus {
   outline: 2px solid var(--accent);
 }
-
-.canvas-node__file-md-editor {
 
 
 /* ─── File Node Markdown Render (Preview) ──────────────────────────────────── */
