@@ -24,5 +24,8 @@ export { extractTags } from './tag-extractor.js'
 // Property extraction utility
 export { extractProperties } from './property-extractor.js'
 
+// Canvas file-reference extraction utility
+export { extractCanvasFileRefs } from './canvas-parser.js'
+
 // Link index service implementation
 export { LinkIndexService, normalizeLinkPath } from './link-index-service.js'

@@ -7,6 +7,7 @@ import { EditMode } from './EditMode'
 import { ViewMode } from './ViewMode'
 import { BinaryViewer } from './BinaryViewer'
 import { GraphView } from './GraphView'
+import { CanvasView } from './canvas/CanvasView'
 import { useTranslation } from '../i18n'
 
 /**
@@ -223,6 +224,37 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
     )
   }
 
+  // Canvas file — render CanvasView
+  if (activeTab.fileName.endsWith('.canvas')) {
+    const currentVault = appState.vaults.find((v) => v.id === activeTab.vaultId)
+    const isReadOnly = currentVault?.permission === 'read'
+    return (
+      <div className="tab-content tab-content--canvas" style={canvasContentStyle}>
+        <CanvasView
+          vaultId={activeTab.vaultId}
+          filePath={activeTab.filePath}
+          content={activeTab.content}
+          readOnly={isReadOnly ?? false}
+          onSave={async (content) => {
+            await saveTab(tabDispatch, apiClient!, activeTab.vaultId, activeTab.filePath, content)
+          }}
+          onFileOpen={(path) => {
+            const fileName = path.split('/').pop() ?? path
+            void openTab(tabDispatch, appDispatch, apiClient!, activeTab.vaultId, path, fileName)
+          }}
+          onFileSave={async (filePath, content) => {
+            await apiClient!.saveFile(activeTab.vaultId, filePath, content)
+            // Refresh tree to update any changed references
+            const newTree = await apiClient!.fetchVaultTree(activeTab.vaultId)
+            appDispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId: activeTab.vaultId, tree: newTree } })
+          }}
+          directoryTree={appState.vaultTrees[activeTab.vaultId] ?? appState.directoryTree}
+          token={apiClient?.getToken() ?? undefined}
+        />
+      </div>
+    )
+  }
+
   // Edit mode
   if (activeTab.mode === 'edit') {
     const editContent = activeTab.editBuffer ?? activeTab.content
@@ -315,6 +347,13 @@ const contentStyle: React.CSSProperties = {
   flex: 1,
   overflow: 'auto',
   minHeight: 0,
+}
+
+const canvasContentStyle: React.CSSProperties = {
+  flex: 1,
+  overflow: 'hidden',
+  minHeight: 0,
+  display: 'flex',
 }
 
 const linkErrorStyle: React.CSSProperties = {

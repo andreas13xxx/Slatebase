@@ -4,7 +4,7 @@ import { useTabContext } from '../state/tabContext'
 import { useTranslation } from '../i18n'
 import { openTab } from '../state/tabActions'
 import type { DirectoryTree, VaultInfo } from '../types'
-import { ChevronRight, ChevronDown, Folder, FolderOpen, Database, Eye, Pencil, RefreshCw, Users, FilePlus, FolderPlus, Trash2, Copy, Move, Download, Star, FileText, History } from 'lucide-react'
+import { ChevronRight, ChevronDown, Folder, FolderOpen, Database, Eye, Pencil, RefreshCw, Users, FilePlus, FolderPlus, Trash2, Copy, Move, Download, Star, FileText, History, LayoutDashboard } from 'lucide-react'
 import { getFileIcon, getFileIconClass, getDisplayName } from '../utils/fileIcons'
 import { getValidDropTargets } from '../utils/pathUtils'
 import { ContextMenu } from './ContextMenu'
@@ -18,6 +18,23 @@ import { favoritesStore } from '../state/favoritesStore'
 import { TemplateSelector } from './TemplateSelector'
 import { getCachedStatistics, fetchVaultStatistics, invalidateStatisticsCache, formatStatisticsTooltip } from '../state/vaultStatisticsCache'
 import { onRealtimeVaultChange } from '../state/realtimeVaultBridge'
+
+/**
+ * Checks if a file path exists in a DirectoryTree (for unique name generation).
+ */
+function fileExistsInVaultTree(tree: DirectoryTree, filePath: string): boolean {
+  const normalized = filePath.replace(/\\/g, '/')
+  function search(node: DirectoryTree): boolean {
+    if (node.path.replace(/\\/g, '/') === normalized) return true
+    if (node.children) {
+      for (const child of node.children) {
+        if (search(child)) return true
+      }
+    }
+    return false
+  }
+  return search(tree)
+}
 
 /**
  * Internal drag state for the FileExplorer.
@@ -287,6 +304,8 @@ export interface FileExplorerProps {
   onRegisterCreateFile?: (trigger: () => void) => void
   /** When set, registers a callback that triggers vault creation. */
   onRegisterCreateVault?: (trigger: () => void) => void
+  /** When set, registers a callback that triggers canvas creation at root. */
+  onRegisterCreateCanvas?: (trigger: () => void) => void
   /** Callback to open the version browser for a specific file. */
   onOpenVersions?: (vaultId: string, filePath: string) => void
 }
@@ -299,7 +318,7 @@ export interface FileExplorerProps {
  * Provides context menu actions (new file, rename, delete) on each tree node.
  * Supports drag & drop for moving files and folders within a vault.
  */
-export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onOpenVersions }: FileExplorerProps = {}) {
+export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRegisterCreateCanvas, onOpenVersions }: FileExplorerProps = {}) {
   const { state, dispatch, apiClient } = useAppContext()
   const { tabState, tabDispatch } = useTabContext()
   const { t } = useTranslation()
@@ -403,6 +422,52 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onOp
       })
     }
   }, [onRegisterCreateVault])
+
+  /** Creates a new .canvas file with empty content and opens it. */
+  async function createCanvasFile(vaultId: string, parentPath: string) {
+    if (!apiClient) return
+    const baseName = 'Neues Canvas'
+    const ext = '.canvas'
+    const emptyCanvas = '{\n\t"nodes": [],\n\t"edges": []\n}'
+
+    // Find a unique name (avoid conflicts)
+    let name = `${baseName}${ext}`
+    let filePath = parentPath ? `${parentPath}/${name}` : name
+    let counter = 1
+    const tree = state.vaultTrees[vaultId]
+    while (tree && fileExistsInVaultTree(tree, filePath)) {
+      name = `${baseName} ${counter}${ext}`
+      filePath = parentPath ? `${parentPath}/${name}` : name
+      counter++
+    }
+
+    try {
+      await apiClient.saveFile(vaultId, filePath, emptyCanvas)
+      const newTree = await apiClient.fetchVaultTree(vaultId)
+      dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree: newTree } })
+      if (state.selectedVaultId !== vaultId) {
+        dispatch({ type: 'VAULT_SELECTED', payload: vaultId })
+      }
+      openTab(tabDispatch, dispatch, apiClient, vaultId, filePath, name)
+      showToast(`${name} erstellt`, 'success')
+    } catch (err: unknown) {
+      const msg = err !== null && typeof err === 'object' && 'message' in err
+        ? (err as { message: string }).message
+        : 'Canvas konnte nicht erstellt werden'
+      showToast(msg, 'error')
+    }
+  }
+
+  // Register the create canvas trigger for the toolbar button
+  useEffect(() => {
+    if (onRegisterCreateCanvas) {
+      onRegisterCreateCanvas(() => {
+        const vaultId = state.selectedVaultId
+        if (!vaultId || !apiClient) return
+        void createCanvasFile(vaultId, '')
+      })
+    }
+  }, [onRegisterCreateCanvas, state.selectedVaultId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Subscribe to vault:change events for statistics cache invalidation
   useEffect(() => {
@@ -936,6 +1001,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onOp
     e.dataTransfer.effectAllowed = 'copyMove'
     e.dataTransfer.setData('application/x-slatebase-path', nodePath)
     e.dataTransfer.setData('application/x-slatebase-type', nodeType)
+    e.dataTransfer.setData('application/x-slatebase-vaultid', vaultId)
 
     const target = e.currentTarget as HTMLElement
     target.style.opacity = '0.5'
@@ -1350,19 +1416,21 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onOp
             { id: 'versions', label: 'Versionen', icon: <History size={14} /> },
           ]
         } else if (isFolder) {
-          // Folder context menu: Neuer Ordner, Neue Datei, Umbenennen, Löschen
+          // Folder context menu: Neuer Ordner, Neue Datei, Neues Canvas, Umbenennen, Löschen
           menuItems = [
             { id: 'newFolder', label: t('contextMenu.newFolder'), icon: <FolderPlus size={14} /> },
             { id: 'newFile', label: t('contextMenu.newFile'), icon: <FilePlus size={14} /> },
+            { id: 'newCanvas', label: 'Neues Canvas', icon: <LayoutDashboard size={14} /> },
             { id: 'separator-1', label: '', separator: true },
             { id: 'rename', label: t('contextMenu.rename'), icon: <Pencil size={14} /> },
             { id: 'delete', label: t('contextMenu.delete'), icon: <Trash2 size={14} /> },
           ]
         } else {
-          // Vault entry context menu: Neuer Ordner, Neue Datei, Neue Notiz aus Vorlage, Export
+          // Vault entry context menu: Neuer Ordner, Neue Datei, Neues Canvas, Neue Notiz aus Vorlage, Export
           menuItems = [
             { id: 'newFolder', label: t('contextMenu.newFolder'), icon: <FolderPlus size={14} /> },
             { id: 'newFile', label: t('contextMenu.newFile'), icon: <FilePlus size={14} /> },
+            { id: 'newCanvas', label: 'Neues Canvas', icon: <LayoutDashboard size={14} /> },
             { id: 'newFromTemplate', label: 'Neue Notiz aus Vorlage', icon: <FileText size={14} /> },
             { id: 'separator-1', label: '', separator: true },
             { id: 'export', label: t('contextMenu.export'), icon: <Download size={14} /> },
@@ -1383,6 +1451,15 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onOp
                 ? node.path
                 : node.path.lastIndexOf('/') === -1 ? '' : node.path.slice(0, node.path.lastIndexOf('/'))
               handleNewFolder(parentPath)
+              break
+            }
+            case 'newCanvas': {
+              const vaultId = contextMenuState.vaultId
+              if (!vaultId) break
+              const parentPath = node.type === 'directory'
+                ? node.path
+                : node.path.lastIndexOf('/') === -1 ? '' : node.path.slice(0, node.path.lastIndexOf('/'))
+              void createCanvasFile(vaultId, parentPath)
               break
             }
             case 'rename':

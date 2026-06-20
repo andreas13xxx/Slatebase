@@ -214,42 +214,92 @@ Implementierung von vier modularen remark-Plugins (Wikilink, Embed, Callout, Tag
     - Verify no circular dependencies
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5_
 
-- [ ] 12. Property-Based Tests
-  - [ ]* 12.1 Write property test for wikilink round-trip
+- [ ] 12. Block References
+  - [ ] 12.1 Implement block marker parser (MDAST transformer)
+    - Create `frontend/src/plugins/block-ref/marker-parser.ts`
+    - Visit paragraph, listItem, heading nodes; detect trailing ` ^block-id` pattern
+    - Strip marker text from visible content, store as `blockId` property on node
+    - Skip `^` inside code blocks/inline code
+    - _Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6_
+
+  - [ ] 12.2 Implement block marker serializer (toMarkdown)
+    - Create `frontend/src/plugins/block-ref/marker-serializer.ts`
+    - Restore ` ^block-id` at end of serialized paragraph/listItem/heading
+    - _Requirements: 17.7_
+
+  - [ ] 12.3 Implement block marker remark plugin wrapper
+    - Create `frontend/src/plugins/block-ref/plugin.ts`
+    - Register MDAST transformer and toMarkdown extension
+    - Export `remarkBlockRef` as named export
+    - _Requirements: 17.1–17.7_
+
+  - [ ] 12.4 Extend wikilink syntax for block references
+    - Modify `frontend/src/plugins/wikilink/syntax.ts` to tokenize `#^block-id` fragments
+    - Modify `frontend/src/plugins/wikilink/mdast-util.ts` to produce `blockRef` field (mutually exclusive with `heading`)
+    - Modify serializer to output `[[target#^block-id]]` format
+    - _Requirements: 18.1, 18.2, 18.3, 18.4, 18.5_
+
+  - [ ] 12.5 Extend embed syntax for block references
+    - Modify `frontend/src/plugins/embed/syntax.ts` to tokenize `#^block-id` fragments
+    - Modify `frontend/src/plugins/embed/mdast-util.ts` to produce `blockRef` field (mutually exclusive with `heading`)
+    - Modify serializer to output `![[target#^block-id]]` format
+    - _Requirements: 19.1, 19.2, 19.3, 19.4_
+
+  - [ ] 12.6 Implement block reference rendering in ViewMode
+    - Extend wikilink rendering: navigate to target file + scroll to `#^block-id` element
+    - Extend embed rendering: fetch target file, locate block by `blockId`, render only that block
+    - Add `id="^{block-id}"` attributes to rendered blocks with `blockId` property
+    - Show broken-link styling when block not found
+    - _Requirements: 20.1, 20.2, 20.3, 20.4, 20.5_
+
+  - [ ] 12.7 Extend extractWikilinks for block references
+    - Modify `frontend/src/plugins/wikilink/extract.ts` to include `blockRef` in `WikilinkInfo`
+    - Extend backend `wikilink-parser.ts` to extract `blockRef` from `[[target#^block-id]]` syntax
+    - _Requirements: 21.1, 21.2, 21.3_
+
+  - [ ]* 12.8 Write unit tests for block references
+    - Test marker parsing (paragraph, list, heading, code-block immunity)
+    - Test wikilink `#^block-id` parsing and serialization
+    - Test embed `#^block-id` parsing and serialization
+    - Test rendering with found/not-found blocks
+    - _Requirements: 17.1–17.7, 18.1–18.5, 19.1–19.4, 20.1–20.5_
+
+- [ ] 13. Property-Based Tests
+  - [ ]* 13.1 Write property test for wikilink round-trip
     - **Property 1: Round-Trip-Invarianten (Wikilink)**
     - **Validates: Requirements 1.7, 13.5**
     - Generate arbitrary valid wikilink strings with fast-check, verify `parse(serialize(parse(input))) ≡ parse(input)`
 
-  - [ ]* 12.2 Write property test for embed round-trip
+  - [ ]* 13.2 Write property test for embed round-trip
     - **Property 1: Round-Trip-Invarianten (Embed)**
     - **Validates: Requirements 4.6, 14.3**
     - Generate arbitrary valid embed strings with fast-check, verify round-trip consistency
 
-  - [ ]* 12.3 Write property test for callout round-trip
+  - [ ]* 13.3 Write property test for callout round-trip
     - **Property 1: Round-Trip-Invarianten (Callout)**
     - **Validates: Requirements 6.7, 15.5**
     - Generate arbitrary valid callout blockquotes with fast-check, verify round-trip consistency
 
-  - [ ]* 12.4 Write property test for tag round-trip
+  - [ ]* 13.4 Write property test for tag round-trip
     - **Property 1: Round-Trip-Invarianten (Tag)**
     - **Validates: Requirements 8.7, 16.3**
     - Generate arbitrary valid tag strings with fast-check, verify round-trip consistency
 
-  - [ ]* 12.5 Write property test for parser invariants
+  - [ ]* 13.5 Write property test for parser invariants
     - **Property 2: Parser-Invarianten**
     - **Validates: Requirements 1.6, 4.5, 8.3, 8.4, 3.4, 10.4**
     - Test code-block immunity: no Obsidian syntax recognized inside fenced code blocks
     - Test heading-anchor determinism: same text always produces same anchor
     - Test link-resolver consistency: same target + same tree always produces same result
 
-  - [ ]* 12.6 Write property test for rendering invariants
+  - [ ]* 13.6 Write property test for rendering invariants
     - **Property 3: Rendering-Invarianten**
     - **Validates: Requirements 2.2, 5.7, 7.6, 11.6**
     - Test broken-link consistency: link is broken iff `resolveWikilinkTarget()` returns `null`
     - Test callout fallback: unknown types always use `note` config
     - Test embed depth limit: nested embeds abort after exactly 3 levels
 
-- [x] 13. Final Checkpoint
+- [x] 14. Final Checkpoint
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes
@@ -276,7 +326,10 @@ Implementierung von vier modularen remark-Plugins (Wikilink, Embed, Callout, Tag
     { "id": 5, "tasks": ["4.4", "11.1"] },
     { "id": 6, "tasks": ["8.1", "9.1"] },
     { "id": 7, "tasks": ["8.2", "8.3", "8.4", "8.5", "9.2"] },
-    { "id": 8, "tasks": ["12.1", "12.2", "12.3", "12.4", "12.5", "12.6"] }
+    { "id": 8, "tasks": ["12.1", "12.2", "12.3"] },
+    { "id": 9, "tasks": ["12.4", "12.5", "12.6", "12.7"] },
+    { "id": 10, "tasks": ["12.8"] },
+    { "id": 11, "tasks": ["13.1", "13.2", "13.3", "13.4", "13.5", "13.6"] }
   ]
 }
 ```

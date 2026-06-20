@@ -198,6 +198,12 @@ src/
 ├── api/index.ts          — ApiClient (IApiClient interface + fetch implementation, includes getVersion())
 ├── utils/
 │   └── semver.ts         — compareSemver() utility (X.Y.Z comparison, v-prefix stripping)
+├── canvas/
+│   ├── index.ts          — Barrel export (parser, serializer, types)
+│   ├── types.ts          — CanvasDocument, CanvasNode (Text/File/Link/Group), CanvasEdge, parse result types
+│   ├── parser.ts         — parseCanvas (Zod validation, passthrough unknown fields for forward-compat)
+│   ├── serializer.ts     — serializeCanvas (Model→JSON, round-trip compatible)
+│   └── parser.test.ts    — Unit tests for parser/serializer round-trip
 ├── plugins/
 │   ├── index.ts          — Barrel export (all plugins, types, utilities)
 │   ├── types.ts          — MDAST node types (WikilinkNode, EmbedNode, CalloutNode, TagNode), IMAGE_EXTENSIONS, PDF_EXTENSIONS
@@ -276,6 +282,8 @@ src/
 │   ├── settingsRegistry.ts   — ISettingsRegistry, section definitions
 │   ├── settingsPersistence.ts — sessionStorage serialize/validate
 │   ├── settingsContext.ts    — SettingsProvider + useSettingsContext hook
+│   ├── canvasState.ts        — Canvas reducer + types (document, viewport, selection, undo/redo stacks, dirty)
+│   ├── canvasContext.ts      — CanvasProvider + useCanvasContext hook (parse, autosave, save)
 ├── hooks/
 │   ├── useHistoryStack.ts — Undo/Redo history stack hook (max 100, FIFO eviction, clear on file switch)
 │   ├── useLineNumbers.ts — Line numbers toggle state (localStorage persistence)
@@ -324,6 +332,26 @@ src/
 │   ├── GraphSettingsPanel.tsx — Collapsible graph settings (color pickers, sliders, toggles, property multi-select, reset)
 │   ├── GraphSettingsPanel.css — GraphSettingsPanel styles
 │   ├── GraphSettingsPanel.test.tsx — Unit tests for GraphSettingsPanel
+│   ├── canvas/
+│   │   ├── CanvasView.tsx        — Main container (viewport zoom/pan, keyboard shortcuts, context menus, DnD, edit-mode orchestration)
+│   │   ├── CanvasView.css        — All canvas styles (nodes, edges, editors, file-search dropdown, design tokens)
+│   │   ├── TextNodeRenderer.tsx  — Markdown text node (inline edit, rAF-focus, drag/resize)
+│   │   ├── FileNodeRenderer.tsx  — File node (image/MD/PDF preview, content vs. path edit, vault-wide file-path search dropdown)
+│   │   ├── LinkNodeRenderer.tsx  — External URL node (iframe preview interactive when selected, edit URL)
+│   │   ├── GroupNodeRenderer.tsx — Group/container node
+│   │   ├── EdgeRenderer.tsx      — Bézier edges with arrowheads, labels, selection
+│   │   ├── CanvasContextMenu.tsx — Node/background context menu (edit, edit-file-path for MD files, add nodes, color, delete)
+│   │   ├── EdgeContextMenu.tsx   — Edge context menu (label, arrow toggles, delete)
+│   │   ├── CanvasToolbar.tsx     — Toolbar (add nodes, zoom, fit, grid, minimap, undo/redo, visual/source mode)
+│   │   ├── CanvasMinimap.tsx     — Minimap overview with click-to-navigate
+│   │   ├── CanvasSourceView.tsx  — Raw JSON source editor with apply
+│   │   ├── ResizeHandles.tsx     — 8-direction resize handles
+│   │   ├── NodeAnchors.tsx       — Edge-creation anchor points
+│   │   ├── useNodeDrag.ts        — Node drag hook (single + multi-select, stopPropagation)
+│   │   ├── useNodeResize.ts      — Node resize hook (min size enforcement)
+│   │   ├── useViewportCulling.ts — Viewport culling for off-screen nodes
+│   │   ├── canvas-utils.ts       — generateCanvasId, getCanvasColorClass
+│   │   └── markdown-render.tsx   — renderSimpleMarkdown for node previews
 │   ├── context-panel/
 │   │   ├── ContextPanel.tsx      — Main orchestrator (data loading, debounce, view wiring)
 │   │   ├── ContextPanel.css      — All context panel styles (Design Tokens)

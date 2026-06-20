@@ -57,6 +57,7 @@ export function TabBar() {
 
         const tabClassName = `tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}`
         const isGraphTab = tab.filePath === '__graph__'
+        const isCanvasTab = tab.fileName.endsWith('.canvas')
         const TabFileIcon = isGraphTab ? Share2 : getFileIcon(tab.fileName)
         const tabFileIconClass = isGraphTab ? 'tab-icon-graph' : getFileIconClass(tab.fileName)
         const displayName = isGraphTab ? tab.fileName : getDisplayName(tab.fileName)
@@ -84,9 +85,9 @@ export function TabBar() {
               title={modeLabel}
               onClick={(e) => handleToggleMode(e, tab.id)}
               onKeyDown={(e) => handleToggleModeKeyDown(e, tab.id)}
-              disabled={tab.isBinary || isGraphTab}
+              disabled={tab.isBinary || isGraphTab || isCanvasTab}
               tabIndex={0}
-              style={isGraphTab ? { display: 'none' } : undefined}
+              style={(isGraphTab || isCanvasTab) ? { display: 'none' } : undefined}
             >
               <ModeIcon size={12} />
             </button>

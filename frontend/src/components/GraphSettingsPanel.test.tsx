@@ -15,7 +15,7 @@ describe('GraphSettingsPanel', () => {
 
   it('renders toggle button', () => {
     render(<GraphSettingsPanel {...defaultProps} />)
-    const toggle = screen.getByRole('button', { name: /graph.settings/i })
+    const toggle = screen.getByRole('button', { name: /einstellungen/i })
     expect(toggle).toBeInTheDocument()
   })
 
@@ -25,7 +25,7 @@ describe('GraphSettingsPanel', () => {
     expect(screen.queryByRole('region')).not.toBeInTheDocument()
 
     // Click toggle
-    fireEvent.click(screen.getByRole('button', { name: /graph.settings/i }))
+    fireEvent.click(screen.getByRole('button', { name: /einstellungen/i }))
 
     // Panel should now be visible
     expect(screen.getByRole('region')).toBeInTheDocument()
@@ -33,7 +33,7 @@ describe('GraphSettingsPanel', () => {
 
   it('panel closes when toggle is clicked again', () => {
     render(<GraphSettingsPanel {...defaultProps} />)
-    const toggle = screen.getByRole('button', { name: /graph.settings/i })
+    const toggle = screen.getByRole('button', { name: /einstellungen/i })
 
     fireEvent.click(toggle) // open
     expect(screen.getByRole('region')).toBeInTheDocument()
@@ -47,7 +47,7 @@ describe('GraphSettingsPanel', () => {
     render(<GraphSettingsPanel {...defaultProps} onConfigChange={onConfigChange} />)
 
     // Open panel
-    fireEvent.click(screen.getByRole('button', { name: /graph.settings/i }))
+    fireEvent.click(screen.getByRole('button', { name: /einstellungen/i }))
 
     // Find the first color input and change it
     const colorInputs = document.querySelectorAll('input[type="color"]')
@@ -64,10 +64,10 @@ describe('GraphSettingsPanel', () => {
     render(<GraphSettingsPanel {...defaultProps} onConfigChange={onConfigChange} />)
 
     // Open panel
-    fireEvent.click(screen.getByRole('button', { name: /graph.settings/i }))
+    fireEvent.click(screen.getByRole('button', { name: /einstellungen/i }))
 
     // Find repulsion slider
-    const slider = screen.getByRole('slider', { name: /graph.repulsion/i })
+    const slider = screen.getByRole('slider', { name: /abstoßung/i })
     fireEvent.change(slider, { target: { value: '100' } })
 
     expect(onConfigChange).toHaveBeenCalledTimes(1)
@@ -80,10 +80,10 @@ describe('GraphSettingsPanel', () => {
     render(<GraphSettingsPanel {...defaultProps} onConfigChange={onConfigChange} />)
 
     // Open panel
-    fireEvent.click(screen.getByRole('button', { name: /graph.settings/i }))
+    fireEvent.click(screen.getByRole('button', { name: /einstellungen/i }))
 
     // Find tags checkbox
-    const checkbox = screen.getByLabelText(/graph.showTags/i)
+    const checkbox = screen.getByLabelText(/tags anzeigen/i)
     fireEvent.click(checkbox)
 
     expect(onConfigChange).toHaveBeenCalledTimes(1)
@@ -96,10 +96,10 @@ describe('GraphSettingsPanel', () => {
     render(<GraphSettingsPanel {...defaultProps} onReset={onReset} />)
 
     // Open panel
-    fireEvent.click(screen.getByRole('button', { name: /graph.settings/i }))
+    fireEvent.click(screen.getByRole('button', { name: /einstellungen/i }))
 
     // Click reset
-    fireEvent.click(screen.getByText(/graph.reset/i))
+    fireEvent.click(screen.getByText(/zurücksetzen/i))
 
     expect(onReset).toHaveBeenCalledTimes(1)
   })
@@ -119,7 +119,7 @@ describe('GraphSettingsPanel', () => {
     render(<GraphSettingsPanel {...defaultProps} config={configWithProps} meta={meta} />)
 
     // Open panel
-    fireEvent.click(screen.getByRole('button', { name: /graph.settings/i }))
+    fireEvent.click(screen.getByRole('button', { name: /einstellungen/i }))
 
     // Property keys should be listed
     expect(screen.getByText('status')).toBeInTheDocument()
@@ -136,7 +136,7 @@ describe('GraphSettingsPanel', () => {
     render(<GraphSettingsPanel {...defaultProps} meta={meta} />)
 
     // Open panel
-    fireEvent.click(screen.getByRole('button', { name: /graph.settings/i }))
+    fireEvent.click(screen.getByRole('button', { name: /einstellungen/i }))
 
     // Property key should NOT be visible (showProperties is false by default)
     expect(screen.queryByText('status')).not.toBeInTheDocument()

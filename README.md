@@ -130,6 +130,7 @@ docker compose up -d
 | 🔒 **Authentication** | Session-based auth with argon2id hashing, CSRF protection, rate limiting |
 | 🔄 **Vault Sync** ⚠️ | CouchDB/obsidian-livesync compatible synchronization with conflict resolution |
 | 🤖 **MCP Context Server** | AI assistants (Claude, Cursor, etc.) read and write your vaults via MCP |
+| 🎨 **Canvas** | Open and edit Obsidian `.canvas` whiteboards: text, file, link, and group nodes with edges, drag, resize, zoom/pan, minimap, file-path search, and auto-save |
 | 🕸️ **Knowledge Graph** | Interactive visualization of vault link structure with zoom, pan, drag, and search |
 | 📑 **Context Panel** | Right-side panel with document outline, forward/backlinks, tags, and properties |
 | 🔍 **Search & Replace** | Vault-wide full-text search with regex, context lines, multi-vault, and find & replace |

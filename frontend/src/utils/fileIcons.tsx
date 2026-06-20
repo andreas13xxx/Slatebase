@@ -30,6 +30,7 @@ import {
   FileSpreadsheet,
   FileType2,
   Film,
+  LayoutDashboard,
   Presentation,
   ScrollText,
   StickyNote,
@@ -68,6 +69,8 @@ const KNOWN_EXTENSIONS = new Set([
   'ttf', 'otf', 'woff', 'woff2', 'eot',
   // Other
   'log', 'lock', 'map', 'wasm', 'dll', 'so', 'dylib', 'exe',
+  // Canvas
+  'canvas',
 ])
 
 /** Extension to icon mapping. Uses @react-symbols/icons where available. */
@@ -234,6 +237,8 @@ const EXTENSION_ICON_MAP: Record<string, IconComponent> = {
   // Patch
   patch: Patch,
   diff: Patch,
+  // Canvas
+  canvas: LayoutDashboard,
 }
 
 /** Filename-based icon mapping for special config files. */
@@ -381,7 +386,8 @@ function wrapIcon(Icon: IconComponent): FileIconComponent {
 function isLucideIcon(icon: IconComponent): boolean {
   return icon === File || icon === FileArchive || icon === FileAudio
     || icon === FileSpreadsheet || icon === FileType2 || icon === Film
-    || icon === Presentation || icon === ScrollText || icon === StickyNote
+    || icon === LayoutDashboard || icon === Presentation || icon === ScrollText
+    || icon === StickyNote
 }
 
 /** Color classes for Lucide fallback icons. */
@@ -400,6 +406,7 @@ function getLucideColorClass(fileName: string): string {
       return 'file-icon--font'
     case 'log': return 'file-icon--log'
     case 'wma': return 'file-icon--audio'
+    case 'canvas': return 'file-icon--canvas'
     default: return 'file-icon--default'
   }
 }

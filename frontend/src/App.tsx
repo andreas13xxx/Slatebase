@@ -433,6 +433,7 @@ function AppContent() {
   const folderInputRef = useRef<HTMLInputElement>(null)
   const createFileTriggerRef = useRef<(() => void) | null>(null)
   const createVaultTriggerRef = useRef<(() => void) | null>(null)
+  const createCanvasTriggerRef = useRef<(() => void) | null>(null)
 
   // Version browser state: which file to show versions for
   const [versionBrowserTarget, setVersionBrowserTarget] = useState<{ vaultId: string; filePath: string } | null>(null)
@@ -719,6 +720,13 @@ function AppContent() {
     // Trigger inline file creation in the FileExplorer
     if (createFileTriggerRef.current) {
       createFileTriggerRef.current()
+    }
+  }
+
+  function handleCreateCanvas() {
+    if (!state.selectedVaultId) return
+    if (createCanvasTriggerRef.current) {
+      createCanvasTriggerRef.current()
     }
   }
 
@@ -1036,6 +1044,7 @@ function AppContent() {
                     <FileExplorer
                       onRegisterCreateFile={(trigger) => { createFileTriggerRef.current = trigger }}
                       onRegisterCreateVault={(trigger) => { createVaultTriggerRef.current = trigger }}
+                      onRegisterCreateCanvas={(trigger) => { createCanvasTriggerRef.current = trigger }}
                       onOpenVersions={(vaultId, filePath) => setVersionBrowserTarget({ vaultId, filePath })}
                     />
                   )}
@@ -1062,6 +1071,7 @@ function AppContent() {
             vaultPermission={selectedVault?.permission}
             onCreateVault={handleCreateVault}
             onCreateFile={handleCreateFile}
+            onCreateCanvas={handleCreateCanvas}
             onImportFile={handleImportFile}
             onImportFolder={handleImportFolder}
             onExportVault={handleExportVault}
@@ -1134,7 +1144,7 @@ function AppContent() {
                       <span className="tab-bar-tab-label">
                         {hasUnsaved ? '● ' : ''}{displayName}
                       </span>
-                      {!tab.isBinary && !isGraphTab && (
+                      {!tab.isBinary && !isGraphTab && !tab.fileName.endsWith('.canvas') && (
                         <button
                           type="button"
                           className="tab-bar-mode-btn"

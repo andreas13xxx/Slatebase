@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Dieses Feature erweitert das bestehende Markdown-Rendering in Slatebase um Obsidian-spezifische Syntax-Elemente. Ziel ist die vollständige Kompatibilität mit Obsidian-Vaults, sodass Wikilinks, Embeds, Callouts und Tags korrekt dargestellt werden. Das Feature baut auf der bestehenden Markdown-Infrastruktur (unified, remark-parse, remark-gfm, remark-frontmatter) auf und erweitert die ViewMode-Komponente um dedizierte remark-Plugins für Obsidian-Syntax.
+Dieses Feature erweitert das bestehende Markdown-Rendering in Slatebase um Obsidian-spezifische Syntax-Elemente. Ziel ist die vollständige Kompatibilität mit Obsidian-Vaults, sodass Wikilinks, Embeds, Callouts, Tags und Block-Referenzen korrekt dargestellt werden. Das Feature baut auf der bestehenden Markdown-Infrastruktur (unified, remark-parse, remark-gfm, remark-frontmatter) auf und erweitert die ViewMode-Komponente um dedizierte remark-Plugins für Obsidian-Syntax.
 
 ## Glossary
 
@@ -16,6 +16,8 @@ Dieses Feature erweitert das bestehende Markdown-Rendering in Slatebase um Obsid
 - **Tag_Renderer**: Komponente die Tag-Nodes als klickbare Inline-Elemente mit visueller Hervorhebung darstellt
 - **ViewMode**: Bestehende React-Komponente die Markdown-Inhalte als formatierte HTML-Elemente rendert
 - **DirectoryTree**: Baumstruktur aller Dateien und Ordner eines Vaults, verwendet zur Link-Auflösung
+- **Block_Marker_Parser**: Remark-Plugin das `^block-id` Syntax am Ende von Absätzen, Listenelementen und Überschriften erkennt und als Metadaten-Attribut im MDAST speichert
+- **Block_Reference**: Ein Verweis auf einen spezifischen Block (Absatz, Listenelement, Überschrift) über dessen eindeutige Block-ID
 - **MDAST**: Markdown Abstract Syntax Tree — Zwischenformat das von remark-Plugins erzeugt und vom Renderer konsumiert wird
 - **Callout_Typ**: Bezeichner der den visuellen Stil eines Callouts bestimmt (z.B. `note`, `warning`, `tip`, `danger`, `info`, `example`, `quote`, `bug`, `success`, `question`, `failure`, `abstract`)
 - **Heading_Anchor**: Normalisierter Anker-Bezeichner einer Überschrift, verwendet für `[[Seite#Überschrift]]`-Navigation
@@ -220,13 +222,72 @@ Dieses Feature erweitert das bestehende Markdown-Rendering in Slatebase um Obsid
 2. WHEN ein Tag-Node mit `tag: "verschachtelt/untertag"` serialisiert wird, THE Tag_Parser SHALL `#verschachtelt/untertag` erzeugen
 3. FOR ALL gültigen Tag-Nodes, Serialisieren und anschließendes Parsen SHALL einen äquivalenten Tag-Node erzeugen (Round-Trip-Eigenschaft)
 
-### Requirement 17: Link-Extraktion für Knowledge Graph
+### Requirement 17: Block References — Marker-Parsing
+
+**User Story:** Als Benutzer möchte ich Block-IDs (`^block-id`) am Ende von Absätzen, Listenelementen und Überschriften setzen können, damit ich einzelne Blöcke gezielt verlinken und einbetten kann.
+
+#### Acceptance Criteria
+
+1. WHEN ein Markdown-Text eine Zeile enthält die mit ` ^block-id` endet (Leerzeichen + Caret + alphanumerisch/Bindestriche), THE Block_Marker_Parser SHALL einen Block-Marker mit `blockId: "block-id"` erkennen und dem zugehörigen Block-Node (Paragraph, ListItem, Heading) als Metadaten anhängen
+2. WHEN ein Block-Marker am Ende eines Paragraphen steht, THE Block_Marker_Parser SHALL den Marker-Text aus dem sichtbaren Inhalt entfernen und als `blockId`-Eigenschaft des Paragraph-Nodes speichern
+3. WHEN ein Block-Marker am Ende eines Listenelements steht, THE Block_Marker_Parser SHALL den Marker dem ListItem-Node als `blockId`-Eigenschaft zuweisen
+4. WHEN ein Block-Marker am Ende einer Überschrift steht, THE Block_Marker_Parser SHALL den Marker der Heading-Node als `blockId`-Eigenschaft zuweisen
+5. THE Block_Marker_Parser SHALL nur Block-IDs erkennen die mit einem Buchstaben oder Ziffer beginnen und aus Buchstaben, Ziffern und Bindestrichen bestehen (Regex: `[a-zA-Z0-9][a-zA-Z0-9-]*`)
+6. WHEN ein `^`-Zeichen innerhalb eines Code-Blocks, Inline-Code oder mitten im Fließtext steht (nicht am Zeilenende nach Leerzeichen), THE Block_Marker_Parser SHALL es nicht als Block-Marker interpretieren
+7. FOR ALL gültigen Block-Marker, Parsen und anschließendes Serialisieren zu Markdown SHALL den Marker am Zeilenende wiederherstellen (Round-Trip-Eigenschaft)
+
+### Requirement 18: Block References — Wikilink-Syntax
+
+**User Story:** Als Benutzer möchte ich mit `[[Seite#^block-id]]` auf einen bestimmten Block in einer anderen Notiz verlinken können, damit ich präzise Querverweise erstelle.
+
+#### Acceptance Criteria
+
+1. WHEN ein Markdown-Text `[[Seitenname#^block-id]]` enthält, THE Wikilink_Parser SHALL einen Wikilink-Node mit `target: "Seitenname"`, `blockRef: "block-id"` und `display: "Seitenname > ^block-id"` im MDAST erzeugen
+2. WHEN ein Markdown-Text `[[#^block-id]]` enthält, THE Wikilink_Parser SHALL einen Wikilink-Node mit `target: ""`, `blockRef: "block-id"` und `display: "^block-id"` im MDAST erzeugen (Block-Referenz innerhalb derselben Seite)
+3. WHEN ein Markdown-Text `[[Seitenname#^block-id|Anzeige]]` enthält, THE Wikilink_Parser SHALL einen Wikilink-Node mit `target: "Seitenname"`, `blockRef: "block-id"` und `display: "Anzeige"` im MDAST erzeugen
+4. THE Wikilink_Parser SHALL `blockRef` und `heading` als sich gegenseitig ausschließende Felder behandeln — ein Wikilink hat entweder `#heading` oder `#^block-id`, nie beides
+5. WHEN ein Wikilink-Node mit `blockRef` serialisiert wird, THE Wikilink_Parser SHALL `[[target#^block-id]]` bzw. `[[target#^block-id|display]]` erzeugen
+
+### Requirement 19: Block References — Embed-Syntax
+
+**User Story:** Als Benutzer möchte ich mit `![[Seite#^block-id]]` einen einzelnen Block aus einer anderen Notiz einbetten können, damit ich gezielt Absätze oder Listenelemente referenziere.
+
+#### Acceptance Criteria
+
+1. WHEN ein Markdown-Text `![[notiz.md#^block-id]]` enthält, THE Embed_Parser SHALL einen Embed-Node mit `target: "notiz.md"`, `blockRef: "block-id"` und `embedType: "note"` im MDAST erzeugen
+2. WHEN ein Markdown-Text `![[notiz#^block-id]]` enthält (ohne Dateiendung), THE Embed_Parser SHALL einen Embed-Node mit `target: "notiz"`, `blockRef: "block-id"` und `embedType: "note"` im MDAST erzeugen
+3. THE Embed_Parser SHALL `blockRef` und `heading` als sich gegenseitig ausschließende Felder behandeln — ein Embed hat entweder `#heading` oder `#^block-id`, nie beides
+4. WHEN ein Embed-Node mit `blockRef` serialisiert wird, THE Embed_Parser SHALL `![[target#^block-id]]` erzeugen
+
+### Requirement 20: Block References — Rendering
+
+**User Story:** Als Benutzer möchte ich Block-Referenz-Links und -Embeds korrekt dargestellt sehen, damit ich den referenzierten Block direkt in meiner Notiz sehe oder dorthin navigieren kann.
+
+#### Acceptance Criteria
+
+1. WHEN ein Wikilink-Node mit `blockRef` gerendert wird und der Zielblock existiert, THE ViewMode SHALL den Link als klickbar darstellen und bei Klick zur Zieldatei navigieren und zum referenzierten Block scrollen
+2. WHEN ein Wikilink-Node mit `blockRef` gerendert wird und der Zielblock nicht gefunden wird, THE ViewMode SHALL den Link mit CSS-Klasse `view-mode-link--broken` darstellen
+3. WHEN ein Embed-Node mit `blockRef` gerendert wird und der Zielblock existiert, THE Embed_Renderer SHALL nur den einzelnen referenzierten Block (Absatz, Listenelement oder Überschrifts-Abschnitt) in einem visuell abgegrenzten Container darstellen
+4. WHEN ein Embed-Node mit `blockRef` gerendert wird und der Zielblock nicht gefunden wird, THE Embed_Renderer SHALL einen Platzhalter mit „Block nicht gefunden: ^{block-id}" darstellen
+5. THE ViewMode SHALL für Blocks mit `blockId` ein `id`-Attribut mit dem Wert `^{block-id}` setzen, damit Block-Referenz-Navigation via Fragment-Scroll funktioniert
+
+### Requirement 21: Block References — Extraktion für Link-Index
+
+**User Story:** Als Entwickler möchte ich Block-Referenzen im Link-Index erfassen, damit der Knowledge Graph und Backlinks auch Block-Level-Verweise anzeigen.
+
+#### Acceptance Criteria
+
+1. THE `extractWikilinks` Funktion SHALL bei Wikilinks mit `blockRef` das Feld `blockRef` im zurückgegebenen `WikilinkInfo`-Objekt enthalten
+2. THE Link_Index_Service SHALL Block-Referenzen als Kanten im Graph erfassen (Quelle → Zielseite, mit `blockRef`-Annotation)
+3. WHEN Backlinks für eine Datei abgefragt werden, THE Link_Index_Service SHALL Block-Referenz-Links mit der Information welcher Block referenziert wird anzeigen
+
+### Requirement 22: Link-Extraktion für Knowledge Graph
 
 **User Story:** Als Entwickler möchte ich alle Wikilinks aus einer Markdown-Datei extrahieren können, damit der Knowledge Graph die Verlinkungen zwischen Notizen darstellen kann.
 
 #### Acceptance Criteria
 
 1. THE Wikilink_Parser SHALL eine Funktion `extractWikilinks(markdown: string): WikilinkInfo[]` exportieren, die alle Wikilinks aus einem Markdown-String extrahiert
-2. WHEN `extractWikilinks` aufgerufen wird, THE Wikilink_Parser SHALL für jeden gefundenen Wikilink ein Objekt mit `target`, `display`, `heading` (optional) und `position` (Zeile/Spalte) zurückgeben
+2. WHEN `extractWikilinks` aufgerufen wird, THE Wikilink_Parser SHALL für jeden gefundenen Wikilink ein Objekt mit `target`, `display`, `heading` (optional), `blockRef` (optional) und `position` (Zeile/Spalte) zurückgeben
 3. THE Wikilink_Parser SHALL Wikilinks innerhalb von Code-Blöcken bei der Extraktion ignorieren
 4. FOR ALL Markdown-Strings, die Anzahl der extrahierten Wikilinks SHALL kleiner oder gleich der Anzahl der `[[`-Vorkommen im Text sein (keine falschen Positiven außerhalb von Code-Blöcken)

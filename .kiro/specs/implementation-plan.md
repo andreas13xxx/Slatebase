@@ -1,6 +1,6 @@
 # Implementierungsplan — Slatebase Ausstehende Features
 
-**Stand:** Juni 2026. Die Kernfeatures sind umgesetzt (Vaults, Editor, Auth, Chat, Sync, MCP, Graph v2, Search, Realtime, Plugins, Feature Toggles, Mermaid, Command Palette, Unified Settings, Welcome Vault, Preferences, Keyboard Shortcuts). Es verbleiben 13 ausstehende Features in unterschiedlichen Reifegraden.
+**Stand:** Juni 2026. Die Kernfeatures sind umgesetzt (Vaults, Editor, Auth, Chat, Sync, MCP, Graph v2, Search, Realtime, Plugins, Feature Toggles, Mermaid, Command Palette, Unified Settings, Welcome Vault, Preferences, Keyboard Shortcuts, Obsidian Canvas). Es verbleiben 12 ausstehende Features in unterschiedlichen Reifegraden.
 
 **Strategie:** Hybrid — Features mit bestehender Spec direkt umsetzen, komplexe Features erst vollständig spezifizieren.
 
@@ -41,6 +41,7 @@
 | 29 | `user-preferences-persistence` | ✅ Fertig |
 | 30 | `vault-config` | ✅ Fertig |
 | 31 | `configurable-keybindings` | ✅ Fertig |
+| 32 | `obsidian-canvas` | ✅ Fertig (Parser, Node-/Edge-Renderer, Editing, Auto-Save, Minimap, Source-View; inkl. Link/File-Node-Interaktion + Datei-Suche im Pfad-Editor) |
 
 ---
 
@@ -50,17 +51,16 @@
 |------|------|------|---------|--------|
 | 1 | Block References | A | ~8–12h | Spec vorhanden (Tasks 12.1–12.8 in `obsidian-markdown-compat`) |
 | 2 | Sync Conflict Resolution | B | ~14–18h | Requirements vorhanden |
-| 3 | Obsidian Canvas | B | ~30–40h | Spec vorhanden (vollständig) |
-| 4 | Workspace Leaf Compat | C | ~20–30h | Requirements vorhanden |
-| 5 | Obsidian Themes | C | ~15–20h | Geplant (keine Spec) |
-| 6 | Public Sharing | C | ~15–20h | Geplant (keine Spec) |
-| 7 | Live Preview Editor | D | ~48–68h | Geplant (keine Spec) |
-| 8 | Semantische Suche / AI-Embeddings | D | ~38–58h | Geplant (keine Spec) |
-| 9 | Server-Side Plugins | D | ~48–68h | Tasks vorhanden |
-| 10 | Security Hardening | E | ~20–30h | Geplant (keine Spec) |
-| 11 | Accessibility Audit | E | ~24–34h | Geplant (keine Spec) |
-| 12 | Responsive/Mobile | E | ~24–34h | Geplant (keine Spec) |
-| 13 | Collaborative Editing | F | ~68–88h | Requirements vorhanden |
+| 3 | Workspace Leaf Compat | C | ~20–30h | Requirements vorhanden |
+| 4 | Obsidian Themes | C | ~15–20h | Geplant (keine Spec) |
+| 5 | Public Sharing | C | ~15–20h | Geplant (keine Spec) |
+| 6 | Live Preview Editor | D | ~48–68h | Geplant (keine Spec) |
+| 7 | Semantische Suche / AI-Embeddings | D | ~38–58h | Geplant (keine Spec) |
+| 8 | Server-Side Plugins | D | ~48–68h | Tasks vorhanden |
+| 9 | Security Hardening | E | ~20–30h | Geplant (keine Spec) |
+| 10 | Accessibility Audit | E | ~24–34h | Geplant (keine Spec) |
+| 11 | Responsive/Mobile | E | ~24–34h | Geplant (keine Spec) |
+| 12 | Collaborative Editing | F | ~68–88h | Requirements vorhanden |
 
 ---
 
@@ -87,7 +87,7 @@ slatebase-overview (Architektur-Grundlage)
       │     ├── context-panel ✅
       │     ├── knowledge-graph ✅ → knowledge-graph-v2 ✅
       │     ├── mermaid-rendering ✅
-      │     ├── obsidian-canvas (braucht Markdown-Rendering für Text-Nodes)
+      │     ├── obsidian-canvas ✅ (braucht Markdown-Rendering für Text-Nodes)
       │     └── obsidian-plugin-compat ✅
       │           ├── workspace-leaf-compat (braucht Plugin-Infra + Tab-System)
       │           ├── server-side-plugins (braucht Plugin-Store + Registry)
@@ -109,7 +109,7 @@ slatebase-overview (Architektur-Grundlage)
 
 ```
 Track A (Markdown):    Block References → Live Preview Editor
-Track B (Canvas):      Obsidian Canvas (unabhängig nach obsidian-markdown-compat ✅)
+Track B (Canvas):      Obsidian Canvas ✅ (abgeschlossen)
 Track C (Sync):        Sync Conflict Resolution (unabhängig nach vault-sync ✅)
 Track D (Plugins):     Workspace Leaf Compat → Obsidian Themes → Server-Side Plugins
 Track E (Sharing):     Public Sharing (unabhängig)
@@ -167,26 +167,32 @@ Scope: ~4h Design, ~10–14h Implementierung.
 
 ---
 
-### Task 3: Obsidian Canvas
+### Task 3: Obsidian Canvas ✅ Abgeschlossen
 
-Scope: ~30–40h. Vollständige Spec vorhanden.
+Scope: ~30–40h. Vollständig umgesetzt.
 
 **Spec:** `.kiro/specs/obsidian-canvas/` (8 Task-Gruppen, ~30 Subtasks)
 
-**Zusammenfassung:**
+**Umgesetzt:**
 
 - **Parser/Serializer**: `.canvas`-JSON-Format (Nodes + Edges) lesen, validieren, schreiben (Round-Trip-kompatibel)
-- **Canvas-View**: Interaktive SVG+HTML-Visualisierung mit Zoom/Pan/Fit-to-View
-- **Node-Renderer**: Text (Markdown), File (Vorschau), Link (URL), Group (Container)
-- **Edge-Renderer**: Bézier-Kurven mit Pfeilspitzen, Farben, Labels
+- **Canvas-View**: Interaktive SVG+HTML-Visualisierung mit Zoom/Pan/Fit-to-View, Grid, Minimap, Source-View
+- **Node-Renderer**: Text (Markdown), File (Vorschau inkl. Bild/MD/PDF), Link (URL mit iframe-Vorschau), Group (Container)
+- **Edge-Renderer**: Bézier-Kurven mit Pfeilspitzen, Farben, Labels, Edge-Kontextmenü
 - **Editing**: Drag & Drop, Resize, Inline-Text-Editing, Node/Edge-CRUD, Multi-Select, Copy/Paste
 - **Auto-Save**: 2s Debounce, Dirty-Indikator, Fehlerbehandlung
 - **Link-Index**: `.canvas` File-Nodes als Verlinkungen im Knowledge Graph
 - **Read-Only-Modus**: Navigation erlaubt, keine Bearbeitung bei Nur-Lese-Rechten
 
-**Abhängigkeiten:** Keine neuen npm-Dependencies. Nutzt bestehende ViewMode-Plugins für Markdown in Text-Nodes.
+**Jüngste Verfeinerungen (Bugfixes + UX):**
 
-**Demo:** `.canvas`-Dateien öffnen sich als interaktives Whiteboard. Knoten erstellen, verschieben, verbinden. Auto-Save. Obsidian-kompatibles JSON-Format.
+- **Link-Node**: iframe-Vorschau im selektierten Zustand interaktiv (Mausrad-Scrollen); neue Link-Nodes mit Vorschaugröße (300×220), damit die Webseite sofort angezeigt wird.
+- **Kontextmenüs**: schließen jetzt zuverlässig beim Klick außerhalb (Outside-Click-Listener in Capture-Phase, damit `stopPropagation` der Node-Drag-Logik ihn nicht blockiert; zusätzlich `window`-`blur` für Klicks in iframes).
+- **Text-/File-Node-Edit**: fokus-robustes Setzen des Editors via `requestAnimationFrame` (gewinnt das Fokus-Rennen gegen das schließende Kontextmenü); Klick außerhalb wechselt zuverlässig in den Ansichtsmodus.
+- **File-Node**: getrennte Aktionen „Bearbeiten" (Inhalt) und „Dateipfad ändern" (Pfad) für Markdown-Dateien; Inhalt wird nicht mehr fälschlich als Pfad gespeichert.
+- **Datei-Suche im Pfad-Editor**: Beim Ändern des Dateipfads (jeder Node-Typ) erscheint ein Autocomplete-Dropdown über alle existierenden Vault-Dateien (Teilstring-Match, Tastatur-Navigation).
+
+**Abhängigkeiten:** Keine neuen npm-Dependencies. Nutzt bestehende ViewMode-Plugins für Markdown in Text-Nodes.
 
 ---
 
@@ -423,9 +429,8 @@ Scope: ~8h Design + ~60–80h Implementierung.
 Tier A: Markdown-Erweiterungen        (~8–12h)
 └── Block References
 
-Tier B: Visuelle Features              (~44–58h)
-├── Sync Conflict Resolution
-└── Obsidian Canvas
+Tier B: Visuelle Features              (~14–18h)
+└── Sync Conflict Resolution
 
 Tier C: Mittelfristige Features        (~50–70h)
 ├── Workspace Leaf Compat
@@ -453,12 +458,12 @@ Tier F: Langfristig                    (~68–88h)
 | Tier | Design | Implementierung | Gesamt |
 |------|--------|-----------------|--------|
 | A: Markdown | — | ~8–12h | ~8–12h |
-| B: Visuelle Features | ~4h | ~40–54h | ~44–58h |
+| B: Visuelle Features | ~4h | ~10–14h | ~14–18h |
 | C: Mittelfristig | ~8h | ~50–70h | ~58–78h |
 | D: Ambitioniert | ~24h | ~110–170h | ~134–194h |
 | E: Polish | ~8h | ~60–90h | ~68–98h |
 | F: Langfristig | ~8h | ~60–80h | ~68–88h |
-| **Summe** | **~52h** | **~328–476h** | **~380–528h** |
+| **Summe** | **~52h** | **~298–436h** | **~350–488h** |
 
 ---
 

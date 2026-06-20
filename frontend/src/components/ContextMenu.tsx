@@ -93,14 +93,25 @@ export function ContextMenu({ x, y, items, onClose, onSelect }: ContextMenuProps
       }
     }
 
-    // Delay listener to avoid the opening click from immediately closing it
+    // Close when focus leaves the window (e.g. clicking into a cross-origin
+    // iframe such as a canvas link-node preview, whose mousedown never reaches
+    // this document).
+    function handleWindowBlur() {
+      onClose()
+    }
+
+    // Delay listener to avoid the opening click from immediately closing it.
+    // Registered in the capture phase so node drag handlers calling
+    // stopPropagation() can't prevent the event from reaching this handler.
     const timeoutId = setTimeout(() => {
-      document.addEventListener('mousedown', handleClick)
+      document.addEventListener('mousedown', handleClick, true)
+      window.addEventListener('blur', handleWindowBlur)
     }, 0)
 
     return () => {
       clearTimeout(timeoutId)
-      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('mousedown', handleClick, true)
+      window.removeEventListener('blur', handleWindowBlur)
     }
   }, [onClose])
 

@@ -15,6 +15,7 @@ import type { ILinkIndex, GraphData, GraphNode, GraphEdge, GraphQueryOptions, Gr
 import { extractWikilinks } from './wikilink-parser.js'
 import { extractTags } from './tag-extractor.js'
 import { extractProperties } from './property-extractor.js'
+import { extractCanvasFileRefs } from './canvas-parser.js'
 
 /** JSON schema v1 for backward compatibility. */
 interface LinkIndexJsonV1 {
@@ -40,7 +41,7 @@ type LinkIndexJson = LinkIndexJsonV1 | LinkIndexJsonV2
  * - Uses forward slashes as separator
  * - Removes leading `./`
  * - Keeps path relative to vault root
- * - Appends `.md` extension if missing
+ * - Appends `.md` extension if missing (unless another known extension is present)
  */
 export function normalizeLinkPath(rawPath: string): string {
   // Replace backslashes with forward slashes
@@ -56,9 +57,13 @@ export function normalizeLinkPath(rawPath: string): string {
     normalized = normalized.slice(1)
   }
 
-  // Append .md if no extension present
-  if (!normalized.endsWith('.md')) {
-    normalized = normalized + '.md'
+  // Append .md if no recognized extension present
+  if (!normalized.includes('.') || (!normalized.endsWith('.md') && !normalized.endsWith('.canvas'))) {
+    // Only append .md if the file has no extension at all
+    const lastSegment = normalized.split('/').pop() ?? normalized
+    if (!lastSegment.includes('.')) {
+      normalized = normalized + '.md'
+    }
   }
 
   return normalized
@@ -103,26 +108,37 @@ export class LinkIndexService implements ILinkIndex {
       try {
         const content = await fs.readFile(absoluteFilePath, 'utf-8')
 
-        // Extract wikilinks
-        const links = extractWikilinks(content)
-        const targets = new Set<string>()
-        for (const link of links) {
-          if (link.target === '') continue
-          const normalizedTarget = normalizeLinkPath(link.target)
-          targets.add(normalizedTarget)
-        }
-        this.forwardLinks.set(normalizedPath, targets)
+        if (absoluteFilePath.endsWith('.canvas')) {
+          // Canvas files: extract file references only (no tags/properties)
+          const fileRefs = extractCanvasFileRefs(content)
+          const targets = new Set<string>()
+          for (const ref of fileRefs) {
+            const normalizedTarget = normalizeLinkPath(ref)
+            targets.add(normalizedTarget)
+          }
+          this.forwardLinks.set(normalizedPath, targets)
+        } else {
+          // Markdown files: extract wikilinks, tags, properties
+          const links = extractWikilinks(content)
+          const targets = new Set<string>()
+          for (const link of links) {
+            if (link.target === '') continue
+            const normalizedTarget = normalizeLinkPath(link.target)
+            targets.add(normalizedTarget)
+          }
+          this.forwardLinks.set(normalizedPath, targets)
 
-        // Extract tags
-        const tags = extractTags(content)
-        if (tags.length > 0) {
-          this.fileTags.set(normalizedPath, new Set(tags))
-        }
+          // Extract tags
+          const tags = extractTags(content)
+          if (tags.length > 0) {
+            this.fileTags.set(normalizedPath, new Set(tags))
+          }
 
-        // Extract properties
-        const properties = extractProperties(content)
-        if (Object.keys(properties).length > 0) {
-          this.fileProperties.set(normalizedPath, new Map(Object.entries(properties)))
+          // Extract properties
+          const properties = extractProperties(content)
+          if (Object.keys(properties).length > 0) {
+            this.fileProperties.set(normalizedPath, new Map(Object.entries(properties)))
+          }
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
@@ -152,40 +168,65 @@ export class LinkIndexService implements ILinkIndex {
     // Remove old forward links for this file from reverse map
     this.removeFromReverseMap(normalizedPath)
 
-    // Parse new content — wikilinks
-    const links = extractWikilinks(content)
-    const targets = new Set<string>()
-    for (const link of links) {
-      if (link.target === '') continue
-      const normalizedTarget = normalizeLinkPath(link.target)
-      targets.add(normalizedTarget)
-    }
-    this.forwardLinks.set(normalizedPath, targets)
-
-    // Add new entries to reverse map
-    for (const target of targets) {
-      const sources = this.backlinks.get(target)
-      if (sources) {
-        sources.add(normalizedPath)
-      } else {
-        this.backlinks.set(target, new Set([normalizedPath]))
+    if (filePath.endsWith('.canvas')) {
+      // Canvas files: extract file references only
+      const fileRefs = extractCanvasFileRefs(content)
+      const targets = new Set<string>()
+      for (const ref of fileRefs) {
+        const normalizedTarget = normalizeLinkPath(ref)
+        targets.add(normalizedTarget)
       }
-    }
+      this.forwardLinks.set(normalizedPath, targets)
 
-    // Update tags
-    const tags = extractTags(content)
-    if (tags.length > 0) {
-      this.fileTags.set(normalizedPath, new Set(tags))
-    } else {
+      // Add new entries to reverse map
+      for (const target of targets) {
+        const sources = this.backlinks.get(target)
+        if (sources) {
+          sources.add(normalizedPath)
+        } else {
+          this.backlinks.set(target, new Set([normalizedPath]))
+        }
+      }
+
+      // Canvas files don't have tags or properties
       this.fileTags.delete(normalizedPath)
-    }
-
-    // Update properties
-    const properties = extractProperties(content)
-    if (Object.keys(properties).length > 0) {
-      this.fileProperties.set(normalizedPath, new Map(Object.entries(properties)))
-    } else {
       this.fileProperties.delete(normalizedPath)
+    } else {
+      // Parse new content — wikilinks
+      const links = extractWikilinks(content)
+      const targets = new Set<string>()
+      for (const link of links) {
+        if (link.target === '') continue
+        const normalizedTarget = normalizeLinkPath(link.target)
+        targets.add(normalizedTarget)
+      }
+      this.forwardLinks.set(normalizedPath, targets)
+
+      // Add new entries to reverse map
+      for (const target of targets) {
+        const sources = this.backlinks.get(target)
+        if (sources) {
+          sources.add(normalizedPath)
+        } else {
+          this.backlinks.set(target, new Set([normalizedPath]))
+        }
+      }
+
+      // Update tags
+      const tags = extractTags(content)
+      if (tags.length > 0) {
+        this.fileTags.set(normalizedPath, new Set(tags))
+      } else {
+        this.fileTags.delete(normalizedPath)
+      }
+
+      // Update properties
+      const properties = extractProperties(content)
+      if (Object.keys(properties).length > 0) {
+        this.fileProperties.set(normalizedPath, new Map(Object.entries(properties)))
+      } else {
+        this.fileProperties.delete(normalizedPath)
+      }
     }
 
     await this.persist()
@@ -508,7 +549,7 @@ export class LinkIndexService implements ILinkIndex {
   // ─── Private Helpers ─────────────────────────────────────────────────────────
 
   /**
-   * Recursively finds all .md files in the given directory.
+   * Recursively finds all .md and .canvas files in the given directory.
    * Skips unreadable directories (logs warning, continues).
    */
   private async findMarkdownFiles(dirPath: string): Promise<string[]> {
@@ -527,7 +568,7 @@ export class LinkIndexService implements ILinkIndex {
           if (entry.name.startsWith('_')) continue
           const subFiles = await this.findMarkdownFiles(fullPath)
           results.push(...subFiles)
-        } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        } else if (entry.isFile() && (entry.name.endsWith('.md') || entry.name.endsWith('.canvas'))) {
           results.push(fullPath)
         }
       }

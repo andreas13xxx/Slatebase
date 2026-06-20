@@ -162,6 +162,21 @@
   /* Presence Tokens — Light */
   --presence-online: #22c55e;
 
+  /* Canvas Tokens — Light */
+  --canvas-color-1: #fb464c;
+  --canvas-color-2: #e9973f;
+  --canvas-color-3: #e0de71;
+  --canvas-color-4: #44cf6e;
+  --canvas-color-5: #53dfdd;
+  --canvas-color-6: #a882ff;
+  --canvas-node-bg: #ffffff;
+  --canvas-node-border: #e2e8f0;
+  --canvas-edge-color: #94a3b8;
+  --canvas-selection-color: #0d9488;
+  --canvas-group-bg: rgba(15, 23, 42, 0.03);
+  --canvas-group-border: #cbd5e1;
+  --canvas-grid-color: #e2e8f0;
+
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
@@ -348,6 +363,21 @@
     /* Presence Tokens — Dark */
     --presence-online: #4ade80;
 
+    /* Canvas Tokens — Dark */
+    --canvas-color-1: #e93147;
+    --canvas-color-2: #e9973f;
+    --canvas-color-3: #e0de71;
+    --canvas-color-4: #44cf6e;
+    --canvas-color-5: #53dfdd;
+    --canvas-color-6: #a882ff;
+    --canvas-node-bg: #1a2130;
+    --canvas-node-border: #334155;
+    --canvas-edge-color: #64748b;
+    --canvas-selection-color: #2dd4bf;
+    --canvas-group-bg: rgba(100, 116, 139, 0.08);
+    --canvas-group-border: #475569;
+    --canvas-grid-color: #1e293b;
+
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
@@ -511,6 +541,21 @@
 
     /* Presence Tokens — Dark */
     --presence-online: #4ade80;
+
+    /* Canvas Tokens — Dark */
+    --canvas-color-1: #e93147;
+    --canvas-color-2: #e9973f;
+    --canvas-color-3: #e0de71;
+    --canvas-color-4: #44cf6e;
+    --canvas-color-5: #53dfdd;
+    --canvas-color-6: #a882ff;
+    --canvas-node-bg: #1a2130;
+    --canvas-node-border: #334155;
+    --canvas-edge-color: #64748b;
+    --canvas-selection-color: #2dd4bf;
+    --canvas-group-bg: rgba(100, 116, 139, 0.08);
+    --canvas-group-border: #475569;
+    --canvas-grid-color: #1e293b;
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);

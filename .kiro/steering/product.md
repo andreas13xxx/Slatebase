@@ -32,6 +32,7 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for 
 - Per-vault configuration (templates directory, daily notes directory — owner-configurable via Settings)
 - Configurable keyboard shortcuts (per-user overrides, 14 commands, conflict detection, Settings UI)
 - Welcome Vault (automatic tutorial vault for new users, feature-toggled, multi-language DE/EN, language defaults to admin's preference at user creation)
+- Obsidian Canvas (`.canvas` whiteboards: text/file/link/group nodes, edges, drag/resize, zoom/pan, minimap, source view, auto-save; link-node iframe preview, file-node content/path editing with vault-wide file-path search)
 
 ## Planned
 

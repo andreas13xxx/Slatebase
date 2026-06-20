@@ -179,6 +179,18 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - `OnUserCreatedFn(userId, language)` reicht Sprache an WelcomeVaultService weiter
 - Template-Verzeichnis-Auswahl: `WelcomeVaultService.TEMPLATE_DIRS` Map (de→`welcome-vault`, en→`welcome-vault-en`)
 
+## Obsidian Canvas
+
+- Parser/Serializer im Frontend (`src/canvas/`), kein Backend-Modell. Zod-Validierung + Passthrough unbekannter Felder (Forward-Compat, Round-Trip).
+- State: eigener `CanvasProvider`/`useCanvasContext` mit Undo/Redo-Stacks + 2s-Debounce-Autosave.
+- Node-Renderer-Muster: gemeinsamer `.canvas-node`-Container + `useNodeDrag`/`useNodeResize`. `.canvas-node { user-select: none }` fürs Ziehen — Formularfelder (`textarea`/`input`) brauchen explizit `user-select: text`, sonst nicht editierbar.
+- **Wheel-Handler** (`CanvasView`): bricht ab, wenn `target.closest('.canvas-node')` — so scrollen Nodes statt zu zoomen. Link-iframe nur im selektierten Zustand `pointer-events: auto` (sonst kein Mausrad-Scroll).
+- **Link-Node iframe**: Vorschau erst ab `width≥200 && height≥150` → neue Link-Nodes mit 300×220 anlegen, sonst bleibt die Seite unsichtbar. Viele Seiten verbieten Einbettung (X-Frame-Options/CSP) — dann bleibt sie leer, kein Bug.
+- **Kontextmenü Outside-Click**: Listener MUSS in der **Capture-Phase** registriert werden (`addEventListener('mousedown', h, true)`). Sonst blockiert das `e.stopPropagation()` aus `useNodeDrag` (React-19-Root-Delegation ruft `nativeEvent.stopPropagation()`) das Event, bevor es `document` erreicht. Zusätzlich `window`-`blur` schließen (Klicks in cross-origin-iframes erreichen das Parent-Dokument nicht).
+- **Editor-Fokus**: beim Eintritt in den Edit-Modus via Kontextmenü das Feld per `requestAnimationFrame` fokussieren — sonst verliert `focus()` das Rennen gegen das im selben Commit unmountende Menü (Portal), Eingaben landen dann beim globalen Canvas-Keyhandler.
+- **File-Node**: `handleMouseDown` im Edit-Modus früh beenden (sonst blockiert `onDragStart`→`preventDefault` den Text-Cursor). Markdown-File-Node hat zwei Aktionen: „Bearbeiten" (Inhalt → `onFileSave`) vs. „Dateipfad ändern" (Pfad → `onFilePathChange`). Niemals Inhalt als Pfad committen. Enter committet nur im einzeiligen Pfad-Editor, nicht im Inhalts-Textarea.
+- **Datei-Suche im Pfad-Editor**: `directoryTree` flach in Dateipfade auflösen, Teilstring-Filter, Dropdown via `position: absolute` + `.canvas-node--editing-path { overflow: visible }` (Node hat sonst `overflow: hidden`). Suggestion-Klick mit `onMouseDown` + `preventDefault`, damit das Input nicht vorher blurrt.
+
 ## Dev-Umgebung
 
 - Git-Proxy: `git -c http.proxy="" push`

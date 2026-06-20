@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react'
 import {
   Upload, FolderOpen, Download, Settings,
   Database, FileText, FilePlus, MessageCircle, ScrollText,
-  ClipboardList, Plus, Share2, CalendarDays, Trash2,
+  ClipboardList, Plus, Share2, CalendarDays, Trash2, LayoutDashboard,
 } from 'lucide-react'
 import { useFeatureContext } from '../state/featureContext'
 
@@ -29,6 +29,7 @@ interface SidebarToolbarProps {
   vaultPermission?: string | null
   onCreateVault: () => void
   onCreateFile: () => void
+  onCreateCanvas: () => void
   onImportFile: () => void
   onImportFolder: () => void
   onExportVault: () => void
@@ -48,12 +49,13 @@ interface SidebarToolbarProps {
  * Buttons can be reordered by drag-and-drop.
  * Tooltips show on hover.
  */
-export function SidebarToolbar({ vaultId, vaultPermission, onCreateVault, onCreateFile, onImportFile, onImportFolder, onExportVault, onNavigate, onOpenGraph, onOpenTrash, onDailyNote, onOpenSettings, isAdmin, isVaultOwner, syncEnabled, globalUnreadCount }: SidebarToolbarProps) {
+export function SidebarToolbar({ vaultId, vaultPermission, onCreateVault, onCreateFile, onCreateCanvas, onImportFile, onImportFolder, onExportVault, onNavigate, onOpenGraph, onOpenTrash, onDailyNote, onOpenSettings, isAdmin, isVaultOwner, syncEnabled, globalUnreadCount }: SidebarToolbarProps) {
   const { isEnabled } = useFeatureContext()
 
   const allItems: ToolbarItem[] = [
     { id: 'create-vault', icon: <Plus size={15} />, label: 'Neuer Vault', action: onCreateVault },
     { id: 'create-file', icon: <FilePlus size={15} />, label: 'Neue Datei', action: onCreateFile, requiresVault: true, requiresWrite: true },
+    { id: 'create-canvas', icon: <LayoutDashboard size={15} />, label: 'Neues Canvas', action: onCreateCanvas, requiresVault: true, requiresWrite: true },
     { id: 'daily-note', icon: <CalendarDays size={15} />, label: 'Tagesnotiz (Ctrl+Alt+D)', action: () => onDailyNote?.(), requiresVault: true, requiresWrite: true },
     { id: 'import-file', icon: <Upload size={15} />, label: 'Datei importieren', action: onImportFile, requiresVault: true, requiresWrite: true },
     { id: 'import-folder', icon: <FolderOpen size={15} />, label: 'Ordner importieren', action: onImportFolder, requiresVault: true, requiresWrite: true },
