@@ -10,6 +10,7 @@ describe('extractWikilinks', () => {
         target: 'world',
         display: 'world',
         heading: null,
+        blockRef: null,
         position: { line: 1, column: 7 },
       })
     })
@@ -21,6 +22,7 @@ describe('extractWikilinks', () => {
         target: 'projects/alpha',
         display: 'projects/alpha',
         heading: null,
+        blockRef: null,
         position: { line: 1, column: 5 },
       })
     })
@@ -32,6 +34,7 @@ describe('extractWikilinks', () => {
         target: 'notes',
         display: 'notes > introduction',
         heading: 'introduction',
+        blockRef: null,
         position: { line: 1, column: 5 },
       })
     })
@@ -43,6 +46,7 @@ describe('extractWikilinks', () => {
         target: 'notes',
         display: 'my notes',
         heading: 'intro',
+        blockRef: null,
         position: { line: 1, column: 5 },
       })
     })
@@ -54,6 +58,7 @@ describe('extractWikilinks', () => {
         target: '',
         display: 'conclusion',
         heading: 'conclusion',
+        blockRef: null,
         position: { line: 1, column: 9 },
       })
     })
@@ -65,6 +70,7 @@ describe('extractWikilinks', () => {
         target: 'file',
         display: 'custom text',
         heading: null,
+        blockRef: null,
         position: { line: 1, column: 5 },
       })
     })
@@ -85,12 +91,14 @@ describe('extractWikilinks', () => {
         target: 'alpha',
         display: 'alpha',
         heading: null,
+        blockRef: null,
         position: { line: 1, column: 8 },
       })
       expect(result[1]).toEqual({
         target: 'beta',
         display: 'beta',
         heading: null,
+        blockRef: null,
         position: { line: 2, column: 8 },
       })
     })

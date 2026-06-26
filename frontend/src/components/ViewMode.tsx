@@ -13,7 +13,7 @@ import type { Plugin } from 'unified'
 import type { Root, RootContent, PhrasingContent, AlignType } from 'mdast'
 import type { DirectoryTree } from '../types'
 import { AppContext } from '../state'
-import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, remarkBreaks, createAnchorTracker } from '../plugins'
+import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, remarkBreaks, remarkBlockRef, createAnchorTracker } from '../plugins'
 import type { WikilinkNode, EmbedNode, CalloutNode, TagNode } from '../plugins'
 import { PdfViewer } from './BinaryViewer'
 import { MermaidRenderer } from './MermaidRenderer'
@@ -102,7 +102,7 @@ function collectFiles(node: DirectoryTree, result: { name: string; path: string 
 
 /**
  * Obsidian remark plugins in the required pipeline order.
- * Order: Wikilink → Embed → Callout → Tag
+ * Order: Wikilink → Embed → Callout → Tag → BlockRef → Breaks
  * Validates: Requirement 11.5
  */
 const OBSIDIAN_PLUGINS: Array<Plugin<[], Root>> = [
@@ -110,6 +110,7 @@ const OBSIDIAN_PLUGINS: Array<Plugin<[], Root>> = [
   remarkEmbed,
   remarkCallout,
   remarkTag,
+  remarkBlockRef,
   remarkBreaks,
 ]
 
@@ -232,6 +233,7 @@ interface NoteEmbedProps {
   filePath: string
   target: string
   heading: string | null
+  blockRef: string | null
   directoryTree: DirectoryTree | null
   token?: string
   embedDepth: number
@@ -240,9 +242,10 @@ interface NoteEmbedProps {
 /**
  * Component that fetches and renders an embedded note's Markdown content.
  * Supports heading-based section filtering (e.g. ![[note#heading]]).
+ * Supports block-ref filtering (e.g. ![[note#^block-id]]).
  * Respects MAX_EMBED_DEPTH to prevent infinite recursion.
  */
-function NoteEmbed({ vaultId, filePath, target, heading, directoryTree, token, embedDepth: _embedDepth }: NoteEmbedProps) { // eslint-disable-line @typescript-eslint/no-unused-vars
+function NoteEmbed({ vaultId, filePath, target, heading, blockRef, directoryTree, token, embedDepth: _embedDepth }: NoteEmbedProps) { // eslint-disable-line @typescript-eslint/no-unused-vars
   const [noteContent, setNoteContent] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -263,8 +266,17 @@ function NoteEmbed({ vaultId, filePath, target, heading, directoryTree, token, e
         if (cancelled) return
         let content = file.content
 
-        // If a heading is specified, extract only that section
-        if (heading && content) {
+        // If a blockRef is specified, extract only that block
+        if (blockRef && content) {
+          const extracted = extractBlockById(content, blockRef)
+          if (extracted !== null) {
+            content = extracted
+          } else {
+            setError(`Block nicht gefunden: ^${blockRef}`)
+            return
+          }
+        } else if (heading && content) {
+          // If a heading is specified, extract only that section
           content = extractHeadingSection(content, heading)
         }
 
@@ -276,7 +288,7 @@ function NoteEmbed({ vaultId, filePath, target, heading, directoryTree, token, e
       })
 
     return () => { cancelled = true }
-  }, [apiClient, vaultId, filePath, heading, target])
+  }, [apiClient, vaultId, filePath, heading, blockRef, target])
 
   if (error) {
     return createElement('span', { className: 'view-mode-embed view-mode-embed--missing' }, error)
@@ -346,6 +358,66 @@ function extractHeadingSection(content: string, heading: string): string {
 }
 
 /**
+ * Extracts the block (paragraph, list item, or heading section) identified by a block-id marker.
+ * Looks for lines ending with ` ^{blockId}` and returns the block content.
+ * Returns null if the block is not found.
+ * Validates: Requirements 20.3, 20.4
+ */
+function extractBlockById(content: string, blockId: string): string | null {
+  const marker = ` ^${blockId}`
+  const lines = content.split('\n')
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!
+    if (line.endsWith(marker)) {
+      // Check if this is a heading — return the heading section
+      const headingMatch = line.match(/^(#{1,6})\s+/)
+      if (headingMatch) {
+        const level = headingMatch[1]!.length
+        // Find end of heading section
+        let endIndex = lines.length
+        for (let j = i + 1; j < lines.length; j++) {
+          const nextLine = lines[j]!
+          const nextMatch = nextLine.match(/^(#{1,6})\s+/)
+          if (nextMatch && nextMatch[1]!.length <= level) {
+            endIndex = j
+            break
+          }
+        }
+        // Return heading line (without marker) + body
+        const headingLine = line.slice(0, line.length - marker.length)
+        return [headingLine, ...lines.slice(i + 1, endIndex)].join('\n')
+      }
+
+      // Check if this is a list item — find the complete list item
+      if (line.match(/^\s*[-*+]\s/) || line.match(/^\s*\d+[.)]\s/)) {
+        // Return just this line without the marker
+        return line.slice(0, line.length - marker.length)
+      }
+
+      // Regular paragraph — find the paragraph boundaries
+      // Look backwards for the start of the paragraph (first blank line or start of content)
+      let startIdx = i
+      for (let j = i - 1; j >= 0; j--) {
+        const prevLine = lines[j]!
+        if (prevLine.trim() === '' || prevLine.match(/^(#{1,6})\s+/) || prevLine.match(/^\s*[-*+]\s/) || prevLine.match(/^\s*\d+[.)]\s/)) {
+          break
+        }
+        startIdx = j
+      }
+
+      // Return the paragraph lines, stripping the marker from the last line
+      const paragraphLines = lines.slice(startIdx, i + 1)
+      const lastLine = paragraphLines[paragraphLines.length - 1]!
+      paragraphLines[paragraphLines.length - 1] = lastLine.slice(0, lastLine.length - marker.length)
+      return paragraphLines.join('\n')
+    }
+  }
+
+  return null
+}
+
+/**
  * Renders the root MDAST node, grouping content under collapsible heading sections.
  * Req 5.2: Headings as collapsible sections with content until next same-or-higher heading.
  */
@@ -383,6 +455,7 @@ interface HeadingSection {
   depth: 1 | 2 | 3 | 4 | 5 | 6
   headingChildren: PhrasingContent[]
   body: RootContent[]
+  blockId?: string
 }
 
 type SectionGroup = ContentGroup | HeadingSection
@@ -422,6 +495,7 @@ function groupByHeadings(nodes: RootContent[]): SectionGroup[] {
         depth: node.depth,
         headingChildren: node.children,
         body: [],
+        blockId: (node as unknown as { blockId?: string }).blockId,
       }
     } else {
       if (currentSection) {
@@ -487,6 +561,11 @@ function renderHeadingSection(
   const headingText = extractPlainText(section.headingChildren)
   const anchorId = anchorTracker ? anchorTracker.getAnchor(headingText) : undefined
 
+  // Check if the heading has a blockId (from block-ref plugin)
+  const blockId = (section as unknown as { blockId?: string }).blockId
+  // If blockId exists, use it as the element id (format: ^block-id)
+  const headingId = blockId ? `^${blockId}` : anchorId
+
   // Recursively group the body content for nested headings
   const bodyGroups = groupByHeadings(section.body)
   const bodyElements: ReactNode[] = []
@@ -500,7 +579,7 @@ function renderHeadingSection(
 
   return createElement('details', { key, open: true, className: `view-mode-section view-mode-section--h${section.depth}` },
     createElement('summary', { className: 'view-mode-section-summary' },
-      createElement(HeadingTag, { id: anchorId }, headingContent)
+      createElement(HeadingTag, { id: headingId }, headingContent)
     ),
     ...bodyElements
   )
@@ -539,7 +618,10 @@ function renderBlockNode(
 ): ReactNode {
   switch (node.type) {
     case 'paragraph':
-      return createElement('p', { key },
+      return createElement('p', {
+        key,
+        ...(((node as unknown as { blockId?: string }).blockId) ? { id: `^${(node as unknown as { blockId: string }).blockId}` } : {}),
+      },
         renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token, onTagClick)
       )
 
@@ -698,11 +780,13 @@ function renderList(
 
   const items = node.children.map((item, i) => {
     const itemKey = `${key}-li-${i}`
+    const blockId = (item as unknown as { blockId?: string }).blockId
+    const blockIdAttr = blockId ? { id: `^${blockId}` } : {}
 
     if (item.checked != null) {
       // Task list item — render with non-interactive checkbox
       const liClassName = item.checked ? 'view-mode-task-item view-mode-task-item--checked' : 'view-mode-task-item'
-      return createElement('li', { key: itemKey, className: liClassName },
+      return createElement('li', { key: itemKey, className: liClassName, ...blockIdAttr },
         createElement('input', {
           type: 'checkbox',
           checked: item.checked,
@@ -716,7 +800,7 @@ function renderList(
       )
     }
 
-    return createElement('li', { key: itemKey },
+    return createElement('li', { key: itemKey, ...blockIdAttr },
       renderBlockNodes(item.children as RootContent[], vaultId, directoryTree, onInternalLinkClick, itemKey, token, anchorTracker, onTagClick)
     )
   })
@@ -1157,6 +1241,7 @@ function renderWikilinkNode(
   const target = node.target
   const displayText = node.display
   const heading = node.heading
+  const blockRef = node.blockRef
 
   // Same-page heading link: [[#Heading]]
   if (!target && heading) {
@@ -1167,6 +1252,19 @@ function renderWikilinkNode(
       onClick: (e: React.MouseEvent) => {
         e.preventDefault()
         scrollToHeadingAnchor(heading)
+      },
+    }, displayText)
+  }
+
+  // Same-page block reference: [[#^block-id]]
+  if (!target && blockRef) {
+    return createElement('a', {
+      key,
+      href: '#',
+      className: 'view-mode-link view-mode-link--internal',
+      onClick: (e: React.MouseEvent) => {
+        e.preventDefault()
+        scrollToBlockAnchor(blockRef)
       },
     }, displayText)
   }
@@ -1187,8 +1285,12 @@ function renderWikilinkNode(
     onClick: (e: React.MouseEvent) => {
       e.preventDefault()
       onInternalLinkClick?.(linkPath)
+      // If there's a blockRef and link is resolved, scroll to it after navigation
+      if (blockRef && !isBroken) {
+        setTimeout(() => scrollToBlockAnchor(blockRef), 100)
+      }
       // If there's a heading fragment and link is resolved, scroll to it after navigation
-      if (heading && !isBroken) {
+      else if (heading && !isBroken) {
         // Use setTimeout to allow the target page to render before scrolling
         setTimeout(() => scrollToHeadingAnchor(heading), 100)
       }
@@ -1209,6 +1311,18 @@ function scrollToHeadingAnchor(heading: string): void {
     .replace(/[^a-z0-9äöüß\-_]/g, '')
 
   const element = document.getElementById(anchorId)
+  if (element) {
+    element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+}
+
+/**
+ * Scrolls to a block anchor element on the current page.
+ * Block anchors have IDs in the format `^{block-id}`.
+ * Validates: Requirements 20.1, 20.5
+ */
+function scrollToBlockAnchor(blockId: string): void {
+  const element = document.getElementById(`^${blockId}`)
   if (element) {
     element.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
@@ -1408,6 +1522,7 @@ function renderEmbedNode(
     filePath: resolvedNotePath,
     target: node.target,
     heading: node.heading,
+    blockRef: node.blockRef ?? null,
     directoryTree,
     token,
     embedDepth: embedDepth + 1,

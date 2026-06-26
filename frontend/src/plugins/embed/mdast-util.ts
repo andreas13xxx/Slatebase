@@ -4,8 +4,12 @@
  * Provides fromMarkdown and toMarkdown handlers that convert between
  * micromark tokens and EmbedNode MDAST nodes.
  *
- * fromMarkdown: Converts embed tokens into EmbedNode with target, heading, display, embedType.
- * toMarkdown: Serializes EmbedNode back to `![[target]]`, `![[target#heading]]`, or `![[target|display]]`.
+ * fromMarkdown: Converts embed tokens into EmbedNode with target, heading, blockRef, display, embedType.
+ * toMarkdown: Serializes EmbedNode back to `![[target]]`, `![[target#heading]]`, `![[target#^block-id]]`, or `![[target|display]]`.
+ *
+ * Block references: when the heading text starts with `^`, it's treated
+ * as a blockRef (e.g., `![[page#^block-id]]` → blockRef: "block-id").
+ * blockRef and heading are mutually exclusive.
  */
 import type { Extension as FromMarkdownExtension } from 'mdast-util-from-markdown'
 import type { Options as ToMarkdownExtension } from 'mdast-util-to-markdown'
@@ -32,6 +36,7 @@ export function embedFromMarkdown(): FromMarkdownExtension {
           type: 'embed',
           target: '',
           heading: null,
+          blockRef: null,
           display: null,
           embedType: 'note',
           value: '',
@@ -54,7 +59,14 @@ export function embedFromMarkdown(): FromMarkdownExtension {
         const current = this.stack[this.stack.length - 1]
         if (current && current.type === 'embed') {
           const node = current as unknown as EmbedNode
-          node.heading = heading
+          // Detect block reference: heading starting with `^`
+          if (heading.startsWith('^')) {
+            node.blockRef = heading.slice(1)
+            node.heading = null
+          } else {
+            node.heading = heading
+            node.blockRef = null
+          }
         }
       },
       embedDisplay(token) {
@@ -71,7 +83,9 @@ export function embedFromMarkdown(): FromMarkdownExtension {
           const embedNode = node as unknown as EmbedNode
           // Build the value (raw text representation)
           let value = `![[${embedNode.target}`
-          if (embedNode.heading) {
+          if (embedNode.blockRef) {
+            value += `#^${embedNode.blockRef}`
+          } else if (embedNode.heading) {
             value += `#${embedNode.heading}`
           }
           if (embedNode.display) {
@@ -90,17 +104,21 @@ export function embedFromMarkdown(): FromMarkdownExtension {
  * Creates a toMarkdown extension that serializes EmbedNode back to markdown.
  *
  * Produces:
- * - `![[target]]` when no heading or display is present
+ * - `![[target]]` when no heading, blockRef, or display is present
  * - `![[target#heading]]` when a heading fragment exists
+ * - `![[target#^block-id]]` when a blockRef exists
  * - `![[target|display]]` when a display/size is present
- * - `![[target#heading|display]]` when both exist
+ * - `![[target#heading|display]]` when both heading and display exist
+ * - `![[target#^block-id|display]]` when both blockRef and display exist
  */
 export function embedToMarkdown(): ToMarkdownExtension {
   return {
     handlers: {
       embed(node: EmbedNode): string {
         let value = `![[${node.target}`
-        if (node.heading) {
+        if (node.blockRef) {
+          value += `#^${node.blockRef}`
+        } else if (node.heading) {
           value += `#${node.heading}`
         }
         if (node.display) {
