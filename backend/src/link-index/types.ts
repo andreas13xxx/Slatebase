@@ -88,6 +88,8 @@ export interface ParsedWikilink {
   display: string
   /** Heading reference within the target file, or null if none. */
   heading: string | null
+  /** Block reference within the target file (e.g., "block-id" from `[[page#^block-id]]`), or null if none. */
+  blockRef: string | null
   /** Position of the wikilink within the source markdown. */
   position: {
     /** 1-based line number. */

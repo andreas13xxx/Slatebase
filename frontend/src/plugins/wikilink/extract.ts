@@ -38,7 +38,7 @@ export function extractWikilinks(markdown: string): WikilinkInfo[] {
  * Recursively walks the MDAST tree collecting WikilinkNode instances.
  *
  * Skips `code` and `inlineCode` nodes (does not descend into them).
- * For each `wikilink` node found, extracts target, display, heading,
+ * For each `wikilink` node found, extracts target, display, heading, blockRef,
  * and position (line/column from node.position).
  */
 function visitWikilinks(node: Root | RootContent | Node, result: WikilinkInfo[]): void {
@@ -55,6 +55,7 @@ function visitWikilinks(node: Root | RootContent | Node, result: WikilinkInfo[])
       target: wikilink.target,
       display: wikilink.display,
       heading: wikilink.heading,
+      blockRef: wikilink.blockRef ?? null,
       position: {
         line: position?.start.line ?? 0,
         column: position?.start.column ?? 0,

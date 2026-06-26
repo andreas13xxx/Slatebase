@@ -1,17 +1,18 @@
 import type { Literal, Node, PhrasingContent, RootContent } from 'mdast'
 
 /**
- * Wikilink node: [[target]], [[target|display]], [[target#heading]]
+ * Wikilink node: [[target]], [[target|display]], [[target#heading]], [[target#^block-id]]
  */
 export interface WikilinkNode extends Literal {
   type: 'wikilink'
   target: string
   display: string
   heading: string | null
+  blockRef: string | null
 }
 
 /**
- * Embed node: ![[target]], ![[target#heading]], ![[target|display]]
+ * Embed node: ![[target]], ![[target#heading]], ![[target|display]], ![[target#^block-id]]
  *
  * For image embeds, the display field can contain sizing/formatting info:
  * - `![[image.jpg|300]]` → width=300
@@ -23,6 +24,7 @@ export interface EmbedNode extends Literal {
   type: 'embed'
   target: string
   heading: string | null
+  blockRef: string | null
   display: string | null
   embedType: 'image' | 'pdf' | 'note'
 }
@@ -55,6 +57,7 @@ export interface WikilinkInfo {
   target: string
   display: string
   heading: string | null
+  blockRef: string | null
   position: { line: number; column: number }
 }
 

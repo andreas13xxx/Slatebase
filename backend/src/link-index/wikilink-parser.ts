@@ -220,6 +220,7 @@ function extractFromLine(line: string, lineNumber: number, results: ParsedWikili
           target: wikilink.target,
           display: wikilink.display,
           heading: wikilink.heading,
+          blockRef: wikilink.blockRef,
           position: { line: lineNumber, column: startColumn },
         })
         i = wikilink.endIndex
@@ -242,10 +243,11 @@ function extractFromLine(line: string, lineNumber: number, results: ParsedWikili
 function parseWikilinkContent(
   line: string,
   startIndex: number
-): { target: string; display: string; heading: string | null; endIndex: number } | null {
+): { target: string; display: string; heading: string | null; blockRef: string | null; endIndex: number } | null {
   let i = startIndex
   let target = ''
   let heading: string | null = null
+  let blockRef: string | null = null
   let display: string | null = null
 
   // Empty wikilink `[[]]` is invalid
@@ -256,12 +258,18 @@ function parseWikilinkContent(
   // Check for heading-only link `[[#...]]`
   if (i < line.length && line[i] === '#') {
     i++ // Skip '#'
-    // Parse heading
+    // Parse heading (may be a block reference if starts with ^)
     const headingResult = consumeUntil(line, i, ['|', ']'])
     if (headingResult === null) {
       return null
     }
-    heading = headingResult.value
+
+    // Detect block reference: heading starts with ^
+    if (headingResult.value.startsWith('^')) {
+      blockRef = headingResult.value.slice(1)
+    } else {
+      heading = headingResult.value
+    }
 
     if (headingResult.stopChar === '|') {
       i = headingResult.endIndex + 1 // Skip '|'
@@ -284,12 +292,18 @@ function parseWikilinkContent(
 
     if (targetResult.stopChar === '#') {
       i = targetResult.endIndex + 1 // Skip '#'
-      // Parse heading
+      // Parse heading (may be a block reference if starts with ^)
       const headingResult = consumeUntil(line, i, ['|', ']'])
       if (headingResult === null) {
         return null
       }
-      heading = headingResult.value
+
+      // Detect block reference: heading starts with ^
+      if (headingResult.value.startsWith('^')) {
+        blockRef = headingResult.value.slice(1)
+      } else {
+        heading = headingResult.value
+      }
 
       if (headingResult.stopChar === '|') {
         i = headingResult.endIndex + 1 // Skip '|'
@@ -325,18 +339,21 @@ function parseWikilinkContent(
   }
   i++ // Second ']'
 
-  // Validate: target must not be empty unless it's a heading-only link
-  if (target === '' && heading === null) {
+  // Validate: target must not be empty unless it's a heading-only or blockRef-only link
+  if (target === '' && heading === null && blockRef === null) {
     return null
   }
 
   // Determine display text (matching frontend behavior):
   // 1. If explicit display text was provided, use it
-  // 2. If heading exists but no display, use "target > heading" (or just heading if target is empty)
-  // 3. Otherwise, use target
+  // 2. If blockRef exists but no display, use "target > ^block-id" (or just "^block-id" if target is empty)
+  // 3. If heading exists but no display, use "target > heading" (or just heading if target is empty)
+  // 4. Otherwise, use target
   let resolvedDisplay: string
   if (display !== null) {
     resolvedDisplay = display
+  } else if (blockRef !== null) {
+    resolvedDisplay = target ? `${target} > ^${blockRef}` : `^${blockRef}`
   } else if (heading !== null) {
     resolvedDisplay = target ? `${target} > ${heading}` : heading
   } else {
@@ -347,6 +364,7 @@ function parseWikilinkContent(
     target,
     display: resolvedDisplay,
     heading,
+    blockRef,
     endIndex: i,
   }
 }

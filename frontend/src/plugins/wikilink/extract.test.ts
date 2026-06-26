@@ -9,6 +9,7 @@ describe('extractWikilinks', () => {
       target: 'World',
       display: 'World',
       heading: null,
+      blockRef: null,
       position: { line: 1, column: 7 },
     })
   })
@@ -20,6 +21,7 @@ describe('extractWikilinks', () => {
       target: 'Page',
       display: 'Custom Text',
       heading: null,
+      blockRef: null,
       position: { line: 1, column: 5 },
     })
   })
@@ -31,6 +33,7 @@ describe('extractWikilinks', () => {
       target: 'Page',
       display: 'Page > Section',
       heading: 'Section',
+      blockRef: null,
       position: { line: 1, column: 7 },
     })
   })

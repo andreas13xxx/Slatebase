@@ -22,6 +22,10 @@ import type { WikilinkNode } from '../types'
  * - wikilinkDisplay (the display text after `|`)
  * - wikilinkHeadingMarker (the `#`)
  * - wikilinkHeading (the heading text after `#`)
+ *
+ * Block references: when the heading text starts with `^`, it's treated
+ * as a blockRef (e.g., `[[page#^block-id]]` → blockRef: "block-id").
+ * blockRef and heading are mutually exclusive.
  */
 export function wikilinkFromMarkdown(): FromMarkdownExtension {
   let target = ''
@@ -41,6 +45,7 @@ export function wikilinkFromMarkdown(): FromMarkdownExtension {
           target: '',
           display: '',
           heading: null,
+          blockRef: null,
           value: '',
         }
         this.enter(node, token)
@@ -60,22 +65,37 @@ export function wikilinkFromMarkdown(): FromMarkdownExtension {
         const node = this.stack[this.stack.length - 1] as WikilinkNode
 
         node.target = target
-        node.heading = heading
+
+        // Determine if heading is actually a block reference
+        let blockRef: string | null = null
+        let actualHeading: string | null = heading
+
+        if (heading !== null && heading.startsWith('^')) {
+          // It's a block reference: strip the `^` prefix
+          blockRef = heading.slice(1)
+          actualHeading = null
+        }
+
+        node.heading = actualHeading
+        node.blockRef = blockRef
 
         // Determine display text:
         // 1. If explicit display text was provided, use it
-        // 2. If heading exists but no display, use "target > heading" (or just heading if target is empty)
-        // 3. Otherwise, use target
+        // 2. If blockRef exists but no display, use "target > ^block-id" (or just "^block-id" if target is empty)
+        // 3. If heading exists but no display, use "target > heading" (or just heading if target is empty)
+        // 4. Otherwise, use target
         if (display !== null) {
           node.display = display
-        } else if (heading !== null) {
-          node.display = target ? `${target} > ${heading}` : heading
+        } else if (blockRef !== null) {
+          node.display = target ? `${target} > ^${blockRef}` : `^${blockRef}`
+        } else if (actualHeading !== null) {
+          node.display = target ? `${target} > ${actualHeading}` : actualHeading
         } else {
           node.display = target
         }
 
         // Build the raw value for the Literal interface
-        node.value = buildWikilinkValue(target, heading, display)
+        node.value = buildWikilinkValue(target, actualHeading, blockRef, display)
 
         this.exit(token)
       },
@@ -89,7 +109,9 @@ export function wikilinkFromMarkdown(): FromMarkdownExtension {
  *
  * Serialization rules:
  * - If target is empty and heading exists: `[[#heading]]`
+ * - If target is empty and blockRef exists: `[[#^block-id]]`
  * - If target and heading exist (and display is default): `[[target#heading]]`
+ * - If target and blockRef exist (and display is default): `[[target#^block-id]]`
  * - If target and display differ from target: `[[target|display]]`
  * - Otherwise: `[[target]]`
  */
@@ -97,11 +119,26 @@ export function wikilinkToMarkdown(): ToMarkdownExtension {
   return {
     handlers: {
       wikilink(node: WikilinkNode): string {
-        const { target, heading, display } = node
+        const { target, heading, blockRef, display } = node
 
         // Case: heading-only link [[#heading]]
         if (!target && heading) {
           return `[[#${heading}]]`
+        }
+
+        // Case: block-ref-only link [[#^block-id]]
+        if (!target && blockRef) {
+          return `[[#^${blockRef}]]`
+        }
+
+        // Case: target with block reference [[target#^block-id]]
+        if (target && blockRef) {
+          const defaultDisplay = `${target} > ^${blockRef}`
+          if (display === defaultDisplay) {
+            return `[[${target}#^${blockRef}]]`
+          }
+          // If display differs from default, use pipe syntax
+          return `[[${target}#^${blockRef}|${display}]]`
         }
 
         // Case: target with heading [[target#heading]]
@@ -137,10 +174,13 @@ export function wikilinkToMarkdown(): ToMarkdownExtension {
 function buildWikilinkValue(
   target: string,
   heading: string | null,
+  blockRef: string | null,
   display: string | null
 ): string {
   let value = target
-  if (heading !== null) {
+  if (blockRef !== null) {
+    value += `#^${blockRef}`
+  } else if (heading !== null) {
     value += `#${heading}`
   }
   if (display !== null) {
