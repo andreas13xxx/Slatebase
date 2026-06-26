@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.0](https://github.com/andreas13xxx/Slatebase/compare/v0.9.0...v0.10.0) (2026-06-26)
+
+
+### Features
+
+* implement block references (Task 12) ([cdc3042](https://github.com/andreas13xxx/Slatebase/commit/cdc3042355a45ba1e4546c639c8f892abbfd153f))
+
+
+### Bugfixes
+
+* resolve TS2783 duplicate property errors in marker-serializer ([ffffa33](https://github.com/andreas13xxx/Slatebase/commit/ffffa333f0596779393f2f9988c2256ba9c2fbfa))
+
 ## [0.9.0](https://github.com/andreas13xxx/Slatebase/compare/v0.8.0...v0.9.0) (2026-06-20)
 
 
