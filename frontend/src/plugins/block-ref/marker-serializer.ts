@@ -24,9 +24,9 @@ export function blockRefToMarkdown(): ToMarkdownExtension {
         const blockNode = node as unknown as NodeWithBlockId
         // Use the default phrasing handler to serialize children
         const result = state.containerPhrasing(node, {
+          ...info,
           before: info.before,
           after: info.after,
-          ...info,
         })
         if (blockNode.blockId) {
           return result + ` ^${blockNode.blockId}`
@@ -38,9 +38,9 @@ export function blockRefToMarkdown(): ToMarkdownExtension {
         const headingNode = node as Heading
         const prefix = '#'.repeat(headingNode.depth) + ' '
         const result = state.containerPhrasing(node, {
+          ...info,
           before: '# ',
           after: '\n',
-          ...info,
         })
         const fullResult = prefix + result
         if (blockNode.blockId) {
