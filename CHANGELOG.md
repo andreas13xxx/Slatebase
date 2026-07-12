@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.10.2](https://github.com/andreas13xxx/Slatebase/compare/v0.10.1...v0.10.2) (2026-07-12)
+
+
+### Bugfixes
+
+* prevent path traversal via plugin ID in manifest and routes - Add strict regex validation (^[a-z0-9][a-z0-9-]{0,63}$) to pluginManifestSchema - Export isValidPluginId() utility for route parameter checks - Add path containment guard in PluginStore.getPluginDir() (defense-in-depth) - Validate :pluginId route params in all 7 plugin endpoints - Add 35 unit tests covering traversal attempts, forbidden chars, schema integration ([1fb7a0c](https://github.com/andreas13xxx/Slatebase/commit/1fb7a0cd68de33cba15f39021bd7edd857bfd2da))
+* prevent registry race conditions with async mutex - Add AsyncMutex class (promise-based queue for serializing async ops) - Wrap VaultRegistry.addEntry/removeEntry with mutex.runExclusive() - Wrap VaultShareRegistry add/remove/removeAll/updatePermission - Prevents lost writes when concurrent requests hit read-modify-write ([22661ca](https://github.com/andreas13xxx/Slatebase/commit/22661caa0af02138703b68ba3d710baa88301871))
+
+
+### Sonstige Änderungen
+
+* add ESLint to backend with CI integration - Add eslint.config.js (flat config, ESLint 10, typescript-eslint) - Add lint script to package.json - Fix 6 pre-existing lint issues (unused vars, useless escape, empty catch) - Add npm run lint step to backend CI job in ci.yml ([7bfdd2c](https://github.com/andreas13xxx/Slatebase/commit/7bfdd2c8f73beb5dae145eed4ee116cd6a625d7e))
+
 ## [0.10.1](https://github.com/andreas13xxx/Slatebase/compare/v0.10.0...v0.10.1) (2026-07-12)
 
 
