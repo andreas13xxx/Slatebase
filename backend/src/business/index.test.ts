@@ -770,7 +770,7 @@ describe('VaultService', () => {
       expect(vaultManager.removedVaultIds).toContain('abc123def456')
 
       // Cleanup
-      try { await fsModule.rm(tmpDir, { recursive: true, force: true }) } catch {}
+      try { await fsModule.rm(tmpDir, { recursive: true, force: true }) } catch { /* ignore cleanup errors */ }
     })
 
     it('removes vault from registry even when directory does not exist (force flag)', async () => {

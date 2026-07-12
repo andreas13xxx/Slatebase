@@ -177,7 +177,7 @@ export class VaultController implements IVaultController {
 
     // Strip internal `path` field and resolve ownerName
     const publicVaults = await Promise.all(
-      vaults.map(async ({ path, ...rest }) => {
+      vaults.map(async ({ path: _path, ...rest }) => {
         let ownerName: string | undefined
         if (rest.ownerId && this.userRepository) {
           const owner = await this.userRepository.findById(rest.ownerId)
@@ -332,7 +332,7 @@ export class VaultController implements IVaultController {
       const vaultInfo = await this.vaultService.createVault(name, ownerId)
 
       // Strip internal `path` field from response
-      const { path, ...publicVault } = vaultInfo
+      const { path: _path, ...publicVault } = vaultInfo
       return c.json(publicVault, 201)
     } catch (error) {
       return this.handleError(c, error)

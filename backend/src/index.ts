@@ -150,6 +150,7 @@ const onUserInvalidated = async (userId: string): Promise<void> => {
 }
 
 // Mutable reference for welcome vault hook (set after VaultService init)
+// eslint-disable-next-line prefer-const
 let welcomeVaultCreator: ((userId: string, language: 'de' | 'en') => Promise<void>) | undefined
 
 const onUserCreated = async (userId: string, language: 'de' | 'en'): Promise<void> => {

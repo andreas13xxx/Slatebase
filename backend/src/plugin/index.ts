@@ -3,6 +3,7 @@
 export { PluginStore } from './plugin-store.js'
 export { PluginInstaller, PluginInstallError, compareSemver } from './plugin-installer.js'
 export { PluginNotFoundError, PluginFileTooLargeError, PluginSettingsTooLargeError } from './errors.js'
+export { PLUGIN_ID_PATTERN, isValidPluginId } from './validation.js'
 export type {
   IPluginStore,
   PluginFiles,

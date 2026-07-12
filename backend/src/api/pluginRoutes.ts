@@ -8,7 +8,7 @@ import type { IPluginStore, PluginRegistryData } from '../plugin/types.js'
 import type { IPluginInstaller, PluginInstallResult } from '../plugin/plugin-installer.js'
 import { PluginNotFoundError, PluginFileTooLargeError, PluginSettingsTooLargeError } from '../plugin/errors.js'
 import { PluginInstallError } from '../plugin/plugin-installer.js'
-import { pluginRegistrySchema } from '../plugin/validation.js'
+import { pluginRegistrySchema, isValidPluginId } from '../plugin/validation.js'
 import type { IVaultAccessControl } from '../business/index.js'
 import { VaultAccessDeniedError } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
@@ -89,6 +89,11 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
   app.post('/detected/:pluginId/install', async (c: Context): Promise<Response> => {
     const vaultId = c.req.param('vaultId') as string
     const pluginId = c.req.param('pluginId') as string
+
+    // Validate plugin ID to prevent path traversal
+    if (!isValidPluginId(pluginId)) {
+      return c.json(createApiError('VALIDATION_ERROR', 'Invalid plugin ID: must contain only lowercase letters, digits, and hyphens (1-64 chars)'), 400)
+    }
 
     const authResult = await checkAccess(c, vaultId, vaultRegistry, accessControl)
     if (!authResult.authorized) {
@@ -223,6 +228,11 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     const vaultId = c.req.param('vaultId') as string
     const pluginId = c.req.param('pluginId') as string
 
+    // Validate plugin ID to prevent path traversal
+    if (!isValidPluginId(pluginId)) {
+      return c.json(createApiError('VALIDATION_ERROR', 'Invalid plugin ID: must contain only lowercase letters, digits, and hyphens (1-64 chars)'), 400)
+    }
+
     const authResult = await checkAccess(c, vaultId, vaultRegistry, accessControl)
     if (!authResult.authorized) {
       return authResult.response
@@ -243,6 +253,11 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
   app.delete('/:pluginId', async (c: Context): Promise<Response> => {
     const vaultId = c.req.param('vaultId') as string
     const pluginId = c.req.param('pluginId') as string
+
+    // Validate plugin ID to prevent path traversal
+    if (!isValidPluginId(pluginId)) {
+      return c.json(createApiError('VALIDATION_ERROR', 'Invalid plugin ID: must contain only lowercase letters, digits, and hyphens (1-64 chars)'), 400)
+    }
 
     const authResult = await checkAccess(c, vaultId, vaultRegistry, accessControl)
     if (!authResult.authorized) {
@@ -267,6 +282,11 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
   app.get('/:pluginId/bundle', async (c: Context): Promise<Response> => {
     const vaultId = c.req.param('vaultId') as string
     const pluginId = c.req.param('pluginId') as string
+
+    // Validate plugin ID to prevent path traversal
+    if (!isValidPluginId(pluginId)) {
+      return c.json(createApiError('VALIDATION_ERROR', 'Invalid plugin ID: must contain only lowercase letters, digits, and hyphens (1-64 chars)'), 400)
+    }
 
     const authResult = await checkAccess(c, vaultId, vaultRegistry, accessControl)
     if (!authResult.authorized) {
@@ -296,6 +316,11 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     const vaultId = c.req.param('vaultId') as string
     const pluginId = c.req.param('pluginId') as string
 
+    // Validate plugin ID to prevent path traversal
+    if (!isValidPluginId(pluginId)) {
+      return c.json(createApiError('VALIDATION_ERROR', 'Invalid plugin ID: must contain only lowercase letters, digits, and hyphens (1-64 chars)'), 400)
+    }
+
     const authResult = await checkAccess(c, vaultId, vaultRegistry, accessControl)
     if (!authResult.authorized) {
       return authResult.response
@@ -324,6 +349,11 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     const vaultId = c.req.param('vaultId') as string
     const pluginId = c.req.param('pluginId') as string
 
+    // Validate plugin ID to prevent path traversal
+    if (!isValidPluginId(pluginId)) {
+      return c.json(createApiError('VALIDATION_ERROR', 'Invalid plugin ID: must contain only lowercase letters, digits, and hyphens (1-64 chars)'), 400)
+    }
+
     const authResult = await checkAccess(c, vaultId, vaultRegistry, accessControl)
     if (!authResult.authorized) {
       return authResult.response
@@ -351,6 +381,11 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
   app.put('/:pluginId/settings', async (c: Context): Promise<Response> => {
     const vaultId = c.req.param('vaultId') as string
     const pluginId = c.req.param('pluginId') as string
+
+    // Validate plugin ID to prevent path traversal
+    if (!isValidPluginId(pluginId)) {
+      return c.json(createApiError('VALIDATION_ERROR', 'Invalid plugin ID: must contain only lowercase letters, digits, and hyphens (1-64 chars)'), 400)
+    }
 
     const authResult = await checkAccess(c, vaultId, vaultRegistry, accessControl)
     if (!authResult.authorized) {

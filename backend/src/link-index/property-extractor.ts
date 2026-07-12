@@ -77,7 +77,7 @@ function parseFrontmatterProperties(frontmatter: string): Record<string, string[
     }
 
     // Match a top-level key (no leading whitespace)
-    const keyMatch = line.match(/^([a-zA-Z0-9_\-]+)\s*:\s*(.*)$/)
+    const keyMatch = line.match(/^([a-zA-Z0-9_-]+)\s*:\s*(.*)$/)
     if (!keyMatch) {
       i++
       continue
