@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.1](https://github.com/andreas13xxx/Slatebase/compare/v0.10.0...v0.10.1) (2026-07-12)
+
+
+### Sonstige Änderungen
+
+* harden SSE auth, add request-id middleware, extract frontend modules ([f657220](https://github.com/andreas13xxx/Slatebase/commit/f657220e8ca5058126167d6b6644a377b99c668d))
+* harden SSE auth, add request-id middleware, extract frontend modules ([2944464](https://github.com/andreas13xxx/Slatebase/commit/2944464fb234bc54012cd224cf290f7d6cbf382b))
+
 ## [0.10.0](https://github.com/andreas13xxx/Slatebase/compare/v0.9.0...v0.10.0) (2026-06-26)
 
 
