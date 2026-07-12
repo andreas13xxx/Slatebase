@@ -8,7 +8,7 @@
       "matcher": "(frontend/src/.*[^/]*\\.ts$|frontend/src/.*[^/]*\\.tsx$)",
       "action": {
         "type": "agent",
-        "prompt": "The edited frontend file may have lint errors. Run: cd frontend && npx eslint --no-warn-ignored [edited file path]. If there are errors (not warnings), fix them immediately."
+        "prompt": "The edited frontend file may have lint errors. Run: npx eslint --no-warn-ignored [edited file path] (with cwd set to frontend/). If there are errors (not warnings), fix them immediately."
       },
       "enabled": true
     }

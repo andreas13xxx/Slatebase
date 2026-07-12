@@ -8,6 +8,7 @@
 
 import type { Dispatch } from 'react'
 import type { SearchAction, SearchFileResult, ReplaceResponse } from './searchState'
+import { extractErrorMessage } from '../utils/error'
 
 /**
  * Interface for search-related API methods.
@@ -213,21 +214,4 @@ function isAbortError(err: unknown): boolean {
   return false
 }
 
-/**
- * Extracts a human-readable error message from an unknown error.
- * Handles the { code, message } shape thrown by ApiClient as well as standard Error instances.
- */
-function extractErrorMessage(err: unknown): string {
-  if (
-    err !== null &&
-    typeof err === 'object' &&
-    'message' in err &&
-    typeof (err as { message: unknown }).message === 'string'
-  ) {
-    return (err as { message: string }).message
-  }
-  if (err instanceof Error) {
-    return err.message
-  }
-  return 'An unexpected error occurred'
-}
+

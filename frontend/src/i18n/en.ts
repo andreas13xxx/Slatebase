@@ -476,6 +476,9 @@ export const en: TranslationShape = {
     renameError: 'Error renaming',
     createError: 'Error creating file',
     deleteError: 'Error deleting',
+    canvasCreateError: 'Could not create canvas',
+    created: '{name} created',
+    statisticsUnavailable: 'Statistics unavailable',
     nameEmpty: 'Filename must not be empty',
     nameInvalidChars: 'Filename contains invalid characters',
     nameTooLong: 'Filename is too long',
@@ -697,6 +700,15 @@ export const en: TranslationShape = {
     errorVaultNotFound: 'Vault not found.',
     errorAccessDenied: 'Access denied. Only the owner can transfer the vault.',
     errorUserNotFound: 'User not found.',
+  },
+
+  tabContent: {
+    noFileOpen: 'No file open. Select a file from the File Explorer.',
+    loading: 'Loading…',
+    fileLoadError: 'Error loading file: {error}',
+    linkCreateError: 'Could not create file: {fileName} — {message}',
+    linkCreateUnexpected: 'An unexpected error occurred',
+    dismissError: 'Dismiss error',
   },
 
 } as const

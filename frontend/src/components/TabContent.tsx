@@ -8,7 +8,10 @@ import { ViewMode } from './ViewMode'
 import { BinaryViewer } from './BinaryViewer'
 import { GraphView } from './GraphView'
 import { CanvasView } from './canvas/CanvasView'
+import { ErrorBoundary } from './ErrorBoundary'
 import { useTranslation } from '../i18n'
+import { extractErrorMessage } from '../utils/error'
+import './TabContent.css'
 
 /**
  * Extracts the file extension from a filename (including the dot).
@@ -110,11 +113,8 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
           appDispatch({ type: 'TREE_LOADED', payload: tree })
         } catch (err: unknown) {
           // File creation failed — show error notification, maintain current view
-          const message =
-            err !== null && typeof err === 'object' && 'message' in err
-              ? String((err as { message: unknown }).message)
-              : 'Ein unerwarteter Fehler ist aufgetreten'
-          setLinkError(`Datei konnte nicht erstellt werden: ${fileName} — ${message}`)
+          const message = extractErrorMessage(err, t('tabContent.linkCreateUnexpected'))
+          setLinkError(t('tabContent.linkCreateError', { fileName, message }))
           return
         }
       }
@@ -165,8 +165,8 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
   // No active tab — empty state
   if (!activeTab) {
     return (
-      <div className="tab-content tab-content--empty" style={emptyStyle}>
-        <p style={emptyTextStyle}>Keine Datei geöffnet. Wähle eine Datei im Datei-Explorer aus.</p>
+      <div className="tab-content tab-content--empty">
+        <p>{t('tabContent.noFileOpen')}</p>
       </div>
     )
   }
@@ -175,14 +175,16 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
   if (activeTab.filePath === '__graph__') {
     if (!activeTab.vaultId) {
       return (
-        <div className="tab-content tab-content--empty" style={emptyStyle}>
-          <p style={emptyTextStyle}>{t('graph.noVault')}</p>
+        <div className="tab-content tab-content--empty">
+          <p>{t('graph.noVault')}</p>
         </div>
       )
     }
     return (
-      <div className="tab-content tab-content--graph" style={contentStyle}>
-        <GraphView vaultId={activeTab.vaultId} />
+      <div className="tab-content tab-content--graph">
+        <ErrorBoundary>
+          <GraphView vaultId={activeTab.vaultId} />
+        </ErrorBoundary>
       </div>
     )
   }
@@ -190,9 +192,9 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
   // Loading state
   if (activeTab.loading) {
     return (
-      <div className="tab-content tab-content--loading" style={loadingStyle} role="status" aria-live="polite">
+      <div className="tab-content tab-content--loading" role="status" aria-live="polite">
         <span className="app-loading-spinner" aria-hidden="true" />
-        <span>Laden…</span>
+        <span>{t('tabContent.loading')}</span>
       </div>
     )
   }
@@ -200,9 +202,9 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
   // Error state
   if (activeTab.error) {
     return (
-      <div className="tab-content tab-content--error" style={errorStyle} role="alert">
-        <p style={errorTextStyle}>
-          Fehler beim Laden der Datei: {activeTab.error}
+      <div className="tab-content tab-content--error" role="alert">
+        <p>
+          {t('tabContent.fileLoadError', { error: activeTab.error })}
         </p>
       </div>
     )
@@ -212,7 +214,7 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
   if (activeTab.isBinary) {
     const extension = getFileExtension(activeTab.fileName)
     return (
-      <div className="tab-content tab-content--binary" style={contentStyle}>
+      <div className="tab-content tab-content--binary">
         <BinaryViewer
           fileName={activeTab.fileName}
           fileExtension={extension}
@@ -229,28 +231,30 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
     const currentVault = appState.vaults.find((v) => v.id === activeTab.vaultId)
     const isReadOnly = currentVault?.permission === 'read'
     return (
-      <div className="tab-content tab-content--canvas" style={canvasContentStyle}>
-        <CanvasView
-          vaultId={activeTab.vaultId}
-          filePath={activeTab.filePath}
-          content={activeTab.content}
-          readOnly={isReadOnly ?? false}
-          onSave={async (content) => {
-            await saveTab(tabDispatch, apiClient!, activeTab.vaultId, activeTab.filePath, content)
-          }}
-          onFileOpen={(path) => {
-            const fileName = path.split('/').pop() ?? path
-            void openTab(tabDispatch, appDispatch, apiClient!, activeTab.vaultId, path, fileName)
-          }}
-          onFileSave={async (filePath, content) => {
-            await apiClient!.saveFile(activeTab.vaultId, filePath, content)
-            // Refresh tree to update any changed references
-            const newTree = await apiClient!.fetchVaultTree(activeTab.vaultId)
-            appDispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId: activeTab.vaultId, tree: newTree } })
-          }}
-          directoryTree={appState.vaultTrees[activeTab.vaultId] ?? appState.directoryTree}
-          token={apiClient?.getToken() ?? undefined}
-        />
+      <div className="tab-content tab-content--canvas">
+        <ErrorBoundary>
+          <CanvasView
+            vaultId={activeTab.vaultId}
+            filePath={activeTab.filePath}
+            content={activeTab.content}
+            readOnly={isReadOnly ?? false}
+            onSave={async (content) => {
+              await saveTab(tabDispatch, apiClient!, activeTab.vaultId, activeTab.filePath, content)
+            }}
+            onFileOpen={(path) => {
+              const fileName = path.split('/').pop() ?? path
+              void openTab(tabDispatch, appDispatch, apiClient!, activeTab.vaultId, path, fileName)
+            }}
+            onFileSave={async (filePath, content) => {
+              await apiClient!.saveFile(activeTab.vaultId, filePath, content)
+              // Refresh tree to update any changed references
+              const newTree = await apiClient!.fetchVaultTree(activeTab.vaultId)
+              appDispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId: activeTab.vaultId, tree: newTree } })
+            }}
+            directoryTree={appState.vaultTrees[activeTab.vaultId] ?? appState.directoryTree}
+            token={apiClient?.getToken() ?? undefined}
+          />
+        </ErrorBoundary>
       </div>
     )
   }
@@ -261,7 +265,7 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
     const currentVault = appState.vaults.find((v) => v.id === activeTab.vaultId)
     const isReadOnly = currentVault?.permission === 'read'
     return (
-      <div className="tab-content tab-content--edit" style={contentStyle}>
+      <div className="tab-content tab-content--edit">
         <EditMode
           content={editContent}
           onChange={handleEditChange}
@@ -281,14 +285,14 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
 
   // View mode — render Markdown
   return (
-    <div className="tab-content tab-content--view" style={contentStyle}>
+    <div className="tab-content tab-content--view">
       {linkError && (
-        <div className="tab-content-link-error" role="alert" style={linkErrorStyle}>
+        <div className="tab-content-link-error" role="alert">
           <span>{linkError}</span>
           <button
+            className="tab-content-link-error-dismiss"
             onClick={() => setLinkError(null)}
-            aria-label="Fehlermeldung schließen"
-            style={linkErrorDismissStyle}
+            aria-label={t('tabContent.dismissError')}
           >
             ×
           </button>
@@ -303,79 +307,4 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
       />
     </div>
   )
-}
-
-/* Inline styles */
-
-const emptyStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  flex: 1,
-  padding: '2rem',
-}
-
-const emptyTextStyle: React.CSSProperties = {
-  color: '#718096',
-  fontSize: '0.95rem',
-}
-
-const loadingStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: '8px',
-  flex: 1,
-  padding: '2rem',
-  color: '#4a5568',
-}
-
-const errorStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  flex: 1,
-  padding: '2rem',
-}
-
-const errorTextStyle: React.CSSProperties = {
-  color: '#dc2626',
-  fontSize: '0.95rem',
-}
-
-const contentStyle: React.CSSProperties = {
-  flex: 1,
-  overflow: 'auto',
-  minHeight: 0,
-}
-
-const canvasContentStyle: React.CSSProperties = {
-  flex: 1,
-  overflow: 'hidden',
-  minHeight: 0,
-  display: 'flex',
-}
-
-const linkErrorStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: '8px 12px',
-  backgroundColor: '#fef2f2',
-  border: '1px solid #fecaca',
-  borderRadius: '4px',
-  margin: '8px 8px 0',
-  color: '#dc2626',
-  fontSize: '0.85rem',
-}
-
-const linkErrorDismissStyle: React.CSSProperties = {
-  background: 'none',
-  border: 'none',
-  color: '#dc2626',
-  cursor: 'pointer',
-  fontSize: '1.2rem',
-  lineHeight: 1,
-  padding: '0 4px',
-  marginLeft: '8px',
 }

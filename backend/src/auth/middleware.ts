@@ -164,8 +164,9 @@ export function createCsrfMiddleware(
 
 /**
  * Hono middleware that applies rate limiting to the login endpoint.
+ * Uses a composite key of username:ip to prevent account lockout attacks.
  * Checks the rate limit before processing login and records failed attempts afterward.
- * Returns 429 with `Retry-After` header when the username is blocked.
+ * Returns 429 with `Retry-After` header when the key is blocked.
  *
  * @param rateLimiter - The rate limiter instance for tracking login attempts.
  * @returns A Hono middleware function.
@@ -199,8 +200,13 @@ export function createRateLimitMiddleware(
       return next()
     }
 
-    // Check if the username is currently rate-limited
-    const result = rateLimiter.checkRateLimit(username)
+    // Build composite key: username + client IP to prevent account lockout attacks.
+    // An attacker from one IP cannot lock out a legitimate user from a different IP.
+    const clientIp = (c.get('clientIp') as string | undefined) ?? '0.0.0.0'
+    const rateLimitKey = `${username}:${clientIp}`
+
+    // Check if the key is currently rate-limited
+    const result = rateLimiter.checkRateLimit(rateLimitKey)
     if (!result.allowed) {
       const retryAfter = result.retryAfter ?? 900
       c.header('Retry-After', String(retryAfter))
@@ -212,10 +218,10 @@ export function createRateLimitMiddleware(
 
     // After the request, check if login failed (4xx status) and record the attempt
     if (c.res.status === 401) {
-      rateLimiter.recordFailedAttempt(username)
+      rateLimiter.recordFailedAttempt(rateLimitKey)
     } else if (c.res.status >= 200 && c.res.status < 300) {
-      // Successful login — reset rate limit for this username
-      rateLimiter.reset(username)
+      // Successful login — reset rate limit for this key
+      rateLimiter.reset(rateLimitKey)
     }
   }
 }

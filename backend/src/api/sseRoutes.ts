@@ -13,6 +13,7 @@ import type { IConnectionManager, IEventBus, IPresenceService, SseEvent } from '
 import { ConnectionLimitError } from '../realtime/errors.js'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
+import type { ISseTicketStore } from '../auth/sse-ticket-store.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,7 @@ export interface SseRouteDeps {
   eventBus: IEventBus
   presenceService: IPresenceService
   authMiddleware: MiddlewareHandler
+  sseTicketStore: ISseTicketStore
   logger: ILogger
 }
 
@@ -46,8 +48,8 @@ function serializeEvent(event: SseEvent): string {
  *   GET /events — Establishes an SSE connection for real-time events.
  *
  * The endpoint:
- * 1. Accepts tokens from `Authorization: Bearer <token>` or `?token=` query param
- * 2. Applies auth middleware and feature guard
+ * 1. Accepts tickets from `?ticket=` (preferred, short-lived one-time nonce)
+ * 2. Falls back to `Authorization: Bearer <token>` or `?token=` query param (legacy)
  * 3. Registers the connection with ConnectionManager
  * 4. Sends initial `presence:init` event with visible online users
  * 5. Replays missed events if `Last-Event-ID` header is present
@@ -58,20 +60,36 @@ function serializeEvent(event: SseEvent): string {
  * @returns A Hono sub-app to be mounted on a parent router
  */
 export function createSseRoutes(deps: SseRouteDeps): Hono {
-  const { connectionManager, eventBus, presenceService, authMiddleware, logger } = deps
+  const { connectionManager, eventBus, presenceService, authMiddleware, sseTicketStore, logger } = deps
 
   const app = new Hono()
 
-  // Token query param → Authorization header middleware.
-  // EventSource cannot set custom headers, so we accept token as a query param
-  // and inject it as a header before the auth middleware runs.
-  const tokenQueryParamMiddleware: MiddlewareHandler = async (c, next) => {
+  // Ticket-based auth middleware for SSE.
+  // If a `?ticket=` param is present, redeem it and set the userId directly.
+  // This avoids passing the full session token in the URL.
+  // Falls back to the standard token-based auth if no ticket is provided.
+  const ticketOrTokenMiddleware: MiddlewareHandler = async (c, next) => {
+    // 1. Try ticket-based auth first (preferred)
+    const ticket = c.req.query('ticket')
+    if (ticket && ticket.length > 0) {
+      const result = sseTicketStore.redeem(ticket)
+      if (result.valid && result.userId) {
+        // Set a minimal session context with just the userId
+        c.set('session', { userId: result.userId } as SessionContext)
+        return next()
+      }
+      // Invalid or expired ticket — reject immediately
+      return c.json(
+        { code: 'INVALID_TICKET', message: 'SSE ticket is invalid or expired', timestamp: new Date().toISOString() },
+        401,
+      )
+    }
+
+    // 2. Fall back to legacy token-based auth (Authorization header or ?token= query param)
     const authHeader = c.req.header('Authorization')
     if (!authHeader) {
       const queryToken = c.req.query('token')
       if (queryToken && queryToken.length > 0) {
-        // Clone the request with the token injected as an Authorization header
-        // so auth middleware can pick it up.
         const headers = new Headers(c.req.raw.headers)
         headers.set('Authorization', `Bearer ${queryToken}`)
         c.req.raw = new Request(c.req.raw.url, {
@@ -81,14 +99,14 @@ export function createSseRoutes(deps: SseRouteDeps): Hono {
         })
       }
     }
-    await next()
+    // Delegate to standard auth middleware
+    return authMiddleware(c, next)
   }
 
   // GET /events — SSE endpoint
   app.get(
     '/events',
-    tokenQueryParamMiddleware,
-    authMiddleware,
+    ticketOrTokenMiddleware,
     async (c: Context) => {
       const session = c.get('session') as SessionContext
       const userId = session.userId

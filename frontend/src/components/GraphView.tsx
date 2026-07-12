@@ -260,16 +260,25 @@ export function GraphView({ vaultId }: GraphViewProps) {
 
   /**
    * Handles mouse wheel for zoom, clamped to [0.1, 5.0].
+   * Attached via useEffect with { passive: false } to allow preventDefault.
+   * Re-attaches after loading completes (SVG is conditionally rendered).
    * Validates: Requirement 5.1
    */
-  const handleWheel = useCallback(
-    (e: React.WheelEvent<SVGSVGElement>) => {
+  useEffect(() => {
+    const svg = svgRef.current
+    if (!svg) return
+
+    const handleWheel = (e: WheelEvent) => {
       e.preventDefault()
       const delta = e.deltaY > 0 ? -0.1 : 0.1
       setZoom((prev) => clampZoom(prev, delta))
-    },
-    [],
-  )
+    }
+
+    svg.addEventListener('wheel', handleWheel, { passive: false })
+    return () => {
+      svg.removeEventListener('wheel', handleWheel)
+    }
+  }, [loading])
 
   /**
    * Handles mouse down on SVG background to start panning.
@@ -712,7 +721,6 @@ export function GraphView({ vaultId }: GraphViewProps) {
         ref={svgRef}
         className="graph-view-svg"
         viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
-        onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

@@ -26,6 +26,8 @@ import { dispatchRealtimeVaultChange, onRealtimeVaultChange } from './state/real
 import type { VaultChangeEvent } from './state/realtimeVaultBridge'
 import { FileExplorer } from './components/FileExplorer'
 import { TabContent } from './components/TabContent'
+import { ErrorBoundary } from './components/ErrorBoundary'
+import { UserMenu } from './components/UserMenu'
 import { LoginPage } from './components/LoginPage'
 import { ChangePasswordPage } from './components/ChangePasswordPage'
 import { ProfilePage } from './components/ProfilePage'
@@ -57,10 +59,12 @@ import { SettingsPanel } from './components/settings/SettingsPanel'
 import { SidebarPanel } from './components/sidebar-panel'
 import { PluginProvider } from './plugins/compat/plugin-context'
 import { CommandPaletteContainer } from './components/CommandPaletteContainer'
+import { useResize } from './hooks/useResize'
+import { saveRestoreState, readRestoreState, clearRestoreState, updateUiSnapshot, RESTORE_STATE_KEY } from './utils/restoreState'
 import {
-  User, LogOut, Settings, Shield, FileText, Clock,
-  Database, Share2, Trash2, Server, Download,
-  Upload, FolderOpen, PanelRight, PanelLeft, X, Eye, Pencil, MessageCircle, RefreshCw, Key, ScrollText, Plug,
+  User, Settings, Shield, FileText, Clock,
+  Database, Share2, Trash2, Server,
+  PanelRight, PanelLeft, X, Eye, Pencil, MessageCircle, RefreshCw, Key, ScrollText, Plug,
 } from 'lucide-react'
 import { getFileIcon, getFileIconClass, getDisplayName } from './utils/fileIcons'
 import './App.css'
@@ -81,84 +85,8 @@ if (_storedCsrf) apiClient.setCsrfToken(_storedCsrf)
 /** LocalStorage key for persisting the last selected vault. */
 const LAST_VAULT_KEY = 'slatebase_last_vault'
 
-/** LocalStorage key for preserving UI state across session expiry. */
-const RESTORE_STATE_KEY = 'slatebase_restore_state'
-
-/** Stale guard: discard restore state older than 5 minutes. */
-const RESTORE_STATE_MAX_AGE_MS = 5 * 60 * 1000
-
-/**
- * Module-level snapshot of the current UI state (vault + tabs).
- * Updated by AppContent via useEffect. Read by the onSessionExpired callback.
- */
-let _currentUiSnapshot: {
-  selectedVaultId: string | null
-  tabs: Array<{ vaultId: string; filePath: string }>
-  activeTabId: string | null
-} = { selectedVaultId: null, tabs: [], activeTabId: null }
-
-/**
- * Saves the current UI state snapshot to localStorage for restoration after re-login.
- */
-function saveRestoreState(): void {
-  try {
-    const restoreState = {
-      selectedVaultId: _currentUiSnapshot.selectedVaultId,
-      tabs: _currentUiSnapshot.tabs,
-      activeTabId: _currentUiSnapshot.activeTabId,
-      savedAt: Date.now(),
-    }
-    localStorage.setItem(RESTORE_STATE_KEY, JSON.stringify(restoreState))
-  } catch {
-    // Storage full or unavailable — silently skip
-  }
-}
-
-/**
- * Reads and validates the stored restore state. Returns null if missing, stale, or invalid.
- */
-function readRestoreState(): {
-  selectedVaultId: string | null
-  tabs: Array<{ vaultId: string; filePath: string }>
-  activeTabId: string | null
-} | null {
-  try {
-    const raw = localStorage.getItem(RESTORE_STATE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as {
-      selectedVaultId?: string | null
-      tabs?: Array<{ vaultId: string; filePath: string }>
-      activeTabId?: string | null
-      savedAt?: number
-    }
-    // Stale guard: discard if older than 5 minutes
-    if (typeof parsed.savedAt !== 'number' || Date.now() - parsed.savedAt > RESTORE_STATE_MAX_AGE_MS) {
-      localStorage.removeItem(RESTORE_STATE_KEY)
-      return null
-    }
-    if (!Array.isArray(parsed.tabs)) return null
-    return {
-      selectedVaultId: parsed.selectedVaultId ?? null,
-      tabs: parsed.tabs,
-      activeTabId: parsed.activeTabId ?? null,
-    }
-  } catch {
-    localStorage.removeItem(RESTORE_STATE_KEY)
-    return null
-  }
-}
-
-/**
- * Clears stored restore state (called after successful restoration or on stale guard).
- */
-function clearRestoreState(): void {
-  localStorage.removeItem(RESTORE_STATE_KEY)
-}
-
-/** Available pages in the app. */
-/* DEPRECATED: Settings pages will be consolidated into SettingsPanel */
-type AppPage =
-  | 'vaults'
+/** Available navigation pages in the app (opened as tabs in the main content area). */
+export type AppPage =
   | 'my-vaults'
   | 'profile'
   | 'sessions'
@@ -176,181 +104,8 @@ type AppPage =
   | 'plugins'
   | 'trash'
 
-/**
- * User avatar and dropdown menu component.
- */
-function UserMenu({ onNavigate, onLogout, hasVaultSelected, onImportFile, onImportFolder, onExportVault }: {
-  onNavigate: (page: AppPage) => void
-  onLogout: () => void
-  hasVaultSelected: boolean
-  onImportFile: () => void
-  onImportFolder: () => void
-  onExportVault: () => void
-}) {
-  const { authState } = useAuthContext()
-  const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({})
-
-  const user = authState.user
-
-  useEffect(() => {
-    if (!open) return
-    function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [open])
-
-  // Calculate dropdown position when opened
-  useEffect(() => {
-    if (open && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect()
-      const dropdownWidth = 210
-      // Position below the trigger, aligned to the right edge
-      let left = rect.right - dropdownWidth
-      // Ensure it doesn't go off-screen to the left
-      if (left < 8) left = 8
-      setDropdownStyle({
-        top: rect.bottom + 8,
-        left,
-      })
-    }
-  }, [open])
-
-  if (!user) return null
-
-  const initials = (user.displayName || user.username).slice(0, 2).toUpperCase()
-  const displayName = user.displayName || user.username
-
-  return (
-    <div className="user-menu" ref={menuRef}>
-      <button
-        ref={triggerRef}
-        className="user-menu-trigger"
-        onClick={() => setOpen(!open)}
-        type="button"
-        aria-label={t('userMenu.ariaLabel')}
-        aria-expanded={open}
-      >
-        {user.avatarUrl ? (
-          <img className="user-menu-avatar" src={user.avatarUrl} alt={displayName} />
-        ) : (
-          <span className="user-menu-avatar user-menu-avatar--initials">{initials}</span>
-        )}
-      </button>
-      {open && (
-        <div className="user-menu-dropdown" role="menu" style={dropdownStyle}>
-          <div className="user-menu-info">
-            <span className="user-menu-name">{displayName}</span>
-            <span className="user-menu-role">{user.role === 'admin' ? t('userMenu.roleAdmin') : t('userMenu.roleUser')}</span>
-          </div>
-          {hasVaultSelected && (
-            <>
-              <div className="user-menu-divider" />
-              <span className="user-menu-section-label">{t('vault.label')}</span>
-              <button className="user-menu-item" role="menuitem" onClick={() => { onImportFile(); setOpen(false) }}>
-                <Upload size={14} /> {t('files.importFile')}
-              </button>
-              <button className="user-menu-item" role="menuitem" onClick={() => { onImportFolder(); setOpen(false) }}>
-                <FolderOpen size={14} /> {t('files.importFolder')}
-              </button>
-              <button className="user-menu-item" role="menuitem" onClick={() => { onExportVault(); setOpen(false) }}>
-                <Download size={14} /> {t('files.exportVault')}
-              </button>
-              <button className="user-menu-item" role="menuitem" onClick={() => { onNavigate('vault-sharing'); setOpen(false) }}>
-                <Share2 size={14} /> {t('userMenu.sharing')}
-              </button>
-              <button className="user-menu-item user-menu-item--danger" role="menuitem" onClick={() => { onNavigate('vault-deletion'); setOpen(false) }}>
-                <Trash2 size={14} /> {t('vault.deleteVault')}
-              </button>
-            </>
-          )}
-          <div className="user-menu-divider" />
-          <button className="user-menu-item" role="menuitem" onClick={() => { onNavigate('profile'); setOpen(false) }}>
-            <User size={14} /> {t('userMenu.profile')}
-          </button>
-          <button className="user-menu-item" role="menuitem" onClick={() => { onNavigate('sessions'); setOpen(false) }}>
-            <Clock size={14} /> {t('userMenu.sessions')}
-          </button>
-          {user.role === 'admin' && (
-            <>
-              <div className="user-menu-divider" />
-              <span className="user-menu-section-label">{t('userMenu.administration')}</span>
-              <button className="user-menu-item" role="menuitem" onClick={() => { onNavigate('admin-users'); setOpen(false) }}>
-                <Shield size={14} /> {t('userMenu.userManagement')}
-              </button>
-              <button className="user-menu-item" role="menuitem" onClick={() => { onNavigate('admin-vaults'); setOpen(false) }}>
-                <Database size={14} /> {t('userMenu.vaultOverview')}
-              </button>
-              <button className="user-menu-item" role="menuitem" onClick={() => { onNavigate('admin-config'); setOpen(false) }}>
-                <Settings size={14} /> {t('userMenu.serverConfig')}
-              </button>
-              <button className="user-menu-item" role="menuitem" onClick={() => { onNavigate('admin-audit'); setOpen(false) }}>
-                <FileText size={14} /> {t('userMenu.auditLog')}
-              </button>
-              <button className="user-menu-item" role="menuitem" onClick={() => { onNavigate('admin-logs'); setOpen(false) }}>
-                <ScrollText size={14} /> {t('userMenu.serverLogs')}
-              </button>
-            </>
-          )}
-          <div className="user-menu-divider" />
-          <button className="user-menu-item user-menu-item--danger" role="menuitem" onClick={() => { onLogout(); setOpen(false) }}>
-            <LogOut size={14} /> {t('auth.logout')}
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-/**
- * Hook for mouse-driven panel resize.
- * Returns a ref to attach to the resize handle and the current width.
- */
-function useResize(initialWidth: number, min: number, max: number, side: 'left' | 'right' = 'left') {
-  const [width, setWidth] = useState(initialWidth)
-  const dragging = useRef(false)
-  const startX = useRef(0)
-  const startWidth = useRef(0)
-
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
-    dragging.current = true
-    startX.current = e.clientX
-    startWidth.current = width
-    document.body.style.cursor = 'col-resize'
-    document.body.style.userSelect = 'none'
-
-    function onMouseMove(ev: MouseEvent) {
-      if (!dragging.current) return
-      const delta = side === 'left' ? ev.clientX - startX.current : startX.current - ev.clientX
-      const newWidth = Math.min(max, Math.max(min, startWidth.current + delta))
-      setWidth(newWidth)
-    }
-
-    function onMouseUp() {
-      dragging.current = false
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-      document.removeEventListener('mousemove', onMouseMove)
-      document.removeEventListener('mouseup', onMouseUp)
-    }
-
-    document.addEventListener('mousemove', onMouseMove)
-    document.addEventListener('mouseup', onMouseUp)
-  }, [width, min, max, side])
-
-  return { width, onMouseDown }
-}
-
-/** Translation keys for settings pages. */
+/** Translation keys for navigation pages. */
 const PAGE_LABEL_KEYS: Record<AppPage, string> = {
-  vaults: 'pages.vaults',
   'my-vaults': 'pages.myVaults',
   profile: 'pages.profile',
   sessions: 'pages.sessions',
@@ -423,8 +178,7 @@ function AppContent() {
   const { isEnabled } = useFeatureContext()
   const { t } = useTranslation()
   const prevVaultId = useRef<string | null>(null)
-  // Settings tabs: list of open pages + which is active
-  /* DEPRECATED: Settings pages will be consolidated into SettingsPanel */
+  // Navigation tabs: list of open pages + which is active
   const [openSettingsPages, setOpenSettingsPages] = useState<AppPage[]>([])
   const [activeSettingsPage, setActiveSettingsPage] = useState<AppPage | null>(null)
   const [showRightPanel, setShowRightPanel] = useState(true)
@@ -563,11 +317,11 @@ function AppContent() {
 
   // Keep module-level UI snapshot updated for session expiry preservation
   useEffect(() => {
-    _currentUiSnapshot = {
+    updateUiSnapshot({
       selectedVaultId: state.selectedVaultId,
       tabs: tabState.tabs.map((t) => ({ vaultId: t.vaultId, filePath: t.filePath })),
       activeTabId: tabState.activeTabId,
-    }
+    })
   }, [state.selectedVaultId, tabState.tabs, tabState.activeTabId])
 
   // Restore UI state after re-login (from session expiry)
@@ -824,12 +578,7 @@ function AppContent() {
   }
 
   /** Open a settings page as a tab (or activate if already open). */
-  /* DEPRECATED: Settings pages will be consolidated into SettingsPanel */
   function handleNavigate(page: AppPage) {
-    if (page === 'vaults') {
-      setActiveSettingsPage(null)
-      return
-    }
     setOpenSettingsPages((prev) => prev.includes(page) ? prev : [...prev, page])
     setActiveSettingsPage(page)
   }
@@ -845,7 +594,6 @@ function AppContent() {
     })
   }
 
-  /* DEPRECATED: Settings pages will be consolidated into SettingsPanel */
   function renderSettingsPage(page: AppPage) {
     switch (page) {
       case 'my-vaults': return <MyVaultsPage apiClient={apiClient} onOpenSync={(vaultId) => {
@@ -1176,7 +924,9 @@ function AppContent() {
                 {renderSettingsPage(activeSettingsPage!)}
               </div>
             ) : (
-              <TabContent onOpenVersions={(vaultId, filePath) => setVersionBrowserTarget({ vaultId, filePath })} />
+              <ErrorBoundary>
+                <TabContent onOpenVersions={(vaultId, filePath) => setVersionBrowserTarget({ vaultId, filePath })} />
+              </ErrorBoundary>
             )}
           </section>
 
@@ -1360,6 +1110,7 @@ function RealtimeBridge({ children }: { children: React.ReactNode }) {
     <RealtimeProvider
       token={token}
       handlers={handlers}
+      getTicket={() => apiClient.getSseTicket()}
     >
       {children}
     </RealtimeProvider>

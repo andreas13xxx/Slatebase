@@ -17,7 +17,7 @@ export interface SseEventData {
 
 /** Options passed to the useEventSource hook. */
 export interface UseEventSourceOptions {
-  /** Session token for authentication (appended as query param). */
+  /** Session token for authentication (fallback: appended as query param). */
   token: string | null
   /** Whether the SSE connection should be active (feature enabled + authenticated). */
   enabled: boolean
@@ -25,6 +25,8 @@ export interface UseEventSourceOptions {
   dispatch: Dispatch<RealtimeAction>
   /** Callback invoked for each successfully parsed SSE event. */
   onEvent: (eventType: string, data: SseEventData) => void
+  /** Optional function to fetch a short-lived SSE ticket (preferred over token in URL). */
+  getTicket?: () => Promise<{ ticket: string }>
 }
 
 /** Maximum consecutive reconnect failures before giving up. */
@@ -60,7 +62,7 @@ const SSE_EVENT_TYPES = [
  * - Dispatch incoming events to onEvent callback
  */
 export function useEventSource(options: UseEventSourceOptions): void {
-  const { token, enabled, dispatch, onEvent } = options
+  const { token, enabled, dispatch, onEvent, getTicket } = options
 
   // Refs for mutable state that persists across renders without causing re-renders
   const eventSourceRef = useRef<EventSource | null>(null)
@@ -104,6 +106,12 @@ export function useEventSource(options: UseEventSourceOptions): void {
   // Use a ref for the connect function so it can self-reference in setTimeout
   const connectRef = useRef<() => void>(() => {})
 
+  // Ref for getTicket to avoid stale closures
+  const getTicketRef = useRef(getTicket)
+  useEffect(() => {
+    getTicketRef.current = getTicket
+  }, [getTicket])
+
   /** Establish a new EventSource connection. */
   const connect = useCallback(() => {
     if (!token || !enabled) return
@@ -112,88 +120,117 @@ export function useEventSource(options: UseEventSourceOptions): void {
     isConnectingRef.current = true
     setStatus('connecting')
 
-    // Build URL with token and optional Last-Event-ID
-    let url = `/api/v1/events?token=${encodeURIComponent(token)}`
-    if (lastEventIdRef.current) {
-      url += `&lastEventId=${encodeURIComponent(lastEventIdRef.current)}`
+    /** Actually open the EventSource with the resolved URL. */
+    const openConnection = (url: string) => {
+      const es = new EventSource(url)
+      eventSourceRef.current = es
+
+      es.onopen = () => {
+        isConnectingRef.current = false
+        attemptCountRef.current = 0
+        dispatchRef.current({ type: 'RECONNECT_RESET' })
+        setStatus('connected')
+      }
+
+      es.onmessage = (event: MessageEvent) => {
+        // Track Last-Event-ID
+        if (event.lastEventId) {
+          lastEventIdRef.current = event.lastEventId
+          dispatchRef.current({ type: 'LAST_EVENT_ID_UPDATED', payload: event.lastEventId })
+        }
+
+        // Parse event data
+        try {
+          const data = JSON.parse(event.data as string) as SseEventData
+          onEventRef.current(data.type, data)
+        } catch (err) {
+          // On parse error: log and skip, continue listening
+          console.warn('[useEventSource] Failed to parse SSE event data:', err)
+        }
+      }
+
+      /** Handler for named SSE events (event: <type>). */
+      const handleNamedEvent = (event: MessageEvent) => {
+        // Track Last-Event-ID
+        if (event.lastEventId) {
+          lastEventIdRef.current = event.lastEventId
+          dispatchRef.current({ type: 'LAST_EVENT_ID_UPDATED', payload: event.lastEventId })
+        }
+
+        // Parse and dispatch
+        try {
+          const data = JSON.parse(event.data as string) as SseEventData
+          onEventRef.current(event.type, data)
+        } catch (err) {
+          console.warn('[useEventSource] Failed to parse SSE event data:', err)
+        }
+      }
+
+      // Listen for all named event types that the server may send
+      for (const eventType of SSE_EVENT_TYPES) {
+        es.addEventListener(eventType, handleNamedEvent as EventListener)
+      }
+
+      es.onerror = () => {
+        isConnectingRef.current = false
+        es.close()
+        eventSourceRef.current = null
+
+        if (!shouldReconnectRef.current) {
+          setStatus('disconnected')
+          return
+        }
+
+        // Increment attempt counter
+        attemptCountRef.current += 1
+        dispatchRef.current({ type: 'RECONNECT_ATTEMPT' })
+
+        // After 5 consecutive failures: stop reconnecting
+        if (attemptCountRef.current >= MAX_RECONNECT_ATTEMPTS) {
+          setStatus('disconnected')
+          return
+        }
+
+        // Schedule reconnect with exponential backoff
+        setStatus('connecting')
+        const delay = computeReconnectDelay(attemptCountRef.current - 1)
+        reconnectTimerRef.current = setTimeout(() => {
+          reconnectTimerRef.current = null
+          connectRef.current()
+        }, delay)
+      }
     }
 
-    const es = new EventSource(url)
-    eventSourceRef.current = es
-
-    es.onopen = () => {
-      isConnectingRef.current = false
-      attemptCountRef.current = 0
-      dispatchRef.current({ type: 'RECONNECT_RESET' })
-      setStatus('connected')
+    // Build base URL with optional Last-Event-ID
+    const buildUrl = (authParam: string): string => {
+      let url = `/api/v1/events?${authParam}`
+      if (lastEventIdRef.current) {
+        url += `&lastEventId=${encodeURIComponent(lastEventIdRef.current)}`
+      }
+      return url
     }
 
-    es.onmessage = (event: MessageEvent) => {
-      // Track Last-Event-ID
-      if (event.lastEventId) {
-        lastEventIdRef.current = event.lastEventId
-        dispatchRef.current({ type: 'LAST_EVENT_ID_UPDATED', payload: event.lastEventId })
-      }
-
-      // Parse event data
-      try {
-        const data = JSON.parse(event.data as string) as SseEventData
-        onEventRef.current(data.type, data)
-      } catch (err) {
-        // On parse error: log and skip, continue listening
-        console.warn('[useEventSource] Failed to parse SSE event data:', err)
-      }
-    }
-
-    /** Handler for named SSE events (event: <type>). */
-    const handleNamedEvent = (event: MessageEvent) => {
-      // Track Last-Event-ID
-      if (event.lastEventId) {
-        lastEventIdRef.current = event.lastEventId
-        dispatchRef.current({ type: 'LAST_EVENT_ID_UPDATED', payload: event.lastEventId })
-      }
-
-      // Parse and dispatch
-      try {
-        const data = JSON.parse(event.data as string) as SseEventData
-        onEventRef.current(event.type, data)
-      } catch (err) {
-        console.warn('[useEventSource] Failed to parse SSE event data:', err)
-      }
-    }
-
-    // Listen for all named event types that the server may send
-    for (const eventType of SSE_EVENT_TYPES) {
-      es.addEventListener(eventType, handleNamedEvent as EventListener)
-    }
-
-    es.onerror = () => {
-      isConnectingRef.current = false
-      es.close()
-      eventSourceRef.current = null
-
-      if (!shouldReconnectRef.current) {
-        setStatus('disconnected')
-        return
-      }
-
-      // Increment attempt counter
-      attemptCountRef.current += 1
-      dispatchRef.current({ type: 'RECONNECT_ATTEMPT' })
-
-      // After 5 consecutive failures: stop reconnecting
-      if (attemptCountRef.current >= MAX_RECONNECT_ATTEMPTS) {
-        setStatus('disconnected')
-        return
-      }
-
-      // Schedule reconnect with exponential backoff
-      setStatus('connecting')
-      const delay = computeReconnectDelay(attemptCountRef.current - 1)
-      reconnectTimerRef.current = setTimeout(() => {
-        reconnectTimerRef.current = null
-        connectRef.current()
-      }, delay)
+    // Try ticket-based auth first (preferred — avoids session token in URL)
+    if (getTicketRef.current) {
+      getTicketRef.current()
+        .then(({ ticket }) => {
+          if (!shouldReconnectRef.current) {
+            isConnectingRef.current = false
+            return
+          }
+          openConnection(buildUrl(`ticket=${encodeURIComponent(ticket)}`))
+        })
+        .catch(() => {
+          // Ticket fetch failed — fall back to legacy token in URL
+          if (!shouldReconnectRef.current) {
+            isConnectingRef.current = false
+            return
+          }
+          openConnection(buildUrl(`token=${encodeURIComponent(token)}`))
+        })
+    } else {
+      // No ticket provider — use legacy token in URL
+      openConnection(buildUrl(`token=${encodeURIComponent(token)}`))
     }
   }, [token, enabled, setStatus])
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { History, RotateCcw, Loader2 } from 'lucide-react'
 import type { IApiClient } from '../api'
 import { showToast } from './ToastNotification'
+import { extractErrorMessage } from '../utils/error'
 import './VersionBrowser.css'
 
 /** A single version entry returned by the API. */
@@ -136,10 +137,7 @@ export function VersionBrowser({
       const sorted = [...response.versions].sort((a, b) => b.timestamp.localeCompare(a.timestamp))
       setVersions(sorted)
     } catch (err: unknown) {
-      const message = err && typeof err === 'object' && 'message' in err
-        ? (err as { message: string }).message
-        : 'Versionen konnten nicht geladen werden'
-      showToast('error', message)
+      showToast('error', extractErrorMessage(err, 'Versionen konnten nicht geladen werden'))
       setVersions([])
     } finally {
       setLoading(false)
@@ -169,10 +167,7 @@ export function VersionBrowser({
       const diff = computeDiff(response.content, currentContent)
       setDiffLines(diff)
     } catch (err: unknown) {
-      const message = err && typeof err === 'object' && 'message' in err
-        ? (err as { message: string }).message
-        : 'Versionsinhalt konnte nicht geladen werden'
-      showToast('error', message)
+      showToast('error', extractErrorMessage(err, 'Versionsinhalt konnte nicht geladen werden'))
       setSelectedTimestamp(null)
     } finally {
       setLoadingContent(false)

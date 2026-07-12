@@ -39,6 +39,8 @@ export interface RealtimeProviderProps {
   knownMessageIds?: Set<string>
   /** Current conversation ID (for routing chat:message events). */
   currentConversationId?: string | null
+  /** Optional function to fetch a short-lived SSE ticket (preferred over token in URL). */
+  getTicket?: () => Promise<{ ticket: string }>
 }
 
 /**
@@ -50,6 +52,7 @@ function RealtimeInner({
   handlers,
   knownMessageIds,
   currentConversationId,
+  getTicket,
 }: Omit<RealtimeProviderProps, 'children'>) {
   const { state, dispatch } = useRealtimeContext()
   const previousStatusRef = useRef<ConnectionStatus>(state.connectionStatus)
@@ -197,6 +200,7 @@ function RealtimeInner({
     enabled: token !== null,
     dispatch,
     onEvent: handleEvent,
+    getTicket,
   })
 
   // Track connection status transitions for reconnect refresh
@@ -235,6 +239,7 @@ export function RealtimeProviderComponent({
   handlers,
   knownMessageIds,
   currentConversationId,
+  getTicket,
 }: RealtimeProviderProps) {
   return React.createElement(
     RealtimeStateProvider,
@@ -244,6 +249,7 @@ export function RealtimeProviderComponent({
       handlers,
       knownMessageIds,
       currentConversationId,
+      getTicket,
     }),
     children,
   )

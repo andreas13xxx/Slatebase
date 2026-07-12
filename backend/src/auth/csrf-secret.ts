@@ -68,7 +68,10 @@ export class CsrfSecretManager implements ICsrfSecretManager {
     // 3. Generate new secret and persist atomically
     const newSecret = randomBytes(SECRET_LENGTH_BYTES).toString('hex')
     await this.persistSecret(newSecret)
-    this.logger.info('New CSRF secret generated and persisted')
+    this.logger.warn(
+      'New CSRF secret generated — all existing sessions are invalidated. ' +
+      'Set SLATEBASE_CSRF_SECRET env var or mount a persistent volume for the data directory to prevent session loss on restart.'
+    )
     return newSecret
   }
 

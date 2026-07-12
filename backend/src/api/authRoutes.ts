@@ -10,6 +10,7 @@ import { AuthenticationError, RateLimitError } from '../auth/index.js'
 import { AccountSuspendedError } from '../user/index.js'
 import { loginRequestSchema } from '../auth/validation.js'
 import type { ILogger } from '../logger/index.js'
+import type { ISseTicketStore } from '../auth/sse-ticket-store.js'
 import type { RouteModule } from './index.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -60,6 +61,8 @@ export interface IAuthController {
   invalidateSession(c: Context): Promise<Response>
   /** DELETE /auth/sessions — Invalidate all other sessions. */
   invalidateOtherSessions(c: Context): Promise<Response>
+  /** POST /auth/sse-ticket — Issue a short-lived one-time ticket for SSE connections. */
+  issueSseTicket(c: Context): Promise<Response>
 }
 
 // ─── AuthController Implementation ──────────────────────────────────────────
@@ -72,6 +75,7 @@ export class AuthController implements IAuthController {
   constructor(
     private readonly authService: IAuthService,
     private readonly logger: ILogger,
+    private readonly sseTicketStore?: ISseTicketStore,
   ) {}
 
   /**
@@ -228,6 +232,29 @@ export class AuthController implements IAuthController {
       return c.json(error, 500)
     }
   }
+
+  /**
+   * POST /auth/sse-ticket — Issue a short-lived one-time ticket for SSE connections.
+   * The ticket can be used as `?ticket=<value>` on the SSE endpoint instead of
+   * passing the full session token in the URL.
+   * Returns 200 with `{ ticket }` on success, 401 if not authenticated,
+   * 501 if ticket store is not configured.
+   */
+  async issueSseTicket(c: Context): Promise<Response> {
+    const session = c.get('session') as SessionContext | undefined
+    if (session === undefined) {
+      const error = createApiError('UNAUTHORIZED', 'Not authenticated')
+      return c.json(error, 401)
+    }
+
+    if (this.sseTicketStore === undefined) {
+      const error = createApiError('NOT_IMPLEMENTED', 'SSE ticket system is not available')
+      return c.json(error, 501)
+    }
+
+    const ticket = this.sseTicketStore.issue(session.userId)
+    return c.json({ ticket }, 200)
+  }
 }
 
 // ─── AuthRouteModule ─────────────────────────────────────────────────────────
@@ -249,5 +276,6 @@ export class AuthRouteModule implements RouteModule {
     router.get('/auth/sessions', (c) => this.controller.getSessions(c))
     router.delete('/auth/sessions/:sessionId', (c) => this.controller.invalidateSession(c))
     router.delete('/auth/sessions', (c) => this.controller.invalidateOtherSessions(c))
+    router.post('/auth/sse-ticket', (c) => this.controller.issueSseTicket(c))
   }
 }

@@ -8,6 +8,7 @@ import {
   CheckCircle2, AlertCircle, HelpCircle, XCircle, X, Save, Trash2,
 } from 'lucide-react'
 import { ConfirmModal } from './ConfirmModal'
+import { extractErrorMessage } from '../utils/error'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -168,10 +169,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       // Background: Analyze compatibility and detect settings for each plugin
       void analyzeAndDetectSettings(manifests, registry)
     } catch (err: unknown) {
-      const message = err && typeof err === 'object' && 'message' in err
-        ? (err as { message: string }).message
-        : 'Fehler beim Laden der Plugins'
-      setError(message)
+      setError(extractErrorMessage(err, 'Fehler beim Laden der Plugins'))
     } finally {
       setLoading(false)
     }
@@ -235,10 +233,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       if (err instanceof SyntaxError) {
         setSettingsError('Ungültiges JSON-Format.')
       } else {
-        const message = err && typeof err === 'object' && 'message' in err
-          ? (err as { message: string }).message
-          : 'Speichern fehlgeschlagen.'
-        setSettingsError(message)
+        setSettingsError(extractErrorMessage(err, 'Speichern fehlgeschlagen.'))
       }
     } finally {
       setSettingsSaving(false)
@@ -378,10 +373,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       // Remove from display list
       setPlugins((prev) => prev.filter((p) => p.pluginId !== pluginId))
     } catch (err: unknown) {
-      const message = err && typeof err === 'object' && 'message' in err
-        ? (err as { message: string }).message
-        : 'Deinstallation fehlgeschlagen.'
-      setError(message)
+      setError(extractErrorMessage(err, 'Deinstallation fehlgeschlagen.'))
     } finally {
       setDeletingPlugins((prev) => {
         const next = new Set(prev)

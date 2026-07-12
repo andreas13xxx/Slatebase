@@ -26,7 +26,8 @@ src/
 ├── auth/
 │   ├── index.ts          — AuthService, SessionStore, interfaces, error classes
 │   ├── middleware.ts     — authMiddleware, csrfMiddleware, rateLimitMiddleware
-│   └── csrf-secret.ts   — CsrfSecretManager (persistent CSRF secret: env → file → generate)
+│   ├── csrf-secret.ts   — CsrfSecretManager (persistent CSRF secret: env → file → generate)
+│   └── sse-ticket-store.ts — SseTicketStore (short-lived one-time tickets for SSE connections)
 ├── user/
 │   ├── index.ts          — UserService, UserRepository, RoleService, interfaces
 │   └── validation.ts     — Profile/password validation (Zod schemas)
@@ -44,6 +45,7 @@ src/
 │   ├── mcpWellKnownRoute.ts — .well-known/mcp.json discovery endpoint (public)
 │   ├── graphRoutes.ts    — Graph API routes (GET graph, GET graph/meta, GET backlinks, GET tags)
 │   ├── client-ip.ts     — Centralized client IP extraction with trusted proxy support
+│   ├── request-id.ts   — Request-ID middleware (X-Request-Id header, UUID generation)
 │   ├── pluginRoutes.ts  — Plugin management CRUD routes (list, install, delete, bundle, styles, settings, registry)
 │   ├── featureRoutes.ts — Feature toggle admin + public routes (GET/PUT /admin/features, GET /features)
 │   ├── searchRoutes.ts — Search routes (GET /vaults/:vaultId/search, GET /search, POST /vaults/:vaultId/replace)
@@ -191,13 +193,15 @@ data/
 ```
 src/
 ├── main.tsx              — React entry point
-├── App.tsx               — Root component, 3-panel layout, routing, resize
+├── App.tsx               — Root component, 3-panel layout, routing, resize, AppPage type export
 ├── App.css               — Global styles (Design Tokens in index.css)
 ├── index.css             — CSS Custom Properties (Design Tokens, Dark Mode)
 ├── types.ts              — Shared TypeScript interfaces (VaultInfo, DirectoryTree, AppState with vaultTrees, etc.)
 ├── api/index.ts          — ApiClient (IApiClient interface + fetch implementation, includes getVersion())
 ├── utils/
-│   └── semver.ts         — compareSemver() utility (X.Y.Z comparison, v-prefix stripping)
+│   ├── semver.ts         — compareSemver() utility (X.Y.Z comparison, v-prefix stripping)
+│   ├── error.ts          — extractErrorMessage(err, fallback) shared utility
+│   ├── restoreState.ts   — UI state preservation across session expiry (save/read/clear/updateSnapshot)
 ├── canvas/
 │   ├── index.ts          — Barrel export (parser, serializer, types)
 │   ├── types.ts          — CanvasDocument, CanvasNode (Text/File/Link/Group), CanvasEdge, parse result types
@@ -287,12 +291,20 @@ src/
 ├── hooks/
 │   ├── useHistoryStack.ts — Undo/Redo history stack hook (max 100, FIFO eviction, clear on file switch)
 │   ├── useLineNumbers.ts — Line numbers toggle state (localStorage persistence)
+│   ├── useResize.ts      — Mouse-driven panel resize hook (width, min, max, side)
 │   └── useDropZone.ts    — File drag-and-drop hook (drag counter, size/count validation, toast errors)
 ├── components/
 │   ├── SlatebaseLogo.tsx — SVG logo component
+│   ├── UserMenu.tsx      — User avatar and dropdown menu (navigation, import/export, admin)
+│   ├── ErrorBoundary.tsx — React Error Boundary (fallback UI, reset button)
+│   ├── ErrorBoundary.css — ErrorBoundary fallback styles
 │   ├── SidebarToolbar.tsx — Draggable vertical toolbar (+ Daily Note, Papierkorb buttons)
 │   ├── VaultList.tsx     — Vault selector/manager dropdown (legacy, no longer rendered in App.tsx)
 │   ├── FileExplorer.tsx  — Unified multi-vault explorer (all vaults as expandable root entries, lazy-loading, DnD, context menu, favorites, statistics tooltip, .trash/.versions filtered)
+│   ├── file-explorer/
+│   │   ├── index.ts      — Barrel export (TreeNode, shared types)
+│   │   ├── types.ts      — DragState, ExternalDropState, ContextMenuState, InlineInputState
+│   │   └── TreeNode.tsx  — Recursive tree node renderer (directory/file, drag/drop, inline input, favorites)
 │   ├── FavoritesSection.tsx — Collapsible favorites section above file tree (star icon, click-to-open)
 │   ├── ContextMenu.tsx   — Generic positioned overlay menu (fixed positioning, keyboard nav, portal)
 │   ├── DropZone.tsx      — File drag-and-drop wrapper (visual overlay, validation, upload)
@@ -304,6 +316,7 @@ src/
 │   ├── SearchPanel.css   — SearchPanel styles with design tokens
 │   ├── TabBar.tsx        — Horizontal tab strip (file tabs)
 │   ├── TabContent.tsx    — Tab content orchestrator (Edit/View/Binary, wires upload + image paste + versions)
+│   ├── TabContent.css    — TabContent styles (empty/loading/error/content states, design tokens)
 │   ├── EditMode.tsx      — Plain-text editor with toolbar + auto-save + undo/redo + line numbers + image paste + DnD + read-only mode + editor command event listener (slatebase:editor-command)
 │   ├── ViewMode.tsx      — Markdown renderer (remark + highlight.js + Obsidian plugins)
 │   ├── MermaidRenderer.tsx — Mermaid diagram renderer (lazy-loaded, SVG inline, theme-aware, timeout, error fallback)

@@ -4,20 +4,22 @@ import { useTabContext } from '../state/tabContext'
 import { useTranslation } from '../i18n'
 import { openTab } from '../state/tabActions'
 import type { DirectoryTree, VaultInfo } from '../types'
-import { ChevronRight, ChevronDown, Folder, FolderOpen, Database, Eye, Pencil, RefreshCw, Users, FilePlus, FolderPlus, Trash2, Copy, Move, Download, Star, FileText, History, LayoutDashboard } from 'lucide-react'
-import { getFileIcon, getFileIconClass, getDisplayName } from '../utils/fileIcons'
+import { extractErrorMessage } from '../utils/error'
+import { ChevronRight, ChevronDown, Database, Eye, Pencil, RefreshCw, Users, FilePlus, FolderPlus, Trash2, Copy, Move, Download, Star, FileText, History, LayoutDashboard } from 'lucide-react'
 import { getValidDropTargets } from '../utils/pathUtils'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
 import { InlineInput } from './InlineInput'
 import { ConfirmModal } from './ConfirmModal'
 import { useToast } from './Toast'
-import { validateFileName, normalizeFileName, getSelectionRange } from '../utils/fileValidation'
+import { validateFileName, normalizeFileName } from '../utils/fileValidation'
 import { showToast as showGlobalToast } from './ToastNotification'
 import { favoritesStore } from '../state/favoritesStore'
 import { TemplateSelector } from './TemplateSelector'
 import { getCachedStatistics, fetchVaultStatistics, invalidateStatisticsCache, formatStatisticsTooltip } from '../state/vaultStatisticsCache'
 import { onRealtimeVaultChange } from '../state/realtimeVaultBridge'
+import { TreeNode } from './file-explorer'
+import type { DragState, ExternalDropState, ContextMenuState, InlineInputState } from './file-explorer'
 
 /**
  * Checks if a file path exists in a DirectoryTree (for unique name generation).
@@ -36,265 +38,6 @@ function fileExistsInVaultTree(tree: DirectoryTree, filePath: string): boolean {
   return search(tree)
 }
 
-/**
- * Internal drag state for the FileExplorer.
- */
-interface DragState {
-  draggedPath: string | null
-  draggedVaultId: string | null
-  validTargets: Set<string>
-  isMoving: boolean
-}
-
-/**
- * State for tracking external file drag-over on individual folders.
- */
-interface ExternalDropState {
-  /** Path of the folder currently being hovered by an external file drag. */
-  targetPath: string | null
-  /** Vault ID for the external drop target. */
-  targetVaultId: string | null
-}
-
-/**
- * State for the context menu.
- */
-interface ContextMenuState {
-  visible: boolean
-  x: number
-  y: number
-  targetNode: DirectoryTree | null
-  vaultId: string | null
-}
-
-/**
- * State for the inline input (new file / new folder / rename).
- */
-interface InlineInputState {
-  visible: boolean
-  mode: 'newFile' | 'newFolder' | 'rename'
-  parentPath: string
-  node: DirectoryTree | null
-  vaultId: string | null
-}
-
-/**
- * Props for the recursive TreeNode component.
- */
-interface TreeNodeProps {
-  node: DirectoryTree
-  selectedFilePath: string | null
-  expandedPaths: Set<string>
-  onToggleFolder: (path: string) => void
-  onSelectFile: (path: string, name: string) => void
-  dragState: DragState
-  externalDropState: ExternalDropState
-  permission: 'owner' | 'read' | 'write' | undefined
-  vaultId: string
-  onDragStart: (e: React.DragEvent<HTMLDivElement>, nodePath: string, nodeType: 'file' | 'directory', vaultId: string) => void
-  onDragEnd: (e: React.DragEvent<HTMLDivElement>) => void
-  onDragOver: (e: React.DragEvent<HTMLDivElement>, nodePath: string, vaultId: string) => void
-  onDragLeave: (e: React.DragEvent<HTMLDivElement>, nodePath: string, vaultId: string) => void
-  onDrop: (e: React.DragEvent<HTMLDivElement>, targetPath: string, vaultId: string) => void
-  onContextMenu: (e: React.MouseEvent, node: DirectoryTree, vaultId: string) => void
-  inlineInputState: InlineInputState
-  onInlineConfirm: (value: string) => void
-  onInlineCancel: () => void
-  isFavorite: (path: string) => boolean
-  onToggleFavorite: (path: string) => void
-}
-
-/**
- * Renders a single node in the directory tree.
- * Directories are rendered as collapsible folders; files as clickable items.
- * Supports drag & drop for moving files/folders.
- * Shows InlineInput when creating a new file or renaming.
- */
-function TreeNode({
-  node,
-  selectedFilePath,
-  expandedPaths,
-  onToggleFolder,
-  onSelectFile,
-  dragState,
-  externalDropState,
-  permission,
-  vaultId,
-  onDragStart,
-  onDragEnd,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  onContextMenu,
-  inlineInputState,
-  onInlineConfirm,
-  onInlineCancel,
-  isFavorite,
-  onToggleFavorite,
-}: TreeNodeProps) {
-  const isDirectory = node.type === 'directory'
-  const isExpanded = expandedPaths.has(`${vaultId}::${node.path}`)
-  const isSelected = !isDirectory && node.path === selectedFilePath
-  const isDragged = dragState.draggedPath === node.path && dragState.draggedVaultId === vaultId
-  const canDrag = permission !== 'read' && !dragState.isMoving
-
-  // Check if this node is being renamed
-  const isRenaming = inlineInputState.visible
-    && inlineInputState.mode === 'rename'
-    && inlineInputState.node?.path === node.path
-    && inlineInputState.vaultId === vaultId
-
-  if (isDirectory) {
-    const isValidTarget = dragState.draggedPath !== null && dragState.draggedVaultId === vaultId && dragState.validTargets.has(node.path)
-    const isExternalDropTarget = externalDropState.targetPath === node.path && externalDropState.targetVaultId === vaultId
-
-    // Check if new file/folder inline input should appear in this directory
-    const showNewFileInput = inlineInputState.visible
-      && (inlineInputState.mode === 'newFile' || inlineInputState.mode === 'newFolder')
-      && inlineInputState.parentPath === node.path
-      && inlineInputState.vaultId === vaultId
-
-    return (
-      <li className="tree-node tree-node--directory">
-        <div
-          className={`tree-node-row${isDragged ? ' tree-node--dragging' : ''}${isValidTarget || isExternalDropTarget ? ' tree-node--drop-target' : ''}`}
-          draggable={canDrag}
-          onDragStart={(e) => onDragStart(e, node.path, node.type, vaultId)}
-          onDragEnd={onDragEnd}
-          onDragOver={(e) => onDragOver(e, node.path, vaultId)}
-          onDragLeave={(e) => onDragLeave(e, node.path, vaultId)}
-          onDrop={(e) => onDrop(e, node.path, vaultId)}
-          onContextMenu={(e) => onContextMenu(e, node, vaultId)}
-        >
-          <button
-            type="button"
-            className="tree-node-toggle"
-            aria-expanded={isExpanded}
-            onClick={() => onToggleFolder(`${vaultId}::${node.path}`)}
-            title={node.path}
-          >
-            <span className="tree-node-chevron" aria-hidden="true">
-              {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-            </span>
-            {isExpanded ? <FolderOpen size={14} style={{ flexShrink: 0, color: 'var(--accent)' }} /> : <Folder size={14} style={{ flexShrink: 0, color: 'var(--sidebar-text)' }} />}
-            {isRenaming ? (
-              <InlineInput
-                initialValue={node.name}
-                selectRange={getSelectionRange(node.name, true)}
-                onConfirm={onInlineConfirm}
-                onCancel={onInlineCancel}
-                validate={(value) => validateFileName(value, 255)}
-              />
-            ) : (
-              <span className="tree-node-name">
-                {node.name}
-                {node.itemCount != null && (
-                  <span className="tree-node-count"> ({node.itemCount})</span>
-                )}
-              </span>
-            )}
-          </button>
-        </div>
-        {isExpanded && node.children && node.children.length > 0 && (
-          <ul className="tree-node-children" role="group">
-            {node.children.map((child) => (
-              <TreeNode
-                key={child.path}
-                node={child}
-                selectedFilePath={selectedFilePath}
-                expandedPaths={expandedPaths}
-                onToggleFolder={onToggleFolder}
-                onSelectFile={onSelectFile}
-                dragState={dragState}
-                externalDropState={externalDropState}
-                permission={permission}
-                vaultId={vaultId}
-                onDragStart={onDragStart}
-                onDragEnd={onDragEnd}
-                onDragOver={onDragOver}
-                onDragLeave={onDragLeave}
-                onDrop={onDrop}
-                onContextMenu={onContextMenu}
-                inlineInputState={inlineInputState}
-                onInlineConfirm={onInlineConfirm}
-                onInlineCancel={onInlineCancel}
-                isFavorite={isFavorite}
-                onToggleFavorite={onToggleFavorite}
-              />
-            ))}
-          </ul>
-        )}
-        {showNewFileInput && (
-          <ul className="tree-node-children" role="group">
-            <li className="tree-node tree-node--file">
-              <div className="tree-node-row">
-                <InlineInput
-                  initialValue=""
-                  onConfirm={onInlineConfirm}
-                  onCancel={onInlineCancel}
-                  validate={(value) => {
-                    const normalized = normalizeFileName(value)
-                    return validateFileName(normalized)
-                  }}
-                />
-              </div>
-            </li>
-          </ul>
-        )}
-      </li>
-    )
-  }
-
-  const FileIconComponent = getFileIcon(node.name)
-  const fileIconClass = getFileIconClass(node.name)
-  const favorited = isFavorite(node.path)
-
-  return (
-    <li className="tree-node tree-node--file">
-      <div
-        className={`tree-node-row${isDragged ? ' tree-node--dragging' : ''}`}
-        draggable={canDrag}
-        onDragStart={(e) => onDragStart(e, node.path, node.type, vaultId)}
-        onDragEnd={onDragEnd}
-        onContextMenu={(e) => onContextMenu(e, node, vaultId)}
-      >
-        {isRenaming ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flex: 1 }}>
-            {React.createElement(FileIconComponent, { size: 13, className: fileIconClass, style: { flexShrink: 0 } })}
-            <InlineInput
-              initialValue={node.name}
-              selectRange={getSelectionRange(node.name, false)}
-              onConfirm={onInlineConfirm}
-              onCancel={onInlineCancel}
-              validate={(value) => validateFileName(value, 255)}
-            />
-          </div>
-        ) : (
-          <button
-            type="button"
-            className={`tree-node-file${isSelected ? ' tree-node-file--selected' : ''}`}
-            aria-current={isSelected ? 'true' : undefined}
-            onClick={() => onSelectFile(node.path, node.name)}
-            title={node.path}
-            style={{ display: 'flex', alignItems: 'center', gap: 5 }}
-          >
-            {React.createElement(FileIconComponent, { size: 13, className: fileIconClass, style: { flexShrink: 0 } })}
-            <span className="tree-node-file-name">{getDisplayName(node.name)}</span>
-            <span
-              className={`tree-node-star${favorited ? ' tree-node-star--active' : ''}`}
-              onClick={(e) => { e.stopPropagation(); onToggleFavorite(node.path) }}
-              role="button"
-              aria-label={favorited ? 'Favorit entfernen' : 'Als Favorit markieren'}
-              tabIndex={-1}
-            >
-              <Star size={12} />
-            </span>
-          </button>
-        )}
-      </div>
-    </li>
-  )
-}
 
 /**
  * Props for the FileExplorer component.
@@ -449,12 +192,9 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
         dispatch({ type: 'VAULT_SELECTED', payload: vaultId })
       }
       openTab(tabDispatch, dispatch, apiClient, vaultId, filePath, name)
-      showToast(`${name} erstellt`, 'success')
+      showToast(t('fileOps.created', { name }), 'success')
     } catch (err: unknown) {
-      const msg = err !== null && typeof err === 'object' && 'message' in err
-        ? (err as { message: string }).message
-        : 'Canvas konnte nicht erstellt werden'
-      showToast(msg, 'error')
+      showToast(extractErrorMessage(err, t('fileOps.canvasCreateError')), 'error')
     }
   }
 
@@ -505,13 +245,13 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
         // Show error text only if no cached value exists
         setVaultTooltips((prev) => {
           if (prev[vaultId]) return prev // Keep existing tooltip
-          return { ...prev, [vaultId]: 'Statistiken nicht verfügbar' }
+          return { ...prev, [vaultId]: t('fileOps.statisticsUnavailable') }
         })
       }
     }).catch(() => {
       setVaultTooltips((prev) => {
         if (prev[vaultId]) return prev
-        return { ...prev, [vaultId]: 'Statistiken nicht verfügbar' }
+        return { ...prev, [vaultId]: t('fileOps.statisticsUnavailable') }
       })
     })
   }, [apiClient])
@@ -549,10 +289,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
       // Select the new vault
       dispatch({ type: 'VAULT_SELECTED', payload: vault.id })
     } catch (err: unknown) {
-      const msg = err !== null && typeof err === 'object' && 'message' in err
-        ? (err as { message: string }).message
-        : t('common.error')
-      setVaultValidationError(msg)
+      setVaultValidationError(extractErrorMessage(err, t('common.error')))
     }
   }
 
@@ -738,10 +475,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
       dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree: newTree } })
       showToast(`${copyName}`, 'success')
     } catch (err: unknown) {
-      const message = err !== null && typeof err === 'object' && 'message' in err
-        ? (err as { message: string }).message
-        : t('fileOps.copyError')
-      showToast(message, 'error')
+      showToast(extractErrorMessage(err, t('fileOps.copyError')), 'error')
     }
   }
 
@@ -774,10 +508,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
       favoritesStore.updatePath(vaultId, node.path, destinationPath)
       setFavoritesVersion((v) => v + 1)
     } catch (err: unknown) {
-      const message = err !== null && typeof err === 'object' && 'message' in err
-        ? (err as { message: string }).message
-        : t('fileOps.moveError')
-      showToast(message, 'error')
+      showToast(extractErrorMessage(err, t('fileOps.moveError')), 'error')
     }
   }
 
@@ -842,10 +573,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
       const newTree = await apiClient.fetchVaultTree(vaultId)
       dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree: newTree } })
     }).catch((err: unknown) => {
-      const message = err !== null && typeof err === 'object' && 'message' in err
-        ? (err as { message: string }).message
-        : t('fileOps.deleteError')
-      showToast(message, 'error')
+      showToast(extractErrorMessage(err, t('fileOps.deleteError')), 'error')
     })
   }
 
@@ -1134,10 +862,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
       favoritesStore.updatePath(vaultId, draggedPath, destinationPath)
       setFavoritesVersion((v) => v + 1)
     } catch (err: unknown) {
-      const message = err !== null && typeof err === 'object' && 'message' in err
-        ? (err as { message: string }).message
-        : t('fileOps.moveError')
-      showToast(message, 'error')
+      showToast(extractErrorMessage(err, t('fileOps.moveError')), 'error')
     } finally {
       setDragState({
         draggedPath: null,

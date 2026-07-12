@@ -20,6 +20,9 @@ Code-Review-Checkliste und Sicherheitsregeln in einem Dokument.
 - [ ] Keine auskommentierten Blöcke, kein `console.log`
 - [ ] Naming-Konventionen (I-Prefix, Error-Suffix, etc.)
 - [ ] Keine Default-Exports
+- [ ] Error-Handling in catch-Blöcken: `extractErrorMessage(err, fallback)` aus `utils/error.ts` — kein inline `err as { message }`
+- [ ] Keine Inline-Styles (`CSSProperties`-Objekte) — CSS-Klassen mit Design Tokens
+- [ ] Keine hartcodierten deutschen Strings — `t('section.key')` verwenden
 
 ### Tests
 - [ ] Unit Tests vorhanden (Success + Error)
@@ -29,6 +32,8 @@ Code-Review-Checkliste und Sicherheitsregeln in einem Dokument.
 ### Integration
 - [ ] Backend: `.js`-Extension, Barrel-Export aktualisiert
 - [ ] API-Error-Format: `{ code, message, timestamp }`
+- [ ] Frontend: `IApiClient` erweitert falls neuer Endpoint
+- [ ] Neue i18n-Keys in `de.ts` UND `en.ts` ergänzt (Struktur muss identisch sein)
 - [ ] Frontend: `IApiClient` erweitert falls neuer Endpoint
 
 ### CSS
@@ -61,9 +66,11 @@ Code-Review-Checkliste und Sicherheitsregeln in einem Dokument.
 - Opake Tokens: `crypto.randomBytes(64).toString('hex')` (128 Zeichen)
 - CSRF: `crypto.randomBytes(32).toString('hex')`, `X-CSRF-Token`-Header bei POST/PUT/DELETE
 - Session: 24h Gültigkeit, sliding expiry
-- Rate-Limiting: In-Memory Map, Reset bei Neustart OK
+- Rate-Limiting: In-Memory Map, Composite Key `username:ip` (verhindert Account-Lockout), Reset bei Neustart OK
 - Login-Fehler: Identische Antwort (kein Username/Passwort-Unterschied)
 - Passwort-Hashing: argon2id
+- SSE-Auth: Einmal-Ticket (`POST /auth/sse-ticket`, 30s TTL) statt Session-Token in URL. `SseTicketStore` in-memory, max 5 pro User.
+- Request-ID: `X-Request-Id` Header auf jeder Response (reuse incoming oder UUIDv4). Im Error-Log mitloggen.
 
 ### Sync-Credentials
 - AES-256-GCM verschlüsselt (`SLATEBASE_SYNC_SECRET`, min 32 Zeichen)

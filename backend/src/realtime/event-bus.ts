@@ -29,6 +29,7 @@ export class EventBus implements IEventBus {
   private readonly replayBuffer: EventReplayBuffer
   private readonly rateLimiter: RateLimiter
   private readonly logger: ILogger
+  private readonly subscribers: Map<string, Array<(options: PublishOptions) => void>> = new Map()
 
   /** Batching window in milliseconds (reserved for future batching optimization). */
   readonly batchWindow: number
@@ -96,6 +97,9 @@ export class EventBus implements IEventBus {
     }
 
     this.logger.debug('Event published', { type, id, target: target.kind, targetCount: targetUserIds.length })
+
+    // Notify subscribers (for cross-cutting concerns like cache invalidation)
+    this.notifySubscribers(options)
   }
 
   /**
@@ -116,6 +120,22 @@ export class EventBus implements IEventBus {
    */
   getEventsSince(userId: string, lastEventId: string): SseEvent[] {
     return this.replayBuffer.getEventsSince(userId, lastEventId)
+  }
+
+  /**
+   * Subscribe to events of a specific type. The callback is invoked after each
+   * publish() call that matches the given type.
+   *
+   * @param type - The event type to subscribe to, or '*' for all events.
+   * @param callback - Function invoked with the publish options after dispatch.
+   */
+  subscribe(type: string, callback: (options: PublishOptions) => void): void {
+    let list = this.subscribers.get(type)
+    if (list === undefined) {
+      list = []
+      this.subscribers.set(type, list)
+    }
+    list.push(callback)
   }
 
   /**
@@ -155,6 +175,35 @@ export class EventBus implements IEventBus {
     }
 
     return userIds
+  }
+
+  /**
+   * Notify all matching subscribers after an event is published.
+   * Subscribers for the specific event type and wildcard '*' are both invoked.
+   */
+  private notifySubscribers(options: PublishOptions): void {
+    const typeSubscribers = this.subscribers.get(options.type)
+    const wildcardSubscribers = this.subscribers.get('*')
+
+    if (typeSubscribers) {
+      for (const cb of typeSubscribers) {
+        try {
+          cb(options)
+        } catch (err) {
+          this.logger.error('EventBus subscriber error', { type: options.type, error: String(err) })
+        }
+      }
+    }
+
+    if (wildcardSubscribers) {
+      for (const cb of wildcardSubscribers) {
+        try {
+          cb(options)
+        } catch (err) {
+          this.logger.error('EventBus subscriber error', { type: options.type, error: String(err) })
+        }
+      }
+    }
   }
 
   /**

@@ -296,9 +296,9 @@ describe('createRateLimitMiddleware', () => {
   })
 
   it('should return 429 when username is blocked', async () => {
-    // Pre-block the username
+    // Pre-block the username:ip composite key (tests use default IP '0.0.0.0')
     for (let i = 0; i < 5; i++) {
-      rateLimiter.recordFailedAttempt('blocked-user')
+      rateLimiter.recordFailedAttempt('blocked-user:0.0.0.0')
     }
 
     const app = new Hono()
@@ -342,9 +342,9 @@ describe('createRateLimitMiddleware', () => {
   })
 
   it('should reset rate limit on successful login', async () => {
-    // Record some failed attempts
-    rateLimiter.recordFailedAttempt('reset-user')
-    rateLimiter.recordFailedAttempt('reset-user')
+    // Record some failed attempts with composite key (username:ip)
+    rateLimiter.recordFailedAttempt('reset-user:0.0.0.0')
+    rateLimiter.recordFailedAttempt('reset-user:0.0.0.0')
 
     const app = new Hono()
     app.use('*', createRateLimitMiddleware(rateLimiter))
@@ -356,8 +356,8 @@ describe('createRateLimitMiddleware', () => {
       body: JSON.stringify({ username: 'reset-user', password: 'correct' }),
     })
 
-    // After successful login, rate limit should be reset
-    const result = rateLimiter.checkRateLimit('reset-user')
+    // After successful login, rate limit should be reset for the composite key
+    const result = rateLimiter.checkRateLimit('reset-user:0.0.0.0')
     expect(result.allowed).toBe(true)
   })
 
@@ -372,6 +372,19 @@ describe('createRateLimitMiddleware', () => {
       body: JSON.stringify({ password: 'password123' }),
     })
     expect(res.status).toBe(200)
+  })
+
+  it('should not block a user from a different IP (account lockout protection)', async () => {
+    // Attacker from IP 10.0.0.1 blocks their own key
+    for (let i = 0; i < 5; i++) {
+      rateLimiter.recordFailedAttempt('victim-user:10.0.0.1')
+    }
+    // Verify attacker's key is blocked
+    expect(rateLimiter.checkRateLimit('victim-user:10.0.0.1').allowed).toBe(false)
+
+    // Legitimate user from IP 192.168.1.5 should still be allowed
+    const result = rateLimiter.checkRateLimit('victim-user:192.168.1.5')
+    expect(result.allowed).toBe(true)
   })
 })
 

@@ -170,9 +170,11 @@ export class CsrfError extends Error {
  * Filesystem-backed session store with in-memory token index.
  * Sessions are persisted as individual JSON files under `data/sessions/`.
  * A `Map<token, sessionId>` is maintained in memory for fast lookups.
+ * A secondary `Map<userId, Set<sessionId>>` enables O(1) user-session lookups.
  */
 export class SessionStore implements ISessionStore {
   private readonly tokenIndex: Map<string, string> = new Map()
+  private readonly userIndex: Map<string, Set<string>> = new Map()
   private readonly sessionsDir: string
   private dirEnsured = false
 
@@ -184,7 +186,7 @@ export class SessionStore implements ISessionStore {
   }
 
   /**
-   * Load all existing sessions from the filesystem into the in-memory index.
+   * Load all existing sessions from the filesystem into the in-memory indexes.
    * Must be called once at startup before the store is used.
    */
   async loadIndex(): Promise<void> {
@@ -207,6 +209,7 @@ export class SessionStore implements ISessionStore {
         const session: unknown = JSON.parse(content)
         if (this.isValidSession(session)) {
           this.tokenIndex.set(session.token, session.sessionId)
+          this.addToUserIndex(session.userId, session.sessionId)
           loaded++
         }
       } catch {
@@ -225,6 +228,7 @@ export class SessionStore implements ISessionStore {
     const filePath = join(this.sessionsDir, `${session.sessionId}.json`)
     await this.atomicWrite(filePath, JSON.stringify(session, null, 2))
     this.tokenIndex.set(session.token, session.sessionId)
+    this.addToUserIndex(session.userId, session.sessionId)
   }
 
   /**
@@ -254,8 +258,9 @@ export class SessionStore implements ISessionStore {
 
     // Check expiry
     if (new Date(session.expiresAt).getTime() <= Date.now()) {
-      // Session expired — remove from index and filesystem
+      // Session expired — remove from indexes and filesystem
       this.tokenIndex.delete(token)
+      this.removeFromUserIndex(session.userId, sessionId)
       await this.deleteSessionFile(sessionId)
       return null
     }
@@ -265,13 +270,19 @@ export class SessionStore implements ISessionStore {
 
   /**
    * Find all sessions belonging to a specific user.
+   * Uses the secondary userId index for O(1) lookup of session IDs,
+   * then reads each session from disk.
    */
   async findByUserId(userId: string): Promise<Session[]> {
-    const sessions: Session[] = []
+    const sessionIds = this.userIndex.get(userId)
+    if (sessionIds === undefined || sessionIds.size === 0) {
+      return []
+    }
 
-    for (const [, sessionId] of this.tokenIndex) {
+    const sessions: Session[] = []
+    for (const sessionId of sessionIds) {
       const session = await this.readSession(sessionId)
-      if (session !== null && session.userId === userId) {
+      if (session !== null) {
         sessions.push(session)
       }
     }
@@ -288,6 +299,12 @@ export class SessionStore implements ISessionStore {
       return
     }
 
+    // Read the session to get the userId for the user index
+    const session = await this.readSession(sessionId)
+    if (session !== null) {
+      this.removeFromUserIndex(session.userId, sessionId)
+    }
+
     this.tokenIndex.delete(token)
     await this.deleteSessionFile(sessionId)
   }
@@ -296,15 +313,18 @@ export class SessionStore implements ISessionStore {
    * Invalidate all sessions for a user, optionally keeping one token active.
    */
   async invalidateAllForUser(userId: string, exceptToken?: string): Promise<void> {
-    const tokensToRemove: string[] = []
+    const sessionIds = this.userIndex.get(userId)
+    if (sessionIds === undefined || sessionIds.size === 0) {
+      return
+    }
 
+    // Find which tokens belong to these sessions
+    const tokensToRemove: string[] = []
     for (const [token, sessionId] of this.tokenIndex) {
       if (exceptToken !== undefined && token === exceptToken) {
         continue
       }
-
-      const session = await this.readSession(sessionId)
-      if (session !== null && session.userId === userId) {
+      if (sessionIds.has(sessionId)) {
         tokensToRemove.push(token)
       }
     }
@@ -313,34 +333,35 @@ export class SessionStore implements ISessionStore {
       const sessionId = this.tokenIndex.get(token)
       if (sessionId !== undefined) {
         this.tokenIndex.delete(token)
+        this.removeFromUserIndex(userId, sessionId)
         await this.deleteSessionFile(sessionId)
       }
     }
   }
 
   /**
-   * Remove expired sessions from both filesystem and in-memory index.
+   * Remove expired sessions from both filesystem and in-memory indexes.
    * Returns the number of sessions removed.
    */
   async cleanup(): Promise<number> {
     const now = Date.now()
-    const tokensToRemove: string[] = []
+    const tokensToRemove: Array<{ token: string; sessionId: string; userId: string | null }> = []
 
     for (const [token, sessionId] of this.tokenIndex) {
       const session = await this.readSession(sessionId)
       if (session === null) {
-        tokensToRemove.push(token)
+        tokensToRemove.push({ token, sessionId, userId: null })
       } else if (new Date(session.expiresAt).getTime() <= now) {
-        tokensToRemove.push(token)
+        tokensToRemove.push({ token, sessionId, userId: session.userId })
       }
     }
 
-    for (const token of tokensToRemove) {
-      const sessionId = this.tokenIndex.get(token)
-      if (sessionId !== undefined) {
-        this.tokenIndex.delete(token)
-        await this.deleteSessionFile(sessionId)
+    for (const { token, sessionId, userId } of tokensToRemove) {
+      this.tokenIndex.delete(token)
+      if (userId !== null) {
+        this.removeFromUserIndex(userId, sessionId)
       }
+      await this.deleteSessionFile(sessionId)
     }
 
     if (tokensToRemove.length > 0) {
@@ -351,6 +372,31 @@ export class SessionStore implements ISessionStore {
   }
 
   // ─── Private Helpers ─────────────────────────────────────────────────────────
+
+  /**
+   * Add a session to the userId secondary index.
+   */
+  private addToUserIndex(userId: string, sessionId: string): void {
+    let sessionIds = this.userIndex.get(userId)
+    if (sessionIds === undefined) {
+      sessionIds = new Set()
+      this.userIndex.set(userId, sessionIds)
+    }
+    sessionIds.add(sessionId)
+  }
+
+  /**
+   * Remove a session from the userId secondary index.
+   */
+  private removeFromUserIndex(userId: string, sessionId: string): void {
+    const sessionIds = this.userIndex.get(userId)
+    if (sessionIds !== undefined) {
+      sessionIds.delete(sessionId)
+      if (sessionIds.size === 0) {
+        this.userIndex.delete(userId)
+      }
+    }
+  }
 
   /**
    * Ensure the sessions directory exists.

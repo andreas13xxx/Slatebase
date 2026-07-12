@@ -149,6 +149,16 @@ export interface IEventBus {
 
   /** Get all events after a given event ID for a specific user (for replay on reconnect). */
   getEventsSince(userId: string, lastEventId: string): SseEvent[]
+
+  /**
+   * Subscribe to events of a specific type. The callback is invoked after each
+   * publish() call that matches the given type. Useful for cross-cutting concerns
+   * like cache invalidation or audit hooks.
+   *
+   * @param type - The event type to subscribe to, or '*' for all events.
+   * @param callback - Function invoked with the publish options after dispatch.
+   */
+  subscribe(type: SseEventType | '*', callback: (options: PublishOptions) => void): void
 }
 
 /**

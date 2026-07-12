@@ -470,6 +470,9 @@ export const de = {
     renameError: 'Fehler beim Umbenennen',
     createError: 'Fehler beim Erstellen',
     deleteError: 'Fehler beim Löschen',
+    canvasCreateError: 'Canvas konnte nicht erstellt werden',
+    created: '{name} erstellt',
+    statisticsUnavailable: 'Statistiken nicht verfügbar',
     nameEmpty: 'Dateiname darf nicht leer sein',
     nameInvalidChars: 'Dateiname enthält ungültige Zeichen',
     nameTooLong: 'Dateiname ist zu lang',
@@ -691,5 +694,14 @@ export const de = {
     errorVaultNotFound: 'Vault nicht gefunden.',
     errorAccessDenied: 'Zugriff verweigert. Nur der Besitzer kann den Vault übertragen.',
     errorUserNotFound: 'Benutzer nicht gefunden.',
+  },
+
+  tabContent: {
+    noFileOpen: 'Keine Datei geöffnet. Wähle eine Datei im Datei-Explorer aus.',
+    loading: 'Laden…',
+    fileLoadError: 'Fehler beim Laden der Datei: {error}',
+    linkCreateError: 'Datei konnte nicht erstellt werden: {fileName} — {message}',
+    linkCreateUnexpected: 'Ein unerwarteter Fehler ist aufgetreten',
+    dismissError: 'Fehlermeldung schließen',
   },
 } as const

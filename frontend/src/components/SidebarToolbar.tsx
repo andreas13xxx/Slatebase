@@ -6,11 +6,7 @@ import {
 } from 'lucide-react'
 import { useFeatureContext } from '../state/featureContext'
 
-type AppPage =
-  | 'vaults' | 'my-vaults' | 'chat'
-  | 'admin-audit' | 'admin-logs'
-  | 'sync-log'
-  | 'trash'
+import type { AppPage } from '../App'
 
 interface ToolbarItem {
   id: string

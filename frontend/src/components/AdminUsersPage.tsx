@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, type FormEvent } from 'react'
 import type { IApiClient } from '../api'
 import type { UserRole } from '../state/authState'
-import { useTranslation, type TranslateFn } from '../i18n'
+import { useTranslation } from '../i18n'
+import { extractErrorMessage } from '../utils/error'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -138,7 +139,7 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
       setTotalPages(result.totalPages)
       setTotal(result.total)
     } catch (err: unknown) {
-      const message = extractErrorMessage(err, t)
+      const message = extractErrorMessage(err, t('admin.users.unknownError'))
       setListError(message)
     } finally {
       setListLoading(false)
@@ -172,7 +173,7 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
       setNewLanguage(locale)
       void loadUsers(page)
     } catch (err: unknown) {
-      setCreateError(extractErrorMessage(err, t))
+      setCreateError(extractErrorMessage(err, t('admin.users.unknownError')))
     } finally {
       setCreateLoading(false)
     }
@@ -192,7 +193,7 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
           setActionSuccess(t('admin.users.deleteSuccess', { username: user.username }))
           void loadUsers(page)
         } catch (err: unknown) {
-          setActionError(extractErrorMessage(err, t))
+          setActionError(extractErrorMessage(err, t('admin.users.unknownError')))
         }
       },
     })
@@ -211,7 +212,7 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
       )
       void loadUsers(page)
     } catch (err: unknown) {
-      setActionError(extractErrorMessage(err, t))
+      setActionError(extractErrorMessage(err, t('admin.users.unknownError')))
     }
   }
 
@@ -229,7 +230,7 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
         t('admin.users.passwordResetSuccess', { username: user.username }),
       )
     } catch (err: unknown) {
-      setActionError(extractErrorMessage(err, t))
+      setActionError(extractErrorMessage(err, t('admin.users.unknownError')))
     }
   }
 
@@ -249,7 +250,7 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
       )
       void loadUsers(page)
     } catch (err: unknown) {
-      setActionError(extractErrorMessage(err, t))
+      setActionError(extractErrorMessage(err, t('admin.users.unknownError')))
     }
   }
 
@@ -488,14 +489,4 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
   )
 }
 
-// ─── Utility functions ─────────────────────────────────────────────────────
 
-/**
- * Extracts a user-friendly error message from an unknown error.
- */
-function extractErrorMessage(err: unknown, t: TranslateFn): string {
-  if (err !== null && typeof err === 'object' && 'message' in err) {
-    return (err as { message: string }).message
-  }
-  return t('admin.users.unknownError')
-}

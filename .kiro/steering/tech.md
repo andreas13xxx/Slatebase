@@ -43,6 +43,12 @@ npm run test:e2e     # Playwright
 npm run lint         # ESLint
 ```
 
+## Terminal-Regeln
+
+- **Keine zusammengesetzten Befehle** (`&&`, `;`, `&`). Jeden Befehl einzeln ausführen.
+- Statt `cd <dir> && <cmd>` den `cwd`-Parameter des Tools nutzen.
+- Unabhängige Befehle als parallele Tool-Calls, nicht als Kette.
+
 ## Dependencies
 
 ### Backend

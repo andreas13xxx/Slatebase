@@ -58,6 +58,9 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - Reconnect von `disconnected` → `connected` triggert `onReconnect` (Full Refresh)
 - Neue Events: Bridge in `state/realtime*Bridge.ts`
 - Tests: `EventSource` Mock in `test-setup.ts` (jsdom hat kein natives EventSource)
+- **SSE-Auth**: Client holt Einmal-Ticket via `POST /auth/sse-ticket` (30s TTL), verbindet mit `?ticket=`. Fallback auf `?token=` wenn Ticket-Fetch fehlschlägt. Session-Token nie in URL.
+- **SSE-Endpoint als HTTP-Intercept**: `/api/v1/events` MUSS im `createHttpServer`-Callback abgefangen werden, BEVOR der Request an Hono gelangt. Grund: `@hono/node-server` versucht nach Handler-Return immer `writeHead()` auf die Response — bei einer offenen SSE-Verbindung, die bereits `res.writeHead(200)` gerufen hat, wirft das `ERR_HTTP_HEADERS_SENT` und bricht die Verbindung ab. Die `sseRoutes.ts` (Hono-Route) ist dead code — der Intercept in `index.ts` ist die Single Source of Truth für SSE.
+- **EventBus Subscriber**: `eventBus.subscribe(type | '*', callback)` für Cross-Cutting-Concerns (z.B. Cache-Invalidierung). Nie `eventBus.publish` monkey-patchen.
 
 ## Obsidian Markdown Plugins
 
@@ -139,6 +142,11 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 22. GraphNode hat jetzt `id` (unique) + `type` ('file'|'tag'|'property') + optionales `path`. Frontend SimNode nutzt `node.id` als Identifier, `node.path ?? node.id` für File-Öffnung.
 23. Tag-Extraction: CSS Hex-Farben (`#fff`, `#bb7739`) werden als Tags erkannt — bekannter Edge-Case. Regex erfordert Buchstabe nach `#`, aber Hex `a-f` qualifiziert.
 24. GraphSettingsPanel: `position: absolute` im Container. Search-Container braucht `right: 48px` (statt 12px) um Platz für Settings-Toggle zu lassen.
+25. `AppPage`-Typ nur in `App.tsx` definieren und exportieren. Andere Dateien (SidebarToolbar, UserMenu) importieren ihn — nie lokal duplizieren, sonst bricht `tsc -b`.
+26. `extractErrorMessage(err, fallback)` aus `utils/error.ts` verwenden — nie inline `err as { message }` Pattern. Fallback ist der i18n-String für den konkreten Kontext.
+27. EventBus NIE monkey-patchen (`eventBus.publish = ...`). Stattdessen `eventBus.subscribe('vault:change', cb)` für Cross-Cutting-Concerns (Cache-Invalidierung, Audit-Hooks).
+28. `X-Request-Id` Header: Middleware generiert UUID pro Request, loggt im Error-Handler mit. Eingehender Header von Upstream-Proxy wird wiederverwendet (max 128 Zeichen).
+29. SSE-Endpoint + MCP-Endpoint: beide als HTTP-Intercept in `createHttpServer`, NICHT via Hono-Route. `@hono/node-server` finalisiert Response nach Handler-Return → bricht offene Streams. Ticket-Auth dort manuell implementieren (Ticket-First, Token-Fallback).
 
 ## Multi-User & Vault-Besitz
 
@@ -146,6 +154,8 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - Transfer: nur an EINEN, vorher ALLE Freigaben widerrufen
 - Optimistisches Concurrency (ETag), kein Locking
 - Sperrung ≠ Löschung; letzter Admin unantastbar
+- **Rate-Limiting**: Composite Key `username:ip` — verhindert Account-Lockout-Angriffe (Angreifer von IP A kann User von IP B nicht aussperren)
+- **SessionStore**: Sekundärer Index `Map<userId, Set<sessionId>>` für O(1) `findByUserId`. Bei `create`/`invalidate`/`cleanup` immer beide Indexes pflegen.
 
 ## Testing
 
@@ -195,3 +205,15 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 
 - Git-Proxy: `git -c http.proxy="" push`
 - Node.js v24, `tsx watch` Dev, `tsc` Prod
+
+## Frontend-Refactoring-Erkenntnisse
+
+- **Error-Utility**: `extractErrorMessage(err, fallback)` in `utils/error.ts` — IMMER nutzen statt inline `err as { message }` Pattern
+- **Inline Styles verboten**: Auch "temporäre" `CSSProperties`-Objekte wandern nicht in Code. Stattdessen CSS-Klassen mit Design Tokens (Dark Mode funktioniert sonst nicht)
+- **ErrorBoundary**: Um `TabContent` (in App.tsx), `GraphView` und `CanvasView` (in TabContent) — schützt Sidebar/Navigation bei Render-Fehlern in riskanten Komponenten
+- **AppPage-Typ**: Ist KEIN "Settings"-System — es ist die aktive Tab-Navigation für Feature-Pages (Chat, Admin, Sync, etc.). `SettingsPanel` (Ctrl+,) ist ein separates Overlay nur für Einstellungen. Typ exportiert aus `App.tsx`.
+- **Module-Level Singletons** (`apiClient`, `dailyNoteService`): Bleiben in `App.tsx` — Race-Condition-frei dank synchronem Token-Restore. Kein Provider-Wrapping nötig (SSR nicht geplant, HMR funktioniert).
+- **Komponenten-Extraktion**: Nur extrahieren wenn eigenständige Logik (UserMenu: eigener State + Effects). Tightly-coupled Sub-Teile (DnD-Handler, Vault-Form) in der Parent-Datei lassen — Extraktion ohne echte Entkopplung schafft nur Import-Overhead.
+- **`file-explorer/` Modul**: Shared Types (`DragState`, `InlineInputState` etc.) + `TreeNode` als eigene Dateien. Barrel-Export `index.ts`. FileExplorer importiert daraus.
+- **SidebarToolbar AppPage**: Hatte lokale Type-Kopie → Muss die exportierte aus `App.tsx` importieren, sonst Type-Mismatch bei `tsc -b` (Vite-Dev schluckt es, Prod-Build nicht)
+- **`tsc --noEmit` ≠ `tsc -b`**: Dev-Check (`--noEmit`) ist permissiver. Prod-Build (`tsc -b`) prüft strenger (project references, declaration emit). Immer `npm run build` als finale Validierung.

@@ -1,6 +1,6 @@
 # Implementierungsplan — Slatebase Ausstehende Features
 
-**Stand:** Juni 2026. Die Kernfeatures sind umgesetzt (Vaults, Editor, Auth, Chat, Sync, MCP, Graph v2, Search, Realtime, Plugins, Feature Toggles, Mermaid, Command Palette, Unified Settings, Welcome Vault, Preferences, Keyboard Shortcuts, Obsidian Canvas). Es verbleiben 12 ausstehende Features in unterschiedlichen Reifegraden.
+**Stand:** Juli 2026 (v0.10.0). Die Kernfeatures sind umgesetzt (Vaults, Editor, Auth, Chat, Sync, MCP, Graph v2, Search, Realtime, Plugins, Feature Toggles, Mermaid, Command Palette, Unified Settings, Welcome Vault, Preferences, Keyboard Shortcuts, Obsidian Canvas, Block References). Es verbleiben 11 ausstehende Features in unterschiedlichen Reifegraden.
 
 **Strategie:** Hybrid — Features mit bestehender Spec direkt umsetzen, komplexe Features erst vollständig spezifizieren.
 
@@ -42,6 +42,7 @@
 | 30 | `vault-config` | ✅ Fertig |
 | 31 | `configurable-keybindings` | ✅ Fertig |
 | 32 | `obsidian-canvas` | ✅ Fertig (Parser, Node-/Edge-Renderer, Editing, Auto-Save, Minimap, Source-View; inkl. Link/File-Node-Interaktion + Datei-Suche im Pfad-Editor) |
+| 33 | `block-references` | ✅ Fertig (Block-Marker-Parser, Wikilink/Embed-Erweiterung, Rendering, Link-Index) |
 
 ---
 
@@ -49,18 +50,17 @@
 
 | Prio | Spec | Tier | Aufwand | Status |
 |------|------|------|---------|--------|
-| 1 | Block References | A | ~8–12h | Spec vorhanden (Tasks 12.1–12.8 in `obsidian-markdown-compat`) |
-| 2 | Sync Conflict Resolution | B | ~14–18h | Requirements vorhanden |
-| 3 | Workspace Leaf Compat | C | ~20–30h | Requirements vorhanden |
-| 4 | Obsidian Themes | C | ~15–20h | Geplant (keine Spec) |
-| 5 | Public Sharing | C | ~15–20h | Geplant (keine Spec) |
-| 6 | Live Preview Editor | D | ~48–68h | Geplant (keine Spec) |
-| 7 | Semantische Suche / AI-Embeddings | D | ~38–58h | Geplant (keine Spec) |
-| 8 | Server-Side Plugins | D | ~48–68h | Tasks vorhanden |
-| 9 | Security Hardening | E | ~20–30h | Geplant (keine Spec) |
-| 10 | Accessibility Audit | E | ~24–34h | Geplant (keine Spec) |
-| 11 | Responsive/Mobile | E | ~24–34h | Geplant (keine Spec) |
-| 12 | Collaborative Editing | F | ~68–88h | Requirements vorhanden |
+| 1 | Sync Conflict Resolution | A | ~14–18h | Requirements vorhanden |
+| 2 | Workspace Leaf Compat | B | ~20–30h | Requirements vorhanden |
+| 3 | Obsidian Themes | B | ~15–20h | Geplant (keine Spec) |
+| 4 | Public Sharing | B | ~15–20h | Geplant (keine Spec) |
+| 5 | Live Preview Editor | C | ~48–68h | Geplant (keine Spec) |
+| 6 | Semantische Suche / AI-Embeddings | C | ~38–58h | Geplant (keine Spec) |
+| 7 | Server-Side Plugins | C | ~48–68h | Tasks vorhanden |
+| 8 | Security Hardening | D | ~20–30h | Geplant (keine Spec) |
+| 9 | Accessibility Audit | D | ~24–34h | Geplant (keine Spec) |
+| 10 | Responsive/Mobile | D | ~24–34h | Geplant (keine Spec) |
+| 11 | Collaborative Editing | E | ~68–88h | Requirements vorhanden |
 
 ---
 
@@ -83,7 +83,7 @@ slatebase-overview (Architektur-Grundlage)
       │     ├── welcome-vault ✅
       │     └── public-sharing (braucht Auth + Rendering)
       ├── obsidian-markdown-compat ✅
-      │     ├── Block References (erweitert Wikilink/Embed-Syntax)
+      │     ├── Block References ✅
       │     ├── context-panel ✅
       │     ├── knowledge-graph ✅ → knowledge-graph-v2 ✅
       │     ├── mermaid-rendering ✅
@@ -108,47 +108,22 @@ slatebase-overview (Architektur-Grundlage)
 ## Parallelisierbare Tracks
 
 ```
-Track A (Markdown):    Block References → Live Preview Editor
-Track B (Canvas):      Obsidian Canvas ✅ (abgeschlossen)
-Track C (Sync):        Sync Conflict Resolution (unabhängig nach vault-sync ✅)
-Track D (Plugins):     Workspace Leaf Compat → Obsidian Themes → Server-Side Plugins
-Track E (Sharing):     Public Sharing (unabhängig)
-Track F (AI):          Semantische Suche (unabhängig)
-Track G (Polish):      Security Hardening → Accessibility Audit → Responsive/Mobile
-Track H (Collab):      Collaborative Editing (braucht Live Preview Editor oder zumindest Editor-Stabilität)
+Track A (Sync):        Sync Conflict Resolution (unabhängig nach vault-sync ✅)
+Track B (Plugins):     Workspace Leaf Compat → Obsidian Themes → Server-Side Plugins
+Track C (Sharing):     Public Sharing (unabhängig)
+Track D (Markdown):    Live Preview Editor
+Track E (AI):          Semantische Suche (unabhängig)
+Track F (Polish):      Security Hardening → Accessibility Audit → Responsive/Mobile
+Track G (Collab):      Collaborative Editing (braucht Live Preview Editor oder zumindest Editor-Stabilität)
 ```
 
 ---
 
-## Tier A: Markdown-Erweiterungen (Spec vorhanden, direkt umsetzbar)
+## Tier A: Nächstes Feature (Spec vorhanden, direkt umsetzbar)
 
 ---
 
-### Task 1: Block References
-
-Scope: ~8–12h. Erweitert bestehende `obsidian-markdown-compat` Spec (Requirements 17–21).
-
-**Spec:** `.kiro/specs/obsidian-markdown-compat/` (Tasks 12.1–12.8)
-
-**Zusammenfassung:**
-
-- **Block-Marker-Parser**: `^block-id` am Ende von Absätzen/Listen/Headings erkennen und als Node-Metadaten speichern
-- **Wikilink-Erweiterung**: `[[Seite#^block-id]]` und `[[#^block-id]]` Syntax parsen und rendern
-- **Embed-Erweiterung**: `![[Seite#^block-id]]` Syntax parsen und einzelnen Block inline einbetten
-- **Rendering**: Navigation zu Block-Ankern, Broken-Link-Styling bei nicht-gefundenen Blocks
-- **Link-Index**: Block-Referenzen als Kanten im Graph erfassen, Backlinks mit Block-Info
-
-**Abhängigkeiten:** Baut auf bestehenden Wikilink/Embed-Plugins auf (bereits implementiert).
-
-**Demo:** `[[Notiz#^abc123]]` verlinkt direkt zu einem spezifischen Absatz. `![[Notiz#^abc123]]` bettet nur diesen einen Block inline ein.
-
----
-
-## Tier B: Visuelle Features (Spec vorhanden)
-
----
-
-### Task 2: Sync Conflict Resolution
+### Task 1: Sync Conflict Resolution
 
 Scope: ~4h Design, ~10–14h Implementierung.
 
@@ -167,40 +142,11 @@ Scope: ~4h Design, ~10–14h Implementierung.
 
 ---
 
-### Task 3: Obsidian Canvas ✅ Abgeschlossen
-
-Scope: ~30–40h. Vollständig umgesetzt.
-
-**Spec:** `.kiro/specs/obsidian-canvas/` (8 Task-Gruppen, ~30 Subtasks)
-
-**Umgesetzt:**
-
-- **Parser/Serializer**: `.canvas`-JSON-Format (Nodes + Edges) lesen, validieren, schreiben (Round-Trip-kompatibel)
-- **Canvas-View**: Interaktive SVG+HTML-Visualisierung mit Zoom/Pan/Fit-to-View, Grid, Minimap, Source-View
-- **Node-Renderer**: Text (Markdown), File (Vorschau inkl. Bild/MD/PDF), Link (URL mit iframe-Vorschau), Group (Container)
-- **Edge-Renderer**: Bézier-Kurven mit Pfeilspitzen, Farben, Labels, Edge-Kontextmenü
-- **Editing**: Drag & Drop, Resize, Inline-Text-Editing, Node/Edge-CRUD, Multi-Select, Copy/Paste
-- **Auto-Save**: 2s Debounce, Dirty-Indikator, Fehlerbehandlung
-- **Link-Index**: `.canvas` File-Nodes als Verlinkungen im Knowledge Graph
-- **Read-Only-Modus**: Navigation erlaubt, keine Bearbeitung bei Nur-Lese-Rechten
-
-**Jüngste Verfeinerungen (Bugfixes + UX):**
-
-- **Link-Node**: iframe-Vorschau im selektierten Zustand interaktiv (Mausrad-Scrollen); neue Link-Nodes mit Vorschaugröße (300×220), damit die Webseite sofort angezeigt wird.
-- **Kontextmenüs**: schließen jetzt zuverlässig beim Klick außerhalb (Outside-Click-Listener in Capture-Phase, damit `stopPropagation` der Node-Drag-Logik ihn nicht blockiert; zusätzlich `window`-`blur` für Klicks in iframes).
-- **Text-/File-Node-Edit**: fokus-robustes Setzen des Editors via `requestAnimationFrame` (gewinnt das Fokus-Rennen gegen das schließende Kontextmenü); Klick außerhalb wechselt zuverlässig in den Ansichtsmodus.
-- **File-Node**: getrennte Aktionen „Bearbeiten" (Inhalt) und „Dateipfad ändern" (Pfad) für Markdown-Dateien; Inhalt wird nicht mehr fälschlich als Pfad gespeichert.
-- **Datei-Suche im Pfad-Editor**: Beim Ändern des Dateipfads (jeder Node-Typ) erscheint ein Autocomplete-Dropdown über alle existierenden Vault-Dateien (Teilstring-Match, Tastatur-Navigation).
-
-**Abhängigkeiten:** Keine neuen npm-Dependencies. Nutzt bestehende ViewMode-Plugins für Markdown in Text-Nodes.
+## Tier B: Mittelfristige Features (teilweise Spec-Erstellung nötig)
 
 ---
 
-## Tier C: Mittelfristige Features (teilweise Spec-Erstellung nötig)
-
----
-
-### Task 4: Workspace Leaf Compat
+### Task 2: Workspace Leaf Compat
 
 Scope: ~20–30h. Requirements vorhanden, Design + Tasks ausstehend.
 
@@ -220,7 +166,7 @@ Scope: ~20–30h. Requirements vorhanden, Design + Tasks ausstehend.
 
 ---
 
-### Task 5: Obsidian Themes
+### Task 3: Obsidian Themes
 
 Scope: ~15–20h. Keine Spec vorhanden.
 
@@ -240,7 +186,7 @@ Scope: ~15–20h. Keine Spec vorhanden.
 
 ---
 
-### Task 6: Public Sharing
+### Task 4: Public Sharing
 
 Scope: ~4h Design + ~15–20h Implementierung.
 
@@ -259,11 +205,11 @@ Scope: ~4h Design + ~15–20h Implementierung.
 
 ---
 
-## Tier D: Technisch ambitionierte Features (Spec-first zwingend)
+## Tier C: Technisch ambitionierte Features (Spec-first zwingend)
 
 ---
 
-### Task 7: Live Preview Editor (WYSIWYG / Side-by-Side)
+### Task 5: Live Preview Editor (WYSIWYG / Side-by-Side)
 
 Scope: ~8h Design + ~40–60h Implementierung.
 
@@ -280,11 +226,11 @@ Scope: ~8h Design + ~40–60h Implementierung.
   - Toolbar-Erweiterung (Formatierung wendet sich auf Source an)
   - Performance bei großen Dateien (virtuelles Scrolling, inkrementelles Parsing)
 
-**Empfehlung:** Nach Block References und Canvas umsetzen. Benötigt Entscheidung ob CodeMirror/ProseMirror-Migration oder eigene Lösung auf bestehender Textarea.
+**Empfehlung:** Block References und Canvas sind abgeschlossen. Benötigt Entscheidung ob CodeMirror/ProseMirror-Migration oder eigene Lösung auf bestehender Textarea.
 
 ---
 
-### Task 8: Semantische Suche / AI-Embeddings
+### Task 6: Semantische Suche / AI-Embeddings
 
 Scope: ~8h Design + ~30–50h Implementierung.
 
@@ -306,7 +252,7 @@ Scope: ~8h Design + ~30–50h Implementierung.
 
 ---
 
-### Task 9: Server-Side Plugins
+### Task 7: Server-Side Plugins
 
 Scope: ~8h Design + ~40–60h Implementierung. Task-Liste existiert (7 Phasen).
 
@@ -332,11 +278,11 @@ Scope: ~8h Design + ~40–60h Implementierung. Task-Liste existiert (7 Phasen).
 
 ---
 
-## Tier E: Polish & Plattform (querschnittlich)
+## Tier D: Polish & Plattform (querschnittlich)
 
 ---
 
-### Task 10: Security Hardening
+### Task 8: Security Hardening
 
 Scope: ~20–30h.
 
@@ -354,7 +300,7 @@ Scope: ~20–30h.
 
 ---
 
-### Task 11: Accessibility Audit (WCAG 2.1 AA)
+### Task 9: Accessibility Audit (WCAG 2.1 AA)
 
 Scope: ~4h Audit + ~20–30h Fixes.
 
@@ -376,7 +322,7 @@ Scope: ~4h Audit + ~20–30h Fixes.
 
 ---
 
-### Task 12: Responsive/Mobile Layout
+### Task 10: Responsive/Mobile Layout
 
 Scope: ~4h Design + ~20–30h Implementierung.
 
@@ -396,11 +342,11 @@ Scope: ~4h Design + ~20–30h Implementierung.
 
 ---
 
-## Tier F: Langfristig (größtes Feature, separates Milestone)
+## Tier E: Langfristig (größtes Feature, separates Milestone)
 
 ---
 
-### Task 13: Collaborative Editing
+### Task 11: Collaborative Editing
 
 Scope: ~8h Design + ~60–80h Implementierung.
 
@@ -426,28 +372,25 @@ Scope: ~8h Design + ~60–80h Implementierung.
 ## Zusammenfassung
 
 ```
-Tier A: Markdown-Erweiterungen        (~8–12h)
-└── Block References
-
-Tier B: Visuelle Features              (~14–18h)
+Tier A: Nächstes Feature                (~14–18h)
 └── Sync Conflict Resolution
 
-Tier C: Mittelfristige Features        (~50–70h)
+Tier B: Mittelfristige Features          (~50–70h)
 ├── Workspace Leaf Compat
 ├── Obsidian Themes
 └── Public Sharing
 
-Tier D: Ambitioniert                   (~96–168h)
+Tier C: Ambitioniert                     (~134–194h)
 ├── Live Preview Editor
 ├── Semantische Suche
 └── Server-Side Plugins
 
-Tier E: Polish & Plattform             (~64–94h)
+Tier D: Polish & Plattform              (~64–94h)
 ├── Security Hardening
 ├── Accessibility Audit
 └── Responsive/Mobile
 
-Tier F: Langfristig                    (~68–88h)
+Tier E: Langfristig                     (~68–88h)
 └── Collaborative Editing
 ```
 
@@ -457,13 +400,12 @@ Tier F: Langfristig                    (~68–88h)
 
 | Tier | Design | Implementierung | Gesamt |
 |------|--------|-----------------|--------|
-| A: Markdown | — | ~8–12h | ~8–12h |
-| B: Visuelle Features | ~4h | ~10–14h | ~14–18h |
-| C: Mittelfristig | ~8h | ~50–70h | ~58–78h |
-| D: Ambitioniert | ~24h | ~110–170h | ~134–194h |
-| E: Polish | ~8h | ~60–90h | ~68–98h |
-| F: Langfristig | ~8h | ~60–80h | ~68–88h |
-| **Summe** | **~52h** | **~298–436h** | **~350–488h** |
+| A: Nächstes Feature | ~4h | ~10–14h | ~14–18h |
+| B: Mittelfristig | ~8h | ~50–70h | ~58–78h |
+| C: Ambitioniert | ~24h | ~110–170h | ~134–194h |
+| D: Polish | ~8h | ~60–90h | ~68–98h |
+| E: Langfristig | ~8h | ~60–80h | ~68–88h |
+| **Summe** | **~52h** | **~290–424h** | **~342–476h** |
 
 ---
 

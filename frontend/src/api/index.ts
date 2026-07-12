@@ -230,6 +230,8 @@ export interface IApiClient {
   getSessions(): Promise<SessionInfo[]>
   invalidateSession(sessionId: string): Promise<void>
   invalidateAllOtherSessions(): Promise<void>
+  /** Request a short-lived one-time ticket for SSE connections. */
+  getSseTicket(): Promise<{ ticket: string }>
   getProfile(): Promise<PublicUserInfo>
   updateProfile(data: UpdateProfileData): Promise<PublicUserInfo>
   changePassword(currentPassword: string, newPassword: string): Promise<void>
@@ -561,6 +563,11 @@ export class ApiClient implements IApiClient {
   /** Invalidate all sessions except the current one. */
   async invalidateAllOtherSessions(): Promise<void> {
     await this.request<void>('DELETE', '/api/v1/auth/sessions')
+  }
+
+  /** Request a short-lived one-time ticket for SSE connections. */
+  async getSseTicket(): Promise<{ ticket: string }> {
+    return this.request<{ ticket: string }>('POST', '/api/v1/auth/sse-ticket')
   }
 
   /** Get the current user's profile. */

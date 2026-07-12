@@ -25,7 +25,9 @@ import { SessionStore, AuthService } from './auth/index.js'
 import { CsrfSecretManager } from './auth/csrf-secret.js'
 import { createAuthMiddleware, createCsrfMiddleware, createRateLimitMiddleware, createMustChangePasswordMiddleware } from './auth/middleware.js'
 import { createClientIpMiddleware } from './api/client-ip.js'
+import { createRequestIdMiddleware } from './api/request-id.js'
 import { RateLimiter } from './auth/ratelimit.js'
+import { SseTicketStore } from './auth/sse-ticket-store.js'
 import { UserRepository, UserService, RoleService, ensureDefaultAdmin } from './user/index.js'
 import { AuditLogger, AuditService } from './audit/index.js'
 import { ConversationStore, MessageStore, ChatRateLimiter, ChatService, UnreadStore } from './chat/index.js'
@@ -62,8 +64,8 @@ import { PluginStore, PluginInstaller } from './plugin/index.js'
 import { createPluginRoutes } from './api/pluginRoutes.js'
 import { versionRoutes } from './api/versionRoutes.js'
 import { SearchService, ReplaceService } from './search/index.js'
-import type { SseEvent, PublishOptions } from './realtime/index.js'
 import { EventReplayBuffer, RateLimiter as SseRateLimiter, ConnectionManager, PresenceService, EventBus, ConnectionLimitError } from './realtime/index.js'
+import type { SseEvent } from './realtime/index.js'
 import { createSseRoutes } from './api/sseRoutes.js'
 import { createSearchRoutes } from './api/searchRoutes.js'
 import { createUploadRoutes } from './api/uploadRoutes.js'
@@ -392,8 +394,9 @@ function getLinkIndex(vaultId: string): LinkIndexService | undefined {
 }
 
 // 5. Controllers
+const sseTicketStore = new SseTicketStore()
 const vaultController = new VaultController(vaultService, logger, importService, userRepository, vaultAccessControl, syncConfigStore, vaultShareRegistry)
-const authController = new AuthController(authService, logger)
+const authController = new AuthController(authService, logger, sseTicketStore)
 const userController = new UserController(userService, logger)
 const chatController = new ChatController(chatService, chatRateLimiter, logger, userRepository)
 
@@ -431,13 +434,14 @@ app.use(
   cors({
     origin: serverConfig.allowedOrigins,
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+    allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Request-Id'],
   }),
 )
 
 // Auth middleware (skips login endpoint internally)
 const rateLimiter = new RateLimiter()
 const authMiddleware = createAuthMiddleware(authService)
+app.use('*', createRequestIdMiddleware())
 app.use('*', createClientIpMiddleware({ trustedProxies: serverConfig.trustedProxies }))
 app.use('/api/v1/*', authMiddleware)
 app.use('/api/v1/*', createCsrfMiddleware(authService))
@@ -446,11 +450,13 @@ app.use('/api/v1/*', createMustChangePasswordMiddleware(userRepository))
 
 // Global error handler — catches unhandled exceptions and returns proper JSON
 app.onError((err, c) => {
+  const requestId = c.res.headers.get('X-Request-Id') ?? undefined
   logger.error('Unhandled error', {
     message: err.message,
     stack: err.stack,
     path: c.req.path,
     method: c.req.method,
+    requestId,
   })
   return c.json({ code: 'INTERNAL_ERROR', message: 'Internal server error', timestamp: new Date().toISOString() }, 500)
 })
@@ -582,19 +588,17 @@ const sseRoutes = createSseRoutes({
   eventBus,
   presenceService,
   authMiddleware,
+  sseTicketStore,
   logger,
 })
 app.route('/api/v1', sseRoutes)
 
-// Wire vault:change events → statistics cache invalidation
-// Wraps the EventBus.publish to intercept vault:change events and invalidate the stats cache.
-const originalPublish = eventBus.publish.bind(eventBus)
-eventBus.publish = (options: PublishOptions): void => {
-  originalPublish(options)
-  if (options.type === 'vault:change' && options.payload['vaultId']) {
+// Wire vault:change events → statistics cache invalidation via subscriber
+eventBus.subscribe('vault:change', (options) => {
+  if (options.payload['vaultId']) {
     statisticsService.invalidateCache(options.payload['vaultId'] as string)
   }
-}
+})
 
 // --- Initialize & Start Server ---
 
@@ -738,25 +742,44 @@ const server = createHttpServer(async (req, res) => {
     return
   }
 
-  // Intercept SSE events endpoint — handle directly to avoid Hono double-response (ERR_HTTP_HEADERS_SENT)
+  // Intercept SSE events endpoint — handle directly to avoid Hono ERR_HTTP_HEADERS_SENT
+  // (Hono's response handler tries to write headers after nodeRes.writeHead() in the SSE route)
   const parsedUrl = new URL(req.url ?? '', `http://${req.headers.host ?? 'localhost'}`)
   if (parsedUrl.pathname === '/api/v1/events' && req.method === 'GET') {
-    // Authenticate via token query param
-    const token = parsedUrl.searchParams.get('token')
-    if (!token) {
-      res.writeHead(401, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ code: 'UNAUTHORIZED', message: 'Missing token', timestamp: new Date().toISOString() }))
-      return
+    // Authenticate: ticket-based (preferred) or token-based (legacy fallback)
+    let userId: string | undefined
+
+    const ticket = parsedUrl.searchParams.get('ticket')
+    if (ticket) {
+      const result = sseTicketStore.redeem(ticket)
+      if (!result.valid || !result.userId) {
+        res.writeHead(401, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ code: 'INVALID_TICKET', message: 'SSE ticket is invalid or expired', timestamp: new Date().toISOString() }))
+        return
+      }
+      userId = result.userId
+    } else {
+      // Fallback: token query param or Authorization header
+      const token = parsedUrl.searchParams.get('token') ?? undefined
+      const authHeader = req.headers['authorization']
+      const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined
+      const sessionToken = token ?? bearerToken
+
+      if (!sessionToken) {
+        res.writeHead(401, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ code: 'UNAUTHORIZED', message: 'Missing authentication', timestamp: new Date().toISOString() }))
+        return
+      }
+
+      const session = await authService.validateSession(sessionToken)
+      if (!session) {
+        res.writeHead(401, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ code: 'UNAUTHORIZED', message: 'Invalid or expired token', timestamp: new Date().toISOString() }))
+        return
+      }
+      userId = session.userId
     }
 
-    const session = await authService.validateSession(token)
-    if (!session) {
-      res.writeHead(401, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ code: 'UNAUTHORIZED', message: 'Invalid or expired token', timestamp: new Date().toISOString() }))
-      return
-    }
-
-    const userId = session.userId
     const lastEventId = req.headers['last-event-id'] as string | undefined
 
     // Register connection
@@ -774,7 +797,7 @@ const server = createHttpServer(async (req, res) => {
 
     logger.info('SSE connection established', { connectionId, userId })
 
-    // Set SSE headers and keep alive
+    // Set SSE headers
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',

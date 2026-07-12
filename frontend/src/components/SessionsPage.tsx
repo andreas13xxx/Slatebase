@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { IApiClient, SessionInfo } from '../api'
 import { useTranslation } from '../i18n'
 import { Monitor, LogOut, RefreshCw } from 'lucide-react'
+import { extractErrorMessage } from '../utils/error'
 
 export interface SessionsPageProps {
   apiClient: IApiClient
@@ -39,9 +40,7 @@ export function SessionsPage({ apiClient }: SessionsPageProps) {
     try {
       setSessions(await apiClient.getSessions())
     } catch (err: unknown) {
-      setError(err !== null && typeof err === 'object' && 'message' in err
-        ? (err as { message: string }).message
-        : t('sessions.loadError'))
+      setError(extractErrorMessage(err, t('sessions.loadError')))
     } finally {
       setIsLoading(false)
     }
@@ -56,8 +55,7 @@ export function SessionsPage({ apiClient }: SessionsPageProps) {
       await apiClient.invalidateSession(sessionId)
       await loadSessions()
     } catch (err: unknown) {
-      setError(err !== null && typeof err === 'object' && 'message' in err
-        ? (err as { message: string }).message : t('sessions.invalidateError'))
+      setError(extractErrorMessage(err, t('sessions.invalidateError')))
     } finally { setPendingAction(null) }
   }
 
@@ -68,8 +66,7 @@ export function SessionsPage({ apiClient }: SessionsPageProps) {
       await apiClient.invalidateAllOtherSessions()
       await loadSessions()
     } catch (err: unknown) {
-      setError(err !== null && typeof err === 'object' && 'message' in err
-        ? (err as { message: string }).message : t('sessions.invalidateAllError'))
+      setError(extractErrorMessage(err, t('sessions.invalidateAllError')))
     } finally { setPendingAction(null) }
   }
 

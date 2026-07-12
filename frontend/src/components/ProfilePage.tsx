@@ -3,6 +3,7 @@ import { useAuthContext } from '../state/authContext'
 import { useTranslation } from '../i18n'
 import type { IApiClient, UpdateProfileData } from '../api'
 import type { PublicUserInfo } from '../state/authState'
+import { extractErrorMessage } from '../utils/error'
 
 /** Props for the ProfilePage component. */
 export interface ProfilePageProps {
@@ -108,11 +109,7 @@ export function ProfilePage({ apiClient, mode = 'full' }: ProfilePageProps) {
         setColorScheme(profile.colorScheme ?? 'system')
       } catch (err: unknown) {
         if (cancelled) return
-        if (err !== null && typeof err === 'object' && 'message' in err) {
-          setProfileApiError((err as { message: string }).message)
-        } else {
-          setProfileApiError(t('profile.profileLoadError'))
-        }
+        setProfileApiError(extractErrorMessage(err, t('profile.profileLoadError')))
       } finally {
         if (!cancelled) {
           setProfileLoading(false)
@@ -208,11 +205,7 @@ export function ProfilePage({ apiClient, mode = 'full' }: ProfilePageProps) {
       authDispatch({ type: 'PROFILE_UPDATED', payload: { user: updatedUser } })
       setProfileSuccess(t('profile.profileSaved'))
     } catch (err: unknown) {
-      if (err !== null && typeof err === 'object' && 'message' in err) {
-        setProfileApiError((err as { message: string }).message)
-      } else {
-        setProfileApiError(t('profile.profileSaveError'))
-      }
+      setProfileApiError(extractErrorMessage(err, t('profile.profileSaveError')))
     } finally {
       setProfilePending(false)
     }
@@ -260,11 +253,7 @@ export function ProfilePage({ apiClient, mode = 'full' }: ProfilePageProps) {
       setCurrentPassword('')
       setNewPassword('')
     } catch (err: unknown) {
-      if (err !== null && typeof err === 'object' && 'message' in err) {
-        setPasswordApiError((err as { message: string }).message)
-      } else {
-        setPasswordApiError(t('profile.passwordChangeError'))
-      }
+      setPasswordApiError(extractErrorMessage(err, t('profile.passwordChangeError')))
     } finally {
       setPasswordPending(false)
     }
@@ -294,11 +283,7 @@ export function ProfilePage({ apiClient, mode = 'full' }: ProfilePageProps) {
       await apiClient.deleteSelf(deletePassword)
       authDispatch({ type: 'LOGOUT' })
     } catch (err: unknown) {
-      if (err !== null && typeof err === 'object' && 'message' in err) {
-        setDeleteApiError((err as { message: string }).message)
-      } else {
-        setDeleteApiError(t('profile.deleteAccountFailed'))
-      }
+      setDeleteApiError(extractErrorMessage(err, t('profile.deleteAccountFailed')))
       setDeleteConfirm(false)
     } finally {
       setDeletePending(false)

@@ -9,6 +9,7 @@ import type { Dispatch } from 'react'
 import type { ChatAction, ConversationListItem } from './chatState'
 import type { IApiClient } from '../api'
 import type { Conversation, Message } from '../types'
+import { extractErrorMessage } from '../utils/error'
 
 /**
  * Fetches the current user's conversations (paginated) and dispatches CONVERSATIONS_LOADED.
@@ -130,21 +131,4 @@ export async function pollUnreadTotal(
   }
 }
 
-/**
- * Extracts a human-readable error message from an unknown error.
- * Handles the { code, message } shape thrown by ApiClient as well as standard Error instances.
- */
-function extractErrorMessage(err: unknown): string {
-  if (
-    err !== null &&
-    typeof err === 'object' &&
-    'message' in err &&
-    typeof (err as { message: unknown }).message === 'string'
-  ) {
-    return (err as { message: string }).message
-  }
-  if (err instanceof Error) {
-    return err.message
-  }
-  return 'An unexpected error occurred'
-}
+

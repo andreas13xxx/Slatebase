@@ -3,6 +3,7 @@ import { useTranslation } from '../i18n'
 import type { IApiClient, McpTokenInfo, McpTokenCreateResult } from '../api'
 import { Key, Plus, Trash2, Copy, AlertTriangle } from 'lucide-react'
 import { ConfirmModal } from './ConfirmModal'
+import { extractErrorMessage } from '../utils/error'
 
 /** Props for the McpTokensPage component. */
 export interface McpTokensPageProps {
@@ -44,8 +45,7 @@ export function McpTokensPage({ apiClient }: McpTokensPageProps) {
       const result = await apiClient.listMcpTokens()
       setTokens(result)
     } catch (err: unknown) {
-      const message = err && typeof err === 'object' && 'message' in err ? (err as { message: string }).message : t('mcpTokens.loadError')
-      setError(message)
+      setError(extractErrorMessage(err, t('mcpTokens.loadError')))
     } finally {
       setLoading(false)
     }
@@ -84,8 +84,7 @@ export function McpTokensPage({ apiClient }: McpTokensPageProps) {
       setExpiryDays(90)
       await loadTokens()
     } catch (err: unknown) {
-      const message = err && typeof err === 'object' && 'message' in err ? (err as { message: string }).message : t('mcpTokens.createError')
-      setCreateError(message)
+      setCreateError(extractErrorMessage(err, t('mcpTokens.createError')))
     } finally {
       setCreating(false)
     }
@@ -118,8 +117,7 @@ export function McpTokensPage({ apiClient }: McpTokensPageProps) {
       setRevokeTarget(null)
       await loadTokens()
     } catch (err: unknown) {
-      const message = err && typeof err === 'object' && 'message' in err ? (err as { message: string }).message : t('mcpTokens.revokeError')
-      setError(message)
+      setError(extractErrorMessage(err, t('mcpTokens.revokeError')))
       setRevokeTarget(null)
     } finally {
       setRevoking(false)

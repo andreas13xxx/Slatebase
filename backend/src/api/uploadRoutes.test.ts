@@ -54,6 +54,7 @@ function createMockEventBus(): IEventBus & { publishCalls: PublishOptions[] } {
     publish: (options: PublishOptions) => { publishCalls.push(options) },
     nextEventId: () => '1',
     getEventsSince: () => [],
+    subscribe: () => {},
   }
 }
 

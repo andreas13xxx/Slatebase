@@ -1,6 +1,9 @@
 /**
  * In-memory rate limiter for login attempts.
- * Tracks failed login attempts per username and blocks after threshold.
+ * Tracks failed login attempts per composite key (username:ip) and blocks after threshold.
+ * Using a composite key prevents account lockout attacks where an attacker blocks
+ * another user's account by sending failed logins — the legitimate user from a
+ * different IP can still log in.
  * Resets on server restart (no filesystem persistence needed).
  */
 
@@ -18,7 +21,7 @@ export const BLOCK_DURATION_MS = 15 * 60 * 1000
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /**
- * Tracks the rate-limit state for a single username.
+ * Tracks the rate-limit state for a single key (username:ip combination).
  */
 export interface RateLimitEntry {
   /** Number of failed attempts recorded in the current window. */
@@ -42,23 +45,24 @@ export interface RateLimitResult {
 // ─── RateLimiter Class ───────────────────────────────────────────────────────
 
 /**
- * In-memory rate limiter that tracks failed login attempts per username.
- * After MAX_ATTEMPTS failures within WINDOW_MS, the username is blocked for BLOCK_DURATION_MS.
+ * In-memory rate limiter that tracks failed login attempts per key.
+ * The key is typically a composite of username and IP address (e.g. "user:192.168.1.1").
+ * After MAX_ATTEMPTS failures within WINDOW_MS, the key is blocked for BLOCK_DURATION_MS.
  * Expired entries are automatically cleaned up on access.
  */
 export class RateLimiter {
   private readonly store: Map<string, RateLimitEntry> = new Map()
 
   /**
-   * Check whether a login attempt is allowed for the given username.
+   * Check whether a login attempt is allowed for the given key.
    * Performs auto-cleanup of expired entries.
    *
-   * @param username - The username to check.
+   * @param key - The rate-limit key (typically "username:ip").
    * @returns An object indicating whether the attempt is allowed, and optionally how many seconds until retry.
    */
-  checkRateLimit(username: string): RateLimitResult {
+  checkRateLimit(key: string): RateLimitResult {
     const now = Date.now()
-    const entry = this.store.get(username)
+    const entry = this.store.get(key)
 
     if (entry === undefined) {
       return { allowed: true }
@@ -66,7 +70,7 @@ export class RateLimiter {
 
     // Window expired and not currently blocked → reset
     if (now - entry.firstAttemptAt > WINDOW_MS && entry.blockedUntil === null) {
-      this.store.delete(username)
+      this.store.delete(key)
       return { allowed: true }
     }
 
@@ -80,7 +84,7 @@ export class RateLimiter {
 
     // Block has expired → reset
     if (entry.blockedUntil !== null && now >= entry.blockedUntil) {
-      this.store.delete(username)
+      this.store.delete(key)
       return { allowed: true }
     }
 
@@ -88,17 +92,17 @@ export class RateLimiter {
   }
 
   /**
-   * Record a failed login attempt for the given username.
-   * If the attempt count reaches MAX_ATTEMPTS, the username is blocked for BLOCK_DURATION_MS.
+   * Record a failed login attempt for the given key.
+   * If the attempt count reaches MAX_ATTEMPTS, the key is blocked for BLOCK_DURATION_MS.
    *
-   * @param username - The username that failed to authenticate.
+   * @param key - The rate-limit key (typically "username:ip").
    */
-  recordFailedAttempt(username: string): void {
+  recordFailedAttempt(key: string): void {
     const now = Date.now()
-    const entry = this.store.get(username)
+    const entry = this.store.get(key)
 
     if (entry === undefined) {
-      this.store.set(username, {
+      this.store.set(key, {
         attempts: 1,
         firstAttemptAt: now,
         blockedUntil: null,
@@ -114,17 +118,17 @@ export class RateLimiter {
   }
 
   /**
-   * Reset the rate-limit state for a specific username.
+   * Reset the rate-limit state for a specific key.
    * Useful after a successful login to clear any accumulated failed attempts.
    *
-   * @param username - The username to reset.
+   * @param key - The rate-limit key to reset.
    */
-  reset(username: string): void {
-    this.store.delete(username)
+  reset(key: string): void {
+    this.store.delete(key)
   }
 
   /**
-   * Get the current number of tracked usernames (for diagnostics).
+   * Get the current number of tracked keys (for diagnostics).
    */
   get size(): number {
     return this.store.size
