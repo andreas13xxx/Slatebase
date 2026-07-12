@@ -5,6 +5,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import type { IPluginStore, PluginFiles, PluginManifest, PluginRegistryData } from './types.js'
 import { PluginFileTooLargeError, PluginSettingsTooLargeError } from './errors.js'
+import { isValidPluginId } from './validation.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -206,9 +207,23 @@ export class PluginStore implements IPluginStore {
 
   /**
    * Returns the directory path for a specific plugin.
+   * Validates the pluginId to prevent path traversal attacks.
+   * @throws Error if pluginId contains unsafe characters.
    */
   private getPluginDir(vaultId: string, pluginId: string): string {
-    return path.join(this.pluginsDir, vaultId, pluginId)
+    if (!isValidPluginId(pluginId)) {
+      throw new Error(`Invalid plugin ID: "${pluginId}" — must match /^[a-z0-9][a-z0-9-]{0,63}$/`)
+    }
+
+    const resolved = path.join(this.pluginsDir, vaultId, pluginId)
+    const expectedParent = path.join(this.pluginsDir, vaultId) + path.sep
+
+    // Defense-in-depth: verify resolved path stays within the vault plugins directory
+    if (!resolved.startsWith(expectedParent)) {
+      throw new Error(`Path traversal detected for plugin ID: "${pluginId}"`)
+    }
+
+    return resolved
   }
 
   /**
