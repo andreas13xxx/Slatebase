@@ -5,6 +5,36 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
 
+// ─── Async Mutex ─────────────────────────────────────────────────────────────
+
+/**
+ * Promise-based mutex for serializing async read-modify-write operations.
+ * Ensures only one async flow executes the critical section at a time.
+ * Safe in single-threaded Node.js — prevents interleaving of async operations.
+ */
+class AsyncMutex {
+  private queue: Promise<void> = Promise.resolve()
+
+  /**
+   * Executes the given function while holding the mutex.
+   * Subsequent calls are queued and execute in order.
+   */
+  async runExclusive<T>(fn: () => Promise<T>): Promise<T> {
+    let release: () => void
+    const next = new Promise<void>((resolve) => { release = resolve })
+
+    const prev = this.queue
+    this.queue = next
+
+    await prev
+    try {
+      return await fn()
+    } finally {
+      release!()
+    }
+  }
+}
+
 // --- Data Models ---
 
 export interface VaultRegistryEntry {
@@ -61,6 +91,7 @@ export class VaultRegistry implements IVaultRegistry {
   private readonly registryPath: string
   private readonly vaultsDir: string
   private initialized = false
+  private readonly mutex = new AsyncMutex()
 
   constructor(
     private readonly dataDir: string,
@@ -145,28 +176,34 @@ export class VaultRegistry implements IVaultRegistry {
 
   /**
    * Adds a new entry to the registry and persists to disk.
+   * Serialized via mutex to prevent concurrent read-modify-write races.
    */
   async addEntry(entry: VaultRegistryEntry): Promise<void> {
-    await this.ensureDirectories()
+    await this.mutex.runExclusive(async () => {
+      await this.ensureDirectories()
 
-    // Load current state from disk to avoid stale data
-    await this.load()
+      // Load current state from disk to avoid stale data
+      await this.load()
 
-    this.entries.push(entry)
-    await this.save(this.entries)
+      this.entries.push(entry)
+      await this.save(this.entries)
+    })
   }
 
   /**
    * Removes an entry by vault ID and persists to disk.
+   * Serialized via mutex to prevent concurrent read-modify-write races.
    */
   async removeEntry(vaultId: string): Promise<void> {
-    await this.ensureDirectories()
+    await this.mutex.runExclusive(async () => {
+      await this.ensureDirectories()
 
-    // Load current state from disk to avoid stale data
-    await this.load()
+      // Load current state from disk to avoid stale data
+      await this.load()
 
-    this.entries = this.entries.filter((e) => e.id !== vaultId)
-    await this.save(this.entries)
+      this.entries = this.entries.filter((e) => e.id !== vaultId)
+      await this.save(this.entries)
+    })
   }
 
   /**
@@ -198,6 +235,7 @@ export class VaultShareRegistry implements IVaultShareRegistry {
   private shares: VaultShareEntry[] = []
   private readonly sharesPath: string
   private initialized = false
+  private readonly mutex = new AsyncMutex()
 
   constructor(private readonly dataDir: string) {
     this.sharesPath = path.join(dataDir, 'shares.json')
@@ -280,44 +318,56 @@ export class VaultShareRegistry implements IVaultShareRegistry {
 
   /**
    * Adds a new share entry and persists to disk.
+   * Serialized via mutex to prevent concurrent read-modify-write races.
    */
   async addShare(share: VaultShareEntry): Promise<void> {
-    await this.load()
-    this.shares.push(share)
-    await this.save(this.shares)
+    await this.mutex.runExclusive(async () => {
+      await this.load()
+      this.shares.push(share)
+      await this.save(this.shares)
+    })
   }
 
   /**
    * Removes a specific share for a user on a vault and persists to disk.
+   * Serialized via mutex to prevent concurrent read-modify-write races.
    */
   async removeShare(vaultId: string, userId: string): Promise<void> {
-    await this.load()
-    this.shares = this.shares.filter(
-      (s) => !(s.vaultId === vaultId && s.userId === userId),
-    )
-    await this.save(this.shares)
+    await this.mutex.runExclusive(async () => {
+      await this.load()
+      this.shares = this.shares.filter(
+        (s) => !(s.vaultId === vaultId && s.userId === userId),
+      )
+      await this.save(this.shares)
+    })
   }
 
   /**
    * Removes all shares for a given vault and persists to disk.
+   * Serialized via mutex to prevent concurrent read-modify-write races.
    */
   async removeAllSharesForVault(vaultId: string): Promise<void> {
-    await this.load()
-    this.shares = this.shares.filter((s) => s.vaultId !== vaultId)
-    await this.save(this.shares)
+    await this.mutex.runExclusive(async () => {
+      await this.load()
+      this.shares = this.shares.filter((s) => s.vaultId !== vaultId)
+      await this.save(this.shares)
+    })
   }
 
   /**
    * Updates the permission level of an existing share and persists to disk.
+   * Serialized via mutex to prevent concurrent read-modify-write races.
    */
   async updatePermission(vaultId: string, userId: string, permission: 'read' | 'write'): Promise<void> {
-    await this.load()
-    const share = this.shares.find(
-      (s) => s.vaultId === vaultId && s.userId === userId,
-    )
-    if (share) {
-      share.permission = permission
-      await this.save(this.shares)
-    }
+    await this.mutex.runExclusive(async () => {
+      await this.load()
+      const share = this.shares.find(
+        (s) => s.vaultId === vaultId && s.userId === userId,
+      )
+      if (share) {
+        share.permission = permission
+        await this.save(this.shares)
+      }
+    })
   }
 }
