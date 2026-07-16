@@ -41,8 +41,16 @@ export function DiffView({
 }: DiffViewProps) {
   const { t } = useTranslation()
 
+  // Always compute diff (hooks must not be conditional)
+  const isBinary = !isTextFile(filePath) || localContent === null || remoteContent === null
+  const groupedHunks = useMemo(() => {
+    if (isBinary) return []
+    const hunks = computeDiff(localContent!, remoteContent!)
+    return groupHunks(hunks, CONTEXT_LINES)
+  }, [localContent, remoteContent, isBinary])
+
   // Binary file fallback: show metadata only
-  if (!isTextFile(filePath) || localContent === null || remoteContent === null) {
+  if (isBinary) {
     return (
       <div className="diff-view diff-view--binary">
         <p className="diff-view__binary-notice">
@@ -71,12 +79,6 @@ export function DiffView({
       </div>
     )
   }
-
-  // Compute diff and group hunks
-  const groupedHunks = useMemo(() => {
-    const hunks = computeDiff(localContent, remoteContent)
-    return groupHunks(hunks, CONTEXT_LINES)
-  }, [localContent, remoteContent])
 
   return (
     <div className="diff-view">

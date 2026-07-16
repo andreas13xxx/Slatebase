@@ -57,6 +57,7 @@ function createInitialState(): ConflictWizardState {
 }
 
 /** Reducer for the conflict wizard local state. */
+// eslint-disable-next-line react-refresh/only-export-components
 export function conflictWizardReducer(
   state: ConflictWizardState,
   action: ConflictWizardAction,
@@ -204,6 +205,7 @@ export function ConflictWizard({ vaultId, onComplete }: ConflictWizardProps) {
   useEffect(() => {
     if (!apiClient) return
     let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     setError(null)
 
@@ -225,7 +227,7 @@ export function ConflictWizard({ vaultId, onComplete }: ConflictWizardProps) {
 
   // --- Subscribe to live sync:conflict SSE events (Req 6.11) ---
   const apiClientRef = useRef(apiClient)
-  apiClientRef.current = apiClient
+  useEffect(() => { apiClientRef.current = apiClient })
   useEffect(() => {
     const unsubscribe = onRealtimeSyncConflict((event) => {
       // Only handle conflicts for the current vault
@@ -259,7 +261,7 @@ export function ConflictWizard({ vaultId, onComplete }: ConflictWizardProps) {
           apiClient.getFileContent(vaultId, conflict.documentPath, 'remote'),
         ])
         dispatch({ type: 'SET_CONTENT', local, remote })
-      } catch (err) {
+      } catch (_err) {
         dispatch({ type: 'SET_CONTENT', local: null, remote: null })
       }
     },

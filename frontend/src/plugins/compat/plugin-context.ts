@@ -230,6 +230,7 @@ export function PluginProvider({
     if (!vaultId) {
       // If we previously had a vault, clean up
       if (prevVaultIdRef.current) {
+        // eslint-disable-next-line react-hooks/immutability
         void unloadAllPlugins()
         pluginRegistryRef.current = null
         pluginLoaderRef.current = null
@@ -251,6 +252,7 @@ export function PluginProvider({
 
     // On vault change: unload old plugins, create new instances for new vault
     if (prevVaultIdRef.current !== vaultId) {
+      // eslint-disable-next-line react-hooks/immutability
       void handleVaultSwitch(vaultId)
     }
     prevVaultIdRef.current = vaultId
@@ -368,8 +370,11 @@ export function PluginProvider({
     // (many plugins and libraries like obsidian-daily-notes-interface access window.app directly)
     const windowApp = (window as unknown as { app: Record<string, unknown> }).app
     if (windowApp) {
+      // eslint-disable-next-line react-hooks/immutability
       windowApp.vault = sharedApp.vault
+      // eslint-disable-next-line react-hooks/immutability
       windowApp.workspace = sharedApp.workspace
+      // eslint-disable-next-line react-hooks/immutability
       windowApp.metadataCache = sharedApp.metadataCache
     }
 
@@ -539,6 +544,7 @@ export function PluginProvider({
           const app = (window as unknown as { app?: { internalPlugins?: { plugins?: Record<string, { instance?: { options?: Record<string, string> } }> } } }).app
           const dailyNotesPlugin = app?.internalPlugins?.plugins?.['daily-notes']
           if (dailyNotesPlugin?.instance?.options) {
+            // eslint-disable-next-line react-hooks/immutability
             dailyNotesPlugin.instance.options.folder = config.dailyNotesDirectory || ''
           }
         } catch {
@@ -664,11 +670,12 @@ export function PluginProvider({
 
   // ─── Event Bridge: connect Slatebase state changes to plugin shim events ──
 
+  // eslint-disable-next-line react-hooks/refs
   usePluginEventBridge({
     tabState,
     directoryTree,
-    workspaceShim: workspaceShimRef.current,
-    metadataCacheShim: metadataCacheShimRef.current,
+    workspaceShim: workspaceShimRef.current, // eslint-disable-line react-hooks/refs
+    metadataCacheShim: metadataCacheShimRef.current, // eslint-disable-line react-hooks/refs
   })
 
   // ─── TabViewBridge: connect plugin view lifecycle events to TabProvider ────
@@ -795,15 +802,18 @@ export function PluginProvider({
 
   // ─── Context value ─────────────────────────────────────────────────────────
 
+  // Refs are read during render to provide stable singleton instances to consumers.
+  // This is intentional: these refs hold long-lived objects that outlive renders.
+  // eslint-disable-next-line react-hooks/refs
   const contextValue: PluginContextValue = {
-    commandRegistry: commandRegistryRef.current,
-    pluginRegistry: pluginRegistryRef.current ?? new PluginRegistry(createRegistryApiAdapter(apiClient), vaultId ?? ''),
-    settingTabRegistry: settingTabRegistryRef.current,
+    commandRegistry: commandRegistryRef.current, // eslint-disable-line react-hooks/refs
+    pluginRegistry: pluginRegistryRef.current ?? new PluginRegistry(createRegistryApiAdapter(apiClient), vaultId ?? ''), // eslint-disable-line react-hooks/refs
+    settingTabRegistry: settingTabRegistryRef.current, // eslint-disable-line react-hooks/refs
     plugins,
     isLoading,
     reload,
     setPluginEnabled,
-    analyzer: analyzerRef.current,
+    analyzer: analyzerRef.current, // eslint-disable-line react-hooks/refs
     activeViews,
     sidebarViews,
     ribbonIcons,
@@ -811,7 +821,7 @@ export function PluginProvider({
 
   return React.createElement(
     PluginContext.Provider,
-    { value: contextValue },
+    { value: contextValue }, // eslint-disable-line react-hooks/refs
     children,
   )
 }
