@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.0](https://github.com/andreas13xxx/Slatebase/compare/v0.10.2...v0.11.0) (2026-07-16)
+
+
+### Features
+
+* conflict wizard, auto-resolution, status bar, appearance settings, plugin compat improvements - Sync conflict resolution: 3-step wizard (overview, category detail, resolution), Myers diff algorithm, merge preview, batch operations, SSE live updates - Auto-resolution engine: newer_wins, remote_wins, local_wins, skip strategies with per-vault persistent configuration - Conflict categorizer: content_conflict, local_deleted, remote_deleted, rename_conflict - Conflict resolver: atomic resolve with rollback, batch max 100, error isolation - Status bar: clock, extensible plugin items, toggleable in Settings - Appearance section in Settings (status bar toggle) - Session verification: checkSessionAlive() on app mount, graceful expiry - Plugin compat: workspace.trigger/vault.trigger now fully supported, VaultShim.create() is create-or-get (Calendar plugin compat), ribbon icon registry, tab-view-bridge, plugin event bridge improvements - Welcome vault templates: DE + EN content updates - Steering docs updated (structure, product, lessons-learned) - Test fixes: settingsRegistry (15 sections), compatibility-analyzer, vault-shim, workspace-shim, App.test.tsx (checkSessionAlive mock) ([b1c5283](https://github.com/andreas13xxx/Slatebase/commit/b1c5283369b0be171180eb18532445c975ef3f03))
+
+
+### Bugfixes
+
+* resolve all ESLint errors in plugin-context, ConflictWizard, DiffView - plugin-context.ts: suppress react-hooks/refs (intentional ref reads for stable singleton context values), react-hooks/immutability (window.app mutations required for Obsidian plugin compat) - ConflictWizard.tsx: move apiClientRef update to useEffect, rename unused err to _err, suppress set-state-in-effect (idiomatic loading pattern), suppress react-refresh/only-export-components (co-located reducer) - DiffView.tsx: move useMemo before early return (hooks must be unconditional) ([8703174](https://github.com/andreas13xxx/Slatebase/commit/870317443d85c1dfffab9cd980aa517e94a31095))
+
 ## [0.10.2](https://github.com/andreas13xxx/Slatebase/compare/v0.10.1...v0.10.2) (2026-07-12)
 
 
