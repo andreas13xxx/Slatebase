@@ -76,9 +76,9 @@ export function TreeNode({
     const isValidTarget = dragState.draggedPath !== null && dragState.draggedVaultId === vaultId && dragState.validTargets.has(node.path)
     const isExternalDropTarget = externalDropState.targetPath === node.path && externalDropState.targetVaultId === vaultId
 
-    // Check if new file/folder inline input should appear in this directory
+    // Check if new file/folder/canvas inline input should appear in this directory
     const showNewFileInput = inlineInputState.visible
-      && (inlineInputState.mode === 'newFile' || inlineInputState.mode === 'newFolder')
+      && (inlineInputState.mode === 'newFile' || inlineInputState.mode === 'newFolder' || inlineInputState.mode === 'newCanvas')
       && inlineInputState.parentPath === node.path
       && inlineInputState.vaultId === vaultId
 
@@ -161,6 +161,10 @@ export function TreeNode({
                   onConfirm={onInlineConfirm}
                   onCancel={onInlineCancel}
                   validate={(value) => {
+                    if (inlineInputState.mode === 'newCanvas') {
+                      const name = value.trim().endsWith('.canvas') ? value.trim() : `${value.trim()}.canvas`
+                      return validateFileName(name)
+                    }
                     const normalized = normalizeFileName(value)
                     return validateFileName(normalized)
                   }}

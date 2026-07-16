@@ -48,7 +48,7 @@ function createMockConfigService(overrides?: Partial<ServerConfig>): IConfigServ
     trash: { retentionDays: 30 },
     versions: { maxPerFile: 20 },
     cleanup: { intervalHours: 24 },
-    templates: { directory: '_templates' },
+    templates: { directory: 'Templates' },
     upload: { maxFileSizeBytes: 104857600, maxFilesPerDrop: 50, maxImagePasteSize: 10485760 },
     welcomeVault: { name: { de: 'Willkommen', en: 'Welcome' } },
     ...overrides,

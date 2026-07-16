@@ -101,8 +101,8 @@ function createMockApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
     saveFavorites: vi.fn().mockResolvedValue({ entries: [] }),
     getKeybindings: vi.fn().mockResolvedValue({ entries: [] }),
     saveKeybindings: vi.fn().mockResolvedValue({ entries: [] }),
-    getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: '_templates', dailyNotesDirectory: '' }),
-    saveVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: '_templates', dailyNotesDirectory: '' }),
+    getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'Templates', dailyNotesDirectory: '' }),
+    saveVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'Templates', dailyNotesDirectory: '' }),
     ...overrides,
   } as IApiClient
 }
@@ -226,7 +226,7 @@ describe('dailyNoteService', () => {
 
     it('creates file with template content when daily note does not exist', async () => {
       const templateContent: FileContent = {
-        path: '_templates/daily.md',
+        path: 'Templates/daily.md',
         name: 'daily.md',
         content: '# {{date}}\n\n## Tasks\n',
         size: 20,

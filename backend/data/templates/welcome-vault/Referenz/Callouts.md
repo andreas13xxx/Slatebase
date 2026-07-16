@@ -27,6 +27,15 @@ Mit `+` oder `-` nach dem Typ kannst du Callouts einklappbar machen:
 ```markdown
 > [!tip]+ Aufklappbar (Standard offen)
 > Dieser Inhalt kann eingeklappt werden.
+
+> [!note]- Eingeklappt (Standard geschlossen)
+> Dieser Inhalt ist zunächst versteckt.
 ```
+
+> [!tip]+ Aufklappbar (Standard offen)
+> Klicke auf den Titel, um diesen Inhalt einzuklappen.
+
+> [!note]- Eingeklappt (Standard geschlossen)
+> Klicke auf den Titel oben, um diesen versteckten Inhalt anzuzeigen.
 
 #referenz #callouts

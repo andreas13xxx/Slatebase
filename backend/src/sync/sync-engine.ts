@@ -15,9 +15,12 @@ import type {
   AnalysisDetail,
   SyncErrorDetail,
   ConflictEntry,
+  CategorizedConflictEntry,
   PulledFileDetail,
   PushedFileDetail,
 } from './types.js'
+import { categorizeConflict } from './conflict-categorizer.js'
+import type { LocalFileState, RemoteFileState } from './conflict-categorizer.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -35,11 +38,26 @@ const ANALYSIS_TIMEOUT_MS = 120_000
 
 /**
  * Paths and patterns that should be excluded from sync.
- * These are directories that should not be written to the vault during pull operations.
- * Note: .obsidian/ is intentionally NOT excluded — Obsidian config files are synced
- * to maintain plugin settings, themes, and workspace configuration across devices.
+ * These are Slatebase-internal directories that should not be pushed to or pulled from CouchDB.
+ *
+ * Sync behavior for dot-prefixed paths:
+ * - `.obsidian/` — SYNCED (Obsidian config, comes from CouchDB with i:/ps: prefixes)
+ * - `.slatebase/` — PARTIALLY SYNCED (config.json and user content yes; trash/, versions/, link-index.json no)
+ * - `.trash/` — NOT SYNCED (legacy Obsidian trash in vault root)
+ * - `.mobile/` — NOT SYNCED (Obsidian mobile app data)
+ * - Other dot-prefixed — synced if present in CouchDB (tools may create them)
+ *
+ * Note on underscore-prefixed files:
+ * Underscore-prefixed files/directories ARE synced like regular files — Obsidian treats them normally.
+ * However, CouchDB rejects document IDs starting with underscore (reserved for _design, _local, etc.).
+ * Files at the vault root starting with `_` (e.g. `_archive/`) cannot be stored in CouchDB as-is.
+ * obsidian-livesync does NOT support top-level underscore paths either — this is a known limitation.
+ * Subdirectory files with underscore prefix (e.g. `notes/_draft.md`) work fine since the full path
+ * does not start with underscore.
  */
 const EXCLUDED_PATH_PREFIXES = [
+  '.slatebase/trash/',
+  '.slatebase/versions/',
   '.trash/',
   '.mobile/',
 ] as const
@@ -48,7 +66,9 @@ const EXCLUDED_PATH_PREFIXES = [
  * Exact file paths that indicate internal/metadata documents
  * which should not be synced as vault files.
  */
-const EXCLUDED_EXACT_PATHS = [] as const
+const EXCLUDED_EXACT_PATHS = [
+  '.slatebase/link-index.json',
+] as const
 
 /**
  * obsidian-livesync internal document IDs that are NOT file paths.
@@ -311,7 +331,7 @@ export class SyncEngine implements ISyncEngine {
 
     let pulledCount = 0
     const errors: SyncErrorDetail[] = []
-    const conflicts: ConflictEntry[] = []
+    const conflicts: CategorizedConflictEntry[] = []
     const pulledFiles: PulledFileDetail[] = []
     const deletedFilePaths: string[] = []
 
@@ -342,7 +362,40 @@ export class SyncEngine implements ISyncEngine {
           const fileStat = await stat(localPath)
           if (fileStat.mtimeMs > checkpointMtime) {
             // Local file was modified since last sync — conflict!
-            conflicts.push({
+            // Compute content hashes for rename detection
+            let localContentHash: string | undefined
+            let remoteContentHash: string | undefined
+            try {
+              const localContent = await readFile(localPath)
+              localContentHash = computeContentHash(localContent)
+            } catch {
+              // Local file read failed — leave hash undefined
+            }
+
+            // Compute remote content hash from the processed document
+            try {
+              if (e2eEnabled && e2ePassphrase && (doc.content || doc.contentChunks)) {
+                const rawData = doc.content ?? (doc.contentChunks ? doc.contentChunks.join('') : '')
+                const encrypted = Buffer.from(rawData, 'base64')
+                const decrypted = this.cryptoService.decryptDocument(encrypted, e2ePassphrase)
+                remoteContentHash = computeContentHash(decrypted)
+              } else if (doc.isBinary && doc.contentChunks) {
+                const buffers = doc.contentChunks.map(chunk => Buffer.from(chunk, 'base64'))
+                const remoteContent = Buffer.concat(buffers)
+                remoteContentHash = computeContentHash(remoteContent)
+              } else if (doc.isBinary && doc.content) {
+                const remoteContent = Buffer.from(doc.content, 'base64')
+                remoteContentHash = computeContentHash(remoteContent)
+              } else {
+                const remoteContent = Buffer.from(doc.content ?? '', 'utf8')
+                remoteContentHash = computeContentHash(remoteContent)
+              }
+            } catch {
+              // Remote content hash computation failed — leave undefined
+            }
+
+            // Build the base conflict entry
+            const baseConflict: ConflictEntry = {
               documentPath: relativePath,
               local: {
                 modifiedAt: new Date(fileStat.mtimeMs).toISOString(),
@@ -354,7 +407,27 @@ export class SyncEngine implements ISyncEngine {
                 size: estimateDocSize(doc),
               },
               detectedAt: new Date().toISOString(),
+            }
+
+            // Determine local/remote file state for categorization
+            const localState: LocalFileState = {
+              exists: true,
+              ...(localContentHash != null ? { contentHash: localContentHash } : {}),
+            }
+            const remoteState: RemoteFileState = {
+              exists: !doc.deleted,
+              ...(remoteContentHash != null ? { contentHash: remoteContentHash } : {}),
+            }
+
+            // Categorize the conflict
+            const categorized = categorizeConflict({
+              conflict: baseConflict,
+              local: localState,
+              remote: remoteState,
+              sameContentAtDifferentPath: false, // Single-path context — rename detection not possible here
             })
+
+            conflicts.push(categorized)
             continue
           }
         } catch {
@@ -966,15 +1039,18 @@ export class SyncEngine implements ISyncEngine {
     const mtime = fileMtime ?? Date.now()
 
     // Build the CouchDB document body (livesync-compatible format)
+    // When storing content directly in `data` (no chunking), `children` must be omitted.
+    // livesync uses `children` presence to determine if content is in leaf chunks.
+    // If `children: []` is present, livesync ignores `data` and reconstructs from (empty) chunks → 0 bytes.
+    // size must match the length of the `data` string for livesync integrity checks.
     const body: Record<string, unknown> = {
       _id: docId,
       path: docId,
       type,
       data,
-      children: [],
       ctime: mtime,
       mtime,
-      size: content.length,
+      size: data.length,
       eden: {},
     }
 
@@ -1042,11 +1118,11 @@ export class SyncEngine implements ISyncEngine {
         _rev: rev,
         path: existingDoc['path'] ?? docId,
         type: existingDoc['type'] ?? 'plain',
+        data: '',
         deleted: true,
         mtime: Date.now(),
         size: 0,
         ctime: existingDoc['ctime'] ?? Date.now(),
-        children: [],
         eden: {},
       }
 
@@ -1225,6 +1301,10 @@ function categorizeDocuments(results: CouchDBChange[]): {
         }
       }
     } else {
+      // Skip obsidian-livesync internal metadata documents (not file paths).
+      // Must check _id directly — doc.path may be set, bypassing derivePathFromId().
+      if (LIVESYNC_INTERNAL_DOC_IDS.has(id)) continue
+
       // Regular document — may have content in `data` or in `children` (leaf references)
       const rawPath = doc.path ?? derivePathFromId(id)
       const path = rawPath ? stripLiveSyncPrefix(rawPath) : null
@@ -1459,7 +1539,14 @@ function isLikelyLeafId(id: string): boolean {
 
 /**
  * Checks whether a file path should be excluded from sync.
- * Excludes Obsidian configuration directories, trash, and other internal paths.
+ *
+ * Exclusion rules:
+ * 1. Exact path matches (e.g. .slatebase/link-index.json)
+ * 2. Path prefix matches (e.g. .slatebase/trash/, .slatebase/versions/, .trash/, .mobile/)
+ * 3. Top-level underscore paths — CouchDB rejects document IDs starting with `_`
+ *    (reserved for _design, _local, etc.). This is a CouchDB/livesync limitation, not a choice.
+ *
+ * Underscore-prefixed files in subdirectories (e.g. `notes/_draft.md`) are NOT excluded.
  */
 function isExcludedPath(path: string): boolean {
   // Check exact matches
@@ -1470,11 +1557,9 @@ function isExcludedPath(path: string): boolean {
   for (const prefix of EXCLUDED_PATH_PREFIXES) {
     if (path.startsWith(prefix)) return true
   }
-  // Exclude internal Slatebase files (underscore-prefixed filenames).
-  // These are derived indexes (e.g. _link-index.json) that should not be synced.
-  // CouchDB also rejects document IDs starting with underscore (reserved for _design, _local, etc.)
-  const fileName = path.includes('/') ? path.slice(path.lastIndexOf('/') + 1) : path
-  if (fileName.startsWith('_')) return true
+  // CouchDB limitation: document IDs starting with underscore are reserved.
+  // Top-level files/directories with underscore prefix cannot be synced.
+  if (path.startsWith('_')) return true
   return false
 }
 
@@ -1584,7 +1669,7 @@ async function scanVaultFilesWithSize(vaultPath: string): Promise<Map<string, { 
 
 /**
  * Recursively scans a directory, populating the files map with relative paths and mtimes.
- * Skips excluded directories (.trash, .mobile).
+ * Skips excluded paths (see isExcludedPath).
  */
 async function scanDirectory(basePath: string, currentPath: string, files: Map<string, number>): Promise<void> {
   const entries = await readdir(currentPath, { withFileTypes: true })
@@ -1606,7 +1691,7 @@ async function scanDirectory(basePath: string, currentPath: string, files: Map<s
 
 /**
  * Recursively scans a directory, populating the files map with relative paths, mtimes, and sizes.
- * Skips excluded directories (.trash, .mobile).
+ * Skips excluded paths (see isExcludedPath).
  */
 async function scanDirectoryWithSize(basePath: string, currentPath: string, files: Map<string, { mtime: number; size: number }>): Promise<void> {
   const entries = await readdir(currentPath, { withFileTypes: true })
@@ -1797,6 +1882,14 @@ function createEmptyAnalysisResult(durationMs: number): AnalysisResult {
   }
 }
 
+/**
+ * Computes a SHA-256 hex hash of the given content buffer.
+ * Used for rename detection (same content at different paths).
+ */
+function computeContentHash(content: Buffer): string {
+  return crypto.createHash('sha256').update(content).digest('hex')
+}
+
 // Export pure functions for testing
 export {
   buildAuthHeaders,
@@ -1812,4 +1905,5 @@ export {
   categorizeDocument,
   buildAnalysisSummary,
   createEmptyAnalysisResult,
+  computeContentHash,
 }

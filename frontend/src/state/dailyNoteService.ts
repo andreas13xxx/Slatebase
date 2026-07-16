@@ -128,10 +128,10 @@ export function createDailyNoteService(apiClient: IApiClient): IDailyNoteService
 
       // 2. Try loading daily.md template from the vault's template directory
       // First get the template directory from vault config
-      let templateDir = '_templates'
+      let templateDir = 'Templates'
       try {
         const vaultConfig = await apiClient.getVaultConfig(vaultId)
-        templateDir = vaultConfig.templatesDirectory || '_templates'
+        templateDir = vaultConfig.templatesDirectory || 'Templates'
       } catch {
         // Use default if config unavailable
       }

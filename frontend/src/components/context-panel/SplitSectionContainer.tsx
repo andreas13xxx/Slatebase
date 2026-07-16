@@ -43,6 +43,8 @@ export interface SplitSectionContainerProps {
   onResize: (heightFractions: number[]) => void
   /** Render function that returns the view component for a given viewId. */
   renderView: (viewId: ContextPanelViewId) => React.ReactNode
+  /** Metadata for plugin views (icon + label lookup). Keyed by viewType. */
+  pluginViewMeta?: Map<string, { viewType: string; displayText: string; icon: string }>
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -62,6 +64,7 @@ export function SplitSectionContainer({
   onTabMove,
   onResize,
   renderView,
+  pluginViewMeta,
 }: SplitSectionContainerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [resizingIndex, setResizingIndex] = useState<number | null>(null)
@@ -205,6 +208,7 @@ export function SplitSectionContainer({
                   onTabSplit={onTabSplit}
                   onTabReceive={onTabMove}
                   panelWidth={panelWidth}
+                  pluginViewMeta={pluginViewMeta}
                 />
               )}
 

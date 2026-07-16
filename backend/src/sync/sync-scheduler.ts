@@ -1,4 +1,5 @@
 import type { ISyncScheduler } from './types.js'
+import { SchedulerAlreadyPausedError } from './errors.js'
 
 /**
  * Entry stored per vault in the timers map.
@@ -17,6 +18,7 @@ interface SchedulerEntry {
  */
 export class SyncScheduler implements ISyncScheduler {
   private readonly timers = new Map<string, SchedulerEntry>()
+  private readonly pausedVaults: Set<string> = new Set()
 
   /**
    * Starts an interval timer for a vault.
@@ -30,6 +32,9 @@ export class SyncScheduler implements ISyncScheduler {
 
     const intervalMs = intervalMinutes * 60 * 1000
     const timer = setInterval(() => {
+      if (this.pausedVaults.has(vaultId)) {
+        return
+      }
       void callback()
     }, intervalMs)
 
@@ -78,5 +83,32 @@ export class SyncScheduler implements ISyncScheduler {
     for (const [vaultId] of this.timers) {
       this.stop(vaultId)
     }
+  }
+
+  /**
+   * Pauses the scheduler for a vault (wizard open).
+   * Timer stays registered but callbacks are skipped.
+   * @throws SchedulerAlreadyPausedError if already paused for this vault.
+   */
+  pause(vaultId: string): void {
+    if (this.pausedVaults.has(vaultId)) {
+      throw new SchedulerAlreadyPausedError()
+    }
+    this.pausedVaults.add(vaultId)
+  }
+
+  /**
+   * Resumes the scheduler for a vault (wizard closed).
+   * Idempotent: no-op if not currently paused.
+   */
+  resume(vaultId: string): void {
+    this.pausedVaults.delete(vaultId)
+  }
+
+  /**
+   * Checks whether the scheduler is paused for a vault.
+   */
+  isPaused(vaultId: string): boolean {
+    return this.pausedVaults.has(vaultId)
   }
 }

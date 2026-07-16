@@ -14,25 +14,28 @@ export type VaultPathResolver = (vaultId: string) => string
 
 /**
  * TrashService manages soft-delete operations.
- * Files are moved to `.trash/<uniqueId>/` and metadata is tracked in `_index.json`.
+ * Files are moved to `.slatebase/trash/<uniqueId>/` and metadata is tracked in `_index.json`.
  * All index updates are atomic (temp file → rename).
  */
 export class TrashService implements ITrashService {
+  /** Trash directory path relative to vault root. */
+  private static readonly TRASH_DIR = path.join('.slatebase', 'trash')
+
   constructor(
     private readonly resolveVaultPath: VaultPathResolver,
     private readonly logger: ILogger,
   ) {}
 
   /**
-   * Moves a file or folder into the `.trash/` directory and records metadata.
-   * The file is stored under `.trash/<uniqueId>/<originalFilename>`.
+   * Moves a file or folder into the `.slatebase/trash/` directory and records metadata.
+   * The file is stored under `.slatebase/trash/<uniqueId>/<originalFilename>`.
    */
   async moveToTrash(vaultId: string, relativePath: string): Promise<TrashEntry> {
     const vaultDir = this.resolveVaultPath(vaultId)
-    const trashDir = path.join(vaultDir, '.trash')
+    const trashDir = path.join(vaultDir, TrashService.TRASH_DIR)
     const entryId = crypto.randomBytes(6).toString('hex')
 
-    // 1. Ensure .trash/ directory exists
+    // 1. Ensure .slatebase/trash/ directory exists
     await fs.mkdir(trashDir, { recursive: true })
 
     // 2. Create entry subdirectory
@@ -44,7 +47,7 @@ export class TrashService implements ITrashService {
     const stat = await fs.stat(sourcePath)
     const isDirectory = stat.isDirectory()
 
-    // 4. Move file/folder to .trash/<id>/<originalFilename>
+    // 4. Move file/folder to .slatebase/trash/<id>/<originalFilename>
     const fileName = path.basename(relativePath)
     const destPath = path.join(entryDir, fileName)
     await fs.rename(sourcePath, destPath)
@@ -71,7 +74,7 @@ export class TrashService implements ITrashService {
    */
   async listTrash(vaultId: string): Promise<TrashEntry[]> {
     const vaultDir = this.resolveVaultPath(vaultId)
-    const trashDir = path.join(vaultDir, '.trash')
+    const trashDir = path.join(vaultDir, TrashService.TRASH_DIR)
     const index = await this.readIndex(trashDir)
 
     return index.entries.sort(
@@ -86,7 +89,7 @@ export class TrashService implements ITrashService {
    */
   async restore(vaultId: string, entryId: string): Promise<{ restoredPath: string }> {
     const vaultDir = this.resolveVaultPath(vaultId)
-    const trashDir = path.join(vaultDir, '.trash')
+    const trashDir = path.join(vaultDir, TrashService.TRASH_DIR)
     const index = await this.readIndex(trashDir)
 
     const entry = index.entries.find((e) => e.id === entryId)
@@ -132,7 +135,7 @@ export class TrashService implements ITrashService {
    */
   async deletePermanently(vaultId: string, entryId: string): Promise<void> {
     const vaultDir = this.resolveVaultPath(vaultId)
-    const trashDir = path.join(vaultDir, '.trash')
+    const trashDir = path.join(vaultDir, TrashService.TRASH_DIR)
     const index = await this.readIndex(trashDir)
 
     const entry = index.entries.find((e) => e.id === entryId)
@@ -157,7 +160,7 @@ export class TrashService implements ITrashService {
    */
   async purgeExpired(vaultId: string, retentionDays: number): Promise<number> {
     const vaultDir = this.resolveVaultPath(vaultId)
-    const trashDir = path.join(vaultDir, '.trash')
+    const trashDir = path.join(vaultDir, TrashService.TRASH_DIR)
     const index = await this.readIndex(trashDir)
 
     if (index.entries.length === 0) {
@@ -201,7 +204,7 @@ export class TrashService implements ITrashService {
 
   /**
    * Permanently deletes a file immediately (when retentionDays is 0).
-   * Does not move to .trash/, simply removes from disk.
+   * Does not move to .slatebase/trash/, simply removes from disk.
    */
   async deleteImmediately(vaultId: string, relativePath: string): Promise<void> {
     const vaultDir = this.resolveVaultPath(vaultId)

@@ -8,10 +8,10 @@ Das Sync-Konfliktmanagement wird um einen halbautomatischen Workflow erweitert. 
 
 - **Conflict_Wizard**: Ein mehrstufiger UI-Dialog der den Benutzer durch die Konfliktauflösung führt
 - **Diff_View**: Eine visuelle Gegenüberstellung von lokaler und Remote-Version eines Dokuments (Side-by-Side oder Unified)
-- **Auto_Resolution_Strategy**: Eine konfigurierbare Strategie zur automatischen Auflösung bestimmter Konflikttypen (z.B. "Remote gewinnt bei Konflikten älter als 7 Tage")
+- **Auto_Resolution_Strategy**: Eine konfigurierbare Strategie zur automatischen Auflösung bestimmter Konflikttypen (z.B. `newer_wins` = neueres Änderungsdatum gewinnt, `remote_wins` = Remote überschreibt immer)
 - **Batch_Resolution**: Die gleichzeitige Anwendung einer Auflösungsstrategie auf mehrere Konflikte
 - **Merge_Preview**: Eine Vorschau des Ergebnisses nach der gewählten Auflösung, bevor die Aktion ausgeführt wird
-- **Conflict_Category**: Klassifikation eines Konflikts: `content_conflict` (beide geändert), `existence_conflict` (lokal gelöscht / remote vorhanden oder umgekehrt), `rename_conflict` (unterschiedliche Pfade)
+- **Conflict_Category**: Klassifikation eines Konflikts in vier Kategorien: `content_conflict` (beide geändert), `local_deleted` (lokal gelöscht, remote vorhanden/geändert), `remote_deleted` (remote gelöscht, lokal vorhanden/geändert), `rename_conflict` (unterschiedliche Pfade, gleicher Inhalt-Hash)
 
 ## Requirements
 
@@ -35,8 +35,8 @@ Das Sync-Konfliktmanagement wird um einen halbautomatischen Workflow erweitert. 
 2. THE Diff_View SHALL hinzugefügte Zeilen (nur in einer Version) mit grünem Hintergrund und entfernte Zeilen mit rotem Hintergrund hervorheben (Design Tokens)
 3. THE Diff_View SHALL Zeilennummern für beide Versionen anzeigen und identische Bereiche einklappbar machen (collapsed mit "N identische Zeilen"-Hinweis)
 4. THE Diff_View SHALL einen Toggle zwischen "Side-by-Side" und "Unified" Ansicht bereitstellen (Standard: Side-by-Side, Einstellung in localStorage persistiert)
-5. THE Diff_View SHALL einen "Übernehmen"-Button für jede Seite bereitstellen (Local / Remote) sowie einen "Manuell mergen"-Button der die Datei in einem temporären Editor öffnet wo der Benutzer aus beiden Versionen zusammenstellen kann
-6. IF die Datei kein Markdown ist (Binärdatei), THEN THE Diff_View SHALL nur Metadaten (Dateigröße, Änderungsdatum) gegenüberstellen und keinen Text-Diff anzeigen
+5. THE Diff_View SHALL einen "Übernehmen"-Button für jede Seite bereitstellen (Local / Remote) sowie einen "Manuell mergen"-Button der den Benutzer von der Diff_View in die Merge_Preview-Komponente überleitet (sequentieller Ablauf: Diff_View → Merge_Preview)
+6. IF die Datei eine Binärdatei ist (MIME-Typ NICHT `text/*` und Dateiendung NICHT in `.md`, `.txt`, `.json`, `.csv`, `.yaml`, `.yml`, `.xml`, `.html`, `.css`, `.js`, `.ts`), THEN THE Diff_View SHALL nur Metadaten (Dateigröße, Änderungsdatum) gegenüberstellen und keinen Text-Diff anzeigen
 
 ### Requirement 3: Batch-Auflösung
 
@@ -44,7 +44,7 @@ Das Sync-Konfliktmanagement wird um einen halbautomatischen Workflow erweitert. 
 
 #### Acceptance Criteria
 
-1. THE Conflict_Wizard SHALL pro Kategorie eine "Alle auflösen"-Aktion bereitstellen die die Standard-Strategie auf alle Konflikte der Kategorie anwendet
+1. THE Conflict_Wizard SHALL pro Kategorie eine "Alle auflösen"-Aktion bereitstellen die die konfigurierte Auto-Resolution-Strategie (gemäß Requirement 4) auf alle Konflikte der Kategorie anwendet; falls keine Strategie konfiguriert ist, wird die Standard-Empfehlung aus Requirement 1 Kriterium 3 verwendet
 2. THE Conflict_Wizard SHALL eine Checkbox pro Konflikt bereitstellen um eine manuelle Auswahl für Batch-Aktionen zu ermöglichen
 3. WHEN der Benutzer eine Batch-Aktion auslöst, THE Conflict_Wizard SHALL eine Bestätigungs-Zusammenfassung anzeigen (Anzahl betroffener Dateien, gewählte Strategie) bevor die Aktion ausgeführt wird
 4. WHEN eine Batch-Auflösung ausgeführt wird, THE Sync_Service SHALL die Aktionen sequentiell verarbeiten und bei Fehlern einzelner Dateien die übrigen fortsetzen
@@ -56,7 +56,7 @@ Das Sync-Konfliktmanagement wird um einen halbautomatischen Workflow erweitert. 
 
 #### Acceptance Criteria
 
-1. THE Sync_Service SHALL folgende konfigurierbare Auto-Resolution-Strategien unterstützen: `newer_wins` (neueres Änderungsdatum gewinnt), `remote_wins` (Remote überschreibt immer), `local_wins` (Lokal bleibt immer), `skip` (Konflikt wird ignoriert und beim nächsten Sync erneut geprüft)
+1. THE Sync_Service SHALL folgende konfigurierbare Auto-Resolution-Strategien unterstützen: `newer_wins` (neueres Änderungsdatum gewinnt; bei identischem `modifiedAt`-Zeitstempel wird `remote_wins` als Fallback angewendet), `remote_wins` (Remote überschreibt immer), `local_wins` (Lokal bleibt immer), `skip` (Konflikt wird ignoriert und beim nächsten Sync erneut geprüft)
 2. THE Conflict_Wizard SHALL eine Einstellung bereitstellen wo der Benutzer die Standard-Auto-Resolution-Strategie pro Kategorie festlegen kann
 3. WHEN eine Auto-Resolution-Strategie konfiguriert ist, THE Sync_Service SHALL bei der nächsten Synchronisation Konflikte der konfigurierten Kategorie automatisch nach der gewählten Strategie auflösen
 4. THE Sync_Service SHALL automatisch aufgelöste Konflikte im Sync-Log mit dem Vermerk `auto_resolved` und der angewandten Strategie protokollieren
@@ -71,9 +71,10 @@ Das Sync-Konfliktmanagement wird um einen halbautomatischen Workflow erweitert. 
 
 1. WHEN der Benutzer eine Auflösungsoption wählt (bevor er bestätigt), THE Conflict_Wizard SHALL eine Vorschau des resultierenden Dateiinhalts anzeigen
 2. THE Merge_Preview SHALL den finalen Text mit Syntax-Highlighting (Markdown) darstellen
-3. IF der Benutzer "Manuell mergen" wählt, THEN THE Merge_Preview SHALL einen editierbaren Textbereich bereitstellen (vorab befüllt mit der gewählten Basisversion) in dem der Benutzer Passagen aus beiden Versionen kombinieren kann
+3. IF der Benutzer "Manuell mergen" in der Diff_View wählt, THEN THE Merge_Preview SHALL einen editierbaren Textbereich bereitstellen (vorab befüllt mit der gewählten Basisversion) in dem der Benutzer Passagen aus beiden Versionen kombinieren kann (die Diff_View und Merge_Preview sind separate Komponenten in einem sequentiellen Ablauf)
 4. THE Merge_Preview SHALL einen "Bestätigen"-Button und einen "Abbrechen"-Button bereitstellen; bei Abbruch wird keine Änderung vorgenommen und der Konflikt bleibt offen
-5. WHEN der Benutzer die Vorschau bestätigt, THE Sync_Service SHALL die Auflösung atomar durchführen (lokale Datei schreiben und/oder CouchDB-Dokument aktualisieren)
+5. WHEN der Benutzer die Vorschau bestätigt, THE Sync_Service SHALL die Auflösung atomar durchführen: zuerst die lokale Datei schreiben, dann das CouchDB-Dokument aktualisieren
+6. IF die lokale Dateischreibung erfolgreich ist aber das CouchDB-Push fehlschlägt, THEN THE Sync_Service SHALL die lokale Datei auf den Zustand vor der Auflösung zurücksetzen (Rollback) und den Konflikt als ungelöst belassen
 
 ### Requirement 6: Conflict-Wizard UI
 
@@ -87,3 +88,8 @@ Das Sync-Konfliktmanagement wird um einen halbautomatischen Workflow erweitert. 
 4. THE Conflict_Wizard SHALL die Auflösungsergebnisse live aktualisieren (gelöste Konflikte verschwinden aus der Liste)
 5. WHEN alle Konflikte gelöst sind, THE Conflict_Wizard SHALL eine Abschluss-Zusammenfassung anzeigen und einen Button "Sync fortsetzen" bereitstellen der den nächsten regulären Sync auslöst
 6. THE Conflict_Wizard SHALL auf allen Bildschirmgrößen ≥768px nutzbar sein (responsive innerhalb des bestehenden Layouts)
+7. IF mehr als 50 Konflikte in einer Kategorie vorhanden sind, THEN THE Conflict_Wizard SHALL die Liste paginiert darstellen (max 50 pro Seite)
+8. THE Conflict_Wizard SHALL bei Batch-Operationen maximal 100 Konflikte pro Ausführung verarbeiten; bei mehr als 100 selektierten Konflikten wird der Benutzer aufgefordert die Auswahl aufzuteilen
+9. WHILE der Conflict_Wizard geöffnet ist, THE Sync_Service SHALL keine automatischen Sync-Läufe starten (Scheduler pausiert)
+10. IF der Benutzer den Wizard schließt oder manuell einen Sync auslöst, THEN THE Sync_Service SHALL den Scheduler wieder aktivieren
+11. IF während der Wizard-Session neue Konflikte durch externe Änderungen entstehen (z.B. ein anderer Benutzer pushed), THEN THE Conflict_Wizard SHALL den Benutzer benachrichtigen und die Konfliktliste aktualisieren ohne den aktuellen Auflösungsschritt zu unterbrechen

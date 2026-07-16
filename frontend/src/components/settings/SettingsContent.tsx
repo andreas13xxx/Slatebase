@@ -25,6 +25,7 @@ import { FeatureTogglesSection } from './FeatureTogglesSection'
 import { ServerRestartSection } from './ServerRestartSection'
 import { VaultConfigSection } from './VaultConfigSection'
 import { KeybindingsSection } from './KeybindingsSection'
+import { AppearanceSection } from './AppearanceSection'
 
 /** German labels for each settings section heading. */
 const SECTION_LABELS: Record<SettingsSection, string> = {
@@ -33,6 +34,7 @@ const SECTION_LABELS: Record<SettingsSection, string> = {
   'sessions': 'Sitzungen',
   'mcp-tokens': 'MCP-Tokens',
   'keybindings': 'Tastaturkürzel',
+  'appearance': 'Darstellung',
   'delete-account': 'Konto löschen',
   'sync': 'Synchronisation',
   'plugins': 'Plugins',
@@ -98,6 +100,8 @@ function renderSection(
       return <AccountDeletionSection apiClient={apiClient} />
     case 'keybindings':
       return <KeybindingsSection />
+    case 'appearance':
+      return <AppearanceSection />
     case 'sync':
       if (selectedVaultId === null) {
         return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>

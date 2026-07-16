@@ -509,6 +509,30 @@ export interface ISyncService {
 
   /** Initializes sync intervals after server restart. */
   initializeSchedulers(): Promise<void>
+
+  /** Returns categorized conflicts with enriched metadata. */
+  getCategorizedConflicts(vaultId: string): Promise<CategorizedConflictEntry[]>
+
+  /** Resolves a conflict with full content (manual merge). */
+  resolveConflictWithContent(vaultId: string, documentPath: string, content: string): Promise<void>
+
+  /** Resolves multiple conflicts in batch. */
+  resolveConflictBatch(vaultId: string, resolutions: Array<{ documentPath: string; resolution: ConflictResolutionAction }>): Promise<BatchResolveResult>
+
+  /** Gets file content for diff view (local or remote). */
+  getFileContent(vaultId: string, documentPath: string, source: 'local' | 'remote'): Promise<string | null>
+
+  /** Gets auto-resolution configuration for a vault. */
+  getAutoResolutionConfig(vaultId: string): Promise<AutoResolutionConfig>
+
+  /** Sets auto-resolution configuration for a vault. */
+  setAutoResolutionConfig(vaultId: string, config: AutoResolutionConfig): Promise<void>
+
+  /** Pauses scheduler for a vault (wizard open). */
+  pauseScheduler(vaultId: string): void
+
+  /** Resumes scheduler for a vault (wizard closed). */
+  resumeScheduler(vaultId: string): void
 }
 
 /**
@@ -627,6 +651,15 @@ export interface ISyncScheduler {
 
   /** Stops all timers (for shutdown). */
   stopAll(): void
+
+  /** Pauses the scheduler for a vault (wizard open). Timer stays registered but callbacks are skipped. */
+  pause(vaultId: string): void
+
+  /** Resumes the scheduler for a vault (wizard closed). */
+  resume(vaultId: string): void
+
+  /** Checks whether the scheduler is paused for a vault. */
+  isPaused(vaultId: string): boolean
 }
 
 /**
@@ -657,4 +690,90 @@ export interface ICheckpointStore {
 
   /** Removes the checkpoint (when config is removed). */
   remove(vaultId: string): Promise<void>
+}
+
+
+// ─── Conflict Resolution Types ───────────────────────────────────────────────
+
+/**
+ * Classification of a sync conflict into one of four categories.
+ * Used by the Conflict Wizard to group and suggest appropriate resolutions.
+ */
+export type ConflictCategory = 'content_conflict' | 'local_deleted' | 'remote_deleted' | 'rename_conflict'
+
+/**
+ * Extended ConflictEntry with category and content hash fields.
+ * Backward-compatible: existing entries without category are treated as 'content_conflict'.
+ */
+export interface CategorizedConflictEntry extends ConflictEntry {
+  /** Conflict category. Defaults to 'content_conflict' for legacy entries. */
+  category: ConflictCategory
+  /** Content hash of local file (for rename detection). */
+  localContentHash?: string
+  /** Content hash of remote file (for rename detection). */
+  remoteContentHash?: string
+}
+
+/**
+ * Resolution action for a sync conflict, including manual merge with content.
+ * Discriminated union on the `type` field.
+ */
+export type ConflictResolutionAction =
+  | { type: 'use_remote' }
+  | { type: 'use_local' }
+  | { type: 'skip' }
+  | { type: 'manual_merge'; content: string }
+
+/**
+ * Configurable auto-resolution strategy for a conflict category.
+ * - `newer_wins`: Version with later mtime wins; identical timestamps → remote wins
+ * - `remote_wins`: Remote always overwrites local
+ * - `local_wins`: Local always kept
+ * - `skip`: Conflict ignored, re-checked on next sync
+ */
+export type AutoResolutionStrategy = 'newer_wins' | 'remote_wins' | 'local_wins' | 'skip'
+
+/**
+ * Auto-resolution configuration persisted per vault.
+ * Controls whether and how conflicts are automatically resolved during sync.
+ */
+export interface AutoResolutionConfig {
+  /** Master toggle for automatic resolution (default: false). */
+  enabled: boolean
+  /** Strategy per conflict category. Unconfigured categories use default recommendations. */
+  strategies: Partial<Record<ConflictCategory, AutoResolutionStrategy>>
+}
+
+/**
+ * Log detail for a conflict that was automatically resolved.
+ * Written to sync log with the `auto_resolved` marker.
+ */
+export interface AutoResolvedLogDetail {
+  /** Relative path of the affected document. */
+  documentPath: string
+  /** Category of the resolved conflict. */
+  category: ConflictCategory
+  /** Strategy that was applied. */
+  strategy: AutoResolutionStrategy
+  /** Resulting resolution action. */
+  resolution: 'use_remote' | 'use_local' | 'skip'
+  /** Whether the resolution was successful. */
+  success: boolean
+  /** Error description if resolution failed. */
+  error?: string
+}
+
+/**
+ * Result of a batch conflict resolution operation.
+ * Partial failures are isolated — each conflict is processed independently.
+ */
+export interface BatchResolveResult {
+  /** Total number of conflicts submitted for resolution. */
+  total: number
+  /** Number of conflicts successfully resolved. */
+  succeeded: number
+  /** Number of conflicts that failed to resolve. */
+  failed: number
+  /** Details of each failed resolution. */
+  errors: Array<{ documentPath: string; error: string }>
 }

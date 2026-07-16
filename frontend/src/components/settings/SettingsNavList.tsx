@@ -24,6 +24,7 @@ const SECTION_LABELS: Record<SettingsSection, string> = {
   'sessions': 'Sitzungen',
   'mcp-tokens': 'MCP-Tokens',
   'keybindings': 'Tastaturkürzel',
+  'appearance': 'Darstellung',
   'delete-account': 'Konto löschen',
   'sync': 'Synchronisation',
   'plugins': 'Plugins',

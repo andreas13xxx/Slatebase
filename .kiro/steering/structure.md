@@ -17,12 +17,14 @@ src/
 ├── version.ts            — getVersion() utility (env → version.json → 'development' fallback)
 ├── config/index.ts       — Zod-validated config (file + env overlay)
 ├── logger/index.ts       — Pino logger with ILogger interface
+├── logger/log-store.ts  — In-memory log ring buffer for admin log viewing
 ├── vault/
 │   ├── index.ts          — VaultReader, VaultManager, path utilities, data models
 │   └── registry.ts       — VaultRegistry (persistent vault metadata in vaults.json)
 ├── business/
 │   ├── index.ts          — VaultService (business logic, orchestrates vault operations)
-│   └── validation.ts     — Vault name validation rules
+│   ├── validation.ts     — Vault name validation rules
+│   └── unique-filename.ts — Unique filename generation (conflict-free renaming)
 ├── auth/
 │   ├── index.ts          — AuthService, SessionStore, interfaces, error classes
 │   ├── middleware.ts     — authMiddleware, csrfMiddleware, rateLimitMiddleware
@@ -84,6 +86,14 @@ src/
 │   ├── checkpoint-store.ts — CheckpointStore (filesystem persistence)
 │   ├── sync-engine.ts    — SyncEngine (CouchDB communication, pull/push/analyze)
 │   ├── sync-scheduler.ts — SyncScheduler (setInterval management)
+│   ├── conflict-categorizer.ts — ConflictCategorizer (pure categorization: content_conflict, local_deleted, remote_deleted, rename_conflict)
+│   ├── conflict-categorizer.test.ts — Unit tests for ConflictCategorizer
+│   ├── conflict-resolver.ts — ConflictResolver (atomic resolve with rollback, batch with error isolation)
+│   ├── conflict-resolver.test.ts — Unit tests for ConflictResolver
+│   ├── auto-resolution-engine.ts — AutoResolutionEngine (strategy evaluation: newer_wins, remote_wins, local_wins, skip)
+│   ├── auto-resolution-engine.test.ts — Unit tests for AutoResolutionEngine
+│   ├── auto-resolution-config-store.ts — AutoResolutionConfigStore (per-vault JSON persistence, Zod validation)
+│   ├── auto-resolution-config-store.test.ts — Unit tests for AutoResolutionConfigStore
 │   └── sync-service.ts   — SyncService (business logic orchestrator)
 ├── mcp/
 │   ├── index.ts          — Barrel export for MCP module
@@ -116,7 +126,8 @@ src/
 │   ├── property-extractor.ts — extractProperties() (YAML frontmatter, regex-based)
 │   ├── property-extractor.test.ts — Unit tests for property extractor
 │   ├── link-index-service.ts — LinkIndexService (rebuild, incremental updates, JSON v2 persistence, tags, properties, getGraph with options, getGraphMeta)
-│   └── link-index-service.test.ts — Unit tests for LinkIndexService v2
+│   ├── link-index-service.test.ts — Unit tests for LinkIndexService v2
+│   └── canvas-parser.test.ts — Unit tests for canvas link extraction
 ├── plugin/
 │   ├── index.ts              — Barrel export for plugin module
 │   ├── types.ts              — IPluginStore, PluginManifest, PluginFiles, PluginRegistryData interfaces
@@ -173,10 +184,12 @@ src/
 │   ├── index.ts              — Barrel export for vault-config module
 │   ├── types.ts              — IVaultConfigService, VaultConfig (templatesDirectory, dailyNotesDirectory)
 │   ├── validation.ts         — Zod schema (updateVaultConfigSchema)
-│   └── vault-config-store.ts — VaultConfigStore (per-vault .vault-config.json, atomic writes)
+│   └── vault-config-store.ts — VaultConfigStore (per-vault .slatebase/config.json, atomic writes)
 ├── welcome-vault/
 │   ├── index.ts              — IWelcomeVaultService, WelcomeVaultService (never-throw, language-aware template copy)
 │   └── types.ts              — WelcomeVaultConfig, WelcomeVaultLanguage, OnUserCreatedFn
+├── upload/
+│   └── errors.ts             — Upload-specific error classes (FileTooLargeError, etc.)
 ├── import/index.ts       — ImportService (file/folder import logic)
 └── integration.test.ts   — Integration tests
 config/
@@ -242,12 +255,15 @@ src/
 │       ├── command-registry.ts — CommandRegistry (addCommand, removeAll, search, hotkeys)
 │       ├── css-injector.ts — CSS injection with scoped selectors (data-plugin-id prefix)
 │       ├── compatibility-analyzer.ts — Multi-layer browser compatibility analysis (isDesktopOnly gate, Node.js module detection, Obsidian API pattern matching)
-│       ├── plugin-context.ts — PluginProvider + usePluginContext hook (vault-scoped instances, FCP loading)
-│       ├── plugin-event-bridge.ts — usePluginEventBridge hook (tab→workspace, save→cache, tree→resolved)
+│       ├── plugin-context.ts — PluginProvider + usePluginContext hook (vault-scoped instances, FCP loading, activeViews/sidebarViews state)
+│       ├── plugin-event-bridge.ts — usePluginEventBridge hook (tab→workspace, save→cache, tree→resolved, leaf events)
+│       ├── view-registry.ts — ViewRegistry (plugin-ownership tracking, location-aware leaf creation, sidebar callbacks)
+│       ├── tab-view-bridge.ts — TabViewBridge (module-level bridge: ViewRegistry → TabProvider for plugin view tabs)
+│       ├── tab-view-bridge-wiring.test.ts — Integration tests for TabViewBridge wiring
 │       └── shims/
 │           ├── app-shim.ts — AppShim (Proxy-based, vault/workspace/metadataCache/plugins properties)
 │           ├── vault-shim.ts — VaultShim (read/modify/create/delete/getAbstractFileByPath/events)
-│           ├── workspace-shim.ts — WorkspaceShim (getActiveFile, file-open, active-leaf-change)
+│           ├── workspace-shim.ts — WorkspaceShim (full Leaf API: getLeaf, getRightLeaf, getLeftLeaf, getLeavesOfType, detachLeavesOfType, openLinkText, iterateAllLeaves, iterateRootLeaves, getActiveLeaf, setActiveLeaf, revealLeaf, createLeafBySplit)
 │           └── metadata-cache-shim.ts — MetadataCacheShim (getFileCache, resolvedLinks, changed/resolved events)
 ├── state/
 │   ├── index.ts          — AppProvider, appReducer, action creators
@@ -276,6 +292,7 @@ src/
 │   ├── realtimeActions.ts — computeReconnectDelay, RealtimeAction types
 │   ├── realtimeChatBridge.ts — Module-level bridge: SSE chat events → ChatProvider (cross-provider communication)
 │   ├── realtimeVaultBridge.ts — Module-level bridge: SSE vault:change events → AppProvider (tree refresh + tab reload)
+│   ├── realtimeSyncBridge.ts — Module-level bridge: SSE sync:conflict events → ConflictWizard (live conflict updates)
 │   ├── useEventSource.ts — Custom hook managing EventSource lifecycle (backoff, visibility, reconnect)
 │   ├── recentFilesStore.ts — Recent files list (server-synced + localStorage cache, max 20, dedup by vaultId+path)
 │   ├── favoritesStore.ts — Favorites per vault (server-synced + localStorage cache, max 50, path tracking on rename/delete)
@@ -288,19 +305,26 @@ src/
 │   ├── settingsContext.ts    — SettingsProvider + useSettingsContext hook
 │   ├── canvasState.ts        — Canvas reducer + types (document, viewport, selection, undo/redo stacks, dirty)
 │   ├── canvasContext.ts      — CanvasProvider + useCanvasContext hook (parse, autosave, save)
+│   ├── sidebarPanelState.ts  — Sidebar panel reducer + types (left sidebar sections, views)
+│   ├── sidebarPanelContext.ts — SidebarPanelProvider + useSidebarPanelContext hook
+│   ├── realtimePresenceBridge.ts — Module-level bridge: SSE presence events → PresenceState
 ├── hooks/
 │   ├── useHistoryStack.ts — Undo/Redo history stack hook (max 100, FIFO eviction, clear on file switch)
 │   ├── useLineNumbers.ts — Line numbers toggle state (localStorage persistence)
 │   ├── useResize.ts      — Mouse-driven panel resize hook (width, min, max, side)
-│   └── useDropZone.ts    — File drag-and-drop hook (drag counter, size/count validation, toast errors)
+│   ├── useDropZone.ts    — File drag-and-drop hook (drag counter, size/count validation, toast errors)
+│   ├── useStatusBar.ts   — Status bar visibility toggle (module-level store, useSyncExternalStore, localStorage)
+│   └── useVersionInfo.ts — Server version info hook (installed vs. latest, GitHub API check)
 ├── components/
 │   ├── SlatebaseLogo.tsx — SVG logo component
+│   ├── StatusBar.tsx     — Bottom status bar (clock, extensible plugin items, togglable in settings)
+│   ├── StatusBar.css     — Status bar styles (Design Tokens)
 │   ├── UserMenu.tsx      — User avatar and dropdown menu (navigation, import/export, admin)
 │   ├── ErrorBoundary.tsx — React Error Boundary (fallback UI, reset button)
 │   ├── ErrorBoundary.css — ErrorBoundary fallback styles
 │   ├── SidebarToolbar.tsx — Draggable vertical toolbar (+ Daily Note, Papierkorb buttons)
 │   ├── VaultList.tsx     — Vault selector/manager dropdown (legacy, no longer rendered in App.tsx)
-│   ├── FileExplorer.tsx  — Unified multi-vault explorer (all vaults as expandable root entries, lazy-loading, DnD, context menu, favorites, statistics tooltip, .trash/.versions filtered)
+│   ├── FileExplorer.tsx  — Unified multi-vault explorer (all vaults as expandable root entries, lazy-loading, DnD, context menu, favorites, statistics tooltip)
 │   ├── file-explorer/
 │   │   ├── index.ts      — Barrel export (TreeNode, shared types)
 │   │   ├── types.ts      — DragState, ExternalDropState, ContextMenuState, InlineInputState
@@ -337,7 +361,23 @@ src/
 │   ├── SyncConfigPage.tsx — Sync configuration (Setup-URI, manual config, mode, interval, E2E)
 │   ├── SyncStatusPanel.tsx — Sync status display with trigger buttons
 │   ├── SyncAnalysisView.tsx — Analysis results (category counters + detail list)
-│   ├── ConflictResolutionView.tsx — Conflict list with resolution options
+│   ├── ConflictResolutionView.tsx — Conflict list with resolution options (deprecated, replaced by ConflictWizard)
+│   ├── conflict-wizard/
+│   │   ├── index.ts              — Barrel export (ConflictWizard, DiffView, MergePreview, BatchActions, types, diff-utils)
+│   │   ├── types.ts              — WizardStep, ConflictWizardState, ConflictWizardAction, CategorizedConflictEntry
+│   │   ├── diff-utils.ts         — Myers diff algorithm (computeDiff, isTextFile, groupHunks)
+│   │   ├── diff-utils.test.ts    — Unit tests for diff utilities
+│   │   ├── ConflictWizard.tsx    — 3-step wizard (overview → category detail → resolution), useReducer state
+│   │   ├── ConflictWizard.css    — Wizard styles (Design Tokens, responsive, dark mode)
+│   │   ├── DiffView.tsx          — Side-by-side / unified diff with collapsible sections
+│   │   ├── DiffView.css          — Diff styles (--diff-added-bg, --diff-removed-bg, responsive)
+│   │   ├── DiffView.test.tsx     — Unit tests for DiffView
+│   │   ├── MergePreview.tsx      — Manual merge editor with preview toggle
+│   │   ├── MergePreview.css      — Merge editor styles
+│   │   ├── MergePreview.test.tsx — Unit tests for MergePreview
+│   │   ├── BatchActions.tsx      — Batch confirmation dialog + result summary
+│   │   ├── BatchActions.css      — Batch actions styles
+│   │   └── BatchActions.test.tsx — Unit tests for BatchActions
 │   ├── GraphView.tsx     — Knowledge graph SVG visualization (d3-force, zoom/pan/drag/search, config-driven colors/layout, tag/property nodes)
 │   ├── graph-utils.ts    — Pure graph utility functions (truncateLabel, clampZoom, computeNodeSize, filterNodes)
 │   ├── graph-config.ts   — GraphConfig interfaces + localStorage persistence (colors, layout, node toggles)
@@ -393,7 +433,8 @@ src/
 │   │   ├── FeatureTogglesSection.tsx  — Extracted feature toggle UI
 │   │   ├── ServerRestartSection.tsx   — Server restart with confirmation
 │   │   ├── VaultConfigSection.tsx     — Per-vault config (templates dir, daily notes dir)
-│   │   └── KeybindingsSection.tsx     — Configurable keyboard shortcuts (table, inline recording, conflict detection)
+│   │   ├── KeybindingsSection.tsx     — Configurable keyboard shortcuts (table, inline recording, conflict detection)
+│   │   └── AppearanceSection.tsx      — Display preferences (status bar toggle)
 │   ├── AdminUsersPage.tsx — User administration
 │   ├── AdminVaultsPage.tsx — Admin: all vaults overview with delete
 │   ├── AdminConfigPage.tsx — Server configuration (card-based layout)
@@ -404,7 +445,31 @@ src/
 │   ├── CommandPalette.tsx — Modal command palette (search, execute, keyboard nav, Ctrl+P always active)
 │   ├── CommandPaletteContainer.tsx — Built-in commands (navigation, vault ops, editor formatting, view toggles) + plugin commands, Ctrl+P shortcut, CustomEvent bridge to EditMode
 │   ├── RealtimeProvider.tsx — SSE event routing (chat, presence, vault:change, toast, server events)
-│   └── ToastNotification.tsx — Toast notification system (module-level state, CSS transitions)
+│   ├── ToastNotification.tsx — Toast notification system (module-level state, CSS transitions)
+│   ├── ConnectionIndicator.tsx — SSE connection status indicator (connected/connecting/disconnected)
+│   ├── PluginViewPanel.tsx — Plugin view rendering (imperative DOM mount for plugin ItemViews)
+│   ├── PluginRibbonIcon.tsx — Plugin ribbon icon buttons (left toolbar)
+│   ├── McpTokensPage.tsx — MCP API token management UI (create, revoke, list)
+│   ├── AdminLogsPage.tsx — Admin server log viewer (ring buffer)
+│   ├── ConflictWizardPage.tsx — Standalone conflict wizard page wrapper
+│   ├── FileViewer.tsx    — File content viewer (legacy, redirects to TabContent)
+│   ├── InlineInput.tsx   — Inline text input with confirm/cancel (used in file rename)
+│   ├── SyncLogPage.tsx   — Sync log viewer page
+│   ├── SyncProtocolView.tsx — Sync protocol details view
+│   └── sidebar-panel/
+│       ├── index.ts              — Barrel export for sidebar-panel module
+│       ├── SidebarPanel.tsx      — Left sidebar panel (tabbed: recent files, favorites)
+│       ├── SidebarPanel.css      — Sidebar panel styles
+│       ├── SidebarPanelTabBar.tsx — Tab bar for sidebar sections
+│       ├── SidebarPanelTabBar.css — Tab bar styles
+│       ├── SidebarSplitContainer.tsx — Split sections with resize
+│       ├── SidebarSplitContainer.css — Split container styles
+│       ├── RecentFilesView.tsx   — Recent files list view
+│       ├── RecentFilesView.css   — Recent files styles
+│       ├── FavoritesView.tsx     — Favorites list view
+│       ├── FavoritesView.css     — Favorites styles
+│       └── utils/
+│           └── persistence.ts    — localStorage layout persistence
 ├── assets/               — Static images
 └── test-setup.ts         — Vitest/Testing Library setup
 ```
@@ -493,7 +558,8 @@ data/sync/
 └── <vaultId>/
     ├── config.json           — Encrypted sync configuration
     ├── checkpoint.json       — Last sync checkpoint (last_seq + local mtimes)
-    ├── conflicts.json        — Open conflicts
+    ├── conflicts.json        — Open conflicts (CategorizedConflictEntry with category + content hashes)
+    ├── auto-resolution.json  — Auto-resolution configuration (enabled, strategies per category)
     └── sync-log.jsonl        — Sync log (append-only JSONL, max 1000 entries)
 ```
 
@@ -538,20 +604,31 @@ data/plugins/
 
 ```
 data/vaults/<vaultId>/
-├── .trash/
-│   ├── _index.json           — Trash index (entries with id, originalPath, deletedAt, isDirectory)
-│   └── <entryId>/            — Moved file/folder per trash entry
-│       └── <originalName>    — The actual file/folder content
-├── .versions/
-│   └── <relativePath>/       — Version directory per file (mirrors file path structure)
-│       ├── 20240120T143000123.md  — Version snapshot (YYYYMMDDTHHmmssSSS UTC timestamp)
-│       └── ...
-└── _templates/               — Template directory (configurable, default: _templates/)
+├── .slatebase/
+│   ├── config.json           — Per-vault configuration (templatesDirectory, dailyNotesDirectory)
+│   ├── link-index.json       — Persistent link index (v2: forwardLinks, tags, properties)
+│   ├── trash/
+│   │   ├── _index.json       — Trash index (entries with id, originalPath, deletedAt, isDirectory)
+│   │   └── <entryId>/        — Moved file/folder per trash entry
+│   │       └── <originalName> — The actual file/folder content
+│   └── versions/
+│       └── <relativePath>/   — Version directory per file (mirrors file path structure)
+│           ├── 20240120T143000123.md  — Version snapshot (YYYYMMDDTHHmmssSSS UTC timestamp)
+│           └── ...
+└── Templates/                — Template directory (configurable, default: "Templates")
     ├── daily.md              — Daily note template (optional)
-    └── meeting.md            — Other templates (any .md, not _-prefixed)
+    └── meeting.md            — Other templates (any .md file)
 ```
 
-- **Trash**: Soft-deleted files moved to `.trash/<id>/`. Atomic index updates (temp → rename). Configurable retention (0–365 days, default 30).
-- **Versions**: Previous file content saved before each write. Configurable max per file (0–100, default 20). Timestamp format: `YYYYMMDDTHHmmssSSS` (UTC).
-- **Templates**: `.md` files (not `_`-prefixed) used for "New from template" feature. Placeholder replacement: `{{date}}`, `{{time}}`, `{{title}}`.
+- **`.slatebase/` directory**: All Slatebase-internal data lives here (analogous to `.obsidian/` for Obsidian). Hidden from user tree (dot-prefix rule). Partially synced via vault-sync.
+- **Trash**: Soft-deleted files moved to `.slatebase/trash/<id>/`. Atomic index updates (temp → rename). Configurable retention (0–365 days, default 30). NOT synced.
+- **Versions**: Previous file content saved before each write. Configurable max per file (0–100, default 20). Timestamp format: `YYYYMMDDTHHmmssSSS` (UTC). NOT synced.
+- **Link-Index**: Derived index rebuilt from vault content. NOT synced.
+- **Config**: Vault configuration (templates dir, daily notes dir). SYNCED.
+- **Templates**: Regular vault directory (visible, synced). `.md` files used for "New from template" feature. Placeholder replacement: `{{date}}`, `{{time}}`, `{{title}}`.
 - **Cleanup Job**: Periodic (default 24h interval). Purges expired trash + prunes excess versions. Per-file error isolation.
+
+### File Visibility Rules (like Obsidian)
+
+- **Dot-prefixed** files and directories (`.obsidian/`, `.slatebase/`, `.hidden-file`) are hidden from the user-visible tree, search, statistics, and link-index. They exist on disk and may be synced.
+- **Underscore-prefixed** files and directories (`_drafts/`, `_archive.md`) are treated as normal user content — visible, searchable, indexed, synced (except at vault root due to CouchDB limitation).

@@ -41,7 +41,7 @@ const CleanupConfigSchema = z.object({
 })
 
 const TemplatesConfigSchema = z.object({
-  directory: z.string().default('_templates'),
+  directory: z.string().default('Templates'),
 })
 
 const UploadConfigSchema = z.object({

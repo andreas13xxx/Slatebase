@@ -44,6 +44,9 @@ import {
   SyncEngine,
   SyncScheduler,
   SyncService,
+  AutoResolutionConfigStore,
+  ConflictResolver,
+  AutoResolutionEngine,
 } from './sync/index.js'
 import type { VaultPathResolver } from './sync/index.js'
 import { createSyncRoutes } from './api/syncRoutes.js'
@@ -194,6 +197,11 @@ const checkpointStore = new CheckpointStore(serverConfig.dataDir, logger)
 const syncEngine = new SyncEngine(cryptoService)
 const syncScheduler = new SyncScheduler()
 
+// Conflict resolution modules
+const autoResolutionConfigStore = new AutoResolutionConfigStore(serverConfig.dataDir, logger)
+const conflictResolver = new ConflictResolver({ conflictStore, syncLock, cryptoService, logger })
+const autoResolutionEngine = new AutoResolutionEngine()
+
 // 4. VaultService (extend existing vault setup with share registry and user repository)
 const vaultPathResolver: VaultPathResolver = (vaultId: string): string | null => {
   const entry = vaultRegistry.findById(vaultId)
@@ -249,6 +257,12 @@ const syncService = new SyncService(
   logger,
   vaultPathResolver,
   syncProtocolStore,
+  {
+    conflictResolver,
+    autoResolutionEngine,
+    autoResolutionConfigStore,
+    vaultOwnerResolver: (vaultId: string) => vaultRegistry.findById(vaultId)?.ownerId,
+  },
 )
 
 // 4c. MCP Module (conditional on config)
@@ -403,6 +417,9 @@ const chatController = new ChatController(chatService, chatRateLimiter, logger, 
 
 // Wire EventBus to VaultController for vault:change events
 vaultController.setEventBus(eventBus)
+
+// Wire EventBus to SyncService for sync:conflict events
+syncService.setEventBus(eventBus)
 
 // 6. Route Modules
 const routeModules = [

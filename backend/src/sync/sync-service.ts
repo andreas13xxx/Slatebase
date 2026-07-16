@@ -1,4 +1,6 @@
 import crypto from 'node:crypto'
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type {
   ISyncService,
   ISyncEngine,
@@ -24,6 +26,11 @@ import type {
   SyncConnectionParams,
   SyncCheckpoint,
   SyncErrorDetail,
+  CategorizedConflictEntry,
+  ConflictResolutionAction,
+  AutoResolutionConfig,
+  BatchResolveResult,
+  AutoResolvedLogDetail,
 } from './types.js'
 import type { ISyncProtocolStore, PaginatedSyncProtocol, SyncProtocolFilter } from './protocol-types.js'
 import { SyncProtocolLogger } from './protocol-logger.js'
@@ -33,9 +40,15 @@ import {
   SyncInProgressError,
   ConnectionTestFailedError,
   ConflictResolutionError,
+  FileContentUnavailableError,
 } from './errors.js'
 import { scanVaultFiles } from './sync-engine.js'
 import type { ILogger } from '../logger/index.js'
+import type { IConflictResolver } from './conflict-resolver.js'
+import type { IAutoResolutionEngine } from './auto-resolution-engine.js'
+import type { IAutoResolutionConfigStore } from './auto-resolution-config-store.js'
+import { applyDefaultCategory } from './conflict-categorizer.js'
+import type { IEventBus } from '../realtime/types.js'
 
 /**
  * Function type for resolving a vault ID to its filesystem storage path.
@@ -72,6 +85,16 @@ export class SyncService implements ISyncService {
    */
   private onPullComplete?: (vaultId: string) => void
 
+  /** Optional EventBus for publishing sync:conflict events via SSE. */
+  private eventBus?: IEventBus
+
+  /** Optional function to resolve vault ID to owner user ID. */
+  private readonly vaultOwnerResolver: ((vaultId: string) => string | undefined) | undefined
+
+  private readonly conflictResolver: IConflictResolver | undefined
+  private readonly autoResolutionEngine: IAutoResolutionEngine | undefined
+  private readonly autoResolutionConfigStore: IAutoResolutionConfigStore | undefined
+
   constructor(
     private readonly configStore: ISyncConfigStore,
     private readonly logStore: ISyncLogStore,
@@ -85,7 +108,18 @@ export class SyncService implements ISyncService {
     private readonly logger: ILogger,
     private readonly vaultPathResolver: VaultPathResolver,
     private readonly protocolStore?: ISyncProtocolStore,
-  ) {}
+    options?: {
+      conflictResolver?: IConflictResolver
+      autoResolutionEngine?: IAutoResolutionEngine
+      autoResolutionConfigStore?: IAutoResolutionConfigStore
+      vaultOwnerResolver?: (vaultId: string) => string | undefined
+    },
+  ) {
+    this.conflictResolver = options?.conflictResolver
+    this.autoResolutionEngine = options?.autoResolutionEngine
+    this.autoResolutionConfigStore = options?.autoResolutionConfigStore
+    this.vaultOwnerResolver = options?.vaultOwnerResolver
+  }
 
   /**
    * Registers a callback to be invoked after a successful pull that wrote files to disk.
@@ -93,6 +127,11 @@ export class SyncService implements ISyncService {
    */
   setOnPullComplete(callback: (vaultId: string) => void): void {
     this.onPullComplete = callback
+  }
+
+  /** Set the optional EventBus for realtime sync:conflict event publishing. */
+  setEventBus(eventBus: IEventBus): void {
+    this.eventBus = eventBus
   }
 
   // ─── Configuration Management ────────────────────────────────────────────
@@ -492,12 +531,40 @@ export class SyncService implements ISyncService {
 
       // Store conflicts from pull (only for documents without existing conflicts)
       let conflictsDetected = 0
+      const newConflicts: ConflictEntry[] = []
       for (const conflict of pullResult.conflicts) {
         const alreadyExists = await this.conflictStore.exists(vaultId, conflict.documentPath)
         if (!alreadyExists) {
           await this.conflictStore.add(vaultId, conflict)
           conflictsDetected++
+          newConflicts.push(conflict)
         }
+      }
+
+      // Publish sync:conflict SSE events for newly detected conflicts
+      if (newConflicts.length > 0 && this.eventBus) {
+        const ownerId = this.vaultOwnerResolver?.(vaultId)
+        if (ownerId) {
+          for (const conflict of newConflicts) {
+            const categorized = conflict as Partial<CategorizedConflictEntry>
+            this.eventBus.publish({
+              type: 'sync:conflict',
+              payload: {
+                vaultId,
+                path: conflict.documentPath,
+                category: categorized.category ?? 'content_conflict',
+              },
+              target: { kind: 'user', userId: ownerId },
+            })
+          }
+        }
+      }
+
+      // Evaluate auto-resolution for newly detected conflicts
+      if (newConflicts.length > 0) {
+        await this.evaluateAutoResolution(
+          vaultId, newConflicts, vaultPath, connection, config.e2eEnabled, e2ePassphrase,
+        )
       }
 
       // Execute push if bidirectional
@@ -810,6 +877,181 @@ export class SyncService implements ISyncService {
     }
   }
 
+  // ─── Conflict Resolution (Extended) ─────────────────────────────────────────
+
+  /**
+   * Returns categorized conflicts with enriched metadata.
+   * Loads conflicts from the store and assigns a default category (content_conflict)
+   * to legacy entries that lack one.
+   */
+  async getCategorizedConflicts(vaultId: string): Promise<CategorizedConflictEntry[]> {
+    const conflicts = await this.conflictStore.getAll(vaultId)
+    const categorized: CategorizedConflictEntry[] = []
+
+    for (const conflict of conflicts) {
+      // Check if the conflict already has a category (newer entries from categorizer)
+      const existing = conflict as Partial<CategorizedConflictEntry>
+      if (existing.category) {
+        categorized.push(existing as CategorizedConflictEntry)
+      } else {
+        // Legacy entries without category — apply default
+        categorized.push(applyDefaultCategory(conflict))
+      }
+    }
+
+    return categorized
+  }
+
+  /**
+   * Resolves a conflict with full content (manual merge).
+   * Delegates to ConflictResolver with a `manual_merge` resolution action.
+   * @throws ConflictResolutionError if resolution fails or conflictResolver is not configured.
+   */
+  async resolveConflictWithContent(vaultId: string, documentPath: string, content: string): Promise<void> {
+    if (!this.conflictResolver) {
+      throw new ConflictResolutionError('Conflict resolver not configured')
+    }
+
+    const config = await this.configStore.load(vaultId)
+    if (!config) {
+      throw new SyncNotConfiguredError()
+    }
+
+    const vaultPath = this.vaultPathResolver(vaultId)
+    if (!vaultPath) {
+      throw new SyncNotConfiguredError()
+    }
+
+    const username = this.cryptoService.decrypt(config.usernameEncrypted)
+    const password = this.cryptoService.decrypt(config.passwordEncrypted)
+    const e2ePassphrase = config.e2eEnabled && config.e2ePassphraseEncrypted
+      ? this.cryptoService.decrypt(config.e2ePassphraseEncrypted)
+      : undefined
+
+    const connection: SyncConnectionParams = {
+      endpoint: config.endpoint,
+      database: config.database,
+      username,
+      password,
+    }
+
+    const result = await this.conflictResolver.resolve({
+      vaultId,
+      vaultPath,
+      documentPath,
+      resolution: { type: 'manual_merge', content },
+      connection,
+      e2eEnabled: config.e2eEnabled,
+      e2ePassphrase,
+    })
+
+    if (!result.success) {
+      throw new ConflictResolutionError(result.error ?? 'Manual merge resolution failed')
+    }
+  }
+
+  /**
+   * Resolves multiple conflicts in batch.
+   * Delegates to ConflictResolver.resolveBatch() with per-item error isolation.
+   * @throws ConflictResolutionError if conflictResolver is not configured.
+   */
+  async resolveConflictBatch(
+    vaultId: string,
+    resolutions: Array<{ documentPath: string; resolution: ConflictResolutionAction }>,
+  ): Promise<BatchResolveResult> {
+    if (!this.conflictResolver) {
+      throw new ConflictResolutionError('Conflict resolver not configured')
+    }
+
+    const config = await this.configStore.load(vaultId)
+    if (!config) {
+      throw new SyncNotConfiguredError()
+    }
+
+    const vaultPath = this.vaultPathResolver(vaultId)
+    if (!vaultPath) {
+      throw new SyncNotConfiguredError()
+    }
+
+    const username = this.cryptoService.decrypt(config.usernameEncrypted)
+    const password = this.cryptoService.decrypt(config.passwordEncrypted)
+    const e2ePassphrase = config.e2eEnabled && config.e2ePassphraseEncrypted
+      ? this.cryptoService.decrypt(config.e2ePassphraseEncrypted)
+      : undefined
+
+    const connection: SyncConnectionParams = {
+      endpoint: config.endpoint,
+      database: config.database,
+      username,
+      password,
+    }
+
+    return this.conflictResolver.resolveBatch({
+      vaultId,
+      vaultPath,
+      conflicts: resolutions,
+      connection,
+      e2eEnabled: config.e2eEnabled,
+      e2ePassphrase,
+    })
+  }
+
+  /**
+   * Gets file content for diff view (local or remote).
+   * - local: reads from the vault filesystem
+   * - remote: fetches from CouchDB and decodes content
+   * @throws FileContentUnavailableError if content cannot be retrieved.
+   */
+  async getFileContent(vaultId: string, documentPath: string, source: 'local' | 'remote'): Promise<string | null> {
+    const vaultPath = this.vaultPathResolver(vaultId)
+    if (!vaultPath) {
+      throw new FileContentUnavailableError('Vault path not found')
+    }
+
+    if (source === 'local') {
+      return this.readLocalFileContent(vaultPath, documentPath)
+    }
+
+    return this.fetchRemoteFileContent(vaultId, documentPath)
+  }
+
+  /**
+   * Gets the auto-resolution configuration for a vault.
+   * Returns default config if the store is not configured.
+   */
+  async getAutoResolutionConfig(vaultId: string): Promise<AutoResolutionConfig> {
+    if (!this.autoResolutionConfigStore) {
+      return { enabled: false, strategies: {} }
+    }
+    return this.autoResolutionConfigStore.load(vaultId)
+  }
+
+  /**
+   * Sets the auto-resolution configuration for a vault.
+   * @throws ConflictResolutionError if the config store is not configured.
+   */
+  async setAutoResolutionConfig(vaultId: string, config: AutoResolutionConfig): Promise<void> {
+    if (!this.autoResolutionConfigStore) {
+      throw new ConflictResolutionError('Auto-resolution config store not configured')
+    }
+    await this.autoResolutionConfigStore.save(vaultId, config)
+  }
+
+  /**
+   * Pauses the sync scheduler for a vault (e.g. when the Conflict Wizard is open).
+   * While paused, scheduled sync callbacks are skipped.
+   */
+  pauseScheduler(vaultId: string): void {
+    this.scheduler.pause(vaultId)
+  }
+
+  /**
+   * Resumes the sync scheduler for a vault (e.g. when the Conflict Wizard is closed).
+   */
+  resumeScheduler(vaultId: string): void {
+    this.scheduler.resume(vaultId)
+  }
+
   // ─── Private Helpers ─────────────────────────────────────────────────────
 
   /**
@@ -841,6 +1083,205 @@ export class SyncService implements ISyncService {
     }
 
     return response
+  }
+
+  /**
+   * Reads local file content as UTF-8 string.
+   * Returns null if the file does not exist.
+   * @throws FileContentUnavailableError on read errors other than ENOENT.
+   */
+  private async readLocalFileContent(vaultPath: string, documentPath: string): Promise<string | null> {
+    const filePath = join(vaultPath, documentPath)
+    try {
+      const content = await readFile(filePath, 'utf-8')
+      return content
+    } catch (error: unknown) {
+      if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return null
+      }
+      const message = error instanceof Error ? error.message : 'Unknown read error'
+      throw new FileContentUnavailableError(`Failed to read local file: ${message}`)
+    }
+  }
+
+  /**
+   * Fetches file content from CouchDB for the remote version.
+   * Loads config, fetches the document, and decodes text content.
+   * Returns null if the document does not exist remotely.
+   * @throws FileContentUnavailableError on fetch errors.
+   */
+  private async fetchRemoteFileContent(vaultId: string, documentPath: string): Promise<string | null> {
+    const config = await this.configStore.load(vaultId)
+    if (!config) {
+      throw new FileContentUnavailableError('Sync not configured')
+    }
+
+    const username = this.cryptoService.decrypt(config.usernameEncrypted)
+    const password = this.cryptoService.decrypt(config.passwordEncrypted)
+    const e2ePassphrase = config.e2eEnabled && config.e2ePassphraseEncrypted
+      ? this.cryptoService.decrypt(config.e2ePassphraseEncrypted)
+      : undefined
+
+    const docId = documentPath
+    const url = `${config.endpoint}/${config.database}/${encodeURIComponent(docId)}`
+    const credentials = Buffer.from(`${username}:${password}`).toString('base64')
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30_000)
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Basic ${credentials}`,
+          'Accept': 'application/json',
+        },
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (response.status === 404) {
+        return null
+      }
+
+      if (!response.ok) {
+        throw new FileContentUnavailableError(`CouchDB GET failed with status ${response.status}`)
+      }
+
+      const doc = await response.json() as Record<string, unknown>
+
+      // Check if document is deleted
+      if (doc['deleted'] === true || doc['_deleted'] === true) {
+        return null
+      }
+
+      // Decode content from CouchDB document
+      const data = doc['data'] as string | string[] | undefined
+      if (data === undefined) {
+        return null
+      }
+
+      let rawContent: string
+      if (Array.isArray(data)) {
+        rawContent = data.join('')
+      } else {
+        rawContent = data
+      }
+
+      // If E2E enabled, decrypt content
+      if (config.e2eEnabled && e2ePassphrase) {
+        try {
+          const encrypted = Buffer.from(rawContent, 'base64')
+          const decrypted = this.cryptoService.decryptDocument(encrypted, e2ePassphrase)
+          return decrypted.toString('utf-8')
+        } catch {
+          throw new FileContentUnavailableError('Failed to decrypt remote file content')
+        }
+      }
+
+      // For binary documents (type "newnote"), decode from base64
+      const docType = doc['type'] as string | undefined
+      if (docType === 'newnote') {
+        const decoded = Buffer.from(rawContent, 'base64')
+        return decoded.toString('utf-8')
+      }
+
+      // For plain text documents, content is already UTF-8
+      return rawContent
+    } catch (error: unknown) {
+      clearTimeout(timeoutId)
+      if (error instanceof FileContentUnavailableError) {
+        throw error
+      }
+      const message = error instanceof Error ? error.message : 'Unknown fetch error'
+      throw new FileContentUnavailableError(`Failed to fetch remote file: ${message}`)
+    }
+  }
+
+  /**
+   * Evaluates auto-resolution for newly detected conflicts during a sync run.
+   * If auto-resolution is configured and enabled, resolves conflicts automatically
+   * and logs each resolution with the `auto_resolved` marker.
+   */
+  private async evaluateAutoResolution(
+    vaultId: string,
+    conflicts: ConflictEntry[],
+    vaultPath: string,
+    connection: SyncConnectionParams,
+    e2eEnabled: boolean,
+    e2ePassphrase?: string,
+  ): Promise<AutoResolvedLogDetail[]> {
+    if (!this.autoResolutionEngine || !this.autoResolutionConfigStore || !this.conflictResolver) {
+      return []
+    }
+
+    const config = await this.autoResolutionConfigStore.load(vaultId)
+    if (!config.enabled) {
+      return []
+    }
+
+    const results: AutoResolvedLogDetail[] = []
+
+    for (const conflict of conflicts) {
+      // Categorize the conflict for strategy evaluation
+      const categorized = applyDefaultCategory(conflict)
+
+      // Evaluate the strategy
+      const action = this.autoResolutionEngine.evaluate(categorized, config)
+      if (!action) {
+        continue
+      }
+
+      const strategy = config.strategies[categorized.category]
+      if (!strategy) {
+        continue
+      }
+
+      // Attempt resolution
+      const resolveResult = await this.conflictResolver.resolve({
+        vaultId,
+        vaultPath,
+        documentPath: conflict.documentPath,
+        resolution: action,
+        connection,
+        e2eEnabled,
+        e2ePassphrase,
+      })
+
+      const detail: AutoResolvedLogDetail = {
+        documentPath: conflict.documentPath,
+        category: categorized.category,
+        strategy,
+        resolution: action.type === 'use_remote' ? 'use_remote'
+          : action.type === 'use_local' ? 'use_local'
+          : 'skip',
+        success: resolveResult.success,
+        ...(resolveResult.error !== undefined ? { error: resolveResult.error } : {}),
+      }
+
+      results.push(detail)
+
+      if (resolveResult.success) {
+        this.logger.info('Conflict auto-resolved', {
+          vaultId,
+          documentPath: conflict.documentPath,
+          strategy,
+          resolution: detail.resolution,
+          marker: 'auto_resolved',
+        })
+      } else {
+        this.logger.warn('Auto-resolution failed, conflict remains unresolved', {
+          vaultId,
+          documentPath: conflict.documentPath,
+          strategy,
+          error: resolveResult.error,
+          marker: 'auto_resolved',
+        })
+      }
+    }
+
+    return results
   }
 
   /**
@@ -981,11 +1422,20 @@ export class SyncService implements ISyncService {
       protocol?.pullComplete(pullResult.pulledCount, pullResult.conflicts.length, pullResult.errors.length)
 
       // Store conflicts from pull (only for documents without existing conflicts)
+      const newScheduledConflicts: ConflictEntry[] = []
       for (const conflict of pullResult.conflicts) {
         const alreadyExists = await this.conflictStore.exists(vaultId, conflict.documentPath)
         if (!alreadyExists) {
           await this.conflictStore.add(vaultId, conflict)
+          newScheduledConflicts.push(conflict)
         }
+      }
+
+      // Evaluate auto-resolution for newly detected conflicts
+      if (newScheduledConflicts.length > 0) {
+        await this.evaluateAutoResolution(
+          vaultId, newScheduledConflicts, vaultPath, connection, config.e2eEnabled, e2ePassphrase,
+        )
       }
 
       // Execute push if bidirectional

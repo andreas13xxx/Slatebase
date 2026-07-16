@@ -46,7 +46,8 @@
 .tab-content--edit,
 .tab-content--view,
 .tab-content--binary,
-.tab-content--graph {
+.tab-content--graph,
+.tab-content--plugin-view {
   flex: 1;
   overflow: auto;
   min-height: 0;

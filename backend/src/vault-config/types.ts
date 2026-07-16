@@ -1,13 +1,13 @@
 /**
  * Per-vault configuration data models.
- * Persisted as `.vault-config.json` inside each vault's data directory.
+ * Persisted as `.slatebase/config.json` inside each vault's data directory.
  */
 
 // ─── Data Model ──────────────────────────────────────────────────────────────
 
 /** Per-vault configuration settings. */
 export interface VaultConfig {
-  /** Directory for note templates (relative to vault root). Default: "_templates". */
+  /** Directory for note templates (relative to vault root). Default: "Templates". */
   templatesDirectory: string
   /** Directory for daily notes (relative to vault root). Empty string = vault root. */
   dailyNotesDirectory: string
@@ -15,7 +15,7 @@ export interface VaultConfig {
 
 /** Default vault configuration values. */
 export const DEFAULT_VAULT_CONFIG: VaultConfig = {
-  templatesDirectory: '_templates',
+  templatesDirectory: 'Templates',
   dailyNotesDirectory: '',
 }
 

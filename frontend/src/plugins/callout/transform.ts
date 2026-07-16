@@ -22,7 +22,7 @@ export function transformCallouts(tree: Root): void {
     if (firstInline?.type !== 'text') return
 
     const textNode = firstInline as Text
-    const firstLine = textNode.value.split('\n')[0]
+    const firstLine = textNode.value.split('\n')[0]?.replace(/\r$/, '')
     if (!firstLine) return
 
     const match = CALLOUT_REGEX.exec(firstLine)
@@ -74,7 +74,8 @@ function extractRemainingInlineContent(
   const result: PhrasingContent[] = []
 
   // Check if the first text node has content beyond the first line
-  const lines = firstTextNode.value.split('\n')
+  // Strip \r from each line to handle CRLF line endings
+  const lines = firstTextNode.value.split('\n').map(l => l.replace(/\r$/, ''))
   if (lines.length > 1) {
     const remainingText = lines.slice(1).join('\n')
     if (remainingText.length > 0) {

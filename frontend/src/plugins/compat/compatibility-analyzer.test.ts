@@ -277,32 +277,32 @@ describe('CompatibilityAnalyzer', () => {
       expect(call?.classification).toBe('supported');
     });
 
-    it('classifies workspace.trigger as partial', () => {
+    it('classifies workspace.trigger as supported', () => {
       const source = `this.app.workspace.trigger('my-event')`;
       const report = analyzer.analyze(source);
       const call = report.apiCalls.find(c => c.method === 'workspace.trigger');
-      expect(call?.classification).toBe('partial');
+      expect(call?.classification).toBe('supported');
     });
 
-    it('classifies vault.trigger as partial', () => {
+    it('classifies vault.trigger as supported', () => {
       const source = `this.app.vault.trigger('create', file)`;
       const report = analyzer.analyze(source);
       const call = report.apiCalls.find(c => c.method === 'vault.trigger');
-      expect(call?.classification).toBe('partial');
+      expect(call?.classification).toBe('supported');
     });
 
-    it('classifies workspace.getLeaf as unsupported', () => {
+    it('classifies workspace.getLeaf as supported', () => {
       const source = `this.app.workspace.getLeaf(true)`;
       const report = analyzer.analyze(source);
       const call = report.apiCalls.find(c => c.method === 'workspace.getLeaf');
-      expect(call?.classification).toBe('unsupported');
+      expect(call?.classification).toBe('supported');
     });
 
-    it('classifies workspace.getLeavesOfType as unsupported', () => {
+    it('classifies workspace.getLeavesOfType as supported', () => {
       const source = `this.app.workspace.getLeavesOfType('markdown')`;
       const report = analyzer.analyze(source);
       const call = report.apiCalls.find(c => c.method === 'workspace.getLeavesOfType');
-      expect(call?.classification).toBe('unsupported');
+      expect(call?.classification).toBe('supported');
     });
 
     it('classifies unknown methods as unsupported', () => {
@@ -340,7 +340,7 @@ describe('CompatibilityAnalyzer', () => {
       expect(report.level).toBe('full');
     });
 
-    it('returns partial when a partial method is used', () => {
+    it('returns full when trigger (now supported) is used', () => {
       const source = `
         class MyPlugin {
           async onload() {
@@ -350,10 +350,10 @@ describe('CompatibilityAnalyzer', () => {
         }
       `;
       const report = analyzer.analyze(source);
-      expect(report.level).toBe('partial');
+      expect(report.level).toBe('full');
     });
 
-    it('returns partial when an unsupported non-lifecycle-critical method is used', () => {
+    it('returns full when leaf methods (now supported) are used', () => {
       const source = `
         class MyPlugin {
           async onload() {
@@ -363,7 +363,7 @@ describe('CompatibilityAnalyzer', () => {
         }
       `;
       const report = analyzer.analyze(source);
-      expect(report.level).toBe('partial');
+      expect(report.level).toBe('full');
     });
 
     it('returns unsupported when a lifecycle-critical method is unsupported', () => {
@@ -516,7 +516,7 @@ describe('CompatibilityAnalyzer', () => {
       expect(report.apiCalls.map(c => c.method)).toContain('vault.getMarkdownFiles');
     });
 
-    it('analyzes a plugin using leaf management (unsupported)', () => {
+    it('analyzes a plugin using leaf management (now supported)', () => {
       const source = `
         class ViewPlugin extends Plugin {
           async onload() {
@@ -532,10 +532,9 @@ describe('CompatibilityAnalyzer', () => {
       const report = analyzer.analyze(source);
       expect(report.apiCalls.map(c => c.method)).toContain('workspace.getLeaf');
       expect(report.apiCalls.map(c => c.method)).toContain('workspace.setActiveLeaf');
-      // workspace.getLeaf and setActiveLeaf are unsupported but NOT lifecycle-critical
-      // Plugin.registerEvent, onload, onunload are lifecycle-critical but supported
-      // → partial (not unsupported)
-      expect(report.level).toBe('partial');
+      // workspace.getLeaf and setActiveLeaf are now supported
+      // → full compatibility
+      expect(report.level).toBe('full');
     });
 
     it('analyzes a plugin using only supported metadata APIs', () => {

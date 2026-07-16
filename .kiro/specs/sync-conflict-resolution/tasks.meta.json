@@ -1,0 +1,613 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Extend sync types with ConflictCategory and CategorizedConflictEntry": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944795482
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944805662
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944916171
+      }
+    ],
+    "1.2 Create new error classes in `sync/errors.ts`": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944795552
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944806375
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944917338
+      }
+    ],
+    "1.3 Create conflict categorizer module (`sync/conflict-categorizer.ts`)": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944795609
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944925843
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783945110362
+      }
+    ],
+    "2.1 Create `sync/conflict-resolver.ts` implementing `IConflictResolver`": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944795683
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783945122692
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783945443829
+      }
+    ],
+    "3.1 Create `sync/auto-resolution-engine.ts` implementing `IAutoResolutionEngine`": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944795770
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783945123879
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783945445142
+      }
+    ],
+    "3.2 Create auto-resolution config persistence (`sync/auto-resolution-config-store.ts`)": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944795827
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944927005
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783945111663
+      }
+    ],
+    "4.1 Extend `sync/sync-scheduler.ts` with `pause(vaultId)`, `resume(vaultId)`, `isPaused(vaultId)`": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944795875
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944928218
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783945112871
+      }
+    ],
+    "5. Checkpoint - Backend infrastructure validation": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944795925
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783945478786
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783945528617
+      }
+    ],
+    "6.1 Extend `sync/sync-service.ts` with new methods": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944795981
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783945538754
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783945991804
+      }
+    ],
+    "6.2 Extend `sync/sync-engine.ts` to categorize conflicts during pull phase": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944796047
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783945539935
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783945992996
+      }
+    ],
+    "6.3 Add Zod validation schemas for new API inputs (`sync/validation.ts`)": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944796117
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783945541164
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783945994237
+      }
+    ],
+    "7.1 Add conflict resolution API routes to `api/syncRoutes.ts`": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944796162
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783946000611
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783946224095
+      }
+    ],
+    "7.2 Update barrel export `sync/index.ts` with new modules": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944796218
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783946001842
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783946225295
+      }
+    ],
+    "8.1 Wire new modules in `backend/src/index.ts`": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944796275
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783946003040
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783946226581
+      }
+    ],
+    "9. Checkpoint - Backend complete validation": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944796327
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783946231911
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783946283779
+      }
+    ],
+    "10.1 Create `components/conflict-wizard/diff-utils.ts` (Myers-Diff)": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944796372
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783946289862
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783946522524
+      }
+    ],
+    "10.4 Extend `IApiClient` interface with new sync endpoints": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944796451
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783946291077
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783946523725
+      }
+    ],
+    "11.1 Create `components/conflict-wizard/types.ts`": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944796515
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783946292289
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783946525040
+      }
+    ],
+    "11.2 Create `components/conflict-wizard/ConflictWizard.tsx` (main component)": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944796592
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783946530240
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947044148
+      }
+    ],
+    "12.1 Create `components/conflict-wizard/DiffView.tsx`": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944796682
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947050152
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947345185
+      }
+    ],
+    "12.2 Create `components/conflict-wizard/DiffView.css`": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944796743
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947352195
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947507156
+      }
+    ],
+    "13.1 Create `components/conflict-wizard/MergePreview.tsx`": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944796796
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947051376
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947344891
+      }
+    ],
+    "14.1 Create `components/conflict-wizard/BatchActions.tsx`": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944796852
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947052670
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947343548
+      }
+    ],
+    "15.1 Create `components/conflict-wizard/ConflictWizard.css`": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944796901
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947353392
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947508486
+      }
+    ],
+    "15.2 Add i18n keys for conflict wizard in `de.ts` and `en.ts`": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944796958
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783946531443
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947042923
+      }
+    ],
+    "16. Checkpoint - Frontend components validation": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944797023
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947514540
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947615463
+      }
+    ],
+    "17.1 Replace `ConflictResolutionView` usage with `ConflictWizard`": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944797085
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947621024
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783948475664
+      }
+    ],
+    "17.2 Create barrel export `components/conflict-wizard/index.ts`": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944797145
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947622241
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783948476848
+      }
+    ],
+    "17.3 Extend SSE `sync:conflict` event with `category` field": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944797211
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947623443
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783948478046
+      }
+    ],
+    "18. Final checkpoint - Full integration validation": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783944797273
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783948483678
+      },
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783948589664
+      }
+    ],
+    "1. Backend: Typen, Errors und Conflict-Kategorisierung": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783945110443
+      }
+    ],
+    "4. Backend: SyncScheduler pause/resume extension": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783945113890
+      }
+    ],
+    "2. Backend: ConflictResolver (atomic resolution with rollback)": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783945443889
+      }
+    ],
+    "3. Backend: AutoResolutionEngine": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783945445232
+      }
+    ],
+    "6. Backend: SyncService extensions and SyncEngine categorization": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783945995224
+      }
+    ],
+    "7. Backend: New API endpoints in syncRoutes.ts": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783946225382
+      }
+    ],
+    "8. Backend: Composition root wiring": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783946226685
+      }
+    ],
+    "10. Frontend: Diff utility and API client extensions": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783946523826
+      }
+    ],
+    "11. Frontend: ConflictWizard types and state": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947044250
+      }
+    ],
+    "14. Frontend: BatchActions component": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947343643
+      }
+    ],
+    "13. Frontend: MergePreview component": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947344981
+      }
+    ],
+    "12. Frontend: DiffView component": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947507242
+      }
+    ],
+    "15. Frontend: CSS and i18n": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783947508595
+      }
+    ],
+    "17. Integration: Wire ConflictWizard into application": [
+      {
+        "executionId": "d1cfb05b-7352-4792-96ba-be84dd2234db",
+        "chatSessionId": "sess_28dd463a-9fc6-4097-b0d5-72da74a7ab04",
+        "timestamp": 1783948478135
+      }
+    ]
+  }
+}

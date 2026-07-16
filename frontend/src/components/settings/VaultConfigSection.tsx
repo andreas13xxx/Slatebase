@@ -96,7 +96,7 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
           Vorlagen-Verzeichnis
         </label>
         <p className="settings-field-hint">
-          Relativer Pfad im Vault für Markdown-Vorlagen. Standard: <code>_templates</code>
+          Relativer Pfad im Vault für Markdown-Vorlagen. Standard: <code>Templates</code>
         </p>
         <input
           id="vault-templates-dir"
@@ -104,7 +104,7 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
           className="settings-field-input"
           value={templatesDir}
           onChange={(e) => setTemplatesDir(e.target.value)}
-          placeholder="_templates"
+          placeholder="Templates"
           disabled={saving}
         />
       </div>

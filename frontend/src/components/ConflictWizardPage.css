@@ -1,0 +1,122 @@
+/* ===== ConflictWizardPage — Sync & Conflict Tab ===== */
+
+.conflict-wizard-page {
+  padding: 24px;
+  overflow-y: auto;
+  height: 100%;
+  background: var(--bg-elevated);
+}
+
+/* ── Sync Status Card ── */
+.conflict-wizard-page__status {
+  margin-bottom: 20px;
+  padding: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.conflict-wizard-page__status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.conflict-wizard-page__status-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Badges (same style as sync-status-panel badges) */
+.conflict-wizard-page__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.conflict-wizard-page__badge--active {
+  background: var(--success-bg, rgba(34, 197, 94, 0.1));
+  color: var(--success, #16a34a);
+  border: 1px solid var(--success-border, rgba(34, 197, 94, 0.3));
+}
+
+.conflict-wizard-page__badge--disabled {
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+}
+
+.conflict-wizard-page__badge--warning {
+  background: var(--warning-bg, rgba(217, 119, 6, 0.1));
+  color: var(--warning, #d97706);
+  border: 1px solid var(--warning-border, rgba(217, 119, 6, 0.3));
+}
+
+/* Last sync result row */
+.conflict-wizard-page__last-sync {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  line-height: 1.4;
+}
+
+.conflict-wizard-page__last-sync--success {
+  color: var(--success, #16a34a);
+  background: var(--success-bg, rgba(34, 197, 94, 0.1));
+  border: 1px solid var(--success-border, rgba(34, 197, 94, 0.3));
+}
+
+.conflict-wizard-page__last-sync--error {
+  color: var(--danger-text);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+}
+
+/* Sync trigger button (matches sync-status-panel-btn style) */
+.conflict-wizard-page__sync-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.conflict-wizard-page__sync-btn:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.conflict-wizard-page__sync-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@keyframes conflict-wizard-page-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.conflict-wizard-page__spinner {
+  animation: conflict-wizard-page-spin 1s linear infinite;
+}

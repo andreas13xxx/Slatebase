@@ -52,7 +52,7 @@ describe('TrashService', () => {
   }
 
   async function readIndex(): Promise<TrashIndex> {
-    const indexPath = path.join(vaultDir, '.trash', '_index.json')
+    const indexPath = path.join(vaultDir, '.slatebase', 'trash', '_index.json')
     const raw = await fs.readFile(indexPath, 'utf-8')
     return JSON.parse(raw)
   }
@@ -69,7 +69,7 @@ describe('TrashService', () => {
   // ─── moveToTrash ────────────────────────────────────────────────────────────
 
   describe('moveToTrash', () => {
-    it('moves a file to .trash/ and records entry in _index.json', async () => {
+    it('moves a file to .slatebase/trash/ and records entry in _index.json', async () => {
       await createFile('notes/hello.md', 'hello world')
 
       const entry = await service.moveToTrash('vault1', 'notes/hello.md')
@@ -77,8 +77,8 @@ describe('TrashService', () => {
       // File should no longer exist at original path
       expect(await fileExists('notes/hello.md')).toBe(false)
 
-      // File should exist in .trash/<id>/hello.md
-      const trashFilePath = path.join(vaultDir, '.trash', entry.id, 'hello.md')
+      // File should exist in .slatebase/trash/<id>/hello.md
+      const trashFilePath = path.join(vaultDir, '.slatebase', 'trash', entry.id, 'hello.md')
       const content = await fs.readFile(trashFilePath, 'utf-8')
       expect(content).toBe('hello world')
 
@@ -94,7 +94,7 @@ describe('TrashService', () => {
       expect(index.entries[0]!.id).toBe(entry.id)
     })
 
-    it('moves a directory to .trash/', async () => {
+    it('moves a directory to .slatebase/trash/', async () => {
       await createDirectory('docs/archive')
       await createFile('docs/archive/file1.md', 'content1')
       await createFile('docs/archive/file2.md', 'content2')
@@ -105,7 +105,7 @@ describe('TrashService', () => {
       expect(await fileExists('docs/archive')).toBe(false)
 
       // Directory contents should be preserved in trash
-      const trashFile1 = path.join(vaultDir, '.trash', entry.id, 'archive', 'file1.md')
+      const trashFile1 = path.join(vaultDir, '.slatebase', 'trash', entry.id, 'archive', 'file1.md')
       expect(await fs.readFile(trashFile1, 'utf-8')).toBe('content1')
     })
 
@@ -239,7 +239,7 @@ describe('TrashService', () => {
       await service.deletePermanently('vault1', entry.id)
 
       // Entry directory should not exist
-      const entryDir = path.join(vaultDir, '.trash', entry.id)
+      const entryDir = path.join(vaultDir, '.slatebase', 'trash', entry.id)
       expect(await fileExists(path.relative(vaultDir, entryDir))).toBe(false)
 
       // Index should be empty
@@ -265,7 +265,7 @@ describe('TrashService', () => {
       await service.moveToTrash('vault1', 'old.md')
 
       // Manually backdate the entry in the index
-      const indexPath = path.join(vaultDir, '.trash', '_index.json')
+      const indexPath = path.join(vaultDir, '.slatebase', 'trash', '_index.json')
       const index: TrashIndex = JSON.parse(await fs.readFile(indexPath, 'utf-8'))
       const oldDate = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString()
       index.entries[0]!.deletedAt = oldDate
@@ -297,7 +297,7 @@ describe('TrashService', () => {
       await service.moveToTrash('vault1', 'recent.md')
 
       // Backdate only the first entry
-      const indexPath = path.join(vaultDir, '.trash', '_index.json')
+      const indexPath = path.join(vaultDir, '.slatebase', 'trash', '_index.json')
       const index: TrashIndex = JSON.parse(await fs.readFile(indexPath, 'utf-8'))
       const oldDate = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString()
       index.entries[0]!.deletedAt = oldDate

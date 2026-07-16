@@ -240,22 +240,43 @@ export class PluginStore implements IPluginStore {
   /**
    * Writes content to a file atomically using temp file + rename.
    * Uses a random suffix for the temp file to avoid collisions.
+   * Retries on EPERM/EACCES errors (common on Windows due to file locking).
    */
   private async atomicWrite(filePath: string, content: string): Promise<void> {
     const tempPath = `${filePath}.${crypto.randomBytes(8).toString('hex')}.tmp`
 
     await fs.writeFile(tempPath, content, 'utf-8')
 
-    try {
-      await fs.rename(tempPath, filePath)
-    } catch (renameError) {
+    let lastError: unknown = null
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        await fs.unlink(tempPath)
-      } catch {
-        // Ignore cleanup errors
+        await fs.rename(tempPath, filePath)
+        return
+      } catch (renameError) {
+        lastError = renameError
+        const code = isNodeError(renameError) ? renameError.code : ''
+        if (code === 'EPERM' || code === 'EACCES') {
+          // Windows file locking — wait and retry
+          await new Promise(resolve => setTimeout(resolve, 50 * (attempt + 1)))
+          continue
+        }
+        // Non-retryable error — cleanup and throw immediately
+        try {
+          await fs.unlink(tempPath)
+        } catch {
+          // Ignore cleanup errors
+        }
+        throw renameError
       }
-      throw renameError
     }
+
+    // All retries exhausted — cleanup temp file and throw
+    try {
+      await fs.unlink(tempPath)
+    } catch {
+      // Ignore cleanup errors
+    }
+    throw lastError
   }
 
   /**

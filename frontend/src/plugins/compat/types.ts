@@ -1,3 +1,5 @@
+import type { WorkspaceLeaf } from './view-registry'
+
 /**
  * EventRef — Reference to a registered event listener.
  * Used for tracking and deregistering event subscriptions.
@@ -22,13 +24,64 @@ export interface IEventEmitter {
 
 /**
  * IWorkspaceShim — Obsidian Workspace API emulation interface.
- * Provides active file tracking, event emission, and no-op stubs for non-emulated methods.
+ * Provides active file tracking, event emission, leaf management, view management,
+ * and no-op stubs for non-emulated methods.
  */
 export interface IWorkspaceShim {
+  // ─── Existing Methods ──────────────────────────────────────────────────────
+
+  /** Returns the currently active TFile, or null if no file tab is active. */
   getActiveFile(): TFile | null;
+  /** Register an event listener. */
   on(event: string, callback: (...args: unknown[]) => void): EventRef;
+  /** Unregister an event listener. */
   off(event: string, callback: (...args: unknown[]) => void): void;
+  /** Emit an event with the given arguments. */
   trigger(event: string, ...args: unknown[]): void;
+
+  // ─── Leaf Management ───────────────────────────────────────────────────────
+
+  /** Get or create a workspace leaf. Pass `true` to force a new leaf (tab). */
+  getLeaf(newLeaf?: boolean | string): WorkspaceLeaf;
+  /** Get or create a leaf in the right sidebar (Context Panel). */
+  getRightLeaf(split?: boolean): WorkspaceLeaf;
+  /** Get or create a leaf in the left sidebar (rendered in Context Panel). */
+  getLeftLeaf(split?: boolean): WorkspaceLeaf;
+  /** Returns the currently active leaf, or null if none is active. */
+  getActiveLeaf(): WorkspaceLeaf | null;
+  /** Set the given leaf as the active leaf (activates the associated tab). */
+  setActiveLeaf(leaf: WorkspaceLeaf): void;
+  /** Get an unpinned leaf (creates a new leaf; Slatebase has no pinning). */
+  getUnpinnedLeaf(): WorkspaceLeaf;
+  /** Reveal a leaf by activating its tab or sidebar section. */
+  revealLeaf(leaf: WorkspaceLeaf): void;
+  /** Create a new leaf by splitting an existing leaf (opens as new tab). */
+  createLeafBySplit(leaf: WorkspaceLeaf): WorkspaceLeaf;
+  /** Split the active leaf (opens as new tab). */
+  splitActiveLeaf(): WorkspaceLeaf;
+
+  // ─── View Management ───────────────────────────────────────────────────────
+
+  /** Register a view type with its factory function. */
+  registerView(viewType: string, creator: (leaf: WorkspaceLeaf) => unknown): void;
+  /** Get all leaves whose view matches the given view type. */
+  getLeavesOfType(viewType: string): WorkspaceLeaf[];
+  /** Detach (close) all leaves of the given view type. */
+  detachLeavesOfType(viewType: string): void;
+  /** Get the active view if it is an instance of the given class, or null. */
+  getActiveViewOfType<T>(viewClass: new (...args: unknown[]) => T): T | null;
+  /** Iterate over all active leaves (main area and sidebar). */
+  iterateAllLeaves(callback: (leaf: WorkspaceLeaf) => void): void;
+  /** Iterate over root leaves only (main area tabs, not sidebar). */
+  iterateRootLeaves(callback: (leaf: WorkspaceLeaf) => void): void;
+
+  // ─── Link Navigation ───────────────────────────────────────────────────────
+
+  /** Resolve and open a wikilink target in a tab. */
+  openLinkText(linkText: string, sourcePath: string): Promise<void>;
+
+  /** Execute a callback when the workspace layout is ready. */
+  onLayoutReady(callback: () => void): void;
 }
 
 // ─── Obsidian-compatible data models ───────────────────────────────────────────
@@ -40,11 +93,13 @@ export interface IVaultShim {
   read(file: TFile): Promise<string>;
   modify(file: TFile, content: string): Promise<void>;
   create(path: string, content?: string): Promise<TFile>;
+  createFolder(path: string): Promise<TFolder>;
   delete(file: TAbstractFile): Promise<void>;
   getAbstractFileByPath(path: string): TAbstractFile | null;
   getMarkdownFiles(): TFile[];
   getFiles(): TFile[];
   getName(): string;
+  getConfig(key: string): unknown;
   on(event: string, callback: (...args: unknown[]) => void): EventRef;
   off(event: string, callback: (...args: unknown[]) => void): void;
   trigger(event: string, ...args: unknown[]): void;

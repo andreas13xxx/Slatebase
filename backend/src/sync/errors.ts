@@ -95,3 +95,63 @@ export class ConflictResolutionError extends Error {
     this.name = 'ConflictResolutionError'
   }
 }
+
+/**
+ * Thrown when a conflict for the specified document path cannot be found in the conflict store.
+ */
+export class ConflictNotFoundError extends Error {
+  public readonly code = 'CONFLICT_NOT_FOUND'
+
+  constructor(message = 'Conflict for the specified path not found') {
+    super(message)
+    this.name = 'ConflictNotFoundError'
+  }
+}
+
+/**
+ * Thrown when a batch conflict resolution request exceeds the maximum allowed size of 100 items.
+ */
+export class BatchLimitExceededError extends Error {
+  public readonly code = 'BATCH_LIMIT_EXCEEDED'
+
+  constructor(message = 'Batch size exceeds the maximum limit of 100 conflicts') {
+    super(message)
+    this.name = 'BatchLimitExceededError'
+  }
+}
+
+/**
+ * Thrown when file content cannot be retrieved for the diff view (file deleted or CouchDB error).
+ */
+export class FileContentUnavailableError extends Error {
+  public readonly code = 'FILE_CONTENT_UNAVAILABLE'
+
+  constructor(message = 'File content is unavailable (deleted or retrieval error)') {
+    super(message)
+    this.name = 'FileContentUnavailableError'
+  }
+}
+
+/**
+ * Thrown when attempting to pause a sync scheduler that is already paused for the vault.
+ */
+export class SchedulerAlreadyPausedError extends Error {
+  public readonly code = 'SCHEDULER_ALREADY_PAUSED'
+
+  constructor(message = 'Scheduler is already paused for this vault') {
+    super(message)
+    this.name = 'SchedulerAlreadyPausedError'
+  }
+}
+
+/**
+ * Thrown when an auto-resolution configuration is invalid (e.g. unknown strategy or malformed structure).
+ */
+export class AutoResolutionConfigError extends Error {
+  public readonly code = 'AUTO_RESOLUTION_CONFIG_ERROR'
+
+  constructor(message = 'Invalid auto-resolution configuration') {
+    super(message)
+    this.name = 'AutoResolutionConfigError'
+  }
+}

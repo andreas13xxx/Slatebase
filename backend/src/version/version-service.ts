@@ -14,10 +14,13 @@ export type VaultPathResolver = (vaultId: string) => string | null
 
 /**
  * Service for file versioning.
- * Stores previous file content under `.versions/` before each save and
+ * Stores previous file content under `.slatebase/versions/` before each save and
  * provides retrieval, restoration, and cleanup operations.
  */
 export class VersionService implements IVersionService {
+  /** Versions directory path relative to vault root. */
+  private static readonly VERSIONS_DIR = path.join('.slatebase', 'versions')
+
   constructor(
     private readonly resolveVaultPath: VaultPathResolver,
     private readonly maxVersionsPerFile: number,
@@ -165,14 +168,14 @@ export class VersionService implements IVersionService {
 
   /**
    * Moves version history when a file is renamed or moved.
-   * Renames the `.versions/oldPath/` directory to `.versions/newPath/`.
+   * Renames the `.slatebase/versions/oldPath/` directory to `.slatebase/versions/newPath/`.
    */
   async moveVersions(vaultId: string, oldPath: string, newPath: string): Promise<void> {
     const vaultPath = this.resolveVaultPath(vaultId)
     if (!vaultPath) return
 
-    const oldVersionDir = path.join(vaultPath, '.versions', oldPath)
-    const newVersionDir = path.join(vaultPath, '.versions', newPath)
+    const oldVersionDir = path.join(vaultPath, VersionService.VERSIONS_DIR, oldPath)
+    const newVersionDir = path.join(vaultPath, VersionService.VERSIONS_DIR, newPath)
 
     try {
       await fs.access(oldVersionDir)
@@ -237,6 +240,6 @@ export class VersionService implements IVersionService {
     if (!vaultPath) {
       throw new VersionNotFoundError(relativePath, 'unknown')
     }
-    return path.join(vaultPath, '.versions', relativePath)
+    return path.join(vaultPath, VersionService.VERSIONS_DIR, relativePath)
   }
 }

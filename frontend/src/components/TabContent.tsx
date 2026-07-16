@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useContext } from 'react'
 import { useTabContext } from '../state/tabContext'
 import { useAppContext } from '../state'
 import { openTab, saveTab } from '../state/tabActions'
@@ -11,6 +11,7 @@ import { CanvasView } from './canvas/CanvasView'
 import { ErrorBoundary } from './ErrorBoundary'
 import { useTranslation } from '../i18n'
 import { extractErrorMessage } from '../utils/error'
+import { PluginContext } from '../plugins/compat/plugin-context'
 import './TabContent.css'
 
 /**
@@ -65,6 +66,10 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
   const { t } = useTranslation()
   const [saving, setSaving] = useState(false)
   const [linkError, setLinkError] = useState<string | null>(null)
+
+  // Access plugin active views (nullable — context may be null if PluginProvider not in tree)
+  const pluginContext = useContext(PluginContext)
+  const pluginActiveViews = pluginContext?.activeViews ?? null
 
   const { tabs, activeTabId } = tabState
   const activeTab = activeTabId ? tabs.find((t) => t.id === activeTabId) ?? null : null
@@ -185,6 +190,30 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
         <ErrorBoundary>
           <GraphView vaultId={activeTab.vaultId} />
         </ErrorBoundary>
+      </div>
+    )
+  }
+
+  // Plugin view tab — render plugin view container
+  if (activeTab.filePath.startsWith('__view::')) {
+    const viewType = activeTab.filePath.slice('__view::'.length)
+    const viewInfo = pluginActiveViews?.get(viewType)
+    if (viewInfo) {
+      return (
+        <div
+          className="tab-content tab-content--plugin-view"
+          ref={(el) => {
+            if (el && !el.contains(viewInfo.containerEl)) {
+              el.appendChild(viewInfo.containerEl)
+            }
+          }}
+        />
+      )
+    }
+    // View not found (may have been deactivated) — show empty state
+    return (
+      <div className="tab-content tab-content--empty">
+        <p>{t('tabContent.noFileOpen')}</p>
       </div>
     )
   }

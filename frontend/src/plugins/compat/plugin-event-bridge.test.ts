@@ -10,6 +10,7 @@ import { renderHook } from '@testing-library/react'
 import { usePluginEventBridge } from './plugin-event-bridge'
 import { WorkspaceShim } from './shims/workspace-shim'
 import { MetadataCacheShim } from './shims/metadata-cache-shim'
+import { ViewRegistry } from './view-registry'
 import type { TabState } from '../../state/tabState'
 import type { DirectoryTree } from '../../types'
 
@@ -491,6 +492,352 @@ describe('usePluginEventBridge', () => {
 
       // It should still emit resolved on initial mount when tree is non-null
       expect(resolvedCb).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('Plugin-view-tab awareness (Req 11.1, 11.2, 11.3, 11.4, 3.7, 12.4)', () => {
+    it('emits active-leaf-change with WorkspaceLeaf when plugin-view-tab is active', () => {
+      // Setup a view registry with a registered view so getLeavesOfType returns a leaf
+      const registry = new ViewRegistry()
+      registry.registerView('calendar', (leaf: unknown) => {
+        const view = { getViewType: () => 'calendar', containerEl: document.createElement('div') }
+        ;(leaf as { view: unknown }).view = view
+        return view
+      }, 'test-plugin')
+      workspaceShim.setViewRegistry(registry, {})
+
+      // Create a leaf with view type 'calendar' via the registry
+      const leaf = registry.createLeaf({}, 'main')
+      void leaf.setViewState({ type: 'calendar' })
+
+      const leafChangeCb = vi.fn()
+      workspaceShim.on('active-leaf-change', leafChangeCb)
+
+      const tabState: TabState = {
+        tabs: [
+          {
+            id: 'vault1::__view::calendar',
+            vaultId: 'vault1',
+            filePath: '__view::calendar',
+            fileName: 'Calendar',
+            mode: 'view',
+            isBinary: false,
+            content: '',
+            editBuffer: null,
+            loading: false,
+            error: null,
+          },
+        ],
+        activeTabId: 'vault1::__view::calendar',
+      }
+
+      renderHook(() =>
+        usePluginEventBridge({
+          tabState,
+          directoryTree: mockTree,
+          workspaceShim,
+          metadataCacheShim,
+        }),
+      )
+
+      expect(leafChangeCb).toHaveBeenCalled()
+      // The last call should have the leaf (not null and not a TFile)
+      const lastCall = leafChangeCb.mock.calls[leafChangeCb.mock.calls.length - 1]
+      expect(lastCall[0]).toBe(leaf)
+    })
+
+    it('sets getActiveFile() to null when plugin-view-tab is active (Req 3.7, 12.4)', () => {
+      const registry = new ViewRegistry()
+      registry.registerView('kanban', (leaf: unknown) => {
+        const view = { getViewType: () => 'kanban', containerEl: document.createElement('div') }
+        ;(leaf as { view: unknown }).view = view
+        return view
+      }, 'test-plugin')
+      workspaceShim.setViewRegistry(registry, {})
+      const leaf = registry.createLeaf({}, 'main')
+      void leaf.setViewState({ type: 'kanban' })
+
+      const tabState: TabState = {
+        tabs: [
+          {
+            id: 'vault1::__view::kanban',
+            vaultId: 'vault1',
+            filePath: '__view::kanban',
+            fileName: 'Kanban',
+            mode: 'view',
+            isBinary: false,
+            content: '',
+            editBuffer: null,
+            loading: false,
+            error: null,
+          },
+        ],
+        activeTabId: 'vault1::__view::kanban',
+      }
+
+      renderHook(() =>
+        usePluginEventBridge({
+          tabState,
+          directoryTree: mockTree,
+          workspaceShim,
+          metadataCacheShim,
+        }),
+      )
+
+      expect(workspaceShim.getActiveFile()).toBeNull()
+    })
+
+    it('emits layout-change when a plugin-view-tab is opened', () => {
+      const layoutChangeCb = vi.fn()
+      workspaceShim.on('layout-change', layoutChangeCb)
+
+      const { rerender } = renderHook(
+        (props: { tabState: TabState }) =>
+          usePluginEventBridge({
+            tabState: props.tabState,
+            directoryTree: mockTree,
+            workspaceShim,
+            metadataCacheShim,
+          }),
+        { initialProps: { tabState: baseTabState } },
+      )
+
+      // Add a plugin-view-tab
+      const withPluginTab: TabState = {
+        tabs: [
+          {
+            id: 'vault1::__view::calendar',
+            vaultId: 'vault1',
+            filePath: '__view::calendar',
+            fileName: 'Calendar',
+            mode: 'view',
+            isBinary: false,
+            content: '',
+            editBuffer: null,
+            loading: false,
+            error: null,
+          },
+        ],
+        activeTabId: 'vault1::__view::calendar',
+      }
+      rerender({ tabState: withPluginTab })
+
+      expect(layoutChangeCb).toHaveBeenCalledTimes(1)
+    })
+
+    it('emits layout-change when a plugin-view-tab is closed', () => {
+      const pluginTab = {
+        id: 'vault1::__view::calendar',
+        vaultId: 'vault1',
+        filePath: '__view::calendar',
+        fileName: 'Calendar',
+        mode: 'view' as const,
+        isBinary: false,
+        content: '',
+        editBuffer: null,
+        loading: false,
+        error: null,
+      }
+
+      const layoutChangeCb = vi.fn()
+      workspaceShim.on('layout-change', layoutChangeCb)
+
+      const { rerender } = renderHook(
+        (props: { tabState: TabState }) =>
+          usePluginEventBridge({
+            tabState: props.tabState,
+            directoryTree: mockTree,
+            workspaceShim,
+            metadataCacheShim,
+          }),
+        { initialProps: { tabState: { tabs: [pluginTab], activeTabId: pluginTab.id } } },
+      )
+
+      // layout-change on initial render (count goes from 0 to 1)
+      expect(layoutChangeCb).toHaveBeenCalledTimes(1)
+
+      // Close the plugin view tab
+      rerender({ tabState: { tabs: [], activeTabId: null } })
+
+      expect(layoutChangeCb).toHaveBeenCalledTimes(2) // once for open, once for close
+    })
+
+    it('does not emit layout-change for regular file tab open/close', () => {
+      const layoutChangeCb = vi.fn()
+      workspaceShim.on('layout-change', layoutChangeCb)
+
+      const { rerender } = renderHook(
+        (props: { tabState: TabState }) =>
+          usePluginEventBridge({
+            tabState: props.tabState,
+            directoryTree: mockTree,
+            workspaceShim,
+            metadataCacheShim,
+          }),
+        { initialProps: { tabState: baseTabState } },
+      )
+
+      // Open a regular file tab
+      const fileTab: TabState = {
+        tabs: [
+          {
+            id: 'vault1::hello.md',
+            vaultId: 'vault1',
+            filePath: 'hello.md',
+            fileName: 'hello.md',
+            mode: 'view',
+            isBinary: false,
+            content: '# Hello',
+            editBuffer: null,
+            loading: false,
+            error: null,
+          },
+        ],
+        activeTabId: 'vault1::hello.md',
+      }
+      rerender({ tabState: fileTab })
+
+      expect(layoutChangeCb).not.toHaveBeenCalled()
+    })
+
+    it('emits active-leaf-change with null when no tab is active from plugin-view state', () => {
+      const registry = new ViewRegistry()
+      registry.registerView('calendar', (leaf: unknown) => {
+        const view = { getViewType: () => 'calendar', containerEl: document.createElement('div') }
+        ;(leaf as { view: unknown }).view = view
+        return view
+      }, 'test-plugin')
+      workspaceShim.setViewRegistry(registry, {})
+      const leaf = registry.createLeaf({}, 'main')
+      void leaf.setViewState({ type: 'calendar' })
+
+      const leafChangeCb = vi.fn()
+      workspaceShim.on('active-leaf-change', leafChangeCb)
+
+      const pluginTabState: TabState = {
+        tabs: [
+          {
+            id: 'vault1::__view::calendar',
+            vaultId: 'vault1',
+            filePath: '__view::calendar',
+            fileName: 'Calendar',
+            mode: 'view',
+            isBinary: false,
+            content: '',
+            editBuffer: null,
+            loading: false,
+            error: null,
+          },
+        ],
+        activeTabId: 'vault1::__view::calendar',
+      }
+
+      const { rerender } = renderHook(
+        (props: { tabState: TabState }) =>
+          usePluginEventBridge({
+            tabState: props.tabState,
+            directoryTree: mockTree,
+            workspaceShim,
+            metadataCacheShim,
+          }),
+        { initialProps: { tabState: pluginTabState } },
+      )
+
+      // Clear active - from plugin-view to no tab
+      rerender({ tabState: { tabs: [], activeTabId: null } })
+
+      // Should have emitted with leaf first, then with null
+      expect(leafChangeCb).toHaveBeenLastCalledWith(null)
+    })
+
+    it('does not emit file-open when plugin-view-tab becomes active', () => {
+      const fileOpenCb = vi.fn()
+      workspaceShim.on('file-open', fileOpenCb)
+
+      const tabState: TabState = {
+        tabs: [
+          {
+            id: 'vault1::__view::calendar',
+            vaultId: 'vault1',
+            filePath: '__view::calendar',
+            fileName: 'Calendar',
+            mode: 'view',
+            isBinary: false,
+            content: '',
+            editBuffer: null,
+            loading: false,
+            error: null,
+          },
+        ],
+        activeTabId: 'vault1::__view::calendar',
+      }
+
+      renderHook(() =>
+        usePluginEventBridge({
+          tabState,
+          directoryTree: mockTree,
+          workspaceShim,
+          metadataCacheShim,
+        }),
+      )
+
+      expect(fileOpenCb).not.toHaveBeenCalled()
+    })
+
+    it('does not emit changed event for plugin-view-tabs', () => {
+      const changedCb = vi.fn()
+      metadataCacheShim.on('changed', changedCb)
+
+      const initialTabState: TabState = {
+        tabs: [
+          {
+            id: 'vault1::__view::calendar',
+            vaultId: 'vault1',
+            filePath: '__view::calendar',
+            fileName: 'Calendar',
+            mode: 'view',
+            isBinary: false,
+            content: '',
+            editBuffer: null,
+            loading: false,
+            error: null,
+          },
+        ],
+        activeTabId: 'vault1::__view::calendar',
+      }
+
+      const { rerender } = renderHook(
+        (props: { tabState: TabState }) =>
+          usePluginEventBridge({
+            tabState: props.tabState,
+            directoryTree: mockTree,
+            workspaceShim,
+            metadataCacheShim,
+          }),
+        { initialProps: { tabState: initialTabState } },
+      )
+
+      // Simulate content change (should not trigger for plugin-view-tabs)
+      const updatedTabState: TabState = {
+        tabs: [
+          {
+            id: 'vault1::__view::calendar',
+            vaultId: 'vault1',
+            filePath: '__view::calendar',
+            fileName: 'Calendar',
+            mode: 'view',
+            isBinary: false,
+            content: 'something',
+            editBuffer: null,
+            loading: false,
+            error: null,
+          },
+        ],
+        activeTabId: 'vault1::__view::calendar',
+      }
+      rerender({ tabState: updatedTabState })
+
+      expect(changedCb).not.toHaveBeenCalled()
     })
   })
 })

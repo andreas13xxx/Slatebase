@@ -1,6 +1,6 @@
 /**
  * VaultConfigStore — filesystem persistence for per-vault configuration.
- * Each vault's config is stored as `.vault-config.json` inside the vault's data directory.
+ * Each vault's config is stored as `.slatebase/config.json` inside the vault's data directory.
  * Uses atomic writes (temp → rename) for crash safety.
  */
 
@@ -13,7 +13,8 @@ import { DEFAULT_VAULT_CONFIG } from './types.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const CONFIG_FILENAME = '.vault-config.json'
+/** Config file path relative to vault root. */
+const CONFIG_PATH = path.join('.slatebase', 'config.json')
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -62,7 +63,7 @@ export class VaultConfigStore implements IVaultConfigService {
   private getFilePath(vaultId: string): string | null {
     const vaultPath = this.resolveVaultPath(vaultId)
     if (!vaultPath) return null
-    return path.join(vaultPath, CONFIG_FILENAME)
+    return path.join(vaultPath, CONFIG_PATH)
   }
 
   private async load(vaultId: string): Promise<Partial<VaultConfig>> {

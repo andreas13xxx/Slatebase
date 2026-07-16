@@ -1,0 +1,374 @@
+/* ===== DiffView — Conflict Diff Visualization ===== */
+
+/* ─── Diff Tokens (Light) ─── */
+:root {
+  --diff-added-bg: #dcfce7;
+  --diff-added-text: #166534;
+  --diff-removed-bg: #fee2e2;
+  --diff-removed-text: #991b1b;
+  --diff-line-number-color: var(--text-muted);
+  --diff-line-number-bg: var(--bg-surface);
+  --diff-equal-bg: transparent;
+  --diff-collapsed-bg: var(--bg-surface);
+  --diff-collapsed-border: var(--border-subtle);
+  --diff-header-bg: var(--bg-surface);
+  --diff-content-border: var(--border-default);
+}
+
+/* ─── Diff Tokens (Dark — explicit) ─── */
+:root[data-theme="dark"] {
+  --diff-added-bg: rgba(34, 197, 94, 0.15);
+  --diff-added-text: #4ade80;
+  --diff-removed-bg: rgba(248, 113, 113, 0.15);
+  --diff-removed-text: #fca5a5;
+  --diff-line-number-color: var(--text-muted);
+  --diff-line-number-bg: var(--bg-surface);
+  --diff-equal-bg: transparent;
+  --diff-collapsed-bg: var(--bg-surface);
+  --diff-collapsed-border: var(--border-subtle);
+  --diff-header-bg: var(--bg-surface);
+  --diff-content-border: var(--border-default);
+}
+
+/* ─── Diff Tokens (Dark — system preference) ─── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --diff-added-bg: rgba(34, 197, 94, 0.15);
+    --diff-added-text: #4ade80;
+    --diff-removed-bg: rgba(248, 113, 113, 0.15);
+    --diff-removed-text: #fca5a5;
+    --diff-line-number-color: var(--text-muted);
+    --diff-line-number-bg: var(--bg-surface);
+    --diff-equal-bg: transparent;
+    --diff-collapsed-bg: var(--bg-surface);
+    --diff-collapsed-border: var(--border-subtle);
+    --diff-header-bg: var(--bg-surface);
+    --diff-content-border: var(--border-default);
+  }
+}
+
+/* ─── Container ─── */
+.diff-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ─── Binary File Fallback ─── */
+.diff-view--binary {
+  padding: 16px;
+  border: 1px solid var(--diff-content-border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.diff-view__binary-notice {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.diff-view__binary-meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.diff-view__binary-side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  min-width: 140px;
+}
+
+.diff-view__binary-side strong {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.diff-view__binary-side span {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+/* ─── Diff Content Area ─── */
+.diff-view__content {
+  border: 1px solid var(--diff-content-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+/* ─── Side-by-Side Layout ─── */
+.diff-view__side-by-side {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+.diff-view__side-by-side-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--diff-header-bg);
+  border-bottom: 1px solid var(--diff-content-border);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.diff-view__column-label {
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-family: var(--font-sans);
+}
+
+.diff-view__column-label + .diff-view__column-label {
+  border-left: 1px solid var(--diff-content-border);
+}
+
+.diff-view__side-by-side-body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Side-by-side rows: 4-column grid (lineNum | content | lineNum | content) */
+.diff-view__side-by-side .diff-view__row {
+  display: grid;
+  grid-template-columns: 40px 1fr 40px 1fr;
+  min-height: 22px;
+}
+
+/* ─── Unified Layout ─── */
+.diff-view__unified {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+/* Unified rows: lineNum | lineNum | prefix | content */
+.diff-view__unified .diff-view__row {
+  display: grid;
+  grid-template-columns: 40px 40px 18px 1fr;
+  min-height: 22px;
+}
+
+/* ─── Hunk Group ─── */
+.diff-view__hunk-group {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Row Variants ─── */
+.diff-view__row--equal {
+  background: var(--diff-equal-bg);
+}
+
+.diff-view__row--added {
+  background: var(--diff-added-bg);
+}
+
+.diff-view__row--removed {
+  background: var(--diff-removed-bg);
+}
+
+/* ─── Line Numbers ─── */
+.diff-view__line-number {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 6px;
+  font-size: 0.75rem;
+  color: var(--diff-line-number-color);
+  background: var(--diff-line-number-bg);
+  user-select: none;
+  min-width: 40px;
+  border-right: 1px solid var(--diff-content-border);
+}
+
+/* ─── Line Content ─── */
+.diff-view__line {
+  padding: 0 8px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
+.diff-view__line--equal {
+  color: var(--text-primary);
+}
+
+.diff-view__line--added {
+  color: var(--diff-added-text);
+}
+
+.diff-view__line--removed {
+  color: var(--diff-removed-text);
+}
+
+.diff-view__line--empty {
+  background: var(--diff-line-number-bg);
+}
+
+/* ─── Prefix (+/-/space) ─── */
+.diff-view__prefix {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 2px;
+  font-weight: 700;
+  user-select: none;
+  color: var(--text-secondary);
+}
+
+.diff-view__row--added .diff-view__prefix {
+  color: var(--diff-added-text);
+}
+
+.diff-view__row--removed .diff-view__prefix {
+  color: var(--diff-removed-text);
+}
+
+/* ─── Collapsed Section ─── */
+.diff-view__collapsed-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 4px 12px;
+  border: none;
+  border-top: 1px solid var(--diff-collapsed-border);
+  border-bottom: 1px solid var(--diff-collapsed-border);
+  background: var(--diff-collapsed-bg);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.diff-view__collapsed-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+.diff-view__collapsed-btn--expanded {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+/* ─── Action Buttons ─── */
+.diff-view__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.diff-view__btn {
+  padding: 8px 16px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.diff-view__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.diff-view__btn--primary {
+  background: var(--accent);
+  color: var(--text-inverse);
+  border-color: var(--accent);
+}
+
+.diff-view__btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.diff-view__btn--secondary {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.diff-view__btn--secondary:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  border-color: var(--border-strong);
+}
+
+/* ─── Responsive: Below 768px — stack side-by-side vertically ─── */
+@media (max-width: 767px) {
+  .diff-view__side-by-side-header {
+    grid-template-columns: 1fr;
+  }
+
+  .diff-view__column-label + .diff-view__column-label {
+    border-left: none;
+    border-top: 1px solid var(--diff-content-border);
+  }
+
+  .diff-view__side-by-side .diff-view__row {
+    grid-template-columns: 32px 1fr;
+    grid-template-rows: auto auto;
+  }
+
+  /* In stacked mode, show local line first, then remote line below */
+  .diff-view__side-by-side .diff-view__row--equal {
+    grid-template-columns: 32px 1fr;
+  }
+
+  .diff-view__side-by-side .diff-view__row .diff-view__line-number {
+    min-width: 32px;
+  }
+
+  /* Unified mode: narrower line numbers */
+  .diff-view__unified .diff-view__row {
+    grid-template-columns: 32px 32px 16px 1fr;
+  }
+
+  .diff-view__actions {
+    flex-direction: column;
+  }
+
+  .diff-view__btn {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+/* ─── Responsive: At 768px+ side-by-side works naturally ─── */
+@media (min-width: 768px) {
+  .diff-view__side-by-side .diff-view__row {
+    grid-template-columns: 44px 1fr 44px 1fr;
+  }
+
+  .diff-view__side-by-side .diff-view__row .diff-view__line-number {
+    min-width: 44px;
+  }
+
+  .diff-view__content {
+    max-height: 600px;
+  }
+}

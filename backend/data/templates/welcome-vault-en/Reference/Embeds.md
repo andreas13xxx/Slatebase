@@ -7,27 +7,46 @@ With embeds you can display images and other notes directly within a note.
 Embed an image:
 
 ```markdown
-![[Images/example.png]]
+![[Appendix/Images/example.png]]
 ```
 
 Preview:
 
-![[Images/example.png]]
+![[Appendix/Images/example.png]]
+
+## Embed with Size
+
+You can specify the width in pixels:
+
+```markdown
+![[Appendix/Images/example.png|100]]
+```
+
+Preview (100px wide):
+
+![[Appendix/Images/example.png|100]]
 
 ## Note Embed
 
-Embed another note:
+Embed another note directly:
 
 ```markdown
 ![[Basics/Wikilinks]]
 ```
 
-## Embed with Size
+Preview:
+
+![[Basics/Wikilinks]]
+
+## Embed a Specific Section
+
+You can also embed just one section of a note:
 
 ```markdown
-![[Images/example.png|200]]
+![[Basics/Markdown Syntax#Headings]]
 ```
 
-This shows the image at 200px width.
+> [!tip] Tip
+> Embeds are ideal for maintaining recurring content in one place and embedding it in multiple locations.
 
 #reference #embeds

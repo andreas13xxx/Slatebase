@@ -11,13 +11,13 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for 
 - Multi-user & sharing (granular read/write, ownership transfer)
 - Real-time chat (unread badges, archiving, pagination)
 - Admin panel (user management, audit log, config, feature toggles)
-- Vault sync ⚠️ experimental (CouchDB/livesync, bidirectional, conflict resolution, E2E encryption)
+- Vault sync ⚠️ experimental (CouchDB/livesync, bidirectional, conflict resolution wizard with 3-step flow, auto-resolution strategies, batch operations, inline diff view, E2E encryption)
 - MCP Context Server (AI read+write via Model Context Protocol)
 - Context Panel (Outline, Links, Tags, Properties — splittable, DnD)
 - Knowledge Graph (d3-force SVG, zoom/pan/drag/search, konfigurierbare Farben/Layout, Tag-Nodes, Property-Nodes)
 - Search & Replace (regex, context lines, multi-vault, atomic writes)
 - Realtime infrastructure (SSE: chat push, presence, vault changes, toasts, reconnect with replay — always active when authenticated)
-- Obsidian plugin compat ⚠️ experimental (API shims, sandbox, command palette, CSS injection)
+- Obsidian plugin compat ⚠️ experimental (API shims, sandbox, command palette, CSS injection, workspace leaf API with plugin views as tabs/sidebar sections)
 - Feature toggles (hot/cold toggle, env overlay, API + admin UI; toggles: vault-sync, obsidian-plugin-compat, chat, mcp, knowledge-graph, welcome-vault)
 - CI/CD (GitHub Actions, Release Please, multi-arch Docker, GHCR)
 - i18n (German/English), Dark Mode, Docker deployment
@@ -33,6 +33,9 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for 
 - Configurable keyboard shortcuts (per-user overrides, 14 commands, conflict detection, Settings UI)
 - Welcome Vault (automatic tutorial vault for new users, feature-toggled, multi-language DE/EN, language defaults to admin's preference at user creation)
 - Obsidian Canvas (`.canvas` whiteboards: text/file/link/group nodes, edges, drag/resize, zoom/pan, minimap, source view, auto-save; link-node iframe preview, file-node content/path editing with vault-wide file-path search)
+- Status Bar (bottom bar with clock, extensible for plugin items, toggleable in Settings → Darstellung)
+- Sidebar Panel (left panel with Recent Files + Favorites views, splittable, tabbed)
+- Session verification (lightweight session-alive check on app mount, graceful expiry handling)
 
 ## Planned
 

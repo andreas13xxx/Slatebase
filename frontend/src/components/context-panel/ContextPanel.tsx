@@ -9,7 +9,7 @@
  * Validates: Requirements 2.4, 2.6, 3.7, 3.8, 5.4
  */
 
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useEffect, useRef, useCallback, useState, useContext } from 'react'
 import { useContextPanelContext } from '../../state/contextPanelContext'
 import { useAppContext } from '../../state'
 import { useTabContext } from '../../state/tabContext'
@@ -29,7 +29,10 @@ import { LinksView } from './LinksView'
 import { TagsView } from './TagsView'
 import { PropertiesView } from './PropertiesView'
 import { SearchPanel } from '../SearchPanel'
+import { PluginContext } from '../../plugins/compat/plugin-context'
+import type { SidebarViewInfo } from '../../plugins/compat/plugin-context'
 import type { ContextPanelViewId } from '../../state/contextPanelState'
+import { isPluginViewId, getPluginViewType } from '../../state/contextPanelState'
 import './ContextPanel.css'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -56,6 +59,50 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
   const { state, dispatch } = useContextPanelContext()
   const { state: appState, dispatch: appDispatch, apiClient } = useAppContext()
   const { tabDispatch } = useTabContext()
+
+  // Access plugin sidebar views (nullable — context may be null if PluginProvider not in tree)
+  const pluginContext = useContext(PluginContext)
+  const sidebarViews: Map<string, SidebarViewInfo> = pluginContext?.sidebarViews ?? new Map()
+
+  // ─── Sync plugin sidebar views with reducer state ──────────────────────────
+
+  const prevSidebarViewTypesRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    const currentViewTypes = new Set(sidebarViews.keys())
+    const prevViewTypes = prevSidebarViewTypesRef.current
+
+    // Add new plugin views to the reducer
+    for (const viewType of currentViewTypes) {
+      if (!prevViewTypes.has(viewType)) {
+        dispatch({ type: 'ADD_PLUGIN_VIEW', viewId: `plugin:${viewType}` })
+      }
+    }
+
+    // Remove disappeared plugin views from the reducer
+    for (const viewType of prevViewTypes) {
+      if (!currentViewTypes.has(viewType)) {
+        dispatch({ type: 'REMOVE_PLUGIN_VIEW', viewId: `plugin:${viewType}` })
+      }
+    }
+
+    // Also clean up any persisted plugin views that are not currently active
+    // (handles case where layout was loaded from localStorage but plugin is no longer installed)
+    if (currentViewTypes.size > 0 || prevViewTypes.size > 0) {
+      for (const section of state.sections) {
+        for (const viewId of section.viewIds) {
+          if (isPluginViewId(viewId)) {
+            const viewType = getPluginViewType(viewId)
+            if (!currentViewTypes.has(viewType)) {
+              dispatch({ type: 'REMOVE_PLUGIN_VIEW', viewId })
+            }
+          }
+        }
+      }
+    }
+
+    prevSidebarViewTypesRef.current = currentViewTypes
+  }, [sidebarViews, dispatch]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Refs for debounce and tracking previous values
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -318,6 +365,28 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
           </div>
         )
     }
+
+    // Plugin view: render container for imperative DOM mount
+    if (isPluginViewId(viewId)) {
+      const viewType = getPluginViewType(viewId)
+      const viewInfo = sidebarViews.get(viewType)
+      if (!viewInfo) {
+        return <div className="context-panel__plugin-section context-panel__plugin-section--empty" />
+      }
+      return (
+        <div
+          className="context-panel__plugin-section"
+          ref={(el) => {
+            if (el && viewInfo && !el.contains(viewInfo.containerEl)) {
+              el.innerHTML = ''
+              el.appendChild(viewInfo.containerEl)
+            }
+          }}
+        />
+      )
+    }
+
+    return null
   }, [
     documentContent,
     state.outline,
@@ -332,6 +401,7 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
     selectedVault,
     appState.vaults,
     appState.selectedVaultId,
+    sidebarViews,
   ])
 
   // ─── Single-Section Body Drop (split trigger) ───────────────────────────────
@@ -357,6 +427,14 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
   // ─── Render ────────────────────────────────────────────────────────────────
 
   const isSingleSection = state.sections.length === 1
+  const sidebarViewEntries = Array.from(sidebarViews.values())
+
+  // Build plugin view metadata map for the TabBar icon/label resolution
+  const pluginViewMeta = new Map(sidebarViewEntries.map(v => [v.viewType, {
+    viewType: v.viewType,
+    displayText: v.displayText,
+    icon: v.icon,
+  }]))
 
   return (
     <div className="context-panel" style={{ width }}>
@@ -369,8 +447,12 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
           onTabReorder={(newOrder) => handleTabReorder(state.sections[0]!.id, newOrder)}
           onTabSplit={handleTabSplit}
           panelWidth={width}
+          pluginViewMeta={pluginViewMeta}
         />
       )}
+
+      {/* Plugin tabs in multi-section mode — no longer a standalone row, passed to SplitSectionContainer */}
+
       <div
         className="context-panel__body"
         ref={panelBodyRef}
@@ -392,6 +474,7 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
             onTabMove={handleTabMove}
             onResize={handleResize}
             renderView={renderView}
+            pluginViewMeta={pluginViewMeta}
           />
         )}
       </div>

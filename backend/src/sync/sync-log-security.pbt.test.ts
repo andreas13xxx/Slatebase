@@ -123,6 +123,9 @@ function createMockScheduler(): ISyncScheduler {
     reset() {},
     isActive() { return false },
     stopAll() {},
+    pause() {},
+    resume() {},
+    isPaused() { return false },
   }
 }
 

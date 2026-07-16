@@ -1,0 +1,28 @@
+/* ===== StatusBar Styles ===== */
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: var(--status-bar-height);
+  padding: 0 12px;
+  background: var(--status-bar-bg);
+  border-top: 1px solid var(--status-bar-border);
+  font-size: var(--status-bar-font-size);
+  color: var(--status-bar-text);
+  user-select: none;
+  flex-shrink: 0;
+  gap: 16px;
+}
+
+.status-bar__item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.status-bar__clock {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}

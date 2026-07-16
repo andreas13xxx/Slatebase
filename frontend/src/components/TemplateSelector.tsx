@@ -78,7 +78,7 @@ export function TemplateSelector({
     apiClient.listTemplates(vaultId).then(
       (result) => {
         if (result.templates.length === 0) {
-          showToast('info', `Keine Vorlagen verfügbar. Erstellen Sie .md-Dateien im Verzeichnis "_templates/" Ihres Vaults.`)
+          showToast('info', `Keine Vorlagen verfügbar. Erstellen Sie .md-Dateien im Verzeichnis "Templates/" Ihres Vaults.`)
           onClose()
           return
         }

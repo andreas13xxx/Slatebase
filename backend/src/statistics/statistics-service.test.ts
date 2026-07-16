@@ -66,9 +66,11 @@ describe('VaultStatisticsService', () => {
     expect(stats.totalSizeBytes).toBe(10) // 7 + 3
   })
 
-  it('excludes .trash/ directory', async () => {
-    await fs.mkdir(path.join(tmpDir, '.trash'))
-    await fs.writeFile(path.join(tmpDir, '.trash', 'deleted.md'), 'trashed')
+  it('excludes dot-prefixed directories', async () => {
+    await fs.mkdir(path.join(tmpDir, '.slatebase'))
+    await fs.writeFile(path.join(tmpDir, '.slatebase', 'link-index.json'), '{}')
+    await fs.mkdir(path.join(tmpDir, '.obsidian'))
+    await fs.writeFile(path.join(tmpDir, '.obsidian', 'app.json'), '{}')
     await fs.writeFile(path.join(tmpDir, 'kept.md'), 'kept')
 
     const stats = await service.getStatistics('test-vault')
@@ -77,28 +79,25 @@ describe('VaultStatisticsService', () => {
     expect(stats.totalSizeBytes).toBe(4)
   })
 
-  it('excludes .versions/ directory', async () => {
-    await fs.mkdir(path.join(tmpDir, '.versions'))
-    await fs.writeFile(path.join(tmpDir, '.versions', 'old.md'), 'versioned')
-    await fs.writeFile(path.join(tmpDir, 'current.md'), 'now')
-
-    const stats = await service.getStatistics('test-vault')
-    expect(stats.fileCount).toBe(1)
-    expect(stats.folderCount).toBe(0)
-    expect(stats.totalSizeBytes).toBe(3)
-  })
-
-  it('excludes _-prefix entries', async () => {
-    await fs.writeFile(path.join(tmpDir, '_link-index.json'), '{}')
-    await fs.writeFile(path.join(tmpDir, '_templates'), 'x')
-    await fs.mkdir(path.join(tmpDir, '_internal'))
-    await fs.writeFile(path.join(tmpDir, '_internal', 'secret.md'), 'hidden')
+  it('excludes dot-prefixed files', async () => {
+    await fs.writeFile(path.join(tmpDir, '.hidden-file'), 'secret')
     await fs.writeFile(path.join(tmpDir, 'visible.md'), 'hi')
 
     const stats = await service.getStatistics('test-vault')
     expect(stats.fileCount).toBe(1)
     expect(stats.folderCount).toBe(0)
     expect(stats.totalSizeBytes).toBe(2)
+  })
+
+  it('includes underscore-prefixed entries (like Obsidian)', async () => {
+    await fs.writeFile(path.join(tmpDir, '_notes.md'), 'underscore')
+    await fs.mkdir(path.join(tmpDir, '_archive'))
+    await fs.writeFile(path.join(tmpDir, '_archive', 'old.md'), 'old')
+    await fs.writeFile(path.join(tmpDir, 'visible.md'), 'hi')
+
+    const stats = await service.getStatistics('test-vault')
+    expect(stats.fileCount).toBe(3)
+    expect(stats.folderCount).toBe(1)
   })
 
   it('uses cached value on second call', async () => {

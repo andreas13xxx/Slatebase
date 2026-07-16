@@ -43,7 +43,7 @@ Ziel ist es, die Obsidian Workspace Leaf API auf Slatebase's bestehendes Tab-Sys
 3. WHEN ein Plugin `leaf.setViewState({ type: viewType })` aufruft, THE Workspace_Leaf SHALL die registrierte Factory-Funktion für den View-Typ aufrufen, die View instanziieren und ein Promise zurückgeben das nach `view.onOpen()` resolved
 4. WHEN `leaf.setViewState` aufgerufen wird und der View-Typ nicht in der View_Registry registriert ist, THE Workspace_Leaf SHALL eine Warnung per `console.warn` loggen und das zurückgegebene Promise resolven ohne eine View zu erstellen
 5. WHEN eine View erfolgreich instanziiert wird, THE Workspace_Leaf SHALL `view.onOpen()` aufrufen bevor das Promise von `setViewState` resolved
-6. WHEN ein Leaf bereits eine View enthält und `setViewState` erneut aufgerufen wird, THE Workspace_Leaf SHALL zuerst `view.onClose()` auf der alten View aufrufen und das `containerEl` aus dem DOM entfernen bevor die neue View instanziiert wird
+6. WHEN ein Leaf bereits eine View enthält und `setViewState` erneut aufgerufen wird, THE Workspace_Leaf SHALL zuerst `view.onClose()` auf der alten View aufrufen und das `containerEl` aus dem DOM entfernen bevor die neue View instanziiert wird; `onClose()` MUSS immer vor jeglichem DOM-Cleanup oder neuer View-Instanziierung aufgerufen werden, auch wenn das `containerEl` der alten View bereits vom DOM getrennt ist
 
 ### Requirement 3: Plugin-Views als Tabs im Hauptbereich
 
@@ -55,7 +55,7 @@ Ziel ist es, die Obsidian Workspace Leaf API auf Slatebase's bestehendes Tab-Sys
 2. WHEN ein Plugin-View-Tab geöffnet wird, THE Tab_System SHALL den Rückgabewert von `view.getDisplayText()` als Tab-Label verwenden und das Label bei jedem Tab-Aktivierungswechsel aktualisieren
 3. IF `view.getIcon()` einen nicht-leeren String zurückgibt, THEN THE Tab_System SHALL diesen als Tab-Icon verwenden; IF `view.getIcon()` einen leeren String oder null zurückgibt, THEN THE Tab_System SHALL kein Icon anzeigen
 4. WHEN ein Plugin-View-Tab aktiv ist, THE Tab_System SHALL das `containerEl` der Item_View als direktes Kind-Element in den Content-Bereich des Tabs einhängen (DOM appendChild)
-5. WHEN ein Plugin-View-Tab geschlossen wird, THE Tab_System SHALL `view.onClose()` aufrufen, das `containerEl` aus dem DOM entfernen und die Leaf-Referenz aus der Workspace_Shim-internen Leaf-Liste entfernen
+5. WHEN ein Plugin-View-Tab geschlossen wird ODER WHEN eine View aufgrund eines Fehler-Szenarios entfernt werden muss, THE Tab_System SHALL `view.onClose()` aufrufen, das `containerEl` aus dem DOM entfernen und die Leaf-Referenz aus der Workspace_Shim-internen Leaf-Liste entfernen
 6. WHEN ein Plugin-View-Tab bereits existiert (gleicher virtueller Pfad `__view::{viewType}`) und erneut geöffnet wird, THE Tab_System SHALL den existierenden Tab aktivieren anstatt einen neuen zu erstellen
 7. WHEN ein Plugin-View-Tab aktiv ist, THE Workspace_Shim SHALL `getActiveFile()` mit null zurückgeben und kein `file-open` Event emittieren
 
@@ -81,7 +81,7 @@ Ziel ist es, die Obsidian Workspace Leaf API auf Slatebase's bestehendes Tab-Sys
 2. WHEN keine Leaves des angegebenen Typs existieren, THE Workspace_Shim SHALL ein leeres Array zurückgeben
 3. WHEN ein Plugin `workspace.getActiveViewOfType(ViewClass)` aufruft, THE Workspace_Shim SHALL prüfen ob das aktive Leaf eine View enthält die eine Instanz von ViewClass ist (via `instanceof`-Check), und diese View zurückgeben falls ja, sonst null
 4. WHEN ein Plugin `workspace.getActiveLeaf()` aufruft und ein Tab aktiv ist, THE Workspace_Shim SHALL das Leaf des aktuell aktiven Tabs zurückgeben
-5. IF kein Tab aktiv ist, THEN THE Workspace_Shim SHALL bei `getActiveLeaf()` null zurückgeben
+5. IF kein Tab aktiv ist ODER der aktive Tab kein zugeordnetes Workspace_Leaf enthält, THEN THE Workspace_Shim SHALL bei `getActiveLeaf()` null zurückgeben
 6. WHEN ein Plugin `workspace.iterateAllLeaves(callback)` aufruft, THE Workspace_Shim SHALL den Callback synchron für jedes aktive Leaf aufrufen (Hauptbereich und Sidebar)
 7. WHEN ein Plugin `workspace.iterateRootLeaves(callback)` aufruft, THE Workspace_Shim SHALL den Callback synchron nur für Leaves aufrufen die im Hauptbereich (Tab_System) liegen, nicht für Leaves die über `getRightLeaf()` oder `getLeftLeaf()` im Context_Panel erstellt wurden
 8. IF ein Callback innerhalb von `iterateAllLeaves` oder `iterateRootLeaves` eine Exception wirft, THEN THE Workspace_Shim SHALL die Exception loggen und die Iteration mit dem nächsten Leaf fortsetzen
@@ -97,7 +97,7 @@ Ziel ist es, die Obsidian Workspace Leaf API auf Slatebase's bestehendes Tab-Sys
 3. WHEN ein Plugin `workspace.detachLeavesOfType(viewType)` aufruft, THE Workspace_Shim SHALL alle Leaves mit dem angegebenen View-Typ (sowohl Hauptbereich als auch Sidebar) schließen und deren Tabs/Sections entfernen
 4. WHEN `detachLeavesOfType` aufgerufen wird, THE Workspace_Shim SHALL für jede geschlossene View `view.onClose()` aufrufen bevor das Leaf aus der internen Liste entfernt wird
 5. WHEN ein Plugin `workspace.setActiveLeaf(leaf)` aufruft und das Leaf in der internen Leaf-Liste existiert, THE Workspace_Shim SHALL den zugehörigen Tab als aktiven Tab setzen
-6. IF `workspace.setActiveLeaf(leaf)` mit einem Leaf aufgerufen wird das nicht in der internen Liste existiert, THEN THE Workspace_Shim SHALL eine Warnung loggen und keine Aktion ausführen
+6. IF `workspace.setActiveLeaf(leaf)` mit einem Leaf aufgerufen wird das nicht in der internen Liste existiert, THEN THE Workspace_Shim SHALL eine Warnung loggen und den gesamten System-State unverändert lassen (keine UI-Änderungen, keine Tab-Wechsel)
 7. WHEN ein Plugin `workspace.getUnpinnedLeaf()` aufruft, THE Workspace_Shim SHALL ein neues Leaf erstellen und zurückgeben (Slatebase hat kein Pinning-Konzept)
 
 ### Requirement 7: Split-Leaf-Erstellung (vereinfacht)
@@ -106,8 +106,8 @@ Ziel ist es, die Obsidian Workspace Leaf API auf Slatebase's bestehendes Tab-Sys
 
 #### Acceptance Criteria
 
-1. WHEN ein Plugin `workspace.createLeafBySplit(leaf)` aufruft, THE Workspace_Shim SHALL ein neues Leaf erstellen und zurückgeben (ohne tatsächlichen Split — als neuer Tab im Hauptbereich)
-2. WHEN ein Plugin `workspace.splitActiveLeaf()` aufruft, THE Workspace_Shim SHALL ein neues Leaf erstellen und zurückgeben
+1. WHEN ein Plugin `workspace.createLeafBySplit(leaf)` aufruft, THE Workspace_Shim SHALL ein neues Leaf erstellen und zurückgeben (ohne tatsächlichen Split — als neuer Tab im Hauptbereich); THE Workspace_Shim SHALL garantieren dass die Leaf-Erstellung immer erfolgreich ist (In-Memory-Operation ohne Fehlschlag-Möglichkeit)
+2. WHEN ein Plugin `workspace.splitActiveLeaf()` aufruft, THE Workspace_Shim SHALL ein neues Leaf erstellen und zurückgeben; THE Workspace_Shim SHALL garantieren dass die Leaf-Erstellung immer erfolgreich ist (In-Memory-Operation ohne Fehlschlag-Möglichkeit)
 3. THE Workspace_Shim SHALL bei Split-Aufrufen keine Fehlermeldung werfen sondern graceful als neuen Tab behandeln
 4. THE Workspace_Shim SHALL bei jedem Split-Aufruf einmalig eine `console.info`-Nachricht ausgeben die darauf hinweist dass Slatebase kein Split-Pane-System hat und ein neuer Tab erstellt wurde
 
@@ -118,7 +118,7 @@ Ziel ist es, die Obsidian Workspace Leaf API auf Slatebase's bestehendes Tab-Sys
 #### Acceptance Criteria
 
 1. WHEN ein Plugin `workspace.openLinkText(linkText, sourcePath)` aufruft, THE Workspace_Shim SHALL den Ziel-Dateipfad mittels des bestehenden link-resolver auflösen (case-insensitive Suche, `.md`-Extension-Fallback)
-2. WHEN der aufgelöste Pfad eine existierende Datei ist, THE Tab_System SHALL den regulären Datei-Tab-Öffnungs-Workflow verwenden (OPEN_TAB Action)
+2. WHEN der aufgelöste Pfad eine existierende Datei ist UND die Zieldatei auf dem Filesystem vorhanden ist, THE Tab_System SHALL den regulären Datei-Tab-Öffnungs-Workflow verwenden (OPEN_TAB Action); IF die Datei nicht mehr existiert, THEN THE Workspace_Shim SHALL eine Warnung loggen und keine Aktion ausführen
 3. IF der Linktext nicht aufgelöst werden kann (kein Treffer im Vault), THEN THE Workspace_Shim SHALL eine Warnung per `console.warn` loggen und keine Aktion ausführen
 4. WHEN `openLinkText` mit einem leeren String als linkText aufgerufen wird, THE Workspace_Shim SHALL keine Aktion ausführen
 
@@ -153,7 +153,7 @@ Ziel ist es, die Obsidian Workspace Leaf API auf Slatebase's bestehendes Tab-Sys
 1. WHEN der aktive Tab wechselt (Datei-Tab oder Plugin-View-Tab), THE Workspace_Shim SHALL das Event `active-leaf-change` mit dem neuen aktiven Workspace_Leaf als Argument emittieren
 2. WHEN ein neuer Plugin-View-Tab geöffnet wird, THE Workspace_Shim SHALL das Event `layout-change` ohne Argumente emittieren
 3. WHEN ein Plugin-View-Tab geschlossen wird, THE Workspace_Shim SHALL das Event `layout-change` ohne Argumente emittieren
-4. WHEN kein Tab aktiv ist (alle Tabs geschlossen), THE Workspace_Shim SHALL das Event `active-leaf-change` mit null als Argument emittieren
+4. WHEN kein Tab aktiv ist (unabhängig davon ob Tabs existieren oder nicht), THE Workspace_Shim SHALL das Event `active-leaf-change` mit null als Argument emittieren
 
 ### Requirement 12: Rückwärtskompatibilität
 
@@ -173,7 +173,7 @@ Ziel ist es, die Obsidian Workspace Leaf API auf Slatebase's bestehendes Tab-Sys
 
 #### Acceptance Criteria
 
-1. WHEN ein Plugin deaktiviert wird, THE View_Registry SHALL alle Leaves dieses Plugins detachen, `onClose()` auf jeder View aufrufen und die zugehörigen Tabs entfernen
+1. WHEN ein Plugin deaktiviert wird, THE View_Registry SHALL alle Leaves dieses Plugins detachen, `onClose()` auf jeder View aufrufen und die zugehörigen Tabs entfernen; IF einzelne Cleanup-Schritte fehlschlagen (z.B. onClose() wirft Exception), THEN THE View_Registry SHALL den Fehler loggen und die Leaf-Entfernung trotzdem fortsetzen
 2. WHEN ein Vault-Wechsel stattfindet, THE View_Registry SHALL alle Plugin-View-Tabs schließen, `onClose()` auf jeder View aufrufen und deren `containerEl` aus dem DOM entfernen
 3. IF `view.onOpen()` eine Exception wirft, THEN THE Workspace_Leaf SHALL den Fehler per console.error loggen und die View trotzdem im Leaf behalten (graceful degradation)
 4. IF `view.onClose()` eine Exception wirft, THEN THE Workspace_Leaf SHALL den Fehler per console.error loggen und das Leaf trotzdem entfernen sowie das DOM-Element bereinigen

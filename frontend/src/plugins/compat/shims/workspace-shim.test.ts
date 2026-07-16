@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { WorkspaceShim } from './workspace-shim';
+import { ViewRegistry } from '../view-registry';
 import type { TFile } from '../types';
 
 function createMockTFile(path: string): TFile {
@@ -82,7 +83,14 @@ describe('WorkspaceShim', () => {
   });
 
   describe('R6.4: Emits active-leaf-change when active tab changes', () => {
-    it('should emit active-leaf-change with TFile when a file is opened', () => {
+    beforeEach(() => {
+      // Provide a ViewRegistry so that setActiveFile can create a leaf
+      const registry = new ViewRegistry();
+      const mockApp = {};
+      workspace.setViewRegistry(registry, mockApp);
+    });
+
+    it('should emit active-leaf-change with a leaf when a file is opened', () => {
       const callback = vi.fn();
       workspace.on('active-leaf-change', callback);
 
@@ -90,7 +98,10 @@ describe('WorkspaceShim', () => {
       workspace.setActiveFile(file);
 
       expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(file);
+      // active-leaf-change is emitted with the leaf object (not the TFile directly)
+      const leaf = callback.mock.calls[0]![0];
+      expect(leaf).not.toBeNull();
+      expect(leaf.view.file).toBe(file);
     });
 
     it('should emit active-leaf-change with null when no file tab is active', () => {
@@ -152,14 +163,14 @@ describe('WorkspaceShim', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const proxied = WorkspaceShim.createProxied();
 
-      // Access a non-emulated method
-      const result = (proxied as Record<string, unknown>)['createLeafBySplit'];
+      // Access a non-emulated method (one that is NOT in emulatedProperties)
+      const result = (proxied as Record<string, unknown>)['openMarkdownView'];
       expect(typeof result).toBe('function');
       expect((result as () => unknown)()).toBeUndefined();
 
       // Should have logged a warning
       expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(warnSpy.mock.calls[0]?.[0]).toContain('createLeafBySplit');
+      expect(warnSpy.mock.calls[0]?.[0]).toContain('openMarkdownView');
       expect(warnSpy.mock.calls[0]?.[0]).toContain('non-emulated');
 
       warnSpy.mockRestore();
@@ -170,9 +181,9 @@ describe('WorkspaceShim', () => {
       const proxied = WorkspaceShim.createProxied();
 
       // Access the same non-emulated method multiple times
-      (proxied as Record<string, unknown>)['iterateAllLeaves'];
-      (proxied as Record<string, unknown>)['iterateAllLeaves'];
-      (proxied as Record<string, unknown>)['iterateAllLeaves'];
+      (proxied as Record<string, unknown>)['openPopout'];
+      (proxied as Record<string, unknown>)['openPopout'];
+      (proxied as Record<string, unknown>)['openPopout'];
 
       // Should have logged only once
       expect(warnSpy).toHaveBeenCalledTimes(1);
@@ -184,9 +195,9 @@ describe('WorkspaceShim', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const proxied = WorkspaceShim.createProxied();
 
-      (proxied as Record<string, unknown>)['createLeafBySplit'];
-      (proxied as Record<string, unknown>)['iterateAllLeaves'];
-      (proxied as Record<string, unknown>)['setActiveLeaf'];
+      (proxied as Record<string, unknown>)['openPopout'];
+      (proxied as Record<string, unknown>)['moveLeafToPopout'];
+      (proxied as Record<string, unknown>)['duplicateLeaf'];
 
       expect(warnSpy).toHaveBeenCalledTimes(3);
 
@@ -197,10 +208,11 @@ describe('WorkspaceShim', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const proxied = WorkspaceShim.createProxied();
 
-      // Access emulated methods
+      // Access emulated methods (including new leaf management ones)
       proxied.getActiveFile();
       proxied.on('file-open', vi.fn());
       proxied.trigger('file-open');
+      proxied.getActiveLeaf();
 
       expect(warnSpy).not.toHaveBeenCalled();
 
@@ -242,6 +254,181 @@ describe('WorkspaceShim', () => {
 
       expect(callback1).not.toHaveBeenCalled();
       expect(callback2).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Leaf Management Methods', () => {
+    let registry: ViewRegistry;
+
+    beforeEach(() => {
+      registry = new ViewRegistry();
+      workspace.setViewRegistry(registry, {});
+    });
+
+    describe('getLeaf()', () => {
+      it('should create a new leaf with location main when newLeaf is true', () => {
+        const leaf = workspace.getLeaf(true);
+        expect(leaf).toBeDefined();
+        expect(leaf.location).toBe('main');
+      });
+
+      it('should return an existing leaf with null view when newLeaf is falsy', () => {
+        // Create a leaf with no view
+        const firstLeaf = workspace.getLeaf(true);
+        expect(firstLeaf.view).toBeNull();
+
+        // Now getLeaf() without true should return the existing empty leaf
+        const secondLeaf = workspace.getLeaf();
+        expect(secondLeaf).toBe(firstLeaf);
+      });
+
+      it('should create a new leaf if no empty leaf exists', () => {
+        const leaf = workspace.getLeaf();
+        expect(leaf).toBeDefined();
+        expect(leaf.location).toBe('main');
+      });
+
+      it('should create a new leaf when newLeaf is false but no empty leaf exists', () => {
+        const leaf = workspace.getLeaf(false);
+        expect(leaf).toBeDefined();
+        expect(leaf.location).toBe('main');
+      });
+    });
+
+    describe('getRightLeaf()', () => {
+      it('should create a leaf with location right-sidebar', () => {
+        const leaf = workspace.getRightLeaf();
+        expect(leaf).toBeDefined();
+        expect(leaf.location).toBe('right-sidebar');
+      });
+    });
+
+    describe('getLeftLeaf()', () => {
+      it('should create a leaf with location right-sidebar (Slatebase maps both to right)', () => {
+        const leaf = workspace.getLeftLeaf();
+        expect(leaf).toBeDefined();
+        expect(leaf.location).toBe('right-sidebar');
+      });
+    });
+
+    describe('getActiveLeaf()', () => {
+      it('should return null initially', () => {
+        expect(workspace.getActiveLeaf()).toBeNull();
+      });
+
+      it('should return the active leaf after setActiveLeaf is called', () => {
+        const leaf = workspace.getLeaf(true);
+        workspace.setActiveLeaf(leaf);
+        expect(workspace.getActiveLeaf()).toBe(leaf);
+      });
+    });
+
+    describe('setActiveLeaf()', () => {
+      it('should set the active leaf and emit active-leaf-change', () => {
+        const callback = vi.fn();
+        workspace.on('active-leaf-change', callback);
+
+        const leaf = workspace.getLeaf(true);
+        workspace.setActiveLeaf(leaf);
+
+        expect(workspace.getActiveLeaf()).toBe(leaf);
+        expect(callback).toHaveBeenCalledWith(leaf);
+      });
+
+      it('should warn and not change state for unknown leaf', () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const callback = vi.fn();
+        workspace.on('active-leaf-change', callback);
+
+        // Create a leaf from a different registry (unknown to workspace)
+        const otherRegistry = new ViewRegistry();
+        const unknownLeaf = otherRegistry.createLeaf({}, 'main');
+
+        workspace.setActiveLeaf(unknownLeaf);
+
+        expect(workspace.getActiveLeaf()).toBeNull();
+        expect(callback).not.toHaveBeenCalled();
+        expect(warnSpy).toHaveBeenCalled();
+
+        warnSpy.mockRestore();
+      });
+    });
+
+    describe('getUnpinnedLeaf()', () => {
+      it('should create a new leaf with location main', () => {
+        const leaf = workspace.getUnpinnedLeaf();
+        expect(leaf).toBeDefined();
+        expect(leaf.location).toBe('main');
+      });
+    });
+
+    describe('createLeafBySplit()', () => {
+      it('should create a new leaf and log info about no split support', () => {
+        const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+        const existingLeaf = workspace.getLeaf(true);
+        const newLeaf = workspace.createLeafBySplit(existingLeaf);
+
+        expect(newLeaf).toBeDefined();
+        expect(newLeaf.location).toBe('main');
+        expect(newLeaf).not.toBe(existingLeaf);
+        expect(infoSpy).toHaveBeenCalledWith(
+          '[WorkspaceShim] createLeafBySplit: Slatebase does not support split panes — created new tab instead.'
+        );
+
+        infoSpy.mockRestore();
+      });
+    });
+
+    describe('splitActiveLeaf()', () => {
+      it('should create a new leaf and log info about no split support', () => {
+        const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+        const leaf = workspace.splitActiveLeaf();
+
+        expect(leaf).toBeDefined();
+        expect(leaf.location).toBe('main');
+        expect(infoSpy).toHaveBeenCalledWith(
+          '[WorkspaceShim] splitActiveLeaf: Slatebase does not support split panes — created new tab instead.'
+        );
+
+        infoSpy.mockRestore();
+      });
+    });
+
+    describe('setActiveLeafInternal()', () => {
+      it('should set the active leaf without emitting events', () => {
+        const callback = vi.fn();
+        workspace.on('active-leaf-change', callback);
+
+        const leaf = workspace.getLeaf(true);
+        workspace.setActiveLeafInternal(leaf);
+
+        expect(workspace.getActiveLeaf()).toBe(leaf);
+        expect(callback).not.toHaveBeenCalled();
+      });
+
+      it('should accept null to clear the active leaf', () => {
+        const leaf = workspace.getLeaf(true);
+        workspace.setActiveLeafInternal(leaf);
+        workspace.setActiveLeafInternal(null);
+
+        expect(workspace.getActiveLeaf()).toBeNull();
+      });
+    });
+
+    describe('registerView() with pluginId', () => {
+      it('should pass pluginId to the view registry', () => {
+        const creator = vi.fn();
+        workspace.registerView('my-view', creator, 'my-plugin');
+
+        expect(registry.hasViewType('my-view')).toBe(true);
+      });
+
+      it('should default pluginId to unknown when not provided', () => {
+        const creator = vi.fn();
+        workspace.registerView('my-view', creator);
+
+        expect(registry.hasViewType('my-view')).toBe(true);
+      });
     });
   });
 });

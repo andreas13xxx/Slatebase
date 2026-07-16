@@ -2,9 +2,11 @@ import { useState, useRef, useCallback } from 'react'
 import {
   Upload, FolderOpen, Download, Settings,
   Database, FileText, FilePlus, MessageCircle, ScrollText,
-  ClipboardList, Plus, Share2, CalendarDays, Trash2, LayoutDashboard,
+  ClipboardList, Plus, Share2, CalendarDays, Trash2, LayoutDashboard, AlertTriangle,
 } from 'lucide-react'
 import { useFeatureContext } from '../state/featureContext'
+import { usePluginContext } from '../plugins/compat/plugin-context'
+import { PluginRibbonIcon } from './PluginRibbonIcon'
 
 import type { AppPage } from '../App'
 
@@ -47,6 +49,7 @@ interface SidebarToolbarProps {
  */
 export function SidebarToolbar({ vaultId, vaultPermission, onCreateVault, onCreateFile, onCreateCanvas, onImportFile, onImportFolder, onExportVault, onNavigate, onOpenGraph, onOpenTrash, onDailyNote, onOpenSettings, isAdmin, isVaultOwner, syncEnabled, globalUnreadCount }: SidebarToolbarProps) {
   const { isEnabled } = useFeatureContext()
+  const { ribbonIcons } = usePluginContext()
 
   const allItems: ToolbarItem[] = [
     { id: 'create-vault', icon: <Plus size={15} />, label: 'Neuer Vault', action: onCreateVault },
@@ -59,6 +62,7 @@ export function SidebarToolbar({ vaultId, vaultPermission, onCreateVault, onCrea
     { id: 'trash', icon: <Trash2 size={15} />, label: 'Papierkorb', action: () => onOpenTrash?.(), requiresVault: true },
     { id: 'graph', icon: <Share2 size={15} />, label: 'Graph', action: onOpenGraph, requiresVault: true, feature: 'knowledge-graph' },
     { id: 'sync-log', icon: <ClipboardList size={15} />, label: 'Sync-Protokoll', action: () => onNavigate('sync-log'), requiresVault: true, ownerOnly: true, feature: 'vault-sync' },
+    { id: 'conflicts', icon: <AlertTriangle size={15} />, label: 'Konflikte', action: () => onNavigate('conflicts'), requiresVault: true, ownerOnly: true, feature: 'vault-sync' },
     { id: 'my-vaults', icon: <Database size={15} />, label: 'Meine Vaults', action: () => onNavigate('my-vaults') },
     { id: 'chat', icon: <MessageCircle size={15} />, label: 'Chat', action: () => onNavigate('chat'), feature: 'chat' },
     { id: 'admin-audit', icon: <FileText size={15} />, label: 'Audit-Log', action: () => onNavigate('admin-audit'), adminOnly: true },
@@ -148,6 +152,15 @@ export function SidebarToolbar({ vaultId, vaultPermission, onCreateVault, onCrea
           </button>
         )
       })}
+      {/* Plugin ribbon icons (only when obsidian-plugin-compat is enabled) */}
+      {isEnabled('obsidian-plugin-compat') && ribbonIcons.length > 0 && (
+        <>
+          <div className="toolbar-separator" aria-hidden="true" />
+          {ribbonIcons.map((entry, index) => (
+            <PluginRibbonIcon key={`${entry.pluginId}-${index}`} entry={entry} />
+          ))}
+        </>
+      )}
     </div>
   )
 }

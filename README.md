@@ -42,8 +42,8 @@ mkdir slatebase && cd slatebase
 ### 2. Download the compose file and environment template
 
 ```bash
-curl -O https://raw.githubusercontent.com/andreas13xxx/Slatebase/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/andreas13xxx/Slatebase/main/docker.env.example
+curl -O https://raw.githubusercontent.com/andreas13xxx/Slatebase/master/docker-compose.yml
+curl -O https://raw.githubusercontent.com/andreas13xxx/Slatebase/master/docker.env.example
 cp docker.env.example docker.env
 ```
 

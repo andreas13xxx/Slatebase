@@ -10,6 +10,7 @@ import type { IApiClient } from '../../../api/index';
 import type { DirectoryTree } from '../../../types';
 import type { EventRef, IVaultShim, TAbstractFile, TFile, TFolder } from '../types';
 import { EventSystem } from '../event-system';
+import { dispatchRealtimeVaultChange } from '../../../state/realtimeVaultBridge';
 
 /**
  * Validates a file path for safety.
@@ -33,6 +34,7 @@ export function validatePath(path: string): void {
 
 /**
  * Creates a TFile object from a DirectoryTree node.
+ * Uses the global obsidian.TFile prototype if available (for instanceof checks).
  */
 export function treeNodeToTFile(node: DirectoryTree, parent: TFolder | null): TFile {
   const name = node.name;
@@ -40,7 +42,7 @@ export function treeNodeToTFile(node: DirectoryTree, parent: TFolder | null): TF
   const basename = dotIndex > 0 ? name.slice(0, dotIndex) : name;
   const extension = dotIndex > 0 ? name.slice(dotIndex + 1) : '';
 
-  return {
+  const file: TFile = {
     path: node.path,
     name,
     basename,
@@ -52,10 +54,19 @@ export function treeNodeToTFile(node: DirectoryTree, parent: TFolder | null): TF
     },
     parent,
   };
+
+  // Set prototype to global obsidian.TFile so `instanceof` checks work
+  const globalTFile = (window as unknown as { obsidian?: { TFile?: { prototype: object } } }).obsidian?.TFile?.prototype;
+  if (globalTFile) {
+    Object.setPrototypeOf(file, globalTFile);
+  }
+
+  return file;
 }
 
 /**
  * Creates a TFolder object from a DirectoryTree node.
+ * Uses the global obsidian.TFolder prototype if available (for instanceof checks).
  */
 export function treeNodeToTFolder(node: DirectoryTree, parent: TFolder | null): TFolder {
   const folder: TFolder = {
@@ -67,6 +78,25 @@ export function treeNodeToTFolder(node: DirectoryTree, parent: TFolder | null): 
       return this.path === '' || this.path === '/';
     },
   };
+
+  // Populate children from the DirectoryTree node so that
+  // Vault.recurseChildren() (used by Calendar etc.) can traverse them.
+  if (node.children) {
+    for (const child of node.children) {
+      if (child.type === 'file') {
+        folder.children.push(treeNodeToTFile(child, folder));
+      } else {
+        folder.children.push(treeNodeToTFolder(child, folder));
+      }
+    }
+  }
+
+  // Set prototype to global obsidian.TFolder so `instanceof` checks work
+  const globalTFolder = (window as unknown as { obsidian?: { TFolder?: { prototype: object } } }).obsidian?.TFolder?.prototype;
+  if (globalTFolder) {
+    Object.setPrototypeOf(folder, globalTFolder);
+  }
+
   return folder;
 }
 
@@ -201,14 +231,25 @@ export class VaultShim implements IVaultShim {
 
   /**
    * Create a new file at the given path.
-   * @throws Error if a file already exists at the path or the API call fails.
+   * If the file already exists, returns the existing TFile without modifying it.
+   * This matches the behavior expected by many Obsidian plugins (e.g. Calendar)
+   * that use vault.create() as a "create or get" operation.
    */
   async create(path: string, content?: string): Promise<TFile> {
     validatePath(path);
 
     const existing = findNodeByPath(this.directoryTree, path);
-    if (existing) {
-      throw new Error(`File already exists: "${path}"`);
+    if (existing && existing.type === 'file') {
+      const parent = findParentNode(this.directoryTree, path);
+      const tFile = treeNodeToTFile(existing, parent);
+
+      // Open the existing file as a tab (plugins expect create-or-open behavior)
+      const workspace = (window as unknown as { app?: { workspace?: { openFileDirectly?: (filePath: string) => void } } }).app?.workspace;
+      if (workspace?.openFileDirectly) {
+        workspace.openFileDirectly(path);
+      }
+
+      return tFile;
     }
 
     try {
@@ -235,11 +276,74 @@ export class VaultShim implements IVaultShim {
       };
 
       this.events.trigger('create', tFile);
+
+      // Notify the app to refresh the file explorer tree
+      dispatchRealtimeVaultChange({
+        vaultId: this.vaultId,
+        action: 'saved',
+        path,
+        userId: '',
+        username: '',
+      });
+
       return tFile;
     } catch (err: unknown) {
       const appErr = err as { code?: string; message?: string };
       throw new Error(
         `Failed to create "${path}": ${appErr.message ?? 'unknown error'} (code: ${appErr.code ?? 'UNKNOWN'})`,
+        { cause: err }
+      );
+    }
+  }
+
+  /**
+   * Create a folder at the given path.
+   * Leverages the backend's automatic intermediate directory creation by writing
+   * and immediately deleting a placeholder file.
+   * @throws Error if the folder already exists or the API call fails.
+   */
+  async createFolder(path: string): Promise<TFolder> {
+    validatePath(path);
+
+    const existing = findNodeByPath(this.directoryTree, path);
+    if (existing) {
+      throw new Error(`Folder already exists: "${path}"`);
+    }
+
+    try {
+      // Create the folder by writing a temporary placeholder file, then deleting it.
+      // This leverages the backend's automatic intermediate directory creation.
+      const placeholderPath = `${path}/.slatebase-mkdir-placeholder`;
+      await this.apiClient.saveFile(this.vaultId, placeholderPath, '');
+      await this.apiClient.deleteContent(this.vaultId, placeholderPath);
+
+      const name = path.includes('/') ? path.slice(path.lastIndexOf('/') + 1) : path;
+      const parent = findParentNode(this.directoryTree, path);
+
+      const tFolder: TFolder = {
+        path,
+        name,
+        children: [],
+        parent,
+        isRoot: () => false,
+      };
+
+      this.events.trigger('create', tFolder);
+
+      // Notify the app to refresh the file explorer tree
+      dispatchRealtimeVaultChange({
+        vaultId: this.vaultId,
+        action: 'saved',
+        path,
+        userId: '',
+        username: '',
+      });
+
+      return tFolder;
+    } catch (err: unknown) {
+      const appErr = err as { code?: string; message?: string };
+      throw new Error(
+        `Failed to create folder "${path}": ${appErr.message ?? 'unknown error'} (code: ${appErr.code ?? 'UNKNOWN'})`,
         { cause: err }
       );
     }
@@ -260,6 +364,15 @@ export class VaultShim implements IVaultShim {
     try {
       await this.apiClient.deleteContent(this.vaultId, file.path);
       this.events.trigger('delete', file);
+
+      // Notify the app to refresh the file explorer tree
+      dispatchRealtimeVaultChange({
+        vaultId: this.vaultId,
+        action: 'deleted',
+        path: file.path,
+        userId: '',
+        username: '',
+      });
     } catch (err: unknown) {
       const appErr = err as { code?: string; message?: string };
       throw new Error(
@@ -298,6 +411,14 @@ export class VaultShim implements IVaultShim {
   }
 
   /**
+   * Read a file from the vault (cached version — in Obsidian, uses in-memory cache).
+   * Our implementation delegates to the regular read() method.
+   */
+  async cachedRead(file: TFile): Promise<string> {
+    return this.read(file);
+  }
+
+  /**
    * Get all files in the vault.
    */
   getFiles(): TFile[] {
@@ -311,6 +432,36 @@ export class VaultShim implements IVaultShim {
    */
   getName(): string {
     return this.vaultName;
+  }
+
+  /**
+   * Get an Obsidian vault configuration value.
+   * Returns sensible defaults for known config keys since Slatebase
+   * does not have an equivalent per-vault config system for these values.
+   *
+   * Known keys:
+   * - "defaultViewMode": "source" | "preview" (default: "source")
+   * - "showLineNumber": boolean (default: false)
+   * - "spellcheck": boolean (default: false)
+   * - "readableLineLength": boolean (default: true)
+   */
+  getConfig(key: string): unknown {
+    const defaults: Record<string, unknown> = {
+      defaultViewMode: 'source',
+      showLineNumber: false,
+      spellcheck: false,
+      readableLineLength: true,
+      livePreview: true,
+      strictLineBreaks: false,
+      showFrontmatter: false,
+      foldHeading: true,
+      foldIndent: true,
+      newFileLocation: 'root',
+      newLinkFormat: 'shortest',
+      useMarkdownLinks: false,
+      attachmentFolderPath: './',
+    };
+    return defaults[key] ?? null;
   }
 
   /**

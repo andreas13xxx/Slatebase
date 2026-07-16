@@ -17,11 +17,20 @@ import {
   InvalidSyncIntervalError,
   InvalidPassphraseError,
   ConflictResolutionError,
+  ConflictNotFoundError,
+  BatchLimitExceededError,
+  FileContentUnavailableError,
+  SchedulerAlreadyPausedError,
+  AutoResolutionConfigError,
 } from '../sync/errors.js'
 import {
   createSyncConfigSchema,
   updateSyncConfigSchema,
   syncLogQuerySchema,
+  resolveBatchSchema,
+  resolveMergeSchema,
+  autoResolutionConfigSchema,
+  fileContentQuerySchema,
 } from '../sync/validation.js'
 
 // --- Helper: API Error Response ---
@@ -130,6 +139,36 @@ function handleSyncError(c: Context, error: unknown, logger: ILogger): Response 
     return c.json(apiError, 500)
   }
 
+  if (error instanceof ConflictNotFoundError) {
+    logger.debug('Conflict not found', { code: error.code })
+    const apiError = createApiError(error.code, error.message)
+    return c.json(apiError, 404)
+  }
+
+  if (error instanceof BatchLimitExceededError) {
+    logger.warn('Batch limit exceeded', { code: error.code })
+    const apiError = createApiError(error.code, error.message)
+    return c.json(apiError, 400)
+  }
+
+  if (error instanceof FileContentUnavailableError) {
+    logger.debug('File content unavailable', { code: error.code })
+    const apiError = createApiError(error.code, error.message)
+    return c.json(apiError, 404)
+  }
+
+  if (error instanceof SchedulerAlreadyPausedError) {
+    logger.warn('Scheduler already paused', { code: error.code })
+    const apiError = createApiError(error.code, error.message)
+    return c.json(apiError, 409)
+  }
+
+  if (error instanceof AutoResolutionConfigError) {
+    logger.warn('Auto-resolution config error', { code: error.code })
+    const apiError = createApiError(error.code, error.message)
+    return c.json(apiError, 400)
+  }
+
   // Zod validation errors (should not reach here normally, but as safety net)
   if (error instanceof z.ZodError) {
     const firstIssue = error.issues[0]
@@ -202,7 +241,21 @@ export class SyncRouteModule implements RouteModule {
 
     // Conflicts
     router.get('/vaults/:vaultId/sync/conflicts', (c) => this.getConflicts(c))
+
+    // Conflict resolution (wizard endpoints) — must be registered BEFORE wildcard :path route
+    router.get('/vaults/:vaultId/sync/conflicts/categorized', (c) => this.getCategorizedConflicts(c))
+    router.post('/vaults/:vaultId/sync/conflicts/resolve-batch', (c) => this.resolveConflictBatch(c))
+    router.post('/vaults/:vaultId/sync/conflicts/resolve-merge', (c) => this.resolveConflictWithContent(c))
+    router.get('/vaults/:vaultId/sync/conflicts/file-content', (c) => this.getFileContent(c))
     router.post('/vaults/:vaultId/sync/conflicts/:path{.+}/resolve', (c) => this.resolveConflict(c))
+
+    // Auto-resolution configuration
+    router.get('/vaults/:vaultId/sync/auto-resolution', (c) => this.getAutoResolutionConfig(c))
+    router.put('/vaults/:vaultId/sync/auto-resolution', (c) => this.setAutoResolutionConfig(c))
+
+    // Scheduler control
+    router.post('/vaults/:vaultId/sync/scheduler/pause', (c) => this.pauseScheduler(c))
+    router.post('/vaults/:vaultId/sync/scheduler/resume', (c) => this.resumeScheduler(c))
   }
 
   // ─── Config CRUD ─────────────────────────────────────────────────────────
@@ -564,6 +617,221 @@ export class SyncRouteModule implements RouteModule {
 
       await this.syncService.resolveConflict(vaultId, documentPath, parsed.data.resolution)
       return c.json({ documentPath, resolution: parsed.data.resolution }, 200)
+    } catch (error) {
+      return handleSyncError(c, error, this.logger)
+    }
+  }
+
+  // ─── Conflict Resolution (Wizard Endpoints) ──────────────────────────────
+
+  /**
+   * GET /vaults/:vaultId/sync/conflicts/categorized
+   * Returns all open conflicts with category classification.
+   */
+  private async getCategorizedConflicts(c: Context): Promise<Response> {
+    const vaultId = c.req.param('vaultId') as string
+
+    const ownerCheck = checkOwnership(c, vaultId, this.vaultRegistry)
+    if (!ownerCheck.authorized) {
+      return ownerCheck.response
+    }
+
+    try {
+      const conflicts = await this.syncService.getCategorizedConflicts(vaultId)
+      return c.json(conflicts, 200)
+    } catch (error) {
+      return handleSyncError(c, error, this.logger)
+    }
+  }
+
+  /**
+   * POST /vaults/:vaultId/sync/conflicts/resolve-batch
+   * Resolves multiple conflicts in a single batch operation.
+   * Body: Array of { documentPath, resolution } (max 100 items).
+   */
+  private async resolveConflictBatch(c: Context): Promise<Response> {
+    const vaultId = c.req.param('vaultId') as string
+
+    const ownerCheck = checkOwnership(c, vaultId, this.vaultRegistry)
+    if (!ownerCheck.authorized) {
+      return ownerCheck.response
+    }
+
+    try {
+      const body: unknown = await c.req.json()
+      const parsed = resolveBatchSchema.safeParse(body)
+
+      if (!parsed.success) {
+        const firstIssue = parsed.error.issues[0]
+        const message = firstIssue ? firstIssue.message : 'Validation failed'
+        const apiError = createApiError('VALIDATION_ERROR', message)
+        return c.json(apiError, 400)
+      }
+
+      const result = await this.syncService.resolveConflictBatch(vaultId, parsed.data)
+      return c.json(result, 200)
+    } catch (error) {
+      return handleSyncError(c, error, this.logger)
+    }
+  }
+
+  /**
+   * POST /vaults/:vaultId/sync/conflicts/resolve-merge
+   * Resolves a conflict with manually provided merged content.
+   * Body: { documentPath, content }.
+   */
+  private async resolveConflictWithContent(c: Context): Promise<Response> {
+    const vaultId = c.req.param('vaultId') as string
+
+    const ownerCheck = checkOwnership(c, vaultId, this.vaultRegistry)
+    if (!ownerCheck.authorized) {
+      return ownerCheck.response
+    }
+
+    try {
+      const body: unknown = await c.req.json()
+      const parsed = resolveMergeSchema.safeParse(body)
+
+      if (!parsed.success) {
+        const firstIssue = parsed.error.issues[0]
+        const message = firstIssue ? firstIssue.message : 'Validation failed'
+        const apiError = createApiError('VALIDATION_ERROR', message)
+        return c.json(apiError, 400)
+      }
+
+      await this.syncService.resolveConflictWithContent(vaultId, parsed.data.documentPath, parsed.data.content)
+      return c.json({ documentPath: parsed.data.documentPath, resolution: 'manual_merge' }, 200)
+    } catch (error) {
+      return handleSyncError(c, error, this.logger)
+    }
+  }
+
+  /**
+   * GET /vaults/:vaultId/sync/conflicts/file-content
+   * Returns the content of a file for the diff view.
+   * Query: path (document path), source (local|remote).
+   */
+  private async getFileContent(c: Context): Promise<Response> {
+    const vaultId = c.req.param('vaultId') as string
+
+    const ownerCheck = checkOwnership(c, vaultId, this.vaultRegistry)
+    if (!ownerCheck.authorized) {
+      return ownerCheck.response
+    }
+
+    try {
+      const rawPath = c.req.query('path')
+      const rawSource = c.req.query('source')
+
+      const parsed = fileContentQuerySchema.safeParse({
+        path: rawPath ?? '',
+        source: rawSource ?? '',
+      })
+
+      if (!parsed.success) {
+        const firstIssue = parsed.error.issues[0]
+        const message = firstIssue ? firstIssue.message : 'Validation failed'
+        const apiError = createApiError('VALIDATION_ERROR', message)
+        return c.json(apiError, 400)
+      }
+
+      const content = await this.syncService.getFileContent(vaultId, parsed.data.path, parsed.data.source)
+      return c.json({ path: parsed.data.path, source: parsed.data.source, content }, 200)
+    } catch (error) {
+      return handleSyncError(c, error, this.logger)
+    }
+  }
+
+  // ─── Auto-Resolution Configuration ───────────────────────────────────────
+
+  /**
+   * GET /vaults/:vaultId/sync/auto-resolution
+   * Returns the auto-resolution configuration for the vault.
+   */
+  private async getAutoResolutionConfig(c: Context): Promise<Response> {
+    const vaultId = c.req.param('vaultId') as string
+
+    const ownerCheck = checkOwnership(c, vaultId, this.vaultRegistry)
+    if (!ownerCheck.authorized) {
+      return ownerCheck.response
+    }
+
+    try {
+      const config = await this.syncService.getAutoResolutionConfig(vaultId)
+      return c.json(config, 200)
+    } catch (error) {
+      return handleSyncError(c, error, this.logger)
+    }
+  }
+
+  /**
+   * PUT /vaults/:vaultId/sync/auto-resolution
+   * Updates the auto-resolution configuration for the vault.
+   * Body: { enabled, strategies }.
+   */
+  private async setAutoResolutionConfig(c: Context): Promise<Response> {
+    const vaultId = c.req.param('vaultId') as string
+
+    const ownerCheck = checkOwnership(c, vaultId, this.vaultRegistry)
+    if (!ownerCheck.authorized) {
+      return ownerCheck.response
+    }
+
+    try {
+      const body: unknown = await c.req.json()
+      const parsed = autoResolutionConfigSchema.safeParse(body)
+
+      if (!parsed.success) {
+        const firstIssue = parsed.error.issues[0]
+        const message = firstIssue ? firstIssue.message : 'Validation failed'
+        const apiError = createApiError('VALIDATION_ERROR', message)
+        return c.json(apiError, 400)
+      }
+
+      await this.syncService.setAutoResolutionConfig(vaultId, parsed.data)
+      return c.json(parsed.data, 200)
+    } catch (error) {
+      return handleSyncError(c, error, this.logger)
+    }
+  }
+
+  // ─── Scheduler Control ────────────────────────────────────────────────────
+
+  /**
+   * POST /vaults/:vaultId/sync/scheduler/pause
+   * Pauses the sync scheduler for the vault (while wizard is open).
+   */
+  private async pauseScheduler(c: Context): Promise<Response> {
+    const vaultId = c.req.param('vaultId') as string
+
+    const ownerCheck = checkOwnership(c, vaultId, this.vaultRegistry)
+    if (!ownerCheck.authorized) {
+      return ownerCheck.response
+    }
+
+    try {
+      this.syncService.pauseScheduler(vaultId)
+      return c.json({ status: 'paused' }, 200)
+    } catch (error) {
+      return handleSyncError(c, error, this.logger)
+    }
+  }
+
+  /**
+   * POST /vaults/:vaultId/sync/scheduler/resume
+   * Resumes the sync scheduler for the vault (wizard closed).
+   */
+  private async resumeScheduler(c: Context): Promise<Response> {
+    const vaultId = c.req.param('vaultId') as string
+
+    const ownerCheck = checkOwnership(c, vaultId, this.vaultRegistry)
+    if (!ownerCheck.authorized) {
+      return ownerCheck.response
+    }
+
+    try {
+      this.syncService.resumeScheduler(vaultId)
+      return c.json({ status: 'resumed' }, 200)
     } catch (error) {
       return handleSyncError(c, error, this.logger)
     }

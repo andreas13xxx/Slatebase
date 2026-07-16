@@ -458,3 +458,105 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+
+/* ─── Plugin Sidebar Tabs ─────────────────────────────────────────────────── */
+
+.context-panel__plugin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--right-panel-bg);
+}
+
+.context-panel__plugin-tab-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.context-panel__plugin-tab-wrapper:hover {
+  background: var(--sidebar-hover);
+}
+
+.context-panel__plugin-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: var(--right-panel-text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.context-panel__plugin-tab:hover {
+  color: var(--right-panel-text);
+}
+
+.context-panel__plugin-tab--active {
+  color: var(--accent-text);
+  font-weight: 600;
+  background: var(--sidebar-active);
+}
+
+.context-panel__plugin-tab-icon {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+}
+
+.context-panel__plugin-tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-panel__plugin-tab-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  background: none;
+  color: var(--right-panel-text-muted);
+  cursor: pointer;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.context-panel__plugin-tab-wrapper:hover .context-panel__plugin-tab-close {
+  opacity: 1;
+}
+
+.context-panel__plugin-tab-close:hover {
+  color: var(--danger-text);
+  background: var(--sidebar-hover);
+}
+
+.context-panel__plugin-tab-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  opacity: 1;
+}
+
+/* ─── Plugin Sidebar Section (Container for plugin DOM) ───────────────────── */
+
+.context-panel__plugin-section {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}

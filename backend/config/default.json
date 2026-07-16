@@ -36,7 +36,7 @@
     "intervalHours": 24
   },
   "templates": {
-    "directory": "_templates"
+    "directory": "Templates"
   },
   "upload": {
     "maxFileSizeBytes": 104857600,

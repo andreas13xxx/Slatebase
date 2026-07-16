@@ -177,6 +177,13 @@
   --canvas-group-border: #cbd5e1;
   --canvas-grid-color: #e2e8f0;
 
+  /* Status Bar Tokens — Light */
+  --status-bar-height: 24px;
+  --status-bar-font-size: 12px;
+  --status-bar-bg: #f1f5f9;
+  --status-bar-border: #e2e8f0;
+  --status-bar-text: #475569;
+
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
@@ -363,6 +370,11 @@
     /* Presence Tokens — Dark */
     --presence-online: #4ade80;
 
+    /* Status Bar Tokens — Dark */
+    --status-bar-bg: #131921;
+    --status-bar-border: #1e293b;
+    --status-bar-text: #94a3b8;
+
     /* Canvas Tokens — Dark */
     --canvas-color-1: #e93147;
     --canvas-color-2: #e9973f;
@@ -541,6 +553,11 @@
 
     /* Presence Tokens — Dark */
     --presence-online: #4ade80;
+
+    /* Status Bar Tokens — Dark */
+    --status-bar-bg: #131921;
+    --status-bar-border: #1e293b;
+    --status-bar-text: #94a3b8;
 
     /* Canvas Tokens — Dark */
     --canvas-color-1: #e93147;

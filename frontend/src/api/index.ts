@@ -2,6 +2,48 @@ import type { VaultInfo, DirectoryTree, FileContent, FileSaveResult, AppError, C
 import type { PublicUserInfo } from '../state/authState'
 import type { SyncConfigResponse, SyncConfigResult, CreateSyncConfigInput, UpdateSyncConfigInput, SyncResult, AnalysisResult, PaginatedSyncLog, PaginatedSyncProtocol, ConflictEntry } from '../state/syncState'
 
+// --- Sync Conflict Resolution Types ---
+
+/** Conflict category classification. */
+export type ConflictCategory = 'content_conflict' | 'local_deleted' | 'remote_deleted' | 'rename_conflict'
+
+/**
+ * Extended conflict entry with category and metadata for the conflict wizard.
+ */
+export interface CategorizedConflictEntry {
+  documentPath: string
+  category: ConflictCategory
+  localContentHash?: string
+  remoteContentHash?: string
+  local: { modifiedAt: string; size: number }
+  remote: { revision: string; modifiedAt: string; size: number }
+  detectedAt: string
+}
+
+/** Resolution action for a single conflict in batch operations. */
+export type ConflictResolutionAction =
+  | { type: 'use_remote' }
+  | { type: 'use_local' }
+  | { type: 'skip' }
+  | { type: 'manual_merge'; content: string }
+
+/** Result of a batch conflict resolution operation. */
+export interface BatchResolveResult {
+  total: number
+  succeeded: number
+  failed: number
+  errors: Array<{ documentPath: string; error: string }>
+}
+
+/** Auto-resolution strategy per conflict category. */
+export type AutoResolutionStrategy = 'newer_wins' | 'remote_wins' | 'local_wins' | 'skip'
+
+/** Auto-resolution configuration persisted per vault. */
+export interface AutoResolutionConfig {
+  enabled: boolean
+  strategies: Partial<Record<ConflictCategory, AutoResolutionStrategy>>
+}
+
 /**
  * Login response returned by the backend on successful authentication.
  */
@@ -205,6 +247,8 @@ export interface IApiClient {
   getCsrfToken(): string | null
   /** Set callback invoked when a 401 response is received. */
   setOnSessionExpired(callback: (() => void) | null): void
+  /** Lightweight session validity check. Returns true if token is still valid. */
+  checkSessionAlive(): Promise<boolean>
 
   // --- Vault methods ---
   fetchVaults(): Promise<VaultInfo[]>
@@ -281,6 +325,24 @@ export interface IApiClient {
   getSyncConflicts(vaultId: string): Promise<ConflictEntry[]>
   /** Resolve a sync conflict for a specific document. */
   resolveSyncConflict(vaultId: string, documentPath: string, resolution: string): Promise<void>
+
+  // --- Sync Conflict Resolution methods ---
+  /** Get categorized conflicts with enriched metadata for the conflict wizard. */
+  getCategorizedConflicts(vaultId: string): Promise<CategorizedConflictEntry[]>
+  /** Resolve multiple conflicts in a single batch operation. */
+  resolveConflictBatch(vaultId: string, resolutions: Array<{ documentPath: string; resolution: ConflictResolutionAction }>): Promise<BatchResolveResult>
+  /** Resolve a conflict by providing merged content (manual merge). */
+  resolveConflictMerge(vaultId: string, documentPath: string, content: string): Promise<void>
+  /** Get file content for diff view (local or remote version). */
+  getFileContent(vaultId: string, documentPath: string, source: 'local' | 'remote'): Promise<string | null>
+  /** Get the auto-resolution configuration for a vault. */
+  getAutoResolutionConfig(vaultId: string): Promise<AutoResolutionConfig>
+  /** Set the auto-resolution configuration for a vault. */
+  setAutoResolutionConfig(vaultId: string, config: AutoResolutionConfig): Promise<void>
+  /** Pause the sync scheduler for a vault (while conflict wizard is open). */
+  pauseSyncScheduler(vaultId: string): Promise<void>
+  /** Resume the sync scheduler for a vault (when conflict wizard closes). */
+  resumeSyncScheduler(vaultId: string): Promise<void>
 
   // --- MCP Token methods ---
   /** List the current user's MCP tokens. */
@@ -709,6 +771,51 @@ export class ApiClient implements IApiClient {
   async resolveSyncConflict(vaultId: string, documentPath: string, resolution: string): Promise<void> {
     const encodedPath = encodeURIComponent(documentPath)
     await this.request<void>('POST', `/api/v1/vaults/${vaultId}/sync/conflicts/${encodedPath}/resolve`, { resolution })
+  }
+
+  // --- Sync Conflict Resolution methods ---
+
+  /** Get categorized conflicts with enriched metadata for the conflict wizard. */
+  async getCategorizedConflicts(vaultId: string): Promise<CategorizedConflictEntry[]> {
+    return this.request<CategorizedConflictEntry[]>('GET', `/api/v1/vaults/${vaultId}/sync/conflicts/categorized`)
+  }
+
+  /** Resolve multiple conflicts in a single batch operation. */
+  async resolveConflictBatch(vaultId: string, resolutions: Array<{ documentPath: string; resolution: ConflictResolutionAction }>): Promise<BatchResolveResult> {
+    return this.request<BatchResolveResult>('POST', `/api/v1/vaults/${vaultId}/sync/conflicts/resolve-batch`, resolutions)
+  }
+
+  /** Resolve a conflict by providing merged content (manual merge). */
+  async resolveConflictMerge(vaultId: string, documentPath: string, content: string): Promise<void> {
+    await this.request<void>('POST', `/api/v1/vaults/${vaultId}/sync/conflicts/resolve-merge`, { documentPath, content })
+  }
+
+  /** Get file content for diff view (local or remote version). */
+  async getFileContent(vaultId: string, documentPath: string, source: 'local' | 'remote'): Promise<string | null> {
+    const encodedPath = encodeURIComponent(documentPath)
+    const encodedSource = encodeURIComponent(source)
+    const result = await this.request<{ content: string | null }>('GET', `/api/v1/vaults/${vaultId}/sync/conflicts/file-content?path=${encodedPath}&source=${encodedSource}`)
+    return result.content
+  }
+
+  /** Get the auto-resolution configuration for a vault. */
+  async getAutoResolutionConfig(vaultId: string): Promise<AutoResolutionConfig> {
+    return this.request<AutoResolutionConfig>('GET', `/api/v1/vaults/${vaultId}/sync/auto-resolution`)
+  }
+
+  /** Set the auto-resolution configuration for a vault. */
+  async setAutoResolutionConfig(vaultId: string, config: AutoResolutionConfig): Promise<void> {
+    await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/sync/auto-resolution`, config)
+  }
+
+  /** Pause the sync scheduler for a vault (while conflict wizard is open). */
+  async pauseSyncScheduler(vaultId: string): Promise<void> {
+    await this.request<void>('POST', `/api/v1/vaults/${vaultId}/sync/scheduler/pause`)
+  }
+
+  /** Resume the sync scheduler for a vault (when conflict wizard closes). */
+  async resumeSyncScheduler(vaultId: string): Promise<void> {
+    await this.request<void>('POST', `/api/v1/vaults/${vaultId}/sync/scheduler/resume`)
   }
 
   // --- MCP Token methods ---
@@ -1207,7 +1314,7 @@ export class ApiClient implements IApiClient {
    * Returns true if session is still valid (2xx), false on 401 or network error.
    * Uses raw fetch to avoid recursion through this.request().
    */
-  private async checkSessionAlive(): Promise<boolean> {
+  async checkSessionAlive(): Promise<boolean> {
     try {
       const headers: Record<string, string> = {}
       if (this.token) {

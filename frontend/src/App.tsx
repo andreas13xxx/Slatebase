@@ -42,9 +42,11 @@ import { VaultDeletionWorkflow } from './components/VaultDeletionWorkflow'
 import { ChatPage } from './components/ChatPage'
 import { SlatebaseLogo } from './components/SlatebaseLogo'
 import { SidebarToolbar } from './components/SidebarToolbar'
+import { StatusBar } from './components/StatusBar'
 import { MyVaultsPage } from './components/MyVaultsPage'
 import { SyncConfigPage } from './components/SyncConfigPage'
 import { SyncLogPage } from './components/SyncLogPage'
+import { ConflictWizardPage } from './components/ConflictWizardPage'
 import { McpTokensPage } from './components/McpTokensPage'
 import { PluginManagementPage } from './components/PluginManagementPage'
 import { PluginViewPanel } from './components/PluginViewPanel'
@@ -60,11 +62,12 @@ import { SidebarPanel } from './components/sidebar-panel'
 import { PluginProvider } from './plugins/compat/plugin-context'
 import { CommandPaletteContainer } from './components/CommandPaletteContainer'
 import { useResize } from './hooks/useResize'
+import { useStatusBar } from './hooks/useStatusBar'
 import { saveRestoreState, readRestoreState, clearRestoreState, updateUiSnapshot, RESTORE_STATE_KEY } from './utils/restoreState'
 import {
   User, Settings, Shield, FileText, Clock,
   Database, Share2, Trash2, Server,
-  PanelRight, PanelLeft, X, Eye, Pencil, MessageCircle, RefreshCw, Key, ScrollText, Plug,
+  PanelRight, PanelLeft, X, Eye, Pencil, MessageCircle, RefreshCw, Key, ScrollText, Plug, GitMerge,
 } from 'lucide-react'
 import { getFileIcon, getFileIconClass, getDisplayName } from './utils/fileIcons'
 import './App.css'
@@ -100,6 +103,7 @@ export type AppPage =
   | 'vault-deletion'
   | 'sync-config'
   | 'sync-log'
+  | 'conflicts'
   | 'mcp-tokens'
   | 'plugins'
   | 'trash'
@@ -119,6 +123,7 @@ const PAGE_LABEL_KEYS: Record<AppPage, string> = {
   'vault-deletion': 'pages.vaultDeletion',
   'sync-config': 'pages.syncConfig',
   'sync-log': 'pages.syncLog',
+  conflicts: 'pages.conflicts',
   'mcp-tokens': 'pages.mcpTokens',
   plugins: 'pages.plugins',
   trash: 'pages.trash',
@@ -139,6 +144,7 @@ const PAGE_ICONS: Partial<Record<AppPage, React.ReactNode>> = {
   'vault-deletion': <Trash2 size={13} />,
   'sync-config': <RefreshCw size={13} />,
   'sync-log': <Clock size={13} />,
+  conflicts: <GitMerge size={13} />,
   'mcp-tokens': <Key size={13} />,
   plugins: <Plug size={13} />,
   trash: <Trash2 size={13} />,
@@ -189,6 +195,10 @@ function AppContent() {
   const createVaultTriggerRef = useRef<(() => void) | null>(null)
   const createCanvasTriggerRef = useRef<(() => void) | null>(null)
 
+  const handleRegisterCreateFile = useCallback((trigger: () => void) => { createFileTriggerRef.current = trigger }, [])
+  const handleRegisterCreateVault = useCallback((trigger: () => void) => { createVaultTriggerRef.current = trigger }, [])
+  const handleRegisterCreateCanvas = useCallback((trigger: () => void) => { createCanvasTriggerRef.current = trigger }, [])
+
   // Version browser state: which file to show versions for
   const [versionBrowserTarget, setVersionBrowserTarget] = useState<{ vaultId: string; filePath: string } | null>(null)
 
@@ -201,6 +211,9 @@ function AppContent() {
 
   // Unified Settings Panel state
   const [settingsOpen, setSettingsOpen] = useState(false)
+
+  // Status bar visibility (persisted in localStorage)
+  const { visible: statusBarVisible } = useStatusBar()
 
   // Global unread count polling (30-second interval)
   // Disabled when SSE connection is active (realtime pushes unread counts)
@@ -534,6 +547,8 @@ function AppContent() {
       const fileName = filePath.split('/').pop() ?? filePath
       setActiveSettingsPage(null)
       await openTab(tabDispatch, dispatch, apiClient, vaultId, filePath, fileName)
+      // Refresh file explorer tree (SSE vault:change excludes the triggering user)
+      void reloadVaultTree(dispatch, apiClient, vaultId)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Tagesnotiz konnte nicht erstellt werden'
       showToast('error', message)
@@ -634,6 +649,11 @@ function AppContent() {
         if (!isEnabled('vault-sync')) return <FeatureDisabledHint featureName="Vault-Sync" />
         return state.selectedVaultId
           ? <SyncProvider><SyncLogPage vaultId={state.selectedVaultId} /></SyncProvider>
+          : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
+      case 'conflicts':
+        if (!isEnabled('vault-sync')) return <FeatureDisabledHint featureName="Vault-Sync" />
+        return state.selectedVaultId
+          ? <SyncProvider><ConflictWizardPage vaultId={state.selectedVaultId} /></SyncProvider>
           : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
       case 'mcp-tokens':
         if (!isEnabled('mcp')) return <FeatureDisabledHint featureName="MCP" />
@@ -790,9 +810,9 @@ function AppContent() {
                   onOpenFile={handleSidebarOpenFile}
                   renderExplorer={() => (
                     <FileExplorer
-                      onRegisterCreateFile={(trigger) => { createFileTriggerRef.current = trigger }}
-                      onRegisterCreateVault={(trigger) => { createVaultTriggerRef.current = trigger }}
-                      onRegisterCreateCanvas={(trigger) => { createCanvasTriggerRef.current = trigger }}
+                      onRegisterCreateFile={handleRegisterCreateFile}
+                      onRegisterCreateVault={handleRegisterCreateVault}
+                      onRegisterCreateCanvas={handleRegisterCreateCanvas}
                       onOpenVersions={(vaultId, filePath) => setVersionBrowserTarget({ vaultId, filePath })}
                     />
                   )}
@@ -974,6 +994,7 @@ function AppContent() {
             <PanelLeft size={15} />
           </button>
         </div>
+        {statusBarVisible && <StatusBar />}
       </main>
     </div>
     </PluginProvider>
@@ -997,6 +1018,7 @@ function I18nBridge({ children }: { children: React.ReactNode }) {
 
   return (
     <I18nProvider userLocale={userLocale}>
+      <ObsidianLocaleSync />
       <ToastProvider>
         {children}
       </ToastProvider>
@@ -1005,10 +1027,35 @@ function I18nBridge({ children }: { children: React.ReactNode }) {
 }
 
 /**
+ * Syncs the active i18n locale to localStorage("language") and moment.locale().
+ * Obsidian plugins (e.g. Calendar) read localStorage("language") to determine
+ * which moment locale to activate. This ensures the plugin locale always matches
+ * the user's chosen language, not the browser default.
+ */
+function ObsidianLocaleSync() {
+  const { locale } = useTranslation()
+
+  useEffect(() => {
+    // Sync to localStorage — plugins read this via localStorage.getItem("language")
+    localStorage.setItem('language', locale)
+
+    // Also update the global moment locale so new moment() calls use it
+    if (window.moment) {
+      window.moment.locale(locale)
+    }
+  }, [locale])
+
+  return null
+}
+
+/**
  * Auth guard component.
+ * When a token is restored from localStorage, verifies the session is still valid
+ * before rendering authenticated content — prevents stale-token API noise (401s).
  */
 function AuthGuard() {
   const { authState, authDispatch } = useAuthContext()
+  const [sessionVerified, setSessionVerified] = useState(false)
 
   // Restore apiClient tokens from persisted auth state (after page reload)
   useEffect(() => {
@@ -1035,12 +1082,51 @@ function AuthGuard() {
     return () => { apiClient.setOnSessionExpired(null) }
   }, [authDispatch])
 
+  // Verify session validity when auth state is restored from localStorage
+  useEffect(() => {
+    if (!authState.isAuthenticated) {
+      return
+    }
+
+    let cancelled = false
+
+    async function verify() {
+      const alive = await apiClient.checkSessionAlive()
+      if (cancelled) return
+
+      if (alive) {
+        setSessionVerified(true)
+      } else {
+        // Session expired — clear auth state (triggers login page)
+        saveRestoreState()
+        apiClient.setToken(null)
+        apiClient.setCsrfToken(null)
+        disconnectRecentFiles()
+        disconnectFavorites()
+        disconnectKeybindings()
+        authDispatch({ type: 'SESSION_EXPIRED' })
+      }
+    }
+
+    void verify()
+    return () => { cancelled = true }
+  }, [authState.isAuthenticated, authDispatch])
+
   if (!authState.isAuthenticated) {
     return <LoginPage apiClient={apiClient} />
   }
 
   if (authState.mustChangePassword) {
     return <ChangePasswordPage apiClient={apiClient} />
+  }
+
+  // Wait for session verification before rendering the app tree
+  if (!sessionVerified) {
+    return (
+      <div className="app-loading" role="status" aria-live="polite">
+        <span className="app-loading-spinner" aria-hidden="true" />
+      </div>
+    )
   }
 
   return (

@@ -9,6 +9,7 @@ import React from 'react'
 import { RealtimeProvider as RealtimeStateProvider, useRealtimeContext } from '../state/realtimeContext'
 import { useEventSource, type SseEventData } from '../state/useEventSource'
 import { dispatchPresenceChange, getOnlineUserIds } from '../state/realtimePresenceBridge'
+import { dispatchRealtimeSyncConflict } from '../state/realtimeSyncBridge'
 import { showToast } from './ToastNotification'
 import type { ConnectionStatus } from '../state/realtimeState'
 
@@ -164,11 +165,21 @@ function RealtimeInner({
 
       case 'sync:conflict': {
         const conflictPath = payload.path as string | undefined
+        const conflictVaultId = payload.vaultId as string | undefined
+        const conflictCategory = payload.category as string | undefined
         if (conflictPath) {
           const fileName = conflictPath.length > 50
             ? conflictPath.slice(0, 50) + '\u2026'
             : conflictPath
           showToast('warning', `Sync-Konflikt: ${fileName}`)
+        }
+        // Dispatch enriched event to bridge (wizard listens for live updates)
+        if (conflictPath && conflictVaultId) {
+          dispatchRealtimeSyncConflict({
+            vaultId: conflictVaultId,
+            path: conflictPath,
+            category: (conflictCategory as 'content_conflict' | 'local_deleted' | 'remote_deleted' | 'rename_conflict') ?? 'content_conflict',
+          })
         }
         break
       }

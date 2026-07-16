@@ -27,6 +27,15 @@ Add `+` or `-` after the type to make callouts collapsible:
 ```markdown
 > [!tip]+ Expandable (open by default)
 > This content can be collapsed.
+
+> [!note]- Collapsed (closed by default)
+> This content is initially hidden.
 ```
+
+> [!tip]+ Expandable (open by default)
+> Click the title to collapse this content.
+
+> [!note]- Collapsed (closed by default)
+> Click the title above to reveal this hidden content.
 
 #reference #callouts

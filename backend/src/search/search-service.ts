@@ -105,13 +105,6 @@ export class SearchService implements ISearchService {
         break
       }
 
-      // Skip internal files with _ prefix
-      const fileName = this.getFileName(filePath)
-      if (fileName.startsWith('_')) {
-        skippedFiles.push({ path: filePath, reason: 'internal' })
-        continue
-      }
-
       // Read file content
       let fileContent: { content: string; size: number; isBinary: boolean }
       try {
@@ -437,12 +430,6 @@ export class SearchService implements ISearchService {
         truncationReason = 'result_limit'
         truncationMessage = `Ergebnislimit von ${options.maxResults} erreicht. Es existieren weitere Treffer.`
         break
-      }
-
-      // Skip internal files with _ prefix
-      const fileName = this.getFileName(filePath)
-      if (fileName.startsWith('_')) {
-        continue
       }
 
       // Read file content

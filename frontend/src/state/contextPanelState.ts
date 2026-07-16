@@ -14,8 +14,29 @@ export const MIN_HEIGHT_FRACTION = 0.1
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-/** Identifiers for the context panel views. */
-export type ContextPanelViewId = 'outline' | 'links' | 'tags' | 'properties' | 'search'
+/** Built-in identifiers for the context panel views. */
+export type BuiltinViewId = 'outline' | 'links' | 'tags' | 'properties' | 'search'
+
+/** Plugin view identifiers use a `plugin:` prefix followed by the view type. */
+export type PluginViewId = `plugin:${string}`
+
+/** All context panel view identifiers (built-in + plugin). */
+export type ContextPanelViewId = BuiltinViewId | PluginViewId
+
+/** Type guard: checks if a view ID is a plugin view. */
+export function isPluginViewId(viewId: string): viewId is PluginViewId {
+  return viewId.startsWith('plugin:')
+}
+
+/** Type guard: checks if a view ID is a built-in view. */
+export function isBuiltinViewId(viewId: string): viewId is BuiltinViewId {
+  return viewId === 'outline' || viewId === 'links' || viewId === 'tags' || viewId === 'properties' || viewId === 'search'
+}
+
+/** Extract the plugin view type from a PluginViewId. */
+export function getPluginViewType(viewId: PluginViewId): string {
+  return viewId.slice(7) // Remove 'plugin:' prefix
+}
 
 /** A single split section within the context panel. */
 export interface SplitSection {
@@ -93,6 +114,8 @@ export type ContextPanelAction =
   | { type: 'SET_TAG_EXPANDED'; tag: string | null; files: string[] }
   | { type: 'SET_PROPERTIES'; data: Record<string, unknown> | null; parseError: string | null; rawFrontmatter: string | null }
   | { type: 'RESET_DOCUMENT_STATE' }
+  | { type: 'ADD_PLUGIN_VIEW'; viewId: PluginViewId }
+  | { type: 'REMOVE_PLUGIN_VIEW'; viewId: PluginViewId }
 
 // ─── Section ID Generation ───────────────────────────────────────────────────
 
@@ -565,6 +588,63 @@ export function contextPanelReducer(state: ContextPanelState, action: ContextPan
           parseError: null,
           rawFrontmatter: null,
         },
+      }
+    }
+
+    case 'ADD_PLUGIN_VIEW': {
+      const { viewId } = action
+
+      // Don't add if already present in any section
+      const alreadyPresent = state.sections.some(s => s.viewIds.includes(viewId))
+      if (alreadyPresent) return state
+
+      // Add to the first section's viewIds
+      const firstSection = state.sections[0]
+      if (!firstSection) return state
+
+      return {
+        ...state,
+        sections: state.sections.map((section, index) =>
+          index === 0
+            ? { ...section, viewIds: [...section.viewIds, viewId] }
+            : section
+        ),
+        tabOrder: [...state.tabOrder, viewId],
+      }
+    }
+
+    case 'REMOVE_PLUGIN_VIEW': {
+      const { viewId } = action
+
+      // Remove from all sections and fix activeViewId if needed
+      let newSections = state.sections.map(section => {
+        if (!section.viewIds.includes(viewId)) return section
+        const updatedViewIds = section.viewIds.filter(v => v !== viewId)
+        const activeViewId = section.activeViewId === viewId
+          ? (updatedViewIds[0] ?? 'outline')
+          : section.activeViewId
+        return { ...section, viewIds: updatedViewIds, activeViewId }
+      })
+
+      // Remove any sections that became empty (but keep at least one)
+      const nonEmptySections = newSections.filter(s => s.viewIds.length > 0)
+      if (nonEmptySections.length > 0) {
+        const equalFraction = 1 / nonEmptySections.length
+        newSections = nonEmptySections.map(s => ({ ...s, heightFraction: equalFraction }))
+      } else {
+        // All sections empty — restore to default with built-in views only
+        newSections = [{
+          id: generateSectionId(),
+          viewIds: ['outline', 'links', 'tags', 'properties', 'search'],
+          activeViewId: 'outline' as ContextPanelViewId,
+          heightFraction: 1,
+        }]
+      }
+
+      return {
+        ...state,
+        sections: newSections,
+        tabOrder: state.tabOrder.filter(v => v !== viewId),
       }
     }
   }

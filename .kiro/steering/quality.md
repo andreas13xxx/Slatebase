@@ -2,6 +2,15 @@
 
 Code-Review-Checkliste und Sicherheitsregeln in einem Dokument.
 
+## Bugfix-Workflow
+
+Bei gemeldeten Problemen/Bugs:
+1. **Erst analysieren** — Root Cause identifizieren, betroffene Stellen zeigen
+2. **Lösungsvorschlag präsentieren** — beschreiben was geändert wird und warum
+3. **Auf Bestätigung warten** — erst nach explizitem OK die Dateien ändern
+
+Keine Dateien modifizieren bevor der Nutzer den Fix bestätigt hat.
+
 ## Code-Review Checkliste
 
 ### Funktionalität

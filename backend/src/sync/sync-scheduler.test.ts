@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { SyncScheduler } from './sync-scheduler.js'
+import { SchedulerAlreadyPausedError } from './errors.js'
 
 describe('SyncScheduler', () => {
   let scheduler: SyncScheduler
@@ -216,6 +217,116 @@ describe('SyncScheduler', () => {
       expect(callback).toHaveBeenCalledTimes(1)
       // Timer should still be active
       expect(scheduler.isActive('vault-1')).toBe(true)
+    })
+  })
+
+  describe('pause', () => {
+    it('marks a vault as paused', () => {
+      const callback = vi.fn().mockResolvedValue(undefined)
+      scheduler.start('vault-1', 5, callback)
+      scheduler.pause('vault-1')
+
+      expect(scheduler.isPaused('vault-1')).toBe(true)
+    })
+
+    it('throws SchedulerAlreadyPausedError when pausing an already-paused vault', () => {
+      const callback = vi.fn().mockResolvedValue(undefined)
+      scheduler.start('vault-1', 5, callback)
+      scheduler.pause('vault-1')
+
+      expect(() => scheduler.pause('vault-1')).toThrow(SchedulerAlreadyPausedError)
+    })
+
+    it('skips callback execution while paused', async () => {
+      const callback = vi.fn().mockResolvedValue(undefined)
+      scheduler.start('vault-1', 5, callback)
+      scheduler.pause('vault-1')
+
+      // Advance past multiple intervals
+      await vi.advanceTimersByTimeAsync(15 * 60 * 1000)
+
+      expect(callback).toHaveBeenCalledTimes(0)
+    })
+
+    it('keeps the timer registered while paused', () => {
+      const callback = vi.fn().mockResolvedValue(undefined)
+      scheduler.start('vault-1', 5, callback)
+      scheduler.pause('vault-1')
+
+      expect(scheduler.isActive('vault-1')).toBe(true)
+    })
+
+    it('can pause a vault without a timer (no-timer scenario)', () => {
+      // Pausing without a timer is allowed — useful if pause is called before start
+      scheduler.pause('vault-no-timer')
+      expect(scheduler.isPaused('vault-no-timer')).toBe(true)
+    })
+  })
+
+  describe('resume', () => {
+    it('removes pause state from a vault', () => {
+      const callback = vi.fn().mockResolvedValue(undefined)
+      scheduler.start('vault-1', 5, callback)
+      scheduler.pause('vault-1')
+      scheduler.resume('vault-1')
+
+      expect(scheduler.isPaused('vault-1')).toBe(false)
+    })
+
+    it('is idempotent — no-op on non-paused vault', () => {
+      expect(() => scheduler.resume('vault-1')).not.toThrow()
+      expect(scheduler.isPaused('vault-1')).toBe(false)
+    })
+
+    it('resumes callback execution after resume', async () => {
+      const callback = vi.fn().mockResolvedValue(undefined)
+      scheduler.start('vault-1', 5, callback)
+      scheduler.pause('vault-1')
+
+      // Advance while paused — no calls
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000)
+      expect(callback).toHaveBeenCalledTimes(0)
+
+      // Resume
+      scheduler.resume('vault-1')
+
+      // Next interval fires
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000)
+      expect(callback).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('isPaused', () => {
+    it('returns false for a vault that has never been paused', () => {
+      expect(scheduler.isPaused('vault-1')).toBe(false)
+    })
+
+    it('returns true after pause', () => {
+      scheduler.pause('vault-1')
+      expect(scheduler.isPaused('vault-1')).toBe(true)
+    })
+
+    it('returns false after pause + resume', () => {
+      scheduler.pause('vault-1')
+      scheduler.resume('vault-1')
+      expect(scheduler.isPaused('vault-1')).toBe(false)
+    })
+  })
+
+  describe('pause does not affect other vaults', () => {
+    it('pausing one vault does not affect another', async () => {
+      const callback1 = vi.fn().mockResolvedValue(undefined)
+      const callback2 = vi.fn().mockResolvedValue(undefined)
+
+      scheduler.start('vault-1', 5, callback1)
+      scheduler.start('vault-2', 5, callback2)
+
+      scheduler.pause('vault-1')
+
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000)
+
+      expect(callback1).toHaveBeenCalledTimes(0)
+      expect(callback2).toHaveBeenCalledTimes(1)
     })
   })
 })

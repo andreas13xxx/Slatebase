@@ -64,6 +64,7 @@ cd frontend && npm run lint     # ESLint
 
 Filesystem-based, no database. All under `backend/data/`:
 - `vaults.json` + `vaults/<id>/` — Vault registry + files
+- `vaults/<id>/.slatebase/` — Per-vault internal data (trash, versions, link-index, config)
 - `users/`, `sessions/`, `shares.json` — Auth data
 - `audit/` — Append-only JSONL (daily rotation)
 - `chat/`, `sync/<vaultId>/`, `mcp/tokens/`, `plugins/<vaultId>/`
@@ -73,7 +74,9 @@ Filesystem-based, no database. All under `backend/data/`:
 - Missing `.js` extension in backend imports → runtime error
 - `noUncheckedIndexedAccess` → null-check array/object access
 - Vault IDs are deterministic SHA-256 (12 hex chars), not random
-- `_`-prefix files filtered from tree (`_link-index.json`)
+- Dot-prefixed files/dirs hidden from tree, search, stats (like Obsidian)
+- Underscore-prefixed files/dirs are normal user content (like Obsidian)
+- Internal vault data in `.slatebase/` (trash, versions, link-index, config)
 - Use `state.vaultTrees[vaultId]` (not legacy `directoryTree`)
 - Expanded paths scoped: `${vaultId}::${path}`
 - Vite proxy requires backend on port 3000

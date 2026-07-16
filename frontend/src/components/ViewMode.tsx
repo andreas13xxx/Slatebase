@@ -68,8 +68,17 @@ export function resolveWikilinkTarget(target: string, tree: DirectoryTree | null
   const files: { name: string; path: string }[] = []
   collectFiles(tree, files)
 
-  // Try exact match (case-insensitive)
   const targetLower = normalizedTarget.toLowerCase()
+
+  // Try exact path match first (case-insensitive) — handles "folder/file" targets
+  for (const file of files) {
+    const pathLower = file.path.toLowerCase()
+    if (pathLower === targetLower || pathLower === targetLower + '.md') {
+      return file.path
+    }
+  }
+
+  // Fallback: match by filename only (Obsidian behavior for short-form links)
   for (const file of files) {
     const nameLower = file.name.toLowerCase()
     if (nameLower === targetLower || nameLower === targetLower + '.md') {
@@ -1556,6 +1565,12 @@ function renderCalloutNode(
   )
 
   const body = createElement('div', { className: 'view-mode-callout-body' },
+    // Inline content from the callout's first paragraph (text after the header line)
+    node.children.length > 0
+      ? createElement('p', { key: `${key}-inline` },
+          renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, `${key}-inline`, token, _onTagClick)
+        )
+      : null,
     renderBlockNodes(node.body, vaultId, directoryTree, onInternalLinkClick, `${key}-body`, token, anchorTracker, _onTagClick, embedDepth)
   )
 
@@ -1563,7 +1578,7 @@ function renderCalloutNode(
   if (node.foldable) {
     return createElement('details', {
       key,
-      className: `view-mode-callout view-mode-callout--${node.calloutType}`,
+      className: `view-mode-callout view-mode-callout--${node.calloutType} view-mode-callout--foldable`,
       // Requirement 7.3: defaultOpen: true sets the open attribute
       open: node.defaultOpen,
     },

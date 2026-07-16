@@ -1,4 +1,6 @@
 import { EventSystem } from '../event-system';
+import { resolveWikilinkTarget } from '../../link-resolver';
+import type { DirectoryTree } from '../../../types';
 import type { EventRef, IWorkspaceShim, TFile } from '../types';
 import type { ViewRegistry, WorkspaceLeaf } from '../view-registry';
 
@@ -12,6 +14,8 @@ import type { ViewRegistry, WorkspaceLeaf } from '../view-registry';
  * - `registerView(type, creator)`: register a custom view type (Calendar, Kanban, etc.)
  * - `getLeaf()` / `getRightLeaf()` / `revealLeaf()`: leaf management for plugin views
  * - `getLeavesOfType()` / `detachLeavesOfType()`: view instance queries
+ * - `getActiveLeaf()` / `setActiveLeaf()` / `getUnpinnedLeaf()`: active leaf tracking
+ * - `createLeafBySplit()` / `splitActiveLeaf()`: split emulation (creates new tab)
  * - ES6 Proxy for non-emulated property/method access (returns no-op with console.warn, once per property)
  *
  * @example
@@ -24,9 +28,19 @@ import type { ViewRegistry, WorkspaceLeaf } from '../view-registry';
 export class WorkspaceShim implements IWorkspaceShim {
   private events: EventSystem;
   private activeFile: TFile | null = null;
+  private activeLeaf: WorkspaceLeaf | null = null;
+  private fileLeaf: WorkspaceLeaf | null = null;
   private warnedProperties: Set<string> = new Set();
   private viewRegistry: ViewRegistry | null = null;
   private app: unknown = null;
+  private directoryTree: DirectoryTree | null = null;
+  private onOpenFile: ((filePath: string) => void) | null = null;
+
+  /**
+   * Whether the workspace layout is ready. In Slatebase, plugins load after
+   * FCP, so the layout is always considered ready when plugins execute.
+   */
+  readonly layoutReady: boolean = true;
 
   constructor() {
     this.events = new EventSystem();
@@ -73,16 +87,44 @@ export class WorkspaceShim implements IWorkspaceShim {
   }
 
   /**
+   * Execute a callback when the workspace layout is ready.
+   * In Slatebase, plugins load after FCP, so the layout is always ready.
+   * The callback is invoked asynchronously (next microtask) to match Obsidian's behavior.
+   */
+  onLayoutReady(callback: () => void): void {
+    Promise.resolve().then(callback);
+  }
+
+  /**
    * Update the active file state externally.
    * Emits 'file-open' and 'active-leaf-change' events when the active file changes.
+   * Also updates activeLeaf with a synthetic leaf so plugins accessing
+   * workspace.activeLeaf get a valid object instead of null.
    */
   setActiveFile(file: TFile | null): void {
     const previousFile = this.activeFile;
     this.activeFile = file;
 
+    // Update activeLeaf: reuse or create a synthetic leaf for regular file tabs
+    if (file !== null) {
+      if (!this.fileLeaf && this.viewRegistry && this.app) {
+        this.fileLeaf = this.viewRegistry.createLeaf(this.app, 'main');
+      }
+      if (this.fileLeaf) {
+        // Attach a minimal view-like object with the file reference
+        (this.fileLeaf as unknown as { view: { file: TFile | null; getViewType: () => string } }).view = {
+          file,
+          getViewType: () => 'markdown',
+        };
+        this.activeLeaf = this.fileLeaf;
+      }
+    } else {
+      this.activeLeaf = null;
+    }
+
     // Only emit events if the file actually changed
     if (previousFile !== file) {
-      this.events.trigger('active-leaf-change', file);
+      this.events.trigger('active-leaf-change', this.activeLeaf);
       if (file !== null) {
         this.events.trigger('file-open', file);
       }
@@ -97,46 +139,137 @@ export class WorkspaceShim implements IWorkspaceShim {
    *
    * @param viewType - Unique string identifier for the view type
    * @param creator - Factory function that creates a view instance given a leaf
+   * @param pluginId - Optional plugin ID for ownership tracking
    */
-  registerView(viewType: string, creator: (leaf: WorkspaceLeaf) => unknown): void {
+  registerView(viewType: string, creator: (leaf: WorkspaceLeaf) => unknown, pluginId?: string): void {
     if (!this.viewRegistry) {
       console.warn(`[WorkspaceShim] registerView("${viewType}") called before ViewRegistry attached — no-op.`);
       return;
     }
-    this.viewRegistry.registerView(viewType, creator);
+    this.viewRegistry.registerView(viewType, creator, pluginId ?? 'unknown');
   }
 
   /**
-   * Get a leaf to host a view. Creates a new leaf in the right panel.
-   * Obsidian supports 'split', 'tab', 'window' — we always create in the right panel.
+   * Get or create a workspace leaf for hosting a view.
+   *
+   * - If `newLeaf === true`: always creates a new leaf with location 'main'.
+   * - If `newLeaf` is falsy/undefined: returns an existing leaf with null view,
+   *   or creates a new leaf with location 'main' if none available.
    */
-  getLeaf(_newLeaf?: boolean | string): WorkspaceLeaf | undefined { // eslint-disable-line @typescript-eslint/no-unused-vars
-    if (!this.viewRegistry) return undefined;
-    return this.viewRegistry.createLeaf(this.app);
+  getLeaf(newLeaf?: boolean | string): WorkspaceLeaf { // eslint-disable-line @typescript-eslint/no-unused-vars
+    if (!this.viewRegistry) {
+      // Should not happen in practice — create a leaf anyway if registry is available later
+      return this.viewRegistry!.createLeaf(this.app, 'main');
+    }
+
+    if (newLeaf === true) {
+      return this.viewRegistry.createLeaf(this.app, 'main');
+    }
+
+    // Find an existing leaf with no view (null view)
+    const allLeaves = this.viewRegistry.getAllLeaves();
+    const emptyLeaf = allLeaves.find(l => l.view === null);
+    if (emptyLeaf) {
+      return emptyLeaf;
+    }
+
+    return this.viewRegistry.createLeaf(this.app, 'main');
   }
 
   /**
-   * Get or create a leaf in the right panel (sidebar).
-   * This is what most sidebar-plugins (Calendar, Outline) use.
+   * Get or create a leaf in the right sidebar (Context Panel).
+   * Creates a leaf with location 'right-sidebar'.
    */
-  getRightLeaf(_split?: boolean): WorkspaceLeaf | undefined { // eslint-disable-line @typescript-eslint/no-unused-vars
-    if (!this.viewRegistry) return undefined;
-    return this.viewRegistry.createLeaf(this.app);
+  getRightLeaf(_split?: boolean): WorkspaceLeaf { // eslint-disable-line @typescript-eslint/no-unused-vars
+    if (!this.viewRegistry) {
+      return this.viewRegistry!.createLeaf(this.app, 'right-sidebar');
+    }
+    return this.viewRegistry.createLeaf(this.app, 'right-sidebar');
   }
 
   /**
-   * Get or create a leaf in the left panel (sidebar).
+   * Get or create a leaf in the left sidebar.
+   * Slatebase maps both left and right sidebar to the Context Panel (right-sidebar).
    */
-  getLeftLeaf(_split?: boolean): WorkspaceLeaf | undefined { // eslint-disable-line @typescript-eslint/no-unused-vars
-    if (!this.viewRegistry) return undefined;
-    return this.viewRegistry.createLeaf(this.app);
+  getLeftLeaf(_split?: boolean): WorkspaceLeaf { // eslint-disable-line @typescript-eslint/no-unused-vars
+    if (!this.viewRegistry) {
+      return this.viewRegistry!.createLeaf(this.app, 'right-sidebar');
+    }
+    return this.viewRegistry.createLeaf(this.app, 'right-sidebar');
   }
 
   /**
-   * Reveal (activate/focus) a leaf. In Slatebase this is a no-op since we auto-show plugin views.
+   * Returns the currently active leaf, or null if no tab is active.
    */
-  revealLeaf(_leaf: WorkspaceLeaf): void { // eslint-disable-line @typescript-eslint/no-unused-vars
-    // Views are automatically shown when setViewState is called
+  getActiveLeaf(): WorkspaceLeaf | null {
+    return this.activeLeaf;
+  }
+
+  /**
+   * Set the given leaf as the active leaf.
+   * Activates the associated tab. Warns if the leaf is unknown.
+   */
+  setActiveLeaf(leaf: WorkspaceLeaf): void {
+    if (!this.viewRegistry) {
+      console.warn('[WorkspaceShim] setActiveLeaf called before ViewRegistry attached — no-op.');
+      return;
+    }
+
+    const allLeaves = this.viewRegistry.getAllLeaves();
+    if (!allLeaves.includes(leaf)) {
+      console.warn('[WorkspaceShim] setActiveLeaf called with unknown leaf — no-op.');
+      return;
+    }
+
+    this.activeLeaf = leaf;
+    this.events.trigger('active-leaf-change', leaf);
+  }
+
+  /**
+   * Get an unpinned leaf. Slatebase has no pinning concept, so this always
+   * creates a new leaf with location 'main'.
+   */
+  getUnpinnedLeaf(): WorkspaceLeaf {
+    if (!this.viewRegistry) {
+      return this.viewRegistry!.createLeaf(this.app, 'main');
+    }
+    return this.viewRegistry.createLeaf(this.app, 'main');
+  }
+
+  /**
+   * Reveal (activate/focus) a leaf.
+   * For main leaves, sets it as the active leaf (triggering tab activation).
+   * For sidebar leaves, sets it as the active leaf (triggering section activation).
+   * Silently ignores unknown leaves.
+   */
+  revealLeaf(leaf: WorkspaceLeaf): void {
+    if (!this.viewRegistry) return;
+    const allLeaves = this.viewRegistry.getAllLeaves();
+    if (!allLeaves.includes(leaf)) return;
+    this.setActiveLeaf(leaf);
+  }
+
+  /**
+   * Create a new leaf by splitting an existing leaf.
+   * Slatebase does not support split panes — creates a new tab instead.
+   */
+  createLeafBySplit(_leaf: WorkspaceLeaf): WorkspaceLeaf { // eslint-disable-line @typescript-eslint/no-unused-vars
+    console.info('[WorkspaceShim] createLeafBySplit: Slatebase does not support split panes — created new tab instead.');
+    if (!this.viewRegistry) {
+      return this.viewRegistry!.createLeaf(this.app, 'main');
+    }
+    return this.viewRegistry.createLeaf(this.app, 'main');
+  }
+
+  /**
+   * Split the active leaf. Slatebase does not support split panes — creates a new tab instead.
+   */
+  splitActiveLeaf(): WorkspaceLeaf {
+    console.info('[WorkspaceShim] splitActiveLeaf: Slatebase does not support split panes — created new tab instead.');
+    if (!this.viewRegistry) {
+      return this.viewRegistry!.createLeaf(this.app, 'main');
+    }
+    return this.viewRegistry.createLeaf(this.app, 'main');
   }
 
   /**
@@ -148,11 +281,57 @@ export class WorkspaceShim implements IWorkspaceShim {
   }
 
   /**
+   * Get the active view if it is an instance of the given class.
+   * Returns the view cast to T if the active leaf's view matches, null otherwise.
+   */
+  getActiveViewOfType<T>(viewClass: new (...args: unknown[]) => T): T | null {
+    if (this.activeLeaf?.view instanceof viewClass) {
+      return this.activeLeaf.view as T;
+    }
+    return null;
+  }
+
+  /**
+   * Iterate over all active leaves (main + sidebar), calling the callback for each.
+   * If a callback throws, the error is logged and iteration continues.
+   */
+  iterateAllLeaves(callback: (leaf: WorkspaceLeaf) => void): void {
+    if (!this.viewRegistry) return;
+    const allLeaves = this.viewRegistry.getAllLeaves();
+    for (const leaf of allLeaves) {
+      try {
+        callback(leaf);
+      } catch (err) {
+        console.error('[WorkspaceShim] iterateAllLeaves: callback threw for leaf:', err);
+      }
+    }
+  }
+
+  /**
+   * Iterate over root (main area) leaves only, calling the callback for each.
+   * Excludes sidebar leaves created via getRightLeaf()/getLeftLeaf().
+   * If a callback throws, the error is logged and iteration continues.
+   */
+  iterateRootLeaves(callback: (leaf: WorkspaceLeaf) => void): void {
+    if (!this.viewRegistry) return;
+    const mainLeaves = this.viewRegistry.getMainLeaves();
+    for (const leaf of mainLeaves) {
+      try {
+        callback(leaf);
+      } catch (err) {
+        console.error('[WorkspaceShim] iterateRootLeaves: callback threw for leaf:', err);
+      }
+    }
+  }
+
+  /**
    * Detach (close) all leaves of the given view type.
+   * Emits `layout-change` after leaves are detached.
    */
   detachLeavesOfType(viewType: string): void {
     if (!this.viewRegistry) return;
     void this.viewRegistry.detachLeavesOfType(viewType);
+    this.events.trigger('layout-change');
   }
 
   /**
@@ -160,6 +339,75 @@ export class WorkspaceShim implements IWorkspaceShim {
    */
   getViewRegistry(): ViewRegistry | null {
     return this.viewRegistry;
+  }
+
+  /**
+   * Set the active leaf internally (called by the event bridge when tab changes).
+   * Does not emit events — used for synchronizing state from external tab changes.
+   */
+  setActiveLeafInternal(leaf: WorkspaceLeaf | null): void {
+    this.activeLeaf = leaf;
+  }
+
+  // ─── Link Navigation ──────────────────────────────────────────────────────────
+
+  /**
+   * Set the vault's directory tree for link resolution.
+   * Called by the PluginProvider when the tree changes.
+   */
+  setDirectoryTree(tree: DirectoryTree | null): void {
+    this.directoryTree = tree;
+  }
+
+  /**
+   * Set the callback for opening a file by path.
+   * Called by the PluginProvider to wire to tabActions/OPEN_TAB.
+   */
+  setOnOpenFile(callback: ((filePath: string) => void) | null): void {
+    this.onOpenFile = callback;
+  }
+
+  /**
+   * Open a file directly by its exact path (no wikilink resolution).
+   * Used by WorkspaceLeaf.openFile() for newly created files that may not
+   * yet be in the directory tree.
+   */
+  openFileDirectly(filePath: string): void {
+    if (!filePath) return;
+    if (this.onOpenFile) {
+      this.onOpenFile(filePath);
+    }
+  }
+
+  /**
+   * Open a link by resolving the linkText against the vault's directory tree.
+   *
+   * - No-op for empty linkText (Req 8.4)
+   * - Uses resolveWikilinkTarget for resolution (case-insensitive, .md fallback)
+   * - If resolved, dispatches tab open via the onOpenFile callback
+   * - If not resolved, logs a console.warn and takes no action (Req 8.3)
+   *
+   * @param linkText - The wikilink target string to resolve
+   * @param _sourcePath - The source file path (unused, reserved for future relative resolution)
+   */
+  async openLinkText(linkText: string, _sourcePath: string): Promise<void> { // eslint-disable-line @typescript-eslint/no-unused-vars
+    // Req 8.4: No-op for empty linkText
+    if (!linkText || !linkText.trim()) return;
+
+    // Resolve using the wikilink resolver
+    const resolved = resolveWikilinkTarget(linkText, this.directoryTree);
+    if (!resolved) {
+      // Req 8.3: Not resolved → warn and no action
+      console.warn(
+        `[WorkspaceShim] openLinkText: could not resolve "${linkText}" — no matching file in vault.`
+      );
+      return;
+    }
+
+    // Open the resolved file as a tab
+    if (this.onOpenFile) {
+      this.onOpenFile(resolved);
+    }
   }
 
   /**
@@ -194,16 +442,34 @@ export class WorkspaceShim implements IWorkspaceShim {
       'getLeaf',
       'getRightLeaf',
       'getLeftLeaf',
+      'getActiveLeaf',
+      'setActiveLeaf',
+      'getUnpinnedLeaf',
       'revealLeaf',
+      'createLeafBySplit',
+      'splitActiveLeaf',
       'getLeavesOfType',
+      'getActiveViewOfType',
+      'iterateAllLeaves',
+      'iterateRootLeaves',
       'detachLeavesOfType',
       'getViewRegistry',
+      'setActiveLeafInternal',
+      'setDirectoryTree',
+      'setOnOpenFile',
+      'openLinkText',
+      'onLayoutReady',
+      'layoutReady',
       // Internal properties that should not trigger warnings
       'events',
       'activeFile',
+      'activeLeaf',
+      'fileLeaf',
       'warnedProperties',
       'viewRegistry',
       'app',
+      'directoryTree',
+      'onOpenFile',
     ]);
 
     return new Proxy(instance, {

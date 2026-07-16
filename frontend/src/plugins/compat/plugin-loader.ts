@@ -41,8 +41,10 @@ export interface IPluginLoader {
   loadPlugin(pluginId: string, bundle: string, manifest: PluginManifest): Promise<PluginInstance>;
   /** Activate a loaded plugin (calls onload) */
   activatePlugin(pluginId: string): Promise<void>;
-  /** Deactivate a plugin (calls onunload, cleanup) */
-  deactivatePlugin(pluginId: string): Promise<void>;
+  /** Deactivate a plugin (calls onunload + cleanup); optionally suppresses the status callback for runtime-only unloads */
+  deactivatePlugin(pluginId: string, notifyStatusChange?: boolean): Promise<void>;
+  /** Deactivate and remove a plugin instance so a later enable evaluates a fresh bundle */
+  unloadPlugin(pluginId: string, notifyStatusChange?: boolean): Promise<void>;
   /** Uninstall a plugin completely */
   uninstallPlugin(pluginId: string): Promise<void>;
   /** Get all loaded plugin instances */
@@ -187,9 +189,18 @@ export class PluginLoader implements IPluginLoader {
         this.createTimeout(ONLOAD_TIMEOUT_MS, pluginId),
       ]);
 
+      // The plugin may have been unloaded while its asynchronous onload was
+      // still pending (for example during a vault switch). Never resurrect it.
+      if (this.plugins.get(pluginId) !== record || record.status === 'deactivated') {
+        return;
+      }
+
       record.status = 'active';
       this.deps.onStatusChange(pluginId, 'active');
     } catch (err) {
+      if (this.plugins.get(pluginId) !== record || record.status === 'deactivated') {
+        return;
+      }
       const detail = err instanceof Error ? err.message : String(err);
       const lifecycleError = new LifecycleError(pluginId, 'onload', detail);
       record.status = 'error';
@@ -206,8 +217,9 @@ export class PluginLoader implements IPluginLoader {
    * Cleanup is delegated to the PluginSandbox's cleanup(pluginId) method.
    *
    * @param pluginId - The plugin to deactivate
+   * @param notifyStatusChange - Whether to publish a persistent inactive status (false for runtime-only unloads)
    */
-  async deactivatePlugin(pluginId: string): Promise<void> {
+  async deactivatePlugin(pluginId: string, notifyStatusChange = true): Promise<void> {
     const record = this.plugins.get(pluginId);
     if (!record) {
       return; // Plugin not loaded, nothing to deactivate
@@ -234,7 +246,24 @@ export class PluginLoader implements IPluginLoader {
     }
 
     record.status = 'deactivated';
-    this.deps.onStatusChange(pluginId, 'deactivated');
+    if (notifyStatusChange) {
+      this.deps.onStatusChange(pluginId, 'deactivated');
+    }
+  }
+
+  /**
+   * Deactivate and remove a plugin instance from the loader.
+   * A later enable therefore evaluates the current bundle and creates a fresh instance.
+   *
+   * @param pluginId - The plugin to unload
+   * @param notifyStatusChange - Whether to publish a persistent inactive status
+   */
+  async unloadPlugin(pluginId: string, notifyStatusChange = true): Promise<void> {
+    if (!this.plugins.has(pluginId)) {
+      return;
+    }
+    await this.deactivatePlugin(pluginId, notifyStatusChange);
+    this.plugins.delete(pluginId);
   }
 
   /**
@@ -354,6 +383,7 @@ const exports = module.exports;
 function require(id) {
   if (id === 'obsidian') return window.obsidian || {};
   if (id === 'obsidian-daily-notes-interface') return window.__obsidianDailyNotesInterface || {};
+  if (id === 'moment') return window.moment;
   console.warn('[PluginLoader] Unknown require:', id);
   return {};
 }

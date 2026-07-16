@@ -503,3 +503,203 @@ describe('syncLogQuerySchema', () => {
     expect(result.success).toBe(false)
   })
 })
+
+// ─── Conflict Resolution Action Schema ───────────────────────────────────────
+
+import {
+  conflictResolutionActionSchema,
+  resolveBatchSchema,
+  resolveMergeSchema,
+  fileContentQuerySchema,
+} from './validation.js'
+
+describe('conflictResolutionActionSchema', () => {
+  it('accepts use_remote action', () => {
+    const result = conflictResolutionActionSchema.safeParse({ type: 'use_remote' })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts use_local action', () => {
+    const result = conflictResolutionActionSchema.safeParse({ type: 'use_local' })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts skip action', () => {
+    const result = conflictResolutionActionSchema.safeParse({ type: 'skip' })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts manual_merge action with content', () => {
+    const result = conflictResolutionActionSchema.safeParse({
+      type: 'manual_merge',
+      content: '# Merged content\nLine 2',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects manual_merge action without content', () => {
+    const result = conflictResolutionActionSchema.safeParse({ type: 'manual_merge' })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects invalid action type', () => {
+    const result = conflictResolutionActionSchema.safeParse({ type: 'delete' })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects empty object', () => {
+    const result = conflictResolutionActionSchema.safeParse({})
+    expect(result.success).toBe(false)
+  })
+})
+
+// ─── Resolve Batch Schema ────────────────────────────────────────────────────
+
+describe('resolveBatchSchema', () => {
+  it('accepts valid batch with single item', () => {
+    const result = resolveBatchSchema.safeParse([
+      { documentPath: 'notes/hello.md', resolution: { type: 'use_remote' } },
+    ])
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts valid batch with multiple items and mixed resolutions', () => {
+    const result = resolveBatchSchema.safeParse([
+      { documentPath: 'notes/a.md', resolution: { type: 'use_remote' } },
+      { documentPath: 'notes/b.md', resolution: { type: 'use_local' } },
+      { documentPath: 'notes/c.md', resolution: { type: 'manual_merge', content: 'merged' } },
+    ])
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts batch at max length (100)', () => {
+    const batch = Array.from({ length: 100 }, (_, i) => ({
+      documentPath: `file-${i}.md`,
+      resolution: { type: 'use_remote' as const },
+    }))
+    const result = resolveBatchSchema.safeParse(batch)
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects empty array', () => {
+    const result = resolveBatchSchema.safeParse([])
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects batch exceeding 100 items', () => {
+    const batch = Array.from({ length: 101 }, (_, i) => ({
+      documentPath: `file-${i}.md`,
+      resolution: { type: 'use_remote' as const },
+    }))
+    const result = resolveBatchSchema.safeParse(batch)
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects item with empty documentPath', () => {
+    const result = resolveBatchSchema.safeParse([
+      { documentPath: '', resolution: { type: 'use_remote' } },
+    ])
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects item with invalid resolution type', () => {
+    const result = resolveBatchSchema.safeParse([
+      { documentPath: 'file.md', resolution: { type: 'invalid' } },
+    ])
+    expect(result.success).toBe(false)
+  })
+})
+
+// ─── Resolve Merge Schema ────────────────────────────────────────────────────
+
+describe('resolveMergeSchema', () => {
+  it('accepts valid merge with content', () => {
+    const result = resolveMergeSchema.safeParse({
+      documentPath: 'notes/hello.md',
+      content: '# Merged\nContent here',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts empty content string', () => {
+    const result = resolveMergeSchema.safeParse({
+      documentPath: 'notes/empty.md',
+      content: '',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects empty documentPath', () => {
+    const result = resolveMergeSchema.safeParse({
+      documentPath: '',
+      content: 'some content',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects content exceeding 10MB', () => {
+    const result = resolveMergeSchema.safeParse({
+      documentPath: 'file.md',
+      content: 'x'.repeat(10_485_761),
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts content at exactly 10MB', () => {
+    const result = resolveMergeSchema.safeParse({
+      documentPath: 'file.md',
+      content: 'x'.repeat(10_485_760),
+    })
+    expect(result.success).toBe(true)
+  })
+})
+
+// ─── File Content Query Schema ───────────────────────────────────────────────
+
+describe('fileContentQuerySchema', () => {
+  it('accepts valid query with source local', () => {
+    const result = fileContentQuerySchema.safeParse({
+      path: 'notes/hello.md',
+      source: 'local',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts valid query with source remote', () => {
+    const result = fileContentQuerySchema.safeParse({
+      path: 'folder/file.md',
+      source: 'remote',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects empty path', () => {
+    const result = fileContentQuerySchema.safeParse({
+      path: '',
+      source: 'local',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects invalid source value', () => {
+    const result = fileContentQuerySchema.safeParse({
+      path: 'file.md',
+      source: 'both',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects missing source field', () => {
+    const result = fileContentQuerySchema.safeParse({
+      path: 'file.md',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects missing path field', () => {
+    const result = fileContentQuerySchema.safeParse({
+      source: 'local',
+    })
+    expect(result.success).toBe(false)
+  })
+})

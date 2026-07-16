@@ -111,16 +111,38 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
   'vault.read',
   'vault.modify',
   'vault.create',
+  'vault.createFolder',
   'vault.delete',
   'vault.getAbstractFileByPath',
   'vault.getMarkdownFiles',
   'vault.getFiles',
   'vault.getName',
+  'vault.getConfig',
+  'vault.cachedRead',
   'vault.on',
   'vault.off',
+  'vault.trigger',
   'workspace.getActiveFile',
   'workspace.on',
   'workspace.off',
+  'workspace.getLeaf',
+  'workspace.getLeavesOfType',
+  'workspace.getActiveViewOfType',
+  'workspace.revealLeaf',
+  'workspace.detachLeavesOfType',
+  'workspace.getActiveLeaf',
+  'workspace.setActiveLeaf',
+  'workspace.createLeafBySplit',
+  'workspace.getRightLeaf',
+  'workspace.getLeftLeaf',
+  'workspace.splitActiveLeaf',
+  'workspace.openLinkText',
+  'workspace.getUnpinnedLeaf',
+  'workspace.iterateAllLeaves',
+  'workspace.iterateRootLeaves',
+  'workspace.activeLeaf',
+  'workspace.layoutReady',
+  'workspace.trigger',
   'metadataCache.getFileCache',
   'metadataCache.getFirstLinkpathDest',
   'metadataCache.resolvedLinks',
@@ -136,32 +158,13 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
 ]);
 
 /** API methods that exist but provide limited functionality. */
-const PARTIAL_METHODS: ReadonlySet<string> = new Set([
-  'workspace.trigger',
-  'vault.trigger',
-]);
+const PARTIAL_METHODS: ReadonlySet<string> = new Set([]);
 
 /**
  * Known unsupported workspace methods.
  * Any workspace/vault/metadataCache method not in supported or partial is also unsupported.
  */
-export const UNSUPPORTED_METHODS: ReadonlySet<string> = new Set([
-  'workspace.createLeafBySplit',
-  'workspace.getLeaf',
-  'workspace.setActiveLeaf',
-  'workspace.getLeavesOfType',
-  'workspace.getActiveViewOfType',
-  'workspace.getActiveLeaf',
-  'workspace.revealLeaf',
-  'workspace.detachLeavesOfType',
-  'workspace.getRightLeaf',
-  'workspace.getLeftLeaf',
-  'workspace.splitActiveLeaf',
-  'workspace.openLinkText',
-  'workspace.getUnpinnedLeaf',
-  'workspace.iterateAllLeaves',
-  'workspace.iterateRootLeaves',
-]);
+export const UNSUPPORTED_METHODS: ReadonlySet<string> = new Set([]);
 
 /**
  * Lifecycle-critical methods — if any of these are classified as unsupported,

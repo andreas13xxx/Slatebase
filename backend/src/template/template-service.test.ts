@@ -52,12 +52,12 @@ describe('TemplateService', () => {
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'slatebase-template-test-'))
     vaultDir = tmpDir
-    templateDir = path.join(vaultDir, '_templates')
+    templateDir = path.join(vaultDir, 'Templates')
     await fs.mkdir(templateDir, { recursive: true })
 
     logger = createMockLogger()
     const vaultManager = createMockVaultManager(vaultDir)
-    service = new TemplateService('_templates', vaultManager, logger)
+    service = new TemplateService('Templates', vaultManager, logger)
   })
 
   afterEach(async () => {

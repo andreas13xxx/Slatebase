@@ -22,30 +22,34 @@ declare module 'micromark-util-types' {
 }
 
 /**
- * Check if a character code is a letter (a-z, A-Z) or underscore.
+ * Check if a character code is a letter (a-z, A-Z, Unicode Latin Extended) or underscore.
  */
 function isTagStartChar(code: Code): boolean {
   if (code === null) return false
   return (
-    (code >= 65 && code <= 90) ||   // A-Z
-    (code >= 97 && code <= 122) ||  // a-z
-    code === 95                      // _
+    (code >= 65 && code <= 90) ||       // A-Z
+    (code >= 97 && code <= 122) ||      // a-z
+    (code >= 0x00C0 && code <= 0x024F) || // Latin Extended (À-ɏ, includes äöüß)
+    (code >= 0x1E00 && code <= 0x1EFF) || // Latin Extended Additional
+    code === 95                          // _
   )
 }
 
 /**
  * Check if a character code is a valid tag continuation character:
- * letters, digits, underscores, hyphens, slashes.
+ * letters (incl. Unicode), digits, underscores, hyphens, slashes.
  */
 function isTagContinueChar(code: Code): boolean {
   if (code === null) return false
   return (
-    (code >= 65 && code <= 90) ||   // A-Z
-    (code >= 97 && code <= 122) ||  // a-z
-    (code >= 48 && code <= 57) ||   // 0-9
-    code === 95 ||                   // _
-    code === 45 ||                   // -
-    code === 47                      // /
+    (code >= 65 && code <= 90) ||       // A-Z
+    (code >= 97 && code <= 122) ||      // a-z
+    (code >= 0x00C0 && code <= 0x024F) || // Latin Extended (À-ɏ, includes äöüß)
+    (code >= 0x1E00 && code <= 0x1EFF) || // Latin Extended Additional
+    (code >= 48 && code <= 57) ||       // 0-9
+    code === 95 ||                       // _
+    code === 45 ||                       // -
+    code === 47                          // /
   )
 }
 

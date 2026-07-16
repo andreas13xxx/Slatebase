@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, type FormEvent } from 'react'
 import type { IApiClient, FeatureToggleState } from '../api'
 import { useTranslation } from '../i18n'
-import { Settings, RefreshCw, Save, AlertTriangle, Loader, AlertCircle } from 'lucide-react'
-import { ConfirmModal } from './ConfirmModal'
+import { Settings, Save, AlertTriangle, Loader, AlertCircle } from 'lucide-react'
 import { VersionCheckCard } from './VersionCheckCard'
 import { useFeatureContext } from '../state/featureContext'
 
@@ -74,10 +73,7 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [isRestarting, setIsRestarting] = useState(false)
-  const [restartConfirmOpen, setRestartConfirmOpen] = useState(false)
-  const [restartMessage, setRestartMessage] = useState<string | null>(null)
-  const [restartError, setRestartError] = useState<string | null>(null)
+
 
   useEffect(() => {
     let cancelled = false
@@ -233,31 +229,6 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
     }
   }
 
-  async function handleRestart(): Promise<void> {
-    setRestartConfirmOpen(true)
-  }
-
-  async function handleRestartConfirmed(): Promise<void> {
-    setRestartConfirmOpen(false)
-    setRestartMessage(null)
-    setRestartError(null)
-    setIsRestarting(true)
-    try {
-      const response = await fetch('/api/v1/admin/restart', {
-        method: 'POST',
-        headers: buildAuthHeaders(apiClient),
-      })
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({ message: t('admin.config.restartError') }))
-        throw new Error(body.message ?? `HTTP ${response.status}`)
-      }
-      setRestartMessage(t('admin.config.restartSuccess'))
-    } catch (err: unknown) {
-      setRestartError(err instanceof Error ? err.message : t('admin.config.unknownError'))
-    } finally {
-      setIsRestarting(false)
-    }
-  }
 
   if (isLoading) {
     return <div className="admin-config-page"><p className="admin-config-loading">{t('common.loading')}</p></div>
@@ -472,37 +443,6 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
         </button>
       </form>
 
-      {/* Restart section */}
-      <section className="admin-config-card admin-config-card--danger">
-        <h2 className="admin-config-card-title">
-          <AlertTriangle size={15} /> {t('admin.config.dangerZone')}
-        </h2>
-        <p className="admin-config-card-desc">
-          {t('admin.config.dangerDesc')}
-        </p>
-        {restartMessage && <div className="admin-config-message admin-config-message--success">{restartMessage}</div>}
-        {restartError && <div className="admin-config-message admin-config-message--error">{restartError}</div>}
-        <button
-          type="button"
-          className="admin-config-btn admin-config-btn--danger"
-          onClick={handleRestart}
-          disabled={isRestarting}
-        >
-          <RefreshCw size={14} />
-          {isRestarting ? t('admin.config.restarting') : t('admin.config.restart')}
-        </button>
-      </section>
-
-      {/* Restart Confirmation Modal */}
-      <ConfirmModal
-        open={restartConfirmOpen}
-        title={t('admin.config.restart')}
-        message={t('admin.config.restartConfirm')}
-        confirmLabel={t('admin.config.restart')}
-        variant="danger"
-        onConfirm={handleRestartConfirmed}
-        onCancel={() => setRestartConfirmOpen(false)}
-      />
     </div>
   )
 }

@@ -36,11 +36,11 @@ export interface ContextMenuState {
 }
 
 /**
- * State for the inline input (new file / new folder / rename).
+ * State for the inline input (new file / new folder / rename / new canvas).
  */
 export interface InlineInputState {
   visible: boolean
-  mode: 'newFile' | 'newFolder' | 'rename'
+  mode: 'newFile' | 'newFolder' | 'rename' | 'newCanvas'
   parentPath: string
   node: DirectoryTree | null
   vaultId: string | null

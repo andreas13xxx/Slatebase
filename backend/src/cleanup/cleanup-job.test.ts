@@ -56,7 +56,7 @@ function createMockConfigService(overrides?: {
     getTrashConfig: vi.fn().mockReturnValue({ retentionDays: overrides?.retentionDays ?? 30 }),
     getVersionsConfig: vi.fn().mockReturnValue({ maxPerFile: overrides?.maxPerFile ?? 20 }),
     getCleanupConfig: vi.fn().mockReturnValue({ intervalHours: overrides?.intervalHours ?? 24 }),
-    getTemplatesConfig: vi.fn().mockReturnValue({ directory: '_templates' }),
+    getTemplatesConfig: vi.fn().mockReturnValue({ directory: 'Templates' }),
     getUploadConfig: vi.fn().mockReturnValue({}),
     getWelcomeVaultConfig: vi.fn().mockReturnValue({ name: { de: 'Willkommen', en: 'Welcome' } }),
   }

@@ -22,24 +22,6 @@ import { TreeNode } from './file-explorer'
 import type { DragState, ExternalDropState, ContextMenuState, InlineInputState } from './file-explorer'
 
 /**
- * Checks if a file path exists in a DirectoryTree (for unique name generation).
- */
-function fileExistsInVaultTree(tree: DirectoryTree, filePath: string): boolean {
-  const normalized = filePath.replace(/\\/g, '/')
-  function search(node: DirectoryTree): boolean {
-    if (node.path.replace(/\\/g, '/') === normalized) return true
-    if (node.children) {
-      for (const child of node.children) {
-        if (search(child)) return true
-      }
-    }
-    return false
-  }
-  return search(tree)
-}
-
-
-/**
  * Props for the FileExplorer component.
  */
 export interface FileExplorerProps {
@@ -169,33 +151,19 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
   /** Creates a new .canvas file with empty content and opens it. */
   async function createCanvasFile(vaultId: string, parentPath: string) {
     if (!apiClient) return
-    const baseName = 'Neues Canvas'
-    const ext = '.canvas'
-    const emptyCanvas = '{\n\t"nodes": [],\n\t"edges": []\n}'
-
-    // Find a unique name (avoid conflicts)
-    let name = `${baseName}${ext}`
-    let filePath = parentPath ? `${parentPath}/${name}` : name
-    let counter = 1
-    const tree = state.vaultTrees[vaultId]
-    while (tree && fileExistsInVaultTree(tree, filePath)) {
-      name = `${baseName} ${counter}${ext}`
-      filePath = parentPath ? `${parentPath}/${name}` : name
-      counter++
-    }
-
-    try {
-      await apiClient.saveFile(vaultId, filePath, emptyCanvas)
-      const newTree = await apiClient.fetchVaultTree(vaultId)
-      dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree: newTree } })
-      if (state.selectedVaultId !== vaultId) {
-        dispatch({ type: 'VAULT_SELECTED', payload: vaultId })
-      }
-      openTab(tabDispatch, dispatch, apiClient, vaultId, filePath, name)
-      showToast(t('fileOps.created', { name }), 'success')
-    } catch (err: unknown) {
-      showToast(extractErrorMessage(err, t('fileOps.canvasCreateError')), 'error')
-    }
+    setInlineInputState({
+      visible: true,
+      mode: 'newCanvas',
+      parentPath,
+      node: null,
+      vaultId,
+    })
+    // Ensure the vault is expanded so the inline input is visible
+    setExpandedVaults((prev) => {
+      const next = new Set(prev)
+      next.add(vaultId)
+      return next
+    })
   }
 
   // Register the create canvas trigger for the toolbar button
@@ -642,6 +610,31 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
           : t('fileOps.createError')
         showToast(msg, 'error')
       }
+    } else if (inlineInputState.mode === 'newCanvas') {
+      const trimmedName = value.trim()
+      if (!trimmedName) return
+      const validationError = validateFileName(trimmedName.endsWith('.canvas') ? trimmedName : `${trimmedName}.canvas`)
+      if (validationError) return
+
+      // Ensure .canvas extension
+      const canvasName = trimmedName.endsWith('.canvas') ? trimmedName : `${trimmedName}.canvas`
+      const filePath = inlineInputState.parentPath
+        ? `${inlineInputState.parentPath}/${canvasName}`
+        : canvasName
+      const emptyCanvas = '{\n\t"nodes": [],\n\t"edges": []\n}'
+
+      try {
+        await apiClient.saveFile(vaultId, filePath, emptyCanvas)
+        const newTree = await apiClient.fetchVaultTree(vaultId)
+        dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree: newTree } })
+        if (state.selectedVaultId !== vaultId) {
+          dispatch({ type: 'VAULT_SELECTED', payload: vaultId })
+        }
+        openTab(tabDispatch, dispatch, apiClient, vaultId, filePath, canvasName)
+        showToast(t('fileOps.created', { name: canvasName }), 'success')
+      } catch (err: unknown) {
+        showToast(extractErrorMessage(err, t('fileOps.canvasCreateError')), 'error')
+      }
     } else if (inlineInputState.mode === 'rename') {
       const node = inlineInputState.node
       if (!node) return
@@ -965,9 +958,9 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
               const isLoading = state.vaultTreesLoading.has(vault.id)
               const permission = vault.permission
 
-              // Show new file/folder input at vault root level
+              // Show new file/folder/canvas input at vault root level
               const showRootNewFileInput = inlineInputState.visible
-                && (inlineInputState.mode === 'newFile' || inlineInputState.mode === 'newFolder')
+                && (inlineInputState.mode === 'newFile' || inlineInputState.mode === 'newFolder' || inlineInputState.mode === 'newCanvas')
                 && inlineInputState.parentPath === ''
                 && inlineInputState.vaultId === vault.id
 
@@ -1053,6 +1046,10 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
                               onConfirm={handleInlineConfirm}
                               onCancel={handleInlineCancel}
                               validate={(value) => {
+                                if (inlineInputState.mode === 'newCanvas') {
+                                  const name = value.trim().endsWith('.canvas') ? value.trim() : `${value.trim()}.canvas`
+                                  return validateFileName(name)
+                                }
                                 const normalized = normalizeFileName(value)
                                 return validateFileName(normalized)
                               }}

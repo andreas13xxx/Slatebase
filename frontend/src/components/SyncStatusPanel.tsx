@@ -140,11 +140,11 @@ export function SyncStatusPanel({ vaultId, onOpenFullLog }: SyncStatusPanelProps
         </span>
       </div>
 
-      {/* ── Conflicts warning ── */}
+      {/* ── Conflict indicator ── */}
       {conflictCount > 0 && (
-        <div className="sync-status-panel-conflicts">
-          <AlertTriangle size={14} className="sync-log-icon sync-log-icon--warning" />
-          <span>{conflictCount} offene{conflictCount === 1 ? 'r' : ''} Konflikt{conflictCount !== 1 ? 'e' : ''}</span>
+        <div className="sync-status-panel-conflict-hint">
+          <AlertTriangle size={14} />
+          <span>{conflictCount} {conflictCount === 1 ? 'Konflikt' : 'Konflikte'} offen</span>
         </div>
       )}
 

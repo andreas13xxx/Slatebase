@@ -1,0 +1,124 @@
+.batch-actions__confirmation,
+.batch-actions__result {
+  padding: var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.batch-actions__confirmation-title,
+.batch-actions__result-title {
+  margin: 0 0 var(--spacing-sm);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.batch-actions__confirmation-text {
+  margin: 0 0 var(--spacing-md);
+  color: var(--text-secondary);
+}
+
+.batch-actions__limit-warning {
+  margin: 0 0 var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  background: var(--bg-warning);
+  color: var(--text-warning);
+  font-weight: 500;
+}
+
+.batch-actions__buttons {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.batch-actions__btn {
+  padding: var(--spacing-xs) var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.batch-actions__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.batch-actions__btn--primary {
+  background: var(--accent-color);
+  color: var(--accent-contrast);
+  border-color: var(--accent-color);
+}
+
+.batch-actions__btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.batch-actions__btn--secondary {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.batch-actions__btn--secondary:hover:not(:disabled) {
+  background: var(--bg-elevated);
+}
+
+.batch-actions__result-summary {
+  margin: 0 0 var(--spacing-sm);
+  color: var(--text-primary);
+}
+
+.batch-actions__errors {
+  margin-bottom: var(--spacing-md);
+}
+
+.batch-actions__errors-toggle {
+  background: none;
+  border: none;
+  color: var(--accent-color);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  padding: var(--spacing-xs) 0;
+  text-decoration: underline;
+}
+
+.batch-actions__errors-toggle:hover {
+  color: var(--accent-hover);
+}
+
+.batch-actions__errors-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--spacing-sm) 0 0;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+
+.batch-actions__error-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.batch-actions__error-item:last-child {
+  border-bottom: none;
+}
+
+.batch-actions__error-path {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.batch-actions__error-reason {
+  font-size: var(--font-size-xs);
+  color: var(--text-danger);
+}

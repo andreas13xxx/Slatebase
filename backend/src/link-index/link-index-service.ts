@@ -84,8 +84,8 @@ export class LinkIndexService implements ILinkIndex {
     private readonly logger: ILogger,
   ) {
     // Persistence file lives inside the vault storage directory:
-    // <vaultPath>/_link-index.json (e.g. data/vaults/<vaultId>/_link-index.json)
-    this.persistPath = path.join(vaultPath, '_link-index.json')
+    // <vaultPath>/.slatebase/link-index.json (e.g. data/vaults/<vaultId>/.slatebase/link-index.json)
+    this.persistPath = path.join(vaultPath, '.slatebase', 'link-index.json')
   }
 
   /**
@@ -562,13 +562,13 @@ export class LinkIndexService implements ILinkIndex {
         const fullPath = path.join(dirPath, entry.name)
 
         if (entry.isDirectory()) {
-          // Skip hidden directories (.obsidian, .trash, .mobile, etc.)
+          // Skip hidden directories (.obsidian, .slatebase, etc.) — like Obsidian
           if (entry.name.startsWith('.')) continue
-          // Skip _ prefixed directories (_link-index.json, _templates)
-          if (entry.name.startsWith('_')) continue
           const subFiles = await this.findMarkdownFiles(fullPath)
           results.push(...subFiles)
         } else if (entry.isFile() && (entry.name.endsWith('.md') || entry.name.endsWith('.canvas'))) {
+          // Skip hidden files (dot-prefixed)
+          if (entry.name.startsWith('.')) continue
           results.push(fullPath)
         }
       }

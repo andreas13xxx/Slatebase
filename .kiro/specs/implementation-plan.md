@@ -1,6 +1,6 @@
 # Implementierungsplan — Slatebase Ausstehende Features
 
-**Stand:** Juli 2026 (v0.10.0). Die Kernfeatures sind umgesetzt (Vaults, Editor, Auth, Chat, Sync, MCP, Graph v2, Search, Realtime, Plugins, Feature Toggles, Mermaid, Command Palette, Unified Settings, Welcome Vault, Preferences, Keyboard Shortcuts, Obsidian Canvas, Block References). Es verbleiben 11 ausstehende Features in unterschiedlichen Reifegraden.
+**Stand:** Juli 2026 (v0.10.x). Die Kernfeatures sind umgesetzt (Vaults, Editor, Auth, Chat, Sync mit Conflict-Resolution-Wizard, MCP, Graph v2, Search, Realtime, Plugins, Feature Toggles, Mermaid, Command Palette, Unified Settings, Welcome Vault, Preferences, Keyboard Shortcuts, Obsidian Canvas, Block References, Workspace Leaf Compat, Status Bar). Es verbleiben 9 ausstehende Features in unterschiedlichen Reifegraden.
 
 **Strategie:** Hybrid — Features mit bestehender Spec direkt umsetzen, komplexe Features erst vollständig spezifizieren.
 
@@ -43,24 +43,26 @@
 | 31 | `configurable-keybindings` | ✅ Fertig |
 | 32 | `obsidian-canvas` | ✅ Fertig (Parser, Node-/Edge-Renderer, Editing, Auto-Save, Minimap, Source-View; inkl. Link/File-Node-Interaktion + Datei-Suche im Pfad-Editor) |
 | 33 | `block-references` | ✅ Fertig (Block-Marker-Parser, Wikilink/Embed-Erweiterung, Rendering, Link-Index) |
+| 34 | `sync-conflict-resolution` | ✅ Fertig (Conflict Wizard, Auto-Resolution, Batch, DiffView, SSE-Live-Updates) |
+| 35 | `workspace-leaf-compat` | ✅ Fertig (ViewRegistry, WorkspaceLeaf, ItemView, TabViewBridge, Plugin-Views als Tabs + Sidebar-Sections) |
+| 36 | `status-bar` | ✅ Fertig (StatusBar-Komponente, Uhr, Settings-Toggle, Design Tokens, erweiterbar für Plugins) |
 
 ---
 
 ## Ausstehende Features — Umsetzungsreihenfolge
 
-| Prio | Spec | Tier | Aufwand | Status |
-|------|------|------|---------|--------|
-| 1 | Sync Conflict Resolution | A | ~14–18h | Requirements vorhanden |
-| 2 | Workspace Leaf Compat | B | ~20–30h | Requirements vorhanden |
-| 3 | Obsidian Themes | B | ~15–20h | Geplant (keine Spec) |
-| 4 | Public Sharing | B | ~15–20h | Geplant (keine Spec) |
-| 5 | Live Preview Editor | C | ~48–68h | Geplant (keine Spec) |
-| 6 | Semantische Suche / AI-Embeddings | C | ~38–58h | Geplant (keine Spec) |
-| 7 | Server-Side Plugins | C | ~48–68h | Tasks vorhanden |
-| 8 | Security Hardening | D | ~20–30h | Geplant (keine Spec) |
-| 9 | Accessibility Audit | D | ~24–34h | Geplant (keine Spec) |
-| 10 | Responsive/Mobile | D | ~24–34h | Geplant (keine Spec) |
-| 11 | Collaborative Editing | E | ~68–88h | Requirements vorhanden |
+| Prio | Spec | Track | Aufwand | Status |
+|------|------|-------|---------|--------|
+| 1 | Welcome Vault v2 (Vollständige Anleitung + nachträgliches Hinzufügen) | A | ~34–45h | Spec vorhanden |
+| 2 | Obsidian Themes | B | ~15–20h | Geplant (keine Spec) |
+| 3 | Public Sharing | C | ~15–20h | Geplant (keine Spec) |
+| 4 | Live Preview Editor | D | ~48–68h | Geplant (keine Spec) |
+| 5 | Semantische Suche / AI-Embeddings | E | ~38–58h | Geplant (keine Spec) |
+| 6 | Server-Side Plugins | B | ~48–68h | Tasks vorhanden |
+| 7 | Security Hardening | F | ~20–30h | Geplant (keine Spec) |
+| 8 | Accessibility Audit | F | ~24–34h | Geplant (keine Spec) |
+| 9 | Responsive/Mobile | F | ~24–34h | Geplant (keine Spec) |
+| 10 | Collaborative Editing | D | ~68–88h | Requirements vorhanden |
 
 ---
 
@@ -77,10 +79,11 @@ slatebase-overview (Architektur-Grundlage)
       │     └── collaborative-editing (braucht Editor + Realtime)
       ├── auth-and-user-management ✅
       │     ├── user-chat ✅ → chat-enhancements ✅
-      │     ├── vault-sync ✅ → sync-conflict-resolution
+      │     ├── vault-sync ✅ → sync-conflict-resolution ✅
       │     ├── mcp-context-server ✅
       │     ├── unified-settings ✅
       │     ├── welcome-vault ✅
+      │     │     └── welcome-vault-v2 (braucht welcome-vault ✅ + unified-settings ✅)
       │     └── public-sharing (braucht Auth + Rendering)
       ├── obsidian-markdown-compat ✅
       │     ├── Block References ✅
@@ -89,7 +92,7 @@ slatebase-overview (Architektur-Grundlage)
       │     ├── mermaid-rendering ✅
       │     ├── obsidian-canvas ✅ (braucht Markdown-Rendering für Text-Nodes)
       │     └── obsidian-plugin-compat ✅
-      │           ├── workspace-leaf-compat (braucht Plugin-Infra + Tab-System)
+      │           ├── workspace-leaf-compat ✅ (Plugin-Views als Tabs/Sidebar)
       │           ├── server-side-plugins (braucht Plugin-Store + Registry)
       │           └── obsidian-themes (braucht Plugin-Store + CSS-Injection)
       ├── realtime-infrastructure ✅
@@ -108,65 +111,46 @@ slatebase-overview (Architektur-Grundlage)
 ## Parallelisierbare Tracks
 
 ```
-Track A (Sync):        Sync Conflict Resolution (unabhängig nach vault-sync ✅)
-Track B (Plugins):     Workspace Leaf Compat → Obsidian Themes → Server-Side Plugins
+Track A (Docs):        Welcome Vault v2 (unabhängig)
+Track B (Plugins):     Obsidian Themes → Server-Side Plugins
 Track C (Sharing):     Public Sharing (unabhängig)
-Track D (Markdown):    Live Preview Editor
+Track D (Editor):      Live Preview Editor → Collaborative Editing
 Track E (AI):          Semantische Suche (unabhängig)
 Track F (Polish):      Security Hardening → Accessibility Audit → Responsive/Mobile
-Track G (Collab):      Collaborative Editing (braucht Live Preview Editor oder zumindest Editor-Stabilität)
 ```
 
 ---
 
-## Tier A: Nächstes Feature (Spec vorhanden, direkt umsetzbar)
+## Prio 1 — Welcome Vault v2 (Track A)
 
----
+Scope: ~34–45h. Spec vorhanden.
 
-### Task 1: Sync Conflict Resolution
-
-Scope: ~4h Design, ~10–14h Implementierung.
-
-**Spec:** `.kiro/specs/sync-conflict-resolution/`
+**Spec:** `.kiro/specs/welcome-vault-v2/`
 
 **Zusammenfassung:**
 
-- Backend: SyncService um Konfliktkategorisierung erweitern (content/deleted/rename)
-- Backend: Endpoints für Merge-Preview und Batch-Auflösung
-- Frontend: ConflictWizard-Komponente (mehrstufig: Übersicht → Detail → Auflösung)
-- Frontend: DiffView-Komponente (Side-by-Side + Unified, Toggle in localStorage)
-- Frontend: Batch-Auflösung mit Bestätigung
-- Frontend: Auto-Resolution-Konfiguration (newer_wins, remote_wins, local_wins pro Kategorie)
+- Welcome-Vault-Templates von ~11 auf ~35–45 Markdown-Dateien + 22 Screenshots ausbauen
+- Vollständige Feature-Dokumentation (alle Slatebase-Features mit Anleitung, Screenshots, Beispielen)
+- Interaktive Übungen (10+ Hands-on-Aufgaben im Vault)
+- Neuer API-Endpoint `POST /api/v1/welcome-vault` für nachträgliches Hinzufügen durch Nutzer
+- Settings-Button + Command-Palette-Befehl "Anleitungs-Vault erstellen"
+- Namens-Deduplication bei mehrfachem Erstellen
+- Beide Sprachen (DE + EN) vollständig
 
-**Demo:** Geführter Wizard für Sync-Konflikte mit Diff-Ansicht, Batch-Aktionen und Auto-Resolution.
+**Phasen:**
 
----
+1. Backend API (Endpoint, Rate-Limiting, Route-Registrierung) — ~4h
+2. Frontend UI (IApiClient, Settings-Button, Command Palette, i18n) — ~3h
+3. DE-Inhalte (Grundlagen, Features, Fortgeschritten, Praxis, Vorlagen) — ~12–16h
+4. EN-Inhalte (Übersetzung aller Guides) — ~8–12h
+5. Screenshots (22 Aufnahmen, in Guides einbetten) — ~4–6h
+6. QA (Link-Check, Integrations-Test) — ~3–4h
 
-## Tier B: Mittelfristige Features (teilweise Spec-Erstellung nötig)
-
----
-
-### Task 2: Workspace Leaf Compat
-
-Scope: ~20–30h. Requirements vorhanden, Design + Tasks ausstehend.
-
-**Spec:** `.kiro/specs/workspace-leaf-compat/`
-
-**Zusammenfassung:**
-
-- WorkspaceShim-Erweiterung: `registerView`, `getLeaf`, `getLeavesOfType`, `revealLeaf`
-- ViewRegistry: Plugin-Views als Tabs im Hauptbereich oder Sections im Context Panel
-- ItemView-Basisklasse (Obsidian-kompatibel)
-- Tab-Integration: Plugin-Views als eigenständige Tab-Typen
-- Compatibility-Analyzer-Update: Leaf-API-Nutzung erkennen
-
-**Abhängigkeiten:** Braucht `obsidian-plugin-compat` ✅ (WorkspaceShim, Plugin-Loader, Tab-System) + `context-panel` ✅ (für Sidebar-Views).
-
-**Demo:** Populäre Plugins wie Calendar, Kanban und Excalidraw können ihre Custom Views in Slatebase als Tabs oder Sidebar-Panels anzeigen.
+**Abhängigkeiten:** Braucht `welcome-vault` ✅ + `unified-settings` ✅.
 
 ---
 
-### Task 3: Obsidian Themes
+## Prio 2 — Obsidian Themes (Track B)
 
 Scope: ~15–20h. Keine Spec vorhanden.
 
@@ -186,7 +170,7 @@ Scope: ~15–20h. Keine Spec vorhanden.
 
 ---
 
-### Task 4: Public Sharing
+## Prio 3 — Public Sharing (Track C)
 
 Scope: ~4h Design + ~15–20h Implementierung.
 
@@ -205,11 +189,7 @@ Scope: ~4h Design + ~15–20h Implementierung.
 
 ---
 
-## Tier C: Technisch ambitionierte Features (Spec-first zwingend)
-
----
-
-### Task 5: Live Preview Editor (WYSIWYG / Side-by-Side)
+## Prio 4 — Live Preview Editor (Track D)
 
 Scope: ~8h Design + ~40–60h Implementierung.
 
@@ -230,7 +210,7 @@ Scope: ~8h Design + ~40–60h Implementierung.
 
 ---
 
-### Task 6: Semantische Suche / AI-Embeddings
+## Prio 5 — Semantische Suche / AI-Embeddings (Track E)
 
 Scope: ~8h Design + ~30–50h Implementierung.
 
@@ -252,7 +232,7 @@ Scope: ~8h Design + ~30–50h Implementierung.
 
 ---
 
-### Task 7: Server-Side Plugins
+## Prio 6 — Server-Side Plugins (Track B)
 
 Scope: ~8h Design + ~40–60h Implementierung. Task-Liste existiert (7 Phasen).
 
@@ -278,11 +258,7 @@ Scope: ~8h Design + ~40–60h Implementierung. Task-Liste existiert (7 Phasen).
 
 ---
 
-## Tier D: Polish & Plattform (querschnittlich)
-
----
-
-### Task 8: Security Hardening
+## Prio 7 — Security Hardening (Track F)
 
 Scope: ~20–30h.
 
@@ -300,7 +276,7 @@ Scope: ~20–30h.
 
 ---
 
-### Task 9: Accessibility Audit (WCAG 2.1 AA)
+## Prio 8 — Accessibility Audit (Track F)
 
 Scope: ~4h Audit + ~20–30h Fixes.
 
@@ -322,7 +298,7 @@ Scope: ~4h Audit + ~20–30h Fixes.
 
 ---
 
-### Task 10: Responsive/Mobile Layout
+## Prio 9 — Responsive/Mobile (Track F)
 
 Scope: ~4h Design + ~20–30h Implementierung.
 
@@ -342,11 +318,7 @@ Scope: ~4h Design + ~20–30h Implementierung.
 
 ---
 
-## Tier E: Langfristig (größtes Feature, separates Milestone)
-
----
-
-### Task 11: Collaborative Editing
+## Prio 10 — Collaborative Editing (Track D)
 
 Scope: ~8h Design + ~60–80h Implementierung.
 
@@ -365,47 +337,34 @@ Scope: ~8h Design + ~60–80h Implementierung.
 
 **Abhängigkeiten:** Braucht `realtime-infrastructure` ✅ + `tabbed-editor-viewer` ✅. Profitiert von `live-preview-editor` (CodeMirror-Basis erleichtert CRDT-Integration).
 
-**Empfehlung:** Als eigenständiges Milestone nach Tier D planen. Technisch anspruchsvollstes Feature.
+**Empfehlung:** Als eigenständiges Milestone nach Track F (Polish) planen. Technisch anspruchsvollstes Feature.
 
 ---
 
-## Zusammenfassung
+## Zusammenfassung nach Tracks
 
 ```
-Tier A: Nächstes Feature                (~14–18h)
-└── Sync Conflict Resolution
-
-Tier B: Mittelfristige Features          (~50–70h)
-├── Workspace Leaf Compat
-├── Obsidian Themes
-└── Public Sharing
-
-Tier C: Ambitioniert                     (~134–194h)
-├── Live Preview Editor
-├── Semantische Suche
-└── Server-Side Plugins
-
-Tier D: Polish & Plattform              (~64–94h)
-├── Security Hardening
-├── Accessibility Audit
-└── Responsive/Mobile
-
-Tier E: Langfristig                     (~68–88h)
-└── Collaborative Editing
+Track A (Docs):      Prio 1: Welcome Vault v2                    (~34–45h)
+Track B (Plugins):   Prio 2: Obsidian Themes → Prio 6: Server-Side Plugins  (~63–88h)
+Track C (Sharing):   Prio 3: Public Sharing                      (~15–20h)
+Track D (Editor):    Prio 4: Live Preview Editor → Prio 10: Collaborative Editing  (~116–156h)
+Track E (AI):        Prio 5: Semantische Suche                   (~38–58h)
+Track F (Polish):    Prio 7–9: Security → Accessibility → Mobile (~68–98h)
 ```
 
 ---
 
 ## Gesamtaufwand (Schätzung, nur verbleibende Features)
 
-| Tier | Design | Implementierung | Gesamt |
-|------|--------|-----------------|--------|
-| A: Nächstes Feature | ~4h | ~10–14h | ~14–18h |
-| B: Mittelfristig | ~8h | ~50–70h | ~58–78h |
-| C: Ambitioniert | ~24h | ~110–170h | ~134–194h |
-| D: Polish | ~8h | ~60–90h | ~68–98h |
-| E: Langfristig | ~8h | ~60–80h | ~68–88h |
-| **Summe** | **~52h** | **~290–424h** | **~342–476h** |
+| Track | Design | Implementierung | Gesamt |
+|-------|--------|-----------------|--------|
+| A: Docs | — | ~34–45h | ~34–45h |
+| B: Plugins | ~4h | ~63–88h | ~67–92h |
+| C: Sharing | ~4h | ~15–20h | ~19–24h |
+| D: Editor | ~16h | ~100–140h | ~116–156h |
+| E: AI | ~8h | ~30–50h | ~38–58h |
+| F: Polish | ~8h | ~60–90h | ~68–98h |
+| **Summe** | **~40h** | **~302–433h** | **~342–473h** |
 
 ---
 
@@ -419,7 +378,7 @@ Kontext warum bestimmte Features NICHT geplant sind:
 | HTML-Rendering (Raw-HTML in Markdown) | 🔴 Verworfen | XSS-Risiko. Markdown + Mermaid + Embeds decken 99% ab. |
 | Offline-Modus (PWA/Service Worker) | 🔴 Zurückgestellt | Self-Hosted = Server nötig. Vault-Sync mit Obsidian-Desktop deckt Offline ab. |
 | AI-Agent im Editor (Copilot) | 🔴 Zurückgestellt | MCP deckt AI-Zugang ab. Eingebauter Copilot = eigenes Produkt. |
-| Kanban/Calendar als native Views | 🟡 Plugin-Lösung | Via `workspace-leaf-compat` — populäre Plugins werden direkt unterstützt. |
+| Kanban/Calendar als native Views | ✅ Plugin-Lösung | Via `workspace-leaf-compat` ✅ — populäre Plugins werden direkt unterstützt. |
 | Multi-Cursor / Multi-Selection | 🟡 Langfristig | Nur mit CodeMirror/ProseMirror realistisch → Teil von `live-preview-editor`. |
 | Multi-Sprachen/RTL-Support | 🔴 Zurückgestellt | Spezieller Use-Case. Bei Bedarf im Rahmen von `accessibility-audit`. |
 

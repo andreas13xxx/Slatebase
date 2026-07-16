@@ -195,10 +195,9 @@ export class VaultReader implements IVaultReader {
       // Still read the directory to get itemCount
       try {
         const entries = await fs.readdir(dirPath, { withFileTypes: true })
-        // Exclude internal files (starting with _) and hidden directories (starting with .) from the count
+        // Exclude hidden entries (starting with .) from the count — like Obsidian
         node.itemCount = entries.filter((e) =>
-          !(e.name.startsWith('_') && e.isFile()) &&
-          !(e.name.startsWith('.') && e.isDirectory())
+          !e.name.startsWith('.')
         ).length
       } catch {
         node.itemCount = 0
@@ -209,17 +208,13 @@ export class VaultReader implements IVaultReader {
     const entries = await fs.readdir(dirPath, { withFileTypes: true })
     const children: DirectoryTree[] = []
 
-    // Separate directories and files, filtering out internal Slatebase files
+    // Separate directories and files, filtering out hidden entries (dot-prefixed)
     const directories: { name: string; dirent: import('node:fs').Dirent }[] = []
     const files: { name: string; dirent: import('node:fs').Dirent }[] = []
 
     for (const entry of entries) {
-      // Skip internal files (e.g. _link-index.json)
-      if (entry.name.startsWith('_') && entry.isFile()) {
-        continue
-      }
-      // Skip hidden directories (e.g. .obsidian, .trash, .mobile)
-      if (entry.name.startsWith('.') && entry.isDirectory()) {
+      // Skip hidden entries (e.g. .obsidian, .slatebase) — like Obsidian
+      if (entry.name.startsWith('.')) {
         continue
       }
       if (entry.isDirectory()) {

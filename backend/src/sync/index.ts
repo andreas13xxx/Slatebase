@@ -37,6 +37,13 @@ export type {
   SetupUriParams,
   PulledFileDetail,
   PushedFileDetail,
+  ConflictCategory,
+  CategorizedConflictEntry,
+  ConflictResolutionAction,
+  AutoResolutionStrategy,
+  AutoResolutionConfig,
+  AutoResolvedLogDetail,
+  BatchResolveResult,
 } from './types.js'
 
 // Protocol types
@@ -59,7 +66,27 @@ export {
   InvalidSyncIntervalError,
   InvalidPassphraseError,
   ConflictResolutionError,
+  ConflictNotFoundError,
+  BatchLimitExceededError,
+  FileContentUnavailableError,
+  SchedulerAlreadyPausedError,
+  AutoResolutionConfigError,
 } from './errors.js'
+
+// Validation schemas
+export { autoResolutionConfigSchema } from './auto-resolution-config-store.js'
+export {
+  conflictResolutionActionSchema,
+  resolveBatchSchema,
+  resolveMergeSchema,
+  fileContentQuerySchema,
+} from './validation.js'
+export type {
+  ConflictResolutionActionInput,
+  ResolveBatchInput,
+  ResolveMergeInput,
+  FileContentQueryInput,
+} from './validation.js'
 
 // Service implementations
 export { CryptoService } from './crypto-service.js'
@@ -75,3 +102,17 @@ export { SyncEngine } from './sync-engine.js'
 export { SyncScheduler } from './sync-scheduler.js'
 export { SyncService, maskPassword } from './sync-service.js'
 export type { VaultPathResolver } from './sync-service.js'
+export { AutoResolutionConfigStore } from './auto-resolution-config-store.js'
+export type { IAutoResolutionConfigStore } from './auto-resolution-config-store.js'
+
+// Conflict categorization
+export { categorizeConflict, categorizeConflicts, applyDefaultCategory } from './conflict-categorizer.js'
+export type { LocalFileState, RemoteFileState, CategorizationInput } from './conflict-categorizer.js'
+
+// Conflict resolver
+export { ConflictResolver } from './conflict-resolver.js'
+export type { IConflictResolver, ResolveParams, ResolveResult, BatchResolveParams } from './conflict-resolver.js'
+
+// Auto-resolution engine
+export { AutoResolutionEngine } from './auto-resolution-engine.js'
+export type { IAutoResolutionEngine } from './auto-resolution-engine.js'

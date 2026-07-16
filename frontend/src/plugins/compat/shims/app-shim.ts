@@ -99,16 +99,23 @@ export class AppShim implements IAppShim {
       },
     };
 
-    // Internal plugins stub — simulates Obsidian's built-in plugins like "daily-notes"
-    this.internalPlugins = {
-      plugins: {
-        'daily-notes': { enabled: true, instance: { options: { format: 'YYYY-MM-DD', folder: '', template: '' } } },
-      },
-      getPluginById: (id: string) => {
-        const p = this.internalPlugins.plugins[id];
-        return p ?? undefined;
-      },
-    };
+    // Internal plugins stub — delegates to window.app.internalPlugins so that
+    // vault config updates (e.g. daily-notes folder) are visible to all plugin instances.
+    // Falls back to a local default if window.app.internalPlugins is not yet initialized.
+    const globalInternalPlugins = (window as unknown as { app?: { internalPlugins?: AppShim['internalPlugins'] } }).app?.internalPlugins;
+    if (globalInternalPlugins) {
+      this.internalPlugins = globalInternalPlugins;
+    } else {
+      this.internalPlugins = {
+        plugins: {
+          'daily-notes': { enabled: true, instance: { options: { format: 'YYYY-MM-DD', folder: '', template: '' } } },
+        },
+        getPluginById: (id: string) => {
+          const p = this.internalPlugins.plugins[id];
+          return p ?? undefined;
+        },
+      };
+    }
   }
 
   /**

@@ -36,6 +36,8 @@ export interface IPluginRegistry {
   loadFromBackend(): Promise<void>;
   /** Save registry state to backend (called after changes) */
   persistToBackend(): Promise<void>;
+  /** Wait until all queued registry writes have completed */
+  waitForPersistence(): Promise<void>;
 }
 
 /**
@@ -79,6 +81,8 @@ export class PluginRegistry implements IPluginRegistry {
   private readonly entries: Map<string, PluginRegistryEntry> = new Map();
   private readonly apiClient: IRegistryApiClient;
   private readonly vaultId: string;
+  private persistenceQueue: Promise<void> = Promise.resolve();
+  private persistenceError: Error | null = null;
 
   constructor(apiClient: IRegistryApiClient, vaultId: string) {
     this.apiClient = apiClient;
@@ -180,16 +184,24 @@ export class PluginRegistry implements IPluginRegistry {
         return;
       }
       this.entries.clear();
+      let recoveredTransientStatus = false;
       for (const [pluginId, pluginData] of Object.entries(data.plugins)) {
+        // `loading` is a runtime-only state. Older versions could persist it and
+        // then skip the plugin forever because startup only loads active entries.
+        const status = pluginData.status === 'loading' ? 'active' : pluginData.status;
+        recoveredTransientStatus ||= pluginData.status === 'loading';
         const entry: PluginRegistryEntry = {
           pluginId,
           manifest: pluginData.manifest ?? { id: pluginId, name: pluginId, version: '0.0.0' },
-          status: pluginData.status,
+          status,
           permissions: pluginData.permissions,
           compatibilityLevel: pluginData.compatibilityLevel,
           error: pluginData.error,
         };
         this.entries.set(pluginId, entry);
+      }
+      if (recoveredTransientStatus) {
+        await this.persistToBackend();
       }
     } catch {
       // Gracefully handle errors — backend API may not be available yet
@@ -202,32 +214,51 @@ export class PluginRegistry implements IPluginRegistry {
    * Called after status, permissions, or entry changes.
    * Handles gracefully if the API method doesn't exist yet.
    */
-  async persistToBackend(): Promise<void> {
-    try {
-      if (!this.apiClient.saveRegistry) {
-        return;
-      }
-      const data: PluginRegistryData = {
-        version: 1,
-        plugins: {},
+  persistToBackend(): Promise<void> {
+    if (!this.apiClient.saveRegistry) {
+      return this.persistenceQueue;
+    }
+
+    // Capture an immutable snapshot when the mutation occurs, then serialize
+    // writes so an older request can never finish after a newer state change.
+    const data: PluginRegistryData = {
+      version: 1,
+      plugins: {},
+    };
+    for (const [pluginId, entry] of this.entries) {
+      const pluginData: Record<string, unknown> = {
+        status: entry.status === 'loading' ? 'active' : entry.status,
+        permissions: entry.permissions,
+        compatibilityLevel: entry.compatibilityLevel,
+        installedAt: (entry as unknown as Record<string, unknown>).installedAt ?? new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
-      for (const [pluginId, entry] of this.entries) {
-        const pluginData: Record<string, unknown> = {
-          status: entry.status,
-          permissions: entry.permissions,
-          compatibilityLevel: entry.compatibilityLevel,
-          installedAt: (entry as unknown as Record<string, unknown>).installedAt ?? new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        if (entry.error) {
-          pluginData.error = entry.error;
-        }
-        data.plugins[pluginId] = pluginData as PluginRegistryData['plugins'][string];
+      if (entry.error) {
+        pluginData.error = entry.error;
       }
-      await this.apiClient.saveRegistry(this.vaultId, data);
-    } catch {
-      // Gracefully handle errors — backend API may not be available yet
-      console.warn(`[PluginRegistry] Failed to persist registry to backend for vault "${this.vaultId}"`);
+      data.plugins[pluginId] = pluginData as PluginRegistryData['plugins'][string];
+    }
+
+    const saveSnapshot = async (): Promise<void> => {
+      try {
+        await this.apiClient.saveRegistry?.(this.vaultId, data);
+        this.persistenceError = null;
+      } catch (error) {
+        this.persistenceError = error instanceof Error ? error : new Error(String(error));
+        // Keep fire-and-forget mutations safe; callers that need confirmation use waitForPersistence().
+        console.warn(`[PluginRegistry] Failed to persist registry to backend for vault "${this.vaultId}"`);
+      }
+    };
+
+    this.persistenceQueue = this.persistenceQueue.then(saveSnapshot, saveSnapshot);
+    return this.persistenceQueue;
+  }
+
+  /** Wait until all queued registry writes have completed. */
+  async waitForPersistence(): Promise<void> {
+    await this.persistenceQueue;
+    if (this.persistenceError) {
+      throw this.persistenceError;
     }
   }
 }

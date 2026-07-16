@@ -133,6 +133,9 @@ function createMockScheduler(): ISyncScheduler & { startedVaults: string[]; stop
     reset: (vaultId: string) => { resetVaults.push(vaultId) },
     isActive: () => false,
     stopAll: () => {},
+    pause: () => {},
+    resume: () => {},
+    isPaused: () => false,
   }
 }
 
@@ -643,5 +646,328 @@ describe('SyncService — resolveConflict', () => {
 
     // Should not throw
     await service.resolveConflict('vault1', 'notes/test.md', 'use_local')
+  })
+})
+
+
+// ─── Extended Conflict Resolution Tests ──────────────────────────────────────
+
+import type { CategorizedConflictEntry, AutoResolutionConfig, ConflictResolutionAction, BatchResolveResult } from './types.js'
+import type { IConflictResolver, ResolveParams, ResolveResult, BatchResolveParams } from './conflict-resolver.js'
+import type { IAutoResolutionEngine } from './auto-resolution-engine.js'
+import type { IAutoResolutionConfigStore } from './auto-resolution-config-store.js'
+import { ConflictResolutionError, FileContentUnavailableError } from './errors.js'
+
+function createMockConflictResolver(): IConflictResolver & {
+  resolvedParams: ResolveParams[]
+  batchParams: BatchResolveParams[]
+} {
+  const resolvedParams: ResolveParams[] = []
+  const batchParams: BatchResolveParams[] = []
+  return {
+    resolvedParams,
+    batchParams,
+    resolve: async (params: ResolveParams): Promise<ResolveResult> => {
+      resolvedParams.push(params)
+      return { success: true }
+    },
+    resolveBatch: async (params: BatchResolveParams): Promise<BatchResolveResult> => {
+      batchParams.push(params)
+      return { total: params.conflicts.length, succeeded: params.conflicts.length, failed: 0, errors: [] }
+    },
+  }
+}
+
+function createMockAutoResolutionEngine(): IAutoResolutionEngine {
+  return {
+    evaluate: () => null,
+  }
+}
+
+function createMockAutoResolutionConfigStore(config?: AutoResolutionConfig): IAutoResolutionConfigStore & {
+  savedConfigs: Array<{ vaultId: string; config: AutoResolutionConfig }>
+} {
+  const savedConfigs: Array<{ vaultId: string; config: AutoResolutionConfig }> = []
+  const defaultConfig: AutoResolutionConfig = config ?? { enabled: false, strategies: {} }
+  return {
+    savedConfigs,
+    load: async () => defaultConfig,
+    save: async (vaultId: string, c: AutoResolutionConfig) => { savedConfigs.push({ vaultId, config: c }) },
+  }
+}
+
+function createServiceWithResolvers(overrides: {
+  configStore?: ISyncConfigStore
+  conflictStore?: IConflictStore & { addedConflicts: ConflictEntry[] }
+  conflictResolver?: IConflictResolver
+  autoResolutionEngine?: IAutoResolutionEngine
+  autoResolutionConfigStore?: IAutoResolutionConfigStore
+  vaultPathResolver?: VaultPathResolver
+  scheduler?: ISyncScheduler & { startedVaults: string[]; stoppedVaults: string[]; resetVaults: string[] }
+} = {}) {
+  const configStore = overrides.configStore ?? createMockConfigStore(createActiveConfig())
+  const conflictStore = overrides.conflictStore ?? createMockConflictStore()
+  const checkpointStore = createMockCheckpointStore()
+  const cryptoService = createMockCryptoService()
+  const setupUriParser = createMockSetupUriParser()
+  const syncEngine = createMockSyncEngine()
+  const scheduler = overrides.scheduler ?? createMockScheduler()
+  const syncLock = createMockSyncLock()
+  const logger = createMockLogger()
+  const vaultPathResolver = overrides.vaultPathResolver ?? createVaultPathResolver()
+  const conflictResolver = overrides.conflictResolver ?? createMockConflictResolver()
+  const autoResolutionEngine = overrides.autoResolutionEngine ?? createMockAutoResolutionEngine()
+  const autoResolutionConfigStore = overrides.autoResolutionConfigStore ?? createMockAutoResolutionConfigStore()
+
+  const service = new SyncService(
+    configStore, createMockLogStore(), conflictStore, checkpointStore,
+    cryptoService, setupUriParser, syncEngine, scheduler,
+    syncLock, logger, vaultPathResolver, undefined,
+    { conflictResolver, autoResolutionEngine, autoResolutionConfigStore },
+  )
+
+  return { service, conflictStore, conflictResolver, autoResolutionConfigStore, scheduler }
+}
+
+
+describe('SyncService — getCategorizedConflicts', () => {
+  it('returns empty array when no conflicts exist', async () => {
+    const conflictStore = createMockConflictStore()
+    conflictStore.getAll = async () => []
+    const { service } = createServiceWithResolvers({ conflictStore })
+
+    const result = await service.getCategorizedConflicts('vault1')
+    expect(result).toEqual([])
+  })
+
+  it('applies default category (content_conflict) to legacy entries without category', async () => {
+    const conflicts: ConflictEntry[] = [{
+      documentPath: 'notes/test.md',
+      local: { modifiedAt: '2024-01-02T00:00:00.000Z', size: 100 },
+      remote: { revision: '2-abc', modifiedAt: '2024-01-03T00:00:00.000Z', size: 120 },
+      detectedAt: '2024-01-03T00:00:00.000Z',
+    }]
+    const conflictStore = createMockConflictStore()
+    conflictStore.getAll = async () => conflicts
+    const { service } = createServiceWithResolvers({ conflictStore })
+
+    const result = await service.getCategorizedConflicts('vault1')
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.category).toBe('content_conflict')
+    expect(result[0]!.documentPath).toBe('notes/test.md')
+  })
+
+  it('preserves existing category on entries that already have one', async () => {
+    const categorized: CategorizedConflictEntry[] = [{
+      documentPath: 'notes/deleted.md',
+      local: { modifiedAt: '2024-01-02T00:00:00.000Z', size: 100 },
+      remote: { revision: '2-abc', modifiedAt: '2024-01-03T00:00:00.000Z', size: 120 },
+      detectedAt: '2024-01-03T00:00:00.000Z',
+      category: 'local_deleted',
+    }]
+    const conflictStore = createMockConflictStore()
+    conflictStore.getAll = async () => categorized as unknown as ConflictEntry[]
+    const { service } = createServiceWithResolvers({ conflictStore })
+
+    const result = await service.getCategorizedConflicts('vault1')
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.category).toBe('local_deleted')
+  })
+})
+
+
+describe('SyncService — resolveConflictWithContent', () => {
+  it('throws ConflictResolutionError if conflictResolver not configured', async () => {
+    const service = new SyncService(
+      createMockConfigStore(createActiveConfig()),
+      createMockLogStore(),
+      createMockConflictStore(),
+      createMockCheckpointStore(),
+      createMockCryptoService(),
+      createMockSetupUriParser(),
+      createMockSyncEngine(),
+      createMockScheduler(),
+      createMockSyncLock(),
+      createMockLogger(),
+      createVaultPathResolver(),
+    )
+
+    await expect(service.resolveConflictWithContent('vault1', 'test.md', 'merged'))
+      .rejects.toThrow(ConflictResolutionError)
+  })
+
+  it('throws SyncNotConfiguredError when no config exists', async () => {
+    const { service } = createServiceWithResolvers({
+      configStore: createMockConfigStore(null),
+    })
+
+    await expect(service.resolveConflictWithContent('vault1', 'test.md', 'merged'))
+      .rejects.toThrow(SyncNotConfiguredError)
+  })
+
+  it('delegates to conflictResolver.resolve with manual_merge action', async () => {
+    const conflictResolver = createMockConflictResolver()
+    const { service } = createServiceWithResolvers({ conflictResolver })
+
+    await service.resolveConflictWithContent('vault1', 'notes/test.md', 'merged content')
+
+    expect(conflictResolver.resolvedParams).toHaveLength(1)
+    expect(conflictResolver.resolvedParams[0]!.documentPath).toBe('notes/test.md')
+    expect(conflictResolver.resolvedParams[0]!.resolution).toEqual({ type: 'manual_merge', content: 'merged content' })
+    expect(conflictResolver.resolvedParams[0]!.vaultPath).toBe('/data/vaults/vault1')
+  })
+
+  it('throws ConflictResolutionError when resolver returns failure', async () => {
+    const conflictResolver = createMockConflictResolver()
+    conflictResolver.resolve = async () => ({ success: false, error: 'CouchDB down' })
+    const { service } = createServiceWithResolvers({ conflictResolver })
+
+    await expect(service.resolveConflictWithContent('vault1', 'notes/test.md', 'merged'))
+      .rejects.toThrow('CouchDB down')
+  })
+})
+
+
+describe('SyncService — resolveConflictBatch', () => {
+  it('throws ConflictResolutionError if conflictResolver not configured', async () => {
+    const service = new SyncService(
+      createMockConfigStore(createActiveConfig()),
+      createMockLogStore(),
+      createMockConflictStore(),
+      createMockCheckpointStore(),
+      createMockCryptoService(),
+      createMockSetupUriParser(),
+      createMockSyncEngine(),
+      createMockScheduler(),
+      createMockSyncLock(),
+      createMockLogger(),
+      createVaultPathResolver(),
+    )
+
+    await expect(service.resolveConflictBatch('vault1', []))
+      .rejects.toThrow(ConflictResolutionError)
+  })
+
+  it('delegates to conflictResolver.resolveBatch with correct params', async () => {
+    const conflictResolver = createMockConflictResolver()
+    const { service } = createServiceWithResolvers({ conflictResolver })
+
+    const resolutions: Array<{ documentPath: string; resolution: ConflictResolutionAction }> = [
+      { documentPath: 'a.md', resolution: { type: 'use_remote' } },
+      { documentPath: 'b.md', resolution: { type: 'use_local' } },
+    ]
+
+    const result = await service.resolveConflictBatch('vault1', resolutions)
+
+    expect(conflictResolver.batchParams).toHaveLength(1)
+    expect(conflictResolver.batchParams[0]!.conflicts).toHaveLength(2)
+    expect(result.total).toBe(2)
+    expect(result.succeeded).toBe(2)
+    expect(result.failed).toBe(0)
+  })
+})
+
+
+describe('SyncService — getFileContent', () => {
+  it('throws FileContentUnavailableError when vault path not found', async () => {
+    const { service } = createServiceWithResolvers({
+      vaultPathResolver: createVaultPathResolver(null),
+    })
+
+    await expect(service.getFileContent('vault1', 'test.md', 'local'))
+      .rejects.toThrow(FileContentUnavailableError)
+  })
+})
+
+
+describe('SyncService — getAutoResolutionConfig', () => {
+  it('returns default config when store is not configured', async () => {
+    const service = new SyncService(
+      createMockConfigStore(createActiveConfig()),
+      createMockLogStore(),
+      createMockConflictStore(),
+      createMockCheckpointStore(),
+      createMockCryptoService(),
+      createMockSetupUriParser(),
+      createMockSyncEngine(),
+      createMockScheduler(),
+      createMockSyncLock(),
+      createMockLogger(),
+      createVaultPathResolver(),
+    )
+
+    const config = await service.getAutoResolutionConfig('vault1')
+    expect(config).toEqual({ enabled: false, strategies: {} })
+  })
+
+  it('delegates to autoResolutionConfigStore.load', async () => {
+    const storedConfig: AutoResolutionConfig = {
+      enabled: true,
+      strategies: { content_conflict: 'newer_wins' },
+    }
+    const configStore = createMockAutoResolutionConfigStore(storedConfig)
+    const { service } = createServiceWithResolvers({ autoResolutionConfigStore: configStore })
+
+    const config = await service.getAutoResolutionConfig('vault1')
+    expect(config).toEqual(storedConfig)
+  })
+})
+
+
+describe('SyncService — setAutoResolutionConfig', () => {
+  it('throws ConflictResolutionError when store is not configured', async () => {
+    const service = new SyncService(
+      createMockConfigStore(createActiveConfig()),
+      createMockLogStore(),
+      createMockConflictStore(),
+      createMockCheckpointStore(),
+      createMockCryptoService(),
+      createMockSetupUriParser(),
+      createMockSyncEngine(),
+      createMockScheduler(),
+      createMockSyncLock(),
+      createMockLogger(),
+      createVaultPathResolver(),
+    )
+
+    await expect(service.setAutoResolutionConfig('vault1', { enabled: true, strategies: {} }))
+      .rejects.toThrow(ConflictResolutionError)
+  })
+
+  it('delegates to autoResolutionConfigStore.save', async () => {
+    const configStore = createMockAutoResolutionConfigStore()
+    const { service } = createServiceWithResolvers({ autoResolutionConfigStore: configStore })
+
+    const newConfig: AutoResolutionConfig = { enabled: true, strategies: { content_conflict: 'remote_wins' } }
+    await service.setAutoResolutionConfig('vault1', newConfig)
+
+    expect(configStore.savedConfigs).toHaveLength(1)
+    expect(configStore.savedConfigs[0]!.vaultId).toBe('vault1')
+    expect(configStore.savedConfigs[0]!.config).toEqual(newConfig)
+  })
+})
+
+
+describe('SyncService — pauseScheduler / resumeScheduler', () => {
+  it('delegates pause to scheduler.pause', () => {
+    let pausedVault: string | null = null
+    const scheduler = createMockScheduler()
+    scheduler.pause = (vaultId: string) => { pausedVault = vaultId }
+    const { service } = createServiceWithResolvers({ scheduler })
+
+    service.pauseScheduler('vault1')
+    expect(pausedVault).toBe('vault1')
+  })
+
+  it('delegates resume to scheduler.resume', () => {
+    let resumedVault: string | null = null
+    const scheduler = createMockScheduler()
+    scheduler.resume = (vaultId: string) => { resumedVault = vaultId }
+    const { service } = createServiceWithResolvers({ scheduler })
+
+    service.resumeScheduler('vault1')
+    expect(resumedVault).toBe('vault1')
   })
 })

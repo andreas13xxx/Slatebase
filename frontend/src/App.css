@@ -5790,6 +5790,42 @@
   margin-bottom: 0;
 }
 
+/* Foldable callout: hide native marker, add chevron indicator */
+.view-mode-callout--foldable > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.view-mode-callout--foldable > summary::-webkit-details-marker {
+  display: none;
+}
+
+.view-mode-callout--foldable > summary::marker {
+  display: none;
+  content: '';
+}
+
+.view-mode-callout--foldable > summary .view-mode-callout-header::after {
+  content: '';
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  flex-shrink: 0;
+  background-color: var(--text-muted);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='9 18 15 12 9 6'%3E%3C/polyline%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='9 18 15 12 9 6'%3E%3C/polyline%3E%3C/svg%3E");
+  mask-size: contain;
+  -webkit-mask-size: contain;
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+  transition: transform 0.15s ease;
+}
+
+.view-mode-callout--foldable[open] > summary .view-mode-callout-header::after {
+  transform: rotate(90deg);
+}
+
 /* Callout type modifiers */
 .view-mode-callout--note {
   border-left-color: var(--callout-note-border);
@@ -6830,6 +6866,51 @@
 .plugin-card-detail-value { color: var(--text-primary); display: flex; align-items: center; gap: 4px; }
 .plugin-card-detail-value--mono { font-family: var(--font-mono); font-size: 11px; }
 
+/* Compatibility reasons list */
+.plugin-card-detail-reasons {
+  padding: 6px 0; font-size: 12px;
+}
+.plugin-card-detail-reasons > .plugin-card-detail-label {
+  display: block; margin-bottom: 6px;
+}
+.plugin-card-reasons-list {
+  margin: 0; padding: 0 0 0 18px; list-style: disc;
+}
+.plugin-card-reasons-item {
+  color: var(--text-secondary); line-height: 1.5; padding: 2px 0;
+}
+
+/* Detected API calls grid */
+.plugin-card-detail-apicalls {
+  padding: 6px 0; font-size: 12px; border-top: 1px solid var(--border-subtle); margin-top: 6px; padding-top: 10px;
+}
+.plugin-card-detail-apicalls > .plugin-card-detail-label {
+  display: block; margin-bottom: 8px;
+}
+.plugin-card-apicalls-grid {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.plugin-card-apicall {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 8px; border-radius: var(--radius-sm);
+  background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+}
+.plugin-card-apicall-method {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-primary);
+}
+.plugin-card-apicall-badge {
+  font-size: 10px; font-weight: 500; padding: 1px 5px; border-radius: 3px;
+}
+.plugin-card-apicall-badge--supported {
+  background: var(--success-bg); color: var(--success);
+}
+.plugin-card-apicall-badge--partial {
+  background: var(--warning-bg); color: var(--warning);
+}
+.plugin-card-apicall-badge--unsupported {
+  background: var(--danger-bg); color: var(--danger-text);
+}
+
 /* Spinning animation for reload icon */
 .plugin-spinning { animation: plugin-spin 0.7s linear infinite; }
 
@@ -6864,7 +6945,7 @@
 
 /* Plugin settings modal */
 .plugin-settings-overlay {
-  position: fixed; inset: 0; z-index: 1000;
+  position: fixed; inset: 0; z-index: 1100;
   display: flex; align-items: center; justify-content: center;
   background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(2px);
 }
@@ -6890,7 +6971,7 @@
   transition: background 0.15s ease, color 0.15s ease;
 }
 .plugin-settings-modal-close:hover { background: var(--bg-surface); color: var(--text-primary); }
-.plugin-settings-modal-body { padding: 16px 20px; flex: 1; overflow-y: auto; }
+.plugin-settings-modal-body { padding: 16px 20px; flex: 1; min-height: 0; overflow-y: auto; }
 .plugin-settings-label {
   display: block; font-size: 12px; font-weight: 500;
   color: var(--text-secondary); margin-bottom: 8px;
@@ -6979,6 +7060,63 @@
 .setting-button--warning:hover { background: var(--danger-border); }
 .setting-extra-button { padding: 4px 8px; font-size: 11px; }
 .plugin-settings-native { min-height: 100px; }
+
+/* Obsidian-native CSS classes used by Svelte-based plugins (Calendar, etc.) */
+.checkbox-container {
+  position: relative; display: inline-block; width: 36px; height: 20px;
+  border-radius: var(--radius-full); background: var(--border-default);
+  cursor: pointer; transition: background 0.2s ease; flex-shrink: 0;
+}
+.checkbox-container::after {
+  content: ''; position: absolute; left: 2px; top: 2px;
+  width: 16px; height: 16px; background: var(--bg-elevated);
+  border-radius: 50%; transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+.checkbox-container.is-enabled { background: var(--accent); }
+.checkbox-container.is-enabled::after { transform: translateX(16px); }
+
+/* Obsidian modal classes used by plugin-spawned modals */
+.modal-bg {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  z-index: 9999; display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(2px);
+}
+.modal-container {
+  background: var(--bg-elevated); border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+  max-width: 560px; width: 90vw; max-height: 80vh; overflow-y: auto; padding: 20px;
+}
+.modal-content { display: flex; flex-direction: column; gap: 12px; }
+.modal-content h3 { font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0 0 8px; }
+.modal-button-container { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.modal-button-container button {
+  padding: 6px 16px; font-size: 13px; border: 1px solid var(--border-default);
+  border-radius: var(--radius-md); background: var(--bg-elevated); color: var(--text-primary);
+  cursor: pointer; transition: background 0.15s ease;
+}
+.modal-button-container button:hover { background: var(--bg-surface); }
+.modal-button-container button.mod-cta {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+.modal-button-container button.mod-cta:hover { background: var(--accent-hover); }
+
+/* Slider component for Setting.addSlider() */
+.setting-slider {
+  width: 120px; height: 4px; appearance: none; background: var(--border-default);
+  border-radius: 2px; outline: none; cursor: pointer;
+}
+.setting-slider::-webkit-slider-thumb {
+  appearance: none; width: 14px; height: 14px; background: var(--accent);
+  border-radius: 50%; cursor: pointer;
+}
+.setting-slider::-moz-range-thumb {
+  width: 14px; height: 14px; background: var(--accent);
+  border-radius: 50%; border: none; cursor: pointer;
+}
+.setting-slider-tooltip {
+  font-size: 11px; color: var(--text-muted); margin-left: 8px;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════════
    Sync Protocol View (Server-Log Style)
@@ -7252,8 +7390,17 @@
 }
 
 /* Calendar plugin specific adjustments */
-.plugin-view-panel .calendar {
+.plugin-view-panel .calendar,
+.context-panel__plugin-section .calendar,
+.tab-content--plugin-view .calendar {
   font-size: 12px;
+  --color-text-day: var(--text-primary);
+  --color-text-today: var(--accent);
+  --color-background-day: transparent;
+  --interactive-accent: var(--accent);
+  --interactive-accent-hover: var(--accent-hover);
+  --interactive-hover: var(--bg-surface);
+  --text-on-accent: #ffffff;
 }
 
 .plugin-view-panel table {
@@ -7278,11 +7425,25 @@
   background: var(--bg-surface);
 }
 
-.plugin-view-panel td.active,
+.plugin-view-panel td.active {
+  background: var(--accent-light);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
 .plugin-view-panel td.today {
   background: var(--accent-light);
   color: var(--accent-text);
   font-weight: 600;
+}
+
+/* Calendar plugin: stronger today highlight (Svelte-scoped .day.today) */
+.context-panel__plugin-section .day.today,
+.plugin-view-panel .day.today,
+.tab-content--plugin-view .day.today {
+  color: var(--accent) !important;
+  font-weight: 700 !important;
+  background-color: var(--accent-light) !important;
 }
 
 .plugin-view-panel .nav {

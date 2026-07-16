@@ -126,7 +126,8 @@ describe('LinkIndexService (extended v2)', () => {
         updatedAt: new Date().toISOString(),
         forwardLinks: { 'a.md': ['b.md'] },
       }
-      await fs.writeFile(path.join(tempDir, '_link-index.json'), JSON.stringify(v1Data))
+      await fs.mkdir(path.join(tempDir, '.slatebase'), { recursive: true })
+      await fs.writeFile(path.join(tempDir, '.slatebase', 'link-index.json'), JSON.stringify(v1Data))
       await fs.writeFile(path.join(tempDir, 'a.md'), '---\nstatus: draft\n---\n#tag\n[[b]]')
       await fs.writeFile(path.join(tempDir, 'b.md'), 'content')
 

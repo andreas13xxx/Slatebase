@@ -40,6 +40,7 @@ vi.mock('./api', () => {
     getCsrfToken = vi.fn().mockReturnValue(null)
     getVersion = vi.fn().mockResolvedValue({ version: '1.0.0' })
     getSseTicket = vi.fn().mockResolvedValue({ ticket: 'mock-ticket' })
+    checkSessionAlive = vi.fn().mockResolvedValue(true)
   }
   return { ApiClient: MockApiClient }
 })

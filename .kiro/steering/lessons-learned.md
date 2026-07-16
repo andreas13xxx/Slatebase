@@ -87,6 +87,31 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - Plugin-Commands nur wenn `obsidian-plugin-compat` aktiviert, Built-in-Commands immer
 - Editor-Commands via CustomEvent `slatebase:editor-command` (EditMode lauscht)
 - Legacy-Event `slatebase:open-command-palette` weiterhin unterstützt (Backward-Compat)
+- **Registry-Persistenz**: `loading` ist reiner Laufzeit-Status — wird nie dauerhaft gespeichert. `persistToBackend()` normalisiert `loading` defensiv zu `active`. Schreibvorgänge sind über Promise-Queue serialisiert (Snapshot bei Mutation, FIFO-Reihenfolge). Verwaiste `loading`-Einträge werden beim Laden automatisch zu `active` migriert.
+- **Plugin-Aktivierung/Deaktivierung**: Toggle in PluginManagementPage nutzt `pluginContext.setPluginEnabled()` für echten Lifecycle (load bundle → activate / deactivate → unload). Reload erzeugt eine frische Instanz (`unloadPlugin` + `setPluginEnabled(true)`).
+- **Cleanup bei Deaktivierung**: `cleanupPluginRegistrations(pluginId)` entfernt Commands, Settings, Views UND Ribbon-Icons. Wird bei `deactivated` und `error` Status aufgerufen. View-Detach ist async und wird awaited.
+- **Vault-Wechsel-Guards**: `pluginSystemVaultIdRef` + `isCurrentContext()`-Check vor jedem async Schritt in `setPluginEnabled` und `loadPluginsForVault`. Registrierungs-Callbacks (`addCommand`, `addSettingTab`, `registerView`) prüfen ebenfalls die Vault-Generation.
+- **WorkspaceShim `layoutReady`**: Property ist `true` (Plugins laden nach FCP, Layout ist immer ready). Plugins die `workspace.layoutReady` prüfen (Calendar) statt `onLayoutReady(cb)` brauchen diese Property.
+- **ItemView-Shim**: Muss `registerEvent(ref)` und `register(cb)` bereitstellen (Views erben von Component). `addAction()` als No-Op-Stub.
+- **Compatibility-Analyse**: Schreibt KEINE vollständigen Registry-Snapshots mehr. Aktualisiert nur `compatibilityLevel` lokal im Display-State — kein Backend-Write, der den Aktivierungsstatus überschreiben könnte.
+- **Plugin-Sidebar-Tabs im Context Panel**: Plugin-Views werden inline in der `ContextPanelTabBar` gerendert (nach den eingebauten Tabs), im selben Icon-only-Stil. `draggable={false}` — sie nehmen aktuell NICHT am DnD-Reorder teil. Die Reducer-gesteuerte `tabOrder` enthält nur `ContextPanelViewId` (fester Union-Typ). Für volle DnD-Integration müsste `ContextPanelViewId` zu einem Template-Literal/generischen String erweitert werden (~2–3h Aufwand, betrifft ~15 Stellen + Persistenz-Validierung + Plugin-Deaktivierungs-Cleanup im Reducer).
+- **Icon-Auflösung**: Obsidian-Icon-Namen (kebab-case) werden über `OBSIDIAN_ICON_MAP` + generische kebab→PascalCase-Konvertierung zu Lucide-React-Komponenten aufgelöst (`resolvePluginIcon()` in `ContextPanelTabBar.tsx`).
+
+## Workspace Leaf Compat
+
+- **Virtual Path Convention**: Plugin-View-Tabs nutzen `__view::{viewType}` als Pfad im Tab-System (konsistent mit `__graph__`)
+- **ViewRegistry**: Plugin-Ownership per Registration (`pluginId`). `unregisterAllForPlugin()` räumt bei Deaktivierung auf.
+- **LeafLocation**: `'main' | 'right-sidebar'`. Beide Sidebar-Locations (left/right) werden im Context Panel gerendert (kein separates Left Panel).
+- **ItemView DOM**: `containerEl` hat CSS-Klasse `view-content`, `contentEl` ist Kind mit `plugin-view-content`. React rendert nur den Container, View manipuliert DOM direkt (Obsidian-Muster).
+- **TabViewBridge**: Module-Level-Bridge (`onOpenPluginViewTab`/`dispatchOpenPluginViewTab` etc.) — folgt dem `realtimeVaultBridge`-Pattern. ViewRegistry → TabProvider ohne React-Context-Dependency.
+- **Tab-Deduplication**: Vor OPEN_TAB prüfen ob Tab mit gleichem `__view::{viewType}` existiert → dann ACTIVATE_TAB statt neuen Tab.
+- **Plugin-View-Tab in TabContent**: `filePath.startsWith('__view::')` → imperativer DOM-Append von `containerEl` via ref-Callback. Keine React-Render-Schleife.
+- **Sidebar-Views im Context Panel**: `sidebarViews` Map in PluginContext. Dynamische Tabs/Sections mit imperativem `containerEl`-Mount.
+- **getActiveFile() bei Plugin-Tab**: Gibt `null` zurück wenn aktiver Tab `__view::` Prefix hat (Req 3.7).
+- **Lifecycle-Fehler-Isolation**: `onOpen()`/`onClose()` Exceptions werden geloggt (`console.error`), blockieren aber nie den Cleanup. Per-Leaf try/catch bei Plugin-Deaktivierung und Vault-Wechsel.
+- **openLinkText**: Nutzt bestehenden `resolveWikilinkTarget()` aus `link-resolver.ts`. Unresolved → `console.warn` + No-Op.
+- **Iteration**: `iterateAllLeaves` (alle Locations), `iterateRootLeaves` (nur main). Exception in einem Callback blockiert nicht die restlichen.
+- **Compatibility Analyzer**: 15 Workspace-Leaf-Methoden von `UNSUPPORTED_METHODS` nach `SUPPORTED_METHODS` verschoben. Sets MÜSSEN disjunkt bleiben.
 
 ## Vault Sync
 
@@ -95,6 +120,35 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - Checkpoint nur bei Erfolg updaten, atomar schreiben
 - Konflikterkennung: mtime Check gegen Checkpoint-mtime
 - Owner-Only (kein Admin-Bypass)
+- **Sync-Exclusions**: `.slatebase/trash/`, `.slatebase/versions/`, `.slatebase/link-index.json`, `.trash/`, `.mobile/` — nicht gesynct
+- **Sync-Included**: `.slatebase/config.json`, `.obsidian/` (via `i:`/`ps:`-Prefixes), reguläre Dateien
+- **CouchDB `_`-Limitation**: Top-Level-Dateien mit `_`-Prefix können nicht gesynct werden (CouchDB reserviert `_` für `_design/`, `_local/`). Subdirectory-Dateien mit `_` sind kein Problem.
+- **Conflict-Kategorisierung**: 4 Typen (content_conflict, local_deleted, remote_deleted, rename_conflict). ConflictCategorizer ist pure Function, SyncEngine ruft bei Pull auf.
+- **Conflict-Resolution Rollback**: ConflictResolver: Backup → Write → Push → bei CouchDB-Fehler Rollback. Batch max 100, per-item Error Isolation.
+- **Auto-Resolution**: `AutoResolutionEngine.evaluate()` pure Function. Config in `data/sync/<vaultId>/auto-resolution.json`. Strategies: newer_wins, remote_wins, local_wins, skip.
+- **Scheduler Pause/Resume**: Wizard pausiert Scheduler bei Mount (`pauseSyncScheduler`), resumed bei Unmount. Set<string> für paused vaults, Timer bleibt registriert.
+- **SSE sync:conflict Event**: Backend publiziert bei neuen Konflikten mit `category`-Feld. Frontend: Module-Level-Bridge `realtimeSyncBridge.ts` (`onRealtimeSyncConflict`/`dispatchRealtimeSyncConflict`).
+- **SyncService EventBus Integration**: `setEventBus()` + `vaultOwnerResolver` als optionale Setter (Dependency-Order Problem in Composition Root). Events nur an Vault-Owner targeted.
+
+## .slatebase/ Verzeichnis
+
+- Analog zu `.obsidian/` — zentrale Ablage für Slatebase-interne Vault-Daten
+- Pfad: `<vaultPath>/.slatebase/`
+- Enthält: `config.json`, `link-index.json`, `trash/`, `versions/`
+- Automatisch versteckt (Dot-Prefix-Regel) aus Tree, Search, Statistics, Link-Index
+- Wird teilweise gesynct: `config.json` ja, `trash/`+`versions/`+`link-index.json` nein
+- Services verwenden statische Konstanten für den Pfad (z.B. `TrashService.TRASH_DIR`, `VersionService.VERSIONS_DIR`)
+- `fs.mkdir(dir, { recursive: true })` in persist-Methoden erstellt `.slatebase/` automatisch
+
+## File Visibility (wie Obsidian)
+
+- **Dot-Prefix** (`.obsidian/`, `.slatebase/`, `.hidden`): versteckt aus Tree, Search, Statistics, Link-Index
+- **Underscore-Prefix** (`_drafts/`, `_notes.md`): normal sichtbar, durchsuchbar, indexiert, gesynct (außer Top-Level wegen CouchDB)
+- VaultReader.scanDirectory: filtert `entry.name.startsWith('.')` (sowohl Dateien als auch Verzeichnisse)
+- statistics-service: filtert `entry.name.startsWith('.')`
+- link-index findMarkdownFiles: filtert `.`-Prefix Dirs und Files
+- search-service: kein eigenes Filtering (arbeitet mit VaultService-Files die schon gefiltert sind)
+- sync-engine: eigene `isExcludedPath()`-Funktion für differenziertes Sync-Verhalten
 
 ## MCP
 
@@ -122,7 +176,7 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 2. Singleton `apiClient` verwenden — nie `new ApiClient()` in Komponenten
 3. `vite.config.ts`: `defineConfig` aus `vitest/config` (nicht `vite`)
 4. Vault-IDs: deterministisch (SHA-256, 12 Hex), nicht random
-5. `_`-Prefix-Dateien aus Tree gefiltert
+5. Dot-Prefix-Dateien/Verzeichnisse aus Tree, Search, Statistics, Link-Index gefiltert (wie Obsidian)
 6. Hono: `/users/search` VOR `/users/me` registrieren
 7. Client ≠ Server Filesystem (Export braucht Download-Endpoint)
 8. `showDirectoryPicker`: nur Chromium, JSZip-Fallback
@@ -132,13 +186,13 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 12. `__dirname` nach tsc prüfen (relative Pfade verschieben sich)
 13. Debounced API-Calls: IMMER AbortController (Race Conditions)
 14. `Ctrl+Shift+F`: `e.preventDefault()` für Browser-Suche
-15. `.trash/` + `.versions/` aus FileExplorer-Tree filtern (Backend filtert `.`-Prefixed Dirs, Frontend zusätzlich explizit)
+15. `.slatebase/` enthält alle internen Daten (trash/, versions/, link-index.json, config.json). Dot-Prefix-Regel versteckt es automatisch aus Tree/Search/Stats.
 16. DropZone + internes DnD: `stopPropagation()` im internen Handler, damit DropZone-Overlay nicht triggert
 17. Favorites-Store: Zustandsänderungen erzwingen Re-Render über Counter-State (Store ist kein React-State)
 18. Image Paste: nur `image/*` MIME-Typen abfangen, Text-Paste NICHT intercepten (`preventDefault` nur bei Bild)
 19. `EventSource` existiert nicht in jsdom — Mock in `test-setup.ts` erforderlich für Tests die RealtimeProvider rendern
 20. Command Palette Ctrl+P: lebt in `CommandPaletteContainer` (nicht in PluginProvider). Editor-Commands via `window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action } }))` — EditMode lauscht darauf
-21. Link-Index Persistenz v2: Tags + Properties werden neben forwardLinks gespeichert. v1→v2 Auto-Migration beim Laden (rebuild triggers). Schema-Feld `version: 2` als Diskriminator.
+21. Link-Index Persistenz v2: Tags + Properties werden neben forwardLinks gespeichert. v1→v2 Auto-Migration beim Laden (rebuild triggers). Schema-Feld `version: 2` als Diskriminator. Gespeichert unter `.slatebase/link-index.json`.
 22. GraphNode hat jetzt `id` (unique) + `type` ('file'|'tag'|'property') + optionales `path`. Frontend SimNode nutzt `node.id` als Identifier, `node.path ?? node.id` für File-Öffnung.
 23. Tag-Extraction: CSS Hex-Farben (`#fff`, `#bb7739`) werden als Tags erkannt — bekannter Edge-Case. Regex erfordert Buchstabe nach `#`, aber Hex `a-f` qualifiziert.
 24. GraphSettingsPanel: `position: absolute` im Container. Search-Container braucht `right: 48px` (statt 12px) um Platz für Settings-Toggle zu lassen.
@@ -147,6 +201,11 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 27. EventBus NIE monkey-patchen (`eventBus.publish = ...`). Stattdessen `eventBus.subscribe('vault:change', cb)` für Cross-Cutting-Concerns (Cache-Invalidierung, Audit-Hooks).
 28. `X-Request-Id` Header: Middleware generiert UUID pro Request, loggt im Error-Handler mit. Eingehender Header von Upstream-Proxy wird wiederverwendet (max 128 Zeichen).
 29. SSE-Endpoint + MCP-Endpoint: beide als HTTP-Intercept in `createHttpServer`, NICHT via Hono-Route. `@hono/node-server` finalisiert Response nach Handler-Return → bricht offene Streams. Ticket-Auth dort manuell implementieren (Ticket-First, Token-Fallback).
+30. Sync-Conflict-Resolution: `ConflictWizard` nutzt `useAppContext()` für `apiClient` — braucht keinen expliziten `apiClient`-Prop. SSE-Bridge `realtimeSyncBridge.ts` folgt dem Module-Level-Pattern wie `realtimeVaultBridge.ts`.
+31. Plugin-View-Tabs: Virtual Path `__view::{viewType}` — Tab-Deduplication vor OPEN_TAB prüfen. `getActiveFile()` gibt `null` bei Plugin-Tabs. DOM-Append via ref-Callback (imperativ, nicht React-managed). `layout-change` Event bei Plugin-View open/close emittieren.
+32. Status Bar: Module-Level-Store mit `useSyncExternalStore` (nicht `useState`) — mehrere Konsumenten (App.tsx + AppearanceSection) müssen synchron reagieren. `useStatusBar()` nutzt Subscriber-Pattern wie `favoritesStore`.
+33. `checkSessionAlive()` in App.tsx: Neues `IApiClient`-Methode. Leichtgewichtiger HEAD-Request gegen Session-Endpoint. Tests MÜSSEN diese Methode im MockApiClient bereitstellen (sonst `is not a function` Error). Default im Test: `mockResolvedValue(true)`.
+34. Settings Sections: `appearance` Section unter account hinzugefügt (Status Bar Toggle). Total ist jetzt 15 Sections (7 account + 3 vault + 5 admin). Tests die feste Zahlen prüfen, müssen bei neuer Section angepasst werden.
 
 ## Multi-User & Vault-Besitz
 
@@ -172,7 +231,7 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - Merge-Strategie: Server-Daten gewinnen bei Konflikten, lokale Einträge füllen leere Slots
 - Debounced Sync: 2s Timeout, keine doppelten Requests (`syncInProgress` Flag)
 - Neue Stores brauchen: `initialize()` in AppContent `useEffect`, `disconnect()` in `onSessionExpired`
-- Per-Vault Config: `.vault-config.json` im Vault-Verzeichnis, Owner-only write, read für alle mit Zugang
+- Per-Vault Config: `.slatebase/config.json` im Vault-Verzeichnis, Owner-only write, read für alle mit Zugang
 - Keybindings: `matchesShortcut(commandId, event)` statt manueller `e.ctrlKey && e.key ===` Checks
 - Keybindings `Mod` = plattformabhängig (Ctrl auf Win/Linux, Meta auf Mac)
 
@@ -188,6 +247,7 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - Sprache bei Nutzererstellung: `CreateUserData.preferredLanguage` (optional, Default = Admin-Sprache)
 - `OnUserCreatedFn(userId, language)` reicht Sprache an WelcomeVaultService weiter
 - Template-Verzeichnis-Auswahl: `WelcomeVaultService.TEMPLATE_DIRS` Map (de→`welcome-vault`, en→`welcome-vault-en`)
+- **Templates-Verzeichnis**: Default `"Templates"` (normales sichtbares Verzeichnis, kein Underscore-Prefix mehr)
 
 ## Obsidian Canvas
 
@@ -200,6 +260,18 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - **Editor-Fokus**: beim Eintritt in den Edit-Modus via Kontextmenü das Feld per `requestAnimationFrame` fokussieren — sonst verliert `focus()` das Rennen gegen das im selben Commit unmountende Menü (Portal), Eingaben landen dann beim globalen Canvas-Keyhandler.
 - **File-Node**: `handleMouseDown` im Edit-Modus früh beenden (sonst blockiert `onDragStart`→`preventDefault` den Text-Cursor). Markdown-File-Node hat zwei Aktionen: „Bearbeiten" (Inhalt → `onFileSave`) vs. „Dateipfad ändern" (Pfad → `onFilePathChange`). Niemals Inhalt als Pfad committen. Enter committet nur im einzeiligen Pfad-Editor, nicht im Inhalts-Textarea.
 - **Datei-Suche im Pfad-Editor**: `directoryTree` flach in Dateipfade auflösen, Teilstring-Filter, Dropdown via `position: absolute` + `.canvas-node--editing-path { overflow: visible }` (Node hat sonst `overflow: hidden`). Suggestion-Klick mit `onMouseDown` + `preventDefault`, damit das Input nicht vorher blurrt.
+
+## Conflict Wizard (Frontend)
+
+- Eigener `useReducer` (kein Provider) — `ConflictWizardState` + `ConflictWizardAction` in `types.ts`
+- 3-Step Flow: Overview (Kategorien mit Badges) → CategoryDetail (Liste mit Checkboxen, Pagination 50/Page) → Resolution (DiffView/MergePreview)
+- `diff-utils.ts`: Myers-Diff (pure, keine Deps). `computeDiff()` → `DiffHunk[]`, `groupHunks()` für Collapsed Sections (3 Kontext-Zeilen).
+- DiffView: Side-by-Side (4-Column Grid) + Unified (mit +/- Prefix). Collapsed Sections expandierbar. Design Tokens `--diff-added-bg`/`--diff-removed-bg`.
+- MergePreview: Textarea + Preview-Toggle. Confirm → `resolveConflictMerge()` API. Cancel → zurück.
+- BatchActions: Confirmation Dialog + Limit 100 + Result Summary mit Error-Details (expandierbar).
+- Live-Updates via `realtimeSyncBridge`: Wizard refresht Conflict-Liste bei neuen SSE-Events.
+- DiffView-Modus (side-by-side/unified) in localStorage persistiert (`slatebase_diff_view_mode`).
+- `ConflictResolutionView.tsx` deprecated — nicht löschen, wird noch importiert in alten Tests.
 
 ## Dev-Umgebung
 
@@ -217,3 +289,6 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - **`file-explorer/` Modul**: Shared Types (`DragState`, `InlineInputState` etc.) + `TreeNode` als eigene Dateien. Barrel-Export `index.ts`. FileExplorer importiert daraus.
 - **SidebarToolbar AppPage**: Hatte lokale Type-Kopie → Muss die exportierte aus `App.tsx` importieren, sonst Type-Mismatch bei `tsc -b` (Vite-Dev schluckt es, Prod-Build nicht)
 - **`tsc --noEmit` ≠ `tsc -b`**: Dev-Check (`--noEmit`) ist permissiver. Prod-Build (`tsc -b`) prüft strenger (project references, declaration emit). Immer `npm run build` als finale Validierung.
+- **Session-Verifikation**: App.tsx prüft nach Auth-Restore via `checkSessionAlive()` ob Token noch gültig (zeigt Loading-Spinner bis bestätigt). Tests MÜSSEN `checkSessionAlive` mocken (`mockResolvedValue(true)`) — sonst rendert die App nie über den Spinner hinaus.
+- **VaultShim.create() = create-or-get**: Gibt existierende Datei zurück statt zu rejecten (Obsidian-Plugin-Erwartung, z.B. Calendar). Kein API-Call wenn Datei im Tree existiert.
+- **Compatibility-Analyzer PARTIAL_METHODS**: Set ist leer — alle vormals partial-klassifizierten Methoden (`workspace.trigger`, `vault.trigger`) sind jetzt `SUPPORTED_METHODS`. Tests die `'partial'` erwarten, müssen bei Migration angepasst werden.

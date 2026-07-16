@@ -37,11 +37,11 @@ describe('VersionService', () => {
   })
 
   describe('createVersion', () => {
-    it('should save previous content under .versions directory', async () => {
+    it('should save previous content under .slatebase/versions directory', async () => {
       const content = Buffer.from('hello world')
       await service.createVersion('test-vault', 'notes/test.md', content)
 
-      const versionDir = path.join(vaultPath, '.versions', 'notes/test.md')
+      const versionDir = path.join(vaultPath, '.slatebase', 'versions', 'notes/test.md')
       const entries = await fs.readdir(versionDir)
       expect(entries).toHaveLength(1)
       expect(entries[0]).toMatch(/^\d{8}T\d{9}\.md$/)
@@ -53,7 +53,7 @@ describe('VersionService', () => {
     it('should use correct timestamp format YYYYMMDDTHHmmssSSS', async () => {
       await service.createVersion('test-vault', 'file.txt', Buffer.from('data'))
 
-      const versionDir = path.join(vaultPath, '.versions', 'file.txt')
+      const versionDir = path.join(vaultPath, '.slatebase', 'versions', 'file.txt')
       const entries = await fs.readdir(versionDir)
       const filename = entries[0]!
       // Pattern: 20240120T143000123.txt
@@ -66,7 +66,7 @@ describe('VersionService', () => {
 
       await disabledService.createVersion('test-vault', 'file.md', Buffer.from('data'))
 
-      const versionDir = path.join(vaultPath, '.versions', 'file.md')
+      const versionDir = path.join(vaultPath, '.slatebase', 'versions', 'file.md')
       await expect(fs.access(versionDir)).rejects.toThrow()
     })
 
@@ -93,7 +93,7 @@ describe('VersionService', () => {
     })
 
     it('should return versions sorted descending by timestamp', async () => {
-      const versionDir = path.join(vaultPath, '.versions', 'test.md')
+      const versionDir = path.join(vaultPath, '.slatebase', 'versions', 'test.md')
       await fs.mkdir(versionDir, { recursive: true })
 
       // Create version files with known timestamps
@@ -110,7 +110,7 @@ describe('VersionService', () => {
     })
 
     it('should include sizeBytes for each version', async () => {
-      const versionDir = path.join(vaultPath, '.versions', 'test.md')
+      const versionDir = path.join(vaultPath, '.slatebase', 'versions', 'test.md')
       await fs.mkdir(versionDir, { recursive: true })
 
       const content = 'hello world'
@@ -121,7 +121,7 @@ describe('VersionService', () => {
     })
 
     it('should ignore files that do not match the timestamp pattern', async () => {
-      const versionDir = path.join(vaultPath, '.versions', 'test.md')
+      const versionDir = path.join(vaultPath, '.slatebase', 'versions', 'test.md')
       await fs.mkdir(versionDir, { recursive: true })
 
       await fs.writeFile(path.join(versionDir, '20240101T100000000.md'), 'valid')
@@ -136,7 +136,7 @@ describe('VersionService', () => {
 
   describe('getVersionContent', () => {
     it('should return content of a specific version', async () => {
-      const versionDir = path.join(vaultPath, '.versions', 'test.md')
+      const versionDir = path.join(vaultPath, '.slatebase', 'versions', 'test.md')
       await fs.mkdir(versionDir, { recursive: true })
       await fs.writeFile(path.join(versionDir, '20240101T100000000.md'), 'version content')
 
@@ -157,7 +157,7 @@ describe('VersionService', () => {
       const filePath = path.join(vaultPath, 'test.md')
       await fs.writeFile(filePath, 'current content')
 
-      const versionDir = path.join(vaultPath, '.versions', 'test.md')
+      const versionDir = path.join(vaultPath, '.slatebase', 'versions', 'test.md')
       await fs.mkdir(versionDir, { recursive: true })
       await fs.writeFile(path.join(versionDir, '20240101T100000000.md'), 'old version')
 
@@ -182,7 +182,7 @@ describe('VersionService', () => {
 
   describe('pruneVersions', () => {
     it('should delete oldest versions exceeding maxVersions', async () => {
-      const versionDir = path.join(vaultPath, '.versions', 'test.md')
+      const versionDir = path.join(vaultPath, '.slatebase', 'versions', 'test.md')
       await fs.mkdir(versionDir, { recursive: true })
 
       await fs.writeFile(path.join(versionDir, '20240101T100000000.md'), 'v1')
@@ -204,7 +204,7 @@ describe('VersionService', () => {
     })
 
     it('should return 0 when versions are within limit', async () => {
-      const versionDir = path.join(vaultPath, '.versions', 'test.md')
+      const versionDir = path.join(vaultPath, '.slatebase', 'versions', 'test.md')
       await fs.mkdir(versionDir, { recursive: true })
 
       await fs.writeFile(path.join(versionDir, '20240101T100000000.md'), 'v1')
@@ -221,7 +221,7 @@ describe('VersionService', () => {
 
   describe('moveVersions', () => {
     it('should rename version directory from old path to new path', async () => {
-      const oldVersionDir = path.join(vaultPath, '.versions', 'old/path.md')
+      const oldVersionDir = path.join(vaultPath, '.slatebase', 'versions', 'old/path.md')
       await fs.mkdir(oldVersionDir, { recursive: true })
       await fs.writeFile(path.join(oldVersionDir, '20240101T100000000.md'), 'v1')
 
@@ -231,7 +231,7 @@ describe('VersionService', () => {
       await expect(fs.access(oldVersionDir)).rejects.toThrow()
 
       // New dir should exist with the version
-      const newVersionDir = path.join(vaultPath, '.versions', 'new/path.md')
+      const newVersionDir = path.join(vaultPath, '.slatebase', 'versions', 'new/path.md')
       const entries = await fs.readdir(newVersionDir)
       expect(entries).toContain('20240101T100000000.md')
     })
@@ -249,7 +249,7 @@ describe('VersionService', () => {
 
   describe('deleteVersions', () => {
     it('should remove all versions for a file', async () => {
-      const versionDir = path.join(vaultPath, '.versions', 'test.md')
+      const versionDir = path.join(vaultPath, '.slatebase', 'versions', 'test.md')
       await fs.mkdir(versionDir, { recursive: true })
       await fs.writeFile(path.join(versionDir, '20240101T100000000.md'), 'v1')
       await fs.writeFile(path.join(versionDir, '20240102T100000000.md'), 'v2')

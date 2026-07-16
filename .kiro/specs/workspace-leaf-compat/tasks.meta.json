@@ -1,0 +1,466 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Refactor `ItemView` in `view-registry.ts`": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948628196
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948653203
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948836526
+      }
+    ],
+    "1.2 Refactor `WorkspaceLeaf` to support location tracking": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948628316
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948653987
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948837495
+      }
+    ],
+    "2.1 Refactor `ViewRegistry` for plugin ownership tracking": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948628448
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948847736
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949010079
+      }
+    ],
+    "2.2 Add location-aware leaf creation and sidebar callbacks": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948628528
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949044884
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949240782
+      }
+    ],
+    "2.3 Add plugin cleanup and vault-switch support": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948628590
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949045627
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949241559
+      }
+    ],
+    "3. Checkpoint - Core classes complete": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948628661
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949252090
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949346986
+      }
+    ],
+    "4.1 Create `tab-view-bridge.ts` in `frontend/src/plugins/compat/`": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948628742
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949352492
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949617326
+      }
+    ],
+    "5.1 Extend `WorkspaceShim` with leaf management methods": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948628819
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949353418
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949617381
+      }
+    ],
+    "5.2 Add iteration and query methods to WorkspaceShim": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948628885
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949623821
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949784460
+      }
+    ],
+    "5.3 Add `openLinkText` to WorkspaceShim": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948629004
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949624810
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949785220
+      }
+    ],
+    "5.4 Update WorkspaceShim proxy `emulatedProperties` set": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948629113
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949625841
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949786252
+      }
+    ],
+    "6. Checkpoint - Compat layer complete": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948629181
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949791562
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949891141
+      }
+    ],
+    "7.1 Update `TabContent.tsx` for plugin view tabs": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948629237
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949896383
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950168000
+      }
+    ],
+    "7.2 Wire TabViewBridge to TabProvider": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948629318
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949897316
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950168776
+      }
+    ],
+    "8.1 Extend `PluginContext` with sidebar view state": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948629385
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949898476
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950169626
+      }
+    ],
+    "8.2 Update Context Panel to render plugin sidebar sections": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948629448
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950174744
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950545404
+      }
+    ],
+    "9.1 Extend `usePluginEventBridge` for plugin-view-tab awareness": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948629509
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950176019
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950544627
+      }
+    ],
+    "10. Checkpoint - UI integration complete": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948629562
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950551735
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950635248
+      }
+    ],
+    "11.1 Move leaf methods from UNSUPPORTED_METHODS to SUPPORTED_METHODS": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948629627
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950641449
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950820549
+      }
+    ],
+    "12.1 Update `plugin-context.ts` to wire new ViewRegistry and WorkspaceShim features": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948629702
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950642822
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950821591
+      }
+    ],
+    "12.2 Verify backward compatibility of existing workspace features": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948629805
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950826977
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950932162
+      }
+    ],
+    "13.1 Extend `IWorkspaceShim` interface in `types.ts`": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948629925
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948655051
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948838500
+      }
+    ],
+    "14. Final checkpoint - All tests pass": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948630001
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950939371
+      },
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783951402002
+      }
+    ],
+    "1. Core-Klassen: ItemView und WorkspaceLeaf refactoring": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948837536
+      }
+    ],
+    "13. Update types.ts with new interface members": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783948838545
+      }
+    ],
+    "2. ViewRegistry refactoring with plugin ownership and location support": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949241636
+      }
+    ],
+    "4. TabViewBridge module-level bridge": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949617434
+      }
+    ],
+    "5. WorkspaceShim extension with full Leaf API": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783949786328
+      }
+    ],
+    "7. UI Integration: TabContent plugin view rendering": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950168858
+      }
+    ],
+    "9. PluginEventBridge extension for leaf events": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950544714
+      }
+    ],
+    "8. UI Integration: Context Panel sidebar views": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950545464
+      }
+    ],
+    "11. Compatibility Analyzer update": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950820633
+      }
+    ],
+    "12. PluginContext wiring and backward compatibility": [
+      {
+        "executionId": "2544b963-621a-47b6-8991-dfa0a86c21f2",
+        "chatSessionId": "sess_12d79412-a8f8-434f-a351-2c6a02fe59ea",
+        "timestamp": 1783950932256
+      }
+    ]
+  }
+}

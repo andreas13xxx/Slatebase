@@ -6,6 +6,11 @@ import { resolveConflict } from '../state/syncActions'
 import { ConfirmModal } from './ConfirmModal'
 import type { ConflictEntry } from '../state/syncState'
 
+/**
+ * @deprecated Use `ConflictWizard` from `./conflict-wizard` instead.
+ * This component is kept as a fallback and will be removed in a future version.
+ */
+
 /** Props for the ConflictResolutionView component. */
 export interface ConflictResolutionViewProps {
   vaultId: string

@@ -404,10 +404,14 @@ describe('VaultShim', () => {
       expect(mockSave).toHaveBeenCalledWith('vault-123', 'empty.md', '');
     });
 
-    it('rejects create if file already exists', async () => {
-      await expect(vault.create('notes/hello.md', 'content')).rejects.toThrow(
-        'File already exists: "notes/hello.md"'
-      );
+    it('returns existing file without API call if file already exists', async () => {
+      const mockSave = vi.fn().mockResolvedValue({ path: 'notes/hello.md', name: 'hello.md', size: 42 });
+      apiClient = createMockApiClient({ saveFile: mockSave });
+      vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+
+      const result = await vault.create('notes/hello.md', 'content');
+      expect(result.path).toBe('notes/hello.md');
+      expect(mockSave).not.toHaveBeenCalled();
     });
 
     it('rejects create with path traversal', async () => {

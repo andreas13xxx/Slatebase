@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef, useContext } from 'react'
+import { createPortal } from 'react-dom'
 import type { IApiClient, PluginManifest, PluginRegistryData } from '../api'
 import { PluginUpload } from './PluginUpload'
 import { CompatibilityAnalyzer } from '../plugins/compat/compatibility-analyzer'
+import type { ApiCallClassification } from '../plugins/compat/compatibility-analyzer'
 import { PluginContext } from '../plugins/compat/plugin-context'
 import {
   Plug, Settings, AlertTriangle, RefreshCw, ChevronDown, ChevronRight,
@@ -27,6 +29,8 @@ interface PluginDisplayItem {
   description: string
   status: PluginStatus
   compatibilityLevel: CompatibilityLevel
+  compatibilityReasons: string[]
+  compatibilityApiCalls: ApiCallClassification[]
   error?: string
   hasSettings: boolean
 }
@@ -73,25 +77,36 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
    */
   const analyzeAndDetectSettings = useCallback(async (
     manifests: PluginManifest[],
-    registry: PluginRegistryData | null,
+    _registry: PluginRegistryData | null,
   ): Promise<void> => {
-    const updates: Array<{ pluginId: string; compatibilityLevel?: CompatibilityLevel; hasSettings?: boolean }> = []
+    const updates: Array<{
+      pluginId: string
+      compatibilityLevel?: CompatibilityLevel
+      compatibilityReasons?: string[]
+      compatibilityApiCalls?: ApiCallClassification[]
+      hasSettings?: boolean
+    }> = []
 
     await Promise.all(manifests.map(async (manifest) => {
-      const update: { pluginId: string; compatibilityLevel?: CompatibilityLevel; hasSettings?: boolean } = {
+      const update: {
+        pluginId: string
+        compatibilityLevel?: CompatibilityLevel
+        compatibilityReasons?: string[]
+        compatibilityApiCalls?: ApiCallClassification[]
+        hasSettings?: boolean
+      } = {
         pluginId: manifest.id,
       }
 
-      // 1. Compatibility analysis (only if currently 'unknown')
-      const existingLevel = registry?.plugins?.[manifest.id]?.compatibilityLevel
-      if (!existingLevel || existingLevel === 'unknown') {
-        try {
-          const bundle = await apiClient.loadBundle(vaultId, manifest.id)
-          const report = analyzerRef.current.analyze(bundle, manifest)
-          update.compatibilityLevel = report.level
-        } catch {
-          // Bundle load failed — leave as unknown
-        }
+      // 1. Compatibility analysis (always run to populate reasons/apiCalls)
+      try {
+        const bundle = await apiClient.loadBundle(vaultId, manifest.id)
+        const report = analyzerRef.current.analyze(bundle, manifest)
+        update.compatibilityLevel = report.level
+        update.compatibilityReasons = report.reasons
+        update.compatibilityApiCalls = report.apiCalls
+      } catch {
+        // Bundle load failed — leave as unknown
       }
 
       // 2. Settings: always available for installed plugins
@@ -109,29 +124,14 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
         return {
           ...p,
           compatibilityLevel: upd.compatibilityLevel ?? p.compatibilityLevel,
+          compatibilityReasons: upd.compatibilityReasons ?? p.compatibilityReasons,
+          compatibilityApiCalls: upd.compatibilityApiCalls ?? p.compatibilityApiCalls,
           hasSettings: upd.hasSettings ?? p.hasSettings,
         }
       }))
 
-      // Persist updated compatibility levels to registry
-      const compatUpdates = updates.filter(u => u.compatibilityLevel && u.compatibilityLevel !== 'unknown')
-      if (compatUpdates.length > 0 && registry) {
-        const updatedRegistry: PluginRegistryData = { ...registry, plugins: { ...registry.plugins } }
-        for (const upd of compatUpdates) {
-          if (upd.compatibilityLevel && updatedRegistry.plugins[upd.pluginId]) {
-            updatedRegistry.plugins[upd.pluginId] = {
-              ...updatedRegistry.plugins[upd.pluginId]!,
-              compatibilityLevel: upd.compatibilityLevel,
-            }
-          }
-        }
-        try {
-          await apiClient.saveRegistry(vaultId, updatedRegistry)
-          setRegistryData(updatedRegistry)
-        } catch {
-          // Non-critical — next load will re-analyze
-        }
-      }
+      // Compatibility analysis is display-only. Persisting a full registry
+      // snapshot here can overwrite newer activation state from the loader.
     }
   }, [apiClient, vaultId])
 
@@ -157,8 +157,12 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
           version: manifest.version,
           author: manifest.author ?? 'Unbekannt',
           description: manifest.description ?? '',
-          status: (regEntry?.status as PluginStatus) ?? 'inactive',
+          status: regEntry?.status === 'loading'
+            ? 'active'
+            : (regEntry?.status as PluginStatus) ?? 'inactive',
           compatibilityLevel: (regEntry?.compatibilityLevel as CompatibilityLevel) ?? 'unknown',
+          compatibilityReasons: [],
+          compatibilityApiCalls: [],
           error: regEntry?.error,
           hasSettings: true, // All installed plugins can be configured
         }
@@ -257,33 +261,37 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
     setTogglingPlugins((prev) => new Set([...prev, pluginId]))
 
     try {
-      // Update registry
-      const currentRegistry = registryData ?? { version: 1 as const, plugins: {} }
-      const updatedRegistry: PluginRegistryData = {
-        ...currentRegistry,
-        plugins: {
-          ...currentRegistry.plugins,
-          [pluginId]: {
-            ...currentRegistry.plugins[pluginId],
-            status: newStatus,
-            permissions: currentRegistry.plugins[pluginId]?.permissions ?? {
-              network: false,
-              networkAllowlist: [],
-              filesystemWrite: false,
-              domManipulation: false,
+      if (pluginContext) {
+        await pluginContext.setPluginEnabled(pluginId, newStatus === 'active')
+        setRegistryData(await apiClient.loadRegistry(vaultId))
+      } else {
+        // Fallback for isolated rendering without PluginProvider.
+        const currentRegistry = registryData ?? { version: 1 as const, plugins: {} }
+        const updatedRegistry: PluginRegistryData = {
+          ...currentRegistry,
+          plugins: {
+            ...currentRegistry.plugins,
+            [pluginId]: {
+              ...currentRegistry.plugins[pluginId],
+              status: newStatus,
+              permissions: currentRegistry.plugins[pluginId]?.permissions ?? {
+                network: false,
+                networkAllowlist: [],
+                filesystemWrite: false,
+                domManipulation: false,
+              },
+              compatibilityLevel: currentRegistry.plugins[pluginId]?.compatibilityLevel ?? 'unknown',
+              installedAt: currentRegistry.plugins[pluginId]?.installedAt ?? new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
             },
-            compatibilityLevel: currentRegistry.plugins[pluginId]?.compatibilityLevel ?? 'unknown',
-            installedAt: currentRegistry.plugins[pluginId]?.installedAt ?? new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
           },
-        },
+        }
+        if (newStatus === 'active' && updatedRegistry.plugins[pluginId]) {
+          delete updatedRegistry.plugins[pluginId]!.error
+        }
+        await apiClient.saveRegistry(vaultId, updatedRegistry)
+        setRegistryData(updatedRegistry)
       }
-      // Remove error field if activating
-      if (newStatus === 'active' && updatedRegistry.plugins[pluginId]) {
-        delete updatedRegistry.plugins[pluginId]!.error
-      }
-      await apiClient.saveRegistry(vaultId, updatedRegistry)
-      setRegistryData(updatedRegistry)
     } catch {
       // Rollback on failure
       setPlugins((prev) => prev.map((p) =>
@@ -309,30 +317,35 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
     ))
 
     try {
-      // Simulate reload by setting to active
-      const currentRegistry = registryData ?? { version: 1 as const, plugins: {} }
-      const updatedRegistry: PluginRegistryData = {
-        ...currentRegistry,
-        plugins: {
-          ...currentRegistry.plugins,
-          [pluginId]: {
-            ...currentRegistry.plugins[pluginId],
-            status: 'active',
-            permissions: currentRegistry.plugins[pluginId]?.permissions ?? {
-              network: false,
-              networkAllowlist: [],
-              filesystemWrite: false,
-              domManipulation: false,
+      if (pluginContext) {
+        await pluginContext.setPluginEnabled(pluginId, false)
+        await pluginContext.setPluginEnabled(pluginId, true)
+        setRegistryData(await apiClient.loadRegistry(vaultId))
+      } else {
+        const currentRegistry = registryData ?? { version: 1 as const, plugins: {} }
+        const updatedRegistry: PluginRegistryData = {
+          ...currentRegistry,
+          plugins: {
+            ...currentRegistry.plugins,
+            [pluginId]: {
+              ...currentRegistry.plugins[pluginId],
+              status: 'active',
+              permissions: currentRegistry.plugins[pluginId]?.permissions ?? {
+                network: false,
+                networkAllowlist: [],
+                filesystemWrite: false,
+                domManipulation: false,
+              },
+              compatibilityLevel: currentRegistry.plugins[pluginId]?.compatibilityLevel ?? 'unknown',
+              installedAt: currentRegistry.plugins[pluginId]?.installedAt ?? new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
             },
-            compatibilityLevel: currentRegistry.plugins[pluginId]?.compatibilityLevel ?? 'unknown',
-            installedAt: currentRegistry.plugins[pluginId]?.installedAt ?? new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
           },
-        },
+        }
+        delete updatedRegistry.plugins[pluginId]!.error
+        await apiClient.saveRegistry(vaultId, updatedRegistry)
+        setRegistryData(updatedRegistry)
       }
-      delete updatedRegistry.plugins[pluginId]!.error
-      await apiClient.saveRegistry(vaultId, updatedRegistry)
-      setRegistryData(updatedRegistry)
       setPlugins((prev) => prev.map((p) =>
         p.pluginId === pluginId ? { ...p, status: 'active', error: undefined } : p
       ))
@@ -357,6 +370,11 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
     setDeletingPlugins((prev) => new Set([...prev, pluginId]))
 
     try {
+      // Deactivate first to clean up runtime registrations (icons, commands, views)
+      if (pluginContext) {
+        await pluginContext.setPluginEnabled(pluginId, false)
+      }
+
       await apiClient.deletePlugin(vaultId, pluginId)
 
       // Remove from registry
@@ -528,7 +546,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
               </div>
 
               <div className="plugin-card-actions">
-                {plugin.hasSettings && (
+                {plugin.hasSettings && plugin.status === 'active' && (
                   <button
                     className="plugin-card-btn plugin-card-btn--settings"
                     title="Einstellungen"
@@ -551,7 +569,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
                   <input
                     type="checkbox"
                     checked={plugin.status === 'active'}
-                    disabled={togglingPlugins.has(plugin.pluginId) || plugin.status === 'loading'}
+                    disabled={togglingPlugins.has(plugin.pluginId)}
                     onChange={() => void handleToggle(plugin.pluginId)}
                   />
                   <span className="plugin-card-toggle-slider" />
@@ -608,6 +626,38 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
                     {getCompatibilityLabel(plugin.compatibilityLevel)}
                   </span>
                 </div>
+
+                {/* Compatibility reasons */}
+                {plugin.compatibilityReasons.length > 0 && (
+                  <div className="plugin-card-detail-reasons">
+                    <span className="plugin-card-detail-label">Begründung:</span>
+                    <ul className="plugin-card-reasons-list">
+                      {plugin.compatibilityReasons.map((reason, idx) => (
+                        <li key={idx} className="plugin-card-reasons-item">{reason}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Detected API calls */}
+                {plugin.compatibilityApiCalls.length > 0 && (
+                  <div className="plugin-card-detail-apicalls">
+                    <span className="plugin-card-detail-label">Erkannte API-Aufrufe:</span>
+                    <div className="plugin-card-apicalls-grid">
+                      {plugin.compatibilityApiCalls.map((call) => (
+                        <div key={call.method} className={`plugin-card-apicall plugin-card-apicall--${call.classification}`}>
+                          <code className="plugin-card-apicall-method">{call.method}</code>
+                          <span className={`plugin-card-apicall-badge plugin-card-apicall-badge--${call.classification}`}>
+                            {call.classification === 'supported' && 'unterstützt'}
+                            {call.classification === 'partial' && 'teilweise'}
+                            {call.classification === 'unsupported' && 'nicht unterstützt'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="plugin-card-detail-row">
                   <span className="plugin-card-detail-label">Plugin-ID:</span>
                   <span className="plugin-card-detail-value plugin-card-detail-value--mono">{plugin.pluginId}</span>
@@ -629,7 +679,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       </div>
 
       {/* Settings modal */}
-      {settingsModal && (
+      {settingsModal && createPortal(
         <div className="plugin-settings-overlay" onClick={() => setSettingsModal(null)}>
           <div className="plugin-settings-modal" onClick={(e) => e.stopPropagation()}>
             <div className="plugin-settings-modal-header">
@@ -701,7 +751,8 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       {/* Delete confirmation modal */}
       <ConfirmModal

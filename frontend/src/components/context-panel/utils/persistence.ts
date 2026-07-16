@@ -4,7 +4,7 @@
  */
 
 /** Identifiers for the context panel views */
-export type ContextPanelViewId = 'outline' | 'links' | 'tags' | 'properties' | 'search';
+export type ContextPanelViewId = 'outline' | 'links' | 'tags' | 'properties' | 'search' | `plugin:${string}`;
 
 /** Persisted layout structure stored in localStorage */
 export interface PersistedContextPanelLayout {
@@ -16,7 +16,7 @@ export interface PersistedContextPanelLayout {
   }>;
 }
 
-const VALID_VIEW_IDS: ReadonlySet<string> = new Set<ContextPanelViewId>([
+const VALID_BUILTIN_VIEW_IDS: ReadonlySet<string> = new Set([
   'outline',
   'links',
   'tags',
@@ -33,9 +33,13 @@ function getStorageKey(userId: string): string {
 
 /**
  * Validates that a value is a valid ContextPanelViewId.
+ * Accepts built-in IDs and plugin IDs (prefixed with 'plugin:').
  */
 function isValidViewId(value: unknown): value is ContextPanelViewId {
-  return typeof value === 'string' && VALID_VIEW_IDS.has(value);
+  if (typeof value !== 'string') return false;
+  if (VALID_BUILTIN_VIEW_IDS.has(value)) return true;
+  if (value.startsWith('plugin:') && value.length > 7) return true;
+  return false;
 }
 
 /**

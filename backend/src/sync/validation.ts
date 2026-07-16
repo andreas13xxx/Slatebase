@@ -212,6 +212,58 @@ export const syncLogQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1, 'Page size must be at least 1').max(100, 'Page size must be at most 100').default(50),
 })
 
+// ─── Conflict Resolution Schemas ─────────────────────────────────────────────
+
+/**
+ * Schema for a single conflict resolution action (discriminated union on `type`).
+ * Supports: use_remote, use_local, skip, manual_merge (with content).
+ */
+export const conflictResolutionActionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('use_remote') }),
+  z.object({ type: z.literal('use_local') }),
+  z.object({ type: z.literal('skip') }),
+  z.object({ type: z.literal('manual_merge'), content: z.string() }),
+])
+
+/**
+ * Schema for batch conflict resolution.
+ * Array of objects with documentPath and resolution action.
+ * Min 1, max 100 items.
+ */
+export const resolveBatchSchema = z
+  .array(
+    z.object({
+      documentPath: z.string().min(1, 'Document path must not be empty'),
+      resolution: conflictResolutionActionSchema,
+    }),
+  )
+  .min(1, 'Batch must contain at least 1 resolution')
+  .max(100, 'Batch must contain at most 100 resolutions')
+
+/**
+ * Schema for manual merge resolution (resolve with custom content).
+ * Validates documentPath (non-empty) and content (max 10MB).
+ */
+export const resolveMergeSchema = z.object({
+  documentPath: z.string().min(1, 'Document path must not be empty'),
+  content: z.string().max(10_485_760, 'Content must be at most 10MB'),
+})
+
+/**
+ * Re-export of auto-resolution config schema from auto-resolution-config-store.
+ * Validates the AutoResolutionConfig shape (enabled + strategies).
+ */
+export { autoResolutionConfigSchema } from './auto-resolution-config-store.js'
+
+/**
+ * Schema for querying file content for diff view.
+ * Requires path (non-empty) and source (local or remote).
+ */
+export const fileContentQuerySchema = z.object({
+  path: z.string().min(1, 'Path must not be empty'),
+  source: z.enum(['local', 'remote']),
+})
+
 // ─── Inferred Types ──────────────────────────────────────────────────────────
 
 export type CreateSyncConfigInput = z.infer<typeof createSyncConfigSchema>
@@ -219,3 +271,7 @@ export type UpdateSyncConfigInput = z.infer<typeof updateSyncConfigSchema>
 export type TriggerSyncInput = z.infer<typeof triggerSyncSchema>
 export type ResolveConflictInput = z.infer<typeof resolveConflictSchema>
 export type SyncLogQueryInput = z.infer<typeof syncLogQuerySchema>
+export type ConflictResolutionActionInput = z.infer<typeof conflictResolutionActionSchema>
+export type ResolveBatchInput = z.infer<typeof resolveBatchSchema>
+export type ResolveMergeInput = z.infer<typeof resolveMergeSchema>
+export type FileContentQueryInput = z.infer<typeof fileContentQuerySchema>

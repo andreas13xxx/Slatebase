@@ -164,7 +164,7 @@ export function LoginPage({ apiClient }: LoginPageProps) {
           {rateLimitMessage && (
             <p className="login-error login-error--rate-limit" role="alert">{rateLimitMessage}</p>
           )}
-          {authState.error && !rateLimitMessage && (
+          {authState.error && !rateLimitMessage && authState.error !== 'auth.sessionExpired' && (
             <p className="login-error" role="alert">{
               authState.error.startsWith('auth.') ? t(authState.error as Parameters<typeof t>[0]) : authState.error
             }</p>

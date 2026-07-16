@@ -20,8 +20,9 @@ import { visit } from 'unist-util-visit'
 /**
  * Regex to match a block marker at the end of text content.
  * Captures the block-id (must start with alphanumeric, followed by alphanumeric or hyphens).
+ * Tolerates an optional trailing \r to handle CRLF line endings (remark-parse preserves \r in text nodes).
  */
-const BLOCK_MARKER_REGEX = / \^([a-zA-Z0-9][a-zA-Z0-9-]*)$/
+const BLOCK_MARKER_REGEX = / \^([a-zA-Z0-9][a-zA-Z0-9-]*)\r?$/
 
 /**
  * Transforms the MDAST tree by detecting and stripping block markers

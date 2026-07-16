@@ -6,9 +6,6 @@ import type { ILogger } from '../logger/index.js'
 import type { IVaultStatisticsService, VaultStatistics } from './types.js'
 import { StatisticsTimeoutError } from './errors.js'
 
-/** Directories excluded from statistics computation. */
-const EXCLUDED_DIRS = new Set(['.trash', '.versions'])
-
 /** Cached entry with timestamp. */
 interface CacheEntry {
   stats: VaultStatistics
@@ -80,7 +77,7 @@ export class VaultStatisticsService implements IVaultStatisticsService {
 
   /**
    * Recursively scans a directory to compute statistics.
-   * Filters out `.trash/`, `.versions/`, and `_`-prefix entries.
+   * Filters out dot-prefixed entries (hidden, like Obsidian).
    */
   private async scanRecursive(dirPath: string, signal: AbortSignal): Promise<VaultStatistics> {
     if (signal.aborted) {
@@ -104,17 +101,12 @@ export class VaultStatisticsService implements IVaultStatisticsService {
         throw new DOMException('Statistics computation aborted', 'AbortError')
       }
 
-      // Skip _-prefix entries (files and directories)
-      if (entry.name.startsWith('_')) {
+      // Skip dot-prefixed entries (hidden files and directories, like Obsidian)
+      if (entry.name.startsWith('.')) {
         continue
       }
 
       if (entry.isDirectory()) {
-        // Skip excluded directories
-        if (EXCLUDED_DIRS.has(entry.name)) {
-          continue
-        }
-
         folderCount += 1
         const childPath = path.join(dirPath, entry.name)
         const childStats = await this.scanRecursive(childPath, signal)
