@@ -142,6 +142,7 @@ docker compose up -d
 | 🌐 **i18n** | German and English UI, switchable per user |
 | 🛡️ **Admin Panel** | User management, feature toggles, audit log, server configuration |
 | 🐳 **Docker Ready** | Pre-built multi-arch images (amd64 + arm64), runs as non-root user |
+| 📖 **Tutorial Vault** | Comprehensive welcome vault with 35+ guides (DE/EN), practice exercises, screenshots, and templates — auto-created for new users or on-demand via Settings/Command Palette |
 
 ⚠️ = Experimental feature. Use with caution.
 
@@ -301,6 +302,7 @@ All routes under `/api/v1`. Authentication required (session cookie or Bearer to
 | GET | `/events` | SSE stream (chat, presence, vault changes) |
 | GET | `/version` | Installed version (public, no auth) |
 | GET | `/.well-known/mcp.json` | MCP discovery (public) |
+| POST | `/welcome-vault` | Create tutorial vault on-demand |
 
 </details>
 

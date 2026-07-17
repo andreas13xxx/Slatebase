@@ -1,0 +1,1841 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "Neue Datei `backend/src/api/welcomeVaultRoutes.ts` erstellen": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218739021
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218754635
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784219243333
+      }
+    ],
+    "Route `POST /api/v1/welcome-vault` implementieren:": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218740374
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784219250846
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784219255729
+      }
+    ],
+    "Rate-Limiting hinzufügen: Max 3 Aufrufe pro Stunde pro User (In-Memory Map)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218740476
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784219259504
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784219262786
+      }
+    ],
+    "Route in `backend/src/index.ts` registrieren (Composition Root)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218740548
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784219267012
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784219455770
+      }
+    ],
+    "In `welcomeVaultRoutes.ts`: Namens-Deduplication als Hilfsfunktion (`deduplicateVaultName`)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218740607
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784219459692
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784219463368
+      }
+    ],
+    "Sicherstellen dass `createWelcomeVault` mit dem deduplizierten Namen aufgerufen wird (ggf. neuen Parameter `overrideName?: string` oder den Namen vorab im VaultService prüfen)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218740661
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784219466623
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784219568062
+      }
+    ],
+    "Integration-Tests in `backend/src/api/welcomeVaultRoutes.test.ts`:": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218740740
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784219571758
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784219855052
+      }
+    ],
+    "`createWelcomeVault()` Methode in `IApiClient` Interface hinzufügen": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218740831
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784219862004
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784219921921
+      }
+    ],
+    "Implementierung in `ApiClient`: `POST /api/v1/welcome-vault`, Response-Typ `{ vaultId: string; vaultName: string }`": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218740925
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784219925038
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784219928431
+      }
+    ],
+    "In der Konto-Sektion der Settings einen Button \"Anleitungs-Vault erstellen\" hinzufügen": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218740987
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784219932321
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220265441
+      }
+    ],
+    "Beschreibungstext unter dem Button (was er tut)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218741094
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220268448
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220271676
+      }
+    ],
+    "Loading-State während Request": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218741186
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220274738
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220278257
+      }
+    ],
+    "Erfolg: Toast-Benachrichtigung mit Vault-Namen, Vault-Tree refreshen (dispatch `REFRESH_VAULT_TREES`)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218741252
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220281824
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220285191
+      }
+    ],
+    "Fehler: Toast mit passender Fehlermeldung (Feature disabled / generischer Fehler)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218741306
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220288468
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220291510
+      }
+    ],
+    "CSS-Styling mit Design Tokens (kein Inline-Style)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218741360
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220294802
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220298253
+      }
+    ],
+    "Neuer Built-in-Command `create-welcome-vault` in `CommandPaletteContainer.tsx`": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218741426
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220302076
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220516050
+      }
+    ],
+    "Kategorie: `vault`": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218741489
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220519403
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220522858
+      }
+    ],
+    "Name: `t('commands.createWelcomeVault')` — \"Anleitungs-Vault erstellen\" / \"Create tutorial vault\"": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218741560
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220527311
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220530693
+      }
+    ],
+    "Execute: selbe Logik wie Settings-Button (Toast + Tree-Refresh)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218741618
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220533825
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220537034
+      }
+    ],
+    "Deutsche Strings in `de.ts` hinzufügen (settings.account.createWelcomeVault, etc.)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218741671
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220541463
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220544840
+      }
+    ],
+    "Englische Strings in `en.ts` hinzufügen (identische Struktur)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218741726
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220548021
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220551268
+      }
+    ],
+    "Strings für Toast-Nachrichten (Erfolg, Fehler, Feature disabled)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218741775
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220554554
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220557748
+      }
+    ],
+    "Command-Palette-Label": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218741841
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220560772
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220564066
+      }
+    ],
+    "Bestehenden Inhalt von `data/templates/welcome-vault/` sichern/entfernen": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218741912
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784220568905
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784226925947
+      }
+    ],
+    "Neue Ordnerstruktur erstellen:": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218741977
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784226929027
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784226931993
+      }
+    ],
+    "`_meta.md` mit Version 1.0.0 und Datum erstellen": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218742025
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784226935343
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784226938620
+      }
+    ],
+    "`Start hier.md` neu schreiben: Übersicht aller Bereiche, gruppierte Wikilinks, Callout mit Tipp": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218742083
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784226941780
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784226944978
+      }
+    ],
+    "`Grundlagen/Erste Schritte.md` — Inhaltsverzeichnis + Empfohlene Reihenfolge": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218742143
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784226948975
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784227642181
+      }
+    ],
+    "`Grundlagen/Markdown Syntax.md` — Headings, Formatierung, Listen, Tabellen, Code-Blöcke, Horizontale Linien (mit Beispielen)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218742203
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784227646039
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784227649569
+      }
+    ],
+    "`Grundlagen/Navigation und Tabs.md` — Tabs öffnen/schließen, Split-View, Tab-Reihenfolge, aktive Datei": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218742243
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784227653082
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784227656586
+      }
+    ],
+    "`Grundlagen/Datei-Explorer.md` — Erstellen, Umbenennen, Verschieben, DnD, Kontextmenü, Favoriten": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218742290
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784227660814
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784227664116
+      }
+    ],
+    "`Grundlagen/Editor und Viewer.md` — Edit/View-Modi, Toolbar-Funktionen, Auto-Save, Line Numbers, Undo/Redo": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218742339
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784227668443
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784227671917
+      }
+    ],
+    "`Features/Übersicht.md` — Inhaltsverzeichnis aller Feature-Guides": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218742388
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784227675994
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228372223
+      }
+    ],
+    "`Features/Wikilinks.md` — Syntax, Pfade, Aliase, Heading-Links, Block-Referenzen, Auto-Resolve": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218742440
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228376188
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228379443
+      }
+    ],
+    "`Features/Embeds.md` — Bilder, PDFs, Notizen, Größenangaben (`|400`), Inline-PDF": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218742494
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228382954
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228386241
+      }
+    ],
+    "`Features/Callouts.md` — Alle Typen (tip, warning, info, note, danger, quote, bug, example, abstract, success, question, failure), faltbare Callouts": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218742544
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228389505
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228392773
+      }
+    ],
+    "`Features/Tags und Properties.md` — Tag-Syntax, verschachtelte Tags, Frontmatter YAML, Properties im Context Panel": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218742591
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228396235
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228399976
+      }
+    ],
+    "`Features/Suche und Ersetzen.md` — Volltextsuche, Regex, Multi-Vault, Kontext-Zeilen, Replace": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218742637
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228403468
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228408298
+      }
+    ],
+    "`Features/Knowledge Graph.md` — Was der Graph zeigt, Navigation, Zoom/Pan, Konfiguration (Farben, Layout), Tag-/Property-Nodes": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218742690
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228414887
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228418436
+      }
+    ],
+    "`Features/Context Panel.md` — Outline, Forward-Links, Backlinks, Tags, Properties, Splits, Tab-Reihenfolge": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218742737
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228422255
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228426053
+      }
+    ],
+    "`Features/Mermaid Diagramme.md` — Flowchart, Sequenz, Gantt, Pie, Class, State (jeweils ein Beispiel)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218742777
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228430251
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228433988
+      }
+    ],
+    "`Features/Vorlagen und Daily Notes.md` — Template-Verzeichnis, Platzhalter (date/time/title), Daily Note per Shortcut/Button": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218742826
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228437969
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228911292
+      }
+    ],
+    "`Features/Papierkorb und Versionen.md` — Soft-Delete, Restore, Retention, Dateiversionen, Inline-Diff, Cleanup": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218742872
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228915182
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228918897
+      }
+    ],
+    "`Features/Canvas.md` — Text-/File-/Link-/Group-Nodes, Edges, Zoom/Pan, Minimap, Source-View, Toolbar": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218742921
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228922529
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228925967
+      }
+    ],
+    "`Features/Command Palette.md` — Ctrl+P, Befehlssuche, Keyboard-Navigation, Kategorien": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218742973
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228929582
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228933168
+      }
+    ],
+    "`Features/Vault-Verwaltung.md` — Erstellen, Löschen, Teilen (Lesen/Schreiben), Transfer, Statistiken": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218743025
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228937195
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228941039
+      }
+    ],
+    "`Features/Einstellungen.md` — Konto, Darstellung, Vault-Konfiguration, Tastenkürzel, Feature-Toggles (Admin)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218743074
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228944538
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228948377
+      }
+    ],
+    "`Features/Chat.md` — Konversationen erstellen, Nachrichten, Unread-Badge, Archivieren, Verlassen": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218743127
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228951778
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228955465
+      }
+    ],
+    "`Features/Sync.md` — CouchDB-Setup, Setup-URI, Manuell, E2E-Verschlüsselung, Konflikte (⚠️ experimentell)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218743172
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228959136
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228963013
+      }
+    ],
+    "`Fortgeschritten/Übersicht.md` — Inhaltsverzeichnis": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218743221
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784228967325
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784229580973
+      }
+    ],
+    "`Fortgeschritten/Regex Suche.md` — Regex-Patterns, Character Classes, Capture Groups, Lookahead": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218743270
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784229585517
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784229589235
+      }
+    ],
+    "`Fortgeschritten/Canvas Workflows.md` — Brainstorming, Projektplanung, Mindmaps, File-Node-Verlinkung": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218743325
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784229592667
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784229596321
+      }
+    ],
+    "`Fortgeschritten/Tastenkürzel anpassen.md` — Settings → Keybindings, Aufnahme, Konflikterkennung, Mod-Key": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218743402
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784229600864
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784229604547
+      }
+    ],
+    "`Fortgeschritten/Vault Sync einrichten.md` — CouchDB-Installation, Setup-URI, Troubleshooting, Konflikte": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218743450
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784229608019
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784229611455
+      }
+    ],
+    "`Fortgeschritten/MCP Context Server.md` — Was ist MCP, Token erstellen, AI-Clients konfigurieren": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218743492
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784229615097
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784229618731
+      }
+    ],
+    "`Fortgeschritten/Obsidian Plugins.md` — Installation via ZIP, kompatible Plugins, Einschränkungen, Fehler": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218743535
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784229622196
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784229625702
+      }
+    ],
+    "`Praxis/Übersicht.md` — Inhaltsverzeichnis mit Schwierigkeitsgrad": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218743583
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784229630214
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230095282
+      }
+    ],
+    "`Praxis/Übung 1 - Erste Notiz.md` — Datei erstellen, Markdown formatieren, speichern": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218743626
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230099868
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230103243
+      }
+    ],
+    "`Praxis/Übung 2 - Verlinkung.md` — Wikilinks erstellen, Backlinks prüfen, Graph erkunden": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218743683
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230111887
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230115448
+      }
+    ],
+    "`Praxis/Übung 3 - Projekt organisieren.md` — Ordner anlegen, Tags vergeben, Template nutzen": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218743725
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230118951
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230122748
+      }
+    ],
+    "`Praxis/Übung 4 - Suche meistern.md` — Volltextsuche, Regex, Ersetzen in mehreren Dateien": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218743769
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230127150
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230134127
+      }
+    ],
+    "`Praxis/Übung 5 - Canvas erstellen.md` — Brainstorming-Board mit Text- und File-Nodes, Edges": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218743818
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230137694
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230141402
+      }
+    ],
+    "`Praxis/Beispielprojekt/Projektplan.md` — Realistischer Projektplan mit Callouts/Tags": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218743871
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230144915
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230148691
+      }
+    ],
+    "`Praxis/Beispielprojekt/Meeting-Notizen.md` — Meeting-Vorlage ausgefüllt": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218743922
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230152324
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230156022
+      }
+    ],
+    "`Praxis/Beispielprojekt/Recherche.md` — Notiz mit Embeds, Links, Quellenangaben": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218743984
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230159788
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230163168
+      }
+    ],
+    "`Vorlagen/Tägliche Notiz.md` — Template mit `{{date}}`, `{{time}}` Platzhaltern": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218744039
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230167734
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230240093
+      }
+    ],
+    "`Vorlagen/Meeting-Protokoll.md` — Datum, Teilnehmer, Agenda, Ergebnisse, TODOs": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218744103
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230243599
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230247060
+      }
+    ],
+    "`Vorlagen/Projektübersicht.md` — Projektziele, Status, Meilensteine, Team": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218744158
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230250701
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230254041
+      }
+    ],
+    "`Vorlagen/Leseliste.md` — Titel, Autor, Status, Notizen, Bewertung": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218744206
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230257672
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230261189
+      }
+    ],
+    "Bestehenden Inhalt von `data/templates/welcome-vault-en/` sichern/entfernen": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218744253
+      },
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784230265830
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784268177722
+      }
+    ],
+    "Neue Ordnerstruktur (englische Benennungen):": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218744303
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231615471
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231643379
+      }
+    ],
+    "`_meta.md`, `Start here.md` erstellen": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218744374
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231649161
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231681873
+      }
+    ],
+    "`Basics/Getting Started.md`": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218744437
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231690958
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231739655
+      }
+    ],
+    "`Basics/Markdown Syntax.md`": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218744491
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231742775
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231746687
+      }
+    ],
+    "`Basics/Navigation and Tabs.md`": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218744543
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231749484
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231752308
+      }
+    ],
+    "`Basics/File Explorer.md`": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218744601
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231755218
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231758115
+      }
+    ],
+    "`Basics/Editor and Viewer.md`": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218744652
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231761130
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231764285
+      }
+    ],
+    "Alle 17 Feature-Guides aus `Features/` übersetzen (identische Struktur, englische Inhalte)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218744701
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231768051
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231827827
+      }
+    ],
+    "Dateinamen anpassen (z.B. \"Suche und Ersetzen\" → \"Search and Replace\")": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218744752
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231830986
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231834305
+      }
+    ],
+    "Alle 7 Guides aus `Advanced/` übersetzen": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218744799
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231837565
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231870565
+      }
+    ],
+    "Dateinamen anpassen": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218744840
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231873668
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231876529
+      }
+    ],
+    "Alle 5 Übungen + 3 Beispielprojekt-Dateien übersetzen": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218744890
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231879847
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231942597
+      }
+    ],
+    "Dateinamen anpassen (z.B. \"Übung 1\" → \"Exercise 1\")": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218744953
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231945777
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231948917
+      }
+    ],
+    "Alle 4 Vorlagen-Dateien übersetzen": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218745005
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231951794
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231955054
+      }
+    ],
+    "Dateinamen anpassen (\"Daily Note\", \"Meeting Notes\", \"Project Overview\", \"Reading List\")": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218745061
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231958418
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784231962108
+      }
+    ],
+    "Slatebase mit realistischen Beispieldaten starten (Dark Mode)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218745109
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784232058063
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784232061195
+      }
+    ],
+    "Screenshots aufnehmen (800px Breite, PNG):": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218745154
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784232064609
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784232067744
+      }
+    ],
+    "Screenshots in `data/templates/welcome-vault/Screenshots/` ablegen": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218745230
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784232070993
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784232073926
+      }
+    ],
+    "Screenshots in `data/templates/welcome-vault-en/Screenshots/` ablegen (identisch oder übersetzte Variante)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218745274
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784232077079
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784232080142
+      }
+    ],
+    "Alle Feature-Guides mit passenden `![[Screenshots/dateiname.png]]` Embeds versehen": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218745322
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784232083125
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784232086474
+      }
+    ],
+    "Bildunterschriften als kursiver Text unter jedem Embed": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218745461
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784232089654
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784232092701
+      }
+    ],
+    "Prüfen dass alle Embeds auflösen (korrekte Pfade)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218745509
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784232095802
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784232098923
+      }
+    ],
+    "Alle Wikilinks in beiden Vault-Varianten prüfen (keine Broken Links)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218745558
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784232105683
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784267571790
+      }
+    ],
+    "Tags konsistent verwenden (#grundlagen, #features, #fortgeschritten, #praxis)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218745618
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784267574853
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784267694363
+      }
+    ],
+    "Callout-Typen korrekt (`> [!tip]`, `> [!todo]` für Übungen, `> [!warning]` für experimentelle Features)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218745661
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784267697548
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784267700807
+      }
+    ],
+    "Frontmatter in `_meta.md` valide": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218745708
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784267704334
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784267707446
+      }
+    ],
+    "Keine Markdown-Syntax-Fehler": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218745759
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784267710416
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784267713364
+      }
+    ],
+    "Alle Guides auf Vollständigkeit prüfen (deckt alle Acceptance Criteria aus Requirements ab?)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218745805
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784267719257
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784267869631
+      }
+    ],
+    "Screenshots referenziert und vorhanden": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218745854
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784267872509
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784267875519
+      }
+    ],
+    "Interaktive Übungen sind \"safe\" (zerstören nichts im Vault)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218745936
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784267878751
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784267954570
+      }
+    ],
+    "Sprachkonsistenz (DE komplett Deutsch, EN komplett Englisch)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218745993
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784267957844
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784267961189
+      }
+    ],
+    "Vor/Zurück-Links und Querverweise stimmig": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218746049
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784267964442
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784268118486
+      }
+    ],
+    "Backend starten, neuen User anlegen → Welcome Vault wird korrekt erstellt": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218746101
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784268123040
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784268125991
+      }
+    ],
+    "Alle Dateien vorhanden, Screenshots laden": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218746151
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784268129163
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784268132418
+      }
+    ],
+    "`POST /api/v1/welcome-vault` manuell testen (Postman/curl)": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218746201
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784268135659
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784268138979
+      }
+    ],
+    "Namens-Deduplication testen (2x aufrufen → \"Willkommen (2)\")": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218746252
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784268142280
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784268145781
+      }
+    ],
+    "Frontend: Settings-Button testen, Toast erscheint, Vault im Explorer sichtbar": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218746300
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784268148865
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784268152463
+      }
+    ],
+    "Frontend: Command Palette \"Anleitungs-Vault erstellen\" testen": [
+      {
+        "executionId": "5c36f302-b11b-4290-a198-a3e54fbdd308",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784218746340
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784268155592
+      },
+      {
+        "executionId": "d9e97a7a-98d9-4952-8b41-25ca2c95193a",
+        "chatSessionId": "sess_ae836602-d829-4b64-84d4-462176f3ddbd",
+        "timestamp": 1784268160661
+      }
+    ]
+  }
+}

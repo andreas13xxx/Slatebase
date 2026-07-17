@@ -3,11 +3,14 @@ import { CommandPalette } from './CommandPalette'
 import { usePluginContext } from '../plugins/compat/plugin-context'
 import { useFeatureContext } from '../state/featureContext'
 import { useTabContext } from '../state/tabContext'
-import { useAppContext } from '../state/index'
+import { useAppContext, loadVaults } from '../state/index'
 import { useAuthContext } from '../state/authContext'
 import { openTab } from '../state/tabActions'
 import { TemplateSelector } from './TemplateSelector'
 import { matchesShortcut } from '../state/keybindingsStore'
+import { useTranslation } from '../i18n'
+import { showToast } from './ToastNotification'
+import { extractErrorMessage } from '../utils/error'
 import type { Command } from '../plugins/compat/command-registry'
 
 /** Pages the CommandPalette can navigate to. */
@@ -66,6 +69,7 @@ export function CommandPaletteContainer({
   const { tabState, tabDispatch } = useTabContext()
   const { state, dispatch: appDispatch, apiClient } = useAppContext()
   const { authState } = useAuthContext()
+  const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
   const [templateSelectorOpen, setTemplateSelectorOpen] = useState(false)
 
@@ -106,6 +110,27 @@ export function CommandPaletteContainer({
   const handleClose = useCallback(() => {
     setIsOpen(false)
   }, [])
+
+  /** Creates a welcome/tutorial vault via the API, shows toast, refreshes vault list. */
+  async function handleCreateWelcomeVault(): Promise<void> {
+    if (!apiClient) return
+    try {
+      const result = await apiClient.createWelcomeVault()
+      showToast('success', t('profile.welcomeVaultCreated', { name: result.vaultName }))
+      await loadVaults(appDispatch, apiClient)
+    } catch (err: unknown) {
+      if (
+        err !== null &&
+        typeof err === 'object' &&
+        'code' in err &&
+        (err as { code: string }).code === 'FEATURE_DISABLED'
+      ) {
+        showToast('error', t('profile.welcomeVaultFeatureDisabled'))
+      } else {
+        showToast('error', extractErrorMessage(err, t('profile.welcomeVaultError')))
+      }
+    }
+  }
 
   const handleExecute = useCallback((commandId: string) => {
     if (commandId === 'slatebase:new-from-template') {
@@ -272,6 +297,15 @@ export function CommandPaletteContainer({
       callback: onCreateVault,
       pluginId: 'slatebase',
     })
+
+    if (isEnabled('welcome-vault')) {
+      commands.push({
+        id: 'create-welcome-vault',
+        name: t('commands.createWelcomeVault'),
+        callback: () => { handleCreateWelcomeVault() },
+        pluginId: 'slatebase',
+      })
+    }
 
     if (hasVault && hasWriteAccess) {
       commands.push({

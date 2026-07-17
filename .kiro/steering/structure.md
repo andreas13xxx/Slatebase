@@ -61,6 +61,8 @@ src/
 │   ├── uploadRoutes.ts   — File upload routes (multipart, image paste mode)
 │   ├── preferencesRoutes.ts — User preferences routes (GET/PUT recent-files, favorites, keybindings)
 │   ├── vaultConfigRoutes.ts — Per-vault config routes (GET/PUT /vaults/:vaultId/config)
+│   ├── welcomeVaultRoutes.ts — POST /api/v1/welcome-vault (on-demand tutorial vault creation, rate-limited)
+│   ├── welcomeVaultRoutes.test.ts — Integration tests for welcome vault route
 │   └── sseRoutes.ts      — GET /events (SSE stream)
 ├── chat/
 │   ├── types.ts          — Chat data models (Conversation, Message, etc.)
@@ -197,8 +199,8 @@ config/
 data/
 ├── vaults.json           — Persistent vault registry
 ├── vaults/<id>/          — Vault storage directories (one per vault)
-├── templates/welcome-vault/    — German welcome vault template (copied for new users with preferredLanguage=de)
-└── templates/welcome-vault-en/ — English welcome vault template (copied for new users with preferredLanguage=en)
+├── templates/welcome-vault/    — German welcome vault v2 (35+ guides: Grundlagen, Features, Fortgeschritten, Praxis, Vorlagen, Screenshots)
+└── templates/welcome-vault-en/ — English welcome vault v2 (35+ guides: Basics, Features, Advanced, Practice, Templates, Screenshots)
 ```
 
 ## Frontend (`frontend/`)
@@ -434,7 +436,8 @@ src/
 │   │   ├── ServerRestartSection.tsx   — Server restart with confirmation
 │   │   ├── VaultConfigSection.tsx     — Per-vault config (templates dir, daily notes dir)
 │   │   ├── KeybindingsSection.tsx     — Configurable keyboard shortcuts (table, inline recording, conflict detection)
-│   │   └── AppearanceSection.tsx      — Display preferences (status bar toggle)
+│   │   ├── AppearanceSection.tsx      — Display preferences (status bar toggle)
+│   │   └── WelcomeVaultSection.tsx    — On-demand tutorial vault creation (button, loading state, toast)
 │   ├── AdminUsersPage.tsx — User administration
 │   ├── AdminVaultsPage.tsx — Admin: all vaults overview with delete
 │   ├── AdminConfigPage.tsx — Server configuration (card-based layout)
@@ -509,6 +512,7 @@ Route modules in `src/api/`:
 - `uploadRoutes.ts` — file upload (multipart, image paste mode)
 - `preferencesRoutes.ts` — user preferences (recent files, favorites, keybindings)
 - `vaultConfigRoutes.ts` — per-vault config (templates dir, daily notes dir)
+- `welcomeVaultRoutes.ts` — `POST /welcome-vault` (on-demand tutorial vault creation)
 - `sseRoutes.ts` — `GET /events` (SSE stream)
 
 ## Data Storage

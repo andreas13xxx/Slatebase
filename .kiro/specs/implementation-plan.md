@@ -1,6 +1,6 @@
 # Implementierungsplan — Slatebase Ausstehende Features
 
-**Stand:** Juli 2026 (v0.10.x). Die Kernfeatures sind umgesetzt (Vaults, Editor, Auth, Chat, Sync mit Conflict-Resolution-Wizard, MCP, Graph v2, Search, Realtime, Plugins, Feature Toggles, Mermaid, Command Palette, Unified Settings, Welcome Vault, Preferences, Keyboard Shortcuts, Obsidian Canvas, Block References, Workspace Leaf Compat, Status Bar). Es verbleiben 9 ausstehende Features in unterschiedlichen Reifegraden.
+**Stand:** Juli 2026 (v0.11.x). Die Kernfeatures sind umgesetzt (Vaults, Editor, Auth, Chat, Sync mit Conflict-Resolution-Wizard, MCP, Graph v2, Search, Realtime, Plugins, Feature Toggles, Mermaid, Command Palette, Unified Settings, Welcome Vault v2, Preferences, Keyboard Shortcuts, Obsidian Canvas, Block References, Workspace Leaf Compat, Status Bar). Es verbleiben 9 ausstehende Features in unterschiedlichen Reifegraden.
 
 **Strategie:** Hybrid — Features mit bestehender Spec direkt umsetzen, komplexe Features erst vollständig spezifizieren.
 
@@ -46,6 +46,7 @@
 | 34 | `sync-conflict-resolution` | ✅ Fertig (Conflict Wizard, Auto-Resolution, Batch, DiffView, SSE-Live-Updates) |
 | 35 | `workspace-leaf-compat` | ✅ Fertig (ViewRegistry, WorkspaceLeaf, ItemView, TabViewBridge, Plugin-Views als Tabs + Sidebar-Sections) |
 | 36 | `status-bar` | ✅ Fertig (StatusBar-Komponente, Uhr, Settings-Toggle, Design Tokens, erweiterbar für Plugins) |
+| 37 | `welcome-vault-v2` | ✅ Fertig (Backend-API, Frontend-UI, 35+ Guides DE/EN, Screenshots, Vorlagen, Praxis-Übungen, Command Palette, Settings-Button) |
 
 ---
 
@@ -53,16 +54,15 @@
 
 | Prio | Spec | Track | Aufwand | Status |
 |------|------|-------|---------|--------|
-| 1 | Welcome Vault v2 (Vollständige Anleitung + nachträgliches Hinzufügen) | A | ~34–45h | Spec vorhanden |
-| 2 | Obsidian Themes | B | ~15–20h | Geplant (keine Spec) |
-| 3 | Public Sharing | C | ~15–20h | Geplant (keine Spec) |
-| 4 | Live Preview Editor | D | ~48–68h | Geplant (keine Spec) |
-| 5 | Semantische Suche / AI-Embeddings | E | ~38–58h | Geplant (keine Spec) |
-| 6 | Server-Side Plugins | B | ~48–68h | Tasks vorhanden |
-| 7 | Security Hardening | F | ~20–30h | Geplant (keine Spec) |
-| 8 | Accessibility Audit | F | ~24–34h | Geplant (keine Spec) |
-| 9 | Responsive/Mobile | F | ~24–34h | Geplant (keine Spec) |
-| 10 | Collaborative Editing | D | ~68–88h | Requirements vorhanden |
+| 1 | Obsidian Themes | B | ~15–20h | Geplant (keine Spec) |
+| 2 | Public Sharing | C | ~15–20h | Geplant (keine Spec) |
+| 3 | Live Preview Editor | D | ~48–68h | Geplant (keine Spec) |
+| 4 | Semantische Suche / AI-Embeddings | E | ~38–58h | Geplant (keine Spec) |
+| 5 | Server-Side Plugins | B | ~48–68h | Tasks vorhanden |
+| 6 | Security Hardening | F | ~20–30h | Geplant (keine Spec) |
+| 7 | Accessibility Audit | F | ~24–34h | Geplant (keine Spec) |
+| 8 | Responsive/Mobile | F | ~24–34h | Geplant (keine Spec) |
+| 9 | Collaborative Editing | D | ~68–88h | Requirements vorhanden |
 
 ---
 
@@ -83,7 +83,7 @@ slatebase-overview (Architektur-Grundlage)
       │     ├── mcp-context-server ✅
       │     ├── unified-settings ✅
       │     ├── welcome-vault ✅
-      │     │     └── welcome-vault-v2 (braucht welcome-vault ✅ + unified-settings ✅)
+      │     │     └── welcome-vault-v2 ✅
       │     └── public-sharing (braucht Auth + Rendering)
       ├── obsidian-markdown-compat ✅
       │     ├── Block References ✅
@@ -111,7 +111,7 @@ slatebase-overview (Architektur-Grundlage)
 ## Parallelisierbare Tracks
 
 ```
-Track A (Docs):        Welcome Vault v2 (unabhängig)
+Track A (Docs):        Welcome Vault v2 ✅
 Track B (Plugins):     Obsidian Themes → Server-Side Plugins
 Track C (Sharing):     Public Sharing (unabhängig)
 Track D (Editor):      Live Preview Editor → Collaborative Editing
@@ -121,36 +121,7 @@ Track F (Polish):      Security Hardening → Accessibility Audit → Responsive
 
 ---
 
-## Prio 1 — Welcome Vault v2 (Track A)
-
-Scope: ~34–45h. Spec vorhanden.
-
-**Spec:** `.kiro/specs/welcome-vault-v2/`
-
-**Zusammenfassung:**
-
-- Welcome-Vault-Templates von ~11 auf ~35–45 Markdown-Dateien + 22 Screenshots ausbauen
-- Vollständige Feature-Dokumentation (alle Slatebase-Features mit Anleitung, Screenshots, Beispielen)
-- Interaktive Übungen (10+ Hands-on-Aufgaben im Vault)
-- Neuer API-Endpoint `POST /api/v1/welcome-vault` für nachträgliches Hinzufügen durch Nutzer
-- Settings-Button + Command-Palette-Befehl "Anleitungs-Vault erstellen"
-- Namens-Deduplication bei mehrfachem Erstellen
-- Beide Sprachen (DE + EN) vollständig
-
-**Phasen:**
-
-1. Backend API (Endpoint, Rate-Limiting, Route-Registrierung) — ~4h
-2. Frontend UI (IApiClient, Settings-Button, Command Palette, i18n) — ~3h
-3. DE-Inhalte (Grundlagen, Features, Fortgeschritten, Praxis, Vorlagen) — ~12–16h
-4. EN-Inhalte (Übersetzung aller Guides) — ~8–12h
-5. Screenshots (22 Aufnahmen, in Guides einbetten) — ~4–6h
-6. QA (Link-Check, Integrations-Test) — ~3–4h
-
-**Abhängigkeiten:** Braucht `welcome-vault` ✅ + `unified-settings` ✅.
-
----
-
-## Prio 2 — Obsidian Themes (Track B)
+## Prio 1 — Obsidian Themes (Track B)
 
 Scope: ~15–20h. Keine Spec vorhanden.
 
@@ -170,7 +141,7 @@ Scope: ~15–20h. Keine Spec vorhanden.
 
 ---
 
-## Prio 3 — Public Sharing (Track C)
+## Prio 2 — Public Sharing (Track C)
 
 Scope: ~4h Design + ~15–20h Implementierung.
 
@@ -189,7 +160,7 @@ Scope: ~4h Design + ~15–20h Implementierung.
 
 ---
 
-## Prio 4 — Live Preview Editor (Track D)
+## Prio 3 — Live Preview Editor (Track D)
 
 Scope: ~8h Design + ~40–60h Implementierung.
 
@@ -210,7 +181,7 @@ Scope: ~8h Design + ~40–60h Implementierung.
 
 ---
 
-## Prio 5 — Semantische Suche / AI-Embeddings (Track E)
+## Prio 4 — Semantische Suche / AI-Embeddings (Track E)
 
 Scope: ~8h Design + ~30–50h Implementierung.
 
@@ -232,7 +203,7 @@ Scope: ~8h Design + ~30–50h Implementierung.
 
 ---
 
-## Prio 6 — Server-Side Plugins (Track B)
+## Prio 5 — Server-Side Plugins (Track B)
 
 Scope: ~8h Design + ~40–60h Implementierung. Task-Liste existiert (7 Phasen).
 
@@ -258,7 +229,7 @@ Scope: ~8h Design + ~40–60h Implementierung. Task-Liste existiert (7 Phasen).
 
 ---
 
-## Prio 7 — Security Hardening (Track F)
+## Prio 6 — Security Hardening (Track F)
 
 Scope: ~20–30h.
 
@@ -276,7 +247,7 @@ Scope: ~20–30h.
 
 ---
 
-## Prio 8 — Accessibility Audit (Track F)
+## Prio 7 — Accessibility Audit (Track F)
 
 Scope: ~4h Audit + ~20–30h Fixes.
 
@@ -298,7 +269,7 @@ Scope: ~4h Audit + ~20–30h Fixes.
 
 ---
 
-## Prio 9 — Responsive/Mobile (Track F)
+## Prio 8 — Responsive/Mobile (Track F)
 
 Scope: ~4h Design + ~20–30h Implementierung.
 
@@ -318,7 +289,7 @@ Scope: ~4h Design + ~20–30h Implementierung.
 
 ---
 
-## Prio 10 — Collaborative Editing (Track D)
+## Prio 9 — Collaborative Editing (Track D)
 
 Scope: ~8h Design + ~60–80h Implementierung.
 

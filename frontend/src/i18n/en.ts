@@ -250,6 +250,12 @@ export const en: TranslationShape = {
     deletingAccount: 'Deleting account…',
     deleteAccountFailed: 'Account deletion failed.',
     deleteAccountAriaConfirm: 'Permanently delete account',
+    createWelcomeVault: 'Create tutorial vault',
+    createWelcomeVaultDescription: 'Creates a vault with a complete Slatebase guide and examples.',
+    creatingWelcomeVault: 'Creating…',
+    welcomeVaultCreated: 'Tutorial vault "{name}" has been created.',
+    welcomeVaultFeatureDisabled: 'The tutorial vault feature is disabled.',
+    welcomeVaultError: 'Failed to create tutorial vault.',
   },
 
   sessions: {
@@ -799,6 +805,10 @@ export const en: TranslationShape = {
 
   statusBar: {
     ariaLabel: 'Status bar',
+  },
+
+  commands: {
+    createWelcomeVault: 'Create tutorial vault',
   },
 
 } as const

@@ -26,6 +26,7 @@ import { ServerRestartSection } from './ServerRestartSection'
 import { VaultConfigSection } from './VaultConfigSection'
 import { KeybindingsSection } from './KeybindingsSection'
 import { AppearanceSection } from './AppearanceSection'
+import { WelcomeVaultSection } from './WelcomeVaultSection'
 
 /** German labels for each settings section heading. */
 const SECTION_LABELS: Record<SettingsSection, string> = {
@@ -89,7 +90,12 @@ function renderSection(
 
   switch (section) {
     case 'profile':
-      return <ProfilePage apiClient={apiClient} mode="profile-only" />
+      return (
+        <>
+          <ProfilePage apiClient={apiClient} mode="profile-only" />
+          <WelcomeVaultSection apiClient={apiClient} />
+        </>
+      )
     case 'password':
       return <ChangePasswordPage apiClient={apiClient} embedded />
     case 'sessions':

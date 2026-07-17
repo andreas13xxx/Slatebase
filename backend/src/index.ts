@@ -86,6 +86,7 @@ import { createPreferencesRoutes } from './api/preferencesRoutes.js'
 import { VaultConfigStore } from './vault-config/index.js'
 import { createVaultConfigRoutes } from './api/vaultConfigRoutes.js'
 import { WelcomeVaultService } from './welcome-vault/index.js'
+import { createWelcomeVaultRoutes } from './api/welcomeVaultRoutes.js'
 
 // --- Composition Root ---
 
@@ -596,6 +597,18 @@ const vaultConfigRoutes = createVaultConfigRoutes({
   logger,
 })
 app.route('/api/v1', vaultConfigRoutes)
+
+// Welcome vault route registration (auth + CSRF middleware applies via /api/v1/* pattern)
+const welcomeVaultRoutes = createWelcomeVaultRoutes({
+  welcomeVaultService,
+  userService,
+  vaultService,
+  featureToggleService,
+  configService: config,
+  linkIndexMap,
+  logger,
+})
+app.route('/api/v1', welcomeVaultRoutes)
 
 // CleanupJob — periodic trash purge and version pruning
 const cleanupJob = new CleanupJob(trashService, versionService, vaultManager, config, logger)

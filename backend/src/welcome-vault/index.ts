@@ -36,9 +36,12 @@ export interface IWelcomeVaultService {
    * - Creates vault via VaultService
    * - Copies template files from the language-specific template directory
    * - Logs errors but never throws
+   * @param userId - The user to create the vault for
+   * @param language - The language determining template content
+   * @param overrideName - Optional vault name override (e.g. deduplicated). Uses config name if omitted.
    * @returns Vault info (id + path + name) on success, undefined on skip/failure
    */
-  createWelcomeVault(userId: string, language: WelcomeVaultLanguage): Promise<WelcomeVaultResult | undefined>
+  createWelcomeVault(userId: string, language: WelcomeVaultLanguage, overrideName?: string): Promise<WelcomeVaultResult | undefined>
 }
 
 // --- Implementation ---
@@ -69,7 +72,7 @@ export class WelcomeVaultService implements IWelcomeVaultService {
   }
 
   /** @inheritdoc */
-  async createWelcomeVault(userId: string, language: WelcomeVaultLanguage): Promise<WelcomeVaultResult | undefined> {
+  async createWelcomeVault(userId: string, language: WelcomeVaultLanguage, overrideName?: string): Promise<WelcomeVaultResult | undefined> {
     try {
       // 1. Check feature toggle
       if (!this.featureToggleService.isEnabled('welcome-vault')) {
@@ -77,7 +80,7 @@ export class WelcomeVaultService implements IWelcomeVaultService {
       }
 
       // 2. Determine vault name and template directory based on language
-      const vaultName = this.config.name[language]
+      const vaultName = overrideName ?? this.config.name[language]
       const templateDir = this.getTemplateDir(language)
 
       // 3. Create vault

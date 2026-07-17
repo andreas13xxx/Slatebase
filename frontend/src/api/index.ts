@@ -458,6 +458,10 @@ export interface IApiClient {
   getVaultConfig(vaultId: string): Promise<VaultConfig>
   /** Update the configuration for a vault (owner only). */
   saveVaultConfig(vaultId: string, config: Partial<VaultConfig>): Promise<VaultConfig>
+
+  // --- Welcome Vault methods ---
+  /** Creates a welcome vault for the current user. */
+  createWelcomeVault(): Promise<{ vaultId: string; vaultName: string }>
 }
 
 /**
@@ -1201,6 +1205,13 @@ export class ApiClient implements IApiClient {
   /** Update the configuration for a vault (owner only). */
   async saveVaultConfig(vaultId: string, config: Partial<VaultConfig>): Promise<VaultConfig> {
     return this.request<VaultConfig>('PUT', `/api/v1/vaults/${vaultId}/config`, config)
+  }
+
+  // --- Welcome Vault methods ---
+
+  /** Creates a welcome vault for the current user. */
+  async createWelcomeVault(): Promise<{ vaultId: string; vaultName: string }> {
+    return this.request<{ vaultId: string; vaultName: string }>('POST', '/api/v1/welcome-vault')
   }
 
   // --- Internal helpers ---

@@ -1082,9 +1082,13 @@ function AuthGuard() {
     return () => { apiClient.setOnSessionExpired(null) }
   }, [authDispatch])
 
-  // Verify session validity when auth state is restored from localStorage
+  // Verify session validity when auth state is restored from localStorage.
+  // Skip when mustChangePassword is true — the session is valid but the
+  // mustChangePassword middleware blocks all other endpoints with 403.
+  // The ChangePasswordPage is rendered before the sessionVerified check,
+  // so skipping verification here does not cause a stuck spinner.
   useEffect(() => {
-    if (!authState.isAuthenticated) {
+    if (!authState.isAuthenticated || authState.mustChangePassword) {
       return
     }
 
@@ -1110,7 +1114,7 @@ function AuthGuard() {
 
     void verify()
     return () => { cancelled = true }
-  }, [authState.isAuthenticated, authDispatch])
+  }, [authState.isAuthenticated, authState.mustChangePassword, authDispatch])
 
   if (!authState.isAuthenticated) {
     return <LoginPage apiClient={apiClient} />

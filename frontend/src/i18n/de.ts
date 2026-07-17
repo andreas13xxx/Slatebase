@@ -244,6 +244,12 @@ export const de = {
     deletingAccount: 'Konto wird gelöscht…',
     deleteAccountFailed: 'Kontolöschung fehlgeschlagen.',
     deleteAccountAriaConfirm: 'Konto endgültig löschen',
+    createWelcomeVault: 'Anleitungs-Vault erstellen',
+    createWelcomeVaultDescription: 'Erstellt einen Vault mit vollständiger Slatebase-Anleitung und Beispielen.',
+    creatingWelcomeVault: 'Erstellen…',
+    welcomeVaultCreated: 'Anleitungs-Vault „{name}" wurde erstellt.',
+    welcomeVaultFeatureDisabled: 'Das Anleitungs-Vault-Feature ist deaktiviert.',
+    welcomeVaultError: 'Fehler beim Erstellen des Anleitungs-Vaults.',
   },
 
   sessions: {
@@ -793,5 +799,9 @@ export const de = {
 
   statusBar: {
     ariaLabel: 'Statusleiste',
+  },
+
+  commands: {
+    createWelcomeVault: 'Anleitungs-Vault erstellen',
   },
 } as const

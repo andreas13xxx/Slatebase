@@ -31,7 +31,7 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for 
 - Per-user preferences persistence (recent files, favorites synced to server with localStorage cache)
 - Per-vault configuration (templates directory, daily notes directory — owner-configurable via Settings)
 - Configurable keyboard shortcuts (per-user overrides, 14 commands, conflict detection, Settings UI)
-- Welcome Vault (automatic tutorial vault for new users, feature-toggled, multi-language DE/EN, language defaults to admin's preference at user creation)
+- Welcome Vault v2 (comprehensive tutorial vault with 35+ guides DE/EN, screenshots, practice exercises, templates; API endpoint for on-demand creation, Settings button, Command Palette integration, name deduplication)
 - Obsidian Canvas (`.canvas` whiteboards: text/file/link/group nodes, edges, drag/resize, zoom/pan, minimap, source view, auto-save; link-node iframe preview, file-node content/path editing with vault-wide file-path search)
 - Status Bar (bottom bar with clock, extensible for plugin items, toggleable in Settings → Darstellung)
 - Sidebar Panel (left panel with Recent Files + Favorites views, splittable, tabbed)

@@ -205,7 +205,8 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 31. Plugin-View-Tabs: Virtual Path `__view::{viewType}` — Tab-Deduplication vor OPEN_TAB prüfen. `getActiveFile()` gibt `null` bei Plugin-Tabs. DOM-Append via ref-Callback (imperativ, nicht React-managed). `layout-change` Event bei Plugin-View open/close emittieren.
 32. Status Bar: Module-Level-Store mit `useSyncExternalStore` (nicht `useState`) — mehrere Konsumenten (App.tsx + AppearanceSection) müssen synchron reagieren. `useStatusBar()` nutzt Subscriber-Pattern wie `favoritesStore`.
 33. `checkSessionAlive()` in App.tsx: Neues `IApiClient`-Methode. Leichtgewichtiger HEAD-Request gegen Session-Endpoint. Tests MÜSSEN diese Methode im MockApiClient bereitstellen (sonst `is not a function` Error). Default im Test: `mockResolvedValue(true)`.
-34. Settings Sections: `appearance` Section unter account hinzugefügt (Status Bar Toggle). Total ist jetzt 15 Sections (7 account + 3 vault + 5 admin). Tests die feste Zahlen prüfen, müssen bei neuer Section angepasst werden.
+34. Settings Sections: `appearance` Section unter account hinzugefügt (Status Bar Toggle). Total ist jetzt 16 Sections (8 account + 3 vault + 5 admin). Tests die feste Zahlen prüfen, müssen bei neuer Section angepasst werden.
+35. Welcome Vault v2 Route: eigene `welcomeVaultRoutes.ts` (nicht in adminRoutes). Rate-Limit 3/h pro User separat von Login-Rate-Limit. `createWelcomeVault()` in IApiClient hinzufügen — Tests brauchen Mock.
 
 ## Multi-User & Vault-Besitz
 
@@ -248,6 +249,18 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - `OnUserCreatedFn(userId, language)` reicht Sprache an WelcomeVaultService weiter
 - Template-Verzeichnis-Auswahl: `WelcomeVaultService.TEMPLATE_DIRS` Map (de→`welcome-vault`, en→`welcome-vault-en`)
 - **Templates-Verzeichnis**: Default `"Templates"` (normales sichtbares Verzeichnis, kein Underscore-Prefix mehr)
+
+### Welcome Vault v2 (nachträgliches Hinzufügen)
+
+- `POST /api/v1/welcome-vault` als dedizierte Route (nicht in adminRoutes oder userRoutes)
+- Namens-Deduplication: bestehende Vault-Namen des Users prüfen, Suffix `(2)` bis `(99)`, dann Timestamp-Fallback
+- Rate-Limiting: eigene In-Memory Map (3 req/h pro User), nicht der globale rateLimitMiddleware
+- Link-Index-Rebuild als fire-and-forget nach Erstellung (kein await, Fehler isoliert)
+- Frontend-Integration: Settings-Button UND Command-Palette-Befehl nutzen dieselbe `apiClient.createWelcomeVault()` Methode
+- Nach Erfolg: `REFRESH_VAULT_TREES` dispatch + Toast (Vault-Name im Text)
+- Feature-Toggle-Check: 403 mit `FEATURE_DISABLED` Code — Frontend zeigt passende Toast-Message
+- Template-Inhalt: 35+ Guides pro Sprache (Grundlagen, Features, Fortgeschritten, Praxis, Vorlagen, Screenshots). Admins können Inhalte ohne Code-Änderung anpassen.
+- Settings-Section: `WelcomeVaultSection.tsx` als eigenständige Komponente in `settings/`
 
 ## Obsidian Canvas
 

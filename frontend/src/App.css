@@ -2602,6 +2602,13 @@
   line-height: 1.6;
 }
 
+.welcome-vault-section__description {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 14px;
+  line-height: 1.6;
+}
+
 .profile-submit {
   padding: 9px 18px;
   background: var(--accent);
