@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/andreas13xxx/Slatebase/compare/v0.11.0...v0.12.0) (2026-07-17)
+
+
+### Features
+
+* welcome vault v2 — comprehensive guides, on-demand API, settings UI - Backend: POST /api/v1/welcome-vault endpoint with rate limiting (3/h), name deduplication, feature-toggle guard, link-index rebuild - Frontend: IApiClient.createWelcomeVault(), WelcomeVaultSection in Settings, Command Palette 'create-welcome-vault' command, i18n strings (DE/EN) - Templates DE: 35+ guides (Grundlagen, Features, Fortgeschritten, Praxis, Vorlagen, Screenshots) with wikilinks, callouts, and embedded screenshots - Templates EN: full translation of all guides with matching structure - Screenshots: 22 placeholder PNGs for both language variants - Docs: updated implementation-plan, product, structure, lessons-learned, README with new feature and API endpoint ([8a4a814](https://github.com/andreas13xxx/Slatebase/commit/8a4a8144f5e7a6e9293d6697cd57177e67714f05))
+
 ## [0.11.0](https://github.com/andreas13xxx/Slatebase/compare/v0.10.2...v0.11.0) (2026-07-16)
 
 
