@@ -56,7 +56,7 @@
 |------|------|-------|---------|--------|
 | 1 | Obsidian Themes | B | ~15–20h | Geplant (keine Spec) |
 | 2 | Public Sharing | C | ~15–20h | Geplant (keine Spec) |
-| 3 | Live Preview Editor | D | ~48–68h | Geplant (keine Spec) |
+| 3 | Live Preview Editor | D | ~43–62h | Spec + Requirements vorhanden |
 | 4 | Semantische Suche / AI-Embeddings | E | ~38–58h | Geplant (keine Spec) |
 | 5 | Server-Side Plugins | B | ~48–68h | Tasks vorhanden |
 | 6 | Security Hardening | F | ~20–30h | Geplant (keine Spec) |
@@ -75,8 +75,8 @@ slatebase-overview (Architektur-Grundlage)
       ├── tabbed-editor-viewer ✅
       │     ├── advanced-file-operations ✅
       │     ├── tier2-daily-workflow ✅ (Editor, Explorer, Trash, Versioning)
-      │     ├── live-preview-editor (braucht Editor-Infrastruktur)
-      │     └── collaborative-editing (braucht Editor + Realtime)
+      │     ├── live-preview-editor (CodeMirror 6 — Spec + Requirements vorhanden)
+      │     └── collaborative-editing (braucht Live Preview Editor + Realtime)
       ├── auth-and-user-management ✅
       │     ├── user-chat ✅ → chat-enhancements ✅
       │     ├── vault-sync ✅ → sync-conflict-resolution ✅
@@ -164,28 +164,53 @@ Scope: ~4h Design + ~15–20h Implementierung.
 
 Scope: ~8h Design + ~40–60h Implementierung.
 
-**Quelle:** Specs-Overview Anforderung 7.2, Product-Overview "Planned".
+**Spec:** `.kiro/specs/live-preview-editor/`
 
-**Vorarbeit (zwingend):**
+**Technologie-Entscheidung: CodeMirror 6** (final entschieden).
 
-- Technologie-Entscheidung: CodeMirror 6 vs. ProseMirror vs. Custom-Lösung
-- Design-Dokument mit:
-  - Editor-Architektur (WYSIWYG vs. Side-by-Side vs. Hybrid)
-  - Integration mit bestehenden remark-Plugins (Wikilinks, Embeds, Callouts, Tags, Block Refs)
-  - Cursor-Position-Synchronisation zwischen Source und Preview
-  - Auto-Save-Integration mit bestehendem Debounce-Mechanismus
-  - Toolbar-Erweiterung (Formatierung wendet sich auf Source an)
-  - Performance bei großen Dateien (virtuelles Scrolling, inkrementelles Parsing)
+**Zusammenfassung:**
 
-**Empfehlung:** Block References und Canvas sind abgeschlossen. Benötigt Entscheidung ob CodeMirror/ProseMirror-Migration oder eigene Lösung auf bestehender Textarea.
+CodeMirror 6 ersetzt das bestehende `<textarea>` in EditMode.tsx. Umgesetzt in 3 Phasen:
+
+- **Phase 1** (~20–28h): CM6 als Source-Editor
+  - textarea → EditorView, Markdown-Syntax-Highlighting
+  - Code-Block-Highlighting (language-data), Dark/Light-Theme via Design Tokens
+  - Auto-Save-Integration (updateListener → Debounce), Toolbar-Anbindung via Transactions
+  - Per-Tab EditorState (Cursor, Scroll, Undo-History bewahren)
+  - Image-Paste + DnD-Upload, Read-Only-Modus, Line Numbers
+  - EditorShim von textarea-Wrapping auf CM6-Wrapping umstellen
+  - Optional: Vim-Mode (via `@replit/codemirror-vim`)
+
+- **Phase 2** (~15–22h): Live Preview
+  - Inline-Rendering: Headings, Bold/Italic, Links, Wikilinks, Embeds, Code, Blockquotes, Callouts, Checkboxes
+  - Cursor-aware: Marker sichtbar bei Cursor-Fokus, versteckt außerhalb
+  - Toggle Source ↔ Live Preview (Toolbar + Keybinding)
+  - Performance-Gate: >50K Zeichen → automatisch Source-Only + Notice
+  - Feature-Toggle `live-preview` (hot, default: true)
+
+- **Phase 3** (~8–12h): Plugin-Integration
+  - `registerEditorExtension()` → CM6 Compartment pro Plugin
+  - `registerEditorSuggest()` → CM6 Autocompletion-Provider
+  - `editorCallback` Commands: Editor + MarkdownView als Argumente
+  - Extension-Isolation: fehlerhaftes Plugin crasht nicht den Editor
+
+**NPM-Pakete:**
+```
+@codemirror/view, @codemirror/state, @codemirror/commands,
+@codemirror/language, @codemirror/lang-markdown, @codemirror/language-data,
+@codemirror/autocomplete, @codemirror/search, @lezer/highlight
+Optional: @replit/codemirror-vim
+```
+
+**Abhängigkeiten:** Braucht `tabbed-editor-viewer` ✅ + `obsidian-plugin-compat` ✅ + `configurable-keybindings` ✅.
+
+**Profiteure:** Collaborative Editing (CRDT-Libraries integrieren direkt mit CM6), Plugin-Compat (registerEditorExtension, Vim-Mode-Plugins), UX (Syntax-Highlighting, Performance bei großen Dateien).
 
 ---
 
 ## Prio 4 — Semantische Suche / AI-Embeddings (Track E)
 
 Scope: ~8h Design + ~30–50h Implementierung.
-
-**Quelle:** Specs-Overview Anforderung 9 ("semantische Suche", "Chunking/Embedding-Pipeline").
 
 **Vorarbeit (zwingend):**
 
@@ -250,8 +275,6 @@ Scope: ~20–30h.
 ## Prio 7 — Accessibility Audit (Track F)
 
 Scope: ~4h Audit + ~20–30h Fixes.
-
-**Quelle:** Specs-Overview Anforderung 13.
 
 **Zusammenfassung:**
 
@@ -318,7 +341,7 @@ Scope: ~8h Design + ~60–80h Implementierung.
 Track A (Docs):      Prio 1: Welcome Vault v2                    (~34–45h)
 Track B (Plugins):   Prio 2: Obsidian Themes → Prio 6: Server-Side Plugins  (~63–88h)
 Track C (Sharing):   Prio 3: Public Sharing                      (~15–20h)
-Track D (Editor):    Prio 4: Live Preview Editor → Prio 10: Collaborative Editing  (~116–156h)
+Track D (Editor):    Live Preview Editor (CM6) → Collaborative Editing  (~116–156h)
 Track E (AI):        Prio 5: Semantische Suche                   (~38–58h)
 Track F (Polish):    Prio 7–9: Security → Accessibility → Mobile (~68–98h)
 ```
@@ -350,7 +373,7 @@ Kontext warum bestimmte Features NICHT geplant sind:
 | Offline-Modus (PWA/Service Worker) | 🔴 Zurückgestellt | Self-Hosted = Server nötig. Vault-Sync mit Obsidian-Desktop deckt Offline ab. |
 | AI-Agent im Editor (Copilot) | 🔴 Zurückgestellt | MCP deckt AI-Zugang ab. Eingebauter Copilot = eigenes Produkt. |
 | Kanban/Calendar als native Views | ✅ Plugin-Lösung | Via `workspace-leaf-compat` ✅ — populäre Plugins werden direkt unterstützt. |
-| Multi-Cursor / Multi-Selection | 🟡 Langfristig | Nur mit CodeMirror/ProseMirror realistisch → Teil von `live-preview-editor`. |
+| Multi-Cursor / Multi-Selection | ✅ Kommt mit CM6 | Inkludiert in `live-preview-editor` Phase 1 (CM6 hat natives Multi-Cursor). |
 | Multi-Sprachen/RTL-Support | 🔴 Zurückgestellt | Spezieller Use-Case. Bei Bedarf im Rahmen von `accessibility-audit`. |
 
 ---
