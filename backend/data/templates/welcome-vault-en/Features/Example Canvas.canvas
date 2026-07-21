@@ -1,0 +1,108 @@
+{
+  "nodes": [
+    {
+      "id": "node-central",
+      "type": "text",
+      "x": 300,
+      "y": 250,
+      "width": 280,
+      "height": 120,
+      "text": "# Project Planning\n\nThis is an example canvas.\nNodes and edges show\nrelationships visually."
+    },
+    {
+      "id": "node-ideas",
+      "type": "text",
+      "x": 0,
+      "y": 50,
+      "width": 220,
+      "height": 100,
+      "text": "## Ideas\n\n- Brainstorming\n- Mind mapping\n- Free thinking"
+    },
+    {
+      "id": "node-tasks",
+      "type": "text",
+      "x": 650,
+      "y": 50,
+      "width": 220,
+      "height": 100,
+      "text": "## Tasks\n\n- [ ] Research\n- [ ] Draft\n- [ ] Implementation"
+    },
+    {
+      "id": "node-resources",
+      "type": "text",
+      "x": 0,
+      "y": 450,
+      "width": 220,
+      "height": 100,
+      "text": "## Resources\n\n- Documentation\n- Tutorials\n- Examples"
+    },
+    {
+      "id": "node-result",
+      "type": "text",
+      "x": 650,
+      "y": 450,
+      "width": 220,
+      "height": 100,
+      "text": "## Result\n\n> [!tip] Goal\n> Create a working\n> product"
+    },
+    {
+      "id": "node-link",
+      "type": "link",
+      "x": 300,
+      "y": 500,
+      "width": 280,
+      "height": 160,
+      "url": "https://en.wikipedia.org/wiki/Markdown"
+    },
+    {
+      "id": "group-planning",
+      "type": "group",
+      "x": -30,
+      "y": 20,
+      "width": 920,
+      "height": 250,
+      "label": "Planning Phase"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1",
+      "fromNode": "node-central",
+      "fromSide": "left",
+      "toNode": "node-ideas",
+      "toSide": "right",
+      "label": "inspires"
+    },
+    {
+      "id": "edge-2",
+      "fromNode": "node-central",
+      "fromSide": "right",
+      "toNode": "node-tasks",
+      "toSide": "left",
+      "label": "generates"
+    },
+    {
+      "id": "edge-3",
+      "fromNode": "node-central",
+      "fromSide": "bottom",
+      "toNode": "node-resources",
+      "toSide": "top",
+      "label": "requires"
+    },
+    {
+      "id": "edge-4",
+      "fromNode": "node-tasks",
+      "fromSide": "bottom",
+      "toNode": "node-result",
+      "toSide": "top",
+      "label": "leads to"
+    },
+    {
+      "id": "edge-5",
+      "fromNode": "node-resources",
+      "fromSide": "right",
+      "toNode": "node-result",
+      "toSide": "left"
+    }
+  ]
+}

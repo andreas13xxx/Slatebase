@@ -177,12 +177,18 @@ Erstelle ein kleines Brainstorming-Canvas:
 > [!tip] Canvas für Planung nutzen
 > Canvas eignet sich hervorragend für Projektplanung, Mindmaps und Brainstorming. Kombiniere Text-Nodes für Ideen mit File-Nodes, die auf ausgearbeitete Notizen verweisen. So verbindest du das freie Denken mit deiner strukturierten Wissensbasis.
 
+> [!example] Beispiel-Canvas
+> Öffne das mitgelieferte Beispiel-Canvas, um die verschiedenen Node-Typen und Edges in Aktion zu sehen:
+> 
+> [[Features/Beispiel Canvas.canvas|Beispiel Canvas öffnen]]
+
 > [!todo] Übung
-> 1. Erstelle ein neues Canvas im Vault
-> 2. Erstelle je einen Node von jedem Typ (Text, File, Link, Group)
-> 3. Verbinde mindestens zwei Nodes mit einer beschrifteten Edge
-> 4. Wechsle in die Source-View und betrachte die JSON-Struktur
-> 5. Nutze die Minimap zur Navigation
+> 1. Öffne das [[Features/Beispiel Canvas.canvas|Beispiel Canvas]] und erkunde die Struktur
+> 2. Erstelle ein eigenes neues Canvas im Vault
+> 3. Erstelle je einen Node von jedem Typ (Text, File, Link, Group)
+> 4. Verbinde mindestens zwei Nodes mit einer beschrifteten Edge
+> 5. Wechsle in die Source-View und betrachte die JSON-Struktur
+> 6. Nutze die Minimap zur Navigation
 
 ---
 

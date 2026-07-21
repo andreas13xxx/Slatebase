@@ -108,13 +108,19 @@ Switch to source view to see and edit the raw JSON of your canvas. Useful for pr
 > - Keep text nodes concise — link to detailed files instead
 > - The canvas auto-saves like regular files
 
+> [!example] Example Canvas
+> Open the included example canvas to see different node types and edges in action:
+> 
+> [[Features/Example Canvas.canvas|Open Example Canvas]]
+
 > [!todo] Exercise
-> 1. Create a new canvas file (right-click → New Canvas)
-> 2. Add a text node with a project idea
-> 3. Add 2–3 more text nodes with related thoughts
-> 4. Connect them with edges
-> 5. Create a group node and drag some nodes into it
-> 6. Try the minimap and zoom controls
+> 1. Open the [[Features/Example Canvas.canvas|Example Canvas]] and explore its structure
+> 2. Create a new canvas file (right-click → New Canvas)
+> 3. Add a text node with a project idea
+> 4. Add 2–3 more text nodes with related thoughts
+> 5. Connect them with edges
+> 6. Create a group node and drag some nodes into it
+> 7. Try the minimap and zoom controls
 
 ---
 

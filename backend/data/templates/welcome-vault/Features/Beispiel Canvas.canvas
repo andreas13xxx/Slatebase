@@ -1,0 +1,108 @@
+{
+  "nodes": [
+    {
+      "id": "node-zentral",
+      "type": "text",
+      "x": 300,
+      "y": 250,
+      "width": 280,
+      "height": 120,
+      "text": "# Projektplanung\n\nDies ist ein Beispiel-Canvas.\nNodes und Edges zeigen\nZusammenhänge visuell."
+    },
+    {
+      "id": "node-ideen",
+      "type": "text",
+      "x": 0,
+      "y": 50,
+      "width": 220,
+      "height": 100,
+      "text": "## Ideen\n\n- Brainstorming\n- Mindmapping\n- Freies Denken"
+    },
+    {
+      "id": "node-aufgaben",
+      "type": "text",
+      "x": 650,
+      "y": 50,
+      "width": 220,
+      "height": 100,
+      "text": "## Aufgaben\n\n- [ ] Recherche\n- [ ] Entwurf\n- [ ] Umsetzung"
+    },
+    {
+      "id": "node-ressourcen",
+      "type": "text",
+      "x": 0,
+      "y": 450,
+      "width": 220,
+      "height": 100,
+      "text": "## Ressourcen\n\n- Dokumentation\n- Tutorials\n- Beispiele"
+    },
+    {
+      "id": "node-ergebnis",
+      "type": "text",
+      "x": 650,
+      "y": 450,
+      "width": 220,
+      "height": 100,
+      "text": "## Ergebnis\n\n> [!tip] Ziel\n> Ein funktionierendes\n> Produkt erstellen"
+    },
+    {
+      "id": "node-link",
+      "type": "link",
+      "x": 300,
+      "y": 500,
+      "width": 280,
+      "height": 160,
+      "url": "https://de.wikipedia.org/wiki/Markdown"
+    },
+    {
+      "id": "group-planung",
+      "type": "group",
+      "x": -30,
+      "y": 20,
+      "width": 920,
+      "height": 250,
+      "label": "Planungsphase"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1",
+      "fromNode": "node-zentral",
+      "fromSide": "left",
+      "toNode": "node-ideen",
+      "toSide": "right",
+      "label": "inspiriert"
+    },
+    {
+      "id": "edge-2",
+      "fromNode": "node-zentral",
+      "fromSide": "right",
+      "toNode": "node-aufgaben",
+      "toSide": "left",
+      "label": "erzeugt"
+    },
+    {
+      "id": "edge-3",
+      "fromNode": "node-zentral",
+      "fromSide": "bottom",
+      "toNode": "node-ressourcen",
+      "toSide": "top",
+      "label": "benötigt"
+    },
+    {
+      "id": "edge-4",
+      "fromNode": "node-aufgaben",
+      "fromSide": "bottom",
+      "toNode": "node-ergebnis",
+      "toSide": "top",
+      "label": "führt zu"
+    },
+    {
+      "id": "edge-5",
+      "fromNode": "node-ressourcen",
+      "fromSide": "right",
+      "toNode": "node-ergebnis",
+      "toSide": "left"
+    }
+  ]
+}
