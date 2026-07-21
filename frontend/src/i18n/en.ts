@@ -142,6 +142,8 @@ export const en: TranslationShape = {
       column: 'Column',
       cell: 'Cell',
     },
+    livePreview: 'Live Preview',
+    livePreviewFileTooLarge: 'File too large for Live Preview — Source mode active',
   },
 
   tabs: {

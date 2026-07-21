@@ -55,6 +55,7 @@ Beyond the core features listed above, you'll find these additional capabilities
 - [[Features/Settings]] — All configuration options
 - [[Features/Chat]] — Messages with other users
 - [[Features/Sync]] — Vault synchronization (experimental)
+- [[Features/Live Preview Editor]] — Source mode and inline-rendered Live Preview
 
 ---
 

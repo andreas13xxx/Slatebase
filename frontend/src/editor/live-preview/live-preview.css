@@ -1,0 +1,219 @@
+/* ===== Live Preview — CM6 Decoration Styles ===== */
+/* All values use CSS Custom Properties (Design Tokens) — no hardcoded colors. */
+/* Supports both Light and Dark mode via CSS variable resolution. */
+
+/* --- Editor Wrapper --- */
+.cm-editor-wrapper {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Ensure CM6 editor fills the wrapper */
+.cm-editor-wrapper .cm-editor {
+  flex: 1;
+  min-height: 0;
+}
+
+/* --- Headings --- */
+.cm-lp-h1 {
+  font-size: 2em;
+  font-weight: bold;
+  line-height: 1.3;
+}
+
+.cm-lp-h2 {
+  font-size: 1.6em;
+  font-weight: bold;
+  line-height: 1.3;
+}
+
+.cm-lp-h3 {
+  font-size: 1.35em;
+  font-weight: bold;
+  line-height: 1.3;
+}
+
+.cm-lp-h4 {
+  font-size: 1.15em;
+  font-weight: bold;
+  line-height: 1.3;
+}
+
+.cm-lp-h5 {
+  font-size: 1em;
+  font-weight: bold;
+  line-height: 1.3;
+}
+
+.cm-lp-h6 {
+  font-size: 0.9em;
+  font-weight: bold;
+  line-height: 1.3;
+}
+
+/* --- Heading Markers (# characters, faded when revealed) --- */
+.cm-lp-heading-marker {
+  color: var(--text-muted);
+}
+
+/* --- Inline Formatting --- */
+.cm-lp-bold {
+  font-weight: bold;
+}
+
+.cm-lp-italic {
+  font-style: italic;
+}
+
+.cm-lp-strikethrough {
+  text-decoration: line-through;
+}
+
+/* --- Inline Code --- */
+.cm-lp-inline-code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--bg-surface);
+  border-radius: var(--radius-sm);
+  padding: 1px 4px;
+}
+
+/* --- Links --- */
+.cm-lp-link {
+  color: var(--accent-text);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.cm-lp-wikilink {
+  color: var(--accent-text);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* --- Embed Images --- */
+.cm-lp-embed-img {
+  max-width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  display: block;
+  margin: 4px 0;
+}
+
+/* --- Embed Files (non-image placeholder) --- */
+.cm-lp-embed-file {
+  display: inline-block;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  font-size: 0.9em;
+  color: var(--text-secondary);
+}
+
+/* --- Checkboxes --- */
+.cm-lp-checkbox {
+  cursor: pointer;
+  accent-color: var(--accent);
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+/* --- Blockquotes --- */
+.cm-lp-blockquote {
+  border-left: 3px solid var(--border-default);
+  padding-left: 16px;
+  color: var(--text-secondary);
+}
+
+/* --- Code Blocks --- */
+.cm-lp-code-block-line {
+  background: var(--bg-surface);
+  border-left: 3px solid var(--border-default);
+  padding-left: 16px;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.cm-lp-code-block-first {
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  padding-top: 8px;
+}
+
+.cm-lp-code-block-last {
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  padding-bottom: 8px;
+}
+
+/* --- Callouts --- */
+.cm-lp-callout {
+  padding: 4px 12px;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+.cm-lp-callout-header {
+  font-weight: 600;
+}
+
+/* Callout types — use callout tokens from index.css */
+.cm-lp-callout-note {
+  background: var(--callout-note-bg);
+  border-left: 3px solid var(--callout-note-border);
+}
+
+.cm-lp-callout-info {
+  background: var(--callout-info-bg);
+  border-left: 3px solid var(--callout-info-border);
+}
+
+.cm-lp-callout-tip {
+  background: var(--callout-tip-bg);
+  border-left: 3px solid var(--callout-tip-border);
+}
+
+.cm-lp-callout-warning {
+  background: var(--callout-warning-bg);
+  border-left: 3px solid var(--callout-warning-border);
+}
+
+.cm-lp-callout-danger {
+  background: var(--callout-danger-bg);
+  border-left: 3px solid var(--callout-danger-border);
+}
+
+.cm-lp-callout-bug {
+  background: var(--callout-bug-bg);
+  border-left: 3px solid var(--callout-bug-border);
+}
+
+.cm-lp-callout-example {
+  background: var(--callout-example-bg);
+  border-left: 3px solid var(--callout-example-border);
+}
+
+.cm-lp-callout-quote {
+  background: var(--callout-quote-bg);
+  border-left: 3px solid var(--callout-quote-border);
+}
+
+.cm-lp-callout-success {
+  background: var(--callout-success-bg);
+  border-left: 3px solid var(--callout-success-border);
+}
+
+.cm-lp-callout-question {
+  background: var(--callout-question-bg);
+  border-left: 3px solid var(--callout-question-border);
+}
+
+.cm-lp-callout-failure {
+  background: var(--callout-failure-bg);
+  border-left: 3px solid var(--callout-failure-border);
+}
+
+.cm-lp-callout-abstract {
+  background: var(--callout-abstract-bg);
+  border-left: 3px solid var(--callout-abstract-border);
+}

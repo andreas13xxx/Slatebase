@@ -107,6 +107,7 @@ featureRegistry.register({ name: 'chat', description: 'Echtzeit-Chat zwischen Be
 featureRegistry.register({ name: 'mcp', description: 'AI Context Server (MCP Integration)', defaultEnabled: true, type: 'cold' })
 featureRegistry.register({ name: 'knowledge-graph', description: 'Interaktive Vault-Verlinkungsvisualisierung', defaultEnabled: true, type: 'hot' })
 featureRegistry.register({ name: 'welcome-vault', description: 'Automatischer Welcome-Vault für neue Benutzer', defaultEnabled: true, type: 'hot' })
+featureRegistry.register({ name: 'live-preview', description: 'Live Preview Editor (CodeMirror 6)', defaultEnabled: true, type: 'hot' })
 
 const featureToggleStore = new FeatureToggleStore(serverConfig.dataDir, logger)
 const persistedFeatureState = await featureToggleStore.load()
