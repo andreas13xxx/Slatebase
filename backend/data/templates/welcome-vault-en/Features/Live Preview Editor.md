@@ -78,3 +78,29 @@ In Vim mode, the familiar modes (Normal, Insert, Visual) and commands are availa
 - **Large files:** Files exceeding 50,000 characters automatically switch to Source mode (performance protection).
 - **Feature toggle:** Live Preview mode can be disabled under Settings → Feature Toggles. The editor then functions as a pure Source editor.
 - **Full Obsidian syntax:** Wikilinks, embeds, callouts, tags, and Mermaid diagrams are all rendered correctly in Live Preview.
+
+---
+
+## What Gets Rendered in Live Preview?
+
+| Element | Example | Rendering |
+|---------|---------|-----------|
+| Headings | `## Title` | Font size + markers hidden |
+| Bold/Italic | `**bold**` / `*italic*` | Formatted, markers hidden |
+| Strikethrough | `~~text~~` | Strikethrough |
+| Highlight | `==text==` | Colored background |
+| Inline code | `` `code` `` | Monospace styling |
+| Links | `[text](url)` | Clickable (Ctrl+Click) |
+| Wikilinks | `[[Page]]` | Clickable, brackets hidden |
+| Embeds | `![[image.png]]` | Inline image |
+| Standard images | `![alt](url)` | Inline image |
+| Checkboxes | `- [x] done` | Clickable checkbox |
+| Tables | Pipe syntax | HTML table |
+| Code blocks | ` ```js ` | Fences hidden, background |
+| Mermaid | ` ```mermaid ` | SVG diagram |
+| Block quotes | `> text` | Border-left, prefix hidden |
+| Callouts | `> [!tip]` | Colored box with icon |
+| Horizontal rule | `---` | Rendered divider line |
+
+> [!info] Cursor Reveal
+> All hidden markers become visible immediately when the cursor touches the formatted area. This preserves full control over the syntax.

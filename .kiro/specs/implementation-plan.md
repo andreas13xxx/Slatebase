@@ -47,7 +47,7 @@
 | 35 | `workspace-leaf-compat` | ✅ Fertig (ViewRegistry, WorkspaceLeaf, ItemView, TabViewBridge, Plugin-Views als Tabs + Sidebar-Sections) |
 | 36 | `status-bar` | ✅ Fertig (StatusBar-Komponente, Uhr, Settings-Toggle, Design Tokens, erweiterbar für Plugins) |
 | 37 | `welcome-vault-v2` | ✅ Fertig (Backend-API, Frontend-UI, 35+ Guides DE/EN, Screenshots, Vorlagen, Praxis-Übungen, Command Palette, Settings-Button) |
-| 38 | `live-preview-editor` | ✅ Fertig (CodeMirror 6, Source + Live Preview, cursor-aware inline rendering, Vim mode, Plugin-Extensions via Compartments, Feature-Toggle `live-preview`) |
+| 38 | `live-preview-editor` | ✅ Fertig (CodeMirror 6, Source + Live Preview, cursor-aware inline rendering, Vim mode, Plugin-Extensions via Compartments, Feature-Toggle `live-preview`, GFM tables, Mermaid diagrams, images, HR, highlight, frontmatter properties, readable line length, click-to-follow links, callout fold/todo) |
 
 ---
 

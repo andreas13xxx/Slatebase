@@ -2,7 +2,8 @@ export type { LivePreviewOptions, LivePreviewState } from './live-preview-extens
 export {
   createLivePreviewExtension,
   createLivePreviewCompartmentExtension,
-  createLivePreviewField
+  createLivePreviewField,
+  createLivePreviewClickHandler
 } from './live-preview-extension'
 
 export type { InlineDecorationResult, HideableRange } from './inline-decorations'
@@ -12,4 +13,4 @@ export type { LinkDecorationOptions, LinkDecorationResult } from './link-decorat
 export { buildLinkDecorations, createLinkClickHandler } from './link-decorations'
 
 export type { WidgetDecorationOptions, WidgetDecorationResult } from './widget-decorations'
-export { buildWidgetDecorations } from './widget-decorations'
+export { buildWidgetDecorations, toggleCalloutFoldEffect } from './widget-decorations'

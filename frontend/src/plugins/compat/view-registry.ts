@@ -540,11 +540,17 @@ export class ViewRegistry {
         const view = leaf.view
         leaf.view = null
         try {
-          await view.onClose()
+          if (typeof view.onClose === 'function') {
+            await view.onClose()
+          }
         } catch (err) {
-          console.error(`[ViewRegistry] Error closing view "${view.getViewType()}" during clear:`, err)
+          console.error(`[ViewRegistry] Error closing view "${view.getViewType?.() ?? 'unknown'}" during clear:`, err)
         }
-        view.containerEl.remove()
+        try {
+          view.containerEl?.remove()
+        } catch {
+          // containerEl may already be detached or undefined
+        }
       }
     }
     this.leaves.clear()

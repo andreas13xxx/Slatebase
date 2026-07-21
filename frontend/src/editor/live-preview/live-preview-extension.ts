@@ -1,11 +1,13 @@
 import { Compartment, type Extension } from '@codemirror/state'
 import { StateField } from '@codemirror/state'
-import { type DecorationSet, Decoration, EditorView } from '@codemirror/view'
+import { type DecorationSet, Decoration, EditorView, ViewPlugin } from '@codemirror/view'
 import type { Range } from '@codemirror/state'
+import { syntaxTree } from '@codemirror/language'
 import type { DirectoryTree } from '../../types'
 import { buildInlineDecorations, type HideableRange } from './inline-decorations'
 import { buildLinkDecorations } from './link-decorations'
-import { buildWidgetDecorations } from './widget-decorations'
+import { buildWidgetDecorations, toggleCalloutFoldEffect } from './widget-decorations'
+import { resolveWikilinkTarget } from '../../plugins/link-resolver'
 
 /**
  * Options for creating the Live Preview extension.
@@ -35,6 +37,46 @@ export interface LivePreviewState {
 }
 
 /**
+ * StateField that tracks which callouts are currently folded.
+ * Stores a Set of position keys (`${from}:${to}`) for folded callouts.
+ * Responds to `toggleCalloutFoldEffect` dispatched by the CalloutIconWidget.
+ */
+const calloutFoldState = StateField.define<Set<string>>({
+  create() {
+    return new Set()
+  },
+  update(value, tr) {
+    let changed = false
+    let newSet = value
+
+    for (const effect of tr.effects) {
+      if (effect.is(toggleCalloutFoldEffect)) {
+        if (!changed) {
+          newSet = new Set(value)
+          changed = true
+        }
+        const key = `${effect.value.from}:${effect.value.to}`
+        // Toggle: if key is in set, remove it (back to default); otherwise add it (invert default)
+        if (newSet.has(key)) {
+          newSet.delete(key)
+        } else {
+          newSet.add(key)
+        }
+      }
+    }
+
+    // If doc changed, remap positions (clear stale keys)
+    if (tr.docChanged && newSet.size > 0) {
+      // Position-based keys become invalid on doc changes — clear them.
+      // The fold defaults from the markdown (+/-) will take over.
+      return new Set()
+    }
+
+    return newSet
+  },
+})
+
+/**
  * Builds decoration ranges from the Lezer Markdown syntax tree.
  * Uses buildInlineDecorations for headings, bold, italic, strikethrough, inline code.
  * Uses buildLinkDecorations for standard links [text](url) and wikilinks [[target]].
@@ -56,11 +98,15 @@ function buildDecorations(
     onInternalLinkClick: options.onInternalLinkClick,
   })
 
+  // Read callout fold state
+  const foldedCallouts = state.field(calloutFoldState, false) ?? new Set<string>()
+
   // Phase 3: Widget decorations (embeds, checkboxes, callouts, code blocks, blockquotes)
   const widgets = buildWidgetDecorations(state, {
     vaultId: options.vaultId,
     token: options.token,
     onCheckboxToggle: options.onCheckboxToggle,
+    foldedCallouts,
   })
 
   // Merge all decorations and hideable ranges
@@ -142,19 +188,36 @@ function filterDecorationsForCursor(
  * @returns A StateField extension that provides decorations
  */
 export function createLivePreviewField(options: LivePreviewOptions): Extension {
+  // Track whether the user has interacted (clicked/typed) — cursor reveal
+  // is deferred until then, so the initial view shows everything rendered.
+  let userHasInteracted = false
+
   const field = StateField.define<DecorationSet>({
     create(state) {
-      const { decorations, hideableRanges } = buildDecorations(state, options)
-      const cursor = state.selection.main
-      return filterDecorationsForCursor(decorations, hideableRanges, cursor.from, cursor.to)
+      // Initial render: no cursor filtering — show everything formatted
+      const { decorations } = buildDecorations(state, options)
+      return Decoration.set(decorations, true)
     },
 
     update(value, tr) {
-      // Recalculate if document changed or selection moved
-      if (tr.docChanged || tr.selection) {
+      // Detect first user interaction (selection change from user action, not programmatic)
+      if (tr.selection && !userHasInteracted) {
+        userHasInteracted = true
+      }
+
+      // Recalculate if document changed, selection moved, callout fold toggled,
+      // or the syntax tree was updated (async Lezer parse completion)
+      const hasFoldEffect = tr.effects.some(e => e.is(toggleCalloutFoldEffect))
+      if (tr.docChanged || tr.selection || hasFoldEffect || syntaxTree(tr.state) !== syntaxTree(tr.startState)) {
         const { decorations, hideableRanges } = buildDecorations(tr.state, options)
-        const cursor = tr.state.selection.main
-        return filterDecorationsForCursor(decorations, hideableRanges, cursor.from, cursor.to)
+
+        // Only apply cursor-aware filtering after user has interacted
+        if (userHasInteracted) {
+          const cursor = tr.state.selection.main
+          return filterDecorationsForCursor(decorations, hideableRanges, cursor.from, cursor.to)
+        }
+
+        return Decoration.set(decorations, true)
       }
 
       return value
@@ -165,7 +228,7 @@ export function createLivePreviewField(options: LivePreviewOptions): Extension {
     }
   })
 
-  return field
+  return [calloutFoldState, field]
 }
 
 /**
@@ -204,5 +267,73 @@ export function createLivePreviewCompartmentExtension(
   if (!enabled) {
     return compartment.of([])
   }
-  return compartment.of(createLivePreviewField(options))
+  return compartment.of([
+    createLivePreviewField(options),
+    createLivePreviewClickHandler(options),
+  ])
+}
+
+/**
+ * Creates a ViewPlugin that intercepts clicks on links in live-preview mode.
+ * Uses a capture-phase mousedown listener to fire BEFORE CM6's selection logic.
+ * Plain click on a link follows it; click elsewhere lets CM6 handle cursor placement.
+ */
+export function createLivePreviewClickHandler(options: LivePreviewOptions): Extension {
+  return ViewPlugin.define((view) => {
+    function handleMousedown(event: MouseEvent) {
+      // Don't intercept if modifier keys are held
+      if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
+        return
+      }
+
+      // Only handle left-click
+      if (event.button !== 0) {
+        return
+      }
+
+      const target = event.target as HTMLElement | null
+      if (!target) {
+        return
+      }
+
+      // Check if clicked element is a rendered link
+      const linkElement = target.closest('.cm-lp-link') as HTMLElement | null
+      const wikilinkElement = target.closest('.cm-lp-wikilink') as HTMLElement | null
+
+      if (linkElement) {
+        const url = linkElement.getAttribute('data-url')
+        if (url) {
+          event.preventDefault()
+          event.stopPropagation()
+          if (url.startsWith('http://') || url.startsWith('https://')) {
+            window.open(url, '_blank', 'noopener,noreferrer')
+          } else if (options.onInternalLinkClick) {
+            options.onInternalLinkClick(url)
+          }
+          return
+        }
+      }
+
+      if (wikilinkElement) {
+        const wikilinkTarget = wikilinkElement.getAttribute('data-target')
+        if (wikilinkTarget && options.onInternalLinkClick) {
+          event.preventDefault()
+          event.stopPropagation()
+          // Resolve wikilink target against directory tree (adds .md if needed)
+          const resolvedPath = resolveWikilinkTarget(wikilinkTarget, options.directoryTree)
+          options.onInternalLinkClick(resolvedPath ?? `${wikilinkTarget}.md`)
+          return
+        }
+      }
+    }
+
+    // Register on capture phase to fire before CM6's internal handlers
+    view.dom.addEventListener('mousedown', handleMousedown, true)
+
+    return {
+      destroy() {
+        view.dom.removeEventListener('mousedown', handleMousedown, true)
+      }
+    }
+  })
 }

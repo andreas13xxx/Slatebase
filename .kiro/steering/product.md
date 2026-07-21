@@ -36,7 +36,7 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for 
 - Status Bar (bottom bar with clock, extensible for plugin items, toggleable in Settings → Darstellung)
 - Sidebar Panel (left panel with Recent Files + Favorites views, splittable, tabbed)
 - Session verification (lightweight session-alive check on app mount, graceful expiry handling)
-- Live Preview Editor (CodeMirror 6 — Source + Live Preview mode, cursor-aware inline rendering, Vim mode, plugin extensions via Compartments; feature toggle `live-preview`)
+- Live Preview Editor (CodeMirror 6 — Source + Live Preview mode, cursor-aware inline rendering, Vim mode, plugin extensions via Compartments; GFM tables, Mermaid diagrams, standard images, horizontal rules, highlight ==text==, frontmatter properties box, readable line length, click-to-follow links, callout fold/unfold with todo type; feature toggle `live-preview`)
 
 ## Planned
 

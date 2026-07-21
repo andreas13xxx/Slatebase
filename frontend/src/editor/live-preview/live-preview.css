@@ -2,18 +2,31 @@
 /* All values use CSS Custom Properties (Design Tokens) — no hardcoded colors. */
 /* Supports both Light and Dark mode via CSS variable resolution. */
 
-/* --- Editor Wrapper --- */
+/* Readable line length — constrains visible content width like Obsidian.
+ * The max-width is on the editor wrapper itself, not on .cm-content or .cm-scroller.
+ * This keeps CM6's internal coordinate system intact for cursor positioning.
+ * The editor is centered within its parent via margin:auto on the wrapper. */
 .cm-editor-wrapper {
   display: flex;
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 24px;
+  padding-right: 24px;
 }
 
 /* Ensure CM6 editor fills the wrapper */
 .cm-editor-wrapper .cm-editor {
   flex: 1;
   min-height: 0;
+}
+
+.cm-editor-wrapper .cm-line {
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 /* --- Headings --- */
@@ -135,6 +148,7 @@
   padding-left: 16px;
   font-family: var(--font-mono);
   font-size: 0.9em;
+  overflow-x: auto;
 }
 
 .cm-lp-code-block-first {
@@ -155,6 +169,55 @@
 
 .cm-lp-callout-header {
   font-weight: 600;
+}
+
+/* Callout icon wrapper (inline, contains chevron + type icon) */
+.cm-lp-callout-icon-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+/* Type icon SVG */
+.cm-lp-callout-icon {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.cm-lp-callout-icon svg {
+  display: block;
+}
+
+/* Fold chevron */
+.cm-lp-callout-chevron {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  transform: rotate(0deg);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  line-height: 1;
+}
+
+.cm-lp-callout-chevron:hover {
+  color: var(--text-primary);
+}
+
+.cm-lp-callout-chevron--open {
+  transform: rotate(90deg);
+}
+
+.cm-lp-callout-chevron svg {
+  display: block;
+}
+
+/* Foldable callout header gets a pointer cursor */
+.cm-lp-callout-foldable.cm-lp-callout-header {
+  cursor: default;
 }
 
 /* Callout types — use callout tokens from index.css */
@@ -216,4 +279,167 @@
 .cm-lp-callout-abstract {
   background: var(--callout-abstract-bg);
   border-left: 3px solid var(--callout-abstract-border);
+}
+
+.cm-lp-callout-todo {
+  background: var(--callout-todo-bg);
+  border-left: 3px solid var(--callout-todo-border);
+}
+
+/* --- Mermaid Diagrams --- */
+.cm-lp-mermaid {
+  display: block;
+  margin: 8px 0;
+  padding: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  text-align: center;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.cm-lp-mermaid-loading {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.9em;
+}
+
+.cm-lp-mermaid-rendered svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.cm-lp-mermaid-error {
+  color: var(--text-error, var(--danger));
+  text-align: left;
+  font-size: 0.9em;
+}
+
+.cm-lp-mermaid-source {
+  margin-top: 8px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  overflow-x: auto;
+  text-align: left;
+}
+
+/* --- Tables --- */
+.cm-lp-table-wrapper {
+  display: block;
+  margin: 8px 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.cm-lp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.cm-lp-table th,
+.cm-lp-table td {
+  border: 1px solid var(--border-default);
+  padding: 6px 12px;
+}
+
+.cm-lp-table th {
+  background: var(--bg-surface);
+  font-weight: 600;
+}
+
+.cm-lp-table tbody tr:nth-child(even) {
+  background: var(--bg-surface);
+}
+
+.cm-lp-table tbody tr:hover {
+  background: var(--bg-elevated);
+}
+
+/* --- Standard Markdown Images --- */
+.cm-lp-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  display: block;
+  margin: 4px 0;
+}
+
+/* --- Horizontal Rules --- */
+.cm-lp-hr {
+  border: none;
+  border-top: 1px solid var(--border-default);
+  margin: 16px 0;
+}
+
+/* --- Highlight ==text== --- */
+.cm-lp-highlight {
+  background: var(--highlight-bg, rgba(255, 208, 0, 0.3));
+  border-radius: 2px;
+  padding: 1px 0;
+}
+
+:root[data-theme="dark"] .cm-lp-highlight {
+  background: var(--highlight-bg, rgba(255, 208, 0, 0.2));
+}
+
+/* --- Callout Default Title --- */
+.cm-lp-callout-default-title {
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+/* --- Frontmatter Properties --- */
+.cm-lp-frontmatter {
+  display: block;
+  margin: 0 0 12px 0;
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: 0.85em;
+}
+
+.cm-lp-frontmatter--empty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.cm-lp-frontmatter-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.cm-lp-frontmatter-key {
+  color: var(--text-secondary);
+  font-weight: 500;
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.cm-lp-frontmatter-key::after {
+  content: ':';
+}
+
+.cm-lp-frontmatter-value {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cm-lp-frontmatter-tag {
+  display: inline-block;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0 6px;
+  font-size: 0.9em;
+  color: var(--text-primary);
 }

@@ -78,3 +78,29 @@ Im Vim-Modus stehen die gewohnten Modi (Normal, Insert, Visual) und Befehle zur 
 - **Große Dateien:** Bei Dateien mit mehr als 50.000 Zeichen wird automatisch auf den Source-Modus umgeschaltet (Performance-Schutz).
 - **Feature-Toggle:** Der Live-Preview-Modus kann unter Einstellungen → Feature Toggles deaktiviert werden. Der Editor funktioniert dann als reiner Source-Editor.
 - **Alle Obsidian-Syntax:** Wikilinks, Embeds, Callouts, Tags und Mermaid-Diagramme werden im Live-Preview korrekt dargestellt.
+
+---
+
+## Was wird im Live-Preview gerendert?
+
+| Element | Beispiel | Rendering |
+|---------|----------|-----------|
+| Überschriften | `## Titel` | Schriftgröße + Marker versteckt |
+| Fett/Kursiv | `**fett**` / `*kursiv*` | Formatiert, Marker versteckt |
+| Durchgestrichen | `~~text~~` | Durchgestrichen |
+| Highlight | `==text==` | Farbiger Hintergrund |
+| Inline-Code | `` `code` `` | Monospace-Styling |
+| Links | `[text](url)` | Klickbar (Ctrl+Click) |
+| Wikilinks | `[[Seite]]` | Klickbar, Brackets versteckt |
+| Embeds | `![[bild.png]]` | Inline-Bild |
+| Standard-Bilder | `![alt](url)` | Inline-Bild |
+| Checkboxen | `- [x] done` | Klickbare Checkbox |
+| Tabellen | Pipe-Syntax | HTML-Tabelle |
+| Code-Blöcke | ` ```js ` | Fences versteckt, Hintergrund |
+| Mermaid | ` ```mermaid ` | SVG-Diagramm |
+| Blockzitate | `> text` | Border-Left, Prefix versteckt |
+| Callouts | `> [!tip]` | Farbige Box mit Icon |
+| Horizontale Linie | `---` | Echte Trennlinie |
+
+> [!info] Cursor-Reveal
+> Alle versteckten Marker werden sofort sichtbar, sobald der Cursor den formatierten Bereich berührt. So bleibt die volle Kontrolle über die Syntax erhalten.

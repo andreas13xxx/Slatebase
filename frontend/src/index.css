@@ -109,6 +109,11 @@
   --callout-abstract-border: #99f6e4;
   --callout-abstract-icon: #14b8a6;
 
+  /* Callout: todo — Light */
+  --callout-todo-bg: #f0fdf4;
+  --callout-todo-border: #86efac;
+  --callout-todo-icon: #16a34a;
+
   /* Tag Tokens — Light */
   --tag-bg: #f1f5f9;
   --tag-text: #475569;
@@ -317,6 +322,10 @@
     --callout-abstract-border: #115e59;
     --callout-abstract-icon: #2dd4bf;
 
+    --callout-todo-bg: #052e16;
+    --callout-todo-border: #166534;
+    --callout-todo-icon: #4ade80;
+
     /* Tag Tokens — Dark */
     --tag-bg: #1e293b;
     --tag-text: #94a3b8;
@@ -500,6 +509,10 @@
     --callout-abstract-bg: #0f2b2b;
     --callout-abstract-border: #115e59;
     --callout-abstract-icon: #2dd4bf;
+
+    --callout-todo-bg: #052e16;
+    --callout-todo-border: #166534;
+    --callout-todo-icon: #4ade80;
 
     /* Tag Tokens — Dark */
     --tag-bg: #1e293b;

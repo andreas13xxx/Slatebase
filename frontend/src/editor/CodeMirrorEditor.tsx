@@ -3,6 +3,7 @@ import { EditorState, Compartment, type Extension } from '@codemirror/state'
 import { EditorView, lineNumbers as cmLineNumbers } from '@codemirror/view'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
+import { GFM } from '@lezer/markdown'
 import { search } from '@codemirror/search'
 import { undo as cmUndo, redo as cmRedo } from '@codemirror/commands'
 import { autocompletion, type CompletionSource } from '@codemirror/autocomplete'
@@ -10,7 +11,7 @@ import type { IEditorHandle, EditorFormattingAction } from './types'
 import { createSlatebaseTheme, createSlatebaseHighlightStyle } from './theme'
 import { getEditorState, saveEditorState, editorHistoryExtension } from './state-store'
 import { applyFormatting as applyFormattingAction } from './formatting'
-import { createLivePreviewCompartmentExtension, createLivePreviewField, type LivePreviewOptions } from './live-preview'
+import { createLivePreviewCompartmentExtension, createLivePreviewField, createLivePreviewClickHandler, type LivePreviewOptions } from './live-preview'
 import { setActiveEditorView, getActivePluginExtensions, getActivePluginCompletions } from './plugin-extensions'
 import './live-preview/live-preview.css'
 
@@ -96,9 +97,10 @@ export function CodeMirrorEditor({
     const pluginCompletionSources = getActivePluginCompletions()
 
     const extensions: Extension[] = [
-      markdown({ base: markdownLanguage, codeLanguages: languages }),
+      markdown({ base: markdownLanguage, codeLanguages: languages, extensions: GFM }),
       createSlatebaseTheme(),
       createSlatebaseHighlightStyle(),
+      EditorView.lineWrapping,
       editorHistoryExtension,
       search(),
       EditorView.updateListener.of((update) => {
@@ -240,7 +242,7 @@ export function CodeMirrorEditor({
     const options = livePreviewOptions ?? { vaultId: '', directoryTree: null }
     view.dispatch({
       effects: livePreviewCompartment.current.reconfigure(
-        effectiveLivePreview ? createLivePreviewField(options) : []
+        effectiveLivePreview ? [createLivePreviewField(options), createLivePreviewClickHandler(options)] : []
       ),
     })
   }, [livePreview, livePreviewOptions])

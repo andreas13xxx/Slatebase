@@ -199,5 +199,52 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
     }
   })
 
+  // --- Highlight (==text==) ---
+  // Not in Lezer grammar — detect via regex on the full document text
+  const docText = state.doc.toString()
+  const HIGHLIGHT_REGEX = /==((?:[^=]|=[^=])+)==/g
+  let hlMatch: RegExpExecArray | null
+
+  HIGHLIGHT_REGEX.lastIndex = 0
+  while ((hlMatch = HIGHLIGHT_REGEX.exec(docText)) !== null) {
+    const from = hlMatch.index
+    const to = from + hlMatch[0].length
+    const markerLen = 2
+    const contentFrom = from + markerLen
+    const contentTo = to - markerLen
+
+    // Skip if inside a code block (check if the range intersects any FencedCode or InlineCode node)
+    let insideCode = false
+    tree.iterate({
+      from, to,
+      enter(n) {
+        if (n.name === 'FencedCode' || n.name === 'InlineCode' || n.name === 'CodeBlock') {
+          insideCode = true
+          return false
+        }
+      }
+    })
+    if (insideCode) continue
+
+    if (contentFrom < contentTo) {
+      // Mark the content with highlight class
+      decorations.push(
+        Decoration.mark({ class: 'cm-lp-highlight' }).range(contentFrom, contentTo)
+      )
+
+      // Opening marker ==
+      hideableRanges.push({ from, to: contentFrom, groupFrom: from, groupTo: to })
+      decorations.push(
+        Decoration.replace({}).range(from, contentFrom)
+      )
+
+      // Closing marker ==
+      hideableRanges.push({ from: contentTo, to, groupFrom: from, groupTo: to })
+      decorations.push(
+        Decoration.replace({}).range(contentTo, to)
+      )
+    }
+  }
+
   return { decorations, hideableRanges }
 }
