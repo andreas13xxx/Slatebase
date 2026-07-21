@@ -77,6 +77,16 @@ npm run lint         # ESLint
 | jszip | ZIP export (Firefox fallback) |
 | d3-force | Knowledge graph layout |
 | mermaid | Diagram rendering (lazy-loaded) |
+| @codemirror/view | CodeMirror 6 editor view layer |
+| @codemirror/state | CodeMirror 6 editor state |
+| @codemirror/commands | CodeMirror 6 standard commands |
+| @codemirror/language | CodeMirror 6 language support infrastructure |
+| @codemirror/lang-markdown | CodeMirror 6 Markdown language |
+| @codemirror/language-data | CodeMirror 6 code-block language registry |
+| @codemirror/autocomplete | CodeMirror 6 autocompletion |
+| @codemirror/search | CodeMirror 6 search/replace |
+| @lezer/highlight | Lezer syntax highlighting primitives |
+| @replit/codemirror-vim | Vim keybindings for CodeMirror 6 |
 
 ### Geplant
 - **better-sqlite3** — SQLite für Graph-Index (erst bei Performance-Bedarf, >10k Dateien)

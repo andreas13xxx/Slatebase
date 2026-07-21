@@ -223,6 +223,27 @@ src/
 │   ├── parser.ts         — parseCanvas (Zod validation, passthrough unknown fields for forward-compat)
 │   ├── serializer.ts     — serializeCanvas (Model→JSON, round-trip compatible)
 │   └── parser.test.ts    — Unit tests for parser/serializer round-trip
+├── editor/
+│   ├── types.ts              — Editor mode types, LivePreviewConfig, EditorMode ('source' | 'live-preview')
+│   ├── theme.ts              — CodeMirror theme (Design Tokens mapping, Dark/Light mode)
+│   ├── state-store.ts        — Per-tab EditorState persistence (Module-Level Map, cursor/scroll/history)
+│   ├── formatting.ts         — Toolbar formatting commands (bold, italic, heading, list, link, etc.)
+│   ├── keybindings.ts        — Custom keybindings integration (Slatebase shortcuts → CM6 keymap)
+│   ├── bracket-close.ts      — Auto-close brackets/quotes extension
+│   ├── auto-save.ts          — Auto-save extension (updateListener → debounce → save callback)
+│   ├── image-paste.ts        — Image paste + DnD upload extension
+│   ├── vim-mode.ts           — Vim mode wrapper (@replit/codemirror-vim Compartment toggle)
+│   ├── plugin-extensions.ts  — Plugin extension registry (per-plugin Compartment, add/remove/isolate)
+│   ├── editor-shim.ts        — EditorShim (1-indexed position API for legacy consumers + plugin compat)
+│   ├── CodeMirrorEditor.tsx  — React wrapper (EditorView in useRef, props→effects sync, mode toggle)
+│   └── live-preview/
+│       ├── index.ts          — Barrel export for live-preview decorations
+│       ├── decorations.ts    — DecorationSet builder (headings, bold, italic, links, code, blockquotes)
+│       ├── wikilink-widget.ts — Wikilink inline widget (rendered link, click-to-navigate)
+│       ├── embed-widget.ts   — Embed inline widget (image/PDF/note preview)
+│       ├── callout-widget.ts — Callout block widget (styled blockquote replacement)
+│       ├── checkbox-widget.ts — Checkbox toggle widget (GFM task lists)
+│       └── cursor-filter.ts  — Cursor-aware decoration filtering (show markers at cursor position)
 ├── plugins/
 │   ├── index.ts          — Barrel export (all plugins, types, utilities)
 │   ├── types.ts          — MDAST node types (WikilinkNode, EmbedNode, CalloutNode, TagNode), IMAGE_EXTENSIONS, PDF_EXTENSIONS

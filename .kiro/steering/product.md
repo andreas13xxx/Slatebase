@@ -18,7 +18,7 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for 
 - Search & Replace (regex, context lines, multi-vault, atomic writes)
 - Realtime infrastructure (SSE: chat push, presence, vault changes, toasts, reconnect with replay — always active when authenticated)
 - Obsidian plugin compat ⚠️ experimental (API shims, sandbox, command palette, CSS injection, workspace leaf API with plugin views as tabs/sidebar sections)
-- Feature toggles (hot/cold toggle, env overlay, API + admin UI; toggles: vault-sync, obsidian-plugin-compat, chat, mcp, knowledge-graph, welcome-vault)
+- Feature toggles (hot/cold toggle, env overlay, API + admin UI; toggles: vault-sync, obsidian-plugin-compat, chat, mcp, knowledge-graph, welcome-vault, live-preview)
 - CI/CD (GitHub Actions, Release Please, multi-arch Docker, GHCR)
 - i18n (German/English), Dark Mode, Docker deployment
 - Vault Explorer enhancements (statistics tooltip, custom context menu, drag & drop file upload)
@@ -36,10 +36,10 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for 
 - Status Bar (bottom bar with clock, extensible for plugin items, toggleable in Settings → Darstellung)
 - Sidebar Panel (left panel with Recent Files + Favorites views, splittable, tabbed)
 - Session verification (lightweight session-alive check on app mount, graceful expiry handling)
+- Live Preview Editor (CodeMirror 6 — Source + Live Preview mode, cursor-aware inline rendering, Vim mode, plugin extensions via Compartments; feature toggle `live-preview`)
 
 ## Planned
 
-- Live Preview Editor (WYSIWYG/Side-by-Side)
 - Server-Side Plugins (Node.js APIs in vm sandbox)
 - Accessibility audit (WCAG 2.1 AA)
 - Responsive/mobile, public sharing

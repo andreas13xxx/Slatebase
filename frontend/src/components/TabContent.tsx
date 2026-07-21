@@ -4,7 +4,6 @@ import { useAppContext } from '../state'
 import { openTab, saveTab } from '../state/tabActions'
 import type { DirectoryTree } from '../types'
 import { EditMode } from './EditMode'
-import { ViewMode } from './ViewMode'
 import { BinaryViewer } from './BinaryViewer'
 import { GraphView } from './GraphView'
 import { CanvasView } from './canvas/CanvasView'
@@ -304,6 +303,14 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
           error={activeTab.error}
           readOnly={isReadOnly}
           filePath={activeTab.filePath}
+          tabId={activeTab.id}
+          livePreviewMode={false}
+          livePreviewOptions={{
+            vaultId: activeTab.vaultId,
+            directoryTree: appState.vaultTrees[activeTab.vaultId] ?? appState.directoryTree,
+            token: apiClient?.getToken() ?? undefined,
+            onInternalLinkClick: handleInternalLinkClick,
+          }}
           onExternalFileDrop={handleExternalFileDrop}
           onImagePaste={handleImagePaste}
           onOpenVersions={onOpenVersions ? () => onOpenVersions(activeTab.vaultId, activeTab.filePath) : undefined}
@@ -312,9 +319,12 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
     )
   }
 
-  // View mode — render Markdown
+  // Preview mode — editable CM6 Live Preview (Variante 1)
+  const editContentPreview = activeTab.editBuffer ?? activeTab.content
+  const currentVaultPreview = appState.vaults.find((v) => v.id === activeTab.vaultId)
+  const isReadOnlyPreview = currentVaultPreview?.permission === 'read'
   return (
-    <div className="tab-content tab-content--view">
+    <div className="tab-content tab-content--edit">
       {linkError && (
         <div className="tab-content-link-error" role="alert">
           <span>{linkError}</span>
@@ -327,12 +337,26 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
           </button>
         </div>
       )}
-      <ViewMode
-        content={activeTab.editBuffer ?? activeTab.content}
-        vaultId={activeTab.vaultId}
-        directoryTree={appState.directoryTree}
-        onInternalLinkClick={handleInternalLinkClick}
-        token={apiClient?.getToken() ?? undefined}
+      <EditMode
+        content={editContentPreview}
+        onChange={handleEditChange}
+        onSave={handleSave}
+        onCancel={handleCancel}
+        saving={saving}
+        error={activeTab.error}
+        readOnly={isReadOnlyPreview}
+        filePath={activeTab.filePath}
+        tabId={activeTab.id}
+        livePreviewMode={true}
+        livePreviewOptions={{
+          vaultId: activeTab.vaultId,
+          directoryTree: appState.vaultTrees[activeTab.vaultId] ?? appState.directoryTree,
+          token: apiClient?.getToken() ?? undefined,
+          onInternalLinkClick: handleInternalLinkClick,
+        }}
+        onExternalFileDrop={handleExternalFileDrop}
+        onImagePaste={handleImagePaste}
+        onOpenVersions={onOpenVersions ? () => onOpenVersions(activeTab.vaultId, activeTab.filePath) : undefined}
       />
     </div>
   )

@@ -43,7 +43,14 @@
   font-size: 0.95rem;
 }
 
-.tab-content--edit,
+.tab-content--edit {
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .tab-content--view,
 .tab-content--binary,
 .tab-content--graph,

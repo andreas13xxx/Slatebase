@@ -131,5 +131,6 @@ Then switch to View mode to see it rendered.
 
 - [[Basics/Markdown Syntax|Markdown Syntax]] — The formatting language
 - [[Basics/Navigation and Tabs|Navigation and Tabs]] — Previous guide
+- [[Features/Live Preview Editor|Live Preview Editor]] — Source mode and inline Live Preview in one editor
 - [[Features/Embeds|Embeds]] — Embedding images and files
 - [[Features/Templates and Daily Notes|Templates and Daily Notes]] — Reusable templates

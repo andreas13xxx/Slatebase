@@ -55,6 +55,7 @@ Neben den hier aufgelisteten Kern-Features findest du in den folgenden Guides we
 - [[Features/Einstellungen]] — Alle Konfigurationsmöglichkeiten
 - [[Features/Chat]] — Nachrichten mit anderen Nutzern
 - [[Features/Sync]] — Vault-Synchronisation (experimentell)
+- [[Features/Live Preview Editor]] — Source-Modus und inline-gerenderte Live-Vorschau
 
 ---
 

@@ -127,4 +127,5 @@ Der Verlauf speichert bis zu 100 Schritte und wird beim Wechsel der Datei zurüc
 
 - [[Grundlagen/Markdown Syntax|Markdown Syntax]] — Vorheriger Guide
 - [[Grundlagen/Navigation und Tabs|Navigation und Tabs]] — Nächster Guide
+- [[Features/Live Preview Editor|Live Preview Editor]] — Source-Modus und Live-Vorschau in einem Editor
 - [[Features/Vorlagen und Daily Notes|Vorlagen und Daily Notes]] — Schnell formatierte Notizen erstellen
