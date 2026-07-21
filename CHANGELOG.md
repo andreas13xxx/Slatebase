@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.13.0](https://github.com/andreas13xxx/Slatebase/compare/v0.12.0...v0.13.0) (2026-07-21)
+
+
+### Features
+
+* implement Live Preview Editor (CodeMirror 6) ([f3e0ce8](https://github.com/andreas13xxx/Slatebase/commit/f3e0ce830f6c2b0f4b6b5d4af75b230fa6c753fe))
+* implement Live Preview Editor (CodeMirror 6) ([922175e](https://github.com/andreas13xxx/Slatebase/commit/922175e7559bb0d0bcae8d0e46b5459fc145e500))
+
+
+### Sonstige Änderungen
+
+* add live-preview-editor spec (CodeMirror 6) and update implementation plan ([b16072d](https://github.com/andreas13xxx/Slatebase/commit/b16072d36577d6ace52234dfad382e5fd38c6e6d))
+
 ## [0.12.0](https://github.com/andreas13xxx/Slatebase/compare/v0.11.0...v0.12.0) (2026-07-17)
 
 
