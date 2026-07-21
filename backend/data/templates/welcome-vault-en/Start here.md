@@ -49,6 +49,7 @@ Discover the full feature set:
 - [[Features/Settings|Settings]]
 - [[Features/Chat|Chat]]
 - [[Features/Sync|Sync]]
+- [[Features/Live Preview Editor|Live Preview Editor]]
 
 ---
 

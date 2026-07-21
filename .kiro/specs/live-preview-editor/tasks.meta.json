@@ -1,0 +1,546 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Install CodeMirror 6 dependencies and create module structure": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383930746
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383940804
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784386574432
+      }
+    ],
+    "1.2 Implement SlatebaseTheme (CM6 Theme Extension)": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383932277
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784386578787
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784386690311
+      }
+    ],
+    "1.4 Implement useEditorStateStore (per-tab state management)": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383932400
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784386579644
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784386691128
+      }
+    ],
+    "1.6 Implement CodeMirrorEditor component": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383932476
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784386698287
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784386819666
+      }
+    ],
+    "2.1 Implement formatting actions (toolbar support)": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383932541
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784386858581
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784387028863
+      }
+    ],
+    "2.3 Implement image paste and drag-and-drop handlers": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383932623
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784386858819
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784387029738
+      }
+    ],
+    "2.5 Implement keybindings integration": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383932696
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784386859967
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784387030711
+      }
+    ],
+    "2.6 Implement Vim mode extension (optional activation)": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383932763
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784387059677
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784391984736
+      }
+    ],
+    "2.7 Implement bracket auto-close extension": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383932825
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784386860485
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784387031304
+      }
+    ],
+    "2.8 Implement auto-save listener extension": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383932879
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784386861389
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784387032328
+      }
+    ],
+    "2.9 Rework EditMode to use CodeMirrorEditor instead of textarea": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383932945
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784387060670
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784391985606
+      }
+    ],
+    "3. Checkpoint — Phase 1 complete": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383932996
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784392010712
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784392242274
+      }
+    ],
+    "4.1 Implement LivePreviewExtension core (StateField + ViewPlugin)": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383933062
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784392011638
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784392243163
+      }
+    ],
+    "4.2 Implement inline decorations (headings, bold, italic, strikethrough, code)": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383933139
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784392248332
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784392623313
+      }
+    ],
+    "4.3 Implement link and wikilink decorations": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383933193
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784392249126
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784392624351
+      }
+    ],
+    "4.4 Implement widget decorations (embeds, checkboxes, callouts, code blocks, blockquotes)": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383933262
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784392250065
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784392625305
+      }
+    ],
+    "4.6 Implement Live Preview toggle and persistence": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383933323
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784392636572
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784392983927
+      }
+    ],
+    "4.7 Implement Live Preview CSS (consistent with ViewMode)": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383933371
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784392636948
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784392982808
+      }
+    ],
+    "5. Checkpoint — Phase 2 complete": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383933413
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784392989210
+      }
+    ],
+    "6.1 Implement PluginExtensionManager (Compartment-based)": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383933467
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784392990102
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784393092357
+      }
+    ],
+    "6.3 Rework EditorShim to wrap CM6 EditorView": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383933529
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784393102300
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784393260685
+      }
+    ],
+    "6.5 Integrate plugin extensions into CodeMirrorEditor": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383933582
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784393269046
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784393359797
+      }
+    ],
+    "7. Checkpoint — Phase 3 complete": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383933631
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784393364450
+      }
+    ],
+    "8.1 Remove legacy editor code": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383933677
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784393365359
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784393488091
+      }
+    ],
+    "9. Final checkpoint — Ensure all tests pass": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784383933738
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784393507838
+      },
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784393668810
+      }
+    ],
+    "1. Phase 1 — CM6 Grundintegration und Infrastruktur": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784386819738
+      }
+    ],
+    "1.3 Write property test for theme token resolution (Property 5)": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784386852753
+      }
+    ],
+    "1.5 Write property test for tab state isolation (Property 2)": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784386853581
+      }
+    ],
+    "1.7 Write property test for content round-trip (Property 1)": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784387052544
+      }
+    ],
+    "1.8 Write property test for undo/redo determinism (Property 3)": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784387053451
+      }
+    ],
+    "2.2 Write property test for formatting idempotence (Property 9)": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784387054170
+      }
+    ],
+    "2.4 Write property test for image paste non-interception (Property 4)": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784387055153
+      }
+    ],
+    "2. Phase 1 — Editor-Integration in bestehende Architektur": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784391985660
+      }
+    ],
+    "2.10 Write property test for external content update preserving history (Property 10)": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784391999173
+      }
+    ],
+    "4.5 Write property test for cursor reveal/hide (Property 6)": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784392635405
+      }
+    ],
+    "4. Phase 2 — Live Preview Extension": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784392984061
+      }
+    ],
+    "6.2 Write property test for plugin extension isolation (Property 7)": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784393101171
+      }
+    ],
+    "6.4 Write property test for EditorShim API equivalence (Property 8)": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784393268177
+      }
+    ],
+    "6. Phase 3 — Plugin-Integration": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784393359906
+      }
+    ],
+    "8. Final integration and cleanup": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784393488181
+      }
+    ],
+    "8.2 Write unit tests for CodeMirrorEditor component": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784393502761
+      }
+    ],
+    "8.3 Write unit tests for EditorShim": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784393503642
+      }
+    ],
+    "8.4 Write integration tests for editor workflow": [
+      {
+        "executionId": "62a10bac-ac82-4e76-9564-7b18677ee67a",
+        "chatSessionId": "sess_21743883-11b8-40dd-839a-0739c09aa1bc",
+        "timestamp": 1784393504422
+      }
+    ]
+  }
+}

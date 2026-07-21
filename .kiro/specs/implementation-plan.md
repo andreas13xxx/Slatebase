@@ -1,6 +1,6 @@
 # Implementierungsplan — Slatebase Ausstehende Features
 
-**Stand:** Juli 2026 (v0.11.x). Die Kernfeatures sind umgesetzt (Vaults, Editor, Auth, Chat, Sync mit Conflict-Resolution-Wizard, MCP, Graph v2, Search, Realtime, Plugins, Feature Toggles, Mermaid, Command Palette, Unified Settings, Welcome Vault v2, Preferences, Keyboard Shortcuts, Obsidian Canvas, Block References, Workspace Leaf Compat, Status Bar). Es verbleiben 9 ausstehende Features in unterschiedlichen Reifegraden.
+**Stand:** Juli 2026 (v0.11.x). Die Kernfeatures sind umgesetzt (Vaults, Editor, Auth, Chat, Sync mit Conflict-Resolution-Wizard, MCP, Graph v2, Search, Realtime, Plugins, Feature Toggles, Mermaid, Command Palette, Unified Settings, Welcome Vault v2, Preferences, Keyboard Shortcuts, Obsidian Canvas, Block References, Workspace Leaf Compat, Status Bar, Live Preview Editor). Es verbleiben 8 ausstehende Features in unterschiedlichen Reifegraden.
 
 **Strategie:** Hybrid — Features mit bestehender Spec direkt umsetzen, komplexe Features erst vollständig spezifizieren.
 
@@ -47,6 +47,7 @@
 | 35 | `workspace-leaf-compat` | ✅ Fertig (ViewRegistry, WorkspaceLeaf, ItemView, TabViewBridge, Plugin-Views als Tabs + Sidebar-Sections) |
 | 36 | `status-bar` | ✅ Fertig (StatusBar-Komponente, Uhr, Settings-Toggle, Design Tokens, erweiterbar für Plugins) |
 | 37 | `welcome-vault-v2` | ✅ Fertig (Backend-API, Frontend-UI, 35+ Guides DE/EN, Screenshots, Vorlagen, Praxis-Übungen, Command Palette, Settings-Button) |
+| 38 | `live-preview-editor` | ✅ Fertig (CodeMirror 6, Source + Live Preview, cursor-aware inline rendering, Vim mode, Plugin-Extensions via Compartments, Feature-Toggle `live-preview`) |
 
 ---
 
@@ -56,13 +57,12 @@
 |------|------|-------|---------|--------|
 | 1 | Obsidian Themes | B | ~15–20h | Geplant (keine Spec) |
 | 2 | Public Sharing | C | ~15–20h | Geplant (keine Spec) |
-| 3 | Live Preview Editor | D | ~43–62h | Spec + Requirements vorhanden |
-| 4 | Semantische Suche / AI-Embeddings | E | ~38–58h | Geplant (keine Spec) |
-| 5 | Server-Side Plugins | B | ~48–68h | Tasks vorhanden |
-| 6 | Security Hardening | F | ~20–30h | Geplant (keine Spec) |
-| 7 | Accessibility Audit | F | ~24–34h | Geplant (keine Spec) |
-| 8 | Responsive/Mobile | F | ~24–34h | Geplant (keine Spec) |
-| 9 | Collaborative Editing | D | ~68–88h | Requirements vorhanden |
+| 3 | Semantische Suche / AI-Embeddings | E | ~38–58h | Geplant (keine Spec) |
+| 4 | Server-Side Plugins | B | ~48–68h | Tasks vorhanden |
+| 5 | Security Hardening | F | ~20–30h | Geplant (keine Spec) |
+| 6 | Accessibility Audit | F | ~24–34h | Geplant (keine Spec) |
+| 7 | Responsive/Mobile | F | ~24–34h | Geplant (keine Spec) |
+| 8 | Collaborative Editing | D | ~68–88h | Requirements vorhanden |
 
 ---
 
@@ -75,8 +75,8 @@ slatebase-overview (Architektur-Grundlage)
       ├── tabbed-editor-viewer ✅
       │     ├── advanced-file-operations ✅
       │     ├── tier2-daily-workflow ✅ (Editor, Explorer, Trash, Versioning)
-      │     ├── live-preview-editor (CodeMirror 6 — Spec + Requirements vorhanden)
-      │     └── collaborative-editing (braucht Live Preview Editor + Realtime)
+      │     ├── live-preview-editor ✅ (CodeMirror 6 — Source + Live Preview)
+      │     └── collaborative-editing (braucht Live Preview Editor ✅ + Realtime)
       ├── auth-and-user-management ✅
       │     ├── user-chat ✅ → chat-enhancements ✅
       │     ├── vault-sync ✅ → sync-conflict-resolution ✅
@@ -114,7 +114,7 @@ slatebase-overview (Architektur-Grundlage)
 Track A (Docs):        Welcome Vault v2 ✅
 Track B (Plugins):     Obsidian Themes → Server-Side Plugins
 Track C (Sharing):     Public Sharing (unabhängig)
-Track D (Editor):      Live Preview Editor → Collaborative Editing
+Track D (Editor):      Live Preview Editor ✅ → Collaborative Editing
 Track E (AI):          Semantische Suche (unabhängig)
 Track F (Polish):      Security Hardening → Accessibility Audit → Responsive/Mobile
 ```
@@ -160,7 +160,7 @@ Scope: ~4h Design + ~15–20h Implementierung.
 
 ---
 
-## Prio 3 — Live Preview Editor (Track D)
+## Prio 3 — Live Preview Editor (Track D) ✅ Fertig
 
 Scope: ~8h Design + ~40–60h Implementierung.
 
@@ -208,7 +208,7 @@ Optional: @replit/codemirror-vim
 
 ---
 
-## Prio 4 — Semantische Suche / AI-Embeddings (Track E)
+## Prio 3 — Semantische Suche / AI-Embeddings (Track E)
 
 Scope: ~8h Design + ~30–50h Implementierung.
 
@@ -228,7 +228,7 @@ Scope: ~8h Design + ~30–50h Implementierung.
 
 ---
 
-## Prio 5 — Server-Side Plugins (Track B)
+## Prio 4 — Server-Side Plugins (Track B)
 
 Scope: ~8h Design + ~40–60h Implementierung. Task-Liste existiert (7 Phasen).
 
@@ -254,7 +254,7 @@ Scope: ~8h Design + ~40–60h Implementierung. Task-Liste existiert (7 Phasen).
 
 ---
 
-## Prio 6 — Security Hardening (Track F)
+## Prio 5 — Security Hardening (Track F)
 
 Scope: ~20–30h.
 
@@ -272,7 +272,7 @@ Scope: ~20–30h.
 
 ---
 
-## Prio 7 — Accessibility Audit (Track F)
+## Prio 6 — Accessibility Audit (Track F)
 
 Scope: ~4h Audit + ~20–30h Fixes.
 
@@ -292,7 +292,7 @@ Scope: ~4h Audit + ~20–30h Fixes.
 
 ---
 
-## Prio 8 — Responsive/Mobile (Track F)
+## Prio 7 — Responsive/Mobile (Track F)
 
 Scope: ~4h Design + ~20–30h Implementierung.
 
@@ -312,7 +312,7 @@ Scope: ~4h Design + ~20–30h Implementierung.
 
 ---
 
-## Prio 9 — Collaborative Editing (Track D)
+## Prio 8 — Collaborative Editing (Track D)
 
 Scope: ~8h Design + ~60–80h Implementierung.
 
@@ -341,7 +341,7 @@ Scope: ~8h Design + ~60–80h Implementierung.
 Track A (Docs):      Prio 1: Welcome Vault v2                    (~34–45h)
 Track B (Plugins):   Prio 2: Obsidian Themes → Prio 6: Server-Side Plugins  (~63–88h)
 Track C (Sharing):   Prio 3: Public Sharing                      (~15–20h)
-Track D (Editor):    Live Preview Editor (CM6) → Collaborative Editing  (~116–156h)
+Track D (Editor):    Live Preview Editor ✅ → Collaborative Editing      (~68–88h)
 Track E (AI):        Prio 5: Semantische Suche                   (~38–58h)
 Track F (Polish):    Prio 7–9: Security → Accessibility → Mobile (~68–98h)
 ```
@@ -355,10 +355,10 @@ Track F (Polish):    Prio 7–9: Security → Accessibility → Mobile (~68–98
 | A: Docs | — | ~34–45h | ~34–45h |
 | B: Plugins | ~4h | ~63–88h | ~67–92h |
 | C: Sharing | ~4h | ~15–20h | ~19–24h |
-| D: Editor | ~16h | ~100–140h | ~116–156h |
+| D: Editor | ~8h | ~60–80h | ~68–88h |
 | E: AI | ~8h | ~30–50h | ~38–58h |
 | F: Polish | ~8h | ~60–90h | ~68–98h |
-| **Summe** | **~40h** | **~302–433h** | **~342–473h** |
+| **Summe** | **~32h** | **~262–373h** | **~294–405h** |
 
 ---
 
@@ -373,7 +373,7 @@ Kontext warum bestimmte Features NICHT geplant sind:
 | Offline-Modus (PWA/Service Worker) | 🔴 Zurückgestellt | Self-Hosted = Server nötig. Vault-Sync mit Obsidian-Desktop deckt Offline ab. |
 | AI-Agent im Editor (Copilot) | 🔴 Zurückgestellt | MCP deckt AI-Zugang ab. Eingebauter Copilot = eigenes Produkt. |
 | Kanban/Calendar als native Views | ✅ Plugin-Lösung | Via `workspace-leaf-compat` ✅ — populäre Plugins werden direkt unterstützt. |
-| Multi-Cursor / Multi-Selection | ✅ Kommt mit CM6 | Inkludiert in `live-preview-editor` Phase 1 (CM6 hat natives Multi-Cursor). |
+| Multi-Cursor / Multi-Selection | ✅ Umgesetzt mit CM6 | Inkludiert in `live-preview-editor` ✅ (CM6 hat natives Multi-Cursor). |
 | Multi-Sprachen/RTL-Support | 🔴 Zurückgestellt | Spezieller Use-Case. Bei Bedarf im Rahmen von `accessibility-audit`. |
 
 ---

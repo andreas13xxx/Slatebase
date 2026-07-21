@@ -136,6 +136,8 @@ export const de = {
       column: 'Spalte',
       cell: 'Zelle',
     },
+    livePreview: 'Live Preview',
+    livePreviewFileTooLarge: 'Datei zu groß für Live Preview — Source-Modus aktiv',
   },
 
   tabs: {

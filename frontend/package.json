@@ -13,7 +13,17 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "6.20.3",
+    "@codemirror/commands": "6.10.4",
+    "@codemirror/lang-markdown": "6.5.1",
+    "@codemirror/language": "6.12.4",
+    "@codemirror/language-data": "6.5.2",
+    "@codemirror/search": "6.7.1",
+    "@codemirror/state": "6.7.1",
+    "@codemirror/view": "6.43.6",
+    "@lezer/highlight": "1.2.3",
     "@react-symbols/icons": "1.2.0",
+    "@replit/codemirror-vim": "6.3.0",
     "d3-force": "3.0.0",
     "highlight.js": "11.11.1",
     "jszip": "3.10.1",

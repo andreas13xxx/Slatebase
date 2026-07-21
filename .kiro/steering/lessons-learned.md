@@ -286,6 +286,24 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - DiffView-Modus (side-by-side/unified) in localStorage persistiert (`slatebase_diff_view_mode`).
 - `ConflictResolutionView.tsx` deprecated — nicht löschen, wird noch importiert in alten Tests.
 
+## CodeMirror 6 (Live Preview Editor)
+
+- **Compartments für dynamische Rekonfiguration**: Jede dynamisch schaltbare Extension (Vim, Theme, Plugin-Extensions, Read-Only) lebt in einem eigenen `Compartment`. Rekonfiguration via `view.dispatch({ effects: compartment.reconfigure(...) })` — nie die gesamte State neu erzeugen.
+- **EditorView in `useRef`, nicht `useState`**: EditorView ist ein mutable DOM-Objekt mit eigenem Lifecycle. In `useState` speichern verursacht unnötige Re-Renders und Stale-Closure-Probleme. `useRef` + `useEffect`-Cleanup (`view.destroy()`).
+- **`onContentChange`-Ref-Pattern**: Save-Callbacks in einer Ref speichern und im `updateListener` auslesen. So bleibt der Listener stabil (kein Compartment-Reconfigure bei jedem Render), aber greift immer auf die aktuelle Closure zu.
+- **Per-Tab-State via Module-Level-Map**: `Map<tabId, { doc, selection, scrollPos }>`. Beim Tab-Wechsel: aktuellen State serialisieren, neuen State aus Map laden oder frisch erzeugen. Kein React-State — CM6 ist Source of Truth.
+- **Cursor-Reveal via DecorationSet-Filtering**: Live-Preview-Decorations (die Markdown-Syntax verstecken) werden in `cursor-filter.ts` dynamisch gefiltert: Decorations die den aktiven Cursor-Range berühren, werden entfernt → Marker werden sichtbar. `DecorationSet.update()` + `RangeSet.between()` für performante Range-Checks.
+- **Plugin-Extensions je eigenes Compartment**: Jedes Plugin bekommt ein dediziertes Compartment (`pluginCompartments: Map<pluginId, Compartment>`). Ermöglicht Isolation — fehlerhafte Extension eines Plugins kann per `reconfigure([])` entfernt werden, ohne den Editor neu zu laden.
+- **EditorShim 1-indexed Pos**: Der Legacy-EditorShim (für Commands + Plugin-Compat) arbeitet mit 1-indexed Zeilen/Spalten. CM6 intern ist 0-indexed. Konvertierung in `editor-shim.ts` — nie CM6-Offsets direkt nach außen geben.
+- **Performance-Gate**: Dateien >50.000 Zeichen schalten automatisch auf Source-Only (Live-Preview-Decorations deaktiviert). Notice-Banner informiert den User. Schwelle konfigurierbar über Feature-Config (nicht Feature-Toggle).
+- **Feature-Toggle `live-preview`**: Hot-Toggle (default: true). Wenn deaktiviert: CM6 läuft weiterhin als Source-Editor, nur die Live-Preview-Decorations + Toggle-Button werden ausgeblendet.
+- **Tab-Modus steuert Live Preview (Variante 1)**: `mode === 'edit'` → CM6 Source (livePreview=false), `mode === 'view'` → CM6 editierbarer Live Preview (livePreview=true). EditMode bekommt `livePreviewMode` + `livePreviewOptions` Props. ViewMode wird nicht mehr für Markdown gerendert.
+- **Compartment-Stale-Bug bei Remount**: Wenn React eine Komponente unmountet/remountet (Mode-Toggle), werden `useRef(new Compartment())` frisch erzeugt — aber der gespeicherte EditorState enthält die ALTEN Compartment-Instanzen. Fix: Bei State-Restore NIE `stored.state` direkt verwenden, sondern `EditorState.create({ doc: stored.state.doc, selection: stored.state.selection, extensions: buildExtensions() })` — so matchen die Compartments immer die aktuellen Refs. Tradeoff: Undo-History geht bei Mode-Toggle verloren.
+- **`.tab-content--edit` braucht `display: flex`**: Ohne explizites `display: flex; flex-direction: column` auf dem Tab-Content-Container propagiert das Flex-Layout nicht — CM6 kollabiert auf 0px Höhe. Auch `overflow: hidden` statt `overflow: auto` (CM6 managed eigenes Scrolling via `.cm-scroller`).
+- **CM6 Theme Height**: `'&': { height: '100%' }` + `.cm-scroller: { overflow: 'auto' }` im Theme nötig, damit CM6 den Container ausfüllt. Zusätzlich `.cm-editor-wrapper .cm-editor { flex: 1; min-height: 0 }` in CSS.
+- **Feature-Toggle Backend-Registrierung**: `live-preview` Feature muss in `backend/src/index.ts` explizit im FeatureRegistry registriert werden (`featureRegistry.register(...)`) — sonst liefert `/api/v1/features` es nicht aus und Frontend `isEnabled('live-preview')` gibt false zurück.
+- **buildDecorations-Verdrahtung**: `buildInlineDecorations`, `buildLinkDecorations` und `buildWidgetDecorations` müssen ALLE in `buildDecorations()` aufgerufen und ihre Ergebnisse gemergt werden — sonst greifen die Decorations nicht.
+
 ## Dev-Umgebung
 
 - Git-Proxy: `git -c http.proxy="" push`
