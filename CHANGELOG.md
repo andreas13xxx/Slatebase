@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.14.0](https://github.com/andreas13xxx/Slatebase/compare/v0.13.0...v0.14.0) (2026-07-21)
+
+
+### Features
+
+* enhance live-preview rendering (tables, mermaid, images, HR, highlight, frontmatter, links) ([86a1022](https://github.com/andreas13xxx/Slatebase/commit/86a1022fc4279ce379a9e921bf4b2da401f5880a))
+* enhance live-preview with full element rendering and UX improvements ([75b6ac0](https://github.com/andreas13xxx/Slatebase/commit/75b6ac0780bdd0b8c9c2e88aff6225dc58cee704))
+
 ## [0.13.0](https://github.com/andreas13xxx/Slatebase/compare/v0.12.0...v0.13.0) (2026-07-21)
 
 
