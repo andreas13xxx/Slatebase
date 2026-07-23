@@ -18,6 +18,7 @@ import { favoritesStore } from '../state/favoritesStore'
 import { TemplateSelector } from './TemplateSelector'
 import { getCachedStatistics, fetchVaultStatistics, invalidateStatisticsCache, formatStatisticsTooltip } from '../state/vaultStatisticsCache'
 import { onRealtimeVaultChange } from '../state/realtimeVaultBridge'
+import { getState as getWorkspaceState, updateExpandedState } from '../state/workspaceStore'
 import { TreeNode } from './file-explorer'
 import type { DragState, ExternalDropState, ContextMenuState, InlineInputState } from './file-explorer'
 
@@ -48,8 +49,8 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
   const { tabState, tabDispatch } = useTabContext()
   const { t } = useTranslation()
   const { showToast } = useToast()
-  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
-  const [expandedVaults, setExpandedVaults] = useState<Set<string>>(new Set())
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set(getWorkspaceState().expandedPaths))
+  const [expandedVaults, setExpandedVaults] = useState<Set<string>>(() => new Set(getWorkspaceState().expandedVaults))
   const [showCreateVaultForm, setShowCreateVaultForm] = useState(false)
   const [newVaultName, setNewVaultName] = useState('')
   const [vaultValidationError, setVaultValidationError] = useState<string | null>(null)
@@ -93,6 +94,28 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
 
   // Counter to force re-render when favorites change
   const [, setFavoritesVersion] = useState(0)
+
+  // Persist expanded paths/vaults to workspace store
+  useEffect(() => {
+    updateExpandedState([...expandedPaths], [...expandedVaults])
+  }, [expandedPaths, expandedVaults])
+
+  // On mount: lazy-load trees for vaults that were persisted as expanded
+  const hasLoadedPersistedVaultsRef = useRef(false)
+  useEffect(() => {
+    if (hasLoadedPersistedVaultsRef.current) return
+    if (expandedVaults.size === 0) return
+    hasLoadedPersistedVaultsRef.current = true
+    for (const vaultId of expandedVaults) {
+      if (!state.vaultTrees[vaultId] && apiClient && !state.vaultTreesLoading.has(vaultId)) {
+        dispatch({ type: 'VAULT_TREE_LOADING', payload: vaultId })
+        apiClient.fetchVaultTree(vaultId).then(
+          (tree) => dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree } }),
+          () => { /* silently ignore — vault will show empty */ },
+        )
+      }
+    }
+  }, [expandedVaults, state.vaultTrees, state.vaultTreesLoading, dispatch])
 
   /** Check if a file is a favorite for a given vault. */
   const checkIsFavorite = useCallback((vaultId: string, path: string): boolean => {

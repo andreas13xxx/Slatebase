@@ -321,6 +321,7 @@ src/
 │   ├── favoritesStore.ts — Favorites per vault (server-synced + localStorage cache, max 50, path tracking on rename/delete)
 │   ├── dailyNoteService.ts — Daily note open/create logic (YYYY-MM-DD.md, template from vault config)
 │   ├── keybindingsStore.ts — Configurable keyboard shortcuts (server-synced, defaults + user overrides, matchesShortcut(), formatShortcut())
+│   ├── workspaceStore.ts — Workspace UI state persistence (tabs, expanded folders, panel sizes/visibility, debounced localStorage, per-vault tab memory)
 │   └── vaultStatisticsCache.ts — Client-side vault statistics cache (invalidate on vault:change SSE)
 │   ├── settingsState.ts      — Settings reducer + types (categories, sections, nav state)
 │   ├── settingsRegistry.ts   — ISettingsRegistry, section definitions

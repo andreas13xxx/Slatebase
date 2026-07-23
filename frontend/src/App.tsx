@@ -63,7 +63,7 @@ import { PluginProvider } from './plugins/compat/plugin-context'
 import { CommandPaletteContainer } from './components/CommandPaletteContainer'
 import { useResize } from './hooks/useResize'
 import { useStatusBar } from './hooks/useStatusBar'
-import { saveRestoreState, readRestoreState, clearRestoreState, updateUiSnapshot, RESTORE_STATE_KEY } from './utils/restoreState'
+import { initialize as initializeWorkspace, getState as getWorkspaceState, updateLayout as updateWorkspaceLayout, updateTabs as updateWorkspaceTabs, update as updateWorkspace, clear as clearWorkspace, flush as flushWorkspace } from './state/workspaceStore'
 import {
   User, Settings, Shield, FileText, Clock,
   Database, Share2, Trash2, Server,
@@ -84,6 +84,10 @@ const _storedToken = localStorage.getItem('slatebase_token')
 const _storedCsrf = localStorage.getItem('slatebase_csrf')
 if (_storedToken) apiClient.setToken(_storedToken)
 if (_storedCsrf) apiClient.setCsrfToken(_storedCsrf)
+
+// Synchronous workspace state restore from localStorage — must run before
+// any component reads getWorkspaceState() in their useState initializers.
+initializeWorkspace()
 
 /** LocalStorage key for persisting the last selected vault. */
 const LAST_VAULT_KEY = 'slatebase_last_vault'
@@ -184,11 +188,13 @@ function AppContent() {
   const { isEnabled } = useFeatureContext()
   const { t } = useTranslation()
   const prevVaultId = useRef<string | null>(null)
+  // Per-vault tab memory: saves tabs when switching away, restores when switching back
+  const vaultTabsCacheRef = useRef<Map<string, { tabs: Array<{ filePath: string; fileName: string }>; activeTabId: string | null }>>(new Map())
   // Navigation tabs: list of open pages + which is active
   const [openSettingsPages, setOpenSettingsPages] = useState<AppPage[]>([])
-  const [activeSettingsPage, setActiveSettingsPage] = useState<AppPage | null>(null)
-  const [showRightPanel, setShowRightPanel] = useState(true)
-  const [showSidebar, setShowSidebar] = useState(true)
+  const [activeSettingsPage, setActiveSettingsPage] = useState<AppPage | null>(() => getWorkspaceState().activeSettingsPage)
+  const [showRightPanel, setShowRightPanel] = useState(() => getWorkspaceState().rightPanelVisible)
+  const [showSidebar, setShowSidebar] = useState(() => getWorkspaceState().sidebarVisible)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
   const createFileTriggerRef = useRef<(() => void) | null>(null)
@@ -202,8 +208,8 @@ function AppContent() {
   // Version browser state: which file to show versions for
   const [versionBrowserTarget, setVersionBrowserTarget] = useState<{ vaultId: string; filePath: string } | null>(null)
 
-  const sidebar = useResize(260, 180, 400, 'left')
-  const rightPanel = useResize(240, 160, 500, 'right')
+  const sidebar = useResize(260, 180, 400, 'left', 'sidebarWidth')
+  const rightPanel = useResize(240, 160, 500, 'right', 'rightPanelWidth')
   const versionInfo = useVersionInfo()
 
   // Refresh key for sidebar panel views (favorites, recent files)
@@ -313,8 +319,8 @@ function AppContent() {
   useEffect(() => {
     if (state.vaults.length === 0) return
     if (state.selectedVaultId !== null) return
-    // Skip if session restore state is pending — the restore effect handles vault selection
-    if (localStorage.getItem(RESTORE_STATE_KEY)) return
+    // Skip if workspace store has persisted state — the restore effect handles vault selection
+    if (getWorkspaceState().selectedVaultId) return
     const lastId = localStorage.getItem(LAST_VAULT_KEY)
     if (lastId && state.vaults.some((v) => v.id === lastId)) {
       dispatch({ type: 'VAULT_SELECTED', payload: lastId })
@@ -328,47 +334,98 @@ function AppContent() {
     }
   }, [state.selectedVaultId])
 
-  // Keep module-level UI snapshot updated for session expiry preservation
+  // Persist panel visibility to workspace store
   useEffect(() => {
-    updateUiSnapshot({
-      selectedVaultId: state.selectedVaultId,
-      tabs: tabState.tabs.map((t) => ({ vaultId: t.vaultId, filePath: t.filePath })),
-      activeTabId: tabState.activeTabId,
-    })
-  }, [state.selectedVaultId, tabState.tabs, tabState.activeTabId])
+    updateWorkspaceLayout({ sidebarVisible: showSidebar, rightPanelVisible: showRightPanel })
+  }, [showSidebar, showRightPanel])
 
-  // Restore UI state after re-login (from session expiry)
+  // Persist active settings page and selected vault to workspace store
+  useEffect(() => {
+    updateWorkspace({ activeSettingsPage, selectedVaultId: state.selectedVaultId })
+  }, [activeSettingsPage, state.selectedVaultId])
+
+  // Persist open tabs to workspace store (skip during initial restore phase)
+  const isRestoringRef = useRef(true)
+  useEffect(() => {
+    // Don't persist until the restore effect has run at least once
+    if (isRestoringRef.current) return
+    const persistedTabs = tabState.tabs.map((t) => ({
+      vaultId: t.vaultId,
+      filePath: t.filePath,
+      fileName: t.fileName,
+      mode: t.mode,
+    }))
+    updateWorkspaceTabs(persistedTabs, tabState.activeTabId)
+  }, [tabState.tabs, tabState.activeTabId])
+
+  // Flush workspace state on page unload
+  useEffect(() => {
+    const handleBeforeUnload = () => { flushWorkspace() }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [])
+
+  // Restore UI state from workspace store (survives page reload and session expiry)
   const hasRestoredRef = useRef(false)
   useEffect(() => {
     if (hasRestoredRef.current) return
     if (state.vaults.length === 0) return
 
-    const restoreState = readRestoreState()
-    if (!restoreState) return
-
-    hasRestoredRef.current = true
-    clearRestoreState()
-
-    // Restore vault selection
-    if (restoreState.selectedVaultId && state.vaults.some((v) => v.id === restoreState.selectedVaultId)) {
-      dispatch({ type: 'VAULT_SELECTED', payload: restoreState.selectedVaultId })
+    const wsState = getWorkspaceState()
+    // Only restore if there are persisted tabs
+    if (wsState.tabs.length === 0 && !wsState.selectedVaultId) {
+      // Nothing to restore — enable persistence immediately
+      hasRestoredRef.current = true
+      isRestoringRef.current = false
+      return
     }
 
-    // Restore tabs — only if the vaults still exist
+    hasRestoredRef.current = true
+
+    // Restore vault selection
+    if (wsState.selectedVaultId && state.vaults.some((v) => v.id === wsState.selectedVaultId)) {
+      dispatch({ type: 'VAULT_SELECTED', payload: wsState.selectedVaultId })
+    }
+
+    // Restore tabs — only if the vaults still exist, then fetch content
     const validVaultIds = new Set(state.vaults.map((v) => v.id))
-    for (const tab of restoreState.tabs) {
+    for (const tab of wsState.tabs) {
       if (!validVaultIds.has(tab.vaultId)) continue
-      const fileName = tab.filePath.split('/').pop() ?? tab.filePath
       tabDispatch({
         type: 'OPEN_TAB',
-        payload: { vaultId: tab.vaultId, filePath: tab.filePath, fileName },
+        payload: { vaultId: tab.vaultId, filePath: tab.filePath, fileName: tab.fileName },
       })
+      // Fetch content for regular file tabs (skip virtual tabs like __graph__, __view::*)
+      const tabId = `${tab.vaultId}::${tab.filePath}`
+      if (!tab.filePath.startsWith('__')) {
+        apiClient.fetchFileContent(tab.vaultId, tab.filePath).then(
+          (result) => {
+            tabDispatch({
+              type: 'TAB_CONTENT_LOADED',
+              payload: { tabId, content: result.content, isBinary: result.isBinary },
+            })
+          },
+          () => {
+            // File no longer exists — close the tab
+            tabDispatch({ type: 'CLOSE_TAB', payload: { tabId } })
+          },
+        )
+      } else {
+        // Virtual tabs (graph, plugin views) don't need content fetch
+        tabDispatch({
+          type: 'TAB_CONTENT_LOADED',
+          payload: { tabId, content: '', isBinary: false },
+        })
+      }
     }
 
     // Restore active tab
-    if (restoreState.activeTabId) {
-      tabDispatch({ type: 'ACTIVATE_TAB', payload: { tabId: restoreState.activeTabId } })
+    if (wsState.activeTabId) {
+      tabDispatch({ type: 'ACTIVATE_TAB', payload: { tabId: wsState.activeTabId } })
     }
+
+    // Enable tab persistence now that restore is complete
+    isRestoringRef.current = false
   }, [state.vaults, dispatch, tabDispatch])
 
   // When a file tab becomes active (e.g. from FileExplorer click), deactivate settings page
@@ -384,22 +441,67 @@ function AppContent() {
     const vaultId = state.selectedVaultId
     if (vaultId !== prevVaultId.current) {
       if (prevVaultId.current !== null) {
+        // Save current tabs for the previous vault before clearing
+        const prevId = prevVaultId.current
+        vaultTabsCacheRef.current.set(prevId, {
+          tabs: tabState.tabs
+            .filter((t) => t.vaultId === prevId)
+            .map((t) => ({ filePath: t.filePath, fileName: t.fileName })),
+          activeTabId: tabState.activeTabId,
+        })
+
         // Vault changed or was deleted — clear all tabs
         const graphTab = tabState.tabs.find((t) => t.filePath === '__graph__')
         tabDispatch({ type: 'CLEAR_ALL_TABS' })
-        if (graphTab && vaultId) {
-          // Re-open graph tab for the new vault (only if a new vault is selected)
-          const vault = state.vaults.find((v) => v.id === vaultId)
-          const graphTabName = vault ? `Graph — ${vault.name}` : 'Graph'
-          tabDispatch({
-            type: 'OPEN_TAB',
-            payload: { vaultId, filePath: '__graph__', fileName: graphTabName },
-          })
-          const graphTabId = `${vaultId}::__graph__`
-          tabDispatch({
-            type: 'TAB_CONTENT_LOADED',
-            payload: { tabId: graphTabId, content: '', isBinary: false },
-          })
+
+        // Restore cached tabs for the new vault (if any)
+        if (vaultId) {
+          const cached = vaultTabsCacheRef.current.get(vaultId)
+          if (cached && cached.tabs.length > 0) {
+            for (const tab of cached.tabs) {
+              tabDispatch({
+                type: 'OPEN_TAB',
+                payload: { vaultId, filePath: tab.filePath, fileName: tab.fileName },
+              })
+              // Fetch content for regular file tabs
+              const tabId = `${vaultId}::${tab.filePath}`
+              if (!tab.filePath.startsWith('__')) {
+                apiClient.fetchFileContent(vaultId, tab.filePath).then(
+                  (result) => {
+                    tabDispatch({
+                      type: 'TAB_CONTENT_LOADED',
+                      payload: { tabId, content: result.content, isBinary: result.isBinary },
+                    })
+                  },
+                  () => {
+                    tabDispatch({ type: 'CLOSE_TAB', payload: { tabId } })
+                  },
+                )
+              } else {
+                tabDispatch({
+                  type: 'TAB_CONTENT_LOADED',
+                  payload: { tabId, content: '', isBinary: false },
+                })
+              }
+            }
+            // Restore active tab
+            if (cached.activeTabId) {
+              tabDispatch({ type: 'ACTIVATE_TAB', payload: { tabId: cached.activeTabId } })
+            }
+          } else if (graphTab) {
+            // No cached tabs but graph was open — re-open graph for new vault
+            const vault = state.vaults.find((v) => v.id === vaultId)
+            const graphTabName = vault ? `Graph — ${vault.name}` : 'Graph'
+            tabDispatch({
+              type: 'OPEN_TAB',
+              payload: { vaultId, filePath: '__graph__', fileName: graphTabName },
+            })
+            const graphTabId = `${vaultId}::__graph__`
+            tabDispatch({
+              type: 'TAB_CONTENT_LOADED',
+              payload: { tabId: graphTabId, content: '', isBinary: false },
+            })
+          }
         }
       }
       if (vaultId) {
@@ -471,6 +573,7 @@ function AppContent() {
     apiClient.setCsrfToken(null)
     authDispatch({ type: 'LOGOUT' })
     localStorage.removeItem(LAST_VAULT_KEY)
+    clearWorkspace()
   }, [authDispatch])
 
   function handleImportFile() { fileInputRef.current?.click() }
@@ -1069,8 +1172,7 @@ function AuthGuard() {
 
   useEffect(() => {
     apiClient.setOnSessionExpired(() => {
-      // Preserve UI state before clearing auth — enables restoration after re-login
-      saveRestoreState()
+      // Workspace state is already persisted continuously — no need to save explicitly
       apiClient.setToken(null)
       apiClient.setCsrfToken(null)
       // Disconnect server-synced stores
@@ -1102,7 +1204,7 @@ function AuthGuard() {
         setSessionVerified(true)
       } else {
         // Session expired — clear auth state (triggers login page)
-        saveRestoreState()
+        // Workspace state is already persisted continuously — no explicit save needed
         apiClient.setToken(null)
         apiClient.setCsrfToken(null)
         disconnectRecentFiles()

@@ -207,6 +207,7 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 33. `checkSessionAlive()` in App.tsx: Neues `IApiClient`-Methode. Leichtgewichtiger HEAD-Request gegen Session-Endpoint. Tests MÜSSEN diese Methode im MockApiClient bereitstellen (sonst `is not a function` Error). Default im Test: `mockResolvedValue(true)`.
 34. Settings Sections: `appearance` Section unter account hinzugefügt (Status Bar Toggle). Total ist jetzt 16 Sections (8 account + 3 vault + 5 admin). Tests die feste Zahlen prüfen, müssen bei neuer Section angepasst werden.
 35. Welcome Vault v2 Route: eigene `welcomeVaultRoutes.ts` (nicht in adminRoutes). Rate-Limit 3/h pro User separat von Login-Rate-Limit. `createWelcomeVault()` in IApiClient hinzufügen — Tests brauchen Mock.
+36. Workspace Store `initialize()` MUSS auf Module-Level laufen (nicht im useEffect). Sonst lesen useState-Initializer den Default-State statt den persistierten. Der „Persist tabs"-Effekt braucht einen `isRestoringRef`-Guard, sonst überschreibt er die gespeicherten Tabs mit `[]` beim ersten Render.
 
 ## Multi-User & Vault-Besitz
 
@@ -319,6 +320,17 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 
 - Git-Proxy: `git -c http.proxy="" push`
 - Node.js v24, `tsx watch` Dev, `tsc` Prod
+
+## Workspace State Persistence
+
+- **workspaceStore.ts**: Module-Level-Store in `state/workspaceStore.ts`. Schema-Version 1 für Forward-Compat. Debounced localStorage (500ms). `initialize()` → `getState()` → `update/updateTabs/updateLayout/updateExpandedState` → `clear()` → `flush()`.
+- **Synchrones Initialize auf Module-Level**: `initializeWorkspace()` MUSS vor dem ersten React-Render laufen (Module-Level in App.tsx, wie Token-Restore). Grund: `useState`-Initializer lesen `getWorkspaceState()` synchron — läuft initialize erst im useEffect, lesen sie den Default-State.
+- **Tab-Persist Race Condition**: Der „Persist tabs"-Effekt würde beim ersten Render `updateWorkspaceTabs([], null)` aufrufen und den gespeicherten State überschreiben. Fix: `isRestoringRef` Guard, der erst nach dem Restore-Effekt auf `false` gesetzt wird.
+- **Content-Fetch bei Tab-Restore**: `OPEN_TAB` allein setzt nur `loading: true`. Man MUSS danach `fetchFileContent()` aufrufen und `TAB_CONTENT_LOADED` dispatchen. Virtuelle Tabs (`__graph__`, `__view::*`) bekommen sofort leeren Content.
+- **Expanded Vaults Tree-Loading**: Beim Restore expandierter Vaults muss `fetchVaultTree()` explizit aufgerufen werden — der Toggle-Handler (User-Click) macht das normalerweise, aber nicht der Restore-Effekt.
+- **Per-Vault Tab Memory**: `vaultTabsCacheRef` (In-Memory Map) speichert Tabs beim Vault-Wechsel. Überlebt keinen Page-Reload (nicht nötig — der Store deckt das ab). Beim Zurückwechseln werden gecachte Tabs wiederhergestellt inkl. Content-Fetch.
+- **Logout Cleanup**: `clearWorkspace()` im Logout-Handler + `beforeunload` → `flushWorkspace()`.
+- **restoreState.ts ist Dead Code**: Die alte Session-Expiry-Restore-Logik (5-Min-TTL) ist vollständig durch den workspaceStore ersetzt. Datei kann gelöscht werden.
 
 ## Frontend-Refactoring-Erkenntnisse
 
