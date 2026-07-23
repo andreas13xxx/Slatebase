@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.15.0](https://github.com/andreas13xxx/Slatebase/compare/v0.14.0...v0.15.0) (2026-07-23)
+
+
+### Features
+
+* implement workspace state persistence across page reloads ([618f939](https://github.com/andreas13xxx/Slatebase/commit/618f93905b1b6b29e3b94b62c7082dd92e3c18a5))
+
+
+### Bugfixes
+
+* clear workspace store between FileExplorer tests ([2f597db](https://github.com/andreas13xxx/Slatebase/commit/2f597dbe92d995904b2dcc83cce530fab5589927))
+
 ## [0.14.0](https://github.com/andreas13xxx/Slatebase/compare/v0.13.0...v0.14.0) (2026-07-21)
 
 
