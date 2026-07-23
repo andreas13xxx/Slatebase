@@ -9,6 +9,7 @@ import type { AppState, AppAction, DirectoryTree, VaultInfo } from '../types'
 import { initialState } from '../state'
 import type { IApiClient } from '../api'
 import type { Dispatch } from 'react'
+import { clear as clearWorkspaceStore } from '../state/workspaceStore'
 
 /** Creates a mock API client with all required interface methods. */
 function createMockApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
@@ -97,6 +98,10 @@ const sampleTree: DirectoryTree = {
 }
 
 describe('FileExplorer', () => {
+  beforeEach(() => {
+    clearWorkspaceStore()
+  })
+
   describe('empty state', () => {
     it('shows "Keine Vaults vorhanden" when no vaults exist', () => {
       renderFileExplorer({ vaults: [] })
