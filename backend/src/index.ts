@@ -86,7 +86,7 @@ import { createPreferencesRoutes } from './api/preferencesRoutes.js'
 import { VaultConfigStore } from './vault-config/index.js'
 import { createVaultConfigRoutes } from './api/vaultConfigRoutes.js'
 import { WelcomeVaultService } from './welcome-vault/index.js'
-import { createWelcomeVaultRoutes } from './api/welcomeVaultRoutes.js'
+import { createWelcomeVaultRoutes, deduplicateVaultName } from './api/welcomeVaultRoutes.js'
 
 // --- Composition Root ---
 
@@ -233,7 +233,14 @@ const welcomeVaultService = new WelcomeVaultService(
   serverConfig.dataDir,
 )
 welcomeVaultCreator = async (userId: string, language: 'de' | 'en'): Promise<void> => {
-  const result = await welcomeVaultService.createWelcomeVault(userId, language)
+  // Deduplicate vault name (VaultService enforces global name uniqueness)
+  const welcomeVaultConfig = config.getWelcomeVaultConfig()
+  const baseName = welcomeVaultConfig.name[language]
+  const allVaults = await vaultService.getVaultList()
+  const existingNames = allVaults.map((v) => v.name)
+  const deduplicatedName = deduplicateVaultName(baseName, existingNames)
+
+  const result = await welcomeVaultService.createWelcomeVault(userId, language, deduplicatedName)
   // After welcome vault creation: initialize link index so Knowledge Graph is available
   if (result) {
     const linkIndex = new LinkIndexService(result.storagePath, result.vaultId, result.vaultName, logger)
