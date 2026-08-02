@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.0](https://github.com/andreas13xxx/Slatebase/compare/v0.16.1...v0.17.0) (2026-08-02)
+
+
+### Features
+
+* **plugin-compat:** add declarative settings renderer, global extensions, and metadata cache improvements ([1925bf7](https://github.com/andreas13xxx/Slatebase/commit/1925bf7c73bb006840d0398bbc3c2783c25d9a78))
+
 ## [0.16.1](https://github.com/andreas13xxx/Slatebase/compare/v0.16.0...v0.16.1) (2026-08-02)
 
 
