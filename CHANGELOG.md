@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.1](https://github.com/andreas13xxx/Slatebase/compare/v0.16.0...v0.16.1) (2026-08-02)
+
+
+### Sonstige Änderungen
+
+* consolidate steering files and update implementation plan ([31d23a7](https://github.com/andreas13xxx/Slatebase/commit/31d23a77a7e96469884d1430fae939f925f99b45))
+
 ## [0.16.0](https://github.com/andreas13xxx/Slatebase/compare/v0.15.1...v0.16.0) (2026-08-02)
 
 
