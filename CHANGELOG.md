@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.0](https://github.com/andreas13xxx/Slatebase/compare/v0.15.1...v0.16.0) (2026-08-02)
+
+
+### Features
+
+* extend Obsidian plugin compat layer (Tier 1-3 APIs, LiveSync full support, CORS proxy) ([54dbcc4](https://github.com/andreas13xxx/Slatebase/commit/54dbcc47ec959e92fd1c880376dca868d130359d))
+
 ## [0.15.1](https://github.com/andreas13xxx/Slatebase/compare/v0.15.0...v0.15.1) (2026-07-27)
 
 
