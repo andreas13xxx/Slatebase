@@ -37,6 +37,7 @@ import { SettingsManager } from './settings-manager'
 import type { ISettingsApiClient } from './settings-manager'
 import { SettingTabRegistry } from './setting-tab-registry'
 import type { ISettingTabRegistry } from './setting-tab-registry'
+import { CssInjector } from './css-injector'
 import { CompatibilityAnalyzer } from './compatibility-analyzer'
 // Import setting-tab module to register global obsidian shims (PluginSettingTab, Setting)
 import './setting-tab'
@@ -44,7 +45,16 @@ import type { ICompatibilityAnalyzer } from './compatibility-analyzer'
 import { VaultShim } from './shims/vault-shim'
 import { WorkspaceShim } from './shims/workspace-shim'
 import { MetadataCacheShim } from './shims/metadata-cache-shim'
+import { FileManagerShim } from './shims/file-manager-shim'
+import type { IVaultShim } from './types'
+import { registerFileViewMatcher, unregisterAllFileViewMatchersForPlugin, removeActiveFileViewsForPlugin, registerExtensionsForPlugin } from './file-view-registry'
+import { registerCodeBlockProcessor, registerPostProcessor } from './code-block-processor-registry'
 import { AppShim } from './shims/app-shim'
+import { setEditorViewAccessor } from './editor-shim'
+import { getActiveEditorView } from '../../editor/plugin-extensions'
+import { registerMarkdownViewGlobal } from './shims/markdown-view-shim'
+import { registerMarkdownRendererGlobal } from './shims/markdown-renderer-shim'
+import { registerSuggestModalGlobals } from './shims/suggest-modal-shim'
 import { usePluginEventBridge } from './plugin-event-bridge'
 import { ViewRegistry } from './view-registry'
 import type { ItemView, WorkspaceLeaf } from './view-registry'
@@ -58,6 +68,7 @@ import {
   offClosePluginViewTab,
   onActivatePluginViewTab,
   offActivatePluginViewTab,
+  dispatchOpenPluginViewTab,
 } from './tab-view-bridge'
 import type {
   OpenPluginViewTabFn,
@@ -69,6 +80,7 @@ import {
   clearAllRibbonIcons,
   onRibbonIconsChange,
   getRibbonIcons,
+  addRibbonIcon,
 } from './ribbon-icon-registry'
 import type { RibbonIconEntry } from './ribbon-icon-registry'
 
@@ -107,6 +119,8 @@ export interface PluginContextValue {
   sidebarViews: Map<string, SidebarViewInfo>
   /** Plugin ribbon icons (for rendering in the toolbar) */
   ribbonIcons: RibbonIconEntry[]
+  /** Create a plugin file view for a given view type and file path. Returns the container element or null. */
+  createFileView(viewType: string, filePath: string): Promise<HTMLElement | null>
 }
 
 // ─── React Context ───────────────────────────────────────────────────────────
@@ -220,6 +234,8 @@ export function PluginProvider({
     commandRegistryRef.current.removeAllForPlugin(pluginId)
     settingTabRegistryRef.current.remove(pluginId)
     removeRibbonIconsForPlugin(pluginId)
+    unregisterAllFileViewMatchersForPlugin(pluginId)
+    await removeActiveFileViewsForPlugin(pluginId)
     await viewRegistryRef.current.detachAllForPlugin(pluginId)
   }
 
@@ -326,6 +342,13 @@ export function PluginProvider({
         })
         return next
       })
+      // Open a tab for main-location plugin views (LiveSync Log, etc.)
+      // Use setTimeout to ensure setActiveViews has committed before TabContent renders
+      if (newVaultId) {
+        setTimeout(() => {
+          dispatchOpenPluginViewTab(newVaultId, viewType, view.getDisplayText(), '')
+        }, 0)
+      }
     })
     newViewRegistry.setOnViewDeactivated((viewType: string) => {
       setActiveViews(prev => {
@@ -366,6 +389,36 @@ export function PluginProvider({
     }
     newWorkspaceShim.setViewRegistry(newViewRegistry, sharedApp)
 
+    // Wire EditorShim to use CM6 EditorView as backend
+    setEditorViewAccessor(getActiveEditorView)
+
+    // Register MarkdownView on window.obsidian for instanceof checks
+    registerMarkdownViewGlobal()
+
+    // Register MarkdownRenderer on window.obsidian for render() calls
+    registerMarkdownRendererGlobal()
+
+    // Register Modal/SuggestModal/FuzzySuggestModal on window.obsidian
+    registerSuggestModalGlobals()
+
+    // Register Notice bridge on window so the require()-shim can call showToast
+    // eslint-disable-next-line react-hooks/immutability
+    ;(window as unknown as { __slatebaseShowNotice?: (msg: string, duration?: number) => void }).__slatebaseShowNotice = (msg: string, _duration?: number) => {
+      // Dynamically import showToast to avoid circular dependency
+      import('../../components/ToastNotification').then(({ showToast }) => {
+        showToast('info', msg)
+      })
+    }
+
+    // Wire the editor context resolver for editorCallback commands
+    commandRegistryRef.current.setEditorContextResolver(() => {
+      const file = newWorkspaceShim.getActiveFile()
+      if (!file) return null
+      const activeEditorInfo = newWorkspaceShim.activeEditor
+      if (!activeEditorInfo) return null
+      return { editor: activeEditorInfo.editor, file }
+    })
+
     // Update window.app to reference the real shim instances
     // (many plugins and libraries like obsidian-daily-notes-interface access window.app directly)
     const windowApp = (window as unknown as { app: Record<string, unknown> }).app
@@ -376,6 +429,12 @@ export function PluginProvider({
       windowApp.workspace = sharedApp.workspace
       // eslint-disable-next-line react-hooks/immutability
       windowApp.metadataCache = sharedApp.metadataCache
+      // eslint-disable-next-line react-hooks/immutability
+      windowApp.fileManager = new FileManagerShim(sharedApp.vault as IVaultShim)
+      // eslint-disable-next-line react-hooks/immutability
+      windowApp.commands = { commands: {}, executeCommand: () => {} }
+      // eslint-disable-next-line react-hooks/immutability
+      windowApp.embedRegistry = { embedByExtension: { md: () => { const F = class {}; return { load(){}, unload(){}, editable: false, showEditor(){}, editMode: Object.create(Object.create(F.prototype)) } } } }
     }
 
     // Wire onOpenFile immediately (not deferred to useEffect) so it's available
@@ -429,6 +488,19 @@ export function PluginProvider({
         setPlugins(newRegistry.listPlugins())
       },
       onPluginInstantiated: (pluginId: string, instance) => {
+        // Wire loadData/saveData to the SettingsManager for persistent plugin config.
+        // Without this, plugins (esp. LiveSync) get null from loadData() and cannot initialize.
+        instance.loadData = () => newSettingsManager.loadData(pluginId)
+        instance.saveData = (data: unknown) => newSettingsManager.saveData(pluginId, data)
+
+        // Ensure scope exists (Obsidian's keymap manager — Kanban needs this.scope.keys)
+        if (!(instance as unknown as { scope?: unknown }).scope) {
+          (instance as unknown as { scope: unknown }).scope = {
+            keys: function() { return this },
+            register: () => ({}),
+            unregister: () => {},
+          }
+        }
         // Wire addCommand to route to the shared CommandRegistry
         instance.addCommand = (command) => {
           if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) return
@@ -439,11 +511,52 @@ export function PluginProvider({
           if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) return
           settingTabRegistryRef.current.register(pluginId, tab as import('./setting-tab').PluginSettingTab)
         }
+        // Wire addRibbonIcon to route to the shared RibbonIconRegistry
+        instance.addRibbonIcon = (icon: string, title: string, callback: () => void) => {
+          console.log(`[PluginProvider] addRibbonIcon called: pluginId="${pluginId}", icon="${icon}", title="${title}", guardCheck: vaultRef=${pluginSystemVaultIdRef.current}, newVaultId=${newVaultId}`)
+          if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) {
+            return document.createElement('div')
+          }
+          return addRibbonIcon(pluginId, icon, title, callback)
+        }
         // Wire registerView to route to the workspace shim's view registry
         ;(instance as unknown as { registerView: (viewType: string, creator: unknown) => void }).registerView = (viewType: string, creator: unknown) => {
           console.log(`[PluginProvider] registerView called: viewType="${viewType}", pluginId="${pluginId}", guardCheck: vaultRef=${pluginSystemVaultIdRef.current}, newVaultId=${newVaultId}, registryMatch=${pluginRegistryRef.current === newRegistry}`)
           if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) return
           newWorkspaceShim.registerView(viewType, creator as (leaf: import('./view-registry').WorkspaceLeaf) => unknown, pluginId)
+
+          // Auto-register a file view matcher for TextFileView-based plugins.
+          // Convention: if a .md file has a frontmatter key "<viewType>-plugin" or "<pluginId>",
+          // this plugin handles the rendering.
+          registerFileViewMatcher(viewType, pluginId, (_filePath: string, content: string) => {
+            if (!content || !_filePath.endsWith('.md')) return false
+            // Quick frontmatter check: look for the view type key in the YAML frontmatter
+            const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/)
+            if (!fmMatch) return false
+            const frontmatter = fmMatch[1] ?? ''
+            // Check for "<viewType>-plugin:" key (e.g. "kanban-plugin: board")
+            if (frontmatter.includes(`${viewType}-plugin:`)) return true
+            // Check for "<pluginId>:" key (e.g. "obsidian-kanban:")
+            if (frontmatter.includes(`${pluginId}:`)) return true
+            return false
+          })
+        }
+        // Wire registerExtensions to route to the file-view-registry
+        ;(instance as unknown as { registerExtensions: (exts: string[], viewType: string) => void }).registerExtensions = (exts: string[], viewType: string) => {
+          if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) return
+          registerExtensionsForPlugin(exts, viewType, pluginId)
+        }
+        // Wire registerMarkdownCodeBlockProcessor to route to the code-block-processor-registry
+        ;(instance as unknown as { registerMarkdownCodeBlockProcessor: (language: string, handler: unknown, sortOrder?: number) => unknown }).registerMarkdownCodeBlockProcessor = (language: string, handler: unknown, sortOrder?: number) => {
+          if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) return {}
+          registerCodeBlockProcessor(language, handler as import('./code-block-processor-registry').CodeBlockHandler, pluginId, sortOrder)
+          return handler
+        }
+        // Wire registerMarkdownPostProcessor to route to the code-block-processor-registry
+        ;(instance as unknown as { registerMarkdownPostProcessor: (processor: unknown, sortOrder?: number) => unknown }).registerMarkdownPostProcessor = (processor: unknown, sortOrder?: number) => {
+          if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) return processor
+          registerPostProcessor(processor as import('./code-block-processor-registry').MarkdownPostProcessor, pluginId, sortOrder)
+          return processor
         }
       },
     })
@@ -507,11 +620,20 @@ export function PluginProvider({
       // Find active plugins and load their bundles
       const activePlugins = registry.listPlugins().filter(p => p.status === 'active')
       const pluginsToLoad: Array<{ pluginId: string; bundle: string; manifest: { id: string; name: string; version: string; minAppVersion?: string; author?: string; description?: string } }> = []
+      const cssInjector = new CssInjector()
 
       for (const entry of activePlugins) {
         try {
           const bundle = await apiClient.loadBundle(targetVaultId, entry.pluginId)
           if (!isCurrentContext()) return
+
+          // Load and inject plugin CSS (fire-and-forget, non-blocking)
+          apiClient.loadStyles(targetVaultId, entry.pluginId).then((css) => {
+            if (css && isCurrentContext()) {
+              cssInjector.inject(entry.pluginId, css)
+            }
+          }).catch(() => { /* No styles or fetch failed — ignore */ })
+
           pluginsToLoad.push({
             pluginId: entry.pluginId,
             bundle,
@@ -625,10 +747,16 @@ export function PluginProvider({
       } else {
         registry.updateStatus(pluginId, 'inactive')
       }
+      // Remove plugin CSS when deactivated
+      const cssInjector = new CssInjector()
+      cssInjector.remove(pluginId)
       await registry.waitForPersistence()
       if (isCurrentContext()) {
         setPlugins(registry.listPlugins())
       }
+      // Reload page to ensure clean state — some plugins (e.g. LiveSync) cannot
+      // reinitialize within the same session after unload due to IndexedDB/PouchDB state.
+      window.location.reload()
       return
     }
 
@@ -644,6 +772,15 @@ export function PluginProvider({
       if (!isCurrentContext()) {
         throw new Error('Vault changed while enabling plugin')
       }
+
+      // Load and inject plugin CSS
+      apiClient.loadStyles(targetVaultId, pluginId).then((css) => {
+        if (css && isCurrentContext()) {
+          const cssInjector = new CssInjector()
+          cssInjector.inject(pluginId, css)
+        }
+      }).catch(() => { /* No styles — ignore */ })
+
       await loader.loadPlugin(pluginId, bundle, manifest)
       if (!isCurrentContext()) {
         await loader.unloadPlugin(pluginId, false)
@@ -676,6 +813,8 @@ export function PluginProvider({
     directoryTree,
     workspaceShim: workspaceShimRef.current, // eslint-disable-line react-hooks/refs
     metadataCacheShim: metadataCacheShimRef.current, // eslint-disable-line react-hooks/refs
+    vaultShim: vaultShimRef.current, // eslint-disable-line react-hooks/refs
+    currentVaultId: vaultId ?? null,
   })
 
   // ─── TabViewBridge: connect plugin view lifecycle events to TabProvider ────
@@ -817,6 +956,22 @@ export function PluginProvider({
     activeViews,
     sidebarViews,
     ribbonIcons,
+    createFileView: async (viewType: string, filePath: string): Promise<HTMLElement | null> => {
+      const workspace = workspaceShimRef.current
+      const viewRegistry = workspace?.getViewRegistry() ?? viewRegistryRef.current
+      if (!viewRegistry || !workspace) return null
+      const sharedApp = {
+        vault: vaultShimRef.current,
+        workspace,
+        metadataCache: metadataCacheShimRef.current,
+      }
+      const leaf = viewRegistry.createLeaf(sharedApp, 'main')
+      await leaf.setViewState({ type: viewType, state: { file: filePath } })
+      if (leaf.view) {
+        return leaf.view.containerEl
+      }
+      return null
+    },
   }
 
   return React.createElement(

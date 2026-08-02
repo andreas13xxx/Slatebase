@@ -2,6 +2,7 @@ import { createContext, useContext, useReducer, type Dispatch, type ReactNode } 
 import React from 'react'
 import type { AppState, AppAction, AppError } from '../types'
 import type { IApiClient } from '../api'
+import { getState as getWorkspaceState, updateTabs, updateExpandedState } from './workspaceStore'
 
 /** Initial application state. */
 export const initialState: AppState = {
@@ -285,6 +286,16 @@ export async function deleteVault(
   try {
     await apiClient.deleteVault(vaultId)
     dispatch({ type: 'VAULT_DELETED', payload: vaultId })
+
+    // Clean up workspace store — remove deleted vault from persisted state
+    const ws = getWorkspaceState()
+    const filteredTabs = ws.tabs.filter((t) => t.vaultId !== vaultId)
+    const activeTabId = ws.activeTabId?.startsWith(`${vaultId}::`) ? null : ws.activeTabId
+    updateTabs(filteredTabs, activeTabId ?? null)
+
+    const filteredPaths = ws.expandedPaths.filter((p) => !p.startsWith(`${vaultId}::`))
+    const filteredVaults = ws.expandedVaults.filter((v) => v !== vaultId)
+    updateExpandedState(filteredPaths, filteredVaults)
   } catch (err: unknown) {
     const error = toAppError(err)
     dispatch({ type: 'ERROR_OCCURRED', payload: error })

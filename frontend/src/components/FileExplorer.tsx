@@ -296,23 +296,26 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
       }
     }
 
+    const wasExpanded = expandedVaults.has(vaultId)
+
     setExpandedVaults((prev) => {
       const next = new Set(prev)
       if (next.has(vaultId)) {
         next.delete(vaultId)
       } else {
         next.add(vaultId)
-        // Lazy-load tree if not yet loaded
-        if (!state.vaultTrees[vaultId] && apiClient && !state.vaultTreesLoading.has(vaultId)) {
-          dispatch({ type: 'VAULT_TREE_LOADING', payload: vaultId })
-          apiClient.fetchVaultTree(vaultId).then(
-            (tree) => dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree } }),
-            () => { /* silently ignore — vault will show empty */ },
-          )
-        }
       }
       return next
     })
+
+    // Lazy-load tree outside of setState updater (avoids dispatch-during-render warning)
+    if (!wasExpanded && !state.vaultTrees[vaultId] && apiClient && !state.vaultTreesLoading.has(vaultId)) {
+      dispatch({ type: 'VAULT_TREE_LOADING', payload: vaultId })
+      apiClient.fetchVaultTree(vaultId).then(
+        (tree) => dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree } }),
+        () => { /* silently ignore — vault will show empty */ },
+      )
+    }
   }
 
   function handleToggleFolder(path: string) {

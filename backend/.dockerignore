@@ -3,7 +3,6 @@ dist
 .env
 .env.local
 data
-!data/templates
 *.test.ts
 coverage
 npm-debug.log*

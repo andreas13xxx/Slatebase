@@ -30,6 +30,8 @@ export interface PluginInstallResult {
   pluginId: string
   manifest: PluginManifest
   isUpgrade: boolean
+  /** Warnings about detected patterns that may indicate unsafe code (non-blocking) */
+  warnings: string[]
 }
 
 /** Interface for the plugin installer */
@@ -61,7 +63,7 @@ export class PluginInstallError extends Error {
  * 2. Extract ZIP into memory
  * 3. Find manifest.json + main.js (in root or single subdirectory)
  * 4. Validate manifest (Zod schema)
- * 5. Check bundle integrity (reject eval, new Function, document.write)
+ * 5. Check bundle integrity (warn about eval, new Function, document.write)
  * 6. Calculate total extracted size — reject if > 10 MB
  * 7. Check if plugin already installed:
  *    - Not installed → fresh install
@@ -108,8 +110,8 @@ export class PluginInstaller implements IPluginInstaller {
     // Step 4: Validate manifest
     const manifest = this.validateManifest(extracted.manifestContent)
 
-    // Step 5: Check bundle integrity
-    this.checkBundleIntegrity(extracted.bundleContent, manifest.id)
+    // Step 5: Check bundle integrity (warnings, non-blocking)
+    const warnings = this.checkBundleIntegrity(extracted.bundleContent, manifest.id)
 
     // Step 6: Calculate total extracted size
     this.validateExtractedSize(entries)
@@ -141,6 +143,7 @@ export class PluginInstaller implements IPluginInstaller {
       pluginId: manifest.id,
       manifest,
       isUpgrade,
+      warnings,
     }
   }
 
@@ -191,8 +194,8 @@ export class PluginInstaller implements IPluginInstaller {
     // Step 4: Validate manifest
     const manifest = this.validateManifest(manifestContent)
 
-    // Step 5: Check bundle integrity
-    this.checkBundleIntegrity(bundleContent, manifest.id)
+    // Step 5: Check bundle integrity (warnings, non-blocking)
+    const warnings = this.checkBundleIntegrity(bundleContent, manifest.id)
 
     // Step 6: Check file sizes
     const bundleSize = Buffer.byteLength(bundleContent, 'utf-8')
@@ -242,6 +245,7 @@ export class PluginInstaller implements IPluginInstaller {
       pluginId: manifest.id,
       manifest,
       isUpgrade,
+      warnings,
     }
   }
 
@@ -366,19 +370,20 @@ export class PluginInstaller implements IPluginInstaller {
 
   /**
    * Check bundle source for unsafe patterns.
-   * Rejects if eval(, new Function(, or document.write( are found.
-   * @throws PluginInstallError if unsafe patterns are detected.
+   * Returns warnings for detected patterns (non-blocking).
+   * Many bundlers emit `new Function(` in their output — this is not necessarily malicious.
    */
-  private checkBundleIntegrity(bundleContent: string, pluginId: string): void {
+  private checkBundleIntegrity(bundleContent: string, pluginId: string): string[] {
+    const warnings: string[] = []
     for (const pattern of UNSAFE_PATTERNS) {
       if (bundleContent.includes(pattern)) {
-        throw new PluginInstallError(
-          `Plugin "${pluginId}" bundle contains unsafe pattern: "${pattern}". ` +
-          `Bundles must not use eval(), new Function(), or document.write().`,
-          'BUNDLE_UNSAFE',
+        warnings.push(
+          `Plugin "${pluginId}" bundle contains pattern: "${pattern}". ` +
+          `This may be bundler-generated code, but review the plugin if unexpected.`,
         )
       }
     }
+    return warnings
   }
 
   /**

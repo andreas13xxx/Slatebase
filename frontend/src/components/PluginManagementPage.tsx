@@ -200,7 +200,14 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
         settingTab.display()
       } catch (err) {
         console.error(`[PluginSettings] Error rendering settings for "${pluginId}":`, err)
-        setSettingsError('Plugin-Einstellungen konnten nicht gerendert werden.')
+        const detail = extractErrorMessage(err, 'Unbekannter Fehler')
+        // If the error is about uninitialized state (common during async plugin startup),
+        // show a retry-friendly message instead of a permanent error
+        if (detail.includes('not ready') || detail.includes('not initialized') || detail.includes('not ready yet')) {
+          setSettingsError(`Plugin wird noch initialisiert. Bitte in wenigen Sekunden erneut versuchen.`)
+        } else {
+          setSettingsError(`Plugin-Einstellungen konnten nicht gerendert werden: ${detail}`)
+        }
       }
       setSettingsLoading(false)
       // Mount containerEl in the next render via ref
@@ -349,9 +356,10 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       setPlugins((prev) => prev.map((p) =>
         p.pluginId === pluginId ? { ...p, status: 'active', error: undefined } : p
       ))
-    } catch {
+    } catch (err: unknown) {
+      const detail = extractErrorMessage(err, 'Neu laden fehlgeschlagen')
       setPlugins((prev) => prev.map((p) =>
-        p.pluginId === pluginId ? { ...p, status: 'error', error: 'Neu laden fehlgeschlagen' } : p
+        p.pluginId === pluginId ? { ...p, status: 'error', error: `Neu laden fehlgeschlagen: ${detail}` } : p
       ))
     } finally {
       setReloadingPlugins((prev) => {
@@ -703,7 +711,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
                 </div>
               ) : pluginContext?.settingTabRegistry.has(settingsModal.pluginId) ? (
                 /* Native plugin settings tab UI */
-                <div ref={settingsContainerRef} className="plugin-settings-native" />
+                <div ref={settingsContainerRef} className="plugin-settings-native" data-plugin-id={settingsModal.pluginId} />
               ) : (
                 /* Fallback: JSON editor */
                 <>

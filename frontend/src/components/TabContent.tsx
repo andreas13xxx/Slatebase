@@ -1,4 +1,4 @@
-import { useState, useCallback, useContext } from 'react'
+import { useState, useCallback, useContext, useEffect, useRef } from 'react'
 import { useTabContext } from '../state/tabContext'
 import { useAppContext } from '../state'
 import { openTab, saveTab } from '../state/tabActions'
@@ -11,6 +11,7 @@ import { ErrorBoundary } from './ErrorBoundary'
 import { useTranslation } from '../i18n'
 import { extractErrorMessage } from '../utils/error'
 import { PluginContext } from '../plugins/compat/plugin-context'
+import { findFileViewMatch, getActiveFileView, setActiveFileView, removeActiveFileView } from '../plugins/compat/file-view-registry'
 import './TabContent.css'
 
 /**
@@ -70,8 +71,57 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
   const pluginContext = useContext(PluginContext)
   const pluginActiveViews = pluginContext?.activeViews ?? null
 
+  // ─── Plugin File View (TextFileView-based plugins like Kanban) ────────────
+  // Track whether the current tab's file is handled by a plugin file view.
+  const fileViewKeyRef = useRef<string | null>(null)
+  // Counter to trigger re-render when async file view is ready
+  const [, setFileViewReady] = useState(0)
+
   const { tabs, activeTabId } = tabState
   const activeTab = activeTabId ? tabs.find((t) => t.id === activeTabId) ?? null : null
+
+  // Determine if the active tab's content matches a plugin file view
+  const fileViewMatch = activeTab && !activeTab.loading && !activeTab.error && !activeTab.isBinary
+    && !activeTab.filePath.startsWith('__view::') && !activeTab.filePath.startsWith('__graph__')
+    && !activeTab.fileName.endsWith('.canvas')
+    ? findFileViewMatch(activeTab.filePath, activeTab.content)
+    : null
+
+  // Manage plugin file view lifecycle: create/destroy when match changes
+  useEffect(() => {
+    const currentKey = activeTab ? `${activeTab.vaultId}::${activeTab.filePath}` : null
+
+    // If no match or different file, cleanup previous file view
+    if (!fileViewMatch || currentKey !== fileViewKeyRef.current) {
+      if (fileViewKeyRef.current) {
+        const [prevVaultId, prevFilePath] = fileViewKeyRef.current.split('::') as [string, string]
+        void removeActiveFileView(prevVaultId, prevFilePath)
+        fileViewKeyRef.current = null
+      }
+    }
+
+    // If we have a match, create the plugin file view
+    if (fileViewMatch && activeTab && currentKey && pluginContext) {
+      const existing = getActiveFileView(activeTab.vaultId, activeTab.filePath)
+      if (!existing) {
+        void pluginContext.createFileView(fileViewMatch.viewType, activeTab.filePath).then((containerEl) => {
+          if (containerEl && activeTab) {
+            setActiveFileView(activeTab.vaultId, activeTab.filePath, {
+              key: currentKey,
+              viewType: fileViewMatch.viewType,
+              leaf: null as never, // Leaf is managed internally by createFileView
+              view: null as never,
+              containerEl,
+            })
+            fileViewKeyRef.current = currentKey
+            // Force re-render to show the plugin view
+            setFileViewReady((n) => n + 1)
+          }
+        })
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab?.vaultId, activeTab?.filePath, activeTab?.content, fileViewMatch?.viewType])
 
   const handleEditChange = useCallback(
     (content: string) => {
@@ -200,6 +250,7 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
     if (viewInfo) {
       return (
         <div
+          key={`plugin-view-${activeTab.id}`}
           className="tab-content tab-content--plugin-view"
           ref={(el) => {
             if (el && !el.contains(viewInfo.containerEl)) {
@@ -283,6 +334,31 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
             token={apiClient?.getToken() ?? undefined}
           />
         </ErrorBoundary>
+      </div>
+    )
+  }
+
+  // Plugin file view — render plugin's TextFileView container (e.g. Kanban board)
+  if (fileViewMatch && activeTab) {
+    const activeFileView = getActiveFileView(activeTab.vaultId, activeTab.filePath)
+    if (activeFileView) {
+      return (
+        <div
+          key={`plugin-file-view-${activeTab.id}`}
+          className="tab-content tab-content--plugin-file-view"
+          ref={(el) => {
+            if (el && !el.contains(activeFileView.containerEl)) {
+              el.appendChild(activeFileView.containerEl)
+            }
+          }}
+        />
+      )
+    }
+    // View is being created asynchronously — show loading
+    return (
+      <div className="tab-content tab-content--loading" role="status" aria-live="polite">
+        <span className="app-loading-spinner" aria-hidden="true" />
+        <span>{t('tabContent.loading')}</span>
       </div>
     )
   }

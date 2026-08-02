@@ -28,4 +28,4 @@ export { extractProperties } from './property-extractor.js'
 export { extractCanvasFileRefs } from './canvas-parser.js'
 
 // Link index service implementation
-export { LinkIndexService, normalizeLinkPath } from './link-index-service.js'
+export { LinkIndexService, normalizeLinkPath, extractFrontmatterTags } from './link-index-service.js'

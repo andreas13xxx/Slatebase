@@ -80,6 +80,9 @@ export interface IWorkspaceShim {
   /** Resolve and open a wikilink target in a tab. */
   openLinkText(linkText: string, sourcePath: string): Promise<void>;
 
+  /** Request saving the workspace layout. No-op in Slatebase. */
+  requestSaveLayout(): void;
+
   /** Execute a callback when the workspace layout is ready. */
   onLayoutReady(callback: () => void): void;
 }
@@ -95,9 +98,13 @@ export interface IVaultShim {
   create(path: string, content?: string): Promise<TFile>;
   createFolder(path: string): Promise<TFolder>;
   delete(file: TAbstractFile): Promise<void>;
+  rename(file: TAbstractFile, newPath: string): Promise<void>;
+  trash(file: TAbstractFile, system?: boolean): Promise<void>;
   getAbstractFileByPath(path: string): TAbstractFile | null;
   getMarkdownFiles(): TFile[];
   getFiles(): TFile[];
+  getAllLoadedFiles(): TAbstractFile[];
+  getRoot(): TFolder;
   getName(): string;
   getConfig(key: string): unknown;
   on(event: string, callback: (...args: unknown[]) => void): EventRef;
@@ -181,15 +188,46 @@ export interface EmbedCache {
 }
 
 /**
+ * SectionCache — A root-level block section in the document.
+ */
+export interface SectionCache {
+  type: string;
+  position: Pos;
+  id?: string;
+}
+
+/**
+ * ListItemCache — A list item entry from a document.
+ */
+export interface ListItemCache {
+  position: Pos;
+  parent: number;
+  task?: string;
+  id?: string;
+}
+
+/**
+ * BlockCache — A block ID reference from a document.
+ */
+export interface BlockCache {
+  id: string;
+  position: Pos;
+}
+
+/**
  * CachedMetadata — Parsed metadata for a single file.
- * Contains frontmatter, links, tags, headings, and embeds.
+ * Contains frontmatter, links, tags, headings, embeds, sections, listItems, and blocks.
  */
 export interface CachedMetadata {
   frontmatter?: Record<string, unknown>;
+  frontmatterPosition?: Pos;
   links?: LinkCache[];
   tags?: TagCache[];
   headings?: HeadingCache[];
   embeds?: EmbedCache[];
+  sections?: SectionCache[];
+  listItems?: ListItemCache[];
+  blocks?: Record<string, BlockCache>;
 }
 
 /**
@@ -197,6 +235,7 @@ export interface CachedMetadata {
  */
 export interface IMetadataCacheShim {
   getFileCache(file: TFile): CachedMetadata | null;
+  getCache(path: string): CachedMetadata | null;
   getFirstLinkpathDest(linkpath: string, sourcePath: string): TFile | null;
   resolvedLinks: Record<string, Record<string, number>>;
   on(event: string, callback: (...args: unknown[]) => void): EventRef;
@@ -284,6 +323,7 @@ export interface PluginInstance {
   saveData(data: unknown): Promise<void>;
   addCommand(command: { id: string; name: string; callback: () => void; hotkeys?: Hotkey[] }): void;
   addSettingTab(tab: unknown): void;
+  addRibbonIcon(icon: string, title: string, callback: () => void): HTMLElement;
   registerEvent(eventRef: EventRef): void;
   registerView(viewType: string, creator: unknown): void;
 }
@@ -310,13 +350,32 @@ export interface Hotkey {
 }
 
 /**
+ * IFileManagerShim — Obsidian FileManager interface subset.
+ */
+export interface IFileManagerShim {
+  /** Rename/move a file to a new path. Updates vault references. */
+  renameFile(file: TFile, newPath: string): Promise<void>;
+  /** Read and optionally modify the frontmatter of a markdown file. */
+  processFrontMatter(file: TFile, fn: (frontmatter: Record<string, unknown>) => void): Promise<void>;
+  /** Generate a markdown link string to a file. */
+  generateMarkdownLink(file: TFile, sourcePath: string, subpath?: string, alias?: string): string;
+  /** Get the default parent folder for new files. */
+  getNewFileParent(sourcePath: string): TFolder;
+  /** Create a new markdown file with the given name in the given folder. */
+  createNewMarkdownFile(folder: TFolder, name: string): Promise<TFile>;
+  /** Prompt user for deletion and delete the file (moves to trash). */
+  promptForFileDeletion(file: TFile): Promise<void>;
+}
+
+/**
  * IAppShim — Obsidian App API emulation interface.
- * Central entry point for plugins to access vault, workspace, and metadata cache.
+ * Central entry point for plugins to access vault, workspace, metadata cache, and file manager.
  */
 export interface IAppShim {
   vault: IVaultShim;
   workspace: IWorkspaceShim;
   metadataCache: IMetadataCacheShim;
+  fileManager: IFileManagerShim;
   plugins: {
     plugins: Record<string, PluginInstance>;
     enabledPlugins: Set<string>;

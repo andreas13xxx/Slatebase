@@ -329,7 +329,12 @@ export class PluginSandbox implements IPluginSandbox {
         );
       }
 
-      // Allowed — pass through to real fetch
+      // Determine if this is a cross-origin request that needs CORS proxying
+      if (isCrossOrigin(url)) {
+        return fetchViaProxy(url, init);
+      }
+
+      // Same-origin — pass through to real fetch
       return fetch(input, init);
     };
   }
@@ -349,6 +354,8 @@ export class PluginSandbox implements IPluginSandbox {
 
     const ProxiedXHR = class extends XMLHttpRequest {
       private _blockedUrl: string | null = null;
+      private _crossOriginUrl: string | null = null;
+      private _crossOriginMethod: string = 'GET';
 
       open(method: string, url: string | URL, async?: boolean, username?: string | null, password?: string | null): void {
         // Block if no network permission
@@ -368,6 +375,13 @@ export class PluginSandbox implements IPluginSandbox {
         // If the lint tool complains about unused var, that's fine — `sandbox` is used for context
         void sandbox;
 
+        // Detect cross-origin requests and route through proxy
+        if (isCrossOrigin(urlStr)) {
+          this._crossOriginUrl = urlStr;
+          this._crossOriginMethod = method;
+          return;
+        }
+
         if (async === undefined) {
           super.open(method, url);
         } else {
@@ -385,6 +399,76 @@ export class PluginSandbox implements IPluginSandbox {
           }
           return;
         }
+
+        // Route cross-origin requests through the server proxy
+        if (this._crossOriginUrl !== null) {
+          const url = this._crossOriginUrl;
+          const method = this._crossOriginMethod;
+          const headers: Record<string, string> = {};
+
+          // Collect headers set via setRequestHeader (stored on the super instance)
+          // Unfortunately XHR doesn't expose set headers — we rely on the proxy for auth headers
+          const init: RequestInit = {
+            method,
+            headers,
+          };
+          if (body != null && method !== 'GET' && method !== 'HEAD') {
+            if (typeof body === 'string') {
+              init.body = body;
+            } else {
+              init.body = body as BodyInit;
+            }
+          }
+
+          fetchViaProxy(url, init).then(async (response) => {
+            const text = await response.text();
+            // Patch readonly properties via defineProperty
+            Object.defineProperty(this, 'status', { value: response.status, writable: false, configurable: true });
+            Object.defineProperty(this, 'statusText', { value: response.statusText, writable: false, configurable: true });
+            Object.defineProperty(this, 'responseText', { value: text, writable: false, configurable: true });
+            Object.defineProperty(this, 'response', { value: text, writable: false, configurable: true });
+            Object.defineProperty(this, 'readyState', { value: 4, writable: false, configurable: true });
+
+            // Build getAllResponseHeaders string
+            const headerLines: string[] = [];
+            response.headers.forEach((value, key) => { headerLines.push(`${key}: ${value}`); });
+            Object.defineProperty(this, 'getAllResponseHeaders', {
+              value: () => headerLines.join('\r\n'),
+              writable: false,
+              configurable: true,
+            });
+            Object.defineProperty(this, 'getResponseHeader', {
+              value: (name: string) => response.headers.get(name),
+              writable: false,
+              configurable: true,
+            });
+
+            // Fire readystatechange and load events
+            this.dispatchEvent(new Event('readystatechange'));
+            if (this.onreadystatechange) {
+              this.onreadystatechange(new Event('readystatechange') as unknown as Event);
+            }
+            const loadEvent = new ProgressEvent('load');
+            this.dispatchEvent(loadEvent);
+            if (this.onload) {
+              this.onload(loadEvent);
+            }
+            const loadendEvent = new ProgressEvent('loadend');
+            this.dispatchEvent(loadendEvent);
+            if (this.onloadend) {
+              this.onloadend(loadendEvent);
+            }
+          }).catch(() => {
+            Object.defineProperty(this, 'readyState', { value: 4, writable: false, configurable: true });
+            const errorEvent = new ProgressEvent('error');
+            this.dispatchEvent(errorEvent);
+            if (this.onerror) {
+              this.onerror(errorEvent);
+            }
+          });
+          return;
+        }
+
         super.send(body);
       }
     };
@@ -583,4 +667,112 @@ function isDomainAllowed(domain: string, allowlist: string[]): boolean {
   }
 
   return false;
+}
+
+/**
+ * Determine if a URL is cross-origin relative to the current page.
+ * Relative URLs and same-origin URLs return false.
+ */
+function isCrossOrigin(url: string): boolean {
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.origin !== window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Route a cross-origin fetch request through the Slatebase server-side proxy
+ * to avoid browser CORS restrictions. Mirrors the response format so callers
+ * receive a standard Response object.
+ */
+async function fetchViaProxy(url: string, init?: RequestInit): Promise<Response> {
+  const token = localStorage.getItem('slatebase_token') || '';
+  const csrfToken = localStorage.getItem('slatebase_csrf') || '';
+  const method = init?.method?.toUpperCase() || 'GET';
+
+  // Extract headers from init
+  const headers: Record<string, string> = {};
+  if (init?.headers) {
+    if (init.headers instanceof Headers) {
+      init.headers.forEach((value, key) => { headers[key] = value; });
+    } else if (Array.isArray(init.headers)) {
+      for (const [key, value] of init.headers) {
+        if (key !== undefined && value !== undefined) {
+          headers[key] = value;
+        }
+      }
+    } else {
+      Object.assign(headers, init.headers);
+    }
+  }
+
+  // Extract body as string
+  let body: string | undefined;
+  if (init?.body != null) {
+    if (typeof init.body === 'string') {
+      body = init.body;
+    } else if (init.body instanceof ArrayBuffer) {
+      body = btoa(String.fromCharCode(...new Uint8Array(init.body)));
+    } else if (init.body instanceof Uint8Array) {
+      body = btoa(String.fromCharCode(...init.body));
+    } else {
+      body = String(init.body);
+    }
+  }
+
+  const proxyResponse = await fetch('/api/v1/proxy', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'X-CSRF-Token': csrfToken,
+    },
+    body: JSON.stringify({
+      url,
+      method,
+      headers,
+      body,
+      contentType: headers['Content-Type'] || headers['content-type'],
+    }),
+  });
+
+  const data = await proxyResponse.json() as {
+    status?: number;
+    headers?: Record<string, string>;
+    text?: string;
+    arrayBuffer?: string;
+    code?: string;
+    message?: string;
+  };
+
+  // If the proxy itself returned an error (e.g. blocked, timeout)
+  if (!proxyResponse.ok) {
+    return new Response(data.message || 'Proxy request failed', {
+      status: data.status || proxyResponse.status,
+      statusText: 'Proxy Error',
+    });
+  }
+
+  // Reconstruct a Response from the proxy data
+  const responseStatus = data.status || 200;
+  const responseHeaders = new Headers(data.headers || {});
+
+  let responseBody: BodyInit | null = null;
+  if (data.text !== undefined) {
+    responseBody = data.text;
+  } else if (data.arrayBuffer) {
+    const binary = atob(data.arrayBuffer);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    responseBody = bytes.buffer;
+  }
+
+  return new Response(responseBody, {
+    status: responseStatus,
+    headers: responseHeaders,
+  });
 }

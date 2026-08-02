@@ -141,7 +141,7 @@ export function CommandPaletteContainer({
     const builtIn = buildBuiltinCommands()
     const builtInCmd = builtIn.find((c) => c.id === commandId)
     if (builtInCmd) {
-      builtInCmd.callback()
+      builtInCmd.callback?.()
       return
     }
     // Fall through to plugin command registry

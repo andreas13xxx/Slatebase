@@ -45,6 +45,13 @@ export function setActiveEditorView(view: EditorView | null): void {
 }
 
 /**
+ * Get the active EditorView instance. Used by EditorShim to route operations through CM6.
+ */
+export function getActiveEditorView(): EditorView | null {
+  return activeView
+}
+
+/**
  * Register a CM6 extension from a plugin.
  * Creates a new Compartment for the plugin if not already registered.
  * Applies the extension immediately if an editor is active.

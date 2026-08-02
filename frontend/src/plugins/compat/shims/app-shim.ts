@@ -1,10 +1,12 @@
 import type {
   IAppShim,
+  IFileManagerShim,
   IMetadataCacheShim,
   IVaultShim,
   IWorkspaceShim,
   PluginInstance,
 } from '../types';
+import { FileManagerShim } from './file-manager-shim';
 
 /**
  * AppShim — Obsidian App API emulation.
@@ -43,10 +45,14 @@ export class AppShim implements IAppShim {
   /** The metadata cache shim bound to the current vault context */
   readonly metadataCache: IMetadataCacheShim;
 
+  /** The file manager shim for rename/frontmatter/link operations */
+  readonly fileManager: IFileManagerShim;
+
   /** Plugin registry exposing active plugins, enabled set, and lookup */
   readonly plugins: {
     plugins: Record<string, PluginInstance>;
     enabledPlugins: Set<string>;
+    manifests: Record<string, { id: string; name: string; version: string }>;
     getPlugin(id: string): PluginInstance | undefined;
   };
 
@@ -85,6 +91,7 @@ export class AppShim implements IAppShim {
     this.vault = options.vault;
     this.workspace = options.workspace;
     this.metadataCache = options.metadataCache;
+    this.fileManager = new FileManagerShim(options.vault);
     this.pluginId = options.pluginId;
 
     this.pluginsMap = {};
@@ -94,6 +101,7 @@ export class AppShim implements IAppShim {
     this.plugins = {
       plugins: this.pluginsMap,
       enabledPlugins: this.enabledPluginsSet,
+      manifests: this.pluginsMap as unknown as Record<string, { id: string; name: string; version: string }>,
       getPlugin: (id: string): PluginInstance | undefined => {
         return this.pluginsMap[id];
       },
@@ -112,9 +120,87 @@ export class AppShim implements IAppShim {
         },
         getPluginById: (id: string) => {
           const p = this.internalPlugins.plugins[id];
-          return p ?? undefined;
+          return p ?? { enabled: false, instance: { options: {} } };
         },
       };
+    }
+  }
+
+  /**
+   * embedRegistry — Obsidian-internal API for creating embedded views.
+   * Kanban uses it to extract the MarkdownEditor class from the prototype chain.
+   * We provide a stub that survives the prototype extraction without crashing.
+   */
+  readonly embedRegistry = {
+    embedByExtension: {
+      md: () => {
+        const FakeEditor = class { constructor() {} }
+        const editMode = Object.create(Object.create(FakeEditor.prototype))
+        return {
+          load: () => {},
+          unload: () => {},
+          editable: false,
+          showEditor: () => {},
+          editMode,
+        }
+      },
+    },
+  }
+
+  /**
+   * commands — Obsidian-internal command manager.
+   * Kanban monkey-patches commands.executeCommand to intercept hotkeys.
+   * LiveSync calls executeCommandById('app:reload') to restart.
+   */
+  readonly commands = {
+    commands: {} as Record<string, unknown>,
+    executeCommand: (_command: unknown) => {},
+    executeCommandById: (id: string) => {
+      if (id === 'app:reload') {
+        // Simulate Obsidian's app reload by refreshing the page
+        window.location.reload()
+      }
+      return Promise.resolve()
+    },
+  }
+
+  /** Whether the app is running on mobile. Always false in Slatebase (web app). */
+  readonly isMobile: boolean = false
+
+  /** Unique app ID (vault identifier). Used by Dataview, Excalidraw for caching. */
+  get appId(): string {
+    return `slatebase-${this.vault.getName()}`
+  }
+
+  /** SecretStorage stub — stores secrets in localStorage (not truly secure, but functional). */
+  readonly secretStorage = {
+    _secrets: new Map<string, string>(),
+    setSecret(id: string, secret: string): void { this._secrets.set(id, secret) },
+    getSecret(id: string): string | null { return this._secrets.get(id) ?? null },
+    listSecrets(): string[] { return [...this._secrets.keys()] },
+  }
+
+  /**
+   * Retrieve value from localStorage for this vault (Obsidian API since 1.8.7).
+   * Uses a vault-scoped prefix to isolate per-vault data.
+   */
+  loadLocalStorage(key: string): string | null {
+    const vaultName = this.vault.getName()
+    const prefixedKey = `slatebase-vault-${vaultName}-${key}`
+    return localStorage.getItem(prefixedKey)
+  }
+
+  /**
+   * Save vault-specific value to localStorage (Obsidian API since 1.8.7).
+   * If data is null, the entry will be cleared.
+   */
+  saveLocalStorage(key: string, data: unknown | null): void {
+    const vaultName = this.vault.getName()
+    const prefixedKey = `slatebase-vault-${vaultName}-${key}`
+    if (data === null || data === undefined) {
+      localStorage.removeItem(prefixedKey)
+    } else {
+      localStorage.setItem(prefixedKey, typeof data === 'string' ? data : JSON.stringify(data))
     }
   }
 
@@ -173,8 +259,16 @@ export class AppShim implements IAppShim {
       'vault',
       'workspace',
       'metadataCache',
+      'fileManager',
       'plugins',
       'internalPlugins',
+      'embedRegistry',
+      'commands',
+      'loadLocalStorage',
+      'saveLocalStorage',
+      'isMobile',
+      'appId',
+      'secretStorage',
       // Internal/utility properties
       'pluginId',
       'warnedProperties',

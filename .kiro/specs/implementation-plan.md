@@ -23,7 +23,7 @@
 | 11 | `mcp-context-server` | ✅ Fertig |
 | 12 | `context-panel` | ✅ Fertig |
 | 13 | `knowledge-graph` | ✅ Fertig |
-| 14 | `obsidian-plugin-compat` | ✅ Fertig ⚠️ experimental |
+| 14 | `obsidian-plugin-compat` | ✅ Fertig ⚠️ experimental (Extended API: Calendar, Dataview, Templater, LiveSync, Excalidraw, Editing Toolbar, Kanban; **LiveSync v1.0.0 bidirectional CouchDB sync functional** — Notice/process/mkdir/readBinary/containerEl shims, plugin deactivation reload) |
 | 15 | `mermaid-rendering` | ✅ Fertig |
 | 16 | `feature-toggles` | ✅ Fertig |
 | 17 | `session-expiry-fix` | ✅ Fertig |

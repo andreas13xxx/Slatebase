@@ -169,7 +169,7 @@ commands: {
 
 ## 3. Template-Inhalt — Ordnerstruktur
 
-### 3.1 Deutsche Variante (`data/templates/welcome-vault/`)
+### 3.1 Deutsche Variante (`assets/templates/welcome-vault/`)
 
 ```
 Start hier.md                          — Einstiegsseite mit Übersicht
@@ -179,7 +179,7 @@ Grundlagen/
 ├── Markdown Syntax.md                 — Formatierung, Listen, Tabellen, Code
 ├── Navigation und Tabs.md             — Tabs, Split-View, Tab-Verwaltung
 ├── Datei-Explorer.md                  — Erstellen, Umbenennen, Verschieben, DnD
-├── Editor und Viewer.md               — Edit/View-Modi, Toolbar, Auto-Save
+├── Editor und Viewer.md               — Source/Live-Preview-Modi, Toolbar, Auto-Save
 └── Erste Schritte.md                  — Inhaltsverzeichnis Grundlagen
 
 Features/
@@ -253,7 +253,7 @@ Vorlagen/
 └── Leseliste.md                       — Template für Bücher/Artikel
 ```
 
-### 3.2 Englische Variante (`data/templates/welcome-vault-en/`)
+### 3.2 Englische Variante (`assets/templates/welcome-vault-en/`)
 
 Identische Struktur mit übersetzten Datei- und Ordnernamen. Screenshots werden geteilt (identische Bilder, da UI-Labels größtenteils Deutsch sind — alternativ eigene EN-Screenshots falls UI-Sprache umschaltbar wird).
 
@@ -331,8 +331,8 @@ if (result) {
 - i18n-Dateien (de.ts, en.ts)
 
 ### Templates (komplett überarbeitet)
-- `data/templates/welcome-vault/` — Alle Dateien ersetzen
-- `data/templates/welcome-vault-en/` — Alle Dateien ersetzen
+- `assets/templates/welcome-vault/` — Alle Dateien ersetzen
+- `assets/templates/welcome-vault-en/` — Alle Dateien ersetzen
 
 ---
 

@@ -52,8 +52,8 @@ COPY version.json ./version.json
 # Create data directory (will be overridden by volume mount)
 RUN mkdir -p ./data
 
-# Copy welcome vault templates
-COPY data/templates/ ./data/templates/
+# Copy welcome vault templates (static assets, independent of data volume)
+COPY assets/ ./assets/
 
 # Non-root user for security
 RUN addgroup --system slatebase && adduser --system --ingroup slatebase slatebase

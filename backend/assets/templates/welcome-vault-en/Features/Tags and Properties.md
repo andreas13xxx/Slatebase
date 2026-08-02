@@ -1,5 +1,8 @@
 ---
-tags: [features]
+tags:
+  - features/tags
+  - basics/organization
+  - type/documentation
 ---
 
 # Tags and Properties
@@ -28,12 +31,15 @@ You can use tags anywhere in the text body or in the frontmatter.
 
 Use `/` to create hierarchies:
 
-```markdown
-#project/alpha
-#project/beta
-#status/done
-#status/in-progress
-```
+#project/alpha #project/beta #project/webapp/frontend #project/webapp/backend
+
+#status/done #status/in-progress #status/archived
+
+#type/meeting #type/daily #type/project
+
+#priority/high #priority/medium #priority/low
+
+Nested tags let you subdivide categories. Filtering for `#project/webapp` will find both frontend and backend entries.
 
 ### Frontmatter Tags
 
@@ -135,8 +141,8 @@ Today we discussed the roadmap for Q2...
 > [!todo] Exercise
 > 1. Open this file in Edit mode and look at the frontmatter (the `---` block at the top)
 > 2. Create a new file with 2 tags in the frontmatter and 1 tag in the body
-> 3. Open the Context Panel and check the Tags section
-> 4. Try a nested tag: `#exercise/tags`
+> 3. Open the Context Panel and check the Tags section — you should see the nested hierarchy from this page
+> 4. Try adding your own nested tag: `#exercise/tags`
 
 ---
 

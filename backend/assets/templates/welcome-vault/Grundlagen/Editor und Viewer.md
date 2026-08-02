@@ -5,7 +5,7 @@ tags:
 
 # Editor und Viewer
 
-Slatebase bietet zwei Darstellungsmodi für jede Markdown-Datei: den **Edit-Modus** zum Schreiben und den **View-Modus** zum Lesen. Du kannst jederzeit zwischen beiden wechseln.
+Slatebase bietet zwei Darstellungsmodi für jede Markdown-Datei: den **Source-Modus** (roher Markdown-Text) und den **Live-Preview-Modus** (inline formatiert). Beide Modi sind vollwertige Editoren — du kannst in beiden schreiben und bearbeiten.
 
 ![[Screenshots/editor-toolbar.png]]
 
@@ -15,38 +15,48 @@ Slatebase bietet zwei Darstellungsmodi für jede Markdown-Datei: den **Edit-Modu
 
 ## Die zwei Modi
 
-### Edit-Modus (Bearbeiten)
+### Source-Modus (Quelltext)
 
-Im Edit-Modus siehst du den rohen Markdown-Text. Hier schreibst und bearbeitest du deine Notizen.
+Im Source-Modus siehst du den rohen Markdown-Text mit Syntax-Highlighting. Alle Marker bleiben sichtbar.
 
 - Markdown-Syntax wird als Text angezeigt (`# Überschrift`, `**fett**`)
 - Cursor und Textauswahl sind aktiv
 - Die Toolbar bietet Formatierungs-Shortcuts
 - Zeilennummern können eingeblendet werden
 
-### View-Modus (Ansicht)
+**Wann verwenden:** Bei komplexer Formatierung, Tabellen oder wenn du die volle Kontrolle über die Syntax brauchst.
+
+### Live-Preview-Modus (Vorschau)
 
 ![[Screenshots/viewer-formatiert.png]]
 
-*Formatierte Ansicht im View-Modus*
+*Formatierte Ansicht im Live-Preview-Modus*
 
-Im View-Modus wird dein Markdown gerendert — du siehst das fertige Ergebnis.
+Im Live-Preview-Modus wird dein Markdown **inline formatiert** dargestellt — und du kannst trotzdem weiter schreiben. Sobald der Cursor einen formatierten Bereich berührt, werden die Markdown-Marker automatisch eingeblendet.
 
-- Überschriften sind formatiert
+- Überschriften erscheinen in der richtigen Größe
 - Links sind anklickbar
 - Tabellen, Code-Blöcke und Callouts werden schön dargestellt
 - Wikilinks führen per Klick zur verlinkten Datei
+- Bilder und Embeds werden inline angezeigt
+
+> [!info] Live Preview Editor
+> Der Live-Preview-Modus ist ein vollwertiger Editor auf Basis von CodeMirror 6. Alles Weitere zu den Fähigkeiten (Vim-Modus, Bild-Einfügen, Mermaid-Rendering u.v.m.) findest du unter [[Features/Live Preview Editor|Live Preview Editor]].
 
 ---
 
 ## Zwischen Modi wechseln
 
-Klicke auf das **Augensymbol** (👁) in der Toolbar, um zwischen Edit und View zu wechseln.
+| Methode | Aktion |
+|---------|--------|
+| Toolbar | Klick auf das Modus-Symbol (Quelltext/Vorschau) |
+| Tastenkürzel | `Ctrl+E` |
+| Command Palette | `Ctrl+P` → "Editor-Modus wechseln" |
 
 | Symbol | Modus | Beschreibung |
 |--------|-------|--------------|
-| Stift-Symbol | Edit | Markdown bearbeiten |
-| Augen-Symbol | View | Formatierte Ansicht |
+| Quelltext-Symbol | Source | Roher Markdown-Text |
+| Vorschau-Symbol | Live Preview | Inline formatiert, editierbar |
 
 ---
 
@@ -62,7 +72,7 @@ Die Toolbar am oberen Rand des Editors bietet Schnellzugriff auf häufige Aktion
 | Liste | Aufzählung einfügen |
 | Code | Code-Block einfügen |
 | Link | Wikilink einfügen |
-| Modus wechseln | Zwischen Edit/View umschalten |
+| Modus wechseln | Zwischen Source/Live Preview umschalten |
 
 > [!tip] Tipp
 > Markiere zuerst den Text, dann klicke auf eine Toolbar-Funktion. Der Text wird automatisch mit der passenden Syntax umschlossen.
@@ -105,21 +115,21 @@ Der Verlauf speichert bis zu 100 Schritte und wird beim Wechsel der Datei zurüc
 ## Schritt-für-Schritt: Text formatieren
 
 1. Erstelle eine neue Datei oder öffne eine bestehende
-2. Wechsle in den **Edit-Modus** (falls nicht schon aktiv)
+2. Wechsle in den **Source-Modus** (falls nicht schon aktiv)
 3. Schreibe einen Absatz mit normalem Text
 4. Markiere ein Wort und klicke **Fett** in der Toolbar
-5. Wechsle in den **View-Modus** — das Wort erscheint fettgedruckt
+5. Wechsle in den **Live-Preview-Modus** — das Wort erscheint fettgedruckt
 6. Wechsle zurück und mache die Änderung mit `Strg+Z` rückgängig
 
 ---
 
 > [!todo] Übung
-> Öffne diese Datei im **Edit-Modus** und füge am Ende eine neue Überschrift `## Meine Notizen` hinzu. Schreibe darunter einen kurzen Absatz. Wechsle dann in den View-Modus und prüfe das Ergebnis. Mache anschließend alles mit `Strg+Z` rückgängig.
+> Öffne diese Datei im **Source-Modus** und füge am Ende eine neue Überschrift `## Meine Notizen` hinzu. Schreibe darunter einen kurzen Absatz. Wechsle dann in den Live-Preview-Modus und prüfe das Ergebnis. Mache anschließend alles mit `Strg+Z` rückgängig.
 
 ---
 
 > [!tip] Best Practice
-> Schreibe im Edit-Modus und wechsle zum View-Modus, wenn du Links anklicken oder das Gesamtbild prüfen möchtest. Für reine Lesevorgänge (z.B. Anleitungen durcharbeiten) ist der View-Modus ideal.
+> Im Live-Preview-Modus siehst du beim Schreiben sofort das Ergebnis. Für komplexe Tabellen oder verschachtelte Syntax ist der Source-Modus übersichtlicher. Beide Modi sind vollwertige Editoren — du verlierst keine Funktionalität.
 
 ---
 

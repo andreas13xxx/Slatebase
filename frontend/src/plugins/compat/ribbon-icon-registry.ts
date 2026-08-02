@@ -58,6 +58,7 @@ export function addRibbonIcon(
   const element = document.createElement('div')
   element.setAttribute('aria-label', title)
 
+  console.log(`[RibbonIconRegistry] Registered icon "${icon}" for plugin "${pluginId}", callback type: ${typeof callback}`)
   const entry: RibbonIconEntry = { pluginId, icon, title, callback, element }
   icons.push(entry)
   notifyListeners()

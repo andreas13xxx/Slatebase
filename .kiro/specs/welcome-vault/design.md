@@ -10,7 +10,7 @@ Das Welcome-Vault-Feature erstellt automatisch einen vorbereiteten Vault mit Tut
 
 2. **Never-Throw-Garantie**: Der WelcomeVaultService fängt ALLE Fehler intern ab und gibt sie nur als Log-Einträge weiter. Die Account-Erstellung darf niemals durch Welcome-Vault-Probleme fehlschlagen.
 
-3. **Filesystem-basiertes Template**: Templates liegen als statische Dateien in `data/templates/welcome-vault/`. Administratoren können sie durch einfaches Ersetzen der Dateien anpassen — kein API-Endpoint nötig.
+3. **Filesystem-basiertes Template**: Templates liegen als statische Dateien in `assets/templates/welcome-vault/`. Administratoren können sie durch einfaches Ersetzen der Dateien anpassen — kein API-Endpoint nötig.
 
 4. **Feature-Toggle (hot)**: Typ `hot` ermöglicht Aktivierung/Deaktivierung zur Laufzeit ohne Server-Neustart.
 
@@ -327,7 +327,7 @@ const userService = new UserService(
 ### Template Directory Structure
 
 ```
-data/templates/welcome-vault/
+assets/templates/welcome-vault/
 ├── Start hier.md                    # Einstiegspunkt mit Wikilinks
 ├── Grundlagen/
 │   ├── Markdown Syntax.md           # Grundlegende Markdown-Formatierung

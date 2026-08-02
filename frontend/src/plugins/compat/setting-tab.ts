@@ -13,7 +13,11 @@
 
 import type { IAppShim, PluginInstance } from './types'
 import { addRibbonIcon as registerRibbonIcon } from './ribbon-icon-registry'
+import { addStatusBarItem as registerStatusBarItem } from './status-bar-registry'
 import moment from 'moment/min/moment-with-locales'
+
+// Load Obsidian-compatible CSS variables (maps Slatebase tokens to Obsidian naming)
+import './obsidian-compat.css'
 
 // ─── PluginSettingTab ────────────────────────────────────────────────────────────
 
@@ -101,6 +105,16 @@ export class TextComponent {
     this.changeCallback = callback
     return this
   }
+
+  setTooltip(tooltip: string): this {
+    this.inputEl.title = tooltip
+    return this
+  }
+
+  then(cb: (component: this) => void): this {
+    cb(this)
+    return this
+  }
 }
 
 /**
@@ -137,6 +151,21 @@ export class TextAreaComponent {
 
   onChange(callback: (value: string) => void): this {
     this.changeCallback = callback
+    return this
+  }
+
+  setDisabled(disabled: boolean): this {
+    this.inputEl.disabled = disabled
+    return this
+  }
+
+  setTooltip(tooltip: string): this {
+    this.inputEl.title = tooltip
+    return this
+  }
+
+  then(cb: (component: this) => void): this {
+    cb(this)
     return this
   }
 }
@@ -189,6 +218,16 @@ export class ToggleComponent {
     this.changeCallback = callback
     return this
   }
+
+  setTooltip(tooltip: string): this {
+    this.toggleEl.title = tooltip
+    return this
+  }
+
+  then(cb: (component: this) => void): this {
+    cb(this)
+    return this
+  }
 }
 
 /**
@@ -237,6 +276,21 @@ export class DropdownComponent {
     this.changeCallback = callback
     return this
   }
+
+  setDisabled(disabled: boolean): this {
+    this.selectEl.disabled = disabled
+    return this
+  }
+
+  setTooltip(tooltip: string): this {
+    this.selectEl.title = tooltip
+    return this
+  }
+
+  then(cb: (component: this) => void): this {
+    cb(this)
+    return this
+  }
 }
 
 /**
@@ -279,6 +333,31 @@ export class ButtonComponent {
 
   onClick(callback: () => void): this {
     this.clickCallback = callback
+    return this
+  }
+
+  setTooltip(tooltip: string): this {
+    this.buttonEl.title = tooltip
+    return this
+  }
+
+  setIcon(_icon: string): this {
+    // No-op — icons are not rendered in Slatebase setting buttons
+    return this
+  }
+
+  setClass(cls: string): this {
+    this.buttonEl.classList.add(cls)
+    return this
+  }
+
+  removeCta(): this {
+    this.buttonEl.classList.remove('setting-button--cta')
+    return this
+  }
+
+  then(cb: (component: this) => void): this {
+    cb(this)
     return this
   }
 }
@@ -445,6 +524,43 @@ export class Setting {
     return this
   }
 
+  addColorPicker(callback: (component: { getValue(): string; setValue(value: string): unknown; onChange(cb: (value: string) => void): unknown; setDisabled(d: boolean): unknown; then(cb: (c: unknown) => void): unknown }) => void): this {
+    const input = document.createElement('input')
+    input.type = 'color'
+    input.className = 'setting-color-picker'
+    this.controlEl.appendChild(input)
+    let changeCb: ((v: string) => void) | null = null
+    input.addEventListener('input', () => { if (changeCb) changeCb(input.value) })
+    const component = {
+      getValue() { return input.value },
+      setValue(value: string) { input.value = value; return this },
+      onChange(cb: (value: string) => void) { changeCb = cb; return this },
+      setDisabled(d: boolean) { input.disabled = d; return this },
+      then(cb: (c: unknown) => void) { cb(this); return this },
+    }
+    callback(component)
+    return this
+  }
+
+  addSearch(callback: (component: { inputEl: HTMLInputElement; getValue(): string; setValue(value: string): unknown; setPlaceholder(p: string): unknown; onChange(cb: (value: string) => void): unknown; then(cb: (c: unknown) => void): unknown }) => void): this {
+    const input = document.createElement('input')
+    input.type = 'search'
+    input.className = 'setting-search-input'
+    this.controlEl.appendChild(input)
+    let changeCb: ((v: string) => void) | null = null
+    input.addEventListener('input', () => { if (changeCb) changeCb(input.value) })
+    const component = {
+      inputEl: input,
+      getValue() { return input.value },
+      setValue(value: string) { input.value = value; return this },
+      setPlaceholder(p: string) { input.placeholder = p; return this },
+      onChange(cb: (value: string) => void) { changeCb = cb; return this },
+      then(cb: (c: unknown) => void) { cb(this); return this },
+    }
+    callback(component)
+    return this
+  }
+
   /** Clear the control area (useful for dynamic updates). */
   clear(): this {
     this.controlEl.innerHTML = ''
@@ -452,9 +568,18 @@ export class Setting {
   }
 
   /** Add custom HTML element to the control area. */
-  addExtraButton(callback: (component: ButtonComponent) => void): this {
-    const component = new ButtonComponent(this.controlEl)
-    component.buttonEl.classList.add('setting-extra-button')
+  addExtraButton(callback: (component: { extraSettingsEl: HTMLElement; setIcon(icon: string): unknown; setTooltip(tooltip: string): unknown; onClick(cb: () => void): unknown; setDisabled(d: boolean): unknown; then(cb: (c: unknown) => void): unknown }) => void): this {
+    const el = document.createElement('div')
+    el.className = 'setting-extra-button clickable-icon'
+    this.controlEl.appendChild(el)
+    const component = {
+      extraSettingsEl: el,
+      setIcon(_icon: string) { return this },
+      setTooltip(tooltip: string) { el.title = tooltip; return this },
+      onClick(cb: () => void) { el.addEventListener('click', cb); return this },
+      setDisabled(_d: boolean) { return this },
+      then(cb: (c: unknown) => void) { cb(this); return this },
+    }
     callback(component)
     return this
   }
@@ -466,6 +591,17 @@ export class Setting {
     } else {
       this.settingEl.classList.remove('setting-item--disabled')
     }
+    return this
+  }
+
+  /** Set a tooltip on the setting row. */
+  setTooltip(_tooltip: string): this {
+    return this
+  }
+
+  /** Facilitates chaining. */
+  then(cb: (setting: this) => void): this {
+    cb(this)
     return this
   }
 }
@@ -490,6 +626,346 @@ if (typeof window !== 'undefined') {
     window.obsidian = {}
   }
 
+  // ─── DOM Prototype Extensions (synchronous, required before any plugin loads) ──
+  // Obsidian patches DOM prototypes with utility methods that plugins use directly.
+  // These MUST be registered synchronously before plugin bundles evaluate.
+  if (!('addClass' in Element.prototype)) {
+    Object.defineProperty(Element.prototype, 'addClass', {
+      value: function (this: Element, ...classes: string[]): void { this.classList.add(...classes) },
+      writable: true, configurable: true,
+    })
+  }
+  if (!('addClasses' in Element.prototype)) {
+    Object.defineProperty(Element.prototype, 'addClasses', {
+      value: function (this: Element, classes: string[]): void { this.classList.add(...classes) },
+      writable: true, configurable: true,
+    })
+  }
+  if (!('removeClass' in Element.prototype)) {
+    Object.defineProperty(Element.prototype, 'removeClass', {
+      value: function (this: Element, ...classes: string[]): void { this.classList.remove(...classes) },
+      writable: true, configurable: true,
+    })
+  }
+  if (!('toggleClass' in Element.prototype)) {
+    Object.defineProperty(Element.prototype, 'toggleClass', {
+      value: function (this: Element, classes: string | string[], value: boolean): void {
+        const list = Array.isArray(classes) ? classes : [classes]
+        for (const cls of list) this.classList.toggle(cls, value)
+      },
+      writable: true, configurable: true,
+    })
+  }
+  if (!('hasClass' in Element.prototype)) {
+    Object.defineProperty(Element.prototype, 'hasClass', {
+      value: function (this: Element, cls: string): boolean { return this.classList.contains(cls) },
+      writable: true, configurable: true,
+    })
+  }
+  // Obsidian exposes `element.doc` as a getter returning the ownerDocument.
+  // Plugins (e.g. LiveSync) use `containerEl.doc.createEl(...)` to create elements.
+  if (!('doc' in Element.prototype)) {
+    Object.defineProperty(Element.prototype, 'doc', {
+      get: function (this: Element): Document { return this.ownerDocument },
+      configurable: true,
+    })
+  }
+  // Also expose `win` getter (ownerDocument.defaultView) used by some plugins.
+  if (!('win' in Element.prototype)) {
+    Object.defineProperty(Element.prototype, 'win', {
+      get: function (this: Element): Window { return this.ownerDocument.defaultView ?? window },
+      configurable: true,
+    })
+  }
+  if (!('appendText' in Node.prototype)) {
+    Object.defineProperty(Node.prototype, 'appendText', {
+      value: function (this: Node, val: string): void {
+        // Guard: Document nodes cannot have Text children — append to documentElement instead
+        if (this.nodeType === 9) {
+          (this as Document).documentElement.appendChild(document.createTextNode(val))
+        } else {
+          this.appendChild(document.createTextNode(val))
+        }
+      },
+      writable: true, configurable: true,
+    })
+  }
+  if (!('detach' in Node.prototype)) {
+    Object.defineProperty(Node.prototype, 'detach', {
+      value: function (this: Node): void { this.parentNode?.removeChild(this) },
+      writable: true, configurable: true,
+    })
+  }
+  if (!('empty' in Node.prototype)) {
+    Object.defineProperty(Node.prototype, 'empty', {
+      value: function (this: Node): void { while (this.firstChild) this.removeChild(this.firstChild) },
+      writable: true, configurable: true,
+    })
+  }
+  if (!('show' in HTMLElement.prototype)) {
+    Object.defineProperty(HTMLElement.prototype, 'show', {
+      value: function (this: HTMLElement): void { this.style.display = '' },
+      writable: true, configurable: true,
+    })
+  }
+  if (!('hide' in HTMLElement.prototype)) {
+    Object.defineProperty(HTMLElement.prototype, 'hide', {
+      value: function (this: HTMLElement): void { this.style.display = 'none' },
+      writable: true, configurable: true,
+    })
+  }
+  if (!('setText' in Element.prototype)) {
+    Object.defineProperty(Element.prototype, 'setText', {
+      value: function (this: Element, val: string): void { this.textContent = val },
+      writable: true, configurable: true,
+    })
+  }
+  if (!('getText' in Element.prototype)) {
+    Object.defineProperty(Element.prototype, 'getText', {
+      value: function (this: Element): string { return this.textContent ?? '' },
+      writable: true, configurable: true,
+    })
+  }
+
+  // Global createEl / createDiv / createSpan
+  if (!(window as unknown as { createEl?: unknown }).createEl) {
+    (window as unknown as { createEl: unknown }).createEl = function(tag: string, o?: unknown): HTMLElement {
+      const el = document.createElement(tag)
+      if (typeof o === 'string') { el.textContent = o }
+      else if (o && typeof o === 'object') {
+        const opts = o as { cls?: string | string[]; text?: string; attr?: Record<string, string | number | boolean | null>; parent?: Node }
+        if (opts.cls) { if (Array.isArray(opts.cls)) el.className = opts.cls.join(' '); else el.className = opts.cls }
+        if (opts.text) el.textContent = opts.text
+        if (opts.attr) { for (const [k, v] of Object.entries(opts.attr)) { if (v !== null) el.setAttribute(k, String(v)) } }
+        if (opts.parent) opts.parent.appendChild(el)
+      }
+      return el
+    }
+  }
+  if (!(window as unknown as { createDiv?: unknown }).createDiv) {
+    (window as unknown as { createDiv: unknown }).createDiv = function(o?: unknown): HTMLDivElement {
+      return (window as unknown as { createEl: (tag: string, o?: unknown) => HTMLElement }).createEl('div', o) as HTMLDivElement
+    }
+  }
+  if (!(window as unknown as { createSpan?: unknown }).createSpan) {
+    (window as unknown as { createSpan: unknown }).createSpan = function(o?: unknown): HTMLSpanElement {
+      return (window as unknown as { createEl: (tag: string, o?: unknown) => HTMLElement }).createEl('span', o) as HTMLSpanElement
+    }
+  }
+  if (!('createEl' in Node.prototype)) {
+    Object.defineProperty(Node.prototype, 'createEl', {
+      value: function (this: Node, tag: string, o?: unknown): HTMLElement {
+        const el = (window as unknown as { createEl: (tag: string, o?: unknown) => HTMLElement }).createEl(tag, o)
+        // Guard: Document nodes cannot accept additional Element children via appendChild
+        if (this.nodeType !== 9) {
+          this.appendChild(el)
+        }
+        return el
+      },
+      writable: true, configurable: true,
+    })
+  }
+  if (!('createDiv' in Node.prototype)) {
+    Object.defineProperty(Node.prototype, 'createDiv', {
+      value: function (this: Node, o?: unknown): HTMLDivElement {
+        const el = (window as unknown as { createDiv: (o?: unknown) => HTMLDivElement }).createDiv(o)
+        // Guard: Document nodes cannot accept additional Element children via appendChild
+        if (this.nodeType !== 9) {
+          this.appendChild(el)
+        }
+        return el
+      },
+      writable: true, configurable: true,
+    })
+  }
+  if (!('createSpan' in Node.prototype)) {
+    Object.defineProperty(Node.prototype, 'createSpan', {
+      value: function (this: Node, o?: unknown): HTMLSpanElement {
+        const el = (window as unknown as { createSpan: (o?: unknown) => HTMLSpanElement }).createSpan(o)
+        // Guard: Document nodes cannot accept additional Element children via appendChild
+        if (this.nodeType !== 9) {
+          this.appendChild(el)
+        }
+        return el
+      },
+      writable: true, configurable: true,
+    })
+  }
+
+  // ─── Icon Registry (synchronous) ──────────────────────────────────────────
+  // Plugins call addIcon() during onload() to register custom SVG icons.
+  // These must be available synchronously before addRibbonIcon() is called.
+  if (!(window as unknown as { __obsidianCustomIcons?: unknown }).__obsidianCustomIcons) {
+    ;(window as unknown as { __obsidianCustomIcons: Map<string, string> }).__obsidianCustomIcons = new Map()
+  }
+  const customIconsRef = (window as unknown as { __obsidianCustomIcons: Map<string, string> }).__obsidianCustomIcons
+
+  if (!window.obsidian.addIcon) {
+    window.obsidian.addIcon = (iconId: string, svgContent: string): void => {
+      customIconsRef.set(iconId, svgContent)
+    }
+  }
+  if (!window.obsidian.removeIcon) {
+    window.obsidian.removeIcon = (iconId: string): void => {
+      customIconsRef.delete(iconId)
+    }
+  }
+  if (!window.obsidian.getIcon) {
+    window.obsidian.getIcon = (iconId: string): SVGSVGElement | null => {
+      const svg = customIconsRef.get(iconId)
+      if (svg) {
+        const container = document.createElement('div')
+        container.innerHTML = svg
+        return container.querySelector('svg') ?? null
+      }
+      return null
+    }
+  }
+  if (!window.obsidian.getIconIds) {
+    window.obsidian.getIconIds = (): string[] => {
+      return Array.from(customIconsRef.keys())
+    }
+  }
+  if (!window.obsidian.setIcon) {
+    window.obsidian.setIcon = (parent: HTMLElement, iconId: string): void => {
+      parent.innerHTML = ''
+      const svg = customIconsRef.get(iconId)
+      if (svg) { parent.innerHTML = svg; return }
+      // Fallback: empty SVG placeholder
+      const placeholder = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+      placeholder.setAttribute('data-icon', iconId)
+      placeholder.setAttribute('width', '16')
+      placeholder.setAttribute('height', '16')
+      parent.appendChild(placeholder)
+    }
+  }
+
+  // Obsidian exposes `activeWindow` and `activeDocument` as globals pointing to
+  // the currently focused window/document (for multi-window support).
+  // In Slatebase, there's always a single window.
+  if (!(window as unknown as { activeWindow?: unknown }).activeWindow) {
+    (window as unknown as { activeWindow: Window }).activeWindow = window
+  }
+  if (!(window as unknown as { activeDocument?: unknown }).activeDocument) {
+    (window as unknown as { activeDocument: Document }).activeDocument = document
+  }
+
+  // Obsidian exposes global `sleep(ms)` and `nextFrame()` utility functions.
+  if (!(window as unknown as { sleep?: unknown }).sleep) {
+    (window as unknown as { sleep: (ms: number) => Promise<void> }).sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+  }
+  if (!(window as unknown as { nextFrame?: unknown }).nextFrame) {
+    (window as unknown as { nextFrame: () => Promise<void> }).nextFrame = () => new Promise(resolve => requestAnimationFrame(() => resolve()))
+  }
+
+  // Obsidian exposes the Workspace class itself on window.obsidian so plugins
+  // can monkey-patch its prototype (e.g. Templater patches getActiveViewOfType).
+  if (!window.obsidian.Workspace) {
+    // Create a dummy class whose prototype plugins can patch.
+    // The real WorkspaceShim instance is separate — patches on this prototype
+    // won't affect it, but plugins won't crash trying to access .prototype.
+    window.obsidian.Workspace = class Workspace {} as unknown as Record<string, unknown>
+  }
+
+  // Component — Obsidian's base class for lifecycle management.
+  // Views, Plugins, and other managed objects extend Component.
+  // Provides: load, unload, addChild, removeChild, register, registerEvent, registerInterval, registerDomEvent.
+  if (!window.obsidian.Component) {
+    window.obsidian.Component = class Component {
+      private _children: unknown[] = []
+      private _loaded: boolean = false
+      private _events: Array<{ target: EventTarget; event: string; handler: EventListenerOrEventListenerObject }> = []
+      private _intervals: number[] = []
+      private _cleanups: Array<() => void> = []
+
+      load(): void {
+        this._loaded = true
+        this.onload()
+      }
+      onload(): void {}
+      unload(): void {
+        this._loaded = false
+        // Clean up registered intervals
+        for (const id of this._intervals) clearInterval(id)
+        this._intervals = []
+        // Clean up registered DOM events
+        for (const { target, event, handler } of this._events) {
+          target.removeEventListener(event, handler)
+        }
+        this._events = []
+        // Run cleanup callbacks
+        for (const fn of this._cleanups) { try { fn() } catch { /* ignore */ } }
+        this._cleanups = []
+        // Unload children
+        for (const child of this._children) {
+          if (child && typeof child === 'object' && 'unload' in child) {
+            (child as { unload: () => void }).unload()
+          }
+        }
+        this._children = []
+        this.onunload()
+      }
+      onunload(): void {}
+      addChild<T>(child: T): T {
+        this._children.push(child)
+        if (this._loaded && child && typeof child === 'object' && 'load' in child) {
+          (child as { load: () => void }).load()
+        }
+        return child
+      }
+      removeChild<T>(child: T): T {
+        const idx = this._children.indexOf(child)
+        if (idx >= 0) this._children.splice(idx, 1)
+        if (child && typeof child === 'object' && 'unload' in child) {
+          (child as { unload: () => void }).unload()
+        }
+        return child
+      }
+      register(cb: unknown): void {
+        if (typeof cb === 'function') this._cleanups.push(cb as () => void)
+      }
+      registerEvent(_ref: unknown): void {}
+      registerInterval(id: number): number {
+        this._intervals.push(id)
+        return id
+      }
+      registerDomEvent(el: EventTarget, event: string, handler: EventListenerOrEventListenerObject): void {
+        el.addEventListener(event, handler)
+        this._events.push({ target: el, event, handler })
+      }
+    } as unknown as Record<string, unknown>
+  }
+
+  // EditorSuggest — Base class for autocomplete suggestions (Kanban DateSuggest/TimeSuggest).
+  // Must be defined early — class heritage evaluates at bundle parse time.
+  if (!window.obsidian.EditorSuggest) {
+    window.obsidian.EditorSuggest = class EditorSuggest {
+      app: unknown
+      context: unknown = null
+      limit: number = 20
+      suggestEl: HTMLElement
+      scope = {
+        keys: [] as unknown[],
+        register: (_modifiers: string[], _key: string | null, _callback: () => boolean | void) => {
+          const handler = { modifiers: _modifiers, key: _key, func: _callback }
+          return handler
+        },
+        unregister: (_handler: unknown) => {},
+      }
+      constructor(app: unknown) {
+        this.app = app
+        this.suggestEl = document.createElement('div')
+        this.suggestEl.className = 'suggestion-container'
+      }
+      open(): void {}
+      close(): void {}
+      getSuggestions(_context: unknown): unknown[] { return [] }
+      renderSuggestion(_value: unknown, _el: HTMLElement): void {}
+      selectSuggestion(_value: unknown, _evt: unknown): void {}
+      onTrigger(_cursor: unknown, _editor: unknown, _file: unknown): unknown { return null }
+    } as unknown as Record<string, unknown>
+  }
+
   // Obsidian exposes `window.app` as a global reference to the app instance.
   // Many plugins and libraries (like obsidian-daily-notes-interface) access it directly.
   if (!(window as unknown as { app?: unknown }).app) {
@@ -500,7 +976,7 @@ if (typeof window !== 'undefined') {
         },
         getPluginById: (id: string) => {
           const plugins = ((window as unknown as { app: { internalPlugins: { plugins: Record<string, unknown> } } }).app.internalPlugins.plugins)
-          return plugins[id] ?? undefined
+          return plugins[id] ?? { enabled: false, instance: { options: {} } }
         },
       },
       plugins: {
@@ -512,6 +988,27 @@ if (typeof window !== 'undefined') {
       workspace: {},
       metadataCache: {},
       foldManager: { save: () => {}, load: () => {}, getFolds: () => [] },
+      embedRegistry: {
+        embedByExtension: {
+          md: () => {
+            // Kanban calls this to extract the internal MarkdownEditor class.
+            // We provide a stub that survives the prototype chain extraction.
+            const FakeEditor = class { constructor() {} }
+            const editMode = Object.create(Object.create(FakeEditor.prototype))
+            return {
+              load: () => {},
+              unload: () => {},
+              editable: false,
+              showEditor: () => {},
+              editMode,
+            }
+          },
+        },
+      },
+      commands: {
+        commands: {},
+        executeCommand: (_command: unknown) => {},
+      },
     }
   }
 
@@ -649,6 +1146,148 @@ if (typeof window !== 'undefined') {
       configurable: true,
     })
   }
+  if (!Object.hasOwn(HTMLElement.prototype, 'setCssProps')) {
+    Object.defineProperty(HTMLElement.prototype, 'setCssProps', {
+      value: function (this: HTMLElement, props: Record<string, string>) {
+        for (const [key, value] of Object.entries(props)) {
+          this.style.setProperty(key, value)
+        }
+      },
+      writable: true,
+      configurable: true,
+    })
+  }
+  if (!Object.hasOwn(HTMLElement.prototype, 'setCssStyles')) {
+    Object.defineProperty(HTMLElement.prototype, 'setCssStyles', {
+      value: function (this: HTMLElement, styles: Partial<CSSStyleDeclaration>) {
+        Object.assign(this.style, styles)
+      },
+      writable: true,
+      configurable: true,
+    })
+  }
+  if (!Object.hasOwn(HTMLElement.prototype, 'onWindowMigrated')) {
+    Object.defineProperty(HTMLElement.prototype, 'onWindowMigrated', {
+      value: function (_callback: () => void) {
+        // No-op — Slatebase has a single window (no pop-out support)
+        return () => {}
+      },
+      writable: true,
+      configurable: true,
+    })
+  }
+  if (!Object.hasOwn(HTMLElement.prototype, 'onNodeInserted')) {
+    Object.defineProperty(HTMLElement.prototype, 'onNodeInserted', {
+      value: function (_callback: () => void) {
+        return () => {}
+      },
+      writable: true,
+      configurable: true,
+    })
+  }
+  if (!Object.hasOwn(HTMLElement.prototype, 'on')) {
+    Object.defineProperty(HTMLElement.prototype, 'on', {
+      value: function (this: HTMLElement, event: string, selectorOrHandler: unknown, handler?: unknown) {
+        // Obsidian overload: on(event, selector, handler) or on(event, handler)
+        const actualHandler = typeof selectorOrHandler === 'function'
+          ? selectorOrHandler as EventListener
+          : handler as EventListener
+        const selector = typeof selectorOrHandler === 'string' ? selectorOrHandler : null
+        if (selector) {
+          // Event delegation: listen on parent, filter by selector
+          const delegated = (evt: Event) => {
+            const target = (evt.target as HTMLElement)?.closest?.(selector)
+            if (target && this.contains(target)) {
+              actualHandler.call(target, evt)
+            }
+          }
+          this.addEventListener(event, delegated)
+        } else {
+          this.addEventListener(event, actualHandler)
+        }
+      },
+      writable: true,
+      configurable: true,
+    })
+  }
+  if (!Object.hasOwn(HTMLElement.prototype, 'off')) {
+    Object.defineProperty(HTMLElement.prototype, 'off', {
+      value: function (this: HTMLElement, event: string, handler: EventListener) {
+        this.removeEventListener(event, handler)
+      },
+      writable: true,
+      configurable: true,
+    })
+  }
+
+  // ─── Global standalone DOM helper functions (Obsidian exposes these on window) ───
+  // Unlike the HTMLElement.prototype methods (which append to `this`), these create
+  // detached elements that are not appended to any parent.
+
+  const win = window as unknown as Record<string, unknown>
+
+  if (!win.createEl) {
+    win.createEl = function createEl(tag: string, o?: unknown, cb?: (el: HTMLElement) => void): HTMLElement {
+      const el = document.createElement(tag)
+      let callback: ((el: HTMLElement) => void) | undefined = cb
+      if (typeof o === 'function') {
+        callback = o as (el: HTMLElement) => void
+      } else if (o && typeof o === 'object') {
+        const options = o as { cls?: string; text?: string; attr?: Record<string, string>; type?: string; href?: string; placeholder?: string; value?: string }
+        if (options.cls) el.className = options.cls
+        if (options.text) el.textContent = options.text
+        if (options.attr) {
+          for (const [k, v] of Object.entries(options.attr)) {
+            el.setAttribute(k, v)
+          }
+        }
+        if (options.type) (el as HTMLInputElement).type = options.type
+        if (options.href) (el as HTMLAnchorElement).href = options.href
+        if (options.placeholder) (el as HTMLInputElement).placeholder = options.placeholder
+        if (options.value) (el as HTMLInputElement).value = options.value
+      }
+      if (callback) callback(el)
+      return el
+    }
+  }
+
+  if (!win.createDiv) {
+    win.createDiv = function createDiv(o?: unknown, cb?: (el: HTMLElement) => void): HTMLElement {
+      let options: { cls?: string; text?: string } | undefined
+      let callback: ((el: HTMLElement) => void) | undefined = cb
+      if (typeof o === 'string') {
+        options = { cls: o }
+      } else if (typeof o === 'function') {
+        callback = o as (el: HTMLElement) => void
+      } else if (o && typeof o === 'object') {
+        options = o as { cls?: string; text?: string }
+      }
+      return (win.createEl as (tag: string, opts?: unknown, cb?: (el: HTMLElement) => void) => HTMLElement)('div', options, callback)
+    }
+  }
+
+  if (!win.createSpan) {
+    win.createSpan = function createSpan(o?: unknown, cb?: (el: HTMLElement) => void): HTMLElement {
+      let options: { cls?: string; text?: string } | undefined
+      let callback: ((el: HTMLElement) => void) | undefined = cb
+      if (typeof o === 'string') {
+        options = { cls: o }
+      } else if (typeof o === 'function') {
+        callback = o as (el: HTMLElement) => void
+      } else if (o && typeof o === 'object') {
+        options = o as { cls?: string; text?: string }
+      }
+      return (win.createEl as (tag: string, opts?: unknown, cb?: (el: HTMLElement) => void) => HTMLElement)('span', options, callback)
+    }
+  }
+
+  if (!win.createFragment) {
+    win.createFragment = function createFragment(cb?: (frag: DocumentFragment) => void): DocumentFragment {
+      const frag = document.createDocumentFragment()
+      if (cb) cb(frag)
+      return frag
+    }
+  }
 
   // Plugin base class — plugins extend this via `class MyPlugin extends Plugin`
   // The constructor receives the app instance from the PluginLoader
@@ -656,16 +1295,41 @@ if (typeof window !== 'undefined') {
     window.obsidian.Plugin = class Plugin {
       app: unknown
       manifest: unknown
+      private _children: unknown[] = []
       private _intervals: number[] = []
       private _events: Array<{ target: EventTarget; event: string; handler: EventListenerOrEventListenerObject }> = []
+      /** Scope — Obsidian's keymap manager for plugin hotkeys */
+      scope = {
+        keys: function(..._args: unknown[]) { return { scope: this } },
+        register: (_modifiers: string[], _key: string | null, _callback: () => boolean | void) => ({ scope: null }),
+        unregister: (_handler: unknown) => {},
+      }
       constructor(app: unknown) {
         this.app = app
         this.manifest = {}
+        this._children = []
         this._intervals = []
         this._events = []
       }
       onload() {}
       onunload() {}
+      load() { this.onload() }
+      unload() { this.onunload() }
+      addChild<T>(child: T): T {
+        this._children.push(child)
+        if (child && typeof child === 'object' && 'load' in child) {
+          (child as { load: () => void }).load()
+        }
+        return child
+      }
+      removeChild<T>(child: T): T {
+        const idx = this._children.indexOf(child)
+        if (idx >= 0) this._children.splice(idx, 1)
+        if (child && typeof child === 'object' && 'unload' in child) {
+          (child as { unload: () => void }).unload()
+        }
+        return child
+      }
       async loadData(): Promise<unknown> { return null }
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       async saveData(_data: unknown): Promise<void> {}
@@ -701,19 +1365,103 @@ if (typeof window !== 'undefined') {
         return registerRibbonIcon(pluginId, icon, title, callback)
       }
       addStatusBarItem(): HTMLElement {
-        return document.createElement('div')
+        const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
+        return registerStatusBarItem(pluginId)
       }
+      /** Register an editor suggest (autocomplete). No-op in Slatebase. */
+      registerEditorSuggest(_suggest: unknown): void {}
+      /** Register a hover link source. No-op in Slatebase. */
+      registerHoverLinkSource(_key: string, _source: unknown): void {}
+      /** Register a markdown post processor. Stored for potential future use. */
+      registerMarkdownPostProcessor(_postProcessor: unknown, _sortOrder?: number): unknown { return _postProcessor }
+      /** Register a code block processor for a specific language. No-op stub. */
+      registerMarkdownCodeBlockProcessor(_language: string, _handler: unknown, _sortOrder?: number): unknown { return _handler }
+      /** Register a CodeMirror 6 extension. No-op in Slatebase. */
+      registerEditorExtension(_extension: unknown): void {}
+      /** Register file extensions for a view type. No-op in Slatebase. */
+      registerExtensions(_extensions: string[], _viewType: string): void {}
+      /** Register an obsidian:// protocol handler. No-op in Slatebase. */
+      registerObsidianProtocolHandler(_action: string, _handler: unknown): void {}
+      /** Remove a previously registered command. No-op in Slatebase. */
+      removeCommand(_commandId: string): void {}
+      /** Register a CLI handler. No-op in Slatebase (no desktop CLI). */
+      registerCliHandler(_command: string, _description: string, _flags: unknown, _handler: unknown): void {}
     } as unknown as Record<string, unknown>
   }
 
   window.obsidian.PluginSettingTab = PluginSettingTab
   window.obsidian.Setting = Setting
+
+  // BaseComponent — abstract base for all setting UI components.
+  // Excalidraw extends this for custom settings controls.
+  if (!window.obsidian.BaseComponent) {
+    window.obsidian.BaseComponent = class BaseComponent {
+      disabled = false
+      then(cb: (component: unknown) => unknown): unknown { cb(this); return this }
+      setDisabled(disabled: boolean): unknown { this.disabled = disabled; return this }
+    } as unknown as Record<string, unknown>
+  }
+
+  // ValueComponent — extends BaseComponent with get/set value pattern.
+  if (!window.obsidian.ValueComponent) {
+    const BaseComp = window.obsidian.BaseComponent as { new (): unknown; prototype: object }
+    window.obsidian.ValueComponent = class ValueComponent extends (BaseComp as unknown as { new (): { disabled: boolean; then(cb: unknown): unknown; setDisabled(d: boolean): unknown } }) {
+      getValue(): unknown { return undefined }
+      setValue(_value: unknown): unknown { return this }
+      registerOptionListener(_listeners: unknown, _key: string): unknown { return this }
+    } as unknown as Record<string, unknown>
+  }
+
   window.obsidian.TextComponent = TextComponent
   window.obsidian.TextAreaComponent = TextAreaComponent
   window.obsidian.ToggleComponent = ToggleComponent
   window.obsidian.DropdownComponent = DropdownComponent
   window.obsidian.ButtonComponent = ButtonComponent
   window.obsidian.SliderComponent = SliderComponent
+
+  // FileSystemAdapter — stub class for `instanceof` checks.
+  // LiveSync uses `vault.adapter instanceof FileSystemAdapter` to detect desktop.
+  if (!window.obsidian.FileSystemAdapter) {
+    window.obsidian.FileSystemAdapter = class FileSystemAdapter {
+      getName(): string { return 'slatebase' }
+      getBasePath(): string { return '/' }
+      getFullPath(path: string): string { return path }
+      getFilePath(path: string): string { return path }
+      getResourcePath(path: string): string { return path }
+      async exists(_path: string): Promise<boolean> { return false }
+      async stat(_path: string): Promise<unknown> { return null }
+      async list(_path: string): Promise<{ files: string[]; folders: string[] }> { return { files: [], folders: [] } }
+      async read(_path: string): Promise<string> { return '' }
+      async readBinary(_path: string): Promise<ArrayBuffer> { return new ArrayBuffer(0) }
+      async write(_path: string, _data: string): Promise<void> {}
+      async writeBinary(_path: string, _data: ArrayBuffer): Promise<void> {}
+      async append(_path: string, _data: string): Promise<void> {}
+      async remove(_path: string): Promise<void> {}
+      async rename(_path: string, _newPath: string): Promise<void> {}
+      async copy(_path: string, _newPath: string): Promise<void> {}
+      async mkdir(_path: string): Promise<void> {}
+      async rmdir(_path: string, _recursive: boolean): Promise<void> {}
+      async trashSystem(_path: string): Promise<boolean> { return false }
+      async trashLocal(_path: string): Promise<void> {}
+      async process(_path: string, fn: (data: string) => string): Promise<string> { return fn('') }
+    } as unknown as Record<string, unknown>
+  }
+
+  // ─── Platform detection (used by Kanban, many others) ──────────────────
+
+  if (!window.obsidian.Platform) {
+    window.obsidian.Platform = {
+      isMobile: false,
+      isPhone: false,
+      isTablet: false,
+      isDesktop: true,
+      isDesktopApp: false,
+      isMacOS: navigator.platform?.startsWith('Mac') ?? false,
+      isWin: navigator.platform?.startsWith('Win') ?? false,
+      isLinux: navigator.platform?.includes('Linux') ?? false,
+      isSafari: /^((?!chrome|android).)*safari/i.test(navigator.userAgent),
+    }
+  }
 
   // ─── Utility functions used by many plugins ────────────────────────────
 
@@ -881,6 +1629,95 @@ if (typeof window !== 'undefined') {
     } as unknown as Record<string, unknown>
   }
 
+  // TextFileView — extends FileView with text content management.
+  // Plugins like Kanban extend this for file-backed views with getViewData/setViewData/requestSave.
+  if (!window.obsidian.TextFileView) {
+    const FileViewClass = window.obsidian.FileView as { new (leaf: unknown): unknown; prototype: object }
+    window.obsidian.TextFileView = class TextFileView extends (FileViewClass as unknown as { new (leaf: unknown): { containerEl: HTMLElement; contentEl: HTMLElement; app: unknown; leaf: unknown; file: unknown } }) {
+      data: string = ''
+      private _saveRequested: boolean = false
+      private _saveTimerId: ReturnType<typeof setTimeout> | null = null
+      getViewType(): string { return '' }
+      getDisplayText(): string { return (this.file as { basename?: string })?.basename ?? 'File View' }
+      /** Get view data — plugins override to serialize state to text. */
+      getViewData(): string { return this.data }
+      /** Set view data — plugins override to parse and render content. */
+      setViewData(_data: string, _clear?: boolean): void { this.data = _data }
+      /** Clear internal state — plugins override for reset between file loads. */
+      clear(): void { /* plugins override */ }
+      /** Request a debounced save to disk. */
+      requestSave(): void {
+        this._saveRequested = true
+        if (this._saveTimerId !== null) clearTimeout(this._saveTimerId)
+        this._saveTimerId = setTimeout(() => {
+          this._saveTimerId = null
+          void this.save(false)
+        }, 2000)
+      }
+      /** Perform the save — writes getViewData() to the vault via vault.modify. */
+      async save(force: boolean): Promise<void> {
+        if (!force && !this._saveRequested) return
+        if (!this.file) return
+        if (this._saveTimerId !== null) { clearTimeout(this._saveTimerId); this._saveTimerId = null }
+        this._saveRequested = false
+        const newData = this.getViewData()
+        this.data = newData
+        try {
+          const vault = (this.app as { vault?: { modify: (f: unknown, content: string) => Promise<void> } })?.vault
+          if (vault) await vault.modify(this.file, newData)
+        } catch (err) { console.error('[TextFileView] Failed to save:', err) }
+      }
+      /** Load a file into this view. */
+      async loadFile(file: unknown): Promise<void> {
+        if (this.file && this.file !== file) await this.onUnloadFile(this.file)
+        this.file = file
+        try {
+          const vault = (this.app as { vault?: { read: (f: unknown) => Promise<string> } })?.vault
+          if (vault) this.data = await vault.read(file)
+          else this.data = ''
+        } catch { this.data = '' }
+        await this.onLoadFile(file)
+      }
+      async onLoadFile(_file: unknown): Promise<void> { this.setViewData(this.data, true) }
+      async onUnloadFile(_file: unknown): Promise<void> { await this.save(true) }
+      async onClose(): Promise<void> {
+        if (this.file) await this.onUnloadFile(this.file)
+        if (this._saveTimerId !== null) { clearTimeout(this._saveTimerId); this._saveTimerId = null }
+      }
+      getState(): Record<string, unknown> { return { file: (this.file as { path?: string })?.path ?? null } }
+      async setState(state: Record<string, unknown>, _result: unknown): Promise<void> {
+        if (state.file && typeof state.file === 'string') {
+          const vault = (this.app as { vault?: { getAbstractFileByPath: (path: string) => unknown } })?.vault
+          const file = vault?.getAbstractFileByPath(state.file as string)
+          if (file) await this.loadFile(file)
+        }
+      }
+      addChild<T>(child: T): T { return child }
+      removeChild<T>(child: T): T { return child }
+      register(_cb: unknown): void { /* no-op */ }
+    } as unknown as Record<string, unknown>
+  }
+
+  // MarkdownView — plugins use `getActiveViewOfType(MarkdownView)` to check if the
+  // active leaf is editing a markdown file. Extends FileView with editor property.
+  if (!window.obsidian.MarkdownView) {
+    const FileViewClass = window.obsidian.FileView as { new (leaf: unknown): unknown; prototype: object }
+    window.obsidian.MarkdownView = class MarkdownView extends (FileViewClass as unknown as { new (leaf: unknown): { containerEl: HTMLElement; contentEl: HTMLElement; app: unknown; leaf: unknown; file: unknown } }) {
+      /** Returns 'markdown' as the view type identifier. */
+      getViewType(): string { return 'markdown' }
+      getDisplayText(): string { return (this.file as { basename?: string })?.basename ?? 'Markdown' }
+      /** The editor instance (EditorShim when available). */
+      get editor(): unknown {
+        const workspace = (this.app as { workspace?: { activeEditor?: { editor: unknown } } })?.workspace
+        return workspace?.activeEditor?.editor ?? null
+      }
+      /** Current edit mode: 'source' (editing) or 'preview' (reading). */
+      getMode(): string { return 'source' }
+      /** Request save — no-op in our implementation, auto-save handles it. */
+      requestSave(): void { /* no-op */ }
+    } as unknown as Record<string, unknown>
+  }
+
   // ─── Moment.js global (required by Calendar, Periodic Notes, and many others) ──
   // Obsidian exposes moment globally as `window.moment`. Plugins access it directly
   // (e.g. `window.moment.weekdays()`) and via `require('obsidian').moment`.
@@ -910,26 +1747,65 @@ if (typeof window !== 'undefined') {
   // Common Obsidian API stubs that plugins may reference
   if (!window.obsidian.Notice) {
     window.obsidian.Notice = class Notice {
+      noticeEl: HTMLElement & { isShown?: () => boolean }
+      messageEl: HTMLElement = document.createElement('div')
+      containerEl: HTMLElement = document.createElement('div')
+      private _shown = true
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      constructor(message: string, _timeout?: number) {
-        console.log('[Obsidian Notice]', message)
+      constructor(message: string | DocumentFragment, _timeout?: number) {
+        this.noticeEl = document.createElement('div') as HTMLElement & { isShown?: () => boolean }
+        this.noticeEl.isShown = () => this._shown
+        const msg = typeof message === 'string' ? message : (message?.textContent ?? '')
+        if ((window as unknown as { __slatebaseShowNotice?: (msg: string, duration?: number) => void }).__slatebaseShowNotice) {
+          (window as unknown as { __slatebaseShowNotice: (msg: string, duration?: number) => void }).__slatebaseShowNotice(msg, _timeout)
+        }
       }
-      hide() {}
+      setMessage(message: string | DocumentFragment): this {
+        const msg = typeof message === 'string' ? message : (message?.textContent ?? '')
+        if ((window as unknown as { __slatebaseShowNotice?: (msg: string) => void }).__slatebaseShowNotice) {
+          (window as unknown as { __slatebaseShowNotice: (msg: string) => void }).__slatebaseShowNotice(msg)
+        }
+        return this
+      }
+      hide() { this._shown = false }
+      isShown(): boolean { return this._shown }
     } as unknown as Record<string, unknown>
   }
   if (!window.obsidian.Modal) {
     window.obsidian.Modal = class Modal {
       app: unknown
       containerEl: HTMLElement
+      modalEl: HTMLElement
+      titleEl: HTMLElement
       contentEl: HTMLElement
+      scope: { register: (_m: unknown, _k: unknown, _cb: unknown) => unknown; unregister: (_h: unknown) => void }
       private overlayEl: HTMLElement | null = null
       constructor(app: unknown) {
         this.app = app
         this.containerEl = document.createElement('div')
         this.containerEl.className = 'modal-container'
+        this.modalEl = document.createElement('div')
+        this.modalEl.className = 'modal'
+        this.titleEl = document.createElement('div')
+        this.titleEl.className = 'modal-title'
         this.contentEl = document.createElement('div')
         this.contentEl.className = 'modal-content'
-        this.containerEl.appendChild(this.contentEl)
+        this.modalEl.appendChild(this.titleEl)
+        this.modalEl.appendChild(this.contentEl)
+        this.containerEl.appendChild(this.modalEl)
+        this.scope = { register: () => ({}), unregister: () => {} }
+      }
+      setTitle(title: string): unknown {
+        this.titleEl.textContent = title
+        return this
+      }
+      setContent(content: string): unknown {
+        this.contentEl.innerHTML = ''
+        this.contentEl.textContent = content
+        return this
+      }
+      isShown(): boolean {
+        return this.overlayEl != null && this.overlayEl.parentNode != null
       }
       open() {
         // Create overlay backdrop
@@ -943,7 +1819,14 @@ if (typeof window !== 'undefined') {
           if (e.target === this.overlayEl) this.close()
         })
         document.body.appendChild(this.overlayEl)
-        this.onOpen()
+        try {
+          this.onOpen()
+        } catch (err: unknown) {
+          // Show the error inside the modal so developers can see what API is missing
+          const errMsg = err instanceof Error ? err.message : String(err)
+          console.error('[Modal.open] onOpen() threw:', err)
+          this.contentEl.innerHTML = `<div style="color:var(--text-error,#e53935);padding:12px;font-size:13px;"><strong>Modal-Fehler:</strong> ${errMsg}</div>`
+        }
       }
       close() {
         this.onClose()
@@ -956,19 +1839,335 @@ if (typeof window !== 'undefined') {
       onClose() {}
     } as unknown as Record<string, unknown>
   }
-  if (!window.obsidian.requestUrl) {
-    window.obsidian.requestUrl = async (urlOrRequest: unknown) => {
-      const url = typeof urlOrRequest === 'string' ? urlOrRequest : (urlOrRequest as { url: string }).url
-      const options = typeof urlOrRequest === 'string' ? {} : urlOrRequest as RequestInit
-      const response = await fetch(url, options)
-      const text = await response.text()
-      let json: unknown = null
-      try { json = JSON.parse(text) } catch { /* not json */ }
-      return { status: response.status, headers: Object.fromEntries(response.headers.entries()), text, json }
+
+  // requireApiVersion — plugins call this to check Obsidian API version compatibility.
+  // We emulate 1.4.0, so all version checks pass (return true).
+  if (!window.obsidian.requireApiVersion) {
+    window.obsidian.requireApiVersion = (_version: string): boolean => true
+  }
+
+  // getLanguage — returns the app's current locale code (e.g. 'en', 'de').
+  // Excalidraw and other i18n-aware plugins use this.
+  if (!window.obsidian.getLanguage) {
+    window.obsidian.getLanguage = (): string => {
+      const lang = navigator.language?.split('-')[0] ?? 'en'
+      return lang
     }
   }
 
-  // obsidian-daily-notes-interface implementation (used by Calendar plugin)
+  // MarkdownRenderChild — base class for rendered markdown child elements.
+  // Dataview and other rendering plugins extend this to manage lifecycle of embedded content.
+  if (!window.obsidian.MarkdownRenderChild) {
+    const ComponentClass = window.obsidian.Component as { new (): unknown; prototype: object }
+    window.obsidian.MarkdownRenderChild = class MarkdownRenderChild extends (ComponentClass as unknown as { new (): { load(): void; unload(): void; onload(): void; onunload(): void; register(cb: unknown): void; registerEvent(ref: unknown): void } }) {
+      containerEl: HTMLElement
+      constructor(containerEl: HTMLElement) {
+        super()
+        this.containerEl = containerEl
+      }
+    } as unknown as Record<string, unknown>
+  }
+
+  // ConfirmationModal — extends Modal with a confirm/cancel pattern.
+  // Templater and other plugins extend this for user confirmation dialogs.
+  if (!window.obsidian.ConfirmationModal) {
+    const ModalClass = window.obsidian.Modal as { new (app: unknown): unknown; prototype: object }
+    window.obsidian.ConfirmationModal = class ConfirmationModal extends (ModalClass as unknown as { new (app: unknown): { app: unknown; containerEl: HTMLElement; contentEl: HTMLElement; open(): void; close(): void; onOpen(): void; onClose(): void } }) {
+      constructor(app: unknown) {
+        super(app)
+      }
+    } as unknown as Record<string, unknown>
+  }
+
+  // SettingPage — Base class for sub-pages within a SettingTab (Obsidian 1.13.0+).
+  // Templater extends this for its settings pages.
+  if (!window.obsidian.SettingPage) {
+    window.obsidian.SettingPage = class SettingPage {
+      rootEl: HTMLElement
+      titlebarEl: HTMLElement
+      containerEl: HTMLElement
+      title = ''
+      constructor() {
+        this.rootEl = document.createElement('div')
+        this.rootEl.className = 'setting-page'
+        this.titlebarEl = document.createElement('div')
+        this.titlebarEl.className = 'setting-page-titlebar'
+        this.containerEl = document.createElement('div')
+        this.containerEl.className = 'setting-page-content'
+        this.rootEl.appendChild(this.titlebarEl)
+        this.rootEl.appendChild(this.containerEl)
+      }
+      display(): void {}
+      hide(): void {}
+    } as unknown as Record<string, unknown>
+  }
+
+  if (!window.obsidian.Menu) {
+    window.obsidian.Menu = class Menu {
+      private items: Array<{ title: string; icon: string; section: string; checked: boolean; callback: () => void }> = []
+      private containerEl: HTMLElement | null = null
+      addItem(cb: (item: unknown) => void): Menu {
+        const item = {
+          title: '', icon: '', section: '', checked: false, callback: () => {},
+          setTitle(t: string) { this.title = t; return this },
+          setIcon(i: string) { this.icon = i; return this },
+          setSection(s: string) { this.section = s; return this },
+          setChecked(c: boolean) { this.checked = c; return this },
+          onClick(fn: () => void) { this.callback = fn; return this },
+        }
+        cb(item)
+        this.items.push(item)
+        return this
+      }
+      addSeparator(): Menu { return this }
+      showAtMouseEvent(evt: MouseEvent): void {
+        this.show(evt.clientX, evt.clientY)
+      }
+      showAtPosition(pos: { x: number; y: number }): void {
+        this.show(pos.x, pos.y)
+      }
+      private show(x: number, y: number): void {
+        // Create menu DOM
+        const overlay = document.createElement('div')
+        overlay.className = 'menu-overlay'
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;'
+        const menu = document.createElement('div')
+        menu.className = 'menu'
+        menu.style.cssText = `position:fixed;left:${x}px;top:${y}px;background:var(--bg-surface,#fff);border:1px solid var(--border-color,#ccc);border-radius:6px;padding:4px 0;min-width:160px;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:10000;`
+        for (const item of this.items) {
+          const el = document.createElement('div')
+          el.className = 'menu-item'
+          el.style.cssText = 'padding:6px 12px;cursor:pointer;font-size:13px;'
+          el.textContent = item.title
+          el.addEventListener('click', () => { item.callback(); this.close() })
+          el.addEventListener('mouseenter', () => { el.style.background = 'var(--bg-hover,#f0f0f0)' })
+          el.addEventListener('mouseleave', () => { el.style.background = '' })
+          menu.appendChild(el)
+        }
+        overlay.appendChild(menu)
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) this.close() })
+        document.body.appendChild(overlay)
+        this.containerEl = overlay
+      }
+      close(): void {
+        if (this.containerEl?.parentNode) {
+          this.containerEl.parentNode.removeChild(this.containerEl)
+        }
+        this.containerEl = null
+      }
+      hide(): void { this.close() }
+    } as unknown as Record<string, unknown>
+  }
+  if (!window.obsidian.requestUrl) {
+    window.obsidian.requestUrl = async (urlOrRequest: unknown) => {
+      const url = typeof urlOrRequest === 'string' ? urlOrRequest : (urlOrRequest as { url: string }).url
+      const reqOptions = typeof urlOrRequest === 'string' ? {} : urlOrRequest as { method?: string; headers?: Record<string, string>; body?: string; contentType?: string }
+      const token = localStorage.getItem('slatebase_token') || ''
+      const csrfToken = localStorage.getItem('slatebase_csrf') || ''
+      const proxyBody = {
+        url,
+        method: reqOptions.method || 'GET',
+        headers: reqOptions.headers,
+        body: reqOptions.body,
+        contentType: reqOptions.contentType,
+      }
+      const proxyResponse = await fetch('/api/v1/proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify(proxyBody),
+      })
+      const data = await proxyResponse.json() as { status?: number; headers?: Record<string, string>; text?: string; arrayBuffer?: string; message?: string }
+      if (!proxyResponse.ok) {
+        throw new Error(data.message || 'Proxy request failed')
+      }
+      let text = ''
+      if (data.text !== undefined) {
+        text = data.text
+      } else if (data.arrayBuffer) {
+        const binary = atob(data.arrayBuffer)
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) { bytes[i] = binary.charCodeAt(i) }
+        text = new TextDecoder().decode(bytes)
+      }
+      let json: unknown = null
+      try { json = JSON.parse(text) } catch { /* not json */ }
+      const arrayBuffer = new TextEncoder().encode(text).buffer
+      return { status: data.status || 200, headers: data.headers || {}, text, json, arrayBuffer }
+    }
+  }
+
+  // ViewState — type-like object export. Kanban imports { ViewState } from 'obsidian'.
+  // It's just used as a TypeScript type, but the bundled code may reference it at runtime.
+  if (!window.obsidian.ViewState) {
+    window.obsidian.ViewState = {} as unknown as Record<string, unknown>
+  }
+
+  // ViewStateResult — used by setState(state, result) in TextFileView subclasses.
+  if (!window.obsidian.ViewStateResult) {
+    window.obsidian.ViewStateResult = {} as unknown as Record<string, unknown>
+  }
+
+  // HoverParent / HoverPopover — Kanban implements HoverParent interface.
+  // These are just type markers; the shim provides empty objects.
+  if (!window.obsidian.HoverParent) {
+    window.obsidian.HoverParent = {} as unknown as Record<string, unknown>
+  }
+  if (!window.obsidian.HoverPopover) {
+    window.obsidian.HoverPopover = class HoverPopover {
+      hoverEl: HTMLElement = document.createElement('div')
+      state: number = 0
+      constructor() {}
+      hide(): void {}
+    } as unknown as Record<string, unknown>
+  }
+
+  // around() — monkey-patching utility used by Kanban.
+  // Kanban bundles `monkey-around` which provides `around(obj, { method(next) { ... } })`.
+  // If the bundled require fails, we provide a fallback on window.
+  if (!(window as unknown as { around?: unknown }).around) {
+    (window as unknown as { around: unknown }).around = function around(
+      obj: Record<string, unknown>,
+      factories: Record<string, (next: (...args: unknown[]) => unknown) => (...args: unknown[]) => unknown>,
+    ): () => void {
+      const originals: Record<string, unknown> = {}
+      for (const [method, factory] of Object.entries(factories)) {
+        originals[method] = obj[method]
+        const original = obj[method] as (...args: unknown[]) => unknown
+        obj[method] = factory(original)
+      }
+      // Return an uninstaller function
+      return () => {
+        for (const [method, original] of Object.entries(originals)) {
+          obj[method] = original
+        }
+      }
+    }
+  }
+  // ─── CodeMirror 6 stubs (used by Kanban inline editor, Tasks, etc.) ─────
+  // Obsidian re-exports @codemirror/state and @codemirror/view.
+  // Plugins that use CodeMirror extensions (StateField, EditorView, etc.) require these.
+  // We provide no-op stubs that allow the plugin to load without crashing.
+  if (!(window as unknown as { __codemirrorState?: unknown }).__codemirrorState) {
+    const noopFacet = { of: () => ({}), compute: () => ({}) }
+    ;(window as unknown as { __codemirrorState: Record<string, unknown> }).__codemirrorState = {
+      StateField: {
+        define: (config: unknown) => ({ ...config as object, __stateField: true }),
+      },
+      StateEffect: {
+        define: () => ({ of: (value: unknown) => ({ value }) }),
+      },
+      Facet: {
+        define: () => noopFacet,
+      },
+      RangeValue: class RangeValue {
+        eq(_other: unknown): boolean { return false }
+      },
+      RangeSet: {
+        empty: {},
+        of: () => ({}),
+      },
+      EditorState: {
+        create: () => ({}),
+      },
+      Transaction: {},
+      Prec: {
+        highest: (ext: unknown) => ext,
+        high: (ext: unknown) => ext,
+        default: (ext: unknown) => ext,
+        low: (ext: unknown) => ext,
+        lowest: (ext: unknown) => ext,
+      },
+      EditorSelection: {
+        single: (anchor: number, head?: number) => ({ anchor, head: head ?? anchor }),
+        cursor: (pos: number) => ({ anchor: pos, head: pos }),
+      },
+      Compartment: class Compartment {
+        of(ext: unknown) { return ext }
+        reconfigure(ext: unknown) { return { effects: ext } }
+      },
+    }
+  }
+  if (!(window as unknown as { __codemirrorView?: unknown }).__codemirrorView) {
+    ;(window as unknown as { __codemirrorView: Record<string, unknown> }).__codemirrorView = {
+      EditorView: {
+        theme: () => ({}),
+        baseTheme: () => ({}),
+        domEventHandlers: () => ({}),
+        updateListener: { of: () => ({}) },
+        editable: { of: () => ({}) },
+        decorations: { of: () => ({}), compute: () => ({}) },
+        lineWrapping: {},
+      },
+      ViewPlugin: {
+        fromClass: (_cls: unknown, _spec?: unknown) => ({}),
+        define: (_create: unknown, _spec?: unknown) => ({}),
+      },
+      Decoration: {
+        mark: () => ({}),
+        widget: () => ({}),
+        line: () => ({}),
+        set: () => ({}),
+        none: {},
+      },
+      WidgetType: class WidgetType {
+        toDOM(): HTMLElement { return document.createElement('span') }
+        eq(_other: unknown): boolean { return false }
+      },
+      keymap: { of: () => ({}) },
+      placeholder: () => ({}),
+    }
+  }
+  if (!(window as unknown as { __codemirrorLanguage?: unknown }).__codemirrorLanguage) {
+    ;(window as unknown as { __codemirrorLanguage: Record<string, unknown> }).__codemirrorLanguage = {
+      syntaxTree: () => ({ resolve: () => null }),
+      ensureSyntaxTree: () => null,
+      defineLanguageFacet: () => ({ of: () => ({}) }),
+      Language: class Language {
+        constructor() {}
+        static define() { return {}; }
+      },
+      StreamLanguage: {
+        define: (_spec: unknown) => ({}),
+      },
+      LanguageSupport: class LanguageSupport {
+        constructor(_lang: unknown, _support?: unknown) {}
+      },
+      HighlightStyle: { define: () => ({}) },
+      syntaxHighlighting: () => ({}),
+      indentUnit: { of: () => ({}) },
+      foldable: () => false,
+    }
+  }
+
+  // CodeMirror 5 legacy global — Templater uses `CodeMirror.defineMode()`
+  if (!(window as unknown as { CodeMirror?: unknown }).CodeMirror) {
+    ;(window as unknown as { CodeMirror: Record<string, unknown> }).CodeMirror = {
+      defineMode: () => {},
+      defineMIME: () => {},
+      defineExtension: () => {},
+      defineOption: () => {},
+      registerHelper: () => {},
+      registerGlobalHelper: () => {},
+      modes: {},
+      mimeModes: {},
+      resolveMode: () => ({}),
+      getMode: () => ({ token: () => null }),
+      modeURL: '',
+      Pass: {},
+    }
+  }
+
+  // Also expose CM6 symbols directly on window.obsidian — Obsidian re-exports them
+  // and many plugins import them via `const { StateField, EditorView } = require('obsidian')`
+  const cmState = (window as unknown as { __codemirrorState: Record<string, unknown> }).__codemirrorState
+  const cmView = (window as unknown as { __codemirrorView: Record<string, unknown> }).__codemirrorView
+  for (const [key, value] of Object.entries(cmState)) {
+    if (!window.obsidian[key]) window.obsidian[key] = value
+  }
+  for (const [key, value] of Object.entries(cmView)) {
+    if (!window.obsidian[key]) window.obsidian[key] = value
+  }
+
   if (!(window as unknown as { __obsidianDailyNotesInterface?: unknown }).__obsidianDailyNotesInterface) {
     /**
      * Helper: get current daily-notes settings from the internalPlugins stub.
@@ -1109,4 +2308,51 @@ if (typeof window !== 'undefined') {
       appHasDailyNotesPluginLoaded: () => true,
     }
   }
+
+  // ─── SuggestModal / FuzzySuggestModal ──────────────────────────────────────
+  // Lazy-import to avoid circular dependency issues at module load time.
+  // These are registered synchronously since the module is already loaded
+  // by the time plugins access window.obsidian.
+
+  if (!window.obsidian.SuggestModal) {
+    // Dynamic import is not needed — the module is bundled and available synchronously.
+    // We use a require-style inline import via the already-evaluated module.
+    import('./suggest-modal').then(({ SuggestModal, FuzzySuggestModal }) => {
+      window.obsidian!.SuggestModal = SuggestModal as unknown as Record<string, unknown>
+      window.obsidian!.FuzzySuggestModal = FuzzySuggestModal as unknown as Record<string, unknown>
+    }).catch(() => {
+      // Fallback: register stubs if dynamic import fails
+      console.warn('[setting-tab] Failed to load SuggestModal/FuzzySuggestModal')
+    })
+  }
+
+  // ─── MarkdownRenderer ──────────────────────────────────────────────────────
+
+  if (!window.obsidian.MarkdownRenderer) {
+    import('./markdown-renderer').then(({ MarkdownRenderer }) => {
+      window.obsidian!.MarkdownRenderer = MarkdownRenderer as unknown as Record<string, unknown>
+    }).catch(() => {
+      console.warn('[setting-tab] Failed to load MarkdownRenderer')
+    })
+  }
+
+  // ─── Editor class stub ─────────────────────────────────────────────────────
+  // Some plugins reference `obsidian.Editor` for type checks.
+
+  if (!window.obsidian.Editor) {
+    import('./editor-shim').then(({ EditorShim }) => {
+      window.obsidian!.Editor = EditorShim as unknown as Record<string, unknown>
+    }).catch(() => {
+      console.warn('[setting-tab] Failed to load Editor')
+    })
+  }
+
+  // ─── Extended API Registration ─────────────────────────────────────────────
+  // Register all additional Obsidian API extensions (icons, Events, Scope, Keymap,
+  // DOM globals, utility functions, extra UI components, MarkdownPreviewRenderer).
+  import('./obsidian-api-extensions').then(({ registerObsidianApiExtensions }) => {
+    registerObsidianApiExtensions()
+  }).catch(() => {
+    console.warn('[setting-tab] Failed to load obsidian-api-extensions')
+  })
 }

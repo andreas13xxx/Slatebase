@@ -51,63 +51,74 @@ describe('CompatibilityAnalyzer', () => {
   });
 
   describe('analyze() — Node.js module detection (Layer 2)', () => {
-    it('detects require("fs") and returns unsupported', () => {
+    it('detects require("fs") but does not block (non-desktopOnly)', () => {
       const source = `const fs = require('fs'); class MyPlugin { onload() { fs.readFileSync('/tmp/x'); } }`;
       const report = analyzer.analyze(source);
-      expect(report.level).toBe('unsupported');
+      // Not blocked — proceeds to API analysis (level depends on API calls)
+      expect(report.level).not.toBe('unknown');
       expect(report.nodeModules).toContain('fs');
       expect(report.reasons[0]).toContain('Node.js');
     });
 
-    it('detects require("child_process")', () => {
+    it('detects require("child_process") as warning', () => {
       const source = `const { exec } = require('child_process'); class MyPlugin { onload() {} }`;
       const report = analyzer.analyze(source);
-      expect(report.level).toBe('unsupported');
       expect(report.nodeModules).toContain('child_process');
+      // Plugin still installs — level based on API patterns
+      expect(report.level).toBe('full');
     });
 
-    it('detects require("net")', () => {
+    it('detects require("net") as warning', () => {
       const source = `const net = require("net"); class MyPlugin { onload() {} }`;
       const report = analyzer.analyze(source);
-      expect(report.level).toBe('unsupported');
       expect(report.nodeModules).toContain('net');
+      expect(report.level).toBe('full');
     });
 
-    it('detects require("electron")', () => {
+    it('detects require("electron") as warning', () => {
       const source = `const { remote } = require('electron'); class MyPlugin { onload() {} }`;
       const report = analyzer.analyze(source);
-      expect(report.level).toBe('unsupported');
       expect(report.nodeModules).toContain('electron');
+      expect(report.level).toBe('full');
     });
 
-    it('detects node: prefixed imports', () => {
+    it('detects node: prefixed imports as warning', () => {
       const source = `const fs = require('node:fs'); class MyPlugin { onload() {} }`;
       const report = analyzer.analyze(source);
-      expect(report.level).toBe('unsupported');
       expect(report.nodeModules).toContain('fs');
+      expect(report.level).toBe('full');
     });
 
-    it('detects ESM import from node builtins', () => {
+    it('detects ESM import from node builtins as warning', () => {
       const source = `import { readFile } from 'fs'; class MyPlugin { onload() {} }`;
       const report = analyzer.analyze(source);
-      expect(report.level).toBe('unsupported');
       expect(report.nodeModules).toContain('fs');
+      expect(report.level).toBe('full');
     });
 
-    it('detects dynamic import of node builtins', () => {
+    it('detects dynamic import of node builtins as warning', () => {
       const source = `class MyPlugin { async onload() { const fs = await import('fs'); } }`;
       const report = analyzer.analyze(source);
-      expect(report.level).toBe('unsupported');
       expect(report.nodeModules).toContain('fs');
+      expect(report.level).toBe('full');
     });
 
-    it('detects multiple Node.js modules', () => {
+    it('detects multiple Node.js modules as warnings', () => {
       const source = `const fs = require('fs'); const path = require('path'); const net = require('net');`;
       const report = analyzer.analyze(source);
-      expect(report.level).toBe('unsupported');
       expect(report.nodeModules).toContain('fs');
       expect(report.nodeModules).toContain('path');
       expect(report.nodeModules).toContain('net');
+      // Level depends on API analysis, not Node.js detection
+      expect(report.level).toBe('full');
+    });
+
+    it('still blocks when isDesktopOnly is true (regardless of Node.js detection)', () => {
+      const manifest: PluginManifestData = { id: 'test', name: 'Test', version: '1.0.0', isDesktopOnly: true };
+      const source = `const fs = require('fs'); class MyPlugin { onload() {} }`;
+      const report = analyzer.analyze(source, manifest);
+      expect(report.level).toBe('unsupported');
+      expect(report.isDesktopOnly).toBe(true);
     });
 
     it('does not flag non-Node.js requires (e.g. obsidian)', () => {
@@ -123,11 +134,11 @@ describe('CompatibilityAnalyzer', () => {
       expect(report.nodeModules).toHaveLength(0);
     });
 
-    it('detects original-fs (Electron-specific)', () => {
+    it('detects original-fs (Electron-specific) as warning', () => {
       const source = `const fs = require('original-fs'); class MyPlugin { onload() {} }`;
       const report = analyzer.analyze(source);
-      expect(report.level).toBe('unsupported');
       expect(report.nodeModules).toContain('original-fs');
+      expect(report.level).toBe('full');
     });
   });
 

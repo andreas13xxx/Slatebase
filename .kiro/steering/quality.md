@@ -11,6 +11,19 @@ Bei gemeldeten Problemen/Bugs:
 
 Keine Dateien modifizieren bevor der Nutzer den Fix bestätigt hat.
 
+## Vor-Push-Pflicht
+
+Vor jedem `git push` MÜSSEN folgende Checks bestehen:
+1. **Backend**: `npx tsc --noEmit` — keine TypeScript-Fehler
+2. **Frontend**: `npm run build` (`tsc -b && vite build`) — keine TypeScript-Fehler
+3. **Backend Tests**: `npm run test` — alle grün
+4. **Frontend Tests**: `npm run test` — alle grün
+5. **Frontend Lint**: `npx eslint . --quiet` — **0 Errors** (Warnings sind OK)
+
+Wenn ein Check fehlschlägt: **erst fixen, dann pushen**. Kein `--no-verify` ohne vorherige Behebung aller Errors.
+
+---
+
 ## Code-Review Checkliste
 
 ### Funktionalität
@@ -108,3 +121,10 @@ Keine Dateien modifizieren bevor der Nutzer den Fix bestätigt hat.
 - Append-Only JSONL (`data/audit/YYYY-MM-DD.jsonl`)
 - Pflichtfelder: Timestamp (ISO 8601), userId, action, target, IP, success/failure
 - Keine sensiblen Daten in Einträgen
+
+### Plugin-Compat-Shims (Fehlerbehandlung)
+- **Keine Silent Failures**: No-Op-Stubs MÜSSEN entweder die API korrekt implementieren oder einen sichtbaren Fehler erzeugen (console.warn bei Funktionsaufruf, Error im Modal bei onOpen-Crash). Niemals still `undefined` zurückgeben.
+- **Modal.onOpen() in try/catch**: Fehler werden direkt im Modal-Content angezeigt — kein Auto-Close leerer Modals (versteckt Root Cause).
+- **Fehlermeldungen mit Detail**: `extractErrorMessage(err, fallback)` für aussagekräftige Fehlertexte bei Plugin-Reload, Settings-Rendering etc.
+- **DOM-Extensions synchron**: Alle Obsidian DOM-Prototype-Patches (`addClass`, `appendText`, `createEl` etc.) MÜSSEN synchron in `setting-tab.ts` registriert werden (vor Plugin-Bundle-Evaluation), nicht async per dynamic import.
+- **Icon-Registry synchron**: `addIcon()`/`getIcon()` und `window.__obsidianCustomIcons` MÜSSEN vor `onload()` verfügbar sein.

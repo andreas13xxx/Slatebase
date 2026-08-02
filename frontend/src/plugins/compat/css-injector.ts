@@ -173,6 +173,21 @@ function scopeSingleSelector(selector: string, scope: string): string {
     return scope + selector.slice(5);
   }
 
+  // body → replace with scope (plugin CSS variables on body should be scoped)
+  if (selector === 'body') {
+    return scope;
+  }
+
+  // body.class or body:pseudo → replace body portion with scope
+  if (selector.startsWith('body') && selector.length > 4 && (selector[4] === '.' || selector[4] === ':' || selector[4] === '[' || selector[4] === ' ')) {
+    // body .child → scope .child (descendant)
+    if (selector[4] === ' ') {
+      return `${scope} ${selector.slice(5)}`;
+    }
+    // body.class or body:pseudo → scope.class / scope:pseudo
+    return scope + selector.slice(4);
+  }
+
   // Prefix with scope
   return `${scope} ${selector}`;
 }

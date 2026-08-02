@@ -167,9 +167,19 @@ describe('scopeCss()', () => {
   });
 
   describe('body selector', () => {
-    it('prefixes body selector', () => {
+    it('replaces body selector with scope (like :root)', () => {
       const result = scopeCss('body { margin: 0; }', pluginId);
-      expect(result).toContain(`${scope} body {`);
+      expect(result).toContain(`${scope} {`);
+    });
+
+    it('replaces body.class selector with scope.class', () => {
+      const result = scopeCss('body.is-mobile .sidebar { display: none; }', pluginId);
+      expect(result).toContain(`${scope}.is-mobile .sidebar`);
+    });
+
+    it('replaces body descendant selector', () => {
+      const result = scopeCss('body .content { padding: 10px; }', pluginId);
+      expect(result).toContain(`${scope} .content`);
     });
   });
 

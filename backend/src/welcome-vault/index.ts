@@ -66,9 +66,9 @@ export class WelcomeVaultService implements IWelcomeVaultService {
     private readonly featureToggleService: IFeatureToggleService,
     private readonly config: WelcomeVaultConfig,
     private readonly logger: ILogger,
-    dataDir: string,
+    templatesDir: string,
   ) {
-    this.baseTemplateDir = path.join(path.resolve(dataDir), 'templates')
+    this.baseTemplateDir = path.resolve(templatesDir)
   }
 
   /** @inheritdoc */

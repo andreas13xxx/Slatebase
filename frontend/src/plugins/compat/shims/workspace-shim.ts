@@ -3,6 +3,9 @@ import { resolveWikilinkTarget } from '../../link-resolver';
 import type { DirectoryTree } from '../../../types';
 import type { EventRef, IWorkspaceShim, TFile } from '../types';
 import type { ViewRegistry, WorkspaceLeaf } from '../view-registry';
+import { EditorShim } from '../editor-shim';
+import type { IEditor } from '../editor-shim';
+import { MarkdownView } from './markdown-view-shim';
 
 /**
  * WorkspaceShim — Obsidian Workspace API emulation.
@@ -35,6 +38,16 @@ export class WorkspaceShim implements IWorkspaceShim {
   private app: unknown = null;
   private directoryTree: DirectoryTree | null = null;
   private onOpenFile: ((filePath: string) => void) | null = null;
+  private editorShim: EditorShim = new EditorShim();
+
+  /**
+   * The currently active editor, or null if no markdown file is being edited.
+   * Plugins access this via `app.workspace.activeEditor?.editor`.
+   */
+  get activeEditor(): { editor: IEditor; file: TFile | null } | null {
+    if (!this.activeFile) return null;
+    return { editor: this.editorShim, file: this.activeFile };
+  }
 
   /**
    * Whether the workspace layout is ready. In Slatebase, plugins load after
@@ -90,9 +103,22 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Execute a callback when the workspace layout is ready.
    * In Slatebase, plugins load after FCP, so the layout is always ready.
    * The callback is invoked asynchronously (next microtask) to match Obsidian's behavior.
+   * Both sync throws and async rejections are caught to prevent unhandled errors.
    */
   onLayoutReady(callback: () => void): void {
-    Promise.resolve().then(callback);
+    Promise.resolve().then(() => {
+      try {
+        const result: unknown = callback();
+        // If the callback returns a Promise (async function), catch its rejection too
+        if (result && typeof (result as { catch?: unknown }).catch === 'function') {
+          (result as Promise<unknown>).catch((err: unknown) => {
+            console.error('[WorkspaceShim] onLayoutReady async callback rejected:', err);
+          });
+        }
+      } catch (err) {
+        console.error('[WorkspaceShim] onLayoutReady callback threw:', err);
+      }
+    });
   }
 
   /**
@@ -283,22 +309,35 @@ export class WorkspaceShim implements IWorkspaceShim {
   /**
    * Get the active view if it is an instance of the given class.
    * Returns the view cast to T if the active leaf's view matches, null otherwise.
+   *
+   * Special case: When plugins request MarkdownView and a file is actively being edited,
+   * we return a synthetic MarkdownView wrapping the EditorShim. This allows plugins like
+   * Templater and Editor Toolbar to access the editor via the standard Obsidian pattern.
    */
   getActiveViewOfType<T>(viewClass: new (...args: unknown[]) => T): T | null {
     if (this.activeLeaf?.view instanceof viewClass) {
       return this.activeLeaf.view as T;
     }
+
+    // If requesting MarkdownView and we have an active file, create a synthetic one
+    if (viewClass === (MarkdownView as unknown) && this.activeFile) {
+      const mdView = new MarkdownView(this.editorShim, this.activeFile);
+      return mdView as unknown as T;
+    }
+
     return null;
   }
 
   /**
    * Iterate over all active leaves (main + sidebar), calling the callback for each.
+   * Only yields leaves that have a view with a containerEl (plugins expect this).
    * If a callback throws, the error is logged and iteration continues.
    */
   iterateAllLeaves(callback: (leaf: WorkspaceLeaf) => void): void {
     if (!this.viewRegistry) return;
     const allLeaves = this.viewRegistry.getAllLeaves();
     for (const leaf of allLeaves) {
+      if (!leaf.view || !leaf.view.containerEl) continue;
       try {
         callback(leaf);
       } catch (err) {
@@ -368,6 +407,14 @@ export class WorkspaceShim implements IWorkspaceShim {
   }
 
   /**
+   * Set the textarea element for the editor shim.
+   * Called by the PluginEventBridge when the active editor textarea changes.
+   */
+  setEditorTextarea(textarea: HTMLTextAreaElement | null): void {
+    this.editorShim.setTextarea(textarea);
+  }
+
+  /**
    * Open a file directly by its exact path (no wikilink resolution).
    * Used by WorkspaceLeaf.openFile() for newly created files that may not
    * yet be in the directory tree.
@@ -418,6 +465,145 @@ export class WorkspaceShim implements IWorkspaceShim {
   }
 
   /**
+   * The workspace container element.
+   * Plugins may append DOM elements here (e.g. LiveSync status div).
+   * We use a hidden, off-screen container so plugin DOM operations
+   * don't affect the visible layout of the Slatebase UI.
+   * Includes stub child elements that plugins expect to find via querySelector.
+   */
+  readonly containerEl: HTMLElement = (() => {
+    const el = document.createElement('div')
+    el.className = 'workspace-plugin-container'
+    el.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:0;height:0;overflow:hidden;pointer-events:none;'
+    // LiveSync and other plugins look for .status-bar to position their status icons
+    const statusBar = document.createElement('div')
+    statusBar.className = 'status-bar'
+    el.appendChild(statusBar)
+    // Some plugins look for .workspace-split or .mod-root
+    const workspaceSplit = document.createElement('div')
+    workspaceSplit.className = 'workspace-split mod-root'
+    el.appendChild(workspaceSplit)
+    document.body.appendChild(el)
+    // Also ensure a .status-bar exists at document.body level for plugins
+    // that search globally via document.querySelector('.status-bar')
+    if (!document.querySelector('body > .status-bar')) {
+      const globalStatusBar = document.createElement('div')
+      globalStatusBar.className = 'status-bar'
+      globalStatusBar.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:0;height:0;overflow:hidden;pointer-events:none;'
+      document.body.appendChild(globalStatusBar)
+    }
+    return el
+  })();
+
+  /**
+   * Get the most recently active leaf in the workspace.
+   * Used by LiveSync for getting the active editing context.
+   */
+  getMostRecentLeaf(): WorkspaceLeaf | null {
+    return this.activeLeaf;
+  }
+
+  /**
+   * Update/reconfigure options for all Markdown views.
+   * No-op in Slatebase — we don't have configurable CM options per-view.
+   */
+  updateOptions(): void {
+    // No-op
+  }
+
+  /**
+   * Get the filenames of the most recently opened files.
+   */
+  getLastOpenFiles(): string[] {
+    // Return empty — Slatebase doesn't track this in the workspace shim
+    return [];
+  }
+
+  /**
+   * Request saving the workspace layout. No-op in Slatebase (no persistent layout).
+   * Kanban calls this when view settings change.
+   */
+  requestSaveLayout(): void {
+    // No-op — Slatebase does not persist workspace layout
+  }
+
+  /**
+   * viewStateReceivers — Array of callbacks that receive view state updates.
+   * Kanban registers/removes itself during load/unload.
+   * Obsidian extends Array with a `.remove()` helper; we stub it as a no-op array.
+   */
+  readonly viewStateReceivers: unknown[] & { remove: (item: unknown) => void } =
+    Object.assign([] as unknown[], { remove: (_item: unknown) => {} });
+
+  /**
+   * editorSuggest — Manager for registered EditorSuggest instances.
+   * Kanban accesses this during suggest registration.
+   */
+  readonly editorSuggest = {
+    suggests: [] as unknown[],
+    removeSuggest: (_suggest: unknown) => {},
+  }
+
+  /**
+   * Register a hover link source. No-op in Slatebase (no hover previews).
+   * Kanban registers itself as a hover link source for board links.
+   */
+  registerHoverLinkSource(_key: string, _source: unknown): void {
+    // No-op — Slatebase does not support hover link previews
+  }
+
+  /**
+   * Unregister a hover link source. No-op in Slatebase.
+   */
+  unregisterHoverLinkSource(_key: string): void {
+    // No-op
+  }
+
+  /**
+   * Remove an event reference. No-op in Slatebase.
+   */
+  offref(_ref: unknown): void {
+    // No-op — event refs are cleaned up on unload
+  }
+
+  /**
+   * Workspace splits — stub objects for plugins that access layout structure.
+   */
+  readonly rootSplit = { type: 'split', children: [] };
+  readonly leftSplit = { type: 'split', collapsed: false, toggle() {}, collapse() {}, expand() {} };
+  readonly rightSplit = { type: 'split', collapsed: false, toggle() {}, collapse() {}, expand() {} };
+
+  /**
+   * Open a popout window leaf. Returns the active leaf (no popout support in web).
+   */
+  openPopoutLeaf(): WorkspaceLeaf | null {
+    // Web app cannot open popout windows — return active leaf as fallback
+    return this.activeLeaf;
+  }
+
+  /**
+   * Get the current workspace layout. Returns minimal stub.
+   */
+  getLayout(): Record<string, unknown> {
+    return { main: { type: 'split', children: [] } };
+  }
+
+  /**
+   * Retrieve a leaf by its ID. Returns null (no persistent leaf IDs in Slatebase).
+   */
+  getLeafById(_id: string): WorkspaceLeaf | null {
+    return null;
+  }
+
+  /**
+   * Create a leaf in a parent split at a given index. Returns a new leaf.
+   */
+  createLeafInParent(_parent: unknown, _index: number): WorkspaceLeaf {
+    // Delegate to getLeaf — no real split management in Slatebase
+    return this.getLeaf(true);
+  }
+
+  /**
    * Creates a Proxy-wrapped instance that intercepts access to non-emulated properties/methods.
    * Non-emulated accesses return a no-op function and log a console.warn (once per property name).
    */
@@ -457,9 +643,29 @@ export class WorkspaceShim implements IWorkspaceShim {
       'setActiveLeafInternal',
       'setDirectoryTree',
       'setOnOpenFile',
+      'setEditorTextarea',
+      'activeEditor',
       'openLinkText',
       'onLayoutReady',
       'layoutReady',
+      'requestSaveLayout',
+      'registerHoverLinkSource',
+      'unregisterHoverLinkSource',
+      'floatingSplit',
+      'viewStateReceivers',
+      'editorSuggest',
+      'containerEl',
+      'getMostRecentLeaf',
+      'updateOptions',
+      'getLastOpenFiles',
+      'offref',
+      'rootSplit',
+      'leftSplit',
+      'rightSplit',
+      'openPopoutLeaf',
+      'getLayout',
+      'getLeafById',
+      'createLeafInParent',
       // Internal properties that should not trigger warnings
       'events',
       'activeFile',

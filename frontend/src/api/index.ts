@@ -144,6 +144,8 @@ export interface PluginInstallResult {
   pluginId: string
   manifest: PluginManifest
   isUpgrade: boolean
+  /** Warnings about detected patterns in the bundle (non-blocking) */
+  warnings?: string[]
 }
 
 /**

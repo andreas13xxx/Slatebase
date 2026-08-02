@@ -1,4 +1,17 @@
 import type { Hotkey } from './types';
+import type { IEditor } from './editor-shim';
+
+/**
+ * EditorCommandContext — Context passed to editorCallback/editorCheckCallback.
+ * Provides the active editor and a view-like object (MarkdownView or MarkdownFileInfo).
+ */
+export interface EditorCommandContext {
+  editor: IEditor;
+  file: { path: string; basename: string; extension: string } | null;
+}
+
+/** Function that resolves the active editor context, or null if no editor is active. */
+export type EditorContextResolver = () => EditorCommandContext | null;
 
 /**
  * Command — A registered command in the command registry.
@@ -7,16 +20,30 @@ import type { Hotkey } from './types';
 export interface Command {
   id: string;
   name: string;
-  callback: () => void;
+  callback?: () => void;
+  checkCallback?: (checking: boolean) => boolean | void;
+  editorCallback?: (editor: IEditor, ctx: unknown) => void;
+  editorCheckCallback?: (checking: boolean, editor: IEditor, ctx: unknown) => boolean | void;
   hotkeys?: Hotkey[];
   pluginId: string;
+}
+
+/** Input shape for addCommand (what plugins pass). */
+export interface CommandInput {
+  id: string;
+  name: string;
+  callback?: () => void;
+  checkCallback?: (checking: boolean) => boolean | void;
+  editorCallback?: (editor: IEditor, ctx: unknown) => void;
+  editorCheckCallback?: (checking: boolean, editor: IEditor, ctx: unknown) => boolean | void;
+  hotkeys?: Hotkey[];
 }
 
 /**
  * ICommandRegistry — Interface for command registration, search, and execution.
  */
 export interface ICommandRegistry {
-  addCommand(pluginId: string, command: { id: string; name: string; callback: () => void; hotkeys?: Hotkey[] }): void;
+  addCommand(pluginId: string, command: CommandInput): void;
   removeCommand(commandId: string): void;
   removeAllForPlugin(pluginId: string): void;
   getCommands(): Command[];
@@ -25,6 +52,7 @@ export interface ICommandRegistry {
   registerHotkey(commandId: string, hotkey: Hotkey): boolean;
   unregisterHotkey(commandId: string, hotkey: Hotkey): void;
   getRegisteredHotkeys(): Map<string, string>;
+  setEditorContextResolver(resolver: EditorContextResolver): void;
 }
 
 /** Maximum number of search results returned by searchCommands */
@@ -52,19 +80,32 @@ export class CommandRegistry implements ICommandRegistry {
   private commands: Map<string, Command> = new Map();
   /** Map of normalized hotkey string → commandId that owns it */
   private hotkeys: Map<string, string> = new Map();
+  /** Resolver for getting the active editor context (set by plugin-context). */
+  private editorContextResolver: EditorContextResolver | null = null;
+
+  /**
+   * Set the resolver function that provides the active editor context.
+   * Called by the PluginProvider to wire the EditorShim + active file.
+   */
+  setEditorContextResolver(resolver: EditorContextResolver): void {
+    this.editorContextResolver = resolver;
+  }
 
   /**
    * Register a command for a plugin.
    * The command ID is namespaced as <pluginId>:<commandId>.
    * If the command defines hotkeys, they are registered with conflict detection.
    */
-  addCommand(pluginId: string, command: { id: string; name: string; callback: () => void; hotkeys?: Hotkey[] }): void {
+  addCommand(pluginId: string, command: CommandInput): void {
     const namespacedId = `${pluginId}:${command.id}`;
 
     const cmd: Command = {
       id: namespacedId,
       name: command.name,
       callback: command.callback,
+      checkCallback: command.checkCallback,
+      editorCallback: command.editorCallback,
+      editorCheckCallback: command.editorCheckCallback,
       hotkeys: command.hotkeys,
       pluginId,
     };
@@ -126,6 +167,19 @@ export class CommandRegistry implements ICommandRegistry {
    * Execute a command by its full namespaced ID.
    * Wraps the callback in try/catch — exceptions are logged and do not propagate.
    */
+  /**
+   * Execute a command by its full namespaced ID.
+   * Wraps the callback in try/catch — exceptions are logged and do not propagate.
+   *
+   * Priority (matches Obsidian):
+   * 1. editorCheckCallback (if editor is active)
+   * 2. editorCallback (if editor is active)
+   * 3. checkCallback
+   * 4. callback
+   *
+   * editorCallback/editorCheckCallback are only invoked when an editor is active.
+   * If no editor is active, falls through to checkCallback/callback.
+   */
   executeCommand(commandId: string): void {
     const cmd = this.commands.get(commandId);
     if (!cmd) {
@@ -134,7 +188,31 @@ export class CommandRegistry implements ICommandRegistry {
     }
 
     try {
-      cmd.callback();
+      // Try editor-specific callbacks first (only when editor is active)
+      const editorCtx = this.editorContextResolver?.();
+
+      if (editorCtx && cmd.editorCheckCallback) {
+        const available = cmd.editorCheckCallback(true, editorCtx.editor, editorCtx);
+        if (available !== false) {
+          cmd.editorCheckCallback(false, editorCtx.editor, editorCtx);
+        }
+        return;
+      }
+
+      if (editorCtx && cmd.editorCallback) {
+        cmd.editorCallback(editorCtx.editor, editorCtx);
+        return;
+      }
+
+      // Fall through to regular callbacks
+      if (cmd.checkCallback) {
+        const available = cmd.checkCallback(true);
+        if (available !== false) {
+          cmd.checkCallback(false);
+        }
+      } else if (cmd.callback) {
+        cmd.callback();
+      }
     } catch (err) {
       console.error(
         `[CommandRegistry] Exception executing command "${commandId}":`,

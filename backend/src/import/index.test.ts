@@ -39,6 +39,7 @@ function createMockConfig(overrides?: Partial<ServerConfig>): IConfigService {
     maxVaults: 20,
     allowedOrigins: [],
     dataDir: './data',
+    templatesDir: './assets/templates',
     maxImportFileSize: 524288000, // 500 MB
     maxImportFiles: 500,
     maxImportDepth: 10,

@@ -93,6 +93,262 @@ export class ItemView {
 /** Location of a WorkspaceLeaf within the Slatebase UI */
 export type LeafLocation = 'main' | 'right-sidebar'
 
+// ─── TextFileView ────────────────────────────────────────────────────────────
+
+/**
+ * TextFileView — Base class for file-backed plugin views.
+ *
+ * In Obsidian, TextFileView extends FileView (which extends ItemView) and provides:
+ * - Automatic file loading (`loadFile` → `onLoadFile` → `setViewData`)
+ * - Automatic save coordination (`requestSave` → `getViewData` → vault.modify)
+ * - `data` property holding the current file text content
+ * - `file` reference to the associated TFile
+ *
+ * Plugins like Kanban extend this instead of ItemView to get file-backed view semantics.
+ * They override `getViewData()`, `setViewData(data, clear)`, and `clear()`.
+ */
+export class TextFileView extends ItemView {
+  /** The file currently open in this view (null until loadFile is called) */
+  file: { path: string; name: string; basename: string; extension: string; stat: { mtime: number; ctime: number; size: number }; parent: unknown } | null = null
+
+  /** The raw text content of the file */
+  data: string = ''
+
+  /** Whether a save has been requested but not yet flushed */
+  private _saveRequested: boolean = false
+
+  /** Timer ID for debounced save */
+  private _saveTimerId: ReturnType<typeof setTimeout> | null = null
+
+  /** Save debounce interval in ms */
+  private static readonly SAVE_DEBOUNCE_MS = 2000
+
+  /**
+   * Returns the view type. Plugins must override.
+   */
+  getViewType(): string {
+    return ''
+  }
+
+  /**
+   * Returns the display text for the tab (defaults to the file's basename).
+   */
+  getDisplayText(): string {
+    return this.file?.basename ?? 'File View'
+  }
+
+  // ─── File Lifecycle ──────────────────────────────────────────────────────
+
+  /**
+   * Load a file into this view.
+   * Calls `onUnloadFile` for the previous file, reads the new file content,
+   * then calls `onLoadFile` → `setViewData(data, clear=true)`.
+   *
+   * @param file - TFile to load
+   */
+  async loadFile(file: { path: string; name: string; basename: string; extension: string; stat: { mtime: number; ctime: number; size: number }; parent: unknown }): Promise<void> {
+    // Unload the previous file if any
+    if (this.file && this.file !== file) {
+      await this.onUnloadFile(this.file)
+    }
+
+    this.file = file
+
+    // Read file content via vault shim
+    try {
+      const vault = (this.app as { vault?: { read: (f: unknown) => Promise<string> } })?.vault
+      if (vault) {
+        this.data = await vault.read(file)
+      } else {
+        this.data = ''
+      }
+    } catch (err) {
+      console.error(`[TextFileView] Failed to read file "${file.path}":`, err)
+      this.data = ''
+    }
+
+    // Notify subclass
+    await this.onLoadFile(file)
+  }
+
+  /**
+   * Called when a file is loaded into this view.
+   * Default implementation calls `setViewData(data, clear=true)`.
+   * Plugins can override to add pre-processing.
+   */
+  async onLoadFile(file: { path: string; name: string; basename: string; extension: string; stat: { mtime: number; ctime: number; size: number }; parent: unknown }): Promise<void> {
+    void file
+    this.setViewData(this.data, true)
+  }
+
+  /**
+   * Called when a file is unloaded from this view (before a new file is loaded or on close).
+   * Default implementation saves pending changes.
+   * Plugins can override for cleanup.
+   */
+  async onUnloadFile(file: { path: string; name: string; basename: string; extension: string; stat: { mtime: number; ctime: number; size: number }; parent: unknown }): Promise<void> {
+    void file
+    // Flush pending save
+    await this.save(true)
+  }
+
+  // ─── Data Access (plugins override these) ────────────────────────────────
+
+  /**
+   * Get the current view data (text content).
+   * Plugins override this to serialize their state back to markdown/text.
+   */
+  getViewData(): string {
+    return this.data
+  }
+
+  /**
+   * Set the view data. Called when a file is first loaded (`clear=true`)
+   * or when external changes are detected (`clear=false`).
+   * Plugins override this to parse and render the content.
+   *
+   * @param data - The file content as text
+   * @param clear - Whether this is a fresh load (true) or an incremental update (false)
+   */
+  setViewData(data: string, clear?: boolean): void {
+    void clear
+    this.data = data
+  }
+
+  /**
+   * Clear the view's internal state.
+   * Called by Obsidian after unloading a file, before loading the next one.
+   * Plugins override to reset their internal state.
+   */
+  clear(): void {
+    // Default no-op — plugins override
+  }
+
+  // ─── Save Coordination ───────────────────────────────────────────────────
+
+  /**
+   * Request a save of the current view data.
+   * The save is debounced — multiple calls within the debounce window
+   * result in a single save at the end.
+   */
+  requestSave(): void {
+    this._saveRequested = true
+
+    if (this._saveTimerId !== null) {
+      clearTimeout(this._saveTimerId)
+    }
+
+    this._saveTimerId = setTimeout(() => {
+      this._saveTimerId = null
+      void this.save(false)
+    }, TextFileView.SAVE_DEBOUNCE_MS)
+  }
+
+  /**
+   * Perform the actual save. Reads `getViewData()` and writes to the vault.
+   *
+   * @param force - If true, skip the debounce check and save immediately
+   */
+  async save(force: boolean): Promise<void> {
+    if (!force && !this._saveRequested) return
+    if (!this.file) return
+
+    // Cancel pending debounce timer
+    if (this._saveTimerId !== null) {
+      clearTimeout(this._saveTimerId)
+      this._saveTimerId = null
+    }
+
+    this._saveRequested = false
+
+    const newData = this.getViewData()
+
+    // Only write if data actually changed
+    if (newData === this.data && !force) return
+
+    this.data = newData
+
+    try {
+      const vault = (this.app as { vault?: { modify: (f: unknown, content: string) => Promise<void> } })?.vault
+      if (vault) {
+        await vault.modify(this.file, newData)
+      }
+    } catch (err) {
+      console.error(`[TextFileView] Failed to save file "${this.file.path}":`, err)
+    }
+  }
+
+  // ─── View State (integrates with workspace layout persistence) ───────────
+
+  /**
+   * Get the view state for workspace serialization.
+   * Includes the file path so the view can be restored.
+   */
+  getState(): Record<string, unknown> {
+    return {
+      file: this.file?.path ?? null,
+    }
+  }
+
+  /**
+   * Restore view state from workspace serialization.
+   * Loads the file if a path is present in the state.
+   */
+  async setState(state: Record<string, unknown>, result: { history?: boolean }): Promise<void> {
+    void result
+    if (state.file && typeof state.file === 'string') {
+      // Resolve file from vault
+      const vault = (this.app as { vault?: { getAbstractFileByPath: (path: string) => unknown } })?.vault
+      if (vault) {
+        const file = vault.getAbstractFileByPath(state.file as string) as { path: string; name: string; basename: string; extension: string; stat: { mtime: number; ctime: number; size: number }; parent: unknown } | null
+        if (file) {
+          await this.loadFile(file)
+        }
+      }
+    }
+  }
+
+  // ─── Lifecycle Overrides ─────────────────────────────────────────────────
+
+  /**
+   * Called when the view is closed. Flushes pending saves and unloads the file.
+   */
+  async onClose(): Promise<void> {
+    if (this.file) {
+      await this.onUnloadFile(this.file)
+    }
+    if (this._saveTimerId !== null) {
+      clearTimeout(this._saveTimerId)
+      this._saveTimerId = null
+    }
+  }
+
+  /**
+   * Add a child component to this view.
+   * In Obsidian, this tracks child components for lifecycle management.
+   * In Slatebase, we just return the child for basic compatibility.
+   */
+  addChild<T>(child: T): T {
+    return child
+  }
+
+  /**
+   * Remove a child component from this view.
+   * No-op in Slatebase (Obsidian uses this for lifecycle cleanup).
+   */
+  removeChild<T>(child: T): T {
+    return child
+  }
+
+  /**
+   * Register a callback for component cleanup.
+   * In Obsidian, this registers cleanup functions called on unload.
+   */
+  register(cb: unknown): void {
+    void cb
+  }
+}
+
 /**
  * WorkspaceLeaf — Stub for Obsidian's WorkspaceLeaf.
  *
@@ -119,8 +375,9 @@ export class WorkspaceLeaf {
   /**
    * Set the view state — triggers view creation/open.
    * Plugins call `leaf.setViewState({ type: 'my-view' })` to activate a registered view.
+   * For TextFileView-based views, `state.state.file` specifies the file path to load.
    */
-  async setViewState(state: { type: string; active?: boolean }): Promise<void> {
+  async setViewState(state: { type: string; active?: boolean; state?: Record<string, unknown>; popstate?: boolean }): Promise<void> {
     const viewType = state.type
     console.log(`[WorkspaceLeaf] setViewState called: type="${viewType}", location="${this.location}", registered types:`, this.registry.getRegisteredViewTypes())
     const creator = this.registry.getViewCreator(viewType)
@@ -146,11 +403,25 @@ export class WorkspaceLeaf {
     const view = creator(this) as ItemView
     this.view = view
 
-    try {
-      await view.onOpen()
-    } catch (err) {
-      // Req 13.3: Log error but keep view in leaf (graceful degradation)
-      console.error(`[WorkspaceLeaf] Error opening view "${viewType}":`, err)
+    // If the view is a TextFileView and state includes a file path, load the file
+    if (view instanceof TextFileView && state.state?.file && typeof state.state.file === 'string') {
+      try {
+        await view.setState(state.state, { history: !!state.popstate })
+        // Open the file as a tab in the Slatebase UI
+        const workspace = (this.app as { workspace?: { openFileDirectly?: (filePath: string) => void } })?.workspace
+        if (workspace?.openFileDirectly) {
+          workspace.openFileDirectly(state.state.file as string)
+        }
+      } catch (err) {
+        console.error(`[WorkspaceLeaf] Error loading file in TextFileView "${viewType}":`, err)
+      }
+    } else {
+      try {
+        await view.onOpen()
+      } catch (err) {
+        // Req 13.3: Log error but keep view in leaf (graceful degradation)
+        console.error(`[WorkspaceLeaf] Error opening view "${viewType}":`, err)
+      }
     }
 
     // Notify the registry that a view was activated

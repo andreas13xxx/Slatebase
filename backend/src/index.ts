@@ -230,7 +230,7 @@ const welcomeVaultService = new WelcomeVaultService(
   featureToggleService,
   config.getWelcomeVaultConfig(),
   logger,
-  serverConfig.dataDir,
+  serverConfig.templatesDir,
 )
 welcomeVaultCreator = async (userId: string, language: 'de' | 'en'): Promise<void> => {
   // Deduplicate vault name (VaultService enforces global name uniqueness)
@@ -617,6 +617,17 @@ const welcomeVaultRoutes = createWelcomeVaultRoutes({
   logger,
 })
 app.route('/api/v1', welcomeVaultRoutes)
+
+// Proxy route — CORS-free HTTP forwarding for Obsidian plugin compat (requestUrl)
+import { createProxyRoutes } from './api/proxyRoutes.js'
+const proxyAllowedOrigins = process.env['SLATEBASE_PROXY_ALLOWED_ORIGINS']
+  ? process.env['SLATEBASE_PROXY_ALLOWED_ORIGINS'].split(',').map(s => s.trim())
+  : []
+const proxyRoutes = createProxyRoutes({
+  logger,
+  allowedOrigins: proxyAllowedOrigins,
+})
+app.route('/api/v1', proxyRoutes)
 
 // CleanupJob — periodic trash purge and version pruning
 const cleanupJob = new CleanupJob(trashService, versionService, vaultManager, config, logger)

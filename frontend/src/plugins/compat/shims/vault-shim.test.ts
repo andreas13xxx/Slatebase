@@ -185,8 +185,8 @@ describe('VaultShim', () => {
   });
 
   describe('getName()', () => {
-    it('returns the vault name', () => {
-      expect(vault.getName()).toBe('Test Vault');
+    it('returns the vault name with vault id for unique IndexedDB naming', () => {
+      expect(vault.getName()).toBe('Test Vault-vault-123');
     });
   });
 
@@ -352,7 +352,9 @@ describe('VaultShim', () => {
         parent: null,
       };
 
-      await expect(vault.modify(file, 'content')).rejects.toThrow('File not found: "nonexistent.md"');
+      // modify() no longer checks the local tree — it sends to backend directly
+      // (fixes race condition: create → modify before tree refreshes)
+      await expect(vault.modify(file, 'content')).resolves.not.toThrow();
     });
 
     it('does not emit event on API failure', async () => {

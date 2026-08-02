@@ -108,31 +108,57 @@ function detectNodeModules(bundleSource: string): Set<string> {
 
 /** API methods that are fully emulated in Slatebase shims. */
 const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
+  // Vault methods
   'vault.read',
   'vault.modify',
   'vault.create',
   'vault.createFolder',
   'vault.delete',
+  'vault.rename',
+  'vault.trash',
   'vault.getAbstractFileByPath',
+  'vault.getAbstractFileByPathInsensitive',
+  'vault.getFileByPath',
+  'vault.getFolderByPath',
   'vault.getMarkdownFiles',
   'vault.getFiles',
+  'vault.getAllLoadedFiles',
+  'vault.getAllFolders',
+  'vault.getRoot',
   'vault.getName',
   'vault.getConfig',
   'vault.cachedRead',
+  'vault.adapter',
+  'vault.config',
+  'vault.configDir',
+  'vault.getAvailablePathForAttachments',
+  'vault.createBinary',
+  'vault.readBinary',
+  'vault.modifyBinary',
+  'vault.process',
+  'vault.append',
+  'vault.exists',
+  'vault.getAvailablePath',
+  'vault.getResourcePath',
   'vault.on',
   'vault.off',
   'vault.trigger',
+  // Workspace methods
   'workspace.getActiveFile',
+  'workspace.activeEditor',
   'workspace.on',
   'workspace.off',
+  'workspace.offref',
   'workspace.getLeaf',
   'workspace.getLeavesOfType',
   'workspace.getActiveViewOfType',
+  'workspace.getMostRecentLeaf',
   'workspace.revealLeaf',
   'workspace.detachLeavesOfType',
   'workspace.getActiveLeaf',
   'workspace.setActiveLeaf',
   'workspace.createLeafBySplit',
+  'workspace.createLeafInParent',
   'workspace.getRightLeaf',
   'workspace.getLeftLeaf',
   'workspace.splitActiveLeaf',
@@ -143,14 +169,47 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
   'workspace.activeLeaf',
   'workspace.layoutReady',
   'workspace.trigger',
+  'workspace.requestSaveLayout',
+  'workspace.onLayoutReady',
+  'workspace.registerHoverLinkSource',
+  'workspace.unregisterHoverLinkSource',
+  'workspace.floatingSplit',
+  'workspace.editorSuggest',
+  'workspace.containerEl',
+  'workspace.updateOptions',
+  'workspace.getLastOpenFiles',
+  'workspace.getLayout',
+  'workspace.getLeafById',
+  'workspace.rootSplit',
+  'workspace.leftSplit',
+  'workspace.rightSplit',
+  'workspace.openPopoutLeaf',
+  // MetadataCache methods
   'metadataCache.getFileCache',
+  'metadataCache.getCache',
   'metadataCache.getFirstLinkpathDest',
   'metadataCache.resolvedLinks',
+  'metadataCache.fileToLinktext',
+  'metadataCache.getTags',
+  'metadataCache.blockCache',
   'metadataCache.on',
   'metadataCache.off',
+  'metadataCache.trigger',
+  // Plugins
   'plugins.getPlugin',
   'plugins.plugins',
   'plugins.enabledPlugins',
+  'plugins.manifests',
+  // FileManager methods
+  'fileManager.renameFile',
+  'fileManager.processFrontMatter',
+  'fileManager.generateMarkdownLink',
+  'fileManager.getNewFileParent',
+  'fileManager.createNewMarkdownFile',
+  'fileManager.promptForFileDeletion',
+  'fileManager.trashFile',
+  'fileManager.getAvailablePathForAttachment',
+  'fileManager.promptForFileRename',
   // Lifecycle methods — fully supported by the PluginLoader
   'onload',
   'onunload',
@@ -195,7 +254,7 @@ const ANALYSIS_TIMEOUT_MS = 10_000;
  *
  * Captures the namespace (vault/workspace/metadataCache/plugins) and method name.
  */
-const API_ACCESS_PATTERN = /(?:this\.app|\.app|app)\.(vault|workspace|metadataCache|plugins)\.(\w+)/g;
+const API_ACCESS_PATTERN = /(?:this\.app|\.app|app)\.(vault|workspace|metadataCache|plugins|fileManager)\.(\w+)/g;
 
 /**
  * Pattern to detect lifecycle methods (onload, onunload).
@@ -389,18 +448,14 @@ export class CompatibilityAnalyzer implements ICompatibilityAnalyzer {
 
       if (nodeModules.size > 0) {
         const moduleList = [...nodeModules].sort().join(', ');
+        // If the plugin does NOT declare isDesktopOnly, the Node.js imports are likely
+        // optional (try/catch, bundler shims, or dead code). The manifest declaration
+        // is the most reliable signal — if it runs on Obsidian Mobile, it can run here.
         reasons.push(
-          `Plugin imports Node.js built-in modules: ${moduleList} — ` +
-          'these are not available in a browser environment'
+          `Plugin bundle references Node.js modules: ${moduleList} — ` +
+          'these may be optional/bundler-generated since the plugin is not marked as desktop-only'
         );
-        return {
-          level: 'unsupported',
-          apiCalls: [],
-          lifecycleCritical: [],
-          nodeModules: [...nodeModules],
-          isDesktopOnly: false,
-          reasons,
-        };
+        // Do NOT return 'unsupported' — proceed to API pattern analysis
       }
 
       // ── Layer 4: Obsidian API pattern matching ──────────────────────────────
@@ -455,7 +510,7 @@ export class CompatibilityAnalyzer implements ICompatibilityAnalyzer {
         }
       }
 
-      return { level, apiCalls, lifecycleCritical, nodeModules: [], isDesktopOnly: false, reasons };
+      return { level, apiCalls, lifecycleCritical, nodeModules: [...nodeModules], isDesktopOnly: false, reasons };
     } catch {
       // Analysis failure → unknown
       return {

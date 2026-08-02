@@ -40,6 +40,16 @@ export class MetadataCacheShim implements IMetadataCacheShim {
   }
 
   /**
+   * Returns the cached metadata for a file path (string variant of getFileCache).
+   * Used by plugins like Kanban that look up metadata by path string.
+   * Returns null if the path hasn't been parsed or doesn't exist in cache.
+   */
+  getCache(path: string): CachedMetadata | null {
+    if (!path) return null;
+    return this.cache.get(path) ?? null;
+  }
+
+  /**
    * Resolves a link path against the directory tree and returns the target TFile.
    * Uses the same link-resolver logic as the main Slatebase application:
    * - Case-insensitive search
@@ -175,6 +185,47 @@ export class MetadataCacheShim implements IMetadataCacheShim {
       parent: null,
     };
   }
+
+  /**
+   * Get all tags in the vault with their occurrence counts.
+   * Returns a Record<tag, count> (e.g. { '#todo': 5, '#project': 3 }).
+   */
+  getTags(): Record<string, number> {
+    const tags: Record<string, number> = {};
+    for (const metadata of this.cache.values()) {
+      if (metadata.tags) {
+        for (const t of metadata.tags) {
+          tags[t.tag] = (tags[t.tag] ?? 0) + 1;
+        }
+      }
+    }
+    return tags;
+  }
+
+  /**
+   * Get all file paths that have cached metadata.
+   * Used by Excalidraw and other plugins for file lookups.
+   */
+  getCachedFiles(): string[] {
+    return [...this.cache.keys()];
+  }
+
+  /**
+   * Generate a linktext for a file relative to a source path.
+   * Uses the shortest unique basename if possible, otherwise full path.
+   */
+  fileToLinktext(file: TFile, _sourcePath: string, omitMdExtension?: boolean): string {
+    const name = omitMdExtension && file.extension === 'md' ? file.basename : file.name;
+    return name;
+  }
+
+  /**
+   * Block cache — stub object for plugins that access block IDs.
+   * Returns an empty object with a getForFile stub.
+   */
+  readonly blockCache = {
+    getForFile: (_sourcePath: unknown): unknown => null,
+  };
 }
 
 /**

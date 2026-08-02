@@ -37,20 +37,24 @@ export function extractProperties(content: string): Record<string, string[]> {
 /**
  * Extracts the raw frontmatter string between `---` delimiters.
  * Returns null if no valid frontmatter block is found.
+ * Normalizes line endings (CRLF → LF) for consistent regex matching.
  */
 function extractFrontmatterBlock(content: string): string | null {
+  // Normalize CRLF → LF before parsing (Windows line endings break regex matching)
+  const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+
   // Frontmatter must start at the very beginning of the document
-  if (!content.startsWith('---')) {
+  if (!normalized.startsWith('---')) {
     return null
   }
 
   // Find the closing delimiter
-  const closingIndex = content.indexOf('\n---', 3)
+  const closingIndex = normalized.indexOf('\n---', 3)
   if (closingIndex === -1) {
     return null
   }
 
-  const raw = content.slice(4, closingIndex)
+  const raw = normalized.slice(4, closingIndex)
   if (raw.trim() === '') {
     return null
   }

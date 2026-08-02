@@ -48,7 +48,7 @@ Implementierung des Welcome-Vault-Features: Ein vorkonfigurierter Vault mit Tuto
 
 - [x] 5. Template Content
   - [x] 5.1 Create template directory and markdown files
-    - Create `backend/data/templates/welcome-vault/` directory structure
+    - Create `backend/assets/templates/welcome-vault/` directory structure
     - Create `Start hier.md` with Wikilinks to other files
     - Create `Grundlagen/Markdown Syntax.md`, `Grundlagen/Wikilinks.md`, `Grundlagen/Tags und Metadaten.md`
     - Create `Projekte/Beispielprojekt.md` (with Callouts), `Projekte/Aufgabenliste.md`

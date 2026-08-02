@@ -67,6 +67,7 @@ export const ServerConfigSchema = z.object({
   maxVaults: z.number().int().positive().default(20),
   allowedOrigins: z.array(z.string()).default(['http://localhost:5173']),
   dataDir: z.string().default('./data'),
+  templatesDir: z.string().default('./assets/templates'),
   maxImportFileSize: z.number().int().positive().default(524288000),
   maxImportFiles: z.number().int().positive().default(500),
   maxImportDepth: z.number().int().positive().default(10),
@@ -253,6 +254,10 @@ export class ConfigService implements IConfigService {
 
     if (process.env['SLATEBASE_DATA_DIR'] !== undefined) {
       overlay['dataDir'] = process.env['SLATEBASE_DATA_DIR']
+    }
+
+    if (process.env['SLATEBASE_TEMPLATES_DIR'] !== undefined) {
+      overlay['templatesDir'] = process.env['SLATEBASE_TEMPLATES_DIR']
     }
 
     if (process.env['SLATEBASE_MAX_IMPORT_FILE_SIZE'] !== undefined) {

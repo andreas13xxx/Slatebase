@@ -158,4 +158,16 @@ my_key: value2
   it('returns empty object for completely empty content', () => {
     expect(extractProperties('')).toEqual({})
   })
+
+  it('handles CRLF line endings (Windows)', () => {
+    const content = '---\r\ntags:\r\n  - grundlagen\r\n  - tutorial\r\n---\r\n\r\n# Content'
+    const result = extractProperties(content)
+    expect(result).toEqual({ tags: ['grundlagen', 'tutorial'] })
+  })
+
+  it('handles CRLF with inline array', () => {
+    const content = '---\r\ntags: [a, b, c]\r\nstatus: draft\r\n---\r\n'
+    const result = extractProperties(content)
+    expect(result).toEqual({ tags: ['a', 'b', 'c'], status: ['draft'] })
+  })
 })

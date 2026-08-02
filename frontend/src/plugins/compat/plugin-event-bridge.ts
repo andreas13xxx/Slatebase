@@ -21,9 +21,40 @@ import type { TabState } from '../../state/tabState'
 import type { TFile } from './types'
 import type { WorkspaceShim } from './shims/workspace-shim'
 import type { MetadataCacheShim } from './shims/metadata-cache-shim'
+import type { VaultShim } from './shims/vault-shim'
+import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
 
 /** The prefix for plugin-view-tab virtual paths. */
 const VIEW_PATH_PREFIX = '__view::'
+
+// ─── Module-Level Plugin Write Tracker (Loop Prevention) ─────────────────────
+
+/**
+ * Tracks recent plugin-initiated file writes (path → timestamp).
+ * Used to prevent SSE vault:change events from re-triggering VaultShim events
+ * for writes that the plugin itself caused.
+ */
+const recentPluginWrites: Map<string, number> = new Map()
+
+/** Debounce window in ms — SSE events within this window after a plugin write are skipped. */
+const PLUGIN_WRITE_DEBOUNCE_MS = 500
+
+/**
+ * Mark a path as recently written by a plugin.
+ * Called from VaultShim.modify/create/delete to prevent SSE event loops.
+ */
+export function markPluginWrite(path: string): void {
+  recentPluginWrites.set(path, Date.now())
+  // Cleanup old entries periodically (keep map from growing unbounded)
+  if (recentPluginWrites.size > 100) {
+    const now = Date.now()
+    for (const [key, ts] of recentPluginWrites) {
+      if (now - ts > PLUGIN_WRITE_DEBOUNCE_MS * 2) {
+        recentPluginWrites.delete(key)
+      }
+    }
+  }
+}
 
 /** Options for the plugin event bridge hook. */
 export interface PluginEventBridgeOptions {
@@ -35,6 +66,10 @@ export interface PluginEventBridgeOptions {
   workspaceShim: WorkspaceShim | null
   /** Shared MetadataCacheShim instance for the current vault (null if no vault) */
   metadataCacheShim: MetadataCacheShim | null
+  /** Shared VaultShim instance for the current vault (null if no vault) */
+  vaultShim: VaultShim | null
+  /** Current vault ID (needed for filtering SSE events) */
+  currentVaultId: string | null
 }
 
 /**
@@ -88,6 +123,8 @@ export function usePluginEventBridge({
   directoryTree,
   workspaceShim,
   metadataCacheShim,
+  vaultShim,
+  currentVaultId,
 }: PluginEventBridgeOptions): void {
   // Track previous active tab to detect changes
   const prevActiveTabIdRef = useRef<string | null>(null)
@@ -132,6 +169,7 @@ export function usePluginEventBridge({
         const wasFileActive = workspaceShim.getActiveFile() !== null
         workspaceShim.setActiveFile(null)
         workspaceShim.setActiveLeafInternal(null)
+        workspaceShim.setEditorTextarea(null)
         if (!wasFileActive) {
           workspaceShim.trigger('active-leaf-change', null)
         }
@@ -142,6 +180,7 @@ export function usePluginEventBridge({
           // Plugin-view-tab is active (Req 3.7, 11.1, 12.4)
           // getActiveFile() must return null — use silent clear if possible
           workspaceShim.setActiveFile(null)
+          workspaceShim.setEditorTextarea(null)
 
           // Extract viewType and find the corresponding WorkspaceLeaf
           const viewType = activeTab.filePath.slice(VIEW_PATH_PREFIX.length)
@@ -157,14 +196,22 @@ export function usePluginEventBridge({
           // Regular file tab is active → build TFile and set it (existing behavior)
           const tFile = buildTFileFromPath(activeTab.filePath)
           workspaceShim.setActiveFile(tFile)
+
+          // Wire editor textarea: query DOM after React renders the textarea
+          requestAnimationFrame(() => {
+            const textarea = document.querySelector('.edit-mode-textarea') as HTMLTextAreaElement | null
+            workspaceShim.setEditorTextarea(textarea)
+          })
         } else if (activeTab && (activeTab.isBinary || activeTab.filePath === '__graph__')) {
           // Non-file tab (binary or graph) → null (Req 6.2)
           workspaceShim.setActiveFile(null)
+          workspaceShim.setEditorTextarea(null)
         } else {
           // Tab not found → treat as no active tab (Req 11.4)
           const wasFileActive2 = workspaceShim.getActiveFile() !== null
           workspaceShim.setActiveFile(null)
           workspaceShim.setActiveLeafInternal(null)
+          workspaceShim.setEditorTextarea(null)
           if (!wasFileActive2) {
             workspaceShim.trigger('active-leaf-change', null)
           }
@@ -224,4 +271,53 @@ export function usePluginEventBridge({
   useEffect(() => {
     resolvedEmittedRef.current = false
   }, [metadataCacheShim])
+
+  // ─── SSE vault:change → VaultShim events (LiveSync listens on vault.on) ───
+  //
+  // When the user edits a file (or another device pushes changes), the backend
+  // sends an SSE vault:change event. We bridge this to VaultShim's event system
+  // so LiveSync (and other plugins) can detect file modifications.
+  //
+  // Loop-prevention: Plugin-initiated writes (via VaultShim.modify/create/delete)
+  // also trigger SSE events. We track recent plugin writes and skip the SSE event
+  // if it arrives within 500ms for the same path.
+
+  useEffect(() => {
+    if (!vaultShim || !currentVaultId) return
+
+    const unsub = onRealtimeVaultChange((event) => {
+      // Only process events for the current vault
+      if (event.vaultId !== currentVaultId) return
+
+      // Loop-prevention: skip if this path was written by a plugin recently
+      const lastWrite = recentPluginWrites.get(event.path)
+      if (lastWrite !== undefined && Date.now() - lastWrite < PLUGIN_WRITE_DEBOUNCE_MS) {
+        return
+      }
+
+      const tFile = buildTFileFromPath(event.path)
+
+      switch (event.action) {
+        case 'saved': {
+          // Determine if this is a new file (create) or existing (modify)
+          const existing = vaultShim.getAbstractFileByPath(event.path)
+          if (existing) {
+            vaultShim.trigger('modify', tFile)
+          } else {
+            vaultShim.trigger('create', tFile)
+          }
+          break
+        }
+        case 'deleted':
+          vaultShim.trigger('delete', tFile)
+          break
+        case 'renamed':
+          // SSE rename only provides the new path — emit as create
+          vaultShim.trigger('create', tFile)
+          break
+      }
+    })
+
+    return unsub
+  }, [vaultShim, currentVaultId])
 }

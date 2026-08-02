@@ -1,4 +1,4 @@
-import { type ReactNode, createElement, useMemo, useState, useEffect, useContext } from 'react'
+import { type ReactNode, createElement, useMemo, useState, useEffect, useContext, useId } from 'react'
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
 import remarkGfm from 'remark-gfm'
@@ -231,7 +231,34 @@ export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick,
     }
   }, [content, vaultId, directoryTree, onInternalLinkClick, onTagClick, token])
 
-  return createElement('article', { className: 'view-mode', 'aria-label': 'Markdown-Ansicht' }, rendered)
+  // After DOM render, run registered code block processors (Dataview, Tasks, etc.)
+  // Uses a unique data attribute to find the container after mount.
+  const viewModeId = useId()
+  useEffect(() => {
+    const el = document.querySelector(`[data-viewmode-id="${viewModeId}"]`) as HTMLElement | null
+    if (!el) return
+    let cancelled = false
+    import('../plugins/compat/code-block-processor-registry').then(({ processCodeBlocks, runPostProcessors, cleanupRenderChildren }) => {
+      if (cancelled) return
+      cleanupRenderChildren()
+      processCodeBlocks(el, '')
+      runPostProcessors(el, '')
+    }).catch(() => {
+      // Code block processor registry not available — no-op
+    })
+    return () => {
+      cancelled = true
+      import('../plugins/compat/code-block-processor-registry').then(({ cleanupRenderChildren }) => {
+        cleanupRenderChildren()
+      }).catch(() => {})
+    }
+  }, [rendered])
+
+  return createElement('article', {
+    className: 'view-mode',
+    'aria-label': 'Markdown-Ansicht',
+    'data-viewmode-id': viewModeId,
+  }, rendered)
 }
 
 /**

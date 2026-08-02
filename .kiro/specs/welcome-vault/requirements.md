@@ -7,7 +7,7 @@ Neue Benutzer erhalten bei der Account-Erstellung automatisch einen "Welcome Vau
 ## Glossary
 
 - **Welcome_Vault**: Ein vorkonfigurierter Vault mit Tutorial-Inhalten der automatisch für neue Benutzer erstellt wird
-- **Template_Verzeichnis**: Ein Verzeichnis im Backend (`data/templates/welcome-vault/`) das die Vorlagendateien für den Welcome Vault enthält
+- **Template_Verzeichnis**: Ein Verzeichnis im Backend (`assets/templates/welcome-vault/`) das die Vorlagendateien für den Welcome Vault enthält
 - **User_Service**: Der bestehende Service der Benutzer erstellt und verwaltet
 
 ## Requirements
@@ -44,7 +44,7 @@ Neue Benutzer erhalten bei der Account-Erstellung automatisch einen "Welcome Vau
 
 #### Acceptance Criteria
 
-1. THE Welcome_Vault SHALL die Template-Dateien aus dem Verzeichnis `data/templates/welcome-vault/` lesen, sodass ein Administrator die Inhalte durch Ersetzen der Dateien anpassen kann
+1. THE Welcome_Vault SHALL die Template-Dateien aus dem Verzeichnis `assets/templates/welcome-vault/` lesen, sodass ein Administrator die Inhalte durch Ersetzen der Dateien anpassen kann
 2. THE Welcome_Vault SHALL per Feature-Toggle `welcome-vault` (Typ: `hot`, Standard: `true`) aktivierbar/deaktivierbar sein
 3. IF der Administrator das Template_Verzeichnis durch eigene Dateien ersetzt, THEN THE Welcome_Vault SHALL die benutzerdefinierten Inhalte für alle danach erstellten Accounts verwenden
 4. THE Welcome_Vault SHALL den Vault-Namen über die Server-Konfiguration (`config.welcomeVault.name`, Standard: `"Willkommen"`) konfigurierbar machen

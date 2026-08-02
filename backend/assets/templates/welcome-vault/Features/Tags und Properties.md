@@ -1,5 +1,8 @@
 ---
-tags: [features]
+tags:
+  - features/tags
+  - grundlagen/organisation
+  - typ/dokumentation
 ---
 
 # Tags und Properties
@@ -28,12 +31,13 @@ Tags können überall im Text stehen — in Überschriften, Listen oder Fließte
 
 Mit `/` erstellst du hierarchische Tags:
 
-```markdown
-#status/offen
-#status/erledigt
-#projekt/webapp/frontend
-#projekt/webapp/backend
-```
+#status/offen #status/erledigt #status/archiviert
+
+#projekt/webapp/frontend #projekt/webapp/backend
+
+#typ/meeting #typ/daily #typ/projekt
+
+#priorität/hoch #priorität/mittel #priorität/niedrig
 
 Verschachtelte Tags erlauben es, Kategorien feiner zu unterteilen. Wenn du nach `#projekt/webapp` filterst, findest du sowohl Frontend- als auch Backend-Einträge.
 
@@ -53,6 +57,8 @@ Verschachtelte Tags erlauben es, Kategorien feiner zu unterteilen. Wenn du nach 
 | `#projekt/slatebase` | Projekt-spezifische Notizen |
 | `#typ/meeting` | Notiz-Typ |
 | `#priorität/hoch` | Priorisierung |
+
+Hier ein paar davon in Aktion: #todo #erledigt #projekt/slatebase
 
 ---
 

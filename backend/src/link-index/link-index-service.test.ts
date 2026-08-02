@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
-import { LinkIndexService } from './link-index-service.js'
+import { LinkIndexService, extractFrontmatterTags } from './link-index-service.js'
 import type { ILogger } from '../logger/index.js'
 
 /** Creates a silent mock logger. */
@@ -236,6 +236,147 @@ describe('LinkIndexService (extended v2)', () => {
       const meta = service.getGraphMeta()
       expect(meta.tags).toEqual([])
       expect(meta.propertyKeys).toEqual([])
+    })
+  })
+
+  describe('extractFrontmatterTags (helper)', () => {
+    it('extracts tags from "tags" property (inline array)', () => {
+      const properties = { tags: ['foo', 'bar', 'baz'] }
+      const result = extractFrontmatterTags(properties)
+      expect(result).toEqual(['foo', 'bar', 'baz'])
+    })
+
+    it('extracts tags from "tag" property (singular)', () => {
+      const properties = { tag: ['single'] }
+      const result = extractFrontmatterTags(properties)
+      expect(result).toEqual(['single'])
+    })
+
+    it('prefers "tags" over "tag" when both present', () => {
+      const properties = { tags: ['from-tags'], tag: ['from-tag'] }
+      const result = extractFrontmatterTags(properties)
+      expect(result).toEqual(['from-tags'])
+    })
+
+    it('strips leading # from tag values', () => {
+      const properties = { tags: ['#foo', '#bar', 'baz'] }
+      const result = extractFrontmatterTags(properties)
+      expect(result).toEqual(['foo', 'bar', 'baz'])
+    })
+
+    it('handles nested tags with slashes', () => {
+      const properties = { tags: ['project/alpha', '#category/sub'] }
+      const result = extractFrontmatterTags(properties)
+      expect(result).toEqual(['project/alpha', 'category/sub'])
+    })
+
+    it('returns empty array when no tags property exists', () => {
+      const properties = { status: ['active'] }
+      const result = extractFrontmatterTags(properties)
+      expect(result).toEqual([])
+    })
+
+    it('filters out empty strings', () => {
+      const properties = { tags: ['', 'valid', '#'] }
+      const result = extractFrontmatterTags(properties)
+      expect(result).toEqual(['valid'])
+    })
+  })
+
+  describe('frontmatter tags integration', () => {
+    it('rebuild merges frontmatter tags with inline tags', async () => {
+      await fs.writeFile(
+        path.join(tempDir, 'a.md'),
+        '---\ntags: [fm-tag, shared]\n---\n#inline-tag #shared\n',
+      )
+      await service.rebuild()
+
+      const meta = service.getGraphMeta()
+      const tagNames = meta.tags.map((t) => t.name)
+      expect(tagNames).toContain('fm-tag')
+      expect(tagNames).toContain('inline-tag')
+      expect(tagNames).toContain('shared')
+      // "shared" should only appear once (deduplicated)
+      expect(meta.tags.find((t) => t.name === 'shared')?.count).toBe(1)
+    })
+
+    it('rebuild handles frontmatter-only tags (no inline tags)', async () => {
+      await fs.writeFile(
+        path.join(tempDir, 'a.md'),
+        '---\ntags:\n  - alpha\n  - beta\n---\nNo inline tags here.\n',
+      )
+      await service.rebuild()
+
+      const meta = service.getGraphMeta()
+      const tagNames = meta.tags.map((t) => t.name)
+      expect(tagNames).toContain('alpha')
+      expect(tagNames).toContain('beta')
+    })
+
+    it('updateFile merges frontmatter tags with inline tags', async () => {
+      await fs.writeFile(path.join(tempDir, 'a.md'), '#old')
+      await service.rebuild()
+
+      await service.updateFile('a.md', '---\ntags: [new-fm]\n---\n#new-inline\n')
+
+      const meta = service.getGraphMeta()
+      const tagNames = meta.tags.map((t) => t.name)
+      expect(tagNames).toContain('new-fm')
+      expect(tagNames).toContain('new-inline')
+      expect(tagNames).not.toContain('old')
+    })
+
+    it('renameFile merges frontmatter tags with inline tags', async () => {
+      await fs.writeFile(path.join(tempDir, 'a.md'), '---\ntags: [fm]\n---\n#inline\n')
+      await service.rebuild()
+
+      await service.renameFile('a.md', 'b.md', '---\ntags: [fm]\n---\n#inline\n')
+
+      const meta = service.getGraphMeta()
+      const tagNames = meta.tags.map((t) => t.name)
+      expect(tagNames).toContain('fm')
+      expect(tagNames).toContain('inline')
+    })
+
+    it('frontmatter tags appear as tag nodes in graph', async () => {
+      await fs.writeFile(
+        path.join(tempDir, 'a.md'),
+        '---\ntags: [fm-only]\n---\nContent without inline tags\n',
+      )
+      await service.rebuild()
+
+      const graph = service.getGraph({ includeTags: true })
+      const tagNodes = graph.nodes.filter((n) => n.type === 'tag')
+      expect(tagNodes.map((n) => n.id)).toContain('tag:fm-only')
+      expect(tagNodes.find((n) => n.id === 'tag:fm-only')?.label).toBe('#fm-only')
+
+      const tagEdges = graph.edges.filter((e) => e.type === 'tag')
+      expect(tagEdges).toContainEqual({ source: 'a.md', target: 'tag:fm-only', type: 'tag' })
+    })
+
+    it('handles "tag" singular property (Obsidian compat)', async () => {
+      await fs.writeFile(
+        path.join(tempDir, 'a.md'),
+        '---\ntag: singular-tag\n---\n',
+      )
+      await service.rebuild()
+
+      const meta = service.getGraphMeta()
+      expect(meta.tags).toContainEqual({ name: 'singular-tag', count: 1 })
+    })
+
+    it('strips # prefix from frontmatter tags', async () => {
+      await fs.writeFile(
+        path.join(tempDir, 'a.md'),
+        '---\ntags: ["#prefixed", "clean"]\n---\n',
+      )
+      await service.rebuild()
+
+      const meta = service.getGraphMeta()
+      const tagNames = meta.tags.map((t) => t.name)
+      expect(tagNames).toContain('prefixed')
+      expect(tagNames).toContain('clean')
+      expect(tagNames).not.toContain('#prefixed')
     })
   })
 

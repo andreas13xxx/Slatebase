@@ -11,11 +11,7 @@ build/
 .env.*.local
 
 # Runtime data (vault storage)
-backend/data/*
-!backend/data/templates/
-backend/data/templates/*
-!backend/data/templates/welcome-vault/
-!backend/data/templates/welcome-vault-en/
+backend/data/
 
 # IDE / Editor
 .vscode/
@@ -64,3 +60,6 @@ skills-lock.json
 
 # Docker environment (contains secrets)
 docker.env
+
+# Sync URI (contains credentials)
+uri.txt

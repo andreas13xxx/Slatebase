@@ -64,7 +64,7 @@
 ## Phase 3: Template-Inhalte — Grundlagen & Features (DE)
 
 ### Task 3.1: Ordnerstruktur anlegen
-- [x] Bestehenden Inhalt von `data/templates/welcome-vault/` sichern/entfernen
+- [x] Bestehenden Inhalt von `assets/templates/welcome-vault/` sichern/entfernen
 - [x] Neue Ordnerstruktur erstellen:
   ```
   Grundlagen/
@@ -82,7 +82,7 @@
 - [x] `Grundlagen/Markdown Syntax.md` — Headings, Formatierung, Listen, Tabellen, Code-Blöcke, Horizontale Linien (mit Beispielen)
 - [x] `Grundlagen/Navigation und Tabs.md` — Tabs öffnen/schließen, Split-View, Tab-Reihenfolge, aktive Datei
 - [x] `Grundlagen/Datei-Explorer.md` — Erstellen, Umbenennen, Verschieben, DnD, Kontextmenü, Favoriten
-- [x] `Grundlagen/Editor und Viewer.md` — Edit/View-Modi, Toolbar-Funktionen, Auto-Save, Line Numbers, Undo/Redo
+- [x] `Grundlagen/Editor und Viewer.md` — Source/Live-Preview-Modi, Toolbar-Funktionen, Auto-Save, Line Numbers, Undo/Redo
 
 ### Task 3.3: Feature-Guides schreiben (DE)
 - [x] `Features/Übersicht.md` — Inhaltsverzeichnis aller Feature-Guides
@@ -134,7 +134,7 @@
 ## Phase 4: Template-Inhalte — Englische Variante
 
 ### Task 4.1: Ordnerstruktur EN anlegen
-- [x] Bestehenden Inhalt von `data/templates/welcome-vault-en/` sichern/entfernen
+- [x] Bestehenden Inhalt von `assets/templates/welcome-vault-en/` sichern/entfernen
 - [x] Neue Ordnerstruktur (englische Benennungen):
   ```
   Basics/
@@ -198,8 +198,8 @@
   - `sync-status.png` — Sync-Panel
   - `chat-ansicht.png` — Chat mit Nachrichten
   - `template-auswahl.png` — Template-Selector-Modal
-- [x] Screenshots in `data/templates/welcome-vault/Screenshots/` ablegen
-- [x] Screenshots in `data/templates/welcome-vault-en/Screenshots/` ablegen (identisch oder übersetzte Variante)
+- [x] Screenshots in `assets/templates/welcome-vault/Screenshots/` ablegen
+- [x] Screenshots in `assets/templates/welcome-vault-en/Screenshots/` ablegen (identisch oder übersetzte Variante)
 
 ### Task 5.2: Screenshots in Guides einbetten
 - [x] Alle Feature-Guides mit passenden `![[Screenshots/dateiname.png]]` Embeds versehen

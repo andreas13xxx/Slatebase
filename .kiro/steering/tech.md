@@ -101,3 +101,32 @@ npm run lint         # ESLint
 ## Verbotene Dependencies
 
 Kein Express/Fastify/Koa, kein Redux/Zustand, kein ORM, kein DI-Container, kein Tailwind/CSS-Framework, kein Mocking-Framework (Backend), kein JWT/Passport, kein Next.js, kein shadcn/ui, kein Framer Motion, kein CouchDB als interner Store.
+
+## Obsidian Plugin Compat — Architektur-Entscheidungen
+
+### requestUrl → Backend-Proxy mit Allowlist
+- Obsidian nutzt Electron's Node.js-Prozess für CORS-freie Requests.
+- Slatebase ist eine Web-App → Browser-CORS gilt.
+- Lösung: `POST /api/v1/proxy` leitet Requests serverseitig weiter.
+- Sicherheit: SSRF-Schutz (private IPs blockiert), URL-Allowlist via `SLATEBASE_PROXY_ALLOWED_ORIGINS` Env-Var (kommasepariert, Wildcard-Prefix `*.domain.com` unterstützt). Leer = alles erlaubt.
+- Limits: 30s Timeout, 10MB Request, 50MB Response.
+
+### CodeBlockProcessor → Gemeinsame Registry, zwei Konsumenten
+- `CodeBlockProcessorRegistry` (Module-Level-Singleton in `code-block-processor-registry.ts`).
+- Plugins registrieren via `registerCodeBlockProcessor(language, handler, pluginId)`.
+- **ViewMode**: `useEffect` nach Render → `processCodeBlocks(containerEl)` scannt DOM nach `<pre><code class="language-xxx">`, ersetzt durch Plugin-Container, ruft Handler auf.
+- **Live Preview** (zukünftig): CM6 Widget-Decoration kann denselben Handler aufrufen.
+- Lifecycle: `MarkdownRenderChild` pro gerenderten Block, `cleanupRenderChildren()` bei Unmount.
+
+### EditorShim → CM6-Backend-First
+- Priority: CM6 EditorView > Textarea > Internal Buffer.
+- `setEditorViewAccessor(getActiveEditorView)` verdrahtet einmal bei Vault-Init.
+- CM6-Operationen laufen über `view.dispatch()` → korrekte Undo-History, Extension-Awareness.
+- `undo()`/`redo()`/`exec()` nutzen dynamic `import('@codemirror/commands')` um Top-Level-Import-Kosten zu vermeiden.
+- Position-Konvertierung: Obsidian ist 0-indexed (line/ch), CM6 ist offset-basiert mit 1-indexed Zeilen.
+
+### Plugin-Fehler-Isolation
+- `onLayoutReady`: try/catch für synchrone throws + `.catch()` für async rejections.
+- `iterateAllLeaves`: Überspringt Leaves ohne view/containerEl.
+- `activatePlugin`: 10s Timeout, Error → Plugin-Status `error`, nächstes Plugin wird geladen.
+- Plugin-Registrierungs-Callbacks (addCommand, registerView, registerExtensions): Vault-Generation-Guard verhindert Registrierungen nach Vault-Wechsel.

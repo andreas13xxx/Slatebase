@@ -69,6 +69,33 @@ export function normalizeLinkPath(rawPath: string): string {
   return normalized
 }
 
+/**
+ * Extracts tags from frontmatter properties (Obsidian-compatible).
+ *
+ * Obsidian treats the `tags` (and `tag`) frontmatter property identically
+ * to inline `#tag` occurrences. This function normalizes frontmatter tag values:
+ * - Strips leading `#` prefix if present
+ * - Handles nested tags (`projekt/alpha`)
+ * - Deduplicates against the provided inline tags set
+ *
+ * @param properties - Parsed frontmatter properties from extractProperties()
+ * @returns Array of normalized tag names (without `#` prefix)
+ */
+export function extractFrontmatterTags(properties: Record<string, string[]>): string[] {
+  const fmTags = properties['tags'] ?? properties['tag'] ?? []
+  const result: string[] = []
+
+  for (const raw of fmTags) {
+    // Strip leading # if present (some users write `tags: [#foo, #bar]`)
+    const normalized = raw.startsWith('#') ? raw.slice(1) : raw
+    if (normalized.length > 0) {
+      result.push(normalized)
+    }
+  }
+
+  return result
+}
+
 export class LinkIndexService implements ILinkIndex {
   private readonly forwardLinks: Map<string, Set<string>> = new Map()
   private readonly backlinks: Map<string, Set<string>> = new Map()
@@ -128,16 +155,21 @@ export class LinkIndexService implements ILinkIndex {
           }
           this.forwardLinks.set(normalizedPath, targets)
 
-          // Extract tags
-          const tags = extractTags(content)
-          if (tags.length > 0) {
-            this.fileTags.set(normalizedPath, new Set(tags))
-          }
-
           // Extract properties
           const properties = extractProperties(content)
           if (Object.keys(properties).length > 0) {
             this.fileProperties.set(normalizedPath, new Map(Object.entries(properties)))
+          }
+
+          // Extract tags (inline + frontmatter, Obsidian-compatible)
+          const inlineTags = extractTags(content)
+          const frontmatterTags = extractFrontmatterTags(properties)
+          const allTags = new Set(inlineTags)
+          for (const fmTag of frontmatterTags) {
+            allTags.add(fmTag)
+          }
+          if (allTags.size > 0) {
+            this.fileTags.set(normalizedPath, allTags)
           }
         }
       } catch (error) {
@@ -212,20 +244,25 @@ export class LinkIndexService implements ILinkIndex {
         }
       }
 
-      // Update tags
-      const tags = extractTags(content)
-      if (tags.length > 0) {
-        this.fileTags.set(normalizedPath, new Set(tags))
-      } else {
-        this.fileTags.delete(normalizedPath)
-      }
-
       // Update properties
       const properties = extractProperties(content)
       if (Object.keys(properties).length > 0) {
         this.fileProperties.set(normalizedPath, new Map(Object.entries(properties)))
       } else {
         this.fileProperties.delete(normalizedPath)
+      }
+
+      // Update tags (inline + frontmatter, Obsidian-compatible)
+      const inlineTags = extractTags(content)
+      const frontmatterTags = extractFrontmatterTags(properties)
+      const allTags = new Set(inlineTags)
+      for (const fmTag of frontmatterTags) {
+        allTags.add(fmTag)
+      }
+      if (allTags.size > 0) {
+        this.fileTags.set(normalizedPath, allTags)
+      } else {
+        this.fileTags.delete(normalizedPath)
       }
     }
 
@@ -289,20 +326,25 @@ export class LinkIndexService implements ILinkIndex {
       }
     }
 
-    // Transfer tags (re-extract from content for correctness)
-    const tags = extractTags(content)
-    if (tags.length > 0) {
-      this.fileTags.set(normalizedNew, new Set(tags))
-    } else if (oldTags && oldTags.size > 0) {
-      this.fileTags.set(normalizedNew, oldTags)
-    }
-
     // Transfer properties (re-extract from content for correctness)
     const properties = extractProperties(content)
     if (Object.keys(properties).length > 0) {
       this.fileProperties.set(normalizedNew, new Map(Object.entries(properties)))
     } else if (oldProps && oldProps.size > 0) {
       this.fileProperties.set(normalizedNew, oldProps)
+    }
+
+    // Transfer tags (re-extract from content, inline + frontmatter, Obsidian-compatible)
+    const inlineTags = extractTags(content)
+    const frontmatterTags = extractFrontmatterTags(properties)
+    const allTags = new Set(inlineTags)
+    for (const fmTag of frontmatterTags) {
+      allTags.add(fmTag)
+    }
+    if (allTags.size > 0) {
+      this.fileTags.set(normalizedNew, allTags)
+    } else if (oldTags && oldTags.size > 0) {
+      this.fileTags.set(normalizedNew, oldTags)
     }
 
     await this.persist()

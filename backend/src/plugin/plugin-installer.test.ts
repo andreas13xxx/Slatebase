@@ -191,40 +191,59 @@ describe('PluginInstaller', () => {
   })
 
   describe('installFromZip — bundle integrity', () => {
-    it('rejects bundle containing eval(', async () => {
+    it('warns about bundle containing eval(', async () => {
       const zipBuffer = createPluginZip({
         bundle: 'const x = eval("1+1");',
       })
 
-      await expect(installer.installFromZip('vault-1', zipBuffer))
-        .rejects.toMatchObject({ code: 'BUNDLE_UNSAFE' })
+      const result = await installer.installFromZip('vault-1', zipBuffer)
+      expect(result.pluginId).toBe('test-plugin')
+      expect(result.warnings).toHaveLength(1)
+      expect(result.warnings[0]).toContain('eval(')
     })
 
-    it('rejects bundle containing new Function(', async () => {
+    it('warns about bundle containing new Function(', async () => {
       const zipBuffer = createPluginZip({
         bundle: 'const fn = new Function("return 1");',
       })
 
-      await expect(installer.installFromZip('vault-1', zipBuffer))
-        .rejects.toMatchObject({ code: 'BUNDLE_UNSAFE' })
+      const result = await installer.installFromZip('vault-1', zipBuffer)
+      expect(result.pluginId).toBe('test-plugin')
+      expect(result.warnings).toHaveLength(1)
+      expect(result.warnings[0]).toContain('new Function(')
     })
 
-    it('rejects bundle containing document.write(', async () => {
+    it('warns about bundle containing document.write(', async () => {
       const zipBuffer = createPluginZip({
         bundle: 'document.write("<h1>Hello</h1>");',
       })
 
-      await expect(installer.installFromZip('vault-1', zipBuffer))
-        .rejects.toMatchObject({ code: 'BUNDLE_UNSAFE' })
+      const result = await installer.installFromZip('vault-1', zipBuffer)
+      expect(result.pluginId).toBe('test-plugin')
+      expect(result.warnings).toHaveLength(1)
+      expect(result.warnings[0]).toContain('document.write(')
     })
 
-    it('allows bundle without unsafe patterns', async () => {
+    it('returns multiple warnings when multiple patterns are present', async () => {
+      const zipBuffer = createPluginZip({
+        bundle: 'eval("x"); const fn = new Function("y");',
+      })
+
+      const result = await installer.installFromZip('vault-1', zipBuffer)
+      expect(result.pluginId).toBe('test-plugin')
+      expect(result.warnings).toHaveLength(2)
+      expect(result.warnings[0]).toContain('eval(')
+      expect(result.warnings[1]).toContain('new Function(')
+    })
+
+    it('returns empty warnings for safe bundles', async () => {
       const zipBuffer = createPluginZip({
         bundle: 'console.log("safe code"); function evaluate() {}',
       })
 
       const result = await installer.installFromZip('vault-1', zipBuffer)
       expect(result.pluginId).toBe('test-plugin')
+      expect(result.warnings).toHaveLength(0)
     })
   })
 

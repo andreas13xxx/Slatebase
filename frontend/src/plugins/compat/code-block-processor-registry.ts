@@ -1,0 +1,345 @@
+/**
+ * CodeBlockProcessorRegistry — Central registry for Obsidian-compatible code block processors.
+ *
+ * Plugins use `plugin.registerMarkdownCodeBlockProcessor(language, handler)` to register
+ * custom renderers for fenced code blocks. When Markdown containing ` ```language ` is rendered,
+ * the handler receives the source text and a container element to render into.
+ *
+ * Architecture:
+ * - Module-level singleton (same pattern as realtimeVaultBridge, file-view-registry)
+ * - ViewMode calls `processCodeBlocks(containerEl, sourcePath)` after rendering HTML
+ * - Each handler gets: (source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext)
+ * - Lifecycle: MarkdownRenderChild attached to container for cleanup when DOM is removed
+ *
+ * @module code-block-processor-registry
+ */
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+/**
+ * MarkdownPostProcessorContext — Context passed to code block handlers.
+ * Provides source file info and lifecycle management.
+ */
+export interface MarkdownPostProcessorContext {
+  /** Unique document ID (tab/view identifier). */
+  docId: string
+  /** Path to the source markdown file (for resolving relative links). */
+  sourcePath: string
+  /** Frontmatter of the source file (if available). */
+  frontmatter: Record<string, unknown> | null
+  /** Add a child component for lifecycle management. */
+  addChild(child: MarkdownRenderChild): void
+  /** Get section information (stub — returns null). */
+  getSectionInfo(el: HTMLElement): null
+}
+
+/**
+ * MarkdownRenderChild — Lifecycle component for rendered code block content.
+ * When the container element is removed from the DOM, unload() is called.
+ */
+export class MarkdownRenderChild {
+  containerEl: HTMLElement
+  private _onunload: (() => void) | null = null
+
+  constructor(containerEl: HTMLElement) {
+    this.containerEl = containerEl
+  }
+
+  load(): void {}
+
+  unload(): void {
+    if (this._onunload) {
+      this._onunload()
+    }
+  }
+
+  onload(): void {}
+
+  onunload(): void {}
+
+  /** Register a callback for cleanup. */
+  register(cb: () => void): void {
+    this._onunload = cb
+  }
+
+  /** Register an event ref for auto-cleanup. */
+  registerEvent(_ref: unknown): void {}
+
+  /** Register a DOM event for auto-cleanup. */
+  registerDomEvent(_el: EventTarget, _type: string, _cb: EventListener): void {}
+
+  /** Register an interval for auto-cleanup. */
+  registerInterval(id: number): number {
+    return id
+  }
+}
+
+/**
+ * CodeBlockHandler — Function signature for a code block processor.
+ *
+ * @param source - The text content of the code block (without the ``` delimiters)
+ * @param el - A container div element to render into (replaces the <pre><code>)
+ * @param ctx - Context with source file info and lifecycle management
+ */
+export type CodeBlockHandler = (
+  source: string,
+  el: HTMLElement,
+  ctx: MarkdownPostProcessorContext,
+) => Promise<void> | void
+
+/**
+ * MarkdownPostProcessor — General post-processor that runs on rendered HTML sections.
+ */
+export type MarkdownPostProcessor = (
+  el: HTMLElement,
+  ctx: MarkdownPostProcessorContext,
+) => Promise<void> | void
+
+/** A registered code block processor entry. */
+interface CodeBlockRegistration {
+  language: string
+  handler: CodeBlockHandler
+  pluginId: string
+  sortOrder: number
+}
+
+/** A registered general post-processor entry. */
+interface PostProcessorRegistration {
+  processor: MarkdownPostProcessor
+  pluginId: string
+  sortOrder: number
+}
+
+// ─── Module-Level State ──────────────────────────────────────────────────────
+
+/** Registered code block processors (language → handler). */
+const codeBlockProcessors: Map<string, CodeBlockRegistration> = new Map()
+
+/** Registered general post-processors (sorted by sortOrder). */
+const postProcessors: PostProcessorRegistration[] = []
+
+/** Active render children (for lifecycle cleanup). */
+const activeRenderChildren: Set<MarkdownRenderChild> = new Set()
+
+// ─── Registration API ────────────────────────────────────────────────────────
+
+/**
+ * Register a code block processor for a specific language.
+ * When markdown containing ` ```language ` is rendered, the handler is called.
+ *
+ * @param language - The code block language identifier (e.g. 'dataview', 'tasks', 'mermaid')
+ * @param handler - The rendering function
+ * @param pluginId - The owning plugin ID (for cleanup on deactivation)
+ * @param sortOrder - Processing order (lower = earlier, default 0)
+ */
+export function registerCodeBlockProcessor(
+  language: string,
+  handler: CodeBlockHandler,
+  pluginId: string,
+  sortOrder: number = 0,
+): void {
+  codeBlockProcessors.set(language.toLowerCase(), { language, handler, pluginId, sortOrder })
+}
+
+/**
+ * Register a general Markdown post-processor.
+ * Runs on every rendered section after initial HTML generation.
+ *
+ * @param processor - The post-processing function
+ * @param pluginId - The owning plugin ID
+ * @param sortOrder - Processing order (lower = earlier, default 0)
+ */
+export function registerPostProcessor(
+  processor: MarkdownPostProcessor,
+  pluginId: string,
+  sortOrder: number = 0,
+): void {
+  postProcessors.push({ processor, pluginId, sortOrder })
+  postProcessors.sort((a, b) => a.sortOrder - b.sortOrder)
+}
+
+/**
+ * Remove all code block processors and post-processors for a plugin.
+ * Called during plugin deactivation.
+ */
+export function unregisterAllForPlugin(pluginId: string): void {
+  for (const [lang, reg] of codeBlockProcessors) {
+    if (reg.pluginId === pluginId) {
+      codeBlockProcessors.delete(lang)
+    }
+  }
+  // Remove post-processors for this plugin
+  for (let i = postProcessors.length - 1; i >= 0; i--) {
+    if (postProcessors[i]!.pluginId === pluginId) {
+      postProcessors.splice(i, 1)
+    }
+  }
+}
+
+/**
+ * Check if a code block processor is registered for a given language.
+ */
+export function hasCodeBlockProcessor(language: string): boolean {
+  return codeBlockProcessors.has(language.toLowerCase())
+}
+
+/**
+ * Get all registered code block languages.
+ */
+export function getRegisteredLanguages(): string[] {
+  return [...codeBlockProcessors.keys()]
+}
+
+// ─── Processing API (called by ViewMode after rendering) ─────────────────────
+
+/**
+ * Process all code blocks in a rendered container element.
+ *
+ * Scans for `<pre><code class="language-xxx">` elements, checks if a handler
+ * is registered for that language, and if so:
+ * 1. Extracts the source text from the <code> element
+ * 2. Creates a replacement <div> container
+ * 3. Calls the registered handler with (source, container, context)
+ * 4. Replaces the <pre> element with the rendered container
+ *
+ * @param containerEl - The root element containing rendered markdown HTML
+ * @param sourcePath - The source file path (for context)
+ * @param frontmatter - The file's frontmatter (if available)
+ * @returns Array of MarkdownRenderChild instances (for lifecycle management)
+ */
+export function processCodeBlocks(
+  containerEl: HTMLElement,
+  sourcePath: string,
+  frontmatter?: Record<string, unknown> | null,
+): MarkdownRenderChild[] {
+  const children: MarkdownRenderChild[] = []
+
+  // Find all <pre><code class="language-xxx"> elements
+  const codeElements = containerEl.querySelectorAll('pre > code[class*="language-"]')
+
+  for (const codeEl of codeElements) {
+    const preEl = codeEl.parentElement
+    if (!preEl) continue
+
+    // Extract language from class (e.g. "language-dataview" → "dataview")
+    const classList = codeEl.className.split(/\s+/)
+    const langClass = classList.find(c => c.startsWith('language-'))
+    if (!langClass) continue
+    const language = langClass.slice('language-'.length).toLowerCase()
+
+    // Check if we have a handler for this language
+    const registration = codeBlockProcessors.get(language)
+    if (!registration) continue
+
+    // Extract source text
+    const source = codeEl.textContent ?? ''
+
+    // Create replacement container
+    const container = document.createElement('div')
+    container.className = `block-language-${language}`
+    container.dataset.language = language
+
+    // Create MarkdownRenderChild for lifecycle
+    const renderChild = new MarkdownRenderChild(container)
+
+    // Build context
+    const ctx: MarkdownPostProcessorContext = {
+      docId: `doc-${Date.now()}`,
+      sourcePath,
+      frontmatter: frontmatter ?? null,
+      addChild(child: MarkdownRenderChild): void {
+        activeRenderChildren.add(child)
+        children.push(child)
+      },
+      getSectionInfo(): null {
+        return null
+      },
+    }
+
+    // Replace the <pre> with our container
+    preEl.replaceWith(container)
+
+    // Call the handler (may be async — we don't await to avoid blocking render)
+    try {
+      const result = registration.handler(source, container, ctx)
+      if (result instanceof Promise) {
+        result.catch((err) => {
+          console.error(`[CodeBlockProcessor] Handler error for language "${language}":`, err)
+          container.textContent = `Error rendering ${language} block: ${err instanceof Error ? err.message : String(err)}`
+        })
+      }
+    } catch (err) {
+      console.error(`[CodeBlockProcessor] Handler error for language "${language}":`, err)
+      container.textContent = `Error rendering ${language} block: ${err instanceof Error ? err.message : String(err)}`
+    }
+
+    activeRenderChildren.add(renderChild)
+    children.push(renderChild)
+  }
+
+  return children
+}
+
+/**
+ * Run registered post-processors on a rendered container.
+ *
+ * @param containerEl - The root element containing rendered markdown HTML
+ * @param sourcePath - The source file path
+ * @param frontmatter - The file's frontmatter
+ */
+export function runPostProcessors(
+  containerEl: HTMLElement,
+  sourcePath: string,
+  frontmatter?: Record<string, unknown> | null,
+): void {
+  if (postProcessors.length === 0) return
+
+  const ctx: MarkdownPostProcessorContext = {
+    docId: `doc-${Date.now()}`,
+    sourcePath,
+    frontmatter: frontmatter ?? null,
+    addChild(child: MarkdownRenderChild): void {
+      activeRenderChildren.add(child)
+    },
+    getSectionInfo(): null {
+      return null
+    },
+  }
+
+  for (const { processor } of postProcessors) {
+    try {
+      const result = processor(containerEl, ctx)
+      if (result instanceof Promise) {
+        result.catch((err) => {
+          console.error('[PostProcessor] Error:', err)
+        })
+      }
+    } catch (err) {
+      console.error('[PostProcessor] Error:', err)
+    }
+  }
+}
+
+/**
+ * Cleanup all active render children.
+ * Called when the view is unmounted or file changes.
+ */
+export function cleanupRenderChildren(): void {
+  for (const child of activeRenderChildren) {
+    try {
+      child.unload()
+    } catch {
+      // Ignore cleanup errors
+    }
+  }
+  activeRenderChildren.clear()
+}
+
+/**
+ * Reset all registrations (for testing or full cleanup).
+ */
+export function resetCodeBlockProcessors(): void {
+  codeBlockProcessors.clear()
+  postProcessors.length = 0
+  cleanupRenderChildren()
+}

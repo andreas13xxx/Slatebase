@@ -197,12 +197,17 @@ describe('PluginSandbox', () => {
       sandbox.createContext('my-plugin', permissions);
       const proxiedFetch = sandbox.createFetchProxy('my-plugin');
 
-      // Mock global fetch to verify it gets called
-      const mockFetch = vi.fn().mockResolvedValue(new Response('ok'));
+      // Mock global fetch — cross-origin requests go through /api/v1/proxy
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ status: 200, headers: {}, text: 'ok' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
       vi.stubGlobal('fetch', mockFetch);
 
       await proxiedFetch('https://api.example.com/data');
-      expect(mockFetch).toHaveBeenCalledWith('https://api.example.com/data', undefined);
+      expect(mockFetch).toHaveBeenCalledWith('/api/v1/proxy', expect.objectContaining({ method: 'POST' }));
 
       vi.unstubAllGlobals();
     });
@@ -217,7 +222,12 @@ describe('PluginSandbox', () => {
       sandbox.createContext('my-plugin', permissions);
       const proxiedFetch = sandbox.createFetchProxy('my-plugin');
 
-      const mockFetch = vi.fn().mockResolvedValue(new Response('ok'));
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ status: 200, headers: {}, text: 'ok' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
       vi.stubGlobal('fetch', mockFetch);
 
       await proxiedFetch('https://sub.example.com/data');

@@ -2,15 +2,20 @@
  * StatusBar — Bottom status bar displaying clock and extensible plugin items.
  *
  * Positioned at the bottom of the application layout. Shows the current time
- * (updated every second). Designed to be extended with additional status items
- * (e.g. from plugins) in the future.
+ * (updated every second). Renders plugin-registered status bar items via
+ * imperative DOM append (plugins manipulate their element directly).
  *
  * @module components/StatusBar
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from '../i18n'
 import { Clock } from 'lucide-react'
+import {
+  getStatusBarItems,
+  onStatusBarItemsChange,
+} from '../plugins/compat/status-bar-registry'
+import type { StatusBarItemEntry } from '../plugins/compat/status-bar-registry'
 import './StatusBar.css'
 
 /**
@@ -26,10 +31,13 @@ function formatTime(): string {
 /**
  * StatusBar component rendered at the bottom of the app.
  * Shows the current time, updated every minute (on the minute boundary).
+ * Also renders plugin status bar items via imperative DOM append.
  */
 export function StatusBar() {
   const { t } = useTranslation()
   const [time, setTime] = useState<string>(formatTime)
+  const [pluginItems, setPluginItems] = useState<StatusBarItemEntry[]>(getStatusBarItems)
+  const pluginContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     // Update immediately, then align to minute boundaries
@@ -56,12 +64,42 @@ export function StatusBar() {
     }
   }, [])
 
+  // Subscribe to status bar item changes from plugin registry
+  useEffect(() => {
+    const unsubscribe = onStatusBarItemsChange((items) => {
+      setPluginItems([...items])
+    })
+    return unsubscribe
+  }, [])
+
+  // Imperatively mount plugin elements into the container
+  const mountPluginItems = useCallback((container: HTMLDivElement | null) => {
+    if (!container) return
+    // Clear existing children
+    container.innerHTML = ''
+    // Append each plugin's element
+    for (const item of pluginItems) {
+      container.appendChild(item.element)
+    }
+  }, [pluginItems])
+
+  // Re-mount when pluginItems change
+  useEffect(() => {
+    mountPluginItems(pluginContainerRef.current)
+  }, [mountPluginItems])
+
   return (
     <footer className="status-bar" role="contentinfo" aria-label={t('statusBar.ariaLabel')}>
-      <div className="status-bar__item status-bar__clock" aria-live="off">
-        <Clock size={12} aria-hidden="true" />
-        <time>{time}</time>
+      <div className="status-bar__left">
+        <div className="status-bar__item status-bar__clock" aria-live="off">
+          <Clock size={12} aria-hidden="true" />
+          <time>{time}</time>
+        </div>
       </div>
+      <div
+        className="status-bar__right"
+        ref={pluginContainerRef}
+      />
     </footer>
   )
 }

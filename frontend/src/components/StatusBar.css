@@ -3,7 +3,7 @@
 .status-bar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   height: var(--status-bar-height);
   padding: 0 12px;
   background: var(--status-bar-bg);
@@ -13,6 +13,18 @@
   user-select: none;
   flex-shrink: 0;
   gap: 16px;
+}
+
+.status-bar__left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-bar__right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .status-bar__item {
@@ -25,4 +37,14 @@
 .status-bar__clock {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
+}
+
+/* Plugin status bar items */
+.status-bar__plugin-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: var(--status-bar-font-size);
+  color: var(--status-bar-text);
 }

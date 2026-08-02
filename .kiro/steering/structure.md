@@ -63,6 +63,7 @@ src/
 │   ├── vaultConfigRoutes.ts — Per-vault config routes (GET/PUT /vaults/:vaultId/config)
 │   ├── welcomeVaultRoutes.ts — POST /api/v1/welcome-vault (on-demand tutorial vault creation, rate-limited)
 │   ├── welcomeVaultRoutes.test.ts — Integration tests for welcome vault route
+│   ├── proxyRoutes.ts    — POST /api/v1/proxy (CORS-free HTTP proxy for plugin requestUrl, SSRF protection, URL allowlist)
 │   └── sseRoutes.ts      — GET /events (SSE stream)
 ├── chat/
 │   ├── types.ts          — Chat data models (Conversation, Message, etc.)
@@ -125,9 +126,9 @@ src/
 │   ├── wikilink-parser.test.ts — Unit tests for parser
 │   ├── tag-extractor.ts      — extractTags() (code-block-aware, nested tags, dedup)
 │   ├── tag-extractor.test.ts — Unit tests for tag extractor
-│   ├── property-extractor.ts — extractProperties() (YAML frontmatter, regex-based)
+│   ├── property-extractor.ts — extractProperties() (YAML frontmatter, regex-based, CRLF-normalized)
 │   ├── property-extractor.test.ts — Unit tests for property extractor
-│   ├── link-index-service.ts — LinkIndexService (rebuild, incremental updates, JSON v2 persistence, tags, properties, getGraph with options, getGraphMeta)
+│   ├── link-index-service.ts — LinkIndexService (rebuild, incremental updates, JSON v2 persistence, tags, properties, getGraph with options, getGraphMeta), extractFrontmatterTags (Obsidian-compatible frontmatter tag extraction)
 │   ├── link-index-service.test.ts — Unit tests for LinkIndexService v2
 │   └── canvas-parser.test.ts — Unit tests for canvas link extraction
 ├── plugin/
@@ -196,11 +197,13 @@ src/
 └── integration.test.ts   — Integration tests
 config/
 └── default.json          — Default server configuration
+assets/
+└── templates/
+    ├── welcome-vault/          — German welcome vault v2 (35+ guides: Grundlagen, Features, Fortgeschritten, Praxis, Vorlagen, Screenshots)
+    └── welcome-vault-en/       — English welcome vault v2 (35+ guides: Basics, Features, Advanced, Practice, Templates, Screenshots)
 data/
 ├── vaults.json           — Persistent vault registry
-├── vaults/<id>/          — Vault storage directories (one per vault)
-├── templates/welcome-vault/    — German welcome vault v2 (35+ guides: Grundlagen, Features, Fortgeschritten, Praxis, Vorlagen, Screenshots)
-└── templates/welcome-vault-en/ — English welcome vault v2 (35+ guides: Basics, Features, Advanced, Practice, Templates, Screenshots)
+└── vaults/<id>/          — Vault storage directories (one per vault)
 ```
 
 ## Frontend (`frontend/`)
@@ -271,23 +274,34 @@ src/
 │       ├── errors.ts     — PluginError, ManifestValidationError, BundleEvaluationError, LifecycleError, etc.
 │       ├── event-system.ts — IEventEmitter (on/off/trigger/offref/removeAllListeners)
 │       ├── manifest-parser.ts — Manifest parsing with Zod validation + semver comparison
-│       ├── plugin-loader.ts — PluginLoader (bundle evaluation, lifecycle, timeout, cleanup)
+│       ├── plugin-loader.ts — PluginLoader (bundle evaluation, lifecycle, timeout, cleanup, @lezer/* stubs)
 │       ├── plugin-registry.ts — PluginRegistry (frontend state, backend persistence)
 │       ├── sandbox.ts    — PluginSandbox (vault isolation, storage namespace, network allowlist, blocking detection)
 │       ├── settings-manager.ts — SettingsManager (loadData/saveData per plugin per vault)
-│       ├── command-registry.ts — CommandRegistry (addCommand, removeAll, search, hotkeys)
+│       ├── setting-tab.ts — PluginSettingTab, Setting, UI components, DOM extensions, icon registry, Modal, Plugin class (synchronous global registration)
+│       ├── obsidian-api-extensions.ts — Extended APIs: Events, Scope, Keymap, utility functions, MarkdownPreviewRenderer, DOM globals (async loaded as supplement)
+│       ├── suggest-modal.ts — SuggestModal, FuzzySuggestModal (search/filter modals)
+│       ├── ribbon-icon-registry.ts — Module-level ribbon icon registry (addRibbonIcon store + change listeners)
+│       ├── command-registry.ts — CommandRegistry (addCommand, removeAll, search, hotkeys, editorCallback/editorCheckCallback)
+│       ├── code-block-processor-registry.ts — CodeBlockProcessorRegistry (registerCodeBlockProcessor, processCodeBlocks, runPostProcessors, MarkdownRenderChild lifecycle)
 │       ├── css-injector.ts — CSS injection with scoped selectors (data-plugin-id prefix)
-│       ├── compatibility-analyzer.ts — Multi-layer browser compatibility analysis (isDesktopOnly gate, Node.js module detection, Obsidian API pattern matching)
+│       ├── compatibility-analyzer.ts — Multi-layer browser compatibility analysis (isDesktopOnly gate, Node.js module detection, Obsidian API pattern matching, SUPPORTED_METHODS set)
 │       ├── plugin-context.ts — PluginProvider + usePluginContext hook (vault-scoped instances, FCP loading, activeViews/sidebarViews state)
 │       ├── plugin-event-bridge.ts — usePluginEventBridge hook (tab→workspace, save→cache, tree→resolved, leaf events)
+│       ├── file-view-registry.ts — FileViewRegistry (content-based + extension-based view routing, registerExtensionsForPlugin)
 │       ├── view-registry.ts — ViewRegistry (plugin-ownership tracking, location-aware leaf creation, sidebar callbacks)
+│       ├── obsidian-compat.css — Obsidian-compatible CSS Custom Properties (100+ vars mapped to Slatebase tokens, Dark Mode)
 │       ├── tab-view-bridge.ts — TabViewBridge (module-level bridge: ViewRegistry → TabProvider for plugin view tabs)
 │       ├── tab-view-bridge-wiring.test.ts — Integration tests for TabViewBridge wiring
 │       └── shims/
-│           ├── app-shim.ts — AppShim (Proxy-based, vault/workspace/metadataCache/plugins properties)
-│           ├── vault-shim.ts — VaultShim (read/modify/create/delete/getAbstractFileByPath/events)
-│           ├── workspace-shim.ts — WorkspaceShim (full Leaf API: getLeaf, getRightLeaf, getLeftLeaf, getLeavesOfType, detachLeavesOfType, openLinkText, iterateAllLeaves, iterateRootLeaves, getActiveLeaf, setActiveLeaf, revealLeaf, createLeafBySplit)
-│           └── metadata-cache-shim.ts — MetadataCacheShim (getFileCache, resolvedLinks, changed/resolved events)
+│           ├── app-shim.ts — AppShim (Proxy-based, vault/workspace/metadataCache/fileManager/plugins/isMobile/appId/secretStorage/loadLocalStorage/saveLocalStorage)
+│           ├── vault-shim.ts — VaultShim (read/modify/create/delete/copy/getFileByPath/readBinary/modifyBinary/process/append/exists/configDir/events)
+│           ├── workspace-shim.ts — WorkspaceShim (full Leaf API + getActiveViewOfType(MarkdownView) synthetic view, onLayoutReady error-isolation)
+│           ├── metadata-cache-shim.ts — MetadataCacheShim (getFileCache, resolvedLinks, changed/resolved events, getTags, fileToLinktext, blockCache, getCachedFiles)
+│           ├── file-manager-shim.ts — FileManagerShim (renameFile, processFrontMatter, generateMarkdownLink, getNewFileParent, trashFile, promptForFileRename, getAvailablePathForAttachment)
+│           ├── markdown-view-shim.ts — MarkdownView stub (editor property, getActiveViewOfType support, registered on window.obsidian)
+│           ├── markdown-renderer-shim.ts — MarkdownRenderer.render() (unified/remark MDAST→HTML pipeline, registered on window.obsidian)
+│           └── suggest-modal-shim.ts — Modal, SuggestModal, FuzzySuggestModal (DOM-based overlays, fuzzy search, keyboard nav)
 ├── state/
 │   ├── index.ts          — AppProvider, appReducer, action creators
 │   ├── authState.ts      — Auth reducer + types
@@ -535,6 +549,7 @@ Route modules in `src/api/`:
 - `preferencesRoutes.ts` — user preferences (recent files, favorites, keybindings)
 - `vaultConfigRoutes.ts` — per-vault config (templates dir, daily notes dir)
 - `welcomeVaultRoutes.ts` — `POST /welcome-vault` (on-demand tutorial vault creation)
+- `proxyRoutes.ts` — `POST /proxy` (CORS-free HTTP proxy for plugin requestUrl, SSRF protection)
 - `sseRoutes.ts` — `GET /events` (SSE stream)
 
 ## Data Storage
