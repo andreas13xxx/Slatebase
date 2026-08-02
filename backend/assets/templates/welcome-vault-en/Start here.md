@@ -53,6 +53,19 @@ Discover the full feature set:
 
 ---
 
+## Administration
+
+For administrators — manage server and users:
+
+- [[Admin/Overview|Admin Overview]]
+- [[Admin/User Management|User Management]]
+- [[Admin/Feature Toggles|Feature Toggles]]
+- [[Admin/Audit Log|Audit Log]]
+- [[Admin/Server Configuration|Server Configuration]]
+- [[Admin/Vault Overview|Vault Overview]]
+
+---
+
 ## Advanced
 
 For power users and specialized workflows:
@@ -64,6 +77,12 @@ For power users and specialized workflows:
 - [[Advanced/Vault Sync Setup|Vault Sync Setup]]
 - [[Advanced/MCP Context Server|MCP Context Server]]
 - [[Advanced/Obsidian Plugins|Obsidian Plugins]]
+- [[Advanced/Plugins/Calendar|Plugin: Calendar]]
+- [[Advanced/Plugins/Dataview|Plugin: Dataview]]
+- [[Advanced/Plugins/Kanban|Plugin: Kanban]]
+- [[Advanced/Plugins/Templater|Plugin: Templater]]
+- [[Advanced/Plugins/Excalidraw|Plugin: Excalidraw]]
+- [[Advanced/Plugins/LiveSync|Plugin: LiveSync]]
 
 ---
 
@@ -78,6 +97,7 @@ Learn by doing — interactive exercises:
 - [[Practice/Exercise 4 - Master Search|Exercise 4: Master Search]]
 - [[Practice/Exercise 5 - Create Canvas|Exercise 5: Create Canvas]]
 - [[Practice/Sample Project/Project Plan|Sample Project]]
+- [[Practice/Plugins/Overview|Plugin Exercises]]
 
 ---
 

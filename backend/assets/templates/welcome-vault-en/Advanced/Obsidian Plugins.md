@@ -91,14 +91,18 @@ Each plugin shows a compatibility level:
 
 ## Known Working Plugins
 
-These plugins have been tested and work well with Slatebase:
-- Calendar
-- Dataview (basic queries)
-- Templater (basic templates)
-- Various small utility plugins
+These plugins have been tested and work with Slatebase:
 
-> [!note] Note
-> Compatibility depends on the plugin version and which APIs it uses. Check the Slatebase compatibility notes for specific plugins.
+| Plugin | Compatibility | Notes |
+|--------|--------------|-------|
+| Calendar | Good | Sidebar calendar, daily note creation |
+| Dataview | Good | DQL queries work, DataviewJS limited |
+| Templater | Good | Date/file functions, no system commands |
+| Kanban | Good | Board view, drag & drop |
+| Excalidraw | Partial | Drawing tools work, libraries limited |
+| LiveSync | Partial | Periodic/OneShot recommended, LiveSync mode timeout-limited |
+
+See the individual [[Advanced/Plugins/Calendar|plugin guides]] for detailed compatibility information.
 
 ---
 
@@ -133,6 +137,27 @@ Plugin CSS is scoped with `[data-plugin-id]` to prevent conflicts. If styles loo
 > 2. Open Plugin Management
 > 3. (Optional) Download a small plugin ZIP and try installing it
 > 4. Check the compatibility indicator
+
+---
+
+## Plugin Guides
+
+Detailed guides with examples and exercises for tested plugins:
+
+| Plugin | Description | Guide |
+|--------|-------------|-------|
+| Calendar | Monthly calendar + daily notes | [[Advanced/Plugins/Calendar]] |
+| Dataview | Vault as queryable database | [[Advanced/Plugins/Dataview]] |
+| Kanban | Visual task boards | [[Advanced/Plugins/Kanban]] |
+| Templater | Dynamic templates with JavaScript | [[Advanced/Plugins/Templater]] |
+| Excalidraw | Freehand drawings and diagrams | [[Advanced/Plugins/Excalidraw]] |
+| LiveSync | Bidirectional vault synchronization | [[Advanced/Plugins/LiveSync]] |
+
+### Hands-on Exercises
+
+- [[Practice/Plugins/Overview]] — Exercise overview
+- [[Practice/Plugins/Create Kanban Board]] — Build a Kanban board
+- [[Practice/Plugins/Dataview Queries]] — Write dynamic queries
 
 ---
 

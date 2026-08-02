@@ -1,3 +1,5 @@
+name: slatebase
+
 services:
   backend:
     image: ghcr.io/andreas13xxx/slatebase-backend:latest

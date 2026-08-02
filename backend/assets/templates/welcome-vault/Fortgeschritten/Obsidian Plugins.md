@@ -66,6 +66,23 @@ Slatebase zeigt nach Installation einen Level an:
 - **Eingeschränkt** — Einige APIs emuliert, Funktionsverlust möglich
 - **Inkompatibel** — Nicht unterstützte APIs, wird wahrscheinlich nicht funktionieren
 
+---
+
+## Getestete Plugins
+
+Diese Plugins wurden getestet und funktionieren in Slatebase:
+
+| Plugin | Kompatibilität | Hinweise |
+|--------|---------------|----------|
+| Calendar | Gut | Sidebar-Kalender, Daily-Note-Erstellung |
+| Dataview | Gut | DQL-Queries funktionieren, DataviewJS eingeschränkt |
+| Templater | Gut | Datums-/Datei-Funktionen, keine System-Commands |
+| Kanban | Gut | Board-Ansicht, Drag & Drop |
+| Excalidraw | Eingeschränkt | Zeichenwerkzeuge funktionieren, Libraries nicht |
+| LiveSync | Eingeschränkt | Periodic/OneShot empfohlen, LiveSync-Modus Timeout-begrenzt |
+
+Siehe die einzelnen [[Fortgeschritten/Plugins/Calendar|Plugin-Guides]] für detaillierte Kompatibilitäts-Informationen.
+
 > [!tip] Ausprobieren statt raten
 > Auch "Eingeschränkt" kann funktionieren — die Analyse ist konservativ. Installiere und teste. Du kannst jederzeit deaktivieren.
 
@@ -118,6 +135,27 @@ Viele Plugins bringen eigene Settings mit:
 - Storage pro Plugin und Vault getrennt
 - Netzwerk nur auf erlaubte Domains
 - Kein Zugriff auf andere Plugins oder Slatebase-Interna
+
+---
+
+## Plugin-Guides
+
+Ausführliche Anleitungen mit Beispielen und Übungen für getestete Plugins:
+
+| Plugin | Beschreibung | Guide |
+|--------|--------------|-------|
+| Calendar | Monatskalender + Daily Notes | [[Fortgeschritten/Plugins/Calendar]] |
+| Dataview | Vault als abfragbare Datenbank | [[Fortgeschritten/Plugins/Dataview]] |
+| Kanban | Visuelle Aufgaben-Boards | [[Fortgeschritten/Plugins/Kanban]] |
+| Templater | Dynamische Vorlagen mit JavaScript | [[Fortgeschritten/Plugins/Templater]] |
+| Excalidraw | Freihand-Zeichnungen und Diagramme | [[Fortgeschritten/Plugins/Excalidraw]] |
+| LiveSync | Bidirektionale Vault-Synchronisation | [[Fortgeschritten/Plugins/LiveSync]] |
+
+### Praktische Übungen
+
+- [[Praxis/Plugins/Übersicht]] — Übungsübersicht
+- [[Praxis/Plugins/Kanban-Board erstellen]] — Kanban-Board aufbauen
+- [[Praxis/Plugins/Dataview Queries]] — Dynamische Queries schreiben
 
 ---
 

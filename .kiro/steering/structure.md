@@ -219,7 +219,6 @@ src/
 ├── utils/
 │   ├── semver.ts         — compareSemver() utility (X.Y.Z comparison, v-prefix stripping)
 │   ├── error.ts          — extractErrorMessage(err, fallback) shared utility
-│   ├── restoreState.ts   — UI state preservation across session expiry (save/read/clear/updateSnapshot)
 ├── canvas/
 │   ├── index.ts          — Barrel export (parser, serializer, types)
 │   ├── types.ts          — CanvasDocument, CanvasNode (Text/File/Link/Group), CanvasEdge, parse result types

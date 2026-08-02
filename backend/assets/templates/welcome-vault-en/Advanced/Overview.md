@@ -68,8 +68,26 @@ These features may change in future versions. They're protected behind feature t
 
 ---
 
+## Plugin Guides
+
+Detailed guides for individual Obsidian plugins:
+
+| Plugin | Description |
+|--------|-------------|
+| [[Advanced/Plugins/Calendar\|Calendar]] | Monthly calendar + daily notes |
+| [[Advanced/Plugins/Dataview\|Dataview]] | Vault as queryable database |
+| [[Advanced/Plugins/Kanban\|Kanban]] | Visual task boards |
+| [[Advanced/Plugins/Templater\|Templater]] | Dynamic templates |
+| [[Advanced/Plugins/Excalidraw\|Excalidraw]] | Freehand drawings |
+| [[Advanced/Plugins/LiveSync\|LiveSync]] | Vault synchronization |
+
+Exercises: [[Practice/Plugins/Overview|Plugin Exercises]]
+
+---
+
 ## Related Areas
 
 - [[Features/Overview]] — Feature reference
 - [[Practice/Overview]] — Hands-on exercises
+- [[Practice/Plugins/Overview]] — Plugin exercises
 - [[Basics/Getting Started]] — Back to the basics

@@ -68,8 +68,26 @@ Diese Features können sich in zukünftigen Versionen ändern. Sie sind hinter F
 
 ---
 
+## Plugin-Guides
+
+Detaillierte Anleitungen für einzelne Obsidian-Plugins:
+
+| Plugin | Beschreibung |
+|--------|--------------|
+| [[Fortgeschritten/Plugins/Calendar\|Calendar]] | Monatskalender + Daily Notes |
+| [[Fortgeschritten/Plugins/Dataview\|Dataview]] | Vault als abfragbare Datenbank |
+| [[Fortgeschritten/Plugins/Kanban\|Kanban]] | Visuelle Aufgaben-Boards |
+| [[Fortgeschritten/Plugins/Templater\|Templater]] | Dynamische Vorlagen |
+| [[Fortgeschritten/Plugins/Excalidraw\|Excalidraw]] | Freihand-Zeichnungen |
+| [[Fortgeschritten/Plugins/LiveSync\|LiveSync]] | Vault-Synchronisation |
+
+Übungen: [[Praxis/Plugins/Übersicht|Plugin-Übungen]]
+
+---
+
 ## Verwandte Bereiche
 
 - [[Features/Übersicht]] — Feature-Referenz
 - [[Praxis/Übersicht]] — Praktische Übungen
+- [[Praxis/Plugins/Übersicht]] — Plugin-Übungen
 - [[Grundlagen/Erste Schritte]] — Zurück zu den Grundlagen

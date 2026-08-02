@@ -53,6 +53,19 @@ Entdecke die vollständige Feature-Palette:
 
 ---
 
+## Administration
+
+Für Administratoren — Server und Nutzer verwalten:
+
+- [[Admin/Übersicht|Admin-Übersicht]]
+- [[Admin/Benutzerverwaltung|Benutzerverwaltung]]
+- [[Admin/Feature-Toggles|Feature-Toggles]]
+- [[Admin/Audit-Log|Audit-Log]]
+- [[Admin/Server-Konfiguration|Server-Konfiguration]]
+- [[Admin/Vault-Übersicht|Vault-Übersicht]]
+
+---
+
 ## Fortgeschritten
 
 Für Power-User und spezielle Workflows:
@@ -64,6 +77,12 @@ Für Power-User und spezielle Workflows:
 - [[Fortgeschritten/Vault Sync einrichten|Vault Sync einrichten]]
 - [[Fortgeschritten/MCP Context Server|MCP Context Server]]
 - [[Fortgeschritten/Obsidian Plugins|Obsidian Plugins]]
+- [[Fortgeschritten/Plugins/Calendar|Plugin: Calendar]]
+- [[Fortgeschritten/Plugins/Dataview|Plugin: Dataview]]
+- [[Fortgeschritten/Plugins/Kanban|Plugin: Kanban]]
+- [[Fortgeschritten/Plugins/Templater|Plugin: Templater]]
+- [[Fortgeschritten/Plugins/Excalidraw|Plugin: Excalidraw]]
+- [[Fortgeschritten/Plugins/LiveSync|Plugin: LiveSync]]
 
 ---
 
@@ -78,6 +97,7 @@ Lerne durch Ausprobieren — interaktive Übungen:
 - [[Praxis/Übung 4 - Suche meistern|Übung 4: Suche meistern]]
 - [[Praxis/Übung 5 - Canvas erstellen|Übung 5: Canvas erstellen]]
 - [[Praxis/Beispielprojekt/Projektplan|Beispielprojekt]]
+- [[Praxis/Plugins/Übersicht|Plugin-Übungen]]
 
 ---
 

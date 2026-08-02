@@ -115,7 +115,7 @@ Kein Express/Fastify/Koa, kein Redux/Zustand, kein ORM, kein DI-Container, kein 
 - `CodeBlockProcessorRegistry` (Module-Level-Singleton in `code-block-processor-registry.ts`).
 - Plugins registrieren via `registerCodeBlockProcessor(language, handler, pluginId)`.
 - **ViewMode**: `useEffect` nach Render → `processCodeBlocks(containerEl)` scannt DOM nach `<pre><code class="language-xxx">`, ersetzt durch Plugin-Container, ruft Handler auf.
-- **Live Preview** (zukünftig): CM6 Widget-Decoration kann denselben Handler aufrufen.
+- **Live Preview**: CM6 Widget-Decoration ruft denselben Handler auf (über CodeMirror-Extension).
 - Lifecycle: `MarkdownRenderChild` pro gerenderten Block, `cleanupRenderChildren()` bei Unmount.
 
 ### EditorShim → CM6-Backend-First
