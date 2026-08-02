@@ -210,7 +210,7 @@ describe('MetadataCacheShim', () => {
       shim.updateFileCache(file, metadata);
 
       expect(callback).toHaveBeenCalledOnce();
-      expect(callback).toHaveBeenCalledWith(file, metadata);
+      expect(callback).toHaveBeenCalledWith(file, '', metadata);
     });
 
     it('emits resolved event when buildInitialCache() is called', () => {

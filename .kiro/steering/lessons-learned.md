@@ -199,3 +199,46 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - `WorkspaceShim.containerEl`: Verstecktes Off-Screen-div (nicht `document.body`)
 - Proxy-Timeout 30s + Buffering: Für OneShot-Sync OK, LiveSync Long-Poll potenziell zu kurz
 - "Plugin initialisation was cancelled by a module": Normal bei unkonfiguriertem Plugin
+
+## Obsidian Plugin Compat — Declarative Settings (1.13+)
+
+- **Templater v2.23+** nutzt `getSettingDefinitions()` statt `display()`. Leeres Settings-Panel = deklarative API nicht implementiert.
+- `PluginSettingTab.getSettingDefinitions()`: Wenn non-empty Array, rendert Framework die Settings automatisch (kein `display()`-Aufruf nötig)
+- `getControlValue(key)` / `setControlValue(key, value)`: Lesen/Schreiben von Plugin-Settings. Plugins überschreiben diese Methoden für Custom Storage.
+- `update()`: Re-render der deklarativen Settings. Plugins rufen das nach State-Changes auf die `visible`/`disabled` Prädikate beeinflussen.
+- Renderer-Datei: `declarative-settings-renderer.ts` (dynamisch importiert, eigener Chunk)
+- SettingDefinitionItem-Typen: `group` (Heading + Items), `list` (Add/Delete/Reorder/EmptyState), `page` (Sub-Navigation oder Factory), Controls (toggle/text/number/dropdown/folder/file/slider/color/secret)
+- Sub-Pages: Ersetzen `containerEl`-Inhalt komplett + Zurück-Button. `page()` Factory erstellt `SettingPage`-Instanzen.
+- `PluginManagementPage.openSettings()`: Prüft `getSettingDefinitions()` → non-empty → declarative Renderer. Sonst `display()`.
+- `SettingTab` als Alias für `PluginSettingTab` auf `window.obsidian` registriert.
+
+## Obsidian Plugin Compat — Global Prototype Extensions
+
+- **`Array.prototype.remove(target)`**: Kritischster fehlender Patch. Plugins nutzen `arr.remove(item)` statt `splice`. Silent Failure (TypeError) ohne den Patch.
+- **`Array.prototype.first()`/`.last()`**: Calendar nutzt `files.first()`.
+- **`Element.prototype.find()`/`.findAll()`**: Kurzform für `querySelector`/`querySelectorAll`.
+- **`HTMLElement.prototype.isShown()`**: Prüft `offsetParent !== null || getClientRects().length > 0`.
+- Alle globalen Extensions in `global-extensions.ts` — importiert als Side-Effect in `setting-tab.ts` (synchron, vor Plugin-Load).
+- `createSvg()` auf `window` — Obsidian-Pendant zu `createEl` für SVG-Elemente.
+- `Object.isEmpty()`, `Object.each()`: Obsidian-spezifische statische Object-Methoden.
+- `Math.clamp()`, `Math.square()`: Obsidian patcht diese auf Math.
+- `String.prototype.contains()`: Alias für `includes()`. Manche ältere Plugins nutzen das.
+- `Node.prototype.insertAfter()`, `Node.prototype.indexOf()`: DOM-Manipulation.
+- `fish()`/`fishAll()`: Globale querySelector-Shortcuts.
+
+## Obsidian Plugin Compat — Vault & MetadataCache Erweiterungen
+
+- **`TAbstractFile.vault` Property**: Obsidian setzt auf jedem `TFile`/`TFolder` eine `.vault`-Referenz. Dataview nutzt `file.vault.read(file)`. Module-Level `activeVaultShimRef` in `vault-shim.ts`, gesetzt im VaultShim-Konstruktor.
+- **`MetadataCache.unresolvedLinks`**: Getter der alle Links aufsammelt die `resolveWikilinkTarget()` nicht auflösen kann. Dataview, Backlinks-Plugins brauchen das.
+- **CachedMetadata-Felder**: `footnotes` (1.6.6), `footnoteRefs` (1.8.7), `referenceLinks` (1.8.7), `frontmatterLinks` (1.4.0) — Typen in `types.ts`.
+- **`changed` Event-Signatur**: `trigger('changed', file, '', metadata)` — 3 Args (file, raw-data-string, cache). Obsidian übergibt den Rohtext als zweiten Parameter.
+- **Per-File `resolve` Event**: Emittiert in `updateFileCache()` nach `changed`.
+
+## Obsidian Plugin Compat — Utility-Funktionen & Events
+
+- `arrayBufferToBase64`, `base64ToArrayBuffer`, `hexToArrayBuffer`, `arrayBufferToHex`: Encoding-Utilities auf `window.obsidian`.
+- `parseFrontMatterAliases(frontmatter)`: Extrahiert `aliases`/`alias` Feld als `string[]`.
+- `setTooltip(el, text)` / `displayTooltip(el, text)`: Setzt `aria-label` + `title`.
+- `stripHeading(heading)` / `stripHeadingForLink(heading)`: Normalisierung für Link-Matching.
+- **Workspace `resize` Event**: Bridged via `window.addEventListener('resize', ...)`.
+- **Workspace `editor-change` Event**: Bridged via MutationObserver auf `.cm-content` + `input`-Event.

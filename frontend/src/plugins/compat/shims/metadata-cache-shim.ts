@@ -115,6 +115,38 @@ export class MetadataCacheShim implements IMetadataCacheShim {
     return result;
   }
 
+  /**
+   * Contains all unresolved links. This object maps each source file to an object
+   * of unknown destinations with count. Source paths are vault absolute paths.
+   */
+  get unresolvedLinks(): Record<string, Record<string, number>> {
+    const result: Record<string, Record<string, number>> = {};
+
+    for (const [sourcePath, metadata] of this.cache) {
+      const links = metadata.links;
+      if (!links || links.length === 0) continue;
+
+      const unresolved: Record<string, number> = {};
+
+      for (const link of links) {
+        const cleanedLink = link.link.split('#')[0]?.trim() ?? '';
+        if (!cleanedLink) continue;
+
+        // Try to resolve — if it fails, it's unresolved
+        const resolvedPath = resolveWikilinkTarget(cleanedLink, this.tree);
+        if (!resolvedPath) {
+          unresolved[cleanedLink] = (unresolved[cleanedLink] ?? 0) + 1;
+        }
+      }
+
+      if (Object.keys(unresolved).length > 0) {
+        result[sourcePath] = unresolved;
+      }
+    }
+
+    return result;
+  }
+
   // ─── Event methods ─────────────────────────────────────────────────────────
 
   /** Register an event listener. */
@@ -137,10 +169,13 @@ export class MetadataCacheShim implements IMetadataCacheShim {
   /**
    * Updates the cache for a single file and emits 'changed' event.
    * Called when a file is saved or synced externally.
+   * Also emits 'resolve' for the specific file (Obsidian emits this after link resolution).
    */
   updateFileCache(file: TFile, metadata: CachedMetadata): void {
     this.cache.set(file.path, metadata);
-    this.events.trigger('changed', file, metadata);
+    this.events.trigger('changed', file, '', metadata);
+    // Emit per-file resolve event (Obsidian fires this after resolvedLinks is updated for the file)
+    this.events.trigger('resolve', file);
   }
 
   /**

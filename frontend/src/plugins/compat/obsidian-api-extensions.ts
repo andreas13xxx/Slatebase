@@ -665,6 +665,113 @@ export class MarkdownPreviewRenderer {
 // We export a reference so plugins doing `instanceof EditableFileView` checks work.
 // The actual class is already handled by TextFileView extending FileView on window.obsidian.
 
+// ─── Encoding Utilities ──────────────────────────────────────────────────────────
+
+/**
+ * Convert an ArrayBuffer to a base64 string.
+ */
+export function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]!);
+  }
+  return btoa(binary);
+}
+
+/**
+ * Convert a base64 string to an ArrayBuffer.
+ */
+export function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+/**
+ * Convert a hex string to an ArrayBuffer.
+ */
+export function hexToArrayBuffer(hex: string): ArrayBuffer {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
+  }
+  return bytes.buffer;
+}
+
+/**
+ * Convert an ArrayBuffer to a hex string.
+ */
+export function arrayBufferToHex(data: ArrayBuffer): string {
+  const bytes = new Uint8Array(data);
+  let hex = '';
+  for (let i = 0; i < bytes.length; i++) {
+    hex += bytes[i]!.toString(16).padStart(2, '0');
+  }
+  return hex;
+}
+
+// ─── Frontmatter Utilities ───────────────────────────────────────────────────────
+
+/**
+ * Parse frontmatter aliases from a CachedMetadata frontmatter object.
+ * Returns an array of alias strings, or null.
+ */
+export function parseFrontMatterAliases(frontmatter: Record<string, unknown> | null): string[] | null {
+  if (!frontmatter) return null;
+  const aliases = frontmatter['aliases'] ?? frontmatter['alias'];
+  if (!aliases) return null;
+  if (Array.isArray(aliases)) return aliases.map(String);
+  if (typeof aliases === 'string') return aliases.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
+  return null;
+}
+
+// ─── Tooltip Utility ─────────────────────────────────────────────────────────────
+
+/**
+ * Attach a tooltip to an element that shows on hover.
+ * Obsidian uses this for hover tooltips on UI elements.
+ */
+export function setTooltip(el: HTMLElement, tooltip: string, _options?: { placement?: string; delay?: number }): void {
+  el.setAttribute('aria-label', tooltip);
+  el.title = tooltip;
+}
+
+/**
+ * Manually trigger a tooltip to appear over an element.
+ */
+export function displayTooltip(targetEl: HTMLElement, content: string, _options?: { placement?: string }): void {
+  targetEl.setAttribute('aria-label', content);
+  targetEl.title = content;
+}
+
+// ─── Heading Utilities ───────────────────────────────────────────────────────────
+
+/**
+ * Normalize a heading string for link matching.
+ * Strips special characters and collapses spaces.
+ */
+export function stripHeading(heading: string): string {
+  return heading
+    .replace(/[^\w\s\u00C0-\u024F\u1E00-\u1EFF-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Prepare a heading for use in a link.
+ * Strips problematic characters that could break links.
+ */
+export function stripHeadingForLink(heading: string): string {
+  return heading
+    .replace(/[#|^[\]\\]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // ─── Registration Function ───────────────────────────────────────────────────────
 
 /**
@@ -703,6 +810,23 @@ export function registerObsidianApiExtensions(): void {
   if (!obs['parseFrontMatterStringArray']) obs['parseFrontMatterStringArray'] = parseFrontMatterStringArray;
   if (!obs['prepareFuzzySearch']) obs['prepareFuzzySearch'] = prepareFuzzySearch;
   if (!obs['prepareSimpleSearch']) obs['prepareSimpleSearch'] = prepareSimpleSearch;
+
+  // Encoding utilities
+  if (!obs['arrayBufferToBase64']) obs['arrayBufferToBase64'] = arrayBufferToBase64;
+  if (!obs['base64ToArrayBuffer']) obs['base64ToArrayBuffer'] = base64ToArrayBuffer;
+  if (!obs['hexToArrayBuffer']) obs['hexToArrayBuffer'] = hexToArrayBuffer;
+  if (!obs['arrayBufferToHex']) obs['arrayBufferToHex'] = arrayBufferToHex;
+
+  // Frontmatter utilities
+  if (!obs['parseFrontMatterAliases']) obs['parseFrontMatterAliases'] = parseFrontMatterAliases;
+
+  // Heading utilities
+  if (!obs['stripHeading']) obs['stripHeading'] = stripHeading;
+  if (!obs['stripHeadingForLink']) obs['stripHeadingForLink'] = stripHeadingForLink;
+
+  // Tooltip utilities
+  if (!obs['setTooltip']) obs['setTooltip'] = setTooltip;
+  if (!obs['displayTooltip']) obs['displayTooltip'] = displayTooltip;
 
   // UI Components
   if (!obs['ExtraButtonComponent']) obs['ExtraButtonComponent'] = ExtraButtonComponent;

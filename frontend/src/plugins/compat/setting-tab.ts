@@ -19,6 +19,10 @@ import moment from 'moment/min/moment-with-locales'
 // Load Obsidian-compatible CSS variables (maps Slatebase tokens to Obsidian naming)
 import './obsidian-compat.css'
 
+// Load global prototype extensions (Array, String, Math, Object, Element, Node)
+// Must be before any plugin code evaluates — plugins use these directly.
+import './global-extensions'
+
 // ─── PluginSettingTab ────────────────────────────────────────────────────────────
 
 /**
@@ -58,6 +62,63 @@ export class PluginSettingTab {
    */
   hide(): void {
     // Base implementation — plugins override this
+  }
+
+  /**
+   * Return declarative setting definitions (Obsidian 1.13+).
+   * Plugins override this to provide declarative settings instead of imperative display().
+   * When this returns a non-empty array, the framework renders settings from definitions
+   * instead of calling display().
+   */
+  getSettingDefinitions(): unknown[] {
+    return []
+  }
+
+  /**
+   * Read the current value for a control key.
+   * Default implementation reads from plugin.settings.
+   * Plugins override this for custom storage.
+   */
+  getControlValue(key: string): unknown {
+    const settings = (this.plugin as unknown as { settings?: Record<string, unknown> }).settings
+    if (settings && typeof settings === 'object') {
+      return settings[key]
+    }
+    return undefined
+  }
+
+  /**
+   * Persist a new value for a control key.
+   * Default implementation writes to plugin.settings and calls saveData.
+   * Plugins override this for custom storage.
+   */
+  setControlValue(key: string, value: unknown): void | Promise<void> {
+    const settings = (this.plugin as unknown as { settings?: Record<string, unknown> }).settings
+    if (settings && typeof settings === 'object') {
+      settings[key] = value
+    }
+    return (this.plugin as unknown as { save_settings?: () => Promise<void>; saveData?: (data: unknown) => Promise<void> }).save_settings?.()
+      ?? (this.plugin as unknown as { saveData?: (data: unknown) => Promise<void> }).saveData?.(settings)
+  }
+
+  /**
+   * Re-render the declarative settings.
+   * Called by plugins after state changes that affect visible/disabled predicates.
+   */
+  update(): void {
+    // Re-render: clear containerEl and re-render from definitions
+    const defs = this.getSettingDefinitions()
+    if (defs.length > 0) {
+      this.containerEl.innerHTML = ''
+      // Dynamic import to avoid circular deps — render on next microtask
+      void import('./declarative-settings-renderer').then(({ renderSettingDefinitions }) => {
+        renderSettingDefinitions(defs as import('./declarative-settings-renderer').SettingDefinitionItem[], this.containerEl, this)
+      })
+    } else {
+      // Fallback: re-call display() for imperative tabs
+      this.containerEl.innerHTML = ''
+      this.display()
+    }
   }
 }
 
@@ -1391,6 +1452,10 @@ if (typeof window !== 'undefined') {
 
   window.obsidian.PluginSettingTab = PluginSettingTab
   window.obsidian.Setting = Setting
+  // SettingTab — base class (PluginSettingTab extends it in Obsidian)
+  if (!window.obsidian.SettingTab) {
+    window.obsidian.SettingTab = PluginSettingTab
+  }
 
   // BaseComponent — abstract base for all setting UI components.
   // Excalidraw extends this for custom settings controls.

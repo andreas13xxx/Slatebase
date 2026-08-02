@@ -225,9 +225,56 @@ export interface CachedMetadata {
   tags?: TagCache[];
   headings?: HeadingCache[];
   embeds?: EmbedCache[];
+  /** @since 1.6.6 */
+  footnotes?: FootnoteCache[];
+  /** @since 1.8.7 */
+  footnoteRefs?: FootnoteRefCache[];
+  /** @since 1.8.7 */
+  referenceLinks?: ReferenceLinkCache[];
   sections?: SectionCache[];
   listItems?: ListItemCache[];
+  /** @since 1.4.0 */
+  frontmatterLinks?: FrontmatterLinkCache[];
   blocks?: Record<string, BlockCache>;
+}
+
+/**
+ * FootnoteCache — A footnote definition in the document.
+ * @since 1.6.6
+ */
+export interface FootnoteCache {
+  id: string;
+  position: Pos;
+}
+
+/**
+ * FootnoteRefCache — A footnote reference in the document.
+ * @since 1.8.7
+ */
+export interface FootnoteRefCache {
+  id: string;
+  position: Pos;
+}
+
+/**
+ * ReferenceLinkCache — A reference-style link definition in the document.
+ * @since 1.8.7
+ */
+export interface ReferenceLinkCache {
+  id: string;
+  link: string;
+  position: Pos;
+}
+
+/**
+ * FrontmatterLinkCache — A link found inside frontmatter.
+ * @since 1.4.0
+ */
+export interface FrontmatterLinkCache {
+  key: string;
+  link: string;
+  original: string;
+  displayText?: string;
 }
 
 /**
@@ -238,6 +285,7 @@ export interface IMetadataCacheShim {
   getCache(path: string): CachedMetadata | null;
   getFirstLinkpathDest(linkpath: string, sourcePath: string): TFile | null;
   resolvedLinks: Record<string, Record<string, number>>;
+  unresolvedLinks: Record<string, Record<string, number>>;
   on(event: string, callback: (...args: unknown[]) => void): EventRef;
   off(event: string, callback: (...args: unknown[]) => void): void;
   trigger(event: string, ...args: unknown[]): void;

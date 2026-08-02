@@ -194,10 +194,24 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
     // Check if the plugin has a native settings tab registered
     const settingTab = pluginContext?.settingTabRegistry.get(pluginId)
     if (settingTab) {
-      // Native settings: call display() to populate containerEl
+      // Native settings: try declarative definitions first, then fall back to display()
       try {
         settingTab.containerEl.innerHTML = ''
-        settingTab.display()
+
+        // Check for declarative settings (Obsidian 1.13+)
+        const defs = (settingTab as unknown as { getSettingDefinitions?: () => unknown[] }).getSettingDefinitions?.()
+        if (defs && Array.isArray(defs) && defs.length > 0) {
+          // Use declarative renderer
+          const { renderSettingDefinitions } = await import('../plugins/compat/declarative-settings-renderer')
+          renderSettingDefinitions(
+            defs as import('../plugins/compat/declarative-settings-renderer').SettingDefinitionItem[],
+            settingTab.containerEl,
+            settingTab as import('../plugins/compat/declarative-settings-renderer').IDeclarativeSettingTab,
+          )
+        } else {
+          // Classic imperative display()
+          settingTab.display()
+        }
       } catch (err) {
         console.error(`[PluginSettings] Error rendering settings for "${pluginId}":`, err)
         const detail = extractErrorMessage(err, 'Unbekannter Fehler')

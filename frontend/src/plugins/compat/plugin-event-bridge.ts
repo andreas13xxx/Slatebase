@@ -15,7 +15,7 @@
  * @module plugin-event-bridge
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import type { DirectoryTree } from '../../types'
 import type { TabState } from '../../state/tabState'
 import type { TFile } from './types'
@@ -320,4 +320,64 @@ export function usePluginEventBridge({
 
     return unsub
   }, [vaultShim, currentVaultId])
+
+  // ─── Window resize → workspace 'resize' event ─────────────────────────────
+  //
+  // Obsidian emits 'resize' when the workspace layout or window size changes.
+  // We bridge the browser's native resize event to the workspace shim.
+
+  const handleResize = useCallback(() => {
+    workspaceShim?.trigger('resize')
+  }, [workspaceShim])
+
+  useEffect(() => {
+    if (!workspaceShim) return
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [workspaceShim, handleResize])
+
+  // ─── Editor change → workspace 'editor-change' event ──────────────────────
+  //
+  // Obsidian emits 'editor-change' when text is modified in the editor.
+  // We listen to the editor's input events and forward them.
+  // Note: We only emit for plugins that listen; many don't, so this is best-effort.
+
+  useEffect(() => {
+    if (!workspaceShim) return
+
+    const handleEditorInput = () => {
+      const activeEditor = workspaceShim.activeEditor
+      if (activeEditor) {
+        workspaceShim.trigger('editor-change', activeEditor.editor, activeEditor)
+      }
+    }
+
+    // Listen to input events on the CM6 editor or textarea
+    const observer = new MutationObserver(() => {
+      // Re-attach listener when editor DOM changes
+      const cmContent = document.querySelector('.cm-content')
+      if (cmContent && !(cmContent as HTMLElement & { __editorChangeWired?: boolean }).__editorChangeWired) {
+        (cmContent as HTMLElement & { __editorChangeWired?: boolean }).__editorChangeWired = true
+        cmContent.addEventListener('input', handleEditorInput)
+      }
+    })
+
+    observer.observe(document.body, { childList: true, subtree: true })
+
+    // Also attach to existing CM content
+    const cmContent = document.querySelector('.cm-content')
+    if (cmContent) {
+      cmContent.addEventListener('input', handleEditorInput)
+    }
+
+    // Attach to textarea fallback
+    const textarea = document.querySelector('.edit-mode-textarea')
+    if (textarea) {
+      textarea.addEventListener('input', handleEditorInput)
+    }
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [workspaceShim])
 }

@@ -15,6 +15,23 @@ import { markPluginWrite } from '../plugin-event-bridge';
 import { VaultAdapterShim } from './vault-adapter-shim';
 import type { IVaultAdapter } from './vault-adapter-shim';
 
+// ─── Module-Level Active Vault Reference ─────────────────────────────────────
+
+/**
+ * Reference to the currently active VaultShim instance.
+ * Used by treeNodeToTFile/treeNodeToTFolder to set the `vault` property
+ * on created TFile/TFolder objects (Obsidian's TAbstractFile.vault).
+ */
+let activeVaultShimRef: IVaultShim | null = null;
+
+/**
+ * Set the active vault shim reference. Called by VaultShim constructor
+ * and when the active vault changes.
+ */
+export function setActiveVaultShimRef(vault: IVaultShim | null): void {
+  activeVaultShimRef = vault;
+}
+
 /**
  * Validates a file path for safety.
  * Rejects paths containing ../, null bytes, or starting with / (absolute paths).
@@ -64,6 +81,11 @@ export function treeNodeToTFile(node: DirectoryTree, parent: TFolder | null): TF
     Object.setPrototypeOf(file, globalTFile);
   }
 
+  // Set vault reference (Obsidian's TAbstractFile.vault)
+  if (activeVaultShimRef) {
+    (file as unknown as { vault: IVaultShim }).vault = activeVaultShimRef;
+  }
+
   return file;
 }
 
@@ -98,6 +120,11 @@ export function treeNodeToTFolder(node: DirectoryTree, parent: TFolder | null): 
   const globalTFolder = (window as unknown as { obsidian?: { TFolder?: { prototype: object } } }).obsidian?.TFolder?.prototype;
   if (globalTFolder) {
     Object.setPrototypeOf(folder, globalTFolder);
+  }
+
+  // Set vault reference (Obsidian's TAbstractFile.vault)
+  if (activeVaultShimRef) {
+    (folder as unknown as { vault: IVaultShim }).vault = activeVaultShimRef;
   }
 
   return folder;
@@ -226,6 +253,8 @@ export class VaultShim implements IVaultShim {
     this.directoryTree = directoryTree;
     this.events = new EventSystem();
     this.adapter = new VaultAdapterShim(vaultId, apiClient, () => this.directoryTree);
+    // Set as active vault so treeNodeToTFile/treeNodeToTFolder can assign .vault
+    setActiveVaultShimRef(this);
   }
 
   /**
