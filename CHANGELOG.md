@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.1](https://github.com/andreas13xxx/Slatebase/compare/v0.17.0...v0.17.1) (2026-08-03)
+
+
+### Sonstige Änderungen
+
+* remove vault-sync module (backend + frontend) ([446ed48](https://github.com/andreas13xxx/Slatebase/commit/446ed484f59a37e252353c7609c27963759d817c))
+
 ## [0.17.0](https://github.com/andreas13xxx/Slatebase/compare/v0.16.1...v0.17.0) (2026-08-02)
 
 
