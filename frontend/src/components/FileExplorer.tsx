@@ -5,7 +5,7 @@ import { useTranslation } from '../i18n'
 import { openTab } from '../state/tabActions'
 import type { DirectoryTree, VaultInfo } from '../types'
 import { extractErrorMessage } from '../utils/error'
-import { ChevronRight, ChevronDown, Database, Eye, Pencil, RefreshCw, Users, FilePlus, FolderPlus, Trash2, Copy, Move, Download, Star, FileText, History, LayoutDashboard } from 'lucide-react'
+import { ChevronRight, ChevronDown, Database, Eye, Pencil, Users, FilePlus, FolderPlus, Trash2, Copy, Move, Download, Star, FileText, History, LayoutDashboard } from 'lucide-react'
 import { getValidDropTargets } from '../utils/pathUtils'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
@@ -941,11 +941,6 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
         {vault.permission === 'write' && (
           <span className="vault-status-icon vault-status-icon--write" title={t('vault.permissionWrite')}>
             <Pencil size={11} />
-          </span>
-        )}
-        {vault.syncEnabled && (
-          <span className="vault-status-icon vault-status-icon--sync" title={t('vault.syncActive')}>
-            <RefreshCw size={11} />
           </span>
         )}
         {(vault.shareCount ?? 0) > 0 && (

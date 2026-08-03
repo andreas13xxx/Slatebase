@@ -39,10 +39,10 @@ describe('settingsState', () => {
     it('navigates to a valid category and section', () => {
       const result = reducer(initialSettingsState, {
         type: 'NAVIGATE',
-        payload: { category: 'vault', section: 'sync' },
+        payload: { category: 'vault', section: 'plugins' },
       })
       expect(result.category).toBe('vault')
-      expect(result.section).toBe('sync')
+      expect(result.section).toBe('plugins')
     })
 
     it('navigates to admin section when user is admin', () => {
@@ -66,7 +66,7 @@ describe('settingsState', () => {
     it('falls back to first section when section does not belong to category', () => {
       const result = reducer(initialSettingsState, {
         type: 'NAVIGATE',
-        payload: { category: 'account', section: 'sync' },
+        payload: { category: 'account', section: 'plugins' },
       })
       expect(result.category).toBe('account')
       expect(result.section).toBe('profile')
@@ -133,7 +133,7 @@ describe('settingsState', () => {
       const state: SettingsNavState = {
         ...initialSettingsState,
         category: 'vault',
-        section: 'sync',
+        section: 'plugins',
         searchQuery: 'test',
         mobileNavOpen: true,
       }
@@ -142,7 +142,7 @@ describe('settingsState', () => {
         payload: { vaultId: 'new-vault' },
       })
       expect(result.category).toBe('vault')
-      expect(result.section).toBe('sync')
+      expect(result.section).toBe('plugins')
       expect(result.searchQuery).toBe('test')
       expect(result.mobileNavOpen).toBe(true)
     })

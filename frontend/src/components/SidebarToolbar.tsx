@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react'
 import {
   Upload, FolderOpen, Download, Settings,
   Database, FileText, FilePlus, MessageCircle, ScrollText,
-  ClipboardList, Plus, Share2, CalendarDays, Trash2, LayoutDashboard, AlertTriangle,
+  Plus, Share2, CalendarDays, Trash2, LayoutDashboard,
 } from 'lucide-react'
 import { useFeatureContext } from '../state/featureContext'
 import { usePluginContext } from '../plugins/compat/plugin-context'
@@ -38,7 +38,6 @@ interface SidebarToolbarProps {
   onOpenSettings?: () => void
   isAdmin: boolean
   isVaultOwner?: boolean
-  syncEnabled?: boolean
   globalUnreadCount?: number
 }
 
@@ -47,7 +46,7 @@ interface SidebarToolbarProps {
  * Buttons can be reordered by drag-and-drop.
  * Tooltips show on hover.
  */
-export function SidebarToolbar({ vaultId, vaultPermission, onCreateVault, onCreateFile, onCreateCanvas, onImportFile, onImportFolder, onExportVault, onNavigate, onOpenGraph, onOpenTrash, onDailyNote, onOpenSettings, isAdmin, isVaultOwner, syncEnabled, globalUnreadCount }: SidebarToolbarProps) {
+export function SidebarToolbar({ vaultId, vaultPermission, onCreateVault, onCreateFile, onCreateCanvas, onImportFile, onImportFolder, onExportVault, onNavigate, onOpenGraph, onOpenTrash, onDailyNote, onOpenSettings, isAdmin, isVaultOwner, globalUnreadCount }: SidebarToolbarProps) {
   const { isEnabled } = useFeatureContext()
   const { ribbonIcons } = usePluginContext()
 
@@ -61,8 +60,6 @@ export function SidebarToolbar({ vaultId, vaultPermission, onCreateVault, onCrea
     { id: 'export-vault', icon: <Download size={15} />, label: 'Vault exportieren', action: onExportVault, requiresVault: true },
     { id: 'trash', icon: <Trash2 size={15} />, label: 'Papierkorb', action: () => onOpenTrash?.(), requiresVault: true },
     { id: 'graph', icon: <Share2 size={15} />, label: 'Graph', action: onOpenGraph, requiresVault: true, feature: 'knowledge-graph' },
-    { id: 'sync-log', icon: <ClipboardList size={15} />, label: 'Sync-Protokoll', action: () => onNavigate('sync-log'), requiresVault: true, ownerOnly: true, feature: 'vault-sync' },
-    { id: 'conflicts', icon: <AlertTriangle size={15} />, label: 'Konflikte', action: () => onNavigate('conflicts'), requiresVault: true, ownerOnly: true, feature: 'vault-sync' },
     { id: 'my-vaults', icon: <Database size={15} />, label: 'Meine Vaults', action: () => onNavigate('my-vaults') },
     { id: 'chat', icon: <MessageCircle size={15} />, label: 'Chat', action: () => onNavigate('chat'), feature: 'chat' },
     { id: 'admin-audit', icon: <FileText size={15} />, label: 'Audit-Log', action: () => onNavigate('admin-audit'), adminOnly: true },
@@ -124,12 +121,11 @@ export function SidebarToolbar({ vaultId, vaultPermission, onCreateVault, onCrea
       {orderedItems.map((item) => {
         const disabled = (item.requiresVault && !vaultId) || (item.requiresWrite && vaultPermission === 'read')
         const showBadge = item.id === 'chat' && globalUnreadCount !== undefined && globalUnreadCount > 0
-        const showSyncActive = item.id === 'sync-config' && syncEnabled === true
         return (
           <button
             key={item.id}
-            className={`toolbar-btn${showSyncActive ? ' toolbar-btn--sync-active' : ''}`}
-            title={showSyncActive ? `${item.label} (aktiv)` : item.label}
+            className="toolbar-btn"
+            title={item.label}
             aria-label={item.label}
             onClick={disabled ? undefined : item.action}
             disabled={disabled}
@@ -145,9 +141,6 @@ export function SidebarToolbar({ vaultId, vaultPermission, onCreateVault, onCrea
               <span className="toolbar-btn-badge" aria-label={`${globalUnreadCount} ungelesene Nachrichten`}>
                 {globalUnreadCount}
               </span>
-            )}
-            {showSyncActive && (
-              <span className="toolbar-btn-sync-dot" aria-hidden="true" />
             )}
           </button>
         )

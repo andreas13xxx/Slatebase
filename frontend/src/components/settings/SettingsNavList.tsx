@@ -26,7 +26,6 @@ const SECTION_LABELS: Record<SettingsSection, string> = {
   'keybindings': 'Tastaturkürzel',
   'appearance': 'Darstellung',
   'delete-account': 'Konto löschen',
-  'sync': 'Synchronisation',
   'plugins': 'Plugins',
   'vault-config': 'Vault-Konfiguration',
   'server-config': 'Serverkonfiguration',

@@ -37,7 +37,6 @@ describe('SettingsNavList', () => {
     expect(screen.getByText('Sitzungen')).toBeInTheDocument()
     expect(screen.getByText('MCP-Tokens')).toBeInTheDocument()
     expect(screen.getByText('Konto löschen')).toBeInTheDocument()
-    expect(screen.getByText('Synchronisation')).toBeInTheDocument()
     expect(screen.getByText('Plugins')).toBeInTheDocument()
   })
 
@@ -146,10 +145,10 @@ describe('SettingsNavList', () => {
       />
     )
 
-    const syncBtn = screen.getByText('Synchronisation')
     const pluginsBtn = screen.getByText('Plugins')
-    expect(syncBtn).toBeDisabled()
+    const vaultConfigBtn = screen.getByText('Vault-Konfiguration')
     expect(pluginsBtn).toBeDisabled()
+    expect(vaultConfigBtn).toBeDisabled()
   })
 
   it('enables vault sections when activeVaultId is set', () => {
@@ -164,10 +163,10 @@ describe('SettingsNavList', () => {
       />
     )
 
-    const syncBtn = screen.getByText('Synchronisation')
     const pluginsBtn = screen.getByText('Plugins')
-    expect(syncBtn).not.toBeDisabled()
+    const vaultConfigBtn = screen.getByText('Vault-Konfiguration')
     expect(pluginsBtn).not.toBeDisabled()
+    expect(vaultConfigBtn).not.toBeDisabled()
   })
 
   it('sets aria-current="page" on active section', () => {
@@ -222,7 +221,7 @@ describe('SettingsNavList', () => {
       />
     )
 
-    fireEvent.click(screen.getByText('Synchronisation'))
+    fireEvent.click(screen.getByText('Plugins'))
     expect(dispatch).not.toHaveBeenCalled()
   })
 
@@ -251,16 +250,16 @@ describe('SettingsNavList', () => {
     const dispatch = vi.fn()
     render(
       <SettingsNavList
-        state={createState({ searchQuery: 'Sync' })}
+        state={createState({ searchQuery: 'Plugin' })}
         isAdmin={false}
         registry={registry}
         dispatch={dispatch}
       />
     )
 
-    // Only Vault category heading should show (Synchronisation matches)
+    // Only Vault category heading should show (Plugins matches)
     expect(screen.getByText('Vault')).toBeInTheDocument()
-    expect(screen.getByText('Synchronisation')).toBeInTheDocument()
+    expect(screen.getByText('Plugins')).toBeInTheDocument()
     expect(screen.queryByText('Konto')).not.toBeInTheDocument()
   })
 })

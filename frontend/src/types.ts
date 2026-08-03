@@ -16,8 +16,6 @@ export interface VaultInfo {
   ownerName?: string
   /** Access level for the current user: 'owner', 'read', or 'write'. */
   permission?: 'owner' | 'read' | 'write'
-  /** Whether this vault has an active sync configuration. */
-  syncEnabled?: boolean
   /** Number of active shares for this vault (only for owned vaults). */
   shareCount?: number
 }

@@ -296,8 +296,8 @@ describe('SettingsPanel', () => {
         ),
       )
       // Vault-specific sections should be disabled when no vault is active
-      const syncBtn = screen.getByRole('button', { name: 'Synchronisation' })
-      expect(syncBtn).toBeDisabled()
+      const pluginsBtn = screen.getByRole('button', { name: 'Plugins' })
+      expect(pluginsBtn).toBeDisabled()
     })
   })
 

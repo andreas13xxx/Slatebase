@@ -27,7 +27,6 @@ import { PathTraversalError } from '../vault/index.js'
 import type { IVaultShareRegistry } from '../vault/registry.js'
 import type { IImportService, UploadedFile } from '../import/index.js'
 import type { IUserRepository } from '../user/index.js'
-import type { ISyncConfigStore } from '../sync/index.js'
 import type { IEventBus } from '../realtime/types.js'
 import {
   InvalidFilenameError,
@@ -126,7 +125,6 @@ export class VaultController implements IVaultController {
     private readonly importService?: IImportService,
     private readonly userRepository?: IUserRepository,
     private readonly accessControl?: IVaultAccessControl,
-    private readonly syncConfigStore?: ISyncConfigStore,
     private readonly shareRegistry?: IVaultShareRegistry,
   ) {}
 
@@ -165,16 +163,6 @@ export class VaultController implements IVaultController {
     const showAll = c.req.query('all') === 'true' && session.role === 'admin'
     const vaults = await this.vaultService.getVaultList(showAll ? undefined : session.userId)
 
-    // Load sync configs to determine which vaults have sync enabled
-    const syncConfigs = this.syncConfigStore
-      ? await this.syncConfigStore.loadAll()
-      : []
-    const syncEnabledSet = new Set(
-      syncConfigs
-        .filter((sc) => sc.config.status === 'active')
-        .map((sc) => sc.vaultId),
-    )
-
     // Strip internal `path` field and resolve ownerName
     const publicVaults = await Promise.all(
       vaults.map(async ({ path: _path, ...rest }) => {
@@ -183,7 +171,6 @@ export class VaultController implements IVaultController {
           const owner = await this.userRepository.findById(rest.ownerId)
           if (owner) ownerName = owner.username
         }
-        const syncEnabled = syncEnabledSet.has(rest.id)
 
         // Include share count for owned vaults
         let shareCount = 0
@@ -192,7 +179,7 @@ export class VaultController implements IVaultController {
           shareCount = shares.length
         }
 
-        return { ...rest, ownerName, syncEnabled, shareCount }
+        return { ...rest, ownerName, shareCount }
       }),
     )
     return c.json(publicVaults, 200)

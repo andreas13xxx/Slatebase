@@ -14,8 +14,6 @@ import { ProfilePage } from '../ProfilePage'
 import { ChangePasswordPage } from '../ChangePasswordPage'
 import { SessionsPage } from '../SessionsPage'
 import { McpTokensPage } from '../McpTokensPage'
-import { SyncConfigPage } from '../SyncConfigPage'
-import { SyncProvider } from '../../state/syncContext'
 import { PluginManagementPage } from '../PluginManagementPage'
 import { AdminConfigPage } from '../AdminConfigPage'
 import { AdminUsersPage } from '../AdminUsersPage'
@@ -37,7 +35,6 @@ const SECTION_LABELS: Record<SettingsSection, string> = {
   'keybindings': 'Tastaturkürzel',
   'appearance': 'Darstellung',
   'delete-account': 'Konto löschen',
-  'sync': 'Synchronisation',
   'plugins': 'Plugins',
   'vault-config': 'Vault-Konfiguration',
   'server-config': 'Serverkonfiguration',
@@ -108,11 +105,6 @@ function renderSection(
       return <KeybindingsSection />
     case 'appearance':
       return <AppearanceSection />
-    case 'sync':
-      if (selectedVaultId === null) {
-        return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>
-      }
-      return <SyncProvider><SyncConfigPage vaultId={selectedVaultId} /></SyncProvider>
     case 'plugins':
       if (selectedVaultId === null) {
         return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>

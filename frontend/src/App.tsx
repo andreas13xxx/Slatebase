@@ -44,16 +44,12 @@ import { SlatebaseLogo } from './components/SlatebaseLogo'
 import { SidebarToolbar } from './components/SidebarToolbar'
 import { StatusBar } from './components/StatusBar'
 import { MyVaultsPage } from './components/MyVaultsPage'
-import { SyncConfigPage } from './components/SyncConfigPage'
-import { SyncLogPage } from './components/SyncLogPage'
-import { ConflictWizardPage } from './components/ConflictWizardPage'
 import { McpTokensPage } from './components/McpTokensPage'
 import { PluginManagementPage } from './components/PluginManagementPage'
 import { PluginViewPanel } from './components/PluginViewPanel'
 import { TrashView } from './components/TrashView'
 import { VersionBrowser } from './components/VersionBrowser'
 import { useVersionInfo } from './hooks/useVersionInfo'
-import { SyncProvider } from './state/syncContext'
 import { ContextPanelProvider } from './state/contextPanelContext'
 import { SidebarPanelProvider } from './state/sidebarPanelContext'
 import { ContextPanel } from './components/context-panel/ContextPanel'
@@ -67,7 +63,7 @@ import { initialize as initializeWorkspace, getState as getWorkspaceState, updat
 import {
   User, Settings, Shield, FileText, Clock,
   Database, Share2, Trash2, Server,
-  PanelRight, PanelLeft, X, Eye, Pencil, MessageCircle, RefreshCw, Key, ScrollText, Plug, GitMerge,
+  PanelRight, PanelLeft, X, Eye, Pencil, MessageCircle, Key, ScrollText, Plug,
 } from 'lucide-react'
 import { getFileIcon, getFileIconClass, getDisplayName } from './utils/fileIcons'
 import './App.css'
@@ -105,9 +101,6 @@ export type AppPage =
   | 'admin-logs'
   | 'vault-sharing'
   | 'vault-deletion'
-  | 'sync-config'
-  | 'sync-log'
-  | 'conflicts'
   | 'mcp-tokens'
   | 'plugins'
   | 'trash'
@@ -125,9 +118,6 @@ const PAGE_LABEL_KEYS: Record<AppPage, string> = {
   'admin-logs': 'pages.adminLogs',
   'vault-sharing': 'pages.vaultSharing',
   'vault-deletion': 'pages.vaultDeletion',
-  'sync-config': 'pages.syncConfig',
-  'sync-log': 'pages.syncLog',
-  conflicts: 'pages.conflicts',
   'mcp-tokens': 'pages.mcpTokens',
   plugins: 'pages.plugins',
   trash: 'pages.trash',
@@ -146,9 +136,6 @@ const PAGE_ICONS: Partial<Record<AppPage, React.ReactNode>> = {
   'admin-logs': <ScrollText size={13} />,
   'vault-sharing': <Share2 size={13} />,
   'vault-deletion': <Trash2 size={13} />,
-  'sync-config': <RefreshCw size={13} />,
-  'sync-log': <Clock size={13} />,
-  conflicts: <GitMerge size={13} />,
   'mcp-tokens': <Key size={13} />,
   plugins: <Plug size={13} />,
   trash: <Trash2 size={13} />,
@@ -714,10 +701,7 @@ function AppContent() {
 
   function renderSettingsPage(page: AppPage) {
     switch (page) {
-      case 'my-vaults': return <MyVaultsPage apiClient={apiClient} onOpenSync={(vaultId) => {
-        dispatch({ type: 'VAULT_SELECTED', payload: vaultId })
-        handleNavigate('sync-config')
-      }} />
+      case 'my-vaults': return <MyVaultsPage apiClient={apiClient} />
       case 'profile': return <ProfilePage apiClient={apiClient} />
       case 'sessions': return <SessionsPage apiClient={apiClient} />
       case 'chat':
@@ -742,21 +726,6 @@ function AppContent() {
                 handleCloseSettingsTab('vault-deletion')
               }}
             />
-          : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
-      case 'sync-config':
-        if (!isEnabled('vault-sync')) return <FeatureDisabledHint featureName="Vault-Sync" />
-        return state.selectedVaultId
-          ? <SyncProvider><SyncConfigPage vaultId={state.selectedVaultId} onOpenSyncLog={() => handleNavigate('sync-log')} /></SyncProvider>
-          : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
-      case 'sync-log':
-        if (!isEnabled('vault-sync')) return <FeatureDisabledHint featureName="Vault-Sync" />
-        return state.selectedVaultId
-          ? <SyncProvider><SyncLogPage vaultId={state.selectedVaultId} /></SyncProvider>
-          : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
-      case 'conflicts':
-        if (!isEnabled('vault-sync')) return <FeatureDisabledHint featureName="Vault-Sync" />
-        return state.selectedVaultId
-          ? <SyncProvider><ConflictWizardPage vaultId={state.selectedVaultId} /></SyncProvider>
           : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
       case 'mcp-tokens':
         if (!isEnabled('mcp')) return <FeatureDisabledHint featureName="MCP" />
@@ -953,7 +922,6 @@ function AppContent() {
             onOpenSettings={() => setSettingsOpen(true)}
             isAdmin={user?.role === 'admin'}
             isVaultOwner={selectedVault?.permission === 'owner'}
-            syncEnabled={selectedVault?.syncEnabled}
             globalUnreadCount={globalUnreadCount}
           />
 

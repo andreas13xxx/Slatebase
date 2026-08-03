@@ -16,7 +16,6 @@ interface ShareInfo {
 
 interface MyVaultsPageProps {
   apiClient: IApiClient
-  onOpenSync?: (vaultId: string) => void
 }
 
 /** Debounce delay for user search. */
@@ -27,7 +26,7 @@ const SEARCH_DEBOUNCE_MS = 300
  * Shows owned vaults with inline share management, transfer, delete,
  * and shared vaults with owner and permission info.
  */
-export function MyVaultsPage({ apiClient, onOpenSync }: MyVaultsPageProps) {
+export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
   const { state, dispatch } = useAppContext()
   const { t } = useTranslation()
   const [sharesMap, setSharesMap] = useState<Map<string, ShareInfo[]>>(new Map())
@@ -231,14 +230,6 @@ export function MyVaultsPage({ apiClient, onOpenSync }: MyVaultsPageProps) {
                       aria-label={`Vault "${vault.name}" exportieren`}
                     >
                       <Download size={12} />
-                    </button>
-                    <button
-                      className={`my-vaults-action-btn${vault.syncEnabled ? ' my-vaults-action-btn--sync-active' : ''}`}
-                      onClick={() => onOpenSync?.(vault.id)}
-                      title={vault.syncEnabled ? 'Vault-Sync aktiv — konfigurieren' : 'Vault-Sync konfigurieren'}
-                      aria-label={`Sync für "${vault.name}" konfigurieren`}
-                    >
-                      <RefreshCw size={12} />
                     </button>
                     <button
                       className={`my-vaults-action-btn${transferVault === vault.id ? ' my-vaults-action-btn--active' : ''}`}

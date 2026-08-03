@@ -72,7 +72,6 @@ All settings live in `docker.env`. Key options:
 | `SLATEBASE_EXTERNAL_PORT` | `8080` | Port exposed on the host |
 | `SLATEBASE_ALLOWED_ORIGINS` | `http://localhost:8080` | Your public URL (for CORS) |
 | `SLATEBASE_CSRF_SECRET` | *(random)* | Persistent CSRF secret — **set this!** |
-| `SLATEBASE_SYNC_SECRET` | *(random)* | Encryption key for CouchDB sync credentials |
 | `SLATEBASE_TRUSTED_PROXIES` | *(empty)* | Reverse proxy IPs/CIDRs for real client IPs |
 | `SLATEBASE_MAX_FILE_SIZE` | `5242880` | Max upload size in bytes (5 MB) |
 | `SLATEBASE_LOG_LEVEL` | `info` | Log level: debug, info, warn, error |
@@ -128,7 +127,7 @@ docker compose up -d
 | 👥 **Multi-User & Sharing** | Invite others to your vaults with read or write access, transfer ownership |
 | 💬 **Real-time Chat** | Messaging between users with unread badges, archiving, and pagination |
 | 🔒 **Authentication** | Session-based auth with argon2id hashing, CSRF protection, rate limiting |
-| 🔄 **Vault Sync** ⚠️ | CouchDB/obsidian-livesync compatible synchronization with conflict resolution |
+| 🔄 **Vault Sync** | Via Obsidian LiveSync plugin (running in plugin compat layer with server-side CORS proxy) |
 | 🤖 **MCP Context Server** | AI assistants (Claude, Cursor, etc.) read and write your vaults via MCP |
 | 🎨 **Canvas** | Open and edit Obsidian `.canvas` whiteboards: text, file, link, and group nodes with edges, drag, resize, zoom/pan, minimap, file-path search, and auto-save |
 | 🕸️ **Knowledge Graph** | Interactive visualization of vault link structure with zoom, pan, drag, and search |
@@ -241,22 +240,6 @@ All routes under `/api/v1`. Authentication required (session cookie or Bearer to
 | POST | `/chat/conversations/:id/messages` | Send message |
 | GET | `/chat/unread` | Global unread count |
 | POST | `/chat/conversations/:id/read` | Mark as read |
-
-### Sync ⚠️
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/vaults/:vaultId/sync/config` | Create sync config |
-| GET | `/vaults/:vaultId/sync/config` | Get sync config |
-| PUT | `/vaults/:vaultId/sync/config` | Update sync config |
-| DELETE | `/vaults/:vaultId/sync/config` | Remove sync config |
-| PUT | `/vaults/:vaultId/sync/config/enable` | Enable sync |
-| PUT | `/vaults/:vaultId/sync/config/disable` | Disable sync |
-| POST | `/vaults/:vaultId/sync/trigger` | Trigger sync |
-| POST | `/vaults/:vaultId/sync/analyze` | Analysis mode |
-| GET | `/vaults/:vaultId/sync/log` | Sync log |
-| GET | `/vaults/:vaultId/sync/conflicts` | Open conflicts |
-| POST | `/vaults/:vaultId/sync/conflicts/:path/resolve` | Resolve conflict |
 
 ### Search & Replace
 

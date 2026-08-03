@@ -67,7 +67,7 @@ Filesystem-based, no database. All under `backend/data/`:
 - `vaults/<id>/.slatebase/` — Per-vault internal data (trash, versions, link-index, config)
 - `users/`, `sessions/`, `shares.json` — Auth data
 - `audit/` — Append-only JSONL (daily rotation)
-- `chat/`, `sync/<vaultId>/`, `mcp/tokens/`, `plugins/<vaultId>/`
+- `chat/`, `mcp/tokens/`, `plugins/<vaultId>/`
 
 ## Common Pitfalls
 

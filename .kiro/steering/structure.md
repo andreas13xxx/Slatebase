@@ -41,7 +41,6 @@ src/
 │   ├── userRoutes.ts     — UserController + profile/password routes
 │   ├── adminRoutes.ts    — AdminController + user management/config routes
 │   ├── chatRoutes.ts     — ChatController + conversation/message routes
-│   ├── syncRoutes.ts     — SyncController + sync config/trigger/log/conflict routes
 │   ├── mcpRoutes.ts      — MCP Streamable HTTP transport endpoint (Bearer token auth)
 │   ├── mcpTokenRoutes.ts — MCP token CRUD routes (session auth)
 │   ├── mcpWellKnownRoute.ts — .well-known/mcp.json discovery endpoint (public)
@@ -75,29 +74,6 @@ src/
 │   ├── unread-store.ts   — UnreadStore (per-user unread counts)
 │   ├── rate-limiter.ts   — ChatRateLimiter (in-memory)
 │   └── chat-service.ts   — ChatService orchestration
-├── sync/
-│   ├── types.ts          — Sync data models (SyncConfig, SyncLogEntry, ConflictEntry, etc.)
-│   ├── errors.ts         — Sync-specific error classes
-│   ├── validation.ts     — Zod schemas for sync input validation
-│   ├── index.ts          — Barrel export for sync module
-│   ├── crypto-service.ts — CryptoService (AES-256-GCM credential & document encryption)
-│   ├── setup-uri-parser.ts — SetupUriParser (obsidian-livesync URI format)
-│   ├── sync-lock.ts      — SyncLock (in-memory mutex per vault)
-│   ├── sync-config-store.ts — SyncConfigStore (filesystem persistence)
-│   ├── sync-log-store.ts — SyncLogStore (JSONL append-only, rotation)
-│   ├── conflict-store.ts — ConflictStore (filesystem persistence)
-│   ├── checkpoint-store.ts — CheckpointStore (filesystem persistence)
-│   ├── sync-engine.ts    — SyncEngine (CouchDB communication, pull/push/analyze)
-│   ├── sync-scheduler.ts — SyncScheduler (setInterval management)
-│   ├── conflict-categorizer.ts — ConflictCategorizer (pure categorization: content_conflict, local_deleted, remote_deleted, rename_conflict)
-│   ├── conflict-categorizer.test.ts — Unit tests for ConflictCategorizer
-│   ├── conflict-resolver.ts — ConflictResolver (atomic resolve with rollback, batch with error isolation)
-│   ├── conflict-resolver.test.ts — Unit tests for ConflictResolver
-│   ├── auto-resolution-engine.ts — AutoResolutionEngine (strategy evaluation: newer_wins, remote_wins, local_wins, skip)
-│   ├── auto-resolution-engine.test.ts — Unit tests for AutoResolutionEngine
-│   ├── auto-resolution-config-store.ts — AutoResolutionConfigStore (per-vault JSON persistence, Zod validation)
-│   ├── auto-resolution-config-store.test.ts — Unit tests for AutoResolutionConfigStore
-│   └── sync-service.ts   — SyncService (business logic orchestrator)
 ├── mcp/
 │   ├── index.ts          — Barrel export for MCP module
 │   ├── types.ts          — MCP data models (TokenRecord, ApiTokenInfo, McpTokenContext, etc.)
@@ -311,9 +287,6 @@ src/
 │   ├── chatState.ts      — Chat reducer + types (conversations, messages, unread)
 │   ├── chatContext.ts    — ChatProvider + useChatContext hook
 │   ├── chatActions.ts    — loadConversations, sendMessage, leaveConversation, etc.
-│   ├── syncState.ts      — Sync reducer + types (config, log, conflicts, analysis)
-│   ├── syncContext.ts    — SyncProvider + useSyncContext hook
-│   ├── syncActions.ts    — loadSyncConfig, triggerSync, resolveConflict, etc.
 │   ├── contextPanelState.ts — Context panel reducer + types (sections, views, outline, links, tags, properties)
 │   ├── contextPanelContext.ts — ContextPanelProvider + useContextPanelContext hook
 │   ├── contextPanelActions.ts — loadOutline, loadForwardLinks, loadBacklinks, loadTags, loadProperties, expandTag
@@ -328,7 +301,6 @@ src/
 │   ├── realtimeActions.ts — computeReconnectDelay, RealtimeAction types
 │   ├── realtimeChatBridge.ts — Module-level bridge: SSE chat events → ChatProvider (cross-provider communication)
 │   ├── realtimeVaultBridge.ts — Module-level bridge: SSE vault:change events → AppProvider (tree refresh + tab reload)
-│   ├── realtimeSyncBridge.ts — Module-level bridge: SSE sync:conflict events → ConflictWizard (live conflict updates)
 │   ├── useEventSource.ts — Custom hook managing EventSource lifecycle (backoff, visibility, reconnect)
 │   ├── recentFilesStore.ts — Recent files list (server-synced + localStorage cache, max 20, dedup by vaultId+path)
 │   ├── favoritesStore.ts — Favorites per vault (server-synced + localStorage cache, max 50, path tracking on rename/delete)
@@ -395,26 +367,6 @@ src/
 │   ├── MessageInput.tsx  — Message input with validation + rate limit handling
 │   ├── NewConversation.tsx — Create conversation dialog with user search
 │   ├── ConfirmModal.tsx  — Reusable confirmation modal
-│   ├── SyncConfigPage.tsx — Sync configuration (Setup-URI, manual config, mode, interval, E2E)
-│   ├── SyncStatusPanel.tsx — Sync status display with trigger buttons
-│   ├── SyncAnalysisView.tsx — Analysis results (category counters + detail list)
-│   ├── ConflictResolutionView.tsx — Conflict list with resolution options (deprecated, replaced by ConflictWizard)
-│   ├── conflict-wizard/
-│   │   ├── index.ts              — Barrel export (ConflictWizard, DiffView, MergePreview, BatchActions, types, diff-utils)
-│   │   ├── types.ts              — WizardStep, ConflictWizardState, ConflictWizardAction, CategorizedConflictEntry
-│   │   ├── diff-utils.ts         — Myers diff algorithm (computeDiff, isTextFile, groupHunks)
-│   │   ├── diff-utils.test.ts    — Unit tests for diff utilities
-│   │   ├── ConflictWizard.tsx    — 3-step wizard (overview → category detail → resolution), useReducer state
-│   │   ├── ConflictWizard.css    — Wizard styles (Design Tokens, responsive, dark mode)
-│   │   ├── DiffView.tsx          — Side-by-side / unified diff with collapsible sections
-│   │   ├── DiffView.css          — Diff styles (--diff-added-bg, --diff-removed-bg, responsive)
-│   │   ├── DiffView.test.tsx     — Unit tests for DiffView
-│   │   ├── MergePreview.tsx      — Manual merge editor with preview toggle
-│   │   ├── MergePreview.css      — Merge editor styles
-│   │   ├── MergePreview.test.tsx — Unit tests for MergePreview
-│   │   ├── BatchActions.tsx      — Batch confirmation dialog + result summary
-│   │   ├── BatchActions.css      — Batch actions styles
-│   │   └── BatchActions.test.tsx — Unit tests for BatchActions
 │   ├── GraphView.tsx     — Knowledge graph SVG visualization (d3-force, zoom/pan/drag/search, config-driven colors/layout, tag/property nodes)
 │   ├── graph-utils.ts    — Pure graph utility functions (truncateLabel, clampZoom, computeNodeSize, filterNodes)
 │   ├── graph-config.ts   — GraphConfig interfaces + localStorage persistence (colors, layout, node toggles)
@@ -489,11 +441,8 @@ src/
 │   ├── PluginRibbonIcon.tsx — Plugin ribbon icon buttons (left toolbar)
 │   ├── McpTokensPage.tsx — MCP API token management UI (create, revoke, list)
 │   ├── AdminLogsPage.tsx — Admin server log viewer (ring buffer)
-│   ├── ConflictWizardPage.tsx — Standalone conflict wizard page wrapper
 │   ├── FileViewer.tsx    — File content viewer (legacy, redirects to TabContent)
 │   ├── InlineInput.tsx   — Inline text input with confirm/cancel (used in file rename)
-│   ├── SyncLogPage.tsx   — Sync log viewer page
-│   ├── SyncProtocolView.tsx — Sync protocol details view
 │   └── sidebar-panel/
 │       ├── index.ts              — Barrel export for sidebar-panel module
 │       ├── SidebarPanel.tsx      — Left sidebar panel (tabbed: recent files, favorites)
@@ -531,7 +480,6 @@ Route modules in `src/api/`:
 - `adminRoutes.ts` — user management, config, audit, restart
 - `vaultShareRoutes.ts` — shares, transfer
 - `chatRoutes.ts` — conversations, messages, unread
-- `syncRoutes.ts` — sync config, trigger, log, conflicts
 - `graphRoutes.ts` — graph, backlinks, tags
 - `searchRoutes.ts` — search, multi-vault search, replace
 - `mcpRoutes.ts` — MCP Streamable HTTP transport (Bearer auth)
@@ -591,23 +539,6 @@ data/chat/
 - **Messages**: Stored per conversation in paginated chunks.
 - **Unread**: Per-user JSON tracking unread counts per conversation.
 
-### Sync Data
-
-```
-data/sync/
-└── <vaultId>/
-    ├── config.json           — Encrypted sync configuration
-    ├── checkpoint.json       — Last sync checkpoint (last_seq + local mtimes)
-    ├── conflicts.json        — Open conflicts (CategorizedConflictEntry with category + content hashes)
-    ├── auto-resolution.json  — Auto-resolution configuration (enabled, strategies per category)
-    └── sync-log.jsonl        — Sync log (append-only JSONL, max 1000 entries)
-```
-
-- **Config**: One JSON file per vault with encrypted credentials. Atomic writes.
-- **Checkpoint**: CouchDB sequence number + local file mtimes. Atomic writes.
-- **Conflicts**: Open conflict entries per vault. Atomic writes.
-- **Sync Log**: Append-only JSONL with rotation at 1000 entries.
-
 ### MCP Data
 
 ```
@@ -660,12 +591,12 @@ data/vaults/<vaultId>/
     └── meeting.md            — Other templates (any .md file)
 ```
 
-- **`.slatebase/` directory**: All Slatebase-internal data lives here (analogous to `.obsidian/` for Obsidian). Hidden from user tree (dot-prefix rule). Partially synced via vault-sync.
-- **Trash**: Soft-deleted files moved to `.slatebase/trash/<id>/`. Atomic index updates (temp → rename). Configurable retention (0–365 days, default 30). NOT synced.
-- **Versions**: Previous file content saved before each write. Configurable max per file (0–100, default 20). Timestamp format: `YYYYMMDDTHHmmssSSS` (UTC). NOT synced.
-- **Link-Index**: Derived index rebuilt from vault content. NOT synced.
-- **Config**: Vault configuration (templates dir, daily notes dir). SYNCED.
-- **Templates**: Regular vault directory (visible, synced). `.md` files used for "New from template" feature. Placeholder replacement: `{{date}}`, `{{time}}`, `{{title}}`.
+- **`.slatebase/` directory**: All Slatebase-internal data lives here (analogous to `.obsidian/` for Obsidian). Hidden from user tree (dot-prefix rule).
+- **Trash**: Soft-deleted files moved to `.slatebase/trash/<id>/`. Atomic index updates (temp → rename). Configurable retention (0–365 days, default 30).
+- **Versions**: Previous file content saved before each write. Configurable max per file (0–100, default 20). Timestamp format: `YYYYMMDDTHHmmssSSS` (UTC).
+- **Link-Index**: Derived index rebuilt from vault content.
+- **Config**: Vault configuration (templates dir, daily notes dir).
+- **Templates**: Regular vault directory (visible). `.md` files used for "New from template" feature. Placeholder replacement: `{{date}}`, `{{time}}`, `{{title}}`.
 - **Cleanup Job**: Periodic (default 24h interval). Purges expired trash + prunes excess versions. Per-file error isolation.
 
 ### File Visibility Rules (like Obsidian)

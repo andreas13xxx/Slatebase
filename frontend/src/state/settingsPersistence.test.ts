@@ -32,7 +32,7 @@ describe('settingsPersistence', () => {
     it('does NOT persist searchQuery or mobileNavOpen (ephemeral fields)', () => {
       const state: SettingsNavState = {
         category: 'vault',
-        section: 'sync',
+        section: 'plugins',
         selectedVaultId: 'vault-123',
         searchQuery: 'test query',
         mobileNavOpen: true,
@@ -101,7 +101,7 @@ describe('settingsPersistence', () => {
     it('round-trip: persist → restore produces equivalent state', () => {
       const state: SettingsNavState = {
         category: 'vault',
-        section: 'sync',
+        section: 'plugins',
         selectedVaultId: 'vault-1',
         searchQuery: 'ignored',
         mobileNavOpen: true,
@@ -112,7 +112,7 @@ describe('settingsPersistence', () => {
 
       expect(result).not.toBeNull()
       expect(result!.category).toBe('vault')
-      expect(result!.section).toBe('sync')
+      expect(result!.section).toBe('plugins')
       expect(result!.selectedVaultId).toBe('vault-1')
       // Ephemeral fields reset to defaults
       expect(result!.searchQuery).toBe('')
@@ -145,7 +145,7 @@ describe('settingsPersistence', () => {
     it('returns null for section that does not belong to category', () => {
       sessionStorage.setItem(SETTINGS_NAV_KEY, JSON.stringify({
         category: 'account',
-        section: 'sync', // sync belongs to vault, not account
+        section: 'plugins', // plugins belongs to vault, not account
         selectedVaultId: null,
       }))
 
@@ -192,7 +192,7 @@ describe('settingsPersistence', () => {
     it('preserves selectedVaultId when present in vaultIds', () => {
       sessionStorage.setItem(SETTINGS_NAV_KEY, JSON.stringify({
         category: 'vault',
-        section: 'sync',
+        section: 'plugins',
         selectedVaultId: 'vault-b',
       }))
 

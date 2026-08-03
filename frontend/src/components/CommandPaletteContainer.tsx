@@ -17,7 +17,7 @@ import type { Command } from '../plugins/compat/command-registry'
 type NavigablePage =
   | 'profile' | 'sessions' | 'my-vaults' | 'chat' | 'mcp-tokens'
   | 'admin-users' | 'admin-vaults' | 'admin-config' | 'admin-audit' | 'admin-logs'
-  | 'trash' | 'sync-config' | 'sync-log' | 'plugins'
+  | 'trash' | 'plugins'
 
 /**
  * Props passed from AppContent to supply app-level action callbacks.
@@ -364,22 +364,6 @@ export function CommandPaletteContainer({
           id: 'slatebase:open-graph',
           name: 'Knowledge Graph öffnen',
           callback: onOpenGraph,
-          pluginId: 'slatebase',
-        })
-      }
-
-      if (isEnabled('vault-sync') && isVaultOwner) {
-        commands.push({
-          id: 'slatebase:sync-config',
-          name: 'Vault-Sync Konfiguration',
-          callback: () => onNavigate('sync-config'),
-          pluginId: 'slatebase',
-        })
-
-        commands.push({
-          id: 'slatebase:sync-log',
-          name: 'Sync-Protokoll',
-          callback: () => onNavigate('sync-log'),
           pluginId: 'slatebase',
         })
       }

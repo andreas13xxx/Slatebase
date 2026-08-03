@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useAppContext, createVault, deleteVault, loadVaults } from '../state'
 import { useTranslation } from '../i18n'
-import { ChevronDown, ChevronUp, Plus, Trash2, Database, Eye, Pencil, RefreshCw, Users } from 'lucide-react'
+import { ChevronDown, ChevronUp, Plus, Trash2, Database, Eye, Pencil, Users } from 'lucide-react'
 import { ConfirmModal } from './ConfirmModal'
 import { VaultDeletionWorkflow } from './VaultDeletionWorkflow'
 
@@ -157,11 +157,6 @@ export function VaultList({ onRegisterCreateVault }: VaultListProps) {
                     <Users size={12} />
                   </span>
                 )}
-                {selectedVault.syncEnabled && (
-                  <span className="vault-status-icon vault-status-icon--sync" title={t('vault.syncActive')}>
-                    <RefreshCw size={12} />
-                  </span>
-                )}
               </>
             : t('vault.select')}
         </span>
@@ -199,11 +194,6 @@ export function VaultList({ onRegisterCreateVault }: VaultListProps) {
                     {vault.permission === 'write' && (
                       <span className="vault-permission-badge vault-permission-badge--write" title={t('vault.permissionWrite')}>
                         <Pencil size={11} />
-                      </span>
-                    )}
-                    {vault.syncEnabled && (
-                      <span className="vault-permission-badge vault-permission-badge--sync" title={t('vault.syncActive')}>
-                        <RefreshCw size={11} />
                       </span>
                     )}
                     {(vault.shareCount ?? 0) > 0 && (

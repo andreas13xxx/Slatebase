@@ -2,7 +2,6 @@
 // Start with: node --experimental-strip-types --env-file=.env src/index.ts (Node.js 22+)
 // Or dev mode: tsx watch --env-file=.env src/index.ts
 
-import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { createServer as createHttpServer } from 'node:http'
@@ -32,24 +31,7 @@ import { UserRepository, UserService, RoleService, ensureDefaultAdmin } from './
 import { AuditLogger, AuditService } from './audit/index.js'
 import { ConversationStore, MessageStore, ChatRateLimiter, ChatService, UnreadStore } from './chat/index.js'
 import { ChatController, ChatRouteModule } from './api/chatRoutes.js'
-import {
-  CryptoService,
-  SetupUriParser,
-  SyncLock,
-  SyncConfigStore,
-  SyncLogStore,
-  SyncProtocolStore,
-  ConflictStore,
-  CheckpointStore,
-  SyncEngine,
-  SyncScheduler,
-  SyncService,
-  AutoResolutionConfigStore,
-  ConflictResolver,
-  AutoResolutionEngine,
-} from './sync/index.js'
-import type { VaultPathResolver } from './sync/index.js'
-import { createSyncRoutes } from './api/syncRoutes.js'
+
 import { FeatureRegistry, FeatureToggleService, FeatureToggleStore, createFeatureGuard } from './feature-toggle/index.js'
 import { createAdminFeatureRoutes, createPublicFeatureRoutes } from './api/featureRoutes.js'
 import { loadMcpConfig } from './mcp/config.js'
@@ -101,7 +83,6 @@ logger.setLogStore(serverLogStore)
 
 // 1c. Feature Toggle System
 const featureRegistry = new FeatureRegistry()
-featureRegistry.register({ name: 'vault-sync', description: 'CouchDB-basierte Vault-Synchronisation', defaultEnabled: false, type: 'hot' })
 featureRegistry.register({ name: 'obsidian-plugin-compat', description: 'Obsidian Community Plugin Compatibility Layer', defaultEnabled: false, type: 'cold' })
 featureRegistry.register({ name: 'chat', description: 'Echtzeit-Chat zwischen Benutzern', defaultEnabled: true, type: 'hot' })
 featureRegistry.register({ name: 'mcp', description: 'AI Context Server (MCP Integration)', defaultEnabled: true, type: 'cold' })
@@ -178,34 +159,8 @@ const unreadStore = new UnreadStore(serverConfig.dataDir, logger)
 const chatRateLimiter = new ChatRateLimiter()
 const chatService = new ChatService(conversationStore, messageStore, unreadStore, userRepository, logger)
 
-// 3d. Sync Module
-const syncSecret = process.env['SLATEBASE_SYNC_SECRET']
-let resolvedSyncSecret: string
-if (syncSecret && syncSecret.length >= 32) {
-  resolvedSyncSecret = syncSecret
-} else {
-  resolvedSyncSecret = crypto.randomBytes(32).toString('hex')
-  logger.warn('SLATEBASE_SYNC_SECRET not set or too short — using random secret (sync credentials will not survive restarts)')
-}
-
-const cryptoService = new CryptoService(resolvedSyncSecret)
-const setupUriParser = new SetupUriParser()
-const syncLock = new SyncLock()
-const syncConfigStore = new SyncConfigStore(serverConfig.dataDir, cryptoService, logger)
-const syncLogStore = new SyncLogStore(serverConfig.dataDir, logger)
-const syncProtocolStore = new SyncProtocolStore(serverConfig.dataDir, logger)
-const conflictStore = new ConflictStore(serverConfig.dataDir, logger)
-const checkpointStore = new CheckpointStore(serverConfig.dataDir, logger)
-const syncEngine = new SyncEngine(cryptoService)
-const syncScheduler = new SyncScheduler()
-
-// Conflict resolution modules
-const autoResolutionConfigStore = new AutoResolutionConfigStore(serverConfig.dataDir, logger)
-const conflictResolver = new ConflictResolver({ conflictStore, syncLock, cryptoService, logger })
-const autoResolutionEngine = new AutoResolutionEngine()
-
 // 4. VaultService (extend existing vault setup with share registry and user repository)
-const vaultPathResolver: VaultPathResolver = (vaultId: string): string | null => {
+const vaultPathResolver = (vaultId: string): string | null => {
   const entry = vaultRegistry.findById(vaultId)
   return entry ? entry.storagePath : null
 }
@@ -251,28 +206,6 @@ welcomeVaultCreator = async (userId: string, language: 'de' | 'en'): Promise<voi
     })
   }
 }
-
-// 4b. SyncService (needs VaultPathResolver)
-const syncService = new SyncService(
-  syncConfigStore,
-  syncLogStore,
-  conflictStore,
-  checkpointStore,
-  cryptoService,
-  setupUriParser,
-  syncEngine,
-  syncScheduler,
-  syncLock,
-  logger,
-  vaultPathResolver,
-  syncProtocolStore,
-  {
-    conflictResolver,
-    autoResolutionEngine,
-    autoResolutionConfigStore,
-    vaultOwnerResolver: (vaultId: string) => vaultRegistry.findById(vaultId)?.ownerId,
-  },
-)
 
 // 4c. MCP Module (conditional on config)
 let mcpTokenService: McpTokenService | undefined
@@ -419,16 +352,13 @@ function getLinkIndex(vaultId: string): LinkIndexService | undefined {
 
 // 5. Controllers
 const sseTicketStore = new SseTicketStore()
-const vaultController = new VaultController(vaultService, logger, importService, userRepository, vaultAccessControl, syncConfigStore, vaultShareRegistry)
+const vaultController = new VaultController(vaultService, logger, importService, userRepository, vaultAccessControl, vaultShareRegistry)
 const authController = new AuthController(authService, logger, sseTicketStore)
 const userController = new UserController(userService, logger)
 const chatController = new ChatController(chatService, chatRateLimiter, logger, userRepository)
 
 // Wire EventBus to VaultController for vault:change events
 vaultController.setEventBus(eventBus)
-
-// Wire EventBus to SyncService for sync:conflict events
-syncService.setEventBus(eventBus)
 
 // 6. Route Modules
 const routeModules = [
@@ -446,7 +376,6 @@ const routeModules = [
   }),
   new VaultShareRouteModule(vaultAccessControl, vaultService, vaultRegistry, logger, vaultShareRegistry, userRepository),
   new ChatRouteModule(chatController),
-  createSyncRoutes({ syncService, vaultRegistry, logger }),
   createGraphRoutes({ getLinkIndex, accessControl: vaultAccessControl, vaultRegistry, logger }),
 ]
 const router = createRouter(routeModules)
@@ -490,7 +419,6 @@ app.onError((err, c) => {
 
 // Feature guards for route protection
 app.use('/api/v1/chat/*', createFeatureGuard('chat', featureToggleService))
-app.use('/api/v1/vaults/:vaultId/sync/*', createFeatureGuard('vault-sync', featureToggleService))
 app.use('/api/v1/vaults/:vaultId/graph', createFeatureGuard('knowledge-graph', featureToggleService))
 app.use('/api/v1/vaults/:vaultId/backlinks', createFeatureGuard('knowledge-graph', featureToggleService))
 app.use('/api/v1/vaults/:vaultId/plugins/*', createFeatureGuard('obsidian-plugin-compat', featureToggleService))
@@ -737,48 +665,6 @@ vaultController.setVaultDeletionHook({
     // Clean up link index for the deleted vault
     linkIndexMap.delete(vaultId)
   },
-})
-
-// Initialize sync schedulers (only if vault-sync feature is enabled)
-if (featureToggleService.isEnabled('vault-sync')) {
-  try {
-    await syncService.initializeSchedulers()
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error)
-    logger.error('Failed to initialize sync schedulers', { error: message })
-  }
-} else {
-  logger.info('Vault-sync feature disabled — skipping scheduler initialization')
-}
-
-// Register feature toggle listener for vault-sync scheduler control
-featureToggleService.onChange((featureName: string, enabled: boolean) => {
-  if (featureName !== 'vault-sync') return
-
-  if (!enabled) {
-    // Deactivated: stop the scheduler (no new cycles; running cycles finish naturally)
-    syncScheduler.stopAll()
-    logger.info('Vault-sync disabled — scheduler stopped')
-  } else {
-    // Activated: restart schedulers from stored config
-    syncService.initializeSchedulers().catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error)
-      logger.error('Failed to restart sync schedulers after toggle activation', { error: message })
-    })
-    logger.info('Vault-sync enabled — scheduler restarted')
-  }
-})
-
-// Set up sync-to-link-index hook: rebuild link index after successful pull
-syncService.setOnPullComplete((vaultId: string) => {
-  const linkIndex = getLinkIndex(vaultId)
-  if (linkIndex) {
-    // Fire-and-forget: rebuild in background (don't block sync response)
-    linkIndex.rebuild().catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error)
-      logger.error('Link index rebuild after sync failed', { vaultId, error: message })
-    })
-  }
 })
 
 // Create the Hono request listener for non-MCP requests
