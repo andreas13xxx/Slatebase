@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.19.0](https://github.com/andreas13xxx/Slatebase/compare/v0.18.1...v0.19.0) (2026-08-04)
+
+
+### Features
+
+* improve plugin compat layer (CM6 extensions, live-preview, welcome vault templates) ([17cff10](https://github.com/andreas13xxx/Slatebase/commit/17cff10aa3eeb5b9c13bdff48359c855e3f81625))
+
+
+### Bugfixes
+
+* resolve Kanban board blank page in view and edit mode ([645fade](https://github.com/andreas13xxx/Slatebase/commit/645fadedf5c70773589593e9c7e3a41a0eeeb6ca))
+
 ## [0.18.1](https://github.com/andreas13xxx/Slatebase/compare/v0.18.0...v0.18.1) (2026-08-04)
 
 
