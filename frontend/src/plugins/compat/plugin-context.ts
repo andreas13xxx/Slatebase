@@ -87,6 +87,10 @@ import {
   clearAllStatusBarItems,
 } from './status-bar-registry'
 import type { RibbonIconEntry } from './ribbon-icon-registry'
+// Static: ToastNotification imports only React, icons and CSS, so there is no
+// cycle to break here, and the module is already statically bundled via App.tsx.
+// Importing it dynamically only delayed every Notice() by a microtask.
+import { showToast } from '../../components/ToastNotification'
 
 // ─── Context Value ───────────────────────────────────────────────────────────
 
@@ -437,10 +441,7 @@ export function PluginProvider({
     // Register Notice bridge on window so the require()-shim can call showToast
     // eslint-disable-next-line react-hooks/immutability
     ;(window as unknown as { __slatebaseShowNotice?: (msg: string, duration?: number) => void }).__slatebaseShowNotice = (msg: string, _duration?: number) => {
-      // Dynamically import showToast to avoid circular dependency
-      import('../../components/ToastNotification').then(({ showToast }) => {
-        showToast('info', msg)
-      })
+      showToast('info', msg)
     }
 
     // Wire the editor context resolver for editorCallback commands

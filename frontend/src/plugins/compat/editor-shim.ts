@@ -19,6 +19,16 @@
  * @module editor-shim
  */
 
+// CM6 modules backing the editor operations below. These are static imports:
+// the same modules are already pulled into the bundle by CodeMirrorEditor and
+// install-globals, so importing them dynamically bought no code splitting (the
+// bundler reported it as INEFFECTIVE_DYNAMIC_IMPORT) and only made synchronous
+// Obsidian APIs — undo, redo, exec, scrollIntoView — resolve a microtask late.
+// Aliased: this module declares its own Obsidian-shaped `EditorSelection`.
+import { EditorView } from '@codemirror/view'
+import { EditorSelection as CmEditorSelection } from '@codemirror/state'
+import * as CmCommands from '@codemirror/commands'
+
 // Note: We import the getter function from plugin-extensions to access
 // the active CM6 EditorView without creating a circular dependency.
 // The import is deferred to avoid module initialization ordering issues.
@@ -407,12 +417,8 @@ export class EditorShim implements IEditor {
       const from = this.cm6PosToOffset(cm, range.from)
       const to = this.cm6PosToOffset(cm, range.to)
       // Use CM6's scrollIntoView effect from @codemirror/view
-      import('@codemirror/view').then(({ EditorView }) => {
-        import('@codemirror/state').then(({ EditorSelection }) => {
-          const sel = EditorSelection.range(from, to)
-          cm.dispatch({ effects: EditorView.scrollIntoView(sel) })
-        })
-      })
+      const sel = CmEditorSelection.range(from, to)
+      cm.dispatch({ effects: EditorView.scrollIntoView(sel) })
       return
     }
     this.textarea?.focus()
@@ -540,8 +546,7 @@ export class EditorShim implements IEditor {
   undo(): void {
     const cm = this.getCM6()
     if (cm) {
-      // Import undo command dynamically to avoid top-level import
-      import('@codemirror/commands').then(({ undo }) => undo(cm))
+      CmCommands.undo(cm)
       return
     }
     // Textarea has no undo API — no-op
@@ -551,7 +556,7 @@ export class EditorShim implements IEditor {
   redo(): void {
     const cm = this.getCM6()
     if (cm) {
-      import('@codemirror/commands').then(({ redo }) => redo(cm))
+      CmCommands.redo(cm)
       return
     }
   }
@@ -561,26 +566,24 @@ export class EditorShim implements IEditor {
     const cm = this.getCM6()
     if (!cm) return
     // Map Obsidian command names to CM6 commands
-    import('@codemirror/commands').then((cmds) => {
-      const cmdMap: Record<string, (view: import('@codemirror/view').EditorView) => boolean> = {
-        goUp: cmds.cursorLineUp,
-        goDown: cmds.cursorLineDown,
-        goLeft: cmds.cursorCharLeft,
-        goRight: cmds.cursorCharRight,
-        goStart: cmds.cursorDocStart,
-        goEnd: cmds.cursorDocEnd,
-        goWordLeft: cmds.cursorGroupLeft,
-        goWordRight: cmds.cursorGroupRight,
-        indentMore: cmds.indentMore,
-        indentLess: cmds.indentLess,
-        newlineAndIndent: cmds.insertNewlineAndIndent,
-        deleteLine: cmds.deleteLine,
-        swapLineUp: cmds.moveLineUp,
-        swapLineDown: cmds.moveLineDown,
-      }
-      const fn = cmdMap[command]
-      if (fn) fn(cm)
-    })
+    const cmdMap: Record<string, (view: EditorView) => boolean> = {
+      goUp: CmCommands.cursorLineUp,
+      goDown: CmCommands.cursorLineDown,
+      goLeft: CmCommands.cursorCharLeft,
+      goRight: CmCommands.cursorCharRight,
+      goStart: CmCommands.cursorDocStart,
+      goEnd: CmCommands.cursorDocEnd,
+      goWordLeft: CmCommands.cursorGroupLeft,
+      goWordRight: CmCommands.cursorGroupRight,
+      indentMore: CmCommands.indentMore,
+      indentLess: CmCommands.indentLess,
+      newlineAndIndent: CmCommands.insertNewlineAndIndent,
+      deleteLine: CmCommands.deleteLine,
+      swapLineUp: CmCommands.moveLineUp,
+      swapLineDown: CmCommands.moveLineDown,
+    }
+    const fn = cmdMap[command]
+    if (fn) fn(cm)
   }
 
   /** Process lines: read values, then write changes. */
