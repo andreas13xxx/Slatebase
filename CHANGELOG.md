@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.19.1](https://github.com/andreas13xxx/Slatebase/compare/v0.19.0...v0.19.1) (2026-08-04)
+
+
+### Bugfixes
+
+* **plugins:** register obsidian shims synchronously to win stub race ([90773b5](https://github.com/andreas13xxx/Slatebase/commit/90773b50dc84870a1dbf2fa256b57c6725cda14a))
+
+
+### Sonstige Änderungen
+
+* **plugins:** extract global installation out of setting-tab.ts ([63fbbe7](https://github.com/andreas13xxx/Slatebase/commit/63fbbe73ea3d3e09d558b6053bf0e5731f6beba7))
+* **plugins:** make unimplemented compat APIs announce themselves ([87cdcbf](https://github.com/andreas13xxx/Slatebase/commit/87cdcbfd0da206326ac6fd0e8c22ca98a03061ae))
+* **plugins:** move obsidian fallback stubs out of injected JS string ([f20249a](https://github.com/andreas13xxx/Slatebase/commit/f20249ae0dde8ba7078caac895f8e76e1abe0ef5))
+
 ## [0.19.0](https://github.com/andreas13xxx/Slatebase/compare/v0.18.1...v0.19.0) (2026-08-04)
 
 
