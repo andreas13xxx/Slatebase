@@ -12,6 +12,7 @@
  */
 
 import type { IAppShim } from './types'
+import { warnNoOp } from './no-op-warning'
 
 // ─── SuggestModal ────────────────────────────────────────────────────────────────
 
@@ -136,7 +137,7 @@ export abstract class SuggestModal<T> {
    * Set the instruction text shown in the modal.
    */
   setInstructions(_instructions: Array<{ command: string; purpose: string }>): void {
-    // Instructions display is not implemented (cosmetic)
+    warnNoOp('SuggestModal', 'setInstructions', 'Instruction hints are not rendered (cosmetic only).')
   }
 
   /**

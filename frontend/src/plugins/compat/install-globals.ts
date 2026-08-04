@@ -71,20 +71,7 @@ import { MarkdownRenderer } from './markdown-renderer'
 import { EditorShim } from './editor-shim'
 import { registerObsidianApiExtensions } from './obsidian-api-extensions'
 import { registerFallbackShims } from './fallback-shims'
-
-/**
- * Dedup guard for no-op method warnings.
- * Key format: `${pluginId}::${methodName}` — warns only once per combination.
- */
-const _noOpWarned = new Set<string>()
-
-/** Emit a one-time warning for a no-op plugin method. */
-function warnNoOp(pluginId: string, method: string): void {
-  const key = `${pluginId}::${method}`
-  if (_noOpWarned.has(key)) return
-  _noOpWarned.add(key)
-  console.warn(`[PluginCompat] Plugin "${pluginId}" called ${method}() which is not implemented in Slatebase.`)
-}
+import { warnNoOp } from './no-op-warning'
 
 // ─── Obsidian-compatible syntaxTree wrapper ──────────────────────────────────────
 
@@ -1220,7 +1207,8 @@ export function installObsidianGlobals(): void {
         }
       }
       /** Add a clickable action icon to the view header (no-op stub). */
-      addAction(_icon: string, _title: string, _callback: () => void): HTMLElement {
+      addAction(_icon: string, title: string, _callback: () => void): HTMLElement {
+        warnNoOp('ItemView', 'addAction', `The "${title}" action will not appear in the view header.`)
         return document.createElement('a')
       }
     } as unknown as Record<string, unknown>

@@ -448,8 +448,15 @@ export function registerFallbackShims(): void {
   const win = window as FallbackWindow
   const obs: Obs = (win.obsidian ??= {})
 
+  // Names that had no real implementation. Reported below: this is the exact
+  // list of APIs a plugin will get a do-nothing stub for, which is otherwise
+  // invisible and very hard to diagnose from plugin behaviour alone.
+  const filled: string[] = []
+
   const set = (name: string, value: unknown): void => {
-    if (!obs[name]) obs[name] = value
+    if (obs[name]) return
+    obs[name] = value
+    filled.push(name)
   }
 
   // Lifecycle base classes. `Plugin` and `MarkdownRenderChild` extend whichever
@@ -574,4 +581,11 @@ export function registerFallbackShims(): void {
   set('SearchComponent', FallbackSearchComponent)
   set('MomentFormatComponent', FallbackMomentFormatComponent)
   set('ProgressBarComponent', FallbackProgressBarComponent)
+
+  if (filled.length > 0) {
+    console.info(
+      `[PluginCompat] ${filled.length} Obsidian API(s) resolved to the minimal ` +
+        `fallback shim rather than a full implementation: ${filled.sort().join(', ')}`,
+    )
+  }
 }
