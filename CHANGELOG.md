@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.0](https://github.com/andreas13xxx/Slatebase/compare/v0.17.1...v0.18.0) (2026-08-04)
+
+
+### Features
+
+* add community plugin store (backend + frontend) ([355d856](https://github.com/andreas13xxx/Slatebase/commit/355d856225ba59f9f48d5cb5b233f2ec2b7b7e9a))
+
 ## [0.17.1](https://github.com/andreas13xxx/Slatebase/compare/v0.17.0...v0.17.1) (2026-08-03)
 
 
