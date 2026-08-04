@@ -43,13 +43,13 @@ describe('FeatureToggleStore', () => {
       const data = {
         version: 1,
         updatedAt: '2024-01-01T00:00:00.000Z',
-        toggles: { chat: false, 'vault-sync': true },
+        toggles: { chat: false, mcp: true },
       }
       await writeFile(join(tempDir, 'features.json'), JSON.stringify(data), 'utf-8')
 
       const store = new FeatureToggleStore(tempDir, logger)
       const result = await store.load()
-      expect(result).toEqual({ chat: false, 'vault-sync': true })
+      expect(result).toEqual({ chat: false, mcp: true })
     })
 
     it('should return empty record for invalid JSON', async () => {
@@ -141,7 +141,7 @@ describe('FeatureToggleStore', () => {
   describe('round-trip', () => {
     it('should correctly round-trip save and load', async () => {
       const store = new FeatureToggleStore(tempDir, logger)
-      const toggles = { chat: false, 'vault-sync': true, mcp: false }
+      const toggles = { chat: false, mcp: true, 'knowledge-graph': false }
 
       await store.save(toggles)
       const loaded = await store.load()

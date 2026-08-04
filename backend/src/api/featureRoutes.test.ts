@@ -86,7 +86,7 @@ describe('featureRoutes', () => {
     it('should return all feature toggles', async () => {
       const features: FeatureToggleState[] = [
         { name: 'chat', enabled: true, type: 'hot', description: 'Chat feature' },
-        { name: 'vault-sync', enabled: false, type: 'hot', description: 'Vault sync' },
+        { name: 'mcp', enabled: false, type: 'cold', description: 'MCP integration' },
       ]
       const service = createMockFeatureToggleService({ getAll: vi.fn().mockReturnValue(features) })
       const app = createAdminApp({ featureToggleService: service })
@@ -134,15 +134,15 @@ describe('featureRoutes', () => {
     })
 
     it('should create an audit log entry on toggle change', async () => {
-      const result: FeatureToggleUpdateResult = { name: 'vault-sync', enabled: true, restartRequired: false }
+      const result: FeatureToggleUpdateResult = { name: 'mcp', enabled: true, restartRequired: false }
       const service = createMockFeatureToggleService({
         setEnabled: vi.fn().mockReturnValue(result),
-        get: vi.fn().mockReturnValue({ name: 'vault-sync', enabled: false, type: 'hot', description: 'Sync' }),
+        get: vi.fn().mockReturnValue({ name: 'mcp', enabled: false, type: 'cold', description: 'MCP integration' }),
       })
       const auditService = createMockAuditService()
       const app = createAdminApp({ featureToggleService: service, auditService })
 
-      await app.request('/features/vault-sync', {
+      await app.request('/features/mcp', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: true }),
@@ -151,7 +151,7 @@ describe('featureRoutes', () => {
       expect(auditService.log).toHaveBeenCalledWith({
         userId: 'admin-user-1',
         action: 'FEATURE_TOGGLED',
-        target: 'vault-sync',
+        target: 'mcp',
         ipAddress: '192.168.1.100',
         success: true,
         details: JSON.stringify({ oldEnabled: false, newEnabled: true }),

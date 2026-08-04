@@ -53,7 +53,6 @@ describe('App', () => {
     vi.clearAllMocks()
     mockLoadFeatures.mockResolvedValue([
       { name: 'chat', enabled: true },
-      { name: 'vault-sync', enabled: false },
       { name: 'mcp', enabled: true },
       { name: 'knowledge-graph', enabled: true },
       { name: 'obsidian-plugin-compat', enabled: false },

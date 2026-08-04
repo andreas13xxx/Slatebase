@@ -48,7 +48,6 @@ Entdecke die vollständige Feature-Palette:
 - [[Features/Vault-Verwaltung|Vault-Verwaltung]]
 - [[Features/Einstellungen|Einstellungen]]
 - [[Features/Chat|Chat]]
-- [[Features/Sync|Sync]]
 - [[Features/Live Preview Editor|Live Preview Editor]]
 
 ---
@@ -74,7 +73,6 @@ Für Power-User und spezielle Workflows:
 - [[Fortgeschritten/Regex Suche|Regex-Suche]]
 - [[Fortgeschritten/Canvas Workflows|Canvas Workflows]]
 - [[Fortgeschritten/Tastenkürzel anpassen|Tastenkürzel anpassen]]
-- [[Fortgeschritten/Vault Sync einrichten|Vault Sync einrichten]]
 - [[Fortgeschritten/MCP Context Server|MCP Context Server]]
 - [[Fortgeschritten/Obsidian Plugins|Obsidian Plugins]]
 - [[Fortgeschritten/Plugins/Calendar|Plugin: Calendar]]

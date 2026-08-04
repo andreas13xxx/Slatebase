@@ -15,7 +15,6 @@ Here you'll find guides for power users. These topics build on the basics and fe
 | [[Advanced/Regex Search\|Regex Search]] | Advanced search patterns with regular expressions — character classes, quantifiers, lookahead |
 | [[Advanced/Canvas Workflows\|Canvas Workflows]] | Brainstorming, project planning, and mind maps with the Canvas feature |
 | [[Advanced/Custom Keybindings\|Custom Keybindings]] | Configure keyboard shortcuts to your needs |
-| [[Advanced/Vault Sync Setup\|Vault Sync Setup]] | CouchDB installation and bidirectional synchronization |
 | [[Advanced/MCP Context Server\|MCP Context Server]] | AI integration via the Model Context Protocol |
 | [[Advanced/Obsidian Plugins\|Obsidian Plugins]] | Install and use Obsidian plugins |
 
@@ -33,9 +32,8 @@ Depending on your interest, we recommend these entry points:
 
 ### For Tech Enthusiasts
 
-1. [[Advanced/Vault Sync Setup]] — Multi-device access
-2. [[Advanced/MCP Context Server]] — AI integration
-3. [[Advanced/Obsidian Plugins]] — Extend functionality
+1. [[Advanced/MCP Context Server]] — AI integration
+2. [[Advanced/Obsidian Plugins]] — Extend functionality
 
 ---
 
@@ -52,7 +50,6 @@ These guides assume you're familiar with the **Basics** and **Features**. If you
 
 Some features described here are marked as **experimental**:
 
-- **Vault Sync** — Bidirectional synchronization with CouchDB
 - **MCP Context Server** — AI integration via the Model Context Protocol
 - **Obsidian Plugins** — Compatibility layer for Obsidian plugins
 

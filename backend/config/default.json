@@ -15,7 +15,6 @@
   "maxImportDepth": 10,
   "trustedProxies": [],
   "features": {
-    "vault-sync": { "enabled": false },
     "obsidian-plugin-compat": { "enabled": false },
     "chat": { "enabled": true },
     "mcp": { "enabled": true },

@@ -15,7 +15,6 @@ Hier findest du Guides für Power-User. Diese Themen bauen auf den Grundlagen un
 | [[Fortgeschritten/Regex Suche\|Regex Suche]] | Erweiterte Suchmuster mit regulären Ausdrücken — Character Classes, Quantifier, Lookahead |
 | [[Fortgeschritten/Canvas Workflows\|Canvas Workflows]] | Brainstorming, Projektplanung und Mindmaps mit dem Canvas-Feature |
 | [[Fortgeschritten/Tastenkürzel anpassen\|Tastenkürzel anpassen]] | Keyboard-Shortcuts nach eigenem Bedarf konfigurieren |
-| [[Fortgeschritten/Vault Sync einrichten\|Vault Sync einrichten]] | CouchDB-Installation und bidirektionale Synchronisation |
 | [[Fortgeschritten/MCP Context Server\|MCP Context Server]] | KI-Integration über das Model Context Protocol |
 | [[Fortgeschritten/Obsidian Plugins\|Obsidian Plugins]] | Obsidian-Plugins installieren und nutzen |
 
@@ -33,9 +32,8 @@ Je nach Interesse empfehlen wir folgende Einstiegspunkte:
 
 ### Für Technik-Enthusiasten
 
-1. [[Fortgeschritten/Vault Sync einrichten]] — Multi-Device-Zugriff
-2. [[Fortgeschritten/MCP Context Server]] — KI-Anbindung
-3. [[Fortgeschritten/Obsidian Plugins]] — Funktionen erweitern
+1. [[Fortgeschritten/MCP Context Server]] — KI-Anbindung
+2. [[Fortgeschritten/Obsidian Plugins]] — Funktionen erweitern
 
 ---
 
@@ -52,7 +50,6 @@ Diese Guides setzen voraus, dass du mit den **Grundlagen** und **Features** vert
 
 Einige der hier beschriebenen Funktionen sind als **experimentell** gekennzeichnet:
 
-- **Vault Sync** — Bidirektionale Synchronisation mit CouchDB
 - **MCP Context Server** — KI-Anbindung über das Model Context Protocol
 - **Obsidian Plugins** — Kompatibilitätsschicht für Obsidian-Plugins
 

@@ -22,7 +22,6 @@ Feature toggles allow you as an admin to enable or disable individual Slatebase 
 | Feature | Default | Description |
 |---------|---------|-------------|
 | `chat` | enabled | Chat between users |
-| `vault-sync` | enabled | Bidirectional vault sync with CouchDB |
 | `knowledge-graph` | enabled | Knowledge graph visualization |
 | `welcome-vault` | enabled | Create tutorial vault for new users |
 | `mcp` | enabled | Model Context Protocol server (AI integration) |
@@ -65,12 +64,6 @@ All current feature toggles are **hot toggles**:
 - **Disabled:** No chat access, no notifications
 - **Data:** Conversations and messages are preserved
 
-### Vault Sync (`vault-sync`)
-
-- **Enabled:** Sync configuration in settings, sync trigger
-- **Disabled:** No sync possible, existing configuration remains stored
-- **Note:** Experimental feature — backups recommended before enabling
-
 ### Knowledge Graph (`knowledge-graph`)
 
 - **Enabled:** Graph tab in tab bar, graph commands in Command Palette
@@ -107,7 +100,6 @@ Feature toggles can also be controlled via environment variables. These override
 
 ```
 SLATEBASE_FEATURE_CHAT=false
-SLATEBASE_FEATURE_VAULT_SYNC=true
 ```
 
 > [!warning] Env Override
@@ -121,7 +113,7 @@ SLATEBASE_FEATURE_VAULT_SYNC=true
 |-----------|---------------|
 | Small installation (1–3 users) | Keep all features enabled |
 | Corporate environment without AI | Disable `mcp` |
-| Stability prioritized | Disable `obsidian-plugin-compat` and `vault-sync` |
+| Stability prioritized | Disable `obsidian-plugin-compat` |
 | No team requirements | Disable `chat` |
 | Performance optimization | Disable `knowledge-graph` for very large vaults |
 
@@ -140,7 +132,7 @@ Test the effect of a feature toggle:
 ---
 
 > [!tip] Gradual Activation
-> For a new Slatebase installation, consider keeping experimental features (Sync, Plugins, MCP) disabled initially and enabling them gradually as you become familiar with the platform.
+> For a new Slatebase installation, consider keeping experimental features (Plugins, MCP) disabled initially and enabling them gradually as you become familiar with the platform.
 
 > [!todo] Exercise
 > 1. Open Feature Toggles (`Ctrl+,` → Administration)
@@ -155,6 +147,5 @@ Test the effect of a feature toggle:
 - [[Admin/Server Configuration]] — Global server settings
 - [[Admin/User Management]] — Users and roles
 - [[Features/Settings]] — Settings panel overview
-- [[Advanced/Vault Sync Setup]] — Sync feature in detail
 - [[Advanced/MCP Context Server]] — MCP feature in detail
 - [[Advanced/Obsidian Plugins]] — Plugin feature in detail

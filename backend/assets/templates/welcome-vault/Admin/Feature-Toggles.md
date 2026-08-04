@@ -22,7 +22,6 @@ Feature-Toggles erlauben dir als Admin, einzelne Funktionen von Slatebase für a
 | Feature | Standard | Beschreibung |
 |---------|----------|--------------|
 | `chat` | aktiv | Chat-Funktion zwischen Nutzern |
-| `vault-sync` | aktiv | Bidirektionale Vault-Synchronisation mit CouchDB |
 | `knowledge-graph` | aktiv | Wissens-Graph-Visualisierung |
 | `welcome-vault` | aktiv | Anleitungs-Vault bei neuen Nutzern erstellen |
 | `mcp` | aktiv | Model Context Protocol Server (KI-Integration) |
@@ -65,12 +64,6 @@ Alle aktuellen Feature-Toggles sind **Hot-Toggles**:
 - **Deaktiviert:** Kein Chat-Zugang, keine Benachrichtigungen
 - **Daten:** Konversationen und Nachrichten bleiben erhalten
 
-### Vault Sync (`vault-sync`)
-
-- **Aktiviert:** Sync-Konfiguration in Einstellungen, Sync-Trigger
-- **Deaktiviert:** Kein Sync möglich, bestehende Konfiguration bleibt gespeichert
-- **Hinweis:** Experimentelles Feature — vor Aktivierung Backups empfohlen
-
 ### Knowledge Graph (`knowledge-graph`)
 
 - **Aktiviert:** Graph-Tab im Tab-Bar, Graph-Befehle in Command Palette
@@ -107,7 +100,6 @@ Feature-Toggles können auch über Umgebungsvariablen gesteuert werden. Diese ü
 
 ```
 SLATEBASE_FEATURE_CHAT=false
-SLATEBASE_FEATURE_VAULT_SYNC=true
 ```
 
 > [!warning] Env-Override
@@ -121,7 +113,7 @@ SLATEBASE_FEATURE_VAULT_SYNC=true
 |-----------|-----------|
 | Kleine Installation (1–3 Nutzer) | Alle Features aktiv lassen |
 | Firmenumgebung ohne KI | `mcp` deaktivieren |
-| Stabilität priorisiert | `obsidian-plugin-compat` und `vault-sync` deaktivieren |
+| Stabilität priorisiert | `obsidian-plugin-compat` deaktivieren |
 | Kein Team-Bedarf | `chat` deaktivieren |
 | Performance-Optimierung | `knowledge-graph` bei sehr großen Vaults deaktivieren |
 
@@ -140,7 +132,7 @@ Teste die Auswirkung eines Feature-Toggles:
 ---
 
 > [!tip] Schrittweise Aktivierung
-> Bei einer neuen Slatebase-Installation empfiehlt es sich, experimentelle Features (Sync, Plugins, MCP) zunächst deaktiviert zu lassen und sie nach und nach zu aktivieren, sobald du dich mit der Plattform vertraut gemacht hast.
+> Bei einer neuen Slatebase-Installation empfiehlt es sich, experimentelle Features (Plugins, MCP) zunächst deaktiviert zu lassen und sie nach und nach zu aktivieren, sobald du dich mit der Plattform vertraut gemacht hast.
 
 > [!todo] Übung
 > 1. Öffne die Feature-Toggles (`Ctrl+,` → Administration)
@@ -155,6 +147,5 @@ Teste die Auswirkung eines Feature-Toggles:
 - [[Admin/Server-Konfiguration]] — Globale Server-Einstellungen
 - [[Admin/Benutzerverwaltung]] — Nutzer und Rollen verwalten
 - [[Features/Einstellungen]] — Einstellungs-Panel-Übersicht
-- [[Fortgeschritten/Vault Sync einrichten]] — Sync-Feature im Detail
 - [[Fortgeschritten/MCP Context Server]] — MCP-Feature im Detail
 - [[Fortgeschritten/Obsidian Plugins]] — Plugin-Feature im Detail

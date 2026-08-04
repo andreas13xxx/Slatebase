@@ -48,7 +48,6 @@ Discover the full feature set:
 - [[Features/Vault Management|Vault Management]]
 - [[Features/Settings|Settings]]
 - [[Features/Chat|Chat]]
-- [[Features/Sync|Sync]]
 - [[Features/Live Preview Editor|Live Preview Editor]]
 
 ---
@@ -74,7 +73,6 @@ For power users and specialized workflows:
 - [[Advanced/Regex Search|Regex Search]]
 - [[Advanced/Canvas Workflows|Canvas Workflows]]
 - [[Advanced/Custom Keybindings|Custom Keybindings]]
-- [[Advanced/Vault Sync Setup|Vault Sync Setup]]
 - [[Advanced/MCP Context Server|MCP Context Server]]
 - [[Advanced/Obsidian Plugins|Obsidian Plugins]]
 - [[Advanced/Plugins/Calendar|Plugin: Calendar]]
