@@ -12,6 +12,7 @@
  */
 
 import type { IVaultShim, TFile, TFolder } from '../types'
+import { warnNoOp } from '../no-op-warning'
 
 /**
  * IFileManagerShim — Obsidian FileManager interface subset.
@@ -210,7 +211,7 @@ export class FileManagerShim implements IFileManagerShim {
    * Plugins like Excalidraw call this for rename dialogs.
    */
   async promptForFileRename(_file: TFile): Promise<void> {
-    // No-op — Slatebase does not show inline rename prompts from plugins
+    warnNoOp('FileManager', 'promptForFileRename', 'No rename dialog is shown; the file is left unchanged.')
   }
 
   /**
