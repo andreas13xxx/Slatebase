@@ -104,14 +104,14 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
     if (fileViewMatch && activeTab && currentKey && pluginContext) {
       const existing = getActiveFileView(activeTab.vaultId, activeTab.filePath)
       if (!existing) {
-        void pluginContext.createFileView(fileViewMatch.viewType, activeTab.filePath).then((containerEl) => {
-          if (containerEl && activeTab) {
+        void pluginContext.createFileView(fileViewMatch.viewType, activeTab.filePath).then((result) => {
+          if (result && activeTab) {
             setActiveFileView(activeTab.vaultId, activeTab.filePath, {
               key: currentKey,
               viewType: fileViewMatch.viewType,
-              leaf: null as never, // Leaf is managed internally by createFileView
-              view: null as never,
-              containerEl,
+              leaf: result.leaf,
+              view: result.view,
+              containerEl: result.containerEl,
             })
             fileViewKeyRef.current = currentKey
             // Force re-render to show the plugin view
@@ -339,13 +339,15 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
   }
 
   // Plugin file view — render plugin's TextFileView container (e.g. Kanban board)
-  if (fileViewMatch && activeTab) {
+  // Only in view mode — edit mode shows raw markdown so the user can see/edit the source.
+  if (fileViewMatch && activeTab && activeTab.mode !== 'edit') {
     const activeFileView = getActiveFileView(activeTab.vaultId, activeTab.filePath)
     if (activeFileView) {
       return (
         <div
           key={`plugin-file-view-${activeTab.id}`}
           className="tab-content tab-content--plugin-file-view"
+          data-plugin-id={fileViewMatch.pluginId}
           ref={(el) => {
             if (el && !el.contains(activeFileView.containerEl)) {
               el.appendChild(activeFileView.containerEl)

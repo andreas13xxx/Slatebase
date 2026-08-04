@@ -183,7 +183,7 @@ export function createEl<K extends keyof HTMLElementTagNameMap>(
 ): HTMLElementTagNameMap[K] {
   const el = document.createElement(tag);
   if (typeof o === 'string') {
-    el.textContent = o;
+    el.className = o;
   } else if (o) {
     if (o.cls) {
       if (Array.isArray(o.cls)) el.className = o.cls.join(' ');

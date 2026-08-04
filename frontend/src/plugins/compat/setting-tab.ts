@@ -16,12 +16,150 @@ import { addRibbonIcon as registerRibbonIcon } from './ribbon-icon-registry'
 import { addStatusBarItem as registerStatusBarItem } from './status-bar-registry'
 import moment from 'moment/min/moment-with-locales'
 
+// Real CM6 modules — used to provide functional extensions to plugins
+import * as CmState from '@codemirror/state'
+import * as CmView from '@codemirror/view'
+import * as CmLanguage from '@codemirror/language'
+import * as CmCommands from '@codemirror/commands'
+import * as CmAutocomplete from '@codemirror/autocomplete'
+import * as CmSearch from '@codemirror/search'
+import * as LezerHighlight from '@lezer/highlight'
+import * as LezerCommon from '@lezer/common'
+
+// Obsidian-compatible editor StateFields — plugins access these via require('obsidian')
+import {
+  editorInfoField,
+  editorEditorField,
+  editorLivePreviewField,
+  editorViewField,
+} from '../../editor/editor-state-fields'
+
+// NodeProp for tokenClassNodeProp polyfill (removed from @codemirror/language in v6.x)
+import { tokenClassNodeProp } from '../../editor/token-class-node-prop'
+
 // Load Obsidian-compatible CSS variables (maps Slatebase tokens to Obsidian naming)
 import './obsidian-compat.css'
 
 // Load global prototype extensions (Array, String, Math, Object, Element, Node)
 // Must be before any plugin code evaluates — plugins use these directly.
 import './global-extensions'
+
+/**
+ * Dedup guard for no-op method warnings.
+ * Key format: `${pluginId}::${methodName}` — warns only once per combination.
+ */
+const _noOpWarned = new Set<string>()
+
+/** Emit a one-time warning for a no-op plugin method. */
+function warnNoOp(pluginId: string, method: string): void {
+  const key = `${pluginId}::${method}`
+  if (_noOpWarned.has(key)) return
+  _noOpWarned.add(key)
+  console.warn(`[PluginCompat] Plugin "${pluginId}" called ${method}() which is not implemented in Slatebase.`)
+}
+
+// ─── Obsidian-compatible syntaxTree wrapper ──────────────────────────────────────
+
+/**
+ * Creates a wrapped version of `syntaxTree()` that adjusts InlineCode node ranges
+ * to exclude backtick delimiters, matching Obsidian's parser behavior.
+ *
+ * In @codemirror/lang-markdown, the `InlineCode` node includes the backticks:
+ *   InlineCode: from=6, to=24 → "`= this.file.name`"
+ *
+ * In Obsidian's internal parser, InlineCode covers only the content:
+ *   InlineCode: from=7, to=23 → "= this.file.name"
+ *
+ * Plugins like Dataview use `node.from`/`node.to` to slice the document and check
+ * `startsWith("=")` for inline queries. Without this adjustment, the sliced text
+ * starts with a backtick and inline queries are never recognized.
+ *
+ * The wrapper intercepts `tree.iterate()` and `tree.cursor()` to provide adjusted
+ * node boundaries when visiting InlineCode nodes with CodeMark children.
+ */
+function createObsidianCompatSyntaxTree(
+  originalSyntaxTree: typeof CmLanguage.syntaxTree
+): typeof CmLanguage.syntaxTree {
+  return function obsidianCompatSyntaxTree(
+    state: Parameters<typeof CmLanguage.syntaxTree>[0]
+  ) {
+    const tree = originalSyntaxTree(state)
+
+    // Return a proxy that intercepts iterate() to adjust InlineCode ranges
+    return new Proxy(tree, {
+      get(target, prop, receiver) {
+        if (prop === 'iterate') {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          return function iterate(spec: any) {
+            const originalEnter = spec.enter
+            if (!originalEnter) {
+              return target.iterate(spec)
+            }
+
+            return target.iterate({
+              ...spec,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              enter(cursor: any) {
+                // Adjust InlineCode node: strip backtick delimiters from range
+                const name = cursor.name as string | undefined
+                if (name === 'InlineCode') {
+                  const node = cursor.node
+                  if (node) {
+                    const origFrom = node.from as number
+                    const origTo = node.to as number
+                    // Verify node has CodeMark children (backtick delimiters)
+                    const firstChild = node.firstChild
+                    const lastChild = node.lastChild
+                    if (
+                      firstChild && firstChild.name === 'CodeMark' &&
+                      lastChild && lastChild.name === 'CodeMark' &&
+                      firstChild.to != null && lastChild.from != null
+                    ) {
+                      // Override node.from/to to exclude backtick markers
+                      Object.defineProperty(node, 'from', { value: firstChild.to, writable: true, configurable: true })
+                      Object.defineProperty(node, 'to', { value: lastChild.from, writable: true, configurable: true })
+                      // Also adjust the cursor itself (some plugins read cursor.from/to)
+                      const cursorFromDesc = Object.getOwnPropertyDescriptor(cursor, 'from')
+                      const cursorToDesc = Object.getOwnPropertyDescriptor(cursor, 'to')
+                      if (cursorFromDesc && cursorFromDesc.writable) {
+                        cursor.from = firstChild.to
+                      }
+                      if (cursorToDesc && cursorToDesc.writable) {
+                        cursor.to = lastChild.from
+                      }
+                      try {
+                        return originalEnter(cursor)
+                      } finally {
+                        // Restore original values so tree navigation isn't corrupted
+                        const proto = Object.getPrototypeOf(node)
+                        const fromGetter = Object.getOwnPropertyDescriptor(proto, 'from')
+                        const toGetter = Object.getOwnPropertyDescriptor(proto, 'to')
+                        if (fromGetter?.get) {
+                          Object.defineProperty(node, 'from', { get: fromGetter.get, configurable: true })
+                        }
+                        if (toGetter?.get) {
+                          Object.defineProperty(node, 'to', { get: toGetter.get, configurable: true })
+                        }
+                        if (cursorFromDesc && cursorFromDesc.writable) {
+                          cursor.from = origFrom
+                        }
+                        if (cursorToDesc && cursorToDesc.writable) {
+                          cursor.to = origTo
+                        }
+                      }
+                    }
+                  }
+                }
+                return originalEnter(cursor)
+              },
+            })
+          }
+        }
+        return Reflect.get(target, prop, receiver)
+      },
+    })
+  } as typeof CmLanguage.syntaxTree
+}
 
 // ─── PluginSettingTab ────────────────────────────────────────────────────────────
 
@@ -622,6 +760,60 @@ export class Setting {
     return this
   }
 
+  /**
+   * Add a moment.js date format input with live preview.
+   * Obsidian plugins use this for date/time format configuration (e.g. Kanban date display format).
+   */
+  addMomentFormat(callback: (component: { inputEl: HTMLInputElement; getValue(): string; setValue(value: string): unknown; setPlaceholder(p: string): unknown; setDefaultFormat(format: string): unknown; setSampleEl(el: HTMLElement): unknown; onChange(cb: (value: string) => void): unknown; then(cb: (c: unknown) => void): unknown }) => void): this {
+    const wrapper = document.createElement('div')
+    wrapper.className = 'setting-moment-format'
+    const input = document.createElement('input')
+    input.type = 'text'
+    input.className = 'setting-text-input'
+    const preview = document.createElement('div')
+    preview.className = 'setting-moment-format-preview'
+    preview.style.fontSize = '0.8em'
+    preview.style.opacity = '0.7'
+    preview.style.marginTop = '4px'
+    wrapper.appendChild(input)
+    wrapper.appendChild(preview)
+    this.controlEl.appendChild(wrapper)
+
+    let changeCb: ((v: string) => void) | null = null
+    let defaultFormat = ''
+    let sampleEl: HTMLElement | null = preview
+
+    const updatePreview = (): void => {
+      const fmt = input.value || defaultFormat
+      if (sampleEl && typeof (window as unknown as { moment?: (v?: unknown) => { format(f: string): string } }).moment === 'function') {
+        try {
+          sampleEl.textContent = (window as unknown as { moment: () => { format(f: string): string } }).moment().format(fmt)
+        } catch {
+          sampleEl.textContent = ''
+        }
+      }
+    }
+
+    input.addEventListener('input', () => {
+      updatePreview()
+      if (changeCb) changeCb(input.value)
+    })
+
+    const component = {
+      inputEl: input,
+      getValue() { return input.value },
+      setValue(value: string) { input.value = value; updatePreview(); return this },
+      setPlaceholder(p: string) { input.placeholder = p; return this },
+      setDefaultFormat(format: string) { defaultFormat = format; input.placeholder = format; updatePreview(); return this },
+      setSampleEl(el: HTMLElement) { sampleEl = el; updatePreview(); return this },
+      onChange(cb: (value: string) => void) { changeCb = cb; return this },
+      then(cb: (c: unknown) => void) { cb(this); return this },
+    }
+    callback(component)
+    updatePreview()
+    return this
+  }
+
   /** Clear the control area (useful for dynamic updates). */
   clear(): this {
     this.controlEl.innerHTML = ''
@@ -792,7 +984,7 @@ if (typeof window !== 'undefined') {
   if (!(window as unknown as { createEl?: unknown }).createEl) {
     (window as unknown as { createEl: unknown }).createEl = function(tag: string, o?: unknown): HTMLElement {
       const el = document.createElement(tag)
-      if (typeof o === 'string') { el.textContent = o }
+      if (typeof o === 'string') { el.className = o }
       else if (o && typeof o === 'object') {
         const opts = o as { cls?: string | string[]; text?: string; attr?: Record<string, string | number | boolean | null>; parent?: Node }
         if (opts.cls) { if (Array.isArray(opts.cls)) el.className = opts.cls.join(' '); else el.className = opts.cls }
@@ -850,6 +1042,40 @@ if (typeof window !== 'undefined') {
         return el
       },
       writable: true, configurable: true,
+    })
+  }
+
+  // ─── Array.prototype.remove (Obsidian global extension) ─────────────────────
+  // Obsidian extends Array.prototype with a .remove(item) method that all plugins
+  // rely on (e.g. Kanban's useKanbanViews calls workspace.viewStateReceivers.remove()).
+  // Must be registered synchronously before any plugin bundle evaluates.
+  if (!('remove' in Array.prototype)) {
+    Object.defineProperty(Array.prototype, 'remove', {
+      value: function <T>(this: T[], item: T): T[] {
+        const index = this.indexOf(item)
+        if (index > -1) {
+          this.splice(index, 1)
+        }
+        return this
+      },
+      writable: true,
+      configurable: true,
+      enumerable: false,
+    })
+  }
+
+  // ─── String.prototype.contains (Obsidian global extension) ─────────────────────
+  // Obsidian extends String.prototype with a .contains(str) method (alias for .includes()).
+  // Plugins like Kanban use it for frontmatter checks (e.g. t[1].contains("kanban-plugin")).
+  // Must be registered synchronously before any plugin bundle evaluates.
+  if (!('contains' in String.prototype)) {
+    Object.defineProperty(String.prototype, 'contains', {
+      value: function (this: string, searchString: string): boolean {
+        return this.includes(searchString)
+      },
+      writable: true,
+      configurable: true,
+      enumerable: false,
     })
   }
 
@@ -1034,6 +1260,7 @@ if (typeof window !== 'undefined') {
       internalPlugins: {
         plugins: {
           'daily-notes': { enabled: true, instance: { options: { format: 'YYYY-MM-DD', folder: '', template: '' } } },
+          'templates': { enabled: false, instance: { options: { folder: '' } } },
         },
         getPluginById: (id: string) => {
           const plugins = ((window as unknown as { app: { internalPlugins: { plugins: Record<string, unknown> } } }).app.internalPlugins.plugins)
@@ -1053,8 +1280,15 @@ if (typeof window !== 'undefined') {
         embedByExtension: {
           md: () => {
             // Kanban calls this to extract the internal MarkdownEditor class.
-            // We provide a stub that survives the prototype chain extraction.
-            const FakeEditor = class { constructor() {} }
+            // It gets the constructor via Object.getPrototypeOf chain on editMode,
+            // then extends it. The class needs set(), get(), destroy(), cm property.
+            const FakeEditor = class {
+              cm: unknown = null
+              constructor() {}
+              set(_value: string) {}
+              get(): string { return '' }
+              destroy() {}
+            }
             const editMode = Object.create(Object.create(FakeEditor.prototype))
             return {
               load: () => {},
@@ -1429,23 +1663,36 @@ if (typeof window !== 'undefined') {
         const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
         return registerStatusBarItem(pluginId)
       }
-      /** Register an editor suggest (autocomplete). No-op in Slatebase. */
-      registerEditorSuggest(_suggest: unknown): void {}
-      /** Register a hover link source. No-op in Slatebase. */
-      registerHoverLinkSource(_key: string, _source: unknown): void {}
-      /** Register a markdown post processor. Stored for potential future use. */
-      registerMarkdownPostProcessor(_postProcessor: unknown, _sortOrder?: number): unknown { return _postProcessor }
+      /** Register an editor suggest (autocomplete). Not implemented in Slatebase. */
+      registerEditorSuggest(_suggest: unknown): void {
+        const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
+        warnNoOp(pluginId, 'registerEditorSuggest')
+      }
+      /** Register a hover link source. Not implemented in Slatebase. */
+      registerHoverLinkSource(_key: string, _source: unknown): void {
+        const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
+        warnNoOp(pluginId, 'registerHoverLinkSource')
+      }
+      /** Register a markdown post processor. Stored but not executed in Slatebase. */
+      registerMarkdownPostProcessor(_postProcessor: unknown, _sortOrder?: number): unknown {
+        const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
+        warnNoOp(pluginId, 'registerMarkdownPostProcessor')
+        return _postProcessor
+      }
       /** Register a code block processor for a specific language. No-op stub. */
       registerMarkdownCodeBlockProcessor(_language: string, _handler: unknown, _sortOrder?: number): unknown { return _handler }
       /** Register a CodeMirror 6 extension. No-op in Slatebase. */
       registerEditorExtension(_extension: unknown): void {}
-      /** Register file extensions for a view type. No-op in Slatebase. */
-      registerExtensions(_extensions: string[], _viewType: string): void {}
-      /** Register an obsidian:// protocol handler. No-op in Slatebase. */
+      /** Register file extensions for a view type. Not implemented in Slatebase. */
+      registerExtensions(_extensions: string[], _viewType: string): void {
+        const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
+        warnNoOp(pluginId, 'registerExtensions')
+      }
+      /** Register an obsidian:// protocol handler. Not applicable in Slatebase (web app). */
       registerObsidianProtocolHandler(_action: string, _handler: unknown): void {}
       /** Remove a previously registered command. No-op in Slatebase. */
       removeCommand(_commandId: string): void {}
-      /** Register a CLI handler. No-op in Slatebase (no desktop CLI). */
+      /** Register a CLI handler. Not applicable in Slatebase (no desktop CLI). */
       registerCliHandler(_command: string, _description: string, _flags: unknown, _handler: unknown): void {}
     } as unknown as Record<string, unknown>
   }
@@ -1698,7 +1945,7 @@ if (typeof window !== 'undefined') {
   // Plugins like Kanban extend this for file-backed views with getViewData/setViewData/requestSave.
   if (!window.obsidian.TextFileView) {
     const FileViewClass = window.obsidian.FileView as { new (leaf: unknown): unknown; prototype: object }
-    window.obsidian.TextFileView = class TextFileView extends (FileViewClass as unknown as { new (leaf: unknown): { containerEl: HTMLElement; contentEl: HTMLElement; app: unknown; leaf: unknown; file: unknown } }) {
+    window.obsidian.TextFileView = class TextFileView extends (FileViewClass as unknown as { new (leaf: unknown): { containerEl: HTMLElement; contentEl: HTMLElement; app: unknown; leaf: unknown; file: unknown; _loaded: boolean } }) {
       data: string = ''
       private _saveRequested: boolean = false
       private _saveTimerId: ReturnType<typeof setTimeout> | null = null
@@ -1757,8 +2004,18 @@ if (typeof window !== 'undefined') {
           if (file) await this.loadFile(file)
         }
       }
-      addChild<T>(child: T): T { return child }
-      removeChild<T>(child: T): T { return child }
+      addChild<T>(child: T): T {
+        if (this._loaded && child && typeof child === 'object' && 'load' in child) {
+          (child as { load: () => void }).load()
+        }
+        return child
+      }
+      removeChild<T>(child: T): T {
+        if (child && typeof child === 'object' && 'unload' in child) {
+          (child as { unload: () => void }).unload()
+        }
+        return child
+      }
       register(_cb: unknown): void { /* no-op */ }
     } as unknown as Record<string, unknown>
   }
@@ -1969,22 +2226,39 @@ if (typeof window !== 'undefined') {
 
   if (!window.obsidian.Menu) {
     window.obsidian.Menu = class Menu {
-      private items: Array<{ title: string; icon: string; section: string; checked: boolean; callback: () => void }> = []
-      private containerEl: HTMLElement | null = null
-      addItem(cb: (item: unknown) => void): Menu {
+      items: Array<{ title: string; icon: string; section: string; checked: boolean; callback: () => void }> = []
+      containerEl: HTMLElement | null = null
+      addItem(cb: (item: unknown) => void): this {
+        const item = Menu._createItem()
+        cb(item)
+        this.items.push(item)
+        return this
+      }
+      addSeparator(): this { return this }
+      /** @internal Create a menu item with all methods Obsidian plugins expect. */
+      static _createItem(): Record<string, unknown> & { title: string; icon: string; section: string; checked: boolean; callback: () => void } {
         const item = {
           title: '', icon: '', section: '', checked: false, callback: () => {},
           setTitle(t: string) { this.title = t; return this },
           setIcon(i: string) { this.icon = i; return this },
           setSection(s: string) { this.section = s; return this },
           setChecked(c: boolean) { this.checked = c; return this },
+          setDisabled(_d: boolean) { return this },
           onClick(fn: () => void) { this.callback = fn; return this },
+          setSubmenu(cb?: unknown) {
+            // Obsidian API: setSubmenu() returns a new Menu (no-arg overload)
+            // OR setSubmenu(cb) calls cb with a new Menu (callback overload)
+            const submenu = new Menu()
+            if (typeof cb === 'function') {
+              ;(cb as (m: unknown) => void)(submenu)
+              return this
+            }
+            // No-arg: return the submenu directly (Kanban uses this pattern)
+            return submenu
+          },
         }
-        cb(item)
-        this.items.push(item)
-        return this
+        return item
       }
-      addSeparator(): Menu { return this }
       showAtMouseEvent(evt: MouseEvent): void {
         this.show(evt.clientX, evt.clientY)
       }
@@ -2111,96 +2385,64 @@ if (typeof window !== 'undefined') {
   // ─── CodeMirror 6 stubs (used by Kanban inline editor, Tasks, etc.) ─────
   // Obsidian re-exports @codemirror/state and @codemirror/view.
   // Plugins that use CodeMirror extensions (StateField, EditorView, etc.) require these.
-  // We provide no-op stubs that allow the plugin to load without crashing.
+  // We provide REAL CM6 implementations so that plugins can register functional editor
+  // extensions via registerEditorExtension(). The real modules are already in the Vite
+  // bundle (used by CodeMirrorEditor), so this is zero additional bundle cost.
   if (!(window as unknown as { __codemirrorState?: unknown }).__codemirrorState) {
-    const noopFacet = { of: () => ({}), compute: () => ({}) }
     ;(window as unknown as { __codemirrorState: Record<string, unknown> }).__codemirrorState = {
-      StateField: {
-        define: (config: unknown) => ({ ...config as object, __stateField: true }),
-      },
-      StateEffect: {
-        define: () => ({ of: (value: unknown) => ({ value }) }),
-      },
-      Facet: {
-        define: () => noopFacet,
-      },
-      RangeValue: class RangeValue {
-        eq(_other: unknown): boolean { return false }
-      },
-      RangeSet: {
-        empty: {},
-        of: () => ({}),
-      },
-      EditorState: {
-        create: () => ({}),
-      },
-      Transaction: {},
-      Prec: {
-        highest: (ext: unknown) => ext,
-        high: (ext: unknown) => ext,
-        default: (ext: unknown) => ext,
-        low: (ext: unknown) => ext,
-        lowest: (ext: unknown) => ext,
-      },
-      EditorSelection: {
-        single: (anchor: number, head?: number) => ({ anchor, head: head ?? anchor }),
-        cursor: (pos: number) => ({ anchor: pos, head: pos }),
-      },
-      Compartment: class Compartment {
-        of(ext: unknown) { return ext }
-        reconfigure(ext: unknown) { return { effects: ext } }
-      },
+      ...CmState as unknown as Record<string, unknown>,
+      // Stubs for exports not in @codemirror/state but expected by some plugins
+      Transaction: CmState.Transaction ?? {},
+      RangeValue: (CmState as unknown as Record<string, unknown>).RangeValue ?? class RangeValue { eq(_other: unknown): boolean { return false } },
+      RangeSet: (CmState as unknown as Record<string, unknown>).RangeSet ?? { empty: {}, of: () => ({}) },
     }
   }
   if (!(window as unknown as { __codemirrorView?: unknown }).__codemirrorView) {
     ;(window as unknown as { __codemirrorView: Record<string, unknown> }).__codemirrorView = {
-      EditorView: {
-        theme: () => ({}),
-        baseTheme: () => ({}),
-        domEventHandlers: () => ({}),
-        updateListener: { of: () => ({}) },
-        editable: { of: () => ({}) },
-        decorations: { of: () => ({}), compute: () => ({}) },
-        lineWrapping: {},
-      },
-      ViewPlugin: {
-        fromClass: (_cls: unknown, _spec?: unknown) => ({}),
-        define: (_create: unknown, _spec?: unknown) => ({}),
-      },
-      Decoration: {
-        mark: () => ({}),
-        widget: () => ({}),
-        line: () => ({}),
-        set: () => ({}),
-        none: {},
-      },
-      WidgetType: class WidgetType {
-        toDOM(): HTMLElement { return document.createElement('span') }
-        eq(_other: unknown): boolean { return false }
-      },
-      keymap: { of: () => ({}) },
-      placeholder: () => ({}),
+      ...CmView as unknown as Record<string, unknown>,
+      // Stub for placeholder if not exported by the version we have
+      placeholder: (CmView as unknown as Record<string, unknown>).placeholder ?? (() => ({})),
     }
   }
   if (!(window as unknown as { __codemirrorLanguage?: unknown }).__codemirrorLanguage) {
     ;(window as unknown as { __codemirrorLanguage: Record<string, unknown> }).__codemirrorLanguage = {
-      syntaxTree: () => ({ resolve: () => null }),
-      ensureSyntaxTree: () => null,
-      defineLanguageFacet: () => ({ of: () => ({}) }),
-      Language: class Language {
-        constructor() {}
-        static define() { return {}; }
-      },
-      StreamLanguage: {
-        define: (_spec: unknown) => ({}),
-      },
-      LanguageSupport: class LanguageSupport {
-        constructor(_lang: unknown, _support?: unknown) {}
-      },
-      HighlightStyle: { define: () => ({}) },
-      syntaxHighlighting: () => ({}),
-      indentUnit: { of: () => ({}) },
-      foldable: () => false,
+      ...CmLanguage as unknown as Record<string, unknown>,
+      // Polyfill: tokenClassNodeProp was removed from @codemirror/language in v6.x
+      // but Obsidian still exports it. Plugins like Dataview use it to read CSS classes
+      // from syntax tree nodes. We provide the singleton instance from our polyfill module
+      // which is also configured on the Markdown parser's NodeTypes.
+      tokenClassNodeProp,
+      // Override syntaxTree() with Obsidian-compatible version that adjusts InlineCode
+      // node ranges to exclude backtick markers. In @codemirror/lang-markdown, InlineCode
+      // nodes include the backticks in their from/to range. In Obsidian's parser, they
+      // don't — the range covers only the content. Plugins like Dataview rely on this
+      // by doing sliceString(node.from, node.to) and checking startsWith("=").
+      syntaxTree: createObsidianCompatSyntaxTree(CmLanguage.syntaxTree),
+    }
+  }
+  if (!(window as unknown as { __codemirrorCommands?: unknown }).__codemirrorCommands) {
+    ;(window as unknown as { __codemirrorCommands: Record<string, unknown> }).__codemirrorCommands = {
+      ...CmCommands as unknown as Record<string, unknown>,
+    }
+  }
+  if (!(window as unknown as { __codemirrorAutocomplete?: unknown }).__codemirrorAutocomplete) {
+    ;(window as unknown as { __codemirrorAutocomplete: Record<string, unknown> }).__codemirrorAutocomplete = {
+      ...CmAutocomplete as unknown as Record<string, unknown>,
+    }
+  }
+  if (!(window as unknown as { __codemirrorSearch?: unknown }).__codemirrorSearch) {
+    ;(window as unknown as { __codemirrorSearch: Record<string, unknown> }).__codemirrorSearch = {
+      ...CmSearch as unknown as Record<string, unknown>,
+    }
+  }
+  if (!(window as unknown as { __lezerHighlight?: unknown }).__lezerHighlight) {
+    ;(window as unknown as { __lezerHighlight: Record<string, unknown> }).__lezerHighlight = {
+      ...LezerHighlight as unknown as Record<string, unknown>,
+    }
+  }
+  if (!(window as unknown as { __lezerCommon?: unknown }).__lezerCommon) {
+    ;(window as unknown as { __lezerCommon: Record<string, unknown> }).__lezerCommon = {
+      ...LezerCommon as unknown as Record<string, unknown>,
     }
   }
 
@@ -2226,12 +2468,39 @@ if (typeof window !== 'undefined') {
   // and many plugins import them via `const { StateField, EditorView } = require('obsidian')`
   const cmState = (window as unknown as { __codemirrorState: Record<string, unknown> }).__codemirrorState
   const cmView = (window as unknown as { __codemirrorView: Record<string, unknown> }).__codemirrorView
+  const cmLang = (window as unknown as { __codemirrorLanguage: Record<string, unknown> }).__codemirrorLanguage
+  const cmCommands = (window as unknown as { __codemirrorCommands: Record<string, unknown> }).__codemirrorCommands
+  const cmAutocomplete = (window as unknown as { __codemirrorAutocomplete: Record<string, unknown> }).__codemirrorAutocomplete
+  const cmSearchMod = (window as unknown as { __codemirrorSearch: Record<string, unknown> }).__codemirrorSearch
+  const lezerHighlight = (window as unknown as { __lezerHighlight: Record<string, unknown> }).__lezerHighlight
   for (const [key, value] of Object.entries(cmState)) {
     if (!window.obsidian[key]) window.obsidian[key] = value
   }
   for (const [key, value] of Object.entries(cmView)) {
     if (!window.obsidian[key]) window.obsidian[key] = value
   }
+  for (const [key, value] of Object.entries(cmLang)) {
+    if (!window.obsidian[key]) window.obsidian[key] = value
+  }
+  for (const [key, value] of Object.entries(cmCommands)) {
+    if (!window.obsidian[key]) window.obsidian[key] = value
+  }
+  for (const [key, value] of Object.entries(cmAutocomplete)) {
+    if (!window.obsidian[key]) window.obsidian[key] = value
+  }
+  for (const [key, value] of Object.entries(cmSearchMod)) {
+    if (!window.obsidian[key]) window.obsidian[key] = value
+  }
+  for (const [key, value] of Object.entries(lezerHighlight)) {
+    if (!window.obsidian[key]) window.obsidian[key] = value
+  }
+
+  // Obsidian-specific StateFields that plugins access via require('obsidian')
+  // These are NOT part of @codemirror/* packages — they are Obsidian's own additions.
+  window.obsidian.editorInfoField = editorInfoField
+  window.obsidian.editorEditorField = editorEditorField
+  window.obsidian.editorLivePreviewField = editorLivePreviewField
+  window.obsidian.editorViewField = editorViewField
 
   if (!(window as unknown as { __obsidianDailyNotesInterface?: unknown }).__obsidianDailyNotesInterface) {
     /**

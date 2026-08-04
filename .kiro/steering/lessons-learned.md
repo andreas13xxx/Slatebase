@@ -4,6 +4,7 @@ Kompakte Referenz für nicht-offensichtliche Erkenntnisse aus der Entwicklung. G
 
 ## Architektur-Patterns
 
+- **Keine Insellösungen:** Fixes und Features immer so implementieren, dass sie generisch wirken — nicht nur den einen gemeldeten Fall lösen. Beispiel: Wenn `this.tags` bei Dataview nicht funktioniert, nicht nur Tags fixen, sondern die gesamte MetadataCache-Pipeline (Frontmatter, Tags, Links) korrekt implementieren, damit auch `this.author`, `this.file.links`, etc. sofort funktionieren. Vor dem Fix fragen: "Welche ähnlichen Fälle gibt es noch, und löst mein Ansatz die alle mit?"
 - **Module-Level Bridge:** `Set<Callback>` für Cross-Provider-Events (`onX()`/`dispatchX()`) — z.B. `realtimeVaultBridge.ts`, `realtimeSyncBridge.ts`, `tabViewBridge.ts`
 - **Atomare Writes:** `<target>.${crypto.randomBytes(8).toString('hex')}.tmp` → `rename()` — nie direkt die Zieldatei überschreiben
 - **Validierung ZWEI Schichten:** Zod (Controller) + Business-Validierung. Bei Änderungen IMMER beide prüfen.
@@ -57,6 +58,8 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - `Element.prototype.doc`/`.win`: Obsidian-spezifische Getter für ownerDocument/defaultView
 - Settings-Container braucht `data-plugin-id={pluginId}` für CSS-Scope
 - Plugin CSS wird NICHT automatisch geladen — `CssInjector` explizit in `plugin-context.ts`
+- **`createEl`/`createDiv` String-Argument**: In Obsidian setzt `createDiv("className")` die CSS-Klasse. NICHT textContent! Beide Stellen fixen: `setting-tab.ts` (synchron) UND `obsidian-api-extensions.ts` (async re-register)
+- **`--text-faint` Dark Mode**: `#484f58` ist zu dunkel auf dunklem Hintergrund. Muss `#7a8088` oder heller sein damit Kanban-Icons/Texte sichtbar bleiben.
 
 ### Shim-Spezifika
 - `requestUrl` Response: MUSS `{ status, headers, text, json, arrayBuffer }` haben — `arrayBuffer` ist Pflicht
@@ -66,7 +69,13 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - `Workspace.viewStateReceivers`: Array-Stub mit `.remove()` No-Op (Kanban)
 - `VaultShim.create()` = create-or-get (Calendar erwartet kein Reject bei existierender Datei)
 - `VaultShim.getName()` gibt `"${name}-${vaultId}"` zurück (verhindert IndexedDB-Kollision)
+- `VaultShim.getAbstractFileByPath("")` und `"/"` müssen den Root-TFolder zurückgeben (Dataview PrefixIndex)
 - `process`-Shim im Bundle-Wrapper: `{ platform: 'linux', env: {} }` (LiveSync/octagonal-wheels)
+- **MetadataCacheShim**: `getFileCache()` darf für existierende Dateien nie `null` zurückgeben — Dataview überspringt sonst die Datei komplett beim Indexieren
+- **MetadataCacheShim**: On-Demand-Parsing via `populateFromContent(path, content)` — VaultShim ruft das nach `read()` auf, MetadataCacheShim parst Frontmatter/Tags/Links synchron für den nächsten `getFileCache()`-Aufruf
+- **MetadataCacheShim**: CRLF normalisieren BEVOR Frontmatter/Tag-Parsing (Windows-Zeilenenden brechen `[...]`-Array-Erkennung)
+- **MetadataCacheShim**: Code-Block-Fence-Tracking mit Fence-Length (nicht simples Toggle) — verschachtelte Fences (`````markdown` innerhalb ````) sonst falsch-positiv für Tags/Links
+- **syntaxTree-Wrapper**: `InlineCode`-Nodes im Standard-Lezer-Parser inkludieren Backticks in `from`/`to`. Obsidian's Parser nicht. Wrapper auf `window.__codemirrorLanguage.syntaxTree` adjustiert per Proxy die Node-Ranges für alle `iterate()`-Aufrufe.
 
 ### Proxy & Netzwerk
 - Cross-Origin-Requests über `/api/v1/proxy` routen (sandbox.ts `createFetchProxy`/`createXHRProxy`)
@@ -82,9 +91,16 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - `getActiveFile()` gibt `null` bei Plugin-Tabs
 - `onOpen()`/`onClose()` Exceptions geloggt, blockieren nie Cleanup
 - Plugin-View-Tabs `dispatchOpenPluginViewTab` mit `setTimeout(0)` (React braucht State-Commit)
+- **TextFileView-basierte Views** (Kanban): Werden NICHT als Plugin-View-Tab geöffnet — sie rendern im bestehenden File-Tab via `file-view-registry.ts`
+- **`onViewActivated`-Callback**: TextFileView-basierte Views NICHT in `activeViews`-Map aufnehmen — sonst raubt `PluginViewPanel` den `containerEl` aus dem TabContent-DOM
+- **`data-plugin-id`-Attribut**: MUSS auf dem TabContent-Container für Plugin-File-Views gesetzt werden (`fileViewMatch.pluginId`) — ohne das greifen die geschopten Plugin-CSS-Regeln nicht
+- **View Lifecycle**: `_loaded = true` direkt auf View setzen VOR `onOpen()` — nicht `view.load()` aufrufen (triggert `onload()` was bei manchen Plugins kollidiert). `addChild()` prüft `_loaded` und ruft `child.load()` nur auf wenn true.
+- **`Component._loaded`**: Instance-Property, nicht Prototype. TextFileView erbt es NICHT automatisch — muss im `setViewState` explizit auf dem View-Objekt gesetzt werden.
 
 ### CM6 Stubs → Echte Module
 - CM6-Stubs (`StateField`, `EditorView`, etc.) auf `window.__codemirrorState`/`View` sind durch echte `@codemirror/*` Module ersetzt seit Live Preview Editor. Plugin-CM6-Extensions funktionieren automatisch mit.
+- `window.__codemirrorLanguage.syntaxTree` ist ein Proxy-Wrapper der `InlineCode`-Nodes adjustiert (from/to ohne Backticks). Plugins die `syntaxTree().iterate()` nutzen bekommen Obsidian-kompatible Ranges.
+- `refreshPluginExtensions()` dispatcht am Ende `{selection: view.state.selection}` — triggert ViewPlugin-Updates für Plugins die nur auf `selectionSet` reagieren (z.B. Dataview Inline-Rendering).
 
 ## Vault Sync
 
@@ -162,6 +178,13 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 27. `tsc --noEmit` ≠ `tsc -b`: Prod-Build (`tsc -b`) strenger. Immer `npm run build` als Validierung.
 28. Plugin-Event-Bridge: `markPluginWrite(path)` → Events 500ms ignorieren (Loop-Prevention)
 29. Welcome Vault v2: eigene Route, eigenes Rate-Limit (3/h), Namens-Deduplication `(2)`–`(99)`
+30. Dataview `this.file.links` existiert NICHT — das Feld heißt `this.file.outlinks` (ausgehend) / `this.file.inlinks` (eingehend)
+31. Dataview-Worker bekommt `metadata` von MetadataCache — parst Tags/Frontmatter NICHT selbst aus dem Content. MetadataCache MUSS diese Felder liefern.
+32. Dataview PrefixIndex nutzt `vault.getAbstractFileByPath("/")` für Root-Folder — muss `TFolder` mit `children` zurückgeben, sonst sind alle `FROM ""`-Queries leer.
+33. **Kanban Plugin File-View**: TabContent rendert Plugin-File-Views VOR dem Edit-Mode-Branch. `fileViewMatch`-Check MUSS `mode !== 'edit'` enthalten, sonst ist Edit-Mode unerreichbar.
+34. **Plugin-File-View CSS**: Container braucht `data-plugin-id={pluginId}` UND CSS-Regel `.tab-content--plugin-file-view { flex: 1; overflow: auto; min-height: 0 }`.
+35. **Kanban MarkdownDomRenderer**: Nutzt Preact-Lifecycle für `Component.load()` → `onload()` → `render()` → `MarkdownRenderer.render()`. Funktioniert nur wenn `_loaded = true` auf Parent-View UND `TextFileView.addChild()` korrekt `child.load()` aufruft.
+36. **TextFileView.addChild Override**: Die `TextFileView`-Klasse in `setting-tab.ts` darf `addChild` NICHT als No-Op (`return child`) überschreiben — muss `_loaded`-Check + `child.load()` enthalten, sonst werden Kanban's MarkdownDomRenderer-Children nie geladen.
 
 ## Multi-User & Vault-Besitz
 

@@ -191,7 +191,10 @@ export class PluginLoader implements IPluginLoader {
 
       const onloadResult = record.instance.onload();
       const onloadPromise = onloadResult instanceof Promise
-        ? onloadResult
+        ? onloadResult.catch((err: unknown) => {
+            console.error(`[PluginLoader] Plugin "${pluginId}" onload() rejected:`, err);
+            throw err;
+          })
         : Promise.resolve();
 
       // LiveSync (and similar plugins) do `void this._startUp()` in onload — fire-and-forget.
@@ -558,6 +561,7 @@ if (!window.__slatebaseXHRPatched) {
 }
 const module = { exports: {} };
 const exports = module.exports;
+const __requireWarnedModules = new Set();
 function require(id) {
   if (id === 'obsidian') {
     const obs = window.obsidian || {};
@@ -565,7 +569,7 @@ function require(id) {
       obs.EditorSuggest = class EditorSuggest { constructor() { this.scope = { keys: [], register(){return {}}, unregister(){} }; this.suggestEl = document.createElement('div'); } };
     }
     if (!obs.Component) {
-      obs.Component = class Component { load(){} unload(){} onload(){} onunload(){} addChild(c){return c} removeChild(c){return c} register(){} registerEvent(){} registerInterval(id){return id} registerDomEvent(){} };
+      obs.Component = class Component { load(){ this._loaded = true; this.onload(); } unload(){ this._loaded = false; this.onunload(); } onload(){} onunload(){} addChild(c){ if(c && c.load) c.load(); return c; } removeChild(c){ if(c && c.unload) c.unload(); return c; } register(){} registerEvent(){} registerInterval(id){return id} registerDomEvent(){} };
     }
     if (!obs.Plugin) {
       obs.Plugin = class Plugin extends obs.Component {
@@ -577,7 +581,7 @@ function require(id) {
         addChild(c){ this._children.push(c); if(c&&c.load) c.load(); return c; }
         removeChild(c){ const i=this._children.indexOf(c); if(i>=0) this._children.splice(i,1); if(c&&c.unload) c.unload(); return c; }
         registerMarkdownPostProcessor(p){ return p; } registerMarkdownCodeBlockProcessor(){ return {}; }
-        registerEditorExtension(){} registerExtensions(){} registerObsidianProtocolHandler(){} removeCommand(){} registerCliHandler(){}
+        registerEditorExtension(ext){ console.log('[Plugin.base] registerEditorExtension called (BASE CLASS NO-OP), ext:', Array.isArray(ext) ? 'Array('+ext.length+')' : typeof ext); } registerExtensions(){} registerObsidianProtocolHandler(){} removeCommand(){} registerCliHandler(){}
       };
     }
     if (!obs.requireApiVersion) {
@@ -662,20 +666,20 @@ function require(id) {
   }
   if (id === 'obsidian-daily-notes-interface') return window.__obsidianDailyNotesInterface || {};
   if (id === 'moment') return window.moment;
-  if (id === '@codemirror/state') return window.__codemirrorState || { StateField: { define: function(c) { return c; } }, StateEffect: { define: function() { return { of: function(v) { return { value: v }; } }; } }, Facet: { define: function() { return { of: function(){return {};}, compute: function(){return {};} }; } }, Prec: { highest: function(e){return e;}, high: function(e){return e;}, default: function(e){return e;}, low: function(e){return e;}, lowest: function(e){return e;} }, Compartment: class { of(e){return e;} reconfigure(e){return {effects:e};} }, RangeValue: class { eq(){return false;} }, RangeSet: { empty: {}, of: function(){return {};} }, EditorSelection: { single: function(a,h){return {anchor:a,head:h||a};}, cursor: function(p){return {anchor:p,head:p};} }, EditorState: { create: function(){return {};} }, Transaction: {} };
-  if (id === '@codemirror/view') return window.__codemirrorView || { EditorView: { theme: function(){return {};}, baseTheme: function(){return {};}, domEventHandlers: function(){return {};}, updateListener: { of: function(){return {};} }, editable: { of: function(){return {};} }, decorations: { of: function(){return {};}, compute: function(){return {};} }, lineWrapping: {} }, ViewPlugin: { fromClass: function(){return {};}, define: function(){return {};} }, Decoration: { mark: function(){return {};}, widget: function(){return {};}, line: function(){return {};}, set: function(){return {};}, none: {} }, WidgetType: class { toDOM(){return document.createElement('span');} eq(){return false;} }, keymap: { of: function(){return {};} } };
-  if (id === '@codemirror/language') return window.__codemirrorLanguage || { syntaxTree: function(){return {resolve:function(){return null;}};}, ensureSyntaxTree: function(){return null;}, StreamLanguage: { define: function(){return {};} }, LanguageSupport: class { constructor(){} }, syntaxHighlighting: function(){return {};}, indentUnit: { of: function(){return {};} } };
-  if (id === '@codemirror/commands') return {};
-  if (id === '@codemirror/autocomplete') return {};
-  if (id === '@codemirror/search') return {};
-  if (id === '@codemirror/lint') return {};
-  if (id === '@codemirror/history') return {};
-  if (id.startsWith('@codemirror/')) return {};
-  if (id === '@lezer/common') return { Tree: class { constructor(){} static empty = {} }, NodeType: { none: {} }, NodeSet: class { constructor(){} }, Parser: class { parse(){ return {}; } } };
-  if (id === '@lezer/lr') return { LRParser: { deserialize: function(spec) { return { configure: function(){ return this; }, parse: function(){ return {}; }, startParse: function(){ return { advance: function(){ return null; } }; } }; } } };
-  if (id === '@lezer/highlight') return { tags: {}, Tag: { define: function(){ return {}; } }, styleTags: function(){ return {}; }, classHighlighter: {}, defaultHighlightStyle: {}, HighlightStyle: { define: function(){ return {}; } } };
-  if (id.startsWith('@lezer/')) return {};
-  console.warn('[PluginLoader] Unknown require:', id);
+  if (id === '@codemirror/state') return window.__codemirrorState || {};
+  if (id === '@codemirror/view') return window.__codemirrorView || {};
+  if (id === '@codemirror/language') return window.__codemirrorLanguage || {};
+  if (id === '@codemirror/commands') return window.__codemirrorCommands || {};
+  if (id === '@codemirror/autocomplete') return window.__codemirrorAutocomplete || {};
+  if (id === '@codemirror/search') return window.__codemirrorSearch || {};
+  if (id === '@codemirror/lint') { if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.warn('[PluginLoader] Module "' + id + '" is not installed — returning empty stub. Plugin features using this module will not work.'); } return {}; }
+  if (id === '@codemirror/history') { if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.warn('[PluginLoader] Module "' + id + '" is not installed — returning empty stub. History is available via @codemirror/commands.'); } return {}; }
+  if (id.startsWith('@codemirror/')) { if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.warn('[PluginLoader] Module "' + id + '" is not available — returning empty stub. Plugin features using this module may not work.'); } return {}; }
+  if (id === '@lezer/common') return window.__lezerCommon || {};
+  if (id === '@lezer/lr') { if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.warn('[PluginLoader] Module "@lezer/lr" is using a minimal stub (LRParser.deserialize). Custom Lezer grammars may not work correctly.'); } return { LRParser: { deserialize: function(spec) { return { configure: function(){ return this; }, parse: function(){ return {}; }, startParse: function(){ return { advance: function(){ return null; } }; } }; } } }; }
+  if (id === '@lezer/highlight') return window.__lezerHighlight || {};
+  if (id.startsWith('@lezer/')) { if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.warn('[PluginLoader] Module "' + id + '" is not available — returning empty stub.'); } return {}; }
+  if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.warn('[PluginLoader] Unknown module "' + id + '" — returning empty stub. Plugin features using this module will not work.'); }
   return {};
 }
 if (!window.CodeMirror) { window.CodeMirror = { defineMode: function(){}, defineMIME: function(){}, defineExtension: function(){}, defineOption: function(){}, registerHelper: function(){}, registerGlobalHelper: function(){}, modes: {}, mimeModes: {}, resolveMode: function(){return {};}, getMode: function(){return {token:function(){return null;}};}, Pass: {} }; }

@@ -211,8 +211,10 @@ src/
 │   ├── auto-save.ts          — Auto-save extension (updateListener → debounce → save callback)
 │   ├── image-paste.ts        — Image paste + DnD upload extension
 │   ├── vim-mode.ts           — Vim mode wrapper (@replit/codemirror-vim Compartment toggle)
-│   ├── plugin-extensions.ts  — Plugin extension registry (per-plugin Compartment, add/remove/isolate)
+│   ├── plugin-extensions.ts  — Plugin extension registry (per-plugin Compartment, add/remove/isolate, selection-dispatch after refresh)
 │   ├── editor-shim.ts        — EditorShim (1-indexed position API for legacy consumers + plugin compat)
+│   ├── editor-state-fields.ts — Obsidian-compatible StateFields (editorInfoField, editorLivePreviewField, editorEditorField)
+│   ├── token-class-node-prop.ts — Singleton NodeProp + Mapping (tokenClassNodeProp polyfill for Obsidian compat)
 │   ├── CodeMirrorEditor.tsx  — React wrapper (EditorView in useRef, props→effects sync, mode toggle)
 │   └── live-preview/
 │       ├── index.ts          — Barrel export for live-preview decorations
@@ -263,7 +265,7 @@ src/
 │       ├── compatibility-analyzer.ts — Multi-layer browser compatibility analysis (isDesktopOnly gate, Node.js module detection, Obsidian API pattern matching, SUPPORTED_METHODS set)
 │       ├── plugin-context.ts — PluginProvider + usePluginContext hook (vault-scoped instances, FCP loading, activeViews/sidebarViews state)
 │       ├── plugin-event-bridge.ts — usePluginEventBridge hook (tab→workspace, save→cache, tree→resolved, leaf events)
-│       ├── file-view-registry.ts — FileViewRegistry (content-based + extension-based view routing, registerExtensionsForPlugin)
+│       ├── file-view-registry.ts — FileViewRegistry (content-based + extension-based view routing, registerExtensionsForPlugin, active file view lifecycle for TextFileView-based plugins like Kanban)
 │       ├── view-registry.ts — ViewRegistry (plugin-ownership tracking, location-aware leaf creation, sidebar callbacks)
 │       ├── obsidian-compat.css — Obsidian-compatible CSS Custom Properties (100+ vars mapped to Slatebase tokens, Dark Mode)
 │       ├── tab-view-bridge.ts — TabViewBridge (module-level bridge: ViewRegistry → TabProvider for plugin view tabs)

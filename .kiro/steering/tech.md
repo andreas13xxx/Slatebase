@@ -125,8 +125,30 @@ Kein Express/Fastify/Koa, kein Redux/Zustand, kein ORM, kein DI-Container, kein 
 - `undo()`/`redo()`/`exec()` nutzen dynamic `import('@codemirror/commands')` um Top-Level-Import-Kosten zu vermeiden.
 - Position-Konvertierung: Obsidian ist 0-indexed (line/ch), CM6 ist offset-basiert mit 1-indexed Zeilen.
 
+### tokenClassNodeProp + syntaxTree-Wrapper
+- `@codemirror/language` v6.x hat `tokenClassNodeProp` entfernt — Obsidian exportiert es noch.
+- `token-class-node-prop.ts` definiert Singleton `NodeProp<string>` + Mapping (InlineCode→"inline-code", CodeMark→"inline-code formatting formatting-code", etc.)
+- Parser wird in `CodeMirrorEditor.tsx` via `markdownLanguage.parser.configure({props: [tokenClassNodePropSource]})` konfiguriert.
+- **InlineCode-Range-Problem**: Standard-Lezer inkludiert Backticks in `node.from/to`, Obsidian nicht. Fix: `createObsidianCompatSyntaxTree()` in `setting-tab.ts` wrapped `syntaxTree()` mit Proxy der `iterate()`-Callbacks für `InlineCode`-Nodes adjustierte from/to liefert (CodeMark-Children-basiert).
+- Wichtig: Werte werden nach dem Callback wiederhergestellt (Tree-Navigation bleibt intakt).
+
+### MetadataCacheShim → On-Demand-Parsing
+- Obsidian's MetadataCache wird automatisch vom internen Parser befüllt. In Slatebase fehlt dieser Parser.
+- Lösung: `VaultShim.read()` ruft `onFileRead` Callback → `MetadataCacheShim.populateFromContent(path, content)` → synchrones Parsing (Frontmatter, Tags, Links).
+- `getFileCache()` prüft: expliziter Cache → contentStore on-demand-Parse → Tree-Fallback `{}` → `null`.
+- Dataview's Worker bekommt `metadata` von `getFileCache()` und liest daraus Tags + Frontmatter (parst den Content-Body NICHT für diese Felder).
+
 ### Plugin-Fehler-Isolation
 - `onLayoutReady`: try/catch für synchrone throws + `.catch()` für async rejections.
 - `iterateAllLeaves`: Überspringt Leaves ohne view/containerEl.
 - `activatePlugin`: 10s Timeout, Error → Plugin-Status `error`, nächstes Plugin wird geladen.
 - Plugin-Registrierungs-Callbacks (addCommand, registerView, registerExtensions): Vault-Generation-Guard verhindert Registrierungen nach Vault-Wechsel.
+
+### Plugin File-View Rendering (TextFileView-Plugins wie Kanban)
+- `file-view-registry.ts`: Matcher-basiertes Routing (Frontmatter-Check für `.md`-Dateien, Extension-Check für andere)
+- `TabContent.tsx`: Plugin-File-View Branch MUSS `mode !== 'edit'` prüfen, sonst ist Edit-Mode unerreichbar
+- Container MUSS `data-plugin-id={pluginId}` Attribut haben (CSS-Scoping)
+- `onViewActivated`-Callback: TextFileView-basierte Views NICHT in `activeViews` aufnehmen (sonst DOM-Raub durch PluginViewPanel)
+- `view-registry.ts setViewState()`: `_loaded = true` direkt auf View setzen VOR `onOpen()` (kein `view.load()` — triggert unerwünschtes `onload()`)
+- `TextFileView.addChild()`: MUSS `if (this._loaded) child.load()` aufrufen (nicht No-Op)
+- `createEl(tag, stringArg)`: String-Argument ist className, NICHT textContent (Obsidian-Konvention)

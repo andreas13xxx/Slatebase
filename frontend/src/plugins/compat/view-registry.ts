@@ -363,6 +363,8 @@ export class WorkspaceLeaf {
   app: unknown
   /** The location of this leaf in the workspace layout */
   readonly location: LeafLocation
+  /** The container element for this leaf (wraps the view's containerEl) */
+  readonly containerEl: HTMLElement
 
   private readonly registry: ViewRegistry
 
@@ -370,6 +372,8 @@ export class WorkspaceLeaf {
     this.app = app
     this.registry = registry
     this.location = location
+    this.containerEl = document.createElement('div')
+    this.containerEl.className = 'workspace-leaf'
   }
 
   /**
@@ -402,20 +406,33 @@ export class WorkspaceLeaf {
     // Create and open new view
     const view = creator(this) as ItemView
     this.view = view
+    // Mount view's containerEl inside the leaf's containerEl (Obsidian pattern)
+    this.containerEl.appendChild(view.containerEl)
 
-    // If the view is a TextFileView and state includes a file path, load the file
-    if (view instanceof TextFileView && state.state?.file && typeof state.state.file === 'string') {
+    // If the view is a TextFileView (duck-type: has getViewData/setViewData/requestSave)
+    // and state includes a file path, load the file before calling onOpen.
+    const viewAny = view as unknown as Record<string, unknown>
+    const isTextFileView = typeof viewAny.getViewData === 'function'
+      && typeof viewAny.setViewData === 'function'
+      && typeof viewAny.requestSave === 'function'
+    if (isTextFileView && state.state?.file && typeof state.state.file === 'string') {
+      // Mark as loaded so addChild() auto-loads children (without triggering onload() which may conflict with onOpen)
+      ;(viewAny as { _loaded?: boolean })._loaded = true
+      // Call onOpen — plugins (Kanban) set up their React root in onOpen
       try {
-        await view.setState(state.state, { history: !!state.popstate })
-        // Open the file as a tab in the Slatebase UI
-        const workspace = (this.app as { workspace?: { openFileDirectly?: (filePath: string) => void } })?.workspace
-        if (workspace?.openFileDirectly) {
-          workspace.openFileDirectly(state.state.file as string)
-        }
+        await view.onOpen()
+      } catch (err) {
+        console.error(`[WorkspaceLeaf] Error in onOpen for TextFileView "${viewType}":`, err)
+      }
+      // Then load the file via setState → loadFile → setViewData
+      try {
+        await (viewAny as unknown as { setState(state: Record<string, unknown>, result: { history?: boolean }): Promise<void> }).setState(state.state, { history: !!state.popstate })
       } catch (err) {
         console.error(`[WorkspaceLeaf] Error loading file in TextFileView "${viewType}":`, err)
       }
     } else {
+      // Mark as loaded so addChild() auto-loads children (without triggering onload() which may conflict with onOpen)
+      ;(viewAny as { _loaded?: boolean })._loaded = true
       try {
         await view.onOpen()
       } catch (err) {

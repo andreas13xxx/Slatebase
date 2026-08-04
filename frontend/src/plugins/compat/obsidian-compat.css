@@ -176,7 +176,7 @@
   /* ─── Text (Dark) ────────────────────────────────────────────────────────── */
   --text-normal: var(--text-primary, #e6edf3);
   --text-muted: var(--text-secondary, #8b949e);
-  --text-faint: #484f58;
+  --text-faint: #7a8088;
   --text-on-accent: #ffffff;
   --text-error: #f85149;
   --text-success: #3fb950;

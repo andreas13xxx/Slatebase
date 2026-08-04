@@ -48,10 +48,10 @@ import { MetadataCacheShim } from './shims/metadata-cache-shim'
 import { FileManagerShim } from './shims/file-manager-shim'
 import type { IVaultShim } from './types'
 import { registerFileViewMatcher, unregisterAllFileViewMatchersForPlugin, removeActiveFileViewsForPlugin, registerExtensionsForPlugin } from './file-view-registry'
-import { registerCodeBlockProcessor, registerPostProcessor } from './code-block-processor-registry'
+import { registerCodeBlockProcessor, registerPostProcessor, unregisterAllForPlugin as unregisterAllCodeBlocksForPlugin } from './code-block-processor-registry'
 import { AppShim } from './shims/app-shim'
 import { setEditorViewAccessor } from './editor-shim'
-import { getActiveEditorView } from '../../editor/plugin-extensions'
+import { getActiveEditorView, registerPluginExtension, removePluginExtensions, registerPluginCompletionSource, removePluginCompletionSources } from '../../editor/plugin-extensions'
 import { registerMarkdownViewGlobal } from './shims/markdown-view-shim'
 import { registerMarkdownRendererGlobal } from './shims/markdown-renderer-shim'
 import { registerSuggestModalGlobals } from './shims/suggest-modal-shim'
@@ -82,6 +82,10 @@ import {
   getRibbonIcons,
   addRibbonIcon,
 } from './ribbon-icon-registry'
+import {
+  removeStatusBarItemsForPlugin,
+  clearAllStatusBarItems,
+} from './status-bar-registry'
 import type { RibbonIconEntry } from './ribbon-icon-registry'
 
 // ─── Context Value ───────────────────────────────────────────────────────────
@@ -119,8 +123,8 @@ export interface PluginContextValue {
   sidebarViews: Map<string, SidebarViewInfo>
   /** Plugin ribbon icons (for rendering in the toolbar) */
   ribbonIcons: RibbonIconEntry[]
-  /** Create a plugin file view for a given view type and file path. Returns the container element or null. */
-  createFileView(viewType: string, filePath: string): Promise<HTMLElement | null>
+  /** Create a plugin file view for a given view type and file path. Returns container, leaf, and view or null. */
+  createFileView(viewType: string, filePath: string): Promise<{ containerEl: HTMLElement; leaf: WorkspaceLeaf; view: ItemView } | null>
 }
 
 // ─── React Context ───────────────────────────────────────────────────────────
@@ -234,9 +238,15 @@ export function PluginProvider({
     commandRegistryRef.current.removeAllForPlugin(pluginId)
     settingTabRegistryRef.current.remove(pluginId)
     removeRibbonIconsForPlugin(pluginId)
+    removeStatusBarItemsForPlugin(pluginId)
     unregisterAllFileViewMatchersForPlugin(pluginId)
     await removeActiveFileViewsForPlugin(pluginId)
     await viewRegistryRef.current.detachAllForPlugin(pluginId)
+    // Remove CM6 editor extensions and completion sources for this plugin
+    removePluginExtensions(pluginId)
+    removePluginCompletionSources(pluginId)
+    // Remove code block processors and post-processors for this plugin
+    unregisterAllCodeBlocksForPlugin(pluginId)
   }
 
   // ─── Vault Switch: unload all → rebuild instances → reload ───────────────
@@ -297,6 +307,8 @@ export function PluginProvider({
     await viewRegistryRef.current.clear()
     // Clear ribbon icons (plugin-scoped)
     clearAllRibbonIcons()
+    // Clear status bar items (plugin-scoped)
+    clearAllStatusBarItems()
     setActiveViews(new Map())
     setSidebarViews(new Map())
 
@@ -333,18 +345,28 @@ export function PluginProvider({
     const newViewRegistry = new ViewRegistry()
     viewRegistryRef.current = newViewRegistry
     newViewRegistry.setOnViewActivated((viewType: string, view: ItemView) => {
-      setActiveViews(prev => {
-        const next = new Map(prev)
-        next.set(viewType, {
-          viewType,
-          displayText: view.getDisplayText(),
-          containerEl: view.containerEl,
-        })
-        return next
-      })
       // Open a tab for main-location plugin views (LiveSync Log, etc.)
-      // Use setTimeout to ensure setActiveViews has committed before TabContent renders
-      if (newVaultId) {
+      // Skip for TextFileView-based views (Kanban) — they render inside an existing file tab.
+      // Duck-type check: TextFileView has getViewData/setViewData/requestSave methods.
+      const viewAny = view as unknown as Record<string, unknown>
+      const isFileBackedView = typeof viewAny.getViewData === 'function'
+        && typeof viewAny.setViewData === 'function'
+        && typeof viewAny.requestSave === 'function'
+
+      // Only add non-file-backed views to activeViews (which PluginViewPanel renders).
+      // TextFileView-based views are rendered by TabContent via the file-view-registry.
+      if (!isFileBackedView) {
+        setActiveViews(prev => {
+          const next = new Map(prev)
+          next.set(viewType, {
+            viewType,
+            displayText: view.getDisplayText(),
+            containerEl: view.containerEl,
+          })
+          return next
+        })
+      }
+      if (newVaultId && !isFileBackedView) {
         setTimeout(() => {
           dispatchOpenPluginViewTab(newVaultId, viewType, view.getDisplayText(), '')
         }, 0)
@@ -382,6 +404,13 @@ export function PluginProvider({
     // The app reference will be a minimal shared object — all plugins see the same vault/workspace/metadataCache
     const newVaultShim = new VaultShim(newVaultId, vaultName, apiClient, directoryTree ?? { name: vaultName, type: 'directory' as const, children: [], itemCount: 0, path: '' })
     vaultShimRef.current = newVaultShim
+
+    // Wire VaultShim to populate MetadataCache when files are read.
+    // Dataview's worker relies on metadataCache.getFileCache() returning frontmatter/tags
+    // which are parsed from the file content on demand.
+    newVaultShim.onFileRead = (path: string, content: string) => {
+      newMetadataCacheShim.populateFromContent(path, content)
+    }
     const sharedApp = {
       vault: newVaultShim,
       workspace: newWorkspaceShim,
@@ -557,6 +586,21 @@ export function PluginProvider({
           if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) return processor
           registerPostProcessor(processor as import('./code-block-processor-registry').MarkdownPostProcessor, pluginId, sortOrder)
           return processor
+        }
+        // Wire registerEditorExtension to route to the CM6 plugin extension manager
+        ;(instance as unknown as { registerEditorExtension: (extension: unknown) => void }).registerEditorExtension = (extension: unknown) => {
+          console.log(`[PluginContext] registerEditorExtension called by "${pluginId}", extension:`, Array.isArray(extension) ? `Array(${(extension as unknown[]).length})` : typeof extension)
+          if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) return
+          registerPluginExtension(pluginId, extension as import('@codemirror/state').Extension)
+        }
+        // Wire registerEditorSuggest to route to the CM6 completion source registry
+        ;(instance as unknown as { registerEditorSuggest: (suggest: unknown) => void }).registerEditorSuggest = (suggest: unknown) => {
+          if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) return
+          // EditorSuggest plugins typically expose a provider function for autocomplete
+          const suggestObj = suggest as { provider?: unknown }
+          if (typeof suggestObj.provider === 'function') {
+            registerPluginCompletionSource(pluginId, suggestObj.provider as import('@codemirror/autocomplete').CompletionSource)
+          }
         }
       },
     })
@@ -956,7 +1000,7 @@ export function PluginProvider({
     activeViews,
     sidebarViews,
     ribbonIcons,
-    createFileView: async (viewType: string, filePath: string): Promise<HTMLElement | null> => {
+    createFileView: async (viewType: string, filePath: string): Promise<{ containerEl: HTMLElement; leaf: WorkspaceLeaf; view: ItemView } | null> => {
       const workspace = workspaceShimRef.current
       const viewRegistry = workspace?.getViewRegistry() ?? viewRegistryRef.current
       if (!viewRegistry || !workspace) return null
@@ -968,7 +1012,7 @@ export function PluginProvider({
       const leaf = viewRegistry.createLeaf(sharedApp, 'main')
       await leaf.setViewState({ type: viewType, state: { file: filePath } })
       if (leaf.view) {
-        return leaf.view.containerEl
+        return { containerEl: leaf.containerEl, leaf, view: leaf.view }
       }
       return null
     },
