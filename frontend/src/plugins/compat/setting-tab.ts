@@ -44,6 +44,17 @@ import './obsidian-compat.css'
 // Must be before any plugin code evaluates — plugins use these directly.
 import './global-extensions'
 
+// Shims registered on window.obsidian at the end of this module.
+// These MUST be static imports: plugin-loader.ts injects fallback stubs for the
+// same API names synchronously when a plugin bundle evaluates, and every layer
+// guards with `if (!window.obsidian[x])` (first writer wins, permanently).
+// A deferred registration would let those throwaway stubs claim the namespace and
+// silently discard the real implementations below.
+import { SuggestModal, FuzzySuggestModal } from './suggest-modal'
+import { MarkdownRenderer } from './markdown-renderer'
+import { EditorShim } from './editor-shim'
+import { registerObsidianApiExtensions } from './obsidian-api-extensions'
+
 /**
  * Dedup guard for no-op method warnings.
  * Key format: `${pluginId}::${methodName}` — warns only once per combination.
@@ -2644,49 +2655,27 @@ if (typeof window !== 'undefined') {
   }
 
   // ─── SuggestModal / FuzzySuggestModal ──────────────────────────────────────
-  // Lazy-import to avoid circular dependency issues at module load time.
-  // These are registered synchronously since the module is already loaded
-  // by the time plugins access window.obsidian.
 
   if (!window.obsidian.SuggestModal) {
-    // Dynamic import is not needed — the module is bundled and available synchronously.
-    // We use a require-style inline import via the already-evaluated module.
-    import('./suggest-modal').then(({ SuggestModal, FuzzySuggestModal }) => {
-      window.obsidian!.SuggestModal = SuggestModal as unknown as Record<string, unknown>
-      window.obsidian!.FuzzySuggestModal = FuzzySuggestModal as unknown as Record<string, unknown>
-    }).catch(() => {
-      // Fallback: register stubs if dynamic import fails
-      console.warn('[setting-tab] Failed to load SuggestModal/FuzzySuggestModal')
-    })
+    window.obsidian.SuggestModal = SuggestModal as unknown as Record<string, unknown>
+    window.obsidian.FuzzySuggestModal = FuzzySuggestModal as unknown as Record<string, unknown>
   }
 
   // ─── MarkdownRenderer ──────────────────────────────────────────────────────
 
   if (!window.obsidian.MarkdownRenderer) {
-    import('./markdown-renderer').then(({ MarkdownRenderer }) => {
-      window.obsidian!.MarkdownRenderer = MarkdownRenderer as unknown as Record<string, unknown>
-    }).catch(() => {
-      console.warn('[setting-tab] Failed to load MarkdownRenderer')
-    })
+    window.obsidian.MarkdownRenderer = MarkdownRenderer as unknown as Record<string, unknown>
   }
 
   // ─── Editor class stub ─────────────────────────────────────────────────────
   // Some plugins reference `obsidian.Editor` for type checks.
 
   if (!window.obsidian.Editor) {
-    import('./editor-shim').then(({ EditorShim }) => {
-      window.obsidian!.Editor = EditorShim as unknown as Record<string, unknown>
-    }).catch(() => {
-      console.warn('[setting-tab] Failed to load Editor')
-    })
+    window.obsidian.Editor = EditorShim as unknown as Record<string, unknown>
   }
 
   // ─── Extended API Registration ─────────────────────────────────────────────
   // Register all additional Obsidian API extensions (icons, Events, Scope, Keymap,
   // DOM globals, utility functions, extra UI components, MarkdownPreviewRenderer).
-  import('./obsidian-api-extensions').then(({ registerObsidianApiExtensions }) => {
-    registerObsidianApiExtensions()
-  }).catch(() => {
-    console.warn('[setting-tab] Failed to load obsidian-api-extensions')
-  })
+  registerObsidianApiExtensions()
 }
