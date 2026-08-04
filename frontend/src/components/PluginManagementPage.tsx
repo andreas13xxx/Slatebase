@@ -7,12 +7,17 @@ import type { ApiCallClassification } from '../plugins/compat/compatibility-anal
 import { PluginContext } from '../plugins/compat/plugin-context'
 import {
   Plug, Settings, AlertTriangle, RefreshCw, ChevronDown, ChevronRight,
-  CheckCircle2, AlertCircle, HelpCircle, XCircle, X, Save, Trash2,
+  CheckCircle2, AlertCircle, HelpCircle, XCircle, X, Save, Trash2, Loader2,
 } from 'lucide-react'
 import { ConfirmModal } from './ConfirmModal'
 import { extractErrorMessage } from '../utils/error'
+import { useTranslation } from '../i18n'
+import { PluginStoreBrowser } from './plugin-store'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
+
+/** Tab for plugin management page */
+type PluginTab = 'installed' | 'available'
 
 /** Plugin status types */
 type PluginStatus = 'active' | 'inactive' | 'error' | 'loading'
@@ -50,6 +55,8 @@ export interface PluginManagementPageProps {
  * activation/deactivation, settings, and compatibility details.
  */
 export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPageProps) {
+  const { t } = useTranslation()
+  const [activeTab, setActiveTab] = useState<PluginTab>('installed')
   const [plugins, setPlugins] = useState<PluginDisplayItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -64,6 +71,10 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
   const [settingsLoading, setSettingsLoading] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<{ pluginId: string; pluginName: string } | null>(null)
   const [deletingPlugins, setDeletingPlugins] = useState<Set<string>>(new Set())
+  const [updateCount, setUpdateCount] = useState<number>(0)
+  const [checkingUpdates, setCheckingUpdates] = useState(false)
+  const [updateInfo, setUpdateInfo] = useState<Map<string, { latestVersion: string; repo: string }>>(new Map())
+  const [hasCheckedUpdates, setHasCheckedUpdates] = useState(false)
 
   const analyzerRef = useRef(new CompatibilityAnalyzer())
   const settingsContainerRef = useRef<HTMLDivElement>(null)
@@ -183,6 +194,43 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadPlugins()
   }, [loadPlugins])
+
+  // Check for available updates on mount (for badge on "Verfügbare Plugins" tab)
+  useEffect(() => {
+    void (async () => {
+      try {
+        const result = await apiClient.checkPluginUpdates(vaultId)
+        const count = result.plugins.filter(p => p.hasUpdate).length
+        setUpdateCount(count)
+      } catch {
+        // Non-critical: update check failure doesn't affect page functionality
+      }
+    })()
+  }, [apiClient, vaultId])
+
+  // ─── Check for updates handler ─────────────────────────────────────────
+
+  const handleCheckUpdates = async () => {
+    setCheckingUpdates(true)
+    try {
+      const result = await apiClient.checkPluginUpdates(vaultId)
+      const map = new Map<string, { latestVersion: string; repo: string }>()
+      let count = 0
+      for (const info of result.plugins) {
+        if (info.hasUpdate) {
+          map.set(info.pluginId, { latestVersion: info.latestVersion, repo: info.repo })
+          count++
+        }
+      }
+      setUpdateInfo(map)
+      setUpdateCount(count)
+      setHasCheckedUpdates(true)
+    } catch {
+      // Silently fail
+    } finally {
+      setCheckingUpdates(false)
+    }
+  }
 
   // ─── Settings modal handlers ───────────────────────────────────────────
 
@@ -455,6 +503,24 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
 
   // ─── Render ────────────────────────────────────────────────────────────
 
+  // Tab bar component (reused across states)
+  const tabBar = (
+    <div className="plugin-management-tabs">
+      <button
+        className={`plugin-management-tab ${activeTab === 'installed' ? 'plugin-management-tab--active' : ''}`}
+        onClick={() => setActiveTab('installed')}
+      >
+        {t('pluginStore.tabInstalled')}
+      </button>
+      <button
+        className={`plugin-management-tab ${activeTab === 'available' ? 'plugin-management-tab--active' : ''}`}
+        onClick={() => setActiveTab('available')}
+      >
+        {t('pluginStore.tabAvailable')}{updateCount > 0 && <span className="plugin-management-tab__badge">{updateCount}</span>}
+      </button>
+    </div>
+  )
+
   // Loading state
   if (loading) {
     return (
@@ -465,10 +531,15 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
             Plugins
           </h1>
         </div>
-        <div className="plugin-management-loading" role="status" aria-live="polite">
-          <span className="plugin-management-spinner" aria-hidden="true" />
-          <span>Plugins werden geladen…</span>
-        </div>
+        {tabBar}
+        {activeTab === 'installed' ? (
+          <div className="plugin-management-loading" role="status" aria-live="polite">
+            <span className="plugin-management-spinner" aria-hidden="true" />
+            <span>Plugins werden geladen…</span>
+          </div>
+        ) : (
+          <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} />
+        )}
       </div>
     )
   }
@@ -483,17 +554,22 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
             Plugins
           </h1>
         </div>
-        <div className="plugin-management-error" role="alert">
-          <AlertTriangle size={16} />
-          <span>{error}</span>
-          <button
-            className="plugin-management-btn plugin-management-btn--small"
-            onClick={() => void loadPlugins()}
-          >
-            <RefreshCw size={12} />
-            Erneut versuchen
-          </button>
-        </div>
+        {tabBar}
+        {activeTab === 'installed' ? (
+          <div className="plugin-management-error" role="alert">
+            <AlertTriangle size={16} />
+            <span>{error}</span>
+            <button
+              className="plugin-management-btn plugin-management-btn--small"
+              onClick={() => void loadPlugins()}
+            >
+              <RefreshCw size={12} />
+              Erneut versuchen
+            </button>
+          </div>
+        ) : (
+          <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} />
+        )}
       </div>
     )
   }
@@ -508,14 +584,21 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
             Plugins
           </h1>
         </div>
-        <PluginUploadSection apiClient={apiClient} vaultId={vaultId} onPluginInstalled={() => void loadPlugins()} />
-        <div className="plugin-management-empty">
-          <Plug size={32} className="plugin-management-empty-icon" />
-          <p className="plugin-management-empty-title">Keine Plugins installiert</p>
-          <p className="plugin-management-empty-text">
-            Installiere Obsidian Community Plugins, um zusätzliche Funktionen hinzuzufügen.
-          </p>
-        </div>
+        {tabBar}
+        {activeTab === 'installed' ? (
+          <>
+            <PluginUploadSection apiClient={apiClient} vaultId={vaultId} onPluginInstalled={() => void loadPlugins()} />
+            <div className="plugin-management-empty">
+              <Plug size={32} className="plugin-management-empty-icon" />
+              <p className="plugin-management-empty-title">Keine Plugins installiert</p>
+              <p className="plugin-management-empty-text">
+                Installiere Obsidian Community Plugins, um zusätzliche Funktionen hinzuzufügen.
+              </p>
+            </div>
+          </>
+        ) : (
+          <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} />
+        )}
       </div>
     )
   }
@@ -531,16 +614,42 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
         <span className="plugin-management-count">{plugins.length} installiert</span>
       </div>
 
-      <PluginUploadSection apiClient={apiClient} vaultId={vaultId} onPluginInstalled={() => void loadPlugins()} />
+      {tabBar}
 
-      <div className="plugin-management-warning" role="status">
-        <AlertTriangle size={14} />
-        <span>
-          <strong>Experimentell:</strong> Die Plugin-Kompatibilitätsschicht befindet sich in aktiver Entwicklung.
-          Nur browser-kompatible Plugins können ausgeführt werden. Plugins die Node.js-Module benötigen
-          (z.B. IMAP, Git, Datenbank-Zugriff) werden erst mit serverseitiger Plugin-Ausführung unterstützt.
-        </span>
-      </div>
+      {activeTab === 'installed' ? (
+        <>
+          <PluginUploadSection apiClient={apiClient} vaultId={vaultId} onPluginInstalled={() => void loadPlugins()} />
+
+          <div className="plugin-management-warning" role="status">
+            <AlertTriangle size={14} />
+            <span>
+              <strong>Experimentell:</strong> Die Plugin-Kompatibilitätsschicht befindet sich in aktiver Entwicklung.
+              Nur browser-kompatible Plugins können ausgeführt werden. Plugins die Node.js-Module benötigen
+              (z.B. IMAP, Git, Datenbank-Zugriff) werden erst mit serverseitiger Plugin-Ausführung unterstützt.
+            </span>
+          </div>
+
+          <div className="plugin-management-update-actions">
+            <button
+              className="plugin-management-check-updates-button"
+              onClick={() => void handleCheckUpdates()}
+              disabled={checkingUpdates}
+            >
+              {checkingUpdates && <Loader2 size={14} className="plugin-spinning" />}
+              {t('pluginStore.checkUpdates')}
+            </button>
+            {updateInfo.size > 0 && !checkingUpdates && (
+              <span className="plugin-management-update-summary">
+                {updateCount} {t('pluginStore.updatesAvailable').replace('{count}', '')}
+              </span>
+            )}
+            {updateInfo.size === 0 && !checkingUpdates && hasCheckedUpdates && updateCount === 0 && plugins.length > 0 && (
+              <span className="plugin-management-all-up-to-date">
+                <CheckCircle2 size={13} />
+                {t('pluginStore.allUpToDate')}
+              </span>
+            )}
+          </div>
 
       <div className="plugin-management-list">
         {plugins.map((plugin) => (
@@ -554,6 +663,11 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
                 <div className="plugin-card-name-row">
                   <span className="plugin-card-name">{plugin.name}</span>
                   <span className="plugin-card-version">v{plugin.version}</span>
+                  {updateInfo.has(plugin.pluginId) && (
+                    <span className="plugin-management-update-hint">
+                      {plugin.version} → {updateInfo.get(plugin.pluginId)!.latestVersion}
+                    </span>
+                  )}
                   <span className={`plugin-card-status plugin-card-status--${plugin.status}`}>
                     {getStatusLabel(plugin.status)}
                   </span>
@@ -786,6 +900,10 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
         onConfirm={() => { if (deleteConfirm) void handleDelete(deleteConfirm.pluginId) }}
         onCancel={() => setDeleteConfirm(null)}
       />
+        </>
+      ) : (
+        <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} />
+      )}
     </div>
   )
 }

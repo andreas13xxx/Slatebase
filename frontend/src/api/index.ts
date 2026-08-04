@@ -81,6 +81,54 @@ export interface VaultTagsResponse {
   tags: VaultTagInfo[]
 }
 
+// ─── Plugin Store Types ───────────────────────────────────────────────────────
+
+/** Entry from community-plugins.json */
+export interface CommunityPluginEntry {
+  id: string
+  name: string
+  author: string
+  description: string
+  repo: string
+}
+
+/** Remote plugin manifest from GitHub */
+export interface RemotePluginManifest {
+  id: string
+  name: string
+  version: string
+  minAppVersion?: string
+  author?: string
+  description?: string
+  isDesktopOnly?: boolean
+  [key: string]: unknown
+}
+
+/** Update info for a single plugin */
+export interface PluginUpdateInfo {
+  pluginId: string
+  installedVersion: string
+  latestVersion: string
+  hasUpdate: boolean
+  releaseUrl: string
+  repo: string
+}
+
+/** Update check result */
+export interface UpdateCheckResult {
+  plugins: PluginUpdateInfo[]
+  checkedAt: string
+  errors: Array<{ pluginId: string; reason: string }>
+}
+
+/** Bulk update result */
+export interface BulkUpdateResult {
+  updated: PluginInstallResult[]
+  failed: Array<{ pluginId: string; reason: string }>
+}
+
+// ─── Plugin Types ─────────────────────────────────────────────────────────────
+
 /**
  * Obsidian-compatible plugin manifest.
  */
@@ -300,6 +348,22 @@ export interface IApiClient {
   getDetectedPlugins(vaultId: string): Promise<{ plugins: DetectedPluginInfo[] }>
   /** Install a detected plugin from .obsidian/plugins/ into the plugin store. */
   installDetectedPlugin(vaultId: string, pluginId: string): Promise<PluginInstallResult>
+
+  // --- Plugin Store methods ---
+  /** Get community plugin list from store. */
+  getStorePlugins(): Promise<{ plugins: CommunityPluginEntry[]; cachedAt: string; total: number }>
+  /** Get remote manifest for a community plugin. */
+  getStorePluginManifest(pluginId: string): Promise<{ manifest: RemotePluginManifest }>
+  /** Install a plugin from the community store. */
+  installFromStore(vaultId: string, pluginId: string, repo: string): Promise<PluginInstallResult>
+  /** Check for updates for installed plugins. */
+  checkPluginUpdates(vaultId: string): Promise<UpdateCheckResult>
+  /** Update a single plugin to latest version. */
+  updatePlugin(vaultId: string, pluginId: string): Promise<PluginInstallResult>
+  /** Update all plugins with available updates. */
+  updateAllPlugins(vaultId: string): Promise<BulkUpdateResult>
+  /** Fetch a plugin's README.md from GitHub (via proxy). */
+  getPluginReadme(repo: string): Promise<string>
 
   // --- Feature Toggle methods ---
   /** Load features visible to the current user (name + enabled). */
@@ -799,6 +863,48 @@ export class ApiClient implements IApiClient {
   /** Install a detected plugin from .obsidian/plugins/ into the plugin store. */
   async installDetectedPlugin(vaultId: string, pluginId: string): Promise<PluginInstallResult> {
     return this.request<PluginInstallResult>('POST', `/api/v1/vaults/${vaultId}/plugins/detected/${pluginId}/install`)
+  }
+
+  // --- Plugin Store methods ---
+
+  /** Get community plugin list from store. */
+  async getStorePlugins(): Promise<{ plugins: CommunityPluginEntry[]; cachedAt: string; total: number }> {
+    return this.request<{ plugins: CommunityPluginEntry[]; cachedAt: string; total: number }>('GET', '/api/v1/plugin-store/plugins')
+  }
+
+  /** Get remote manifest for a community plugin. */
+  async getStorePluginManifest(pluginId: string): Promise<{ manifest: RemotePluginManifest }> {
+    return this.request<{ manifest: RemotePluginManifest }>('GET', `/api/v1/plugin-store/plugins/${encodeURIComponent(pluginId)}/manifest`)
+  }
+
+  /** Install a plugin from the community store. */
+  async installFromStore(vaultId: string, pluginId: string, repo: string): Promise<PluginInstallResult> {
+    return this.request<PluginInstallResult>('POST', `/api/v1/vaults/${vaultId}/plugins/store-install`, { pluginId, repo })
+  }
+
+  /** Check for updates for installed plugins. */
+  async checkPluginUpdates(vaultId: string): Promise<UpdateCheckResult> {
+    return this.request<UpdateCheckResult>('POST', `/api/v1/vaults/${vaultId}/plugins/check-updates`)
+  }
+
+  /** Update a single plugin to latest version. */
+  async updatePlugin(vaultId: string, pluginId: string): Promise<PluginInstallResult> {
+    return this.request<PluginInstallResult>('POST', `/api/v1/vaults/${vaultId}/plugins/${encodeURIComponent(pluginId)}/update`)
+  }
+
+  /** Update all plugins with available updates. */
+  async updateAllPlugins(vaultId: string): Promise<BulkUpdateResult> {
+    return this.request<BulkUpdateResult>('POST', `/api/v1/vaults/${vaultId}/plugins/update-all`)
+  }
+
+  /** Fetch a plugin's README.md from GitHub via the backend proxy. */
+  async getPluginReadme(repo: string): Promise<string> {
+    const url = `https://raw.githubusercontent.com/${repo}/HEAD/README.md`
+    const result = await this.request<{ status: number; headers: Record<string, string>; text: string }>('POST', '/api/v1/proxy', {
+      url,
+      method: 'GET',
+    })
+    return result.text
   }
 
   // --- Feature Toggle methods ---

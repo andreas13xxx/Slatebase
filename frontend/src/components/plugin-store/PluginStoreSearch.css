@@ -1,0 +1,118 @@
+/* ─── PluginStoreSearch ─────────────────────────────────────────────────────── */
+
+.plugin-store-search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* ─── Top row: Search input + counter ──────────────────────────────────────── */
+
+.plugin-store-search__row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.plugin-store-search__input-wrapper {
+  position: relative;
+  flex: 1;
+  max-width: 400px;
+}
+
+.plugin-store-search__icon {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.plugin-store-search__input {
+  width: 100%;
+  padding: 8px 12px 8px 34px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.4;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.plugin-store-search__input::placeholder {
+  color: var(--text-muted);
+}
+
+.plugin-store-search__input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.plugin-store-search__counter {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+/* ─── Bottom row: Filters + Category ───────────────────────────────────────── */
+
+.plugin-store-search__filters {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.plugin-store-search__filter-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.plugin-store-search__filter-label:hover {
+  border-color: var(--border-default);
+  background: var(--bg-hover);
+}
+
+.plugin-store-search__filter-label input[type="checkbox"] {
+  margin: 0;
+  accent-color: var(--accent);
+  width: 13px;
+  height: 13px;
+}
+
+/* ─── Category Select ──────────────────────────────────────────────────────── */
+
+.plugin-store-search__category-select {
+  padding: 4px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.plugin-store-search__category-select:hover {
+  border-color: var(--border-default);
+}
+
+.plugin-store-search__category-select:focus {
+  border-color: var(--accent);
+}

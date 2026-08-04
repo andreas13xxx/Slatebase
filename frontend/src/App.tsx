@@ -54,6 +54,7 @@ import { ContextPanelProvider } from './state/contextPanelContext'
 import { SidebarPanelProvider } from './state/sidebarPanelContext'
 import { ContextPanel } from './components/context-panel/ContextPanel'
 import { SettingsPanel } from './components/settings/SettingsPanel'
+import type { SettingsCategory, SettingsSection } from './state/settingsState'
 import { SidebarPanel } from './components/sidebar-panel'
 import { PluginProvider } from './plugins/compat/plugin-context'
 import { CommandPaletteContainer } from './components/CommandPaletteContainer'
@@ -204,6 +205,7 @@ function AppContent() {
 
   // Unified Settings Panel state
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsInitialNav, setSettingsInitialNav] = useState<{ category: SettingsCategory; section: SettingsSection } | undefined>(undefined)
 
   // Status bar visibility (persisted in localStorage)
   const { visible: statusBarVisible } = useStatusBar()
@@ -769,7 +771,10 @@ function AppContent() {
         onDailyNote={handleDailyNote}
         onToggleSidebar={() => setShowSidebar((v) => !v)}
         onToggleRightPanel={() => setShowRightPanel((v) => !v)}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSettings={(nav) => {
+          setSettingsInitialNav(nav)
+          setSettingsOpen(true)
+        }}
         onLogout={handleLogout}
         onToggleTheme={() => {
           const current = document.documentElement.getAttribute('data-theme') ?? 'system'
@@ -778,7 +783,7 @@ function AppContent() {
         }}
       />
       {/* Unified Settings Panel (renders as fixed overlay when open) */}
-      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} initialNav={settingsInitialNav} />
       {/* Version Browser Modal */}
       {versionBrowserTarget && (
         <div className="version-browser-modal-overlay" onClick={() => setVersionBrowserTarget(null)}>

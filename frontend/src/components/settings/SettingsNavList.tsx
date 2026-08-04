@@ -25,6 +25,7 @@ const SECTION_LABELS: Record<SettingsSection, string> = {
   'mcp-tokens': 'MCP-Tokens',
   'keybindings': 'Tastaturkürzel',
   'appearance': 'Darstellung',
+  'my-vaults': 'Meine Vaults',
   'delete-account': 'Konto löschen',
   'plugins': 'Plugins',
   'vault-config': 'Vault-Konfiguration',

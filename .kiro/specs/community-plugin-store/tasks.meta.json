@@ -1,0 +1,583 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Erstelle `backend/src/plugin-store/types.ts` mit allen Interfaces (`CommunityPluginEntry`, `RemotePluginManifest`, `PluginUpdateInfo`, `UpdateCheckResult`, `StoreInstallRequest`, `IPluginStoreConfig`, `PluginReleaseAssets`, `BulkUpdateResult`)": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749627171
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749638928
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749762998
+      }
+    ],
+    "2. Erstelle `backend/src/plugin-store/errors.ts` mit Fehlerklassen (`GitHubRateLimitError`, `GitHubFetchError`, `DesktopOnlyPluginError`, `AssetTooLargeError`, `PluginNotInStoreError`, `UpstreamError`)": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749627302
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749770951
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749829471
+      }
+    ],
+    "3. Erstelle `backend/src/plugin-store/validation.ts` mit Zod-Schemas (`storeInstallSchema` für Request-Body-Validierung, `communityPluginEntrySchema`)": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749627374
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749837438
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749900594
+      }
+    ],
+    "4. Erstelle `backend/src/plugin-store/github-client.ts` — GitHub API Client mit: fetch community-plugins.json, fetch remote manifest, download release assets, Rate-Limit-Tracking via Response-Headers, Domain-Allowlist, Size-Limits (10 MB/Asset, 15 MB total), optionaler `SLATEBASE_GITHUB_TOKEN`, 30s Timeout": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749627448
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749905537
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785750161774
+      }
+    ],
+    "5. Erstelle `backend/src/plugin-store/plugin-store-cache.ts` — In-Memory Cache mit TTL: Plugin-Liste (1h), Remote-Manifeste (15min), Update-Check-Ergebnisse (15min), Fallback auf letzten gültigen Stand bei Fehler": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749627520
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785750166204
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785750325877
+      }
+    ],
+    "6. Erstelle `backend/src/plugin-store/index.ts` — Barrel export": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749627591
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785750330327
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785750371692
+      }
+    ],
+    "7. Erstelle `backend/src/plugin-store/plugin-store-service.ts` — Business-Logik: `getPluginList()`, `getRemoteManifest(repo)`, `installFromStore(vaultId, pluginId, repo)`, `checkUpdates(vaultId)`, `updatePlugin(vaultId, pluginId)`, `updateAll(vaultId)`. Nutzt GitHubClient, Cache, bestehenden PluginStore + Versionsprüfung. `installFromStore` validiert `isDesktopOnly` vor Installation, speichert Assets direkt via `pluginStore.savePlugin()`, prüft Versions-Upgrade-Logik": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749627655
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785750377722
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785750588404
+      }
+    ],
+    "8. Erstelle `backend/src/plugin-store/update-checker.ts` — Periodischer Update-Check (24h Intervall via setInterval), Persistenz des letzten Check-Timestamps in `data/plugin-store/last-update-check.json`, Start/Stop-Lifecycle, iteriert alle Vaults": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749627732
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785750593465
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785750740742
+      }
+    ],
+    "9. Unit-Tests für `github-client.ts` (Mocked fetch, Rate-Limit-Tracking, Size-Limit-Prüfung, Domain-Allowlist)": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749627817
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785750751450
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785750794651
+      }
+    ],
+    "10. Unit-Tests für `plugin-store-service.ts` (Install-Flow, Update-Check, Bulk-Update, Desktop-Only-Rejection, Fehlerbehandlung)": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749627888
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785750799297
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785751104503
+      }
+    ],
+    "11. Erstelle `backend/src/api/pluginStoreRoutes.ts` mit Routes: `GET /api/v1/plugin-store/plugins` (Plugin-Liste), `GET /api/v1/plugin-store/plugins/:pluginId/manifest` (Remote-Manifest), `POST /api/v1/vaults/:vaultId/plugins/store-install` (Store-Installation), `POST /api/v1/vaults/:vaultId/plugins/check-updates` (Update-Check), `POST /api/v1/vaults/:vaultId/plugins/:pluginId/update` (Einzel-Update), `POST /api/v1/vaults/:vaultId/plugins/update-all` (Bulk-Update). Auth + Vault-Zugriffsprüfung auf allen Vault-spezifischen Routes": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749627966
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785751111262
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785751291705
+      }
+    ],
+    "12. Registriere neue Routes in `backend/src/index.ts` (Composition Root): Plugin-Store-Service instanziieren, GitHubClient + Cache verdrahten, Update-Checker starten, Routes mounten. Feature-Guard (`obsidian-plugin-compat`) auf Store-Routes anwenden": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749628035
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785751297175
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785751560827
+      }
+    ],
+    "13. Erweitere `backend/config/default.json` um Plugin-Store-Konfiguration (cacheTtl, autoCheck, maxAssetSize)": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749628102
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785751565019
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785751605477
+      }
+    ],
+    "14. Integrationstests für Plugin-Store-Routes (Happy Path: Liste abrufen, Install, Update-Check; Error Path: Rate-Limit, Desktop-Only, Nicht-gelistetes Plugin)": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749628201
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785751609926
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785751803561
+      }
+    ],
+    "15. Erweitere `frontend/src/api/index.ts` (IApiClient-Interface) um neue Methoden: `getStorePlugins()`, `getStorePluginManifest(pluginId)`, `installFromStore(vaultId, pluginId, repo)`, `checkPluginUpdates(vaultId)`, `updatePlugin(vaultId, pluginId)`, `updateAllPlugins(vaultId)`": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749628265
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785751809889
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785751975881
+      }
+    ],
+    "16. Implementiere die neuen Methoden in der `ApiClient`-Klasse (fetch-Calls zu den neuen Backend-Routes)": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749628325
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785751980565
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785752053561
+      }
+    ],
+    "17. Erstelle `frontend/src/components/plugin-store/types.ts` mit Frontend-spezifischen Typen (Re-Exports aus API + lokale Display-Typen)": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749628390
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785752063319
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785752142598
+      }
+    ],
+    "18. Erstelle `frontend/src/components/plugin-store/PluginStoreSearch.tsx` — Suchfeld (debounced 200ms) + Filter-Checkboxen (\"Kompatibel\", \"Nicht installiert\") + Ergebnis-Counter": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749628456
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785752148204
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785752376872
+      }
+    ],
+    "19. Erstelle `frontend/src/components/plugin-store/PluginStoreSearch.css` — Styles für Search/Filter-Bereich": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749628522
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785752383424
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785752388098
+      }
+    ],
+    "20. Erstelle `frontend/src/components/plugin-store/PluginStoreCard.tsx` — Plugin-Karte: Name, Autor, Beschreibung, Version (installiert vs. latest), Status-Badge (Installiert/Desktop-Only), Aktions-Buttons (Installieren/Aktualisieren), Spinner während Aktion, Fehlermeldung, Link zu Release Notes": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749628588
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785752394070
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785752608063
+      }
+    ],
+    "21. Erstelle `frontend/src/components/plugin-store/UpdateBanner.tsx` — Banner-Komponente: \"X Updates verfügbar\" + \"Alle aktualisieren\"-Button + Spinner + Ergebnis-Zusammenfassung nach Bulk-Update": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749628655
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785752613689
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785752750041
+      }
+    ],
+    "22. Erstelle `frontend/src/components/plugin-store/PluginStoreBrowser.tsx` — Hauptkomponente: Lädt Plugin-Liste, verwaltet lokalen State (search, filter, installing, updating), Client-Side-Filtering, koordiniert Update-Check + Install/Update-Aktionen, integriert Search + Cards + UpdateBanner": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749628717
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785752755149
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785752999786
+      }
+    ],
+    "23. Erstelle `frontend/src/components/plugin-store/PluginStoreBrowser.css` — Styles (Plugin-Grid/Liste, Cards, Desktop-Only-Graying, Responsive)": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749628804
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785753005430
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785753197870
+      }
+    ],
+    "24. Erstelle `frontend/src/components/plugin-store/index.ts` — Barrel export": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749628867
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785753202777
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785753282878
+      }
+    ],
+    "25. Erweitere `PluginManagementPage.tsx` um Tab-Navigation: \"Installierte Plugins\" (bestehende Ansicht) und \"Verfügbare Plugins\" (PluginStoreBrowser). Tab-State als `useState`. Installierte-Plugin-Tab als Default": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749628933
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785753288383
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785753527658
+      }
+    ],
+    "26. Passe `SettingsPanel.css` an: `max-width: none` für den Content-Bereich wenn Plugin-Management aktiv ist (CSS `:has()` oder Klassen-basiert)": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749629027
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785753531961
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785753600422
+      }
+    ],
+    "27. Erweitere i18n (`de.ts` + `en.ts`) um alle neuen Strings: Tab-Labels, Filter-Labels, Button-Texte, Fehlermeldungen, Statusmeldungen, Update-Banner-Texte": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749629153
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785753605365
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785753624729
+      }
+    ],
+    "28. Implementiere Update-Badge/Hinweis: Beim Öffnen der Plugin-Seite prüfen ob gecachte Update-Ergebnisse vorliegen und Badge anzeigen (\"2 Updates\"). Optional: Toast-Notification bei App-Start wenn Updates verfügbar": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749629221
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785753630038
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785753780271
+      }
+    ],
+    "29. \"Nach Updates suchen\"-Button im \"Installierte Plugins\"-Tab: Lädt Update-Check, zeigt Ergebnis inline bei jedem Plugin (Version → neueste Version, Update-Button)": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749629292
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785753785241
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785754110157
+      }
+    ],
+    "30. Unit-Tests für `PluginStoreBrowser` (Rendering, Filtering, Install-Flow, Error-States)": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749629353
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785754116013
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785758228404
+      }
+    ],
+    "31. Unit-Tests für `PluginStoreCard` (Status-Varianten: installiert, update verfügbar, desktop-only, installierend)": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749629432
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785758233401
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785758370274
+      }
+    ],
+    "32. Manueller E2E-Test: Plugin-Store öffnen → Suchen → Installieren → Update prüfen → Einzeln updaten → Bulk-Update": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749629491
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785758378348
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785758383714
+      }
+    ],
+    "33. Backend `npx tsc --noEmit` + Frontend `npm run build` erfolgreich": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749629599
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785758388700
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785758590648
+      }
+    ],
+    "34. Frontend `npm run lint` — 0 Errors": [
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785749629664
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785758596366
+      },
+      {
+        "executionId": "77d44c5b-9678-4491-aedf-aa5e5c06da8b",
+        "chatSessionId": "sess_9210d320-c8f8-4ad3-9d6f-42dcb1076ef1",
+        "timestamp": 1785758876436
+      }
+    ]
+  }
+}

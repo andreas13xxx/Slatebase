@@ -48,5 +48,10 @@
       "de": "Willkommen",
       "en": "Welcome"
     }
+  },
+  "pluginStore": {
+    "cacheTtl": 3600000,
+    "maxAssetSize": 10485760,
+    "autoCheckInterval": 86400000
   }
 }

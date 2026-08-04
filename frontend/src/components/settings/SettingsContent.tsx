@@ -25,6 +25,7 @@ import { VaultConfigSection } from './VaultConfigSection'
 import { KeybindingsSection } from './KeybindingsSection'
 import { AppearanceSection } from './AppearanceSection'
 import { WelcomeVaultSection } from './WelcomeVaultSection'
+import { MyVaultsPage } from '../MyVaultsPage'
 
 /** German labels for each settings section heading. */
 const SECTION_LABELS: Record<SettingsSection, string> = {
@@ -34,6 +35,7 @@ const SECTION_LABELS: Record<SettingsSection, string> = {
   'mcp-tokens': 'MCP-Tokens',
   'keybindings': 'Tastaturkürzel',
   'appearance': 'Darstellung',
+  'my-vaults': 'Meine Vaults',
   'delete-account': 'Konto löschen',
   'plugins': 'Plugins',
   'vault-config': 'Vault-Konfiguration',
@@ -105,6 +107,8 @@ function renderSection(
       return <KeybindingsSection />
     case 'appearance':
       return <AppearanceSection />
+    case 'my-vaults':
+      return <MyVaultsPage apiClient={apiClient} />
     case 'plugins':
       if (selectedVaultId === null) {
         return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>

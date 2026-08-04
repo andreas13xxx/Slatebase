@@ -12,10 +12,11 @@ import { useTranslation } from '../i18n'
 import { showToast } from './ToastNotification'
 import { extractErrorMessage } from '../utils/error'
 import type { Command } from '../plugins/compat/command-registry'
+import type { SettingsCategory, SettingsSection } from '../state/settingsState'
 
 /** Pages the CommandPalette can navigate to. */
 type NavigablePage =
-  | 'profile' | 'sessions' | 'my-vaults' | 'chat' | 'mcp-tokens'
+  | 'profile' | 'sessions' | 'chat' | 'mcp-tokens'
   | 'admin-users' | 'admin-vaults' | 'admin-config' | 'admin-audit' | 'admin-logs'
   | 'trash' | 'plugins'
 
@@ -33,7 +34,7 @@ export interface CommandPaletteContainerProps {
   onDailyNote: () => void
   onToggleSidebar: () => void
   onToggleRightPanel: () => void
-  onOpenSettings: () => void
+  onOpenSettings: (nav?: { category: SettingsCategory; section: SettingsSection }) => void
   onLogout: () => void
   onToggleTheme: () => void
 }
@@ -221,7 +222,7 @@ export function CommandPaletteContainer({
     commands.push({
       id: 'slatebase:navigate-my-vaults',
       name: 'Meine Vaults',
-      callback: () => onNavigate('my-vaults'),
+      callback: () => onOpenSettings({ category: 'account', section: 'my-vaults' }),
       pluginId: 'slatebase',
     })
 

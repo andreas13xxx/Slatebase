@@ -47,6 +47,9 @@ import { LinkIndexService } from './link-index/index.js'
 import { createGraphRoutes } from './api/graphRoutes.js'
 import { PluginStore, PluginInstaller } from './plugin/index.js'
 import { createPluginRoutes } from './api/pluginRoutes.js'
+import { GitHubClient, PluginStoreCache, PluginStoreService, UpdateChecker } from './plugin-store/index.js'
+import type { IPluginStoreConfig } from './plugin-store/index.js'
+import { createPluginStoreRoutes, createVaultPluginStoreRoutes } from './api/pluginStoreRoutes.js'
 import { versionRoutes } from './api/versionRoutes.js'
 import { SearchService, ReplaceService } from './search/index.js'
 import { EventReplayBuffer, RateLimiter as SseRateLimiter, ConnectionManager, PresenceService, EventBus, ConnectionLimitError } from './realtime/index.js'
@@ -277,11 +280,32 @@ const linkIndexMap = new Map<string, LinkIndexService>()
 const pluginStore = new PluginStore(serverConfig.dataDir)
 const pluginInstaller = new PluginInstaller(pluginStore)
 
-// 4f. Search Module
+// 4f. Plugin Store Module (Community Plugin Store)
+const pluginStoreConfig: IPluginStoreConfig = {
+  ...(process.env['SLATEBASE_GITHUB_TOKEN'] ? { githubToken: process.env['SLATEBASE_GITHUB_TOKEN'] } : {}),
+  cacheTtlPluginList: (config as unknown as { pluginStore?: { cacheTtl?: number } }).pluginStore?.cacheTtl ?? 3600000,
+  cacheTtlManifest: 900000,
+  maxAssetSize: (config as unknown as { pluginStore?: { maxAssetSize?: number } }).pluginStore?.maxAssetSize ?? 10 * 1024 * 1024,
+  maxTotalDownloadSize: 15 * 1024 * 1024,
+  autoCheckInterval: (config as unknown as { pluginStore?: { autoCheckInterval?: number } }).pluginStore?.autoCheckInterval ?? 86400000,
+}
+const pluginStoreCache = new PluginStoreCache(pluginStoreConfig)
+const githubClient = new GitHubClient(pluginStoreConfig, logger)
+const pluginStoreService = new PluginStoreService(githubClient, pluginStoreCache, pluginStore, logger)
+const updateChecker = new UpdateChecker(
+  pluginStoreService,
+  pluginStoreCache,
+  pluginStoreConfig,
+  serverConfig.dataDir,
+  () => Array.from(linkIndexMap.keys()),
+  logger,
+)
+
+// 4g. Search Module
 const searchService = new SearchService(vaultService, vaultAccessControl, logger)
 const replaceService = new ReplaceService(vaultService, vaultAccessControl, logger)
 
-// 4g. Realtime Services (SSE)
+// 4h. Realtime Services (SSE)
 const sseConfig = config.getSseConfig()
 const replayBuffer = new EventReplayBuffer({ bufferSize: sseConfig.replayBufferSize, ttlMs: sseConfig.replayTtl })
 const sseRateLimiter = new SseRateLimiter({ maxPerSecond: 10 })
@@ -423,6 +447,8 @@ app.use('/api/v1/vaults/:vaultId/graph', createFeatureGuard('knowledge-graph', f
 app.use('/api/v1/vaults/:vaultId/backlinks', createFeatureGuard('knowledge-graph', featureToggleService))
 app.use('/api/v1/vaults/:vaultId/plugins/*', createFeatureGuard('obsidian-plugin-compat', featureToggleService))
 app.use('/api/v1/vaults/:vaultId/plugins', createFeatureGuard('obsidian-plugin-compat', featureToggleService))
+app.use('/api/v1/plugin-store/*', createFeatureGuard('obsidian-plugin-compat', featureToggleService))
+app.use('/api/v1/plugin-store', createFeatureGuard('obsidian-plugin-compat', featureToggleService))
 app.use('/api/v1/mcp/tokens', createFeatureGuard('mcp', featureToggleService))
 app.use('/api/v1/mcp/tokens/*', createFeatureGuard('mcp', featureToggleService))
 
@@ -455,6 +481,12 @@ const pluginRoutes = createPluginRoutes({
   logger,
 })
 app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)
+
+// Plugin Store route registration (auth middleware applies via /api/v1/* pattern)
+const pluginStoreRoutes = createPluginStoreRoutes({ pluginStoreService, updateChecker, accessControl: vaultAccessControl, vaultRegistry, logger })
+const vaultPluginStoreRoutes = createVaultPluginStoreRoutes({ pluginStoreService, updateChecker, accessControl: vaultAccessControl, vaultRegistry, logger })
+app.route('/api/v1/plugin-store', pluginStoreRoutes)
+app.route('/api/v1/vaults/:vaultId/plugins', vaultPluginStoreRoutes)
 
 // Search route registration (auth middleware applies via /api/v1/* pattern)
 const searchRoutes = createSearchRoutes({ searchService, replaceService, vaultAccessControl, logger })
@@ -788,6 +820,11 @@ server.listen(serverConfig.port, serverConfig.host, () => {
 
   // Start periodic cleanup job (trash purge + version pruning)
   cleanupJob.start()
+
+  // Start plugin store update checker (periodic background checks)
+  if (pluginStoreConfig.autoCheckInterval > 0) {
+    updateChecker.start()
+  }
 })
 
 // --- Graceful Shutdown ---
@@ -797,6 +834,9 @@ const gracefulShutdown = async (signal: string): Promise<void> => {
 
   // Stop periodic cleanup job
   cleanupJob.stop()
+
+  // Stop plugin store update checker
+  updateChecker.stop()
 
   // Shutdown realtime connections (sends server:shutdown event, closes all streams)
   await realtimeConnectionManager.shutdown()

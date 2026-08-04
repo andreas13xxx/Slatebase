@@ -475,3 +475,9 @@
   gap: 4px;
   flex-wrap: wrap;
 }
+
+
+/* Plugin-Management needs full width for the Store Browser */
+.settings-panel-content:has(.plugin-management-page) {
+  max-width: none;
+}

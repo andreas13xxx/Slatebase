@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import {
   Upload, FolderOpen, Download, Settings,
-  Database, FileText, FilePlus, MessageCircle, ScrollText,
+  FileText, FilePlus, MessageCircle, ScrollText,
   Plus, Share2, CalendarDays, Trash2, LayoutDashboard,
 } from 'lucide-react'
 import { useFeatureContext } from '../state/featureContext'
@@ -60,7 +60,6 @@ export function SidebarToolbar({ vaultId, vaultPermission, onCreateVault, onCrea
     { id: 'export-vault', icon: <Download size={15} />, label: 'Vault exportieren', action: onExportVault, requiresVault: true },
     { id: 'trash', icon: <Trash2 size={15} />, label: 'Papierkorb', action: () => onOpenTrash?.(), requiresVault: true },
     { id: 'graph', icon: <Share2 size={15} />, label: 'Graph', action: onOpenGraph, requiresVault: true, feature: 'knowledge-graph' },
-    { id: 'my-vaults', icon: <Database size={15} />, label: 'Meine Vaults', action: () => onNavigate('my-vaults') },
     { id: 'chat', icon: <MessageCircle size={15} />, label: 'Chat', action: () => onNavigate('chat'), feature: 'chat' },
     { id: 'admin-audit', icon: <FileText size={15} />, label: 'Audit-Log', action: () => onNavigate('admin-audit'), adminOnly: true },
     { id: 'admin-logs', icon: <ScrollText size={15} />, label: 'Server-Logs', action: () => onNavigate('admin-logs'), adminOnly: true },

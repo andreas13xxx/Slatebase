@@ -40,6 +40,7 @@ export const SETTINGS_SECTIONS: ISettingsSectionDef[] = [
   { id: 'mcp-tokens', labelKey: 'settings.sections.mcpTokens', category: 'account', requiresAdmin: false, requiresVault: false },
   { id: 'keybindings', labelKey: 'settings.sections.keybindings', category: 'account', requiresAdmin: false, requiresVault: false },
   { id: 'appearance', labelKey: 'settings.sections.appearance', category: 'account', requiresAdmin: false, requiresVault: false },
+  { id: 'my-vaults', labelKey: 'settings.sections.myVaults', category: 'account', requiresAdmin: false, requiresVault: false },
   { id: 'delete-account', labelKey: 'settings.sections.deleteAccount', category: 'account', requiresAdmin: false, requiresVault: false },
   // Vault
   { id: 'vault-config', labelKey: 'settings.sections.vaultConfig', category: 'vault', requiresAdmin: false, requiresVault: true },

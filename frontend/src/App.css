@@ -6716,6 +6716,43 @@
 
 /* ===== Plugin Management Page ===== */
 .plugin-management-page { padding: 28px 32px; max-width: 900px; }
+.plugin-management-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-default);
+  margin-bottom: var(--spacing-md, 16px);
+}
+.plugin-management-tab {
+  padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm, 13px);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+.plugin-management-tab:hover { color: var(--text-primary); }
+.plugin-management-tab--active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 500;
+}
+.plugin-management-tab__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--bg-primary);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
 .plugin-management-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
 .plugin-management-title {
   font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0;
@@ -6920,6 +6957,33 @@
 
 /* Spinning animation for reload icon */
 .plugin-spinning { animation: plugin-spin 0.7s linear infinite; }
+
+/* Check for updates button + inline update hint */
+.plugin-management-update-actions {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+}
+.plugin-management-check-updates-button {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; font-size: 13px; border: 1px solid var(--border-default);
+  border-radius: var(--radius-md); cursor: pointer; background: var(--bg-elevated);
+  color: var(--text-primary); transition: background 0.15s ease, border-color 0.15s ease;
+}
+.plugin-management-check-updates-button:hover:not(:disabled) { background: var(--bg-surface); border-color: var(--border-strong); }
+.plugin-management-check-updates-button:disabled { opacity: 0.6; cursor: not-allowed; }
+.plugin-management-update-summary {
+  font-size: 13px; color: var(--accent); font-weight: 500;
+}
+.plugin-management-all-up-to-date {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 13px; color: var(--success);
+}
+.plugin-management-update-hint {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-family: var(--font-mono);
+  color: var(--accent); font-weight: 500;
+  padding: 1px 7px; border-radius: var(--radius-sm);
+  background: var(--accent-light, rgba(var(--accent-rgb, 56, 132, 244), 0.08));
+}
 
 /* General button style matching existing pattern */
 .plugin-management-btn {
