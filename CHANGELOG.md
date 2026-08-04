@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.0](https://github.com/andreas13xxx/Slatebase/compare/v0.19.1...v0.20.0) (2026-08-04)
+
+
+### Features
+
+* **plugins:** make unemulated App/Workspace APIs enumerable ([5c757fb](https://github.com/andreas13xxx/Slatebase/commit/5c757fbc6b6895ef0337712c68c3c0e932acdba8))
+
 ## [0.19.1](https://github.com/andreas13xxx/Slatebase/compare/v0.19.0...v0.19.1) (2026-08-04)
 
 
