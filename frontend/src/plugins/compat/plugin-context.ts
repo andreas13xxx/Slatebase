@@ -41,6 +41,7 @@ import { CssInjector } from './css-injector'
 import { CompatibilityAnalyzer } from './compatibility-analyzer'
 // Installs the global `window.obsidian` namespace the plugin bundles run against.
 import { installObsidianGlobals } from './install-globals'
+import { clearApiGaps } from './api-gap-registry'
 import type { ICompatibilityAnalyzer } from './compatibility-analyzer'
 import { VaultShim } from './shims/vault-shim'
 import { WorkspaceShim } from './shims/workspace-shim'
@@ -762,6 +763,8 @@ export function PluginProvider({
     const loader = pluginLoaderRef.current
     if (!loader) return
     await unloadLoaderPlugins(loader)
+    // Recorded gaps belong to the plugins that just went away.
+    clearApiGaps()
   }
 
   /**

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { WorkspaceShim } from './workspace-shim';
+import { clearApiGaps } from '../api-gap-registry';
 import { ViewRegistry } from '../view-registry';
 import type { TFile } from '../types';
 
@@ -24,6 +25,10 @@ describe('WorkspaceShim', () => {
 
   beforeEach(() => {
     workspace = new WorkspaceShim();
+    // The proxy's once-per-property warning is deduplicated by the shared
+    // api-gap-registry rather than per shim instance, so tests must reset it to
+    // stay independent of each other's non-emulated accesses.
+    clearApiGaps();
   });
 
   describe('R6.1: getActiveFile() returns TFile when a file tab is active', () => {
@@ -176,7 +181,7 @@ describe('WorkspaceShim', () => {
       warnSpy.mockRestore();
     });
 
-    it('should only log warning once per property name per instance', () => {
+    it('should only log warning once per property name', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const proxied = WorkspaceShim.createProxied();
 

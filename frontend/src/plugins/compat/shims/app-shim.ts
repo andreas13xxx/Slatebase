@@ -7,6 +7,7 @@ import type {
   PluginInstance,
 } from '../types';
 import { FileManagerShim } from './file-manager-shim';
+import { recordGapRead, recordGapCall } from '../api-gap-registry';
 
 /**
  * AppShim — Obsidian App API emulation.
@@ -17,9 +18,11 @@ import { FileManagerShim } from './file-manager-shim';
  * - `metadataCache`: IMetadataCacheShim instance bound to the current vault context
  * - `plugins`: plugin registry with plugins map, enabledPlugins set, and getPlugin method
  *
- * Uses an ES6 Proxy to intercept non-emulated property/method access:
- * - Non-emulated properties return `undefined` with a console warning (once per property per plugin)
- * - Non-emulated methods return a no-op function with a console warning (once per property per plugin)
+ * Uses an ES6 Proxy to intercept non-emulated property/method access. A `get`
+ * trap cannot tell a property read from a method lookup, so both receive the
+ * same callable no-op, warned once per property per plugin. Note that a function
+ * is truthy, so `if (app.someMissingThing)` takes the wrong branch — every such
+ * access is recorded in the api-gap-registry so the gaps stay enumerable.
  *
  * Per-vault-context instances: each vault gets its own AppShim instance with sub-shims
  * bound to that same vault context.
@@ -64,9 +67,6 @@ export class AppShim implements IAppShim {
 
   /** Plugin ID used for scoping console warnings */
   private readonly pluginId: string;
-
-  /** Set of property names for which a warning has already been logged */
-  private readonly warnedProperties: Set<string> = new Set();
 
   /** Internal plugins map (mutable for registration/unregistration) */
   private readonly pluginsMap: Record<string, PluginInstance>;
@@ -312,7 +312,6 @@ export class AppShim implements IAppShim {
       'secretStorage',
       // Internal/utility properties
       'pluginId',
-      'warnedProperties',
       'pluginsMap',
       'enabledPluginsSet',
       'registerPlugin',
@@ -335,18 +334,26 @@ export class AppShim implements IAppShim {
           return Reflect.get(target, prop, receiver);
         }
 
-        // Non-emulated property: warn once per property name per plugin instance
-        if (!target.warnedProperties.has(prop)) {
-          target.warnedProperties.add(prop);
+        // Non-emulated property: record the gap and warn once per property name.
+        if (recordGapRead('App', prop, target.pluginId)) {
           console.warn(
             `[AppShim] Plugin "${target.pluginId}" accessed non-emulated app property/method "${prop}". ` +
-            `This API is not supported in Slatebase and will return undefined/no-op.`
+            `Slatebase returns a no-op function here, which is truthy — feature ` +
+            `detection like \`if (app.${prop})\` will take the wrong branch. ` +
+            `Inspect all gaps with window.__slatebasePluginApiGaps().`
           );
         }
 
-        // Return a no-op function that returns undefined
-        // This handles both property reads (returns a callable no-op) and method calls
-        return () => undefined;
+        // Return a callable no-op. This covers both property reads and method
+        // calls, since a `get` trap cannot tell them apart. Invoking it is the
+        // signal that the plugin actually depended on the API, so record that
+        // separately from the read.
+        // Invocation is recorded but not warned again — the read already warned
+        // once, and the call count is queryable via the registry.
+        return () => {
+          recordGapCall('App', prop, target.pluginId);
+          return undefined;
+        };
       },
     }) as AppShim & Record<string, unknown>;
   }
