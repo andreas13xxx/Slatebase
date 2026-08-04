@@ -1,13 +1,13 @@
 // Import Service — handles file and folder import into vaults
 
 import fs from 'node:fs/promises'
-import path from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { createWriteStream } from 'node:fs'
 import type { ILogger } from '../logger/index.js'
 import type { IConfigService } from '../config/index.js'
 import type { IVaultManager, IVaultReader } from '../vault/index.js'
+import { validateFilePath } from '../vault/index.js'
 import { VaultNotFoundError } from '../business/index.js'
 
 // --- Custom Errors ---
@@ -126,7 +126,7 @@ export class ImportService implements IImportService {
     }
 
     // 4. Check for name conflict at root level
-    const targetPath = path.join(vault.info.path, file.name)
+    const targetPath = validateFilePath(vault.info.path, file.name)
     try {
       await fs.access(targetPath)
       // If access succeeds, the file already exists
@@ -216,7 +216,7 @@ export class ImportService implements IImportService {
 
     // 4. Check for name conflicts at all target paths before writing
     for (const file of files) {
-      const targetPath = path.join(vault.info.path, file.relativePath)
+      const targetPath = validateFilePath(vault.info.path, file.relativePath)
       try {
         await fs.access(targetPath)
         // If access succeeds, there's a conflict
@@ -234,7 +234,7 @@ export class ImportService implements IImportService {
     // Also check if any intermediate directories conflict with existing files
     const allDirs = this.extractDirectories(files)
     for (const dir of allDirs) {
-      const dirPath = path.join(vault.info.path, dir)
+      const dirPath = validateFilePath(vault.info.path, dir)
       try {
         const stat = await fs.stat(dirPath)
         if (!stat.isDirectory()) {
@@ -258,7 +258,7 @@ export class ImportService implements IImportService {
       // Create all needed directories first
       const dirsToCreate = this.extractDirectories(files)
       for (const dir of dirsToCreate) {
-        const dirPath = path.join(vault.info.path, dir)
+        const dirPath = validateFilePath(vault.info.path, dir)
         // Check if directory already exists before tracking it as created
         let existed = false
         try {
@@ -277,7 +277,7 @@ export class ImportService implements IImportService {
 
       // Write all files
       for (const file of files) {
-        const targetPath = path.join(vault.info.path, file.relativePath)
+        const targetPath = validateFilePath(vault.info.path, file.relativePath)
 
         const nodeReadable = Readable.fromWeb(file.stream as import('node:stream/web').ReadableStream)
         const writeStream = createWriteStream(targetPath)

@@ -532,6 +532,27 @@ describe('ImportService', () => {
         .rejects.toThrow(FileConflictError)
     })
 
+    it('should reject a relativePath that traverses outside the vault', async () => {
+      const vault = createTestVault()
+      const vaultManager = createMockVaultManager(vault)
+      const service = new ImportService(
+        vaultManager,
+        createMockVaultReader(),
+        createMockConfig(),
+        createMockLogger(),
+      )
+
+      // A crafted upload target escaping the vault root via '..' segments
+      const files = [
+        createUploadedFileWithPath('../../outside.txt', 'malicious content'),
+      ]
+
+      await expect(service.importFolder('testvault123', files)).rejects.toThrow()
+
+      // Verify nothing was written outside the vault
+      await expect(fs.access(path.join(tempDir, 'outside.txt'))).rejects.toThrow()
+    })
+
     it('should not write any files when a conflict is detected', async () => {
       const vault = createTestVault()
       const vaultManager = createMockVaultManager(vault)
