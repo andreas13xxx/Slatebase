@@ -584,11 +584,13 @@ function require(id) {
   if (id === '@codemirror/commands') return window.__codemirrorCommands || {};
   if (id === '@codemirror/autocomplete') return window.__codemirrorAutocomplete || {};
   if (id === '@codemirror/search') return window.__codemirrorSearch || {};
-  if (id === '@codemirror/lint') { if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.warn('[PluginLoader] Module "' + id + '" is not installed — returning empty stub. Plugin features using this module will not work.'); } return {}; }
-  if (id === '@codemirror/history') { if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.warn('[PluginLoader] Module "' + id + '" is not installed — returning empty stub. History is available via @codemirror/commands.'); } return {}; }
+  if (id === '@codemirror/lint') return window.__codemirrorLint || {};
+  // Folded into @codemirror/commands during the CM6 beta; the shim re-exports
+  // the real history API under the legacy module name.
+  if (id === '@codemirror/history') return window.__codemirrorHistory || {};
   if (id.startsWith('@codemirror/')) { if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.warn('[PluginLoader] Module "' + id + '" is not available — returning empty stub. Plugin features using this module may not work.'); } return {}; }
   if (id === '@lezer/common') return window.__lezerCommon || {};
-  if (id === '@lezer/lr') { if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.warn('[PluginLoader] Module "@lezer/lr" is using a minimal stub (LRParser.deserialize). Custom Lezer grammars may not work correctly.'); } return { LRParser: { deserialize: function(spec) { return { configure: function(){ return this; }, parse: function(){ return {}; }, startParse: function(){ return { advance: function(){ return null; } }; } }; } } }; }
+  if (id === '@lezer/lr') return window.__lezerLr || {};
   if (id === '@lezer/highlight') return window.__lezerHighlight || {};
   if (id.startsWith('@lezer/')) { if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.warn('[PluginLoader] Module "' + id + '" is not available — returning empty stub.'); } return {}; }
   if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.warn('[PluginLoader] Unknown module "' + id + '" — returning empty stub. Plugin features using this module will not work.'); }

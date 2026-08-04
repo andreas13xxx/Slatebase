@@ -29,8 +29,10 @@ import * as CmLanguage from '@codemirror/language'
 import * as CmCommands from '@codemirror/commands'
 import * as CmAutocomplete from '@codemirror/autocomplete'
 import * as CmSearch from '@codemirror/search'
+import * as CmLint from '@codemirror/lint'
 import * as LezerHighlight from '@lezer/highlight'
 import * as LezerCommon from '@lezer/common'
+import * as LezerLr from '@lezer/lr'
 
 // Obsidian-compatible editor StateFields — plugins access these via require('obsidian')
 import {
@@ -1734,6 +1736,28 @@ export function installObsidianGlobals(): void {
       ...CmSearch as unknown as Record<string, unknown>,
     }
   }
+  if (!(window as unknown as { __codemirrorLint?: unknown }).__codemirrorLint) {
+    ;(window as unknown as { __codemirrorLint: Record<string, unknown> }).__codemirrorLint = {
+      ...CmLint as unknown as Record<string, unknown>,
+    }
+  }
+  // @codemirror/history does not exist in CM6 — the package was folded into
+  // @codemirror/commands during the CM6 beta. Plugins written against the old
+  // module name get the real history API rather than an empty object.
+  if (!(window as unknown as { __codemirrorHistory?: unknown }).__codemirrorHistory) {
+    ;(window as unknown as { __codemirrorHistory: Record<string, unknown> }).__codemirrorHistory = {
+      history: CmCommands.history,
+      historyField: CmCommands.historyField,
+      historyKeymap: CmCommands.historyKeymap,
+      isolateHistory: CmCommands.isolateHistory,
+      undo: CmCommands.undo,
+      redo: CmCommands.redo,
+      undoDepth: CmCommands.undoDepth,
+      redoDepth: CmCommands.redoDepth,
+      undoSelection: CmCommands.undoSelection,
+      redoSelection: CmCommands.redoSelection,
+    }
+  }
   if (!(window as unknown as { __lezerHighlight?: unknown }).__lezerHighlight) {
     ;(window as unknown as { __lezerHighlight: Record<string, unknown> }).__lezerHighlight = {
       ...LezerHighlight as unknown as Record<string, unknown>,
@@ -1742,6 +1766,11 @@ export function installObsidianGlobals(): void {
   if (!(window as unknown as { __lezerCommon?: unknown }).__lezerCommon) {
     ;(window as unknown as { __lezerCommon: Record<string, unknown> }).__lezerCommon = {
       ...LezerCommon as unknown as Record<string, unknown>,
+    }
+  }
+  if (!(window as unknown as { __lezerLr?: unknown }).__lezerLr) {
+    ;(window as unknown as { __lezerLr: Record<string, unknown> }).__lezerLr = {
+      ...LezerLr as unknown as Record<string, unknown>,
     }
   }
 
