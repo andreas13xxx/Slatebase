@@ -7,6 +7,7 @@ import { EditorShim } from '../editor-shim';
 import type { IEditor } from '../editor-shim';
 import { refreshPluginExtensions } from '../../../editor/plugin-extensions';
 import { MarkdownView } from './markdown-view-shim';
+import { recordGapRead, recordGapCall } from '../api-gap-registry';
 
 /**
  * WorkspaceShim — Obsidian Workspace API emulation.
@@ -34,7 +35,6 @@ export class WorkspaceShim implements IWorkspaceShim {
   private activeFile: TFile | null = null;
   private activeLeaf: WorkspaceLeaf | null = null;
   private fileLeaf: WorkspaceLeaf | null = null;
-  private warnedProperties: Set<string> = new Set();
   private viewRegistry: ViewRegistry | null = null;
   private app: unknown = null;
   private directoryTree: DirectoryTree | null = null;
@@ -674,7 +674,6 @@ export class WorkspaceShim implements IWorkspaceShim {
       'activeFile',
       'activeLeaf',
       'fileLeaf',
-      'warnedProperties',
       'viewRegistry',
       'app',
       'directoryTree',
@@ -697,17 +696,25 @@ export class WorkspaceShim implements IWorkspaceShim {
           return Reflect.get(target, prop, receiver);
         }
 
-        // Non-emulated property: warn once and return no-op function
-        if (!target.warnedProperties.has(prop)) {
-          target.warnedProperties.add(prop);
+        // Non-emulated property: record the gap and warn once. The workspace is
+        // shared across plugins, so these accesses cannot be attributed to one.
+        if (recordGapRead('Workspace', prop)) {
           console.warn(
             `[WorkspaceShim] Access to non-emulated workspace method/property "${prop}". ` +
-            `This method is not supported in Slatebase and will return a no-op.`
+            `Slatebase returns a no-op function here, which is truthy — feature ` +
+            `detection like \`if (workspace.${prop})\` will take the wrong branch. ` +
+            `Inspect all gaps with window.__slatebasePluginApiGaps().`
           );
         }
 
-        // Return a no-op function for method calls
-        return () => undefined;
+        // Return a callable no-op. Invoking it means a plugin actually depended
+        // on the API, which is recorded separately from the read.
+        // Invocation is recorded but not warned again — the read already warned
+        // once, and the call count is queryable via the registry.
+        return () => {
+          recordGapCall('Workspace', prop);
+          return undefined;
+        };
       },
     }) as WorkspaceShim & Record<string, unknown>;
   }

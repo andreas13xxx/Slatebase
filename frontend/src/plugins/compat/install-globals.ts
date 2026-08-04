@@ -73,6 +73,7 @@ import { MarkdownRenderer } from './markdown-renderer'
 import { EditorShim } from './editor-shim'
 import { registerObsidianApiExtensions } from './obsidian-api-extensions'
 import { registerFallbackShims } from './fallback-shims'
+import { installApiGapInspector } from './api-gap-registry'
 import { warnNoOp } from './no-op-warning'
 
 // ─── Obsidian-compatible syntaxTree wrapper ──────────────────────────────────────
@@ -2001,4 +2002,10 @@ export function installObsidianGlobals(): void {
   // plugin reaching for an unimplemented API gets a no-op instead of a crash.
   // Must stay after every real registration — these only fill genuine gaps.
   registerFallbackShims()
+
+  // ─── Diagnostics ───────────────────────────────────────────────────────────
+  // Exposes window.__slatebasePluginApiGaps() so the APIs plugins reached for
+  // but Slatebase does not emulate can be inspected instead of scrolling past
+  // in the console.
+  installApiGapInspector()
 }
