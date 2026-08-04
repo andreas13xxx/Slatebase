@@ -21,6 +21,12 @@ import type {
 } from './types';
 import { BundleEvaluationError, LifecycleError } from './errors';
 
+// Side-effect import: populates the `window.obsidian` namespace that the
+// injected `require('obsidian')` hands to every evaluated bundle. Imported here
+// rather than relied upon transitively, so the namespace is guaranteed complete
+// no matter which entry point reaches the loader first.
+import './setting-tab';
+
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 /** Internal plugin status used by the loader */
@@ -564,105 +570,9 @@ const exports = module.exports;
 const __requireWarnedModules = new Set();
 function require(id) {
   if (id === 'obsidian') {
-    const obs = window.obsidian || {};
-    if (!obs.EditorSuggest) {
-      obs.EditorSuggest = class EditorSuggest { constructor() { this.scope = { keys: [], register(){return {}}, unregister(){} }; this.suggestEl = document.createElement('div'); } };
-    }
-    if (!obs.Component) {
-      obs.Component = class Component { load(){ this._loaded = true; this.onload(); } unload(){ this._loaded = false; this.onunload(); } onload(){} onunload(){} addChild(c){ if(c && c.load) c.load(); return c; } removeChild(c){ if(c && c.unload) c.unload(); return c; } register(){} registerEvent(){} registerInterval(id){return id} registerDomEvent(){} };
-    }
-    if (!obs.Plugin) {
-      obs.Plugin = class Plugin extends obs.Component {
-        constructor(app) { super(); this.app = app; this.manifest = {}; this.scope = { keys: [], register(){}, unregister(){} }; this._children = []; }
-        onload(){} onunload(){} loadData(){ return Promise.resolve(null); } saveData(){ return Promise.resolve(); }
-        addCommand(){} addSettingTab(){} registerEvent(){} registerView(){} registerEditorSuggest(){}
-        registerHoverLinkSource(){} registerInterval(id){ return id; } registerDomEvent(el,ev,h){ el.addEventListener(ev,h); }
-        register(){} addRibbonIcon(){ return document.createElement('div'); } addStatusBarItem(){ return document.createElement('div'); }
-        addChild(c){ this._children.push(c); if(c&&c.load) c.load(); return c; }
-        removeChild(c){ const i=this._children.indexOf(c); if(i>=0) this._children.splice(i,1); if(c&&c.unload) c.unload(); return c; }
-        registerMarkdownPostProcessor(p){ return p; } registerMarkdownCodeBlockProcessor(){ return {}; }
-        registerEditorExtension(ext){ console.log('[Plugin.base] registerEditorExtension called (BASE CLASS NO-OP), ext:', Array.isArray(ext) ? 'Array('+ext.length+')' : typeof ext); } registerExtensions(){} registerObsidianProtocolHandler(){} removeCommand(){} registerCliHandler(){}
-      };
-    }
-    if (!obs.requireApiVersion) {
-      obs.requireApiVersion = function() { return true; };
-    }
-    if (!obs.MarkdownRenderChild) {
-      obs.MarkdownRenderChild = class MarkdownRenderChild extends obs.Component {
-        constructor(containerEl) { super(); this.containerEl = containerEl; }
-      };
-    }
-    if (!obs.ConfirmationModal) {
-      obs.ConfirmationModal = class ConfirmationModal extends (obs.Modal || class { constructor(){} open(){} close(){} onOpen(){} onClose(){} }) {
-        constructor(app) { super(app); }
-      };
-    }
-    if (!obs.SettingPage) {
-      obs.SettingPage = class SettingPage {
-        constructor() { this.rootEl = document.createElement('div'); this.titlebarEl = document.createElement('div'); this.containerEl = document.createElement('div'); this.title = ''; }
-        display(){} hide(){}
-      };
-    }
-    if (!obs.Events) {
-      obs.Events = class Events {
-        constructor() { this._e = {}; }
-        on(name, cb) { if (!this._e[name]) this._e[name] = []; this._e[name].push(cb); return { id: 0 }; }
-        off(name, cb) { if (this._e[name]) this._e[name] = this._e[name].filter(f => f !== cb); }
-        offref() {}
-        trigger(name, ...args) { if (this._e[name]) this._e[name].forEach(cb => { try { cb(...args); } catch(e) { console.error(e); } }); }
-        tryTrigger() {}
-      };
-    }
-    if (!obs.Scope) {
-      obs.Scope = class Scope {
-        constructor() { this._h = []; }
-        register(mods, key, func) { const h = { modifiers: mods, key, func }; this._h.push(h); return h; }
-        unregister(h) { const i = this._h.indexOf(h); if (i >= 0) this._h.splice(i, 1); }
-      };
-    }
-    if (!obs.Keymap) {
-      obs.Keymap = class Keymap {
-        static isModifier(evt, mod) { if (mod === 'Mod') return evt.metaKey || evt.ctrlKey; return false; }
-        static isModEvent(evt) { if (!evt) return false; return (evt.metaKey || evt.ctrlKey) ? 'tab' : false; }
-        pushScope() {} popScope() {}
-      };
-    }
-    if (!obs.addIcon) obs.addIcon = function() {};
-    if (!obs.setIcon) obs.setIcon = function(el) { return el; };
-    if (!obs.getIcon) obs.getIcon = function() { return null; };
-    if (!obs.getIconIds) obs.getIconIds = function() { return []; };
-    if (!obs.removeIcon) obs.removeIcon = function() {};
-    if (!obs.apiVersion) obs.apiVersion = '1.4.0';
-    if (!obs.parseYaml) obs.parseYaml = function(s) { try { return JSON.parse(s); } catch { return {}; } };
-    if (!obs.stringifyYaml) obs.stringifyYaml = function(o) { return JSON.stringify(o, null, 2); };
-    if (!obs.parseLinktext) obs.parseLinktext = function(t) { const i = t.indexOf('#'); return i < 0 ? { path: t, subpath: '' } : { path: t.slice(0, i), subpath: t.slice(i) }; };
-    if (!obs.getLinkpath) obs.getLinkpath = function(t) { const i = t.indexOf('#'); return i < 0 ? t : t.slice(0, i); };
-    if (!obs.normalizePath) obs.normalizePath = function(p) { return p.replace(/\\\\/g,'/').replace(/\\/\\//g,'/').replace(/^\\//, ''); };
-    if (!obs.htmlToMarkdown) obs.htmlToMarkdown = function(h) { return typeof h === 'string' ? h.replace(/<[^>]*>/g, '') : (h.textContent || ''); };
-    if (!obs.sanitizeHTMLToDom) obs.sanitizeHTMLToDom = function(h) { const t = document.createElement('template'); t.innerHTML = h; return t.content; };
-    if (!obs.getAllTags) obs.getAllTags = function(cache) { if (!cache) return null; var tags = []; if (cache.tags) { for (var i = 0; i < cache.tags.length; i++) { tags.push(cache.tags[i].tag); } } if (cache.frontmatter) { var fm = cache.frontmatter; var fmTags = fm.tags || fm.tag; if (Array.isArray(fmTags)) { for (var j = 0; j < fmTags.length; j++) { var t = fmTags[j]; tags.push(t.startsWith('#') ? t : '#' + t); } } else if (typeof fmTags === 'string') { fmTags.split(',').forEach(function(t) { t = t.trim(); if (t) tags.push(t.startsWith('#') ? t : '#' + t); }); } } return tags.length > 0 ? tags : null; };
-    if (!obs.prepareFuzzySearch) obs.prepareFuzzySearch = function() { return function() { return null; }; };
-    if (!obs.prepareSimpleSearch) obs.prepareSimpleSearch = function() { return function() { return null; }; };
-    if (!obs.getFrontMatterInfo) obs.getFrontMatterInfo = function(c) { if (!c.startsWith('---')) return { exists: false, frontmatter: '', from: 0, to: 0, contentStart: 0 }; const e = c.indexOf('\\n---', 3); if (e < 0) return { exists: false, frontmatter: '', from: 0, to: 0, contentStart: 0 }; return { exists: true, frontmatter: c.slice(4, e), from: 4, to: e, contentStart: e + 4 }; };
-    if (!obs.getLanguage) obs.getLanguage = function() { return (navigator.language || 'en').split('-')[0]; };
-    if (!obs.debounce) obs.debounce = function(cb, timeout, resetTimer) { var timer = null; var debounced = function() { var args = arguments; var ctx = this; if (resetTimer && timer) { clearTimeout(timer); } if (!timer || resetTimer) { timer = setTimeout(function() { timer = null; cb.apply(ctx, args); }, timeout || 0); } }; debounced.cancel = function() { if (timer) { clearTimeout(timer); timer = null; } return debounced; }; debounced.run = function() { if (timer) { clearTimeout(timer); timer = null; return cb.apply(this, arguments); } }; return debounced; };
-    if (!obs.BaseComponent) obs.BaseComponent = class BaseComponent { constructor(){} then(cb){cb(this);return this;} setDisabled(){return this;} };
-    if (!obs.ValueComponent) obs.ValueComponent = class ValueComponent extends obs.BaseComponent { getValue(){} setValue(){return this;} registerOptionListener(){return this;} };
-    if (!obs.MarkdownPreviewRenderer) obs.MarkdownPreviewRenderer = { registerPostProcessor(){}, unregisterPostProcessor(){}, createCodeBlockPostProcessor(){ return function(){}; } };
-    if (!obs.MarkdownRenderer) obs.MarkdownRenderer = { render: async function(_app, md, el) { el.innerHTML = md.replace(/</g,'&lt;').replace(/>/g,'&gt;'); }, renderMarkdown: async function(md, el) { el.innerHTML = md.replace(/</g,'&lt;').replace(/>/g,'&gt;'); } };
-    if (!obs.Notice) obs.Notice = class Notice { constructor(message, duration) { this.noticeEl = document.createElement('div'); this.noticeEl.isShown = () => this._shown; this.messageEl = document.createElement('div'); this.containerEl = document.createElement('div'); this._shown = true; const msg = typeof message === 'string' ? message : (message && message.textContent) || ''; if (window.__slatebaseShowNotice) window.__slatebaseShowNotice(msg, duration); } setMessage(message) { const msg = typeof message === 'string' ? message : (message && message.textContent) || ''; if (window.__slatebaseShowNotice) window.__slatebaseShowNotice(msg); return this; } hide() { this._shown = false; } isShown() { return this._shown; } };
-    if (!obs.requestUrl) obs.requestUrl = function(params) { const opts = typeof params === 'string' ? { url: params } : params; const token = localStorage.getItem('slatebase_token') || ''; const csrf = localStorage.getItem('slatebase_csrf') || ''; const p = fetch('/api/v1/proxy', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, 'X-CSRF-Token': csrf }, body: JSON.stringify({ url: opts.url, method: opts.method || 'GET', headers: opts.headers, body: opts.body ? (typeof opts.body === 'string' ? opts.body : btoa(String.fromCharCode(...new Uint8Array(opts.body)))) : undefined, contentType: opts.contentType }) }).then(async function(r) { const data = await r.json(); if (!r.ok) throw new Error(data.message || 'Proxy request failed'); const result = { status: data.status, headers: data.headers || {} }; if (data.text !== undefined) { result.text = data.text; try { result.json = JSON.parse(data.text); } catch(e) { result.json = null; } result.arrayBuffer = new TextEncoder().encode(data.text).buffer; } else if (data.arrayBuffer) { const bin = atob(data.arrayBuffer); const bytes = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i); result.arrayBuffer = bytes.buffer; result.text = new TextDecoder().decode(bytes); try { result.json = JSON.parse(result.text); } catch(e) { result.json = null; } } console.log('[requestUrl]', opts.method || 'GET', opts.url, '->', result.status); return result; }); p.text = p.then(function(r){return r.text||''}); p.json = p.then(function(r){return r.json}); p.arrayBuffer = p.then(function(r){return r.arrayBuffer}); return p; };
-    if (!obs.request) obs.request = function(params) { return obs.requestUrl(params).then(function(r) { return r.text || ''; }); };
-    if (!obs.EditableFileView) obs.EditableFileView = obs.FileView || class {};
-    if (!obs.MarkdownView) obs.MarkdownView = class MarkdownView { constructor(leaf) { this.leaf = leaf; this.editor = null; this.file = null; this.contentEl = document.createElement('div'); this.containerEl = document.createElement('div'); this.previewMode = { rerender(){} }; this.currentMode = { get(){ return ''; }, set(){} }; } getViewType(){ return 'markdown'; } getDisplayText(){ return this.file?.basename || 'Markdown'; } getMode(){ return 'source'; } getViewData(){ return this.editor?.getValue() || ''; } clear(){} setViewData(d){ if(this.editor) this.editor.setValue(d); } showSearch(){} };
-    if (!obs.FileSystemAdapter) obs.FileSystemAdapter = class FileSystemAdapter { getName(){ return 'slatebase'; } getBasePath(){ return '/'; } getFullPath(p){ return p; } };
-    if (!obs.AbstractInputSuggest) obs.AbstractInputSuggest = class { constructor(app, el) { this.app = app; this.textInputEl = el; } open(){} close(){} setValue(v){ if (this.textInputEl) this.textInputEl.value = v; } getValue(){ return this.textInputEl ? this.textInputEl.value : ''; } onSelect(){ return this; } };
-    if (!obs.ExtraButtonComponent) obs.ExtraButtonComponent = class { constructor(el) { this.extraSettingsEl = document.createElement('div'); el.appendChild(this.extraSettingsEl); } setIcon(){ return this; } setTooltip(){ return this; } onClick(){ return this; } setDisabled(){ return this; } then(cb){ cb(this); return this; } };
-    if (!obs.ColorComponent) obs.ColorComponent = class { constructor(el) { this.colorEl = document.createElement('input'); this.colorEl.type = 'color'; el.appendChild(this.colorEl); } getValue(){ return this.colorEl.value; } setValue(v){ this.colorEl.value = v; return this; } onChange(){ return this; } setDisabled(){ return this; } then(cb){ cb(this); return this; } };
-    if (!obs.SearchComponent) obs.SearchComponent = class { constructor(el) { this.inputEl = document.createElement('input'); this.clearButtonEl = document.createElement('div'); el.appendChild(this.inputEl); } getValue(){ return this.inputEl.value; } setValue(v){ this.inputEl.value = v; return this; } setPlaceholder(p){ this.inputEl.placeholder = p; return this; } onChange(){ return this; } setDisabled(){ return this; } then(cb){ cb(this); return this; } };
-    if (!obs.MomentFormatComponent) obs.MomentFormatComponent = class { constructor(el) { this.inputEl = document.createElement('input'); this.sampleEl = document.createElement('span'); el.appendChild(this.inputEl); } setDefaultFormat(){ return this; } setSampleEl(){ return this; } getValue(){ return this.inputEl.value; } setValue(v){ this.inputEl.value = v; return this; } onChange(){ return this; } then(cb){ cb(this); return this; } };
-    if (!obs.ProgressBarComponent) obs.ProgressBarComponent = class { constructor(el) { this.progressEl = document.createElement('progress'); el.appendChild(this.progressEl); } getValue(){ return 0; } setValue(v){ this.progressEl.value = v; return this; } then(cb){ cb(this); return this; } };
-    return obs;
+    // The namespace is fully populated by the compat layer before any plugin
+    // evaluates (see setting-tab.ts, which ends with registerFallbackShims()).
+    return window.obsidian || {};
   }
   if (id === 'obsidian-daily-notes-interface') return window.__obsidianDailyNotesInterface || {};
   if (id === 'moment') return window.moment;

@@ -54,6 +54,7 @@ import { SuggestModal, FuzzySuggestModal } from './suggest-modal'
 import { MarkdownRenderer } from './markdown-renderer'
 import { EditorShim } from './editor-shim'
 import { registerObsidianApiExtensions } from './obsidian-api-extensions'
+import { registerFallbackShims } from './fallback-shims'
 
 /**
  * Dedup guard for no-op method warnings.
@@ -2678,4 +2679,10 @@ if (typeof window !== 'undefined') {
   // Register all additional Obsidian API extensions (icons, Events, Scope, Keymap,
   // DOM globals, utility functions, extra UI components, MarkdownPreviewRenderer).
   registerObsidianApiExtensions()
+
+  // ─── Fallback Shims ────────────────────────────────────────────────────────
+  // Last: fill any name still unclaimed above with a minimal fallback, so a
+  // plugin reaching for an unimplemented API gets a no-op instead of a crash.
+  // Must stay after every real registration — these only fill genuine gaps.
+  registerFallbackShims()
 }
