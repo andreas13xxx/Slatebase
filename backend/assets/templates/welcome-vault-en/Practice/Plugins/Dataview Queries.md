@@ -162,11 +162,12 @@ LIMIT 3
 ````
 
 > [!todo] Step 5: Test Inline Query
-> Add an inline query to one of the project files:
-> ```markdown
-> Created: `= this.file.cday`
-> Deadline: `= this.deadline`
-> ```
+> Add the following lines **directly in the body text** of one of the project files (not inside a code block):
+>
+> `Created: ` followed by `` `= this.file.cday` ``
+> `Deadline: ` followed by `` `= this.deadline` ``
+>
+> The finished line looks like: `Created: `= this.file.cday``
 
 ---
 

@@ -241,6 +241,9 @@ export class VaultShim implements IVaultShim {
   /** Obsidian-compatible DataAdapter for raw filesystem access. */
   readonly adapter: IVaultAdapter;
 
+  /** Optional callback invoked after a file is read, with path and content. */
+  onFileRead: ((path: string, content: string) => void) | null = null;
+
   constructor(
     vaultId: string,
     vaultName: string,
@@ -278,6 +281,10 @@ export class VaultShim implements IVaultShim {
 
     try {
       const result = await this.apiClient.fetchFileContent(this.vaultId, file.path);
+      // Notify MetadataCache so it can parse frontmatter/tags on demand
+      if (this.onFileRead) {
+        this.onFileRead(file.path, result.content);
+      }
       return result.content;
     } catch (err: unknown) {
       const appErr = err as { code?: string; message?: string };
@@ -532,6 +539,10 @@ export class VaultShim implements IVaultShim {
    * Returns a TFile, TFolder, or null if not found.
    */
   getAbstractFileByPath(path: string): TAbstractFile | null {
+    // Root folder: Dataview's PrefixIndex queries "/" or "" for the vault root
+    if (path === '/' || path === '') {
+      return treeNodeToTFolder(this.directoryTree, null);
+    }
     if (!path || path.trim() === '') return null;
 
     const node = findNodeByPath(this.directoryTree, path);

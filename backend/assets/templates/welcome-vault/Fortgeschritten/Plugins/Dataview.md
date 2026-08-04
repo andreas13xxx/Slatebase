@@ -1,5 +1,7 @@
 ---
 tags: [fortgeschritten, plugins]
+author: Andreas
+difficulty: mittel
 ---
 
 # Dataview Plugin
@@ -229,13 +231,16 @@ SORT company ASC
 
 ## Inline-Queries
 
-Neben Code-Blöcken gibt es auch Inline-Queries:
+Neben Code-Blöcken gibt es auch Inline-Queries — diese werden **direkt im Fließtext** geschrieben (nicht in einem Code-Block). Die Syntax ist ein Backtick, Gleichzeichen, Leerzeichen, Expression, Backtick:
 
-```markdown
-Letzte Änderung: `= this.file.mtime`
-Dateigröße: `= this.file.size`
-Erstelldatum: `= this.file.cday`
-```
+Beispiel (so im Editor geschrieben):
+
+    Letzte Änderung: `= this.file.mtime`
+    Dateigröße: `= this.file.size`
+    Erstelldatum: `= this.file.cday`
+
+> [!warning] Nicht in Code-Blöcke setzen
+> Inline-Queries funktionieren nur im normalen Fließtext. Innerhalb von ` ``` `-Fences werden sie als Code angezeigt, nicht ausgeführt.
 
 ---
 
@@ -275,6 +280,51 @@ Erstelldatum: `= this.file.cday`
 > 5. Erstelle eine TASK-Query, die alle offenen Aufgaben aus einem Ordner sammelt
 > 6. Teste eine LIST-Query mit Sortierung nach Erstelldatum
 > 7. Siehe [[Praxis/Plugins/Dataview Queries]] für eine geführte Übung
+
+---
+
+## Live-Beispiele
+
+Die folgenden Beispiele werden automatisch gerendert, wenn das Dataview-Plugin aktiviert ist.
+
+### Alle Dateien in diesem Vault (TABLE)
+
+```dataview
+TABLE file.ctime AS "Erstellt", file.size AS "Größe", file.folder AS "Ordner"
+FROM ""
+SORT file.ctime DESC
+LIMIT 10
+```
+
+### Dateien mit Tag "fortgeschritten" (LIST)
+
+```dataview
+LIST
+FROM #fortgeschritten
+SORT file.name ASC
+```
+
+### Inline-Queries (direkt im Text)
+
+Diese Datei heißt: `= this.file.name`
+
+Sie wurde erstellt am: `= this.file.cday`
+
+Sie hat die Tags: `= this.tags`
+
+Anzahl Zeichen in dieser Datei: `= this.file.size`
+
+Dateipfad: `= this.file.path`
+
+Ordner: `= this.file.folder`
+
+Letzte Änderung: `= this.file.mday`
+
+Anzahl Links in dieser Datei: `= length(this.file.outlinks)`
+
+Autor (custom Frontmatter): `= this.author`
+
+Schwierigkeit: `= this.difficulty`
 
 ---
 

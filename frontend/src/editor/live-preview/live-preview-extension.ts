@@ -8,6 +8,7 @@ import { buildInlineDecorations, type HideableRange } from './inline-decorations
 import { buildLinkDecorations } from './link-decorations'
 import { buildWidgetDecorations, toggleCalloutFoldEffect } from './widget-decorations'
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
+import { editorInfoField } from '../editor-state-fields'
 
 /**
  * Options for creating the Live Preview extension.
@@ -102,9 +103,11 @@ function buildDecorations(
   const foldedCallouts = state.field(calloutFoldState, false) ?? new Set<string>()
 
   // Phase 3: Widget decorations (embeds, checkboxes, callouts, code blocks, blockquotes)
+  const fileInfo = state.field(editorInfoField, false)
   const widgets = buildWidgetDecorations(state, {
     vaultId: options.vaultId,
     token: options.token,
+    sourcePath: fileInfo?.file?.path ?? '',
     onCheckboxToggle: options.onCheckboxToggle,
     foldedCallouts,
   })

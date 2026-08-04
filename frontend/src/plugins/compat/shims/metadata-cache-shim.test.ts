@@ -38,10 +38,12 @@ function makeTree(): DirectoryTree {
 
 describe('MetadataCacheShim', () => {
   describe('getFileCache()', () => {
-    it('returns null when file has not been cached', () => {
+    it('returns empty metadata for file in tree but not explicitly cached', () => {
       const shim = new MetadataCacheShim(makeTree());
       const file = makeTFile('notes/hello.md');
-      expect(shim.getFileCache(file)).toBeNull();
+      // Files that exist in the vault tree return minimal metadata (not null)
+      // so that plugins like Dataview don't skip them during indexing.
+      expect(shim.getFileCache(file)).toEqual({});
     });
 
     it('returns CachedMetadata after updateFileCache()', () => {
@@ -64,9 +66,9 @@ describe('MetadataCacheShim', () => {
       expect(result?.headings).toHaveLength(1);
     });
 
-    it('returns null for file not in cache even if tree has it', () => {
+    it('returns null for file not in tree', () => {
       const shim = new MetadataCacheShim(makeTree());
-      const file = makeTFile('readme.md');
+      const file = makeTFile('nonexistent.md');
       expect(shim.getFileCache(file)).toBeNull();
     });
   });

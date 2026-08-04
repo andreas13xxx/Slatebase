@@ -5,6 +5,7 @@ import type { EventRef, IWorkspaceShim, TFile } from '../types';
 import type { ViewRegistry, WorkspaceLeaf } from '../view-registry';
 import { EditorShim } from '../editor-shim';
 import type { IEditor } from '../editor-shim';
+import { refreshPluginExtensions } from '../../../editor/plugin-extensions';
 import { MarkdownView } from './markdown-view-shim';
 
 /**
@@ -505,10 +506,12 @@ export class WorkspaceShim implements IWorkspaceShim {
 
   /**
    * Update/reconfigure options for all Markdown views.
-   * No-op in Slatebase — we don't have configurable CM options per-view.
+   * Triggers re-evaluation of plugin CM6 extensions — plugins like Dataview
+   * fill their extension arrays after registration and call this to apply them.
    */
   updateOptions(): void {
-    // No-op
+    console.log('[WorkspaceShim] updateOptions() called → refreshPluginExtensions()')
+    refreshPluginExtensions()
   }
 
   /**

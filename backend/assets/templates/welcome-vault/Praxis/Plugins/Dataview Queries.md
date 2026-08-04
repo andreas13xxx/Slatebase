@@ -162,11 +162,12 @@ LIMIT 3
 ````
 
 > [!todo] Schritt 5: Inline-Query testen
-> Füge in einer der Projektdateien eine Inline-Query ein:
-> ```markdown
-> Erstellt: `= this.file.cday`
-> Deadline: `= this.deadline`
-> ```
+> Füge in einer der Projektdateien folgende Zeilen **direkt im Fließtext** ein (nicht in einem Code-Block):
+>
+> `Erstellt: ` gefolgt von `` `= this.file.cday` ``
+> `Deadline: ` gefolgt von `` `= this.deadline` ``
+>
+> Die fertige Zeile sieht so aus: `Erstellt: `= this.file.cday``
 
 ---
 

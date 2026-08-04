@@ -232,6 +232,14 @@ Aktueller Sprint-Status:
 
 ---
 
+## Live-Beispiel
+
+Das folgende Board wird als Kanban-Board gerendert wenn das Plugin aktiviert ist:
+
+→ [[Fortgeschritten/Plugins/Beispiel-Kanban-Board]]
+
+---
+
 ## Verwandte Features
 
 - [[Features/Canvas]] — Visuelles Board (Alternative ohne Plugin)

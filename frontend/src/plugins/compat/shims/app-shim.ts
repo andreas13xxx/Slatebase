@@ -117,6 +117,7 @@ export class AppShim implements IAppShim {
       this.internalPlugins = {
         plugins: {
           'daily-notes': { enabled: true, instance: { options: { format: 'YYYY-MM-DD', folder: '', template: '' } } },
+          'templates': { enabled: false, instance: { options: { folder: '' } } },
         },
         getPluginById: (id: string) => {
           const p = this.internalPlugins.plugins[id];
@@ -129,12 +130,52 @@ export class AppShim implements IAppShim {
   /**
    * embedRegistry — Obsidian-internal API for creating embedded views.
    * Kanban uses it to extract the MarkdownEditor class from the prototype chain.
-   * We provide a stub that survives the prototype extraction without crashing.
+   * The FakeEditor creates a real CodeMirror 6 EditorView so Kanban's inline
+   * card editors can work (they call .set(), .cm.dispatch(), etc.).
    */
   readonly embedRegistry = {
     embedByExtension: {
       md: () => {
-        const FakeEditor = class { constructor() {} }
+        const FakeEditor = class {
+          cm: unknown
+          containerEl: HTMLElement
+          constructor(containerEl?: unknown) {
+            this.containerEl = (containerEl instanceof HTMLElement) ? containerEl : document.createElement('div')
+            // Lazy-init CM6: dynamically import to avoid top-level dep issues
+            this.cm = null
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-require-imports
+              const cmView = (globalThis as unknown as { __codemirrorView?: { EditorView: unknown } }).__codemirrorView
+              const cmState = (globalThis as unknown as { __codemirrorState?: { EditorState: unknown } }).__codemirrorState
+              if (cmView && cmState) {
+                const EV = cmView.EditorView as new (config: unknown) => { state: { doc: { length: number; toString(): string } }; dispatch(tr: unknown): void; destroy(): void; focus(): void }
+                const ES = cmState.EditorState as { create(config: unknown): unknown }
+                const state = ES.create({ doc: '' })
+                this.cm = new EV({ state, parent: this.containerEl })
+              }
+            } catch { /* CM6 not available — cm stays null */ }
+          }
+          set(value: string) {
+            const cm = this.cm as { state: { doc: { length: number } }; dispatch(tr: unknown): void } | null
+            if (cm) {
+              cm.dispatch({ changes: { from: 0, to: cm.state.doc.length, insert: value } })
+            }
+          }
+          get(): string {
+            const cm = this.cm as { state: { doc: { toString(): string } } } | null
+            return cm ? cm.state.doc.toString() : ''
+          }
+          destroy() {
+            const cm = this.cm as { destroy(): void } | null
+            if (cm) cm.destroy()
+          }
+          getDoc() { return { getValue: () => this.get() } }
+          clear() { this.set('') }
+          focus() {
+            const cm = this.cm as { focus(): void } | null
+            if (cm) cm.focus()
+          }
+        }
         const editMode = Object.create(Object.create(FakeEditor.prototype))
         return {
           load: () => {},

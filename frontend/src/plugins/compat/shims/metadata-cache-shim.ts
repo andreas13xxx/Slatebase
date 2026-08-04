@@ -26,6 +26,8 @@ export class MetadataCacheShim implements IMetadataCacheShim {
   private events = new EventSystem();
   private cache: Map<string, CachedMetadata> = new Map();
   private tree: DirectoryTree | null;
+  /** Content store for on-demand metadata parsing when explicit cache is empty */
+  private contentStore: Map<string, string> = new Map();
 
   constructor(directoryTree: DirectoryTree | null) {
     this.tree = directoryTree;
@@ -34,9 +36,49 @@ export class MetadataCacheShim implements IMetadataCacheShim {
   /**
    * Returns the cached metadata for a given file.
    * Returns null if the file hasn't been parsed or doesn't exist in cache.
+   *
+   * For files that exist in the vault but haven't been explicitly cached yet,
+   * returns parsed metadata from the content store (populated by vault reads).
+   * This is critical because plugins like Dataview get tags and frontmatter
+   * exclusively from the MetadataCache, not from raw file content.
    */
   getFileCache(file: TFile): CachedMetadata | null {
-    return this.cache.get(file.path) ?? null;
+    const cached = this.cache.get(file.path);
+    if (cached) return cached;
+
+    // If we have file content available, parse and cache metadata on demand
+    const content = this.contentStore.get(file.path);
+    if (content !== undefined) {
+      const metadata = this.parseContentToMetadata(content);
+      this.cache.set(file.path, metadata);
+      return metadata;
+    }
+
+    // If the file exists in the vault tree, return a minimal empty metadata object.
+    // Dataview's reload() checks `getFileCache(file) != null` before importing —
+    // without this, all files are skipped and the index stays empty.
+    if (this.tree && this.fileExistsInTree(file.path)) {
+      return {};
+    }
+
+    return null;
+  }
+
+  /**
+   * Registers file content for on-demand metadata parsing.
+   * Called by VaultShim after reading a file, so that getFileCache() can
+   * return meaningful metadata (frontmatter, tags, links) without needing
+   * a separate async cache-building step.
+   */
+  populateFromContent(path: string, content: string): void {
+    this.contentStore.set(path, content);
+    // If this path was already in the explicit cache with empty metadata,
+    // re-parse it now with the actual content.
+    const existing = this.cache.get(path);
+    if (existing && !existing.frontmatter && !existing.tags) {
+      const metadata = this.parseContentToMetadata(content);
+      this.cache.set(path, metadata);
+    }
   }
 
   /**
@@ -195,6 +237,194 @@ export class MetadataCacheShim implements IMetadataCacheShim {
   }
 
   // ─── Private helpers ───────────────────────────────────────────────────────
+
+  /**
+   * Checks if a file path exists in the current directory tree.
+   * Used by getFileCache() to return minimal metadata for existing files
+   * that haven't been explicitly cached yet.
+   */
+  private fileExistsInTree(path: string): boolean {
+    if (!this.tree) return false;
+    const files = collectFilesSorted(this.tree);
+    return files.some(f => f.path === path);
+  }
+
+  /**
+   * Parses markdown content to extract CachedMetadata (frontmatter, tags, links).
+   * Used for on-demand metadata generation when explicit cache hasn't been populated.
+   *
+   * Extracts:
+   * - frontmatter: YAML between --- delimiters
+   * - tags: inline #tags in text (outside code blocks) + frontmatter tags
+   * - links: [[wikilinks]] in text
+   * - headings: # headings
+   */
+  private parseContentToMetadata(content: string): CachedMetadata {
+    const metadata: CachedMetadata = {};
+
+    // Normalize CRLF to LF (lessons-learned #25: JS regex `.` doesn't match `\r`)
+    const normalizedContent = content.replace(/\r\n/g, '\n')
+
+    // Parse frontmatter (YAML between --- delimiters)
+    const fmMatch = normalizedContent.match(/^---\n([\s\S]*?)\n---/)
+    if (fmMatch) {
+      const fmText = fmMatch[1] ?? ''
+      const frontmatter: Record<string, unknown> = {}
+
+      // Simple YAML parsing for common fields
+      for (const line of fmText.split('\n')) {
+        const kvMatch = line.match(/^(\w[\w-]*)\s*:\s*(.+)$/)
+        if (kvMatch) {
+          const key = kvMatch[1]!
+          let value: unknown = kvMatch[2]!.trim()
+
+          // Parse array values: [item1, item2] or - item
+          if (typeof value === 'string' && value.startsWith('[') && value.endsWith(']')) {
+            value = value.slice(1, -1).split(',').map(s => s.trim()).filter(Boolean)
+          }
+
+          frontmatter[key] = value
+        }
+      }
+
+      if (Object.keys(frontmatter).length > 0) {
+        metadata.frontmatter = frontmatter
+      }
+
+      // Add frontmatter tags as tag objects in metadata.tags
+      // Dataview reads both metadata.tags (for tag objects) and metadata.frontmatter.tags
+      const fmTags = frontmatter['tags'] ?? frontmatter['tag']
+      if (fmTags) {
+        const tagArray = Array.isArray(fmTags) ? fmTags : [fmTags]
+        const fmTagObjects = tagArray.map((t: unknown) => {
+          const tagStr = String(t).trim()
+          return {
+            tag: tagStr.startsWith('#') ? tagStr : '#' + tagStr,
+            position: { start: { line: 0, col: 0, offset: 0 }, end: { line: 0, col: 0, offset: 0 } },
+          }
+        })
+        // Will be merged with inline tags below
+        metadata.tags = fmTagObjects
+      }
+    }
+
+    // Extract inline tags (outside code blocks)
+    const tags: Array<{ tag: string; position: { start: { line: number; col: number; offset: number }; end: { line: number; col: number; offset: number } } }> = []
+    const lines = normalizedContent.split('\n')
+    let codeBlockFenceLength = 0  // 0 = not in code block, >0 = min backticks needed to close
+    let inFrontmatter = false
+    let offset = 0
+
+    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+      const line = lines[lineNum]!
+      if (lineNum === 0 && line.trim() === '---') {
+        inFrontmatter = true
+        offset += line.length + 1
+        continue
+      }
+      if (inFrontmatter) {
+        if (line.trim() === '---') inFrontmatter = false
+        offset += line.length + 1
+        continue
+      }
+      // Code fence detection: track opening fence length, close only with same or longer fence
+      const fenceMatch = line.match(/^(`{3,}|~{3,})/)
+      if (fenceMatch) {
+        const fenceLen = fenceMatch[1]!.length
+        if (codeBlockFenceLength === 0) {
+          // Opening a code block
+          codeBlockFenceLength = fenceLen
+        } else if (fenceLen >= codeBlockFenceLength && line.trim() === fenceMatch[1]) {
+          // Closing the code block (must be at least as long, no info string)
+          codeBlockFenceLength = 0
+        }
+        offset += line.length + 1
+        continue
+      }
+      if (codeBlockFenceLength === 0) {
+        // Find inline tags: #tag (not in code spans, not preceded by &)
+        const tagRegex = /(?:^|(?<=\s))#([a-zA-Z\u00C0-\u024F][\w\u00C0-\u024F/-]*)/g
+        let match
+        while ((match = tagRegex.exec(line)) !== null) {
+          // Skip if inside inline code
+          const beforeTag = line.substring(0, match.index)
+          const backtickCount = (beforeTag.match(/`/g) ?? []).length
+          if (backtickCount % 2 !== 0) continue
+
+          tags.push({
+            tag: '#' + match[1],
+            position: {
+              start: { line: lineNum, col: match.index, offset: offset + match.index },
+              end: { line: lineNum, col: match.index + match[0].length, offset: offset + match.index + match[0].length },
+            },
+          })
+        }
+      }
+      offset += line.length + 1
+    }
+
+    if (tags.length > 0) {
+      // Merge with any frontmatter tags already set above
+      metadata.tags = [...(metadata.tags ?? []), ...tags]
+    }
+
+    // Extract wikilinks [[target|display]]
+    const links: Array<{ link: string; displayText?: string; original: string; position: { start: { line: number; col: number; offset: number }; end: { line: number; col: number; offset: number } } }> = []
+    offset = 0
+    let linkCodeBlockFenceLength = 0
+    inFrontmatter = false
+
+    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+      const line = lines[lineNum]!
+      if (lineNum === 0 && line.trim() === '---') {
+        inFrontmatter = true
+        offset += line.length + 1
+        continue
+      }
+      if (inFrontmatter) {
+        if (line.trim() === '---') inFrontmatter = false
+        offset += line.length + 1
+        continue
+      }
+      const linkFenceMatch = line.match(/^(`{3,}|~{3,})/)
+      if (linkFenceMatch) {
+        const fenceLen = linkFenceMatch[1]!.length
+        if (linkCodeBlockFenceLength === 0) {
+          linkCodeBlockFenceLength = fenceLen
+        } else if (fenceLen >= linkCodeBlockFenceLength && line.trim() === linkFenceMatch[1]) {
+          linkCodeBlockFenceLength = 0
+        }
+        offset += line.length + 1
+        continue
+      }
+      if (linkCodeBlockFenceLength === 0) {
+        const linkRegex = /\[\[([^\]]+)\]\]/g
+        let match
+        while ((match = linkRegex.exec(line)) !== null) {
+          const inner = match[1]!
+          const pipeIdx = inner.indexOf('|')
+          const link = pipeIdx >= 0 ? inner.substring(0, pipeIdx) : inner
+          const displayText = pipeIdx >= 0 ? inner.substring(pipeIdx + 1) : undefined
+          links.push({
+            link,
+            displayText,
+            original: match[0],
+            position: {
+              start: { line: lineNum, col: match.index, offset: offset + match.index },
+              end: { line: lineNum, col: match.index + match[0].length, offset: offset + match.index + match[0].length },
+            },
+          })
+        }
+      }
+      offset += line.length + 1
+    }
+
+    if (links.length > 0) {
+      metadata.links = links
+    }
+
+    return metadata
+  }
 
   /**
    * Builds a TFile object from a resolved path and the current directory tree.

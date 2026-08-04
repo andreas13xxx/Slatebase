@@ -4,6 +4,24 @@ import { EditorView, lineNumbers as cmLineNumbers } from '@codemirror/view'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { GFM } from '@lezer/markdown'
+import { tokenClassNodePropSource } from './token-class-node-prop'
+
+/**
+ * Pre-configured Markdown parser with tokenClassNodeProp set on all NodeTypes.
+ * This ensures Lezer trees have the prop values that plugins like Dataview expect.
+ * Created at module level (singleton) — reused for all editor instances.
+ */
+const markdownParserWithProps = (markdownLanguage.parser as unknown as { configure(spec: Record<string, unknown>): unknown }).configure({
+  props: [tokenClassNodePropSource],
+}) as typeof markdownLanguage.parser
+
+/**
+ * Markdown Language instance with our configured parser.
+ * Uses Object.create to inherit all Language behavior while swapping the parser.
+ */
+const markdownLanguageWithProps: typeof markdownLanguage = Object.create(markdownLanguage, {
+  parser: { value: markdownParserWithProps, configurable: true },
+})
 import { search } from '@codemirror/search'
 import { undo as cmUndo, redo as cmRedo } from '@codemirror/commands'
 import { autocompletion, type CompletionSource } from '@codemirror/autocomplete'
@@ -13,6 +31,8 @@ import { getEditorState, saveEditorState, editorHistoryExtension } from './state
 import { applyFormatting as applyFormattingAction } from './formatting'
 import { createLivePreviewCompartmentExtension, createLivePreviewField, createLivePreviewClickHandler, type LivePreviewOptions } from './live-preview'
 import { setActiveEditorView, getActivePluginExtensions, getActivePluginCompletions } from './plugin-extensions'
+import { editorInfoField, editorEditorField, editorLivePreviewField } from './editor-state-fields'
+import { setEditorInfo, setEditorEditor, setEditorLivePreview, type EditorFileInfo } from './editor-state-fields'
 import './live-preview/live-preview.css'
 
 /**
@@ -58,7 +78,7 @@ export function CodeMirrorEditor({
   onContentChange,
   readOnly = false,
   tabId,
-  filePath: _filePath,
+  filePath,
   livePreview = false,
   livePreviewOptions,
   showLineNumbers = false,
@@ -97,7 +117,27 @@ export function CodeMirrorEditor({
     const pluginCompletionSources = getActivePluginCompletions()
 
     const extensions: Extension[] = [
-      markdown({ base: markdownLanguage, codeLanguages: languages, extensions: GFM }),
+      // Obsidian-compatible StateFields — MUST be before plugin extensions
+      // so that plugins can access them via view.state.field() during initialization.
+      // Use .init() to provide correct initial values so ViewPlugins that read
+      // these fields in their constructor get the right data (not defaults).
+      editorInfoField.init(() => ({
+        app: (window as unknown as { app?: unknown }).app ?? null,
+        file: filePath ? {
+          path: filePath,
+          basename: filePath.replace(/\.[^.]+$/, '').split('/').pop() ?? '',
+          extension: filePath.split('.').pop() ?? 'md',
+          name: filePath.split('/').pop() ?? '',
+        } : null,
+        editor: undefined,
+      })),
+      editorEditorField,
+      editorLivePreviewField.init(() => livePreview),
+      markdown({
+        base: markdownLanguageWithProps,
+        codeLanguages: languages,
+        extensions: GFM,
+      }),
       createSlatebaseTheme(),
       createSlatebaseHighlightStyle(),
       EditorView.lineWrapping,
@@ -189,6 +229,25 @@ export function CodeMirrorEditor({
     // Register the active EditorView with the plugin extension manager
     setActiveEditorView(view)
 
+    // Initialize Obsidian-compatible StateFields with current context
+    const fileInfo: EditorFileInfo = {
+      app: (window as unknown as { app?: unknown }).app ?? null,
+      file: filePath ? {
+        path: filePath,
+        basename: filePath.replace(/\.[^.]+$/, '').split('/').pop() ?? '',
+        extension: filePath.split('.').pop() ?? 'md',
+        name: filePath.split('/').pop() ?? '',
+      } : null,
+      editor: undefined,
+    }
+    view.dispatch({
+      effects: [
+        setEditorInfo.of(fileInfo),
+        setEditorEditor.of(view),
+        setEditorLivePreview.of(livePreview),
+      ],
+    })
+
     // Restore scroll position if available
     if (stored) {
       view.scrollDOM.scrollTop = stored.scrollTop
@@ -246,6 +305,13 @@ export function CodeMirrorEditor({
       ),
     })
   }, [livePreview, livePreviewOptions])
+
+  // Update editorLivePreviewField StateField when live preview mode changes
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({ effects: setEditorLivePreview.of(livePreview) })
+  }, [livePreview])
 
   // Expose imperative handle
   useImperativeHandle(editorRef, () => ({

@@ -1,5 +1,7 @@
 ---
 tags: [advanced, plugins]
+author: Andreas
+difficulty: intermediate
 ---
 
 # Dataview Plugin
@@ -229,13 +231,16 @@ SORT company ASC
 
 ## Inline Queries
 
-Besides code blocks, there are inline queries:
+Besides code blocks, there are inline queries — written **directly in body text** (not inside a code block). The syntax is a backtick, equals sign, space, expression, backtick:
 
-```markdown
-Last modified: `= this.file.mtime`
-File size: `= this.file.size`
-Created: `= this.file.cday`
-```
+Example (written like this in the editor):
+
+    Last modified: `= this.file.mtime`
+    File size: `= this.file.size`
+    Created: `= this.file.cday`
+
+> [!warning] Don't put them in code blocks
+> Inline queries only work in normal body text. Inside ` ``` ` fences they are displayed as code, not executed.
 
 ---
 
@@ -275,6 +280,51 @@ Created: `= this.file.cday`
 > 5. Create a TASK query collecting all open tasks from a folder
 > 6. Test a LIST query sorted by creation date
 > 7. See [[Practice/Plugins/Dataview Queries]] for a guided exercise
+
+---
+
+## Live Examples
+
+The following examples render automatically when the Dataview plugin is activated.
+
+### All files in this vault (TABLE)
+
+```dataview
+TABLE file.ctime AS "Created", file.size AS "Size", file.folder AS "Folder"
+FROM ""
+SORT file.ctime DESC
+LIMIT 10
+```
+
+### Files tagged "advanced" (LIST)
+
+```dataview
+LIST
+FROM #advanced
+SORT file.name ASC
+```
+
+### Inline Queries (directly in text)
+
+This file is called: `= this.file.name`
+
+It was created on: `= this.file.cday`
+
+It has the tags: `= this.tags`
+
+Character count of this file: `= this.file.size`
+
+File path: `= this.file.path`
+
+Folder: `= this.file.folder`
+
+Last modified: `= this.file.mday`
+
+Number of links in this file: `= length(this.file.outlinks)`
+
+Author (custom frontmatter): `= this.author`
+
+Difficulty: `= this.difficulty`
 
 ---
 

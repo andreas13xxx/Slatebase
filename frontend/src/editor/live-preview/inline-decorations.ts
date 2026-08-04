@@ -246,5 +246,44 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
     }
   }
 
+  // --- Inline Tags (#tag, #nested/tag) ---
+  // Not in Lezer grammar — detect via regex on the full document text.
+  // Tags start with # preceded by whitespace, line start, or punctuation,
+  // followed by a letter or underscore, then letters/digits/underscores/hyphens/slashes.
+  const TAG_REGEX = /(?:^|(?<=[\s([\]{}"',;:.!?><]))#([A-Za-z\u00C0-\u024F\u1E00-\u1EFF_][A-Za-z\u00C0-\u024F\u1E00-\u1EFF0-9_\-/]*)/gm
+  let tagMatch: RegExpExecArray | null
+
+  TAG_REGEX.lastIndex = 0
+  while ((tagMatch = TAG_REGEX.exec(docText)) !== null) {
+    const fullFrom = tagMatch.index + (tagMatch[0].length - tagMatch[1]!.length - 1) // position of #
+    const fullTo = fullFrom + 1 + tagMatch[1]!.length // # + tag value
+
+    // Skip if this is a heading marker at line start (# followed by space)
+    const line = state.doc.lineAt(fullFrom)
+    const linePrefix = docText.slice(line.from, fullFrom)
+    if (/^#{0,5}$/.test(linePrefix)) {
+      // This # is part of a heading marker sequence — skip
+      continue
+    }
+
+    // Skip if inside a code block
+    let insideCodeBlock = false
+    tree.iterate({
+      from: fullFrom, to: fullTo,
+      enter(n) {
+        if (n.name === 'FencedCode' || n.name === 'InlineCode' || n.name === 'CodeBlock') {
+          insideCodeBlock = true
+          return false
+        }
+      }
+    })
+    if (insideCodeBlock) continue
+
+    // Mark the entire tag (#value) with the tag class
+    decorations.push(
+      Decoration.mark({ class: 'cm-lp-tag' }).range(fullFrom, fullTo)
+    )
+  }
+
   return { decorations, hideableRanges }
 }

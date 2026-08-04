@@ -198,8 +198,14 @@ describe('VaultShim', () => {
       expect(result).toBeNull();
     });
 
-    it('returns null for empty path', () => {
-      expect(vault.getAbstractFileByPath('')).toBeNull();
+    it('returns root folder for empty path (Obsidian compat)', () => {
+      const root = vault.getAbstractFileByPath('');
+      expect(root).not.toBeNull();
+      expect(root!.name).toBeDefined();
+      expect((root as { children?: unknown[] }).children).toBeDefined();
+    });
+
+    it('returns null for whitespace-only path', () => {
       expect(vault.getAbstractFileByPath('   ')).toBeNull();
     });
   });

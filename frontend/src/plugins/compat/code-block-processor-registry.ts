@@ -184,6 +184,15 @@ export function hasCodeBlockProcessor(language: string): boolean {
 }
 
 /**
+ * Get the code block handler for a given language (if registered).
+ * Used by Live Preview to render plugin code blocks as widgets.
+ */
+export function getCodeBlockHandler(language: string): CodeBlockHandler | null {
+  const registration = codeBlockProcessors.get(language.toLowerCase())
+  return registration?.handler ?? null
+}
+
+/**
  * Get all registered code block languages.
  */
 export function getRegisteredLanguages(): string[] {

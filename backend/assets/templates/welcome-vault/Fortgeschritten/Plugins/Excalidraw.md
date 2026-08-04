@@ -182,6 +182,14 @@ Excalidraw speichert Zeichnungen als `.excalidraw.md`-Dateien:
 
 ---
 
+## Live-Beispiel
+
+Die folgende Datei wird als Excalidraw-Zeichnung gerendert wenn das Plugin aktiviert ist:
+
+→ [[Fortgeschritten/Plugins/Beispiel-Zeichnung.excalidraw]]
+
+---
+
 ## Verwandte Features
 
 - [[Features/Canvas]] — Knoten-basiertes Whiteboard (Alternative)

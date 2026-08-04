@@ -162,6 +162,14 @@ Excalidraw saves drawings as `.excalidraw.md` files:
 
 ---
 
+## Live Example
+
+The following file renders as an Excalidraw drawing when the plugin is activated:
+
+→ [[Advanced/Plugins/Example-Drawing.excalidraw]]
+
+---
+
 ## Related Features
 
 - [[Features/Canvas]] — Node-based whiteboard (alternative)

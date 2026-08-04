@@ -147,7 +147,11 @@ export async function removeActiveFileView(vaultId: string, filePath: string): P
   activeFileViews.delete(key)
 
   try {
-    await active.leaf.detach()
+    if (active.leaf) {
+      await active.leaf.detach()
+    } else if (active.view) {
+      await active.view.onClose()
+    }
   } catch (err) {
     console.error(`[FileViewRegistry] Error detaching file view for "${filePath}":`, err)
   }
@@ -159,7 +163,11 @@ export async function removeActiveFileView(vaultId: string, filePath: string): P
 export async function removeAllActiveFileViews(): Promise<void> {
   for (const [key, active] of activeFileViews) {
     try {
-      await active.leaf.detach()
+      if (active.leaf) {
+        await active.leaf.detach()
+      } else if (active.view) {
+        await active.view.onClose()
+      }
     } catch (err) {
       console.error(`[FileViewRegistry] Error detaching file view "${key}":`, err)
     }
@@ -182,7 +190,11 @@ export async function removeActiveFileViewsForPlugin(pluginId: string): Promise<
     if (active) {
       activeFileViews.delete(key)
       try {
-        await active.leaf.detach()
+        if (active.leaf) {
+          await active.leaf.detach()
+        } else if (active.view) {
+          await active.view.onClose()
+        }
       } catch (err) {
         console.error(`[FileViewRegistry] Error detaching file view "${key}":`, err)
       }

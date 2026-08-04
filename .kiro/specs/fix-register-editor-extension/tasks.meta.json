@@ -1,0 +1,109 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Write bug condition exploration test": [
+      {
+        "executionId": "d7ab4d49-152f-4c23-8676-ae630ba19a40",
+        "chatSessionId": "sess_67c8bcf8-b86d-4045-9bd4-70aa174afbb3",
+        "timestamp": 1785687622711
+      },
+      {
+        "executionId": "d7ab4d49-152f-4c23-8676-ae630ba19a40",
+        "chatSessionId": "sess_67c8bcf8-b86d-4045-9bd4-70aa174afbb3",
+        "timestamp": 1785687630083
+      },
+      {
+        "executionId": "d7ab4d49-152f-4c23-8676-ae630ba19a40",
+        "chatSessionId": "sess_67c8bcf8-b86d-4045-9bd4-70aa174afbb3",
+        "timestamp": 1785688274566
+      }
+    ],
+    "2. Write preservation property tests (BEFORE implementing fix)": [
+      {
+        "executionId": "d7ab4d49-152f-4c23-8676-ae630ba19a40",
+        "chatSessionId": "sess_67c8bcf8-b86d-4045-9bd4-70aa174afbb3",
+        "timestamp": 1785687622792
+      },
+      {
+        "executionId": "d7ab4d49-152f-4c23-8676-ae630ba19a40",
+        "chatSessionId": "sess_67c8bcf8-b86d-4045-9bd4-70aa174afbb3",
+        "timestamp": 1785688279170
+      },
+      {
+        "executionId": "d7ab4d49-152f-4c23-8676-ae630ba19a40",
+        "chatSessionId": "sess_67c8bcf8-b86d-4045-9bd4-70aa174afbb3",
+        "timestamp": 1785688621374
+      }
+    ],
+    "3.1 Implement the fix in plugin-context.ts": [
+      {
+        "executionId": "d7ab4d49-152f-4c23-8676-ae630ba19a40",
+        "chatSessionId": "sess_67c8bcf8-b86d-4045-9bd4-70aa174afbb3",
+        "timestamp": 1785687622878
+      },
+      {
+        "executionId": "d7ab4d49-152f-4c23-8676-ae630ba19a40",
+        "chatSessionId": "sess_67c8bcf8-b86d-4045-9bd4-70aa174afbb3",
+        "timestamp": 1785688625127
+      },
+      {
+        "executionId": "d7ab4d49-152f-4c23-8676-ae630ba19a40",
+        "chatSessionId": "sess_67c8bcf8-b86d-4045-9bd4-70aa174afbb3",
+        "timestamp": 1785689008693
+      }
+    ],
+    "3.2 Verify bug condition exploration test now passes": [
+      {
+        "executionId": "d7ab4d49-152f-4c23-8676-ae630ba19a40",
+        "chatSessionId": "sess_67c8bcf8-b86d-4045-9bd4-70aa174afbb3",
+        "timestamp": 1785687622925
+      },
+      {
+        "executionId": "d7ab4d49-152f-4c23-8676-ae630ba19a40",
+        "chatSessionId": "sess_67c8bcf8-b86d-4045-9bd4-70aa174afbb3",
+        "timestamp": 1785689012638
+      },
+      {
+        "executionId": "d7ab4d49-152f-4c23-8676-ae630ba19a40",
+        "chatSessionId": "sess_67c8bcf8-b86d-4045-9bd4-70aa174afbb3",
+        "timestamp": 1785689190503
+      }
+    ],
+    "3.3 Verify preservation tests still pass": [
+      {
+        "executionId": "d7ab4d49-152f-4c23-8676-ae630ba19a40",
+        "chatSessionId": "sess_67c8bcf8-b86d-4045-9bd4-70aa174afbb3",
+        "timestamp": 1785687622981
+      },
+      {
+        "executionId": "d7ab4d49-152f-4c23-8676-ae630ba19a40",
+        "chatSessionId": "sess_67c8bcf8-b86d-4045-9bd4-70aa174afbb3",
+        "timestamp": 1785689194523
+      }
+    ],
+    "4. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "d7ab4d49-152f-4c23-8676-ae630ba19a40",
+        "chatSessionId": "sess_67c8bcf8-b86d-4045-9bd4-70aa174afbb3",
+        "timestamp": 1785687623035
+      },
+      {
+        "executionId": "d7ab4d49-152f-4c23-8676-ae630ba19a40",
+        "chatSessionId": "sess_67c8bcf8-b86d-4045-9bd4-70aa174afbb3",
+        "timestamp": 1785689199313
+      },
+      {
+        "executionId": "d7ab4d49-152f-4c23-8676-ae630ba19a40",
+        "chatSessionId": "sess_67c8bcf8-b86d-4045-9bd4-70aa174afbb3",
+        "timestamp": 1785689314913
+      }
+    ],
+    "3. Fix for registerEditorExtension/registerEditorSuggest No-Op stubs": [
+      {
+        "executionId": "d7ab4d49-152f-4c23-8676-ae630ba19a40",
+        "chatSessionId": "sess_67c8bcf8-b86d-4045-9bd4-70aa174afbb3",
+        "timestamp": 1785689194591
+      }
+    ]
+  }
+}

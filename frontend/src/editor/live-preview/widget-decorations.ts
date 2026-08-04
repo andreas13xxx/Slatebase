@@ -2,6 +2,8 @@ import { Decoration, WidgetType, type EditorView } from '@codemirror/view'
 import { StateEffect, type EditorState, type Range } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
 import type { HideableRange } from './inline-decorations'
+import { hasCodeBlockProcessor, getCodeBlockHandler, MarkdownRenderChild } from '../../plugins/compat/code-block-processor-registry'
+import type { MarkdownPostProcessorContext } from '../../plugins/compat/code-block-processor-registry'
 
 /**
  * State effect to toggle callout fold state.
@@ -24,6 +26,8 @@ export interface WidgetDecorationOptions {
   vaultId: string
   /** Auth token for image requests. */
   token?: string
+  /** Source file path (for code block processor context). */
+  sourcePath?: string
   /** Callback when a checkbox is toggled. */
   onCheckboxToggle?: (line: number, checked: boolean) => void
   /** Set of folded callout block positions (keyed as `${from}:${to}`). */
@@ -258,6 +262,93 @@ function parseTableRow(line: string): string[] {
   if (trimmed.startsWith('|')) trimmed = trimmed.slice(1)
   if (trimmed.endsWith('|')) trimmed = trimmed.slice(0, -1)
   return trimmed.split('|')
+}
+
+/**
+ * Widget for rendering plugin-registered code block processors in Live Preview.
+ *
+ * When a FencedCode block's language has a registered CodeBlockProcessor
+ * (e.g. `dataview`, `dataviewjs`, `kanban`, `tasks`), this widget replaces
+ * the raw code block with the plugin's rendered output.
+ *
+ * The handler is called asynchronously. Errors are caught and displayed inline.
+ */
+class CodeBlockProcessorWidget extends WidgetType {
+  private readonly language: string
+  private readonly source: string
+  private readonly sourcePath: string
+
+  constructor(language: string, source: string, sourcePath: string) {
+    super()
+    this.language = language
+    this.source = source
+    this.sourcePath = sourcePath
+  }
+
+  toDOM(): HTMLElement {
+    const container = document.createElement('div')
+    container.className = `cm-lp-code-block-processed block-language-${this.language}`
+    container.dataset.language = this.language
+
+    // Call the registered handler
+    this.renderBlock(container)
+
+    return container
+  }
+
+  private renderBlock(container: HTMLElement): void {
+    const handler = getCodeBlockHandler(this.language)
+    if (!handler) {
+      container.textContent = `No handler for language: ${this.language}`
+      return
+    }
+
+    // Build context
+    const renderChild = new MarkdownRenderChild(container)
+    const ctx: MarkdownPostProcessorContext = {
+      docId: `lp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      sourcePath: this.sourcePath,
+      frontmatter: null,
+      addChild(child: MarkdownRenderChild): void {
+        // Track child for cleanup — widget destroy handles lifecycle
+        void child
+      },
+      getSectionInfo(): null {
+        return null
+      },
+    }
+
+    try {
+      const result = handler(this.source, container, ctx)
+      if (result instanceof Promise) {
+        result.catch((err) => {
+          console.error(`[CodeBlockProcessorWidget] Handler error for "${this.language}":`, err)
+          container.textContent = `Error rendering ${this.language}: ${err instanceof Error ? err.message : String(err)}`
+        })
+      }
+    } catch (err) {
+      console.error(`[CodeBlockProcessorWidget] Handler error for "${this.language}":`, err)
+      container.textContent = `Error rendering ${this.language}: ${err instanceof Error ? err.message : String(err)}`
+    }
+
+    // Store render child for potential cleanup
+    ;(container as unknown as { __renderChild?: MarkdownRenderChild }).__renderChild = renderChild
+  }
+
+  eq(other: CodeBlockProcessorWidget): boolean {
+    return this.language === other.language && this.source === other.source
+  }
+
+  get estimatedHeight(): number {
+    return 100
+  }
+
+  destroy(_dom: HTMLElement): void {
+    const renderChild = (_dom as unknown as { __renderChild?: MarkdownRenderChild }).__renderChild
+    if (renderChild) {
+      renderChild.unload()
+    }
+  }
 }
 
 /**
@@ -861,6 +952,22 @@ export function buildWidgetDecorations(
             )
             hideableRanges.push({ from: node.from, to: node.to, groupFrom: node.from, groupTo: node.to })
           }
+          return
+        }
+
+        // Plugin-registered code block processors (dataview, kanban, tasks, etc.)
+        if (hasCodeBlockProcessor(language)) {
+          const openLine = fenceOpenFrom !== -1 ? doc.lineAt(fenceOpenFrom) : null
+          const closeLine = fenceCloseFrom !== -1 ? doc.lineAt(fenceCloseFrom) : null
+          const codeStart = openLine ? openLine.to + 1 : node.from
+          const codeEnd = closeLine ? closeLine.from : node.to
+          const source = codeEnd > codeStart ? doc.sliceString(codeStart, codeEnd) : ''
+
+          const widget = new CodeBlockProcessorWidget(language, source, options.sourcePath ?? '')
+          decorations.push(
+            Decoration.replace({ widget }).range(node.from, node.to)
+          )
+          hideableRanges.push({ from: node.from, to: node.to, groupFrom: node.from, groupTo: node.to })
           return
         }
 

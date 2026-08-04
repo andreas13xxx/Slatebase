@@ -232,6 +232,14 @@ Current sprint status:
 
 ---
 
+## Live Example
+
+The following board renders as a Kanban board when the plugin is activated:
+
+→ [[Advanced/Plugins/Example-Kanban-Board]]
+
+---
+
 ## Related Features
 
 - [[Features/Canvas]] — Visual board (alternative without plugin)

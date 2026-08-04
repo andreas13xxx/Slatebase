@@ -327,6 +327,87 @@
   text-align: left;
 }
 
+/* --- Plugin Code Block Processors (Dataview, Kanban, Tasks, etc.) --- */
+.cm-lp-code-block-processed {
+  display: block;
+  margin: 8px 0;
+  padding: 12px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  max-width: 100%;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+
+/* Dataview tables */
+.cm-lp-code-block-processed table.dataview {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.cm-lp-code-block-processed table.dataview thead tr {
+  border-bottom: 2px solid var(--border-default);
+}
+
+.cm-lp-code-block-processed table.dataview th {
+  text-align: left;
+  padding: 6px 12px;
+  font-weight: 600;
+  color: var(--text-accent);
+}
+
+.cm-lp-code-block-processed table.dataview td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cm-lp-code-block-processed table.dataview tbody tr:hover {
+  background: var(--bg-elevated);
+}
+
+/* Dataview lists */
+.cm-lp-code-block-processed .dataview.list-view-ul {
+  padding-left: 20px;
+  margin: 0;
+}
+
+.cm-lp-code-block-processed .dataview.list-view-ul li {
+  margin: 4px 0;
+}
+
+/* Dataview task views */
+.cm-lp-code-block-processed .dataview.task-list-basic-ul {
+  list-style: none;
+  padding-left: 4px;
+  margin: 0;
+}
+
+.cm-lp-code-block-processed .dataview.task-list-basic-ul li {
+  margin: 4px 0;
+}
+
+/* Dataview status messages */
+.cm-lp-code-block-processed .dataview.dataview-error,
+.cm-lp-code-block-processed .dataview.dataview-no-value {
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  padding: 16px;
+}
+
+/* Dataview internal links */
+.cm-lp-code-block-processed .internal-link {
+  color: var(--text-accent);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.cm-lp-code-block-processed .internal-link:hover {
+  text-decoration: underline;
+}
+
 /* --- Tables --- */
 .cm-lp-table-wrapper {
   display: block;
@@ -442,4 +523,15 @@
   padding: 0 6px;
   font-size: 0.9em;
   color: var(--text-primary);
+}
+
+/* ===== Inline Tags (#tag) ===== */
+.cm-lp-tag {
+  background: var(--tag-bg);
+  color: var(--tag-text);
+  border: 1px solid var(--tag-border);
+  border-radius: var(--radius-full);
+  padding: 1px 6px;
+  font-size: 0.9em;
+  font-weight: 500;
 }
