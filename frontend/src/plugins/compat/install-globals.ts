@@ -73,6 +73,7 @@ import { MarkdownRenderer } from './markdown-renderer'
 import { EditorShim } from './editor-shim'
 import { registerObsidianApiExtensions } from './obsidian-api-extensions'
 import { registerFallbackShims } from './fallback-shims'
+import { detectPlatform, readPlatformEnvironment } from './platform-detection'
 import { warnNoOp } from './no-op-warning'
 
 // ─── Obsidian-compatible syntaxTree wrapper ──────────────────────────────────────
@@ -1061,18 +1062,10 @@ export function installObsidianGlobals(): void {
 
   // ─── Platform detection (used by Kanban, many others) ──────────────────
 
+  // Derived from the actual device rather than hardcoded to desktop: the same
+  // build serves a laptop and a phone browser. See ./platform-detection.
   if (!window.obsidian.Platform) {
-    window.obsidian.Platform = {
-      isMobile: false,
-      isPhone: false,
-      isTablet: false,
-      isDesktop: true,
-      isDesktopApp: false,
-      isMacOS: navigator.platform?.startsWith('Mac') ?? false,
-      isWin: navigator.platform?.startsWith('Win') ?? false,
-      isLinux: navigator.platform?.includes('Linux') ?? false,
-      isSafari: /^((?!chrome|android).)*safari/i.test(navigator.userAgent),
-    }
+    window.obsidian.Platform = detectPlatform(readPlatformEnvironment()) as unknown as Record<string, unknown>
   }
 
   // ─── Utility functions used by many plugins ────────────────────────────
