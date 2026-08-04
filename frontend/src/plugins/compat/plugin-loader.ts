@@ -21,11 +21,11 @@ import type {
 } from './types';
 import { BundleEvaluationError, LifecycleError } from './errors';
 
-// Side-effect import: populates the `window.obsidian` namespace that the
-// injected `require('obsidian')` hands to every evaluated bundle. Imported here
-// rather than relied upon transitively, so the namespace is guaranteed complete
-// no matter which entry point reaches the loader first.
-import './setting-tab';
+// Populates the `window.obsidian` namespace that the injected
+// `require('obsidian')` hands to every evaluated bundle. Called here rather than
+// relied upon transitively, so the namespace is guaranteed complete no matter
+// which entry point reaches the loader first. Idempotent.
+import { installObsidianGlobals } from './install-globals';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -95,6 +95,8 @@ export class PluginLoader implements IPluginLoader {
 
   constructor(deps: PluginLoaderDeps) {
     this.deps = deps;
+    // The namespace must be complete before any bundle evaluates.
+    installObsidianGlobals();
   }
 
   /**

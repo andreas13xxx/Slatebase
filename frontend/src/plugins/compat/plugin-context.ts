@@ -39,8 +39,8 @@ import { SettingTabRegistry } from './setting-tab-registry'
 import type { ISettingTabRegistry } from './setting-tab-registry'
 import { CssInjector } from './css-injector'
 import { CompatibilityAnalyzer } from './compatibility-analyzer'
-// Import setting-tab module to register global obsidian shims (PluginSettingTab, Setting)
-import './setting-tab'
+// Installs the global `window.obsidian` namespace the plugin bundles run against.
+import { installObsidianGlobals } from './install-globals'
 import type { ICompatibilityAnalyzer } from './compatibility-analyzer'
 import { VaultShim } from './shims/vault-shim'
 import { WorkspaceShim } from './shims/workspace-shim'
@@ -420,6 +420,10 @@ export function PluginProvider({
 
     // Wire EditorShim to use CM6 EditorView as backend
     setEditorViewAccessor(getActiveEditorView)
+
+    // Install the base obsidian namespace before the context-specific shims
+    // below layer onto it. Idempotent — the PluginLoader calls it too.
+    installObsidianGlobals()
 
     // Register MarkdownView on window.obsidian for instanceof checks
     registerMarkdownViewGlobal()
