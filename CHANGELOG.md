@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.1](https://github.com/andreas13xxx/Slatebase/compare/v0.18.0...v0.18.1) (2026-08-04)
+
+
+### Sonstige Änderungen
+
+* remove sync references from welcome vault templates and feature toggles ([7409c6d](https://github.com/andreas13xxx/Slatebase/commit/7409c6d462637654b6564bac125a2b086d09ea91))
+
 ## [0.18.0](https://github.com/andreas13xxx/Slatebase/compare/v0.17.1...v0.18.0) (2026-08-04)
 
 
