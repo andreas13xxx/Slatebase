@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.24.0](https://github.com/andreas13xxx/Slatebase/compare/v0.23.1...v0.24.0) (2026-08-05)
+
+
+### Features
+
+* plugin store UI improvements ([6a66ac8](https://github.com/andreas13xxx/Slatebase/commit/6a66ac8a9d27c6031daffe635a1705460dd83794))
+* plugin store UI improvements ([9b4eb38](https://github.com/andreas13xxx/Slatebase/commit/9b4eb3855a868b61d944c67659ead8186ec01eb4))
+* **plugins:** scope view container styles to owning plugin, add compat CSS aliases ([d40faef](https://github.com/andreas13xxx/Slatebase/commit/d40faeffd01fe21e944909e727b9cd940341960b))
+
 ## [0.23.1](https://github.com/andreas13xxx/Slatebase/compare/v0.23.0...v0.23.1) (2026-08-05)
 
 
