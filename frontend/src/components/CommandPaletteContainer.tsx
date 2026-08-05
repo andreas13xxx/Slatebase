@@ -292,6 +292,26 @@ export function CommandPaletteContainer({
 
     // ── Vault operations (require a vault selected) ─────────────────────────
 
+    // Toggle editor mode (always available when a non-binary file tab is active)
+    if (activeTab && !activeTab.isBinary && activeTab.filePath !== '__graph__' && !activeTab.fileName.endsWith('.canvas')) {
+      commands.push({
+        id: 'slatebase:toggle-mode',
+        name: 'Editor-Modus wechseln (Bearbeiten/Vorschau)',
+        callback: () => tabDispatch({ type: 'TOGGLE_MODE', payload: { tabId: activeTab.id } }),
+        pluginId: 'slatebase',
+      })
+    }
+
+    // Open search (always available)
+    commands.push({
+      id: 'slatebase:open-search',
+      name: 'Vault-Suche öffnen',
+      callback: () => {
+        window.dispatchEvent(new CustomEvent('slatebase:open-search'))
+      },
+      pluginId: 'slatebase',
+    })
+
     commands.push({
       id: 'slatebase:create-vault',
       name: 'Neuer Vault',

@@ -11,12 +11,15 @@ export interface VaultConfig {
   templatesDirectory: string
   /** Directory for daily notes (relative to vault root). Empty string = vault root. */
   dailyNotesDirectory: string
+  /** Filename of the daily note template (relative to templatesDirectory). Default: "daily.md". */
+  dailyNoteTemplateName: string
 }
 
 /** Default vault configuration values. */
 export const DEFAULT_VAULT_CONFIG: VaultConfig = {
   templatesDirectory: 'Templates',
   dailyNotesDirectory: '',
+  dailyNoteTemplateName: 'daily.md',
 }
 
 // ─── Service Interface ───────────────────────────────────────────────────────

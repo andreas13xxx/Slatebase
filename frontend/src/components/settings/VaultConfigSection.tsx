@@ -29,6 +29,7 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
   // Form state
   const [templatesDir, setTemplatesDir] = useState('')
   const [dailyNotesDir, setDailyNotesDir] = useState('')
+  const [dailyNoteTemplateName, setDailyNoteTemplateName] = useState('')
 
   // Load config on mount / vault change
   useEffect(() => {
@@ -41,6 +42,7 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
         setConfig(cfg)
         setTemplatesDir(cfg.templatesDirectory)
         setDailyNotesDir(cfg.dailyNotesDirectory)
+        setDailyNoteTemplateName(cfg.dailyNoteTemplateName)
         setError(null)
       } catch (err: unknown) {
         if (cancelled) return
@@ -62,10 +64,12 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
       const updated = await apiClient.saveVaultConfig(vaultId, {
         templatesDirectory: templatesDir.trim(),
         dailyNotesDirectory: dailyNotesDir.trim(),
+        dailyNoteTemplateName: dailyNoteTemplateName.trim(),
       })
       setConfig(updated)
       setTemplatesDir(updated.templatesDirectory)
       setDailyNotesDir(updated.dailyNotesDirectory)
+      setDailyNoteTemplateName(updated.dailyNoteTemplateName)
       showToast('success', 'Vault-Konfiguration gespeichert')
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'message' in err
@@ -76,11 +80,12 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
     } finally {
       setSaving(false)
     }
-  }, [apiClient, vaultId, templatesDir, dailyNotesDir])
+  }, [apiClient, vaultId, templatesDir, dailyNotesDir, dailyNoteTemplateName])
 
   const hasChanges = config !== null && (
     templatesDir.trim() !== config.templatesDirectory ||
-    dailyNotesDir.trim() !== config.dailyNotesDirectory
+    dailyNotesDir.trim() !== config.dailyNotesDirectory ||
+    dailyNoteTemplateName.trim() !== config.dailyNoteTemplateName
   )
 
   if (loading) {
@@ -123,6 +128,24 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
           value={dailyNotesDir}
           onChange={(e) => setDailyNotesDir(e.target.value)}
           placeholder="(Vault-Wurzel)"
+          disabled={saving}
+        />
+      </div>
+
+      <div className="settings-field">
+        <label htmlFor="vault-daily-note-template" className="settings-field-label">
+          Tagesnotiz-Vorlage
+        </label>
+        <p className="settings-field-hint">
+          Dateiname der Vorlage im Vorlagen-Verzeichnis, die für neue Tagesnotizen verwendet wird. Standard: <code>daily.md</code>
+        </p>
+        <input
+          id="vault-daily-note-template"
+          type="text"
+          className="settings-field-input"
+          value={dailyNoteTemplateName}
+          onChange={(e) => setDailyNoteTemplateName(e.target.value)}
+          placeholder="daily.md"
           disabled={saving}
         />
       </div>

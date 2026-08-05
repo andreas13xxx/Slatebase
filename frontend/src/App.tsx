@@ -51,7 +51,7 @@ import { PluginViewPanel } from './components/PluginViewPanel'
 import { TrashView } from './components/TrashView'
 import { VersionBrowser } from './components/VersionBrowser'
 import { useVersionInfo } from './hooks/useVersionInfo'
-import { ContextPanelProvider } from './state/contextPanelContext'
+import { ContextPanelProvider, useContextPanelContext } from './state/contextPanelContext'
 import { SidebarPanelProvider } from './state/sidebarPanelContext'
 import { ContextPanel } from './components/context-panel/ContextPanel'
 import { SettingsPanel } from './components/settings/SettingsPanel'
@@ -175,6 +175,7 @@ function AppContent() {
   const { authState, authDispatch } = useAuthContext()
   const { tabState, tabDispatch } = useTabContext()
   const { isEnabled } = useFeatureContext()
+  const { state: contextPanelState, dispatch: contextPanelDispatch } = useContextPanelContext()
   const { t } = useTranslation()
   const prevVaultId = useRef<string | null>(null)
   // Per-vault tab memory: saves tabs when switching away, restores when switching back
@@ -189,6 +190,10 @@ function AppContent() {
   const createFileTriggerRef = useRef<(() => void) | null>(null)
   const createVaultTriggerRef = useRef<(() => void) | null>(null)
   const createCanvasTriggerRef = useRef<(() => void) | null>(null)
+
+  // Tab drag-and-drop reordering state
+  const tabDragIndexRef = useRef<number | null>(null)
+  const [tabDragOverIndex, setTabDragOverIndex] = useState<number | null>(null)
 
   const handleRegisterCreateFile = useCallback((trigger: () => void) => { createFileTriggerRef.current = trigger }, [])
   const handleRegisterCreateVault = useCallback((trigger: () => void) => { createVaultTriggerRef.current = trigger }, [])
@@ -527,8 +532,13 @@ function AppContent() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (matchesShortcut('slatebase:open-search', e)) {
         e.preventDefault()
-        // Open right panel and focus search input
+        // Open right panel and activate search view
         setShowRightPanel(true)
+        // Find the section that contains 'search' and activate it
+        const searchSection = contextPanelState.sections.find(s => s.viewIds.includes('search'))
+        if (searchSection) {
+          contextPanelDispatch({ type: 'SET_ACTIVE_VIEW', sectionId: searchSection.id, viewId: 'search' })
+        }
         // Focus the search input after the panel renders
         setTimeout(() => {
           const input = document.querySelector('.search-panel__input') as HTMLInputElement | null
@@ -542,7 +552,44 @@ function AppContent() {
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [contextPanelState.sections, contextPanelDispatch])
+
+  // Global keyboard shortcut: Toggle editor mode (default: Ctrl+E / Cmd+E)
+  useEffect(() => {
+    const handleToggleMode = (e: KeyboardEvent) => {
+      if (matchesShortcut('slatebase:toggle-mode', e)) {
+        e.preventDefault()
+        const activeTab = tabState.tabs.find(t => t.id === tabState.activeTabId)
+        if (activeTab && !activeTab.isBinary && activeTab.filePath !== '__graph__' && !activeTab.fileName.endsWith('.canvas')) {
+          tabDispatch({ type: 'TOGGLE_MODE', payload: { tabId: activeTab.id } })
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleToggleMode)
+    return () => document.removeEventListener('keydown', handleToggleMode)
+  }, [tabState.tabs, tabState.activeTabId, tabDispatch])
+
+  // Listen for custom event from Command Palette: open search
+  useEffect(() => {
+    const handleOpenSearch = () => {
+      setShowRightPanel(true)
+      const searchSection = contextPanelState.sections.find(s => s.viewIds.includes('search'))
+      if (searchSection) {
+        contextPanelDispatch({ type: 'SET_ACTIVE_VIEW', sectionId: searchSection.id, viewId: 'search' })
+      }
+      setTimeout(() => {
+        const input = document.querySelector('.search-panel__input') as HTMLInputElement | null
+        if (input) {
+          input.focus()
+          input.select()
+        }
+      }, 50)
+    }
+
+    window.addEventListener('slatebase:open-search', handleOpenSearch)
+    return () => window.removeEventListener('slatebase:open-search', handleOpenSearch)
+  }, [contextPanelState.sections, contextPanelDispatch])
 
   // Global keyboard shortcut: Settings panel (default: Ctrl+,)
   useEffect(() => {
@@ -935,7 +982,13 @@ function AppContent() {
           <section className="app-content">
             {/* Unified tab bar: settings tabs + file tabs in one row */}
             {(openSettingsPages.length > 0 || tabState.tabs.length > 0) && (
-              <div className="tab-bar" role="tablist" aria-label={t('tabs.ariaLabel')}>
+              <div
+                className="tab-bar"
+                role="tablist"
+                aria-label={t('tabs.ariaLabel')}
+                onDragOver={(e) => { if (tabDragIndexRef.current !== null) { e.preventDefault(); e.dataTransfer.dropEffect = 'move' } }}
+                onDrop={(e) => { e.preventDefault(); setTabDragOverIndex(null); const from = tabDragIndexRef.current; const lastIndex = tabState.tabs.length - 1; if (from !== null && from !== lastIndex) { tabDispatch({ type: 'REORDER_TABS', payload: { fromIndex: from, toIndex: lastIndex } }) } tabDragIndexRef.current = null }}
+              >
                 {/* Settings tabs */}
                 {openSettingsPages.map((page) => {
                   const isActive = isShowingSettings && page === activeSettingsPage
@@ -965,7 +1018,7 @@ function AppContent() {
                   )
                 })}
                 {/* File tabs */}
-                {tabState.tabs.map((tab) => {
+                {tabState.tabs.map((tab, index) => {
                   const isActive = !isShowingSettings && tab.id === tabState.activeTabId
                   const hasUnsaved = tab.editBuffer !== null && tab.editBuffer !== tab.content
                   const modeLabel = tab.mode === 'edit' ? t('tabs.showPreview') : t('tabs.edit')
@@ -980,10 +1033,16 @@ function AppContent() {
                       role="tab"
                       aria-selected={isActive}
                       aria-label={tab.filePath}
-                      className={`tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}`}
+                      className={`tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}${tabDragOverIndex === index ? ' tab-bar-tab--drag-over' : ''}`}
                       onClick={() => { setActiveSettingsPage(null); tabDispatch({ type: 'ACTIVATE_TAB', payload: { tabId: tab.id } }) }}
                       title={isGraphTab ? 'Graph' : tab.filePath}
                       tabIndex={isActive ? 0 : -1}
+                      draggable
+                      onDragStart={(e) => { tabDragIndexRef.current = index; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(index)) }}
+                      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (tabDragIndexRef.current !== null && tabDragIndexRef.current !== index) setTabDragOverIndex(index) }}
+                      onDragLeave={() => setTabDragOverIndex(null)}
+                      onDrop={(e) => { e.preventDefault(); setTabDragOverIndex(null); const from = tabDragIndexRef.current; if (from !== null && from !== index) tabDispatch({ type: 'REORDER_TABS', payload: { fromIndex: from, toIndex: index } }); tabDragIndexRef.current = null }}
+                      onDragEnd={() => { tabDragIndexRef.current = null; setTabDragOverIndex(null) }}
                     >
                       <TabFileIcon size={13} className={`tab-bar-tab-icon ${tabFileIconClass}`} />
                       <span className="tab-bar-tab-label">

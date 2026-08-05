@@ -517,6 +517,19 @@
   background: var(--danger-bg);
 }
 
+.tab-bar-tab--drag-over {
+  border-left: 2px solid var(--accent);
+}
+
+.tab-bar-tab[draggable="true"] {
+  cursor: grab;
+}
+
+.tab-bar-tab[draggable="true"]:active {
+  cursor: grabbing;
+  opacity: 0.6;
+}
+
 /* ===== Tab Content ===== */
 .tab-content {
   flex: 1;

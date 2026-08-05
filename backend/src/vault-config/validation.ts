@@ -25,6 +25,14 @@ export const updateVaultConfigSchema = z.object({
       'Daily notes directory must be a relative path without parent traversal',
     )
     .optional(),
+  dailyNoteTemplateName: z
+    .string()
+    .max(255, 'Daily note template name must be at most 255 characters')
+    .refine(
+      (val) => !val.includes('..') && !val.includes('/') && !val.includes('\\'),
+      'Daily note template name must be a plain filename without path separators',
+    )
+    .optional(),
 })
 
 export type UpdateVaultConfigInput = z.infer<typeof updateVaultConfigSchema>

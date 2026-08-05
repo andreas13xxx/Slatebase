@@ -292,16 +292,16 @@
   padding: 8px 16px;
   border: none;
   border-radius: var(--radius-md);
-  background: var(--accent-primary);
-  color: var(--text-on-accent);
+  background: var(--accent);
+  color: var(--text-inverse);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition: opacity var(--transition-base);
+  transition: opacity var(--transition-base), background var(--transition-base);
 }
 
 .settings-save-btn:hover:not(:disabled) {
-  opacity: 0.9;
+  background: var(--accent-hover);
 }
 
 .settings-save-btn:disabled {

@@ -65,6 +65,7 @@ export const DEFAULT_KEYBINDINGS: KeybindingDefinition[] = [
 
   // Panel
   { commandId: 'slatebase:open-search', label: 'Vault-Suche öffnen', defaultShortcut: 'Mod+Shift+F', category: 'panel' },
+  { commandId: 'slatebase:toggle-mode', label: 'Editor-Modus wechseln', defaultShortcut: 'Mod+E', category: 'panel' },
 
   // Editor
   { commandId: 'slatebase:editor-save', label: 'Datei speichern', defaultShortcut: 'Mod+S', category: 'editor' },

@@ -250,6 +250,7 @@ export interface KeybindingEntry {
 export interface VaultConfig {
   templatesDirectory: string
   dailyNotesDirectory: string
+  dailyNoteTemplateName: string
 }
 
 /**

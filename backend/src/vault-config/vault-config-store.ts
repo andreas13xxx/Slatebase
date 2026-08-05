@@ -35,6 +35,7 @@ export class VaultConfigStore implements IVaultConfigService {
     return {
       templatesDirectory: stored.templatesDirectory ?? this.globalTemplatesDirectory,
       dailyNotesDirectory: stored.dailyNotesDirectory ?? DEFAULT_VAULT_CONFIG.dailyNotesDirectory,
+      dailyNoteTemplateName: stored.dailyNoteTemplateName ?? DEFAULT_VAULT_CONFIG.dailyNoteTemplateName,
     }
   }
 
@@ -43,6 +44,7 @@ export class VaultConfigStore implements IVaultConfigService {
     const merged: VaultConfig = {
       templatesDirectory: config.templatesDirectory ?? current.templatesDirectory ?? this.globalTemplatesDirectory,
       dailyNotesDirectory: config.dailyNotesDirectory ?? current.dailyNotesDirectory ?? DEFAULT_VAULT_CONFIG.dailyNotesDirectory,
+      dailyNoteTemplateName: config.dailyNoteTemplateName ?? current.dailyNoteTemplateName ?? DEFAULT_VAULT_CONFIG.dailyNoteTemplateName,
     }
     await this.persist(vaultId, merged)
     return merged
@@ -79,6 +81,9 @@ export class VaultConfigStore implements IVaultConfigService {
       }
       if (typeof parsed.dailyNotesDirectory === 'string') {
         result.dailyNotesDirectory = parsed.dailyNotesDirectory
+      }
+      if (typeof parsed.dailyNoteTemplateName === 'string') {
+        result.dailyNoteTemplateName = parsed.dailyNoteTemplateName
       }
       return result
     } catch (error: unknown) {

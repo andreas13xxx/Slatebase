@@ -17,11 +17,19 @@ Der Datei-Explorer ist die linke Seitenleiste in Slatebase. Er zeigt die gesamte
 
 ### Neue Datei
 
-1. Klicke auf das **+**-Symbol oben im Explorer
+1. Klicke auf das **Blatt-mit-Plus**-Symbol (📄+) oben im Explorer
 2. Gib einen Dateinamen ein (z.B. `Meine Notiz.md`)
 3. Bestätige mit **Enter**
 
 Die Datei wird im aktuell ausgewählten Ordner erstellt. Ohne Auswahl landet sie im Vault-Stammverzeichnis.
+
+### Neuen Vault erstellen
+
+1. Klicke auf das **+**-Symbol oben im Explorer
+2. Gib einen Vault-Namen ein (1–128 Zeichen)
+3. Bestätige mit **Enter**
+
+Der neue Vault erscheint sofort im Datei-Explorer als eigener Abschnitt.
 
 ### Neuer Ordner
 

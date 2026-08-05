@@ -236,7 +236,7 @@ describe('dailyNoteService', () => {
 
       const result = await service.openOrCreate('vault1', '')
       expect(result).toBe('2024-06-15.md')
-      expect(apiClient.saveFile).toHaveBeenCalledWith('vault1', '2024-06-15.md', '# {{date}}\n\n## Tasks\n')
+      expect(apiClient.saveFile).toHaveBeenCalledWith('vault1', '2024-06-15.md', '# 2024-06-15\n\n## Tasks\n')
 
       vi.useRealTimers()
     })

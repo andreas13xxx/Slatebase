@@ -17,10 +17,19 @@ The File Explorer is the left panel in Slatebase. It shows all files and folders
 
 ### New File
 
-1. Right-click in the explorer on a free area or a folder
-2. Select **New File**
-3. Enter a name (without `.md` — the extension is added automatically)
-4. Confirm with Enter
+1. Click the **file-with-plus** icon (📄+) at the top of the explorer
+2. Enter a filename (e.g. `My Note.md`)
+3. Confirm with Enter
+
+Alternatively, right-click on a folder → **New File**.
+
+### Create New Vault
+
+1. Click the **+** icon at the top of the explorer
+2. Enter a vault name (1–128 characters)
+3. Confirm with Enter
+
+The new vault appears immediately in the file explorer as its own section.
 
 ### New Folder
 

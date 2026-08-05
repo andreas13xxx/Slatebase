@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react'
 import { useTabContext } from '../state/tabContext'
 import { Eye, Pencil, X, Share2 } from 'lucide-react'
 import { getFileIcon, getFileIconClass, getDisplayName } from '../utils/fileIcons'
@@ -7,12 +8,15 @@ import { getFileIcon, getFileIconClass, getDisplayName } from '../utils/fileIcon
  * Each tab displays the filename (truncated to fit), a mode toggle icon, and a close button.
  * The active tab is visually distinguished with a bottom border and background.
  * Tabs shrink to fit the available width without overflowing.
+ * Tabs can be reordered via drag and drop.
  *
  * Validates: Requirements 1.3, 1.4, 1.5, 2.1, 3.1
  */
 export function TabBar() {
   const { tabState, tabDispatch } = useTabContext()
   const { tabs, activeTabId } = tabState
+  const dragIndexRef = useRef<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
   if (tabs.length === 0) {
     return null
@@ -46,16 +50,49 @@ export function TabBar() {
     }
   }
 
+  function handleDragStart(e: React.DragEvent, index: number) {
+    dragIndexRef.current = index
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', String(index))
+  }
+
+  function handleDragOver(e: React.DragEvent, index: number) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (dragIndexRef.current !== null && dragIndexRef.current !== index) {
+      setDragOverIndex(index)
+    }
+  }
+
+  function handleDragLeave() {
+    setDragOverIndex(null)
+  }
+
+  function handleDrop(e: React.DragEvent, toIndex: number) {
+    e.preventDefault()
+    setDragOverIndex(null)
+    const fromIndex = dragIndexRef.current
+    if (fromIndex !== null && fromIndex !== toIndex) {
+      tabDispatch({ type: 'REORDER_TABS', payload: { fromIndex, toIndex } })
+    }
+    dragIndexRef.current = null
+  }
+
+  function handleDragEnd() {
+    dragIndexRef.current = null
+    setDragOverIndex(null)
+  }
+
   return (
     <div className="tab-bar" role="tablist" aria-label="Geöffnete Dateien">
-      {tabs.map((tab) => {
+      {tabs.map((tab, index) => {
         const isActive = tab.id === activeTabId
         const tooltip = tab.filePath
         const modeLabel = tab.mode === 'edit' ? 'Vorschau anzeigen' : 'Bearbeiten'
         const ModeIcon = tab.mode === 'edit' ? Eye : Pencil
         const hasUnsaved = tab.editBuffer !== null && tab.editBuffer !== tab.content
 
-        const tabClassName = `tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}`
+        const tabClassName = `tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}${dragOverIndex === index ? ' tab-bar-tab--drag-over' : ''}`
         const isGraphTab = tab.filePath === '__graph__'
         const isCanvasTab = tab.fileName.endsWith('.canvas')
         const TabFileIcon = isGraphTab ? Share2 : getFileIcon(tab.fileName)
@@ -72,6 +109,12 @@ export function TabBar() {
             onClick={() => handleActivate(tab.id)}
             title={tooltip}
             tabIndex={isActive ? 0 : -1}
+            draggable
+            onDragStart={(e) => handleDragStart(e, index)}
+            onDragOver={(e) => handleDragOver(e, index)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, index)}
+            onDragEnd={handleDragEnd}
           >
             <TabFileIcon size={13} className={`tab-bar-tab-icon ${tabFileIconClass}`} />
             <span className="tab-bar-tab-label">

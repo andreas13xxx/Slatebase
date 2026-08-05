@@ -126,25 +126,45 @@ export function createDailyNoteService(apiClient: IApiClient): IDailyNoteService
         // File does not exist (404) — proceed to create
       }
 
-      // 2. Try loading daily.md template from the vault's template directory
-      // First get the template directory from vault config
+      // 2. Try loading daily note template from the vault's template directory
+      // First get the template directory and template name from vault config
       let templateDir = 'Templates'
+      let templateName = 'daily.md'
       try {
         const vaultConfig = await apiClient.getVaultConfig(vaultId)
         templateDir = vaultConfig.templatesDirectory || 'Templates'
+        templateName = vaultConfig.dailyNoteTemplateName || 'daily.md'
       } catch {
         // Use default if config unavailable
       }
 
       let templateContent = ''
       try {
-        const templateFile = await apiClient.fetchFileContent(vaultId, `${templateDir}/daily.md`)
+        const templateFile = await apiClient.fetchFileContent(vaultId, `${templateDir}/${templateName}`)
         templateContent = templateFile.content
       } catch {
         // No template found — use empty content
       }
 
-      // 3. Create the daily note file
+      // 3. Replace placeholders in template content
+      if (templateContent) {
+        const now = new Date()
+        const year = now.getFullYear()
+        const month = String(now.getMonth() + 1).padStart(2, '0')
+        const day = String(now.getDate()).padStart(2, '0')
+        const hours = String(now.getHours()).padStart(2, '0')
+        const minutes = String(now.getMinutes()).padStart(2, '0')
+        const date = `${year}-${month}-${day}`
+        const time = `${hours}:${minutes}`
+        const title = dateStr
+
+        templateContent = templateContent
+          .replace(/\{\{date\}\}/g, date)
+          .replace(/\{\{time\}\}/g, time)
+          .replace(/\{\{title\}\}/g, title)
+      }
+
+      // 4. Create the daily note file
       await apiClient.saveFile(vaultId, filePath, templateContent)
 
       return filePath
