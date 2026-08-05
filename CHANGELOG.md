@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.25.0](https://github.com/andreas13xxx/Slatebase/compare/v0.24.0...v0.25.0) (2026-08-05)
+
+
+### Features
+
+* mermaid renderer improvements and advanced diagram documentation ([35cb503](https://github.com/andreas13xxx/Slatebase/commit/35cb503d3a16d82b517c3a1f879e74aecb2d3309))
+* tab drag reorder, Ctrl+E toggle mode, Ctrl+Shift+F search fix, daily note template placeholders, configurable dailyNoteTemplateName, welcome vault preconfig ([745e663](https://github.com/andreas13xxx/Slatebase/commit/745e663db938d0985e681a358b2f8e15633d9cf5))
+
 ## [0.24.0](https://github.com/andreas13xxx/Slatebase/compare/v0.23.1...v0.24.0) (2026-08-05)
 
 
