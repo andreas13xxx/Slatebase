@@ -33,6 +33,9 @@ function createMockVaultRegistry(entries: VaultRegistryEntry[] = []): IVaultRegi
     async removeEntry(vaultId: string) { entryMap.delete(vaultId) },
     findById(vaultId: string) { return entryMap.get(vaultId) ?? null },
     findByName(name: string) { return entries.find((e) => e.name === name) ?? null },
+    async updateEntries<T>(mutator: (entries: VaultRegistryEntry[]) => T): Promise<T> {
+      return mutator(entries)
+    },
   }
 }
 

@@ -12,6 +12,7 @@ import {
   GitHubFetchError,
   AssetTooLargeError,
 } from './errors.js'
+import { communityPluginEntrySchema } from './validation.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -26,6 +27,9 @@ const ALLOWED_DOMAINS = new Set([
 ])
 
 const REQUEST_TIMEOUT_MS = 30_000
+
+/** Maximum number of redirects to follow before giving up. */
+const MAX_REDIRECTS = 5
 
 // ─── Interface ───────────────────────────────────────────────────────────────
 
@@ -83,7 +87,22 @@ export class GitHubClient implements IGitHubClient {
       throw new GitHubFetchError(502, COMMUNITY_PLUGINS_URL)
     }
 
-    return data as CommunityPluginEntry[]
+    // Validate each entry against the expected shape (in particular the "owner/repo"
+    // format for `repo`, which later gets interpolated into GitHub API/CDN URLs).
+    // Malformed entries are skipped rather than failing the whole list.
+    const validEntries: CommunityPluginEntry[] = []
+    for (const entry of data) {
+      const result = communityPluginEntrySchema.safeParse(entry)
+      if (result.success) {
+        validEntries.push(result.data)
+      } else {
+        this.logger.warn('Skipping malformed community plugin entry', {
+          entry: typeof entry === 'object' ? JSON.stringify(entry).slice(0, 200) : String(entry),
+        })
+      }
+    }
+
+    return validEntries
   }
 
   /** Fetch manifest.json from a plugin repo's default branch */
@@ -206,12 +225,32 @@ export class GitHubClient implements IGitHubClient {
     let response: Response
 
     try {
-      response = await fetch(url, {
-        headers,
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-        redirect: 'follow',
-      })
+      // Follow redirects manually, re-validating the domain allowlist on each hop —
+      // otherwise a redirect (e.g. from a compromised/misbehaving upstream) could send
+      // the request to a host outside ALLOWED_DOMAINS without ever being checked.
+      let currentUrl = url
+      for (let redirectCount = 0; ; redirectCount++) {
+        if (redirectCount > MAX_REDIRECTS) {
+          throw new GitHubFetchError(0, currentUrl)
+        }
+
+        response = await fetch(currentUrl, {
+          headers,
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+          redirect: 'manual',
+        })
+
+        if (response.status < 300 || response.status >= 400) break
+
+        const location = response.headers.get('location')
+        if (!location) break
+
+        const nextUrl = new URL(location, currentUrl).toString()
+        this.validateDomain(nextUrl)
+        currentUrl = nextUrl
+      }
     } catch (err: unknown) {
+      if (err instanceof GitHubFetchError) throw err
       if (err instanceof Error && err.name === 'TimeoutError') {
         this.logger.error('GitHub request timed out', { url, timeoutMs: REQUEST_TIMEOUT_MS })
       } else {

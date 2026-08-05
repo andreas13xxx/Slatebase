@@ -159,6 +159,11 @@ function createMockRegistry(entries: VaultRegistryEntry[] = []): IVaultRegistry 
     findByName(name: string) {
       return entryList.find(e => e.name === name) ?? null
     },
+    async updateEntries<T>(mutator: (entries: VaultRegistryEntry[]) => T): Promise<T> {
+      const result = mutator(entryList)
+      this.savedEntries.push([...entryList])
+      return result
+    },
   }
 }
 
@@ -553,6 +558,48 @@ describe('VaultService — transferOwnership', () => {
 
     // Old owner's access should be revoked
     expect(shareRegistry.removedShares).toContainEqual({ vaultId, userId: currentOwnerId })
+  })
+
+  it('aborts if ownership changed between the pre-check and the atomic commit (concurrent transfer)', async () => {
+    // Regression test: the final registry mutation re-verifies ownership inside
+    // registry.updateEntries()'s mutex-protected mutator against freshly-loaded
+    // data, so a transfer that completed in the gap between the initial
+    // ownership pre-check and this commit is detected instead of silently
+    // overwritten.
+    const registryEntry: VaultRegistryEntry = {
+      id: vaultId,
+      name: 'Test Vault',
+      storagePath: '/test/vault/path',
+      createdAt: '2025-01-01T00:00:00.000Z',
+      ownerId: currentOwnerId,
+    }
+    const registry: IVaultRegistry = {
+      load: async () => [registryEntry],
+      save: async () => {},
+      addEntry: async () => {},
+      removeEntry: async () => {},
+      findById: () => registryEntry,
+      findByName: () => null,
+      updateEntries: async (mutator) => {
+        // Simulate a concurrent transfer completing in the window between the
+        // caller's pre-check load() and this atomic commit.
+        registryEntry.ownerId = 'someone-else'
+        return mutator([registryEntry])
+      },
+    }
+    const vaultManager = createMockVaultManager([createMockVault(vaultId, 'Test Vault', '/test/vault/path')])
+    const shareRegistry = createMockShareRegistry([])
+    const userRepository = createMockUserRepository([
+      createTestUser(currentOwnerId, 'current-owner'),
+      createTestUser(newOwnerId, 'new-owner'),
+    ])
+    const service = new VaultService(
+      vaultManager, createMockVaultReader(), createMockConfigService(), createMockLogger(),
+      registry, shareRegistry, userRepository,
+    )
+
+    await expect(service.transferOwnership(vaultId, currentOwnerId, newOwnerId))
+      .rejects.toThrow(VaultNotFoundError)
   })
 })
 

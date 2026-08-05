@@ -162,6 +162,64 @@ describe('VaultRegistry', () => {
     })
   })
 
+  describe('updateEntries()', () => {
+    it('applies the mutator and persists the result', async () => {
+      const entry = makeEntry()
+      await registry.addEntry(entry)
+
+      const result = await registry.updateEntries((entries) => {
+        const found = entries.find((e) => e.id === entry.id)
+        if (found) found.name = 'Renamed'
+        return found
+      })
+
+      expect(result?.name).toBe('Renamed')
+      const onDisk = await registry.load()
+      expect(onDisk[0]?.name).toBe('Renamed')
+    })
+
+    it('does not persist when the mutator throws', async () => {
+      const entry = makeEntry()
+      await registry.addEntry(entry)
+
+      await expect(
+        registry.updateEntries(() => {
+          throw new Error('precondition failed')
+        }),
+      ).rejects.toThrow('precondition failed')
+
+      const onDisk = await registry.load()
+      expect(onDisk[0]?.name).toBe(entry.name)
+    })
+
+    it('serializes with a concurrent addEntry so neither write is lost', async () => {
+      // Regression test: updateEntries() and addEntry() share the same mutex as
+      // save(), so a read-modify-write via updateEntries can no longer race with
+      // (and silently clobber) a concurrent addEntry/removeEntry, as it could
+      // when callers used registry.save() directly.
+      const existing = makeEntry({ id: 'aaa111bbb222', name: 'Existing' })
+      await registry.addEntry(existing)
+
+      const added = makeEntry({ id: 'ccc333ddd444', name: 'Added via addEntry' })
+
+      const [, renamedEntry] = await Promise.all([
+        registry.addEntry(added),
+        registry.updateEntries((entries) => {
+          const found = entries.find((e) => e.id === existing.id)
+          if (found) found.name = 'Renamed via updateEntries'
+          return found
+        }),
+      ])
+
+      expect(renamedEntry?.name).toBe('Renamed via updateEntries')
+
+      const onDisk = await registry.load()
+      expect(onDisk).toHaveLength(2)
+      expect(onDisk.find((e) => e.id === added.id)).toBeDefined()
+      expect(onDisk.find((e) => e.id === existing.id)?.name).toBe('Renamed via updateEntries')
+    })
+  })
+
   describe('findById()', () => {
     it('returns entry when found', async () => {
       const entry = makeEntry()

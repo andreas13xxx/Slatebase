@@ -828,9 +828,17 @@ export class VaultService implements IVaultService {
       throw new SharesNotRevokedError(vaultId, remainingShares)
     }
 
-    // Transfer ownership: update registry entry
-    entry.ownerId = resolvedNewOwnerId
-    await this.registry.save(entries)
+    // Transfer ownership: atomically re-verify current ownership and persist,
+    // closing the race window between the pre-check above and this write (a
+    // concurrent transfer completing in between would otherwise be silently
+    // overwritten by this stale `entries` snapshot).
+    await this.registry.updateEntries((currentEntries) => {
+      const target = currentEntries.find((e) => e.id === vaultId)
+      if (!target || target.ownerId !== currentOwnerId) {
+        throw new VaultNotFoundError(vaultId)
+      }
+      target.ownerId = resolvedNewOwnerId
+    })
 
     // Update in-memory VaultManager so getVaultList reflects the new owner immediately
     vault.info.ownerId = resolvedNewOwnerId

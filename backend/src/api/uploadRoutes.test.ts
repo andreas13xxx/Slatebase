@@ -44,6 +44,7 @@ function createMockVaultRegistry(entry: VaultRegistryEntry | null = null): IVaul
     removeEntry: async () => {},
     findById: () => entry,
     findByName: () => entry,
+    updateEntries: async (mutator) => mutator(entry ? [entry] : []),
   }
 }
 
