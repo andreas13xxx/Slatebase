@@ -2,6 +2,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
+import { isNodeError } from '../shared/fs-utils.js'
 
 // ─── Interface ───────────────────────────────────────────────────────────────
 
@@ -95,6 +96,3 @@ export class CsrfSecretManager implements ICsrfSecretManager {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function isNodeError(err: unknown): err is NodeJS.ErrnoException {
-  return err instanceof Error && 'code' in err
-}

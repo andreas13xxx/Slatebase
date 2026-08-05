@@ -5,6 +5,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
 import type { IUnreadStore } from './types.js'
+import { isNodeError } from '../shared/fs-utils.js'
 
 // --- File format ---
 
@@ -210,6 +211,3 @@ export class UnreadStore implements IUnreadStore {
 
 // --- Helpers ---
 
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && 'code' in error
-}

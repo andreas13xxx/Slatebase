@@ -10,6 +10,7 @@ import { mkdir, readFile, rename, writeFile, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
+import { isNodeError } from '../shared/fs-utils.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -109,9 +110,6 @@ export class FeatureToggleStore implements IFeatureToggleStore {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function isNodeError(err: unknown): err is NodeJS.ErrnoException {
-  return err instanceof Error && 'code' in err
-}
 
 function isValidPersistedState(data: unknown): data is PersistedFeatureState {
   if (typeof data !== 'object' || data === null) return false

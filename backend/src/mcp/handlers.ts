@@ -11,17 +11,12 @@ import type { IVaultService, IVaultAccessControl } from '../business/index.js'
 import { VaultNotFoundError, VaultAccessDeniedError } from '../business/index.js'
 import { PathTraversalError, isBinaryContent } from '../vault/index.js'
 import type { IVaultReader, DirectoryTree } from '../vault/index.js'
-
-// ─── MCP Error Codes ─────────────────────────────────────────────────────────
-
-/** Access denied — user does not have permission for this vault. */
-const MCP_ERROR_ACCESS_DENIED = -32001
-/** Resource not found — file or vault does not exist. */
-const MCP_ERROR_NOT_FOUND = -32002
-/** Binary file or invalid path — cannot serve binary content. */
-const MCP_ERROR_BINARY_FILE = -32003
-/** File too large — exceeds configured maxFileSize. */
-const MCP_ERROR_FILE_TOO_LARGE = -32004
+import {
+  MCP_ERROR_ACCESS_DENIED,
+  MCP_ERROR_NOT_FOUND,
+  MCP_ERROR_BINARY_FILE,
+  MCP_ERROR_FILE_TOO_LARGE,
+} from './error-codes.js'
 
 // ─── Interface ───────────────────────────────────────────────────────────────
 

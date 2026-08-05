@@ -5,11 +5,10 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import type { ILinkIndex } from '../link-index/types.js'
 import type { IVaultAccessControl } from '../business/index.js'
-import { VaultAccessDeniedError } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
-import type { SessionContext } from '../auth/index.js'
 import type { RouteModule } from './index.js'
+import { checkVaultReadAccess } from './access-check.js'
 
 // --- Helper: API Error Response ---
 
@@ -106,7 +105,7 @@ export class GraphRouteModule implements RouteModule {
   private async getGraph(c: Context): Promise<Response> {
     const vaultId = c.req.param('vaultId') as string
 
-    const authResult = await this.checkAccess(c, vaultId)
+    const authResult = await checkVaultReadAccess(c, vaultId, this.vaultRegistry, this.accessControl)
     if (!authResult.authorized) {
       return authResult.response
     }
@@ -149,7 +148,7 @@ export class GraphRouteModule implements RouteModule {
   private async getGraphMeta(c: Context): Promise<Response> {
     const vaultId = c.req.param('vaultId') as string
 
-    const authResult = await this.checkAccess(c, vaultId)
+    const authResult = await checkVaultReadAccess(c, vaultId, this.vaultRegistry, this.accessControl)
     if (!authResult.authorized) {
       return authResult.response
     }
@@ -177,7 +176,7 @@ export class GraphRouteModule implements RouteModule {
   private async getBacklinks(c: Context): Promise<Response> {
     const vaultId = c.req.param('vaultId') as string
 
-    const authResult = await this.checkAccess(c, vaultId)
+    const authResult = await checkVaultReadAccess(c, vaultId, this.vaultRegistry, this.accessControl)
     if (!authResult.authorized) {
       return authResult.response
     }
@@ -219,7 +218,7 @@ export class GraphRouteModule implements RouteModule {
   private async getTags(c: Context): Promise<Response> {
     const vaultId = c.req.param('vaultId') as string
 
-    const authResult = await this.checkAccess(c, vaultId)
+    const authResult = await checkVaultReadAccess(c, vaultId, this.vaultRegistry, this.accessControl)
     if (!authResult.authorized) {
       return authResult.response
     }
@@ -263,43 +262,6 @@ export class GraphRouteModule implements RouteModule {
     }))
 
     return c.json({ tags }, 200)
-  }
-
-  // ─── Private Helpers ─────────────────────────────────────────────────────
-
-  /**
-   * Checks authentication and vault access (read or write permission).
-   * Returns 401 if no session, 404 if vault not found, 403 if access denied.
-   */
-  private async checkAccess(
-    c: Context,
-    vaultId: string,
-  ): Promise<{ authorized: true } | { authorized: false; response: Response }> {
-    const session = c.get('session') as SessionContext | undefined
-    if (session === undefined) {
-      const error = createApiError('UNAUTHORIZED', 'Missing session context')
-      return { authorized: false, response: c.json(error, 401) }
-    }
-
-    // Check vault existence
-    const entry = this.vaultRegistry.findById(vaultId)
-    if (entry === null) {
-      const error = createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`)
-      return { authorized: false, response: c.json(error, 404) }
-    }
-
-    // Check read access (read or write permission satisfies this)
-    try {
-      await this.accessControl.checkReadAccess(vaultId, session.userId)
-    } catch (error) {
-      if (error instanceof VaultAccessDeniedError) {
-        const apiError = createApiError('FORBIDDEN', error.message)
-        return { authorized: false, response: c.json(apiError, 403) }
-      }
-      throw error
-    }
-
-    return { authorized: true }
   }
 }
 

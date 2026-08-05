@@ -6,6 +6,7 @@ import crypto from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
 import type { Conversation, IConversationStore } from './types.js'
 import { AsyncMutex } from '../shared/async-mutex.js'
+import { isNodeError } from '../shared/fs-utils.js'
 
 // --- Implementation ---
 
@@ -201,6 +202,3 @@ export class ConversationStore implements IConversationStore {
 
 // --- Helpers ---
 
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && 'code' in error
-}

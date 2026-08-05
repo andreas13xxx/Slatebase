@@ -6,6 +6,7 @@ import crypto from 'node:crypto'
 import type { IPluginStore, PluginFiles, PluginManifest, PluginRegistryData } from './types.js'
 import { PluginFileTooLargeError, PluginSettingsTooLargeError } from './errors.js'
 import { isValidPluginId } from './validation.js'
+import { isNodeError } from '../shared/fs-utils.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -314,6 +315,3 @@ export class PluginStore implements IPluginStore {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && 'code' in error
-}

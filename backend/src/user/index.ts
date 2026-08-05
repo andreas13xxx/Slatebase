@@ -6,6 +6,7 @@ import type { ISessionStore } from '../auth/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { IAuditService } from '../audit/index.js'
 import type { OnUserCreatedFn } from '../welcome-vault/types.js'
+import { isNodeError } from '../shared/fs-utils.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -251,9 +252,6 @@ export class VaultOwnershipError extends Error {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && 'code' in error
-}
 
 /**
  * Username-to-userId index stored in `_index.json`.
