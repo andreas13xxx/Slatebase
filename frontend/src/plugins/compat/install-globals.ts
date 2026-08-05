@@ -76,6 +76,12 @@ import { registerFallbackShims } from './fallback-shims'
 import { detectPlatform, readPlatformEnvironment } from './platform-detection'
 import { installApiGapInspector } from './api-gap-registry'
 import { warnNoOp } from './no-op-warning'
+// Aliased: the Plugin methods below carry the same names and would read as
+// recursive calls otherwise.
+import {
+  registerHoverLinkSource as addHoverSource,
+  unregisterHoverLinkSource as removeHoverSource,
+} from './hover-link-bus'
 
 // ─── Obsidian-compatible syntaxTree wrapper ──────────────────────────────────────
 
@@ -970,10 +976,18 @@ export function installObsidianGlobals(): void {
         const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
         warnNoOp(pluginId, 'registerEditorSuggest')
       }
-      /** Register a hover link source. Not implemented in Slatebase. */
-      registerHoverLinkSource(_key: string, _source: unknown): void {
-        const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
-        warnNoOp(pluginId, 'registerHoverLinkSource')
+      /**
+       * Register a hover link source. Delegates to the workspace, as Obsidian
+       * does — the two must not disagree, since plugins reach for either.
+       */
+      registerHoverLinkSource(key: string, source: unknown): void {
+        addHoverSource(key, typeof source === 'object' && source !== null
+          ? (source as { display?: string })
+          : undefined)
+      }
+      /** Withdraw a hover link source. Delegates to the workspace. */
+      unregisterHoverLinkSource(key: string): void {
+        removeHoverSource(key)
       }
       /** Register a markdown post processor. Stored but not executed in Slatebase. */
       registerMarkdownPostProcessor(_postProcessor: unknown, _sortOrder?: number): unknown {
