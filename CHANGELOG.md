@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.23.0](https://github.com/andreas13xxx/Slatebase/compare/v0.22.0...v0.23.0) (2026-08-05)
+
+
+### Features
+
+* hover previews for internal links ([df05339](https://github.com/andreas13xxx/Slatebase/commit/df05339cef7d78bacad842cf49b06e0afe110b30))
+
 ## [0.22.0](https://github.com/andreas13xxx/Slatebase/compare/v0.21.0...v0.22.0) (2026-08-05)
 
 
