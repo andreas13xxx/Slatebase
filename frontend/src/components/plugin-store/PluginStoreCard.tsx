@@ -5,7 +5,7 @@
  * status badges, and action buttons (install/update). Handles loading
  * states and error display.
  */
-import { ExternalLink, Loader2, Check } from 'lucide-react'
+import { ExternalLink, Loader2, Check, Download, Clock } from 'lucide-react'
 import { useTranslation, type TranslateFn } from '../../i18n'
 import type { PluginStoreDisplayEntry } from './types'
 
@@ -56,6 +56,23 @@ export function PluginStoreCard({ plugin, onInstall, onUpdate, onClick }: Plugin
         <span className="plugin-store-card__author">{plugin.author}</span>
         <span className="plugin-store-card__description">{plugin.description}</span>
       </div>
+
+      {(plugin.downloads !== undefined || plugin.updatedAt) && (
+        <div className="plugin-store-card__stats">
+          {plugin.downloads !== undefined && (
+            <span className="plugin-store-card__stat">
+              <Download size={12} aria-hidden="true" />
+              {formatDownloads(plugin.downloads)}
+            </span>
+          )}
+          {plugin.updatedAt && (
+            <span className="plugin-store-card__stat">
+              <Clock size={12} aria-hidden="true" />
+              {formatRelativeDate(plugin.updatedAt)}
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="plugin-store-card__footer">
         <div className="plugin-store-card__badges">
@@ -161,4 +178,44 @@ function renderActionButton(
       {t('pluginStore.install')}
     </button>
   )
+}
+
+/**
+ * Formats a download count with K/M suffixes for readability.
+ * Examples: 950 → "950", 1200 → "1.2K", 1500000 → "1.5M"
+ */
+function formatDownloads(count: number): string {
+  if (count >= 1_000_000) {
+    return `${(count / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+  }
+  if (count >= 1_000) {
+    return `${(count / 1_000).toFixed(1).replace(/\.0$/, '')}K`
+  }
+  return String(count)
+}
+
+/**
+ * Formats an ISO 8601 date string as a relative time label.
+ * Examples: "vor 3 Tagen", "vor 2 Monaten", "vor 1 Jahr"
+ */
+function formatRelativeDate(isoDate: string): string {
+  const date = new Date(isoDate)
+  const now = Date.now()
+  const diffMs = now - date.getTime()
+
+  if (diffMs < 0) return date.toLocaleDateString()
+
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) return 'heute'
+  if (diffDays === 1) return 'gestern'
+  if (diffDays < 30) return `vor ${diffDays} Tagen`
+
+  const diffMonths = Math.floor(diffDays / 30)
+  if (diffMonths === 1) return 'vor 1 Monat'
+  if (diffMonths < 12) return `vor ${diffMonths} Monaten`
+
+  const diffYears = Math.floor(diffDays / 365)
+  if (diffYears === 1) return 'vor 1 Jahr'
+  return `vor ${diffYears} Jahren`
 }

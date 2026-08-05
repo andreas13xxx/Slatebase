@@ -142,3 +142,29 @@ export interface BulkUpdateResult {
   /** Plugins that failed to update */
   failed: Array<{ pluginId: string; reason: string }>;
 }
+
+// ─── Plugin Release Stats ─────────────────────────────────────────────────────
+
+/**
+ * Release statistics for a single plugin.
+ * Fetched from GitHub API (latest release download count + published date).
+ */
+export interface PluginReleaseStats {
+  /** Plugin identifier */
+  pluginId: string;
+  /** Total download count across all assets of the latest release */
+  downloads: number;
+  /** ISO 8601 timestamp of the latest release publication */
+  updatedAt: string;
+}
+
+/**
+ * Aggregated release stats response for all plugins.
+ * The backend caches this data to avoid excessive GitHub API calls.
+ */
+export interface PluginStatsResponse {
+  /** Map of plugin ID → release stats */
+  stats: Record<string, PluginReleaseStats>;
+  /** ISO 8601 timestamp when the stats cache was last refreshed */
+  cachedAt: string;
+}

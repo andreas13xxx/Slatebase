@@ -12,7 +12,7 @@ import { useTranslation } from '../../i18n'
 import './PluginStoreSearch.css'
 
 /** Debounce delay in milliseconds. */
-const DEBOUNCE_MS = 200
+const DEBOUNCE_MS = 300
 
 /** Props for the PluginStoreSearch component. */
 export interface PluginStoreSearchProps {

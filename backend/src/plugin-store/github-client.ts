@@ -44,6 +44,8 @@ export interface IGitHubClient {
   fetchManifest(repo: string): Promise<RemotePluginManifest>
   /** Download release assets for a specific version (or latest) */
   downloadReleaseAssets(repo: string, version?: string): Promise<PluginReleaseAssets>
+  /** Fetch latest release info (download count + published date) */
+  fetchLatestReleaseInfo(repo: string): Promise<{ downloads: number; publishedAt: string } | null>
   /** Get remaining rate limit */
   getRateLimitRemaining(): number
 }
@@ -54,11 +56,13 @@ interface GitHubReleaseAsset {
   name: string
   browser_download_url: string
   size: number
+  download_count?: number
 }
 
 interface GitHubRelease {
   tag_name: string
   html_url: string
+  published_at?: string
   assets: GitHubReleaseAsset[]
 }
 
@@ -154,6 +158,35 @@ export class GitHubClient implements IGitHubClient {
   /** Get the last known remaining rate limit from GitHub response headers */
   getRateLimitRemaining(): number {
     return this.rateLimitRemaining
+  }
+
+  /**
+   * Fetch latest release info for a plugin (download count + published date).
+   * Returns null if the release cannot be fetched (404, rate limit, etc.)
+   * instead of throwing — this is a non-critical stats query.
+   */
+  async fetchLatestReleaseInfo(repo: string): Promise<{ downloads: number; publishedAt: string } | null> {
+    const releaseUrl = `https://api.github.com/repos/${repo}/releases/latest`
+
+    try {
+      const response = await this.fetchWithGuards(releaseUrl)
+      const release = (await response.json()) as GitHubRelease
+
+      // Sum download counts across all assets
+      let downloads = 0
+      if (Array.isArray(release.assets)) {
+        for (const asset of release.assets) {
+          downloads += asset.download_count ?? 0
+        }
+      }
+
+      const publishedAt = release.published_at ?? ''
+
+      return { downloads, publishedAt }
+    } catch {
+      // Non-critical — return null on any error
+      return null
+    }
   }
 
   // ─── Private Helpers ─────────────────────────────────────────────────────

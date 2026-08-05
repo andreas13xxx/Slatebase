@@ -11,6 +11,8 @@ import type {
   RemotePluginManifest,
   UpdateCheckResult,
   PluginUpdateInfo,
+  PluginReleaseStats,
+  PluginStatsResponse,
 } from './types.js'
 import {
   DesktopOnlyPluginError,
@@ -38,6 +40,8 @@ export interface IPluginStoreService {
   updatePlugin(vaultId: string, pluginId: string): Promise<PluginInstallResult>
   /** Update all plugins with available updates */
   updateAll(vaultId: string): Promise<BulkUpdateResult>
+  /** Get release stats (downloads + last updated) for all plugins */
+  getPluginStats(): Promise<PluginStatsResponse>
 }
 
 // ─── Implementation ──────────────────────────────────────────────────────────
@@ -325,6 +329,78 @@ export class PluginStoreService implements IPluginStoreService {
     })
 
     return { updated, failed }
+  }
+
+  /**
+   * Get release statistics (download count + last-updated date) for all
+   * community plugins. Results are cached for the same TTL as the plugin list.
+   *
+   * Fetches release info in batches with concurrency limiting to avoid
+   * GitHub rate limit exhaustion. Individual fetch failures are silently
+   * skipped (stats are best-effort).
+   */
+  async getPluginStats(): Promise<PluginStatsResponse> {
+    // Return cached stats if still fresh
+    const cached = this.cache.getPluginStats()
+    if (cached !== null) {
+      const statsRecord: Record<string, PluginReleaseStats> = {}
+      for (const [id, stat] of cached) {
+        statsRecord[id] = stat
+      }
+      return { stats: statsRecord, cachedAt: new Date().toISOString() }
+    }
+
+    this.logger.info('Fetching plugin release stats from GitHub')
+
+    const communityPlugins = await this.getPluginList()
+
+    const statsMap = new Map<string, PluginReleaseStats>()
+    const BATCH_SIZE = 10
+
+    for (let i = 0; i < communityPlugins.length; i += BATCH_SIZE) {
+      const batch = communityPlugins.slice(i, i + BATCH_SIZE)
+
+      const results = await Promise.all(
+        batch.map(async (plugin) => {
+          const info = await this.githubClient.fetchLatestReleaseInfo(plugin.repo)
+          if (info !== null) {
+            return {
+              pluginId: plugin.id,
+              downloads: info.downloads,
+              updatedAt: info.publishedAt,
+            } satisfies PluginReleaseStats
+          }
+          return null
+        })
+      )
+
+      for (const result of results) {
+        if (result !== null) {
+          statsMap.set(result.pluginId, result)
+        }
+      }
+
+      // Stop early if rate limit is critically low
+      if (this.githubClient.getRateLimitRemaining() >= 0 && this.githubClient.getRateLimitRemaining() < 5) {
+        this.logger.warn('Stopping stats fetch early due to low rate limit', {
+          remaining: this.githubClient.getRateLimitRemaining(),
+          fetched: statsMap.size,
+        })
+        break
+      }
+    }
+
+    // Cache the results
+    this.cache.setPluginStats(statsMap)
+
+    const statsRecord: Record<string, PluginReleaseStats> = {}
+    for (const [id, stat] of statsMap) {
+      statsRecord[id] = stat
+    }
+
+    this.logger.info('Plugin stats fetch complete', { total: statsMap.size })
+
+    return { stats: statsRecord, cachedAt: new Date().toISOString() }
   }
 
   // ─── Private Helpers ─────────────────────────────────────────────────────

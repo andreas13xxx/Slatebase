@@ -41,7 +41,12 @@ export interface PluginStoreDisplayEntry {
   /** Error message from last failed action */
   error?: string
   /** Release notes URL */
+  /** Release notes URL */
   releaseUrl?: string
+  /** Total download count of the latest release */
+  downloads?: number
+  /** ISO 8601 timestamp of last release publication */
+  updatedAt?: string
 }
 
 /** Props for the search/filter component */

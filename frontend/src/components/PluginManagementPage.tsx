@@ -75,6 +75,8 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
   const [checkingUpdates, setCheckingUpdates] = useState(false)
   const [updateInfo, setUpdateInfo] = useState<Map<string, { latestVersion: string; repo: string }>>(new Map())
   const [hasCheckedUpdates, setHasCheckedUpdates] = useState(false)
+  const [updatingPlugins, setUpdatingPlugins] = useState<Set<string>>(new Set())
+  const [isUpdatingAll, setIsUpdatingAll] = useState(false)
 
   const analyzerRef = useRef(new CompatibilityAnalyzer())
   const settingsContainerRef = useRef<HTMLDivElement>(null)
@@ -229,6 +231,49 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       // Silently fail
     } finally {
       setCheckingUpdates(false)
+    }
+  }
+
+  // ─── Update single plugin handler ───────────────────────────────────────
+
+  async function handleUpdatePlugin(pluginId: string): Promise<void> {
+    setUpdatingPlugins(prev => new Set(prev).add(pluginId))
+    try {
+      await apiClient.updatePlugin(vaultId, pluginId)
+      // Remove from updateInfo after successful update
+      setUpdateInfo(prev => {
+        const next = new Map(prev)
+        next.delete(pluginId)
+        return next
+      })
+      setUpdateCount(prev => Math.max(0, prev - 1))
+      // Reload plugins to show new version
+      void loadPlugins()
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err, t('pluginStore.update') + ' fehlgeschlagen'))
+    } finally {
+      setUpdatingPlugins(prev => {
+        const next = new Set(prev)
+        next.delete(pluginId)
+        return next
+      })
+    }
+  }
+
+  // ─── Update all plugins handler ────────────────────────────────────────
+
+  async function handleUpdateAllInstalled(): Promise<void> {
+    setIsUpdatingAll(true)
+    try {
+      await apiClient.updateAllPlugins(vaultId)
+      setUpdateInfo(new Map())
+      setUpdateCount(0)
+      // Reload to reflect new versions
+      void loadPlugins()
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err, t('pluginStore.updateAll') + ' fehlgeschlagen'))
+    } finally {
+      setIsUpdatingAll(false)
     }
   }
 
@@ -639,9 +684,19 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
               {t('pluginStore.checkUpdates')}
             </button>
             {updateInfo.size > 0 && !checkingUpdates && (
-              <span className="plugin-management-update-summary">
-                {updateCount} {t('pluginStore.updatesAvailable').replace('{count}', '')}
-              </span>
+              <>
+                <span className="plugin-management-update-summary">
+                  {updateCount} {t('pluginStore.updatesAvailable').replace('{count}', '')}
+                </span>
+                <button
+                  className="plugin-management-update-all-button"
+                  onClick={() => void handleUpdateAllInstalled()}
+                  disabled={isUpdatingAll}
+                >
+                  {isUpdatingAll && <Loader2 size={14} className="plugin-spinning" />}
+                  {t('pluginStore.updateAll')}
+                </button>
+              </>
             )}
             {updateInfo.size === 0 && !checkingUpdates && hasCheckedUpdates && updateCount === 0 && plugins.length > 0 && (
               <span className="plugin-management-all-up-to-date">
@@ -682,6 +737,18 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
               </div>
 
               <div className="plugin-card-actions">
+                {updateInfo.has(plugin.pluginId) && (
+                  <button
+                    className="plugin-card-btn plugin-card-btn--update"
+                    onClick={() => void handleUpdatePlugin(plugin.pluginId)}
+                    disabled={updatingPlugins.has(plugin.pluginId)}
+                    title={t('pluginStore.update')}
+                    aria-label={`${plugin.name} aktualisieren`}
+                  >
+                    {updatingPlugins.has(plugin.pluginId) ? <Loader2 size={14} className="plugin-spinning" /> : <RefreshCw size={14} />}
+                    {t('pluginStore.update')}
+                  </button>
+                )}
                 {plugin.hasSettings && plugin.status === 'active' && (
                   <button
                     className="plugin-card-btn plugin-card-btn--settings"

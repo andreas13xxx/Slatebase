@@ -56,6 +56,10 @@ function createMockPluginStoreService(overrides: Partial<IPluginStoreService> = 
       updated: [],
       failed: [],
     })),
+    getPluginStats: vi.fn(async () => ({
+      stats: {},
+      cachedAt: new Date().toISOString(),
+    })),
     ...overrides,
   }
 }
