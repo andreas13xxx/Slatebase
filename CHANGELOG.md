@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.22.0](https://github.com/andreas13xxx/Slatebase/compare/v0.21.0...v0.22.0) (2026-08-05)
+
+
+### Features
+
+* **plugins:** populate block ids in the metadata cache ([512caf5](https://github.com/andreas13xxx/Slatebase/commit/512caf516e07cfdedea8ec30a1a1331a73861f94))
+
 ## [0.21.0](https://github.com/andreas13xxx/Slatebase/compare/v0.20.0...v0.21.0) (2026-08-05)
 
 
