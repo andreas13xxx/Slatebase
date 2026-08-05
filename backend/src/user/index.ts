@@ -660,7 +660,7 @@ export class RoleService implements IRoleService {
 // ─── Argon2 Configuration ────────────────────────────────────────────────────
 
 /** Argon2id hashing parameters (OWASP recommended). */
-const ARGON2_OPTIONS = {
+export const ARGON2_OPTIONS = {
   type: 2 as const,       // argon2id
   memoryCost: 65536,      // 64 MB
   timeCost: 3,            // 3 iterations

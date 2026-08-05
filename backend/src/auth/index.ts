@@ -1,9 +1,9 @@
 import { mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomBytes, randomUUID, createHmac, timingSafeEqual } from 'node:crypto'
-import { verify } from 'argon2'
+import { hash, verify } from 'argon2'
 import type { UserRole, PublicUserInfo, IUserRepository } from '../user/index.js'
-import { AccountSuspendedError } from '../user/index.js'
+import { AccountSuspendedError, ARGON2_OPTIONS } from '../user/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { IAuditService } from '../audit/index.js'
 
@@ -541,6 +541,17 @@ export class AuthService implements IAuthService {
     const user = await this.userRepository.findByUsername(username)
 
     if (user === null) {
+      // Run a dummy Argon2 hash with the same cost parameters as a real verify()
+      // below, so this branch takes roughly the same wall-clock time as the
+      // "user found, wrong password" branch. Without this, an attacker can
+      // enumerate valid usernames by measuring how much slower a login attempt
+      // is for existing usernames (which pay for a real argon2 verify).
+      try {
+        await hash(password, ARGON2_OPTIONS)
+      } catch {
+        // Timing-only — ignore failures (e.g. an absurdly long password)
+      }
+
       this.logger.info('Login failed: user not found', { username })
       await this.auditService?.log({
         userId: null,

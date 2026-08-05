@@ -961,9 +961,10 @@ export class VaultService implements IVaultService {
    * 1. Verifies the vault exists (throws VaultNotFoundError if not)
    * 2. Validates source and destination paths with validateFilePath (path traversal protection)
    * 3. Checks for circular move (destination is subdirectory of source)
-   * 4. Checks for file conflict at destination
+   * 4. Checks source exists
    * 5. Creates intermediate directories at destination
-   * 6. Moves via fs.rename()
+   * 6. Moves, atomically detecting a destination conflict for files via
+   *    moveNoClobber (directories fall back to check-then-rename)
    * 7. Refreshes the vault's in-memory directory tree
    * 8. Returns { newPath: destinationPath }
    */
@@ -986,35 +987,29 @@ export class VaultService implements IVaultService {
       throw new InvalidMoveError(sourcePath, destinationPath)
     }
 
-    // 4. Check for file conflict at destination
+    // 4. Check source exists (and determine whether it's a file or directory)
+    let sourceStat
     try {
-      await fs.access(absoluteDestPath)
-      // If access succeeds, something already exists at the destination
-      throw new FileConflictError(destinationPath)
-    } catch (error) {
-      if (error instanceof FileConflictError) {
-        throw error
-      }
-      // ENOENT means nothing exists at destination — this is the expected case
-    }
-
-    // 5. Check source exists
-    try {
-      await fs.access(absoluteSourcePath)
+      sourceStat = await fs.stat(absoluteSourcePath)
     } catch {
       const error = new Error(`File or folder not found at path: ${sourcePath}`)
       ;(error as NodeJS.ErrnoException).code = 'ENOENT'
       throw error
     }
 
-    // 6. Create intermediate directories at destination
+    // 5. Create intermediate directories at destination
     const destDir = path.dirname(absoluteDestPath)
     await fs.mkdir(destDir, { recursive: true })
 
-    // 7. Move via fs.rename()
+    // 6. Move, detecting a conflict at the destination and performing the move
+    // in one step where possible (see moveNoClobber for why files vs.
+    // directories are handled differently).
     try {
-      await fs.rename(absoluteSourcePath, absoluteDestPath)
+      await this.moveNoClobber(absoluteSourcePath, absoluteDestPath, sourceStat.isDirectory(), destinationPath)
     } catch (error) {
+      if (error instanceof FileConflictError) {
+        throw error
+      }
       const message = error instanceof Error ? error.message : String(error)
       this.logger.error('Failed to move content', { vaultId, sourcePath, destinationPath, error: message })
       throw new StorageError(`Failed to move content: ${message}`)
@@ -1056,11 +1051,11 @@ export class VaultService implements IVaultService {
    * 2. Validates the file path with validateFilePath (path traversal protection)
    * 3. Validates the new name with validateContentName (invalid characters, length)
    * 4. Computes the target path (same directory, new name)
-   * 5. Checks if target already exists (throws FileConflictError if it does)
-   * 6. Checks if source exists (throws ENOENT error if not)
-   * 7. Renames via fs.rename()
-   * 8. Refreshes the vault's in-memory directory tree
-   * 9. Returns { newPath } — the new relative path
+   * 5. Checks if source exists (throws ENOENT error if not)
+   * 6. Renames, atomically detecting a target conflict for files via
+   *    moveNoClobber (directories fall back to check-then-rename)
+   * 7. Refreshes the vault's in-memory directory tree
+   * 8. Returns { newPath } — the new relative path
    */
   async renameContent(vaultId: string, filePath: string, newName: string): Promise<{ newPath: string }> {
     // 1. Verify vault exists
@@ -1079,33 +1074,26 @@ export class VaultService implements IVaultService {
     const sourceDir = path.dirname(resolvedSourcePath)
     const resolvedTargetPath = path.join(sourceDir, newName)
 
-    // 5. Check if target already exists → FileConflictError
+    // 5. Check if source exists (and determine whether it's a file or directory)
+    let sourceStat
     try {
-      await fs.access(resolvedTargetPath)
-      // If access succeeds, the target exists — conflict
-      const relativeTargetPath = path.relative(vault.info.path, resolvedTargetPath).replace(/\\/g, '/')
-      throw new FileConflictError(relativeTargetPath)
-    } catch (error) {
-      // If it's already a FileConflictError, re-throw
-      if (error instanceof FileConflictError) {
-        throw error
-      }
-      // Otherwise, target doesn't exist — proceed
-    }
-
-    // 6. Check if source exists
-    try {
-      await fs.access(resolvedSourcePath)
+      sourceStat = await fs.stat(resolvedSourcePath)
     } catch {
       const error = new Error(`File or folder not found at path: ${filePath}`)
       ;(error as NodeJS.ErrnoException).code = 'ENOENT'
       throw error
     }
 
-    // 7. Rename via fs.rename()
+    // 6. Rename, detecting a conflict at the target and performing the rename
+    // in one step where possible (see moveNoClobber for why files vs.
+    // directories are handled differently).
+    const relativeTargetPath = path.relative(vault.info.path, resolvedTargetPath).replace(/\\/g, '/')
     try {
-      await fs.rename(resolvedSourcePath, resolvedTargetPath)
+      await this.moveNoClobber(resolvedSourcePath, resolvedTargetPath, sourceStat.isDirectory(), relativeTargetPath)
     } catch (error) {
+      if (error instanceof FileConflictError) {
+        throw error
+      }
       const message = error instanceof Error ? error.message : String(error)
       this.logger.error('Failed to rename content', { vaultId, filePath, newName, error: message })
       throw new StorageError(`Failed to rename: ${message}`)
@@ -1143,6 +1131,58 @@ export class VaultService implements IVaultService {
     this.logger.info('Content renamed', { vaultId, oldPath: filePath, newName, newPath: newRelativePath })
 
     return { newPath: newRelativePath }
+  }
+
+  /**
+   * Moves `sourcePath` to `destPath`, throwing FileConflictError if something
+   * already exists at the destination.
+   *
+   * For files, this is done atomically via fs.link() + fs.unlink(): link()
+   * fails with EEXIST if the destination already exists, so there is no gap
+   * between checking and acting — unlike a separate fs.access() check followed
+   * by fs.rename(), where a file created at the destination in between would
+   * be silently overwritten by rename().
+   *
+   * Directories can't be hard-linked, so they fall back to a check-then-rename;
+   * that path still has a (narrower) TOCTOU window, which isn't avoidable
+   * without OS-level exclusive-rename support.
+   */
+  private async moveNoClobber(
+    sourcePath: string,
+    destPath: string,
+    isDirectory: boolean,
+    conflictRelativePath: string,
+  ): Promise<void> {
+    if (isDirectory) {
+      try {
+        await fs.access(destPath)
+        throw new FileConflictError(conflictRelativePath)
+      } catch (error) {
+        if (error instanceof FileConflictError) {
+          throw error
+        }
+        // ENOENT — expected, nothing exists at the destination
+      }
+      await fs.rename(sourcePath, destPath)
+      return
+    }
+
+    try {
+      await fs.link(sourcePath, destPath)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+        throw new FileConflictError(conflictRelativePath)
+      }
+      throw error
+    }
+
+    try {
+      await fs.unlink(sourcePath)
+    } catch (error) {
+      // Roll back the link so a failed move doesn't leave a duplicate behind
+      try { await fs.unlink(destPath) } catch { /* best effort */ }
+      throw error
+    }
   }
 }
 
