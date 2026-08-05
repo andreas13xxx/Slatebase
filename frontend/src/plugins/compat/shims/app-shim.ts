@@ -7,6 +7,7 @@ import type {
   PluginInstance,
 } from '../types';
 import { FileManagerShim } from './file-manager-shim';
+import { detectPlatform, readPlatformEnvironment } from '../platform-detection';
 import { recordGapRead, recordGapCall } from '../api-gap-registry';
 
 /**
@@ -205,8 +206,12 @@ export class AppShim implements IAppShim {
     },
   }
 
-  /** Whether the app is running on mobile. Always false in Slatebase (web app). */
-  readonly isMobile: boolean = false
+  /**
+   * Whether the app is running on a mobile device. Derived from the same
+   * detection as `Platform.isMobile`, so the two cannot disagree — plugins read
+   * both, and a browser build serves phones as well as desktops.
+   */
+  readonly isMobile: boolean = detectPlatform(readPlatformEnvironment()).isMobile
 
   /** Unique app ID (vault identifier). Used by Dataview, Excalidraw for caching. */
   get appId(): string {
