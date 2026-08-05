@@ -14,6 +14,7 @@ import { I18nProvider, useTranslation } from './i18n'
 import { ToastProvider } from './components/Toast'
 import { RealtimeProvider, type RealtimeEventHandlers } from './components/RealtimeProvider'
 import { ToastNotification, showToast } from './components/ToastNotification'
+import { HoverPreview } from './components/HoverPreview'
 import { ConnectionIndicator } from './components/ConnectionIndicator'
 import { useRealtimeContext } from './state/realtimeContext'
 import {
@@ -1218,6 +1219,9 @@ function AuthGuard() {
               <ContextPanelProvider>
                 <SidebarPanelProvider>
                   <AppContent />
+                  {/* Inside AppProvider: the popover reads the vault and API
+                      client from AppContext to load the previewed note. */}
+                  <HoverPreview />
                 </SidebarPanelProvider>
               </ContextPanelProvider>
             </TabProvider>

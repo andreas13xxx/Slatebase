@@ -8,6 +8,12 @@ import type { IEditor } from '../editor-shim';
 import { refreshPluginExtensions } from '../../../editor/plugin-extensions';
 import { MarkdownView } from './markdown-view-shim';
 import { recordGapRead, recordGapCall } from '../api-gap-registry';
+import {
+  registerHoverLinkSource,
+  unregisterHoverLinkSource,
+  requestHoverPreview,
+  hoverLinkEventToRequest,
+} from '../hover-link-bus';
 
 /**
  * WorkspaceShim — Obsidian Workspace API emulation.
@@ -97,6 +103,13 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Trigger a workspace event, dispatching to all registered callbacks.
    */
   trigger(event: string, ...args: unknown[]): void {
+    // 'hover-link' is how a plugin asks for a preview. In Obsidian the core
+    // "Page preview" plugin listens; here it goes to the popover. Listeners
+    // still receive it, since plugins may observe each other's hover events.
+    if (event === 'hover-link') {
+      const request = hoverLinkEventToRequest(args[0]);
+      if (request) requestHoverPreview(request);
+    }
     this.events.trigger(event, ...args);
   }
 
@@ -548,18 +561,22 @@ export class WorkspaceShim implements IWorkspaceShim {
   }
 
   /**
-   * Register a hover link source. No-op in Slatebase (no hover previews).
-   * Kanban registers itself as a hover link source for board links.
+   * Declare that a plugin's views can produce hover previews.
+   *
+   * As in Obsidian this only registers the source; the preview itself appears
+   * when the plugin triggers a `hover-link` event, which `trigger()` below
+   * forwards to the popover.
    */
-  registerHoverLinkSource(_key: string, _source: unknown): void {
-    // No-op — Slatebase does not support hover link previews
+  registerHoverLinkSource(key: string, source: unknown): void {
+    const info = typeof source === 'object' && source !== null
+      ? (source as { display?: string })
+      : undefined;
+    registerHoverLinkSource(key, info);
   }
 
-  /**
-   * Unregister a hover link source. No-op in Slatebase.
-   */
-  unregisterHoverLinkSource(_key: string): void {
-    // No-op
+  /** Withdraw a previously declared hover link source. */
+  unregisterHoverLinkSource(key: string): void {
+    unregisterHoverLinkSource(key);
   }
 
   /**

@@ -13,6 +13,7 @@ import type { Plugin } from 'unified'
 import type { Root, RootContent, PhrasingContent, AlignType } from 'mdast'
 import type { DirectoryTree } from '../types'
 import { AppContext } from '../state'
+import { requestHoverPreview, dismissHoverPreview } from '../plugins/compat/hover-link-bus'
 import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, remarkBreaks, remarkBlockRef, createAnchorTracker } from '../plugins'
 import type { WikilinkNode, EmbedNode, CalloutNode, TagNode } from '../plugins'
 import { PdfViewer } from './BinaryViewer'
@@ -257,6 +258,37 @@ export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick,
     // `content` changes in lockstep with `rendered`, so listing it adds no extra
     // runs; `viewModeId` is stable across renders.
   }, [rendered, content, viewModeId])
+
+  // Hover previews for internal links. Delegated on the container rather than
+  // bound per link, so the resolved path travels via a data attribute instead of
+  // through every render function's signature.
+  useEffect(() => {
+    const el = document.querySelector(`[data-viewmode-id="${viewModeId}"]`) as HTMLElement | null
+    if (!el) return
+
+    const linkUnder = (target: EventTarget | null): HTMLElement | null => {
+      if (!(target instanceof Element)) return null
+      const link = target.closest('a[data-link-path]')
+      return link instanceof HTMLElement ? link : null
+    }
+
+    const onOver = (e: MouseEvent): void => {
+      const link = linkUnder(e.target)
+      const path = link?.dataset['linkPath']
+      if (!link || !path) return
+      requestHoverPreview({ linkPath: path, targetEl: link, source: 'internal-link' })
+    }
+    const onOut = (e: MouseEvent): void => {
+      if (linkUnder(e.target)) dismissHoverPreview()
+    }
+
+    el.addEventListener('mouseover', onOver)
+    el.addEventListener('mouseout', onOut)
+    return () => {
+      el.removeEventListener('mouseover', onOver)
+      el.removeEventListener('mouseout', onOut)
+    }
+  }, [rendered, viewModeId])
 
   return createElement('article', {
     className: 'view-mode',
@@ -1322,6 +1354,9 @@ function renderWikilinkNode(
     key,
     href: '#',
     className,
+    // Read by the hover-preview delegation on the container, so the resolved
+    // path does not have to be threaded through every render function.
+    'data-link-path': isBroken ? undefined : linkPath,
     onClick: (e: React.MouseEvent) => {
       e.preventDefault()
       onInternalLinkClick?.(linkPath)
