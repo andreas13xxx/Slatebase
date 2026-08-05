@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.0](https://github.com/andreas13xxx/Slatebase/compare/v0.20.0...v0.21.0) (2026-08-05)
+
+
+### Features
+
+* **plugins:** implement getSectionInfo for code blocks ([8e744b3](https://github.com/andreas13xxx/Slatebase/commit/8e744b3d4f9548aff645a2abeade83ca43f84b27))
+
 ## [0.20.0](https://github.com/andreas13xxx/Slatebase/compare/v0.19.1...v0.20.0) (2026-08-04)
 
 
