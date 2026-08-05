@@ -16,19 +16,7 @@ import type { ILogger } from '../logger/index.js'
 import type { IMcpTokenService } from '../mcp/token-service.js'
 import { TokenLimitError, TokenValidationError, TokenNotFoundError } from '../mcp/errors.js'
 import { createTokenSchema } from '../mcp/validation.js'
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Creates a structured API error response object.
- */
-function createApiError(code: string, message: string): { code: string; message: string; timestamp: string } {
-  return {
-    code,
-    message,
-    timestamp: new Date().toISOString(),
-  }
-}
+import { createApiError } from './api-error.js'
 
 // ─── Factory Function ────────────────────────────────────────────────────────
 

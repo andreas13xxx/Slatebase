@@ -26,14 +26,9 @@ import dns from 'node:dns/promises'
 import net from 'node:net'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
+import { createApiError } from './api-error.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-interface ApiError {
-  code: string
-  message: string
-  timestamp: string
-}
 
 /** Dependencies for the proxy routes. */
 export interface ProxyRoutesDeps {
@@ -67,10 +62,6 @@ const PROXY_TIMEOUT_MS = 30_000
 const MAX_PROXY_REDIRECTS = 5
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function createApiError(code: string, message: string): ApiError {
-  return { code, message, timestamp: new Date().toISOString() }
-}
 
 /** Thrown when a URL (initial or post-redirect) is blocked by SSRF/allowlist checks. */
 class ProxyBlockedError extends Error {

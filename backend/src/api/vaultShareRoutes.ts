@@ -17,25 +17,7 @@ import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
 import type { IUserRepository } from '../user/index.js'
 import type { RouteModule } from './index.js'
-
-// --- Helper: API Error Response ---
-
-interface ApiError {
-  code: string
-  message: string
-  timestamp: string
-}
-
-/**
- * Creates a structured API error response object.
- */
-function createApiError(code: string, message: string): ApiError {
-  return {
-    code,
-    message,
-    timestamp: new Date().toISOString(),
-  }
-}
+import { createApiError } from './api-error.js'
 
 // --- Helper: Owner Authorization Check ---
 

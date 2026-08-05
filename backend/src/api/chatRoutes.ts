@@ -24,19 +24,7 @@ import {
   sendMessageSchema,
 } from '../chat/validation.js'
 import type { RouteModule } from './index.js'
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Creates a JSON error response in the standard API error format.
- */
-function createApiError(code: string, message: string): { code: string; message: string; timestamp: string } {
-  return {
-    code,
-    message,
-    timestamp: new Date().toISOString(),
-  }
-}
+import { createApiError } from './api-error.js'
 
 // ─── ChatController Implementation ──────────────────────────────────────────
 

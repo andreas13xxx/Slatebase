@@ -12,19 +12,9 @@ import { loginRequestSchema } from '../auth/validation.js'
 import type { ILogger } from '../logger/index.js'
 import type { ISseTicketStore } from '../auth/sse-ticket-store.js'
 import type { RouteModule } from './index.js'
+import { createApiError } from './api-error.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Creates a JSON error response in the standard API error format.
- */
-function createApiError(code: string, message: string): { code: string; message: string; timestamp: string } {
-  return {
-    code,
-    message,
-    timestamp: new Date().toISOString(),
-  }
-}
 
 /**
  * Extracts the Bearer token from the Authorization header.

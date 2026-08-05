@@ -21,24 +21,13 @@ import {
   saveFavoritesSchema,
   saveKeybindingsSchema,
 } from '../preferences/validation.js'
+import { createApiError } from './api-error.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-interface ApiError {
-  code: string
-  message: string
-  timestamp: string
-}
 
 interface PreferencesRoutesDeps {
   preferencesService: IPreferencesService
   logger: ILogger
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function createApiError(code: string, message: string): ApiError {
-  return { code, message, timestamp: new Date().toISOString() }
 }
 
 // ─── Route Factory ───────────────────────────────────────────────────────────

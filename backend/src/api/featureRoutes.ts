@@ -8,17 +8,9 @@ import { FeatureNotFoundError } from '../feature-toggle/index.js'
 import type { IAuditService } from '../audit/index.js'
 import type { SessionContext } from '../auth/index.js'
 import type { RouteModule } from './index.js'
+import { createApiError } from './api-error.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-/**
- * Standard API error response format.
- */
-interface ApiError {
-  code: string
-  message: string
-  timestamp: string
-}
 
 /**
  * Dependencies required to create the feature route modules.
@@ -26,19 +18,6 @@ interface ApiError {
 export interface FeatureRouteDeps {
   featureToggleService: IFeatureToggleService
   auditService?: IAuditService
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Creates a structured API error response object.
- */
-function createApiError(code: string, message: string): ApiError {
-  return {
-    code,
-    message,
-    timestamp: new Date().toISOString(),
-  }
 }
 
 // ─── Zod Schemas ─────────────────────────────────────────────────────────────

@@ -11,25 +11,7 @@ import type { IVaultService } from '../business/index.js'
 import type { IFeatureToggleService } from '../feature-toggle/types.js'
 import type { IConfigService } from '../config/index.js'
 import { LinkIndexService } from '../link-index/index.js'
-
-// --- Helper: API Error Response ---
-
-interface ApiError {
-  code: string
-  message: string
-  timestamp: string
-}
-
-/**
- * Creates a structured API error response object.
- */
-function createApiError(code: string, message: string): ApiError {
-  return {
-    code,
-    message,
-    timestamp: new Date().toISOString(),
-  }
-}
+import { createApiError } from './api-error.js'
 
 // --- Rate Limiting ---
 

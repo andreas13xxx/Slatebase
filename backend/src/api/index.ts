@@ -36,22 +36,7 @@ import {
   FileCountExceededError,
 } from '../import/index.js'
 import { isNodeError } from '../shared/fs-utils.js'
-
-// --- ApiError Response Format ---
-
-interface ApiError {
-  code: string
-  message: string
-  timestamp: string
-}
-
-function createApiError(code: string, message: string): ApiError {
-  return {
-    code,
-    message,
-    timestamp: new Date().toISOString(),
-  }
-}
+import { createApiError } from './api-error.js'
 
 // --- Zod Schemas for Request Validation ---
 

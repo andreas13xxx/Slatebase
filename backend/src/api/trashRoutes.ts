@@ -11,25 +11,7 @@ import type { IVaultRegistry } from '../vault/registry.js'
 import type { IEventBus } from '../realtime/types.js'
 import type { ITrashService } from '../trash/index.js'
 import { TrashNotFoundError, TrashRestoreError } from '../trash/index.js'
-
-// --- Helper: API Error Response ---
-
-interface ApiError {
-  code: string
-  message: string
-  timestamp: string
-}
-
-/**
- * Creates a structured API error response object.
- */
-function createApiError(code: string, message: string): ApiError {
-  return {
-    code,
-    message,
-    timestamp: new Date().toISOString(),
-  }
-}
+import { createApiError } from './api-error.js'
 
 // --- Zod Validation Schemas ---
 

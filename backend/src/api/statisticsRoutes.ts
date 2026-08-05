@@ -9,25 +9,7 @@ import { VaultNotFoundError, VaultAccessDeniedError } from '../business/index.js
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { IVaultStatisticsService } from '../statistics/index.js'
 import { StatisticsTimeoutError, formatSize } from '../statistics/index.js'
-
-// --- Helper: API Error Response ---
-
-interface ApiError {
-  code: string
-  message: string
-  timestamp: string
-}
-
-/**
- * Creates a structured API error response object.
- */
-function createApiError(code: string, message: string): ApiError {
-  return {
-    code,
-    message,
-    timestamp: new Date().toISOString(),
-  }
-}
+import { createApiError } from './api-error.js'
 
 // --- StatisticsRouteDependencies ---
 

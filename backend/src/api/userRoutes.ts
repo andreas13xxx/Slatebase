@@ -11,27 +11,7 @@ import type { ILogger } from '../logger/index.js'
 import { updateProfileSchema, changePasswordSchema } from '../user/validation.js'
 import type { SessionContext } from '../auth/index.js'
 import type { RouteModule } from './index.js'
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface ApiError {
-  code: string
-  message: string
-  timestamp: string
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Creates a structured API error response object.
- */
-function createApiError(code: string, message: string): ApiError {
-  return {
-    code,
-    message,
-    timestamp: new Date().toISOString(),
-  }
-}
+import { createApiError } from './api-error.js'
 
 // ─── UserController ──────────────────────────────────────────────────────────
 

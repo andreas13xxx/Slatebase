@@ -19,30 +19,7 @@ import type { IServerLogStore, LogLevel } from '../logger/index.js'
 import { createUserSchema, roleSchema } from '../user/validation.js'
 import { serverConfigUpdateSchema } from '../auth/validation.js'
 import type { RouteModule } from './index.js'
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-/**
- * Standard API error response format.
- */
-interface ApiError {
-  code: string
-  message: string
-  timestamp: string
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Creates a structured API error response object.
- */
-function createApiError(code: string, message: string): ApiError {
-  return {
-    code,
-    message,
-    timestamp: new Date().toISOString(),
-  }
-}
+import { createApiError } from './api-error.js'
 
 // ─── AdminController Interface ───────────────────────────────────────────────
 

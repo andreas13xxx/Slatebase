@@ -16,26 +16,15 @@ import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
 import { updateVaultConfigSchema } from '../vault-config/validation.js'
 import { VaultAccessDeniedError } from '../business/index.js'
+import { createApiError } from './api-error.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-interface ApiError {
-  code: string
-  message: string
-  timestamp: string
-}
 
 interface VaultConfigRoutesDeps {
   vaultConfigService: IVaultConfigService
   accessControl: IVaultAccessControl
   vaultRegistry: IVaultRegistry
   logger: ILogger
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function createApiError(code: string, message: string): ApiError {
-  return { code, message, timestamp: new Date().toISOString() }
 }
 
 // ─── Route Factory ───────────────────────────────────────────────────────────

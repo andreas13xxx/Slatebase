@@ -18,19 +18,9 @@ import {
   RegexTooLongError,
   ReplaceValidationError,
 } from '../search/index.js'
+import { createApiError } from './api-error.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Creates a structured API error response object.
- */
-function createApiError(code: string, message: string): { code: string; message: string; timestamp: string } {
-  return {
-    code,
-    message,
-    timestamp: new Date().toISOString(),
-  }
-}
 
 /**
  * Maps domain errors to HTTP status codes and structured API error responses.
