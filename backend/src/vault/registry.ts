@@ -5,6 +5,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
 import { AsyncMutex } from '../shared/async-mutex.js'
+import { isNodeError } from '../shared/fs-utils.js'
 
 // --- Data Models ---
 
@@ -232,9 +233,6 @@ export class VaultRegistry implements IVaultRegistry {
 
 // --- Helpers ---
 
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && 'code' in error
-}
 
 // --- VaultShareRegistry Implementation ---
 

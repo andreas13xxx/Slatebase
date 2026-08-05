@@ -6,6 +6,7 @@ import path from 'node:path'
 import type { ILogger } from '../logger/index.js'
 import type { ITrashService, TrashEntry, TrashIndex } from './types.js'
 import { TrashNotFoundError, TrashRestoreError } from './errors.js'
+import { isNodeError } from '../shared/fs-utils.js'
 
 /**
  * Resolves a vault ID to its data directory path.
@@ -319,6 +320,3 @@ export class TrashService implements ITrashService {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && 'code' in error
-}

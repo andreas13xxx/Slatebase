@@ -24,9 +24,7 @@ export {
   SearchQueryValidationError,
   RegexValidationError,
   RegexTooLongError,
-  SearchTimeoutError,
   ReplaceValidationError,
-  FileChangedError,
 } from './errors.js'
 
 // Validation schemas and inferred types

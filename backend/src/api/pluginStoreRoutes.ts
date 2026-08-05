@@ -3,7 +3,6 @@
 import type { Context } from 'hono'
 import { Hono } from 'hono'
 import type { IPluginStoreService } from '../plugin-store/plugin-store-service.js'
-import type { IUpdateChecker } from '../plugin-store/update-checker.js'
 import {
   GitHubRateLimitError,
   GitHubFetchError,
@@ -18,6 +17,7 @@ import { VaultAccessDeniedError } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
+import { checkVaultReadAccess } from './access-check.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -45,7 +45,6 @@ function createApiError(code: string, message: string): ApiError {
  */
 export interface PluginStoreRouteDependencies {
   pluginStoreService: IPluginStoreService
-  updateChecker: IUpdateChecker
   accessControl: IVaultAccessControl
   vaultRegistry: IVaultRegistry
   logger: ILogger
@@ -131,14 +130,13 @@ export function createPluginStoreRoutes(deps: PluginStoreRouteDependencies): Hon
  */
 export function createVaultPluginStoreRoutes(deps: PluginStoreRouteDependencies): Hono {
   const { pluginStoreService, accessControl, vaultRegistry, logger } = deps
-  // updateChecker available in deps for future use (e.g. cached results)
   const app = new Hono()
 
   // POST /store-install — Install a plugin from the community store
   app.post('/store-install', async (c: Context): Promise<Response> => {
     const vaultId = c.req.param('vaultId') as string
 
-    const authResult = await checkAccess(c, vaultId, vaultRegistry, accessControl)
+    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
     if (!authResult.authorized) {
       return authResult.response
     }
@@ -171,7 +169,7 @@ export function createVaultPluginStoreRoutes(deps: PluginStoreRouteDependencies)
   app.post('/check-updates', async (c: Context): Promise<Response> => {
     const vaultId = c.req.param('vaultId') as string
 
-    const authResult = await checkAccess(c, vaultId, vaultRegistry, accessControl)
+    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
     if (!authResult.authorized) {
       return authResult.response
     }
@@ -188,7 +186,7 @@ export function createVaultPluginStoreRoutes(deps: PluginStoreRouteDependencies)
   app.post('/update-all', async (c: Context): Promise<Response> => {
     const vaultId = c.req.param('vaultId') as string
 
-    const authResult = await checkAccess(c, vaultId, vaultRegistry, accessControl)
+    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
     if (!authResult.authorized) {
       return authResult.response
     }
@@ -206,7 +204,7 @@ export function createVaultPluginStoreRoutes(deps: PluginStoreRouteDependencies)
     const vaultId = c.req.param('vaultId') as string
     const pluginId = c.req.param('pluginId') as string
 
-    const authResult = await checkAccess(c, vaultId, vaultRegistry, accessControl)
+    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
     if (!authResult.authorized) {
       return authResult.response
     }
@@ -220,46 +218,6 @@ export function createVaultPluginStoreRoutes(deps: PluginStoreRouteDependencies)
   })
 
   return app
-}
-
-// ─── Access Control Helper ───────────────────────────────────────────────────
-
-/**
- * Checks authentication and vault access (read permission sufficient).
- * Same access control as vault files: owner + shared users.
- * Returns 401 if no session, 404 if vault not found, 403 if access denied.
- */
-async function checkAccess(
-  c: Context,
-  vaultId: string,
-  vaultRegistry: IVaultRegistry,
-  accessControl: IVaultAccessControl,
-): Promise<{ authorized: true } | { authorized: false; response: Response }> {
-  const session = c.get('session') as SessionContext | undefined
-  if (session === undefined) {
-    const error = createApiError('UNAUTHORIZED', 'Missing session context')
-    return { authorized: false, response: c.json(error, 401) }
-  }
-
-  // Check vault existence
-  const entry = vaultRegistry.findById(vaultId)
-  if (entry === null) {
-    const error = createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`)
-    return { authorized: false, response: c.json(error, 404) }
-  }
-
-  // Check read access (owner + shared users)
-  try {
-    await accessControl.checkReadAccess(vaultId, session.userId)
-  } catch (error) {
-    if (error instanceof VaultAccessDeniedError) {
-      const apiError = createApiError('FORBIDDEN', error.message)
-      return { authorized: false, response: c.json(apiError, 403) }
-    }
-    throw error
-  }
-
-  return { authorized: true }
 }
 
 // ─── Error Mapping ───────────────────────────────────────────────────────────

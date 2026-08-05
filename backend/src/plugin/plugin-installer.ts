@@ -7,6 +7,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { IPluginStore, PluginManifest } from './types.js'
 import { pluginManifestSchema } from './validation.js'
+import { compareSemver } from '../shared/semver.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -407,27 +408,9 @@ export class PluginInstaller implements IPluginInstaller {
   }
 }
 
-// ─── Utility: Semver Comparison ──────────────────────────────────────────────
-
-/**
- * Compare two semver strings numerically.
- * @param a - First semver string (e.g., "1.4.0")
- * @param b - Second semver string (e.g., "1.3.0")
- * @returns -1 if a < b, 0 if a === b, 1 if a > b
- */
-export function compareSemver(a: string, b: string): -1 | 0 | 1 {
-  const partsA = a.split('.').map(Number)
-  const partsB = b.split('.').map(Number)
-
-  for (let i = 0; i < 3; i++) {
-    const segA = partsA[i] ?? 0
-    const segB = partsB[i] ?? 0
-    if (segA < segB) return -1
-    if (segA > segB) return 1
-  }
-
-  return 0
-}
+// Re-exported for backward compatibility — callers of this module (and
+// plugin/index.ts's barrel export) import compareSemver from here.
+export { compareSemver }
 
 // ─── Internal Types ──────────────────────────────────────────────────────────
 

@@ -35,6 +35,7 @@ import {
   DepthExceededError,
   FileCountExceededError,
 } from '../import/index.js'
+import { isNodeError } from '../shared/fs-utils.js'
 
 // --- ApiError Response Format ---
 
@@ -775,16 +776,6 @@ export class VaultController implements IVaultController {
     const apiError = createApiError('INTERNAL_ERROR', 'Internal server error')
     return c.json(apiError, 500)
   }
-}
-
-// --- Helper: Node.js error type guard ---
-
-interface NodeError extends Error {
-  code: string
-}
-
-function isNodeError(error: unknown): error is NodeError {
-  return error instanceof Error && 'code' in error && typeof (error as NodeError).code === 'string'
 }
 
 // --- Helper: Content-Type mapping from file extension ---

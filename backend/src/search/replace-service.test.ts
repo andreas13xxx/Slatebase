@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { ReplaceService } from './replace-service.js'
 import { RegexValidationError, RegexTooLongError } from './errors.js'
-import type { IVaultService, IVaultAccessControl } from '../business/index.js'
+import type { IVaultService } from '../business/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { DirectoryTree, FileContent } from '../vault/index.js'
 
@@ -13,16 +13,6 @@ function createMockLogger(): ILogger {
     info: () => {},
     warn: () => {},
     error: () => {},
-  }
-}
-
-function createMockVaultAccessControl(): IVaultAccessControl {
-  return {
-    checkReadAccess: async () => {},
-    checkWriteAccess: async () => {},
-    createShare: async () => {},
-    revokeShare: async () => {},
-    updateSharePermission: async () => {},
   }
 }
 
@@ -92,11 +82,9 @@ function createMockVaultService(opts: MockVaultServiceOptions = {}): IVaultServi
 
 describe('ReplaceService', () => {
   let logger: ILogger
-  let accessControl: IVaultAccessControl
 
   beforeEach(() => {
     logger = createMockLogger()
-    accessControl = createMockVaultAccessControl()
   })
 
   describe('replace() — basic plain-text replacement', () => {
@@ -106,7 +94,7 @@ describe('ReplaceService', () => {
           'notes/hello.md': { content: 'Hello World. Hello again.' },
         },
       })
-      const service = new ReplaceService(vaultService, accessControl, logger)
+      const service = new ReplaceService(vaultService, logger)
 
       const result = await service.replace('vault1', {
         query: 'Hello',
@@ -129,7 +117,7 @@ describe('ReplaceService', () => {
           'notes/test.md': { content: 'Hello HELLO hello' },
         },
       })
-      const service = new ReplaceService(vaultService, accessControl, logger)
+      const service = new ReplaceService(vaultService, logger)
 
       const result = await service.replace('vault1', {
         query: 'hello',
@@ -149,7 +137,7 @@ describe('ReplaceService', () => {
           'notes/test.md': { content: 'No matches here' },
         },
       })
-      const service = new ReplaceService(vaultService, accessControl, logger)
+      const service = new ReplaceService(vaultService, logger)
 
       const result = await service.replace('vault1', {
         query: 'xyz',
@@ -173,7 +161,7 @@ describe('ReplaceService', () => {
           'file3.md': { content: 'no match' },
         },
       })
-      const service = new ReplaceService(vaultService, accessControl, logger)
+      const service = new ReplaceService(vaultService, logger)
 
       const result = await service.replace('vault1', {
         query: 'old',
@@ -198,7 +186,7 @@ describe('ReplaceService', () => {
           'test.md': { content: 'foo123 bar456 baz789' },
         },
       })
-      const service = new ReplaceService(vaultService, accessControl, logger)
+      const service = new ReplaceService(vaultService, logger)
 
       const result = await service.replace('vault1', {
         query: '\\d+',
@@ -218,7 +206,7 @@ describe('ReplaceService', () => {
           'test.md': { content: 'Foo FOO foo' },
         },
       })
-      const service = new ReplaceService(vaultService, accessControl, logger)
+      const service = new ReplaceService(vaultService, logger)
 
       const result = await service.replace('vault1', {
         query: 'foo',
@@ -238,7 +226,7 @@ describe('ReplaceService', () => {
           'test.md': { content: 'hello-world foo-bar' },
         },
       })
-      const service = new ReplaceService(vaultService, accessControl, logger)
+      const service = new ReplaceService(vaultService, logger)
 
       const result = await service.replace('vault1', {
         query: '(\\w+)-(\\w+)',
@@ -254,7 +242,7 @@ describe('ReplaceService', () => {
 
     it('throws RegexValidationError for invalid regex', async () => {
       const vaultService = createMockVaultService({ files: {} })
-      const service = new ReplaceService(vaultService, accessControl, logger)
+      const service = new ReplaceService(vaultService, logger)
 
       await expect(
         service.replace('vault1', {
@@ -268,7 +256,7 @@ describe('ReplaceService', () => {
 
     it('throws RegexTooLongError for patterns exceeding 1000 chars', async () => {
       const vaultService = createMockVaultService({ files: {} })
-      const service = new ReplaceService(vaultService, accessControl, logger)
+      const service = new ReplaceService(vaultService, logger)
 
       await expect(
         service.replace('vault1', {
@@ -286,7 +274,7 @@ describe('ReplaceService', () => {
       // interrupt. It must now be rejected before ever being compiled against
       // real file content.
       const vaultService = createMockVaultService({ files: { 'note.md': { content: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaa!' } } })
-      const service = new ReplaceService(vaultService, accessControl, logger)
+      const service = new ReplaceService(vaultService, logger)
 
       await expect(
         service.replace('vault1', {
@@ -305,7 +293,7 @@ describe('ReplaceService', () => {
       const vaultService = createMockVaultService({
         files: { 'huge.md': { content: hugeContent }, 'small.md': { content: 'hello world' } },
       })
-      const service = new ReplaceService(vaultService, accessControl, logger)
+      const service = new ReplaceService(vaultService, logger)
 
       const result = await service.replace('vault1', {
         query: 'hello',
@@ -344,7 +332,7 @@ describe('ReplaceService', () => {
           }
           return result
         }
-        const service = new ReplaceService(vaultService, accessControl, logger)
+        const service = new ReplaceService(vaultService, logger)
 
         const result = await service.replace('vault1', {
           query: 'hello',
@@ -375,7 +363,7 @@ describe('ReplaceService', () => {
       }
 
       const vaultService = createMockVaultService({ files })
-      const service = new ReplaceService(vaultService, accessControl, logger)
+      const service = new ReplaceService(vaultService, logger)
 
       const result = await service.replace('vault1', {
         query: 'target',
@@ -397,7 +385,7 @@ describe('ReplaceService', () => {
       }
 
       const vaultService = createMockVaultService({ files })
-      const service = new ReplaceService(vaultService, accessControl, logger)
+      const service = new ReplaceService(vaultService, logger)
 
       const result = await service.replace('vault1', {
         query: 'target',
@@ -423,7 +411,7 @@ describe('ReplaceService', () => {
           'file2.md': new Error('Permission denied'),
         },
       })
-      const service = new ReplaceService(vaultService, accessControl, logger)
+      const service = new ReplaceService(vaultService, logger)
 
       const result = await service.replace('vault1', {
         query: 'replace me',
@@ -450,7 +438,7 @@ describe('ReplaceService', () => {
           'file1.md': new Error('File not accessible'),
         },
       })
-      const service = new ReplaceService(vaultService, accessControl, logger)
+      const service = new ReplaceService(vaultService, logger)
 
       const result = await service.replace('vault1', {
         query: 'replace me',
@@ -477,7 +465,7 @@ describe('ReplaceService', () => {
           'file3.md': new Error('Disk full'),
         },
       })
-      const service = new ReplaceService(vaultService, accessControl, logger)
+      const service = new ReplaceService(vaultService, logger)
 
       const result = await service.replace('vault1', {
         query: 'old',
@@ -502,7 +490,7 @@ describe('ReplaceService', () => {
           'notes.md': { content: 'find me' },
         },
       })
-      const service = new ReplaceService(vaultService, accessControl, logger)
+      const service = new ReplaceService(vaultService, logger)
 
       const result = await service.replace('vault1', {
         query: 'find me',
@@ -536,7 +524,7 @@ describe('ReplaceService', () => {
         },
         tree,
       })
-      const service = new ReplaceService(vaultService, accessControl, logger)
+      const service = new ReplaceService(vaultService, logger)
 
       const result = await service.replace('vault1', {
         query: 'find this',
@@ -560,7 +548,7 @@ describe('ReplaceService', () => {
           'c.md': { content: 'match' },
         },
       })
-      const service = new ReplaceService(vaultService, accessControl, logger)
+      const service = new ReplaceService(vaultService, logger)
 
       await service.replace('vault1', {
         query: 'match',
@@ -581,7 +569,7 @@ describe('ReplaceService', () => {
           'test.md': { content: 'some content' },
         },
       })
-      const service = new ReplaceService(vaultService, accessControl, logger)
+      const service = new ReplaceService(vaultService, logger)
 
       const result = await service.replace('vault1', {
         query: '',

@@ -144,44 +144,6 @@ describe('UnreadStore', () => {
     })
   })
 
-  describe('getAllCounts', () => {
-    it('should return empty map for unknown user', async () => {
-      const store = new UnreadStore(tempDir, logger)
-      await store.loadIndex()
-
-      const counts = await store.getAllCounts('unknown')
-      expect(counts.size).toBe(0)
-      await cleanup(tempDir)
-    })
-
-    it('should return all counts for a user', async () => {
-      const store = new UnreadStore(tempDir, logger)
-      await store.loadIndex()
-
-      await store.increment('user1', 'conv1')
-      await store.increment('user1', 'conv1')
-      await store.increment('user1', 'conv2')
-
-      const counts = await store.getAllCounts('user1')
-      expect(counts.get('conv1')).toBe(2)
-      expect(counts.get('conv2')).toBe(1)
-      expect(counts.size).toBe(2)
-      await cleanup(tempDir)
-    })
-
-    it('should return a copy (not a reference)', async () => {
-      const store = new UnreadStore(tempDir, logger)
-      await store.loadIndex()
-
-      await store.increment('user1', 'conv1')
-
-      const counts = await store.getAllCounts('user1')
-      counts.set('conv1', 999)
-
-      expect(await store.getCount('user1', 'conv1')).toBe(1)
-      await cleanup(tempDir)
-    })
-  })
 
   describe('getTotal', () => {
     it('should return 0 for unknown user', async () => {

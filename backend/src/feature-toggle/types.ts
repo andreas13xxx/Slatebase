@@ -42,9 +42,6 @@ export interface FeatureToggleUpdateResult {
   restartRequired: boolean
 }
 
-/** Callback invoked when a toggle changes */
-export type FeatureChangeListener = (featureName: string, enabled: boolean) => void
-
 /** Service interface for feature toggle queries and modifications */
 export interface IFeatureToggleService {
   /** Synchronous query whether a feature is enabled. Returns false for unknown/invalid names. */
@@ -58,9 +55,6 @@ export interface IFeatureToggleService {
 
   /** Returns the state of a single toggle, or undefined if not found. */
   get(featureName: string): FeatureToggleState | undefined
-
-  /** Registers a listener that is called on toggle changes. */
-  onChange(listener: FeatureChangeListener): void
 }
 
 /** Registry interface for declarative feature registration */
@@ -70,9 +64,6 @@ export interface IFeatureRegistry {
 
   /** Returns all registered definitions. */
   getAll(): FeatureToggleDefinition[]
-
-  /** Checks whether a feature name is registered. */
-  has(name: string): boolean
 
   /** Returns the definition of a feature, or undefined. */
   get(name: string): FeatureToggleDefinition | undefined

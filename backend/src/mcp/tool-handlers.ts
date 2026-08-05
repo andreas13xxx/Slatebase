@@ -21,16 +21,15 @@ import type { DirectoryTree } from '../vault/index.js'
 import { PathTraversalError, isBinaryContent } from '../vault/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { McpConfig } from './config.js'
-
-// ─── MCP Error Codes ─────────────────────────────────────────────────────────
-
-const MCP_ERROR_ACCESS_DENIED = -32001
-const MCP_ERROR_NOT_FOUND = -32002
-const MCP_ERROR_BINARY_FILE = -32003
-const MCP_ERROR_FILE_TOO_LARGE = -32004
-const MCP_ERROR_INVALID_PARAMS = -32602
-const MCP_ERROR_CONFLICT = -32005
-const MCP_ERROR_STORAGE = -32006
+import {
+  MCP_ERROR_ACCESS_DENIED,
+  MCP_ERROR_NOT_FOUND,
+  MCP_ERROR_BINARY_FILE,
+  MCP_ERROR_FILE_TOO_LARGE,
+  MCP_ERROR_INVALID_PARAMS,
+  MCP_ERROR_CONFLICT,
+  MCP_ERROR_STORAGE,
+} from './error-codes.js'
 
 // ─── Helper: Count files recursively in a DirectoryTree ──────────────────────
 

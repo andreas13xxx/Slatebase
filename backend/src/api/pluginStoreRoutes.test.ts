@@ -8,7 +8,6 @@ import type { IVaultAccessControl } from '../business/index.js'
 
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { IPluginStoreService } from '../plugin-store/plugin-store-service.js'
-import type { IUpdateChecker } from '../plugin-store/update-checker.js'
 import type { CommunityPluginEntry, UpdateCheckResult, PluginInstallResult, BulkUpdateResult, RemotePluginManifest } from '../plugin-store/types.js'
 import {
   GitHubRateLimitError,
@@ -61,16 +60,6 @@ function createMockPluginStoreService(overrides: Partial<IPluginStoreService> = 
   }
 }
 
-function createMockUpdateChecker(overrides: Partial<IUpdateChecker> = {}): IUpdateChecker {
-  return {
-    start: () => {},
-    stop: () => {},
-    getLastCheckTime: () => null,
-    getCachedResults: () => null,
-    ...overrides,
-  }
-}
-
 function createMockVaultAccessControl(overrides: Partial<IVaultAccessControl> = {}): IVaultAccessControl {
   return {
     checkReadAccess: async () => {},
@@ -106,14 +95,12 @@ const defaultSession: SessionContext = {
 
 function createTestApp(options: {
   pluginStoreService?: IPluginStoreService
-  updateChecker?: IUpdateChecker
   accessControl?: IVaultAccessControl
   vaultRegistry?: IVaultRegistry
   session?: SessionContext | null
 } = {}) {
   const logger = createMockLogger()
   const pluginStoreService = options.pluginStoreService ?? createMockPluginStoreService()
-  const updateChecker = options.updateChecker ?? createMockUpdateChecker()
   const accessControl = options.accessControl ?? createMockVaultAccessControl()
   const vaultRegistry = options.vaultRegistry ?? createMockVaultRegistry()
 
@@ -128,7 +115,7 @@ function createTestApp(options: {
     })
   }
 
-  const deps = { pluginStoreService, updateChecker, accessControl, vaultRegistry, logger }
+  const deps = { pluginStoreService, accessControl, vaultRegistry, logger }
   const storeRoutes = createPluginStoreRoutes(deps)
   const vaultStoreRoutes = createVaultPluginStoreRoutes(deps)
 

@@ -40,7 +40,7 @@ import { McpTokenService } from './mcp/token-service.js'
 import { McpRateLimiter } from './mcp/rate-limiter.js'
 import { McpHandlers } from './mcp/handlers.js'
 import { McpServerFactory } from './mcp/server-factory.js'
-import { createMcpRoutes, createMcpHttpHandler } from './api/mcpRoutes.js'
+import { createMcpHttpHandler } from './api/mcpRoutes.js'
 import { createMcpTokenRoutes } from './api/mcpTokenRoutes.js'
 import { createMcpWellKnownHandler } from './api/mcpWellKnownRoute.js'
 import { LinkIndexService } from './link-index/index.js'
@@ -212,7 +212,6 @@ welcomeVaultCreator = async (userId: string, language: 'de' | 'en'): Promise<voi
 
 // 4c. MCP Module (conditional on config)
 let mcpTokenService: McpTokenService | undefined
-let mcpRoutes: ReturnType<typeof createMcpRoutes> | undefined
 let mcpTokenRoutes: ReturnType<typeof createMcpTokenRoutes> | undefined
 let mcpHttpHandler: ReturnType<typeof createMcpHttpHandler> = null
 let mcpRateLimiter: McpRateLimiter | undefined
@@ -247,18 +246,10 @@ if (featureToggleService.isEnabled('mcp')) {
     logger,
   })
 
-  mcpRoutes = createMcpRoutes({
-    tokenService: mcpTokenService,
-    rateLimiter: mcpRateLimiter,
-    serverFactory: mcpServerFactory,
-    mcpConfig,
-    logger,
-  })
   mcpHttpHandler = createMcpHttpHandler({
     tokenService: mcpTokenService,
     rateLimiter: mcpRateLimiter,
     serverFactory: mcpServerFactory,
-    mcpConfig,
     logger,
     onAuthenticated: (userId: string) => { currentUserId = userId },
   })
@@ -304,7 +295,7 @@ const updateChecker = new UpdateChecker(
 
 // 4g. Search Module
 const searchService = new SearchService(vaultService, vaultAccessControl, logger)
-const replaceService = new ReplaceService(vaultService, vaultAccessControl, logger)
+const replaceService = new ReplaceService(vaultService, logger)
 
 // 4h. Realtime Services (SSE)
 const sseConfig = config.getSseConfig()
@@ -467,7 +458,7 @@ app.route('/api/v1', publicFeatureApp)
 // Token routes use session auth (registered under /api/v1/mcp/tokens — session middleware applies)
 // MCP transport routes are handled OUTSIDE Hono to avoid double-response issues
 // .well-known/mcp.json is public (no auth)
-if (featureToggleService.isEnabled('mcp') && mcpRoutes !== undefined && mcpTokenRoutes !== undefined) {
+if (featureToggleService.isEnabled('mcp') && mcpTokenService !== undefined && mcpTokenRoutes !== undefined) {
   app.route('/api/v1/mcp/tokens', mcpTokenRoutes)
 }
 app.get('/.well-known/mcp.json', createMcpWellKnownHandler(featureToggleService))
@@ -484,8 +475,8 @@ const pluginRoutes = createPluginRoutes({
 app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)
 
 // Plugin Store route registration (auth middleware applies via /api/v1/* pattern)
-const pluginStoreRoutes = createPluginStoreRoutes({ pluginStoreService, updateChecker, accessControl: vaultAccessControl, vaultRegistry, logger })
-const vaultPluginStoreRoutes = createVaultPluginStoreRoutes({ pluginStoreService, updateChecker, accessControl: vaultAccessControl, vaultRegistry, logger })
+const pluginStoreRoutes = createPluginStoreRoutes({ pluginStoreService, accessControl: vaultAccessControl, vaultRegistry, logger })
+const vaultPluginStoreRoutes = createVaultPluginStoreRoutes({ pluginStoreService, accessControl: vaultAccessControl, vaultRegistry, logger })
 app.route('/api/v1/plugin-store', pluginStoreRoutes)
 app.route('/api/v1/vaults/:vaultId/plugins', vaultPluginStoreRoutes)
 

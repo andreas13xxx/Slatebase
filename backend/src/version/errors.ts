@@ -12,14 +12,3 @@ export class VersionNotFoundError extends Error {
   }
 }
 
-/**
- * Thrown when the maximum number of versions per file has been exceeded.
- */
-export class VersionLimitError extends Error {
-  public readonly code = 'VERSION_LIMIT_EXCEEDED'
-
-  constructor(public readonly path: string, public readonly maxVersions: number) {
-    super(`Version limit (${maxVersions}) exceeded for "${path}"`)
-    this.name = 'VersionLimitError'
-  }
-}

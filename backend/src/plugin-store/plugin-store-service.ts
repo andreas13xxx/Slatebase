@@ -17,6 +17,7 @@ import {
   PluginNotInStoreError,
   UpstreamError,
 } from './errors.js'
+import { compareSemver } from '../shared/semver.js'
 
 // ─── Interface ───────────────────────────────────────────────────────────────
 
@@ -157,7 +158,7 @@ export class PluginStoreService implements IPluginStoreService {
 
     if (existingManifest !== null) {
       // Compare versions — only upgrade if remote is higher
-      if (!isVersionHigher(downloadedManifest.version, existingManifest.version)) {
+      if (compareSemver(downloadedManifest.version, existingManifest.version) <= 0) {
         this.logger.info('Plugin already up to date, skipping install', {
           vaultId,
           pluginId,
@@ -346,7 +347,7 @@ export class PluginStoreService implements IPluginStoreService {
     // Fetch remote manifest to get the latest version
     const remoteManifest = await this.getRemoteManifest(entry.repo)
 
-    const hasUpdate = isVersionHigher(remoteManifest.version, installed.version)
+    const hasUpdate = compareSemver(remoteManifest.version, installed.version) > 0
 
     return {
       pluginId: installed.id,
@@ -359,26 +360,3 @@ export class PluginStoreService implements IPluginStoreService {
   }
 }
 
-// ─── Utility Functions ───────────────────────────────────────────────────────
-
-/**
- * Compare two semantic version strings.
- * Returns true if `remote` is strictly higher than `installed`.
- * Splits on '.', compares major/minor/patch numerically.
- */
-export function isVersionHigher(remote: string, installed: string): boolean {
-  const remoteParts = remote.split('.').map(Number)
-  const installedParts = installed.split('.').map(Number)
-
-  const maxLength = Math.max(remoteParts.length, installedParts.length)
-
-  for (let i = 0; i < maxLength; i++) {
-    const r = remoteParts[i] ?? 0
-    const inst = installedParts[i] ?? 0
-
-    if (r > inst) return true
-    if (r < inst) return false
-  }
-
-  return false
-}

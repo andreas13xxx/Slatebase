@@ -5,6 +5,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
 import type { IUnreadStore } from './types.js'
+import { isNodeError } from '../shared/fs-utils.js'
 
 // --- File format ---
 
@@ -125,15 +126,6 @@ export class UnreadStore implements IUnreadStore {
   }
 
   /**
-   * Get all unread counts for a user (conversationId → count).
-   */
-  async getAllCounts(userId: string): Promise<Map<string, number>> {
-    const userCounts = this.index.get(userId)
-    if (!userCounts) return new Map()
-    return new Map(userCounts)
-  }
-
-  /**
    * Get total unread count across all conversations for a user.
    */
   async getTotal(userId: string): Promise<number> {
@@ -219,6 +211,3 @@ export class UnreadStore implements IUnreadStore {
 
 // --- Helpers ---
 
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && 'code' in error
-}

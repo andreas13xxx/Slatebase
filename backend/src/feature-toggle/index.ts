@@ -11,7 +11,6 @@ export type {
   FeatureToggleDefinition,
   FeatureToggleState,
   FeatureToggleUpdateResult,
-  FeatureChangeListener,
   IFeatureToggleService,
   IFeatureRegistry,
 } from './types.js'
