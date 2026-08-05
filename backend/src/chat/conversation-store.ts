@@ -2,11 +2,11 @@
 
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import crypto from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
 import type { Conversation, IConversationStore } from './types.js'
 import { AsyncMutex } from '../shared/async-mutex.js'
 import { isNodeError } from '../shared/fs-utils.js'
+import { atomicWriteFile } from '../shared/atomic-write.js'
 
 // --- Implementation ---
 
@@ -86,21 +86,7 @@ export class ConversationStore implements IConversationStore {
 
     await this.mutex.runExclusive(async () => {
       const filePath = path.join(this.conversationsDir, `${conversation.id}.json`)
-      const tempPath = `${filePath}.${crypto.randomBytes(8).toString('hex')}.tmp`
-      const content = JSON.stringify(conversation, null, 2)
-
-      await fs.writeFile(tempPath, content, 'utf-8')
-
-      try {
-        await fs.rename(tempPath, filePath)
-      } catch (renameError) {
-        try {
-          await fs.unlink(tempPath)
-        } catch {
-          // Ignore cleanup errors
-        }
-        throw renameError
-      }
+      await atomicWriteFile(filePath, JSON.stringify(conversation, null, 2))
 
       this.conversationCache.set(conversation.id, conversation)
       this.indexParticipants(conversation)
@@ -122,21 +108,7 @@ export class ConversationStore implements IConversationStore {
       // committed state, not a value captured before waiting in the queue.
       const oldConversation = this.conversationCache.get(conversation.id)
       const filePath = path.join(this.conversationsDir, `${conversation.id}.json`)
-      const tempPath = `${filePath}.${crypto.randomBytes(8).toString('hex')}.tmp`
-      const content = JSON.stringify(conversation, null, 2)
-
-      await fs.writeFile(tempPath, content, 'utf-8')
-
-      try {
-        await fs.rename(tempPath, filePath)
-      } catch (renameError) {
-        try {
-          await fs.unlink(tempPath)
-        } catch {
-          // Ignore cleanup errors
-        }
-        throw renameError
-      }
+      await atomicWriteFile(filePath, JSON.stringify(conversation, null, 2))
 
       // Remove conversation from old participants' index entries
       if (oldConversation) {

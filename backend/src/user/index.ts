@@ -7,6 +7,7 @@ import type { ILogger } from '../logger/index.js'
 import type { IAuditService } from '../audit/index.js'
 import type { OnUserCreatedFn } from '../welcome-vault/types.js'
 import { isNodeError } from '../shared/fs-utils.js'
+import { atomicWriteFile } from '../shared/atomic-write.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -313,20 +314,7 @@ export class UserRepository implements IUserRepository {
   private async writeIndex(index: UsernameIndex): Promise<void> {
     await this.ensureDirectory()
     const content = JSON.stringify(index, null, 2)
-    const tempPath = this.indexPath + `.${crypto.randomBytes(8).toString('hex')}.tmp`
-
-    await fs.writeFile(tempPath, content, 'utf-8')
-
-    try {
-      await fs.rename(tempPath, this.indexPath)
-    } catch (renameError) {
-      try {
-        await fs.unlink(tempPath)
-      } catch {
-        // Ignore cleanup errors
-      }
-      throw renameError
-    }
+    await atomicWriteFile(this.indexPath, content)
   }
 
   /**
@@ -336,20 +324,7 @@ export class UserRepository implements IUserRepository {
     await this.ensureDirectory()
     const filePath = path.join(this.usersDir, `${user.userId}.json`)
     const content = JSON.stringify(user, null, 2)
-    const tempPath = filePath + `.${crypto.randomBytes(8).toString('hex')}.tmp`
-
-    await fs.writeFile(tempPath, content, 'utf-8')
-
-    try {
-      await fs.rename(tempPath, filePath)
-    } catch (renameError) {
-      try {
-        await fs.unlink(tempPath)
-      } catch {
-        // Ignore cleanup errors
-      }
-      throw renameError
-    }
+    await atomicWriteFile(filePath, content)
   }
 
   /**

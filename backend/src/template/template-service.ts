@@ -9,6 +9,7 @@ import { validateFilePath } from '../vault/index.js'
 import type { ITemplateService, TemplateInfo } from './types.js'
 import { TemplateNotFoundError, TemplateConflictError } from './errors.js'
 import type { IVaultConfigService } from '../vault-config/index.js'
+import { isNodeError } from '../shared/fs-utils.js'
 
 // ─── Implementation ──────────────────────────────────────────────────────────
 
@@ -54,7 +55,7 @@ export class TemplateService implements ITemplateService {
       return templates
     } catch (error: unknown) {
       // Return empty list when template directory doesn't exist
-      if (this.isNodeError(error) && error.code === 'ENOENT') {
+      if (isNodeError(error) && error.code === 'ENOENT') {
         this.logger.debug('Template directory does not exist', {
           vaultId,
           path: templatesPath,
@@ -90,7 +91,7 @@ export class TemplateService implements ITemplateService {
     try {
       templateContent = await fs.readFile(templatePath, 'utf-8')
     } catch (error: unknown) {
-      if (this.isNodeError(error) && error.code === 'ENOENT') {
+      if (isNodeError(error) && error.code === 'ENOENT') {
         throw new TemplateNotFoundError(templateName)
       }
       throw error
@@ -119,7 +120,7 @@ export class TemplateService implements ITemplateService {
         throw error
       }
       // ENOENT is expected — file doesn't exist, proceed
-      if (!this.isNodeError(error) || error.code !== 'ENOENT') {
+      if (!isNodeError(error) || error.code !== 'ENOENT') {
         throw error
       }
     }
@@ -193,10 +194,4 @@ export class TemplateService implements ITemplateService {
     return vault.info.path
   }
 
-  /**
-   * Type guard for Node.js filesystem errors with a `code` property.
-   */
-  private isNodeError(error: unknown): error is NodeJS.ErrnoException {
-    return error instanceof Error && 'code' in error
-  }
 }

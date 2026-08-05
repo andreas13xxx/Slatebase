@@ -15,6 +15,7 @@ import type {
   FavoriteEntry,
   KeybindingEntry,
 } from './types.js'
+import { isNodeError } from '../shared/fs-utils.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -87,7 +88,7 @@ export class PreferencesStore implements IPreferencesService {
         keybindings: Array.isArray(parsed.keybindings) ? parsed.keybindings : [],
       }
     } catch (error: unknown) {
-      if (this.isNodeError(error) && error.code === 'ENOENT') {
+      if (isNodeError(error) && error.code === 'ENOENT') {
         return { recentFiles: [], favorites: [], keybindings: [] }
       }
       this.logger.error('Failed to load user preferences', { userId, error: String(error) })
@@ -114,7 +115,4 @@ export class PreferencesStore implements IPreferencesService {
     }
   }
 
-  private isNodeError(error: unknown): error is NodeJS.ErrnoException {
-    return error instanceof Error && 'code' in error
-  }
 }

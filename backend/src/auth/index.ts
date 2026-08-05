@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomBytes, randomUUID, createHmac, timingSafeEqual } from 'node:crypto'
 import { hash, verify } from 'argon2'
@@ -6,6 +6,7 @@ import type { UserRole, PublicUserInfo, IUserRepository } from '../user/index.js
 import { AccountSuspendedError, ARGON2_OPTIONS } from '../user/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { IAuditService } from '../audit/index.js'
+import { atomicWriteFile } from '../shared/atomic-write.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -226,7 +227,7 @@ export class SessionStore implements ISessionStore {
   async create(session: Session): Promise<void> {
     await this.ensureDir()
     const filePath = join(this.sessionsDir, `${session.sessionId}.json`)
-    await this.atomicWrite(filePath, JSON.stringify(session, null, 2))
+    await atomicWriteFile(filePath, JSON.stringify(session, null, 2))
     this.tokenIndex.set(session.token, session.sessionId)
     this.addToUserIndex(session.userId, session.sessionId)
   }
@@ -237,7 +238,7 @@ export class SessionStore implements ISessionStore {
   async update(session: Session): Promise<void> {
     await this.ensureDir()
     const filePath = join(this.sessionsDir, `${session.sessionId}.json`)
-    await this.atomicWrite(filePath, JSON.stringify(session, null, 2))
+    await atomicWriteFile(filePath, JSON.stringify(session, null, 2))
   }
 
   /**
@@ -438,44 +439,6 @@ export class SessionStore implements ISessionStore {
     }
   }
 
-  /**
-   * Write data atomically: write to a temp file, then rename to target.
-   * On Windows, rename can fail with EPERM if the target is briefly locked
-   * (e.g. by antivirus or file watchers). Retries with delay and unlink-before-rename.
-   */
-  private async atomicWrite(targetPath: string, data: string): Promise<void> {
-    const tempName = `${randomBytes(16).toString('hex')}.tmp`
-    const tempPath = join(this.sessionsDir, tempName)
-    await writeFile(tempPath, data, 'utf-8')
-
-    try {
-      await rename(tempPath, targetPath)
-    } catch (err: unknown) {
-      const code = (err as NodeJS.ErrnoException).code
-      if (code === 'EPERM' || code === 'EACCES') {
-        // Windows: target may be locked — wait briefly for lock release, then retry
-        await new Promise(resolve => setTimeout(resolve, 50))
-        try { await unlink(targetPath) } catch { /* may not exist */ }
-        try {
-          await rename(tempPath, targetPath)
-        } catch {
-          // Second retry after another short delay
-          await new Promise(resolve => setTimeout(resolve, 100))
-          try {
-            await rename(tempPath, targetPath)
-          } catch {
-            // Last resort: direct overwrite (loses atomicity but avoids crash)
-            await writeFile(targetPath, data, 'utf-8')
-            try { await unlink(tempPath) } catch { /* cleanup */ }
-          }
-        }
-      } else {
-        // Clean up temp file and rethrow
-        try { await unlink(tempPath) } catch { /* ignore */ }
-        throw err
-      }
-    }
-  }
 
   /**
    * Type guard to validate that a parsed JSON value is a valid Session object.

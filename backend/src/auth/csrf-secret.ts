@@ -1,8 +1,9 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
 import { isNodeError } from '../shared/fs-utils.js'
+import { atomicWriteFile } from '../shared/atomic-write.js'
 
 // ─── Interface ───────────────────────────────────────────────────────────────
 
@@ -88,9 +89,7 @@ export class CsrfSecretManager implements ICsrfSecretManager {
    */
   private async persistSecret(secret: string): Promise<void> {
     await mkdir(this.dataDir, { recursive: true })
-    const tempPath = `${this.secretPath}.${randomBytes(8).toString('hex')}.tmp`
-    await writeFile(tempPath, secret, 'utf-8')
-    await rename(tempPath, this.secretPath)
+    await atomicWriteFile(this.secretPath, secret)
   }
 }
 

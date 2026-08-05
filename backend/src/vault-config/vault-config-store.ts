@@ -6,10 +6,11 @@
 
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import crypto from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
 import type { IVaultConfigService, VaultConfig } from './types.js'
 import { DEFAULT_VAULT_CONFIG } from './types.js'
+import { isNodeError } from '../shared/fs-utils.js'
+import { atomicWriteFile } from '../shared/atomic-write.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -82,7 +83,7 @@ export class VaultConfigStore implements IVaultConfigService {
       }
       return result
     } catch (error: unknown) {
-      if (this.isNodeError(error) && error.code === 'ENOENT') {
+      if (isNodeError(error) && error.code === 'ENOENT') {
         return {}
       }
       this.logger.error('Failed to load vault config', { vaultId, error: String(error) })
@@ -99,20 +100,12 @@ export class VaultConfigStore implements IVaultConfigService {
     const dir = path.dirname(filePath)
     await fs.mkdir(dir, { recursive: true })
 
-    const tmpSuffix = crypto.randomBytes(8).toString('hex')
-    const tmpPath = `${filePath}.${tmpSuffix}.tmp`
-
     try {
-      await fs.writeFile(tmpPath, JSON.stringify(config, null, 2), 'utf-8')
-      await fs.rename(tmpPath, filePath)
+      await atomicWriteFile(filePath, JSON.stringify(config, null, 2))
     } catch (error: unknown) {
-      try { await fs.unlink(tmpPath) } catch { /* ignore */ }
       this.logger.error('Failed to persist vault config', { vaultId, error: String(error) })
       throw error
     }
   }
 
-  private isNodeError(error: unknown): error is NodeJS.ErrnoException {
-    return error instanceof Error && 'code' in error
-  }
 }

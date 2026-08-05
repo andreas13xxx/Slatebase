@@ -2,10 +2,10 @@
 
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import crypto from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
 import { AsyncMutex } from '../shared/async-mutex.js'
 import { isNodeError } from '../shared/fs-utils.js'
+import { atomicWriteFile } from '../shared/atomic-write.js'
 
 // --- Data Models ---
 
@@ -147,22 +147,7 @@ export class VaultRegistry implements IVaultRegistry {
       vaults: entries,
     }
 
-    const content = JSON.stringify(data, null, 2)
-    const tempPath = this.registryPath + `.${crypto.randomBytes(8).toString('hex')}.tmp`
-
-    await fs.writeFile(tempPath, content, 'utf-8')
-
-    try {
-      await fs.rename(tempPath, this.registryPath)
-    } catch (renameError) {
-      // Clean up temp file on rename failure
-      try {
-        await fs.unlink(tempPath)
-      } catch {
-        // Ignore cleanup errors
-      }
-      throw renameError
-    }
+    await atomicWriteFile(this.registryPath, JSON.stringify(data, null, 2))
 
     this.entries = [...entries]
   }
@@ -286,21 +271,7 @@ export class VaultShareRegistry implements IVaultShareRegistry {
   private async save(shares: VaultShareEntry[]): Promise<void> {
     await this.ensureDirectory()
 
-    const content = JSON.stringify(shares, null, 2)
-    const tempPath = this.sharesPath + `.${crypto.randomBytes(8).toString('hex')}.tmp`
-
-    await fs.writeFile(tempPath, content, 'utf-8')
-
-    try {
-      await fs.rename(tempPath, this.sharesPath)
-    } catch (renameError) {
-      try {
-        await fs.unlink(tempPath)
-      } catch {
-        // Ignore cleanup errors
-      }
-      throw renameError
-    }
+    await atomicWriteFile(this.sharesPath, JSON.stringify(shares, null, 2))
 
     this.shares = [...shares]
   }
