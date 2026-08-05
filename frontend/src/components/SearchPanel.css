@@ -622,7 +622,7 @@
 }
 
 .search-panel__file-header-toggle:hover {
-  color: var(--accent-primary);
+  color: var(--accent);
 }
 
 .search-panel__file-icon {
@@ -640,7 +640,7 @@
 }
 
 .search-panel__highlight {
-  background: var(--search-highlight-bg, rgba(255, 213, 79, 0.4));
+  background: var(--search-match-bg);
   color: inherit;
   border-radius: 2px;
   padding: 0 1px;
@@ -670,7 +670,7 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 4px 6px;
-  border-bottom: 1px solid var(--border-primary);
+  border-bottom: 1px solid var(--border-default);
   margin-bottom: 2px;
 }
 

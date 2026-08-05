@@ -273,8 +273,8 @@
 
 .settings-field-input:focus {
   outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px var(--accent-primary-faded);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-light);
 }
 
 .settings-field-input:disabled {
@@ -325,7 +325,7 @@
 }
 
 .settings-error {
-  color: var(--text-danger);
+  color: var(--danger-text);
   font-size: 0.875rem;
   margin: 0;
 }
@@ -409,7 +409,7 @@
 }
 
 .keybindings-shortcut-btn:hover {
-  border-color: var(--accent-primary);
+  border-color: var(--accent);
 }
 
 .keybindings-unset {
@@ -424,7 +424,7 @@
 
 .keybindings-input {
   padding: 4px 8px;
-  border: 2px solid var(--accent-primary);
+  border: 2px solid var(--accent);
   border-radius: var(--radius-sm);
   background: var(--bg-base);
   color: var(--text-primary);
@@ -436,7 +436,7 @@
 
 .keybindings-input:focus {
   outline: none;
-  box-shadow: 0 0 0 2px var(--accent-primary-faded);
+  box-shadow: 0 0 0 2px var(--accent-light);
 }
 
 .keybindings-btn {
@@ -457,12 +457,12 @@
 }
 
 .keybindings-btn--save {
-  color: var(--text-success);
+  color: var(--success);
   font-weight: 600;
 }
 
 .keybindings-btn--cancel {
-  color: var(--text-danger);
+  color: var(--danger-text);
 }
 
 .keybindings-btn--save:disabled {

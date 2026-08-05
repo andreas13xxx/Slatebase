@@ -3,8 +3,8 @@
 .plugin-store-search {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
-  padding-bottom: var(--spacing-md);
+  gap: 8px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -13,7 +13,7 @@
 .plugin-store-search__row {
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
+  gap: 12px;
 }
 
 .plugin-store-search__input-wrapper {
@@ -65,7 +65,7 @@
 .plugin-store-search__filters {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -85,7 +85,7 @@
 
 .plugin-store-search__filter-label:hover {
   border-color: var(--border-default);
-  background: var(--bg-hover);
+  background: var(--bg-surface);
 }
 
 .plugin-store-search__filter-label input[type="checkbox"] {
