@@ -117,27 +117,15 @@ export class PluginInstaller implements IPluginInstaller {
     // Step 6: Calculate total extracted size
     this.validateExtractedSize(entries)
 
-    // Step 7: Check existing installation (version comparison)
-    const existingManifest = await this.pluginStore.loadManifest(vaultId, manifest.id)
-    let isUpgrade = false
-
-    if (existingManifest !== null) {
-      const comparison = compareSemver(manifest.version, existingManifest.version)
-      if (comparison <= 0) {
-        throw new PluginInstallError(
-          `Plugin "${manifest.id}" is already installed with version ${existingManifest.version}. ` +
-          `Uploaded version ${manifest.version} is not higher.`,
-          'VERSION_NOT_HIGHER',
-        )
-      }
-      isUpgrade = true
-    }
-
-    // Step 8: Save files to PluginStore
-    const files = extracted.stylesContent !== undefined
-      ? { manifest: extracted.manifestContent, bundle: extracted.bundleContent, styles: extracted.stylesContent }
-      : { manifest: extracted.manifestContent, bundle: extracted.bundleContent }
-    await this.pluginStore.savePlugin(vaultId, manifest.id, files)
+    // Steps 7-8: Check existing installation (version comparison) and save
+    const isUpgrade = await this.checkVersionAndSave(
+      vaultId,
+      manifest,
+      extracted.manifestContent,
+      extracted.bundleContent,
+      extracted.stylesContent,
+      'Uploaded',
+    )
 
     // Step 9: Return install result
     return {
@@ -207,27 +195,15 @@ export class PluginInstaller implements IPluginInstaller {
       )
     }
 
-    // Step 7: Check existing installation (version comparison)
-    const existingManifest = await this.pluginStore.loadManifest(vaultId, manifest.id)
-    let isUpgrade = false
-
-    if (existingManifest !== null) {
-      const comparison = compareSemver(manifest.version, existingManifest.version)
-      if (comparison <= 0) {
-        throw new PluginInstallError(
-          `Plugin "${manifest.id}" is already installed with version ${existingManifest.version}. ` +
-          `Detected version ${manifest.version} is not higher.`,
-          'VERSION_NOT_HIGHER',
-        )
-      }
-      isUpgrade = true
-    }
-
-    // Step 8: Save files to PluginStore
-    const files = stylesContent !== undefined
-      ? { manifest: manifestContent, bundle: bundleContent, styles: stylesContent }
-      : { manifest: manifestContent, bundle: bundleContent }
-    await this.pluginStore.savePlugin(vaultId, manifest.id, files)
+    // Steps 7-8: Check existing installation (version comparison) and save
+    const isUpgrade = await this.checkVersionAndSave(
+      vaultId,
+      manifest,
+      manifestContent,
+      bundleContent,
+      stylesContent,
+      'Detected',
+    )
 
     // Step 9: Copy data.json (settings) if it exists and plugin is fresh install
     if (!isUpgrade) {
@@ -251,6 +227,47 @@ export class PluginInstaller implements IPluginInstaller {
   }
 
   // ─── Private Helpers ─────────────────────────────────────────────────────────
+
+  /**
+   * Compares against any existing installed version (rejecting non-upgrades)
+   * and saves the plugin files. Shared by installFromZip and
+   * installFromDetected, which differ only in how they sourced the files and
+   * in the wording of the "not higher" error message.
+   *
+   * @throws PluginInstallError with code VERSION_NOT_HIGHER if a version is
+   *   already installed and is not strictly lower than the new one.
+   * @returns true if this is an upgrade over an existing installation.
+   */
+  private async checkVersionAndSave(
+    vaultId: string,
+    manifest: PluginManifest,
+    manifestContent: string,
+    bundleContent: string,
+    stylesContent: string | undefined,
+    versionSourceLabel: 'Uploaded' | 'Detected',
+  ): Promise<boolean> {
+    const existingManifest = await this.pluginStore.loadManifest(vaultId, manifest.id)
+    let isUpgrade = false
+
+    if (existingManifest !== null) {
+      const comparison = compareSemver(manifest.version, existingManifest.version)
+      if (comparison <= 0) {
+        throw new PluginInstallError(
+          `Plugin "${manifest.id}" is already installed with version ${existingManifest.version}. ` +
+          `${versionSourceLabel} version ${manifest.version} is not higher.`,
+          'VERSION_NOT_HIGHER',
+        )
+      }
+      isUpgrade = true
+    }
+
+    const files = stylesContent !== undefined
+      ? { manifest: manifestContent, bundle: bundleContent, styles: stylesContent }
+      : { manifest: manifestContent, bundle: bundleContent }
+    await this.pluginStore.savePlugin(vaultId, manifest.id, files)
+
+    return isUpgrade
+  }
 
   /**
    * Find manifest.json and main.js in the ZIP entries.
