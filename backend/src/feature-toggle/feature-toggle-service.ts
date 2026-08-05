@@ -9,7 +9,6 @@
  */
 
 import type {
-  FeatureChangeListener,
   FeatureToggleDefinition,
   FeatureToggleState,
   FeatureToggleUpdateResult,
@@ -92,7 +91,6 @@ function isValidQueryName(name: string): boolean {
  */
 export class FeatureToggleService implements IFeatureToggleService {
   private readonly toggles: Map<string, ToggleEntry> = new Map()
-  private readonly listeners: FeatureChangeListener[] = []
   private onPersist: ((toggles: Record<string, boolean>) => Promise<void>) | undefined
 
   /**
@@ -159,14 +157,8 @@ export class FeatureToggleService implements IFeatureToggleService {
       throw new FeatureNotFoundError(featureName)
     }
 
-    const previousEnabled = entry.currentEnabled
     entry.currentEnabled = enabled
     entry.source = 'runtime'
-
-    // Notify listeners only if the value actually changed
-    if (previousEnabled !== enabled) {
-      this.notifyListeners(featureName, enabled)
-    }
 
     // Persist the current runtime overrides (fire-and-forget)
     if (this.onPersist) {
@@ -219,16 +211,6 @@ export class FeatureToggleService implements IFeatureToggleService {
       type: entry.definition.type,
       description: entry.definition.description,
     }
-  }
-
-  /**
-   * Registers a listener that is called when any toggle changes value.
-   * Listeners are only notified when the value actually changes (not on redundant sets).
-   *
-   * @param listener - The callback to invoke on changes
-   */
-  onChange(listener: FeatureChangeListener): void {
-    this.listeners.push(listener)
   }
 
   /**
@@ -294,19 +276,5 @@ export class FeatureToggleService implements IFeatureToggleService {
       }
     }
     return result
-  }
-
-  /**
-   * Notifies all registered listeners of a toggle change.
-   * Exceptions in listeners are caught and ignored to prevent cascading failures.
-   */
-  private notifyListeners(featureName: string, enabled: boolean): void {
-    for (const listener of this.listeners) {
-      try {
-        listener(featureName, enabled)
-      } catch {
-        // Swallow listener exceptions to prevent cascading failures
-      }
-    }
   }
 }

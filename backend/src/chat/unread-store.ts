@@ -125,15 +125,6 @@ export class UnreadStore implements IUnreadStore {
   }
 
   /**
-   * Get all unread counts for a user (conversationId → count).
-   */
-  async getAllCounts(userId: string): Promise<Map<string, number>> {
-    const userCounts = this.index.get(userId)
-    if (!userCounts) return new Map()
-    return new Map(userCounts)
-  }
-
-  /**
    * Get total unread count across all conversations for a user.
    */
   async getTotal(userId: string): Promise<number> {

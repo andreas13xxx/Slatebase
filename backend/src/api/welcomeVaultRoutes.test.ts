@@ -90,7 +90,6 @@ function createMockFeatureToggleService(overrides: Partial<IFeatureToggleService
     setEnabled: () => ({ name: '', enabled: true, restartRequired: false }),
     getAll: () => [],
     get: () => undefined,
-    onChange: () => {},
     ...overrides,
   }
 }

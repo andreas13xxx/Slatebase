@@ -1,4 +1,4 @@
-import type { IVaultService, IVaultAccessControl } from '../business/index.js'
+import type { IVaultService } from '../business/index.js'
 import type { ILogger } from '../logger/index.js'
 import type {
   IReplaceService,
@@ -30,12 +30,8 @@ const GLOBAL_TIMEOUT_MS = 30_000
 export class ReplaceService implements IReplaceService {
   constructor(
     private readonly vaultService: IVaultService,
-    private readonly vaultAccessControl: IVaultAccessControl,
     private readonly logger: ILogger,
-  ) {
-    // vaultAccessControl is stored for potential future use (e.g., per-file access checks)
-    void this.vaultAccessControl
-  }
+  ) {}
 
   /**
    * Replaces all occurrences of query with replacement in the specified vault.

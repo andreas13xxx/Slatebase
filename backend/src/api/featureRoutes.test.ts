@@ -25,7 +25,6 @@ function createMockFeatureToggleService(overrides: Partial<IFeatureToggleService
     setEnabled: vi.fn().mockReturnValue({ name: 'chat', enabled: true, restartRequired: false }),
     getAll: vi.fn().mockReturnValue([]),
     get: vi.fn().mockReturnValue(undefined),
-    onChange: vi.fn(),
     ...overrides,
   }
 }

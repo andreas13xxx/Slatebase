@@ -1,17 +1,3 @@
-// ─── Data Models ─────────────────────────────────────────────────────────────
-
-/**
- * Configuration for the periodic cleanup job.
- */
-export interface CleanupConfig {
-  /** Number of days to retain trash entries before permanent deletion. */
-  trashRetentionDays: number
-  /** Maximum number of versions to keep per file. */
-  maxVersionsPerFile: number
-  /** Interval between cleanup runs in milliseconds. */
-  intervalMs: number
-}
-
 // ─── Service Interface ───────────────────────────────────────────────────────
 
 /**

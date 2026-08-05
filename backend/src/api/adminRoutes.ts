@@ -524,8 +524,6 @@ export interface AdminRouteDependencies {
   logger: ILogger
   /** Optional server log store for the admin log viewer. */
   serverLogStore?: IServerLogStore
-  /** Callback that performs a graceful server restart. */
-  restartFn?: () => Promise<void>
 }
 
 /**

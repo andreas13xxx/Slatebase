@@ -3,7 +3,6 @@
 import type { Context } from 'hono'
 import { Hono } from 'hono'
 import type { IPluginStoreService } from '../plugin-store/plugin-store-service.js'
-import type { IUpdateChecker } from '../plugin-store/update-checker.js'
 import {
   GitHubRateLimitError,
   GitHubFetchError,
@@ -45,7 +44,6 @@ function createApiError(code: string, message: string): ApiError {
  */
 export interface PluginStoreRouteDependencies {
   pluginStoreService: IPluginStoreService
-  updateChecker: IUpdateChecker
   accessControl: IVaultAccessControl
   vaultRegistry: IVaultRegistry
   logger: ILogger
@@ -131,7 +129,6 @@ export function createPluginStoreRoutes(deps: PluginStoreRouteDependencies): Hon
  */
 export function createVaultPluginStoreRoutes(deps: PluginStoreRouteDependencies): Hono {
   const { pluginStoreService, accessControl, vaultRegistry, logger } = deps
-  // updateChecker available in deps for future use (e.g. cached results)
   const app = new Hono()
 
   // POST /store-install — Install a plugin from the community store

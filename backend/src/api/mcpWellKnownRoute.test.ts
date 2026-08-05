@@ -13,7 +13,6 @@ function createMockFeatureToggleService(mcpEnabled: boolean): IFeatureToggleServ
     setEnabled: () => ({ name: 'mcp', enabled: mcpEnabled, restartRequired: false }),
     getAll: () => [],
     get: () => undefined,
-    onChange: () => {},
   }
 }
 

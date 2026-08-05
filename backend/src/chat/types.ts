@@ -174,9 +174,6 @@ export interface IUnreadStore {
   /** Get unread count for a user in a specific conversation. */
   getCount(userId: string, conversationId: string): Promise<number>
 
-  /** Get all unread counts for a user (conversationId → count). */
-  getAllCounts(userId: string): Promise<Map<string, number>>
-
   /** Get total unread count across all conversations for a user. */
   getTotal(userId: string): Promise<number>
 

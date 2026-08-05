@@ -50,16 +50,6 @@ export class FeatureRegistry implements IFeatureRegistry {
   }
 
   /**
-   * Checks whether a feature name is registered.
-   *
-   * @param name - The feature name to check
-   * @returns true if the feature is registered, false otherwise
-   */
-  has(name: string): boolean {
-    return this.definitions.has(name)
-  }
-
-  /**
    * Returns the definition of a feature, or undefined if not registered.
    *
    * @param name - The feature name to look up
