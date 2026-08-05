@@ -8,6 +8,19 @@ import type { IAuditService } from '../audit/index.js'
 import type { OnUserCreatedFn } from '../welcome-vault/types.js'
 import { isNodeError } from '../shared/fs-utils.js'
 import { atomicWriteFile } from '../shared/atomic-write.js'
+import {
+  USERNAME_MIN_LENGTH,
+  USERNAME_MAX_LENGTH,
+  USERNAME_PATTERN,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_MAX_LENGTH,
+  DISPLAY_NAME_MIN_LENGTH,
+  DISPLAY_NAME_MAX_LENGTH,
+  EMAIL_MAX_LENGTH,
+  EMAIL_PATTERN,
+  AVATAR_URL_MAX_LENGTH,
+  AVATAR_URL_PATTERN,
+} from './validation.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -1104,13 +1117,13 @@ export class UserService implements IUserService {
    * Validate username format: 3–64 chars, alphanumeric + hyphen + underscore.
    */
   private validateUsername(username: string): void {
-    if (username.length < 3) {
-      throw new UserValidationError('USERNAME_TOO_SHORT', 'Username must be at least 3 characters')
+    if (username.length < USERNAME_MIN_LENGTH) {
+      throw new UserValidationError('USERNAME_TOO_SHORT', `Username must be at least ${USERNAME_MIN_LENGTH} characters`)
     }
-    if (username.length > 64) {
-      throw new UserValidationError('USERNAME_TOO_LONG', 'Username must be at most 64 characters')
+    if (username.length > USERNAME_MAX_LENGTH) {
+      throw new UserValidationError('USERNAME_TOO_LONG', `Username must be at most ${USERNAME_MAX_LENGTH} characters`)
     }
-    if (!/^[a-zA-Z0-9\-_]+$/.test(username)) {
+    if (!USERNAME_PATTERN.test(username)) {
       throw new UserValidationError(
         'USERNAME_INVALID_CHARS',
         'Username must contain only alphanumeric characters, hyphens, and underscores',
@@ -1122,11 +1135,11 @@ export class UserService implements IUserService {
    * Validate password length: 8–128 characters.
    */
   private validatePassword(password: string): void {
-    if (password.length < 8) {
-      throw new UserValidationError('PASSWORD_TOO_SHORT', 'Password must be at least 8 characters')
+    if (password.length < PASSWORD_MIN_LENGTH) {
+      throw new UserValidationError('PASSWORD_TOO_SHORT', `Password must be at least ${PASSWORD_MIN_LENGTH} characters`)
     }
-    if (password.length > 128) {
-      throw new UserValidationError('PASSWORD_TOO_LONG', 'Password must be at most 128 characters')
+    if (password.length > PASSWORD_MAX_LENGTH) {
+      throw new UserValidationError('PASSWORD_TOO_LONG', `Password must be at most ${PASSWORD_MAX_LENGTH} characters`)
     }
   }
 
@@ -1134,11 +1147,11 @@ export class UserService implements IUserService {
    * Validate display name: 1–50 characters.
    */
   private validateDisplayName(displayName: string): void {
-    if (displayName.length < 1) {
-      throw new UserValidationError('DISPLAY_NAME_TOO_SHORT', 'Display name must be at least 1 character')
+    if (displayName.length < DISPLAY_NAME_MIN_LENGTH) {
+      throw new UserValidationError('DISPLAY_NAME_TOO_SHORT', `Display name must be at least ${DISPLAY_NAME_MIN_LENGTH} character`)
     }
-    if (displayName.length > 50) {
-      throw new UserValidationError('DISPLAY_NAME_TOO_LONG', 'Display name must be at most 50 characters')
+    if (displayName.length > DISPLAY_NAME_MAX_LENGTH) {
+      throw new UserValidationError('DISPLAY_NAME_TOO_LONG', `Display name must be at most ${DISPLAY_NAME_MAX_LENGTH} characters`)
     }
   }
 
@@ -1148,12 +1161,10 @@ export class UserService implements IUserService {
    */
   private validateEmail(email: string): void {
     if (email === '') return
-    if (email.length > 254) {
-      throw new UserValidationError('EMAIL_TOO_LONG', 'Email must be at most 254 characters')
+    if (email.length > EMAIL_MAX_LENGTH) {
+      throw new UserValidationError('EMAIL_TOO_LONG', `Email must be at most ${EMAIL_MAX_LENGTH} characters`)
     }
-    // Basic RFC 5322 email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
+    if (!EMAIL_PATTERN.test(email)) {
       throw new UserValidationError('EMAIL_INVALID', 'Email must be a valid email address')
     }
   }
@@ -1164,10 +1175,10 @@ export class UserService implements IUserService {
    */
   private validateAvatarUrl(avatarUrl: string): void {
     if (avatarUrl === '') return
-    if (avatarUrl.length > 2048) {
-      throw new UserValidationError('AVATAR_URL_TOO_LONG', 'Avatar URL must be at most 2048 characters')
+    if (avatarUrl.length > AVATAR_URL_MAX_LENGTH) {
+      throw new UserValidationError('AVATAR_URL_TOO_LONG', `Avatar URL must be at most ${AVATAR_URL_MAX_LENGTH} characters`)
     }
-    if (!/^https?:\/\//.test(avatarUrl)) {
+    if (!AVATAR_URL_PATTERN.test(avatarUrl)) {
       throw new UserValidationError('AVATAR_URL_INVALID', 'Avatar URL must start with http:// or https://')
     }
   }

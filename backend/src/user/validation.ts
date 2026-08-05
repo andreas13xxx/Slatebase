@@ -1,5 +1,28 @@
 import { z } from 'zod'
 
+// --- Shared Validation Constants ---
+//
+// These are the single source of truth for user-field validation rules.
+// Both the Zod schemas below (used at the API route layer) and UserService's
+// internal guards (user/index.ts, used regardless of call path) are built
+// from these constants so the two validation layers can't drift apart.
+
+export const USERNAME_MIN_LENGTH = 3
+export const USERNAME_MAX_LENGTH = 64
+export const USERNAME_PATTERN = /^[a-zA-Z0-9\-_]+$/
+
+export const PASSWORD_MIN_LENGTH = 8
+export const PASSWORD_MAX_LENGTH = 128
+
+export const DISPLAY_NAME_MIN_LENGTH = 1
+export const DISPLAY_NAME_MAX_LENGTH = 50
+
+export const EMAIL_MAX_LENGTH = 254
+export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+export const AVATAR_URL_MAX_LENGTH = 2048
+export const AVATAR_URL_PATTERN = /^https?:\/\//
+
 // --- Username Validation ---
 
 /**
@@ -7,10 +30,10 @@ import { z } from 'zod'
  */
 export const usernameSchema = z
   .string()
-  .min(3, 'Username must be at least 3 characters')
-  .max(64, 'Username must be at most 64 characters')
+  .min(USERNAME_MIN_LENGTH, `Username must be at least ${USERNAME_MIN_LENGTH} characters`)
+  .max(USERNAME_MAX_LENGTH, `Username must be at most ${USERNAME_MAX_LENGTH} characters`)
   .regex(
-    /^[a-zA-Z0-9\-_]+$/,
+    USERNAME_PATTERN,
     'Username must contain only alphanumeric characters, hyphens, and underscores',
   )
 
@@ -21,8 +44,8 @@ export const usernameSchema = z
  */
 export const passwordSchema = z
   .string()
-  .min(8, 'Password must be at least 8 characters')
-  .max(128, 'Password must be at most 128 characters')
+  .min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`)
+  .max(PASSWORD_MAX_LENGTH, `Password must be at most ${PASSWORD_MAX_LENGTH} characters`)
 
 // --- Email Validation ---
 
@@ -32,9 +55,9 @@ export const passwordSchema = z
  */
 export const emailSchema = z
   .string()
-  .max(254, 'Email must be at most 254 characters')
+  .max(EMAIL_MAX_LENGTH, `Email must be at most ${EMAIL_MAX_LENGTH} characters`)
   .refine(
-    (val) => val === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val),
+    (val) => val === '' || EMAIL_PATTERN.test(val),
     'Email must be a valid email address',
   )
 
@@ -45,8 +68,8 @@ export const emailSchema = z
  */
 export const displayNameSchema = z
   .string()
-  .min(1, 'Display name must be at least 1 character')
-  .max(50, 'Display name must be at most 50 characters')
+  .min(DISPLAY_NAME_MIN_LENGTH, `Display name must be at least ${DISPLAY_NAME_MIN_LENGTH} character`)
+  .max(DISPLAY_NAME_MAX_LENGTH, `Display name must be at most ${DISPLAY_NAME_MAX_LENGTH} characters`)
 
 // --- Avatar URL Validation ---
 
@@ -56,9 +79,9 @@ export const displayNameSchema = z
  */
 export const avatarUrlSchema = z
   .string()
-  .max(2048, 'Avatar URL must be at most 2048 characters')
+  .max(AVATAR_URL_MAX_LENGTH, `Avatar URL must be at most ${AVATAR_URL_MAX_LENGTH} characters`)
   .refine(
-    (val) => val === '' || /^https?:\/\//.test(val),
+    (val) => val === '' || AVATAR_URL_PATTERN.test(val),
     'Avatar URL must start with http:// or https://',
   )
 
