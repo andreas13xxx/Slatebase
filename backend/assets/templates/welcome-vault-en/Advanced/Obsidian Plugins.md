@@ -23,10 +23,23 @@ Slatebase emulates Obsidian's plugin API:
 
 ## Installing a Plugin
 
+### From the Community Plugin Directory (recommended)
+
+Slatebase integrates the official Obsidian Community Plugin directory directly — around 6000 plugins, searchable without a manual download.
+
+1. Go to **Plugin Management** (via Settings or Command Palette)
+2. Switch to the **"Available Plugins"** tab
+3. Search by text or filter by category; the "Compatible" and "Not installed" filters narrow the list further
+4. Desktop-only plugins are grayed out ("Desktop only") and can't be installed
+5. Click **Install** on a plugin — Slatebase downloads the latest release from GitHub automatically and installs it
+6. After installation: switch on the **activation toggle**
+
 ### From a ZIP File
 
+For plugins not (yet) listed in the official directory, or local/private forks.
+
 1. Download the plugin as a ZIP (from GitHub releases)
-2. Go to **Plugin Management** (via Settings or Command Palette)
+2. Go to **Plugin Management** → **"Installed Plugins"** tab
 3. Click **Upload Plugin**
 4. Select the ZIP file
 5. The plugin is extracted and activated
@@ -39,6 +52,14 @@ The ZIP should contain:
 - `styles.css` — Optional plugin styles
 
 Both root-level and subdirectory layouts are supported (auto-detected).
+
+---
+
+## Updates
+
+The **"Installed Plugins"** tab has a **"Check for Updates"** button that shows whether newer versions are available (installed version → latest version). Update plugins individually, or update everything at once with **"Update All"** (run sequentially to respect GitHub rate limits). Existing plugin settings (`data.json`) are preserved across updates.
+
+Slatebase also checks for updates automatically in the background every 24 hours and shows a notice when updates are available.
 
 ---
 

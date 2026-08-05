@@ -156,6 +156,18 @@
   --background-modifier-error-rgb: 220, 38, 38;
   --text-warning: #d97706;
   --text-on-accent-inverted: #0f172a;
+
+  /* ─── Additional UI aliases used by community plugins ─────────────────── */
+  --nav-item-color-selected: var(--text-accent);
+  --table-row-background-hover: var(--background-modifier-hover);
+  --text-selection: rgba(13, 148, 136, 0.2);
+  --layer-cover: 1000;
+  --safe-area-inset-top: 0px;
+  --safe-area-inset-right: 0px;
+  --safe-area-inset-bottom: 0px;
+  --safe-area-inset-left: 0px;
+  --view-header-height: var(--header-height);
+  --bases-header-height: var(--header-height);
 }
 
 /* ─── Dark Mode Overrides ───────────────────────────────────────────────────── */
@@ -221,6 +233,9 @@
   --color-base-60: #edf2f7;
   --color-base-70: #f7fafc;
   --color-base-100: #ffffff;
+  --nav-item-color-selected: var(--text-accent);
+  --table-row-background-hover: var(--background-modifier-hover);
+  --text-selection: rgba(45, 212, 191, 0.25);
 }
 
 @media (prefers-color-scheme: dark) {

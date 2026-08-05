@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { WorkspaceShim } from './workspace-shim';
 import { clearApiGaps } from '../api-gap-registry';
-import { ViewRegistry } from '../view-registry';
+import { ItemView, ViewRegistry } from '../view-registry';
 import type { TFile } from '../types';
 
 function createMockTFile(path: string): TFile {
@@ -297,6 +297,15 @@ describe('WorkspaceShim', () => {
         const leaf = workspace.getLeaf(false);
         expect(leaf).toBeDefined();
         expect(leaf.location).toBe('main');
+      });
+
+      it('applies the owning plugin ID to a custom view root for scoped styles', async () => {
+        registry.registerView('test-plugin-view', (leaf) => new ItemView(leaf), 'test-plugin');
+        const leaf = workspace.getLeaf(true);
+
+        await leaf.setViewState({ type: 'test-plugin-view' });
+
+        expect(leaf.view?.containerEl.dataset.pluginId).toBe('test-plugin');
       });
     });
 

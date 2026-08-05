@@ -20,7 +20,20 @@ Slatebase bietet eine experimentelle Kompatibilitätsschicht für Obsidian-Plugi
 
 ## Plugin installieren
 
-### ZIP-Datei beschaffen
+### Aus dem Community-Plugin-Verzeichnis (empfohlen)
+
+Slatebase bindet das offizielle Obsidian Community-Plugin-Verzeichnis direkt ein — rund 6000 Plugins, durchsuchbar ohne manuellen Download.
+
+1. Öffne **Einstellungen → Vault → Plugins**
+2. Wechsle zum Tab **"Verfügbare Plugins"**
+3. Suche per Textsuche oder filtere nach Kategorie; die Filter "Kompatibel" und "Nicht installiert" grenzen die Liste weiter ein
+4. Desktop-only Plugins sind ausgegraut markiert ("Nur Desktop") und lassen sich nicht installieren
+5. Klicke **"Installieren"** bei einem Plugin — Slatebase lädt das neueste Release automatisch von GitHub herunter und installiert es
+6. Nach Installation: **Aktivierungs-Toggle** einschalten
+
+### Manuell per ZIP-Datei
+
+Für Plugins, die (noch) nicht im offiziellen Verzeichnis gelistet sind, oder für lokale/private Forks.
 
 Eine gültige ZIP enthält mindestens:
 - `manifest.json` — Plugin-Metadaten (ID, Name, Version)
@@ -29,13 +42,19 @@ Eine gültige ZIP enthält mindestens:
 
 Quellen: GitHub Releases des Plugins oder `.obsidian/plugins/<id>/` aus einer bestehenden Installation.
 
-### Upload und Aktivierung
-
-1. Öffne **Einstellungen → Vault → Plugins**
+1. Öffne **Einstellungen → Vault → Plugins** → Tab **"Installierte Plugins"**
 2. Klicke **"Plugin installieren"** → ZIP auswählen oder per Drag & Drop
 3. Slatebase validiert Manifest und prüft Kompatibilität
 4. Nach Installation: **Aktivierungs-Toggle** einschalten
 5. Plugin wird geladen, Commands registriert, Styles injiziert
+
+---
+
+## Updates
+
+Im Tab **"Installierte Plugins"** zeigt **"Nach Updates suchen"**, ob neuere Versionen verfügbar sind (installierte Version → neueste Version). Einzelne Plugins lassen sich gezielt aktualisieren, oder alle auf einmal über **"Alle aktualisieren"** (sequentiell, um GitHub-Rate-Limits zu schonen). Bestehende Plugin-Einstellungen (`data.json`) bleiben beim Update erhalten.
+
+Slatebase prüft zusätzlich automatisch alle 24 Stunden im Hintergrund auf Updates und zeigt einen Hinweis, falls welche verfügbar sind.
 
 ---
 

@@ -406,6 +406,13 @@ export class WorkspaceLeaf {
     // Create and open new view
     const view = creator(this) as ItemView
     this.view = view
+    // Plugin styles are scoped by CssInjector to the owning plugin's
+    // data attribute. Put that attribute on the view root so the styles apply
+    // consistently to main, sidebar, and file-backed plugin views.
+    const pluginId = this.registry.getPluginIdForView(viewType)
+    if (pluginId) {
+      view.containerEl.dataset.pluginId = pluginId
+    }
     // Mount view's containerEl inside the leaf's containerEl (Obsidian pattern)
     this.containerEl.appendChild(view.containerEl)
 
@@ -605,6 +612,15 @@ export class ViewRegistry {
    */
   getViewCreator(viewType: string): ((leaf: WorkspaceLeaf) => unknown) | undefined {
     return this.registrations.get(viewType)?.creator
+  }
+
+  /**
+   * Get the ID of the plugin that registered a view type.
+   *
+   * This is used to attach the CSS-isolation attribute to a view's DOM root.
+   */
+  getPluginIdForView(viewType: string): string | undefined {
+    return this.registrations.get(viewType)?.pluginId
   }
 
   /**
