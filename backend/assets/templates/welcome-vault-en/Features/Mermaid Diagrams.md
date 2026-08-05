@@ -125,6 +125,136 @@ stateDiagram-v2
 
 ---
 
+## Entity Relationship Diagram
+
+ER diagrams describe database models and relationships between entities:
+
+```mermaid
+erDiagram
+    USER ||--o{ VAULT : owns
+    USER ||--o{ SESSION : has
+    VAULT ||--o{ FILE : contains
+    VAULT ||--o{ SHARE : has
+    SHARE }o--|| USER : grants
+
+    USER {
+        string id PK
+        string username
+        string role
+        date createdAt
+    }
+    VAULT {
+        string id PK
+        string name
+        string ownerId FK
+    }
+    FILE {
+        string path PK
+        string content
+        date modified
+    }
+```
+
+### Relationship Notation
+
+| Syntax | Meaning |
+|--------|---------|
+| `\|\|--o{` | One to many |
+| `\|\|--\|\|` | One to one |
+| `}o--o{` | Many to many |
+| `PK` / `FK` | Primary / Foreign key |
+
+---
+
+## Git Graph
+
+Git graphs visualize branch and merge histories:
+
+```mermaid
+gitGraph
+    commit id: "Initial"
+    commit id: "Add README"
+    branch feature/login
+    commit id: "Login UI"
+    commit id: "Auth logic"
+    checkout main
+    commit id: "Hotfix"
+    merge feature/login id: "Merge login"
+    commit id: "Release v1.0"
+```
+
+### Key Commands
+
+- `commit` — Create a commit on the current branch
+- `branch` — Create a new branch
+- `checkout` — Switch branches
+- `merge` — Merge a branch
+
+---
+
+## User Journey Diagram
+
+User journey maps show a user's step-by-step experience:
+
+```mermaid
+journey
+    title Getting Started with Slatebase
+    section Registration
+        Open login page: 5: User
+        Enter password: 3: User
+        Create vault: 4: User
+    section First Note
+        Create new file: 5: User
+        Write Markdown: 4: User
+        Check preview: 5: User
+    section Organization
+        Create folders: 4: User
+        Add wikilinks: 3: User
+        Explore graph: 5: User
+```
+
+### Syntax
+
+- `title` — Diagram heading
+- `section` — Group steps into phases
+- `Task: Rating: Actor` — Step with satisfaction score (1–5)
+
+---
+
+## Mindmap
+
+Mindmaps for brainstorming and structuring ideas:
+
+```mermaid
+mindmap
+    root((Knowledge Management))
+        Capture
+            Quick Notes
+            Daily Notes
+            Web Clipper
+        Organize
+            Folder Structure
+            Tags
+            Wikilinks
+        Visualize
+            Knowledge Graph
+            Mermaid Diagrams
+            Canvas
+        Share
+            Vault Sharing
+            PDF Export
+            MCP API
+```
+
+### Syntax
+
+- `root((...))` — Central topic (circle shape)
+- Indentation defines the hierarchy
+- Each line is a node
+- Shapes: `(...)` rounded, `[...]` square, `))...((` cloud
+
+---
+
 ## Tips for Mermaid
 
 > [!tip] Rendering
@@ -153,4 +283,5 @@ stateDiagram-v2
 
 - [[Basics/Markdown Syntax]] — Code blocks basics
 - [[Features/Canvas]] — Visual boards (alternative to diagrams)
+- [[Features/Mermaid Advanced]] — More diagram types (Timeline, Sankey, XY Chart, etc.)
 - [[Features/Embeds]] — Embedding content

@@ -160,6 +160,9 @@ export function MermaidRenderer({ code, diagramKey }: MermaidRendererProps) {
         theme: getMermaidTheme(getEffectiveTheme()),
         startOnLoad: false,
         suppressErrorRendering: true,
+        sankey: {
+          linkColor: 'source',
+        },
       })
 
       // Step 3: Render with timeout protection
@@ -211,6 +214,9 @@ export function MermaidRenderer({ code, diagramKey }: MermaidRendererProps) {
           theme: getMermaidTheme(getEffectiveTheme()),
           startOnLoad: false,
           suppressErrorRendering: true,
+          sankey: {
+            linkColor: 'source',
+          },
         })
 
         // Re-render with a new unique ID

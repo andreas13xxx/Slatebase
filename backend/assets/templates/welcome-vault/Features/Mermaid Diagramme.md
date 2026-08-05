@@ -146,8 +146,8 @@ classDiagram
         +String username
         +String role
     }
-    User "1" --> "*" Vault : besitzt
-    Vault "1" --> "*" File : enthält
+    User "1" --> "*" Vault : owns
+    Vault "1" --> "*" File : contains
 ```
 
 **Syntax-Elemente:**
@@ -176,6 +176,131 @@ stateDiagram-v2
 - `[*]` — Start-/Endpunkt
 - `-->` — Übergang
 - `: Label` — Auslöser des Übergangs
+
+---
+
+## Entity-Relationship-Diagramm (ER)
+
+ER-Diagramme beschreiben Datenbankmodelle und Beziehungen zwischen Entitäten:
+
+```mermaid
+erDiagram
+    USER ||--o{ VAULT : owns
+    USER ||--o{ SESSION : has
+    VAULT ||--o{ FILE : contains
+    VAULT ||--o{ SHARE : has
+    SHARE }o--|| USER : grants
+
+    USER {
+        string id PK
+        string username
+        string role
+        date createdAt
+    }
+    VAULT {
+        string id PK
+        string name
+        string ownerId FK
+    }
+    FILE {
+        string path PK
+        string content
+        date modified
+    }
+```
+
+**Syntax-Elemente:**
+- `||--o{` — Eins-zu-Viele-Beziehung
+- `}o--||` — Viele-zu-Eins
+- `PK` / `FK` — Primär-/Fremdschlüssel
+- Kardinalitäten: `||` (genau eins), `o{` (null oder viele), `|{` (eins oder viele)
+
+---
+
+## Git-Graph
+
+Git-Graphen visualisieren Branch- und Merge-Historien:
+
+```mermaid
+gitGraph
+    commit id: "Initial"
+    commit id: "Add README"
+    branch feature/login
+    commit id: "Login UI"
+    commit id: "Auth logic"
+    checkout main
+    commit id: "Hotfix"
+    merge feature/login id: "Merge login"
+    commit id: "Release v1.0"
+```
+
+**Syntax-Elemente:**
+- `commit` — Commit auf aktuellem Branch
+- `branch` — Neuen Branch erstellen
+- `checkout` — Branch wechseln
+- `merge` — Branch zusammenführen
+- `id:` — Commit-Nachricht
+
+---
+
+## User-Journey-Diagramm
+
+User-Journey-Maps zeigen die Erfahrung eines Nutzers Schritt für Schritt:
+
+```mermaid
+journey
+    title Erste Schritte mit Slatebase
+    section Registrierung
+        Login-Seite öffnen: 5: Nutzer
+        Passwort eingeben: 3: Nutzer
+        Vault erstellen: 4: Nutzer
+    section Erste Notiz
+        Neue Datei anlegen: 5: Nutzer
+        Markdown schreiben: 4: Nutzer
+        Vorschau prüfen: 5: Nutzer
+    section Organisation
+        Ordner erstellen: 4: Nutzer
+        Wikilinks setzen: 3: Nutzer
+        Graph erkunden: 5: Nutzer
+```
+
+**Syntax-Elemente:**
+- `title` — Überschrift
+- `section` — Phasen gruppieren
+- `Aufgabe: Bewertung: Akteur` — Schritt mit Zufriedenheit (1–5)
+
+---
+
+## Mindmap
+
+Mindmaps für Brainstorming und Ideenstrukturierung:
+
+```mermaid
+mindmap
+    root((Wissensmanagement))
+        Erfassen
+            Quick Notes
+            Daily Notes
+            Web Clipper
+        Organisieren
+            Ordnerstruktur
+            Tags
+            Wikilinks
+        Visualisieren
+            Knowledge Graph
+            Mermaid Diagramme
+            Canvas
+        Teilen
+            Vault Sharing
+            PDF Export
+            MCP API
+```
+
+**Syntax-Elemente:**
+- `root((...))` — Zentrales Thema (runde Form)
+- Einrückung definiert die Hierarchie
+- Jede Zeile ist ein Knoten
+- Formen: `(...)` rund, `[...]` eckig, `))...((` Wolke
 
 ---
 
@@ -232,3 +357,4 @@ Wechsle in den Viewer-Modus — das Diagramm wird als SVG gerendert.
 - [[Features/Embeds]] — Bilder und Dateien einbetten
 - [[Grundlagen/Markdown Syntax]] — Fenced Code Blocks allgemein
 - [[Features/Canvas]] — Freiform-Diagramme mit Nodes und Edges
+- [[Features/Mermaid Erweitert]] — Weitere Diagrammtypen (Timeline, Sankey, XY Chart, etc.)
