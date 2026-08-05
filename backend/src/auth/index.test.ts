@@ -1,10 +1,22 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import * as argon2 from 'argon2'
 import type { ILogger } from '../logger/index.js'
 import type { IUserRepository } from '../user/index.js'
 import type { UserRecord } from '../user/index.js'
 import type { ISessionStore, Session, LoginMeta } from './index.js'
 import { AuthService, AuthenticationError } from './index.js'
-import { AccountSuspendedError } from '../user/index.js'
+import { AccountSuspendedError, ARGON2_OPTIONS } from '../user/index.js'
+
+// Wrap argon2.hash in a spy while keeping its real implementation, so the
+// "dummy hash for timing safety" call in login() can be asserted on without
+// breaking every other test in this file that relies on real hashing.
+vi.mock('argon2', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('argon2')>()
+  return {
+    ...actual,
+    hash: vi.fn(actual.hash),
+  }
+})
 
 // ─── Mock Factories ──────────────────────────────────────────────────────────
 
@@ -226,6 +238,24 @@ describe('AuthService', () => {
       expect(err2).toBeInstanceOf(AuthenticationError)
       expect(err1.code).toBe(err2.code)
       expect(err1.message).toBe(err2.message)
+    })
+
+    it('runs a dummy Argon2 hash for a non-existent username to equalize timing with a real verify', async () => {
+      // Regression test: previously, "user not found" returned immediately
+      // while "user found, wrong password" paid for a real argon2 verify —
+      // letting an attacker enumerate valid usernames by measuring response
+      // time. login() should now spend comparable CPU time on both paths by
+      // running a dummy hash with the same cost parameters used to hash real
+      // passwords.
+      const hashMock = vi.mocked(argon2.hash)
+      hashMock.mockClear()
+      const userRepo = createMockUserRepository([])
+      const authService = new AuthService(sessionStore, userRepo, logger, csrfSecret)
+
+      await expect(authService.login('nonexistent', 'password123', loginMeta))
+        .rejects.toThrow(AuthenticationError)
+
+      expect(hashMock).toHaveBeenCalledWith('password123', ARGON2_OPTIONS)
     })
   })
 

@@ -1,27 +1,43 @@
 import type { SseEvent, ReplayBufferEntry } from './types.js'
 
+/** Default interval between automatic expired-buffer sweeps (60 seconds). */
+const DEFAULT_SWEEP_INTERVAL_MS = 60_000
+
 /** Configuration options for the EventReplayBuffer. */
 export interface ReplayBufferConfig {
   /** Maximum number of events to keep per user. Defaults to 100. */
   bufferSize?: number
   /** Time-to-live in milliseconds for buffered events. Defaults to 300000 (5 minutes). */
   ttlMs?: number
+  /** Interval between automatic sweeps of fully-expired user buffers. Default: 60000. */
+  sweepIntervalMs?: number
 }
 
 /**
  * Per-user circular buffer for SSE event replay on reconnect.
  * Stores the last N events per user with TTL-based eviction.
  * Events older than the configured TTL are evicted regardless of buffer capacity.
+ *
+ * Per-user eviction happens lazily whenever that user's buffer is touched
+ * (push/getEventsSince), but a user who never reconnects after their last
+ * event would otherwise keep an entry in the outer buffers Map forever. A
+ * periodic sweep (unref'd, doesn't keep the process alive) removes buffers
+ * whose entries have all expired. Call destroy() during shutdown to stop it.
  */
 export class EventReplayBuffer {
   private readonly buffers: Map<string, ReplayBufferEntry[]> = new Map()
   private readonly bufferSize: number
   private readonly ttlMs: number
   private eventCounter = 0
+  private sweepTimer: ReturnType<typeof setInterval> | null = null
 
   constructor(config?: ReplayBufferConfig) {
     this.bufferSize = config?.bufferSize ?? (Number(process.env['SLATEBASE_SSE_REPLAY_BUFFER_SIZE']) || 100)
     this.ttlMs = config?.ttlMs ?? (Number(process.env['SLATEBASE_SSE_REPLAY_TTL']) || 300_000)
+
+    const sweepIntervalMs = config?.sweepIntervalMs ?? DEFAULT_SWEEP_INTERVAL_MS
+    this.sweepTimer = setInterval(() => this.sweepExpired(), sweepIntervalMs)
+    this.sweepTimer.unref?.()
   }
 
   /**
@@ -133,5 +149,34 @@ export class EventReplayBuffer {
    */
   clearAll(): void {
     this.buffers.clear()
+  }
+
+  /**
+   * Removes buffer entries whose events have all expired (TTL), and deletes
+   * the user's entry from the outer Map entirely rather than leaving an empty
+   * array behind. Runs automatically on an interval; exposed for testing.
+   */
+  sweepExpired(): void {
+    const now = Date.now()
+    const ttlThreshold = now - this.ttlMs
+
+    for (const [userId, buffer] of this.buffers) {
+      const freshEntries = buffer.filter(entry => entry.timestamp > ttlThreshold)
+      if (freshEntries.length === 0) {
+        this.buffers.delete(userId)
+      } else if (freshEntries.length !== buffer.length) {
+        this.buffers.set(userId, freshEntries)
+      }
+    }
+  }
+
+  /**
+   * Stops the automatic sweep. Call during graceful shutdown.
+   */
+  destroy(): void {
+    if (this.sweepTimer !== null) {
+      clearInterval(this.sweepTimer)
+      this.sweepTimer = null
+    }
   }
 }

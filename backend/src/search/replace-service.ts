@@ -7,15 +7,18 @@ import type {
   ReplaceFileResult,
   ReplaceFailure,
 } from './types.js'
-import { RegexValidationError, RegexTooLongError } from './errors.js'
+import { validateRegexPattern } from './regex-safety.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 /** Maximum number of files to process in a single replace operation. */
 const MAX_REPLACE_FILES = 100
 
-/** Maximum regex pattern length (characters). */
-const MAX_REGEX_LENGTH = 1000
+/** Maximum file size to process (10 MB) — matches SearchService's limit. */
+const MAX_FILE_SIZE = 10 * 1024 * 1024
+
+/** Global timeout for a replace operation in milliseconds (30 seconds). */
+const GLOBAL_TIMEOUT_MS = 30_000
 
 // ─── ReplaceService Implementation ──────────────────────────────────────────
 
@@ -43,9 +46,11 @@ export class ReplaceService implements IReplaceService {
    * Note: Write access must be verified by the caller (route handler) before invoking this method.
    */
   async replace(vaultId: string, options: IReplaceOptions): Promise<ReplaceResponse> {
+    const startTime = Date.now()
+
     // Validate regex pattern if regex mode is enabled
     if (options.regex) {
-      this.validateRegex(options.query)
+      validateRegexPattern(options.query)
     }
 
     const files: ReplaceFileResult[] = []
@@ -63,6 +68,13 @@ export class ReplaceService implements IReplaceService {
 
     // Process files sequentially
     for (const filePath of filesToProcess) {
+      // Check global timeout — stop processing further files rather than
+      // letting delays (e.g. several large files) compound across the batch.
+      if (Date.now() - startTime > GLOBAL_TIMEOUT_MS) {
+        failed.push({ path: filePath, reason: 'Zeitlimit von 30 Sekunden erreicht — Datei wurde nicht bearbeitet' })
+        continue
+      }
+
       try {
         const result = await this.processFile(vaultId, filePath, replacer)
         if (result !== null) {
@@ -92,24 +104,6 @@ export class ReplaceService implements IReplaceService {
   }
 
   // ─── Private Helpers ─────────────────────────────────────────────────────────
-
-  /**
-   * Validates a regex pattern for syntax errors and length.
-   * Throws RegexTooLongError if pattern exceeds 1000 characters.
-   * Throws RegexValidationError if pattern is not a valid JavaScript regex.
-   */
-  private validateRegex(pattern: string): void {
-    if (pattern.length > MAX_REGEX_LENGTH) {
-      throw new RegexTooLongError(pattern.length)
-    }
-
-    try {
-      new RegExp(pattern)
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error)
-      throw new RegexValidationError(pattern, reason)
-    }
-  }
 
   /**
    * Resolves the list of file paths to process.
@@ -203,6 +197,11 @@ export class ReplaceService implements IReplaceService {
     // Skip binary files
     if (fileContent.isBinary) {
       return null
+    }
+
+    // Reject files too large to safely run a regex/text replacement over
+    if (fileContent.size > MAX_FILE_SIZE) {
+      throw new Error(`Datei überschreitet die maximale Größe von ${MAX_FILE_SIZE / (1024 * 1024)} MB`)
     }
 
     // Apply replacement

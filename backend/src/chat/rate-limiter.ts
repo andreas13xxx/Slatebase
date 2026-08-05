@@ -14,6 +14,9 @@ export const WINDOW_MS = 60_000
 /** Maximum number of messages allowed within the sliding window. */
 export const MAX_MESSAGES = 30
 
+/** Default interval between automatic cleanup sweeps (5 minutes). */
+const DEFAULT_CLEANUP_INTERVAL_MS = 5 * 60_000
+
 // ─── ChatRateLimiter Class ───────────────────────────────────────────────────
 
 /**
@@ -21,9 +24,21 @@ export const MAX_MESSAGES = 30
  * Uses a sliding window algorithm: only timestamps within the last WINDOW_MS
  * are counted. After MAX_MESSAGES within the window, further messages are blocked
  * until the oldest timestamp expires out of the window.
+ *
+ * checkLimit() only prunes a user's own expired timestamps when THAT user is
+ * checked again — a user who sends messages and then never sends another
+ * would otherwise keep an entry in the store forever. A periodic sweep
+ * (unref'd, doesn't keep the process alive) removes fully-expired entries.
+ * Call destroy() during shutdown to stop it.
  */
 export class ChatRateLimiter implements IChatRateLimiter {
   private readonly store: Map<string, number[]> = new Map()
+  private cleanupTimer: ReturnType<typeof setInterval> | null = null
+
+  constructor(cleanupIntervalMs: number = DEFAULT_CLEANUP_INTERVAL_MS) {
+    this.cleanupTimer = setInterval(() => this.cleanup(), cleanupIntervalMs)
+    this.cleanupTimer.unref?.()
+  }
 
   /**
    * Check if a user is allowed to send a message.
@@ -86,5 +101,33 @@ export class ChatRateLimiter implements IChatRateLimiter {
    */
   get size(): number {
     return this.store.size
+  }
+
+  /**
+   * Removes entries whose timestamps have all fallen out of the sliding
+   * window. Runs automatically on an interval; exposed for testing.
+   */
+  cleanup(): void {
+    const now = Date.now()
+    const cutoff = now - WINDOW_MS
+
+    for (const [userId, timestamps] of this.store) {
+      const valid = timestamps.filter((ts) => ts > cutoff)
+      if (valid.length === 0) {
+        this.store.delete(userId)
+      } else if (valid.length !== timestamps.length) {
+        this.store.set(userId, valid)
+      }
+    }
+  }
+
+  /**
+   * Stops the automatic cleanup sweep. Call during graceful shutdown.
+   */
+  destroy(): void {
+    if (this.cleanupTimer !== null) {
+      clearInterval(this.cleanupTimer)
+      this.cleanupTimer = null
+    }
   }
 }

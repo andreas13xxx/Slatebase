@@ -22,6 +22,13 @@ const VERSION_PATH = '/api/v1/version'
 /** The password change endpoint path allowed during mustChangePassword. */
 const PASSWORD_CHANGE_PATH = '/api/v1/users/me/password'
 
+/**
+ * The raw file content endpoint — the only route allowed to authenticate via a
+ * `?token=` query parameter, since it's loaded via `<img src="...">` tags that
+ * can't set an Authorization header.
+ */
+const RAW_FILE_CONTENT_PATH_PATTERN = /^\/api\/v1\/vaults\/[^/]+\/files$/
+
 /** HTTP methods that require CSRF validation. */
 const CSRF_METHODS = new Set(['POST', 'PUT', 'DELETE'])
 
@@ -43,7 +50,10 @@ function createErrorResponse(c: Context, status: number, code: string, message: 
 
 /**
  * Extracts the Bearer token from the Authorization header.
- * Falls back to the `token` query parameter for raw file requests (e.g. <img src="...">).
+ * Falls back to the `token` query parameter, but only for the raw file content
+ * endpoint (e.g. <img src="...">), which cannot set an Authorization header.
+ * Accepting it for every route would leak the full session token into access
+ * logs, Referer headers, and browser history far more broadly than necessary.
  * Returns null if no token is found.
  */
 function extractBearerToken(c: Context): string | null {
@@ -55,10 +65,15 @@ function extractBearerToken(c: Context): string | null {
     }
   }
 
-  // Fallback: accept token from query parameter for raw file requests (images in <img> tags)
-  const queryToken = c.req.query('token')
-  if (queryToken !== undefined && queryToken.length > 0) {
-    return queryToken
+  const isRawFileContentRequest = c.req.method === 'GET'
+    && RAW_FILE_CONTENT_PATH_PATTERN.test(c.req.path)
+    && c.req.query('raw') === 'true'
+
+  if (isRawFileContentRequest) {
+    const queryToken = c.req.query('token')
+    if (queryToken !== undefined && queryToken.length > 0) {
+      return queryToken
+    }
   }
 
   return null

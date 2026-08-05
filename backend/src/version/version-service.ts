@@ -5,6 +5,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
 import type { IVersionService, VersionEntry } from './types.js'
+import { VERSIONS_DIR_SEGMENTS } from './types.js'
 import { VersionNotFoundError } from './errors.js'
 
 /**
@@ -19,7 +20,7 @@ export type VaultPathResolver = (vaultId: string) => string | null
  */
 export class VersionService implements IVersionService {
   /** Versions directory path relative to vault root. */
-  private static readonly VERSIONS_DIR = path.join('.slatebase', 'versions')
+  private static readonly VERSIONS_DIR = path.join(...VERSIONS_DIR_SEGMENTS)
 
   constructor(
     private readonly resolveVaultPath: VaultPathResolver,

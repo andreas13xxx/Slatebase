@@ -1,3 +1,13 @@
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+/**
+ * Versions directory path relative to vault root, as path segments (join
+ * with the vault's absolute path via path.join(vaultPath, ...VERSIONS_DIR_SEGMENTS)).
+ * Shared so that anything scanning the versions directory (e.g. CleanupJob)
+ * can't drift out of sync with where VersionService actually stores versions.
+ */
+export const VERSIONS_DIR_SEGMENTS = ['.slatebase', 'versions'] as const
+
 // ─── Data Models ─────────────────────────────────────────────────────────────
 
 /**
@@ -22,8 +32,8 @@ export interface VersionList {
 
 /**
  * Service for file versioning.
- * Stores previous file content under `.versions/` before each save and
- * provides retrieval, restoration, and cleanup operations.
+ * Stores previous file content under `.slatebase/versions/` before each save
+ * and provides retrieval, restoration, and cleanup operations.
  */
 export interface IVersionService {
   /** Creates a new version by saving the previous content before overwrite. */

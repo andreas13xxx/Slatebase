@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import path from 'node:path'
 import fs from 'node:fs/promises'
-import { VaultService, VaultNotFoundError, VaultValidationError, StorageError, ConflictError } from './index'
+import os from 'node:os'
+import { VaultService, VaultNotFoundError, VaultValidationError, StorageError, ConflictError, FileConflictError, InvalidMoveError } from './index'
 import type { IVaultService } from './index'
 import type { IVaultManager, IVaultReader, Vault, DirectoryTree, FileContent } from '../vault/index'
 import { PathTraversalError, computeEtag } from '../vault/index'
@@ -918,6 +919,201 @@ describe('VaultService', () => {
       expect(result.etag).toMatch(/^[0-9a-f]{16}$/)
 
       await fs.rm(tmpDir, { recursive: true, force: true })
+    })
+  })
+
+  describe('moveContent', () => {
+    let tmpDir: string
+    let vaultDir: string
+
+    async function setup() {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'move-test-'))
+      vaultDir = path.join(tmpDir, 'vault')
+      await fs.mkdir(vaultDir, { recursive: true })
+
+      const vault = createMockVault('abc123def456', 'Test Vault', vaultDir)
+      const vaultManager = createMockVaultManager([vault])
+      const configService = createMockConfigService()
+      const vaultReader = createMockVaultReader()
+      const logger = createMockLogger()
+      const service = new VaultService(vaultManager, vaultReader, configService, logger)
+      return { service, vaultManager }
+    }
+
+    async function cleanup() {
+      await fs.rm(tmpDir, { recursive: true, force: true })
+    }
+
+    it('moves a file and preserves its content', async () => {
+      const { service } = await setup()
+      try {
+        await fs.writeFile(path.join(vaultDir, 'source.md'), '# Hello')
+
+        const result = await service.moveContent('abc123def456', 'source.md', 'dest.md')
+
+        expect(result.newPath).toBe('dest.md')
+        await expect(fs.access(path.join(vaultDir, 'source.md'))).rejects.toThrow()
+        const content = await fs.readFile(path.join(vaultDir, 'dest.md'), 'utf-8')
+        expect(content).toBe('# Hello')
+      } finally {
+        await cleanup()
+      }
+    })
+
+    it('moves a directory', async () => {
+      const { service } = await setup()
+      try {
+        await fs.mkdir(path.join(vaultDir, 'sourceDir'))
+        await fs.writeFile(path.join(vaultDir, 'sourceDir', 'note.md'), '# In folder')
+
+        const result = await service.moveContent('abc123def456', 'sourceDir', 'destDir')
+
+        expect(result.newPath).toBe('destDir')
+        const content = await fs.readFile(path.join(vaultDir, 'destDir', 'note.md'), 'utf-8')
+        expect(content).toBe('# In folder')
+      } finally {
+        await cleanup()
+      }
+    })
+
+    it('throws FileConflictError when a file already exists at the destination', async () => {
+      const { service } = await setup()
+      try {
+        await fs.writeFile(path.join(vaultDir, 'source.md'), '# Source')
+        await fs.writeFile(path.join(vaultDir, 'dest.md'), '# Existing')
+
+        await expect(service.moveContent('abc123def456', 'source.md', 'dest.md'))
+          .rejects.toThrow(FileConflictError)
+
+        // Neither file should have been touched
+        expect(await fs.readFile(path.join(vaultDir, 'source.md'), 'utf-8')).toBe('# Source')
+        expect(await fs.readFile(path.join(vaultDir, 'dest.md'), 'utf-8')).toBe('# Existing')
+      } finally {
+        await cleanup()
+      }
+    })
+
+    it('throws an ENOENT error when the source does not exist', async () => {
+      const { service } = await setup()
+      try {
+        await expect(service.moveContent('abc123def456', 'missing.md', 'dest.md'))
+          .rejects.toMatchObject({ code: 'ENOENT' })
+      } finally {
+        await cleanup()
+      }
+    })
+
+    it('throws InvalidMoveError for a circular move into a subdirectory of itself', async () => {
+      const { service } = await setup()
+      try {
+        await fs.mkdir(path.join(vaultDir, 'folder'))
+
+        await expect(service.moveContent('abc123def456', 'folder', 'folder/nested'))
+          .rejects.toThrow(InvalidMoveError)
+      } finally {
+        await cleanup()
+      }
+    })
+
+    it('does not lose either file when two concurrent moves race to the same destination', async () => {
+      // Regression test: moveContent used to check fs.access(dest) and then
+      // separately fs.rename() — a file created at dest in that gap would be
+      // silently clobbered by rename(). For files, the move is now performed
+      // via fs.link() (which atomically fails with EEXIST) + fs.unlink(),
+      // so exactly one of two racing moves to the same destination succeeds
+      // and the other is rejected with FileConflictError — neither file is lost.
+      const { service } = await setup()
+      try {
+        await fs.writeFile(path.join(vaultDir, 'fileA.md'), '# A')
+        await fs.writeFile(path.join(vaultDir, 'fileB.md'), '# B')
+
+        const results = await Promise.allSettled([
+          service.moveContent('abc123def456', 'fileA.md', 'dest.md'),
+          service.moveContent('abc123def456', 'fileB.md', 'dest.md'),
+        ])
+
+        const fulfilled = results.filter((r) => r.status === 'fulfilled')
+        const rejected = results.filter((r) => r.status === 'rejected')
+        expect(fulfilled).toHaveLength(1)
+        expect(rejected).toHaveLength(1)
+        expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(FileConflictError)
+
+        // The winning file's content must be intact at the destination, and the
+        // loser's original file must still exist untouched (the move never happened).
+        const destContent = await fs.readFile(path.join(vaultDir, 'dest.md'), 'utf-8')
+        expect(['# A', '# B']).toContain(destContent)
+
+        const loserPath = destContent === '# A' ? 'fileB.md' : 'fileA.md'
+        const loserContent = await fs.readFile(path.join(vaultDir, loserPath), 'utf-8')
+        expect(loserContent).toBe(destContent === '# A' ? '# B' : '# A')
+      } finally {
+        await cleanup()
+      }
+    })
+  })
+
+  describe('renameContent', () => {
+    let tmpDir: string
+    let vaultDir: string
+
+    async function setup() {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rename-test-'))
+      vaultDir = path.join(tmpDir, 'vault')
+      await fs.mkdir(vaultDir, { recursive: true })
+
+      const vault = createMockVault('abc123def456', 'Test Vault', vaultDir)
+      const vaultManager = createMockVaultManager([vault])
+      const configService = createMockConfigService()
+      const vaultReader = createMockVaultReader()
+      const logger = createMockLogger()
+      const service = new VaultService(vaultManager, vaultReader, configService, logger)
+      return { service, vaultManager }
+    }
+
+    async function cleanup() {
+      await fs.rm(tmpDir, { recursive: true, force: true })
+    }
+
+    it('renames a file and preserves its content', async () => {
+      const { service } = await setup()
+      try {
+        await fs.writeFile(path.join(vaultDir, 'old.md'), '# Hello')
+
+        const result = await service.renameContent('abc123def456', 'old.md', 'new.md')
+
+        expect(result.newPath).toBe('new.md')
+        await expect(fs.access(path.join(vaultDir, 'old.md'))).rejects.toThrow()
+        const content = await fs.readFile(path.join(vaultDir, 'new.md'), 'utf-8')
+        expect(content).toBe('# Hello')
+      } finally {
+        await cleanup()
+      }
+    })
+
+    it('throws FileConflictError when a file already exists at the target name', async () => {
+      const { service } = await setup()
+      try {
+        await fs.writeFile(path.join(vaultDir, 'old.md'), '# Old')
+        await fs.writeFile(path.join(vaultDir, 'new.md'), '# Existing')
+
+        await expect(service.renameContent('abc123def456', 'old.md', 'new.md'))
+          .rejects.toThrow(FileConflictError)
+
+        expect(await fs.readFile(path.join(vaultDir, 'old.md'), 'utf-8')).toBe('# Old')
+        expect(await fs.readFile(path.join(vaultDir, 'new.md'), 'utf-8')).toBe('# Existing')
+      } finally {
+        await cleanup()
+      }
+    })
+
+    it('throws an ENOENT error when the source does not exist', async () => {
+      const { service } = await setup()
+      try {
+        await expect(service.renameContent('abc123def456', 'missing.md', 'new.md'))
+          .rejects.toMatchObject({ code: 'ENOENT' })
+      } finally {
+        await cleanup()
+      }
     })
   })
 

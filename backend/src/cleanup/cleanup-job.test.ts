@@ -1,6 +1,9 @@
 // Unit tests for CleanupJob
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import os from 'node:os'
 import { CleanupJob } from './cleanup-job.js'
 import type { ITrashService } from '../trash/types.js'
 import type { IVersionService } from '../version/types.js'
@@ -281,6 +284,63 @@ describe('CleanupJob', () => {
       await cleanupJob.runOnce()
 
       expect(logger.info).toHaveBeenCalledWith('Cleanup run completed')
+    })
+
+    it('finds and prunes real version files under .slatebase/versions/', async () => {
+      // Regression test: pruneAllVersions used to scan `<vaultPath>/.versions`,
+      // but VersionService actually stores versions under
+      // `<vaultPath>/.slatebase/versions` — so this always found nothing and
+      // silently no-op'd. Every other test in this file mocks paths that
+      // don't exist on disk, so it never caught the mismatch; this one uses a
+      // real temp directory with the real on-disk layout.
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'cleanup-job-test-'))
+      try {
+        const versionDir = path.join(tmpDir, '.slatebase', 'versions', 'notes', 'todo.md')
+        await fs.mkdir(versionDir, { recursive: true })
+        await fs.writeFile(path.join(versionDir, '20250101T000000000.md'), 'old content')
+
+        const vault = createTestVault('vault1', tmpDir)
+        vaultManager = createMockVaultManager([vault])
+        configService = createMockConfigService({ maxPerFile: 5 })
+        cleanupJob = new CleanupJob(trashService, versionService, vaultManager, configService, logger)
+
+        await cleanupJob.runOnce()
+
+        expect(versionService.pruneVersions).toHaveBeenCalledWith(
+          'vault1',
+          path.join('notes', 'todo.md'),
+          5,
+        )
+      } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true })
+      }
+    })
+
+    it('skips a run that starts while a previous run is still in progress', async () => {
+      // Regression test: start() fires an immediate run and then schedules a
+      // periodic run; with a slow first run (e.g. a large vault), the next
+      // tick could previously start a second, fully overlapping run — racing
+      // on the same files. Only one run should ever be in flight at a time.
+      const vault = createTestVault('vault1', '/tmp/v1')
+      vaultManager = createMockVaultManager([vault])
+      configService = createMockConfigService()
+      cleanupJob = new CleanupJob(trashService, versionService, vaultManager, configService, logger)
+
+      let resolvePurge!: (value: number) => void
+      const purgeGate = new Promise<number>((resolve) => { resolvePurge = resolve })
+      vi.mocked(trashService.purgeExpired).mockReturnValueOnce(purgeGate)
+
+      const firstRun = cleanupJob.runOnce()
+      // The first run is now blocked inside purgeExpired — start a second
+      // run concurrently while it's still in flight.
+      const secondRun = cleanupJob.runOnce()
+      await secondRun
+
+      expect(logger.warn).toHaveBeenCalledWith('Cleanup run skipped: previous run still in progress')
+      expect(trashService.purgeExpired).toHaveBeenCalledTimes(1)
+
+      resolvePurge(0)
+      await firstRun
     })
   })
 })

@@ -20,6 +20,9 @@ export interface IMcpRateLimiter {
 /** Sliding window duration in milliseconds (60 seconds). */
 const WINDOW_MS = 60_000
 
+/** Default interval between automatic cleanup sweeps (5 minutes). */
+const DEFAULT_CLEANUP_INTERVAL_MS = 5 * 60_000
+
 // ─── McpRateLimiter Class ────────────────────────────────────────────────────
 
 /**
@@ -27,18 +30,29 @@ const WINDOW_MS = 60_000
  * Uses a sliding window algorithm: only timestamps within the last 60 seconds
  * are counted. After the configured limit is reached within the window,
  * further requests are blocked until the oldest timestamp expires.
+ *
+ * checkLimit() only prunes a token's own expired timestamps when THAT token
+ * is checked again — a token used for a while and then left idle (without
+ * being explicitly revoked, which would call clear()) would otherwise keep an
+ * entry in the store forever. A periodic sweep (unref'd, doesn't keep the
+ * process alive) removes fully-expired entries. Call destroy() during
+ * shutdown to stop it.
  */
 export class McpRateLimiter implements IMcpRateLimiter {
   private readonly store: Map<string, number[]> = new Map()
   private readonly maxRequests: number
+  private cleanupTimer: ReturnType<typeof setInterval> | null = null
 
   /**
    * Create a new McpRateLimiter.
    *
    * @param rateLimit - Maximum number of requests allowed per 60-second window.
+   * @param cleanupIntervalMs - Interval between automatic cleanup sweeps. Default: 5 minutes.
    */
-  constructor(rateLimit: number) {
+  constructor(rateLimit: number, cleanupIntervalMs: number = DEFAULT_CLEANUP_INTERVAL_MS) {
     this.maxRequests = rateLimit
+    this.cleanupTimer = setInterval(() => this.cleanup(), cleanupIntervalMs)
+    this.cleanupTimer.unref?.()
   }
 
   /**
@@ -113,5 +127,33 @@ export class McpRateLimiter implements IMcpRateLimiter {
    */
   get size(): number {
     return this.store.size
+  }
+
+  /**
+   * Removes entries whose timestamps have all fallen out of the sliding
+   * window. Runs automatically on an interval; exposed for testing.
+   */
+  cleanup(): void {
+    const now = Date.now()
+    const cutoff = now - WINDOW_MS
+
+    for (const [tokenId, timestamps] of this.store) {
+      const valid = timestamps.filter((ts) => ts > cutoff)
+      if (valid.length === 0) {
+        this.store.delete(tokenId)
+      } else if (valid.length !== timestamps.length) {
+        this.store.set(tokenId, valid)
+      }
+    }
+  }
+
+  /**
+   * Stops the automatic cleanup sweep. Call during graceful shutdown.
+   */
+  destroy(): void {
+    if (this.cleanupTimer !== null) {
+      clearInterval(this.cleanupTimer)
+      this.cleanupTimer = null
+    }
   }
 }

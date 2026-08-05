@@ -150,6 +150,49 @@ describe('createAuthMiddleware', () => {
     const body = await res.json() as { session: SessionContext }
     expect(body.session).toEqual(validSession)
   })
+
+  it('should accept a ?token= query param on the raw file content endpoint (raw=true)', async () => {
+    const authService = createMockAuthService({
+      validateSession: async () => validSession,
+    })
+    const app = new Hono()
+    app.use('*', createAuthMiddleware(authService))
+    app.get('/api/v1/vaults/:vaultId/files', (c) => c.json({ ok: true }))
+
+    const res = await app.request('/api/v1/vaults/vault-1/files?path=img.png&raw=true&token=valid-token-123')
+    expect(res.status).toBe(200)
+  })
+
+  it('should reject a ?token= query param on the raw file content endpoint without raw=true', async () => {
+    // Regression test: the query-param fallback used to be accepted on every
+    // route. It's now scoped to exactly the raw file content endpoint used by
+    // <img src="..."> tags — the JSON content variant (no raw=true) must still
+    // require a real Authorization header.
+    const authService = createMockAuthService({
+      validateSession: async () => validSession,
+    })
+    const app = new Hono()
+    app.use('*', createAuthMiddleware(authService))
+    app.get('/api/v1/vaults/:vaultId/files', (c) => c.json({ ok: true }))
+
+    const res = await app.request('/api/v1/vaults/vault-1/files?path=note.md&token=valid-token-123')
+    expect(res.status).toBe(401)
+  })
+
+  it('should reject a ?token= query param on unrelated routes', async () => {
+    // Regression test: previously, ?token= was accepted on ANY route, risking
+    // leaking the full session token via access logs, Referer headers, and
+    // browser history far more broadly than the <img src> use case requires.
+    const authService = createMockAuthService({
+      validateSession: async () => validSession,
+    })
+    const app = new Hono()
+    app.use('*', createAuthMiddleware(authService))
+    app.get('/api/v1/vaults', (c) => c.json({ ok: true }))
+
+    const res = await app.request('/api/v1/vaults?token=valid-token-123')
+    expect(res.status).toBe(401)
+  })
 })
 
 // ─── CSRF Middleware Tests ───────────────────────────────────────────────────
