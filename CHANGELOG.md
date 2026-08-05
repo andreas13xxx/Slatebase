@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.23.1](https://github.com/andreas13xxx/Slatebase/compare/v0.23.0...v0.23.1) (2026-08-05)
+
+
+### Bugfixes
+
+* **plugins:** delegate Plugin.registerHoverLinkSource to the workspace ([66e365f](https://github.com/andreas13xxx/Slatebase/commit/66e365ff97f7591520c7c38e49a508e371af21c0))
+
 ## [0.23.0](https://github.com/andreas13xxx/Slatebase/compare/v0.22.0...v0.23.0) (2026-08-05)
 
 
