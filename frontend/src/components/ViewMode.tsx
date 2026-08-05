@@ -241,7 +241,9 @@ export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick,
     import('../plugins/compat/code-block-processor-registry').then(({ processCodeBlocks, runPostProcessors, cleanupRenderChildren }) => {
       if (cancelled) return
       cleanupRenderChildren()
-      processCodeBlocks(el, '')
+      // `content` is passed so ctx.getSectionInfo() can map rendered code blocks
+      // back to their line range in the source.
+      processCodeBlocks(el, '', null, content)
       runPostProcessors(el, '')
     }).catch(() => {
       // Code block processor registry not available — no-op
@@ -252,7 +254,9 @@ export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick,
         cleanupRenderChildren()
       }).catch(() => {})
     }
-  }, [rendered])
+    // `content` changes in lockstep with `rendered`, so listing it adds no extra
+    // runs; `viewModeId` is stable across renders.
+  }, [rendered, content, viewModeId])
 
   return createElement('article', {
     className: 'view-mode',

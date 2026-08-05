@@ -14,6 +14,38 @@
  * @module code-block-processor-registry
  */
 
+import {
+  scanFencedCodeBlocks,
+  matchRenderedBlocks,
+  toSectionInfo,
+  type MarkdownSectionInformation,
+} from './markdown-sections'
+
+export type { MarkdownSectionInformation }
+
+// ─── Section Info ────────────────────────────────────────────────────────────
+
+/**
+ * Section info per rendered container, populated by {@link processCodeBlocks}.
+ *
+ * A WeakMap so entries disappear with the DOM nodes; rendered output is replaced
+ * on every edit and must not be retained.
+ */
+const sectionInfoByElement = new WeakMap<HTMLElement, MarkdownSectionInformation>()
+
+/**
+ * Resolve section info for an element by walking up to the nearest container
+ * that has a known source range. Plugins usually pass a node they created
+ * *inside* the container they were handed, so an exact match is not enough.
+ */
+function resolveSectionInfo(el: HTMLElement | null): MarkdownSectionInformation | null {
+  for (let node = el; node; node = node.parentElement) {
+    const info = sectionInfoByElement.get(node)
+    if (info) return info
+  }
+  return null
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /**
@@ -29,8 +61,16 @@ export interface MarkdownPostProcessorContext {
   frontmatter: Record<string, unknown> | null
   /** Add a child component for lifecycle management. */
   addChild(child: MarkdownRenderChild): void
-  /** Get section information (stub — returns null). */
-  getSectionInfo(el: HTMLElement): null
+  /**
+   * Which lines of the source document produced `el`.
+   *
+   * Resolved for fenced code blocks, which is what plugins like Tasks and
+   * Dataview need in order to write edits back. Returns null when the element
+   * cannot be traced to a source range — including when no source was supplied,
+   * and for elements outside a code block, whose positions Slatebase's render
+   * pipeline does not carry through.
+   */
+  getSectionInfo(el: HTMLElement): MarkdownSectionInformation | null
 }
 
 /**
@@ -214,27 +254,47 @@ export function getRegisteredLanguages(): string[] {
  * @param containerEl - The root element containing rendered markdown HTML
  * @param sourcePath - The source file path (for context)
  * @param frontmatter - The file's frontmatter (if available)
+ * @param markdownSource - The full Markdown source. Supplying it enables
+ *        `ctx.getSectionInfo()`; without it that returns null as before.
  * @returns Array of MarkdownRenderChild instances (for lifecycle management)
  */
 export function processCodeBlocks(
   containerEl: HTMLElement,
   sourcePath: string,
   frontmatter?: Record<string, unknown> | null,
+  markdownSource?: string,
 ): MarkdownRenderChild[] {
   const children: MarkdownRenderChild[] = []
 
   // Find all <pre><code class="language-xxx"> elements
-  const codeElements = containerEl.querySelectorAll('pre > code[class*="language-"]')
+  const codeElements = [...containerEl.querySelectorAll('pre > code[class*="language-"]')]
 
-  for (const codeEl of codeElements) {
+  // Locate each rendered block in the source. Every language-tagged block takes
+  // part in the matching, not just the ones with a handler, so that an unhandled
+  // block in between cannot shift the alignment of the ones that follow.
+  const languageOf = (codeEl: Element): string | null => {
+    const langClass = codeEl.className.split(/\s+/).find((c) => c.startsWith('language-'))
+    return langClass ? langClass.slice('language-'.length).toLowerCase() : null
+  }
+
+  const sourceBlocks = markdownSource ? scanFencedCodeBlocks(markdownSource) : []
+  const matches = markdownSource
+    ? matchRenderedBlocks(
+        codeElements.map((el) => ({
+          language: languageOf(el) ?? '',
+          content: el.textContent ?? '',
+        })),
+        sourceBlocks,
+      )
+    : []
+
+  for (const [index, codeEl] of codeElements.entries()) {
     const preEl = codeEl.parentElement
     if (!preEl) continue
 
     // Extract language from class (e.g. "language-dataview" → "dataview")
-    const classList = codeEl.className.split(/\s+/)
-    const langClass = classList.find(c => c.startsWith('language-'))
-    if (!langClass) continue
-    const language = langClass.slice('language-'.length).toLowerCase()
+    const language = languageOf(codeEl)
+    if (!language) continue
 
     // Check if we have a handler for this language
     const registration = codeBlockProcessors.get(language)
@@ -251,6 +311,13 @@ export function processCodeBlocks(
     // Create MarkdownRenderChild for lifecycle
     const renderChild = new MarkdownRenderChild(container)
 
+    // Record where this block came from, so getSectionInfo can resolve it for
+    // the container and for anything the handler renders inside it.
+    const match = matches[index]
+    if (match && markdownSource !== undefined) {
+      sectionInfoByElement.set(container, toSectionInfo(markdownSource, match))
+    }
+
     // Build context
     const ctx: MarkdownPostProcessorContext = {
       docId: `doc-${Date.now()}`,
@@ -260,8 +327,10 @@ export function processCodeBlocks(
         activeRenderChildren.add(child)
         children.push(child)
       },
-      getSectionInfo(): null {
-        return null
+      getSectionInfo(el: HTMLElement): MarkdownSectionInformation | null {
+        // Fall back to this block's own container: plugins sometimes pass an
+        // element they have already detached from the DOM.
+        return resolveSectionInfo(el) ?? sectionInfoByElement.get(container) ?? null
       },
     }
 
@@ -310,8 +379,11 @@ export function runPostProcessors(
     addChild(child: MarkdownRenderChild): void {
       activeRenderChildren.add(child)
     },
-    getSectionInfo(): null {
-      return null
+    getSectionInfo(el: HTMLElement): MarkdownSectionInformation | null {
+      // Only elements inside a code-block container can be traced. Positions for
+      // ordinary Markdown are not carried through the render pipeline, so a
+      // post-processor inspecting a paragraph still gets null.
+      return resolveSectionInfo(el)
     },
   }
 
