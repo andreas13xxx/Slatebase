@@ -4,6 +4,20 @@ on:
   push:
     branches:
       - master
+  # Rebuild the images for an existing tag without cutting a release. A re-run
+  # cannot do this: release-please reports release_created=false the second time
+  # around, so docker-build is skipped and nothing is rebuilt.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to build images for, e.g. v0.23.0'
+        required: true
+        type: string
+      update_latest:
+        description: 'Also move the :latest tag. Turn this off when rebuilding an older release.'
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: write
@@ -12,6 +26,8 @@ permissions:
 
 jobs:
   release-please:
+    # Only a push decides about releases; a manual run just rebuilds images.
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
@@ -32,8 +48,21 @@ jobs:
 
   docker-build:
     needs: release-please
-    if: needs.release-please.outputs.release_created == 'true'
+    # `always()` is required because release-please is skipped on a manual run,
+    # and a skipped dependency would otherwise skip this job too.
+    if: |
+      always() && (
+        (github.event_name == 'push' && needs.release-please.outputs.release_created == 'true')
+        || github.event_name == 'workflow_dispatch'
+      )
     runs-on: ubuntu-latest
+    # The tag comes from release-please on a push, and from the input on a
+    # manual run. Resolved once here so the steps below have a single source.
+    env:
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || needs.release-please.outputs.tag_name }}
+      # A release always becomes :latest. A manual rebuild only does so when
+      # asked, so re-running an old tag cannot move :latest backwards.
+      UPDATE_LATEST: ${{ github.event_name != 'workflow_dispatch' || inputs.update_latest }}
     strategy:
       matrix:
         include:
@@ -46,7 +75,10 @@ jobs:
             dockerfile: ./frontend/Dockerfile
             description: Slatebase Frontend Web Application
     steps:
+      # A manual run must build the tag's source, not the current master.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.sha }}
 
       - name: Setup QEMU
         uses: docker/setup-qemu-action@v3
@@ -85,12 +117,12 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,scope=${{ matrix.image }},mode=max
           tags: |
-            ghcr.io/andreas13xxx/${{ matrix.image }}:${{ needs.release-please.outputs.tag_name }}
-            ghcr.io/andreas13xxx/${{ matrix.image }}:latest
-            ${{ steps.dockerhub-login.outcome == 'success' && format('{0}/{1}:{2}', vars.DOCKERHUB_USERNAME, matrix.image, needs.release-please.outputs.tag_name) || '' }}
-            ${{ steps.dockerhub-login.outcome == 'success' && format('{0}/{1}:latest', vars.DOCKERHUB_USERNAME, matrix.image) || '' }}
+            ghcr.io/andreas13xxx/${{ matrix.image }}:${{ env.TAG }}
+            ${{ env.UPDATE_LATEST == 'true' && format('ghcr.io/andreas13xxx/{0}:latest', matrix.image) || '' }}
+            ${{ steps.dockerhub-login.outcome == 'success' && format('{0}/{1}:{2}', vars.DOCKERHUB_USERNAME, matrix.image, env.TAG) || '' }}
+            ${{ steps.dockerhub-login.outcome == 'success' && env.UPDATE_LATEST == 'true' && format('{0}/{1}:latest', vars.DOCKERHUB_USERNAME, matrix.image) || '' }}
           labels: |
-            org.opencontainers.image.version=${{ needs.release-please.outputs.tag_name }}
+            org.opencontainers.image.version=${{ env.TAG }}
             org.opencontainers.image.description=${{ matrix.description }}
             org.opencontainers.image.source=https://github.com/andreas13xxx/Slatebase
             org.opencontainers.image.licenses=MIT
