@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.1](https://github.com/andreas13xxx/Slatebase/compare/v0.25.0...v0.25.1) (2026-08-05)
+
+
+### Bugfixes
+
+* replace all undefined CSS variables with correct design tokens ([2851ffd](https://github.com/andreas13xxx/Slatebase/commit/2851ffd2fdb7e1d140e34067aadeec795acd30e0))
+
 ## [0.25.0](https://github.com/andreas13xxx/Slatebase/compare/v0.24.0...v0.25.0) (2026-08-05)
 
 
