@@ -1,9 +1,11 @@
 import type {
   TFile,
   CachedMetadata,
+  BlockCache,
   EventRef,
   IMetadataCacheShim,
 } from '../types';
+import { parseBlocks } from '../block-cache';
 import { EventSystem } from '../event-system';
 import type { DirectoryTree } from '../../../types';
 import { resolveWikilinkTarget, collectFilesSorted } from '../../link-resolver';
@@ -423,6 +425,13 @@ export class MetadataCacheShim implements IMetadataCacheShim {
       metadata.links = links
     }
 
+    // Block ids (^my-id) — resolves [[note#^my-id]] links and lets plugins
+    // locate a specific block.
+    const blocks = parseBlocks(normalizedContent)
+    if (Object.keys(blocks).length > 0) {
+      metadata.blocks = blocks
+    }
+
     return metadata
   }
 
@@ -485,11 +494,29 @@ export class MetadataCacheShim implements IMetadataCacheShim {
   }
 
   /**
-   * Block cache — stub object for plugins that access block IDs.
-   * Returns an empty object with a getForFile stub.
+   * Block cache — Obsidian-internal counterpart to `CachedMetadata.blocks`.
+   *
+   * Not part of the public API, so its exact shape is undocumented; plugins that
+   * reach for it are reading Obsidian's internals. It is backed by the same
+   * parse as `getFileCache(file).blocks`, which is the supported way to get at
+   * this data.
+   *
+   * Obsidian calls it as `getForFile(cancelContext, file)`. Both that form and a
+   * plain file argument are accepted, since callers vary by Obsidian version.
    */
   readonly blockCache = {
-    getForFile: (_sourcePath: unknown): unknown => null,
+    getForFile: (...args: unknown[]): { blocks: Record<string, BlockCache> } | null => {
+      const file = args.find(
+        (arg): arg is { path: string } =>
+          typeof arg === 'object' && arg !== null && typeof (arg as { path?: unknown }).path === 'string',
+      );
+      if (!file) return null;
+
+      const content = this.contentStore.get(file.path);
+      if (content === undefined) return null;
+
+      return { blocks: parseBlocks(content) };
+    },
   };
 }
 
