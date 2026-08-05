@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { ReplaceService } from './replace-service.js'
 import { RegexValidationError, RegexTooLongError } from './errors.js'
 import type { IVaultService, IVaultAccessControl } from '../business/index.js'
@@ -278,6 +278,89 @@ describe('ReplaceService', () => {
           regex: true,
         }),
       ).rejects.toThrow(RegexTooLongError)
+    })
+
+    it('throws RegexValidationError for a catastrophic-backtracking (nested quantifier) pattern', async () => {
+      // Regression test: a regex like (a+)+ can hang the (single-threaded)
+      // regex engine for a single exec() call in a way no in-loop timeout can
+      // interrupt. It must now be rejected before ever being compiled against
+      // real file content.
+      const vaultService = createMockVaultService({ files: { 'note.md': { content: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaa!' } } })
+      const service = new ReplaceService(vaultService, accessControl, logger)
+
+      await expect(
+        service.replace('vault1', {
+          query: '(a+)+',
+          replacement: 'x',
+          caseSensitive: true,
+          regex: true,
+        }),
+      ).rejects.toThrow(RegexValidationError)
+    })
+  })
+
+  describe('replace() — file size limit', () => {
+    it('reports oversized files as failed instead of running the replacer on them', async () => {
+      const hugeContent = 'x'.repeat(11 * 1024 * 1024) // 11 MB, over the 10 MB cap
+      const vaultService = createMockVaultService({
+        files: { 'huge.md': { content: hugeContent }, 'small.md': { content: 'hello world' } },
+      })
+      const service = new ReplaceService(vaultService, accessControl, logger)
+
+      const result = await service.replace('vault1', {
+        query: 'hello',
+        replacement: 'hi',
+        caseSensitive: true,
+        regex: false,
+      })
+
+      expect(result.failed).toHaveLength(1)
+      expect(result.failed[0]!.path).toBe('huge.md')
+      expect(vaultService.savedFiles.find((f) => f.path === 'huge.md')).toBeUndefined()
+      // The small file should still be processed normally
+      expect(result.files).toHaveLength(1)
+      expect(result.files[0]!.path).toBe('small.md')
+    })
+  })
+
+  describe('replace() — global timeout', () => {
+    it('stops processing further files once the global timeout is exceeded', async () => {
+      vi.useFakeTimers()
+      try {
+        const files = {
+          'file1.md': { content: 'hello world' },
+          'file2.md': { content: 'hello world' },
+        }
+        const vaultService = createMockVaultService({ files })
+        const originalGetFileContent = vaultService.getFileContent.bind(vaultService)
+        let callCount = 0
+        vaultService.getFileContent = async (vId: string, filePath: string) => {
+          callCount++
+          const result = await originalGetFileContent(vId, filePath)
+          if (callCount === 1) {
+            // Simulate the first file's processing having taken past the
+            // global timeout budget by the time the loop checks again.
+            vi.advanceTimersByTime(31_000)
+          }
+          return result
+        }
+        const service = new ReplaceService(vaultService, accessControl, logger)
+
+        const result = await service.replace('vault1', {
+          query: 'hello',
+          replacement: 'hi',
+          caseSensitive: true,
+          regex: false,
+        })
+
+        // file1.md was already in flight when the timeout was crossed, so it completes
+        expect(result.files.map((f) => f.path)).toEqual(['file1.md'])
+        // file2.md's turn starts after the timeout check — it must be skipped, not processed
+        expect(result.failed.some((f) => f.path === 'file2.md')).toBe(true)
+        expect(vaultService.savedFiles.find((f) => f.path === 'file2.md')).toBeUndefined()
+      } finally {
+        vi.useRealTimers()
+      }
     })
   })
 

@@ -11,7 +11,7 @@ import type {
   VaultSearchResult,
   FailedVault,
 } from './types.js'
-import { RegexValidationError, RegexTooLongError } from './errors.js'
+import { validateRegexPattern } from './regex-safety.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -29,9 +29,6 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024
 
 /** Maximum length of matched text returned per hit. */
 const MAX_MATCH_TEXT_LENGTH = 200
-
-/** Maximum regex pattern length (characters). */
-const MAX_REGEX_LENGTH = 1000
 
 // ─── SearchService Implementation ───────────────────────────────────────────
 
@@ -56,7 +53,7 @@ export class SearchService implements ISearchService {
 
     // Validate regex pattern if regex mode is enabled
     if (options.regex) {
-      this.validateRegex(options.query)
+      validateRegexPattern(options.query)
     }
 
     const results: SearchFileResult[] = []
@@ -217,7 +214,7 @@ export class SearchService implements ISearchService {
 
     // Validate regex pattern if regex mode is enabled
     if (options.regex) {
-      this.validateRegex(options.query)
+      validateRegexPattern(options.query)
     }
 
     // Determine which vaults to search
@@ -520,24 +517,6 @@ export class SearchService implements ISearchService {
   }
 
   // ─── Private Helpers ─────────────────────────────────────────────────────────
-
-  /**
-   * Validates a regex pattern for syntax errors and length.
-   * Throws RegexTooLongError if pattern exceeds 1000 characters.
-   * Throws RegexValidationError if pattern is not a valid JavaScript regex.
-   */
-  private validateRegex(pattern: string): void {
-    if (pattern.length > MAX_REGEX_LENGTH) {
-      throw new RegexTooLongError(pattern.length)
-    }
-
-    try {
-      new RegExp(pattern)
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error)
-      throw new RegexValidationError(pattern, reason)
-    }
-  }
 
   /**
    * Builds a matcher function based on search options.

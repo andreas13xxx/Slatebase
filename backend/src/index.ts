@@ -215,13 +215,14 @@ let mcpTokenService: McpTokenService | undefined
 let mcpRoutes: ReturnType<typeof createMcpRoutes> | undefined
 let mcpTokenRoutes: ReturnType<typeof createMcpTokenRoutes> | undefined
 let mcpHttpHandler: ReturnType<typeof createMcpHttpHandler> = null
+let mcpRateLimiter: McpRateLimiter | undefined
 
 if (featureToggleService.isEnabled('mcp')) {
   const tokenStore = new TokenStore(serverConfig.dataDir, logger)
   await tokenStore.loadIndex()
 
   mcpTokenService = new McpTokenService(tokenStore, mcpConfig, logger, auditService)
-  const mcpRateLimiter = new McpRateLimiter(mcpConfig.rateLimit)
+  mcpRateLimiter = new McpRateLimiter(mcpConfig.rateLimit)
 
   const mcpHandlers = new McpHandlers({
     vaultService,
@@ -837,6 +838,12 @@ const gracefulShutdown = async (signal: string): Promise<void> => {
 
   // Stop plugin store update checker
   updateChecker.stop()
+
+  // Stop rate limiters' and the replay buffer's periodic cleanup sweeps
+  sseRateLimiter.destroy()
+  replayBuffer.destroy()
+  chatRateLimiter.destroy()
+  mcpRateLimiter?.destroy()
 
   // Shutdown realtime connections (sends server:shutdown event, closes all streams)
   await realtimeConnectionManager.shutdown()

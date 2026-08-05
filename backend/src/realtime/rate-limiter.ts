@@ -1,27 +1,41 @@
 import type { SseEventType, IRateLimiter, RateLimiterEntry } from './types.js'
 
+/** Default interval between automatic cleanup sweeps (60 seconds). */
+const DEFAULT_CLEANUP_INTERVAL_MS = 60_000
+
 /** Configuration options for the rate limiter. */
 export interface RateLimiterConfig {
   /** Maximum number of events allowed per window per user per type. Default: 10. */
   maxPerSecond?: number
   /** Window size in milliseconds. Default: 1000 (1 second). */
   windowMs?: number
+  /** Interval between automatic cleanup() sweeps in milliseconds. Default: 60000. */
+  cleanupIntervalMs?: number
 }
 
 /**
  * Per-user per-event-type sliding window rate limiter.
  * Enforces a maximum number of events per type within a configurable time window.
  * When the limit is exceeded, older events are discarded (only the most recent is kept).
+ *
+ * Runs its own periodic cleanup sweep (unref'd, doesn't keep the process alive)
+ * so expired entries don't accumulate in memory for the lifetime of the
+ * process. Call destroy() during shutdown to stop the sweep explicitly.
  */
 export class RateLimiter implements IRateLimiter {
   private readonly maxPerSecond: number
   private readonly windowMs: number
   private readonly store: Map<string, Map<SseEventType, RateLimiterEntry>>
+  private cleanupTimer: ReturnType<typeof setInterval> | null = null
 
   constructor(config: RateLimiterConfig = {}) {
     this.maxPerSecond = config.maxPerSecond ?? 10
     this.windowMs = config.windowMs ?? 1000
     this.store = new Map()
+
+    const cleanupIntervalMs = config.cleanupIntervalMs ?? DEFAULT_CLEANUP_INTERVAL_MS
+    this.cleanupTimer = setInterval(() => this.cleanup(), cleanupIntervalMs)
+    this.cleanupTimer.unref?.()
   }
 
   /**
@@ -90,6 +104,16 @@ export class RateLimiter implements IRateLimiter {
       if (userMap.size === 0) {
         this.store.delete(userId)
       }
+    }
+  }
+
+  /**
+   * Stops the automatic cleanup sweep. Call during graceful shutdown.
+   */
+  destroy(): void {
+    if (this.cleanupTimer !== null) {
+      clearInterval(this.cleanupTimer)
+      this.cleanupTimer = null
     }
   }
 }
