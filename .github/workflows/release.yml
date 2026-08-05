@@ -77,6 +77,13 @@ jobs:
           file: ${{ matrix.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: true
+          # The arm64 image is emulated through QEMU, which makes `npm ci` and
+          # the bundle build several times more expensive than they are natively.
+          # Caching the layers means an unchanged package-lock.json skips the
+          # dependency install entirely on the next release. Scoped per image so
+          # backend and frontend do not evict each other.
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,scope=${{ matrix.image }},mode=max
           tags: |
             ghcr.io/andreas13xxx/${{ matrix.image }}:${{ needs.release-please.outputs.tag_name }}
             ghcr.io/andreas13xxx/${{ matrix.image }}:latest
