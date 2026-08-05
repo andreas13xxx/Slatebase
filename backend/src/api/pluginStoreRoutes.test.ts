@@ -90,6 +90,7 @@ function createMockVaultRegistry(overrides: Partial<IVaultRegistry> = {}): IVaul
     removeEntry: async () => {},
     findById: () => ({ id: 'vault-1', name: 'Test Vault', storagePath: '/data/vaults/vault-1', createdAt: '2024-01-01T00:00:00.000Z' }),
     findByName: () => null,
+    updateEntries: async (mutator) => mutator([]),
     ...overrides,
   }
 }

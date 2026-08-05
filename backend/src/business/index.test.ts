@@ -169,6 +169,9 @@ function createMockRegistry(entries: VaultRegistryEntry[] = []): IVaultRegistry 
     findByName(name: string) {
       return entryList.find(e => e.name === name) ?? null
     },
+    async updateEntries<T>(mutator: (entries: VaultRegistryEntry[]) => T): Promise<T> {
+      return mutator(entryList)
+    },
   }
 }
 

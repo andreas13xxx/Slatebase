@@ -5,6 +5,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
 import type { Conversation, IConversationStore } from './types.js'
+import { AsyncMutex } from '../shared/async-mutex.js'
 
 // --- Implementation ---
 
@@ -13,6 +14,7 @@ export class ConversationStore implements IConversationStore {
   private participantIndex: Map<string, Set<string>> = new Map()
   private conversationCache: Map<string, Conversation> = new Map()
   private initialized = false
+  private readonly mutex = new AsyncMutex()
 
   constructor(
     dataDir: string,
@@ -81,70 +83,79 @@ export class ConversationStore implements IConversationStore {
   async create(conversation: Conversation): Promise<void> {
     await this.ensureDirectory()
 
-    const filePath = path.join(this.conversationsDir, `${conversation.id}.json`)
-    const tempPath = `${filePath}.${crypto.randomBytes(8).toString('hex')}.tmp`
-    const content = JSON.stringify(conversation, null, 2)
+    await this.mutex.runExclusive(async () => {
+      const filePath = path.join(this.conversationsDir, `${conversation.id}.json`)
+      const tempPath = `${filePath}.${crypto.randomBytes(8).toString('hex')}.tmp`
+      const content = JSON.stringify(conversation, null, 2)
 
-    await fs.writeFile(tempPath, content, 'utf-8')
+      await fs.writeFile(tempPath, content, 'utf-8')
 
-    try {
-      await fs.rename(tempPath, filePath)
-    } catch (renameError) {
       try {
-        await fs.unlink(tempPath)
-      } catch {
-        // Ignore cleanup errors
+        await fs.rename(tempPath, filePath)
+      } catch (renameError) {
+        try {
+          await fs.unlink(tempPath)
+        } catch {
+          // Ignore cleanup errors
+        }
+        throw renameError
       }
-      throw renameError
-    }
 
-    this.conversationCache.set(conversation.id, conversation)
-    this.indexParticipants(conversation)
+      this.conversationCache.set(conversation.id, conversation)
+      this.indexParticipants(conversation)
+    })
   }
 
   /**
    * Update an existing conversation with atomic write (temp → rename).
    * Diffs old vs new participants to update the participantIndex correctly.
+   * Serialized via mutex so that two concurrent updates to the same conversation
+   * can't both diff against the same stale `oldConversation` snapshot — which
+   * would corrupt the participantIndex (entries removed twice, or not at all).
    */
   async update(conversation: Conversation): Promise<void> {
     await this.ensureDirectory()
 
-    const oldConversation = this.conversationCache.get(conversation.id)
-    const filePath = path.join(this.conversationsDir, `${conversation.id}.json`)
-    const tempPath = `${filePath}.${crypto.randomBytes(8).toString('hex')}.tmp`
-    const content = JSON.stringify(conversation, null, 2)
+    await this.mutex.runExclusive(async () => {
+      // Read the "old" snapshot inside the lock so it reflects the latest
+      // committed state, not a value captured before waiting in the queue.
+      const oldConversation = this.conversationCache.get(conversation.id)
+      const filePath = path.join(this.conversationsDir, `${conversation.id}.json`)
+      const tempPath = `${filePath}.${crypto.randomBytes(8).toString('hex')}.tmp`
+      const content = JSON.stringify(conversation, null, 2)
 
-    await fs.writeFile(tempPath, content, 'utf-8')
+      await fs.writeFile(tempPath, content, 'utf-8')
 
-    try {
-      await fs.rename(tempPath, filePath)
-    } catch (renameError) {
       try {
-        await fs.unlink(tempPath)
-      } catch {
-        // Ignore cleanup errors
+        await fs.rename(tempPath, filePath)
+      } catch (renameError) {
+        try {
+          await fs.unlink(tempPath)
+        } catch {
+          // Ignore cleanup errors
+        }
+        throw renameError
       }
-      throw renameError
-    }
 
-    // Remove conversation from old participants' index entries
-    if (oldConversation) {
-      for (const participantId of oldConversation.participants) {
-        const set = this.participantIndex.get(participantId)
-        if (set) {
-          set.delete(conversation.id)
-          if (set.size === 0) {
-            this.participantIndex.delete(participantId)
+      // Remove conversation from old participants' index entries
+      if (oldConversation) {
+        for (const participantId of oldConversation.participants) {
+          const set = this.participantIndex.get(participantId)
+          if (set) {
+            set.delete(conversation.id)
+            if (set.size === 0) {
+              this.participantIndex.delete(participantId)
+            }
           }
         }
       }
-    }
 
-    // Update in-memory cache
-    this.conversationCache.set(conversation.id, conversation)
+      // Update in-memory cache
+      this.conversationCache.set(conversation.id, conversation)
 
-    // Add conversation to new participants' index entries
-    this.indexParticipants(conversation)
+      // Add conversation to new participants' index entries
+      this.indexParticipants(conversation)
+    })
   }
 
   /**

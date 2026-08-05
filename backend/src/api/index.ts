@@ -193,6 +193,12 @@ export class VaultController implements IVaultController {
     const vaultId = c.req.param('vaultId') as string
 
     try {
+      // Check read access before returning the tree
+      if (this.accessControl) {
+        const session = c.get('session') as SessionContext
+        await this.accessControl.checkReadAccess(vaultId, session.userId)
+      }
+
       const tree = await this.vaultService.getVaultTree(vaultId)
       return c.json(tree, 200)
     } catch (error) {
@@ -217,7 +223,23 @@ export class VaultController implements IVaultController {
     }
 
     // URL-decode the path parameter
-    const decodedPath = decodeURIComponent(rawPath)
+    let decodedPath: string
+    try {
+      decodedPath = decodeURIComponent(rawPath)
+    } catch {
+      const error = createApiError('PATH_TRAVERSAL', 'Invalid path encoding')
+      return c.json(error, 400)
+    }
+
+    // Check read access before returning any file content
+    if (this.accessControl) {
+      try {
+        const session = c.get('session') as SessionContext
+        await this.accessControl.checkReadAccess(vaultId, session.userId)
+      } catch (error) {
+        return this.handleError(c, error)
+      }
+    }
 
     // When raw=true, serve the file as binary with appropriate Content-Type
     if (rawParam === 'true') {

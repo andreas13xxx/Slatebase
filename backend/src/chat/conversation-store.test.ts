@@ -162,6 +162,60 @@ describe('ConversationStore', () => {
     })
   })
 
+  describe('update', () => {
+    it('should overwrite the persisted file and update the participant index', async () => {
+      const conv = makeConversation({ participants: ['alice', 'bob'] })
+      await store.create(conv)
+
+      const updated = { ...conv, participants: ['alice', 'charlie'] }
+      await store.update(updated)
+
+      const result = await store.findById(conv.id)
+      expect(result).toEqual(updated)
+
+      expect(await store.findByParticipant('bob')).toEqual([])
+      expect(await store.findByParticipant('charlie')).toHaveLength(1)
+      expect(await store.findByParticipant('alice')).toHaveLength(1)
+    })
+
+    it('should not corrupt the participant index when two updates to the same conversation race', async () => {
+      // Regression test: update() used to read `oldConversation` from the cache
+      // before awaiting the file write, so two concurrent updates to the same
+      // conversation could both diff against the same stale snapshot —
+      // corrupting the participantIndex (an entry removed twice, or left
+      // dangling). update() now reads oldConversation inside the same
+      // mutex-protected section as the write, so the second call always diffs
+      // against the first call's already-committed state.
+      const conv = makeConversation({ participants: ['alice', 'bob'] })
+      await store.create(conv)
+
+      const updateA = { ...conv, participants: ['alice'] }
+      const updateB = { ...conv, participants: ['alice', 'charlie'] }
+
+      await Promise.all([store.update(updateA), store.update(updateB)])
+
+      // Whichever update landed last, the index must be internally consistent
+      // with it — no duplicate or dangling entries.
+      const finalConv = await store.findById(conv.id)
+      expect(finalConv).toBeTruthy()
+
+      const aliceConvs = await store.findByParticipant('alice')
+      expect(aliceConvs).toHaveLength(1)
+      expect(aliceConvs[0]!.id).toBe(conv.id)
+
+      // Both candidate updates drop bob, so he must never remain indexed
+      expect(await store.findByParticipant('bob')).toEqual([])
+
+      // charlie should be indexed if and only if updateB's state won
+      const charlieConvs = await store.findByParticipant('charlie')
+      if (finalConv!.participants.includes('charlie')) {
+        expect(charlieConvs).toHaveLength(1)
+      } else {
+        expect(charlieConvs).toEqual([])
+      }
+    })
+  })
+
   describe('findById', () => {
     it('should return null for non-existent conversation', async () => {
       await store.loadIndex()

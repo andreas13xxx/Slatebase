@@ -1,6 +1,5 @@
-import { mkdir, appendFile, readFile, rename, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, appendFile, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import crypto from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
 import type { IMessageStore, Message, PaginatedMessages } from './types.js'
 
@@ -26,7 +25,6 @@ export class MessageStore implements IMessageStore {
 
   /**
    * Append a message to a conversation's JSONL file.
-   * Uses atomic write (temp → rename) for new files, appendFile for existing files.
    * Updates the lastMessageCache after successful write.
    */
   async append(message: Message): Promise<void> {
@@ -35,35 +33,19 @@ export class MessageStore implements IMessageStore {
     const filePath = this.getFilePath(message.conversationId)
     const line = JSON.stringify(message) + '\n'
 
-    let fileExists = true
     try {
-      await readFile(filePath, { flag: 'r' })
-    } catch {
-      fileExists = false
-    }
-
-    if (fileExists) {
-      await appendFile(filePath, line, 'utf-8')
-    } else {
-      // Atomic write for new files: write to temp, then rename
-      const tempPath = `${filePath}.${crypto.randomBytes(8).toString('hex')}.tmp`
-      await writeFile(tempPath, line, 'utf-8')
-      try {
-        await rename(tempPath, filePath)
-      } catch (err: unknown) {
-        const code = (err as NodeJS.ErrnoException).code
-        if (code === 'EPERM' || code === 'EACCES') {
-          try { await unlink(filePath) } catch { /* may not exist */ }
-          try {
-            await rename(tempPath, filePath)
-          } catch {
-            await writeFile(filePath, line, 'utf-8')
-            try { await unlink(tempPath) } catch { /* cleanup */ }
-          }
-        } else {
-          try { await unlink(tempPath) } catch { /* ignore */ }
-          throw err
-        }
+      // Exclusive create (O_EXCL): atomically creates the file only if it doesn't
+      // already exist. This avoids a check-then-act race where two concurrent
+      // first messages to the same new conversation could both see "file doesn't
+      // exist" and both take a create path — with a plain rename, the second
+      // write would silently clobber the first instead of failing.
+      await writeFile(filePath, line, { flag: 'wx' })
+    } catch (err: unknown) {
+      const code = (err as NodeJS.ErrnoException).code
+      if (code === 'EEXIST') {
+        await appendFile(filePath, line, 'utf-8')
+      } else {
+        throw err
       }
     }
 

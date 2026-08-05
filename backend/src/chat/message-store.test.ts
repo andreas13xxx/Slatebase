@@ -39,21 +39,22 @@ describe('MessageStore', () => {
   let tempDir: string
   let logger: ReturnType<typeof createMockLogger>
   let store: MessageStore
+  const createdTempDirs: string[] = []
 
   beforeEach(async () => {
     tempDir = path.join(os.tmpdir(), `slatebase-msg-test-${crypto.randomBytes(8).toString('hex')}`)
     await mkdir(tempDir, { recursive: true })
+    createdTempDirs.push(tempDir)
     logger = createMockLogger()
     store = new MessageStore(tempDir, logger)
   })
 
   afterAll(async () => {
-    // Clean up all temp directories created during tests
-    try {
-      await rm(path.join(os.tmpdir()), { recursive: true, force: true })
-    } catch {
-      // Ignore cleanup errors
-    }
+    // Clean up only the temp directories this suite created — NOT the whole
+    // OS temp directory, which other processes may also be using.
+    await Promise.all(
+      createdTempDirs.map((dir) => rm(dir, { recursive: true, force: true }).catch(() => {})),
+    )
   })
 
   describe('append()', () => {
@@ -85,6 +86,28 @@ describe('MessageStore', () => {
       expect(lines).toHaveLength(2)
       expect(JSON.parse(lines[0]!)).toMatchObject({ content: 'First' })
       expect(JSON.parse(lines[1]!)).toMatchObject({ content: 'Second' })
+    })
+
+    it('should not lose either message when two concurrent first messages race to create the same new conversation file', async () => {
+      // Regression test: append() used to check "does the file exist?" and then
+      // separately create it via write-temp-then-rename. Two concurrent first
+      // messages to a brand-new conversation could both see "doesn't exist" and
+      // both take the create path, with the second rename silently clobbering
+      // the first message. append() now uses an exclusive create (O_EXCL) so
+      // only one call can win the create; the other falls back to appending.
+      const convId = 'ffeeddccbbaa998877665544'
+      const msgA = createMessage({ conversationId: convId, content: 'A' })
+      const msgB = createMessage({ conversationId: convId, content: 'B' })
+
+      await Promise.all([store.append(msgA), store.append(msgB)])
+
+      const filePath = path.join(tempDir, 'chat', 'messages', `${convId}.jsonl`)
+      const content = await readFile(filePath, 'utf-8')
+      const lines = content.trim().split('\n')
+
+      expect(lines).toHaveLength(2)
+      const contents = lines.map((line) => (JSON.parse(line) as Message).content).sort()
+      expect(contents).toEqual(['A', 'B'])
     })
 
     it('should update lastMessageCache after append', async () => {

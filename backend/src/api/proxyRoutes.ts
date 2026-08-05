@@ -22,6 +22,8 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { z } from 'zod'
+import dns from 'node:dns/promises'
+import net from 'node:net'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
 
@@ -61,38 +63,84 @@ const MAX_RESPONSE_BODY = 50 * 1024 * 1024
 /** Request timeout in milliseconds. */
 const PROXY_TIMEOUT_MS = 30_000
 
+/** Maximum number of redirects the proxy will follow before giving up. */
+const MAX_PROXY_REDIRECTS = 5
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function createApiError(code: string, message: string): ApiError {
   return { code, message, timestamp: new Date().toISOString() }
 }
 
+/** Thrown when a URL (initial or post-redirect) is blocked by SSRF/allowlist checks. */
+class ProxyBlockedError extends Error {
+  constructor(public readonly apiCode: string, message: string) {
+    super(message)
+    this.name = 'ProxyBlockedError'
+  }
+}
+
+/** Checks whether a raw IP address falls within a private/loopback/link-local IPv4 range. */
+function isPrivateIPv4(ip: string): boolean {
+  const parts = ip.split('.').map((p) => Number.parseInt(p, 10))
+  if (parts.length !== 4 || parts.some((p) => Number.isNaN(p) || p < 0 || p > 255)) return true
+  const [a, b] = parts as [number, number, number, number]
+  if (a === 127) return true // 127.0.0.0/8 loopback
+  if (a === 10) return true // 10.0.0.0/8
+  if (a === 0) return true // 0.0.0.0/8
+  if (a === 169 && b === 254) return true // 169.254.0.0/16 link-local
+  if (a === 192 && b === 168) return true // 192.168.0.0/16
+  if (a === 172 && b >= 16 && b <= 31) return true // 172.16.0.0/12
+  if (a === 100 && b >= 64 && b <= 127) return true // 100.64.0.0/10 carrier-grade NAT
+  if (a >= 224) return true // multicast (224-239) and reserved (240-255)
+  return false
+}
+
+/** Checks whether a raw IP address falls within a private/loopback/link-local IPv6 range. */
+function isPrivateIPv6(ip: string): boolean {
+  const normalized = ip.toLowerCase()
+  if (normalized === '::1' || normalized === '::') return true
+  if (normalized.startsWith('fe8') || normalized.startsWith('fe9') || normalized.startsWith('fea') || normalized.startsWith('feb')) return true // fe80::/10 link-local
+  if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true // fc00::/7 unique local
+  // IPv4-mapped IPv6 addresses, e.g. ::ffff:127.0.0.1
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(normalized)
+  if (mapped?.[1]) return isPrivateIPv4(mapped[1])
+  return false
+}
+
+function isPrivateIp(ip: string): boolean {
+  const family = net.isIP(ip)
+  if (family === 4) return isPrivateIPv4(ip)
+  if (family === 6) return isPrivateIPv6(ip)
+  return true // Not a recognizable IP — block defensively
+}
+
 /**
- * Check if a URL's hostname resolves to a private/internal IP range.
- * Blocks SSRF attacks against internal services.
+ * Checks if a URL's hostname resolves to a private/internal IP range.
+ * Resolves DNS (rather than pattern-matching the hostname string) so that a public
+ * domain name which resolves to a private/loopback address (DNS rebinding) is also blocked.
  */
-function isPrivateUrl(urlStr: string): boolean {
+async function isPrivateUrl(urlStr: string): Promise<boolean> {
+  let hostname: string
   try {
-    const url = new URL(urlStr)
-    const hostname = url.hostname
-
-    // Block obvious private addresses
-    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') return true
-    if (hostname.startsWith('10.')) return true
-    if (hostname.startsWith('192.168.')) return true
-    if (hostname.startsWith('169.254.')) return true
-    if (hostname.startsWith('0.')) return true
-
-    // Block 172.16.0.0 - 172.31.255.255
-    const parts = hostname.split('.')
-    if (parts[0] === '172') {
-      const second = parseInt(parts[1] ?? '0', 10)
-      if (second >= 16 && second <= 31) return true
-    }
-
-    return false
+    hostname = new URL(urlStr).hostname
   } catch {
     return true // Invalid URL = block
+  }
+
+  if (hostname.toLowerCase() === 'localhost') return true
+
+  // Literal IP in the URL — check directly, no DNS lookup needed
+  if (net.isIP(hostname) !== 0) {
+    return isPrivateIp(hostname)
+  }
+
+  try {
+    const records = await dns.lookup(hostname, { all: true, verbatim: true })
+    if (records.length === 0) return true
+    return records.some((record) => isPrivateIp(record.address))
+  } catch {
+    return true // Unresolvable hostname = block
   }
 }
 
@@ -171,7 +219,7 @@ export function createProxyRoutes(deps: ProxyRoutesDeps): Hono {
       ?? (headers ? (headers['Content-Type'] ?? headers['content-type']) : undefined)
 
     // Security: Block private/internal URLs (SSRF protection)
-    if (isPrivateUrl(url)) {
+    if (await isPrivateUrl(url)) {
       logger.warn('Proxy request blocked: private URL', { userId: session.userId, url })
       return c.json(createApiError('PROXY_BLOCKED', 'Requests to private/internal addresses are not allowed'), 403)
     }
@@ -215,13 +263,39 @@ export function createProxyRoutes(deps: ProxyRoutesDeps): Hono {
     const timeoutId = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS)
 
     try {
-      const response = await fetch(url, {
-        method,
-        headers: outgoingHeaders,
-        body: (method !== 'GET' && method !== 'HEAD' && body) ? Buffer.from(body, 'utf-8') : null,
-        signal: controller.signal,
-        redirect: 'follow',
-      })
+      let currentUrl = url
+      let response: Response
+
+      // Follow redirects manually, re-validating each hop against the SSRF/allowlist
+      // checks above — a compromised or malicious server could otherwise redirect the
+      // request to a private address or an off-allowlist origin after the initial check.
+      for (let redirectCount = 0; ; redirectCount++) {
+        if (redirectCount > MAX_PROXY_REDIRECTS) {
+          throw new ProxyBlockedError('PROXY_BLOCKED', 'Too many redirects')
+        }
+
+        response = await fetch(currentUrl, {
+          method,
+          headers: outgoingHeaders,
+          body: (method !== 'GET' && method !== 'HEAD' && body) ? Buffer.from(body, 'utf-8') : null,
+          signal: controller.signal,
+          redirect: 'manual',
+        })
+
+        if (response.status < 300 || response.status >= 400) break
+
+        const location = response.headers.get('location')
+        if (!location) break
+
+        const nextUrl = new URL(location, currentUrl).toString()
+        if (await isPrivateUrl(nextUrl)) {
+          throw new ProxyBlockedError('PROXY_BLOCKED', 'Redirect target is a private/internal address')
+        }
+        if (!isUrlAllowed(nextUrl, combinedAllowlist)) {
+          throw new ProxyBlockedError('PROXY_BLOCKED', 'Redirect target is not in the allowed origins list')
+        }
+        currentUrl = nextUrl
+      }
 
       clearTimeout(timeoutId)
 
@@ -262,6 +336,11 @@ export function createProxyRoutes(deps: ProxyRoutesDeps): Hono {
       }
     } catch (error) {
       clearTimeout(timeoutId)
+
+      if (error instanceof ProxyBlockedError) {
+        logger.warn('Proxy request blocked during redirect', { userId: session.userId, url, reason: error.message })
+        return c.json(createApiError(error.apiCode, error.message), 403)
+      }
 
       if (error instanceof Error && error.name === 'AbortError') {
         logger.warn('Proxy request timed out', { userId: session.userId, url })

@@ -4,36 +4,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
-
-// ─── Async Mutex ─────────────────────────────────────────────────────────────
-
-/**
- * Promise-based mutex for serializing async read-modify-write operations.
- * Ensures only one async flow executes the critical section at a time.
- * Safe in single-threaded Node.js — prevents interleaving of async operations.
- */
-class AsyncMutex {
-  private queue: Promise<void> = Promise.resolve()
-
-  /**
-   * Executes the given function while holding the mutex.
-   * Subsequent calls are queued and execute in order.
-   */
-  async runExclusive<T>(fn: () => Promise<T>): Promise<T> {
-    let release: () => void
-    const next = new Promise<void>((resolve) => { release = resolve })
-
-    const prev = this.queue
-    this.queue = next
-
-    await prev
-    try {
-      return await fn()
-    } finally {
-      release!()
-    }
-  }
-}
+import { AsyncMutex } from '../shared/async-mutex.js'
 
 // --- Data Models ---
 
@@ -82,6 +53,15 @@ export interface IVaultRegistry {
   removeEntry(vaultId: string): Promise<void>
   findById(vaultId: string): VaultRegistryEntry | null
   findByName(name: string): VaultRegistryEntry | null
+
+  /**
+   * Loads the freshest entries, applies `mutator` to them, and persists the
+   * result — all while holding the same mutex as addEntry/removeEntry, so the
+   * whole read-modify-write cycle is atomic with respect to concurrent
+   * registry mutations. `mutator` may throw to abort without persisting
+   * (e.g. if a precondition no longer holds against the freshly-loaded data).
+   */
+  updateEntries<T>(mutator: (entries: VaultRegistryEntry[]) => T): Promise<T>
 }
 
 // --- Implementation ---
@@ -145,8 +125,20 @@ export class VaultRegistry implements IVaultRegistry {
    * Writes the entries to disk atomically.
    * Writes to a temp file first, then renames to prevent corruption.
    * Updates the in-memory cache.
+   * Serialized via mutex (same lock as addEntry/removeEntry) to prevent a direct
+   * save() call from racing with — and silently clobbering — a concurrent add/remove.
    */
   async save(entries: VaultRegistryEntry[]): Promise<void> {
+    await this.mutex.runExclusive(async () => {
+      await this.persistUnlocked(entries)
+    })
+  }
+
+  /**
+   * Writes entries to disk without acquiring the mutex.
+   * Only call this from within a block already holding `this.mutex`.
+   */
+  private async persistUnlocked(entries: VaultRegistryEntry[]): Promise<void> {
     await this.ensureDirectories()
 
     const data: RegistryFile = {
@@ -186,7 +178,7 @@ export class VaultRegistry implements IVaultRegistry {
       await this.load()
 
       this.entries.push(entry)
-      await this.save(this.entries)
+      await this.persistUnlocked(this.entries)
     })
   }
 
@@ -202,7 +194,22 @@ export class VaultRegistry implements IVaultRegistry {
       await this.load()
 
       this.entries = this.entries.filter((e) => e.id !== vaultId)
-      await this.save(this.entries)
+      await this.persistUnlocked(this.entries)
+    })
+  }
+
+  /**
+   * Loads the freshest entries, applies `mutator`, and persists the result —
+   * all within a single mutex hold. See IVaultRegistry for details.
+   */
+  async updateEntries<T>(mutator: (entries: VaultRegistryEntry[]) => T): Promise<T> {
+    return this.mutex.runExclusive(async () => {
+      await this.ensureDirectories()
+      await this.load()
+
+      const result = mutator(this.entries)
+      await this.persistUnlocked(this.entries)
+      return result
     })
   }
 
