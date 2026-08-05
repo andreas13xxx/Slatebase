@@ -25,6 +25,7 @@ function createMockGitHubClient(): IGitHubClient {
     fetchCommunityPlugins: vi.fn(),
     fetchManifest: vi.fn(),
     downloadReleaseAssets: vi.fn(),
+    fetchLatestReleaseInfo: vi.fn().mockResolvedValue(null),
     getRateLimitRemaining: vi.fn().mockReturnValue(100),
   }
 }
@@ -41,6 +42,9 @@ function createMockCache(): IPluginStoreCache {
     getPluginListFallback: vi.fn().mockReturnValue(null),
     getManifestFallback: vi.fn().mockReturnValue(null),
     getUpdateCheckFallback: vi.fn().mockReturnValue(null),
+    getPluginStats: vi.fn().mockReturnValue(null),
+    setPluginStats: vi.fn(),
+    getPluginStatsFallback: vi.fn().mockReturnValue(null),
   }
 }
 

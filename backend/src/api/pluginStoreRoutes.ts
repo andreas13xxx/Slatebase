@@ -86,6 +86,22 @@ export function createPluginStoreRoutes(deps: PluginStoreRouteDependencies): Hon
     }
   })
 
+  // GET /plugins/stats — Release stats for all plugins (cached)
+  // NOTE: Must be registered BEFORE /plugins/:pluginId/* to avoid "stats" being matched as pluginId
+  app.get('/plugins/stats', async (c: Context): Promise<Response> => {
+    const session = c.get('session') as SessionContext | undefined
+    if (session === undefined) {
+      return c.json(createApiError('UNAUTHORIZED', 'Missing session context'), 401)
+    }
+
+    try {
+      const result = await pluginStoreService.getPluginStats()
+      return c.json(result, 200)
+    } catch (error) {
+      return handleStoreError(c, error, logger)
+    }
+  })
+
   // GET /plugins/:pluginId/manifest — Remote manifest for a plugin
   app.get('/plugins/:pluginId/manifest', async (c: Context): Promise<Response> => {
     const session = c.get('session') as SessionContext | undefined

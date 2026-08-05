@@ -7,7 +7,7 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Loader2 } from 'lucide-react'
-import type { IApiClient, CommunityPluginEntry, UpdateCheckResult, BulkUpdateResult, PluginManifest } from '../../api'
+import type { IApiClient, CommunityPluginEntry, UpdateCheckResult, BulkUpdateResult, PluginManifest, PluginReleaseStats } from '../../api'
 import { useTranslation } from '../../i18n'
 import { extractErrorMessage } from '../../utils/error'
 import type { PluginStoreDisplayEntry, PluginStoreStatus } from './types'
@@ -56,6 +56,7 @@ export function PluginStoreBrowser({ vaultId, apiClient }: PluginStoreBrowserPro
   const [installedPlugins, setInstalledPlugins] = useState<PluginManifest[]>([])
   const [selectedPlugin, setSelectedPlugin] = useState<PluginStoreDisplayEntry | null>(null)
   const [selectedCategory, setSelectedCategory] = useState('')
+  const [pluginStats, setPluginStats] = useState<Record<string, PluginReleaseStats>>({})
   // ─── Data Loading ───────────────────────────────────────────────────────────
 
   const loadPlugins = useCallback(async () => {
@@ -78,6 +79,18 @@ export function PluginStoreBrowser({ vaultId, apiClient }: PluginStoreBrowserPro
   useEffect(() => {
     void loadPlugins()
   }, [loadPlugins])
+
+  // Fetch release stats (non-blocking, best-effort)
+  useEffect(() => {
+    void (async () => {
+      try {
+        const result = await apiClient.getPluginStats()
+        setPluginStats(result.stats)
+      } catch {
+        // Non-critical: stats are optional display data
+      }
+    })()
+  }, [apiClient])
 
   // ─── Derived Data ───────────────────────────────────────────────────────────
 
@@ -162,6 +175,8 @@ export function PluginStoreBrowser({ vaultId, apiClient }: PluginStoreBrowserPro
       else if (hasUpdate) status = 'update-available'
       else if (isInstalled) status = 'installed'
 
+      const stats = pluginStats[p.id]
+
       return {
         id: p.id,
         name: p.name,
@@ -175,9 +190,11 @@ export function PluginStoreBrowser({ vaultId, apiClient }: PluginStoreBrowserPro
         status,
         error: pluginError,
         releaseUrl: updateInfo?.releaseUrl,
+        downloads: stats?.downloads,
+        updatedAt: stats?.updatedAt,
       }
     })
-  }, [filteredPlugins, installedPluginIds, installedVersionMap, updateInfoMap, installingPlugins, updatingPlugins, pluginErrors])
+  }, [filteredPlugins, installedPluginIds, installedVersionMap, updateInfoMap, installingPlugins, updatingPlugins, pluginErrors, pluginStats])
 
   // ─── Actions ────────────────────────────────────────────────────────────────
 

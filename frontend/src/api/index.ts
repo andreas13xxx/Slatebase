@@ -127,6 +127,19 @@ export interface BulkUpdateResult {
   failed: Array<{ pluginId: string; reason: string }>
 }
 
+/** Release stats for a single plugin */
+export interface PluginReleaseStats {
+  pluginId: string
+  downloads: number
+  updatedAt: string
+}
+
+/** Aggregated stats response from the backend */
+export interface PluginStatsResponse {
+  stats: Record<string, PluginReleaseStats>
+  cachedAt: string
+}
+
 // ─── Plugin Types ─────────────────────────────────────────────────────────────
 
 /**
@@ -364,6 +377,8 @@ export interface IApiClient {
   updateAllPlugins(vaultId: string): Promise<BulkUpdateResult>
   /** Fetch a plugin's README.md from GitHub (via proxy). */
   getPluginReadme(repo: string): Promise<string>
+  /** Get release stats (downloads, last updated) for all plugins. */
+  getPluginStats(): Promise<PluginStatsResponse>
 
   // --- Feature Toggle methods ---
   /** Load features visible to the current user (name + enabled). */
@@ -905,6 +920,11 @@ export class ApiClient implements IApiClient {
       method: 'GET',
     })
     return result.text
+  }
+
+  /** Get release stats (downloads, last updated) for all plugins. */
+  async getPluginStats(): Promise<PluginStatsResponse> {
+    return this.request<PluginStatsResponse>('GET', '/api/v1/plugin-store/plugins/stats')
   }
 
   // --- Feature Toggle methods ---

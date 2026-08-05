@@ -1,6 +1,6 @@
 // ─── Plugin Store Cache ───────────────────────────────────────────────────────
 
-import type { CommunityPluginEntry, IPluginStoreConfig, RemotePluginManifest, UpdateCheckResult } from './types.js'
+import type { CommunityPluginEntry, IPluginStoreConfig, RemotePluginManifest, UpdateCheckResult, PluginReleaseStats } from './types.js'
 
 /** A cached entry with TTL expiration tracking */
 interface CacheEntry<T> {
@@ -34,6 +34,12 @@ export interface IPluginStoreCache {
   getManifestFallback(repo: string): RemotePluginManifest | null
   /** Get a cached update check result even if expired (fallback for errors) */
   getUpdateCheckFallback(vaultId: string): UpdateCheckResult | null
+  /** Get cached plugin stats if within TTL, otherwise null */
+  getPluginStats(): Map<string, PluginReleaseStats> | null
+  /** Store plugin stats with configured TTL (same as plugin list TTL) */
+  setPluginStats(stats: Map<string, PluginReleaseStats>): void
+  /** Get cached plugin stats even if expired (fallback for errors) */
+  getPluginStatsFallback(): Map<string, PluginReleaseStats> | null
 }
 
 /**
@@ -50,6 +56,7 @@ export class PluginStoreCache implements IPluginStoreCache {
   private pluginList: CacheEntry<CommunityPluginEntry[]> | null = null
   private readonly manifests = new Map<string, CacheEntry<RemotePluginManifest>>()
   private readonly updateChecks = new Map<string, CacheEntry<UpdateCheckResult>>()
+  private pluginStats: CacheEntry<Map<string, PluginReleaseStats>> | null = null
 
   private readonly cacheTtlPluginList: number
   private readonly cacheTtlManifest: number
@@ -147,5 +154,32 @@ export class PluginStoreCache implements IPluginStoreCache {
       return null
     }
     return entry.data
+  }
+
+  /** Get cached plugin stats if within TTL, otherwise null */
+  getPluginStats(): Map<string, PluginReleaseStats> | null {
+    if (this.pluginStats === null) {
+      return null
+    }
+    if (Date.now() > this.pluginStats.expiresAt) {
+      return null
+    }
+    return this.pluginStats.data
+  }
+
+  /** Store plugin stats with configured TTL (same as plugin list TTL) */
+  setPluginStats(stats: Map<string, PluginReleaseStats>): void {
+    this.pluginStats = {
+      data: stats,
+      expiresAt: Date.now() + this.cacheTtlPluginList,
+    }
+  }
+
+  /** Get cached plugin stats even if expired (fallback for errors) */
+  getPluginStatsFallback(): Map<string, PluginReleaseStats> | null {
+    if (this.pluginStats === null) {
+      return null
+    }
+    return this.pluginStats.data
   }
 }

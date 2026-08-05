@@ -9,23 +9,11 @@
 
 .plugin-store-browser__list {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: var(--spacing-sm);
   overflow-y: auto;
   flex: 1;
   padding-right: var(--spacing-xs);
-}
-
-@media (max-width: 899px) {
-  .plugin-store-browser__list {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 599px) {
-  .plugin-store-browser__list {
-    grid-template-columns: 1fr;
-  }
 }
 
 .plugin-store-browser__loading {
@@ -186,6 +174,21 @@
 }
 
 /* ─── Card Footer ──────────────────────────────────────────────────────────── */
+
+.plugin-store-card__stats {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-top: 2px;
+}
+
+.plugin-store-card__stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
 
 .plugin-store-card__footer {
   display: flex;
