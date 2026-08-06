@@ -8,7 +8,7 @@ import type { ComponentType, SVGProps } from 'react'
 import {
   Markdown, TypeScript, Js, Reactjs, Reactts,
   Python, Ruby, Rust, Go, Java, Kotlin, Swift,
-  C, Cplus, Csharp, PHP, Lua, Shell, Dart, Scala,
+  CLang, Cplus, Csharp, PHP, Lua, Shell, Dart, Scala,
   Clojure, Elixir, Zig, R, Perl, Julia, Vlang,
   Angular, Svelte, Vue,
   Sass, PostCSS, Tailwind,
@@ -104,9 +104,9 @@ const EXTENSION_ICON_MAP: Record<string, IconComponent> = {
   // Swift
   swift: Swift,
   // C / C++
-  c: C,
+  c: CLang,
   cpp: Cplus,
-  h: C,
+  h: CLang,
   hpp: Cplus,
   // C#
   cs: Csharp,
