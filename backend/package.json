@@ -16,18 +16,18 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@hono/node-server": "^1.14.0",
+    "@hono/node-server": "^2.0.10",
     "@modelcontextprotocol/sdk": "1.18.0",
-    "adm-zip": "0.5.16",
+    "adm-zip": "0.6.0",
     "argon2": "0.41.1",
-    "hono": "^4.7.0",
+    "hono": "^4.13.0",
     "pino": "^9.6.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/adm-zip": "0.5.7",
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.1.2",
     "eslint": "^10.3.0",
     "fast-check": "3.22.0",
     "globals": "^17.6.0",
