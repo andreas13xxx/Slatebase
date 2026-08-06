@@ -515,7 +515,6 @@ export function PluginProvider({
           workspace: newWorkspaceShim,
           metadataCache: newMetadataCacheShim,
           pluginId,
-          commandRegistry: commandRegistryRef.current,
         })
       },
       sandbox: newSandbox,
@@ -552,14 +551,10 @@ export function PluginProvider({
             unregister: () => {},
           }
         }
-        // Wire addCommand to route to the shared CommandRegistry.
-        // Must return the registered Command — plugins commonly stash the result,
-        // e.g. `this.forceSaveCommand = this.addCommand(...)`, and later read `.id` off it.
+        // Wire addCommand to route to the shared CommandRegistry
         instance.addCommand = (command) => {
-          if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) {
-            return { ...command, pluginId }
-          }
-          return commandRegistryRef.current.addCommand(pluginId, command)
+          if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) return
+          commandRegistryRef.current.addCommand(pluginId, command)
         }
         // Wire addSettingTab to route to the shared SettingTabRegistry
         instance.addSettingTab = (tab: unknown) => {
