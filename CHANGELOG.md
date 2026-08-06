@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.25.3](https://github.com/andreas13xxx/Slatebase/compare/v0.25.2...v0.25.3) (2026-08-06)
+
+
+### Bugfixes
+
+* cast transport for exactOptionalPropertyTypes compat with newer MCP SDK ([9d69edd](https://github.com/andreas13xxx/Slatebase/commit/9d69edde2352364eff5522673f42da1e99485ca1))
+
+
+### Sonstige Änderungen
+
+* bump @hono/node-server from 1.19.14 to 2.0.10 in /backend ([#83](https://github.com/andreas13xxx/Slatebase/issues/83)) ([95ddd41](https://github.com/andreas13xxx/Slatebase/commit/95ddd412d489a0c55a90ed57561310cd76fd4d52))
+* bump @testing-library/jest-dom from 6.9.1 to 7.0.0 in /frontend ([#79](https://github.com/andreas13xxx/Slatebase/issues/79)) ([e00944b](https://github.com/andreas13xxx/Slatebase/commit/e00944beef4b450b9a7a6215090812c623890ced))
+* bump @types/node from 24.12.4 to 26.1.2 in /frontend ([#77](https://github.com/andreas13xxx/Slatebase/issues/77)) ([45784fc](https://github.com/andreas13xxx/Slatebase/commit/45784fcbecd8a98943b636a6e47086408669764c))
+* bump adm-zip from 0.5.16 to 0.6.0 in /backend ([#84](https://github.com/andreas13xxx/Slatebase/issues/84)) ([b69a3fa](https://github.com/andreas13xxx/Slatebase/commit/b69a3fa2af906daf27abb48e0bad7816030b207a))
+* bump body-parser from 2.2.2 to 2.3.0 in /backend ([#85](https://github.com/andreas13xxx/Slatebase/issues/85)) ([4aa7bb1](https://github.com/andreas13xxx/Slatebase/commit/4aa7bb18a61c7c61f72ce98b43b486481dde7a08))
+* bump fast-check from 3.22.0 to 4.9.0 in /backend ([#74](https://github.com/andreas13xxx/Slatebase/issues/74)) ([b41b597](https://github.com/andreas13xxx/Slatebase/commit/b41b597910259b9847e71659fd27143dfc374297))
+* bump hono from 4.12.21 to 4.13.0 in /backend ([#82](https://github.com/andreas13xxx/Slatebase/issues/82)) ([3e526c8](https://github.com/andreas13xxx/Slatebase/commit/3e526c8b57e08d49c4373cbd56db27efc7cf45ab))
+* bump lucide-react from 0.511.0 to 1.28.0 in /frontend ([#76](https://github.com/andreas13xxx/Slatebase/issues/76)) ([7c88ba0](https://github.com/andreas13xxx/Slatebase/commit/7c88ba09b507451344a04f7e731a9bfb06bcfe61))
+* bump vitest from 3.2.4 to 4.1.10 in /backend ([#72](https://github.com/andreas13xxx/Slatebase/issues/72)) ([314cf38](https://github.com/andreas13xxx/Slatebase/commit/314cf383693a1ff1c394427b532bbade3a1ce834))
+
 ## [0.25.2](https://github.com/andreas13xxx/Slatebase/compare/v0.25.1...v0.25.2) (2026-08-06)
 
 
