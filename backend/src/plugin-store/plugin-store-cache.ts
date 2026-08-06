@@ -98,6 +98,8 @@ export class PluginStoreCache implements IPluginStoreCache {
   private readonly cacheTtlManifest: number
   private readonly store: JsonFileStore<PersistedCacheState> | null
   private readonly logger: ILogger | null
+  /** Resolves once the most recently triggered persist() write has settled — test-only hook. */
+  private lastPersist: Promise<void> = Promise.resolve()
 
   constructor(config: IPluginStoreConfig, dataDir?: string, logger?: ILogger) {
     this.cacheTtlPluginList = config.cacheTtlPluginList
@@ -279,9 +281,17 @@ export class PluginStoreCache implements IPluginStoreCache {
         : null,
     }
 
-    this.store.write(state).catch((err: unknown) => {
+    this.lastPersist = this.store.write(state).catch((err: unknown) => {
       this.logger?.error('Failed to persist plugin store cache', { error: String(err) })
     })
+  }
+
+  /**
+   * Resolves once the most recently triggered persist() write has settled.
+   * Test-only: lets tests await the fire-and-forget write instead of racing it.
+   */
+  async waitForPersist(): Promise<void> {
+    await this.lastPersist
   }
 }
 
