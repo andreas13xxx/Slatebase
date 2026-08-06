@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.25.2](https://github.com/andreas13xxx/Slatebase/compare/v0.25.1...v0.25.2) (2026-08-06)
+
+
+### Bugfixes
+
+* cancel scheduled post-FCP plugin load on unmount ([f4926c2](https://github.com/andreas13xxx/Slatebase/commit/f4926c264d75bb442fdf1f0799979618191d7ab2))
+* replace fixed-delay persist wait with deterministic flush in cache test ([46ffed9](https://github.com/andreas13xxx/Slatebase/commit/46ffed9e93570f088cce9d5fc584cbc96c6fed5c))
+* revert accidental commandRegistry AppShim wiring ([e7805d7](https://github.com/andreas13xxx/Slatebase/commit/e7805d7369588c07e968f3c96674fa860babbddc))
+* update to renamed CLang icon export from @react-symbols/icons ([64fa218](https://github.com/andreas13xxx/Slatebase/commit/64fa2180470171fa12b4d0d1a61f5376444f4965))
+
+
+### Sonstige Änderungen
+
+* add Dependabot config for backend, frontend, and GitHub Actions ([e8141f8](https://github.com/andreas13xxx/Slatebase/commit/e8141f8296ffb6de7ddcd9d17b95bab99dd7c553))
+* bump @types/node from 22.19.19 to 26.1.2 in /backend ([#71](https://github.com/andreas13xxx/Slatebase/issues/71)) ([aafbf9d](https://github.com/andreas13xxx/Slatebase/commit/aafbf9d5286650b89d3fa300f724ccebf2db063f))
+* bump actions/checkout from 4 to 7 ([#67](https://github.com/andreas13xxx/Slatebase/issues/67)) ([4d362c9](https://github.com/andreas13xxx/Slatebase/commit/4d362c9ebe5205a19db9cd57c00caacc58d62ad7))
+* bump docker/build-push-action from 6 to 7 ([#69](https://github.com/andreas13xxx/Slatebase/issues/69)) ([d19ec54](https://github.com/andreas13xxx/Slatebase/commit/d19ec54de3e06503fe1d739a49b345ba35495466))
+* bump docker/login-action from 3 to 4 ([#68](https://github.com/andreas13xxx/Slatebase/issues/68)) ([302757e](https://github.com/andreas13xxx/Slatebase/commit/302757e1510f8b5d7126c8ca35c0d1d8224cf8fb))
+* bump docker/setup-buildx-action from 3 to 4 ([#66](https://github.com/andreas13xxx/Slatebase/issues/66)) ([e620e81](https://github.com/andreas13xxx/Slatebase/commit/e620e81e959f4714853039cb9d5fccf4a4a7de83))
+* bump docker/setup-qemu-action from 3 to 4 ([#65](https://github.com/andreas13xxx/Slatebase/issues/65)) ([61f8d32](https://github.com/andreas13xxx/Slatebase/commit/61f8d3282dd9d63f0508c44b4ea633775475028b))
+* bump postcss from 8.5.15 to 8.5.26 in /backend ([#81](https://github.com/andreas13xxx/Slatebase/issues/81)) ([f74e60d](https://github.com/andreas13xxx/Slatebase/commit/f74e60db5327191446c97f1d67e94025480efb51))
+* bump the minor-patch group in /frontend with 15 updates ([#75](https://github.com/andreas13xxx/Slatebase/issues/75)) ([340f818](https://github.com/andreas13xxx/Slatebase/commit/340f818eca6a4824b9af0be0f004efe3d9b0af2c))
+* consolidate JSON persistence into shared JsonFileStore, add plugin service layer ([feb84da](https://github.com/andreas13xxx/Slatebase/commit/feb84daa5bede90d955d3c0103e281387d3a5f3d))
+* **deps-dev:** bump brace-expansion from 5.0.6 to 5.0.9 in /frontend ([#64](https://github.com/andreas13xxx/Slatebase/issues/64)) ([bdac8b7](https://github.com/andreas13xxx/Slatebase/commit/bdac8b78e30f79e74b80f1e5d170e4522c5552eb))
+* **deps:** bump dompurify from 3.4.11 to 3.4.13 in /frontend ([#63](https://github.com/andreas13xxx/Slatebase/issues/63)) ([076b18e](https://github.com/andreas13xxx/Slatebase/commit/076b18ef22085464784c32d2ba23048812d4c477))
+* **deps:** bump postcss from 8.5.15 to 8.5.26 in /frontend ([#62](https://github.com/andreas13xxx/Slatebase/issues/62)) ([03e0ced](https://github.com/andreas13xxx/Slatebase/commit/03e0ced692a3d1bdf46b4103daba376d36457078))
+* **deps:** bump undici from 7.25.0 to 7.29.0 in /frontend ([#61](https://github.com/andreas13xxx/Slatebase/issues/61)) ([ff7530c](https://github.com/andreas13xxx/Slatebase/commit/ff7530cce67d228724d6f42ccc6f00e80dc74c62))
+
 ## [0.25.1](https://github.com/andreas13xxx/Slatebase/compare/v0.25.0...v0.25.1) (2026-08-05)
 
 
