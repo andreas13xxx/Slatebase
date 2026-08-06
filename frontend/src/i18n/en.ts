@@ -38,6 +38,7 @@ export const en: TranslationShape = {
     sessionExpiredBanner: 'Session expired — please log in again',
     changePassword: 'Change password',
     changingPassword: 'Changing password…',
+    changePasswordFor: 'Password for {name}',
     changePasswordInfo: 'You must change your password before you can continue.',
     currentPassword: 'Current password',
     newPassword: 'New password',
@@ -253,7 +254,6 @@ export const en: TranslationShape = {
     createWelcomeVaultDescription: 'Creates a vault with a complete Slatebase guide and examples.',
     creatingWelcomeVault: 'Creating…',
     welcomeVaultCreated: 'Tutorial vault "{name}" has been created.',
-    welcomeVaultFeatureDisabled: 'The tutorial vault feature is disabled.',
     welcomeVaultError: 'Failed to create tutorial vault.',
   },
 

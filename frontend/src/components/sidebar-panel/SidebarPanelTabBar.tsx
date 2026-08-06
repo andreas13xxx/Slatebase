@@ -34,7 +34,7 @@ export function SidebarPanelTabBar({
   onTabReorder,
   onTabSplit,
   onTabReceive,
-  panelWidth: _panelWidth, // eslint-disable-line @typescript-eslint/no-unused-vars
+  panelWidth: _panelWidth,  
 }: SidebarPanelTabBarProps) {
   const [draggedTab, setDraggedTab] = useState<SidebarViewId | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)

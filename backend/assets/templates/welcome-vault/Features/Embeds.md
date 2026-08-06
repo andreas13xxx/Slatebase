@@ -27,6 +27,16 @@ Unterstützte Formate: PNG, JPG, JPEG, GIF, WEBP, SVG.
 ![[Screenshots/gesamtansicht.png]]
 ```
 
+**Live-Beispiel:** Im Vault liegt unter `Anhänge/Demo-Bild.png` ein Testbild. Der folgende Code
+
+```
+![[Anhänge/Demo-Bild.png|400]]
+```
+
+erzeugt direkt darunter dieses eingebettete Bild:
+
+![[Anhänge/Demo-Bild.png|400]]
+
 ### Größe anpassen
 
 Mit dem Pipe-Zeichen gibst du eine Breite in Pixeln an:
@@ -41,6 +51,10 @@ Mit dem Pipe-Zeichen gibst du eine Breite in Pixeln an:
 | `![[foto.png]]` | Volle Breite (max. Container) |
 | `![[foto.png\|300]]` | 300px Breite |
 | `![[foto.png\|150]]` | 150px Breite (Thumbnail) |
+
+Zum Vergleich dasselbe Demo-Bild als Thumbnail:
+
+![[Anhänge/Demo-Bild.png|150]]
 
 ---
 
@@ -60,6 +74,16 @@ Der PDF-Viewer erlaubt:
 > [!tip] PDF-Größe
 > Für große PDFs empfiehlt sich eine Größenangabe, um den Viewer in der Höhe zu begrenzen: `![[handbuch.pdf|600]]`
 
+**Live-Beispiel:** Im Vault liegt unter `Anhänge/Demo-Dokument.pdf` ein zweiseitiges Test-PDF. Der Code
+
+```
+![[Anhänge/Demo-Dokument.pdf|500]]
+```
+
+rendert den folgenden Inline-Viewer — blättere auf Seite 2, um zu sehen, dass die Navigation funktioniert:
+
+![[Anhänge/Demo-Dokument.pdf|500]]
+
 ---
 
 ## Notizen einbetten
@@ -72,6 +96,16 @@ Du kannst den gesamten Inhalt einer anderen Markdown-Datei einbetten:
 
 Die eingebettete Notiz wird vollständig gerendert (mit Headings, Listen, Callouts usw.).
 
+**Live-Beispiel:** Im Vault liegt unter `Anhänge/Demo-Notiz.md` eine Demo-Notiz mit zwei Abschnitten. Der Code
+
+```
+![[Anhänge/Demo-Notiz]]
+```
+
+bettet die komplette Notiz ein — inklusive beider Abschnitte, Liste und Callout:
+
+![[Anhänge/Demo-Notiz]]
+
 ### Heading-Embeds
 
 Nur einen bestimmten Abschnitt einbetten:
@@ -81,6 +115,14 @@ Nur einen bestimmten Abschnitt einbetten:
 ```
 
 Dies zeigt nur den Inhalt unter der angegebenen Überschrift (bis zur nächsten Überschrift gleicher oder höherer Ebene).
+
+**Live-Beispiel:** Derselbe Code mit `#Abschnitt B` zeigt nur diesen einen Abschnitt aus der Demo-Notiz — Abschnitt A und der einleitende Text fehlen:
+
+```
+![[Anhänge/Demo-Notiz#Abschnitt B]]
+```
+
+![[Anhänge/Demo-Notiz#Abschnitt B]]
 
 ---
 
@@ -130,7 +172,9 @@ Eingefügte Bilder werden automatisch im Vault gespeichert und können sofort ei
 > [!todo] Übung
 > 1. Erstelle eine neue Datei und bette diese Datei ein: `![[Features/Embeds#Grundsyntax]]`
 > 2. Wechsle in den Viewer-Modus und prüfe, ob nur der Abschnitt "Grundsyntax" angezeigt wird
-> 3. Falls du ein Bild im Vault hast, bette es mit einer Größenangabe ein
+> 3. Bette `Anhänge/Demo-Bild.png` mit einer anderen Breite ein, z. B. `![[Anhänge/Demo-Bild.png|250]]`
+> 4. Bette `Anhänge/Demo-Dokument.pdf` ein und blättere im Viewer auf Seite 2
+> 5. Bette `Anhänge/Demo-Notiz` einmal komplett und einmal nur mit `#Abschnitt A` ein — vergleiche die beiden Ergebnisse
 
 ---
 

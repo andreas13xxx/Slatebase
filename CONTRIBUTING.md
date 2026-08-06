@@ -40,6 +40,22 @@ The frontend runs on `http://localhost:5173` and proxies `/api` requests to the 
 
 **Default login:** `admin` / `admin` (password change is enforced on first login).
 
+### Git Hooks
+
+One-time setup per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This activates `.githooks/pre-commit`, which on every commit:
+
+- Asks you to confirm your configured git identity (`user.name`/`user.email`)
+- Blocks commits containing merge-conflict markers or likely secret/credential files (`.env`, `.pem`, `.key`, `id_rsa`, `credentials.json`)
+- Runs ESLint and `tsc --noEmit` for `backend`/`frontend` when staged files touch that package
+
+This catches the same lint/type errors CI would fail on, before you push. Skip in an emergency with `git commit --no-verify` (use sparingly).
+
 ### Commands
 
 #### Backend (`cd backend`)
@@ -74,23 +90,34 @@ backend/           — Node.js REST API (Hono + TypeScript, ESM)
 ├── src/           — Source code (layered architecture)
 │   ├── config/    — Zod-validated configuration
 │   ├── logger/    — Pino structured logging
+│   ├── shared/    — Cross-cutting utilities (atomic JSON-file stores, mutexes, rate limiter, semver, fs helpers)
 │   ├── vault/     — Data access (filesystem)
 │   ├── business/  — Business logic orchestration
 │   ├── auth/      — Authentication, sessions, CSRF
 │   ├── user/      — User management, roles
 │   ├── api/       — HTTP controllers + routes
 │   ├── chat/      — Messaging system
-│   ├── sync/      — CouchDB synchronization
 │   ├── mcp/       — MCP server (AI integration)
 │   ├── search/    — Full-text search + replace
 │   ├── link-index/— Knowledge graph indexing
-│   ├── plugin/    — Obsidian plugin store
+│   ├── plugin/    — Installed-plugin management (per vault)
+│   ├── plugin-store/ — Community plugin marketplace (browse/install/update from GitHub)
 │   ├── feature-toggle/ — Feature flag system
 │   ├── realtime/  — SSE connections + event bus
 │   ├── audit/     — Audit logging
+│   ├── trash/     — Soft-delete, restore, retention purge
+│   ├── version/   — File version history
+│   ├── template/  — Note templates + daily notes
+│   ├── statistics/ — Vault file/folder/size statistics
+│   ├── cleanup/   — Periodic trash purge + version pruning job
+│   ├── preferences/ — Per-user preferences (recent files, favorites, keybindings)
+│   ├── vault-config/ — Per-vault configuration (templates dir, daily notes dir)
+│   ├── welcome-vault/ — Tutorial vault creation
 │   └── import/    — File/folder import
 ├── config/        — Default configuration (default.json)
 └── data/          — Runtime data (created at startup)
+
+Vault synchronization runs client-side via the Obsidian LiveSync plugin inside the plugin-compat layer (server-side CORS proxy only) — there is no backend sync module.
 
 frontend/          — React SPA (Vite + TypeScript)
 ├── src/
@@ -271,7 +298,6 @@ Backend configuration via `backend/config/default.json`, overridden by `SLATEBAS
 | `SLATEBASE_ALLOWED_ORIGINS` | `http://localhost:5173` | CORS origins (comma-separated) |
 | `SLATEBASE_TRUSTED_PROXIES` | *(empty)* | Trusted reverse proxy IPs/CIDRs |
 | `SLATEBASE_CSRF_SECRET` | *(random)* | Persistent CSRF secret |
-| `SLATEBASE_SYNC_SECRET` | *(random)* | AES-256-GCM key for sync credentials |
 | `SLATEBASE_MCP_ENABLED` | `true` | Enable MCP server |
 | `SLATEBASE_MCP_MAX_FILE_SIZE` | `5242880` | Max file size for MCP reads |
 | `SLATEBASE_MCP_RATE_LIMIT` | `60` | MCP requests per minute per token |

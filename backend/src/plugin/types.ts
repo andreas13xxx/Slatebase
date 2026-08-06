@@ -51,10 +51,12 @@ export interface PluginFiles {
 }
 
 /**
- * Interface for the plugin filesystem store.
- * Manages plugin files, settings, and registry data.
+ * Interface for the installed-plugin filesystem store.
+ * Manages plugin files, settings, and registry data for plugins installed
+ * into a vault. Not to be confused with the `plugin-store/` module, which
+ * manages the marketplace of plugins available to install.
  */
-export interface IPluginStore {
+export interface IInstalledPluginStore {
   /** Save plugin files (manifest, bundle, styles) */
   savePlugin(vaultId: string, pluginId: string, files: PluginFiles): Promise<void>;
   /** Load plugin manifest */

@@ -11,9 +11,8 @@ import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
 import { InlineInput } from './InlineInput'
 import { ConfirmModal } from './ConfirmModal'
-import { useToast } from './Toast'
 import { validateFileName, normalizeFileName } from '../utils/fileValidation'
-import { showToast as showGlobalToast } from './ToastNotification'
+import { showToast } from './ToastNotification'
 import { favoritesStore } from '../state/favoritesStore'
 import { TemplateSelector } from './TemplateSelector'
 import { getCachedStatistics, fetchVaultStatistics, invalidateStatisticsCache, formatStatisticsTooltip } from '../state/vaultStatisticsCache'
@@ -48,7 +47,6 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
   const { state, dispatch, apiClient } = useAppContext()
   const { tabState, tabDispatch } = useTabContext()
   const { t } = useTranslation()
-  const { showToast } = useToast()
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set(getWorkspaceState().expandedPaths))
   const [expandedVaults, setExpandedVaults] = useState<Set<string>>(() => new Set(getWorkspaceState().expandedVaults))
   const [showCreateVaultForm, setShowCreateVaultForm] = useState(false)
@@ -467,9 +465,9 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
       await apiClient.saveFile(vaultId, copyPath, fileContent.content)
       const newTree = await apiClient.fetchVaultTree(vaultId)
       dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree: newTree } })
-      showToast(`${copyName}`, 'success')
+      showToast('success', `${copyName}`)
     } catch (err: unknown) {
-      showToast(extractErrorMessage(err, t('fileOps.copyError')), 'error')
+      showToast('error', extractErrorMessage(err, t('fileOps.copyError')))
     }
   }
 
@@ -502,7 +500,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
       favoritesStore.updatePath(vaultId, node.path, destinationPath)
       setFavoritesVersion((v) => v + 1)
     } catch (err: unknown) {
-      showToast(extractErrorMessage(err, t('fileOps.moveError')), 'error')
+      showToast('error', extractErrorMessage(err, t('fileOps.moveError')))
     }
   }
 
@@ -567,7 +565,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
       const newTree = await apiClient.fetchVaultTree(vaultId)
       dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree: newTree } })
     }).catch((err: unknown) => {
-      showToast(extractErrorMessage(err, t('fileOps.deleteError')), 'error')
+      showToast('error', extractErrorMessage(err, t('fileOps.deleteError')))
     })
   }
 
@@ -603,7 +601,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
         const msg = err !== null && typeof err === 'object' && 'message' in err
           ? (err as { message: string }).message
           : t('fileOps.createError')
-        showToast(msg, 'error')
+        showToast('error', msg)
       }
     } else if (inlineInputState.mode === 'newFolder') {
       const normalizedName = normalizeFileName(value)
@@ -634,7 +632,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
         const msg = err !== null && typeof err === 'object' && 'message' in err
           ? (err as { message: string }).message
           : t('fileOps.createError')
-        showToast(msg, 'error')
+        showToast('error', msg)
       }
     } else if (inlineInputState.mode === 'newCanvas') {
       const trimmedName = value.trim()
@@ -657,9 +655,9 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
           dispatch({ type: 'VAULT_SELECTED', payload: vaultId })
         }
         openTab(tabDispatch, dispatch, apiClient, vaultId, filePath, canvasName)
-        showToast(t('fileOps.created', { name: canvasName }), 'success')
+        showToast('success', t('fileOps.created', { name: canvasName }))
       } catch (err: unknown) {
-        showToast(extractErrorMessage(err, t('fileOps.canvasCreateError')), 'error')
+        showToast('error', extractErrorMessage(err, t('fileOps.canvasCreateError')))
       }
     } else if (inlineInputState.mode === 'rename') {
       const node = inlineInputState.node
@@ -710,7 +708,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
         const msg = err !== null && typeof err === 'object' && 'message' in err
           ? (err as { message: string }).message
           : t('fileOps.renameError')
-        showToast(msg, 'error')
+        showToast('error', msg)
       }
     }
 
@@ -818,7 +816,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
 
       // Validate: max 50 files
       if (droppedFiles.length > 50) {
-        showGlobalToast('error', `Maximal 50 Dateien pro Drop-Vorgang erlaubt (${droppedFiles.length} ausgewählt)`)
+        showToast('error', `Maximal 50 Dateien pro Drop-Vorgang erlaubt (${droppedFiles.length} ausgewählt)`)
         return
       }
 
@@ -827,7 +825,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
       const validFiles: File[] = []
       for (const file of droppedFiles) {
         if (file.size > maxFileSize) {
-          showGlobalToast('error', `"${file.name}" überschreitet die maximale Dateigröße von 100 MB`)
+          showToast('error', `"${file.name}" überschreitet die maximale Dateigröße von 100 MB`)
           continue
         }
         validFiles.push(file)
@@ -842,7 +840,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
       } catch (err) {
         for (const file of validFiles) {
           const reason = err instanceof Error ? err.message : 'Upload fehlgeschlagen'
-          showGlobalToast('error', `"${file.name}": ${reason}`)
+          showToast('error', `"${file.name}": ${reason}`)
         }
       }
       return
@@ -881,7 +879,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
       favoritesStore.updatePath(vaultId, draggedPath, destinationPath)
       setFavoritesVersion((v) => v + 1)
     } catch (err: unknown) {
-      showToast(extractErrorMessage(err, t('fileOps.moveError')), 'error')
+      showToast('error', extractErrorMessage(err, t('fileOps.moveError')))
     } finally {
       setDragState({
         draggedPath: null,
@@ -890,7 +888,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
         isMoving: false,
       })
     }
-  }, [dragState.validTargets, dragState.draggedPath, dragState.draggedVaultId, apiClient, state.vaults, dispatch, tabDispatch, t, showToast])
+  }, [dragState.validTargets, dragState.draggedPath, dragState.draggedVaultId, apiClient, state.vaults, dispatch, tabDispatch, t])
 
   // --- Root Drop Zone Handlers (per vault) ---
 

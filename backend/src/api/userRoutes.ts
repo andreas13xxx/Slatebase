@@ -11,6 +11,7 @@ import type { ILogger } from '../logger/index.js'
 import { updateProfileSchema, changePasswordSchema } from '../user/validation.js'
 import type { SessionContext } from '../auth/index.js'
 import type { RouteModule } from './index.js'
+import type { SlidingWindowRateLimiter } from '../shared/sliding-window-rate-limiter.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,7 @@ export class UserController {
   constructor(
     private readonly userService: IUserService,
     private readonly logger: ILogger,
+    private readonly passwordChangeRateLimiter?: SlidingWindowRateLimiter,
   ) {}
 
   /**
@@ -113,9 +115,21 @@ export class UserController {
   /**
    * PUT /users/me/password — Changes the current user's password.
    * Requires current password confirmation.
+   * Rate-limited per user: a hijacked or CSRF-forged session would otherwise
+   * be able to brute-force the current password with unlimited attempts.
    */
   async changePassword(c: Context): Promise<Response> {
     const session = c.get('session') as SessionContext
+
+    if (this.passwordChangeRateLimiter) {
+      const limit = this.passwordChangeRateLimiter.checkLimit(session.userId)
+      if (!limit.allowed) {
+        c.header('Retry-After', String(limit.retryAfter))
+        const apiError = createApiError('RATE_LIMITED', `Too many password change attempts. Retry after ${limit.retryAfter} seconds`)
+        return c.json(apiError, 429)
+      }
+      this.passwordChangeRateLimiter.recordRequest(session.userId)
+    }
 
     let body: unknown
     try {

@@ -89,12 +89,7 @@ function renderSection(
 
   switch (section) {
     case 'profile':
-      return (
-        <>
-          <ProfilePage apiClient={apiClient} mode="profile-only" />
-          <WelcomeVaultSection apiClient={apiClient} />
-        </>
-      )
+      return <ProfilePage apiClient={apiClient} mode="profile-only" />
     case 'password':
       return <ChangePasswordPage apiClient={apiClient} embedded />
     case 'sessions':
@@ -108,7 +103,12 @@ function renderSection(
     case 'appearance':
       return <AppearanceSection />
     case 'my-vaults':
-      return <MyVaultsPage apiClient={apiClient} />
+      return (
+        <>
+          <MyVaultsPage apiClient={apiClient} />
+          <WelcomeVaultSection apiClient={apiClient} />
+        </>
+      )
     case 'plugins':
       if (selectedVaultId === null) {
         return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>

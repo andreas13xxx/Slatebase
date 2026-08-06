@@ -16,6 +16,7 @@ import type {
   SandboxContext,
   TrackedResources,
 } from './types';
+import { getStoredAuthToken, getStoredCsrfToken } from '../../state/authContext';
 
 /** Maximum storage size per plugin per storage type (5 MB) */
 const MAX_STORAGE_SIZE_BYTES = 5 * 1024 * 1024;
@@ -688,8 +689,8 @@ function isCrossOrigin(url: string): boolean {
  * receive a standard Response object.
  */
 async function fetchViaProxy(url: string, init?: RequestInit): Promise<Response> {
-  const token = localStorage.getItem('slatebase_token') || '';
-  const csrfToken = localStorage.getItem('slatebase_csrf') || '';
+  const token = getStoredAuthToken() || '';
+  const csrfToken = getStoredCsrfToken() || '';
   const method = init?.method?.toUpperCase() || 'GET';
 
   // Extract headers from init

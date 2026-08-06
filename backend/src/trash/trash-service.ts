@@ -7,6 +7,8 @@ import type { ILogger } from '../logger/index.js'
 import type { ITrashService, TrashEntry, TrashIndex } from './types.js'
 import { TrashNotFoundError, TrashRestoreError } from './errors.js'
 import { isNodeError } from '../shared/fs-utils.js'
+import { KeyedMutex } from '../shared/async-mutex.js'
+import { writeJsonFileAtomic } from '../shared/json-file-store.js'
 
 /**
  * Resolves a vault ID to its data directory path.
@@ -22,6 +24,17 @@ export class TrashService implements ITrashService {
   /** Trash directory path relative to vault root. */
   private static readonly TRASH_DIR = path.join('.slatebase', 'trash')
 
+  /**
+   * Serializes all trash mutations (move/restore/delete/purge) per vault.
+   * Without this, the periodic cleanup job's `purgeExpired` could run
+   * concurrently with a user's `restore`/`moveToTrash`/`deletePermanently`
+   * on the same vault: both would read the same `_index.json` snapshot,
+   * and — worse — `purgeExpired` could `rm` an entry's directory while
+   * `restore` is mid-move out of it. Keying the lock by `trashDir` means
+   * different vaults never block each other.
+   */
+  private readonly locks = new KeyedMutex()
+
   constructor(
     private readonly resolveVaultPath: VaultPathResolver,
     private readonly logger: ILogger,
@@ -34,40 +47,43 @@ export class TrashService implements ITrashService {
   async moveToTrash(vaultId: string, relativePath: string): Promise<TrashEntry> {
     const vaultDir = this.resolveVaultPath(vaultId)
     const trashDir = path.join(vaultDir, TrashService.TRASH_DIR)
-    const entryId = crypto.randomBytes(6).toString('hex')
 
-    // 1. Ensure .slatebase/trash/ directory exists
-    await fs.mkdir(trashDir, { recursive: true })
+    return this.locks.runExclusive(trashDir, async () => {
+      const entryId = crypto.randomBytes(6).toString('hex')
 
-    // 2. Create entry subdirectory
-    const entryDir = path.join(trashDir, entryId)
-    await fs.mkdir(entryDir)
+      // 1. Ensure .slatebase/trash/ directory exists
+      await fs.mkdir(trashDir, { recursive: true })
 
-    // 3. Determine source path and check if it's a directory
-    const sourcePath = path.join(vaultDir, relativePath)
-    const stat = await fs.stat(sourcePath)
-    const isDirectory = stat.isDirectory()
+      // 2. Create entry subdirectory
+      const entryDir = path.join(trashDir, entryId)
+      await fs.mkdir(entryDir)
 
-    // 4. Move file/folder to .slatebase/trash/<id>/<originalFilename>
-    const fileName = path.basename(relativePath)
-    const destPath = path.join(entryDir, fileName)
-    await fs.rename(sourcePath, destPath)
+      // 3. Determine source path and check if it's a directory
+      const sourcePath = path.join(vaultDir, relativePath)
+      const stat = await fs.stat(sourcePath)
+      const isDirectory = stat.isDirectory()
 
-    // 5. Create entry metadata
-    const entry: TrashEntry = {
-      id: entryId,
-      originalPath: relativePath,
-      deletedAt: new Date().toISOString(),
-      isDirectory,
-    }
+      // 4. Move file/folder to .slatebase/trash/<id>/<originalFilename>
+      const fileName = path.basename(relativePath)
+      const destPath = path.join(entryDir, fileName)
+      await fs.rename(sourcePath, destPath)
 
-    // 6. Update _index.json atomically
-    await this.updateIndex(trashDir, (index) => {
-      index.entries.push(entry)
+      // 5. Create entry metadata
+      const entry: TrashEntry = {
+        id: entryId,
+        originalPath: relativePath,
+        deletedAt: new Date().toISOString(),
+        isDirectory,
+      }
+
+      // 6. Update _index.json atomically
+      await this.updateIndex(trashDir, (index) => {
+        index.entries.push(entry)
+      })
+
+      this.logger.info('Moved to trash', { vaultId, path: relativePath, entryId })
+      return entry
     })
-
-    this.logger.info('Moved to trash', { vaultId, path: relativePath, entryId })
-    return entry
   }
 
   /**
@@ -91,44 +107,47 @@ export class TrashService implements ITrashService {
   async restore(vaultId: string, entryId: string): Promise<{ restoredPath: string }> {
     const vaultDir = this.resolveVaultPath(vaultId)
     const trashDir = path.join(vaultDir, TrashService.TRASH_DIR)
-    const index = await this.readIndex(trashDir)
 
-    const entry = index.entries.find((e) => e.id === entryId)
-    if (!entry) {
-      throw new TrashNotFoundError(entryId)
-    }
+    return this.locks.runExclusive(trashDir, async () => {
+      const index = await this.readIndex(trashDir)
 
-    // Determine source path in .trash/
-    const fileName = path.basename(entry.originalPath)
-    const entryDir = path.join(trashDir, entryId)
-    const sourcePath = path.join(entryDir, fileName)
+      const entry = index.entries.find((e) => e.id === entryId)
+      if (!entry) {
+        throw new TrashNotFoundError(entryId)
+      }
 
-    // Determine restore target path (with suffix if occupied)
-    const restoredPath = await this.findAvailablePath(vaultDir, entry.originalPath)
-    const absoluteRestorePath = path.join(vaultDir, restoredPath)
+      // Determine source path in .trash/
+      const fileName = path.basename(entry.originalPath)
+      const entryDir = path.join(trashDir, entryId)
+      const sourcePath = path.join(entryDir, fileName)
 
-    try {
-      // Create missing parent directories
-      const parentDir = path.dirname(absoluteRestorePath)
-      await fs.mkdir(parentDir, { recursive: true })
+      // Determine restore target path (with suffix if occupied)
+      const restoredPath = await this.findAvailablePath(vaultDir, entry.originalPath)
+      const absoluteRestorePath = path.join(vaultDir, restoredPath)
 
-      // Move file back to original (or suffixed) location
-      await fs.rename(sourcePath, absoluteRestorePath)
+      try {
+        // Create missing parent directories
+        const parentDir = path.dirname(absoluteRestorePath)
+        await fs.mkdir(parentDir, { recursive: true })
 
-      // Clean up the entry directory (should be empty now)
-      await fs.rm(entryDir, { recursive: true, force: true })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      throw new TrashRestoreError(entryId, message)
-    }
+        // Move file back to original (or suffixed) location
+        await fs.rename(sourcePath, absoluteRestorePath)
 
-    // Remove entry from index atomically
-    await this.updateIndex(trashDir, (idx) => {
-      idx.entries = idx.entries.filter((e) => e.id !== entryId)
+        // Clean up the entry directory (should be empty now)
+        await fs.rm(entryDir, { recursive: true, force: true })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        throw new TrashRestoreError(entryId, message)
+      }
+
+      // Remove entry from index atomically
+      await this.updateIndex(trashDir, (idx) => {
+        idx.entries = idx.entries.filter((e) => e.id !== entryId)
+      })
+
+      this.logger.info('Restored from trash', { vaultId, entryId, restoredPath })
+      return { restoredPath }
     })
-
-    this.logger.info('Restored from trash', { vaultId, entryId, restoredPath })
-    return { restoredPath }
   }
 
   /**
@@ -137,23 +156,26 @@ export class TrashService implements ITrashService {
   async deletePermanently(vaultId: string, entryId: string): Promise<void> {
     const vaultDir = this.resolveVaultPath(vaultId)
     const trashDir = path.join(vaultDir, TrashService.TRASH_DIR)
-    const index = await this.readIndex(trashDir)
 
-    const entry = index.entries.find((e) => e.id === entryId)
-    if (!entry) {
-      throw new TrashNotFoundError(entryId)
-    }
+    return this.locks.runExclusive(trashDir, async () => {
+      const index = await this.readIndex(trashDir)
 
-    // Remove the entry directory and its contents
-    const entryDir = path.join(trashDir, entryId)
-    await fs.rm(entryDir, { recursive: true, force: true })
+      const entry = index.entries.find((e) => e.id === entryId)
+      if (!entry) {
+        throw new TrashNotFoundError(entryId)
+      }
 
-    // Remove entry from index atomically
-    await this.updateIndex(trashDir, (idx) => {
-      idx.entries = idx.entries.filter((e) => e.id !== entryId)
+      // Remove the entry directory and its contents
+      const entryDir = path.join(trashDir, entryId)
+      await fs.rm(entryDir, { recursive: true, force: true })
+
+      // Remove entry from index atomically
+      await this.updateIndex(trashDir, (idx) => {
+        idx.entries = idx.entries.filter((e) => e.id !== entryId)
+      })
+
+      this.logger.info('Permanently deleted from trash', { vaultId, entryId })
     })
-
-    this.logger.info('Permanently deleted from trash', { vaultId, entryId })
   }
 
   /**
@@ -162,45 +184,48 @@ export class TrashService implements ITrashService {
   async purgeExpired(vaultId: string, retentionDays: number): Promise<number> {
     const vaultDir = this.resolveVaultPath(vaultId)
     const trashDir = path.join(vaultDir, TrashService.TRASH_DIR)
-    const index = await this.readIndex(trashDir)
 
-    if (index.entries.length === 0) {
-      return 0
-    }
+    return this.locks.runExclusive(trashDir, async () => {
+      const index = await this.readIndex(trashDir)
 
-    const now = Date.now()
-    const retentionMs = retentionDays * 24 * 60 * 60 * 1000
-    const expiredIds: string[] = []
-
-    for (const entry of index.entries) {
-      const deletedAt = new Date(entry.deletedAt).getTime()
-      if (now - deletedAt > retentionMs) {
-        expiredIds.push(entry.id)
+      if (index.entries.length === 0) {
+        return 0
       }
-    }
 
-    if (expiredIds.length === 0) {
-      return 0
-    }
+      const now = Date.now()
+      const retentionMs = retentionDays * 24 * 60 * 60 * 1000
+      const expiredIds: string[] = []
 
-    // Remove expired entry directories (isolated per entry — one failure doesn't stop others)
-    for (const id of expiredIds) {
-      const entryDir = path.join(trashDir, id)
-      try {
-        await fs.rm(entryDir, { recursive: true, force: true })
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        this.logger.error('Failed to purge trash entry', { vaultId, entryId: id, error: message })
+      for (const entry of index.entries) {
+        const deletedAt = new Date(entry.deletedAt).getTime()
+        if (now - deletedAt > retentionMs) {
+          expiredIds.push(entry.id)
+        }
       }
-    }
 
-    // Remove expired entries from index atomically
-    await this.updateIndex(trashDir, (idx) => {
-      idx.entries = idx.entries.filter((e) => !expiredIds.includes(e.id))
+      if (expiredIds.length === 0) {
+        return 0
+      }
+
+      // Remove expired entry directories (isolated per entry — one failure doesn't stop others)
+      for (const id of expiredIds) {
+        const entryDir = path.join(trashDir, id)
+        try {
+          await fs.rm(entryDir, { recursive: true, force: true })
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          this.logger.error('Failed to purge trash entry', { vaultId, entryId: id, error: message })
+        }
+      }
+
+      // Remove expired entries from index atomically
+      await this.updateIndex(trashDir, (idx) => {
+        idx.entries = idx.entries.filter((e) => !expiredIds.includes(e.id))
+      })
+
+      this.logger.info('Purged expired trash entries', { vaultId, count: expiredIds.length })
+      return expiredIds.length
     })
-
-    this.logger.info('Purged expired trash entries', { vaultId, count: expiredIds.length })
-    return expiredIds.length
   }
 
   /**
@@ -243,33 +268,14 @@ export class TrashService implements ITrashService {
   /**
    * Atomically updates the `_index.json` file.
    * Reads current index, applies the updater function, writes to temp file, renames.
+   * Callers must already hold `this.locks` for `trashDir` — this alone does not
+   * serialize concurrent calls.
    */
   private async updateIndex(trashDir: string, updater: (index: TrashIndex) => void): Promise<void> {
     const indexPath = path.join(trashDir, '_index.json')
-
-    // Read current index
     const index = await this.readIndex(trashDir)
-
-    // Apply update
     updater(index)
-
-    // Write atomically: temp → rename
-    const content = JSON.stringify(index, null, 2)
-    const tempPath = `${indexPath}.${crypto.randomBytes(8).toString('hex')}.tmp`
-
-    await fs.writeFile(tempPath, content, 'utf-8')
-
-    try {
-      await fs.rename(tempPath, indexPath)
-    } catch (renameError) {
-      // Clean up temp file on rename failure
-      try {
-        await fs.unlink(tempPath)
-      } catch {
-        // Ignore cleanup errors
-      }
-      throw renameError
-    }
+    await writeJsonFileAtomic(indexPath, index)
   }
 
   /**

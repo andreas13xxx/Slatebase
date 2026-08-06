@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import { AppProvider, useAppContext, loadVaults, importFile, importFolder, exportVault, reloadVaultTree } from './state'
 import { ApiClient } from './api'
-import { AuthProvider, useAuthContext } from './state/authContext'
+import { AuthProvider, useAuthContext, getStoredAuthToken, getStoredCsrfToken } from './state/authContext'
 import { TabProvider, useTabContext } from './state/tabContext'
 import { FeatureProvider, useFeatureContext } from './state/featureContext'
 import { SearchProvider } from './state/searchContext'
@@ -9,9 +9,8 @@ import { createDailyNoteService, loadDailyNotesConfigFromServer } from './state/
 import { openTab } from './state/tabActions'
 import { initialize as initializeRecentFiles, disconnect as disconnectRecentFiles } from './state/recentFilesStore'
 import { initialize as initializeFavorites, disconnect as disconnectFavorites } from './state/favoritesStore'
-import { initialize as initializeKeybindings, disconnect as disconnectKeybindings, matchesShortcut } from './state/keybindingsStore'
+import { initialize as initializeKeybindings, disconnect as disconnectKeybindings } from './state/keybindingsStore'
 import { I18nProvider, useTranslation } from './i18n'
-import { ToastProvider } from './components/Toast'
 import { RealtimeProvider, type RealtimeEventHandlers } from './components/RealtimeProvider'
 import { ToastNotification, showToast } from './components/ToastNotification'
 import { HoverPreview } from './components/HoverPreview'
@@ -59,15 +58,17 @@ import type { SettingsCategory, SettingsSection } from './state/settingsState'
 import { SidebarPanel } from './components/sidebar-panel'
 import { PluginProvider } from './plugins/compat/plugin-context'
 import { CommandPaletteContainer } from './components/CommandPaletteContainer'
+import { TabBar, type SettingsTabDescriptor } from './components/TabBar'
 import { useResize } from './hooks/useResize'
 import { useStatusBar } from './hooks/useStatusBar'
-import { initialize as initializeWorkspace, getState as getWorkspaceState, updateLayout as updateWorkspaceLayout, updateTabs as updateWorkspaceTabs, update as updateWorkspace, clear as clearWorkspace, flush as flushWorkspace } from './state/workspaceStore'
+import { useGlobalShortcuts } from './hooks/useGlobalShortcuts'
+import { useWorkspaceRestore, LAST_VAULT_KEY } from './hooks/useWorkspaceRestore'
+import { initialize as initializeWorkspace, getState as getWorkspaceState, clear as clearWorkspace } from './state/workspaceStore'
 import {
   User, Settings, Shield, FileText, Clock,
   Database, Share2, Trash2, Server,
-  PanelRight, PanelLeft, X, Eye, Pencil, MessageCircle, Key, ScrollText, Plug,
+  PanelRight, PanelLeft, X, MessageCircle, Key, ScrollText, Plug,
 } from 'lucide-react'
-import { getFileIcon, getFileIconClass, getDisplayName } from './utils/fileIcons'
 import './App.css'
 
 /** Singleton ApiClient instance shared across the app. */
@@ -78,17 +79,14 @@ const dailyNoteService = createDailyNoteService(apiClient)
 
 // Synchronous token restore from localStorage — eliminates race condition
 // where API calls fire before the useEffect in AuthGuard sets the token.
-const _storedToken = localStorage.getItem('slatebase_token')
-const _storedCsrf = localStorage.getItem('slatebase_csrf')
+const _storedToken = getStoredAuthToken()
+const _storedCsrf = getStoredCsrfToken()
 if (_storedToken) apiClient.setToken(_storedToken)
 if (_storedCsrf) apiClient.setCsrfToken(_storedCsrf)
 
 // Synchronous workspace state restore from localStorage — must run before
 // any component reads getWorkspaceState() in their useState initializers.
 initializeWorkspace()
-
-/** LocalStorage key for persisting the last selected vault. */
-const LAST_VAULT_KEY = 'slatebase_last_vault'
 
 /** Available navigation pages in the app (opened as tabs in the main content area). */
 export type AppPage =
@@ -190,10 +188,6 @@ function AppContent() {
   const createFileTriggerRef = useRef<(() => void) | null>(null)
   const createVaultTriggerRef = useRef<(() => void) | null>(null)
   const createCanvasTriggerRef = useRef<(() => void) | null>(null)
-
-  // Tab drag-and-drop reordering state
-  const tabDragIndexRef = useRef<number | null>(null)
-  const [tabDragOverIndex, setTabDragOverIndex] = useState<number | null>(null)
 
   const handleRegisterCreateFile = useCallback((trigger: () => void) => { createFileTriggerRef.current = trigger }, [])
   const handleRegisterCreateVault = useCallback((trigger: () => void) => { createVaultTriggerRef.current = trigger }, [])
@@ -310,118 +304,18 @@ function AppContent() {
     initializeKeybindings(apiClient).catch(() => { /* ignore */ })
   }, [dispatch])
 
-  // Restore last selected vault after vaults are loaded
-  useEffect(() => {
-    if (state.vaults.length === 0) return
-    if (state.selectedVaultId !== null) return
-    // Skip if workspace store has persisted state — the restore effect handles vault selection
-    if (getWorkspaceState().selectedVaultId) return
-    const lastId = localStorage.getItem(LAST_VAULT_KEY)
-    if (lastId && state.vaults.some((v) => v.id === lastId)) {
-      dispatch({ type: 'VAULT_SELECTED', payload: lastId })
-    }
-  }, [state.vaults, state.selectedVaultId, dispatch])
-
-  // Persist selected vault to localStorage
-  useEffect(() => {
-    if (state.selectedVaultId) {
-      localStorage.setItem(LAST_VAULT_KEY, state.selectedVaultId)
-    }
-  }, [state.selectedVaultId])
-
-  // Persist panel visibility to workspace store
-  useEffect(() => {
-    updateWorkspaceLayout({ sidebarVisible: showSidebar, rightPanelVisible: showRightPanel })
-  }, [showSidebar, showRightPanel])
-
-  // Persist active settings page and selected vault to workspace store
-  useEffect(() => {
-    updateWorkspace({ activeSettingsPage, selectedVaultId: state.selectedVaultId })
-  }, [activeSettingsPage, state.selectedVaultId])
-
-  // Persist open tabs to workspace store (skip during initial restore phase)
-  const isRestoringRef = useRef(true)
-  useEffect(() => {
-    // Don't persist until the restore effect has run at least once
-    if (isRestoringRef.current) return
-    const persistedTabs = tabState.tabs.map((t) => ({
-      vaultId: t.vaultId,
-      filePath: t.filePath,
-      fileName: t.fileName,
-      mode: t.mode,
-    }))
-    updateWorkspaceTabs(persistedTabs, tabState.activeTabId)
-  }, [tabState.tabs, tabState.activeTabId])
-
-  // Flush workspace state on page unload
-  useEffect(() => {
-    const handleBeforeUnload = () => { flushWorkspace() }
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [])
-
-  // Restore UI state from workspace store (survives page reload and session expiry)
-  const hasRestoredRef = useRef(false)
-  useEffect(() => {
-    if (hasRestoredRef.current) return
-    if (state.vaults.length === 0) return
-
-    const wsState = getWorkspaceState()
-    // Only restore if there are persisted tabs
-    if (wsState.tabs.length === 0 && !wsState.selectedVaultId) {
-      // Nothing to restore — enable persistence immediately
-      hasRestoredRef.current = true
-      isRestoringRef.current = false
-      return
-    }
-
-    hasRestoredRef.current = true
-
-    // Restore vault selection
-    if (wsState.selectedVaultId && state.vaults.some((v) => v.id === wsState.selectedVaultId)) {
-      dispatch({ type: 'VAULT_SELECTED', payload: wsState.selectedVaultId })
-    }
-
-    // Restore tabs — only if the vaults still exist, then fetch content
-    const validVaultIds = new Set(state.vaults.map((v) => v.id))
-    for (const tab of wsState.tabs) {
-      if (!validVaultIds.has(tab.vaultId)) continue
-      tabDispatch({
-        type: 'OPEN_TAB',
-        payload: { vaultId: tab.vaultId, filePath: tab.filePath, fileName: tab.fileName },
-      })
-      // Fetch content for regular file tabs (skip virtual tabs like __graph__, __view::*)
-      const tabId = `${tab.vaultId}::${tab.filePath}`
-      if (!tab.filePath.startsWith('__')) {
-        apiClient.fetchFileContent(tab.vaultId, tab.filePath).then(
-          (result) => {
-            tabDispatch({
-              type: 'TAB_CONTENT_LOADED',
-              payload: { tabId, content: result.content, isBinary: result.isBinary },
-            })
-          },
-          () => {
-            // File no longer exists — close the tab
-            tabDispatch({ type: 'CLOSE_TAB', payload: { tabId } })
-          },
-        )
-      } else {
-        // Virtual tabs (graph, plugin views) don't need content fetch
-        tabDispatch({
-          type: 'TAB_CONTENT_LOADED',
-          payload: { tabId, content: '', isBinary: false },
-        })
-      }
-    }
-
-    // Restore active tab
-    if (wsState.activeTabId) {
-      tabDispatch({ type: 'ACTIVATE_TAB', payload: { tabId: wsState.activeTabId } })
-    }
-
-    // Enable tab persistence now that restore is complete
-    isRestoringRef.current = false
-  }, [state.vaults, dispatch, tabDispatch])
+  useWorkspaceRestore({
+    vaults: state.vaults,
+    selectedVaultId: state.selectedVaultId,
+    dispatch,
+    tabs: tabState.tabs,
+    activeTabId: tabState.activeTabId,
+    tabDispatch,
+    activeSettingsPage,
+    showSidebar,
+    showRightPanel,
+    apiClient,
+  })
 
   // When a file tab becomes active (e.g. from FileExplorer click), deactivate settings page
   useEffect(() => {
@@ -434,6 +328,11 @@ function AppContent() {
   // When selectedVaultId changes, update directoryTree from vaultTrees and clear old tabs
   useEffect(() => {
     const vaultId = state.selectedVaultId
+    // Guards the async dispatches below: if the vault is switched again before
+    // a fetch resolves, its stale result must not overwrite state for the
+    // vault the user is now on (see VAULT_TREE_LOADED vs. the older
+    // vault-agnostic TREE_LOADED action in state/index.ts).
+    let cancelled = false
     if (vaultId !== prevVaultId.current) {
       if (prevVaultId.current !== null) {
         // Save current tabs for the previous vault before clearing
@@ -463,12 +362,14 @@ function AppContent() {
               if (!tab.filePath.startsWith('__')) {
                 apiClient.fetchFileContent(vaultId, tab.filePath).then(
                   (result) => {
+                    if (cancelled) return
                     tabDispatch({
                       type: 'TAB_CONTENT_LOADED',
                       payload: { tabId, content: result.content, isBinary: result.isBinary },
                     })
                   },
                   () => {
+                    if (cancelled) return
                     tabDispatch({ type: 'CLOSE_TAB', payload: { tabId } })
                   },
                 )
@@ -509,10 +410,12 @@ function AppContent() {
           dispatch({ type: 'LOADING_STARTED' })
           apiClient.fetchVaultTree(vaultId).then(
             (tree) => {
+              if (cancelled) return
               dispatch({ type: 'TREE_LOADED', payload: tree })
               dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree } })
             },
             (err) => {
+              if (cancelled) return
               const error =
                 err && typeof err === 'object' && 'code' in err && 'message' in err
                   ? { code: err.code as string, message: err.message as string }
@@ -524,85 +427,11 @@ function AppContent() {
       }
     }
     prevVaultId.current = vaultId
+    return () => {
+      cancelled = true
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.selectedVaultId, dispatch, tabDispatch])
-
-  // Global keyboard shortcut: Vault search (default: Ctrl+Shift+F / Cmd+Shift+F)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (matchesShortcut('slatebase:open-search', e)) {
-        e.preventDefault()
-        // Open right panel and activate search view
-        setShowRightPanel(true)
-        // Find the section that contains 'search' and activate it
-        const searchSection = contextPanelState.sections.find(s => s.viewIds.includes('search'))
-        if (searchSection) {
-          contextPanelDispatch({ type: 'SET_ACTIVE_VIEW', sectionId: searchSection.id, viewId: 'search' })
-        }
-        // Focus the search input after the panel renders
-        setTimeout(() => {
-          const input = document.querySelector('.search-panel__input') as HTMLInputElement | null
-          if (input) {
-            input.focus()
-            input.select()
-          }
-        }, 50)
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [contextPanelState.sections, contextPanelDispatch])
-
-  // Global keyboard shortcut: Toggle editor mode (default: Ctrl+E / Cmd+E)
-  useEffect(() => {
-    const handleToggleMode = (e: KeyboardEvent) => {
-      if (matchesShortcut('slatebase:toggle-mode', e)) {
-        e.preventDefault()
-        const activeTab = tabState.tabs.find(t => t.id === tabState.activeTabId)
-        if (activeTab && !activeTab.isBinary && activeTab.filePath !== '__graph__' && !activeTab.fileName.endsWith('.canvas')) {
-          tabDispatch({ type: 'TOGGLE_MODE', payload: { tabId: activeTab.id } })
-        }
-      }
-    }
-
-    document.addEventListener('keydown', handleToggleMode)
-    return () => document.removeEventListener('keydown', handleToggleMode)
-  }, [tabState.tabs, tabState.activeTabId, tabDispatch])
-
-  // Listen for custom event from Command Palette: open search
-  useEffect(() => {
-    const handleOpenSearch = () => {
-      setShowRightPanel(true)
-      const searchSection = contextPanelState.sections.find(s => s.viewIds.includes('search'))
-      if (searchSection) {
-        contextPanelDispatch({ type: 'SET_ACTIVE_VIEW', sectionId: searchSection.id, viewId: 'search' })
-      }
-      setTimeout(() => {
-        const input = document.querySelector('.search-panel__input') as HTMLInputElement | null
-        if (input) {
-          input.focus()
-          input.select()
-        }
-      }, 50)
-    }
-
-    window.addEventListener('slatebase:open-search', handleOpenSearch)
-    return () => window.removeEventListener('slatebase:open-search', handleOpenSearch)
-  }, [contextPanelState.sections, contextPanelDispatch])
-
-  // Global keyboard shortcut: Settings panel (default: Ctrl+,)
-  useEffect(() => {
-    const handleSettingsShortcut = (e: KeyboardEvent) => {
-      if (matchesShortcut('slatebase:open-settings', e)) {
-        e.preventDefault()
-        setSettingsOpen(true)
-      }
-    }
-
-    document.addEventListener('keydown', handleSettingsShortcut)
-    return () => document.removeEventListener('keydown', handleSettingsShortcut)
-  }, [])
 
   const handleLogout = useCallback(async () => {
     try { await apiClient.logout() } catch { /* ignore */ }
@@ -646,7 +475,6 @@ function AppContent() {
 
   function handleOpenGraph() {
     if (!state.selectedVaultId) return
-    if (!isEnabled('knowledge-graph')) return
     // Check if a graph tab already exists for the current vault
     const existingGraphTab = tabState.tabs.find((t) => t.filePath === '__graph__' && t.vaultId === state.selectedVaultId)
     if (existingGraphTab) {
@@ -695,18 +523,16 @@ function AppContent() {
     }
   }, [state.selectedVaultId, tabDispatch, dispatch])
 
-  // Global keyboard shortcut: Ctrl+Alt+D — open/create daily note
-  useEffect(() => {
-    const handleDailyNoteShortcut = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.altKey && (e.key === 'd' || e.key === 'D')) {
-        e.preventDefault()
-        handleDailyNote()
-      }
-    }
-
-    document.addEventListener('keydown', handleDailyNoteShortcut)
-    return () => document.removeEventListener('keydown', handleDailyNoteShortcut)
-  }, [handleDailyNote])
+  useGlobalShortcuts({
+    contextPanelSections: contextPanelState.sections,
+    contextPanelDispatch,
+    setShowRightPanel,
+    tabs: tabState.tabs,
+    activeTabId: tabState.activeTabId,
+    tabDispatch,
+    setSettingsOpen,
+    onDailyNote: handleDailyNote,
+  })
 
   /** Open a file from the sidebar panel (favorites or recent files). */
   const handleSidebarOpenFile = useCallback((vaultId: string, path: string) => {
@@ -798,6 +624,21 @@ function AppContent() {
   const selectedVault = state.vaults.find((v) => v.id === state.selectedVaultId) ?? null
   const activeTab = tabState.tabs.find((tab) => tab.id === tabState.activeTabId) ?? null
   const selectedVaultName = selectedVault?.name ?? ''
+
+  const settingsTabs: SettingsTabDescriptor[] = openSettingsPages.map((page) => {
+    const isActive = isShowingSettings && page === activeSettingsPage
+    const pageLabel = t(PAGE_LABEL_KEYS[page] as Parameters<typeof t>[0])
+    return {
+      key: page,
+      label: pageLabel,
+      icon: PAGE_ICONS[page],
+      isActive,
+      onActivate: () => setActiveSettingsPage(page),
+      onClose: () => handleCloseSettingsTab(page),
+      closeAriaLabel: t('tabs.closePageAriaLabel', { name: pageLabel }),
+      closeTitle: t('common.close'),
+    }
+  })
 
   return (
     <PluginProvider
@@ -981,98 +822,11 @@ function AppContent() {
           {/* ── Main Content ── */}
           <section className="app-content">
             {/* Unified tab bar: settings tabs + file tabs in one row */}
-            {(openSettingsPages.length > 0 || tabState.tabs.length > 0) && (
-              <div
-                className="tab-bar"
-                role="tablist"
-                aria-label={t('tabs.ariaLabel')}
-                onDragOver={(e) => { if (tabDragIndexRef.current !== null) { e.preventDefault(); e.dataTransfer.dropEffect = 'move' } }}
-                onDrop={(e) => { e.preventDefault(); setTabDragOverIndex(null); const from = tabDragIndexRef.current; const lastIndex = tabState.tabs.length - 1; if (from !== null && from !== lastIndex) { tabDispatch({ type: 'REORDER_TABS', payload: { fromIndex: from, toIndex: lastIndex } }) } tabDragIndexRef.current = null }}
-              >
-                {/* Settings tabs */}
-                {openSettingsPages.map((page) => {
-                  const isActive = isShowingSettings && page === activeSettingsPage
-                  const pageLabel = t(PAGE_LABEL_KEYS[page] as Parameters<typeof t>[0])
-                  return (
-                    <div
-                      key={`settings-${page}`}
-                      role="tab"
-                      aria-selected={isActive}
-                      className={`tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}`}
-                      onClick={() => setActiveSettingsPage(page)}
-                      title={pageLabel}
-                      tabIndex={isActive ? 0 : -1}
-                    >
-                      {PAGE_ICONS[page] && <span style={{ flexShrink: 0 }}>{PAGE_ICONS[page]}</span>}
-                      <span className="tab-bar-tab-label">{pageLabel}</span>
-                      <button
-                        type="button"
-                        className="tab-bar-close-btn"
-                        aria-label={t('tabs.closePageAriaLabel', { name: pageLabel })}
-                        title={t('common.close')}
-                        onClick={(e) => { e.stopPropagation(); handleCloseSettingsTab(page) }}
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  )
-                })}
-                {/* File tabs */}
-                {tabState.tabs.map((tab, index) => {
-                  const isActive = !isShowingSettings && tab.id === tabState.activeTabId
-                  const hasUnsaved = tab.editBuffer !== null && tab.editBuffer !== tab.content
-                  const modeLabel = tab.mode === 'edit' ? t('tabs.showPreview') : t('tabs.edit')
-                  const ModeIcon = tab.mode === 'edit' ? Eye : Pencil
-                  const isGraphTab = tab.filePath === '__graph__'
-                  const TabFileIcon = isGraphTab ? Share2 : getFileIcon(tab.fileName)
-                  const tabFileIconClass = isGraphTab ? 'tab-icon-graph' : getFileIconClass(tab.fileName)
-                  const displayName = isGraphTab ? tab.fileName : getDisplayName(tab.fileName)
-                  return (
-                    <div
-                      key={tab.id}
-                      role="tab"
-                      aria-selected={isActive}
-                      aria-label={tab.filePath}
-                      className={`tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}${tabDragOverIndex === index ? ' tab-bar-tab--drag-over' : ''}`}
-                      onClick={() => { setActiveSettingsPage(null); tabDispatch({ type: 'ACTIVATE_TAB', payload: { tabId: tab.id } }) }}
-                      title={isGraphTab ? 'Graph' : tab.filePath}
-                      tabIndex={isActive ? 0 : -1}
-                      draggable
-                      onDragStart={(e) => { tabDragIndexRef.current = index; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(index)) }}
-                      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (tabDragIndexRef.current !== null && tabDragIndexRef.current !== index) setTabDragOverIndex(index) }}
-                      onDragLeave={() => setTabDragOverIndex(null)}
-                      onDrop={(e) => { e.preventDefault(); setTabDragOverIndex(null); const from = tabDragIndexRef.current; if (from !== null && from !== index) tabDispatch({ type: 'REORDER_TABS', payload: { fromIndex: from, toIndex: index } }); tabDragIndexRef.current = null }}
-                      onDragEnd={() => { tabDragIndexRef.current = null; setTabDragOverIndex(null) }}
-                    >
-                      <TabFileIcon size={13} className={`tab-bar-tab-icon ${tabFileIconClass}`} />
-                      <span className="tab-bar-tab-label">
-                        {hasUnsaved ? '● ' : ''}{displayName}
-                      </span>
-                      {!tab.isBinary && !isGraphTab && !tab.fileName.endsWith('.canvas') && (
-                        <button
-                          type="button"
-                          className="tab-bar-mode-btn"
-                          aria-label={modeLabel}
-                          title={modeLabel}
-                          onClick={(e) => { e.stopPropagation(); tabDispatch({ type: 'TOGGLE_MODE', payload: { tabId: tab.id } }) }}
-                        >
-                          <ModeIcon size={12} />
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="tab-bar-close-btn"
-                        aria-label={t('tabs.closeTabAriaLabel', { name: tab.fileName })}
-                        title={t('tabs.closeTab')}
-                        onClick={(e) => { e.stopPropagation(); tabDispatch({ type: 'CLOSE_TAB', payload: { tabId: tab.id } }) }}
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+            <TabBar
+              settingsTabs={settingsTabs}
+              isShowingSettings={isShowingSettings}
+              onActivateFileTab={() => setActiveSettingsPage(null)}
+            />
 
             {/* Content: settings page or vault editor */}
             {isShowingSettings ? (
@@ -1155,9 +909,7 @@ function I18nBridge({ children }: { children: React.ReactNode }) {
   return (
     <I18nProvider userLocale={userLocale}>
       <ObsidianLocaleSync />
-      <ToastProvider>
-        {children}
-      </ToastProvider>
+      {children}
     </I18nProvider>
   )
 }

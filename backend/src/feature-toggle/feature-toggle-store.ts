@@ -6,11 +6,9 @@
  * but before env-var overrides (priority: env > persisted > config > default).
  */
 
-import { mkdir, readFile, rename, writeFile, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
-import { randomBytes } from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
-import { isNodeError } from '../shared/fs-utils.js'
+import { JsonFileStore } from '../shared/json-file-store.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -37,14 +35,18 @@ const FEATURES_FILE = 'features.json'
  * Persists feature toggle overrides to a JSON file on disk.
  * Uses atomic writes (temp file → rename) to prevent corruption.
  */
+const EMPTY_STATE: PersistedFeatureState = { version: 1, updatedAt: '', toggles: {} }
+
 export class FeatureToggleStore implements IFeatureToggleStore {
-  private readonly filePath: string
+  private readonly store: JsonFileStore<PersistedFeatureState>
 
   constructor(
-    private readonly dataDir: string,
+    dataDir: string,
     private readonly logger: ILogger,
   ) {
-    this.filePath = join(this.dataDir, FEATURES_FILE)
+    this.store = new JsonFileStore(join(dataDir, FEATURES_FILE), EMPTY_STATE, (raw) =>
+      isValidPersistedState(raw) ? raw : null,
+    )
   }
 
   /**
@@ -52,59 +54,25 @@ export class FeatureToggleStore implements IFeatureToggleStore {
    * Returns an empty record if the file does not exist or is invalid.
    */
   async load(): Promise<Record<string, boolean>> {
-    try {
-      const raw = await readFile(this.filePath, 'utf-8')
-      const data: unknown = JSON.parse(raw)
-
-      if (!isValidPersistedState(data)) {
-        this.logger.warn('Feature toggle state file has invalid format, ignoring')
-        return {}
-      }
-
-      this.logger.info('Feature toggle states loaded from disk', {
-        count: Object.keys(data.toggles).length,
-      })
-      return data.toggles
-    } catch (err: unknown) {
-      if (isNodeError(err) && err.code === 'ENOENT') {
-        // File does not exist — normal on first run
-        return {}
-      }
-      this.logger.warn('Failed to read feature toggle state file, ignoring', {
-        error: err instanceof Error ? err.message : String(err),
-      })
-      return {}
+    const data = await this.store.read()
+    const count = Object.keys(data.toggles).length
+    if (count > 0) {
+      this.logger.info('Feature toggle states loaded from disk', { count })
     }
+    return data.toggles
   }
 
   /**
    * Saves toggle overrides to disk using atomic write (temp → rename).
+   * Serialized per-file so concurrent saves can't land their renames out of
+   * order and regress the persisted state to a stale snapshot.
    */
   async save(toggles: Record<string, boolean>): Promise<void> {
-    await mkdir(this.dataDir, { recursive: true })
-
-    const data: PersistedFeatureState = {
+    await this.store.write({
       version: 1,
       updatedAt: new Date().toISOString(),
       toggles,
-    }
-
-    const content = JSON.stringify(data, null, 2)
-    const tempPath = `${this.filePath}.${randomBytes(8).toString('hex')}.tmp`
-
-    await writeFile(tempPath, content, 'utf-8')
-
-    try {
-      await rename(tempPath, this.filePath)
-    } catch (renameError) {
-      // Clean up temp file on rename failure
-      try {
-        await unlink(tempPath)
-      } catch {
-        // Ignore cleanup errors
-      }
-      throw renameError
-    }
+    })
   }
 }
 

@@ -87,7 +87,7 @@ export function ContextPanelTabBar({
   onTabReorder,
   onTabSplit,
   onTabReceive,
-  panelWidth: _panelWidth, // eslint-disable-line @typescript-eslint/no-unused-vars
+  panelWidth: _panelWidth,  
   pluginViewMeta,
 }: ContextPanelTabBarProps) {
   const [draggedTab, setDraggedTab] = useState<ContextPanelViewId | null>(null)

@@ -45,7 +45,7 @@ function createMockBundleEvaluator(options?: {
   constructorThrows?: boolean;
   evaluationThrows?: boolean;
 }): BundleEvaluator {
-  return async (_bundle: string): Promise<Record<string, unknown>> => { // eslint-disable-line @typescript-eslint/no-unused-vars
+  return async (_bundle: string): Promise<Record<string, unknown>> => {  
     if (options?.evaluationThrows) {
       throw new SyntaxError('Unexpected token');
     }
@@ -76,7 +76,7 @@ function createMockBundleEvaluator(options?: {
         onload() { return options?.onloadFn?.(); }
         onunload() { options?.onunloadFn?.(); }
         loadData() { return Promise.resolve(null); }
-        saveData(_data: unknown) { return Promise.resolve(); } // eslint-disable-line @typescript-eslint/no-unused-vars
+        saveData(_data: unknown) { return Promise.resolve(); }  
         addCommand() {}
         registerEvent() {}
       },
@@ -377,7 +377,7 @@ describe('PluginLoader', () => {
     it('should continue loading remaining plugins when one fails', async () => {
       // First call fails (evaluation error), second call succeeds
       let callCount = 0;
-      const evaluator: BundleEvaluator = async (_bundle: string) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+      const evaluator: BundleEvaluator = async (_bundle: string) => {  
         callCount++;
         if (callCount === 1) {
           throw new SyntaxError('bad bundle');

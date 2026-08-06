@@ -130,7 +130,7 @@ export class Events {
 export class Scope {
   private handlers: Array<{ modifiers: string[] | null; key: string | null; func: (...args: unknown[]) => unknown }> = [];
 
-  constructor(_parent?: Scope) {} // eslint-disable-line @typescript-eslint/no-unused-vars
+  constructor(_parent?: Scope) {}  
 
   register(modifiers: string[] | null, key: string | null, func: (...args: unknown[]) => unknown): { modifiers: string[] | null; key: string | null; func: (...args: unknown[]) => unknown } {
     const handler = { modifiers, key, func };

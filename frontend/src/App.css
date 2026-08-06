@@ -1585,6 +1585,14 @@
 }
 
 /* ===== Change Password Page ===== */
+.change-password-user {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: center;
+}
+
 .change-password-info {
   margin: 0 0 20px;
   font-size: 14px;
@@ -2272,14 +2280,14 @@
 }
 .view-mode-section > summary::-webkit-details-marker { display: none; }
 .view-mode-section > summary::before {
-  content: 'â–¼';
+  content: '▼';
   font-size: 9px;
   color: var(--text-muted);
   flex-shrink: 0;
   transition: transform var(--transition-fast);
   margin-top: 0.2em;
 }
-.view-mode-section:not([open]) > summary::before { content: 'â–¶'; }
+.view-mode-section:not([open]) > summary::before { content: '▶'; }
 .view-mode-section > summary > h1,
 .view-mode-section > summary > h2,
 .view-mode-section > summary > h3,

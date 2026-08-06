@@ -2,18 +2,6 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
-
-// Mock useFeatureContext to prevent "must be used within a FeatureProvider" error.
-// EditMode now calls useFeatureContext() internally for live-preview feature check.
-vi.mock('../state/featureContext', () => ({
-  useFeatureContext: () => ({
-    state: { features: [], loading: false, error: null },
-    dispatch: vi.fn(),
-    isEnabled: () => true,
-  }),
-  FeatureProvider: ({ children }: { children: React.ReactNode }) => children,
-}))
-
 import { EditMode, type EditModeProps } from './EditMode'
 
 /** Helper to render EditMode with default props and optional overrides. */

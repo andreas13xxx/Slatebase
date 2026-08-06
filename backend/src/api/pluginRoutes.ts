@@ -1,18 +1,16 @@
 // Plugin Routes — Route module for plugin management endpoints (CRUD + upload)
 
-import fs from 'node:fs/promises'
-import path from 'node:path'
 import type { Context } from 'hono'
 import { Hono } from 'hono'
-import type { IPluginStore, PluginRegistryData } from '../plugin/types.js'
-import type { IPluginInstaller, PluginInstallResult } from '../plugin/plugin-installer.js'
+import type { PluginRegistryData } from '../plugin/types.js'
+import type { IPluginService } from '../plugin/plugin-service.js'
+import type { PluginInstallResult } from '../plugin/plugin-installer.js'
 import { PluginNotFoundError, PluginFileTooLargeError, PluginSettingsTooLargeError } from '../plugin/errors.js'
 import { PluginInstallError } from '../plugin/plugin-installer.js'
 import { pluginRegistrySchema, isValidPluginId } from '../plugin/validation.js'
 import type { IVaultAccessControl } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
-import { isNodeError } from '../shared/fs-utils.js'
 import { checkVaultReadAccess } from './access-check.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -40,8 +38,7 @@ function createApiError(code: string, message: string): ApiError {
  * Dependencies required by the plugin route module.
  */
 export interface PluginRouteDependencies {
-  pluginStore: IPluginStore
-  pluginInstaller: IPluginInstaller
+  pluginService: IPluginService
   accessControl: IVaultAccessControl
   vaultRegistry: IVaultRegistry
   logger: ILogger
@@ -58,7 +55,7 @@ export interface PluginRouteDependencies {
  * @returns A Hono instance with plugin management routes registered.
  */
 export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
-  const { pluginStore, pluginInstaller, accessControl, vaultRegistry, logger } = deps
+  const { pluginService, accessControl, vaultRegistry, logger } = deps
   const app = new Hono()
 
   // ─── Detected plugins route (scans .obsidian/plugins/ inside vault filesystem) ───
@@ -78,7 +75,7 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
         return c.json(createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`), 404)
       }
 
-      const detected = await scanObsidianPlugins(entry.storagePath)
+      const detected = await pluginService.listDetected(entry.storagePath)
       return c.json({ plugins: detected }, 200)
     } catch (error) {
       return handlePluginError(c, error, logger)
@@ -106,7 +103,7 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
         return c.json(createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`), 404)
       }
 
-      const result = await pluginInstaller.installFromDetected(vaultId, pluginId, entry.storagePath)
+      const result = await pluginService.installDetected(vaultId, pluginId, entry.storagePath)
       return c.json(result, 201)
     } catch (error) {
       return handlePluginError(c, error, logger)
@@ -139,7 +136,7 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     }
 
     try {
-      await pluginStore.saveRegistry(vaultId, parsed.data as PluginRegistryData)
+      await pluginService.saveRegistry(vaultId, parsed.data as PluginRegistryData)
       return c.body(null, 204)
     } catch (error) {
       return handlePluginError(c, error, logger)
@@ -156,7 +153,7 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     }
 
     try {
-      const registry = await pluginStore.loadRegistry(vaultId)
+      const registry = await pluginService.loadRegistry(vaultId)
       if (registry === null) {
         return c.json({ version: 1, plugins: {} }, 200)
       }
@@ -178,7 +175,7 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     }
 
     try {
-      const manifests = await pluginStore.listPlugins(vaultId)
+      const manifests = await pluginService.listPlugins(vaultId)
       return c.json({ plugins: manifests }, 200)
     } catch (error) {
       return handlePluginError(c, error, logger)
@@ -213,7 +210,7 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
 
       const arrayBuffer = await file.arrayBuffer()
       const buffer = Buffer.from(arrayBuffer)
-      const result: PluginInstallResult = await pluginInstaller.installFromZip(vaultId, buffer)
+      const result: PluginInstallResult = await pluginService.installFromZip(vaultId, buffer)
 
       return c.json(result, 201)
     } catch (error) {
@@ -239,7 +236,7 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     }
 
     try {
-      const manifest = await pluginStore.loadManifest(vaultId, pluginId)
+      const manifest = await pluginService.getManifest(vaultId, pluginId)
       if (manifest === null) {
         return c.json(createApiError('PLUGIN_NOT_FOUND', `Plugin "${pluginId}" not found in vault "${vaultId}"`), 404)
       }
@@ -266,12 +263,12 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
 
     try {
       // Verify plugin exists before deleting
-      const manifest = await pluginStore.loadManifest(vaultId, pluginId)
+      const manifest = await pluginService.getManifest(vaultId, pluginId)
       if (manifest === null) {
         return c.json(createApiError('PLUGIN_NOT_FOUND', `Plugin "${pluginId}" not found in vault "${vaultId}"`), 404)
       }
 
-      await pluginStore.deletePlugin(vaultId, pluginId)
+      await pluginService.deletePlugin(vaultId, pluginId)
       return c.body(null, 204)
     } catch (error) {
       return handlePluginError(c, error, logger)
@@ -294,7 +291,7 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     }
 
     try {
-      const bundle = await pluginStore.loadBundle(vaultId, pluginId)
+      const bundle = await pluginService.loadBundle(vaultId, pluginId)
       if (bundle === null) {
         return c.json(createApiError('PLUGIN_NOT_FOUND', `Plugin "${pluginId}" not found in vault "${vaultId}"`), 404)
       }
@@ -327,7 +324,7 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     }
 
     try {
-      const styles = await pluginStore.loadStyles(vaultId, pluginId)
+      const styles = await pluginService.loadStyles(vaultId, pluginId)
       if (styles === null) {
         return c.json(createApiError('PLUGIN_NOT_FOUND', `Plugin "${pluginId}" styles not found`), 404)
       }
@@ -360,7 +357,7 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     }
 
     try {
-      const settings = await pluginStore.loadSettings(vaultId, pluginId)
+      const settings = await pluginService.loadSettings(vaultId, pluginId)
       if (settings === null) {
         return c.json(null, 200)
       }
@@ -412,7 +409,7 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
         return c.json(createApiError('VALIDATION_ERROR', 'Request body must be valid JSON'), 400)
       }
 
-      await pluginStore.saveSettings(vaultId, pluginId, rawBody)
+      await pluginService.saveSettings(vaultId, pluginId, rawBody)
       return c.body(null, 204)
     } catch (error) {
       return handlePluginError(c, error, logger)
@@ -456,73 +453,4 @@ function handlePluginError(c: Context, error: unknown, logger: ILogger): Respons
   return c.json(createApiError('INTERNAL_ERROR', 'Internal server error'), 500)
 }
 
-// ─── Detected Plugin Scanner ─────────────────────────────────────────────────
-
-/** Detected plugin from .obsidian/plugins/ directory. */
-interface DetectedPluginInfo {
-  /** Plugin folder name (used as plugin ID). */
-  id: string
-  /** Whether a manifest.json was found. */
-  hasManifest: boolean
-  /** Whether a main.js was found. */
-  hasMainJs: boolean
-}
-
-/**
- * Scans the .obsidian/plugins/ directory inside a vault's storage path
- * and returns information about detected plugins (folder name, presence of manifest/bundle).
- * Returns empty array if .obsidian/plugins/ does not exist.
- */
-async function scanObsidianPlugins(vaultStoragePath: string): Promise<DetectedPluginInfo[]> {
-  const pluginsDir = path.join(vaultStoragePath, '.obsidian', 'plugins')
-
-  let entries: string[]
-  try {
-    entries = await fs.readdir(pluginsDir)
-  } catch (error: unknown) {
-    if (isNodeError(error) && error.code === 'ENOENT') {
-      return []
-    }
-    throw error
-  }
-
-  const detected: DetectedPluginInfo[] = []
-
-  for (const entry of entries) {
-    const entryPath = path.join(pluginsDir, entry)
-
-    let stat: import('node:fs').Stats
-    try {
-      stat = await fs.stat(entryPath)
-    } catch {
-      continue
-    }
-
-    if (!stat.isDirectory()) continue
-
-    // Check for manifest.json and main.js
-    let hasManifest = false
-    let hasMainJs = false
-
-    try {
-      await fs.access(path.join(entryPath, 'manifest.json'))
-      hasManifest = true
-    } catch {
-      // not found
-    }
-
-    try {
-      await fs.access(path.join(entryPath, 'main.js'))
-      hasMainJs = true
-    } catch {
-      // not found
-    }
-
-    detected.push({ id: entry, hasManifest, hasMainJs })
-  }
-
-  return detected
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 

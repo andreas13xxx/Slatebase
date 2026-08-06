@@ -1,7 +1,7 @@
 // ─── Plugin Store Service ─────────────────────────────────────────────────────
 
 import type { ILogger } from '../logger/index.js'
-import type { IPluginStore, PluginManifest } from '../plugin/types.js'
+import type { IInstalledPluginStore, PluginManifest } from '../plugin/types.js'
 import type { IGitHubClient } from './github-client.js'
 import type { IPluginStoreCache } from './plugin-store-cache.js'
 import type {
@@ -54,13 +54,13 @@ export interface IPluginStoreService {
 export class PluginStoreService implements IPluginStoreService {
   private readonly githubClient: IGitHubClient
   private readonly cache: IPluginStoreCache
-  private readonly pluginStore: IPluginStore
+  private readonly pluginStore: IInstalledPluginStore
   private readonly logger: ILogger
 
   constructor(
     githubClient: IGitHubClient,
     cache: IPluginStoreCache,
-    pluginStore: IPluginStore,
+    pluginStore: IInstalledPluginStore,
     logger: ILogger
   ) {
     this.githubClient = githubClient

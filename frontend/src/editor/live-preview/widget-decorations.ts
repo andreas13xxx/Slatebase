@@ -1,9 +1,15 @@
 import { Decoration, WidgetType, type EditorView } from '@codemirror/view'
 import { StateEffect, type EditorState, type Range } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
+import { createElement } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
 import type { HideableRange } from './inline-decorations'
 import { hasCodeBlockProcessor, getCodeBlockHandler, MarkdownRenderChild } from '../../plugins/compat/code-block-processor-registry'
 import type { MarkdownPostProcessorContext } from '../../plugins/compat/code-block-processor-registry'
+import { createWikilinkRegex, resolveWikilinkMatchTarget } from './link-decorations'
+import { resolveWikilinkTarget } from '../../plugins/link-resolver'
+import { ViewMode } from '../../components/ViewMode'
+import type { DirectoryTree } from '../../types'
 
 /**
  * State effect to toggle callout fold state.
@@ -17,6 +23,12 @@ export const toggleCalloutFoldEffect = StateEffect.define<{
 
 /** Image file extensions (lowercase, with dot) that get inline image preview. */
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.avif', '.bmp'])
+
+/** PDF file extensions (lowercase, with dot) that get an inline PDF viewer. */
+const PDF_EXTENSIONS = new Set(['.pdf'])
+
+/** Default inline PDF viewer height in pixels, when no `|height` is specified. */
+const DEFAULT_PDF_HEIGHT_PX = 500
 
 /**
  * Options for building widget decorations.
@@ -32,6 +44,8 @@ export interface WidgetDecorationOptions {
   onCheckboxToggle?: (line: number, checked: boolean) => void
   /** Set of folded callout block positions (keyed as `${from}:${to}`). */
   foldedCallouts?: Set<string>
+  /** Directory tree, for resolving note-embed targets (bare names, missing .md). */
+  directoryTree?: DirectoryTree | null
 }
 
 /**
@@ -46,59 +60,226 @@ export interface WidgetDecorationResult {
 // Widget Classes
 // ---------------------------------------------------------------------------
 
+/** What kind of inline preview an embed target gets in Live Preview. */
+type EmbedKind = 'image' | 'pdf' | 'note' | 'file'
+
 /**
- * Widget for inline image/file embed previews.
- * Renders an <img> for image files or a file-icon placeholder for other types.
+ * Widget for inline image/PDF/note/file embed previews.
+ * - image: <img>
+ * - pdf: fetched as a Blob and rendered via <object type="application/pdf">
+ *   (mirroring BinaryViewer's PdfViewer, chosen there so Firefox uses its
+ *   built-in pdf.js viewer)
+ * - note: resolved against the directory tree, fetched, optionally sliced
+ *   to a `#heading` section, and rendered by mounting a nested ViewMode
+ *   React root — reusing the same rendering pipeline Viewer mode and hover
+ *   previews use, rather than re-implementing Markdown rendering here
+ * - anything else: a plain file-icon placeholder
  */
 class EmbedWidget extends WidgetType {
   private readonly filename: string
   private readonly vaultId: string
   private readonly token: string | undefined
-  private readonly isImage: boolean
+  private readonly kind: EmbedKind
+  private readonly display: string | null
+  private readonly heading: string | null
+  private readonly directoryTree: DirectoryTree | null
+  private objectUrl: string | null = null
+  private reactRoot: Root | null = null
 
   constructor(
     filename: string,
     vaultId: string,
     token: string | undefined,
-    isImage: boolean
+    kind: EmbedKind,
+    display: string | null,
+    heading: string | null,
+    directoryTree: DirectoryTree | null
   ) {
     super()
     this.filename = filename
     this.vaultId = vaultId
     this.token = token
-    this.isImage = isImage
+    this.kind = kind
+    this.display = display
+    this.heading = heading
+    this.directoryTree = directoryTree
+  }
+
+  private buildRawSrc(path: string = this.filename): string {
+    let src = `/api/v1/vaults/${this.vaultId}/files?path=${encodeURIComponent(path)}&raw=true`
+    if (this.token) {
+      src += `&token=${encodeURIComponent(this.token)}`
+    }
+    return src
   }
 
   toDOM(): HTMLElement {
-    if (this.isImage) {
+    if (this.kind === 'image') {
       const img = document.createElement('img')
-      let src = `/api/v1/vaults/${this.vaultId}/files?path=${encodeURIComponent(this.filename)}&raw=true`
-      if (this.token) {
-        src += `&token=${encodeURIComponent(this.token)}`
-      }
-      img.src = src
+      img.src = this.buildRawSrc()
       img.className = 'cm-lp-embed-img'
       img.alt = this.filename
       img.loading = 'lazy'
+      applyEmbedImageSize(img, this.display)
       return img
     }
 
-    // Non-image embed: file icon placeholder
+    if (this.kind === 'pdf') {
+      return this.buildPdfDOM()
+    }
+
+    if (this.kind === 'note') {
+      return this.buildNoteDOM()
+    }
+
+    // Unsupported embed type: file icon placeholder
     const span = document.createElement('span')
     span.className = 'cm-lp-embed-file'
     span.textContent = `📄 ${this.filename}`
     return span
   }
 
+  /**
+   * Builds an inline PDF viewer, fetched as a Blob and rendered via
+   * <object type="application/pdf"> — same approach as BinaryViewer's
+   * PdfViewer (chosen there so Firefox uses its built-in pdf.js viewer).
+   * The fetch happens after mount since toDOM() must return synchronously;
+   * a loading placeholder shows until the blob URL is ready.
+   */
+  private buildPdfDOM(): HTMLElement {
+    const heightPx = parseEmbedPdfHeight(this.display)
+    const container = document.createElement('div')
+    container.className = 'cm-lp-embed-pdf'
+    container.style.height = `${String(heightPx)}px`
+
+    const status = document.createElement('p')
+    status.className = 'cm-lp-embed-pdf-status'
+    status.textContent = '…'
+    container.appendChild(status)
+
+    fetch(this.buildRawSrc())
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${String(res.status)}`)
+        return res.blob()
+      })
+      .then((blob) => {
+        const pdfBlob = new Blob([blob], { type: 'application/pdf' })
+        this.objectUrl = URL.createObjectURL(pdfBlob)
+
+        const object = document.createElement('object')
+        object.data = this.objectUrl
+        object.type = 'application/pdf'
+        object.className = 'cm-lp-embed-pdf-object'
+        object.setAttribute('aria-label', this.filename)
+
+        container.replaceChildren(object)
+      })
+      .catch(() => {
+        status.textContent = `📄 ${this.filename}`
+      })
+
+    return container
+  }
+
+  /**
+   * Builds an inline note embed: resolves the target against the directory
+   * tree (handles bare names and missing `.md`, same as wikilinks), fetches
+   * its content, slices to `#heading` if given, and renders it by mounting a
+   * nested <ViewMode> React root — the same component Viewer mode and hover
+   * previews use, so nested embeds/callouts/headings render identically.
+   */
+  private buildNoteDOM(): HTMLElement {
+    const container = document.createElement('div')
+    container.className = 'cm-lp-embed-note'
+
+    const resolvedPath = resolveWikilinkTarget(this.filename, this.directoryTree)
+    if (!resolvedPath) {
+      container.classList.add('cm-lp-embed-note--missing')
+      container.textContent = `Notiz nicht gefunden: ${this.filename}`
+      return container
+    }
+
+    const status = document.createElement('p')
+    status.className = 'cm-lp-embed-note-status'
+    status.textContent = '…'
+    container.appendChild(status)
+
+    // The non-raw JSON endpoint only accepts the auth token via a real
+    // Authorization header — unlike raw=true (used by the image/PDF embeds
+    // above), which also allows a ?token= query param specifically so plain
+    // <img src>/<object data> tags can authenticate without custom headers.
+    const fetchInit: RequestInit = this.token
+      ? { headers: { Authorization: `Bearer ${this.token}` } }
+      : {}
+
+    fetch(this.buildFileContentSrc(resolvedPath), fetchInit)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${String(res.status)}`)
+        return res.json() as Promise<{ content: string; isBinary: boolean }>
+      })
+      .then((file) => {
+        if (file.isBinary) throw new Error('binary')
+        const content = this.heading ? extractHeadingSection(file.content, this.heading) : file.content
+
+        const header = document.createElement('span')
+        header.className = 'cm-lp-embed-note-title'
+        header.textContent = this.filename
+
+        const body = document.createElement('div')
+        container.replaceChildren(header, body)
+
+        this.reactRoot = createRoot(body)
+        this.reactRoot.render(
+          createElement(ViewMode, {
+            content,
+            vaultId: this.vaultId,
+            directoryTree: this.directoryTree,
+            token: this.token,
+          })
+        )
+      })
+      .catch(() => {
+        container.classList.add('cm-lp-embed-note--missing')
+        container.textContent = `Notiz nicht gefunden: ${this.filename}`
+      })
+
+    return container
+  }
+
+  /**
+   * Builds the JSON (non-raw) file-content URL used to fetch note text.
+   * No `?token=` here — see the Authorization-header comment above.
+   */
+  private buildFileContentSrc(path: string): string {
+    return `/api/v1/vaults/${this.vaultId}/files?path=${encodeURIComponent(path)}`
+  }
+
+  destroy(_dom: HTMLElement): void {
+    if (this.objectUrl) {
+      URL.revokeObjectURL(this.objectUrl)
+      this.objectUrl = null
+    }
+    if (this.reactRoot) {
+      this.reactRoot.unmount()
+      this.reactRoot = null
+    }
+  }
+
   eq(other: EmbedWidget): boolean {
     return this.filename === other.filename &&
       this.vaultId === other.vaultId &&
       this.token === other.token &&
-      this.isImage === other.isImage
+      this.kind === other.kind &&
+      this.display === other.display &&
+      this.heading === other.heading &&
+      this.directoryTree === other.directoryTree
   }
 
   get estimatedHeight(): number {
-    return this.isImage ? 200 : 24
+    if (this.kind === 'image') return 200
+    if (this.kind === 'pdf') return parseEmbedPdfHeight(this.display)
+    if (this.kind === 'note') return 100
+    return 24
   }
 }
 
@@ -186,7 +367,7 @@ class TableWidget extends WidgetType {
       const headerCells = this.rows[0]!
       for (let i = 0; i < headerCells.length; i++) {
         const th = document.createElement('th')
-        th.textContent = headerCells[i]!.trim()
+        renderCellInline(th, headerCells[i]!.trim())
         const align = this.alignments[i]
         if (align) th.style.textAlign = align
         headerRow.appendChild(th)
@@ -203,7 +384,7 @@ class TableWidget extends WidgetType {
         const cells = this.rows[r]!
         for (let i = 0; i < cells.length; i++) {
           const td = document.createElement('td')
-          td.textContent = cells[i]!.trim()
+          renderCellInline(td, cells[i]!.trim())
           const align = this.alignments[i]
           if (align) td.style.textAlign = align
           tr.appendChild(td)
@@ -255,13 +436,104 @@ function parseTableAlignments(delimiterRow: string[]): Array<'left' | 'center' |
 
 /**
  * Parses a pipe-separated table line into cells.
- * Strips leading/trailing pipes and splits on `|`.
+ * Splits on `|`, but a backslash-escaped pipe (`\|`) — the convention for
+ * keeping an aliased wikilink intact inside a table cell, since `|` is
+ * also the column delimiter — is kept as literal cell text and does not
+ * start a new column. Mirrors the escape handling in Lezer's own GFM
+ * table row parser (`@lezer/markdown`'s `parseRow`).
+ * A leading/trailing `|` (the optional outer table pipes) does not
+ * produce an empty boundary column.
  */
-function parseTableRow(line: string): string[] {
-  let trimmed = line.trim()
-  if (trimmed.startsWith('|')) trimmed = trimmed.slice(1)
-  if (trimmed.endsWith('|')) trimmed = trimmed.slice(0, -1)
-  return trimmed.split('|')
+export function parseTableRow(line: string): string[] {
+  const trimmedLine = line.trim()
+  const cells: string[] = []
+  let cell = ''
+  let escaped = false
+
+  for (const ch of trimmedLine) {
+    if (ch === '|' && !escaped) {
+      cells.push(cell)
+      cell = ''
+    } else {
+      cell += ch
+    }
+    escaped = !escaped && ch === '\\'
+  }
+  cells.push(cell)
+
+  if (cells.length > 0 && cells[0] === '') cells.shift()
+  if (cells.length > 0 && cells[cells.length - 1] === '') cells.pop()
+
+  return cells
+}
+
+/**
+ * Renders cell text into a container element, turning `[[wikilink]]` /
+ * `[[target|alias]]` spans (including the `\|` escaped-pipe alias
+ * convention, see `resolveWikilinkMatchTarget`) into clickable wikilink
+ * spans. Inline code spans (`` `text` ``) are rendered literally as
+ * `<code>` — their content is never scanned for wikilinks, matching how
+ * code spans suppress inline syntax everywhere else. Everything else is
+ * inserted as plain text. Cell content is never covered by the
+ * block-level Lezer syntax tree used elsewhere in this file (the whole
+ * table is one replaced widget), so both code spans and wikilinks here
+ * are found by regex, same as `link-decorations.ts` does outside the tree.
+ */
+export function renderCellInline(container: HTMLElement, text: string): void {
+  const codeSpanRegex = /`([^`]+)`/g
+  let lastIndex = 0
+  let codeMatch: RegExpExecArray | null
+
+  while ((codeMatch = codeSpanRegex.exec(text)) !== null) {
+    if (codeMatch.index > lastIndex) {
+      renderWikilinkSegment(container, text.slice(lastIndex, codeMatch.index))
+    }
+
+    const code = document.createElement('code')
+    code.className = 'cm-lp-inline-code'
+    code.textContent = codeMatch[1] ?? ''
+    container.appendChild(code)
+
+    lastIndex = codeMatch.index + codeMatch[0].length
+  }
+
+  if (lastIndex < text.length) {
+    renderWikilinkSegment(container, text.slice(lastIndex))
+  }
+}
+
+/**
+ * Renders a cell text segment known to contain no inline code spans,
+ * turning `[[wikilink]]` spans into clickable spans and leaving
+ * everything else as plain text. Extracted from `renderCellInline` so
+ * code spans can be carved out first.
+ */
+function renderWikilinkSegment(container: HTMLElement, text: string): void {
+  const wikilinkRegex = createWikilinkRegex()
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = wikilinkRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      container.appendChild(document.createTextNode(text.slice(lastIndex, match.index)))
+    }
+
+    const rawTarget = match[1] ?? ''
+    const alias = match[2]
+    const target = resolveWikilinkMatchTarget(rawTarget, alias !== undefined)
+
+    const link = document.createElement('span')
+    link.className = 'cm-lp-wikilink'
+    link.setAttribute('data-target', target)
+    link.textContent = alias ?? target
+    container.appendChild(link)
+
+    lastIndex = match.index + match[0].length
+  }
+
+  if (lastIndex < text.length) {
+    container.appendChild(document.createTextNode(text.slice(lastIndex)))
+  }
 }
 
 /**
@@ -807,7 +1079,10 @@ export function buildWidgetDecorations(
           EMBED_REGEX.lastIndex = 0
 
           while ((match = EMBED_REGEX.exec(text)) !== null) {
-            const filename = match[1]!
+            const raw = match[1]!
+            const filename = parseEmbedTarget(raw)
+            const display = parseEmbedDisplay(raw)
+            const heading = parseEmbedHeading(raw)
             const matchFrom = node.from + match.index
             const matchTo = matchFrom + match[0].length
             const key = `embed:${matchFrom}:${matchTo}`
@@ -815,14 +1090,37 @@ export function buildWidgetDecorations(
             if (processedBlocks.has(key)) continue
             processedBlocks.add(key)
 
+            // Skip embed syntax written as a code example (e.g. `` `![[file.pdf|600]]` ``
+            // inside a tip callout) — matches the same guard link-decorations.ts uses
+            // for wikilinks. Without it, docs demonstrating the syntax would try to
+            // fetch and render a file that's just example text, not a real target.
+            let insideCode = false
+            tree.iterate({
+              from: matchFrom, to: matchTo,
+              enter(n) {
+                if (n.name === 'FencedCode' || n.name === 'InlineCode' || n.name === 'CodeBlock') {
+                  insideCode = true
+                  return false
+                }
+              }
+            })
+            if (insideCode) continue
+
             const ext = getFileExtension(filename)
-            const isImage = IMAGE_EXTENSIONS.has(ext)
+            const kind: EmbedKind =
+              IMAGE_EXTENSIONS.has(ext) ? 'image' :
+              PDF_EXTENSIONS.has(ext) ? 'pdf' :
+              (ext === '' || ext === '.md') ? 'note' :
+              'file'
 
             const widget = new EmbedWidget(
               filename,
               options.vaultId,
               options.token,
-              isImage
+              kind,
+              display,
+              heading,
+              options.directoryTree ?? null
             )
 
             // Replace the ![[...]] syntax with the widget
@@ -1163,6 +1461,142 @@ export function buildWidgetDecorations(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Strips the `#heading` and `|display` (e.g. size) suffixes from a raw
+ * `![[target#heading|display]]` capture, leaving just the file path.
+ * Without this, a sized embed like `![[photo.png|400]]` resolves its
+ * extension as `.png|400` — matching no known type — and its API path
+ * as `photo.png|400`, which 404s.
+ */
+function parseEmbedTarget(raw: string): string {
+  const hashIndex = raw.indexOf('#')
+  const pipeIndex = raw.indexOf('|')
+  const candidates = [hashIndex, pipeIndex].filter((i) => i !== -1)
+  const end = candidates.length > 0 ? Math.min(...candidates) : raw.length
+  return raw.slice(0, end)
+}
+
+/**
+ * Extracts the `|display` (size/alt) text from a raw `![[target#heading|display]]`
+ * capture, or null if no `|` is present.
+ */
+function parseEmbedDisplay(raw: string): string | null {
+  const pipeIndex = raw.indexOf('|')
+  if (pipeIndex === -1) return null
+  return raw.slice(pipeIndex + 1)
+}
+
+/**
+ * Extracts the `#heading` text from a raw `![[target#heading|display]]`
+ * capture, or null if no `#` is present. Block refs (`#^id`) are left as-is
+ * (a heading named e.g. "^id" simply won't match, degrading to full content)
+ * — block-ref embeds aren't supported in Live Preview note embeds.
+ */
+function parseEmbedHeading(raw: string): string | null {
+  const hashIndex = raw.indexOf('#')
+  if (hashIndex === -1) return null
+  const pipeIndex = raw.indexOf('|')
+  const end = pipeIndex === -1 ? raw.length : pipeIndex
+  if (end <= hashIndex + 1) return null
+  return raw.slice(hashIndex + 1, end)
+}
+
+/**
+ * Extracts the content under a specific heading from Markdown text — all
+ * lines from the heading until the next heading of equal or higher level.
+ * Mirrors ViewMode.tsx's extractHeadingSection (duplicated rather than
+ * imported: this module operates on raw embed targets pre-fetch, outside
+ * ViewMode's React tree, so keeping it local avoids a cross-layer coupling
+ * for a ~20-line pure function). Returns the full content if not found.
+ */
+function extractHeadingSection(content: string, heading: string): string {
+  const lines = content.split('\n')
+  const headingLower = heading.toLowerCase().trim()
+
+  let startIndex = -1
+  let startLevel = 0
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!
+    const match = line.match(/^(#{1,6})\s+(.+)$/)
+    if (match) {
+      const level = match[1]!.length
+      const text = match[2]!.trim().toLowerCase()
+      if (text === headingLower) {
+        startIndex = i
+        startLevel = level
+        break
+      }
+    }
+  }
+
+  if (startIndex === -1) return content
+
+  let endIndex = lines.length
+  for (let i = startIndex + 1; i < lines.length; i++) {
+    const line = lines[i]!
+    const match = line.match(/^(#{1,6})\s+/)
+    if (match && match[1]!.length <= startLevel) {
+      endIndex = i
+      break
+    }
+  }
+
+  return lines.slice(startIndex, endIndex).join('\n')
+}
+
+/**
+ * Parses a PDF embed's `|display` text into a viewer height in pixels
+ * (mirroring ViewMode.tsx's parseEmbedPdfHeight). PDF embeds only support
+ * a plain number, e.g. `![[doc.pdf|600]]`, which bounds the viewer height
+ * — unlike image embeds, where a bare number is a width. Falls back to
+ * DEFAULT_PDF_HEIGHT_PX for missing/non-numeric display text.
+ */
+function parseEmbedPdfHeight(display: string | null): number {
+  if (!display) return DEFAULT_PDF_HEIGHT_PX
+  const widthMatch = display.trim().match(/^(\d+)$/)
+  return widthMatch ? Number(widthMatch[1]) : DEFAULT_PDF_HEIGHT_PX
+}
+
+/**
+ * Applies a width/height style to an embed `<img>` from its `|display` text,
+ * mirroring the size formats supported in Viewer mode (ViewMode.tsx's
+ * parseEmbedImageStyle): `300` (width px), `300x200` (widthxheight px),
+ * `x200` (height px), `100%` (percent width). Non-numeric display text is
+ * alt text, not a size, so it's left alone.
+ */
+function applyEmbedImageSize(img: HTMLImageElement, display: string | null): void {
+  if (!display) return
+  const trimmed = display.trim()
+
+  const dimensionMatch = trimmed.match(/^(\d+)\s*x\s*(\d+)$/)
+  if (dimensionMatch) {
+    img.style.width = `${dimensionMatch[1]!}px`
+    img.style.height = `${dimensionMatch[2]!}px`
+    return
+  }
+
+  const heightOnlyMatch = trimmed.match(/^x\s*(\d+)$/)
+  if (heightOnlyMatch) {
+    img.style.height = `${heightOnlyMatch[1]!}px`
+    img.style.width = 'auto'
+    return
+  }
+
+  const percentMatch = trimmed.match(/^(\d+)%$/)
+  if (percentMatch) {
+    img.style.width = `${percentMatch[1]!}%`
+    img.style.height = 'auto'
+    return
+  }
+
+  const widthMatch = trimmed.match(/^(\d+)$/)
+  if (widthMatch) {
+    img.style.width = `${widthMatch[1]!}px`
+    img.style.height = 'auto'
+  }
+}
 
 /**
  * Extracts the file extension from a filename (lowercase, with dot).

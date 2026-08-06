@@ -3,7 +3,7 @@ import { Send } from 'lucide-react'
 import { useChatContext } from '../state/chatContext'
 import { useAppContext } from '../state/index'
 import { useTranslation } from '../i18n/index'
-import { useToast } from './Toast'
+import { showToast } from './ToastNotification'
 import { sendMessage } from '../state/chatActions'
 
 /** Maximum allowed message content length. */
@@ -26,7 +26,6 @@ export function MessageInput({ conversationId }: MessageInputProps) {
   const { state, dispatch } = useChatContext()
   const { apiClient } = useAppContext()
   const { t } = useTranslation()
-  const { showToast } = useToast()
   const [content, setContent] = useState('')
 
   const trimmed = content.trim()
@@ -49,12 +48,12 @@ export function MessageInput({ conversationId }: MessageInputProps) {
       const errorMessage = state.error ?? ''
       const rateLimitMatch = errorMessage.match(/(\d+)\s*(seconds?|Sekunden?)/)
       if (rateLimitMatch?.[1]) {
-        showToast(t('chat.rateLimited', { seconds: rateLimitMatch[1] }), 'error')
+        showToast('error', t('chat.rateLimited', { seconds: rateLimitMatch[1] }))
       } else if (errorMessage.toLowerCase().includes('rate') || errorMessage.includes('429')) {
-        showToast(t('chat.rateLimited', { seconds: '60' }), 'error')
+        showToast('error', t('chat.rateLimited', { seconds: '60' }))
       }
     }
-  }, [isSendDisabled, apiClient, dispatch, conversationId, trimmed, state.error, showToast, t])
+  }, [isSendDisabled, apiClient, dispatch, conversationId, trimmed, state.error, t])
 
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {

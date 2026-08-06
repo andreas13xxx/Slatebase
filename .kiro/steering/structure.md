@@ -18,6 +18,12 @@ src/
 ├── config/index.ts       — Zod-validated config (file + env overlay)
 ├── logger/index.ts       — Pino logger with ILogger interface
 ├── logger/log-store.ts  — In-memory log ring buffer for admin log viewing
+├── shared/                   — Cross-cutting utilities with no domain of their own; used by most other modules
+│   ├── fs-utils.ts           — isNodeError() type guard for Node.js filesystem errors
+│   ├── semver.ts             — compareSemver() (re-exported via plugin/index.ts)
+│   ├── async-mutex.ts        — AsyncMutex (serializes one path's read-modify-write cycle), KeyedMutex (one AsyncMutex per string key, cached for the store/service's lifetime)
+│   ├── json-file-store.ts    — writeJsonFileAtomic() (temp→rename, Windows EPERM/EACCES retry) + readJsonFile(); JsonFileStore<T> (single fixed path) and KeyedJsonFileStore<T> (one path per key, e.g. per user/vault/token) wrap these with an AsyncMutex/KeyedMutex around read-modify-write. Standard pattern for new per-file or per-key JSON persistence — used by feature-toggle-store, preferences-store, vault-config-store, token-store, unread-store.
+│   └── sliding-window-rate-limiter.ts — SlidingWindowRateLimiter (generic sliding-window request limiter keyed by string; same algorithm as ChatRateLimiter/McpRateLimiter, generalized for new call sites instead of re-implementing it)
 ├── vault/
 │   ├── index.ts          — VaultReader, VaultManager, path utilities, data models
 │   └── registry.ts       — VaultRegistry (persistent vault metadata in vaults.json)
@@ -71,7 +77,7 @@ src/
 │   ├── index.ts          — ChatService (business logic)
 │   ├── conversation-store.ts — ConversationStore (filesystem persistence)
 │   ├── message-store.ts  — MessageStore (filesystem persistence)
-│   ├── unread-store.ts   — UnreadStore (per-user unread counts)
+│   ├── unread-store.ts   — UnreadStore (per-user unread counts; persisted via shared `KeyedJsonFileStore`, keyed by userId)
 │   ├── rate-limiter.ts   — ChatRateLimiter (in-memory)
 │   └── chat-service.ts   — ChatService orchestration
 ├── mcp/
@@ -80,7 +86,7 @@ src/
 │   ├── config.ts         — McpConfig interface + loadMcpConfig() from env/config
 │   ├── errors.ts         — MCP-specific error classes (McpAuthenticationError, TokenLimitError, etc.)
 │   ├── validation.ts     — Zod schemas for token creation + tool parameters
-│   ├── token-store.ts    — TokenStore (filesystem persistence, in-memory hash index)
+│   ├── token-store.ts    — TokenStore (filesystem persistence, in-memory hash index; per-token records and the per-user token-ID index are each a `KeyedJsonFileStore`, so the user-index update can't race and drop a tokenId — which would make it un-revocable via "revoke all")
 │   ├── token-service.ts  — McpTokenService (token lifecycle: create, validate, revoke, list)
 │   ├── rate-limiter.ts   — McpRateLimiter (sliding window per token)
 │   ├── handlers.ts       — McpHandlers (MCP resource handlers: list, read)
@@ -107,21 +113,32 @@ src/
 │   ├── link-index-service.ts — LinkIndexService (rebuild, incremental updates, JSON v2 persistence, tags, properties, getGraph with options, getGraphMeta), extractFrontmatterTags (Obsidian-compatible frontmatter tag extraction)
 │   ├── link-index-service.test.ts — Unit tests for LinkIndexService v2
 │   └── canvas-parser.test.ts — Unit tests for canvas link extraction
-├── plugin/
+├── plugin/                   — Installed-plugin management (per vault). Not to be confused with `plugin-store/` (the marketplace).
 │   ├── index.ts              — Barrel export for plugin module
-│   ├── types.ts              — IPluginStore, PluginManifest, PluginFiles, PluginRegistryData interfaces
+│   ├── types.ts              — IInstalledPluginStore, PluginManifest, PluginFiles, PluginRegistryData interfaces
 │   ├── errors.ts             — PluginNotFoundError, PluginFileTooLargeError, PluginSettingsTooLargeError
 │   ├── validation.ts         — Zod schemas (pluginManifestSchema, pluginRegistrySchema)
-│   ├── plugin-store.ts       — PluginStore (filesystem persistence, atomic writes, per-vault per-plugin dirs)
-│   ├── plugin-store.test.ts  — Unit tests for PluginStore
+│   ├── installed-plugin-store.ts — InstalledPluginStore (filesystem persistence, atomic writes, per-vault per-plugin dirs)
+│   ├── installed-plugin-store.test.ts — Unit tests for InstalledPluginStore
 │   ├── plugin-installer.ts   — PluginInstaller (ZIP extraction, manifest validation, bundle integrity, version comparison)
-│   └── plugin-installer.test.ts — Unit tests for PluginInstaller
+│   ├── plugin-installer.test.ts — Unit tests for PluginInstaller
+│   └── plugin-service.ts     — PluginService (routes→service→store layer wrapping InstalledPluginStore + PluginInstaller; also hosts the `.obsidian/plugins/` detected-plugin scanner)
+├── plugin-store/             — Community plugin marketplace (browse/install/update from GitHub releases). Distinct from `plugin/` (installed plugins).
+│   ├── index.ts              — Barrel export for plugin-store module
+│   ├── types.ts              — IPluginStoreConfig, CommunityPluginEntry, RemotePluginManifest, UpdateCheckResult, etc.
+│   ├── errors.ts             — GitHubRateLimitError, GitHubFetchError, AssetTooLargeError, DesktopOnlyPluginError, PluginNotInStoreError, UpstreamError
+│   ├── validation.ts         — Zod schemas (communityPluginEntrySchema, storeInstallSchema)
+│   ├── github-client.ts      — GitHubClient (fetches community plugin list/releases; domain allowlist re-validated on every redirect hop, size limits)
+│   ├── plugin-store-cache.ts — PluginStoreCache (in-memory TTL cache for plugin list/manifests/update results)
+│   ├── plugin-store-service.ts — PluginStoreService (browse/install/update orchestration; installs via the shared `plugin/` InstalledPluginStore)
+│   └── update-checker.ts     — UpdateChecker (periodic update check, default 24h interval, persists last-check timestamp)
 ├── feature-toggle/
 │   ├── index.ts              — Barrel export for feature-toggle module
 │   ├── types.ts              — IFeatureToggleService, IFeatureRegistry, FeatureToggleDefinition, FeatureToggleState, etc.
 │   ├── errors.ts             — FeatureNotFoundError, FeatureAlreadyRegisteredError, InvalidFeatureNameError
 │   ├── feature-registry.ts   — FeatureRegistry (declarative registration with validation)
 │   ├── feature-toggle-service.ts — FeatureToggleService (in-memory state, env-var overlay, onChange listeners)
+│   ├── feature-toggle-store.ts — FeatureToggleStore (persists runtime overrides to `features.json` via shared `JsonFileStore`)
 │   └── middleware.ts         — createFeatureGuard() factory (Hono middleware, 403 on disabled features)
 ├── realtime/
 │   ├── index.ts              — Barrel export for realtime module
@@ -135,7 +152,7 @@ src/
 │   ├── index.ts              — Barrel export for trash module
 │   ├── types.ts              — ITrashService, TrashEntry, TrashIndex interfaces
 │   ├── errors.ts             — TrashNotFoundError, TrashRestoreError
-│   └── trash-service.ts      — TrashService (soft-delete, restore, purgeExpired, atomic index)
+│   └── trash-service.ts      — TrashService (soft-delete, restore, purgeExpired, atomic index; each op runs inside a per-vault `KeyedMutex` lock — keeps the periodic cleanup job's `purgeExpired` from interleaving with a concurrent restore/delete on the same vault)
 ├── version/
 │   ├── index.ts              — Barrel export for version module
 │   ├── types.ts              — IVersionService, VersionEntry, VersionList interfaces
@@ -158,12 +175,12 @@ src/
 │   ├── index.ts              — Barrel export for preferences module
 │   ├── types.ts              — IPreferencesService, UserPreferences, RecentFileEntry, FavoriteEntry, KeybindingEntry
 │   ├── validation.ts         — Zod schemas (saveRecentFilesSchema, saveFavoritesSchema, saveKeybindingsSchema)
-│   └── preferences-store.ts  — PreferencesStore (per-user JSON file, atomic writes)
+│   └── preferences-store.ts  — PreferencesStore (per-user JSON file via shared `KeyedJsonFileStore`; recent-files/favorites/keybindings updates go through `mutate()` so concurrent saves can't lose each other's field)
 ├── vault-config/
 │   ├── index.ts              — Barrel export for vault-config module
 │   ├── types.ts              — IVaultConfigService, VaultConfig (templatesDirectory, dailyNotesDirectory)
 │   ├── validation.ts         — Zod schema (updateVaultConfigSchema)
-│   └── vault-config-store.ts — VaultConfigStore (per-vault .slatebase/config.json, atomic writes)
+│   └── vault-config-store.ts — VaultConfigStore (per-vault .slatebase/config.json via shared `KeyedJsonFileStore`; `saveConfig` merges through `mutate()` to avoid losing concurrent partial updates)
 ├── welcome-vault/
 │   ├── index.ts              — IWelcomeVaultService, WelcomeVaultService (never-throw, language-aware template copy)
 │   └── types.ts              — WelcomeVaultConfig, WelcomeVaultLanguage, OnUserCreatedFn
@@ -195,6 +212,8 @@ src/
 ├── utils/
 │   ├── semver.ts         — compareSemver() utility (X.Y.Z comparison, v-prefix stripping)
 │   ├── error.ts          — extractErrorMessage(err, fallback) shared utility
+│   ├── fileValidation.ts — Filename validation for InlineInput (new file/rename): invalid chars, length
+│   ├── pathUtils.ts      — Relative path computation, image/PDF detection, drop target + context-menu viewport clamping
 ├── canvas/
 │   ├── index.ts          — Barrel export (parser, serializer, types)
 │   ├── types.ts          — CanvasDocument, CanvasNode (Text/File/Link/Group), CanvasEdge, parse result types
@@ -206,24 +225,16 @@ src/
 │   ├── theme.ts              — CodeMirror theme (Design Tokens mapping, Dark/Light mode)
 │   ├── state-store.ts        — Per-tab EditorState persistence (Module-Level Map, cursor/scroll/history)
 │   ├── formatting.ts         — Toolbar formatting commands (bold, italic, heading, list, link, etc.)
-│   ├── keybindings.ts        — Custom keybindings integration (Slatebase shortcuts → CM6 keymap)
-│   ├── bracket-close.ts      — Auto-close brackets/quotes extension
-│   ├── auto-save.ts          — Auto-save extension (updateListener → debounce → save callback)
-│   ├── image-paste.ts        — Image paste + DnD upload extension
-│   ├── vim-mode.ts           — Vim mode wrapper (@replit/codemirror-vim Compartment toggle)
 │   ├── plugin-extensions.ts  — Plugin extension registry (per-plugin Compartment, add/remove/isolate, selection-dispatch after refresh)
-│   ├── editor-shim.ts        — EditorShim (1-indexed position API for legacy consumers + plugin compat)
 │   ├── editor-state-fields.ts — Obsidian-compatible StateFields (editorInfoField, editorLivePreviewField, editorEditorField)
 │   ├── token-class-node-prop.ts — Singleton NodeProp + Mapping (tokenClassNodeProp polyfill for Obsidian compat)
 │   ├── CodeMirrorEditor.tsx  — React wrapper (EditorView in useRef, props→effects sync, mode toggle)
 │   └── live-preview/
-│       ├── index.ts          — Barrel export for live-preview decorations
-│       ├── decorations.ts    — DecorationSet builder (headings, bold, italic, links, code, blockquotes)
-│       ├── wikilink-widget.ts — Wikilink inline widget (rendered link, click-to-navigate)
-│       ├── embed-widget.ts   — Embed inline widget (image/PDF/note preview)
-│       ├── callout-widget.ts — Callout block widget (styled blockquote replacement)
-│       ├── checkbox-widget.ts — Checkbox toggle widget (GFM task lists)
-│       └── cursor-filter.ts  — Cursor-aware decoration filtering (show markers at cursor position)
+│       ├── index.ts               — Barrel export for live-preview decorations + extension factory
+│       ├── inline-decorations.ts  — Cursor-aware inline formatting decorations (bold, italic, strikethrough, inline code), HideableRange model
+│       ├── link-decorations.ts    — Wikilink + standard-link decorations, click-to-navigate
+│       ├── widget-decorations.ts  — Block widgets (callouts with fold/unfold, GFM checkboxes, code-block-processor integration)
+│       └── live-preview-extension.ts — Composes decorations into the CM6 extension (StateField, Compartment, click handler)
 ├── plugins/
 │   ├── index.ts          — Barrel export (all plugins, types, utilities)
 │   ├── types.ts          — MDAST node types (WikilinkNode, EmbedNode, CalloutNode, TagNode), IMAGE_EXTENSIONS, PDF_EXTENSIONS
@@ -251,20 +262,34 @@ src/
 │       ├── errors.ts     — PluginError, ManifestValidationError, BundleEvaluationError, LifecycleError, etc.
 │       ├── event-system.ts — IEventEmitter (on/off/trigger/offref/removeAllListeners)
 │       ├── manifest-parser.ts — Manifest parsing with Zod validation + semver comparison
+│       ├── install-globals.ts — Installs the `window.obsidian` namespace + DOM/window globals plugin bundles expect; explicit idempotent entry point (registration order: DOM patches → real API → obsidian-api-extensions → fallback-shims)
+│       ├── global-extensions.ts — Obsidian-compatible prototype patches (Array.remove/first/last, String.contains, Element.find/findAll, Math.clamp, etc.) — imported synchronously before any plugin bundle evaluates
+│       ├── fallback-shims.ts — Last-resort no-op/minimal implementations for anything install-globals + obsidian-api-extensions leave unclaimed; registered last so real shims always win
 │       ├── plugin-loader.ts — PluginLoader (bundle evaluation, lifecycle, timeout, cleanup, @lezer/* stubs)
 │       ├── plugin-registry.ts — PluginRegistry (frontend state, backend persistence)
 │       ├── sandbox.ts    — PluginSandbox (vault isolation, storage namespace, network allowlist, blocking detection)
 │       ├── settings-manager.ts — SettingsManager (loadData/saveData per plugin per vault)
 │       ├── setting-tab.ts — PluginSettingTab, Setting, UI components, DOM extensions, icon registry, Modal, Plugin class (synchronous global registration)
+│       ├── setting-tab-registry.ts — Tracks which plugins registered a PluginSettingTab (via addSettingTab), so the Plugin Management UI can mount tab.containerEl
+│       ├── declarative-settings-renderer.ts — Renders Obsidian 1.13+ `getSettingDefinitions()` declarative settings arrays (group/list/page/controls) into Setting/*Component UI
 │       ├── obsidian-api-extensions.ts — Extended APIs: Events, Scope, Keymap, utility functions, MarkdownPreviewRenderer, DOM globals (async loaded as supplement)
+│       ├── editor-shim.ts — EditorShim (Obsidian Editor API; backend priority CM6 EditorView → textarea → internal buffer; setEditorViewAccessor wired once at vault init)
+│       ├── markdown-renderer.ts — MarkdownRenderer.render()/renderMarkdown() — lightweight markdown-to-HTML (not the full remark/unified pipeline) for plugin custom views (Kanban, Dataview)
+│       ├── markdown-sections.ts — Maps rendered code blocks back to their source line range (getSectionInfo) by re-scanning the source for fenced blocks in document order
+│       ├── block-cache.ts — Parses `^block-id` markers out of Markdown so `[[note#^id]]` links and CachedMetadata.blocks resolve
 │       ├── suggest-modal.ts — SuggestModal, FuzzySuggestModal (search/filter modals)
 │       ├── ribbon-icon-registry.ts — Module-level ribbon icon registry (addRibbonIcon store + change listeners)
+│       ├── status-bar-registry.ts — Module-level registry for addStatusBarItem() entries; notifies the StatusBar component on change
 │       ├── command-registry.ts — CommandRegistry (addCommand, removeAll, search, hotkeys, editorCallback/editorCheckCallback)
 │       ├── code-block-processor-registry.ts — CodeBlockProcessorRegistry (registerCodeBlockProcessor, processCodeBlocks, runPostProcessors, MarkdownRenderChild lifecycle)
 │       ├── css-injector.ts — CSS injection with scoped selectors (data-plugin-id prefix)
 │       ├── compatibility-analyzer.ts — Multi-layer browser compatibility analysis (isDesktopOnly gate, Node.js module detection, Obsidian API pattern matching, SUPPORTED_METHODS set)
+│       ├── platform-detection.ts — Runtime device/Platform flags (Obsidian's are Electron build constants; Slatebase derives isMobile/isDesktop etc. at runtime since one build serves both)
+│       ├── api-gap-registry.ts — Records which no-op Proxy-trapped API a plugin read vs. actually called, so silently-unimplemented API usage is diagnosable instead of invisible
+│       ├── no-op-warning.ts — One-warning-per-session console.warn for no-op compat APIs (avoids flooding the console from render-path calls)
 │       ├── plugin-context.ts — PluginProvider + usePluginContext hook (vault-scoped instances, FCP loading, activeViews/sidebarViews state)
 │       ├── plugin-event-bridge.ts — usePluginEventBridge hook (tab→workspace, save→cache, tree→resolved, leaf events)
+│       ├── hover-link-bus.ts — Routes hover-preview requests (Slatebase's own links + plugins' `workspace.trigger('hover-link', …)`) to the HoverPreview popover
 │       ├── file-view-registry.ts — FileViewRegistry (content-based + extension-based view routing, registerExtensionsForPlugin, active file view lifecycle for TextFileView-based plugins like Kanban)
 │       ├── view-registry.ts — ViewRegistry (plugin-ownership tracking, location-aware leaf creation, sidebar callbacks)
 │       ├── obsidian-compat.css — Obsidian-compatible CSS Custom Properties (100+ vars mapped to Slatebase tokens, Dark Mode)
@@ -325,7 +350,10 @@ src/
 │   ├── useResize.ts      — Mouse-driven panel resize hook (width, min, max, side)
 │   ├── useDropZone.ts    — File drag-and-drop hook (drag counter, size/count validation, toast errors)
 │   ├── useStatusBar.ts   — Status bar visibility toggle (module-level store, useSyncExternalStore, localStorage)
-│   └── useVersionInfo.ts — Server version info hook (installed vs. latest, GitHub API check)
+│   ├── useVersionInfo.ts — Server version info hook (installed vs. latest, GitHub API check)
+│   ├── useGlobalShortcuts.ts — App-wide keyboard shortcuts (vault search, mode toggle, settings panel, daily note); extracted from AppContent
+│   ├── useWorkspaceRestore.ts — Session-persistence lifecycle: restores vault/tabs/layout from workspaceStore on mount, persists changes back; extracted from AppContent
+│   └── usePaginatedResource.ts — Shared list-loading state machine (page/loading/error, loadPage/reload) for admin list pages
 ├── components/
 │   ├── SlatebaseLogo.tsx — SVG logo component
 │   ├── StatusBar.tsx     — Bottom status bar (clock, extensible plugin items, togglable in settings)
@@ -340,7 +368,6 @@ src/
 │   │   ├── index.ts      — Barrel export (TreeNode, shared types)
 │   │   ├── types.ts      — DragState, ExternalDropState, ContextMenuState, InlineInputState
 │   │   └── TreeNode.tsx  — Recursive tree node renderer (directory/file, drag/drop, inline input, favorites)
-│   ├── FavoritesSection.tsx — Collapsible favorites section above file tree (star icon, click-to-open)
 │   ├── ContextMenu.tsx   — Generic positioned overlay menu (fixed positioning, keyboard nav, portal)
 │   ├── DropZone.tsx      — File drag-and-drop wrapper (visual overlay, validation, upload)
 │   ├── LineNumbers.tsx   — Line number gutter (scroll-synced with textarea)
@@ -349,7 +376,7 @@ src/
 │   ├── TemplateSelector.tsx — Two-step modal (template selection → filename input)
 │   ├── SearchPanel.tsx   — Vault-wide search + replace panel (replaces FileExplorer when open, debounced search, result navigation)
 │   ├── SearchPanel.css   — SearchPanel styles with design tokens
-│   ├── TabBar.tsx        — Horizontal tab strip (file tabs)
+│   ├── TabBar.tsx        — Unified horizontal tab strip: settings-page tabs (not draggable) + file tabs (draggable/reorderable) in one row
 │   ├── TabContent.tsx    — Tab content orchestrator (Edit/View/Binary, wires upload + image paste + versions)
 │   ├── TabContent.css    — TabContent styles (empty/loading/error/content states, design tokens)
 │   ├── EditMode.tsx      — Plain-text editor with toolbar + auto-save + undo/redo + line numbers + image paste + DnD + read-only mode + editor command event listener (slatebase:editor-command)
@@ -421,7 +448,7 @@ src/
 │   │   ├── SettingsNavList.css   — Nav list styles
 │   │   ├── SettingsContent.tsx   — Section → Component mapping with focus management
 │   │   ├── AccountDeletionSection.tsx — Extracted account deletion form
-│   │   ├── FeatureTogglesSection.tsx  — Extracted feature toggle UI
+│   │   ├── FeatureTogglesSection.tsx  — Feature toggle UI; single consumer of state/featureActions.ts + the global FeatureContext (also embedded by AdminConfigPage, which no longer duplicates the load/toggle logic itself)
 │   │   ├── ServerRestartSection.tsx   — Server restart with confirmation
 │   │   ├── VaultConfigSection.tsx     — Per-vault config (templates dir, daily notes dir)
 │   │   ├── KeybindingsSection.tsx     — Configurable keyboard shortcuts (table, inline recording, conflict detection)
@@ -469,8 +496,11 @@ src/
 - **Composition root**: All dependencies wired in `backend/src/index.ts` (manual DI, no container)
 - **Interface-driven**: Each layer exposes an `I*` interface (IVaultReader, IVaultService, ILogger, etc.)
 - **Custom error classes**: Domain errors (VaultNotFoundError, PathTraversalError, etc.) mapped to HTTP status codes in the controller layer
+- **Routes → service → store**: Route modules do auth checks + HTTP status mapping only; a service owns business logic; a store owns persistence (e.g. `pluginRoutes.ts` → `PluginService` → `InstalledPluginStore`/`PluginInstaller`). Some smaller modules collapse service+store into one class that implements the service interface directly (`PreferencesStore implements IPreferencesService`, `VaultConfigStore implements IVaultConfigService`) — acceptable when there's no business logic beyond persistence, but don't reach from a route straight into a store when there is.
+- **New per-file/per-key JSON persistence → `shared/json-file-store.ts`**: Use `JsonFileStore<T>` for a single fixed file, `KeyedJsonFileStore<T>` for one file per key (userId/vaultId/tokenId/...). Both wrap the atomic temp→rename write and serialize read-modify-write via `AsyncMutex`/`KeyedMutex` — don't hand-roll another copy of this pattern. If a critical section spans more than one file's read-modify-write (e.g. a filesystem move plus an index update, as in `TrashService`), wrap the whole operation in `shared/async-mutex.ts`'s `KeyedMutex` directly instead.
 - **Frontend state**: Single reducer with discriminated union actions, async action creators that call ApiClient then dispatch. Multi-vault trees cached in `vaultTrees: Record<string, DirectoryTree | null>` with lazy-loading on vault expand.
 - **Co-located tests**: Test files sit next to their source files (`*.test.ts` / `*.test.tsx`)
+- **AppContent decomposition**: Non-rendering effect groups (global keyboard shortcuts, workspace-restore lifecycle) live in dedicated `hooks/use*.ts` files rather than growing inline in `App.tsx` — see `useGlobalShortcuts.ts`, `useWorkspaceRestore.ts`. Prefer this over adding another `useEffect` block directly to `AppContent`.
 
 ## API Routes
 
@@ -487,7 +517,8 @@ Route modules in `src/api/`:
 - `mcpRoutes.ts` — MCP Streamable HTTP transport (Bearer auth)
 - `mcpTokenRoutes.ts` — token CRUD (session auth)
 - `mcpWellKnownRoute.ts` — `.well-known/mcp.json` (public)
-- `pluginRoutes.ts` — plugin CRUD, bundle, styles, settings, registry
+- `pluginRoutes.ts` — installed-plugin CRUD, bundle, styles, settings, registry (depends only on `IPluginService`)
+- `pluginStoreRoutes.ts` — community plugin marketplace: browse, install, update (per-vault and global mounts)
 - `featureRoutes.ts` — feature toggles (admin + public)
 - `versionRoutes.ts` — `GET /version` (public)
 - `statisticsRoutes.ts` — vault statistics (file/folder count, total size)

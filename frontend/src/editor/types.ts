@@ -32,4 +32,6 @@ export interface IEditorHandle {
   redo(): void
   /** Insert text at current cursor position. */
   insertAtCursor(text: string): void
+  /** Insert text at a specific document position (e.g. a drag-and-drop target). */
+  insertAtPos(text: string, pos: number): void
 }

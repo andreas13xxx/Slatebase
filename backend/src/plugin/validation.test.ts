@@ -129,12 +129,12 @@ describe('pluginManifestSchema — ID validation', () => {
   })
 })
 
-// ─── PluginStore path safety (via installFromZip rejection) ──────────────────
+// ─── InstalledPluginStore path safety (via installFromZip rejection) ─────────
 
 describe('PluginInstaller — manifest ID path traversal', () => {
   it('rejects ZIP with path traversal in manifest ID via Zod schema', async () => {
     // This test verifies the end-to-end protection:
-    // The Zod schema in pluginManifestSchema rejects the ID before it reaches PluginStore
+    // The Zod schema in pluginManifestSchema rejects the ID before it reaches InstalledPluginStore
     const { PluginInstaller, PluginInstallError } = await import('./plugin-installer.js')
     const { default: AdmZip } = await import('adm-zip')
 

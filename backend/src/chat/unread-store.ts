@@ -2,10 +2,10 @@
 
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import crypto from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
 import type { IUnreadStore } from './types.js'
 import { isNodeError } from '../shared/fs-utils.js'
+import { KeyedJsonFileStore } from '../shared/json-file-store.js'
 
 // --- File format ---
 
@@ -17,6 +17,7 @@ interface UnreadFile {
 
 export class UnreadStore implements IUnreadStore {
   private readonly unreadDir: string
+  private readonly store: KeyedJsonFileStore<UnreadFile>
   private index: Map<string, Map<string, number>> = new Map()
   private initialized = false
 
@@ -25,6 +26,10 @@ export class UnreadStore implements IUnreadStore {
     private readonly logger: ILogger,
   ) {
     this.unreadDir = path.join(dataDir, 'chat', 'unread')
+    this.store = new KeyedJsonFileStore<UnreadFile>(
+      (userId) => path.join(this.unreadDir, `${userId}.json`),
+      { counts: {} },
+    )
   }
 
   /**
@@ -159,6 +164,9 @@ export class UnreadStore implements IUnreadStore {
 
   /**
    * Persist unread counts for a user to disk using atomic write (temp → rename).
+   * Serialized per-user, so two near-simultaneous increments for the same
+   * user can't land their renames out of order and regress the on-disk
+   * snapshot to a stale count.
    */
   private async persist(userId: string): Promise<void> {
     await this.ensureDirectory()
@@ -174,23 +182,7 @@ export class UnreadStore implements IUnreadStore {
       counts[conversationId] = count
     }
 
-    const data: UnreadFile = { counts }
-    const filePath = path.join(this.unreadDir, `${userId}.json`)
-    const tempPath = `${filePath}.${crypto.randomBytes(8).toString('hex')}.tmp`
-    const content = JSON.stringify(data, null, 2)
-
-    await fs.writeFile(tempPath, content, 'utf-8')
-
-    try {
-      await fs.rename(tempPath, filePath)
-    } catch (renameError) {
-      try {
-        await fs.unlink(tempPath)
-      } catch {
-        // Ignore cleanup errors
-      }
-      throw renameError
-    }
+    await this.store.write(userId, { counts })
   }
 
   /**

@@ -32,6 +32,7 @@ export const de = {
     sessionExpiredBanner: 'Sitzung abgelaufen — bitte erneut anmelden',
     changePassword: 'Passwort ändern',
     changingPassword: 'Passwort ändern…',
+    changePasswordFor: 'Passwort für {name}',
     changePasswordInfo: 'Sie müssen Ihr Passwort ändern, bevor Sie fortfahren können.',
     currentPassword: 'Aktuelles Passwort',
     newPassword: 'Neues Passwort',
@@ -247,7 +248,6 @@ export const de = {
     createWelcomeVaultDescription: 'Erstellt einen Vault mit vollständiger Slatebase-Anleitung und Beispielen.',
     creatingWelcomeVault: 'Erstellen…',
     welcomeVaultCreated: 'Anleitungs-Vault „{name}" wurde erstellt.',
-    welcomeVaultFeatureDisabled: 'Das Anleitungs-Vault-Feature ist deaktiviert.',
     welcomeVaultError: 'Fehler beim Erstellen des Anleitungs-Vaults.',
   },
 

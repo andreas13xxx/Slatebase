@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import type { IApiClient } from '../api'
 import type { VaultInfo } from '../types'
 import { useTranslation } from '../i18n'
 import { Server, RefreshCw, Users, FileText, HardDrive, Trash2 } from 'lucide-react'
 import { ConfirmModal } from './ConfirmModal'
+import { usePaginatedResource, type PaginatedResult } from '../hooks/usePaginatedResource'
 
 interface VaultAdminEntry extends VaultInfo {
   fileCount?: number
@@ -28,56 +29,51 @@ function formatBytes(bytes: number): string {
 export function AdminVaultsPage({ apiClient }: AdminVaultsPageProps) {
   const { t } = useTranslation()
 
-  const [vaults, setVaults] = useState<VaultAdminEntry[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; vaultId: string; vaultName: string }>({
     open: false, vaultId: '', vaultName: '',
   })
 
-  const loadVaults = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await apiClient.fetchAllVaults()
+  // Not server-paginated — fetches and enriches every vault, always "page 1 of 1".
+  const fetchAllVaultsEnriched = useCallback(async (): Promise<PaginatedResult<VaultAdminEntry>> => {
+    const data = await apiClient.fetchAllVaults()
 
-      // Enrich with tree info for file count
-      const enriched: VaultAdminEntry[] = await Promise.all(
-        data.map(async (v) => {
-          let fileCount = 0
-          let sizeBytes = 0
-          let shareCount = 0
-          try {
-            const tree = await apiClient.fetchVaultTree(v.id)
-            function countFiles(node: { type: string; size?: number; children?: typeof node[] }): void {
-              if (node.type === 'file') { fileCount++; sizeBytes += node.size ?? 0 }
-              node.children?.forEach(countFiles)
-            }
-            countFiles(tree)
-          } catch { /* ignore */ }
-          try {
-            const token = apiClient.getToken()
-            const headers: Record<string, string> = {}
-            if (token) headers['Authorization'] = `Bearer ${token}`
-            const res = await fetch(`/api/v1/vaults/${v.id}/shares`, { headers })
-            if (res.ok) {
-              const shares: unknown[] = await res.json()
-              shareCount = shares.length
-            }
-          } catch { /* ignore */ }
-          return { ...v, fileCount, sizeBytes, shareCount }
-        }),
-      )
-      setVaults(enriched)
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t('admin.vaults.loadError'))
-    } finally {
-      setLoading(false)
-    }
+    // Enrich with tree info for file count
+    const enriched: VaultAdminEntry[] = await Promise.all(
+      data.map(async (v) => {
+        let fileCount = 0
+        let sizeBytes = 0
+        let shareCount = 0
+        try {
+          const tree = await apiClient.fetchVaultTree(v.id)
+          function countFiles(node: { type: string; size?: number; children?: typeof node[] }): void {
+            if (node.type === 'file') { fileCount++; sizeBytes += node.size ?? 0 }
+            node.children?.forEach(countFiles)
+          }
+          countFiles(tree)
+        } catch { /* ignore */ }
+        try {
+          const token = apiClient.getToken()
+          const headers: Record<string, string> = {}
+          if (token) headers['Authorization'] = `Bearer ${token}`
+          const res = await fetch(`/api/v1/vaults/${v.id}/shares`, { headers })
+          if (res.ok) {
+            const shares: unknown[] = await res.json()
+            shareCount = shares.length
+          }
+        } catch { /* ignore */ }
+        return { ...v, fileCount, sizeBytes, shareCount }
+      }),
+    )
+    return { items: enriched, page: 1, totalPages: 1, total: enriched.length }
   }, [apiClient])
 
-  useEffect(() => { void loadVaults() }, [loadVaults]) // eslint-disable-line react-hooks/set-state-in-effect
+  const {
+    items: vaults,
+    loading,
+    error,
+    reload: loadVaults,
+  } = usePaginatedResource(fetchAllVaultsEnriched, t('admin.vaults.loadError'))
 
   async function handleDelete(vaultId: string, vaultName: string): Promise<void> {
     setDeleteConfirm({ open: true, vaultId, vaultName })

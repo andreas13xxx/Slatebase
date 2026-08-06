@@ -18,6 +18,7 @@ export { remarkCallout } from './callout/plugin'
 export { remarkTag } from './tag/plugin'
 export { remarkBreaks } from './breaks/plugin'
 export { remarkBlockRef } from './block-ref/plugin'
+export { remarkPreserveTableCodeEscapes } from './preserve-table-code-escapes'
 
 // Utilities
 export { extractWikilinks } from './wikilink/extract'

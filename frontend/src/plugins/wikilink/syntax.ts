@@ -31,6 +31,7 @@ declare module 'micromark-util-types' {
     wikilinkDisplay: 'wikilinkDisplay'
     wikilinkHeadingMarker: 'wikilinkHeadingMarker'
     wikilinkHeading: 'wikilinkHeading'
+    wikilinkEscape: 'wikilinkEscape'
   }
 }
 
@@ -139,9 +140,34 @@ function tokenizeWikilink(
       effects.enter('wikilinkHeading')
       return heading
     }
+    // Backslash — may escape a `|` (the Obsidian convention for keeping an
+    // aliased wikilink intact inside a GFM table cell, where `|` is also the
+    // column delimiter). Peek at the next character before committing it.
+    if (code === 92) { // '\'
+      effects.exit('wikilinkTarget')
+      effects.enter('wikilinkEscape')
+      effects.consume(code)
+      return targetEscape
+    }
     // Regular character (including spaces, umlauts, punctuation)
     effects.consume(code)
     return target
+  }
+
+  /** After a backslash in the target — resolve as an escaped separator or literal text */
+  function targetEscape(code: Code): State | undefined {
+    if (code === 124) { // '\|' — escaped pipe still separates target from display
+      effects.exit('wikilinkEscape')
+      effects.enter('wikilinkSeparator')
+      effects.consume(code)
+      effects.exit('wikilinkSeparator')
+      effects.enter('wikilinkDisplay')
+      return display
+    }
+    // Not an escaped pipe — resume target parsing at this character.
+    effects.exit('wikilinkEscape')
+    effects.enter('wikilinkTarget')
+    return target(code)
   }
 
   /** Consume heading characters until `|`, `]`, or end */
@@ -164,9 +190,32 @@ function tokenizeWikilink(
       effects.enter('wikilinkDisplay')
       return display
     }
+    // Backslash — same escaped-pipe handling as in the target (see `target`)
+    if (code === 92) { // '\'
+      effects.exit('wikilinkHeading')
+      effects.enter('wikilinkEscape')
+      effects.consume(code)
+      return headingEscape
+    }
     // Regular character
     effects.consume(code)
     return heading
+  }
+
+  /** After a backslash in the heading — resolve as an escaped separator or literal text */
+  function headingEscape(code: Code): State | undefined {
+    if (code === 124) { // '\|' — escaped pipe still separates heading from display
+      effects.exit('wikilinkEscape')
+      effects.enter('wikilinkSeparator')
+      effects.consume(code)
+      effects.exit('wikilinkSeparator')
+      effects.enter('wikilinkDisplay')
+      return display
+    }
+    // Not an escaped pipe — resume heading parsing at this character.
+    effects.exit('wikilinkEscape')
+    effects.enter('wikilinkHeading')
+    return heading(code)
   }
 
   /** Consume display text characters until `]` or end */

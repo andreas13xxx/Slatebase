@@ -115,6 +115,56 @@
   margin: 4px 0;
 }
 
+/* --- Embed PDFs --- */
+.cm-lp-embed-pdf {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+  margin: 4px 0;
+}
+
+.cm-lp-embed-pdf-object {
+  flex: 1;
+  width: 100%;
+  border: none;
+}
+
+.cm-lp-embed-pdf-status {
+  margin: auto;
+  color: var(--text-secondary);
+  font-size: 0.9em;
+}
+
+/* --- Embed Notes --- */
+.cm-lp-embed-note {
+  border-left: 3px solid var(--accent);
+  padding: 2px 0 2px 14px;
+  margin: 4px 0;
+}
+
+.cm-lp-embed-note--missing {
+  color: var(--text-muted);
+  font-style: italic;
+  border-left-color: var(--danger, #e5484d);
+}
+
+.cm-lp-embed-note-status {
+  color: var(--text-secondary);
+  font-size: 0.9em;
+  margin: 0;
+}
+
+.cm-lp-embed-note-title {
+  display: block;
+  font-weight: 600;
+  font-size: 0.85em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
 /* --- Embed Files (non-image placeholder) --- */
 .cm-lp-embed-file {
   display: inline-block;

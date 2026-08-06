@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useImperativeHandle, useCallback } from 'react'
 import { EditorState, Compartment, type Extension } from '@codemirror/state'
-import { EditorView, lineNumbers as cmLineNumbers } from '@codemirror/view'
+import { EditorView, lineNumbers as cmLineNumbers, dropCursor } from '@codemirror/view'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { GFM } from '@lezer/markdown'
@@ -141,6 +141,9 @@ export function CodeMirrorEditor({
       createSlatebaseTheme(),
       createSlatebaseHighlightStyle(),
       EditorView.lineWrapping,
+      // Shows a cursor following the mouse while a file is dragged over the
+      // editor, so the drop position (e.g. for an image) is visible before release.
+      dropCursor(),
       editorHistoryExtension,
       search(),
       EditorView.updateListener.of((update) => {
@@ -346,6 +349,15 @@ export function CodeMirrorEditor({
       const view = viewRef.current
       if (!view) return
       view.dispatch(view.state.replaceSelection(text))
+    },
+    insertAtPos(text: string, pos: number) {
+      const view = viewRef.current
+      if (!view) return
+      const clamped = Math.max(0, Math.min(pos, view.state.doc.length))
+      view.dispatch({
+        changes: { from: clamped, insert: text },
+        selection: { anchor: clamped + text.length },
+      })
     },
   }), [])
 

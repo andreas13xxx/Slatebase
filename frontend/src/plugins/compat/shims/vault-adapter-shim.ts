@@ -18,6 +18,7 @@
  */
 
 import type { IApiClient } from '../../../api/index'
+import { getStoredAuthToken, getStoredCsrfToken } from '../../../state/authContext'
 import type { DirectoryTree } from '../../../types'
 import { markPluginWrite } from '../plugin-event-bridge'
 
@@ -201,7 +202,7 @@ export class VaultAdapterShim implements IVaultAdapter {
    */
   async readBinary(path: string): Promise<ArrayBuffer> {
     try {
-      const token = localStorage.getItem('slatebase_token') ?? ''
+      const token = getStoredAuthToken() ?? ''
       const response = await fetch(`/api/v1/vaults/${this.vaultId}/files?path=${encodeURIComponent(path)}&raw=true`, {
         headers: { 'Authorization': `Bearer ${token}` },
       })
@@ -230,8 +231,8 @@ export class VaultAdapterShim implements IVaultAdapter {
       formData.append('file', file, name)
       formData.append('targetDir', targetDir)
 
-      const token = localStorage.getItem('slatebase_token') ?? ''
-      const csrf = localStorage.getItem('slatebase_csrf') ?? ''
+      const token = getStoredAuthToken() ?? ''
+      const csrf = getStoredCsrfToken() ?? ''
       const response = await fetch(`/api/v1/vaults/${this.vaultId}/upload`, {
         method: 'POST',
         headers: {

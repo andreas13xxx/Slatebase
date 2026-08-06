@@ -21,8 +21,33 @@ export interface LinkDecorationResult {
   hideableRanges: HideableRange[]
 }
 
-/** Regex for detecting [[wikilink]] and [[target|alias]] syntax (not in Lezer grammar). */
-const WIKILINK_REGEX = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g
+/**
+ * Regex source for detecting [[wikilink]] and [[target|alias]] syntax
+ * (not in Lezer grammar). Exported as a source string rather than a
+ * shared RegExp instance so every caller gets its own non-stateful
+ * (fresh `lastIndex`) matcher — see `createWikilinkRegex`.
+ */
+const WIKILINK_PATTERN = '\\[\\[([^\\]|]+)(?:\\|([^\\]]+))?\\]\\]'
+
+/** Creates a fresh `g`-flagged RegExp for wikilink matching (never share one instance across calls). */
+export function createWikilinkRegex(): RegExp {
+  return new RegExp(WIKILINK_PATTERN, 'g')
+}
+
+/**
+ * Resolves the real link target from a raw wikilink target match.
+ *
+ * `[^\]|]+` (the target group) stops at the first `|` whether or not it's
+ * backslash-escaped, since a literal `\` isn't excluded from the char
+ * class — so an escaped pipe (`[[Target\|Alias]]`, the convention for
+ * keeping an aliased wikilink intact inside a GFM table cell, where `|`
+ * is also the column delimiter) leaves a trailing backslash on the
+ * captured target. Strip it: the backslash is punctuation for the table
+ * parser, not part of the link target.
+ */
+export function resolveWikilinkMatchTarget(rawTarget: string, hasAlias: boolean): string {
+  return hasAlias && rawTarget.endsWith('\\') ? rawTarget.slice(0, -1) : rawTarget
+}
 
 /**
  * Build link and wikilink decorations from the document.
@@ -106,12 +131,37 @@ export function buildLinkDecorations(
   const docText = doc.toString()
   let match: RegExpExecArray | null
 
-  WIKILINK_REGEX.lastIndex = 0
-  while ((match = WIKILINK_REGEX.exec(docText)) !== null) {
+  const wikilinkRegex = createWikilinkRegex()
+  while ((match = wikilinkRegex.exec(docText)) !== null) {
     const fullMatchFrom = match.index
     const fullMatchTo = fullMatchFrom + match[0].length
-    const target = match[1] ?? ''
+
+    // Skip embeds — `![[target|size]]` is handled entirely by the embed
+    // widget system (widget-decorations.ts). Without this guard, the `|size`
+    // gets misread as a link alias here too, and both decoration passes
+    // compete: the embed widget hides on cursor-enter to reveal raw source,
+    // but this pass's own alias decorations remain layered on top, hiding
+    // everything except the size number.
+    if (fullMatchFrom > 0 && docText[fullMatchFrom - 1] === '!') continue
+
+    // Skip if inside a code block — `[[...]]` in a fenced or inline code
+    // span is literal text, not a wikilink (matches the same guard used
+    // for the ==highlight== and #tag regex passes in inline-decorations.ts).
+    let insideCode = false
+    tree.iterate({
+      from: fullMatchFrom, to: fullMatchTo,
+      enter(n) {
+        if (n.name === 'FencedCode' || n.name === 'InlineCode' || n.name === 'CodeBlock') {
+          insideCode = true
+          return false
+        }
+      }
+    })
+    if (insideCode) continue
+
+    const rawTarget = match[1] ?? ''
     const alias = match[2]
+    const target = resolveWikilinkMatchTarget(rawTarget, alias !== undefined)
 
     if (alias) {
       // [[target|alias]] — show only alias
@@ -123,9 +173,11 @@ export function buildLinkDecorations(
       )
       hideableRanges.push({ from: prefixFrom, to: prefixTo, groupFrom: fullMatchFrom, groupTo: fullMatchTo })
 
-      // Hide target| part (between [[ and alias)
+      // Hide target| part (between [[ and alias). Uses `rawTarget.length`
+      // (not the backslash-stripped `target`) since this is real source
+      // text being hidden, e.g. `Features/Wikilinks\|`.
       const targetPipeFrom = fullMatchFrom + 2
-      const targetPipeTo = fullMatchFrom + 2 + target.length + 1 // target + |
+      const targetPipeTo = fullMatchFrom + 2 + rawTarget.length + 1 // target + |
       decorations.push(
         Decoration.replace({}).range(targetPipeFrom, targetPipeTo)
       )

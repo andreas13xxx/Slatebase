@@ -110,6 +110,7 @@ function buildDecorations(
     sourcePath: fileInfo?.file?.path ?? '',
     onCheckboxToggle: options.onCheckboxToggle,
     foldedCallouts,
+    directoryTree: options.directoryTree,
   })
 
   // Merge all decorations and hideable ranges

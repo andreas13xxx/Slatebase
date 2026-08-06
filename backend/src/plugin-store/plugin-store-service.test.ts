@@ -3,7 +3,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { IGitHubClient } from './github-client.js'
 import type { IPluginStoreCache } from './plugin-store-cache.js'
-import type { IPluginStore, PluginManifest } from '../plugin/types.js'
+import type { IInstalledPluginStore, PluginManifest } from '../plugin/types.js'
 import type { ILogger } from '../logger/index.js'
 import type {
   CommunityPluginEntry,
@@ -45,10 +45,11 @@ function createMockCache(): IPluginStoreCache {
     getPluginStats: vi.fn().mockReturnValue(null),
     setPluginStats: vi.fn(),
     getPluginStatsFallback: vi.fn().mockReturnValue(null),
+    load: vi.fn().mockResolvedValue(undefined),
   }
 }
 
-function createMockPluginStore(): IPluginStore {
+function createMockPluginStore(): IInstalledPluginStore {
   return {
     savePlugin: vi.fn(),
     loadManifest: vi.fn().mockResolvedValue(null),
@@ -100,7 +101,7 @@ const sampleAssets: PluginReleaseAssets = {
 describe('PluginStoreService', () => {
   let githubClient: IGitHubClient
   let cache: IPluginStoreCache
-  let pluginStore: IPluginStore
+  let pluginStore: IInstalledPluginStore
   let logger: ILogger
   let service: PluginStoreService
 

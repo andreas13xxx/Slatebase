@@ -39,6 +39,7 @@ vi.mock('./api', () => {
     getToken = vi.fn().mockReturnValue(null)
     getCsrfToken = vi.fn().mockReturnValue(null)
     getVersion = vi.fn().mockResolvedValue({ version: '1.0.0' })
+    getVaultConfig = vi.fn().mockResolvedValue({ templatesDirectory: '', dailyNotesDirectory: '', dailyNoteTemplateName: '' })
     getSseTicket = vi.fn().mockResolvedValue({ ticket: 'mock-ticket' })
     checkSessionAlive = vi.fn().mockResolvedValue(true)
   }
@@ -54,7 +55,6 @@ describe('App', () => {
     mockLoadFeatures.mockResolvedValue([
       { name: 'chat', enabled: true },
       { name: 'mcp', enabled: true },
-      { name: 'knowledge-graph', enabled: true },
       { name: 'obsidian-plugin-compat', enabled: false },
     ])
     mockFetchVaults.mockResolvedValue([
@@ -229,5 +229,80 @@ describe('App', () => {
     await waitFor(() => {
       expect(mockFetchVaults).toHaveBeenCalled()
     })
+  })
+
+  it('does not let a stale vault-tree fetch corrupt the currently selected vault (race condition regression)', async () => {
+    // Regression test for the TREE_LOADED race: switching vaults before an
+    // in-flight fetchVaultTree() resolves must not let the stale response
+    // overwrite the tree of the vault the user has since switched to.
+    function createDeferred<T>() {
+      let resolve!: (value: T) => void
+      const promise = new Promise<T>((res) => { resolve = res })
+      return { promise, resolve }
+    }
+
+    const vault1Tree = {
+      name: 'root',
+      type: 'directory' as const,
+      path: '/',
+      children: [{ name: 'personal-file.md', type: 'file' as const, path: 'personal-file.md' }],
+    }
+    const vault2Tree = {
+      name: 'root',
+      type: 'directory' as const,
+      path: '/',
+      children: [{ name: 'work-file.md', type: 'file' as const, path: 'work-file.md' }],
+    }
+    const vault1Deferred = createDeferred<typeof vault1Tree>()
+    const vault2Deferred = createDeferred<typeof vault2Tree>()
+    mockFetchVaultTree.mockImplementation((vaultId: string) => {
+      if (vaultId === 'vault1') return vault1Deferred.promise
+      if (vaultId === 'vault2') return vault2Deferred.promise
+      return Promise.reject(new Error(`unexpected vaultId: ${vaultId}`))
+    })
+
+    // Clean slate: no leftover auth/workspace state from earlier tests, and
+    // pre-select vault1 via the "last selected vault" restore mechanism so
+    // its tree fetch is triggered purely by App.tsx's vault-switch effect —
+    // not by clicking it in the sidebar (which would also trigger
+    // FileExplorer's own, independently vault-scoped VAULT_TREE_LOADED fetch).
+    localStorage.clear()
+    localStorage.setItem('slatebase_last_vault', 'vault1')
+
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.type(screen.getByLabelText('Benutzername'), 'admin')
+    await user.type(screen.getByLabelText('Passwort'), 'admin123')
+    await user.click(screen.getByRole('button', { name: 'Anmelden' }))
+
+    // vault1 gets auto-selected on load; its tree fetch is now in flight.
+    await waitFor(() => {
+      expect(mockFetchVaultTree).toHaveBeenCalledWith('vault1')
+    })
+
+    // Switch to vault2 before vault1's fetch resolves.
+    await waitFor(() => {
+      expect(screen.getByTitle('Work Vault')).toBeInTheDocument()
+    })
+    await user.click(screen.getByTitle('Work Vault'))
+
+    await waitFor(() => {
+      expect(mockFetchVaultTree).toHaveBeenCalledWith('vault2')
+    })
+
+    // vault2's fetch resolves first. Filenames render without their
+    // extension (tree-node-file-name span); the full name lives in `title`.
+    vault2Deferred.resolve(vault2Tree)
+    await waitFor(() => {
+      expect(screen.getByTitle('work-file.md')).toBeInTheDocument()
+    })
+
+    // vault1's stale fetch resolves late — must not corrupt vault2's tree.
+    vault1Deferred.resolve(vault1Tree)
+    await waitFor(() => {
+      expect(screen.getByTitle('work-file.md')).toBeInTheDocument()
+    })
+    expect(screen.queryByTitle('personal-file.md')).not.toBeInTheDocument()
   })
 })

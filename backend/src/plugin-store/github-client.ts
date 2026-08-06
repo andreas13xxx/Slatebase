@@ -24,7 +24,17 @@ const ALLOWED_DOMAINS = new Set([
   'api.github.com',
   'raw.githubusercontent.com',
   'objects.githubusercontent.com',
+  'release-assets.githubusercontent.com',
 ])
+
+/**
+ * Only api.github.com participates in GitHub's core REST rate limit (the
+ * X-RateLimit-* header scheme, 60/hr unauthenticated). raw.githubusercontent.com
+ * and objects.githubusercontent.com are separate CDN infrastructure with their
+ * own, much higher limits and don't send these headers — so exhausting the
+ * api.github.com quota must not block requests to those hosts.
+ */
+const RATE_LIMITED_HOST = 'api.github.com'
 
 const REQUEST_TIMEOUT_MS = 30_000
 
@@ -74,6 +84,8 @@ interface GitHubRelease {
  */
 export class GitHubClient implements IGitHubClient {
   private rateLimitRemaining = -1
+  /** Epoch ms when the current rate limit window resets. Only meaningful while rateLimitRemaining === 0. */
+  private rateLimitResetAt = 0
   private readonly config: IPluginStoreConfig
   private readonly logger: ILogger
 
@@ -241,9 +253,16 @@ export class GitHubClient implements IGitHubClient {
     // Domain allowlist check
     this.validateDomain(url)
 
-    // Rate limit check before request
-    if (this.rateLimitRemaining === 0) {
-      throw new GitHubRateLimitError(60, 0)
+    // Rate limit check before request. Only api.github.com is subject to the
+    // shared quota — see RATE_LIMITED_HOST. Once the reset time has passed,
+    // the previous window is over — clear the guard so the request can go
+    // through and re-establish the real state from this response's headers.
+    if (new URL(url).hostname === RATE_LIMITED_HOST && this.rateLimitRemaining === 0) {
+      if (Date.now() < this.rateLimitResetAt) {
+        const retryAfter = Math.max(Math.ceil((this.rateLimitResetAt - Date.now()) / 1000), 1)
+        throw new GitHubRateLimitError(retryAfter, 0)
+      }
+      this.rateLimitRemaining = -1
     }
 
     const headers: Record<string, string> = {
@@ -256,12 +275,12 @@ export class GitHubClient implements IGitHubClient {
     }
 
     let response: Response
+    let currentUrl = url
 
     try {
       // Follow redirects manually, re-validating the domain allowlist on each hop —
       // otherwise a redirect (e.g. from a compromised/misbehaving upstream) could send
       // the request to a host outside ALLOWED_DOMAINS without ever being checked.
-      let currentUrl = url
       for (let redirectCount = 0; ; redirectCount++) {
         if (redirectCount > MAX_REDIRECTS) {
           throw new GitHubFetchError(0, currentUrl)
@@ -292,19 +311,28 @@ export class GitHubClient implements IGitHubClient {
       throw new GitHubFetchError(0, url)
     }
 
-    // Track rate limit from response headers
-    this.updateRateLimit(response)
+    // Rate limit tracking and enforcement only apply to api.github.com — the
+    // final URL after redirects is what actually served this response (e.g.
+    // release asset downloads redirect from github.com to objects.githubusercontent.com).
+    const isRateLimitedHost = new URL(currentUrl).hostname === RATE_LIMITED_HOST
 
-    // Handle rate limit response
-    if (response.status === 429 || response.status === 403) {
-      const remaining = parseInt(response.headers.get('X-RateLimit-Remaining') ?? '0', 10)
-      if (remaining === 0 || response.status === 429) {
-        const resetHeader = response.headers.get('X-RateLimit-Reset')
-        const resetTime = resetHeader ? parseInt(resetHeader, 10) : 0
-        const retryAfter = resetTime > 0
-          ? Math.max(resetTime - Math.floor(Date.now() / 1000), 1)
-          : 60
-        throw new GitHubRateLimitError(retryAfter, 0)
+    if (isRateLimitedHost) {
+      // Track rate limit from response headers
+      this.updateRateLimit(response)
+
+      // Handle rate limit response
+      if (response.status === 429 || response.status === 403) {
+        const remaining = parseInt(response.headers.get('X-RateLimit-Remaining') ?? '0', 10)
+        if (remaining === 0 || response.status === 429) {
+          const resetHeader = response.headers.get('X-RateLimit-Reset')
+          const resetTime = resetHeader ? parseInt(resetHeader, 10) : 0
+          const retryAfter = resetTime > 0
+            ? Math.max(resetTime - Math.floor(Date.now() / 1000), 1)
+            : 60
+          this.rateLimitRemaining = 0
+          this.rateLimitResetAt = resetTime > 0 ? resetTime * 1000 : Date.now() + retryAfter * 1000
+          throw new GitHubRateLimitError(retryAfter, 0)
+        }
       }
     }
 
@@ -345,6 +373,14 @@ export class GitHubClient implements IGitHubClient {
       const value = parseInt(remaining, 10)
       if (!isNaN(value)) {
         this.rateLimitRemaining = value
+
+        if (value === 0) {
+          const resetHeader = response.headers.get('X-RateLimit-Reset')
+          const resetTime = resetHeader ? parseInt(resetHeader, 10) : NaN
+          this.rateLimitResetAt = !isNaN(resetTime) && resetTime > 0
+            ? resetTime * 1000
+            : Date.now() + 60_000
+        }
 
         if (value > 0 && value <= 10) {
           this.logger.warn('GitHub rate limit approaching', { remaining: value })

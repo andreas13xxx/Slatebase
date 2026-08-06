@@ -281,6 +281,51 @@ describe('PluginStoreBrowser', () => {
         expect(screen.getByText('Installiert')).toBeInTheDocument()
       })
     })
+
+    it('notifies the parent via onPluginInstalled after a successful install', async () => {
+      const api = createMockApiClient({
+        installFromStore: vi.fn().mockResolvedValue({
+          pluginId: 'calendar',
+          manifest: { id: 'calendar', name: 'Calendar', version: '1.5.1' },
+          isUpgrade: false,
+        }),
+      })
+      const onPluginInstalled = vi.fn()
+
+      render(<PluginStoreBrowser vaultId={vaultId} apiClient={api} onPluginInstalled={onPluginInstalled} />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Calendar')).toBeInTheDocument()
+      })
+
+      const installButtons = screen.getAllByText('Installieren')
+      fireEvent.click(installButtons[0]!)
+
+      await waitFor(() => {
+        expect(onPluginInstalled).toHaveBeenCalledTimes(1)
+      })
+    })
+
+    it('does not call onPluginInstalled when install fails', async () => {
+      const api = createMockApiClient({
+        installFromStore: vi.fn().mockRejectedValue({ code: 'INSTALL_FAILED', message: 'Download failed' }),
+      })
+      const onPluginInstalled = vi.fn()
+
+      render(<PluginStoreBrowser vaultId={vaultId} apiClient={api} onPluginInstalled={onPluginInstalled} />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Calendar')).toBeInTheDocument()
+      })
+
+      const installButtons = screen.getAllByText('Installieren')
+      fireEvent.click(installButtons[0]!)
+
+      await waitFor(() => {
+        expect(screen.getByText('Download failed')).toBeInTheDocument()
+      })
+      expect(onPluginInstalled).not.toHaveBeenCalled()
+    })
   })
 
   // ─── Error States ───────────────────────────────────────────────────────────

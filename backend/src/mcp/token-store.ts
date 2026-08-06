@@ -1,8 +1,8 @@
-import { mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { randomBytes } from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
 import type { TokenRecord, UserTokenIndex } from './types.js'
+import { KeyedJsonFileStore } from '../shared/json-file-store.js'
 
 // ─── Interface ───────────────────────────────────────────────────────────────
 
@@ -37,6 +37,35 @@ export interface ITokenStore {
   invalidateAllForUser(userId: string): Promise<void>
 }
 
+// ─── Validation ──────────────────────────────────────────────────────────────
+
+/** Type guard / parser for a persisted TokenRecord. */
+function parseTokenRecord(value: unknown): TokenRecord | null {
+  if (typeof value !== 'object' || value === null) return null
+  const obj = value as Record<string, unknown>
+  const valid =
+    typeof obj['tokenId'] === 'string' &&
+    typeof obj['tokenHash'] === 'string' &&
+    typeof obj['userId'] === 'string' &&
+    typeof obj['name'] === 'string' &&
+    typeof obj['createdAt'] === 'string' &&
+    typeof obj['expiresAt'] === 'string' &&
+    (obj['revokedAt'] === null || typeof obj['revokedAt'] === 'string') &&
+    (obj['lastUsedAt'] === null || typeof obj['lastUsedAt'] === 'string')
+  return valid ? (obj as unknown as TokenRecord) : null
+}
+
+/** Type guard / parser for a persisted UserTokenIndex. Never rejects — falls back to empty. */
+function parseUserTokenIndex(value: unknown): UserTokenIndex {
+  if (typeof value === 'object' && value !== null) {
+    const obj = value as Record<string, unknown>
+    if (Array.isArray(obj['tokenIds']) && obj['tokenIds'].every((id: unknown) => typeof id === 'string')) {
+      return { tokenIds: obj['tokenIds'] as string[] }
+    }
+  }
+  return { tokenIds: [] }
+}
+
 // ─── Implementation ──────────────────────────────────────────────────────────
 
 /**
@@ -47,16 +76,25 @@ export interface ITokenStore {
 export class TokenStore implements ITokenStore {
   private readonly hashIndex: Map<string, string> = new Map()
   private readonly tokensDir: string
-  private readonly byUserDir: string
-  private tokensDirEnsured = false
-  private byUserDirEnsured = false
+  private readonly recordStore: KeyedJsonFileStore<TokenRecord | null>
+  private readonly userIndexStore: KeyedJsonFileStore<UserTokenIndex>
 
   constructor(
     dataDir: string,
     private readonly logger: ILogger
   ) {
     this.tokensDir = join(dataDir, 'mcp', 'tokens')
-    this.byUserDir = join(dataDir, 'mcp', 'tokens', '_by-user')
+    const byUserDir = join(this.tokensDir, '_by-user')
+    this.recordStore = new KeyedJsonFileStore<TokenRecord | null>(
+      (tokenId) => join(this.tokensDir, `${tokenId}.json`),
+      null,
+      parseTokenRecord,
+    )
+    this.userIndexStore = new KeyedJsonFileStore<UserTokenIndex>(
+      (userId) => join(byUserDir, `${userId}.json`),
+      { tokenIds: [] },
+      parseUserTokenIndex,
+    )
   }
 
   /**
@@ -65,7 +103,7 @@ export class TokenStore implements ITokenStore {
    * Corrupted files are skipped with a warning.
    */
   async loadIndex(): Promise<void> {
-    await this.ensureTokensDir()
+    await mkdir(this.tokensDir, { recursive: true })
     let files: string[]
     try {
       files = await readdir(this.tokensDir)
@@ -81,8 +119,8 @@ export class TokenStore implements ITokenStore {
       try {
         const filePath = join(this.tokensDir, file)
         const content = await readFile(filePath, 'utf-8')
-        const record: unknown = JSON.parse(content)
-        if (this.isValidTokenRecord(record) && record.revokedAt === null) {
+        const record = parseTokenRecord(JSON.parse(content))
+        if (record !== null && record.revokedAt === null) {
           this.hashIndex.set(record.tokenHash, record.tokenId)
           loaded++
         }
@@ -95,22 +133,18 @@ export class TokenStore implements ITokenStore {
   }
 
   /**
-   * Persist a new token record. Updates both token file and user index atomically.
+   * Persist a new token record. Updates both token file and user index.
+   * The user index update is serialized per-user, so two tokens created for
+   * the same user in quick succession can no longer race and drop one
+   * tokenId from the index (which would make it un-revocable via "revoke all").
    */
   async create(record: TokenRecord): Promise<void> {
-    await this.ensureTokensDir()
-    await this.ensureByUserDir()
+    await this.recordStore.write(record.tokenId, record)
 
-    // Write token file atomically
-    const tokenFilePath = join(this.tokensDir, `${record.tokenId}.json`)
-    await this.atomicWrite(tokenFilePath, JSON.stringify(record, null, 2))
-
-    // Update in-memory index
     if (record.revokedAt === null) {
       this.hashIndex.set(record.tokenHash, record.tokenId)
     }
 
-    // Update user index
     await this.addToUserIndex(record.userId, record.tokenId)
   }
 
@@ -131,17 +165,7 @@ export class TokenStore implements ITokenStore {
    * Returns null if the file does not exist or is corrupted.
    */
   async findById(tokenId: string): Promise<TokenRecord | null> {
-    const filePath = join(this.tokensDir, `${tokenId}.json`)
-    try {
-      const content = await readFile(filePath, 'utf-8')
-      const parsed: unknown = JSON.parse(content)
-      if (this.isValidTokenRecord(parsed)) {
-        return parsed
-      }
-      return null
-    } catch {
-      return null
-    }
+    return this.recordStore.read(tokenId)
   }
 
   /**
@@ -149,26 +173,15 @@ export class TokenStore implements ITokenStore {
    * Returns an empty array if the user has no tokens or the index file doesn't exist.
    */
   async getTokenIdsForUser(userId: string): Promise<string[]> {
-    const indexPath = join(this.byUserDir, `${userId}.json`)
-    try {
-      const content = await readFile(indexPath, 'utf-8')
-      const parsed: unknown = JSON.parse(content)
-      if (this.isValidUserTokenIndex(parsed)) {
-        return parsed.tokenIds
-      }
-      return []
-    } catch {
-      return []
-    }
+    const index = await this.userIndexStore.read(userId)
+    return index.tokenIds
   }
 
   /**
    * Update a token record (e.g., revocation, lastUsedAt). Atomic write.
    */
   async update(record: TokenRecord): Promise<void> {
-    await this.ensureTokensDir()
-    const filePath = join(this.tokensDir, `${record.tokenId}.json`)
-    await this.atomicWrite(filePath, JSON.stringify(record, null, 2))
+    await this.recordStore.write(record.tokenId, record)
   }
 
   /**
@@ -204,115 +217,16 @@ export class TokenStore implements ITokenStore {
   // ─── Private Helpers ─────────────────────────────────────────────────────────
 
   /**
-   * Ensure the tokens directory exists.
-   */
-  private async ensureTokensDir(): Promise<void> {
-    if (this.tokensDirEnsured) {
-      return
-    }
-    await mkdir(this.tokensDir, { recursive: true })
-    this.tokensDirEnsured = true
-  }
-
-  /**
-   * Ensure the _by-user directory exists.
-   */
-  private async ensureByUserDir(): Promise<void> {
-    if (this.byUserDirEnsured) {
-      return
-    }
-    await mkdir(this.byUserDir, { recursive: true })
-    this.byUserDirEnsured = true
-  }
-
-  /**
-   * Write data atomically: write to a temp file with random hex suffix, then rename to target.
-   * On Windows, retries with unlink-before-rename on EPERM/EACCES.
-   */
-  private async atomicWrite(targetPath: string, data: string): Promise<void> {
-    const tempSuffix = randomBytes(8).toString('hex')
-    const tempPath = `${targetPath}.${tempSuffix}.tmp`
-    await writeFile(tempPath, data, 'utf-8')
-
-    try {
-      await rename(tempPath, targetPath)
-    } catch (err: unknown) {
-      const code = (err as NodeJS.ErrnoException).code
-      if (code === 'EPERM' || code === 'EACCES') {
-        try { await unlink(targetPath) } catch { /* may not exist */ }
-        try {
-          await rename(tempPath, targetPath)
-        } catch {
-          await writeFile(targetPath, data, 'utf-8')
-          try { await unlink(tempPath) } catch { /* cleanup */ }
-        }
-      } else {
-        try { await unlink(tempPath) } catch { /* ignore */ }
-        throw err
-      }
-    }
-  }
-
-  /**
-   * Add a token ID to the user's index file. Creates the file if it doesn't exist.
-   * Atomic write to prevent corruption.
+   * Add a token ID to the user's index file, creating it if needed.
+   * Runs inside the per-user mutex (via `mutate`) so the read-then-append
+   * can't race against a concurrent token creation for the same user.
    */
   private async addToUserIndex(userId: string, tokenId: string): Promise<void> {
-    await this.ensureByUserDir()
-    const indexPath = join(this.byUserDir, `${userId}.json`)
-
-    // Read existing index or start fresh
-    let tokenIds: string[] = []
-    try {
-      const content = await readFile(indexPath, 'utf-8')
-      const parsed: unknown = JSON.parse(content)
-      if (this.isValidUserTokenIndex(parsed)) {
-        tokenIds = parsed.tokenIds
+    await this.userIndexStore.mutate(userId, (current) => {
+      if (current.tokenIds.includes(tokenId)) {
+        return current
       }
-    } catch {
-      // File doesn't exist yet — start with empty array
-    }
-
-    // Add new token ID if not already present
-    if (!tokenIds.includes(tokenId)) {
-      tokenIds.push(tokenId)
-    }
-
-    const index: UserTokenIndex = { tokenIds }
-    await this.atomicWrite(indexPath, JSON.stringify(index, null, 2))
-  }
-
-  /**
-   * Type guard to validate that a parsed JSON value is a valid TokenRecord.
-   */
-  private isValidTokenRecord(value: unknown): value is TokenRecord {
-    if (typeof value !== 'object' || value === null) {
-      return false
-    }
-    const obj = value as Record<string, unknown>
-    return (
-      typeof obj['tokenId'] === 'string' &&
-      typeof obj['tokenHash'] === 'string' &&
-      typeof obj['userId'] === 'string' &&
-      typeof obj['name'] === 'string' &&
-      typeof obj['createdAt'] === 'string' &&
-      typeof obj['expiresAt'] === 'string' &&
-      (obj['revokedAt'] === null || typeof obj['revokedAt'] === 'string') &&
-      (obj['lastUsedAt'] === null || typeof obj['lastUsedAt'] === 'string')
-    )
-  }
-
-  /**
-   * Type guard to validate that a parsed JSON value is a valid UserTokenIndex.
-   */
-  private isValidUserTokenIndex(value: unknown): value is UserTokenIndex {
-    if (typeof value !== 'object' || value === null) {
-      return false
-    }
-    const obj = value as Record<string, unknown>
-    return (
-      Array.isArray(obj['tokenIds']) &&
-      obj['tokenIds'].every((id: unknown) => typeof id === 'string')
-    )
+      return { tokenIds: [...current.tokenIds, tokenId] }
+    })
   }
 }

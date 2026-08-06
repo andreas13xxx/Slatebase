@@ -141,7 +141,7 @@ describe('FeatureToggleStore', () => {
   describe('round-trip', () => {
     it('should correctly round-trip save and load', async () => {
       const store = new FeatureToggleStore(tempDir, logger)
-      const toggles = { chat: false, mcp: true, 'knowledge-graph': false }
+      const toggles = { chat: false, mcp: true, 'obsidian-plugin-compat': false }
 
       await store.save(toggles)
       const loaded = await store.load()

@@ -583,7 +583,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
             <span>Plugins werden geladen…</span>
           </div>
         ) : (
-          <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} />
+          <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} onPluginInstalled={() => void loadPlugins()} />
         )}
       </div>
     )
@@ -613,7 +613,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
             </button>
           </div>
         ) : (
-          <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} />
+          <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} onPluginInstalled={() => void loadPlugins()} />
         )}
       </div>
     )
@@ -642,7 +642,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
             </div>
           </>
         ) : (
-          <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} />
+          <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} onPluginInstalled={() => void loadPlugins()} />
         )}
       </div>
     )
@@ -969,7 +969,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       />
         </>
       ) : (
-        <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} />
+        <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} onPluginInstalled={() => void loadPlugins()} />
       )}
     </div>
   )

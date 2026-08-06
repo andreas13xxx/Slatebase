@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
-import type { IApiClient, FeatureToggleState } from '../../api'
+import { useEffect } from 'react'
+import type { IApiClient } from '../../api'
 import { useFeatureContext } from '../../state/featureContext'
+import { loadFeatures, toggleFeature } from '../../state/featureActions'
 import { AlertTriangle, Loader, AlertCircle } from 'lucide-react'
 
 /** Props for the FeatureTogglesSection component. */
@@ -12,70 +13,27 @@ export interface FeatureTogglesSectionProps {
 /**
  * Self-contained feature toggles section for the unified Settings panel.
  * Renders the list of feature toggles with on/off switches, optimistic updates,
- * and rollback on failure. Syncs toggle state with the global FeatureContext.
+ * and rollback on failure. Reads/writes the global FeatureContext directly via
+ * the shared loadFeatures()/toggleFeature() action creators — this is also
+ * what App.tsx's isEnabled() gating reads from, so an admin toggling a
+ * feature here takes effect app-wide immediately, without a page reload.
  *
  * Extracted from AdminConfigPage. No outer layout wrapper — intended to be
  * placed inside SettingsContent.
  */
 export function FeatureTogglesSection({ apiClient }: FeatureTogglesSectionProps) {
-  const { dispatch: featureDispatch } = useFeatureContext()
-
-  const [adminFeatures, setAdminFeatures] = useState<FeatureToggleState[]>([])
-  const [featuresLoading, setFeaturesLoading] = useState(true)
-  const [featuresError, setFeaturesError] = useState<string | null>(null)
-  const [toggleError, setToggleError] = useState<string | null>(null)
-
-  const loadAdminFeatures = useCallback(async () => {
-    setFeaturesLoading(true)
-    setFeaturesError(null)
-    try {
-      const features = await apiClient.loadAdminFeatures()
-      setAdminFeatures(features)
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message :
-        (typeof err === 'object' && err !== null && 'message' in err) ?
-          String((err as { message: unknown }).message) : 'Fehler beim Laden der Feature-Toggles'
-      setFeaturesError(message)
-    } finally {
-      setFeaturesLoading(false)
-    }
-  }, [apiClient])
+  const { state, dispatch: featureDispatch } = useFeatureContext()
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch on mount, setState is async/deferred
-    void loadAdminFeatures()
-  }, [loadAdminFeatures])
+    void loadFeatures(featureDispatch, apiClient)
+  }, [featureDispatch, apiClient])
 
-  async function handleToggle(featureName: string, currentEnabled: boolean): Promise<void> {
-    setToggleError(null)
-    const newEnabled = !currentEnabled
+  // A load failure leaves `features` empty; a toggle failure happens after a
+  // successful load, so `features` is non-empty. Both share `state.error`.
+  const loadFailed = state.error !== null && state.features.length === 0
+  const toggleFailed = state.error !== null && state.features.length > 0
 
-    // Optimistic update on local admin features list
-    setAdminFeatures(prev => prev.map(f =>
-      f.name === featureName ? { ...f, enabled: newEnabled } : f
-    ))
-
-    // Also update the global feature context optimistically
-    featureDispatch({ type: 'FEATURE_UPDATED', name: featureName, enabled: newEnabled })
-
-    try {
-      await apiClient.toggleAdminFeature(featureName, newEnabled)
-    } catch (err: unknown) {
-      // Rollback local admin features
-      setAdminFeatures(prev => prev.map(f =>
-        f.name === featureName ? { ...f, enabled: currentEnabled } : f
-      ))
-      // Rollback global feature context
-      featureDispatch({ type: 'FEATURE_UPDATED', name: featureName, enabled: currentEnabled })
-
-      const message = err instanceof Error ? err.message :
-        (typeof err === 'object' && err !== null && 'message' in err) ?
-          String((err as { message: unknown }).message) : 'Fehler beim Ändern des Features'
-      setToggleError(message)
-    }
-  }
-
-  if (featuresLoading) {
+  if (state.isLoading) {
     return (
       <div className="feature-toggle-loading">
         <Loader size={16} className="feature-toggle-spinner" />
@@ -84,15 +42,15 @@ export function FeatureTogglesSection({ apiClient }: FeatureTogglesSectionProps)
     )
   }
 
-  if (featuresError) {
+  if (loadFailed) {
     return (
       <div className="feature-toggle-error">
         <AlertCircle size={14} />
-        <span>{featuresError}</span>
+        <span>{state.error}</span>
         <button
           type="button"
           className="feature-toggle-retry-btn"
-          onClick={() => void loadAdminFeatures()}
+          onClick={() => void loadFeatures(featureDispatch, apiClient)}
         >
           Erneut versuchen
         </button>
@@ -102,21 +60,21 @@ export function FeatureTogglesSection({ apiClient }: FeatureTogglesSectionProps)
 
   return (
     <div className="feature-toggles-section">
-      {toggleError && (
+      {toggleFailed && (
         <div className="feature-toggle-toast">
           <AlertCircle size={14} />
-          <span>{toggleError}</span>
+          <span>{state.error}</span>
           <button
             type="button"
             className="feature-toggle-toast-close"
-            onClick={() => setToggleError(null)}
+            onClick={() => featureDispatch({ type: 'FEATURE_ERROR_CLEARED' })}
             aria-label="Schließen"
           >
             ×
           </button>
         </div>
       )}
-      {adminFeatures.map(feature => (
+      {state.features.map(feature => (
         <div
           key={feature.name}
           className={`feature-toggle-item${!feature.enabled ? ' feature-toggle-item--disabled' : ''}`}
@@ -135,7 +93,7 @@ export function FeatureTogglesSection({ apiClient }: FeatureTogglesSectionProps)
             <input
               type="checkbox"
               checked={feature.enabled}
-              onChange={() => void handleToggle(feature.name, feature.enabled)}
+              onChange={() => void toggleFeature(featureDispatch, apiClient, feature.name, !feature.enabled, feature.enabled)}
               aria-label={`${feature.name} ${feature.enabled ? 'deaktivieren' : 'aktivieren'}`}
             />
             <span className="feature-toggle-switch__slider" />

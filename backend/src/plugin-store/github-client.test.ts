@@ -274,26 +274,72 @@ describe('GitHubClient', () => {
   })
 
   describe('Rate Limit Tracking', () => {
-    it('tracks rate limit from response headers', async () => {
-      vi.mocked(fetch).mockResolvedValueOnce(createMockResponse([], {
-        headers: { 'X-RateLimit-Remaining': '42' },
-      }))
+    // Rate limiting only applies to api.github.com (see RATE_LIMITED_HOST in
+    // github-client.ts), so these tests drive it via downloadReleaseAssets,
+    // which hits GET /repos/{repo}/releases/latest on api.github.com.
+    const releaseData = {
+      tag_name: '1.0.0',
+      html_url: 'https://github.com/test/repo/releases/tag/1.0.0',
+      assets: [
+        { name: 'main.js', browser_download_url: 'https://github.com/test/repo/releases/download/1.0.0/main.js', size: 100 },
+        { name: 'manifest.json', browser_download_url: 'https://github.com/test/repo/releases/download/1.0.0/manifest.json', size: 50 },
+      ],
+    }
 
-      await client.fetchCommunityPlugins()
+    it('tracks rate limit from response headers', async () => {
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(createMockResponse(releaseData, { headers: { 'X-RateLimit-Remaining': '42' } }))
+        .mockResolvedValueOnce(createMockResponse('bundle'))
+        .mockResolvedValueOnce(createMockResponse('manifest'))
+
+      await client.downloadReleaseAssets('test/repo')
       expect(client.getRateLimitRemaining()).toBe(42)
     })
 
     it('throws GitHubRateLimitError when rate limit is 0 before request', async () => {
       // First call to set rate limit to 0
-      vi.mocked(fetch).mockResolvedValueOnce(createMockResponse([], {
-        headers: { 'X-RateLimit-Remaining': '0' },
-      }))
-      await client.fetchCommunityPlugins()
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(createMockResponse(releaseData, { headers: { 'X-RateLimit-Remaining': '0' } }))
+        .mockResolvedValueOnce(createMockResponse('bundle'))
+        .mockResolvedValueOnce(createMockResponse('manifest'))
+      await client.downloadReleaseAssets('test/repo')
 
       // Second call should throw before making request
-      await expect(client.fetchCommunityPlugins()).rejects.toThrow(GitHubRateLimitError)
-      // fetch should only have been called once (for the first request)
-      expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+      await expect(client.downloadReleaseAssets('test/repo')).rejects.toThrow(GitHubRateLimitError)
+      // fetch should only have been called 3 times (all from the first request)
+      expect(vi.mocked(fetch)).toHaveBeenCalledTimes(3)
+    })
+
+    it('recovers and allows requests again once the reset window has passed', async () => {
+      vi.useFakeTimers()
+      try {
+        // First call gets rate-limited with a reset 60s out.
+        vi.mocked(fetch).mockResolvedValueOnce(createMockResponse('rate limited', {
+          status: 429,
+          headers: {
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': String(Math.floor(Date.now() / 1000) + 60),
+          },
+        }))
+        await expect(client.downloadReleaseAssets('test/repo')).rejects.toThrow(GitHubRateLimitError)
+
+        // Still within the window — guard should short-circuit without calling fetch again.
+        await expect(client.downloadReleaseAssets('test/repo')).rejects.toThrow(GitHubRateLimitError)
+        expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+
+        // Once the reset time has passed, the client must try again rather than
+        // stay permanently wedged (this was the bug: rateLimitRemaining === 0
+        // was never cleared, so every future request failed instantly forever).
+        vi.advanceTimersByTime(61_000)
+        vi.mocked(fetch)
+          .mockResolvedValueOnce(createMockResponse(releaseData, { headers: { 'X-RateLimit-Remaining': '59' } }))
+          .mockResolvedValueOnce(createMockResponse('bundle'))
+          .mockResolvedValueOnce(createMockResponse('manifest'))
+        await expect(client.downloadReleaseAssets('test/repo')).resolves.toBeDefined()
+        expect(vi.mocked(fetch)).toHaveBeenCalledTimes(4)
+      } finally {
+        vi.useRealTimers()
+      }
     })
 
     it('throws GitHubRateLimitError on 429 response', async () => {
@@ -305,20 +351,40 @@ describe('GitHubClient', () => {
         },
       }))
 
-      await expect(client.fetchCommunityPlugins()).rejects.toThrow(GitHubRateLimitError)
+      await expect(client.downloadReleaseAssets('test/repo')).rejects.toThrow(GitHubRateLimitError)
     })
 
     it('logs warning when rate limit is approaching', async () => {
-      vi.mocked(fetch).mockResolvedValueOnce(createMockResponse([], {
-        headers: { 'X-RateLimit-Remaining': '5' },
-      }))
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(createMockResponse(releaseData, { headers: { 'X-RateLimit-Remaining': '5' } }))
+        .mockResolvedValueOnce(createMockResponse('bundle'))
+        .mockResolvedValueOnce(createMockResponse('manifest'))
 
-      await client.fetchCommunityPlugins()
+      await client.downloadReleaseAssets('test/repo')
       expect(logger.warn).toHaveBeenCalledWith('GitHub rate limit approaching', { remaining: 5 })
     })
 
     it('returns -1 when rate limit has not been observed yet', () => {
       expect(client.getRateLimitRemaining()).toBe(-1)
+    })
+
+    it('does not block raw.githubusercontent.com requests when api.github.com is rate-limited', async () => {
+      // Exhaust the api.github.com quota.
+      vi.mocked(fetch).mockResolvedValueOnce(createMockResponse('rate limited', {
+        status: 429,
+        headers: {
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': String(Math.floor(Date.now() / 1000) + 120),
+        },
+      }))
+      await expect(client.downloadReleaseAssets('test/repo')).rejects.toThrow(GitHubRateLimitError)
+
+      // raw.githubusercontent.com is separate CDN infrastructure with its own
+      // limits and must not be blocked by the exhausted api.github.com quota.
+      vi.mocked(fetch).mockResolvedValueOnce(createMockResponse({
+        id: 'test-plugin', name: 'Test Plugin', version: '1.0.0', minAppVersion: '0.1.0',
+      }))
+      await expect(client.fetchManifest('test/repo')).resolves.toMatchObject({ id: 'test-plugin' })
     })
   })
 
@@ -341,6 +407,25 @@ describe('GitHubClient', () => {
 
       await client.fetchCommunityPlugins()
       expect(vi.mocked(fetch)).toHaveBeenCalled()
+    })
+
+    it('allows requests to release-assets.githubusercontent.com', async () => {
+      // GitHub serves some release assets from this CDN host instead of
+      // objects.githubusercontent.com; it must not be rejected as a domain violation.
+      const releaseData = {
+        tag_name: '1.0.0',
+        html_url: 'https://github.com/test/repo/releases/tag/1.0.0',
+        assets: [
+          { name: 'main.js', browser_download_url: 'https://release-assets.githubusercontent.com/main.js', size: 100 },
+          { name: 'manifest.json', browser_download_url: 'https://release-assets.githubusercontent.com/manifest.json', size: 50 },
+        ],
+      }
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(createMockResponse(releaseData, { headers: { 'X-RateLimit-Remaining': '59' } }))
+        .mockResolvedValueOnce(createMockResponse('bundle'))
+        .mockResolvedValueOnce(createMockResponse('manifest'))
+
+      await expect(client.downloadReleaseAssets('test/repo')).resolves.toBeDefined()
     })
   })
 

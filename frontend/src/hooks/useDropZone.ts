@@ -9,8 +9,8 @@ const DEFAULT_MAX_FILE_SIZE = 104857600
 
 /** Options for configuring the drop zone hook. */
 export interface UseDropZoneOptions {
-  /** Callback invoked when valid files are dropped. */
-  onDrop: (files: File[], targetPath: string) => Promise<void>
+  /** Callback invoked when valid files are dropped. `dropPoint` is the cursor position (viewport coords) at the moment of drop. */
+  onDrop: (files: File[], targetPath: string, dropPoint: { x: number; y: number }) => Promise<void>
   /** Maximum number of files per drop (default 50). */
   maxFiles?: number
   /** Maximum individual file size in bytes (default 100 MB). */
@@ -90,6 +90,7 @@ export function useDropZone(options: UseDropZoneOptions): UseDropZoneReturn {
     e.stopPropagation()
     dragCounterRef.current = 0
     setIsDragOver(false)
+    const dropPoint = { x: e.clientX, y: e.clientY }
 
     // Reject drop when disabled (e.g. no file open in editor)
     if (disabled) {
@@ -132,7 +133,7 @@ export function useDropZone(options: UseDropZoneOptions): UseDropZoneReturn {
     }
 
     try {
-      await onDrop(validFiles, targetPath)
+      await onDrop(validFiles, targetPath, dropPoint)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Upload fehlgeschlagen'
       showToast('error', message)

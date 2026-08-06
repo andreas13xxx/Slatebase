@@ -120,16 +120,7 @@ export function CommandPaletteContainer({
       showToast('success', t('profile.welcomeVaultCreated', { name: result.vaultName }))
       await loadVaults(appDispatch, apiClient)
     } catch (err: unknown) {
-      if (
-        err !== null &&
-        typeof err === 'object' &&
-        'code' in err &&
-        (err as { code: string }).code === 'FEATURE_DISABLED'
-      ) {
-        showToast('error', t('profile.welcomeVaultFeatureDisabled'))
-      } else {
-        showToast('error', extractErrorMessage(err, t('profile.welcomeVaultError')))
-      }
+      showToast('error', extractErrorMessage(err, t('profile.welcomeVaultError')))
     }
   }
 
@@ -319,14 +310,12 @@ export function CommandPaletteContainer({
       pluginId: 'slatebase',
     })
 
-    if (isEnabled('welcome-vault')) {
-      commands.push({
-        id: 'create-welcome-vault',
-        name: t('commands.createWelcomeVault'),
-        callback: () => { handleCreateWelcomeVault() },
-        pluginId: 'slatebase',
-      })
-    }
+    commands.push({
+      id: 'create-welcome-vault',
+      name: t('commands.createWelcomeVault'),
+      callback: () => { handleCreateWelcomeVault() },
+      pluginId: 'slatebase',
+    })
 
     if (hasVault && hasWriteAccess) {
       commands.push({
@@ -380,14 +369,12 @@ export function CommandPaletteContainer({
         pluginId: 'slatebase',
       })
 
-      if (isEnabled('knowledge-graph')) {
-        commands.push({
-          id: 'slatebase:open-graph',
-          name: 'Knowledge Graph öffnen',
-          callback: onOpenGraph,
-          pluginId: 'slatebase',
-        })
-      }
+      commands.push({
+        id: 'slatebase:open-graph',
+        name: 'Knowledge Graph öffnen',
+        callback: onOpenGraph,
+        pluginId: 'slatebase',
+      })
 
       if (isEnabled('obsidian-plugin-compat')) {
         commands.push({

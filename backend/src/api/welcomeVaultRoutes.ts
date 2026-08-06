@@ -8,7 +8,6 @@ import type { IWelcomeVaultService } from '../welcome-vault/index.js'
 import type { WelcomeVaultLanguage } from '../welcome-vault/types.js'
 import type { IUserService } from '../user/index.js'
 import type { IVaultService } from '../business/index.js'
-import type { IFeatureToggleService } from '../feature-toggle/types.js'
 import type { IConfigService } from '../config/index.js'
 import { LinkIndexService } from '../link-index/index.js'
 
@@ -114,7 +113,6 @@ export interface WelcomeVaultRouteDependencies {
   welcomeVaultService: IWelcomeVaultService
   userService: IUserService
   vaultService: IVaultService
-  featureToggleService: IFeatureToggleService
   configService: IConfigService
   linkIndexMap: Map<string, InstanceType<typeof LinkIndexService>>
   logger: ILogger
@@ -139,7 +137,6 @@ export function createWelcomeVaultRoutes(deps: WelcomeVaultRouteDependencies): H
     welcomeVaultService,
     userService,
     vaultService,
-    featureToggleService,
     configService,
     linkIndexMap,
     logger,
@@ -155,7 +152,6 @@ export function createWelcomeVaultRoutes(deps: WelcomeVaultRouteDependencies): H
    *
    * Response:
    * - 201 `{ vaultId, vaultName }` on success
-   * - 403 `{ code, message, timestamp }` if feature is disabled
    * - 429 `{ code, message, timestamp }` if rate-limited
    * - 500 `{ code, message, timestamp }` on internal error
    */
@@ -167,13 +163,7 @@ export function createWelcomeVaultRoutes(deps: WelcomeVaultRouteDependencies): H
       return c.json(error, 401)
     }
 
-    // 1. Check feature toggle
-    if (!featureToggleService.isEnabled('welcome-vault')) {
-      const error = createApiError('FEATURE_DISABLED', 'The welcome vault feature is currently disabled')
-      return c.json(error, 403)
-    }
-
-    // 2. Check rate limit
+    // 1. Check rate limit
     const rateLimitResult = checkRateLimit(session.userId)
     if (!rateLimitResult.allowed) {
       c.header('Retry-After', String(rateLimitResult.retryAfter))
@@ -182,11 +172,11 @@ export function createWelcomeVaultRoutes(deps: WelcomeVaultRouteDependencies): H
     }
 
     try {
-      // 3. Get user's preferred language
+      // 2. Get user's preferred language
       const userInfo = await userService.getUser(session.userId)
       const language: WelcomeVaultLanguage = userInfo.preferredLanguage ?? 'de'
 
-      // 4. Determine vault name from config and deduplicate
+      // 3. Determine vault name from config and deduplicate
       // Check against all system vault names since VaultService.createVault
       // validates uniqueness globally (not just per-user).
       const welcomeVaultConfig = configService.getWelcomeVaultConfig()
@@ -195,7 +185,7 @@ export function createWelcomeVaultRoutes(deps: WelcomeVaultRouteDependencies): H
       const existingNames = allVaults.map((v) => v.name)
       const deduplicatedName = deduplicateVaultName(baseName, existingNames)
 
-      // 5. Create welcome vault via service
+      // 4. Create welcome vault via service
       // The service internally calls VaultService.createVault with this name.
       // Deduplication ensures the name doesn't collide.
       logger.debug('Creating welcome vault', { userId: session.userId, language, vaultName: deduplicatedName })
@@ -206,7 +196,7 @@ export function createWelcomeVaultRoutes(deps: WelcomeVaultRouteDependencies): H
         return c.json(error, 500)
       }
 
-      // 6. Fire-and-forget: rebuild link index for the new vault
+      // 5. Fire-and-forget: rebuild link index for the new vault
       const linkIndex = new LinkIndexService(result.storagePath, result.vaultId, result.vaultName, logger)
       linkIndexMap.set(result.vaultId, linkIndex)
       linkIndex.rebuild().catch((err: unknown) => {
@@ -220,7 +210,7 @@ export function createWelcomeVaultRoutes(deps: WelcomeVaultRouteDependencies): H
         vaultName: result.vaultName,
       })
 
-      // 7. Return success
+      // 6. Return success
       return c.json({ vaultId: result.vaultId, vaultName: result.vaultName }, 201)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)

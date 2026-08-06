@@ -248,11 +248,18 @@ export class VaultController implements IVaultController {
         const resolvedPath = this.vaultService.resolveFilePath(vaultId, decodedPath)
         const buffer = await fs.readFile(resolvedPath)
         const contentType = getContentTypeFromExtension(decodedPath)
+        // SVG and HTML can carry <script>; browsers execute it when such a
+        // response is opened as a top-level document (e.g. a shared raw-file
+        // link opened in a new tab). Force a download instead of rendering it
+        // inline — `<img>`/preview usage elsewhere in the app is unaffected,
+        // since Content-Disposition only changes how a direct navigation is
+        // handled, not how an <img> tag consumes the response.
+        const disposition = isInlineUnsafeContentType(contentType) ? 'attachment' : 'inline'
         return new Response(buffer, {
           status: 200,
           headers: {
             'Content-Type': contentType,
-            'Content-Disposition': 'inline',
+            'Content-Disposition': disposition,
             'Content-Length': buffer.length.toString(),
           },
         })
@@ -809,6 +816,17 @@ const CONTENT_TYPE_MAP: Record<string, string> = {
 function getContentTypeFromExtension(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase()
   return CONTENT_TYPE_MAP[ext] ?? 'application/octet-stream'
+}
+
+/**
+ * Content types that browsers will parse and execute as active documents
+ * (embedded `<script>`) when opened as a top-level navigation. These must
+ * never be served with `Content-Disposition: inline`.
+ */
+const INLINE_UNSAFE_CONTENT_TYPES = new Set(['image/svg+xml', 'text/html; charset=utf-8'])
+
+function isInlineUnsafeContentType(contentType: string): boolean {
+  return INLINE_UNSAFE_CONTENT_TYPES.has(contentType)
 }
 
 // --- RouteModule Interface ---

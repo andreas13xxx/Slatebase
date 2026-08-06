@@ -100,7 +100,7 @@ export function BinaryViewer({ fileName, fileExtension, vaultId, filePath, token
  * Using <object type="application/pdf"> forces Firefox to use its built-in pdf.js
  * viewer regardless of the user's download preferences for PDF files.
  */
-export function PdfViewer({ rawSrc, fileName }: { rawSrc: string; fileName: string }) {
+export function PdfViewer({ rawSrc, fileName, heightPx }: { rawSrc: string; fileName: string; heightPx?: number }) {
   const { t } = useTranslation()
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
   const [error, setError] = useState(false)
@@ -151,13 +151,17 @@ export function PdfViewer({ rawSrc, fileName }: { rawSrc: string; fileName: stri
   return (
     <section
       aria-label={fileName}
-      style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: '500px' }}
+      style={
+        heightPx
+          ? { display: 'flex', flexDirection: 'column', height: `${heightPx}px` }
+          : { display: 'flex', flexDirection: 'column', height: '100%', minHeight: '500px' }
+      }
     >
       <object
         data={blobUrl}
         type="application/pdf"
         aria-label={fileName}
-        style={{ flex: 1, width: '100%', minHeight: '500px' }}
+        style={heightPx ? { flex: 1, width: '100%' } : { flex: 1, width: '100%', minHeight: '500px' }}
       >
         <p style={{ padding: '2rem', textAlign: 'center', color: '#888' }}>
           {t('binaryViewer.unsupported', { name: fileName, type: '.pdf' })}

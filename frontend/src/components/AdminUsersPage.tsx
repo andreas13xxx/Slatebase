@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, type FormEvent } from 'react'
+import { useState, useCallback, type FormEvent } from 'react'
 import type { IApiClient } from '../api'
 import type { UserRole } from '../state/authState'
 import { useTranslation } from '../i18n'
 import { extractErrorMessage } from '../utils/error'
+import { usePaginatedResource } from '../hooks/usePaginatedResource'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -42,14 +43,6 @@ export interface AdminUsersPageProps {
  */
 export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
   const { t, locale } = useTranslation()
-
-  // ─── User list state ─────────────────────────────────────────────────────
-  const [users, setUsers] = useState<AdminUserInfo[]>([])
-  const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [listLoading, setListLoading] = useState(false)
-  const [listError, setListError] = useState<string | null>(null)
 
   // ─── Create user form state ──────────────────────────────────────────────
   const [newUsername, setNewUsername] = useState('')
@@ -126,30 +119,22 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
 
   // ─── Load users ──────────────────────────────────────────────────────────
 
-  const loadUsers = useCallback(async (targetPage: number) => {
-    setListLoading(true)
-    setListError(null)
-    try {
-      const result = await adminFetch<PaginatedUsersResponse>(
-        'GET',
-        `/api/v1/admin/users?page=${targetPage}&pageSize=${PAGE_SIZE}`,
-      )
-      setUsers(result.items)
-      setPage(result.page)
-      setTotalPages(result.totalPages)
-      setTotal(result.total)
-    } catch (err: unknown) {
-      const message = extractErrorMessage(err, t('admin.users.unknownError'))
-      setListError(message)
-    } finally {
-      setListLoading(false)
-    }
+  const fetchUsersPage = useCallback(async (targetPage: number): Promise<PaginatedUsersResponse> => {
+    return adminFetch<PaginatedUsersResponse>(
+      'GET',
+      `/api/v1/admin/users?page=${targetPage}&pageSize=${PAGE_SIZE}`,
+    )
   }, [apiClient])
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadUsers(1)
-  }, [loadUsers])
+  const {
+    items: users,
+    page,
+    totalPages,
+    total,
+    loading: listLoading,
+    error: listError,
+    loadPage: loadUsers,
+  } = usePaginatedResource(fetchUsersPage, t('admin.users.unknownError'))
 
   // ─── Create user ────────────────────────────────────────────────────────
 

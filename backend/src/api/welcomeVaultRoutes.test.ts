@@ -8,7 +8,6 @@ import type { IWelcomeVaultService, WelcomeVaultResult } from '../welcome-vault/
 import type { IUserService, PublicUserInfo } from '../user/index.js'
 import type { IVaultService } from '../business/index.js'
 import type { VaultInfo } from '../vault/index.js'
-import type { IFeatureToggleService } from '../feature-toggle/types.js'
 import type { IConfigService } from '../config/index.js'
 import { LinkIndexService } from '../link-index/index.js'
 import { createWelcomeVaultRoutes, deduplicateVaultName } from './welcomeVaultRoutes.js'
@@ -84,16 +83,6 @@ function createMockVaultService(overrides: Partial<IVaultService> = {}): IVaultS
   } as unknown as IVaultService
 }
 
-function createMockFeatureToggleService(overrides: Partial<IFeatureToggleService> = {}): IFeatureToggleService {
-  return {
-    isEnabled: () => true,
-    setEnabled: () => ({ name: '', enabled: true, restartRequired: false }),
-    getAll: () => [],
-    get: () => undefined,
-    ...overrides,
-  }
-}
-
 function createMockConfigService(overrides: Partial<IConfigService> = {}): IConfigService {
   return {
     getServerConfig: () => ({} as ReturnType<IConfigService['getServerConfig']>),
@@ -125,7 +114,6 @@ function createTestApp(options: {
   welcomeVaultService?: IWelcomeVaultService
   userService?: IUserService
   vaultService?: IVaultService
-  featureToggleService?: IFeatureToggleService
   configService?: IConfigService
   session?: SessionContext | null
   csrfValid?: boolean
@@ -134,7 +122,6 @@ function createTestApp(options: {
   const welcomeVaultService = options.welcomeVaultService ?? createMockWelcomeVaultService()
   const userService = options.userService ?? createMockUserService()
   const vaultService = options.vaultService ?? createMockVaultService()
-  const featureToggleService = options.featureToggleService ?? createMockFeatureToggleService()
   const configService = options.configService ?? createMockConfigService()
   const linkIndexMap = new Map<string, InstanceType<typeof LinkIndexService>>()
 
@@ -142,7 +129,6 @@ function createTestApp(options: {
     welcomeVaultService,
     userService,
     vaultService,
-    featureToggleService,
     configService,
     linkIndexMap,
     logger,
@@ -178,21 +164,6 @@ describe('Welcome Vault Routes', () => {
       const body = await res.json() as { vaultId: string; vaultName: string }
       expect(body.vaultId).toBe('vault-123')
       expect(body.vaultName).toBe('Willkommen')
-    })
-
-    it('returns 403 when feature toggle is disabled', async () => {
-      const session: SessionContext = { userId: 'user-403', username: 'user403', role: 'user', sessionId: 'sess-403' }
-      const featureToggleService = createMockFeatureToggleService({
-        isEnabled: (name) => name !== 'welcome-vault',
-      })
-      const app = createTestApp({ featureToggleService, session })
-
-      const res = await app.request('/api/v1/welcome-vault', { method: 'POST' })
-      expect(res.status).toBe(403)
-
-      const body = await res.json() as { code: string; message: string; timestamp: string }
-      expect(body.code).toBe('FEATURE_DISABLED')
-      expect(body.timestamp).toBeDefined()
     })
 
     it('deduplicates vault name when base name already exists', async () => {

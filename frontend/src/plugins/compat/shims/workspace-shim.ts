@@ -196,7 +196,7 @@ export class WorkspaceShim implements IWorkspaceShim {
    * - If `newLeaf` is falsy/undefined: returns an existing leaf with null view,
    *   or creates a new leaf with location 'main' if none available.
    */
-  getLeaf(newLeaf?: boolean | string): WorkspaceLeaf { // eslint-disable-line @typescript-eslint/no-unused-vars
+  getLeaf(newLeaf?: boolean | string): WorkspaceLeaf {  
     if (!this.viewRegistry) {
       // Should not happen in practice — create a leaf anyway if registry is available later
       return this.viewRegistry!.createLeaf(this.app, 'main');
@@ -220,7 +220,7 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Get or create a leaf in the right sidebar (Context Panel).
    * Creates a leaf with location 'right-sidebar'.
    */
-  getRightLeaf(_split?: boolean): WorkspaceLeaf { // eslint-disable-line @typescript-eslint/no-unused-vars
+  getRightLeaf(_split?: boolean): WorkspaceLeaf {  
     if (!this.viewRegistry) {
       return this.viewRegistry!.createLeaf(this.app, 'right-sidebar');
     }
@@ -231,7 +231,7 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Get or create a leaf in the left sidebar.
    * Slatebase maps both left and right sidebar to the Context Panel (right-sidebar).
    */
-  getLeftLeaf(_split?: boolean): WorkspaceLeaf { // eslint-disable-line @typescript-eslint/no-unused-vars
+  getLeftLeaf(_split?: boolean): WorkspaceLeaf {  
     if (!this.viewRegistry) {
       return this.viewRegistry!.createLeaf(this.app, 'right-sidebar');
     }
@@ -293,7 +293,7 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Create a new leaf by splitting an existing leaf.
    * Slatebase does not support split panes — creates a new tab instead.
    */
-  createLeafBySplit(_leaf: WorkspaceLeaf): WorkspaceLeaf { // eslint-disable-line @typescript-eslint/no-unused-vars
+  createLeafBySplit(_leaf: WorkspaceLeaf): WorkspaceLeaf {  
     console.info('[WorkspaceShim] createLeafBySplit: Slatebase does not support split panes — created new tab instead.');
     if (!this.viewRegistry) {
       return this.viewRegistry!.createLeaf(this.app, 'main');
@@ -451,7 +451,7 @@ export class WorkspaceShim implements IWorkspaceShim {
    * @param linkText - The wikilink target string to resolve
    * @param _sourcePath - The source file path (unused, reserved for future relative resolution)
    */
-  async openLinkText(linkText: string, _sourcePath: string): Promise<void> { // eslint-disable-line @typescript-eslint/no-unused-vars
+  async openLinkText(linkText: string, _sourcePath: string): Promise<void> {  
     // Req 8.4: No-op for empty linkText
     if (!linkText || !linkText.trim()) return;
 

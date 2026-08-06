@@ -168,7 +168,7 @@ export function GraphView({ vaultId }: GraphViewProps) {
 
     if (!graphData || graphData.nodes.length === 0) {
       setNodes([]) // eslint-disable-line react-hooks/set-state-in-effect
-      setLinks([]) // eslint-disable-line react-hooks/set-state-in-effect
+      setLinks([])  
       return
     }
 
@@ -212,8 +212,8 @@ export function GraphView({ vaultId }: GraphViewProps) {
       }))
 
     // Initialize state
-    setNodes(simNodes) // eslint-disable-line react-hooks/set-state-in-effect
-    setLinks(simLinks) // eslint-disable-line react-hooks/set-state-in-effect
+    setNodes(simNodes)  
+    setLinks(simLinks)  
 
     // Run d3-force simulation
     const simulation = forceSimulation<SimNode>(simNodes)

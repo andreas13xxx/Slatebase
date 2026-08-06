@@ -48,7 +48,7 @@ Slatebase als Self-Hosted-Alternative für Obsidian-Vault-Zugriff in der Communi
 | # | Maßnahme | Status | Details |
 |---|----------|--------|---------|
 | 19 | Docker Hub Listing (zusätzlich zu GHCR) | 📋 Geplant | Breitere Sichtbarkeit, gute Beschreibung |
-| 20 | Obsidian Community Plugin (Sync zu Slatebase) | 🟡 Teilweise | `vault-sync` Backend+Frontend implementiert — Plugin-Seite noch offen |
+| 20 | Obsidian Community Plugin (Sync zu Slatebase) | ✅ Anders gelöst | Custom `vault-sync`-Backend/Frontend-Modul wieder entfernt — stattdessen läuft das echte Obsidian-Community-Plugin „LiveSync" nativ im Plugin-Compat-Layer (bidirektionale CouchDB-Replikation via Server-Proxy). Kein eigenes Sync-Plugin nötig. |
 | 21 | MCP-Server im MCP-Verzeichnis listen | 📋 Geplant | MCP-Server implementiert — Listing vorbereiten |
 | 22 | Vergleichsseite: Slatebase vs. Obsidian Publish vs. Quartz | 📋 Geplant | Faire Gegenüberstellung — Differenzierung: Multi-User, Chat, granulare Rechte, Vault-Transfer, Sync (alles was die anderen nicht haben) |
 | 23 | Localization: Englische UI als Default für internationale Reichweite | 📋 Geplant | i18n ist vorhanden — English als Default für breitere Adoption |

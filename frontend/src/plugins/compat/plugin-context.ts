@@ -995,7 +995,7 @@ export function PluginProvider({
 
   // Refs are read during render to provide stable singleton instances to consumers.
   // This is intentional: these refs hold long-lived objects that outlive renders.
-  // eslint-disable-next-line react-hooks/refs
+   
   const contextValue: PluginContextValue = {
     commandRegistry: commandRegistryRef.current, // eslint-disable-line react-hooks/refs
     pluginRegistry: pluginRegistryRef.current ?? new PluginRegistry(createRegistryApiAdapter(apiClient), vaultId ?? ''), // eslint-disable-line react-hooks/refs

@@ -23,6 +23,9 @@ export interface DropZoneProps {
   disabledMessage?: string
   /** Optional additional CSS class name. */
   className?: string
+  /** Suppress the centered "drop files here" overlay (e.g. when the target itself
+   * shows its own drop indicator, such as the editor's caret). */
+  hideOverlay?: boolean
 }
 
 /**
@@ -42,6 +45,7 @@ export function DropZone({
   disabled,
   disabledMessage,
   className,
+  hideOverlay,
 }: DropZoneProps) {
   const { isDragOver, dropRef, handlers } = useDropZone({
     onDrop,
@@ -60,7 +64,7 @@ export function DropZone({
       {...handlers}
     >
       {children}
-      {isDragOver && (
+      {isDragOver && !hideOverlay && (
         <div className="drop-zone__overlay" aria-hidden="true">
           <div className="drop-zone__overlay-content">
             <Upload size={32} className="drop-zone__overlay-icon" />

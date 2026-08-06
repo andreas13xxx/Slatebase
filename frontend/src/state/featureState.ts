@@ -38,6 +38,7 @@ export type FeatureAction =
   | { type: 'FEATURES_ERROR'; error: string }
   | { type: 'FEATURE_UPDATED'; name: string; enabled: boolean }
   | { type: 'FEATURE_UPDATE_FAILED'; name: string; previousEnabled: boolean; error: string }
+  | { type: 'FEATURE_ERROR_CLEARED' }
 
 // ─── Reducer ─────────────────────────────────────────────────────────────────
 
@@ -49,6 +50,7 @@ export type FeatureAction =
  * - FEATURES_ERROR: Set error, clear loading
  * - FEATURE_UPDATED: Optimistically update a specific feature's enabled field
  * - FEATURE_UPDATE_FAILED: Rollback a specific feature to previousEnabled, set error
+ * - FEATURE_ERROR_CLEARED: Clear a displayed error without touching features/loading
  */
 export function featureReducer(state: FeatureState, action: FeatureAction): FeatureState {
   switch (action.type) {
@@ -89,6 +91,12 @@ export function featureReducer(state: FeatureState, action: FeatureAction): Feat
           f.name === action.name ? { ...f, enabled: action.previousEnabled } : f
         ),
         error: action.error,
+      }
+
+    case 'FEATURE_ERROR_CLEARED':
+      return {
+        ...state,
+        error: null,
       }
   }
 }

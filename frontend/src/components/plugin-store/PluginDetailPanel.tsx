@@ -6,6 +6,7 @@
  * and provides install/update actions.
  */
 import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Loader2, ExternalLink } from 'lucide-react'
 import type { IApiClient } from '../../api'
 import { useTranslation } from '../../i18n'
@@ -90,7 +91,7 @@ export function PluginDetailPanel({
   const isBusy = plugin.status === 'installing' || plugin.status === 'updating'
   const isDesktopOnly = plugin.status === 'desktop-only'
 
-  return (
+  return createPortal(
     <div className="plugin-detail-overlay" onClick={handleOverlayClick} role="dialog" aria-modal="true">
       <div className="plugin-detail-panel">
         {/* Header */}
@@ -175,7 +176,8 @@ export function PluginDetailPanel({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -184,6 +186,10 @@ export function PluginDetailPanel({
  * Handles headings, bold, italic, code blocks, inline code, links, images,
  * lists, blockquotes, and horizontal rules.
  * Relative image URLs are resolved against the GitHub raw content URL.
+ *
+ * README content comes from arbitrary, untrusted GitHub repos, so link/image
+ * URLs and alt text are sanitized before interpolation — see sanitizeUrl()
+ * and escapeAttributeQuotes() below.
  */
 function markdownToHtml(markdown: string, repo: string): string {
   const rawBase = `https://raw.githubusercontent.com/${repo}/HEAD/`
@@ -214,11 +220,16 @@ function markdownToHtml(markdown: string, repo: string): string {
   // Images (before links since ![...] includes [...)
   html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, alt, src) => {
     const resolvedSrc = resolveUrl(src as string, rawBase)
-    return `<img src="${resolvedSrc}" alt="${alt as string}" />`
+    const safeSrc = escapeAttributeQuotes(sanitizeUrl(resolvedSrc))
+    const safeAlt = escapeAttributeQuotes(alt as string)
+    return `<img src="${safeSrc}" alt="${safeAlt}" />`
   })
 
   // Links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, text, href) => {
+    const safeHref = escapeAttributeQuotes(sanitizeUrl(href as string))
+    return `<a href="${safeHref}" target="_blank" rel="noopener noreferrer">${text as string}</a>`
+  })
 
   // Bold
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
@@ -255,4 +266,38 @@ function resolveUrl(src: string, base: string): string {
     return src
   }
   return base + src.replace(/^\.\//, '')
+}
+
+/** URL schemes allowed in href/src attributes rendered from an untrusted README. */
+const SAFE_URL_SCHEME = /^(?:https?|mailto):/i
+
+/**
+ * Sanitizes a URL for use in an href/src attribute rendered from untrusted
+ * README content (arbitrary GitHub repos). Only http(s)/mailto and
+ * scheme-less (relative) URLs are allowed; anything else — javascript:,
+ * data:, vbscript:, etc. — is replaced with a harmless fallback ('#').
+ */
+function sanitizeUrl(url: string): string {
+  // Strip ASCII whitespace/control characters (code points 0-32) one by one.
+  // Browsers ignore them when resolving a URL scheme (the classic
+  // "java<TAB>script:" filter-bypass trick) — without this, such a payload
+  // would fail the scheme check below and be waved through as "relative".
+  let stripped = ''
+  for (const ch of url) {
+    if (ch.charCodeAt(0) > 32) stripped += ch
+  }
+  const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(stripped)
+  if (hasScheme && !SAFE_URL_SCHEME.test(stripped)) {
+    return '#'
+  }
+  return stripped
+}
+
+/**
+ * Escapes quote characters for safe interpolation inside a double-quoted
+ * HTML attribute. `&`/`<`/`>` are already escaped by the entity pass at the
+ * top of markdownToHtml, so only quotes need handling here.
+ */
+function escapeAttributeQuotes(value: string): string {
+  return value.replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }

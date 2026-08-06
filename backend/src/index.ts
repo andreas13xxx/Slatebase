@@ -7,6 +7,7 @@ import path from 'node:path'
 import { createServer as createHttpServer } from 'node:http'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { secureHeaders } from 'hono/secure-headers'
 import { getRequestListener } from '@hono/node-server'
 
 import { ConfigService } from './config/index.js'
@@ -38,6 +39,7 @@ import { loadMcpConfig } from './mcp/config.js'
 import { TokenStore } from './mcp/token-store.js'
 import { McpTokenService } from './mcp/token-service.js'
 import { McpRateLimiter } from './mcp/rate-limiter.js'
+import { SlidingWindowRateLimiter } from './shared/sliding-window-rate-limiter.js'
 import { McpHandlers } from './mcp/handlers.js'
 import { McpServerFactory } from './mcp/server-factory.js'
 import { createMcpHttpHandler } from './api/mcpRoutes.js'
@@ -45,7 +47,7 @@ import { createMcpTokenRoutes } from './api/mcpTokenRoutes.js'
 import { createMcpWellKnownHandler } from './api/mcpWellKnownRoute.js'
 import { LinkIndexService } from './link-index/index.js'
 import { createGraphRoutes } from './api/graphRoutes.js'
-import { PluginStore, PluginInstaller } from './plugin/index.js'
+import { InstalledPluginStore, PluginInstaller, PluginService } from './plugin/index.js'
 import { createPluginRoutes } from './api/pluginRoutes.js'
 import { GitHubClient, PluginStoreCache, PluginStoreService, UpdateChecker } from './plugin-store/index.js'
 import type { IPluginStoreConfig } from './plugin-store/index.js'
@@ -89,9 +91,6 @@ const featureRegistry = new FeatureRegistry()
 featureRegistry.register({ name: 'obsidian-plugin-compat', description: 'Obsidian Community Plugin Compatibility Layer', defaultEnabled: false, type: 'cold' })
 featureRegistry.register({ name: 'chat', description: 'Echtzeit-Chat zwischen Benutzern', defaultEnabled: true, type: 'hot' })
 featureRegistry.register({ name: 'mcp', description: 'AI Context Server (MCP Integration)', defaultEnabled: true, type: 'cold' })
-featureRegistry.register({ name: 'knowledge-graph', description: 'Interaktive Vault-Verlinkungsvisualisierung', defaultEnabled: true, type: 'hot' })
-featureRegistry.register({ name: 'welcome-vault', description: 'Automatischer Welcome-Vault für neue Benutzer', defaultEnabled: true, type: 'hot' })
-featureRegistry.register({ name: 'live-preview', description: 'Live Preview Editor (CodeMirror 6)', defaultEnabled: true, type: 'hot' })
 
 const featureToggleStore = new FeatureToggleStore(serverConfig.dataDir, logger)
 const persistedFeatureState = await featureToggleStore.load()
@@ -185,7 +184,6 @@ const importService = new ImportService(vaultManager, vaultReader, config, logge
 // 4a. Welcome Vault Service (wires onUserCreated callback)
 const welcomeVaultService = new WelcomeVaultService(
   vaultService,
-  featureToggleService,
   config.getWelcomeVaultConfig(),
   logger,
   serverConfig.templatesDir,
@@ -222,6 +220,9 @@ if (featureToggleService.isEnabled('mcp')) {
 
   mcpTokenService = new McpTokenService(tokenStore, mcpConfig, logger, auditService)
   mcpRateLimiter = new McpRateLimiter(mcpConfig.rateLimit)
+  // Caps how often a session can hit POST /mcp/tokens — otherwise bounded only
+  // by the 10-active-token cap, which a create/revoke loop can cycle past.
+  const mcpTokenCreationRateLimiter = new SlidingWindowRateLimiter(10, 15 * 60_000)
 
   const mcpHandlers = new McpHandlers({
     vaultService,
@@ -253,7 +254,7 @@ if (featureToggleService.isEnabled('mcp')) {
     logger,
     onAuthenticated: (userId: string) => { currentUserId = userId },
   })
-  mcpTokenRoutes = createMcpTokenRoutes({ tokenService: mcpTokenService, logger })
+  mcpTokenRoutes = createMcpTokenRoutes({ tokenService: mcpTokenService, logger, tokenCreationRateLimiter: mcpTokenCreationRateLimiter })
 
   // Wire the MCP token invalidation hook
   mcpTokenInvalidator = async (userId: string) => {
@@ -269,7 +270,7 @@ if (featureToggleService.isEnabled('mcp')) {
 const linkIndexMap = new Map<string, LinkIndexService>()
 
 // 4e. Plugin Module
-const pluginStore = new PluginStore(serverConfig.dataDir)
+const pluginStore = new InstalledPluginStore(serverConfig.dataDir)
 const pluginInstaller = new PluginInstaller(pluginStore)
 
 // 4f. Plugin Store Module (Community Plugin Store)
@@ -281,7 +282,8 @@ const pluginStoreConfig: IPluginStoreConfig = {
   maxTotalDownloadSize: 15 * 1024 * 1024,
   autoCheckInterval: (config as unknown as { pluginStore?: { autoCheckInterval?: number } }).pluginStore?.autoCheckInterval ?? 86400000,
 }
-const pluginStoreCache = new PluginStoreCache(pluginStoreConfig)
+const pluginStoreCache = new PluginStoreCache(pluginStoreConfig, serverConfig.dataDir, logger)
+await pluginStoreCache.load()
 const githubClient = new GitHubClient(pluginStoreConfig, logger)
 const pluginStoreService = new PluginStoreService(githubClient, pluginStoreCache, pluginStore, logger)
 const updateChecker = new UpdateChecker(
@@ -370,7 +372,11 @@ function getLinkIndex(vaultId: string): LinkIndexService | undefined {
 const sseTicketStore = new SseTicketStore()
 const vaultController = new VaultController(vaultService, logger, importService, userRepository, vaultAccessControl, vaultShareRegistry)
 const authController = new AuthController(authService, logger, sseTicketStore)
-const userController = new UserController(userService, logger)
+// Same thresholds as the login rate limiter (5 attempts / 15 minutes) — caps
+// how many times a hijacked or CSRF-forged session can try to brute-force
+// the current password via PUT /users/me/password.
+const passwordChangeRateLimiter = new SlidingWindowRateLimiter(5, 15 * 60_000)
+const userController = new UserController(userService, logger, passwordChangeRateLimiter)
 const chatController = new ChatController(chatService, chatRateLimiter, logger, userRepository)
 
 // Wire EventBus to VaultController for vault:change events
@@ -410,6 +416,23 @@ app.use(
   }),
 )
 
+// Security headers (CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, HSTS, ...).
+// `crossOriginResourcePolicy` is disabled because the frontend and this API run on
+// different origins by design (see `allowedOrigins`) — `same-origin` CORP would
+// block cross-origin <img> loads of vault files served from here.
+// `objectSrc`/`frameAncestors` are 'none' to close the <object>/<embed>/iframe
+// script-execution vector for the SVG/HTML raw-file endpoint and to block clickjacking.
+app.use(
+  '*',
+  secureHeaders({
+    crossOriginResourcePolicy: false,
+    contentSecurityPolicy: {
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+    },
+  }),
+)
+
 // Auth middleware (skips login endpoint internally)
 const rateLimiter = new RateLimiter()
 const authMiddleware = createAuthMiddleware(authService)
@@ -435,8 +458,6 @@ app.onError((err, c) => {
 
 // Feature guards for route protection
 app.use('/api/v1/chat/*', createFeatureGuard('chat', featureToggleService))
-app.use('/api/v1/vaults/:vaultId/graph', createFeatureGuard('knowledge-graph', featureToggleService))
-app.use('/api/v1/vaults/:vaultId/backlinks', createFeatureGuard('knowledge-graph', featureToggleService))
 app.use('/api/v1/vaults/:vaultId/plugins/*', createFeatureGuard('obsidian-plugin-compat', featureToggleService))
 app.use('/api/v1/vaults/:vaultId/plugins', createFeatureGuard('obsidian-plugin-compat', featureToggleService))
 app.use('/api/v1/plugin-store/*', createFeatureGuard('obsidian-plugin-compat', featureToggleService))
@@ -465,9 +486,9 @@ app.get('/.well-known/mcp.json', createMcpWellKnownHandler(featureToggleService)
 app.route('', versionRoutes)
 
 // Plugin route registration (auth middleware applies via /api/v1/* pattern)
+const pluginService = new PluginService(pluginStore, pluginInstaller)
 const pluginRoutes = createPluginRoutes({
-  pluginStore,
-  pluginInstaller,
+  pluginService,
   accessControl: vaultAccessControl,
   vaultRegistry,
   logger,
@@ -563,7 +584,6 @@ const welcomeVaultRoutes = createWelcomeVaultRoutes({
   welcomeVaultService,
   userService,
   vaultService,
-  featureToggleService,
   configService: config,
   linkIndexMap,
   logger,

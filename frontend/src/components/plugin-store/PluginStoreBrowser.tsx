@@ -23,6 +23,8 @@ export interface PluginStoreBrowserProps {
   vaultId: string
   /** API client instance for making authenticated requests. */
   apiClient: IApiClient
+  /** Called after a plugin is successfully installed, updated, or bulk-updated, so the parent can refresh its own "installed" list. */
+  onPluginInstalled?: () => void
 }
 
 /**
@@ -36,7 +38,7 @@ export interface PluginStoreBrowserProps {
  * 5. Check for updates via apiClient.checkPluginUpdates(vaultId)
  * 6. Integrate PluginStoreSearch, PluginStoreCard, and UpdateBanner
  */
-export function PluginStoreBrowser({ vaultId, apiClient }: PluginStoreBrowserProps) {
+export function PluginStoreBrowser({ vaultId, apiClient, onPluginInstalled }: PluginStoreBrowserProps) {
   const { t } = useTranslation()
 
   // ─── State ──────────────────────────────────────────────────────────────────
@@ -215,6 +217,7 @@ export function PluginStoreBrowser({ vaultId, apiClient }: PluginStoreBrowserPro
       })
       // Add to installed plugins list
       setInstalledPlugins(prev => [...prev, result.manifest as PluginManifest])
+      onPluginInstalled?.()
     } catch (err: unknown) {
       setInstallingPlugins(prev => {
         const next = new Set(prev)
@@ -227,7 +230,7 @@ export function PluginStoreBrowser({ vaultId, apiClient }: PluginStoreBrowserPro
         return next
       })
     }
-  }, [apiClient, vaultId])
+  }, [apiClient, vaultId, onPluginInstalled])
 
   const handleUpdate = useCallback(async (pluginId: string) => {
     setUpdatingPlugins(prev => new Set(prev).add(pluginId))
@@ -258,6 +261,7 @@ export function PluginStoreBrowser({ vaultId, apiClient }: PluginStoreBrowserPro
           ),
         }
       })
+      onPluginInstalled?.()
     } catch (err: unknown) {
       setUpdatingPlugins(prev => {
         const next = new Set(prev)
@@ -270,7 +274,7 @@ export function PluginStoreBrowser({ vaultId, apiClient }: PluginStoreBrowserPro
         return next
       })
     }
-  }, [apiClient, vaultId])
+  }, [apiClient, vaultId, onPluginInstalled])
 
   const handleUpdateAll = useCallback(async () => {
     setIsUpdatingAll(true)
@@ -288,6 +292,7 @@ export function PluginStoreBrowser({ vaultId, apiClient }: PluginStoreBrowserPro
       }
       // Clear update check to reflect new state
       setUpdateCheck(null)
+      onPluginInstalled?.()
     } catch (err: unknown) {
       setBulkResult({
         updated: [],
@@ -296,7 +301,7 @@ export function PluginStoreBrowser({ vaultId, apiClient }: PluginStoreBrowserPro
     } finally {
       setIsUpdatingAll(false)
     }
-  }, [apiClient, vaultId])
+  }, [apiClient, vaultId, onPluginInstalled])
 
   const handleCheckUpdates = useCallback(async () => {
     try {

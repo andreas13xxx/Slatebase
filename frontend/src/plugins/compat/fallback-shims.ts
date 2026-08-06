@@ -18,6 +18,8 @@
  * @module fallback-shims
  */
 
+import { getStoredAuthToken, getStoredCsrfToken } from '../../state/authContext'
+
 type Obs = Record<string, unknown>
 
 /** Minimal shape of the pieces of `window` these fallbacks touch. */
@@ -268,8 +270,8 @@ function base64ToArrayBuffer(b64: string): ArrayBuffer {
 
 function fallbackRequestUrl(params: RequestUrlParams | string): RequestUrlPromise {
   const opts = typeof params === 'string' ? { url: params } : params
-  const token = localStorage.getItem('slatebase_token') ?? ''
-  const csrf = localStorage.getItem('slatebase_csrf') ?? ''
+  const token = getStoredAuthToken() ?? ''
+  const csrf = getStoredCsrfToken() ?? ''
 
   const encodedBody =
     opts.body === undefined

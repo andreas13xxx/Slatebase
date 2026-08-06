@@ -86,7 +86,6 @@ npm run lint         # ESLint
 | @codemirror/autocomplete | CodeMirror 6 autocompletion |
 | @codemirror/search | CodeMirror 6 search/replace |
 | @lezer/highlight | Lezer syntax highlighting primitives |
-| @replit/codemirror-vim | Vim keybindings for CodeMirror 6 |
 
 ### Geplant
 - **better-sqlite3** — SQLite für Graph-Index (erst bei Performance-Bedarf, >10k Dateien)

@@ -4,9 +4,7 @@
  * Uses atomic writes (temp → rename) for crash safety.
  */
 
-import fs from 'node:fs/promises'
 import path from 'node:path'
-import crypto from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
 import type {
   IPreferencesService,
@@ -15,6 +13,7 @@ import type {
   FavoriteEntry,
   KeybindingEntry,
 } from './types.js'
+import { KeyedJsonFileStore } from '../shared/json-file-store.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -22,99 +21,59 @@ const MAX_RECENT_FILES = 20
 const MAX_FAVORITES_TOTAL = 500
 const MAX_KEYBINDINGS = 200
 
+const EMPTY_PREFERENCES: UserPreferences = { recentFiles: [], favorites: [], keybindings: [] }
+
+function sanitizePreferences(raw: unknown): UserPreferences {
+  const parsed = (typeof raw === 'object' && raw !== null ? raw : {}) as Partial<UserPreferences>
+  return {
+    recentFiles: Array.isArray(parsed.recentFiles) ? parsed.recentFiles : [],
+    favorites: Array.isArray(parsed.favorites) ? parsed.favorites : [],
+    keybindings: Array.isArray(parsed.keybindings) ? parsed.keybindings : [],
+  }
+}
+
 // ─── Implementation ──────────────────────────────────────────────────────────
 
 export class PreferencesStore implements IPreferencesService {
-  private readonly usersDir: string
+  private readonly store: KeyedJsonFileStore<UserPreferences>
 
   constructor(
     dataDir: string,
     private readonly logger: ILogger,
   ) {
-    this.usersDir = path.join(dataDir, 'users')
+    const usersDir = path.join(dataDir, 'users')
+    this.store = new KeyedJsonFileStore<UserPreferences>(
+      (userId) => path.join(usersDir, `${userId}-preferences.json`),
+      EMPTY_PREFERENCES,
+      sanitizePreferences,
+      (error) => this.logger.error('Failed to load user preferences', { error: String(error) }),
+    )
   }
 
   async getRecentFiles(userId: string): Promise<RecentFileEntry[]> {
-    const prefs = await this.load(userId)
-    return prefs.recentFiles
+    return (await this.store.read(userId)).recentFiles
   }
 
   async saveRecentFiles(userId: string, entries: RecentFileEntry[]): Promise<void> {
     const capped = entries.slice(0, MAX_RECENT_FILES)
-    const prefs = await this.load(userId)
-    prefs.recentFiles = capped
-    await this.persist(userId, prefs)
+    await this.store.mutate(userId, (prefs) => ({ ...prefs, recentFiles: capped }))
   }
 
   async getFavorites(userId: string): Promise<FavoriteEntry[]> {
-    const prefs = await this.load(userId)
-    return prefs.favorites
+    return (await this.store.read(userId)).favorites
   }
 
   async saveFavorites(userId: string, entries: FavoriteEntry[]): Promise<void> {
     const capped = entries.slice(0, MAX_FAVORITES_TOTAL)
-    const prefs = await this.load(userId)
-    prefs.favorites = capped
-    await this.persist(userId, prefs)
+    await this.store.mutate(userId, (prefs) => ({ ...prefs, favorites: capped }))
   }
 
   async getKeybindings(userId: string): Promise<KeybindingEntry[]> {
-    const prefs = await this.load(userId)
-    return prefs.keybindings
+    return (await this.store.read(userId)).keybindings
   }
 
   async saveKeybindings(userId: string, entries: KeybindingEntry[]): Promise<void> {
     const capped = entries.slice(0, MAX_KEYBINDINGS)
-    const prefs = await this.load(userId)
-    prefs.keybindings = capped
-    await this.persist(userId, prefs)
-  }
-
-  // ─── Internal ────────────────────────────────────────────────────────────────
-
-  private getFilePath(userId: string): string {
-    return path.join(this.usersDir, `${userId}-preferences.json`)
-  }
-
-  private async load(userId: string): Promise<UserPreferences> {
-    const filePath = this.getFilePath(userId)
-    try {
-      const raw = await fs.readFile(filePath, 'utf-8')
-      const parsed = JSON.parse(raw) as Partial<UserPreferences>
-      return {
-        recentFiles: Array.isArray(parsed.recentFiles) ? parsed.recentFiles : [],
-        favorites: Array.isArray(parsed.favorites) ? parsed.favorites : [],
-        keybindings: Array.isArray(parsed.keybindings) ? parsed.keybindings : [],
-      }
-    } catch (error: unknown) {
-      if (this.isNodeError(error) && error.code === 'ENOENT') {
-        return { recentFiles: [], favorites: [], keybindings: [] }
-      }
-      this.logger.error('Failed to load user preferences', { userId, error: String(error) })
-      return { recentFiles: [], favorites: [], keybindings: [] }
-    }
-  }
-
-  private async persist(userId: string, prefs: UserPreferences): Promise<void> {
-    const filePath = this.getFilePath(userId)
-    const dir = path.dirname(filePath)
-    await fs.mkdir(dir, { recursive: true })
-
-    const tmpSuffix = crypto.randomBytes(8).toString('hex')
-    const tmpPath = `${filePath}.${tmpSuffix}.tmp`
-
-    try {
-      await fs.writeFile(tmpPath, JSON.stringify(prefs, null, 2), 'utf-8')
-      await fs.rename(tmpPath, filePath)
-    } catch (error: unknown) {
-      // Clean up temp file on failure
-      try { await fs.unlink(tmpPath) } catch { /* ignore */ }
-      this.logger.error('Failed to persist user preferences', { userId, error: String(error) })
-      throw error
-    }
-  }
-
-  private isNodeError(error: unknown): error is NodeJS.ErrnoException {
-    return error instanceof Error && 'code' in error
+    await this.store.mutate(userId, (prefs) => ({ ...prefs, keybindings: capped }))
   }
 }

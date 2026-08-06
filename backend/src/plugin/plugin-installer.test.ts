@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import AdmZip from 'adm-zip'
 import { PluginInstaller, PluginInstallError, compareSemver } from './plugin-installer.js'
-import type { IPluginStore, PluginManifest, PluginFiles, PluginRegistryData } from './types.js'
+import type { IInstalledPluginStore, PluginManifest, PluginFiles, PluginRegistryData } from './types.js'
 
 // ─── Mock PluginStore ────────────────────────────────────────────────────────
 
-function createMockPluginStore(overrides?: Partial<IPluginStore>): IPluginStore & {
+function createMockPluginStore(overrides?: Partial<IInstalledPluginStore>): IInstalledPluginStore & {
   savedPlugins: Array<{ vaultId: string; pluginId: string; files: PluginFiles }>;
 } {
   const savedPlugins: Array<{ vaultId: string; pluginId: string; files: PluginFiles }> = []

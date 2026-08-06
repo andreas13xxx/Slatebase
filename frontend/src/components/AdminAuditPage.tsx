@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import type { IApiClient } from '../api'
 import { useTranslation } from '../i18n'
+import { usePaginatedResource } from '../hooks/usePaginatedResource'
 
 /**
  * All auditable actions in the system.
@@ -76,13 +77,6 @@ export interface AdminAuditPageProps {
 export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
   const { t, locale } = useTranslation()
 
-  const [entries, setEntries] = useState<AuditEntry[]>([])
-  const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
   // Filter state
   const [actionFilter, setActionFilter] = useState<AuditAction | ''>('')
   const [startDate, setStartDate] = useState('')
@@ -91,64 +85,46 @@ export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
   const pageSize = 50
 
   /**
-   * Fetches audit entries from the backend with current filter and pagination state.
+   * Fetches one page of audit entries from the backend using the current filters.
    */
-  const fetchAuditEntries = useCallback(async (currentPage: number) => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const params = new URLSearchParams()
-      if (actionFilter) {
-        params.set('action', actionFilter)
-      }
-      if (startDate) {
-        params.set('startDate', startDate)
-      }
-      if (endDate) {
-        params.set('endDate', endDate)
-      }
-      params.set('page', String(currentPage))
-      params.set('pageSize', String(pageSize))
-
-      const url = `/api/v1/admin/audit?${params.toString()}`
-      const response = await fetch(url, {
-        headers: buildHeaders(apiClient),
-      })
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({ message: t('admin.audit.errorStatus', { status: String(response.status) }) }))
-        throw new Error((body as { message?: string }).message ?? t('admin.audit.errorStatus', { status: String(response.status) }))
-      }
-
-      const data = (await response.json()) as AuditResponse
-      setEntries(data.items)
-      setTotalPages(data.totalPages)
-      setTotal(data.total)
-      setPage(data.page)
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message)
-      } else {
-        setError(t('admin.audit.loadError'))
-      }
-    } finally {
-      setIsLoading(false)
+  const fetchAuditEntries = useCallback(async (targetPage: number): Promise<AuditResponse> => {
+    const params = new URLSearchParams()
+    if (actionFilter) {
+      params.set('action', actionFilter)
     }
-  }, [apiClient, actionFilter, startDate, endDate])
+    if (startDate) {
+      params.set('startDate', startDate)
+    }
+    if (endDate) {
+      params.set('endDate', endDate)
+    }
+    params.set('page', String(targetPage))
+    params.set('pageSize', String(pageSize))
 
-  // Fetch on mount and when filters or page change
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void fetchAuditEntries(page)
-  }, [fetchAuditEntries, page])
+    const url = `/api/v1/admin/audit?${params.toString()}`
+    const response = await fetch(url, {
+      headers: buildHeaders(apiClient),
+    })
 
-  /**
-   * Resets to page 1 when filters change.
-   */
-  function handleFilterChange() {
-    setPage(1)
-  }
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ message: t('admin.audit.errorStatus', { status: String(response.status) }) }))
+      throw new Error((body as { message?: string }).message ?? t('admin.audit.errorStatus', { status: String(response.status) }))
+    }
+
+    return (await response.json()) as AuditResponse
+  }, [apiClient, actionFilter, startDate, endDate, t])
+
+  // Fetches page 1 on mount, and again whenever a filter changes (fetchAuditEntries's
+  // identity changes with the filters, which usePaginatedResource reacts to).
+  const {
+    items: entries,
+    page,
+    totalPages,
+    total,
+    loading: isLoading,
+    error,
+    loadPage,
+  } = usePaginatedResource(fetchAuditEntries, t('admin.audit.loadError'))
 
   /**
    * Formats an ISO 8601 timestamp to a human-readable locale string.
@@ -178,10 +154,7 @@ export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
           <select
             id="audit-action-filter"
             value={actionFilter}
-            onChange={(e) => {
-              setActionFilter(e.target.value as AuditAction | '')
-              handleFilterChange()
-            }}
+            onChange={(e) => setActionFilter(e.target.value as AuditAction | '')}
           >
             <option value="">{t('admin.audit.actionFilterAll')}</option>
             {AUDIT_ACTIONS.map((action) => (
@@ -198,10 +171,7 @@ export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
             id="audit-start-date"
             type="date"
             value={startDate}
-            onChange={(e) => {
-              setStartDate(e.target.value)
-              handleFilterChange()
-            }}
+            onChange={(e) => setStartDate(e.target.value)}
           />
         </div>
 
@@ -211,10 +181,7 @@ export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
             id="audit-end-date"
             type="date"
             value={endDate}
-            onChange={(e) => {
-              setEndDate(e.target.value)
-              handleFilterChange()
-            }}
+            onChange={(e) => setEndDate(e.target.value)}
           />
         </div>
       </div>
@@ -274,7 +241,7 @@ export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
             <button
               type="button"
               disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              onClick={() => loadPage(Math.max(1, page - 1))}
             >
               {t('admin.audit.previousPage')}
             </button>
@@ -284,7 +251,7 @@ export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
             <button
               type="button"
               disabled={page >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              onClick={() => loadPage(Math.min(totalPages, page + 1))}
             >
               {t('admin.audit.nextPage')}
             </button>

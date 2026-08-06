@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { ChangePasswordPage } from './ChangePasswordPage'
 import { AuthContext, type AuthContextValue } from '../state/authContext'
-import { initialAuthState, type AuthState, type AuthAction } from '../state/authState'
+import { initialAuthState, type AuthState, type AuthAction, type PublicUserInfo } from '../state/authState'
 import type { IApiClient } from '../api'
 import type { Dispatch } from 'react'
 
@@ -90,6 +90,50 @@ describe('ChangePasswordPage', () => {
     renderChangePasswordPage()
 
     expect(screen.getByText('Sie müssen Ihr Passwort ändern, bevor Sie fortfahren können.')).toBeInTheDocument()
+  })
+
+  it('shows the display name of the user whose password is being changed', () => {
+    const user: PublicUserInfo = {
+      userId: 'u1',
+      username: 'mmuster',
+      displayName: 'Max Mustermann',
+      email: 'max@example.com',
+      avatarUrl: '',
+      role: 'user',
+      preferredLanguage: 'de',
+      colorScheme: 'system',
+      suspended: false,
+      mustChangePassword: true,
+      createdAt: '2026-01-01T00:00:00.000Z',
+    }
+    renderChangePasswordPage({ user })
+
+    expect(screen.getByText('Passwort für Max Mustermann')).toBeInTheDocument()
+  })
+
+  it('falls back to username when display name is empty', () => {
+    const user: PublicUserInfo = {
+      userId: 'u1',
+      username: 'mmuster',
+      displayName: '',
+      email: 'max@example.com',
+      avatarUrl: '',
+      role: 'user',
+      preferredLanguage: 'de',
+      colorScheme: 'system',
+      suspended: false,
+      mustChangePassword: true,
+      createdAt: '2026-01-01T00:00:00.000Z',
+    }
+    renderChangePasswordPage({ user })
+
+    expect(screen.getByText('Passwort für mmuster')).toBeInTheDocument()
+  })
+
+  it('does not show a user name when no user is present in auth state', () => {
+    renderChangePasswordPage()
+
+    expect(screen.queryByText(/^Passwort für /)).not.toBeInTheDocument()
   })
 
   it('shows error when current password is empty', async () => {

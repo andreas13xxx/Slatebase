@@ -93,24 +93,34 @@ Wenn ein Check fehlschlägt: **erst fixen, dann pushen**. Kein `--no-verify` ohn
 - Passwort-Hashing: argon2id
 - SSE-Auth: Einmal-Ticket (`POST /auth/sse-ticket`, 30s TTL) statt Session-Token in URL. `SseTicketStore` in-memory, max 5 pro User.
 - Request-ID: `X-Request-Id` Header auf jeder Response (reuse incoming oder UUIDv4). Im Error-Log mitloggen.
+- Passwort-Änderung (`PUT /users/me/password`): rate-limited pro userId (5/15min, `SlidingWindowRateLimiter`) — eine gekaperte/CSRF-erzwungene Session könnte sonst das aktuelle Passwort unbegrenzt brute-forcen.
+- Jeder neue state-changing Endpoint, der nur durch eine gültige Session geschützt ist (kein zusätzliches Secret wie CSRF-Token oder MFA), braucht ein eigenes Rate-Limit — Session-Diebstahl/CSRF-Bypass ist die Bedrohung, nicht nur der ursprüngliche Login.
 
-### Sync-Credentials
-- AES-256-GCM verschlüsselt (`SLATEBASE_SYNC_SECRET`, min 32 Zeichen)
-- Passwort in Responses immer maskiert
-- Nur Vault-Besitzer konfiguriert Sync (kein Admin-Bypass)
+### Security-Header
+- `hono/secure-headers` global aktiv (CSP `object-src`/`frame-ancestors: 'none'`, `X-Content-Type-Options: nosniff`, `X-Frame-Options`, `Referrer-Policy`, HSTS, entfernt `X-Powered-By`).
+- `crossOriginResourcePolicy` bewusst deaktiviert: Frontend und Backend laufen laut `allowedOrigins`-Konfiguration auf unterschiedlichen Origins — `same-origin` CORP würde `<img src>`-Ladevorgänge von Vault-Dateien (raw-file-Endpoint) blockieren.
+- Rohes SVG/HTML (`raw=true`-Dateiendpoint) niemals mit `Content-Disposition: inline` ausliefern — beide können `<script>` enthalten und werden bei direkter Navigation (geteilter Link, neuer Tab) ausgeführt. `attachment` erzwingt Download statt Rendern; `<img>`-Einbettung im Frontend bleibt unbetroffen (Disposition wirkt nur bei Top-Level-Navigation).
 
 ### MCP-Tokens
 - SHA-256-Hash gespeichert, Klartext nur bei Erstellung
 - In-Memory-Index für O(1) Validierung
-- Max 10 Tokens pro User, Rate-Limit 60 req/min
+- Max 10 Tokens pro User, Rate-Limit 60 req/min (Requests pro Token, `McpRateLimiter`)
+- Token-*Erstellung* separat rate-limited (10/15min pro User, `SlidingWindowRateLimiter`) — sonst nur durch das 10-Token-Limit begrenzt, das ein Create/Revoke-Loop umgehen kann
 - Auto-Invalidierung bei User-Löschung/Sperrung
 - Write-Tools prüfen `checkWriteAccess()`
 
 ### Filesystem
-- Atomare Writes: Temp → `rename()`
+- Atomare Writes: Temp → `rename()` — Standard-Implementierung in `shared/json-file-store.ts` (`writeJsonFileAtomic`, `JsonFileStore`, `KeyedJsonFileStore`) nutzen statt neu zu implementieren
+- Read-Modify-Write über mehrere Requests hinweg IMMER durch `AsyncMutex`/`KeyedMutex` serialisieren (`shared/async-mutex.ts`) — sonst Lost-Update oder Out-of-Order-Rename bei zwei nahezu gleichzeitigen Schreibern. Bei Requests, die mehr als eine Datei anfassen (z.B. Filesystem-Move + Index-Update), den Lock um die GESAMTE Operation legen, nicht nur um den Index-Write (siehe `TrashService` — sonst kann ein periodischer Cleanup-Job ein Verzeichnis löschen, aus dem gerade parallel restored wird)
 - Kein `eval()` mit User-Input
 - File-Size-Limits vor vollständigem Lesen
 - Symlinks nicht folgen
+
+### Untrusted Content Rendering (XSS)
+- `dangerouslySetInnerHTML` nur mit einer der beiden Garantien: (a) Bibliothek mit eingebautem Escaping (`highlight.js`-Output, Mermaid mit `securityLevel: 'strict'`), oder (b) explizites Sanitizing durch uns.
+- Content aus externen/Dritt-Quellen (Plugin-READMEs von GitHub, Community-Plugin-Metadaten, o.ä.) gilt als nicht vertrauenswürdig — auch wenn kein direkter User-Input.
+- Eigenes Sanitizing MUSS: Text-Escaping (`&`/`<`/`>`) UND Attribut-Quote-Escaping (`"`/`'`) UND URL-Schema-Allowlist (http/https/mailto, alles andere → `#`) — reines Text-Escaping lässt `javascript:`-URIs und Attribut-Breakout durch. Whitespace/Steuerzeichen vor der Schema-Prüfung entfernen (`java<TAB>script:`-Bypass).
+- Roh-HTML aus Markdown (` ```html ` o.ä.) grundsätzlich als Text rendern, nicht als HTML.
 
 ### CORS & Errors
 - Explizite `allowedOrigins` — nie `*`

@@ -30,18 +30,7 @@ export function WelcomeVaultSection({ apiClient }: WelcomeVaultSectionProps) {
       // Refresh the vault list so the new vault appears in the explorer
       await loadVaults(dispatch, apiClient)
     } catch (err: unknown) {
-      const message = extractErrorMessage(err, t('profile.welcomeVaultError'))
-      // Check for feature-disabled (403) response
-      if (
-        err !== null &&
-        typeof err === 'object' &&
-        'code' in err &&
-        (err as { code: string }).code === 'FEATURE_DISABLED'
-      ) {
-        showToast('error', t('profile.welcomeVaultFeatureDisabled'))
-      } else {
-        showToast('error', message)
-      }
+      showToast('error', extractErrorMessage(err, t('profile.welcomeVaultError')))
     } finally {
       setLoading(false)
     }

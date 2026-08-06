@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTranslation } from '../i18n'
 import { useLineNumbers } from '../hooks/useLineNumbers'
-import { useFeatureContext } from '../state/featureContext'
 import { DropZone } from './DropZone'
 import { showToast } from './ToastNotification'
 import { CodeMirrorEditor } from '../editor/CodeMirrorEditor'
@@ -78,7 +77,7 @@ const TOOLBAR_BUTTONS: (ToolbarButton | 'sep')[] = [
  *
  * Validates: Requirements 1.1, 1.5, 1.6, 1.7, 1.8, 1.9, 10.1, 10.2, 10.3, 10.4, 10.5
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 export function EditMode({ content, onChange, onSave, onCancel: _onCancel, saving, error, readOnly, filePath, tabId, onExternalFileDrop, onImagePaste: _onImagePaste, onOpenVersions, livePreviewMode, livePreviewOptions }: EditModeProps) {
   const { t } = useTranslation()
   const [status, setStatus] = useState<SaveStatus>('idle')
@@ -94,10 +93,6 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
   // Line numbers toggle state (persisted to localStorage, translates to CM6 showLineNumbers prop)
   const { enabled: lineNumbersEnabled, toggle: toggleLineNumbers } = useLineNumbers()
 
-  // Feature toggle: check if live-preview is enabled
-  const { isEnabled: isFeatureEnabled } = useFeatureContext()
-  const livePreviewFeatureEnabled = isFeatureEnabled('live-preview')
-
   // Live Preview state (persisted to localStorage)
   const LIVE_PREVIEW_STORAGE_KEY = 'slatebase_editor_live_preview'
   const [livePreviewEnabled, setLivePreviewEnabled] = useState<boolean>(() => {
@@ -110,13 +105,13 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
     }
   })
 
-  // Compute effective live preview state (respects feature toggle + file size).
+  // Compute effective live preview state (respects file size).
   // When livePreviewMode is set (Variante 1), the tab mode drives live preview,
   // overriding the localStorage-based toggle.
   const isFileTooLarge = content.length > 50000
   const effectiveLivePreview = livePreviewMode !== undefined
-    ? (livePreviewFeatureEnabled && livePreviewMode && !isFileTooLarge)
-    : (livePreviewFeatureEnabled && livePreviewEnabled && !isFileTooLarge)
+    ? (livePreviewMode && !isFileTooLarge)
+    : (livePreviewEnabled && !isFileTooLarge)
 
   /** Toggle Live Preview mode and persist to localStorage. */
   const toggleLivePreview = useCallback(() => {
@@ -138,11 +133,11 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
   // Show toast when file is too large for Live Preview (auto-disable notice)
   const prevFileTooLargeRef = useRef(isFileTooLarge)
   useEffect(() => {
-    if (isFileTooLarge && livePreviewEnabled && livePreviewFeatureEnabled && !prevFileTooLargeRef.current) {
+    if (isFileTooLarge && livePreviewEnabled && !prevFileTooLargeRef.current) {
       showToast('info', t('editor.livePreviewFileTooLarge'))
     }
     prevFileTooLargeRef.current = isFileTooLarge
-  }, [isFileTooLarge, livePreviewEnabled, livePreviewFeatureEnabled, t])
+  }, [isFileTooLarge, livePreviewEnabled, t])
 
   // Track saving status transitions
   useEffect(() => {
@@ -217,8 +212,14 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
     : ''
 
   /** Handle external file drop from OS — uploads to same directory as current file. */
-  const handleExternalFileDrop = useCallback(async (files: File[], _targetPath: string) => {
+  const handleExternalFileDrop = useCallback(async (files: File[], _targetPath: string, dropPoint: { x: number; y: number }) => {
     if (!onExternalFileDrop || !filePath) return
+
+    // Resolve the drop position in the document immediately (before the upload
+    // completes) so the image lands where the drop cursor was shown, not
+    // wherever the text cursor happens to be once the upload finishes.
+    const view = editorRef.current?.getView()
+    const insertPos = view?.posAtCoords(dropPoint) ?? view?.state.selection.main.from ?? 0
 
     try {
       const result = await onExternalFileDrop(files)
@@ -237,7 +238,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
 
       if (imageEmbeds.length > 0 && editorRef.current) {
         const embedText = imageEmbeds.join('\n')
-        editorRef.current.insertAtCursor(embedText)
+        editorRef.current.insertAtPos(embedText, insertPos)
         setStatus('unsaved')
         // Trigger auto-save
         if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -337,9 +338,8 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
           >
             <Hash size={14} />
           </button>
-          {/* Live Preview toggle — only shown when feature is enabled and the tab
-              is not driving the mode (Variante 1 hides this toggle) */}
-          {livePreviewFeatureEnabled && livePreviewMode === undefined && (
+          {/* Live Preview toggle — hidden when the tab drives the mode (Variante 1) */}
+          {livePreviewMode === undefined && (
             <button
               type="button"
               className={`edit-toolbar-btn${effectiveLivePreview ? ' edit-toolbar-btn--active' : ''}`}
@@ -375,6 +375,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
         disabled={!filePath}
         disabledMessage="Bitte zuerst eine Datei öffnen"
         className="edit-mode-drop-zone"
+        hideOverlay
       >
         <div className="edit-mode-editor-area">
           <CodeMirrorEditor

@@ -198,6 +198,25 @@ describe('ViewMode', () => {
       expect(tds?.length).toBe(2)
       expect(tds?.[0]?.textContent).toBe('Cell 1')
     })
+
+    it('keeps a backslash-escaped pipe verbatim inside an inline code span (matches Obsidian, not raw GFM)', () => {
+      const markdown =
+        '| Syntax | Anzeige |\n' +
+        '|--------|---------|\n' +
+        '| `[[Start hier\\|Startseite]]` | Startseite |\n'
+      const { container } = render(<ViewMode {...defaultProps} content={markdown} />)
+      const code = container.querySelector('table code')
+      expect(code).not.toBeNull()
+      expect(code?.textContent).toBe('[[Start hier\\|Startseite]]')
+    })
+
+    it('still unescapes a backslash-escaped pipe in plain (non-code) table cell text', () => {
+      const markdown = '| A | B |\n|---|---|\n| x\\|y | z |\n'
+      const { container } = render(<ViewMode {...defaultProps} content={markdown} />)
+      const tds = container.querySelectorAll('table tbody td')
+      expect(tds.length).toBe(2)
+      expect(tds[0]?.textContent).toBe('x|y')
+    })
   })
 
   describe('Blockquotes and horizontal rules (Req 5.6)', () => {

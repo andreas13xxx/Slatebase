@@ -16,6 +16,7 @@ import type { ILogger } from '../logger/index.js'
 import type { IMcpTokenService } from '../mcp/token-service.js'
 import { TokenLimitError, TokenValidationError, TokenNotFoundError } from '../mcp/errors.js'
 import { createTokenSchema } from '../mcp/validation.js'
+import type { SlidingWindowRateLimiter } from '../shared/sliding-window-rate-limiter.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -42,8 +43,9 @@ function createApiError(code: string, message: string): { code: string; message:
 export function createMcpTokenRoutes(deps: {
   tokenService: IMcpTokenService
   logger: ILogger
+  tokenCreationRateLimiter?: SlidingWindowRateLimiter
 }): Hono {
-  const { tokenService, logger } = deps
+  const { tokenService, logger, tokenCreationRateLimiter } = deps
   const app = new Hono()
 
   // GET / — List user's tokens
@@ -66,6 +68,18 @@ export function createMcpTokenRoutes(deps: {
     const session = c.get('session') as SessionContext | undefined
     if (session === undefined) {
       return c.json(createApiError('UNAUTHORIZED', 'Missing session context'), 401)
+    }
+
+    if (tokenCreationRateLimiter) {
+      const limit = tokenCreationRateLimiter.checkLimit(session.userId)
+      if (!limit.allowed) {
+        c.header('Retry-After', String(limit.retryAfter))
+        return c.json(
+          createApiError('RATE_LIMITED', `Too many token creation attempts. Retry after ${limit.retryAfter} seconds`),
+          429,
+        )
+      }
+      tokenCreationRateLimiter.recordRequest(session.userId)
     }
 
     let body: unknown

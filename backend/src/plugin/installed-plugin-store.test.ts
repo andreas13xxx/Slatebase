@@ -3,19 +3,19 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import crypto from 'node:crypto'
-import { PluginStore } from './plugin-store.js'
+import { InstalledPluginStore } from './installed-plugin-store.js'
 import { PluginFileTooLargeError, PluginSettingsTooLargeError } from './errors.js'
 import type { PluginFiles, PluginManifest, PluginRegistryData } from './types.js'
 
 // ─── Test Setup ──────────────────────────────────────────────────────────────
 
 let tmpDir: string
-let store: PluginStore
+let store: InstalledPluginStore
 
 beforeAll(async () => {
   tmpDir = path.join(os.tmpdir(), `plugin-store-test-${crypto.randomBytes(8).toString('hex')}`)
   await fs.mkdir(tmpDir, { recursive: true })
-  store = new PluginStore(tmpDir)
+  store = new InstalledPluginStore(tmpDir)
 })
 
 afterAll(async () => {
@@ -40,7 +40,7 @@ const testFiles: PluginFiles = {
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-describe('PluginStore', () => {
+describe('InstalledPluginStore', () => {
   describe('savePlugin / loadManifest / loadBundle / loadStyles', () => {
     it('saves and loads plugin files correctly', async () => {
       await store.savePlugin('vault-1', 'test-plugin', testFiles)

@@ -1,53 +1,62 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { useTabContext } from '../state/tabContext'
+import { useTranslation } from '../i18n'
 import { Eye, Pencil, X, Share2 } from 'lucide-react'
 import { getFileIcon, getFileIconClass, getDisplayName } from '../utils/fileIcons'
 
+/** A single settings-page tab shown ahead of the file tabs (not draggable). */
+export interface SettingsTabDescriptor {
+  /** Stable identifier for the React key — the AppPage value. */
+  key: string
+  label: string
+  icon?: ReactNode
+  isActive: boolean
+  onActivate: () => void
+  onClose: () => void
+  closeAriaLabel: string
+  closeTitle: string
+}
+
+/** Props for the TabBar component. */
+export interface TabBarProps {
+  /** Settings pages currently open as tabs (e.g. Profile, Sessions, Admin panels). */
+  settingsTabs: SettingsTabDescriptor[]
+  /** True while a settings tab is the active content (no file tab shows as active). */
+  isShowingSettings: boolean
+  /** Called when a file tab is clicked, before activating it — lets the caller deactivate any settings tab. */
+  onActivateFileTab: () => void
+}
+
 /**
- * TabBar renders the horizontal tab strip showing all open tabs.
- * Each tab displays the filename (truncated to fit), a mode toggle icon, and a close button.
- * The active tab is visually distinguished with a bottom border and background.
- * Tabs shrink to fit the available width without overflowing.
- * Tabs can be reordered via drag and drop.
- *
- * Validates: Requirements 1.3, 1.4, 1.5, 2.1, 3.1
+ * TabBar renders the unified horizontal tab strip: settings-page tabs first
+ * (not draggable), then open file tabs (draggable/reorderable), in one row.
+ * Each file tab shows the filename (truncated to fit), a mode toggle icon,
+ * and a close button. The active tab is visually distinguished.
  */
-export function TabBar() {
+export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab }: TabBarProps) {
+  const { t } = useTranslation()
   const { tabState, tabDispatch } = useTabContext()
   const { tabs, activeTabId } = tabState
   const dragIndexRef = useRef<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
-  if (tabs.length === 0) {
+  if (settingsTabs.length === 0 && tabs.length === 0) {
     return null
   }
 
   function handleActivate(tabId: string) {
+    onActivateFileTab()
     tabDispatch({ type: 'ACTIVATE_TAB', payload: { tabId } })
   }
 
-  function handleClose(e: React.MouseEvent | React.KeyboardEvent, tabId: string) {
+  function handleClose(e: React.MouseEvent, tabId: string) {
     e.stopPropagation()
     tabDispatch({ type: 'CLOSE_TAB', payload: { tabId } })
   }
 
-  function handleCloseKeyDown(e: React.KeyboardEvent, tabId: string) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      handleClose(e, tabId)
-    }
-  }
-
-  function handleToggleMode(e: React.MouseEvent | React.KeyboardEvent, tabId: string) {
+  function handleToggleMode(e: React.MouseEvent, tabId: string) {
     e.stopPropagation()
     tabDispatch({ type: 'TOGGLE_MODE', payload: { tabId } })
-  }
-
-  function handleToggleModeKeyDown(e: React.KeyboardEvent, tabId: string) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      handleToggleMode(e, tabId)
-    }
   }
 
   function handleDragStart(e: React.DragEvent, index: number) {
@@ -83,16 +92,62 @@ export function TabBar() {
     setDragOverIndex(null)
   }
 
-  return (
-    <div className="tab-bar" role="tablist" aria-label="Geöffnete Dateien">
-      {tabs.map((tab, index) => {
-        const isActive = tab.id === activeTabId
-        const tooltip = tab.filePath
-        const modeLabel = tab.mode === 'edit' ? 'Vorschau anzeigen' : 'Bearbeiten'
-        const ModeIcon = tab.mode === 'edit' ? Eye : Pencil
-        const hasUnsaved = tab.editBuffer !== null && tab.editBuffer !== tab.content
+  /** Dropping past the last tab (in the row's empty space) moves it to the end. */
+  function handleRowDragOver(e: React.DragEvent) {
+    if (dragIndexRef.current !== null) {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'move'
+    }
+  }
 
-        const tabClassName = `tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}${dragOverIndex === index ? ' tab-bar-tab--drag-over' : ''}`
+  function handleRowDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setDragOverIndex(null)
+    const fromIndex = dragIndexRef.current
+    const lastIndex = tabs.length - 1
+    if (fromIndex !== null && fromIndex !== lastIndex) {
+      tabDispatch({ type: 'REORDER_TABS', payload: { fromIndex, toIndex: lastIndex } })
+    }
+    dragIndexRef.current = null
+  }
+
+  return (
+    <div
+      className="tab-bar"
+      role="tablist"
+      aria-label={t('tabs.ariaLabel')}
+      onDragOver={handleRowDragOver}
+      onDrop={handleRowDrop}
+    >
+      {settingsTabs.map((settingsTab) => (
+        <div
+          key={`settings-${settingsTab.key}`}
+          role="tab"
+          aria-selected={settingsTab.isActive}
+          className={`tab-bar-tab${settingsTab.isActive ? ' tab-bar-tab--active' : ''}`}
+          onClick={settingsTab.onActivate}
+          title={settingsTab.label}
+          tabIndex={settingsTab.isActive ? 0 : -1}
+        >
+          {settingsTab.icon && <span style={{ flexShrink: 0 }}>{settingsTab.icon}</span>}
+          <span className="tab-bar-tab-label">{settingsTab.label}</span>
+          <button
+            type="button"
+            className="tab-bar-close-btn"
+            aria-label={settingsTab.closeAriaLabel}
+            title={settingsTab.closeTitle}
+            onClick={(e) => { e.stopPropagation(); settingsTab.onClose() }}
+          >
+            <X size={12} />
+          </button>
+        </div>
+      ))}
+
+      {tabs.map((tab, index) => {
+        const isActive = !isShowingSettings && tab.id === activeTabId
+        const hasUnsaved = tab.editBuffer !== null && tab.editBuffer !== tab.content
+        const modeLabel = tab.mode === 'edit' ? t('tabs.showPreview') : t('tabs.edit')
+        const ModeIcon = tab.mode === 'edit' ? Eye : Pencil
         const isGraphTab = tab.filePath === '__graph__'
         const isCanvasTab = tab.fileName.endsWith('.canvas')
         const TabFileIcon = isGraphTab ? Share2 : getFileIcon(tab.fileName)
@@ -105,9 +160,9 @@ export function TabBar() {
             role="tab"
             aria-selected={isActive}
             aria-label={tab.filePath}
-            className={tabClassName}
+            className={`tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}${dragOverIndex === index ? ' tab-bar-tab--drag-over' : ''}`}
             onClick={() => handleActivate(tab.id)}
-            title={tooltip}
+            title={isGraphTab ? 'Graph' : tab.filePath}
             tabIndex={isActive ? 0 : -1}
             draggable
             onDragStart={(e) => handleDragStart(e, index)}
@@ -120,29 +175,23 @@ export function TabBar() {
             <span className="tab-bar-tab-label">
               {hasUnsaved ? '● ' : ''}{displayName}
             </span>
-
-            <button
-              type="button"
-              className="tab-bar-mode-btn"
-              aria-label={modeLabel}
-              title={modeLabel}
-              onClick={(e) => handleToggleMode(e, tab.id)}
-              onKeyDown={(e) => handleToggleModeKeyDown(e, tab.id)}
-              disabled={tab.isBinary || isGraphTab || isCanvasTab}
-              tabIndex={0}
-              style={(isGraphTab || isCanvasTab) ? { display: 'none' } : undefined}
-            >
-              <ModeIcon size={12} />
-            </button>
-
+            {!tab.isBinary && !isGraphTab && !isCanvasTab && (
+              <button
+                type="button"
+                className="tab-bar-mode-btn"
+                aria-label={modeLabel}
+                title={modeLabel}
+                onClick={(e) => handleToggleMode(e, tab.id)}
+              >
+                <ModeIcon size={12} />
+              </button>
+            )}
             <button
               type="button"
               className="tab-bar-close-btn"
-              aria-label={`Tab schließen: ${tab.fileName}`}
-              title="Tab schließen"
+              aria-label={t('tabs.closeTabAriaLabel', { name: tab.fileName })}
+              title={t('tabs.closeTab')}
               onClick={(e) => handleClose(e, tab.id)}
-              onKeyDown={(e) => handleCloseKeyDown(e, tab.id)}
-              tabIndex={0}
             >
               <X size={12} />
             </button>

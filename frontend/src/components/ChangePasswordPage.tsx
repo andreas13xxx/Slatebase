@@ -17,8 +17,10 @@ export interface ChangePasswordPageProps {
  * Performs client-side validation before calling the API.
  */
 export function ChangePasswordPage({ apiClient, embedded }: ChangePasswordPageProps) {
-  const { authDispatch } = useAuthContext()
+  const { authState, authDispatch } = useAuthContext()
   const { t } = useTranslation()
+
+  const userName = authState.user?.displayName || authState.user?.username || null
 
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -100,6 +102,11 @@ export function ChangePasswordPage({ apiClient, embedded }: ChangePasswordPagePr
   const formContent = (
     <form className={formClass} onSubmit={handleSubmit} noValidate>
       {!embedded && <h1 className="login-title">{t('auth.changePassword')}</h1>}
+      {userName && (
+        <p className="change-password-user">
+          {t('auth.changePasswordFor', { name: userName })}
+        </p>
+      )}
       <p className="change-password-info">
         {t('auth.changePasswordInfo')}
       </p>

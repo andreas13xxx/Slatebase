@@ -14,7 +14,7 @@ import type { Root, RootContent, PhrasingContent, AlignType } from 'mdast'
 import type { DirectoryTree } from '../types'
 import { AppContext } from '../state'
 import { requestHoverPreview, dismissHoverPreview } from '../plugins/compat/hover-link-bus'
-import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, remarkBreaks, remarkBlockRef, createAnchorTracker } from '../plugins'
+import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, remarkBreaks, remarkBlockRef, remarkPreserveTableCodeEscapes, createAnchorTracker } from '../plugins'
 import type { WikilinkNode, EmbedNode, CalloutNode, TagNode } from '../plugins'
 import { PdfViewer } from './BinaryViewer'
 import { MermaidRenderer } from './MermaidRenderer'
@@ -179,6 +179,8 @@ function createSafePipeline(content: string): Root {
     .use(remarkParse)
     .use(remarkFrontmatter, ['yaml'])
     .use(remarkGfm)
+    // Must come after remarkGfm — see the plugin's own doc comment for why.
+    .use(remarkPreserveTableCodeEscapes)
 
   for (const plugin of OBSIDIAN_PLUGINS) {
     try {
@@ -317,7 +319,7 @@ interface NoteEmbedProps {
  * Supports block-ref filtering (e.g. ![[note#^block-id]]).
  * Respects MAX_EMBED_DEPTH to prevent infinite recursion.
  */
-function NoteEmbed({ vaultId, filePath, target, heading, blockRef, directoryTree, token, embedDepth: _embedDepth }: NoteEmbedProps) { // eslint-disable-line @typescript-eslint/no-unused-vars
+function NoteEmbed({ vaultId, filePath, target, heading, blockRef, directoryTree, token, embedDepth: _embedDepth }: NoteEmbedProps) {  
   const [noteContent, setNoteContent] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -1494,6 +1496,20 @@ function parseEmbedImageStyle(display: string | null): React.CSSProperties {
  * Returns null if the display field is a sizing value (numeric/dimension).
  * Returns the display text if it's non-numeric (used as alt text).
  */
+/**
+ * Parses a PDF embed's `|display` text into a viewer height in pixels.
+ * PDF embeds only support a plain number (e.g. `![[doc.pdf|600]]`), which
+ * bounds the viewer's height — unlike image embeds, where a bare number is
+ * a width. Returns undefined for missing/non-numeric display text, letting
+ * the viewer fall back to its default height.
+ */
+function parseEmbedPdfHeight(display: string | null): number | undefined {
+  if (!display) return undefined
+  const trimmed = display.trim()
+  const widthMatch = trimmed.match(/^(\d+)$/)
+  return widthMatch ? Number(widthMatch[1]) : undefined
+}
+
 function parseEmbedAltText(display: string | null): string | null {
   if (!display) return null
 
@@ -1566,10 +1582,11 @@ function renderEmbedNode(
     const resolvedPath = resolveWikilinkTarget(node.target, directoryTree)
     if (resolvedPath) {
       const rawSrc = buildImageSrc(vaultId, resolvedPath, token)
+      const heightPx = parseEmbedPdfHeight(node.display)
       return createElement('div', {
         key,
         className: 'view-mode-embed view-mode-embed--pdf',
-      }, createElement(PdfViewer, { rawSrc, fileName: node.target }))
+      }, createElement(PdfViewer, { rawSrc, fileName: node.target, heightPx }))
     }
     return createElement('span', {
       key,

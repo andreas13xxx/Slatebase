@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Pre-commit hook for Slatebase.
+# Installed via: git config core.hooksPath .githooks (see CONTRIBUTING.md)
+set -uo pipefail
+
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+fail() {
+  echo -e "${RED}✗ $1${NC}" >&2
+  exit 1
+}
+
+# --- 1. Confirm git identity ---------------------------------------------
+NAME=$(git config user.name || true)
+EMAIL=$(git config user.email || true)
+
+if { exec 3</dev/tty; } 2>/dev/null; then
+  echo -e "${YELLOW}Committing as: ${NAME} <${EMAIL}>${NC}"
+  read -r -p "Sind Name und E-Mail korrekt? [J/n] " REPLY <&3
+  exec 3<&-
+  REPLY=${REPLY:-j}
+  case "$REPLY" in
+    [jJyY]*) ;;
+    *) fail "Commit abgebrochen. Bitte 'git config user.name'/'user.email' korrigieren (ggf. --local für dieses Repo)." ;;
+  esac
+else
+  echo -e "${YELLOW}⚠ Kein Terminal verfügbar, Identitätsprüfung übersprungen (${NAME} <${EMAIL}>).${NC}"
+fi
+
+# --- Staged files (added/copied/modified/renamed), excluding deletions ----
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$STAGED" ] && exit 0
+
+# --- 2. Block merge conflict markers in staged content ---------------------
+CONFLICT_FILES=""
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  if git show ":$f" 2>/dev/null | grep -qE '^(<<<<<<<|=======$|>>>>>>>)'; then
+    CONFLICT_FILES="$CONFLICT_FILES $f"
+  fi
+done <<< "$STAGED"
+if [ -n "$CONFLICT_FILES" ]; then
+  fail "Merge-Konflikt-Marker gefunden in:$CONFLICT_FILES"
+fi
+
+# --- 3. Block likely secrets / credential files -----------------------------
+SECRET_PATTERN='(^|/)\.env($|\.[^.]+$)|\.pem$|\.key$|(^|/)id_rsa(\.|$)|credentials\.json$'
+SECRETS=$(echo "$STAGED" | grep -Ei "$SECRET_PATTERN" || true)
+if [ -n "$SECRETS" ]; then
+  fail "Mögliche Secrets/Zugangsdaten im Commit:\n$SECRETS\nFalls das ein Fehlalarm ist, Datei mit 'git commit --no-verify' committen."
+fi
+
+# --- 4. Lint + type-check per package (only if that package has changes) ---
+run_package_checks() {
+  local pkg="$1"
+  local files
+  files=$(echo "$STAGED" | grep -E "^${pkg}/src/.*\.(ts|tsx)$" | sed "s#^${pkg}/##" || true)
+  [ -z "$files" ] && return 0
+
+  echo -e "${YELLOW}→ ESLint (${pkg}, staged files)…${NC}"
+  if ! (cd "$pkg" && echo "$files" | xargs npx eslint); then
+    fail "ESLint fehlgeschlagen (${pkg}). Bitte Fehler beheben oder 'npm run lint' in ${pkg}/ ausführen."
+  fi
+
+  echo -e "${YELLOW}→ TypeScript-Check (${pkg})…${NC}"
+  if [ "$pkg" = "frontend" ]; then
+    (cd "$pkg" && npx tsc -b --noEmit) || fail "TypeScript-Fehler (${pkg})."
+  else
+    (cd "$pkg" && npx tsc --noEmit -p tsconfig.json) || fail "TypeScript-Fehler (${pkg})."
+  fi
+}
+
+run_package_checks backend
+run_package_checks frontend
+
+echo -e "${GREEN}✓ Pre-commit checks passed.${NC}"

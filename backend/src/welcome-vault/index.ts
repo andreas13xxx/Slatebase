@@ -10,7 +10,6 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { ILogger } from '../logger/index.js'
 import type { IVaultService } from '../business/index.js'
-import type { IFeatureToggleService } from '../feature-toggle/types.js'
 import type { WelcomeVaultConfig, WelcomeVaultLanguage } from './types.js'
 
 // --- Interface ---
@@ -32,7 +31,6 @@ export interface WelcomeVaultResult {
 export interface IWelcomeVaultService {
   /**
    * Creates a welcome vault for the given user in the specified language.
-   * - Checks feature toggle first
    * - Creates vault via VaultService
    * - Copies template files from the language-specific template directory
    * - Logs errors but never throws
@@ -63,7 +61,6 @@ export class WelcomeVaultService implements IWelcomeVaultService {
 
   constructor(
     private readonly vaultService: IVaultService,
-    private readonly featureToggleService: IFeatureToggleService,
     private readonly config: WelcomeVaultConfig,
     private readonly logger: ILogger,
     templatesDir: string,
@@ -74,19 +71,14 @@ export class WelcomeVaultService implements IWelcomeVaultService {
   /** @inheritdoc */
   async createWelcomeVault(userId: string, language: WelcomeVaultLanguage, overrideName?: string): Promise<WelcomeVaultResult | undefined> {
     try {
-      // 1. Check feature toggle
-      if (!this.featureToggleService.isEnabled('welcome-vault')) {
-        return undefined
-      }
-
-      // 2. Determine vault name and template directory based on language
+      // 1. Determine vault name and template directory based on language
       const vaultName = overrideName ?? this.config.name[language]
       const templateDir = this.getTemplateDir(language)
 
-      // 3. Create vault
+      // 2. Create vault
       const vault = await this.vaultService.createVault(vaultName, userId)
 
-      // 4. Copy template files
+      // 3. Copy template files
       await this.copyTemplateFiles(vault.path, templateDir)
 
       return { vaultId: vault.id, storagePath: vault.path, vaultName }

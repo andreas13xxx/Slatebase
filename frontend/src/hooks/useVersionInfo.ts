@@ -70,7 +70,7 @@ export function useVersionInfo(): VersionInfo {
       }
     }
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     void check()
     return () => { cancelled = true }
   }, [])

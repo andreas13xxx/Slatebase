@@ -27,6 +27,16 @@ Supported formats: PNG, JPG, JPEG, GIF, WEBP, SVG.
 ![[Screenshots/overview.png]]
 ```
 
+**Live example:** The vault has a test image at `Attachments/Demo-Image.png`. The following code
+
+```
+![[Attachments/Demo-Image.png|400]]
+```
+
+renders this embedded image right below:
+
+![[Attachments/Demo-Image.png|400]]
+
 ### Adjusting Size
 
 With the pipe character you specify a width in pixels:
@@ -41,6 +51,10 @@ With the pipe character you specify a width in pixels:
 | `![[photo.png]]` | Full width (max container) |
 | `![[photo.png\|300]]` | 300px width |
 | `![[photo.png\|150]]` | 150px width (thumbnail) |
+
+The same demo image as a thumbnail, for comparison:
+
+![[Attachments/Demo-Image.png|150]]
 
 ---
 
@@ -60,6 +74,16 @@ The PDF viewer allows:
 > [!tip] PDF Size
 > For large PDFs a size specification is recommended to limit the viewer height: `![[manual.pdf|600]]`
 
+**Live example:** The vault has a two-page test PDF at `Attachments/Demo-Document.pdf`. The code
+
+```
+![[Attachments/Demo-Document.pdf|500]]
+```
+
+renders the inline viewer below — flip to page 2 to confirm navigation works:
+
+![[Attachments/Demo-Document.pdf|500]]
+
 ---
 
 ## Embedding Notes
@@ -72,6 +96,16 @@ You can embed the entire content of another Markdown file:
 
 The embedded note is fully rendered (with headings, lists, callouts, etc.).
 
+**Live example:** The vault has a demo note with two sections at `Attachments/Demo-Note.md`. The code
+
+```
+![[Attachments/Demo-Note]]
+```
+
+embeds the whole note — including both sections, the list, and the callout:
+
+![[Attachments/Demo-Note]]
+
 ### Heading Embeds
 
 Embed only a specific section:
@@ -81,6 +115,14 @@ Embed only a specific section:
 ```
 
 This shows only the content under the specified heading (until the next heading of equal or higher level).
+
+**Live example:** The same code with `#Section B` shows only that one section from the demo note — Section A and the intro text are left out:
+
+```
+![[Attachments/Demo-Note#Section B]]
+```
+
+![[Attachments/Demo-Note#Section B]]
 
 ---
 
@@ -130,7 +172,9 @@ Pasted images are automatically saved in the vault and can be embedded immediate
 > [!todo] Exercise
 > 1. Create a new file and embed this file: `![[Features/Embeds#Basic Syntax]]`
 > 2. Switch to View mode and verify only the "Basic Syntax" section is displayed
-> 3. If you have an image in the vault, embed it with a size specification
+> 3. Embed `Attachments/Demo-Image.png` with a different width, e.g. `![[Attachments/Demo-Image.png|250]]`
+> 4. Embed `Attachments/Demo-Document.pdf` and flip to page 2 in the viewer
+> 5. Embed `Attachments/Demo-Note` once in full and once with just `#Section A` — compare the two results
 
 ---
 

@@ -5,7 +5,7 @@
 import AdmZip from 'adm-zip'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import type { IPluginStore, PluginManifest } from './types.js'
+import type { IInstalledPluginStore, PluginManifest } from './types.js'
 import { pluginManifestSchema } from './validation.js'
 import { compareSemver } from '../shared/semver.js'
 
@@ -74,7 +74,7 @@ export class PluginInstallError extends Error {
  * 9. Return install result
  */
 export class PluginInstaller implements IPluginInstaller {
-  constructor(private readonly pluginStore: IPluginStore) {}
+  constructor(private readonly pluginStore: IInstalledPluginStore) {}
 
   /**
    * Install a plugin from a ZIP buffer.

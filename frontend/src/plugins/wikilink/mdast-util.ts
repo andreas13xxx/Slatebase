@@ -53,10 +53,14 @@ export function wikilinkFromMarkdown(): FromMarkdownExtension {
     },
     exit: {
       wikilinkTarget(this, token) {
-        target = this.sliceSerialize(token)
+        // May fire more than once per link: a backslash that turns out not
+        // to escape a `|` splits wikilinkTarget into separate segments
+        // around it (see targetEscape in syntax.ts), so accumulate instead
+        // of overwriting.
+        target += this.sliceSerialize(token)
       },
       wikilinkHeading(this, token) {
-        heading = this.sliceSerialize(token)
+        heading = (heading ?? '') + this.sliceSerialize(token)
       },
       wikilinkDisplay(this, token) {
         display = this.sliceSerialize(token)
@@ -118,8 +122,15 @@ export function wikilinkFromMarkdown(): FromMarkdownExtension {
 export function wikilinkToMarkdown(): ToMarkdownExtension {
   return {
     handlers: {
-      wikilink(node: WikilinkNode): string {
+      wikilink(node: WikilinkNode, _parent, state): string {
         const { target, heading, blockRef, display } = node
+
+        // Inside a table cell, `|` is also the column delimiter, so any
+        // literal pipe carried in the alias separator must be escaped —
+        // otherwise re-parsing the saved note splits the cell (see
+        // targetEscape/headingEscape in syntax.ts, which understand `\|`
+        // as this same escaped separator).
+        const pipe = state.stack.includes('tableCell') ? '\\|' : '|'
 
         // Case: heading-only link [[#heading]]
         if (!target && heading) {
@@ -138,7 +149,7 @@ export function wikilinkToMarkdown(): ToMarkdownExtension {
             return `[[${target}#^${blockRef}]]`
           }
           // If display differs from default, use pipe syntax
-          return `[[${target}#^${blockRef}|${display}]]`
+          return `[[${target}#^${blockRef}${pipe}${display}]]`
         }
 
         // Case: target with heading [[target#heading]]
@@ -149,12 +160,12 @@ export function wikilinkToMarkdown(): ToMarkdownExtension {
             return `[[${target}#${heading}]]`
           }
           // If display differs from default, use pipe syntax
-          return `[[${target}#${heading}|${display}]]`
+          return `[[${target}#${heading}${pipe}${display}]]`
         }
 
         // Case: target with custom display [[target|display]]
         if (target && display && display !== target) {
-          return `[[${target}|${display}]]`
+          return `[[${target}${pipe}${display}]]`
         }
 
         // Default case: simple link [[target]]

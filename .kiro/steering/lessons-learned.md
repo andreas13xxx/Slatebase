@@ -14,13 +14,15 @@ Kompakte Referenz für nicht-offensichtliche Erkenntnisse aus der Entwicklung. G
 
 Provider-Hierarchie:
 ```
-AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvider → SearchProvider → TabProvider → ContextPanelProvider → AppContent
+AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvider → SearchProvider → TabProvider → ContextPanelProvider → SidebarPanelProvider → AppContent
 ```
 
 - `vaultTrees: Record<string, DirectoryTree | null>` (Multi-Vault), Expanded-Paths: `${vaultId}::${path}`
 - `useTranslation()` Fallback-Deutsch ohne Provider (Tests brauchen keinen Wrapper)
 - Module-Level Singletons (`apiClient`, `dailyNoteService`): Bleiben in `App.tsx` — Race-Condition-frei dank synchronem Token-Restore
 - `AppPage`-Typ nur in `App.tsx` definieren und exportieren — nie lokal duplizieren
+- **Vault-Wechsel-Race**: `TREE_LOADED` (legacy) schreibt beim Dispatch-Zeitpunkt in `vaultTrees[state.selectedVaultId]` — nicht in den Vault, für den ursprünglich gefetcht wurde. Bei schnellem Vault-Wechsel (A→B bevor A geantwortet hat) landet A's Baum unter B's Cache-Eintrag. `VAULT_TREE_LOADED` (payload trägt `vaultId`) ist dagegen sicher. Jeder `fetchVaultTree()`-Call in einem Effekt, der bei Vault-Wechsel neu feuert, braucht einen `cancelled`-Guard (siehe `useWorkspaceRestore.ts`/`App.tsx`) — sonst überschreibt eine späte Antwort den inzwischen aktiven Vault.
+- **localStorage-Token-Zugriff**: Immer `getStoredAuthToken()`/`getStoredCsrfToken()` aus `state/authContext.ts` nutzen, nie `localStorage.getItem('slatebase_token'/'slatebase_csrf')` direkt — auch nicht in `plugins/compat/**`, das die Werte für eigene proxied Fetches braucht. Der Key-Name ist dort als exportierte Konstante (`STORAGE_KEY_TOKEN`/`STORAGE_KEY_CSRF`) verfügbar, falls eine Stelle (z.B. ein in einen Blob-URL-Modul-Kontext injizierter String-Template wie in `plugin-loader.ts`) den Wert zur Build-Zeit interpolieren statt importieren muss.
 
 ## Realtime (SSE)
 
@@ -83,7 +85,7 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - Body als `Buffer.from(body, 'utf-8')` senden (Node.js `fetch` überschreibt sonst Content-Type)
 - localStorage-Keys: `slatebase_token` / `slatebase_csrf` (NICHT `auth_token`)
 - `window.fetch` Override: `__slatebaseProxyFetch` (Cross-Origin → Proxy, Same-Origin → Original)
-- `requestUrl` Shim: Primär in `setting-tab.ts`, Fallback in `plugin-loader.ts` (dead code wenn ersteres lädt)
+- `requestUrl` Shim: Primär in `setting-tab.ts`, Fallback in `fallback-shims.ts` (nur relevant falls ersteres nicht lädt)
 
 ### Workspace Leaf
 - Virtual Path: `__view::{viewType}` — Tab-Deduplication vor OPEN_TAB prüfen
@@ -102,17 +104,6 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - `window.__codemirrorLanguage.syntaxTree` ist ein Proxy-Wrapper der `InlineCode`-Nodes adjustiert (from/to ohne Backticks). Plugins die `syntaxTree().iterate()` nutzen bekommen Obsidian-kompatible Ranges.
 - `refreshPluginExtensions()` dispatcht am Ende `{selection: view.state.selection}` — triggert ViewPlugin-Updates für Plugins die nur auf `selectionSet` reagieren (z.B. Dataview Inline-Rendering).
 
-## Vault Sync
-
-- `SLATEBASE_SYNC_SECRET` ≠ `SLATEBASE_CSRF_SECRET` (getrennt!)
-- Checkpoint nur bei Erfolg updaten, atomar schreiben
-- Owner-Only (kein Admin-Bypass)
-- **Sync-Exclusions**: `.slatebase/trash/`, `.slatebase/versions/`, `.slatebase/link-index.json`, `.trash/`, `.mobile/`
-- **CouchDB `_`-Limitation**: Top-Level-Dateien mit `_`-Prefix nicht synctbar
-- ConflictResolver: Backup → Write → Push → bei CouchDB-Fehler Rollback. Batch max 100.
-- Scheduler: Wizard pausiert bei Mount, resumed bei Unmount
-- `SyncService.setEventBus()` + `vaultOwnerResolver` als optionale Setter (Dependency-Order)
-
 ## Workspace State Persistence
 
 - `initializeWorkspace()` MUSS vor dem ersten React-Render laufen (Module-Level in App.tsx)
@@ -124,7 +115,7 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 
 ## CodeMirror 6 (Live Preview)
 
-- Compartments für dynamische Rekonfiguration (Vim, Theme, Plugin-Extensions, Read-Only)
+- Compartments für dynamische Rekonfiguration (Theme, Plugin-Extensions, Read-Only)
 - EditorView in `useRef` (nie `useState`). `onContentChange` in Ref speichern.
 - Per-Tab-State via Module-Level-Map (CM6 ist Source of Truth, nicht React)
 - Compartment-Stale bei Remount: Immer `EditorState.create()` mit frischen Extensions (History geht verloren)
@@ -185,6 +176,12 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 34. **Plugin-File-View CSS**: Container braucht `data-plugin-id={pluginId}` UND CSS-Regel `.tab-content--plugin-file-view { flex: 1; overflow: auto; min-height: 0 }`.
 35. **Kanban MarkdownDomRenderer**: Nutzt Preact-Lifecycle für `Component.load()` → `onload()` → `render()` → `MarkdownRenderer.render()`. Funktioniert nur wenn `_loaded = true` auf Parent-View UND `TextFileView.addChild()` korrekt `child.load()` aufruft.
 36. **TextFileView.addChild Override**: Die `TextFileView`-Klasse in `setting-tab.ts` darf `addChild` NICHT als No-Op (`return child`) überschreiben — muss `_loaded`-Check + `child.load()` enthalten, sonst werden Kanban's MarkdownDomRenderer-Children nie geladen.
+37. **Verwaiste Extraktionen**: Vor neuem State/neuer Logik in einer Komponente per Grep prüfen, ob ein Action-Creator/Hook/Component dafür schon existiert (z.B. `featureActions.ts`, `TabBar.tsx` waren fertig implementiert, aber ungenutzt — Call-Sites hatten die Logik parallel inline reimplementiert). `knip` (`npx --yes knip`) findet solche Leichen zuverlässig.
+38. **Hand-gebautes Markdown→HTML vor `dangerouslySetInnerHTML`**: Reines `&`/`<`/`>`-Escaping reicht nicht. URLs brauchen eine Schema-Allowlist (http/https/mailto; alles andere inkl. `javascript:` → `#`) UND Anführungszeichen-Escaping vor dem Einsetzen in `href`/`src`/`alt` — sonst Attribut-Breakout via `[x]("onmouseover="...)`. Siehe `PluginDetailPanel.tsx` (README-Rendering für Community-Plugins, per Definition nicht vertrauenswürdiger Content).
+39. **Generischer Store + in-place-mutierender Caller = Corruption-Falle**: `JsonFileStore`/`KeyedJsonFileStore` (`shared/json-file-store.ts`) geben bei fehlender/kaputter Datei einen `defaultValue` zurück. Caller-Code, der im imperativen Stil mutiert (`index.entries.push(...)` statt `{...current, ...}`), würde bei naiver Implementierung das GETEILTE `defaultValue`-Objekt selbst mutieren und es für alle künftigen Reads (auch für andere Keys!) verunreinigen. Fix: `readJsonFile()` liefert bei jedem Miss `structuredClone(defaultValue)`, nie die Originalreferenz. Gilt für jeden selbstgebauten Cache/Store mit einem Default-Objekt als Fallback.
+40. **`KeyedMutex` sperrt einen Key, nicht eine Datei**: Wenn eine Operation mehr als eine Datei anfasst (Filesystem-Move + Index-Update, siehe `TrashService`), muss der Lock die GESAMTE Methode umschließen, nicht nur den Index-Write. Ein Lock nur um `updateIndex()` hätte die eigentliche Race (Cleanup-Job löscht ein Verzeichnis, aus dem gerade parallel restored wird) nicht verhindert — nur die Reihenfolge der `_index.json`-Writes.
+41. **Bulk-Rename via `replace_all` kollidiert bei Substring-Namen**: Ein `replace_all` von `IPluginStore` → `IInstalledPluginStore` trifft ungewollt auch `IPluginStoreService`/`IPluginStoreCache` (Substring-Match). Vor jedem mechanischen Rename mit `grep` auf exakte Wortgrenzen (`\bName\b`) prüfen, welche Symbole WIRKLICH getroffen werden, bevor `replace_all` läuft — insbesondere wenn ein kurzer Name Präfix eines längeren, unverwandten Namens ist (hier: zwei bewusst ähnlich benannte, aber fachlich getrennte Module `plugin/` vs. `plugin-store/`).
+42. **`Content-Disposition: attachment` schützt nur Top-Level-Navigation**: Der Raw-File-Endpoint liefert SVG/HTML jetzt mit `attachment` statt `inline`, um Script-Ausführung beim direkten Öffnen (geteilter Link, neuer Tab) zu verhindern. Das wirkt NICHT bei `<img src="...">`-Einbettung (Browser führen dort ohnehin kein `<script>` in SVGs aus) — Disposition ändert nur, wie eine direkte Navigation gehandhabt wird. Bei Security-Fixes an Datei-Endpoints immer den tatsächlichen Konsum-Kontext (direkte Navigation vs. `<img>`/`<iframe>`/`<object>`) durchdenken, nicht pauschal "ein Header behebt alles" annehmen.
 
 ## Multi-User & Vault-Besitz
 

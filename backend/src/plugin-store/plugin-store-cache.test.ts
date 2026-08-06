@@ -1,6 +1,14 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { PluginStoreCache } from './plugin-store-cache.js'
 import type { CommunityPluginEntry, IPluginStoreConfig, RemotePluginManifest, UpdateCheckResult } from './types.js'
+import type { ILogger } from '../logger/index.js'
+
+function createMockLogger(): ILogger {
+  return { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+}
 
 function createTestConfig(overrides?: Partial<IPluginStoreConfig>): IPluginStoreConfig {
   return {
@@ -280,6 +288,116 @@ describe('PluginStoreCache', () => {
 
       vi.advanceTimersByTime(1)
       expect(customCache.getManifest('owner/calendar')).toBeNull()
+    })
+  })
+
+  describe('Persistence', () => {
+    let tempDir: string
+    const logger = createMockLogger()
+
+    // Real fs I/O doesn't play well with the outer describe's fake timers
+    // (setImmediate/etc. get faked too), so this block uses real time —
+    // TTL expiry is exercised via a real short delay instead of vi.advanceTimersByTime.
+    beforeEach(async () => {
+      vi.useRealTimers()
+      tempDir = await mkdtemp(join(tmpdir(), 'plugin-store-cache-test-'))
+    })
+
+    afterEach(() => {
+      vi.useFakeTimers()
+    })
+
+    /** Waits for the fire-and-forget persist() write to land on disk. */
+    async function flushPersist(): Promise<void> {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    }
+
+    it('does not touch disk when constructed without a dataDir', () => {
+      const memOnlyCache = new PluginStoreCache(createTestConfig())
+      expect(() => memOnlyCache.setPluginList([createTestPlugin('calendar')])).not.toThrow()
+    })
+
+    it('load() is a no-op when no file exists yet', async () => {
+      const store = new PluginStoreCache(createTestConfig(), tempDir, logger)
+      await expect(store.load()).resolves.toBeUndefined()
+      expect(store.getPluginList()).toBeNull()
+    })
+
+    it('persists the plugin list to disk and reloads it after a restart', async () => {
+      const store = new PluginStoreCache(createTestConfig(), tempDir, logger)
+      const plugins = [createTestPlugin('calendar'), createTestPlugin('dataview')]
+
+      store.setPluginList(plugins)
+      await flushPersist()
+
+      // Simulate a backend restart: fresh instance, same dataDir.
+      const restarted = new PluginStoreCache(createTestConfig(), tempDir, logger)
+      await restarted.load()
+
+      expect(restarted.getPluginList()).toEqual(plugins)
+    })
+
+    it('persists manifests and stats to disk and reloads them after a restart', async () => {
+      const store = new PluginStoreCache(createTestConfig(), tempDir, logger)
+      const manifest = createTestManifest('calendar')
+      const stats = new Map([['calendar', { pluginId: 'calendar', downloads: 42, updatedAt: '2026-01-01T00:00:00.000Z' }]])
+
+      store.setManifest('owner/calendar', manifest)
+      store.setPluginStats(stats)
+      await flushPersist()
+
+      const restarted = new PluginStoreCache(createTestConfig(), tempDir, logger)
+      await restarted.load()
+
+      expect(restarted.getManifest('owner/calendar')).toEqual(manifest)
+      expect(restarted.getPluginStats()).toEqual(stats)
+    })
+
+    it('still enforces TTL on reloaded data', async () => {
+      const store = new PluginStoreCache(createTestConfig({ cacheTtlPluginList: 30 }), tempDir, logger)
+      store.setPluginList([createTestPlugin('calendar')])
+      await flushPersist()
+
+      // Wait past the 30ms TTL.
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      const restarted = new PluginStoreCache(createTestConfig({ cacheTtlPluginList: 30 }), tempDir, logger)
+      await restarted.load()
+
+      // Expired per TTL, but still available as a stale fallback.
+      expect(restarted.getPluginList()).toBeNull()
+      expect(restarted.getPluginListFallback()).toEqual([createTestPlugin('calendar')])
+    })
+
+    it('does not persist the update-check cache to disk', async () => {
+      const store = new PluginStoreCache(createTestConfig(), tempDir, logger)
+      store.setUpdateCheck('vault-abc', createTestUpdateCheck())
+      await flushPersist()
+
+      // setUpdateCheck() never triggers a write — update checks are
+      // intentionally excluded from persisted state, so no file exists.
+      const raw = await readFile(join(tempDir, 'plugin-store-cache.json'), 'utf-8').catch(() => null)
+      expect(raw).toBeNull()
+    })
+
+    it('falls back to empty state for a corrupted cache file', async () => {
+      await writeFile(join(tempDir, 'plugin-store-cache.json'), 'not valid json', 'utf-8')
+
+      const store = new PluginStoreCache(createTestConfig(), tempDir, logger)
+      await expect(store.load()).resolves.toBeUndefined()
+      expect(store.getPluginList()).toBeNull()
+    })
+
+    it('falls back to empty state for the wrong version', async () => {
+      await writeFile(
+        join(tempDir, 'plugin-store-cache.json'),
+        JSON.stringify({ version: 99, pluginList: null, manifests: [], pluginStats: null }),
+        'utf-8',
+      )
+
+      const store = new PluginStoreCache(createTestConfig(), tempDir, logger)
+      await store.load()
+      expect(store.getPluginList()).toBeNull()
     })
   })
 })

@@ -11,6 +11,7 @@ import type { DirectoryTree } from '../../../types';
 import type { EventRef, IVaultShim, TAbstractFile, TFile, TFolder } from '../types';
 import { EventSystem } from '../event-system';
 import { dispatchRealtimeVaultChange } from '../../../state/realtimeVaultBridge';
+import { getStoredAuthToken, getStoredCsrfToken } from '../../../state/authContext';
 import { markPluginWrite } from '../plugin-event-bridge';
 import { VaultAdapterShim } from './vault-adapter-shim';
 import type { IVaultAdapter } from './vault-adapter-shim';
@@ -843,7 +844,7 @@ export class VaultShim implements IVaultShim {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.getToken()}`,
-          'X-CSRF-Token': localStorage.getItem('slatebase_csrf') ?? '',
+          'X-CSRF-Token': getStoredCsrfToken() ?? '',
         },
         body: formData,
       });
@@ -883,7 +884,7 @@ export class VaultShim implements IVaultShim {
    * Helper: get auth token from localStorage.
    */
   private getToken(): string {
-    return localStorage.getItem('slatebase_token') ?? '';
+    return getStoredAuthToken() ?? '';
   }
 
   async createBinary(path: string, data: ArrayBuffer): Promise<TFile> {
@@ -907,7 +908,7 @@ export class VaultShim implements IVaultShim {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.getToken()}`,
-          'X-CSRF-Token': localStorage.getItem('slatebase_csrf') ?? '',
+          'X-CSRF-Token': getStoredCsrfToken() ?? '',
         },
         body: formData,
       });

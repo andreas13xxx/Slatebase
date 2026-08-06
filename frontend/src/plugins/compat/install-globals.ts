@@ -18,6 +18,7 @@
  * @module install-globals
  */
 
+import { getStoredAuthToken, getStoredCsrfToken } from '../../state/authContext'
 import { addRibbonIcon as registerRibbonIcon } from './ribbon-icon-registry'
 import { addStatusBarItem as registerStatusBarItem } from './status-bar-registry'
 import moment from 'moment/min/moment-with-locales'
@@ -934,15 +935,15 @@ export function installObsidianGlobals(): void {
         return child
       }
       async loadData(): Promise<unknown> { return null }
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+       
       async saveData(_data: unknown): Promise<void> {}
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+       
       addCommand(_cmd: unknown): void {}
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+       
       addSettingTab(_tab: unknown): void {}
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+       
       registerEvent(_ref: unknown): void {}
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+       
       registerView(_viewType: string, _creator: unknown): void {}
       /** Register a callback that runs on an interval (auto-cleared on unload) */
       registerInterval(interval: number): number {
@@ -1382,7 +1383,7 @@ export function installObsidianGlobals(): void {
       messageEl: HTMLElement = document.createElement('div')
       containerEl: HTMLElement = document.createElement('div')
       private _shown = true
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+       
       constructor(message: string | DocumentFragment, _timeout?: number) {
         this.noticeEl = document.createElement('div') as HTMLElement & { isShown?: () => boolean }
         this.noticeEl.isShown = () => this._shown
@@ -1610,8 +1611,8 @@ export function installObsidianGlobals(): void {
     window.obsidian.requestUrl = async (urlOrRequest: unknown) => {
       const url = typeof urlOrRequest === 'string' ? urlOrRequest : (urlOrRequest as { url: string }).url
       const reqOptions = typeof urlOrRequest === 'string' ? {} : urlOrRequest as { method?: string; headers?: Record<string, string>; body?: string; contentType?: string }
-      const token = localStorage.getItem('slatebase_token') || ''
-      const csrfToken = localStorage.getItem('slatebase_csrf') || ''
+      const token = getStoredAuthToken() || ''
+      const csrfToken = getStoredCsrfToken() || ''
       const proxyBody = {
         url,
         method: reqOptions.method || 'GET',

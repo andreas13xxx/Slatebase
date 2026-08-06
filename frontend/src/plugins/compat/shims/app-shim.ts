@@ -145,7 +145,7 @@ export class AppShim implements IAppShim {
             // Lazy-init CM6: dynamically import to avoid top-level dep issues
             this.cm = null
             try {
-              // eslint-disable-next-line @typescript-eslint/no-require-imports
+               
               const cmView = (globalThis as unknown as { __codemirrorView?: { EditorView: unknown } }).__codemirrorView
               const cmState = (globalThis as unknown as { __codemirrorState?: { EditorState: unknown } }).__codemirrorState
               if (cmView && cmState) {

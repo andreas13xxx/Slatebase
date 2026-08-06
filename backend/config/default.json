@@ -17,8 +17,7 @@
   "features": {
     "obsidian-plugin-compat": { "enabled": false },
     "chat": { "enabled": true },
-    "mcp": { "enabled": true },
-    "knowledge-graph": { "enabled": true }
+    "mcp": { "enabled": true }
   },
   "mcp": {
     "maxFileSize": 5242880,

@@ -1,9 +1,11 @@
-// PluginStore — Filesystem persistence for plugin files, settings, and registry
+// InstalledPluginStore — Filesystem persistence for plugin files, settings, and registry
+// of plugins installed into a vault. Not to be confused with the `plugin-store/`
+// module, which manages the marketplace of plugins available to install.
 
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import type { IPluginStore, PluginFiles, PluginManifest, PluginRegistryData } from './types.js'
+import type { IInstalledPluginStore, PluginFiles, PluginManifest, PluginRegistryData } from './types.js'
 import { PluginFileTooLargeError, PluginSettingsTooLargeError } from './errors.js'
 import { isValidPluginId } from './validation.js'
 import { isNodeError } from '../shared/fs-utils.js'
@@ -23,7 +25,7 @@ const MAX_SETTINGS_SIZE = 1 * 1024 * 1024
  * Stores plugins under `data/plugins/<vaultId>/<pluginId>/`.
  * All writes are atomic (temp file → rename).
  */
-export class PluginStore implements IPluginStore {
+export class InstalledPluginStore implements IInstalledPluginStore {
   private readonly pluginsDir: string
 
   constructor(dataDir: string) {

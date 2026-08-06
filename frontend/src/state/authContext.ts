@@ -2,9 +2,15 @@ import { createContext, useContext, useReducer, useEffect, type Dispatch, type R
 import React from 'react'
 import { authReducer, initialAuthState, type AuthState, type AuthAction, type PublicUserInfo } from './authState'
 
-/** Storage keys for persisting auth tokens and user info. */
-const STORAGE_KEY_TOKEN = 'slatebase_token'
-const STORAGE_KEY_CSRF = 'slatebase_csrf'
+/**
+ * Storage keys for persisting auth tokens and user info.
+ * Exported as the single source of truth — the plugin compatibility layer
+ * (plugins/compat/**) also needs to read the raw token/CSRF pair directly
+ * (outside React) to authenticate its own proxied fetches, and must import
+ * these instead of re-hardcoding the key strings.
+ */
+export const STORAGE_KEY_TOKEN = 'slatebase_token'
+export const STORAGE_KEY_CSRF = 'slatebase_csrf'
 const STORAGE_KEY_USER = 'slatebase_user'
 
 /** Context value shape exposing auth state and dispatch. */
@@ -134,4 +140,22 @@ export function useAuthContext(): AuthContextValue {
     throw new Error('useAuthContext must be used within an AuthProvider')
   }
   return context
+}
+
+/**
+ * Reads the persisted auth token directly from storage, outside of React.
+ * The single point of access for code that can't use useAuthContext() —
+ * the initial ApiClient seed in App.tsx and the plugin compatibility layer,
+ * which authenticates its own proxied fetches on the plugin's behalf.
+ */
+export function getStoredAuthToken(): string | null {
+  return localStorage.getItem(STORAGE_KEY_TOKEN)
+}
+
+/**
+ * Reads the persisted CSRF token directly from storage, outside of React.
+ * See getStoredAuthToken() for why this accessor exists.
+ */
+export function getStoredCsrfToken(): string | null {
+  return localStorage.getItem(STORAGE_KEY_CSRF)
 }
