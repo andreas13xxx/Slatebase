@@ -27,7 +27,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/adm-zip": "0.5.7",
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.1.2",
     "eslint": "^10.3.0",
     "fast-check": "3.22.0",
     "globals": "^17.6.0",
