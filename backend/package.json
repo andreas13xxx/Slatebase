@@ -16,7 +16,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@hono/node-server": "^1.14.0",
+    "@hono/node-server": "^2.0.10",
     "@modelcontextprotocol/sdk": "1.18.0",
     "adm-zip": "0.5.16",
     "argon2": "0.41.1",
