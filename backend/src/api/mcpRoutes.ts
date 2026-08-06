@@ -10,6 +10,7 @@
 import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import type { IMcpTokenService } from '../mcp/token-service.js'
 import type { IMcpRateLimiter } from '../mcp/rate-limiter.js'
 import type { IMcpServerFactory } from '../mcp/server-factory.js'
@@ -181,7 +182,11 @@ export function createMcpHttpHandler(deps: McpRouteDependencies & { onAuthentica
         }
 
         const server = serverFactory.createServer()
-        await server.connect(transport)
+        // StreamableHTTPServerTransport's `onclose` accessor types as `(() => void) | undefined`
+        // (it can be cleared), which exactOptionalPropertyTypes treats as incompatible with
+        // Transport's plain `onclose?: () => void` — a structural-typing false positive, not a
+        // real mismatch, since an absent vs. undefined `onclose` behave identically at runtime.
+        await server.connect(transport as Transport)
         await transport.handleRequest(req, res, body)
       } catch (err) {
         logger.error('MCP POST error (new session)', { userId: tokenContext.userId, error: err instanceof Error ? err.message : String(err) })
