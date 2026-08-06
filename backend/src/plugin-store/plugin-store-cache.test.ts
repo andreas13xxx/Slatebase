@@ -307,11 +307,6 @@ describe('PluginStoreCache', () => {
       vi.useFakeTimers()
     })
 
-    /** Waits for the fire-and-forget persist() write to land on disk. */
-    async function flushPersist(): Promise<void> {
-      await new Promise((resolve) => setTimeout(resolve, 20))
-    }
-
     it('does not touch disk when constructed without a dataDir', () => {
       const memOnlyCache = new PluginStoreCache(createTestConfig())
       expect(() => memOnlyCache.setPluginList([createTestPlugin('calendar')])).not.toThrow()
@@ -328,7 +323,7 @@ describe('PluginStoreCache', () => {
       const plugins = [createTestPlugin('calendar'), createTestPlugin('dataview')]
 
       store.setPluginList(plugins)
-      await flushPersist()
+      await store.waitForPersist()
 
       // Simulate a backend restart: fresh instance, same dataDir.
       const restarted = new PluginStoreCache(createTestConfig(), tempDir, logger)
@@ -344,7 +339,7 @@ describe('PluginStoreCache', () => {
 
       store.setManifest('owner/calendar', manifest)
       store.setPluginStats(stats)
-      await flushPersist()
+      await store.waitForPersist()
 
       const restarted = new PluginStoreCache(createTestConfig(), tempDir, logger)
       await restarted.load()
@@ -356,7 +351,7 @@ describe('PluginStoreCache', () => {
     it('still enforces TTL on reloaded data', async () => {
       const store = new PluginStoreCache(createTestConfig({ cacheTtlPluginList: 30 }), tempDir, logger)
       store.setPluginList([createTestPlugin('calendar')])
-      await flushPersist()
+      await store.waitForPersist()
 
       // Wait past the 30ms TTL.
       await new Promise((resolve) => setTimeout(resolve, 50))
@@ -372,7 +367,7 @@ describe('PluginStoreCache', () => {
     it('does not persist the update-check cache to disk', async () => {
       const store = new PluginStoreCache(createTestConfig(), tempDir, logger)
       store.setUpdateCheck('vault-abc', createTestUpdateCheck())
-      await flushPersist()
+      await store.waitForPersist()
 
       // setUpdateCheck() never triggers a write — update checks are
       // intentionally excluded from persisted state, so no file exists.
