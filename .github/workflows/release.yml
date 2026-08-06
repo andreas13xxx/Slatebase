@@ -76,7 +76,7 @@ jobs:
             description: Slatebase Frontend Web Application
     steps:
       # A manual run must build the tag's source, not the current master.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.sha }}
 
