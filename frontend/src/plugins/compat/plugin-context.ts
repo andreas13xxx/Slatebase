@@ -232,6 +232,8 @@ export function PluginProvider({
   const prevVaultIdRef = useRef<string | null>(null)
   const pluginSystemVaultIdRef = useRef<string | null>(null)
   const loadedRef = useRef(false)
+  const mountedRef = useRef(true)
+  const cancelScheduledLoadRef = useRef<(() => void) | null>(null)
 
   // Shared shim instances per vault (used by all plugins and the event bridge)
   const workspaceShimRef = useRef<WorkspaceShim | null>(null)
@@ -253,6 +255,19 @@ export function PluginProvider({
     // Remove code block processors and post-processors for this plugin
     unregisterAllCodeBlocksForPlugin(pluginId)
   }
+
+  // ─── Track mount state to avoid post-unmount state updates ────────────────
+  // The post-FCP plugin load is scheduled via requestIdleCallback/setTimeout and
+  // may otherwise still fire (and call setState) after the provider has unmounted.
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      cancelScheduledLoadRef.current?.()
+      cancelScheduledLoadRef.current = null
+    }
+  }, [])
 
   // ─── Vault Switch: unload all → rebuild instances → reload ───────────────
 
@@ -631,16 +646,21 @@ export function PluginProvider({
     registry: PluginRegistry,
     loader: PluginLoader,
   ): void {
+    cancelScheduledLoadRef.current?.()
+
     const doLoad = () => {
-      // Guard: vault may have switched again before this fires
-      if (prevVaultIdRef.current !== targetVaultId) return
+      cancelScheduledLoadRef.current = null
+      // Guard: component may have unmounted, or vault may have switched again, before this fires
+      if (!mountedRef.current || prevVaultIdRef.current !== targetVaultId) return
       void loadPluginsForVault(targetVaultId, registry, loader)
     }
 
     if (typeof window.requestIdleCallback === 'function') {
-      window.requestIdleCallback(doLoad, { timeout: 2000 })
+      const handle = window.requestIdleCallback(doLoad, { timeout: 2000 })
+      cancelScheduledLoadRef.current = () => window.cancelIdleCallback(handle)
     } else {
-      setTimeout(doLoad, 50)
+      const handle = setTimeout(doLoad, 50)
+      cancelScheduledLoadRef.current = () => clearTimeout(handle)
     }
   }
 
@@ -653,7 +673,8 @@ export function PluginProvider({
     loader: PluginLoader,
   ): Promise<void> {
     const isCurrentContext = (): boolean => (
-      pluginSystemVaultIdRef.current === targetVaultId
+      mountedRef.current
+      && pluginSystemVaultIdRef.current === targetVaultId
       && pluginRegistryRef.current === registry
       && pluginLoaderRef.current === loader
     )
