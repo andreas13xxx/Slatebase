@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.0.10",
-    "@modelcontextprotocol/sdk": "1.18.0",
+    "@modelcontextprotocol/sdk": "1.26.0",
     "adm-zip": "0.6.0",
     "argon2": "0.41.1",
     "hono": "^4.13.0",
