@@ -25,7 +25,7 @@ function createMockGitHubClient(): IGitHubClient {
     fetchCommunityPlugins: vi.fn(),
     fetchManifest: vi.fn(),
     downloadReleaseAssets: vi.fn(),
-    fetchLatestReleaseInfo: vi.fn().mockResolvedValue(null),
+    fetchCommunityPluginStats: vi.fn().mockResolvedValue(new Map()),
     getRateLimitRemaining: vi.fn().mockReturnValue(100),
   }
 }
@@ -518,6 +518,65 @@ describe('PluginStoreService', () => {
 
       expect(result.failed).toHaveLength(1)
       expect(result.updated).toHaveLength(0)
+    })
+  })
+
+  // ─── getPluginStats() ────────────────────────────────────────────────────
+
+  describe('getPluginStats()', () => {
+    it('returns cached stats without calling GitHub when cache is fresh', async () => {
+      const cachedStats = new Map([
+        ['plugin-a', { pluginId: 'plugin-a', downloads: 42, updatedAt: '2026-01-01T00:00:00.000Z' }],
+      ])
+      vi.mocked(cache.getPluginStats).mockReturnValue(cachedStats)
+
+      const result = await service.getPluginStats()
+
+      expect(result.stats).toEqual({
+        'plugin-a': { pluginId: 'plugin-a', downloads: 42, updatedAt: '2026-01-01T00:00:00.000Z' },
+      })
+      expect(githubClient.fetchCommunityPluginStats).not.toHaveBeenCalled()
+    })
+
+    it('fetches the single stats file and maps entries by community plugin ID', async () => {
+      vi.mocked(cache.getPluginList).mockReturnValue(samplePluginList)
+      vi.mocked(githubClient.fetchCommunityPluginStats).mockResolvedValue(new Map([
+        ['plugin-a', { downloads: 100, updatedAt: '2026-02-01T00:00:00.000Z' }],
+        ['plugin-not-in-store', { downloads: 999, updatedAt: '2026-02-01T00:00:00.000Z' }],
+      ]))
+
+      const result = await service.getPluginStats()
+
+      // Only plugin-a is in samplePluginList; plugin-b has no stats entry;
+      // plugin-not-in-store isn't in the community list and must be dropped.
+      expect(result.stats).toEqual({
+        'plugin-a': { pluginId: 'plugin-a', downloads: 100, updatedAt: '2026-02-01T00:00:00.000Z' },
+      })
+      expect(githubClient.fetchCommunityPluginStats).toHaveBeenCalledOnce()
+      expect(cache.setPluginStats).toHaveBeenCalledOnce()
+    })
+
+    it('falls back to stale cache when the stats fetch fails', async () => {
+      vi.mocked(cache.getPluginList).mockReturnValue(samplePluginList)
+      vi.mocked(githubClient.fetchCommunityPluginStats).mockRejectedValue(new Error('rate limited'))
+      const staleStats = new Map([
+        ['plugin-a', { pluginId: 'plugin-a', downloads: 7, updatedAt: '2025-12-01T00:00:00.000Z' }],
+      ])
+      vi.mocked(cache.getPluginStatsFallback).mockReturnValue(staleStats)
+
+      const result = await service.getPluginStats()
+
+      expect(result.stats).toEqual({
+        'plugin-a': { pluginId: 'plugin-a', downloads: 7, updatedAt: '2025-12-01T00:00:00.000Z' },
+      })
+    })
+
+    it('throws UpstreamError when the fetch fails and no cache fallback exists', async () => {
+      vi.mocked(cache.getPluginList).mockReturnValue(samplePluginList)
+      vi.mocked(githubClient.fetchCommunityPluginStats).mockRejectedValue(new Error('rate limited'))
+      vi.mocked(cache.getPluginStatsFallback).mockReturnValue(null)
+
+      await expect(service.getPluginStats()).rejects.toThrow(UpstreamError)
     })
   })
 })

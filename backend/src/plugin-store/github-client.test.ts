@@ -110,6 +110,53 @@ describe('GitHubClient', () => {
     })
   })
 
+  describe('fetchCommunityPluginStats', () => {
+    it('fetches the single stats file and returns a Map keyed by plugin ID', async () => {
+      const statsPayload = {
+        'plugin-a': { downloads: 4678, updated: 1709754303000, '0.1.0': 13 },
+        'plugin-b': { downloads: 261, updated: 1685163487000 },
+      }
+
+      vi.mocked(fetch).mockResolvedValueOnce(createMockResponse(statsPayload, {
+        headers: { 'X-RateLimit-Remaining': '59' },
+      }))
+
+      const result = await client.fetchCommunityPluginStats()
+
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        'https://raw.githubusercontent.com/obsidianmd/obsidian-releases/master/community-plugin-stats.json',
+        expect.any(Object),
+      )
+      expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+      expect(result.get('plugin-a')).toEqual({ downloads: 4678, updatedAt: new Date(1709754303000).toISOString() })
+      expect(result.get('plugin-b')).toEqual({ downloads: 261, updatedAt: new Date(1685163487000).toISOString() })
+    })
+
+    it('skips malformed entries instead of failing the whole fetch', async () => {
+      const statsPayload = {
+        'plugin-a': { downloads: 100, updated: 1709754303000 },
+        'plugin-broken': { downloads: 'not-a-number' },
+      }
+
+      vi.mocked(fetch).mockResolvedValueOnce(createMockResponse(statsPayload, {
+        headers: { 'X-RateLimit-Remaining': '59' },
+      }))
+
+      const result = await client.fetchCommunityPluginStats()
+
+      expect(result.has('plugin-a')).toBe(true)
+      expect(result.has('plugin-broken')).toBe(false)
+    })
+
+    it('throws GitHubFetchError for a non-object response', async () => {
+      vi.mocked(fetch).mockResolvedValueOnce(createMockResponse([], {
+        headers: { 'X-RateLimit-Remaining': '59' },
+      }))
+
+      await expect(client.fetchCommunityPluginStats()).rejects.toThrow(GitHubFetchError)
+    })
+  })
+
   describe('fetchManifest', () => {
     it('fetches manifest from correct URL', async () => {
       const manifest = { id: 'calendar', name: 'Calendar', version: '1.5.1' }

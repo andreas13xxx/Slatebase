@@ -36,6 +36,17 @@ export const communityPluginEntrySchema = z.object({
   repo: z.string().regex(REPO_FORMAT_PATTERN, 'repo must match "owner/repo" format'),
 })
 
+/**
+ * Schema for a single entry in community-plugin-stats.json.
+ * Each entry has `downloads` (total across all versions) and `updated`
+ * (epoch ms of the latest release), plus per-version download counts as
+ * additional keys — passthrough since those extra keys aren't consumed.
+ */
+export const communityPluginStatsEntrySchema = z.object({
+  downloads: z.number(),
+  updated: z.number(),
+}).passthrough()
+
 // ─── Inferred Types ──────────────────────────────────────────────────────────
 
 /** Request body type for the store-install endpoint. */

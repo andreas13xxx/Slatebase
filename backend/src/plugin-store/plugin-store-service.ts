@@ -335,72 +335,55 @@ export class PluginStoreService implements IPluginStoreService {
    * Get release statistics (download count + last-updated date) for all
    * community plugins. Results are cached for the same TTL as the plugin list.
    *
-   * Fetches release info in batches with concurrency limiting to avoid
-   * GitHub rate limit exhaustion. Individual fetch failures are silently
-   * skipped (stats are best-effort).
+   * Fetches Obsidian's single pre-aggregated community-plugin-stats.json
+   * (one CDN request) rather than querying `releases/latest` per plugin,
+   * which would exhaust the shared GitHub API rate limit almost instantly
+   * across thousands of plugins. Falls back to stale cache on upstream errors.
    */
   async getPluginStats(): Promise<PluginStatsResponse> {
     // Return cached stats if still fresh
     const cached = this.cache.getPluginStats()
     if (cached !== null) {
-      const statsRecord: Record<string, PluginReleaseStats> = {}
-      for (const [id, stat] of cached) {
-        statsRecord[id] = stat
-      }
-      return { stats: statsRecord, cachedAt: new Date().toISOString() }
+      return { stats: statsMapToRecord(cached), cachedAt: new Date().toISOString() }
     }
 
     this.logger.info('Fetching plugin release stats from GitHub')
 
-    const communityPlugins = await this.getPluginList()
+    try {
+      const communityPlugins = await this.getPluginList()
+      const rawStats = await this.githubClient.fetchCommunityPluginStats()
 
-    const statsMap = new Map<string, PluginReleaseStats>()
-    const BATCH_SIZE = 10
-
-    for (let i = 0; i < communityPlugins.length; i += BATCH_SIZE) {
-      const batch = communityPlugins.slice(i, i + BATCH_SIZE)
-
-      const results = await Promise.all(
-        batch.map(async (plugin) => {
-          const info = await this.githubClient.fetchLatestReleaseInfo(plugin.repo)
-          if (info !== null) {
-            return {
-              pluginId: plugin.id,
-              downloads: info.downloads,
-              updatedAt: info.publishedAt,
-            } satisfies PluginReleaseStats
-          }
-          return null
-        })
-      )
-
-      for (const result of results) {
-        if (result !== null) {
-          statsMap.set(result.pluginId, result)
+      const statsMap = new Map<string, PluginReleaseStats>()
+      for (const plugin of communityPlugins) {
+        const entry = rawStats.get(plugin.id)
+        if (entry !== undefined) {
+          statsMap.set(plugin.id, {
+            pluginId: plugin.id,
+            downloads: entry.downloads,
+            updatedAt: entry.updatedAt,
+          })
         }
       }
 
-      // Stop early if rate limit is critically low
-      if (this.githubClient.getRateLimitRemaining() >= 0 && this.githubClient.getRateLimitRemaining() < 5) {
-        this.logger.warn('Stopping stats fetch early due to low rate limit', {
-          remaining: this.githubClient.getRateLimitRemaining(),
-          fetched: statsMap.size,
-        })
-        break
+      // Cache the results
+      this.cache.setPluginStats(statsMap)
+
+      this.logger.info('Plugin stats fetch complete', { total: statsMap.size })
+
+      return { stats: statsMapToRecord(statsMap), cachedAt: new Date().toISOString() }
+    } catch (err: unknown) {
+      this.logger.error('Failed to fetch plugin stats from GitHub', {
+        error: err instanceof Error ? err.message : String(err),
+      })
+
+      const fallback = this.cache.getPluginStatsFallback()
+      if (fallback !== null) {
+        this.logger.info('Using stale cache fallback for plugin stats')
+        return { stats: statsMapToRecord(fallback), cachedAt: new Date().toISOString() }
       }
+
+      throw new UpstreamError('Plugin stats unavailable and no cache fallback exists')
     }
-
-    // Cache the results
-    this.cache.setPluginStats(statsMap)
-
-    const statsRecord: Record<string, PluginReleaseStats> = {}
-    for (const [id, stat] of statsMap) {
-      statsRecord[id] = stat
-    }
-
-    this.logger.info('Plugin stats fetch complete', { total: statsMap.size })
-
-    return { stats: statsRecord, cachedAt: new Date().toISOString() }
   }
 
   // ─── Private Helpers ─────────────────────────────────────────────────────
@@ -434,5 +417,14 @@ export class PluginStoreService implements IPluginStoreService {
       repo: entry.repo,
     }
   }
+}
+
+/** Converts a plugin stats Map to the plain Record shape used in API responses. */
+function statsMapToRecord(stats: Map<string, PluginReleaseStats>): Record<string, PluginReleaseStats> {
+  const record: Record<string, PluginReleaseStats> = {}
+  for (const [id, stat] of stats) {
+    record[id] = stat
+  }
+  return record
 }
 

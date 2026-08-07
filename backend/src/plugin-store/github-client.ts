@@ -12,12 +12,23 @@ import {
   GitHubFetchError,
   AssetTooLargeError,
 } from './errors.js'
-import { communityPluginEntrySchema } from './validation.js'
+import { communityPluginEntrySchema, communityPluginStatsEntrySchema } from './validation.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const COMMUNITY_PLUGINS_URL =
   'https://raw.githubusercontent.com/obsidianmd/obsidian-releases/master/community-plugins.json'
+
+/**
+ * Pre-aggregated download counts + last-updated timestamps for every community
+ * plugin, built and published by Obsidian's own infrastructure. Fetching this
+ * one file is what Obsidian's own plugin browser does instead of calling
+ * `api.github.com/repos/{repo}/releases/latest` per plugin — the latter is
+ * both a CDN request (no rate limit) and a single request regardless of how
+ * many thousands of plugins exist, instead of one rate-limited API call each.
+ */
+const COMMUNITY_PLUGIN_STATS_URL =
+  'https://raw.githubusercontent.com/obsidianmd/obsidian-releases/master/community-plugin-stats.json'
 
 const ALLOWED_DOMAINS = new Set([
   'github.com',
@@ -54,8 +65,8 @@ export interface IGitHubClient {
   fetchManifest(repo: string): Promise<RemotePluginManifest>
   /** Download release assets for a specific version (or latest) */
   downloadReleaseAssets(repo: string, version?: string): Promise<PluginReleaseAssets>
-  /** Fetch latest release info (download count + published date) */
-  fetchLatestReleaseInfo(repo: string): Promise<{ downloads: number; publishedAt: string } | null>
+  /** Fetch community-plugin-stats.json (downloads + last-updated per plugin ID) */
+  fetchCommunityPluginStats(): Promise<Map<string, { downloads: number; updatedAt: string }>>
   /** Get remaining rate limit */
   getRateLimitRemaining(): number
 }
@@ -66,13 +77,11 @@ interface GitHubReleaseAsset {
   name: string
   browser_download_url: string
   size: number
-  download_count?: number
 }
 
 interface GitHubRelease {
   tag_name: string
   html_url: string
-  published_at?: string
   assets: GitHubReleaseAsset[]
 }
 
@@ -173,32 +182,34 @@ export class GitHubClient implements IGitHubClient {
   }
 
   /**
-   * Fetch latest release info for a plugin (download count + published date).
-   * Returns null if the release cannot be fetched (404, rate limit, etc.)
-   * instead of throwing — this is a non-critical stats query.
+   * Fetch community-plugin-stats.json — a single pre-aggregated file
+   * (downloads + last-updated per plugin ID) that Obsidian's own infrastructure
+   * builds and publishes to the CDN. This intentionally avoids calling
+   * `api.github.com/repos/{repo}/releases/latest` per plugin, which would burn
+   * through the shared rate limit almost instantly across thousands of plugins.
    */
-  async fetchLatestReleaseInfo(repo: string): Promise<{ downloads: number; publishedAt: string } | null> {
-    const releaseUrl = `https://api.github.com/repos/${repo}/releases/latest`
+  async fetchCommunityPluginStats(): Promise<Map<string, { downloads: number; updatedAt: string }>> {
+    const response = await this.fetchWithGuards(COMMUNITY_PLUGIN_STATS_URL)
+    const data: unknown = await response.json()
 
-    try {
-      const response = await this.fetchWithGuards(releaseUrl)
-      const release = (await response.json()) as GitHubRelease
-
-      // Sum download counts across all assets
-      let downloads = 0
-      if (Array.isArray(release.assets)) {
-        for (const asset of release.assets) {
-          downloads += asset.download_count ?? 0
-        }
-      }
-
-      const publishedAt = release.published_at ?? ''
-
-      return { downloads, publishedAt }
-    } catch {
-      // Non-critical — return null on any error
-      return null
+    if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+      throw new GitHubFetchError(502, COMMUNITY_PLUGIN_STATS_URL)
     }
+
+    const stats = new Map<string, { downloads: number; updatedAt: string }>()
+    for (const [pluginId, entry] of Object.entries(data as Record<string, unknown>)) {
+      const result = communityPluginStatsEntrySchema.safeParse(entry)
+      if (result.success) {
+        stats.set(pluginId, {
+          downloads: result.data.downloads,
+          updatedAt: new Date(result.data.updated).toISOString(),
+        })
+      } else {
+        this.logger.warn('Skipping malformed community plugin stats entry', { pluginId })
+      }
+    }
+
+    return stats
   }
 
   // ─── Private Helpers ─────────────────────────────────────────────────────
