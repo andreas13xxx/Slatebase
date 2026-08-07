@@ -1,6 +1,6 @@
 # Implementierungsplan — Slatebase Ausstehende Features
 
-**Stand:** August 2026 (v0.11.x). Die Kernfeatures sind umgesetzt. Es verbleiben 7 ausstehende Features in unterschiedlichen Reifegraden.
+**Stand:** August 2026 (v0.25.x). Die Kernfeatures sind umgesetzt. Es verbleiben 8 ausstehende Features in unterschiedlichen Reifegraden.
 
 **Strategie:** Hybrid — Features mit bestehender Spec direkt umsetzen, komplexe Features erst vollständig spezifizieren.
 
@@ -10,22 +10,21 @@
 
 | Prio | Feature | Track | Aufwand | Status |
 |------|---------|-------|---------|--------|
-| 1 | Community Plugin Store | B | ~20–28h | Spec vorhanden |
-| 2 | Obsidian Themes | B | ~15–20h | Geplant (keine Spec) |
-| 3 | Public Sharing | C | ~15–20h | Geplant (keine Spec) |
-| 4 | Semantische Suche / AI-Embeddings | E | ~38–58h | Geplant (keine Spec) |
-| 5 | Server-Side Plugins | B | ~48–68h | Tasks vorhanden |
-| 6 | Security Hardening | F | ~20–30h | Geplant (keine Spec) |
-| 7 | Accessibility Audit | F | ~24–34h | Geplant (keine Spec) |
-| 8 | Responsive/Mobile | F | ~24–34h | Geplant (keine Spec) |
-| 9 | Collaborative Editing | D | ~68–88h | Requirements vorhanden |
+| 1 | Obsidian Themes | B | ~15–20h | Geplant (keine Spec) |
+| 2 | Public Sharing | C | ~15–20h | Geplant (keine Spec) |
+| 3 | Semantische Suche / AI-Embeddings | E | ~38–58h | Geplant (keine Spec) |
+| 4 | Server-Side Plugins | B | ~48–68h | Tasks vorhanden |
+| 5 | Security Hardening | F | ~20–30h | Geplant (keine Spec) |
+| 6 | Accessibility Audit | F | ~24–34h | Geplant (keine Spec) |
+| 7 | Responsive/Mobile | F | ~24–34h | Geplant (keine Spec) |
+| 8 | Collaborative Editing | D | ~68–88h | Requirements vorhanden |
 
 ---
 
 ## Abhängigkeiten
 
 ```
-Track B (Plugins):     Community Plugin Store → Obsidian Themes → Server-Side Plugins
+Track B (Plugins):     Community Plugin Store ✅ → Obsidian Themes → Server-Side Plugins
 Track C (Sharing):     Public Sharing (unabhängig)
 Track D (Editor):      Collaborative Editing (braucht Realtime + CM6)
 Track E (AI):          Semantische Suche (unabhängig)
@@ -34,30 +33,17 @@ Track F (Polish):      Security → Accessibility → Responsive/Mobile
 
 ---
 
-## Prio 1 — Community Plugin Store (Track B)
+## Erledigt — Community Plugin Store (Track B) ✅
 
-Scope: ~20–28h. Spec vorhanden.
+**Spec:** `.kiro/specs/community-plugin-store/` — alle 34 Tasks abgeschlossen.
 
-**Spec:** `.kiro/specs/community-plugin-store/`
+Browse der vollen Community-Liste im Settings-Panel (Text-/Kompatibel-/Installiert-Filter), Installation direkt aus GitHub-Releases, Einzel- + Bulk-Update, Update-Check manuell und automatisch (24h), Download-Zahlen. Sicherheit: Domain-Allowlist (auf jedem Redirect-Hop revalidiert), Size-Limits, Desktop-Only-Gate, Rate-Limit-Tracking, optionaler `SLATEBASE_GITHUB_TOKEN`.
 
-**Zusammenfassung:**
-
-- Browse: Gesamte Obsidian Community Plugin-Liste (~6000 Plugins) im Settings-Panel durchsuchbar
-- Filter: Textsuche (Name, Autor, Beschreibung), Kompatibel-Filter, Installiert-Filter
-- Install: Direkte Installation aus dem Store (Backend downloadet Release-Assets von GitHub)
-- Update-Check: Manuell + automatisch (24h), Versions-Vergleich für installierte Plugins
-- Aktualisierung: Einzel-Update + Bulk-Update mit Spinner
-- Desktop-Only: Prüfung bei Installation (v1), ausgegraut-Anzeige (v2)
-- Sicherheit: GitHub-Rate-Limit-Tracking, Domain-Allowlist, Size-Limits, optional PAT
-- UI: Neuer Tab "Verfügbare Plugins" in der PluginManagementPage, Settings-Panel volle Breite
-
-**Phasen (8):** GitHub Client & Cache → Plugin Store Service → API Routes → Frontend API/Types → Store Browser UI → Integration in PluginManagementPage → Update-Indikator → Tests & Polish
-
-**Abhängigkeiten:** Braucht `obsidian-plugin-compat` ✅ (Plugin-Store, Installer, CompatibilityAnalyzer).
+**Nachträgliche Korrektur:** Statistiken kommen aus Obsidians aggregiertem `community-plugin-stats.json` (ein CDN-Request) statt aus `releases/latest` pro Repo — der Fanout hätte das GitHub-Rate-Limit bei ~6000 Plugins sofort erschöpft.
 
 ---
 
-## Prio 2 — Obsidian Themes (Track B)
+## Prio 1 — Obsidian Themes (Track B)
 
 Scope: ~15–20h. Keine Spec vorhanden.
 
@@ -75,7 +61,7 @@ Scope: ~15–20h. Keine Spec vorhanden.
 
 ---
 
-## Prio 3 — Public Sharing (Track C)
+## Prio 2 — Public Sharing (Track C)
 
 Scope: ~4h Design + ~15–20h Implementierung.
 
@@ -94,7 +80,7 @@ Scope: ~4h Design + ~15–20h Implementierung.
 
 ---
 
-## Prio 4 — Semantische Suche / AI-Embeddings (Track E)
+## Prio 3 — Semantische Suche / AI-Embeddings (Track E)
 
 Scope: ~8h Design + ~30–50h Implementierung.
 
@@ -108,7 +94,7 @@ Scope: ~8h Design + ~30–50h Implementierung.
 
 ---
 
-## Prio 5 — Server-Side Plugins (Track B)
+## Prio 4 — Server-Side Plugins (Track B)
 
 Scope: ~8h Design + ~40–60h Implementierung. Task-Liste existiert (7 Phasen).
 
@@ -122,7 +108,7 @@ Scope: ~8h Design + ~40–60h Implementierung. Task-Liste existiert (7 Phasen).
 
 ---
 
-## Prio 6 — Security Hardening (Track F)
+## Prio 5 — Security Hardening (Track F)
 
 Scope: ~20–30h.
 
@@ -135,7 +121,7 @@ Scope: ~20–30h.
 
 ---
 
-## Prio 7 — Accessibility Audit (Track F)
+## Prio 6 — Accessibility Audit (Track F)
 
 Scope: ~4h Audit + ~20–30h Fixes.
 
@@ -147,7 +133,7 @@ Scope: ~4h Audit + ~20–30h Fixes.
 
 ---
 
-## Prio 8 — Responsive/Mobile (Track F)
+## Prio 7 — Responsive/Mobile (Track F)
 
 Scope: ~4h Design + ~20–30h Implementierung.
 
@@ -159,7 +145,7 @@ Scope: ~4h Design + ~20–30h Implementierung.
 
 ---
 
-## Prio 9 — Collaborative Editing (Track D)
+## Prio 8 — Collaborative Editing (Track D)
 
 Scope: ~8h Design + ~60–80h Implementierung.
 
@@ -175,14 +161,16 @@ Scope: ~8h Design + ~60–80h Implementierung.
 
 ## Gesamtaufwand (Schätzung)
 
+Nur noch ausstehende Arbeit (Community Plugin Store ist raus):
+
 | Track | Aufwand |
 |-------|---------|
-| B: Plugins (Store + Themes + Server-Side) | ~87–120h |
+| B: Plugins (Themes + Server-Side) | ~63–88h |
 | C: Sharing | ~19–24h |
 | D: Editor (Collaborative) | ~68–88h |
 | E: AI (Semantische Suche) | ~38–58h |
 | F: Polish (Security + a11y + Mobile) | ~68–98h |
-| **Summe** | **~280–388h** |
+| **Summe** | **~256–356h** |
 
 ---
 

@@ -121,7 +121,7 @@ docker compose up -d
 |---------|-------------|
 | 📁 **Multi-Vault Management** | Create, delete, import, and switch between multiple vaults |
 | 🌳 **File Explorer** | Navigate your vault's directory tree with context menus and drag & drop |
-| 📝 **Markdown Editor** | Edit files with toolbar, auto-save, and keyboard shortcuts |
+| 📝 **Markdown Editor** | CodeMirror 6 editor with Live Preview, auto-save, and keyboard shortcuts — formatting via Command Palette or an Obsidian toolbar plugin |
 | 👁️ **Markdown Viewer** | Rendered view with GFM, syntax highlighting, frontmatter, and collapsible headings |
 | 🗂️ **Tabs** | Open multiple files simultaneously with unsaved indicators |
 | 👥 **Multi-User & Sharing** | Invite others to your vaults with read or write access, transfer ownership |
@@ -135,6 +135,7 @@ docker compose up -d
 | 🔍 **Search & Replace** | Vault-wide full-text search with regex, context lines, multi-vault, and find & replace |
 | 📊 **Mermaid Diagrams** | Render Mermaid code blocks as interactive SVG diagrams with dark mode support |
 | 🧩 **Plugin Compat** ⚠️ | Run browser-compatible Obsidian Community Plugins in the web UI |
+| 🛒 **Plugin Store** | Browse the Obsidian community plugin list, install from GitHub releases, and keep plugins updated — all from Settings |
 | 📦 **Import & Export** | Import files/folders, export vaults as ZIP or to a local directory |
 | 🌐 **Real-time Updates** | SSE-based push for chat messages, vault changes, presence, and notifications |
 | 🌙 **Dark Mode** | Automatic light/dark theme based on system preference or manual override |

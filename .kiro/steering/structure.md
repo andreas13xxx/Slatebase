@@ -9,6 +9,17 @@ frontend/         — React SPA (Vite)
 .kiro/steering/   — Steering rules for AI assistants
 ```
 
+Test/coverage config lives per package: `backend/vitest.config.ts` and the `test` block in
+`frontend/vite.config.ts`. Both pin `include: ['src/**/*.{ts,tsx}']` explicitly rather than
+relying on `exclude` alone — v8's "all files" scan would otherwise sweep in non-app files
+(backend: gitignored `data/` runtime state incl. installed plugin bundles; frontend:
+`scripts/`), making local and CI numbers diverge. Both also exclude `dist/**` from test
+discovery: Vitest 4 dropped that default, so a local build leaves compiled copies of every
+test behind for the next run to collect. Thresholds are a regression baseline measured on
+2026-08-07, not an aspirational target — ratchet up as coverage improves. Backend's
+branch/function figures look low next to statements/lines because coverage-v8 v4 made
+AST-aware remapping the default; that is the accurate number, not a regression.
+
 ## Backend (`backend/`)
 
 ```
@@ -128,7 +139,7 @@ src/
 │   ├── types.ts              — IPluginStoreConfig, CommunityPluginEntry, RemotePluginManifest, UpdateCheckResult, etc.
 │   ├── errors.ts             — GitHubRateLimitError, GitHubFetchError, AssetTooLargeError, DesktopOnlyPluginError, PluginNotInStoreError, UpstreamError
 │   ├── validation.ts         — Zod schemas (communityPluginEntrySchema, storeInstallSchema)
-│   ├── github-client.ts      — GitHubClient (fetches community plugin list/releases; domain allowlist re-validated on every redirect hop, size limits)
+│   ├── github-client.ts      — GitHubClient (fetches community plugin list/releases + `community-plugin-stats.json` (Obsidian's pre-aggregated downloads/last-updated feed — one CDN request instead of one rate-limited API call per plugin); domain allowlist re-validated on every redirect hop, size limits)
 │   ├── plugin-store-cache.ts — PluginStoreCache (in-memory TTL cache for plugin list/manifests/update results)
 │   ├── plugin-store-service.ts — PluginStoreService (browse/install/update orchestration; installs via the shared `plugin/` InstalledPluginStore)
 │   └── update-checker.ts     — UpdateChecker (periodic update check, default 24h interval, persists last-check timestamp)
@@ -224,11 +235,11 @@ src/
 │   ├── types.ts              — Editor mode types, LivePreviewConfig, EditorMode ('source' | 'live-preview')
 │   ├── theme.ts              — CodeMirror theme (Design Tokens mapping, Dark/Light mode)
 │   ├── state-store.ts        — Per-tab EditorState persistence (Module-Level Map, cursor/scroll/history)
-│   ├── formatting.ts         — Toolbar formatting commands (bold, italic, heading, list, link, etc.)
-│   ├── plugin-extensions.ts  — Plugin extension registry (per-plugin Compartment, add/remove/isolate, selection-dispatch after refresh)
+│   ├── formatting.ts         — Formatting commands (bold, italic, heading, list, link, etc.) — driven by the Command Palette, no longer by a native toolbar
+│   ├── plugin-extensions.ts  — Plugin extension registry (per-plugin Compartment, add/remove/isolate, selection-dispatch after refresh) + active-editor-container tracking (get/setActiveEditorContainerEl, setEditorContainerMountedListener) so MarkdownView.containerEl points at real, attached DOM
 │   ├── editor-state-fields.ts — Obsidian-compatible StateFields (editorInfoField, editorLivePreviewField, editorEditorField)
 │   ├── token-class-node-prop.ts — Singleton NodeProp + Mapping (tokenClassNodeProp polyfill for Obsidian compat)
-│   ├── CodeMirrorEditor.tsx  — React wrapper (EditorView in useRef, props→effects sync, mode toggle)
+│   ├── CodeMirrorEditor.tsx  — React wrapper (EditorView in useRef, props→effects sync, mode toggle); marks the wrapper's parent `.markdown-source-view` and publishes its grandparent as containerEl for plugin toolbars
 │   └── live-preview/
 │       ├── index.ts               — Barrel export for live-preview decorations + extension factory
 │       ├── inline-decorations.ts  — Cursor-aware inline formatting decorations (bold, italic, strikethrough, inline code), HideableRange model
@@ -280,9 +291,11 @@ src/
 │       ├── suggest-modal.ts — SuggestModal, FuzzySuggestModal (search/filter modals)
 │       ├── ribbon-icon-registry.ts — Module-level ribbon icon registry (addRibbonIcon store + change listeners)
 │       ├── status-bar-registry.ts — Module-level registry for addStatusBarItem() entries; notifies the StatusBar component on change
-│       ├── command-registry.ts — CommandRegistry (addCommand, removeAll, search, hotkeys, editorCallback/editorCheckCallback)
+│       ├── command-registry.ts — CommandRegistry (addCommand → returns the Command like Obsidian does, getCommand, removeAll, search, hotkeys, editorCallback/editorCheckCallback; executes callbacks inside withPluginContext)
+│       ├── plugin-execution-context.ts — Tracks which plugin's code is currently executing (withPluginContext/getCurrentPluginId) so createEl() can tag elements with data-plugin-id; scopeForPlugin() binds the id into a closure for call sites that must survive `await`
+│       ├── lucide-icons.ts — Resolves Obsidian's built-in icon names (Lucide IDs + `-glyph` aliases) to SVG via lucide-react's per-icon dynamic-import map — real Obsidian ships the whole set, our addIcon() registry alone left plugin buttons blank
 │       ├── code-block-processor-registry.ts — CodeBlockProcessorRegistry (registerCodeBlockProcessor, processCodeBlocks, runPostProcessors, MarkdownRenderChild lifecycle)
-│       ├── css-injector.ts — CSS injection with scoped selectors (data-plugin-id prefix)
+│       ├── css-injector.ts — CSS injection with scoped selectors (data-plugin-id); each rule emits both a descendant form (`[scope] sel`) and a self form (`sel[scope]`) so plugin UI inserted into shared workspace DOM — which has no scoped ancestor — still matches
 │       ├── compatibility-analyzer.ts — Multi-layer browser compatibility analysis (isDesktopOnly gate, Node.js module detection, Obsidian API pattern matching, SUPPORTED_METHODS set)
 │       ├── platform-detection.ts — Runtime device/Platform flags (Obsidian's are Electron build constants; Slatebase derives isMobile/isDesktop etc. at runtime since one build serves both)
 │       ├── api-gap-registry.ts — Records which no-op Proxy-trapped API a plugin read vs. actually called, so silently-unimplemented API usage is diagnosable instead of invisible
@@ -292,16 +305,16 @@ src/
 │       ├── hover-link-bus.ts — Routes hover-preview requests (Slatebase's own links + plugins' `workspace.trigger('hover-link', …)`) to the HoverPreview popover
 │       ├── file-view-registry.ts — FileViewRegistry (content-based + extension-based view routing, registerExtensionsForPlugin, active file view lifecycle for TextFileView-based plugins like Kanban)
 │       ├── view-registry.ts — ViewRegistry (plugin-ownership tracking, location-aware leaf creation, sidebar callbacks)
-│       ├── obsidian-compat.css — Obsidian-compatible CSS Custom Properties (100+ vars mapped to Slatebase tokens, Dark Mode)
+│       ├── obsidian-compat.css — Obsidian-compatible CSS Custom Properties (~590 vars mapped to Slatebase tokens, Dark Mode: fonts/weights, sizing scale, code + tag tokens, accent HSL components, input shadows) + `position: relative` on `.markdown-source-view`/`.view-content` so plugin UI anchored to the editor pane sizes against the pane, as it does in real Obsidian
 │       ├── tab-view-bridge.ts — TabViewBridge (module-level bridge: ViewRegistry → TabProvider for plugin view tabs)
 │       ├── tab-view-bridge-wiring.test.ts — Integration tests for TabViewBridge wiring
 │       └── shims/
-│           ├── app-shim.ts — AppShim (Proxy-based, vault/workspace/metadataCache/fileManager/plugins/isMobile/appId/secretStorage/loadLocalStorage/saveLocalStorage)
+│           ├── app-shim.ts — AppShim (Proxy-based, vault/workspace/metadataCache/fileManager/plugins/isMobile/appId/secretStorage/loadLocalStorage/saveLocalStorage); `commands` + `hotkeyManager` are backed by the shared CommandRegistry (findCommand/listCommands/executeCommandById, defaultKeys/addDefaultHotkeys), `workspace` is wrapped with scopeForPlugin so its callbacks stay plugin-tagged
 │           ├── vault-shim.ts — VaultShim (read/modify/create/delete/copy/getFileByPath/readBinary/modifyBinary/process/append/exists/configDir/events)
-│           ├── workspace-shim.ts — WorkspaceShim (full Leaf API + getActiveViewOfType(MarkdownView) synthetic view, onLayoutReady error-isolation)
+│           ├── workspace-shim.ts — WorkspaceShim (full Leaf API + getActiveViewOfType synthetic view for the MarkdownView/FileView/ItemView family, onLayoutReady error-isolation); active leaf falls back to an "empty"-type view instead of null, and layout/leaf events re-fire once the CM6 editor mounts
 │           ├── metadata-cache-shim.ts — MetadataCacheShim (getFileCache, resolvedLinks, changed/resolved events, getTags, fileToLinktext, blockCache, getCachedFiles)
 │           ├── file-manager-shim.ts — FileManagerShim (renameFile, processFrontMatter, generateMarkdownLink, getNewFileParent, trashFile, promptForFileRename, getAvailablePathForAttachment)
-│           ├── markdown-view-shim.ts — MarkdownView stub (editor property, getActiveViewOfType support, registered on window.obsidian)
+│           ├── markdown-view-shim.ts — MarkdownView stub (editor property, getActiveViewOfType support, registered on window.obsidian); containerEl resolves to the live editor container (detached div only when no editor is mounted)
 │           ├── markdown-renderer-shim.ts — MarkdownRenderer.render() (unified/remark MDAST→HTML pipeline, registered on window.obsidian)
 │           └── suggest-modal-shim.ts — Modal, SuggestModal, FuzzySuggestModal (DOM-based overlays, fuzzy search, keyboard nav)
 ├── state/
@@ -379,7 +392,7 @@ src/
 │   ├── TabBar.tsx        — Unified horizontal tab strip: settings-page tabs (not draggable) + file tabs (draggable/reorderable) in one row
 │   ├── TabContent.tsx    — Tab content orchestrator (Edit/View/Binary, wires upload + image paste + versions)
 │   ├── TabContent.css    — TabContent styles (empty/loading/error/content states, design tokens)
-│   ├── EditMode.tsx      — Plain-text editor with toolbar + auto-save + undo/redo + line numbers + image paste + DnD + read-only mode + editor command event listener (slatebase:editor-command)
+│   ├── EditMode.tsx      — CodeMirror editor host: auto-save + undo/redo + line numbers + image paste + DnD + read-only banner + editor command event listener (slatebase:editor-command). No native formatting toolbar — formatting runs through the Command Palette or an Obsidian-compatible plugin toolbar (Editing Toolbar); `livePreviewMode` is a required prop driven by the tab mode
 │   ├── ViewMode.tsx      — Markdown renderer (remark + highlight.js + Obsidian plugins)
 │   ├── MermaidRenderer.tsx — Mermaid diagram renderer (lazy-loaded, SVG inline, theme-aware, timeout, error fallback)
 │   ├── MermaidRenderer.test.tsx — Unit tests for MermaidRenderer

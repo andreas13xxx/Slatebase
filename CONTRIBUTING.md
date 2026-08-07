@@ -67,6 +67,7 @@ This catches the same lint/type errors CI would fail on, before you push. Skip i
 | `npm run build` | Compile TypeScript to `dist/` |
 | `npm run test` | Run tests once (vitest --run) |
 | `npm run test:watch` | Run tests in watch mode |
+| `npm run test:coverage` | Run tests with coverage + thresholds (what CI runs) |
 
 #### Frontend (`cd frontend`)
 
@@ -76,6 +77,7 @@ This catches the same lint/type errors CI would fail on, before you push. Skip i
 | `npm run build` | Type-check + Vite production build |
 | `npm run test` | Run unit tests once |
 | `npm run test:watch` | Run tests in watch mode |
+| `npm run test:coverage` | Run tests with coverage + thresholds (what CI runs) |
 | `npm run test:e2e` | Playwright E2E tests |
 | `npm run lint` | ESLint check |
 

@@ -11,7 +11,7 @@ Monorepo: `backend/` + `frontend/`. Separate `package.json` + `node_modules` eac
 - **Framework**: Hono (`@hono/node-server`)
 - **Validation**: Zod
 - **Logging**: Pino (structured JSON)
-- **Test**: Vitest
+- **Test**: Vitest (+ `@vitest/coverage-v8`, thresholds enforced in CI)
 - **Module**: ESM (`"type": "module"`)
 
 ## Frontend
@@ -23,7 +23,7 @@ Monorepo: `backend/` + `frontend/`. Separate `package.json` + `node_modules` eac
 - **Icons**: Lucide React
 - **Styling**: CSS Custom Properties (Design Tokens), Dark Mode
 - **Markdown**: unified + remark-parse + remark-gfm + remark-frontmatter + custom Obsidian plugins
-- **Test**: Vitest + Testing Library + Playwright (e2e)
+- **Test**: Vitest (+ `@vitest/coverage-v8`) + Testing Library + Playwright (e2e)
 - **Lint**: ESLint (react-hooks, react-refresh)
 - **Proxy**: Vite → `http://localhost:3000`
 
@@ -31,17 +31,22 @@ Monorepo: `backend/` + `frontend/`. Separate `package.json` + `node_modules` eac
 
 ```bash
 # Backend
-npm run dev          # tsx watch (hot reload)
-npm run build        # tsc → dist/
-npm run test         # vitest --run
+npm run dev            # tsx watch (hot reload)
+npm run build          # tsc → dist/
+npm run test           # vitest --run
+npm run test:coverage  # vitest --run --coverage (enforces thresholds — what CI runs)
 
 # Frontend
-npm run dev          # Vite (port 5173)
-npm run build        # Type-check + production build
-npm run test         # vitest --run
-npm run test:e2e     # Playwright
-npm run lint         # ESLint
+npm run dev            # Vite (port 5173)
+npm run build          # Type-check + production build
+npm run test           # vitest --run
+npm run test:coverage  # vitest --run --coverage (enforces thresholds — what CI runs)
+npm run test:e2e       # Playwright
+npm run lint           # ESLint
 ```
+
+CI runs `test:coverage`, not `test` — a coverage-threshold miss fails the build like a failing
+test. Config: `backend/vitest.config.ts` and the `test.coverage` block in `frontend/vite.config.ts`.
 
 ## Terminal-Regeln
 
@@ -142,6 +147,22 @@ Kein Express/Fastify/Koa, kein Redux/Zustand, kein ORM, kein DI-Container, kein 
 - `iterateAllLeaves`: Überspringt Leaves ohne view/containerEl.
 - `activatePlugin`: 10s Timeout, Error → Plugin-Status `error`, nächstes Plugin wird geladen.
 - Plugin-Registrierungs-Callbacks (addCommand, registerView, registerExtensions): Vault-Generation-Guard verhindert Registrierungen nach Vault-Wechsel.
+
+### Plugin-Ausführungskontext → `data-plugin-id` beim Erzeugen
+- Problem: `CssInjector` schopt Plugin-CSS über `[data-plugin-id]`. Plugins, die UI in geteiltes Workspace-DOM einhängen (Toolbars, Popovers), haben keinen geschopten Ancestor — ihr CSS greift dort nie.
+- Lösung, zwei Hälften: (1) `plugin-execution-context.ts` verfolgt, welches Plugin gerade läuft; `createEl`/`createDiv` taggen jedes erzeugte Element damit. (2) `scopeSingleSelector()` emittiert pro Regel zusätzlich eine Self-Form (`sel[data-plugin-id="x"]`) neben der Descendant-Form.
+- Kontext-Propagierung: synchron via `withPluginContext()` (Save/Restore, reentrant-sicher); über `await`-Grenzen hinweg via `scopeForPlugin()` (Proxy, bindet die ID in eine Closure und wrappt übergebene Callbacks). `EventSystem` speichert die ID am Listener und stellt sie beim `trigger()` wieder her.
+- Bewusst kein `AsyncLocalStorage`-Äquivalent: alle Plugins laufen im selben JS-Realm ohne Iframes/Worker, und die Call-Sites mit bekannter pluginId sind abzählbar.
+
+### Icon-Auflösung → lucide-react Dynamic-Import-Map
+- Obsidian bundlet den kompletten Lucide-Satz; `setIcon(el, 'chevron-down')` funktioniert dort für jeden Namen. Unsere `addIcon()`-Registry allein ließ Plugin-Buttons leer.
+- `lucide-icons.ts` nutzt `lucide-react/dynamicIconImports` (Dependency ist ohnehin da) — lazy pro Icon, kein Vorab-Bundle von ~1500 Icons, keine neue Dependency.
+- Obsidian-Eigennamen (`*-glyph`) treffen meist nach Strippen des Suffix; Rest über `EXPLICIT_ALIASES`.
+
+### Plugin-Store-Statistiken → aggregierter CDN-Feed statt API-Fanout
+- `community-plugin-stats.json` (Obsidians eigene Aggregation: Downloads + Last-Updated pro Plugin-ID) statt `releases/latest` pro Repo.
+- Ein CDN-Request ohne Rate-Limit, unabhängig von der Plugin-Anzahl — der Fanout hätte das geteilte GitHub-Limit bei ~6000 Plugins sofort erschöpft.
+- Fehlerpfad: Fallback auf Stale-Cache, sonst `UpstreamError`.
 
 ### Plugin File-View Rendering (TextFileView-Plugins wie Kanban)
 - `file-view-registry.ts`: Matcher-basiertes Routing (Frontmatter-Check für `.md`-Dateien, Extension-Check für andere)

@@ -16,11 +16,18 @@ Keine Dateien modifizieren bevor der Nutzer den Fix bestätigt hat.
 Vor jedem `git push` MÜSSEN folgende Checks bestehen:
 1. **Backend**: `npx tsc --noEmit` — keine TypeScript-Fehler
 2. **Frontend**: `npm run build` (`tsc -b && vite build`) — keine TypeScript-Fehler
-3. **Backend Tests**: `npm run test` — alle grün
-4. **Frontend Tests**: `npm run test` — alle grün
+3. **Backend Tests**: `npm run test:coverage` — alle grün, Coverage-Schwellen gehalten
+4. **Frontend Tests**: `npm run test:coverage` — alle grün, Coverage-Schwellen gehalten
 5. **Frontend Lint**: `npx eslint . --quiet` — **0 Errors** (Warnings sind OK)
 
 Wenn ein Check fehlschlägt: **erst fixen, dann pushen**. Kein `--no-verify` ohne vorherige Behebung aller Errors.
+
+### Coverage-Schwellen
+
+CI fährt `test:coverage` (nicht `test`) — ein Unterschreiten der Schwellen bricht den Build wie ein roter Test. Die Werte in `backend/vitest.config.ts` bzw. `frontend/vite.config.ts` sind eine **Regressions-Baseline** (gemessener Stand vom 2026-08-07 minus kleiner Puffer), kein Zielwert.
+
+- Schwellen nach oben nachziehen, wenn Coverage steigt. **Nie senken**, um einen Push durchzubekommen — dann fehlen Tests.
+- `include` explizit auf `src/**` lassen: v8 scannt sonst „all files" und zieht Backend-`data/` (installierte Plugin-Bundles) bzw. Frontend-`scripts/` mit rein, die im CI-Checkout gar nicht existieren.
 
 ---
 
@@ -138,3 +145,6 @@ Wenn ein Check fehlschlägt: **erst fixen, dann pushen**. Kein `--no-verify` ohn
 - **Fehlermeldungen mit Detail**: `extractErrorMessage(err, fallback)` für aussagekräftige Fehlertexte bei Plugin-Reload, Settings-Rendering etc.
 - **DOM-Extensions synchron**: Alle Obsidian DOM-Prototype-Patches (`addClass`, `appendText`, `createEl` etc.) MÜSSEN synchron in `setting-tab.ts` registriert werden (vor Plugin-Bundle-Evaluation), nicht async per dynamic import.
 - **Icon-Registry synchron**: `addIcon()`/`getIcon()` und `window.__obsidianCustomIcons` MÜSSEN vor `onload()` verfügbar sein.
+- **Keine leeren DOM-Stubs für Einhängepunkte**: Ein detachtes `document.createElement('div')` als `containerEl` ist für Plugins nicht von „nichts gefunden" unterscheidbar — sie suchen darin per `querySelector()` und geben still auf. Entweder echtes, eingehängtes DOM liefern (siehe `getActiveEditorContainerEl()`) oder den Fall sichtbar machen.
+- **Rückgabewerte der echten API nachbauen**: `addCommand()` gibt in Obsidian das `Command` zurück, `executeCommandById()` ein `boolean`. Plugins stashen/prüfen diese Werte; ein `void`/`undefined` crasht erst viel später und weit weg von der Ursache. Gilt auch für Guard-Pfade (z.B. Vault-Wechsel): Form der Rückgabe beibehalten statt früh leer zu returnen.
+- **Container-Objekte müssen existieren, auch wenn leer**: Plugins indizieren direkt (`hotkeyManager.customKeys[id]`) statt vorher zu prüfen. Ein fehlendes Feld ist ein `undefined[id]`-TypeError; `{}` ist ein sauberer Miss.

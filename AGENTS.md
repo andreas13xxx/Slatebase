@@ -45,19 +45,22 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Monorepo: `backend/` (
 - Vitest, co-located (`*.test.ts`)
 - Backend: hand-written mock factories, no mocking lib
 - Frontend: `vi.fn()` for API client
-- Commands: `npm run test` (single), `npm run test:watch`
+- Commands: `npm run test` (single), `npm run test:watch`, `npm run test:coverage`
+- CI runs `test:coverage` — thresholds are a regression baseline; raise them as coverage grows, never lower them to get a build through
 
 ## Commands
 
 ```bash
 # Backend
-cd backend && npm run dev       # Hot reload
-cd backend && npm run test      # Tests
+cd backend && npm run dev            # Hot reload
+cd backend && npm run test           # Tests
+cd backend && npm run test:coverage  # Tests + coverage thresholds (as in CI)
 
 # Frontend
-cd frontend && npm run dev      # Vite (port 5173, proxies /api)
-cd frontend && npm run test     # Unit tests
-cd frontend && npm run lint     # ESLint
+cd frontend && npm run dev            # Vite (port 5173, proxies /api)
+cd frontend && npm run test           # Unit tests
+cd frontend && npm run test:coverage  # Tests + coverage thresholds (as in CI)
+cd frontend && npm run lint           # ESLint
 ```
 
 ## Data Storage
