@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.26.0](https://github.com/andreas13xxx/Slatebase/compare/v0.25.4...v0.26.0) (2026-08-07)
+
+
+### Features
+
+* make Obsidian toolbar plugins work, drop native editor toolbar ([25cfadd](https://github.com/andreas13xxx/Slatebase/commit/25cfadd7d0dcc89c7e5f87562bf0acbf096d2a5f))
+
+
+### Bugfixes
+
+* fetch plugin stats from aggregated feed instead of per-repo API ([09c09f9](https://github.com/andreas13xxx/Slatebase/commit/09c09f945d59da861f55e051a9dfeb95c1ac4090))
+
+
+### Sonstige Änderungen
+
+* enforce coverage thresholds in CI ([ad1a5f5](https://github.com/andreas13xxx/Slatebase/commit/ad1a5f5c154ab1a58cd4c5c63df35ca3c090b2c3))
+* update steering, implementation plan and learnings ([1517cce](https://github.com/andreas13xxx/Slatebase/commit/1517cced001c35bb4497be7befab958bb523359a))
+
 ## [0.25.4](https://github.com/andreas13xxx/Slatebase/compare/v0.25.3...v0.25.4) (2026-08-07)
 
 
