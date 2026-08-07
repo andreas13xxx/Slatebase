@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.25.4](https://github.com/andreas13xxx/Slatebase/compare/v0.25.3...v0.25.4) (2026-08-07)
+
+
+### Sonstige Änderungen
+
+* bump @modelcontextprotocol/sdk from 1.18.0 to 1.26.0 in /backend ([#86](https://github.com/andreas13xxx/Slatebase/issues/86)) ([4d1e3f2](https://github.com/andreas13xxx/Slatebase/commit/4d1e3f24efedad04f08c4b2bebc8432e16d2973c))
+* bump pino from 9.14.0 to 10.3.1 in /backend ([#73](https://github.com/andreas13xxx/Slatebase/issues/73)) ([869a7cf](https://github.com/andreas13xxx/Slatebase/commit/869a7cfffda7cbbb3469bb3ddf8a8c75f2920806))
+* bump vite from 8.2.0 to 8.2.1 in /backend ([#90](https://github.com/andreas13xxx/Slatebase/issues/90)) ([11cd77a](https://github.com/andreas13xxx/Slatebase/commit/11cd77aab2d843c5126b3406eaa854cdce02bdfa))
+
 ## [0.25.3](https://github.com/andreas13xxx/Slatebase/compare/v0.25.2...v0.25.3) (2026-08-06)
 
 
