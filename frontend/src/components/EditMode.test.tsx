@@ -13,6 +13,7 @@ function renderEditMode(overrides: Partial<EditModeProps> = {}) {
     onCancel: vi.fn(),
     saving: false,
     error: null,
+    livePreviewMode: false,
     ...overrides,
   }
 

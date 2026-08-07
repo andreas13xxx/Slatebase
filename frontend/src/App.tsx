@@ -835,7 +835,7 @@ function AppContent() {
               </div>
             ) : (
               <ErrorBoundary>
-                <TabContent onOpenVersions={(vaultId, filePath) => setVersionBrowserTarget({ vaultId, filePath })} />
+                <TabContent />
               </ErrorBoundary>
             )}
           </section>

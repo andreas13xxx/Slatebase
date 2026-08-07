@@ -1,5 +1,6 @@
 import type { Hotkey } from './types';
 import type { IEditor } from './editor-shim';
+import { withPluginContext } from './plugin-execution-context';
 
 /**
  * EditorCommandContext — Context passed to editorCallback/editorCheckCallback.
@@ -43,10 +44,11 @@ export interface CommandInput {
  * ICommandRegistry — Interface for command registration, search, and execution.
  */
 export interface ICommandRegistry {
-  addCommand(pluginId: string, command: CommandInput): void;
+  addCommand(pluginId: string, command: CommandInput): Command;
   removeCommand(commandId: string): void;
   removeAllForPlugin(pluginId: string): void;
   getCommands(): Command[];
+  getCommand(commandId: string): Command | undefined;
   executeCommand(commandId: string): void;
   searchCommands(query: string): Command[];
   registerHotkey(commandId: string, hotkey: Hotkey): boolean;
@@ -95,8 +97,10 @@ export class CommandRegistry implements ICommandRegistry {
    * Register a command for a plugin.
    * The command ID is namespaced as <pluginId>:<commandId>.
    * If the command defines hotkeys, they are registered with conflict detection.
+   * Returns the registered Command (matches Obsidian's Plugin.addCommand, which
+   * plugins rely on to stash a reference, e.g. `this.forceSaveCommand = this.addCommand(...)`).
    */
-  addCommand(pluginId: string, command: CommandInput): void {
+  addCommand(pluginId: string, command: CommandInput): Command {
     const namespacedId = `${pluginId}:${command.id}`;
 
     const cmd: Command = {
@@ -118,6 +122,15 @@ export class CommandRegistry implements ICommandRegistry {
         this.registerHotkey(namespacedId, hotkey);
       }
     }
+
+    return cmd;
+  }
+
+  /**
+   * Look up a single command by its full namespaced ID.
+   */
+  getCommand(commandId: string): Command | undefined {
+    return this.commands.get(commandId);
   }
 
   /**
@@ -188,31 +201,35 @@ export class CommandRegistry implements ICommandRegistry {
     }
 
     try {
-      // Try editor-specific callbacks first (only when editor is active)
-      const editorCtx = this.editorContextResolver?.();
+      // Scoped so createEl() calls made by the callback (e.g. building a modal)
+      // get tagged with this command's owning plugin — see plugin-execution-context.ts.
+      withPluginContext(cmd.pluginId, () => {
+        // Try editor-specific callbacks first (only when editor is active)
+        const editorCtx = this.editorContextResolver?.();
 
-      if (editorCtx && cmd.editorCheckCallback) {
-        const available = cmd.editorCheckCallback(true, editorCtx.editor, editorCtx);
-        if (available !== false) {
-          cmd.editorCheckCallback(false, editorCtx.editor, editorCtx);
+        if (editorCtx && cmd.editorCheckCallback) {
+          const available = cmd.editorCheckCallback(true, editorCtx.editor, editorCtx);
+          if (available !== false) {
+            cmd.editorCheckCallback(false, editorCtx.editor, editorCtx);
+          }
+          return;
         }
-        return;
-      }
 
-      if (editorCtx && cmd.editorCallback) {
-        cmd.editorCallback(editorCtx.editor, editorCtx);
-        return;
-      }
-
-      // Fall through to regular callbacks
-      if (cmd.checkCallback) {
-        const available = cmd.checkCallback(true);
-        if (available !== false) {
-          cmd.checkCallback(false);
+        if (editorCtx && cmd.editorCallback) {
+          cmd.editorCallback(editorCtx.editor, editorCtx);
+          return;
         }
-      } else if (cmd.callback) {
-        cmd.callback();
-      }
+
+        // Fall through to regular callbacks
+        if (cmd.checkCallback) {
+          const available = cmd.checkCallback(true);
+          if (available !== false) {
+            cmd.checkCallback(false);
+          }
+        } else if (cmd.callback) {
+          cmd.callback();
+        }
+      });
     } catch (err) {
       console.error(
         `[CommandRegistry] Exception executing command "${commandId}":`,

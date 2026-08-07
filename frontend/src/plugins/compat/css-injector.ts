@@ -188,8 +188,55 @@ function scopeSingleSelector(selector: string, scope: string): string {
     return scope + selector.slice(4);
   }
 
-  // Prefix with scope
-  return `${scope} ${selector}`;
+  // Descendant form: matches when some ANCESTOR carries the scope attribute
+  // (e.g. a plugin's own view container).
+  const descendantForm = `${scope} ${selector}`;
+
+  // Self form: matches when the selector's own leading element carries the
+  // scope attribute directly. Needed for plugins that build UI by inserting
+  // elements straight into shared workspace DOM (toolbars, popovers) rather
+  // than their own view container — there is no wrapping ancestor to match,
+  // only the elements themselves, tagged at creation time (see
+  // plugin-execution-context.ts + the createEl patches in install-globals.ts).
+  const { head, rest } = splitLeadingCompound(selector);
+  const selfForm = `${scope}${head}${rest}`;
+
+  return `${selfForm}, ${descendantForm}`;
+}
+
+/**
+ * Split a selector into its leading compound (up to the first combinator —
+ * space, `>`, `+`, `~` — outside of brackets/parens/quotes) and the remainder,
+ * so the scope attribute can be attached directly onto that leading compound.
+ */
+function splitLeadingCompound(selector: string): { head: string; rest: string } {
+  let i = 0;
+  let depth = 0;
+
+  while (i < selector.length) {
+    const ch = selector[i]!;
+
+    if (ch === '"' || ch === "'") {
+      i = skipString(selector, i);
+      continue;
+    }
+    if (ch === '(' || ch === '[') {
+      depth++;
+      i++;
+      continue;
+    }
+    if (ch === ')' || ch === ']') {
+      depth--;
+      i++;
+      continue;
+    }
+    if (depth === 0 && (ch === ' ' || ch === '>' || ch === '+' || ch === '~')) {
+      break;
+    }
+    i++;
+  }
+
+  return { head: selector.slice(0, i), rest: selector.slice(i) };
 }
 
 /**

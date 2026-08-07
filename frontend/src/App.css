@@ -1941,56 +1941,6 @@
   min-height: 0;
 }
 
-.edit-mode-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-surface);
-  flex-shrink: 0;
-  flex-wrap: wrap;
-}
-
-.edit-toolbar-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  transition: background var(--transition-fast), color var(--transition-fast);
-}
-
-.edit-toolbar-btn:hover {
-  background: var(--border-subtle);
-  color: var(--text-primary);
-}
-
-.edit-toolbar-btn--active {
-  background: var(--accent-light);
-  color: var(--accent-text);
-}
-
-.edit-toolbar-btn--active:hover {
-  background: var(--accent-light);
-  color: var(--accent-hover);
-}
-
-.edit-toolbar-separator {
-  width: 1px;
-  height: 18px;
-  background: var(--border-subtle);
-  margin: 0 3px;
-  flex-shrink: 0;
-}
-
 .edit-mode-drop-zone {
   flex: 1;
   min-height: 0;
@@ -2000,7 +1950,11 @@
 
 .edit-mode-editor-area {
   display: flex;
-  flex-direction: row;
+  /* column: natively wraps a single CodeMirror child, so this only matters
+     when a plugin (e.g. editing-toolbar) inserts a toolbar bar as a sibling
+     of .cm-editor-wrapper here — it should stack full-width above the editor
+     rather than squeeze beside it in a row. */
+  flex-direction: column;
   flex: 1;
   min-height: 0;
 }

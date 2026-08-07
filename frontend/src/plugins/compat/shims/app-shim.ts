@@ -1,4 +1,5 @@
 import type {
+  Hotkey,
   IAppShim,
   IFileManagerShim,
   IMetadataCacheShim,
@@ -9,6 +10,8 @@ import type {
 import { FileManagerShim } from './file-manager-shim';
 import { detectPlatform, readPlatformEnvironment } from '../platform-detection';
 import { recordGapRead, recordGapCall } from '../api-gap-registry';
+import type { Command, ICommandRegistry } from '../command-registry';
+import { scopeForPlugin } from '../plugin-execution-context';
 
 /**
  * AppShim — Obsidian App API emulation.
@@ -69,6 +72,9 @@ export class AppShim implements IAppShim {
   /** Plugin ID used for scoping console warnings */
   private readonly pluginId: string;
 
+  /** Shared command registry (backs `app.commands`), if provided by the host. */
+  private readonly commandRegistry: ICommandRegistry | undefined;
+
   /** Internal plugins map (mutable for registration/unregistration) */
   private readonly pluginsMap: Record<string, PluginInstance>;
 
@@ -88,12 +94,20 @@ export class AppShim implements IAppShim {
     workspace: IWorkspaceShim;
     metadataCache: IMetadataCacheShim;
     pluginId: string;
+    commandRegistry?: ICommandRegistry;
   }) {
     this.vault = options.vault;
-    this.workspace = options.workspace;
+    // Scoped per-plugin: `on`/`onLayoutReady` bind options.pluginId into a
+    // closure so any callback registered through this plugin's `app.workspace`
+    // (and its deferred/event-triggered invocations) is tagged correctly for
+    // createEl()'s data-plugin-id, regardless of how much async work the
+    // plugin's onload() does first. See plugin-execution-context.ts — ambient
+    // "currently executing plugin" tracking alone doesn't survive `await`.
+    this.workspace = scopeForPlugin(options.workspace, options.pluginId, ['on', 'onLayoutReady']);
     this.metadataCache = options.metadataCache;
     this.fileManager = new FileManagerShim(options.vault);
     this.pluginId = options.pluginId;
+    this.commandRegistry = options.commandRegistry;
 
     this.pluginsMap = {};
     this.enabledPluginsSet = new Set();
@@ -193,18 +207,67 @@ export class AppShim implements IAppShim {
    * commands — Obsidian-internal command manager.
    * Kanban monkey-patches commands.executeCommand to intercept hotkeys.
    * LiveSync calls executeCommandById('app:reload') to restart.
+   * editing-toolbar calls commands.findCommand() during startup to migrate command IDs.
+   * Backed by the shared CommandRegistry when one is provided, so this reflects the
+   * same commands plugins register via `this.addCommand(...)`.
    */
-  readonly commands = {
-    commands: {} as Record<string, unknown>,
-    executeCommand: (_command: unknown) => {},
-    executeCommandById: (id: string) => {
+  readonly commands = ((self: AppShim) => ({
+    get commands(): Record<string, Command> {
+      const out: Record<string, Command> = {}
+      for (const cmd of self.commandRegistry?.getCommands() ?? []) out[cmd.id] = cmd
+      return out
+    },
+    findCommand: (id: string): Command | undefined => self.commandRegistry?.getCommand(id),
+    listCommands: (): Command[] => self.commandRegistry?.getCommands() ?? [],
+    executeCommand: (command: { id: string }): boolean => {
+      if (!self.commandRegistry?.getCommand(command.id)) return false
+      self.commandRegistry.executeCommand(command.id)
+      return true
+    },
+    executeCommandById: (id: string): boolean => {
       if (id === 'app:reload') {
         // Simulate Obsidian's app reload by refreshing the page
         window.location.reload()
+        return true
       }
-      return Promise.resolve()
+      if (!self.commandRegistry?.getCommand(id)) return false
+      self.commandRegistry.executeCommand(id)
+      return true
     },
-  }
+  }))(this)
+
+  /**
+   * hotkeyManager — Obsidian-internal hotkey manager (undocumented but widely used
+   * by plugins, e.g. Excalidraw's `addDefaultHotkeys`, editing-toolbar's
+   * `customKeys[id]` lookups during startup command-ID migration).
+   * `customKeys` holds user-configured overrides — always empty here since Slatebase
+   * has no hotkey-customization UI yet, but it must exist as an object or plugins
+   * that index into it directly (`customKeys[id]`) crash on `undefined[id]`.
+   * `defaultKeys` and `addDefaultHotkeys` are backed by the shared CommandRegistry.
+   */
+  readonly hotkeyManager = ((self: AppShim) => {
+    const getDefaultKeys = (): Record<string, Hotkey[]> => {
+      const out: Record<string, Hotkey[]> = {}
+      for (const cmd of self.commandRegistry?.getCommands() ?? []) {
+        if (cmd.hotkeys?.length) out[cmd.id] = cmd.hotkeys
+      }
+      return out
+    }
+    return {
+      customKeys: {} as Record<string, Hotkey[]>,
+      get defaultKeys(): Record<string, Hotkey[]> {
+        return getDefaultKeys()
+      },
+      getHotkeys: (commandId: string): Hotkey[] | undefined => getDefaultKeys()[commandId],
+      getDefaultHotkeys: (commandId: string): Hotkey[] | undefined => getDefaultKeys()[commandId],
+      setHotkeys: (_commandId: string, _hotkeys: Hotkey[]): void => {},
+      removeHotkeys: (_commandId: string): void => {},
+      addDefaultHotkeys: (commandId: string, hotkeys: Hotkey[]): void => {
+        for (const hk of hotkeys) self.commandRegistry?.registerHotkey(commandId, hk)
+      },
+      bake: (): void => {},
+    }
+  })(this)
 
   /**
    * Whether the app is running on a mobile device. Derived from the same
@@ -289,6 +352,7 @@ export class AppShim implements IAppShim {
     workspace: IWorkspaceShim;
     metadataCache: IMetadataCacheShim;
     pluginId: string;
+    commandRegistry?: ICommandRegistry;
   }): AppShim & Record<string, unknown> {
     const instance = new AppShim(options);
     return AppShim.wrapWithProxy(instance);
@@ -310,6 +374,7 @@ export class AppShim implements IAppShim {
       'internalPlugins',
       'embedRegistry',
       'commands',
+      'hotkeyManager',
       'loadLocalStorage',
       'saveLocalStorage',
       'isMobile',

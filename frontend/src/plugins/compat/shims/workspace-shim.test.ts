@@ -109,7 +109,10 @@ describe('WorkspaceShim', () => {
       expect(leaf.view.file).toBe(file);
     });
 
-    it('should emit active-leaf-change with null when no file tab is active', () => {
+    it('should emit active-leaf-change with an "empty" leaf (not null) when no file tab is active', () => {
+      // Real Obsidian's active leaf is (almost) never null — plugins like
+      // Excalidraw call `leaf.view?.getViewType()` on the leaf itself without
+      // null-checking the leaf, so emitting null here crashes them.
       const file = createMockTFile('notes/hello.md');
       workspace.setActiveFile(file);
 
@@ -118,7 +121,19 @@ describe('WorkspaceShim', () => {
       workspace.setActiveFile(null);
 
       expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(null);
+      const leaf = callback.mock.calls[0]![0];
+      expect(leaf).not.toBeNull();
+      expect(leaf.view.getViewType()).toBe('empty');
+    });
+
+    it('should emit active-leaf-change with null when no leaf has ever been created', () => {
+      const callback = vi.fn();
+      workspace.on('active-leaf-change', callback);
+      workspace.setActiveFile(null);
+
+      // setActiveFile(null) with no prior file open is a no-op (previousFile
+      // was already null), so nothing should fire at all.
+      expect(callback).not.toHaveBeenCalled();
     });
 
     it('should not emit active-leaf-change when same file is set again', () => {

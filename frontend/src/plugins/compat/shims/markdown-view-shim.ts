@@ -15,6 +15,7 @@
 
 import type { IEditor } from '../editor-shim'
 import type { TFile } from '../types'
+import { getActiveEditorContainerEl } from '../../../editor/plugin-extensions'
 
 /**
  * MarkdownView — Obsidian-compatible MarkdownView emulation.
@@ -45,7 +46,11 @@ export class MarkdownView {
     this.editor = editor
     this.file = file
     this.contentEl = document.createElement('div')
-    this.containerEl = document.createElement('div')
+    // Point at the real, attached DOM node hosting the CM6 editor when one is
+    // mounted, so plugins that query containerEl for an insertion point (e.g.
+    // Editing Toolbar's `.markdown-source-view` lookup) can actually find it.
+    // Falls back to a detached div when no editor is mounted (e.g. no file open).
+    this.containerEl = getActiveEditorContainerEl() ?? document.createElement('div')
     this.previewMode = { rerender: () => {} }
     this.currentMode = {
       get: () => '',

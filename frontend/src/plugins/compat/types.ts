@@ -1,4 +1,5 @@
 import type { WorkspaceLeaf } from './view-registry'
+import type { Command } from './command-registry'
 
 /**
  * EventRef — Reference to a registered event listener.
@@ -369,7 +370,7 @@ export interface PluginInstance {
   onunload(): void;
   loadData(): Promise<unknown>;
   saveData(data: unknown): Promise<void>;
-  addCommand(command: { id: string; name: string; callback: () => void; hotkeys?: Hotkey[] }): void;
+  addCommand(command: { id: string; name: string; callback: () => void; hotkeys?: Hotkey[] }): Command;
   addSettingTab(tab: unknown): void;
   addRibbonIcon(icon: string, title: string, callback: () => void): HTMLElement;
   registerEvent(eventRef: EventRef): void;

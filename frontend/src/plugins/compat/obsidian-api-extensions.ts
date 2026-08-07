@@ -17,6 +17,8 @@
  * @module obsidian-api-extensions
  */
 
+import { getCachedLucideIconNode, renderLucideIconNode, renderLucideIconInto } from './lucide-icons';
+
 // ─── Icon Registry ───────────────────────────────────────────────────────────────
 
 const customIcons: Map<string, string> = new Map();
@@ -48,7 +50,8 @@ export function getIcon(iconId: string): SVGSVGElement | null {
     const svgEl = container.querySelector('svg');
     return svgEl ?? null;
   }
-  return null;
+  const cached = getCachedLucideIconNode(iconId);
+  return cached ? renderLucideIconNode(cached) : null;
 }
 
 /**
@@ -69,16 +72,7 @@ export function setIcon(parent: HTMLElement, iconId: string): void {
     parent.innerHTML = svg;
     return;
   }
-  // Fallback: create a placeholder SVG with the icon name as data attr
-  const placeholder = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  placeholder.setAttribute('data-icon', iconId);
-  placeholder.setAttribute('width', '16');
-  placeholder.setAttribute('height', '16');
-  placeholder.setAttribute('viewBox', '0 0 24 24');
-  placeholder.setAttribute('fill', 'none');
-  placeholder.setAttribute('stroke', 'currentColor');
-  placeholder.setAttribute('stroke-width', '2');
-  parent.appendChild(placeholder);
+  renderLucideIconInto(parent, iconId);
 }
 
 // ─── Events Class ────────────────────────────────────────────────────────────────

@@ -61,6 +61,48 @@ export function getActiveEditorView(): EditorView | null {
   return activeView
 }
 
+// Reference to the DOM element hosting the active markdown editor (an ancestor
+// of the CM6 mount node, marked with a `.markdown-source-view` descendant).
+// Obsidian plugins (e.g. "Editing Toolbar") locate their insertion point via
+// `MarkdownView.containerEl.querySelector('.markdown-source-view')`, so this
+// must point at a real, attached DOM node rather than a detached stub.
+let activeEditorContainerEl: HTMLElement | null = null
+
+/**
+ * Notified whenever a real (non-null) container becomes available. Set by
+ * WorkspaceShim so it can re-fire 'active-leaf-change'/'layout-change' —
+ * plugins that build UI off `containerEl` on first load (e.g. "Editing
+ * Toolbar") run before CodeMirrorEditor has mounted, fail silently, and
+ * only get a second chance if one of those events fires again afterward.
+ */
+let onContainerMounted: (() => void) | null = null
+
+/**
+ * Register the callback invoked when the editor container mounts. Only one
+ * listener at a time — the current vault's WorkspaceShim is the sole owner.
+ */
+export function setEditorContainerMountedListener(fn: (() => void) | null): void {
+  onContainerMounted = fn
+}
+
+/**
+ * Set the DOM element hosting the active markdown editor. Called by
+ * CodeMirrorEditor on mount/unmount, mirroring setActiveEditorView.
+ */
+export function setActiveEditorContainerEl(el: HTMLElement | null): void {
+  activeEditorContainerEl = el
+  if (el) onContainerMounted?.()
+}
+
+/**
+ * Get the DOM element hosting the active markdown editor, or null if no
+ * editor is currently mounted. Used by the MarkdownView shim to give plugins
+ * a real containerEl instead of a detached div.
+ */
+export function getActiveEditorContainerEl(): HTMLElement | null {
+  return activeEditorContainerEl
+}
+
 /**
  * Validate whether a value is a real CM6 Extension or a fake stub object.
  *
@@ -392,6 +434,7 @@ export function resetPluginExtensions(): void {
   pluginCompartments.clear()
   pluginCompletions.clear()
   activeView = null
+  activeEditorContainerEl = null
 }
 
 /**

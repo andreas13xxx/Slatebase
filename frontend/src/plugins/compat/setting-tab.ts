@@ -15,6 +15,7 @@
  */
 
 import type { IAppShim, PluginInstance } from './types'
+import { renderLucideIconInto } from './lucide-icons'
 
 // ─── PluginSettingTab ────────────────────────────────────────────────────────────
 
@@ -395,13 +396,21 @@ export class ButtonComponent {
     return this
   }
 
-  setIcon(_icon: string): this {
-    // No-op — icons are not rendered in Slatebase setting buttons
+  setIcon(icon: string): this {
+    this.buttonEl.innerHTML = ''
+    renderLucideIconInto(this.buttonEl, icon)
     return this
   }
 
   setClass(cls: string): this {
+    // Keep our own 'setting-button' styling hook at the end of the class
+    // list rather than the front. Plugins (e.g. editing-toolbar) rely on
+    // attribute selectors like [class^=editingToolbarCommandsubItem] that
+    // only match when their own class is the first token — real Obsidian's
+    // ButtonComponent never injects a class ahead of what the plugin sets.
+    this.buttonEl.classList.remove('setting-button')
     this.buttonEl.classList.add(cls)
+    this.buttonEl.classList.add('setting-button')
     return this
   }
 

@@ -5,7 +5,7 @@ import type { EventRef, IWorkspaceShim, TFile } from '../types';
 import type { ViewRegistry, WorkspaceLeaf } from '../view-registry';
 import { EditorShim } from '../editor-shim';
 import type { IEditor } from '../editor-shim';
-import { refreshPluginExtensions } from '../../../editor/plugin-extensions';
+import { refreshPluginExtensions, getActiveEditorContainerEl, setEditorContainerMountedListener } from '../../../editor/plugin-extensions';
 import { MarkdownView } from './markdown-view-shim';
 import { recordGapRead, recordGapCall } from '../api-gap-registry';
 import {
@@ -64,6 +64,16 @@ export class WorkspaceShim implements IWorkspaceShim {
 
   constructor() {
     this.events = new EventSystem();
+    // Re-fire the leaf/layout events once the CM6 editor actually mounts. Plugins
+    // that build DOM-dependent UI off `activeLeaf.view.containerEl` (e.g. "Editing
+    // Toolbar") run their first attempt during onload/onLayoutReady, before the
+    // editor has mounted, so that attempt finds an empty containerEl and gives up
+    // silently. Without this, they never get a second chance since our shim only
+    // fires these events on an actual file/leaf change, which may not happen again.
+    setEditorContainerMountedListener(() => {
+      this.events.trigger('layout-change');
+      if (this.activeLeaf) this.events.trigger('active-leaf-change', this.activeLeaf);
+    });
   }
 
   /**
@@ -118,6 +128,12 @@ export class WorkspaceShim implements IWorkspaceShim {
    * In Slatebase, plugins load after FCP, so the layout is always ready.
    * The callback is invoked asynchronously (next microtask) to match Obsidian's behavior.
    * Both sync throws and async rejections are caught to prevent unhandled errors.
+   *
+   * Plugin-id tagging for createEl() calls made inside `callback` is handled
+   * by the per-plugin `scopeForPlugin()` wrapper applied to `app.workspace` in
+   * AppShim — not here, since this method has no way to know which plugin is
+   * calling it, and by the time this deferred callback runs, any ambient
+   * "currently executing plugin" tracking would already have unwound anyway.
    */
   onLayoutReady(callback: () => void): void {
     Promise.resolve().then(() => {
@@ -151,14 +167,38 @@ export class WorkspaceShim implements IWorkspaceShim {
         this.fileLeaf = this.viewRegistry.createLeaf(this.app, 'main');
       }
       if (this.fileLeaf) {
-        // Attach a minimal view-like object with the file reference
-        (this.fileLeaf as unknown as { view: { file: TFile | null; getViewType: () => string } }).view = {
+        // Attach a minimal view-like object with the file reference.
+        // containerEl is a getter (not a snapshot) because plugins may read
+        // activeLeaf.view.containerEl before or after the CM6 editor mounts
+        // (React effect ordering isn't guaranteed relative to this call) —
+        // it must always reflect whatever editor is currently live.
+        (this.fileLeaf as unknown as { view: { file: TFile | null; getViewType: () => string; getMode: () => string; readonly containerEl: HTMLElement } }).view = {
           file,
           getViewType: () => 'markdown',
+          getMode: () => 'source',
+          get containerEl() {
+            return getActiveEditorContainerEl() ?? document.createElement('div');
+          },
         };
         this.activeLeaf = this.fileLeaf;
       }
+    } else if (this.fileLeaf) {
+      // Real Obsidian's active leaf is (almost) never null — even with no file
+      // open there's a leaf with view type "empty". Plugins rely on this (e.g.
+      // Excalidraw's isUnwantedLeaf() does `e.view?.getViewType()` on the leaf
+      // itself without null-checking `e`, so passing null here throws).
+      (this.fileLeaf as unknown as { view: { file: TFile | null; getViewType: () => string; getMode: () => string; readonly containerEl: HTMLElement } }).view = {
+        file: null,
+        getViewType: () => 'empty',
+        getMode: () => 'source',
+        get containerEl() {
+          return getActiveEditorContainerEl() ?? document.createElement('div');
+        },
+      };
+      this.activeLeaf = this.fileLeaf;
     } else {
+      // No leaf has ever been created yet (no file opened this session) —
+      // there is nothing to hand plugins, so null is the only honest option.
       this.activeLeaf = null;
     }
 
@@ -327,14 +367,26 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Special case: When plugins request MarkdownView and a file is actively being edited,
    * we return a synthetic MarkdownView wrapping the EditorShim. This allows plugins like
    * Templater and Editor Toolbar to access the editor via the standard Obsidian pattern.
+   *
+   * The same synthetic view is also returned for `ItemView`/`FileView` — real Obsidian's
+   * MarkdownView descends from both, so plugins commonly probe with a generic base class
+   * (Editing Toolbar calls `getActiveViewOfType(ItemView)`, not `MarkdownView`, to also
+   * cover canvas/excalidraw). Our shim classes don't share a prototype chain, so this
+   * lookup is done by identity against the real `window.obsidian` globals instead.
    */
   getActiveViewOfType<T>(viewClass: new (...args: unknown[]) => T): T | null {
     if (this.activeLeaf?.view instanceof viewClass) {
       return this.activeLeaf.view as T;
     }
 
-    // If requesting MarkdownView and we have an active file, create a synthetic one
-    if (viewClass === (MarkdownView as unknown) && this.activeFile) {
+    const obsidian = (window as unknown as { obsidian?: Record<string, unknown> }).obsidian;
+    const isMarkdownViewFamily =
+      viewClass === (MarkdownView as unknown) ||
+      (!!obsidian && (viewClass === obsidian.FileView || viewClass === obsidian.ItemView));
+
+    // If requesting MarkdownView (or one of its Obsidian ancestor classes) and we
+    // have an active file, create a synthetic one
+    if (isMarkdownViewFamily && this.activeFile) {
       const mdView = new MarkdownView(this.editorShim, this.activeFile);
       return mdView as unknown as T;
     }

@@ -15,10 +15,16 @@
   --background-secondary: #f1f5f9;
   --background-secondary-alt: #ffffff;
   --background-modifier-border: #cbd5e1;
+  --background-modifier-border-hover: #94a3b8;
+  --background-modifier-border-focus: var(--interactive-accent);
   --background-modifier-form-field: #ffffff;
   --background-modifier-form-field-highlighted: #f1f5f9;
   --background-modifier-success: #f0fdf4;
+  --background-modifier-success-rgb: 22, 163, 74;
   --background-modifier-error: #fef2f2;
+  --background-modifier-error-hover: #fee2e2;
+  --background-modifier-active-hover: rgba(0, 0, 0, 0.08);
+  --background-modifier-message: var(--background-secondary);
 
   /* ─── Text ─────────────────────────────────────────────────────────────── */
   --text-normal: #0f172a;
@@ -29,6 +35,7 @@
   --text-success: #16a34a;
   --text-accent: #0d9488;
   --text-accent-hover: #0f766e;
+  --caret-color: var(--text-normal);
 
   /* ─── Interactive / Accent ──────────────────────────────────────────────── */
   --interactive-normal: #ffffff;
@@ -36,6 +43,13 @@
   --interactive-accent: #0d9488;
   --interactive-accent-hover: #0f766e;
   --interactive-accent-rgb: 13, 148, 136;
+  --interactive-accent-hsl: var(--accent-h), var(--accent-s), var(--accent-l);
+
+  /* ─── Accent HSL components + alias ──────────────────────────────────────── */
+  --accent-h: 175;
+  --accent-s: 84%;
+  --accent-l: 32%;
+  --color-accent: var(--interactive-accent);
 
   /* ─── UI ────────────────────────────────────────────────────────────────── */
   --icon-color: #475569;
@@ -48,10 +62,34 @@
   --font-text: var(--font-sans);
   --font-monospace: var(--font-mono);
   --font-interface: var(--font-sans);
+  --font-interface-theme: var(--font-interface);
+  --font-text-theme: var(--font-text);
+  --font-monospace-theme: var(--font-monospace);
+  --font-text-size: 16px;
+  --font-smallest: 0.8em;
+  --font-smaller: 0.875em;
+  --font-small: 0.933em;
+  --font-thin: 100;
+  --font-extralight: 200;
+  --font-light: 300;
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-bold: 700;
+  --font-extrabold: 800;
+  --font-black: 900;
+  --bold-modifier: 700;
+  --font-weight: 400;
+  --bold-weight: var(--font-bold);
+  --bold-color: var(--text-normal);
+  --italic-color: var(--text-normal);
+  --line-height-normal: 1.5;
+  --heading-spacing: 1.25;
+  --p-spacing: 1em;
 
   /* ─── Borders & Dividers ────────────────────────────────────────────────── */
   --divider-color: #e2e8f0;
   --border-color: #cbd5e1;
+  --border-width: 1px;
 
   /* ─── Scrollbar ─────────────────────────────────────────────────────────── */
   --scrollbar-bg: transparent;
@@ -61,6 +99,18 @@
   /* ─── Code ──────────────────────────────────────────────────────────────── */
   --code-normal: #0f172a;
   --code-background: #f1f5f9;
+  --code-white-space: pre;
+  --code-size: var(--font-smaller);
+  --code-comment: #94a3b8;
+  --code-function: #3b82f6;
+  --code-important: #dc2626;
+  --code-keyword: #9333ea;
+  --code-operator: var(--text-normal);
+  --code-property: var(--text-accent);
+  --code-punctuation: var(--text-muted);
+  --code-string: #16a34a;
+  --code-tag: #dc2626;
+  --code-value: #d97706;
 
   /* ─── Headings ──────────────────────────────────────────────────────────── */
   --h1-color: #0f172a;
@@ -72,13 +122,36 @@
 
   /* ─── Tags ──────────────────────────────────────────────────────────────── */
   --tag-color: #0d9488;
+  --tag-color-hover: var(--text-accent-hover);
   --tag-background: #f0fdfa;
+  --tag-background-hover: #ccfbf1;
   --tag-border-color: transparent;
+  --tag-border-color-hover: var(--text-accent-hover);
+  --tag-border-width: 1px;
+  --tag-size: var(--font-smaller);
+  --tag-decoration: none;
+  --tag-decoration-hover: none;
+  --tag-padding-x: var(--size-4-2);
+  --tag-padding-y: var(--size-2-2);
+  --tag-radius: var(--radius-s);
+  --tag-weight: var(--font-medium);
 
   /* ─── Links ─────────────────────────────────────────────────────────────── */
   --link-color: #0d9488;
   --link-color-hover: #0f766e;
+  --link-decoration: none;
+  --link-decoration-hover: underline;
+  --link-decoration-thickness: 1px;
+  --link-weight: inherit;
+  --link-unresolved-color: var(--text-error);
+  --link-unresolved-opacity: 0.7;
+  --link-unresolved-filter: none;
+  --link-unresolved-decoration-style: solid;
+  --link-unresolved-decoration-color: var(--link-unresolved-color);
   --link-external-color: #0d9488;
+  --link-external-color-hover: var(--link-color-hover);
+  --link-external-decoration: none;
+  --link-external-decoration-hover: underline;
 
   /* ─── Vault name ────────────────────────────────────────────────────────── */
   --vault-name-color: #0f172a;
@@ -86,6 +159,8 @@
   /* ─── Color-channel variables for alpha manipulation ────────────────────── */
   /* Excalidraw's StylesManager uses these with alphaTo() for transparency.
      These provide RGB channel values that can be combined with alpha. */
+  --mono-0: #000000;
+  --mono-100: #ffffff;
   --mono-rgb-0: 0, 0, 0;
   --mono-rgb-100: 255, 255, 255;
   --color-red-rgb: 220, 38, 38;
@@ -135,6 +210,7 @@
   --size-4-9: 36px;
   --size-4-12: 48px;
   --size-4-16: 64px;
+  --size-4-18: 72px;
 
   /* ─── Radii (Obsidian) ──────────────────────────────────────────────────── */
   --radius-s: 4px;
@@ -168,6 +244,496 @@
   --safe-area-inset-left: 0px;
   --view-header-height: var(--header-height);
   --bases-header-height: var(--header-height);
+
+  /* ─── Additional aliases used by Excalidraw's StylesManager ────────────── */
+  --background-modifier-cover: rgba(15, 23, 42, 0.4);
+  --text-highlight-bg: rgba(250, 204, 21, 0.4);
+  --text-highlight-bg-active: rgba(250, 204, 21, 0.6);
+  --tab-container-background: var(--background-secondary);
+  --titlebar-background-focused: var(--background-primary);
+
+  /* ─── Status bar ──────────────────────────────────────────────────────── */
+  --status-bar-background: var(--background-secondary);
+  --status-bar-border-color: var(--background-modifier-border);
+  --status-bar-border-width: 1px 0 0 0;
+  --status-bar-font-size: var(--font-ui-smaller);
+  --status-bar-text-color: var(--text-muted);
+  --status-bar-position: static;
+  --status-bar-radius: 0px;
+  --status-bar-scroll-padding: var(--size-4-2);
+
+  /* ─── Workspace ───────────────────────────────────────────────────────── */
+  --workspace-background-translucent: rgba(248, 250, 252, 0.85);
+
+  /* ─── Tabs (extended) ─────────────────────────────────────────────────── */
+  --tab-background-active: var(--background-primary);
+  --tab-text-color-active: var(--text-normal);
+  --tab-text-color-focused-active: var(--text-normal);
+  --tab-text-color-focused-highlighted: var(--text-normal);
+  --tab-text-color-focused-active-current: var(--text-normal);
+  --tab-font-size: var(--font-ui-small);
+  --tab-font-weight: 500;
+  --tab-divider-color: var(--background-modifier-border);
+  --tab-outline-color: var(--background-modifier-border);
+  --tab-outline-width: 1px;
+  --tab-curve: 6px;
+  --tab-radius: var(--radius-m);
+  --tab-radius-active: var(--radius-m);
+  --tab-width: 200px;
+  --tab-max-width: 320px;
+  --tab-stacked-pane-width: 40px;
+  --tab-stacked-header-width: 24px;
+  --tab-stacked-font-size: var(--font-ui-smaller);
+  --tab-stacked-font-weight: 500;
+  --tab-stacked-text-align: start;
+  --tab-stacked-text-transform: none;
+  --tab-stacked-text-writing-mode: vertical-rl;
+  --tab-stacked-shadow: none;
+
+  /* ─── Modal ───────────────────────────────────────────────────────────── */
+  --modal-background: var(--background-primary);
+  --modal-width: 600px;
+  --modal-height: auto;
+  --modal-max-width: 90vw;
+  --modal-max-height: 85vh;
+  --modal-max-width-narrow: 420px;
+  --modal-border-width: 1px;
+  --modal-border-color: var(--background-modifier-border);
+  --modal-radius: var(--radius-l);
+  --modal-community-sidebar-width: 300px;
+
+  /* ─── Callouts ────────────────────────────────────────────────────────── */
+  --callout-color: 59, 130, 246;
+  --callout-icon: lucide-pencil;
+  --callout-border-width: 1px;
+  --callout-border-opacity: 0.25;
+  --callout-padding: var(--size-4-3) var(--size-4-4);
+  --callout-radius: var(--radius-m);
+  --callout-blend-mode: multiply;
+  --callout-title-color: inherit;
+  --callout-title-padding: 0;
+  --callout-title-size: inherit;
+  --callout-title-weight: var(--font-semibold);
+  --callout-content-padding: var(--size-4-1) 0 0 0;
+  --callout-content-background: transparent;
+  --callout-bug: 220, 38, 38;
+  --callout-default: 59, 130, 246;
+  --callout-error: 220, 38, 38;
+  --callout-example: 147, 51, 234;
+  --callout-fail: 220, 38, 38;
+  --callout-important: 6, 182, 212;
+  --callout-info: 59, 130, 246;
+  --callout-question: 217, 119, 6;
+  --callout-success: 22, 163, 74;
+  --callout-summary: 6, 182, 212;
+  --callout-tip: 6, 182, 212;
+  --callout-todo: 59, 130, 246;
+  --callout-warning: 217, 119, 6;
+  --callout-quote: 148, 163, 184;
+
+  /* ─── The following block adds the remainder of Obsidian's documented CSS
+     variable surface (docs.obsidian.md/Reference/CSS+variables) that wasn't
+     already covered above. Values are sourced from Obsidian's own v1.0.3
+     app.css defaults where available (verified via a community-published
+     extract), and reasoned compositions from our existing Foundation-tier
+     tokens for newer variables (e.g. Properties/metadata) that postdate that
+     snapshot. Most are pure var() compositions and need no separate dark
+     variant; a handful of literal colors/shadows do differ by theme — see
+     the "Misc hardcoded colors" section at the end of this block and the
+     matching overrides in the dark-mode blocks below. ─── */
+
+  /* ─── Foundations: Borders/Cursor ─── */
+  --cursor: default;
+  --cursor-link: pointer;
+
+  /* ─── Foundations: Icons ─── */
+  --icon-stroke: var(--icon-m-stroke-width);
+  --icon-xs: 14px;
+  --icon-s: 16px;
+  --icon-m: 18px;
+  --icon-l: 18px;
+  --icon-xl: 32px;
+  --icon-xs-stroke-width: 2px;
+  --icon-s-stroke-width: 2px;
+  --icon-m-stroke-width: 1.75px;
+  --icon-l-stroke-width: 1.75px;
+  --icon-xl-stroke-width: 1.25px;
+  --icon-opacity: 0.85;
+  --icon-opacity-hover: 1;
+  --icon-opacity-active: 1;
+  --clickable-icon-radius: var(--radius-s);
+
+  /* ─── Foundations: Layers ─── */
+  --layer-sidedock: 10;
+  --layer-status-bar: 15;
+  --layer-popover: 30;
+  --layer-slides: 45;
+  --layer-modal: 50;
+  --layer-notice: 60;
+  --layer-menu: 65;
+  --layer-tooltip: 70;
+  --layer-dragged-item: 80;
+
+  /* ─── Foundations: Typography extras ─── */
+  --font-family: var(--font-interface);
+
+  /* ─── Components: Button ─── */
+  --button-radius: var(--input-radius);
+
+  /* ─── Components: Checkbox ─── */
+  --checkbox-radius: var(--radius-s);
+  --checkbox-size: 15px;
+  --checkbox-marker-color: var(--background-primary);
+  --checkbox-color: var(--interactive-accent);
+  --checkbox-color-hover: var(--interactive-accent-hover);
+  --checkbox-border-color: var(--text-faint);
+  --checkbox-border-color-hover: var(--text-muted);
+  --checklist-done-decoration: line-through;
+  --checklist-done-color: var(--text-muted);
+  --checkbox-margin-inline-start: 0;
+
+  /* ─── Components: Color input ─── */
+  --swatch-radius: 14px;
+  --swatch-height: 24px;
+  --swatch-width: 24px;
+  --swatch-shadow: inset 0 0 0 1px rgba(var(--mono-rgb-100), 0.15);
+
+  /* ─── Components: Dialog ─── */
+  --dialog-width: 560px;
+  --dialog-max-width: 80vw;
+  --dialog-max-height: 85vh;
+
+  /* ─── Components: Dragging ─── */
+  --drag-ghost-text-color: #fff;
+
+  /* ─── Components: Indentation guides ─── */
+  --indentation-guide-width: 1px;
+  --indentation-guide-width-active: 1px;
+  --indentation-guide-color: rgba(var(--mono-rgb-100), 0.12);
+  --indentation-guide-color-active: rgba(var(--mono-rgb-100), 0.3);
+  --indentation-guide-editing-indent: var(--list-indent);
+  --indentation-guide-reading-indent: var(--list-indent);
+  --indentation-guide-source-indent: 1em;
+
+  /* ─── Components: Multi-select (pills) ─── */
+  --pill-color: var(--text-muted);
+  --pill-color-hover: var(--text-normal);
+  --pill-color-remove: var(--text-faint);
+  --pill-color-remove-hover: var(--text-error);
+  --pill-decoration: none;
+  --pill-decoration-hover: none;
+  --pill-background: var(--background-modifier-hover);
+  --pill-background-hover: var(--background-modifier-border);
+  --pill-border-color: transparent;
+  --pill-border-color-hover: transparent;
+  --pill-border-width: 0px;
+  --pill-padding-x: var(--size-4-2);
+  --pill-padding-y: var(--size-2-2);
+  --pill-radius: var(--radius-s);
+  --pill-weight: var(--font-medium);
+
+  /* ─── Components: Navigation ─── */
+  --nav-item-size: var(--font-ui-small);
+  --nav-item-color: var(--text-muted);
+  --nav-item-color-hover: var(--text-normal);
+  --nav-item-color-active: var(--text-normal);
+  --nav-item-color-highlighted: var(--text-accent-hover);
+  --nav-item-background-hover: var(--background-modifier-hover);
+  --nav-item-background-active: var(--background-modifier-hover);
+  --nav-item-background-selected: hsla(var(--interactive-accent-hsl), 0.2);
+  --nav-item-padding: var(--size-4-1) var(--size-4-2);
+  --nav-item-parent-padding: var(--size-4-1) var(--size-4-2);
+  --nav-item-children-padding-start: var(--size-4-2);
+  --nav-item-children-margin-start: var(--size-4-2);
+  --nav-item-weight: inherit;
+  --nav-item-weight-hover: inherit;
+  --nav-item-weight-active: inherit;
+  --nav-item-white-space: nowrap;
+  --nav-indentation-guide-width: var(--indentation-guide-width);
+  --nav-indentation-guide-color: var(--indentation-guide-color);
+  --nav-collapse-icon-color: var(--text-faint);
+  --nav-collapse-icon-color-collapsed: var(--text-faint);
+  --nav-heading-color: var(--text-muted);
+  --nav-heading-color-hover: var(--text-normal);
+  --nav-heading-color-collapsed: var(--text-muted);
+  --nav-heading-color-colapsed-hover: var(--text-normal);
+  --nav-heading-weight: var(--font-semibold);
+  --nav-heading-weight-hover: var(--font-semibold);
+
+  /* ─── Components: Popover ─── */
+  --popover-width: 450px;
+  --popover-height: 400px;
+  --popover-max-height: 70vh;
+  --popover-font-size: var(--font-text-size);
+  --popover-pdf-width: 600px;
+  --popover-pdf-height: 800px;
+
+  /* ─── Components: Slider ─── */
+  --slider-thumb-border-width: 1px;
+  --slider-thumb-border-color: var(--background-modifier-border-hover);
+  --slider-thumb-height: 18px;
+  --slider-thumb-width: 18px;
+  --slider-thumb-y: -6px;
+  --slider-thumb-radius: 50%;
+  --slider-track-background: var(--background-modifier-border);
+  --slider-track-height: 3px;
+
+  /* ─── Components: Text input ─── */
+  --input-radius: 5px;
+  --input-font-weight: var(--font-normal);
+  --input-border-width: 1px;
+
+  /* ─── Components: Toggle ─── */
+  --toggle-border-width: 2px;
+  --toggle-radius: 18px;
+  --toggle-thumb-color: white;
+  --toggle-thumb-radius: 18px;
+  --toggle-thumb-height: 18px;
+  --toggle-thumb-width: 18px;
+  --toggle-s-border-width: 2px;
+  --toggle-s-width: 34px;
+  --toggle-s-thumb-height: 15px;
+  --toggle-s-thumb-width: 15px;
+
+  /* ─── Editor: Block/Embed ─── */
+  --embed-block-shadow-hover: 0 0 0 1px var(--background-modifier-border), inset 0 0 0 1px var(--background-modifier-border);
+  --embed-max-height: 4000px;
+  --embed-canvas-max-height: 4000px;
+  --embed-background: inherit;
+  --embed-border-start: 2px solid var(--interactive-accent);
+  --embed-border-end: none;
+  --embed-border-top: none;
+  --embed-border-bottom: none;
+  --embed-padding: 0 0 0 var(--size-4-6);
+  --embed-font-style: inherit;
+
+  /* ─── Editor: File ─── */
+  --file-line-width: 700px;
+  --file-folding-offset: 24px;
+  --file-margins: var(--size-4-8);
+  --file-header-font-size: var(--font-ui-small);
+  --file-header-font-weight: 400;
+  --file-header-border: var(--border-width) solid transparent;
+  --file-header-justify: center;
+
+  /* ─── Editor: Footnote ─── */
+  --footnote-size: var(--font-smaller);
+
+  /* ─── Editor: Headings (h1-h6 font/line-height/size/style/variant/weight) ─── */
+  --h1-font: inherit;
+  --h2-font: inherit;
+  --h3-font: inherit;
+  --h4-font: inherit;
+  --h5-font: inherit;
+  --h6-font: inherit;
+  --h1-line-height: 1.2;
+  --h2-line-height: 1.2;
+  --h3-line-height: 1.3;
+  --h4-line-height: 1.4;
+  --h5-line-height: var(--line-height-normal);
+  --h6-line-height: var(--line-height-normal);
+  --h1-size: 2em;
+  --h2-size: 1.6em;
+  --h3-size: 1.37em;
+  --h4-size: 1.25em;
+  --h5-size: 1.12em;
+  --h6-size: 1.12em;
+  --h1-style: normal;
+  --h2-style: normal;
+  --h3-style: normal;
+  --h4-style: normal;
+  --h5-style: normal;
+  --h6-style: normal;
+  --h1-variant: normal;
+  --h2-variant: normal;
+  --h3-variant: normal;
+  --h4-variant: normal;
+  --h5-variant: normal;
+  --h6-variant: normal;
+  --h1-weight: 700;
+  --h2-weight: 600;
+  --h3-weight: 600;
+  --h4-weight: 600;
+  --h5-weight: 600;
+  --h6-weight: 600;
+  --heading-formatting: var(--text-faint);
+
+  /* ─── Editor: Horizontal rule ─── */
+  --hr-color: var(--background-modifier-border);
+  --hr-thickness: 2px;
+
+  /* ─── Editor: Inline title ─── */
+  --inline-title-color: var(--h1-color);
+  --inline-title-font: var(--h1-font);
+  --inline-title-line-height: var(--h1-line-height);
+  --inline-title-size: var(--h1-size);
+  --inline-title-style: var(--h1-style);
+  --inline-title-variant: var(--h1-variant);
+  --inline-title-weight: var(--h1-weight);
+
+  /* ─── Editor: Link extras ─── */
+  --link-external-filter: none;
+
+  /* ─── Editor: List ─── */
+  --list-indent: 2em;
+  --list-indent-editing: 2em;
+  --list-indent-source: 2em;
+  --list-spacing: 0.075em;
+  --list-marker-color: var(--text-faint);
+  --list-marker-color-hover: var(--text-muted);
+  --list-marker-color-collapsed: var(--text-accent);
+  --list-bullet-border: none;
+  --list-bullet-end-padding: 4px;
+  --list-bullet-radius: 50%;
+  --list-bullet-size: 5px;
+  --list-bullet-transform: none;
+  --list-numbered-style: auto;
+
+  /* ─── Editor: Properties (metadata) — newer feature, no v1.0.3 default; composed from Foundations ─── */
+  --metadata-background: transparent;
+  --metadata-display-editing: flex;
+  --metadata-display-reading: flex;
+  --metadata-max-width: var(--file-line-width);
+  --metadata-padding: var(--size-4-2);
+  --metadata-border-color: var(--background-modifier-border);
+  --metadata-border-radius: var(--radius-s);
+  --metadata-border-width: var(--border-width);
+  --metadata-gap: var(--size-4-1);
+  --metadata-divider-color: var(--background-modifier-border);
+  --metadata-divider-color-hover: var(--background-modifier-border-hover);
+  --metadata-divider-color-focus: var(--interactive-accent);
+  --metadata-divider-width: 1px;
+  --metadata-property-padding: var(--size-4-1) var(--size-4-2);
+  --metadata-property-radius: var(--radius-s);
+  --metadata-property-radius-hover: var(--radius-s);
+  --metadata-property-radius-focus: var(--radius-s);
+  --metadata-property-background: transparent;
+  --metadata-property-background-hover: var(--background-modifier-hover);
+  --metadata-property-background-active: var(--background-modifier-active-hover);
+  --metadata-label-background-hover: var(--background-modifier-hover);
+  --metadata-label-background-active: var(--background-modifier-active-hover);
+  --metadata-label-font-size: var(--font-ui-small);
+  --metadata-label-font-weight: var(--font-normal);
+  --metadata-sidebar-label-font-size: var(--font-ui-smaller);
+  --metadata-label-text-color: var(--text-muted);
+  --metadata-label-text-color-hover: var(--text-normal);
+  --metadata-label-width: 120px;
+  --metadata-input-height: var(--input-height);
+  --metadata-input-text-color: var(--text-normal);
+  --metadata-input-font-size: var(--font-ui-small);
+  --metadata-sidebar-input-font-size: var(--font-ui-smaller);
+  --metadata-input-background: transparent;
+  --metadata-input-background-hover: var(--background-modifier-hover);
+  --metadata-input-background-active: var(--background-modifier-active-hover);
+
+  /* ─── Editor: Table ─── */
+  --table-background: transparent;
+  --table-border-width: 1px;
+  --table-border-color: var(--background-modifier-border);
+  --table-cell-vertical-alignment: top;
+  --table-white-space: normal;
+  --table-header-background: var(--table-background);
+  --table-header-background-hover: inherit;
+  --table-header-border-width: var(--table-border-width);
+  --table-header-border-color: var(--table-border-color);
+  --table-header-font: inherit;
+  --table-header-size: var(--font-smaller);
+  --table-header-weight: var(--font-normal);
+  --table-header-color: var(--text-muted);
+  --table-line-height: var(--line-height-normal);
+  --table-text-size: inherit;
+  --table-text-color: inherit;
+  --table-column-max-width: none;
+  --table-column-alt-background: var(--table-background);
+  --table-column-first-border-width: var(--table-border-width);
+  --table-column-last-border-width: var(--table-border-width);
+  --table-row-alt-background: var(--table-background);
+  --table-row-alt-background-hover: var(--table-row-background-hover);
+  --table-row-last-border-width: var(--table-border-width);
+  --table-selection: hsla(var(--interactive-accent-hsl), 0.15);
+  --table-selection-blend-mode: multiply;
+  --table-selection-border-color: var(--interactive-accent);
+  --table-selection-border-width: 1px;
+  --table-selection-border-radius: 2px;
+  --table-drag-handle-background: var(--background-secondary);
+  --table-drag-handle-background-active: var(--background-modifier-hover);
+  --table-drag-handle-color: var(--text-faint);
+  --table-drag-handle-color-active: var(--text-muted);
+  --table-add-button-background: transparent;
+  --table-add-button-border-width: 1px;
+  --table-add-button-border-color: var(--background-modifier-border);
+
+  /* ─── Editor: Blockquote ─── */
+  --blockquote-border-thickness: 2px;
+  --blockquote-border-color: var(--interactive-accent);
+  --blockquote-font-style: normal;
+  --blockquote-color: inherit;
+  --blockquote-background-color: transparent;
+
+  /* ─── Window: Divider ─── */
+  --divider-width: 1px;
+  --divider-width-hover: 3px;
+  --divider-vertical-height: calc(100% - var(--header-height));
+  --divider-color-hover: var(--interactive-accent);
+
+  /* ─── Window: Ribbon ─── */
+  --ribbon-background: var(--background-secondary);
+  --ribbon-background-collapsed: var(--background-primary);
+  --ribbon-width: 44px;
+  --ribbon-padding: var(--size-4-2) var(--size-4-1) var(--size-4-3);
+
+  /* ─── Window: Window frame ─── */
+  --titlebar-background: var(--background-secondary);
+  --titlebar-border-width: 0px;
+  --titlebar-border-color: var(--background-modifier-border);
+  --titlebar-text-color: var(--text-muted);
+  --titlebar-text-color-focused: var(--text-normal);
+  --titlebar-text-weight: var(--font-bold);
+
+  /* ─── Plugins: Canvas ─── */
+  --canvas-background: var(--background-primary);
+  --canvas-card-label-color: var(--text-muted);
+  --canvas-dot-pattern: var(--background-modifier-border);
+  --canvas-color-1: var(--color-red);
+  --canvas-color-2: var(--color-orange);
+  --canvas-color-3: var(--color-yellow);
+  --canvas-color-4: var(--color-green);
+  --canvas-color-5: var(--color-cyan);
+  --canvas-color-6: var(--color-purple);
+
+  /* ─── Plugins: File explorer (Vault profile) ─── */
+  --vault-profile-display: flex;
+  --vault-profile-actions-display: flex;
+  --vault-profile-font-size: var(--font-ui-small);
+  --vault-profile-font-weight: var(--font-medium);
+  --vault-profile-color: var(--text-normal);
+  --vault-profile-color-hover: var(--text-normal);
+
+  /* ─── Plugins: Graph ─── */
+  --graph-controls-width: 240px;
+  --graph-text: var(--text-normal);
+  --graph-line: var(--background-modifier-border-focus);
+  --graph-node: var(--text-muted);
+  --graph-node-unresolved: var(--text-faint);
+  --graph-node-focused: var(--text-accent);
+  --graph-node-tag: var(--color-green);
+  --graph-node-attachment: var(--color-yellow);
+
+  /* ─── Plugins: Search ─── */
+  --search-clear-button-color: var(--text-muted);
+  --search-clear-button-size: 13px;
+  --search-icon-color: var(--text-muted);
+  --search-icon-size: 18px;
+  --search-result-background: var(--background-primary);
+
+  /* ─── Misc hardcoded colors that DO differ light/dark (from the real dump) ─── */
+  --drag-ghost-background: rgba(0, 0, 0, 0.85);
+  --background-modifier-box-shadow: rgba(0, 0, 0, 0.1);
+  --highlight-mix-blend-mode: darken;
+  --input-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12), 0 2px 3px 0 rgba(0,0,0,.05), 0 1px 1.5px 0 rgba(0,0,0,.03), 0 1px 2px 0 rgba(0,0,0,.04), 0 0 0 0 transparent;
+  --input-shadow-hover: inset 0 0 0 1px rgba(0, 0, 0, 0.17), 0 2px 3px 0 rgba(0,0,0,.1), 0 1px 1.5px 0 rgba(0,0,0,.03), 0 1px 2px 0 rgba(0,0,0,.04), 0 0 0 0 transparent;
+  --shadow-s: 0px 1px 2px rgba(0, 0, 0, 0.028), 0px 3.4px 6.7px rgba(0, 0, 0, .042), 0px 15px 30px rgba(0, 0, 0, .07);
+  --shadow-l: 0px 1.8px 7.3px rgba(0, 0, 0, 0.071), 0px 6.3px 24.7px rgba(0, 0, 0, 0.112), 0px 30px 90px rgba(0, 0, 0, 0.2);
 }
 
 /* ─── Dark Mode Overrides ───────────────────────────────────────────────────── */
@@ -178,11 +744,15 @@
   --background-secondary: var(--bg-surface, #161b22);
   --background-secondary-alt: var(--bg-elevated, #21262d);
   --background-modifier-border: var(--border-default, #30363d);
+  --background-modifier-border-hover: #484f58;
   --background-modifier-form-field: var(--bg-surface, #161b22);
   --background-modifier-form-field-highlighted: var(--bg-elevated, #21262d);
   --background-modifier-success: rgba(46, 160, 67, 0.15);
+  --background-modifier-success-rgb: 46, 160, 67;
   --background-modifier-error: rgba(248, 81, 73, 0.15);
+  --background-modifier-error-hover: rgba(248, 81, 73, 0.25);
   --background-modifier-hover: rgba(255, 255, 255, 0.05);
+  --background-modifier-active-hover: rgba(255, 255, 255, 0.08);
   --background-modifier-error-rgb: 248, 113, 113;
 
   /* ─── Text (Dark) ────────────────────────────────────────────────────────── */
@@ -203,6 +773,11 @@
   --interactive-accent-hover: var(--accent-hover, #5eead4);
   --interactive-accent-rgb: 45, 212, 191;
 
+  /* ─── Accent HSL components (Dark) ──────────────────────────────────────── */
+  --accent-h: 173;
+  --accent-s: 66%;
+  --accent-l: 50%;
+
   /* ─── UI (Dark) ──────────────────────────────────────────────────────────── */
   --icon-color: #8b949e;
   --icon-color-hover: #e6edf3;
@@ -219,6 +794,20 @@
   --scrollbar-thumb-bg: #30363d;
   --scrollbar-active-thumb-bg: #484f58;
 
+  /* ─── Code (Dark) ────────────────────────────────────────────────────────── */
+  --code-comment: #7a8088;
+  --code-function: #58a6ff;
+  --code-important: #f85149;
+  --code-keyword: #d2a8ff;
+  --code-string: #3fb950;
+  --code-tag: #f85149;
+  --code-value: #fbbf24;
+
+  /* ─── Tags (Dark) ────────────────────────────────────────────────────────── */
+  --tag-background-hover: rgba(45, 212, 191, 0.15);
+
+  --mono-0: #ffffff;
+  --mono-100: #000000;
   --mono-rgb-0: 255, 255, 255;
   --mono-rgb-100: 0, 0, 0;
   --color-base-00: #0d1117;
@@ -236,6 +825,26 @@
   --nav-item-color-selected: var(--text-accent);
   --table-row-background-hover: var(--background-modifier-hover);
   --text-selection: rgba(45, 212, 191, 0.25);
+
+  /* ─── Additional aliases used by Excalidraw's StylesManager (Dark) ─────── */
+  --background-modifier-cover: rgba(0, 0, 0, 0.6);
+  --text-highlight-bg: rgba(250, 204, 21, 0.3);
+  --text-highlight-bg-active: rgba(250, 204, 21, 0.5);
+  --tab-container-background: var(--bg-surface, #161b22);
+  --titlebar-background-focused: var(--bg-base, #0d1117);
+
+  /* ─── Workspace (Dark) ───────────────────────────────────────────────────── */
+  --workspace-background-translucent: rgba(13, 17, 23, 0.85);
+
+  /* ─── Callouts (Dark) ────────────────────────────────────────────────────── */
+  --callout-blend-mode: screen;
+
+  /* ─── Misc hardcoded colors that DO differ light/dark (Dark) ────────────── */
+  --background-modifier-box-shadow: rgba(0, 0, 0, 0.3);
+  --highlight-mix-blend-mode: lighten;
+  --input-shadow: inset 0 0.5px 0.5px 0.5px rgba(255, 255, 255, 0.09), 0 2px 4px 0 rgba(0,0,0,.15), 0 1px 1.5px 0 rgba(0,0,0,.1), 0 1px 2px 0 rgba(0,0,0,.2), 0 0 0 0 transparent;
+  --input-shadow-hover: inset 0 0.5px 1px 0.5px rgba(255, 255, 255, 0.16), 0 2px 3px 0 rgba(0,0,0,.3), 0 1px 1.5px 0 rgba(0,0,0,.2), 0 1px 2px 0 rgba(0,0,0,.4), 0 0 0 0 transparent;
+  --shadow-s: 0px 1px 2px rgba(0, 0, 0, 0.121), 0px 3.4px 6.7px rgba(0, 0, 0, 0.179), 0px 15px 30px rgba(0, 0, 0, 0.3);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -246,11 +855,15 @@
     --background-secondary: var(--bg-surface, #161b22);
     --background-secondary-alt: var(--bg-elevated, #21262d);
     --background-modifier-border: var(--border-default, #30363d);
+    --background-modifier-border-hover: #484f58;
     --background-modifier-form-field: var(--bg-surface, #161b22);
     --background-modifier-form-field-highlighted: var(--bg-elevated, #21262d);
     --background-modifier-success: rgba(46, 160, 67, 0.15);
+    --background-modifier-success-rgb: 46, 160, 67;
     --background-modifier-error: rgba(248, 81, 73, 0.15);
+    --background-modifier-error-hover: rgba(248, 81, 73, 0.25);
     --background-modifier-hover: rgba(255, 255, 255, 0.05);
+    --background-modifier-active-hover: rgba(255, 255, 255, 0.08);
     --background-modifier-error-rgb: 248, 113, 113;
 
     /* ─── Text (Dark) ──────────────────────────────────────────────────────── */
@@ -271,6 +884,11 @@
     --interactive-accent-hover: var(--accent-hover, #5eead4);
     --interactive-accent-rgb: 45, 212, 191;
 
+    /* ─── Accent HSL components (Dark) ──────────────────────────────────────── */
+    --accent-h: 173;
+    --accent-s: 66%;
+    --accent-l: 50%;
+
     /* ─── UI (Dark) ────────────────────────────────────────────────────────── */
     --icon-color: #8b949e;
     --icon-color-hover: #e6edf3;
@@ -287,6 +905,20 @@
     --scrollbar-thumb-bg: #30363d;
     --scrollbar-active-thumb-bg: #484f58;
 
+    /* ─── Code (Dark) ─────────────────────────────────────────────────────── */
+    --code-comment: #7a8088;
+    --code-function: #58a6ff;
+    --code-important: #f85149;
+    --code-keyword: #d2a8ff;
+    --code-string: #3fb950;
+    --code-tag: #f85149;
+    --code-value: #fbbf24;
+
+    /* ─── Tags (Dark) ───────────────────────────────────────────────────────── */
+    --tag-background-hover: rgba(45, 212, 191, 0.15);
+
+    --mono-0: #ffffff;
+    --mono-100: #000000;
     --mono-rgb-0: 255, 255, 255;
     --mono-rgb-100: 0, 0, 0;
     --color-base-00: #0d1117;
@@ -301,5 +933,37 @@
     --color-base-60: #edf2f7;
     --color-base-70: #f7fafc;
     --color-base-100: #ffffff;
+
+    /* ─── Additional aliases used by Excalidraw's StylesManager (Dark) ───── */
+    --background-modifier-cover: rgba(0, 0, 0, 0.6);
+    --text-highlight-bg: rgba(250, 204, 21, 0.3);
+    --text-highlight-bg-active: rgba(250, 204, 21, 0.5);
+    --tab-container-background: var(--bg-surface, #161b22);
+    --titlebar-background-focused: var(--bg-base, #0d1117);
+
+    /* ─── Workspace (Dark) ─────────────────────────────────────────────────── */
+    --workspace-background-translucent: rgba(13, 17, 23, 0.85);
+
+    /* ─── Callouts (Dark) ──────────────────────────────────────────────────── */
+    --callout-blend-mode: screen;
+
+    /* ─── Misc hardcoded colors that DO differ light/dark (Dark) ────────────── */
+    --background-modifier-box-shadow: rgba(0, 0, 0, 0.3);
+    --highlight-mix-blend-mode: lighten;
+    --input-shadow: inset 0 0.5px 0.5px 0.5px rgba(255, 255, 255, 0.09), 0 2px 4px 0 rgba(0,0,0,.15), 0 1px 1.5px 0 rgba(0,0,0,.1), 0 1px 2px 0 rgba(0,0,0,.2), 0 0 0 0 transparent;
+    --input-shadow-hover: inset 0 0.5px 1px 0.5px rgba(255, 255, 255, 0.16), 0 2px 3px 0 rgba(0,0,0,.3), 0 1px 1.5px 0 rgba(0,0,0,.2), 0 1px 2px 0 rgba(0,0,0,.4), 0 0 0 0 transparent;
+    --shadow-s: 0px 1px 2px rgba(0, 0, 0, 0.121), 0px 3.4px 6.7px rgba(0, 0, 0, 0.179), 0px 15px 30px rgba(0, 0, 0, 0.3);
   }
+}
+
+/* ─── Structural view classes ────────────────────────────────────────────
+   Real Obsidian panes are `position: relative`, so plugins that render
+   absolutely-positioned UI anchored to the editor pane (e.g. Editing
+   Toolbar's floating toolbar bar) size against the pane instead of
+   falling back to the nearest positioned ancestor up the page — which is
+   what stacks them in the corner instead of over the editor. CodeMirrorEditor
+   marks `.edit-mode-editor-area` with `.markdown-source-view` at mount time. */
+.markdown-source-view,
+.view-content {
+  position: relative;
 }

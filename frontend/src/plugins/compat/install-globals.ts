@@ -21,6 +21,8 @@
 import { getStoredAuthToken, getStoredCsrfToken } from '../../state/authContext'
 import { addRibbonIcon as registerRibbonIcon } from './ribbon-icon-registry'
 import { addStatusBarItem as registerStatusBarItem } from './status-bar-registry'
+import { getCurrentPluginId } from './plugin-execution-context'
+import { getCachedLucideIconNode, renderLucideIconNode, renderLucideIconInto } from './lucide-icons'
 import moment from 'moment/min/moment-with-locales'
 
 // Real CM6 modules — used to provide functional extensions to plugins
@@ -321,6 +323,12 @@ export function installObsidianGlobals(): void {
   if (!(window as unknown as { createEl?: unknown }).createEl) {
     (window as unknown as { createEl: unknown }).createEl = function(tag: string, o?: unknown): HTMLElement {
       const el = document.createElement(tag)
+      // Tag with the currently-executing plugin so CssInjector's [data-plugin-id]
+      // ancestor scoping can still match — even when this element gets inserted
+      // into shared workspace DOM (toolbars, popovers) instead of the plugin's
+      // own view container, which has no such ancestor of its own.
+      const pluginId = getCurrentPluginId()
+      if (pluginId) el.setAttribute('data-plugin-id', pluginId)
       if (typeof o === 'string') { el.className = o }
       else if (o && typeof o === 'object') {
         const opts = o as { cls?: string | string[]; text?: string; attr?: Record<string, string | number | boolean | null>; parent?: Node }
@@ -414,7 +422,8 @@ export function installObsidianGlobals(): void {
         container.innerHTML = svg
         return container.querySelector('svg') ?? null
       }
-      return null
+      const cached = getCachedLucideIconNode(iconId)
+      return cached ? renderLucideIconNode(cached) : null
     }
   }
   if (!window.obsidian.getIconIds) {
@@ -427,12 +436,7 @@ export function installObsidianGlobals(): void {
       parent.innerHTML = ''
       const svg = customIconsRef.get(iconId)
       if (svg) { parent.innerHTML = svg; return }
-      // Fallback: empty SVG placeholder
-      const placeholder = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-      placeholder.setAttribute('data-icon', iconId)
-      placeholder.setAttribute('width', '16')
-      placeholder.setAttribute('height', '16')
-      parent.appendChild(placeholder)
+      renderLucideIconInto(parent, iconId)
     }
   }
 
@@ -632,6 +636,10 @@ export function installObsidianGlobals(): void {
     Object.defineProperty(HTMLElement.prototype, 'createEl', {
       value: function (this: HTMLElement, tag: string, o?: unknown, cb?: (el: HTMLElement) => void) {
         const el = document.createElement(tag)
+        // See the matching comment on the global createEl() above — same
+        // reasoning, this is the `containerEl.createEl(...)` entry point.
+        const pluginId = getCurrentPluginId()
+        if (pluginId) el.setAttribute('data-plugin-id', pluginId)
         // Obsidian overload: createEl(tag, options?, callback?)
         // - options can be { cls, text, attr, type, href, placeholder, value }
         // - callback receives the created element for imperative population

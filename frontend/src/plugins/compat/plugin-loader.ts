@@ -31,6 +31,7 @@ import { STORAGE_KEY_TOKEN, STORAGE_KEY_CSRF } from '../../state/authContext';
 // relied upon transitively, so the namespace is guaranteed complete no matter
 // which entry point reaches the loader first. Idempotent.
 import { installObsidianGlobals } from './install-globals';
+import { withPluginContext } from './plugin-execution-context';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -202,7 +203,10 @@ export class PluginLoader implements IPluginLoader {
         unregister: () => {},
       };
 
-      const onloadResult = record.instance.onload();
+      // Scoped so createEl() calls made during onload (and, via captured
+      // pluginId on registered listeners/deferred callbacks, afterward too —
+      // see plugin-execution-context.ts) get tagged with this plugin's id.
+      const onloadResult = withPluginContext(pluginId, () => record.instance.onload());
       const onloadPromise = onloadResult instanceof Promise
         ? onloadResult.catch((err: unknown) => {
             console.error(`[PluginLoader] Plugin "${pluginId}" onload() rejected:`, err);

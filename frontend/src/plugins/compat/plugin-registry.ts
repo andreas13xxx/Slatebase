@@ -230,6 +230,7 @@ export class PluginRegistry implements IPluginRegistry {
         status: entry.status === 'loading' ? 'active' : entry.status,
         permissions: entry.permissions,
         compatibilityLevel: entry.compatibilityLevel,
+        manifest: entry.manifest,
         installedAt: (entry as unknown as Record<string, unknown>).installedAt ?? new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

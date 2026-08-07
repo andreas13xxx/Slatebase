@@ -60,7 +60,7 @@ function pathExistsInTree(tree: DirectoryTree | null, filePath: string): boolean
  *
  * Validates: Requirements 1.1, 3.4, 3.5, 7.1
  */
-export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: string, filePath: string) => void } = {}) {
+export function TabContent() {
   const { tabState, tabDispatch } = useTabContext()
   const { state: appState, dispatch: appDispatch, apiClient } = useAppContext()
   const { t } = useTranslation()
@@ -391,7 +391,6 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
           }}
           onExternalFileDrop={handleExternalFileDrop}
           onImagePaste={handleImagePaste}
-          onOpenVersions={onOpenVersions ? () => onOpenVersions(activeTab.vaultId, activeTab.filePath) : undefined}
         />
       </div>
     )
@@ -434,7 +433,6 @@ export function TabContent({ onOpenVersions }: { onOpenVersions?: (vaultId: stri
         }}
         onExternalFileDrop={handleExternalFileDrop}
         onImagePaste={handleImagePaste}
-        onOpenVersions={onOpenVersions ? () => onOpenVersions(activeTab.vaultId, activeTab.filePath) : undefined}
       />
     </div>
   )

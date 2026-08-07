@@ -30,7 +30,7 @@ import { createSlatebaseTheme, createSlatebaseHighlightStyle } from './theme'
 import { getEditorState, saveEditorState, editorHistoryExtension } from './state-store'
 import { applyFormatting as applyFormattingAction } from './formatting'
 import { createLivePreviewCompartmentExtension, createLivePreviewField, createLivePreviewClickHandler, type LivePreviewOptions } from './live-preview'
-import { setActiveEditorView, getActivePluginExtensions, getActivePluginCompletions } from './plugin-extensions'
+import { setActiveEditorView, setActiveEditorContainerEl, getActivePluginExtensions, getActivePluginCompletions } from './plugin-extensions'
 import { editorInfoField, editorEditorField, editorLivePreviewField } from './editor-state-fields'
 import { setEditorInfo, setEditorEditor, setEditorLivePreview, type EditorFileInfo } from './editor-state-fields'
 import './live-preview/live-preview.css'
@@ -189,6 +189,10 @@ export function CodeMirrorEditor({
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
+    // Captured here (not re-read in cleanup) so the class removal below always
+    // targets the same node the mount branch marked, even if `container` has
+    // already been detached from the DOM by the time cleanup runs.
+    let editorArea: HTMLElement | null = null
 
     // If tab changed, save old state
     if (prevTabIdRef.current !== tabId && viewRef.current) {
@@ -231,6 +235,16 @@ export function CodeMirrorEditor({
 
     // Register the active EditorView with the plugin extension manager
     setActiveEditorView(view)
+    // Expose an ancestor of the mount node as the "MarkdownView.containerEl" that
+    // plugins like Editing Toolbar query for an insertion point via
+    // containerEl.querySelector('.markdown-source-view'). The marker class goes on
+    // cm-editor-wrapper's *parent* rather than cm-editor-wrapper itself: the wrapper
+    // has `overflow: hidden` (see live-preview.css), which would clip an
+    // absolutely-positioned toolbar bar inserted inside it. containerEl is then the
+    // grandparent, since containerEl must be a strict ancestor of the marked element.
+    editorArea = container.parentElement
+    editorArea?.classList.add('markdown-source-view')
+    setActiveEditorContainerEl(editorArea?.parentElement ?? editorArea ?? null)
 
     // Initialize Obsidian-compatible StateFields with current context
     const fileInfo: EditorFileInfo = {
@@ -262,6 +276,8 @@ export function CodeMirrorEditor({
       if (viewRef.current) {
         saveCurrentState(tabId)
         setActiveEditorView(null)
+        setActiveEditorContainerEl(null)
+        editorArea?.classList.remove('markdown-source-view')
         viewRef.current.destroy()
         viewRef.current = null
       }

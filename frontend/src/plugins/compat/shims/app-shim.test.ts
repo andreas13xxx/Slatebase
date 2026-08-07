@@ -78,7 +78,12 @@ describe('AppShim', () => {
       const app = new AppShim({ vault, workspace, metadataCache, pluginId: 'test-plugin' });
 
       expect(app.vault).toBe(vault);
-      expect(app.workspace).toBe(workspace);
+      // workspace is wrapped (scopeForPlugin) so `on`/`onLayoutReady` calls get
+      // tagged with this plugin's id — not the same reference, but delegates
+      // to the same underlying mock.
+      expect(app.workspace).not.toBe(workspace);
+      app.workspace.getActiveFile();
+      expect(workspace.getActiveFile).toHaveBeenCalled();
       expect(app.metadataCache).toBe(metadataCache);
     });
 
@@ -187,7 +192,10 @@ describe('AppShim', () => {
 
       expect(warnSpy).not.toHaveBeenCalled();
       expect(v).toBe(vault);
-      expect(w).toBe(workspace);
+      // workspace is wrapped (scopeForPlugin) — see note above.
+      expect(w).not.toBe(workspace);
+      w.getActiveFile();
+      expect(workspace.getActiveFile).toHaveBeenCalled();
       expect(mc).toBe(metadataCache);
       expect(p).toBeDefined();
     });
@@ -232,7 +240,10 @@ describe('AppShim', () => {
 
       expect(app).toBeDefined();
       expect(app.vault).toBe(vault);
-      expect(app.workspace).toBe(workspace);
+      // workspace is wrapped (scopeForPlugin) — see note above.
+      expect(app.workspace).not.toBe(workspace);
+      app.workspace.getActiveFile();
+      expect(workspace.getActiveFile).toHaveBeenCalled();
       expect(app.metadataCache).toBe(metadataCache);
     });
 

@@ -1,9 +1,12 @@
 import type { EventRef, IEventEmitter } from './types';
+import { getCurrentPluginId, withPluginContext } from './plugin-execution-context';
 
 /** Internal listener entry stored per event */
 interface ListenerEntry {
   id: string;
   callback: (...args: unknown[]) => void;
+  /** The plugin executing when this listener was registered, if any. */
+  pluginId: string | null;
 }
 
 let nextId = 0;
@@ -31,7 +34,7 @@ export class EventSystem implements IEventEmitter {
    */
   on(event: string, callback: (...args: unknown[]) => void): EventRef {
     const id = generateId();
-    const entry: ListenerEntry = { id, callback };
+    const entry: ListenerEntry = { id, callback, pluginId: getCurrentPluginId() };
 
     const list = this.listeners.get(event);
     if (list) {
@@ -78,7 +81,7 @@ export class EventSystem implements IEventEmitter {
       if (!this.isRegistered(event, entry.id)) continue;
 
       try {
-        entry.callback(...args);
+        withPluginContext(entry.pluginId, () => entry.callback(...args));
       } catch (err) {
         console.error(
           `[PluginEventSystem] Exception in event callback for "${event}":`,
