@@ -13,7 +13,8 @@
     "build": "tsc",
     "lint": "eslint .",
     "test": "vitest --run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest --run --coverage"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.10",
@@ -28,6 +29,7 @@
     "@eslint/js": "^10.0.1",
     "@types/adm-zip": "0.5.7",
     "@types/node": "^26.1.2",
+    "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^10.3.0",
     "fast-check": "4.9.0",
     "globals": "^17.6.0",

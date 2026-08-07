@@ -22,7 +22,7 @@ jobs:
         working-directory: backend
       - run: npm run lint
         working-directory: backend
-      - run: npm run test
+      - run: npm run test:coverage
         working-directory: backend
       - run: npm run build
         working-directory: backend
@@ -40,7 +40,7 @@ jobs:
         working-directory: frontend
       - run: npm run lint
         working-directory: frontend
-      - run: npm run test
+      - run: npm run test:coverage
         working-directory: frontend
       - run: npm run build
         working-directory: frontend
