@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.26.1](https://github.com/andreas13xxx/Slatebase/compare/v0.26.0...v0.26.1) (2026-08-08)
+
+
+### Sonstige Änderungen
+
+* update steering, AGENTS.md to reflect current codebase ([0ac8988](https://github.com/andreas13xxx/Slatebase/commit/0ac8988b6a6207ac9039c795f193c468f7e1b279))
+
 ## [0.26.0](https://github.com/andreas13xxx/Slatebase/compare/v0.25.4...v0.26.0) (2026-08-07)
 
 
