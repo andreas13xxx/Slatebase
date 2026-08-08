@@ -45,6 +45,8 @@ src/
 ├── auth/
 │   ├── index.ts          — AuthService, SessionStore, interfaces, error classes
 │   ├── middleware.ts     — authMiddleware, csrfMiddleware, rateLimitMiddleware
+│   ├── ratelimit.ts     — In-memory rate limiter for login attempts (composite key username:ip)
+│   ├── validation.ts    — Zod schemas for login request validation (loginRequestSchema)
 │   ├── csrf-secret.ts   — CsrfSecretManager (persistent CSRF secret: env → file → generate)
 │   └── sse-ticket-store.ts — SseTicketStore (short-lived one-time tickets for SSE connections)
 ├── user/
@@ -54,6 +56,7 @@ src/
 │   └── index.ts          — AuditService, AuditLogger, interfaces
 ├── api/
 │   ├── index.ts          — VaultController, route modules, error mapping
+│   ├── access-check.ts  — Shared vault-access-check helper (session + vault existence + read access in one call)
 │   ├── authRoutes.ts     — AuthController + login/logout/session routes
 │   ├── userRoutes.ts     — UserController + profile/password routes
 │   ├── adminRoutes.ts    — AdminController + user management/config routes
@@ -80,6 +83,7 @@ src/
 │   ├── welcomeVaultRoutes.ts — POST /api/v1/welcome-vault (on-demand tutorial vault creation, rate-limited)
 │   ├── welcomeVaultRoutes.test.ts — Integration tests for welcome vault route
 │   ├── proxyRoutes.ts    — POST /api/v1/proxy (CORS-free HTTP proxy for plugin requestUrl, SSRF protection, URL allowlist)
+│   ├── pluginStoreRoutes.ts — Community plugin store routes (browse, install, update; per-vault and global mounts)
 │   └── sseRoutes.ts      — GET /events (SSE stream)
 ├── chat/
 │   ├── types.ts          — Chat data models (Conversation, Message, etc.)
@@ -96,6 +100,7 @@ src/
 │   ├── types.ts          — MCP data models (TokenRecord, ApiTokenInfo, McpTokenContext, etc.)
 │   ├── config.ts         — McpConfig interface + loadMcpConfig() from env/config
 │   ├── errors.ts         — MCP-specific error classes (McpAuthenticationError, TokenLimitError, etc.)
+│   ├── error-codes.ts    — Shared JSON-RPC-style error codes (ACCESS_DENIED, NOT_FOUND, BINARY_FILE, etc.)
 │   ├── validation.ts     — Zod schemas for token creation + tool parameters
 │   ├── token-store.ts    — TokenStore (filesystem persistence, in-memory hash index; per-token records and the per-user token-ID index are each a `KeyedJsonFileStore`, so the user-index update can't race and drop a tokenId — which would make it un-revocable via "revoke all")
 │   ├── token-service.ts  — McpTokenService (token lifecycle: create, validate, revoke, list)
@@ -121,9 +126,10 @@ src/
 │   ├── tag-extractor.test.ts — Unit tests for tag extractor
 │   ├── property-extractor.ts — extractProperties() (YAML frontmatter, regex-based, CRLF-normalized)
 │   ├── property-extractor.test.ts — Unit tests for property extractor
+│   ├── canvas-parser.ts      — Canvas link extraction (extracts wikilinks from .canvas JSON files)
+│   ├── canvas-parser.test.ts — Unit tests for canvas link extraction
 │   ├── link-index-service.ts — LinkIndexService (rebuild, incremental updates, JSON v2 persistence, tags, properties, getGraph with options, getGraphMeta), extractFrontmatterTags (Obsidian-compatible frontmatter tag extraction)
-│   ├── link-index-service.test.ts — Unit tests for LinkIndexService v2
-│   └── canvas-parser.test.ts — Unit tests for canvas link extraction
+│   └── link-index-service.test.ts — Unit tests for LinkIndexService v2
 ├── plugin/                   — Installed-plugin management (per vault). Not to be confused with `plugin-store/` (the marketplace).
 │   ├── index.ts              — Barrel export for plugin module
 │   ├── types.ts              — IInstalledPluginStore, PluginManifest, PluginFiles, PluginRegistryData interfaces
@@ -157,7 +163,8 @@ src/
 │   ├── errors.ts             — ConnectionLimitError
 │   ├── connection-manager.ts — ConnectionManager (per-user connections, broadcast, drain, limits)
 │   ├── event-bus.ts          — EventBus (publish with targeting, rate limiting, replay buffer)
-│   ├── replay-buffer.ts      — ReplayBuffer (per-user circular buffer with TTL eviction)
+│   ├── event-replay-buffer.ts — EventReplayBuffer (per-user circular buffer with TTL eviction)
+│   ├── rate-limiter.ts       — Per-user per-event-type sliding window rate limiter for SSE events
 │   └── presence-service.ts   — PresenceService (online/offline tracking, heartbeat, visibility)
 ├── trash/
 │   ├── index.ts              — Barrel export for trash module
@@ -225,6 +232,7 @@ src/
 │   ├── error.ts          — extractErrorMessage(err, fallback) shared utility
 │   ├── fileValidation.ts — Filename validation for InlineInput (new file/rename): invalid chars, length
 │   ├── pathUtils.ts      — Relative path computation, image/PDF detection, drop target + context-menu viewport clamping
+│   ├── fileIcons.tsx     — File extension to icon mapping (@react-symbols/icons for known types, Lucide fallback)
 ├── canvas/
 │   ├── index.ts          — Barrel export (parser, serializer, types)
 │   ├── types.ts          — CanvasDocument, CanvasNode (Text/File/Link/Group), CanvasEdge, parse result types
@@ -245,12 +253,14 @@ src/
 │       ├── inline-decorations.ts  — Cursor-aware inline formatting decorations (bold, italic, strikethrough, inline code), HideableRange model
 │       ├── link-decorations.ts    — Wikilink + standard-link decorations, click-to-navigate
 │       ├── widget-decorations.ts  — Block widgets (callouts with fold/unfold, GFM checkboxes, code-block-processor integration)
+│       ├── live-preview.css       — CSS styles for live-preview decorations (readable line length, editor wrapper)
 │       └── live-preview-extension.ts — Composes decorations into the CM6 extension (StateField, Compartment, click handler)
 ├── plugins/
 │   ├── index.ts          — Barrel export (all plugins, types, utilities)
 │   ├── types.ts          — MDAST node types (WikilinkNode, EmbedNode, CalloutNode, TagNode), IMAGE_EXTENSIONS, PDF_EXTENSIONS
 │   ├── link-resolver.ts  — Wikilink target resolution against DirectoryTree
 │   ├── heading-anchor.ts — Heading anchor generation + deduplication tracker
+│   ├── preserve-table-code-escapes.ts — Counters mdast-util-gfm-table's pipe-unescaping inside inline code spans (Obsidian verbatim rendering)
 │   ├── wikilink/
 │   │   ├── syntax.ts     — micromark tokenizer extension for [[...]] syntax
 │   │   ├── mdast-util.ts — fromMarkdown + toMarkdown handlers
@@ -264,10 +274,16 @@ src/
 │   │   ├── transform.ts  — MDAST transformer (blockquote → CalloutNode)
 │   │   ├── serializer.ts — toMarkdown serializer
 │   │   └── plugin.ts     — remark plugin wrapper (remarkCallout)
-│   └── tag/
-│       ├── syntax.ts     — micromark tokenizer extension for #tag syntax
-│       ├── mdast-util.ts — fromMarkdown + toMarkdown handlers
-│       └── plugin.ts     — remark plugin wrapper (remarkTag)
+│   ├── tag/
+│   │   ├── syntax.ts     — micromark tokenizer extension for #tag syntax
+│   │   ├── mdast-util.ts — fromMarkdown + toMarkdown handlers
+│   │   └── plugin.ts     — remark plugin wrapper (remarkTag)
+│   ├── block-ref/
+│   │   ├── marker-parser.ts    — MDAST transformer for block reference markers (^block-id)
+│   │   ├── marker-serializer.ts — toMarkdown extension for block refs
+│   │   └── plugin.ts           — remark plugin wrapper (remarkBlockRef)
+│   ├── breaks/
+│   │   └── plugin.ts     — remark plugin (remarkBreaks) converting soft line breaks to hard breaks (Obsidian default)
 │   └── compat/           — Obsidian Plugin Compatibility Layer
 │       ├── types.ts      — TFile, TFolder, TAbstractFile, CachedMetadata, PluginManifest, PluginRegistryEntry, etc.
 │       ├── errors.ts     — PluginError, ManifestValidationError, BundleEvaluationError, LifecycleError, etc.
@@ -311,6 +327,7 @@ src/
 │       └── shims/
 │           ├── app-shim.ts — AppShim (Proxy-based, vault/workspace/metadataCache/fileManager/plugins/isMobile/appId/secretStorage/loadLocalStorage/saveLocalStorage); `commands` + `hotkeyManager` are backed by the shared CommandRegistry (findCommand/listCommands/executeCommandById, defaultKeys/addDefaultHotkeys), `workspace` is wrapped with scopeForPlugin so its callbacks stay plugin-tagged
 │           ├── vault-shim.ts — VaultShim (read/modify/create/delete/copy/getFileByPath/readBinary/modifyBinary/process/append/exists/configDir/events)
+│           ├── vault-adapter-shim.ts — VaultAdapterShim (Obsidian-compatible DataAdapter API: exists, read, write, list, stat, mkdir, remove, rename)
 │           ├── workspace-shim.ts — WorkspaceShim (full Leaf API + getActiveViewOfType synthetic view for the MarkdownView/FileView/ItemView family, onLayoutReady error-isolation); active leaf falls back to an "empty"-type view instead of null, and layout/leaf events re-fire once the CM6 editor mounts
 │           ├── metadata-cache-shim.ts — MetadataCacheShim (getFileCache, resolvedLinks, changed/resolved events, getTags, fileToLinktext, blockCache, getCachedFiles)
 │           ├── file-manager-shim.ts — FileManagerShim (renameFile, processFrontMatter, generateMarkdownLink, getNewFileParent, trashFile, promptForFileRename, getAvailablePathForAttachment)
@@ -358,7 +375,6 @@ src/
 │   ├── sidebarPanelContext.ts — SidebarPanelProvider + useSidebarPanelContext hook
 │   ├── realtimePresenceBridge.ts — Module-level bridge: SSE presence events → PresenceState
 ├── hooks/
-│   ├── useHistoryStack.ts — Undo/Redo history stack hook (max 100, FIFO eviction, clear on file switch)
 │   ├── useLineNumbers.ts — Line numbers toggle state (localStorage persistence)
 │   ├── useResize.ts      — Mouse-driven panel resize hook (width, min, max, side)
 │   ├── useDropZone.ts    — File drag-and-drop hook (drag counter, size/count validation, toast errors)
@@ -382,11 +398,15 @@ src/
 │   │   ├── types.ts      — DragState, ExternalDropState, ContextMenuState, InlineInputState
 │   │   └── TreeNode.tsx  — Recursive tree node renderer (directory/file, drag/drop, inline input, favorites)
 │   ├── ContextMenu.tsx   — Generic positioned overlay menu (fixed positioning, keyboard nav, portal)
+│   ├── ContextMenu.css   — ContextMenu styles
 │   ├── DropZone.tsx      — File drag-and-drop wrapper (visual overlay, validation, upload)
-│   ├── LineNumbers.tsx   — Line number gutter (scroll-synced with textarea)
+│   ├── DropZone.css      — DropZone styles
 │   ├── TrashView.tsx     — Papierkorb view (list, restore, permanent delete with confirmation)
+│   ├── TrashView.css     — TrashView styles
 │   ├── VersionBrowser.tsx — File version browser (version list, inline diff, restore)
+│   ├── VersionBrowser.css — VersionBrowser styles
 │   ├── TemplateSelector.tsx — Two-step modal (template selection → filename input)
+│   ├── TemplateSelector.css — TemplateSelector styles
 │   ├── SearchPanel.tsx   — Vault-wide search + replace panel (replaces FileExplorer when open, debounced search, result navigation)
 │   ├── SearchPanel.css   — SearchPanel styles with design tokens
 │   ├── TabBar.tsx        — Unified horizontal tab strip: settings-page tabs (not draggable) + file tabs (draggable/reorderable) in one row
@@ -409,6 +429,10 @@ src/
 │   ├── MessageInput.tsx  — Message input with validation + rate limit handling
 │   ├── NewConversation.tsx — Create conversation dialog with user search
 │   ├── ConfirmModal.tsx  — Reusable confirmation modal
+│   ├── HoverPreview.tsx  — Hover preview popover for internal links (hover-link bus, plugin compat)
+│   ├── HoverPreview.css  — HoverPreview styles
+│   ├── hover-preview-position.ts — Pure geometry positioning logic for hover preview popover
+│   ├── VaultSharing.tsx  — Vault sharing component (share list, add/revoke permissions)
 │   ├── GraphView.tsx     — Knowledge graph SVG visualization (d3-force, zoom/pan/drag/search, config-driven colors/layout, tag/property nodes)
 │   ├── graph-utils.ts    — Pure graph utility functions (truncateLabel, clampZoom, computeNodeSize, filterNodes)
 │   ├── graph-config.ts   — GraphConfig interfaces + localStorage persistence (colors, layout, node toggles)
@@ -478,6 +502,7 @@ src/
 │   ├── CommandPaletteContainer.tsx — Built-in commands (navigation, vault ops, editor formatting, view toggles) + plugin commands, Ctrl+P shortcut, CustomEvent bridge to EditMode
 │   ├── RealtimeProvider.tsx — SSE event routing (chat, presence, vault:change, toast, server events)
 │   ├── ToastNotification.tsx — Toast notification system (module-level state, CSS transitions)
+│   ├── ToastNotification.css — Toast notification styles
 │   ├── ConnectionIndicator.tsx — SSE connection status indicator (connected/connecting/disconnected)
 │   ├── PluginViewPanel.tsx — Plugin view rendering (imperative DOM mount for plugin ItemViews)
 │   ├── PluginRibbonIcon.tsx — Plugin ribbon icon buttons (left toolbar)
@@ -485,6 +510,16 @@ src/
 │   ├── AdminLogsPage.tsx — Admin server log viewer (ring buffer)
 │   ├── FileViewer.tsx    — File content viewer (legacy, redirects to TabContent)
 │   ├── InlineInput.tsx   — Inline text input with confirm/cancel (used in file rename)
+│   ├── plugin-store/
+│   │   ├── index.ts              — Barrel export for plugin-store UI module
+│   │   ├── types.ts              — Plugin store frontend types (CommunityPlugin, StoreState, etc.)
+│   │   ├── PluginStoreBrowser.tsx — Main store browser (list, filters, install)
+│   │   ├── PluginStoreBrowser.css — Plugin store browser styles
+│   │   ├── PluginStoreCard.tsx   — Individual plugin card (name, description, downloads, install button)
+│   │   ├── PluginStoreSearch.tsx — Search within plugin store (debounced, filter toggles)
+│   │   ├── PluginStoreSearch.css — Plugin store search styles
+│   │   ├── PluginDetailPanel.tsx — Plugin detail view (README, settings, compatibility info)
+│   │   └── UpdateBanner.tsx      — Update notification banner (available updates count)
 │   └── sidebar-panel/
 │       ├── index.ts              — Barrel export for sidebar-panel module
 │       ├── SidebarPanel.tsx      — Left sidebar panel (tabbed: recent files, favorites)

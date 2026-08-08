@@ -657,6 +657,14 @@ export const de = {
     detailRepo: 'Repository',
     categoryAll: 'Alle Kategorien',
     categoryLabel: 'Kategorie filtern',
+    sortLabel: 'Sortierung',
+    sortDownloads: 'Downloads',
+    sortName: 'Name',
+    sortUpdatedAt: 'Zuletzt aktualisiert',
+    sortAuthor: 'Autor',
+    sortDirectionLabel: 'Sortierrichtung umkehren',
+    sortAsc: 'Aufsteigend',
+    sortDesc: 'Absteigend',
   },
 
   commands: {

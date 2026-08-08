@@ -10,7 +10,7 @@ import { Loader2 } from 'lucide-react'
 import type { IApiClient, CommunityPluginEntry, UpdateCheckResult, BulkUpdateResult, PluginManifest, PluginReleaseStats } from '../../api'
 import { useTranslation } from '../../i18n'
 import { extractErrorMessage } from '../../utils/error'
-import type { PluginStoreDisplayEntry, PluginStoreStatus } from './types'
+import type { PluginStoreDisplayEntry, PluginStoreStatus, PluginStoreSortField, PluginStoreSortDirection } from './types'
 import { PluginStoreSearch } from './PluginStoreSearch'
 import { PluginStoreCard } from './PluginStoreCard'
 import { UpdateBanner } from './UpdateBanner'
@@ -59,6 +59,9 @@ export function PluginStoreBrowser({ vaultId, apiClient, onPluginInstalled }: Pl
   const [selectedPlugin, setSelectedPlugin] = useState<PluginStoreDisplayEntry | null>(null)
   const [selectedCategory, setSelectedCategory] = useState('')
   const [pluginStats, setPluginStats] = useState<Record<string, PluginReleaseStats>>({})
+  const [sortField, setSortField] = useState<PluginStoreSortField>('downloads')
+  const [sortDirection, setSortDirection] = useState<PluginStoreSortDirection>('desc')
+
   // ─── Data Loading ───────────────────────────────────────────────────────────
 
   const loadPlugins = useCallback(async () => {
@@ -162,7 +165,7 @@ export function PluginStoreBrowser({ vaultId, apiClient, onPluginInstalled }: Pl
 
   /** Build display entries enriched with local state. */
   const displayEntries: PluginStoreDisplayEntry[] = useMemo(() => {
-    return filteredPlugins.map(p => {
+    const entries = filteredPlugins.map(p => {
       const isInstalled = installedPluginIds.has(p.id)
       const installedVersion = installedVersionMap.get(p.id)
       const updateInfo = updateInfoMap.get(p.id)
@@ -196,7 +199,32 @@ export function PluginStoreBrowser({ vaultId, apiClient, onPluginInstalled }: Pl
         updatedAt: stats?.updatedAt,
       }
     })
-  }, [filteredPlugins, installedPluginIds, installedVersionMap, updateInfoMap, installingPlugins, updatingPlugins, pluginErrors, pluginStats])
+
+    // Sort entries
+    const dir = sortDirection === 'asc' ? 1 : -1
+    entries.sort((a, b) => {
+      switch (sortField) {
+        case 'downloads': {
+          const da = a.downloads ?? 0
+          const db = b.downloads ?? 0
+          return (da - db) * dir
+        }
+        case 'name':
+          return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) * dir
+        case 'author':
+          return a.author.localeCompare(b.author, undefined, { sensitivity: 'base' }) * dir
+        case 'updatedAt': {
+          const ta = a.updatedAt ?? ''
+          const tb = b.updatedAt ?? ''
+          return ta.localeCompare(tb) * dir
+        }
+        default:
+          return 0
+      }
+    })
+
+    return entries
+  }, [filteredPlugins, installedPluginIds, installedVersionMap, updateInfoMap, installingPlugins, updatingPlugins, pluginErrors, pluginStats, sortField, sortDirection])
 
   // ─── Actions ────────────────────────────────────────────────────────────────
 
@@ -373,6 +401,10 @@ export function PluginStoreBrowser({ vaultId, apiClient, onPluginInstalled }: Pl
         categories={categories}
         totalCount={plugins.length}
         filteredCount={displayEntries.length}
+        sortField={sortField}
+        onSortFieldChange={setSortField}
+        sortDirection={sortDirection}
+        onSortDirectionChange={setSortDirection}
       />
 
       <UpdateBanner

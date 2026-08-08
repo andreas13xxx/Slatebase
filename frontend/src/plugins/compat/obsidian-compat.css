@@ -967,3 +967,44 @@
 .view-content {
   position: relative;
 }
+
+/* ─── View Header Actions ────────────────────────────────────────────────
+   Buttons added via ItemView.addAction() — displayed as a row of icon
+   buttons at the top of plugin views (e.g. Kanban "Board Settings"). */
+.view-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  flex-shrink: 0;
+}
+
+.view-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-s, 4px);
+  background: transparent;
+  color: var(--icon-color, var(--text-muted));
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.view-action:hover {
+  background: var(--background-modifier-hover, rgba(0, 0, 0, 0.05));
+  color: var(--icon-color-hover, var(--text-normal));
+}
+
+.view-action:active {
+  background: var(--background-modifier-active-hover, rgba(0, 0, 0, 0.08));
+}
+
+.view-action svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2;
+}

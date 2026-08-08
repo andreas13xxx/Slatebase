@@ -208,7 +208,9 @@ const OBSIDIAN_ICON_MAP: Record<string, string> = {
   'outdent': 'Outdent',
   'list-ordered': 'ListOrdered',
   'list-checks': 'ListChecks',
-  'kanban': 'Columns3',
+  'kanban': 'Kanban',
+  'lucide-trello': 'Kanban',
+  'trello': 'Kanban',
 }
 
 /**

@@ -663,6 +663,14 @@ export const en: TranslationShape = {
     detailRepo: 'Repository',
     categoryAll: 'All categories',
     categoryLabel: 'Filter by category',
+    sortLabel: 'Sort by',
+    sortDownloads: 'Downloads',
+    sortName: 'Name',
+    sortUpdatedAt: 'Last updated',
+    sortAuthor: 'Author',
+    sortDirectionLabel: 'Reverse sort direction',
+    sortAsc: 'Ascending',
+    sortDesc: 'Descending',
   },
 
   commands: {

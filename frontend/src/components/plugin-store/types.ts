@@ -49,6 +49,14 @@ export interface PluginStoreDisplayEntry {
   updatedAt?: string
 }
 
+// ─── Sort Types ───────────────────────────────────────────────────────────────
+
+/** Available fields to sort the plugin list by */
+export type PluginStoreSortField = 'downloads' | 'name' | 'updatedAt' | 'author'
+
+/** Sort direction */
+export type PluginStoreSortDirection = 'asc' | 'desc'
+
 /** Props for the search/filter component */
 export interface PluginStoreFilters {
   searchQuery: string

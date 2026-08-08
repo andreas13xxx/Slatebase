@@ -6,7 +6,7 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for 
 
 - Multi-vault management (CRUD, import/export, unified file explorer)
 - Tabbed Markdown editor/viewer (auto-save, GFM, syntax highlighting, collapsible headings)
-- Obsidian-compatible rendering (Wikilinks, Embeds with inline PDF, Callouts, Tags incl. Frontmatter-Tags)
+- Obsidian-compatible rendering (Wikilinks, Embeds with inline PDF, Callouts, Tags incl. Frontmatter-Tags, Block References, Soft→Hard Line Breaks)
 - Authentication (opaque tokens, argon2id, CSRF, sliding sessions, rate limiting)
 - Multi-user & sharing (granular read/write, ownership transfer)
 - Real-time chat (unread badges, archiving, pagination)
@@ -39,6 +39,9 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for 
 - Session verification (lightweight session-alive check on app mount, graceful expiry handling)
 - Live Preview Editor (CodeMirror 6 — Source + Live Preview mode, cursor-aware inline rendering, plugin extensions via Compartments; GFM tables, Mermaid diagrams, standard images, horizontal rules, highlight ==text==, frontmatter properties box, readable line length, click-to-follow links, callout fold/unfold with todo type; feature toggle `live-preview`)
 - Workspace State Persistence (open tabs, expanded folders, panel sizes/visibility, active page restored across page reloads; per-vault tab memory on vault switch)
+- Hover Preview (internal link hover popover with rendered Markdown preview, plugin compat via workspace hover-link event)
+- File Type Icons (file-extension-based icons in explorer via @react-symbols/icons with Lucide fallback)
+- Canvas link extraction (wikilinks inside .canvas JSON files included in knowledge graph)
 
 ## Planned
 

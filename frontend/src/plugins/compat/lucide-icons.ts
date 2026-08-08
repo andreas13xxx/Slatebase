@@ -146,6 +146,8 @@ const EXPLICIT_ALIASES: Record<string, readonly string[]> = {
   'three-horizontal-bars': ['menu'],
   'uppercase-lowercase-a': ['case-sensitive'],
   'vertical-three-dots': ['ellipsis-vertical'],
+  'lucide-trello': ['kanban'],
+  'trello': ['kanban'],
 }
 
 function candidateNames(iconId: string): string[] {

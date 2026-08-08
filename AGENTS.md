@@ -70,7 +70,7 @@ Filesystem-based, no database. All under `backend/data/`:
 - `vaults/<id>/.slatebase/` — Per-vault internal data (trash, versions, link-index, config)
 - `users/`, `sessions/`, `shares.json` — Auth data
 - `audit/` — Append-only JSONL (daily rotation)
-- `chat/`, `mcp/tokens/`, `plugins/<vaultId>/`
+- `chat/`, `mcp/tokens/`, `plugins/<vaultId>/`, `features.json`
 
 ## Common Pitfalls
 
@@ -83,3 +83,9 @@ Filesystem-based, no database. All under `backend/data/`:
 - Use `state.vaultTrees[vaultId]` (not legacy `directoryTree`)
 - Expanded paths scoped: `${vaultId}::${path}`
 - Vite proxy requires backend on port 3000
+- `useHistoryStack` hook removed — CM6 handles undo/redo natively
+- `LineNumbers.tsx` removed — CM6 renders line numbers natively
+- Backend `event-replay-buffer.ts` (not `replay-buffer.ts`)
+- New remark plugins: `block-ref/`, `breaks/`, `preserve-table-code-escapes.ts`
+- `@modelcontextprotocol/sdk` is a backend dependency (MCP transport)
+- Frontend uses Zod 4 (`zod@4.4.3`), backend uses Zod 3 (`zod@^3.24.0`)

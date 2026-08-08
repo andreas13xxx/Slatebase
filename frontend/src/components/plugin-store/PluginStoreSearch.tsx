@@ -7,8 +7,9 @@
  * Row 2: Filter pills + Category dropdown
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Search } from 'lucide-react'
+import { Search, ArrowUpDown } from 'lucide-react'
 import { useTranslation } from '../../i18n'
+import type { PluginStoreSortField, PluginStoreSortDirection } from './types'
 import './PluginStoreSearch.css'
 
 /** Debounce delay in milliseconds. */
@@ -38,6 +39,14 @@ export interface PluginStoreSearchProps {
   totalCount: number
   /** Number of plugins matching current filters. */
   filteredCount: number
+  /** Current sort field. */
+  sortField: PluginStoreSortField
+  /** Called when the sort field changes. */
+  onSortFieldChange: (field: PluginStoreSortField) => void
+  /** Current sort direction. */
+  sortDirection: PluginStoreSortDirection
+  /** Called when the sort direction toggles. */
+  onSortDirectionChange: (direction: PluginStoreSortDirection) => void
 }
 
 /**
@@ -55,6 +64,10 @@ export function PluginStoreSearch({
   categories,
   totalCount,
   filteredCount,
+  sortField,
+  onSortFieldChange,
+  sortDirection,
+  onSortDirectionChange,
 }: PluginStoreSearchProps) {
   const { t } = useTranslation()
   const [localValue, setLocalValue] = useState(searchQuery)
@@ -146,6 +159,32 @@ export function PluginStoreSearch({
             ))}
           </select>
         )}
+
+        <div className="plugin-store-search__sort">
+          <select
+            className="plugin-store-search__sort-select"
+            value={sortField}
+            onChange={(e) => onSortFieldChange(e.target.value as PluginStoreSortField)}
+            aria-label={t('pluginStore.sortLabel')}
+          >
+            <option value="downloads">{t('pluginStore.sortDownloads')}</option>
+            <option value="name">{t('pluginStore.sortName')}</option>
+            <option value="updatedAt">{t('pluginStore.sortUpdatedAt')}</option>
+            <option value="author">{t('pluginStore.sortAuthor')}</option>
+          </select>
+          <button
+            type="button"
+            className="plugin-store-search__sort-direction"
+            onClick={() => onSortDirectionChange(sortDirection === 'asc' ? 'desc' : 'asc')}
+            aria-label={t('pluginStore.sortDirectionLabel')}
+            title={sortDirection === 'asc' ? t('pluginStore.sortAsc') : t('pluginStore.sortDesc')}
+          >
+            <ArrowUpDown size={14} aria-hidden="true" />
+            <span className="plugin-store-search__sort-direction-text">
+              {sortDirection === 'asc' ? '↑' : '↓'}
+            </span>
+          </button>
+        </div>
       </div>
     </div>
   )

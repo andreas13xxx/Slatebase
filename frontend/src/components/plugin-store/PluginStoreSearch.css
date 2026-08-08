@@ -116,3 +116,63 @@
 .plugin-store-search__category-select:focus {
   border-color: var(--accent);
 }
+
+/* ─── Sort Controls ────────────────────────────────────────────────────────── */
+
+.plugin-store-search__sort {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.plugin-store-search__sort-select {
+  padding: 4px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.plugin-store-search__sort-select:hover {
+  border-color: var(--border-default);
+}
+
+.plugin-store-search__sort-select:focus {
+  border-color: var(--accent);
+}
+
+.plugin-store-search__sort-direction {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  line-height: 1;
+}
+
+.plugin-store-search__sort-direction:hover {
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+.plugin-store-search__sort-direction:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.plugin-store-search__sort-direction-text {
+  font-weight: 600;
+  font-size: 13px;
+}

@@ -39,8 +39,11 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 
 - Pattern: `syntax.ts` → `mdast-util.ts` → `plugin.ts`
 - Callouts: Transformer (kein Token, transformiert `blockquote`)
+- Block Refs: Transformer + Serializer (parst `^block-id` Markers aus Paragraphen)
+- Breaks: Reiner Transformer (soft→hard line breaks, Obsidian Default)
 - Embeds: 3 Typen (image/pdf/note), Pipe-Separator
 - `extractPlainText()` bei neuen Inline-Nodes erweitern
+- `preserve-table-code-escapes.ts`: Inline-Code in GFM-Tabellen vor Pipe-Unescaping schützen
 - Transitive Deps (`micromark`, `mdast-util-*`, `unist-util-visit`) direkt nutzbar
 
 ## Obsidian Plugin Compat — Gotchas
@@ -77,6 +80,7 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - `VaultShim.getName()` gibt `"${name}-${vaultId}"` zurück (verhindert IndexedDB-Kollision)
 - `VaultShim.getAbstractFileByPath("")` und `"/"` müssen den Root-TFolder zurückgeben (Dataview PrefixIndex)
 - `process`-Shim im Bundle-Wrapper: `{ platform: 'linux', env: {} }` (LiveSync/octagonal-wheels)
+- **VaultAdapterShim**: `vault-adapter-shim.ts` implementiert Obsidians `DataAdapter`-API (exists, read, write, list, stat, mkdir, remove, rename) — Plugins die `app.vault.adapter` direkt nutzen statt der VaultShim-Methoden brauchen das.
 - **MetadataCacheShim**: `getFileCache()` darf für existierende Dateien nie `null` zurückgeben — Dataview überspringt sonst die Datei komplett beim Indexieren
 - **MetadataCacheShim**: On-Demand-Parsing via `populateFromContent(path, content)` — VaultShim ruft das nach `read()` auf, MetadataCacheShim parst Frontmatter/Tags/Links synchron für den nächsten `getFileCache()`-Aufruf
 - **MetadataCacheShim**: CRLF normalisieren BEVOR Frontmatter/Tag-Parsing (Windows-Zeilenenden brechen `[...]`-Array-Erkennung)
@@ -203,7 +207,9 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 43. **Coverage-Provider v8 scannt „all files" — `include` explizit setzen**: Reines `exclude` reicht nicht. Backend zieht sich sonst das gitignorete `data/` mit rein (hochgeladene Vaults, installierte Plugin-Bundles wie Excalidraw/Kanban `main.js` samt vendored Deps), Frontend das `scripts/`-Verzeichnis — beides existiert im frischen CI-Checkout nicht, also driften lokale und CI-Zahlen auseinander. Schwellen sind als Regressions-Baseline gesetzt (gemessener Stand minus kleiner Puffer), nicht als Zielwert.
 44. **Vitest 4 excludet `dist/` nicht mehr per Default**: Nach einem lokalen `npm run build` sammelt der nächste Testlauf die kompilierten Kopien aller Tests aus `dist/` mit ein — Testanzahl verdoppelt sich (63 → 127 Dateien), Coverage wird gegen `dist/` statt `src/` attribuiert. CI merkt das nie, weil dort `build` NACH `test:coverage` läuft; genau deshalb muss `test.exclude` in beiden Configs explizit `dist/**` listen. Gilt doppelt fürs Frontend, wo `exclude` in `vite.config.ts` die Defaults komplett ersetzt.
 45. **`@vitest/coverage-v8` v4: Branch-/Function-Zahlen brechen ein, ohne dass sich etwas verschlechtert hat**: Bei identischen Tests fiel Backend-Branches von 84% auf 42% und Functions von 79% auf 53%, während Statements/Lines gleich blieben. Ursache ist AST-aware Remapping als neuer Default — v3 hat Branches/Functions gutgeschrieben, die die Tests nie erreichen. Die neuen Zahlen sind die ehrlichen. Nach einem Coverage-Provider-Major also neu baselinen statt die alten Schwellen „wiederherstellen" zu wollen. Merkregel: Statements/Lines stabil + Branches/Functions eingebrochen = Messverfahren geändert, nicht die Testqualität.
-44. **`Content-Disposition: attachment` schützt nur Top-Level-Navigation**: Der Raw-File-Endpoint liefert SVG/HTML jetzt mit `attachment` statt `inline`, um Script-Ausführung beim direkten Öffnen (geteilter Link, neuer Tab) zu verhindern. Das wirkt NICHT bei `<img src="...">`-Einbettung (Browser führen dort ohnehin kein `<script>` in SVGs aus) — Disposition ändert nur, wie eine direkte Navigation gehandhabt wird. Bei Security-Fixes an Datei-Endpoints immer den tatsächlichen Konsum-Kontext (direkte Navigation vs. `<img>`/`<iframe>`/`<object>`) durchdenken, nicht pauschal "ein Header behebt alles" annehmen.
+46. **`Content-Disposition: attachment` schützt nur Top-Level-Navigation**: Der Raw-File-Endpoint liefert SVG/HTML jetzt mit `attachment` statt `inline`, um Script-Ausführung beim direkten Öffnen (geteilter Link, neuer Tab) zu verhindern. Das wirkt NICHT bei `<img src="...">`-Einbettung (Browser führen dort ohnehin kein `<script>` in SVGs aus) — Disposition ändert nur, wie eine direkte Navigation gehandhabt wird. Bei Security-Fixes an Datei-Endpoints immer den tatsächlichen Konsum-Kontext (direkte Navigation vs. `<img>`/`<iframe>`/`<object>`) durchdenken, nicht pauschal "ein Header behebt alles" annehmen.
+47. **Remark-Plugins ohne syntax.ts**: `block-ref/` und `breaks/` nutzen reine Transformer (kein micromark-Tokenizer), weil ihre Syntax entweder am Zeilenende lebt (Block Ref: `^block-id` als Marker nach letztem Inhalt) oder eine Standardfunktion überschreibt (Breaks: Soft→Hard Line-Break, Obsidians Default). Nicht jedes Plugin braucht `syntax.ts → mdast-util.ts → plugin.ts` — ein reiner MDAST-Transformer reicht wenn kein neuer Token nötig ist.
+48. **EventReplayBuffer statt ReplayBuffer**: Backend-Realtime-Modul benennt die Klasse `EventReplayBuffer` in `event-replay-buffer.ts` (nicht `ReplayBuffer` in `replay-buffer.ts`). Konsistent mit dem bestehenden `event-bus.ts`-Naming.
 
 ## Multi-User & Vault-Besitz
 

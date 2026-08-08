@@ -10,6 +10,8 @@
  * @module view-registry
  */
 
+import { renderLucideIconInto } from './lucide-icons'
+
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -68,6 +70,7 @@ export class ItemView {
   /**
    * Add an action button to the view header area.
    * Creates a button element with the given icon, title, and click callback.
+   * Icon is resolved via the custom icon registry first, then Lucide.
    */
   addAction(icon: string, title: string, callback: () => void): HTMLElement {
     // Create or find the header actions container
@@ -82,9 +85,17 @@ export class ItemView {
     button.className = 'view-action'
     button.setAttribute('aria-label', title)
     button.title = title
-    button.dataset.icon = icon
     button.addEventListener('click', callback)
     actionsEl.appendChild(button)
+
+    // Render icon: custom icon registry first, then Lucide
+    const customIcons = (window as unknown as { __obsidianCustomIcons?: Map<string, string> }).__obsidianCustomIcons
+    const customSvg = customIcons?.get(icon)
+    if (customSvg) {
+      button.innerHTML = customSvg
+    } else {
+      renderLucideIconInto(button, icon)
+    }
 
     return button
   }

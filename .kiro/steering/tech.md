@@ -60,6 +60,8 @@ test. Config: `backend/vitest.config.ts` and the `test.coverage` block in `front
 | Package | Purpose |
 |---------|---------|
 | hono | HTTP framework |
+| @hono/node-server | Node.js adapter for Hono |
+| @modelcontextprotocol/sdk | MCP SDK (Streamable HTTP transport) |
 | zod | Schema validation |
 | pino | Structured logging |
 | tsx | Dev server |
@@ -90,7 +92,12 @@ test. Config: `backend/vitest.config.ts` and the `test.coverage` block in `front
 | @codemirror/language-data | CodeMirror 6 code-block language registry |
 | @codemirror/autocomplete | CodeMirror 6 autocompletion |
 | @codemirror/search | CodeMirror 6 search/replace |
+| @codemirror/lint | CodeMirror 6 lint infrastructure |
 | @lezer/highlight | Lezer syntax highlighting primitives |
+| @lezer/lr | Lezer LR parser runtime |
+| @react-symbols/icons | File type icons (file explorer) |
+| moment | Date/time formatting (Calendar plugin compat) |
+| zod | Schema validation (canvas parser, frontend-side) |
 
 ### Geplant
 - **better-sqlite3** — SQLite für Graph-Index (erst bei Performance-Bedarf, >10k Dateien)

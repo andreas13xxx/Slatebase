@@ -1225,10 +1225,33 @@ export function installObsidianGlobals(): void {
           this._eventRefs.push({ event: '__cleanup__', callback: cb as () => void })
         }
       }
-      /** Add a clickable action icon to the view header (no-op stub). */
-      addAction(_icon: string, title: string, _callback: () => void): HTMLElement {
-        warnNoOp('ItemView', 'addAction', `The "${title}" action will not appear in the view header.`)
-        return document.createElement('a')
+      /** Add a clickable action icon to the view header. */
+      addAction(icon: string, title: string, callback: () => void): HTMLElement {
+        // Create or find the header actions container
+        let actionsEl = this.containerEl.querySelector('.view-actions') as HTMLElement | null
+        if (!actionsEl) {
+          actionsEl = document.createElement('div')
+          actionsEl.className = 'view-actions'
+          this.containerEl.insertBefore(actionsEl, this.contentEl)
+        }
+
+        const button = document.createElement('button')
+        button.className = 'view-action'
+        button.setAttribute('aria-label', title)
+        button.title = title
+        button.addEventListener('click', callback)
+        actionsEl.appendChild(button)
+
+        // Render icon: custom icon registry first, then Lucide
+        const customIcons = (window as unknown as { __obsidianCustomIcons?: Map<string, string> }).__obsidianCustomIcons
+        const customSvg = customIcons?.get(icon)
+        if (customSvg) {
+          button.innerHTML = customSvg
+        } else {
+          renderLucideIconInto(button, icon)
+        }
+
+        return button
       }
     } as unknown as Record<string, unknown>
   }
