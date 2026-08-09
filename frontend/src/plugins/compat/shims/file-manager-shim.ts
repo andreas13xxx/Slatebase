@@ -377,7 +377,10 @@ function serializeYamlValue(value: unknown): string {
     if (value.includes(':') || value.includes('#') || value.includes('\n') ||
         value.includes('"') || value.includes("'") || value.startsWith('[') ||
         value.startsWith('{') || value === '') {
-      return `"${value.replace(/"/g, '\\"')}"`;
+      // Escape backslashes first, so the ones just inserted for the quote/newline
+      // escapes below aren't themselves re-escaped.
+      const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+      return `"${escaped}"`;
     }
     return value;
   }

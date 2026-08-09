@@ -140,7 +140,14 @@ function fallbackNormalizePath(p: string): string {
 }
 
 function fallbackHtmlToMarkdown(h: string | { textContent?: string | null }): string {
-  return typeof h === 'string' ? h.replace(/<[^>]*>/g, '') : (h.textContent ?? '')
+  if (typeof h !== 'string') return h.textContent ?? ''
+  // Parse via a detached <template> (never attached to the live DOM, so no
+  // scripts/images execute) rather than a regex tag-stripper — malformed or
+  // nested markup can survive a single regex pass, but the browser's own
+  // HTML parser handles it correctly.
+  const template = document.createElement('template')
+  template.innerHTML = h
+  return template.content.textContent ?? ''
 }
 
 function fallbackSanitizeHTMLToDom(h: string): DocumentFragment {

@@ -1202,16 +1202,12 @@ export class UserService implements IUserService {
    * Uses 12 characters from a reduced character set (ambiguous chars removed).
    */
   private generateTempPassword(): string {
-    const bytes = crypto.randomBytes(TEMP_PASSWORD_LENGTH)
     let result = ''
     for (let i = 0; i < TEMP_PASSWORD_LENGTH; i++) {
-      const byte = bytes[i]
-      if (byte === undefined) {
-        // Should never happen with correct length, but satisfies noUncheckedIndexedAccess
-        result += TEMP_PASSWORD_CHARS[0]
-      } else {
-        result += TEMP_PASSWORD_CHARS[byte % TEMP_PASSWORD_CHARS.length]
-      }
+      // randomInt() uses rejection sampling internally, so every character is
+      // equally likely — a plain `randomBytes() % length` would bias whichever
+      // characters fall in the range 256 % length wraps around to.
+      result += TEMP_PASSWORD_CHARS[crypto.randomInt(TEMP_PASSWORD_CHARS.length)]
     }
     return result
   }

@@ -4,6 +4,30 @@
  * Intentionally lightweight — no full remark pipeline for performance in canvas nodes.
  */
 
+/** URL schemes allowed in link hrefs rendered from untrusted note content. */
+const SAFE_URL_SCHEME = /^(?:https?|mailto):/i
+
+/**
+ * Sanitizes a URL for use in an `href` rendered from untrusted note content.
+ * Only http(s)/mailto and scheme-less (relative) URLs are allowed; anything
+ * else — javascript:, data:, vbscript:, etc. — is replaced with '#'.
+ */
+function sanitizeUrl(url: string): string {
+  // Strip ASCII whitespace/control characters (code points 0-32) one by one.
+  // Browsers ignore them when resolving a URL scheme (the classic
+  // "java<TAB>script:" filter-bypass trick) — without this, such a payload
+  // would fail the scheme check below and be waved through as "relative".
+  let stripped = ''
+  for (const ch of url) {
+    if (ch.charCodeAt(0) > 32) stripped += ch
+  }
+  const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(stripped)
+  if (hasScheme && !SAFE_URL_SCHEME.test(stripped)) {
+    return '#'
+  }
+  return stripped
+}
+
 /** Renders inline markdown: bold, italic, code, links. */
 export function renderInline(text: string): React.ReactNode {
   // Process inline patterns with a simple regex approach
@@ -36,7 +60,7 @@ export function renderInline(text: string): React.ReactNode {
     // Link: [text](url)
     const linkMatch = remaining.match(/^\[(.+?)\]\((.+?)\)/)
     if (linkMatch) {
-      parts.push(<a key={key++} className="canvas-md-link" href={linkMatch[2]} onClick={(e) => e.stopPropagation()}>{linkMatch[1]}</a>)
+      parts.push(<a key={key++} className="canvas-md-link" href={sanitizeUrl(linkMatch[2]!)} onClick={(e) => e.stopPropagation()}>{linkMatch[1]}</a>)
       remaining = remaining.slice(linkMatch[0].length)
       continue
     }
