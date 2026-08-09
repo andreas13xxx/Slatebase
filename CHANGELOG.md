@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.27.1](https://github.com/andreas13xxx/Slatebase/compare/v0.27.0...v0.27.1) (2026-08-09)
+
+
+### Bugfixes
+
+* address CodeQL findings (XSS, biased random, YAML escaping) ([d176e49](https://github.com/andreas13xxx/Slatebase/commit/d176e4929bd616c88574fb3a1c3450f3a5b3249a))
+
+
+### Sonstige Änderungen
+
+* add security policy ([4774d5e](https://github.com/andreas13xxx/Slatebase/commit/4774d5ea763f1772dd39efdbd99e5be4251616da))
+
 ## [0.27.0](https://github.com/andreas13xxx/Slatebase/compare/v0.26.2...v0.27.0) (2026-08-09)
 
 
