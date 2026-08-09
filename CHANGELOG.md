@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.0](https://github.com/andreas13xxx/Slatebase/compare/v0.26.2...v0.27.0) (2026-08-09)
+
+
+### Features
+
+* **plugins:** Obsidian core commands, global tooltips, inline HTML allowlist ([aceb46b](https://github.com/andreas13xxx/Slatebase/commit/aceb46bad27c3f9faed825c51e1f944909ef9499))
+
 ## [0.26.2](https://github.com/andreas13xxx/Slatebase/compare/v0.26.1...v0.26.2) (2026-08-08)
 
 
