@@ -112,6 +112,7 @@ export function authReducer(state: AuthState, action: AuthAction): AuthState {
       return {
         ...state,
         mustChangePassword: false,
+        user: state.user ? { ...state.user, mustChangePassword: false } : state.user,
       }
 
     case 'PROFILE_UPDATED':

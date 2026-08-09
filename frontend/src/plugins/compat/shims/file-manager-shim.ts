@@ -11,8 +11,8 @@
  * @module file-manager-shim
  */
 
-import type { IVaultShim, TFile, TFolder } from '../types'
-import { warnNoOp } from '../no-op-warning'
+import type { DataWriteOptions, IVaultShim, TFile, TFolder } from '../types'
+import { warnNoOp } from '../log'
 
 /**
  * IFileManagerShim — Obsidian FileManager interface subset.
@@ -21,7 +21,7 @@ export interface IFileManagerShim {
   /** Rename/move a file to a new path. Updates vault references. */
   renameFile(file: TFile, newPath: string): Promise<void>;
   /** Read and optionally modify the frontmatter of a markdown file. */
-  processFrontMatter(file: TFile, fn: (frontmatter: Record<string, unknown>) => void): Promise<void>;
+  processFrontMatter(file: TFile, fn: (frontmatter: Record<string, unknown>) => void, options?: DataWriteOptions): Promise<void>;
   /** Generate a markdown link string to a file. */
   generateMarkdownLink(file: TFile, sourcePath: string, subpath?: string, alias?: string): string;
   /** Get the default parent folder for new files. */
@@ -70,8 +70,10 @@ export class FileManagerShim implements IFileManagerShim {
    *
    * @param file - The markdown file to process
    * @param fn - Function that receives the frontmatter object. Modify it in place.
+   * @param options - Obsidian 1.4.4+ write options, forwarded to vault.modify().
+   *   Custom mtime/ctime are accepted but not persisted — see Vault.modify().
    */
-  async processFrontMatter(file: TFile, fn: (frontmatter: Record<string, unknown>) => void): Promise<void> {
+  async processFrontMatter(file: TFile, fn: (frontmatter: Record<string, unknown>) => void, options?: DataWriteOptions): Promise<void> {
     const content = await this.vault.read(file);
 
     const { frontmatter, body, hasFrontmatter } = parseFrontmatter(content);
@@ -96,7 +98,7 @@ export class FileManagerShim implements IFileManagerShim {
 
     // Only write if content actually changed
     if (newContent !== content) {
-      await this.vault.modify(file, newContent);
+      await this.vault.modify(file, newContent, options);
     }
   }
 
@@ -189,12 +191,18 @@ export class FileManagerShim implements IFileManagerShim {
   /**
    * Prompt the user for file deletion, then delete the file.
    *
-   * In Obsidian, this shows a confirmation dialog before deleting.
-   * In Slatebase, we delete directly (trash system provides undo capability).
+   * The prompt is the point of this method — a plugin calls it precisely when it
+   * wants the user, not itself, to make the call. Deleting straight away (which
+   * this used to do) turns a plugin's "ask before removing this" into an
+   * unannounced deletion, and the trash being recoverable does not make that the
+   * behaviour the plugin asked for.
    *
    * @param file - The file to delete
    */
   async promptForFileDeletion(file: TFile): Promise<void> {
+    if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+      if (!window.confirm(`"${file.name}" löschen?`)) return;
+    }
     await this.vault.delete(file);
   }
 

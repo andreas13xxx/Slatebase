@@ -11,6 +11,7 @@ import { useEventSource, type SseEventData } from '../state/useEventSource'
 import { dispatchPresenceChange, getOnlineUserIds } from '../state/realtimePresenceBridge'
 import { showToast } from './ToastNotification'
 import type { ConnectionStatus } from '../state/realtimeState'
+import { warnOnce } from '../plugins/compat/log'
 
 /** Callback props for communicating with other providers. */
 export interface RealtimeEventHandlers {
@@ -178,7 +179,7 @@ function RealtimeInner({
 
       default:
         // Unknown event type — log and skip
-        console.warn('[RealtimeProvider] Unknown event type:', eventType)
+        warnOnce(`RealtimeProvider.unknownEvent::${eventType}`, '[RealtimeProvider] Unknown event type:', eventType)
         break
     }
   }, [])

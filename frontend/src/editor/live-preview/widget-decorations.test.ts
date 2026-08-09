@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { parseTableRow, renderCellInline } from './widget-decorations'
+import { EditorState } from '@codemirror/state'
+import { markdown } from '@codemirror/lang-markdown'
+import { GFM } from '@lezer/markdown'
+import { parseTableRow, renderCellInline, buildWidgetDecorations } from './widget-decorations'
+
+/** Builds an EditorState with the same markdown/GFM setup used by CodeMirrorEditor.tsx. */
+function makeState(doc: string): EditorState {
+  return EditorState.create({ doc, extensions: [markdown({ extensions: GFM })] })
+}
 
 describe('parseTableRow', () => {
   it('splits a simple row on unescaped pipes', () => {
@@ -80,5 +88,49 @@ describe('renderCellInline', () => {
     const link = el.querySelector('.cm-lp-wikilink')
     expect(link!.textContent).toBe('Real')
     expect(link!.getAttribute('data-target')).toBe('Real')
+  })
+})
+
+describe('buildWidgetDecorations — <center> HTML block', () => {
+  it('applies a centering line class to a <center>...</center> block', () => {
+    const state = makeState('<center>Starte hier, um die Basics zu lernen: Testtest</center>')
+    const result = buildWidgetDecorations(state, { vaultId: 'v1' })
+    const lineDeco = result.decorations.find((r) => {
+      const spec = r.value.spec as { attributes?: { class?: string } }
+      return spec.attributes?.class === 'cm-lp-html-center'
+    })
+    expect(lineDeco).toBeDefined()
+  })
+
+  it('hides the opening and closing tags as replace decorations', () => {
+    const state = makeState('<center>Testtest</center>')
+    const result = buildWidgetDecorations(state, { vaultId: 'v1' })
+    const replaceRanges = result.decorations.filter((r) => {
+      const spec = r.value.spec as { attributes?: unknown; class?: unknown; widget?: unknown }
+      return spec.attributes === undefined && spec.class === undefined && spec.widget === undefined
+    })
+    const openTag = replaceRanges.find((r) => state.doc.sliceString(r.from, r.to) === '<center>')
+    const closeTag = replaceRanges.find((r) => state.doc.sliceString(r.from, r.to) === '</center>')
+    expect(openTag).toBeDefined()
+    expect(closeTag).toBeDefined()
+  })
+
+  it('reveals both tags together as one hideable group', () => {
+    const state = makeState('<center>Testtest</center>')
+    const result = buildWidgetDecorations(state, { vaultId: 'v1' })
+    expect(result.hideableRanges).toHaveLength(2)
+    const [open, close] = result.hideableRanges
+    expect(open!.groupFrom).toBe(close!.groupFrom)
+    expect(open!.groupTo).toBe(close!.groupTo)
+  })
+
+  it('does not decorate unrelated HTML blocks', () => {
+    const state = makeState('<div>Testtest</div>')
+    const result = buildWidgetDecorations(state, { vaultId: 'v1' })
+    const centerLine = result.decorations.find((r) => {
+      const spec = r.value.spec as { attributes?: { class?: string } }
+      return spec.attributes?.class === 'cm-lp-html-center'
+    })
+    expect(centerLine).toBeUndefined()
   })
 })

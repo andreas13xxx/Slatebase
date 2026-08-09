@@ -10,6 +10,7 @@ import { createWikilinkRegex, resolveWikilinkMatchTarget } from './link-decorati
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
 import { ViewMode } from '../../components/ViewMode'
 import type { DirectoryTree } from '../../types'
+import { errorOnce } from '../../plugins/compat/log'
 
 /**
  * State effect to toggle callout fold state.
@@ -594,12 +595,12 @@ class CodeBlockProcessorWidget extends WidgetType {
       const result = handler(this.source, container, ctx)
       if (result instanceof Promise) {
         result.catch((err) => {
-          console.error(`[CodeBlockProcessorWidget] Handler error for "${this.language}":`, err)
+          errorOnce(`CodeBlockProcessorWidget.handlerError::${this.language}`, `[CodeBlockProcessorWidget] Handler error for "${this.language}":`, err)
           container.textContent = `Error rendering ${this.language}: ${err instanceof Error ? err.message : String(err)}`
         })
       }
     } catch (err) {
-      console.error(`[CodeBlockProcessorWidget] Handler error for "${this.language}":`, err)
+      errorOnce(`CodeBlockProcessorWidget.handlerError::${this.language}`, `[CodeBlockProcessorWidget] Handler error for "${this.language}":`, err)
       container.textContent = `Error rendering ${this.language}: ${err instanceof Error ? err.message : String(err)}`
     }
 
@@ -1450,6 +1451,44 @@ export function buildWidgetDecorations(
             Decoration.replace({ widget }).range(node.from, node.to)
           )
           hideableRanges.push({ from: node.from, to: node.to, groupFrom: node.from, groupTo: node.to })
+        }
+      }
+
+      // --- HTML block: <center>...</center> ---
+      // Lezer parses this as one opaque HTMLBlock node (unlike inline tags like
+      // <font>, which come through as separate HTMLTag open/close nodes handled
+      // in inline-decorations.ts). Centering is applied as a per-line CSS class
+      // (mirroring the Blockquote branch above) and the tag lines are hidden,
+      // revealed together via hideableRanges when the cursor is inside.
+      if (node.name === 'HTMLBlock') {
+        const key = `htmlblock:${node.from}:${node.to}`
+        if (processedBlocks.has(key)) return
+        processedBlocks.add(key)
+
+        const text = doc.sliceString(node.from, node.to)
+        const centerMatch = /^(<center(?:\s[^<>]*)?>)[\s\S]*(<\/center\s*>)\s*$/i.exec(text)
+
+        if (centerMatch) {
+          const openTag = centerMatch[1]!
+          const closeTag = centerMatch[2]!
+          const openFrom = node.from
+          const openTo = openFrom + openTag.length
+          const closeFrom = node.from + text.lastIndexOf(closeTag)
+          const closeTo = closeFrom + closeTag.length
+
+          const startLine = doc.lineAt(node.from)
+          const endLine = doc.lineAt(node.to)
+          for (let lineNum = startLine.number; lineNum <= endLine.number; lineNum++) {
+            decorations.push(
+              Decoration.line({ attributes: { class: 'cm-lp-html-center' } }).range(doc.line(lineNum).from)
+            )
+          }
+
+          hideableRanges.push({ from: openFrom, to: openTo, groupFrom: node.from, groupTo: node.to })
+          decorations.push(Decoration.replace({}).range(openFrom, openTo))
+
+          hideableRanges.push({ from: closeFrom, to: closeTo, groupFrom: node.from, groupTo: node.to })
+          decorations.push(Decoration.replace({}).range(closeFrom, closeTo))
         }
       }
     }

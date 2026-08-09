@@ -79,7 +79,8 @@ src/
 │   ├── templateRoutes.ts — Template routes (list, create from template)
 │   ├── uploadRoutes.ts   — File upload routes (multipart, image paste mode)
 │   ├── preferencesRoutes.ts — User preferences routes (GET/PUT recent-files, favorites, keybindings)
-│   ├── vaultConfigRoutes.ts — Per-vault config routes (GET/PUT /vaults/:vaultId/config)
+│   ├── vaultConfigRoutes.ts — Per-vault config routes (GET/PUT /vaults/:vaultId/config — templates dir, daily notes dir, daily note template name)
+│   ├── vaultConfigRoutes.test.ts — Integration tests for vault config routes
 │   ├── welcomeVaultRoutes.ts — POST /api/v1/welcome-vault (on-demand tutorial vault creation, rate-limited)
 │   ├── welcomeVaultRoutes.test.ts — Integration tests for welcome vault route
 │   ├── proxyRoutes.ts    — POST /api/v1/proxy (CORS-free HTTP proxy for plugin requestUrl, SSRF protection, URL allowlist)
@@ -135,7 +136,7 @@ src/
 │   ├── types.ts              — IInstalledPluginStore, PluginManifest, PluginFiles, PluginRegistryData interfaces
 │   ├── errors.ts             — PluginNotFoundError, PluginFileTooLargeError, PluginSettingsTooLargeError
 │   ├── validation.ts         — Zod schemas (pluginManifestSchema, pluginRegistrySchema)
-│   ├── installed-plugin-store.ts — InstalledPluginStore (filesystem persistence, atomic writes, per-vault per-plugin dirs)
+│   ├── installed-plugin-store.ts — InstalledPluginStore (filesystem persistence, atomic writes, per-vault per-plugin dirs); `loadManifest` normalizes `manifest.id` to the directory name, since every other lookup is keyed by that and a manifest's self-declared id is upstream-controlled and can drift
 │   ├── installed-plugin-store.test.ts — Unit tests for InstalledPluginStore
 │   ├── plugin-installer.ts   — PluginInstaller (ZIP extraction, manifest validation, bundle integrity, version comparison)
 │   ├── plugin-installer.test.ts — Unit tests for PluginInstaller
@@ -245,7 +246,7 @@ src/
 │   ├── state-store.ts        — Per-tab EditorState persistence (Module-Level Map, cursor/scroll/history)
 │   ├── formatting.ts         — Formatting commands (bold, italic, heading, list, link, etc.) — driven by the Command Palette, no longer by a native toolbar
 │   ├── plugin-extensions.ts  — Plugin extension registry (per-plugin Compartment, add/remove/isolate, selection-dispatch after refresh) + active-editor-container tracking (get/setActiveEditorContainerEl, setEditorContainerMountedListener) so MarkdownView.containerEl points at real, attached DOM
-│   ├── editor-state-fields.ts — Obsidian-compatible StateFields (editorInfoField, editorLivePreviewField, editorEditorField)
+│   ├── editor-state-fields.ts — Obsidian-compatible StateFields (editorInfoField, editorLivePreviewField, editorEditorField) + `livePreviewState` (`{ mousedown }`) and the `livePreviewStateTracker` extension that maintains it (document-level mouseup, so a drag ending outside the editor still clears)
 │   ├── token-class-node-prop.ts — Singleton NodeProp + Mapping (tokenClassNodeProp polyfill for Obsidian compat)
 │   ├── CodeMirrorEditor.tsx  — React wrapper (EditorView in useRef, props→effects sync, mode toggle); marks the wrapper's parent `.markdown-source-view` and publishes its grandparent as containerEl for plugin toolbars
 │   └── live-preview/
@@ -261,6 +262,7 @@ src/
 │   ├── link-resolver.ts  — Wikilink target resolution against DirectoryTree
 │   ├── heading-anchor.ts — Heading anchor generation + deduplication tracker
 │   ├── preserve-table-code-escapes.ts — Counters mdast-util-gfm-table's pipe-unescaping inside inline code spans (Obsidian verbatim rendering)
+│   ├── inline-html.ts    — Allowlist + attribute parsing for the safe subset of inline raw HTML (`<font color>`, `<mark>`, `<span style>`, …); shared by Live Preview (inline-decorations.ts, styled span) and reading view (ViewMode.tsx, real element) so both agree on what renders vs. stays literal text
 │   ├── wikilink/
 │   │   ├── syntax.ts     — micromark tokenizer extension for [[...]] syntax
 │   │   ├── mdast-util.ts — fromMarkdown + toMarkdown handlers
@@ -289,7 +291,7 @@ src/
 │       ├── errors.ts     — PluginError, ManifestValidationError, BundleEvaluationError, LifecycleError, etc.
 │       ├── event-system.ts — IEventEmitter (on/off/trigger/offref/removeAllListeners)
 │       ├── manifest-parser.ts — Manifest parsing with Zod validation + semver comparison
-│       ├── install-globals.ts — Installs the `window.obsidian` namespace + DOM/window globals plugin bundles expect; explicit idempotent entry point (registration order: DOM patches → real API → obsidian-api-extensions → fallback-shims)
+│       ├── install-globals.ts — Installs the `window.obsidian` namespace + DOM/window globals plugin bundles expect; explicit idempotent entry point (registration order: DOM patches → real API → obsidian-api-extensions → fallback-shims). Also home to the single real view/modal class chain (Component → View → ItemView → FileView → MarkdownView, and Modal → SuggestModal → FuzzySuggestModal) so `instanceof` and the prototype chain behave as plugins expect — these were previously duplicated across separate shim modules that overwrote each other
 │       ├── global-extensions.ts — Obsidian-compatible prototype patches (Array.remove/first/last, String.contains, Element.find/findAll, Math.clamp, etc.) — imported synchronously before any plugin bundle evaluates
 │       ├── fallback-shims.ts — Last-resort no-op/minimal implementations for anything install-globals + obsidian-api-extensions leave unclaimed; registered last so real shims always win
 │       ├── plugin-loader.ts — PluginLoader (bundle evaluation, lifecycle, timeout, cleanup, @lezer/* stubs)
@@ -304,7 +306,6 @@ src/
 │       ├── markdown-renderer.ts — MarkdownRenderer.render()/renderMarkdown() — lightweight markdown-to-HTML (not the full remark/unified pipeline) for plugin custom views (Kanban, Dataview)
 │       ├── markdown-sections.ts — Maps rendered code blocks back to their source line range (getSectionInfo) by re-scanning the source for fenced blocks in document order
 │       ├── block-cache.ts — Parses `^block-id` markers out of Markdown so `[[note#^id]]` links and CachedMetadata.blocks resolve
-│       ├── suggest-modal.ts — SuggestModal, FuzzySuggestModal (search/filter modals)
 │       ├── ribbon-icon-registry.ts — Module-level ribbon icon registry (addRibbonIcon store + change listeners)
 │       ├── status-bar-registry.ts — Module-level registry for addStatusBarItem() entries; notifies the StatusBar component on change
 │       ├── command-registry.ts — CommandRegistry (addCommand → returns the Command like Obsidian does, getCommand, removeAll, search, hotkeys, editorCallback/editorCheckCallback; executes callbacks inside withPluginContext)
@@ -315,7 +316,12 @@ src/
 │       ├── compatibility-analyzer.ts — Multi-layer browser compatibility analysis (isDesktopOnly gate, Node.js module detection, Obsidian API pattern matching, SUPPORTED_METHODS set)
 │       ├── platform-detection.ts — Runtime device/Platform flags (Obsidian's are Electron build constants; Slatebase derives isMobile/isDesktop etc. at runtime since one build serves both)
 │       ├── api-gap-registry.ts — Records which no-op Proxy-trapped API a plugin read vs. actually called, so silently-unimplemented API usage is diagnosable instead of invisible
-│       ├── no-op-warning.ts — One-warning-per-session console.warn for no-op compat APIs (avoids flooding the console from render-path calls)
+│       ├── log.ts — Shared console helpers with meaningful severity: `debug*` = deliberate compat trade-off (expected), `warn*` = real gap (actionable); `*Once` variants dedupe by key so render/event-path call sites log one line per session instead of flooding
+│       ├── core-commands.ts — Obsidian's built-in `editor:*` commands (formatting, lists, headings, tables) registered against the CommandRegistry, so `executeCommandById('editor:toggle-code')` resolves like a real install; no-Slatebase-equivalent commands are registered as literal no-ops rather than left unresolvable
+│       ├── core-commands-app.ts — The core commands needing app-level React state (`workspace:*`, `file-explorer:*`, `app:*`, `theme:*`, Graph/Canvas/Daily Notes, side panels); registered once by CommandPaletteContainer and fed fresh state via a ref
+│       ├── body-classes.ts — Syncs Obsidian's `theme-dark`/`theme-light` + platform marker classes (`is-mobile`, `mod-macos`, …) onto `document.body`; plugin CSS and runtime theme checks read those, while Slatebase's own state lives in `data-theme` on `<html>`
+│       ├── active-workspace-shim.ts — Module-level get/set for the current vault's WorkspaceShim, so native UI outside the PluginProvider tree (file-explorer context menu) can fire `file-menu`/`files-menu`
+│       ├── obsidian-components.css — Styles for the Obsidian-compatible Setting/*Component controls rendered by setting-tab.ts
 │       ├── plugin-context.ts — PluginProvider + usePluginContext hook (vault-scoped instances, FCP loading, activeViews/sidebarViews state)
 │       ├── plugin-event-bridge.ts — usePluginEventBridge hook (tab→workspace, save→cache, tree→resolved, leaf events)
 │       ├── hover-link-bus.ts — Routes hover-preview requests (Slatebase's own links + plugins' `workspace.trigger('hover-link', …)`) to the HoverPreview popover
@@ -331,9 +337,7 @@ src/
 │           ├── workspace-shim.ts — WorkspaceShim (full Leaf API + getActiveViewOfType synthetic view for the MarkdownView/FileView/ItemView family, onLayoutReady error-isolation); active leaf falls back to an "empty"-type view instead of null, and layout/leaf events re-fire once the CM6 editor mounts
 │           ├── metadata-cache-shim.ts — MetadataCacheShim (getFileCache, resolvedLinks, changed/resolved events, getTags, fileToLinktext, blockCache, getCachedFiles)
 │           ├── file-manager-shim.ts — FileManagerShim (renameFile, processFrontMatter, generateMarkdownLink, getNewFileParent, trashFile, promptForFileRename, getAvailablePathForAttachment)
-│           ├── markdown-view-shim.ts — MarkdownView stub (editor property, getActiveViewOfType support, registered on window.obsidian); containerEl resolves to the live editor container (detached div only when no editor is mounted)
-│           ├── markdown-renderer-shim.ts — MarkdownRenderer.render() (unified/remark MDAST→HTML pipeline, registered on window.obsidian)
-│           └── suggest-modal-shim.ts — Modal, SuggestModal, FuzzySuggestModal (DOM-based overlays, fuzzy search, keyboard nav)
+│           └── markdown-renderer-shim.ts — MarkdownRenderer.render() (unified/remark MDAST→HTML pipeline, registered on window.obsidian)
 ├── state/
 │   ├── index.ts          — AppProvider, appReducer, action creators
 │   ├── authState.ts      — Auth reducer + types
@@ -363,7 +367,7 @@ src/
 │   ├── favoritesStore.ts — Favorites per vault (server-synced + localStorage cache, max 50, path tracking on rename/delete)
 │   ├── dailyNoteService.ts — Daily note open/create logic (YYYY-MM-DD.md, template from vault config)
 │   ├── keybindingsStore.ts — Configurable keyboard shortcuts (server-synced, defaults + user overrides, matchesShortcut(), formatShortcut())
-│   ├── workspaceStore.ts — Workspace UI state persistence (tabs, expanded folders, panel sizes/visibility, debounced localStorage, per-vault tab memory)
+│   ├── workspaceStore.ts — Workspace UI state persistence (tabs, expanded folders, panel sizes/visibility, debounced localStorage, per-vault tab memory); a `storage`-event listener adopts writes from other browser tabs, except while this tab has a pending debounced write of its own
 │   └── vaultStatisticsCache.ts — Client-side vault statistics cache (invalidate on vault:change SSE)
 │   ├── settingsState.ts      — Settings reducer + types (categories, sections, nav state)
 │   ├── settingsRegistry.ts   — ISettingsRegistry, section definitions
@@ -432,6 +436,9 @@ src/
 │   ├── HoverPreview.tsx  — Hover preview popover for internal links (hover-link bus, plugin compat)
 │   ├── HoverPreview.css  — HoverPreview styles
 │   ├── hover-preview-position.ts — Pure geometry positioning logic for hover preview popover
+│   ├── GlobalTooltip.tsx — Renders a visible tooltip for any element carrying an `aria-label` (Obsidian's tooltip mechanism — plugins and our own `setTooltip()` just set the attribute and expect a bubble; browsers only do that for `title`). Mounted once near the root, independent of vault/auth state
+│   ├── GlobalTooltip.css — GlobalTooltip styles
+│   ├── global-tooltip-position.ts — Pure geometry for placing the tooltip (viewport-edge flipping), testable without a browser layout
 │   ├── VaultSharing.tsx  — Vault sharing component (share list, add/revoke permissions)
 │   ├── GraphView.tsx     — Knowledge graph SVG visualization (d3-force, zoom/pan/drag/search, config-driven colors/layout, tag/property nodes)
 │   ├── graph-utils.ts    — Pure graph utility functions (truncateLabel, clampZoom, computeNodeSize, filterNodes)
@@ -575,7 +582,7 @@ Route modules in `src/api/`:
 - `templateRoutes.ts` — template listing and creation
 - `uploadRoutes.ts` — file upload (multipart, image paste mode)
 - `preferencesRoutes.ts` — user preferences (recent files, favorites, keybindings)
-- `vaultConfigRoutes.ts` — per-vault config (templates dir, daily notes dir)
+- `vaultConfigRoutes.ts` — per-vault config (templates dir, daily notes dir, daily note template name)
 - `welcomeVaultRoutes.ts` — `POST /welcome-vault` (on-demand tutorial vault creation)
 - `proxyRoutes.ts` — `POST /proxy` (CORS-free HTTP proxy for plugin requestUrl, SSRF protection)
 - `sseRoutes.ts` — `GET /events` (SSE stream)

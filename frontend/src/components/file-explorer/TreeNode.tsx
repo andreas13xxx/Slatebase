@@ -83,7 +83,7 @@ export function TreeNode({
       && inlineInputState.vaultId === vaultId
 
     return (
-      <li className="tree-node tree-node--directory">
+      <li className="tree-node tree-node--directory" data-path={node.path}>
         <div
           className={`tree-node-row${isDragged ? ' tree-node--dragging' : ''}${isValidTarget || isExternalDropTarget ? ' tree-node--drop-target' : ''}`}
           draggable={canDrag}
@@ -182,7 +182,7 @@ export function TreeNode({
   const favorited = isFavorite(node.path)
 
   return (
-    <li className="tree-node tree-node--file">
+    <li className="tree-node tree-node--file" data-path={node.path}>
       <div
         className={`tree-node-row${isDragged ? ' tree-node--dragging' : ''}`}
         draggable={canDrag}

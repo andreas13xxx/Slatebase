@@ -21,8 +21,8 @@
 import { getStoredAuthToken, getStoredCsrfToken } from '../../state/authContext'
 import { addRibbonIcon as registerRibbonIcon } from './ribbon-icon-registry'
 import { addStatusBarItem as registerStatusBarItem } from './status-bar-registry'
-import { getCurrentPluginId } from './plugin-execution-context'
-import { getCachedLucideIconNode, renderLucideIconNode, renderLucideIconInto } from './lucide-icons'
+import { getCurrentPluginId, trackPluginTimer, withPluginContext } from './plugin-execution-context'
+import { getBuiltInIconIds, getLucideIconElement, renderLucideIconInto } from './lucide-icons'
 import moment from 'moment/min/moment-with-locales'
 
 // Real CM6 modules — used to provide functional extensions to plugins
@@ -43,6 +43,7 @@ import {
   editorEditorField,
   editorLivePreviewField,
   editorViewField,
+  livePreviewState,
 } from '../../editor/editor-state-fields'
 
 // NodeProp for tokenClassNodeProp polyfill (removed from @codemirror/language in v6.x)
@@ -50,15 +51,25 @@ import { tokenClassNodeProp } from '../../editor/token-class-node-prop'
 
 // Load Obsidian-compatible CSS variables (maps Slatebase tokens to Obsidian naming)
 import './obsidian-compat.css'
+// Structural styling for the Obsidian component classes our shims render.
+// After the variables above: it is written entirely in terms of them.
+import './obsidian-components.css'
 
 // Load global prototype extensions (Array, String, Math, Object, Element, Node)
 // Must be before any plugin code evaluates — plugins use these directly.
 import './global-extensions'
 
-// Settings UI classes registered onto the namespace below.
+// Settings UI classes registered onto the namespace below. BaseComponent/
+// ValueComponent/AbstractTextComponent live here too (not redefined inline)
+// so `window.obsidian.BaseComponent` and the classes TextComponent/etc.
+// actually extend are the exact same class — see the setting-tab.ts module
+// doc for why that used to be two disconnected copies.
 import {
   PluginSettingTab,
   Setting,
+  BaseComponent,
+  ValueComponent,
+  AbstractTextComponent,
   TextComponent,
   TextAreaComponent,
   ToggleComponent,
@@ -71,14 +82,22 @@ import {
 // plugin-loader.ts hands the namespace to every evaluated bundle, and every
 // layer guards with `if (!window.obsidian[x])` (first writer wins, permanently).
 // A deferred registration would let a plugin observe an incomplete namespace.
-import { SuggestModal, FuzzySuggestModal } from './suggest-modal'
 import { MarkdownRenderer } from './markdown-renderer'
 import { EditorShim } from './editor-shim'
-import { registerObsidianApiExtensions } from './obsidian-api-extensions'
+// Registered on the namespace under their Obsidian names, so plugin prototype
+// patches and `instanceof` checks act on the classes actually in use.
+import { WorkspaceShim } from './shims/workspace-shim'
+import { MetadataCacheShim } from './shims/metadata-cache-shim'
+import { VaultShim } from './shims/vault-shim'
+import { FileManagerShim } from './shims/file-manager-shim'
+import { registerObsidianApiExtensions, OBSIDIAN_API_VERSION, compareApiVersions } from './obsidian-api-extensions'
 import { registerFallbackShims } from './fallback-shims'
 import { detectPlatform, readPlatformEnvironment } from './platform-detection'
+import { installObsidianBodyClasses } from './body-classes'
 import { installApiGapInspector } from './api-gap-registry'
-import { warnNoOp } from './no-op-warning'
+import { warnNoOp, warnOnce } from './log'
+import { isOwnedEventRef, offrefAtOwner } from './event-system'
+import type { EventRef } from './types'
 // Aliased: the Plugin methods below carry the same names and would read as
 // recursive calls otherwise.
 import {
@@ -204,6 +223,48 @@ declare global {
 }
 
 
+/** Result of {@link fuzzyMatchText} — used by the canonical FuzzySuggestModal below. */
+interface FuzzyMatchResult<T> {
+  item: T
+  match: { score: number; matches: Array<[number, number]> }
+}
+
+/**
+ * Gap-tolerant fuzzy match (query characters must appear in order in `text`,
+ * not necessarily contiguously — the classic Ctrl+P / Cmd+P style match).
+ * Lower score is better: penalizes gaps between matched characters, rewards
+ * matches starting at a word boundary. Returns null if `query` doesn't match.
+ */
+function fuzzyMatchText(query: string, text: string): { score: number; matches: Array<[number, number]> } | null {
+  if (query.length === 0) return { score: 0, matches: [] }
+  if (query.length > text.length) return null
+
+  const matches: Array<[number, number]> = []
+  let queryIdx = 0
+  let score = 0
+  let lastMatchIdx = -1
+
+  for (let i = 0; i < text.length && queryIdx < query.length; i++) {
+    if (text[i] === query[queryIdx]) {
+      const start = i
+      while (i < text.length && queryIdx < query.length && text[i] === query[queryIdx]) {
+        queryIdx++
+        i++
+      }
+      i--
+      matches.push([start, i])
+      if (lastMatchIdx >= 0) score += start - lastMatchIdx - 1
+      if (start === 0 || text[start - 1] === ' ' || text[start - 1] === '/' || text[start - 1] === '-' || text[start - 1] === '_') {
+        score -= 2
+      }
+      lastMatchIdx = i
+    }
+  }
+
+  if (queryIdx < query.length) return null
+  return { score, matches }
+}
+
 /** Guard so repeated calls from multiple entry points are harmless. */
 let installed = false
 
@@ -217,6 +278,11 @@ export function installObsidianGlobals(): void {
   if (!window.obsidian) {
     window.obsidian = {}
   }
+
+  // theme-dark/theme-light and the platform mod-* classes. Before anything else:
+  // plugin CSS and module-body theme checks both read them, and a plugin bundle
+  // can run either the moment it is evaluated.
+  installObsidianBodyClasses()
 
   // ─── DOM Prototype Extensions (synchronous, required before any plugin loads) ──
   // Obsidian patches DOM prototypes with utility methods that plugins use directly.
@@ -267,6 +333,24 @@ export function installObsidianGlobals(): void {
     Object.defineProperty(Element.prototype, 'win', {
       get: function (this: Element): Window { return this.ownerDocument.defaultView ?? window },
       configurable: true,
+    })
+  }
+  // Obsidian's window-aware `instanceOf` — plugins use `node.instanceOf(HTMLElement)`
+  // instead of the native `instanceof` because Obsidian supports popout windows, where
+  // an element's `HTMLElement` constructor belongs to a different realm than the main
+  // window's (so a plain `instanceof` would wrongly say false). It resolves the
+  // constructor by name on the node's own window first, falling back to the passed-in
+  // type for same-window checks. Kanban calls this on every drag/resize/click target
+  // (e.g. `t.instanceOf(HTMLElement)` in its resize observer), so without it those
+  // handlers throw instead of running.
+  if (!('instanceOf' in Node.prototype)) {
+    Object.defineProperty(Node.prototype, 'instanceOf', {
+      value: function (this: Node, type: { new (...args: unknown[]): unknown; name: string }): boolean {
+        const win = (this as unknown as { win?: Window }).win ?? this.ownerDocument?.defaultView ?? window
+        const winCtor = (win as unknown as Record<string, unknown>)[type.name] as (new (...args: unknown[]) => unknown) | undefined
+        return this instanceof (winCtor ?? type)
+      },
+      writable: true, configurable: true,
     })
   }
   if (!('appendText' in Node.prototype)) {
@@ -390,6 +474,82 @@ export function installObsidianGlobals(): void {
     })
   }
 
+  // Global setTimeout / setInterval — carry the plugin-execution-context across
+  // the macrotask boundary. withPluginContext() only covers synchronous nesting,
+  // so a plugin's bare `setTimeout(() => this.buildUI(), 100)` called from
+  // onload() loses its plugin id by the time the callback actually fires: any
+  // createEl()/createDiv() calls inside it come back untagged, and CssInjector's
+  // [data-plugin-id] scoping silently fails to match, leaving unstyled DOM.
+  // ("Editing Toolbar" builds its whole toolbar this way, which is how this was
+  // found — its first, untagged attempt "wins" whenever the editor is already
+  // mounted at onload time, since no later re-tagged event fires to replace it.)
+  // Captures the currently-executing plugin at *scheduling* time and re-enters
+  // that context when the deferred callback runs.
+  const nativeSetTimeout = window.setTimeout.bind(window)
+  const nativeSetInterval = window.setInterval.bind(window)
+  window.setTimeout = ((handler: TimerHandler, timeout?: number, ...args: unknown[]): number => {
+    if (typeof handler !== 'function') return nativeSetTimeout(handler, timeout, ...args) as unknown as number
+    const pluginId = getCurrentPluginId()
+    const id = nativeSetTimeout(
+      pluginId ? () => withPluginContext(pluginId, () => handler(...args)) : () => handler(...args),
+      timeout
+    ) as unknown as number
+    // Let the sandbox cancel this on unload — otherwise a plugin's pending
+    // timers (e.g. an autosave reset) keep firing after teardown, throwing on
+    // whatever plugin state they still reference. See trackPluginTimer.
+    if (pluginId) trackPluginTimer(pluginId, id)
+    return id
+  }) as typeof window.setTimeout
+  window.setInterval = ((handler: TimerHandler, timeout?: number, ...args: unknown[]): number => {
+    if (typeof handler !== 'function') return nativeSetInterval(handler, timeout, ...args) as unknown as number
+    const pluginId = getCurrentPluginId()
+    const id = nativeSetInterval(
+      pluginId ? () => withPluginContext(pluginId, () => handler(...args)) : () => handler(...args),
+      timeout
+    ) as unknown as number
+    if (pluginId) trackPluginTimer(pluginId, id)
+    return id
+  }) as typeof window.setInterval
+
+  // requestAnimationFrame — same macrotask-boundary problem as setTimeout above.
+  // Toolbar/positioning plugins commonly use rAF for layout/reposition loops.
+  const nativeRAF = window.requestAnimationFrame.bind(window)
+  window.requestAnimationFrame = ((callback: FrameRequestCallback): number => {
+    const pluginId = getCurrentPluginId()
+    return nativeRAF(
+      pluginId ? (time) => withPluginContext(pluginId, () => callback(time)) : callback
+    )
+  }) as typeof window.requestAnimationFrame
+
+  // MutationObserver / ResizeObserver — likewise scheduled asynchronously, and
+  // commonly used by plugins (e.g. "Editing Toolbar") to detect when the editor
+  // DOM becomes available and (re)build UI in response. The observer is
+  // constructed while plugin context is set (synchronously, during onload or an
+  // event handler), but its callback fires later on its own schedule — same
+  // context-loss shape as setTimeout, just via a different native API.
+  if (typeof window.MutationObserver !== 'undefined') {
+    const NativeMutationObserver = window.MutationObserver
+    window.MutationObserver = class extends NativeMutationObserver {
+      constructor(callback: MutationCallback) {
+        const pluginId = getCurrentPluginId()
+        super(pluginId
+          ? (mutations, observer) => withPluginContext(pluginId, () => callback(mutations, observer))
+          : callback)
+      }
+    }
+  }
+  if (typeof window.ResizeObserver !== 'undefined') {
+    const NativeResizeObserver = window.ResizeObserver
+    window.ResizeObserver = class extends NativeResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        const pluginId = getCurrentPluginId()
+        super(pluginId
+          ? (entries, observer) => withPluginContext(pluginId, () => callback(entries, observer))
+          : callback)
+      }
+    }
+  }
+
   // NOTE: Array.prototype.remove and String.prototype.contains are installed by
   // './global-extensions', imported at the top of this module. Duplicate copies
   // used to live here but were unreachable — global-extensions runs first and
@@ -422,13 +582,14 @@ export function installObsidianGlobals(): void {
         container.innerHTML = svg
         return container.querySelector('svg') ?? null
       }
-      const cached = getCachedLucideIconNode(iconId)
-      return cached ? renderLucideIconNode(cached) : null
+      return getLucideIconElement(iconId)
     }
   }
   if (!window.obsidian.getIconIds) {
+    // Obsidian returns the built-in ids too, not just plugin-registered ones;
+    // plugins list them to populate icon pickers.
     window.obsidian.getIconIds = (): string[] => {
-      return Array.from(customIconsRef.keys())
+      return [...customIconsRef.keys(), ...getBuiltInIconIds()]
     }
   }
   if (!window.obsidian.setIcon) {
@@ -458,13 +619,23 @@ export function installObsidianGlobals(): void {
     (window as unknown as { nextFrame: () => Promise<void> }).nextFrame = () => new Promise(resolve => requestAnimationFrame(() => resolve()))
   }
 
-  // Obsidian exposes the Workspace class itself on window.obsidian so plugins
-  // can monkey-patch its prototype (e.g. Templater patches getActiveViewOfType).
+  // Obsidian exposes its manager classes on window.obsidian for two reasons:
+  // plugins monkey-patch their prototypes (Templater patches
+  // Workspace.getActiveViewOfType) and they narrow with `instanceof`.
+  //
+  // These used to be empty marker classes — `class Workspace {}` — which
+  // satisfied `.prototype` access but nothing else: a prototype patch landed on
+  // a class no live object descended from, and every `instanceof` was false.
+  // Both failures are silent. Exporting the actual shim constructors makes the
+  // patch reach the running instance and the type test answer correctly.
   if (!window.obsidian.Workspace) {
-    // Create a dummy class whose prototype plugins can patch.
-    // The real WorkspaceShim instance is separate — patches on this prototype
-    // won't affect it, but plugins won't crash trying to access .prototype.
-    window.obsidian.Workspace = class Workspace {} as unknown as Record<string, unknown>
+    window.obsidian.Workspace = WorkspaceShim as unknown as Record<string, unknown>
+  }
+  if (!window.obsidian.MetadataCache) {
+    window.obsidian.MetadataCache = MetadataCacheShim as unknown as Record<string, unknown>
+  }
+  if (!window.obsidian.FileManager) {
+    window.obsidian.FileManager = FileManagerShim as unknown as Record<string, unknown>
   }
 
   // Component — Obsidian's base class for lifecycle management.
@@ -477,6 +648,7 @@ export function installObsidianGlobals(): void {
       private _events: Array<{ target: EventTarget; event: string; handler: EventListenerOrEventListenerObject }> = []
       private _intervals: number[] = []
       private _cleanups: Array<() => void> = []
+      private _eventRefs: EventRef[] = []
 
       load(): void {
         this._loaded = true
@@ -493,6 +665,9 @@ export function installObsidianGlobals(): void {
           target.removeEventListener(event, handler)
         }
         this._events = []
+        // Deregister listeners handed to registerEvent()
+        for (const ref of this._eventRefs) offrefAtOwner(ref)
+        this._eventRefs = []
         // Run cleanup callbacks
         for (const fn of this._cleanups) { try { fn() } catch { /* ignore */ } }
         this._cleanups = []
@@ -524,7 +699,19 @@ export function installObsidianGlobals(): void {
       register(cb: unknown): void {
         if (typeof cb === 'function') this._cleanups.push(cb as () => void)
       }
-      registerEvent(_ref: unknown): void {}
+      /**
+       * Hold an event subscription for the lifetime of this component.
+       * Refs from a foreign emitter cannot be deregistered here, so they are
+       * reported rather than dropped — the listener would survive unload.
+       */
+      registerEvent(ref: unknown): void {
+        if (!ref || typeof ref !== 'object') return
+        if (!isOwnedEventRef(ref)) {
+          warnNoOp('Component', 'registerEvent', 'The event ref did not come from a Slatebase emitter and will not be deregistered on unload.')
+          return
+        }
+        this._eventRefs.push(ref)
+      }
       registerInterval(id: number): number {
         this._intervals.push(id)
         return id
@@ -536,13 +723,17 @@ export function installObsidianGlobals(): void {
     } as unknown as Record<string, unknown>
   }
 
-  // EditorSuggest — Base class for autocomplete suggestions (Kanban DateSuggest/TimeSuggest).
-  // Must be defined early — class heritage evaluates at bundle parse time.
-  if (!window.obsidian.EditorSuggest) {
-    window.obsidian.EditorSuggest = class EditorSuggest {
+  // PopoverSuggest — real Obsidian's shared base of EditorSuggest and
+  // AbstractInputSuggest (Component -> PopoverSuggest -> {EditorSuggest,
+  // AbstractInputSuggest}). Without this, both subclasses lacked
+  // registerEvent/registerDomEvent/addChild/etc. (the same crash class as the
+  // View/ItemView bug), and `instanceof PopoverSuggest` — which plugins use to
+  // check "is this any kind of suggester" — was aliased to the unrelated
+  // SuggestModal class.
+  if (!window.obsidian.PopoverSuggest) {
+    const ComponentClass = window.obsidian.Component as { new (): unknown; prototype: object }
+    window.obsidian.PopoverSuggest = class PopoverSuggest<T> extends (ComponentClass as unknown as { new (): { load(): void; unload(): void; onload(): void; onunload(): void; register(cb: unknown): void; registerEvent(ref: unknown): void; registerDomEvent(el: EventTarget, event: string, handler: EventListenerOrEventListenerObject): void; registerInterval(id: number): number; addChild<C>(c: C): C; removeChild<C>(c: C): C } }) {
       app: unknown
-      context: unknown = null
-      limit: number = 20
       suggestEl: HTMLElement
       scope = {
         keys: [] as unknown[],
@@ -553,15 +744,31 @@ export function installObsidianGlobals(): void {
         unregister: (_handler: unknown) => {},
       }
       constructor(app: unknown) {
+        super()
         this.app = app
         this.suggestEl = document.createElement('div')
         this.suggestEl.className = 'suggestion-container'
       }
       open(): void {}
       close(): void {}
-      getSuggestions(_context: unknown): unknown[] { return [] }
-      renderSuggestion(_value: unknown, _el: HTMLElement): void {}
-      selectSuggestion(_value: unknown, _evt: unknown): void {}
+      /** Render a suggestion item. Plugins override this. */
+      renderSuggestion(_value: T, _el: HTMLElement): void {}
+      /** Handle the user choosing a suggestion. Plugins override this. */
+      selectSuggestion(_value: T, _evt: MouseEvent | KeyboardEvent): void {}
+    } as unknown as Record<string, unknown>
+  }
+
+  // EditorSuggest — Base class for autocomplete suggestions (Kanban DateSuggest/TimeSuggest).
+  // Must be defined early — class heritage evaluates at bundle parse time.
+  if (!window.obsidian.EditorSuggest) {
+    const PopoverSuggestClass = window.obsidian.PopoverSuggest as { new (app: unknown): { app: unknown; suggestEl: HTMLElement; scope: unknown; open(): void; close(): void } }
+    window.obsidian.EditorSuggest = class EditorSuggest<T> extends (PopoverSuggestClass as unknown as { new (app: unknown): { app: unknown; suggestEl: HTMLElement; scope: unknown; open(): void; close(): void } }) {
+      context: unknown = null
+      limit: number = 20
+      constructor(app: unknown) {
+        super(app)
+      }
+      getSuggestions(_context: unknown): T[] { return [] }
       onTrigger(_cursor: unknown, _editor: unknown, _file: unknown): unknown { return null }
     } as unknown as Record<string, unknown>
   }
@@ -574,6 +781,37 @@ export function installObsidianGlobals(): void {
         plugins: {
           'daily-notes': { enabled: true, instance: { options: { format: 'YYYY-MM-DD', folder: '', template: '' } } },
           'templates': { enabled: false, instance: { options: { folder: '' } } },
+          // Obsidian's built-in Canvas core plugin — Slatebase has no canvas
+          // feature, but Excalidraw's CanvasNodeFactory.initialize() (run from
+          // its view's onLayoutReady handler, to support embedding files as
+          // canvas nodes inside a drawing) unconditionally reaches into
+          // `internalPlugins.plugins.canvas._loaded`/`.load()`/`.views.canvas(leaf)`
+          // with no null check and no try/catch around the await. Without this
+          // entry that access throws "canvas is undefined", which aborts the
+          // rest of that onLayoutReady callback — including the statements
+          // that add the `excalidraw-view` class and set up the toolbar's
+          // sliding-panes/parent-move listeners — leaving the view half
+          // initialized (drawing canvas visible, toolbar controls missing).
+          // Stubbed enough to satisfy that call path; actual node embedding
+          // through it is a no-op since there's no real canvas to render into.
+          'canvas': {
+            enabled: false,
+            _loaded: true,
+            load: () => {},
+            views: {
+              canvas: (_leaf: unknown) => ({
+                canvas: {
+                  createFileNode: (_opts: unknown) => ({
+                    setFilePath: (_path: string, _subpath?: string) => {},
+                    render: () => {},
+                    containerEl: document.createElement('div'),
+                  }),
+                  removeNode: (_node: unknown) => {},
+                  setReadonly: (_readonly: boolean) => {},
+                },
+              }),
+            },
+          },
         },
         getPluginById: (id: string) => {
           const plugins = ((window as unknown as { app: { internalPlugins: { plugins: Record<string, unknown> } } }).app.internalPlugins.plugins)
@@ -581,14 +819,31 @@ export function installObsidianGlobals(): void {
         },
       },
       plugins: {
-        plugins: {},
+        plugins: {} as Record<string, unknown>,
         enabledPlugins: new Set<string>(),
-        getPlugin: () => undefined,
+        getPlugin(id: string) {
+          return (this as { plugins: Record<string, unknown> }).plugins[id]
+        },
+        registerPlugin(id: string, instance: unknown) {
+          (this as { plugins: Record<string, unknown> }).plugins[id] = instance
+          ;(this as { enabledPlugins: Set<string> }).enabledPlugins.add(id)
+        },
+        unregisterPlugin(id: string) {
+          delete (this as { plugins: Record<string, unknown> }).plugins[id]
+          ;(this as { enabledPlugins: Set<string> }).enabledPlugins.delete(id)
+        },
       },
       vault: {},
       workspace: {},
       metadataCache: {},
       foldManager: { save: () => {}, load: () => {}, getFolds: () => [] },
+      // See AppShim.getAccentColor() for why this exists — kept in sync here
+      // so views opened via createFileView's `sharedApp` (which reads through
+      // window.app rather than owning its own AppShim) get the same method.
+      getAccentColor: (): string => {
+        const value = getComputedStyle(document.documentElement).getPropertyValue('--interactive-accent').trim()
+        return value || '#7c3aed'
+      },
       embedRegistry: {
         embedByExtension: {
           md: () => {
@@ -902,14 +1157,18 @@ export function installObsidianGlobals(): void {
   }
 
   // Plugin base class — plugins extend this via `class MyPlugin extends Plugin`
-  // The constructor receives the app instance from the PluginLoader
+  // The constructor receives the app instance from the PluginLoader.
+  // Real Obsidian: Plugin extends Component. It used to reimplement Component's
+  // entire lifecycle (load/unload/addChild/register*) by hand instead of
+  // inheriting it — near-identical code kept in two places, which is exactly
+  // how the View/ItemView Component bug happened (a fix applied to one was
+  // never applied to the other). Extending Component here means there is only
+  // one lifecycle implementation to fix or extend going forward.
   if (!window.obsidian.Plugin) {
-    window.obsidian.Plugin = class Plugin {
+    const ComponentClass = window.obsidian.Component as { new (): { load(): void; unload(): void; onload(): void; onunload(): void; addChild<T>(c: T): T; removeChild<T>(c: T): T; register(cb: unknown): void; registerEvent(ref: unknown): void; registerInterval(id: number): number; registerDomEvent(el: EventTarget, event: string, handler: EventListenerOrEventListenerObject): void } }
+    window.obsidian.Plugin = class Plugin extends ComponentClass {
       app: unknown
       manifest: unknown
-      private _children: unknown[] = []
-      private _intervals: number[] = []
-      private _events: Array<{ target: EventTarget; event: string; handler: EventListenerOrEventListenerObject }> = []
       /** Scope — Obsidian's keymap manager for plugin hotkeys */
       scope = {
         keys: function(..._args: unknown[]) { return { scope: this } },
@@ -917,61 +1176,19 @@ export function installObsidianGlobals(): void {
         unregister: (_handler: unknown) => {},
       }
       constructor(app: unknown) {
+        super()
         this.app = app
         this.manifest = {}
-        this._children = []
-        this._intervals = []
-        this._events = []
-      }
-      onload() {}
-      onunload() {}
-      load() { this.onload() }
-      unload() { this.onunload() }
-      addChild<T>(child: T): T {
-        this._children.push(child)
-        if (child && typeof child === 'object' && 'load' in child) {
-          (child as { load: () => void }).load()
-        }
-        return child
-      }
-      removeChild<T>(child: T): T {
-        const idx = this._children.indexOf(child)
-        if (idx >= 0) this._children.splice(idx, 1)
-        if (child && typeof child === 'object' && 'unload' in child) {
-          (child as { unload: () => void }).unload()
-        }
-        return child
       }
       async loadData(): Promise<unknown> { return null }
-       
+
       async saveData(_data: unknown): Promise<void> {}
-       
+
       addCommand(_cmd: unknown): void {}
-       
+
       addSettingTab(_tab: unknown): void {}
-       
-      registerEvent(_ref: unknown): void {}
-       
+
       registerView(_viewType: string, _creator: unknown): void {}
-      /** Register a callback that runs on an interval (auto-cleared on unload) */
-      registerInterval(interval: number): number {
-        this._intervals.push(interval)
-        return interval
-      }
-      /** Register a DOM event listener (auto-removed on unload) */
-      registerDomEvent(el: EventTarget, event: string, handler: EventListenerOrEventListenerObject): void {
-        el.addEventListener(event, handler)
-        this._events.push({ target: el, event, handler })
-      }
-      /** General register method — in Obsidian this handles various cleanup registrations */
-      register(cb: unknown): void {
-        // In Obsidian, register() accepts a cleanup callback that runs on unload.
-        // We just invoke it if it's a function that returns a cleanup, or store it.
-        if (typeof cb === 'function') {
-          // Some plugins pass an interval ID here
-          this._intervals.push(cb as unknown as number)
-        }
-      }
       addRibbonIcon(icon: string, title: string, callback: () => void): HTMLElement {
         const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
         return registerRibbonIcon(pluginId, icon, title, callback)
@@ -1013,12 +1230,27 @@ export function installObsidianGlobals(): void {
         const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
         warnNoOp(pluginId, 'registerExtensions')
       }
-      /** Register an obsidian:// protocol handler. Not applicable in Slatebase (web app). */
-      registerObsidianProtocolHandler(_action: string, _handler: unknown): void {}
-      /** Remove a previously registered command. No-op in Slatebase. */
-      removeCommand(_commandId: string): void {}
-      /** Register a CLI handler. Not applicable in Slatebase (no desktop CLI). */
-      registerCliHandler(_command: string, _description: string, _flags: unknown, _handler: unknown): void {}
+      /**
+       * Register an `obsidian://` protocol handler. Deliberately unsupported:
+       * Slatebase is a web app and cannot claim a custom URL scheme.
+       */
+      registerObsidianProtocolHandler(action: string, _handler: unknown): void {
+        const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
+        warnNoOp(pluginId, 'registerObsidianProtocolHandler', `Slatebase is a web app and cannot handle obsidian://${action} links.`)
+      }
+      /** Remove a previously registered command. Wired to the CommandRegistry per instance. */
+      removeCommand(_commandId: string): void {
+        const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
+        warnNoOp(pluginId, 'removeCommand', 'The command stays in the command palette.')
+      }
+      /**
+       * Register a CLI handler. Deliberately unsupported: there is no Slatebase
+       * desktop CLI for a plugin to extend.
+       */
+      registerCliHandler(command: string, _description: string, _flags: unknown, _handler: unknown): void {
+        const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
+        warnNoOp(pluginId, 'registerCliHandler', `Slatebase has no CLI, so "${command}" is unreachable.`)
+      }
     } as unknown as Record<string, unknown>
   }
 
@@ -1030,23 +1262,22 @@ export function installObsidianGlobals(): void {
   }
 
   // BaseComponent — abstract base for all setting UI components.
-  // Excalidraw extends this for custom settings controls.
+  // Excalidraw extends this for custom settings controls. Defined in
+  // setting-tab.ts (imported above) — TextComponent/ToggleComponent/etc. all
+  // extend that exact same class, so this is the same object plugins see via
+  // `instanceof BaseComponent`, not a second copy.
   if (!window.obsidian.BaseComponent) {
-    window.obsidian.BaseComponent = class BaseComponent {
-      disabled = false
-      then(cb: (component: unknown) => unknown): unknown { cb(this); return this }
-      setDisabled(disabled: boolean): unknown { this.disabled = disabled; return this }
-    } as unknown as Record<string, unknown>
+    window.obsidian.BaseComponent = BaseComponent as unknown as Record<string, unknown>
   }
 
   // ValueComponent — extends BaseComponent with get/set value pattern.
   if (!window.obsidian.ValueComponent) {
-    const BaseComp = window.obsidian.BaseComponent as { new (): unknown; prototype: object }
-    window.obsidian.ValueComponent = class ValueComponent extends (BaseComp as unknown as { new (): { disabled: boolean; then(cb: unknown): unknown; setDisabled(d: boolean): unknown } }) {
-      getValue(): unknown { return undefined }
-      setValue(_value: unknown): unknown { return this }
-      registerOptionListener(_listeners: unknown, _key: string): unknown { return this }
-    } as unknown as Record<string, unknown>
+    window.obsidian.ValueComponent = ValueComponent as unknown as Record<string, unknown>
+  }
+
+  // AbstractTextComponent — shared base of TextComponent/TextAreaComponent.
+  if (!window.obsidian.AbstractTextComponent) {
+    window.obsidian.AbstractTextComponent = AbstractTextComponent as unknown as Record<string, unknown>
   }
 
   window.obsidian.TextComponent = TextComponent
@@ -1056,31 +1287,41 @@ export function installObsidianGlobals(): void {
   window.obsidian.ButtonComponent = ButtonComponent
   window.obsidian.SliderComponent = SliderComponent
 
-  // FileSystemAdapter — stub class for `instanceof` checks.
+  // FileSystemAdapter — exists for `instanceof` checks, not for use.
   // LiveSync uses `vault.adapter instanceof FileSystemAdapter` to detect desktop.
+  //
+  // The adapter a plugin actually receives is `vault.adapter` (vault-adapter-shim),
+  // which is backed by the real vault. This class is what a plugin gets if it
+  // constructs one itself, and it is disconnected from any storage: every method
+  // is a stub. Reads returning empty and writes discarding data are equally
+  // dangerous silently, so both warn — a plugin down this path is broken either
+  // way, and the warning is the only trace of why.
   if (!window.obsidian.FileSystemAdapter) {
+    const detachedAdapter = (method: string): void => {
+      warnNoOp('FileSystemAdapter', method, 'This adapter is a bare `instanceof` stub with no vault behind it — use `vault.adapter` instead.')
+    }
     window.obsidian.FileSystemAdapter = class FileSystemAdapter {
       getName(): string { return 'slatebase' }
       getBasePath(): string { return '/' }
       getFullPath(path: string): string { return path }
       getFilePath(path: string): string { return path }
       getResourcePath(path: string): string { return path }
-      async exists(_path: string): Promise<boolean> { return false }
-      async stat(_path: string): Promise<unknown> { return null }
-      async list(_path: string): Promise<{ files: string[]; folders: string[] }> { return { files: [], folders: [] } }
-      async read(_path: string): Promise<string> { return '' }
-      async readBinary(_path: string): Promise<ArrayBuffer> { return new ArrayBuffer(0) }
-      async write(_path: string, _data: string): Promise<void> {}
-      async writeBinary(_path: string, _data: ArrayBuffer): Promise<void> {}
-      async append(_path: string, _data: string): Promise<void> {}
-      async remove(_path: string): Promise<void> {}
-      async rename(_path: string, _newPath: string): Promise<void> {}
-      async copy(_path: string, _newPath: string): Promise<void> {}
-      async mkdir(_path: string): Promise<void> {}
-      async rmdir(_path: string, _recursive: boolean): Promise<void> {}
-      async trashSystem(_path: string): Promise<boolean> { return false }
-      async trashLocal(_path: string): Promise<void> {}
-      async process(_path: string, fn: (data: string) => string): Promise<string> { return fn('') }
+      async exists(_path: string): Promise<boolean> { detachedAdapter('exists'); return false }
+      async stat(_path: string): Promise<unknown> { detachedAdapter('stat'); return null }
+      async list(_path: string): Promise<{ files: string[]; folders: string[] }> { detachedAdapter('list'); return { files: [], folders: [] } }
+      async read(_path: string): Promise<string> { detachedAdapter('read'); return '' }
+      async readBinary(_path: string): Promise<ArrayBuffer> { detachedAdapter('readBinary'); return new ArrayBuffer(0) }
+      async write(_path: string, _data: string): Promise<void> { detachedAdapter('write') }
+      async writeBinary(_path: string, _data: ArrayBuffer): Promise<void> { detachedAdapter('writeBinary') }
+      async append(_path: string, _data: string): Promise<void> { detachedAdapter('append') }
+      async remove(_path: string): Promise<void> { detachedAdapter('remove') }
+      async rename(_path: string, _newPath: string): Promise<void> { detachedAdapter('rename') }
+      async copy(_path: string, _newPath: string): Promise<void> { detachedAdapter('copy') }
+      async mkdir(_path: string): Promise<void> { detachedAdapter('mkdir') }
+      async rmdir(_path: string, _recursive: boolean): Promise<void> { detachedAdapter('rmdir') }
+      async trashSystem(_path: string): Promise<boolean> { detachedAdapter('trashSystem'); return false }
+      async trashLocal(_path: string): Promise<void> { detachedAdapter('trashLocal') }
+      async process(_path: string, fn: (data: string) => string): Promise<string> { detachedAdapter('process'); return fn('') }
     } as unknown as Record<string, unknown>
   }
 
@@ -1125,9 +1366,11 @@ export function installObsidianGlobals(): void {
       fn: T,
       delay: number,
       resetTimer = true,
-    ): T & { cancel: () => void } => {
+    ): T & { cancel: () => void; run: () => ReturnType<T> | void } => {
       let timerId: ReturnType<typeof setTimeout> | null = null
+      let lastArgs: unknown[] | null = null
       const debounced = (...args: unknown[]) => {
+        lastArgs = args
         if (resetTimer) {
           if (timerId !== null) clearTimeout(timerId)
           timerId = setTimeout(() => { timerId = null; fn(...args) }, delay)
@@ -1141,36 +1384,55 @@ export function installObsidianGlobals(): void {
       debounced.cancel = () => {
         if (timerId !== null) { clearTimeout(timerId); timerId = null }
       }
-      return debounced as unknown as T & { cancel: () => void }
+      /** Force-fire a pending call immediately (Obsidian 1.4.4+ Debouncer.run()). */
+      debounced.run = (): ReturnType<T> | void => {
+        if (timerId === null || lastArgs === null) return
+        clearTimeout(timerId)
+        timerId = null
+        return fn(...lastArgs) as ReturnType<T>
+      }
+      return debounced as unknown as T & { cancel: () => void; run: () => ReturnType<T> | void }
     }
+  }
+
+  // TAbstractFile — the shared base of TFile and TFolder. Plugins narrow with
+  // `instanceof TAbstractFile` when a value could be either (Vault.on('rename')
+  // hands one out), so TFile/TFolder below must extend it, not stand alone.
+  if (!window.obsidian.TAbstractFile) {
+    window.obsidian.TAbstractFile = class TAbstractFile {
+      path = ''
+      name = ''
+      parent: unknown = null
+      vault: unknown = null
+    } as unknown as Record<string, unknown>
+  }
+  const TAbstractFileClass = window.obsidian.TAbstractFile as unknown as {
+    new (): { path: string; name: string; parent: unknown; vault: unknown }
   }
 
   // TFile class stub — some plugins use `instanceof obsidian.TFile`
   if (!window.obsidian.TFile) {
-    window.obsidian.TFile = class TFile {
-      path = ''
-      name = ''
+    window.obsidian.TFile = class TFile extends TAbstractFileClass {
       basename = ''
       extension = ''
       stat = { mtime: 0, ctime: 0, size: 0 }
-      parent: unknown = null
     } as unknown as Record<string, unknown>
   }
 
   // TFolder class stub — some plugins use `instanceof obsidian.TFolder`
   if (!window.obsidian.TFolder) {
-    window.obsidian.TFolder = class TFolder {
-      path = ''
-      name = ''
+    window.obsidian.TFolder = class TFolder extends TAbstractFileClass {
       children: unknown[] = []
-      parent: unknown = null
       isRoot() { return this.path === '' || this.path === '/' }
     } as unknown as Record<string, unknown>
   }
 
   // Vault static methods — some plugins use `Vault.recurseChildren(folder, cb)`
   if (!window.obsidian.Vault) {
-    window.obsidian.Vault = {} as Record<string, unknown>
+    // The real shim class, so `file.vault instanceof Vault` holds and prototype
+    // patches reach the live instance; the statics below hang off it as in
+    // Obsidian, where Vault is a class with static helpers.
+    window.obsidian.Vault = VaultShim as unknown as Record<string, unknown>
   }
   if (!(window.obsidian.Vault as Record<string, unknown>).recurseChildren) {
     (window.obsidian.Vault as Record<string, unknown>).recurseChildren = (
@@ -1189,15 +1451,28 @@ export function installObsidianGlobals(): void {
     }
   }
 
+  // View — the abstract base every view type derives from. Exported because
+  // plugins type-test against it (`leaf.view instanceof View`) and because
+  // `MarkdownView extends View` is what makes those tests hold for our views.
+  // Extends Component (real Obsidian: Component -> View -> ItemView) so that
+  // registerDomEvent/registerInterval/addChild/removeChild/load/unload reach
+  // ItemView and its subclasses — plugins call these from onload(), which our
+  // WorkspaceLeaf now invokes as part of the view lifecycle (see view-registry.ts).
+  if (!window.obsidian.View) {
+    const ComponentClass = window.obsidian.Component as { new (): unknown; prototype: object }
+    window.obsidian.View = class View extends (ComponentClass as unknown as { new (): object }) {} as unknown as Record<string, unknown>
+  }
+  const ViewClass = window.obsidian.View as unknown as { new (): object }
+
   // ItemView — base class for custom plugin views (Calendar, Kanban, etc.)
   if (!window.obsidian.ItemView) {
-    window.obsidian.ItemView = class ItemView {
+    window.obsidian.ItemView = class ItemView extends ViewClass {
       containerEl: HTMLElement
       contentEl: HTMLElement
       app: unknown
       leaf: unknown
-      private _eventRefs: Array<{ event: string; callback: (...args: unknown[]) => void }> = []
       constructor(leaf: unknown) {
+        super()
         this.leaf = leaf
         this.app = leaf && typeof leaf === 'object' && 'app' in leaf ? (leaf as { app: unknown }).app : null
         this.containerEl = document.createElement('div')
@@ -1211,20 +1486,8 @@ export function installObsidianGlobals(): void {
       getIcon(): string { return 'file' }
       async onOpen(): Promise<void> { /* plugins override */ }
       async onClose(): Promise<void> { /* plugins override */ }
-      onload(): void {}
-      onunload(): void {}
-      /** Track an event subscription for automatic cleanup on view close. */
-      registerEvent(eventRef: unknown): void {
-        if (eventRef && typeof eventRef === 'object') {
-          this._eventRefs.push(eventRef as { event: string; callback: (...args: unknown[]) => void })
-        }
-      }
-      /** Register a generic cleanup callback (interval, DOM listener, etc.). */
-      register(cb: unknown): void {
-        if (typeof cb === 'function') {
-          this._eventRefs.push({ event: '__cleanup__', callback: cb as () => void })
-        }
-      }
+      // registerEvent/register/registerDomEvent/registerInterval/addChild/removeChild/
+      // load/unload/onload/onunload are inherited from Component via View — see above.
       /** Add a clickable action icon to the view header. */
       addAction(icon: string, title: string, callback: () => void): HTMLElement {
         // Create or find the header actions container
@@ -1290,6 +1553,7 @@ export function installObsidianGlobals(): void {
       data: string = ''
       private _saveRequested: boolean = false
       private _saveTimerId: ReturnType<typeof setTimeout> | null = null
+      private _cleanups: Array<() => void> = []
       getViewType(): string { return '' }
       getDisplayText(): string { return (this.file as { basename?: string })?.basename ?? 'File View' }
       /** Get view data — plugins override to serialize state to text. */
@@ -1336,6 +1600,7 @@ export function installObsidianGlobals(): void {
       async onClose(): Promise<void> {
         if (this.file) await this.onUnloadFile(this.file)
         if (this._saveTimerId !== null) { clearTimeout(this._saveTimerId); this._saveTimerId = null }
+        this.runCleanups()
       }
       getState(): Record<string, unknown> { return { file: (this.file as { path?: string })?.path ?? null } }
       async setState(state: Record<string, unknown>, _result: unknown): Promise<void> {
@@ -1357,12 +1622,38 @@ export function installObsidianGlobals(): void {
         }
         return child
       }
-      register(_cb: unknown): void { /* no-op */ }
+      /**
+       * Register a cleanup callback, run when the view closes.
+       *
+       * Was a no-op, which is the silent-failure case Obsidian's Component
+       * contract makes expensive: plugins hand `register()` their event
+       * unsubscribes and interval clears and never track them separately, so
+       * dropping the callback leaks a listener per view open.
+       */
+      register(cb: unknown): void {
+        if (typeof cb === 'function') this._cleanups.push(cb as () => void)
+      }
+      /** Run and drop every registered cleanup. One throwing must not skip the rest. */
+      private runCleanups(): void {
+        const cleanups = this._cleanups.splice(0)
+        for (const cb of cleanups) {
+          try {
+            cb()
+          } catch (err) {
+            console.error('[PluginCompat] TextFileView cleanup callback threw', err)
+          }
+        }
+      }
     } as unknown as Record<string, unknown>
   }
 
   // MarkdownView — plugins use `getActiveViewOfType(MarkdownView)` to check if the
   // active leaf is editing a markdown file. Extends FileView with editor property.
+  // This is the ONE canonical MarkdownView (Component -> View -> ItemView -> FileView
+  // -> MarkdownView chain) — WorkspaceShim.getActiveViewOfType() constructs instances
+  // of this exact class rather than a separate lookalike, so `instanceof MarkdownView`
+  // and inherited Component methods (registerEvent/registerDomEvent/addChild/...) work
+  // regardless of whether a plugin got the view from `activeLeaf.view` or by querying.
   if (!window.obsidian.MarkdownView) {
     const FileViewClass = window.obsidian.FileView as { new (leaf: unknown): unknown; prototype: object }
     window.obsidian.MarkdownView = class MarkdownView extends (FileViewClass as unknown as { new (leaf: unknown): { containerEl: HTMLElement; contentEl: HTMLElement; app: unknown; leaf: unknown; file: unknown } }) {
@@ -1378,6 +1669,25 @@ export function installObsidianGlobals(): void {
       getMode(): string { return 'source' }
       /** Request save — no-op in our implementation, auto-save handles it. */
       requestSave(): void { /* no-op */ }
+      /** Preview-mode stub (Live Preview only — no separate reading-mode renderer). */
+      previewMode: { rerender: () => void } = { rerender: () => {} }
+      /** Sub-view mode stub (source/preview toggle plugins may probe). */
+      currentMode: { get: () => string; set: (data: string, clear: boolean) => void } = {
+        get: () => 'source',
+        set: () => {},
+      }
+      /** Get the raw view data — delegates to the live editor. */
+      getViewData(): string {
+        return (this.editor as { getValue: () => string } | null)?.getValue() ?? ''
+      }
+      /** Set the view data — delegates to the live editor. */
+      setViewData(data: string, _clear?: boolean): void {
+        (this.editor as { setValue: (v: string) => void } | null)?.setValue(data)
+      }
+      /** Clear the view state. No-op — Slatebase re-renders from the editor directly. */
+      clear(): void { /* no-op */ }
+      /** Show the search bar. No-op — Slatebase has its own search panel. */
+      showSearch(_replace?: boolean): void { /* no-op */ }
     } as unknown as Record<string, unknown>
   }
 
@@ -1434,6 +1744,12 @@ export function installObsidianGlobals(): void {
       isShown(): boolean { return this._shown }
     } as unknown as Record<string, unknown>
   }
+  // Modal — the ONE canonical Modal implementation. SuggestModal/FuzzySuggestModal
+  // (below) and ConfirmationModal both extend THIS class — there used to be two
+  // independent Modal implementations (this one, and a second one in
+  // shims/suggest-modal-shim.ts that unconditionally overwrote this one after
+  // install, orphaning ConfirmationModal's `extends` binding). `instanceof Modal`
+  // and shared behavior fixes now apply consistently everywhere.
   if (!window.obsidian.Modal) {
     window.obsidian.Modal = class Modal {
       app: unknown
@@ -1442,6 +1758,8 @@ export function installObsidianGlobals(): void {
       titleEl: HTMLElement
       contentEl: HTMLElement
       scope: { register: (_m: unknown, _k: unknown, _cb: unknown) => unknown; unregister: (_h: unknown) => void }
+      /** Whether to restore the previous text selection on close (real Obsidian field; cosmetic here). */
+      shouldRestoreSelection: boolean = true
       private overlayEl: HTMLElement | null = null
       constructor(app: unknown) {
         this.app = app
@@ -1478,8 +1796,12 @@ export function installObsidianGlobals(): void {
         this.containerEl.style.cssText = 'background:var(--bg-surface,#fff);border-radius:8px;padding:16px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;'
         this.overlayEl.appendChild(this.containerEl)
         // Close on backdrop click
-        this.overlayEl.addEventListener('click', (e) => {
+        this.overlayEl.addEventListener('mousedown', (e) => {
           if (e.target === this.overlayEl) this.close()
+        })
+        // Close on Escape
+        this.overlayEl.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') { e.preventDefault(); this.close() }
         })
         document.body.appendChild(this.overlayEl)
         try {
@@ -1490,6 +1812,9 @@ export function installObsidianGlobals(): void {
           console.error('[Modal.open] onOpen() threw:', err)
           this.contentEl.innerHTML = `<div style="color:var(--text-error,#e53935);padding:12px;font-size:13px;"><strong>Modal-Fehler:</strong> ${errMsg}</div>`
         }
+        // Focus the first focusable element so Escape/Tab work without a click first.
+        const focusable = this.modalEl.querySelector('input, button, [tabindex]') as HTMLElement | null
+        focusable?.focus()
       }
       close() {
         this.onClose()
@@ -1503,10 +1828,28 @@ export function installObsidianGlobals(): void {
     } as unknown as Record<string, unknown>
   }
 
-  // requireApiVersion — plugins call this to check Obsidian API version compatibility.
-  // We emulate 1.4.0, so all version checks pass (return true).
+  // requireApiVersion — plugins call this to check Obsidian API version
+  // compatibility, then branch on the answer.
+  //
+  // This used to return true unconditionally, which is the worst of both worlds:
+  // the plugin skips the fallback path it wrote for older Obsidian and calls an
+  // API we never implemented, crashing somewhere unrelated. Answering against
+  // the version we actually claim sends it down the path we can support.
+  if (!window.obsidian.apiVersion) {
+    window.obsidian.apiVersion = OBSIDIAN_API_VERSION
+  }
   if (!window.obsidian.requireApiVersion) {
-    window.obsidian.requireApiVersion = (_version: string): boolean => true
+    window.obsidian.requireApiVersion = (version: string): boolean => {
+      const satisfied = compareApiVersions(OBSIDIAN_API_VERSION, version) >= 0
+      if (!satisfied) {
+        warnOnce(
+          `requireApiVersion::${version}`,
+          `[PluginCompat] A plugin asked for Obsidian API >= ${version}; Slatebase implements ${OBSIDIAN_API_VERSION}, ` +
+            `so it will take its older-version fallback path.`,
+        )
+      }
+      return satisfied
+    }
   }
 
   // getLanguage — returns the app's current locale code (e.g. 'en', 'de').
@@ -1566,30 +1909,83 @@ export function installObsidianGlobals(): void {
   }
 
   if (!window.obsidian.Menu) {
+    /**
+     * A menu entry. `kind` distinguishes real items from separators so both can
+     * live in one ordered list — Obsidian's `addSeparator()` position matters,
+     * and keeping separators in a side channel loses it.
+     */
+    interface MenuEntry {
+      kind: 'item' | 'separator'
+      title: string
+      icon: string
+      section: string
+      checked: boolean
+      disabled: boolean
+      submenu: MenuInstance | null
+      callback: (evt: MouseEvent | KeyboardEvent) => void
+    }
+    interface MenuInstance {
+      items: MenuEntry[]
+      close(): void
+    }
+
     window.obsidian.Menu = class Menu {
-      items: Array<{ title: string; icon: string; section: string; checked: boolean; callback: () => void }> = []
+      items: MenuEntry[] = []
+      /** Obsidian exposes the menu element as `dom`; plugins style and measure it. */
+      dom: HTMLElement | null = null
       containerEl: HTMLElement | null = null
+      private onHideCallbacks: Array<() => void> = []
+      private submenuEl: HTMLElement | null = null
+      private noIcon = false
+
       addItem(cb: (item: unknown) => void): this {
-        const item = Menu._createItem()
+        const item = Menu._createEntry('item')
         cb(item)
         this.items.push(item)
         return this
       }
-      addSeparator(): this { return this }
-      /** @internal Create a menu item with all methods Obsidian plugins expect. */
-      static _createItem(): Record<string, unknown> & { title: string; icon: string; section: string; checked: boolean; callback: () => void } {
-        const item = {
-          title: '', icon: '', section: '', checked: false, callback: () => {},
-          setTitle(t: string) { this.title = t; return this },
-          setIcon(i: string) { this.icon = i; return this },
+
+      addSeparator(): this {
+        this.items.push(Menu._createEntry('separator'))
+        return this
+      }
+
+      /** Obsidian's opt-out of the icon gutter, for menus where no item has one. */
+      setNoIcon(): this {
+        this.noIcon = true
+        return this
+      }
+
+      /** Register a callback for when the menu closes, by click or dismissal. */
+      onHide(cb: () => void): this {
+        this.onHideCallbacks.push(cb)
+        return this
+      }
+
+      /** @internal Create a menu entry with all methods Obsidian plugins expect. */
+      static _createEntry(kind: 'item' | 'separator'): MenuEntry & Record<string, unknown> {
+        const entry = {
+          kind,
+          title: '', icon: '', section: '', checked: false, disabled: false,
+          submenu: null as MenuInstance | null,
+          callback: (_evt: MouseEvent | KeyboardEvent) => {},
+          setTitle(t: string | DocumentFragment) {
+            // Obsidian accepts a DocumentFragment for rich titles; flatten it,
+            // since our renderer sets textContent.
+            this.title = typeof t === 'string' ? t : (t.textContent ?? '')
+            return this
+          },
+          setIcon(i: string | null) { this.icon = i ?? ''; return this },
           setSection(s: string) { this.section = s; return this },
-          setChecked(c: boolean) { this.checked = c; return this },
-          setDisabled(_d: boolean) { return this },
-          onClick(fn: () => void) { this.callback = fn; return this },
+          setChecked(c: boolean | null) { this.checked = c === true; return this },
+          setDisabled(d: boolean) { this.disabled = d !== false; return this },
+          setIsLabel(isLabel: boolean) { this.disabled = isLabel !== false; return this },
+          onClick(fn: (evt: MouseEvent | KeyboardEvent) => void) { this.callback = fn; return this },
           setSubmenu(cb?: unknown) {
             // Obsidian API: setSubmenu() returns a new Menu (no-arg overload)
             // OR setSubmenu(cb) calls cb with a new Menu (callback overload)
             const submenu = new Menu()
+            this.submenu = submenu as unknown as MenuInstance
             if (typeof cb === 'function') {
               ;(cb as (m: unknown) => void)(submenu)
               return this
@@ -1598,44 +1994,198 @@ export function installObsidianGlobals(): void {
             return submenu
           },
         }
-        return item
+        return entry as unknown as MenuEntry & Record<string, unknown>
       }
-      showAtMouseEvent(evt: MouseEvent): void {
+
+      showAtMouseEvent(evt: MouseEvent): this {
         this.show(evt.clientX, evt.clientY)
+        return this
       }
-      showAtPosition(pos: { x: number; y: number }): void {
+
+      showAtPosition(pos: { x: number; y: number }): this {
         this.show(pos.x, pos.y)
+        return this
       }
+
+      /**
+       * Build and mount the menu.
+       *
+       * Everything visual is left to the `.menu`/`.menu-item` classes in
+       * obsidian-compat.css so plugin and theme CSS can restyle menus the way it
+       * does in Obsidian; only the caller-supplied position is set inline.
+       */
       private show(x: number, y: number): void {
-        // Create menu DOM
+        this.close()
         const overlay = document.createElement('div')
         overlay.className = 'menu-overlay'
-        overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;'
+
         const menu = document.createElement('div')
-        menu.className = 'menu'
-        menu.style.cssText = `position:fixed;left:${x}px;top:${y}px;background:var(--bg-surface,#fff);border:1px solid var(--border-color,#ccc);border-radius:6px;padding:4px 0;min-width:160px;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:10000;`
-        for (const item of this.items) {
-          const el = document.createElement('div')
-          el.className = 'menu-item'
-          el.style.cssText = 'padding:6px 12px;cursor:pointer;font-size:13px;'
-          el.textContent = item.title
-          el.addEventListener('click', () => { item.callback(); this.close() })
-          el.addEventListener('mouseenter', () => { el.style.background = 'var(--bg-hover,#f0f0f0)' })
-          el.addEventListener('mouseleave', () => { el.style.background = '' })
-          menu.appendChild(el)
+        menu.className = this.noIcon ? 'menu mod-no-icon' : 'menu'
+        // Grouping by section is what keeps plugin-contributed entries together
+        // in the order the plugin declared the sections, as Obsidian does.
+        for (const entry of this.sortedBySection()) {
+          menu.appendChild(this.renderEntry(entry))
         }
+
         overlay.appendChild(menu)
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) this.close() })
+        overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) this.close() })
         document.body.appendChild(overlay)
         this.containerEl = overlay
+        this.dom = menu
+
+        this.positionAt(menu, x, y)
+        this.attachKeyboardNavigation(menu)
+        menu.focus()
       }
-      close(): void {
-        if (this.containerEl?.parentNode) {
-          this.containerEl.parentNode.removeChild(this.containerEl)
+
+      /** Entries grouped by `section`, sections in first-seen order. */
+      private sortedBySection(): MenuEntry[] {
+        const sections: string[] = []
+        for (const entry of this.items) {
+          if (!sections.includes(entry.section)) sections.push(entry.section)
         }
-        this.containerEl = null
+        if (sections.length <= 1) return this.items
+        return sections.flatMap((section, i) => {
+          const entries = this.items.filter((e) => e.section === section)
+          // A divider between sections, unless the plugin already placed one.
+          if (i > 0 && entries[0]?.kind !== 'separator') {
+            return [Menu._createEntry('separator'), ...entries]
+          }
+          return entries
+        })
       }
-      hide(): void { this.close() }
+
+      /** Build the DOM for one entry, matching Obsidian's menu-item structure. */
+      private renderEntry(entry: MenuEntry): HTMLElement {
+        if (entry.kind === 'separator') {
+          const sep = document.createElement('div')
+          sep.className = 'menu-separator'
+          return sep
+        }
+
+        const el = document.createElement('div')
+        el.className = 'menu-item'
+        if (entry.disabled) el.classList.add('is-disabled')
+        if (entry.checked) el.classList.add('is-checked')
+        if (entry.submenu) el.classList.add('mod-submenu')
+
+        const iconEl = document.createElement('div')
+        iconEl.className = 'menu-item-icon'
+        if (entry.icon) renderLucideIconInto(iconEl, entry.icon)
+        el.appendChild(iconEl)
+
+        const titleEl = document.createElement('div')
+        titleEl.className = 'menu-item-title'
+        titleEl.textContent = entry.title
+        el.appendChild(titleEl)
+
+        if (entry.submenu) {
+          const arrow = document.createElement('div')
+          arrow.className = 'menu-item-icon mod-submenu-arrow'
+          renderLucideIconInto(arrow, 'chevron-right')
+          el.appendChild(arrow)
+          el.addEventListener('mouseenter', () => { this.openSubmenu(entry, el) })
+        } else {
+          el.addEventListener('mouseenter', () => { this.closeSubmenu() })
+        }
+
+        if (entry.disabled) {
+          // A disabled item that still fires its callback is worse than one that
+          // does nothing, so swallow the event rather than only greying it out.
+          el.setAttribute('aria-disabled', 'true')
+          el.addEventListener('click', (e) => { e.stopPropagation() })
+        } else {
+          el.setAttribute('tabindex', '0')
+          el.addEventListener('click', (e) => { this.invoke(entry, e) })
+        }
+        return el
+      }
+
+      private invoke(entry: MenuEntry, evt: MouseEvent | KeyboardEvent): void {
+        // Close first: a callback that opens a modal must not leave the menu
+        // floating above it.
+        this.close()
+        try {
+          entry.callback(evt)
+        } catch (err) {
+          console.error('[PluginCompat] Menu item callback threw', entry.title, err)
+        }
+      }
+
+      private openSubmenu(entry: MenuEntry, anchor: HTMLElement): void {
+        this.closeSubmenu()
+        const submenu = entry.submenu as unknown as Menu | null
+        if (!submenu || !this.containerEl) return
+        const rect = anchor.getBoundingClientRect()
+        submenu.show(rect.right, rect.top)
+        this.submenuEl = submenu.containerEl
+      }
+
+      private closeSubmenu(): void {
+        this.submenuEl?.remove()
+        this.submenuEl = null
+      }
+
+      /**
+       * Clamp the menu inside the viewport.
+       *
+       * Menus are opened at the pointer, so one raised near the right or bottom
+       * edge would otherwise extend past it and have its last items unreachable.
+       */
+      private positionAt(menu: HTMLElement, x: number, y: number): void {
+        menu.style.left = `${x}px`
+        menu.style.top = `${y}px`
+        const rect = menu.getBoundingClientRect()
+        const margin = 4
+        if (rect.right > window.innerWidth) {
+          menu.style.left = `${Math.max(margin, window.innerWidth - rect.width - margin)}px`
+        }
+        if (rect.bottom > window.innerHeight) {
+          menu.style.top = `${Math.max(margin, window.innerHeight - rect.height - margin)}px`
+        }
+      }
+
+      /** Arrow-key/Enter/Escape handling, as Obsidian's menus support. */
+      private attachKeyboardNavigation(menu: HTMLElement): void {
+        menu.setAttribute('tabindex', '-1')
+        menu.addEventListener('keydown', (evt: KeyboardEvent) => {
+          const selectable = [...menu.querySelectorAll<HTMLElement>('.menu-item:not(.is-disabled)')]
+          if (selectable.length === 0) return
+          const current = selectable.findIndex((el) => el === document.activeElement)
+          if (evt.key === 'Escape') {
+            evt.preventDefault()
+            this.close()
+          } else if (evt.key === 'ArrowDown') {
+            evt.preventDefault()
+            selectable[(current + 1) % selectable.length]?.focus()
+          } else if (evt.key === 'ArrowUp') {
+            evt.preventDefault()
+            selectable[(current - 1 + selectable.length) % selectable.length]?.focus()
+          } else if (evt.key === 'Enter' || evt.key === ' ') {
+            if (current >= 0) {
+              evt.preventDefault()
+              selectable[current]?.click()
+            }
+          }
+        })
+      }
+
+      close(): void {
+        this.closeSubmenu()
+        if (!this.containerEl) return
+        this.containerEl.remove()
+        this.containerEl = null
+        this.dom = null
+        for (const cb of this.onHideCallbacks) {
+          try {
+            cb()
+          } catch (err) {
+            console.error('[PluginCompat] Menu onHide callback threw', err)
+          }
+        }
+      }
+
+      hide(): this { this.close(); return this }
     } as unknown as Record<string, unknown>
   }
   if (!window.obsidian.requestUrl) {
@@ -1869,6 +2419,7 @@ export function installObsidianGlobals(): void {
   window.obsidian.editorEditorField = editorEditorField
   window.obsidian.editorLivePreviewField = editorLivePreviewField
   window.obsidian.editorViewField = editorViewField
+  window.obsidian.livePreviewState = livePreviewState
 
   if (!(window as unknown as { __obsidianDailyNotesInterface?: unknown }).__obsidianDailyNotesInterface) {
     /**
@@ -1890,15 +2441,51 @@ export function installObsidianGlobals(): void {
       }
     }
 
+    /** A minimal TFile shape, as returned by vault.getMarkdownFiles() / getAbstractFileByPath(). */
+    type DailyNotesTFile = { path: string; name: string; basename: string; extension: string; stat: { mtime: number; ctime: number; size: number }; parent: unknown }
+
     /**
      * Helper: get the vault shim from window.app.
      */
-    const getVault = (): { create: (path: string, content?: string) => Promise<unknown>; getMarkdownFiles: () => Array<{ path: string; name: string; basename: string; extension: string; stat: { mtime: number; ctime: number; size: number }; parent: unknown }> } | null => {
+    const getVault = (): {
+      create: (path: string, content?: string) => Promise<unknown>
+      getMarkdownFiles: () => Array<DailyNotesTFile>
+      read: (file: DailyNotesTFile) => Promise<string>
+    } | null => {
       try {
         const app = (window as unknown as { app?: { vault?: unknown } }).app
         return app?.vault as ReturnType<typeof getVault> ?? null
       } catch {
         return null
+      }
+    }
+
+    /**
+     * Helper: resolve the configured daily-note template file, if any.
+     * Mirrors dailyNoteService.ts's placeholder substitution so both note-creation
+     * paths (native UI and community plugins like Calendar) produce identical content.
+     */
+    const readDailyNoteTemplate = async (templatePath: string, date: { format: (fmt: string) => string }): Promise<string> => {
+      if (!templatePath.trim()) return ''
+      try {
+        const app = (window as unknown as { app?: { metadataCache?: { getFirstLinkpathDest: (linkpath: string, sourcePath: string) => DailyNotesTFile | null } } }).app
+        const templateFile = app?.metadataCache?.getFirstLinkpathDest?.(templatePath, '')
+        if (!templateFile) return ''
+
+        const vault = getVault()
+        if (!vault) return ''
+        const raw = await vault.read(templateFile)
+
+        const now = new Date()
+        const dateStr = date.format('YYYY-MM-DD')
+        const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+
+        return raw
+          .replace(/\{\{date\}\}/g, dateStr)
+          .replace(/\{\{time\}\}/g, timeStr)
+          .replace(/\{\{title\}\}/g, dateStr)
+      } catch {
+        return ''
       }
     }
 
@@ -1977,9 +2564,10 @@ export function installObsidianGlobals(): void {
         const folder = settings.folder || ''
         const fileName = date.format(format) + '.md'
         const filePath = folder ? `${folder}/${fileName}` : fileName
+        const content = await readDailyNoteTemplate(settings.template, date)
 
         try {
-          const tFile = await vault.create(filePath, '')
+          const tFile = await vault.create(filePath, content)
           return tFile
         } catch (err) {
           console.error('[obsidian-daily-notes-interface] Failed to create daily note:', err)
@@ -2012,10 +2600,157 @@ export function installObsidianGlobals(): void {
   }
 
   // ─── SuggestModal / FuzzySuggestModal ──────────────────────────────────────
-
+  // Extend the canonical Modal above (not a second, disconnected one) so
+  // `instanceof Modal` holds and Escape/backdrop-close behavior is shared.
   if (!window.obsidian.SuggestModal) {
-    window.obsidian.SuggestModal = SuggestModal as unknown as Record<string, unknown>
-    window.obsidian.FuzzySuggestModal = FuzzySuggestModal as unknown as Record<string, unknown>
+    const ModalClass = window.obsidian.Modal as { new (app: unknown): unknown; prototype: object }
+    type ModalInstance = { app: unknown; containerEl: HTMLElement; modalEl: HTMLElement; contentEl: HTMLElement; open(): void; close(): void; onOpen(): void; onClose(): void }
+    window.obsidian.SuggestModal = class SuggestModal<T> extends (ModalClass as unknown as { new (app: unknown): ModalInstance }) {
+      limit = 100
+      emptyStateText = 'No results found.'
+      inputEl: HTMLInputElement
+      resultContainerEl: HTMLElement
+      private suggestions: T[] = []
+      private selectedIndex = 0
+
+      constructor(app: unknown) {
+        super(app)
+        this.inputEl = document.createElement('input')
+        this.inputEl.type = 'text'
+        this.inputEl.className = 'prompt-input'
+        this.inputEl.style.cssText = 'width:100%;padding:8px 12px;border:1px solid var(--border-color,#ddd);border-radius:4px;font-size:14px;margin-bottom:8px;outline:none;box-sizing:border-box;'
+        this.inputEl.placeholder = 'Type to search...'
+
+        this.resultContainerEl = document.createElement('div')
+        this.resultContainerEl.className = 'prompt-results'
+        this.resultContainerEl.style.cssText = 'max-height:300px;overflow-y:auto;'
+
+        this.modalEl.insertBefore(this.inputEl, this.contentEl)
+        this.modalEl.insertBefore(this.resultContainerEl, this.contentEl)
+
+        this.inputEl.addEventListener('input', () => { void this.updateSuggestions() })
+        this.inputEl.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowDown') { e.preventDefault(); this.setSelectedIndex(this.selectedIndex + 1) }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); this.setSelectedIndex(this.selectedIndex - 1) }
+          else if (e.key === 'Enter') { e.preventDefault(); this.selectActiveSuggestion(e) }
+        })
+      }
+
+      open(): void {
+        super.open()
+        this.inputEl.focus()
+        void this.updateSuggestions()
+      }
+
+      setPlaceholder(placeholder: string): void { this.inputEl.placeholder = placeholder }
+      /** Instruction hints (e.g. "↵ to select"). Cosmetic only — not rendered. */
+      setInstructions(_instructions: Array<{ command: string; purpose: string }>): void { /* no-op */ }
+
+      onNoSuggestion(): void {
+        this.resultContainerEl.innerHTML = ''
+        const empty = document.createElement('div')
+        empty.className = 'suggestion-empty'
+        empty.style.cssText = 'padding:12px;color:var(--text-muted,#888);text-align:center;'
+        empty.textContent = this.emptyStateText
+        this.resultContainerEl.appendChild(empty)
+      }
+
+      selectSuggestion(value: T, evt: MouseEvent | KeyboardEvent): void {
+        this.onChooseSuggestion(value, evt)
+        this.close()
+      }
+
+      selectActiveSuggestion(evt: MouseEvent | KeyboardEvent): void {
+        const item = this.suggestions[this.selectedIndex]
+        if (item !== undefined) this.selectSuggestion(item, evt)
+      }
+
+      /** Return suggestions for the current query. Plugins override this. */
+      getSuggestions(_query: string): T[] | Promise<T[]> { return [] }
+      /** Render a suggestion item. Plugins override this. */
+      renderSuggestion(_value: T, _el: HTMLElement): void { /* plugins override */ }
+      /** Handle the user choosing a suggestion. Plugins override this. */
+      onChooseSuggestion(_item: T, _evt: MouseEvent | KeyboardEvent): void { /* plugins override */ }
+
+      private async updateSuggestions(): Promise<void> {
+        const query = this.inputEl.value
+        const result = this.getSuggestions(query)
+        const items = result instanceof Promise ? await result : result
+        this.suggestions = items.slice(0, this.limit)
+        this.selectedIndex = 0
+        this.renderSuggestions()
+      }
+
+      private renderSuggestions(): void {
+        this.resultContainerEl.innerHTML = ''
+        if (this.suggestions.length === 0) { this.onNoSuggestion(); return }
+        for (let i = 0; i < this.suggestions.length; i++) {
+          const item = this.suggestions[i]!
+          const el = document.createElement('div')
+          el.className = 'suggestion-item'
+          el.style.cssText = 'padding:8px 12px;cursor:pointer;border-radius:4px;'
+          if (i === this.selectedIndex) {
+            el.style.background = 'var(--bg-elevated, #f0f0f0)'
+            el.classList.add('is-selected')
+          }
+          el.addEventListener('mousedown', (e) => { e.preventDefault(); this.selectSuggestion(item, e) })
+          el.addEventListener('mouseenter', () => { this.setSelectedIndex(i) })
+          this.renderSuggestion(item, el)
+          this.resultContainerEl.appendChild(el)
+        }
+      }
+
+      private setSelectedIndex(index: number): void {
+        if (this.suggestions.length === 0) return
+        this.selectedIndex = ((index % this.suggestions.length) + this.suggestions.length) % this.suggestions.length
+        const items = this.resultContainerEl.querySelectorAll('.suggestion-item')
+        items.forEach((el, i) => {
+          if (i === this.selectedIndex) {
+            el.classList.add('is-selected')
+            ;(el as HTMLElement).style.background = 'var(--bg-elevated, #f0f0f0)'
+            el.scrollIntoView({ block: 'nearest' })
+          } else {
+            el.classList.remove('is-selected')
+            ;(el as HTMLElement).style.background = ''
+          }
+        })
+      }
+    } as unknown as Record<string, unknown>
+
+    const SuggestModalClass = window.obsidian.SuggestModal as { new (app: unknown): { limit: number; getSuggestions(q: string): unknown } }
+    window.obsidian.FuzzySuggestModal = class FuzzySuggestModal<T> extends SuggestModalClass {
+      /** Return all searchable items. Plugins override this. */
+      getItems(): T[] { return [] }
+      /** Return the searchable text for an item. Plugins override this. */
+      getItemText(_item: T): string { return '' }
+      /** Handle the user choosing an item. Plugins override this. */
+      onChooseItem(_item: T, _evt: MouseEvent | KeyboardEvent): void { /* plugins override */ }
+
+      getSuggestions(query: string): FuzzyMatchResult<T>[] {
+        const items = this.getItems()
+        if (!query.trim()) {
+          return items.map(item => ({ item, match: { score: 0, matches: [] } }))
+        }
+        const lowerQuery = query.toLowerCase()
+        const results: FuzzyMatchResult<T>[] = []
+        for (const item of items) {
+          const text = this.getItemText(item)
+          const matchResult = fuzzyMatchText(lowerQuery, text.toLowerCase())
+          if (matchResult) results.push({ item, match: matchResult })
+        }
+        // Lower score is better (fewer/tighter gaps between matched characters).
+        results.sort((a, b) => a.match.score - b.match.score)
+        return results
+      }
+
+      renderSuggestion(fuzzyMatch: FuzzyMatchResult<T>, el: HTMLElement): void {
+        el.textContent = this.getItemText(fuzzyMatch.item)
+      }
+
+      onChooseSuggestion(fuzzyMatch: FuzzyMatchResult<T>, evt: MouseEvent | KeyboardEvent): void {
+        this.onChooseItem(fuzzyMatch.item, evt)
+      }
+    } as unknown as Record<string, unknown>
   }
 
   // ─── MarkdownRenderer ──────────────────────────────────────────────────────

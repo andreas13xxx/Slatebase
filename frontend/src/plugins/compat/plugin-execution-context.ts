@@ -22,6 +22,27 @@
 
 let currentPluginId: string | null = null
 
+/**
+ * Callback registered by the active PluginSandbox so the global setTimeout/
+ * setInterval override (install-globals.ts) can record a scheduled timer
+ * against the plugin that scheduled it. Without this, sandbox.cleanup()'s
+ * timer-clearing loop always operates on an empty set — nothing schedules
+ * through the sandbox's own (unused) createSetTimeoutProxy — so a plugin's
+ * pending timers (e.g. Excalidraw's autosave/prevent-reload resets) keep
+ * firing after the plugin has been unloaded and torn down.
+ */
+let timerTracker: ((pluginId: string, timerId: number) => void) | null = null
+
+/** Register the sandbox's timer-tracking callback. Pass null to unregister. */
+export function setTimerTracker(tracker: ((pluginId: string, timerId: number) => void) | null): void {
+  timerTracker = tracker
+}
+
+/** Record that `pluginId` scheduled `timerId`, so it can be cancelled on unload. */
+export function trackPluginTimer(pluginId: string, timerId: number): void {
+  timerTracker?.(pluginId, timerId)
+}
+
 /** Run `fn` with `pluginId` marked as the currently executing plugin. */
 export function withPluginContext<T>(pluginId: string | null, fn: () => T): T {
   if (!pluginId) return fn()
@@ -37,6 +58,38 @@ export function withPluginContext<T>(pluginId: string | null, fn: () => T): T {
 /** The plugin currently executing on the call stack, or null outside plugin code. */
 export function getCurrentPluginId(): string | null {
   return currentPluginId
+}
+
+/**
+ * Like withPluginContext(), but for an async `fn` — holds `pluginId` as the
+ * current plugin for `fn`'s entire async lifetime (every internal `await`),
+ * not just its first synchronous chunk.
+ *
+ * withPluginContext()'s plain try/finally resets the context as soon as `fn()`
+ * *returns* — which, for an async function, is as soon as it hits its first
+ * `await`, long before the rest of its body (and any createEl() calls in it)
+ * actually runs. A plugin whose async onload() does `await this.loadSettings()`
+ * before building DOM loses its tag on everything built afterward, even though
+ * it's all still "the same onload() call". Awaiting `fn()` here instead means
+ * the `finally` only runs once the whole async call — including every await
+ * inside it — has settled.
+ *
+ * Only safe at a call site known to run exclusively for one plugin at a time
+ * (e.g. activatePlugin() awaiting one plugin's onload() before the next plugin
+ * starts) — unlike withPluginContext(), this does NOT nest safely with
+ * unrelated plugin activity that happens to run during one of `fn`'s awaits
+ * (e.g. another already-active plugin's event listener firing mid-await would
+ * see the wrong currentPluginId). Prefer withPluginContext() elsewhere.
+ */
+export async function withPluginContextAsync<T>(pluginId: string | null, fn: () => Promise<T> | T): Promise<T> {
+  if (!pluginId) return fn()
+  const previous = currentPluginId
+  currentPluginId = pluginId
+  try {
+    return await fn()
+  } finally {
+    currentPluginId = previous
+  }
 }
 
 /**

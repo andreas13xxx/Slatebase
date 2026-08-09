@@ -28,6 +28,7 @@ import {
   DropdownComponent,
   SliderComponent,
 } from './setting-tab'
+import { warnOnce } from './log'
 
 // ─── Types (matching Obsidian 1.13 obsidian.d.ts) ────────────────────────────
 
@@ -493,9 +494,9 @@ function renderControl(
           if (control.validate) {
             const result = control.validate(value)
             if (result instanceof Promise) {
-              void result.then((msg) => { if (msg) console.warn(`[Settings] Validation: ${msg}`) })
+              void result.then((msg) => { if (msg) warnOnce(`Settings.validate::${control.key}::${msg}`, `[Settings] Validation: ${msg}`) })
             } else if (result) {
-              console.warn(`[Settings] Validation: ${result}`)
+              warnOnce(`Settings.validate::${control.key}::${result}`, `[Settings] Validation: ${result}`)
               return
             }
           }
@@ -531,9 +532,9 @@ function renderControl(
           if (control.validate) {
             const result = control.validate(num)
             if (result instanceof Promise) {
-              void result.then((msg) => { if (msg) console.warn(`[Settings] Validation: ${msg}`) })
+              void result.then((msg) => { if (msg) warnOnce(`Settings.validate::${control.key}::${msg}`, `[Settings] Validation: ${msg}`) })
             } else if (result) {
-              console.warn(`[Settings] Validation: ${result}`)
+              warnOnce(`Settings.validate::${control.key}::${result}`, `[Settings] Validation: ${result}`)
               return
             }
           }

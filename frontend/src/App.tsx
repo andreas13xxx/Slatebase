@@ -13,6 +13,7 @@ import { initialize as initializeKeybindings, disconnect as disconnectKeybinding
 import { I18nProvider, useTranslation } from './i18n'
 import { RealtimeProvider, type RealtimeEventHandlers } from './components/RealtimeProvider'
 import { ToastNotification, showToast } from './components/ToastNotification'
+import { GlobalTooltip } from './components/GlobalTooltip'
 import { HoverPreview } from './components/HoverPreview'
 import { ConnectionIndicator } from './components/ConnectionIndicator'
 import { useRealtimeContext } from './state/realtimeContext'
@@ -186,15 +187,28 @@ function AppContent() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
   const createFileTriggerRef = useRef<(() => void) | null>(null)
+  const createFolderTriggerRef = useRef<(() => void) | null>(null)
   const createVaultTriggerRef = useRef<(() => void) | null>(null)
   const createCanvasTriggerRef = useRef<(() => void) | null>(null)
 
   const handleRegisterCreateFile = useCallback((trigger: () => void) => { createFileTriggerRef.current = trigger }, [])
+  const handleRegisterCreateFolder = useCallback((trigger: () => void) => { createFolderTriggerRef.current = trigger }, [])
   const handleRegisterCreateVault = useCallback((trigger: () => void) => { createVaultTriggerRef.current = trigger }, [])
   const handleRegisterCreateCanvas = useCallback((trigger: () => void) => { createCanvasTriggerRef.current = trigger }, [])
 
   // Version browser state: which file to show versions for
   const [versionBrowserTarget, setVersionBrowserTarget] = useState<{ vaultId: string; filePath: string } | null>(null)
+
+  // Opens the version browser for a given file (file-recovery:open core command).
+  useEffect(() => {
+    function handleOpenFileRecovery(e: Event) {
+      const detail = (e as CustomEvent<{ vaultId: string; filePath: string }>).detail
+      if (!detail?.vaultId || !detail?.filePath) return
+      setVersionBrowserTarget({ vaultId: detail.vaultId, filePath: detail.filePath })
+    }
+    window.addEventListener('slatebase:open-file-recovery', handleOpenFileRecovery)
+    return () => window.removeEventListener('slatebase:open-file-recovery', handleOpenFileRecovery)
+  }, [])
 
   const sidebar = useResize(260, 180, 400, 'left', 'sidebarWidth')
   const rightPanel = useResize(240, 160, 500, 'right', 'rightPanelWidth')
@@ -459,6 +473,13 @@ function AppContent() {
     }
   }
 
+  function handleCreateFolder() {
+    if (!state.selectedVaultId) return
+    if (createFolderTriggerRef.current) {
+      createFolderTriggerRef.current()
+    }
+  }
+
   function handleCreateCanvas() {
     if (!state.selectedVaultId) return
     if (createCanvasTriggerRef.current) {
@@ -648,16 +669,26 @@ function AppContent() {
       directoryTree={state.directoryTree}
       tabState={tabState}
     >
-    <div className="app">
+    {/* app-container: Obsidian-parity marker class — real Obsidian's outermost
+        app div carries this class, and some plugins (e.g. Calendar's Svelte
+        popovers via a `portal` action) document.querySelector for it to
+        teleport floating UI to a guaranteed-visible root. No visual/behavioral
+        effect in Slatebase itself — see mod-vertical/mod-root and
+        workspace-tab-container above for the same pattern. */}
+    <div className="app app-container">
       <CommandPaletteContainer
         onNavigate={handleNavigate}
         onCreateVault={handleCreateVault}
         onCreateFile={handleCreateFile}
+        onCreateFolder={handleCreateFolder}
+        onCreateCanvas={handleCreateCanvas}
         onImportFile={handleImportFile}
         onImportFolder={handleImportFolder}
         onExportVault={handleExportVault}
         onOpenGraph={handleOpenGraph}
         onDailyNote={handleDailyNote}
+        showSidebar={showSidebar}
+        showRightPanel={showRightPanel}
         onToggleSidebar={() => setShowSidebar((v) => !v)}
         onToggleRightPanel={() => setShowRightPanel((v) => !v)}
         onOpenSettings={(nav) => {
@@ -665,10 +696,13 @@ function AppContent() {
           setSettingsOpen(true)
         }}
         onLogout={handleLogout}
-        onToggleTheme={() => {
-          const current = document.documentElement.getAttribute('data-theme') ?? 'system'
+        onToggleTheme={async () => {
+          const current = authState.user?.colorScheme ?? 'system'
           const next = current === 'dark' ? 'light' : 'dark'
-          document.documentElement.setAttribute('data-theme', next)
+          try {
+            const updatedUser = await apiClient.updateProfile({ colorScheme: next })
+            authDispatch({ type: 'PROFILE_UPDATED', payload: { user: updatedUser } })
+          } catch { /* ignore — theme stays as-is until the next successful save */ }
         }}
       />
       {/* Unified Settings Panel (renders as fixed overlay when open) */}
@@ -732,7 +766,16 @@ function AppContent() {
       )}
 
       <main className="app-main app-main--vault-view">
-        <div className="app-vault-layout">
+        {/* workspace-split/mod-vertical/mod-root: Obsidian-parity marker classes some
+            community plugins (e.g. Editing Toolbar's fullscreen-focus) query for via
+            document.querySelector to find the workspace root — no visual/behavioral
+            effect in Slatebase itself. Deliberately duplicates the same classes the
+            WorkspaceShim stamps on its hidden off-screen container (see workspace-shim.ts
+            containerEl): plugins that portal *visible* UI via `.workspace-split` need a
+            real, on-screen node, not the shim's 0x0 stub. React mounts #root before the
+            plugin system runs, so this element is earlier in document order and wins any
+            document.querySelector('.workspace-split') lookup over the shim's hidden one. */}
+        <div className="app-vault-layout mod-vertical mod-root workspace-split">
 
           {/* ── Sidebar ── */}
           {showSidebar && (
@@ -777,6 +820,7 @@ function AppContent() {
                   renderExplorer={() => (
                     <FileExplorer
                       onRegisterCreateFile={handleRegisterCreateFile}
+                      onRegisterCreateFolder={handleRegisterCreateFolder}
                       onRegisterCreateVault={handleRegisterCreateVault}
                       onRegisterCreateCanvas={handleRegisterCreateCanvas}
                       onOpenVersions={(vaultId, filePath) => setVersionBrowserTarget({ vaultId, filePath })}
@@ -820,7 +864,9 @@ function AppContent() {
           />
 
           {/* ── Main Content ── */}
-          <section className="app-content">
+          {/* workspace-tab-container: Obsidian-parity marker class — see mod-vertical/mod-root
+              note above. Some plugins requestFullscreen() this element by selector. */}
+          <section className="app-content workspace-tab-container">
             {/* Unified tab bar: settings tabs + file tabs in one row */}
             <TabBar
               settingsTabs={settingsTabs}
@@ -1141,6 +1187,7 @@ export function App() {
         <AuthGuard />
       </I18nBridge>
       <ToastNotification />
+      <GlobalTooltip />
     </AuthProvider>
   )
 }

@@ -20,6 +20,7 @@ import {
   toSectionInfo,
   type MarkdownSectionInformation,
 } from './markdown-sections'
+import { errorOnce } from './log'
 
 export type { MarkdownSectionInformation }
 
@@ -342,12 +343,12 @@ export function processCodeBlocks(
       const result = registration.handler(source, container, ctx)
       if (result instanceof Promise) {
         result.catch((err) => {
-          console.error(`[CodeBlockProcessor] Handler error for language "${language}":`, err)
+          errorOnce(`CodeBlockProcessor.handlerError::${language}`, `[CodeBlockProcessor] Handler error for language "${language}":`, err)
           container.textContent = `Error rendering ${language} block: ${err instanceof Error ? err.message : String(err)}`
         })
       }
     } catch (err) {
-      console.error(`[CodeBlockProcessor] Handler error for language "${language}":`, err)
+      errorOnce(`CodeBlockProcessor.handlerError::${language}`, `[CodeBlockProcessor] Handler error for language "${language}":`, err)
       container.textContent = `Error rendering ${language} block: ${err instanceof Error ? err.message : String(err)}`
     }
 
@@ -387,16 +388,16 @@ export function runPostProcessors(
     },
   }
 
-  for (const { processor } of postProcessors) {
+  for (const { processor, pluginId } of postProcessors) {
     try {
       const result = processor(containerEl, ctx)
       if (result instanceof Promise) {
         result.catch((err) => {
-          console.error('[PostProcessor] Error:', err)
+          errorOnce(`PostProcessor.error::${pluginId}`, `[PostProcessor] Error (plugin "${pluginId}"):`, err)
         })
       }
     } catch (err) {
-      console.error('[PostProcessor] Error:', err)
+      errorOnce(`PostProcessor.error::${pluginId}`, `[PostProcessor] Error (plugin "${pluginId}"):`, err)
     }
   }
 }

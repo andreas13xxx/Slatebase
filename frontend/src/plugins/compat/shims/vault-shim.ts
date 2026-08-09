@@ -8,11 +8,12 @@
 
 import type { IApiClient } from '../../../api/index';
 import type { DirectoryTree } from '../../../types';
-import type { EventRef, IVaultShim, TAbstractFile, TFile, TFolder } from '../types';
+import type { DataWriteOptions, EventRef, IVaultShim, TAbstractFile, TFile, TFolder } from '../types';
 import { EventSystem } from '../event-system';
 import { dispatchRealtimeVaultChange } from '../../../state/realtimeVaultBridge';
 import { getStoredAuthToken, getStoredCsrfToken } from '../../../state/authContext';
 import { markPluginWrite } from '../plugin-event-bridge';
+import { warnNoOp } from '../log';
 import { VaultAdapterShim } from './vault-adapter-shim';
 import type { IVaultAdapter } from './vault-adapter-shim';
 
@@ -300,9 +301,16 @@ export class VaultShim implements IVaultShim {
    * Modify the content of an existing file.
    * If the file is not yet in the local directory tree (e.g. just created),
    * we still send the write to the backend which validates independently.
+   *
+   * `options` (Obsidian 1.4.4+) is accepted for signature compatibility but
+   * mtime/ctime are not persisted — the backend always stamps the actual
+   * write time.
    */
-  async modify(file: TFile, content: string): Promise<void> {
+  async modify(file: TFile, content: string, options?: DataWriteOptions): Promise<void> {
     validatePath(file.path);
+    if (options?.mtime !== undefined || options?.ctime !== undefined) {
+      warnNoOp('Vault', 'modify(..., options)', 'Custom mtime/ctime are not persisted; the write is timestamped normally.')
+    }
 
     try {
       await this.apiClient.saveFile(this.vaultId, file.path, content);
@@ -344,24 +352,13 @@ export class VaultShim implements IVaultShim {
       await this.apiClient.saveFile(this.vaultId, path, content ?? '');
 
       const name = path.includes('/') ? path.slice(path.lastIndexOf('/') + 1) : path;
-      const dotIndex = name.lastIndexOf('.');
-      const basename = dotIndex > 0 ? name.slice(0, dotIndex) : name;
-      const extension = dotIndex > 0 ? name.slice(dotIndex + 1) : '';
-
       const parent = findParentNode(this.directoryTree, path);
 
-      const tFile: TFile = {
-        path,
-        name,
-        basename,
-        extension,
-        stat: {
-          mtime: Date.now(),
-          ctime: Date.now(),
-          size: (content ?? '').length,
-        },
-        parent,
-      };
+      // Build via treeNodeToTFile so the result gets the same instanceof-TFile
+      // prototype patch and vault reference as files loaded from the tree —
+      // plugins (e.g. LiveSync's sync watcher) do `instanceof TFile` checks
+      // on the objects passed to 'create' event listeners.
+      const tFile = treeNodeToTFile({ name, type: 'file', path, size: (content ?? '').length }, parent);
 
       markPluginWrite(path);
       this.events.trigger('create', tFile);
@@ -374,6 +371,14 @@ export class VaultShim implements IVaultShim {
         userId: '',
         username: '',
       });
+
+      // Open a tab for the newly created file — mirrors the "already exists" branch
+      // above so vault.create() always surfaces the file to the user, whether it's
+      // brand new or already there (matches Slatebase's own "new file" behavior).
+      const workspace = (window as unknown as { app?: { workspace?: { openFileDirectly?: (filePath: string) => void } } }).app?.workspace;
+      if (workspace?.openFileDirectly) {
+        workspace.openFileDirectly(path);
+      }
 
       return tFile;
     } catch (err: unknown) {
@@ -409,13 +414,9 @@ export class VaultShim implements IVaultShim {
       const name = path.includes('/') ? path.slice(path.lastIndexOf('/') + 1) : path;
       const parent = findParentNode(this.directoryTree, path);
 
-      const tFolder: TFolder = {
-        path,
-        name,
-        children: [],
-        parent,
-        isRoot: () => false,
-      };
+      // Build via treeNodeToTFolder for the same instanceof-TFolder prototype
+      // patch and vault reference applied to folders loaded from the tree.
+      const tFolder = treeNodeToTFolder({ name, type: 'directory', path, children: [] }, parent);
 
       markPluginWrite(path);
       this.events.trigger('create', tFolder);
@@ -652,6 +653,16 @@ export class VaultShim implements IVaultShim {
    */
   off(event: string, callback: (...args: unknown[]) => void): void {
     this.events.off(event, callback);
+  }
+
+  /**
+   * Remove a listener by the ref `on()` returned.
+   *
+   * Part of Obsidian's `Events` base class, which Vault extends. Without it,
+   * `vault.offref(ref)` — the documented way to unsubscribe — was a TypeError.
+   */
+  offref(ref: EventRef): void {
+    this.events.offref(ref);
   }
 
   /**
@@ -893,9 +904,6 @@ export class VaultShim implements IVaultShim {
     try {
       const name = path.includes('/') ? path.slice(path.lastIndexOf('/') + 1) : path;
       const targetDir = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
-      const dotIndex = name.lastIndexOf('.');
-      const basename = dotIndex > 0 ? name.slice(0, dotIndex) : name;
-      const extension = dotIndex > 0 ? name.slice(dotIndex + 1) : '';
 
       // Upload via multipart form (same approach as modifyBinary)
       const blob = new Blob([data]);
@@ -916,14 +924,8 @@ export class VaultShim implements IVaultShim {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const tFile: TFile = {
-        path,
-        name,
-        basename,
-        extension,
-        stat: { mtime: Date.now(), ctime: Date.now(), size: data.byteLength },
-        parent: null,
-      };
+      const parent = findParentNode(this.directoryTree, path);
+      const tFile = treeNodeToTFile({ name, type: 'file', path, size: data.byteLength }, parent);
 
       markPluginWrite(path);
       this.events.trigger('create', tFile);

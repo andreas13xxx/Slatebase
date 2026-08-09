@@ -29,6 +29,7 @@
   /* ─── Text ─────────────────────────────────────────────────────────────── */
   --text-normal: #0f172a;
   --text-muted: #475569;
+  --text-muted-rgb: 71, 85, 105;
   --text-faint: #94a3b8;
   --text-on-accent: #ffffff;
   --text-error: #dc2626;
@@ -758,6 +759,7 @@
   /* ─── Text (Dark) ────────────────────────────────────────────────────────── */
   --text-normal: var(--text-primary, #e6edf3);
   --text-muted: var(--text-secondary, #8b949e);
+  --text-muted-rgb: 139, 148, 158;
   --text-faint: #7a8088;
   --text-on-accent: #ffffff;
   --text-error: #f85149;
@@ -869,6 +871,7 @@
     /* ─── Text (Dark) ──────────────────────────────────────────────────────── */
     --text-normal: var(--text-primary, #e6edf3);
     --text-muted: var(--text-secondary, #8b949e);
+    --text-muted-rgb: 139, 148, 158;
     --text-faint: #484f58;
     --text-on-accent: #ffffff;
     --text-error: #f85149;
@@ -968,6 +971,24 @@
   position: relative;
 }
 
+/* ─── Workspace Leaf (file-view container) ───────────────────────────────
+   `WorkspaceLeaf.containerEl` (view-registry.ts) wraps a plugin's own
+   `view.containerEl` (e.g. Kanban's `.plugin-view-container`, which relies
+   on `height: 100%` — see App.css). Without an explicit `flex: 1` here,
+   `.workspace-leaf` is just a plain block child of the flex-column
+   `.tab-content--plugin-file-view` pane, so it collapses to its content's
+   height instead of stretching to fill the pane — the inner view (and
+   anything it sizes via `height: 100%`) collapses with it. `position:
+   relative` restores the same anchoring behavior as `.view-content` above
+   for any absolutely-positioned UI the plugin renders. */
+.workspace-leaf {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
 /* ─── View Header Actions ────────────────────────────────────────────────
    Buttons added via ItemView.addAction() — displayed as a row of icon
    buttons at the top of plugin views (e.g. Kanban "Board Settings"). */
@@ -1007,4 +1028,33 @@
   width: 16px;
   height: 16px;
   stroke-width: 2;
+}
+
+/* ─── Calendar plugin: persistent "Heute" reset button ───────────────────
+   Upstream (obsidian-calendar-ui's Nav.svelte) renders the reset-to-today
+   control as a near-invisible dot (opacity 0.4) whose only label is an
+   aria-label tooltip — and that tooltip is English ("Reset to current
+   month") and only set once you've navigated away from the current month,
+   so on today's own month there is nothing to show at all. Slatebase ships
+   German-first (see index.html's lang="de"), so trade that hover-only,
+   English-only affordance for an always-visible "Heute" label instead. The
+   plugin's own #calendar-container id scopes this to just that view; the
+   click handler is already wired to the whole element regardless of CSS. */
+#calendar-container .reset-button {
+  opacity: 1;
+  gap: 4px;
+}
+
+#calendar-container .reset-button svg {
+  display: none;
+}
+
+#calendar-container .reset-button::after {
+  content: "Heute";
+  font-size: var(--font-ui-smaller, 12px);
+}
+
+#calendar-container .reset-button.active::after {
+  cursor: pointer;
+  text-decoration: underline;
 }

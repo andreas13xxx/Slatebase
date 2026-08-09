@@ -1,6 +1,6 @@
 # Implementierungsplan — Slatebase Ausstehende Features
 
-**Stand:** August 2026 (v0.25.x). Die Kernfeatures sind umgesetzt. Es verbleiben 8 ausstehende Features in unterschiedlichen Reifegraden.
+**Stand:** August 2026 (v0.26.x). Die Kernfeatures sind umgesetzt. Es verbleiben 8 ausstehende Features in unterschiedlichen Reifegraden.
 
 **Strategie:** Hybrid — Features mit bestehender Spec direkt umsetzen, komplexe Features erst vollständig spezifizieren.
 
@@ -179,7 +179,7 @@ Nur noch ausstehende Arbeit (Community Plugin Store ist raus):
 | Idee | Grund |
 |------|-------|
 | GitSync | CouchDB-Sync deckt Use-Case ab. Hohe Komplexität. |
-| HTML-Rendering (Raw-HTML) | XSS-Risiko. Markdown + Mermaid + Embeds reichen. |
+| HTML-Rendering (Raw-HTML), generisch | XSS-Risiko. Markdown + Mermaid + Embeds reichen. **Teilweise revidiert:** Eine enge Allowlist für Inline-Tags (`<font color>`, `<mark>`, `<span style>`) plus `<center>`-Blöcke ist umgesetzt (`plugins/inline-html.ts`, geteilt zwischen Live Preview und Reading View) — alles außerhalb der Allowlist, inkl. `on*`-Handler/`script`/`iframe`, bleibt literaler Text. Generisches HTML-Rendering bleibt verworfen. |
 | Offline-Modus (PWA) | Self-Hosted = Server nötig. Vault-Sync mit Obsidian-Desktop deckt Offline ab. |
 | AI-Agent im Editor | MCP deckt AI-Zugang ab. Eingebauter Copilot = eigenes Produkt. |
 | Multi-Sprachen/RTL | Spezieller Use-Case. Bei Bedarf im accessibility-audit. |
@@ -188,10 +188,4 @@ Nur noch ausstehende Arbeit (Community Plugin Store ist raus):
 
 ## Bekannte Limitierungen
 
-### vault-sync: Push ohne Chunking (>8MB-Limit)
 
-- **Problem**: Slatebase pusht Dateien als einzelnes `data`-Feld. CouchDB `max_document_size` (default 8MB) limitiert Dateigröße.
-- **Betrifft**: Nur sehr große Einzeldateien beim bidirektionalen Sync.
-- **Workaround**: CouchDB `max_document_size` erhöhen oder große Dateien vom Sync ausschließen.
-- **Langfristige Lösung**: Leaf-Dokumente + `children`-Array (wie livesync). Aufwand: Mittel.
-- **Priorität**: Niedrig — typische Vault-Dateien sind weit unter 8MB.

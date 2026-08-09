@@ -19,6 +19,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { installObsidianGlobals } from './install-globals'
+import { withPluginContext } from './plugin-execution-context'
 
 // Captured synchronously, in the same turn as the install call — no microtask gap.
 installObsidianGlobals()
@@ -83,6 +84,59 @@ describe('installObsidianGlobals', () => {
       'CodeMirror',
     ])('installs window.%s', (name) => {
       expect((window as unknown as Record<string, unknown>)[name]).toBeDefined()
+    })
+  })
+
+  describe('setTimeout/setInterval carry plugin-execution-context across the macrotask boundary', () => {
+    // Regression: "Editing Toolbar" (and any plugin) builds DOM inside a bare
+    // `setTimeout(() => this.buildUI(), ms)` scheduled from onload(). Before this
+    // fix, withPluginContext()'s synchronous save/restore had already unwound to
+    // null by the time the deferred callback ran, so createEl() tagged nothing
+    // and CssInjector's [data-plugin-id] scoping silently failed to match —
+    // producing unstyled, always-visible dropdown/flyout DOM.
+    it('createEl() inside a setTimeout callback is tagged with the plugin active when it was scheduled', async () => {
+      const createEl = (window as unknown as { createEl: (tag: string) => HTMLElement }).createEl
+      let el: HTMLElement | undefined
+
+      withPluginContext('editing-toolbar', () => {
+        window.setTimeout(() => {
+          el = createEl('div')
+        }, 0)
+      })
+
+      await new Promise((resolve) => window.setTimeout(resolve, 10))
+
+      expect(el?.getAttribute('data-plugin-id')).toBe('editing-toolbar')
+    })
+
+    it('createEl() inside a setInterval callback is tagged with the plugin active when it was scheduled', async () => {
+      const createEl = (window as unknown as { createEl: (tag: string) => HTMLElement }).createEl
+      let el: HTMLElement | undefined
+      let intervalId: number | undefined
+
+      withPluginContext('editing-toolbar', () => {
+        intervalId = window.setInterval(() => {
+          el = createEl('div')
+        }, 0)
+      })
+
+      await new Promise((resolve) => window.setTimeout(resolve, 10))
+      window.clearInterval(intervalId)
+
+      expect(el?.getAttribute('data-plugin-id')).toBe('editing-toolbar')
+    })
+
+    it('does not tag elements created by host-app setTimeout callbacks (no plugin context active)', async () => {
+      const createEl = (window as unknown as { createEl: (tag: string) => HTMLElement }).createEl
+      let el: HTMLElement | undefined
+
+      window.setTimeout(() => {
+        el = createEl('div')
+      }, 0)
+
+      await new Promise((resolve) => window.setTimeout(resolve, 10))
+
+      expect(el?.hasAttribute('data-plugin-id')).toBe(false)
     })
   })
 

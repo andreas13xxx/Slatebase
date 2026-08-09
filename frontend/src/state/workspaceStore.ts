@@ -207,6 +207,43 @@ export function initialize(): void {
   }
 }
 
+/**
+ * Cross-tab sync: another browser tab/window wrote (or cleared) the workspace
+ * key. Without this, each tab only ever reads localStorage once (in
+ * `initialize`), so a tab left open with a stale in-memory `currentState`
+ * would eventually overwrite a newer write from another tab with its own
+ * outdated copy — e.g. resurrecting a tab the user already closed elsewhere.
+ *
+ * Only adopt the incoming state when we have no pending local write: if this
+ * tab has unpersisted local changes, its own debounced write is newer than
+ * what just landed in storage and should win instead of being discarded.
+ */
+function handleStorageEvent(event: StorageEvent): void {
+  if (event.key !== STORAGE_KEY) return
+  if (debounceTimer !== null) return
+
+  if (event.newValue === null) {
+    currentState = createDefaultState()
+    notifySubscribers()
+    return
+  }
+
+  try {
+    const parsed = JSON.parse(event.newValue) as unknown
+    const validated = validateState(parsed)
+    if (validated) {
+      currentState = validated
+      notifySubscribers()
+    }
+  } catch {
+    // Ignore malformed writes from other tabs
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', handleStorageEvent)
+}
+
 /** Get the current workspace state (read-only snapshot). */
 export function getState(): Readonly<WorkspaceState> {
   return currentState

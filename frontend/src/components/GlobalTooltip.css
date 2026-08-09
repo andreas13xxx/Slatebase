@@ -1,0 +1,33 @@
+/* Global aria-label tooltip — see GlobalTooltip.tsx */
+
+.global-tooltip {
+  position: fixed;
+  z-index: var(--layer-tooltip, 70);
+  max-width: min(280px, calc(100vw - 16px));
+  padding: 4px 8px;
+  border-radius: var(--radius-s, 4px);
+  background: rgba(15, 23, 42, 0.92);
+  color: #fff;
+  font-size: var(--font-ui-smaller, 12px);
+  line-height: 1.4;
+  text-align: center;
+  white-space: pre-line;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .global-tooltip {
+    animation: global-tooltip-in 100ms ease-out;
+  }
+
+  @keyframes global-tooltip-in {
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+}

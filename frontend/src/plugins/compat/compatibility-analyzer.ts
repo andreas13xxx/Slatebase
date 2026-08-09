@@ -157,11 +157,8 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
   'workspace.detachLeavesOfType',
   'workspace.getActiveLeaf',
   'workspace.setActiveLeaf',
-  'workspace.createLeafBySplit',
-  'workspace.createLeafInParent',
   'workspace.getRightLeaf',
   'workspace.getLeftLeaf',
-  'workspace.splitActiveLeaf',
   'workspace.openLinkText',
   'workspace.getUnpinnedLeaf',
   'workspace.iterateAllLeaves',
@@ -169,21 +166,22 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
   'workspace.activeLeaf',
   'workspace.layoutReady',
   'workspace.trigger',
-  'workspace.requestSaveLayout',
   'workspace.onLayoutReady',
   'workspace.registerHoverLinkSource',
   'workspace.unregisterHoverLinkSource',
-  'workspace.floatingSplit',
-  'workspace.editorSuggest',
   'workspace.containerEl',
   'workspace.updateOptions',
-  'workspace.getLastOpenFiles',
+  // No split/popout/layout object model in Slatebase's flat-tab workspace —
+  // these degrade to a plain tab or a stub, but log a console message
+  // explaining the substitution, so plugins get an equivalent signal.
+  'workspace.createLeafBySplit',
+  'workspace.openPopoutLeaf',
   'workspace.getLayout',
-  'workspace.getLeafById',
   'workspace.rootSplit',
   'workspace.leftSplit',
   'workspace.rightSplit',
-  'workspace.openPopoutLeaf',
+  'workspace.floatingSplit',
+  'workspace.getLeafById',
   // MetadataCache methods
   'metadataCache.getFileCache',
   'metadataCache.getCache',
@@ -209,6 +207,7 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
   'fileManager.promptForFileDeletion',
   'fileManager.trashFile',
   'fileManager.getAvailablePathForAttachment',
+  // No rename dialog — the call logs a console message and leaves the file untouched.
   'fileManager.promptForFileRename',
   // Lifecycle methods — fully supported by the PluginLoader
   'onload',
@@ -216,8 +215,31 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
   'Plugin.registerEvent',
 ]);
 
-/** API methods that exist but provide limited functionality. */
-const PARTIAL_METHODS: ReadonlySet<string> = new Set([]);
+/**
+ * API methods that exist and don't throw, but do less than Obsidian does.
+ *
+ * The distinction matters for what this analyzer is for. `unsupported` means a
+ * plugin is likely to break outright; `partial` means it will run and quietly
+ * do less — which is the harder failure to notice, and exactly what a user
+ * deserves a warning about before installing.
+ *
+ * Nearly all of these come from one architectural difference: Slatebase's
+ * workspace is a flat set of tabs. It has no split/sidebar/popout object model,
+ * so the methods that create or inspect that structure degrade to a plain tab
+ * or return a stub. See the shim implementations for the per-method behaviour.
+ */
+const PARTIAL_METHODS: ReadonlySet<string> = new Set([
+  // Split emulation — these create an ordinary tab instead of a split pane.
+  'workspace.splitActiveLeaf',
+  'workspace.createLeafInParent',
+  // Layout structure: stub objects, since there is none to report.
+  'workspace.leftRibbon',
+  'workspace.rightRibbon',
+  'workspace.editorSuggest',
+  // No persisted layout, so nothing to save.
+  'workspace.requestSaveLayout',
+  'workspace.getLastOpenFiles',
+]);
 
 /**
  * Known unsupported workspace methods.

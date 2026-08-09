@@ -104,6 +104,9 @@ export function createVaultConfigRoutes(deps: VaultConfigRoutesDeps): Hono {
       if (result.data.dailyNotesDirectory !== undefined) {
         partial.dailyNotesDirectory = result.data.dailyNotesDirectory
       }
+      if (result.data.dailyNoteTemplateName !== undefined) {
+        partial.dailyNoteTemplateName = result.data.dailyNoteTemplateName
+      }
       const config = await vaultConfigService.saveConfig(vaultId, partial)
       return c.json(config, 200)
     } catch (error) {

@@ -16,6 +16,7 @@
 
 import type { IAppShim, PluginInstance } from './types'
 import { renderLucideIconInto } from './lucide-icons'
+import { ProgressBarComponent } from './obsidian-api-extensions'
 
 // ─── PluginSettingTab ────────────────────────────────────────────────────────────
 
@@ -119,123 +120,90 @@ export class PluginSettingTab {
 // ─── Setting (Fluent UI Builder) ─────────────────────────────────────────────────
 
 /**
- * TextComponent — Wraps an input[type=text] element with fluent API.
+ * BaseComponent — real Obsidian's shared base of every Setting UI control.
+ * `install-globals.ts` registers this same class as `window.obsidian.BaseComponent`
+ * (imported from here, not redefined) so both sides of the API stay one class.
  */
-export class TextComponent {
-  inputEl: HTMLInputElement
+export class BaseComponent {
+  disabled = false
+  then(cb: (component: this) => void): this { cb(this); return this }
+  setDisabled(disabled: boolean): this { this.disabled = disabled; return this }
+}
+
+/** ValueComponent<T> — BaseComponent plus the get/set value pattern. */
+export class ValueComponent<T> extends BaseComponent {
+  getValue(): T { return undefined as unknown as T }
+  setValue(_value: T): this { return this }
+  registerOptionListener(_listeners: unknown, _key: string): this { return this }
+}
+
+/**
+ * AbstractTextComponent<E> — shared base of TextComponent/TextAreaComponent.
+ * Real Obsidian: `AbstractTextComponent<E> extends ValueComponent<string>`.
+ */
+export abstract class AbstractTextComponent<E extends HTMLInputElement | HTMLTextAreaElement> extends ValueComponent<string> {
+  inputEl: E
   private changeCallback: ((value: string) => void) | null = null
 
-  constructor(containerEl: HTMLElement) {
-    this.inputEl = document.createElement('input')
-    this.inputEl.type = 'text'
-    this.inputEl.className = 'setting-text-input'
+  constructor(inputEl: E) {
+    super()
+    this.inputEl = inputEl
     this.inputEl.addEventListener('input', () => {
-      if (this.changeCallback) {
-        this.changeCallback(this.inputEl.value)
-      }
+      if (this.changeCallback) this.changeCallback(this.inputEl.value)
     })
-    containerEl.appendChild(this.inputEl)
   }
 
-  setValue(value: string): this {
-    this.inputEl.value = value
-    return this
-  }
+  getValue(): string { return this.inputEl.value }
+  setValue(value: string): this { this.inputEl.value = value; return this }
+  setPlaceholder(placeholder: string): this { this.inputEl.placeholder = placeholder; return this }
+  onChange(callback: (value: string) => void): this { this.changeCallback = callback; return this }
+  setTooltip(tooltip: string): this { this.inputEl.title = tooltip; return this }
+  /** BaseComponent's generic setDisabled, specialized to the wrapped input element. */
+  override setDisabled(disabled: boolean): this { this.inputEl.disabled = disabled; return super.setDisabled(disabled) }
+}
 
-  getValue(): string {
-    return this.inputEl.value
-  }
-
-  setPlaceholder(placeholder: string): this {
-    this.inputEl.placeholder = placeholder
-    return this
-  }
-
-  setDisabled(disabled: boolean): this {
-    this.inputEl.disabled = disabled
-    return this
-  }
-
-  onChange(callback: (value: string) => void): this {
-    this.changeCallback = callback
-    return this
-  }
-
-  setTooltip(tooltip: string): this {
-    this.inputEl.title = tooltip
-    return this
-  }
-
-  then(cb: (component: this) => void): this {
-    cb(this)
-    return this
+/**
+ * TextComponent — Wraps an input[type=text] element with fluent API.
+ */
+export class TextComponent extends AbstractTextComponent<HTMLInputElement> {
+  constructor(containerEl: HTMLElement) {
+    const inputEl = document.createElement('input')
+    inputEl.type = 'text'
+    inputEl.className = 'setting-text-input'
+    containerEl.appendChild(inputEl)
+    super(inputEl)
   }
 }
 
 /**
  * TextAreaComponent — Wraps a textarea element with fluent API.
  */
-export class TextAreaComponent {
-  inputEl: HTMLTextAreaElement
-  private changeCallback: ((value: string) => void) | null = null
-
+export class TextAreaComponent extends AbstractTextComponent<HTMLTextAreaElement> {
   constructor(containerEl: HTMLElement) {
-    this.inputEl = document.createElement('textarea')
-    this.inputEl.className = 'setting-textarea-input'
-    this.inputEl.addEventListener('input', () => {
-      if (this.changeCallback) {
-        this.changeCallback(this.inputEl.value)
-      }
-    })
-    containerEl.appendChild(this.inputEl)
-  }
-
-  setValue(value: string): this {
-    this.inputEl.value = value
-    return this
-  }
-
-  getValue(): string {
-    return this.inputEl.value
-  }
-
-  setPlaceholder(placeholder: string): this {
-    this.inputEl.placeholder = placeholder
-    return this
-  }
-
-  onChange(callback: (value: string) => void): this {
-    this.changeCallback = callback
-    return this
-  }
-
-  setDisabled(disabled: boolean): this {
-    this.inputEl.disabled = disabled
-    return this
-  }
-
-  setTooltip(tooltip: string): this {
-    this.inputEl.title = tooltip
-    return this
-  }
-
-  then(cb: (component: this) => void): this {
-    cb(this)
-    return this
+    const inputEl = document.createElement('textarea')
+    inputEl.className = 'setting-textarea-input'
+    containerEl.appendChild(inputEl)
+    super(inputEl)
   }
 }
 
 /**
  * ToggleComponent — Wraps a toggle switch element with fluent API.
+ * Real Obsidian: `ToggleComponent extends ValueComponent<boolean>`.
  */
-export class ToggleComponent {
+export class ToggleComponent extends ValueComponent<boolean> {
   toggleEl: HTMLElement
   private inputEl: HTMLInputElement
   private changeCallback: ((value: boolean) => void) | null = null
 
   constructor(containerEl: HTMLElement) {
+    super()
     this.toggleEl = document.createElement('label')
-    this.toggleEl.className = 'setting-toggle'
+    // Two names on purpose: `setting-toggle` is Slatebase's own (styled in
+    // App.css), `checkbox-container` is what Obsidian renders. Plugin and theme
+    // CSS is written against the latter, and some plugins reach for the element
+    // with `querySelector('.checkbox-container')`.
+    this.toggleEl.className = 'setting-toggle checkbox-container'
 
     this.inputEl = document.createElement('input')
     this.inputEl.type = 'checkbox'
@@ -249,14 +217,21 @@ export class ToggleComponent {
     containerEl.appendChild(this.toggleEl)
 
     this.inputEl.addEventListener('change', () => {
+      this.syncEnabledClass()
       if (this.changeCallback) {
         this.changeCallback(this.inputEl.checked)
       }
     })
   }
 
+  /** Obsidian marks the on-state with `is-enabled` on the container, not with :checked. */
+  private syncEnabledClass(): void {
+    this.toggleEl.classList.toggle('is-enabled', this.inputEl.checked)
+  }
+
   setValue(value: boolean): this {
     this.inputEl.checked = value
+    this.syncEnabledClass()
     return this
   }
 
@@ -264,9 +239,9 @@ export class ToggleComponent {
     return this.inputEl.checked
   }
 
-  setDisabled(disabled: boolean): this {
+  override setDisabled(disabled: boolean): this {
     this.inputEl.disabled = disabled
-    return this
+    return super.setDisabled(disabled)
   }
 
   onChange(callback: (value: boolean) => void): this {
@@ -278,23 +253,21 @@ export class ToggleComponent {
     this.toggleEl.title = tooltip
     return this
   }
-
-  then(cb: (component: this) => void): this {
-    cb(this)
-    return this
-  }
 }
 
 /**
  * DropdownComponent — Wraps a select element with fluent API.
+ * Real Obsidian: `DropdownComponent extends ValueComponent<string>`.
  */
-export class DropdownComponent {
+export class DropdownComponent extends ValueComponent<string> {
   selectEl: HTMLSelectElement
   private changeCallback: ((value: string) => void) | null = null
 
   constructor(containerEl: HTMLElement) {
+    super()
     this.selectEl = document.createElement('select')
-    this.selectEl.className = 'setting-dropdown'
+    // `dropdown` is Obsidian's class for a select; plugin CSS targets it.
+    this.selectEl.className = 'setting-dropdown dropdown'
     this.selectEl.addEventListener('change', () => {
       if (this.changeCallback) {
         this.changeCallback(this.selectEl.value)
@@ -332,30 +305,27 @@ export class DropdownComponent {
     return this
   }
 
-  setDisabled(disabled: boolean): this {
+  override setDisabled(disabled: boolean): this {
     this.selectEl.disabled = disabled
-    return this
+    return super.setDisabled(disabled)
   }
 
   setTooltip(tooltip: string): this {
     this.selectEl.title = tooltip
     return this
   }
-
-  then(cb: (component: this) => void): this {
-    cb(this)
-    return this
-  }
 }
 
 /**
  * ButtonComponent — Wraps a button element with fluent API.
+ * Real Obsidian: `ButtonComponent extends BaseComponent` (no value to hold).
  */
-export class ButtonComponent {
+export class ButtonComponent extends BaseComponent {
   buttonEl: HTMLButtonElement
   private clickCallback: (() => void) | null = null
 
   constructor(containerEl: HTMLElement) {
+    super()
     this.buttonEl = document.createElement('button')
     this.buttonEl.className = 'setting-button'
     this.buttonEl.addEventListener('click', () => {
@@ -371,19 +341,21 @@ export class ButtonComponent {
     return this
   }
 
+  // `mod-cta`/`mod-warning` are Obsidian's own modifier classes and carry the
+  // styling plugins and themes expect; ours are kept alongside for App.css.
   setCta(): this {
-    this.buttonEl.classList.add('setting-button--cta')
+    this.buttonEl.classList.add('setting-button--cta', 'mod-cta')
     return this
   }
 
   setWarning(): this {
-    this.buttonEl.classList.add('setting-button--warning')
+    this.buttonEl.classList.add('setting-button--warning', 'mod-warning')
     return this
   }
 
-  setDisabled(disabled: boolean): this {
+  override setDisabled(disabled: boolean): this {
     this.buttonEl.disabled = disabled
-    return this
+    return super.setDisabled(disabled)
   }
 
   onClick(callback: () => void): this {
@@ -415,28 +387,26 @@ export class ButtonComponent {
   }
 
   removeCta(): this {
-    this.buttonEl.classList.remove('setting-button--cta')
-    return this
-  }
-
-  then(cb: (component: this) => void): this {
-    cb(this)
+    this.buttonEl.classList.remove('setting-button--cta', 'mod-cta')
     return this
   }
 }
 
 /**
  * SliderComponent — Wraps an input[type=range] element with fluent API.
+ * Real Obsidian: `SliderComponent extends ValueComponent<number>`.
  */
-export class SliderComponent {
+export class SliderComponent extends ValueComponent<number> {
   sliderEl: HTMLInputElement
   private changeCallback: ((value: number) => void) | null = null
   private tooltipEl: HTMLElement | null = null
 
   constructor(containerEl: HTMLElement) {
+    super()
     this.sliderEl = document.createElement('input')
     this.sliderEl.type = 'range'
-    this.sliderEl.className = 'setting-slider'
+    // `slider` is Obsidian's class for a range input; plugin CSS targets it.
+    this.sliderEl.className = 'setting-slider slider'
     this.sliderEl.addEventListener('input', () => {
       if (this.tooltipEl) {
         this.tooltipEl.textContent = this.sliderEl.value
@@ -479,9 +449,9 @@ export class SliderComponent {
     return this
   }
 
-  setDisabled(disabled: boolean): this {
+  override setDisabled(disabled: boolean): this {
     this.sliderEl.disabled = disabled
-    return this
+    return super.setDisabled(disabled)
   }
 
   onChange(callback: (value: number) => void): this {
@@ -503,6 +473,12 @@ export class SliderComponent {
  */
 export class Setting {
   settingEl: HTMLElement
+  /**
+   * Every control added to this row (real Obsidian field). `setDisabled()`
+   * propagates to each of these — without tracking them, disabling a Setting
+   * only dimmed the row visually while its `<input>` stayed interactive.
+   */
+  components: Array<{ setDisabled(disabled: boolean): unknown }> = []
   private nameEl: HTMLElement
   private descEl: HTMLElement
   private controlEl: HTMLElement
@@ -542,7 +518,10 @@ export class Setting {
   }
 
   setHeading(): this {
-    this.settingEl.classList.add('setting-item--heading')
+    // Obsidian's name is `setting-item-heading`; ours is the BEM variant styled
+    // in App.css. Both are applied so plugin CSS matches too — obsidian-components.css
+    // carries the Obsidian-named rule.
+    this.settingEl.classList.add('setting-item--heading', 'setting-item-heading')
     return this
   }
 
@@ -553,36 +532,53 @@ export class Setting {
 
   addText(callback: (component: TextComponent) => void): this {
     const component = new TextComponent(this.controlEl)
+    this.components.push(component)
     callback(component)
     return this
   }
 
   addTextArea(callback: (component: TextAreaComponent) => void): this {
     const component = new TextAreaComponent(this.controlEl)
+    this.components.push(component)
     callback(component)
     return this
   }
 
   addToggle(callback: (component: ToggleComponent) => void): this {
     const component = new ToggleComponent(this.controlEl)
+    this.components.push(component)
     callback(component)
     return this
   }
 
   addDropdown(callback: (component: DropdownComponent) => void): this {
     const component = new DropdownComponent(this.controlEl)
+    this.components.push(component)
     callback(component)
     return this
   }
 
   addButton(callback: (component: ButtonComponent) => void): this {
     const component = new ButtonComponent(this.controlEl)
+    this.components.push(component)
     callback(component)
     return this
   }
 
   addSlider(callback: (component: SliderComponent) => void): this {
     const component = new SliderComponent(this.controlEl)
+    this.components.push(component)
+    callback(component)
+    return this
+  }
+
+  /**
+   * Add a progress bar (Obsidian 1.4.4+).
+   * Not tracked in `components` — ProgressBarComponent has no setDisabled
+   * (a progress indicator isn't interactive, so there is nothing to disable).
+   */
+  addProgressBar(callback: (component: ProgressBarComponent) => void): this {
+    const component = new ProgressBarComponent(this.controlEl)
     callback(component)
     return this
   }
@@ -601,25 +597,57 @@ export class Setting {
       setDisabled(d: boolean) { input.disabled = d; return this },
       then(cb: (c: unknown) => void) { cb(this); return this },
     }
+    this.components.push(component)
     callback(component)
     return this
   }
 
-  addSearch(callback: (component: { inputEl: HTMLInputElement; getValue(): string; setValue(value: string): unknown; setPlaceholder(p: string): unknown; onChange(cb: (value: string) => void): unknown; then(cb: (c: unknown) => void): unknown }) => void): this {
+  /**
+   * Add a search box.
+   *
+   * The DOM mirrors Obsidian's: a `.search-input-container` wrapping the input
+   * and a `.search-input-clear-button`. Both the structure and the clear button
+   * are load-bearing — plugin CSS positions the button against the container,
+   * and `containerEl`/`clearButtonEl` are part of Obsidian's SearchComponent.
+   */
+  addSearch(callback: (component: { inputEl: HTMLInputElement; containerEl: HTMLElement; clearButtonEl: HTMLElement; getValue(): string; setValue(value: string): unknown; setPlaceholder(p: string): unknown; onChange(cb: (value: string) => void): unknown; setDisabled(d: boolean): unknown; then(cb: (c: unknown) => void): unknown }) => void): this {
+    const container = document.createElement('div')
+    container.className = 'search-input-container'
     const input = document.createElement('input')
     input.type = 'search'
-    input.className = 'setting-search-input'
-    this.controlEl.appendChild(input)
+    input.className = 'setting-search-input search-input'
+    input.spellcheck = false
+    const clearButton = document.createElement('div')
+    clearButton.className = 'search-input-clear-button is-hidden'
+    clearButton.setAttribute('aria-label', 'Clear search')
+    container.appendChild(input)
+    container.appendChild(clearButton)
+    this.controlEl.appendChild(container)
+
     let changeCb: ((v: string) => void) | null = null
-    input.addEventListener('input', () => { if (changeCb) changeCb(input.value) })
+    const syncClearButton = (): void => {
+      clearButton.classList.toggle('is-hidden', input.value.length === 0)
+    }
+    const emit = (): void => { if (changeCb) changeCb(input.value) }
+    input.addEventListener('input', () => { syncClearButton(); emit() })
+    clearButton.addEventListener('click', () => {
+      input.value = ''
+      syncClearButton()
+      input.focus()
+      emit()
+    })
     const component = {
       inputEl: input,
+      containerEl: container,
+      clearButtonEl: clearButton,
       getValue() { return input.value },
-      setValue(value: string) { input.value = value; return this },
+      setValue(value: string) { input.value = value; syncClearButton(); return this },
       setPlaceholder(p: string) { input.placeholder = p; return this },
       onChange(cb: (value: string) => void) { changeCb = cb; return this },
+      setDisabled(d: boolean) { input.disabled = d; return this },
       then(cb: (c: unknown) => void) { cb(this); return this },
     }
+    this.components.push(component)
     callback(component)
     return this
   }
@@ -628,7 +656,7 @@ export class Setting {
    * Add a moment.js date format input with live preview.
    * Obsidian plugins use this for date/time format configuration (e.g. Kanban date display format).
    */
-  addMomentFormat(callback: (component: { inputEl: HTMLInputElement; getValue(): string; setValue(value: string): unknown; setPlaceholder(p: string): unknown; setDefaultFormat(format: string): unknown; setSampleEl(el: HTMLElement): unknown; onChange(cb: (value: string) => void): unknown; then(cb: (c: unknown) => void): unknown }) => void): this {
+  addMomentFormat(callback: (component: { inputEl: HTMLInputElement; getValue(): string; setValue(value: string): unknown; setPlaceholder(p: string): unknown; setDefaultFormat(format: string): unknown; setSampleEl(el: HTMLElement): unknown; onChange(cb: (value: string) => void): unknown; setDisabled(d: boolean): unknown; then(cb: (c: unknown) => void): unknown }) => void): this {
     const wrapper = document.createElement('div')
     wrapper.className = 'setting-moment-format'
     const input = document.createElement('input')
@@ -671,8 +699,10 @@ export class Setting {
       setDefaultFormat(format: string) { defaultFormat = format; input.placeholder = format; updatePreview(); return this },
       setSampleEl(el: HTMLElement) { sampleEl = el; updatePreview(); return this },
       onChange(cb: (value: string) => void) { changeCb = cb; return this },
+      setDisabled(d: boolean) { input.disabled = d; return this },
       then(cb: (c: unknown) => void) { cb(this); return this },
     }
+    this.components.push(component)
     callback(component)
     updatePreview()
     return this
@@ -694,19 +724,31 @@ export class Setting {
       setIcon(_icon: string) { return this },
       setTooltip(tooltip: string) { el.title = tooltip; return this },
       onClick(cb: () => void) { el.addEventListener('click', cb); return this },
-      setDisabled(_d: boolean) { return this },
+      setDisabled(d: boolean) {
+        el.classList.toggle('is-disabled', d)
+        el.style.pointerEvents = d ? 'none' : ''
+        return this
+      },
       then(cb: (c: unknown) => void) { cb(this); return this },
     }
+    this.components.push(component)
     callback(component)
     return this
   }
 
-  /** Show/hide the entire setting row. */
+  /**
+   * Disable (or re-enable) the entire setting row — real Obsidian propagates
+   * this to every control added via addText/addToggle/etc., not just a CSS
+   * class on the row, so the inputs themselves stop accepting input too.
+   */
   setDisabled(disabled: boolean): this {
     if (disabled) {
       this.settingEl.classList.add('setting-item--disabled')
     } else {
       this.settingEl.classList.remove('setting-item--disabled')
+    }
+    for (const component of this.components) {
+      component.setDisabled(disabled)
     }
     return this
   }

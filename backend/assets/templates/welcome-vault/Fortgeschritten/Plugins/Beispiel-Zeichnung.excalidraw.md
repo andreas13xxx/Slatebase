@@ -10,6 +10,13 @@ Diese Datei wird als Zeichnung gerendert wenn das Excalidraw-Plugin aktiviert is
 %%
 # Excalidraw Data
 
+## Text Elements
+Slatebase ^label1
+
+Plugins ^label2
+
+Dataview + Kanban + Excalidraw ^label3
+
 ## Drawing
 ```json
 {

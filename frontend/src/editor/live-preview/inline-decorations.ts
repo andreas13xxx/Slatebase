@@ -1,6 +1,7 @@
 import { Decoration } from '@codemirror/view'
 import type { EditorState, Range } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
+import { INLINE_HTML_OPEN_TAG_RE, INLINE_HTML_CLOSE_TAG_RE, parseInlineHtmlAttrs, inlineHtmlToCssText } from '../../plugins/inline-html'
 
 /**
  * Decoration ranges that should be hidden when cursor is outside them.
@@ -37,9 +38,15 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
   const decorations: Range<Decoration>[] = []
   const hideableRanges: HideableRange[] = []
   const tree = syntaxTree(state)
+  const htmlTagNodes: { from: number; to: number }[] = []
 
   tree.iterate({
     enter(node) {
+      // --- HTMLTag (collected here, paired up and decorated after the walk) ---
+      if (node.name === 'HTMLTag') {
+        htmlTagNodes.push({ from: node.from, to: node.to })
+      }
+
       // --- ATXHeading1-6 ---
       if (
         node.name === 'ATXHeading1' || node.name === 'ATXHeading2' ||
@@ -198,6 +205,56 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
       }
     }
   })
+
+  // --- Inline HTML tag pairs (e.g. <font color="#ff0000">text</font>) ---
+  // Allowlisted, paired open/close tags render their content styled (via a
+  // wrapping <span>, since a CM6 mark decoration has no way to emit a real
+  // <font>/<mark> element) and hide their own tag syntax like other markers,
+  // revealed together when the cursor is anywhere inside the pair.
+  {
+    let ti = 0
+    while (ti < htmlTagNodes.length) {
+      const openNode = htmlTagNodes[ti]!
+      const openMatch = INLINE_HTML_OPEN_TAG_RE.exec(state.doc.sliceString(openNode.from, openNode.to).trim())
+      if (!openMatch) { ti++; continue }
+      const tagName = openMatch[1]!.toLowerCase()
+      const attrs = parseInlineHtmlAttrs(tagName, openMatch[2] ?? '')
+      if (attrs === null) { ti++; continue }
+
+      let depth = 1
+      let closeIdx = -1
+      for (let j = ti + 1; j < htmlTagNodes.length; j++) {
+        const text = state.doc.sliceString(htmlTagNodes[j]!.from, htmlTagNodes[j]!.to).trim()
+        const openInner = INLINE_HTML_OPEN_TAG_RE.exec(text)
+        if (openInner && openInner[1]!.toLowerCase() === tagName) { depth++; continue }
+        const closeInner = INLINE_HTML_CLOSE_TAG_RE.exec(text)
+        if (closeInner && closeInner[1]!.toLowerCase() === tagName) {
+          depth--
+          if (depth === 0) { closeIdx = j; break }
+        }
+      }
+
+      if (closeIdx === -1) { ti++; continue }
+      const closeNode = htmlTagNodes[closeIdx]!
+      const contentFrom = openNode.to
+      const contentTo = closeNode.from
+
+      if (contentFrom < contentTo) {
+        const style = inlineHtmlToCssText(tagName, attrs)
+        decorations.push(
+          Decoration.mark({ attributes: style ? { style } : {} }).range(contentFrom, contentTo)
+        )
+      }
+
+      hideableRanges.push({ from: openNode.from, to: openNode.to, groupFrom: openNode.from, groupTo: closeNode.to })
+      decorations.push(Decoration.replace({}).range(openNode.from, openNode.to))
+
+      hideableRanges.push({ from: closeNode.from, to: closeNode.to, groupFrom: openNode.from, groupTo: closeNode.to })
+      decorations.push(Decoration.replace({}).range(closeNode.from, closeNode.to))
+
+      ti = closeIdx + 1
+    }
+  }
 
   // --- Highlight (==text==) ---
   // Not in Lezer grammar — detect via regex on the full document text

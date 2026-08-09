@@ -99,9 +99,13 @@ export class CommandRegistry implements ICommandRegistry {
    * If the command defines hotkeys, they are registered with conflict detection.
    * Returns the registered Command (matches Obsidian's Plugin.addCommand, which
    * plugins rely on to stash a reference, e.g. `this.forceSaveCommand = this.addCommand(...)`).
+   *
+   * A handful of Obsidian's own core commands (`daily-notes`, `insert-template`, ...)
+   * have no namespace prefix at all — pass `pluginId: ''` to register those verbatim
+   * instead of getting a leading `:`.
    */
   addCommand(pluginId: string, command: CommandInput): Command {
-    const namespacedId = `${pluginId}:${command.id}`;
+    const namespacedId = pluginId ? `${pluginId}:${command.id}` : command.id;
 
     const cmd: Command = {
       id: namespacedId,

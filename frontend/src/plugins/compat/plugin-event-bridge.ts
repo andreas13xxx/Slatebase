@@ -76,7 +76,7 @@ export interface PluginEventBridgeOptions {
  * Builds a TFile object from a file path.
  * Used to construct the TFile argument for workspace events.
  */
-function buildTFileFromPath(filePath: string): TFile {
+export function buildTFileFromPath(filePath: string): TFile {
   const name = filePath.split('/').pop() ?? filePath
   const lastDot = name.lastIndexOf('.')
   const basename = lastDot > 0 ? name.slice(0, lastDot) : name
@@ -182,10 +182,13 @@ export function usePluginEventBridge({
           workspaceShim.setActiveFile(null)
           workspaceShim.setEditorTextarea(null)
 
-          // Extract viewType and find the corresponding WorkspaceLeaf
+          // Extract viewType and find the corresponding WorkspaceLeaf. Fall back to
+          // an "empty" leaf (not bare null) if it can't be found yet — e.g. a race
+          // where the view is still being created — since some plugins (Excalidraw)
+          // dereference `leaf.view` on active-leaf-change without a null check.
           const viewType = activeTab.filePath.slice(VIEW_PATH_PREFIX.length)
           const leaves = workspaceShim.getLeavesOfType(viewType)
-          const leaf = leaves[0] ?? null
+          const leaf = leaves[0] ?? workspaceShim.getOrCreateEmptyLeaf()
 
           // Update internal leaf tracking (no event emission from this call)
           workspaceShim.setActiveLeafInternal(leaf)

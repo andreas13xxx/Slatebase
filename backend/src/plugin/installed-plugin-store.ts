@@ -58,10 +58,24 @@ export class InstalledPluginStore implements IInstalledPluginStore {
   /**
    * Loads a plugin manifest from disk.
    * Returns null if the file does not exist or cannot be parsed.
+   *
+   * The `id` field is normalized to the directory name (the pluginId this
+   * plugin was actually installed under), overriding whatever the manifest
+   * file itself declares. A plugin's manifest.json is attacker/upstream
+   * controlled content — its `id` can drift from the install-time pluginId
+   * (e.g. a community-store entry id vs. the id baked into the downloaded
+   * release). Every other lookup (bundle, styles, settings, activate,
+   * delete) is keyed by directory name, so callers that trust manifest.id
+   * from listPlugins()/getManifest() must see the same value or those
+   * follow-up requests 404.
    */
   async loadManifest(vaultId: string, pluginId: string): Promise<PluginManifest | null> {
     const filePath = path.join(this.getPluginDir(vaultId, pluginId), 'manifest.json')
-    return this.readJsonFile<PluginManifest>(filePath)
+    const manifest = await this.readJsonFile<PluginManifest>(filePath)
+    if (manifest === null) {
+      return null
+    }
+    return { ...manifest, id: pluginId }
   }
 
   /**
@@ -133,8 +147,7 @@ export class InstalledPluginStore implements IInstalledPluginStore {
         continue
       }
 
-      const manifestPath = path.join(vaultDir, entry, 'manifest.json')
-      const manifest = await this.readJsonFile<PluginManifest>(manifestPath)
+      const manifest = await this.loadManifest(vaultId, entry)
       if (manifest !== null) {
         manifests.push(manifest)
       }

@@ -20,6 +20,18 @@ import { onRealtimeVaultChange } from '../state/realtimeVaultBridge'
 import { getState as getWorkspaceState, updateExpandedState } from '../state/workspaceStore'
 import { TreeNode } from './file-explorer'
 import type { DragState, ExternalDropState, ContextMenuState, InlineInputState } from './file-explorer'
+import { getActiveWorkspaceShim } from '../plugins/compat/active-workspace-shim'
+import { buildTFileFromPath } from '../plugins/compat/plugin-event-bridge'
+import type { TFile, TFolder } from '../plugins/compat/types'
+
+/**
+ * Monotonic per-vault sequence counter used to discard out-of-order fetchVaultTree
+ * responses (see refreshVaultTree). Deliberately module-scope rather than a ref: a
+ * ref mutated/read from plain (non-useCallback) render-time closures — like the
+ * context-menu action switch below — trips eslint-plugin-react-hooks' compiler-safety
+ * rules for every call site that transitively reaches it.
+ */
+const vaultTreeRequestSeq = new Map<string, number>()
 
 /**
  * Props for the FileExplorer component.
@@ -27,6 +39,8 @@ import type { DragState, ExternalDropState, ContextMenuState, InlineInputState }
 export interface FileExplorerProps {
   /** When set, registers a callback that triggers inline new file creation at root. */
   onRegisterCreateFile?: (trigger: () => void) => void
+  /** When set, registers a callback that triggers inline new folder creation at root. */
+  onRegisterCreateFolder?: (trigger: () => void) => void
   /** When set, registers a callback that triggers vault creation. */
   onRegisterCreateVault?: (trigger: () => void) => void
   /** When set, registers a callback that triggers canvas creation at root. */
@@ -43,7 +57,7 @@ export interface FileExplorerProps {
  * Provides context menu actions (new file, rename, delete) on each tree node.
  * Supports drag & drop for moving files and folders within a vault.
  */
-export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRegisterCreateCanvas, onOpenVersions }: FileExplorerProps = {}) {
+export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onRegisterCreateVault, onRegisterCreateCanvas, onOpenVersions }: FileExplorerProps = {}) {
   const { state, dispatch, apiClient } = useAppContext()
   const { tabState, tabDispatch } = useTabContext()
   const { t } = useTranslation()
@@ -93,6 +107,21 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
   // Counter to force re-render when favorites change
   const [, setFavoritesVersion] = useState(0)
 
+  // Several handlers below (delete, rename, move, create, drag/drop, lazy-load) each
+  // independently fetch-then-dispatch a fresh tree. Without the sequence guard in
+  // vaultTreeRequestSeq, an older request that happens to resolve after a newer one
+  // (e.g. a lazy-load expand racing a delete) would overwrite current state with
+  // stale data — a deleted file reappearing in the explorer is the visible symptom.
+  const refreshVaultTree = useCallback(async (vaultIdToRefresh: string): Promise<DirectoryTree> => {
+    const seq = (vaultTreeRequestSeq.get(vaultIdToRefresh) ?? 0) + 1
+    vaultTreeRequestSeq.set(vaultIdToRefresh, seq)
+    const tree = await apiClient!.fetchVaultTree(vaultIdToRefresh)
+    if (vaultTreeRequestSeq.get(vaultIdToRefresh) === seq) {
+      dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId: vaultIdToRefresh, tree } })
+    }
+    return tree
+  }, [apiClient, dispatch])
+
   // Persist expanded paths/vaults to workspace store
   useEffect(() => {
     updateExpandedState([...expandedPaths], [...expandedVaults])
@@ -107,13 +136,12 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
     for (const vaultId of expandedVaults) {
       if (!state.vaultTrees[vaultId] && apiClient && !state.vaultTreesLoading.has(vaultId)) {
         dispatch({ type: 'VAULT_TREE_LOADING', payload: vaultId })
-        apiClient.fetchVaultTree(vaultId).then(
-          (tree) => dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree } }),
+        refreshVaultTree(vaultId).catch(
           () => { /* silently ignore — vault will show empty */ },
         )
       }
     }
-  }, [expandedVaults, state.vaultTrees, state.vaultTreesLoading, dispatch])
+  }, [expandedVaults, state.vaultTrees, state.vaultTreesLoading, dispatch, refreshVaultTree])
 
   /** Check if a file is a favorite for a given vault. */
   const checkIsFavorite = useCallback((vaultId: string, path: string): boolean => {
@@ -157,6 +185,72 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
       })
     }
   }, [onRegisterCreateFile, state.selectedVaultId])
+
+  // Register the create folder trigger for core commands (file-explorer:new-folder)
+  useEffect(() => {
+    if (onRegisterCreateFolder) {
+      onRegisterCreateFolder(() => {
+        const vaultId = state.selectedVaultId
+        if (!vaultId) return
+        setInlineInputState({
+          visible: true,
+          mode: 'newFolder',
+          parentPath: '',
+          node: null,
+          vaultId,
+        })
+        setExpandedVaults((prev) => {
+          const next = new Set(prev)
+          next.add(vaultId)
+          return next
+        })
+      })
+    }
+  }, [onRegisterCreateFolder, state.selectedVaultId])
+
+  // Reveal a specific file in the tree (file-explorer:reveal-active-file core command):
+  // expand its ancestor folders, then scroll it into view once it's rendered.
+  const pendingRevealPathRef = useRef<string | null>(null)
+  useEffect(() => {
+    function handleRevealFile(e: Event) {
+      const detail = (e as CustomEvent<{ path: string }>).detail
+      if (!detail?.path) return
+      const vaultId = state.selectedVaultId
+      if (!vaultId) return
+
+      pendingRevealPathRef.current = detail.path
+      setExpandedVaults((prev) => {
+        const next = new Set(prev)
+        next.add(vaultId)
+        return next
+      })
+      setExpandedPaths((prev) => {
+        const next = new Set(prev)
+        const segments = detail.path.split('/')
+        let acc = ''
+        for (let i = 0; i < segments.length - 1; i++) {
+          acc = acc ? `${acc}/${segments[i]}` : segments[i]
+          next.add(acc)
+        }
+        return next
+      })
+    }
+
+    window.addEventListener('slatebase:reveal-file', handleRevealFile)
+    return () => window.removeEventListener('slatebase:reveal-file', handleRevealFile)
+  }, [state.selectedVaultId])
+
+  // Runs after every render: once the revealed file's ancestors are expanded and it
+  // exists in the DOM, scroll to it and clear the pending request.
+  useEffect(() => {
+    const path = pendingRevealPathRef.current
+    if (!path) return
+    const el = document.querySelector(`[data-path="${CSS.escape(path)}"].tree-node--file`)
+    if (el) {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      pendingRevealPathRef.current = null
+    }
+  })
 
   // Register the create vault trigger for the toolbar button
   useEffect(() => {
@@ -309,8 +403,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
     // Lazy-load tree outside of setState updater (avoids dispatch-during-render warning)
     if (!wasExpanded && !state.vaultTrees[vaultId] && apiClient && !state.vaultTreesLoading.has(vaultId)) {
       dispatch({ type: 'VAULT_TREE_LOADING', payload: vaultId })
-      apiClient.fetchVaultTree(vaultId).then(
-        (tree) => dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree } }),
+      refreshVaultTree(vaultId).catch(
         () => { /* silently ignore — vault will show empty */ },
       )
     }
@@ -344,6 +437,59 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
   }
 
   // --- Context Menu Handlers ---
+
+  /**
+   * Build extra context menu items contributed by plugins via
+   * `workspace.on('file-menu', (menu, file, source) => menu.addItem(...))`
+   * (Obsidian's real event for "user right-clicked a file/folder in the
+   * explorer"). Returns [] when no plugin is listening (or none are loaded
+   * yet), in which case the menu looks exactly as it did before this existed.
+   */
+  function buildPluginMenuItems(node: DirectoryTree): ContextMenuItem[] {
+    const workspaceShim = getActiveWorkspaceShim()
+    const MenuCtor = (window as unknown as { obsidian?: { Menu?: new () => { items: Array<{ kind: string; title: string; icon: string; disabled: boolean; callback: (evt: MouseEvent | KeyboardEvent) => void }> } } }).obsidian?.Menu
+    if (!workspaceShim || !MenuCtor) return []
+
+    const file: TFile | TFolder = node.type === 'file'
+      ? buildTFileFromPath(node.path)
+      : {
+          path: node.path,
+          name: node.name,
+          children: [],
+          parent: null,
+          isRoot: () => node.path === '',
+        }
+
+    const menu = new MenuCtor()
+    try {
+      workspaceShim.trigger('file-menu', menu, file, 'file-explorer-context-menu')
+    } catch (err) {
+      console.error('[FileExplorer] A plugin\'s file-menu handler threw:', err)
+    }
+
+    const items: ContextMenuItem[] = []
+    menu.items.forEach((entry, index) => {
+      if (entry.kind === 'separator') {
+        items.push({ id: `plugin-menu-sep-${index}`, label: '', separator: true })
+        return
+      }
+      items.push({
+        id: `plugin-menu-item-${index}`,
+        label: entry.title,
+        disabled: entry.disabled,
+        run: () => {
+          try {
+            entry.callback(new MouseEvent('click'))
+          } catch (err) {
+            console.error('[FileExplorer] A plugin\'s file-menu item threw:', err)
+          }
+        },
+      })
+    })
+
+    if (items.length === 0) return []
+    return [{ id: 'plugin-menu-sep-leading', label: '', separator: true }, ...items]
+  }
 
   function handleContextMenu(e: React.MouseEvent, node: DirectoryTree, vaultId: string) {
     e.preventDefault()
@@ -463,8 +609,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
       // Read the source file content and save as a copy
       const fileContent = await apiClient.fetchFileContent(vaultId, node.path)
       await apiClient.saveFile(vaultId, copyPath, fileContent.content)
-      const newTree = await apiClient.fetchVaultTree(vaultId)
-      dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree: newTree } })
+      await refreshVaultTree(vaultId)
       showToast('success', `${copyName}`)
     } catch (err: unknown) {
       showToast('error', extractErrorMessage(err, t('fileOps.copyError')))
@@ -489,8 +634,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
 
     try {
       await apiClient.moveContent(vaultId, node.path, destinationPath)
-      const newTree = await apiClient.fetchVaultTree(vaultId)
-      dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree: newTree } })
+      await refreshVaultTree(vaultId)
       tabDispatch({
         type: 'UPDATE_TAB_PATHS',
         payload: { oldPathPrefix: node.path, newPathPrefix: destinationPath },
@@ -524,10 +668,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
     // Open the created file in a tab
     openTab(tabDispatch, dispatch, apiClient, vaultId, filePath, fileName.endsWith('.md') ? fileName : `${fileName}.md`)
     // Refresh file tree
-    apiClient.fetchVaultTree(vaultId).then(
-      (tree) => dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree } }),
-      () => { /* ignore */ }
-    )
+    refreshVaultTree(vaultId).catch(() => { /* ignore */ })
   }
 
   function handleRename(node: DirectoryTree) {
@@ -550,20 +691,22 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
     setDeleteConfirm({ open: false, node: null, vaultId: null })
     if (!node || !vaultId || !apiClient) return
 
+    // Close affected tabs and drop favorites immediately, before the delete request
+    // round-trips. Recreating a file at the same path (e.g. a daily note for the same
+    // day) reuses a deterministic tab id (vaultId::filePath); if the old tab were still
+    // open when that happens, OPEN_TAB would reactivate it with its stale content
+    // instead of loading the freshly created file. Doing this synchronously — rather
+    // than in the delete's .then() — closes that window regardless of network timing.
+    tabDispatch({
+      type: 'CLOSE_TABS_BY_PATH',
+      payload: { pathPrefix: node.path },
+    })
+    favoritesStore.removeByPath(vaultId, node.path)
+    setFavoritesVersion((v) => v + 1)
+
     apiClient.deleteContent(vaultId, node.path).then(async () => {
-      // Close affected tabs
-      tabDispatch({
-        type: 'CLOSE_TABS_BY_PATH',
-        payload: { pathPrefix: node.path },
-      })
-
-      // Remove from favorites on delete
-      favoritesStore.removeByPath(vaultId, node.path)
-      setFavoritesVersion((v) => v + 1)
-
       // Reload tree for this vault
-      const newTree = await apiClient.fetchVaultTree(vaultId)
-      dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree: newTree } })
+      await refreshVaultTree(vaultId)
     }).catch((err: unknown) => {
       showToast('error', extractErrorMessage(err, t('fileOps.deleteError')))
     })
@@ -571,6 +714,66 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
 
   function handleDeleteCancelled() {
     setDeleteConfirm({ open: false, node: null, vaultId: null })
+  }
+
+  /** Handles a context menu action selection for the currently targeted node. */
+  function handleMenuSelect(action: string) {
+    const node = contextMenuState.targetNode
+    if (!node) return
+
+    switch (action) {
+      case 'newFile': {
+        const parentPath = node.type === 'directory'
+          ? node.path
+          : node.path.lastIndexOf('/') === -1 ? '' : node.path.slice(0, node.path.lastIndexOf('/'))
+        handleNewFile(parentPath)
+        break
+      }
+      case 'newFolder': {
+        const parentPath = node.type === 'directory'
+          ? node.path
+          : node.path.lastIndexOf('/') === -1 ? '' : node.path.slice(0, node.path.lastIndexOf('/'))
+        handleNewFolder(parentPath)
+        break
+      }
+      case 'newCanvas': {
+        const vaultId = contextMenuState.vaultId
+        if (!vaultId) break
+        const parentPath = node.type === 'directory'
+          ? node.path
+          : node.path.lastIndexOf('/') === -1 ? '' : node.path.slice(0, node.path.lastIndexOf('/'))
+        void createCanvasFile(vaultId, parentPath)
+        break
+      }
+      case 'rename':
+        handleRename(node)
+        break
+      case 'delete':
+        handleDelete(node)
+        break
+      case 'copy':
+        void handleCopyFile(node)
+        break
+      case 'move':
+        void handleMoveFile(node)
+        break
+      case 'export':
+        handleExportVault()
+        break
+      case 'newFromTemplate':
+        handleNewFromTemplate()
+        break
+      case 'toggleFavorite':
+        if (contextMenuState.vaultId) {
+          handleToggleFavorite(contextMenuState.vaultId, node.path)
+        }
+        break
+      case 'versions':
+        if (contextMenuState.vaultId && onOpenVersions) {
+          onOpenVersions(contextMenuState.vaultId, node.path)
+        }
+        break
+    }
   }
 
   // --- Inline Input Handlers ---
@@ -590,8 +793,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
 
       try {
         await apiClient.saveFile(vaultId, filePath, '')
-        const newTree = await apiClient.fetchVaultTree(vaultId)
-        dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree: newTree } })
+        await refreshVaultTree(vaultId)
         // Implicitly select this vault and open the file
         if (state.selectedVaultId !== vaultId) {
           dispatch({ type: 'VAULT_SELECTED', payload: vaultId })
@@ -620,8 +822,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
         await apiClient.saveFile(vaultId, placeholderPath, '')
         // Delete the placeholder — the folder now exists on the backend
         await apiClient.deleteContent(vaultId, placeholderPath)
-        const newTree = await apiClient.fetchVaultTree(vaultId)
-        dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree: newTree } })
+        await refreshVaultTree(vaultId)
         // Expand the new folder
         setExpandedPaths((prev) => {
           const next = new Set(prev)
@@ -649,8 +850,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
 
       try {
         await apiClient.saveFile(vaultId, filePath, emptyCanvas)
-        const newTree = await apiClient.fetchVaultTree(vaultId)
-        dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree: newTree } })
+        await refreshVaultTree(vaultId)
         if (state.selectedVaultId !== vaultId) {
           dispatch({ type: 'VAULT_SELECTED', payload: vaultId })
         }
@@ -686,8 +886,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
 
       try {
         await apiClient.renameContent(vaultId, node.path, newName)
-        const newTree = await apiClient.fetchVaultTree(vaultId)
-        dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree: newTree } })
+        await refreshVaultTree(vaultId)
 
         // Update tab paths
         const oldPath = node.path
@@ -835,8 +1034,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
 
       try {
         await apiClient.uploadFiles(dropVaultId, validFiles, targetFolderPath)
-        const newTree = await apiClient.fetchVaultTree(dropVaultId)
-        dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId: dropVaultId, tree: newTree } })
+        await refreshVaultTree(dropVaultId)
       } catch (err) {
         for (const file of validFiles) {
           const reason = err instanceof Error ? err.message : 'Upload fehlgeschlagen'
@@ -868,8 +1066,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
 
     try {
       await apiClient.moveContent(vaultId, draggedPath, destinationPath)
-      const newTree = await apiClient.fetchVaultTree(vaultId)
-      dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree: newTree } })
+      await refreshVaultTree(vaultId)
       tabDispatch({
         type: 'UPDATE_TAB_PATHS',
         payload: { oldPathPrefix: draggedPath, newPathPrefix: destinationPath },
@@ -888,7 +1085,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
         isMoving: false,
       })
     }
-  }, [dragState.validTargets, dragState.draggedPath, dragState.draggedVaultId, apiClient, state.vaults, dispatch, tabDispatch, t])
+  }, [dragState.validTargets, dragState.draggedPath, dragState.draggedVaultId, apiClient, state.vaults, tabDispatch, t, refreshVaultTree])
 
   // --- Root Drop Zone Handlers (per vault) ---
 
@@ -1156,6 +1353,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
             { id: 'separator-2', label: '', separator: true },
             { id: 'versions', label: 'Versionen', icon: <History size={14} /> },
           ]
+          menuItems = [...menuItems, ...buildPluginMenuItems(node)]
         } else if (isFolder) {
           // Folder context menu: Neuer Ordner, Neue Datei, Neues Canvas, Umbenennen, Löschen
           menuItems = [
@@ -1166,6 +1364,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
             { id: 'rename', label: t('contextMenu.rename'), icon: <Pencil size={14} /> },
             { id: 'delete', label: t('contextMenu.delete'), icon: <Trash2 size={14} /> },
           ]
+          menuItems = [...menuItems, ...buildPluginMenuItems(node)]
         } else {
           // Vault entry context menu: Neuer Ordner, Neue Datei, Neues Canvas, Neue Notiz aus Vorlage, Export
           menuItems = [
@@ -1176,62 +1375,6 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateVault, onRe
             { id: 'separator-1', label: '', separator: true },
             { id: 'export', label: t('contextMenu.export'), icon: <Download size={14} /> },
           ]
-        }
-
-        function handleMenuSelect(action: string) {
-          switch (action) {
-            case 'newFile': {
-              const parentPath = node.type === 'directory'
-                ? node.path
-                : node.path.lastIndexOf('/') === -1 ? '' : node.path.slice(0, node.path.lastIndexOf('/'))
-              handleNewFile(parentPath)
-              break
-            }
-            case 'newFolder': {
-              const parentPath = node.type === 'directory'
-                ? node.path
-                : node.path.lastIndexOf('/') === -1 ? '' : node.path.slice(0, node.path.lastIndexOf('/'))
-              handleNewFolder(parentPath)
-              break
-            }
-            case 'newCanvas': {
-              const vaultId = contextMenuState.vaultId
-              if (!vaultId) break
-              const parentPath = node.type === 'directory'
-                ? node.path
-                : node.path.lastIndexOf('/') === -1 ? '' : node.path.slice(0, node.path.lastIndexOf('/'))
-              void createCanvasFile(vaultId, parentPath)
-              break
-            }
-            case 'rename':
-              handleRename(node)
-              break
-            case 'delete':
-              handleDelete(node)
-              break
-            case 'copy':
-              void handleCopyFile(node)
-              break
-            case 'move':
-              void handleMoveFile(node)
-              break
-            case 'export':
-              handleExportVault()
-              break
-            case 'newFromTemplate':
-              handleNewFromTemplate()
-              break
-            case 'toggleFavorite':
-              if (contextMenuState.vaultId) {
-                handleToggleFavorite(contextMenuState.vaultId, node.path)
-              }
-              break
-            case 'versions':
-              if (contextMenuState.vaultId && onOpenVersions) {
-                onOpenVersions(contextMenuState.vaultId, node.path)
-              }
-              break
-          }
         }
 
         return (

@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { warnNoOp, resetNoOpWarnings } from './no-op-warning'
+import { warnNoOp, warnOnce, debugOnce, resetLogDedup } from './log'
 
 describe('warnNoOp', () => {
   let warn: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
-    resetNoOpWarnings()
+    resetLogDedup()
     warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
   })
 
@@ -44,9 +44,56 @@ describe('warnNoOp', () => {
 
   it('does not dedup across a reset', () => {
     warnNoOp('ItemView', 'addAction')
-    resetNoOpWarnings()
+    resetLogDedup()
     warnNoOp('ItemView', 'addAction')
 
     expect(warn).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('warnOnce', () => {
+  let warn: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    resetLogDedup()
+    warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    warn.mockRestore()
+  })
+
+  it('logs at warn level, once per key', () => {
+    warnOnce('workspace-shim::unknownProp::foo', 'unsupported property "foo" accessed')
+    warnOnce('workspace-shim::unknownProp::foo', 'unsupported property "foo" accessed')
+
+    expect(warn).toHaveBeenCalledOnce()
+  })
+
+  it('shares dedup state with warnNoOp keys', () => {
+    warnNoOp('ItemView', 'addAction')
+    warnOnce('no-op::ItemView::addAction', 'should be suppressed')
+
+    expect(warn).toHaveBeenCalledOnce()
+  })
+})
+
+describe('debugOnce', () => {
+  let debug: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    resetLogDedup()
+    debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    debug.mockRestore()
+  })
+
+  it('logs at debug level, once per key', () => {
+    debugOnce('workspace-shim::splitPane', 'split panes are not supported, opened a new tab instead')
+    debugOnce('workspace-shim::splitPane', 'split panes are not supported, opened a new tab instead')
+
+    expect(debug).toHaveBeenCalledOnce()
   })
 })

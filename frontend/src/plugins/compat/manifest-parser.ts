@@ -8,9 +8,16 @@
  */
 
 import { z } from 'zod';
+import { OBSIDIAN_API_VERSION } from './obsidian-api-extensions';
 
-/** Emulated Obsidian API version used for compatibility checks */
-export const EMULATED_OBSIDIAN_VERSION = '1.4.0';
+/**
+ * Emulated Obsidian API version used for compatibility checks.
+ * Re-exports OBSIDIAN_API_VERSION (obsidian-api-extensions.ts) rather than
+ * declaring its own copy — two constants for the same fact is exactly how the
+ * View/Component compat bugs happened (fix applied in one place, silently
+ * absent from the other).
+ */
+export const EMULATED_OBSIDIAN_VERSION = OBSIDIAN_API_VERSION;
 
 /** Maximum allowed manifest file size in bytes (1 MB) */
 const DEFAULT_MAX_SIZE_BYTES = 1_048_576;

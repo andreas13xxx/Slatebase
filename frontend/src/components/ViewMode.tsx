@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm'
 import remarkFrontmatter from 'remark-frontmatter'
 import { parse as parseYaml } from 'yaml'
 import hljs from 'highlight.js'
+import DOMPurify from 'dompurify'
 import {
   Hash, Pencil as PencilIcon, Info, Lightbulb, AlertTriangle, Zap, Bug, List as ListIcon,
   Quote, Check, HelpCircle, X as XIcon, ClipboardList,
@@ -14,8 +15,10 @@ import type { Root, RootContent, PhrasingContent, AlignType } from 'mdast'
 import type { DirectoryTree } from '../types'
 import { AppContext } from '../state'
 import { requestHoverPreview, dismissHoverPreview } from '../plugins/compat/hover-link-bus'
+import { warnOnce } from '../plugins/compat/log'
 import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, remarkBreaks, remarkBlockRef, remarkPreserveTableCodeEscapes, createAnchorTracker } from '../plugins'
 import type { WikilinkNode, EmbedNode, CalloutNode, TagNode } from '../plugins'
+import { INLINE_HTML_OPEN_TAG_RE, INLINE_HTML_CLOSE_TAG_RE, parseInlineHtmlAttrs, parseStyleString } from '../plugins/inline-html'
 import { PdfViewer } from './BinaryViewer'
 import { MermaidRenderer } from './MermaidRenderer'
 
@@ -186,7 +189,7 @@ function createSafePipeline(content: string): Root {
     try {
       pipeline = pipeline.use(plugin) as unknown as typeof pipeline
     } catch (err) {
-      console.warn('Obsidian plugin failed to register, skipping:', err)
+      warnOnce(`ViewMode.pluginRegister::${plugin.name || 'anonymous'}`, `Obsidian plugin "${plugin.name || 'anonymous'}" failed to register, skipping:`, err)
     }
   }
 
@@ -195,7 +198,7 @@ function createSafePipeline(content: string): Root {
     // runSync executes transformers (e.g., remarkCallout, remarkBreaks) on the parsed tree
     return pipeline.runSync(tree) as Root
   } catch (err) {
-    console.warn('Pipeline parse/run failed, falling back to base pipeline:', err)
+    warnOnce('ViewMode.pipelineParseFailed', 'Pipeline parse/run failed, falling back to base pipeline:', err)
     // Fallback: parse without any Obsidian plugins
     return unified()
       .use(remarkParse)
@@ -730,8 +733,12 @@ function renderBlockNode(
       return createElement('hr', { key })
 
     case 'html':
-      // Render raw HTML as plain text for safety (Req 5.7)
-      return createElement('pre', { key, className: 'view-mode-html' }, node.value)
+      // Raw HTML blocks are sanitized (DOMPurify) before being rendered as real DOM.
+      return createElement('div', {
+        key,
+        className: 'view-mode-html',
+        dangerouslySetInnerHTML: { __html: DOMPurify.sanitize(node.value) },
+      })
 
     case 'definition':
       // Link definitions are not rendered visually
@@ -942,6 +949,42 @@ function renderTable(
 /**
  * Renders an array of phrasing (inline) MDAST nodes.
  */
+
+/**
+ * Looks for a matching closing tag for an inline HTML opening tag at `openIndex`,
+ * honoring same-tag nesting depth. Returns null if the tag isn't allowlisted or
+ * has no matching close (in which case it falls back to literal text).
+ */
+function matchInlineHtmlPair(
+  nodes: PhrasingContent[],
+  openIndex: number
+): { tagName: string; attrs: Record<string, string>; closeIndex: number } | null {
+  const openNode = nodes[openIndex] as unknown as { type: 'html'; value: string }
+  const openMatch = INLINE_HTML_OPEN_TAG_RE.exec(openNode.value.trim())
+  if (!openMatch) return null
+  const tagName = openMatch[1]!.toLowerCase()
+  const attrs = parseInlineHtmlAttrs(tagName, openMatch[2] ?? '')
+  if (attrs === null) return null
+
+  let depth = 1
+  for (let j = openIndex + 1; j < nodes.length; j++) {
+    const n = nodes[j]!
+    if (n.type !== 'html') continue
+    const value = (n as unknown as { value: string }).value.trim()
+    const openInner = INLINE_HTML_OPEN_TAG_RE.exec(value)
+    if (openInner && openInner[1]!.toLowerCase() === tagName) {
+      depth++
+      continue
+    }
+    const closeInner = INLINE_HTML_CLOSE_TAG_RE.exec(value)
+    if (closeInner && closeInner[1]!.toLowerCase() === tagName) {
+      depth--
+      if (depth === 0) return { tagName, attrs, closeIndex: j }
+    }
+  }
+  return null
+}
+
 function renderPhrasingNodes(
   nodes: PhrasingContent[],
   vaultId: string,
@@ -951,7 +994,30 @@ function renderPhrasingNodes(
   token?: string,
   onTagClick?: (tag: string) => void
 ): ReactNode[] {
-  return nodes.map((node, i) => renderPhrasingNode(node, vaultId, directoryTree, onInternalLinkClick, `${keyPrefix}-${i}`, token, onTagClick))
+  const result: ReactNode[] = []
+  let i = 0
+  while (i < nodes.length) {
+    const node = nodes[i]!
+    const pair = node.type === 'html' ? matchInlineHtmlPair(nodes, i) : null
+    if (pair) {
+      const { tagName, attrs, closeIndex } = pair
+      const key = `${keyPrefix}-${i}`
+      const props: Record<string, unknown> = { key }
+      for (const [name, value] of Object.entries(attrs)) {
+        props[name === 'style' ? 'style' : name] = name === 'style' ? parseStyleString(value) : value
+      }
+      result.push(createElement(
+        tagName,
+        props,
+        renderPhrasingNodes(nodes.slice(i + 1, closeIndex), vaultId, directoryTree, onInternalLinkClick, key, token, onTagClick)
+      ))
+      i = closeIndex + 1
+      continue
+    }
+    result.push(renderPhrasingNode(node, vaultId, directoryTree, onInternalLinkClick, `${keyPrefix}-${i}`, token, onTagClick))
+    i++
+  }
+  return result
 }
 
 /**
@@ -1010,9 +1076,15 @@ function renderPhrasingNode(
       // Req 7.6: Show placeholder for images not found
       return renderImage(node.url, node.alt, vaultId, directoryTree, key, token)
 
-    case 'html':
-      // Inline HTML rendered as plain text for safety
+    case 'html': {
+      // Paired/allowlisted tags are handled by renderPhrasingNodes' matchInlineHtmlPair
+      // before individual nodes reach here. This branch is the fallback for everything
+      // else (unmatched, unpaired, or non-allowlisted tags) — rendered as literal text
+      // for safety — plus the `<br>` void tag, which has no closing counterpart to pair.
+      const trimmed = node.value.trim()
+      if (/^<br\s*\/?>$/i.test(trimmed)) return createElement('br', { key })
       return node.value
+    }
 
     case 'footnoteReference':
       return createElement('sup', { key, className: 'view-mode-footnote-ref' },

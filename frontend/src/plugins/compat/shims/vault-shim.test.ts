@@ -413,6 +413,73 @@ describe('VaultShim', () => {
     it('rejects create with path traversal', async () => {
       await expect(vault.create('../hack.md', 'evil')).rejects.toThrow('path traversal');
     });
+
+    it('returns a TFile that passes `instanceof obsidian.TFile` (plugins like LiveSync check this on create events)', async () => {
+      class FakeTFile {}
+      (window as unknown as { obsidian: { TFile: typeof FakeTFile } }).obsidian = { TFile: FakeTFile };
+      try {
+        const mockSave = vi.fn().mockResolvedValue({ path: 'drawing.excalidraw.md', name: 'drawing.excalidraw.md', size: 5 });
+        apiClient = createMockApiClient({ saveFile: mockSave });
+        vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+
+        const result = await vault.create('drawing.excalidraw.md', 'content');
+        expect(result).toBeInstanceOf(FakeTFile);
+      } finally {
+        delete (window as unknown as { obsidian?: unknown }).obsidian;
+      }
+    });
+
+    it('opens a tab for a newly created file', async () => {
+      const openFileDirectly = vi.fn();
+      (window as unknown as { app: { workspace: { openFileDirectly: typeof openFileDirectly } } }).app = {
+        workspace: { openFileDirectly },
+      };
+      try {
+        const mockSave = vi.fn().mockResolvedValue({ path: 'new-file.md', name: 'new-file.md', size: 5 });
+        apiClient = createMockApiClient({ saveFile: mockSave });
+        vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+
+        await vault.create('new-file.md', 'hello');
+        expect(openFileDirectly).toHaveBeenCalledWith('new-file.md');
+      } finally {
+        delete (window as unknown as { app?: unknown }).app;
+      }
+    });
+
+    it('opens a tab for a file that already existed', async () => {
+      const openFileDirectly = vi.fn();
+      (window as unknown as { app: { workspace: { openFileDirectly: typeof openFileDirectly } } }).app = {
+        workspace: { openFileDirectly },
+      };
+      try {
+        apiClient = createMockApiClient();
+        vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+
+        await vault.create('notes/hello.md', 'content');
+        expect(openFileDirectly).toHaveBeenCalledWith('notes/hello.md');
+      } finally {
+        delete (window as unknown as { app?: unknown }).app;
+      }
+    });
+  });
+
+  describe('createFolder()', () => {
+    it('returns a TFolder that passes `instanceof obsidian.TFolder`', async () => {
+      class FakeTFolder {}
+      (window as unknown as { obsidian: { TFolder: typeof FakeTFolder } }).obsidian = { TFolder: FakeTFolder };
+      try {
+        apiClient = createMockApiClient({
+          saveFile: vi.fn().mockResolvedValue({ path: '', name: '', size: 0 }),
+          deleteContent: vi.fn().mockResolvedValue(undefined),
+        });
+        vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+
+        const result = await vault.createFolder('new-folder');
+        expect(result).toBeInstanceOf(FakeTFolder);
+      } finally {
+        delete (window as unknown as { obsidian?: unknown }).obsidian;
+      }
+    });
   });
 
   describe('delete()', () => {

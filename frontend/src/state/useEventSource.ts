@@ -7,6 +7,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import type { Dispatch } from 'react'
 import { computeReconnectDelay } from './realtimeActions'
 import type { RealtimeAction, ConnectionStatus } from './realtimeState'
+import { warnOnce } from '../plugins/compat/log'
 
 /** Shape of an incoming SSE event's parsed data field. */
 export interface SseEventData {
@@ -144,8 +145,8 @@ export function useEventSource(options: UseEventSourceOptions): void {
           const data = JSON.parse(event.data as string) as SseEventData
           onEventRef.current(data.type, data)
         } catch (err) {
-          // On parse error: log and skip, continue listening
-          console.warn('[useEventSource] Failed to parse SSE event data:', err)
+          // On parse error: log (once — a broken stream can emit many of these) and skip, continue listening
+          warnOnce('useEventSource.parseError', '[useEventSource] Failed to parse SSE event data:', err)
         }
       }
 
@@ -162,7 +163,7 @@ export function useEventSource(options: UseEventSourceOptions): void {
           const data = JSON.parse(event.data as string) as SseEventData
           onEventRef.current(event.type, data)
         } catch (err) {
-          console.warn('[useEventSource] Failed to parse SSE event data:', err)
+          warnOnce('useEventSource.parseError', '[useEventSource] Failed to parse SSE event data:', err)
         }
       }
 

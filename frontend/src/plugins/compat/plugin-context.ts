@@ -33,6 +33,7 @@ import type { IRegistryApiClient, PluginRegistryData } from './plugin-registry'
 import { PluginSandbox } from './sandbox'
 import { CommandRegistry } from './command-registry'
 import type { ICommandRegistry } from './command-registry'
+import { registerCoreEditorCommands } from './core-commands'
 import { SettingsManager } from './settings-manager'
 import type { ISettingsApiClient } from './settings-manager'
 import { SettingTabRegistry } from './setting-tab-registry'
@@ -45,17 +46,16 @@ import { clearApiGaps } from './api-gap-registry'
 import type { ICompatibilityAnalyzer } from './compatibility-analyzer'
 import { VaultShim } from './shims/vault-shim'
 import { WorkspaceShim } from './shims/workspace-shim'
+import { setActiveWorkspaceShim } from './active-workspace-shim'
 import { MetadataCacheShim } from './shims/metadata-cache-shim'
 import { FileManagerShim } from './shims/file-manager-shim'
-import type { IVaultShim } from './types'
 import { registerFileViewMatcher, unregisterAllFileViewMatchersForPlugin, removeActiveFileViewsForPlugin, registerExtensionsForPlugin } from './file-view-registry'
 import { registerCodeBlockProcessor, registerPostProcessor, unregisterAllForPlugin as unregisterAllCodeBlocksForPlugin } from './code-block-processor-registry'
-import { AppShim } from './shims/app-shim'
+import { warnNoOp } from './log'
+import { AppShim, createCommandManager, createHotkeyManager } from './shims/app-shim'
 import { setEditorViewAccessor } from './editor-shim'
 import { getActiveEditorView, registerPluginExtension, removePluginExtensions, registerPluginCompletionSource, removePluginCompletionSources } from '../../editor/plugin-extensions'
-import { registerMarkdownViewGlobal } from './shims/markdown-view-shim'
 import { registerMarkdownRendererGlobal } from './shims/markdown-renderer-shim'
-import { registerSuggestModalGlobals } from './shims/suggest-modal-shim'
 import { usePluginEventBridge } from './plugin-event-bridge'
 import { ViewRegistry } from './view-registry'
 import type { ItemView, WorkspaceLeaf } from './view-registry'
@@ -92,6 +92,11 @@ import type { RibbonIconEntry } from './ribbon-icon-registry'
 // cycle to break here, and the module is already statically bundled via App.tsx.
 // Importing it dynamically only delayed every Notice() by a microtask.
 import { showToast } from '../../components/ToastNotification'
+
+/** Reads the global `window.app` stub installed by installObsidianGlobals/AppShim. */
+function getWindowApp(): { internalPlugins?: unknown; plugins?: unknown; embedRegistry?: unknown; getAccentColor?: () => string } | undefined {
+  return (window as unknown as { app?: { internalPlugins?: unknown; plugins?: unknown; embedRegistry?: unknown; getAccentColor?: () => string } }).app
+}
 
 // ─── Context Value ───────────────────────────────────────────────────────────
 
@@ -240,6 +245,11 @@ export function PluginProvider({
   const metadataCacheShimRef = useRef<MetadataCacheShim | null>(null)
   const vaultShimRef = useRef<VaultShim | null>(null)
 
+  // Kept up to date by an effect below (needs tabDispatch/tabState) so the
+  // built-in "markdown" view type registered in handleVaultSwitch can drop the
+  // active tab out of a plugin's file view without capturing stale closures.
+  const requestSourceViewRef = useRef<() => void>(() => {})
+
   /** Remove all UI registrations owned by one plugin instance. */
   async function cleanupPluginRegistrations(pluginId: string): Promise<void> {
     commandRegistryRef.current.removeAllForPlugin(pluginId)
@@ -254,6 +264,30 @@ export function PluginProvider({
     removePluginCompletionSources(pluginId)
     // Remove code block processors and post-processors for this plugin
     unregisterAllCodeBlocksForPlugin(pluginId)
+  }
+
+  /**
+   * Deactivate one plugin for a normal (responsive-plugin) teardown.
+   *
+   * Closes the plugin's own views *before* calling unloadPlugin(), not after.
+   * A well-behaved plugin's onunload() (e.g. Excalidraw) detaches its own
+   * leaves as fire-and-forget async work it never awaits — if we instead ran
+   * unloadPlugin() first and closed leftover views afterward (the old order),
+   * our onClose() could land on the same view while the plugin's own teardown
+   * was still mid-flight, hitting state the plugin had already nulled out.
+   * Closing views first means that fire-and-forget call finds nothing left to
+   * do. Not used for the auto-deactivate-on-hang path, where the plugin can't
+   * be trusted to let an awaited close finish.
+   */
+  async function deactivatePluginSafely(
+    loader: PluginLoader,
+    pluginId: string,
+    notifyStatusChange = true
+  ): Promise<void> {
+    await removeActiveFileViewsForPlugin(pluginId)
+    await viewRegistryRef.current.detachAllForPlugin(pluginId)
+    await loader.unloadPlugin(pluginId, notifyStatusChange)
+    await cleanupPluginRegistrations(pluginId)
   }
 
   // ─── Track mount state to avoid post-unmount state updates ────────────────
@@ -283,6 +317,7 @@ export function PluginProvider({
         sandboxRef.current = null
         settingsManagerRef.current = null
         workspaceShimRef.current = null
+        setActiveWorkspaceShim(null)
         metadataCacheShimRef.current = null
         vaultShimRef.current = null
         pluginSystemVaultIdRef.current = null
@@ -310,6 +345,7 @@ export function PluginProvider({
    * create new vault-scoped instances, reload plugins.
    */
   async function handleVaultSwitch(newVaultId: string): Promise<void> {
+    console.info(`[PluginProvider] Vault switch: rebuilding plugin registry for vault "${newVaultId}"`)
     pluginSystemVaultIdRef.current = null
 
     // 1. Unload all plugins from the old loader (if any)
@@ -359,11 +395,46 @@ export function PluginProvider({
     const newWorkspaceShim = new WorkspaceShim()
     const newMetadataCacheShim = new MetadataCacheShim(directoryTree)
     workspaceShimRef.current = newWorkspaceShim
+    setActiveWorkspaceShim(newWorkspaceShim)
     metadataCacheShimRef.current = newMetadataCacheShim
 
     // Create a fresh ViewRegistry for this vault and wire it to the WorkspaceShim
     const newViewRegistry = new ViewRegistry()
     viewRegistryRef.current = newViewRegistry
+
+    // Built-in "markdown" view type — real Obsidian's core view. Plugins switch a
+    // leaf to it directly (Kanban's "Open as Markdown" menu item calls
+    // `leaf.setViewState({ type: 'markdown', ... })` on its own leaf), which
+    // otherwise hits "No view registered for type 'markdown'" and silently no-ops.
+    // Slatebase has no leaf-hosted markdown view of its own — the raw file is
+    // rendered by the tab's edit mode instead — so this creator's only job is to
+    // drop the active tab out of the plugin's file view and hand back an inert
+    // stand-in view for the leaf's own bookkeeping.
+    newViewRegistry.registerView('markdown', (leaf) => {
+      requestSourceViewRef.current()
+      return {
+        containerEl: document.createElement('div'),
+        contentEl: document.createElement('div'),
+        app: leaf.app,
+        leaf,
+        getViewType: () => 'markdown',
+        getDisplayText: () => 'Markdown',
+        getIcon: () => 'document',
+        onOpen: async () => {},
+        onClose: async () => {},
+        onload: () => {},
+        onunload: () => {},
+        addAction: () => document.createElement('div'),
+        // Duck-typed as file-backed (see setOnViewActivated below) so it's
+        // treated like Kanban's TextFileView and never surfaces in the
+        // plugin-view sidebar — it renders nothing of its own.
+        getViewData: () => '',
+        setViewData: () => {},
+        requestSave: () => {},
+        setState: async () => {},
+      } as unknown as ItemView
+    }, 'core')
+
     newViewRegistry.setOnViewActivated((viewType: string, view: ItemView) => {
       // Open a tab for main-location plugin views (LiveSync Log, etc.)
       // Skip for TextFileView-based views (Kanban) — they render inside an existing file tab.
@@ -400,7 +471,6 @@ export function PluginProvider({
       })
     })
     newViewRegistry.setOnSidebarViewActivated((viewType: string, view: ItemView, leaf: WorkspaceLeaf) => {
-      console.log('[PluginProvider] Sidebar view activated:', viewType, view.getDisplayText())
       setSidebarViews(prev => {
         const next = new Map(prev)
         next.set(viewType, {
@@ -431,10 +501,27 @@ export function PluginProvider({
     newVaultShim.onFileRead = (path: string, content: string) => {
       newMetadataCacheShim.populateFromContent(path, content)
     }
+    // Includes fileManager/commands/hotkeyManager, not just vault/workspace/metadataCache:
+    // this object becomes `leaf.app`, which ItemView's constructor copies to `this.app`
+    // (see view-registry.ts). Plugin views (Kanban's list/table view switch, etc.) call
+    // `this.app.fileManager.processFrontMatter(...)` directly, so a leaf app missing
+    // fileManager crashes with "fileManager is undefined" the moment such a view is opened.
+    // internalPlugins/plugins/embedRegistry are pulled from window.app (set up by
+    // installObsidianGlobals/AppShim) rather than re-stubbed here, so a view's `this.app`
+    // (e.g. Excalidraw's) shares the same registries as every plugin's onload-time `app` —
+    // without this, `this.app.internalPlugins.plugins` and `this.app.plugins.getPlugin(id)`
+    // threw/returned undefined inside opened views even though they worked during onload().
     const sharedApp = {
       vault: newVaultShim,
       workspace: newWorkspaceShim,
       metadataCache: newMetadataCacheShim,
+      fileManager: new FileManagerShim(newVaultShim),
+      commands: createCommandManager(commandRegistryRef.current),
+      hotkeyManager: createHotkeyManager(commandRegistryRef.current),
+      get internalPlugins() { return getWindowApp()?.internalPlugins },
+      get plugins() { return getWindowApp()?.plugins },
+      get embedRegistry() { return getWindowApp()?.embedRegistry },
+      getAccentColor: () => getWindowApp()?.getAccentColor?.() ?? '#7c3aed',
     }
     newWorkspaceShim.setViewRegistry(newViewRegistry, sharedApp)
 
@@ -443,16 +530,18 @@ export function PluginProvider({
 
     // Install the base obsidian namespace before the context-specific shims
     // below layer onto it. Idempotent — the PluginLoader calls it too.
+    // MarkdownView is registered here too (guarded, Component-chain based) —
+    // there is no separate registerMarkdownViewGlobal() call layered on top,
+    // since a second, disconnected MarkdownView class would defeat the point:
+    // instanceof checks and inherited registerEvent/registerDomEvent/addChild
+    // only work if every plugin gets the SAME class.
     installObsidianGlobals()
-
-    // Register MarkdownView on window.obsidian for instanceof checks
-    registerMarkdownViewGlobal()
 
     // Register MarkdownRenderer on window.obsidian for render() calls
     registerMarkdownRendererGlobal()
 
-    // Register Modal/SuggestModal/FuzzySuggestModal on window.obsidian
-    registerSuggestModalGlobals()
+    // Modal/SuggestModal/FuzzySuggestModal are registered by installObsidianGlobals()
+    // above (guarded, Modal-extending) — no separate registration layered on top.
 
     // Register Notice bridge on window so the require()-shim can call showToast
     // eslint-disable-next-line react-hooks/immutability
@@ -469,6 +558,11 @@ export function PluginProvider({
       return { editor: activeEditorInfo.editor, file }
     })
 
+    // Register Obsidian's built-in `editor:*` commands (toggle-code, toggle-checklist-status, ...)
+    // so plugins calling app.commands.executeCommandById('editor:...') find a real command
+    // instead of silently no-oping. Idempotent — safe to re-run on every vault switch.
+    registerCoreEditorCommands(commandRegistryRef.current)
+
     // Update window.app to reference the real shim instances
     // (many plugins and libraries like obsidian-daily-notes-interface access window.app directly)
     const windowApp = (window as unknown as { app: Record<string, unknown> }).app
@@ -480,9 +574,22 @@ export function PluginProvider({
       // eslint-disable-next-line react-hooks/immutability
       windowApp.metadataCache = sharedApp.metadataCache
       // eslint-disable-next-line react-hooks/immutability
-      windowApp.fileManager = new FileManagerShim(sharedApp.vault as IVaultShim)
+      windowApp.fileManager = sharedApp.fileManager
+      // The shim's real command manager, not an empty stub: it was being
+      // overwritten here with one whose executeCommand() did nothing and whose
+      // command list was always empty, so plugins reaching commands through
+      // `window.app` (Kanban patches executeCommand, editing-toolbar reads
+      // findCommand at startup) saw a different, dead registry than the one
+      // behind their own `this.app.commands`.
+      // The real command manager, not an empty stub: this was being overwritten
+      // with one whose executeCommand() did nothing and whose command list was
+      // always empty, so plugins reaching commands through `window.app` (Kanban
+      // patches executeCommand, editing-toolbar reads findCommand at startup)
+      // saw a different, dead registry than the one behind `this.app.commands`.
       // eslint-disable-next-line react-hooks/immutability
-      windowApp.commands = { commands: {}, executeCommand: () => {} }
+      windowApp.commands = createCommandManager(commandRegistryRef.current)
+      // eslint-disable-next-line react-hooks/immutability
+      windowApp.hotkeyManager = createHotkeyManager(commandRegistryRef.current)
       // eslint-disable-next-line react-hooks/immutability
       windowApp.embedRegistry = { embedByExtension: { md: () => { const F = class {}; return { load(){}, unload(){}, editable: false, showEditor(){}, editMode: Object.create(Object.create(F.prototype)) } } } }
     }
@@ -503,6 +610,9 @@ export function PluginProvider({
       const dailyNotesPlugin = app?.internalPlugins?.plugins?.['daily-notes']
       if (dailyNotesPlugin?.instance?.options) {
         dailyNotesPlugin.instance.options.folder = config.dailyNotesDirectory || ''
+        dailyNotesPlugin.instance.options.template = config.dailyNoteTemplateName
+          ? `${config.templatesDirectory}/${config.dailyNoteTemplateName}`
+          : ''
       }
     }).catch(() => { /* vault config unavailable — keep defaults */ })
 
@@ -515,6 +625,7 @@ export function PluginProvider({
           workspace: newWorkspaceShim,
           metadataCache: newMetadataCacheShim,
           pluginId,
+          commandRegistry: commandRegistryRef.current,
         })
       },
       sandbox: newSandbox,
@@ -558,6 +669,16 @@ export function PluginProvider({
           }
           return commandRegistryRef.current.addCommand(pluginId, command)
         }
+        // Wire removeCommand to the same registry. Plugins that toggle a feature
+        // in their settings withdraw its command this way; leaving it a no-op
+        // keeps a dead entry in the command palette that then fails when run.
+        ;(instance as unknown as { removeCommand: (commandId: string) => void }).removeCommand = (commandId: string) => {
+          if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) return
+          // Obsidian accepts both the bare id and the `<plugin>:<id>` form.
+          const registry = commandRegistryRef.current
+          const qualified = commandId.includes(':') ? commandId : `${pluginId}:${commandId}`
+          registry.removeCommand(registry.getCommand(qualified) ? qualified : commandId)
+        }
         // Wire addSettingTab to route to the shared SettingTabRegistry
         instance.addSettingTab = (tab: unknown) => {
           if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) return
@@ -565,7 +686,6 @@ export function PluginProvider({
         }
         // Wire addRibbonIcon to route to the shared RibbonIconRegistry
         instance.addRibbonIcon = (icon: string, title: string, callback: () => void) => {
-          console.log(`[PluginProvider] addRibbonIcon called: pluginId="${pluginId}", icon="${icon}", title="${title}", guardCheck: vaultRef=${pluginSystemVaultIdRef.current}, newVaultId=${newVaultId}`)
           if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) {
             return document.createElement('div')
           }
@@ -573,7 +693,6 @@ export function PluginProvider({
         }
         // Wire registerView to route to the workspace shim's view registry
         ;(instance as unknown as { registerView: (viewType: string, creator: unknown) => void }).registerView = (viewType: string, creator: unknown) => {
-          console.log(`[PluginProvider] registerView called: viewType="${viewType}", pluginId="${pluginId}", guardCheck: vaultRef=${pluginSystemVaultIdRef.current}, newVaultId=${newVaultId}, registryMatch=${pluginRegistryRef.current === newRegistry}`)
           if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) return
           newWorkspaceShim.registerView(viewType, creator as (leaf: import('./view-registry').WorkspaceLeaf) => unknown, pluginId)
 
@@ -612,18 +731,29 @@ export function PluginProvider({
         }
         // Wire registerEditorExtension to route to the CM6 plugin extension manager
         ;(instance as unknown as { registerEditorExtension: (extension: unknown) => void }).registerEditorExtension = (extension: unknown) => {
-          console.log(`[PluginContext] registerEditorExtension called by "${pluginId}", extension:`, Array.isArray(extension) ? `Array(${(extension as unknown[]).length})` : typeof extension)
           if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) return
           registerPluginExtension(pluginId, extension as import('@codemirror/state').Extension)
         }
         // Wire registerEditorSuggest to route to the CM6 completion source registry
         ;(instance as unknown as { registerEditorSuggest: (suggest: unknown) => void }).registerEditorSuggest = (suggest: unknown) => {
           if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) return
-          // EditorSuggest plugins typically expose a provider function for autocomplete
-          const suggestObj = suggest as { provider?: unknown }
+          // Only a CM6-shaped `provider` can be bridged directly. Obsidian's own
+          // EditorSuggest interface is onTrigger/getSuggestions/renderSuggestion/
+          // selectSuggestion, which has no CM6 equivalent we translate yet — a
+          // plugin passing one registers successfully and then never suggests
+          // anything, so say so rather than accept it silently.
+          const suggestObj = suggest as { provider?: unknown; getSuggestions?: unknown }
           if (typeof suggestObj.provider === 'function') {
             registerPluginCompletionSource(pluginId, suggestObj.provider as import('@codemirror/autocomplete').CompletionSource)
+            return
           }
+          warnNoOp(
+            pluginId,
+            'registerEditorSuggest',
+            typeof suggestObj.getSuggestions === 'function'
+              ? "Obsidian's EditorSuggest interface is not translated to CodeMirror 6; this suggester will never appear."
+              : 'The suggester exposes neither a CodeMirror `provider` nor `getSuggestions`, so it cannot be wired up.',
+          )
         }
       },
     })
@@ -741,6 +871,10 @@ export function PluginProvider({
           if (dailyNotesPlugin?.instance?.options) {
             // eslint-disable-next-line react-hooks/immutability
             dailyNotesPlugin.instance.options.folder = config.dailyNotesDirectory || ''
+            // eslint-disable-next-line react-hooks/immutability
+            dailyNotesPlugin.instance.options.template = config.dailyNoteTemplateName
+              ? `${config.templatesDirectory}/${config.dailyNoteTemplateName}`
+              : ''
           }
         } catch {
           // Vault config unavailable — keep defaults (folder='')
@@ -771,8 +905,7 @@ export function PluginProvider({
     const loadedPlugins = loader.getPlugins()
     for (const [pluginId] of loadedPlugins) {
       try {
-        await loader.unloadPlugin(pluginId, false)
-        await cleanupPluginRegistrations(pluginId)
+        await deactivatePluginSafely(loader, pluginId, false)
       } catch (err) {
         console.error(`[PluginProvider] Error unloading plugin "${pluginId}":`, err)
       }
@@ -817,8 +950,7 @@ export function PluginProvider({
 
     if (!enabled) {
       if (loader.getRecord(pluginId)) {
-        await loader.unloadPlugin(pluginId)
-        await cleanupPluginRegistrations(pluginId)
+        await deactivatePluginSafely(loader, pluginId)
       } else {
         registry.updateStatus(pluginId, 'inactive')
       }
@@ -858,8 +990,7 @@ export function PluginProvider({
 
       await loader.loadPlugin(pluginId, bundle, manifest)
       if (!isCurrentContext()) {
-        await loader.unloadPlugin(pluginId, false)
-        await cleanupPluginRegistrations(pluginId)
+        await deactivatePluginSafely(loader, pluginId, false)
         throw new Error('Vault changed while enabling plugin')
       }
     }
@@ -870,8 +1001,7 @@ export function PluginProvider({
       await loader.activatePlugin(pluginId)
     }
     if (!isCurrentContext()) {
-      await loader.unloadPlugin(pluginId, false)
-      await cleanupPluginRegistrations(pluginId)
+      await deactivatePluginSafely(loader, pluginId, false)
       throw new Error('Vault changed while enabling plugin')
     }
     await registry.waitForPersistence()
@@ -895,6 +1025,20 @@ export function PluginProvider({
   // ─── TabViewBridge: connect plugin view lifecycle events to TabProvider ────
 
   const { tabDispatch } = useTabContext()
+
+  // Keeps the "markdown" view creator (registered in handleVaultSwitch, which
+  // closes over refs rather than this render's tabState/tabDispatch) pointed at
+  // the current tab list so it always toggles the actually-active tab.
+  useEffect(() => {
+    requestSourceViewRef.current = () => {
+      const tabId = tabState.activeTabId
+      if (!tabId) return
+      const tab = tabState.tabs.find(t => t.id === tabId)
+      if (tab && tab.mode !== 'edit') {
+        tabDispatch({ type: 'TOGGLE_MODE', payload: { tabId } })
+      }
+    }
+  }, [tabState, tabDispatch])
 
   useEffect(() => {
     const currentVaultId = vaultId
@@ -1035,10 +1179,20 @@ export function PluginProvider({
       const workspace = workspaceShimRef.current
       const viewRegistry = workspace?.getViewRegistry() ?? viewRegistryRef.current
       if (!viewRegistry || !workspace) return null
+      // See the `sharedApp` construction above for why fileManager/commands/hotkeyManager
+      // (and internalPlugins/plugins/embedRegistry) must be included here too — this
+      // becomes `leaf.app` / `this.app` inside the view.
       const sharedApp = {
         vault: vaultShimRef.current,
         workspace,
         metadataCache: metadataCacheShimRef.current,
+        fileManager: vaultShimRef.current ? new FileManagerShim(vaultShimRef.current) : undefined,
+        commands: createCommandManager(commandRegistryRef.current),
+        hotkeyManager: createHotkeyManager(commandRegistryRef.current),
+        get internalPlugins() { return getWindowApp()?.internalPlugins },
+        get plugins() { return getWindowApp()?.plugins },
+        get embedRegistry() { return getWindowApp()?.embedRegistry },
+        getAccentColor: () => getWindowApp()?.getAccentColor?.() ?? '#7c3aed',
       }
       const leaf = viewRegistry.createLeaf(sharedApp, 'main')
       await leaf.setViewState({ type: viewType, state: { file: filePath } })

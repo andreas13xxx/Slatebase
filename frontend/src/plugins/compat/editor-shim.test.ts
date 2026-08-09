@@ -87,3 +87,103 @@ describe('EditorShim CM6 operations are synchronous', () => {
     expect(plainEditor.getValue()).toBe('plain')
   })
 })
+
+describe('EditorShim toolbar formatting commands', () => {
+  let view: EditorView
+  let editor: EditorShim
+
+  const setDoc = (doc: string) => {
+    view.setState(EditorState.create({ doc, extensions: [history()] }))
+  }
+
+  beforeEach(() => {
+    view = new EditorView({
+      state: EditorState.create({ doc: '', extensions: [history()] }),
+      parent: document.body,
+    })
+    setEditorViewAccessor(() => view)
+    editor = new EditorShim()
+  })
+
+  afterEach(() => {
+    view.destroy()
+    setEditorViewAccessor(() => null)
+  })
+
+  it('toggleMarkdownFormatting("bold") wraps a selection, then unwraps it on repeat', () => {
+    setDoc('hello world')
+    editor.setSelection({ line: 0, ch: 0 }, { line: 0, ch: 5 })
+
+    editor.toggleMarkdownFormatting('bold')
+    expect(editor.getValue()).toBe('**hello** world')
+
+    editor.setSelection({ line: 0, ch: 2 }, { line: 0, ch: 7 })
+    editor.toggleMarkdownFormatting('bold')
+    expect(editor.getValue()).toBe('hello world')
+  })
+
+  it('toggleMarkdownFormatting("italic") inserts an empty pair at the cursor when nothing is selected', () => {
+    setDoc('hello')
+    editor.setCursor({ line: 0, ch: 5 })
+
+    editor.toggleMarkdownFormatting('italic')
+
+    expect(editor.getValue()).toBe('hello**')
+    expect(editor.getCursor().ch).toBe(6)
+  })
+
+  it('toggleMarkdownFormatting("code") wraps a selection in backticks, then unwraps it on repeat', () => {
+    setDoc('hello world')
+    editor.setSelection({ line: 0, ch: 0 }, { line: 0, ch: 5 })
+
+    editor.toggleMarkdownFormatting('code')
+    expect(editor.getValue()).toBe('`hello` world')
+
+    editor.setSelection({ line: 0, ch: 1 }, { line: 0, ch: 6 })
+    editor.toggleMarkdownFormatting('code')
+    expect(editor.getValue()).toBe('hello world')
+  })
+
+  it('toggleBulletList() adds and removes "- " prefixes across selected lines', () => {
+    setDoc('one\ntwo\nthree')
+    editor.setSelection({ line: 0, ch: 0 }, { line: 2, ch: 5 })
+
+    editor.toggleBulletList()
+    expect(editor.getValue()).toBe('- one\n- two\n- three')
+
+    editor.toggleBulletList()
+    expect(editor.getValue()).toBe('one\ntwo\nthree')
+  })
+
+  it('toggleNumberList() numbers selected lines sequentially', () => {
+    setDoc('a\nb\nc')
+    editor.setSelection({ line: 0, ch: 0 }, { line: 2, ch: 1 })
+
+    editor.toggleNumberList()
+
+    expect(editor.getValue()).toBe('1. a\n2. b\n3. c')
+  })
+
+  it('toggleCheckList() adds an unchecked box, then toggles it off', () => {
+    setDoc('todo item')
+    editor.setSelection({ line: 0, ch: 0 }, { line: 0, ch: 9 })
+
+    editor.toggleCheckList()
+    expect(editor.getValue()).toBe('- [ ] todo item')
+
+    editor.toggleCheckList()
+    expect(editor.getValue()).toBe('todo item')
+  })
+
+  it('indentList() and unindentList() add/remove one indent level', () => {
+    setDoc('- item')
+    editor.setSelection({ line: 0, ch: 0 }, { line: 0, ch: 0 })
+
+    editor.indentList()
+    expect(editor.getValue()).not.toBe('- item')
+    expect(editor.getValue().endsWith('- item')).toBe(true)
+
+    editor.unindentList()
+    expect(editor.getValue()).toBe('- item')
+  })
+})

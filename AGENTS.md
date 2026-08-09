@@ -89,3 +89,9 @@ Filesystem-based, no database. All under `backend/data/`:
 - New remark plugins: `block-ref/`, `breaks/`, `preserve-table-code-escapes.ts`
 - `@modelcontextprotocol/sdk` is a backend dependency (MCP transport)
 - Frontend uses Zod 4 (`zod@4.4.3`), backend uses Zod 3 (`zod@^3.24.0`)
+- Obsidian's view/modal classes live only in `plugins/compat/install-globals.ts` — the separate `suggest-modal*.ts` / `markdown-view-shim.ts` modules are gone; don't reintroduce a parallel definition
+- Console output in the compat layer goes through `plugins/compat/log.ts` (`debug*` = intended trade-off, `warn*` = real gap, `*Once` for render/event paths) — `no-op-warning.ts` is gone
+- Core Obsidian command IDs are registered in `core-commands.ts` (editor-only) and `core-commands-app.ts` (needs React state, wired by `CommandPaletteContainer`)
+- Raw HTML is allowlist-only (`plugins/inline-html.ts`), shared by Live Preview and reading view — never widen it on one side alone
+- `erasableSyntaxOnly` is on in the frontend: no constructor parameter properties, no `enum`, no namespaces
+- A `.githooks/pre-commit` hook runs lint + `tsc` for both packages before every commit

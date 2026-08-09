@@ -91,11 +91,22 @@ export interface IWorkspaceShim {
 // ─── Obsidian-compatible data models ───────────────────────────────────────────
 
 /**
+ * DataWriteOptions — optional metadata for vault write operations (Obsidian
+ * 1.4.4+). Slatebase accepts these so plugins passing them don't hit an arity
+ * mismatch, but does not persist custom mtime/ctime — the backend always
+ * stamps writes with the actual write time.
+ */
+export interface DataWriteOptions {
+  mtime?: number;
+  ctime?: number;
+}
+
+/**
  * IVaultShim — Obsidian-compatible Vault interface subset.
  */
 export interface IVaultShim {
   read(file: TFile): Promise<string>;
-  modify(file: TFile, content: string): Promise<void>;
+  modify(file: TFile, content: string, options?: DataWriteOptions): Promise<void>;
   create(path: string, content?: string): Promise<TFile>;
   createFolder(path: string): Promise<TFolder>;
   delete(file: TAbstractFile): Promise<void>;
@@ -429,5 +440,10 @@ export interface IAppShim {
     plugins: Record<string, PluginInstance>;
     enabledPlugins: Set<string>;
     getPlugin(id: string): PluginInstance | undefined;
+  };
+  setting: {
+    open(): void;
+    close(): void;
+    openTabById(id: string): boolean;
   };
 }

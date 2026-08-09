@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { WorkspaceShim } from './workspace-shim';
 import { clearApiGaps } from '../api-gap-registry';
 import { ItemView, ViewRegistry } from '../view-registry';
+import { resetLogDedup } from '../log';
 import type { TFile } from '../types';
 
 function createMockTFile(path: string): TFile {
@@ -29,6 +30,20 @@ describe('WorkspaceShim', () => {
     // api-gap-registry rather than per shim instance, so tests must reset it to
     // stay independent of each other's non-emulated accesses.
     clearApiGaps();
+    // Several WorkspaceShim warnings/notices are deduped session-wide via the
+    // shared log module — reset so tests don't see each other's dedup state.
+    resetLogDedup();
+  });
+
+  describe('leftRibbon / rightRibbon', () => {
+    it('exposes hide/show/toggle as no-ops instead of leaving the property undefined', () => {
+      expect(() => workspace.leftRibbon.hide()).not.toThrow();
+      expect(() => workspace.leftRibbon.show()).not.toThrow();
+      expect(() => workspace.leftRibbon.toggle()).not.toThrow();
+      expect(() => workspace.rightRibbon.hide()).not.toThrow();
+      expect(() => workspace.rightRibbon.show()).not.toThrow();
+      expect(() => workspace.rightRibbon.toggle()).not.toThrow();
+    });
   });
 
   describe('R6.1: getActiveFile() returns TFile when a file tab is active', () => {
@@ -322,6 +337,25 @@ describe('WorkspaceShim', () => {
 
         expect(leaf.view?.containerEl.dataset.pluginId).toBe('test-plugin');
       });
+
+      it('opens a tab for a TextFileView-based view activated via setViewState (e.g. a new Kanban board)', async () => {
+        // Duck-typed TextFileView: has getViewData/setViewData/requestSave.
+        class FakeTextFileView extends ItemView {
+          getViewData(): string { return ''; }
+          setViewData(): void { /* no-op */ }
+          requestSave(): void { /* no-op */ }
+          async setState(): Promise<void> { /* no-op, skip real file loading */ }
+        }
+        registry.registerView('kanban', (leaf) => new FakeTextFileView(leaf), 'kanban-plugin');
+
+        const openFileDirectly = vi.fn();
+        workspace.setViewRegistry(registry, { workspace: { openFileDirectly } });
+
+        const leaf = workspace.getLeaf(true);
+        await leaf.setViewState({ type: 'kanban', state: { file: 'boards/new-board.md' } });
+
+        expect(openFileDirectly).toHaveBeenCalledWith('boards/new-board.md');
+      });
     });
 
     describe('getRightLeaf()', () => {
@@ -392,34 +426,34 @@ describe('WorkspaceShim', () => {
     });
 
     describe('createLeafBySplit()', () => {
-      it('should create a new leaf and log info about no split support', () => {
-        const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+      it('should create a new leaf and log a debug notice about no split support', () => {
+        const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
         const existingLeaf = workspace.getLeaf(true);
         const newLeaf = workspace.createLeafBySplit(existingLeaf);
 
         expect(newLeaf).toBeDefined();
         expect(newLeaf.location).toBe('main');
         expect(newLeaf).not.toBe(existingLeaf);
-        expect(infoSpy).toHaveBeenCalledWith(
+        expect(debugSpy).toHaveBeenCalledWith(
           '[WorkspaceShim] createLeafBySplit: Slatebase does not support split panes — created new tab instead.'
         );
 
-        infoSpy.mockRestore();
+        debugSpy.mockRestore();
       });
     });
 
     describe('splitActiveLeaf()', () => {
-      it('should create a new leaf and log info about no split support', () => {
-        const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+      it('should create a new leaf and log a debug notice about no split support', () => {
+        const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
         const leaf = workspace.splitActiveLeaf();
 
         expect(leaf).toBeDefined();
         expect(leaf.location).toBe('main');
-        expect(infoSpy).toHaveBeenCalledWith(
+        expect(debugSpy).toHaveBeenCalledWith(
           '[WorkspaceShim] splitActiveLeaf: Slatebase does not support split panes — created new tab instead.'
         );
 
-        infoSpy.mockRestore();
+        debugSpy.mockRestore();
       });
     });
 

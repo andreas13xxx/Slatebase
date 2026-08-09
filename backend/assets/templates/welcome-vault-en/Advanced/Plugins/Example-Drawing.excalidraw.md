@@ -10,6 +10,13 @@ This file renders as a drawing when the Excalidraw plugin is activated.
 %%
 # Excalidraw Data
 
+## Text Elements
+Slatebase ^label1
+
+Plugins ^label2
+
+Dataview + Kanban + Excalidraw ^label3
+
 ## Drawing
 ```json
 {

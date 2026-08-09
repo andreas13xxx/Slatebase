@@ -6,6 +6,15 @@ tags: [fortgeschritten, plugins]
 
 Templater erweitert das Vorlagen-System um dynamische Befehle. Statt statischer Platzhalter (`{{date}}`) kannst du JavaScript-Ausdrücke, Datums-Berechnungen und interaktive Prompts in deinen Templates verwenden.
 
+> [!example] Live-Beispiele in diesem Vault
+> Im Ordner `Vorlagen/Templater` liegen vier fertige Templater-Vorlagen, die du nach der Installation sofort ausprobieren kannst:
+> - [[Vorlagen/Templater/Tägliche Notiz (Templater)]]
+> - [[Vorlagen/Templater/Meeting-Protokoll (Templater)]]
+> - [[Vorlagen/Templater/Wochenreview (Templater)]]
+> - [[Vorlagen/Templater/Projekt-Vorlage (Templater)]]
+>
+> Setze in den Templater-Plugin-Einstellungen den Templates-Ordner auf `Vorlagen/Templater` und erstelle darüber eine neue Datei — alle `<% ... %>`-Ausdrücke unten werden live ausgewertet.
+
 ---
 
 ## Voraussetzungen
@@ -294,17 +303,18 @@ priority: mittel
 
 > [!todo] Übung
 > 1. Installiere und aktiviere das Templater-Plugin
-> 2. Setze den Templates-Ordner in den Plugin-Einstellungen
-> 3. Erstelle eine Vorlage `Templates/daily-templater.md` mit Datums-Funktionen
-> 4. Erstelle eine neue Datei aus dieser Vorlage (`Ctrl+P` → "Templater")
-> 5. Prüfe, dass die Datums-Platzhalter korrekt ersetzt wurden
-> 6. Erstelle ein Meeting-Template mit `tp.date.now()` und `tp.file.title`
+> 2. Setze den Templates-Ordner in den Plugin-Einstellungen auf `Vorlagen/Templater`
+> 3. Erstelle eine neue Datei aus [[Vorlagen/Templater/Tägliche Notiz (Templater)]] (`Ctrl+P` → "Templater")
+> 4. Prüfe, dass die Datums-Platzhalter korrekt ersetzt wurden
+> 5. Probiere auch [[Vorlagen/Templater/Meeting-Protokoll (Templater)]] und [[Vorlagen/Templater/Wochenreview (Templater)]] aus
+> 6. Erstelle danach eine eigene Vorlage `Vorlagen/Templater/eigene-vorlage.md` mit `tp.date.now()` und `tp.file.title`
 > 7. Teste relative Daten: Gestern, Morgen, nächste Woche
 
 ---
 
 ## Verwandte Features
 
+- `Vorlagen/Templater` — Live-Beispielvorlagen zum Ausprobieren
 - [[Features/Vorlagen und Daily Notes]] — Slatebase-eigene Vorlagen
 - [[Fortgeschritten/Plugins/Calendar]] — Kalender mit Templater-Integration
 - [[Features/Command Palette]] — Templater-Commands

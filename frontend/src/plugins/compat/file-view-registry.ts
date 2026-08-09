@@ -58,6 +58,17 @@ const registrations: Map<string, FileViewRegistration> = new Map()
 /** Currently active file views (keyed by vaultId::filePath) */
 const activeFileViews: Map<string, ActiveFileView> = new Map()
 
+/**
+ * File paths temporarily forced to render with Slatebase's native markdown
+ * editor, bypassing content-based matchers even though their frontmatter still
+ * matches a plugin (e.g. Kanban's `kanban-plugin: basic`). Set when a plugin
+ * calls `leaf.setViewState({ type: 'markdown' })` — its "Open as Markdown"
+ * action — since matchers re-run on every render from file content alone and
+ * would otherwise immediately re-open the plugin view. Cleared when the file
+ * is explicitly switched back to a registered plugin view.
+ */
+const markdownOverrides: Set<string> = new Set()
+
 // ─── Registration API ────────────────────────────────────────────────────────
 
 /**
@@ -107,6 +118,7 @@ export function unregisterAllFileViewMatchersForPlugin(pluginId: string): void {
  * @returns The matching registration or null
  */
 export function findFileViewMatch(filePath: string, content: string): FileViewRegistration | null {
+  if (markdownOverrides.has(filePath)) return null
   for (const reg of registrations.values()) {
     try {
       if (reg.match(filePath, content)) {
@@ -117,6 +129,22 @@ export function findFileViewMatch(filePath: string, content: string): FileViewRe
     }
   }
   return null
+}
+
+/**
+ * Force a file to render with Slatebase's native markdown editor, ignoring any
+ * matching plugin file view until `clearMarkdownOverride` is called for it.
+ */
+export function setMarkdownOverride(filePath: string): void {
+  markdownOverrides.add(filePath)
+}
+
+/**
+ * Lift a previously set markdown override, letting content-based matchers
+ * (e.g. Kanban's frontmatter check) apply again for this file.
+ */
+export function clearMarkdownOverride(filePath: string): void {
+  markdownOverrides.delete(filePath)
 }
 
 // ─── Active File View Management ─────────────────────────────────────────────

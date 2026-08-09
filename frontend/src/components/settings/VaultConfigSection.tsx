@@ -46,7 +46,9 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
         setError(null)
       } catch (err: unknown) {
         if (cancelled) return
-        const msg = err instanceof Error ? err.message : 'Fehler beim Laden der Vault-Konfiguration'
+        const msg = err && typeof err === 'object' && 'message' in err
+          ? (err as { message: string }).message
+          : 'Fehler beim Laden der Vault-Konfiguration'
         setError(msg)
       } finally {
         if (!cancelled) setLoading(false)

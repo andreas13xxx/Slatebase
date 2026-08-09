@@ -17,6 +17,13 @@ export interface ContextMenuItem {
   disabled?: boolean
   /** Whether this entry is a visual separator (renders a divider line). */
   separator?: boolean
+  /**
+   * Optional direct handler, called instead of `onSelect(id)`. For items built
+   * from data not known to the menu's owner ahead of time — e.g. plugin-
+   * contributed 'file-menu' items, whose action is a callback supplied by the
+   * plugin rather than one of the owner's own fixed action ids.
+   */
+  run?: () => void
 }
 
 /**
@@ -148,7 +155,8 @@ export function ContextMenu({ x, y, items, onClose, onSelect }: ContextMenuProps
         if (focusedIndex >= 0 && focusedIndex < items.length) {
           const item = items[focusedIndex]
           if (item && !item.disabled && !item.separator) {
-            onSelect(item.id)
+            if (item.run) item.run()
+            else onSelect(item.id)
             onClose()
           }
         }
@@ -171,7 +179,8 @@ export function ContextMenu({ x, y, items, onClose, onSelect }: ContextMenuProps
 
   function handleItemClick(item: ContextMenuItem) {
     if (item.disabled) return
-    onSelect(item.id)
+    if (item.run) item.run()
+    else onSelect(item.id)
     onClose()
   }
 

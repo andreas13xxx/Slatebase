@@ -12,6 +12,95 @@ import { detectPlatform, readPlatformEnvironment } from '../platform-detection';
 import { recordGapRead, recordGapCall } from '../api-gap-registry';
 import type { Command, ICommandRegistry } from '../command-registry';
 import { scopeForPlugin } from '../plugin-execution-context';
+import { warnNoOp } from '../log';
+
+/** The shape of Obsidian's internal `app.commands`. */
+export type CommandManagerShim = ReturnType<typeof createCommandManager>
+
+/**
+ * Build Obsidian's internal command manager over a command registry.
+ *
+ * A standalone factory rather than an AppShim field because `window.app` needs
+ * the same manager: AppShim instances are per-plugin, but `window.app` is one
+ * global that plugins also reach commands through (Kanban patches
+ * `executeCommand`, editing-toolbar reads `findCommand` at startup). Building it
+ * from the shared registry is what keeps both paths pointed at one command set.
+ *
+ * Kanban monkey-patches commands.executeCommand to intercept hotkeys.
+ * LiveSync calls executeCommandById('app:reload') to restart.
+ */
+export function createCommandManager(commandRegistry: ICommandRegistry | undefined) {
+  return {
+    get commands(): Record<string, Command> {
+      const out: Record<string, Command> = {}
+      for (const cmd of commandRegistry?.getCommands() ?? []) out[cmd.id] = cmd
+      return out
+    },
+    findCommand: (id: string): Command | undefined => commandRegistry?.getCommand(id),
+    listCommands: (): Command[] => commandRegistry?.getCommands() ?? [],
+    executeCommand: (command: { id: string }): boolean => {
+      if (!commandRegistry?.getCommand(command.id)) return false
+      commandRegistry.executeCommand(command.id)
+      return true
+    },
+    executeCommandById: (id: string): boolean => {
+      if (id === 'app:reload') {
+        // Simulate Obsidian's app reload by refreshing the page
+        window.location.reload()
+        return true
+      }
+      if (!commandRegistry?.getCommand(id)) return false
+      commandRegistry.executeCommand(id)
+      return true
+    },
+  }
+}
+
+/** The shape of Obsidian's internal `app.hotkeyManager`. */
+export type HotkeyManagerShim = ReturnType<typeof createHotkeyManager>
+
+/**
+ * Build Obsidian's internal hotkey manager over a command registry.
+ *
+ * Undocumented but widely used — Excalidraw's `addDefaultHotkeys`,
+ * editing-toolbar's `customKeys[id]` lookups during startup command-ID
+ * migration. `customKeys` holds user-configured overrides: always empty here
+ * since Slatebase has no hotkey-customization UI, but it must exist as an object
+ * or plugins that index into it directly (`customKeys[id]`) crash on
+ * `undefined[id]`.
+ */
+export function createHotkeyManager(commandRegistry: ICommandRegistry | undefined) {
+  const getDefaultKeys = (): Record<string, Hotkey[]> => {
+    const out: Record<string, Hotkey[]> = {}
+    for (const cmd of commandRegistry?.getCommands() ?? []) {
+      if (cmd.hotkeys?.length) out[cmd.id] = cmd.hotkeys
+    }
+    return out
+  }
+  return {
+    customKeys: {} as Record<string, Hotkey[]>,
+    get defaultKeys(): Record<string, Hotkey[]> {
+      return getDefaultKeys()
+    },
+    getHotkeys: (commandId: string): Hotkey[] | undefined => getDefaultKeys()[commandId],
+    getDefaultHotkeys: (commandId: string): Hotkey[] | undefined => getDefaultKeys()[commandId],
+    // Slatebase has no per-user hotkey customisation to write into, so a
+    // plugin's "rebind this command" UI reports success and changes nothing.
+    // Warning is the only thing that makes that visible from the outside.
+    setHotkeys: (commandId: string, _hotkeys: Hotkey[]): void => {
+      warnNoOp('hotkeyManager', 'setHotkeys', `Custom hotkey for "${commandId}" was not persisted.`)
+    },
+    removeHotkeys: (commandId: string): void => {
+      warnNoOp('hotkeyManager', 'removeHotkeys', `Hotkey removal for "${commandId}" had no effect.`)
+    },
+    addDefaultHotkeys: (commandId: string, hotkeys: Hotkey[]): void => {
+      for (const hk of hotkeys) commandRegistry?.registerHotkey(commandId, hk)
+    },
+    // Obsidian recomputes its hotkey lookup table here. Ours is derived on read
+    // (see defaultKeys), so there is nothing to rebuild.
+    bake: (): void => {},
+  }
+}
 
 /**
  * AppShim — Obsidian App API emulation.
@@ -63,17 +152,19 @@ export class AppShim implements IAppShim {
     getPlugin(id: string): PluginInstance | undefined;
   };
 
-  /** Internal plugins stub (used by obsidian-daily-notes-interface and other plugins) */
+  /**
+   * Internal plugins stub (used by obsidian-daily-notes-interface and other plugins).
+   * Most entries are `{ enabled, instance }` wrappers; core plugins that expose their
+   * own Component-like API directly (e.g. `canvas`, which Excalidraw reaches into via
+   * `._loaded`/`.load()`/`.views.canvas(leaf)`) don't fit that shape, hence `unknown`.
+   */
   readonly internalPlugins: {
-    plugins: Record<string, { enabled: boolean; instance: unknown }>;
+    plugins: Record<string, unknown>;
     getPluginById(id: string): { enabled: boolean; instance: unknown } | undefined;
   };
 
   /** Plugin ID used for scoping console warnings */
   private readonly pluginId: string;
-
-  /** Shared command registry (backs `app.commands`), if provided by the host. */
-  private readonly commandRegistry: ICommandRegistry | undefined;
 
   /** Internal plugins map (mutable for registration/unregistration) */
   private readonly pluginsMap: Record<string, PluginInstance>;
@@ -107,10 +198,23 @@ export class AppShim implements IAppShim {
     this.metadataCache = options.metadataCache;
     this.fileManager = new FileManagerShim(options.vault);
     this.pluginId = options.pluginId;
-    this.commandRegistry = options.commandRegistry;
+    // Built here rather than as field initializers: those run before the
+    // constructor body, so they would capture commandRegistry as undefined.
+    this.commands = createCommandManager(options.commandRegistry);
+    this.hotkeyManager = createHotkeyManager(options.commandRegistry);
 
-    this.pluginsMap = {};
-    this.enabledPluginsSet = new Set();
+    // Plugins registry — delegates to window.app.plugins so that every plugin's
+    // AppShim (and the `leaf.app` used by opened views) shares one registry.
+    // Without this, `app.plugins.getPlugin(id)` — used by plugins to look up
+    // their own or another plugin's instance/settings (e.g. Excalidraw) —
+    // always returned undefined, since each AppShim otherwise got its own
+    // private, never-populated map. Falls back to a local map if window.app
+    // isn't initialized yet (e.g. in unit tests constructing AppShim directly).
+    const globalPlugins = (window as unknown as {
+      app?: { plugins?: { plugins: Record<string, PluginInstance>; enabledPlugins: Set<string> } };
+    }).app?.plugins;
+    this.pluginsMap = globalPlugins?.plugins ?? {};
+    this.enabledPluginsSet = globalPlugins?.enabledPlugins ?? new Set();
 
     // Create the plugins property with live references
     this.plugins = {
@@ -133,9 +237,30 @@ export class AppShim implements IAppShim {
         plugins: {
           'daily-notes': { enabled: true, instance: { options: { format: 'YYYY-MM-DD', folder: '', template: '' } } },
           'templates': { enabled: false, instance: { options: { folder: '' } } },
+          // See installObsidianGlobals() in install-globals.ts for why this stub
+          // exists — kept in sync here for the (test-only) path where AppShim
+          // constructs its own internalPlugins instead of sharing window.app's.
+          'canvas': {
+            enabled: false,
+            _loaded: true,
+            load: () => {},
+            views: {
+              canvas: (_leaf: unknown) => ({
+                canvas: {
+                  createFileNode: (_opts: unknown) => ({
+                    setFilePath: (_path: string, _subpath?: string) => {},
+                    render: () => {},
+                    containerEl: document.createElement('div'),
+                  }),
+                  removeNode: (_node: unknown) => {},
+                  setReadonly: (_readonly: boolean) => {},
+                },
+              }),
+            },
+          },
         },
         getPluginById: (id: string) => {
-          const p = this.internalPlugins.plugins[id];
+          const p = this.internalPlugins.plugins[id] as { enabled: boolean; instance: unknown } | undefined;
           return p ?? { enabled: false, instance: { options: {} } };
         },
       };
@@ -154,21 +279,60 @@ export class AppShim implements IAppShim {
         const FakeEditor = class {
           cm: unknown
           containerEl: HTMLElement
-          constructor(containerEl?: unknown) {
-            this.containerEl = (containerEl instanceof HTMLElement) ? containerEl : document.createElement('div')
+          owner: unknown
+          constructor(...args: unknown[]) {
+            // Real Obsidian's MarkdownEditor is constructed as (app, containerEl, config) —
+            // Kanban's subclass forwards all of its own (app, containerEl, owner) args via
+            // `super(...arguments)`, so the container is the second argument, not the first.
+            // Scan for whichever argument is actually an element instead of assuming position,
+            // since other plugins reusing this same API may call it with a different arity.
+            const containerEl = args.find((a): a is HTMLElement => a instanceof HTMLElement)
+            this.containerEl = containerEl ?? document.createElement('div')
+            this.owner = args[2]
             // Lazy-init CM6: dynamically import to avoid top-level dep issues
             this.cm = null
             try {
-               
-              const cmView = (globalThis as unknown as { __codemirrorView?: { EditorView: unknown } }).__codemirrorView
+              const cmView = (globalThis as unknown as { __codemirrorView?: Record<string, unknown> }).__codemirrorView
               const cmState = (globalThis as unknown as { __codemirrorState?: { EditorState: unknown } }).__codemirrorState
               if (cmView && cmState) {
-                const EV = cmView.EditorView as new (config: unknown) => { state: { doc: { length: number; toString(): string } }; dispatch(tr: unknown): void; destroy(): void; focus(): void }
+                const EV = cmView.EditorView as (new (config: unknown) => { state: { doc: { length: number; toString(): string } }; dispatch(tr: unknown): void; destroy(): void; focus(): void }) & { theme(spec: Record<string, unknown>): unknown }
                 const ES = cmState.EditorState as { create(config: unknown): unknown }
-                const state = ES.create({ doc: '' })
+                // Real Obsidian's MarkdownEditor calls `this.buildLocalExtensions()` here to
+                // assemble the CM6 extension set — it's a protected hook subclasses override
+                // to add their own keymaps/handlers. Kanban's subclass (see the `y extends
+                // c.plugin.MarkdownEditor` wrapper around this class) overrides it to push an
+                // Enter/Escape keymap that submits the card/list instead of inserting a
+                // newline, plus a placeholder and focus/blur handlers. Building the state
+                // directly here instead of going through this method — as an earlier version
+                // of this shim did — silently drops every one of those overrides: Kanban's
+                // keymap never got registered, so Enter fell through to CM6's native
+                // newline-insertion instead of calling Kanban's submit handler.
+                const extensions = this.buildLocalExtensions()
+                const state = ES.create({ doc: '', extensions })
                 this.cm = new EV({ state, parent: this.containerEl })
               }
             } catch { /* CM6 not available — cm stays null */ }
+          }
+          buildLocalExtensions(): unknown[] {
+            const cmView = (globalThis as unknown as { __codemirrorView?: Record<string, unknown> }).__codemirrorView
+            if (!cmView) return []
+            const EV = cmView.EditorView as { theme(spec: Record<string, unknown>): unknown }
+            // CM6 only draws a visible cursor via the `drawSelection` extension — without it
+            // the editor is fully functional (focus, typing, selection) but renders no caret
+            // at all, which is invisible rather than "subtly wrong" and easy to miss in a
+            // quick look. Its default cursor color also only adapts to `.cm-dark`/`.cm-light`
+            // classes this bare editor never gets, so it'd paint a black caret that's
+            // invisible on Slatebase's dark theme even once drawn — hence the explicit
+            // theme() pinning caret/cursor color to the app's text color variable instead,
+            // which tracks light/dark automatically.
+            const drawSelection = cmView.drawSelection as (() => unknown) | undefined
+            return [
+              EV.theme({
+                '.cm-content': { caretColor: 'var(--text-primary)' },
+                '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--text-primary)' },
+              }),
+              ...(typeof drawSelection === 'function' ? [drawSelection()] : []),
+            ]
           }
           set(value: string) {
             const cm = this.cm as { state: { doc: { length: number } }; dispatch(tr: unknown): void } | null
@@ -211,30 +375,7 @@ export class AppShim implements IAppShim {
    * Backed by the shared CommandRegistry when one is provided, so this reflects the
    * same commands plugins register via `this.addCommand(...)`.
    */
-  readonly commands = ((self: AppShim) => ({
-    get commands(): Record<string, Command> {
-      const out: Record<string, Command> = {}
-      for (const cmd of self.commandRegistry?.getCommands() ?? []) out[cmd.id] = cmd
-      return out
-    },
-    findCommand: (id: string): Command | undefined => self.commandRegistry?.getCommand(id),
-    listCommands: (): Command[] => self.commandRegistry?.getCommands() ?? [],
-    executeCommand: (command: { id: string }): boolean => {
-      if (!self.commandRegistry?.getCommand(command.id)) return false
-      self.commandRegistry.executeCommand(command.id)
-      return true
-    },
-    executeCommandById: (id: string): boolean => {
-      if (id === 'app:reload') {
-        // Simulate Obsidian's app reload by refreshing the page
-        window.location.reload()
-        return true
-      }
-      if (!self.commandRegistry?.getCommand(id)) return false
-      self.commandRegistry.executeCommand(id)
-      return true
-    },
-  }))(this)
+  readonly commands: CommandManagerShim
 
   /**
    * hotkeyManager — Obsidian-internal hotkey manager (undocumented but widely used
@@ -245,29 +386,21 @@ export class AppShim implements IAppShim {
    * that index into it directly (`customKeys[id]`) crash on `undefined[id]`.
    * `defaultKeys` and `addDefaultHotkeys` are backed by the shared CommandRegistry.
    */
-  readonly hotkeyManager = ((self: AppShim) => {
-    const getDefaultKeys = (): Record<string, Hotkey[]> => {
-      const out: Record<string, Hotkey[]> = {}
-      for (const cmd of self.commandRegistry?.getCommands() ?? []) {
-        if (cmd.hotkeys?.length) out[cmd.id] = cmd.hotkeys
-      }
-      return out
-    }
-    return {
-      customKeys: {} as Record<string, Hotkey[]>,
-      get defaultKeys(): Record<string, Hotkey[]> {
-        return getDefaultKeys()
-      },
-      getHotkeys: (commandId: string): Hotkey[] | undefined => getDefaultKeys()[commandId],
-      getDefaultHotkeys: (commandId: string): Hotkey[] | undefined => getDefaultKeys()[commandId],
-      setHotkeys: (_commandId: string, _hotkeys: Hotkey[]): void => {},
-      removeHotkeys: (_commandId: string): void => {},
-      addDefaultHotkeys: (commandId: string, hotkeys: Hotkey[]): void => {
-        for (const hk of hotkeys) self.commandRegistry?.registerHotkey(commandId, hk)
-      },
-      bake: (): void => {},
-    }
-  })(this)
+  readonly hotkeyManager: HotkeyManagerShim
+
+  /**
+   * setting — Obsidian's Settings modal controller (undocumented but used by
+   * plugins to steer users to their own settings tab, e.g. Excalidraw calls
+   * `app.setting.open()` / `openTabById(id)` on a version mismatch to prompt
+   * reconfiguration). Slatebase's settings UI isn't reachable from the shim
+   * layer, so these are safe no-ops — they let plugins continue instead of
+   * crashing on `app.setting.open is not a function`.
+   */
+  readonly setting = {
+    open: (): void => {},
+    close: (): void => {},
+    openTabById: (_id: string): boolean => false,
+  }
 
   /**
    * Whether the app is running on a mobile device. Derived from the same
@@ -279,6 +412,22 @@ export class AppShim implements IAppShim {
   /** Unique app ID (vault identifier). Used by Dataview, Excalidraw for caching. */
   get appId(): string {
     return `slatebase-${this.vault.getName()}`
+  }
+
+  /**
+   * Returns the user's configured accent color, resolved from the same
+   * `--interactive-accent` CSS variable Slatebase's theme already exposes
+   * (see obsidian-compat.css). Excalidraw's dynamic-styling code
+   * (`setDynamicStyle` → `app.getAccentColor()`) blends the toolbar's
+   * palette against this color — without it the call throws (missing
+   * method), `setDynamicStyle`'s try/catch swallows it and logs "Dynamic
+   * styling failed", and every CSS variable it would have set on the
+   * toolbar (icon fill, button backgrounds, borders, ...) is left unset,
+   * which is why several toolbar icons render blank/invisible.
+   */
+  getAccentColor(): string {
+    const value = getComputedStyle(document.documentElement).getPropertyValue('--interactive-accent').trim()
+    return value || '#7c3aed'
   }
 
   /** SecretStorage stub — stores secrets in localStorage (not truly secure, but functional). */
@@ -380,6 +529,7 @@ export class AppShim implements IAppShim {
       'isMobile',
       'appId',
       'secretStorage',
+      'setting',
       // Internal/utility properties
       'pluginId',
       'pluginsMap',

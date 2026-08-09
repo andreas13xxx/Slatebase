@@ -95,11 +95,23 @@ export function useWorkspaceRestore({
     updateWorkspaceTabs(persistedTabs, activeTabId)
   }, [tabs, activeTabId])
 
-  // Flush workspace state on page unload
+  // Flush workspace state on page unload. `beforeunload` alone misses cases
+  // like mobile backgrounding, tab discarding, or the OS killing the process —
+  // `visibilitychange`/`pagehide` catch those so a pending debounced write
+  // (e.g. a just-closed tab) isn't lost and later resurrected by a stale read.
   useEffect(() => {
-    const handleBeforeUnload = () => { flushWorkspace() }
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+    const handleFlush = () => { flushWorkspace() }
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flushWorkspace()
+    }
+    window.addEventListener('beforeunload', handleFlush)
+    window.addEventListener('pagehide', handleFlush)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      window.removeEventListener('beforeunload', handleFlush)
+      window.removeEventListener('pagehide', handleFlush)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
   // Restore UI state from workspace store (survives page reload and session expiry)

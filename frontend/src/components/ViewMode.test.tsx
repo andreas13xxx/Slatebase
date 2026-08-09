@@ -515,6 +515,88 @@ def hello():
       expect(img?.getAttribute('src')).toContain('subfolder%2Fdeep-image.jpg')
     })
   })
+
+  describe('Inline and block raw HTML', () => {
+    it('renders an allowlisted inline tag pair as a real element', () => {
+      const { container } = render(
+        <ViewMode {...defaultProps} content={'<font color="#ff0000">Testtest</font>'} />
+      )
+      const font = container.querySelector('font')
+      expect(font).not.toBeNull()
+      expect(font?.getAttribute('color')).toBe('#ff0000')
+      expect(font?.textContent).toBe('Testtest')
+    })
+
+    it('renders nested markdown (e.g. bold) inside an allowlisted inline tag', () => {
+      const { container } = render(
+        <ViewMode {...defaultProps} content={'<mark>hello **world**</mark>'} />
+      )
+      const mark = container.querySelector('mark')
+      expect(mark).not.toBeNull()
+      expect(mark?.querySelector('strong')?.textContent).toBe('world')
+    })
+
+    it('parses a span style attribute into real CSS properties', () => {
+      const { container } = render(
+        <ViewMode {...defaultProps} content={'<span style="color: blue; font-weight: bold">text</span>'} />
+      )
+      const span = container.querySelector('span[style]')
+      expect(span).not.toBeNull()
+      expect(span?.getAttribute('style')).toContain('color: blue')
+    })
+
+    it('drops disallowed attributes (e.g. onclick) from allowlisted tags', () => {
+      const { container } = render(
+        <ViewMode {...defaultProps} content={'<span onclick="alert(1)">text</span>'} />
+      )
+      const span = container.querySelector('span')
+      expect(span).not.toBeNull()
+      expect(span?.getAttribute('onclick')).toBeNull()
+    })
+
+    it('strips a block-level script tag entirely via sanitization', () => {
+      // A standalone <script> is parsed as block-level HTML (CommonMark HTML block
+      // type 1), so it goes through the DOMPurify path, which removes it outright.
+      const { container } = render(
+        <ViewMode {...defaultProps} content={'<script>alert(1)</script>'} />
+      )
+      expect(container.querySelector('script')).toBeNull()
+      expect(container.textContent).not.toContain('alert')
+    })
+
+    it('falls back to literal text for a non-allowlisted inline tag', () => {
+      const { container } = render(
+        <ViewMode {...defaultProps} content={'before <blink>text</blink> after'} />
+      )
+      expect(container.querySelector('blink')).toBeNull()
+      expect(container.textContent).toContain('<blink>')
+    })
+
+    it('falls back to literal text for an inline tag with no matching close', () => {
+      const { container } = render(
+        <ViewMode {...defaultProps} content={'<font color="red">unterminated'} />
+      )
+      expect(container.querySelector('font')).toBeNull()
+      expect(container.textContent).toContain('<font color="red">')
+    })
+
+    it('renders a literal <br> as a line break', () => {
+      const { container } = render(
+        <ViewMode {...defaultProps} content={'line one<br>line two'} />
+      )
+      expect(container.querySelector('br')).not.toBeNull()
+    })
+
+    it('sanitizes a block-level HTML node and strips script tags', () => {
+      const { container } = render(
+        <ViewMode {...defaultProps} content={'<div style="color:red">\n<b>Block</b>\n<script>alert(1)</script>\n</div>'} />
+      )
+      const div = container.querySelector('.view-mode-html')
+      expect(div).not.toBeNull()
+      expect(div?.querySelector('b')?.textContent).toBe('Block')
+      expect(div?.querySelector('script')).toBeNull()
+    })
+  })
 })
 
 describe('resolveWikilinkTarget', () => {

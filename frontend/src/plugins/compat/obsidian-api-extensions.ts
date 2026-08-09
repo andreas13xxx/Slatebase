@@ -17,7 +17,42 @@
  * @module obsidian-api-extensions
  */
 
-import { getCachedLucideIconNode, renderLucideIconNode, renderLucideIconInto } from './lucide-icons';
+import { getBuiltInIconIds, getLucideIconElement, renderLucideIconInto } from './lucide-icons';
+import { errorOnce, warnNoOp } from './log';
+import type { BlockCache, CachedMetadata, HeadingCache, Pos } from './types';
+
+/**
+ * The Obsidian API version Slatebase claims to implement.
+ *
+ * Read by plugins as `apiVersion` and used by `requireApiVersion()`, which must
+ * answer against the same number — a `requireApiVersion()` that always says yes
+ * sends plugins down code paths using APIs we do not have, and they crash there
+ * instead of taking the fallback they already wrote.
+ *
+ * Raise this only when the corresponding APIs actually exist here.
+ *
+ * 1.4.14: the `obsidian` npm typings package never published past 1.4.11
+ * within the 1.4.x line (no 1.4.12–14 release exists), so "1.4.14" and
+ * "1.4.11" are the same documented API surface. That surface is fully
+ * implemented here: Debouncer.run() (install-globals.ts debounce()),
+ * FileManager.processFrontMatter()'s DataWriteOptions param, Setting.
+ * addProgressBar(), AbstractInputSuggest, and the 'file-menu' workspace event.
+ */
+export const OBSIDIAN_API_VERSION = '1.4.14';
+
+/**
+ * Compare two dotted version strings. Missing components count as 0, so
+ * `'1.5'` and `'1.5.0'` are equal, matching how plugins write these checks.
+ */
+export function compareApiVersions(a: string, b: string): number {
+  const pa = a.split('.').map((n) => Number.parseInt(n, 10) || 0);
+  const pb = b.split('.').map((n) => Number.parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff < 0 ? -1 : 1;
+  }
+  return 0;
+}
 
 // ─── Icon Registry ───────────────────────────────────────────────────────────────
 
@@ -40,7 +75,7 @@ export function removeIcon(iconId: string): void {
 
 /**
  * Get an SVG element for an icon ID.
- * Checks custom icons first, then falls back to null.
+ * Checks plugin-registered custom icons first, then the built-in Lucide set.
  */
 export function getIcon(iconId: string): SVGSVGElement | null {
   const svg = customIcons.get(iconId);
@@ -50,15 +85,15 @@ export function getIcon(iconId: string): SVGSVGElement | null {
     const svgEl = container.querySelector('svg');
     return svgEl ?? null;
   }
-  const cached = getCachedLucideIconNode(iconId);
-  return cached ? renderLucideIconNode(cached) : null;
+  return getLucideIconElement(iconId);
 }
 
 /**
- * Get the list of registered custom icon IDs.
+ * Get the list of icon IDs `getIcon()`/`setIcon()` accept — plugin-registered
+ * custom icons plus the built-in (Lucide) set, as Obsidian does.
  */
 export function getIconIds(): string[] {
-  return Array.from(customIcons.keys());
+  return [...customIcons.keys(), ...getBuiltInIconIds()];
 }
 
 /**
@@ -106,7 +141,7 @@ export class Events {
     const handlers = this._events.get(name);
     if (!handlers) return;
     for (const { callback, ctx } of handlers) {
-      try { callback.apply(ctx, data); } catch (e) { console.error('[Events] Handler error:', e); }
+      try { callback.apply(ctx, data); } catch (e) { errorOnce(`Events.handlerError::${name}`, `[Events] Handler error for "${name}":`, e); }
     }
   }
 
@@ -419,6 +454,203 @@ export function prepareSimpleSearch(query: string): (text: string) => { score: n
   };
 }
 
+/** A scored match, as returned by the `prepare*Search` callbacks. */
+export interface SearchResult {
+  score: number;
+  matches: Array<[number, number]>;
+}
+
+/** A search result paired with the item it came from. */
+export interface SearchResultContainer<T = unknown> {
+  match: SearchResult;
+  item: T;
+}
+
+/**
+ * Run a one-off fuzzy match of `query` against `text`.
+ *
+ * The convenience form of {@link prepareFuzzySearch} for callers matching a
+ * single string; `prepareFuzzySearch` is the one to use in a loop, since it
+ * lowercases the query once instead of per candidate.
+ */
+export function fuzzySearch(query: string, text: string): SearchResult | null {
+  return prepareFuzzySearch(query)(text);
+}
+
+/**
+ * Sort search results in place, best match first.
+ *
+ * Obsidian's suggestion lists rely on this rather than each plugin sorting by
+ * `.match.score` itself, so the ordering stays consistent across plugins.
+ */
+export function sortSearchResults(results: SearchResultContainer[]): void {
+  results.sort((a, b) => (b.match?.score ?? 0) - (a.match?.score ?? 0));
+}
+
+/**
+ * Render `text` into `el`, wrapping the matched ranges in `<span class="suggestion-highlight">`.
+ *
+ * Ranges are applied in order and non-overlapping; anything out of order or
+ * overlapping is skipped rather than producing scrambled output, since a match
+ * list is data from a plugin's own scoring function and need not be well-formed.
+ */
+export function renderMatches(
+  el: HTMLElement,
+  text: string,
+  matches: Array<[number, number]> | null,
+  offset = 0,
+): void {
+  if (!matches || matches.length === 0) {
+    el.appendChild(document.createTextNode(text));
+    return;
+  }
+  let cursor = 0;
+  for (const range of matches) {
+    const start = (range[0] ?? 0) + offset;
+    const end = (range[1] ?? 0) + offset;
+    if (start < cursor || end <= start || start > text.length) continue;
+    if (start > cursor) el.appendChild(document.createTextNode(text.slice(cursor, start)));
+    const highlight = document.createElement('span');
+    highlight.className = 'suggestion-highlight';
+    highlight.textContent = text.slice(start, end);
+    el.appendChild(highlight);
+    cursor = end;
+  }
+  if (cursor < text.length) el.appendChild(document.createTextNode(text.slice(cursor)));
+}
+
+/**
+ * Render a search result's text into `el` with its matched ranges highlighted.
+ *
+ * The element is cleared first — Obsidian re-renders suggestion rows in place as
+ * the query changes.
+ */
+export function renderResults(
+  el: HTMLElement,
+  text: string,
+  result: SearchResult | null,
+  offset = 0,
+): void {
+  el.textContent = '';
+  renderMatches(el, text, result?.matches ?? null, offset);
+}
+
+// ─── Subpath resolution ──────────────────────────────────────────────────────────
+
+/** What a `#heading` or `#^block` subpath resolved to. */
+export interface SubpathResult {
+  type: 'heading' | 'block';
+  /** The matched HeadingCache or BlockCache entry. */
+  current?: HeadingCache | BlockCache;
+  start: Pos['start'];
+  /** Where the addressed section ends; null means "to the end of the file". */
+  end: Pos['start'] | null;
+}
+
+/**
+ * Resolve the `#...` part of a link against a file's cached metadata.
+ *
+ * `[[Note#Heading]]` and `[[Note#^blockid]]` are how Obsidian addresses part of
+ * a file, and plugins that render or transclude link targets call this to turn
+ * the fragment into a document range. Heading resolution matches the way
+ * Obsidian does: on the heading text with formatting stripped, so `#Über uns`
+ * still finds a `## **Über uns**`.
+ *
+ * @param cache - The file's parsed metadata
+ * @param subpath - The fragment, with or without its leading `#`
+ * @returns The resolved range, or null if nothing in the file matches
+ */
+export function resolveSubpath(
+  cache: CachedMetadata | null | undefined,
+  subpath: string,
+): SubpathResult | null {
+  if (!cache) return null;
+  const fragment = subpath.startsWith('#') ? subpath.slice(1) : subpath;
+  if (!fragment) return null;
+
+  if (fragment.startsWith('^')) {
+    const block = cache.blocks?.[fragment.slice(1).toLowerCase()];
+    if (!block) return null;
+    return { type: 'block', current: block, start: block.position.start, end: block.position.end };
+  }
+
+  const headings = cache.headings ?? [];
+  const wanted = stripHeading(fragment).toLowerCase();
+  const index = headings.findIndex((h) => stripHeading(h.heading).toLowerCase() === wanted);
+  const heading = headings[index];
+  if (!heading) return null;
+
+  // The section runs to the next heading of the same or higher level; a null
+  // end means "to the end of the file", which is what Obsidian reports too.
+  const next = headings.slice(index + 1).find((h) => h.level <= heading.level);
+  return {
+    type: 'heading',
+    current: heading,
+    start: heading.position.start,
+    end: next ? next.position.start : null,
+  };
+}
+
+// ─── Blob / async module loaders ─────────────────────────────────────────────────
+
+/** Read a Blob into an ArrayBuffer. Obsidian's promisified `FileReader` helper. */
+export function getBlobArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
+  return blob.arrayBuffer();
+}
+
+/**
+ * Resolve the Mermaid instance, loading it on first use.
+ *
+ * Obsidian bundles Mermaid and hands plugins the module object; Slatebase has
+ * the same dependency for its own diagram rendering, so this is the real library
+ * rather than a stub.
+ */
+export async function loadMermaid(): Promise<unknown> {
+  const mod = await import('mermaid');
+  return mod.default ?? mod;
+}
+
+/**
+ * Register the loaders for libraries Slatebase does not ship.
+ *
+ * MathJax, Prism and PDF.js are all in Obsidian's bundle, and plugins call these
+ * loaders unguarded — `await loadMathJax()` on a namespace without the function
+ * is a TypeError somewhere unrelated to the actual cause. Defining them means
+ * the plugin gets a named, logged answer instead.
+ *
+ * They are deliberately *not* implemented: LaTeX rendering, Prism highlighting
+ * and PDF rendering are each a feature Slatebase does not have, not an oversight
+ * in the compat layer. Adding the dependency here would put a renderer behind
+ * the plugin API that the app's own Markdown pipeline cannot use.
+ *
+ * `renderMath` returns an element containing the raw source, so a formula shows
+ * up as its own LaTeX rather than vanishing.
+ */
+function registerUnsupportedLoaders(obs: Record<string, unknown>): void {
+  const unavailable = (api: string, feature: string) => (): Promise<null> => {
+    warnNoOp('obsidian', api, `Slatebase does not bundle ${feature}; the plugin's ${feature} features will not render.`);
+    return Promise.resolve(null);
+  };
+
+  if (!obs['loadMathJax']) obs['loadMathJax'] = unavailable('loadMathJax', 'MathJax');
+  if (!obs['loadPrism']) obs['loadPrism'] = unavailable('loadPrism', 'Prism');
+  if (!obs['loadPdfJs']) obs['loadPdfJs'] = unavailable('loadPdfJs', 'PDF.js');
+
+  if (!obs['renderMath']) {
+    obs['renderMath'] = (source: string, display: boolean): HTMLElement => {
+      warnNoOp('obsidian', 'renderMath', 'Slatebase does not bundle MathJax; the formula source is shown verbatim.');
+      const el = document.createElement(display ? 'div' : 'span');
+      el.className = display ? 'math math-block' : 'math math-inline';
+      el.textContent = source;
+      return el;
+    };
+  }
+  // Paired with renderMath in Obsidian's typesetting cycle. Nothing to flush
+  // without MathJax, and renderMath already warned — staying quiet here avoids
+  // a second line for the same cause.
+  if (!obs['finishRenderMath']) obs['finishRenderMath'] = (): Promise<void> => Promise.resolve();
+}
+
 // ─── Additional UI Components ────────────────────────────────────────────────────
 
 /**
@@ -473,29 +705,48 @@ export class ColorComponent {
  * SearchComponent — Search input for settings.
  */
 export class SearchComponent {
+  /**
+   * The `.search-input-container` Obsidian wraps the input in. The clear button
+   * is positioned against it, so it is structural rather than cosmetic — plugin
+   * CSS that styles the search box targets this element.
+   */
+  containerEl: HTMLElement;
   inputEl: HTMLInputElement;
   clearButtonEl: HTMLElement;
   private _callback: ((value: string) => void) | null = null;
 
   constructor(containerEl: HTMLElement) {
+    this.containerEl = document.createElement('div');
+    this.containerEl.className = 'search-input-container';
     this.inputEl = document.createElement('input');
     this.inputEl.type = 'search';
     this.inputEl.className = 'search-input';
+    this.inputEl.spellcheck = false;
     this.clearButtonEl = document.createElement('div');
-    this.clearButtonEl.className = 'search-input-clear-button';
-    containerEl.appendChild(this.inputEl);
-    containerEl.appendChild(this.clearButtonEl);
+    this.clearButtonEl.className = 'search-input-clear-button is-hidden';
+    this.clearButtonEl.setAttribute('aria-label', 'Clear search');
+    this.containerEl.appendChild(this.inputEl);
+    this.containerEl.appendChild(this.clearButtonEl);
+    containerEl.appendChild(this.containerEl);
     this.inputEl.addEventListener('input', () => {
+      this.syncClearButton();
       if (this._callback) this._callback(this.inputEl.value);
     });
     this.clearButtonEl.addEventListener('click', () => {
       this.inputEl.value = '';
+      this.syncClearButton();
+      this.inputEl.focus();
       if (this._callback) this._callback('');
     });
   }
 
+  /** Obsidian only shows the clear button once the field has content. */
+  private syncClearButton(): void {
+    this.clearButtonEl.classList.toggle('is-hidden', this.inputEl.value.length === 0);
+  }
+
   getValue(): string { return this.inputEl.value; }
-  setValue(value: string): this { this.inputEl.value = value; return this; }
+  setValue(value: string): this { this.inputEl.value = value; this.syncClearButton(); return this; }
   setPlaceholder(placeholder: string): this { this.inputEl.placeholder = placeholder; return this; }
   setDisabled(disabled: boolean): this { this.inputEl.disabled = disabled; return this; }
   onChange(callback: (value: string) => void): this { this._callback = callback; return this; }
@@ -570,44 +821,57 @@ export class ProgressBarComponent {
 /**
  * AbstractInputSuggest — Base class for input autocomplete.
  * Templater uses this for file/folder suggest inputs in settings.
+ *
+ * Real Obsidian: Component -> PopoverSuggest -> AbstractInputSuggest. Built as a
+ * factory (not a static class) because PopoverSuggest only exists on
+ * `window.obsidian` once installObsidianGlobals() has run — see its call site in
+ * registerObsidianApiExtensions() below, which passes that class in at register
+ * time so open/close/renderSuggestion and Component's registerEvent/
+ * registerDomEvent/addChild are all inherited for real, not reimplemented here.
  */
-export class AbstractInputSuggest {
+type PopoverSuggestBase = new (app: unknown) => {
   app: unknown;
-  textInputEl: HTMLInputElement | HTMLDivElement;
-  limit = 100;
-  private _selectCallback: ((value: unknown, evt: MouseEvent | KeyboardEvent) => void) | null = null;
+  open(): void;
+  close(): void;
+  renderSuggestion(value: unknown, el: HTMLElement): void;
+  selectSuggestion(value: unknown, evt: MouseEvent | KeyboardEvent): void;
+};
 
-  constructor(app: unknown, textInputEl: HTMLInputElement | HTMLDivElement) {
-    this.app = app;
-    this.textInputEl = textInputEl;
-  }
+function createAbstractInputSuggestClass(PopoverSuggest: PopoverSuggestBase) {
+  return class AbstractInputSuggest extends PopoverSuggest {
+    textInputEl: HTMLInputElement | HTMLDivElement;
+    limit = 100;
+    private _selectCallback: ((value: unknown, evt: MouseEvent | KeyboardEvent) => void) | null = null;
 
-  setValue(value: string): void {
-    if (this.textInputEl instanceof HTMLInputElement) {
-      this.textInputEl.value = value;
-    } else {
-      this.textInputEl.textContent = value;
+    constructor(app: unknown, textInputEl: HTMLInputElement | HTMLDivElement) {
+      super(app);
+      this.textInputEl = textInputEl;
     }
-  }
 
-  getValue(): string {
-    if (this.textInputEl instanceof HTMLInputElement) return this.textInputEl.value;
-    return this.textInputEl.textContent ?? '';
-  }
+    setValue(value: string): void {
+      if (this.textInputEl instanceof HTMLInputElement) {
+        this.textInputEl.value = value;
+      } else {
+        this.textInputEl.textContent = value;
+      }
+    }
 
-  onSelect(callback: (value: unknown, evt: MouseEvent | KeyboardEvent) => void): this {
-    this._selectCallback = callback;
-    return this;
-  }
+    getValue(): string {
+      if (this.textInputEl instanceof HTMLInputElement) return this.textInputEl.value;
+      return this.textInputEl.textContent ?? '';
+    }
 
-  selectSuggestion(value: unknown, evt: MouseEvent | KeyboardEvent): void {
-    if (this._selectCallback) this._selectCallback(value, evt);
-  }
+    onSelect(callback: (value: unknown, evt: MouseEvent | KeyboardEvent) => void): this {
+      this._selectCallback = callback;
+      return this;
+    }
 
-  open(): void {}
-  close(): void {}
-  getSuggestions(_query: string): unknown[] { return []; }
-  renderSuggestion(_value: unknown, _el: HTMLElement): void {}
+    selectSuggestion(value: unknown, evt: MouseEvent | KeyboardEvent): void {
+      if (this._selectCallback) this._selectCallback(value, evt);
+    }
+
+    getSuggestions(_query: string): unknown[] { return []; }
+  };
 }
 
 // ─── MarkdownPreviewRenderer ─────────────────────────────────────────────────────
@@ -729,17 +993,20 @@ export function parseFrontMatterAliases(frontmatter: Record<string, unknown> | n
  * Attach a tooltip to an element that shows on hover.
  * Obsidian uses this for hover tooltips on UI elements.
  */
-export function setTooltip(el: HTMLElement, tooltip: string, _options?: { placement?: string; delay?: number }): void {
+export function setTooltip(el: HTMLElement, tooltip: string, options?: { placement?: string; delay?: number }): void {
   el.setAttribute('aria-label', tooltip);
-  el.title = tooltip;
+  // Obsidian renders tooltips itself from aria-label and never sets `title`;
+  // Slatebase does the same via GlobalTooltip. Setting `title` as well produced
+  // two overlapping tooltips — the browser's native one and ours.
+  el.removeAttribute('title');
+  if (options?.placement) el.setAttribute('data-tooltip-position', options.placement);
 }
 
 /**
  * Manually trigger a tooltip to appear over an element.
  */
-export function displayTooltip(targetEl: HTMLElement, content: string, _options?: { placement?: string }): void {
-  targetEl.setAttribute('aria-label', content);
-  targetEl.title = content;
+export function displayTooltip(targetEl: HTMLElement, content: string, options?: { placement?: string }): void {
+  setTooltip(targetEl, content, options);
 }
 
 // ─── Heading Utilities ───────────────────────────────────────────────────────────
@@ -804,6 +1071,18 @@ export function registerObsidianApiExtensions(): void {
   if (!obs['parseFrontMatterStringArray']) obs['parseFrontMatterStringArray'] = parseFrontMatterStringArray;
   if (!obs['prepareFuzzySearch']) obs['prepareFuzzySearch'] = prepareFuzzySearch;
   if (!obs['prepareSimpleSearch']) obs['prepareSimpleSearch'] = prepareSimpleSearch;
+  if (!obs['fuzzySearch']) obs['fuzzySearch'] = fuzzySearch;
+  if (!obs['sortSearchResults']) obs['sortSearchResults'] = sortSearchResults;
+  if (!obs['renderResults']) obs['renderResults'] = renderResults;
+  if (!obs['renderMatches']) obs['renderMatches'] = renderMatches;
+
+  // Subpath resolution
+  if (!obs['resolveSubpath']) obs['resolveSubpath'] = resolveSubpath;
+
+  // Blob / async module loaders
+  if (!obs['getBlobArrayBuffer']) obs['getBlobArrayBuffer'] = getBlobArrayBuffer;
+  if (!obs['loadMermaid']) obs['loadMermaid'] = loadMermaid;
+  registerUnsupportedLoaders(obs);
 
   // Encoding utilities
   if (!obs['arrayBufferToBase64']) obs['arrayBufferToBase64'] = arrayBufferToBase64;
@@ -828,7 +1107,12 @@ export function registerObsidianApiExtensions(): void {
   if (!obs['SearchComponent']) obs['SearchComponent'] = SearchComponent;
   if (!obs['MomentFormatComponent']) obs['MomentFormatComponent'] = MomentFormatComponent;
   if (!obs['ProgressBarComponent']) obs['ProgressBarComponent'] = ProgressBarComponent;
-  if (!obs['AbstractInputSuggest']) obs['AbstractInputSuggest'] = AbstractInputSuggest;
+  if (!obs['AbstractInputSuggest']) {
+    const PopoverSuggestClass = obs['PopoverSuggest'] as PopoverSuggestBase | undefined;
+    if (PopoverSuggestClass) {
+      obs['AbstractInputSuggest'] = createAbstractInputSuggestClass(PopoverSuggestClass);
+    }
+  }
 
   // MarkdownPreviewRenderer
   if (!obs['MarkdownPreviewRenderer']) obs['MarkdownPreviewRenderer'] = MarkdownPreviewRenderer;
@@ -837,7 +1121,7 @@ export function registerObsidianApiExtensions(): void {
   if (!obs['EditableFileView']) obs['EditableFileView'] = obs['FileView'];
 
   // apiVersion string
-  if (!obs['apiVersion']) obs['apiVersion'] = '1.4.0';
+  if (!obs['apiVersion']) obs['apiVersion'] = OBSIDIAN_API_VERSION;
 
   // Global DOM helpers
   const win = window as unknown as Record<string, unknown>;

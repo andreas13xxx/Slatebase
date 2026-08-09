@@ -9,6 +9,12 @@
 .cm-editor-wrapper {
   display: flex;
   flex: 1;
+  /* Explicit width is required here: .edit-mode-editor-area is a column flex
+   * container, so left/right margins are on the cross axis. Auto margins on
+   * the cross axis disable flex stretch (CSS Flexbox spec 8.3.2), so without
+   * an explicit width this shrinks to CodeMirror's own (initially too-small)
+   * intrinsic content width instead of filling the available space. */
+  width: 100%;
   min-height: 0;
   overflow: hidden;
   max-width: 800px;
@@ -189,6 +195,11 @@
   border-left: 3px solid var(--border-default);
   padding-left: 16px;
   color: var(--text-secondary);
+}
+
+/* --- HTML blocks (<center>) --- */
+.cm-lp-html-center {
+  text-align: center;
 }
 
 /* --- Code Blocks --- */

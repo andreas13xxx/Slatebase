@@ -1,4 +1,5 @@
 import { EventSystem } from '../event-system';
+import { debugOnce, warnOnce } from '../log';
 import { resolveWikilinkTarget } from '../../link-resolver';
 import type { DirectoryTree } from '../../../types';
 import type { EventRef, IWorkspaceShim, TFile } from '../types';
@@ -6,7 +7,6 @@ import type { ViewRegistry, WorkspaceLeaf } from '../view-registry';
 import { EditorShim } from '../editor-shim';
 import type { IEditor } from '../editor-shim';
 import { refreshPluginExtensions, getActiveEditorContainerEl, setEditorContainerMountedListener } from '../../../editor/plugin-extensions';
-import { MarkdownView } from './markdown-view-shim';
 import { recordGapRead, recordGapCall } from '../api-gap-registry';
 import {
   registerHoverLinkSource,
@@ -125,30 +125,34 @@ export class WorkspaceShim implements IWorkspaceShim {
 
   /**
    * Execute a callback when the workspace layout is ready.
-   * In Slatebase, plugins load after FCP, so the layout is always ready.
-   * The callback is invoked asynchronously (next microtask) to match Obsidian's behavior.
+   * In Slatebase, plugins load after FCP, so the layout is always ready — per
+   * Obsidian's documented semantics ("called when the layout is ready, or
+   * immediately if the layout is already ready"), the callback therefore runs
+   * synchronously, in the same tick as the call. Deferring it (e.g. to a
+   * microtask) would open a timing gap real Obsidian doesn't have: plugins
+   * that build DOM off a container captured just before the call can find it
+   * replaced/removed by the time a deferred callback finally runs, since
+   * unrelated app work (React re-renders, other plugins loading) gets a
+   * chance to run in between.
    * Both sync throws and async rejections are caught to prevent unhandled errors.
    *
    * Plugin-id tagging for createEl() calls made inside `callback` is handled
    * by the per-plugin `scopeForPlugin()` wrapper applied to `app.workspace` in
    * AppShim — not here, since this method has no way to know which plugin is
-   * calling it, and by the time this deferred callback runs, any ambient
-   * "currently executing plugin" tracking would already have unwound anyway.
+   * calling it.
    */
   onLayoutReady(callback: () => void): void {
-    Promise.resolve().then(() => {
-      try {
-        const result: unknown = callback();
-        // If the callback returns a Promise (async function), catch its rejection too
-        if (result && typeof (result as { catch?: unknown }).catch === 'function') {
-          (result as Promise<unknown>).catch((err: unknown) => {
-            console.error('[WorkspaceShim] onLayoutReady async callback rejected:', err);
-          });
-        }
-      } catch (err) {
-        console.error('[WorkspaceShim] onLayoutReady callback threw:', err);
+    try {
+      const result: unknown = callback();
+      // If the callback returns a Promise (async function), catch its rejection too
+      if (result && typeof (result as { catch?: unknown }).catch === 'function') {
+        (result as Promise<unknown>).catch((err: unknown) => {
+          console.error('[WorkspaceShim] onLayoutReady async callback rejected:', err);
+        });
       }
-    });
+    } catch (err) {
+      console.error('[WorkspaceShim] onLayoutReady callback threw:', err);
+    }
   }
 
   /**
@@ -182,24 +186,12 @@ export class WorkspaceShim implements IWorkspaceShim {
         };
         this.activeLeaf = this.fileLeaf;
       }
-    } else if (this.fileLeaf) {
-      // Real Obsidian's active leaf is (almost) never null — even with no file
-      // open there's a leaf with view type "empty". Plugins rely on this (e.g.
-      // Excalidraw's isUnwantedLeaf() does `e.view?.getViewType()` on the leaf
-      // itself without null-checking `e`, so passing null here throws).
-      (this.fileLeaf as unknown as { view: { file: TFile | null; getViewType: () => string; getMode: () => string; readonly containerEl: HTMLElement } }).view = {
-        file: null,
-        getViewType: () => 'empty',
-        getMode: () => 'source',
-        get containerEl() {
-          return getActiveEditorContainerEl() ?? document.createElement('div');
-        },
-      };
-      this.activeLeaf = this.fileLeaf;
     } else {
-      // No leaf has ever been created yet (no file opened this session) —
-      // there is nothing to hand plugins, so null is the only honest option.
-      this.activeLeaf = null;
+      // Real Obsidian's active leaf is (almost) never null — even with no file
+      // open there's a leaf with view type "empty". getOrCreateEmptyLeaf()
+      // returns null only when there's truly no leaf infrastructure available
+      // (no ViewRegistry/app attached) to hand plugins anything.
+      this.activeLeaf = this.getOrCreateEmptyLeaf();
     }
 
     // Only emit events if the file actually changed
@@ -209,6 +201,32 @@ export class WorkspaceShim implements IWorkspaceShim {
         this.events.trigger('file-open', file);
       }
     }
+  }
+
+  /**
+   * Return a leaf with an "empty" view (creating the shared fallback leaf on
+   * demand if none exists yet), or null if there's no ViewRegistry/app to
+   * create one with.
+   *
+   * Real Obsidian's active leaf is (almost) never null — plugins routinely
+   * dereference `leaf.view` without checking `leaf` itself (Excalidraw's
+   * `isUnwantedLeaf()`/`onActiveLeafChangeHandler` both do), so anywhere we'd
+   * otherwise hand a plugin a bare `null` leaf, this should be used instead.
+   */
+  getOrCreateEmptyLeaf(): WorkspaceLeaf | null {
+    if (!this.fileLeaf) {
+      if (!this.viewRegistry || !this.app) return null;
+      this.fileLeaf = this.viewRegistry.createLeaf(this.app, 'main');
+    }
+    (this.fileLeaf as unknown as { view: { file: TFile | null; getViewType: () => string; getMode: () => string; readonly containerEl: HTMLElement } }).view = {
+      file: null,
+      getViewType: () => 'empty',
+      getMode: () => 'source',
+      get containerEl() {
+        return getActiveEditorContainerEl() ?? document.createElement('div');
+      },
+    };
+    return this.fileLeaf;
   }
 
   // ─── View Registration & Leaf Management ──────────────────────────────────
@@ -223,7 +241,10 @@ export class WorkspaceShim implements IWorkspaceShim {
    */
   registerView(viewType: string, creator: (leaf: WorkspaceLeaf) => unknown, pluginId?: string): void {
     if (!this.viewRegistry) {
-      console.warn(`[WorkspaceShim] registerView("${viewType}") called before ViewRegistry attached — no-op.`);
+      warnOnce(
+        `WorkspaceShim.registerView.notAttached::${viewType}`,
+        `[WorkspaceShim] registerView("${viewType}") called before ViewRegistry attached — no-op.`,
+      );
       return;
     }
     this.viewRegistry.registerView(viewType, creator, pluginId ?? 'unknown');
@@ -291,13 +312,13 @@ export class WorkspaceShim implements IWorkspaceShim {
    */
   setActiveLeaf(leaf: WorkspaceLeaf): void {
     if (!this.viewRegistry) {
-      console.warn('[WorkspaceShim] setActiveLeaf called before ViewRegistry attached — no-op.');
+      warnOnce('WorkspaceShim.setActiveLeaf.notAttached', '[WorkspaceShim] setActiveLeaf called before ViewRegistry attached — no-op.');
       return;
     }
 
     const allLeaves = this.viewRegistry.getAllLeaves();
     if (!allLeaves.includes(leaf)) {
-      console.warn('[WorkspaceShim] setActiveLeaf called with unknown leaf — no-op.');
+      warnOnce('WorkspaceShim.setActiveLeaf.unknownLeaf', '[WorkspaceShim] setActiveLeaf called with unknown leaf — no-op.');
       return;
     }
 
@@ -333,8 +354,8 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Create a new leaf by splitting an existing leaf.
    * Slatebase does not support split panes — creates a new tab instead.
    */
-  createLeafBySplit(_leaf: WorkspaceLeaf): WorkspaceLeaf {  
-    console.info('[WorkspaceShim] createLeafBySplit: Slatebase does not support split panes — created new tab instead.');
+  createLeafBySplit(_leaf: WorkspaceLeaf): WorkspaceLeaf {
+    debugOnce('WorkspaceShim.createLeafBySplit', '[WorkspaceShim] createLeafBySplit: Slatebase does not support split panes — created new tab instead.');
     if (!this.viewRegistry) {
       return this.viewRegistry!.createLeaf(this.app, 'main');
     }
@@ -345,7 +366,7 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Split the active leaf. Slatebase does not support split panes — creates a new tab instead.
    */
   splitActiveLeaf(): WorkspaceLeaf {
-    console.info('[WorkspaceShim] splitActiveLeaf: Slatebase does not support split panes — created new tab instead.');
+    debugOnce('WorkspaceShim.splitActiveLeaf', '[WorkspaceShim] splitActiveLeaf: Slatebase does not support split panes — created new tab instead.');
     if (!this.viewRegistry) {
       return this.viewRegistry!.createLeaf(this.app, 'main');
     }
@@ -365,14 +386,17 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Returns the view cast to T if the active leaf's view matches, null otherwise.
    *
    * Special case: When plugins request MarkdownView and a file is actively being edited,
-   * we return a synthetic MarkdownView wrapping the EditorShim. This allows plugins like
-   * Templater and Editor Toolbar to access the editor via the standard Obsidian pattern.
+   * we build one by constructing the REAL `window.obsidian.MarkdownView` (the
+   * Component -> View -> ItemView -> FileView -> MarkdownView chain from
+   * install-globals.ts) against the shared fileLeaf, so the result is a genuine
+   * `instanceof MarkdownView` with working registerEvent/registerDomEvent/addChild —
+   * not a disconnected lookalike. This allows plugins like Templater and Editor
+   * Toolbar to access the editor via the standard Obsidian pattern.
    *
-   * The same synthetic view is also returned for `ItemView`/`FileView` — real Obsidian's
-   * MarkdownView descends from both, so plugins commonly probe with a generic base class
-   * (Editing Toolbar calls `getActiveViewOfType(ItemView)`, not `MarkdownView`, to also
-   * cover canvas/excalidraw). Our shim classes don't share a prototype chain, so this
-   * lookup is done by identity against the real `window.obsidian` globals instead.
+   * The same view is also returned for `ItemView`/`FileView` — real Obsidian's
+   * MarkdownView descends from both, so plugins commonly probe with a generic base
+   * class (Editing Toolbar calls `getActiveViewOfType(ItemView)`, not `MarkdownView`,
+   * to also cover canvas/excalidraw).
    */
   getActiveViewOfType<T>(viewClass: new (...args: unknown[]) => T): T | null {
     if (this.activeLeaf?.view instanceof viewClass) {
@@ -380,14 +404,19 @@ export class WorkspaceShim implements IWorkspaceShim {
     }
 
     const obsidian = (window as unknown as { obsidian?: Record<string, unknown> }).obsidian;
+    const MarkdownViewClass = obsidian?.MarkdownView as (new (leaf: unknown) => object) | undefined;
     const isMarkdownViewFamily =
-      viewClass === (MarkdownView as unknown) ||
-      (!!obsidian && (viewClass === obsidian.FileView || viewClass === obsidian.ItemView));
+      !!MarkdownViewClass &&
+      (viewClass === (MarkdownViewClass as unknown) || viewClass === obsidian?.FileView || viewClass === obsidian?.ItemView);
 
     // If requesting MarkdownView (or one of its Obsidian ancestor classes) and we
-    // have an active file, create a synthetic one
-    if (isMarkdownViewFamily && this.activeFile) {
-      const mdView = new MarkdownView(this.editorShim, this.activeFile);
+    // have an active file and a leaf to build it against, construct one.
+    if (isMarkdownViewFamily && this.activeFile && MarkdownViewClass && this.fileLeaf) {
+      const mdView = new MarkdownViewClass(this.fileLeaf) as unknown as { file: TFile | null; containerEl: HTMLElement };
+      mdView.file = this.activeFile;
+      // Snapshot the live editor container — fresh per call, so this stays
+      // accurate whether or not the CM6 editor has mounted yet.
+      mdView.containerEl = getActiveEditorContainerEl() ?? mdView.containerEl;
       return mdView as unknown as T;
     }
 
@@ -511,8 +540,9 @@ export class WorkspaceShim implements IWorkspaceShim {
     const resolved = resolveWikilinkTarget(linkText, this.directoryTree);
     if (!resolved) {
       // Req 8.3: Not resolved → warn and no action
-      console.warn(
-        `[WorkspaceShim] openLinkText: could not resolve "${linkText}" — no matching file in vault.`
+      warnOnce(
+        `WorkspaceShim.openLinkText.unresolved::${linkText}`,
+        `[WorkspaceShim] openLinkText: could not resolve "${linkText}" — no matching file in vault.`,
       );
       return;
     }
@@ -575,7 +605,6 @@ export class WorkspaceShim implements IWorkspaceShim {
    * fill their extension arrays after registration and call this to apply them.
    */
   updateOptions(): void {
-    console.log('[WorkspaceShim] updateOptions() called → refreshPluginExtensions()')
     refreshPluginExtensions()
   }
 
@@ -632,10 +661,15 @@ export class WorkspaceShim implements IWorkspaceShim {
   }
 
   /**
-   * Remove an event reference. No-op in Slatebase.
+   * Remove a listener by the ref `on()` returned.
+   *
+   * This used to be a no-op on the assumption that unload cleans everything up.
+   * It doesn't cover the case plugins actually use `offref` for: unsubscribing
+   * while still loaded (a view closing, a feature toggled off in settings). The
+   * listener kept firing for the rest of the session.
    */
-  offref(_ref: unknown): void {
-    // No-op — event refs are cleaned up on unload
+  offref(ref: EventRef): void {
+    this.events.offref(ref);
   }
 
   /**
@@ -644,6 +678,14 @@ export class WorkspaceShim implements IWorkspaceShim {
   readonly rootSplit = { type: 'split', children: [] };
   readonly leftSplit = { type: 'split', collapsed: false, toggle() {}, collapse() {}, expand() {} };
   readonly rightSplit = { type: 'split', collapsed: false, toggle() {}, collapse() {}, expand() {} };
+
+  /**
+   * Ribbon (the vertical icon bar) stubs — Slatebase has no ribbon UI, so hide/show/toggle
+   * are no-ops. Exists so plugins calling `workspace.leftRibbon.hide()` (e.g. Editing
+   * Toolbar's "Workplace Fullscreen" command) don't crash on `undefined.hide()`.
+   */
+  readonly leftRibbon = { hide() {}, show() {}, toggle() {}, collapsed: false };
+  readonly rightRibbon = { hide() {}, show() {}, toggle() {}, collapsed: false };
 
   /**
    * Open a popout window leaf. Returns the active leaf (no popout support in web).
@@ -734,6 +776,8 @@ export class WorkspaceShim implements IWorkspaceShim {
       'rootSplit',
       'leftSplit',
       'rightSplit',
+      'leftRibbon',
+      'rightRibbon',
       'openPopoutLeaf',
       'getLayout',
       'getLeafById',

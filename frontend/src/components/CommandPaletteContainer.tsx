@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { CommandPalette } from './CommandPalette'
 import { usePluginContext } from '../plugins/compat/plugin-context'
 import { useFeatureContext } from '../state/featureContext'
@@ -12,13 +12,11 @@ import { useTranslation } from '../i18n'
 import { showToast } from './ToastNotification'
 import { extractErrorMessage } from '../utils/error'
 import type { Command } from '../plugins/compat/command-registry'
+import type { IApiClient } from '../api'
 import type { SettingsCategory, SettingsSection } from '../state/settingsState'
-
-/** Pages the CommandPalette can navigate to. */
-type NavigablePage =
-  | 'profile' | 'sessions' | 'chat' | 'mcp-tokens'
-  | 'admin-users' | 'admin-vaults' | 'admin-config' | 'admin-audit' | 'admin-logs'
-  | 'trash' | 'plugins'
+import { useContextPanelContext } from '../state/contextPanelContext'
+import { useSidebarPanelContext } from '../state/sidebarPanelContext'
+import { registerCoreAppCommands, type CoreAppCommandHandlers, type NavigablePage } from '../plugins/compat/core-commands-app'
 
 /**
  * Props passed from AppContent to supply app-level action callbacks.
@@ -27,11 +25,15 @@ export interface CommandPaletteContainerProps {
   onNavigate: (page: NavigablePage) => void
   onCreateVault: () => void
   onCreateFile: () => void
+  onCreateFolder: () => void
+  onCreateCanvas: () => void
   onImportFile: () => void
   onImportFolder: () => void
   onExportVault: () => void
   onOpenGraph: () => void
   onDailyNote: () => void
+  showSidebar: boolean
+  showRightPanel: boolean
   onToggleSidebar: () => void
   onToggleRightPanel: () => void
   onOpenSettings: (nav?: { category: SettingsCategory; section: SettingsSection }) => void
@@ -54,11 +56,15 @@ export function CommandPaletteContainer({
   onNavigate,
   onCreateVault,
   onCreateFile,
+  onCreateFolder,
+  onCreateCanvas,
   onImportFile,
   onImportFolder,
   onExportVault,
   onOpenGraph,
   onDailyNote,
+  showSidebar,
+  showRightPanel,
   onToggleSidebar,
   onToggleRightPanel,
   onOpenSettings,
@@ -69,10 +75,49 @@ export function CommandPaletteContainer({
   const { isEnabled } = useFeatureContext()
   const { tabState, tabDispatch } = useTabContext()
   const { state, dispatch: appDispatch, apiClient } = useAppContext()
-  const { authState } = useAuthContext()
+  const { authState, authDispatch } = useAuthContext()
+  const { state: contextPanelState, dispatch: contextPanelDispatch } = useContextPanelContext()
+  const { state: sidebarPanelState, dispatch: sidebarPanelDispatch } = useSidebarPanelContext()
   const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
   const [templateSelectorOpen, setTemplateSelectorOpen] = useState(false)
+
+  // ─── Core command registration (Obsidian's workspace:*/app:*/theme:*/... commands) ──
+  // Registered once; commands read fresh state via this ref instead of stale closures
+  // (same ref-indirection idiom EditMode.tsx uses for onSave — see its onSaveRef).
+  const coreHandlersRef = useRef<CoreAppCommandHandlers>(null as unknown as CoreAppCommandHandlers)
+  coreHandlersRef.current = {
+    vaultId: state.selectedVaultId,
+    vaultName: state.vaults.find((v) => v.id === state.selectedVaultId)?.name ?? '',
+    // App.tsx always provides a real ApiClient to AppProvider; the context type
+    // is nullable only to give tests a no-client default.
+    apiClient: apiClient as IApiClient,
+    tabState,
+    tabDispatch,
+    appDispatch,
+    authState,
+    authDispatch,
+    showSidebar,
+    showRightPanel,
+    contextPanelSections: contextPanelState.sections,
+    contextPanelDispatch,
+    sidebarPanelSections: sidebarPanelState.sections,
+    sidebarPanelDispatch,
+    onToggleSidebar,
+    onToggleRightPanel,
+    onOpenSettings,
+    onNavigate,
+    onCreateFile,
+    onCreateFolder,
+    onCreateCanvas,
+    onOpenGraph,
+    onDailyNote,
+    onOpenTemplateSelector: () => setTemplateSelectorOpen(true),
+  }
+
+  useEffect(() => {
+    registerCoreAppCommands(commandRegistry, () => coreHandlersRef.current)
+  }, [commandRegistry])
 
   const pluginCompatEnabled = isEnabled('obsidian-plugin-compat')
   const isAdmin = authState.user?.role === 'admin'

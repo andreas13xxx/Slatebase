@@ -52,6 +52,14 @@ describe('CommandRegistry', () => {
       expect(commands.map(c => c.id)).toContain('plugin-a:save');
       expect(commands.map(c => c.id)).toContain('plugin-b:save');
     });
+
+    it('registers an unprefixed ID (no leading ":") when pluginId is empty', () => {
+      registry.addCommand('', { id: 'daily-notes', name: 'Daily notes', callback: vi.fn() });
+
+      const commands = registry.getCommands();
+      expect(commands[0]!.id).toBe('daily-notes');
+      expect(registry.getCommand('daily-notes')).toBeDefined();
+    });
   });
 
   describe('removeCommand', () => {

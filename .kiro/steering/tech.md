@@ -18,7 +18,7 @@ Monorepo: `backend/` + `frontend/`. Separate `package.json` + `node_modules` eac
 
 - **Framework**: React 19, functional components
 - **Build**: Vite 8
-- **Language**: TypeScript ~6.0
+- **Language**: TypeScript ~6.0, `erasableSyntaxOnly` (no constructor parameter properties, `enum` or namespaces — type syntax must be strippable)
 - **State**: useReducer + Context (no external lib)
 - **Icons**: Lucide React
 - **Styling**: CSS Custom Properties (Design Tokens), Dark Mode

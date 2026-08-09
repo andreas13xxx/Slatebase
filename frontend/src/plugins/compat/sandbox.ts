@@ -17,6 +17,7 @@ import type {
   TrackedResources,
 } from './types';
 import { getStoredAuthToken, getStoredCsrfToken } from '../../state/authContext';
+import { setTimerTracker } from './plugin-execution-context';
 
 /** Maximum storage size per plugin per storage type (5 MB) */
 const MAX_STORAGE_SIZE_BYTES = 5 * 1024 * 1024;
@@ -59,6 +60,12 @@ export class PluginSandbox implements IPluginSandbox {
   ) {
     this.vaultId = vaultId;
     this.onAutoDeactivate = onAutoDeactivate;
+    // Global window.setTimeout/setInterval (install-globals.ts) route scheduled
+    // timers here so cleanup() can actually cancel a plugin's pending timers —
+    // see the trackPluginTimer doc comment for why this is needed.
+    setTimerTracker((pluginId, timerId) => {
+      this.contexts.get(pluginId)?.trackedResources.timers.add(timerId);
+    });
   }
 
   /**

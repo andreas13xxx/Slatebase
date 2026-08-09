@@ -124,6 +124,12 @@ export interface IEditor {
   undo(): void
   redo(): void
   exec(command: string): void
+  toggleMarkdownFormatting(type: string): void
+  toggleBulletList(): void
+  toggleNumberList(): void
+  toggleCheckList(checked?: boolean): void
+  indentList(): void
+  unindentList(): void
   processLines<T>(
     read: (line: number, lineText: string) => T | null,
     write: (line: number, lineText: string, value: T | null) => { from: EditorPosition; to?: EditorPosition; text: string } | void,
@@ -502,9 +508,19 @@ export class EditorShim implements IEditor {
     }
   }
 
-  /** Set multiple selections (applies first for textarea). */
+  /** Set multiple selections (multi-cursor). Falls back to the first range for textarea. */
   setSelections(selections: Array<{ anchor: EditorPosition; head?: EditorPosition }>): void {
     if (selections.length === 0) return
+    const cm = this.getCM6()
+    if (cm) {
+      const ranges = selections.map((sel) => {
+        const anchorOffset = this.cm6PosToOffset(cm, sel.anchor)
+        const headOffset = sel.head ? this.cm6PosToOffset(cm, sel.head) : anchorOffset
+        return CmEditorSelection.range(anchorOffset, headOffset)
+      })
+      cm.dispatch({ selection: CmEditorSelection.create(ranges) })
+      return
+    }
     const sel = selections[0]!
     this.setSelection(sel.anchor, sel.head)
   }
@@ -584,6 +600,149 @@ export class EditorShim implements IEditor {
     }
     const fn = cmdMap[command]
     if (fn) fn(cm)
+  }
+
+  /** Toggle inline markdown formatting (bold/italic/highlight/strikethrough/math) around the selection. */
+  toggleMarkdownFormatting(type: string): void {
+    const markers: Record<string, [string, string]> = {
+      bold: ['**', '**'],
+      italic: ['*', '*'],
+      highlight: ['==', '=='],
+      strikethrough: ['~~', '~~'],
+      math: ['$', '$'],
+      code: ['`', '`'],
+    }
+    const pair = markers[type]
+    if (!pair) return
+    this.toggleWrap(pair[0], pair[1])
+  }
+
+  /** Wrap/unwrap the current selection with the given marker pair, toggling on repeated use. */
+  private toggleWrap(before: string, after: string): void {
+    const fromOff = this.posToOffset(this.getCursor('from'))
+    const toOff = this.posToOffset(this.getCursor('to'))
+    const beforeLen = before.length
+    const afterLen = after.length
+    const value = this.getValue()
+
+    const selText = value.slice(fromOff, toOff)
+    const preText = value.slice(Math.max(0, fromOff - beforeLen), fromOff)
+    const postText = value.slice(toOff, toOff + afterLen)
+
+    // Selection itself contains the markers (e.g. "**bold**" is selected) — unwrap.
+    if (selText.length >= beforeLen + afterLen && selText.startsWith(before) && selText.endsWith(after)) {
+      const inner = selText.slice(beforeLen, selText.length - afterLen)
+      this.replaceRange(inner, this.offsetToPos(fromOff), this.offsetToPos(toOff))
+      this.setSelection(this.offsetToPos(fromOff), this.offsetToPos(fromOff + inner.length))
+      return
+    }
+
+    // Markers surround the selection — unwrap.
+    if (preText === before && postText === after) {
+      this.replaceRange(selText, this.offsetToPos(fromOff - beforeLen), this.offsetToPos(toOff + afterLen))
+      this.setSelection(this.offsetToPos(fromOff - beforeLen), this.offsetToPos(fromOff - beforeLen + selText.length))
+      return
+    }
+
+    // Not wrapped — wrap. With no selection this inserts an empty pair and places the cursor between them.
+    this.replaceRange(before + selText + after, this.offsetToPos(fromOff), this.offsetToPos(toOff))
+    this.setSelection(this.offsetToPos(fromOff + beforeLen), this.offsetToPos(toOff + beforeLen))
+  }
+
+  /** Toggle a "- " bullet prefix on each selected line. */
+  toggleBulletList(): void {
+    const fromLine = this.getCursor('from').line
+    const toLine = this.getCursor('to').line
+    const bulletRe = /^(\s*)([-*+])\s+/
+    let allBulleted = true
+    for (let i = fromLine; i <= toLine; i++) {
+      if (!bulletRe.test(this.getLine(i))) { allBulleted = false; break }
+    }
+    for (let i = fromLine; i <= toLine; i++) {
+      const line = this.getLine(i)
+      if (allBulleted) {
+        this.setLine(i, line.replace(bulletRe, '$1'))
+      } else if (!bulletRe.test(line)) {
+        const indent = line.match(/^\s*/)?.[0] ?? ''
+        this.setLine(i, `${indent}- ${line.slice(indent.length)}`)
+      }
+    }
+  }
+
+  /** Toggle a "1. " numbered prefix on each selected line, renumbering sequentially. */
+  toggleNumberList(): void {
+    const fromLine = this.getCursor('from').line
+    const toLine = this.getCursor('to').line
+    const numRe = /^(\s*)\d+\.\s+/
+    let allNumbered = true
+    for (let i = fromLine; i <= toLine; i++) {
+      if (!numRe.test(this.getLine(i))) { allNumbered = false; break }
+    }
+    let n = 1
+    for (let i = fromLine; i <= toLine; i++) {
+      const line = this.getLine(i)
+      if (allNumbered) {
+        this.setLine(i, line.replace(numRe, '$1'))
+      } else {
+        const indent = line.match(/^\s*/)?.[0] ?? ''
+        const rest = numRe.test(line) ? line.replace(numRe, '') : line.slice(indent.length)
+        this.setLine(i, `${indent}${n}. ${rest}`)
+        n++
+      }
+    }
+  }
+
+  /** Toggle a "- [ ] " / "- [x] " checklist prefix on each selected line. */
+  toggleCheckList(checked?: boolean): void {
+    const fromLine = this.getCursor('from').line
+    const toLine = this.getCursor('to').line
+    const checkRe = /^(\s*)([-*+])\s+\[[ xX]\]\s+/
+    const bulletRe = /^(\s*)([-*+])\s+/
+    let allChecked = true
+    for (let i = fromLine; i <= toLine; i++) {
+      if (!checkRe.test(this.getLine(i))) { allChecked = false; break }
+    }
+    const mark = checked ? 'x' : ' '
+    for (let i = fromLine; i <= toLine; i++) {
+      const line = this.getLine(i)
+      if (allChecked) {
+        this.setLine(i, line.replace(checkRe, '$1'))
+      } else if (checkRe.test(line)) {
+        this.setLine(i, line.replace(checkRe, (_m, indent, bullet) => `${indent}${bullet} [${mark}] `))
+      } else if (bulletRe.test(line)) {
+        this.setLine(i, line.replace(bulletRe, (_m, indent, bullet) => `${indent}${bullet} [${mark}] `))
+      } else {
+        const indent = line.match(/^\s*/)?.[0] ?? ''
+        this.setLine(i, `${indent}- [${mark}] ${line.slice(indent.length)}`)
+      }
+    }
+  }
+
+  /** Indent the selected lines by one level. */
+  indentList(): void {
+    const cm = this.getCM6()
+    if (cm) { CmCommands.indentMore(cm); return }
+    const fromLine = this.getCursor('from').line
+    const toLine = this.getCursor('to').line
+    for (let i = fromLine; i <= toLine; i++) {
+      this.setLine(i, '\t' + this.getLine(i))
+    }
+  }
+
+  /** Unindent the selected lines by one level. */
+  unindentList(): void {
+    const cm = this.getCM6()
+    if (cm) { CmCommands.indentLess(cm); return }
+    const fromLine = this.getCursor('from').line
+    const toLine = this.getCursor('to').line
+    for (let i = fromLine; i <= toLine; i++) {
+      const line = this.getLine(i)
+      if (line.startsWith('\t')) {
+        this.setLine(i, line.slice(1))
+      } else if (/^ {1,4}/.test(line)) {
+        this.setLine(i, line.replace(/^ {1,4}/, ''))
+      }
+    }
   }
 
   /** Process lines: read values, then write changes. */

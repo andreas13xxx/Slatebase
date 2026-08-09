@@ -163,7 +163,7 @@ describe('authReducer', () => {
 
       expect(result.mustChangePassword).toBe(false)
       expect(result.isAuthenticated).toBe(true)
-      expect(result.user).toEqual(mockAdminUser)
+      expect(result.user).toEqual({ ...mockAdminUser, mustChangePassword: false })
     })
   })
 })

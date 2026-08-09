@@ -11,6 +11,7 @@
  */
 
 import { renderLucideIconInto } from './lucide-icons'
+import { setMarkdownOverride, clearMarkdownOverride } from './file-view-registry'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -388,17 +389,86 @@ export class WorkspaceLeaf {
   }
 
   /**
+   * Run the view's load lifecycle before onOpen(), matching real Obsidian's
+   * Component -> View -> ItemView chain (WorkspaceLeaf calls `view.load()`,
+   * which sets the loaded flag and invokes `onload()`, before `onOpen()`).
+   * Real plugin views (Component-backed, via the global `obsidian.ItemView`)
+   * expose `load()`; our lightweight in-repo ItemView/TextFileView mocks
+   * (used by tests) only implement the no-op `onload()`, so fall back to
+   * calling that directly and flagging `_loaded` ourselves.
+   */
+  private runViewLoad(view: ItemView, viewType: string): void {
+    const viewAny = view as unknown as Record<string, unknown>
+    try {
+      if (typeof viewAny.load === 'function') {
+        (viewAny.load as () => void).call(view)
+      } else {
+        (viewAny as { _loaded?: boolean })._loaded = true
+        view.onload()
+      }
+    } catch (err) {
+      console.error(`[WorkspaceLeaf] Error in onload for view "${viewType}":`, err)
+    }
+  }
+
+  /**
+   * Counterpart to runViewLoad — real Component-backed views expose `unload()`,
+   * which deregisters everything `load()`/`onload()` set up via registerDomEvent/
+   * registerInterval/registerEvent/register before calling `onunload()`. Without
+   * this, those subscriptions would survive the view closing.
+   */
+  private runViewUnload(view: ItemView, viewType: string): void {
+    const viewAny = view as unknown as Record<string, unknown>
+    try {
+      if (typeof viewAny.unload === 'function') {
+        (viewAny.unload as () => void).call(view)
+      } else {
+        view.onunload()
+      }
+    } catch (err) {
+      console.error(`[WorkspaceLeaf] Error in onunload for view "${viewType}":`, err)
+    }
+  }
+
+  /**
    * Set the view state — triggers view creation/open.
    * Plugins call `leaf.setViewState({ type: 'my-view' })` to activate a registered view.
    * For TextFileView-based views, `state.state.file` specifies the file path to load.
    */
   async setViewState(state: { type: string; active?: boolean; state?: Record<string, unknown>; popstate?: boolean }): Promise<void> {
     const viewType = state.type
-    console.log(`[WorkspaceLeaf] setViewState called: type="${viewType}", location="${this.location}", registered types:`, this.registry.getRegisteredViewTypes())
     const creator = this.registry.getViewCreator(viewType)
     if (!creator) {
+      if (viewType === 'markdown') {
+        // "markdown" isn't a plugin view — it's Slatebase's native editor, which
+        // lives outside the ViewRegistry entirely. Plugins call this to implement
+        // "Open as Markdown" (Kanban's board menu, etc.): the file's frontmatter
+        // still matches the plugin's file-view matcher, so without an explicit
+        // override TabContent would just re-open the plugin view on the very next
+        // render. Recording the override here and handing off to the native
+        // workspace open is what actually makes the switch stick.
+        const filePath = (typeof state.state?.file === 'string' ? state.state.file : null)
+          ?? (this.view as unknown as { file?: { path?: string } } | null)?.file?.path
+          ?? null
+        if (filePath) {
+          setMarkdownOverride(filePath)
+          const workspace = (this.app as { workspace?: { openFileDirectly?: (filePath: string) => void } })?.workspace
+          if (workspace && typeof workspace.openFileDirectly === 'function') {
+            workspace.openFileDirectly(filePath)
+          }
+        }
+        return
+      }
       console.warn(`[WorkspaceLeaf] No view registered for type "${viewType}"`)
       return
+    }
+
+    // Switching to an actual registered plugin view for this file (e.g. Kanban's
+    // "Open as Kanban Board") lifts any earlier markdown override so the file
+    // opens as the plugin view again next time.
+    const targetFilePath = typeof state.state?.file === 'string' ? state.state.file : null
+    if (targetFilePath) {
+      clearMarkdownOverride(targetFilePath)
     }
 
     // Close existing view if any (Req 2.6: onClose before DOM removal before new view)
@@ -411,6 +481,7 @@ export class WorkspaceLeaf {
       } catch (err) {
         console.error(`[WorkspaceLeaf] Error closing view "${oldView.getViewType()}":`, err)
       }
+      this.runViewUnload(oldView, oldView.getViewType())
       oldView.containerEl.remove()
     }
 
@@ -434,9 +505,10 @@ export class WorkspaceLeaf {
       && typeof viewAny.setViewData === 'function'
       && typeof viewAny.requestSave === 'function'
     if (isTextFileView && state.state?.file && typeof state.state.file === 'string') {
-      // Mark as loaded so addChild() auto-loads children (without triggering onload() which may conflict with onOpen)
-      ;(viewAny as { _loaded?: boolean })._loaded = true
-      // Call onOpen — plugins (Kanban) set up their React root in onOpen
+      // Load then onOpen — matches real Obsidian's Component.load() (which runs
+      // onload()) followed by the leaf's own onOpen() call. Some plugins (Excalidraw)
+      // do their core setup in onload(); others (Kanban) do it in onOpen(). Both must run.
+      this.runViewLoad(view, viewType)
       try {
         await view.onOpen()
       } catch (err) {
@@ -448,9 +520,21 @@ export class WorkspaceLeaf {
       } catch (err) {
         console.error(`[WorkspaceLeaf] Error loading file in TextFileView "${viewType}":`, err)
       }
+      // Ensure a Slatebase tab is open for this file, same as openFile() does below.
+      // TextFileView-based views (Kanban, etc.) render inside the file's own tab —
+      // without this, a view opened via setViewState() (e.g. a "new board" command)
+      // never becomes visible because no tab exists for it yet.
+      try {
+        const workspace = (this.app as { workspace?: { openFileDirectly?: (filePath: string) => void } })?.workspace
+        if (workspace && typeof workspace.openFileDirectly === 'function') {
+          workspace.openFileDirectly(state.state.file)
+        }
+      } catch (err) {
+        console.error(`[WorkspaceLeaf] Error opening tab for TextFileView "${viewType}":`, err)
+      }
     } else {
-      // Mark as loaded so addChild() auto-loads children (without triggering onload() which may conflict with onOpen)
-      ;(viewAny as { _loaded?: boolean })._loaded = true
+      // Load then onOpen — see comment above.
+      this.runViewLoad(view, viewType)
       try {
         await view.onOpen()
       } catch (err) {
@@ -479,6 +563,7 @@ export class WorkspaceLeaf {
         // Req 13.4: Log error but proceed with leaf removal
         console.error(`[WorkspaceLeaf] Error closing view "${view.getViewType()}":`, err)
       }
+      this.runViewUnload(view, view.getViewType())
       // Remove containerEl from DOM
       view.containerEl.remove()
     }

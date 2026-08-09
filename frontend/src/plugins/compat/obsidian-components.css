@@ -1,0 +1,381 @@
+/**
+ * Structural CSS for the Obsidian component classes our shims render.
+ *
+ * `obsidian-compat.css` next door maps Slatebase's design tokens onto
+ * Obsidian's ~590 CSS variables, which is what plugins *read*. This file
+ * covers the other half: the classes plugins *write against*. Obsidian ships
+ * the look of `.menu`, `.suggestion-item`, `.notice`, `.svg-icon` and friends
+ * in its app stylesheet, and plugin CSS assumes that baseline exists — it only
+ * ever overrides parts of it.
+ *
+ * We had the variables but not the classes, so shim-rendered DOM using the
+ * right Obsidian class names arrived unstyled. The Menu shim papered over that
+ * with inline styles, which then made the elements unstylable by plugins and
+ * themes (a style attribute wins over any selector they can write).
+ *
+ * Everything here is expressed in the Obsidian variables from
+ * obsidian-compat.css, so it follows the active theme automatically and needs
+ * no separate dark-mode block.
+ */
+
+/* ─── Prompt / suggestion tokens ──────────────────────────────────────────
+   Obsidian's suggestion-modal variables. Absent until now, so plugin rules
+   written against them (`width: var(--prompt-width)`) resolved to nothing. */
+:root {
+  --prompt-width: 700px;
+  --prompt-max-width: 90vw;
+  --prompt-max-height: 70vh;
+  --prompt-border-width: 1px;
+  --prompt-border-color: var(--background-modifier-border);
+  --prompt-input-height: 40px;
+
+  /* Obsidian's `.svg-icon` reads --icon-size/--icon-stroke from whatever
+     context it sits in; both need a root default or icons outside a sized
+     container collapse to zero. */
+  --icon-size: var(--icon-s);
+
+  --collapse-icon-color: var(--text-faint);
+  --collapse-icon-color-collapsed: var(--text-accent);
+  --code-radius: var(--radius-s);
+  --nav-file-tag: var(--text-faint);
+}
+
+/* ─── Icons ───────────────────────────────────────────────────────────────
+   setIcon()/getIcon() emit `<svg class="svg-icon lucide-*">`, matching
+   Obsidian. Sizing lives on the class rather than the element so a container
+   can scale its icons by setting --icon-size, as plugin CSS expects. */
+.svg-icon {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  stroke-width: var(--icon-stroke, 2px);
+  flex-shrink: 0;
+}
+
+/* ─── Menu ────────────────────────────────────────────────────────────── */
+.menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--layer-menu, 65);
+}
+
+.menu {
+  position: fixed;
+  min-width: 180px;
+  max-width: 320px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: var(--size-2-3, 6px) 0;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-l);
+  font-size: var(--font-ui-small);
+  z-index: var(--layer-menu, 65);
+}
+
+.menu:focus {
+  outline: none;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2, 8px);
+  padding: var(--size-2-2, 4px) var(--size-4-3, 12px);
+  color: var(--text-normal);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.menu-item:hover,
+.menu-item:focus-visible {
+  background-color: var(--background-modifier-hover);
+  outline: none;
+}
+
+.menu-item.is-disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.menu-item.is-disabled:hover {
+  background-color: transparent;
+}
+
+.menu-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-s);
+  height: var(--icon-s);
+  color: var(--icon-color);
+  flex-shrink: 0;
+}
+
+/* Checked items get their marker in the icon slot, so a menu of toggles
+   stays aligned with one of icons. */
+.menu-item.is-checked .menu-item-icon:empty::before {
+  content: "\2713";
+  font-size: var(--font-ui-small);
+  line-height: 1;
+}
+
+/* The icon gutter is kept for items without an icon so titles line up.
+   `setNoIcon()` opts the whole menu out, as in Obsidian. */
+.menu.mod-no-icon .menu-item-icon:not(.mod-submenu-arrow) {
+  display: none;
+}
+
+.menu-item-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-item-icon.mod-submenu-arrow {
+  margin-inline-start: auto;
+  color: var(--text-faint);
+}
+
+.menu-separator {
+  height: 1px;
+  margin: var(--size-2-3, 6px) 0;
+  background-color: var(--background-modifier-border);
+}
+
+/* ─── Suggestion / prompt ─────────────────────────────────────────────────
+   The class names SuggestModal and FuzzySuggestModal render. */
+.prompt {
+  display: flex;
+  flex-direction: column;
+  width: var(--prompt-width);
+  max-width: var(--prompt-max-width);
+  max-height: var(--prompt-max-height);
+  padding: 0;
+  background-color: var(--background-primary);
+  border: var(--prompt-border-width) solid var(--prompt-border-color);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-l);
+  overflow: hidden;
+}
+
+.prompt-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.prompt-input,
+.suggestion-input {
+  width: 100%;
+  height: var(--prompt-input-height);
+  padding: 0 var(--size-4-4, 16px);
+  border: none;
+  border-bottom: 1px solid var(--background-modifier-border);
+  border-radius: 0;
+  background-color: transparent;
+  color: var(--text-normal);
+  font-size: var(--font-ui-medium);
+}
+
+.prompt-input:focus,
+.suggestion-input:focus {
+  outline: none;
+}
+
+.prompt-results,
+.suggestion-container {
+  overflow-y: auto;
+  padding: var(--size-2-3, 6px);
+}
+
+.suggestion-item,
+.suggestion {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2, 8px);
+  padding: var(--size-2-3, 6px) var(--size-4-3, 12px);
+  border-radius: var(--radius-s);
+  color: var(--text-normal);
+  cursor: pointer;
+}
+
+.suggestion-item:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.suggestion-item.is-selected {
+  background-color: var(--background-modifier-active-hover, var(--background-modifier-hover));
+}
+
+.suggestion-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.suggestion-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestion-note,
+.suggestion-aux {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+/* renderMatches()/renderResults() wrap matched ranges in this. */
+.suggestion-highlight {
+  color: var(--text-accent);
+  font-weight: var(--font-semibold, 600);
+}
+
+.suggestion-empty {
+  padding: var(--size-4-4, 16px);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ─── Notice ──────────────────────────────────────────────────────────── */
+.notice-container {
+  position: fixed;
+  top: var(--size-4-4, 16px);
+  inset-inline-end: var(--size-4-4, 16px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2, 8px);
+  z-index: var(--layer-notice, 60);
+}
+
+.notice {
+  max-width: 400px;
+  padding: var(--size-4-3, 12px) var(--size-4-4, 16px);
+  background-color: var(--background-secondary-alt, var(--background-secondary));
+  color: var(--text-normal);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-l);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+}
+
+.notice.mod-error {
+  background-color: var(--background-modifier-error);
+  color: var(--text-error);
+}
+
+/* ─── Modal extras ────────────────────────────────────────────────────────
+   .modal / .modal-bg / .modal-container / .modal-content are styled in
+   App.css; these are the parts only the plugin shims render. */
+.modal-title {
+  margin: 0 0 var(--size-4-3, 12px);
+  font-size: var(--font-ui-large);
+  font-weight: var(--font-semibold, 600);
+  color: var(--text-normal);
+  line-height: var(--line-height-tight);
+}
+
+.modal-close-button {
+  position: absolute;
+  top: var(--size-4-2, 8px);
+  inset-inline-end: var(--size-4-2, 8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--icon-color);
+  cursor: pointer;
+}
+
+.modal-close-button:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--icon-color-hover, var(--text-normal));
+}
+
+.modal-close-button::before {
+  content: "\00d7";
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* ─── Settings ────────────────────────────────────────────────────────────
+   Obsidian's heading modifier is `.setting-item-heading`; our Setting shim
+   renders `.setting-item--heading` (BEM, styled in App.css). Accepting both
+   keeps plugin CSS written against the Obsidian name working. */
+.setting-item-heading {
+  padding-top: var(--size-4-6, 24px);
+  border-top: none;
+  font-weight: var(--font-semibold, 600);
+}
+
+.setting-item-heading .setting-item-name {
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold, 600);
+}
+
+/* ─── Buttons ─────────────────────────────────────────────────────────────
+   `mod-warning` is Obsidian's destructive-action modifier; `mod-cta` is
+   already covered in App.css. */
+button.mod-warning {
+  background-color: var(--background-modifier-error);
+  color: var(--text-error);
+}
+
+button.mod-warning:hover {
+  background-color: var(--background-modifier-error-hover);
+}
+
+/* ─── Search input ────────────────────────────────────────────────────────
+   Setting.addSearch() renders Obsidian's structure — a container holding the
+   input and an overlaid clear button. The container has to establish a
+   positioning context or the button lands at the top of the page; Obsidian's
+   own stylesheet does the same, and plugin CSS assumes it. */
+.search-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input-container > input {
+  width: 100%;
+  padding-inline-end: var(--size-4-6, 24px);
+}
+
+.search-input-clear-button {
+  position: absolute;
+  inset-inline-end: var(--size-2-2, 4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-4-4, 16px);
+  height: var(--size-4-4, 16px);
+  border-radius: var(--radius-s);
+  color: var(--text-faint);
+  cursor: var(--cursor);
+}
+
+/* Obsidian only shows the clear button once there is something to clear.
+   Driven by a class rather than :placeholder-shown, which is false for an
+   input with no placeholder at all and would leave the button permanently on. */
+.search-input-clear-button.is-hidden {
+  display: none;
+}
+
+.search-input-clear-button:hover {
+  color: var(--text-normal);
+  background-color: var(--background-modifier-hover);
+}
+
+.search-input-clear-button::before {
+  content: "\00d7";
+  font-size: var(--font-ui-medium);
+  line-height: 1;
+}

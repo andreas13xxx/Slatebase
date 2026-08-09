@@ -19,6 +19,8 @@
  */
 
 import { getStoredAuthToken, getStoredCsrfToken } from '../../state/authContext'
+import { debugLog } from './log'
+import { OBSIDIAN_API_VERSION, compareApiVersions } from './obsidian-api-extensions'
 
 type Obs = Record<string, unknown>
 
@@ -530,9 +532,10 @@ export function registerFallbackShims(): void {
   set('getIconIds', () => [])
   set('removeIcon', () => {})
 
-  // Version
-  set('apiVersion', '1.4.0')
-  set('requireApiVersion', () => true)
+  // Version. Answering against the version we claim rather than always `true`,
+  // for the same reason as the real implementation — see install-globals.
+  set('apiVersion', OBSIDIAN_API_VERSION)
+  set('requireApiVersion', (version: string) => compareApiVersions(OBSIDIAN_API_VERSION, version) >= 0)
 
   // Utilities
   set('parseYaml', fallbackParseYaml)
@@ -584,8 +587,40 @@ export function registerFallbackShims(): void {
   set('MomentFormatComponent', FallbackMomentFormatComponent)
   set('ProgressBarComponent', FallbackProgressBarComponent)
 
+  // Type-test-only exports. Plugins narrow with `instanceof` against these
+  // (`leaf.parent instanceof WorkspaceTabs`, `item instanceof MenuSeparator`)
+  // and, being classes rather than values, that is nearly all they are used for.
+  //
+  // A missing name is not a silent gap here — `x instanceof undefined` is a
+  // TypeError that takes the plugin down at an unrelated line. Declaring them
+  // turns that into `false`, which is also the honest answer for the layout
+  // classes: Slatebase's workspace is a flat set of tabs with no split/sidedock
+  // object model, so nothing is an instance of them. `AbstractTextComponent`
+  // and `PopoverSuggest` extend the concrete classes already registered above,
+  // so for those the test answers correctly rather than just safely.
+  //
+  // PopoverSuggest is normally already set by installObsidianGlobals() (real
+  // Component-chain base of EditorSuggest/AbstractInputSuggest) — `set()`'s
+  // guard skips this in that case. EditorSuggest is the closer relative if this
+  // fallback layer ever runs on its own; SuggestModal (unrelated in real
+  // Obsidian — it only extends Modal) is the last-resort answer, not the first.
+  const textComponent = obs['TextComponent'] as (new () => object) | undefined
+  if (textComponent) set('AbstractTextComponent', textComponent)
+  const popoverSuggestFallback = (obs['EditorSuggest'] ?? obs['SuggestModal']) as (new (...args: never[]) => object) | undefined
+  if (popoverSuggestFallback) set('PopoverSuggest', popoverSuggestFallback)
+  set('MarkdownPreviewView', obs['MarkdownView'] ?? class MarkdownPreviewView {})
+  set('MenuItem', class MenuItem {})
+  set('MenuSeparator', class MenuSeparator {})
+  for (const name of [
+    'WorkspaceItem', 'WorkspaceParent', 'WorkspaceContainer', 'WorkspaceSplit',
+    'WorkspaceTabs', 'WorkspaceRoot', 'WorkspaceSidedock', 'WorkspaceMobileDrawer',
+    'WorkspaceWindow', 'WorkspaceFloating', 'WorkspaceRibbon',
+  ]) {
+    set(name, class WorkspaceLayoutItem {})
+  }
+
   if (filled.length > 0) {
-    console.info(
+    debugLog(
       `[PluginCompat] ${filled.length} Obsidian API(s) resolved to the minimal ` +
         `fallback shim rather than a full implementation: ${filled.sort().join(', ')}`,
     )

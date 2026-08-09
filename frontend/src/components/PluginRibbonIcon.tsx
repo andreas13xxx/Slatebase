@@ -14,6 +14,7 @@ import {
   Puzzle,
 } from 'lucide-react'
 import type { RibbonIconEntry } from '../plugins/compat/ribbon-icon-registry'
+import { warnOnce } from '../plugins/compat/log'
 
 // ─── Icon Resolution ─────────────────────────────────────────────────────────
 
@@ -243,7 +244,7 @@ function resolveIconKey(iconName: string): string {
   }
 
   // Fallback — log so we can add mappings for newly discovered icons
-  console.warn(`[PluginRibbonIcon] Unknown icon "${iconName}" — using fallback`)
+  warnOnce(`PluginRibbonIcon.unknownIcon::${iconName}`, `[PluginRibbonIcon] Unknown icon "${iconName}" — using fallback`)
   return ''
 }
 

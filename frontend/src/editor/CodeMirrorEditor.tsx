@@ -30,8 +30,9 @@ import { createSlatebaseTheme, createSlatebaseHighlightStyle } from './theme'
 import { getEditorState, saveEditorState, editorHistoryExtension } from './state-store'
 import { applyFormatting as applyFormattingAction } from './formatting'
 import { createLivePreviewCompartmentExtension, createLivePreviewField, createLivePreviewClickHandler, type LivePreviewOptions } from './live-preview'
+import { warnOnce } from '../plugins/compat/log'
 import { setActiveEditorView, setActiveEditorContainerEl, getActivePluginExtensions, getActivePluginCompletions } from './plugin-extensions'
-import { editorInfoField, editorEditorField, editorLivePreviewField } from './editor-state-fields'
+import { editorInfoField, editorEditorField, editorLivePreviewField, livePreviewStateTracker } from './editor-state-fields'
 import { setEditorInfo, setEditorEditor, setEditorLivePreview, type EditorFileInfo } from './editor-state-fields'
 import './live-preview/live-preview.css'
 
@@ -110,7 +111,7 @@ export function CodeMirrorEditor({
     // Auto-disable Live Preview for files >50,000 chars
     const effectiveLivePreview = livePreview && content.length <= 50000
     if (livePreview && content.length > 50000) {
-      console.warn('[CodeMirrorEditor] Live Preview auto-disabled: file exceeds 50,000 characters')
+      warnOnce('CodeMirrorEditor.livePreviewAutoDisabled', '[CodeMirrorEditor] Live Preview auto-disabled: file exceeds 50,000 characters')
     }
 
     // Collect plugin-provided completions
@@ -133,6 +134,8 @@ export function CodeMirrorEditor({
       })),
       editorEditorField,
       editorLivePreviewField.init(() => livePreview),
+      // Obsidian's `livePreviewState` plus the pointer tracking that fills it.
+      livePreviewStateTracker,
       markdown({
         base: markdownLanguageWithProps,
         codeLanguages: languages,
@@ -141,6 +144,11 @@ export function CodeMirrorEditor({
       createSlatebaseTheme(),
       createSlatebaseHighlightStyle(),
       EditorView.lineWrapping,
+      // Multi-cursor support — off by default in CM6. Needed for Obsidian's
+      // editor:add-cursor-above/below core commands (see core-commands.ts);
+      // relaxing this only permits multi-range selections, it doesn't change
+      // any single-cursor editing behavior.
+      EditorState.allowMultipleSelections.of(true),
       // Shows a cursor following the mouse while a file is dragged over the
       // editor, so the drop position (e.g. for an image) is visible before release.
       dropCursor(),
@@ -315,7 +323,7 @@ export function CodeMirrorEditor({
     const docLength = view.state.doc.length
     const effectiveLivePreview = livePreview && docLength <= 50000
     if (livePreview && docLength > 50000) {
-      console.warn('[CodeMirrorEditor] Live Preview auto-disabled: file exceeds 50,000 characters')
+      warnOnce('CodeMirrorEditor.livePreviewAutoDisabled', '[CodeMirrorEditor] Live Preview auto-disabled: file exceeds 50,000 characters')
     }
     const options = livePreviewOptions ?? { vaultId: '', directoryTree: null }
     view.dispatch({

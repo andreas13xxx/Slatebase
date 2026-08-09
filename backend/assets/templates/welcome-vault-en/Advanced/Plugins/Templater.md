@@ -6,6 +6,15 @@ tags: [advanced, plugins]
 
 Templater extends the template system with dynamic commands. Instead of static placeholders (`{{date}}`), you can use JavaScript expressions, date calculations, and interactive prompts in your templates.
 
+> [!example] Live examples in this vault
+> The `Templates/Templater` folder contains four ready-made Templater templates you can try right after installing the plugin:
+> - [[Templates/Templater/Daily Note (Templater)]]
+> - [[Templates/Templater/Meeting Notes (Templater)]]
+> - [[Templates/Templater/Weekly Review (Templater)]]
+> - [[Templates/Templater/Project Template (Templater)]]
+>
+> In the Templater plugin settings, set the templates folder to `Templates/Templater` and create a new file from one of them — every `<% ... %>` expression below is evaluated live.
+
 ---
 
 ## Prerequisites
@@ -294,17 +303,18 @@ priority: medium
 
 > [!todo] Exercise
 > 1. Install and activate the Templater plugin
-> 2. Set the templates folder in plugin settings
-> 3. Create a template `Templates/daily-templater.md` with date functions
-> 4. Create a new file from this template (`Ctrl+P` → "Templater")
-> 5. Verify that date placeholders were correctly replaced
-> 6. Create a meeting template with `tp.date.now()` and `tp.file.title`
+> 2. Set the templates folder in plugin settings to `Templates/Templater`
+> 3. Create a new file from [[Templates/Templater/Daily Note (Templater)]] (`Ctrl+P` → "Templater")
+> 4. Verify that date placeholders were correctly replaced
+> 5. Also try [[Templates/Templater/Meeting Notes (Templater)]] and [[Templates/Templater/Weekly Review (Templater)]]
+> 6. Then create your own template `Templates/Templater/my-template.md` with `tp.date.now()` and `tp.file.title`
 > 7. Test relative dates: yesterday, tomorrow, next week
 
 ---
 
 ## Related Features
 
+- `Templates/Templater` — Live example templates to try
 - [[Features/Templates and Daily Notes]] — Slatebase's built-in templates
 - [[Advanced/Plugins/Calendar]] — Calendar with Templater integration
 - [[Features/Command Palette]] — Templater commands

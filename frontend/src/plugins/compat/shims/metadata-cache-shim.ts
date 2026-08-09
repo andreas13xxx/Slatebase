@@ -198,6 +198,16 @@ export class MetadataCacheShim implements IMetadataCacheShim {
     return this.events.on(event, callback);
   }
 
+  /**
+   * Remove a listener by the ref `on()` returned.
+   *
+   * Part of Obsidian's `Events` base class, which MetadataCache extends. Without
+   * it, `metadataCache.offref(ref)` was a TypeError.
+   */
+  offref(ref: EventRef): void {
+    this.events.offref(ref);
+  }
+
   /** Remove an event listener. */
   off(event: string, callback: (...args: unknown[]) => void): void {
     this.events.off(event, callback);

@@ -212,7 +212,6 @@ export function registerPluginExtension(pluginId: string, extension: Extension):
     // Store the reference so refreshPluginExtensions() can re-read it.
     if (Array.isArray(extension)) {
       entry.mutableRefs.push(extension as Extension[])
-      console.log(`[PluginExtensionManager] Plugin "${pluginId}" registered mutable array ref (length: ${(extension as Extension[]).length})`)
       // If the array already has content, also add to extensions
       if ((extension as Extension[]).length > 0) {
         entry.extensions.push(extension)
@@ -290,7 +289,6 @@ function buildEffectiveExtensions(entry: PluginCompartmentEntry): Extension[] {
  */
 export function refreshPluginExtensions(): void {
   if (!activeView) {
-    console.log('[PluginExtensionManager] refreshPluginExtensions called but no activeView')
     return
   }
 
@@ -299,7 +297,6 @@ export function refreshPluginExtensions(): void {
     if (entry.mutableRefs.length === 0) continue
 
     const effective = buildEffectiveExtensions(entry)
-    console.log(`[PluginExtensionManager] refreshPluginExtensions for "${entry.pluginId}": effective=${effective.length}, mutableRefs=${entry.mutableRefs.length}, refLengths=[${entry.mutableRefs.map(r => r.length).join(',')}]`)
     // Skip if no effective extensions
     if (effective.length === 0) continue
 

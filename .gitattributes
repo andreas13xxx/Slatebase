@@ -1,0 +1,6 @@
+# Vault template assets are served to the browser byte-for-byte and parsed by
+# plugin regexes that assume Unix line endings (e.g. Excalidraw's DRAWING_REG
+# requires a literal `\n` around its ```json fences). With core.autocrlf=true
+# on Windows, editing these without this rule silently reintroduces CRLF and
+# breaks that parsing again — pin them to LF regardless of checkout platform.
+backend/assets/templates/** text eol=lf

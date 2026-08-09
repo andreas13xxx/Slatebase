@@ -31,7 +31,7 @@ import { STORAGE_KEY_TOKEN, STORAGE_KEY_CSRF } from '../../state/authContext';
 // relied upon transitively, so the namespace is guaranteed complete no matter
 // which entry point reaches the loader first. Idempotent.
 import { installObsidianGlobals } from './install-globals';
-import { withPluginContext } from './plugin-execution-context';
+import { withPluginContextAsync } from './plugin-execution-context';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -149,6 +149,10 @@ export class PluginLoader implements IPluginLoader {
       instance = new (PluginClass as new (app: IAppShim) => PluginInstance)(app);
       // Ensure manifest data is attached
       instance.manifest = this.toManifestData(manifest);
+      // Register the instance into app.plugins so `app.plugins.getPlugin(id)`
+      // resolves — plugins commonly look themselves (or each other) up this way
+      // to reach `.settings` (e.g. Excalidraw does this during its own onload).
+      (app as unknown as { registerPlugin?: (id: string, inst: PluginInstance) => void }).registerPlugin?.(pluginId, instance);
       // Call post-instantiation hook (e.g. to wire addCommand to CommandRegistry)
       if (this.deps.onPluginInstantiated) {
         this.deps.onPluginInstantiated(pluginId, instance);
@@ -203,16 +207,19 @@ export class PluginLoader implements IPluginLoader {
         unregister: () => {},
       };
 
-      // Scoped so createEl() calls made during onload (and, via captured
-      // pluginId on registered listeners/deferred callbacks, afterward too —
-      // see plugin-execution-context.ts) get tagged with this plugin's id.
-      const onloadResult = withPluginContext(pluginId, () => record.instance.onload());
-      const onloadPromise = onloadResult instanceof Promise
-        ? onloadResult.catch((err: unknown) => {
-            console.error(`[PluginLoader] Plugin "${pluginId}" onload() rejected:`, err);
-            throw err;
-          })
-        : Promise.resolve();
+      // Scoped so createEl() calls made during onload — including everything
+      // after an internal `await` inside an async onload(), not just its first
+      // synchronous chunk (see withPluginContextAsync) — and, via captured
+      // pluginId on registered listeners/deferred callbacks, afterward too
+      // (see plugin-execution-context.ts) get tagged with this plugin's id.
+      const onloadPromise = withPluginContextAsync(pluginId, async () => {
+        try {
+          return await record.instance.onload();
+        } catch (err) {
+          console.error(`[PluginLoader] Plugin "${pluginId}" onload() rejected:`, err);
+          throw err;
+        }
+      });
 
       // LiveSync (and similar plugins) do `void this._startUp()` in onload — fire-and-forget.
       // Add a temporary unhandledrejection listener to catch any async errors during startup.
@@ -240,6 +247,7 @@ export class PluginLoader implements IPluginLoader {
 
       record.status = 'active';
       this.deps.onStatusChange(pluginId, 'active');
+      console.info(`[PluginLoader] Plugin "${pluginId}" activated`);
     } catch (err) {
       if (this.plugins.get(pluginId) !== record || record.status === 'deactivated') {
         return;
@@ -268,9 +276,17 @@ export class PluginLoader implements IPluginLoader {
       return; // Plugin not loaded, nothing to deactivate
     }
 
-    // Call onunload() in try/catch — cleanup happens regardless
+    // Prefer unload(): the Component/Plugin base class releases what it tracked
+    // (registered cleanups, event refs, intervals, child components) and calls
+    // onunload() itself. Calling onunload() directly would skip all of that.
+    // Fall back for instances that only define onunload().
+    const instance = record.instance as { unload?: () => void; onunload: () => void };
     try {
-      record.instance.onunload();
+      if (typeof instance.unload === 'function') {
+        instance.unload();
+      } else {
+        instance.onunload();
+      }
     } catch (err) {
       console.error(
         `[PluginLoader] Plugin "${pluginId}" threw during onunload:`,
@@ -288,10 +304,16 @@ export class PluginLoader implements IPluginLoader {
       );
     }
 
+    // Remove from the shared plugins registry so a stale/unloaded instance
+    // isn't returned by another plugin's `app.plugins.getPlugin(id)`.
+    (window as unknown as { app?: { plugins?: { unregisterPlugin?: (id: string) => void } } })
+      .app?.plugins?.unregisterPlugin?.(pluginId);
+
     record.status = 'deactivated';
     if (notifyStatusChange) {
       this.deps.onStatusChange(pluginId, 'deactivated');
     }
+    console.info(`[PluginLoader] Plugin "${pluginId}" deactivated`);
   }
 
   /**
@@ -427,6 +449,9 @@ if (typeof process === 'undefined') {
 if (!window.__slatebaseOriginalFetch) {
   window.__slatebaseOriginalFetch = window.fetch.bind(window);
 }
+if (!window.__slatebaseProxyWarned) {
+  window.__slatebaseProxyWarned = new Set();
+}
 if (!window.__slatebaseProxyFetch) {
   const __originalFetch = window.__slatebaseOriginalFetch;
   const __slatebaseToken = () => localStorage.getItem('${STORAGE_KEY_TOKEN}') || '';
@@ -436,7 +461,6 @@ if (!window.__slatebaseProxyFetch) {
     catch { return false; }
   }
   async function __proxyFetch(url, method, headers, body, contentType) {
-    console.log('[ProxyFetch] >>>', method, url);
     const r = await __originalFetch('/api/v1/proxy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + __slatebaseToken(), 'X-CSRF-Token': __slatebaseCsrf() },
@@ -444,7 +468,13 @@ if (!window.__slatebaseProxyFetch) {
     });
     const data = await r.json();
     const respStatus = data.status || 200;
-    console.log('[ProxyFetch] <<<', method, url, 'status:', respStatus);
+    if (respStatus >= 400) {
+      const warnKey = method + ' ' + url + ' ' + respStatus;
+      if (!window.__slatebaseProxyWarned.has(warnKey)) {
+        window.__slatebaseProxyWarned.add(warnKey);
+        console.warn('[ProxyFetch] Proxied request failed:', method, url, 'status:', respStatus);
+      }
+    }
     if (!r.ok) {
       return new Response(JSON.stringify({ error: data.message || 'Proxy error' }), {
         status: respStatus,
@@ -537,9 +567,7 @@ if (!window.__slatebaseXHRPatched) {
       }
       var bodyStr = (body && typeof body === 'string') ? body : undefined;
       var ct = _headers['Content-Type'] || _headers['content-type'] || undefined;
-      console.log('[ProxyXHR] >>>', _method, _url);
       __proxyFetch(_url, _method, _headers, bodyStr, ct).then(function(response) {
-        console.log('[ProxyXHR] <<<', _method, _url, 'status:', response.status);
         Object.defineProperty(xhr, 'status', { value: response.status, writable: false, configurable: true });
         Object.defineProperty(xhr, 'statusText', { value: response.statusText || '', writable: false, configurable: true });
         Object.defineProperty(xhr, 'readyState', { value: 4, writable: false, configurable: true });

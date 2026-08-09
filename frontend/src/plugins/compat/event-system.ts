@@ -1,5 +1,6 @@
 import type { EventRef, IEventEmitter } from './types';
 import { getCurrentPluginId, withPluginContext } from './plugin-execution-context';
+import { errorOnce } from './log';
 
 /** Internal listener entry stored per event */
 interface ListenerEntry {
@@ -14,6 +15,35 @@ let nextId = 0;
 /** Generate a unique ID for each EventRef */
 function generateId(): string {
   return `evt_${(nextId++).toString(36)}_${Date.now().toString(36)}`;
+}
+
+/**
+ * Which emitter produced each EventRef.
+ *
+ * `Component.registerEvent(ref)` promises to deregister the listener on unload,
+ * but an EventRef alone does not say where it came from — and every shim
+ * (Vault, Workspace, MetadataCache) hands out refs from its own EventSystem.
+ * A WeakMap keeps the association without putting an internal field on the ref
+ * object, which plugins can see and Obsidian's own EventRef does not have.
+ */
+const owners = new WeakMap<EventRef, EventSystem>();
+
+/**
+ * Deregister an EventRef at whichever emitter produced it.
+ *
+ * @returns `false` if the ref did not come from an EventSystem, so callers can
+ *          fall back or report the gap instead of silently doing nothing.
+ */
+export function offrefAtOwner(ref: EventRef): boolean {
+  const owner = owners.get(ref);
+  if (!owner) return false;
+  owner.offref(ref);
+  return true;
+}
+
+/** Whether this ref came from an EventSystem and can therefore be deregistered. */
+export function isOwnedEventRef(ref: unknown): ref is EventRef {
+  return typeof ref === 'object' && ref !== null && owners.has(ref as EventRef);
 }
 
 /**
@@ -43,7 +73,9 @@ export class EventSystem implements IEventEmitter {
       this.listeners.set(event, [entry]);
     }
 
-    return { id, event, callback };
+    const ref: EventRef = { id, event, callback };
+    owners.set(ref, this);
+    return ref;
   }
 
   /**
@@ -83,8 +115,9 @@ export class EventSystem implements IEventEmitter {
       try {
         withPluginContext(entry.pluginId, () => entry.callback(...args));
       } catch (err) {
-        console.error(
-          `[PluginEventSystem] Exception in event callback for "${event}":`,
+        errorOnce(
+          `PluginEventSystem.callbackError::${event}::${entry.pluginId}`,
+          `[PluginEventSystem] Exception in event callback for "${event}" (plugin "${entry.pluginId}"):`,
           err
         );
       }
