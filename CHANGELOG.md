@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.0](https://github.com/andreas13xxx/Slatebase/compare/v0.27.2...v0.28.0) (2026-08-10)
+
+
+### Features
+
+* Obsidian API 1.8.7 audit, session robustness, polish specs ([4fe5d38](https://github.com/andreas13xxx/Slatebase/commit/4fe5d3854d1513c9227351b77ce4a2db40007c12))
+
 ## [0.27.2](https://github.com/andreas13xxx/Slatebase/compare/v0.27.1...v0.27.2) (2026-08-10)
 
 
