@@ -5,6 +5,9 @@ node_modules/
 dist/
 build/
 
+# TypeScript incremental build cache (rewritten by every `tsc` run)
+*.tsbuildinfo
+
 # Environment files
 .env
 .env.local
