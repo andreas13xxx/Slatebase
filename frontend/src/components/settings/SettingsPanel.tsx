@@ -6,11 +6,12 @@
  * @module components/settings/SettingsPanel
  */
 
-import { useEffect, useCallback, useRef } from 'react'
+import { useEffect, useCallback } from 'react'
 import React from 'react'
 import { useAuthContext } from '../../state/authContext'
 import { matchesShortcut } from '../../state/keybindingsStore'
 import { useAppContext } from '../../state'
+import { useFocusTrap } from '../../hooks/useFocusTrap'
 import { SettingsProvider } from '../../state/settingsContext'
 import { SettingsSidebar } from './SettingsSidebar'
 import { SettingsContent } from './SettingsContent'
@@ -45,47 +46,18 @@ export interface SettingsPanelProps {
 export function SettingsPanel({ open, onClose, initialNav }: SettingsPanelProps) {
   const { authState } = useAuthContext()
   const { state: appState } = useAppContext()
-  const panelRef = useRef<HTMLDivElement>(null)
-  const previousFocusRef = useRef<HTMLElement | null>(null)
+
+  const containerRef = useFocusTrap<HTMLDivElement>({
+    isActive: open,
+    onEscape: onClose,
+    returnFocusOnDeactivate: true,
+  })
 
   const isAdmin = authState.user?.role === 'admin'
 
   const vaults = appState.vaults
     .filter(v => v.permission === 'owner')
     .map(v => ({ id: v.id, name: v.name }))
-
-  // Store the previously focused element when opening
-  useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement as HTMLElement | null
-    }
-  }, [open])
-
-  // Focus the panel when it opens
-  useEffect(() => {
-    if (open && panelRef.current) {
-      panelRef.current.focus()
-    }
-  }, [open])
-
-  // Restore focus when closing
-  useEffect(() => {
-    if (!open && previousFocusRef.current) {
-      previousFocusRef.current.focus()
-      previousFocusRef.current = null
-    }
-  }, [open])
-
-  // Handle Escape key to close
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        onClose()
-      }
-    },
-    [onClose],
-  )
 
   // Handle overlay click to close
   const handleOverlayClick = useCallback(
@@ -108,7 +80,7 @@ export function SettingsPanel({ open, onClose, initialNav }: SettingsPanelProps)
           return
         }
         // Panel is already open — focus it
-        panelRef.current?.focus()
+        containerRef.current?.focus()
       }
     }
 
@@ -116,7 +88,7 @@ export function SettingsPanel({ open, onClose, initialNav }: SettingsPanelProps)
     return () => {
       document.removeEventListener('keydown', handleGlobalKeyDown)
     }
-  }, [open])
+  }, [open, containerRef])
 
   if (!open) {
     return null
@@ -132,9 +104,8 @@ export function SettingsPanel({ open, onClose, initialNav }: SettingsPanelProps)
     >
       <div
         className="settings-panel"
-        ref={panelRef}
+        ref={containerRef}
         tabIndex={-1}
-        onKeyDown={handleKeyDown}
       >
         <header className="settings-panel-header">
           <h1 className="settings-panel-title">Einstellungen</h1>

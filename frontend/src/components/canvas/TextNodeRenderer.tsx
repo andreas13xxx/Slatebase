@@ -95,6 +95,20 @@ export const TextNodeRenderer = memo(function TextNodeRenderer({
     }
   }, [node.text, onEditEnd])
 
+  const handleNodeKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      // Don't activate when already editing or when inside a textarea/input
+      if (editing) return
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'TEXTAREA' || tag === 'INPUT') return
+      e.preventDefault()
+      if (!readOnly) {
+        setInternalEditing(true)
+        setEditText(node.text)
+      }
+    }
+  }, [editing, readOnly, node.text])
+
   return (
     <div
       className={`canvas-node canvas-node--text ${colorClass} ${selected ? 'canvas-node--selected' : ''}`}
@@ -107,6 +121,7 @@ export const TextNodeRenderer = memo(function TextNodeRenderer({
       data-node-id={node.id}
       onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
+      onKeyDown={handleNodeKeyDown}
       role="button"
       tabIndex={0}
       aria-label={`Textknoten${readOnly ? ' (nur lesen)' : ''}`}

@@ -23,6 +23,9 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
         working-directory: backend
+      - name: Dependency audit
+        run: npm audit --audit-level=high --omit=dev
+        working-directory: backend
       - run: npm run lint
         working-directory: backend
       - run: npm run test:coverage
@@ -40,6 +43,9 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+        working-directory: frontend
+      - name: Dependency audit
+        run: npm audit --audit-level=high --omit=dev
         working-directory: frontend
       - run: npm run lint
         working-directory: frontend

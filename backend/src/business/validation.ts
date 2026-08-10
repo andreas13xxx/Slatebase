@@ -86,6 +86,7 @@ export function validateVaultName(name: string, existingNames: string[]): Valida
  * - Must not be empty or whitespace-only
  * - Must not contain path separators (`/` or `\`)
  * - Must not contain null bytes (`\0`)
+ * - Must not be a relative path reference (`.` or `..`) — prevents path traversal
  * - Must not exceed maxLength characters (default: 255)
  *
  * Throws InvalidNameError with a descriptive reason on failure.
@@ -105,6 +106,11 @@ export function validateContentName(name: string, maxLength: number = 255): void
 
   if (name.includes('\0')) {
     throw new InvalidNameError(name, 'Name must not contain null bytes')
+  }
+
+  // Reject path traversal sequences (.. navigates to parent, . is a no-op rename)
+  if (name === '..' || name === '.') {
+    throw new InvalidNameError(name, 'Name must not be a relative path reference (. or ..)')
   }
 
   if (name.length > maxLength) {

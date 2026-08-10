@@ -676,6 +676,7 @@ function AppContent() {
         teleport floating UI to a guaranteed-visible root. No visual/behavioral
         effect in Slatebase itself — see mod-vertical/mod-root and
         workspace-tab-container above for the same pattern. */}
+    <a href="#main-content" className="skip-link">{t('common.skipToContent')}</a>
     <div className="app app-container">
       <CommandPaletteContainer
         onNavigate={handleNavigate}
@@ -766,7 +767,7 @@ function AppContent() {
         </div>
       )}
 
-      <main className="app-main app-main--vault-view">
+      <main id="main-content" className="app-main app-main--vault-view">
         {/* workspace-split/mod-vertical/mod-root: Obsidian-parity marker classes some
             community plugins (e.g. Editing Toolbar's fullscreen-focus) query for via
             document.querySelector to find the workspace root — no visual/behavioral
@@ -838,9 +839,15 @@ function AppContent() {
             <div
               className="resize-handle"
               onMouseDown={sidebar.onMouseDown}
+              onKeyDown={sidebar.onKeyDown}
               title={t('resize.adjustWidth')}
               role="separator"
               aria-orientation="vertical"
+              aria-valuenow={sidebar.width}
+              aria-valuemin={sidebar.min}
+              aria-valuemax={sidebar.max}
+              aria-label={t('resize.adjustWidth')}
+              tabIndex={0}
             />
           )}
 
@@ -893,9 +900,15 @@ function AppContent() {
               <div
                 className="resize-handle"
                 onMouseDown={rightPanel.onMouseDown}
+                onKeyDown={rightPanel.onKeyDown}
                 title={t('resize.adjustWidth')}
                 role="separator"
                 aria-orientation="vertical"
+                aria-valuenow={rightPanel.width}
+                aria-valuemin={rightPanel.min}
+                aria-valuemax={rightPanel.max}
+                aria-label={t('resize.adjustWidth')}
+                tabIndex={0}
               />
               <aside className="app-right-panel" style={{ width: rightPanel.width }}>
                 <PluginViewPanel />

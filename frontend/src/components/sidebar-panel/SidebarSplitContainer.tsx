@@ -66,6 +66,9 @@ export function SidebarSplitContainer({
   const startYRef = useRef(0)
   const startFractionsRef = useRef<number[]>([])
 
+  /** Step size for keyboard-driven resize (fraction of total height). */
+  const KEYBOARD_STEP = 10 / (panelHeight || 1)
+
   // ─── Resize Logic ────────────────────────────────────────────────────────
 
   const handleResizeStart = useCallback((e: React.MouseEvent, handleIndex: number) => {
@@ -74,6 +77,37 @@ export function SidebarSplitContainer({
     startYRef.current = e.clientY
     startFractionsRef.current = sections.map((s) => s.heightFraction)
   }, [sections])
+
+  /** Handle arrow key resize on a focused separator. */
+  const handleResizeKeyDown = useCallback((e: React.KeyboardEvent, handleIndex: number) => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+    e.preventDefault()
+
+    const fractions = sections.map((s) => s.heightFraction)
+    const topFraction = fractions[handleIndex]
+    const bottomFraction = fractions[handleIndex + 1]
+    if (topFraction === undefined || bottomFraction === undefined) return
+
+    const delta = e.key === 'ArrowDown' ? KEYBOARD_STEP : -KEYBOARD_STEP
+    const containerHeight = panelHeight || 1
+    const minFraction = MIN_SECTION_HEIGHT / containerHeight
+
+    let newTop = topFraction + delta
+    let newBottom = bottomFraction - delta
+
+    if (newTop < minFraction) {
+      newTop = minFraction
+      newBottom = topFraction + bottomFraction - minFraction
+    }
+    if (newBottom < minFraction) {
+      newBottom = minFraction
+      newTop = topFraction + bottomFraction - minFraction
+    }
+
+    fractions[handleIndex] = newTop
+    fractions[handleIndex + 1] = newBottom
+    onResize(fractions)
+  }, [sections, panelHeight, onResize, KEYBOARD_STEP])
 
   useEffect(() => {
     if (resizingIndex === null) return
@@ -172,9 +206,14 @@ export function SidebarSplitContainer({
               <div
                 className={`sidebar-split-resize-handle${resizingIndex === index - 1 ? ' sidebar-split-resize-handle--active' : ''}`}
                 onMouseDown={(e) => handleResizeStart(e, index - 1)}
+                onKeyDown={(e) => handleResizeKeyDown(e, index - 1)}
                 role="separator"
                 aria-orientation="horizontal"
+                aria-valuenow={Math.round(sections[index - 1]!.heightFraction * 100)}
+                aria-valuemin={Math.round((MIN_SECTION_HEIGHT / (panelHeight || 1)) * 100)}
+                aria-valuemax={100 - Math.round((MIN_SECTION_HEIGHT / (panelHeight || 1)) * 100)}
                 aria-label="Bereichsgröße anpassen"
+                tabIndex={0}
               />
             )}
 

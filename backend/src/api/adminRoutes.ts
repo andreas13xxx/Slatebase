@@ -2,6 +2,7 @@
 
 import type { Context } from 'hono'
 import { Hono } from 'hono'
+import { z } from 'zod'
 import type { IUserService, IRoleService, PaginationOptions } from '../user/index.js'
 import {
   UserNotFoundError,
@@ -42,6 +43,110 @@ function createApiError(code: string, message: string): ApiError {
     message,
     timestamp: new Date().toISOString(),
   }
+}
+
+// ─── Zod Schemas ─────────────────────────────────────────────────────────────
+
+/**
+ * Schema for route params containing `:userId`.
+ * Non-empty string, max 64 characters (user IDs are shorter, but leave margin).
+ */
+const userIdParamSchema = z.object({
+  userId: z.string().min(1, 'userId must not be empty').max(64, 'userId too long'),
+})
+
+/**
+ * Schema for route params containing `:userId` and `:sessionId`.
+ */
+const sessionParamsSchema = z.object({
+  userId: z.string().min(1, 'userId must not be empty').max(64, 'userId too long'),
+  sessionId: z.string().min(1, 'sessionId must not be empty').max(256, 'sessionId too long'),
+})
+
+/**
+ * Schema for pagination query params (page, pageSize).
+ * Accepts strings from query params and coerces to numbers.
+ */
+const paginationQuerySchema = z.object({
+  page: z.coerce.number().int().min(1, 'Page must be a positive integer').default(1),
+  pageSize: z.coerce.number().int().min(1, 'Page size must be at least 1').max(100, 'Page size must be at most 100').default(20),
+})
+
+/**
+ * Valid audit action values for query-param validation.
+ */
+const auditActionEnum = z.enum([
+  'LOGIN_SUCCESS',
+  'LOGIN_FAILED',
+  'LOGOUT',
+  'PASSWORD_CHANGED',
+  'PASSWORD_RESET',
+  'ROLE_CHANGED',
+  'USER_CREATED',
+  'USER_DELETED',
+  'USER_SUSPENDED',
+  'USER_UNSUSPENDED',
+  'VAULT_SHARE_CREATED',
+  'VAULT_SHARE_REVOKED',
+  'VAULT_SHARE_UPDATED',
+  'VAULT_OWNERSHIP_TRANSFERRED',
+  'CONFIG_CHANGED',
+  'FEATURE_TOGGLED',
+])
+
+/**
+ * ISO 8601 date string schema (YYYY-MM-DD format).
+ */
+const isoDateSchema = z.string().regex(
+  /^\d{4}-\d{2}-\d{2}$/,
+  'Date must be in YYYY-MM-DD format',
+)
+
+/**
+ * Schema for audit log query params.
+ */
+const auditQuerySchema = z.object({
+  action: auditActionEnum.optional(),
+  startDate: isoDateSchema.optional(),
+  endDate: isoDateSchema.optional(),
+  page: z.coerce.number().int().min(1, 'Page must be a positive integer').default(1),
+  pageSize: z.coerce.number().int().min(1, 'Page size must be at least 1').max(100, 'Page size must be at most 100').default(20),
+})
+
+/**
+ * Valid log level enum for server log query.
+ */
+const logLevelEnum = z.enum(['debug', 'info', 'warn', 'error'])
+
+/**
+ * Schema for server logs query params.
+ */
+const logsQuerySchema = z.object({
+  level: logLevelEnum.optional(),
+  startDate: isoDateSchema.optional(),
+  endDate: isoDateSchema.optional(),
+  search: z.string().max(256, 'Search term too long').optional(),
+  page: z.coerce.number().int().min(1, 'Page must be a positive integer').default(1),
+  pageSize: z.coerce.number().int().min(1, 'Page size must be at least 1').max(100, 'Page size must be at most 100').default(50),
+})
+
+/**
+ * Schema for the changeRole body.
+ * Wraps role in an object so we validate the body shape.
+ */
+const changeRoleBodySchema = z.object({
+  role: roleSchema,
+})
+
+// ─── Helpers: Validation ─────────────────────────────────────────────────────
+
+/**
+ * Extracts the first error message from a Zod error and returns a 400 response.
+ */
+function validationErrorResponse(c: Context, zodError: z.ZodError): Response {
+  const firstError = zodError.errors[0]
+  const message = firstError ? firstError.message : 'Validation failed'
+  return c.json(createApiError('VALIDATION_ERROR', message), 400)
 }
 
 // ─── AdminController Interface ───────────────────────────────────────────────
@@ -103,21 +208,14 @@ export class AdminController implements IAdminController {
    */
   async listUsers(c: Context): Promise<Response> {
     try {
-      const pageParam = c.req.query('page')
-      const pageSizeParam = c.req.query('pageSize')
+      const raw = c.req.query()
+      const parsed = paginationQuerySchema.safeParse(raw)
 
-      const page = pageParam !== undefined ? parseInt(pageParam, 10) : 1
-      const pageSize = pageSizeParam !== undefined ? parseInt(pageSizeParam, 10) : 20
-
-      if (isNaN(page) || page < 1) {
-        return c.json(createApiError('VALIDATION_ERROR', 'Page must be a positive integer'), 400)
+      if (!parsed.success) {
+        return validationErrorResponse(c, parsed.error)
       }
 
-      if (isNaN(pageSize) || pageSize < 1 || pageSize > 100) {
-        return c.json(createApiError('VALIDATION_ERROR', 'Page size must be between 1 and 100'), 400)
-      }
-
-      const options: PaginationOptions = { page, pageSize }
+      const options: PaginationOptions = { page: parsed.data.page, pageSize: parsed.data.pageSize }
       const result = await this.userService.listUsers(options)
 
       return c.json(result, 200)
@@ -170,8 +268,12 @@ export class AdminController implements IAdminController {
    */
   async deleteUser(c: Context): Promise<Response> {
     try {
-      const userId = c.req.param('userId') as string
-      await this.userService.deleteUser(userId)
+      const paramsParsed = userIdParamSchema.safeParse({ userId: c.req.param('userId') })
+      if (!paramsParsed.success) {
+        return validationErrorResponse(c, paramsParsed.error)
+      }
+
+      await this.userService.deleteUser(paramsParsed.data.userId)
       return c.body(null, 204)
     } catch (error) {
       return this.handleError(c, error)
@@ -184,16 +286,22 @@ export class AdminController implements IAdminController {
    */
   async changeRole(c: Context): Promise<Response> {
     try {
-      const userId = c.req.param('userId') as string
-      const body = await c.req.json()
-
-      const parsed = roleSchema.safeParse(body?.role)
-      if (!parsed.success) {
-        return c.json(createApiError('VALIDATION_ERROR', 'Role must be "admin" or "user"'), 400)
+      const paramsParsed = userIdParamSchema.safeParse({ userId: c.req.param('userId') })
+      if (!paramsParsed.success) {
+        return validationErrorResponse(c, paramsParsed.error)
       }
 
-      await this.roleService.assignRole(userId, parsed.data)
-      return c.json({ userId, role: parsed.data }, 200)
+      const body = await c.req.json()
+      const bodyParsed = changeRoleBodySchema.safeParse(body)
+      if (!bodyParsed.success) {
+        return validationErrorResponse(c, bodyParsed.error)
+      }
+
+      const { userId } = paramsParsed.data
+      const { role } = bodyParsed.data
+
+      await this.roleService.assignRole(userId, role)
+      return c.json({ userId, role }, 200)
     } catch (error) {
       return this.handleError(c, error)
     }
@@ -205,9 +313,13 @@ export class AdminController implements IAdminController {
    */
   async resetPassword(c: Context): Promise<Response> {
     try {
-      const userId = c.req.param('userId') as string
-      const tempPassword = await this.userService.resetPassword(userId)
-      return c.json({ userId, temporaryPassword: tempPassword }, 200)
+      const paramsParsed = userIdParamSchema.safeParse({ userId: c.req.param('userId') })
+      if (!paramsParsed.success) {
+        return validationErrorResponse(c, paramsParsed.error)
+      }
+
+      const tempPassword = await this.userService.resetPassword(paramsParsed.data.userId)
+      return c.json({ userId: paramsParsed.data.userId, temporaryPassword: tempPassword }, 200)
     } catch (error) {
       return this.handleError(c, error)
     }
@@ -219,7 +331,12 @@ export class AdminController implements IAdminController {
    */
   async suspendUser(c: Context): Promise<Response> {
     try {
-      const userId = c.req.param('userId') as string
+      const paramsParsed = userIdParamSchema.safeParse({ userId: c.req.param('userId') })
+      if (!paramsParsed.success) {
+        return validationErrorResponse(c, paramsParsed.error)
+      }
+
+      const { userId } = paramsParsed.data
       await this.userService.suspendUser(userId)
       return c.json({ userId, suspended: true }, 200)
     } catch (error) {
@@ -232,7 +349,12 @@ export class AdminController implements IAdminController {
    */
   async unsuspendUser(c: Context): Promise<Response> {
     try {
-      const userId = c.req.param('userId') as string
+      const paramsParsed = userIdParamSchema.safeParse({ userId: c.req.param('userId') })
+      if (!paramsParsed.success) {
+        return validationErrorResponse(c, paramsParsed.error)
+      }
+
+      const { userId } = paramsParsed.data
       await this.userService.unsuspendUser(userId)
       return c.json({ userId, suspended: false }, 200)
     } catch (error) {
@@ -245,7 +367,12 @@ export class AdminController implements IAdminController {
    */
   async listUserSessions(c: Context): Promise<Response> {
     try {
-      const userId = c.req.param('userId') as string
+      const paramsParsed = userIdParamSchema.safeParse({ userId: c.req.param('userId') })
+      if (!paramsParsed.success) {
+        return validationErrorResponse(c, paramsParsed.error)
+      }
+
+      const { userId } = paramsParsed.data
 
       // Verify user exists
       await this.userService.getUser(userId)
@@ -262,8 +389,15 @@ export class AdminController implements IAdminController {
    */
   async invalidateUserSession(c: Context): Promise<Response> {
     try {
-      const userId = c.req.param('userId') as string
-      const sessionId = c.req.param('sessionId') as string
+      const paramsParsed = sessionParamsSchema.safeParse({
+        userId: c.req.param('userId'),
+        sessionId: c.req.param('sessionId'),
+      })
+      if (!paramsParsed.success) {
+        return validationErrorResponse(c, paramsParsed.error)
+      }
+
+      const { userId, sessionId } = paramsParsed.data
 
       // Verify user exists
       await this.userService.getUser(userId)
@@ -364,21 +498,11 @@ export class AdminController implements IAdminController {
    */
   async getAuditLog(c: Context): Promise<Response> {
     try {
-      const actionParam = c.req.query('action')
-      const startDate = c.req.query('startDate')
-      const endDate = c.req.query('endDate')
-      const pageParam = c.req.query('page')
-      const pageSizeParam = c.req.query('pageSize')
+      const raw = c.req.query()
+      const parsed = auditQuerySchema.safeParse(raw)
 
-      const page = pageParam !== undefined ? parseInt(pageParam, 10) : 1
-      const pageSize = pageSizeParam !== undefined ? parseInt(pageSizeParam, 10) : 20
-
-      if (isNaN(page) || page < 1) {
-        return c.json(createApiError('VALIDATION_ERROR', 'Page must be a positive integer'), 400)
-      }
-
-      if (isNaN(pageSize) || pageSize < 1 || pageSize > 100) {
-        return c.json(createApiError('VALIDATION_ERROR', 'Page size must be between 1 and 100'), 400)
+      if (!parsed.success) {
+        return validationErrorResponse(c, parsed.error)
       }
 
       const filter: {
@@ -387,18 +511,18 @@ export class AdminController implements IAdminController {
         endDate?: string
         page: number
         pageSize: number
-      } = { page, pageSize }
+      } = { page: parsed.data.page, pageSize: parsed.data.pageSize }
 
-      if (actionParam !== undefined) {
-        filter.action = actionParam as AuditAction
+      if (parsed.data.action !== undefined) {
+        filter.action = parsed.data.action as AuditAction
       }
 
-      if (startDate !== undefined) {
-        filter.startDate = startDate
+      if (parsed.data.startDate !== undefined) {
+        filter.startDate = parsed.data.startDate
       }
 
-      if (endDate !== undefined) {
-        filter.endDate = endDate
+      if (parsed.data.endDate !== undefined) {
+        filter.endDate = parsed.data.endDate
       }
 
       const result = await this.auditService.query(filter)
@@ -418,45 +542,29 @@ export class AdminController implements IAdminController {
     }
 
     try {
-      const levelParam = c.req.query('level')
-      const startDate = c.req.query('startDate')
-      const endDate = c.req.query('endDate')
-      const search = c.req.query('search')
-      const pageParam = c.req.query('page')
-      const pageSizeParam = c.req.query('pageSize')
+      const raw = c.req.query()
+      const parsed = logsQuerySchema.safeParse(raw)
 
-      const page = pageParam !== undefined ? parseInt(pageParam, 10) : 1
-      const pageSize = pageSizeParam !== undefined ? parseInt(pageSizeParam, 10) : 50
-
-      if (isNaN(page) || page < 1) {
-        return c.json(createApiError('VALIDATION_ERROR', 'Page must be a positive integer'), 400)
-      }
-
-      if (isNaN(pageSize) || pageSize < 1 || pageSize > 100) {
-        return c.json(createApiError('VALIDATION_ERROR', 'Page size must be between 1 and 100'), 400)
-      }
-
-      const validLevels = new Set(['debug', 'info', 'warn', 'error'])
-      if (levelParam !== undefined && !validLevels.has(levelParam)) {
-        return c.json(createApiError('VALIDATION_ERROR', 'Level must be one of: debug, info, warn, error'), 400)
+      if (!parsed.success) {
+        return validationErrorResponse(c, parsed.error)
       }
 
       const filter: { level?: LogLevel; startDate?: string; endDate?: string; search?: string; page: number; pageSize: number } = {
-        page,
-        pageSize,
+        page: parsed.data.page,
+        pageSize: parsed.data.pageSize,
       }
 
-      if (levelParam !== undefined) {
-        filter.level = levelParam as LogLevel
+      if (parsed.data.level !== undefined) {
+        filter.level = parsed.data.level as LogLevel
       }
-      if (startDate !== undefined) {
-        filter.startDate = startDate
+      if (parsed.data.startDate !== undefined) {
+        filter.startDate = parsed.data.startDate
       }
-      if (endDate !== undefined) {
-        filter.endDate = endDate
+      if (parsed.data.endDate !== undefined) {
+        filter.endDate = parsed.data.endDate
       }
-      if (search !== undefined) {
-        filter.search = search
+      if (parsed.data.search !== undefined) {
+        filter.search = parsed.data.search
       }
 
       const result = await this.serverLogStore.query(filter)

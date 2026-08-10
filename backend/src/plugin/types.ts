@@ -40,6 +40,8 @@ export interface PluginRegistryData {
     installedAt: string;
     updatedAt: string;
     error?: string;
+    /** True if the plugin bundle contains eval()/new Function() patterns (security indicator) */
+    hasEvalUsage?: boolean;
   }>;
 }
 

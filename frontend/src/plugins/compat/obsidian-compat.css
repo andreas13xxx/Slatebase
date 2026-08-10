@@ -30,32 +30,32 @@
   --text-normal: #0f172a;
   --text-muted: #475569;
   --text-muted-rgb: 71, 85, 105;
-  --text-faint: #94a3b8;
+  --text-faint: #64748b;
   --text-on-accent: #ffffff;
   --text-error: #dc2626;
   --text-success: #16a34a;
-  --text-accent: #0d9488;
-  --text-accent-hover: #0f766e;
+  --text-accent: #0f766e;
+  --text-accent-hover: #115e59;
   --caret-color: var(--text-normal);
 
   /* ─── Interactive / Accent ──────────────────────────────────────────────── */
   --interactive-normal: #ffffff;
   --interactive-hover: #f1f5f9;
-  --interactive-accent: #0d9488;
-  --interactive-accent-hover: #0f766e;
-  --interactive-accent-rgb: 13, 148, 136;
+  --interactive-accent: #0f766e;
+  --interactive-accent-hover: #115e59;
+  --interactive-accent-rgb: 15, 118, 110;
   --interactive-accent-hsl: var(--accent-h), var(--accent-s), var(--accent-l);
 
   /* ─── Accent HSL components + alias ──────────────────────────────────────── */
-  --accent-h: 175;
-  --accent-s: 84%;
-  --accent-l: 32%;
+  --accent-h: 173;
+  --accent-s: 77%;
+  --accent-l: 26%;
   --color-accent: var(--interactive-accent);
 
   /* ─── UI ────────────────────────────────────────────────────────────────── */
   --icon-color: #475569;
   --icon-color-hover: #0f172a;
-  --icon-color-focused: #0d9488;
+  --icon-color-focused: #0f766e;
   --tab-text-color: #475569;
   --tab-text-color-focused: #0f172a;
 
@@ -122,7 +122,7 @@
   --h6-color: #475569;
 
   /* ─── Tags ──────────────────────────────────────────────────────────────── */
-  --tag-color: #0d9488;
+  --tag-color: #0f766e;
   --tag-color-hover: var(--text-accent-hover);
   --tag-background: #f0fdfa;
   --tag-background-hover: #ccfbf1;
@@ -138,8 +138,8 @@
   --tag-weight: var(--font-medium);
 
   /* ─── Links ─────────────────────────────────────────────────────────────── */
-  --link-color: #0d9488;
-  --link-color-hover: #0f766e;
+  --link-color: #0f766e;
+  --link-color-hover: #115e59;
   --link-decoration: none;
   --link-decoration-hover: underline;
   --link-decoration-thickness: 1px;
@@ -149,7 +149,7 @@
   --link-unresolved-filter: none;
   --link-unresolved-decoration-style: solid;
   --link-unresolved-decoration-color: var(--link-unresolved-color);
-  --link-external-color: #0d9488;
+  --link-external-color: #0f766e;
   --link-external-color-hover: var(--link-color-hover);
   --link-external-decoration: none;
   --link-external-decoration-hover: underline;
@@ -194,8 +194,8 @@
   --color-base-60: #1e293b;
   --color-base-70: #0f172a;
   --color-base-100: #000000;
-  --color-accent-1: #0d9488;
-  --color-accent-2: #0f766e;
+  --color-accent-1: #0f766e;
+  --color-accent-2: #115e59;
 
   /* ─── Sizing (Obsidian spacing scale) ───────────────────────────────────── */
   --size-2-1: 2px;
@@ -872,7 +872,7 @@
     --text-normal: var(--text-primary, #e6edf3);
     --text-muted: var(--text-secondary, #8b949e);
     --text-muted-rgb: 139, 148, 158;
-    --text-faint: #484f58;
+    --text-faint: #7a8088;
     --text-on-accent: #ffffff;
     --text-error: #f85149;
     --text-success: #3fb950;

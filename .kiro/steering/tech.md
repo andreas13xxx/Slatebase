@@ -24,7 +24,7 @@ Monorepo: `backend/` + `frontend/`. Separate `package.json` + `node_modules` eac
 - **Styling**: CSS Custom Properties (Design Tokens), Dark Mode
 - **Markdown**: unified + remark-parse + remark-gfm + remark-frontmatter + custom Obsidian plugins
 - **Test**: Vitest (+ `@vitest/coverage-v8`) + Testing Library + Playwright (e2e)
-- **Lint**: ESLint (react-hooks, react-refresh)
+- **Lint**: ESLint (react-hooks, react-refresh, jsx-a11y)
 - **Proxy**: Vite → `http://localhost:3000`
 
 ## Commands
@@ -75,6 +75,8 @@ test. Config: `backend/vitest.config.ts` and the `test.coverage` block in `front
 | vite / vitest | Build + test |
 | @testing-library/react | Component testing |
 | playwright | E2E testing |
+| vitest-axe | Automated accessibility testing (axe-core for Vitest) |
+| eslint-plugin-jsx-a11y-x | Static JSX accessibility lint rules (ESLint 10 compat fork) |
 | unified / remark-parse / remark-gfm / remark-frontmatter | Markdown (MDAST) |
 | micromark / mdast-util-from-markdown / mdast-util-to-markdown | Obsidian plugins (transitive, used directly) |
 | unist-util-visit | Callout transformer (transitive, used directly) |

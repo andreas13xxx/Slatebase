@@ -8,6 +8,56 @@
  * - Main-thread blocking detection (>5s → auto-deactivate)
  * - Deny-by-default permissions for new plugins
  * - Resource cleanup on deactivation (DOM elements, timers, event listeners, WebSockets)
+ *
+ * ─── SECURITY NOTE: Soft Isolation — NOT a Security Boundary ───────────────────
+ *
+ * This sandbox is a **Proxy-based soft isolation layer**, NOT a true security
+ * boundary. It enforces access-control policies (vault isolation, network
+ * allowlist, storage namespacing) but cannot prevent a deliberately malicious
+ * plugin from escaping.
+ *
+ * Known bypass vectors:
+ *
+ * 1. **Same-context execution:** Plugins run in the same main-thread JavaScript
+ *    context as the host application — no process, Worker, or iframe separation.
+ *    Any global state (window, document, prototype chains) is reachable.
+ *
+ * 2. **Unproxied window properties:** Only explicitly intercepted APIs (fetch,
+ *    XHR, Storage, timers) are proxied. A plugin can access any window property
+ *    that is not explicitly wrapped (e.g. `navigator`, `indexedDB`,
+ *    `WebSocket` constructor directly).
+ *
+ * 3. **Pre-proxy closures:** Closures captured before proxy installation retain
+ *    references to the original, unproxied APIs. A plugin that caches
+ *    `window.fetch` at module-evaluation time bypasses the fetch proxy.
+ *
+ * 4. **Prototype manipulation:** `Function.prototype.call`, `.apply`, `.bind`,
+ *    and `Reflect.*` can bypass proxy traps or invoke trapped functions with
+ *    an altered `this` context.
+ *
+ * 5. **Shared DOM:** Plugins can read and modify any DOM node in the document
+ *    (not just their own container). CSS-scoping via `data-plugin-id` is a
+ *    convention, not an enforcement boundary.
+ *
+ * 6. **Side-channels:** SharedArrayBuffer, BroadcastChannel, postMessage, and
+ *    Service Workers (if available) allow cross-context communication that
+ *    bypasses any in-process proxy.
+ *
+ * Trust model:
+ *
+ * Plugins are **trust-on-install**. They originate from:
+ * - The Obsidian Community Plugin list (domain-allowlisted GitHub releases), or
+ * - Direct ZIP upload by the vault owner (explicit trust decision).
+ *
+ * This matches Obsidian's own trust model: plugins are community-vetted code
+ * that runs with full app privileges once installed. The sandbox here limits
+ * accidental cross-vault data leakage and resource exhaustion, NOT intentional
+ * malice.
+ *
+ * Future: Real process-level isolation (Worker / Node.js `vm` / `isolated-vm`)
+ * is scoped as a future feature in the `server-side-plugins` spec (Priority 4).
+ * See `.kiro/specs/` for details.
+ * ───────────────────────────────────────────────────────────────────────────────
  */
 
 import type {

@@ -45,6 +45,15 @@ interface SidebarToolbarProps {
  * Draggable vertical toolbar to the left of the file explorer.
  * Buttons can be reordered by drag-and-drop.
  * Tooltips show on hover.
+ *
+ * Accessibility Landmark Assessment (R3.2):
+ * This component uses `role="toolbar"` with `aria-label` — NOT `<header>`.
+ * Rationale: The toolbar is a vertical icon action strip (create, import, graph,
+ * settings, etc.), not a page-level header or navigation banner. A `<header>`
+ * landmark would mislead screenreader users into expecting page title/navigation.
+ * The existing `role="toolbar"` correctly identifies this region as a collection
+ * of related action buttons per WAI-ARIA toolbar pattern. Screenreaders announce
+ * it as "Werkzeugleiste toolbar" which is accurate. No change needed.
  */
 export function SidebarToolbar({ vaultId, vaultPermission, onCreateVault, onCreateFile, onCreateCanvas, onImportFile, onImportFolder, onExportVault, onNavigate, onOpenGraph, onOpenTrash, onDailyNote, onOpenSettings, isAdmin, isVaultOwner, globalUnreadCount }: SidebarToolbarProps) {
   const { isEnabled } = useFeatureContext()

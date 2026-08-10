@@ -5,6 +5,7 @@ import { useAppContext } from '../state'
 import { useAuthContext } from '../state/authContext'
 import { useTranslation } from '../i18n'
 import { createConversation, loadConversations } from '../state/chatActions'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 import type { UserSearchResult } from '../api'
 
 /** Props for the NewConversation component. */
@@ -48,6 +49,13 @@ export function NewConversation({ onClose }: NewConversationProps) {
   const resultsRef = useRef<HTMLUListElement>(null)
 
   const currentUserId = authState.user?.userId ?? ''
+
+  // Focus trap: Tab cycling + Escape → close
+  const containerRef = useFocusTrap<HTMLDivElement>({
+    isActive: true,
+    onEscape: onClose,
+    returnFocusOnDeactivate: true,
+  })
 
   /**
    * Performs the user search and filters out already-selected and current user.
@@ -169,23 +177,10 @@ export function NewConversation({ onClose }: NewConversationProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  /**
-   * Closes dialog on Escape key.
-   */
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent): void {
-      if (e.key === 'Escape') {
-        onClose()
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
-
   return (
     <div className="new-conversation-overlay" onClick={onClose}>
       <div
+        ref={containerRef}
         className="new-conversation-modal"
         onClick={(e) => e.stopPropagation()}
         role="dialog"

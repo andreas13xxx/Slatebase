@@ -11,6 +11,7 @@
 
 import type { Context } from 'hono'
 import { Hono } from 'hono'
+import { z } from 'zod'
 import type { SessionContext } from '../auth/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { IMcpTokenService } from '../mcp/token-service.js'
@@ -30,6 +31,15 @@ function createApiError(code: string, message: string): { code: string; message:
     timestamp: new Date().toISOString(),
   }
 }
+
+// ─── Zod Schemas ─────────────────────────────────────────────────────────────
+
+/** Schema for DELETE /:tokenId path parameter. Token IDs are hex strings (max 64 chars). */
+const tokenIdParamSchema = z.object({
+  tokenId: z.string()
+    .min(1, 'tokenId must not be empty')
+    .max(64, 'tokenId too long'),
+})
 
 // ─── Factory Function ────────────────────────────────────────────────────────
 
@@ -114,7 +124,14 @@ export function createMcpTokenRoutes(deps: {
       return c.json(createApiError('UNAUTHORIZED', 'Missing session context'), 401)
     }
 
-    const tokenId = c.req.param('tokenId') as string
+    // Validate tokenId param
+    const paramsParsed = tokenIdParamSchema.safeParse({ tokenId: c.req.param('tokenId') })
+    if (!paramsParsed.success) {
+      const firstError = paramsParsed.error.errors[0]
+      const message = firstError ? firstError.message : 'Invalid tokenId'
+      return c.json(createApiError('VALIDATION_ERROR', message), 400)
+    }
+    const { tokenId } = paramsParsed.data
 
     try {
       await tokenService.revokeToken(session.userId, tokenId)

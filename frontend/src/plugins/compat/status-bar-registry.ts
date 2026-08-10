@@ -36,6 +36,8 @@ const listeners = new Set<StatusBarChangeListener>()
 /**
  * Register a status bar item for a plugin.
  * Returns the HTMLElement that the plugin populates with content.
+ * The element is made keyboard-accessible: focusable via tabIndex and
+ * Enter/Space trigger a synthetic click (for plugins that attach onClick).
  *
  * @param pluginId - The plugin registering the item
  * @returns HTMLElement the plugin can modify (textContent, innerHTML, children)
@@ -44,6 +46,14 @@ export function addStatusBarItem(pluginId: string): HTMLElement {
   const element = document.createElement('div')
   element.className = 'status-bar__plugin-item'
   element.dataset.pluginId = pluginId
+  element.setAttribute('role', 'button')
+  element.tabIndex = 0
+  element.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      element.click()
+    }
+  })
 
   const entry: StatusBarItemEntry = { pluginId, element }
   items.push(entry)

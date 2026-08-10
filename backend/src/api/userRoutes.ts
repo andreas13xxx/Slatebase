@@ -5,13 +5,26 @@
 
 import type { Context } from 'hono'
 import type { Hono } from 'hono'
+import { z } from 'zod'
 import type { IUserService, UpdateProfileData } from '../user/index.js'
 import { UserNotFoundError, UserValidationError, VaultOwnershipError } from '../user/index.js'
 import type { ILogger } from '../logger/index.js'
-import { updateProfileSchema, changePasswordSchema } from '../user/validation.js'
+import { updateProfileSchema, changePasswordSchema, passwordSchema } from '../user/validation.js'
 import type { SessionContext } from '../auth/index.js'
 import type { RouteModule } from './index.js'
 import type { SlidingWindowRateLimiter } from '../shared/sliding-window-rate-limiter.js'
+
+// ─── Zod Schemas ─────────────────────────────────────────────────────────────
+
+/** Schema for DELETE /users/me request body (password confirmation). */
+const deleteAccountSchema = z.object({
+  password: passwordSchema,
+})
+
+/** Schema for GET /users/search query parameter. */
+const searchQuerySchema = z.object({
+  q: z.string().min(1, 'Search query must not be empty').max(128, 'Search query too long (max 128 characters)'),
+})
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -175,20 +188,17 @@ export class UserController {
       return c.json(apiError, 400)
     }
 
-    // Validate password field is present
-    if (body === null || typeof body !== 'object' || !('password' in body)) {
-      const apiError = createApiError('VALIDATION_ERROR', 'Missing required field: password')
-      return c.json(apiError, 400)
-    }
-
-    const { password } = body as { password: unknown }
-    if (typeof password !== 'string' || password.length === 0) {
-      const apiError = createApiError('VALIDATION_ERROR', 'Password must be a non-empty string')
+    // Validate with Zod schema
+    const result = deleteAccountSchema.safeParse(body)
+    if (!result.success) {
+      const firstIssue = result.error.issues[0]
+      const message = firstIssue !== undefined ? firstIssue.message : 'Invalid input'
+      const apiError = createApiError('VALIDATION_ERROR', message)
       return c.json(apiError, 400)
     }
 
     try {
-      await this.userService.deleteSelf(session.userId, password)
+      await this.userService.deleteSelf(session.userId, result.data.password)
       return c.body(null, 204)
     } catch (error) {
       return this.handleError(c, error)
@@ -200,16 +210,24 @@ export class UserController {
    * Returns up to 10 matching users with public info.
    */
   async searchUsers(c: Context): Promise<Response> {
-    const query = c.req.query('q')
+    const queryParam = c.req.query('q') ?? ''
 
-    if (!query || query.trim().length === 0) {
-      return c.json([], 200)
+    // Validate query parameter with Zod
+    const parsed = searchQuerySchema.safeParse({ q: queryParam })
+    if (!parsed.success) {
+      // Empty query returns empty results (backwards-compatible)
+      const firstIssue = parsed.error.issues[0]
+      if (firstIssue !== undefined && firstIssue.message.includes('must not be empty')) {
+        return c.json([], 200)
+      }
+      const message = firstIssue !== undefined ? firstIssue.message : 'Invalid input'
+      const apiError = createApiError('VALIDATION_ERROR', message)
+      return c.json(apiError, 400)
     }
 
-    const trimmed = query.trim()
-    if (trimmed.length > 128) {
-      const apiError = createApiError('VALIDATION_ERROR', 'Search query too long (max 128 characters)')
-      return c.json(apiError, 400)
+    const trimmed = parsed.data.q.trim()
+    if (trimmed.length === 0) {
+      return c.json([], 200)
     }
 
     try {

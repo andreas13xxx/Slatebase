@@ -14,7 +14,7 @@
 | 2 | Public Sharing | C | ~15–20h | Geplant (keine Spec) |
 | 3 | Semantische Suche / AI-Embeddings | E | ~38–58h | Geplant (keine Spec) |
 | 4 | Server-Side Plugins | B | ~48–68h | Tasks vorhanden |
-| 5 | Security Hardening | F | ~20–30h | Spec vollständig (Req + Design + Tasks) |
+| 5 | Security Hardening | F | ~20–30h | ✅ Erledigt (2026-08) |
 | 6 | Accessibility Audit | F | ~24–34h | Spec vollständig (Req + Design + Tasks) |
 | 7 | Responsive/Mobile | F | ~24–34h | Spec vollständig (Req + Design + Tasks) |
 | 8 | Collaborative Editing | D | ~68–88h | Nur Requirements |
@@ -28,7 +28,7 @@ Track B (Plugins):     Community Plugin Store ✅ → Obsidian Themes → Server
 Track C (Sharing):     Public Sharing (unabhängig)
 Track D (Editor):      Collaborative Editing (braucht Realtime + CM6)
 Track E (AI):          Semantische Suche (unabhängig)
-Track F (Polish):      Security → Accessibility → Responsive/Mobile
+Track F (Polish):      Security ✅ → Accessibility → Responsive/Mobile
 ```
 
 ---
@@ -40,6 +40,24 @@ Track F (Polish):      Security → Accessibility → Responsive/Mobile
 Browse der vollen Community-Liste im Settings-Panel (Text-/Kompatibel-/Installiert-Filter), Installation direkt aus GitHub-Releases, Einzel- + Bulk-Update, Update-Check manuell und automatisch (24h), Download-Zahlen. Sicherheit: Domain-Allowlist (auf jedem Redirect-Hop revalidiert), Size-Limits, Desktop-Only-Gate, Rate-Limit-Tracking, optionaler `SLATEBASE_GITHUB_TOKEN`.
 
 **Nachträgliche Korrektur:** Statistiken kommen aus Obsidians aggregiertem `community-plugin-stats.json` (ein CDN-Request) statt aus `releases/latest` pro Repo — der Fanout hätte das GitHub-Rate-Limit bei ~6000 Plugins sofort erschöpft.
+
+---
+
+## Erledigt — Security Hardening (Track F) ✅
+
+**Spec:** `.kiro/specs/security-hardening/` — alle 22 Tasks abgeschlossen.
+
+OWASP-Top-10-strukturierter Security-Audit (`SECURITY-AUDIT.md`). 9 Findings (1 Medium fixed, 8 Low: 3 fixed, 3 backlog, 3 accepted risk). Wichtigste Ergebnisse:
+
+- **Path Traversal** (Medium, Fixed): `renameContent` erlaubte `..` als `newName` → Vault-Escape. Fix: `validateContentName()` blockiert jetzt `.`/`..` + Defense-in-depth Prefix-Check.
+- **CSP vollständig**: `script-src 'self' blob:` (Plugin-Bundles via Blob URL), `style-src 'self' 'unsafe-inline'` (Plugin CSS), `img-src 'self' data: https:`, `connect-src 'self'`, `frame-src 'self' https:`. Kein `unsafe-eval` nötig.
+- **Input-Validierung 24/24 Routen**: Zod-Schemas auf allen Route-Modulen (vorher 17/24).
+- **CI Dependency Audit**: `npm audit --audit-level=high --omit=dev` in Backend + Frontend Jobs.
+- **Plugin-Sandbox dokumentiert**: Proxy-basierte Soft-Isolation, Known-Bypass-Vektoren, Trust-Modell.
+- **Startup-Warnungen**: `SLATEBASE_CSRF_SECRET`/`SLATEBASE_SYNC_SECRET` warn-Level bei fehlendem Env-Var.
+- **Plugin eval-Warnung**: UI-Bestätigungsschritt bei `hasEvalUsage: true` vor Aktivierung.
+
+**Fix-Backlog (nicht in diesem Pass):** Per-User-Rate-Limiter für `/proxy` + `/shares` + `/search`, echte Plugin-Sandbox-Isolation (Worker/VM, Prio 4 Spec).
 
 ---
 
@@ -110,16 +128,11 @@ Scope: ~8h Design + ~40–60h Implementierung. Task-Liste existiert (7 Phasen).
 
 ## Prio 5 — Security Hardening (Track F)
 
+**Status: ✅ Erledigt.** Alle 22 Tasks abgeschlossen (August 2026).
+
 Scope: ~20–30h.
 
-**Spec:** `.kiro/specs/security-hardening/` — Requirements + Design + Tasks vorhanden, basierend auf Ist-Zustands-Audit (Auth, CSP, Input-Validierung, Rate-Limits, Plugin-Sandbox, Path-Traversal).
-
-- OWASP-Top-10-Checkliste, Race-Condition-Analyse, CSP-Header
-- Input-Validierung vervollständigen, Dependency-Audit in CI
-- Rate-Limit-Analyse aller Endpoints
-- Ergebnis: Security-Report + Fix-Backlog
-
-**Empfehlung:** Vor v1.0 oder bei wachsender Nutzerbasis.
+**Spec:** `.kiro/specs/security-hardening/` — OWASP-Top-10-Audit, CSP-Implementierung, Input-Validierung, Dependency-Audit, Path-Traversal-Fix, Plugin-Sandbox-Dokumentation. Details siehe "Erledigt"-Abschnitt oben.
 
 ---
 
@@ -175,8 +188,8 @@ Nur noch ausstehende Arbeit (Community Plugin Store ist raus):
 | C: Sharing | ~19–24h |
 | D: Editor (Collaborative) | ~68–88h |
 | E: AI (Semantische Suche) | ~38–58h |
-| F: Polish (Security + a11y + Mobile) | ~68–98h |
-| **Summe** | **~256–356h** |
+| F: Polish (a11y + Mobile) | ~48–68h |
+| **Summe** | **~236–326h** |
 
 ---
 

@@ -46,6 +46,8 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for 
 - Global tooltips (`aria-label` renders a visible tooltip anywhere in the app, matching Obsidian's tooltip mechanism that plugins and `setTooltip()` rely on)
 - Inline raw HTML subset (allowlisted inline tags like `<font color>`, `<mark>`, `<span style>` and `<center>` blocks render in both Live Preview and reading view; everything else — including `on*` handlers, `script`/`iframe` — stays literal text)
 - Templater templates in the Welcome Vault (`Templates/Templater/` — daily note, meeting notes, project, weekly review)
+- Security hardening (OWASP Top 10 audit with SECURITY-AUDIT.md report, full CSP — script-src/style-src/img-src/connect-src/frame-src, HSTS 2yr + nosniff + strict referrer-policy, path traversal fix in renameContent, zod input validation on all 24 route modules, npm audit in CI with --omit=dev, plugin eval-usage UI warning, sandbox bypass documentation, production secrets startup warnings, README deployment secrets section)
+- Accessibility audit pass 1 (WCAG 2.1 AA partial � axe-core CI, eslint-plugin-jsx-a11y, useFocusTrap hook in all modals, skip-link, keyboard-operable splitters/canvas/status-bar, 8 contrast token fixes, Graph/Canvas aria-labels, 200% zoom check, screenreader static analysis; report at ACCESSIBILITY-AUDIT.md)
 
 ## Planned
 
@@ -53,7 +55,7 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for 
 - Public sharing (token links, read-only rendering)
 - Semantic search / AI embeddings
 - Server-Side Plugins (Node.js APIs in vm sandbox)
-- Security hardening, accessibility audit (WCAG 2.1 AA), responsive/mobile
+- Responsive/mobile
 - Collaborative editing (CRDT)
 
 ## Language Convention

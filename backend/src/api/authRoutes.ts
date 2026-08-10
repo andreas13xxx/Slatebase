@@ -5,6 +5,7 @@
 
 import type { Context } from 'hono'
 import { Hono } from 'hono'
+import { z } from 'zod'
 import type { IAuthService, SessionContext } from '../auth/index.js'
 import { AuthenticationError, RateLimitError } from '../auth/index.js'
 import { AccountSuspendedError } from '../user/index.js'
@@ -12,6 +13,19 @@ import { loginRequestSchema } from '../auth/validation.js'
 import type { ILogger } from '../logger/index.js'
 import type { ISseTicketStore } from '../auth/sse-ticket-store.js'
 import type { RouteModule } from './index.js'
+
+// ─── Zod Schemas ─────────────────────────────────────────────────────────────
+
+/**
+ * Schema for the `:sessionId` path parameter.
+ * Session IDs are UUIDs (36 chars), validated as non-empty with max length.
+ */
+const sessionIdParamSchema = z.object({
+  sessionId: z
+    .string()
+    .min(1, 'Session ID must not be empty')
+    .max(64, 'Session ID must be at most 64 characters'),
+})
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -180,7 +194,7 @@ export class AuthController implements IAuthController {
 
   /**
    * DELETE /auth/sessions/:sessionId — Invalidate a specific session belonging to the current user.
-   * Returns 204 on success.
+   * Returns 204 on success, 400 on invalid sessionId param.
    */
   async invalidateSession(c: Context): Promise<Response> {
     const session = c.get('session') as SessionContext | undefined
@@ -189,7 +203,15 @@ export class AuthController implements IAuthController {
       return c.json(error, 401)
     }
 
-    const sessionId = c.req.param('sessionId') as string
+    const paramResult = sessionIdParamSchema.safeParse({ sessionId: c.req.param('sessionId') })
+    if (!paramResult.success) {
+      const firstIssue = paramResult.error.issues[0]
+      const message = firstIssue !== undefined ? firstIssue.message : 'Invalid session ID'
+      const error = createApiError('VALIDATION_ERROR', message)
+      return c.json(error, 400)
+    }
+
+    const { sessionId } = paramResult.data
 
     try {
       await this.authService.invalidateSession(session.userId, sessionId)

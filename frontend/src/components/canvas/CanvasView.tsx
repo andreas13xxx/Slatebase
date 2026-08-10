@@ -62,6 +62,8 @@ const MIN_ZOOM = 0.1
 const MAX_ZOOM = 4.0
 const ZOOM_STEP = 0.1
 const GRID_SIZE = 20
+/** Pixels (in canvas space) the viewport shifts per arrow key press. */
+const PAN_STEP = 50
 
 // ─── Inner Component ──────────────────────────────────────────────────────────
 
@@ -210,6 +212,27 @@ function CanvasViewInner({ vaultId, readOnly, onFileOpen, directoryTree, token, 
       if (e.key === 'g' && !e.ctrlKey && !e.metaKey && !e.altKey && !readOnly) {
         addNodeAtCenter('group')
       }
+      // Arrow keys → Pan viewport (accessibility alternative to mouse drag)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        switch (e.key) {
+          case 'ArrowLeft':
+            e.preventDefault()
+            dispatch({ type: 'SET_VIEWPORT', payload: { ...viewport, x: viewport.x + PAN_STEP } })
+            break
+          case 'ArrowRight':
+            e.preventDefault()
+            dispatch({ type: 'SET_VIEWPORT', payload: { ...viewport, x: viewport.x - PAN_STEP } })
+            break
+          case 'ArrowUp':
+            e.preventDefault()
+            dispatch({ type: 'SET_VIEWPORT', payload: { ...viewport, y: viewport.y + PAN_STEP } })
+            break
+          case 'ArrowDown':
+            e.preventDefault()
+            dispatch({ type: 'SET_VIEWPORT', payload: { ...viewport, y: viewport.y - PAN_STEP } })
+            break
+        }
+      }
     }
 
     function handleKeyUp(e: KeyboardEvent) {
@@ -224,7 +247,7 @@ function CanvasViewInner({ vaultId, readOnly, onFileOpen, directoryTree, token, 
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('keyup', handleKeyUp)
     }
-  }, [dispatch, save, readOnly, selectedNodeIds, selectedEdgeIds, document, addNodeAtCenter])
+  }, [dispatch, save, readOnly, selectedNodeIds, selectedEdgeIds, document, addNodeAtCenter, viewport])
 
   // ─── Zoom ─────────────────────────────────────────────────────────────────
 

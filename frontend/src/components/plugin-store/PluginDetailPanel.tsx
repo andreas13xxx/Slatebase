@@ -11,6 +11,7 @@ import { X, Loader2, ExternalLink } from 'lucide-react'
 import type { IApiClient } from '../../api'
 import { useTranslation } from '../../i18n'
 import { extractErrorMessage } from '../../utils/error'
+import { useFocusTrap } from '../../hooks/useFocusTrap'
 import type { PluginStoreDisplayEntry } from './types'
 
 /** Props for the PluginDetailPanel component. */
@@ -70,16 +71,12 @@ export function PluginDetailPanel({
     return () => { cancelled = true }
   }, [apiClient, plugin.repo, t])
 
-  // Close on Escape key
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        onClose()
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+  // Focus trap: Tab cycling + Escape → close
+  const containerRef = useFocusTrap<HTMLDivElement>({
+    isActive: true,
+    onEscape: onClose,
+    returnFocusOnDeactivate: true,
+  })
 
   // Close on overlay click (not panel itself)
   const handleOverlayClick = useCallback((e: React.MouseEvent) => {
@@ -93,7 +90,7 @@ export function PluginDetailPanel({
 
   return createPortal(
     <div className="plugin-detail-overlay" onClick={handleOverlayClick} role="dialog" aria-modal="true">
-      <div className="plugin-detail-panel">
+      <div ref={containerRef} className="plugin-detail-panel">
         {/* Header */}
         <div className="plugin-detail-panel__header">
           <div className="plugin-detail-panel__header-info">

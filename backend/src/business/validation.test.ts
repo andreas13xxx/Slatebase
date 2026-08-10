@@ -139,6 +139,25 @@ describe('validateContentName', () => {
     })
   })
 
+  describe('rejects relative path references', () => {
+    it('throws for double-dot (parent traversal)', () => {
+      expect(() => validateContentName('..')).toThrow(InvalidNameError)
+      expect(() => validateContentName('..')).toThrow('relative path reference')
+    })
+
+    it('throws for single dot (current directory)', () => {
+      expect(() => validateContentName('.')).toThrow(InvalidNameError)
+      expect(() => validateContentName('.')).toThrow('relative path reference')
+    })
+
+    it('accepts names containing dots that are not pure traversal', () => {
+      expect(() => validateContentName('..hidden')).not.toThrow()
+      expect(() => validateContentName('file..md')).not.toThrow()
+      expect(() => validateContentName('.gitignore')).not.toThrow()
+      expect(() => validateContentName('test..')).not.toThrow()
+    })
+  })
+
   describe('rejects null bytes', () => {
     it('throws for a name containing a null byte', () => {
       expect(() => validateContentName('file\0.md')).toThrow(InvalidNameError)

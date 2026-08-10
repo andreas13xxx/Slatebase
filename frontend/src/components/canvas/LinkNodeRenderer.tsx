@@ -93,6 +93,15 @@ export const LinkNodeRenderer = memo(function LinkNodeRenderer({
     }
   })()
 
+  const handleNodeKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'TEXTAREA' || tag === 'INPUT') return
+      e.preventDefault()
+      window.open(node.url, '_blank', 'noopener,noreferrer')
+    }
+  }, [node.url])
+
   // ─── Edit Mode ──────────────────────────────────────────────────────────
   if (editing) {
     return (
@@ -132,6 +141,7 @@ export const LinkNodeRenderer = memo(function LinkNodeRenderer({
       onDoubleClick={() => {
         window.open(node.url, '_blank', 'noopener,noreferrer')
       }}
+      onKeyDown={handleNodeKeyDown}
       role="button"
       tabIndex={0}
       aria-label={`Link: ${node.url}`}

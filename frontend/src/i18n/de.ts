@@ -16,6 +16,7 @@ export const de = {
     back: 'Zurück',
     search: 'Suchen',
     noSelection: 'Kein Vault ausgewählt.',
+    skipToContent: 'Zum Inhalt springen',
   },
 
   auth: {
@@ -532,6 +533,7 @@ export const de = {
     showTags: 'Tags anzeigen',
     showProperties: 'Properties anzeigen',
     reset: 'Zurücksetzen',
+    ariaLabel: 'Graph mit {nodeCount} Knoten und {edgeCount} Kanten',
   },
 
   contextPanel: {
@@ -617,10 +619,14 @@ export const de = {
     linkCreateError: 'Datei konnte nicht erstellt werden: {fileName} — {message}',
     linkCreateUnexpected: 'Ein unerwarteter Fehler ist aufgetreten',
     dismissError: 'Fehlermeldung schließen',
+    panelLabel: 'Dateiinhalt',
+    emptyPanelLabel: 'Kein Inhalt — keine Datei geöffnet',
   },
 
   statusBar: {
     ariaLabel: 'Statusleiste',
+    clock: 'Aktuelle Uhrzeit',
+    pluginItems: 'Plugin-Statusanzeigen',
   },
 
   pluginStore: {
@@ -665,6 +671,10 @@ export const de = {
     sortDirectionLabel: 'Sortierrichtung umkehren',
     sortAsc: 'Aufsteigend',
     sortDesc: 'Absteigend',
+    evalWarningTitle: 'Sicherheitshinweis',
+    evalWarningMessage: 'Dieses Plugin verwendet dynamische Code-Ausführung (eval/new Function). Dies birgt ein erhöhtes Sicherheitsrisiko. Bitte aktivieren Sie dieses Plugin nur, wenn Sie der Quelle vertrauen.',
+    evalWarningConfirm: 'Risiko akzeptieren und aktivieren',
+    evalWarningCancel: 'Abbrechen',
   },
 
   commands: {

@@ -361,6 +361,40 @@ describe('Upload Routes', () => {
       expect(body.uploaded[1]!.fileName).toBe('b.txt')
     })
 
+    it('returns 400 for invalid paste query param value', async () => {
+      const { app } = createTestApp({ storagePath: tempDir })
+
+      const formData = new FormData()
+      formData.append('file', new File(['hello'], 'test.txt'))
+
+      const res = await app.request('/api/v1/vaults/vault-1/upload?paste=maybe', {
+        method: 'POST',
+        body: formData,
+      })
+      expect(res.status).toBe(400)
+
+      const body = await res.json() as { code: string; message: string; timestamp: string }
+      expect(body.code).toBe('VALIDATION_ERROR')
+      expect(body).toHaveProperty('timestamp')
+    })
+
+    it('returns 400 for targetDir containing null bytes', async () => {
+      const { app } = createTestApp({ storagePath: tempDir })
+
+      const formData = new FormData()
+      formData.append('file', new File(['bad'], 'evil.txt'))
+      formData.append('targetDir', 'notes\0hack')
+
+      const res = await app.request('/api/v1/vaults/vault-1/upload', {
+        method: 'POST',
+        body: formData,
+      })
+      expect(res.status).toBe(400)
+
+      const body = await res.json() as { code: string }
+      expect(body.code).toBe('VALIDATION_ERROR')
+    })
+
     it('returns 400 for path traversal in targetDir', async () => {
       const { app } = createTestApp({ storagePath: tempDir })
 

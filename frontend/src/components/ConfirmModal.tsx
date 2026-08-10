@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { useTranslation } from '../i18n'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 
 export interface ConfirmModalProps {
   /** Whether the modal is visible. */
@@ -36,33 +36,18 @@ export function ConfirmModal({
   onCancel,
 }: ConfirmModalProps) {
   const { t } = useTranslation()
-  const confirmRef = useRef<HTMLButtonElement>(null)
-  const cancelRef = useRef<HTMLButtonElement>(null)
-
-  // Focus the cancel button when modal opens (safer default)
-  useEffect(() => {
-    if (open) {
-      cancelRef.current?.focus()
-    }
-  }, [open])
-
-  // Handle Escape key
-  useEffect(() => {
-    if (!open) return
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        onCancel()
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [open, onCancel])
+  const containerRef = useFocusTrap<HTMLDivElement>({
+    isActive: open,
+    onEscape: onCancel,
+    returnFocusOnDeactivate: true,
+  })
 
   if (!open) return null
 
   return (
     <div className="confirm-modal-overlay" onClick={onCancel} role="presentation">
       <div
+        ref={containerRef}
         className="confirm-modal"
         role="alertdialog"
         aria-modal="true"
@@ -81,7 +66,6 @@ export function ConfirmModal({
         <p id="confirm-modal-message" className="confirm-modal-message">{message}</p>
         <div className="confirm-modal-actions">
           <button
-            ref={cancelRef}
             type="button"
             className="confirm-modal-btn confirm-modal-btn--cancel"
             onClick={onCancel}
@@ -89,7 +73,6 @@ export function ConfirmModal({
             {cancelLabel ?? t('common.cancel')}
           </button>
           <button
-            ref={confirmRef}
             type="button"
             className={`confirm-modal-btn confirm-modal-btn--${variant}`}
             onClick={onConfirm}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Search } from 'lucide-react'
 import type { Command } from '../plugins/compat/command-registry'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 
 export interface CommandPaletteProps {
   /** All available commands from the command registry */
@@ -31,6 +32,11 @@ export function CommandPalette({ commands, isOpen, onClose, onExecute }: Command
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
+  const containerRef = useFocusTrap<HTMLDivElement>({
+    isActive: isOpen,
+    onEscape: onClose,
+    returnFocusOnDeactivate: true,
+  })
 
   // Filter commands by case-insensitive substring match on name
   const filteredCommands = filterCommands(commands, query)
@@ -43,7 +49,7 @@ export function CommandPalette({ commands, isOpen, onClose, onExecute }: Command
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setQuery('')
       setSelectedIndex(0)
-      // Autofocus the input after render
+      // Focus the input after the focus trap activates (which focuses first focusable child)
       requestAnimationFrame(() => {
         inputRef.current?.focus()
       })
@@ -97,12 +103,8 @@ export function CommandPalette({ commands, isOpen, onClose, onExecute }: Command
           }
         }
         break
-      case 'Escape':
-        e.preventDefault()
-        onClose()
-        break
     }
-  }, [filteredCommands, selectedIndex, handleExecute, onClose, totalItems])
+  }, [filteredCommands, selectedIndex, handleExecute, totalItems])
 
   const handleOverlayClick = useCallback((e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -123,6 +125,7 @@ export function CommandPalette({ commands, isOpen, onClose, onExecute }: Command
       role="presentation"
     >
       <div
+        ref={containerRef}
         className="command-palette"
         role="dialog"
         aria-modal="true"

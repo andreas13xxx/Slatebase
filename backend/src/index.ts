@@ -119,6 +119,26 @@ const auditService = new AuditService(auditLogger)
 
 const csrfSecretManager = new CsrfSecretManager(serverConfig.dataDir, logger)
 const csrfSecret = await csrfSecretManager.loadOrCreate()
+
+// --- Production Secrets Startup Warnings (R7.1) ---
+// Clearly visible warn-level messages when secrets are not configured via environment
+// variables. File-based fallback works but is fragile (not portable across containers,
+// lost when data volume is recreated).
+if (!process.env['SLATEBASE_CSRF_SECRET']) {
+  logger.warn(
+    'SLATEBASE_CSRF_SECRET is not set — using file-based or auto-generated secret. ' +
+    'Sessions will be invalidated if the secret is lost (container rebuild, volume reset). ' +
+    'Set this environment variable in production for stable session persistence.',
+  )
+}
+if (!process.env['SLATEBASE_SYNC_SECRET']) {
+  logger.warn(
+    'SLATEBASE_SYNC_SECRET is not set — sync credential encryption uses an auto-generated key. ' +
+    'Encrypted sync credentials will not survive server restarts without this variable. ' +
+    'Set this environment variable in production if you use CouchDB vault synchronization.',
+  )
+}
+
 const sessionDurationMs = serverConfig.sessionDurationHours * 60 * 60 * 1000
 const maxLifetimeMs = serverConfig.sessionMaxLifetimeDays * 24 * 60 * 60 * 1000
 const authService = new AuthService(sessionStore, userRepository, logger, csrfSecret, auditService, sessionDurationMs, maxLifetimeMs)
@@ -423,13 +443,28 @@ app.use(
 // `crossOriginResourcePolicy` is disabled because the frontend and this API run on
 // different origins by design (see `allowedOrigins`) — `same-origin` CORP would
 // block cross-origin <img> loads of vault files served from here.
-// `objectSrc`/`frameAncestors` are 'none' to close the <object>/<embed>/iframe
-// script-execution vector for the SVG/HTML raw-file endpoint and to block clickjacking.
+// Content-Security-Policy: explicit directives per resource type.
+// - `blob:` in scriptSrc: plugin bundles execute via Blob URL + dynamic import()
+// - `'unsafe-inline'` in styleSrc: plugin CSS injection uses <style> tags
+// - `data:` + `https:` in imgSrc: inline images and external images in notes
+// - `https:` in frameSrc: Canvas link-node iframes embed external URLs
+// - `crossOriginResourcePolicy: false`: frontend and backend run on different origins
+//   (allowedOrigins config) — `same-origin` CORP would block <img src> loads from
+//   the raw-file endpoint.
 app.use(
   '*',
   secureHeaders({
     crossOriginResourcePolicy: false,
+    strictTransportSecurity: 'max-age=63072000; includeSubDomains',
+    xContentTypeOptions: 'nosniff',
+    referrerPolicy: 'strict-origin-when-cross-origin',
     contentSecurityPolicy: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "blob:"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+      frameSrc: ["'self'", "https:"],
       objectSrc: ["'none'"],
       frameAncestors: ["'none'"],
     },

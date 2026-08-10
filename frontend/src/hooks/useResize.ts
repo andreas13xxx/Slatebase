@@ -4,9 +4,13 @@ import { getState, updateLayout } from '../state/workspaceStore'
 /** Keys in WorkspaceState that hold panel widths. */
 type LayoutWidthKey = 'sidebarWidth' | 'rightPanelWidth'
 
+/** Step size in pixels for keyboard-driven resize. */
+const KEYBOARD_STEP = 10
+
 /**
- * Hook for mouse-driven panel resize.
- * Returns the current width and an onMouseDown handler to attach to the resize handle.
+ * Hook for mouse- and keyboard-driven panel resize.
+ * Returns the current width, an onMouseDown handler, and an onKeyDown handler
+ * to attach to the resize handle.
  *
  * @param initialWidth - Starting width in pixels (used as fallback if no persisted value)
  * @param min - Minimum allowed width
@@ -68,5 +72,15 @@ export function useResize(
     document.addEventListener('mouseup', onMouseUp)
   }, [width, min, max, side])
 
-  return { width, onMouseDown }
+  /** Keyboard handler: ArrowLeft/ArrowRight adjust width by KEYBOARD_STEP. */
+  const onKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+    e.preventDefault()
+
+    const grow = side === 'left' ? e.key === 'ArrowRight' : e.key === 'ArrowLeft'
+    const delta = grow ? KEYBOARD_STEP : -KEYBOARD_STEP
+    setWidth((current) => Math.min(max, Math.max(min, current + delta)))
+  }, [min, max, side])
+
+  return { width, min, max, onMouseDown, onKeyDown }
 }

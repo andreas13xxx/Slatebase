@@ -5,6 +5,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { Context } from 'hono'
 import { Hono } from 'hono'
+import { z } from 'zod'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
@@ -34,6 +35,34 @@ function createApiError(code: string, message: string): ApiError {
     timestamp: new Date().toISOString(),
   }
 }
+
+// --- Zod Schemas ---
+
+/**
+ * Schema for route params on upload endpoints.
+ * Validates the `vaultId` param (non-empty, max 24 hex chars).
+ */
+const uploadParamsSchema = z.object({
+  vaultId: z.string().min(1, 'vaultId must not be empty').max(24, 'vaultId too long'),
+})
+
+/**
+ * Schema for the query parameters on the upload endpoint.
+ * `paste` is an optional flag — only the string `"true"` enables paste mode.
+ */
+const uploadQuerySchema = z.object({
+  paste: z.enum(['true', 'false']).optional(),
+})
+
+/**
+ * Schema for the `targetDir` form field extracted from multipart data.
+ * Must be a string with max 1024 chars. Empty string means vault root.
+ * Rejects obviously invalid characters (null bytes).
+ */
+const targetDirSchema = z.string().max(1024, 'targetDir too long').refine(
+  (val) => !val.includes('\0'),
+  { message: 'targetDir contains invalid characters' },
+)
 
 // --- Helper: Generate paste filename ---
 
@@ -98,7 +127,26 @@ export function createUploadRoutes(deps: UploadRouteDependencies): Hono {
    * Returns 201 with `{ uploaded: [{ fileName, path }] }`
    */
   app.post('/vaults/:vaultId/upload', async (c: Context) => {
-    const vaultId = c.req.param('vaultId') as string
+    const rawParams = { vaultId: c.req.param('vaultId') }
+    const paramsParsed = uploadParamsSchema.safeParse(rawParams)
+    if (!paramsParsed.success) {
+      const firstError = paramsParsed.error.errors[0]
+      const message = firstError ? firstError.message : 'Invalid route parameters'
+      const apiError = createApiError('VALIDATION_ERROR', message)
+      return c.json(apiError, 400)
+    }
+    const vaultId = paramsParsed.data.vaultId
+
+    // Validate query params
+    const rawQuery = { paste: c.req.query('paste') }
+    const queryParsed = uploadQuerySchema.safeParse(rawQuery)
+    if (!queryParsed.success) {
+      const firstError = queryParsed.error.errors[0]
+      const message = firstError ? firstError.message : 'Invalid query parameters'
+      const apiError = createApiError('VALIDATION_ERROR', message)
+      return c.json(apiError, 400)
+    }
+
     const session = c.get('session') as SessionContext | undefined
 
     if (!session) {
@@ -129,7 +177,7 @@ export function createUploadRoutes(deps: UploadRouteDependencies): Hono {
     }
 
     // 3. Determine if paste mode
-    const isPaste = c.req.query('paste') === 'true'
+    const isPaste = queryParsed.data.paste === 'true'
     const maxFileSize = isPaste
       ? uploadConfig.maxImagePasteSize
       : uploadConfig.maxFileSizeBytes
@@ -154,6 +202,16 @@ export function createUploadRoutes(deps: UploadRouteDependencies): Hono {
         targetDir = value
       }
     }
+
+    // Validate targetDir
+    const targetDirParsed = targetDirSchema.safeParse(targetDir)
+    if (!targetDirParsed.success) {
+      const firstError = targetDirParsed.error.errors[0]
+      const message = firstError ? firstError.message : 'Invalid targetDir'
+      const apiError = createApiError('VALIDATION_ERROR', message)
+      return c.json(apiError, 400)
+    }
+    targetDir = targetDirParsed.data
 
     if (files.length === 0) {
       const apiError = createApiError('VALIDATION_ERROR', 'No files provided')

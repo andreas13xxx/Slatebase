@@ -53,6 +53,12 @@
   background: var(--accent);
 }
 
+.split-section-resize-handle:focus-visible {
+  background: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
 /* Larger hit area for easier grabbing */
 .split-section-resize-handle::before {
   content: '';

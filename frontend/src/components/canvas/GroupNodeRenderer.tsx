@@ -33,6 +33,13 @@ export const GroupNodeRenderer = memo(function GroupNodeRenderer({
     onDragStart(e)
   }, [onSelect, onDragStart])
 
+  const handleNodeKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onSelect(e.shiftKey)
+    }
+  }, [onSelect])
+
   return (
     <div
       className={`canvas-node canvas-node--group ${colorClass} ${selected ? 'canvas-node--selected' : ''}`}
@@ -44,6 +51,8 @@ export const GroupNodeRenderer = memo(function GroupNodeRenderer({
       }}
       data-node-id={node.id}
       onMouseDown={handleMouseDown}
+      onKeyDown={handleNodeKeyDown}
+      tabIndex={0}
       role="group"
       aria-label={node.label ? `Gruppe: ${node.label}` : 'Gruppe'}
     >

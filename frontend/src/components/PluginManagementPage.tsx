@@ -38,6 +38,7 @@ interface PluginDisplayItem {
   compatibilityApiCalls: ApiCallClassification[]
   error?: string
   hasSettings: boolean
+  hasEvalUsage: boolean
 }
 
 /** Props for the PluginManagementPage component. */
@@ -71,6 +72,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
   const [settingsLoading, setSettingsLoading] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<{ pluginId: string; pluginName: string } | null>(null)
   const [deletingPlugins, setDeletingPlugins] = useState<Set<string>>(new Set())
+  const [evalWarningConfirm, setEvalWarningConfirm] = useState<{ pluginId: string; pluginName: string } | null>(null)
   const [updateCount, setUpdateCount] = useState<number>(0)
   const [checkingUpdates, setCheckingUpdates] = useState(false)
   const [updateInfo, setUpdateInfo] = useState<Map<string, { latestVersion: string; repo: string }>>(new Map())
@@ -178,6 +180,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
           compatibilityApiCalls: [],
           error: regEntry?.error,
           hasSettings: true, // All installed plugins can be configured
+          hasEvalUsage: regEntry?.hasEvalUsage === true,
         }
       })
 
@@ -368,6 +371,18 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
 
     const newStatus: PluginStatus = plugin.status === 'active' ? 'inactive' : 'active'
 
+    // Show eval usage warning before activation (not deactivation)
+    if (newStatus === 'active' && plugin.hasEvalUsage) {
+      setEvalWarningConfirm({ pluginId, pluginName: plugin.name })
+      return
+    }
+
+    await performToggle(pluginId, plugin, newStatus)
+  }
+
+  /** Performs the actual toggle after any confirmation. */
+  async function performToggle(pluginId: string, plugin: PluginDisplayItem, newStatus: PluginStatus): Promise<void> {
+
     // Optimistic update
     setPlugins((prev) => prev.map((p) =>
       p.pluginId === pluginId ? { ...p, status: newStatus, error: undefined } : p
@@ -418,6 +433,18 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
         return next
       })
     }
+  }
+
+  /** Confirms activation of a plugin with eval usage after user acknowledged the warning. */
+  function handleEvalWarningConfirm(): void {
+    if (!evalWarningConfirm) return
+    const plugin = plugins.find((p) => p.pluginId === evalWarningConfirm.pluginId)
+    if (!plugin) {
+      setEvalWarningConfirm(null)
+      return
+    }
+    setEvalWarningConfirm(null)
+    void performToggle(evalWarningConfirm.pluginId, plugin, 'active')
   }
 
   // ─── Reload plugin ─────────────────────────────────────────────────────
@@ -807,6 +834,14 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
               </div>
             )}
 
+            {/* Eval usage warning indicator */}
+            {plugin.hasEvalUsage && plugin.status !== 'error' && (
+              <div className="plugin-card-eval-warning">
+                <AlertTriangle size={13} />
+                <span>{t('pluginStore.evalWarningTitle')}: {t('pluginStore.evalWarningMessage')}</span>
+              </div>
+            )}
+
             {/* Expandable compatibility details */}
             <button
               className="plugin-card-expand-btn"
@@ -966,6 +1001,17 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
         variant="danger"
         onConfirm={() => { if (deleteConfirm) void handleDelete(deleteConfirm.pluginId) }}
         onCancel={() => setDeleteConfirm(null)}
+      />
+      {/* Eval usage warning modal */}
+      <ConfirmModal
+        open={evalWarningConfirm !== null}
+        title={t('pluginStore.evalWarningTitle')}
+        message={`${evalWarningConfirm?.pluginName ?? ''}: ${t('pluginStore.evalWarningMessage')}`}
+        confirmLabel={t('pluginStore.evalWarningConfirm')}
+        cancelLabel={t('pluginStore.evalWarningCancel')}
+        variant="danger"
+        onConfirm={handleEvalWarningConfirm}
+        onCancel={() => setEvalWarningConfirm(null)}
       />
         </>
       ) : (

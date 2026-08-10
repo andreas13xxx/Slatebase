@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Upload, CheckCircle, AlertTriangle, Package, Loader, Download } from 'lucide-react'
 import type { IApiClient, PluginInstallResult } from '../api'
+import { useTranslation } from '../i18n'
 
 /** Maximum ZIP file size in bytes (5 MB). */
 const MAX_ZIP_SIZE = 5 * 1024 * 1024
@@ -31,6 +32,7 @@ interface DetectedPlugin {
  * from the .obsidian/plugins/ directory in synced vaults.
  */
 export function PluginUpload({ apiClient, vaultId, onPluginInstalled }: PluginUploadProps) {
+  const { t } = useTranslation()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Upload state
@@ -187,6 +189,14 @@ export function PluginUpload({ apiClient, vaultId, onPluginInstalled }: PluginUp
               {uploadSuccess.isUpgrade ? 'Plugin aktualisiert' : 'Plugin installiert'}:{' '}
               <strong>{uploadSuccess.manifest.name}</strong> v{uploadSuccess.manifest.version}
             </span>
+          </div>
+        )}
+
+        {/* Eval usage warning after install */}
+        {uploadSuccess && uploadSuccess.warnings && uploadSuccess.warnings.some((w) => w.includes('eval(') || w.includes('new Function(')) && (
+          <div className="plugin-upload__message plugin-upload__message--warning">
+            <AlertTriangle size={14} />
+            <span>{t('pluginStore.evalWarningMessage')}</span>
           </div>
         )}
 

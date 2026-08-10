@@ -72,6 +72,7 @@ All settings live in `docker.env`. Key options:
 | `SLATEBASE_EXTERNAL_PORT` | `8080` | Port exposed on the host |
 | `SLATEBASE_ALLOWED_ORIGINS` | `http://localhost:8080` | Your public URL (for CORS) |
 | `SLATEBASE_CSRF_SECRET` | *(random)* | Persistent CSRF secret — **set this!** |
+| `SLATEBASE_SYNC_SECRET` | *(random)* | Sync credential encryption — set if using LiveSync |
 | `SLATEBASE_TRUSTED_PROXIES` | *(empty)* | Reverse proxy IPs/CIDRs for real client IPs |
 | `SLATEBASE_MAX_FILE_SIZE` | `5242880` | Max upload size in bytes (5 MB) |
 | `SLATEBASE_LOG_LEVEL` | `info` | Log level: debug, info, warn, error |
@@ -91,6 +92,40 @@ slatebase.example.com {
 ```
 
 For detailed reverse proxy setup (Nginx Proxy Manager, Traefik, etc.), see [CONTRIBUTING.md](CONTRIBUTING.md#reverse-proxy).
+
+### Production Secrets
+
+Slatebase uses two secrets that **must** be set in production. Without them, the server generates random secrets on each startup — meaning sessions are invalidated and encrypted data is lost on every restart.
+
+| Variable | Purpose |
+|----------|---------|
+| `SLATEBASE_CSRF_SECRET` | HMAC-based CSRF token generation. Without it, all user sessions break on server restart. |
+| `SLATEBASE_SYNC_SECRET` | Encrypts CouchDB sync credentials at rest. Without it, vault sync stops working after restart. Only required if you use LiveSync. |
+
+**Generate a secure secret:**
+
+```bash
+# Option A: OpenSSL
+openssl rand -hex 32
+
+# Option B: Node.js
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+**Set them in your `docker.env` (or via `-e` flags):**
+
+```bash
+SLATEBASE_CSRF_SECRET=<your-64-char-hex-secret>
+SLATEBASE_SYNC_SECRET=<your-64-char-hex-secret>
+```
+
+Or directly with Docker:
+
+```bash
+docker run -e SLATEBASE_CSRF_SECRET=... -e SLATEBASE_SYNC_SECRET=... ghcr.io/andreas13xxx/slatebase:latest
+```
+
+The server logs a visible warning at startup if either secret is not set.
 
 ### Updates
 

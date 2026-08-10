@@ -1,0 +1,383 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "Task 1: `vitest-axe` (oder Fallback `axe-core` direkt) als Dev-Dependency ergänzen": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355086430
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355097609
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355658475
+      }
+    ],
+    "Task 2: `eslint-plugin-jsx-a11y` in `frontend/eslint.config.js` aktivieren (recommended-Preset, laute Regeln vorerst `warn`)": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355086528
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355665586
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786364134449
+      }
+    ],
+    "Task 3: axe-Unit-Tests für `ConfirmModal`, `CommandPalette`, `SettingsPanel`, `FileExplorer`, `TabBar`, `ContextMenu` ergänzen": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355086581
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786364138845
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786364527352
+      }
+    ],
+    "Task 4: Verifizieren dass axe-Tests als Teil von `npm run test:coverage` in CI laufen (kein separater Workflow nötig)": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355086622
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786364530584
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786364791055
+      }
+    ],
+    "Task 5: `useFocusTrap`-Hook implementieren (`frontend/src/hooks/useFocusTrap.ts`) — Tab-Zirkulation, Escape-Callback, Fokus-Rückgabe": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355086664
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786364795111
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786365012019
+      }
+    ],
+    "Task 6: `ConfirmModal.tsx` auf `useFocusTrap` umstellen (Referenzimplementierung)": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355086713
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786365016069
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786365177034
+      }
+    ],
+    "Task 7: `CommandPalette.tsx` auf `useFocusTrap` umstellen": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355086790
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786365180879
+      }
+    ],
+    "Task 8: `SettingsPanel.tsx` auf `useFocusTrap` umstellen": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355086832
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786365321169
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786365414194
+      }
+    ],
+    "Task 9: `PluginDetailPanel.tsx`, `NewConversation.tsx`, `TemplateSelector.tsx` auf `useFocusTrap` umstellen": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355086874
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786365417857
+      }
+    ],
+    "Task 10: Skip-Link in `App.tsx` + `App.css` ergänzen, springt zu `#main-content`": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355086922
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786365593732
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786365776136
+      }
+    ],
+    "Task 11: Toolbar-Landmark-Bewertung durchführen, ggf. `<header>` oder konsistentes Pattern ergänzen": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355086976
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786365779700
+      }
+    ],
+    "Task 12: `StatusBar.tsx` — fehlende `role`/`tabIndex`/Keydown-Handler für interaktive Items ergänzen": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355087031
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786365917599
+      }
+    ],
+    "Task 13: `TabContent.tsx` — ARIA/Tastatur-Lücken schließen": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355087076
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786366303851
+      }
+    ],
+    "Task 14: `TrashView.tsx` — ARIA/Tastatur-Lücken schließen": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355087122
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786366762774
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786366983501
+      }
+    ],
+    "Task 15: `SidebarSplitContainer.tsx`/`SidebarPanelTabBar.tsx` — `role=\"separator\"` + Pfeiltasten-Resize (Wiederverwendung von `useResize`-Callback)": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355087160
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786366987409
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786367374611
+      }
+    ],
+    "Task 16: `CanvasMinimap.tsx` — `aria-hidden` oder Tastaturzugriff, je nach Audit-Ergebnis": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355087205
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786367379584
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786367452572
+      }
+    ],
+    "Task 17: Alle Text-/Hintergrund-Token-Paare in `index.css` (Light + Dark) gegen WCAG-AA prüfen": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355087245
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786367458315
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786367649395
+      }
+    ],
+    "Task 18: Gefundene Kontrast-Verstöße gezielt beheben (nur betroffene Tokens anpassen)": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355087290
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786367653000
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786368058732
+      }
+    ],
+    "Task 19: `GraphView.tsx` — dynamisches `aria-label` mit Knoten-/Kanten-Anzahl auf SVG-Root": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355087356
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786368063646
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786368165428
+      }
+    ],
+    "Task 20: `CanvasView.tsx` — Tab-Fokus-Reihenfolge zwischen Nodes + Enter/Space zum Öffnen": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355087396
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786368170426
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786368442875
+      }
+    ],
+    "Task 21: `CanvasView.tsx` — Pfeiltasten-Viewport-Verschiebung als Tastatur-Alternative zu Maus-Pan": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355087446
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786368448357
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786368568275
+      }
+    ],
+    "Task 22: 200%-Zoom-Check für Editor, Sidebar, Settings-Panel; kritische Brüche fixen": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355087492
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786368574021
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786368801261
+      }
+    ],
+    "Task 23: Manueller NVDA-Testdurchlauf über Login, Datei öffnen/bearbeiten, Sidebar-Navigation, Settings": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355087546
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786368806529
+      }
+    ],
+    "Task 24: `ACCESSIBILITY-AUDIT.md` mit allen Findings (Schweregrad, Komponente, Status) finalisieren": [
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786355087658
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786369170868
+      },
+      {
+        "executionId": "ab70ea2e-84dd-444b-a545-d14784e8a1d3",
+        "chatSessionId": "sess_3ec5224b-8cd2-4585-ad84-41a168d61205",
+        "timestamp": 1786369387634
+      }
+    ]
+  }
+}

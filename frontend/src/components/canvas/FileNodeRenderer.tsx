@@ -378,6 +378,16 @@ export const FileNodeRenderer = memo(function FileNodeRenderer({
     )
   }
 
+  const handleNodeKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      if (editing) return
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'TEXTAREA' || tag === 'INPUT') return
+      e.preventDefault()
+      if (exists) onFileOpen(node.file)
+    }
+  }, [editing, exists, onFileOpen, node.file])
+
   return (
     <div
       className={`canvas-node canvas-node--file ${colorClass} ${selected ? 'canvas-node--selected' : ''} ${!exists ? 'canvas-node--broken' : ''} ${editing && showPathEditor ? 'canvas-node--editing-path' : ''}`}
@@ -392,6 +402,7 @@ export const FileNodeRenderer = memo(function FileNodeRenderer({
       onDoubleClick={() => {
         if (exists && !editing) onFileOpen(node.file)
       }}
+      onKeyDown={handleNodeKeyDown}
       role="button"
       tabIndex={0}
       aria-label={`Dateiknoten: ${fileName}`}

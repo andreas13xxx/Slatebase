@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { FileText, Search } from 'lucide-react'
 import type { IApiClient } from '../api'
 import { showToast } from './ToastNotification'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 import './TemplateSelector.css'
 
 /**
@@ -61,6 +62,13 @@ export function TemplateSelector({
   const inputRef = useRef<HTMLInputElement>(null)
   const fileNameInputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
+
+  // Focus trap: Tab cycling + Escape → close
+  const containerRef = useFocusTrap<HTMLDivElement>({
+    isActive: isOpen && step !== 'loading',
+    onEscape: onClose,
+    returnFocusOnDeactivate: true,
+  })
 
   // Fetch templates when opened
   useEffect(() => {
@@ -190,12 +198,8 @@ export function TemplateSelector({
           }
         }
         break
-      case 'Escape':
-        e.preventDefault()
-        onClose()
-        break
     }
-  }, [filteredTemplates, selectedIndex, handleSelectTemplate, onClose])
+  }, [filteredTemplates, selectedIndex, handleSelectTemplate])
 
   const handleKeyDownFileName = useCallback((e: React.KeyboardEvent) => {
     switch (e.key) {
@@ -203,12 +207,8 @@ export function TemplateSelector({
         e.preventDefault()
         void handleCreateFile()
         break
-      case 'Escape':
-        e.preventDefault()
-        onClose()
-        break
     }
-  }, [handleCreateFile, onClose])
+  }, [handleCreateFile])
 
   const handleOverlayClick = useCallback((e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -225,6 +225,7 @@ export function TemplateSelector({
       role="presentation"
     >
       <div
+        ref={containerRef}
         className="template-selector"
         role="dialog"
         aria-modal="true"

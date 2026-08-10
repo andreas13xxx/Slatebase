@@ -1,0 +1,339 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "Task 1: `SECURITY-AUDIT.md` mit OWASP-Top-10-Struktur anlegen, bereits behobene Findings (Commit `d176e49`) als Baseline eintragen": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345182347
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345192270
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345245763
+      }
+    ],
+    "Task 2: Rate-Limit-Abgleich aller `/api/v1/*`-Routen gegen vorhandene Limiter durchführen, Tabelle in Report eintragen (R4)": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345183519
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345253191
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345682578
+      }
+    ],
+    "Task 3: Path-Traversal-Stichprobe: Rename/Move-Pfad in `backend/src/business/index.ts` sowie weitere `path.join`/`path.resolve`-Aufrufe mit Nutzer-Input prüfen (R8.1/R8.2)": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345183632
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345690069
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786347339551
+      }
+    ],
+    "Task 4: Klären ob Plugin-Loader (`frontend/src/plugins/compat/plugin-loader.ts`) `eval`/`new Function` zur Bundle-Ausführung braucht (Voraussetzung für Task 5)": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345183696
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786347346025
+      }
+    ],
+    "Task 5: `secureHeaders()`-Konfiguration in `backend/src/index.ts` um `scriptSrc`/`defaultSrc`/`styleSrc`/`imgSrc`/`connectSrc` erweitern": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345183762
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786347592352
+      }
+    ],
+    "Task 6: `Strict-Transport-Security`, `X-Content-Type-Options`, `Referrer-Policy` ergänzen falls fehlend": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345183799
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786347695523
+      }
+    ],
+    "Task 7: Regressionsprüfung: Editor, Canvas, Plugin-Install/-Aktivierung, Graph-View mit neuer CSP testen (Browser-Konsole auf Violations prüfen)": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345183850
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786347858409
+      }
+    ],
+    "Task 8: zod-Schemas für `uploadRoutes.ts` (Größe, MIME, Pfad)": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345183902
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786348137334
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786348281104
+      }
+    ],
+    "Task 9: zod-Schemas für `vaultShareRoutes.ts`": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345183981
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786348284306
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786348521922
+      }
+    ],
+    "Task 10: zod-Schemas für `adminRoutes.ts`": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345184034
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786348526109
+      }
+    ],
+    "Task 11: zod-Schemas für `authRoutes.ts` (ohne Timing-Verhalten der Login-Route zu verändern)": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345184145
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786348842023
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786349078340
+      }
+    ],
+    "Task 12: zod-Schemas für `pluginRoutes.ts`, `mcpRoutes.ts`, `userRoutes.ts`": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345184214
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786349083111
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786349548349
+      }
+    ],
+    "Task 13: Tests für invalid-payload-Fälle (400-Response) in den betroffenen Route-Test-Dateien ergänzen": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345184260
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786349554239
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786351872403
+      }
+    ],
+    "Task 14: `npm audit --audit-level=high` als Step in `.github/workflows/ci.yml` (Backend-Job) ergänzen": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345184317
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786351881129
+      }
+    ],
+    "Task 15: `npm audit --audit-level=high` als Step in `.github/workflows/ci.yml` (Frontend-Job) ergänzen": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345184366
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786351962715
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786352012711
+      }
+    ],
+    "Task 16: Bestehende Findings ohne verfügbaren Fix identifizieren, ggf. `--omit=dev` nutzen und Rest im Report dokumentieren": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345184416
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786352017173
+      }
+    ],
+    "Task 17: UI-Warnung im Plugin-Install-Flow bei `hasEvalUsage: true` (aus `plugin-installer.ts`-Scan) mit explizitem Bestätigungsschritt": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345184466
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786352420755
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786353550502
+      }
+    ],
+    "Task 18: Bypass-Dokumentation als Kommentar in `sandbox.ts` + Report-Eintrag (Trust-Modell, Verweis auf `server-side-plugins`-Spec)": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345184534
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786353555813
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786353727869
+      }
+    ],
+    "Task 19: Sichtbare Startup-Warnung falls `SLATEBASE_CSRF_SECRET`/`SLATEBASE_SYNC_SECRET` nicht gesetzt": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345184585
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786353732793
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786353862155
+      }
+    ],
+    "Task 20: `.gitignore`-Abdeckung für `backend/.env` verifizieren": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345184629
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786353866237
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786353914069
+      }
+    ],
+    "Task 21: README/Deploy-Doku um \"Produktions-Secrets\"-Abschnitt ergänzen falls nicht vorhanden": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345184668
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786353918420
+      }
+    ],
+    "Task 22: `SECURITY-AUDIT.md` finalisieren (alle Findings mit Status Fixed/Backlog/Akzeptiert), Fix-Backlog für nicht in diesem Pass behobene Punkte festhalten": [
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786345184709
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786354022488
+      },
+      {
+        "executionId": "1c19dcfa-dcf9-4849-b10d-2354e1dad2af",
+        "chatSessionId": "sess_ea18899a-dfc9-4b43-8028-a86740025da6",
+        "timestamp": 1786354333497
+      }
+    ]
+  }
+}

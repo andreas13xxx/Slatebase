@@ -91,7 +91,7 @@ export function StatusBar() {
   return (
     <footer className="status-bar" role="contentinfo" aria-label={t('statusBar.ariaLabel')}>
       <div className="status-bar__left">
-        <div className="status-bar__item status-bar__clock" aria-live="off">
+        <div className="status-bar__item status-bar__clock" aria-live="off" aria-label={t('statusBar.clock')}>
           <Clock size={12} aria-hidden="true" />
           <time>{time}</time>
         </div>
@@ -99,6 +99,8 @@ export function StatusBar() {
       <div
         className="status-bar__right"
         ref={pluginContainerRef}
+        role="group"
+        aria-label={t('statusBar.pluginItems')}
       />
     </footer>
   )

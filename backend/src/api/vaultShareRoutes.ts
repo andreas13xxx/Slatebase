@@ -2,6 +2,7 @@
 
 import type { Context } from 'hono'
 import { Hono } from 'hono'
+import { z } from 'zod'
 import type { IVaultAccessControl, IVaultService } from '../business/index.js'
 import type { IVaultShareRegistry } from '../vault/registry.js'
 import {
@@ -35,6 +36,67 @@ function createApiError(code: string, message: string): ApiError {
     message,
     timestamp: new Date().toISOString(),
   }
+}
+
+// --- Zod Schemas ---
+
+/**
+ * Schema for route params containing only `:vaultId`.
+ * Non-empty string, max 24 hex chars (deterministic SHA-256 vault IDs).
+ */
+const vaultIdParamSchema = z.object({
+  vaultId: z.string().min(1, 'vaultId must not be empty').max(24, 'vaultId too long'),
+})
+
+/**
+ * Schema for route params containing `:vaultId` and `:userId`.
+ */
+const vaultShareParamsSchema = z.object({
+  vaultId: z.string().min(1, 'vaultId must not be empty').max(24, 'vaultId too long'),
+  userId: z.string().min(1, 'userId must not be empty').max(64, 'userId too long'),
+})
+
+/**
+ * Valid share permission levels.
+ */
+const permissionEnum = z.enum(['read', 'write'], {
+  errorMap: () => ({ message: 'Field permission must be "read" or "write"' }),
+})
+
+/**
+ * Schema for create-share request body.
+ * Body: { userId: string, permission: 'read' | 'write' }
+ */
+const createShareBodySchema = z.object({
+  userId: z.string().min(1, 'Missing or invalid field: userId').max(64, 'userId too long'),
+  permission: permissionEnum,
+})
+
+/**
+ * Schema for update-share-permission request body.
+ * Body: { permission: 'read' | 'write' }
+ */
+const updatePermissionBodySchema = z.object({
+  permission: permissionEnum,
+})
+
+/**
+ * Schema for transfer-ownership request body.
+ * Body: { newOwnerId: string }
+ */
+const transferBodySchema = z.object({
+  newOwnerId: z.string().min(1, 'Missing or invalid field: newOwnerId').max(64, 'newOwnerId too long'),
+})
+
+// --- Helper: Validation Error Response ---
+
+/**
+ * Extracts the first error message from a Zod error and returns a 400 response.
+ */
+function validationErrorResponse(c: Context, zodError: z.ZodError): Response {
+  const firstError = zodError.errors[0]
+  const message = firstError ? firstError.message : 'Validation failed'
+  return c.json(createApiError('VALIDATION_ERROR', message), 400)
 }
 
 // --- Helper: Owner Authorization Check ---
@@ -162,7 +224,11 @@ export class VaultShareRouteModule implements RouteModule {
    * Enriches each share entry with the username of the target user.
    */
   private async listShares(c: Context): Promise<Response> {
-    const vaultId = c.req.param('vaultId') as string
+    const paramsParsed = vaultIdParamSchema.safeParse({ vaultId: c.req.param('vaultId') })
+    if (!paramsParsed.success) {
+      return validationErrorResponse(c, paramsParsed.error)
+    }
+    const { vaultId } = paramsParsed.data
 
     const ownerCheck = checkOwnership(c, vaultId, this.vaultRegistry)
     if (!ownerCheck.authorized) {
@@ -204,7 +270,11 @@ export class VaultShareRouteModule implements RouteModule {
    * Body: { userId: string, permission: 'read' | 'write' }
    */
   private async createShare(c: Context): Promise<Response> {
-    const vaultId = c.req.param('vaultId') as string
+    const paramsParsed = vaultIdParamSchema.safeParse({ vaultId: c.req.param('vaultId') })
+    if (!paramsParsed.success) {
+      return validationErrorResponse(c, paramsParsed.error)
+    }
+    const { vaultId } = paramsParsed.data
 
     const ownerCheck = checkOwnership(c, vaultId, this.vaultRegistry)
     if (!ownerCheck.authorized) {
@@ -212,24 +282,20 @@ export class VaultShareRouteModule implements RouteModule {
     }
 
     try {
-      const body: unknown = await c.req.json()
-
-      if (body === null || typeof body !== 'object') {
-        const error = createApiError('VALIDATION_ERROR', 'Request body must be a JSON object')
+      let body: unknown
+      try {
+        body = await c.req.json()
+      } catch {
+        const error = createApiError('VALIDATION_ERROR', 'Request body must be valid JSON')
         return c.json(error, 400)
       }
 
-      const { userId, permission } = body as { userId?: unknown; permission?: unknown }
-
-      if (typeof userId !== 'string' || userId.length === 0) {
-        const error = createApiError('VALIDATION_ERROR', 'Missing or invalid field: userId')
-        return c.json(error, 400)
+      const bodyParsed = createShareBodySchema.safeParse(body)
+      if (!bodyParsed.success) {
+        return validationErrorResponse(c, bodyParsed.error)
       }
 
-      if (permission !== 'read' && permission !== 'write') {
-        const error = createApiError('VALIDATION_ERROR', 'Field permission must be "read" or "write"')
-        return c.json(error, 400)
-      }
+      const { userId, permission } = bodyParsed.data
 
       await this.accessControl.createShare(vaultId, ownerCheck.session.userId, userId, permission)
 
@@ -244,8 +310,14 @@ export class VaultShareRouteModule implements RouteModule {
    * Revokes a share for a target user on the vault.
    */
   private async revokeShare(c: Context): Promise<Response> {
-    const vaultId = c.req.param('vaultId') as string
-    const targetUserId = c.req.param('userId') as string
+    const paramsParsed = vaultShareParamsSchema.safeParse({
+      vaultId: c.req.param('vaultId'),
+      userId: c.req.param('userId'),
+    })
+    if (!paramsParsed.success) {
+      return validationErrorResponse(c, paramsParsed.error)
+    }
+    const { vaultId, userId: targetUserId } = paramsParsed.data
 
     const ownerCheck = checkOwnership(c, vaultId, this.vaultRegistry)
     if (!ownerCheck.authorized) {
@@ -266,8 +338,14 @@ export class VaultShareRouteModule implements RouteModule {
    * Body: { permission: 'read' | 'write' }
    */
   private async updateSharePermission(c: Context): Promise<Response> {
-    const vaultId = c.req.param('vaultId') as string
-    const targetUserId = c.req.param('userId') as string
+    const paramsParsed = vaultShareParamsSchema.safeParse({
+      vaultId: c.req.param('vaultId'),
+      userId: c.req.param('userId'),
+    })
+    if (!paramsParsed.success) {
+      return validationErrorResponse(c, paramsParsed.error)
+    }
+    const { vaultId, userId: targetUserId } = paramsParsed.data
 
     const ownerCheck = checkOwnership(c, vaultId, this.vaultRegistry)
     if (!ownerCheck.authorized) {
@@ -275,19 +353,20 @@ export class VaultShareRouteModule implements RouteModule {
     }
 
     try {
-      const body: unknown = await c.req.json()
-
-      if (body === null || typeof body !== 'object') {
-        const error = createApiError('VALIDATION_ERROR', 'Request body must be a JSON object')
+      let body: unknown
+      try {
+        body = await c.req.json()
+      } catch {
+        const error = createApiError('VALIDATION_ERROR', 'Request body must be valid JSON')
         return c.json(error, 400)
       }
 
-      const { permission } = body as { permission?: unknown }
-
-      if (permission !== 'read' && permission !== 'write') {
-        const error = createApiError('VALIDATION_ERROR', 'Field permission must be "read" or "write"')
-        return c.json(error, 400)
+      const bodyParsed = updatePermissionBodySchema.safeParse(body)
+      if (!bodyParsed.success) {
+        return validationErrorResponse(c, bodyParsed.error)
       }
+
+      const { permission } = bodyParsed.data
 
       await this.accessControl.updateSharePermission(vaultId, ownerCheck.session.userId, targetUserId, permission)
 
@@ -303,7 +382,11 @@ export class VaultShareRouteModule implements RouteModule {
    * Body: { newOwnerId: string }
    */
   private async transferOwnership(c: Context): Promise<Response> {
-    const vaultId = c.req.param('vaultId') as string
+    const paramsParsed = vaultIdParamSchema.safeParse({ vaultId: c.req.param('vaultId') })
+    if (!paramsParsed.success) {
+      return validationErrorResponse(c, paramsParsed.error)
+    }
+    const { vaultId } = paramsParsed.data
 
     const ownerCheck = checkOwnership(c, vaultId, this.vaultRegistry)
     if (!ownerCheck.authorized) {
@@ -311,19 +394,20 @@ export class VaultShareRouteModule implements RouteModule {
     }
 
     try {
-      const body: unknown = await c.req.json()
-
-      if (body === null || typeof body !== 'object') {
-        const error = createApiError('VALIDATION_ERROR', 'Request body must be a JSON object')
+      let body: unknown
+      try {
+        body = await c.req.json()
+      } catch {
+        const error = createApiError('VALIDATION_ERROR', 'Request body must be valid JSON')
         return c.json(error, 400)
       }
 
-      const { newOwnerId } = body as { newOwnerId?: unknown }
-
-      if (typeof newOwnerId !== 'string' || newOwnerId.length === 0) {
-        const error = createApiError('VALIDATION_ERROR', 'Missing or invalid field: newOwnerId')
-        return c.json(error, 400)
+      const bodyParsed = transferBodySchema.safeParse(body)
+      if (!bodyParsed.success) {
+        return validationErrorResponse(c, bodyParsed.error)
       }
+
+      const { newOwnerId } = bodyParsed.data
 
       await this.vaultService.transferOwnership(vaultId, ownerCheck.session.userId, newOwnerId)
 

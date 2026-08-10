@@ -389,7 +389,8 @@ src/
 │   ├── useVersionInfo.ts — Server version info hook (installed vs. latest, GitHub API check)
 │   ├── useGlobalShortcuts.ts — App-wide keyboard shortcuts (vault search, mode toggle, settings panel, daily note); extracted from AppContent
 │   ├── useWorkspaceRestore.ts — Session-persistence lifecycle: restores vault/tabs/layout from workspaceStore on mount, persists changes back; extracted from AppContent
-│   └── usePaginatedResource.ts — Shared list-loading state machine (page/loading/error, loadPage/reload) for admin list pages
+│   ├── usePaginatedResource.ts — Shared list-loading state machine (page/loading/error, loadPage/reload) for admin list pages
+│   └── useFocusTrap.ts    — Reusable focus trap hook (Tab cycling, Escape callback, focus return to trigger element)
 ├── components/
 │   ├── SlatebaseLogo.tsx — SVG logo component
 │   ├── StatusBar.tsx     — Bottom status bar (clock, extensible plugin items, togglable in settings)

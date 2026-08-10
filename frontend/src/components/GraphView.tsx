@@ -721,6 +721,8 @@ export function GraphView({ vaultId }: GraphViewProps) {
         ref={svgRef}
         className="graph-view-svg"
         viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
+        role="img"
+        aria-label={t('graph.ariaLabel', { nodeCount: nodes.length, edgeCount: links.length })}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

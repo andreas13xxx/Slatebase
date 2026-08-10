@@ -87,13 +87,13 @@ export function TrashView({ vaultId, apiClient }: TrashViewProps) {
 
   if (loading) {
     return (
-      <div className="trash-view">
+      <div className="trash-view" aria-label="Papierkorb">
         <div className="trash-view__header">
-          <Trash2 size={18} className="trash-view__header-icon" />
+          <Trash2 size={18} className="trash-view__header-icon" aria-hidden="true" />
           <h2 className="trash-view__title">Papierkorb</h2>
         </div>
-        <div className="trash-view__loading">
-          <Loader2 size={18} className="trash-view__spinner" />
+        <div className="trash-view__loading" role="status" aria-live="polite">
+          <Loader2 size={18} className="trash-view__spinner" aria-hidden="true" />
           <span>Lade Papierkorb…</span>
         </div>
       </div>
@@ -101,23 +101,23 @@ export function TrashView({ vaultId, apiClient }: TrashViewProps) {
   }
 
   return (
-    <div className="trash-view">
+    <div className="trash-view" aria-label="Papierkorb">
       <div className="trash-view__header">
-        <Trash2 size={18} className="trash-view__header-icon" />
+        <Trash2 size={18} className="trash-view__header-icon" aria-hidden="true" />
         <h2 className="trash-view__title">Papierkorb</h2>
-        <span className="trash-view__count">{entries.length}</span>
+        <span className="trash-view__count" aria-label={`${entries.length} Einträge`}>{entries.length}</span>
       </div>
 
       {entries.length === 0 ? (
-        <div className="trash-view__empty">
-          <Trash2 size={32} className="trash-view__empty-icon" />
+        <div className="trash-view__empty" role="status" aria-live="polite">
+          <Trash2 size={32} className="trash-view__empty-icon" aria-hidden="true" />
           <p className="trash-view__empty-text">Der Papierkorb ist leer.</p>
         </div>
       ) : (
-        <ul className="trash-view__list" role="list">
+        <ul className="trash-view__list" role="list" aria-label="Gelöschte Dateien">
           {entries.map((entry) => (
             <li key={entry.id} className="trash-view__entry">
-              <div className="trash-view__entry-icon">
+              <div className="trash-view__entry-icon" aria-hidden="true">
                 {entry.isDirectory
                   ? <Folder size={16} />
                   : <FileText size={16} />
@@ -131,7 +131,7 @@ export function TrashView({ vaultId, apiClient }: TrashViewProps) {
                   Gelöscht: {formatDeletionDate(entry.deletedAt)}
                 </span>
               </div>
-              <div className="trash-view__entry-actions">
+              <div className="trash-view__entry-actions" role="group" aria-label={`Aktionen für ${entry.originalPath}`}>
                 <button
                   type="button"
                   className="trash-view__btn trash-view__btn--restore"
@@ -140,7 +140,7 @@ export function TrashView({ vaultId, apiClient }: TrashViewProps) {
                   title="Wiederherstellen"
                   aria-label={`${entry.originalPath} wiederherstellen`}
                 >
-                  <RotateCcw size={14} />
+                  <RotateCcw size={14} aria-hidden="true" />
                   <span>Wiederherstellen</span>
                 </button>
                 <button
@@ -151,7 +151,7 @@ export function TrashView({ vaultId, apiClient }: TrashViewProps) {
                   title="Endgültig löschen"
                   aria-label={`${entry.originalPath} endgültig löschen`}
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={14} aria-hidden="true" />
                   <span>Endgültig löschen</span>
                 </button>
               </div>

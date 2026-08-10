@@ -100,13 +100,16 @@ export const CanvasMinimap = memo(function CanvasMinimap({
   const viewRectW = viewWidth * scale
   const viewRectH = viewHeight * scale
 
+  // a11y: The minimap is a purely visual redundancy — a scaled overview with click-to-jump
+  // viewport positioning. Keyboard alternatives for viewport navigation are provided directly
+  // on the main canvas (arrow-key panning, Tab focus between nodes). Marking aria-hidden so
+  // screenreaders skip this decorative/redundant widget entirely.
   return (
     <div
       ref={minimapRef}
       className="canvas-minimap"
       onClick={handleClick}
-      role="navigation"
-      aria-label="Canvas-Minimap"
+      aria-hidden="true"
     >
       <svg
         width={MINIMAP_WIDTH}

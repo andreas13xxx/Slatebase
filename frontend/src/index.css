@@ -13,7 +13,7 @@
 
   --text-primary: #0f172a;
   --text-secondary: #475569;
-  --text-muted: #94a3b8;
+  --text-muted: #64748b;
   --text-inverse: #ffffff;
 
   --border-subtle: #e2e8f0;
@@ -21,10 +21,10 @@
   --border-strong: #94a3b8;
 
   /* Accent — Teal */
-  --accent: #0d9488;
-  --accent-hover: #0f766e;
+  --accent: #0f766e;
+  --accent-hover: #115e59;
   --accent-light: #f0fdfa;
-  --accent-text: #0d9488;
+  --accent-text: #0f766e;
 
   --success: #16a34a;
   --success-bg: #f0fdf4;
@@ -38,7 +38,7 @@
   --danger-hover: #b91c1c;
   --danger-bg: #fef2f2;
   --danger-border: #fecaca;
-  --danger-text: #dc2626;
+  --danger-text: #c92020;
 
   --info-bg: #f0fdfa;
   --info-border: #99f6e4;
@@ -58,7 +58,7 @@
   --right-panel-border: #e2e8f0;
   --right-panel-header-bg: rgba(15, 23, 42, 0.03);
   --right-panel-text: #0f172a;
-  --right-panel-text-muted: #64748b;
+  --right-panel-text-muted: #586373;
 
   /* Callout Tokens — Light */
   --callout-note-bg: #eff6ff;
@@ -71,11 +71,11 @@
 
   --callout-tip-bg: #f0fdf4;
   --callout-tip-border: #bbf7d0;
-  --callout-tip-icon: #22c55e;
+  --callout-tip-icon: #16a34a;
 
   --callout-warning-bg: #fffbeb;
   --callout-warning-border: #fde68a;
-  --callout-warning-icon: #f59e0b;
+  --callout-warning-icon: #d97706;
 
   --callout-danger-bg: #fef2f2;
   --callout-danger-border: #fecaca;
@@ -124,13 +124,13 @@
   --embed-border: #e2e8f0;
 
   /* Broken Link Tokens — Light */
-  --broken-link-color: #94a3b8;
+  --broken-link-color: #64748b;
   --broken-link-text-decoration: underline dashed;
 
   /* Search Tokens — Light */
   --search-match-bg: #fef08a;
   --search-match-text: #1c1917;
-  --search-active-bg: rgba(13, 148, 136, 0.08);
+  --search-active-bg: rgba(15, 118, 110, 0.08);
   --search-file-header-bg: #f1f5f9;
   --search-hit-hover-bg: rgba(15, 23, 42, 0.04);
 
@@ -177,7 +177,7 @@
   --canvas-node-bg: #ffffff;
   --canvas-node-border: #e2e8f0;
   --canvas-edge-color: #94a3b8;
-  --canvas-selection-color: #0d9488;
+  --canvas-selection-color: #0f766e;
   --canvas-group-bg: rgba(15, 23, 42, 0.03);
   --canvas-group-border: #cbd5e1;
   --canvas-grid-color: #e2e8f0;
@@ -227,7 +227,7 @@
 
     --text-primary: #f1f5f9;
     --text-secondary: #94a3b8;
-    --text-muted: #64748b;
+    --text-muted: #7a8592;
     --text-inverse: #0f172a;
 
     --border-subtle: #1e293b;
@@ -260,7 +260,7 @@
 
     /* Sidebar (darker slate) */
     --sidebar-bg: #0b1120;
-    --sidebar-text: #64748b;
+    --sidebar-text: #7a8592;
     --sidebar-text-active: #f1f5f9;
     --sidebar-hover: rgba(100, 116, 139, 0.12);
     --sidebar-active: rgba(100, 116, 139, 0.2);
@@ -271,7 +271,7 @@
     --right-panel-border: rgba(100, 116, 139, 0.1);
     --right-panel-header-bg: rgba(100, 116, 139, 0.08);
     --right-panel-text: #f1f5f9;
-    --right-panel-text-muted: #64748b;
+    --right-panel-text-muted: #7a8592;
 
     /* Callout Tokens — Dark */
     --callout-note-bg: #1e293b;
@@ -336,7 +336,7 @@
     --embed-border: #1e293b;
 
     /* Broken Link Tokens — Dark */
-    --broken-link-color: #64748b;
+    --broken-link-color: #7a8592;
     --broken-link-text-decoration: underline dashed;
 
     /* Search Tokens — Dark */
@@ -415,7 +415,7 @@
 
     --text-primary: #f1f5f9;
     --text-secondary: #94a3b8;
-    --text-muted: #64748b;
+    --text-muted: #7a8592;
     --text-inverse: #0f172a;
 
     --border-subtle: #1e293b;
@@ -448,7 +448,7 @@
 
     /* Sidebar (darker slate) */
     --sidebar-bg: #0b1120;
-    --sidebar-text: #64748b;
+    --sidebar-text: #7a8592;
     --sidebar-text-active: #f1f5f9;
     --sidebar-hover: rgba(100, 116, 139, 0.12);
     --sidebar-active: rgba(100, 116, 139, 0.2);
@@ -459,7 +459,7 @@
     --right-panel-border: rgba(100, 116, 139, 0.1);
     --right-panel-header-bg: rgba(100, 116, 139, 0.08);
     --right-panel-text: #f1f5f9;
-    --right-panel-text-muted: #64748b;
+    --right-panel-text-muted: #7a8592;
 
     /* Callout Tokens — Dark */
     --callout-note-bg: #1e293b;
@@ -524,7 +524,7 @@
     --embed-border: #1e293b;
 
     /* Broken Link Tokens — Dark */
-    --broken-link-color: #64748b;
+    --broken-link-color: #7a8592;
     --broken-link-text-decoration: underline dashed;
 
     /* Search Tokens — Dark */

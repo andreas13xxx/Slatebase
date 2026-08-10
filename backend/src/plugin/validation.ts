@@ -70,6 +70,7 @@ export const pluginRegistrySchema = z.object({
       installedAt: z.string(),
       updatedAt: z.string(),
       error: z.string().optional(),
+      hasEvalUsage: z.boolean().optional(),
     }),
   ),
 })

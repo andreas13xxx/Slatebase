@@ -219,7 +219,7 @@ export function TabContent() {
   // No active tab — empty state
   if (!activeTab) {
     return (
-      <div className="tab-content tab-content--empty">
+      <div className="tab-content tab-content--empty" role="tabpanel" aria-label={t('tabContent.emptyPanelLabel')}>
         <p>{t('tabContent.noFileOpen')}</p>
       </div>
     )
@@ -229,13 +229,13 @@ export function TabContent() {
   if (activeTab.filePath === '__graph__') {
     if (!activeTab.vaultId) {
       return (
-        <div className="tab-content tab-content--empty">
+        <div className="tab-content tab-content--empty" role="tabpanel" aria-label={t('tabContent.emptyPanelLabel')}>
           <p>{t('graph.noVault')}</p>
         </div>
       )
     }
     return (
-      <div className="tab-content tab-content--graph">
+      <div className="tab-content tab-content--graph" role="tabpanel" aria-label={activeTab.fileName}>
         <ErrorBoundary>
           <GraphView vaultId={activeTab.vaultId} />
         </ErrorBoundary>
@@ -252,6 +252,8 @@ export function TabContent() {
         <div
           key={`plugin-view-${activeTab.id}`}
           className="tab-content tab-content--plugin-view"
+          role="tabpanel"
+          aria-label={activeTab.fileName}
           ref={(el) => {
             if (el && !el.contains(viewInfo.containerEl)) {
               el.appendChild(viewInfo.containerEl)
@@ -262,7 +264,7 @@ export function TabContent() {
     }
     // View not found (may have been deactivated) — show empty state
     return (
-      <div className="tab-content tab-content--empty">
+      <div className="tab-content tab-content--empty" role="tabpanel" aria-label={t('tabContent.emptyPanelLabel')}>
         <p>{t('tabContent.noFileOpen')}</p>
       </div>
     )
@@ -271,9 +273,11 @@ export function TabContent() {
   // Loading state
   if (activeTab.loading) {
     return (
-      <div className="tab-content tab-content--loading" role="status" aria-live="polite">
-        <span className="app-loading-spinner" aria-hidden="true" />
-        <span>{t('tabContent.loading')}</span>
+      <div className="tab-content tab-content--loading" role="tabpanel" aria-label={t('tabContent.panelLabel')}>
+        <span role="status" aria-live="polite">
+          <span className="app-loading-spinner" aria-hidden="true" />
+          <span>{t('tabContent.loading')}</span>
+        </span>
       </div>
     )
   }
@@ -281,8 +285,8 @@ export function TabContent() {
   // Error state
   if (activeTab.error) {
     return (
-      <div className="tab-content tab-content--error" role="alert">
-        <p>
+      <div className="tab-content tab-content--error" role="tabpanel" aria-label={activeTab.fileName}>
+        <p role="alert">
           {t('tabContent.fileLoadError', { error: activeTab.error })}
         </p>
       </div>
@@ -293,7 +297,7 @@ export function TabContent() {
   if (activeTab.isBinary) {
     const extension = getFileExtension(activeTab.fileName)
     return (
-      <div className="tab-content tab-content--binary">
+      <div className="tab-content tab-content--binary" role="tabpanel" aria-label={activeTab.fileName}>
         <BinaryViewer
           fileName={activeTab.fileName}
           fileExtension={extension}
@@ -310,7 +314,7 @@ export function TabContent() {
     const currentVault = appState.vaults.find((v) => v.id === activeTab.vaultId)
     const isReadOnly = currentVault?.permission === 'read'
     return (
-      <div className="tab-content tab-content--canvas">
+      <div className="tab-content tab-content--canvas" role="tabpanel" aria-label={activeTab.fileName}>
         <ErrorBoundary>
           <CanvasView
             vaultId={activeTab.vaultId}
@@ -347,6 +351,8 @@ export function TabContent() {
         <div
           key={`plugin-file-view-${activeTab.id}`}
           className="tab-content tab-content--plugin-file-view"
+          role="tabpanel"
+          aria-label={activeTab.fileName}
           data-plugin-id={fileViewMatch.pluginId}
           ref={(el) => {
             if (el && !el.contains(activeFileView.containerEl)) {
@@ -358,9 +364,11 @@ export function TabContent() {
     }
     // View is being created asynchronously — show loading
     return (
-      <div className="tab-content tab-content--loading" role="status" aria-live="polite">
-        <span className="app-loading-spinner" aria-hidden="true" />
-        <span>{t('tabContent.loading')}</span>
+      <div className="tab-content tab-content--loading" role="tabpanel" aria-label={t('tabContent.panelLabel')}>
+        <span role="status" aria-live="polite">
+          <span className="app-loading-spinner" aria-hidden="true" />
+          <span>{t('tabContent.loading')}</span>
+        </span>
       </div>
     )
   }
@@ -371,7 +379,7 @@ export function TabContent() {
     const currentVault = appState.vaults.find((v) => v.id === activeTab.vaultId)
     const isReadOnly = currentVault?.permission === 'read'
     return (
-      <div className="tab-content tab-content--edit">
+      <div className="tab-content tab-content--edit" role="tabpanel" aria-label={activeTab.fileName}>
         <EditMode
           content={editContent}
           onChange={handleEditChange}
@@ -401,7 +409,7 @@ export function TabContent() {
   const currentVaultPreview = appState.vaults.find((v) => v.id === activeTab.vaultId)
   const isReadOnlyPreview = currentVaultPreview?.permission === 'read'
   return (
-    <div className="tab-content tab-content--edit">
+    <div className="tab-content tab-content--edit" role="tabpanel" aria-label={activeTab.fileName}>
       {linkError && (
         <div className="tab-content-link-error" role="alert">
           <span>{linkError}</span>

@@ -65,6 +65,16 @@ CI fährt `test:coverage` (nicht `test`) — ein Unterschreiten der Schwellen br
 - [ ] Neue i18n-Keys in `de.ts` UND `en.ts` ergänzt (Struktur muss identisch sein)
 - [ ] Frontend: `IApiClient` erweitert falls neuer Endpoint
 
+
+### Accessibility (WCAG 2.1 AA)
+- [ ] Neue Modals/Dialoge nutzen `useFocusTrap` aus `hooks/useFocusTrap.ts` (kein manueller `document`-Keydown-Listener)
+- [ ] Interaktive Elemente (`onClick`) auf nicht-interaktiven Tags (`div`, `span`) haben `role="button"`, `tabIndex={0}`, `onKeyDown` (Enter/Space)
+- [ ] Neue Farbtoken in `index.css`: Kontrast = 4.5:1 (Normal-Text) / 3:1 (Large Text, UI-Komponenten) pr�fen
+- [ ] Resize-Handles: `role="separator"` + `aria-valuenow/min/max` + `tabIndex={0}` + Pfeiltasten-Handler
+- [ ] SVG-Visualisierungen: `role="img"` + beschreibendes `aria-label`
+- [ ] Ladezust�nde: `role="status" aria-live="polite"`; Fehler: `role="alert"`
+- [ ] axe-Test (`*.a11y.test.tsx`) f�r neue Kern-Komponenten (Modals, Panels, Listen)
+
 ### CSS
 - [ ] Tokens existieren in `index.css` (nie hartcodierte Farben)
 - [ ] Dark Mode in `:root[data-theme="dark"]` UND `@media (prefers-color-scheme: dark)`
@@ -79,11 +89,13 @@ CI fährt `test:coverage` (nicht `test`) — ein Unterschreiten der Schwellen br
 - `validateFilePath()` vor JEDEM Vault-Dateizugriff
 - Neue Endpoints mit Pfaden: Path-Traversal-Test zuerst
 - Blockiert: Null-Bytes, absolute Pfade, `..`-Sequenzen
+- `validateContentName()` in `business/validation.ts` für Rename/Move-Ziele: blockiert `/`, `\`, `\0`, `.`, `..`. Defense-in-depth: `renameContent` prüft ZUSÄTZLICH `resolvedTargetPath.startsWith(vault.info.path + path.sep)`.
 
 ### Input-Validierung
 - Zod im Controller-Layer, BEVOR Business-Logik aufgerufen wird
 - Zwei Schichten: Zod (Controller) + Business-Validierung
 - Max-Längen definieren (Vault-Name: 128, Pfade: sinnvoll)
+- Alle 24 Route-Module haben Zod-Schemas (Stand August 2026 Security Audit). Neue Routen MÜSSEN vor Merge validiert sein — CI-Test prüft die 400-Responses.
 
 ### Secrets & Credentials
 - Keine Secrets in Logs (Pino: sensible Felder exclude)
@@ -104,7 +116,7 @@ CI fährt `test:coverage` (nicht `test`) — ein Unterschreiten der Schwellen br
 - Jeder neue state-changing Endpoint, der nur durch eine gültige Session geschützt ist (kein zusätzliches Secret wie CSRF-Token oder MFA), braucht ein eigenes Rate-Limit — Session-Diebstahl/CSRF-Bypass ist die Bedrohung, nicht nur der ursprüngliche Login.
 
 ### Security-Header
-- `hono/secure-headers` global aktiv (CSP `object-src`/`frame-ancestors: 'none'`, `X-Content-Type-Options: nosniff`, `X-Frame-Options`, `Referrer-Policy`, HSTS, entfernt `X-Powered-By`).
+- `hono/secure-headers` global aktiv. Vollständige CSP: `default-src 'self'`, `script-src 'self' blob:` (Plugin-Bundles via Blob URL + dynamic import), `style-src 'self' 'unsafe-inline'` (Plugin-CSS-Injection), `img-src 'self' data: https:` (Inline-/Externe Bilder), `connect-src 'self'`, `frame-src 'self' https:` (Canvas Link-Node iframes), `object-src 'none'`, `frame-ancestors 'none'`. HSTS `max-age=63072000; includeSubDomains`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`. Kein `unsafe-eval` nötig.
 - `crossOriginResourcePolicy` bewusst deaktiviert: Frontend und Backend laufen laut `allowedOrigins`-Konfiguration auf unterschiedlichen Origins — `same-origin` CORP würde `<img src>`-Ladevorgänge von Vault-Dateien (raw-file-Endpoint) blockieren.
 - Rohes SVG/HTML (`raw=true`-Dateiendpoint) niemals mit `Content-Disposition: inline` ausliefern — beide können `<script>` enthalten und werden bei direkter Navigation (geteilter Link, neuer Tab) ausgeführt. `attachment` erzwingt Download statt Rendern; `<img>`-Einbettung im Frontend bleibt unbetroffen (Disposition wirkt nur bei Top-Level-Navigation).
 

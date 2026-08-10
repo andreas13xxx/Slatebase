@@ -9,6 +9,11 @@
  * - Lifecycle: activate (onload with 10s timeout), deactivate (onunload + full cleanup)
  * - Exception handling: mark as error, log, continue with remaining plugins
  *
+ * CSP: Plugin bundles are executed via Blob URL + dynamic import() (see evaluateBundle()).
+ * This does NOT require 'unsafe-eval' in script-src. It DOES require 'blob:' in script-src
+ * so the browser permits importing the generated blob: URL as a JavaScript module.
+ * No eval() or new Function() is used anywhere in this module or in sandbox.ts.
+ *
  * @module plugin-loader
  */
 

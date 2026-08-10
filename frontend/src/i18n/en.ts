@@ -22,6 +22,7 @@ export const en: TranslationShape = {
     back: 'Back',
     search: 'Search',
     noSelection: 'No vault selected.',
+    skipToContent: 'Skip to content',
   },
 
   auth: {
@@ -538,6 +539,7 @@ export const en: TranslationShape = {
     showTags: 'Show tags',
     showProperties: 'Show properties',
     reset: 'Reset',
+    ariaLabel: 'Graph with {nodeCount} nodes and {edgeCount} edges',
   },
 
   contextPanel: {
@@ -623,10 +625,14 @@ export const en: TranslationShape = {
     linkCreateError: 'Could not create file: {fileName} — {message}',
     linkCreateUnexpected: 'An unexpected error occurred',
     dismissError: 'Dismiss error',
+    panelLabel: 'File content',
+    emptyPanelLabel: 'No content — no file open',
   },
 
   statusBar: {
     ariaLabel: 'Status bar',
+    clock: 'Current time',
+    pluginItems: 'Plugin status indicators',
   },
 
   pluginStore: {
@@ -671,6 +677,10 @@ export const en: TranslationShape = {
     sortDirectionLabel: 'Reverse sort direction',
     sortAsc: 'Ascending',
     sortDesc: 'Descending',
+    evalWarningTitle: 'Security Notice',
+    evalWarningMessage: 'This plugin uses dynamic code execution (eval/new Function). This poses an elevated security risk. Only activate this plugin if you trust the source.',
+    evalWarningConfirm: 'Accept risk and activate',
+    evalWarningCancel: 'Cancel',
   },
 
   commands: {

@@ -2,12 +2,13 @@
 
 import type { Context } from 'hono'
 import { Hono } from 'hono'
+import { z } from 'zod'
 import type { PluginRegistryData } from '../plugin/types.js'
 import type { IPluginService } from '../plugin/plugin-service.js'
 import type { PluginInstallResult } from '../plugin/plugin-installer.js'
 import { PluginNotFoundError, PluginFileTooLargeError, PluginSettingsTooLargeError } from '../plugin/errors.js'
 import { PluginInstallError } from '../plugin/plugin-installer.js'
-import { pluginRegistrySchema, isValidPluginId } from '../plugin/validation.js'
+import { pluginRegistrySchema } from '../plugin/validation.js'
 import type { IVaultAccessControl } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
@@ -30,6 +31,41 @@ function createApiError(code: string, message: string): ApiError {
     message,
     timestamp: new Date().toISOString(),
   }
+}
+
+// ─── Zod Schemas ─────────────────────────────────────────────────────────────
+
+/**
+ * Schema for vaultId path parameter.
+ * Vault IDs are deterministic SHA-256 hashes, max 24 hex chars.
+ */
+const vaultIdParamSchema = z.object({
+  vaultId: z.string().min(1, 'vaultId must not be empty').max(24, 'vaultId too long'),
+})
+
+/**
+ * Schema for plugin ID path parameter.
+ * Lowercase alphanumeric + hyphens, max 64 chars.
+ */
+const pluginIdParamSchema = z.object({
+  pluginId: z.string()
+    .min(1, 'pluginId must not be empty')
+    .max(64, 'pluginId must not exceed 64 characters')
+    .regex(/^[a-z0-9][a-z0-9-]{0,63}$/, 'Invalid plugin ID: must contain only lowercase letters, digits, and hyphens (1-64 chars)'),
+})
+
+/**
+ * Validates a vaultId param via the zod schema and returns an error response if invalid.
+ * Returns null if validation passes.
+ */
+function validateVaultIdParam(c: Context, vaultId: string): Response | null {
+  const parsed = vaultIdParamSchema.safeParse({ vaultId })
+  if (!parsed.success) {
+    const firstIssue = parsed.error.issues[0]
+    const message = firstIssue ? firstIssue.message : 'Invalid vaultId'
+    return c.json(createApiError('VALIDATION_ERROR', message), 400)
+  }
+  return null
 }
 
 // ─── Dependencies ────────────────────────────────────────────────────────────
@@ -64,6 +100,9 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
   app.get('/detected', async (c: Context): Promise<Response> => {
     const vaultId = c.req.param('vaultId') as string
 
+    const vaultIdError = validateVaultIdParam(c, vaultId)
+    if (vaultIdError) return vaultIdError
+
     const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
     if (!authResult.authorized) {
       return authResult.response
@@ -87,9 +126,15 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     const vaultId = c.req.param('vaultId') as string
     const pluginId = c.req.param('pluginId') as string
 
-    // Validate plugin ID to prevent path traversal
-    if (!isValidPluginId(pluginId)) {
-      return c.json(createApiError('VALIDATION_ERROR', 'Invalid plugin ID: must contain only lowercase letters, digits, and hyphens (1-64 chars)'), 400)
+    const vaultIdError = validateVaultIdParam(c, vaultId)
+    if (vaultIdError) return vaultIdError
+
+    // Validate plugin ID with zod schema
+    const pluginIdParsed = pluginIdParamSchema.safeParse({ pluginId })
+    if (!pluginIdParsed.success) {
+      const firstIssue = pluginIdParsed.error.issues[0]
+      const message = firstIssue ? firstIssue.message : 'Invalid plugin ID'
+      return c.json(createApiError('VALIDATION_ERROR', message), 400)
     }
 
     const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
@@ -104,6 +149,37 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
       }
 
       const result = await pluginService.installDetected(vaultId, pluginId, entry.storagePath)
+
+      // Persist hasEvalUsage in registry if eval/Function patterns were detected
+      if (result.warnings.length > 0) {
+        const hasEvalUsage = result.warnings.some((w) => w.includes('eval(') || w.includes('new Function('))
+        if (hasEvalUsage) {
+          const registry = await pluginService.loadRegistry(vaultId)
+          const now = new Date().toISOString()
+          const existingEntry = registry?.plugins?.[result.pluginId]
+          const updatedRegistry = {
+            version: 1 as const,
+            plugins: {
+              ...(registry?.plugins ?? {}),
+              [result.pluginId]: {
+                status: existingEntry?.status ?? ('inactive' as const),
+                permissions: existingEntry?.permissions ?? {
+                  network: false,
+                  networkAllowlist: [],
+                  filesystemWrite: false,
+                  domManipulation: false,
+                },
+                compatibilityLevel: existingEntry?.compatibilityLevel ?? ('unknown' as const),
+                installedAt: existingEntry?.installedAt ?? now,
+                updatedAt: now,
+                hasEvalUsage: true,
+              },
+            },
+          }
+          await pluginService.saveRegistry(vaultId, updatedRegistry)
+        }
+      }
+
       return c.json(result, 201)
     } catch (error) {
       return handlePluginError(c, error, logger)
@@ -115,6 +191,9 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
   // PUT /registry — Save registry state
   app.put('/registry', async (c: Context): Promise<Response> => {
     const vaultId = c.req.param('vaultId') as string
+
+    const vaultIdError = validateVaultIdParam(c, vaultId)
+    if (vaultIdError) return vaultIdError
 
     const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
     if (!authResult.authorized) {
@@ -147,6 +226,9 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
   app.get('/registry', async (c: Context): Promise<Response> => {
     const vaultId = c.req.param('vaultId') as string
 
+    const vaultIdError = validateVaultIdParam(c, vaultId)
+    if (vaultIdError) return vaultIdError
+
     const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
     if (!authResult.authorized) {
       return authResult.response
@@ -169,6 +251,9 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
   app.get('/', async (c: Context): Promise<Response> => {
     const vaultId = c.req.param('vaultId') as string
 
+    const vaultIdError = validateVaultIdParam(c, vaultId)
+    if (vaultIdError) return vaultIdError
+
     const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
     if (!authResult.authorized) {
       return authResult.response
@@ -185,6 +270,9 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
   // POST / — Upload/install plugin (ZIP, multipart/form-data)
   app.post('/', async (c: Context): Promise<Response> => {
     const vaultId = c.req.param('vaultId') as string
+
+    const vaultIdError = validateVaultIdParam(c, vaultId)
+    if (vaultIdError) return vaultIdError
 
     const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
     if (!authResult.authorized) {
@@ -212,6 +300,36 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
       const buffer = Buffer.from(arrayBuffer)
       const result: PluginInstallResult = await pluginService.installFromZip(vaultId, buffer)
 
+      // Persist hasEvalUsage in registry if eval/Function patterns were detected
+      if (result.warnings.length > 0) {
+        const hasEvalUsage = result.warnings.some((w) => w.includes('eval(') || w.includes('new Function('))
+        if (hasEvalUsage) {
+          const registry = await pluginService.loadRegistry(vaultId)
+          const now = new Date().toISOString()
+          const existingEntry = registry?.plugins?.[result.pluginId]
+          const updatedRegistry = {
+            version: 1 as const,
+            plugins: {
+              ...(registry?.plugins ?? {}),
+              [result.pluginId]: {
+                status: existingEntry?.status ?? ('inactive' as const),
+                permissions: existingEntry?.permissions ?? {
+                  network: false,
+                  networkAllowlist: [],
+                  filesystemWrite: false,
+                  domManipulation: false,
+                },
+                compatibilityLevel: existingEntry?.compatibilityLevel ?? ('unknown' as const),
+                installedAt: existingEntry?.installedAt ?? now,
+                updatedAt: now,
+                hasEvalUsage: true,
+              },
+            },
+          }
+          await pluginService.saveRegistry(vaultId, updatedRegistry)
+        }
+      }
+
       return c.json(result, 201)
     } catch (error) {
       return handlePluginError(c, error, logger)
@@ -225,9 +343,15 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     const vaultId = c.req.param('vaultId') as string
     const pluginId = c.req.param('pluginId') as string
 
-    // Validate plugin ID to prevent path traversal
-    if (!isValidPluginId(pluginId)) {
-      return c.json(createApiError('VALIDATION_ERROR', 'Invalid plugin ID: must contain only lowercase letters, digits, and hyphens (1-64 chars)'), 400)
+    const vaultIdError = validateVaultIdParam(c, vaultId)
+    if (vaultIdError) return vaultIdError
+
+    // Validate plugin ID with zod schema
+    const pluginIdParsed = pluginIdParamSchema.safeParse({ pluginId })
+    if (!pluginIdParsed.success) {
+      const firstIssue = pluginIdParsed.error.issues[0]
+      const message = firstIssue ? firstIssue.message : 'Invalid plugin ID'
+      return c.json(createApiError('VALIDATION_ERROR', message), 400)
     }
 
     const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
@@ -251,9 +375,15 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     const vaultId = c.req.param('vaultId') as string
     const pluginId = c.req.param('pluginId') as string
 
-    // Validate plugin ID to prevent path traversal
-    if (!isValidPluginId(pluginId)) {
-      return c.json(createApiError('VALIDATION_ERROR', 'Invalid plugin ID: must contain only lowercase letters, digits, and hyphens (1-64 chars)'), 400)
+    const vaultIdError = validateVaultIdParam(c, vaultId)
+    if (vaultIdError) return vaultIdError
+
+    // Validate plugin ID with zod schema
+    const pluginIdParsed = pluginIdParamSchema.safeParse({ pluginId })
+    if (!pluginIdParsed.success) {
+      const firstIssue = pluginIdParsed.error.issues[0]
+      const message = firstIssue ? firstIssue.message : 'Invalid plugin ID'
+      return c.json(createApiError('VALIDATION_ERROR', message), 400)
     }
 
     const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
@@ -280,9 +410,15 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     const vaultId = c.req.param('vaultId') as string
     const pluginId = c.req.param('pluginId') as string
 
-    // Validate plugin ID to prevent path traversal
-    if (!isValidPluginId(pluginId)) {
-      return c.json(createApiError('VALIDATION_ERROR', 'Invalid plugin ID: must contain only lowercase letters, digits, and hyphens (1-64 chars)'), 400)
+    const vaultIdError = validateVaultIdParam(c, vaultId)
+    if (vaultIdError) return vaultIdError
+
+    // Validate plugin ID with zod schema
+    const pluginIdParsed = pluginIdParamSchema.safeParse({ pluginId })
+    if (!pluginIdParsed.success) {
+      const firstIssue = pluginIdParsed.error.issues[0]
+      const message = firstIssue ? firstIssue.message : 'Invalid plugin ID'
+      return c.json(createApiError('VALIDATION_ERROR', message), 400)
     }
 
     const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
@@ -313,9 +449,15 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     const vaultId = c.req.param('vaultId') as string
     const pluginId = c.req.param('pluginId') as string
 
-    // Validate plugin ID to prevent path traversal
-    if (!isValidPluginId(pluginId)) {
-      return c.json(createApiError('VALIDATION_ERROR', 'Invalid plugin ID: must contain only lowercase letters, digits, and hyphens (1-64 chars)'), 400)
+    const vaultIdError = validateVaultIdParam(c, vaultId)
+    if (vaultIdError) return vaultIdError
+
+    // Validate plugin ID with zod schema
+    const pluginIdParsed = pluginIdParamSchema.safeParse({ pluginId })
+    if (!pluginIdParsed.success) {
+      const firstIssue = pluginIdParsed.error.issues[0]
+      const message = firstIssue ? firstIssue.message : 'Invalid plugin ID'
+      return c.json(createApiError('VALIDATION_ERROR', message), 400)
     }
 
     const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
@@ -346,9 +488,15 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     const vaultId = c.req.param('vaultId') as string
     const pluginId = c.req.param('pluginId') as string
 
-    // Validate plugin ID to prevent path traversal
-    if (!isValidPluginId(pluginId)) {
-      return c.json(createApiError('VALIDATION_ERROR', 'Invalid plugin ID: must contain only lowercase letters, digits, and hyphens (1-64 chars)'), 400)
+    const vaultIdError = validateVaultIdParam(c, vaultId)
+    if (vaultIdError) return vaultIdError
+
+    // Validate plugin ID with zod schema
+    const pluginIdParsed = pluginIdParamSchema.safeParse({ pluginId })
+    if (!pluginIdParsed.success) {
+      const firstIssue = pluginIdParsed.error.issues[0]
+      const message = firstIssue ? firstIssue.message : 'Invalid plugin ID'
+      return c.json(createApiError('VALIDATION_ERROR', message), 400)
     }
 
     const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
@@ -379,9 +527,15 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     const vaultId = c.req.param('vaultId') as string
     const pluginId = c.req.param('pluginId') as string
 
-    // Validate plugin ID to prevent path traversal
-    if (!isValidPluginId(pluginId)) {
-      return c.json(createApiError('VALIDATION_ERROR', 'Invalid plugin ID: must contain only lowercase letters, digits, and hyphens (1-64 chars)'), 400)
+    const vaultIdError = validateVaultIdParam(c, vaultId)
+    if (vaultIdError) return vaultIdError
+
+    // Validate plugin ID with zod schema
+    const pluginIdParsed = pluginIdParamSchema.safeParse({ pluginId })
+    if (!pluginIdParsed.success) {
+      const firstIssue = pluginIdParsed.error.issues[0]
+      const message = firstIssue ? firstIssue.message : 'Invalid plugin ID'
+      return c.json(createApiError('VALIDATION_ERROR', message), 400)
     }
 
     const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)

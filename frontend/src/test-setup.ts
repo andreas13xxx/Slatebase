@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom'
+import 'vitest-axe/extend-expect'
 
 // Set navigator.language to German for consistent test behavior
 Object.defineProperty(navigator, 'language', { value: 'de-DE', configurable: true })

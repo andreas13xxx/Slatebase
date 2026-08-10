@@ -1067,12 +1067,18 @@ export class VaultService implements IVaultService {
     // 2. Validate file path (path traversal protection)
     const resolvedSourcePath = validateFilePath(vault.info.path, filePath)
 
-    // 3. Validate new name (invalid characters, length)
+    // 3. Validate new name (invalid characters, length, path traversal sequences)
     validateContentName(newName)
 
     // 4. Compute target path: same directory as source, but with new name
     const sourceDir = path.dirname(resolvedSourcePath)
     const resolvedTargetPath = path.join(sourceDir, newName)
+
+    // 4b. Defense-in-depth: verify computed target stays within the vault root
+    //     (validateContentName rejects '..' but we double-check the resolved path)
+    if (!resolvedTargetPath.startsWith(vault.info.path + path.sep)) {
+      throw new InvalidMoveError(filePath, newName)
+    }
 
     // 5. Check if source exists (and determine whether it's a file or directory)
     let sourceStat
