@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.2](https://github.com/andreas13xxx/Slatebase/compare/v0.27.1...v0.27.2) (2026-08-10)
+
+
+### Sonstige Änderungen
+
+* stop tracking TypeScript incremental build cache ([116f7b7](https://github.com/andreas13xxx/Slatebase/commit/116f7b7185816a826d55707e2eba5229ae742bba))
+
 ## [0.27.1](https://github.com/andreas13xxx/Slatebase/compare/v0.27.0...v0.27.1) (2026-08-09)
 
 
