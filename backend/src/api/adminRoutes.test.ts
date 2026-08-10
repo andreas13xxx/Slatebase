@@ -25,7 +25,7 @@ function createMockUserService(overrides: Partial<IUserService> = {}): IUserServ
     changePassword: async () => {},
     resetPassword: async () => 'temp-pass',
     getUser: async () => ({ userId: 'admin-1', username: 'admin', displayName: 'Admin', email: '', avatarUrl: '', role: 'admin' as const, preferredLanguage: 'en' as const, colorScheme: 'system' as const, suspended: false, mustChangePassword: false, createdAt: '2025-01-01T00:00:00.000Z' }),
-    listUsers: async (): Promise<PaginatedResult<PublicUserInfo>> => ({ items: [], total: 0, page: 1, pageSize: 20 }),
+    listUsers: async (): Promise<PaginatedResult<PublicUserInfo>> => ({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 }),
     searchUsers: async () => [],
     suspendUser: async () => {},
     unsuspendUser: async () => {},
@@ -60,7 +60,7 @@ function createMockAuthService(overrides: Partial<IAuthService> = {}): IAuthServ
 function createMockAuditService(): IAuditService {
   return {
     log: async () => {},
-    query: async () => ({ items: [], total: 0, page: 1, pageSize: 20 }),
+    query: async () => ({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 }),
   }
 }
 

@@ -25,7 +25,7 @@ function createMockTokenService(overrides: Partial<IMcpTokenService> = {}): IMcp
     validateToken: async (): Promise<McpTokenContext> => ({
       tokenId: 'tok-1',
       userId: 'user-1',
-      name: 'Test Token',
+      tokenName: 'Test Token',
     }),
     listTokens: async (): Promise<ApiTokenInfo[]> => [],
     revokeToken: async () => {},
