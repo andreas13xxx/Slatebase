@@ -21,6 +21,8 @@ export interface RealtimeEventHandlers {
   onChatUnread?: (totalUnread: number) => void
   /** Called when a vault:change event is received. */
   onVaultChange?: (vaultId: string, data?: Record<string, unknown>) => void
+  /** Called when a plugin-settings:change event is received. */
+  onPluginSettingsChange?: (vaultId: string, pluginId: string) => void
   /** Called when a presence:update event is received. */
   onPresenceUpdate?: (userId: string, username: string, status: string) => void
   /** Called when a presence:init event is received with the initial online users list. */
@@ -163,6 +165,15 @@ function RealtimeInner({
         break
       }
 
+      case 'plugin-settings:change': {
+        const vaultId = payload.vaultId as string | undefined
+        const pluginId = payload.pluginId as string | undefined
+        if (vaultId && pluginId) {
+          handlersRef.current?.onPluginSettingsChange?.(vaultId, pluginId)
+        }
+        break
+      }
+
       case 'notification:toast': {
         const variant = payload.variant as 'info' | 'success' | 'warning' | 'error' | undefined
         const message = payload.message as string | undefined
@@ -219,6 +230,7 @@ function RealtimeInner({
  * - chat:unread → onChatUnread callback
  * - presence:update / presence:init → local presence map + callbacks
  * - vault:change → onVaultChange callback + toast
+ * - plugin-settings:change → onPluginSettingsChange callback
  * - sync:conflict → toast notification
  * - notification:toast → toast notification
  * - server:shutdown → warning toast

@@ -48,6 +48,12 @@ export interface IWorkspaceShim {
   getRightLeaf(split?: boolean): WorkspaceLeaf;
   /** Get or create a leaf in the left sidebar (rendered in Context Panel). */
   getLeftLeaf(split?: boolean): WorkspaceLeaf;
+  /** Get-or-create a leaf of the given view type in a sidebar (since 1.7.2). */
+  ensureSideLeaf(
+    viewType: string,
+    side: 'left' | 'right',
+    options?: { active?: boolean; reveal?: boolean; split?: boolean; state?: Record<string, unknown> },
+  ): Promise<WorkspaceLeaf>;
   /** Returns the currently active leaf, or null if none is active. */
   getActiveLeaf(): WorkspaceLeaf | null;
   /** Set the given leaf as the active leaf (activates the associated tab). */
@@ -386,6 +392,19 @@ export interface PluginInstance {
   addRibbonIcon(icon: string, title: string, callback: () => void): HTMLElement;
   registerEvent(eventRef: EventRef): void;
   registerView(viewType: string, creator: unknown): void;
+  /**
+   * Obsidian API since 1.7.2. Called once, right after the user manually
+   * enables the plugin (not on the auto-load of an already-active plugin at
+   * startup) — a place for one-time setup like registering a custom view type.
+   */
+  onUserEnable?(): void;
+  /**
+   * Obsidian API since 1.5.7. Called when the plugin's settings (data.json)
+   * change from outside the running instance — e.g. synced in from another
+   * device — so the plugin can reload them instead of overwriting the
+   * external change on its next save.
+   */
+  onExternalSettingsChange?(): Promise<void> | void;
 }
 
 /**

@@ -35,7 +35,7 @@ function createMockApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
     setCsrfToken: vi.fn(),
     getCsrfToken: vi.fn(),
     setOnSessionExpired: vi.fn(),
-    checkSessionAlive: vi.fn().mockResolvedValue(true),
+    probeSession: vi.fn().mockResolvedValue('alive'),
     ...overrides,
   } as unknown as IApiClient
 }

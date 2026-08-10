@@ -25,7 +25,7 @@ import {
 import React from 'react'
 import type { IApiClient } from '../../api'
 import type { DirectoryTree } from '../../types'
-import type { PluginRegistryEntry } from './types'
+import type { PluginManifestData, PluginRegistryEntry } from './types'
 import { PluginLoader } from './plugin-loader'
 import type { PluginLoaderStatus } from './plugin-loader'
 import { PluginRegistry } from './plugin-registry'
@@ -34,8 +34,9 @@ import { PluginSandbox } from './sandbox'
 import { CommandRegistry } from './command-registry'
 import type { ICommandRegistry } from './command-registry'
 import { registerCoreEditorCommands } from './core-commands'
-import { SettingsManager } from './settings-manager'
+import { SettingsManager, wasRecentSettingsWrite } from './settings-manager'
 import type { ISettingsApiClient } from './settings-manager'
+import { onPluginSettingsChange } from '../../state/pluginSettingsChangeBridge'
 import { SettingTabRegistry } from './setting-tab-registry'
 import type { ISettingTabRegistry } from './setting-tab-registry'
 import { CssInjector } from './css-injector'
@@ -53,6 +54,7 @@ import { registerFileViewMatcher, unregisterAllFileViewMatchersForPlugin, remove
 import { registerCodeBlockProcessor, registerPostProcessor, unregisterAllForPlugin as unregisterAllCodeBlocksForPlugin } from './code-block-processor-registry'
 import { warnNoOp } from './log'
 import { AppShim, createCommandManager, createHotkeyManager } from './shims/app-shim'
+import { Scope } from './obsidian-api-extensions'
 import { setEditorViewAccessor } from './editor-shim'
 import { getActiveEditorView, registerPluginExtension, removePluginExtensions, registerPluginCompletionSource, removePluginCompletionSources } from '../../editor/plugin-extensions'
 import { registerMarkdownRendererGlobal } from './shims/markdown-renderer-shim'
@@ -654,13 +656,12 @@ export function PluginProvider({
         instance.loadData = () => newSettingsManager.loadData(pluginId)
         instance.saveData = (data: unknown) => newSettingsManager.saveData(pluginId, data)
 
-        // Ensure scope exists (Obsidian's keymap manager — Kanban needs this.scope.keys)
+        // Ensure scope exists — a real Scope so `app.keymap.pushScope(this.scope)` in
+        // a plugin's onload() actually participates in hotkey dispatch, not just a
+        // crash-guard. `.keys()` (Kanban reaching into Obsidian's internals) is a
+        // method on Scope itself, see obsidian-api-extensions.ts.
         if (!(instance as unknown as { scope?: unknown }).scope) {
-          (instance as unknown as { scope: unknown }).scope = {
-            keys: function() { return this },
-            register: () => ({}),
-            unregister: () => {},
-          }
+          (instance as unknown as { scope: Scope }).scope = new Scope();
         }
         // Wire addCommand to route to the shared CommandRegistry
         instance.addCommand = (command) => {
@@ -818,11 +819,24 @@ export function PluginProvider({
       // Load registry from backend
       await registry.loadFromBackend()
       if (!isCurrentContext()) return
+
+      // Hydrate the entries with the real manifest.json content. _registry.json
+      // stores only status/permissions — the backend's registry schema has no
+      // manifest field, so anything the frontend puts there is silently dropped
+      // and comes back as the id-only placeholder. Without this, every plugin
+      // auto-loaded at startup sees version "0.0.0" and its id as its name.
+      try {
+        const { plugins: manifests } = await apiClient.listPlugins(targetVaultId)
+        if (!isCurrentContext()) return
+        registry.hydrateManifests(manifests)
+      } catch (err) {
+        console.warn('[PluginProvider] Failed to load plugin manifests — versions may be inaccurate:', err)
+      }
       setPlugins(registry.listPlugins())
 
       // Find active plugins and load their bundles
       const activePlugins = registry.listPlugins().filter(p => p.status === 'active')
-      const pluginsToLoad: Array<{ pluginId: string; bundle: string; manifest: { id: string; name: string; version: string; minAppVersion?: string; author?: string; description?: string } }> = []
+      const pluginsToLoad: Array<{ pluginId: string; bundle: string; manifest: PluginManifestData }> = []
       const cssInjector = new CssInjector()
 
       for (const entry of activePlugins) {
@@ -837,17 +851,13 @@ export function PluginProvider({
             }
           }).catch(() => { /* No styles or fetch failed — ignore */ })
 
+          // Pass the manifest through whole rather than re-picking known fields:
+          // plugins read manifest entries we do not model (fundingUrl, helpUrl,
+          // isDesktopOnly, …), and a field-by-field copy silently drops them.
           pluginsToLoad.push({
             pluginId: entry.pluginId,
             bundle,
-            manifest: {
-              id: entry.manifest?.id ?? entry.pluginId,
-              name: entry.manifest?.name ?? entry.pluginId,
-              version: entry.manifest?.version ?? '0.0.0',
-              minAppVersion: entry.manifest?.minAppVersion,
-              author: entry.manifest?.author,
-              description: entry.manifest?.description,
-            },
+            manifest: { ...entry.manifest, id: entry.manifest?.id ?? entry.pluginId },
           })
         } catch (err) {
           console.error(`[PluginProvider] Failed to load bundle for "${entry.pluginId}":`, err)
@@ -999,6 +1009,16 @@ export function PluginProvider({
       registry.updateStatus(pluginId, 'active')
     } else {
       await loader.activatePlugin(pluginId)
+      // Only reached via this user-driven toggle, never via loadPluginsForVault's
+      // startup auto-load of already-active plugins — matching Obsidian, where
+      // onUserEnable() fires once for a real enable action, not every load.
+      if (isCurrentContext()) {
+        try {
+          await loader.getPlugin(pluginId)?.onUserEnable?.()
+        } catch (err) {
+          console.error(`[PluginProvider] Plugin "${pluginId}" onUserEnable() threw:`, err)
+        }
+      }
     }
     if (!isCurrentContext()) {
       await deactivatePluginSafely(loader, pluginId, false)
@@ -1021,6 +1041,28 @@ export function PluginProvider({
     vaultShim: vaultShimRef.current, // eslint-disable-line react-hooks/refs
     currentVaultId: vaultId ?? null,
   })
+
+  // ─── Realtime: plugin settings changed externally (another tab/device) ────
+  //
+  // Obsidian API since 1.5.7 (Plugin#onExternalSettingsChange). The backend
+  // broadcasts on every saveSettings() write, including the echo of a write
+  // this tab itself just made — wasRecentSettingsWrite() suppresses that,
+  // same pattern as markPluginWrite() for vault file writes.
+  useEffect(() => {
+    return onPluginSettingsChange(({ vaultId: eventVaultId, pluginId }) => {
+      if (eventVaultId !== vaultId) return
+      if (wasRecentSettingsWrite(eventVaultId, pluginId)) return
+      const instance = pluginLoaderRef.current?.getPlugin(pluginId)
+      if (!instance?.onExternalSettingsChange) return
+      void (async () => {
+        try {
+          await instance.onExternalSettingsChange?.()
+        } catch (err) {
+          console.error(`[PluginProvider] Plugin "${pluginId}" onExternalSettingsChange() threw:`, err)
+        }
+      })()
+    })
+  }, [vaultId])
 
   // ─── TabViewBridge: connect plugin view lifecycle events to TabProvider ────
 

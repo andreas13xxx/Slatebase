@@ -90,7 +90,7 @@ import { WorkspaceShim } from './shims/workspace-shim'
 import { MetadataCacheShim } from './shims/metadata-cache-shim'
 import { VaultShim } from './shims/vault-shim'
 import { FileManagerShim } from './shims/file-manager-shim'
-import { registerObsidianApiExtensions, OBSIDIAN_API_VERSION, compareApiVersions } from './obsidian-api-extensions'
+import { registerObsidianApiExtensions, OBSIDIAN_API_VERSION, compareApiVersions, dispatchKeydownToScopeStack, Scope } from './obsidian-api-extensions'
 import { registerFallbackShims } from './fallback-shims'
 import { detectPlatform, readPlatformEnvironment } from './platform-detection'
 import { installObsidianBodyClasses } from './body-classes'
@@ -283,6 +283,11 @@ export function installObsidianGlobals(): void {
   // plugin CSS and module-body theme checks both read them, and a plugin bundle
   // can run either the moment it is evaluated.
   installObsidianBodyClasses()
+
+  // Keymap/Scope dispatch: inert until a plugin actually pushes a Scope (e.g. a
+  // View's onOpen() calling `app.keymap.pushScope(this.scope)`), so this is safe
+  // to register unconditionally alongside Slatebase's own key handling.
+  window.addEventListener('keydown', dispatchKeydownToScopeStack)
 
   // ─── DOM Prototype Extensions (synchronous, required before any plugin loads) ──
   // Obsidian patches DOM prototypes with utility methods that plugins use directly.
@@ -820,6 +825,11 @@ export function installObsidianGlobals(): void {
       },
       plugins: {
         plugins: {} as Record<string, unknown>,
+        // Obsidian keys this by plugin id to the *manifest*, not the instance —
+        // `app.plugins.manifests[id].version` is how plugins read each other's
+        // versions. It was previously aliased to the instance map, where
+        // `.version` is undefined (an instance carries `.manifest.version`).
+        manifests: {} as Record<string, unknown>,
         enabledPlugins: new Set<string>(),
         getPlugin(id: string) {
           return (this as { plugins: Record<string, unknown> }).plugins[id]
@@ -827,9 +837,14 @@ export function installObsidianGlobals(): void {
         registerPlugin(id: string, instance: unknown) {
           (this as { plugins: Record<string, unknown> }).plugins[id] = instance
           ;(this as { enabledPlugins: Set<string> }).enabledPlugins.add(id)
+          const manifest = (instance as { manifest?: unknown } | null)?.manifest
+          if (manifest) {
+            (this as { manifests: Record<string, unknown> }).manifests[id] = manifest
+          }
         },
         unregisterPlugin(id: string) {
           delete (this as { plugins: Record<string, unknown> }).plugins[id]
+          delete (this as { manifests: Record<string, unknown> }).manifests[id]
           ;(this as { enabledPlugins: Set<string> }).enabledPlugins.delete(id)
         },
       },
@@ -1175,10 +1190,15 @@ export function installObsidianGlobals(): void {
         register: (_modifiers: string[], _key: string | null, _callback: () => boolean | void) => ({ scope: null }),
         unregister: (_handler: unknown) => {},
       }
-      constructor(app: unknown) {
+      // Obsidian's signature is `constructor(app, manifest)`. The manifest must
+      // be in place before the subclass body runs: esbuild lowers class fields
+      // into the constructor, so `foo = this.manifest.version` in a plugin's
+      // class body reads it here — assigning it only after construction (as the
+      // loader used to) left those fields undefined for good.
+      constructor(app: unknown, manifest?: unknown) {
         super()
         this.app = app
-        this.manifest = {}
+        this.manifest = manifest ?? {}
       }
       async loadData(): Promise<unknown> { return null }
 
@@ -1757,7 +1777,7 @@ export function installObsidianGlobals(): void {
       modalEl: HTMLElement
       titleEl: HTMLElement
       contentEl: HTMLElement
-      scope: { register: (_m: unknown, _k: unknown, _cb: unknown) => unknown; unregister: (_h: unknown) => void }
+      readonly scope: Scope = new Scope()
       /** Whether to restore the previous text selection on close (real Obsidian field; cosmetic here). */
       shouldRestoreSelection: boolean = true
       private overlayEl: HTMLElement | null = null
@@ -1774,7 +1794,6 @@ export function installObsidianGlobals(): void {
         this.modalEl.appendChild(this.titleEl)
         this.modalEl.appendChild(this.contentEl)
         this.containerEl.appendChild(this.modalEl)
-        this.scope = { register: () => ({}), unregister: () => {} }
       }
       setTitle(title: string): unknown {
         this.titleEl.textContent = title
@@ -1804,6 +1823,10 @@ export function installObsidianGlobals(): void {
           if (e.key === 'Escape') { e.preventDefault(); this.close() }
         })
         document.body.appendChild(this.overlayEl)
+        // Real Obsidian pushes the modal's own scope while it's open, so hotkeys
+        // plugins register on `this.scope` (e.g. a suggest modal's Mod+Enter) fire
+        // — Escape/backdrop-close above are wired separately and unaffected.
+        ;(this.app as { keymap?: { pushScope: (s: Scope) => void } } | undefined)?.keymap?.pushScope(this.scope)
         try {
           this.onOpen()
         } catch (err: unknown) {
@@ -1817,6 +1840,7 @@ export function installObsidianGlobals(): void {
         focusable?.focus()
       }
       close() {
+        (this.app as { keymap?: { popScope: (s: Scope) => void } } | undefined)?.keymap?.popScope(this.scope)
         this.onClose()
         if (this.overlayEl && this.overlayEl.parentNode) {
           this.overlayEl.parentNode.removeChild(this.overlayEl)

@@ -127,6 +127,50 @@ describe('PluginLoader', () => {
       expect(instance.manifest.version).toBe('1.0.0');
     });
 
+    it('passes the manifest to the constructor, so class fields can read it', async () => {
+      // esbuild lowers `foo = this.manifest.version` into the constructor, so a
+      // manifest attached only after construction arrives too late for it.
+      let versionSeenByConstructor: unknown;
+      const deps = createMockDeps({
+        bundleEvaluator: async () => ({
+          default: class MockPlugin {
+            manifest: { version?: string };
+            app: IAppShim;
+            constructor(app: IAppShim, manifest: { version?: string }) {
+              this.app = app;
+              this.manifest = manifest;
+              versionSeenByConstructor = this.manifest.version;
+            }
+            onload() {}
+            onunload() {}
+            loadData() { return Promise.resolve(null); }
+            saveData(_data: unknown) { return Promise.resolve(); }
+            addCommand() {}
+            registerEvent() {}
+          },
+        }),
+      });
+      const loader = new PluginLoader(deps);
+
+      await loader.loadPlugin('test-plugin', 'bundle-code', createValidManifest({ version: '2.26.4' }));
+
+      expect(versionSeenByConstructor).toBe('2.26.4');
+    });
+
+    it('preserves manifest fields it does not model explicitly', async () => {
+      const manifest = createValidManifest({
+        authorUrl: 'https://example.test',
+        fundingUrl: 'https://ko-fi.test',
+        isDesktopOnly: false,
+      } as Partial<PluginManifest>);
+
+      const instance = await loader.loadPlugin('test-plugin', 'bundle-code', manifest);
+
+      expect(instance.manifest.authorUrl).toBe('https://example.test');
+      expect(instance.manifest.fundingUrl).toBe('https://ko-fi.test');
+      expect(instance.manifest.isDesktopOnly).toBe(false);
+    });
+
     it('should call appShimFactory with the plugin ID', async () => {
       const manifest = createValidManifest();
 

@@ -41,7 +41,7 @@ vi.mock('./api', () => {
     getVersion = vi.fn().mockResolvedValue({ version: '1.0.0' })
     getVaultConfig = vi.fn().mockResolvedValue({ templatesDirectory: '', dailyNotesDirectory: '', dailyNoteTemplateName: '' })
     getSseTicket = vi.fn().mockResolvedValue({ ticket: 'mock-ticket' })
-    checkSessionAlive = vi.fn().mockResolvedValue(true)
+    probeSession = vi.fn().mockResolvedValue('alive')
   }
   return { ApiClient: MockApiClient }
 })

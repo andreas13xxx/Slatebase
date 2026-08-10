@@ -145,12 +145,13 @@ describe('ApiClient', () => {
   })
 
   describe('401 response interceptor', () => {
-    it('calls onSessionExpired callback on 401 response', async () => {
+    it('calls onSessionExpired when the server confirms the session is dead', async () => {
       const onExpired = vi.fn()
       client.setToken('expired-token')
       client.setCsrfToken('csrf')
       client.setOnSessionExpired(onExpired)
 
+      // Every fetch (original request + the confirming probe) sees 401.
       fetchMock.mockResolvedValue(new Response(
         JSON.stringify({ code: 'SESSION_EXPIRED', message: 'Session expired', timestamp: '2025-01-01T00:00:00Z' }),
         { status: 401 },
@@ -164,7 +165,7 @@ describe('ApiClient', () => {
       expect(onExpired).toHaveBeenCalledOnce()
     })
 
-    it('clears token and csrfToken on 401 response', async () => {
+    it('clears token and csrfToken once the probe confirms the session is dead', async () => {
       client.setToken('my-token')
       client.setCsrfToken('my-csrf')
       client.setOnSessionExpired(vi.fn())
@@ -206,17 +207,90 @@ describe('ApiClient', () => {
       await expect(client.fetchVaults()).rejects.toBeDefined()
       expect(onExpired).not.toHaveBeenCalled()
     })
+
+    it('keeps the session when the confirming probe cannot reach the server', async () => {
+      // This is the actual bug this rewrite fixes: a 401 that turns out to be a
+      // network hiccup (dropped connection, backend mid-restart after a plugin
+      // reload) must NOT be treated as proof the session is dead.
+      const onExpired = vi.fn()
+      client.setToken('my-token')
+      client.setCsrfToken('my-csrf')
+      client.setOnSessionExpired(onExpired)
+
+      fetchMock
+        .mockResolvedValueOnce(new Response(
+          JSON.stringify({ code: 'SESSION_EXPIRED', message: 'Expired' }),
+          { status: 401 },
+        ))
+        .mockRejectedValueOnce(new Error('Network error'))
+
+      await expect(client.fetchVaults()).rejects.toEqual({
+        code: 'SESSION_EXPIRED',
+        message: 'Expired',
+      })
+
+      expect(onExpired).not.toHaveBeenCalled()
+      expect(client.getToken()).toBe('my-token')
+      expect(client.getCsrfToken()).toBe('my-csrf')
+    })
+
+    it('keeps the session when the confirming probe gets a 5xx', async () => {
+      const onExpired = vi.fn()
+      client.setToken('my-token')
+      client.setCsrfToken('my-csrf')
+      client.setOnSessionExpired(onExpired)
+
+      fetchMock
+        .mockResolvedValueOnce(new Response(
+          JSON.stringify({ code: 'SESSION_EXPIRED', message: 'Expired' }),
+          { status: 401 },
+        ))
+        .mockResolvedValueOnce(new Response('Internal Server Error', { status: 500 }))
+
+      await expect(client.fetchVaults()).rejects.toEqual({
+        code: 'SESSION_EXPIRED',
+        message: 'Expired',
+      })
+
+      expect(onExpired).not.toHaveBeenCalled()
+      expect(client.getToken()).toBe('my-token')
+      expect(client.getCsrfToken()).toBe('my-csrf')
+    })
+
+    it('shares one probe across concurrent 401s instead of probing per request', async () => {
+      const onExpired = vi.fn()
+      client.setToken('my-token')
+      client.setCsrfToken('my-csrf')
+      client.setOnSessionExpired(onExpired)
+
+      // Two requests fail with 401 back to back; only one confirming probe
+      // should go out. Without the shared in-flight probe, each 401 would
+      // fire its own /auth/sessions call.
+      fetchMock.mockResolvedValue(new Response(
+        JSON.stringify({ code: 'SESSION_EXPIRED', message: 'Expired' }),
+        { status: 401 },
+      ))
+
+      await Promise.all([
+        client.fetchVaults().catch(() => {}),
+        client.fetchAllVaults().catch(() => {}),
+      ])
+
+      // 2 original requests + exactly 1 shared probe = 3 total fetch calls.
+      expect(fetchMock).toHaveBeenCalledTimes(3)
+      expect(onExpired).toHaveBeenCalledOnce()
+    })
   })
 
   describe('403 CSRF_INVALID recovery', () => {
-    it('calls checkSessionAlive on 403 CSRF_INVALID and triggers onSessionExpired if session is dead', async () => {
+    it('probes the session on 403 CSRF_INVALID and triggers onSessionExpired if session is dead', async () => {
       const onExpired = vi.fn()
       client.setToken('my-token')
       client.setCsrfToken('old-csrf')
       client.setOnSessionExpired(onExpired)
 
       // First call: the actual request returns 403 CSRF_INVALID
-      // Second call: checkSessionAlive GET /auth/sessions returns 401 (session dead)
+      // Second call: probeSession GET /auth/sessions returns 401 (session dead)
       fetchMock
         .mockResolvedValueOnce(new Response(
           JSON.stringify({ code: 'CSRF_INVALID', message: 'CSRF token invalid' }),
@@ -235,7 +309,7 @@ describe('ApiClient', () => {
       expect(onExpired).toHaveBeenCalledOnce()
       expect(client.getToken()).toBeNull()
       expect(client.getCsrfToken()).toBeNull()
-      // Verify checkSessionAlive was called
+      // Verify the probe was called
       expect(fetchMock).toHaveBeenCalledTimes(2)
       expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/auth/sessions')
     })
@@ -247,7 +321,7 @@ describe('ApiClient', () => {
       client.setOnSessionExpired(onExpired)
 
       // First call: 403 CSRF_INVALID
-      // Second call: checkSessionAlive returns 200 (session alive)
+      // Second call: probeSession returns 200 (session alive)
       fetchMock
         .mockResolvedValueOnce(new Response(
           JSON.stringify({ code: 'CSRF_INVALID', message: 'CSRF token invalid' }),
@@ -289,7 +363,7 @@ describe('ApiClient', () => {
       })
     })
 
-    it('handles non-CSRF 403 responses normally without calling checkSessionAlive', async () => {
+    it('handles non-CSRF 403 responses normally without probing the session', async () => {
       const onExpired = vi.fn()
       client.setToken('token')
       client.setCsrfToken('csrf')
@@ -310,7 +384,7 @@ describe('ApiClient', () => {
       expect(onExpired).not.toHaveBeenCalled()
     })
 
-    it('handles 403 with unparseable body without calling checkSessionAlive', async () => {
+    it('handles 403 with unparseable body without probing the session', async () => {
       client.setToken('token')
       client.setCsrfToken('csrf')
       client.setOnSessionExpired(vi.fn())
@@ -326,14 +400,15 @@ describe('ApiClient', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1)
     })
 
-    it('clears tokens when checkSessionAlive fails with network error', async () => {
+    it('keeps the session when the probe fails with a network error', async () => {
+      // This inverts the old expectation on purpose: a probe that cannot reach
+      // the server proves nothing, so the session must survive a CSRF blip
+      // that coincides with a dropped connection.
       const onExpired = vi.fn()
       client.setToken('my-token')
       client.setCsrfToken('old-csrf')
       client.setOnSessionExpired(onExpired)
 
-      // First call: 403 CSRF_INVALID
-      // Second call: network error (checkSessionAlive returns false)
       fetchMock
         .mockResolvedValueOnce(new Response(
           JSON.stringify({ code: 'CSRF_INVALID', message: 'CSRF token invalid' }),
@@ -346,10 +421,34 @@ describe('ApiClient', () => {
         message: 'CSRF token invalid',
       })
 
-      // Network error means session cannot be verified → treat as dead
-      expect(onExpired).toHaveBeenCalledOnce()
-      expect(client.getToken()).toBeNull()
-      expect(client.getCsrfToken()).toBeNull()
+      expect(onExpired).not.toHaveBeenCalled()
+      expect(client.getToken()).toBe('my-token')
+      expect(client.getCsrfToken()).toBe('old-csrf')
+    })
+  })
+
+  describe('probeSession', () => {
+    it('returns "alive" on a 2xx response', async () => {
+      fetchMock.mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }))
+      await expect(client.probeSession()).resolves.toBe('alive')
+    })
+
+    it('returns "dead" on a 401 response', async () => {
+      fetchMock.mockResolvedValue(new Response(
+        JSON.stringify({ code: 'SESSION_EXPIRED', message: 'Expired' }),
+        { status: 401 },
+      ))
+      await expect(client.probeSession()).resolves.toBe('dead')
+    })
+
+    it('returns "unknown" on a non-401 error status', async () => {
+      fetchMock.mockResolvedValue(new Response('Bad Gateway', { status: 502 }))
+      await expect(client.probeSession()).resolves.toBe('unknown')
+    })
+
+    it('returns "unknown" when the request itself fails', async () => {
+      fetchMock.mockRejectedValue(new Error('Network error'))
+      await expect(client.probeSession()).resolves.toBe('unknown')
     })
   })
 

@@ -400,6 +400,13 @@ export class SliderComponent extends ValueComponent<number> {
   sliderEl: HTMLInputElement
   private changeCallback: ((value: number) => void) | null = null
   private tooltipEl: HTMLElement | null = null
+  /**
+   * Since Obsidian 1.5.9, a slider only fires `onChange` when released, not on
+   * every drag tick — `setInstant(true)` opts back into the old continuous
+   * behavior. The tooltip still tracks the drag live either way; only the
+   * callback timing changes.
+   */
+  private instant = false
 
   constructor(containerEl: HTMLElement) {
     super()
@@ -411,11 +418,26 @@ export class SliderComponent extends ValueComponent<number> {
       if (this.tooltipEl) {
         this.tooltipEl.textContent = this.sliderEl.value
       }
-      if (this.changeCallback) {
+      if (this.instant && this.changeCallback) {
+        this.changeCallback(Number(this.sliderEl.value))
+      }
+    })
+    this.sliderEl.addEventListener('change', () => {
+      if (!this.instant && this.changeCallback) {
         this.changeCallback(Number(this.sliderEl.value))
       }
     })
     containerEl.appendChild(this.sliderEl)
+  }
+
+  /**
+   * Obsidian API since 1.5.9. `true` restores the old continuous-update
+   * behavior (fire `onChange` on every drag tick); `false` (the default,
+   * matching current Obsidian) fires only once the slider is released.
+   */
+  setInstant(instant: boolean): this {
+    this.instant = instant
+    return this
   }
 
   setValue(value: number): this {

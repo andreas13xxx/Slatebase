@@ -6,6 +6,7 @@ import type { UserRole, PublicUserInfo, IUserRepository } from '../user/index.js
 import { AccountSuspendedError, ARGON2_OPTIONS } from '../user/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { IAuditService } from '../audit/index.js'
+import { isNodeError } from '../shared/fs-utils.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -177,12 +178,50 @@ export class SessionStore implements ISessionStore {
   private readonly userIndex: Map<string, Set<string>> = new Map()
   private readonly sessionsDir: string
   private dirEnsured = false
+  private cleanupTimer: ReturnType<typeof setInterval> | null = null
 
   constructor(
     dataDir: string,
     private readonly logger: ILogger
   ) {
     this.sessionsDir = join(dataDir, 'sessions')
+  }
+
+  /**
+   * Starts a periodic sweep that removes expired session files (see cleanup()).
+   * Nothing calls cleanup() otherwise — findByToken() only prunes a session it
+   * happens to be asked about, so a session nobody requests again (an
+   * abandoned tab, a token that was never revisited) would sit on disk
+   * forever. Left alone, `getSessions()`/`findByUserId()` — which is also what
+   * the frontend's session-liveness probe hits — reads every leftover file for
+   * that user on every call, so the backlog makes that check slower over time.
+   *
+   * Not part of ISessionStore: composition-root lifecycle concern only, same
+   * as loadIndex().
+   */
+  startCleanup(intervalMs: number): void {
+    if (this.cleanupTimer !== null) {
+      return
+    }
+    this.cleanupTimer = setInterval(() => {
+      this.cleanup().catch((err: unknown) => {
+        this.logger.error('Periodic session cleanup failed', {
+          error: err instanceof Error ? err.message : String(err),
+        })
+      })
+    }, intervalMs)
+    // Allow the process to exit even if this timer is active.
+    if (this.cleanupTimer.unref) {
+      this.cleanupTimer.unref()
+    }
+  }
+
+  /** Stops the periodic cleanup sweep started by startCleanup(). */
+  stopCleanup(): void {
+    if (this.cleanupTimer !== null) {
+      clearInterval(this.cleanupTimer)
+      this.cleanupTimer = null
+    }
   }
 
   /**
@@ -250,11 +289,26 @@ export class SessionStore implements ISessionStore {
       return null
     }
 
-    const session = await this.readSession(sessionId)
-    if (session === null) {
-      this.tokenIndex.delete(token)
+    const result = await this.readSessionResult(sessionId)
+    if (result.session === null) {
+      if (result.gone) {
+        // The file really is absent or unusable — the session no longer exists.
+        this.tokenIndex.delete(token)
+      } else {
+        // A transient read failure (a lock held by antivirus, a synced folder,
+        // a concurrent rewrite) is not evidence that the session is gone.
+        // Dropping the token here would kill a valid session permanently: the
+        // file stays on disk but nothing maps the token to it again until the
+        // process restarts and rebuilds the index. Answer "not right now" and
+        // keep the mapping, so the next request recovers.
+        this.logger.warn('Session file temporarily unreadable — keeping token index entry', {
+          sessionId,
+          error: result.error,
+        })
+      }
       return null
     }
+    const session = result.session
 
     // Check expiry
     if (new Date(session.expiresAt).getTime() <= Date.now()) {
@@ -411,19 +465,50 @@ export class SessionStore implements ISessionStore {
 
   /**
    * Read a session from the filesystem by its ID.
+   * Callers that only need the session (not the gone/transient distinction)
+   * use this; findByToken() uses readSessionResult() directly instead.
    */
   private async readSession(sessionId: string): Promise<Session | null> {
+    return (await this.readSessionResult(sessionId)).session
+  }
+
+  /**
+   * Read a session from the filesystem by its ID, distinguishing a confirmed
+   * deletion from a transient read failure.
+   *
+   * `gone: true` means the file is provably absent (ENOENT) or its content is
+   * provably not a session (parses but fails schema validation) — safe to
+   * deindex. `gone: false` covers everything else: a lock held by antivirus or
+   * a synced folder (EPERM/EBUSY on Windows), or a JSON parse failure that
+   * could be a torn read of an in-progress write. None of those prove the
+   * session doesn't exist, so the caller must not drop it from the index.
+   */
+  private async readSessionResult(sessionId: string): Promise<{ session: Session | null; gone: boolean; error?: string }> {
     const filePath = join(this.sessionsDir, `${sessionId}.json`)
+    let content: string
     try {
-      const content = await readFile(filePath, 'utf-8')
-      const parsed: unknown = JSON.parse(content)
-      if (this.isValidSession(parsed)) {
-        return parsed
+      content = await readFile(filePath, 'utf-8')
+    } catch (err: unknown) {
+      if (isNodeError(err) && err.code === 'ENOENT') {
+        return { session: null, gone: true, error: 'ENOENT' }
       }
-      return null
-    } catch {
-      return null
+      return { session: null, gone: false, error: err instanceof Error ? err.message : String(err) }
     }
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(content)
+    } catch (err: unknown) {
+      // Could be a torn read of a file mid-write via the non-atomic last-resort
+      // fallback in atomicWrite() — not proof the session is gone.
+      return { session: null, gone: false, error: err instanceof Error ? err.message : String(err) }
+    }
+
+    if (this.isValidSession(parsed)) {
+      return { session: parsed, gone: false }
+    }
+    // Well-formed JSON that isn't a session — genuinely wrong content, not a race.
+    return { session: null, gone: true, error: 'Session file content failed validation' }
   }
 
   /**
@@ -508,6 +593,9 @@ const DEFAULT_SESSION_DURATION_MS = 24 * 60 * 60 * 1000
 
 /** Default max lifetime of a session in milliseconds (7 days). */
 const DEFAULT_MAX_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000
+
+/** Minimum interval between session file writes for sliding expiry (1 minute). */
+const LAST_ACTIVITY_WRITE_INTERVAL_MS = 60 * 1000
 
 /**
  * Core authentication service.
@@ -693,6 +781,10 @@ export class AuthService implements IAuthService {
   async validateSession(token: string): Promise<SessionContext | null> {
     const session = await this.sessionStore.findByToken(token)
     if (session === null) {
+      // Logged because a rejected session is invisible otherwise: the middleware
+      // answers 401 without a trace, and the client reports "logged out for no
+      // reason". The reason is always one of these four branches.
+      this.logger.info('Session rejected', { reason: 'UNKNOWN_OR_EXPIRED_TOKEN' })
       return null
     }
 
@@ -700,6 +792,12 @@ export class AuthService implements IAuthService {
     const createdAt = new Date(session.createdAt).getTime()
     if (Date.now() - createdAt > this.maxLifetimeMs) {
       await this.sessionStore.invalidate(token)
+      this.logger.info('Session rejected', {
+        reason: 'MAX_LIFETIME_EXCEEDED',
+        sessionId: session.sessionId,
+        userId: session.userId,
+        createdAt: session.createdAt,
+      })
       return null
     }
 
@@ -708,27 +806,44 @@ export class AuthService implements IAuthService {
     if (user === null) {
       // User was deleted — invalidate the session
       await this.sessionStore.invalidate(token)
+      this.logger.info('Session rejected', {
+        reason: 'USER_NOT_FOUND',
+        sessionId: session.sessionId,
+        userId: session.userId,
+      })
       return null
     }
 
-    // Sliding expiry: extend expiresAt and update lastActivity
+    // Sliding expiry: extend expiresAt and refresh lastActivity.
+    //
+    // Throttled on purpose. Writing the session file on every single request
+    // produced a file write per API call — pure churn, and actively harmful when
+    // the data directory sits in a synced folder (OneDrive) that locks files
+    // behind our back. Second-level precision on lastActivity buys nothing
+    // against a session lifetime measured in hours.
     const now = new Date()
-    const newExpiresAt = new Date(now.getTime() + this.sessionDurationMs)
-    const updatedSession: Session = {
-      ...session,
-      lastActivity: now.toISOString(),
-      expiresAt: newExpiresAt.toISOString(),
-      role: user.role, // Always use current role from user record
-    }
-    try {
-      await this.sessionStore.update(updatedSession)
-    } catch (err: unknown) {
-      // On Windows, EPERM can occur if antivirus or file watchers lock the session file.
-      // This is a non-critical update (only lastActivity/role sync) — log and continue.
-      this.logger.warn('Failed to update session lastActivity', {
-        sessionId: session.sessionId,
-        error: (err as Error).message,
-      })
+    const lastWrite = new Date(session.lastActivity).getTime()
+    const isStale = now.getTime() - lastWrite >= LAST_ACTIVITY_WRITE_INTERVAL_MS
+    const roleChanged = session.role !== user.role
+
+    if (isStale || roleChanged) {
+      const newExpiresAt = new Date(now.getTime() + this.sessionDurationMs)
+      const updatedSession: Session = {
+        ...session,
+        lastActivity: now.toISOString(),
+        expiresAt: newExpiresAt.toISOString(),
+        role: user.role, // Always use current role from user record
+      }
+      try {
+        await this.sessionStore.update(updatedSession)
+      } catch (err: unknown) {
+        // On Windows, EPERM can occur if antivirus or file watchers lock the session file.
+        // This is a non-critical update (only lastActivity/role sync) — log and continue.
+        this.logger.warn('Failed to update session lastActivity', {
+          sessionId: session.sessionId,
+          error: (err as Error).message,
+        })
+      }
     }
 
     return {

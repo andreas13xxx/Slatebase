@@ -140,6 +140,42 @@ describe('installObsidianGlobals', () => {
     })
   })
 
+  describe('window.app.plugins', () => {
+    it('keys manifests by plugin id to the manifest, not to the instance', () => {
+      // `app.plugins.manifests[id].version` is how plugins read each other's
+      // versions. Aliasing this to the instance map made every such read
+      // undefined, since an instance carries those fields under `.manifest`.
+      const plugins = (window as unknown as {
+        app: {
+          plugins: {
+            manifests: Record<string, { version?: string }>
+            registerPlugin(id: string, instance: unknown): void
+            unregisterPlugin(id: string): void
+          }
+        }
+      }).app.plugins
+
+      plugins.registerPlugin('some-plugin', {
+        manifest: { id: 'some-plugin', name: 'Some Plugin', version: '2.26.4' },
+      })
+
+      expect(plugins.manifests['some-plugin']?.version).toBe('2.26.4')
+
+      plugins.unregisterPlugin('some-plugin')
+      expect(plugins.manifests['some-plugin']).toBeUndefined()
+    })
+  })
+
+  describe('Plugin base class', () => {
+    it('stores the manifest passed to the constructor', () => {
+      const PluginClass = (window.obsidian as Record<string, unknown>)['Plugin'] as
+        new (app: unknown, manifest: unknown) => { manifest: unknown }
+      const manifest = { id: 'p', name: 'P', version: '1.2.3' }
+
+      expect(new PluginClass({}, manifest).manifest).toBe(manifest)
+    })
+  })
+
   describe('idempotency', () => {
     it('a repeated call does not replace already-registered implementations', () => {
       const before = window.obsidian as Record<string, unknown>

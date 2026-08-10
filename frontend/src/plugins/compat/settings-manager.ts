@@ -11,6 +11,47 @@
 /** Maximum allowed serialized settings size in bytes (1 MB). */
 const MAX_SETTINGS_SIZE = 1_048_576;
 
+// ─── Module-Level Write Tracker (Loop Prevention) ───────────────────────────
+//
+// The backend broadcasts a `plugin-settings:change` SSE event on every
+// saveSettings() write, including an echo of the write this tab itself just
+// made. Without suppressing that echo, a plugin's own saveData() call would
+// immediately turn around and be reported back to it as an *external*
+// change — same pattern as markPluginWrite() in plugin-event-bridge.ts for
+// vault file writes.
+
+const recentWrites: Map<string, number> = new Map();
+
+/** Debounce window in ms — an SSE echo within this window after our own write is suppressed. */
+const WRITE_DEBOUNCE_MS = 2000;
+
+function writeKey(vaultId: string, pluginId: string): string {
+  return `${vaultId}::${pluginId}`;
+}
+
+/** Mark that this tab just saved a plugin's settings. Called by `saveData()` below. */
+function markSettingsWrite(vaultId: string, pluginId: string): void {
+  recentWrites.set(writeKey(vaultId, pluginId), Date.now());
+  if (recentWrites.size > 100) {
+    const now = Date.now();
+    for (const [key, ts] of recentWrites) {
+      if (now - ts > WRITE_DEBOUNCE_MS * 2) {
+        recentWrites.delete(key);
+      }
+    }
+  }
+}
+
+/**
+ * Whether (vaultId, pluginId) was written by this tab within the debounce
+ * window — used to suppress the SSE echo of our own write before calling a
+ * plugin's `onExternalSettingsChange()`.
+ */
+export function wasRecentSettingsWrite(vaultId: string, pluginId: string): boolean {
+  const ts = recentWrites.get(writeKey(vaultId, pluginId));
+  return ts !== undefined && Date.now() - ts < WRITE_DEBOUNCE_MS;
+}
+
 /**
  * ISettingsApiClient — Minimal API client interface required by SettingsManager.
  * Methods are optional to handle gracefully when the backend doesn't exist yet.
@@ -132,6 +173,10 @@ export class SettingsManager implements ISettingsManager {
       return;
     }
 
+    // Mark before the request resolves — the SSE echo of this write can
+    // arrive back over the event stream before the API call's own promise
+    // settles.
+    markSettingsWrite(this.vaultId, pluginId);
     await this.apiClient.saveSettings(this.vaultId, pluginId, serialized);
   }
 }

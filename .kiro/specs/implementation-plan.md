@@ -14,10 +14,10 @@
 | 2 | Public Sharing | C | ~15–20h | Geplant (keine Spec) |
 | 3 | Semantische Suche / AI-Embeddings | E | ~38–58h | Geplant (keine Spec) |
 | 4 | Server-Side Plugins | B | ~48–68h | Tasks vorhanden |
-| 5 | Security Hardening | F | ~20–30h | Geplant (keine Spec) |
-| 6 | Accessibility Audit | F | ~24–34h | Geplant (keine Spec) |
-| 7 | Responsive/Mobile | F | ~24–34h | Geplant (keine Spec) |
-| 8 | Collaborative Editing | D | ~68–88h | Requirements vorhanden |
+| 5 | Security Hardening | F | ~20–30h | Spec vollständig (Req + Design + Tasks) |
+| 6 | Accessibility Audit | F | ~24–34h | Spec vollständig (Req + Design + Tasks) |
+| 7 | Responsive/Mobile | F | ~24–34h | Spec vollständig (Req + Design + Tasks) |
+| 8 | Collaborative Editing | D | ~68–88h | Nur Requirements |
 
 ---
 
@@ -112,6 +112,8 @@ Scope: ~8h Design + ~40–60h Implementierung. Task-Liste existiert (7 Phasen).
 
 Scope: ~20–30h.
 
+**Spec:** `.kiro/specs/security-hardening/` — Requirements + Design + Tasks vorhanden, basierend auf Ist-Zustands-Audit (Auth, CSP, Input-Validierung, Rate-Limits, Plugin-Sandbox, Path-Traversal).
+
 - OWASP-Top-10-Checkliste, Race-Condition-Analyse, CSP-Header
 - Input-Validierung vervollständigen, Dependency-Audit in CI
 - Rate-Limit-Analyse aller Endpoints
@@ -125,6 +127,8 @@ Scope: ~20–30h.
 
 Scope: ~4h Audit + ~20–30h Fixes.
 
+**Spec:** `.kiro/specs/accessibility-audit/` — Requirements + Design + Tasks vorhanden, basierend auf Ist-Zustands-Audit (ARIA-Abdeckung, Fokus-Management, Testing-Infrastruktur, Canvas/Graph-Zugänglichkeit).
+
 - axe-core / Lighthouse (CI), manuelles Screenreader-Testing
 - Tastaturnavigation, Farbkontrast (4.5:1 / 3:1), Fokus-Indikatoren
 - ARIA-Landmarks, Zoom-Kompatibilität (200%), Skip-Navigation
@@ -136,6 +140,8 @@ Scope: ~4h Audit + ~20–30h Fixes.
 ## Prio 7 — Responsive/Mobile (Track F)
 
 Scope: ~4h Design + ~20–30h Implementierung.
+
+**Spec:** `.kiro/specs/responsive-mobile/` — Requirements + Design + Tasks vorhanden, basierend auf Ist-Zustands-Audit (Layout-Shell, Canvas-Interaktion, Touch-Support).
 
 - Breakpoints: Mobile (<768px), Tablet (768–1024px), Desktop (>1024px)
 - Sidebar als Overlay/Drawer, Touch-Interaktionen, Canvas Pinch-to-Zoom

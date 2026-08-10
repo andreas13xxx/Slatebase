@@ -12,6 +12,7 @@
 
 import { renderLucideIconInto } from './lucide-icons'
 import { setMarkdownOverride, clearMarkdownOverride } from './file-view-registry'
+import { Scope } from './obsidian-api-extensions'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -30,6 +31,12 @@ export class ItemView {
   app: unknown
   /** The leaf this view is attached to */
   leaf: WorkspaceLeaf
+  /**
+   * Public hotkey scope (Obsidian API since 1.5.7). Plugins register
+   * view-specific hotkeys here and activate them via
+   * `app.keymap.pushScope(this.scope)` in `onOpen()` / `popScope()` in `onClose()`.
+   */
+  readonly scope: Scope = new Scope()
 
   constructor(leaf: WorkspaceLeaf) {
     this.leaf = leaf
@@ -551,6 +558,24 @@ export class WorkspaceLeaf {
   getViewState(): { type: string } {
     return { type: this.view?.getViewType() ?? '' }
   }
+
+  /**
+   * Whether this leaf's view is still deferred — created but not yet loaded
+   * (Obsidian API since 1.7.2, which defers tab initialization until the tab
+   * is actually shown). `setViewState()` above always eagerly creates and
+   * opens the view synchronously, so a Slatebase leaf is never in a deferred
+   * state; plugins written against the deferred-views guide that check this
+   * before doing real work see `false` and proceed normally.
+   */
+  get isDeferred(): boolean {
+    return false
+  }
+
+  /**
+   * Load a deferred view immediately. Since `isDeferred` is always `false`
+   * here, there is never anything to load — this resolves right away.
+   */
+  async loadIfDeferred(): Promise<void> {}
 
   /** Detach the leaf (close view) */
   async detach(): Promise<void> {

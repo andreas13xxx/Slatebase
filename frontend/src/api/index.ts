@@ -254,6 +254,17 @@ export interface VaultConfig {
 }
 
 /**
+ * Outcome of a session probe.
+ *
+ * The distinction between `dead` and `unknown` is the whole point: only the
+ * server saying 401 proves the session is gone. A network failure, a 5xx, or a
+ * backend that is restarting proves nothing — treating those as `dead` throws
+ * away a session that is still perfectly valid, and the user gets bounced to
+ * the login page for what was a two-second hiccup.
+ */
+export type SessionProbe = 'alive' | 'dead' | 'unknown'
+
+/**
  * Interface for the Slatebase API client.
  * All methods throw an AppError on non-2xx responses.
  */
@@ -266,10 +277,10 @@ export interface IApiClient {
   setCsrfToken(csrfToken: string | null): void
   /** Get the current CSRF token. */
   getCsrfToken(): string | null
-  /** Set callback invoked when a 401 response is received. */
+  /** Set callback invoked when the server confirms the session is gone. */
   setOnSessionExpired(callback: (() => void) | null): void
-  /** Lightweight session validity check. Returns true if token is still valid. */
-  checkSessionAlive(): Promise<boolean>
+  /** Lightweight session probe. See {@link SessionProbe} for the three outcomes. */
+  probeSession(): Promise<SessionProbe>
 
   // --- Vault methods ---
   fetchVaults(): Promise<VaultInfo[]>
@@ -498,6 +509,8 @@ export class ApiClient implements IApiClient {
   private token: string | null = null
   private csrfToken: string | null = null
   private onSessionExpired: (() => void) | null = null
+  /** In-flight session probe shared by concurrent auth failures. See handleAuthFailure(). */
+  private authFailureProbe: Promise<SessionProbe> | null = null
 
   /** Set the auth token for subsequent requests. */
   setToken(token: string | null): void {
@@ -786,11 +799,7 @@ export class ApiClient implements IApiClient {
     const response = await fetch(`/api/v1/vaults/${vaultId}/plugins/${pluginId}/bundle`, { method: 'GET', headers })
 
     if (response.status === 401) {
-      this.token = null
-      this.csrfToken = null
-      if (this.onSessionExpired) {
-        this.onSessionExpired()
-      }
+      await this.handleAuthFailure()
       await handleErrorResponse(response)
     }
 
@@ -807,11 +816,7 @@ export class ApiClient implements IApiClient {
     const response = await fetch(`/api/v1/vaults/${vaultId}/plugins/${pluginId}/styles`, { method: 'GET', headers })
 
     if (response.status === 401) {
-      this.token = null
-      this.csrfToken = null
-      if (this.onSessionExpired) {
-        this.onSessionExpired()
-      }
+      await this.handleAuthFailure()
       await handleErrorResponse(response)
     }
 
@@ -832,11 +837,7 @@ export class ApiClient implements IApiClient {
     const response = await fetch(`/api/v1/vaults/${vaultId}/plugins/${pluginId}/settings`, { method: 'GET', headers })
 
     if (response.status === 401) {
-      this.token = null
-      this.csrfToken = null
-      if (this.onSessionExpired) {
-        this.onSessionExpired()
-      }
+      await this.handleAuthFailure()
       await handleErrorResponse(response)
     }
 
@@ -1154,30 +1155,22 @@ export class ApiClient implements IApiClient {
   }
 
   /**
-   * Handles a response, checking for 401 (session expired), 403 CSRF_INVALID
-   * (with session liveness check), and other errors.
+   * Handles a response, checking for 401 and 403 CSRF_INVALID (both confirmed
+   * against the server before any teardown), and other errors.
    * Returns the parsed JSON body for successful responses, or undefined for 204.
    */
   private async handleResponse<T>(response: Response): Promise<T> {
     if (response.status === 401) {
-      this.token = null
-      this.csrfToken = null
-      if (this.onSessionExpired) {
-        this.onSessionExpired()
-      }
+      await this.handleAuthFailure()
       await handleErrorResponse(response)
     }
 
     if (response.status === 403) {
       const body = await response.clone().json().catch(() => null) as { code?: string } | null
       if (body?.code === 'CSRF_INVALID') {
-        // Attempt session validation before giving up
-        const isAlive = await this.checkSessionAlive()
-        if (!isAlive) {
-          this.token = null
-          this.csrfToken = null
-          if (this.onSessionExpired) this.onSessionExpired()
-        }
+        // A stale CSRF token and a dead session look identical from here — ask
+        // the server which it is before touching local auth state.
+        await this.handleAuthFailure()
         // Re-throw the original error either way (caller gets CSRF_INVALID)
         await handleErrorResponse(response)
       }
@@ -1237,11 +1230,14 @@ export class ApiClient implements IApiClient {
   }
 
   /**
-   * Lightweight session check: GET /api/v1/auth/sessions.
-   * Returns true if session is still valid (2xx), false on 401 or network error.
-   * Uses raw fetch to avoid recursion through this.request().
+   * Lightweight session probe: GET /api/v1/auth/sessions.
+   * Uses raw fetch to avoid recursion through this.request()/handleResponse().
+   *
+   * Only a 401 counts as proof that the session is gone. Anything else that is
+   * not a success — 5xx, 429, a rejected fetch — means we could not find out,
+   * which is reported as `unknown` so callers can wait rather than log out.
    */
-  async checkSessionAlive(): Promise<boolean> {
+  async probeSession(): Promise<SessionProbe> {
     try {
       const headers: Record<string, string> = {}
       if (this.token) {
@@ -1251,9 +1247,62 @@ export class ApiClient implements IApiClient {
         method: 'GET',
         headers,
       })
-      return resp.ok
+      if (resp.ok) return 'alive'
+      return resp.status === 401 ? 'dead' : 'unknown'
     } catch {
-      return false
+      return 'unknown'
+    }
+  }
+
+  /**
+   * Reacts to a 401 (or a CSRF failure that might be a dead session) by asking
+   * the server whether the session really is gone, and only then clearing local
+   * auth state.
+   *
+   * Two properties matter here:
+   *
+   * - Concurrent failures share one probe. A page load fires many requests at
+   *   once; without this, the first 401 would clear the token, every already
+   *   queued request would then go out with no Authorization header, each would
+   *   come back 401, and a single spurious failure would avalanche into a
+   *   guaranteed logout.
+   * - An unconfirmed failure changes nothing. The caller still gets its error,
+   *   but the session survives, so a backend restart or a dropped connection no
+   *   longer costs the user their login.
+   */
+  private async handleAuthFailure(): Promise<void> {
+    if (this.token === null && this.csrfToken === null) {
+      // Already torn down by a concurrent failure — nothing left to do.
+      return
+    }
+
+    this.authFailureProbe ??= this.probeSession()
+    let probe: SessionProbe
+    try {
+      probe = await this.authFailureProbe
+    } finally {
+      // Release the shared probe so an unrelated later failure re-checks.
+      this.authFailureProbe = null
+    }
+
+    if (probe !== 'dead') {
+      console.warn(
+        `[ApiClient] Auth failure received, but the session still responds (${probe}) — keeping local session`,
+      )
+      return
+    }
+
+    if (this.token === null && this.csrfToken === null) {
+      // A concurrent caller that shared this same probe already tore the
+      // session down (see the guard above) — avoid firing onSessionExpired twice.
+      return
+    }
+
+    console.warn('[ApiClient] Server confirmed the session is invalid — clearing local auth state')
+    this.token = null
+    this.csrfToken = null
+    if (this.onSessionExpired) {
+      this.onSessionExpired()
     }
   }
 }

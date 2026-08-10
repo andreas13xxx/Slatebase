@@ -20,6 +20,7 @@ import type {
   PluginManifestData,
 } from './types';
 import { BundleEvaluationError, LifecycleError } from './errors';
+import { Scope } from './obsidian-api-extensions';
 // Interpolated (not imported!) into the wrappedBundle string template below —
 // that string is Blob-URL-imported into the plugin's own module scope, which
 // has no access to this file's imports. Keeping the storage key in one place
@@ -146,9 +147,16 @@ export class PluginLoader implements IPluginLoader {
     let instance: PluginInstance;
     try {
       const app = this.deps.appShimFactory(pluginId);
-      instance = new (PluginClass as new (app: IAppShim) => PluginInstance)(app);
-      // Ensure manifest data is attached
-      instance.manifest = this.toManifestData(manifest);
+      const manifestData = this.toManifestData(manifest);
+      // Obsidian instantiates plugins as `new Plugin(app, manifest)`. Passing
+      // the manifest here (not just assigning it afterwards) is what makes it
+      // visible to class-field initializers and constructor bodies, which is
+      // where plugins commonly capture their own version.
+      instance = new (PluginClass as new (app: IAppShim, manifest: PluginManifestData) => PluginInstance)(app, manifestData);
+      // Re-assert it: a subclass constructor that skips `super(app, manifest)`
+      // (or a bundler shim that drops the second argument) would otherwise
+      // leave the instance without one.
+      instance.manifest = manifestData;
       // Register the instance into app.plugins so `app.plugins.getPlugin(id)`
       // resolves — plugins commonly look themselves (or each other) up this way
       // to reach `.settings` (e.g. Excalidraw does this during its own onload).
@@ -197,15 +205,13 @@ export class PluginLoader implements IPluginLoader {
     }
 
     try {
-      // Force-inject scope onto the instance right before onload.
-      // Kanban accesses this.scope.keys() during onload.
+      // Force-inject scope onto the instance right before onload — a real Scope
+      // so `app.keymap.pushScope(this.scope)` (the standard Obsidian pattern for
+      // view/plugin-local hotkeys) actually participates in dispatch, not just a
+      // crash-guard. Kanban also accesses this.scope.keys directly during onload.
       // Set unconditionally — some bundlers' class field initializers may have
       // overwritten it to undefined during construction.
-      (record.instance as unknown as Record<string, unknown>).scope = {
-        keys: [] as unknown[],
-        register: () => ({}),
-        unregister: () => {},
-      };
+      (record.instance as unknown as { scope: Scope }).scope = new Scope();
 
       // Scoped so createEl() calls made during onload — including everything
       // after an internal `await` inside an async onload(), not just its first
@@ -684,16 +690,19 @@ export default module.exports.default || module.exports;
   }
 
   /**
-   * Convert a PluginManifest (Zod-inferred) to PluginManifestData (minimal runtime type).
+   * Convert a PluginManifest (Zod-inferred) to PluginManifestData (runtime type).
+   *
+   * Copies the manifest wholesale. Picking out a fixed field list dropped
+   * everything else the manifest declares — authorUrl, fundingUrl, helpUrl,
+   * isDesktopOnly — even though both manifest schemas use `.passthrough()`
+   * specifically to keep those fields around for the plugin to read.
    */
   private toManifestData(manifest: PluginManifest): PluginManifestData {
     return {
+      ...manifest,
       id: manifest.id,
       name: manifest.name,
       version: manifest.version,
-      minAppVersion: manifest.minAppVersion,
-      author: manifest.author,
-      description: manifest.description,
     };
   }
 }

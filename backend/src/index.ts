@@ -111,6 +111,9 @@ const userRepository = new UserRepository(serverConfig.dataDir)
 const sessionStore = new SessionStore(serverConfig.dataDir, logger)
 const auditLogger = new AuditLogger(serverConfig.dataDir)
 
+/** How often the SessionStore sweeps expired session files from disk (1 hour). */
+const SESSION_CLEANUP_INTERVAL_MS = 60 * 60 * 1000
+
 // 3. Business Layer: AuditService, AuthService, UserService, RoleService, VaultAccessControlService
 const auditService = new AuditService(auditLogger)
 
@@ -486,7 +489,7 @@ app.get('/.well-known/mcp.json', createMcpWellKnownHandler(featureToggleService)
 app.route('', versionRoutes)
 
 // Plugin route registration (auth middleware applies via /api/v1/* pattern)
-const pluginService = new PluginService(pluginStore, pluginInstaller)
+const pluginService = new PluginService(pluginStore, pluginInstaller, eventBus)
 const pluginRoutes = createPluginRoutes({
   pluginService,
   accessControl: vaultAccessControl,
@@ -626,6 +629,11 @@ eventBus.subscribe('vault:change', (options) => {
 
 // Load session index from filesystem
 await sessionStore.loadIndex()
+
+// Periodically sweep expired session files — nothing else calls cleanup(),
+// so without this, sessions nobody revisits (an abandoned tab, a token that
+// expired and was never used again) would accumulate on disk indefinitely.
+sessionStore.startCleanup(SESSION_CLEANUP_INTERVAL_MS)
 
 // Load conversation index from filesystem
 await conversationStore.loadIndex()
@@ -846,6 +854,9 @@ const gracefulShutdown = async (signal: string): Promise<void> => {
 
   // Stop periodic cleanup job
   cleanupJob.stop()
+
+  // Stop the session store's expired-file sweep
+  sessionStore.stopCleanup()
 
   // Stop plugin store update checker
   updateChecker.stop()

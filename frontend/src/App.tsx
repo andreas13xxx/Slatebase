@@ -25,6 +25,7 @@ import {
 } from './state/realtimeChatBridge'
 import { dispatchRealtimeVaultChange, onRealtimeVaultChange } from './state/realtimeVaultBridge'
 import type { VaultChangeEvent } from './state/realtimeVaultBridge'
+import { dispatchPluginSettingsChange } from './state/pluginSettingsChangeBridge'
 import { FileExplorer } from './components/FileExplorer'
 import { TabContent } from './components/TabContent'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -982,10 +983,17 @@ function ObsidianLocaleSync() {
   return null
 }
 
+/** How many times the session probe retries while the server is unreachable. */
+const SESSION_PROBE_ATTEMPTS = 3
+
+/** Base delay between session probe retries (grows linearly per attempt). */
+const SESSION_PROBE_RETRY_MS = 700
+
 /**
  * Auth guard component.
  * When a token is restored from localStorage, verifies the session is still valid
  * before rendering authenticated content — prevents stale-token API noise (401s).
+ * An unreachable server is never treated as an invalid session.
  */
 function AuthGuard() {
   const { authState, authDispatch } = useAuthContext()
@@ -1028,21 +1036,44 @@ function AuthGuard() {
     let cancelled = false
 
     async function verify() {
-      const alive = await apiClient.checkSessionAlive()
-      if (cancelled) return
+      // A probe that cannot reach the server says nothing about the session, so
+      // retry a few times before deciding. This matters most right after a
+      // plugin toggle, which reloads the page (see plugins/compat/plugin-context.ts)
+      // and re-runs this check against a backend that may still be busy or restarting.
+      for (let attempt = 0; attempt < SESSION_PROBE_ATTEMPTS; attempt++) {
+        const probe = await apiClient.probeSession()
+        if (cancelled) return
 
-      if (alive) {
-        setSessionVerified(true)
-      } else {
-        // Session expired — clear auth state (triggers login page)
-        // Workspace state is already persisted continuously — no explicit save needed
-        apiClient.setToken(null)
-        apiClient.setCsrfToken(null)
-        disconnectRecentFiles()
-        disconnectFavorites()
-        disconnectKeybindings()
-        authDispatch({ type: 'SESSION_EXPIRED' })
+        if (probe === 'alive') {
+          setSessionVerified(true)
+          return
+        }
+
+        if (probe === 'dead') {
+          // Server confirmed the session is gone — clear auth state (triggers login page).
+          // Workspace state is already persisted continuously — no explicit save needed
+          apiClient.setToken(null)
+          apiClient.setCsrfToken(null)
+          disconnectRecentFiles()
+          disconnectFavorites()
+          disconnectKeybindings()
+          authDispatch({ type: 'SESSION_EXPIRED' })
+          return
+        }
+
+        const isLastAttempt = attempt === SESSION_PROBE_ATTEMPTS - 1
+        if (!isLastAttempt) {
+          await new Promise(resolve => setTimeout(resolve, SESSION_PROBE_RETRY_MS * (attempt + 1)))
+          if (cancelled) return
+        }
       }
+
+      // Still unreachable. Keep the session and let the app render: individual
+      // requests surface their own errors, and a confirmed 401 will tear the
+      // session down through the ApiClient. Throwing the login away here would
+      // punish the user for the server being briefly unavailable.
+      console.warn('[AuthGuard] Could not reach the server to verify the session — continuing with the stored session')
+      setSessionVerified(true)
     }
 
     void verify()
@@ -1129,6 +1160,9 @@ function RealtimeBridge({ children }: { children: React.ReactNode }) {
         username: (data?.username as string) ?? '',
       }
       dispatchRealtimeVaultChange(event)
+    },
+    onPluginSettingsChange: (vaultId: string, pluginId: string) => {
+      dispatchPluginSettingsChange({ vaultId, pluginId })
     },
   }), [])
 

@@ -22,6 +22,8 @@ export interface IPluginRegistry {
   listPlugins(): PluginRegistryEntry[];
   /** Register a new plugin with default permissions and 'unknown' compatibility */
   register(manifest: PluginManifestData, status: PluginStatus): void;
+  /** Replace cached manifest snapshots with the authoritative manifest.json data */
+  hydrateManifests(manifests: PluginManifestData[]): void;
   /** Update plugin status (and optional error message), persists to backend */
   updateStatus(pluginId: string, status: PluginStatus, error?: string): void;
   /** Remove a plugin from registry, persists to backend */
@@ -110,6 +112,30 @@ export class PluginRegistry implements IPluginRegistry {
   }
 
   /**
+   * Replace cached manifest snapshots with the authoritative manifest.json
+   * content (as returned by `GET /plugins`).
+   *
+   * `_registry.json` does not carry manifests — the backend's registry schema
+   * has no `manifest` field, so Zod strips it on every save. Entries restored
+   * by loadFromBackend() therefore start with the id-only placeholder below,
+   * and without this hydration every auto-loaded plugin would report version
+   * "0.0.0" and its id as its name to the plugin code itself (which is what
+   * triggered Excalidraw's "version recorded by Obsidian is 0.0.0" dialog).
+   *
+   * Keeping manifest.json as the single source of truth also means a plugin
+   * updated on disk reports its new version on the next load, with no cached
+   * snapshot to go stale.
+   */
+  hydrateManifests(manifests: PluginManifestData[]): void {
+    for (const manifest of manifests) {
+      const entry = this.entries.get(manifest.id);
+      if (entry) {
+        entry.manifest = manifest;
+      }
+    }
+  }
+
+  /**
    * Update plugin status and optional error message.
    * R3.5: Persists activation status via backend API.
    */
@@ -192,6 +218,8 @@ export class PluginRegistry implements IPluginRegistry {
         recoveredTransientStatus ||= pluginData.status === 'loading';
         const entry: PluginRegistryEntry = {
           pluginId,
+          // Placeholder only — _registry.json carries no manifest (see
+          // hydrateManifests, which overwrites this with manifest.json).
           manifest: pluginData.manifest ?? { id: pluginId, name: pluginId, version: '0.0.0' },
           status,
           permissions: pluginData.permissions,
@@ -230,6 +258,9 @@ export class PluginRegistry implements IPluginRegistry {
         status: entry.status === 'loading' ? 'active' : entry.status,
         permissions: entry.permissions,
         compatibilityLevel: entry.compatibilityLevel,
+        // Sent for completeness but NOT persisted: the backend's registry schema
+        // (backend/src/plugin/validation.ts) has no `manifest` field, so Zod
+        // strips it. manifest.json is the source of truth — see hydrateManifests.
         manifest: entry.manifest,
         installedAt: (entry as unknown as Record<string, unknown>).installedAt ?? new Date().toISOString(),
         updatedAt: new Date().toISOString(),

@@ -300,6 +300,34 @@ export class WorkspaceShim implements IWorkspaceShim {
   }
 
   /**
+   * Get-or-create a leaf of the given view type in a sidebar (Obsidian API
+   * since 1.7.2) — the public shorthand for the get-existing-or-create-new
+   * pattern plugins previously had to write by hand against
+   * `getLeavesOfType()` + `getRightLeaf()`/`getLeftLeaf()`.
+   *
+   * Slatebase maps both sidebar sides onto the single Context Panel
+   * (`right-sidebar` location — see `getLeftLeaf()`), so `side` only chooses
+   * which factory creates a *new* leaf; an existing leaf of the type is
+   * reused regardless of which side it was originally opened on.
+   */
+  async ensureSideLeaf(
+    viewType: string,
+    side: 'left' | 'right',
+    options?: { active?: boolean; reveal?: boolean; split?: boolean; state?: Record<string, unknown> },
+  ): Promise<WorkspaceLeaf> {
+    const existing = this.getLeavesOfType(viewType).find(l => l.location === 'right-sidebar');
+    if (existing) {
+      if (options?.reveal !== false) this.revealLeaf(existing);
+      return existing;
+    }
+
+    const leaf = side === 'left' ? this.getLeftLeaf(options?.split) : this.getRightLeaf(options?.split);
+    await leaf.setViewState({ type: viewType, active: options?.active, state: options?.state });
+    if (options?.reveal !== false) this.revealLeaf(leaf);
+    return leaf;
+  }
+
+  /**
    * Returns the currently active leaf, or null if no tab is active.
    */
   getActiveLeaf(): WorkspaceLeaf | null {
@@ -742,6 +770,7 @@ export class WorkspaceShim implements IWorkspaceShim {
       'getLeaf',
       'getRightLeaf',
       'getLeftLeaf',
+      'ensureSideLeaf',
       'getActiveLeaf',
       'setActiveLeaf',
       'getUnpinnedLeaf',

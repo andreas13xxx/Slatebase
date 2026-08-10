@@ -6,6 +6,7 @@ import type {
   IVaultShim,
   IWorkspaceShim,
   PluginInstance,
+  PluginManifestData,
 } from '../types';
 import { FileManagerShim } from './file-manager-shim';
 import { detectPlatform, readPlatformEnvironment } from '../platform-detection';
@@ -13,6 +14,7 @@ import { recordGapRead, recordGapCall } from '../api-gap-registry';
 import type { Command, ICommandRegistry } from '../command-registry';
 import { scopeForPlugin } from '../plugin-execution-context';
 import { warnNoOp } from '../log';
+import { Keymap } from '../obsidian-api-extensions';
 
 /** The shape of Obsidian's internal `app.commands`. */
 export type CommandManagerShim = ReturnType<typeof createCommandManager>
@@ -148,7 +150,7 @@ export class AppShim implements IAppShim {
   readonly plugins: {
     plugins: Record<string, PluginInstance>;
     enabledPlugins: Set<string>;
-    manifests: Record<string, { id: string; name: string; version: string }>;
+    manifests: Record<string, PluginManifestData>;
     getPlugin(id: string): PluginInstance | undefined;
   };
 
@@ -171,6 +173,9 @@ export class AppShim implements IAppShim {
 
   /** Internal enabled plugins set (mutable for registration/unregistration) */
   private readonly enabledPluginsSet: Set<string>;
+
+  /** Internal id → manifest map (mutable for registration/unregistration) */
+  private readonly manifestsMap: Record<string, PluginManifestData>;
 
   /**
    * Creates an AppShim instance.
@@ -211,16 +216,27 @@ export class AppShim implements IAppShim {
     // private, never-populated map. Falls back to a local map if window.app
     // isn't initialized yet (e.g. in unit tests constructing AppShim directly).
     const globalPlugins = (window as unknown as {
-      app?: { plugins?: { plugins: Record<string, PluginInstance>; enabledPlugins: Set<string> } };
+      app?: {
+        plugins?: {
+          plugins: Record<string, PluginInstance>;
+          enabledPlugins: Set<string>;
+          manifests?: Record<string, PluginManifestData>;
+        };
+      };
     }).app?.plugins;
     this.pluginsMap = globalPlugins?.plugins ?? {};
     this.enabledPluginsSet = globalPlugins?.enabledPlugins ?? new Set();
+    // Obsidian's `manifests` maps plugin id → manifest. It used to be aliased
+    // to `pluginsMap`, which maps id → plugin *instance*: every read of
+    // `app.plugins.manifests[id].version` (or `.id`, `.name`) came back
+    // undefined, since an instance carries those under `.manifest`.
+    this.manifestsMap = globalPlugins?.manifests ?? {};
 
     // Create the plugins property with live references
     this.plugins = {
       plugins: this.pluginsMap,
       enabledPlugins: this.enabledPluginsSet,
-      manifests: this.pluginsMap as unknown as Record<string, { id: string; name: string; version: string }>,
+      manifests: this.manifestsMap,
       getPlugin: (id: string): PluginInstance | undefined => {
         return this.pluginsMap[id];
       },
@@ -403,6 +419,16 @@ export class AppShim implements IAppShim {
   }
 
   /**
+   * keymap — Obsidian's hotkey scope manager. Views and modals push their own
+   * `Scope` here (typically `app.keymap.pushScope(this.scope)` in `onOpen()`,
+   * popped again in `onClose()`) to get first refusal on keydown events while
+   * active. `pushScope`/`popScope` operate on a stack shared across every
+   * `Keymap` instance (see `obsidian-api-extensions.ts`), matching real
+   * Obsidian where hotkey scoping is global to the window, not per-App.
+   */
+  readonly keymap = new Keymap()
+
+  /**
    * Whether the app is running on a mobile device. Derived from the same
    * detection as `Platform.isMobile`, so the two cannot disagree — plugins read
    * both, and a browser build serves phones as well as desktops.
@@ -472,6 +498,9 @@ export class AppShim implements IAppShim {
   registerPlugin(id: string, instance: PluginInstance): void {
     this.pluginsMap[id] = instance;
     this.enabledPluginsSet.add(id);
+    if (instance.manifest) {
+      this.manifestsMap[id] = instance.manifest;
+    }
   }
 
   /**
@@ -482,6 +511,7 @@ export class AppShim implements IAppShim {
    */
   unregisterPlugin(id: string): void {
     delete this.pluginsMap[id];
+    delete this.manifestsMap[id];
     this.enabledPluginsSet.delete(id);
   }
 
@@ -526,6 +556,7 @@ export class AppShim implements IAppShim {
       'hotkeyManager',
       'loadLocalStorage',
       'saveLocalStorage',
+      'keymap',
       'isMobile',
       'appId',
       'secretStorage',

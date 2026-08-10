@@ -374,6 +374,55 @@ describe('WorkspaceShim', () => {
       });
     });
 
+    describe('ensureSideLeaf()', () => {
+      // getLeavesOfType() matches on the VIEW's own getViewType(), not just the
+      // registration key, so the fake view here must return it — same as any
+      // real plugin view would.
+      class FakeSideView extends ItemView {
+        getViewType(): string { return 'my-view'; }
+      }
+
+      it('creates a new sidebar leaf and activates the requested view type', async () => {
+        registry.registerView('my-view', (leaf) => new FakeSideView(leaf), 'my-plugin');
+
+        const leaf = await workspace.ensureSideLeaf('my-view', 'right');
+
+        expect(leaf.location).toBe('right-sidebar');
+        expect(leaf.view?.getViewType()).toBe('my-view');
+        expect(workspace.getActiveLeaf()).toBe(leaf);
+      });
+
+      it('reuses an existing leaf of the same view type instead of creating another', async () => {
+        registry.registerView('my-view', (leaf) => new FakeSideView(leaf), 'my-plugin');
+
+        const first = await workspace.ensureSideLeaf('my-view', 'right');
+        const second = await workspace.ensureSideLeaf('my-view', 'left');
+
+        expect(second).toBe(first);
+        expect(workspace.getLeavesOfType('my-view')).toHaveLength(1);
+      });
+
+      it('does not activate the leaf when reveal is false', async () => {
+        registry.registerView('my-view', (leaf) => new FakeSideView(leaf), 'my-plugin');
+
+        await workspace.ensureSideLeaf('my-view', 'right', { reveal: false });
+
+        expect(workspace.getActiveLeaf()).toBeNull();
+      });
+    });
+
+    describe('WorkspaceLeaf.isDeferred / loadIfDeferred()', () => {
+      it('is never deferred, since setViewState() always loads the view eagerly', () => {
+        const leaf = workspace.getLeaf(true);
+        expect(leaf.isDeferred).toBe(false);
+      });
+
+      it('loadIfDeferred() resolves immediately without error', async () => {
+        const leaf = workspace.getLeaf(true);
+        await expect(leaf.loadIfDeferred()).resolves.toBeUndefined();
+      });
+    });
+
     describe('getActiveLeaf()', () => {
       it('should return null initially', () => {
         expect(workspace.getActiveLeaf()).toBeNull();

@@ -8,6 +8,7 @@ import path from 'node:path'
 import type { IInstalledPluginStore, PluginManifest, PluginRegistryData } from './types.js'
 import type { IPluginInstaller, PluginInstallResult } from './plugin-installer.js'
 import { isNodeError } from '../shared/fs-utils.js'
+import type { IEventBus } from '../realtime/types.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,7 @@ export class PluginService implements IPluginService {
   constructor(
     private readonly pluginStore: IInstalledPluginStore,
     private readonly pluginInstaller: IPluginInstaller,
+    private readonly eventBus?: IEventBus,
   ) {}
 
   async listDetected(vaultStoragePath: string): Promise<DetectedPluginInfo[]> {
@@ -107,6 +109,15 @@ export class PluginService implements IPluginService {
 
   async saveSettings(vaultId: string, pluginId: string, data: string): Promise<void> {
     await this.pluginStore.saveSettings(vaultId, pluginId, data)
+    // Lets any other open tab/device with this plugin loaded for this vault
+    // reload its settings instead of silently drifting from what was just
+    // saved — the frontend's own recent-write tracker (settings-manager.ts)
+    // suppresses this for the tab that made the write itself.
+    this.eventBus?.publish({
+      type: 'plugin-settings:change',
+      payload: { vaultId, pluginId },
+      target: { kind: 'broadcast' },
+    })
   }
 }
 

@@ -37,8 +37,29 @@ import type { BlockCache, CachedMetadata, HeadingCache, Pos } from './types';
  * implemented here: Debouncer.run() (install-globals.ts debounce()),
  * FileManager.processFrontMatter()'s DataWriteOptions param, Setting.
  * addProgressBar(), AbstractInputSuggest, and the 'file-menu' workspace event.
+ *
+ * 1.8.7: audited every documented API addition between 1.4.11 and 1.8.7
+ * against the official obsidianmd/obsidian-api CHANGELOG.md (the desktop
+ * app's own changelog is UI-focused and mostly silent on plugin API surface).
+ * Implemented as part of that audit:
+ * - 1.5.7: Plugin.onExternalSettingsChange (plugin-settings:change SSE event,
+ *   see settings-manager.ts/plugin-context.ts), Vault.getFileByPath/
+ *   getFolderByPath, View.scope (view-registry.ts), getFrontMatterInfo,
+ *   FileManager.getAvailablePathForAttachment
+ * - 1.5.9: SliderComponent.setInstant() (setting-tab.ts)
+ * - 1.7.2: Plugin.onUserEnable (plugin-context.ts), Plugin.removeCommand,
+ *   SuggestModal.selectActiveSuggestion, Workspace.ensureSideLeaf
+ *   (workspace-shim.ts), WorkspaceLeaf.isDeferred/loadIfDeferred
+ *   (view-registry.ts — always false/no-op, Slatebase never defers a leaf's
+ *   view), prepareFuzzySearch already the only search primitive implemented
+ * - 1.8.7 (community-tracked, not in the official changelog):
+ *   loadLocalStorage/saveLocalStorage (app-shim.ts), CachedMetadata.
+ *   footnoteRefs/referenceLinks (metadata-parser.ts)
+ *
+ * `Scope`/`Keymap` (this file) went from inert stand-ins to an actually
+ * dispatching hotkey stack as a prerequisite for View.scope to mean anything.
  */
-export const OBSIDIAN_API_VERSION = '1.4.14';
+export const OBSIDIAN_API_VERSION = '1.8.7';
 
 /**
  * Compare two dotted version strings. Missing components count as 0, so
@@ -152,14 +173,43 @@ export class Events {
 
 // ─── Scope & Keymap ──────────────────────────────────────────────────────────────
 
+/** Whether a registered modifier list matches the modifiers actually held down on a keyboard event. */
+function matchesModifiers(modifiers: string[] | null, evt: KeyboardEvent): boolean {
+  if (modifiers === null) return true;
+  const want = new Set(modifiers);
+  // 'Mod' is the cross-platform alias for Ctrl (Win/Linux) / Cmd (Mac) — it consumes
+  // whichever one actually fired instead of requiring both 'Ctrl' and 'Meta' to match.
+  if (want.has('Mod') && !(evt.ctrlKey || evt.metaKey)) return false;
+  const ctrlPressed = evt.ctrlKey && !want.has('Mod');
+  const metaPressed = evt.metaKey && !want.has('Mod');
+  if (want.has('Ctrl') !== ctrlPressed) return false;
+  if (want.has('Meta') !== metaPressed) return false;
+  if (want.has('Shift') !== evt.shiftKey) return false;
+  if (want.has('Alt') !== evt.altKey) return false;
+  return true;
+}
+
 /**
  * Scope — Handles keyboard events with registered hotkeys.
- * Used by Modals and suggest popups for keyboard navigation.
+ * Used by Modals, suggest popups, and views for keyboard navigation.
+ *
+ * Plugins register handlers via `register(modifiers, key, callback)` and activate
+ * the scope by pushing it onto the keymap stack (`app.keymap.pushScope(this.scope)`,
+ * typically in `onOpen()`/paired with `popScope()` in `onClose()`). See
+ * {@link dispatchKeydownToScopeStack}, which is what actually calls `handleKey()`.
  */
 export class Scope {
   private handlers: Array<{ modifiers: string[] | null; key: string | null; func: (...args: unknown[]) => unknown }> = [];
 
-  constructor(_parent?: Scope) {}  
+  /**
+   * Compat shim for plugins (Kanban) that read/reset Obsidian's private `keys`
+   * array directly instead of going through `register()`/`unregister()`. Not
+   * part of the public API — kept as a plain array (not a method) because
+   * that's the shape actually exercised in production; see plugin-loader.ts.
+   */
+  keys: unknown[] = [];
+
+  constructor(_parent?: Scope) {}
 
   register(modifiers: string[] | null, key: string | null, func: (...args: unknown[]) => unknown): { modifiers: string[] | null; key: string | null; func: (...args: unknown[]) => unknown } {
     const handler = { modifiers, key, func };
@@ -171,6 +221,52 @@ export class Scope {
     const idx = this.handlers.indexOf(handler);
     if (idx >= 0) this.handlers.splice(idx, 1);
   }
+
+  /**
+   * Try every registered handler against a keydown event, most recently
+   * registered first. A handler "handles" the event unless it explicitly
+   * returns `false`, matching Obsidian's convention — at which point the
+   * event is prevented from its default action and no further scope on the
+   * stack is consulted.
+   */
+  handleKey(evt: KeyboardEvent): boolean {
+    for (let i = this.handlers.length - 1; i >= 0; i--) {
+      const h = this.handlers[i]!;
+      if (h.key !== null && h.key.toLowerCase() !== evt.key.toLowerCase()) continue;
+      if (!matchesModifiers(h.modifiers, evt)) continue;
+      const result = h.func(evt, this);
+      if (result !== false) {
+        evt.preventDefault();
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
+/**
+ * The active scope stack, shared across every `Keymap` instance — matching
+ * real Obsidian, where hotkey scoping is global to the window, not per-App.
+ */
+const scopeStack: Scope[] = [];
+
+/**
+ * Dispatch a keydown event through the active scope stack, most recently
+ * pushed scope first.
+ *
+ * Obsidian's model: once a plugin pushes a Scope (typically in a View's
+ * `onOpen()`, popped again in `onClose()`), it gets first refusal on every
+ * keydown — even ahead of Slatebase's own shortcuts — until popped. The stack
+ * starts empty and nothing is pushed onto it unless a plugin explicitly opts
+ * in, so this is inert until then.
+ *
+ * @returns Whether a handler consumed the event (and therefore already called `preventDefault()`).
+ */
+export function dispatchKeydownToScopeStack(evt: KeyboardEvent): boolean {
+  for (let i = scopeStack.length - 1; i >= 0; i--) {
+    if (scopeStack[i]!.handleKey(evt)) return true;
+  }
+  return false;
 }
 
 /**
@@ -195,8 +291,14 @@ export class Keymap {
     return false;
   }
 
-  pushScope(_scope: Scope): void {}
-  popScope(_scope: Scope): void {}
+  pushScope(scope: Scope): void {
+    scopeStack.push(scope);
+  }
+
+  popScope(scope: Scope): void {
+    const idx = scopeStack.lastIndexOf(scope);
+    if (idx >= 0) scopeStack.splice(idx, 1);
+  }
 }
 
 // ─── DOM Global Helpers ──────────────────────────────────────────────────────────

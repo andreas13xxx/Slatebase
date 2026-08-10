@@ -247,6 +247,58 @@ describe('PluginRegistry', () => {
     });
   });
 
+  describe('hydrateManifests()', () => {
+    it('replaces the placeholder manifest that loadFromBackend() falls back to', async () => {
+      // _registry.json carries no manifest — the backend's registry schema has
+      // no such field, so Zod strips it on every save and it comes back absent.
+      apiClient = createMockApiClient({
+        loadRegistry: vi.fn().mockResolvedValue({
+          version: 1,
+          plugins: {
+            'obsidian-excalidraw-plugin': {
+              status: 'active',
+              permissions: {
+                network: false,
+                networkAllowlist: [],
+                filesystemWrite: false,
+                domManipulation: false,
+              },
+              compatibilityLevel: 'unknown',
+              installedAt: '2026-08-10T06:00:16.441Z',
+              updatedAt: '2026-08-10T06:00:16.441Z',
+            },
+          },
+        } as unknown as PluginRegistryData),
+      });
+      registry = new PluginRegistry(apiClient, 'vault-123');
+      await registry.loadFromBackend();
+
+      expect(registry.listPlugins()[0]?.manifest.version).toBe('0.0.0');
+
+      registry.hydrateManifests([
+        createManifest({
+          id: 'obsidian-excalidraw-plugin',
+          name: 'Excalidraw',
+          version: '2.26.4',
+          minAppVersion: '1.8.7',
+        }),
+      ]);
+
+      const entry = registry.listPlugins()[0];
+      expect(entry?.manifest.version).toBe('2.26.4');
+      expect(entry?.manifest.name).toBe('Excalidraw');
+      expect(entry?.manifest.minAppVersion).toBe('1.8.7');
+    });
+
+    it('ignores manifests for plugins that are not registered', () => {
+      registry.register(createManifest({ id: 'known' }), 'active');
+      registry.hydrateManifests([createManifest({ id: 'unknown', version: '9.9.9' })]);
+
+      expect(registry.listPlugins()).toHaveLength(1);
+      expect(registry.listPlugins()[0]?.pluginId).toBe('known');
+    });
+  });
+
   describe('loadFromBackend()', () => {
     it('loads and populates registry from backend data', async () => {
       const data: PluginRegistryData = {

@@ -95,3 +95,6 @@ Filesystem-based, no database. All under `backend/data/`:
 - Raw HTML is allowlist-only (`plugins/inline-html.ts`), shared by Live Preview and reading view — never widen it on one side alone
 - `erasableSyntaxOnly` is on in the frontend: no constructor parameter properties, no `enum`, no namespaces
 - A `.githooks/pre-commit` hook runs lint + `tsc` for both packages before every commit
+- `CachedMetadata` is produced only by `plugins/compat/metadata-parser.ts` — extend it there, not in `metadata-cache-shim.ts`
+- `OBSIDIAN_API_VERSION` (`obsidian-api-extensions.ts`) may only be raised once the APIs of that version are actually implemented
+- Only a server 401 ends a session: a failed read (backend) or a failed request (frontend) is "unknown", never "gone"

@@ -9,6 +9,7 @@ export type SseEventType =
   | 'presence:update'
   | 'presence:init'
   | 'vault:change'
+  | 'plugin-settings:change'
   | 'notification:toast'
   | 'server:shutdown'
   | 'server:feature-disabled'

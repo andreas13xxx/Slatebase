@@ -43,7 +43,7 @@ src/
 │   ├── validation.ts     — Vault name validation rules
 │   └── unique-filename.ts — Unique filename generation (conflict-free renaming)
 ├── auth/
-│   ├── index.ts          — AuthService, SessionStore, interfaces, error classes
+│   ├── index.ts          — AuthService, SessionStore, interfaces, error classes. Session reads distinguish "provably gone" (ENOENT / parses but fails schema) from a transient read failure (EPERM/EBUSY from antivirus or a synced folder, torn read mid-write) and only deindex the former, so a locked file never kills a valid session. `startCleanup()`/`stopCleanup()` (composition-root lifecycle, not on ISessionStore) sweep expired session files periodically — otherwise abandoned sessions accumulate and slow every `findByUserId()`
 │   ├── middleware.ts     — authMiddleware, csrfMiddleware, rateLimitMiddleware
 │   ├── ratelimit.ts     — In-memory rate limiter for login attempts (composite key username:ip)
 │   ├── validation.ts    — Zod schemas for login request validation (loginRequestSchema)
@@ -140,7 +140,8 @@ src/
 │   ├── installed-plugin-store.test.ts — Unit tests for InstalledPluginStore
 │   ├── plugin-installer.ts   — PluginInstaller (ZIP extraction, manifest validation, bundle integrity, version comparison)
 │   ├── plugin-installer.test.ts — Unit tests for PluginInstaller
-│   └── plugin-service.ts     — PluginService (routes→service→store layer wrapping InstalledPluginStore + PluginInstaller; also hosts the `.obsidian/plugins/` detected-plugin scanner)
+│   ├── plugin-service.ts     — PluginService (routes→service→store layer wrapping InstalledPluginStore + PluginInstaller; also hosts the `.obsidian/plugins/` detected-plugin scanner); `saveSettings()` publishes a `plugin-settings:change` broadcast so other tabs/devices reload instead of drifting
+│   └── plugin-service.test.ts — Unit tests for PluginService
 ├── plugin-store/             — Community plugin marketplace (browse/install/update from GitHub releases). Distinct from `plugin/` (installed plugins).
 │   ├── index.ts              — Barrel export for plugin-store module
 │   ├── types.ts              — IPluginStoreConfig, CommunityPluginEntry, RemotePluginManifest, UpdateCheckResult, etc.
@@ -227,7 +228,7 @@ src/
 ├── App.css               — Global styles (Design Tokens in index.css)
 ├── index.css             — CSS Custom Properties (Design Tokens, Dark Mode)
 ├── types.ts              — Shared TypeScript interfaces (VaultInfo, DirectoryTree, AppState with vaultTrees, etc.)
-├── api/index.ts          — ApiClient (IApiClient interface + fetch implementation, includes getVersion())
+├── api/index.ts          — ApiClient (IApiClient interface + fetch implementation, includes getVersion()). A 401 (or a CSRF failure, which is indistinguishable from a dead session client-side) triggers a session probe returning `alive`/`dead`/`unknown` — only the server answering 401 counts as `dead`; a 5xx, 429 or rejected fetch is `unknown` and leaves the session intact. Concurrent failures share one in-flight probe, so a burst of requests on page load cannot avalanche into a logout
 ├── utils/
 │   ├── semver.ts         — compareSemver() utility (X.Y.Z comparison, v-prefix stripping)
 │   ├── error.ts          — extractErrorMessage(err, fallback) shared utility
@@ -295,13 +296,14 @@ src/
 │       ├── global-extensions.ts — Obsidian-compatible prototype patches (Array.remove/first/last, String.contains, Element.find/findAll, Math.clamp, etc.) — imported synchronously before any plugin bundle evaluates
 │       ├── fallback-shims.ts — Last-resort no-op/minimal implementations for anything install-globals + obsidian-api-extensions leave unclaimed; registered last so real shims always win
 │       ├── plugin-loader.ts — PluginLoader (bundle evaluation, lifecycle, timeout, cleanup, @lezer/* stubs)
-│       ├── plugin-registry.ts — PluginRegistry (frontend state, backend persistence)
+│       ├── plugin-registry.ts — PluginRegistry (frontend state, backend persistence); `hydrateManifests()` overwrites the id-only placeholders restored from `_registry.json` (whose schema carries no manifest) with the real `manifest.json` content, so plugins don't report version "0.0.0" back to themselves
 │       ├── sandbox.ts    — PluginSandbox (vault isolation, storage namespace, network allowlist, blocking detection)
-│       ├── settings-manager.ts — SettingsManager (loadData/saveData per plugin per vault)
+│       ├── settings-manager.ts — SettingsManager (loadData/saveData per plugin per vault); tracks its own recent writes (2s) so the `plugin-settings:change` broadcast triggered by a save is not delivered back to the tab that made it as an "external" change
 │       ├── setting-tab.ts — PluginSettingTab, Setting, UI components, DOM extensions, icon registry, Modal, Plugin class (synchronous global registration)
 │       ├── setting-tab-registry.ts — Tracks which plugins registered a PluginSettingTab (via addSettingTab), so the Plugin Management UI can mount tab.containerEl
 │       ├── declarative-settings-renderer.ts — Renders Obsidian 1.13+ `getSettingDefinitions()` declarative settings arrays (group/list/page/controls) into Setting/*Component UI
-│       ├── obsidian-api-extensions.ts — Extended APIs: Events, Scope, Keymap, utility functions, MarkdownPreviewRenderer, DOM globals (async loaded as supplement)
+│       ├── obsidian-api-extensions.ts — Extended APIs: Events, Scope, Keymap, utility functions, MarkdownPreviewRenderer, DOM globals (async loaded as supplement) + `OBSIDIAN_API_VERSION` behind `requireApiVersion()`. `Scope.handleKey()` and the module-level `Keymap` scope stack really dispatch (a single global keydown listener walks the stack) instead of only collecting handlers — inert until a plugin calls `app.keymap.pushScope()`
+│       ├── metadata-parser.ts — `parseMetadata()`: the single producer of Obsidian-shaped `CachedMetadata` from raw Markdown — headings, embeds, sections, listItems, footnotes/footnoteRefs, referenceLinks, frontmatterLinks alongside frontmatter/tags/links/blocks. Best-effort CommonMark approximation (same bar as `parseBlocks`/`scanFencedCodeBlocks`), not a spec-compliant parser
 │       ├── editor-shim.ts — EditorShim (Obsidian Editor API; backend priority CM6 EditorView → textarea → internal buffer; setEditorViewAccessor wired once at vault init)
 │       ├── markdown-renderer.ts — MarkdownRenderer.render()/renderMarkdown() — lightweight markdown-to-HTML (not the full remark/unified pipeline) for plugin custom views (Kanban, Dataview)
 │       ├── markdown-sections.ts — Maps rendered code blocks back to their source line range (getSectionInfo) by re-scanning the source for fenced blocks in document order
@@ -335,7 +337,7 @@ src/
 │           ├── vault-shim.ts — VaultShim (read/modify/create/delete/copy/getFileByPath/readBinary/modifyBinary/process/append/exists/configDir/events)
 │           ├── vault-adapter-shim.ts — VaultAdapterShim (Obsidian-compatible DataAdapter API: exists, read, write, list, stat, mkdir, remove, rename)
 │           ├── workspace-shim.ts — WorkspaceShim (full Leaf API + getActiveViewOfType synthetic view for the MarkdownView/FileView/ItemView family, onLayoutReady error-isolation); active leaf falls back to an "empty"-type view instead of null, and layout/leaf events re-fire once the CM6 editor mounts
-│           ├── metadata-cache-shim.ts — MetadataCacheShim (getFileCache, resolvedLinks, changed/resolved events, getTags, fileToLinktext, blockCache, getCachedFiles)
+│           ├── metadata-cache-shim.ts — MetadataCacheShim (getFileCache, resolvedLinks, changed/resolved events, getTags, fileToLinktext, blockCache, getCachedFiles); content parsing is delegated to `metadata-parser.ts`
 │           ├── file-manager-shim.ts — FileManagerShim (renameFile, processFrontMatter, generateMarkdownLink, getNewFileParent, trashFile, promptForFileRename, getAvailablePathForAttachment)
 │           └── markdown-renderer-shim.ts — MarkdownRenderer.render() (unified/remark MDAST→HTML pipeline, registered on window.obsidian)
 ├── state/
@@ -362,6 +364,7 @@ src/
 │   ├── realtimeActions.ts — computeReconnectDelay, RealtimeAction types
 │   ├── realtimeChatBridge.ts — Module-level bridge: SSE chat events → ChatProvider (cross-provider communication)
 │   ├── realtimeVaultBridge.ts — Module-level bridge: SSE vault:change events → AppProvider (tree refresh + tab reload)
+│   ├── pluginSettingsChangeBridge.ts — Same module-level bridge pattern for SSE `plugin-settings:change` → PluginProvider, which resolves the PluginInstance and calls its `onExternalSettingsChange()` (RealtimeProvider sits above PluginProvider, so it cannot reach the loader directly)
 │   ├── useEventSource.ts — Custom hook managing EventSource lifecycle (backoff, visibility, reconnect)
 │   ├── recentFilesStore.ts — Recent files list (server-synced + localStorage cache, max 20, dedup by vaultId+path)
 │   ├── favoritesStore.ts — Favorites per vault (server-synced + localStorage cache, max 50, path tracking on rename/delete)
@@ -507,7 +510,7 @@ src/
 │   ├── VersionCheckCard.tsx — Admin version check (installed vs. latest, GitHub API, update notification)
 │   ├── CommandPalette.tsx — Modal command palette (search, execute, keyboard nav, Ctrl+P always active)
 │   ├── CommandPaletteContainer.tsx — Built-in commands (navigation, vault ops, editor formatting, view toggles) + plugin commands, Ctrl+P shortcut, CustomEvent bridge to EditMode
-│   ├── RealtimeProvider.tsx — SSE event routing (chat, presence, vault:change, toast, server events)
+│   ├── RealtimeProvider.tsx — SSE event routing (chat, presence, vault:change, plugin-settings:change, toast, server events)
 │   ├── ToastNotification.tsx — Toast notification system (module-level state, CSS transitions)
 │   ├── ToastNotification.css — Toast notification styles
 │   ├── ConnectionIndicator.tsx — SSE connection status indicator (connected/connecting/disconnected)

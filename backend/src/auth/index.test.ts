@@ -1,10 +1,13 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as argon2 from 'argon2'
+import { mkdtemp, rm, readFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { ILogger } from '../logger/index.js'
 import type { IUserRepository } from '../user/index.js'
 import type { UserRecord } from '../user/index.js'
 import type { ISessionStore, Session, LoginMeta } from './index.js'
-import { AuthService, AuthenticationError } from './index.js'
+import { AuthService, AuthenticationError, SessionStore } from './index.js'
 import { AccountSuspendedError, ARGON2_OPTIONS } from '../user/index.js'
 
 // Wrap argon2.hash in a spy while keeping its real implementation, so the
@@ -15,6 +18,18 @@ vi.mock('argon2', async (importOriginal) => {
   return {
     ...actual,
     hash: vi.fn(actual.hash),
+  }
+})
+
+// Wrap fs/promises.readFile in a spy while keeping its real implementation, so
+// the SessionStore filesystem tests below can force a single transient read
+// failure (e.g. an antivirus/OneDrive file lock) without touching any other
+// read in the same test.
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  return {
+    ...actual,
+    readFile: vi.fn(actual.readFile),
   }
 })
 
@@ -301,7 +316,7 @@ describe('AuthService', () => {
       expect(context!.sessionId).toBeDefined()
     })
 
-    it('should update lastActivity on the session', async () => {
+    it('should update lastActivity on the session once the write-throttle window has passed', async () => {
       const { hash } = await import('argon2')
       const passwordHash = await hash('password123', { type: 2, memoryCost: 4096, timeCost: 2, parallelism: 1 })
       const user = createMockUser({ passwordHash })
@@ -309,16 +324,109 @@ describe('AuthService', () => {
       const authService = new AuthService(sessionStore, userRepo, logger, csrfSecret)
 
       const loginResult = await authService.login('testuser', 'password123', loginMeta)
-      const originalLastActivity = sessionStore.sessions[0]!.lastActivity
 
-      // Small delay to ensure timestamp differs
-      await new Promise(resolve => setTimeout(resolve, 10))
+      // Backdate lastActivity past the throttle window so this validateSession
+      // call is expected to write, instead of relying on real wall-clock delay.
+      sessionStore.sessions[0]!.lastActivity = new Date(Date.now() - 61_000).toISOString()
+      const originalLastActivity = sessionStore.sessions[0]!.lastActivity
 
       await authService.validateSession(loginResult.token)
       const updatedLastActivity = sessionStore.sessions[0]!.lastActivity
 
-      expect(new Date(updatedLastActivity).getTime()).toBeGreaterThanOrEqual(
+      expect(new Date(updatedLastActivity).getTime()).toBeGreaterThan(
         new Date(originalLastActivity).getTime()
+      )
+    })
+
+    it('should NOT write the session again within the throttle window (avoids write-per-request churn)', async () => {
+      const { hash } = await import('argon2')
+      const passwordHash = await hash('password123', { type: 2, memoryCost: 4096, timeCost: 2, parallelism: 1 })
+      const user = createMockUser({ passwordHash })
+      const userRepo = createMockUserRepository([user])
+      const authService = new AuthService(sessionStore, userRepo, logger, csrfSecret)
+
+      const loginResult = await authService.login('testuser', 'password123', loginMeta)
+      const updateSpy = vi.spyOn(sessionStore, 'update')
+
+      // Freshly created session, well within the throttle window — repeated
+      // validation should not touch the session file at all.
+      await authService.validateSession(loginResult.token)
+      await authService.validateSession(loginResult.token)
+      await authService.validateSession(loginResult.token)
+
+      expect(updateSpy).not.toHaveBeenCalled()
+    })
+
+    it('should still write immediately when the user role changed, even inside the throttle window', async () => {
+      const { hash } = await import('argon2')
+      const passwordHash = await hash('password123', { type: 2, memoryCost: 4096, timeCost: 2, parallelism: 1 })
+      const user = createMockUser({ passwordHash, role: 'user' })
+      const users = [user]
+      const userRepo = createMockUserRepository(users)
+      const authService = new AuthService(sessionStore, userRepo, logger, csrfSecret)
+
+      const loginResult = await authService.login('testuser', 'password123', loginMeta)
+
+      // Promote the user after login — the session record still says 'user'.
+      users[0] = { ...user, role: 'admin' }
+
+      const context = await authService.validateSession(loginResult.token)
+
+      expect(context!.role).toBe('admin')
+      expect(sessionStore.sessions[0]!.role).toBe('admin')
+    })
+
+    it('should log the reason when a session is rejected for an unknown/expired token', async () => {
+      const userRepo = createMockUserRepository([])
+      const authService = new AuthService(sessionStore, userRepo, logger, csrfSecret)
+      const infoSpy = vi.spyOn(logger, 'info')
+
+      await authService.validateSession('never-issued-token')
+
+      expect(infoSpy).toHaveBeenCalledWith(
+        'Session rejected',
+        expect.objectContaining({ reason: 'UNKNOWN_OR_EXPIRED_TOKEN' }),
+      )
+    })
+
+    it('should log the reason when a session exceeds its absolute max lifetime', async () => {
+      const { hash } = await import('argon2')
+      const passwordHash = await hash('password123', { type: 2, memoryCost: 4096, timeCost: 2, parallelism: 1 })
+      const user = createMockUser({ passwordHash })
+      const userRepo = createMockUserRepository([user])
+      // maxLifetimeMs = 1ms so the session is already "too old" by the time we check.
+      const authService = new AuthService(sessionStore, userRepo, logger, csrfSecret, undefined, undefined, 1)
+      const infoSpy = vi.spyOn(logger, 'info')
+
+      const loginResult = await authService.login('testuser', 'password123', loginMeta)
+      await new Promise(resolve => setTimeout(resolve, 5))
+
+      const context = await authService.validateSession(loginResult.token)
+
+      expect(context).toBeNull()
+      expect(infoSpy).toHaveBeenCalledWith(
+        'Session rejected',
+        expect.objectContaining({ reason: 'MAX_LIFETIME_EXCEEDED', userId: 'user-1' }),
+      )
+    })
+
+    it('should log the reason when the session user no longer exists', async () => {
+      const { hash } = await import('argon2')
+      const passwordHash = await hash('password123', { type: 2, memoryCost: 4096, timeCost: 2, parallelism: 1 })
+      const user = createMockUser({ passwordHash })
+      const users = [user]
+      const userRepo = createMockUserRepository(users)
+      const authService = new AuthService(sessionStore, userRepo, logger, csrfSecret)
+      const infoSpy = vi.spyOn(logger, 'info')
+
+      const loginResult = await authService.login('testuser', 'password123', loginMeta)
+      users.length = 0
+
+      await authService.validateSession(loginResult.token)
+
+      expect(infoSpy).toHaveBeenCalledWith(
+        'Session rejected',
+        expect.objectContaining({ reason: 'USER_NOT_FOUND', userId: 'user-1' }),
       )
     })
 
@@ -492,5 +600,105 @@ describe('AuthService', () => {
 
       expect(isValid).toBe(false)
     })
+  })
+})
+
+// ─── SessionStore (filesystem-backed) ─────────────────────────────────────────
+
+function createTestSession(overrides?: Partial<Session>): Session {
+  const now = new Date()
+  return {
+    sessionId: 'session-1',
+    token: 'token-1',
+    csrfToken: 'csrf-1',
+    userId: 'user-1',
+    role: 'user',
+    userAgent: 'TestAgent/1.0',
+    ipAddress: '127.0.0.1',
+    createdAt: now.toISOString(),
+    expiresAt: new Date(now.getTime() + 3_600_000).toISOString(),
+    lastActivity: now.toISOString(),
+    ...overrides,
+  }
+}
+
+describe('SessionStore (filesystem)', () => {
+  let dataDir: string
+  let logger: ILogger
+
+  beforeEach(async () => {
+    dataDir = await mkdtemp(join(tmpdir(), 'slatebase-session-store-test-'))
+    logger = createMockLogger()
+    vi.mocked(readFile).mockClear()
+  })
+
+  afterEach(async () => {
+    await rm(dataDir, { recursive: true, force: true })
+  })
+
+  it('finds a session that was just created', async () => {
+    const store = new SessionStore(dataDir, logger)
+    const session = createTestSession()
+    await store.create(session)
+
+    const found = await store.findByToken(session.token)
+
+    expect(found).not.toBeNull()
+    expect(found!.sessionId).toBe(session.sessionId)
+  })
+
+  it('keeps the token indexed after a transient read failure, and recovers on retry', async () => {
+    // Regression test: a single EPERM/EBUSY-style failure (Windows antivirus or
+    // a synced folder briefly locking the file) must not permanently drop a
+    // valid session — the file is still there, only unreadable for a moment.
+    const store = new SessionStore(dataDir, logger)
+    const session = createTestSession()
+    await store.create(session)
+
+    vi.mocked(readFile).mockRejectedValueOnce(
+      Object.assign(new Error('EBUSY: resource busy or locked'), { code: 'EBUSY' }),
+    )
+    const warnSpy = vi.spyOn(logger, 'warn')
+
+    const duringFailure = await store.findByToken(session.token)
+    expect(duringFailure).toBeNull()
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Session file temporarily unreadable — keeping token index entry',
+      expect.objectContaining({ sessionId: session.sessionId }),
+    )
+
+    // The mock only rejects once — the retry hits the real filesystem and succeeds,
+    // proving the token was never removed from the index.
+    const afterRecovery = await store.findByToken(session.token)
+    expect(afterRecovery).not.toBeNull()
+    expect(afterRecovery!.sessionId).toBe(session.sessionId)
+  })
+
+  it('deindexes a session once its file is confirmed gone (ENOENT), without a warning', async () => {
+    const store = new SessionStore(dataDir, logger)
+    const session = createTestSession()
+    await store.create(session)
+
+    // Simulate the file having been removed by something other than invalidate()
+    // (e.g. manual cleanup) while the in-memory index still references it.
+    await rm(join(dataDir, 'sessions', `${session.sessionId}.json`))
+    const warnSpy = vi.spyOn(logger, 'warn')
+
+    const found = await store.findByToken(session.token)
+
+    expect(found).toBeNull()
+    // ENOENT is a confirmed deletion, not a transient failure — no warning expected.
+    expect(warnSpy).not.toHaveBeenCalled()
+  })
+
+  it('does not resurrect an expired session after a transient read failure', async () => {
+    const store = new SessionStore(dataDir, logger)
+    const expired = createTestSession({
+      expiresAt: new Date(Date.now() - 1000).toISOString(),
+    })
+    await store.create(expired)
+
+    const found = await store.findByToken(expired.token)
+    expect(found).toBeNull()
   })
 })
