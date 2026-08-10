@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.29.0](https://github.com/andreas13xxx/Slatebase/compare/v0.28.0...v0.29.0) (2026-08-10)
+
+
+### Features
+
+* accessibility audit, security hardening, and UI improvements ([e3536a6](https://github.com/andreas13xxx/Slatebase/commit/e3536a6749092733a836d5a356544b9ce18b33ee))
+
+
+### Bugfixes
+
+* correct type errors in adminRoutes and mcpTokenRoutes tests ([561075f](https://github.com/andreas13xxx/Slatebase/commit/561075f1a6f8b44a40ec3766631808e47b13378a))
+
 ## [0.28.0](https://github.com/andreas13xxx/Slatebase/compare/v0.27.2...v0.28.0) (2026-08-10)
 
 
