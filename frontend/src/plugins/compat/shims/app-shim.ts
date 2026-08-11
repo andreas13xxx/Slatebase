@@ -14,7 +14,7 @@ import { recordGapRead, recordGapCall } from '../api-gap-registry';
 import type { Command, ICommandRegistry } from '../command-registry';
 import { scopeForPlugin } from '../plugin-execution-context';
 import { warnNoOp } from '../log';
-import { Keymap } from '../obsidian-api-extensions';
+import { Keymap, Scope } from '../obsidian-api-extensions';
 
 /** The shape of Obsidian's internal `app.commands`. */
 export type CommandManagerShim = ReturnType<typeof createCommandManager>
@@ -105,6 +105,28 @@ export function createHotkeyManager(commandRegistry: ICommandRegistry | undefine
 }
 
 /**
+ * The app-wide `Scope` backing `App.scope`. Real Obsidian has exactly one App
+ * instance, so `app.scope.register(...)` calls from different plugins accumulate
+ * into the same global hotkey set; sharing one instance here (rather than one per
+ * AppShim, since every plugin gets its own AppShim) reproduces that. Pushed onto
+ * the shared scope stack once — see `ensureAppScopeActive` — so registrations
+ * actually receive keydown events instead of sitting inert.
+ */
+const appScope = new Scope();
+let appScopeActive = false;
+
+/**
+ * Push the shared `appScope` onto the scope stack the first time any AppShim is
+ * constructed. It is the base of the stack and is never popped, matching real
+ * Obsidian where the root scope is active for the lifetime of the app.
+ */
+function ensureAppScopeActive(keymap: Keymap): void {
+  if (appScopeActive) return;
+  keymap.pushScope(appScope);
+  appScopeActive = true;
+}
+
+/**
  * AppShim — Obsidian App API emulation.
  *
  * Provides the central entry point for plugins to access the emulated Obsidian API:
@@ -163,7 +185,17 @@ export class AppShim implements IAppShim {
   readonly internalPlugins: {
     plugins: Record<string, unknown>;
     getPluginById(id: string): { enabled: boolean; instance: unknown } | undefined;
+    getEnabledPluginById(id: string): unknown;
   };
+
+  /**
+   * The App's global `Scope` (documented API: `App.scope`). Plugins call
+   * `app.scope.register(modifiers, key, callback)` directly to add app-wide
+   * hotkeys — e.g. obsidian-tasks-plugin registers its "toggle done" shortcut
+   * this way in onload(). Shared across every plugin's AppShim (see `appScope`
+   * above) and kept active on the scope stack for the app's lifetime.
+   */
+  readonly scope: Scope;
 
   /** Plugin ID used for scoping console warnings */
   private readonly pluginId: string;
@@ -207,6 +239,8 @@ export class AppShim implements IAppShim {
     // constructor body, so they would capture commandRegistry as undefined.
     this.commands = createCommandManager(options.commandRegistry);
     this.hotkeyManager = createHotkeyManager(options.commandRegistry);
+    this.scope = appScope;
+    ensureAppScopeActive(this.keymap);
 
     // Plugins registry — delegates to window.app.plugins so that every plugin's
     // AppShim (and the `leaf.app` used by opened views) shares one registry.
@@ -279,6 +313,10 @@ export class AppShim implements IAppShim {
           const p = this.internalPlugins.plugins[id] as { enabled: boolean; instance: unknown } | undefined;
           return p ?? { enabled: false, instance: { options: {} } };
         },
+        getEnabledPluginById: (id: string) => {
+          const p = this.internalPlugins.plugins[id] as { enabled: boolean; instance: unknown } | undefined;
+          return p?.enabled ? p.instance : null;
+        },
       };
     }
   }
@@ -296,6 +334,11 @@ export class AppShim implements IAppShim {
           cm: unknown
           containerEl: HTMLElement
           owner: unknown
+          // Real Obsidian's MarkdownEditor exposes `win` (the window owning its DOM,
+          // for popout-window support) — Kanban's card editor reads `this.win.setTimeout`
+          // directly in its own focus handling. Without it, focusing a card editor throws
+          // "can't access property setTimeout, this.win is undefined".
+          win: Window
           constructor(...args: unknown[]) {
             // Real Obsidian's MarkdownEditor is constructed as (app, containerEl, config) —
             // Kanban's subclass forwards all of its own (app, containerEl, owner) args via
@@ -305,6 +348,7 @@ export class AppShim implements IAppShim {
             const containerEl = args.find((a): a is HTMLElement => a instanceof HTMLElement)
             this.containerEl = containerEl ?? document.createElement('div')
             this.owner = args[2]
+            this.win = this.containerEl.ownerDocument?.defaultView ?? window
             // Lazy-init CM6: dynamically import to avoid top-level dep issues
             this.cm = null
             try {
@@ -419,6 +463,26 @@ export class AppShim implements IAppShim {
   }
 
   /**
+   * metadataTypeManager — Obsidian-internal registry of frontmatter property
+   * types (undocumented; backs the Properties view's type icons/pickers).
+   * obsidian-tasks-plugin reads `getAllProperties()` on startup and calls
+   * `setType()` to register its own fields (e.g. "due" as a date) so they get
+   * the right editor in Obsidian's Properties view. Slatebase has no
+   * Properties view to reflect these into, so `setType` just records them —
+   * enough that `getAllProperties()`/`getPropertyInfo()` echo back what a
+   * plugin registered instead of crashing on a missing method.
+   */
+  readonly metadataTypeManager = {
+    properties: {} as Record<string, { name: string; type: string }>,
+    getAllProperties: (): Record<string, { name: string; type: string }> => this.metadataTypeManager.properties,
+    getPropertyInfo: (property: string): { name: string; type: string } | undefined =>
+      this.metadataTypeManager.properties[property.toLowerCase()],
+    setType: (property: string, type: string): void => {
+      this.metadataTypeManager.properties[property.toLowerCase()] = { name: property, type };
+    },
+  }
+
+  /**
    * keymap — Obsidian's hotkey scope manager. Views and modals push their own
    * `Scope` here (typically `app.keymap.pushScope(this.scope)` in `onOpen()`,
    * popped again in `onClose()`) to get first refusal on keydown events while
@@ -486,6 +550,18 @@ export class AppShim implements IAppShim {
     } else {
       localStorage.setItem(prefixedKey, typeof data === 'string' ? data : JSON.stringify(data))
     }
+  }
+
+  /**
+   * Undocumented internal API that opens Obsidian's "what's new" release-notes
+   * screen. Slatebase has no such screen, so this is a deliberate no-op rather
+   * than a tracked gap — declaring it explicitly (and listing it in
+   * `emulatedProperties`) keeps `if (app.showReleaseNotes)` feature-detection
+   * from tripping the generic "non-emulated" warning, since the real method is
+   * genuinely present, it just does nothing.
+   */
+  showReleaseNotes(): void {
+    warnNoOp('App', 'showReleaseNotes', 'No release notes screen is shown.')
   }
 
   /**
@@ -557,10 +633,13 @@ export class AppShim implements IAppShim {
       'loadLocalStorage',
       'saveLocalStorage',
       'keymap',
+      'scope',
+      'metadataTypeManager',
       'isMobile',
       'appId',
       'secretStorage',
       'setting',
+      'showReleaseNotes',
       // Internal/utility properties
       'pluginId',
       'pluginsMap',

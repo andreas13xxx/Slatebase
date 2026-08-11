@@ -99,6 +99,7 @@ test. Config: `backend/vitest.config.ts` and the `test.coverage` block in `front
 | @lezer/lr | Lezer LR parser runtime |
 | @react-symbols/icons | File type icons (file explorer) |
 | moment | Date/time formatting (Calendar plugin compat) |
+| buffer | Node `Buffer` polyfill for plugin bundles (obsidian-git/isomorphic-git reference it at module top level) |
 | zod | Schema validation (canvas parser, frontend-side) |
 
 ### Geplant

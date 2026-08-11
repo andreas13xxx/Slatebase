@@ -663,6 +663,24 @@ function AppContent() {
   })
 
   return (
+    // PluginProvider wraps the entire vault view below, and third-party plugin
+    // code (view.getDisplayText()/getIcon() overrides, onLayoutReady callbacks,
+    // etc.) runs inside it on every vault switch and plugin toggle. A plugin
+    // bug there is an uncaught error with no boundary above it otherwise —
+    // React's default is to unmount the whole tree, which reads as the app
+    // having crashed. This boundary contains that to a "something went wrong"
+    // panel instead, with a reload button to recover.
+    <ErrorBoundary
+      onError={(error, errorInfo) => {
+        console.error('[App] Plugin system crashed — a plugin threw an uncaught error:', error, errorInfo)
+      }}
+      fallback={
+        <div className="app-loading" role="alert" style={{ flexDirection: 'column', gap: 12 }}>
+          <span>Ein Plugin hat einen unerwarteten Fehler verursacht.</span>
+          <button type="button" onClick={() => window.location.reload()}>Seite neu laden</button>
+        </div>
+      }
+    >
     <PluginProvider
       vaultId={state.selectedVaultId}
       vaultName={selectedVaultName}
@@ -948,6 +966,7 @@ function AppContent() {
       </main>
     </div>
     </PluginProvider>
+    </ErrorBoundary>
   )
 }
 

@@ -38,6 +38,12 @@ import { STORAGE_KEY_TOKEN, STORAGE_KEY_CSRF } from '../../state/authContext';
 // which entry point reaches the loader first. Idempotent.
 import { installObsidianGlobals } from './install-globals';
 import { withPluginContextAsync } from './plugin-execution-context';
+import { createBrowserPathShim } from './browser-path-shim';
+import { preloadIconsReferencedIn } from './lucide-icons';
+// Node's Buffer — plugins that bundle git/crypto tooling (e.g. obsidian-git's
+// isomorphic-git dependency) reference it directly at module top level, not
+// just inside onload(), so it must exist before the bundle evaluates.
+import { Buffer } from 'buffer';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -109,6 +115,8 @@ export class PluginLoader implements IPluginLoader {
     this.deps = deps;
     // The namespace must be complete before any bundle evaluates.
     installObsidianGlobals();
+    (window as unknown as { __slatebasePath?: ReturnType<typeof createBrowserPathShim> }).__slatebasePath ??= createBrowserPathShim();
+    (window as unknown as { Buffer?: typeof Buffer }).Buffer ??= Buffer;
   }
 
   /**
@@ -127,11 +135,17 @@ export class PluginLoader implements IPluginLoader {
     let module: Record<string, unknown>;
 
     try {
+      // Some plugins (e.g. Excalidraw) resolve icons once into a frozen
+      // React tree at module top level via getIcon() — see
+      // preloadIconsReferencedIn's docs for why that needs the icon cache
+      // warmed *before* the bundle's own code runs, not just before onload().
+      await preloadIconsReferencedIn(bundle);
       module = await this.evaluateBundle(bundle);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       const bundleError = new BundleEvaluationError(pluginId, error);
       this.setStatus(pluginId, 'error', manifest, bundleError.message);
+      console.error(`[PluginLoader] Plugin "${pluginId}" failed to evaluate:`, error);
       throw bundleError;
     }
 
@@ -145,6 +159,7 @@ export class PluginLoader implements IPluginLoader {
       );
       const bundleError = new BundleEvaluationError(pluginId, error);
       this.setStatus(pluginId, 'error', manifest, bundleError.message);
+      console.error(`[PluginLoader] Plugin "${pluginId}" has an invalid bundle:`, error.message);
       throw bundleError;
     }
 
@@ -174,6 +189,7 @@ export class PluginLoader implements IPluginLoader {
       const error = err instanceof Error ? err : new Error(String(err));
       const bundleError = new BundleEvaluationError(pluginId, error);
       this.setStatus(pluginId, 'error', manifest, bundleError.message);
+      console.error(`[PluginLoader] Plugin "${pluginId}" failed to instantiate:`, error);
       throw bundleError;
     }
 
@@ -457,6 +473,12 @@ export class PluginLoader implements IPluginLoader {
 if (typeof process === 'undefined') {
   var process = { platform: 'linux', env: {}, version: 'v22.0.0', versions: { node: '22.0.0' }, cwd: function() { return '/'; } };
 }
+if (typeof global === 'undefined') {
+  var global = window;
+}
+if (typeof Buffer === 'undefined') {
+  var Buffer = window.Buffer;
+}
 if (!window.__slatebaseOriginalFetch) {
   window.__slatebaseOriginalFetch = window.fetch.bind(window);
 }
@@ -626,6 +648,8 @@ function require(id) {
   }
   if (id === 'obsidian-daily-notes-interface') return window.__obsidianDailyNotesInterface || {};
   if (id === 'moment') return window.moment;
+  if (id === 'path' || id === 'node:path') return window.__slatebasePath || {};
+  if (id === 'buffer' || id === 'node:buffer') return { Buffer: window.Buffer };
   if (id === '@codemirror/state') return window.__codemirrorState || {};
   if (id === '@codemirror/view') return window.__codemirrorView || {};
   if (id === '@codemirror/language') return window.__codemirrorLanguage || {};

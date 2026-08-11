@@ -98,6 +98,9 @@ Filesystem-based, no database. All under `backend/data/`:
 - `CachedMetadata` is produced only by `plugins/compat/metadata-parser.ts` — extend it there, not in `metadata-cache-shim.ts`
 - `OBSIDIAN_API_VERSION` (`obsidian-api-extensions.ts`) may only be raised once the APIs of that version are actually implemented
 - Only a server 401 ends a session: a failed read (backend) or a failed request (frontend) is "unknown", never "gone"
+- Base classes plugins extend must survive ES5-downlevel `_super.call(this)` as well as native `super()` — see the `new.target` wrapper in `install-globals.ts`
+- Vault write operations must patch the local `directoryTree` immediately; the synchronous lookup APIs cannot await the realtime round-trip
+- Windows file locking (OneDrive, antivirus) makes EPERM/EACCES routine: retry atomic writes, never treat a failed read as "file gone"
 - New modals/dialogs MUST use `useFocusTrap` from `src/hooks/useFocusTrap.ts` (no manual document-keydown + focus management)
 - New interactive elements on non-button tags need `role="button"`, `tabIndex={0}`, `onKeyDown` (Enter/Space)
 - `vitest-axe` is installed; new core components should have a co-located `*.a11y.test.tsx`

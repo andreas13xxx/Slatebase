@@ -421,10 +421,13 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
         await apiClient.saveRegistry(vaultId, updatedRegistry)
         setRegistryData(updatedRegistry)
       }
-    } catch {
-      // Rollback on failure
+    } catch (err: unknown) {
+      console.error(`[PluginManagementPage] Failed to ${newStatus === 'active' ? 'activate' : 'deactivate'} plugin "${pluginId}":`, err)
+      const detail = extractErrorMessage(err, 'Aktivierung fehlgeschlagen')
+      // Rollback on failure, but surface what actually went wrong instead of
+      // silently reverting to the previous (usually empty) error state.
       setPlugins((prev) => prev.map((p) =>
-        p.pluginId === pluginId ? { ...p, status: plugin.status, error: plugin.error } : p
+        p.pluginId === pluginId ? { ...p, status: newStatus === 'active' ? 'error' : plugin.status, error: detail } : p
       ))
     } finally {
       setTogglingPlugins((prev) => {

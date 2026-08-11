@@ -182,6 +182,14 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
   'workspace.rightSplit',
   'workspace.floatingSplit',
   'workspace.getLeafById',
+  'workspace.splitActiveLeaf',
+  'workspace.createLeafInParent',
+  'workspace.ensureSideLeaf',
+  'workspace.leftRibbon',
+  'workspace.rightRibbon',
+  'workspace.editorSuggest',
+  'workspace.requestSaveLayout',
+  'workspace.getLastOpenFiles',
   // MetadataCache methods
   'metadataCache.getFileCache',
   'metadataCache.getCache',
@@ -223,23 +231,16 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
  * do less — which is the harder failure to notice, and exactly what a user
  * deserves a warning about before installing.
  *
- * Nearly all of these come from one architectural difference: Slatebase's
- * workspace is a flat set of tabs. It has no split/sidebar/popout object model,
- * so the methods that create or inspect that structure degrade to a plain tab
- * or return a stub. See the shim implementations for the per-method behaviour.
+ * Methods whose degradation is graceful and self-explanatory (a split becomes
+ * a plain tab, both sidebars merge into the Context Panel, layout/ribbon
+ * structure becomes a stub) live in `SUPPORTED_METHODS` instead, with a
+ * console message at call time explaining the substitution — that's enough
+ * signal for a developer without turning the install-time compatibility
+ * badge yellow for something that just works differently. This set is for
+ * methods whose reduced behavior is more likely to actually break a plugin's
+ * functionality and warrants a warning before install.
  */
-const PARTIAL_METHODS: ReadonlySet<string> = new Set([
-  // Split emulation — these create an ordinary tab instead of a split pane.
-  'workspace.splitActiveLeaf',
-  'workspace.createLeafInParent',
-  // Layout structure: stub objects, since there is none to report.
-  'workspace.leftRibbon',
-  'workspace.rightRibbon',
-  'workspace.editorSuggest',
-  // No persisted layout, so nothing to save.
-  'workspace.requestSaveLayout',
-  'workspace.getLastOpenFiles',
-]);
+const PARTIAL_METHODS: ReadonlySet<string> = new Set([]);
 
 /**
  * Known unsupported workspace methods.

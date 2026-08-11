@@ -1,8 +1,8 @@
 # Implementierungsplan — Slatebase Ausstehende Features
 
-**Stand:** August 2026 (v0.26.x). Die Kernfeatures sind umgesetzt. Es verbleiben 8 ausstehende Features in unterschiedlichen Reifegraden.
+**Stand:** 10.08.2026 (v0.28.0 + ungereleaster Commit `e3536a6`). Security Hardening und Accessibility Audit (Runde 1) sind mit dem letzten Pull abgeschlossen — beide Specs vollständig (24/24 bzw. 22/22 Tasks). Kernfeatures sind umgesetzt. Es verbleiben 14 priorisierte offene Spec-Einheiten (decken ~24 Einzelfeatures ab, da mehrere thematisch verwandte Features gebündelt wurden). Zwei davon — **Workspaces/Split-Panes** und **Bases** — waren zuvor als "kein Äquivalent geplant" eingestuft und sind jetzt auf ausdrücklichen Nutzerwunsch in die aktive Roadmap aufgenommen.
 
-**Strategie:** Hybrid — Features mit bestehender Spec direkt umsetzen, komplexe Features erst vollständig spezifizieren.
+**Strategie:** Hybrid — Features mit bestehender Spec direkt umsetzen, komplexe Features erst vollständig spezifizieren. Kleinere, thematisch verwandte Features werden zu gemeinsamen Specs gebündelt statt einzeln spezifiziert (siehe Track A und H).
 
 ---
 
@@ -10,25 +10,35 @@
 
 | Prio | Feature | Track | Aufwand | Status |
 |------|---------|-------|---------|--------|
-| 1 | Obsidian Themes | B | ~15–20h | Geplant (keine Spec) |
-| 2 | Public Sharing | C | ~15–20h | Geplant (keine Spec) |
-| 3 | Semantische Suche / AI-Embeddings | E | ~38–58h | Geplant (keine Spec) |
-| 4 | Server-Side Plugins | B | ~48–68h | Tasks vorhanden |
-| 5 | Security Hardening | F | ~20–30h | ✅ Erledigt (2026-08) |
-| 6 | Accessibility Audit | F | ~24–34h | Spec vollständig (Req + Design + Tasks) |
+| 1 | PDF-Export / Drucken | A | ~6–10h | Geplant (keine Spec) |
+| 2 | Navigation & Verknüpfungs-Politur | A | ~25–35h | Geplant (keine Spec) |
+| 3 | UI-Politur (Bookmarks/Statusleiste/CSS-Snippets) | A | ~12–18h | Geplant (keine Spec) |
+| 4 | Editor-Erweiterungen (Mathe & Medien) | A | ~15–20h | Geplant (keine Spec) |
+| 5 | Obsidian Themes | B | ~15–20h | Geplant (keine Spec) |
+| 6 | Public Sharing | C | ~15–20h | Geplant (keine Spec) |
 | 7 | Responsive/Mobile | F | ~24–34h | Spec vollständig (Req + Design + Tasks) |
-| 8 | Collaborative Editing | D | ~68–88h | Nur Requirements |
+| 8 | Properties-Editor & Suchoperatoren | H | ~25–35h | Geplant (keine Spec) |
+| 9 | Workspaces & Split-Panes | G | ~60–90h | Geplant (keine Spec) — Nutzerwunsch |
+| 10 | Bases | H | ~55–75h | Geplant (keine Spec) — Nutzerwunsch, braucht Prio 8 |
+| 11 | Server-Side Plugins | B | ~48–68h | Tasks vorhanden |
+| 12 | Fremdformat-Importer | I | ~20–30h | Geplant (keine Spec) |
+| 13 | Semantische Suche / AI-Embeddings | E | ~38–58h | Geplant (keine Spec) |
+| 14 | Collaborative Editing | D | ~68–88h | Nur Requirements |
 
 ---
 
 ## Abhängigkeiten
 
 ```
+Track A (Politur):     PDF-Export → Navigation & Verknüpfungs-Politur → UI-Politur → Editor-Erweiterungen (Mathe/Medien)
 Track B (Plugins):     Community Plugin Store ✅ → Obsidian Themes → Server-Side Plugins
 Track C (Sharing):     Public Sharing (unabhängig)
 Track D (Editor):      Collaborative Editing (braucht Realtime + CM6)
 Track E (AI):          Semantische Suche (unabhängig)
-Track F (Polish):      Security ✅ → Accessibility → Responsive/Mobile
+Track F (Qualität):    Security Hardening ✅ → Accessibility Audit ✅ → Responsive/Mobile
+Track G (Layout):      Responsive/Mobile (empfohlene Vorarbeit) → Workspaces & Split-Panes
+Track H (Daten):       Properties-Editor & Suchoperatoren → Bases
+Track I (Onboarding):  Fremdformat-Importer (unabhängig)
 ```
 
 ---
@@ -57,11 +67,93 @@ OWASP-Top-10-strukturierter Security-Audit (`SECURITY-AUDIT.md`). 9 Findings (1 
 - **Startup-Warnungen**: `SLATEBASE_CSRF_SECRET`/`SLATEBASE_SYNC_SECRET` warn-Level bei fehlendem Env-Var.
 - **Plugin eval-Warnung**: UI-Bestätigungsschritt bei `hasEvalUsage: true` vor Aktivierung.
 
-**Fix-Backlog (nicht in diesem Pass):** Per-User-Rate-Limiter für `/proxy` + `/shares` + `/search`, echte Plugin-Sandbox-Isolation (Worker/VM, Prio 4 Spec).
+**Fix-Backlog (nicht in diesem Pass, siehe Prio 11):** Per-User-Rate-Limiter für `/proxy` + `/shares` + `/search`, echte Plugin-Sandbox-Isolation (Worker/VM statt Proxy-basierter Soft-Isolation) — beides beim `server-side-plugins`-Spec (Prio 11) mit erledigen, nicht als eigener Nachfolge-Pass.
 
 ---
 
-## Prio 1 — Obsidian Themes (Track B)
+## Erledigt — Accessibility Audit (Track F) ✅
+
+**Spec:** `.kiro/specs/accessibility-audit/` — alle 24 Tasks abgeschlossen (2026-08-10).
+
+WCAG-2.1-AA-Audit mit Ist-Zustands-Analyse und gezielten Fixes:
+
+- **Tooling & CI**: `vitest-axe`/`axe-core` als Dev-Dependency, `eslint-plugin-jsx-a11y` (recommended-Preset), axe-Unit-Tests für ConfirmModal/CommandPalette/SettingsPanel/FileExplorer/TabBar/ContextMenu, laufen als Teil von `npm run test:coverage` in CI.
+- **Focus-Management**: `useFocusTrap`-Hook (Tab-Zirkulation, Escape, Fokus-Rückgabe), angewendet auf ConfirmModal, CommandPalette, SettingsPanel, PluginDetailPanel, NewConversation, TemplateSelector.
+- **Skip-Navigation & Landmarks**: Skip-Link zu `#main-content`, Toolbar-Landmark-Bewertung.
+- **Tastaturbedienbarkeit**: StatusBar, TabContent, TrashView, Sidebar-Resize (`role="separator"` + Pfeiltasten), CanvasMinimap.
+- **Farbkontrast**: alle Text-/Hintergrund-Token-Paare (Light + Dark) gegen WCAG AA geprüft, gefundene Verstöße gefixt.
+- **Canvas/Graph-Alternative**: dynamisches `aria-label` mit Knoten-/Kantenzahl auf dem Graph-SVG, Tab-Fokus-Reihenfolge zwischen Canvas-Nodes mit Enter/Space, Pfeiltasten-Viewport-Verschiebung als Tastatur-Alternative zum Maus-Pan.
+- **Zoom & manueller Test**: 200%-Zoom-Check für Editor/Sidebar/Settings, manueller NVDA-Testdurchlauf über Login → Datei bearbeiten → Sidebar-Navigation → Settings, `ACCESSIBILITY-AUDIT.md` finalisiert.
+
+**Nachsorge (kein neuer Spec nötig):** Weitere Screenreader-Testdurchläufe (VoiceOver/JAWS) nur bei konkretem Bedarf. Wichtiger: neue große Features (Workspaces, Bases, Themes) müssen a11y-Anforderungen direkt in ihren eigenen Requirements mitführen, damit kein weiterer nachträglicher Vollaudit nötig wird.
+
+---
+
+## Prio 1 — PDF-Export / Drucken (Track A)
+
+Scope: ~6–10h. Keine Spec vorhanden.
+
+**Zusammenfassung:**
+
+- Print-Stylesheet (`@media print`) für die gerenderte Ansicht: Editor-Chrome, Sidebar, Tabs und Statusleiste ausblenden, nur Inhalt sichtbar
+- Befehl "Drucken / Als PDF speichern" in Command Palette + Datei-Kontextmenü, löst `window.print()` mit aktivem Print-Stylesheet aus (Browser-eigener PDF-Export im Druckdialog)
+- Callouts, Mermaid-SVGs und Embeds im Printlayout prüfen (Seitenumbrüche, Bildskalierung)
+
+**Abhängigkeiten:** Keine — nutzt die bestehende ViewMode-Rendering-Pipeline.
+
+**Empfehlung:** Kleinster Aufwand im gesamten Backlog bei sofort sichtbarem Nutzen — guter Startpunkt.
+
+---
+
+## Prio 2 — Navigation & Verknüpfungs-Politur (Track A)
+
+Scope: ~25–35h. Bündelt vier kleinere Navigations-/Verknüpfungslücken in einer Spec, da alle auf denselben Backend-Daten (Graph Store, Link-Resolver) aufbauen.
+
+**Zusammenfassung:**
+
+- **Quick Switcher** (Strg+O): Fuzzy-Suche über den Datei-Index; aktuell im Code als expliziter No-Op registriert
+- **Lokaler Graph** (pro Notiz): Filterung der bestehenden `/vaults/:id/graph`-Antwort auf n-Hop-Nachbarschaft, eigene GraphView-Instanz; aktuell No-Op
+- **Ungelinkte Erwähnungen**: Volltextsuche nach dem Dateinamen ohne Wikilink-Syntax, Anzeige im Context Panel unterhalb der Backlinks
+- **Automatische Link-Aktualisierung** beim Umbenennen/Verschieben: `renameContent`/`moveContent` müssen vaultweit alle Wikilinks auf die alte Datei umschreiben, statt sie brechen zu lassen — nutzt die im Graph Store bereits vorhandenen Backlink-Daten. Größte *unbeabsichtigte* Einzel-Lücke ggü. Obsidian-Kernverhalten (Datenintegrität).
+
+**Abhängigkeiten:** Braucht `knowledge-graph` ✅ (Backlink-/Adjazenzdaten) + `link-resolver.ts` ✅.
+
+**Empfehlung:** Vier kleine, unabhängig testbare Tasks in einer Spec — hohe wahrgenommene Qualitätssteigerung für moderaten Aufwand, insbesondere die Link-Aktualisierung.
+
+---
+
+## Prio 3 — UI-Politur: Bookmarks, Statusleiste, CSS-Snippets (Track A)
+
+Scope: ~12–18h. Drei kleine, unabhängige Ergänzungen bestehender Features.
+
+**Zusammenfassung:**
+
+- **Bookmarks vervollständigen**: Block-, Überschrift- und Such-Lesezeichen sowie "Alle Tabs bookmarken" (aktuell No-Ops) — Datei-Lesezeichen laufen bereits über die Favoriten
+- **Wortanzahl/Zeichenanzahl** in der Statusleiste (bereits als erweiterbar angelegt, aktuell nur Uhr)
+- **CSS-Snippets**: nutzereigenes CSS pro Vault, wiederverwendet den bestehenden Plugin-CSS-Injection-Mechanismus
+
+**Abhängigkeiten:** Braucht `sidebar-panel` ✅ (Favoriten) + `obsidian-plugin-compat` ✅ (CSS-Injection) + Status Bar ✅.
+
+**Empfehlung:** Aufräum-Spec vor den großen Architektur-Features — schließt kleine, länger bekannte Lücken günstig ab.
+
+---
+
+## Prio 4 — Editor-Erweiterungen: Mathe & Medien (Track A)
+
+Scope: ~15–20h. Keine Spec vorhanden.
+
+**Zusammenfassung:**
+
+- **Mathe/LaTeX-Rendering**: KaTeX (leichtgewichtiger als MathJax) lazy-loaded nach dem bestehenden Mermaid-Muster; `renderMath`/`finishRenderMath` im Plugin-Shim ersetzen die aktuelle Rohtext-Ausgabe
+- **Audio-/Video-Embeds**: `![[datei.mp3]]` / `.mp4` im Embed-Modul, analog zur bestehenden Bild-/PDF-Embed-Pipeline
+
+**Abhängigkeiten:** Braucht `obsidian-markdown-compat` ✅ (Embed-Pipeline) + `mermaid-rendering` ✅ (Lazy-Load-Pattern als Vorlage).
+
+**Empfehlung:** Mathe ist eine der sichtbarsten verbliebenen Rendering-Lücken für technische/wissenschaftliche Nutzer — moderater Aufwand, hohe Sichtbarkeit.
+
+---
+
+## Prio 5 — Obsidian Themes (Track B)
 
 Scope: ~15–20h. Keine Spec vorhanden.
 
@@ -79,7 +171,7 @@ Scope: ~15–20h. Keine Spec vorhanden.
 
 ---
 
-## Prio 2 — Public Sharing (Track C)
+## Prio 6 — Public Sharing (Track C)
 
 Scope: ~4h Design + ~15–20h Implementierung.
 
@@ -94,11 +186,114 @@ Scope: ~4h Design + ~15–20h Implementierung.
 - Audit-Log: Wer hat wann welchen Share erstellt/zugegriffen
 - Verwaltung: Liste aktiver Public-Links pro Vault, Widerruf jederzeit
 
-**Abhängigkeiten:** Braucht `auth-and-user-management` ✅ + `obsidian-markdown-compat` ✅.
+**Abhängigkeiten:** Braucht `auth-and-user-management` ✅ + `obsidian-markdown-compat` ✅. Teilt die Read-Only-Rendering-Basis mit Prio 1 (PDF-Export).
 
 ---
 
-## Prio 3 — Semantische Suche / AI-Embeddings (Track E)
+## Prio 7 — Responsive/Mobile (Track F/G)
+
+Scope: ~4h Design + ~20–30h Implementierung.
+
+**Spec:** `.kiro/specs/responsive-mobile/` — Requirements + Design + Tasks vorhanden, basierend auf Ist-Zustands-Audit (Layout-Shell, Canvas-Interaktion, Touch-Support).
+
+- Breakpoints: Mobile (<768px), Tablet (768–1024px), Desktop (>1024px)
+- Sidebar als Overlay/Drawer, Touch-Interaktionen, Canvas Pinch-to-Zoom
+- Optional: PWA-Manifest
+
+**Sequenzierungs-Hinweis:** Bewusst vor Workspaces (Prio 9) eingeplant. Ein Split-Pane-Layout responsive zu machen ist deutlich schwerer als ein bestehendes Single-Pane-Layout — die Workspaces-Spec sollte Responsive-Verhalten von Anfang an mitdenken statt es nachträglich in ein bereits fertiges Pane-System zu quetschen.
+
+**Empfehlung:** Spec ist bereits vollständig (kein Design-Aufwand mehr nötig) und zentral fürs Kernversprechen "von jedem Browser" — günstige Gelegenheit, vor dem großen Workspaces-Umbau umzusetzen.
+
+---
+
+## Prio 8 — Properties-Editor & Suchoperatoren (Track H)
+
+Scope: ~25–35h. Keine Spec vorhanden. Zwingende Vorarbeit für Bases (Prio 10) — bewusst vorgezogen, damit Bases auf einer bereits fertigen Query-/Property-Schicht aufbauen kann statt sie zu duplizieren.
+
+**Zusammenfassung:**
+
+- **Properties-Editor-UI**: typisierte Frontmatter-Felder (Text/Zahl/Datum/Checkbox/Liste/Tags) statt aktuell rohem YAML im Editor; Typ-Erkennung aus vorhandenen Werten, manuelle Typ-Umschaltung
+- **Such-Operatoren**: Query-Syntax-Parser für `path:`, `tag:`, `file:`, `line:`, `-tag:` u. Ä., vor die bestehende Regex-Suche geschaltet
+- Beide Teile greifen auf dieselbe Property-/Metadaten-Schicht zu, die auch Bases (Prio 10) als Query-Grundlage braucht
+
+**Abhängigkeiten:** Braucht `context-panel` ✅ (Properties-Anzeige) + `search-and-discovery` ✅.
+
+**Empfehlung:** Nicht überspringen, auch wenn beide Teile für sich genommen "nur" mittlere Priorität hätten — ohne diese Vorarbeit baut Bases sonst eine zweite, inkonsistente Query-Engine.
+
+---
+
+## Prio 9 — Workspaces & Split-Panes (Track G)
+
+Scope: ~60–90h. Keine Spec vorhanden. **Nutzerwunsch** — zuvor als "kein Äquivalent geplant" eingestuft. Größter Architektur-Eingriff im gesamten Backlog.
+
+**Zusammenfassung:**
+
+- Pane-Baum statt einzelner Tab-Reihe: horizontale/vertikale Splits, verschachtelbar
+- Gespeicherte, benannte Workspace-Layouts (Speichern/Laden/Löschen), Workspace-Switcher
+- `workspace-leaf-compat` ✅ erweitern: `createLeafBySplit`/`splitActiveLeaf` erzeugen echte Splits statt neuer Tabs — hebt betroffene Plugins von "partial" auf "full"-Kompatibilität
+- Tab-Drag-and-Drop zwischen Panes
+- Persistenz des Pane-Baums analog zur bestehenden Tab-/Panel-State-Persistierung
+
+**Abhängigkeiten:** Braucht `tabbed-editor-viewer` ✅ und `workspace-leaf-compat` ✅ (wird erweitert, nicht ersetzt). **Empfohlen:** Prio 7 (Responsive/Mobile) zuerst.
+
+**Risiko:** Größte einzelne Architekturänderung am Layout-System der App. Vor dem Requirements-Dokument ein kurzes Design-Spike gegen bekannte Regressionsflächen (Tab-State-Persistenz, Plugin-Sidebar-Views, Canvas-/Graph-Fullscreen-Modus) empfohlen.
+
+**Empfehlung:** Eingeplant, aber bewusst nach den Politur-Specs (Prio 1–4) und nach Responsive/Mobile, damit das Fundament stabil ist, wenn der große Umbau kommt.
+
+---
+
+## Prio 10 — Bases (Track H)
+
+Scope: ~55–75h. Keine Spec vorhanden. **Nutzerwunsch** — zuvor als "kein Äquivalent geplant" eingestuft.
+
+**Zusammenfassung:**
+
+- `.base`-Dateiformat lesen/schreiben (YAML: Filter, Views, Formeln) — kompatibel zu Obsidians Format, damit importierte Vaults funktionieren
+- Query-Engine (baut auf Prio 8 auf): Filter nach Properties/Tags/Pfad, Sortierung
+- View-Typen: Tabelle (editierbare Zellen) zuerst; Karten-/Board-Ansicht optional als Ausbaustufe
+- Formeln: einfache Ausdrücke über Properties (Vergleiche, Verkettung, Basis-Arithmetik)
+- Bases-Tabs im Tab-System (bzw. in eigenen Panes, falls Workspaces/Prio 9 vorher landet)
+
+**Abhängigkeiten:** **Zwingend** Prio 8 (Properties-Editor & Suchoperatoren) zuerst. Profitiert von Prio 9 (Workspaces), ist davon aber nicht hart blockiert.
+
+**Empfehlung:** Größtes Einzelfeature nach Workspaces. Scope-Risiko liegt vor allem bei den Formeln — Obsidians Formel-Sprache ist nicht trivial nachzubauen; für die erste Version auf einfache Ausdrücke beschränken statt volle Parität in einem Zug anzustreben.
+
+---
+
+## Prio 11 — Server-Side Plugins (Track B)
+
+Scope: ~8h Design + ~40–60h Implementierung. Task-Liste existiert (7 Phasen).
+
+**Spec:** `.kiro/specs/server-side-plugins/`
+
+**Phasen:** Plugin-Klassifikation → Server-Side Sandbox (vm) → Runtime Manager → API & Logs → Settings-Bridge → Frontend-Integration → Sicherheit & Hardening.
+
+**Sicherheits-Nachsorge aus Security Hardening:** Diese Spec ist auch der richtige Ort für echte Plugin-Sandbox-Isolation (Worker/VM statt Proxy-basierter Soft-Isolation) und den Per-User-Rate-Limiter für `/proxy`/`/shares`/`/search` — beide im Security-Audit als Fix-Backlog vermerkt (Task 18), bewusst hier statt in einem eigenen Nachfolge-Pass mit erledigt.
+
+**Abhängigkeiten:** Braucht `obsidian-plugin-compat` ✅ (Plugin-Store, Registry, Installer).
+
+**Blockiert:** IMAP-Importer, Git-Plugin, Shell Commands und andere Node.js-basierte Plugins.
+
+---
+
+## Prio 12 — Fremdformat-Importer (Track I)
+
+Scope: ~20–30h. Keine Spec vorhanden.
+
+**Zusammenfassung:**
+
+- Notion-Export (ZIP mit HTML/Markdown + CSV-Datenbanken) → Markdown + Frontmatter
+- Evernote (`.enex`) → Markdown
+- Generisches HTML → Markdown
+- Mapping-Report nach Import (was wurde wie übersetzt, was ist fehlgeschlagen)
+
+**Abhängigkeiten:** Braucht `advanced-file-operations` ✅ (Import-Pipeline).
+
+**Empfehlung:** Onboarding-Feature — sinnvoll, aber nicht zeitkritisch; niedrigere Priorität als die Kernparitäts-Lücken oben.
+
+---
+
+## Prio 13 — Semantische Suche / AI-Embeddings (Track E)
 
 Scope: ~8h Design + ~30–50h Implementierung.
 
@@ -112,59 +307,7 @@ Scope: ~8h Design + ~30–50h Implementierung.
 
 ---
 
-## Prio 4 — Server-Side Plugins (Track B)
-
-Scope: ~8h Design + ~40–60h Implementierung. Task-Liste existiert (7 Phasen).
-
-**Spec:** `.kiro/specs/server-side-plugins/`
-
-**Phasen:** Plugin-Klassifikation → Server-Side Sandbox (vm) → Runtime Manager → API & Logs → Settings-Bridge → Frontend-Integration → Sicherheit & Hardening.
-
-**Abhängigkeiten:** Braucht `obsidian-plugin-compat` ✅ (Plugin-Store, Registry, Installer).
-
-**Blockiert:** IMAP-Importer, Git-Plugin, Shell Commands und andere Node.js-basierte Plugins.
-
----
-
-## Prio 5 — Security Hardening (Track F)
-
-**Status: ✅ Erledigt.** Alle 22 Tasks abgeschlossen (August 2026).
-
-Scope: ~20–30h.
-
-**Spec:** `.kiro/specs/security-hardening/` — OWASP-Top-10-Audit, CSP-Implementierung, Input-Validierung, Dependency-Audit, Path-Traversal-Fix, Plugin-Sandbox-Dokumentation. Details siehe "Erledigt"-Abschnitt oben.
-
----
-
-## Prio 6 — Accessibility Audit (Track F)
-
-Scope: ~4h Audit + ~20–30h Fixes.
-
-**Spec:** `.kiro/specs/accessibility-audit/` — Requirements + Design + Tasks vorhanden, basierend auf Ist-Zustands-Audit (ARIA-Abdeckung, Fokus-Management, Testing-Infrastruktur, Canvas/Graph-Zugänglichkeit).
-
-- axe-core / Lighthouse (CI), manuelles Screenreader-Testing
-- Tastaturnavigation, Farbkontrast (4.5:1 / 3:1), Fokus-Indikatoren
-- ARIA-Landmarks, Zoom-Kompatibilität (200%), Skip-Navigation
-
-**Empfehlung:** Nach den visuellen Features (Canvas, Live Preview) durchführen.
-
----
-
-## Prio 7 — Responsive/Mobile (Track F)
-
-Scope: ~4h Design + ~20–30h Implementierung.
-
-**Spec:** `.kiro/specs/responsive-mobile/` — Requirements + Design + Tasks vorhanden, basierend auf Ist-Zustands-Audit (Layout-Shell, Canvas-Interaktion, Touch-Support).
-
-- Breakpoints: Mobile (<768px), Tablet (768–1024px), Desktop (>1024px)
-- Sidebar als Overlay/Drawer, Touch-Interaktionen, Canvas Pinch-to-Zoom
-- Optional: PWA-Manifest
-
-**Empfehlung:** Nach Accessibility Audit.
-
----
-
-## Prio 8 — Collaborative Editing (Track D)
+## Prio 14 — Collaborative Editing (Track D)
 
 Scope: ~8h Design + ~60–80h Implementierung.
 
@@ -174,37 +317,42 @@ Scope: ~8h Design + ~60–80h Implementierung.
 
 **Abhängigkeiten:** Braucht `realtime-infrastructure` ✅ + `live-preview-editor` ✅ (CM6 erleichtert CRDT-Integration).
 
-**Empfehlung:** Als eigenständiges Milestone nach Track F planen. Technisch anspruchsvollstes Feature.
+**Empfehlung:** Als eigenständiges Milestone nach den anderen Tracks planen. Technisch anspruchsvollstes und riskantestes Feature im Backlog — bewusst zuletzt.
 
 ---
 
 ## Gesamtaufwand (Schätzung)
 
-Nur noch ausstehende Arbeit (Community Plugin Store ist raus):
-
 | Track | Aufwand |
 |-------|---------|
+| A: Politur (PDF, Navigation, UI, Mathe/Medien) | ~58–83h |
 | B: Plugins (Themes + Server-Side) | ~63–88h |
 | C: Sharing | ~19–24h |
 | D: Editor (Collaborative) | ~68–88h |
 | E: AI (Semantische Suche) | ~38–58h |
-| F: Polish (a11y + Mobile) | ~48–68h |
-| **Summe** | **~236–326h** |
+| F/G: Qualität & Layout (Responsive + Workspaces) | ~84–124h |
+| H: Strukturierte Daten (Properties/Suche + Bases) | ~80–110h |
+| I: Onboarding (Importer) | ~20–30h |
+| **Summe** | **~430–605h** |
 
 ---
 
-## Verworfene/Zurückgestellte Ideen
+## Bewusst nicht implementierte Features
+
+Bases, Workspaces und PDF-Export standen hier zeitweise als "kein Äquivalent geplant" — sind aber auf Nutzerwunsch jetzt aktiv in der Roadmap oben (Prio 1, 9, 10). Die folgende Liste enthält nur, was tatsächlich dauerhaft ausgeschlossen bleibt:
 
 | Idee | Grund |
 |------|-------|
-| GitSync | CouchDB-Sync deckt Use-Case ab. Hohe Komplexität. |
+| Mehrere native Fenster / OS-Fensterverwaltung | Browser-App-Architektur schließt das aus. Tabs + geplante Split-Panes (Prio 9) decken den Bedarf innerhalb eines Browser-Fensters ab. |
+| Native Mobile-Apps (iOS/Android) | Bewusst web-only. Responsive/Mobile-Weboberfläche (Prio 7) deckt den Mobile-Anwendungsfall ab, ohne App-Store-Overhead oder zweite Codebasis. |
+| GitSync | CouchDB-Sync (LiveSync-Kompat) deckt den Use-Case ab. Hohe Komplexität für einen Nischenfall. |
 | HTML-Rendering (Raw-HTML), generisch | XSS-Risiko. Markdown + Mermaid + Embeds reichen. **Teilweise revidiert:** Eine enge Allowlist für Inline-Tags (`<font color>`, `<mark>`, `<span style>`) plus `<center>`-Blöcke ist umgesetzt (`plugins/inline-html.ts`, geteilt zwischen Live Preview und Reading View) — alles außerhalb der Allowlist, inkl. `on*`-Handler/`script`/`iframe`, bleibt literaler Text. Generisches HTML-Rendering bleibt verworfen. |
-| Offline-Modus (PWA) | Self-Hosted = Server nötig. Vault-Sync mit Obsidian-Desktop deckt Offline ab. |
-| AI-Agent im Editor | MCP deckt AI-Zugang ab. Eingebauter Copilot = eigenes Produkt. |
-| Multi-Sprachen/RTL | Spezieller Use-Case. Bei Bedarf im accessibility-audit. |
+| Offline-Modus (volles PWA-Offline) | Self-Hosted = Server nötig. Vault-Sync mit Obsidian-Desktop deckt Offline ab. (Ein reines PWA-Installations-Manifest ohne Offline-Anspruch ist als Option in Prio 7 vorgesehen.) |
+| AI-Agent im Editor | MCP (bereits implementiert) deckt AI-Zugang ab. Ein eingebauter Copilot wäre ein eigenes Produkt. |
+| Multi-Sprachen/RTL | Spezieller Use-Case. Bei konkretem Bedarf im Rahmen der responsive-mobile- oder einer eigenen i18n-Spec aufgreifen. |
 
 ---
 
 ## Bekannte Limitierungen
 
-
+Siehe Abschnitt "Bewusst nicht implementierte Features" oben für dauerhaft ausgeschlossene Funktionalität. Für den aktuellen Umsetzungsstand aller Obsidian-Kernfeatures (inkl. Abweichungen bei bereits implementierten Features) siehe den separaten Feature-Paritäts-Audit.

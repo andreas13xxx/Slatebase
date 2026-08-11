@@ -269,7 +269,37 @@ describe('VaultShim', () => {
       expect(mockFetch).toHaveBeenCalledWith('vault-123', 'notes/hello.md');
     });
 
-    it('rejects read on non-existent file', async () => {
+    it('normalizes CRLF to LF, matching MetadataCacheShim\'s position offsets', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        content: '# Heading\r\n\r\n- one\r\n- two\r\n',
+        path: 'notes/hello.md',
+        name: 'hello.md',
+        size: 13,
+        encoding: 'utf-8',
+        isBinary: false,
+        isTruncated: false,
+      });
+      apiClient = createMockApiClient({ fetchFileContent: mockFetch });
+      vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+
+      const file: TFile = {
+        path: 'notes/hello.md',
+        name: 'hello.md',
+        basename: 'hello',
+        extension: 'md',
+        stat: { mtime: 0, ctime: 0, size: 42 },
+        parent: null,
+      };
+
+      const content = await vault.read(file);
+      expect(content).toBe('# Heading\n\n- one\n- two\n');
+    });
+
+    it('rejects read when the backend reports the file missing', async () => {
+      const mockFetch = vi.fn().mockRejectedValue({ code: 'NOT_FOUND', message: 'File not found' });
+      apiClient = createMockApiClient({ fetchFileContent: mockFetch });
+      vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+
       const file: TFile = {
         path: 'does-not-exist.md',
         name: 'does-not-exist.md',
@@ -279,7 +309,35 @@ describe('VaultShim', () => {
         parent: null,
       };
 
-      await expect(vault.read(file)).rejects.toThrow('File not found: "does-not-exist.md"');
+      await expect(vault.read(file)).rejects.toThrow('Failed to read "does-not-exist.md"');
+    });
+
+    it('reads a file the local tree cache does not know about yet', async () => {
+      // Mirrors create() then immediate read() (e.g. Templater reading back a
+      // note it just created to run template parsing) before the tree has been
+      // refreshed — the local cache must not gate the call.
+      const mockFetch = vi.fn().mockResolvedValue({
+        content: 'fresh content',
+        path: 'Untitled 2.md',
+        name: 'Untitled 2.md',
+        size: 13,
+        encoding: 'utf-8',
+        isBinary: false,
+        isTruncated: false,
+      });
+      apiClient = createMockApiClient({ fetchFileContent: mockFetch });
+      vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+
+      const file: TFile = {
+        path: 'Untitled 2.md',
+        name: 'Untitled 2.md',
+        basename: 'Untitled 2',
+        extension: 'md',
+        stat: { mtime: 0, ctime: 0, size: 0 },
+        parent: null,
+      };
+
+      await expect(vault.read(file)).resolves.toBe('fresh content');
     });
 
     it('rejects read with path traversal', async () => {
@@ -414,6 +472,37 @@ describe('VaultShim', () => {
       await expect(vault.create('../hack.md', 'evil')).rejects.toThrow('path traversal');
     });
 
+    it('makes the new file visible to synchronous cache lookups immediately', async () => {
+      // Regression test: Templater (and other plugins) create a note and then
+      // synchronously call getAbstractFileByPath()/exists()/getFileByPath() on
+      // it before the tree has been refreshed via updateTree(). Those lookups
+      // are sync and can't await a network round-trip, so create() must splice
+      // the new node into the local tree itself.
+      const mockSave = vi.fn().mockResolvedValue({ path: 'Untitled.md', name: 'Untitled.md', size: 0 });
+      apiClient = createMockApiClient({ saveFile: mockSave });
+      vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+
+      await vault.create('Untitled.md', '');
+
+      expect(vault.getAbstractFileByPath('Untitled.md')).not.toBeNull();
+      expect(vault.getFileByPath('Untitled.md')).not.toBeNull();
+      await expect(vault.exists('Untitled.md')).resolves.toBe(true);
+      // Now that 'Untitled.md' is in the cache, the next available name must skip it.
+      expect(vault.getAvailablePath('Untitled', 'md')).toBe('Untitled 1.md');
+    });
+
+    it('creates missing intermediate directories in the local cache', async () => {
+      const mockSave = vi.fn().mockResolvedValue({ path: 'a/b/c.md', name: 'c.md', size: 0 });
+      apiClient = createMockApiClient({ saveFile: mockSave });
+      vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+
+      await vault.create('a/b/c.md', '');
+
+      expect(vault.getFolderByPath('a')).not.toBeNull();
+      expect(vault.getFolderByPath('a/b')).not.toBeNull();
+      expect(vault.getFileByPath('a/b/c.md')).not.toBeNull();
+    });
+
     it('returns a TFile that passes `instanceof obsidian.TFile` (plugins like LiveSync check this on create events)', async () => {
       class FakeTFile {}
       (window as unknown as { obsidian: { TFile: typeof FakeTFile } }).obsidian = { TFile: FakeTFile };
@@ -505,7 +594,11 @@ describe('VaultShim', () => {
       expect(eventCallback).toHaveBeenCalledWith(file);
     });
 
-    it('rejects delete on non-existent file', async () => {
+    it('rejects delete when the backend reports the file missing', async () => {
+      const mockDelete = vi.fn().mockRejectedValue({ code: 'NOT_FOUND', message: 'File not found' });
+      apiClient = createMockApiClient({ deleteContent: mockDelete });
+      vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+
       const file: TAbstractFile = {
         path: 'ghost.md',
         name: 'ghost.md',
@@ -515,7 +608,134 @@ describe('VaultShim', () => {
         parent: null,
       };
 
-      await expect(vault.delete(file)).rejects.toThrow('File not found: "ghost.md"');
+      await expect(vault.delete(file)).rejects.toThrow('Failed to delete "ghost.md"');
+    });
+
+    it('deletes a file the local tree cache does not know about yet', async () => {
+      // Mirrors create() then immediate delete() (e.g. Templater deleting a
+      // just-created placeholder note) before the tree has been refreshed —
+      // the local cache must not gate the call, the backend is authoritative.
+      const mockDelete = vi.fn().mockResolvedValue(undefined);
+      apiClient = createMockApiClient({ deleteContent: mockDelete });
+      vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+
+      const file: TAbstractFile = {
+        path: 'Untitled 1.md',
+        name: 'Untitled 1.md',
+        basename: 'Untitled 1',
+        extension: 'md',
+        stat: { mtime: 0, ctime: 0, size: 0 },
+        parent: null,
+      };
+
+      await expect(vault.delete(file)).resolves.toBeUndefined();
+      expect(mockDelete).toHaveBeenCalledWith('vault-123', 'Untitled 1.md');
+    });
+
+    it('removes the file from synchronous cache lookups immediately', async () => {
+      const mockDelete = vi.fn().mockResolvedValue(undefined);
+      apiClient = createMockApiClient({ deleteContent: mockDelete });
+      vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+
+      const file: TAbstractFile = {
+        path: 'notes/hello.md',
+        name: 'hello.md',
+        basename: 'hello',
+        extension: 'md',
+        stat: { mtime: 0, ctime: 0, size: 42 },
+        parent: null,
+      };
+
+      expect(vault.getAbstractFileByPath('notes/hello.md')).not.toBeNull();
+      await vault.delete(file);
+      expect(vault.getAbstractFileByPath('notes/hello.md')).toBeNull();
+      await expect(vault.exists('notes/hello.md')).resolves.toBe(false);
+    });
+  });
+
+  describe('rename()', () => {
+    it('renames via API and emits rename event', async () => {
+      const mockMove = vi.fn().mockResolvedValue({ newPath: 'notes/renamed.md' });
+      apiClient = createMockApiClient({ moveContent: mockMove });
+      vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+
+      const eventCallback = vi.fn();
+      vault.on('rename', eventCallback);
+
+      const file: TAbstractFile = {
+        path: 'notes/hello.md',
+        name: 'hello.md',
+        basename: 'hello',
+        extension: 'md',
+        stat: { mtime: 0, ctime: 0, size: 42 },
+        parent: null,
+      };
+
+      await vault.rename(file, 'notes/renamed.md');
+      expect(mockMove).toHaveBeenCalledWith('vault-123', 'notes/hello.md', 'notes/renamed.md');
+      expect(file.path).toBe('notes/renamed.md');
+      expect(eventCallback).toHaveBeenCalledWith(file, 'notes/hello.md');
+    });
+
+    it('moves the file between synchronous cache lookups immediately', async () => {
+      const mockMove = vi.fn().mockResolvedValue({ newPath: 'notes/renamed.md' });
+      apiClient = createMockApiClient({ moveContent: mockMove });
+      vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+
+      const file: TAbstractFile = {
+        path: 'notes/hello.md',
+        name: 'hello.md',
+        basename: 'hello',
+        extension: 'md',
+        stat: { mtime: 0, ctime: 0, size: 42 },
+        parent: null,
+      };
+
+      await vault.rename(file, 'notes/renamed.md');
+
+      expect(vault.getAbstractFileByPath('notes/hello.md')).toBeNull();
+      expect(vault.getAbstractFileByPath('notes/renamed.md')).not.toBeNull();
+    });
+
+    it('moves a whole directory subtree in the local cache', async () => {
+      const mockMove = vi.fn().mockResolvedValue({ newPath: 'archive' });
+      apiClient = createMockApiClient({ moveContent: mockMove });
+      vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+
+      const folder: TAbstractFile = {
+        path: 'notes',
+        name: 'notes',
+        stat: { mtime: 0, ctime: 0, size: 0 },
+        parent: null,
+      };
+
+      await vault.rename(folder, 'archive');
+
+      expect(vault.getFolderByPath('notes')).toBeNull();
+      expect(vault.getFolderByPath('archive')).not.toBeNull();
+      expect(vault.getFileByPath('archive/hello.md')).not.toBeNull();
+      expect(vault.getFileByPath('archive/world.md')).not.toBeNull();
+      expect(vault.getFileByPath('notes/hello.md')).toBeNull();
+    });
+
+    it('is a no-op on the local cache when the file is not in it yet', async () => {
+      // Mirrors create() then immediate rename() before the tree has refreshed.
+      const mockMove = vi.fn().mockResolvedValue({ newPath: 'Renamed.md' });
+      apiClient = createMockApiClient({ moveContent: mockMove });
+      vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+
+      const file: TAbstractFile = {
+        path: 'Untitled 1.md',
+        name: 'Untitled 1.md',
+        basename: 'Untitled 1',
+        extension: 'md',
+        stat: { mtime: 0, ctime: 0, size: 0 },
+        parent: null,
+      };
+
+      await expect(vault.rename(file, 'Renamed.md')).resolves.toBeUndefined();
+      expect(mockMove).toHaveBeenCalledWith('vault-123', 'Untitled 1.md', 'Renamed.md');
+      expect(file.path).toBe('Renamed.md');
     });
   });
 
@@ -547,6 +767,18 @@ describe('VaultShim', () => {
       vault.off('custom-event', cb);
       vault.trigger('custom-event', 'arg3');
       expect(cb).toHaveBeenCalledTimes(1);
+    });
+
+    it('forwards the optional callback context', () => {
+      const context = { received: '' };
+      function callback(this: typeof context, value: string): void {
+        this.received = value;
+      }
+      vault.on('custom-event', callback, context);
+
+      vault.trigger('custom-event', 'bound value');
+
+      expect(context.received).toBe('bound value');
     });
   });
 });

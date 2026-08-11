@@ -43,6 +43,15 @@ export class ItemView {
     this.app = leaf.app
     this.containerEl = document.createElement('div')
     this.containerEl.className = 'view-content'
+    // Real Obsidian's ItemView.containerEl always has two children — a
+    // header (children[0]) and the content pane (children[1] === contentEl).
+    // Kept in sync with the equivalent constructor in install-globals.ts,
+    // which is what real plugin bundles actually extend; see the comment
+    // there for why this matters (children[1]-reading plugins like
+    // obsidian-day-planner's Timeline/TimeTracker views).
+    const headerEl = document.createElement('div')
+    headerEl.className = 'view-header'
+    this.containerEl.appendChild(headerEl)
     this.contentEl = document.createElement('div')
     this.contentEl.className = 'plugin-view-content'
     this.containerEl.appendChild(this.contentEl)
@@ -81,12 +90,16 @@ export class ItemView {
    * Icon is resolved via the custom icon registry first, then Lucide.
    */
   addAction(icon: string, title: string, callback: () => void): HTMLElement {
-    // Create or find the header actions container
+    // Create or find the header actions container — lives inside the header
+    // (children[0]), not inserted as a sibling before contentEl, which would
+    // shift contentEl to children[2] and break the children[1]-is-contentEl
+    // contract the constructor sets up (see there for why that matters).
     let actionsEl = this.containerEl.querySelector('.view-actions') as HTMLElement | null
     if (!actionsEl) {
       actionsEl = document.createElement('div')
       actionsEl.className = 'view-actions'
-      this.containerEl.insertBefore(actionsEl, this.contentEl)
+      const headerEl = this.containerEl.querySelector('.view-header') ?? this.containerEl
+      headerEl.appendChild(actionsEl)
     }
 
     const button = document.createElement('button')
@@ -557,6 +570,21 @@ export class WorkspaceLeaf {
   /** Get the current view type */
   getViewState(): { type: string } {
     return { type: this.view?.getViewType() ?? '' }
+  }
+
+  /**
+   * Returns the root split container this leaf lives in. Real Obsidian plugins
+   * (day-planner's `isLeafInSidebar`, etc.) call this and compare the result
+   * against `workspace.leftSplit`/`rightSplit`/`rootSplit` to tell sidebar
+   * leaves from main-area ones. Slatebase collapses both sidebar sides into a
+   * single Context Panel, so any 'right-sidebar' leaf reports `rightSplit`.
+   */
+  getRoot(): unknown {
+    const workspace = (this.app as { workspace?: { rootSplit?: unknown; rightSplit?: unknown } })?.workspace
+    if (this.location === 'right-sidebar') {
+      return workspace?.rightSplit ?? this
+    }
+    return workspace?.rootSplit ?? this
   }
 
   /**

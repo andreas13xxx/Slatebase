@@ -97,8 +97,8 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Register a callback for the given workspace event.
    * Supported events: 'file-open', 'active-leaf-change'
    */
-  on(event: string, callback: (...args: unknown[]) => void): EventRef {
-    return this.events.on(event, callback);
+  on(event: string, callback: (...args: unknown[]) => void, context?: unknown): EventRef {
+    return this.events.on(event, callback, context);
   }
 
   /**
@@ -315,6 +315,7 @@ export class WorkspaceShim implements IWorkspaceShim {
     side: 'left' | 'right',
     options?: { active?: boolean; reveal?: boolean; split?: boolean; state?: Record<string, unknown> },
   ): Promise<WorkspaceLeaf> {
+    debugOnce('WorkspaceShim.ensureSideLeaf', '[WorkspaceShim] ensureSideLeaf: Slatebase maps both sidebar sides onto the single Context Panel.');
     const existing = this.getLeavesOfType(viewType).find(l => l.location === 'right-sidebar');
     if (existing) {
       if (options?.reveal !== false) this.revealLeaf(existing);
@@ -640,7 +641,7 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Get the filenames of the most recently opened files.
    */
   getLastOpenFiles(): string[] {
-    // Return empty — Slatebase doesn't track this in the workspace shim
+    debugOnce('WorkspaceShim.getLastOpenFiles', '[WorkspaceShim] getLastOpenFiles: Slatebase does not track recently opened files — returning an empty list.');
     return [];
   }
 
@@ -649,7 +650,7 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Kanban calls this when view settings change.
    */
   requestSaveLayout(): void {
-    // No-op — Slatebase does not persist workspace layout
+    debugOnce('WorkspaceShim.requestSaveLayout', '[WorkspaceShim] requestSaveLayout: Slatebase does not persist workspace layout — no-op.');
   }
 
   /**
@@ -664,9 +665,14 @@ export class WorkspaceShim implements IWorkspaceShim {
    * editorSuggest — Manager for registered EditorSuggest instances.
    * Kanban accesses this during suggest registration.
    */
-  readonly editorSuggest = {
+  private readonly _editorSuggest = {
     suggests: [] as unknown[],
     removeSuggest: (_suggest: unknown) => {},
+  }
+
+  get editorSuggest(): { suggests: unknown[]; removeSuggest: (suggest: unknown) => void } {
+    debugOnce('WorkspaceShim.editorSuggest', '[WorkspaceShim] editorSuggest: Slatebase does not run the built-in suggest manager — registered suggesters are tracked but not driven by Slatebase.');
+    return this._editorSuggest;
   }
 
   /**
@@ -712,8 +718,18 @@ export class WorkspaceShim implements IWorkspaceShim {
    * are no-ops. Exists so plugins calling `workspace.leftRibbon.hide()` (e.g. Editing
    * Toolbar's "Workplace Fullscreen" command) don't crash on `undefined.hide()`.
    */
-  readonly leftRibbon = { hide() {}, show() {}, toggle() {}, collapsed: false };
-  readonly rightRibbon = { hide() {}, show() {}, toggle() {}, collapsed: false };
+  readonly leftRibbon = {
+    hide: () => debugOnce('WorkspaceShim.leftRibbon', '[WorkspaceShim] leftRibbon: Slatebase has no ribbon UI — hide/show/toggle are no-ops.'),
+    show: () => debugOnce('WorkspaceShim.leftRibbon', '[WorkspaceShim] leftRibbon: Slatebase has no ribbon UI — hide/show/toggle are no-ops.'),
+    toggle: () => debugOnce('WorkspaceShim.leftRibbon', '[WorkspaceShim] leftRibbon: Slatebase has no ribbon UI — hide/show/toggle are no-ops.'),
+    collapsed: false,
+  };
+  readonly rightRibbon = {
+    hide: () => debugOnce('WorkspaceShim.rightRibbon', '[WorkspaceShim] rightRibbon: Slatebase has no ribbon UI — hide/show/toggle are no-ops.'),
+    show: () => debugOnce('WorkspaceShim.rightRibbon', '[WorkspaceShim] rightRibbon: Slatebase has no ribbon UI — hide/show/toggle are no-ops.'),
+    toggle: () => debugOnce('WorkspaceShim.rightRibbon', '[WorkspaceShim] rightRibbon: Slatebase has no ribbon UI — hide/show/toggle are no-ops.'),
+    collapsed: false,
+  };
 
   /**
    * Open a popout window leaf. Returns the active leaf (no popout support in web).
@@ -741,7 +757,7 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Create a leaf in a parent split at a given index. Returns a new leaf.
    */
   createLeafInParent(_parent: unknown, _index: number): WorkspaceLeaf {
-    // Delegate to getLeaf — no real split management in Slatebase
+    debugOnce('WorkspaceShim.createLeafInParent', '[WorkspaceShim] createLeafInParent: Slatebase has no split/parent structure — created a new tab instead.');
     return this.getLeaf(true);
   }
 

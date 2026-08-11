@@ -786,3 +786,119 @@ export class Setting {
     return this
   }
 }
+
+/**
+ * Groups multiple Setting rows under a shared heading, with optional search/
+ * extra-button controls in the header (Obsidian 1.11+). Plugins that adopt the
+ * declarative settings API (getSettingDefinitions()) receive one of these as the
+ * `render` callback's second argument; some plugins also subclass it directly
+ * for custom grouped settings UI, so it must be a real extendable class rather
+ * than an inline shape — `class X extends SettingGroup` evaluates at bundle
+ * parse time and throws immediately if the name resolves to undefined.
+ */
+export class SettingGroup {
+  /** Obsidian's container for the group's Setting rows. */
+  listEl: HTMLElement
+  private groupEl: HTMLElement
+  private headerEl: HTMLElement
+  private headingEl: HTMLElement | null = null
+
+  constructor(containerEl: HTMLElement) {
+    this.groupEl = document.createElement('div')
+    this.groupEl.className = 'setting-group'
+
+    this.headerEl = document.createElement('div')
+    this.headerEl.className = 'setting-group-header'
+
+    this.listEl = document.createElement('div')
+    this.listEl.className = 'setting-group-list'
+
+    this.groupEl.appendChild(this.headerEl)
+    this.groupEl.appendChild(this.listEl)
+    containerEl.appendChild(this.groupEl)
+  }
+
+  setHeading(text: string | DocumentFragment): this {
+    if (!this.headingEl) {
+      this.headingEl = document.createElement('div')
+      this.headingEl.className = 'setting-group-heading setting-item-heading'
+      this.headerEl.insertBefore(this.headingEl, this.headerEl.firstChild)
+    }
+    this.headingEl.textContent = ''
+    if (typeof text === 'string') this.headingEl.textContent = text
+    else this.headingEl.appendChild(text)
+    return this
+  }
+
+  addClass(...classes: string[]): this {
+    this.groupEl.classList.add(...classes)
+    return this
+  }
+
+  addSetting(cb: (setting: Setting) => void): this {
+    cb(new Setting(this.listEl))
+    return this
+  }
+
+  /** Search input at the beginning of the group's header — mirrors Setting.addSearch's DOM shape. */
+  addSearch(callback: (component: { inputEl: HTMLInputElement; containerEl: HTMLElement; clearButtonEl: HTMLElement; getValue(): string; setValue(value: string): unknown; setPlaceholder(p: string): unknown; onChange(cb: (value: string) => void): unknown; setDisabled(d: boolean): unknown; then(cb: (c: unknown) => void): unknown }) => void): this {
+    const container = document.createElement('div')
+    container.className = 'search-input-container'
+    const input = document.createElement('input')
+    input.type = 'search'
+    input.className = 'setting-search-input search-input'
+    input.spellcheck = false
+    const clearButton = document.createElement('div')
+    clearButton.className = 'search-input-clear-button is-hidden'
+    clearButton.setAttribute('aria-label', 'Clear search')
+    container.appendChild(input)
+    container.appendChild(clearButton)
+    this.headerEl.appendChild(container)
+
+    let changeCb: ((v: string) => void) | null = null
+    const syncClearButton = (): void => {
+      clearButton.classList.toggle('is-hidden', input.value.length === 0)
+    }
+    const emit = (): void => { if (changeCb) changeCb(input.value) }
+    input.addEventListener('input', () => { syncClearButton(); emit() })
+    clearButton.addEventListener('click', () => {
+      input.value = ''
+      syncClearButton()
+      input.focus()
+      emit()
+    })
+    const component = {
+      inputEl: input,
+      containerEl: container,
+      clearButtonEl: clearButton,
+      getValue() { return input.value },
+      setValue(value: string) { input.value = value; syncClearButton(); return this },
+      setPlaceholder(p: string) { input.placeholder = p; return this },
+      onChange(cb: (value: string) => void) { changeCb = cb; return this },
+      setDisabled(d: boolean) { input.disabled = d; return this },
+      then(cb: (c: unknown) => void) { cb(this); return this },
+    }
+    callback(component)
+    return this
+  }
+
+  addExtraButton(callback: (component: { extraSettingsEl: HTMLElement; setIcon(icon: string): unknown; setTooltip(tooltip: string): unknown; onClick(cb: () => void): unknown; setDisabled(d: boolean): unknown; then(cb: (c: unknown) => void): unknown }) => void): this {
+    const el = document.createElement('div')
+    el.className = 'setting-extra-button clickable-icon'
+    this.headerEl.appendChild(el)
+    const component = {
+      extraSettingsEl: el,
+      setIcon(_icon: string) { return this },
+      setTooltip(tooltip: string) { el.title = tooltip; return this },
+      onClick(cb: () => void) { el.addEventListener('click', cb); return this },
+      setDisabled(d: boolean) {
+        el.classList.toggle('is-disabled', d)
+        el.style.pointerEvents = d ? 'none' : ''
+        return this
+      },
+      then(cb: (c: unknown) => void) { cb(this); return this },
+    }
+    callback(component)
+    return this
+  }
+}

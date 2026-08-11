@@ -29,6 +29,13 @@ const iconImports = dynamicIconImports as Record<string, (() => Promise<{ __icon
 // undefined = never attempted, null = attempted and no such icon
 const nodeCache = new Map<string, ResolvedIcon | null>()
 
+/** Last-resort node used only if the 'circle-help' dynamic import itself fails to load. */
+const FALLBACK_ICON_NODE: IconNode = [
+  ['circle', { cx: '12', cy: '12', r: '10' }],
+  ['line', { x1: '12', y1: '8', x2: '12', y2: '12' }],
+  ['line', { x1: '12', y1: '16', x2: '12.01', y2: '16' }],
+]
+
 // Obsidian's built-in icon names don't always match Lucide's package names:
 // most "-glyph" names are Obsidian-specific variants of a standard icon whose
 // bare name (glyph suffix stripped) already matches Lucide directly — that
@@ -118,6 +125,7 @@ const EXPLICIT_ALIASES: Record<string, readonly string[]> = {
   'dot-network': ['network', 'share-2'],
   'workspace-glyph': ['layout-grid'],
   'pane-layout': ['layout-panel-left'],
+  'editingToolbar': ['panel-top'],
   'navigate-glyph': ['navigation'],
   'dice-glyph': ['dices'],
   'dice': ['dices'],
@@ -160,6 +168,13 @@ const EXPLICIT_ALIASES: Record<string, readonly string[]> = {
   'crossed-out-eye': ['eye-off'],
   'enter': ['corner-down-left'],
   'two-blank-pages': ['files'],
+  // obsidian-excalidraw-plugin's own icon ids (ribbon icon, script-engine
+  // command, "export as image" action) — not Obsidian built-ins, but the
+  // same "verified to exist in the installed lucide-react package" rule
+  // applies.
+  'excalidraw-icon': ['shapes'],
+  'ScriptEngine': ['square-code'],
+  'export-img': ['image-down'],
 }
 
 // Obsidian's built-in set also includes third-party brand marks (GitHub,
@@ -221,6 +236,49 @@ export function getCachedLucideIconNode(iconId: string): ResolvedIcon | null | u
   return nodeCache.get(iconId)
 }
 
+let builtInIconIdSet: Set<string> | null = null
+function getBuiltInIconIdSet(): Set<string> {
+  builtInIconIdSet ??= new Set(getBuiltInIconIds())
+  return builtInIconIdSet
+}
+
+// Matches bare kebab-case tokens the way Lucide/Obsidian icon ids are shaped
+// ("image-down", "chevron-right"). Capped at 5 hyphenated segments — no real
+// icon id is longer — so it doesn't run away across unrelated minified code.
+const ICON_LITERAL_RE = /["']([a-z][a-z0-9]*(?:-[a-z0-9]+){0,4})["']/g
+
+/**
+ * Warm the icon cache for every valid icon id that appears as a string
+ * literal anywhere in a plugin bundle's source, before the bundle evaluates.
+ *
+ * Real Obsidian's getIcon() is synchronous because the whole Lucide set ships
+ * in its app bundle. Ours resolves per-icon on demand (see file header) —
+ * fine for icons appended straight into a live DOM element, since the async
+ * fill-in shows up whenever it lands. It breaks for a pattern several plugins
+ * use: resolving every icon once into a frozen React/vDOM tree at module load,
+ * e.g. Excalidraw's `ICONS = { Foo: getIconAsJSX('image-down'), ... }` at its
+ * top level. getIcon() hands back an empty shell there, the plugin snapshots
+ * it into React elements before the dynamic import resolves, and the later
+ * DOM mutation lands on a node nothing still points to — that icon stays
+ * blank for the rest of the session, no matter how long it runs.
+ *
+ * Scanning the bundle text for tokens shaped like — and matching — a known
+ * icon id, and resolving those first, gets them into the cache synchronously
+ * before any of the plugin's own top-level code runs. It only costs as many
+ * dynamic imports as the plugin actually references (typically a few dozen),
+ * not the full ~1500-icon set.
+ */
+export async function preloadIconsReferencedIn(bundleSource: string): Promise<void> {
+  const validIds = getBuiltInIconIdSet()
+  const found = new Set<string>()
+  for (const match of bundleSource.matchAll(ICON_LITERAL_RE)) {
+    const token = match[1]
+    if (token && validIds.has(token)) found.add(token)
+  }
+  if (found.size === 0) return
+  await Promise.all([...found].map((id) => resolveLucideIconNode(id)))
+}
+
 /** Load a single Lucide package icon by its exact name, or null if it doesn't exist. */
 async function loadLucideIcon(name: string): Promise<IconNode | null> {
   const loader = iconImports[name]
@@ -261,9 +319,15 @@ export async function resolveLucideIconNode(iconId: string): Promise<ResolvedIco
       `Add a mapping to EXPLICIT_ALIASES in lucide-icons.ts if this is an Obsidian built-in.`,
   )
   const placeholderNode = await loadLucideIcon('circle-help')
-  const placeholder: ResolvedIcon | null = placeholderNode
+  // Obsidian's getIcon() never returns null for an id getIconIds() listed —
+  // plugins (e.g. Iconize's icon-pack scan) rely on that guarantee and crash
+  // dereferencing a null element otherwise. loadLucideIcon('circle-help')
+  // should always succeed, but if the dynamic import itself ever fails, fall
+  // back to a hand-drawn node rather than caching null and breaking that
+  // contract for every caller of this iconId from then on.
+  const placeholder: ResolvedIcon = placeholderNode
     ? { node: placeholderNode, lucideName: 'circle-help' }
-    : null
+    : { node: FALLBACK_ICON_NODE, lucideName: 'circle-help' }
   nodeCache.set(iconId, placeholder)
   return placeholder
 }

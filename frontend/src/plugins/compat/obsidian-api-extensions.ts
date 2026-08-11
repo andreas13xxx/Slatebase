@@ -104,7 +104,12 @@ export function getIcon(iconId: string): SVGSVGElement | null {
     const container = document.createElement('div');
     container.innerHTML = svg;
     const svgEl = container.querySelector('svg');
-    return svgEl ?? null;
+    // A registered custom icon whose content isn't a full <svg>...</svg> string
+    // (e.g. bare path data) has no element to return here. Obsidian guarantees
+    // getIcon() never returns null for an id getIconIds() listed (customIcons
+    // keys are included there) — fall back to the Lucide-resolved icon instead
+    // of breaking that contract.
+    if (svgEl) return svgEl;
   }
   return getLucideIconElement(iconId);
 }

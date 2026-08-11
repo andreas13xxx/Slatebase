@@ -615,7 +615,34 @@ export function registerFallbackShims(): void {
   if (textComponent) set('AbstractTextComponent', textComponent)
   const popoverSuggestFallback = (obs['EditorSuggest'] ?? obs['SuggestModal']) as (new (...args: never[]) => object) | undefined
   if (popoverSuggestFallback) set('PopoverSuggest', popoverSuggestFallback)
-  set('MarkdownPreviewView', obs['MarkdownView'] ?? class MarkdownPreviewView {})
+  // MarkdownPreviewView is mostly an instanceof-only export (see the block
+  // below), but real Obsidian also exposes a static `render()` on it, and at
+  // least one plugin (day-planner's release-notes popup) calls
+  // `MarkdownPreviewView.render(app, markdown, el, sourcePath, component)`
+  // directly rather than `MarkdownRenderer.render()` — without it, that's an
+  // uncaught "render is not a function" the first time the popup opens.
+  // Subclassing (rather than assigning statics onto MarkdownView in place)
+  // keeps the instanceof relationship without mutating the shared MarkdownView
+  // class. The MarkdownRenderer lookup happens at call time, not here, so it
+  // resolves to the real MarkdownRendererShim — registerMarkdownRendererGlobal()
+  // overwrites `obsidian.MarkdownRenderer` with the real implementation right
+  // after this function runs (see plugin-context.ts), by which point any
+  // plugin's actual render() call is long past module init.
+  const MarkdownViewBase = (obs['MarkdownView'] ?? class {}) as new (...args: never[]) => object
+  class MarkdownPreviewViewFallback extends MarkdownViewBase {
+    static async render(app: unknown, markdown: string, el: HTMLElement, sourcePath: string, component: unknown): Promise<void> {
+      const renderer = obs['MarkdownRenderer'] as { render?: (...args: unknown[]) => Promise<void> } | undefined
+      if (renderer?.render) {
+        await renderer.render(app, markdown, el, sourcePath, component)
+      } else {
+        el.textContent = markdown
+      }
+    }
+    static async renderMarkdown(markdown: string, el: HTMLElement, sourcePath: string, component: unknown): Promise<void> {
+      return MarkdownPreviewViewFallback.render(null, markdown, el, sourcePath, component)
+    }
+  }
+  set('MarkdownPreviewView', MarkdownPreviewViewFallback)
   set('MenuItem', class MenuItem {})
   set('MenuSeparator', class MenuSeparator {})
   for (const name of [

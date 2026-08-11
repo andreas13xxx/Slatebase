@@ -6,6 +6,8 @@ import { errorOnce } from './log';
 interface ListenerEntry {
   id: string;
   callback: (...args: unknown[]) => void;
+  /** Optional receiver supplied through Obsidian's `on(event, callback, context)` API. */
+  context: unknown;
   /** The plugin executing when this listener was registered, if any. */
   pluginId: string | null;
 }
@@ -62,9 +64,9 @@ export class EventSystem implements IEventEmitter {
    * Register a callback for the given event.
    * Returns an EventRef that can be used with offref() to deregister.
    */
-  on(event: string, callback: (...args: unknown[]) => void): EventRef {
+  on(event: string, callback: (...args: unknown[]) => void, context?: unknown): EventRef {
     const id = generateId();
-    const entry: ListenerEntry = { id, callback, pluginId: getCurrentPluginId() };
+    const entry: ListenerEntry = { id, callback, context, pluginId: getCurrentPluginId() };
 
     const list = this.listeners.get(event);
     if (list) {
@@ -113,7 +115,7 @@ export class EventSystem implements IEventEmitter {
       if (!this.isRegistered(event, entry.id)) continue;
 
       try {
-        withPluginContext(entry.pluginId, () => entry.callback(...args));
+        withPluginContext(entry.pluginId, () => entry.callback.apply(entry.context, args));
       } catch (err) {
         errorOnce(
           `PluginEventSystem.callbackError::${event}::${entry.pluginId}`,

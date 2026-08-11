@@ -366,6 +366,25 @@ describe('WorkspaceShim', () => {
       });
     });
 
+    describe('getRoot()', () => {
+      // Production wires `app.workspace` back to the same WorkspaceShim instance
+      // (see plugin-context.ts's `sharedApp`); the outer beforeEach's `{}` mock
+      // doesn't, so getRoot() needs a leaf whose app actually has that link.
+      beforeEach(() => {
+        workspace.setViewRegistry(registry, { workspace });
+      });
+
+      it('returns workspace.rootSplit for a main-area leaf', () => {
+        const leaf = workspace.getLeaf(true);
+        expect(leaf.getRoot()).toBe(workspace.rootSplit);
+      });
+
+      it('returns workspace.rightSplit for a sidebar leaf', () => {
+        const leaf = workspace.getRightLeaf();
+        expect(leaf.getRoot()).toBe(workspace.rightSplit);
+      });
+    });
+
     describe('getLeftLeaf()', () => {
       it('should create a leaf with location right-sidebar (Slatebase maps both to right)', () => {
         const leaf = workspace.getLeftLeaf();

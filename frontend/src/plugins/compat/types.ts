@@ -16,7 +16,7 @@ export interface EventRef {
  * Provides synchronous dispatch in registration order with exception isolation.
  */
 export interface IEventEmitter {
-  on(event: string, callback: (...args: unknown[]) => void): EventRef;
+  on(event: string, callback: (...args: unknown[]) => void, context?: unknown): EventRef;
   off(event: string, callback: (...args: unknown[]) => void): void;
   trigger(event: string, ...args: unknown[]): void;
   offref(ref: EventRef): void;
@@ -33,8 +33,8 @@ export interface IWorkspaceShim {
 
   /** Returns the currently active TFile, or null if no file tab is active. */
   getActiveFile(): TFile | null;
-  /** Register an event listener. */
-  on(event: string, callback: (...args: unknown[]) => void): EventRef;
+  /** Register an event listener, optionally binding `this` for the callback. */
+  on(event: string, callback: (...args: unknown[]) => void, context?: unknown): EventRef;
   /** Unregister an event listener. */
   off(event: string, callback: (...args: unknown[]) => void): void;
   /** Emit an event with the given arguments. */
@@ -125,7 +125,7 @@ export interface IVaultShim {
   getRoot(): TFolder;
   getName(): string;
   getConfig(key: string): unknown;
-  on(event: string, callback: (...args: unknown[]) => void): EventRef;
+  on(event: string, callback: (...args: unknown[]) => void, context?: unknown): EventRef;
   off(event: string, callback: (...args: unknown[]) => void): void;
   trigger(event: string, ...args: unknown[]): void;
 }
@@ -304,7 +304,7 @@ export interface IMetadataCacheShim {
   getFirstLinkpathDest(linkpath: string, sourcePath: string): TFile | null;
   resolvedLinks: Record<string, Record<string, number>>;
   unresolvedLinks: Record<string, Record<string, number>>;
-  on(event: string, callback: (...args: unknown[]) => void): EventRef;
+  on(event: string, callback: (...args: unknown[]) => void, context?: unknown): EventRef;
   off(event: string, callback: (...args: unknown[]) => void): void;
   trigger(event: string, ...args: unknown[]): void;
 }

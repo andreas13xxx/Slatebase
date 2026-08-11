@@ -256,7 +256,11 @@ export class InstalledPluginStore implements IInstalledPluginStore {
   /**
    * Writes content to a file atomically using temp file + rename.
    * Uses a random suffix for the temp file to avoid collisions.
-   * Retries on EPERM/EACCES errors (common on Windows due to file locking).
+   * Retries on EPERM/EACCES errors (common on Windows due to file locking,
+   * e.g. OneDrive sync or antivirus briefly holding the target open). If
+   * renaming still fails after retries, unlinking the target and retrying
+   * once more, then falling back to a direct write, so a lingering lock
+   * never surfaces as a lost write or a spurious error to the caller.
    */
   private async atomicWrite(filePath: string, content: string): Promise<void> {
     const tempPath = `${filePath}.${crypto.randomBytes(8).toString('hex')}.tmp`
@@ -283,6 +287,26 @@ export class InstalledPluginStore implements IInstalledPluginStore {
           // Ignore cleanup errors
         }
         throw renameError
+      }
+    }
+
+    // Retries exhausted but the lock may still be transient — unlink the
+    // target and retry once, then fall back to a direct write as a last
+    // resort so the operation never silently loses data.
+    const code = isNodeError(lastError) ? lastError.code : ''
+    if (code === 'EPERM' || code === 'EACCES') {
+      try {
+        await fs.unlink(filePath)
+        await fs.rename(tempPath, filePath)
+        return
+      } catch {
+        try {
+          await fs.writeFile(filePath, content, 'utf-8')
+          await fs.unlink(tempPath)
+          return
+        } catch (fallbackError) {
+          lastError = fallbackError
+        }
       }
     }
 

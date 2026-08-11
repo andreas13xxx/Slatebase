@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import dynamicIconImports from 'lucide-react/dynamicIconImports'
-import { getBuiltInIconIds, resolveLucideIconNode } from './lucide-icons'
+import { getBuiltInIconIds, getCachedLucideIconNode, preloadIconsReferencedIn, resolveLucideIconNode } from './lucide-icons'
 
 const lucideNames = new Set(Object.keys(dynamicIconImports as Record<string, unknown>))
 
@@ -19,7 +19,7 @@ const OBSIDIAN_BUILT_INS = [
   'calendar-with-checkmark', 'check-in-circle', 'check-small', 'checkmark',
   'create-new', 'cross', 'cross-in-box', 'crossed-out-eye', 'crossed-star',
   'dice', 'document', 'documents', 'dot-network', 'enter', 'exit-fullscreen',
-  'expand-vertically', 'filled-pin', 'forward-arrow', 'gear', 'go-to-file',
+  'editingToolbar', 'expand-vertically', 'filled-pin', 'forward-arrow', 'gear', 'go-to-file',
   'hashtag', 'help', 'horizontal-split', 'image-file', 'install',
   'left-arrow', 'lines-of-text', 'magnifying-glass', 'microphone',
   'minus-with-circle', 'open-vault', 'pane-layout', 'paper-plane', 'paused',
@@ -57,5 +57,22 @@ describe('lucide-icons', () => {
   it('falls back to the placeholder glyph for a name that is not an icon at all', async () => {
     const icon = await resolveLucideIconNode('definitely-not-an-icon')
     expect(icon?.lucideName).toBe('circle-help')
+  })
+
+  describe('preloadIconsReferencedIn', () => {
+    it('warms the cache for icon ids that appear as string literals in a bundle', async () => {
+      // A never-before-requested icon name (unlikely to have been resolved by
+      // an earlier test in this file), embedded the way a minified plugin
+      // bundle would reference it: as an argument to some wrapper call.
+      const bundle = `getIconAsJSX("axe"), someOtherCall("not-an-icon-id")`
+      expect(getCachedLucideIconNode('axe')).toBeUndefined()
+      await preloadIconsReferencedIn(bundle)
+      expect(getCachedLucideIconNode('axe')).not.toBeNull()
+      expect(getCachedLucideIconNode('axe')?.lucideName).toBe('axe')
+    })
+
+    it('is a no-op when the bundle references no known icon ids', async () => {
+      await expect(preloadIconsReferencedIn('const x = "totally-unrelated-string";')).resolves.toBeUndefined()
+    })
   })
 })

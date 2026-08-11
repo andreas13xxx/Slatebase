@@ -227,6 +227,87 @@ function findParentNode(tree: DirectoryTree, targetPath: string): TFolder | null
   return null;
 }
 
+// ─── Local Tree Mutation Helpers ──────────────────────────────────────────────
+//
+// create()/delete()/rename()/createFolder() call the backend and then want the
+// local `directoryTree` snapshot to reflect the change immediately, rather than
+// waiting for the next `updateTree()` call (which only arrives after a realtime
+// sync round-trip). That gap is what let plugins like Templater — which create a
+// file and then synchronously look it up via getAbstractFileByPath()/exists()/
+// getFileByPath() (all synchronous, cache-only APIs — they can't await a network
+// call the way read()/delete()/rename() do) — see a stale, wrong answer.
+//
+// These helpers return a *new* tree (structural sharing elsewhere) rather than
+// mutating in place, since `directoryTree` may be the same object a pending
+// `updateTree()` snapshot was derived from.
+
+/**
+ * Returns a tree with `child` inserted (or replaced, matched by path) under the
+ * directory at `parentPath`, creating any missing intermediate directories.
+ */
+function withNodeInserted(tree: DirectoryTree, parentPath: string, child: DirectoryTree): DirectoryTree {
+  if (tree.path === parentPath) {
+    const children = (tree.children ?? []).filter((c) => c.path !== child.path);
+    children.push(child);
+    return { ...tree, type: 'directory', children };
+  }
+
+  const rest = tree.path ? parentPath.slice(tree.path.length + 1) : parentPath;
+  const nextSlash = rest.indexOf('/');
+  const segmentName = nextSlash === -1 ? rest : rest.slice(0, nextSlash);
+  const segmentPath = tree.path ? `${tree.path}/${segmentName}` : segmentName;
+
+  const existingChildren = tree.children ?? [];
+  const existingIdx = existingChildren.findIndex((c) => c.path === segmentPath);
+  const segmentDir: DirectoryTree =
+    existingIdx !== -1 && existingChildren[existingIdx].type === 'directory'
+      ? existingChildren[existingIdx]
+      : { name: segmentName, type: 'directory', path: segmentPath, children: [] };
+
+  const updatedSegmentDir = withNodeInserted(segmentDir, parentPath, child);
+
+  const children = [...existingChildren];
+  if (existingIdx !== -1) {
+    children[existingIdx] = updatedSegmentDir;
+  } else {
+    children.push(updatedSegmentDir);
+  }
+  return { ...tree, children };
+}
+
+/**
+ * Returns a tree with the node at `path` removed, wherever it is.
+ */
+function withNodeRemoved(tree: DirectoryTree, path: string): DirectoryTree {
+  if (!tree.children) return tree;
+  let changed = false;
+  const children: DirectoryTree[] = [];
+  for (const child of tree.children) {
+    if (child.path === path) {
+      changed = true;
+      continue;
+    }
+    const updatedChild = withNodeRemoved(child, path);
+    if (updatedChild !== child) changed = true;
+    children.push(updatedChild);
+  }
+  return changed ? { ...tree, children } : tree;
+}
+
+/**
+ * Returns a copy of `node` with its path (and, for directories, every
+ * descendant's path) rewritten from the `oldPrefix` to `newPrefix`.
+ */
+function withPathPrefixReplaced(node: DirectoryTree, oldPrefix: string, newPrefix: string): DirectoryTree {
+  const newPath = newPrefix + node.path.slice(oldPrefix.length);
+  const name = newPath.includes('/') ? newPath.slice(newPath.lastIndexOf('/') + 1) : newPath;
+  const updated: DirectoryTree = { ...node, path: newPath, name };
+  if (node.children) {
+    updated.children = node.children.map((c) => withPathPrefixReplaced(c, oldPrefix, newPrefix));
+  }
+  return updated;
+}
+
 /**
  * VaultShim implementation.
  *
@@ -271,23 +352,33 @@ export class VaultShim implements IVaultShim {
 
   /**
    * Read the text content of a file.
-   * @throws Error if the file does not exist in the tree or the API call fails.
+   * Does not gate on the local directory tree cache — see delete() below for why
+   * (a file created via create() moments earlier, e.g. Templater reading back a
+   * note it just created, won't be in the tree yet). The backend call is the
+   * authoritative existence check.
+   * @throws Error if the file does not exist or the API call fails.
    */
   async read(file: TFile): Promise<string> {
     validatePath(file.path);
 
-    const node = findNodeByPath(this.directoryTree, file.path);
-    if (!node || node.type !== 'file') {
-      throw new Error(`File not found: "${file.path}"`);
-    }
-
     try {
       const result = await this.apiClient.fetchFileContent(this.vaultId, file.path);
+      // Real Obsidian's Vault.read() always normalizes CRLF to LF — plugins get
+      // consistent `\n`-only content regardless of how the file was saved.
+      // This must match what MetadataCacheShim's parser normalizes internally
+      // (see metadata-parser.ts): getFileCache() positions are computed against
+      // LF-only offsets, and a CRLF file (e.g. saved from Windows) returned here
+      // unnormalized would be longer than that by one byte per line break —
+      // every position after the first line would point at the wrong character,
+      // silently corrupting anything a plugin slices out by cached position
+      // (e.g. obsidian-day-planner's list-item parser, which then fails to
+      // match its own line-format regex on the shifted substring).
+      const content = result.content.replace(/\r\n/g, '\n');
       // Notify MetadataCache so it can parse frontmatter/tags on demand
       if (this.onFileRead) {
-        this.onFileRead(file.path, result.content);
+        this.onFileRead(file.path, content);
       }
-      return result.content;
+      return content;
     } catch (err: unknown) {
       const appErr = err as { code?: string; message?: string };
       throw new Error(
@@ -352,13 +443,21 @@ export class VaultShim implements IVaultShim {
       await this.apiClient.saveFile(this.vaultId, path, content ?? '');
 
       const name = path.includes('/') ? path.slice(path.lastIndexOf('/') + 1) : path;
+      const parentPath = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+      const newNode: DirectoryTree = { name, type: 'file', path, size: (content ?? '').length };
+
+      // Splice the new file into the local tree immediately so synchronous,
+      // cache-only lookups (getAbstractFileByPath, exists, getFileByPath,
+      // getAvailablePath) see it right away — they can't await the realtime
+      // sync round-trip the way read()/delete()/rename() await the backend.
+      this.directoryTree = withNodeInserted(this.directoryTree, parentPath, newNode);
       const parent = findParentNode(this.directoryTree, path);
 
       // Build via treeNodeToTFile so the result gets the same instanceof-TFile
       // prototype patch and vault reference as files loaded from the tree —
       // plugins (e.g. LiveSync's sync watcher) do `instanceof TFile` checks
       // on the objects passed to 'create' event listeners.
-      const tFile = treeNodeToTFile({ name, type: 'file', path, size: (content ?? '').length }, parent);
+      const tFile = treeNodeToTFile(newNode, parent);
 
       markPluginWrite(path);
       this.events.trigger('create', tFile);
@@ -412,11 +511,17 @@ export class VaultShim implements IVaultShim {
       await this.apiClient.deleteContent(this.vaultId, placeholderPath);
 
       const name = path.includes('/') ? path.slice(path.lastIndexOf('/') + 1) : path;
+      const parentPath = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+      const newNode: DirectoryTree = { name, type: 'directory', path, children: [] };
+
+      // See create() above — splice into the local tree immediately for
+      // synchronous cache-only lookups.
+      this.directoryTree = withNodeInserted(this.directoryTree, parentPath, newNode);
       const parent = findParentNode(this.directoryTree, path);
 
       // Build via treeNodeToTFolder for the same instanceof-TFolder prototype
       // patch and vault reference applied to folders loaded from the tree.
-      const tFolder = treeNodeToTFolder({ name, type: 'directory', path, children: [] }, parent);
+      const tFolder = treeNodeToTFolder(newNode, parent);
 
       markPluginWrite(path);
       this.events.trigger('create', tFolder);
@@ -445,20 +550,27 @@ export class VaultShim implements IVaultShim {
    * Obsidian signature: vault.rename(file, newPath)
    * Uses the backend moveContent API (source → destination).
    * Emits 'rename' event with (file, oldPath) on success.
+   * Does not gate on the local directory tree cache — see delete() above for why.
    * @throws Error if the file does not exist or the API call fails.
    */
   async rename(file: TAbstractFile, newPath: string): Promise<void> {
     validatePath(file.path);
     validatePath(newPath);
 
-    const node = findNodeByPath(this.directoryTree, file.path);
-    if (!node) {
-      throw new Error(`File not found: "${file.path}"`);
-    }
-
     try {
       await this.apiClient.moveContent(this.vaultId, file.path, newPath);
       const oldPath = file.path;
+
+      // Move the node (and, for directories, its whole subtree) in the local
+      // tree immediately — see create() above for why. If the node isn't in
+      // the tree yet (e.g. renaming a file moments after creating it) there's
+      // nothing to move locally; the next sync will bring it in already renamed.
+      const existingNode = findNodeByPath(this.directoryTree, oldPath);
+      if (existingNode) {
+        const renamedNode = withPathPrefixReplaced(existingNode, oldPath, newPath);
+        const newParentPath = newPath.includes('/') ? newPath.slice(0, newPath.lastIndexOf('/')) : '';
+        this.directoryTree = withNodeInserted(withNodeRemoved(this.directoryTree, oldPath), newParentPath, renamedNode);
+      }
 
       // Update the file object's path (Obsidian mutates the TFile in place)
       (file as { path: string }).path = newPath;
@@ -504,18 +616,21 @@ export class VaultShim implements IVaultShim {
 
   /**
    * Delete a file or folder.
-   * @throws Error if the file does not exist in the tree or the API call fails.
+   * Does not gate on the local directory tree cache: a file created via create()
+   * moments earlier (e.g. Templater's create-then-delete-placeholder flow) won't
+   * be in the tree yet, since it's only refreshed by a subsequent realtime sync
+   * round-trip. The backend call below is the authoritative existence check.
+   * @throws Error if the file does not exist or the API call fails.
    */
   async delete(file: TAbstractFile): Promise<void> {
     validatePath(file.path);
 
-    const node = findNodeByPath(this.directoryTree, file.path);
-    if (!node) {
-      throw new Error(`File not found: "${file.path}"`);
-    }
-
     try {
       await this.apiClient.deleteContent(this.vaultId, file.path);
+
+      // Prune the node from the local tree immediately — see create() above.
+      this.directoryTree = withNodeRemoved(this.directoryTree, file.path);
+
       markPluginWrite(file.path);
       this.events.trigger('delete', file);
 
@@ -644,8 +759,8 @@ export class VaultShim implements IVaultShim {
   /**
    * Register an event listener.
    */
-  on(event: string, callback: (...args: unknown[]) => void): EventRef {
-    return this.events.on(event, callback);
+  on(event: string, callback: (...args: unknown[]) => void, context?: unknown): EventRef {
+    return this.events.on(event, callback, context);
   }
 
   /**
@@ -924,8 +1039,14 @@ export class VaultShim implements IVaultShim {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
+      const parentPath = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+      const newNode: DirectoryTree = { name, type: 'file', path, size: data.byteLength };
+
+      // See create() above — splice into the local tree immediately for
+      // synchronous cache-only lookups.
+      this.directoryTree = withNodeInserted(this.directoryTree, parentPath, newNode);
       const parent = findParentNode(this.directoryTree, path);
-      const tFile = treeNodeToTFile({ name, type: 'file', path, size: data.byteLength }, parent);
+      const tFile = treeNodeToTFile(newNode, parent);
 
       markPluginWrite(path);
       this.events.trigger('create', tFile);

@@ -468,7 +468,10 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     try {
       const styles = await pluginService.loadStyles(vaultId, pluginId)
       if (styles === null) {
-        return c.json(createApiError('PLUGIN_NOT_FOUND', `Plugin "${pluginId}" styles not found`), 404)
+        // styles.css is optional for Obsidian plugins. Returning a successful
+        // empty response prevents browsers from logging a misleading XHR error
+        // when an otherwise valid plugin does not ship its own stylesheet.
+        return c.body(null, 204)
       }
 
       return new Response(styles, {

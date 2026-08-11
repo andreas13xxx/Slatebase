@@ -316,6 +316,20 @@ describe('CompatibilityAnalyzer', () => {
       expect(call?.classification).toBe('supported');
     });
 
+    it('classifies workspace.ensureSideLeaf as supported (graceful degradation, logged to console)', () => {
+      const source = `this.app.workspace.ensureSideLeaf('my-view', 'left')`;
+      const report = analyzer.analyze(source);
+      const call = report.apiCalls.find(c => c.method === 'workspace.ensureSideLeaf');
+      expect(call?.classification).toBe('supported');
+    });
+
+    it('classifies workspace.splitActiveLeaf as supported (graceful degradation, logged to console)', () => {
+      const source = `this.app.workspace.splitActiveLeaf()`;
+      const report = analyzer.analyze(source);
+      const call = report.apiCalls.find(c => c.method === 'workspace.splitActiveLeaf');
+      expect(call?.classification).toBe('supported');
+    });
+
     it('classifies unknown methods as unsupported', () => {
       const source = `this.app.workspace.someUnknownMethod()`;
       const report = analyzer.analyze(source);

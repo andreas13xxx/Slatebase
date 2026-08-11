@@ -195,8 +195,8 @@ export class MetadataCacheShim implements IMetadataCacheShim {
   // ─── Event methods ─────────────────────────────────────────────────────────
 
   /** Register an event listener. */
-  on(event: string, callback: (...args: unknown[]) => void): EventRef {
-    return this.events.on(event, callback);
+  on(event: string, callback: (...args: unknown[]) => void, context?: unknown): EventRef {
+    return this.events.on(event, callback, context);
   }
 
   /**

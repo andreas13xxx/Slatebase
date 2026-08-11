@@ -33,21 +33,31 @@ export async function writeJsonFileAtomic(filePath: string, value: unknown): Pro
   const tempPath = `${filePath}.${randomBytes(8).toString('hex')}.tmp`
   await writeFile(tempPath, content, 'utf-8')
 
+  let renamed = false
   try {
-    await rename(tempPath, filePath)
-  } catch (err: unknown) {
-    const code = isNodeError(err) ? err.code : undefined
-    if (code === 'EPERM' || code === 'EACCES') {
+    try {
+      await rename(tempPath, filePath)
+      renamed = true
+    } catch (err: unknown) {
+      const code = isNodeError(err) ? err.code : undefined
+      if (code !== 'EPERM' && code !== 'EACCES') throw err
       try { await unlink(filePath) } catch { /* may not exist */ }
       try {
         await rename(tempPath, filePath)
+        renamed = true
       } catch {
+        // Last resort. This can throw too if the lock outlives every attempt —
+        // the `finally` below still removes the temp file in that case.
         await writeFile(filePath, content, 'utf-8')
-        try { await unlink(tempPath) } catch { /* cleanup */ }
       }
-    } else {
-      try { await unlink(tempPath) } catch { /* ignore */ }
-      throw err
+    }
+  } finally {
+    // Only a successful rename consumes the temp file. Every other path leaves
+    // it behind, including the direct-write fallback throwing — which is how a
+    // sustained lock (OneDrive, antivirus) used to orphan one temp copy of the
+    // full payload per write attempt.
+    if (!renamed) {
+      try { await unlink(tempPath) } catch { /* already gone */ }
     }
   }
 }

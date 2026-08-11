@@ -174,6 +174,25 @@ describe('installObsidianGlobals', () => {
 
       expect(new PluginClass({}, manifest).manifest).toBe(manifest)
     })
+
+    it('preserves plugin loadData overrides while super loads persisted data', async () => {
+      const PluginClass = (window.obsidian as Record<string, unknown>)['Plugin'] as
+        new (app: unknown, manifest: unknown) => { __slatebaseLoadData?: () => Promise<unknown> }
+
+      class PluginWithDefaults extends PluginClass {
+        data: unknown
+
+        async loadData(): Promise<void> {
+          this.data = await super.loadData()
+        }
+      }
+
+      const plugin = new PluginWithDefaults({}, {})
+      plugin.__slatebaseLoadData = async () => ({ recentFiles: [] })
+      await plugin.loadData()
+
+      expect(plugin.data).toEqual({ recentFiles: [] })
+    })
   })
 
   describe('idempotency', () => {

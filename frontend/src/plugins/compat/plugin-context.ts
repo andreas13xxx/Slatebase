@@ -25,7 +25,7 @@ import {
 import React from 'react'
 import type { IApiClient } from '../../api'
 import type { DirectoryTree } from '../../types'
-import type { PluginManifestData, PluginRegistryEntry } from './types'
+import type { PluginInstance, PluginManifestData, PluginRegistryEntry } from './types'
 import { PluginLoader } from './plugin-loader'
 import type { PluginLoaderStatus } from './plugin-loader'
 import { PluginRegistry } from './plugin-registry'
@@ -173,7 +173,12 @@ function createRegistryApiAdapter(apiClient: IApiClient): IRegistryApiClient {
       try {
         const data = await apiClient.loadRegistry(vaultId)
         return data as unknown as PluginRegistryData
-      } catch {
+      } catch (err) {
+        // A missing registry (fresh vault) resolves normally from the backend —
+        // anything that lands here is a real failure (network, 401, 500) and
+        // would otherwise vanish silently, since PluginRegistry.loadFromBackend()
+        // only sees the `null` this returns, never the original exception.
+        console.error(`[PluginProvider] Failed to load plugin registry for vault "${vaultId}":`, err)
         return null
       }
     },
@@ -193,13 +198,40 @@ function createSettingsApiAdapter(apiClient: IApiClient): ISettingsApiClient {
         const data = await apiClient.loadSettings(vaultId, pluginId)
         if (data === null || data === undefined) return null
         return typeof data === 'string' ? data : JSON.stringify(data)
-      } catch {
+      } catch (err) {
+        // apiClient.loadSettings already resolves to null for "no settings yet"
+        // (404) — anything that throws here is a real failure. Logging it is
+        // what SettingsManager.loadData()'s own catch (R9.4) is meant to do,
+        // but it never sees this exception since it's swallowed to null first.
+        console.error(`[PluginProvider] Failed to load settings for plugin "${pluginId}" in vault "${vaultId}":`, err)
         return null
       }
     },
     saveSettings: async (vaultId: string, pluginId: string, data: string): Promise<void> => {
       await apiClient.saveSettings(vaultId, pluginId, JSON.parse(data))
     },
+  }
+}
+
+/**
+ * Safely call a plugin view's `getDisplayText()`/`getIcon()` override.
+ *
+ * These run from the view-activation callbacks below, outside setViewState()'s
+ * own try/catch around onOpen()/onClose()/onload()/onunload() — so a buggy
+ * override (e.g. one that assumes a real Obsidian workspace layout Slatebase
+ * doesn't fully emulate, like day-planner's release-notes view did) would
+ * otherwise throw uncaught inside a React state updater. PluginProvider sits
+ * above every other provider in the tree with no error boundary of its own,
+ * so an uncaught throw here doesn't just break one view — it blanks the
+ * entire app. Every call into plugin-authored code from this file must be
+ * guarded like this.
+ */
+function safeViewCall<T>(viewType: string, method: string, fallback: T, fn: () => T): T {
+  try {
+    return fn()
+  } catch (err) {
+    console.error(`[PluginProvider] Plugin view "${viewType}" threw in ${method}():`, err)
+    return fallback
   }
 }
 
@@ -453,7 +485,7 @@ export function PluginProvider({
           const next = new Map(prev)
           next.set(viewType, {
             viewType,
-            displayText: view.getDisplayText(),
+            displayText: safeViewCall(viewType, 'getDisplayText', 'Plugin View', () => view.getDisplayText()),
             containerEl: view.containerEl,
           })
           return next
@@ -461,7 +493,8 @@ export function PluginProvider({
       }
       if (newVaultId && !isFileBackedView) {
         setTimeout(() => {
-          dispatchOpenPluginViewTab(newVaultId, viewType, view.getDisplayText(), '')
+          const displayText = safeViewCall(viewType, 'getDisplayText', 'Plugin View', () => view.getDisplayText())
+          dispatchOpenPluginViewTab(newVaultId, viewType, displayText, '')
         }, 0)
       }
     })
@@ -477,8 +510,8 @@ export function PluginProvider({
         const next = new Map(prev)
         next.set(viewType, {
           viewType,
-          displayText: view.getDisplayText(),
-          icon: view.getIcon(),
+          displayText: safeViewCall(viewType, 'getDisplayText', 'Plugin View', () => view.getDisplayText()),
+          icon: safeViewCall(viewType, 'getIcon', 'file', () => view.getIcon()),
           containerEl: view.containerEl,
           leaf,
         })
@@ -651,10 +684,16 @@ export function PluginProvider({
         setPlugins(newRegistry.listPlugins())
       },
       onPluginInstantiated: (pluginId: string, instance) => {
-        // Wire loadData/saveData to the SettingsManager for persistent plugin config.
-        // Without this, plugins (esp. LiveSync) get null from loadData() and cannot initialize.
-        instance.loadData = () => newSettingsManager.loadData(pluginId)
-        instance.saveData = (data: unknown) => newSettingsManager.saveData(pluginId, data)
+        // Supply persistent storage through the Plugin base class. Do not replace
+        // loadData/saveData on the instance: many community plugins override
+        // them to merge defaults, then delegate with super.loadData(). Replacing
+        // the methods prevents that initialization (e.g. Recent Files).
+        const persistenceBridge = instance as PluginInstance & {
+          __slatebaseLoadData?: () => Promise<unknown>
+          __slatebaseSaveData?: (data: unknown) => Promise<void>
+        }
+        persistenceBridge.__slatebaseLoadData = () => newSettingsManager.loadData(pluginId)
+        persistenceBridge.__slatebaseSaveData = (data: unknown) => newSettingsManager.saveData(pluginId, data)
 
         // Ensure scope exists — a real Scope so `app.keymap.pushScope(this.scope)` in
         // a plugin's onload() actually participates in hotkey dispatch, not just a

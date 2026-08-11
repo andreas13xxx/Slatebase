@@ -67,6 +67,7 @@ import './global-extensions'
 import {
   PluginSettingTab,
   Setting,
+  SettingGroup,
   BaseComponent,
   ValueComponent,
   AbstractTextComponent,
@@ -263,6 +264,32 @@ function fuzzyMatchText(query: string, text: string): { score: number; matches: 
 
   if (queryIdx < query.length) return null
   return { score, matches }
+}
+
+/**
+ * Wraps a base class so plugins can extend it whether their bundle uses native
+ * ES6 `class ... extends` or the ES5-downlevel output TypeScript/tslib produced
+ * for older targets (common in Obsidian community plugins compiled a few years
+ * ago). The downlevel pattern invokes the parent constructor as
+ * `_super.call(this, ...)` / `_super.apply(this, arguments)` instead of `new` —
+ * which throws ("class constructor cannot be invoked without 'new'") on a
+ * native `class`. `new.target` distinguishes the two call shapes: a real `new`/
+ * `super()` call delegates straight to `RealClass` via `Reflect.construct`
+ * (unchanged behavior); a bare `.call()`/`.apply()` instead builds a real
+ * instance and copies its fields onto the `this` the child constructor already
+ * created, matching what the ES5 pattern expects from its "parent constructor".
+ */
+function makeExtendable<T extends new (...args: never[]) => unknown>(RealClass: T): T {
+  function Wrapper(this: unknown, ...args: unknown[]): unknown {
+    if (new.target) {
+      return Reflect.construct(RealClass, args, new.target)
+    }
+    const instance = Reflect.construct(RealClass, args)
+    return Object.assign(this as object, instance)
+  }
+  Wrapper.prototype = RealClass.prototype
+  Object.setPrototypeOf(Wrapper, RealClass)
+  return Wrapper as unknown as T
 }
 
 /** Guard so repeated calls from multiple entry points are harmless. */
@@ -585,7 +612,14 @@ export function installObsidianGlobals(): void {
       if (svg) {
         const container = document.createElement('div')
         container.innerHTML = svg
-        return container.querySelector('svg') ?? null
+        const svgEl = container.querySelector('svg')
+        // A registered custom icon whose content isn't a full <svg>...</svg>
+        // string (e.g. bare path data) has no element to return here. Obsidian
+        // guarantees getIcon() never returns null for an id getIconIds() listed
+        // (customIconsRef keys are included there), and plugins like Iconize's
+        // icon-pack scan rely on that — fall back to the Lucide-resolved icon
+        // instead of breaking that contract.
+        if (svgEl) return svgEl
       }
       return getLucideIconElement(iconId)
     }
@@ -821,6 +855,14 @@ export function installObsidianGlobals(): void {
         getPluginById: (id: string) => {
           const plugins = ((window as unknown as { app: { internalPlugins: { plugins: Record<string, unknown> } } }).app.internalPlugins.plugins)
           return plugins[id] ?? { enabled: false, instance: { options: {} } }
+        },
+        // Real Obsidian returns the plugin's instance directly when enabled,
+        // or null otherwise — unlike getPluginById, which always returns the
+        // `{ enabled, instance }` wrapper regardless of enabled state.
+        getEnabledPluginById: (id: string) => {
+          const plugins = ((window as unknown as { app: { internalPlugins: { plugins: Record<string, { enabled: boolean; instance: unknown }> } } }).app.internalPlugins.plugins)
+          const p = plugins[id]
+          return p?.enabled ? p.instance : null
         },
       },
       plugins: {
@@ -1181,9 +1223,16 @@ export function installObsidianGlobals(): void {
   // one lifecycle implementation to fix or extend going forward.
   if (!window.obsidian.Plugin) {
     const ComponentClass = window.obsidian.Component as { new (): { load(): void; unload(): void; onload(): void; onunload(): void; addChild<T>(c: T): T; removeChild<T>(c: T): T; register(cb: unknown): void; registerEvent(ref: unknown): void; registerInterval(id: number): number; registerDomEvent(el: EventTarget, event: string, handler: EventListenerOrEventListenerObject): void } }
-    window.obsidian.Plugin = class Plugin extends ComponentClass {
+    window.obsidian.Plugin = makeExtendable(class Plugin extends ComponentClass {
       app: unknown
       manifest: unknown
+      /**
+       * Persistence callbacks supplied by PluginProvider. These deliberately
+       * live separately from loadData/saveData: community plugins often
+       * override those methods and call super to merge their defaults.
+       */
+      __slatebaseLoadData?: () => Promise<unknown>
+      __slatebaseSaveData?: (data: unknown) => Promise<void>
       /** Scope — Obsidian's keymap manager for plugin hotkeys */
       scope = {
         keys: function(..._args: unknown[]) { return { scope: this } },
@@ -1200,9 +1249,13 @@ export function installObsidianGlobals(): void {
         this.app = app
         this.manifest = manifest ?? {}
       }
-      async loadData(): Promise<unknown> { return null }
+      async loadData(): Promise<unknown> {
+        return this.__slatebaseLoadData ? this.__slatebaseLoadData() : null
+      }
 
-      async saveData(_data: unknown): Promise<void> {}
+      async saveData(data: unknown): Promise<void> {
+        await this.__slatebaseSaveData?.(data)
+      }
 
       addCommand(_cmd: unknown): void {}
 
@@ -1271,14 +1324,14 @@ export function installObsidianGlobals(): void {
         const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
         warnNoOp(pluginId, 'registerCliHandler', `Slatebase has no CLI, so "${command}" is unreachable.`)
       }
-    } as unknown as Record<string, unknown>
+    }) as unknown as Record<string, unknown>
   }
 
-  window.obsidian.PluginSettingTab = PluginSettingTab
+  window.obsidian.PluginSettingTab = makeExtendable(PluginSettingTab)
   window.obsidian.Setting = Setting
   // SettingTab — base class (PluginSettingTab extends it in Obsidian)
   if (!window.obsidian.SettingTab) {
-    window.obsidian.SettingTab = PluginSettingTab
+    window.obsidian.SettingTab = window.obsidian.PluginSettingTab
   }
 
   // BaseComponent — abstract base for all setting UI components.
@@ -1306,6 +1359,16 @@ export function installObsidianGlobals(): void {
   window.obsidian.DropdownComponent = DropdownComponent
   window.obsidian.ButtonComponent = ButtonComponent
   window.obsidian.SliderComponent = SliderComponent
+
+  // SettingGroup (Obsidian 1.11+) — groups Setting rows under a shared heading;
+  // the declarative settings API also hands one to a definition's `render`
+  // callback as its second argument. Wrapped like PluginSettingTab/ItemView
+  // above: plugins subclass it directly for custom grouped settings UI, and
+  // some bundles use the ES5-downlevel `_super.call()` pattern rather than
+  // native `class extends`.
+  if (!window.obsidian.SettingGroup) {
+    window.obsidian.SettingGroup = makeExtendable(SettingGroup)
+  }
 
   // FileSystemAdapter — exists for `instanceof` checks, not for use.
   // LiveSync uses `vault.adapter instanceof FileSystemAdapter` to detect desktop.
@@ -1486,7 +1549,7 @@ export function installObsidianGlobals(): void {
 
   // ItemView — base class for custom plugin views (Calendar, Kanban, etc.)
   if (!window.obsidian.ItemView) {
-    window.obsidian.ItemView = class ItemView extends ViewClass {
+    window.obsidian.ItemView = makeExtendable(class ItemView extends ViewClass {
       containerEl: HTMLElement
       contentEl: HTMLElement
       app: unknown
@@ -1497,8 +1560,19 @@ export function installObsidianGlobals(): void {
         this.app = leaf && typeof leaf === 'object' && 'app' in leaf ? (leaf as { app: unknown }).app : null
         this.containerEl = document.createElement('div')
         this.containerEl.className = 'plugin-view-container'
+        // Real Obsidian's ItemView.containerEl always has two children: a
+        // header (children[0], holding the title/action icons) and the
+        // content pane (children[1] === contentEl). Some plugins read
+        // `this.containerEl.children[1]` directly in onOpen() instead of
+        // going through `contentEl` (obsidian-day-planner's Timeline/
+        // TimeTracker views do, asserting it's non-null) — with contentEl as
+        // the only child, that was children[0] and children[1] was
+        // undefined, throwing before the view could render.
+        const headerEl = document.createElement('div')
+        headerEl.className = 'view-header'
+        this.containerEl.appendChild(headerEl)
         this.contentEl = document.createElement('div')
-        this.contentEl.className = 'plugin-view-content'
+        this.contentEl.className = 'plugin-view-content view-content'
         this.containerEl.appendChild(this.contentEl)
       }
       getViewType(): string { return '' }
@@ -1510,12 +1584,16 @@ export function installObsidianGlobals(): void {
       // load/unload/onload/onunload are inherited from Component via View — see above.
       /** Add a clickable action icon to the view header. */
       addAction(icon: string, title: string, callback: () => void): HTMLElement {
-        // Create or find the header actions container
+        // Create or find the header actions container — lives inside the
+        // header (children[0]), matching real Obsidian's `.view-header >
+        // .view-actions`, not as a sibling inserted before contentEl (which
+        // would silently break the children[1]-is-contentEl contract above).
         let actionsEl = this.containerEl.querySelector('.view-actions') as HTMLElement | null
         if (!actionsEl) {
           actionsEl = document.createElement('div')
           actionsEl.className = 'view-actions'
-          this.containerEl.insertBefore(actionsEl, this.contentEl)
+          const headerEl = this.containerEl.querySelector('.view-header') ?? this.containerEl
+          headerEl.appendChild(actionsEl)
         }
 
         const button = document.createElement('button')
@@ -1536,7 +1614,7 @@ export function installObsidianGlobals(): void {
 
         return button
       }
-    } as unknown as Record<string, unknown>
+    }) as unknown as Record<string, unknown>
   }
 
   // WorkspaceLeaf stub — just enough for plugins to instantiate views with `new MyView(leaf)`
@@ -1612,7 +1690,10 @@ export function installObsidianGlobals(): void {
           const vault = (this.app as { vault?: { read: (f: unknown) => Promise<string> } })?.vault
           if (vault) this.data = await vault.read(file)
           else this.data = ''
-        } catch { this.data = '' }
+        } catch (err) {
+          console.error(`[TextFileView] Failed to load file "${(file as { path?: string })?.path ?? '?'}":`, err)
+          this.data = ''
+        }
         await this.onLoadFile(file)
       }
       async onLoadFile(_file: unknown): Promise<void> { this.setViewData(this.data, true) }
@@ -1708,6 +1789,18 @@ export function installObsidianGlobals(): void {
       clear(): void { /* no-op */ }
       /** Show the search bar. No-op — Slatebase has its own search panel. */
       showSearch(_replace?: boolean): void { /* no-op */ }
+      /**
+       * Force-write the current editor content to the vault.
+       * Real Obsidian's MarkdownView inherits this from TextFileView, which our
+       * shim chain skips (FileView -> MarkdownView, no TextFileView). Plugins like
+       * Templater call `view.save()` directly after programmatic edits to flush
+       * immediately rather than waiting on the debounced autosave.
+       */
+      async save(): Promise<void> {
+        if (!this.file) return
+        const vault = (this.app as { vault?: { modify: (f: unknown, content: string) => Promise<void> } })?.vault
+        if (vault) await vault.modify(this.file, this.getViewData())
+      }
     } as unknown as Record<string, unknown>
   }
 

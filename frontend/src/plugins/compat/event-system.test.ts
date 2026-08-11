@@ -37,6 +37,18 @@ describe('EventSystem', () => {
       expect(cb).toHaveBeenCalledWith('arg1', 42);
     });
 
+    it('binds the optional callback context', () => {
+      const context = { received: '' };
+      function callback(this: typeof context, value: string): void {
+        this.received = value;
+      }
+      emitter.on('test', callback, context);
+
+      emitter.trigger('test', 'bound value');
+
+      expect(context.received).toBe('bound value');
+    });
+
     it('dispatches synchronously in registration order', () => {
       const order: number[] = [];
       emitter.on('test', () => order.push(1));
