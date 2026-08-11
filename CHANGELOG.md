@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.30.0](https://github.com/andreas13xxx/Slatebase/compare/v0.29.0...v0.30.0) (2026-08-11)
+
+
+### Features
+
+* **plugins:** harden compat layer against real community plugin bundles ([4ff8f03](https://github.com/andreas13xxx/Slatebase/commit/4ff8f03b6dac9ce2c74cd0862fb2d33fed8da1ae))
+
 ## [0.29.0](https://github.com/andreas13xxx/Slatebase/compare/v0.28.0...v0.29.0) (2026-08-10)
 
 
