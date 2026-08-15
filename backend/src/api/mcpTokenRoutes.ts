@@ -102,7 +102,7 @@ export function createMcpTokenRoutes(deps: {
     // Validate input with Zod
     const parseResult = createTokenSchema.safeParse(body)
     if (!parseResult.success) {
-      const firstError = parseResult.error.errors[0]
+      const firstError = parseResult.error.issues[0]
       const message = firstError ? firstError.message : 'Invalid request body'
       return c.json(createApiError('VALIDATION_ERROR', message), 400)
     }
@@ -127,7 +127,7 @@ export function createMcpTokenRoutes(deps: {
     // Validate tokenId param
     const paramsParsed = tokenIdParamSchema.safeParse({ tokenId: c.req.param('tokenId') })
     if (!paramsParsed.success) {
-      const firstError = paramsParsed.error.errors[0]
+      const firstError = paramsParsed.error.issues[0]
       const message = firstError ? firstError.message : 'Invalid tokenId'
       return c.json(createApiError('VALIDATION_ERROR', message), 400)
     }

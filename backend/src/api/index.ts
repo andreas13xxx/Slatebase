@@ -558,7 +558,7 @@ export class VaultController implements IVaultController {
       const parsed = moveRequestSchema.safeParse(body)
 
       if (!parsed.success) {
-        const firstError = parsed.error.errors[0]
+        const firstError = parsed.error.issues[0]
         const message = firstError ? firstError.message : 'Invalid request body'
         const apiError = createApiError('VALIDATION_ERROR', message)
         return c.json(apiError, 400)
@@ -603,7 +603,7 @@ export class VaultController implements IVaultController {
       const parsed = renameRequestSchema.safeParse(body)
 
       if (!parsed.success) {
-        const firstError = parsed.error.errors[0]
+        const firstError = parsed.error.issues[0]
         const message = firstError ? firstError.message : 'Invalid request body'
         const apiError = createApiError('VALIDATION_ERROR', message)
         return c.json(apiError, 400)
