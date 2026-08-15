@@ -92,7 +92,7 @@ export function createTrashRoutes(deps: TrashRouteDependencies): Hono {
     // Validate params
     const params = vaultIdParamSchema.safeParse({ vaultId: c.req.param('vaultId') })
     if (!params.success) {
-      const firstError = params.error.errors[0]
+      const firstError = params.error.issues[0]
       const message = firstError ? firstError.message : 'Invalid parameters'
       const apiError = createApiError('VALIDATION_ERROR', message)
       return c.json(apiError, 400)
@@ -158,7 +158,7 @@ export function createTrashRoutes(deps: TrashRouteDependencies): Hono {
       entryId: c.req.param('entryId'),
     })
     if (!params.success) {
-      const firstError = params.error.errors[0]
+      const firstError = params.error.issues[0]
       const message = firstError ? firstError.message : 'Invalid parameters'
       const apiError = createApiError('VALIDATION_ERROR', message)
       return c.json(apiError, 400)
@@ -251,7 +251,7 @@ export function createTrashRoutes(deps: TrashRouteDependencies): Hono {
       entryId: c.req.param('entryId'),
     })
     if (!params.success) {
-      const firstError = params.error.errors[0]
+      const firstError = params.error.issues[0]
       const message = firstError ? firstError.message : 'Invalid parameters'
       const apiError = createApiError('VALIDATION_ERROR', message)
       return c.json(apiError, 400)

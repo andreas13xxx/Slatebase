@@ -132,7 +132,7 @@ export function createFileVersionRoutes(deps: FileVersionRouteDependencies): Hon
     const rawPath = c.req.query('path')
     const parsed = filePathQuerySchema.safeParse({ path: rawPath })
     if (!parsed.success) {
-      const firstError = parsed.error.errors[0]
+      const firstError = parsed.error.issues[0]
       const message = firstError ? firstError.message : 'Invalid query parameters'
       const apiError = createApiError('VALIDATION_ERROR', message)
       return c.json(apiError, 400)
@@ -213,7 +213,7 @@ export function createFileVersionRoutes(deps: FileVersionRouteDependencies): Hon
     const rawTimestamp = c.req.query('timestamp')
     const parsed = timestampQuerySchema.safeParse({ path: rawPath, timestamp: rawTimestamp })
     if (!parsed.success) {
-      const firstError = parsed.error.errors[0]
+      const firstError = parsed.error.issues[0]
       const message = firstError ? firstError.message : 'Invalid query parameters'
       const apiError = createApiError('VALIDATION_ERROR', message)
       return c.json(apiError, 400)
@@ -305,7 +305,7 @@ export function createFileVersionRoutes(deps: FileVersionRouteDependencies): Hon
 
     const parsed = restoreBodySchema.safeParse(body)
     if (!parsed.success) {
-      const firstError = parsed.error.errors[0]
+      const firstError = parsed.error.issues[0]
       const message = firstError ? firstError.message : 'Invalid request body'
       const apiError = createApiError('VALIDATION_ERROR', message)
       return c.json(apiError, 400)

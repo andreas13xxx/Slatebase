@@ -85,7 +85,7 @@ export function createAdminFeatureRoutes(deps: FeatureRouteDeps): Hono {
 
     const parsed = toggleUpdateSchema.safeParse(body)
     if (!parsed.success) {
-      const firstError = parsed.error.errors[0]
+      const firstError = parsed.error.issues[0]
       const message = firstError !== undefined ? firstError.message : 'Field "enabled" must be a boolean'
       return c.json(createApiError('VALIDATION_ERROR', message), 400)
     }

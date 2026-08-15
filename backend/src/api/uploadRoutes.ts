@@ -130,7 +130,7 @@ export function createUploadRoutes(deps: UploadRouteDependencies): Hono {
     const rawParams = { vaultId: c.req.param('vaultId') }
     const paramsParsed = uploadParamsSchema.safeParse(rawParams)
     if (!paramsParsed.success) {
-      const firstError = paramsParsed.error.errors[0]
+      const firstError = paramsParsed.error.issues[0]
       const message = firstError ? firstError.message : 'Invalid route parameters'
       const apiError = createApiError('VALIDATION_ERROR', message)
       return c.json(apiError, 400)
@@ -141,7 +141,7 @@ export function createUploadRoutes(deps: UploadRouteDependencies): Hono {
     const rawQuery = { paste: c.req.query('paste') }
     const queryParsed = uploadQuerySchema.safeParse(rawQuery)
     if (!queryParsed.success) {
-      const firstError = queryParsed.error.errors[0]
+      const firstError = queryParsed.error.issues[0]
       const message = firstError ? firstError.message : 'Invalid query parameters'
       const apiError = createApiError('VALIDATION_ERROR', message)
       return c.json(apiError, 400)
@@ -206,7 +206,7 @@ export function createUploadRoutes(deps: UploadRouteDependencies): Hono {
     // Validate targetDir
     const targetDirParsed = targetDirSchema.safeParse(targetDir)
     if (!targetDirParsed.success) {
-      const firstError = targetDirParsed.error.errors[0]
+      const firstError = targetDirParsed.error.issues[0]
       const message = firstError ? firstError.message : 'Invalid targetDir'
       const apiError = createApiError('VALIDATION_ERROR', message)
       return c.json(apiError, 400)

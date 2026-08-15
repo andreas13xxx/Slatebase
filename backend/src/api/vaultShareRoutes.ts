@@ -94,7 +94,7 @@ const transferBodySchema = z.object({
  * Extracts the first error message from a Zod error and returns a 400 response.
  */
 function validationErrorResponse(c: Context, zodError: z.ZodError): Response {
-  const firstError = zodError.errors[0]
+  const firstError = zodError.issues[0]
   const message = firstError ? firstError.message : 'Validation failed'
   return c.json(createApiError('VALIDATION_ERROR', message), 400)
 }

@@ -25,7 +25,7 @@ const arbConversationListItem: fc.Arbitrary<ConversationListItem> = fc.record({
   id: fc.uuid(),
   participants: fc.array(fc.uuid(), { minLength: 1, maxLength: 5 }),
   participantNames: fc.array(fc.string({ minLength: 1, maxLength: 20 }), { minLength: 1, maxLength: 5 }),
-  lastMessageTimestamp: fc.option(fc.date().map(d => d.toISOString()), { nil: null }),
+  lastMessageTimestamp: fc.option(fc.date({ noInvalidDate: true }).map(d => d.toISOString()), { nil: null }),
   lastMessagePreview: fc.option(fc.string({ minLength: 0, maxLength: 200 }), { nil: null }),
   unreadCount: fc.nat({ max: 100 }),
   archived: fc.option(fc.boolean(), { nil: undefined }),
@@ -37,7 +37,7 @@ const arbMessage: fc.Arbitrary<Message> = fc.record({
   conversationId: fc.uuid(),
   senderId: fc.uuid(),
   content: fc.string({ minLength: 1, maxLength: 500 }),
-  timestamp: fc.date().map(d => d.toISOString()),
+  timestamp: fc.date({ noInvalidDate: true }).map(d => d.toISOString()),
 })
 
 /** Arbitrary for PaginatedConversations payload. */

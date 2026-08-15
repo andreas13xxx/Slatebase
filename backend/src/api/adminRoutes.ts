@@ -144,7 +144,7 @@ const changeRoleBodySchema = z.object({
  * Extracts the first error message from a Zod error and returns a 400 response.
  */
 function validationErrorResponse(c: Context, zodError: z.ZodError): Response {
-  const firstError = zodError.errors[0]
+  const firstError = zodError.issues[0]
   const message = firstError ? firstError.message : 'Validation failed'
   return c.json(createApiError('VALIDATION_ERROR', message), 400)
 }
@@ -234,7 +234,7 @@ export class AdminController implements IAdminController {
       const parsed = createUserSchema.safeParse(body)
 
       if (!parsed.success) {
-        const firstError = parsed.error.errors[0]
+        const firstError = parsed.error.issues[0]
         const message = firstError !== undefined ? firstError.message : 'Validation failed'
         return c.json(createApiError('VALIDATION_ERROR', message), 400)
       }
@@ -432,7 +432,7 @@ export class AdminController implements IAdminController {
       const parsed = serverConfigUpdateSchema.safeParse(body)
 
       if (!parsed.success) {
-        const firstError = parsed.error.errors[0]
+        const firstError = parsed.error.issues[0]
         const message = firstError !== undefined ? firstError.message : 'Validation failed'
         return c.json(createApiError('VALIDATION_ERROR', message), 400)
       }
