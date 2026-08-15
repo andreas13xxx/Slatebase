@@ -167,9 +167,12 @@ describe('PropertiesView', () => {
     const level1Cell = screen.getByText('level1').closest('td')
     const level2Cell = screen.getByText('level2').closest('td')
 
-    expect(level0Cell).toHaveStyle({ paddingLeft: '0rem' })
-    expect(level1Cell).toHaveStyle({ paddingLeft: '1rem' })
-    expect(level2Cell).toHaveStyle({ paddingLeft: '2rem' })
+    // getComputedStyle resolves rem against the default 16px root font-size,
+    // same as a real browser — toHaveStyle compares against computed style,
+    // not the raw inline `rem` value.
+    expect(level0Cell).toHaveStyle({ paddingLeft: '0px' })
+    expect(level1Cell).toHaveStyle({ paddingLeft: '16px' })
+    expect(level2Cell).toHaveStyle({ paddingLeft: '32px' })
   })
 
   it('renders objects deeper than 5 levels as inline JSON', () => {
