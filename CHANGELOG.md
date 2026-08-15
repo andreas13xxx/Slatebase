@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.30.1](https://github.com/andreas13xxx/Slatebase/compare/v0.30.0...v0.30.1) (2026-08-15)
+
+
+### Bugfixes
+
+* exclude Invalid Date from fc.date() arbitraries in chat state tests ([9117aca](https://github.com/andreas13xxx/Slatebase/commit/9117aca328c6d648e108922b501c4b74eb65d85f))
+* update PropertiesView test to expect resolved rem→px computed styles ([d53e5b5](https://github.com/andreas13xxx/Slatebase/commit/d53e5b59678c352c80b802c7f55ccb4678bf93ad))
+* use ZodError.issues instead of the deprecated .errors alias ([a937679](https://github.com/andreas13xxx/Slatebase/commit/a9376796d30db761708caf0bd56b18092134590b))
+
+
+### Sonstige Änderungen
+
+* bump actions/setup-node from 4 to 7 ([#102](https://github.com/andreas13xxx/Slatebase/issues/102)) ([7fe1b21](https://github.com/andreas13xxx/Slatebase/commit/7fe1b216203efa216972fdad27631eb72544ec56))
+* bump fast-check from 3.23.2 to 4.9.0 in /frontend ([#108](https://github.com/andreas13xxx/Slatebase/issues/108)) ([0c7198a](https://github.com/andreas13xxx/Slatebase/commit/0c7198a189c0704652cbfd68bf4b7d12f4c048d3))
+* bump googleapis/release-please-action from 4 to 5 ([#103](https://github.com/andreas13xxx/Slatebase/issues/103)) ([c142a28](https://github.com/andreas13xxx/Slatebase/commit/c142a28f690091d352be714a90c3b04c3fa5189e))
+* bump jsdom from 29.1.1 to 30.0.1 in /frontend ([#109](https://github.com/andreas13xxx/Slatebase/issues/109)) ([f9a692f](https://github.com/andreas13xxx/Slatebase/commit/f9a692f27774e99dee73f53a2640aaf2dbfcee04))
+* bump the minor-patch group in /backend with 4 updates ([#104](https://github.com/andreas13xxx/Slatebase/issues/104)) ([8c21ae1](https://github.com/andreas13xxx/Slatebase/commit/8c21ae16331305b74c7d7205f2cacbcf93a86474))
+* bump the minor-patch group in /frontend with 10 updates ([#107](https://github.com/andreas13xxx/Slatebase/issues/107)) ([cde36e0](https://github.com/andreas13xxx/Slatebase/commit/cde36e07f8b7e0009012e08b9452f19bb0ae658d))
+
 ## [0.30.0](https://github.com/andreas13xxx/Slatebase/compare/v0.29.0...v0.30.0) (2026-08-11)
 
 
