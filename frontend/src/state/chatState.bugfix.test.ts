@@ -40,7 +40,7 @@ const arbConversationListItem = (id: string): fc.Arbitrary<ConversationListItem>
     participantNames: fc.array(fc.string({ minLength: 1, maxLength: 20 }), { minLength: 2, maxLength: 4 }),
     lastMessageTimestamp: fc.oneof(
       fc.constant(null),
-      fc.date({ min: new Date('2024-01-01'), max: new Date('2025-12-31') }).map(d => d.toISOString())
+      fc.date({ min: new Date('2024-01-01'), max: new Date('2025-12-31'), noInvalidDate: true }).map(d => d.toISOString())
     ),
     lastMessagePreview: fc.oneof(
       fc.constant(null),
@@ -77,7 +77,7 @@ const arbStateWithTargetConversation = fc.gen().chain(() => {
         conversationId: fc.constant(tId),
         senderId: fc.uuid(),
         content: fc.string({ minLength: 1, maxLength: 200 }),
-        timestamp: fc.date({ min: new Date('2025-01-01'), max: new Date('2025-12-31') }).map(d => d.toISOString()),
+        timestamp: fc.date({ min: new Date('2025-01-01'), max: new Date('2025-12-31'), noInvalidDate: true }).map(d => d.toISOString()),
       }) as fc.Arbitrary<Message>
 
       return messageArb.map(message => ({
