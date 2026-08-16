@@ -471,7 +471,16 @@ export class PluginLoader implements IPluginLoader {
     // We wrap the bundle in a CJS-to-ESM adapter that provides require() and module.exports.
     const wrappedBundle = `
 if (typeof process === 'undefined') {
-  var process = { platform: 'linux', env: {}, version: 'v22.0.0', versions: { node: '22.0.0' }, cwd: function() { return '/'; } };
+  // type: 'renderer' matters, not just cosmetic — real Obsidian desktop *is* an
+  // Electron renderer process, and libraries bundled into plugins (e.g. obsidian-git's
+  // vendored js-sha256) use \`process.type !== 'renderer'\` as their "genuine Node.js
+  // main process" detection heuristic to pick a fast path that assumes real Node
+  // builtins (Buffer, crypto). Without this, they wrongly take that path here — where
+  // esbuild has already tree-shaken the underlying require('buffer')/require('crypto')
+  // calls down to empty stubs at plugin-build time — and crash on the undefined result
+  // (e.g. "Cannot read properties of undefined (reading 'from')") instead of falling
+  // back to their universal/browser-safe implementation.
+  var process = { platform: 'linux', env: {}, version: 'v22.0.0', versions: { node: '22.0.0' }, type: 'renderer', cwd: function() { return '/'; } };
 }
 if (typeof global === 'undefined') {
   var global = window;
@@ -669,6 +678,7 @@ function require(id) {
   return {};
 }
 if (!window.CodeMirror) { window.CodeMirror = { defineMode: function(){}, defineMIME: function(){}, defineExtension: function(){}, defineOption: function(){}, registerHelper: function(){}, registerGlobalHelper: function(){}, modes: {}, mimeModes: {}, resolveMode: function(){return {};}, getMode: function(){return {token:function(){return null;}};}, Pass: {} }; }
+if (!window.CodeMirrorAdapter) { window.CodeMirrorAdapter = { commands: {}, Vim: { defineAction: function(){}, handleEx: function(){}, enterInsertMode: function(){}, mapCommand: function(){} } }; }
 ${bundle}
 export default module.exports.default || module.exports;
 `;

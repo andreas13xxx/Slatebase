@@ -23,7 +23,7 @@ Shows the heading structure of the current file. Click a heading to jump to that
 ### Links
 
 - **Forward links** — Files that the current file links to
-- **Backlinks** — Files that link back to the current file
+- **Backlinks** — Files that link back to the current file. Updates automatically when another file is saved, renamed, or deleted in the background — even from another tab, device, or user — no need to switch documents to refresh the list
 - Unresolved links are shown separately
 
 ### Tags

@@ -33,7 +33,7 @@ Das Settings-Panel hat eine Sidebar-Navigation mit Kategorien und Abschnitten:
 | Passwort | Passwort ändern (aktuelles + neues) |
 | Sprache | Bevorzugte Sprache (DE/EN), bestimmt UI und Welcome-Vault-Sprache |
 | Anleitungs-Vault | Button zum nachträglichen Erstellen des Anleitungs-Vaults |
-| Darstellung | Statusleiste ein-/ausblenden |
+| Darstellung | Statusleiste (global + pro Element) ein-/ausblenden, CSS-Snippets verwalten |
 | Tastenkürzel | Benutzerdefinierte Tastenkombinationen (Keybindings) |
 | Account löschen | Eigenen Account permanent entfernen |
 
@@ -83,10 +83,33 @@ Der Benutzername (Login-Name) kann nicht nachträglich geändert werden.
 
 ### Statusleiste
 
-Die Statusleiste am unteren Rand der Anwendung zeigt die Uhrzeit und erweiterte Informationen:
+Die Statusleiste am unteren Rand der Anwendung zeigt mehrere Informationen gleichzeitig:
 
-- **Einschalten:** Einstellungen → Darstellung → "Statusleiste anzeigen" aktivieren
-- **Ausschalten:** Toggle deaktivieren
+| Element | Zeigt |
+|---------|-------|
+| Uhr | Aktuelle Uhrzeit |
+| Vault-Name | Name des geöffneten Vaults |
+| Wort-/Zeichenanzahl | Anzahl Wörter und Zeichen der aktiven Datei; bei markiertem Text zusätzlich die Auswahlgröße |
+| Cursor-Position | Zeile:Spalte des Cursors — ein Klick darauf öffnet "Gehe zu Zeile" |
+
+- **Global ein-/ausschalten:** Einstellungen → Darstellung → "Statusleiste anzeigen"
+- **Einzelne Elemente ein-/ausblenden:** Direkt darunter hat jedes Element einen eigenen Schalter — so zeigst du z.B. nur die Wortanzahl, ohne Uhr und Cursor-Position
+- Plugin-Statusanzeigen (falls die Obsidian-Plugin-Kompatibilität aktiv ist) erscheinen zusätzlich am rechten Rand der Leiste
+
+### CSS-Snippets
+
+Passe das Erscheinungsbild von Slatebase mit eigenem CSS an — pro Vault gespeichert und verwaltet unter Einstellungen → Darstellung → "CSS-Snippets":
+
+1. **Hochladen** — eine bestehende `.css`-Datei auswählen (max. 512 KB)
+2. **Neu erstellen** — Namen vergeben, Inhalt direkt im eingebetteten Editor schreiben
+3. **Aktivieren/Deaktivieren** — Schalter neben jedem Snippet; die Änderung wirkt sofort, ohne Neuladen der Seite
+4. **Bearbeiten** — Stift-Symbol öffnet den Editor erneut
+5. **Löschen** — Papierkorb-Symbol, mit Bestätigungsabfrage
+
+Aktivierte Snippets werden automatisch angewendet, sobald du den Vault öffnest oder wechselst — im Gegensatz zu Plugin-CSS wirken sie global (z.B. `body { }`- oder `:root {}`-Regeln), nicht nur auf eine einzelne Plugin-Oberfläche.
+
+> [!tip] Idee für den Einstieg
+> Erstelle ein Snippet mit `:root { --accent: #ff6b6b; }`, um die Akzentfarbe der Oberfläche zu ändern (die genauen Variablennamen findest du über die Browser-Entwicklertools).
 
 ### Theme (Dark/Light Mode)
 
@@ -200,6 +223,8 @@ Personalisiere deine Slatebase-Instanz:
 ## Verwandte Features
 
 - [[Features/Command Palette]] — Alternativer Weg zu den Einstellungen
+- [[Features/CSS-Snippets]] — Detailguide zu eigenem CSS pro Vault
+- [[Features/Lesezeichen]] — Lesezeichen-Ansicht, ebenfalls über die Seitenleiste erreichbar
 - [[Features/Vorlagen und Daily Notes]] — Templates-Verzeichnis konfigurieren
 - [[Fortgeschritten/Tastenkürzel anpassen]] — Detailguide zu Keybindings
 - [[Features/Chat]] — Feature-Toggle `chat` in den Admin-Einstellungen

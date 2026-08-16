@@ -14,14 +14,20 @@ export interface CommandPaletteProps {
   onExecute: (commandId: string) => void;
 }
 
-/** Maximum number of results displayed */
-const MAX_RESULTS = 50;
+/**
+ * Safety cap on rendered results, not a UX-intended limit — the list is a normal
+ * scrollable `<ul>` (see `.command-palette-list` in App.css), so this only exists
+ * to avoid rendering an absurd number of `<li>`s if a user has installed dozens
+ * of plugins each registering dozens of commands. Realistic totals (native +
+ * Obsidian core-compat + a handful of real plugins) land in the low hundreds.
+ */
+const MAX_RESULTS = 300;
 
 /**
  * CommandPalette — Modal overlay for searching and executing plugin commands.
  *
  * Opens when `isOpen` is true. Provides a search input with case-insensitive
- * filtering (max 50 results), keyboard navigation (Arrow Up/Down, Enter, Escape),
+ * filtering, keyboard navigation (Arrow Up/Down, Enter, Escape),
  * and click-to-execute.
  *
  * The keyboard shortcut (Ctrl+P / Cmd+P) is registered at the App level,
@@ -186,17 +192,26 @@ export function CommandPalette({ commands, isOpen, onClose, onExecute }: Command
 
 /**
  * Filter commands by case-insensitive substring match on the command name.
- * Returns at most MAX_RESULTS items.
+ * Returns at most MAX_RESULTS items, alphabetically sorted.
+ *
+ * Sorting matters most for the empty-query case: `commands` arrives in
+ * registration order (native commands first, then the ~120 Obsidian core-compat
+ * commands, with any real community-plugin commands registered last of all) —
+ * without a sort, the MAX_RESULTS cap on an empty query always cuts off exactly
+ * at that boundary, so a real plugin's own commands never appear until the user
+ * types a query that searches the full (unsliced) list instead.
  */
 function filterCommands(commands: Command[], query: string): Command[] {
+  const sorted = [...commands].sort((a, b) => a.name.localeCompare(b.name, 'de'))
+
   if (!query) {
-    return commands.slice(0, MAX_RESULTS)
+    return sorted.slice(0, MAX_RESULTS)
   }
 
   const lowerQuery = query.toLowerCase()
   const results: Command[] = []
 
-  for (const cmd of commands) {
+  for (const cmd of sorted) {
     if (cmd.name.toLowerCase().includes(lowerQuery)) {
       results.push(cmd)
       if (results.length >= MAX_RESULTS) break

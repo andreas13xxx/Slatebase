@@ -201,6 +201,48 @@ describe('MetadataCacheShim', () => {
     });
   });
 
+  describe('getBacklinksForFile()', () => {
+    it('returns empty data when nothing links to the file', () => {
+      const shim = new MetadataCacheShim(makeTree());
+      const backlinks = shim.getBacklinksForFile(makeTFile('notes/world.md'));
+      expect(backlinks.data.size).toBe(0);
+      expect(backlinks.count()).toBe(0);
+    });
+
+    it('collects links from other files pointing at the target file', () => {
+      const shim = new MetadataCacheShim(makeTree());
+      const helloLink = { link: 'world', position: { start: { line: 1, col: 0, offset: 5 }, end: { line: 1, col: 9, offset: 14 } }, original: '[[world]]' };
+      const readmeLink = { link: 'notes/world', position: { start: { line: 0, col: 0, offset: 0 }, end: { line: 0, col: 13, offset: 13 } }, original: '[[notes/world]]' };
+
+      shim.updateFileCache(makeTFile('notes/hello.md'), { links: [helloLink, helloLink] });
+      shim.updateFileCache(makeTFile('readme.md'), { links: [readmeLink] });
+
+      const backlinks = shim.getBacklinksForFile(makeTFile('notes/world.md'));
+
+      expect(backlinks.data.get('notes/hello.md')).toHaveLength(2);
+      expect(backlinks.data.get('readme.md')).toHaveLength(1);
+      expect(backlinks.count()).toBe(3);
+    });
+
+    it('excludes the target file itself and unrelated links', () => {
+      const shim = new MetadataCacheShim(makeTree());
+      shim.updateFileCache(makeTFile('readme.md'), {
+        links: [{ link: 'hello', position: { start: { line: 0, col: 0, offset: 0 }, end: { line: 0, col: 8, offset: 8 } }, original: '[[hello]]' }],
+      });
+
+      const backlinks = shim.getBacklinksForFile(makeTFile('notes/world.md'));
+      expect(backlinks.data.size).toBe(0);
+    });
+  });
+
+  describe('isUserIgnored()', () => {
+    it('always returns false — Slatebase has no excluded-files setting', () => {
+      const shim = new MetadataCacheShim(makeTree());
+      expect(shim.isUserIgnored('notes/hello.md')).toBe(false);
+      expect(shim.isUserIgnored('anything')).toBe(false);
+    });
+  });
+
   describe('events', () => {
     it('emits changed event when updateFileCache() is called', () => {
       const shim = new MetadataCacheShim(makeTree());

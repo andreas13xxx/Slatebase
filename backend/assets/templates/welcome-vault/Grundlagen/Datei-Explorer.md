@@ -83,7 +83,7 @@ Ein Rechtsklick auf eine Datei oder einen Ordner öffnet das Kontextmenü mit fo
 | Umbenennen | Namen ändern |
 | Verschieben | In anderen Ordner verschieben |
 | Löschen | In den Papierkorb verschieben |
-| Als Favorit | Zu Favoriten hinzufügen/entfernen |
+| Als Favorit | Lesezeichen für diese Datei hinzufügen/entfernen |
 
 Bei Ordnern stehen zusätzlich zur Verfügung:
 - **Neue Datei hier** — Datei im gewählten Ordner erstellen
@@ -98,7 +98,7 @@ Markiere häufig genutzte Dateien als Favorit:
 1. Rechtsklick auf die Datei → **Als Favorit markieren**
 2. Oder klicke auf das **Stern-Symbol** neben dem Dateinamen
 
-Favoriten erscheinen im oberen Bereich der Seitenleiste für schnellen Zugriff.
+Favoriten erscheinen sowohl im oberen Bereich der Seitenleiste als auch in einer eigenen **Lesezeichen**-Ansicht (Tab in der linken Seitenleiste), in der du sie per Drag & Drop neu sortieren, umbenennen und per Rechtsklick verwalten kannst — mehr dazu im [[Features/Lesezeichen|Lesezeichen-Guide]].
 
 ---
 
@@ -137,5 +137,6 @@ Ordner lassen sich auf- und zuklappen:
 ## Verwandte Seiten
 
 - [[Grundlagen/Editor und Viewer|Editor und Viewer]] — Vorheriger Guide
+- [[Features/Lesezeichen|Lesezeichen]] — Favoriten sortieren, umbenennen und weitere Lesezeichen-Typen
 - [[Features/Tags und Properties|Tags und Properties]] — Alternative Organisation
 - [[Features/Vault-Verwaltung|Vault-Verwaltung]] — Vault-übergreifende Funktionen

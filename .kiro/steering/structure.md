@@ -68,6 +68,7 @@ src/
 │   ├── client-ip.ts     — Centralized client IP extraction with trusted proxy support
 │   ├── request-id.ts   — Request-ID middleware (X-Request-Id header, UUID generation)
 │   ├── pluginRoutes.ts  — Plugin management CRUD routes (list, install, delete, bundle, styles, settings, registry)
+│   ├── snippetRoutes.ts — CSS snippet CRUD routes (list, create, get/put/delete content, registry) — same access-control model as pluginRoutes.ts
 │   ├── featureRoutes.ts — Feature toggle admin + public routes (GET/PUT /admin/features, GET /features)
 │   ├── searchRoutes.ts — Search routes (GET /vaults/:vaultId/search, GET /search, POST /vaults/:vaultId/replace)
 │   ├── searchRoutes.test.ts — Integration tests for search routes
@@ -151,6 +152,13 @@ src/
 │   ├── plugin-store-cache.ts — PluginStoreCache (in-memory TTL cache for plugin list/manifests/update results)
 │   ├── plugin-store-service.ts — PluginStoreService (browse/install/update orchestration; installs via the shared `plugin/` InstalledPluginStore)
 │   └── update-checker.ts     — UpdateChecker (periodic update check, default 24h interval, persists last-check timestamp)
+├── snippets/                 — User CSS snippets (per vault). Modeled on `plugin/installed-plugin-store.ts`'s atomic-write pattern, but stores unscoped user CSS rather than plugin-scoped bundles.
+│   ├── index.ts              — Barrel export for snippets module
+│   ├── types.ts              — ISnippetStore, SnippetMeta, SnippetRegistryData interfaces
+│   ├── errors.ts             — SnippetNotFoundError, SnippetTooLargeError, InvalidSnippetFilenameError
+│   ├── validation.ts         — Zod schemas + `SNIPPET_FILENAME_PATTERN` (`^[a-zA-Z0-9_-]+\.css$`), `MAX_SNIPPET_SIZE` (512 KB)
+│   ├── snippet-store.ts      — SnippetStore (filesystem persistence, atomic writes, per-vault dirs; `data/snippets/<vaultId>/<snippetId>.css` + `_registry.json`)
+│   └── snippet-store.test.ts — Unit tests for SnippetStore
 ├── feature-toggle/
 │   ├── index.ts              — Barrel export for feature-toggle module
 │   ├── types.ts              — IFeatureToggleService, IFeatureRegistry, FeatureToggleDefinition, FeatureToggleState, etc.
@@ -193,8 +201,8 @@ src/
 │   └── cleanup-job.ts        — CleanupJob (periodic trash purge + version prune, per-file error isolation)
 ├── preferences/
 │   ├── index.ts              — Barrel export for preferences module
-│   ├── types.ts              — IPreferencesService, UserPreferences, RecentFileEntry, FavoriteEntry, KeybindingEntry
-│   ├── validation.ts         — Zod schemas (saveRecentFilesSchema, saveFavoritesSchema, saveKeybindingsSchema)
+│   ├── types.ts              — IPreferencesService, UserPreferences, RecentFileEntry, FavoriteEntry (now a discriminated-by-`type` bookmark: file/heading/block/search, with `id`/`order`/`label` — see lessons-learned.md), KeybindingEntry
+│   ├── validation.ts         — Zod schemas (saveRecentFilesSchema, saveFavoritesSchema, saveKeybindingsSchema); optional fields typed `| undefined` (not just `?:`) to satisfy `exactOptionalPropertyTypes: true` against Zod's `.optional()` inference
 │   └── preferences-store.ts  — PreferencesStore (per-user JSON file via shared `KeyedJsonFileStore`; recent-files/favorites/keybindings updates go through `mutate()` so concurrent saves can't lose each other's field)
 ├── vault-config/
 │   ├── index.ts              — Barrel export for vault-config module
@@ -224,7 +232,7 @@ data/
 ```
 src/
 ├── main.tsx              — React entry point
-├── App.tsx               — Root component, 3-panel layout, routing, resize, AppPage type export. An ErrorBoundary wraps PluginProvider: third-party plugin code runs inside it on every vault switch and toggle, and without a boundary a plugin bug unmounts the whole tree and reads as an app crash
+├── App.tsx               — Root component, 3-panel layout, routing, resize, AppPage type export. An ErrorBoundary wraps PluginProvider: third-party plugin code runs inside it on every vault switch and toggle, and without a boundary a plugin bug unmounts the whole tree and reads as an app crash. `NavigationControls` renders next to `TabBar` in a `.tab-bar-row`; `Breadcrumb` renders above `TabContent` for file tabs (both derived from `tabState.activeTabId`, not props threaded down). Auto-reveal effect and breadcrumb derivation live in `AppContent` itself — `usePluginContext()` cannot be called there, since `<PluginProvider>` is mounted inside `AppContent`'s own JSX output (~line 722), not as an ancestor of it
 ├── App.css               — Global styles (Design Tokens in index.css)
 ├── index.css             — CSS Custom Properties (Design Tokens, Dark Mode)
 ├── types.ts              — Shared TypeScript interfaces (VaultInfo, DirectoryTree, AppState with vaultTrees, etc.)
@@ -235,6 +243,9 @@ src/
 │   ├── fileValidation.ts — Filename validation for InlineInput (new file/rename): invalid chars, length
 │   ├── pathUtils.ts      — Relative path computation, image/PDF detection, drop target + context-menu viewport clamping
 │   ├── fileIcons.tsx     — File extension to icon mapping (@react-symbols/icons for known types, Lucide fallback)
+│   ├── fuzzyMatch.ts     — Case-insensitive subsequence fuzzy match (QuickSwitcher), lower score = better
+│   ├── internalLink.ts   — Builds the wikilink/embed text for a file dropped from the File Explorer; image/PDF extensions become `![[…]]` embeds, Markdown links drop its `.md` so the target matches what the wikilink resolver looks up
+│   ├── pluginIcon.ts     — Single resolution path for plugin icon names (addRibbonIcon, ItemView.getIcon, context-panel tabs): checks the plugin's own `addIcon()` SVGs first, then falls back to the shared Lucide resolver in `plugins/compat/lucide-icons.ts`. Centralized so a new render site cannot skip the custom-icon check — a second, independently maintained alias table used to live here and drifted
 ├── canvas/
 │   ├── index.ts          — Barrel export (parser, serializer, types)
 │   ├── types.ts          — CanvasDocument, CanvasNode (Text/File/Link/Group), CanvasEdge, parse result types
@@ -260,7 +271,7 @@ src/
 ├── plugins/
 │   ├── index.ts          — Barrel export (all plugins, types, utilities)
 │   ├── types.ts          — MDAST node types (WikilinkNode, EmbedNode, CalloutNode, TagNode), IMAGE_EXTENSIONS, PDF_EXTENSIONS
-│   ├── link-resolver.ts  — Wikilink target resolution against DirectoryTree
+│   ├── link-resolver.ts  — Wikilink target resolution against DirectoryTree; `resolveWikilinkTargetWithAlternatives()`/`resolveAmbiguousMatch()` disambiguate multiple same-named files (optional `sourcePath` → same folder as source, then shortest path, then alphabetical) and report `alternativeCount` for link tooltips
 │   ├── heading-anchor.ts — Heading anchor generation + deduplication tracker
 │   ├── preserve-table-code-escapes.ts — Counters mdast-util-gfm-table's pipe-unescaping inside inline code spans (Obsidian verbatim rendering)
 │   ├── inline-html.ts    — Allowlist + attribute parsing for the safe subset of inline raw HTML (`<font color>`, `<mark>`, `<span style>`, …); shared by Live Preview (inline-decorations.ts, styled span) and reading view (ViewMode.tsx, real element) so both agree on what renders vs. stays literal text
@@ -287,6 +298,9 @@ src/
 │   │   └── plugin.ts           — remark plugin wrapper (remarkBlockRef)
 │   ├── breaks/
 │   │   └── plugin.ts     — remark plugin (remarkBreaks) converting soft line breaks to hard breaks (Obsidian default)
+│   ├── appearance/           — User-facing appearance customization (CSS Snippets), distinct from plugin CSS
+│   │   ├── snippet-injector.ts — SnippetInjector (unscoped `<style data-snippet-id>` injection — deliberately does NOT reuse compat/css-injector.ts's `[data-plugin-id]` scoping, since user snippets must affect the whole app, e.g. `body`/`:root` overrides)
+│   │   └── snippet-injector.test.ts — Unit tests for SnippetInjector
 │   └── compat/           — Obsidian Plugin Compatibility Layer
 │       ├── types.ts      — TFile, TFolder, TAbstractFile, CachedMetadata, PluginManifest, PluginRegistryEntry, etc.
 │       ├── errors.ts     — PluginError, ManifestValidationError, BundleEvaluationError, LifecycleError, etc.
@@ -321,12 +335,14 @@ src/
 │       ├── api-gap-registry.ts — Records which no-op Proxy-trapped API a plugin read vs. actually called, so silently-unimplemented API usage is diagnosable instead of invisible
 │       ├── log.ts — Shared console helpers with meaningful severity: `debug*` = deliberate compat trade-off (expected), `warn*` = real gap (actionable); `*Once` variants dedupe by key so render/event-path call sites log one line per session instead of flooding
 │       ├── core-commands.ts — Obsidian's built-in `editor:*` commands (formatting, lists, headings, tables) registered against the CommandRegistry, so `executeCommandById('editor:toggle-code')` resolves like a real install; no-Slatebase-equivalent commands are registered as literal no-ops rather than left unresolvable
-│       ├── core-commands-app.ts — The core commands needing app-level React state (`workspace:*`, `file-explorer:*`, `app:*`, `theme:*`, Graph/Canvas/Daily Notes, side panels); registered once by CommandPaletteContainer and fed fresh state via a ref
+│       ├── core-commands-app.ts — The core commands needing app-level React state (`workspace:*`, `file-explorer:*`, `app:*`, `theme:*`, Graph/Canvas/Daily Notes, side panels); registered once by CommandPaletteContainer and fed fresh state via a ref. `app:go-back`/`app:go-forward`/`switcher:open` (formerly no-ops) now call `h.onNavigateBack`/`onNavigateForward`/`onOpenQuickSwitcher`; `workspace:next-tab`/`previous-tab` (`activateTabByOffset()`, wrap-around) predate this but only got a default keybinding now
 │       ├── body-classes.ts — Syncs Obsidian's `theme-dark`/`theme-light` + platform marker classes (`is-mobile`, `mod-macos`, …) onto `document.body`; plugin CSS and runtime theme checks read those, while Slatebase's own state lives in `data-theme` on `<html>`
 │       ├── active-workspace-shim.ts — Module-level get/set for the current vault's WorkspaceShim, so native UI outside the PluginProvider tree (file-explorer context menu) can fire `file-menu`/`files-menu`
 │       ├── obsidian-components.css — Styles for the Obsidian-compatible Setting/*Component controls rendered by setting-tab.ts
 │       ├── plugin-context.ts — PluginProvider + usePluginContext hook (vault-scoped instances, FCP loading, activeViews/sidebarViews state)
 │       ├── plugin-event-bridge.ts — usePluginEventBridge hook (tab→workspace, save→cache, tree→resolved, leaf events)
+│       ├── core-command-i18n.ts — German/English display names for the core commands, keyed by the same full command ID. The IDs themselves stay fixed and language-independent (plugins resolve them); only the palette label is localized, and keeping it here means translating never touches the command spec arrays
+│       ├── embed-registry.ts — `app.embedRegistry`: undocumented core API (absent from the public `obsidian.d.ts`) through which plugins render custom non-Markdown embeds for `![[file.ext]]` — Supernote, tldraw, PDF++, drawio and obsidian-dev-utils' EmbedExtensionsComponent rely on it. Shape cross-checked against obsidian-typings and those plugins' source
 │       ├── hover-link-bus.ts — Routes hover-preview requests (Slatebase's own links + plugins' `workspace.trigger('hover-link', …)`) to the HoverPreview popover
 │       ├── file-view-registry.ts — FileViewRegistry (content-based + extension-based view routing, registerExtensionsForPlugin, active file view lifecycle for TextFileView-based plugins like Kanban)
 │       ├── view-registry.ts — ViewRegistry (plugin-ownership tracking, location-aware leaf creation, sidebar callbacks). `ItemView.containerEl` keeps Obsidian's two-child shape (header at `children[0]`, contentEl at `children[1]`) — header actions go inside the header, never as a sibling before contentEl, which plugins read positionally. `WorkspaceLeaf.getRoot()` reports `rightSplit` for sidebar leaves and `rootSplit` otherwise, which is how plugins tell the two apart
@@ -348,6 +364,8 @@ src/
 │   ├── tabState.ts       — Tab reducer + types
 │   ├── tabContext.ts     — TabProvider + useTabContext hook
 │   ├── tabActions.ts     — openTab, saveTab action creators (+ recentFilesStore.add on open)
+│   ├── navigationHistoryState.ts   — Back/forward navigation history reducer (RECORD_VISIT/GO_BACK/GO_FORWARD/DROP_ENTRY/CLEAR), session-only, MAX_STACK_SIZE 50
+│   ├── navigationHistoryContext.ts — NavigationHistoryProvider + useNavigationHistory hook. Records a visit centrally via a `useEffect` watching `tabState.activeTabId` (not threaded through every click handler) — GO_BACK/GO_FORWARD suppress the resulting auto-record via a ref flag so they don't re-record their own tab activation
 │   ├── chatState.ts      — Chat reducer + types (conversations, messages, unread)
 │   ├── chatContext.ts    — ChatProvider + useChatContext hook
 │   ├── chatActions.ts    — loadConversations, sendMessage, leaveConversation, etc.
@@ -368,10 +386,11 @@ src/
 │   ├── pluginSettingsChangeBridge.ts — Same module-level bridge pattern for SSE `plugin-settings:change` → PluginProvider, which resolves the PluginInstance and calls its `onExternalSettingsChange()` (RealtimeProvider sits above PluginProvider, so it cannot reach the loader directly)
 │   ├── useEventSource.ts — Custom hook managing EventSource lifecycle (backoff, visibility, reconnect)
 │   ├── recentFilesStore.ts — Recent files list (server-synced + localStorage cache, max 20, dedup by vaultId+path)
-│   ├── favoritesStore.ts — Favorites per vault (server-synced + localStorage cache, max 50, path tracking on rename/delete)
+│   ├── favoritesStore.ts — Bookmarks per vault (server-synced + localStorage cache, max 50 across all types, path tracking on rename/delete). Four bookmark types (file/heading/block/search) share one entry shape discriminated by `type` (absent = legacy 'file'); `id` (not `path`) is the primary key for reorder/label/removeById since `path` is no longer unique once entries can share it (heading/block bookmarks on the same file) or be empty (search). `order` field drives display order (lazy-migrated for pre-existing entries on first read, idempotently)
+│   ├── snippetStore.ts   — CSS snippet action-creator functions `(apiClient, vaultId, ...)` — not a module-level singleton like favoritesStore.ts, since snippets are only managed from one place (Settings) and gain nothing from hidden shared state
 │   ├── dailyNoteService.ts — Daily note open/create logic (YYYY-MM-DD.md, template from vault config)
-│   ├── keybindingsStore.ts — Configurable keyboard shortcuts (server-synced, defaults + user overrides, matchesShortcut(), formatShortcut())
-│   ├── workspaceStore.ts — Workspace UI state persistence (tabs, expanded folders, panel sizes/visibility, debounced localStorage, per-vault tab memory); a `storage`-event listener adopts writes from other browser tabs, except while this tab has a pending debounced write of its own
+│   ├── keybindingsStore.ts — Configurable keyboard shortcuts (server-synced, defaults + user overrides, matchesShortcut(), formatShortcut()); includes `slatebase:navigate-back`/`-forward` (Alt+ArrowLeft/Right — the `event.key` form, not `Left`/`Right`), `slatebase:open-quick-switcher` (Mod+O), `slatebase:next-tab`/`previous-tab` (Ctrl+Tab/Ctrl+Shift+Tab)
+│   ├── workspaceStore.ts — Workspace UI state persistence (tabs, expanded folders, panel sizes/visibility, `explorerFollowActiveFile` auto-reveal toggle, debounced localStorage, per-vault tab memory); a `storage`-event listener adopts writes from other browser tabs, except while this tab has a pending debounced write of its own. `explorerFollowActiveFile` validates leniently (defaults `false` instead of invalidating the whole blob on old persisted state) since it was added after the initial schema
 │   └── vaultStatisticsCache.ts — Client-side vault statistics cache (invalidate on vault:change SSE)
 │   ├── settingsState.ts      — Settings reducer + types (categories, sections, nav state)
 │   ├── settingsRegistry.ts   — ISettingsRegistry, section definitions
@@ -386,15 +405,19 @@ src/
 │   ├── useLineNumbers.ts — Line numbers toggle state (localStorage persistence)
 │   ├── useResize.ts      — Mouse-driven panel resize hook (width, min, max, side)
 │   ├── useDropZone.ts    — File drag-and-drop hook (drag counter, size/count validation, toast errors)
-│   ├── useStatusBar.ts   — Status bar visibility toggle (module-level store, useSyncExternalStore, localStorage)
+│   ├── useStatusBar.ts   — Status bar visibility toggle (module-level store, useSyncExternalStore, localStorage) — global on/off, gates everything below
+│   ├── useStatusBarItemVisibility.ts — Per-built-in-item visibility toggle (`slatebase:statusBarItem:<itemId>`, same module-level useSyncExternalStore pattern as useStatusBar.ts)
+│   ├── useWordStats.ts   — Word/character count (+ selection) for the active file. Polls `getActiveEditorView()` (300ms) rather than subscribing to CM6 transactions directly — no reactive content/selection stream exists without extending the core editor's extension pipeline
+│   ├── useCursorPosition.ts — Cursor line/column (100ms poll, same rationale as useWordStats.ts) + `goToLine()` helper
 │   ├── useVersionInfo.ts — Server version info hook (installed vs. latest, GitHub API check)
-│   ├── useGlobalShortcuts.ts — App-wide keyboard shortcuts (vault search, mode toggle, settings panel, daily note); extracted from AppContent
+│   ├── useGlobalShortcuts.ts — App-wide keyboard shortcuts (vault search, mode toggle, settings panel, daily note, navigate back/forward); extracted from AppContent. Next/previous tab is registered in `CommandPaletteContainer.tsx` instead — it needs `commandRegistry` from `usePluginContext()`, unreachable from this hook (see App.tsx note)
 │   ├── useWorkspaceRestore.ts — Session-persistence lifecycle: restores vault/tabs/layout from workspaceStore on mount, persists changes back; extracted from AppContent
 │   ├── usePaginatedResource.ts — Shared list-loading state machine (page/loading/error, loadPage/reload) for admin list pages
 │   └── useFocusTrap.ts    — Reusable focus trap hook (Tab cycling, Escape callback, focus return to trigger element)
 ├── components/
 │   ├── SlatebaseLogo.tsx — SVG logo component
-│   ├── StatusBar.tsx     — Bottom status bar (clock, extensible plugin items, togglable in settings)
+│   ├── StatusBar.tsx     — Bottom status bar (clock, vault name, word/char count, cursor position with "go to line" popover, extensible plugin items — each built-in item independently togglable). Plugin items are diff-synced into the DOM (only added/removed elements touched, never a full `innerHTML = ''` + rebuild) so a plugin mutating its own element in place never gets torn out and flickers
+│   ├── SnippetLifecycle.tsx — Renders nothing; applies a vault's enabled CSS snippets on open and swaps them for the new vault's on switch. Mounted once near the app root (reacts to `state.selectedVaultId` via useAppContext) — same "self-contained, context-only, no prop drilling" pattern as StatusBar's VaultNameItem
 │   ├── StatusBar.css     — Status bar styles (Design Tokens)
 │   ├── UserMenu.tsx      — User avatar and dropdown menu (navigation, import/export, admin)
 │   ├── ErrorBoundary.tsx — React Error Boundary (fallback UI, reset button)
@@ -419,6 +442,8 @@ src/
 │   ├── SearchPanel.tsx   — Vault-wide search + replace panel (replaces FileExplorer when open, debounced search, result navigation)
 │   ├── SearchPanel.css   — SearchPanel styles with design tokens
 │   ├── TabBar.tsx        — Unified horizontal tab strip: settings-page tabs (not draggable) + file tabs (draggable/reorderable) in one row
+│   ├── NavigationControls.tsx — Back/forward buttons for the navigation history, disabled when the respective stack is empty
+│   ├── Breadcrumb.tsx    — Active file's folder path as clickable segments (vault name → folders → filename); collapses middle segments into a "…" dropdown past 2 visible folders; hidden for non-file tabs (graph, plugin views)
 │   ├── TabContent.tsx    — Tab content orchestrator (Edit/View/Binary, wires upload + image paste + versions)
 │   ├── TabContent.css    — TabContent styles (empty/loading/error/content states, design tokens)
 │   ├── EditMode.tsx      — CodeMirror editor host: auto-save + undo/redo + line numbers + image paste + DnD + read-only banner + editor command event listener (slatebase:editor-command). No native formatting toolbar — formatting runs through the Command Palette or an Obsidian-compatible plugin toolbar (Editing Toolbar); `livePreviewMode` is a required prop driven by the tab mode
@@ -473,7 +498,7 @@ src/
 │   │   ├── canvas-utils.ts       — generateCanvasId, getCanvasColorClass
 │   │   └── markdown-render.tsx   — renderSimpleMarkdown for node previews
 │   ├── context-panel/
-│   │   ├── ContextPanel.tsx      — Main orchestrator (data loading, debounce, view wiring)
+│   │   ├── ContextPanel.tsx      — Main orchestrator (data loading, debounce, view wiring); also subscribes to `onRealtimeVaultChange` (`realtimeVaultBridge.ts`) and debounces (1000ms) a backlinks re-fetch when a remote `saved`/`renamed`/`deleted` event lands for the current vault, so the Links_View backlinks list stays live instead of only refreshing on document switch
 │   │   ├── ContextPanel.css      — All context panel styles (Design Tokens)
 │   │   ├── ContextPanelTabBar.tsx — Tab bar with Drag & Drop reordering + split detection
 │   │   ├── ContextPanelTabBar.css — Tab bar styles
@@ -499,9 +524,12 @@ src/
 │   │   ├── AccountDeletionSection.tsx — Extracted account deletion form
 │   │   ├── FeatureTogglesSection.tsx  — Feature toggle UI; single consumer of state/featureActions.ts + the global FeatureContext (also embedded by AdminConfigPage, which no longer duplicates the load/toggle logic itself)
 │   │   ├── ServerRestartSection.tsx   — Server restart with confirmation
-│   │   ├── VaultConfigSection.tsx     — Per-vault config (templates dir, daily notes dir)
+│   │   ├── VaultConfigSection.tsx     — Per-vault config (templates dir, daily notes dir) + "Aktive Datei im Explorer verfolgen" checkbox (client-only `workspaceStore.explorerFollowActiveFile`, applies instantly, no save button — unlike the server-persisted fields in the same section)
 │   │   ├── KeybindingsSection.tsx     — Configurable keyboard shortcuts (table, inline recording, conflict detection)
-│   │   ├── AppearanceSection.tsx      — Display preferences (status bar toggle)
+│   │   ├── AppearanceSection.tsx      — Display preferences: global status bar toggle + one toggle per built-in item (clock/vault name/word stats/cursor position), plus the embedded SnippetManager
+│   │   ├── SnippetManager.tsx         — CSS snippet list (name/enabled toggle/size), upload (.css file), "create new" (opens SnippetEditorModal on an empty snippet), delete with ConfirmModal
+│   │   ├── SnippetManager.css         — SnippetManager + SnippetEditorModal styles
+│   │   ├── SnippetEditorModal.tsx     — Embedded snippet content editor (plain textarea — a small settings dialog, not the main document editor); loads on mount unless `initialContent` is already known (skips the round-trip for newly created snippets)
 │   │   └── WelcomeVaultSection.tsx    — On-demand tutorial vault creation (button, loading state, toast)
 │   ├── AdminUsersPage.tsx — User administration
 │   ├── AdminVaultsPage.tsx — Admin: all vaults overview with delete
@@ -511,7 +539,8 @@ src/
 │   ├── PluginUpload.tsx  — Plugin ZIP upload + detected plugins from .obsidian/plugins/
 │   ├── VersionCheckCard.tsx — Admin version check (installed vs. latest, GitHub API, update notification)
 │   ├── CommandPalette.tsx — Modal command palette (search, execute, keyboard nav, Ctrl+P always active)
-│   ├── CommandPaletteContainer.tsx — Built-in commands (navigation, vault ops, editor formatting, view toggles) + plugin commands, Ctrl+P shortcut, CustomEvent bridge to EditMode
+│   ├── QuickSwitcher.tsx — Fuzzy-open-by-name modal (Ctrl+O), structurally mirrors CommandPalette.tsx (overlay, useFocusTrap, Arrow/Enter/Escape) and reuses its `.command-palette-*` CSS classes; sources candidates via `collectFilesSorted()`, ranks via `fuzzyMatch()`, shows `recentFilesStore.getRecent()` for an empty query, offers "create new file" when nothing matches
+│   ├── CommandPaletteContainer.tsx — Built-in commands (navigation, vault ops, editor formatting, view toggles) + plugin commands, Ctrl+P shortcut, CustomEvent bridge to EditMode. Also owns QuickSwitcher's open state and the next/previous-tab keyboard shortcut (both need `commandRegistry`/`usePluginContext()`, only reachable from inside `<PluginProvider>` — see App.tsx note) and wires `app:go-back`/`app:go-forward`/`switcher:open` (previously no-ops in `core-commands-app.ts`) to `useNavigationHistory()`
 │   ├── RealtimeProvider.tsx — SSE event routing (chat, presence, vault:change, plugin-settings:change, toast, server events)
 │   ├── ToastNotification.tsx — Toast notification system (module-level state, CSS transitions)
 │   ├── ToastNotification.css — Toast notification styles
@@ -534,7 +563,7 @@ src/
 │   │   └── UpdateBanner.tsx      — Update notification banner (available updates count)
 │   └── sidebar-panel/
 │       ├── index.ts              — Barrel export for sidebar-panel module
-│       ├── SidebarPanel.tsx      — Left sidebar panel (tabbed: recent files, favorites)
+│       ├── SidebarPanel.tsx      — Left sidebar panel (tabbed: recent files, bookmarks)
 │       ├── SidebarPanel.css      — Sidebar panel styles
 │       ├── SidebarPanelTabBar.tsx — Tab bar for sidebar sections
 │       ├── SidebarPanelTabBar.css — Tab bar styles
@@ -542,8 +571,8 @@ src/
 │       ├── SidebarSplitContainer.css — Split container styles
 │       ├── RecentFilesView.tsx   — Recent files list view
 │       ├── RecentFilesView.css   — Recent files styles
-│       ├── FavoritesView.tsx     — Favorites list view
-│       ├── FavoritesView.css     — Favorites styles
+│       ├── FavoritesView.tsx     — Bookmarks list view: renders all 4 bookmark types (file/heading/block/search) with type-appropriate icon and click resolution; HTML5 drag-and-drop reorder; right-click/Shift+F10 context menu (remove, reveal in explorer via the shared `slatebase:reveal-file` window event + SidebarPanelContext SET_ACTIVE_VIEW, rename via InlineInput) — reuses the generic `ContextMenu.tsx` rather than a dedicated component
+│       ├── FavoritesView.css     — Bookmarks view styles (incl. drag-over/dragging state)
 │       └── utils/
 │           └── persistence.ts    — localStorage layout persistence
 ├── assets/               — Static images
@@ -578,6 +607,7 @@ Route modules in `src/api/`:
 - `mcpTokenRoutes.ts` — token CRUD (session auth)
 - `mcpWellKnownRoute.ts` — `.well-known/mcp.json` (public)
 - `pluginRoutes.ts` — installed-plugin CRUD, bundle, styles, settings, registry (depends only on `IPluginService`)
+- `snippetRoutes.ts` — CSS snippet CRUD + registry (depends only on `ISnippetStore`); DELETE also prunes the snippet's registry entry
 - `pluginStoreRoutes.ts` — community plugin marketplace: browse, install, update (per-vault and global mounts)
 - `featureRoutes.ts` — feature toggles (admin + public)
 - `versionRoutes.ts` — `GET /version` (public)
@@ -586,7 +616,7 @@ Route modules in `src/api/`:
 - `fileVersionRoutes.ts` — file version management (list, get content, restore)
 - `templateRoutes.ts` — template listing and creation
 - `uploadRoutes.ts` — file upload (multipart, image paste mode)
-- `preferencesRoutes.ts` — user preferences (recent files, favorites, keybindings)
+- `preferencesRoutes.ts` — user preferences (recent files, bookmarks, keybindings)
 - `vaultConfigRoutes.ts` — per-vault config (templates dir, daily notes dir, daily note template name)
 - `welcomeVaultRoutes.ts` — `POST /welcome-vault` (on-demand tutorial vault creation)
 - `proxyRoutes.ts` — `POST /proxy` (CORS-free HTTP proxy for plugin requestUrl, SSRF protection)

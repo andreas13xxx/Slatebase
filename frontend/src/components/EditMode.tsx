@@ -6,6 +6,7 @@ import { showToast } from './ToastNotification'
 import { CodeMirrorEditor } from '../editor/CodeMirrorEditor'
 import type { IEditorHandle, EditorFormattingAction } from '../editor/types'
 import type { LivePreviewOptions } from '../editor/live-preview'
+import { isEmbeddableFile, buildInternalLinkText } from '../utils/internalLink'
 
 /**
  * Props for the EditMode component.
@@ -34,12 +35,15 @@ export interface EditModeProps {
 
 type SaveStatus = 'idle' | 'unsaved' | 'saving' | 'saved' | 'error'
 
+/** MIME type used by the File Explorer to mark an internal drag (see FileExplorer.tsx). */
+const INTERNAL_DRAG_TYPE = 'application/x-slatebase-path'
+
 /**
  * EditMode renders a CodeMirror 6 editor with auto-save.
  *
  * Validates: Requirements 1.1, 1.5, 1.6, 1.7, 1.8, 1.9, 10.1, 10.2, 10.3, 10.4, 10.5
  */
- 
+
 export function EditMode({ content, onChange, onSave, onCancel: _onCancel, saving, error, readOnly, filePath, tabId, onExternalFileDrop, onImagePaste: _onImagePaste, livePreviewMode, livePreviewOptions }: EditModeProps) {
   const { t } = useTranslation()
   const [status, setStatus] = useState<SaveStatus>('idle')
@@ -158,11 +162,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
       // For image files, insert embed links via CM6
       const imageEmbeds: string[] = []
       for (const uploaded of result.uploaded) {
-        // Check common image/embeddable extensions
-        const name = uploaded.fileName.toLowerCase()
-        if (name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg') ||
-            name.endsWith('.gif') || name.endsWith('.webp') || name.endsWith('.svg') ||
-            name.endsWith('.pdf')) {
+        if (isEmbeddableFile(uploaded.fileName)) {
           imageEmbeds.push(`![[${uploaded.fileName}]]`)
         }
       }
@@ -189,6 +189,53 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
   //  file-tree DnD indicator which CM6 handles via its own drop extension)
   void isDragOver
   void setIsDragOver
+
+  // --- Internal file drop (from the File Explorer) — inserts a wikilink/embed ---
+
+  const currentVaultId = livePreviewOptions?.vaultId
+
+  /** Allow the drop when dragging a file node from the File Explorer. */
+  const handleInternalDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    if (!e.dataTransfer.types.includes(INTERNAL_DRAG_TYPE)) return
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'copy'
+  }, [])
+
+  /**
+   * Inserts a wikilink for a file dragged from the File Explorer at the drop
+   * position. Folders are ignored; files from a different vault are rejected
+   * since their path can't be resolved against the open file's vault.
+   */
+  const handleInternalDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    if (!e.dataTransfer.types.includes(INTERNAL_DRAG_TYPE)) return
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (readOnly) return
+
+    const draggedPath = e.dataTransfer.getData('application/x-slatebase-path')
+    const draggedType = e.dataTransfer.getData('application/x-slatebase-type')
+    const draggedVaultId = e.dataTransfer.getData('application/x-slatebase-vaultid')
+
+    if (draggedType !== 'file' || !draggedPath) return
+
+    if (currentVaultId && draggedVaultId && draggedVaultId !== currentVaultId) {
+      showToast('warning', t('editor.internalLinkCrossVault'))
+      return
+    }
+
+    const view = editorRef.current?.getView()
+    const insertPos = view?.posAtCoords({ x: e.clientX, y: e.clientY }) ?? view?.state.selection.main.from ?? 0
+    const fileName = draggedPath.split('/').pop() ?? draggedPath
+
+    editorRef.current?.insertAtPos(buildInternalLinkText(fileName), insertPos)
+    setStatus('unsaved')
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => { onSaveRef.current() }, 1500)
+  }, [readOnly, currentVaultId, t])
+
+  const internalDropHandlers = { onDragOver: handleInternalDragOver, onDrop: handleInternalDrop }
 
   // Status bar text
   const statusText = (() => {
@@ -225,7 +272,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
         className="edit-mode-drop-zone"
         hideOverlay
       >
-        <div className="edit-mode-editor-area">
+        <div className="edit-mode-editor-area" {...internalDropHandlers}>
           <CodeMirrorEditor
             content={content}
             onContentChange={handleContentChange}

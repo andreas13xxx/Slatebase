@@ -1,6 +1,6 @@
 ---
-version: "1.0.0"
-updated: "2025-07-15"
+version: "1.2.0"
+updated: "2026-08-14"
 min_slatebase_version: "0.11.0"
 ---
 
@@ -8,6 +8,6 @@ min_slatebase_version: "0.11.0"
 
 This vault contains a complete guide for all Slatebase features.
 
-- **Version:** 1.0.0
-- **Last updated:** July 2025
+- **Version:** 1.2.0
+- **Last updated:** August 2026
 - **Minimum Slatebase version:** 0.11.0

@@ -77,10 +77,14 @@ export interface IWorkspaceShim {
   detachLeavesOfType(viewType: string): void;
   /** Get the active view if it is an instance of the given class, or null. */
   getActiveViewOfType<T>(viewClass: new (...args: unknown[]) => T): T | null;
+  /** Get the active leaf's view if it is a FileView, or null. */
+  getActiveFileView(): unknown;
   /** Iterate over all active leaves (main area and sidebar). */
   iterateAllLeaves(callback: (leaf: WorkspaceLeaf) => void): void;
   /** Iterate over root leaves only (main area tabs, not sidebar). */
   iterateRootLeaves(callback: (leaf: WorkspaceLeaf) => void): void;
+  /** Iterate over legacy CM5 editor instances. No-op — Slatebase's editor is CM6-only. */
+  iterateCodeMirrors(callback: (cm: unknown) => void): void;
 
   // ─── Link Navigation ───────────────────────────────────────────────────────
 
@@ -304,6 +308,10 @@ export interface IMetadataCacheShim {
   getFirstLinkpathDest(linkpath: string, sourcePath: string): TFile | null;
   resolvedLinks: Record<string, Record<string, number>>;
   unresolvedLinks: Record<string, Record<string, number>>;
+  /** All links in the vault that point at `file`, grouped by source path. */
+  getBacklinksForFile(file: TFile): { data: Map<string, LinkCache[]>; count(): number };
+  /** Whether `path` matches the user's "Excluded files" filters. */
+  isUserIgnored(path: string): boolean;
   on(event: string, callback: (...args: unknown[]) => void, context?: unknown): EventRef;
   off(event: string, callback: (...args: unknown[]) => void): void;
   trigger(event: string, ...args: unknown[]): void;
@@ -442,8 +450,8 @@ export interface IFileManagerShim {
   getNewFileParent(sourcePath: string): TFolder;
   /** Create a new markdown file with the given name in the given folder. */
   createNewMarkdownFile(folder: TFolder, name: string): Promise<TFile>;
-  /** Prompt user for deletion and delete the file (moves to trash). */
-  promptForFileDeletion(file: TFile): Promise<void>;
+  /** Prompt user for deletion and delete the file (moves to trash). Resolves to whether it was deleted. */
+  promptForDeletion(file: TFile): Promise<boolean>;
 }
 
 /**
@@ -458,7 +466,27 @@ export interface IAppShim {
   plugins: {
     plugins: Record<string, PluginInstance>;
     enabledPlugins: Set<string>;
+    manifests: Record<string, PluginManifestData>;
     getPlugin(id: string): PluginInstance | undefined;
+    /** Re-fetch manifest data for installed plugins from the backend. */
+    loadManifests(): Promise<void>;
+    /** Wait until any in-flight plugin registry writes have been persisted. */
+    requestSaveConfig(): Promise<void>;
+    /**
+     * Enable (loading it first if needed) and persist the plugin's enabled
+     * state. Mirrors the Settings page toggle exactly, including that it
+     * reloads the page after a successful disable (see disablePluginAndSave).
+     */
+    enablePluginAndSave(pluginId: string): Promise<void>;
+    /**
+     * Disable and persist the plugin's disabled state. Reloads the page once
+     * the disable completes — the same unconditional reload the Settings page
+     * toggle triggers, needed because some plugins (e.g. LiveSync) cannot
+     * reinitialize within the same session after being unloaded. Calling this
+     * on ANY plugin id — including one the caller does not own — reloads the
+     * whole app; there is no per-plugin scoping.
+     */
+    disablePluginAndSave(pluginId: string): Promise<void>;
   };
   setting: {
     open(): void;

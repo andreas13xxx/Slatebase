@@ -22,6 +22,7 @@ import {
   expandTag,
 } from '../../state/contextPanelActions'
 import { openTab } from '../../state/tabActions'
+import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
 import { SplitSectionContainer } from './SplitSectionContainer'
 import { ContextPanelTabBar } from './ContextPanelTabBar'
 import { OutlineView } from './OutlineView'
@@ -39,6 +40,9 @@ import './ContextPanel.css'
 
 /** Debounce delay for content-change updates (outline, forward links, properties). */
 const CONTENT_DEBOUNCE_MS = 500
+
+/** Debounce delay for backlinks re-fetch triggered by remote vault changes (Requirement 5.2). */
+const BACKLINKS_REFRESH_DEBOUNCE_MS = 1000
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -106,6 +110,7 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
 
   // Refs for debounce and tracking previous values
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const backlinksRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevDocumentPathRef = useRef<string | null>(null)
   const prevVaultIdRef = useRef<string | null>(null)
   const panelBodyRef = useRef<HTMLDivElement>(null)
@@ -139,7 +144,7 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
       if (documentContent !== null && documentPath !== null) {
         // Load content-dependent views immediately on document switch
         loadOutline(dispatch, documentContent)
-        loadForwardLinks(dispatch, documentContent, appState.directoryTree)
+        loadForwardLinks(dispatch, documentContent, appState.directoryTree, documentPath ?? undefined)
         loadProperties(dispatch, documentContent)
       }
 
@@ -167,7 +172,7 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
 
     debounceTimerRef.current = setTimeout(() => {
       loadOutline(dispatch, documentContent)
-      loadForwardLinks(dispatch, documentContent, appState.directoryTree)
+      loadForwardLinks(dispatch, documentContent, appState.directoryTree, documentPath ?? undefined)
       loadProperties(dispatch, documentContent)
       debounceTimerRef.current = null
     }, CONTENT_DEBOUNCE_MS)
@@ -194,6 +199,38 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vaultId])
+
+  // ─── Live Backlinks: Refresh on Remote Vault Changes ───────────────────────
+  // Requirement 5: the backlinks fetched above only reflect the vault state at the
+  // moment the document was opened. If another tab/device/user saves, renames, or
+  // deletes a file afterwards, those backlinks go stale until the user switches
+  // documents and back. Subscribe to the existing realtime vault-change bus (already
+  // wired end-to-end for SSE via RealtimeBridge) and debounce a re-fetch.
+
+  useEffect(() => {
+    if (documentPath === null || vaultId === null || !apiClient) return
+
+    const unsubscribe = onRealtimeVaultChange((event) => {
+      if (event.vaultId !== vaultId) return // Requirement 5.6
+      if (event.action !== 'saved' && event.action !== 'renamed' && event.action !== 'deleted') return
+
+      if (backlinksRefreshTimerRef.current !== null) {
+        clearTimeout(backlinksRefreshTimerRef.current)
+      }
+      backlinksRefreshTimerRef.current = setTimeout(() => {
+        backlinksRefreshTimerRef.current = null
+        void loadBacklinks(dispatch, apiClient, vaultId, documentPath)
+      }, BACKLINKS_REFRESH_DEBOUNCE_MS)
+    })
+
+    return () => {
+      unsubscribe()
+      if (backlinksRefreshTimerRef.current !== null) {
+        clearTimeout(backlinksRefreshTimerRef.current)
+        backlinksRefreshTimerRef.current = null
+      }
+    }
+  }, [documentPath, vaultId, apiClient, dispatch])
 
   // ─── Tab Switching ─────────────────────────────────────────────────────────
 
@@ -302,7 +339,7 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
     switch (viewId) {
       case 'outline':
         return (
-          <div className="context-panel__view-wrapper">
+          <div className="context-panel__view-wrapper" key={viewId}>
             <h3 className="context-panel__view-header">Gliederung</h3>
             <OutlineView
               headings={state.outline.headings}
@@ -314,7 +351,7 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
         )
       case 'links':
         return (
-          <div className="context-panel__view-wrapper">
+          <div className="context-panel__view-wrapper" key={viewId}>
             <h3 className="context-panel__view-header">Links</h3>
             <LinksView
               forwardLinks={state.links.forward}
@@ -328,7 +365,7 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
         )
       case 'tags':
         return (
-          <div className="context-panel__view-wrapper">
+          <div className="context-panel__view-wrapper" key={viewId}>
             <h3 className="context-panel__view-header">Tags</h3>
             <TagsView
               tags={state.tags.entries}
@@ -342,7 +379,7 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
         )
       case 'properties':
         return (
-          <div className="context-panel__view-wrapper">
+          <div className="context-panel__view-wrapper" key={viewId}>
             <h3 className="context-panel__view-header">Eigenschaften</h3>
             <PropertiesView
               data={state.properties.data}
@@ -354,7 +391,7 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
         )
       case 'search':
         return (
-          <div className="context-panel__view-wrapper">
+          <div className="context-panel__view-wrapper" key={viewId}>
             <h3 className="context-panel__view-header">Suche</h3>
             <SearchPanel
               vaults={appState.vaults}
@@ -371,15 +408,19 @@ export function ContextPanel({ documentContent, documentPath, vaultId, width }: 
       const viewType = getPluginViewType(viewId)
       const viewInfo = sidebarViews.get(viewType)
       if (!viewInfo) {
-        return <div className="context-panel__plugin-section context-panel__plugin-section--empty" />
+        return <div className="context-panel__plugin-section context-panel__plugin-section--empty" key={viewId} />
       }
       return (
         <div
           className="context-panel__plugin-section"
+          key={viewId}
           ref={(el) => {
             if (el && viewInfo && !el.contains(viewInfo.containerEl)) {
               el.innerHTML = ''
               el.appendChild(viewInfo.containerEl)
+            }
+            if (!el && viewInfo.containerEl.parentElement) {
+              viewInfo.containerEl.parentElement.removeChild(viewInfo.containerEl)
             }
           }}
         />

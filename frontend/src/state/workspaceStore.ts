@@ -50,6 +50,8 @@ export interface WorkspaceState {
   activeSettingsPage: AppPage | null
   /** Selected vault ID. */
   selectedVaultId: string | null
+  /** Whether the file explorer auto-reveals the active tab's file (Requirement 4). */
+  explorerFollowActiveFile: boolean
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -94,6 +96,7 @@ function createDefaultState(): WorkspaceState {
     rightPanelVisible: true,
     activeSettingsPage: null,
     selectedVaultId: null,
+    explorerFollowActiveFile: false,
   }
 }
 
@@ -159,6 +162,9 @@ function validateState(data: unknown): WorkspaceState | null {
     rightPanelVisible: obj.rightPanelVisible as boolean,
     activeSettingsPage: (obj.activeSettingsPage as AppPage | null),
     selectedVaultId: (obj.selectedVaultId as string | null),
+    // Lenient (not strictly validated above): added after the initial schema, so
+    // older persisted blobs won't have it — default to false rather than invalidating them.
+    explorerFollowActiveFile: typeof obj.explorerFollowActiveFile === 'boolean' ? obj.explorerFollowActiveFile : false,
   }
 }
 

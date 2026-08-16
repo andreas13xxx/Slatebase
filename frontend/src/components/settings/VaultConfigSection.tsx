@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { IApiClient, VaultConfig } from '../../api'
 import { showToast } from '../ToastNotification'
+import { getState as getWorkspaceState, update as updateWorkspaceState } from '../../state/workspaceStore'
 
 interface VaultConfigSectionProps {
   apiClient: IApiClient
@@ -30,6 +31,15 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
   const [templatesDir, setTemplatesDir] = useState('')
   const [dailyNotesDir, setDailyNotesDir] = useState('')
   const [dailyNoteTemplateName, setDailyNoteTemplateName] = useState('')
+
+  // Personal display preference (Requirement 4) — client-only, applies instantly,
+  // not part of the server-persisted VaultConfig above.
+  const [followActiveFile, setFollowActiveFile] = useState(() => getWorkspaceState().explorerFollowActiveFile)
+  const handleToggleFollowActiveFile = useCallback(() => {
+    const next = !followActiveFile
+    setFollowActiveFile(next)
+    updateWorkspaceState({ explorerFollowActiveFile: next })
+  }, [followActiveFile])
 
   // Load config on mount / vault change
   useEffect(() => {
@@ -97,6 +107,21 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
   return (
     <div className="vault-config-section">
       {error && <p className="settings-error">{error}</p>}
+
+      <div className="settings-field settings-field--checkbox">
+        <label htmlFor="vault-explorer-follow-active-file" className="settings-field-checkbox-label">
+          <input
+            id="vault-explorer-follow-active-file"
+            type="checkbox"
+            checked={followActiveFile}
+            onChange={handleToggleFollowActiveFile}
+          />
+          Aktive Datei im Explorer verfolgen
+        </label>
+        <p className="settings-field-hint">
+          Klappt beim Wechsel des aktiven Tabs automatisch die übergeordneten Ordner der Datei im Datei-Explorer auf und markiert sie — persönliche Anzeigeeinstellung, wirkt sofort und wird nicht mit anderen Geräten synchronisiert.
+        </p>
+      </div>
 
       <div className="settings-field">
         <label htmlFor="vault-templates-dir" className="settings-field-label">

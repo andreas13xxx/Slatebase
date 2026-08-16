@@ -274,13 +274,7 @@ function renderList(
         const def = item as SettingDefinition
         const setting = new Setting(itemEl)
         if (def.name) setting.setName(def.name)
-        if (def.desc) {
-          if (typeof def.desc === 'string') {
-            setting.setDesc(def.desc)
-          } else {
-            setting.settingEl.querySelector('.setting-item-description')?.appendChild(def.desc)
-          }
-        }
+        if (def.desc) setting.setDesc(def.desc)
 
         // If has action callback — make clickable
         if ('action' in def && def.action && typeof def.action === 'function') {
@@ -341,6 +335,27 @@ function renderPageLink(
   // Make the row navigable (clickable → opens sub-page)
   setting.settingEl.classList.add('setting-item--navigable')
   setting.settingEl.style.cursor = 'pointer'
+
+  // displayValue (Obsidian 1.13.1+) — a computed value shown next to the arrow,
+  // e.g. a sub-page link showing "3 aktiv" for how many items are configured.
+  const displayValue = typeof page.displayValue === 'function' ? page.displayValue() : page.displayValue
+  if (displayValue) {
+    const displayEl = document.createElement('span')
+    displayEl.className = 'setting-item-display-value'
+    displayEl.style.cssText = 'opacity:0.6;font-size:0.9em;margin-left:auto;'
+    displayEl.textContent = displayValue
+    setting.settingEl.querySelector('.setting-item-control')?.appendChild(displayEl)
+  }
+
+  // status (Obsidian 1.13.1+) — a warning indicator on the page link row.
+  const status = typeof page.status === 'function' ? page.status() : page.status
+  if (status === 'warning') {
+    const statusEl = document.createElement('span')
+    statusEl.className = 'setting-item-status setting-item-status--warning'
+    statusEl.style.cssText = 'color:var(--text-warning,#e0a300);margin-left:8px;'
+    statusEl.textContent = '⚠'
+    setting.settingEl.querySelector('.setting-item-control')?.appendChild(statusEl)
+  }
 
   // Arrow indicator
   const arrow = document.createElement('span')
@@ -427,18 +442,7 @@ function renderDefinition(
   const setting = new Setting(containerEl)
 
   if (def.name) setting.setName(def.name)
-  if (def.desc) {
-    if (typeof def.desc === 'string') {
-      setting.setDesc(def.desc)
-    } else {
-      // DocumentFragment — append to descEl
-      const descEl = setting.settingEl.querySelector('.setting-item-description')
-      if (descEl) {
-        descEl.textContent = ''
-        descEl.appendChild(def.desc)
-      }
-    }
-  }
+  if (def.desc) setting.setDesc(def.desc)
 
   // Render callback (imperative)
   if ('render' in def && def.render) {

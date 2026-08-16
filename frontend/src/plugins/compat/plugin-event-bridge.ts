@@ -248,9 +248,9 @@ export function usePluginEventBridge({
       // Content changed AND editBuffer is null means SAVE_SUCCESS happened
       if (prevContent !== undefined && prevContent !== currentContent && tab.editBuffer === null) {
         const tFile = buildTFileFromPath(tab.filePath)
-        // Emit 'changed' with the file and a minimal CachedMetadata
-        // (the full metadata parsing is done by the shim's cache if populated)
-        metadataCacheShim.trigger('changed', tFile, {})
+        // Re-parse the saved content so getFileCache() (sections, frontmatter, tags,
+        // links) reflects the current document rather than the stale open-time snapshot.
+        metadataCacheShim.refreshFileCache(tFile, currentContent)
       }
     }
 

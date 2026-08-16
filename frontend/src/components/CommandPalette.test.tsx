@@ -78,12 +78,12 @@ describe('CommandPalette', () => {
     expect(screen.queryByText('Open File')).not.toBeInTheDocument()
   })
 
-  it('limits results to 50 items', () => {
-    const manyCommands = createCommands(60)
+  it('limits results to 300 items', () => {
+    const manyCommands = createCommands(310)
     render(<CommandPalette {...defaultProps} commands={manyCommands} />)
 
     const items = screen.getAllByRole('option')
-    expect(items.length).toBe(50)
+    expect(items.length).toBe(300)
   })
 
   it('shows empty state when no commands match', async () => {

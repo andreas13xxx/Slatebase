@@ -15,12 +15,14 @@ import type { Root, RootContent, PhrasingContent, AlignType } from 'mdast'
 import type { DirectoryTree } from '../types'
 import { AppContext } from '../state'
 import { requestHoverPreview, dismissHoverPreview } from '../plugins/compat/hover-link-bus'
+import { resolveWikilinkTargetWithAlternatives } from '../plugins/link-resolver'
 import { warnOnce } from '../plugins/compat/log'
 import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, remarkBreaks, remarkBlockRef, remarkPreserveTableCodeEscapes, createAnchorTracker } from '../plugins'
 import type { WikilinkNode, EmbedNode, CalloutNode, TagNode } from '../plugins'
 import { INLINE_HTML_OPEN_TAG_RE, INLINE_HTML_CLOSE_TAG_RE, parseInlineHtmlAttrs, parseStyleString } from '../plugins/inline-html'
 import { PdfViewer } from './BinaryViewer'
 import { MermaidRenderer } from './MermaidRenderer'
+import { findEmbedCreatorForTarget, getLinktextExtension, mountRegisteredEmbed, type EmbedCreator, type EmbedContext } from '../plugins/compat/embed-registry'
 
 /**
  * Mapping of callout types to their Lucide icon component and CSS color token.
@@ -55,60 +57,33 @@ export interface ViewModeProps {
 }
 
 /**
- * Searches the DirectoryTree recursively for a file matching the given target name.
- * Matching is case-insensitive and tries both with and without .md extension.
- * Returns the file's relative path if found, or null if not found.
+ * Resolves a wikilink target against the DirectoryTree, with deterministic
+ * disambiguation when multiple files share the target name (same folder as
+ * `sourcePath`, then shortest path, then alphabetical — see `resolveAmbiguousMatch`
+ * in `link-resolver.ts`). Returns the file's relative path, or null if not found.
+ *
+ * Thin wrapper around `resolveWikilinkTargetWithAlternatives` kept for backward
+ * compatibility with existing imports of `resolveWikilinkTarget` from this module;
+ * rendering call sites that need the alternative-count for tooltips (Requirement 6.6)
+ * call `resolveWikilinkTargetWithAlternatives` directly instead.
  *
  * Validates: Requirements 6.1, 6.6
  */
 // eslint-disable-next-line react-refresh/only-export-components
-export function resolveWikilinkTarget(target: string, tree: DirectoryTree | null): string | null {
-  if (!tree) return null
-
-  const normalizedTarget = target.trim()
-  if (!normalizedTarget) return null
-
-  // Collect all files from the tree
-  const files: { name: string; path: string }[] = []
-  collectFiles(tree, files)
-
-  const targetLower = normalizedTarget.toLowerCase()
-
-  // Try exact path match first (case-insensitive) — handles "folder/file" targets
-  for (const file of files) {
-    const pathLower = file.path.toLowerCase()
-    if (pathLower === targetLower || pathLower === targetLower + '.md') {
-      return file.path
-    }
-  }
-
-  // Fallback: match by filename only (Obsidian behavior for short-form links)
-  for (const file of files) {
-    const nameLower = file.name.toLowerCase()
-    if (nameLower === targetLower || nameLower === targetLower + '.md') {
-      return file.path
-    }
-    // Also match if target includes .md and file name matches
-    if (targetLower.endsWith('.md') && nameLower === targetLower) {
-      return file.path
-    }
-  }
-
-  return null
+export function resolveWikilinkTarget(target: string, tree: DirectoryTree | null, sourcePath?: string): string | null {
+  return resolveWikilinkTargetWithAlternatives(target, tree, sourcePath)?.resolved.path ?? null
 }
 
 /**
- * Recursively collects all file entries from a DirectoryTree.
+ * Builds the `title` tooltip hint for an ambiguous link resolution (Requirement 6.6).
+ * Returns undefined for unresolved or unambiguous links (no tooltip needed).
  */
-function collectFiles(node: DirectoryTree, result: { name: string; path: string }[]): void {
-  if (node.type === 'file') {
-    result.push({ name: node.name, path: node.path })
-  }
-  if (node.children) {
-    for (const child of node.children) {
-      collectFiles(child, result)
-    }
-  }
+function ambiguityTitle(
+  resolution: { resolved: { path: string }; alternativeCount: number } | null,
+): string | undefined {
+  if (!resolution || resolution.alternativeCount === 0) return undefined
+  const suffix = resolution.alternativeCount === 1 ? 'weitere gleichnamige Datei' : 'weitere gleichnamige Dateien'
+  return `Löst auf zu: ${resolution.resolved.path} (+${resolution.alternativeCount} ${suffix})`
 }
 
 
@@ -389,6 +364,59 @@ function NoteEmbed({ vaultId, filePath, target, heading, blockRef, directoryTree
       token,
     })
   )
+}
+
+/**
+ * Props for the RegisteredEmbed component.
+ */
+interface RegisteredEmbedProps {
+  filePath: string
+  target: string
+  heading: string | null
+  blockRef: string | null
+  creator: EmbedCreator
+}
+
+/**
+ * Renders an embed by delegating to a plugin-registered creator from
+ * app.embedRegistry (see ../plugins/compat/embed-registry.ts) instead of
+ * the built-in image/PDF/note pipeline — e.g. Supernote's `.note` embeds or
+ * PDF++'s overridden PDF embeds. Mounts the plugin's Component into a plain
+ * container div on mount, and unloads it on unmount/target change.
+ */
+function RegisteredEmbed({ filePath, target, heading, blockRef, creator }: RegisteredEmbedProps) {
+  // A state-backed callback ref (not a ref object) — the effect below needs
+  // to re-run once the container div actually exists, and a plain ref's
+  // `.current` read during render is what react-hooks/refs flags; setState
+  // as the ref sidesteps that while still triggering the effect on mount.
+  const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!containerEl) return
+
+    const context: EmbedContext = {
+      app: (window as unknown as { app?: unknown }).app,
+      containerEl,
+      linktext: target,
+      sourcePath: '',
+      showInline: true,
+      displayMode: true,
+    }
+    // Obsidian's subpath convention: `#heading` or `#^block-id`, including
+    // the leading `#` — heading and blockRef are mutually exclusive (see
+    // embedFromMarkdown in ../plugins/embed/mdast-util.ts).
+    const subpath = blockRef ? `#^${blockRef}` : heading ? `#${heading}` : undefined
+    const component = mountRegisteredEmbed(creator, context, filePath, subpath)
+
+    return () => {
+      component?.unload?.()
+    }
+  }, [containerEl, filePath, target, heading, blockRef, creator])
+
+  return createElement('div', {
+    ref: setContainerEl,
+    className: 'view-mode-embed view-mode-embed--plugin',
+  })
 }
 
 /**
@@ -1338,10 +1366,10 @@ function renderTextWithEmbeds(
       const displayText = match[4] ?? target
 
       // Resolve the wikilink target against the directory tree
-      const resolvedPath = resolveWikilinkTarget(target, directoryTree)
-      const isBroken = resolvedPath === null
+      const resolution = resolveWikilinkTargetWithAlternatives(target, directoryTree)
+      const isBroken = resolution === null
 
-      const linkPath = resolvedPath ?? `${target}.md`
+      const linkPath = resolution?.resolved.path ?? `${target}.md`
       const className = isBroken
         ? 'view-mode-link view-mode-link--internal view-mode-link--broken'
         : 'view-mode-link view-mode-link--internal'
@@ -1350,6 +1378,7 @@ function renderTextWithEmbeds(
         key: `${key}-wikilink-${matchStart}`,
         href: '#',
         className,
+        title: ambiguityTitle(resolution),
         onClick: (e: React.MouseEvent) => {
           e.preventDefault()
           onInternalLinkClick?.(linkPath)
@@ -1416,10 +1445,10 @@ function renderWikilinkNode(
   }
 
   // Resolve the wikilink target against the directory tree
-  const resolvedPath = resolveWikilinkTarget(target, directoryTree)
-  const isBroken = resolvedPath === null
+  const resolution = resolveWikilinkTargetWithAlternatives(target, directoryTree)
+  const isBroken = resolution === null
 
-  const linkPath = resolvedPath ?? `${target}.md`
+  const linkPath = resolution?.resolved.path ?? `${target}.md`
   const className = isBroken
     ? 'view-mode-link view-mode-link--internal view-mode-link--broken'
     : 'view-mode-link view-mode-link--internal'
@@ -1428,6 +1457,7 @@ function renderWikilinkNode(
     key,
     href: '#',
     className,
+    title: ambiguityTitle(resolution),
     // Read by the hover-preview delegation on the container, so the resolved
     // path does not have to be threaded through every render function.
     'data-link-path': isBroken ? undefined : linkPath,
@@ -1677,6 +1707,24 @@ function renderEmbedNode(
       key,
       className: 'view-mode-embed view-mode-embed--missing',
     }, `Notiz nicht gefunden: ${node.target}`)
+  }
+
+  // Before falling into the generic note pipeline: check app.embedRegistry
+  // (see ../plugins/compat/embed-registry.ts) for a plugin-registered
+  // creator matching this embed's extension — either the apparent one in
+  // the link text (e.g. "excalidraw" from "Drawing.excalidraw") or the
+  // resolved file's real one (e.g. "md"). A match delegates to that
+  // plugin's own embed component instead of rendering the raw note.
+  const embedCreator = findEmbedCreatorForTarget(node.target, getLinktextExtension(resolvedNotePath))
+  if (embedCreator) {
+    return createElement(RegisteredEmbed, {
+      key,
+      filePath: resolvedNotePath,
+      target: node.target,
+      heading: node.heading,
+      blockRef: node.blockRef ?? null,
+      creator: embedCreator,
+    })
   }
 
   // Render note embed as a component that fetches and displays the content

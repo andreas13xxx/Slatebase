@@ -502,6 +502,18 @@
   background: var(--bg-elevated);
 }
 
+.cm-lp-table th:focus,
+.cm-lp-table td:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.cm-lp-table th[contenteditable="true"],
+.cm-lp-table td[contenteditable="true"] {
+  cursor: text;
+  background: var(--bg-elevated);
+}
+
 /* --- Standard Markdown Images --- */
 .cm-lp-image {
   max-width: 100%;

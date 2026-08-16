@@ -36,11 +36,69 @@ import {
  * workspace.setActiveFile(myTFile);
  * ```
  */
+/**
+ * Shape of the synthetic `view` object attached to the shared fileLeaf, used
+ * both for regular file tabs (setActiveFile) and the "empty" fallback
+ * (getOrCreateEmptyLeaf). Covers the View surface real plugins call on
+ * whatever leaf happens to be active, without necessarily checking it first.
+ */
+/**
+ * Builds a placeholder container carrying the `.markdown-source-view` marker
+ * that plugins query for an editor insertion point (e.g. "Editing Toolbar"
+ * builds its floating selection toolbar off
+ * `containerEl.querySelector('.markdown-source-view')`), for use before the
+ * real CM6 editor has mounted.
+ *
+ * Real Obsidian's leaf DOM skeleton — including that marker — exists
+ * synchronously, before the CM6 instance inside it finishes initializing.
+ * Without this, `querySelector('.markdown-source-view')` returns null during
+ * a plugin's synchronous onload()/onLayoutReady() init. Plugins treat that as
+ * "nothing to attach to yet" and skip their own setup, but never get a signal
+ * to retry once the real editor mounts — leaving a field like a cached
+ * toolbar element permanently unset and throwing the next time selection
+ * handling reads it.
+ */
+function createMarkdownSourceViewPlaceholder(): HTMLElement {
+  const container = document.createElement('div');
+  container.className = 'plugin-view-container';
+  const marker = document.createElement('div');
+  marker.className = 'markdown-source-view mod-cm6';
+  container.appendChild(marker);
+  return container;
+}
+
+interface SyntheticFileLeafView {
+  view: {
+    file: TFile | null;
+    getViewType: () => string;
+    getMode: () => string;
+    getDisplayText: () => string;
+    getIcon: () => string;
+    getState: () => Record<string, unknown>;
+    setState: () => Promise<void>;
+    getEphemeralState: () => Record<string, unknown>;
+    setEphemeralState: () => void;
+    readonly containerEl: HTMLElement;
+  };
+}
+
 export class WorkspaceShim implements IWorkspaceShim {
   private events: EventSystem;
   private activeFile: TFile | null = null;
   private activeLeaf: WorkspaceLeaf | null = null;
   private fileLeaf: WorkspaceLeaf | null = null;
+  /**
+   * The most recently active leaf in the MAIN area specifically — distinct from
+   * `activeLeaf`, which also tracks sidebar leaves (e.g. a plugin's own toolbar
+   * panel in the Context Panel). Real Obsidian's `getMostRecentLeaf()` defaults
+   * to `root = this.rootSplit`, deliberately excluding sidebar leaves, so that
+   * a sidebar panel (Advanced Tables' table-controls toolbar, for one) can look
+   * up "the editor I should act on" even while the user's focus/click is inside
+   * the sidebar itself. Sharing a single field with `activeLeaf` broke exactly
+   * that: revealing the sidebar leaf overwrote it, and the toolbar's own
+   * `instanceof MarkdownView` check against the wrong leaf failed.
+   */
+  private mostRecentMainLeaf: WorkspaceLeaf | null = null;
   private viewRegistry: ViewRegistry | null = null;
   private app: unknown = null;
   private directoryTree: DirectoryTree | null = null;
@@ -74,6 +132,10 @@ export class WorkspaceShim implements IWorkspaceShim {
       this.events.trigger('layout-change');
       if (this.activeLeaf) this.events.trigger('active-leaf-change', this.activeLeaf);
     });
+    debugOnce(
+      'WorkspaceShim.protocolHandlers',
+      '[WorkspaceShim] protocolHandlers/protocolHandler: Slatebase is a web app and cannot receive obsidian:// links — registered handlers are stored but never invoked.'
+    );
   }
 
   /**
@@ -171,20 +233,36 @@ export class WorkspaceShim implements IWorkspaceShim {
         this.fileLeaf = this.viewRegistry.createLeaf(this.app, 'main');
       }
       if (this.fileLeaf) {
+        // Memoized per view instance so repeated pre-mount reads return the
+        // same placeholder rather than a fresh detached div each time.
+        let containerElFallback: HTMLElement | null = null;
         // Attach a minimal view-like object with the file reference.
         // containerEl is a getter (not a snapshot) because plugins may read
         // activeLeaf.view.containerEl before or after the CM6 editor mounts
         // (React effect ordering isn't guaranteed relative to this call) —
         // it must always reflect whatever editor is currently live.
-        (this.fileLeaf as unknown as { view: { file: TFile | null; getViewType: () => string; getMode: () => string; readonly containerEl: HTMLElement } }).view = {
+        (this.fileLeaf as unknown as SyntheticFileLeafView).view = {
           file,
           getViewType: () => 'markdown',
           getMode: () => 'source',
+          // Real Obsidian's MarkdownView always implements this View surface —
+          // plugins routinely call these off the active leaf without checking
+          // they're implemented first (obsidian-git's active-leaf-change handler
+          // and Mind Map's activeLeafPath/activeLeafName both do, for getState()
+          // and getDisplayText() respectively). Implementing the whole small
+          // surface at once avoids fixing this one method at a time.
+          getDisplayText: () => file?.basename ?? file?.name ?? 'Untitled',
+          getIcon: () => 'document',
+          getState: () => ({ file: file?.path ?? null, mode: 'source', source: true }),
+          setState: async () => {},
+          getEphemeralState: () => ({}),
+          setEphemeralState: () => {},
           get containerEl() {
-            return getActiveEditorContainerEl() ?? document.createElement('div');
+            return getActiveEditorContainerEl() ?? (containerElFallback ??= createMarkdownSourceViewPlaceholder());
           },
         };
         this.activeLeaf = this.fileLeaf;
+        this.mostRecentMainLeaf = this.fileLeaf;
       }
     } else {
       // Real Obsidian's active leaf is (almost) never null — even with no file
@@ -192,6 +270,7 @@ export class WorkspaceShim implements IWorkspaceShim {
       // returns null only when there's truly no leaf infrastructure available
       // (no ViewRegistry/app attached) to hand plugins anything.
       this.activeLeaf = this.getOrCreateEmptyLeaf();
+      this.mostRecentMainLeaf = this.activeLeaf;
     }
 
     // Only emit events if the file actually changed
@@ -218,12 +297,19 @@ export class WorkspaceShim implements IWorkspaceShim {
       if (!this.viewRegistry || !this.app) return null;
       this.fileLeaf = this.viewRegistry.createLeaf(this.app, 'main');
     }
-    (this.fileLeaf as unknown as { view: { file: TFile | null; getViewType: () => string; getMode: () => string; readonly containerEl: HTMLElement } }).view = {
+    let emptyContainerElFallback: HTMLElement | null = null;
+    (this.fileLeaf as unknown as SyntheticFileLeafView).view = {
       file: null,
       getViewType: () => 'empty',
       getMode: () => 'source',
+      getDisplayText: () => 'New tab',
+      getIcon: () => 'file',
+      getState: () => ({ file: null }),
+      setState: async () => {},
+      getEphemeralState: () => ({}),
+      setEphemeralState: () => {},
       get containerEl() {
-        return getActiveEditorContainerEl() ?? document.createElement('div');
+        return getActiveEditorContainerEl() ?? (emptyContainerElFallback ??= createMarkdownSourceViewPlaceholder());
       },
     };
     return this.fileLeaf;
@@ -352,6 +438,11 @@ export class WorkspaceShim implements IWorkspaceShim {
     }
 
     this.activeLeaf = leaf;
+    // Sidebar leaves (e.g. a plugin revealing its own Context Panel toolbar)
+    // must not steal "most recent main leaf" status — see the field doc comment.
+    if (leaf.location === 'main') {
+      this.mostRecentMainLeaf = leaf;
+    }
     this.events.trigger('active-leaf-change', leaf);
   }
 
@@ -440,16 +531,67 @@ export class WorkspaceShim implements IWorkspaceShim {
 
     // If requesting MarkdownView (or one of its Obsidian ancestor classes) and we
     // have an active file and a leaf to build it against, construct one.
-    if (isMarkdownViewFamily && this.activeFile && MarkdownViewClass && this.fileLeaf) {
-      const mdView = new MarkdownViewClass(this.fileLeaf) as unknown as { file: TFile | null; containerEl: HTMLElement };
-      mdView.file = this.activeFile;
-      // Snapshot the live editor container — fresh per call, so this stays
-      // accurate whether or not the CM6 editor has mounted yet.
-      mdView.containerEl = getActiveEditorContainerEl() ?? mdView.containerEl;
-      return mdView as unknown as T;
+    if (isMarkdownViewFamily) {
+      const mdView = this.buildMarkdownView();
+      if (mdView) return mdView as unknown as T;
     }
 
     return null;
+  }
+
+  /**
+   * Builds a fresh `window.obsidian.MarkdownView` instance (the real
+   * Component -> View -> ItemView -> FileView -> MarkdownView chain from
+   * install-globals.ts) bound to the shared `fileLeaf`, reflecting whatever
+   * file/editor is currently active. Returns null if there's no active file,
+   * no fileLeaf, or the MarkdownView class hasn't been installed yet.
+   *
+   * Built fresh on every call — like `getActiveViewOfType`'s containerEl
+   * snapshot below, this must stay accurate whether or not the CM6 editor
+   * has mounted yet, so nothing here is cached across calls.
+   */
+  private buildMarkdownView(): unknown | null {
+    const obsidian = (window as unknown as { obsidian?: Record<string, unknown> }).obsidian;
+    const MarkdownViewClass = obsidian?.MarkdownView as (new (leaf: unknown) => object) | undefined;
+    if (!MarkdownViewClass || !this.activeFile || !this.fileLeaf) return null;
+
+    const mdView = new MarkdownViewClass(this.fileLeaf) as unknown as { file: TFile | null; containerEl: HTMLElement; contentEl?: HTMLElement };
+    mdView.file = this.activeFile;
+    const liveContainer = getActiveEditorContainerEl();
+    if (liveContainer) {
+      // Snapshot the live editor container — fresh per call, so this stays
+      // accurate whether or not the CM6 editor has mounted yet.
+      mdView.containerEl = liveContainer;
+    } else if (mdView.contentEl) {
+      // No real editor mounted yet. Real Obsidian's leaf DOM skeleton — including
+      // the `.markdown-source-view` marker plugins query for an insertion point
+      // (e.g. "Editing Toolbar" builds its floating selection toolbar off
+      // `containerEl.querySelector('.markdown-source-view')`) — exists
+      // synchronously, before the CM6 instance inside it finishes initializing.
+      // Without this, that query returns null during a plugin's synchronous
+      // onload()/onLayoutReady() init. Plugins treat that as "nothing to attach
+      // to yet" and skip their setup, but — unlike the active-leaf-change/
+      // layout-change re-fire below — never get a signal to retry once the real
+      // editor mounts, leaving a field like a cached toolbar element permanently
+      // unset and throwing the next time selection handling reads it.
+      const placeholder = document.createElement('div');
+      placeholder.className = 'markdown-source-view mod-cm6';
+      mdView.contentEl.appendChild(placeholder);
+    }
+    return mdView;
+  }
+
+  /**
+   * Returns the active leaf's view if it is a FileView, or null.
+   *
+   * Undocumented internal Obsidian API — several plugins call it as a shortcut
+   * for `getActiveViewOfType(FileView)` instead of importing FileView themselves.
+   */
+  getActiveFileView(): unknown {
+    const obsidian = (window as unknown as { obsidian?: Record<string, unknown> }).obsidian;
+    const FileViewClass = obsidian?.FileView as (new (...args: unknown[]) => object) | undefined;
+    if (!FileViewClass) return null;
+    return this.getActiveViewOfType(FileViewClass);
   }
 
   /**
@@ -488,6 +630,14 @@ export class WorkspaceShim implements IWorkspaceShim {
   }
 
   /**
+   * Iterate over legacy CM5 editor instances. Slatebase's editor is CM6-only —
+   * there is no CM5 instance to hand back, so the callback is never invoked.
+   */
+  iterateCodeMirrors(_callback: (cm: unknown) => void): void {
+    debugOnce('WorkspaceShim.iterateCodeMirrors', '[WorkspaceShim] iterateCodeMirrors: Slatebase has no legacy CM5 editor instances — callback not invoked.');
+  }
+
+  /**
    * Detach (close) all leaves of the given view type.
    * Emits `layout-change` after leaves are detached.
    */
@@ -507,9 +657,14 @@ export class WorkspaceShim implements IWorkspaceShim {
   /**
    * Set the active leaf internally (called by the event bridge when tab changes).
    * Does not emit events — used for synchronizing state from external tab changes.
+   *
+   * Only ever called for the main tab bar (file tabs and main-area plugin view
+   * tabs — see plugin-event-bridge.ts), never for Context Panel/sidebar leaves,
+   * so it's always safe to update mostRecentMainLeaf alongside activeLeaf here.
    */
   setActiveLeafInternal(leaf: WorkspaceLeaf | null): void {
     this.activeLeaf = leaf;
+    this.mostRecentMainLeaf = leaf;
   }
 
   // ─── Link Navigation ──────────────────────────────────────────────────────────
@@ -621,11 +776,27 @@ export class WorkspaceShim implements IWorkspaceShim {
   })();
 
   /**
-   * Get the most recently active leaf in the workspace.
-   * Used by LiveSync for getting the active editing context.
+   * Get the most recently active leaf in the MAIN area (mirrors real Obsidian's
+   * `getMostRecentLeaf(root = this.rootSplit)`, which explicitly excludes
+   * sidebar leaves). Used by LiveSync for getting the active editing context,
+   * and by plugins with their own sidebar toolbar (Advanced Tables) to find
+   * "the editor to act on" even while the click that triggered them happened
+   * inside the sidebar — see the `mostRecentMainLeaf` field doc comment.
+   *
+   * When that leaf is the native file editor, its `.view` is rebuilt as a real
+   * `MarkdownView` instance on every call (not the plain duck-typed object
+   * `setActiveFile` stores there) so `instanceof MarkdownView` checks succeed —
+   * the same construction `getActiveViewOfType(MarkdownView)` uses.
    */
   getMostRecentLeaf(): WorkspaceLeaf | null {
-    return this.activeLeaf;
+    const leaf = this.mostRecentMainLeaf ?? this.activeLeaf;
+    if (leaf && leaf === this.fileLeaf) {
+      const mdView = this.buildMarkdownView();
+      if (mdView) {
+        (leaf as unknown as { view: unknown }).view = mdView;
+      }
+    }
+    return leaf;
   }
 
   /**
@@ -714,6 +885,16 @@ export class WorkspaceShim implements IWorkspaceShim {
   readonly rightSplit = { type: 'split', collapsed: false, toggle() {}, collapse() {}, expand() {} };
 
   /**
+   * `obsidian://` protocol-handler registry. Slatebase is a web app and cannot
+   * receive OS-level obsidian:// links, so nothing ever invokes handlers stored
+   * here — these are present as real, writable containers so plugins that read
+   * or write them directly (bypassing `registerObsidianProtocolHandler`) don't
+   * crash.
+   */
+  readonly protocolHandlers = new Map<string, (params: Record<string, string>) => unknown>();
+  protocolHandler: ((params: Record<string, string>) => unknown) | null = null;
+
+  /**
    * Ribbon (the vertical icon bar) stubs — Slatebase has no ribbon UI, so hide/show/toggle
    * are no-ops. Exists so plugins calling `workspace.leftRibbon.hide()` (e.g. Editing
    * Toolbar's "Workplace Fullscreen" command) don't crash on `undefined.hide()`.
@@ -780,6 +961,8 @@ export class WorkspaceShim implements IWorkspaceShim {
       'off',
       'trigger',
       'setActiveFile',
+      'getOrCreateEmptyLeaf',
+      'openFileDirectly',
       'removeAllListeners',
       'setViewRegistry',
       'registerView',
@@ -827,6 +1010,10 @@ export class WorkspaceShim implements IWorkspaceShim {
       'getLayout',
       'getLeafById',
       'createLeafInParent',
+      'getActiveFileView',
+      'iterateCodeMirrors',
+      'protocolHandlers',
+      'protocolHandler',
       // Internal properties that should not trigger warnings
       'events',
       'activeFile',
@@ -839,10 +1026,17 @@ export class WorkspaceShim implements IWorkspaceShim {
     ]);
 
     return new Proxy(instance, {
-      get(target: WorkspaceShim, prop: string | symbol, receiver: unknown): unknown {
-        // Allow access to emulated properties directly
+      get(target: WorkspaceShim, prop: string | symbol): unknown {
+        // Allow access to emulated properties directly. `target` (not the
+        // Proxy) is passed as the receiver so getters run with `this` bound
+        // to the real instance — otherwise a getter that reads `this.somePrivateField`
+        // (not itself in emulatedProperties) would re-enter this trap via the
+        // Proxy and get the generic no-op-function gap value instead of the
+        // real field. That's exactly how `activeEditor`'s `this.editorShim`
+        // read used to come back as a callable stub instead of the EditorShim,
+        // crashing any plugin that then called `.hasFocus()` on it.
         if (emulatedProperties.has(prop)) {
-          const value = Reflect.get(target, prop, receiver);
+          const value = Reflect.get(target, prop, target);
           if (typeof value === 'function') {
             return value.bind(target);
           }
@@ -851,7 +1045,17 @@ export class WorkspaceShim implements IWorkspaceShim {
 
         // Allow symbol properties (iterator, toStringTag, etc.) and standard object properties
         if (typeof prop === 'symbol') {
-          return Reflect.get(target, prop, receiver);
+          return Reflect.get(target, prop, target);
+        }
+
+        // A callable `then` makes this object "thenable" — if the proxy is ever
+        // returned from an async function or otherwise flows through a Promise,
+        // the native Promise resolution algorithm calls it as `then(resolve,
+        // reject)` instead of just settling with the proxy, and since the no-op
+        // below never calls resolve/reject, that await hangs forever. Must stay
+        // a plain `undefined`, not fall into the generic callable-no-op path.
+        if (prop === 'then') {
+          return undefined;
         }
 
         // Non-emulated property: record the gap and warn once. The workspace is

@@ -140,6 +140,65 @@ describe('AppShim', () => {
     });
   });
 
+  describe('plugins.loadManifests() / plugins.requestSaveConfig()', () => {
+    it('warns once and resolves when no pluginManager was supplied', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const app = new AppShim({ vault, workspace, metadataCache, pluginId: 'test-plugin' });
+
+      await expect(app.plugins.loadManifests()).resolves.toBeUndefined();
+      await expect(app.plugins.requestSaveConfig()).resolves.toBeUndefined();
+      expect(warnSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('delegates to the supplied pluginManager callbacks', async () => {
+      const loadManifests = vi.fn().mockResolvedValue(undefined);
+      const requestSaveConfig = vi.fn().mockResolvedValue(undefined);
+      const app = new AppShim({
+        vault, workspace, metadataCache, pluginId: 'test-plugin',
+        pluginManager: { loadManifests, requestSaveConfig },
+      });
+
+      await app.plugins.loadManifests();
+      await app.plugins.requestSaveConfig();
+
+      expect(loadManifests).toHaveBeenCalledOnce();
+      expect(requestSaveConfig).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('plugins.enablePluginAndSave() / plugins.disablePluginAndSave()', () => {
+    it('warns once and resolves when no pluginManager was supplied', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const app = new AppShim({ vault, workspace, metadataCache, pluginId: 'test-plugin' });
+
+      await expect(app.plugins.enablePluginAndSave('other-plugin')).resolves.toBeUndefined();
+      await expect(app.plugins.disablePluginAndSave('other-plugin')).resolves.toBeUndefined();
+      expect(warnSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('delegates to the supplied pluginManager callbacks with the target plugin id', async () => {
+      const enablePluginAndSave = vi.fn().mockResolvedValue(undefined);
+      const disablePluginAndSave = vi.fn().mockResolvedValue(undefined);
+      const app = new AppShim({
+        vault, workspace, metadataCache, pluginId: 'test-plugin',
+        pluginManager: {
+          loadManifests: vi.fn().mockResolvedValue(undefined),
+          requestSaveConfig: vi.fn().mockResolvedValue(undefined),
+          enablePluginAndSave,
+          disablePluginAndSave,
+        },
+      });
+
+      await app.plugins.enablePluginAndSave('other-plugin');
+      await app.plugins.disablePluginAndSave('other-plugin');
+
+      expect(enablePluginAndSave).toHaveBeenCalledOnce();
+      expect(enablePluginAndSave).toHaveBeenCalledWith('other-plugin');
+      expect(disablePluginAndSave).toHaveBeenCalledOnce();
+      expect(disablePluginAndSave).toHaveBeenCalledWith('other-plugin');
+    });
+  });
+
   describe('Proxy-based non-emulated access', () => {
     it('should return no-op function for non-emulated property access', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});

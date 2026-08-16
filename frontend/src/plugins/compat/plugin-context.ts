@@ -43,6 +43,7 @@ import { CssInjector } from './css-injector'
 import { CompatibilityAnalyzer } from './compatibility-analyzer'
 // Installs the global `window.obsidian` namespace the plugin bundles run against.
 import { installObsidianGlobals } from './install-globals'
+import { useTranslation } from '../../i18n'
 import { clearApiGaps } from './api-gap-registry'
 import type { ICompatibilityAnalyzer } from './compatibility-analyzer'
 import { VaultShim } from './shims/vault-shim'
@@ -56,10 +57,12 @@ import { warnNoOp } from './log'
 import { AppShim, createCommandManager, createHotkeyManager } from './shims/app-shim'
 import { Scope } from './obsidian-api-extensions'
 import { setEditorViewAccessor } from './editor-shim'
+import { withPluginContextAsync } from './plugin-execution-context'
 import { getActiveEditorView, registerPluginExtension, removePluginExtensions, registerPluginCompletionSource, removePluginCompletionSources } from '../../editor/plugin-extensions'
 import { registerMarkdownRendererGlobal } from './shims/markdown-renderer-shim'
 import { usePluginEventBridge } from './plugin-event-bridge'
 import { ViewRegistry } from './view-registry'
+import { createEmbedRegistryShim } from './embed-registry'
 import type { ItemView, WorkspaceLeaf } from './view-registry'
 import type { TabState } from '../../state/tabState'
 import { useTabContext } from '../../state/tabContext'
@@ -251,6 +254,7 @@ export function PluginProvider({
   directoryTree,
   tabState,
 }: PluginProviderProps) {
+  const { locale } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
   const [plugins, setPlugins] = useState<PluginRegistryEntry[]>([])
   const [activeViews, setActiveViews] = useState<Map<string, { viewType: string; displayText: string; containerEl: HTMLElement }>>(new Map())
@@ -425,9 +429,12 @@ export function PluginProvider({
       })()
     })
 
-    // Create shared shim instances for the vault (shared across all plugins)
-    const newWorkspaceShim = new WorkspaceShim()
-    const newMetadataCacheShim = new MetadataCacheShim(directoryTree)
+    // Create shared shim instances for the vault (shared across all plugins).
+    // Proxy-wrapped so a plugin calling a non-emulated workspace method/property
+    // gets a warned no-op instead of a hard crash (see WorkspaceShim.wrapWithProxy) —
+    // this was previously built and tested but never actually wired in here.
+    const newWorkspaceShim = WorkspaceShim.createProxied()
+    const newMetadataCacheShim = MetadataCacheShim.wrapWithProxy(new MetadataCacheShim(directoryTree))
     workspaceShimRef.current = newWorkspaceShim
     setActiveWorkspaceShim(newWorkspaceShim)
     metadataCacheShimRef.current = newMetadataCacheShim
@@ -527,7 +534,7 @@ export function PluginProvider({
     })
     // Attach registry to workspace shim (needs a dummy app reference for leaf creation)
     // The app reference will be a minimal shared object — all plugins see the same vault/workspace/metadataCache
-    const newVaultShim = new VaultShim(newVaultId, vaultName, apiClient, directoryTree ?? { name: vaultName, type: 'directory' as const, children: [], itemCount: 0, path: '' })
+    const newVaultShim = VaultShim.wrapWithProxy(new VaultShim(newVaultId, vaultName, apiClient, directoryTree ?? { name: vaultName, type: 'directory' as const, children: [], itemCount: 0, path: '' }))
     vaultShimRef.current = newVaultShim
 
     // Wire VaultShim to populate MetadataCache when files are read.
@@ -536,6 +543,14 @@ export function PluginProvider({
     newVaultShim.onFileRead = (path: string, content: string) => {
       newMetadataCacheShim.populateFromContent(path, content)
     }
+    // Notify any open plugin view whose file was renamed — see
+    // ViewRegistry.notifyFileRenamed()'s doc comment for why this can't just
+    // compare object identity. Independent of the vault's own 'rename' event,
+    // which plugins listening via `vault.on('rename', ...)` already receive.
+    newVaultShim.on('rename', (...args: unknown[]) => {
+      const [file, oldPath] = args as [{ path: string }, string]
+      newViewRegistry.notifyFileRenamed(file, oldPath)
+    })
     // Includes fileManager/commands/hotkeyManager, not just vault/workspace/metadataCache:
     // this object becomes `leaf.app`, which ItemView's constructor copies to `this.app`
     // (see view-registry.ts). Plugin views (Kanban's list/table view switch, etc.) call
@@ -550,7 +565,7 @@ export function PluginProvider({
       vault: newVaultShim,
       workspace: newWorkspaceShim,
       metadataCache: newMetadataCacheShim,
-      fileManager: new FileManagerShim(newVaultShim),
+      fileManager: FileManagerShim.wrapWithProxy(new FileManagerShim(newVaultShim)),
       commands: createCommandManager(commandRegistryRef.current),
       hotkeyManager: createHotkeyManager(commandRegistryRef.current),
       get internalPlugins() { return getWindowApp()?.internalPlugins },
@@ -596,7 +611,7 @@ export function PluginProvider({
     // Register Obsidian's built-in `editor:*` commands (toggle-code, toggle-checklist-status, ...)
     // so plugins calling app.commands.executeCommandById('editor:...') find a real command
     // instead of silently no-oping. Idempotent — safe to re-run on every vault switch.
-    registerCoreEditorCommands(commandRegistryRef.current)
+    registerCoreEditorCommands(commandRegistryRef.current, locale)
 
     // Update window.app to reference the real shim instances
     // (many plugins and libraries like obsidian-daily-notes-interface access window.app directly)
@@ -625,8 +640,16 @@ export function PluginProvider({
       windowApp.commands = createCommandManager(commandRegistryRef.current)
       // eslint-disable-next-line react-hooks/immutability
       windowApp.hotkeyManager = createHotkeyManager(commandRegistryRef.current)
+      // Was a throwaway inline stub whose `embedByExtension` map started empty
+      // on every vault switch — any plugin's registerExtension() call from a
+      // previous switch (or from AppShim's `this.app.embedRegistry`, read by
+      // views reached through `window.app.embedRegistry`) vanished with it.
+      // `createEmbedRegistryShim()` wraps the same shared, module-level
+      // `embedByExtension` record every other embedRegistry consumer reads
+      // and writes, so registrations made through any of them are visible
+      // through all of them.
       // eslint-disable-next-line react-hooks/immutability
-      windowApp.embedRegistry = { embedByExtension: { md: () => { const F = class {}; return { load(){}, unload(){}, editable: false, showEditor(){}, editMode: Object.create(Object.create(F.prototype)) } } } }
+      windowApp.embedRegistry = createEmbedRegistryShim()
     }
 
     // Wire onOpenFile immediately (not deferred to useEffect) so it's available
@@ -661,6 +684,45 @@ export function PluginProvider({
           metadataCache: newMetadataCacheShim,
           pluginId,
           commandRegistry: commandRegistryRef.current,
+          pluginManager: {
+            // Re-fetch manifest.json content for every installed plugin — the
+            // same refresh loadPluginsForVault() does on startup — so a plugin
+            // manager (e.g. an update-checker) sees fresh versions without
+            // requiring a full vault reload.
+            loadManifests: async (): Promise<void> => {
+              try {
+                const { plugins: manifests } = await apiClient.listPlugins(newVaultId)
+                if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) return
+                newRegistry.hydrateManifests(manifests)
+                const windowApp = (window as unknown as { app?: { plugins?: { manifests?: Record<string, PluginManifestData> } } }).app
+                if (windowApp?.plugins?.manifests) {
+                  for (const manifest of manifests) {
+                    windowApp.plugins.manifests[manifest.id] = manifest
+                  }
+                }
+                setPlugins(newRegistry.listPlugins())
+              } catch (err) {
+                console.warn('[PluginProvider] plugins.loadManifests() failed:', err)
+              }
+            },
+            // Registry writes are already persisted eagerly on every status/
+            // permission change (see PluginRegistry.updateStatus/setPermissions);
+            // this just waits for any of those in-flight writes to land.
+            requestSaveConfig: async (): Promise<void> => {
+              await newRegistry.waitForPersistence()
+            },
+            // Both delegate to the exact same path the Settings page toggle
+            // uses (setPluginEnabled, defined below) — including that
+            // disabling reloads the whole page once it completes. That reload
+            // is not scoped to the plugin being disabled: any plugin calling
+            // disablePluginAndSave(anyId) reloads the app for everyone.
+            enablePluginAndSave: async (id: string): Promise<void> => {
+              await setPluginEnabled(id, true)
+            },
+            disablePluginAndSave: async (id: string): Promise<void> => {
+              await setPluginEnabled(id, false)
+            },
+          },
         })
       },
       sandbox: newSandbox,
@@ -1125,7 +1187,7 @@ export function PluginProvider({
     const currentVaultId = vaultId
     if (!currentVaultId) return
 
-    const handleOpen: OpenPluginViewTabFn = (_vaultId, viewType, displayText, _icon) => {
+    const handleOpen: OpenPluginViewTabFn = (_vaultId, viewType, displayText, icon) => {
       const virtualPath = `__view::${viewType}`
       // Deduplication: check if tab with same virtual path already exists
       const existingTab = tabState.tabs.find(
@@ -1138,7 +1200,7 @@ export function PluginProvider({
       }
       tabDispatch({
         type: 'OPEN_TAB',
-        payload: { vaultId: currentVaultId, filePath: virtualPath, fileName: displayText },
+        payload: { vaultId: currentVaultId, filePath: virtualPath, fileName: displayText, icon },
       })
     }
 
@@ -1267,7 +1329,7 @@ export function PluginProvider({
         vault: vaultShimRef.current,
         workspace,
         metadataCache: metadataCacheShimRef.current,
-        fileManager: vaultShimRef.current ? new FileManagerShim(vaultShimRef.current) : undefined,
+        fileManager: vaultShimRef.current ? FileManagerShim.wrapWithProxy(new FileManagerShim(vaultShimRef.current)) : undefined,
         commands: createCommandManager(commandRegistryRef.current),
         hotkeyManager: createHotkeyManager(commandRegistryRef.current),
         get internalPlugins() { return getWindowApp()?.internalPlugins },
@@ -1275,12 +1337,25 @@ export function PluginProvider({
         get embedRegistry() { return getWindowApp()?.embedRegistry },
         getAccentColor: () => getWindowApp()?.getAccentColor?.() ?? '#7c3aed',
       }
-      const leaf = viewRegistry.createLeaf(sharedApp, 'main')
-      await leaf.setViewState({ type: viewType, state: { file: filePath } })
-      if (leaf.view) {
-        return { containerEl: leaf.containerEl, leaf, view: leaf.view }
-      }
-      return null
+      // Unlike a plugin-initiated setViewState() call (already running inside
+      // withPluginContext from onload/a command/an event handler), this view
+      // is constructed by Slatebase's own TabContent effect — nothing has the
+      // owning plugin marked as "currently executing". Without this wrapper,
+      // any setTimeout/setInterval the view's onload() schedules (e.g.
+      // Excalidraw's autosave reset) is scheduled with a null pluginId, so
+      // trackPluginTimer() never records it and sandbox.cleanup() can't
+      // cancel it on plugin unload — it fires later against a torn-down
+      // plugin and throws. withPluginContextAsync keeps the plugin marked
+      // as current across every await in setViewState (onClose/onload/onOpen).
+      const pluginId = viewRegistry.getPluginIdForView(viewType) ?? null
+      return withPluginContextAsync(pluginId, async () => {
+        const leaf = viewRegistry.createLeaf(sharedApp, 'main')
+        await leaf.setViewState({ type: viewType, state: { file: filePath } })
+        if (leaf.view) {
+          return { containerEl: leaf.containerEl, leaf, view: leaf.view }
+        }
+        return null
+      })
     },
   }
 

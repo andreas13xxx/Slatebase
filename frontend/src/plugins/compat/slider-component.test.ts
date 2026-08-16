@@ -57,4 +57,27 @@ describe('SliderComponent', () => {
 
     expect(container.querySelector('.setting-slider-tooltip')?.textContent).toBe('9')
   })
+
+  it('setDisplayFormat() formats the dynamic tooltip text (Obsidian 1.13.1+)', () => {
+    const container = document.createElement('div')
+    const slider = new SliderComponent(container)
+    slider.setDynamicTooltip()
+    slider.setDisplayFormat((v) => `${v}%`)
+
+    slider.sliderEl.value = '42'
+    slider.sliderEl.dispatchEvent(new Event('input'))
+
+    expect(container.querySelector('.setting-slider-tooltip')?.textContent).toBe('42%')
+  })
+
+  it('setValue() also applies the display format', () => {
+    const container = document.createElement('div')
+    const slider = new SliderComponent(container)
+    slider.setDynamicTooltip()
+    slider.setDisplayFormat((v) => `~${v}`)
+
+    slider.setValue(5)
+
+    expect(container.querySelector('.setting-slider-tooltip')?.textContent).toBe('~5')
+  })
 })

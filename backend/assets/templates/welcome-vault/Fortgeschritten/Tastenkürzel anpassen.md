@@ -82,7 +82,7 @@ Slatebase erkennt automatisch, wenn du ein Kürzel zuweist, das bereits von eine
    - **Abbrechen:** Keine Änderung
 
 > [!warning] Browser-Shortcuts
-> Einige Tastenkombinationen sind vom Browser reserviert (z.B. `Ctrl+T` für neuen Tab, `Ctrl+W` zum Schließen). Diese können nicht überschrieben werden. Slatebase zeigt einen Hinweis, falls du einen solchen Shortcut wählst.
+> Einige Tastenkombinationen sind vom Browser reserviert (z.B. `Ctrl+T` für neuen Tab, `Ctrl+W` zum Schließen, `Ctrl+Tab` zum Tab-Wechsel im Browser selbst). Der Browser fängt diese ab, bevor die Seite sie überhaupt sieht — eine Zuweisung in Slatebase wird dadurch wirkungslos, auch ohne Konflikt-Warnung.
 
 ---
 
@@ -106,6 +106,11 @@ Folgende Befehle können mit eigenen Kürzeln belegt werden:
 | `Ctrl+E` | Zwischen Edit/View wechseln |
 | `Ctrl+W` | Aktiven Tab schließen |
 | `Ctrl+G` | Knowledge Graph öffnen |
+| `Ctrl+O` | Schnellwechsler öffnen |
+| `Alt+←` | Zurück navigieren |
+| `Alt+→` | Vor navigieren |
+| `Ctrl+Shift+]` | Nächster Tab |
+| `Ctrl+Shift+[` | Vorheriger Tab |
 
 ---
 

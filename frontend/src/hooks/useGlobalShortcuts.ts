@@ -14,6 +14,9 @@ export interface UseGlobalShortcutsParams {
   tabDispatch: Dispatch<TabAction>
   setSettingsOpen: (open: boolean) => void
   onDailyNote: () => void
+  /** Navigation history back/forward (Requirement 1.10). */
+  onNavigateBack: () => void
+  onNavigateForward: () => void
 }
 
 /**
@@ -23,6 +26,13 @@ export interface UseGlobalShortcutsParams {
  * - Toggle editor mode (default: Ctrl+E / Cmd+E)
  * - Settings panel (default: Ctrl+,)
  * - Daily note (Ctrl+Alt+D)
+ * - Navigate back/forward (default: Alt+Left / Alt+Right)
+ *
+ * Next/previous tab (Ctrl+Shift+] / Ctrl+Shift+[) is registered in
+ * `CommandPaletteContainer.tsx` instead, not here — it needs `commandRegistry`
+ * from `usePluginContext()`, and `PluginProvider` is mounted *inside* AppContent's
+ * own render tree (not above it), so this hook (called at the top of AppContent)
+ * cannot reach it.
  *
  * Extracted from AppContent — these were five separate document/window
  * listener effects with no rendering logic of their own.
@@ -36,6 +46,8 @@ export function useGlobalShortcuts({
   tabDispatch,
   setSettingsOpen,
   onDailyNote,
+  onNavigateBack,
+  onNavigateForward,
 }: UseGlobalShortcutsParams): void {
   // Vault search: opens the right panel, activates the search view, and
   // focuses the input. Shared between the keyboard shortcut and the Command
@@ -113,4 +125,20 @@ export function useGlobalShortcuts({
     document.addEventListener('keydown', handleDailyNoteShortcut)
     return () => document.removeEventListener('keydown', handleDailyNoteShortcut)
   }, [onDailyNote])
+
+  // Navigate back / forward (Requirement 1.10)
+  useEffect(() => {
+    const handleNavShortcut = (e: KeyboardEvent) => {
+      if (matchesShortcut('slatebase:navigate-back', e)) {
+        e.preventDefault()
+        onNavigateBack()
+      } else if (matchesShortcut('slatebase:navigate-forward', e)) {
+        e.preventDefault()
+        onNavigateForward()
+      }
+    }
+
+    document.addEventListener('keydown', handleNavShortcut)
+    return () => document.removeEventListener('keydown', handleNavShortcut)
+  }, [onNavigateBack, onNavigateForward])
 }

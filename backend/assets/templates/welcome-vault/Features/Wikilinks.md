@@ -40,7 +40,7 @@ Wenn mehrere Dateien denselben Namen haben, kannst du den Pfad angeben:
 [[Ordner/Unterordner/Dateiname]]
 ```
 
-Slatebase versucht automatisch den kürzesten eindeutigen Pfad aufzulösen. Nur bei Mehrdeutigkeit ist der volle Pfad nötig.
+Bei mehrdeutigen Namen ohne Pfadangabe löst Slatebase deterministisch auf: zuerst eine Datei im **selben Ordner** wie die verlinkende Notiz, sonst die Datei mit dem **kürzesten Pfad**, und bei weiterhin gleichwertigen Kandidaten **alphabetisch**. Fährst du mit der Maus über einen so aufgelösten Link, zeigt der Tooltip die Zieldatei und die Anzahl weiterer gleichnamiger Dateien an. Bei echter Mehrdeutigkeit ist eine explizite Pfadangabe trotzdem die zuverlässigste Wahl.
 
 ---
 
@@ -112,8 +112,8 @@ Slatebase löst Wikilinks intelligent auf:
 
 1. **Exakter Match** — Dateiname stimmt exakt überein
 2. **Ohne Extension** — `[[Notiz]]` findet `Notiz.md`
-3. **Kürzester Pfad** — Bei Eindeutigkeit reicht der Dateiname ohne Ordner
-4. **Case-insensitive** — `[[notiz]]` findet `Notiz.md`
+3. **Case-insensitive** — `[[notiz]]` findet `Notiz.md`
+4. **Bei mehreren Treffern** — siehe „Pfad-Angaben" oben: selber Ordner → kürzester Pfad → alphabetisch
 
 Wenn ein Link nicht aufgelöst werden kann, wird er als "Broken Link" dargestellt (gestrichelte Unterstreichung). Du kannst darauf klicken, um eine neue Datei mit diesem Namen zu erstellen.
 

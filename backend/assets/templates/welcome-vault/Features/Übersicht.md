@@ -51,8 +51,10 @@ Neben den hier aufgelisteten Kern-Features findest du in den folgenden Guides we
 - [[Features/Papierkorb und Versionen]] — Gelöschte Dateien wiederherstellen, Versionshistorie
 - [[Features/Canvas]] — Visuelle Whiteboards mit Nodes und Verbindungen
 - [[Features/Command Palette]] — Schnellzugriff auf alle Befehle per Tastatur
+- [[Features/Lesezeichen]] — Favoriten sortieren, umbenennen, Überschriften-/Block-/Such-Lesezeichen
 - [[Features/Vault-Verwaltung]] — Vaults erstellen, teilen und verwalten
 - [[Features/Einstellungen]] — Alle Konfigurationsmöglichkeiten
+- [[Features/CSS-Snippets]] — Eigenes CSS pro Vault
 - [[Features/Chat]] — Nachrichten mit anderen Nutzern
 - [[Features/Sync]] — Vault-Synchronisation (experimentell)
 - [[Features/Live Preview Editor]] — Source-Modus und inline-gerenderte Live-Vorschau

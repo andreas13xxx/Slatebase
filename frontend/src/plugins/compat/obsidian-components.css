@@ -103,6 +103,13 @@
   background-color: transparent;
 }
 
+/* setWarning() — destructive items (e.g. "Delete file"), same treatment as
+   button.mod-warning below. */
+.menu-item.is-warning,
+.menu-item.is-warning .menu-item-icon {
+  color: var(--text-error);
+}
+
 .menu-item-icon {
   display: flex;
   align-items: center;

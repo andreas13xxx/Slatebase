@@ -46,6 +46,33 @@ describe('WorkspaceShim', () => {
     });
   });
 
+  describe('iterateCodeMirrors()', () => {
+    it('does not throw and never invokes the callback — no CM5 instances exist', () => {
+      const callback = vi.fn();
+      expect(() => workspace.iterateCodeMirrors(callback)).not.toThrow();
+      expect(callback).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('protocolHandlers / protocolHandler', () => {
+    it('exposes a writable Map and a writable field instead of leaving them undefined', () => {
+      expect(workspace.protocolHandlers).toBeInstanceOf(Map);
+      workspace.protocolHandlers.set('foo', () => 'bar');
+      expect(workspace.protocolHandlers.get('foo')?.({})).toBe('bar');
+
+      expect(workspace.protocolHandler).toBeNull();
+      const handler = () => 'handled';
+      workspace.protocolHandler = handler;
+      expect(workspace.protocolHandler).toBe(handler);
+    });
+  });
+
+  describe('getActiveFileView()', () => {
+    it('returns null when no file is active', () => {
+      expect(workspace.getActiveFileView()).toBeNull();
+    });
+  });
+
   describe('R6.1: getActiveFile() returns TFile when a file tab is active', () => {
     it('should return the active file after setActiveFile is called', () => {
       const file = createMockTFile('notes/hello.md');
@@ -272,6 +299,24 @@ describe('WorkspaceShim', () => {
 
       expect(callback).toHaveBeenCalledWith(file);
     });
+
+    // Regression: the `activeEditor` getter reads `this.editorShim`, a private
+    // field never listed in emulatedProperties. If the Proxy's `get` trap
+    // invokes that getter with the Proxy itself as receiver, `this.editorShim`
+    // re-enters the trap and resolves through the generic gap fallback instead
+    // of the real field, silently swapping the real EditorShim for a callable
+    // no-op. Any plugin calling `workspace.activeEditor.editor.hasFocus()`
+    // (e.g. "Editing Toolbar") then throws "hasFocus is not a function".
+    it('activeEditor.editor accessed through the proxy is a real EditorShim, not a gap no-op', () => {
+      const proxied = WorkspaceShim.createProxied();
+      const file = createMockTFile('notes/test.md');
+      proxied.setActiveFile(file);
+
+      const editor = proxied.activeEditor?.editor;
+      expect(typeof editor).toBe('object');
+      expect(typeof (editor as { hasFocus?: unknown })?.hasFocus).toBe('function');
+      expect(() => (editor as { hasFocus: () => boolean }).hasFocus()).not.toThrow();
+    });
   });
 
   describe('removeAllListeners()', () => {
@@ -355,6 +400,89 @@ describe('WorkspaceShim', () => {
         await leaf.setViewState({ type: 'kanban', state: { file: 'boards/new-board.md' } });
 
         expect(openFileDirectly).toHaveBeenCalledWith('boards/new-board.md');
+      });
+    });
+
+    describe('notifyFileRenamed()', () => {
+      it("updates a matching view's file and calls onRename with the renamed file", async () => {
+        const onRename = vi.fn();
+        class FakeFileView extends ItemView {
+          file: { path: string } | null = null
+          onRename = onRename
+        }
+        registry.registerView('fake-file-view', (leaf) => new FakeFileView(leaf), 'fake-plugin');
+
+        const leaf = workspace.getLeaf(true);
+        await leaf.setViewState({ type: 'fake-file-view' });
+        const view = leaf.view as unknown as FakeFileView;
+        view.file = { path: 'notes/old.md' };
+
+        const renamedFile = { path: 'notes/new.md' };
+        registry.notifyFileRenamed(renamedFile, 'notes/old.md');
+
+        expect(view.file).toBe(renamedFile);
+        expect(onRename).toHaveBeenCalledWith(renamedFile);
+      });
+
+      it('leaves non-matching views untouched', async () => {
+        const onRename = vi.fn();
+        class FakeFileView extends ItemView {
+          file: { path: string } | null = { path: 'notes/unrelated.md' }
+          onRename = onRename
+        }
+        registry.registerView('fake-file-view', (leaf) => new FakeFileView(leaf), 'fake-plugin');
+
+        const leaf = workspace.getLeaf(true);
+        await leaf.setViewState({ type: 'fake-file-view' });
+        const view = leaf.view as unknown as FakeFileView;
+        const originalFile = view.file;
+
+        registry.notifyFileRenamed({ path: 'notes/new.md' }, 'notes/old.md');
+
+        expect(view.file).toBe(originalFile);
+        expect(onRename).not.toHaveBeenCalled();
+      });
+
+      it('updates the file reference even when the view has no onRename override', async () => {
+        class FakeFileView extends ItemView {
+          file: { path: string } | null = { path: 'notes/old.md' }
+        }
+        registry.registerView('fake-file-view', (leaf) => new FakeFileView(leaf), 'fake-plugin');
+
+        const leaf = workspace.getLeaf(true);
+        await leaf.setViewState({ type: 'fake-file-view' });
+        const view = leaf.view as unknown as FakeFileView;
+
+        const renamedFile = { path: 'notes/new.md' };
+        expect(() => registry.notifyFileRenamed(renamedFile, 'notes/old.md')).not.toThrow();
+
+        expect(view.file).toBe(renamedFile);
+      });
+
+      it('does not let one view onRename throwing stop other leaves from being notified', async () => {
+        const throwingOnRename = vi.fn(() => { throw new Error('boom'); });
+        const okOnRename = vi.fn();
+        class ThrowingFileView extends ItemView {
+          file: { path: string } | null = { path: 'notes/shared.md' }
+          onRename = throwingOnRename
+        }
+        class OkFileView extends ItemView {
+          file: { path: string } | null = { path: 'notes/shared.md' }
+          onRename = okOnRename
+        }
+        registry.registerView('throwing-view', (leaf) => new ThrowingFileView(leaf), 'plugin-a');
+        registry.registerView('ok-view', (leaf) => new OkFileView(leaf), 'plugin-b');
+
+        const leafA = registry.createLeaf({}, 'main');
+        await leafA.setViewState({ type: 'throwing-view' });
+        const leafB = registry.createLeaf({}, 'main');
+        await leafB.setViewState({ type: 'ok-view' });
+
+        const renamedFile = { path: 'notes/shared-renamed.md' };
+        expect(() => registry.notifyFileRenamed(renamedFile, 'notes/shared.md')).not.toThrow();
+
+        expect(throwingOnRename).toHaveBeenCalled();
+        expect(okOnRename).toHaveBeenCalledWith(renamedFile);
       });
     });
 
@@ -482,6 +610,86 @@ describe('WorkspaceShim', () => {
         expect(warnSpy).toHaveBeenCalled();
 
         warnSpy.mockRestore();
+      });
+    });
+
+    describe('getMostRecentLeaf()', () => {
+      // Regression: real plugins with their own sidebar toolbar (Advanced
+      // Tables' table-controls panel) call this — not getActiveLeaf() — to
+      // find the editor to act on, specifically because it should keep
+      // pointing at the main-area editor even while the user's click that
+      // triggered them landed inside the sidebar panel itself. Sharing a
+      // single "active leaf" field for both broke that: revealing the
+      // sidebar leaf silently redirected getMostRecentLeaf() too, so
+      // `leaf.view instanceof MarkdownView` failed for a plugin's own
+      // sidebar button clicks.
+      it('keeps pointing at the main file leaf after a sidebar leaf is revealed', async () => {
+        const file = createMockTFile('notes/hello.md');
+        workspace.setActiveFile(file);
+        const fileLeaf = workspace.getMostRecentLeaf();
+        expect(fileLeaf?.location).toBe('main');
+
+        registry.registerView('sidebar-tool', (leaf) => new ItemView(leaf), 'some-plugin');
+        const sidebarLeaf = workspace.getRightLeaf();
+        await sidebarLeaf.setViewState({ type: 'sidebar-tool', active: true });
+        workspace.revealLeaf(sidebarLeaf);
+
+        expect(workspace.getActiveLeaf()).toBe(sidebarLeaf);
+        expect(workspace.getMostRecentLeaf()).toBe(fileLeaf);
+      });
+
+      it('returns a leaf whose view is a real MarkdownView instance for the active file', async () => {
+        const { installObsidianGlobals } = await import('../install-globals');
+        installObsidianGlobals();
+
+        const file = createMockTFile('notes/hello.md');
+        workspace.setActiveFile(file);
+
+        registry.registerView('sidebar-tool', (leaf) => new ItemView(leaf), 'some-plugin');
+        const sidebarLeaf = workspace.getRightLeaf();
+        await sidebarLeaf.setViewState({ type: 'sidebar-tool', active: true });
+        workspace.revealLeaf(sidebarLeaf);
+
+        const MarkdownViewClass = (window as unknown as { obsidian: Record<string, unknown> }).obsidian['MarkdownView'] as new (...args: unknown[]) => unknown;
+        const mostRecent = workspace.getMostRecentLeaf();
+        expect(mostRecent?.view).toBeInstanceOf(MarkdownViewClass);
+      });
+
+      // Regression: "Editing Toolbar" builds its floating selection toolbar off
+      // `containerEl.querySelector('.markdown-source-view')` during onload()/
+      // onLayoutReady(), before the CM6 editor has mounted. The pre-mount
+      // fallback containerEl previously had no such descendant, so that lookup
+      // returned null, the plugin silently skipped creating its toolbar
+      // element, and crashed later ("t.containerEl is undefined") the first
+      // time the user selected text and its selectionchange handler ran.
+      it('getActiveViewOfType(MarkdownView).containerEl exposes a .markdown-source-view descendant even before the CM6 editor mounts', async () => {
+        const { installObsidianGlobals } = await import('../install-globals');
+        installObsidianGlobals();
+
+        const file = createMockTFile('notes/hello.md');
+        workspace.setActiveFile(file);
+
+        const MarkdownViewClass = (window as unknown as { obsidian: Record<string, unknown> }).obsidian['MarkdownView'] as new (...args: unknown[]) => { containerEl: HTMLElement };
+        const view = workspace.getActiveViewOfType(MarkdownViewClass);
+        expect(view).not.toBeNull();
+        expect(view!.containerEl.querySelector('.markdown-source-view')).not.toBeNull();
+      });
+
+      it('activeLeaf.view.containerEl exposes a .markdown-source-view descendant even before the CM6 editor mounts', () => {
+        const file = createMockTFile('notes/hello.md');
+        workspace.setActiveFile(file);
+
+        const containerEl = workspace.getActiveLeaf()!.view.containerEl;
+        expect(containerEl.querySelector('.markdown-source-view')).not.toBeNull();
+        // Reading it again must return the same element, not a fresh detached
+        // div each time (plugins may query once and reuse the reference).
+        expect(workspace.getActiveLeaf()!.view.containerEl).toBe(containerEl);
+      });
+
+      it('tracks a main leaf activated directly via setActiveLeaf(), not just setActiveFile()', () => {
+        const leaf = workspace.getLeaf(true);
+        workspace.setActiveLeaf(leaf);
+        expect(workspace.getMostRecentLeaf()).toBe(leaf);
       });
     });
 

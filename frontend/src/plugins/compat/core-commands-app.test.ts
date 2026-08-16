@@ -6,6 +6,8 @@ import { CommandRegistry } from './command-registry'
 import { registerCoreAppCommands, type CoreAppCommandHandlers } from './core-commands-app'
 import { EditorShim, setEditorViewAccessor } from './editor-shim'
 import { setActiveEditorView } from '../../editor/plugin-extensions'
+import { favoritesStore } from '../../state/favoritesStore'
+import * as ToastNotificationModule from '../../components/ToastNotification'
 import type { IApiClient } from '../../api'
 import type { TabEntry } from '../../state/tabState'
 import type { PublicUserInfo } from '../../state/authState'
@@ -117,6 +119,12 @@ describe('registerCoreAppCommands', () => {
       onOpenGraph: vi.fn(),
       onDailyNote: vi.fn(),
       onOpenTemplateSelector: vi.fn(),
+      onNavigateBack: vi.fn(),
+      onNavigateForward: vi.fn(),
+      onOpenQuickSwitcher: vi.fn(),
+      searchQuery: '',
+      searchCaseSensitive: false,
+      searchRegex: false,
     }
 
     registerCoreAppCommands(registry, () => handlers)
@@ -329,6 +337,12 @@ describe('registerCoreAppCommands — editor:* commands needing app context', ()
       onOpenGraph: vi.fn(),
       onDailyNote: vi.fn(),
       onOpenTemplateSelector: vi.fn(),
+      onNavigateBack: vi.fn(),
+      onNavigateForward: vi.fn(),
+      onOpenQuickSwitcher: vi.fn(),
+      searchQuery: '',
+      searchCaseSensitive: false,
+      searchRegex: false,
     }
 
     registry.setEditorContextResolver(() => ({ editor, file: { path: 'note.md', basename: 'note', extension: 'md' } }))
@@ -374,5 +388,216 @@ describe('registerCoreAppCommands — editor:* commands needing app context', ()
     registry.executeCommand('editor:open-search')
 
     expect(view.dom.querySelector('.cm-search')).not.toBeNull()
+  })
+})
+
+describe('registerCoreAppCommands — bookmark types (Requirements 11-14)', () => {
+  let registry: CommandRegistry
+  let apiClient: IApiClient
+  let handlers: CoreAppCommandHandlers
+  let toastSpy: ReturnType<typeof vi.spyOn>
+
+  function makeHandlers(overrides: Partial<CoreAppCommandHandlers> = {}): CoreAppCommandHandlers {
+    return {
+      vaultId: 'vault-1',
+      vaultName: 'My Vault',
+      apiClient,
+      tabState: { tabs: [makeTab()], activeTabId: 'vault-1::note.md' },
+      tabDispatch: vi.fn(),
+      appDispatch: vi.fn(),
+      authState: { isAuthenticated: true, user: makeUser(), token: null, csrfToken: null, mustChangePassword: false, isLoading: false, error: null },
+      authDispatch: vi.fn(),
+      showSidebar: false,
+      showRightPanel: false,
+      contextPanelSections: [],
+      contextPanelDispatch: vi.fn(),
+      sidebarPanelSections: [],
+      sidebarPanelDispatch: vi.fn(),
+      onToggleSidebar: vi.fn(),
+      onToggleRightPanel: vi.fn(),
+      onOpenSettings: vi.fn(),
+      onNavigate: vi.fn(),
+      onCreateFile: vi.fn(),
+      onCreateFolder: vi.fn(),
+      onCreateCanvas: vi.fn(),
+      onOpenGraph: vi.fn(),
+      onDailyNote: vi.fn(),
+      onOpenTemplateSelector: vi.fn(),
+      onNavigateBack: vi.fn(),
+      onNavigateForward: vi.fn(),
+      onOpenQuickSwitcher: vi.fn(),
+      searchQuery: '',
+      searchCaseSensitive: false,
+      searchRegex: false,
+      ...overrides,
+    }
+  }
+
+  beforeEach(() => {
+    localStorage.clear()
+    registry = new CommandRegistry()
+    apiClient = createMockApiClient()
+    handlers = makeHandlers()
+    toastSpy = vi.spyOn(ToastNotificationModule, 'showToast').mockImplementation(() => {})
+    registerCoreAppCommands(registry, () => handlers)
+  })
+
+  afterEach(() => {
+    setActiveEditorView(null)
+    toastSpy.mockRestore()
+  })
+
+  describe('bookmarks:bookmark-current-heading', () => {
+    it('bookmarks the nearest heading at or above the cursor', () => {
+      const doc = '# Heading One\n\nSome text here.\n\n## Heading Two\n\nMore text under cursor.'
+      const view = new EditorView({ state: EditorState.create({ doc }), parent: document.body })
+      const cursorPos = view.state.doc.line(7).from
+      view.dispatch({ selection: { anchor: cursorPos } })
+      setActiveEditorView(view)
+
+      registry.executeCommand('bookmarks:bookmark-current-heading')
+
+      const [entry] = favoritesStore.getForVault('vault-1')
+      expect(entry?.type).toBe('heading')
+      expect(entry?.heading).toBe('Heading Two')
+      expect(entry?.path).toBe('note.md')
+      view.destroy()
+    })
+
+    it('shows an error toast and adds no bookmark when there is no heading above the cursor', () => {
+      const doc = 'Just plain text, no heading anywhere.'
+      const view = new EditorView({ state: EditorState.create({ doc }), parent: document.body })
+      setActiveEditorView(view)
+
+      registry.executeCommand('bookmarks:bookmark-current-heading')
+
+      expect(favoritesStore.getForVault('vault-1')).toHaveLength(0)
+      expect(toastSpy).toHaveBeenCalledWith('error', expect.any(String))
+      view.destroy()
+    })
+
+    it('does nothing when no editor is active', () => {
+      setActiveEditorView(null)
+
+      registry.executeCommand('bookmarks:bookmark-current-heading')
+
+      expect(favoritesStore.getForVault('vault-1')).toHaveLength(0)
+    })
+  })
+
+  describe('bookmarks:bookmark-current-search', () => {
+    it('bookmarks the current search query and flags', () => {
+      handlers.searchQuery = 'TODO'
+      handlers.searchCaseSensitive = true
+      handlers.searchRegex = false
+
+      registry.executeCommand('bookmarks:bookmark-current-search')
+
+      const [entry] = favoritesStore.getForVault('vault-1')
+      expect(entry?.type).toBe('search')
+      expect(entry?.searchQuery).toBe('TODO')
+      expect(entry?.searchCaseSensitive).toBe(true)
+    })
+
+    it('shows an error toast when there is no active search query', () => {
+      handlers.searchQuery = '   '
+
+      registry.executeCommand('bookmarks:bookmark-current-search')
+
+      expect(favoritesStore.getForVault('vault-1')).toHaveLength(0)
+      expect(toastSpy).toHaveBeenCalledWith('error', expect.any(String))
+    })
+  })
+
+  describe('bookmarks:bookmark-current-section (block)', () => {
+    it('generates and inserts a block marker when the paragraph has none, then bookmarks it', () => {
+      const doc = 'First paragraph.\n\nSecond paragraph without id.\n\nThird paragraph.'
+      const view = new EditorView({ state: EditorState.create({ doc, extensions: [history()] }), parent: document.body })
+      const cursorPos = view.state.doc.line(3).from + 5 // inside "Second paragraph..."
+      view.dispatch({ selection: { anchor: cursorPos } })
+      setActiveEditorView(view)
+
+      registry.executeCommand('bookmarks:bookmark-current-section')
+
+      expect(view.state.doc.line(3).text).toMatch(/^Second paragraph without id\. \^[a-zA-Z0-9-]+$/)
+      const [entry] = favoritesStore.getForVault('vault-1')
+      expect(entry?.type).toBe('block')
+      expect(entry?.blockId).toBeTruthy()
+      view.destroy()
+    })
+
+    it('reuses an existing block marker instead of inserting a new one', () => {
+      const doc = 'First paragraph.\n\nSecond paragraph. ^existing-id'
+      const view = new EditorView({ state: EditorState.create({ doc, extensions: [history()] }), parent: document.body })
+      const cursorPos = view.state.doc.line(3).from + 5
+      view.dispatch({ selection: { anchor: cursorPos } })
+      setActiveEditorView(view)
+
+      registry.executeCommand('bookmarks:bookmark-current-section')
+
+      expect(view.state.doc.line(3).text).toBe('Second paragraph. ^existing-id')
+      const [entry] = favoritesStore.getForVault('vault-1')
+      expect(entry?.blockId).toBe('existing-id')
+      view.destroy()
+    })
+
+    it('does nothing when no editor is active', () => {
+      setActiveEditorView(null)
+
+      registry.executeCommand('bookmarks:bookmark-current-section')
+
+      expect(favoritesStore.getForVault('vault-1')).toHaveLength(0)
+    })
+  })
+
+  describe('bookmarks:bookmark-all-tabs', () => {
+    it('bookmarks every open file tab not already favorited', () => {
+      handlers.tabState = {
+        tabs: [makeTab({ id: 'a', filePath: 'a.md' }), makeTab({ id: 'b', filePath: 'b.md' })],
+        activeTabId: 'a',
+      }
+
+      registry.executeCommand('bookmarks:bookmark-all-tabs')
+
+      const paths = favoritesStore.getForVault('vault-1').map((e) => e.path)
+      expect(paths.sort()).toEqual(['a.md', 'b.md'])
+    })
+
+    it('skips tabs that are already favorited', () => {
+      favoritesStore.add('vault-1', 'a.md')
+      handlers.tabState = {
+        tabs: [makeTab({ id: 'a', filePath: 'a.md' }), makeTab({ id: 'b', filePath: 'b.md' })],
+        activeTabId: 'a',
+      }
+
+      registry.executeCommand('bookmarks:bookmark-all-tabs')
+
+      expect(favoritesStore.getForVault('vault-1')).toHaveLength(2)
+    })
+
+    it('shows an info toast and adds nothing when all open tabs are already favorited', () => {
+      favoritesStore.add('vault-1', 'note.md')
+      handlers.tabState = { tabs: [makeTab({ filePath: 'note.md' })], activeTabId: 'vault-1::note.md' }
+
+      registry.executeCommand('bookmarks:bookmark-all-tabs')
+
+      expect(favoritesStore.getForVault('vault-1')).toHaveLength(1)
+      expect(toastSpy).toHaveBeenCalledWith('info', expect.any(String))
+    })
+
+    it('stops and shows an info toast once the 50-entry cap is reached', () => {
+      for (let i = 0; i < 50; i++) {
+        favoritesStore.add('vault-1', `existing-${i}.md`)
+      }
+      handlers.tabState = {
+        tabs: [makeTab({ id: 'a', filePath: 'new-a.md' }), makeTab({ id: 'b', filePath: 'new-b.md' })],
+        activeTabId: 'a',
+      }
+
+      registry.executeCommand('bookmarks:bookmark-all-tabs')
+
+      expect(favoritesStore.getForVault('vault-1')).toHaveLength(50)
+      expect(toastSpy).toHaveBeenCalledWith('info', expect.stringContaining('Limit'))
+    })
   })
 })

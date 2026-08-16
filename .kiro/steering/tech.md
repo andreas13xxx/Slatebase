@@ -100,6 +100,7 @@ test. Config: `backend/vitest.config.ts` and the `test.coverage` block in `front
 | @react-symbols/icons | File type icons (file explorer) |
 | moment | Date/time formatting (Calendar plugin compat) |
 | buffer | Node `Buffer` polyfill for plugin bundles (obsidian-git/isomorphic-git reference it at module top level) |
+| dompurify | Sanitizes raw HTML blocks before they are rendered as real DOM (reading view) |
 | zod | Schema validation (canvas parser, frontend-side) |
 
 ### Geplant

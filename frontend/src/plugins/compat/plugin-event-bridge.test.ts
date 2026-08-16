@@ -13,6 +13,7 @@ import { MetadataCacheShim } from './shims/metadata-cache-shim'
 import { ViewRegistry } from './view-registry'
 import type { TabState } from '../../state/tabState'
 import type { DirectoryTree } from '../../types'
+import type { TFile } from './types'
 
 describe('usePluginEventBridge', () => {
   let workspaceShim: WorkspaceShim
@@ -341,8 +342,63 @@ describe('usePluginEventBridge', () => {
       expect(changedCb).toHaveBeenCalledTimes(1)
       expect(changedCb).toHaveBeenCalledWith(
         expect.objectContaining({ path: 'hello.md' }),
+        '# Hello World',
         expect.any(Object),
       )
+    })
+
+    it('refreshes getFileCache() with metadata parsed from the saved content', () => {
+      const initialTabState: TabState = {
+        tabs: [
+          {
+            id: 'vault1::hello.md',
+            vaultId: 'vault1',
+            filePath: 'hello.md',
+            fileName: 'hello.md',
+            mode: 'edit',
+            isBinary: false,
+            content: '# Hello',
+            editBuffer: null,
+            loading: false,
+            error: null,
+          },
+        ],
+        activeTabId: 'vault1::hello.md',
+      }
+
+      const { rerender } = renderHook(
+        (props: { tabState: TabState }) =>
+          usePluginEventBridge({
+            tabState: props.tabState,
+            directoryTree: mockTree,
+            workspaceShim,
+            metadataCacheShim,
+          }),
+        { initialProps: { tabState: initialTabState } },
+      )
+
+      const savedTabState: TabState = {
+        tabs: [
+          {
+            id: 'vault1::hello.md',
+            vaultId: 'vault1',
+            filePath: 'hello.md',
+            fileName: 'hello.md',
+            mode: 'edit',
+            isBinary: false,
+            content: '| a | b |\n| - | - |\n| 1 | 2 |',
+            editBuffer: null,
+            loading: false,
+            error: null,
+          },
+        ],
+        activeTabId: 'vault1::hello.md',
+      }
+
+      rerender({ tabState: savedTabState })
+
+      const cache = metadataCacheShim.getFileCache({ path: 'hello.md' } as TFile)
+      expect(cache?.sections?.some((s) => s.type === 'table')).toBe(true)
     })
 
     it('does not emit changed event when editBuffer is set (user typing, not save)', () => {

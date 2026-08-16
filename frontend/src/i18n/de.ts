@@ -121,6 +121,7 @@ export const de = {
       cell: 'Zelle',
     },
     livePreviewFileTooLarge: 'Datei zu groß für Live Preview — Source-Modus aktiv',
+    internalLinkCrossVault: 'Dateien aus einem anderen Vault können hier nicht verlinkt werden',
   },
 
   tabs: {
@@ -627,6 +628,16 @@ export const de = {
     ariaLabel: 'Statusleiste',
     clock: 'Aktuelle Uhrzeit',
     pluginItems: 'Plugin-Statusanzeigen',
+    vaultNameAriaLabel: 'Aktueller Vault',
+    wordStats: '{words} Wörter, {characters} Zeichen',
+    wordStatsAriaLabel: 'Wort- und Zeichenanzahl',
+    wordStatsSelection: '{selected} von {total} Wörtern ausgewählt',
+    cursorPositionAriaLabel: 'Cursor-Position, klicken um zu einer Zeile zu springen',
+    cursorSelectedLines: '{count} Zeilen ausgewählt',
+    goToLineTitle: 'Gehe zu Zeile',
+    goToLineLabel: 'Zeilennummer',
+    goToLineConfirm: 'Gehe zu',
+    goToLineCancel: 'Abbrechen',
   },
 
   pluginStore: {

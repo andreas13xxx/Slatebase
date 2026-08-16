@@ -17,6 +17,7 @@
 import type { IAppShim, PluginInstance } from './types'
 import { renderLucideIconInto } from './lucide-icons'
 import { ProgressBarComponent } from './obsidian-api-extensions'
+import { getCustomIconSvg, sizeCustomIconSvg } from '../../utils/pluginIcon'
 
 // ─── PluginSettingTab ────────────────────────────────────────────────────────────
 
@@ -370,6 +371,19 @@ export class ButtonComponent extends BaseComponent {
 
   setIcon(icon: string): this {
     this.buttonEl.innerHTML = ''
+    // Custom icons registered via addIcon() first, same as window.obsidian.setIcon —
+    // otherwise a plugin's own SVG (e.g. a settings-dialog action button) falls
+    // through to the Lucide-only resolver and warns as an unrecognized Obsidian id.
+    const customSvg = getCustomIconSvg(icon)
+    if (customSvg) {
+      // Unsized (no viewBox-independent width/height) custom SVGs a plugin
+      // registers via addIcon() default to the browser's intrinsic <svg> size
+      // instead of the button's — invisible or wildly oversized depending on
+      // the plugin's own viewBox, not just missing. Same fix as the React
+      // icon components (PluginRibbonIcon etc.) already apply.
+      this.buttonEl.innerHTML = sizeCustomIconSvg(customSvg, 16)
+      return this
+    }
     renderLucideIconInto(this.buttonEl, icon)
     return this
   }
@@ -407,6 +421,8 @@ export class SliderComponent extends ValueComponent<number> {
    * callback timing changes.
    */
   private instant = false
+  /** Obsidian API since 1.13.1. Formats the dynamic tooltip's displayed text. */
+  private displayFormat: ((value: number) => string) | null = null
 
   constructor(containerEl: HTMLElement) {
     super()
@@ -416,7 +432,7 @@ export class SliderComponent extends ValueComponent<number> {
     this.sliderEl.className = 'setting-slider slider'
     this.sliderEl.addEventListener('input', () => {
       if (this.tooltipEl) {
-        this.tooltipEl.textContent = this.sliderEl.value
+        this.tooltipEl.textContent = this.formatValue(this.sliderEl.value)
       }
       if (this.instant && this.changeCallback) {
         this.changeCallback(Number(this.sliderEl.value))
@@ -440,10 +456,23 @@ export class SliderComponent extends ValueComponent<number> {
     return this
   }
 
+  /** Obsidian API since 1.13.1. Formats the value shown in the dynamic tooltip. */
+  setDisplayFormat(format: (value: number) => string): this {
+    this.displayFormat = format
+    if (this.tooltipEl) {
+      this.tooltipEl.textContent = this.formatValue(this.sliderEl.value)
+    }
+    return this
+  }
+
+  private formatValue(rawValue: string): string {
+    return this.displayFormat ? this.displayFormat(Number(rawValue)) : rawValue
+  }
+
   setValue(value: number): this {
     this.sliderEl.value = String(value)
     if (this.tooltipEl) {
-      this.tooltipEl.textContent = String(value)
+      this.tooltipEl.textContent = this.formatValue(String(value))
     }
     return this
   }
@@ -463,7 +492,7 @@ export class SliderComponent extends ValueComponent<number> {
     if (!this.tooltipEl) {
       this.tooltipEl = document.createElement('span')
       this.tooltipEl.className = 'setting-slider-tooltip'
-      this.tooltipEl.textContent = this.sliderEl.value
+      this.tooltipEl.textContent = this.formatValue(this.sliderEl.value)
       if (this.sliderEl.parentElement) {
         this.sliderEl.parentElement.appendChild(this.tooltipEl)
       }
@@ -478,6 +507,66 @@ export class SliderComponent extends ValueComponent<number> {
 
   onChange(callback: (value: number) => void): this {
     this.changeCallback = callback
+    return this
+  }
+}
+
+/**
+ * SecretComponent — Password-style input for API keys/tokens (Obsidian 1.11.4+).
+ * Real Obsidian: `SecretComponent extends BaseComponent`, constructed as
+ * `new SecretComponent(app, containerEl)` and added to a row via the generic
+ * `Setting.addComponent()` (there is no dedicated `Setting.addSecret()` in the
+ * real API). Deliberately has no `getValue()` — real Obsidian's SecretComponent
+ * doesn't expose one either; the value only ever flows out through `onChange()`.
+ */
+export class SecretComponent extends BaseComponent {
+  private inputEl: HTMLInputElement
+  private changeCallback: ((value: string | null) => void) | null = null
+
+  constructor(_app: unknown, containerEl: HTMLElement) {
+    super()
+    this.inputEl = document.createElement('input')
+    this.inputEl.type = 'password'
+    this.inputEl.className = 'setting-secret-input'
+    this.inputEl.addEventListener('input', () => {
+      if (this.changeCallback) this.changeCallback(this.inputEl.value || null)
+    })
+    containerEl.appendChild(this.inputEl)
+  }
+
+  setValue(value: string): this {
+    this.inputEl.value = value
+    return this
+  }
+
+  onChange(callback: (value: string | null) => void): this {
+    this.changeCallback = callback
+    return this
+  }
+
+  override setDisabled(disabled: boolean): this {
+    this.inputEl.disabled = disabled
+    return super.setDisabled(disabled)
+  }
+}
+
+/**
+ * DisplayValueComponent — Read-only computed-value label for a setting row
+ * (Obsidian 1.13.1+). Real Obsidian: plain `class DisplayValueComponent {}`,
+ * not a BaseComponent (no disabled state — there's nothing to disable on a
+ * label), added via `Setting.addDisplayValue()`.
+ */
+export class DisplayValueComponent {
+  valueEl: HTMLElement
+
+  constructor(containerEl: HTMLElement) {
+    this.valueEl = document.createElement('div')
+    this.valueEl.className = 'setting-display-value'
+    containerEl.appendChild(this.valueEl)
+  }
+
+  setValue(value: string | null): this {
+    this.valueEl.textContent = value ?? ''
     return this
   }
 }
@@ -529,13 +618,23 @@ export class Setting {
     containerEl.appendChild(this.settingEl)
   }
 
-  setName(name: string): this {
-    this.nameEl.textContent = name
+  setName(name: string | DocumentFragment): this {
+    if (name instanceof DocumentFragment) {
+      this.nameEl.textContent = ''
+      this.nameEl.appendChild(name)
+    } else {
+      this.nameEl.textContent = name
+    }
     return this
   }
 
-  setDesc(desc: string): this {
-    this.descEl.textContent = desc
+  setDesc(desc: string | DocumentFragment): this {
+    if (desc instanceof DocumentFragment) {
+      this.descEl.textContent = ''
+      this.descEl.appendChild(desc)
+    } else {
+      this.descEl.textContent = desc
+    }
     return this
   }
 
@@ -595,6 +694,32 @@ export class Setting {
   }
 
   /**
+   * Generic escape hatch for adding an arbitrary BaseComponent to the row
+   * (Obsidian API since 1.11.0) — this is how real Obsidian expects plugins to
+   * wire up e.g. `SecretComponent`, which has no dedicated `addSecret()`.
+   */
+  addComponent<T extends BaseComponent>(cb: (el: HTMLElement) => T): this {
+    const el = document.createElement('div')
+    el.className = 'setting-component'
+    this.controlEl.appendChild(el)
+    const component = cb(el)
+    this.components.push(component)
+    return this
+  }
+
+  /**
+   * Add a read-only computed-value label (Obsidian API since 1.13.1) — e.g.
+   * showing a slider's value in words, or a cache size next to a "Clear cache"
+   * button. Not tracked in `components` — like ProgressBarComponent, a plain
+   * label has no `setDisabled`.
+   */
+  addDisplayValue(callback: (component: DisplayValueComponent) => void): this {
+    const component = new DisplayValueComponent(this.controlEl)
+    callback(component)
+    return this
+  }
+
+  /**
    * Add a progress bar (Obsidian 1.4.4+).
    * Not tracked in `components` — ProgressBarComponent has no setDisabled
    * (a progress indicator isn't interactive, so there is nothing to disable).
@@ -632,7 +757,7 @@ export class Setting {
    * are load-bearing — plugin CSS positions the button against the container,
    * and `containerEl`/`clearButtonEl` are part of Obsidian's SearchComponent.
    */
-  addSearch(callback: (component: { inputEl: HTMLInputElement; containerEl: HTMLElement; clearButtonEl: HTMLElement; getValue(): string; setValue(value: string): unknown; setPlaceholder(p: string): unknown; onChange(cb: (value: string) => void): unknown; setDisabled(d: boolean): unknown; then(cb: (c: unknown) => void): unknown }) => void): this {
+  addSearch(callback: (component: { inputEl: HTMLInputElement; containerEl: HTMLElement; clearButtonEl: HTMLElement; getValue(): string; setValue(value: string): unknown; setPlaceholder(p: string): unknown; onChange(cb: (value: string) => void): unknown; setDisabled(d: boolean): unknown; setStatus(status: 'warning' | null): unknown; then(cb: (c: unknown) => void): unknown }) => void): this {
     const container = document.createElement('div')
     container.className = 'search-input-container'
     const input = document.createElement('input')
@@ -667,6 +792,8 @@ export class Setting {
       setPlaceholder(p: string) { input.placeholder = p; return this },
       onChange(cb: (value: string) => void) { changeCb = cb; return this },
       setDisabled(d: boolean) { input.disabled = d; return this },
+      // Obsidian API since 1.13.1 — validation-status affordance on search-like inputs.
+      setStatus(status: 'warning' | null) { container.classList.toggle('setting-search--warning', status === 'warning'); return this },
       then(cb: (c: unknown) => void) { cb(this); return this },
     }
     this.components.push(component)
@@ -840,8 +967,20 @@ export class SettingGroup {
     return this
   }
 
+  /**
+   * Generic escape hatch for adding an arbitrary BaseComponent to the group's
+   * header (Obsidian API since 1.11.0) — mirrors `Setting.addComponent()`.
+   */
+  addComponent<T extends BaseComponent>(cb: (el: HTMLElement) => T): this {
+    const el = document.createElement('div')
+    el.className = 'setting-component'
+    this.headerEl.appendChild(el)
+    cb(el)
+    return this
+  }
+
   /** Search input at the beginning of the group's header — mirrors Setting.addSearch's DOM shape. */
-  addSearch(callback: (component: { inputEl: HTMLInputElement; containerEl: HTMLElement; clearButtonEl: HTMLElement; getValue(): string; setValue(value: string): unknown; setPlaceholder(p: string): unknown; onChange(cb: (value: string) => void): unknown; setDisabled(d: boolean): unknown; then(cb: (c: unknown) => void): unknown }) => void): this {
+  addSearch(callback: (component: { inputEl: HTMLInputElement; containerEl: HTMLElement; clearButtonEl: HTMLElement; getValue(): string; setValue(value: string): unknown; setPlaceholder(p: string): unknown; onChange(cb: (value: string) => void): unknown; setDisabled(d: boolean): unknown; setStatus(status: 'warning' | null): unknown; then(cb: (c: unknown) => void): unknown }) => void): this {
     const container = document.createElement('div')
     container.className = 'search-input-container'
     const input = document.createElement('input')
@@ -876,6 +1015,7 @@ export class SettingGroup {
       setPlaceholder(p: string) { input.placeholder = p; return this },
       onChange(cb: (value: string) => void) { changeCb = cb; return this },
       setDisabled(d: boolean) { input.disabled = d; return this },
+      setStatus(status: 'warning' | null) { container.classList.toggle('setting-search--warning', status === 'warning'); return this },
       then(cb: (c: unknown) => void) { cb(this); return this },
     }
     callback(component)

@@ -193,6 +193,24 @@ export interface PluginRegistryData {
   }>
 }
 
+/** Metadata for a single stored CSS snippet. */
+export interface SnippetMeta {
+  /** Filename without the `.css` extension. */
+  id: string
+  /** Full filename, e.g. `dark-accent.css`. */
+  filename: string
+  /** Byte size of the CSS content. */
+  size: number
+  /** ISO 8601 timestamp of the last write. */
+  updatedAt: string
+}
+
+/** CSS snippet activation registry (persisted per vault). */
+export interface SnippetRegistryData {
+  version: 1
+  snippets: Record<string, { enabled: boolean; updatedAt: string }>
+}
+
 /**
  * Trash entry info returned by the backend API.
  */
@@ -235,11 +253,23 @@ export interface RecentFileEntry {
   timestamp: string
 }
 
+/** Discriminates what a favorite entry points at. Absent means 'file' (legacy entries). */
+export type BookmarkType = 'file' | 'heading' | 'block' | 'search'
+
 /** A favorite entry persisted on the server. */
 export interface FavoriteEntry {
+  id?: string
   vaultId: string
   path: string
   addedAt: string
+  order?: number
+  label?: string
+  type?: BookmarkType
+  heading?: string
+  blockId?: string
+  searchQuery?: string
+  searchCaseSensitive?: boolean
+  searchRegex?: boolean
 }
 
 /** A keybinding override entry persisted on the server. */
@@ -375,6 +405,22 @@ export interface IApiClient {
   getDetectedPlugins(vaultId: string): Promise<{ plugins: DetectedPluginInfo[] }>
   /** Install a detected plugin from .obsidian/plugins/ into the plugin store. */
   installDetectedPlugin(vaultId: string, pluginId: string): Promise<PluginInstallResult>
+
+  // --- CSS Snippet methods ---
+  /** List all CSS snippets for a vault. */
+  listSnippets(vaultId: string): Promise<{ snippets: SnippetMeta[] }>
+  /** Create a new snippet (upload or empty). Rejects with 409 if the filename already exists. */
+  createSnippet(vaultId: string, filename: string, content: string): Promise<SnippetMeta>
+  /** Load a snippet's CSS content. */
+  loadSnippetContent(vaultId: string, snippetId: string): Promise<string>
+  /** Save (overwrite) a snippet's CSS content. */
+  saveSnippetContent(vaultId: string, snippetId: string, content: string): Promise<void>
+  /** Delete a snippet. */
+  deleteSnippet(vaultId: string, snippetId: string): Promise<void>
+  /** Load the snippet activation registry for a vault. */
+  loadSnippetRegistry(vaultId: string): Promise<SnippetRegistryData>
+  /** Save the snippet activation registry for a vault. */
+  saveSnippetRegistry(vaultId: string, registry: SnippetRegistryData): Promise<void>
 
   // --- Plugin Store methods ---
   /** Get community plugin list from store. */
@@ -882,6 +928,55 @@ export class ApiClient implements IApiClient {
   /** Install a detected plugin from .obsidian/plugins/ into the plugin store. */
   async installDetectedPlugin(vaultId: string, pluginId: string): Promise<PluginInstallResult> {
     return this.request<PluginInstallResult>('POST', `/api/v1/vaults/${vaultId}/plugins/detected/${pluginId}/install`)
+  }
+
+  // --- CSS Snippet methods ---
+
+  /** List all CSS snippets for a vault. */
+  async listSnippets(vaultId: string): Promise<{ snippets: SnippetMeta[] }> {
+    return this.request<{ snippets: SnippetMeta[] }>('GET', `/api/v1/vaults/${vaultId}/snippets`)
+  }
+
+  /** Create a new snippet (upload or empty). Rejects with 409 if the filename already exists. */
+  async createSnippet(vaultId: string, filename: string, content: string): Promise<SnippetMeta> {
+    return this.request<SnippetMeta>('POST', `/api/v1/vaults/${vaultId}/snippets`, { filename, content })
+  }
+
+  /** Load a snippet's CSS content. */
+  async loadSnippetContent(vaultId: string, snippetId: string): Promise<string> {
+    const headers = this.buildHeaders('GET', false)
+    const response = await fetch(`/api/v1/vaults/${vaultId}/snippets/${snippetId}`, { method: 'GET', headers })
+
+    if (response.status === 401) {
+      await this.handleAuthFailure()
+      await handleErrorResponse(response)
+    }
+
+    if (!response.ok) {
+      await handleErrorResponse(response)
+    }
+
+    return response.text()
+  }
+
+  /** Save (overwrite) a snippet's CSS content. */
+  async saveSnippetContent(vaultId: string, snippetId: string, content: string): Promise<void> {
+    await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/snippets/${snippetId}`, { content })
+  }
+
+  /** Delete a snippet. */
+  async deleteSnippet(vaultId: string, snippetId: string): Promise<void> {
+    await this.request<void>('DELETE', `/api/v1/vaults/${vaultId}/snippets/${snippetId}`)
+  }
+
+  /** Load the snippet activation registry for a vault. */
+  async loadSnippetRegistry(vaultId: string): Promise<SnippetRegistryData> {
+    return this.request<SnippetRegistryData>('GET', `/api/v1/vaults/${vaultId}/snippets/registry`)
+  }
+
+  /** Save the snippet activation registry for a vault. */
+  async saveSnippetRegistry(vaultId: string, registry: SnippetRegistryData): Promise<void> {
+    await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/snippets/registry`, registry)
   }
 
   // --- Plugin Store methods ---

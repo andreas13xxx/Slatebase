@@ -14,6 +14,7 @@ import { dispatchRealtimeVaultChange } from '../../../state/realtimeVaultBridge'
 import { getStoredAuthToken, getStoredCsrfToken } from '../../../state/authContext';
 import { markPluginWrite } from '../plugin-event-bridge';
 import { warnNoOp } from '../log';
+import { recordGapRead, recordGapCall } from '../api-gap-registry';
 import { VaultAdapterShim } from './vault-adapter-shim';
 import type { IVaultAdapter } from './vault-adapter-shim';
 
@@ -1007,6 +1008,23 @@ export class VaultShim implements IVaultShim {
   }
 
   /**
+   * Append binary data to the end of a file. Mirrors `append()` but for binary
+   * files (audio recordings, attachment logs, etc.) — read the existing bytes,
+   * concatenate, and write back via modifyBinary.
+   *
+   * `options` (Obsidian API since 1.12.3) is accepted for arity compatibility,
+   * same simplification as `modify()`'s: the backend always stamps writes with
+   * the actual write time, so a custom mtime/ctime is accepted but not persisted.
+   */
+  async appendBinary(file: TFile, data: ArrayBuffer, _options?: DataWriteOptions): Promise<void> {
+    const existing = await this.readBinary(file);
+    const combined = new Uint8Array(existing.byteLength + data.byteLength);
+    combined.set(new Uint8Array(existing), 0);
+    combined.set(new Uint8Array(data), existing.byteLength);
+    await this.modifyBinary(file, combined.buffer);
+  }
+
+  /**
    * Helper: get auth token from localStorage.
    */
   private getToken(): string {
@@ -1084,5 +1102,104 @@ export class VaultShim implements IVaultShim {
         { cause: err }
       );
     }
+  }
+
+  /**
+   * Wraps a VaultShim instance with a Proxy for non-emulated API interception.
+   * Mirrors AppShim/WorkspaceShim's pattern: a plugin calling a non-emulated
+   * vault method/property gets a warned no-op instead of a hard crash.
+   *
+   * `getToken()` is deliberately excluded from the whitelist below — it's a
+   * private implementation detail (returns the raw auth token from
+   * localStorage) that TypeScript's `private` doesn't actually hide at
+   * runtime; a plugin reaching `vault.getToken()` through this proxy must get
+   * the same no-op as any other non-emulated method, not the real token.
+   */
+  static wrapWithProxy(instance: VaultShim): VaultShim & Record<string, unknown> {
+    const emulatedProperties = new Set<string | symbol>([
+      'adapter',
+      'onFileRead',
+      'updateTree',
+      'read',
+      'modify',
+      'create',
+      'createFolder',
+      'rename',
+      'trash',
+      'delete',
+      'getAbstractFileByPath',
+      'getAbstractFileByPathInsensitive',
+      'getMarkdownFiles',
+      'cachedRead',
+      'getFiles',
+      'getAllLoadedFiles',
+      'getAllFolders',
+      'getRoot',
+      'getName',
+      'getConfig',
+      'on',
+      'off',
+      'offref',
+      'trigger',
+      'config',
+      'getAvailablePathForAttachments',
+      'exists',
+      'getAvailablePath',
+      'getResourcePath',
+      'getFileByPath',
+      'getFolderByPath',
+      'readBinary',
+      'modifyBinary',
+      'process',
+      'append',
+      'appendBinary',
+      'createBinary',
+      'copy',
+    ]);
+
+    return new Proxy(instance, {
+      get(target: VaultShim, prop: string | symbol): unknown {
+        // `target` (not the Proxy) is passed as the receiver so getters run
+        // with `this` bound to the real instance — see WorkspaceShim.wrapWithProxy
+        // for why a proxy receiver here silently breaks getters that read
+        // un-allowlisted private fields.
+        if (emulatedProperties.has(prop)) {
+          const value = Reflect.get(target, prop, target);
+          if (typeof value === 'function') {
+            return value.bind(target);
+          }
+          return value;
+        }
+
+        if (typeof prop === 'symbol') {
+          return Reflect.get(target, prop, target);
+        }
+
+        // A callable `then` makes this object "thenable" — if the proxy is ever
+        // returned from an async function or otherwise flows through a Promise,
+        // the native Promise resolution algorithm calls it as `then(resolve,
+        // reject)` instead of just settling with the proxy, and since the no-op
+        // below never calls resolve/reject, that await hangs forever. Must stay
+        // a plain `undefined`, not fall into the generic callable-no-op path.
+        if (prop === 'then') {
+          return undefined;
+        }
+
+        if (recordGapRead('Vault', prop)) {
+          console.warn(
+            `[VaultShim] Access to non-emulated vault method/property "${prop}". ` +
+            `Slatebase returns a no-op function here, which is truthy — feature ` +
+            `detection like \`if (vault.${prop})\` will take the wrong branch. ` +
+            `Inspect all gaps with window.__slatebasePluginApiGaps().`
+          );
+        }
+
+        return (...args: unknown[]) => {
+          recordGapCall('Vault', prop);
+          void args;
+          return undefined;
+        };
+      },
+    }) as VaultShim & Record<string, unknown>;
   }
 }

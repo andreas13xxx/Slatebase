@@ -1,8 +1,10 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { EditorState } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
-import { parseTableRow, renderCellInline, buildWidgetDecorations } from './widget-decorations'
+import { parseTableRow, parseTableRowWithPositions, renderCellInline, buildWidgetDecorations } from './widget-decorations'
+import type { DirectoryTree } from '../../types'
+import { registerExtension, resetEmbedRegistry } from '../../plugins/compat/embed-registry'
 
 /** Builds an EditorState with the same markdown/GFM setup used by CodeMirrorEditor.tsx. */
 function makeState(doc: string): EditorState {
@@ -28,6 +30,36 @@ describe('parseTableRow', () => {
 
   it('does not produce an empty column from the optional outer pipes', () => {
     expect(parseTableRow('a | b')).toEqual(['a ', ' b'])
+  })
+})
+
+describe('parseTableRowWithPositions', () => {
+  it('resolves trimmed cell text to correct absolute offsets', () => {
+    const line = '| Guide | Beschreibung |'
+    const lineFrom = 100
+    const cells = parseTableRowWithPositions(line, lineFrom)
+    expect(cells.map(c => c.text)).toEqual(['Guide', 'Beschreibung'])
+    for (const cell of cells) {
+      expect(line.slice(cell.from - lineFrom, cell.to - lineFrom)).toBe(cell.text)
+    }
+  })
+
+  it('keeps a backslash-escaped pipe inside one cell and resolves correct offsets', () => {
+    const line = '| [[A\\|B]] | [[C\\|D]] |'
+    const cells = parseTableRowWithPositions(line, 0)
+    expect(cells.map(c => c.text)).toEqual(['[[A\\|B]]', '[[C\\|D]]'])
+    for (const cell of cells) {
+      expect(line.slice(cell.from, cell.to)).toBe(cell.text)
+    }
+  })
+
+  it('trims surrounding whitespace out of the reported range', () => {
+    const line = 'a | b'
+    const cells = parseTableRowWithPositions(line, 0)
+    expect(cells.map(c => c.text)).toEqual(['a', 'b'])
+    for (const cell of cells) {
+      expect(line.slice(cell.from, cell.to)).toBe(cell.text)
+    }
   })
 })
 
@@ -132,5 +164,120 @@ describe('buildWidgetDecorations — <center> HTML block', () => {
       return spec.attributes?.class === 'cm-lp-html-center'
     })
     expect(centerLine).toBeUndefined()
+  })
+})
+
+describe('buildWidgetDecorations — embed kind classification', () => {
+  it('renders a non-image/pdf, non-.md extension (e.g. .excalidraw) as a note embed, not a bare file placeholder', () => {
+    // Regression test: plugins like Excalidraw rely on their note embed being
+    // rendered via a nested ViewMode, so registerMarkdownPostProcessor gets a
+    // chance to replace the raw content with the actual drawing — matching
+    // Reading mode's detectEmbedType(), which treats any unrecognized
+    // extension as a note. A generic file-icon placeholder never reaches
+    // ViewMode, so no plugin ever gets a chance to render it.
+    const state = makeState('![[Architecture-Diagram.excalidraw]]')
+    const result = buildWidgetDecorations(state, { vaultId: 'v1' })
+    const embedDeco = result.decorations.find((r) => {
+      const spec = r.value.spec as { widget?: { toDOM?: () => HTMLElement } }
+      return typeof spec.widget?.toDOM === 'function'
+    })
+    expect(embedDeco).toBeDefined()
+
+    const el = (embedDeco!.value.spec as { widget: { toDOM: () => HTMLElement } }).widget.toDOM()
+    expect(el.classList.contains('cm-lp-embed-note')).toBe(true)
+    expect(el.classList.contains('cm-lp-embed-file')).toBe(false)
+  })
+
+  it('resolves a bare image filename to its vault-relative path (e.g. dragged in from a subfolder), not the literal name', () => {
+    // Regression test: an `![[image.png]]` embed for a file living in a
+    // subfolder must resolve via the directory tree just like Reading mode's
+    // renderEmbedNode does — otherwise the <img> requests the bare filename
+    // at the vault root and 404s, even though the file exists.
+    const directoryTree: DirectoryTree = {
+      name: 'root',
+      type: 'directory',
+      path: '',
+      children: [
+        {
+          name: 'Attachments',
+          type: 'directory',
+          path: 'Attachments',
+          children: [{ name: 'Demo-Bild.png', type: 'file', path: 'Attachments/Demo-Bild.png' }],
+        },
+      ],
+    }
+    const state = makeState('![[Demo-Bild.png]]')
+    const result = buildWidgetDecorations(state, { vaultId: 'v1', directoryTree })
+    const embedDeco = result.decorations.find((r) => {
+      const spec = r.value.spec as { widget?: { toDOM?: () => HTMLElement } }
+      return typeof spec.widget?.toDOM === 'function'
+    })
+    expect(embedDeco).toBeDefined()
+
+    const img = (embedDeco!.value.spec as { widget: { toDOM: () => HTMLElement } }).widget.toDOM() as HTMLImageElement
+    expect(img.src).toContain(encodeURIComponent('Attachments/Demo-Bild.png'))
+  })
+})
+
+describe('buildWidgetDecorations — app.embedRegistry integration', () => {
+  afterEach(() => {
+    resetEmbedRegistry()
+  })
+
+  const directoryTree: DirectoryTree = {
+    name: 'root',
+    type: 'directory',
+    path: '',
+    children: [{ name: 'Drawing.excalidraw.md', type: 'file', path: 'Drawing.excalidraw.md' }],
+  }
+
+  function toDOMFor(state: EditorState): HTMLElement {
+    const result = buildWidgetDecorations(state, { vaultId: 'v1', directoryTree })
+    const embedDeco = result.decorations.find((r) => {
+      const spec = r.value.spec as { widget?: { toDOM?: () => HTMLElement } }
+      return typeof spec.widget?.toDOM === 'function'
+    })
+    if (!embedDeco) throw new Error('no embed decoration found')
+    return (embedDeco.value.spec as { widget: { toDOM: () => HTMLElement } }).widget.toDOM()
+  }
+
+  it('delegates to a plugin-registered embed creator instead of the built-in note pipeline', () => {
+    // Same regression this registry exists for: the wikilink target's
+    // apparent extension ("excalidraw") differs from the resolved file's
+    // real one ("md", since the file is "Drawing.excalidraw.md").
+    let receivedFile: unknown = null
+    registerExtension('excalidraw', (_context, file) => {
+      receivedFile = file
+      return { load(): void {}, unload(): void {}, loadFile(): void {} }
+    })
+
+    const el = toDOMFor(makeState('![[Drawing.excalidraw]]'))
+    expect(el.className).toBe('cm-lp-embed-plugin')
+    expect(receivedFile).toMatchObject({ path: 'Drawing.excalidraw.md', extension: 'md' })
+  })
+
+  it('unloads the plugin embed component on widget destroy', () => {
+    let unloaded = false
+    registerExtension('excalidraw', () => ({
+      load(): void {},
+      unload(): void { unloaded = true },
+      loadFile(): void {},
+    }))
+
+    const state = makeState('![[Drawing.excalidraw]]')
+    const result = buildWidgetDecorations(state, { vaultId: 'v1', directoryTree })
+    const embedDeco = result.decorations.find((r) => {
+      const spec = r.value.spec as { widget?: { toDOM?: () => HTMLElement; destroy?: (dom: HTMLElement) => void } }
+      return typeof spec.widget?.toDOM === 'function'
+    })
+    const widget = (embedDeco!.value.spec as { widget: { toDOM: () => HTMLElement; destroy: (dom: HTMLElement) => void } }).widget
+    const dom = widget.toDOM()
+    widget.destroy(dom)
+    expect(unloaded).toBe(true)
+  })
+
+  it('falls back to the built-in note pipeline when no creator is registered for the extension', () => {
+    const el = toDOMFor(makeState('![[Drawing.excalidraw]]'))
+    expect(el.classList.contains('cm-lp-embed-note')).toBe(true)
   })
 })

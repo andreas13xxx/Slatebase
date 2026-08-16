@@ -271,6 +271,39 @@ describe('CompatibilityAnalyzer', () => {
       const methods = report.apiCalls.map(c => c.method);
       expect(methods).toContain('vault.read');
     });
+
+    it('detects Bases usage (registerBasesView call)', () => {
+      const source = `
+        class MyPlugin extends Plugin {
+          onload() {
+            this.registerBasesView('my-view', { factory: (c, el) => new MyView(c, el) });
+          }
+        }
+      `;
+      const report = analyzer.analyze(source);
+      const methods = report.apiCalls.map(c => c.method);
+      expect(methods).toContain('obsidian.Bases');
+    });
+
+    it('detects Bases usage (extending a Bases class)', () => {
+      const source = `class MyView extends BasesView {}`;
+      const report = analyzer.analyze(source);
+      const methods = report.apiCalls.map(c => c.method);
+      expect(methods).toContain('obsidian.Bases');
+    });
+
+    it('detects CLI handler usage', () => {
+      const source = `
+        class MyPlugin extends Plugin {
+          onload() {
+            this.registerCliHandler('mycmd', 'does a thing', null, (params) => 'ok');
+          }
+        }
+      `;
+      const report = analyzer.analyze(source);
+      const methods = report.apiCalls.map(c => c.method);
+      expect(methods).toContain('obsidian.Cli');
+    });
   });
 
   describe('analyze() — classification', () => {
@@ -321,6 +354,27 @@ describe('CompatibilityAnalyzer', () => {
       const report = analyzer.analyze(source);
       const call = report.apiCalls.find(c => c.method === 'workspace.ensureSideLeaf');
       expect(call?.classification).toBe('supported');
+    });
+
+    it('classifies obsidian.Bases as partial (loads, but .base files never render) and overall level as partial', () => {
+      const source = `
+        class MyPlugin extends Plugin {
+          onload() { this.registerBasesView('my-view', {}); }
+        }
+      `;
+      const report = analyzer.analyze(source);
+      const call = report.apiCalls.find(c => c.method === 'obsidian.Bases');
+      expect(call?.classification).toBe('partial');
+      expect(report.level).toBe('partial');
+      expect(report.reasons.some(r => r.includes('Bases'))).toBe(true);
+    });
+
+    it('classifies obsidian.Cli as partial (no CLI in a web app)', () => {
+      const source = `this.registerCliHandler('mycmd', 'desc', null, () => 'ok')`;
+      const report = analyzer.analyze(source);
+      const call = report.apiCalls.find(c => c.method === 'obsidian.Cli');
+      expect(call?.classification).toBe('partial');
+      expect(report.reasons.some(r => r.includes('CLI'))).toBe(true);
     });
 
     it('classifies workspace.splitActiveLeaf as supported (graceful degradation, logged to console)', () => {

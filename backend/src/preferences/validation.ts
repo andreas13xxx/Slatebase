@@ -18,9 +18,19 @@ export const saveRecentFilesSchema = z.object({
 
 /** Schema for a single favorite entry. */
 const favoriteEntrySchema = z.object({
+  id: z.string().min(1).max(128).optional(),
   vaultId: z.string().min(1).max(64),
-  path: z.string().min(1).max(1024),
+  // Empty string is valid for type='search' (no file target).
+  path: z.string().max(1024),
   addedAt: z.string().min(1).max(64),
+  order: z.number().int().min(0).optional(),
+  label: z.string().max(100).optional(),
+  type: z.enum(['file', 'heading', 'block', 'search']).optional(),
+  heading: z.string().max(500).optional(),
+  blockId: z.string().max(128).optional(),
+  searchQuery: z.string().max(1024).optional(),
+  searchCaseSensitive: z.boolean().optional(),
+  searchRegex: z.boolean().optional(),
 })
 
 /** Schema for saving favorites. */

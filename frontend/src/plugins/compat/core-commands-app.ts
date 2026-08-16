@@ -22,6 +22,7 @@
 
 import type { Dispatch } from 'react'
 import { openSearchPanel } from '@codemirror/search'
+import type { EditorView } from '@codemirror/view'
 import type { ICommandRegistry } from './command-registry'
 import type { IEditor } from './editor-shim'
 import type { IApiClient } from '../../api'
@@ -34,6 +35,9 @@ import type { SidebarPanelAction, SidebarViewId, SidebarSplitSection as SidebarP
 import type { SettingsCategory, SettingsSection } from '../../state/settingsState'
 import { favoritesStore } from '../../state/favoritesStore'
 import { getActiveEditorView } from '../../editor/plugin-extensions'
+import { showToast } from '../../components/ToastNotification'
+import type { Locale } from '../../i18n'
+import { translateCoreCommandName } from './core-command-i18n'
 
 /** Pages the CommandPalette / core commands can navigate to (mirrors CommandPaletteContainer's NavigablePage). */
 export type NavigablePage =
@@ -67,6 +71,13 @@ export interface CoreAppCommandHandlers {
   onOpenGraph: () => void
   onDailyNote: () => void
   onOpenTemplateSelector: () => void
+  onNavigateBack: () => void
+  onNavigateForward: () => void
+  onOpenQuickSwitcher: () => void
+  /** Current vault-search panel query/flags, for `bookmarks:bookmark-current-search`. */
+  searchQuery: string
+  searchCaseSensitive: boolean
+  searchRegex: boolean
 }
 
 function getActiveTab(h: CoreAppCommandHandlers): TabEntry | null {
@@ -260,6 +271,121 @@ function insertCurrentTime(editor: IEditor): void {
   editor.replaceSelection(formatted)
 }
 
+// ─── Bookmarks: heading/block/search/all-tabs (Requirements 11-14) ────────
+// The four `bookmarks:bookmark-*` no-ops below (see buildSpecs) complete the
+// bookmark types beyond plain file favorites, which already run through
+// `bookmarks:bookmark-current-view`/`unbookmark-current-view` above.
+
+/** Same pattern as `plugins/block-ref/marker-parser.ts`'s (unexported) block-marker regex. */
+const BLOCK_MARKER_REGEX = / \^([a-zA-Z0-9][a-zA-Z0-9-]*)\r?$/
+
+/** Nearest Markdown heading at or above the cursor's line (Requirement 11.1). */
+function findHeadingBeforeCursor(view: EditorView): string | null {
+  const cursorLine = view.state.doc.lineAt(view.state.selection.main.head).number
+  for (let lineNo = cursorLine; lineNo >= 1; lineNo--) {
+    const match = /^#{1,6}\s+(.+?)\s*#*$/.exec(view.state.doc.line(lineNo).text)
+    if (match) return match[1]!.trim()
+  }
+  return null
+}
+
+function bookmarkCurrentHeading(h: CoreAppCommandHandlers): void {
+  const tab = getActiveTab(h)
+  const view = getActiveEditorView()
+  if (!tab || !h.vaultId || !view) return
+
+  const heading = findHeadingBeforeCursor(view)
+  if (!heading) {
+    showToast('error', 'Keine Überschrift oberhalb des Cursors gefunden')
+    return
+  }
+  favoritesStore.addHeadingBookmark(h.vaultId, tab.filePath, heading)
+}
+
+function bookmarkCurrentSearch(h: CoreAppCommandHandlers): void {
+  if (!h.vaultId || h.searchQuery.trim() === '') {
+    showToast('error', 'Keine aktive Suchanfrage vorhanden')
+    return
+  }
+  favoritesStore.addSearchBookmark(h.vaultId, h.searchQuery, h.searchCaseSensitive, h.searchRegex)
+}
+
+/** Last line of the paragraph (consecutive non-blank lines) containing `lineNo`. */
+function findParagraphEndLine(view: EditorView, lineNo: number): number {
+  const doc = view.state.doc
+  let toLine = lineNo
+  while (toLine < doc.lines && doc.line(toLine + 1).text.trim() !== '') toLine++
+  return toLine
+}
+
+/** A block ID not already used by any `^id` marker in the document. */
+function generateUniqueBlockId(content: string): string {
+  const used = new Set<string>()
+  const re = /\^([a-zA-Z0-9][a-zA-Z0-9-]*)/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(content))) used.add(m[1]!)
+  let id: string
+  do {
+    id = Math.random().toString(36).slice(2, 8)
+  } while (used.has(id))
+  return id
+}
+
+function bookmarkCurrentBlock(h: CoreAppCommandHandlers): void {
+  const tab = getActiveTab(h)
+  const view = getActiveEditorView()
+  if (!tab || !h.vaultId || !view) return
+
+  const cursorLine = view.state.doc.lineAt(view.state.selection.main.head).number
+  const endLine = findParagraphEndLine(view, cursorLine)
+  const lastLine = view.state.doc.line(endLine)
+  const existing = BLOCK_MARKER_REGEX.exec(lastLine.text)
+
+  if (existing) {
+    favoritesStore.addBlockBookmark(h.vaultId, tab.filePath, existing[1]!)
+    return
+  }
+
+  const blockId = generateUniqueBlockId(view.state.doc.toString())
+  view.dispatch({ changes: { from: lastLine.to, insert: ` ^${blockId}` } })
+  favoritesStore.addBlockBookmark(h.vaultId, tab.filePath, blockId)
+}
+
+/** True for tabs backing a real vault file (excludes plugin-view tabs and the graph tab). */
+function isFileTab(tab: TabEntry): boolean {
+  return !tab.filePath.startsWith('__view::') && tab.filePath !== '__graph__'
+}
+
+function bookmarkAllTabs(h: CoreAppCommandHandlers): void {
+  if (!h.vaultId) return
+  const vaultId = h.vaultId
+  const fileTabs = h.tabState.tabs.filter(isFileTab)
+  if (fileTabs.length === 0) return
+
+  if (fileTabs.every((t) => favoritesStore.isFavorite(vaultId, t.filePath))) {
+    showToast('info', 'Alle offenen Tabs sind bereits favorisiert')
+    return
+  }
+
+  let added = 0
+  let limitReached = false
+  for (const tab of fileTabs) {
+    if (favoritesStore.isFavorite(vaultId, tab.filePath)) continue
+    const before = favoritesStore.getForVault(vaultId).length
+    favoritesStore.add(vaultId, tab.filePath)
+    if (favoritesStore.getForVault(vaultId).length > before) {
+      added++
+    } else {
+      limitReached = true
+      break
+    }
+  }
+
+  if (limitReached) {
+    showToast('info', `Limit von 50 Favoriten erreicht — ${added} Tab(s) hinzugefügt`)
+  }
+}
+
 const noop = (): void => { /* no Slatebase equivalent — see module docstring */ }
 
 interface CoreAppCommandSpec {
@@ -324,11 +450,11 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'app:open-vault', name: 'Manage vaults', run: (h) => h.onOpenSettings({ category: 'account', section: 'my-vaults' }) },
     { id: 'app:switch-vault', name: 'Change vault...', run: (h) => h.onOpenSettings({ category: 'account', section: 'my-vaults' }) },
     { id: 'app:open-another-vault', name: 'Open vault...', run: (h) => h.onOpenSettings({ category: 'account', section: 'my-vaults' }) },
-    // No Slatebase equivalent — no ribbon UI, no navigation-history stack, no sandbox
-    // vault, no in-app help/debug pages, no split-pane default-mode setting.
+    // No Slatebase equivalent — no ribbon UI, no sandbox vault, no in-app
+    // help/debug pages, no split-pane default-mode setting.
     { id: 'app:toggle-ribbon', name: 'Toggle ribbon', run: noop },
-    { id: 'app:go-back', name: 'Navigate back', run: noop },
-    { id: 'app:go-forward', name: 'Navigate forward', run: noop },
+    { id: 'app:go-back', name: 'Navigate back', run: (h) => h.onNavigateBack() },
+    { id: 'app:go-forward', name: 'Navigate forward', run: (h) => h.onNavigateForward() },
     { id: 'app:open-sandbox-vault', name: 'Open sandbox vault', run: noop },
     { id: 'app:open-help', name: 'Open help', run: noop },
     { id: 'app:show-debug-info', name: 'Show debug info', run: noop },
@@ -393,11 +519,11 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'bases:new-file', name: 'Bases: Create new base', run: noop },
     { id: 'open-with-default-app:open', name: 'Open in default app', run: noop },
     { id: 'open-with-default-app:show', name: 'Show in system explorer', run: noop },
-    { id: 'switcher:open', name: 'Quick switcher: Open quick switcher', run: noop },
-    { id: 'bookmarks:bookmark-all-tabs', name: 'Bookmarks: Bookmark all tabs...', run: noop },
-    { id: 'bookmarks:bookmark-current-heading', name: 'Bookmarks: Bookmark heading under cursor...', run: noop },
-    { id: 'bookmarks:bookmark-current-search', name: 'Bookmarks: Bookmark current search...', run: noop },
-    { id: 'bookmarks:bookmark-current-section', name: 'Bookmarks: Bookmark block under cursor...', run: noop },
+    { id: 'switcher:open', name: 'Quick switcher: Open quick switcher', run: (h) => h.onOpenQuickSwitcher() },
+    { id: 'bookmarks:bookmark-all-tabs', name: 'Bookmarks: Bookmark all tabs...', run: bookmarkAllTabs },
+    { id: 'bookmarks:bookmark-current-heading', name: 'Bookmarks: Bookmark heading under cursor...', run: bookmarkCurrentHeading },
+    { id: 'bookmarks:bookmark-current-search', name: 'Bookmarks: Bookmark current search...', run: bookmarkCurrentSearch },
+    { id: 'bookmarks:bookmark-current-section', name: 'Bookmarks: Bookmark block under cursor...', run: bookmarkCurrentBlock },
 
     // ── Search / command palette — real, via the same window events the app itself uses ──
     { id: 'global-search:open', name: 'Search: Search in all files', run: () => window.dispatchEvent(new CustomEvent('slatebase:open-search')) },
@@ -433,13 +559,14 @@ function buildSpecs(): CoreAppCommandSpec[] {
  * current tab/vault/panel state. Safe to call once; re-registering is only
  * needed if the registry itself changes.
  */
-export function registerCoreAppCommands(registry: ICommandRegistry, getHandlers: () => CoreAppCommandHandlers): void {
+export function registerCoreAppCommands(registry: ICommandRegistry, getHandlers: () => CoreAppCommandHandlers, locale: Locale): void {
   for (const spec of buildSpecs()) {
     const { pluginId, id } = splitId(spec.id)
+    const name = translateCoreCommandName(spec.id, locale, spec.name)
     if (spec.editor) {
-      registry.addCommand(pluginId, { id, name: spec.name, editorCallback: (editor) => { void spec.run(getHandlers(), editor) } })
+      registry.addCommand(pluginId, { id, name, editorCallback: (editor) => { void spec.run(getHandlers(), editor) } })
     } else {
-      registry.addCommand(pluginId, { id, name: spec.name, callback: () => { void spec.run(getHandlers(), null as unknown as IEditor) } })
+      registry.addCommand(pluginId, { id, name, callback: () => { void spec.run(getHandlers(), null as unknown as IEditor) } })
     }
   }
 }

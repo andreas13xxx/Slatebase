@@ -40,7 +40,7 @@ When multiple files have the same name, you can specify the path:
 [[Folder/Subfolder/Filename]]
 ```
 
-Slatebase automatically tries to resolve the shortest unique path. Only when ambiguous is the full path needed.
+For ambiguous names without a path, Slatebase resolves deterministically: first a file in the **same folder** as the linking note, otherwise the file with the **shortest path**, and if candidates still tie, **alphabetically**. Hovering over a link resolved this way shows the target file and how many other same-named files exist in its tooltip. For genuine ambiguity, an explicit path is still the most reliable choice.
 
 ---
 
@@ -112,8 +112,8 @@ Slatebase resolves wikilinks intelligently:
 
 1. **Exact match** — Filename matches exactly
 2. **Without extension** — `[[Note]]` finds `Note.md`
-3. **Shortest path** — When unique, the filename alone suffices
-4. **Case-insensitive** — `[[note]]` finds `Note.md`
+3. **Case-insensitive** — `[[note]]` finds `Note.md`
+4. **When multiple matches exist** — see "Path Specifications" above: same folder → shortest path → alphabetical
 
 When a link cannot be resolved, it's displayed as a "broken link" (dashed underline). You can click on it to create a new file with that name.
 

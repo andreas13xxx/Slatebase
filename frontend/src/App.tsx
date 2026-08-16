@@ -1,8 +1,9 @@
-import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
+import { useEffect, useRef, useCallback, useState, useMemo, useSyncExternalStore } from 'react'
 import { AppProvider, useAppContext, loadVaults, importFile, importFolder, exportVault, reloadVaultTree } from './state'
 import { ApiClient } from './api'
 import { AuthProvider, useAuthContext, getStoredAuthToken, getStoredCsrfToken } from './state/authContext'
 import { TabProvider, useTabContext } from './state/tabContext'
+import { NavigationHistoryProvider, useNavigationHistory } from './state/navigationHistoryContext'
 import { FeatureProvider, useFeatureContext } from './state/featureContext'
 import { SearchProvider } from './state/searchContext'
 import { createDailyNoteService, loadDailyNotesConfigFromServer } from './state/dailyNoteService'
@@ -45,6 +46,7 @@ import { ChatPage } from './components/ChatPage'
 import { SlatebaseLogo } from './components/SlatebaseLogo'
 import { SidebarToolbar } from './components/SidebarToolbar'
 import { StatusBar } from './components/StatusBar'
+import { SnippetLifecycle } from './components/SnippetLifecycle'
 import { MyVaultsPage } from './components/MyVaultsPage'
 import { McpTokensPage } from './components/McpTokensPage'
 import { PluginManagementPage } from './components/PluginManagementPage'
@@ -61,11 +63,13 @@ import { SidebarPanel } from './components/sidebar-panel'
 import { PluginProvider } from './plugins/compat/plugin-context'
 import { CommandPaletteContainer } from './components/CommandPaletteContainer'
 import { TabBar, type SettingsTabDescriptor } from './components/TabBar'
+import { NavigationControls } from './components/NavigationControls'
+import { Breadcrumb } from './components/Breadcrumb'
 import { useResize } from './hooks/useResize'
 import { useStatusBar } from './hooks/useStatusBar'
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts'
 import { useWorkspaceRestore, LAST_VAULT_KEY } from './hooks/useWorkspaceRestore'
-import { initialize as initializeWorkspace, getState as getWorkspaceState, clear as clearWorkspace } from './state/workspaceStore'
+import { initialize as initializeWorkspace, getState as getWorkspaceState, clear as clearWorkspace, subscribe as subscribeWorkspace, getSnapshot as getWorkspaceSnapshot } from './state/workspaceStore'
 import {
   User, Settings, Shield, FileText, Clock,
   Database, Share2, Trash2, Server,
@@ -176,6 +180,7 @@ function AppContent() {
   const { tabState, tabDispatch } = useTabContext()
   const { isEnabled } = useFeatureContext()
   const { state: contextPanelState, dispatch: contextPanelDispatch } = useContextPanelContext()
+  const { goBack, goForward } = useNavigationHistory()
   const { t } = useTranslation()
   const prevVaultId = useRef<string | null>(null)
   // Per-vault tab memory: saves tabs when switching away, restores when switching back
@@ -210,6 +215,16 @@ function AppContent() {
     window.addEventListener('slatebase:open-file-recovery', handleOpenFileRecovery)
     return () => window.removeEventListener('slatebase:open-file-recovery', handleOpenFileRecovery)
   }, [])
+
+  // Aktive Datei im Explorer verfolgen (Requirement 4): when enabled, reveal the
+  // active tab's file in the explorer on every tab change — the same mechanism
+  // the explicit `file-explorer:reveal-active-file` command already uses, just
+  // triggered automatically instead of requiring the user to invoke it.
+  // (Effect lives further down, right after `activeTab` is derived from tabState.)
+  const explorerFollowActiveFile = useSyncExternalStore(
+    subscribeWorkspace,
+    () => getWorkspaceSnapshot().explorerFollowActiveFile,
+  )
 
   const sidebar = useResize(260, 180, 400, 'left', 'sidebarWidth')
   const rightPanel = useResize(240, 160, 500, 'right', 'rightPanelWidth')
@@ -554,6 +569,8 @@ function AppContent() {
     tabDispatch,
     setSettingsOpen,
     onDailyNote: handleDailyNote,
+    onNavigateBack: goBack,
+    onNavigateForward: goForward,
   })
 
   /** Open a file from the sidebar panel (favorites or recent files). */
@@ -646,6 +663,26 @@ function AppContent() {
   const selectedVault = state.vaults.find((v) => v.id === state.selectedVaultId) ?? null
   const activeTab = tabState.tabs.find((tab) => tab.id === tabState.activeTabId) ?? null
   const selectedVaultName = selectedVault?.name ?? ''
+
+  // Breadcrumb (Requirement 7.5): only for real file tabs, not the graph tab or plugin views.
+  const breadcrumbFilePath = activeTab && activeTab.filePath !== '__graph__' && !activeTab.filePath.startsWith('__view::')
+    ? activeTab.filePath
+    : null
+
+  // Auto-reveal effect (Requirement 4) — depends on `activeTab?.id` (a stable string,
+  // unlike the `tabState.tabs` array which gets a new identity on every edit-buffer
+  // keystroke) so it only re-fires when the active tab itself changes.
+  useEffect(() => {
+    if (!explorerFollowActiveFile || !activeTab) return
+    if (activeTab.filePath === '__graph__' || activeTab.filePath.startsWith('__view::')) return
+    window.dispatchEvent(new CustomEvent('slatebase:reveal-file', { detail: { path: activeTab.filePath } }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [explorerFollowActiveFile, activeTab?.id])
+
+  const handleBreadcrumbSegmentClick = useCallback((folderPath: string) => {
+    if (!showSidebar) setShowSidebar(true)
+    window.dispatchEvent(new CustomEvent('slatebase:reveal-file', { detail: { path: folderPath, kind: 'folder' } }))
+  }, [showSidebar])
 
   const settingsTabs: SettingsTabDescriptor[] = openSettingsPages.map((page) => {
     const isActive = isShowingSettings && page === activeSettingsPage
@@ -893,12 +930,15 @@ function AppContent() {
           {/* workspace-tab-container: Obsidian-parity marker class — see mod-vertical/mod-root
               note above. Some plugins requestFullscreen() this element by selector. */}
           <section className="app-content workspace-tab-container">
-            {/* Unified tab bar: settings tabs + file tabs in one row */}
-            <TabBar
-              settingsTabs={settingsTabs}
-              isShowingSettings={isShowingSettings}
-              onActivateFileTab={() => setActiveSettingsPage(null)}
-            />
+            {/* Back/forward navigation history + unified tab bar (settings tabs + file tabs) in one row */}
+            <div className="tab-bar-row">
+              <NavigationControls />
+              <TabBar
+                settingsTabs={settingsTabs}
+                isShowingSettings={isShowingSettings}
+                onActivateFileTab={() => setActiveSettingsPage(null)}
+              />
+            </div>
 
             {/* Content: settings page or vault editor */}
             {isShowingSettings ? (
@@ -906,9 +946,18 @@ function AppContent() {
                 {renderSettingsPage(activeSettingsPage!)}
               </div>
             ) : (
-              <ErrorBoundary>
-                <TabContent />
-              </ErrorBoundary>
+              <>
+                {breadcrumbFilePath !== null && selectedVault && (
+                  <Breadcrumb
+                    vaultName={selectedVault.name}
+                    filePath={breadcrumbFilePath}
+                    onSegmentClick={handleBreadcrumbSegmentClick}
+                  />
+                )}
+                <ErrorBoundary>
+                  <TabContent />
+                </ErrorBoundary>
+              </>
             )}
           </section>
 
@@ -963,6 +1012,7 @@ function AppContent() {
           </button>
         </div>
         {statusBarVisible && <StatusBar />}
+        <SnippetLifecycle />
       </main>
     </div>
     </PluginProvider>
@@ -1136,14 +1186,16 @@ function AuthGuard() {
         <AppProvider apiClient={apiClient}>
           <SearchProvider>
             <TabProvider>
-              <ContextPanelProvider>
-                <SidebarPanelProvider>
-                  <AppContent />
-                  {/* Inside AppProvider: the popover reads the vault and API
-                      client from AppContext to load the previewed note. */}
-                  <HoverPreview />
-                </SidebarPanelProvider>
-              </ContextPanelProvider>
+              <NavigationHistoryProvider>
+                <ContextPanelProvider>
+                  <SidebarPanelProvider>
+                    <AppContent />
+                    {/* Inside AppProvider: the popover reads the vault and API
+                        client from AppContext to load the previewed note. */}
+                    <HoverPreview />
+                  </SidebarPanelProvider>
+                </ContextPanelProvider>
+              </NavigationHistoryProvider>
             </TabProvider>
           </SearchProvider>
         </AppProvider>

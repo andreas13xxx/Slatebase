@@ -127,6 +127,7 @@ export const en: TranslationShape = {
       cell: 'Cell',
     },
     livePreviewFileTooLarge: 'File too large for Live Preview — Source mode active',
+    internalLinkCrossVault: 'Files from a different vault can\'t be linked here',
   },
 
   tabs: {
@@ -633,6 +634,16 @@ export const en: TranslationShape = {
     ariaLabel: 'Status bar',
     clock: 'Current time',
     pluginItems: 'Plugin status indicators',
+    vaultNameAriaLabel: 'Current vault',
+    wordStats: '{words} words, {characters} characters',
+    wordStatsAriaLabel: 'Word and character count',
+    wordStatsSelection: '{selected} of {total} words selected',
+    cursorPositionAriaLabel: 'Cursor position, click to jump to a line',
+    cursorSelectedLines: '{count} lines selected',
+    goToLineTitle: 'Go to line',
+    goToLineLabel: 'Line number',
+    goToLineConfirm: 'Go to',
+    goToLineCancel: 'Cancel',
   },
 
   pluginStore: {

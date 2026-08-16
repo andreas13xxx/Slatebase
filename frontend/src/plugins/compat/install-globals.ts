@@ -23,6 +23,7 @@ import { addRibbonIcon as registerRibbonIcon } from './ribbon-icon-registry'
 import { addStatusBarItem as registerStatusBarItem } from './status-bar-registry'
 import { getCurrentPluginId, trackPluginTimer, withPluginContext } from './plugin-execution-context'
 import { getBuiltInIconIds, getLucideIconElement, renderLucideIconInto } from './lucide-icons'
+import { getCustomIconSvg, sizeCustomIconSvg } from '../../utils/pluginIcon'
 import moment from 'moment/min/moment-with-locales'
 
 // Real CM6 modules — used to provide functional extensions to plugins
@@ -77,6 +78,8 @@ import {
   DropdownComponent,
   ButtonComponent,
   SliderComponent,
+  SecretComponent,
+  DisplayValueComponent,
 } from './setting-tab'
 
 // Shims registered on window.obsidian below. These MUST be static imports:
@@ -99,6 +102,7 @@ import { installApiGapInspector } from './api-gap-registry'
 import { warnNoOp, warnOnce } from './log'
 import { isOwnedEventRef, offrefAtOwner } from './event-system'
 import type { EventRef } from './types'
+import { createEmbedRegistryShim } from './embed-registry'
 // Aliased: the Plugin methods below carry the same names and would read as
 // recursive calls otherwise.
 import {
@@ -292,6 +296,23 @@ function makeExtendable<T extends new (...args: never[]) => unknown>(RealClass: 
   return Wrapper as unknown as T
 }
 
+/**
+ * Obsidian's `text` option (createEl/createDiv/createSpan) and `setText()` both
+ * accept `string | DocumentFragment` — plugins build rich suggestion-list items
+ * (e.g. fuzzy-match highlighting) as a DocumentFragment and hand it through the
+ * same `text` slot as a plain string. Assigning a DocumentFragment straight to
+ * `.textContent` coerces it via its default `toString()`, which renders as the
+ * literal string "[object DocumentFragment]" instead of the fragment's content.
+ */
+function applyElementText(el: Element, text: string | DocumentFragment): void {
+  if (text instanceof DocumentFragment) {
+    el.textContent = ''
+    el.appendChild(text)
+  } else {
+    el.textContent = text
+  }
+}
+
 /** Guard so repeated calls from multiple entry points are harmless. */
 let installed = false
 
@@ -422,9 +443,24 @@ export function installObsidianGlobals(): void {
       writable: true, configurable: true,
     })
   }
+  // Obsidian's shorthand for addEventListener('click', ...), returning `this`
+  // for chaining. Plugins that build UI purely with the DOM extension methods
+  // (Advanced Tables' toolbar view, among others) call this directly on
+  // elements created via createDiv/createEl instead of addEventListener —
+  // without it, the click wiring throws mid-render and the view is left
+  // empty (whatever was appended before the throw never reaches contentEl).
+  if (!('onClickEvent' in HTMLElement.prototype)) {
+    Object.defineProperty(HTMLElement.prototype, 'onClickEvent', {
+      value: function (this: HTMLElement, callback: (this: HTMLElement, ev: MouseEvent) => unknown, options?: boolean | AddEventListenerOptions): HTMLElement {
+        this.addEventListener('click', callback as EventListener, options)
+        return this
+      },
+      writable: true, configurable: true,
+    })
+  }
   if (!('setText' in Element.prototype)) {
     Object.defineProperty(Element.prototype, 'setText', {
-      value: function (this: Element, val: string): void { this.textContent = val },
+      value: function (this: Element, val: string | DocumentFragment): void { applyElementText(this, val) },
       writable: true, configurable: true,
     })
   }
@@ -447,9 +483,9 @@ export function installObsidianGlobals(): void {
       if (pluginId) el.setAttribute('data-plugin-id', pluginId)
       if (typeof o === 'string') { el.className = o }
       else if (o && typeof o === 'object') {
-        const opts = o as { cls?: string | string[]; text?: string; attr?: Record<string, string | number | boolean | null>; parent?: Node }
+        const opts = o as { cls?: string | string[]; text?: string | DocumentFragment; attr?: Record<string, string | number | boolean | null>; parent?: Node }
         if (opts.cls) { if (Array.isArray(opts.cls)) el.className = opts.cls.join(' '); else el.className = opts.cls }
-        if (opts.text) el.textContent = opts.text
+        if (opts.text) applyElementText(el, opts.text)
         if (opts.attr) { for (const [k, v] of Object.entries(opts.attr)) { if (v !== null) el.setAttribute(k, String(v)) } }
         if (opts.parent) opts.parent.appendChild(el)
       }
@@ -626,16 +662,24 @@ export function installObsidianGlobals(): void {
   }
   if (!window.obsidian.getIconIds) {
     // Obsidian returns the built-in ids too, not just plugin-registered ones;
-    // plugins list them to populate icon pickers.
+    // plugins list them to populate icon pickers. Built-ins go first: icon
+    // pickers (e.g. Iconize) render this list unsorted and often slice it to a
+    // limit, so plugin-registered custom ids (other plugins' addIcon() calls,
+    // e.g. Editing Toolbar's "Header1"/"CodeblockGlyph") must not crowd out
+    // the real Lucide set at the front of an unfiltered/empty-query listing.
     window.obsidian.getIconIds = (): string[] => {
-      return [...customIconsRef.keys(), ...getBuiltInIconIds()]
+      return [...getBuiltInIconIds(), ...customIconsRef.keys()]
     }
   }
   if (!window.obsidian.setIcon) {
     window.obsidian.setIcon = (parent: HTMLElement, iconId: string): void => {
       parent.innerHTML = ''
-      const svg = customIconsRef.get(iconId)
-      if (svg) { parent.innerHTML = svg; return }
+      // Unsized (see sizeCustomIconSvg's doc comment) — inserted raw, a custom
+      // icon renders at the browser's intrinsic replaced-element size instead
+      // of the caller's, which inside a small list/button icon slot looks
+      // indistinguishable from no icon at all rather than a sizing bug.
+      const customSvg = getCustomIconSvg(iconId)
+      if (customSvg) { parent.innerHTML = sizeCustomIconSvg(customSvg, 16); return }
       renderLucideIconInto(parent, iconId)
     }
   }
@@ -759,6 +803,109 @@ export function installObsidianGlobals(): void {
         el.addEventListener(event, handler)
         this._events.push({ target: el, event, handler })
       }
+    } as unknown as Record<string, unknown>
+  }
+
+  // ─── Bases (Obsidian API since 1.10.0) — types + no-op registration only ───
+  // Bases is Obsidian's database/formula-query view over vault properties.
+  // Slatebase does not implement it: no formula engine, no `.base` file
+  // rendering, no query UI — `Plugin.registerBasesView()` (above, in the
+  // Plugin prototype) already no-ops with a `warnNoOp`. These class stand-ins
+  // exist only so a plugin that references the names at module-eval time
+  // (`class MyView extends BasesView`, `new NumberValue(...)`) doesn't crash
+  // on load; every method is an inert default. `compatibility-analyzer.ts`
+  // flags plugins that reference any of these as 'partial', so this isn't
+  // silently invisible in the install-time compat report.
+  if (!window.obsidian.Value) {
+    /** Base of the whole formula-result type hierarchy. Real API: abstract class Value. */
+    class ValueBase {
+      value: unknown
+      constructor(value?: unknown) { this.value = value }
+      toString(): string { return this.value == null ? '' : String(this.value) }
+      isTruthy(): boolean { return !!this.value }
+      equals(other: unknown): boolean { return this === other }
+      looseEquals(other: unknown): boolean { return this.equals(other) }
+      renderTo(el: HTMLElement, _ctx: unknown): void { el.textContent = this.toString() }
+      static equals(a: unknown, b: unknown): boolean { return a === b }
+      static looseEquals(a: unknown, b: unknown): boolean { return a === b }
+    }
+    /** Builds a named subclass so devtools/console show a real name instead of "ValueBase". */
+    const namedValueClass = (name: string, Base: typeof ValueBase): typeof ValueBase => {
+      const cls = class extends Base {}
+      Object.defineProperty(cls, 'name', { value: name })
+      return cls
+    }
+    window.obsidian.Value = ValueBase as unknown as Record<string, unknown>
+    const NotNullValue = namedValueClass('NotNullValue', ValueBase)
+    window.obsidian.NotNullValue = NotNullValue as unknown as Record<string, unknown>
+    const NullValueClass = namedValueClass('NullValue', ValueBase) as unknown as { new (): ValueBase; value?: ValueBase }
+    NullValueClass.value = new NullValueClass()
+    window.obsidian.NullValue = NullValueClass as unknown as Record<string, unknown>
+    const PrimitiveValue = namedValueClass('PrimitiveValue', NotNullValue)
+    window.obsidian.PrimitiveValue = PrimitiveValue as unknown as Record<string, unknown>
+    window.obsidian.BooleanValue = namedValueClass('BooleanValue', PrimitiveValue) as unknown as Record<string, unknown>
+    window.obsidian.NumberValue = namedValueClass('NumberValue', PrimitiveValue) as unknown as Record<string, unknown>
+    const StringValue = namedValueClass('StringValue', PrimitiveValue)
+    window.obsidian.StringValue = StringValue as unknown as Record<string, unknown>
+    for (const name of ['HTMLValue', 'IconValue', 'ImageValue', 'LinkValue', 'TagValue', 'UrlValue']) {
+      (window.obsidian as Record<string, unknown>)[name] = namedValueClass(name, StringValue) as unknown as Record<string, unknown>
+    }
+    const DateValue = namedValueClass('DateValue', NotNullValue)
+    window.obsidian.DateValue = DateValue as unknown as Record<string, unknown>
+    window.obsidian.RelativeDateValue = namedValueClass('RelativeDateValue', DateValue) as unknown as Record<string, unknown>
+    for (const name of ['DurationValue', 'FileValue', 'ListValue', 'ObjectValue', 'RegExpValue']) {
+      (window.obsidian as Record<string, unknown>)[name] = namedValueClass(name, NotNullValue) as unknown as Record<string, unknown>
+    }
+  }
+
+  if (!window.obsidian.BasesView) {
+    const ComponentClass = window.obsidian.Component as { new (): { load(): void; unload(): void; onload(): void; onunload(): void; addChild<C>(c: C): C; removeChild<C>(c: C): C; register(cb: unknown): void; registerEvent(ref: unknown): void; registerDomEvent(el: EventTarget, event: string, handler: EventListenerOrEventListenerObject): void; registerInterval(id: number): number } }
+    /** Real API: `class BasesViewConfig` — the per-view config object handed to a BasesView. Options/formula queries are never evaluated. */
+    window.obsidian.BasesViewConfig = class BasesViewConfig {
+      name = ''
+      getOption(_key: string): unknown { return undefined }
+      getAsPropertyId(_key: string): unknown { return undefined }
+      getOrder(): unknown[] { return [] }
+      getEvaluatedFormula(_view: unknown, _key: string): unknown { return (window.obsidian!.NullValue as { value: unknown }).value }
+      setViewData(_key: string, _value: unknown): void {}
+      getViewData(_key: string): unknown { return undefined }
+    } as unknown as Record<string, unknown>
+    /** Real API: `abstract class BasesView extends Component`. Never instantiated by Slatebase — `registerBasesView()` stores the registration but never calls its factory. */
+    window.obsidian.BasesView = class BasesView extends (ComponentClass as unknown as { new (): object }) {
+      app: unknown
+      containerEl: HTMLElement
+      config: unknown
+      constructor(controller: unknown, containerEl: HTMLElement) {
+        super()
+        this.containerEl = containerEl
+        this.app = (controller as { app?: unknown } | undefined)?.app
+      }
+      onDataUpdated(): void {}
+    } as unknown as Record<string, unknown>
+    /** Real API: `class QueryController extends Component` — drives a BasesView's data. Slatebase never constructs one. */
+    window.obsidian.QueryController = class QueryController extends (ComponentClass as unknown as { new (): object }) {
+      app: unknown
+      constructor(app: unknown) { super(); this.app = app }
+    } as unknown as Record<string, unknown>
+    /** Real API: `class RenderContext implements HoverParent` — passed to Value.renderTo(). */
+    window.obsidian.RenderContext = class RenderContext {
+      hoverPopover = null
+    } as unknown as Record<string, unknown>
+    /** Real API: `class BasesEntry` / `class BasesEntryGroup` / `class BasesQueryResult` — query results. Never populated since no query ever runs. */
+    window.obsidian.BasesEntry = class BasesEntry {
+      file: unknown = null
+      app: unknown
+      constructor(app: unknown) { this.app = app }
+      get(_key: string): unknown { return (window.obsidian!.NullValue as { value: unknown }).value }
+    } as unknown as Record<string, unknown>
+    window.obsidian.BasesEntryGroup = class BasesEntryGroup {
+      key: unknown = null
+      items: unknown[] = []
+    } as unknown as Record<string, unknown>
+    window.obsidian.BasesQueryResult = class BasesQueryResult {
+      hasKey(): boolean { return false }
+      length(): number { return 0 }
+      get(_index: number): unknown { return (window.obsidian!.NullValue as { value: unknown }).value }
     } as unknown as Record<string, unknown>
   }
 
@@ -901,30 +1048,13 @@ export function installObsidianGlobals(): void {
         const value = getComputedStyle(document.documentElement).getPropertyValue('--interactive-accent').trim()
         return value || '#7c3aed'
       },
-      embedRegistry: {
-        embedByExtension: {
-          md: () => {
-            // Kanban calls this to extract the internal MarkdownEditor class.
-            // It gets the constructor via Object.getPrototypeOf chain on editMode,
-            // then extends it. The class needs set(), get(), destroy(), cm property.
-            const FakeEditor = class {
-              cm: unknown = null
-              constructor() {}
-              set(_value: string) {}
-              get(): string { return '' }
-              destroy() {}
-            }
-            const editMode = Object.create(Object.create(FakeEditor.prototype))
-            return {
-              load: () => {},
-              unload: () => {},
-              editable: false,
-              showEditor: () => {},
-              editMode,
-            }
-          },
-        },
-      },
+      // Backed by the same module-level `embedByExtension` record every other
+      // embedRegistry consumer (AppShim's `this.app.embedRegistry`, and
+      // plugin-context.ts's later `window.app.embedRegistry` overwrite) reads
+      // and writes — including its `md` default (Kanban's card-editor
+      // extraction hack; see embed-registry.ts's seedKanbanMarkdownEmbed for
+      // why). A plugin registering through one must be visible through all.
+      embedRegistry: createEmbedRegistryShim(),
       commands: {
         commands: {},
         executeCommand: (_command: unknown) => {},
@@ -960,9 +1090,9 @@ export function installObsidianGlobals(): void {
           // createEl(tag, callback) — no options, second arg is the callback
           callback = o as (el: HTMLElement) => void
         } else if (o && typeof o === 'object') {
-          const options = o as { cls?: string; text?: string; attr?: Record<string, string>; type?: string; href?: string; placeholder?: string; value?: string }
+          const options = o as { cls?: string; text?: string | DocumentFragment; attr?: Record<string, string>; type?: string; href?: string; placeholder?: string; value?: string }
           if (options.cls) el.className = options.cls
-          if (options.text) el.textContent = options.text
+          if (options.text) applyElementText(el, options.text)
           if (options.attr) {
             for (const [k, v] of Object.entries(options.attr)) {
               el.setAttribute(k, v)
@@ -985,7 +1115,7 @@ export function installObsidianGlobals(): void {
     Object.defineProperty(HTMLElement.prototype, 'createDiv', {
       value: function (this: HTMLElement, o?: unknown, cb?: (el: HTMLElement) => void) {
         // Obsidian overload: createDiv(cls: string, callback?) or createDiv(options?, callback?)
-        let options: { cls?: string; text?: string } | undefined
+        let options: { cls?: string; text?: string | DocumentFragment } | undefined
         let callback: ((el: HTMLElement) => void) | undefined = cb
         if (typeof o === 'string') {
           options = { cls: o }
@@ -993,7 +1123,7 @@ export function installObsidianGlobals(): void {
         } else if (typeof o === 'function') {
           callback = o as (el: HTMLElement) => void
         } else if (o && typeof o === 'object') {
-          options = o as { cls?: string; text?: string }
+          options = o as { cls?: string; text?: string | DocumentFragment }
         }
         return (this as unknown as { createEl: (tag: string, opts?: unknown, cb?: (el: HTMLElement) => void) => HTMLElement }).createEl('div', options, callback)
       },
@@ -1005,7 +1135,7 @@ export function installObsidianGlobals(): void {
     Object.defineProperty(HTMLElement.prototype, 'createSpan', {
       value: function (this: HTMLElement, o?: unknown, cb?: (el: HTMLElement) => void) {
         // Obsidian overload: createSpan(cls: string, callback?) or createSpan(options?, callback?)
-        let options: { cls?: string; text?: string } | undefined
+        let options: { cls?: string; text?: string | DocumentFragment } | undefined
         let callback: ((el: HTMLElement) => void) | undefined = cb
         if (typeof o === 'string') {
           options = { cls: o }
@@ -1013,7 +1143,7 @@ export function installObsidianGlobals(): void {
         } else if (typeof o === 'function') {
           callback = o as (el: HTMLElement) => void
         } else if (o && typeof o === 'object') {
-          options = o as { cls?: string; text?: string }
+          options = o as { cls?: string; text?: string | DocumentFragment }
         }
         return (this as unknown as { createEl: (tag: string, opts?: unknown, cb?: (el: HTMLElement) => void) => HTMLElement }).createEl('span', options, callback)
       },
@@ -1062,8 +1192,8 @@ export function installObsidianGlobals(): void {
   }
   if (!Object.hasOwn(HTMLElement.prototype, 'setText')) {
     Object.defineProperty(HTMLElement.prototype, 'setText', {
-      value: function (this: HTMLElement, text: string) {
-        this.textContent = text
+      value: function (this: HTMLElement, text: string | DocumentFragment) {
+        applyElementText(this, text)
         return this
       },
       writable: true,
@@ -1157,9 +1287,9 @@ export function installObsidianGlobals(): void {
       if (typeof o === 'function') {
         callback = o as (el: HTMLElement) => void
       } else if (o && typeof o === 'object') {
-        const options = o as { cls?: string; text?: string; attr?: Record<string, string>; type?: string; href?: string; placeholder?: string; value?: string }
+        const options = o as { cls?: string; text?: string | DocumentFragment; attr?: Record<string, string>; type?: string; href?: string; placeholder?: string; value?: string }
         if (options.cls) el.className = options.cls
-        if (options.text) el.textContent = options.text
+        if (options.text) applyElementText(el, options.text)
         if (options.attr) {
           for (const [k, v] of Object.entries(options.attr)) {
             el.setAttribute(k, v)
@@ -1177,7 +1307,7 @@ export function installObsidianGlobals(): void {
 
   if (!win.createDiv) {
     win.createDiv = function createDiv(o?: unknown, cb?: (el: HTMLElement) => void): HTMLElement {
-      let options: { cls?: string; text?: string } | undefined
+      let options: { cls?: string; text?: string | DocumentFragment } | undefined
       let callback: ((el: HTMLElement) => void) | undefined = cb
       if (typeof o === 'string') {
         options = { cls: o }
@@ -1192,7 +1322,7 @@ export function installObsidianGlobals(): void {
 
   if (!win.createSpan) {
     win.createSpan = function createSpan(o?: unknown, cb?: (el: HTMLElement) => void): HTMLElement {
-      let options: { cls?: string; text?: string } | undefined
+      let options: { cls?: string; text?: string | DocumentFragment } | undefined
       let callback: ((el: HTMLElement) => void) | undefined = cb
       if (typeof o === 'string') {
         options = { cls: o }
@@ -1304,6 +1434,15 @@ export function installObsidianGlobals(): void {
         warnNoOp(pluginId, 'registerExtensions')
       }
       /**
+       * Register a Bases view type (Obsidian's built-in database/table view
+       * feature, since 1.9). Slatebase has no Bases concept — plugins that
+       * extend it (custom Bases view types) have nothing to render into.
+       */
+      registerBasesView(_id: string, _config: unknown): void {
+        const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
+        warnNoOp(pluginId, 'registerBasesView', 'Slatebase does not implement Bases; this view type is never rendered.')
+      }
+      /**
        * Register an `obsidian://` protocol handler. Deliberately unsupported:
        * Slatebase is a web app and cannot claim a custom URL scheme.
        */
@@ -1359,6 +1498,9 @@ export function installObsidianGlobals(): void {
   window.obsidian.DropdownComponent = DropdownComponent
   window.obsidian.ButtonComponent = ButtonComponent
   window.obsidian.SliderComponent = SliderComponent
+  // SecretComponent (1.11.4) / DisplayValueComponent (1.13.1) — see setting-tab.ts.
+  window.obsidian.SecretComponent = SecretComponent
+  window.obsidian.DisplayValueComponent = DisplayValueComponent
 
   // SettingGroup (Obsidian 1.11+) — groups Setting rows under a shared heading;
   // the declarative settings API also hands one to a definition's `render`
@@ -1543,7 +1685,18 @@ export function installObsidianGlobals(): void {
   // WorkspaceLeaf now invokes as part of the view lifecycle (see view-registry.ts).
   if (!window.obsidian.View) {
     const ComponentClass = window.obsidian.Component as { new (): unknown; prototype: object }
-    window.obsidian.View = class View extends (ComponentClass as unknown as { new (): object }) {} as unknown as Record<string, unknown>
+    // getState()/setState() are real Obsidian defaults on View itself (returning
+    // `{}` / resolving immediately), not something every subclass must override.
+    // Other plugins routinely call `leaf.view.getState()` on whatever view happens
+    // to be active without checking it's implemented (obsidian-git's
+    // active-leaf-change handler, Mind Map's activeLeafPath) — without a default
+    // here, any plugin view that doesn't override it throws for unrelated plugins.
+    window.obsidian.View = class View extends (ComponentClass as unknown as { new (): object }) {
+      getState(): Record<string, unknown> { return {} }
+      async setState(_state: Record<string, unknown>, _result: unknown): Promise<void> {}
+      getEphemeralState(): Record<string, unknown> { return {} }
+      setEphemeralState(_state: Record<string, unknown>): void {}
+    } as unknown as Record<string, unknown>
   }
   const ViewClass = window.obsidian.View as unknown as { new (): object }
 
@@ -1575,9 +1728,13 @@ export function installObsidianGlobals(): void {
         this.contentEl.className = 'plugin-view-content view-content'
         this.containerEl.appendChild(this.contentEl)
       }
+      icon: string = 'file'
+      navigation: boolean = true
       getViewType(): string { return '' }
       getDisplayText(): string { return 'Plugin View' }
-      getIcon(): string { return 'file' }
+      getIcon(): string { return this.icon }
+      onResize(): void { /* plugins override */ }
+      onPaneMenu(_menu: unknown, _source: string): void { /* plugins override */ }
       async onOpen(): Promise<void> { /* plugins override */ }
       async onClose(): Promise<void> { /* plugins override */ }
       // registerEvent/register/registerDomEvent/registerInterval/addChild/removeChild/
@@ -1603,11 +1760,13 @@ export function installObsidianGlobals(): void {
         button.addEventListener('click', callback)
         actionsEl.appendChild(button)
 
-        // Render icon: custom icon registry first, then Lucide
-        const customIcons = (window as unknown as { __obsidianCustomIcons?: Map<string, string> }).__obsidianCustomIcons
-        const customSvg = customIcons?.get(icon)
+        // Render icon: custom icon registry first, then Lucide. Sized explicitly —
+        // an unsized custom SVG defaults to the browser's intrinsic <svg> size
+        // instead of the button's, so it renders invisible or oversized rather
+        // than just missing (see sizeCustomIconSvg's doc comment).
+        const customSvg = getCustomIconSvg(icon)
         if (customSvg) {
-          button.innerHTML = customSvg
+          button.innerHTML = sizeCustomIconSvg(customSvg, 16)
         } else {
           renderLucideIconInto(button, icon)
         }
@@ -1640,6 +1799,14 @@ export function installObsidianGlobals(): void {
       getViewType(): string { return 'file' }
       onLoadFile(_file: unknown): Promise<void> { return Promise.resolve() }
       onUnloadFile(_file: unknown): Promise<void> { return Promise.resolve() }
+      /**
+       * Called when the file backing this view is renamed. Fired by
+       * ViewRegistry.notifyFileRenamed() (wired to the vault's 'rename' event
+       * in plugin-context.ts), matching real Obsidian's active-FileView
+       * notification. Default no-op — plugins override to react (e.g. update
+       * a cached title).
+       */
+      onRename(_file: unknown): Promise<void> { return Promise.resolve() }
     } as unknown as Record<string, unknown>
   }
 
@@ -1761,6 +1928,8 @@ export function installObsidianGlobals(): void {
       /** Returns 'markdown' as the view type identifier. */
       getViewType(): string { return 'markdown' }
       getDisplayText(): string { return (this.file as { basename?: string })?.basename ?? 'Markdown' }
+      /** Real Obsidian's MarkdownView always has this (null unless a hover preview is open). */
+      hoverPopover: unknown = null
       /** The editor instance (EditorShim when available). */
       get editor(): unknown {
         const workspace = (this.app as { workspace?: { activeEditor?: { editor: unknown } } })?.workspace
@@ -1813,9 +1982,13 @@ export function installObsidianGlobals(): void {
   // We use moment/min/moment-with-locales which includes all ~130 locales,
   // just like Obsidian does. This ensures any locale a plugin requests is available.
 
-  // Set the active locale from browser language (like Obsidian does at startup)
+  // Set the active locale from the app's chosen language (localStorage("language"),
+  // kept in sync with the user's profile setting by ObsidianLocaleSync in App.tsx),
+  // falling back to browser language only when no app locale has been recorded yet
+  // (e.g. first paint before login/before that effect has run).
+  const storedLang = localStorage.getItem('language')
   const browserLang = (navigator.language ?? 'en').toLowerCase()
-  const desiredLocale = browserLang.startsWith('de') ? 'de' : browserLang.split('-')[0]
+  const desiredLocale = storedLang || (browserLang.startsWith('de') ? 'de' : browserLang.split('-')[0])
   moment.locale(desiredLocale)
 
   ;(window as unknown as { moment: typeof moment }).moment = moment
@@ -1878,6 +2051,13 @@ export function installObsidianGlobals(): void {
         this.app = app
         this.containerEl = document.createElement('div')
         this.containerEl.className = 'modal-container'
+        // Modals attach straight to document.body (see open() below), outside
+        // any plugin view container, so tag the root here the same way
+        // createEl() does — otherwise CssInjector's [data-plugin-id] ancestor
+        // scoping never matches anything inside, and the plugin's modal CSS
+        // (grids, icon sizing, etc.) silently fails to apply.
+        const pluginId = getCurrentPluginId()
+        if (pluginId) this.containerEl.setAttribute('data-plugin-id', pluginId)
         this.modalEl = document.createElement('div')
         this.modalEl.className = 'modal'
         this.titleEl = document.createElement('div')
@@ -1970,11 +2150,13 @@ export function installObsidianGlobals(): void {
   }
 
   // getLanguage — returns the app's current locale code (e.g. 'en', 'de').
-  // Excalidraw and other i18n-aware plugins use this.
+  // Excalidraw and other i18n-aware plugins use this. Prefer the app's own language
+  // setting (localStorage("language"), synced from the user's profile by
+  // ObsidianLocaleSync) over the browser default so plugins follow what the user
+  // actually picked in Slatebase, not their OS/browser locale.
   if (!window.obsidian.getLanguage) {
     window.obsidian.getLanguage = (): string => {
-      const lang = navigator.language?.split('-')[0] ?? 'en'
-      return lang
+      return localStorage.getItem('language') || navigator.language?.split('-')[0] || 'en'
     }
   }
 
@@ -1991,15 +2173,102 @@ export function installObsidianGlobals(): void {
     } as unknown as Record<string, unknown>
   }
 
-  // ConfirmationModal — extends Modal with a confirm/cancel pattern.
-  // Templater and other plugins extend this for user confirmation dialogs.
-  if (!window.obsidian.ConfirmationModal) {
-    const ModalClass = window.obsidian.Modal as { new (app: unknown): unknown; prototype: object }
-    window.obsidian.ConfirmationModal = class ConfirmationModal extends (ModalClass as unknown as { new (app: unknown): { app: unknown; containerEl: HTMLElement; contentEl: HTMLElement; open(): void; close(): void; onOpen(): void; onClose(): void } }) {
-      constructor(app: unknown) {
-        super(app)
+  // ConfirmationButton — extends the real ButtonComponent (Obsidian API since
+  // 1.13.0). Real Obsidian's constructor is private (only ConfirmationModal.
+  // addButton/addCancelButton build one); ours is public for simplicity, but
+  // nothing else in this file constructs one directly.
+  if (!window.obsidian.ConfirmationButton) {
+    window.obsidian.ConfirmationButton = class ConfirmationButton extends ButtonComponent {
+      private autoClose: () => void
+      constructor(containerEl: HTMLElement, autoClose: () => void) {
+        super(containerEl)
+        this.autoClose = autoClose
+      }
+      /**
+       * Overrides ButtonComponent.onClick: per the real API doc, buttons in a
+       * ConfirmationModal auto-close the modal on click unless the handler
+       * returns (or resolves to) a truthy value.
+       */
+      override onClick(handler: (evt: MouseEvent) => unknown): this {
+        this.buttonEl.addEventListener('click', (evt) => {
+          void Promise.resolve(handler(evt)).then((result) => {
+            if (!result) this.autoClose()
+          })
+        })
+        return this
+      }
+      setInitialFocus(): this {
+        this.buttonEl.setAttribute('data-initial-focus', 'true')
+        this.buttonEl.focus()
+        return this
+      }
+      setSecondary(): this {
+        this.buttonEl.classList.add('mod-secondary')
+        return this
+      }
+      setCancel(): this {
+        this.buttonEl.classList.add('mod-cancel')
+        return this
       }
     } as unknown as Record<string, unknown>
+  }
+
+  // ConfirmationModal — extends Modal with a confirm/cancel button-row pattern
+  // (Obsidian API since 1.13.0). Templater and other plugins extend this for
+  // user confirmation dialogs.
+  if (!window.obsidian.ConfirmationModal) {
+    const ModalClass = window.obsidian.Modal as { new (app: unknown): unknown; prototype: object }
+    const ConfirmationButtonClass = window.obsidian.ConfirmationButton as {
+      new (containerEl: HTMLElement, autoClose: () => void): { buttonEl: HTMLButtonElement; setButtonText(text: string): unknown }
+    }
+    window.obsidian.ConfirmationModal = makeExtendable(class ConfirmationModal extends (ModalClass as unknown as {
+      new (app: unknown): {
+        app: unknown; containerEl: HTMLElement; modalEl: HTMLElement; contentEl: HTMLElement
+        open(): void; close(): void; onOpen(): void; onClose(): void
+      }
+    }) {
+      buttonContainerEl: HTMLElement
+
+      constructor(app: unknown) {
+        super(app)
+        this.buttonContainerEl = document.createElement('div')
+        this.buttonContainerEl.className = 'modal-button-container'
+        this.modalEl.appendChild(this.buttonContainerEl)
+      }
+
+      addClass(cls: string): this {
+        this.modalEl.classList.add(cls)
+        return this
+      }
+
+      addCheckbox(label: string, cb: (value: boolean) => unknown): this {
+        const wrapper = document.createElement('label')
+        wrapper.className = 'modal-checkbox'
+        const input = document.createElement('input')
+        input.type = 'checkbox'
+        const text = document.createElement('span')
+        text.textContent = label
+        wrapper.appendChild(input)
+        wrapper.appendChild(text)
+        input.addEventListener('change', () => { void cb(input.checked) })
+        this.contentEl.appendChild(wrapper)
+        return this
+      }
+
+      addButton(cb: (btn: unknown) => unknown): this {
+        const btn = new ConfirmationButtonClass(this.buttonContainerEl, () => this.close())
+        cb(btn)
+        return this
+      }
+
+      addCancelButton(text?: string): this {
+        const btn = new ConfirmationButtonClass(this.buttonContainerEl, () => this.close())
+        btn.setButtonText(text ?? 'Abbrechen')
+        ;(btn as unknown as { setCancel(): unknown; onClick(h: (evt: MouseEvent) => unknown): unknown }).setCancel()
+        ;(btn as unknown as { onClick(h: (evt: MouseEvent) => unknown): unknown }).onClick(() => false)
+        return this
+      }
+    }) as unknown as Record<string, unknown>
   }
 
   // SettingPage — Base class for sub-pages within a SettingTab (Obsidian 1.13.0+).
@@ -2038,8 +2307,34 @@ export function installObsidianGlobals(): void {
       section: string
       checked: boolean
       disabled: boolean
+      warning: boolean
       submenu: MenuInstance | null
       callback: (evt: MouseEvent | KeyboardEvent) => void
+      /**
+       * The plugin that was executing when this item was built via addItem(),
+       * captured then because by the time the user actually clicks it —  a
+       * separate later event — any withPluginContext() from menu construction
+       * (e.g. the wrapped 'file-menu' dispatch in event-system.ts) has long
+       * since unwound. Without replaying it in invoke(), a callback that opens
+       * a Modal/picker builds DOM with getCurrentPluginId() === null, so
+       * CssInjector's [data-plugin-id] scoping matches nothing inside it and
+       * the plugin's own stylesheet (icon grids, layout, ...) never applies.
+       */
+      pluginId: string | null
+      /**
+       * Real Obsidian's MenuItem is imperative: `dom`/`titleEl`/`iconEl` exist
+       * the moment addItem()'s callback runs, not only once the menu opens.
+       * Plugins rely on that to embed extra components straight into an item
+       * — "Editing Toolbar"'s status-bar menu does
+       * `new ToggleComponent(item.dom)` inside the addItem() callback, which
+       * crashed with "containerEl is undefined" when `dom` didn't exist yet.
+       * Built eagerly in _createEntry() and reused as-is at show()-time
+       * instead of building fresh DOM there, so anything a plugin appended
+       * into `dom` survives into the rendered menu.
+       */
+      dom: HTMLElement
+      iconEl: HTMLElement | null
+      titleEl: HTMLElement | null
     }
     interface MenuInstance {
       items: MenuEntry[]
@@ -2048,28 +2343,62 @@ export function installObsidianGlobals(): void {
 
     window.obsidian.Menu = class Menu {
       items: MenuEntry[] = []
-      /** Obsidian exposes the menu element as `dom`; plugins style and measure it. */
-      dom: HTMLElement | null = null
+      /**
+       * Obsidian creates the menu's root element eagerly in the constructor,
+       * not at show()-time — plugins routinely do `menu.dom.addClass(...)` or
+       * append custom content right after `new Menu()`, before ever calling
+       * showAtMouseEvent()/showAtPosition(). Making this lazy (only built in
+       * show(), nulled in close()) crashed those plugins with
+       * "can't access property addClass, dom is null" the moment they touched
+       * `.dom` pre-show, or reused a menu instance after it had closed.
+       */
+      dom: HTMLElement = document.createElement('div')
       containerEl: HTMLElement | null = null
       private onHideCallbacks: Array<() => void> = []
       private submenuEl: HTMLElement | null = null
-      private noIcon = false
+
+      constructor() {
+        this.dom.className = 'menu'
+      }
 
       addItem(cb: (item: unknown) => void): this {
-        const item = Menu._createEntry('item')
+        const item = this._createEntry('item')
+        item.pluginId = getCurrentPluginId()
         cb(item)
         this.items.push(item)
         return this
       }
 
       addSeparator(): this {
-        this.items.push(Menu._createEntry('separator'))
+        this.items.push(this._createEntry('separator'))
+        return this
+      }
+
+      /** Pre-declared section display order, populated by addSections(). */
+      private sectionOrder: string[] = []
+
+      /**
+       * Pre-declare the display order of named sections (Obsidian 1.x+). Plugins
+       * call this once per section, typically right before adding that
+       * section's items — "Editing Toolbar"'s status-bar menu is
+       * `addSections(["settings"]); <add settings items>; addSections(["viewType"]); ...`.
+       * Without this, items still group by `setSection()` (first-seen item
+       * order), but a section named before it has any items — as here — has no
+       * effect until an item actually claims it, which can visually reorder
+       * groups relative to what the plugin declared.
+       */
+      addSections(sections: string[]): this {
+        for (const section of sections) {
+          if (!this.sectionOrder.includes(section)) this.sectionOrder.push(section)
+        }
         return this
       }
 
       /** Obsidian's opt-out of the icon gutter, for menus where no item has one. */
       setNoIcon(): this {
-        this.noIcon = true
+        // The class is the whole mechanism — Obsidian's own stylesheet keys the
+        // icon gutter off it, so there is no separate flag to track.
+        this.dom.classList.add('mod-no-icon')
         return this
       }
 
@@ -2079,30 +2408,128 @@ export function installObsidianGlobals(): void {
         return this
       }
 
-      /** @internal Create a menu entry with all methods Obsidian plugins expect. */
-      static _createEntry(kind: 'item' | 'separator'): MenuEntry & Record<string, unknown> {
+      /**
+       * Real Obsidian toggles between the OS-native (Electron) context menu and
+       * its own HTML one. Slatebase is a web app with no native menu to switch
+       * to — always renders the HTML menu — so this is a no-op kept only so
+       * plugins that call it (desktop-focused ones toggling native menus off
+       * for custom rendering) don't crash.
+       */
+      setUseNativeMenu(_useNativeMenu: boolean): this {
+        return this
+      }
+
+      /**
+       * @internal Create a menu entry with all methods Obsidian plugins
+       * expect. DOM is built here, not at show()-time, so `item.dom` is a
+       * real element the instant addItem()'s callback receives the item —
+       * see the MenuEntry.dom doc comment for why that matters. An instance
+       * method (not static) because the item's click/hover wiring calls back
+       * into this menu (`this.invoke`/`this.openSubmenu`/`this.closeSubmenu`).
+       */
+      private _createEntry(kind: 'item' | 'separator'): MenuEntry & Record<string, unknown> {
+        let dom: HTMLElement
+        let iconEl: HTMLElement | null = null
+        let titleEl: HTMLElement | null = null
+
+        if (kind === 'separator') {
+          dom = document.createElement('div')
+          dom.className = 'menu-separator'
+        } else {
+          dom = document.createElement('div')
+          dom.className = 'menu-item'
+          iconEl = document.createElement('div')
+          iconEl.className = 'menu-item-icon'
+          dom.appendChild(iconEl)
+          titleEl = document.createElement('div')
+          titleEl.className = 'menu-item-title'
+          dom.appendChild(titleEl)
+
+          // Wired once here rather than rebuilt per show(): `disabled`/`submenu`
+          // are read live off the entry at event time, so toggling either
+          // after creation (setDisabled()/setSubmenu() called later in the
+          // same addItem() callback, as most plugins do) still behaves
+          // correctly without re-attaching anything.
+          dom.setAttribute('tabindex', '0')
+          dom.addEventListener('click', (e) => {
+            if (entry.disabled) { e.stopPropagation(); return }
+            this.invoke(entry, e)
+          })
+          dom.addEventListener('mouseenter', () => {
+            if (entry.submenu) this.openSubmenu(entry, dom)
+            else this.closeSubmenu()
+          })
+        }
+
         const entry = {
           kind,
-          title: '', icon: '', section: '', checked: false, disabled: false,
+          title: '', icon: '', section: '', checked: false, disabled: false, warning: false,
           submenu: null as MenuInstance | null,
           callback: (_evt: MouseEvent | KeyboardEvent) => {},
+          pluginId: null as string | null,
+          dom, iconEl, titleEl,
           setTitle(t: string | DocumentFragment) {
             // Obsidian accepts a DocumentFragment for rich titles; flatten it,
             // since our renderer sets textContent.
             this.title = typeof t === 'string' ? t : (t.textContent ?? '')
+            if (this.titleEl) this.titleEl.textContent = this.title
             return this
           },
-          setIcon(i: string | null) { this.icon = i ?? ''; return this },
+          setIcon(i: string | null) {
+            this.icon = i ?? ''
+            if (this.iconEl) {
+              this.iconEl.innerHTML = ''
+              if (this.icon) {
+                // Custom icons registered via addIcon() first, same as
+                // window.obsidian.setIcon — otherwise a plugin's own SVG used
+                // as a menu-item icon falls through to the Lucide-only
+                // resolver and warns as an unrecognized Obsidian id. Sized
+                // explicitly — see sizeCustomIconSvg's doc comment for why an
+                // unsized custom SVG renders invisible/oversized rather than
+                // just missing.
+                const customSvg = getCustomIconSvg(this.icon)
+                if (customSvg) this.iconEl.innerHTML = sizeCustomIconSvg(customSvg, 16)
+                else renderLucideIconInto(this.iconEl, this.icon)
+              }
+            }
+            return this
+          },
           setSection(s: string) { this.section = s; return this },
-          setChecked(c: boolean | null) { this.checked = c === true; return this },
-          setDisabled(d: boolean) { this.disabled = d !== false; return this },
-          setIsLabel(isLabel: boolean) { this.disabled = isLabel !== false; return this },
+          setChecked(c: boolean | null) {
+            this.checked = c === true
+            this.dom.classList.toggle('is-checked', this.checked)
+            return this
+          },
+          setDisabled(d: boolean) {
+            this.disabled = d !== false
+            this.dom.classList.toggle('is-disabled', this.disabled)
+            // A disabled item that still fires its callback is worse than one
+            // that does nothing — the click listener checks `disabled` live,
+            // this attribute is presentational/a11y only.
+            if (this.disabled) this.dom.setAttribute('aria-disabled', 'true')
+            else this.dom.removeAttribute('aria-disabled')
+            return this
+          },
+          setIsLabel(isLabel: boolean) { return this.setDisabled(isLabel !== false) },
+          /** Red/destructive styling for the item, mirroring ButtonComponent.setWarning(). */
+          setWarning(w: boolean) {
+            this.warning = w !== false
+            this.dom.classList.toggle('is-warning', this.warning)
+            return this
+          },
           onClick(fn: (evt: MouseEvent | KeyboardEvent) => void) { this.callback = fn; return this },
           setSubmenu(cb?: unknown) {
             // Obsidian API: setSubmenu() returns a new Menu (no-arg overload)
             // OR setSubmenu(cb) calls cb with a new Menu (callback overload)
             const submenu = new Menu()
             this.submenu = submenu as unknown as MenuInstance
+            this.dom.classList.add('mod-submenu')
+            if (this.dom.querySelector('.mod-submenu-arrow') === null) {
+              const arrow = document.createElement('div')
+              arrow.className = 'menu-item-icon mod-submenu-arrow'
+              renderLucideIconInto(arrow, 'chevron-right')
+              this.dom.appendChild(arrow)
+            }
             if (typeof cb === 'function') {
               ;(cb as (m: unknown) => void)(submenu)
               return this
@@ -2136,86 +2563,55 @@ export function installObsidianGlobals(): void {
         const overlay = document.createElement('div')
         overlay.className = 'menu-overlay'
 
-        const menu = document.createElement('div')
-        menu.className = this.noIcon ? 'menu mod-no-icon' : 'menu'
+        // Reuse the eagerly-created `dom` (see the field doc comment) rather
+        // than building a fresh element, so any classes/content a plugin
+        // already added to `menu.dom` before calling show() survive into the
+        // rendered menu.
+        const menu = this.dom
+        menu.replaceChildren()
         // Grouping by section is what keeps plugin-contributed entries together
         // in the order the plugin declared the sections, as Obsidian does.
+        // Each entry's DOM was already built (and possibly added to, by a
+        // plugin reaching into `item.dom`) back in _createEntry() — appendChild
+        // here just moves it into the visible tree, it doesn't build it.
         for (const entry of this.sortedBySection()) {
-          menu.appendChild(this.renderEntry(entry))
+          menu.appendChild(entry.dom)
         }
 
         overlay.appendChild(menu)
         overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) this.close() })
         document.body.appendChild(overlay)
         this.containerEl = overlay
-        this.dom = menu
 
         this.positionAt(menu, x, y)
         this.attachKeyboardNavigation(menu)
         menu.focus()
       }
 
-      /** Entries grouped by `section`, sections in first-seen order. */
+      /**
+       * Entries grouped by `section`: sections declared via addSections() come
+       * first in that order, then any section only ever seen on an item (no
+       * addSections() call) in first-seen order.
+       */
       private sortedBySection(): MenuEntry[] {
-        const sections: string[] = []
+        const sections: string[] = [...this.sectionOrder]
         for (const entry of this.items) {
           if (!sections.includes(entry.section)) sections.push(entry.section)
         }
         if (sections.length <= 1) return this.items
-        return sections.flatMap((section, i) => {
+        const result: MenuEntry[] = []
+        for (const section of sections) {
           const entries = this.items.filter((e) => e.section === section)
+          // A section pre-declared via addSections() but never actually used
+          // by an item renders nothing — not even a stray leading separator.
+          if (entries.length === 0) continue
           // A divider between sections, unless the plugin already placed one.
-          if (i > 0 && entries[0]?.kind !== 'separator') {
-            return [Menu._createEntry('separator'), ...entries]
+          if (result.length > 0 && entries[0]?.kind !== 'separator') {
+            result.push(this._createEntry('separator'))
           }
-          return entries
-        })
-      }
-
-      /** Build the DOM for one entry, matching Obsidian's menu-item structure. */
-      private renderEntry(entry: MenuEntry): HTMLElement {
-        if (entry.kind === 'separator') {
-          const sep = document.createElement('div')
-          sep.className = 'menu-separator'
-          return sep
+          result.push(...entries)
         }
-
-        const el = document.createElement('div')
-        el.className = 'menu-item'
-        if (entry.disabled) el.classList.add('is-disabled')
-        if (entry.checked) el.classList.add('is-checked')
-        if (entry.submenu) el.classList.add('mod-submenu')
-
-        const iconEl = document.createElement('div')
-        iconEl.className = 'menu-item-icon'
-        if (entry.icon) renderLucideIconInto(iconEl, entry.icon)
-        el.appendChild(iconEl)
-
-        const titleEl = document.createElement('div')
-        titleEl.className = 'menu-item-title'
-        titleEl.textContent = entry.title
-        el.appendChild(titleEl)
-
-        if (entry.submenu) {
-          const arrow = document.createElement('div')
-          arrow.className = 'menu-item-icon mod-submenu-arrow'
-          renderLucideIconInto(arrow, 'chevron-right')
-          el.appendChild(arrow)
-          el.addEventListener('mouseenter', () => { this.openSubmenu(entry, el) })
-        } else {
-          el.addEventListener('mouseenter', () => { this.closeSubmenu() })
-        }
-
-        if (entry.disabled) {
-          // A disabled item that still fires its callback is worse than one that
-          // does nothing, so swallow the event rather than only greying it out.
-          el.setAttribute('aria-disabled', 'true')
-          el.addEventListener('click', (e) => { e.stopPropagation() })
-        } else {
-          el.setAttribute('tabindex', '0')
-          el.addEventListener('click', (e) => { this.invoke(entry, e) })
-        }
-        return el
+        return result
       }
 
       private invoke(entry: MenuEntry, evt: MouseEvent | KeyboardEvent): void {
@@ -2223,7 +2619,10 @@ export function installObsidianGlobals(): void {
         // floating above it.
         this.close()
         try {
-          entry.callback(evt)
+          // Replay the plugin context captured at addItem()-time (see MenuEntry.pluginId)
+          // so DOM the callback builds synchronously — e.g. a picker Modal — is tagged
+          // for CssInjector's [data-plugin-id] scoping.
+          withPluginContext(entry.pluginId, () => entry.callback(evt))
         } catch (err) {
           console.error('[PluginCompat] Menu item callback threw', entry.title, err)
         }
@@ -2292,7 +2691,6 @@ export function installObsidianGlobals(): void {
         if (!this.containerEl) return
         this.containerEl.remove()
         this.containerEl = null
-        this.dom = null
         for (const cb of this.onHideCallbacks) {
           try {
             cb()
@@ -2496,6 +2894,31 @@ export function installObsidianGlobals(): void {
       getMode: () => ({ token: () => null }),
       modeURL: '',
       Pass: {},
+    }
+  }
+
+  // CodeMirror 5 legacy adapter global — plugins that still target the old
+  // editor (e.g. obsidian-linter's registerEventsAndSaveCallback) reach for
+  // `CodeMirrorAdapter.commands` to register/read CM5-style named commands.
+  // There is no real CM5 instance underneath in Slatebase, so this is just a
+  // plain registry object — enough that assigning into `.commands` doesn't
+  // throw on an undefined property.
+  //
+  // `.Vim` mirrors real Obsidian's `@replit/codemirror-vim` global, which
+  // plugins probe to hook into Vim normal-mode commands (e.g.
+  // obsidian-outliner's "override o/O behaviour" feature calls
+  // `Vim.defineAction`/`Vim.mapCommand` when present). Slatebase has no Vim
+  // keymap engine, so these are no-ops rather than a missing-adapter warning —
+  // same graceful-degradation approach as the ribbon/split stubs above.
+  if (!(window as unknown as { CodeMirrorAdapter?: unknown }).CodeMirrorAdapter) {
+    ;(window as unknown as { CodeMirrorAdapter: Record<string, unknown> }).CodeMirrorAdapter = {
+      commands: {},
+      Vim: {
+        defineAction: () => {},
+        handleEx: () => {},
+        enterInsertMode: () => {},
+        mapCommand: () => {},
+      },
     }
   }
 

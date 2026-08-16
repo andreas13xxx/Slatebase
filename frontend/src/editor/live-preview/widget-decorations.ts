@@ -11,6 +11,7 @@ import { resolveWikilinkTarget } from '../../plugins/link-resolver'
 import { ViewMode } from '../../components/ViewMode'
 import type { DirectoryTree } from '../../types'
 import { errorOnce } from '../../plugins/compat/log'
+import { findEmbedCreatorForTarget, getLinktextExtension, mountRegisteredEmbed, type EmbedComponent, type EmbedContext } from '../../plugins/compat/embed-registry'
 
 /**
  * State effect to toggle callout fold state.
@@ -62,10 +63,10 @@ export interface WidgetDecorationResult {
 // ---------------------------------------------------------------------------
 
 /** What kind of inline preview an embed target gets in Live Preview. */
-type EmbedKind = 'image' | 'pdf' | 'note' | 'file'
+type EmbedKind = 'image' | 'pdf' | 'note'
 
 /**
- * Widget for inline image/PDF/note/file embed previews.
+ * Widget for inline image/PDF/note embed previews.
  * - image: <img>
  * - pdf: fetched as a Blob and rendered via <object type="application/pdf">
  *   (mirroring BinaryViewer's PdfViewer, chosen there so Firefox uses its
@@ -73,8 +74,17 @@ type EmbedKind = 'image' | 'pdf' | 'note' | 'file'
  * - note: resolved against the directory tree, fetched, optionally sliced
  *   to a `#heading` section, and rendered by mounting a nested ViewMode
  *   React root — reusing the same rendering pipeline Viewer mode and hover
- *   previews use, rather than re-implementing Markdown rendering here
- * - anything else: a plain file-icon placeholder
+ *   previews use, rather than re-implementing Markdown rendering here.
+ *   Every non-image/non-PDF extension falls through to 'note' — matching
+ *   Reading mode's detectEmbedType(), which treats any unrecognized
+ *   extension (.excalidraw, .canvas, ...) as a note. This is what gives a
+ *   plugin's registerMarkdownPostProcessor a chance to re-render the nested
+ *   ViewMode's output (e.g. Excalidraw turning its raw .excalidraw.md JSON
+ *   into a drawing) — a 'file' placeholder fallback here used to skip that
+ *   pipeline entirely and never call the plugin. Before falling into the
+ *   note-fetch pipeline, buildNoteDOM() also checks app.embedRegistry for a
+ *   plugin-registered creator (Supernote, PDF++, and similar plugins that
+ *   render their own embed type) and delegates to it when one matches.
  */
 class EmbedWidget extends WidgetType {
   private readonly filename: string
@@ -86,6 +96,7 @@ class EmbedWidget extends WidgetType {
   private readonly directoryTree: DirectoryTree | null
   private objectUrl: string | null = null
   private reactRoot: Root | null = null
+  private pluginEmbed: EmbedComponent | null = null
 
   constructor(
     filename: string,
@@ -106,7 +117,18 @@ class EmbedWidget extends WidgetType {
     this.directoryTree = directoryTree
   }
 
-  private buildRawSrc(path: string = this.filename): string {
+  /**
+   * Resolves the embed target against the directory tree — same bare-name/
+   * missing-extension resolution wikilinks and note embeds get (and what
+   * Reading mode's renderEmbedNode already does for images/PDFs) — falling
+   * back to the literal filename when it can't be resolved (e.g. tree not
+   * loaded yet) so a valid explicit path still works.
+   */
+  private resolveFilePath(): string {
+    return resolveWikilinkTarget(this.filename, this.directoryTree) ?? this.filename
+  }
+
+  private buildRawSrc(path: string = this.resolveFilePath()): string {
     let src = `/api/v1/vaults/${this.vaultId}/files?path=${encodeURIComponent(path)}&raw=true`
     if (this.token) {
       src += `&token=${encodeURIComponent(this.token)}`
@@ -129,15 +151,7 @@ class EmbedWidget extends WidgetType {
       return this.buildPdfDOM()
     }
 
-    if (this.kind === 'note') {
-      return this.buildNoteDOM()
-    }
-
-    // Unsupported embed type: file icon placeholder
-    const span = document.createElement('span')
-    span.className = 'cm-lp-embed-file'
-    span.textContent = `📄 ${this.filename}`
-    return span
+    return this.buildNoteDOM()
   }
 
   /**
@@ -188,6 +202,13 @@ class EmbedWidget extends WidgetType {
    * its content, slices to `#heading` if given, and renders it by mounting a
    * nested <ViewMode> React root — the same component Viewer mode and hover
    * previews use, so nested embeds/callouts/headings render identically.
+   *
+   * Before any of that: checks app.embedRegistry (see ../../plugins/compat/
+   * embed-registry.ts) for a plugin-registered creator matching this
+   * embed's extension — either the apparent one in the link text (e.g.
+   * "excalidraw" from "Drawing.excalidraw") or the resolved file's real one
+   * (e.g. "md"). A match delegates to that plugin's own embed component
+   * instead of the note-fetch pipeline below.
    */
   private buildNoteDOM(): HTMLElement {
     const container = document.createElement('div')
@@ -198,6 +219,11 @@ class EmbedWidget extends WidgetType {
       container.classList.add('cm-lp-embed-note--missing')
       container.textContent = `Notiz nicht gefunden: ${this.filename}`
       return container
+    }
+
+    const creator = findEmbedCreatorForTarget(this.filename, getLinktextExtension(resolvedPath))
+    if (creator) {
+      return this.buildPluginEmbedDOM(creator, resolvedPath)
     }
 
     const status = document.createElement('p')
@@ -255,6 +281,34 @@ class EmbedWidget extends WidgetType {
     return `/api/v1/vaults/${this.vaultId}/files?path=${encodeURIComponent(path)}`
   }
 
+  /**
+   * Delegates rendering to a plugin's registered embed creator (found by
+   * buildNoteDOM above) instead of the built-in note pipeline. Mirrors real
+   * Obsidian's embed contract: the creator gets a containerEl to render
+   * into and a subpath (the `#heading`/`#^block` fragment, if any); the
+   * returned component is tracked so destroy() can unload() it.
+   */
+  private buildPluginEmbedDOM(creator: NonNullable<ReturnType<typeof findEmbedCreatorForTarget>>, resolvedPath: string): HTMLElement {
+    const container = document.createElement('div')
+    container.className = 'cm-lp-embed-plugin'
+
+    const context: EmbedContext = {
+      app: (window as unknown as { app?: unknown }).app,
+      containerEl: container,
+      linktext: this.filename,
+      sourcePath: '',
+      showInline: true,
+      displayMode: false,
+    }
+    // `this.heading` already holds the raw text after `#` — a block ref's
+    // (`^block-id`) as much as a heading's, since Live Preview's parser
+    // (unlike Reading mode's) doesn't split the two apart. Re-adding the `#`
+    // here reconstructs Obsidian's subpath convention for both.
+    const subpath = this.heading ? `#${this.heading}` : undefined
+    this.pluginEmbed = mountRegisteredEmbed(creator, context, resolvedPath, subpath)
+    return container
+  }
+
   destroy(_dom: HTMLElement): void {
     if (this.objectUrl) {
       URL.revokeObjectURL(this.objectUrl)
@@ -263,6 +317,10 @@ class EmbedWidget extends WidgetType {
     if (this.reactRoot) {
       this.reactRoot.unmount()
       this.reactRoot = null
+    }
+    if (this.pluginEmbed) {
+      this.pluginEmbed.unload?.()
+      this.pluginEmbed = null
     }
   }
 
@@ -279,8 +337,7 @@ class EmbedWidget extends WidgetType {
   get estimatedHeight(): number {
     if (this.kind === 'image') return 200
     if (this.kind === 'pdf') return parseEmbedPdfHeight(this.display)
-    if (this.kind === 'note') return 100
-    return 24
+    return 100
   }
 }
 
@@ -345,21 +402,35 @@ class CheckboxWidget extends WidgetType {
 
 /**
  * Widget for rendering Markdown tables as proper HTML <table> elements.
- * Parses pipe-separated rows and renders with header/body distinction and alignment.
+ * Parses pipe-separated rows and renders with header/body distinction and
+ * alignment. Cells are click-to-edit: a static cell swaps to a
+ * contentEditable island showing its raw Markdown on click, and commits
+ * back to the document (via `view.dispatch`) on blur/Enter/Tab — mirroring
+ * how inline marks elsewhere in Live Preview reveal raw syntax only while
+ * being edited, applied here at cell granularity instead of the whole node.
  */
 class TableWidget extends WidgetType {
-  private readonly rows: string[][]
+  private readonly rows: TableCellSpan[][]
   private readonly alignments: Array<'left' | 'center' | 'right' | null>
 
-  constructor(rows: string[][], alignments: Array<'left' | 'center' | 'right' | null>) {
+  constructor(rows: TableCellSpan[][], alignments: Array<'left' | 'center' | 'right' | null>) {
     super()
     this.rows = rows
     this.alignments = alignments
   }
 
-  toDOM(): HTMLElement {
+  toDOM(view: EditorView): HTMLElement {
     const table = document.createElement('table')
     table.className = 'cm-lp-table'
+
+    const buildCell = (tag: 'th' | 'td', cell: TableCellSpan, align: 'left' | 'center' | 'right' | null) => {
+      const el = document.createElement(tag)
+      renderCellInline(el, cell.text)
+      if (align) el.style.textAlign = align
+      el.tabIndex = 0
+      wireCellEditing(el, cell, view)
+      return el
+    }
 
     // Header row
     if (this.rows.length > 0) {
@@ -367,11 +438,7 @@ class TableWidget extends WidgetType {
       const headerRow = document.createElement('tr')
       const headerCells = this.rows[0]!
       for (let i = 0; i < headerCells.length; i++) {
-        const th = document.createElement('th')
-        renderCellInline(th, headerCells[i]!.trim())
-        const align = this.alignments[i]
-        if (align) th.style.textAlign = align
-        headerRow.appendChild(th)
+        headerRow.appendChild(buildCell('th', headerCells[i]!, this.alignments[i] ?? null))
       }
       thead.appendChild(headerRow)
       table.appendChild(thead)
@@ -384,11 +451,7 @@ class TableWidget extends WidgetType {
         const tr = document.createElement('tr')
         const cells = this.rows[r]!
         for (let i = 0; i < cells.length; i++) {
-          const td = document.createElement('td')
-          renderCellInline(td, cells[i]!.trim())
-          const align = this.alignments[i]
-          if (align) td.style.textAlign = align
-          tr.appendChild(td)
+          tr.appendChild(buildCell('td', cells[i]!, this.alignments[i] ?? null))
         }
         tbody.appendChild(tr)
       }
@@ -408,7 +471,7 @@ class TableWidget extends WidgetType {
       const b = other.rows[i]!
       if (a.length !== b.length) return false
       for (let j = 0; j < a.length; j++) {
-        if (a[j] !== b[j]) return false
+        if (a[j]!.text !== b[j]!.text) return false
       }
     }
     return true
@@ -417,6 +480,102 @@ class TableWidget extends WidgetType {
   get estimatedHeight(): number {
     return 30 + this.rows.length * 28
   }
+}
+
+/**
+ * Replaces any unescaped `|` in user-typed cell text with `\|` (the same
+ * escape convention `parseTableRow` already understands for aliased
+ * wikilinks) so a literal pipe typed while editing can't split the cell
+ * into extra columns. Also collapses `\r`/`\n` (e.g. from a multi-line
+ * paste) to spaces, since a GFM table row is always exactly one source line.
+ */
+function escapeTableCellText(text: string): string {
+  return text
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/\\?\|/g, match => (match === '|' ? '\\|' : match))
+}
+
+/**
+ * Wires click-to-edit behavior onto a single rendered `<th>`/`<td>`.
+ * Clicking a wikilink/link inside the cell is left alone — the global
+ * mousedown-capture handler (`createLivePreviewClickHandler`) navigates it,
+ * matching link behavior everywhere else in Live Preview.
+ */
+function wireCellEditing(el: HTMLElement, cell: TableCellSpan, view: EditorView): void {
+  let originalHTML = el.innerHTML
+
+  const renderStatic = (text: string) => {
+    el.innerHTML = ''
+    renderCellInline(el, text)
+    originalHTML = el.innerHTML
+  }
+
+  const commit = (): boolean => {
+    const raw = el.textContent ?? ''
+    const newText = escapeTableCellText(raw.trim())
+    el.contentEditable = 'false'
+    if (newText !== cell.text) {
+      view.dispatch({ changes: { from: cell.from, to: cell.to, insert: newText } })
+      // The dispatch triggers a full decoration rebuild (fresh TableWidget),
+      // but render eagerly too so there's no flicker back to raw text first.
+      renderStatic(newText)
+      return true
+    }
+    renderStatic(cell.text)
+    return false
+  }
+
+  const cancel = () => {
+    el.contentEditable = 'false'
+    el.innerHTML = originalHTML
+  }
+
+  const startEditing = () => {
+    if (el.contentEditable === 'true') return
+    el.innerHTML = ''
+    el.textContent = cell.text
+    el.contentEditable = 'true'
+    el.focus()
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    range.collapse(false)
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+  }
+
+  el.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement
+    if (target.closest('.cm-lp-wikilink, .cm-lp-link')) return
+    startEditing()
+  })
+
+  el.addEventListener('keydown', (event) => {
+    if (el.contentEditable !== 'true') return
+    event.stopPropagation()
+
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      cancel()
+      el.blur()
+    } else if (event.key === 'Enter') {
+      event.preventDefault()
+      commit()
+      el.blur()
+    } else if (event.key === 'Tab') {
+      event.preventDefault()
+      commit()
+      const table = el.closest('table')
+      const cells = table ? Array.from(table.querySelectorAll<HTMLElement>('th, td')) : []
+      const index = cells.indexOf(el)
+      const next = cells[index + (event.shiftKey ? -1 : 1)]
+      next?.click()
+    }
+  })
+
+  el.addEventListener('blur', () => {
+    if (el.contentEditable === 'true') commit()
+  })
 }
 
 /**
@@ -445,27 +604,74 @@ function parseTableAlignments(delimiterRow: string[]): Array<'left' | 'center' |
  * A leading/trailing `|` (the optional outer table pipes) does not
  * produce an empty boundary column.
  */
-export function parseTableRow(line: string): string[] {
+/** A single table cell's raw (untrimmed) text plus its start/end offset within the source line. */
+interface RawCellSpan {
+  text: string
+  /** Offset of `text[0]` within `line`, accounting for the line's leading trim. */
+  start: number
+  end: number
+}
+
+/**
+ * Escape-aware pipe-splitter shared by `parseTableRow` and
+ * `parseTableRowWithPositions`, so both stay in exact agreement on where
+ * cell boundaries fall. See `parseTableRow`'s doc comment for the escape
+ * and outer-pipe-stripping rules this implements.
+ */
+function splitTableRowSpans(line: string): RawCellSpan[] {
+  const leadingTrim = line.length - line.trimStart().length
   const trimmedLine = line.trim()
-  const cells: string[] = []
+  const spans: RawCellSpan[] = []
   let cell = ''
+  let cellStart = leadingTrim
   let escaped = false
 
-  for (const ch of trimmedLine) {
+  for (let i = 0; i < trimmedLine.length; i++) {
+    const ch = trimmedLine[i]!
     if (ch === '|' && !escaped) {
-      cells.push(cell)
+      spans.push({ text: cell, start: cellStart, end: cellStart + cell.length })
       cell = ''
+      cellStart = leadingTrim + i + 1
     } else {
       cell += ch
     }
     escaped = !escaped && ch === '\\'
   }
-  cells.push(cell)
+  spans.push({ text: cell, start: cellStart, end: cellStart + cell.length })
 
-  if (cells.length > 0 && cells[0] === '') cells.shift()
-  if (cells.length > 0 && cells[cells.length - 1] === '') cells.pop()
+  if (spans.length > 0 && spans[0]!.text === '') spans.shift()
+  if (spans.length > 0 && spans[spans.length - 1]!.text === '') spans.pop()
 
-  return cells
+  return spans
+}
+
+export function parseTableRow(line: string): string[] {
+  return splitTableRowSpans(line).map(span => span.text)
+}
+
+/** A table cell resolved to its trimmed content and absolute document offsets. */
+export interface TableCellSpan {
+  /** Trimmed cell text (what a user would type/see when editing). */
+  text: string
+  /** Absolute document offset of the first trimmed character. */
+  from: number
+  /** Absolute document offset just past the last trimmed character. */
+  to: number
+}
+
+/**
+ * Like `parseTableRow`, but resolves each cell to its trimmed content's
+ * absolute document offsets (`lineFrom` + the cell's position within
+ * `line`). Used to let Live Preview commit direct edits to a single table
+ * cell without touching the surrounding pipe padding or other cells.
+ */
+export function parseTableRowWithPositions(line: string, lineFrom: number): TableCellSpan[] {
+  return splitTableRowSpans(line).map(span => {
+    const leadingWs = span.text.length - span.text.trimStart().length
+    const trimmed = span.text.trim()
+    const from = lineFrom + span.start + leadingWs
+    return { text: trimmed, from, to: from + trimmed.length }
+  })
 }
 
 /**
@@ -1111,8 +1317,7 @@ export function buildWidgetDecorations(
             const kind: EmbedKind =
               IMAGE_EXTENSIONS.has(ext) ? 'image' :
               PDF_EXTENSIONS.has(ext) ? 'pdf' :
-              (ext === '' || ext === '.md') ? 'note' :
-              'file'
+              'note'
 
             const widget = new EmbedWidget(
               filename,
@@ -1437,20 +1642,25 @@ export function buildWidgetDecorations(
         if (processedBlocks.has(key)) return
         processedBlocks.add(key)
 
-        // Parse all lines of the table
-        const tableText = doc.sliceString(node.from, node.to)
-        const lines = tableText.split('\n').filter(l => l.trim().length > 0)
+        // Walk the table's actual source lines so each cell can carry its
+        // absolute document offsets (needed to commit direct cell edits).
+        const startLine = doc.lineAt(node.from)
+        const endLine = doc.lineAt(node.to)
+        const rows: TableCellSpan[][] = []
+        for (let lineNum = startLine.number; lineNum <= endLine.number; lineNum++) {
+          const line = doc.line(lineNum)
+          if (line.text.trim().length === 0) continue
+          rows.push(parseTableRowWithPositions(line.text, line.from))
+        }
 
-        if (lines.length >= 2) {
-          const rows = lines.map(l => parseTableRow(l))
+        if (rows.length >= 2) {
           // Row index 1 is the delimiter row (---|:---:|---:)
-          const alignments = rows.length > 1 ? parseTableAlignments(rows[1]!) : []
+          const alignments = parseTableAlignments(rows[1]!.map(c => c.text))
 
           const widget = new TableWidget(rows, alignments)
           decorations.push(
             Decoration.replace({ widget }).range(node.from, node.to)
           )
-          hideableRanges.push({ from: node.from, to: node.to, groupFrom: node.from, groupTo: node.to })
         }
       }
 

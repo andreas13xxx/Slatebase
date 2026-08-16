@@ -36,7 +36,8 @@ The settings panel opens as an overlay with a sidebar for navigation.
 
 ### Appearance
 
-- **Status Bar** — Toggle the bottom status bar
+- **Status Bar** — Toggle the bottom status bar globally, plus a separate toggle per built-in item (clock, vault name, word/character count, cursor position)
+- **CSS Snippets** — Manage custom per-vault CSS (upload or create/edit in an embedded editor, enable/disable, delete)
 
 ### Vault Configuration
 
@@ -58,6 +59,38 @@ The settings panel opens as an overlay with a sidebar for navigation.
 - **Server Configuration** — Runtime configuration
 - **Feature Toggles** — Enable/disable features (sync, MCP, plugins, etc.)
 - **Audit Log** — View security-relevant events
+
+---
+
+## Appearance
+
+### Status Bar
+
+The status bar at the bottom of the app can show several pieces of information at once:
+
+| Item | Shows |
+|------|-------|
+| Clock | Current time |
+| Vault name | Name of the open vault |
+| Word/character count | Word and character count of the active file; plus selection size when text is selected |
+| Cursor position | Line:column of the cursor — click it to open "Go to line" |
+
+Toggle the whole bar on/off, or toggle individual items independently (e.g. show only the word count, hide the clock and cursor position). Plugin status items (when the Obsidian plugin compatibility layer is enabled) appear on the right side of the bar.
+
+### CSS Snippets
+
+Customize Slatebase's appearance with your own CSS, stored and managed per vault under Settings → Appearance → "CSS Snippets":
+
+1. **Upload** an existing `.css` file (max 512 KB)
+2. Or **create new** — name it and write the content directly in the embedded editor
+3. **Enable/disable** with the toggle next to each snippet — takes effect immediately, no page reload
+4. **Edit** via the pencil icon
+5. **Delete** via the trash icon, with a confirmation prompt
+
+Enabled snippets are applied automatically whenever you open or switch to the vault. Unlike plugin CSS, snippets apply globally (e.g. `body { }` or `:root { }` rules), not just to a single plugin's UI.
+
+> [!tip] Getting started
+> Try a snippet with `:root { --accent: #ff6b6b; }` to change the interface's accent color (find the exact variable names via your browser's dev tools).
 
 ---
 
@@ -105,5 +138,7 @@ The settings panel has a search field that filters sections by keyword. Type to 
 ## Related Features
 
 - [[Advanced/Custom Keybindings]] — Detailed keybinding guide
+- [[Features/CSS Snippets]] — Detailed guide to custom per-vault CSS
+- [[Features/Bookmarks]] — Bookmarks view, also reachable via the sidebar
 - [[Features/Vault Management]] — Vault administration
 - [[Features/Command Palette]] — Alternative quick access

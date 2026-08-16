@@ -1,8 +1,10 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { useTabContext } from '../state/tabContext'
 import { useTranslation } from '../i18n'
-import { Eye, Pencil, X, Share2 } from 'lucide-react'
+import { Eye, Pencil, X, Share2, Puzzle } from 'lucide-react'
 import { getFileIcon, getFileIconClass, getDisplayName } from '../utils/fileIcons'
+import { getCustomIconSvg, sizeCustomIconSvg, useIconResolutionTick } from '../utils/pluginIcon'
+import { resolveIconMarkupSync } from '../plugins/compat/lucide-icons'
 
 /** A single settings-page tab shown ahead of the file tabs (not draggable). */
 export interface SettingsTabDescriptor {
@@ -35,6 +37,9 @@ export interface TabBarProps {
  */
 export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab }: TabBarProps) {
   const { t } = useTranslation()
+  // Re-renders once any icon's (async, per-icon) Lucide resolution lands —
+  // see PluginRibbonIcon.tsx for why this is needed.
+  useIconResolutionTick()
   const { tabState, tabDispatch } = useTabContext()
   const { tabs, activeTabId } = tabState
   const dragIndexRef = useRef<number | null>(null)
@@ -150,6 +155,14 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab }: T
         const ModeIcon = tab.mode === 'edit' ? Eye : Pencil
         const isGraphTab = tab.filePath === '__graph__'
         const isCanvasTab = tab.fileName.endsWith('.canvas')
+        // Plugin-view tabs (opened via workspace.getLeaf().setViewState()) carry the
+        // view's own Obsidian icon name instead of a real filename — resolving it
+        // through getFileIcon() would just guess from "__view::..." and show a generic
+        // file icon, so these go through the same custom-icon-aware resolution as
+        // ribbon icons and context-panel tabs instead.
+        const isPluginViewTab = tab.filePath.startsWith('__view::')
+        const customIconSvg = isPluginViewTab && tab.icon ? getCustomIconSvg(tab.icon) : undefined
+        const pluginIconMarkup = isPluginViewTab && !customIconSvg && tab.icon ? resolveIconMarkupSync(tab.icon, 13) : undefined
         const TabFileIcon = isGraphTab ? Share2 : getFileIcon(tab.fileName)
         const tabFileIconClass = isGraphTab ? 'tab-icon-graph' : getFileIconClass(tab.fileName)
         const displayName = isGraphTab ? tab.fileName : getDisplayName(tab.fileName)
@@ -171,7 +184,15 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab }: T
             onDrop={(e) => handleDrop(e, index)}
             onDragEnd={handleDragEnd}
           >
-            <TabFileIcon size={13} className={`tab-bar-tab-icon ${tabFileIconClass}`} />
+            {customIconSvg ? (
+              <span className="tab-bar-tab-icon" dangerouslySetInnerHTML={{ __html: sizeCustomIconSvg(customIconSvg, 13) }} />
+            ) : isPluginViewTab && tab.icon ? (
+              pluginIconMarkup
+                ? <span className="tab-bar-tab-icon" dangerouslySetInnerHTML={{ __html: pluginIconMarkup }} />
+                : <Puzzle size={13} className="tab-bar-tab-icon" />
+            ) : (
+              <TabFileIcon size={13} className={`tab-bar-tab-icon ${tabFileIconClass}`} />
+            )}
             <span className="tab-bar-tab-label">
               {hasUnsaved ? '● ' : ''}{displayName}
             </span>

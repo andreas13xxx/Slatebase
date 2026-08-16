@@ -62,6 +62,11 @@ export const DEFAULT_KEYBINDINGS: KeybindingDefinition[] = [
   { commandId: 'slatebase:toggle-sidebar', label: 'Seitenleiste ein-/ausblenden', defaultShortcut: '', category: 'navigation' },
   { commandId: 'slatebase:toggle-right-panel', label: 'Kontextpanel ein-/ausblenden', defaultShortcut: '', category: 'navigation' },
   { commandId: 'slatebase:toggle-theme', label: 'Farbschema umschalten', defaultShortcut: '', category: 'navigation' },
+  { commandId: 'slatebase:navigate-back', label: 'Zurück navigieren', defaultShortcut: 'Alt+ArrowLeft', category: 'navigation' },
+  { commandId: 'slatebase:navigate-forward', label: 'Vor navigieren', defaultShortcut: 'Alt+ArrowRight', category: 'navigation' },
+  { commandId: 'slatebase:open-quick-switcher', label: 'Schnellwechsler öffnen', defaultShortcut: 'Mod+O', category: 'navigation' },
+  { commandId: 'slatebase:next-tab', label: 'Nächster Tab', defaultShortcut: 'Ctrl+Shift+]', category: 'navigation' },
+  { commandId: 'slatebase:previous-tab', label: 'Vorheriger Tab', defaultShortcut: 'Ctrl+Shift+[', category: 'navigation' },
 
   // Panel
   { commandId: 'slatebase:open-search', label: 'Vault-Suche öffnen', defaultShortcut: 'Mod+Shift+F', category: 'panel' },

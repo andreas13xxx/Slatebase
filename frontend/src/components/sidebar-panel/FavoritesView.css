@@ -37,6 +37,14 @@
   padding: 0;
 }
 
+.favorites-view__item--dragging {
+  opacity: 0.5;
+}
+
+.favorites-view__item--drop-before {
+  box-shadow: inset 0 2px 0 0 var(--accent, #4f8cff);
+}
+
 .favorites-view__entry {
   display: flex;
   align-items: center;

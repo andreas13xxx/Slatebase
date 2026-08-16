@@ -5,8 +5,10 @@ import { useFeatureContext } from '../state/featureContext'
 import { useTabContext } from '../state/tabContext'
 import { useAppContext, loadVaults } from '../state/index'
 import { useAuthContext } from '../state/authContext'
+import { useNavigationHistory } from '../state/navigationHistoryContext'
 import { openTab } from '../state/tabActions'
 import { TemplateSelector } from './TemplateSelector'
+import { QuickSwitcher } from './QuickSwitcher'
 import { matchesShortcut } from '../state/keybindingsStore'
 import { useTranslation } from '../i18n'
 import { showToast } from './ToastNotification'
@@ -16,7 +18,61 @@ import type { IApiClient } from '../api'
 import type { SettingsCategory, SettingsSection } from '../state/settingsState'
 import { useContextPanelContext } from '../state/contextPanelContext'
 import { useSidebarPanelContext } from '../state/sidebarPanelContext'
+import { useSearchContext } from '../state/searchContext'
 import { registerCoreAppCommands, type CoreAppCommandHandlers, type NavigablePage } from '../plugins/compat/core-commands-app'
+
+/**
+ * Obsidian core-command IDs (from core-commands.ts / core-commands-app.ts) that do
+ * exactly what an existing native `slatebase:*` command already does, mapped to the
+ * ID of the native command that duplicates them. Those core commands stay registered
+ * in the command registry — real community plugins still resolve them via
+ * `executeCommandById()` — but are hidden from the palette itself *only when the
+ * native command they duplicate is actually visible right now*.
+ *
+ * That condition matters: most native commands are gated (an open editor tab for
+ * formatting commands, a selected vault for vault-scoped ones, ...), while these
+ * compat commands are always registered unconditionally (matching real Obsidian,
+ * where editor commands are always listed but no-op without an active note). A
+ * static always-hide list would make the action disappear from the palette
+ * entirely whenever the native gate isn't met — e.g. "Fett umschalten" vanishing
+ * completely whenever no file is open in edit mode, instead of falling back to
+ * the always-available compat entry the way it did before this dedup existed.
+ */
+const DUPLICATE_OF_NATIVE_COMMAND = new Map<string, string>([
+  ['app:open-settings', 'slatebase:open-settings'],
+  ['app:toggle-left-sidebar', 'slatebase:toggle-sidebar'],
+  ['app:toggle-right-sidebar', 'slatebase:toggle-right-panel'],
+  ['app:open-vault', 'slatebase:navigate-my-vaults'],
+  ['app:switch-vault', 'slatebase:navigate-my-vaults'],
+  ['app:open-another-vault', 'slatebase:navigate-my-vaults'],
+  ['app:go-back', 'slatebase:navigate-back'],
+  ['app:go-forward', 'slatebase:navigate-forward'],
+  ['workspace:show-trash', 'slatebase:open-trash'],
+  ['graph:open', 'slatebase:open-graph'],
+  ['daily-notes', 'slatebase:daily-note'],
+  ['insert-template', 'slatebase:new-from-template'],
+  ['file-explorer:new-file', 'slatebase:create-file'],
+  ['file-explorer:new-file-in-current-tab', 'slatebase:create-file'],
+  ['file-explorer:new-file-in-new-pane', 'slatebase:create-file'],
+  ['markdown:toggle-preview', 'slatebase:toggle-mode'],
+  ['editor:toggle-source', 'slatebase:toggle-mode'],
+  ['global-search:open', 'slatebase:open-search'],
+  ['switcher:open', 'slatebase:open-quick-switcher'],
+  ['editor:toggle-line-numbers', 'slatebase:editor-toggle-line-numbers'],
+  ['editor:set-heading-1', 'slatebase:editor-heading1'],
+  ['editor:set-heading-2', 'slatebase:editor-heading2'],
+  ['editor:set-heading-3', 'slatebase:editor-heading3'],
+  ['editor:toggle-bold', 'slatebase:editor-bold'],
+  ['editor:toggle-italics', 'slatebase:editor-italic'],
+  ['editor:toggle-strikethrough', 'slatebase:editor-strikethrough'],
+  ['editor:toggle-code', 'slatebase:editor-code'],
+  ['editor:insert-link', 'slatebase:editor-link'],
+  ['editor:toggle-bullet-list', 'slatebase:editor-bullet-list'],
+  ['editor:toggle-numbered-list', 'slatebase:editor-numbered-list'],
+  ['editor:toggle-blockquote', 'slatebase:editor-quote'],
+  ['editor:insert-horizontal-rule', 'slatebase:editor-horizontal-rule'],
+  ['editor:insert-table', 'slatebase:editor-table'],
+])
 
 /**
  * Props passed from AppContent to supply app-level action callbacks.
@@ -78,9 +134,12 @@ export function CommandPaletteContainer({
   const { authState, authDispatch } = useAuthContext()
   const { state: contextPanelState, dispatch: contextPanelDispatch } = useContextPanelContext()
   const { state: sidebarPanelState, dispatch: sidebarPanelDispatch } = useSidebarPanelContext()
-  const { t } = useTranslation()
+  const { state: searchState } = useSearchContext()
+  const { goBack, goForward } = useNavigationHistory()
+  const { t, locale } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
   const [templateSelectorOpen, setTemplateSelectorOpen] = useState(false)
+  const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false)
 
   // ─── Core command registration (Obsidian's workspace:*/app:*/theme:*/... commands) ──
   // Registered once; commands read fresh state via this ref instead of stale closures
@@ -113,11 +172,17 @@ export function CommandPaletteContainer({
     onOpenGraph,
     onDailyNote,
     onOpenTemplateSelector: () => setTemplateSelectorOpen(true),
+    onNavigateBack: goBack,
+    onNavigateForward: goForward,
+    onOpenQuickSwitcher: () => { if (state.selectedVaultId) setQuickSwitcherOpen(true) },
+    searchQuery: searchState.query,
+    searchCaseSensitive: searchState.caseSensitive,
+    searchRegex: searchState.regex,
   }
 
   useEffect(() => {
-    registerCoreAppCommands(commandRegistry, () => coreHandlersRef.current)
-  }, [commandRegistry])
+    registerCoreAppCommands(commandRegistry, () => coreHandlersRef.current, locale)
+  }, [commandRegistry, locale])
 
   const pluginCompatEnabled = isEnabled('obsidian-plugin-compat')
   const isAdmin = authState.user?.role === 'admin'
@@ -155,6 +220,62 @@ export function CommandPaletteContainer({
 
   const handleClose = useCallback(() => {
     setIsOpen(false)
+  }, [])
+
+  // ─── Keyboard shortcut: Quick Switcher (default: Ctrl+O / Cmd+O) ─────────────
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent): void {
+      if (matchesShortcut('slatebase:open-quick-switcher', e)) {
+        e.preventDefault()
+        if (state.selectedVaultId) setQuickSwitcherOpen(true)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [state.selectedVaultId])
+
+  // Also listen to the custom event (dispatched by the "Schnellwechsler öffnen" command)
+  useEffect(() => {
+    function handleOpen() {
+      if (state.selectedVaultId) setQuickSwitcherOpen(true)
+    }
+
+    window.addEventListener('slatebase:open-quick-switcher', handleOpen)
+    return () => {
+      window.removeEventListener('slatebase:open-quick-switcher', handleOpen)
+    }
+  }, [state.selectedVaultId])
+
+  // ─── Keyboard shortcut: Next/previous tab (default: Ctrl+Shift+] / Ctrl+Shift+[) ───
+  // Ctrl+Tab / Ctrl+Shift+Tab were the original defaults but browsers intercept
+  // them at the chrome level for their own tab switching before JS ever sees the
+  // event — preventDefault() can't stop that. Bracket keys aren't reserved.
+  // Registered here rather than in useGlobalShortcuts.ts because it needs
+  // `commandRegistry` from usePluginContext() (see above) — PluginProvider is
+  // mounted inside AppContent's own render tree, not above it, so a hook called
+  // at the top of AppContent can't reach it. Delegates to the existing
+  // workspace:next-tab/previous-tab core commands so the wrap-around logic in
+  // activateTabByOffset() (core-commands-app.ts) lives in one place (Requirement 3.1).
+  useEffect(() => {
+    function handleTabCycleShortcut(e: KeyboardEvent): void {
+      if (matchesShortcut('slatebase:next-tab', e)) {
+        e.preventDefault()
+        commandRegistry.executeCommand('workspace:next-tab')
+      } else if (matchesShortcut('slatebase:previous-tab', e)) {
+        e.preventDefault()
+        commandRegistry.executeCommand('workspace:previous-tab')
+      }
+    }
+
+    window.addEventListener('keydown', handleTabCycleShortcut)
+    return () => window.removeEventListener('keydown', handleTabCycleShortcut)
+  }, [commandRegistry])
+
+  const handleQuickSwitcherClose = useCallback(() => {
+    setQuickSwitcherOpen(false)
   }, [])
 
   /** Creates a welcome/tutorial vault via the API, shows toast, refreshes vault list. */
@@ -345,6 +466,29 @@ export function CommandPaletteContainer({
       callback: () => {
         window.dispatchEvent(new CustomEvent('slatebase:open-search'))
       },
+      pluginId: 'slatebase',
+    })
+
+    if (hasVault) {
+      commands.push({
+        id: 'slatebase:open-quick-switcher',
+        name: 'Schnellwechsler öffnen',
+        callback: () => setQuickSwitcherOpen(true),
+        pluginId: 'slatebase',
+      })
+    }
+
+    commands.push({
+      id: 'slatebase:navigate-back',
+      name: 'Zurück navigieren',
+      callback: goBack,
+      pluginId: 'slatebase',
+    })
+
+    commands.push({
+      id: 'slatebase:navigate-forward',
+      name: 'Vor navigieren',
+      callback: goForward,
       pluginId: 'slatebase',
     })
 
@@ -563,7 +707,13 @@ export function CommandPaletteContainer({
 
   // Combine built-in + plugin commands
   const builtinCommands = buildBuiltinCommands()
-  const pluginCommands = pluginCompatEnabled ? commandRegistry.getCommands() : []
+  const visibleNativeIds = new Set(builtinCommands.map((c) => c.id))
+  const pluginCommands = pluginCompatEnabled
+    ? commandRegistry.getCommands().filter((c) => {
+        const nativeId = DUPLICATE_OF_NATIVE_COMMAND.get(c.id)
+        return nativeId === undefined || !visibleNativeIds.has(nativeId)
+      })
+    : []
   const allCommands = [...builtinCommands, ...pluginCommands]
 
   return (
@@ -582,6 +732,17 @@ export function CommandPaletteContainer({
           vaultId={state.selectedVaultId}
           targetDir=""
           onFileCreated={handleTemplateFileCreated}
+        />
+      )}
+      {state.selectedVaultId && apiClient && (
+        <QuickSwitcher
+          isOpen={quickSwitcherOpen}
+          onClose={handleQuickSwitcherClose}
+          vaultId={state.selectedVaultId}
+          directoryTree={state.vaultTrees[state.selectedVaultId] ?? state.directoryTree}
+          apiClient={apiClient}
+          tabDispatch={tabDispatch}
+          appDispatch={appDispatch}
         />
       )}
     </>

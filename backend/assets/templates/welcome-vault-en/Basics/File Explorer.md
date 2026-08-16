@@ -81,6 +81,7 @@ Right-clicking on a file or folder opens the context menu with these options:
 | Rename | Rename the element |
 | Delete | Move to trash |
 | Copy Path | Copy the file path to clipboard |
+| Add to Favorites | Bookmark this file (or click the star icon next to the filename) |
 
 ---
 
@@ -88,11 +89,10 @@ Right-clicking on a file or folder opens the context menu with these options:
 
 Frequently used files can be marked as favorites:
 
-1. Right-click on a file
-2. Select **Add to Favorites**
-3. The file appears in the favorites section of the sidebar
+1. Right-click on a file → **Add to Favorites**
+2. Or click the **star icon** next to the filename
 
-To remove a favorite, right-click and select **Remove from Favorites**.
+Favorites appear both at the top of the sidebar and in a dedicated **Bookmarks** view (a tab in the left sidebar), where you can reorder them by drag-and-drop, rename them, and manage them via right-click — see the [[Features/Bookmarks|Bookmarks guide]] for details.
 
 ---
 
@@ -138,5 +138,6 @@ Daily Notes/
 ## Related Pages
 
 - [[Basics/Editor and Viewer|Editor and Viewer]] — Next guide
+- [[Features/Bookmarks|Bookmarks]] — Reorder, rename, and other bookmark types
 - [[Features/Vault Management|Vault Management]] — Creating and managing vaults
 - [[Features/Trash and Versions|Trash and Versions]] — Restoring deleted files

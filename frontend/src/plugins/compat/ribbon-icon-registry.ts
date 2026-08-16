@@ -10,6 +10,8 @@
  * @module ribbon-icon-registry
  */
 
+import { withPluginContext } from './plugin-execution-context'
+
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 /** A registered ribbon icon entry. */
@@ -58,7 +60,16 @@ export function addRibbonIcon(
   const element = document.createElement('div')
   element.setAttribute('aria-label', title)
 
-  const entry: RibbonIconEntry = { pluginId, icon, title, callback, element }
+  // Wrapped once here so every consumer (PluginRibbonIcon's onClick,
+  // FileExplorer's synthetic click, ...) gets correct plugin-execution
+  // context without having to remember to wrap it themselves — a click
+  // handler invoked bare runs with getCurrentPluginId() === null, so any
+  // Modal/DOM it builds synchronously never gets tagged data-plugin-id,
+  // and CssInjector's [data-plugin-id] scoping silently matches nothing
+  // inside it (the plugin's own stylesheet — icons, layout, ... — fails
+  // to apply even though generic/JS-rendered content still looks fine).
+  const wrappedCallback = () => withPluginContext(pluginId, callback)
+  const entry: RibbonIconEntry = { pluginId, icon, title, callback: wrappedCallback, element }
   icons.push(entry)
   notifyListeners()
 

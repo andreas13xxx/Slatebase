@@ -122,6 +122,11 @@ These plugins have been tested and work with Slatebase:
 | Kanban | Good | Board view, drag & drop |
 | Excalidraw | Partial | Drawing tools work, libraries limited |
 | LiveSync | Partial | Periodic/OneShot recommended, LiveSync mode timeout-limited |
+| Tasks | Good | Emoji signifiers, query blocks, recurring tasks |
+| Advanced Tables | Good | Auto-formatting, navigation, sorting, formulas |
+| Git | Good | Commit/push/pull over HTTPS + PAT, no SSH |
+| Mind Map | Good | Headings/lists as an interactive mind map |
+| Editing Toolbar | Good | Fixed and floating formatting toolbar |
 
 See the individual [[Advanced/Plugins/Calendar|plugin guides]] for detailed compatibility information.
 
@@ -173,6 +178,11 @@ Detailed guides with examples and exercises for tested plugins:
 | Templater | Dynamic templates with JavaScript | [[Advanced/Plugins/Templater]] |
 | Excalidraw | Freehand drawings and diagrams | [[Advanced/Plugins/Excalidraw]] |
 | LiveSync | Bidirectional vault synchronization | [[Advanced/Plugins/LiveSync]] |
+| Tasks | Task management with due dates and priorities | [[Advanced/Plugins/Tasks]] |
+| Advanced Tables | Table editor with formulas | [[Advanced/Plugins/Advanced Tables]] |
+| Git | Versioning with an external remote repository | [[Advanced/Plugins/Git]] |
+| Mind Map | Turn notes into an interactive mind map | [[Advanced/Plugins/Mind Map]] |
+| Editing Toolbar | Formatting toolbar for the editor | [[Advanced/Plugins/Editing Toolbar]] |
 
 ### Hands-on Exercises
 

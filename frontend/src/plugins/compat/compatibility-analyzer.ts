@@ -137,11 +137,13 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
   'vault.modifyBinary',
   'vault.process',
   'vault.append',
+  'vault.appendBinary',
   'vault.exists',
   'vault.getAvailablePath',
   'vault.getResourcePath',
   'vault.on',
   'vault.off',
+  'vault.offref',
   'vault.trigger',
   // Workspace methods
   'workspace.getActiveFile',
@@ -163,6 +165,7 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
   'workspace.getUnpinnedLeaf',
   'workspace.iterateAllLeaves',
   'workspace.iterateRootLeaves',
+  'workspace.getActiveFileView',
   'workspace.activeLeaf',
   'workspace.layoutReady',
   'workspace.trigger',
@@ -190,6 +193,12 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
   'workspace.editorSuggest',
   'workspace.requestSaveLayout',
   'workspace.getLastOpenFiles',
+  // No CM5 editor instances and no OS-level obsidian:// URI delivery in a web
+  // app — these degrade to a no-op/inert stub and log a console message
+  // explaining the substitution.
+  'workspace.iterateCodeMirrors',
+  'workspace.protocolHandlers',
+  'workspace.protocolHandler',
   // MetadataCache methods
   'metadataCache.getFileCache',
   'metadataCache.getCache',
@@ -198,21 +207,30 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
   'metadataCache.fileToLinktext',
   'metadataCache.getTags',
   'metadataCache.blockCache',
+  'metadataCache.unresolvedLinks',
+  'metadataCache.getBacklinksForFile',
+  'metadataCache.isUserIgnored',
   'metadataCache.on',
   'metadataCache.off',
+  'metadataCache.offref',
   'metadataCache.trigger',
   // Plugins
   'plugins.getPlugin',
   'plugins.plugins',
   'plugins.enabledPlugins',
   'plugins.manifests',
+  'plugins.loadManifests',
+  'plugins.requestSaveConfig',
+  'plugins.enablePluginAndSave',
+  'plugins.disablePluginAndSave',
   // FileManager methods
   'fileManager.renameFile',
   'fileManager.processFrontMatter',
   'fileManager.generateMarkdownLink',
   'fileManager.getNewFileParent',
   'fileManager.createNewMarkdownFile',
-  'fileManager.promptForFileDeletion',
+  'fileManager.createNewFile',
+  'fileManager.promptForDeletion',
   'fileManager.trashFile',
   'fileManager.getAvailablePathForAttachment',
   // No rename dialog — the call logs a console message and leaves the file untouched.
@@ -239,8 +257,20 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
  * badge yellow for something that just works differently. This set is for
  * methods whose reduced behavior is more likely to actually break a plugin's
  * functionality and warrants a warning before install.
+ *
+ * `obsidian.Bases` and `obsidian.Cli` are synthetic keys (not `app.*` calls —
+ * see BASES_USAGE_PATTERN/CLI_USAGE_PATTERN below) for two API areas that are
+ * typed but never functionally implemented: Bases (database/formula-query
+ * views, since 1.10.0 — no formula engine, no `.base` file rendering) and the
+ * desktop CLI (`registerCliHandler`, since 1.12.2 — no CLI exists in a web
+ * app). Both are real, non-crashing no-ops (`Plugin.registerBasesView()`/
+ * `registerCliHandler()` in install-globals.ts), so `partial` — not
+ * `unsupported` — is correct: the plugin still loads.
  */
-const PARTIAL_METHODS: ReadonlySet<string> = new Set([]);
+const PARTIAL_METHODS: ReadonlySet<string> = new Set([
+  'obsidian.Bases',
+  'obsidian.Cli',
+]);
 
 /**
  * Known unsupported workspace methods.
@@ -289,6 +319,19 @@ const LIFECYCLE_PATTERN = /(?:async\s+)?onload\s*\(|(?:async\s+)?onunload\s*\(/g
  */
 const REGISTER_EVENT_PATTERN = /\.registerEvent\s*\(/g;
 
+/**
+ * Detects references to Obsidian's Bases feature (database/formula-query
+ * views over vault properties, since 1.10.0) — either registering a custom
+ * Bases view type, or importing/extending any of the Bases/Value classes.
+ * Not an `app.*` chain, so it can't go through API_ACCESS_PATTERN.
+ */
+const BASES_USAGE_PATTERN = /\bregisterBasesView\s*\(|\bBases(View|Entry|EntryGroup|QueryResult|ViewConfig|ViewRegistration)\b|\bQueryController\b|\bFormulaContext\b/;
+
+/**
+ * Detects references to Obsidian's desktop CLI extension API (since 1.12.2).
+ */
+const CLI_USAGE_PATTERN = /\bregisterCliHandler\s*\(|\bCliFlag\b|\bCliData\b|\bCliHandler\b/;
+
 // ─── Implementation ────────────────────────────────────────────────────────────
 
 /**
@@ -333,6 +376,14 @@ function detectApiCalls(bundleSource: string): Set<string> {
   REGISTER_EVENT_PATTERN.lastIndex = 0;
   if (REGISTER_EVENT_PATTERN.test(bundleSource)) {
     detected.add('Plugin.registerEvent');
+  }
+
+  // Detect Bases / CLI usage (not app.* chains, see the patterns' own docs)
+  if (BASES_USAGE_PATTERN.test(bundleSource)) {
+    detected.add('obsidian.Bases');
+  }
+  if (CLI_USAGE_PATTERN.test(bundleSource)) {
+    detected.add('obsidian.Cli');
   }
 
   return detected;
@@ -527,6 +578,12 @@ export class CompatibilityAnalyzer implements ICompatibilityAnalyzer {
         }
         if (partialCalls.length > 0) {
           reasons.push(`Partially supported API methods detected: ${partialCalls.join(', ')} — limited functionality`);
+        }
+        if (partialCalls.includes('obsidian.Bases')) {
+          reasons.push('Plugin references Obsidian Bases (database/formula-query views) — Slatebase has no formula engine or .base file rendering; the plugin loads but any Bases view it registers is never shown');
+        }
+        if (partialCalls.includes('obsidian.Cli')) {
+          reasons.push('Plugin registers a desktop CLI handler — Slatebase is a web app with no CLI, so this handler is unreachable');
         }
         if (!desktopOnly) {
           reasons.push('Plugin is mobile-compatible — core functionality likely works despite unsupported methods');

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
 import React from 'react'
 import { ViewMode, resolveWikilinkTarget } from './ViewMode'
@@ -6,6 +6,7 @@ import { AppContext } from '../state'
 import type { AppContextValue } from '../state'
 import type { DirectoryTree, AppState } from '../types'
 import type { IApiClient } from '../api'
+import { registerExtension, resetEmbedRegistry } from '../plugins/compat/embed-registry'
 
 describe('ViewMode', () => {
   const defaultProps = {
@@ -513,6 +514,68 @@ def hello():
       const img = container.querySelector('img.view-mode-embed--image')
       expect(img).not.toBeNull()
       expect(img?.getAttribute('src')).toContain('subfolder%2Fdeep-image.jpg')
+    })
+
+    describe('app.embedRegistry integration', () => {
+      const treeWithExcalidrawFile: DirectoryTree = {
+        name: 'root',
+        type: 'directory',
+        path: '',
+        children: [
+          { name: 'Drawing.excalidraw.md', type: 'file', path: 'Drawing.excalidraw.md' },
+        ],
+      }
+
+      afterEach(() => {
+        resetEmbedRegistry()
+      })
+
+      it('delegates to a plugin-registered embed creator instead of the built-in note pipeline', () => {
+        // Regression coverage: a plugin (e.g. Excalidraw-shaped) whose files
+        // are saved as "name.excalidraw.md" but whose wikilink omits the
+        // trailing .md — the resolved file's real extension is "md", but the
+        // apparent one in the link text is "excalidraw", which is what a
+        // plugin registers under.
+        let receivedFile: unknown = null
+        registerExtension('excalidraw', (_context, file) => {
+          receivedFile = file
+          return {
+            load(): void {},
+            unload(): void {},
+            loadFile(): void {},
+          }
+        })
+
+        const { container } = render(
+          <ViewMode content="![[Drawing.excalidraw]]" vaultId="v1" directoryTree={treeWithExcalidrawFile} />
+        )
+
+        expect(container.querySelector('.view-mode-embed--plugin')).not.toBeNull()
+        expect(container.querySelector('.view-mode-embed--note')).toBeNull()
+        expect(receivedFile).toMatchObject({ path: 'Drawing.excalidraw.md', extension: 'md' })
+      })
+
+      it('unloads the plugin embed component on unmount', () => {
+        let unloaded = false
+        registerExtension('excalidraw', () => ({
+          load(): void {},
+          unload(): void { unloaded = true },
+          loadFile(): void {},
+        }))
+
+        const { unmount } = render(
+          <ViewMode content="![[Drawing.excalidraw]]" vaultId="v1" directoryTree={treeWithExcalidrawFile} />
+        )
+        unmount()
+        expect(unloaded).toBe(true)
+      })
+
+      it('falls back to the built-in note pipeline when no creator is registered for the extension', () => {
+        const { container } = render(
+          <ViewMode content="![[Drawing.excalidraw]]" vaultId="v1" directoryTree={treeWithExcalidrawFile} />
+        )
+        expect(container.querySelector('.view-mode-embed--plugin')).toBeNull()
+      })
     })
   })
 

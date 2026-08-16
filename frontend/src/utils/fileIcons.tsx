@@ -363,12 +363,27 @@ function resolveRawIcon(fileName: string): IconComponent {
   return EXTENSION_ICON_MAP[ext] ?? File
 }
 
+/**
+ * One wrapper component per underlying icon, for the lifetime of the module.
+ *
+ * `getFileIcon()` is called during render (file explorer rows, recent files,
+ * bookmarks). Building the wrapper fresh each time would hand React a new
+ * component *identity* on every render, which unmounts and remounts the icon
+ * subtree instead of updating it — and is what the "cannot create components
+ * during render" lint rule flags at those call sites.
+ */
+const wrappedIconCache = new Map<IconComponent, FileIconComponent>()
+
 /** Wraps an icon component to accept unified { size, className, style } props. */
 function wrapIcon(Icon: IconComponent): FileIconComponent {
   if (isLucideIcon(Icon)) {
     // Lucide icons already accept `size`
     return Icon as unknown as FileIconComponent
   }
+
+  const cached = wrappedIconCache.get(Icon)
+  if (cached) return cached
+
   // @react-symbols icons use width/height
   function SymbolIcon({ size = 16, className, style }: FileIconProps) {
     return createElement(Icon as ComponentType<SVGProps<SVGSVGElement>>, {
@@ -379,6 +394,7 @@ function wrapIcon(Icon: IconComponent): FileIconComponent {
     })
   }
   SymbolIcon.displayName = `SymbolIcon(${(Icon as { displayName?: string }).displayName ?? 'Unknown'})`
+  wrappedIconCache.set(Icon, SymbolIcon)
   return SymbolIcon
 }
 

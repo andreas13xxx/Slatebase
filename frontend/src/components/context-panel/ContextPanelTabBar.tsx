@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback } from 'react'
-import { List, Link, Tag, FileText, Search, icons } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { List, Link, Tag, FileText, Search } from 'lucide-react'
 import { isPluginViewId, getPluginViewType } from '../../state/contextPanelState'
 import type { ContextPanelViewId, BuiltinViewId } from '../../state/contextPanelState'
+import { getCustomIconSvg, sizeCustomIconSvg, useIconResolutionTick } from '../../utils/pluginIcon'
+import { resolveIconMarkupSync } from '../../plugins/compat/lucide-icons'
 import './ContextPanelTabBar.css'
 
 /** Tab metadata mapping built-in view IDs to icons and labels. */
@@ -12,46 +13,6 @@ const TAB_CONFIG: Record<BuiltinViewId, { icon: typeof List; label: string }> = 
   tags: { icon: Tag, label: 'Tags' },
   properties: { icon: FileText, label: 'Eigenschaften' },
   search: { icon: Search, label: 'Suche' },
-}
-
-/** Known Obsidian icon name → Lucide key mappings. */
-const OBSIDIAN_ICON_MAP: Record<string, string> = {
-  'calendar-with-checkmark': 'CalendarCheck',
-  'calendar': 'Calendar',
-  'lucide-calendar': 'Calendar',
-  'file-text': 'FileText',
-  'folder': 'Folder',
-  'search': 'Search',
-  'settings': 'Settings',
-  'star': 'Star',
-  'trash': 'Trash2',
-  'link': 'Link',
-  'eye': 'Eye',
-  'pencil': 'Pencil',
-  'clock': 'Clock',
-  'check': 'Check',
-  'list': 'List',
-  'hash': 'Hash',
-  'tag': 'Tag',
-  'book': 'Book',
-  'image': 'Image',
-  'code': 'Code',
-  'quote': 'Quote',
-  'table': 'Table',
-}
-
-/** Resolve an Obsidian icon name to a Lucide React component, or null if not found. */
-function resolvePluginIcon(iconName: string): LucideIcon | null {
-  const mapped = OBSIDIAN_ICON_MAP[iconName]
-  if (mapped && mapped in icons) {
-    return icons[mapped as keyof typeof icons]
-  }
-  // Generic: kebab-case → PascalCase
-  const pascalCase = iconName.split('-').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join('')
-  if (pascalCase in icons) {
-    return icons[pascalCase as keyof typeof icons]
-  }
-  return null
 }
 
 /** Plugin view metadata provided externally for label/icon resolution. */
@@ -90,6 +51,9 @@ export function ContextPanelTabBar({
   panelWidth: _panelWidth,  
   pluginViewMeta,
 }: ContextPanelTabBarProps) {
+  // Re-renders once any icon's (async, per-icon) Lucide resolution lands —
+  // see PluginRibbonIcon.tsx for why this is needed.
+  useIconResolutionTick()
   const [draggedTab, setDraggedTab] = useState<ContextPanelViewId | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   const tabBarRef = useRef<HTMLDivElement>(null)
@@ -262,7 +226,11 @@ export function ContextPanelTabBar({
       const viewType = getPluginViewType(viewId)
       const meta = pluginViewMeta?.get(viewType)
       const label = meta?.displayText ?? viewType
-      const PluginIcon = meta?.icon ? resolvePluginIcon(meta.icon) : null
+      // Custom icons registered via addIcon() first, same as everywhere else —
+      // otherwise a plugin's own SVG tab icon falls through to the generic
+      // Lucide guesser and silently renders as plain text instead.
+      const customSvg = meta?.icon ? getCustomIconSvg(meta.icon) : undefined
+      const pluginIconMarkup = !customSvg && meta?.icon ? resolveIconMarkupSync(meta.icon, 14) : undefined
 
       return (
         <div key={viewId} className="context-panel-tab-wrapper">
@@ -282,7 +250,11 @@ export function ContextPanelTabBar({
             onDragStart={(e) => handleDragStart(e, viewId)}
             onDragEnd={handleDragEnd}
           >
-            {PluginIcon ? <PluginIcon size={14} className="context-panel-tab-icon" /> : <span className="context-panel-tab-icon">{viewType}</span>}
+            {customSvg
+              ? <span className="context-panel-tab-icon" dangerouslySetInnerHTML={{ __html: sizeCustomIconSvg(customSvg, 14) }} />
+              : pluginIconMarkup
+                ? <span className="context-panel-tab-icon" dangerouslySetInnerHTML={{ __html: pluginIconMarkup }} />
+                : <span className="context-panel-tab-icon">{viewType}</span>}
           </button>
         </div>
       )

@@ -18,7 +18,7 @@ import { warnOnce } from './log'
 type IconNode = readonly (readonly [string, Record<string, string>])[]
 
 /** Resolved icon data plus the Lucide name it resolved through. */
-interface ResolvedIcon {
+export interface ResolvedIcon {
   node: IconNode
   /** The Lucide package name that matched — becomes the `lucide-*` CSS class. */
   lucideName: string
@@ -28,6 +28,23 @@ const iconImports = dynamicIconImports as Record<string, (() => Promise<{ __icon
 
 // undefined = never attempted, null = attempted and no such icon
 const nodeCache = new Map<string, ResolvedIcon | null>()
+
+// In-flight resolutions, keyed by icon id, so concurrent callers (e.g. several
+// React rows re-rendering before the first request for a shared icon lands)
+// share one dynamic import instead of each kicking off their own.
+const pendingResolutions = new Map<string, Promise<ResolvedIcon | null>>()
+
+// Notified whenever a previously-unresolved icon id finishes resolving, so a
+// caller that rendered a placeholder before the dynamic import landed (see
+// resolveIconMarkupSync below) knows to re-render and pick up the real icon
+// from the cache.
+const resolutionListeners = new Set<() => void>()
+
+/** Subscribe to "an icon finished resolving" notifications. Returns an unsubscribe function. */
+export function subscribeToIconResolution(listener: () => void): () => void {
+  resolutionListeners.add(listener)
+  return () => resolutionListeners.delete(listener)
+}
 
 /** Last-resort node used only if the 'circle-help' dynamic import itself fails to load. */
 const FALLBACK_ICON_NODE: IconNode = [
@@ -295,17 +312,31 @@ async function loadLucideIcon(name: string): Promise<IconNode | null> {
 export async function resolveLucideIconNode(iconId: string): Promise<ResolvedIcon | null> {
   const cached = nodeCache.get(iconId)
   if (cached !== undefined) return cached
+  const pending = pendingResolutions.get(iconId)
+  if (pending) return pending
+  const promise = resolveLucideIconNodeUncached(iconId)
+  pendingResolutions.set(iconId, promise)
+  try {
+    return await promise
+  } finally {
+    pendingResolutions.delete(iconId)
+  }
+}
+
+async function resolveLucideIconNodeUncached(iconId: string): Promise<ResolvedIcon | null> {
   for (const name of candidateNames(iconId)) {
     const node = await loadLucideIcon(name)
     if (node) {
       const resolved: ResolvedIcon = { node, lucideName: name }
       nodeCache.set(iconId, resolved)
+      notifyIconResolved()
       return resolved
     }
   }
   const brand = resolveBrandIcon(iconId)
   if (brand) {
     nodeCache.set(iconId, brand)
+    notifyIconResolved()
     return brand
   }
   // An unresolved icon rendering as blank space looks like a styling bug
@@ -329,7 +360,12 @@ export async function resolveLucideIconNode(iconId: string): Promise<ResolvedIco
     ? { node: placeholderNode, lucideName: 'circle-help' }
     : { node: FALLBACK_ICON_NODE, lucideName: 'circle-help' }
   nodeCache.set(iconId, placeholder)
+  notifyIconResolved()
   return placeholder
+}
+
+function notifyIconResolved(): void {
+  for (const listener of resolutionListeners) listener()
 }
 
 /**
@@ -370,6 +406,42 @@ export function renderLucideIconNode(icon: ResolvedIcon): SVGSVGElement {
   const svg = createIconShell()
   fillIconShell(svg, icon)
   return svg
+}
+
+/**
+ * Serialize a resolved icon to a sized, ready-to-inject `<svg>...</svg>` string —
+ * the `dangerouslySetInnerHTML` equivalent of {@link renderLucideIconNode}, for
+ * React call sites (ribbon icons, tab icons) that can't hand back a live DOM
+ * element the way `setIcon()`'s direct-DOM callers can.
+ */
+export function iconNodeToSvgString(icon: ResolvedIcon, sizePx: number): string {
+  const paths = icon.node
+    .map(([tag, attrs]) => `<${tag} ${Object.entries(attrs).map(([key, value]) => `${key}="${value}"`).join(' ')} />`)
+    .join('')
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${sizePx}" height="${sizePx}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon lucide-${icon.lucideName}" style="width:${sizePx}px;height:${sizePx}px;">${paths}</svg>`
+}
+
+/**
+ * Synchronous, React-friendly counterpart to {@link getLucideIconElement}:
+ * returns ready-to-inject markup for `iconId` if it is already cached,
+ * kicking off resolution in the background otherwise, or `null` while
+ * resolution is still in flight (or hasn't been requested before).
+ *
+ * The single resolver behind every Obsidian-icon-name-to-visual lookup in the
+ * app: `window.obsidian.setIcon`/`getIcon`, `ButtonComponent.setIcon`,
+ * `ItemView.addAction`, and — via this function — the React-rendered ribbon,
+ * tab, and context-panel-tab icons all resolve through the same alias table
+ * and brand marks above, so the same icon name never renders differently
+ * depending on which of those it happens to go through.
+ *
+ * Pair with {@link subscribeToIconResolution} (see `utils/pluginIcon.ts`'s
+ * `useIconResolutionTick`) to re-render once a `null` result resolves.
+ */
+export function resolveIconMarkupSync(iconId: string, sizePx: number): string | null {
+  const cached = getCachedLucideIconNode(iconId)
+  if (cached) return iconNodeToSvgString(cached, sizePx)
+  if (cached === undefined) void resolveLucideIconNode(iconId)
+  return null
 }
 
 /**

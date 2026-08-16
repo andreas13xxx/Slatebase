@@ -51,8 +51,10 @@ Beyond the core features listed above, you'll find these additional capabilities
 - [[Features/Trash and Versions]] — Restore deleted files, version history
 - [[Features/Canvas]] — Visual whiteboards with nodes and connections
 - [[Features/Command Palette]] — Quick access to all commands via keyboard
+- [[Features/Bookmarks]] — Reorder and rename favorites, heading/block/search bookmarks
 - [[Features/Vault Management]] — Create, share, and manage vaults
 - [[Features/Settings]] — All configuration options
+- [[Features/CSS Snippets]] — Custom CSS per vault
 - [[Features/Chat]] — Messages with other users
 - [[Features/Sync]] — Vault synchronization (experimental)
 - [[Features/Live Preview Editor]] — Source mode and inline-rendered Live Preview

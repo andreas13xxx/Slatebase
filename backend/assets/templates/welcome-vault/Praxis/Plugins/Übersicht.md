@@ -34,6 +34,11 @@ Ausführliche Guides zu jedem Plugin:
 - [[Fortgeschritten/Plugins/Dataview]] — Vault als Datenbank
 - [[Fortgeschritten/Plugins/Excalidraw]] — Freihand-Zeichnungen
 - [[Fortgeschritten/Plugins/Templater]] — Dynamische Vorlagen
+- [[Fortgeschritten/Plugins/Tasks]] — Aufgabenverwaltung mit Fälligkeiten
+- [[Fortgeschritten/Plugins/Advanced Tables]] — Tabellen-Editor mit Formeln
+- [[Fortgeschritten/Plugins/Git]] — Versionierung mit externem Repository
+- [[Fortgeschritten/Plugins/Mind Map]] — Notizen als Mindmap
+- [[Fortgeschritten/Plugins/Editing Toolbar]] — Formatierungsleiste
 
 ---
 

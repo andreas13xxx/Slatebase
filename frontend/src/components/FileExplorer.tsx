@@ -23,6 +23,7 @@ import type { DragState, ExternalDropState, ContextMenuState, InlineInputState }
 import { getActiveWorkspaceShim } from '../plugins/compat/active-workspace-shim'
 import { buildTFileFromPath } from '../plugins/compat/plugin-event-bridge'
 import type { TFile, TFolder } from '../plugins/compat/types'
+import { withPluginContext } from '../plugins/compat/plugin-execution-context'
 
 /**
  * Monotonic per-vault sequence counter used to discard out-of-order fetchVaultTree
@@ -208,27 +209,42 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
     }
   }, [onRegisterCreateFolder, state.selectedVaultId])
 
-  // Reveal a specific file in the tree (file-explorer:reveal-active-file core command):
-  // expand its ancestor folders, then scroll it into view once it's rendered.
-  const pendingRevealPathRef = useRef<string | null>(null)
+  // Reveal a specific file or folder in the tree (file-explorer:reveal-active-file
+  // core command, and the Breadcrumb's segment clicks — Requirement 7.3/7.4): expand
+  // ancestor folders, then scroll the target into view once it's rendered.
+  const pendingRevealRef = useRef<{ path: string; kind: 'file' | 'folder' } | null>(null)
   useEffect(() => {
     function handleRevealFile(e: Event) {
-      const detail = (e as CustomEvent<{ path: string }>).detail
-      if (!detail?.path) return
+      const detail = (e as CustomEvent<{ path: string; kind?: 'file' | 'folder' }>).detail
+      if (!detail || detail.path === undefined) return
       const vaultId = state.selectedVaultId
       if (!vaultId) return
+      const kind = detail.kind ?? 'file'
 
-      pendingRevealPathRef.current = detail.path
       setExpandedVaults((prev) => {
         const next = new Set(prev)
         next.add(vaultId)
         return next
       })
+
+      if (detail.path === '') {
+        // Requirement 7.4: the vault-name breadcrumb segment scrolls to vault root —
+        // no specific tree node to expand or find, just ensure the vault is open.
+        pendingRevealRef.current = null
+        const container = document.querySelector('.file-explorer-tree, .file-explorer')
+        container?.scrollTo({ top: 0, behavior: 'smooth' })
+        return
+      }
+
+      pendingRevealRef.current = { path: detail.path, kind }
       setExpandedPaths((prev) => {
         const next = new Set(prev)
         const segments = detail.path.split('/')
+        // For a file, expand every ancestor folder (up to, not including, the file itself).
+        // For a folder, also expand the folder itself so its contents become visible.
+        const depth = kind === 'folder' ? segments.length : segments.length - 1
         let acc = ''
-        for (let i = 0; i < segments.length - 1; i++) {
+        for (let i = 0; i < depth; i++) {
           acc = acc ? `${acc}/${segments[i]}` : segments[i]
           next.add(acc)
         }
@@ -240,15 +256,16 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
     return () => window.removeEventListener('slatebase:reveal-file', handleRevealFile)
   }, [state.selectedVaultId])
 
-  // Runs after every render: once the revealed file's ancestors are expanded and it
-  // exists in the DOM, scroll to it and clear the pending request.
+  // Runs after every render: once the revealed file's/folder's ancestors are expanded
+  // and it exists in the DOM, scroll to it and clear the pending request.
   useEffect(() => {
-    const path = pendingRevealPathRef.current
-    if (!path) return
-    const el = document.querySelector(`[data-path="${CSS.escape(path)}"].tree-node--file`)
+    const pending = pendingRevealRef.current
+    if (!pending) return
+    const nodeClass = pending.kind === 'folder' ? 'tree-node--directory' : 'tree-node--file'
+    const el = document.querySelector(`[data-path="${CSS.escape(pending.path)}"].${nodeClass}`)
     if (el) {
       el.scrollIntoView({ block: 'center', behavior: 'smooth' })
-      pendingRevealPathRef.current = null
+      pendingRevealRef.current = null
     }
   })
 
@@ -447,7 +464,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
    */
   function buildPluginMenuItems(node: DirectoryTree): ContextMenuItem[] {
     const workspaceShim = getActiveWorkspaceShim()
-    const MenuCtor = (window as unknown as { obsidian?: { Menu?: new () => { items: Array<{ kind: string; title: string; icon: string; disabled: boolean; callback: (evt: MouseEvent | KeyboardEvent) => void }> } } }).obsidian?.Menu
+    const MenuCtor = (window as unknown as { obsidian?: { Menu?: new () => { items: Array<{ kind: string; title: string; icon: string; disabled: boolean; callback: (evt: MouseEvent | KeyboardEvent) => void; pluginId: string | null }> } } }).obsidian?.Menu
     if (!workspaceShim || !MenuCtor) return []
 
     const file: TFile | TFolder = node.type === 'file'
@@ -479,7 +496,12 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
         disabled: entry.disabled,
         run: () => {
           try {
-            entry.callback(new MouseEvent('click'))
+            // Replay the plugin context captured when the item was built (see
+            // MenuEntry.pluginId) — the click happens on a later, separate event
+            // than the synchronous file-menu trigger above, so without this a
+            // callback that opens a Modal builds it with no plugin tagged, and
+            // CssInjector's [data-plugin-id] scoping matches nothing inside it.
+            withPluginContext(entry.pluginId, () => entry.callback(new MouseEvent('click')))
           } catch (err) {
             console.error('[FileExplorer] A plugin\'s file-menu item threw:', err)
           }

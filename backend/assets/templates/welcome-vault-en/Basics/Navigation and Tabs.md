@@ -20,6 +20,21 @@ There are several ways to open a file:
 1. **Click in the Explorer** — A click on a file opens it in a new tab
 2. **Click a Wikilink** — In View mode, clicking `[[Filename]]` opens the linked file
 3. **Command Palette** — `Ctrl+P` opens the command palette where you can search for files
+4. **Quick Switcher** — `Ctrl+O` opens a fuzzy file finder: type a few letters from the filename and matches are ranked by how well they fit. If nothing matches, the Quick Switcher offers to create a new file with that name right away
+
+---
+
+## Back and Forward Navigation
+
+Slatebase remembers which files you've recently visited — similar to a browser's history.
+
+- **Back** (`Alt+←` or the ◀ button left of the tab bar): jumps to the previously visited file
+- **Forward** (`Alt+→` or the ▶ button): jumps forward again, if you've used "Back" before
+
+Every navigation counts as a visit — whether you click a file in the explorer, follow a wikilink, open a search result, or use the Quick Switcher. If you navigate to a new file after going "Back" (instead of pressing "Forward" again), the existing forward history is discarded — just like in a browser.
+
+> [!tip] Tip
+> The Back button is greyed out as long as there's no previous file. Same for the Forward button, until you've used "Back" at least once.
 
 ---
 
@@ -38,6 +53,19 @@ Drag a tab via **Drag & Drop** to the desired position in the tab bar.
 
 The active tab is highlighted. The content of this tab is displayed in the main area.
 
+### Switching Tabs by Keyboard
+
+- `Ctrl+Shift+]` — next tab (wraps around to the first tab at the end)
+- `Ctrl+Shift+[` — previous tab (wraps around to the last tab at the start)
+
+---
+
+## Breadcrumb Bar
+
+Above the editor, the breadcrumb bar shows the folder path of the open file as a chain of clickable segments — e.g. `MyVault / Projects / Alpha / notes.md`. Clicking a folder segment opens the File Explorer and highlights that folder; clicking the vault name jumps to the root level. For deeply nested paths, the middle folders collapse behind a "…" icon.
+
+For files at the vault root, the bar shows only the vault name and filename. For non-file tabs (e.g. the Knowledge Graph), it stays hidden.
+
 ---
 
 ## Step by Step: Using Multiple Tabs
@@ -54,8 +82,13 @@ The active tab is highlighted. The content of this tab is displayed in the main 
 | Action | Shortcut |
 |--------|----------|
 | Open Command Palette | `Ctrl+P` |
+| Open Quick Switcher | `Ctrl+O` |
 | Open Settings | `Ctrl+,` |
 | Open Search | `Ctrl+Shift+F` |
+| Navigate Back | `Alt+←` |
+| Navigate Forward | `Alt+→` |
+| Next Tab | `Ctrl+Shift+]` |
+| Previous Tab | `Ctrl+Shift+[` |
 
 > [!tip] Tip
 > Keyboard shortcuts can be customized under **Settings → Keybindings**. More on this in the guide [[Advanced/Custom Keybindings|Custom Keybindings]].
@@ -71,6 +104,10 @@ In the left sidebar you'll find the **Recently Opened** list. It shows the last 
 ### Favorites
 
 Frequently used files can be marked as **Favorites** (star icon in the explorer). They then appear in the favorites section of the sidebar.
+
+### Follow Active File in Explorer
+
+Under **Settings → Vault Configuration** there's a toggle "Follow active file in explorer". When enabled, the File Explorer automatically expands the relevant folders and scrolls to the file whenever the active tab changes — no need to manually hunt through the explorer to see where you are. The toggle is off by default and applies instantly, no save button needed.
 
 ---
 

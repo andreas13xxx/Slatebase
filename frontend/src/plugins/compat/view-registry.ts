@@ -13,6 +13,10 @@
 import { renderLucideIconInto } from './lucide-icons'
 import { setMarkdownOverride, clearMarkdownOverride } from './file-view-registry'
 import { Scope } from './obsidian-api-extensions'
+import { getCustomIconSvg, sizeCustomIconSvg } from '../../utils/pluginIcon'
+import { EventSystem } from './event-system'
+import type { EventRef } from './types'
+import { recordGapRead, recordGapCall } from './api-gap-registry'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -37,6 +41,14 @@ export class ItemView {
    * `app.keymap.pushScope(this.scope)` in `onOpen()` / `popScope()` in `onClose()`.
    */
   readonly scope: Scope = new Scope()
+  /** Icon name shown in the tab. Plugins typically set this instead of overriding getIcon(). */
+  icon: string = 'file'
+  /**
+   * Whether this view is intended for navigation (shows up in history, gets a
+   * "back" affordance) vs. a static panel like a file explorer or calendar.
+   * Defaults to true, matching real Obsidian's default for ItemView subclasses.
+   */
+  navigation: boolean = true
 
   constructor(leaf: WorkspaceLeaf) {
     this.leaf = leaf
@@ -67,10 +79,16 @@ export class ItemView {
     return 'Plugin View'
   }
 
-  /** Returns the icon name for the view. */
+  /** Returns the icon name for the view. Real Obsidian's default reads the `icon` property. */
   getIcon(): string {
-    return 'file'
+    return this.icon
   }
+
+  /** Called when the size of this view is changed. No layout to react to here. */
+  onResize(): void {}
+
+  /** Populates the pane's context menu. Plugins override to add menu items. */
+  onPaneMenu(_menu: unknown, _source: string): void {}
 
   /** Called when the view is opened/mounted. Plugins override to build UI. */
   async onOpen(): Promise<void> {}
@@ -83,6 +101,33 @@ export class ItemView {
 
   /** Called when the view is unloaded. */
   onunload(): void {}
+
+  /**
+   * Get the view state for workspace serialization. Real Obsidian's base `View`
+   * always implements this (default `{}`) — plugins routinely call
+   * `leaf.view.getState()` on whatever view happens to be active without
+   * checking it's overridden, so views that don't need custom state still
+   * need this default rather than throwing for unrelated plugins.
+   */
+  getState(): Record<string, unknown> {
+    return {}
+  }
+
+  /** Restore view state from workspace serialization. Default no-op. */
+  async setState(state: Record<string, unknown>, result: { history?: boolean }): Promise<void> {
+    void state
+    void result
+  }
+
+  /** Get transient UI state (scroll position, etc.) not persisted across sessions. Default `{}`. */
+  getEphemeralState(): Record<string, unknown> {
+    return {}
+  }
+
+  /** Restore transient UI state. Default no-op. */
+  setEphemeralState(state: Record<string, unknown>): void {
+    void state
+  }
 
   /**
    * Add an action button to the view header area.
@@ -109,11 +154,13 @@ export class ItemView {
     button.addEventListener('click', callback)
     actionsEl.appendChild(button)
 
-    // Render icon: custom icon registry first, then Lucide
-    const customIcons = (window as unknown as { __obsidianCustomIcons?: Map<string, string> }).__obsidianCustomIcons
-    const customSvg = customIcons?.get(icon)
+    // Render icon: custom icon registry first, then Lucide. Sized explicitly —
+    // an unsized custom SVG defaults to the browser's intrinsic <svg> size
+    // instead of the button's, so it renders invisible or oversized rather
+    // than just missing (see sizeCustomIconSvg's doc comment).
+    const customSvg = getCustomIconSvg(icon)
     if (customSvg) {
-      button.innerHTML = customSvg
+      button.innerHTML = sizeCustomIconSvg(customSvg, 16)
     } else {
       renderLucideIconInto(button, icon)
     }
@@ -397,8 +444,23 @@ export class WorkspaceLeaf {
   readonly location: LeafLocation
   /** The container element for this leaf (wraps the view's containerEl) */
   readonly containerEl: HTMLElement
+  /**
+   * Real Obsidian's active hover preview popover anchored to this leaf, if any.
+   * Slatebase's hover previews aren't tracked per-leaf (see hover-link-bus.ts),
+   * so this stays null — present only so `leaf.hoverPopover` reads don't fail.
+   */
+  hoverPopover: unknown = null
+  /**
+   * The leaf's direct parent (a WorkspaceTabs/WorkspaceMobileDrawer in real
+   * Obsidian). Slatebase has no such split/tab-group hierarchy to expose, so
+   * this stays null — plugins doing `leaf.parent instanceof WorkspaceTabs`
+   * (tab-group detection) get a clean `false` instead of a crash.
+   */
+  parent: unknown = null
 
   private readonly registry: ViewRegistry
+  private readonly leafEvents = new EventSystem()
+  private pinned = false
 
   constructor(app: unknown, registry: ViewRegistry, location: LeafLocation) {
     this.app = app
@@ -407,6 +469,50 @@ export class WorkspaceLeaf {
     this.containerEl = document.createElement('div')
     this.containerEl.className = 'workspace-leaf'
   }
+
+  /**
+   * Leaf-scoped events ('pinned-change', 'group-change'). Real Obsidian's
+   * `WorkspaceLeaf` extends `WorkspaceItem extends Events`, so these exist
+   * directly on the leaf, separate from the shared workspace-wide event bus.
+   */
+  on(name: string, callback: (...args: unknown[]) => unknown, ctx?: unknown): EventRef {
+    return this.leafEvents.on(name, callback, ctx)
+  }
+
+  off(name: string, callback: (...args: unknown[]) => unknown): void {
+    this.leafEvents.off(name, callback)
+  }
+
+  offref(ref: EventRef): void {
+    this.leafEvents.offref(ref)
+  }
+
+  trigger(name: string, ...args: unknown[]): void {
+    this.leafEvents.trigger(name, ...args)
+  }
+
+  /**
+   * Pinning/tab-groups have no equivalent in Slatebase's tab model. These
+   * track just enough state for `togglePinned()`/`setPinned()` round-trips
+   * and fire the real 'pinned-change' event plugins may listen for; the
+   * group methods are no-ops since there's nothing to group leaves into.
+   */
+  togglePinned(): void {
+    this.setPinned(!this.pinned)
+  }
+
+  setPinned(pinned: boolean): void {
+    if (this.pinned === pinned) return
+    this.pinned = pinned
+    this.leafEvents.trigger('pinned-change', pinned)
+  }
+
+  setGroupMember(_other: WorkspaceLeaf): void {}
+
+  setGroup(_group: string): void {}
+
+  /** Called by Obsidian when the leaf is resized. No layout to react to here. */
+  onResize(): void {}
 
   /**
    * Run the view's load lifecycle before onOpen(), matching real Obsidian's
@@ -567,9 +673,72 @@ export class WorkspaceLeaf {
     this.registry.notifyViewActivated(viewType, view)
   }
 
+  /**
+   * Attach an already-constructed view instance to this leaf (Obsidian API).
+   * Unlike `setViewState()`, which looks up a registered factory by view type,
+   * `open()` takes a view the plugin built itself (`new MyView(leaf)`) — Mind
+   * Map's `initPreview` does exactly this to attach its markmap preview view
+   * directly instead of going through `registerView()` + `setViewState()`.
+   * Mirrors the close-old/mount-new/load/onOpen sequence `setViewState()` uses.
+   */
+  async open(view: ItemView): Promise<ItemView> {
+    if (this.view) {
+      const oldView = this.view
+      this.view = null
+      try {
+        await oldView.onClose()
+      } catch (err) {
+        console.error(`[WorkspaceLeaf] Error closing view "${oldView.getViewType()}":`, err)
+      }
+      this.runViewUnload(oldView, oldView.getViewType())
+      oldView.containerEl.remove()
+    }
+
+    this.view = view
+    const viewType = view.getViewType()
+    const pluginId = this.registry.getPluginIdForView(viewType)
+    if (pluginId) {
+      view.containerEl.dataset.pluginId = pluginId
+    }
+    this.containerEl.appendChild(view.containerEl)
+
+    this.runViewLoad(view, viewType)
+    try {
+      await view.onOpen()
+    } catch (err) {
+      console.error(`[WorkspaceLeaf] Error in onOpen for view "${viewType}":`, err)
+    }
+
+    this.registry.notifyViewActivated(viewType, view)
+    return view
+  }
+
   /** Get the current view type */
   getViewState(): { type: string } {
     return { type: this.view?.getViewType() ?? '' }
+  }
+
+  /**
+   * Convenience pass-throughs to the leaf's view. Real Obsidian's `WorkspaceLeaf`
+   * exposes these directly (delegating to `this.view`) alongside the view-only
+   * `getState()`/`setState()` pair — plugins commonly call the leaf-level
+   * shorthand instead of going through `.view` explicitly (Mind Map's
+   * `activeLeafName` calls `leaf.getDisplayText()`, not `leaf.view.getDisplayText()`).
+   */
+  getDisplayText(): string {
+    return this.view?.getDisplayText() ?? ''
+  }
+
+  getIcon(): string {
+    return this.view?.getIcon() ?? 'file'
+  }
+
+  getEphemeralState(): Record<string, unknown> {
+    return (this.view as unknown as { getEphemeralState?: () => Record<string, unknown> })?.getEphemeralState?.() ?? {}
+  }
+
+  setEphemeralState(state: Record<string, unknown>): void {
+    (this.view as unknown as { setEphemeralState?: (state: Record<string, unknown>) => void })?.setEphemeralState?.(state)
   }
 
   /**
@@ -640,6 +809,95 @@ export class WorkspaceLeaf {
       console.error(`[WorkspaceLeaf] Error opening file "${file.path}":`, err)
     }
   }
+
+  /**
+   * Wraps a WorkspaceLeaf instance with a Proxy for non-emulated API
+   * interception. Mirrors AppShim/WorkspaceShim/VaultShim's pattern.
+   *
+   * Bound methods run with `this` set to the raw instance (not the proxy) so
+   * they can still reach private fields like `registry` — which is why
+   * `detach()`'s `this.registry.removeLeaf(this)` passes the raw leaf, and
+   * `ViewRegistry` keys its `leaves` map by the raw instance too (see
+   * `createLeaf()`/`toExternalLeaf()`), translating to the proxy only at the
+   * methods that hand leaves back to plugins.
+   */
+  static wrapWithProxy(instance: WorkspaceLeaf): WorkspaceLeaf & Record<string, unknown> {
+    const emulatedProperties = new Set<string | symbol>([
+      'view',
+      'app',
+      'location',
+      'containerEl',
+      'hoverPopover',
+      'parent',
+      'on',
+      'off',
+      'offref',
+      'trigger',
+      'togglePinned',
+      'setPinned',
+      'setGroupMember',
+      'setGroup',
+      'onResize',
+      'setViewState',
+      'open',
+      'getViewState',
+      'getDisplayText',
+      'getIcon',
+      'getEphemeralState',
+      'setEphemeralState',
+      'getRoot',
+      'isDeferred',
+      'loadIfDeferred',
+      'detach',
+      'openFile',
+    ]);
+
+    return new Proxy(instance, {
+      get(target: WorkspaceLeaf, prop: string | symbol): unknown {
+        // `target` (not the Proxy) is passed as the receiver so getters run
+        // with `this` bound to the real instance — see WorkspaceShim.wrapWithProxy
+        // for why a proxy receiver here silently breaks getters that read
+        // un-allowlisted private fields.
+        if (emulatedProperties.has(prop)) {
+          const value = Reflect.get(target, prop, target);
+          if (typeof value === 'function') {
+            return value.bind(target);
+          }
+          return value;
+        }
+
+        if (typeof prop === 'symbol') {
+          return Reflect.get(target, prop, target);
+        }
+
+        // A callable `then` makes this object "thenable" — leaves are routinely
+        // returned from async functions (setViewState/ensureSideLeaf/etc.), and
+        // the native Promise resolution algorithm would call it as
+        // `then(resolve, reject)` instead of just settling with the leaf. Since
+        // the no-op below never calls resolve/reject, that await hangs forever.
+        // Must stay a plain `undefined`, not fall into the generic
+        // callable-no-op path — this is exactly what broke `ensureSideLeaf()`.
+        if (prop === 'then') {
+          return undefined;
+        }
+
+        if (recordGapRead('WorkspaceLeaf', prop)) {
+          console.warn(
+            `[WorkspaceLeaf] Access to non-emulated leaf method/property "${prop}". ` +
+            `Slatebase returns a no-op function here, which is truthy — feature ` +
+            `detection like \`if (leaf.${prop})\` will take the wrong branch. ` +
+            `Inspect all gaps with window.__slatebasePluginApiGaps().`
+          );
+        }
+
+        return (...args: unknown[]) => {
+          recordGapCall('WorkspaceLeaf', prop);
+          void args;
+          return undefined;
+        };
+      },
+    }) as WorkspaceLeaf & Record<string, unknown>;
+  }
 }
 
 // ─── View Registry ─────────────────────────────────────────────────────────────
@@ -687,8 +945,17 @@ export interface LeafEntry {
 export class ViewRegistry {
   /** Map of view type → view registration (includes creator + pluginId) */
   private readonly registrations: Map<string, ViewRegistration> = new Map()
-  /** All active leaves with their metadata */
+  /**
+   * All active leaves with their metadata. Keyed by the raw (unwrapped)
+   * WorkspaceLeaf instance — internal methods (`notifyViewActivated()`, the
+   * `this.leaves.get(leaf)` lookup in `detachLeavesOfType()`, `WorkspaceLeaf`'s
+   * own `detach()` calling `removeLeaf(this)`) all operate on raw identity, so
+   * the map has to be too. Methods that hand leaves back to plugins translate
+   * to the proxy via `toExternalLeaf()`/`rawToProxy` before returning.
+   */
   private readonly leaves: Map<WorkspaceLeaf, LeafEntry> = new Map()
+  /** Raw leaf → its Proxy-wrapped external identity (see `leaves` above). */
+  private readonly rawToProxy = new WeakMap<WorkspaceLeaf, WorkspaceLeaf>()
   /** Callback for UI updates when a main view is activated */
   private onViewActivated: ViewActivatedCallback | null = null
   /** Callback for UI updates when a view is deactivated */
@@ -800,28 +1067,51 @@ export class ViewRegistry {
       pluginId: pluginId ?? null,
       viewType: null
     })
-    return leaf
+    const proxy = WorkspaceLeaf.wrapWithProxy(leaf)
+    this.rawToProxy.set(leaf, proxy)
+    return proxy
   }
 
   /**
-   * Remove a leaf from tracking.
+   * Translate a raw leaf to the Proxy-wrapped identity plugins hold (falls
+   * back to the raw leaf itself if it was never registered through
+   * `createLeaf()`, which shouldn't happen outside tests constructing a
+   * `WorkspaceLeaf` directly).
+   */
+  private toExternalLeaf(leaf: WorkspaceLeaf): WorkspaceLeaf {
+    return this.rawToProxy.get(leaf) ?? leaf
+  }
+
+  /**
+   * Remove a leaf from tracking. Takes the raw leaf — always called from
+   * `WorkspaceLeaf.detach()` as `this.registry.removeLeaf(this)`, where `this`
+   * is raw (see `WorkspaceLeaf.wrapWithProxy()`'s doc comment).
    */
   removeLeaf(leaf: WorkspaceLeaf): void {
     this.leaves.delete(leaf)
   }
 
+  /** Raw-identity leaves matching a view type — for internal use only (see `getLeavesOfType()`). */
+  private getRawLeavesOfType(viewType: string): WorkspaceLeaf[] {
+    return [...this.leaves.keys()].filter(l => l.view?.getViewType() === viewType)
+  }
+
   /**
-   * Get all leaves that have a view of the given type.
+   * Get all leaves that have a view of the given type. This is `workspace.
+   * getLeavesOfType()` itself (WorkspaceShim delegates straight through), so
+   * it returns the plugin-facing Proxy identity — internal callers that need
+   * to key back into `this.leaves` (`detachLeavesOfType()`) use
+   * `getRawLeavesOfType()` instead.
    */
   getLeavesOfType(viewType: string): WorkspaceLeaf[] {
-    return [...this.leaves.keys()].filter(l => l.view?.getViewType() === viewType)
+    return this.getRawLeavesOfType(viewType).map(l => this.toExternalLeaf(l))
   }
 
   /**
    * Get all tracked leaves.
    */
   getAllLeaves(): WorkspaceLeaf[] {
-    return [...this.leaves.keys()]
+    return [...this.leaves.keys()].map(l => this.toExternalLeaf(l))
   }
 
   /**
@@ -830,7 +1120,7 @@ export class ViewRegistry {
   getMainLeaves(): WorkspaceLeaf[] {
     return [...this.leaves.entries()]
       .filter(([, entry]) => entry.location === 'main')
-      .map(([leaf]) => leaf)
+      .map(([leaf]) => this.toExternalLeaf(leaf))
   }
 
   /**
@@ -839,7 +1129,7 @@ export class ViewRegistry {
   getSidebarLeaves(): WorkspaceLeaf[] {
     return [...this.leaves.entries()]
       .filter(([, entry]) => entry.location === 'right-sidebar')
-      .map(([leaf]) => leaf)
+      .map(([leaf]) => this.toExternalLeaf(leaf))
   }
 
   /**
@@ -848,10 +1138,48 @@ export class ViewRegistry {
   getLeafByViewType(viewType: string): WorkspaceLeaf | undefined {
     for (const [leaf, entry] of this.leaves) {
       if (entry.viewType === viewType || leaf.view?.getViewType() === viewType) {
-        return leaf
+        return this.toExternalLeaf(leaf)
       }
     }
     return undefined
+  }
+
+  /**
+   * Notify any open view whose file was just renamed — real Obsidian's
+   * counterpart to the vault's own 'rename' event (which plugins listening via
+   * `vault.on('rename', ...)` already get independently of this).
+   *
+   * Matched by `oldPath`, not object identity: `vault.getAbstractFileByPath()`
+   * builds a fresh TFile on every call (see treeNodeToTFile in vault-shim.ts),
+   * so a view's `.file` is essentially never the exact same object `rename()`
+   * was called with, even when they describe the same file. `view.file` is
+   * updated to the renamed object unconditionally (matching real Obsidian's
+   * guarantee that a FileView's `.file` always reflects the file's current
+   * path) — `onRename()` is only the optional notification hook on top.
+   */
+  notifyFileRenamed(file: { path: string }, oldPath: string): void {
+    for (const [leaf] of this.leaves) {
+      const view = leaf.view as unknown as {
+        file?: { path?: string } | null
+        onRename?: (f: unknown) => unknown
+        getViewType?: () => string
+      } | null
+      if (!view || view.file == null || view.file.path !== oldPath) continue
+
+      view.file = file
+
+      if (typeof view.onRename !== 'function') continue
+      try {
+        const result = view.onRename(file)
+        if (result && typeof (result as { catch?: unknown }).catch === 'function') {
+          (result as Promise<unknown>).catch((err: unknown) => {
+            console.error(`[ViewRegistry] onRename rejected for view "${view.getViewType?.() ?? 'unknown'}":`, err)
+          })
+        }
+      } catch (err) {
+        console.error(`[ViewRegistry] onRename threw for view "${view.getViewType?.() ?? 'unknown'}":`, err)
+      }
+    }
   }
 
   /**
@@ -859,7 +1187,7 @@ export class ViewRegistry {
    * Calls `onSidebarViewDeactivated` for sidebar leaves and `onViewDeactivated` for main leaves.
    */
   async detachLeavesOfType(viewType: string): Promise<void> {
-    const matching = this.getLeavesOfType(viewType)
+    const matching = this.getRawLeavesOfType(viewType)
     let hasSidebar = false
     let hasMain = false
     for (const leaf of matching) {
@@ -941,7 +1269,11 @@ export class ViewRegistry {
           entry.pluginId = registration.pluginId
         }
         if (entry.location === 'right-sidebar') {
-          this.onSidebarViewActivated?.(viewType, view, leaf)
+          // Proxy identity: this leaf typically ends up in React state and
+          // later flows back into workspace.setActiveLeaf()/revealLeaf(),
+          // whose `allLeaves.includes(leaf)` check needs the same object
+          // reference getAllLeaves() hands out (see toExternalLeaf()).
+          this.onSidebarViewActivated?.(viewType, view, this.toExternalLeaf(leaf))
         } else {
           this.onViewActivated?.(viewType, view)
         }

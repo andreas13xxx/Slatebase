@@ -34,6 +34,11 @@ Comprehensive guides for each plugin:
 - [[Advanced/Plugins/Dataview]] — Vault as database
 - [[Advanced/Plugins/Excalidraw]] — Freehand drawings
 - [[Advanced/Plugins/Templater]] — Dynamic templates
+- [[Advanced/Plugins/Tasks]] — Task management with due dates
+- [[Advanced/Plugins/Advanced Tables]] — Table editor with formulas
+- [[Advanced/Plugins/Git]] — Versioning with an external repository
+- [[Advanced/Plugins/Mind Map]] — Notes as a mind map
+- [[Advanced/Plugins/Editing Toolbar]] — Formatting toolbar
 
 ---
 

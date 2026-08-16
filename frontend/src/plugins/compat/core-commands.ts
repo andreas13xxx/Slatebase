@@ -29,6 +29,8 @@
 
 import type { ICommandRegistry } from './command-registry'
 import type { IEditor } from './editor-shim'
+import type { Locale } from '../../i18n'
+import { translateCoreCommandName } from './core-command-i18n'
 
 /** Insert `before`/`after` around the current selection (or at the cursor if empty). */
 function wrapSelection(editor: IEditor, before: string, after: string): void {
@@ -364,7 +366,7 @@ const noop = (): void => { /* no Slatebase equivalent — see module docstring *
  * Safe to call repeatedly — addCommand overwrites by namespaced ID, so re-running
  * this on every vault switch is idempotent.
  */
-export function registerCoreEditorCommands(registry: ICommandRegistry): void {
+export function registerCoreEditorCommands(registry: ICommandRegistry, locale: Locale): void {
   const commands: Array<{ id: string; name: string; run: (editor: IEditor) => void }> = [
     // ── Already-shipped formatting/insertion commands ──
     { id: 'toggle-checklist-status', name: 'Cycle list and checklist', run: (e) => e.toggleCheckList() },
@@ -452,6 +454,6 @@ export function registerCoreEditorCommands(registry: ICommandRegistry): void {
   ]
 
   for (const { id, name, run } of commands) {
-    registry.addCommand('editor', { id, name, editorCallback: (editor) => run(editor) })
+    registry.addCommand('editor', { id, name: translateCoreCommandName(`editor:${id}`, locale, name), editorCallback: (editor) => run(editor) })
   }
 }

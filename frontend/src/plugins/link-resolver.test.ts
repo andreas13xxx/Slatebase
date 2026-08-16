@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { resolveWikilinkTarget, collectFilesSorted, resolvePathTarget } from './link-resolver'
+import {
+  resolveWikilinkTarget,
+  resolveWikilinkTargetWithAlternatives,
+  resolveAmbiguousMatch,
+  collectFilesSorted,
+  resolvePathTarget,
+  type FileCandidate,
+} from './link-resolver'
 import type { DirectoryTree } from '../types'
 
 /**
@@ -52,8 +59,7 @@ describe('resolveWikilinkTarget', () => {
 
   it('resolves with .md extension fallback', () => {
     expect(resolveWikilinkTarget('README', sampleTree)).toBe('README.md')
-    // "Notes" matches first in depth-first alphabetical order
-    // "folder/sub/Notes.md" comes before root "Notes.md" because "folder" < "Notes.md" alphabetically
+    // "Notes" is ambiguous (root + folder/sub/) — see the dedicated disambiguation tests below
     expect(resolveWikilinkTarget('Notes', sampleTree)).not.toBeNull()
     expect(resolveWikilinkTarget('alpha', sampleTree)).toBe('folder/alpha.md')
     expect(resolveWikilinkTarget('gamma', sampleTree)).toBe('another/gamma.md')
@@ -64,11 +70,19 @@ describe('resolveWikilinkTarget', () => {
     expect(resolveWikilinkTarget('BETA', sampleTree)).toBe('folder/Beta.md')
   })
 
-  it('returns first match in depth-first alphabetical order for ambiguous names', () => {
-    // "Notes.md" exists at root and in folder/sub/
-    // In depth-first alphabetical order, directories are traversed before later siblings
-    // "folder" sorts before "Notes.md" so folder/sub/Notes.md is found first
+  it('prefers the shortest path for ambiguous names with no known source file', () => {
+    // "Notes.md" exists at root (1 path segment) and in folder/sub/ (3 segments).
+    // Without a sourcePath to prefer a same-folder match, resolution falls back to
+    // shortest-path-then-alphabetical (Requirement 6.2/6.3 of navigation-link-polish) —
+    // not the old "first hit in a depth-first tree walk" behavior.
     const result = resolveWikilinkTarget('Notes.md', sampleTree)
+    expect(result).toBe('Notes.md')
+  })
+
+  it('prefers a same-folder match over a shorter path when sourcePath is known', () => {
+    // Requirement 6.1: same-folder-as-source wins even over the objectively shorter
+    // root-level "Notes.md" candidate.
+    const result = resolveWikilinkTarget('Notes.md', sampleTree, 'folder/sub/current.md')
     expect(result).toBe('folder/sub/Notes.md')
   })
 
@@ -109,6 +123,53 @@ describe('resolveWikilinkTarget', () => {
     expect(resolveWikilinkTarget('  Notes  ', sampleTree)).not.toBeNull()
     // Unique file resolves correctly with whitespace
     expect(resolveWikilinkTarget('  alpha  ', sampleTree)).toBe('folder/alpha.md')
+  })
+})
+
+describe('resolveAmbiguousMatch', () => {
+  const a: FileCandidate = { name: 'note.md', path: 'note.md' }
+  const b: FileCandidate = { name: 'note.md', path: 'projects/note.md' }
+  const c: FileCandidate = { name: 'note.md', path: 'projects/archive/note.md' }
+
+  it('returns the single candidate unchanged with alternativeCount 0 (Requirement 6.7)', () => {
+    const result = resolveAmbiguousMatch([a])
+    expect(result).toEqual({ resolved: a, alternativeCount: 0 })
+  })
+
+  it('prefers the same-folder candidate over shorter paths elsewhere (Requirement 6.1)', () => {
+    const result = resolveAmbiguousMatch([a, b, c], 'projects/archive/current.md')
+    expect(result.resolved).toBe(c)
+    expect(result.alternativeCount).toBe(2)
+  })
+
+  it('falls back to the shortest path when no same-folder candidate exists (Requirement 6.2)', () => {
+    const result = resolveAmbiguousMatch([a, b, c], 'somewhere-else/current.md')
+    expect(result.resolved).toBe(a)
+  })
+
+  it('falls back to alphabetical-by-path as a final deterministic tie-break (Requirement 6.3)', () => {
+    const x: FileCandidate = { name: 'note.md', path: 'zeta/note.md' }
+    const y: FileCandidate = { name: 'note.md', path: 'alpha/note.md' }
+    const result = resolveAmbiguousMatch([x, y])
+    expect(result.resolved).toBe(y)
+  })
+
+  it('is deterministic and repeatable for a fixed input (Property 5)', () => {
+    const first = resolveAmbiguousMatch([a, b, c], 'projects/current.md')
+    const second = resolveAmbiguousMatch([a, b, c], 'projects/current.md')
+    expect(first).toEqual(second)
+  })
+})
+
+describe('resolveWikilinkTargetWithAlternatives', () => {
+  it('reports zero alternatives for an unambiguous target', () => {
+    const result = resolveWikilinkTargetWithAlternatives('README.md', sampleTree)
+    expect(result).toEqual({ resolved: { name: 'README.md', path: 'README.md' }, alternativeCount: 0 })
+  })
+
+  it('reports alternativeCount for an ambiguous target', () => {
+    const result = resolveWikilinkTargetWithAlternatives('Notes.md', sampleTree)
+    expect(result?.alternativeCount).toBe(1)
   })
 })
 

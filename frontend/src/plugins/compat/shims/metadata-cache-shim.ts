@@ -4,12 +4,14 @@ import type {
   BlockCache,
   EventRef,
   IMetadataCacheShim,
+  LinkCache,
 } from '../types';
 import { parseBlocks } from '../block-cache';
 import { parseMetadata } from '../metadata-parser';
 import { EventSystem } from '../event-system';
 import type { DirectoryTree } from '../../../types';
 import { resolveWikilinkTarget, collectFilesSorted } from '../../link-resolver';
+import { recordGapRead, recordGapCall } from '../api-gap-registry';
 
 /**
  * MetadataCacheShim — Obsidian-compatible MetadataCache emulation.
@@ -192,6 +194,56 @@ export class MetadataCacheShim implements IMetadataCacheShim {
     return result;
   }
 
+  /**
+   * Returns all links in the vault that point at `file`, grouped by source path.
+   *
+   * Undocumented but stable internal API — the core Backlinks pane and several
+   * plugins (e.g. Dataview, Juggl) call it directly instead of deriving the
+   * same thing from `resolvedLinks`. Shape mirrors what those callers expect:
+   * a `.data` map plus a `.count()` convenience method.
+   */
+  getBacklinksForFile(file: TFile): { data: Map<string, LinkCache[]>; count(): number } {
+    const data = new Map<string, LinkCache[]>();
+
+    for (const [sourcePath, metadata] of this.cache) {
+      if (sourcePath === file.path) continue;
+      const links = metadata.links;
+      if (!links || links.length === 0) continue;
+
+      const matches: LinkCache[] = [];
+      for (const link of links) {
+        const cleanedLink = link.link.split('#')[0]?.trim() ?? '';
+        if (!cleanedLink) continue;
+        const resolvedPath = resolveWikilinkTarget(cleanedLink, this.tree);
+        if (resolvedPath === file.path) {
+          matches.push(link);
+        }
+      }
+
+      if (matches.length > 0) {
+        data.set(sourcePath, matches);
+      }
+    }
+
+    return {
+      data,
+      count(): number {
+        let total = 0;
+        for (const links of data.values()) total += links.length;
+        return total;
+      },
+    };
+  }
+
+  /**
+   * Whether `path` matches the user's configured "Excluded files" filters.
+   * Slatebase has no equivalent setting yet, so nothing is ever excluded —
+   * the same behavior Obsidian has by default with an empty filter list.
+   */
+  isUserIgnored(_path: string): boolean {
+    return false;
+  }
+
   // ─── Event methods ─────────────────────────────────────────────────────────
 
   /** Register an event listener. */
@@ -230,6 +282,23 @@ export class MetadataCacheShim implements IMetadataCacheShim {
     this.cache.set(file.path, metadata);
     this.events.trigger('changed', file, '', metadata);
     // Emit per-file resolve event (Obsidian fires this after resolvedLinks is updated for the file)
+    this.events.trigger('resolve', file);
+  }
+
+  /**
+   * Re-parses a file's saved content and replaces its cached metadata, emitting 'changed'.
+   *
+   * Called on save so `getFileCache().sections` (and frontmatter/tags/links) reflect the
+   * current document instead of the snapshot taken when the file was first opened. Without
+   * this, plugins that validate cursor/selection position against live section boundaries
+   * (e.g. Advanced Tables' `acceptsTableEdit`) keep using stale line numbers after any edit,
+   * and start rejecting positions that are visibly correct in the editor.
+   */
+  refreshFileCache(file: TFile, content: string): void {
+    this.contentStore.set(file.path, content);
+    const metadata = this.parseContentToMetadata(content);
+    this.cache.set(file.path, metadata);
+    this.events.trigger('changed', file, content, metadata);
     this.events.trigger('resolve', file);
   }
 
@@ -354,6 +423,80 @@ export class MetadataCacheShim implements IMetadataCacheShim {
       return { blocks: parseBlocks(content) };
     },
   };
+
+  /**
+   * Wraps a MetadataCacheShim instance with a Proxy for non-emulated API
+   * interception. Mirrors AppShim/WorkspaceShim/VaultShim's pattern.
+   */
+  static wrapWithProxy(instance: MetadataCacheShim): MetadataCacheShim & Record<string, unknown> {
+    const emulatedProperties = new Set<string | symbol>([
+      'getFileCache',
+      'populateFromContent',
+      'getCache',
+      'getFirstLinkpathDest',
+      'getBacklinksForFile',
+      'isUserIgnored',
+      'on',
+      'off',
+      'offref',
+      'trigger',
+      'updateFileCache',
+      'refreshFileCache',
+      'buildInitialCache',
+      'updateTree',
+      'getTags',
+      'getCachedFiles',
+      'fileToLinktext',
+      'resolvedLinks',
+      'unresolvedLinks',
+      'blockCache',
+    ]);
+
+    return new Proxy(instance, {
+      get(target: MetadataCacheShim, prop: string | symbol): unknown {
+        // `target` (not the Proxy) is passed as the receiver so getters run
+        // with `this` bound to the real instance — see WorkspaceShim.wrapWithProxy
+        // for why a proxy receiver here silently breaks getters that read
+        // un-allowlisted private fields.
+        if (emulatedProperties.has(prop)) {
+          const value = Reflect.get(target, prop, target);
+          if (typeof value === 'function') {
+            return value.bind(target);
+          }
+          return value;
+        }
+
+        if (typeof prop === 'symbol') {
+          return Reflect.get(target, prop, target);
+        }
+
+        // A callable `then` makes this object "thenable" — if the proxy is ever
+        // returned from an async function or otherwise flows through a Promise,
+        // the native Promise resolution algorithm calls it as `then(resolve,
+        // reject)` instead of just settling with the proxy, and since the no-op
+        // below never calls resolve/reject, that await hangs forever. Must stay
+        // a plain `undefined`, not fall into the generic callable-no-op path.
+        if (prop === 'then') {
+          return undefined;
+        }
+
+        if (recordGapRead('MetadataCache', prop)) {
+          console.warn(
+            `[MetadataCacheShim] Access to non-emulated metadataCache method/property "${prop}". ` +
+            `Slatebase returns a no-op function here, which is truthy — feature ` +
+            `detection like \`if (metadataCache.${prop})\` will take the wrong branch. ` +
+            `Inspect all gaps with window.__slatebasePluginApiGaps().`
+          );
+        }
+
+        return (...args: unknown[]) => {
+          recordGapCall('MetadataCache', prop);
+          void args;
+          return undefined;
+        };
+      },
+    }) as MetadataCacheShim & Record<string, unknown>;
+  }
 }
 
 /**

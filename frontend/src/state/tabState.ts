@@ -15,6 +15,8 @@ export interface TabEntry {
   filePath: string
   /** Filename portion of the path (last segment). */
   fileName: string
+  /** Obsidian icon name, for plugin-view tabs (`filePath` starting with `__view::`). Unset for regular file tabs. */
+  icon?: string
   mode: TabMode
   isBinary: boolean
   /** Last loaded/saved content (server truth). */
@@ -33,7 +35,7 @@ export interface TabState {
 
 /** Discriminated union of all tab actions. */
 export type TabAction =
-  | { type: 'OPEN_TAB'; payload: { vaultId: string; filePath: string; fileName: string } }
+  | { type: 'OPEN_TAB'; payload: { vaultId: string; filePath: string; fileName: string; icon?: string } }
   | { type: 'CLOSE_TAB'; payload: { tabId: string } }
   | { type: 'ACTIVATE_TAB'; payload: { tabId: string } }
   | { type: 'TOGGLE_MODE'; payload: { tabId: string } }
@@ -68,16 +70,17 @@ export function generateTabId(vaultId: string, filePath: string): string {
 export function tabReducer(state: TabState, action: TabAction): TabState {
   switch (action.type) {
     case 'OPEN_TAB': {
-      const { vaultId, filePath, fileName } = action.payload
+      const { vaultId, filePath, fileName, icon } = action.payload
       const tabId = generateTabId(vaultId, filePath)
 
-      // If tab already exists, activate it and update fileName
+      // If tab already exists, activate it and update fileName/icon
       const existingTab = state.tabs.find((t) => t.id === tabId)
       if (existingTab) {
+        const needsUpdate = existingTab.fileName !== fileName || existingTab.icon !== icon
         return {
           ...state,
-          tabs: existingTab.fileName !== fileName
-            ? state.tabs.map((t) => t.id === tabId ? { ...t, fileName } : t)
+          tabs: needsUpdate
+            ? state.tabs.map((t) => t.id === tabId ? { ...t, fileName, icon } : t)
             : state.tabs,
           activeTabId: tabId,
         }
@@ -89,6 +92,7 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
         vaultId,
         filePath,
         fileName,
+        icon,
         mode: 'view', // default, will be confirmed on TAB_CONTENT_LOADED
         isBinary: false,
         content: '',

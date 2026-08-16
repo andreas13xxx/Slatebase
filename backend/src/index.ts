@@ -49,6 +49,8 @@ import { LinkIndexService } from './link-index/index.js'
 import { createGraphRoutes } from './api/graphRoutes.js'
 import { InstalledPluginStore, PluginInstaller, PluginService } from './plugin/index.js'
 import { createPluginRoutes } from './api/pluginRoutes.js'
+import { SnippetStore } from './snippets/index.js'
+import { createSnippetRoutes } from './api/snippetRoutes.js'
 import { GitHubClient, PluginStoreCache, PluginStoreService, UpdateChecker } from './plugin-store/index.js'
 import type { IPluginStoreConfig } from './plugin-store/index.js'
 import { createPluginStoreRoutes, createVaultPluginStoreRoutes } from './api/pluginStoreRoutes.js'
@@ -296,6 +298,9 @@ const linkIndexMap = new Map<string, LinkIndexService>()
 const pluginStore = new InstalledPluginStore(serverConfig.dataDir)
 const pluginInstaller = new PluginInstaller(pluginStore)
 
+// 4e2. CSS Snippet Module
+const snippetStore = new SnippetStore(serverConfig.dataDir)
+
 // 4f. Plugin Store Module (Community Plugin Store)
 const pluginStoreConfig: IPluginStoreConfig = {
   ...(process.env['SLATEBASE_GITHUB_TOKEN'] ? { githubToken: process.env['SLATEBASE_GITHUB_TOKEN'] } : {}),
@@ -533,6 +538,15 @@ const pluginRoutes = createPluginRoutes({
 })
 app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)
 
+// Snippet route registration (auth middleware applies via /api/v1/* pattern)
+const snippetRoutes = createSnippetRoutes({
+  snippetStore,
+  accessControl: vaultAccessControl,
+  vaultRegistry,
+  logger,
+})
+app.route('/api/v1/vaults/:vaultId/snippets', snippetRoutes)
+
 // Plugin Store route registration (auth middleware applies via /api/v1/* pattern)
 const pluginStoreRoutes = createPluginStoreRoutes({ pluginStoreService, accessControl: vaultAccessControl, vaultRegistry, logger })
 const vaultPluginStoreRoutes = createVaultPluginStoreRoutes({ pluginStoreService, accessControl: vaultAccessControl, vaultRegistry, logger })
@@ -747,6 +761,12 @@ vaultController.setVaultDeletionHook({
     pluginStore.deleteAllForVault(vaultId).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error)
       logger.error('Plugin cleanup failed after vault deletion', { vaultId, error: message })
+    })
+
+    // Clean up CSS snippet data for the deleted vault (fire-and-forget)
+    snippetStore.deleteAllForVault(vaultId).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error)
+      logger.error('Snippet cleanup failed after vault deletion', { vaultId, error: message })
     })
 
     // Clean up link index for the deleted vault

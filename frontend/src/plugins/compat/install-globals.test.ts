@@ -82,9 +82,30 @@ describe('installObsidianGlobals', () => {
       'sleep',
       'nextFrame',
       'CodeMirror',
+      'CodeMirrorAdapter',
     ])('installs window.%s', (name) => {
       expect((window as unknown as Record<string, unknown>)[name]).toBeDefined()
     })
+  })
+
+  describe('CodeMirrorAdapter.Vim', () => {
+    // Regression: obsidian-outliner's "override Vim o/O behaviour" feature
+    // (src/features/VimOBehaviourOverride.ts) checks
+    // `window.CodeMirrorAdapter.Vim` and logs `console.error("Vim adapter not
+    // found")` when it's missing, instead of skipping the optional feature
+    // silently. Slatebase has no Vim keymap engine, so this is a no-op stub —
+    // same graceful-degradation approach as the other CodeMirrorAdapter/CodeMirror
+    // globals above, not a real Vim implementation.
+    it.each(['defineAction', 'handleEx', 'enterInsertMode', 'mapCommand'])(
+      'exposes a no-op %s so plugins probing for the Vim adapter do not error',
+      (method) => {
+        const vim = (
+          window as unknown as { CodeMirrorAdapter: { Vim: Record<string, unknown> } }
+        ).CodeMirrorAdapter.Vim
+        expect(vim[method]).toBeTypeOf('function')
+        expect(() => (vim[method] as (...args: unknown[]) => unknown)()).not.toThrow()
+      },
+    )
   })
 
   describe('setTimeout/setInterval carry plugin-execution-context across the macrotask boundary', () => {
@@ -205,6 +226,25 @@ describe('installObsidianGlobals', () => {
 
       expect(before['parseYaml']).toBe(parseYaml)
       expect(before['Plugin']).toBe(Plugin)
+    })
+  })
+
+  describe('HTMLElement.onClickEvent', () => {
+    // Regression: plugins that build UI purely with Obsidian's DOM extension
+    // methods (e.g. Advanced Tables' sidebar toolbar view) call this directly
+    // instead of addEventListener. Without it, the click wiring throws
+    // mid-render and the view is left empty — whatever was appended before
+    // the throw never reaches contentEl.
+    it('registers a click listener and returns the element for chaining', () => {
+      const el = document.createElement('div')
+      let clicked = false
+
+      const returned = (el as unknown as { onClickEvent: (cb: () => void) => HTMLElement })
+        .onClickEvent(() => { clicked = true })
+
+      expect(returned).toBe(el)
+      el.dispatchEvent(new MouseEvent('click'))
+      expect(clicked).toBe(true)
     })
   })
 })

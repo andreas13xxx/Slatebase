@@ -47,11 +47,12 @@ export function loadForwardLinks(
   dispatch: Dispatch<ContextPanelAction>,
   content: string,
   vaultTree: DirectoryTree | null,
+  sourcePath?: string,
 ): void {
   try {
     const wikilinks = extractWikilinks(content)
     const links: LinkEntry[] = wikilinks.map((link) => {
-      const resolved = resolveWikilinkTarget(link.target, vaultTree) !== null
+      const resolved = resolveWikilinkTarget(link.target, vaultTree, sourcePath) !== null
       const displayName = link.display || link.target
       return {
         target: link.target,

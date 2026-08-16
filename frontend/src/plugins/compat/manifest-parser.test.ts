@@ -330,8 +330,8 @@ describe('manifest-parser', () => {
   });
 
   describe('EMULATED_OBSIDIAN_VERSION', () => {
-    it('should be 1.8.7', () => {
-      expect(EMULATED_OBSIDIAN_VERSION).toBe('1.8.7');
+    it('should be 1.13.2', () => {
+      expect(EMULATED_OBSIDIAN_VERSION).toBe('1.13.2');
     });
   });
 });

@@ -3,6 +3,34 @@ import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { EditMode, type EditModeProps } from './EditMode'
+import { isEmbeddableFile, buildInternalLinkText } from '../utils/internalLink'
+
+describe('buildInternalLinkText', () => {
+  it('links a markdown file without its .md extension', () => {
+    expect(buildInternalLinkText('Note.md')).toBe('[[Note]]')
+  })
+
+  it('embeds image and pdf files with their extension kept', () => {
+    expect(buildInternalLinkText('photo.png')).toBe('![[photo.png]]')
+    expect(buildInternalLinkText('scan.PDF')).toBe('![[scan.PDF]]')
+  })
+
+  it('links non-markdown, non-embeddable files with their extension kept', () => {
+    expect(buildInternalLinkText('data.csv')).toBe('[[data.csv]]')
+  })
+})
+
+describe('isEmbeddableFile', () => {
+  it('recognizes common embeddable extensions case-insensitively', () => {
+    expect(isEmbeddableFile('image.PNG')).toBe(true)
+    expect(isEmbeddableFile('doc.pdf')).toBe(true)
+  })
+
+  it('rejects non-embeddable extensions', () => {
+    expect(isEmbeddableFile('note.md')).toBe(false)
+    expect(isEmbeddableFile('archive.zip')).toBe(false)
+  })
+})
 
 /** Helper to render EditMode with default props and optional overrides. */
 function renderEditMode(overrides: Partial<EditModeProps> = {}) {

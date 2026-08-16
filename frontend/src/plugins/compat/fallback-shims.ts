@@ -200,7 +200,7 @@ function fallbackGetFrontMatterInfo(c: string): FallbackFrontMatterInfo {
 }
 
 function fallbackGetLanguage(): string {
-  return (navigator.language || 'en').split('-')[0]!
+  return localStorage.getItem('language') || (navigator.language || 'en').split('-')[0]!
 }
 
 interface DebouncedFn {

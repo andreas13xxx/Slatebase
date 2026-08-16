@@ -5,7 +5,6 @@
  *
  * This file is imported by setting-tab.ts to register everything on window.obsidian.
  * It covers:
- * - Icon management (addIcon, setIcon, getIcon, getIconIds)
  * - Events class (base EventEmitter)
  * - Scope & Keymap (keyboard handling)
  * - DOM globals (createEl, createDiv, createSpan, createFragment)
@@ -14,10 +13,20 @@
  * - Extra UI component classes
  * - MarkdownPreviewRenderer
  *
+ * Icon management (`addIcon`/`removeIcon`/`getIcon`/`getIconIds`/`setIcon`) is
+ * NOT here — it lives in install-globals.ts (backed by lucide-icons.ts), which
+ * registers `window.obsidian` before this file's `registerObsidianApiExtensions()`
+ * runs. This file used to carry its own second implementation behind the same
+ * names, backed by its own separate custom-icon Map; every `if (!obs['x'])`
+ * guard below meant it silently never actually ran, since install-globals.ts's
+ * version always won the race — a second, inert copy of the icon registry that
+ * would only cause confusion (or worse, a live bug) if that registration order
+ * ever changed. Removed rather than fixed in place, since a single icon
+ * registry is the whole point.
+ *
  * @module obsidian-api-extensions
  */
 
-import { getBuiltInIconIds, getLucideIconElement, renderLucideIconInto } from './lucide-icons';
 import { errorOnce, warnNoOp } from './log';
 import type { BlockCache, CachedMetadata, HeadingCache, Pos } from './types';
 
@@ -58,8 +67,41 @@ import type { BlockCache, CachedMetadata, HeadingCache, Pos } from './types';
  *
  * `Scope`/`Keymap` (this file) went from inert stand-ins to an actually
  * dispatching hotkey stack as a prerequisite for View.scope to mean anything.
+ *
+ * 1.10.0–1.13.2: the official CHANGELOG.md stopped being updated after 1.7.2
+ * (confirmed by fetching obsidianmd/obsidian-api directly — no 1.8+ entries
+ * exist), so this pass used the per-symbol `@since X.Y.Z` JSDoc tags in the
+ * current `obsidian.d.ts` itself as the primary source. No `@since 1.9.x` tag
+ * exists anywhere — the plugin API surface jumped straight from 1.8.7 to
+ * 1.10.0. Implemented as part of this audit:
+ * - 1.11.0: SettingGroup.addComponent()/Setting.addComponent() (generic
+ *   BaseComponent slot; setting-tab.ts)
+ * - 1.11.4: SecretComponent (setting-tab.ts), SecretStorage + App.
+ *   secretStorage (obsidian-api-extensions.ts/app-shim.ts) — real Obsidian
+ *   encrypts this via the OS keychain, this persists to a vault-scoped
+ *   localStorage prefix instead (same simplification as loadLocalStorage)
+ * - 1.12.3: Vault.appendBinary()'s DataWriteOptions param (vault-shim.ts) —
+ *   accepted, not persisted, same as every other DataWriteOptions call
+ * - 1.13.0: ConfirmationModal/ConfirmationButton (install-globals.ts)
+ * - 1.13.1: DisplayValueComponent + Setting.addDisplayValue(), SliderComponent
+ *   .setDisplayFormat(), SearchComponent-shape .setStatus() on Setting.
+ *   addSearch()/SettingGroup.addSearch() (setting-tab.ts); displayValue/status
+ *   on declarative-settings SettingDefinitionPage rows
+ *   (declarative-settings-renderer.ts)
+ *
+ * Two areas from this range are deliberately typed but NOT functionally
+ * implemented — real, non-crashing no-ops, not silent gaps:
+ * - Bases (database/formula-query views, 1.10.0/1.10.2): no formula engine,
+ *   no `.base` file rendering. `Plugin.registerBasesView()` stores the
+ *   registration and warns; the ~20 Bases/Value classes exist only so a
+ *   plugin referencing them at module-eval time doesn't crash
+ *   (install-globals.ts). `compatibility-analyzer.ts` flags any plugin that
+ *   references them as 'partial' rather than silently 'full'.
+ * - Desktop CLI (`registerCliHandler`, 1.12.2): no CLI exists in a web app
+ *   for a handler to attach to; the call warns and is a no-op
+ *   (install-globals.ts), also flagged 'partial' by the analyzer.
  */
-export const OBSIDIAN_API_VERSION = '1.8.7';
+export const OBSIDIAN_API_VERSION = '1.13.2';
 
 /**
  * Compare two dotted version strings. Missing components count as 0, so
@@ -73,67 +115,6 @@ export function compareApiVersions(a: string, b: string): number {
     if (diff !== 0) return diff < 0 ? -1 : 1;
   }
   return 0;
-}
-
-// ─── Icon Registry ───────────────────────────────────────────────────────────────
-
-const customIcons: Map<string, string> = new Map();
-
-/**
- * Add a custom icon to the library.
- * Plugins use this to register SVG icons by ID.
- */
-export function addIcon(iconId: string, svgContent: string): void {
-  customIcons.set(iconId, svgContent);
-}
-
-/**
- * Remove a custom icon from the library.
- */
-export function removeIcon(iconId: string): void {
-  customIcons.delete(iconId);
-}
-
-/**
- * Get an SVG element for an icon ID.
- * Checks plugin-registered custom icons first, then the built-in Lucide set.
- */
-export function getIcon(iconId: string): SVGSVGElement | null {
-  const svg = customIcons.get(iconId);
-  if (svg) {
-    const container = document.createElement('div');
-    container.innerHTML = svg;
-    const svgEl = container.querySelector('svg');
-    // A registered custom icon whose content isn't a full <svg>...</svg> string
-    // (e.g. bare path data) has no element to return here. Obsidian guarantees
-    // getIcon() never returns null for an id getIconIds() listed (customIcons
-    // keys are included there) — fall back to the Lucide-resolved icon instead
-    // of breaking that contract.
-    if (svgEl) return svgEl;
-  }
-  return getLucideIconElement(iconId);
-}
-
-/**
- * Get the list of icon IDs `getIcon()`/`setIcon()` accept — plugin-registered
- * custom icons plus the built-in (Lucide) set, as Obsidian does.
- */
-export function getIconIds(): string[] {
-  return [...customIcons.keys(), ...getBuiltInIconIds()];
-}
-
-/**
- * Insert an SVG icon into an element.
- * Tries custom icons first, then Lucide icons via class name.
- */
-export function setIcon(parent: HTMLElement, iconId: string): void {
-  parent.innerHTML = '';
-  const svg = customIcons.get(iconId);
-  if (svg) {
-    parent.innerHTML = svg;
-    return;
-  }
-  renderLucideIconInto(parent, iconId);
 }
 
 // ─── Events Class ────────────────────────────────────────────────────────────────
@@ -173,6 +154,48 @@ export class Events {
 
   tryTrigger(_evt: unknown, _args: unknown[]): void {
     // No-op — internal Obsidian method
+  }
+}
+
+/**
+ * SecretStorage — Obsidian API since 1.11.4. Stores API keys/tokens outside a
+ * plugin's regular `data.json`. Exposed as `app.secretStorage`, and paired
+ * with `SecretComponent` (setting-tab.ts) for the settings-UI side.
+ *
+ * Real Obsidian encrypts this at rest via the OS keychain; Slatebase has no
+ * such facility in a browser, so this persists to `localStorage` under a
+ * vault-scoped prefix — the same simplification already applied to
+ * `App.loadLocalStorage`/`saveLocalStorage` (app-shim.ts). Not more secret
+ * than any other browser-local data.
+ */
+export class SecretStorage extends Events {
+  private prefix: string;
+
+  constructor(storagePrefix: string) {
+    super();
+    this.prefix = storagePrefix;
+  }
+
+  private key(id: string): string {
+    return `${this.prefix}${id}`;
+  }
+
+  setSecret(id: string, secret: string): void {
+    localStorage.setItem(this.key(id), secret);
+    this.trigger('change', id);
+  }
+
+  getSecret(id: string): string | null {
+    return localStorage.getItem(this.key(id));
+  }
+
+  listSecrets(): string[] {
+    const ids: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const storageKey = localStorage.key(i);
+      if (storageKey?.startsWith(this.prefix)) ids.push(storageKey.slice(this.prefix.length));
+    }
+    return ids;
   }
 }
 
@@ -309,12 +332,27 @@ export class Keymap {
 // ─── DOM Global Helpers ──────────────────────────────────────────────────────────
 
 /**
+ * Obsidian's `text` option and `setText()` both accept `string | DocumentFragment`
+ * (used for e.g. fuzzy-match highlighting in suggestion lists). Assigning a
+ * DocumentFragment straight to `.textContent` coerces it to the literal string
+ * "[object DocumentFragment]" instead of rendering its content.
+ */
+function applyElementText(el: Element, text: string | DocumentFragment): void {
+  if (text instanceof DocumentFragment) {
+    el.textContent = '';
+    el.appendChild(text);
+  } else {
+    el.textContent = text;
+  }
+}
+
+/**
  * Create an HTML element with optional configuration.
  * Obsidian exposes this as a global and on Node.prototype.
  */
 export function createEl<K extends keyof HTMLElementTagNameMap>(
   tag: K,
-  o?: { cls?: string | string[]; text?: string; attr?: Record<string, string | number | boolean | null>; parent?: Node; href?: string; type?: string; value?: string; placeholder?: string; prepend?: boolean; title?: string } | string,
+  o?: { cls?: string | string[]; text?: string | DocumentFragment; attr?: Record<string, string | number | boolean | null>; parent?: Node; href?: string; type?: string; value?: string; placeholder?: string; prepend?: boolean; title?: string } | string,
   callback?: (el: HTMLElementTagNameMap[K]) => void
 ): HTMLElementTagNameMap[K] {
   const el = document.createElement(tag);
@@ -325,7 +363,7 @@ export function createEl<K extends keyof HTMLElementTagNameMap>(
       if (Array.isArray(o.cls)) el.className = o.cls.join(' ');
       else el.className = o.cls;
     }
-    if (o.text) el.textContent = o.text;
+    if (o.text) applyElementText(el, o.text);
     if (o.title) el.title = o.title;
     if (o.attr) {
       for (const [k, v] of Object.entries(o.attr)) {
@@ -346,14 +384,14 @@ export function createEl<K extends keyof HTMLElementTagNameMap>(
 }
 
 export function createDiv(
-  o?: { cls?: string | string[]; text?: string; attr?: Record<string, string | number | boolean | null>; parent?: Node } | string,
+  o?: { cls?: string | string[]; text?: string | DocumentFragment; attr?: Record<string, string | number | boolean | null>; parent?: Node } | string,
   callback?: (el: HTMLDivElement) => void
 ): HTMLDivElement {
   return createEl('div', o, callback);
 }
 
 export function createSpan(
-  o?: { cls?: string | string[]; text?: string; attr?: Record<string, string | number | boolean | null>; parent?: Node } | string,
+  o?: { cls?: string | string[]; text?: string | DocumentFragment; attr?: Record<string, string | number | boolean | null>; parent?: Node } | string,
   callback?: (el: HTMLSpanElement) => void
 ): HTMLSpanElement {
   return createEl('span', o, callback);
@@ -1151,15 +1189,12 @@ export function registerObsidianApiExtensions(): void {
   const obs = window.obsidian as Record<string, unknown> | undefined;
   if (!obs) return;
 
-  // Icon functions
-  if (!obs['addIcon']) obs['addIcon'] = addIcon;
-  if (!obs['removeIcon']) obs['removeIcon'] = removeIcon;
-  if (!obs['getIcon']) obs['getIcon'] = getIcon;
-  if (!obs['getIconIds']) obs['getIconIds'] = getIconIds;
-  if (!obs['setIcon']) obs['setIcon'] = setIcon;
+  // Icon functions are registered by install-globals.ts, before this function
+  // runs — see the file header for why they don't live here.
 
   // Events class
   if (!obs['Events']) obs['Events'] = Events;
+  if (!obs['SecretStorage']) obs['SecretStorage'] = SecretStorage;
 
   // Scope & Keymap
   if (!obs['Scope']) obs['Scope'] = Scope;
@@ -1355,8 +1390,8 @@ function installDomExtensions(): void {
   // Element.setText / getText
   if (!('setText' in Element.prototype)) {
     Object.defineProperty(Element.prototype, 'setText', {
-      value: function (this: Element, val: string): void {
-        this.textContent = val;
+      value: function (this: Element, val: string | DocumentFragment): void {
+        applyElementText(this, val);
       },
       writable: true,
       configurable: true,
@@ -1429,6 +1464,22 @@ function installDomExtensions(): void {
     Object.defineProperty(HTMLElement.prototype, 'toggle', {
       value: function (this: HTMLElement, show: boolean): void {
         this.style.display = show ? '' : 'none';
+      },
+      writable: true,
+      configurable: true,
+    });
+  }
+
+  // HTMLElement.onClickEvent — shorthand for addEventListener('click', ...),
+  // returns `this` for chaining. Kept in sync with the copy in
+  // install-globals.ts (which registers first and so actually wins the
+  // guard below at runtime; this one exists for plugins loaded via a path
+  // that only calls registerObsidianApiExtensions()).
+  if (!('onClickEvent' in HTMLElement.prototype)) {
+    Object.defineProperty(HTMLElement.prototype, 'onClickEvent', {
+      value: function (this: HTMLElement, callback: (this: HTMLElement, ev: MouseEvent) => unknown, options?: boolean | AddEventListenerOptions): HTMLElement {
+        this.addEventListener('click', callback as EventListener, options);
+        return this;
       },
       writable: true,
       configurable: true,

@@ -47,6 +47,7 @@ Alle Dateien, die **auf** die aktuelle Datei verlinken:
 - Zeigt den Kontext (die Zeile, in der der Link steht)
 - Klick öffnet die verlinkende Datei
 - Besonders wertvoll, um zu entdecken, wo eine Notiz referenziert wird
+- Aktualisiert sich automatisch, wenn eine andere Datei im Hintergrund gespeichert, umbenannt oder gelöscht wird — auch wenn diese Änderung aus einem anderen Tab, Gerät oder von einem anderen Benutzer kommt. Kein manueller Wechsel des Dokuments nötig, um die Liste aufzufrischen
 
 ### Tags
 

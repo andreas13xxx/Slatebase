@@ -14,7 +14,8 @@ import { recordGapRead, recordGapCall } from '../api-gap-registry';
 import type { Command, ICommandRegistry } from '../command-registry';
 import { scopeForPlugin } from '../plugin-execution-context';
 import { warnNoOp } from '../log';
-import { Keymap, Scope } from '../obsidian-api-extensions';
+import { Keymap, Scope, SecretStorage } from '../obsidian-api-extensions';
+import { createEmbedRegistryShim } from '../embed-registry';
 
 /** The shape of Obsidian's internal `app.commands`. */
 export type CommandManagerShim = ReturnType<typeof createCommandManager>
@@ -174,6 +175,10 @@ export class AppShim implements IAppShim {
     enabledPlugins: Set<string>;
     manifests: Record<string, PluginManifestData>;
     getPlugin(id: string): PluginInstance | undefined;
+    loadManifests(): Promise<void>;
+    requestSaveConfig(): Promise<void>;
+    enablePluginAndSave(pluginId: string): Promise<void>;
+    disablePluginAndSave(pluginId: string): Promise<void>;
   };
 
   /**
@@ -223,8 +228,19 @@ export class AppShim implements IAppShim {
     metadataCache: IMetadataCacheShim;
     pluginId: string;
     commandRegistry?: ICommandRegistry;
+    pluginManager?: {
+      /** Re-fetch manifest data for installed plugins from the backend. */
+      loadManifests(): Promise<void>;
+      /** Wait until any in-flight plugin registry writes have been persisted. */
+      requestSaveConfig(): Promise<void>;
+      /** Enable (loading it first if needed) and persist the plugin's enabled state. */
+      enablePluginAndSave(pluginId: string): Promise<void>;
+      /** Disable and persist the plugin's disabled state. */
+      disablePluginAndSave(pluginId: string): Promise<void>;
+    };
   }) {
     this.vault = options.vault;
+    this.secretStorage = new SecretStorage(`slatebase-vault-${options.vault.getName()}-secret:`);
     // Scoped per-plugin: `on`/`onLayoutReady` bind options.pluginId into a
     // closure so any callback registered through this plugin's `app.workspace`
     // (and its deferred/event-triggered invocations) is tagged correctly for
@@ -233,7 +249,7 @@ export class AppShim implements IAppShim {
     // "currently executing plugin" tracking alone doesn't survive `await`.
     this.workspace = scopeForPlugin(options.workspace, options.pluginId, ['on', 'onLayoutReady']);
     this.metadataCache = options.metadataCache;
-    this.fileManager = new FileManagerShim(options.vault);
+    this.fileManager = FileManagerShim.wrapWithProxy(new FileManagerShim(options.vault));
     this.pluginId = options.pluginId;
     // Built here rather than as field initializers: those run before the
     // constructor body, so they would capture commandRegistry as undefined.
@@ -273,6 +289,34 @@ export class AppShim implements IAppShim {
       manifests: this.manifestsMap,
       getPlugin: (id: string): PluginInstance | undefined => {
         return this.pluginsMap[id];
+      },
+      loadManifests: async (): Promise<void> => {
+        if (options.pluginManager?.loadManifests) {
+          await options.pluginManager.loadManifests();
+        } else {
+          warnNoOp(this.pluginId, 'plugins.loadManifests');
+        }
+      },
+      requestSaveConfig: async (): Promise<void> => {
+        if (options.pluginManager?.requestSaveConfig) {
+          await options.pluginManager.requestSaveConfig();
+        } else {
+          warnNoOp(this.pluginId, 'plugins.requestSaveConfig');
+        }
+      },
+      enablePluginAndSave: async (pluginId: string): Promise<void> => {
+        if (options.pluginManager?.enablePluginAndSave) {
+          await options.pluginManager.enablePluginAndSave(pluginId);
+        } else {
+          warnNoOp(this.pluginId, 'plugins.enablePluginAndSave');
+        }
+      },
+      disablePluginAndSave: async (pluginId: string): Promise<void> => {
+        if (options.pluginManager?.disablePluginAndSave) {
+          await options.pluginManager.disablePluginAndSave(pluginId);
+        } else {
+          warnNoOp(this.pluginId, 'plugins.disablePluginAndSave');
+        }
       },
     };
 
@@ -322,110 +366,18 @@ export class AppShim implements IAppShim {
   }
 
   /**
-   * embedRegistry — Obsidian-internal API for creating embedded views.
-   * Kanban uses it to extract the MarkdownEditor class from the prototype chain.
-   * The FakeEditor creates a real CodeMirror 6 EditorView so Kanban's inline
-   * card editors can work (they call .set(), .cm.dispatch(), etc.).
+   * embedRegistry — Obsidian-internal API for rendering custom embed types
+   * inline for `![[file.ext]]` (undocumented; not in the public
+   * obsidian.d.ts — see ../embed-registry.ts for the full implementation,
+   * the real-plugin sources it was cross-checked against, and the
+   * `embedByExtension.md` default it seeds for Kanban's card-editor hack).
+   * `window.app.embedRegistry` (set up in plugin-context.ts/install-globals.ts)
+   * shares the same underlying registrations as `this.app.embedRegistry` here
+   * — both are built by `createEmbedRegistryShim()` over one module-level
+   * `embedByExtension` record, so a plugin's `registerExtension()` call is
+   * visible however a later reader reaches the registry.
    */
-  readonly embedRegistry = {
-    embedByExtension: {
-      md: () => {
-        const FakeEditor = class {
-          cm: unknown
-          containerEl: HTMLElement
-          owner: unknown
-          // Real Obsidian's MarkdownEditor exposes `win` (the window owning its DOM,
-          // for popout-window support) — Kanban's card editor reads `this.win.setTimeout`
-          // directly in its own focus handling. Without it, focusing a card editor throws
-          // "can't access property setTimeout, this.win is undefined".
-          win: Window
-          constructor(...args: unknown[]) {
-            // Real Obsidian's MarkdownEditor is constructed as (app, containerEl, config) —
-            // Kanban's subclass forwards all of its own (app, containerEl, owner) args via
-            // `super(...arguments)`, so the container is the second argument, not the first.
-            // Scan for whichever argument is actually an element instead of assuming position,
-            // since other plugins reusing this same API may call it with a different arity.
-            const containerEl = args.find((a): a is HTMLElement => a instanceof HTMLElement)
-            this.containerEl = containerEl ?? document.createElement('div')
-            this.owner = args[2]
-            this.win = this.containerEl.ownerDocument?.defaultView ?? window
-            // Lazy-init CM6: dynamically import to avoid top-level dep issues
-            this.cm = null
-            try {
-              const cmView = (globalThis as unknown as { __codemirrorView?: Record<string, unknown> }).__codemirrorView
-              const cmState = (globalThis as unknown as { __codemirrorState?: { EditorState: unknown } }).__codemirrorState
-              if (cmView && cmState) {
-                const EV = cmView.EditorView as (new (config: unknown) => { state: { doc: { length: number; toString(): string } }; dispatch(tr: unknown): void; destroy(): void; focus(): void }) & { theme(spec: Record<string, unknown>): unknown }
-                const ES = cmState.EditorState as { create(config: unknown): unknown }
-                // Real Obsidian's MarkdownEditor calls `this.buildLocalExtensions()` here to
-                // assemble the CM6 extension set — it's a protected hook subclasses override
-                // to add their own keymaps/handlers. Kanban's subclass (see the `y extends
-                // c.plugin.MarkdownEditor` wrapper around this class) overrides it to push an
-                // Enter/Escape keymap that submits the card/list instead of inserting a
-                // newline, plus a placeholder and focus/blur handlers. Building the state
-                // directly here instead of going through this method — as an earlier version
-                // of this shim did — silently drops every one of those overrides: Kanban's
-                // keymap never got registered, so Enter fell through to CM6's native
-                // newline-insertion instead of calling Kanban's submit handler.
-                const extensions = this.buildLocalExtensions()
-                const state = ES.create({ doc: '', extensions })
-                this.cm = new EV({ state, parent: this.containerEl })
-              }
-            } catch { /* CM6 not available — cm stays null */ }
-          }
-          buildLocalExtensions(): unknown[] {
-            const cmView = (globalThis as unknown as { __codemirrorView?: Record<string, unknown> }).__codemirrorView
-            if (!cmView) return []
-            const EV = cmView.EditorView as { theme(spec: Record<string, unknown>): unknown }
-            // CM6 only draws a visible cursor via the `drawSelection` extension — without it
-            // the editor is fully functional (focus, typing, selection) but renders no caret
-            // at all, which is invisible rather than "subtly wrong" and easy to miss in a
-            // quick look. Its default cursor color also only adapts to `.cm-dark`/`.cm-light`
-            // classes this bare editor never gets, so it'd paint a black caret that's
-            // invisible on Slatebase's dark theme even once drawn — hence the explicit
-            // theme() pinning caret/cursor color to the app's text color variable instead,
-            // which tracks light/dark automatically.
-            const drawSelection = cmView.drawSelection as (() => unknown) | undefined
-            return [
-              EV.theme({
-                '.cm-content': { caretColor: 'var(--text-primary)' },
-                '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--text-primary)' },
-              }),
-              ...(typeof drawSelection === 'function' ? [drawSelection()] : []),
-            ]
-          }
-          set(value: string) {
-            const cm = this.cm as { state: { doc: { length: number } }; dispatch(tr: unknown): void } | null
-            if (cm) {
-              cm.dispatch({ changes: { from: 0, to: cm.state.doc.length, insert: value } })
-            }
-          }
-          get(): string {
-            const cm = this.cm as { state: { doc: { toString(): string } } } | null
-            return cm ? cm.state.doc.toString() : ''
-          }
-          destroy() {
-            const cm = this.cm as { destroy(): void } | null
-            if (cm) cm.destroy()
-          }
-          getDoc() { return { getValue: () => this.get() } }
-          clear() { this.set('') }
-          focus() {
-            const cm = this.cm as { focus(): void } | null
-            if (cm) cm.focus()
-          }
-        }
-        const editMode = Object.create(Object.create(FakeEditor.prototype))
-        return {
-          load: () => {},
-          unload: () => {},
-          editable: false,
-          showEditor: () => {},
-          editMode,
-        }
-      },
-    },
-  }
+  readonly embedRegistry = createEmbedRegistryShim()
 
   /**
    * commands — Obsidian-internal command manager.
@@ -520,13 +472,15 @@ export class AppShim implements IAppShim {
     return value || '#7c3aed'
   }
 
-  /** SecretStorage stub — stores secrets in localStorage (not truly secure, but functional). */
-  readonly secretStorage = {
-    _secrets: new Map<string, string>(),
-    setSecret(id: string, secret: string): void { this._secrets.set(id, secret) },
-    getSecret(id: string): string | null { return this._secrets.get(id) ?? null },
-    listSecrets(): string[] { return [...this._secrets.keys()] },
-  }
+  /**
+   * SecretStorage (Obsidian API since 1.11.4) — vault-scoped, localStorage-backed.
+   * Same simplification as loadLocalStorage/saveLocalStorage below: no OS
+   * keychain in a browser, so "secret" means "not in data.json", not encrypted.
+   * Assigned in the constructor, not here — see the field-initializer-ordering
+   * note above `this.commands = createCommandManager(...)`: this needs
+   * `this.vault`, which isn't set yet when field initializers run.
+   */
+  readonly secretStorage: SecretStorage
 
   /**
    * Retrieve value from localStorage for this vault (Obsidian API since 1.8.7).
@@ -608,6 +562,12 @@ export class AppShim implements IAppShim {
     metadataCache: IMetadataCacheShim;
     pluginId: string;
     commandRegistry?: ICommandRegistry;
+    pluginManager?: {
+      loadManifests(): Promise<void>;
+      requestSaveConfig(): Promise<void>;
+      enablePluginAndSave(pluginId: string): Promise<void>;
+      disablePluginAndSave(pluginId: string): Promise<void>;
+    };
   }): AppShim & Record<string, unknown> {
     const instance = new AppShim(options);
     return AppShim.wrapWithProxy(instance);
@@ -649,10 +609,14 @@ export class AppShim implements IAppShim {
     ]);
 
     return new Proxy(instance, {
-      get(target: AppShim, prop: string | symbol, receiver: unknown): unknown {
-        // Allow access to emulated properties directly
+      get(target: AppShim, prop: string | symbol): unknown {
+        // Allow access to emulated properties directly. `target` (not the
+        // Proxy) is passed as the receiver so getters run with `this` bound
+        // to the real instance — see WorkspaceShim.wrapWithProxy for why a
+        // proxy receiver here silently breaks getters that read un-allowlisted
+        // private fields.
         if (emulatedProperties.has(prop)) {
-          const value = Reflect.get(target, prop, receiver);
+          const value = Reflect.get(target, prop, target);
           if (typeof value === 'function') {
             return value.bind(target);
           }
@@ -661,7 +625,18 @@ export class AppShim implements IAppShim {
 
         // Allow symbol properties (iterator, toStringTag, etc.) and standard object properties
         if (typeof prop === 'symbol') {
-          return Reflect.get(target, prop, receiver);
+          return Reflect.get(target, prop, target);
+        }
+
+        // A callable `then` makes this object "thenable" — if the proxy is ever
+        // returned from an async function or otherwise flows through a Promise,
+        // the native Promise resolution algorithm sees a function here and calls
+        // it as `then(resolve, reject)` instead of just settling with the proxy.
+        // The no-op below never calls resolve/reject, so that await hangs
+        // forever. Must stay a plain `undefined`, not fall into the generic
+        // callable-no-op path below.
+        if (prop === 'then') {
+          return undefined;
         }
 
         // Non-emulated property: record the gap and warn once per property name.

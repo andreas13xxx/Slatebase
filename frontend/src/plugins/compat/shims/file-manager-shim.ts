@@ -13,6 +13,7 @@
 
 import type { DataWriteOptions, IVaultShim, TFile, TFolder } from '../types'
 import { warnNoOp } from '../log'
+import { recordGapRead, recordGapCall } from '../api-gap-registry'
 
 /**
  * IFileManagerShim — Obsidian FileManager interface subset.
@@ -28,8 +29,10 @@ export interface IFileManagerShim {
   getNewFileParent(sourcePath: string): TFolder;
   /** Create a new markdown file with the given name in the given folder. */
   createNewMarkdownFile(folder: TFolder, name: string): Promise<TFile>;
-  /** Prompt user for deletion and delete the file (moves to trash). */
-  promptForFileDeletion(file: TFile): Promise<void>;
+  /** Create a new file of any extension, with optional initial content, in the given folder. */
+  createNewFile(folder: TFolder, name: string, extension: string, data?: string): Promise<TFile>;
+  /** Prompt user for deletion and delete the file (moves to trash). Resolves to whether it was deleted. */
+  promptForDeletion(file: TFile): Promise<boolean>;
   /** Move a file to trash (soft-delete). Used by LiveSync and other plugins. */
   trashFile(file: TFile): Promise<void>;
   /** Get an available path for an attachment file. */
@@ -165,27 +168,47 @@ export class FileManagerShim implements IFileManagerShim {
 
   /**
    * Create a new markdown file with the given name in the specified folder.
-   *
-   * Generates a unique filename if a file with the same name already exists
-   * by appending a number suffix (e.g. "Note 1.md", "Note 2.md").
+   * Delegates to createNewFile() with the 'md' extension.
    *
    * @param folder - Target folder
    * @param name - Desired file name (without .md extension)
    * @returns The created TFile
    */
   async createNewMarkdownFile(folder: TFolder, name: string): Promise<TFile> {
-    const baseName = name.endsWith('.md') ? name.slice(0, -3) : name;
-    let filePath = folder.path ? `${folder.path}/${baseName}.md` : `${baseName}.md`;
+    return this.createNewFile(folder, name, 'md');
+  }
+
+  /**
+   * Create a new file of any extension, with optional initial content, in the
+   * specified folder.
+   *
+   * Generates a unique filename if a file with the same name already exists
+   * by appending a number suffix (e.g. "Drawing 1.canvas", "Drawing 2.canvas").
+   *
+   * Undocumented but stable internal API — createNewMarkdownFile is Obsidian's
+   * thin public wrapper around this for the 'md' case; plugins that create
+   * non-markdown files (canvases, Excalidraw drawings) call it directly.
+   *
+   * @param folder - Target folder
+   * @param name - Desired file name (without extension)
+   * @param extension - File extension, with or without a leading dot
+   * @param data - Optional initial file content
+   * @returns The created TFile
+   */
+  async createNewFile(folder: TFolder, name: string, extension: string, data?: string): Promise<TFile> {
+    const ext = extension.startsWith('.') ? extension.slice(1) : extension;
+    const baseName = name.endsWith(`.${ext}`) ? name.slice(0, -(ext.length + 1)) : name;
+    let filePath = folder.path ? `${folder.path}/${baseName}.${ext}` : `${baseName}.${ext}`;
 
     // Check if file already exists and generate unique name
     let attempt = 0;
     while (this.vault.getAbstractFileByPath(filePath) !== null) {
       attempt++;
       const uniqueName = `${baseName} ${attempt}`;
-      filePath = folder.path ? `${folder.path}/${uniqueName}.md` : `${uniqueName}.md`;
+      filePath = folder.path ? `${folder.path}/${uniqueName}.${ext}` : `${uniqueName}.${ext}`;
     }
 
-    return await this.vault.create(filePath, '');
+    return await this.vault.create(filePath, data ?? '');
   }
 
   /**
@@ -199,11 +222,12 @@ export class FileManagerShim implements IFileManagerShim {
    *
    * @param file - The file to delete
    */
-  async promptForFileDeletion(file: TFile): Promise<void> {
+  async promptForDeletion(file: TFile): Promise<boolean> {
     if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
-      if (!window.confirm(`"${file.name}" löschen?`)) return;
+      if (!window.confirm(`"${file.name}" löschen?`)) return false;
     }
     await this.vault.delete(file);
+    return true;
   }
 
   /**
@@ -229,6 +253,70 @@ export class FileManagerShim implements IFileManagerShim {
   async getAvailablePathForAttachment(filename: string, sourcePath?: string): Promise<string> {
     return (this.vault as unknown as { getAvailablePathForAttachments: (f: string, s?: string) => string })
       .getAvailablePathForAttachments(filename, sourcePath);
+  }
+
+  /**
+   * Wraps a FileManagerShim instance with a Proxy for non-emulated API
+   * interception. Mirrors AppShim/WorkspaceShim/VaultShim's pattern.
+   */
+  static wrapWithProxy(instance: FileManagerShim): FileManagerShim & Record<string, unknown> {
+    const emulatedProperties = new Set<string | symbol>([
+      'renameFile',
+      'processFrontMatter',
+      'generateMarkdownLink',
+      'getNewFileParent',
+      'createNewMarkdownFile',
+      'createNewFile',
+      'promptForDeletion',
+      'trashFile',
+      'promptForFileRename',
+      'getAvailablePathForAttachment',
+    ]);
+
+    return new Proxy(instance, {
+      get(target: FileManagerShim, prop: string | symbol): unknown {
+        // `target` (not the Proxy) is passed as the receiver so getters run
+        // with `this` bound to the real instance — see WorkspaceShim.wrapWithProxy
+        // for why a proxy receiver here silently breaks getters that read
+        // un-allowlisted private fields.
+        if (emulatedProperties.has(prop)) {
+          const value = Reflect.get(target, prop, target);
+          if (typeof value === 'function') {
+            return value.bind(target);
+          }
+          return value;
+        }
+
+        if (typeof prop === 'symbol') {
+          return Reflect.get(target, prop, target);
+        }
+
+        // A callable `then` makes this object "thenable" — if the proxy is ever
+        // returned from an async function or otherwise flows through a Promise,
+        // the native Promise resolution algorithm calls it as `then(resolve,
+        // reject)` instead of just settling with the proxy, and since the no-op
+        // below never calls resolve/reject, that await hangs forever. Must stay
+        // a plain `undefined`, not fall into the generic callable-no-op path.
+        if (prop === 'then') {
+          return undefined;
+        }
+
+        if (recordGapRead('FileManager', prop)) {
+          console.warn(
+            `[FileManagerShim] Access to non-emulated fileManager method/property "${prop}". ` +
+            `Slatebase returns a no-op function here, which is truthy — feature ` +
+            `detection like \`if (fileManager.${prop})\` will take the wrong branch. ` +
+            `Inspect all gaps with window.__slatebasePluginApiGaps().`
+          );
+        }
+
+        return (...args: unknown[]) => {
+          recordGapCall('FileManager', prop);
+          void args;
+          return undefined;
+        };
+      },
+    }) as FileManagerShim & Record<string, unknown>;
   }
 }
 

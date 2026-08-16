@@ -31,6 +31,11 @@ Keybindings can be configured for these actions:
 | Create link | `Ctrl+K` |
 | Open daily note | — |
 | Toggle sidebar | — |
+| Open Quick Switcher | `Ctrl+O` |
+| Navigate back | `Alt+←` |
+| Navigate forward | `Alt+→` |
+| Next tab | `Ctrl+Shift+]` |
+| Previous tab | `Ctrl+Shift+[` |
 | And more... | |
 
 ---
@@ -80,7 +85,7 @@ To reset all shortcuts:
 > [!tip] Shortcut Design
 > - Keep frequently used actions on easy-to-reach combinations
 > - Use consistent modifiers (e.g., all navigation with `Ctrl+Shift+`)
-> - Avoid conflicts with browser shortcuts (`Ctrl+W`, `Ctrl+T`, etc.)
+> - Avoid conflicts with browser shortcuts (`Ctrl+W`, `Ctrl+T`, `Ctrl+Tab`, etc.) — browsers intercept these before the page ever sees them, so remapping a command to one silently does nothing
 > - Document your custom shortcuts somewhere for reference
 
 ---

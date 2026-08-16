@@ -1,6 +1,8 @@
 # Implementierungsplan — Slatebase Ausstehende Features
 
-**Stand:** 10.08.2026 (v0.28.0 + ungereleaster Commit `e3536a6`). Security Hardening und Accessibility Audit (Runde 1) sind mit dem letzten Pull abgeschlossen — beide Specs vollständig (24/24 bzw. 22/22 Tasks). Kernfeatures sind umgesetzt. Es verbleiben 14 priorisierte offene Spec-Einheiten (decken ~24 Einzelfeatures ab, da mehrere thematisch verwandte Features gebündelt wurden). Zwei davon — **Workspaces/Split-Panes** und **Bases** — waren zuvor als "kein Äquivalent geplant" eingestuft und sind jetzt auf ausdrücklichen Nutzerwunsch in die aktive Roadmap aufgenommen.
+**Stand:** 14.08.2026. Security Hardening, Accessibility Audit (Runde 1), **Navigation & Verknüpfungs-Politur** und jetzt auch **UI-Politur (Bookmarks/Statusleiste/CSS-Snippets)** sind abgeschlossen. Kernfeatures sind umgesetzt. Es verbleiben 13 priorisierte offene Spec-Einheiten (decken ~23 Einzelfeatures ab, da mehrere thematisch verwandte Features gebündelt wurden). Zwei davon — **Workspaces/Split-Panes** und **Bases** — waren zuvor als "kein Äquivalent geplant" eingestuft und sind jetzt auf ausdrücklichen Nutzerwunsch in die aktive Roadmap aufgenommen.
+
+**Scope-Korrektur Navigation & Verknüpfungs-Politur:** Die umgesetzte Spec (`.kiro/specs/navigation-link-polish/`) deckt Quick Switcher (wie ursprünglich hier geplant) sowie zusätzlich Navigationsverlauf, Tab-Tastaturkürzel, Live-Backlinks, deterministische Link-Auflösung, Explorer-Auto-Reveal und eine Breadcrumb-Leiste ab — ein sinnvollerer, in sich geschlossener Scope als ursprünglich hier skizziert. Die drei übrigen ursprünglich hier gelisteten Punkte (Lokaler Graph, Ungelinkte Erwähnungen, Automatische Link-Aktualisierung beim Umbenennen/Verschieben) wurden **nicht** mitgeliefert und sind unten als eigener Prio 15 „Graph-Politur & Link-Integrität" weitergeführt.
 
 **Strategie:** Hybrid — Features mit bestehender Spec direkt umsetzen, komplexe Features erst vollständig spezifizieren. Kleinere, thematisch verwandte Features werden zu gemeinsamen Specs gebündelt statt einzeln spezifiziert (siehe Track A und H).
 
@@ -11,8 +13,8 @@
 | Prio | Feature | Track | Aufwand | Status |
 |------|---------|-------|---------|--------|
 | 1 | PDF-Export / Drucken | A | ~6–10h | Geplant (keine Spec) |
-| 2 | Navigation & Verknüpfungs-Politur | A | ~25–35h | Geplant (keine Spec) |
-| 3 | UI-Politur (Bookmarks/Statusleiste/CSS-Snippets) | A | ~12–18h | Geplant (keine Spec) |
+| ~~2~~ | ~~Navigation & Verknüpfungs-Politur~~ | A | ~~25–35h~~ | ✅ Erledigt (Teil-Scope, siehe unten) |
+| ~~3~~ | ~~UI-Politur (Bookmarks/Statusleiste/CSS-Snippets)~~ | A | ~~12–18h~~ | ✅ Erledigt (siehe unten) |
 | 4 | Editor-Erweiterungen (Mathe & Medien) | A | ~15–20h | Geplant (keine Spec) |
 | 5 | Obsidian Themes | B | ~15–20h | Geplant (keine Spec) |
 | 6 | Public Sharing | C | ~15–20h | Geplant (keine Spec) |
@@ -24,13 +26,14 @@
 | 12 | Fremdformat-Importer | I | ~20–30h | Geplant (keine Spec) |
 | 13 | Semantische Suche / AI-Embeddings | E | ~38–58h | Geplant (keine Spec) |
 | 14 | Collaborative Editing | D | ~68–88h | Nur Requirements |
+| 15 | Graph-Politur & Link-Integrität | A | ~15–24h | Geplant (keine Spec) — Rest-Scope aus Prio 2 |
 
 ---
 
 ## Abhängigkeiten
 
 ```
-Track A (Politur):     PDF-Export → Navigation & Verknüpfungs-Politur → UI-Politur → Editor-Erweiterungen (Mathe/Medien)
+Track A (Politur):     PDF-Export → Editor-Erweiterungen (Mathe/Medien); Navigation & Verknüpfungs-Politur ✅ → Graph-Politur & Link-Integrität; UI-Politur ✅ (unabhängig erledigt)
 Track B (Plugins):     Community Plugin Store ✅ → Obsidian Themes → Server-Side Plugins
 Track C (Sharing):     Public Sharing (unabhängig)
 Track D (Editor):      Collaborative Editing (braucht Realtime + CM6)
@@ -89,6 +92,44 @@ WCAG-2.1-AA-Audit mit Ist-Zustands-Analyse und gezielten Fixes:
 
 ---
 
+## Erledigt — Navigation & Verknüpfungs-Politur (Track A) ✅
+
+**Spec:** `.kiro/specs/navigation-link-polish/` — alle 8 Requirement-Bereiche umgesetzt (2026-08-14).
+
+Verdrahtet mehrere bestehende No-Op-Befehle mit echtem Verhalten und schließt Aktualisierungs-/Determinismus-Lücken in bereits vorhandenen Navigations-Features:
+
+- **Navigationsverlauf**: Browser-artiges Zurück/Vor (`app:go-back`/`app:go-forward` waren literale No-Ops) — Toolbar-Buttons + `Alt+←/→`. Zentral aufgezeichnet über einen `useEffect`, der `tabState.activeTabId` beobachtet, statt einen Aufruf durch jeden einzelnen Navigations-Auslöser zu fädeln.
+- **Schnellwechsler** (Strg+O): `switcher:open` war ebenfalls No-Op — jetzt echter Fuzzy-Datei-Finder, strukturell an die bestehende Befehlspalette angelehnt, nutzt für „Zuletzt geöffnet" den bereits vorhandenen `recentFilesStore`.
+- **Tab-Navigation per Tastatur**: `Strg+Tab`/`Strg+Umschalt+Tab` für den bereits funktionierenden, aber ungebundenen `workspace:next-tab`/`previous-tab`.
+- **Live-Backlinks**: Links-View im Context Panel hört jetzt auf den bestehenden Realtime-Vault-Change-Bus (debounced 1s) statt nur bei Dokumentwechsel zu laden.
+- **Deterministische Link-Auflösung**: `resolveWikilinkTarget()` löst mehrdeutige Dateinamen jetzt über gleicher Ordner → kürzester Pfad → alphabetisch auf, statt über einen willkürlichen Tiefensuche-Artefakt; Tooltip zeigt Mehrdeutigkeit an. Dabei eine zweite, unabhängige Duplikat-Implementierung derselben Funktion in `ViewMode.tsx` gefunden und entfernt (siehe `lessons-learned.md` #84).
+- **Explorer-Auto-Reveal**: Toggle „Aktive Datei im Explorer verfolgen" in den Vault-Einstellungen.
+- **Breadcrumb-Leiste**: klickbarer Ordnerpfad der aktiven Datei oberhalb des Editors.
+
+**Scope-Korrektur:** Von den vier ursprünglich hier geplanten Punkten wurde nur der Quick Switcher wie vorgesehen umgesetzt — die übrigen drei (Lokaler Graph, Ungelinkte Erwähnungen, Automatische Link-Aktualisierung beim Umbenennen/Verschieben) waren nicht Teil der tatsächlich geschriebenen Spec und sind als eigener Prio 15 „Graph-Politur & Link-Integrität" weitergeführt. Im Gegenzug deckt die umgesetzte Spec vier Bereiche ab, die hier ursprünglich gar nicht geplant waren (Navigationsverlauf, Tab-Tastaturkürzel, Live-Backlinks, Explorer-Auto-Reveal, Breadcrumb).
+
+**Zwei echte Bugs während der Umsetzung gefunden und behoben** (nicht nur Verschönerung): ein React-Ref-Mutation-während-Render-Fehler (von der strengeren `react-hooks/refs`-Lint-Regel gefangen) und ein Absturz beim App-Start, weil `PluginProvider` innerhalb von `AppContent`s eigenem Render-Baum sitzt statt darüber (`app.test.tsx` deckte das sofort auf). Details in `lessons-learned.md` #80–86.
+
+---
+
+## Erledigt — UI-Politur: Bookmarks, Statusleiste, CSS-Snippets (Track A) ✅
+
+**Spec:** `.kiro/specs/ui-polish-bookmarks-status-css-snippets/` — alle Requirement-Bereiche umgesetzt (2026-08-14).
+
+Drei additive Verbesserungen an bestehenden bzw. eng verwandten Features:
+
+- **Bookmarks vervollständigt**: Die vier zuvor als No-Op registrierten Commands `bookmarks:bookmark-current-heading`/`-current-search`/`-current-section`/`-all-tabs` lösen jetzt echtes Verhalten aus (Überschriften-, Block-, Such-Lesezeichen; alle offenen Tabs bookmarken). Zusätzlich, über den ursprünglichen Scope hinaus: manuelles Neuordnen der Favoriten per Drag & Drop, Kontextmenü (Entfernen/Im Explorer zeigen/Umbenennen — wiederverwendet die bestehende generische `ContextMenu.tsx` statt einer neuen Komponente) und eigene Anzeigenamen (Labels).
+- **Statusleiste erweitert**: Wort-/Zeichenanzahl (inkl. Selektion), Cursor-Position mit "Gehe zu Zeile"-Popover, Vault-Name — jedes Item einzeln in Settings → Darstellung umschaltbar. Flicker-Fix für Plugin-Items: Diffing (nur hinzugefügte/entfernte Elemente anfassen) statt vollständigem `innerHTML = ''` + Neuaufbau bei jeder Änderung.
+- **CSS-Snippets** (komplett neues Feature): nutzereigenes CSS pro Vault, verwaltet in Settings → Darstellung (Upload/Erstellen/Bearbeiten/Aktivieren/Löschen). Backend-Store analog zu `plugin/installed-plugin-store.ts` (`data/snippets/<vaultId>/<snippetId>.css` + `_registry.json`, atomare Writes), automatische Anwendung beim Vault-Öffnen/-Wechsel.
+
+**Zwei bewusste Architektur-Abweichungen vom ursprünglichen Kurz-Scope:**
+1. CSS-Snippets nutzen **nicht** den bestehenden Plugin-CSS-Injection-Mechanismus (`css-injector.ts`) — der scoped zwingend auf `[data-plugin-id]`, was für global wirkende Benutzer-Snippets (z. B. `body`-Overrides, `:root`-Variablen) ungeeignet ist. Stattdessen ein eigenständiger, unscoped `SnippetInjector` (`plugins/appearance/snippet-injector.ts`), der nur das Grundmuster (ein `<style>`-Tag pro Einheit) mit dem Plugin-Pendant teilt.
+2. Favoriten-Einträge haben jetzt ein `id`-Feld (nicht ursprünglich geplant): Sobald mehrere Bookmark-Typen denselben Dateipfad teilen können (Datei- + Überschriften-Bookmark auf derselben Datei) oder gar keinen Pfad haben (Suche), ist `path` keine eindeutige Kennung mehr. `reorder()`/`setLabel()`/`removeById()` arbeiten deshalb über `id`, nicht `path`.
+
+**Nicht umgesetzt (dokumentierter Rand-Punkt):** Requirement 2.5 ("fehlend"-Markierung für eine favorisierte Datei, die inzwischen gelöscht wurde) — `FavoritesView.tsx` erhält aktuell keinen `DirectoryTree`, um das zu prüfen. Nachrüstbar durch eine Prop-Erweiterung von `SidebarPanel.tsx`.
+
+---
+
 ## Prio 1 — PDF-Export / Drucken (Track A)
 
 Scope: ~6–10h. Keine Spec vorhanden.
@@ -105,36 +146,21 @@ Scope: ~6–10h. Keine Spec vorhanden.
 
 ---
 
-## Prio 2 — Navigation & Verknüpfungs-Politur (Track A)
-
-Scope: ~25–35h. Bündelt vier kleinere Navigations-/Verknüpfungslücken in einer Spec, da alle auf denselben Backend-Daten (Graph Store, Link-Resolver) aufbauen.
-
-**Zusammenfassung:**
-
-- **Quick Switcher** (Strg+O): Fuzzy-Suche über den Datei-Index; aktuell im Code als expliziter No-Op registriert
-- **Lokaler Graph** (pro Notiz): Filterung der bestehenden `/vaults/:id/graph`-Antwort auf n-Hop-Nachbarschaft, eigene GraphView-Instanz; aktuell No-Op
-- **Ungelinkte Erwähnungen**: Volltextsuche nach dem Dateinamen ohne Wikilink-Syntax, Anzeige im Context Panel unterhalb der Backlinks
-- **Automatische Link-Aktualisierung** beim Umbenennen/Verschieben: `renameContent`/`moveContent` müssen vaultweit alle Wikilinks auf die alte Datei umschreiben, statt sie brechen zu lassen — nutzt die im Graph Store bereits vorhandenen Backlink-Daten. Größte *unbeabsichtigte* Einzel-Lücke ggü. Obsidian-Kernverhalten (Datenintegrität).
-
-**Abhängigkeiten:** Braucht `knowledge-graph` ✅ (Backlink-/Adjazenzdaten) + `link-resolver.ts` ✅.
-
-**Empfehlung:** Vier kleine, unabhängig testbare Tasks in einer Spec — hohe wahrgenommene Qualitätssteigerung für moderaten Aufwand, insbesondere die Link-Aktualisierung.
-
----
-
 ## Prio 3 — UI-Politur: Bookmarks, Statusleiste, CSS-Snippets (Track A)
 
-Scope: ~12–18h. Drei kleine, unabhängige Ergänzungen bestehender Features.
+Scope: ~12–18h.
+
+**Spec:** `.kiro/specs/ui-polish-bookmarks-status-css-snippets/` — Requirements + Design + Tasks vorhanden (14 Requirements, 32 Correctness Properties, 20 Task-Blöcke).
 
 **Zusammenfassung:**
 
-- **Bookmarks vervollständigen**: Block-, Überschrift- und Such-Lesezeichen sowie "Alle Tabs bookmarken" (aktuell No-Ops) — Datei-Lesezeichen laufen bereits über die Favoriten
-- **Wortanzahl/Zeichenanzahl** in der Statusleiste (bereits als erweiterbar angelegt, aktuell nur Uhr)
-- **CSS-Snippets**: nutzereigenes CSS pro Vault, wiederverwendet den bestehenden Plugin-CSS-Injection-Mechanismus
+- **Bookmarks vervollständigen**: Block-, Überschrift- und Such-Lesezeichen sowie "Alle Tabs bookmarken" (aktuell No-Ops in `core-commands-app.ts`) — Datei-Lesezeichen laufen bereits über die Favoriten. Zusätzlich, über den ursprünglichen Scope hinaus: manuelles Neuordnen (Drag & Drop), Kontextmenü (Entfernen/Im Explorer zeigen/Umbenennen) und eigene Anzeigenamen für Favoriten
+- **Wortanzahl/Zeichenanzahl, Cursor-Position** in der Statusleiste (bereits als erweiterbar angelegt, aktuell nur Uhr), granulare Pro-Item-Sichtbarkeit, Vault-Name-Item, sowie ein Flicker-Fix für Plugin-Items (Remount → Diffing)
+- **CSS-Snippets**: nutzereigenes CSS pro Vault. **Abweichung von der ursprünglichen Kurzfassung:** Der bestehende Plugin-CSS-Injection-Mechanismus (`css-injector.ts`) scoped zwingend auf `[data-plugin-id]`, was für global wirkende Benutzer-Snippets (z. B. `body`-Overrides) ungeeignet ist — die Spec sieht stattdessen einen eigenständigen, unscoped `SnippetInjector` vor, der nur das Grundmuster (ein `<style>`-Tag pro Einheit) teilt
 
-**Abhängigkeiten:** Braucht `sidebar-panel` ✅ (Favoriten) + `obsidian-plugin-compat` ✅ (CSS-Injection) + Status Bar ✅.
+**Abhängigkeiten:** Braucht `sidebar-panel` ✅ (Favoriten) + `obsidian-plugin-compat` ✅ (CSS-Injection als Vorbild, nicht wiederverwendet) + Status Bar ✅.
 
-**Empfehlung:** Aufräum-Spec vor den großen Architektur-Features — schließt kleine, länger bekannte Lücken günstig ab.
+**Empfehlung:** Aufräum-Spec vor den großen Architektur-Features — schließt kleine, länger bekannte Lücken günstig ab. Bereit zur Umsetzung.
 
 ---
 
@@ -321,11 +347,27 @@ Scope: ~8h Design + ~60–80h Implementierung.
 
 ---
 
+## Prio 15 — Graph-Politur & Link-Integrität (Track A)
+
+Scope: ~15–24h. Rest-Scope aus der ursprünglich als „Navigation & Verknüpfungs-Politur" geplanten Spec — die drei Punkte, die nicht in der tatsächlich umgesetzten `navigation-link-polish`-Spec (siehe „Erledigt" oben) mitgeliefert wurden. Kein Quick-Switcher-Punkt mehr, der ist erledigt.
+
+**Zusammenfassung:**
+
+- **Lokaler Graph** (pro Notiz): Filterung der bestehenden `/vaults/:id/graph`-Antwort auf n-Hop-Nachbarschaft, eigene GraphView-Instanz; aktuell No-Op
+- **Ungelinkte Erwähnungen**: Volltextsuche nach dem Dateinamen ohne Wikilink-Syntax, Anzeige im Context Panel unterhalb der Backlinks
+- **Automatische Link-Aktualisierung** beim Umbenennen/Verschieben: `renameContent`/`moveContent` müssen vaultweit alle Wikilinks auf die alte Datei umschreiben, statt sie brechen zu lassen — nutzt die im Graph Store bereits vorhandenen Backlink-Daten. Größte *unbeabsichtigte* Einzel-Lücke ggü. Obsidian-Kernverhalten (Datenintegrität).
+
+**Abhängigkeiten:** Braucht `knowledge-graph` ✅ (Backlink-/Adjazenzdaten) + `link-resolver.ts` ✅ (jetzt mit deterministischer Mehrdeutigkeits-Auflösung, siehe `navigation-link-polish` ✅).
+
+**Empfehlung:** Drei kleine, unabhängig testbare Tasks — die Link-Aktualisierung ist davon die mit dem größten wahrgenommenen Qualitätsgewinn (Datenintegrität beim Umbenennen).
+
+---
+
 ## Gesamtaufwand (Schätzung)
 
 | Track | Aufwand |
 |-------|---------|
-| A: Politur (PDF, Navigation, UI, Mathe/Medien) | ~58–83h |
+| A: Politur (PDF, Mathe/Medien, Graph-Politur) | ~36–54h |
 | B: Plugins (Themes + Server-Side) | ~63–88h |
 | C: Sharing | ~19–24h |
 | D: Editor (Collaborative) | ~68–88h |
@@ -333,7 +375,7 @@ Scope: ~8h Design + ~60–80h Implementierung.
 | F/G: Qualität & Layout (Responsive + Workspaces) | ~84–124h |
 | H: Strukturierte Daten (Properties/Suche + Bases) | ~80–110h |
 | I: Onboarding (Importer) | ~20–30h |
-| **Summe** | **~430–605h** |
+| **Summe** | **~408–576h** |
 
 ---
 

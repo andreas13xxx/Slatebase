@@ -20,6 +20,21 @@ Es gibt mehrere Wege, eine Datei zu öffnen:
 1. **Klick im Explorer** — Ein Klick auf eine Datei öffnet sie in einem neuen Tab
 2. **Wikilink anklicken** — Im View-Modus öffnet ein Klick auf `[[Dateiname]]` die verlinkte Datei
 3. **Command Palette** — `Strg+P` öffnet die Befehlspalette, dort kannst du Dateien suchen
+4. **Schnellwechsler** — `Strg+O` öffnet einen Fuzzy-Datei-Finder: tippe ein paar Buchstaben aus dem Dateinamen, die Treffer werden nach Übereinstimmungsgüte sortiert. Findet der Suchtext keine Datei, bietet der Schnellwechsler an, direkt eine neue Datei mit diesem Namen anzulegen
+
+---
+
+## Zurück und Vor navigieren
+
+Slatebase merkt sich, welche Dateien du zuletzt besucht hast — ähnlich wie der Verlauf in einem Browser.
+
+- **Zurück** (`Alt+←` oder der ◀-Button links neben der Tab-Leiste): springt zur zuvor besuchten Datei
+- **Vor** (`Alt+→` oder der ▶-Button): springt wieder vorwärts, sofern du zuvor "Zurück" verwendet hast
+
+Jede Navigation zählt als Besuch — ob du eine Datei im Explorer anklickst, einem Wikilink folgst, ein Suchergebnis öffnest oder den Schnellwechsler nutzt. Navigierst du nach einem "Zurück" zu einer neuen Datei (statt erneut "Vor" zu drücken), wird der bisherige Vor-Verlauf verworfen — genau wie im Browser.
+
+> [!tip] Tipp
+> Der Zurück-Button ist ausgegraut, solange keine vorherige Datei existiert. Genauso der Vor-Button, solange du nicht zuvor "Zurück" genutzt hast.
 
 ---
 
@@ -38,6 +53,19 @@ Ziehe einen Tab per **Drag & Drop** an die gewünschte Position in der Tab-Leist
 
 Der aktive Tab ist farblich hervorgehoben. Der Inhalt dieses Tabs wird im Hauptbereich angezeigt.
 
+### Zwischen Tabs wechseln (Tastatur)
+
+- `Strg+Shift+]` — nächster Tab (springt am Ende wieder zum ersten)
+- `Strg+Shift+[` — vorheriger Tab (springt am Anfang wieder zum letzten)
+
+---
+
+## Breadcrumb-Leiste
+
+Oberhalb des Editors zeigt die Breadcrumb-Leiste den Ordnerpfad der geöffneten Datei als Kette klickbarer Segmente — z.B. `MeinVault / Projekte / Alpha / notizen.md`. Ein Klick auf ein Ordner-Segment öffnet den Datei-Explorer und markiert diesen Ordner; ein Klick auf den Vault-Namen springt zur Wurzelebene. Bei tief verschachtelten Pfaden werden die mittleren Ordner hinter einem „…"-Symbol zusammengefasst.
+
+Für Dateien im Vault-Root zeigt die Leiste nur Vault-Name und Dateiname. Bei Nicht-Datei-Tabs (z.B. dem Knowledge Graph) bleibt sie ausgeblendet.
+
 ---
 
 ## Schritt-für-Schritt: Mehrere Tabs nutzen
@@ -54,8 +82,13 @@ Der aktive Tab ist farblich hervorgehoben. Der Inhalt dieses Tabs wird im Hauptb
 | Aktion | Kürzel |
 |--------|--------|
 | Command Palette öffnen | `Strg+P` |
+| Schnellwechsler öffnen | `Strg+O` |
 | Einstellungen öffnen | `Strg+,` |
 | Suche öffnen | `Strg+Shift+F` |
+| Zurück navigieren | `Alt+←` |
+| Vor navigieren | `Alt+→` |
+| Nächster Tab | `Strg+Shift+]` |
+| Vorheriger Tab | `Strg+Shift+[` |
 
 > [!tip] Tipp
 > Die Tastenkürzel lassen sich unter **Einstellungen → Tastenkürzel** anpassen. Mehr dazu im Guide [[Fortgeschritten/Tastenkürzel anpassen|Tastenkürzel anpassen]].
@@ -71,6 +104,10 @@ Im linken Seitenbereich findest du die **Zuletzt geöffnet**-Liste. Sie zeigt di
 ### Favoriten
 
 Häufig benötigte Dateien kannst du als **Favorit** markieren (Stern-Symbol im Explorer). Sie erscheinen dann im Favoriten-Bereich der Seitenleiste.
+
+### Aktive Datei im Explorer verfolgen
+
+Unter **Einstellungen → Vault-Konfiguration** gibt es den Schalter „Aktive Datei im Explorer verfolgen". Ist er aktiviert, klappt der Datei-Explorer beim Wechsel des aktiven Tabs automatisch die passenden Ordner auf und scrollt zur Datei — du musst den Explorer nicht mehr manuell durchsuchen, um zu sehen, wo du gerade bist. Der Schalter ist standardmäßig deaktiviert und wirkt sofort, ohne Speichern-Button.
 
 ---
 

@@ -99,6 +99,11 @@ Diese Plugins wurden getestet und funktionieren in Slatebase:
 | Kanban | Gut | Board-Ansicht, Drag & Drop |
 | Excalidraw | Eingeschränkt | Zeichenwerkzeuge funktionieren, Libraries nicht |
 | LiveSync | Eingeschränkt | Periodic/OneShot empfohlen, LiveSync-Modus Timeout-begrenzt |
+| Tasks | Gut | Emoji-Signifikatoren, Query-Blöcke, wiederkehrende Aufgaben |
+| Advanced Tables | Gut | Auto-Formatierung, Navigation, Sortierung, Formeln |
+| Git | Gut | Commit/Push/Pull über HTTPS + PAT, kein SSH |
+| Mind Map | Gut | Überschriften/Listen als interaktive Mindmap |
+| Editing Toolbar | Gut | Fixe und schwebende Formatierungsleiste |
 
 Siehe die einzelnen [[Fortgeschritten/Plugins/Calendar|Plugin-Guides]] für detaillierte Kompatibilitäts-Informationen.
 
@@ -169,6 +174,11 @@ Ausführliche Anleitungen mit Beispielen und Übungen für getestete Plugins:
 | Templater | Dynamische Vorlagen mit JavaScript | [[Fortgeschritten/Plugins/Templater]] |
 | Excalidraw | Freihand-Zeichnungen und Diagramme | [[Fortgeschritten/Plugins/Excalidraw]] |
 | LiveSync | Bidirektionale Vault-Synchronisation | [[Fortgeschritten/Plugins/LiveSync]] |
+| Tasks | Aufgabenverwaltung mit Fälligkeiten und Prioritäten | [[Fortgeschritten/Plugins/Tasks]] |
+| Advanced Tables | Tabellen-Editor mit Formeln | [[Fortgeschritten/Plugins/Advanced Tables]] |
+| Git | Versionierung mit externem Remote-Repository | [[Fortgeschritten/Plugins/Git]] |
+| Mind Map | Notizen als interaktive Mindmap darstellen | [[Fortgeschritten/Plugins/Mind Map]] |
+| Editing Toolbar | Formatierungsleiste für den Editor | [[Fortgeschritten/Plugins/Editing Toolbar]] |
 
 ### Praktische Übungen
 

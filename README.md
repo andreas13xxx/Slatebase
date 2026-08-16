@@ -155,10 +155,10 @@ docker compose up -d
 | Feature | Description |
 |---------|-------------|
 | 📁 **Multi-Vault Management** | Create, delete, import, and switch between multiple vaults |
-| 🌳 **File Explorer** | Navigate your vault's directory tree with context menus and drag & drop |
+| 🌳 **File Explorer** | Navigate your vault's directory tree with context menus, drag & drop, and an optional "follow active file" auto-reveal |
 | 📝 **Markdown Editor** | CodeMirror 6 editor with Live Preview, auto-save, and keyboard shortcuts — formatting via Command Palette or an Obsidian toolbar plugin |
 | 👁️ **Markdown Viewer** | Rendered view with GFM, syntax highlighting, frontmatter, and collapsible headings |
-| 🗂️ **Tabs** | Open multiple files simultaneously with unsaved indicators |
+| 🗂️ **Tabs & Navigation** | Open multiple files simultaneously with unsaved indicators; browser-like back/forward history, fuzzy Quick Switcher (Ctrl+O), Ctrl+Shift+]/[ tab cycling, and a clickable folder breadcrumb |
 | 👥 **Multi-User & Sharing** | Invite others to your vaults with read or write access, transfer ownership |
 | 💬 **Real-time Chat** | Messaging between users with unread badges, archiving, and pagination |
 | 🔒 **Authentication** | Session-based auth with argon2id hashing, CSRF protection, rate limiting |
@@ -167,6 +167,9 @@ docker compose up -d
 | 🎨 **Canvas** | Open and edit Obsidian `.canvas` whiteboards: text, file, link, and group nodes with edges, drag, resize, zoom/pan, minimap, file-path search, and auto-save |
 | 🕸️ **Knowledge Graph** | Interactive visualization of vault link structure with zoom, pan, drag, and search |
 | 📑 **Context Panel** | Right-side panel with document outline, forward/backlinks, tags, and properties |
+| 🔖 **Bookmarks** | Bookmark files, headings, blocks, or saved searches — reorder by drag and drop, rename, and bookmark all open tabs at once |
+| 📟 **Status Bar** | Clock, vault name, word/character count, and cursor position with click-to-"go to line" — each item toggleable |
+| 🎨 **CSS Snippets** | Per-vault custom CSS, uploaded or written in an embedded editor, enabled and disabled individually |
 | 🔍 **Search & Replace** | Vault-wide full-text search with regex, context lines, multi-vault, and find & replace |
 | 📊 **Mermaid Diagrams** | Render Mermaid code blocks as interactive SVG diagrams with dark mode support |
 | 🧩 **Plugin Compat** ⚠️ | Run browser-compatible Obsidian Community Plugins in the web UI |
@@ -177,7 +180,7 @@ docker compose up -d
 | 🌐 **i18n** | German and English UI, switchable per user |
 | 🛡️ **Admin Panel** | User management, feature toggles, audit log, server configuration |
 | 🐳 **Docker Ready** | Pre-built multi-arch images (amd64 + arm64), runs as non-root user |
-| 📖 **Tutorial Vault** | Comprehensive welcome vault with 35+ guides (DE/EN), practice exercises, screenshots, and templates — auto-created for new users or on-demand via Settings/Command Palette |
+| 📖 **Tutorial Vault** | Comprehensive welcome vault with 65+ guides (DE/EN), practice exercises, screenshots, and templates — auto-created for new users or on-demand via Settings/Command Palette |
 
 ⚠️ = Experimental feature. Use with caution.
 
