@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.31.0](https://github.com/andreas13xxx/Slatebase/compare/v0.30.1...v0.31.0) (2026-08-16)
+
+
+### Features
+
+* navigation & link polish, bookmarks/status bar/CSS snippets, plugin API 1.13.2 ([6ae0140](https://github.com/andreas13xxx/Slatebase/commit/6ae01401e7b42c7b7b37e662068eb9abe44314d9))
+
 ## [0.30.1](https://github.com/andreas13xxx/Slatebase/compare/v0.30.0...v0.30.1) (2026-08-15)
 
 
