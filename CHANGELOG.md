@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.33.0](https://github.com/andreas13xxx/Slatebase/compare/v0.32.0...v0.33.0) (2026-08-19)
+
+
+### Features
+
+* server-side encrypted storage for plugin secrets ([9494c22](https://github.com/andreas13xxx/Slatebase/commit/9494c223de73979556e733a0ffb0067ff0fb0dcd))
+* server-side encrypted storage for plugin secrets ([56e11d1](https://github.com/andreas13xxx/Slatebase/commit/56e11d10786f49949bfa086a9308f517b402abe9))
+
+
+### Bugfixes
+
+* cast Uint8Array to BufferSource for Web Crypto calls (TS 6.x / @types/node 26) ([af77280](https://github.com/andreas13xxx/Slatebase/commit/af772809280f1977180cf66afbf530a3b4c82b74))
+* cast Uint8Array.buffer to ArrayBuffer for TS 6.x / @types/node 26 compat ([88c22e6](https://github.com/andreas13xxx/Slatebase/commit/88c22e625e49ccd9ede4f218a594ba44eeaa64e8))
+
 ## [0.32.0](https://github.com/andreas13xxx/Slatebase/compare/v0.31.0...v0.32.0) (2026-08-19)
 
 
