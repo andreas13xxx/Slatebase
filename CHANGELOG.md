@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.32.0](https://github.com/andreas13xxx/Slatebase/compare/v0.31.0...v0.32.0) (2026-08-19)
+
+
+### Features
+
+* graph polish & link integrity, unified side panel, Iconize compat ([78c9885](https://github.com/andreas13xxx/Slatebase/commit/78c9885e2a8fadff31dc3542deb3833c1c42b0cb))
+
 ## [0.31.0](https://github.com/andreas13xxx/Slatebase/compare/v0.30.1...v0.31.0) (2026-08-16)
 
 
