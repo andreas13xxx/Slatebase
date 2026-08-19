@@ -32,7 +32,7 @@ export interface IFileManagerShim {
   /** Create a new file of any extension, with optional initial content, in the given folder. */
   createNewFile(folder: TFolder, name: string, extension: string, data?: string): Promise<TFile>;
   /** Prompt user for deletion and delete the file (moves to trash). Resolves to whether it was deleted. */
-  promptForDeletion(file: TFile): Promise<boolean>;
+  promptForFileDeletion(file: TFile): Promise<boolean>;
   /** Move a file to trash (soft-delete). Used by LiveSync and other plugins. */
   trashFile(file: TFile): Promise<void>;
   /** Get an available path for an attachment file. */
@@ -55,8 +55,10 @@ export class FileManagerShim implements IFileManagerShim {
    * Rename/move a file to a new path.
    * Delegates to vault.rename() which handles the API call and event emission.
    *
-   * In Obsidian, this also updates all links pointing to the renamed file.
-   * In Slatebase, link updates are not automatic (plugins can listen to 'rename' event).
+   * Like Obsidian, this also updates all wikilinks elsewhere in the vault
+   * that point to the renamed file — handled server-side by the same
+   * moveContent/renameContent endpoint vault.rename() calls (Link-Migration,
+   * see .kiro/specs/graph-polish-link-integrity/), not by this shim itself.
    */
   async renameFile(file: TFile, newPath: string): Promise<void> {
     await this.vault.rename(file, newPath);
@@ -222,7 +224,7 @@ export class FileManagerShim implements IFileManagerShim {
    *
    * @param file - The file to delete
    */
-  async promptForDeletion(file: TFile): Promise<boolean> {
+  async promptForFileDeletion(file: TFile): Promise<boolean> {
     if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
       if (!window.confirm(`"${file.name}" löschen?`)) return false;
     }
@@ -267,7 +269,7 @@ export class FileManagerShim implements IFileManagerShim {
       'getNewFileParent',
       'createNewMarkdownFile',
       'createNewFile',
-      'promptForDeletion',
+      'promptForFileDeletion',
       'trashFile',
       'promptForFileRename',
       'getAvailablePathForAttachment',

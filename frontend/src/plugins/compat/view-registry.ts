@@ -170,7 +170,7 @@ export class ItemView {
 }
 
 /** Location of a WorkspaceLeaf within the Slatebase UI */
-export type LeafLocation = 'main' | 'right-sidebar'
+export type LeafLocation = 'main' | 'right-sidebar' | 'left-sidebar'
 
 // ─── TextFileView ────────────────────────────────────────────────────────────
 
@@ -440,8 +440,15 @@ export class WorkspaceLeaf {
   view: ItemView | null = null
   /** Reference to the app instance */
   app: unknown
-  /** The location of this leaf in the workspace layout */
-  readonly location: LeafLocation
+  /**
+   * The location of this leaf in the workspace layout. Not `readonly`:
+   * `ViewRegistry.moveLeafToSide()` reassigns it when a user drags a plugin's
+   * sidebar view to the other side — the wrapping Proxy (see
+   * `wrapWithProxy()`) has no `set` trap, so writes to other fields (e.g.
+   * `view`) already pass straight through elsewhere in this file, this is
+   * not a new exposure.
+   */
+  location: LeafLocation
   /** The container element for this leaf (wraps the view's containerEl) */
   readonly containerEl: HTMLElement
   /**
@@ -745,13 +752,15 @@ export class WorkspaceLeaf {
    * Returns the root split container this leaf lives in. Real Obsidian plugins
    * (day-planner's `isLeafInSidebar`, etc.) call this and compare the result
    * against `workspace.leftSplit`/`rightSplit`/`rootSplit` to tell sidebar
-   * leaves from main-area ones. Slatebase collapses both sidebar sides into a
-   * single Context Panel, so any 'right-sidebar' leaf reports `rightSplit`.
+   * leaves from main-area ones and which sidebar they're in.
    */
   getRoot(): unknown {
-    const workspace = (this.app as { workspace?: { rootSplit?: unknown; rightSplit?: unknown } })?.workspace
+    const workspace = (this.app as { workspace?: { rootSplit?: unknown; rightSplit?: unknown; leftSplit?: unknown } })?.workspace
     if (this.location === 'right-sidebar') {
       return workspace?.rightSplit ?? this
+    }
+    if (this.location === 'left-sidebar') {
+      return workspace?.leftSplit ?? this
     }
     return workspace?.rootSplit ?? this
   }
@@ -900,6 +909,24 @@ export class WorkspaceLeaf {
   }
 }
 
+/**
+ * WorkspaceSplit — real Obsidian's layout-tree node for split panes. Slatebase
+ * has no split tree (flat tab model), so `WorkspaceShim.rootSplit`/`leftSplit`/
+ * `rightSplit` never form an actual tree — this class exists purely so those
+ * stub objects have a correct `instanceof` identity instead of being anonymous
+ * object literals, for plugins that defensively probe layout objects.
+ */
+export class WorkspaceSplit {
+  readonly type = 'split' as const
+}
+
+/**
+ * WorkspaceRibbon — real Obsidian's vertical icon bar. Slatebase has no ribbon
+ * UI; this class exists purely so `WorkspaceShim.leftRibbon`/`rightRibbon` have
+ * a correct `instanceof` identity instead of being anonymous object literals.
+ */
+export class WorkspaceRibbon {}
+
 // ─── View Registry ─────────────────────────────────────────────────────────────
 
 /**
@@ -926,6 +953,16 @@ export type SidebarViewActivatedCallback = (
 
 /** Callback when a sidebar view is deactivated */
 export type SidebarViewDeactivatedCallback = (viewType: string) => void
+
+/** Callback when a left-sidebar view is activated */
+export type LeftSidebarViewActivatedCallback = (
+  viewType: string,
+  view: ItemView,
+  leaf: WorkspaceLeaf
+) => void
+
+/** Callback when a left-sidebar view is deactivated */
+export type LeftSidebarViewDeactivatedCallback = (viewType: string) => void
 
 /**
  * Internal tracking entry for each leaf in the registry.
@@ -956,6 +993,8 @@ export class ViewRegistry {
   private readonly leaves: Map<WorkspaceLeaf, LeafEntry> = new Map()
   /** Raw leaf → its Proxy-wrapped external identity (see `leaves` above). */
   private readonly rawToProxy = new WeakMap<WorkspaceLeaf, WorkspaceLeaf>()
+  /** Reverse of `rawToProxy` — needed by `moveLeafToSide()`, which only ever receives the external (Proxy) identity plugin-context hands out via `SidebarViewInfo.leaf`. */
+  private readonly proxyToRaw = new WeakMap<WorkspaceLeaf, WorkspaceLeaf>()
   /** Callback for UI updates when a main view is activated */
   private onViewActivated: ViewActivatedCallback | null = null
   /** Callback for UI updates when a view is deactivated */
@@ -964,6 +1003,10 @@ export class ViewRegistry {
   private onSidebarViewActivated: SidebarViewActivatedCallback | null = null
   /** Callback for UI updates when a sidebar view is deactivated */
   private onSidebarViewDeactivated: SidebarViewDeactivatedCallback | null = null
+  /** Callback for UI updates when a left-sidebar view is activated */
+  private onLeftSidebarViewActivated: LeftSidebarViewActivatedCallback | null = null
+  /** Callback for UI updates when a left-sidebar view is deactivated */
+  private onLeftSidebarViewDeactivated: LeftSidebarViewDeactivatedCallback | null = null
 
   /**
    * Register a view type with its factory function.
@@ -1069,6 +1112,7 @@ export class ViewRegistry {
     })
     const proxy = WorkspaceLeaf.wrapWithProxy(leaf)
     this.rawToProxy.set(leaf, proxy)
+    this.proxyToRaw.set(proxy, leaf)
     return proxy
   }
 
@@ -1133,6 +1177,57 @@ export class ViewRegistry {
   }
 
   /**
+   * Get all leaves located in the left sidebar.
+   */
+  getLeftSidebarLeaves(): WorkspaceLeaf[] {
+    return [...this.leaves.entries()]
+      .filter(([, entry]) => entry.location === 'left-sidebar')
+      .map(([leaf]) => this.toExternalLeaf(leaf))
+  }
+
+  /**
+   * Moves an active sidebar leaf to the other side (left ⇄ right) in place —
+   * used by cross-panel drag-and-drop (dragging a plugin's Context Panel tab
+   * into the left Sidebar Panel, or vice versa). Unlike detach+recreate, this
+   * keeps the same View instance and containerEl alive (no onClose/onOpen,
+   * no lost view-internal state) — only the tracked location changes, plus a
+   * deactivate/activate callback pair so plugin-context's two view maps (and,
+   * through their existing sync effects, each panel's reducer state) follow.
+   *
+   * No-op if `externalLeaf` isn't a currently tracked, active sidebar leaf,
+   * or is already on `targetSide`.
+   */
+  moveLeafToSide(externalLeaf: WorkspaceLeaf, targetSide: 'left' | 'right'): void {
+    const rawLeaf = this.proxyToRaw.get(externalLeaf)
+    if (!rawLeaf) return
+    const entry = this.leaves.get(rawLeaf)
+    if (!entry || !entry.viewType || !rawLeaf.view) return
+    if (entry.location !== 'left-sidebar' && entry.location !== 'right-sidebar') return
+
+    const targetLocation: LeafLocation = targetSide === 'left' ? 'left-sidebar' : 'right-sidebar'
+    if (entry.location === targetLocation) return
+
+    const sourceLocation = entry.location
+    const viewType = entry.viewType
+    const view = rawLeaf.view
+
+    entry.location = targetLocation
+    rawLeaf.location = targetLocation
+
+    if (sourceLocation === 'right-sidebar') {
+      this.onSidebarViewDeactivated?.(viewType)
+    } else {
+      this.onLeftSidebarViewDeactivated?.(viewType)
+    }
+
+    if (targetLocation === 'right-sidebar') {
+      this.onSidebarViewActivated?.(viewType, view, externalLeaf)
+    } else {
+      this.onLeftSidebarViewActivated?.(viewType, view, externalLeaf)
+    }
+  }
+
+  /**
    * Get the first leaf with a view of the given type (for deduplication checks).
    */
   getLeafByViewType(viewType: string): WorkspaceLeaf | undefined {
@@ -1189,11 +1284,14 @@ export class ViewRegistry {
   async detachLeavesOfType(viewType: string): Promise<void> {
     const matching = this.getRawLeavesOfType(viewType)
     let hasSidebar = false
+    let hasLeftSidebar = false
     let hasMain = false
     for (const leaf of matching) {
       const entry = this.leaves.get(leaf)
       if (entry?.location === 'right-sidebar') {
         hasSidebar = true
+      } else if (entry?.location === 'left-sidebar') {
+        hasLeftSidebar = true
       } else {
         hasMain = true
       }
@@ -1201,6 +1299,9 @@ export class ViewRegistry {
     }
     if (hasSidebar) {
       this.onSidebarViewDeactivated?.(viewType)
+    }
+    if (hasLeftSidebar) {
+      this.onLeftSidebarViewDeactivated?.(viewType)
     }
     if (hasMain && matching.length > 0) {
       this.onViewDeactivated?.(viewType)
@@ -1219,6 +1320,7 @@ export class ViewRegistry {
   async detachAllForPlugin(pluginId: string): Promise<void> {
     const pluginLeaves: WorkspaceLeaf[] = []
     const sidebarViewTypes = new Set<string>()
+    const leftSidebarViewTypes = new Set<string>()
     const mainViewTypes = new Set<string>()
 
     for (const [leaf, entry] of this.leaves) {
@@ -1227,6 +1329,8 @@ export class ViewRegistry {
         if (entry.viewType) {
           if (entry.location === 'right-sidebar') {
             sidebarViewTypes.add(entry.viewType)
+          } else if (entry.location === 'left-sidebar') {
+            leftSidebarViewTypes.add(entry.viewType)
           } else {
             mainViewTypes.add(entry.viewType)
           }
@@ -1245,6 +1349,9 @@ export class ViewRegistry {
     // Notify React state about deactivated views
     for (const viewType of sidebarViewTypes) {
       this.onSidebarViewDeactivated?.(viewType)
+    }
+    for (const viewType of leftSidebarViewTypes) {
+      this.onLeftSidebarViewDeactivated?.(viewType)
     }
     for (const viewType of mainViewTypes) {
       this.onViewDeactivated?.(viewType)
@@ -1274,6 +1381,8 @@ export class ViewRegistry {
           // whose `allLeaves.includes(leaf)` check needs the same object
           // reference getAllLeaves() hands out (see toExternalLeaf()).
           this.onSidebarViewActivated?.(viewType, view, this.toExternalLeaf(leaf))
+        } else if (entry.location === 'left-sidebar') {
+          this.onLeftSidebarViewActivated?.(viewType, view, this.toExternalLeaf(leaf))
         } else {
           this.onViewActivated?.(viewType, view)
         }
@@ -1312,6 +1421,22 @@ export class ViewRegistry {
    */
   setOnSidebarViewDeactivated(callback: SidebarViewDeactivatedCallback | null): void {
     this.onSidebarViewDeactivated = callback
+  }
+
+  /**
+   * Set the callback for left-sidebar view activation events.
+   * Called when a view in a left-sidebar leaf is activated.
+   */
+  setOnLeftSidebarViewActivated(callback: LeftSidebarViewActivatedCallback | null): void {
+    this.onLeftSidebarViewActivated = callback
+  }
+
+  /**
+   * Set the callback for left-sidebar view deactivation events.
+   * Called when a left-sidebar view is detached.
+   */
+  setOnLeftSidebarViewDeactivated(callback: LeftSidebarViewDeactivatedCallback | null): void {
+    this.onLeftSidebarViewDeactivated = callback
   }
 
   /**

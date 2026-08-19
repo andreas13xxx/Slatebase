@@ -7,6 +7,7 @@
  */
 
 import { useTranslation } from '../../i18n'
+import './PropertiesView.css'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 

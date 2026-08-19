@@ -108,7 +108,8 @@ src/
 │   ├── token-service.ts  — McpTokenService (token lifecycle: create, validate, revoke, list)
 │   ├── rate-limiter.ts   — McpRateLimiter (sliding window per token)
 │   ├── handlers.ts       — McpHandlers (MCP resource handlers: list, read)
-│   ├── tool-handlers.ts  — MCP tool handlers (list_vaults, get_vault_structure, search_vault, read_file, write_file, create_directory, delete_file, move_file, rename_file)
+│   ├── tool-handlers.ts  — MCP tool handlers (list_vaults, get_vault_structure, search_vault, read_file, write_file, create_directory, delete_file, move_file, rename_file). `move_file`/`rename_file` run Link-Migration too via the optional `ToolHandlerDeps.migrateLinks` (wired to the same `LinkMigrationService` as the REST API in the composition root) — snapshots the pre-move tree, rewrites wikilinks elsewhere in the vault pointing at the old path, reports partial failures as `linkMigrationWarnings`
+│   ├── tool-handlers-link-migration.test.ts — Unit tests for move_file/rename_file Link-Migration wiring
 │   └── server-factory.ts — McpServerFactory (creates configured McpServer instance)
 ├── search/
 │   ├── index.ts              — Barrel export for search module
@@ -131,7 +132,11 @@ src/
 │   ├── canvas-parser.ts      — Canvas link extraction (extracts wikilinks from .canvas JSON files)
 │   ├── canvas-parser.test.ts — Unit tests for canvas link extraction
 │   ├── link-index-service.ts — LinkIndexService (rebuild, incremental updates, JSON v2 persistence, tags, properties, getGraph with options, getGraphMeta), extractFrontmatterTags (Obsidian-compatible frontmatter tag extraction)
-│   └── link-index-service.test.ts — Unit tests for LinkIndexService v2
+│   ├── link-index-service.test.ts — Unit tests for LinkIndexService v2
+│   ├── link-match-resolver.ts — resolveWikilinkTargetOnTree() — backend port of frontend/src/plugins/link-resolver.ts (same-folder → shortest-path → alphabetical disambiguation against a DirectoryTree). Needed because LinkIndexService.getBacklinks() only matches literal normalized paths and misses bare-name wikilinks (`[[Note]]`) to subfolder files
+│   ├── link-match-resolver.test.ts — Unit tests for the resolver (mirrors frontend link-resolver.test.ts fixtures)
+│   ├── link-migration-service.ts — LinkMigrationService.migrateLinks() (rewrites wikilinks vault-wide after a rename/move — candidates via getBacklinks() ∪ filename search, resolved against the pre-move DirectoryTree, written via IVaultService.saveFile), computeAffectedFilePairs() (file vs. folder move → {oldPath,newPath} pairs), rewriteWikilinksInContent()
+│   └── link-migration-service.test.ts — Unit tests for LinkMigrationService and its pure helpers
 ├── plugin/                   — Installed-plugin management (per vault). Not to be confused with `plugin-store/` (the marketplace).
 │   ├── index.ts              — Barrel export for plugin module
 │   ├── types.ts              — IInstalledPluginStore, PluginManifest, PluginFiles, PluginRegistryData interfaces
@@ -316,7 +321,7 @@ src/
 │       ├── setting-tab.ts — PluginSettingTab, Setting, SettingGroup (1.11+ grouped settings with optional search/extra-button header — a real extendable class, since plugins subclass it and `class X extends undefined` throws at bundle parse time), UI components, DOM extensions, icon registry, Modal, Plugin class (synchronous global registration)
 │       ├── setting-tab-registry.ts — Tracks which plugins registered a PluginSettingTab (via addSettingTab), so the Plugin Management UI can mount tab.containerEl
 │       ├── declarative-settings-renderer.ts — Renders Obsidian 1.13+ `getSettingDefinitions()` declarative settings arrays (group/list/page/controls) into Setting/*Component UI
-│       ├── obsidian-api-extensions.ts — Extended APIs: Events, Scope, Keymap, utility functions, MarkdownPreviewRenderer, DOM globals (async loaded as supplement) + `OBSIDIAN_API_VERSION` behind `requireApiVersion()`. `Scope.handleKey()` and the module-level `Keymap` scope stack really dispatch (a single global keydown listener walks the stack) instead of only collecting handlers — inert until a plugin calls `app.keymap.pushScope()`
+│       ├── obsidian-api-extensions.ts — Extended APIs: Events, Scope, Keymap, utility functions, MarkdownPreviewRenderer, DOM globals (async loaded as supplement) + `OBSIDIAN_API_VERSION` behind `requireApiVersion()`. `Scope.handleKey()` and the module-level `Keymap` scope stack really dispatch (a single global keydown listener walks the stack) instead of only collecting handlers — inert until a plugin calls `app.keymap.pushScope()`. `sanitizeHTMLToDom()` strips inline event-handler attributes and `javascript:`/dangerous `data:` URLs, not just `<script>` tags. `renderComponentIcon()` is `ExtraButtonComponent.setIcon()`'s Lucide/custom-SVG resolver (same logic `ButtonComponent.setIcon()` in `setting-tab.ts` implements separately) — `Setting`/`SettingGroup`'s `addExtraButton()` now construct a real `ExtraButtonComponent` instead of a third copy, so this one fix covers all three call sites.
 │       ├── metadata-parser.ts — `parseMetadata()`: the single producer of Obsidian-shaped `CachedMetadata` from raw Markdown — headings, embeds, sections, listItems, footnotes/footnoteRefs, referenceLinks, frontmatterLinks alongside frontmatter/tags/links/blocks. Best-effort CommonMark approximation (same bar as `parseBlocks`/`scanFencedCodeBlocks`), not a spec-compliant parser
 │       ├── editor-shim.ts — EditorShim (Obsidian Editor API; backend priority CM6 EditorView → textarea → internal buffer; setEditorViewAccessor wired once at vault init)
 │       ├── markdown-renderer.ts — MarkdownRenderer.render()/renderMarkdown() — lightweight markdown-to-HTML (not the full remark/unified pipeline) for plugin custom views (Kanban, Dataview)
@@ -335,13 +340,15 @@ src/
 │       ├── api-gap-registry.ts — Records which no-op Proxy-trapped API a plugin read vs. actually called, so silently-unimplemented API usage is diagnosable instead of invisible
 │       ├── log.ts — Shared console helpers with meaningful severity: `debug*` = deliberate compat trade-off (expected), `warn*` = real gap (actionable); `*Once` variants dedupe by key so render/event-path call sites log one line per session instead of flooding
 │       ├── core-commands.ts — Obsidian's built-in `editor:*` commands (formatting, lists, headings, tables) registered against the CommandRegistry, so `executeCommandById('editor:toggle-code')` resolves like a real install; no-Slatebase-equivalent commands are registered as literal no-ops rather than left unresolvable
-│       ├── core-commands-app.ts — The core commands needing app-level React state (`workspace:*`, `file-explorer:*`, `app:*`, `theme:*`, Graph/Canvas/Daily Notes, side panels); registered once by CommandPaletteContainer and fed fresh state via a ref. `app:go-back`/`app:go-forward`/`switcher:open` (formerly no-ops) now call `h.onNavigateBack`/`onNavigateForward`/`onOpenQuickSwitcher`; `workspace:next-tab`/`previous-tab` (`activateTabByOffset()`, wrap-around) predate this but only got a default keybinding now
+│       ├── core-commands-app.ts — The core commands needing app-level React state (`workspace:*`, `file-explorer:*`, `app:*`, `theme:*`, Graph/Canvas/Daily Notes, side panels); registered once by CommandPaletteContainer and fed fresh state via a ref. `app:go-back`/`app:go-forward`/`switcher:open` (formerly no-ops) now call `h.onNavigateBack`/`onNavigateForward`/`onOpenQuickSwitcher`; `workspace:next-tab`/`previous-tab` (`activateTabByOffset()`, wrap-around) predate this but only got a default keybinding now; `graph:open-local` (formerly a no-op) now calls `h.onOpenLocalGraph(activeTab.filePath)`, guarded against sentinel (non-file) active tabs
 │       ├── body-classes.ts — Syncs Obsidian's `theme-dark`/`theme-light` + platform marker classes (`is-mobile`, `mod-macos`, …) onto `document.body`; plugin CSS and runtime theme checks read those, while Slatebase's own state lives in `data-theme` on `<html>`
 │       ├── active-workspace-shim.ts — Module-level get/set for the current vault's WorkspaceShim, so native UI outside the PluginProvider tree (file-explorer context menu) can fire `file-menu`/`files-menu`
 │       ├── obsidian-components.css — Styles for the Obsidian-compatible Setting/*Component controls rendered by setting-tab.ts
 │       ├── plugin-context.ts — PluginProvider + usePluginContext hook (vault-scoped instances, FCP loading, activeViews/sidebarViews state)
 │       ├── plugin-event-bridge.ts — usePluginEventBridge hook (tab→workspace, save→cache, tree→resolved, leaf events)
 │       ├── core-command-i18n.ts — German/English display names for the core commands, keyed by the same full command ID. The IDs themselves stay fixed and language-independent (plugins resolve them); only the palette label is localized, and keeping it here means translating never touches the command spec arrays
+│       ├── menu.ts — `Menu`/`MenuItem`/`MenuSeparator`, extracted out of `installObsidianGlobals()` so entries are real class instances rather than object literals — plugins narrow menu entries with `instanceof MenuItem`/`instanceof MenuSeparator`, which only holds if these are the same classes `addItem()`/`addSeparator()` construct
+│       ├── file-explorer-dom-registry.ts — Live DOM registry behind `workspace.getLeavesOfType('file-explorer')[0].view.fileItems`, Obsidian's undocumented-but-supported path for plugins that inject DOM straight into a tree row (Iconize is the known consumer). `titleEl` points at the row's title button, whose React children keep a stable count/order, so plugin-inserted nodes survive re-renders
 │       ├── embed-registry.ts — `app.embedRegistry`: undocumented core API (absent from the public `obsidian.d.ts`) through which plugins render custom non-Markdown embeds for `![[file.ext]]` — Supernote, tldraw, PDF++, drawio and obsidian-dev-utils' EmbedExtensionsComponent rely on it. Shape cross-checked against obsidian-typings and those plugins' source
 │       ├── hover-link-bus.ts — Routes hover-preview requests (Slatebase's own links + plugins' `workspace.trigger('hover-link', …)`) to the HoverPreview popover
 │       ├── file-view-registry.ts — FileViewRegistry (content-based + extension-based view routing, registerExtensionsForPlugin, active file view lifecycle for TextFileView-based plugins like Kanban)
@@ -351,7 +358,7 @@ src/
 │       ├── tab-view-bridge-wiring.test.ts — Integration tests for TabViewBridge wiring
 │       └── shims/
 │           ├── app-shim.ts — AppShim (Proxy-based, vault/workspace/metadataCache/fileManager/plugins/isMobile/appId/secretStorage/loadLocalStorage/saveLocalStorage); `commands` + `hotkeyManager` are backed by the shared CommandRegistry (findCommand/listCommands/executeCommandById, defaultKeys/addDefaultHotkeys), `workspace` is wrapped with scopeForPlugin so its callbacks stay plugin-tagged. `App.scope` is one shared `Scope` across every AppShim (real Obsidian has a single App, so `app.scope.register()` from different plugins accumulates into one hotkey set) and is pushed onto the scope stack once, never popped. Also `metadataTypeManager` (undocumented frontmatter property-type registry — obsidian-tasks registers its field types on startup; Slatebase has no Properties view to reflect them into, so it just echoes back what was registered)
-│           ├── vault-shim.ts — VaultShim (read/modify/create/delete/copy/getFileByPath/readBinary/modifyBinary/process/append/exists/configDir/events); create/delete/rename/createFolder also patch the local `directoryTree` snapshot immediately (returning a new tree, not mutating in place) so the synchronous cache-only APIs — `getAbstractFileByPath`/`exists`/`getFileByPath`, which cannot await — don't answer from stale state before the realtime round-trip lands (Templater creates a file and looks it up in the same tick)
+│           ├── vault-shim.ts — VaultShim (read/modify/create/delete/copy/getFileByPath/readBinary/modifyBinary/process/append/exists/configDir/events); create/delete/rename/createFolder also patch the local `directoryTree` snapshot immediately (returning a new tree, not mutating in place) so the synchronous cache-only APIs — `getAbstractFileByPath`/`exists`/`getFileByPath`, which cannot await — don't answer from stale state before the realtime round-trip lands (Templater creates a file and looks it up in the same tick). `onFileRead`/`onFileWrite` callbacks (wired in `plugin-context.ts`) feed `MetadataCacheShim.populateFromContent()`/`refreshFileCache()` after every read/write, so `getFileCache()` never answers from a stale or empty cache. `TFile.stat.mtime`/`ctime` come from the backend's directory-tree scan (real `fs.stat()`), falling back to "now" only for locally-synthesized nodes (e.g. a file just created, ahead of the next tree refresh)
 │           ├── vault-adapter-shim.ts — VaultAdapterShim (Obsidian-compatible DataAdapter API: exists, read, write, list, stat, mkdir, remove, rename)
 │           ├── workspace-shim.ts — WorkspaceShim (full Leaf API + getActiveViewOfType synthetic view for the MarkdownView/FileView/ItemView family, onLayoutReady error-isolation); active leaf falls back to an "empty"-type view instead of null, and layout/leaf events re-fire once the CM6 editor mounts
 │           ├── metadata-cache-shim.ts — MetadataCacheShim (getFileCache, resolvedLinks, changed/resolved events, getTags, fileToLinktext, blockCache, getCachedFiles); content parsing is delegated to `metadata-parser.ts`
@@ -369,9 +376,12 @@ src/
 │   ├── chatState.ts      — Chat reducer + types (conversations, messages, unread)
 │   ├── chatContext.ts    — ChatProvider + useChatContext hook
 │   ├── chatActions.ts    — loadConversations, sendMessage, leaveConversation, etc.
-│   ├── contextPanelState.ts — Context panel reducer + types (sections, views, outline, links, tags, properties)
-│   ├── contextPanelContext.ts — ContextPanelProvider + useContextPanelContext hook
-│   ├── contextPanelActions.ts — loadOutline, loadForwardLinks, loadBacklinks, loadTags, loadProperties, expandTag
+│   ├── panelState.ts     — Generic split-section/tab-ordering reducer shared by both side panels (`side-panel/SidePanel.tsx`) — layout only, not document-derived content. MAX_SECTIONS 3
+│   ├── panelState.test.ts — Unit tests for panelState reducer
+│   ├── panelContext.tsx  — LeftPanelProvider/RightPanelProvider + useLeftPanelContext/useRightPanelContext — both wrap the same `usePanelState` hook (reducer + localStorage persistence scoped by userId), differing only in storage-key prefix and default view set
+│   ├── documentPanelData.ts — DocumentPanelState reducer + types (outline, forward/backlinks, unlinkedMentions, tags, properties) and the `useDocumentPanelData` hook (owns the 5 effects: document switch, debounced content re-parse, vault-change tag reload, live backlinks refresh, live unlinked-mentions refresh — all via `onRealtimeVaultChange`). Side-agnostic: doesn't care which panel currently hosts Outline/Links/Tags/Properties, see `panelState.ts`
+│   ├── documentPanelActions.ts — loadOutline, loadForwardLinks, loadBacklinks, loadUnlinkedMentions (search-based, filters out matches already inside a wikilink via extractWikilinks/resolveWikilinkTarget), linkUnlinkedMention (rewrites one occurrence into a wikilink and saves), loadTags, loadProperties, expandTag
+│   ├── documentPanelActions.test.ts — Unit tests for loadUnlinkedMentions/linkUnlinkedMention
 │   ├── featureState.ts   — Feature toggle reducer + types (FeatureToggleInfo, optimistic update/rollback)
 │   ├── featureContext.ts — FeatureProvider + useFeatureContext hook (isEnabled helper)
 │   ├── featureActions.ts — loadFeatures, toggleFeature action creators
@@ -398,8 +408,6 @@ src/
 │   ├── settingsContext.ts    — SettingsProvider + useSettingsContext hook
 │   ├── canvasState.ts        — Canvas reducer + types (document, viewport, selection, undo/redo stacks, dirty)
 │   ├── canvasContext.ts      — CanvasProvider + useCanvasContext hook (parse, autosave, save)
-│   ├── sidebarPanelState.ts  — Sidebar panel reducer + types (left sidebar sections, views)
-│   ├── sidebarPanelContext.ts — SidebarPanelProvider + useSidebarPanelContext hook
 │   ├── realtimePresenceBridge.ts — Module-level bridge: SSE presence events → PresenceState
 ├── hooks/
 │   ├── useLineNumbers.ts — Line numbers toggle state (localStorage persistence)
@@ -470,9 +478,12 @@ src/
 │   ├── GlobalTooltip.css — GlobalTooltip styles
 │   ├── global-tooltip-position.ts — Pure geometry for placing the tooltip (viewport-edge flipping), testable without a browser layout
 │   ├── VaultSharing.tsx  — Vault sharing component (share list, add/revoke permissions)
-│   ├── GraphView.tsx     — Knowledge graph SVG visualization (d3-force, zoom/pan/drag/search, config-driven colors/layout, tag/property nodes)
+│   ├── GraphView.tsx     — Knowledge graph SVG visualization (d3-force, zoom/pan/drag/search, config-driven colors/layout, tag/property nodes). Optional `localGraphCenterPath` prop renders a Lokaler_Graph: full graph data filtered client-side to the center note's N-hop neighborhood (local-graph-utils.ts), no separate endpoint. Hop-radius stepper, center highlight, live-refresh, dedicated error state when the center note is deleted
+│   ├── GraphView.test.tsx — Unit tests for local-graph filtering/rendering behavior
+│   ├── local-graph-utils.ts — filterToNeighborhood() — pure BFS filter of GraphData to a center node's N-hop neighborhood (undirected edges)
+│   ├── local-graph-utils.test.ts — Unit tests for filterToNeighborhood
 │   ├── graph-utils.ts    — Pure graph utility functions (truncateLabel, clampZoom, computeNodeSize, filterNodes)
-│   ├── graph-config.ts   — GraphConfig interfaces + localStorage persistence (colors, layout, node toggles)
+│   ├── graph-config.ts   — GraphConfig interfaces + localStorage persistence (colors, layout, node toggles, localGraph.hops)
 │   ├── graph-config.test.ts — Unit tests for GraphConfig
 │   ├── GraphSettingsPanel.tsx — Collapsible graph settings (color pickers, sliders, toggles, property multi-select, reset)
 │   ├── GraphSettingsPanel.css — GraphSettingsPanel styles
@@ -497,21 +508,33 @@ src/
 │   │   ├── useViewportCulling.ts — Viewport culling for off-screen nodes
 │   │   ├── canvas-utils.ts       — generateCanvasId, getCanvasColorClass
 │   │   └── markdown-render.tsx   — renderSimpleMarkdown for node previews
-│   ├── context-panel/
-│   │   ├── ContextPanel.tsx      — Main orchestrator (data loading, debounce, view wiring); also subscribes to `onRealtimeVaultChange` (`realtimeVaultBridge.ts`) and debounces (1000ms) a backlinks re-fetch when a remote `saved`/`renamed`/`deleted` event lands for the current vault, so the Links_View backlinks list stays live instead of only refreshing on document switch
-│   │   ├── ContextPanel.css      — All context panel styles (Design Tokens)
-│   │   ├── ContextPanelTabBar.tsx — Tab bar with Drag & Drop reordering + split detection
-│   │   ├── ContextPanelTabBar.css — Tab bar styles
-│   │   ├── SplitSectionContainer.tsx — Vertically stacked sections with resize handles
-│   │   ├── SplitSectionContainer.css — Split section styles
+│   ├── context-panel/            — Built-in Outline/Links/Tags/Properties view components only (layout/orchestration now lives in `side-panel/` — see below; the former `ContextPanel.tsx`/`ContextPanelTabBar.tsx`/`SplitSectionContainer.tsx` orchestrator trio was replaced by the unified `side-panel/SidePanel.tsx`, since every built-in view can now live on either side panel)
 │   │   ├── OutlineView.tsx       — Document heading hierarchy (navigable)
-│   │   ├── LinksView.tsx         — Forward links + backlinks (resolved/unresolved)
+│   │   ├── OutlineView.test.tsx
+│   │   ├── OutlineView.css
+│   │   ├── LinksView.tsx         — Forward links, backlinks, and Ungelinkte_Erwähnungen (three sections: resolved/unresolved forward+back links; unlinked mentions found via search + filtered against extractWikilinks/resolveWikilinkTarget, with a "Verlinken" action per entry)
+│   │   ├── LinksView.test.tsx
+│   │   ├── LinksView.css
 │   │   ├── TagsView.tsx          — Vault-wide tags with expand/collapse
+│   │   ├── TagsView.test.tsx
+│   │   ├── TagsView.css
 │   │   ├── PropertiesView.tsx    — YAML frontmatter as key-value table
+│   │   ├── PropertiesView.test.tsx
+│   │   ├── PropertiesView.css
 │   │   └── utils/
 │   │       ├── extractHeadings.ts — Heading extraction from markdown
-│   │       ├── parseFrontmatter.ts — YAML frontmatter parsing
-│   │       └── persistence.ts    — localStorage layout persistence
+│   │       └── parseFrontmatter.ts — YAML frontmatter parsing
+│   ├── side-panel/               — Unified left/right side-panel shell (layout only — document content lives in `context-panel/` + `documentPanelData.ts`)
+│   │   ├── SidePanel.tsx         — Single shared implementation for both panels; `side` prop only selects which `PanelContext` instance, plugin view source, and CSS look applies — every built-in/plugin view can move freely between sides
+│   │   ├── SidePanel.css
+│   │   ├── PanelTabBar.tsx       — Tab bar with Drag & Drop reordering + split detection
+│   │   ├── PanelTabBar.test.tsx
+│   │   ├── PanelTabBar.css
+│   │   ├── PanelSplitContainer.tsx — Vertically stacked split sections with resize handles, each with its own PanelTabBar
+│   │   ├── PanelSplitContainer.css
+│   │   └── utils/
+│   │       ├── persistence.ts    — localStorage layout persistence, shared by both panels (caller-supplied storage-key prefix keeps left/right independent)
+│   │       └── persistence.test.ts
 │   ├── settings/
 │   │   ├── SettingsPanel.tsx     — Unified settings overlay (Container Query, Ctrl+,, Escape/overlay close)
 │   │   ├── SettingsPanel.css     — Settings panel styles (responsive layout, embedded table overrides)
@@ -542,7 +565,7 @@ src/
 │   ├── QuickSwitcher.tsx — Fuzzy-open-by-name modal (Ctrl+O), structurally mirrors CommandPalette.tsx (overlay, useFocusTrap, Arrow/Enter/Escape) and reuses its `.command-palette-*` CSS classes; sources candidates via `collectFilesSorted()`, ranks via `fuzzyMatch()`, shows `recentFilesStore.getRecent()` for an empty query, offers "create new file" when nothing matches
 │   ├── CommandPaletteContainer.tsx — Built-in commands (navigation, vault ops, editor formatting, view toggles) + plugin commands, Ctrl+P shortcut, CustomEvent bridge to EditMode. Also owns QuickSwitcher's open state and the next/previous-tab keyboard shortcut (both need `commandRegistry`/`usePluginContext()`, only reachable from inside `<PluginProvider>` — see App.tsx note) and wires `app:go-back`/`app:go-forward`/`switcher:open` (previously no-ops in `core-commands-app.ts`) to `useNavigationHistory()`
 │   ├── RealtimeProvider.tsx — SSE event routing (chat, presence, vault:change, plugin-settings:change, toast, server events)
-│   ├── ToastNotification.tsx — Toast notification system (module-level state, CSS transitions)
+│   ├── ToastNotification.tsx — Toast notification system (module-level state, CSS transitions). `showToast()` returns the toast's id; `updateToastMessage(id, msg)`/`dismissToast(id)` target that specific toast — the Obsidian `Notice` compat shim's `setMessage()`/`hide()` need this to affect the toast they actually created, not just fire another `showToast()` blind. `duration: 0` suppresses auto-dismiss (Notice's "stays until closed")
 │   ├── ToastNotification.css — Toast notification styles
 │   ├── ConnectionIndicator.tsx — SSE connection status indicator (connected/connecting/disconnected)
 │   ├── PluginViewPanel.tsx — Plugin view rendering (imperative DOM mount for plugin ItemViews)
@@ -561,20 +584,12 @@ src/
 │   │   ├── PluginStoreSearch.css — Plugin store search styles
 │   │   ├── PluginDetailPanel.tsx — Plugin detail view (README, settings, compatibility info)
 │   │   └── UpdateBanner.tsx      — Update notification banner (available updates count)
-│   └── sidebar-panel/
-│       ├── index.ts              — Barrel export for sidebar-panel module
-│       ├── SidebarPanel.tsx      — Left sidebar panel (tabbed: recent files, bookmarks)
-│       ├── SidebarPanel.css      — Sidebar panel styles
-│       ├── SidebarPanelTabBar.tsx — Tab bar for sidebar sections
-│       ├── SidebarPanelTabBar.css — Tab bar styles
-│       ├── SidebarSplitContainer.tsx — Split sections with resize
-│       ├── SidebarSplitContainer.css — Split container styles
+│   └── sidebar-panel/            — Built-in view components only, mounted by `side-panel/SidePanel.tsx` (the former `SidebarPanel.tsx`/`SidebarPanelTabBar.tsx`/`SidebarSplitContainer.tsx` orchestrator trio was replaced by the same unified `side-panel/` shell that absorbed `context-panel/`'s orchestrator — see above)
 │       ├── RecentFilesView.tsx   — Recent files list view
 │       ├── RecentFilesView.css   — Recent files styles
-│       ├── FavoritesView.tsx     — Bookmarks list view: renders all 4 bookmark types (file/heading/block/search) with type-appropriate icon and click resolution; HTML5 drag-and-drop reorder; right-click/Shift+F10 context menu (remove, reveal in explorer via the shared `slatebase:reveal-file` window event + SidebarPanelContext SET_ACTIVE_VIEW, rename via InlineInput) — reuses the generic `ContextMenu.tsx` rather than a dedicated component
-│       ├── FavoritesView.css     — Bookmarks view styles (incl. drag-over/dragging state)
-│       └── utils/
-│           └── persistence.ts    — localStorage layout persistence
+│       ├── FavoritesView.tsx     — Bookmarks list view: renders all 4 bookmark types (file/heading/block/search) with type-appropriate icon and click resolution; HTML5 drag-and-drop reorder; right-click/Shift+F10 context menu (remove, reveal in explorer via the shared `slatebase:reveal-file` window event, rename via InlineInput) — reuses the generic `ContextMenu.tsx` rather than a dedicated component
+│       ├── FavoritesView.test.tsx
+│       └── FavoritesView.css     — Bookmarks view styles (incl. drag-over/dragging state)
 ├── assets/               — Static images
 └── test-setup.ts         — Vitest/Testing Library setup
 ```

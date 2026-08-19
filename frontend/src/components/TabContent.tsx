@@ -243,6 +243,25 @@ export function TabContent() {
     )
   }
 
+  // Local graph tab — render GraphView scoped to a single note's neighborhood
+  if (activeTab.filePath.startsWith('__local-graph::')) {
+    const centerPath = activeTab.filePath.slice('__local-graph::'.length)
+    if (!activeTab.vaultId) {
+      return (
+        <div className="tab-content tab-content--empty" role="tabpanel" aria-label={t('tabContent.emptyPanelLabel')}>
+          <p>{t('graph.noVault')}</p>
+        </div>
+      )
+    }
+    return (
+      <div className="tab-content tab-content--graph" role="tabpanel" aria-label={activeTab.fileName}>
+        <ErrorBoundary>
+          <GraphView vaultId={activeTab.vaultId} localGraphCenterPath={centerPath} />
+        </ErrorBoundary>
+      </div>
+    )
+  }
+
   // Plugin view tab — render plugin view container
   if (activeTab.filePath.startsWith('__view::')) {
     const viewType = activeTab.filePath.slice('__view::'.length)

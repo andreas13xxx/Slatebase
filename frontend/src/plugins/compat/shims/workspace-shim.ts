@@ -3,11 +3,13 @@ import { debugOnce, warnOnce } from '../log';
 import { resolveWikilinkTarget } from '../../link-resolver';
 import type { DirectoryTree } from '../../../types';
 import type { EventRef, IWorkspaceShim, TFile } from '../types';
-import type { ViewRegistry, WorkspaceLeaf } from '../view-registry';
+import { WorkspaceLeaf, WorkspaceSplit, WorkspaceRibbon } from '../view-registry';
+import type { ViewRegistry } from '../view-registry';
 import { EditorShim } from '../editor-shim';
 import type { IEditor } from '../editor-shim';
 import { refreshPluginExtensions, getActiveEditorContainerEl, setEditorContainerMountedListener } from '../../../editor/plugin-extensions';
 import { recordGapRead, recordGapCall } from '../api-gap-registry';
+import { createFileItemsProxy, type FileExplorerFileItem } from '../file-explorer-dom-registry';
 import {
   registerHoverLinkSource,
   unregisterHoverLinkSource,
@@ -67,6 +69,89 @@ function createMarkdownSourceViewPlaceholder(): HTMLElement {
   return container;
 }
 
+/**
+ * Shape of the synthetic `view` object attached to the file-explorer leaf
+ * (`getLeavesOfType('file-explorer')[0].view`). Only `fileItems` and
+ * `containerEl` are real; everything else a plugin might reach for
+ * (`sortOrder`, `createFolderDom`, `requestSort`, …) falls through the
+ * Proxy in `wrapFileExplorerView()` to the standard no-op-with-warning gap
+ * mechanism, same as `WorkspaceLeaf.wrapWithProxy`.
+ */
+interface FileExplorerLeafView {
+  getViewType: () => string;
+  getDisplayText: () => string;
+  getIcon: () => string;
+  getState: () => Record<string, unknown>;
+  setState: () => Promise<void>;
+  getEphemeralState: () => Record<string, unknown>;
+  setEphemeralState: () => void;
+  readonly containerEl: HTMLElement;
+  readonly fileItems: Record<string, FileExplorerFileItem | undefined>;
+}
+
+let fileExplorerContainerElFallback: HTMLElement | null = null;
+
+/**
+ * `containerEl` for the file-explorer view is deliberately a static,
+ * permanently detached placeholder — never the real, live
+ * `.file-explorer-tree` DOM node. That node is shared, persistent UI (never
+ * remounted per vault); handing it out as a leaf's `containerEl` would put
+ * it one `view.containerEl.remove()` away (e.g. `ViewRegistry.clear()`, or a
+ * plugin calling `leaf.detach()`) from being permanently ripped out of the
+ * page. The actual DOM access this feature exists for goes through
+ * `fileItems[path].titleEl`/`.selfEl` instead, which is what real plugins
+ * (Iconize) use.
+ */
+function getFileExplorerContainerEl(): HTMLElement {
+  return fileExplorerContainerElFallback ??= document.createElement('div');
+}
+
+const fileExplorerEmulatedProperties = new Set<string | symbol>([
+  'getViewType', 'getDisplayText', 'getIcon', 'getState', 'setState',
+  'getEphemeralState', 'setEphemeralState', 'containerEl', 'fileItems',
+]);
+
+function wrapFileExplorerView(view: FileExplorerLeafView): FileExplorerLeafView {
+  return new Proxy(view, {
+    get(target: FileExplorerLeafView, prop: string | symbol): unknown {
+      if (fileExplorerEmulatedProperties.has(prop)) {
+        const value = Reflect.get(target, prop, target);
+        return typeof value === 'function' ? value.bind(target) : value;
+      }
+      if (typeof prop === 'symbol') return Reflect.get(target, prop, target);
+      if (prop === 'then') return undefined;
+
+      if (recordGapRead('FileExplorerView', prop)) {
+        console.warn(
+          `[FileExplorerView] Access to non-emulated file-explorer view property "${prop}". ` +
+          `Slatebase only emulates fileItems/containerEl on this view — everything else is a ` +
+          `no-op. Inspect all gaps with window.__slatebasePluginApiGaps().`
+        );
+      }
+      return (...args: unknown[]) => {
+        recordGapCall('FileExplorerView', prop);
+        void args;
+        return undefined;
+      };
+    },
+  }) as FileExplorerLeafView;
+}
+
+/** Builds the (Proxy-wrapped) synthetic file-explorer view. */
+function createFileExplorerView(): FileExplorerLeafView {
+  return wrapFileExplorerView({
+    getViewType: () => 'file-explorer',
+    getDisplayText: () => 'Files',
+    getIcon: () => 'folder',
+    getState: () => ({}),
+    setState: async () => {},
+    getEphemeralState: () => ({}),
+    setEphemeralState: () => {},
+    get containerEl() { return getFileExplorerContainerEl(); },
+    get fileItems() { return createFileItemsProxy(); },
+  });
+}
+
 interface SyntheticFileLeafView {
   view: {
     file: TFile | null;
@@ -99,6 +184,12 @@ export class WorkspaceShim implements IWorkspaceShim {
    * `instanceof MarkdownView` check against the wrong leaf failed.
    */
   private mostRecentMainLeaf: WorkspaceLeaf | null = null;
+  /**
+   * Singleton synthetic leaf backing `workspace.getLeavesOfType('file-explorer')`
+   * — see `getOrCreateFileExplorerLeaf()` for why it's built directly with
+   * `new WorkspaceLeaf(...)` instead of `viewRegistry.createLeaf()`.
+   */
+  private fileExplorerLeaf: WorkspaceLeaf | null = null;
   private viewRegistry: ViewRegistry | null = null;
   private app: unknown = null;
   private directoryTree: DirectoryTree | null = null;
@@ -376,13 +467,13 @@ export class WorkspaceShim implements IWorkspaceShim {
 
   /**
    * Get or create a leaf in the left sidebar.
-   * Slatebase maps both left and right sidebar to the Context Panel (right-sidebar).
+   * Creates a leaf with location 'left-sidebar'.
    */
-  getLeftLeaf(_split?: boolean): WorkspaceLeaf {  
+  getLeftLeaf(_split?: boolean): WorkspaceLeaf {
     if (!this.viewRegistry) {
-      return this.viewRegistry!.createLeaf(this.app, 'right-sidebar');
+      return this.viewRegistry!.createLeaf(this.app, 'left-sidebar');
     }
-    return this.viewRegistry.createLeaf(this.app, 'right-sidebar');
+    return this.viewRegistry.createLeaf(this.app, 'left-sidebar');
   }
 
   /**
@@ -391,18 +482,17 @@ export class WorkspaceShim implements IWorkspaceShim {
    * pattern plugins previously had to write by hand against
    * `getLeavesOfType()` + `getRightLeaf()`/`getLeftLeaf()`.
    *
-   * Slatebase maps both sidebar sides onto the single Context Panel
-   * (`right-sidebar` location — see `getLeftLeaf()`), so `side` only chooses
-   * which factory creates a *new* leaf; an existing leaf of the type is
-   * reused regardless of which side it was originally opened on.
+   * Reuses an existing leaf of the type only if it's already in the
+   * requested sidebar — a leaf opened on the other side is left alone and a
+   * new one is created for `side`, matching real Obsidian's per-side leaves.
    */
   async ensureSideLeaf(
     viewType: string,
     side: 'left' | 'right',
     options?: { active?: boolean; reveal?: boolean; split?: boolean; state?: Record<string, unknown> },
   ): Promise<WorkspaceLeaf> {
-    debugOnce('WorkspaceShim.ensureSideLeaf', '[WorkspaceShim] ensureSideLeaf: Slatebase maps both sidebar sides onto the single Context Panel.');
-    const existing = this.getLeavesOfType(viewType).find(l => l.location === 'right-sidebar');
+    const location = side === 'left' ? 'left-sidebar' : 'right-sidebar';
+    const existing = this.getLeavesOfType(viewType).find(l => l.location === location);
     if (existing) {
       if (options?.reveal !== false) this.revealLeaf(existing);
       return existing;
@@ -497,8 +587,33 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Get all leaves that have a view of the given type.
    */
   getLeavesOfType(viewType: string): WorkspaceLeaf[] {
+    if (viewType === 'file-explorer') {
+      const leaf = this.getOrCreateFileExplorerLeaf();
+      return leaf ? [leaf] : [];
+    }
     if (!this.viewRegistry) return [];
     return this.viewRegistry.getLeavesOfType(viewType);
+  }
+
+  /**
+   * Lazily builds the singleton leaf for `getLeavesOfType('file-explorer')`
+   * (Iconize's real access path, per PLUGIN-COMPAT.md). Deliberately built
+   * with `new WorkspaceLeaf(...)` rather than `viewRegistry.createLeaf()`:
+   * the latter adds the leaf to `ViewRegistry`'s tracked `leaves` map, and
+   * `ViewRegistry.clear()` — called on every vault switch — unconditionally
+   * calls `view.containerEl.remove()` on every tracked leaf. This leaf's
+   * `fileItems`/`containerEl` never need that lifecycle (they read the live,
+   * module-global DOM registry directly), so staying outside the tracked map
+   * avoids that footgun entirely rather than working around it.
+   */
+  private getOrCreateFileExplorerLeaf(): WorkspaceLeaf | null {
+    if (!this.fileExplorerLeaf) {
+      if (!this.viewRegistry || !this.app) return null;
+      const raw = new WorkspaceLeaf(this.app, this.viewRegistry, 'left-sidebar');
+      (raw as unknown as { view: unknown }).view = createFileExplorerView();
+      this.fileExplorerLeaf = WorkspaceLeaf.wrapWithProxy(raw);
+    }
+    return this.fileExplorerLeaf;
   }
 
   /**
@@ -879,10 +994,14 @@ export class WorkspaceShim implements IWorkspaceShim {
 
   /**
    * Workspace splits — stub objects for plugins that access layout structure.
+   * Built on `WorkspaceSplit` (rather than plain object literals) so that
+   * `rootSplit instanceof WorkspaceSplit` etc. hold for plugins that probe
+   * layout objects defensively — Slatebase still has no real split tree, so
+   * `children` stays permanently empty and collapse/expand stay no-ops.
    */
-  readonly rootSplit = { type: 'split', children: [] };
-  readonly leftSplit = { type: 'split', collapsed: false, toggle() {}, collapse() {}, expand() {} };
-  readonly rightSplit = { type: 'split', collapsed: false, toggle() {}, collapse() {}, expand() {} };
+  readonly rootSplit = Object.assign(new WorkspaceSplit(), { children: [] as unknown[] });
+  readonly leftSplit = Object.assign(new WorkspaceSplit(), { collapsed: false, toggle() {}, collapse() {}, expand() {} });
+  readonly rightSplit = Object.assign(new WorkspaceSplit(), { collapsed: false, toggle() {}, collapse() {}, expand() {} });
 
   /**
    * `obsidian://` protocol-handler registry. Slatebase is a web app and cannot
@@ -897,20 +1016,23 @@ export class WorkspaceShim implements IWorkspaceShim {
   /**
    * Ribbon (the vertical icon bar) stubs — Slatebase has no ribbon UI, so hide/show/toggle
    * are no-ops. Exists so plugins calling `workspace.leftRibbon.hide()` (e.g. Editing
-   * Toolbar's "Workplace Fullscreen" command) don't crash on `undefined.hide()`.
+   * Toolbar's "Workplace Fullscreen" command) don't crash on `undefined.hide()`. Built on
+   * `WorkspaceRibbon` (rather than a plain object literal) so `instanceof WorkspaceRibbon`
+   * holds — real Obsidian's `WorkspaceRibbon` itself has no public members, so the extra
+   * hide/show/toggle/collapsed here are pragmatic additions, not a deviation from the base.
    */
-  readonly leftRibbon = {
+  readonly leftRibbon = Object.assign(new WorkspaceRibbon(), {
     hide: () => debugOnce('WorkspaceShim.leftRibbon', '[WorkspaceShim] leftRibbon: Slatebase has no ribbon UI — hide/show/toggle are no-ops.'),
     show: () => debugOnce('WorkspaceShim.leftRibbon', '[WorkspaceShim] leftRibbon: Slatebase has no ribbon UI — hide/show/toggle are no-ops.'),
     toggle: () => debugOnce('WorkspaceShim.leftRibbon', '[WorkspaceShim] leftRibbon: Slatebase has no ribbon UI — hide/show/toggle are no-ops.'),
     collapsed: false,
-  };
-  readonly rightRibbon = {
+  });
+  readonly rightRibbon = Object.assign(new WorkspaceRibbon(), {
     hide: () => debugOnce('WorkspaceShim.rightRibbon', '[WorkspaceShim] rightRibbon: Slatebase has no ribbon UI — hide/show/toggle are no-ops.'),
     show: () => debugOnce('WorkspaceShim.rightRibbon', '[WorkspaceShim] rightRibbon: Slatebase has no ribbon UI — hide/show/toggle are no-ops.'),
     toggle: () => debugOnce('WorkspaceShim.rightRibbon', '[WorkspaceShim] rightRibbon: Slatebase has no ribbon UI — hide/show/toggle are no-ops.'),
     collapsed: false,
-  };
+  });
 
   /**
    * Open a popout window leaf. Returns the active leaf (no popout support in web).

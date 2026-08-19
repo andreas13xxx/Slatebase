@@ -7,7 +7,8 @@
  */
 
 import { useTranslation } from '../../i18n'
-import type { OutlineHeading } from '../../state/contextPanelState'
+import type { OutlineHeading } from '../../state/documentPanelData'
+import './OutlineView.css'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 

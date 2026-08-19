@@ -6,6 +6,9 @@ tags: [fortgeschritten, plugins]
 
 Das Mind-Map-Plugin verwandelt die Überschriften- und Listen-Struktur einer Notiz in eine interaktive, zoombare Mindmap — ohne dass du die Notiz selbst umschreiben musst. Jede Überschriftenebene und jede Einrückungsstufe wird automatisch zu einem Knoten.
 
+> [!warning] Plugin vermutlich kaputt
+> Das Mind-Map-Plugin (`lynchjames/obsidian-mind-map`) wird seit 2024-02-25 nicht mehr aktualisiert und gilt als bestätigt kaputt — betroffene Nutzer berichten auf GitHub, dass es in aktuellen Obsidian-Versionen nicht mehr funktioniert (Issue #117 „Doesn't work in latest version", 04/2025; Issue #119 „Obsidian update", 09/2025). Das ist ein Problem des Plugins selbst, unabhängig von Slatebases Kompatibilitätsschicht. Installiere es nur zum Ausprobieren und erwarte, dass die Mindmap-Ansicht nicht (mehr) öffnet.
+
 ---
 
 ## Voraussetzungen

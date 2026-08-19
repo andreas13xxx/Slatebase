@@ -1,7 +1,9 @@
 /**
- * Context panel state management.
- * Manages split sections, tab ordering, and view-specific data
- * for the right-side context panel (Outline, Links, Tags, Properties).
+ * Generic side-panel state management — shared by both the left and right
+ * sidebar panels (`frontend/src/components/side-panel/SidePanel.tsx`).
+ * Manages split sections and tab ordering only; document-derived data
+ * (outline/links/tags/properties content) lives in `documentPanelData.ts`
+ * instead, since it doesn't depend on which side currently hosts those views.
  */
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -14,14 +16,20 @@ export const MIN_HEIGHT_FRACTION = 0.1
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-/** Built-in identifiers for the context panel views. */
-export type BuiltinViewId = 'outline' | 'links' | 'tags' | 'properties' | 'search'
+/**
+ * All built-in view identifiers, valid on either side. Which side a given
+ * view starts on is just an initial-state default (`createInitialState`) —
+ * any of these can be dragged to the other panel at runtime.
+ */
+export type BuiltinPanelViewId =
+  | 'explorer' | 'favorites' | 'recent'
+  | 'outline' | 'links' | 'tags' | 'properties' | 'search'
 
 /** Plugin view identifiers use a `plugin:` prefix followed by the view type. */
 export type PluginViewId = `plugin:${string}`
 
-/** All context panel view identifiers (built-in + plugin). */
-export type ContextPanelViewId = BuiltinViewId | PluginViewId
+/** All panel view identifiers (built-in + plugin). */
+export type PanelViewId = BuiltinPanelViewId | PluginViewId
 
 /** Type guard: checks if a view ID is a plugin view. */
 export function isPluginViewId(viewId: string): viewId is PluginViewId {
@@ -29,8 +37,12 @@ export function isPluginViewId(viewId: string): viewId is PluginViewId {
 }
 
 /** Type guard: checks if a view ID is a built-in view. */
-export function isBuiltinViewId(viewId: string): viewId is BuiltinViewId {
-  return viewId === 'outline' || viewId === 'links' || viewId === 'tags' || viewId === 'properties' || viewId === 'search'
+export function isBuiltinViewId(viewId: string): viewId is BuiltinPanelViewId {
+  return (
+    viewId === 'explorer' || viewId === 'favorites' || viewId === 'recent' ||
+    viewId === 'outline' || viewId === 'links' || viewId === 'tags' ||
+    viewId === 'properties' || viewId === 'search'
+  )
 }
 
 /** Extract the plugin view type from a PluginViewId. */
@@ -38,84 +50,32 @@ export function getPluginViewType(viewId: PluginViewId): string {
   return viewId.slice(7) // Remove 'plugin:' prefix
 }
 
-/** A single split section within the context panel. */
-export interface SplitSection {
+/** A single split section within a panel. */
+export interface PanelSplitSection {
   id: string
-  viewIds: ContextPanelViewId[]
-  activeViewId: ContextPanelViewId
+  viewIds: PanelViewId[]
+  activeViewId: PanelViewId
   /** Height as a fraction (0–1) of total panel body height. */
   heightFraction: number
 }
 
-/** Heading entry for the outline view. */
-export interface OutlineHeading {
-  text: string
-  level: 1 | 2 | 3 | 4 | 5 | 6
-  anchor: string
+/** Panel state (layout only — no document-derived data). */
+export interface PanelState {
+  sections: PanelSplitSection[]
+  tabOrder: PanelViewId[]
 }
 
-/** Link entry for the links view. */
-export interface LinkEntry {
-  target: string
-  displayName: string
-  resolved: boolean
-}
-
-/** Tag entry for the tags view. */
-export interface TagEntry {
-  name: string
-  count: number
-}
-
-/** Context panel state. */
-export interface ContextPanelState {
-  sections: SplitSection[]
-  tabOrder: ContextPanelViewId[]
-  outline: {
-    headings: OutlineHeading[]
-    activeAnchor: string | null
-  }
-  links: {
-    forward: LinkEntry[]
-    backlinks: LinkEntry[]
-    backlinksLoading: boolean
-    backlinksError: string | null
-  }
-  tags: {
-    entries: TagEntry[]
-    loading: boolean
-    expandedTag: string | null
-    tagFiles: string[]
-  }
-  properties: {
-    data: Record<string, unknown> | null
-    parseError: string | null
-    rawFrontmatter: string | null
-  }
-}
-
-/** Action types for the context panel reducer. */
-export type ContextPanelAction =
-  | { type: 'SET_TAB_ORDER'; tabOrder: ContextPanelViewId[] }
-  | { type: 'SET_ACTIVE_VIEW'; sectionId: string; viewId: ContextPanelViewId }
-  | { type: 'SPLIT_VIEW'; viewId: ContextPanelViewId; targetSectionIndex: number }
-  | { type: 'MERGE_SECTION'; sectionId: string; targetSectionId: string; viewId: ContextPanelViewId }
-  | { type: 'MOVE_VIEW_TO_SECTION'; viewId: ContextPanelViewId; targetSectionId: string }
+/** Action types for the panel reducer. */
+export type PanelAction =
+  | { type: 'SET_TAB_ORDER'; sectionId: string; viewIds: PanelViewId[] }
+  | { type: 'SET_ACTIVE_VIEW'; sectionId: string; viewId: PanelViewId }
+  | { type: 'SPLIT_VIEW'; viewId: PanelViewId; targetSectionIndex: number }
+  | { type: 'MERGE_SECTION'; sectionId: string; targetSectionId: string; viewId: PanelViewId }
+  | { type: 'MOVE_VIEW_TO_SECTION'; viewId: PanelViewId; targetSectionId: string }
   | { type: 'REMOVE_SECTION'; sectionId: string }
   | { type: 'RESIZE_SECTIONS'; heightFractions: number[] }
-  | { type: 'SET_OUTLINE'; headings: OutlineHeading[] }
-  | { type: 'SET_ACTIVE_ANCHOR'; anchor: string | null }
-  | { type: 'SET_FORWARD_LINKS'; links: LinkEntry[] }
-  | { type: 'SET_BACKLINKS'; backlinks: LinkEntry[] }
-  | { type: 'SET_BACKLINKS_LOADING'; loading: boolean }
-  | { type: 'SET_BACKLINKS_ERROR'; error: string | null }
-  | { type: 'SET_TAGS'; entries: TagEntry[] }
-  | { type: 'SET_TAGS_LOADING'; loading: boolean }
-  | { type: 'SET_TAG_EXPANDED'; tag: string | null; files: string[] }
-  | { type: 'SET_PROPERTIES'; data: Record<string, unknown> | null; parseError: string | null; rawFrontmatter: string | null }
-  | { type: 'RESET_DOCUMENT_STATE' }
-  | { type: 'ADD_PLUGIN_VIEW'; viewId: PluginViewId }
-  | { type: 'REMOVE_PLUGIN_VIEW'; viewId: PluginViewId }
+  | { type: 'ADD_VIEW'; viewId: PanelViewId }
+  | { type: 'REMOVE_VIEW'; viewId: PanelViewId }
 
 // ─── Section ID Generation ───────────────────────────────────────────────────
 
@@ -124,7 +84,7 @@ let sectionIdCounter = 0
 /** Generates a unique section ID using a simple counter. */
 export function generateSectionId(): string {
   sectionIdCounter += 1
-  return `section-${sectionIdCounter}`
+  return `panel-section-${sectionIdCounter}`
 }
 
 /**
@@ -135,60 +95,51 @@ export function resetSectionIdCounter(): void {
   sectionIdCounter = 0
 }
 
-// ─── Default Tab Order ───────────────────────────────────────────────────────
-
-/** Default tab order for the context panel. */
-export const DEFAULT_TAB_ORDER: ContextPanelViewId[] = ['outline', 'links', 'tags', 'properties', 'search']
-
 // ─── Initial State ───────────────────────────────────────────────────────────
 
-/** Creates the initial context panel state with a single section containing all views. */
-export function createInitialState(): ContextPanelState {
+/**
+ * Creates the initial panel state with a single section containing the given
+ * default views. Left and right panels pass different `defaultViewIds` —
+ * that's the only place a "side" is baked in; from there on, any view can
+ * move freely between panels.
+ */
+export function createInitialState(defaultViewIds: PanelViewId[]): PanelState {
   return {
     sections: [
       {
         id: generateSectionId(),
-        viewIds: ['outline', 'links', 'tags', 'properties', 'search'],
-        activeViewId: 'outline',
+        viewIds: [...defaultViewIds],
+        activeViewId: defaultViewIds[0]!,
         heightFraction: 1,
       },
     ],
-    tabOrder: [...DEFAULT_TAB_ORDER],
-    outline: {
-      headings: [],
-      activeAnchor: null,
-    },
-    links: {
-      forward: [],
-      backlinks: [],
-      backlinksLoading: false,
-      backlinksError: null,
-    },
-    tags: {
-      entries: [],
-      loading: false,
-      expandedTag: null,
-      tagFiles: [],
-    },
-    properties: {
-      data: null,
-      parseError: null,
-      rawFrontmatter: null,
-    },
+    tabOrder: [...defaultViewIds],
   }
 }
 
 // ─── Reducer ─────────────────────────────────────────────────────────────────
 
 /**
- * Pure reducer handling all context panel state transitions.
+ * Pure reducer handling all panel layout state transitions. Shared by both
+ * the left and right panel — identical mechanics regardless of which side's
+ * views happen to be flowing through it.
  */
-export function contextPanelReducer(state: ContextPanelState, action: ContextPanelAction): ContextPanelState {
+export function panelReducer(state: PanelState, action: PanelAction): PanelState {
   switch (action.type) {
     case 'SET_TAB_ORDER': {
+      // Drag-reorder within a section reorders that section's own `viewIds`
+      // (what the tab bar actually renders) — `tabOrder` alone was a stale
+      // flat field nothing read for display, only used for the persisted-
+      // layout migration check below, so it's kept in sync here as a
+      // derived concatenation of all sections' viewIds in section order.
+      const { sectionId, viewIds } = action
+      const newSections = state.sections.map((section) =>
+        section.id === sectionId ? { ...section, viewIds } : section
+      )
       return {
         ...state,
-        tabOrder: action.tabOrder,
+        sections: newSections,
+        tabOrder: newSections.flatMap((section) => section.viewIds),
       }
     }
 
@@ -226,11 +177,11 @@ export function contextPanelReducer(state: ContextPanelState, action: ContextPan
       // Remove the view from the source section
       const updatedSourceViewIds = sourceSection.viewIds.filter((v) => v !== viewId)
       const updatedSourceActiveView = sourceSection.activeViewId === viewId
-        ? updatedSourceViewIds[0] ?? 'outline'
+        ? updatedSourceViewIds[0]!
         : sourceSection.activeViewId
 
       // Create the new section with the split view
-      const newSection: SplitSection = {
+      const newSection: PanelSplitSection = {
         id: generateSectionId(),
         viewIds: [viewId],
         activeViewId: viewId,
@@ -238,7 +189,7 @@ export function contextPanelReducer(state: ContextPanelState, action: ContextPan
       }
 
       // Build new sections array with the new section inserted at the target index
-      const newSections: SplitSection[] = []
+      const newSections: PanelSplitSection[] = []
       const insertIndex = Math.min(targetSectionIndex, state.sections.length)
 
       for (let i = 0; i <= state.sections.length; i++) {
@@ -291,7 +242,7 @@ export function contextPanelReducer(state: ContextPanelState, action: ContextPan
       const updatedTargetViewIds = [...targetSection.viewIds, viewId]
 
       // Build new sections
-      let newSections: SplitSection[]
+      let newSections: PanelSplitSection[]
 
       if (updatedSourceViewIds.length === 0) {
         // Source section is now empty — remove it and redistribute height equally
@@ -317,7 +268,7 @@ export function contextPanelReducer(state: ContextPanelState, action: ContextPan
       } else {
         // Source section still has views — just move the view
         const updatedSourceActiveView = sourceSection.activeViewId === viewId
-          ? updatedSourceViewIds[0] ?? 'outline'
+          ? updatedSourceViewIds[0]!
           : sourceSection.activeViewId
 
         newSections = state.sections.map((s) => {
@@ -363,7 +314,7 @@ export function contextPanelReducer(state: ContextPanelState, action: ContextPan
       const updatedTargetViewIds = [...targetSection.viewIds, viewId]
 
       // Build new sections
-      let newSections: SplitSection[]
+      let newSections: PanelSplitSection[]
 
       if (updatedSourceViewIds.length === 0) {
         // Source section is now empty — remove it and redistribute height equally
@@ -389,7 +340,7 @@ export function contextPanelReducer(state: ContextPanelState, action: ContextPan
       } else {
         // Source section still has views — just move the view
         const updatedSourceActiveView = sourceSection.activeViewId === viewId
-          ? updatedSourceViewIds[0] ?? 'outline'
+          ? updatedSourceViewIds[0]!
           : sourceSection.activeViewId
 
         newSections = state.sections.map((s) => {
@@ -459,139 +410,7 @@ export function contextPanelReducer(state: ContextPanelState, action: ContextPan
       }
     }
 
-    case 'SET_OUTLINE': {
-      return {
-        ...state,
-        outline: {
-          ...state.outline,
-          headings: action.headings,
-        },
-      }
-    }
-
-    case 'SET_ACTIVE_ANCHOR': {
-      return {
-        ...state,
-        outline: {
-          ...state.outline,
-          activeAnchor: action.anchor,
-        },
-      }
-    }
-
-    case 'SET_FORWARD_LINKS': {
-      return {
-        ...state,
-        links: {
-          ...state.links,
-          forward: action.links,
-        },
-      }
-    }
-
-    case 'SET_BACKLINKS': {
-      return {
-        ...state,
-        links: {
-          ...state.links,
-          backlinks: action.backlinks,
-          backlinksLoading: false,
-          backlinksError: null,
-        },
-      }
-    }
-
-    case 'SET_BACKLINKS_LOADING': {
-      return {
-        ...state,
-        links: {
-          ...state.links,
-          backlinksLoading: action.loading,
-        },
-      }
-    }
-
-    case 'SET_BACKLINKS_ERROR': {
-      return {
-        ...state,
-        links: {
-          ...state.links,
-          backlinksError: action.error,
-          backlinksLoading: false,
-        },
-      }
-    }
-
-    case 'SET_TAGS': {
-      return {
-        ...state,
-        tags: {
-          ...state.tags,
-          entries: action.entries,
-          loading: false,
-        },
-      }
-    }
-
-    case 'SET_TAGS_LOADING': {
-      return {
-        ...state,
-        tags: {
-          ...state.tags,
-          loading: action.loading,
-        },
-      }
-    }
-
-    case 'SET_TAG_EXPANDED': {
-      return {
-        ...state,
-        tags: {
-          ...state.tags,
-          expandedTag: action.tag,
-          tagFiles: action.files,
-        },
-      }
-    }
-
-    case 'SET_PROPERTIES': {
-      return {
-        ...state,
-        properties: {
-          data: action.data,
-          parseError: action.parseError,
-          rawFrontmatter: action.rawFrontmatter,
-        },
-      }
-    }
-
-    case 'RESET_DOCUMENT_STATE': {
-      return {
-        ...state,
-        outline: {
-          headings: [],
-          activeAnchor: null,
-        },
-        links: {
-          forward: [],
-          backlinks: [],
-          backlinksLoading: false,
-          backlinksError: null,
-        },
-        tags: {
-          ...state.tags,
-          expandedTag: null,
-          tagFiles: [],
-        },
-        properties: {
-          data: null,
-          parseError: null,
-          rawFrontmatter: null,
-        },
-      }
-    }
-
-    case 'ADD_PLUGIN_VIEW': {
+    case 'ADD_VIEW': {
       const { viewId } = action
 
       // Don't add if already present in any section
@@ -613,15 +432,19 @@ export function contextPanelReducer(state: ContextPanelState, action: ContextPan
       }
     }
 
-    case 'REMOVE_PLUGIN_VIEW': {
+    case 'REMOVE_VIEW': {
       const { viewId } = action
 
-      // Remove from all sections and fix activeViewId if needed
+      // Remove from all sections and fix activeViewId if needed. The
+      // fallback below (`?? viewId`) is only reached when the section became
+      // empty (updatedViewIds.length === 0) — that section is then dropped
+      // by the `nonEmptySections` filter just below, so the placeholder
+      // value is never actually rendered, just needs to satisfy the type.
       let newSections = state.sections.map(section => {
         if (!section.viewIds.includes(viewId)) return section
         const updatedViewIds = section.viewIds.filter(v => v !== viewId)
         const activeViewId = section.activeViewId === viewId
-          ? (updatedViewIds[0] ?? 'outline')
+          ? (updatedViewIds[0] ?? viewId)
           : section.activeViewId
         return { ...section, viewIds: updatedViewIds, activeViewId }
       })
@@ -632,11 +455,14 @@ export function contextPanelReducer(state: ContextPanelState, action: ContextPan
         const equalFraction = 1 / nonEmptySections.length
         newSections = nonEmptySections.map(s => ({ ...s, heightFraction: equalFraction }))
       } else {
-        // All sections empty — restore to default with built-in views only
+        // All sections empty — fall back to whatever views remain in
+        // tabOrder (built-ins the user hasn't moved away, other plugin
+        // views), or an empty section if truly nothing is left.
+        const remaining = state.tabOrder.filter(v => v !== viewId)
         newSections = [{
           id: generateSectionId(),
-          viewIds: ['outline', 'links', 'tags', 'properties', 'search'],
-          activeViewId: 'outline' as ContextPanelViewId,
+          viewIds: remaining,
+          activeViewId: remaining[0] ?? viewId,
           heightFraction: 1,
         }]
       }

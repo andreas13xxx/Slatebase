@@ -54,12 +54,15 @@ import { PluginViewPanel } from './components/PluginViewPanel'
 import { TrashView } from './components/TrashView'
 import { VersionBrowser } from './components/VersionBrowser'
 import { useVersionInfo } from './hooks/useVersionInfo'
-import { ContextPanelProvider, useContextPanelContext } from './state/contextPanelContext'
-import { SidebarPanelProvider } from './state/sidebarPanelContext'
-import { ContextPanel } from './components/context-panel/ContextPanel'
+import { LeftPanelProvider, RightPanelProvider, useLeftPanelContext, useRightPanelContext } from './state/panelContext'
+import type { PanelViewId } from './state/panelState'
+import { useDocumentPanelData } from './state/documentPanelData'
+import type { UnlinkedMentionEntry } from './state/documentPanelData'
+import { linkUnlinkedMention } from './state/documentPanelActions'
+import { SidePanel } from './components/side-panel/SidePanel'
+import type { SidePanelDocumentProps, SidePanelSearchProps } from './components/side-panel/SidePanel'
 import { SettingsPanel } from './components/settings/SettingsPanel'
 import type { SettingsCategory, SettingsSection } from './state/settingsState'
-import { SidebarPanel } from './components/sidebar-panel'
 import { PluginProvider } from './plugins/compat/plugin-context'
 import { CommandPaletteContainer } from './components/CommandPaletteContainer'
 import { TabBar, type SettingsTabDescriptor } from './components/TabBar'
@@ -179,7 +182,8 @@ function AppContent() {
   const { authState, authDispatch } = useAuthContext()
   const { tabState, tabDispatch } = useTabContext()
   const { isEnabled } = useFeatureContext()
-  const { state: contextPanelState, dispatch: contextPanelDispatch } = useContextPanelContext()
+  const { state: leftPanelState, dispatch: leftPanelDispatch } = useLeftPanelContext()
+  const { state: rightPanelState, dispatch: rightPanelDispatch } = useRightPanelContext()
   const { goBack, goForward } = useNavigationHistory()
   const { t } = useTranslation()
   const prevVaultId = useRef<string | null>(null)
@@ -536,6 +540,29 @@ function AppContent() {
     }
   }
 
+  /** Opens (or activates) a Lokaler_Graph tab centered on the given note. */
+  function handleOpenLocalGraph(filePath: string) {
+    if (!state.selectedVaultId) return
+    const sentinelPath = '__local-graph::' + filePath
+    const existingTab = tabState.tabs.find((t) => t.filePath === sentinelPath && t.vaultId === state.selectedVaultId)
+    if (existingTab) {
+      setActiveSettingsPage(null)
+      tabDispatch({ type: 'ACTIVATE_TAB', payload: { tabId: existingTab.id } })
+    } else {
+      setActiveSettingsPage(null)
+      const noteName = filePath.split('/').pop()?.replace(/\.md$/i, '') ?? filePath
+      tabDispatch({
+        type: 'OPEN_TAB',
+        payload: { vaultId: state.selectedVaultId, filePath: sentinelPath, fileName: `${t('graph.localGraph.tabPrefix')} ${noteName}` },
+      })
+      const localGraphTabId = `${state.selectedVaultId}::${sentinelPath}`
+      tabDispatch({
+        type: 'TAB_CONTENT_LOADED',
+        payload: { tabId: localGraphTabId, content: '', isBinary: false },
+      })
+    }
+  }
+
   /** Opens or creates today's daily note for the active vault. */
   const handleDailyNote = useCallback(async () => {
     if (!state.selectedVaultId) {
@@ -561,9 +588,12 @@ function AppContent() {
   }, [state.selectedVaultId, tabDispatch, dispatch])
 
   useGlobalShortcuts({
-    contextPanelSections: contextPanelState.sections,
-    contextPanelDispatch,
+    leftPanelSections: leftPanelState.sections,
+    leftPanelDispatch,
+    rightPanelSections: rightPanelState.sections,
+    rightPanelDispatch,
     setShowRightPanel,
+    setShowSidebar,
     tabs: tabState.tabs,
     activeTabId: tabState.activeTabId,
     tabDispatch,
@@ -664,6 +694,87 @@ function AppContent() {
   const activeTab = tabState.tabs.find((tab) => tab.id === tabState.activeTabId) ?? null
   const selectedVaultName = selectedVault?.name ?? ''
 
+  // ─── Document-derived panel data (Outline/Links/Tags/Properties) ──────────
+  // Shared across whichever side panel currently hosts these views — see SidePanel.tsx.
+  const documentContent = activeTab && !activeTab.isBinary && activeTab.filePath !== '__graph__' ? (activeTab.editBuffer ?? activeTab.content) : null
+  const documentPath = activeTab && !activeTab.isBinary && activeTab.filePath !== '__graph__' ? activeTab.filePath : null
+
+  const documentPanelData = useDocumentPanelData({
+    documentContent,
+    documentPath,
+    vaultId: state.selectedVaultId,
+    apiClient,
+    directoryTree: state.directoryTree,
+  })
+
+  const handleLinkClick = useCallback((target: string, resolved: boolean) => {
+    if (!resolved || !state.selectedVaultId) return
+    const filePath = target.endsWith('.md') ? target : `${target}.md`
+    const parts = filePath.split('/')
+    const fileName = parts[parts.length - 1] ?? filePath
+    void openTab(tabDispatch, dispatch, apiClient, state.selectedVaultId, filePath, fileName)
+  }, [state.selectedVaultId, tabDispatch, dispatch])
+
+  const handleFileClick = useCallback((filePath: string) => {
+    if (!state.selectedVaultId) return
+    const parts = filePath.split('/')
+    const fileName = parts[parts.length - 1] ?? filePath
+    void openTab(tabDispatch, dispatch, apiClient, state.selectedVaultId, filePath, fileName)
+  }, [state.selectedVaultId, tabDispatch, dispatch])
+
+  /** Converts an Ungelinkte_Erwähnung into a real wikilink (Requirement 2.7). */
+  async function handleLinkMention(entry: UnlinkedMentionEntry): Promise<void> {
+    const vaultId = state.selectedVaultId
+    const path = documentPath
+    if (!vaultId || !path) return
+    const baseName = path.split('/').pop()?.replace(/\.md$/i, '') ?? path
+    try {
+      await linkUnlinkedMention(apiClient, vaultId, entry, baseName)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      showToast('error', message)
+    }
+  }
+
+  const handleSearchNavigate = useCallback((targetVaultId: string, filePath: string, _line: number) => {
+    if (targetVaultId !== state.selectedVaultId) {
+      dispatch({ type: 'VAULT_SELECTED', payload: targetVaultId })
+    }
+    const parts = filePath.split('/')
+    const fileName = parts[parts.length - 1] ?? filePath
+    void openTab(tabDispatch, dispatch, apiClient, targetVaultId, filePath, fileName)
+  }, [state.selectedVaultId, dispatch, tabDispatch])
+
+  const documentPanelProps: SidePanelDocumentProps = {
+    outline: documentPanelData.state.outline,
+    links: documentPanelData.state.links,
+    tags: documentPanelData.state.tags,
+    properties: documentPanelData.state.properties,
+    hasDocument: documentContent !== null,
+    onHeadingClick: documentPanelData.onHeadingClick,
+    onLinkClick: handleLinkClick,
+    onTagClick: documentPanelData.onTagClick,
+    onFileClick: handleFileClick,
+    onLinkMention: handleLinkMention,
+  }
+
+  const searchProps: SidePanelSearchProps = {
+    vaults: state.vaults,
+    selectedVaultId: state.selectedVaultId,
+    hasWriteAccess: selectedVault?.permission === 'owner' || selectedVault?.permission === 'write',
+    onNavigateToResult: handleSearchNavigate,
+  }
+
+  const handleMoveBuiltinView = useCallback((viewId: PanelViewId, targetSide: 'left' | 'right') => {
+    if (targetSide === 'left') {
+      rightPanelDispatch({ type: 'REMOVE_VIEW', viewId })
+      leftPanelDispatch({ type: 'ADD_VIEW', viewId })
+    } else {
+      leftPanelDispatch({ type: 'REMOVE_VIEW', viewId })
+      rightPanelDispatch({ type: 'ADD_VIEW', viewId })
+    }
+  }, [leftPanelDispatch, rightPanelDispatch])
+
   // Breadcrumb (Requirement 7.5): only for real file tabs, not the graph tab or plugin views.
   const breadcrumbFilePath = activeTab && activeTab.filePath !== '__graph__' && !activeTab.filePath.startsWith('__view::')
     ? activeTab.filePath
@@ -743,6 +854,7 @@ function AppContent() {
         onImportFolder={handleImportFolder}
         onExportVault={handleExportVault}
         onOpenGraph={handleOpenGraph}
+        onOpenLocalGraph={handleOpenLocalGraph}
         onDailyNote={handleDailyNote}
         showSidebar={showSidebar}
         showRightPanel={showRightPanel}
@@ -870,7 +982,8 @@ function AppContent() {
               </div>
 
               <div className="app-sidebar-body">
-                <SidebarPanel
+                <SidePanel
+                  side="left"
                   width={sidebar.width}
                   vaultId={state.selectedVaultId}
                   onOpenFile={handleSidebarOpenFile}
@@ -884,6 +997,9 @@ function AppContent() {
                     />
                   )}
                   refreshKey={sidebarRefreshKey}
+                  documentPanel={documentPanelProps}
+                  search={searchProps}
+                  onMoveBuiltinView={handleMoveBuiltinView}
                 />
               </div>
             </aside>
@@ -979,11 +1095,24 @@ function AppContent() {
               />
               <aside className="app-right-panel" style={{ width: rightPanel.width }}>
                 <PluginViewPanel />
-                <ContextPanel
-                  documentContent={activeTab && !activeTab.isBinary && activeTab.filePath !== '__graph__' ? (activeTab.editBuffer ?? activeTab.content) : null}
-                  documentPath={activeTab && !activeTab.isBinary && activeTab.filePath !== '__graph__' ? activeTab.filePath : null}
-                  vaultId={state.selectedVaultId}
+                <SidePanel
+                  side="right"
                   width={rightPanel.width}
+                  vaultId={state.selectedVaultId}
+                  onOpenFile={handleSidebarOpenFile}
+                  renderExplorer={() => (
+                    <FileExplorer
+                      onRegisterCreateFile={handleRegisterCreateFile}
+                      onRegisterCreateFolder={handleRegisterCreateFolder}
+                      onRegisterCreateVault={handleRegisterCreateVault}
+                      onRegisterCreateCanvas={handleRegisterCreateCanvas}
+                      onOpenVersions={(vaultId, filePath) => setVersionBrowserTarget({ vaultId, filePath })}
+                    />
+                  )}
+                  refreshKey={sidebarRefreshKey}
+                  documentPanel={documentPanelProps}
+                  search={searchProps}
+                  onMoveBuiltinView={handleMoveBuiltinView}
                 />
               </aside>
             </>
@@ -1187,14 +1316,14 @@ function AuthGuard() {
           <SearchProvider>
             <TabProvider>
               <NavigationHistoryProvider>
-                <ContextPanelProvider>
-                  <SidebarPanelProvider>
+                <LeftPanelProvider>
+                  <RightPanelProvider>
                     <AppContent />
                     {/* Inside AppProvider: the popover reads the vault and API
                         client from AppContext to load the previewed note. */}
                     <HoverPreview />
-                  </SidebarPanelProvider>
-                </ContextPanelProvider>
+                  </RightPanelProvider>
+                </LeftPanelProvider>
               </NavigationHistoryProvider>
             </TabProvider>
           </SearchProvider>

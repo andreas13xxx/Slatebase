@@ -5,6 +5,10 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { WorkspaceShim } from './workspace-shim'
+import { VaultAdapterShim } from './vault-adapter-shim'
+import { FileManagerShim } from './file-manager-shim'
+import type { IApiClient } from '../../../api/index'
+import type { IVaultShim } from '../types'
 import { clearApiGaps, getApiGaps, getApiGapsForPlugin } from '../api-gap-registry'
 
 describe('proxy gap recording', () => {
@@ -77,5 +81,70 @@ describe('proxy gap recording', () => {
     void workspace['openPopout']
 
     expect(getApiGapsForPlugin('unknown')).toHaveLength(1)
+  })
+
+  describe('VaultAdapterShim', () => {
+    function createProxiedAdapter(): Record<string, unknown> {
+      const instance = new VaultAdapterShim('vault-1', {} as IApiClient, () => ({ name: '', path: '', type: 'directory', children: [] }))
+      return VaultAdapterShim.wrapWithProxy(instance) as unknown as Record<string, unknown>
+    }
+
+    it('records a non-emulated read instead of returning undefined', () => {
+      const adapter = createProxiedAdapter()
+
+      void adapter['getResourcePath']
+
+      expect(getApiGaps()).toEqual([
+        { shim: 'VaultAdapter', property: 'getResourcePath', pluginId: 'unknown', reads: 1, calls: 0 },
+      ])
+    })
+
+    it('returns a safe no-op instead of throwing when the gap is called', () => {
+      const adapter = createProxiedAdapter()
+
+      const copy = adapter['copy'] as () => unknown
+
+      expect(copy).toBeTypeOf('function')
+      expect(() => copy()).not.toThrow()
+      expect(copy()).toBeUndefined()
+    })
+
+    it('does not record emulated members', () => {
+      const adapter = createProxiedAdapter()
+
+      void adapter['exists']
+      void adapter['read']
+
+      expect(getApiGaps()).toEqual([])
+    })
+  })
+
+  describe('FileManagerShim', () => {
+    function createProxiedFileManager(): Record<string, unknown> {
+      const instance = new FileManagerShim({} as IVaultShim)
+      return FileManagerShim.wrapWithProxy(instance) as unknown as Record<string, unknown>
+    }
+
+    // Regression test: real Obsidian's method is `promptForFileDeletion`, not
+    // `promptForDeletion` — a real plugin (Calendar) was found calling the
+    // real name and silently falling through to the Proxy's no-op because the
+    // shim was implemented and allow-listed under the wrong name.
+    it('emulates promptForFileDeletion (the real Obsidian method name) without recording a gap', () => {
+      const fileManager = createProxiedFileManager()
+
+      void fileManager['promptForFileDeletion']
+
+      expect(getApiGaps()).toEqual([])
+    })
+
+    it('records a non-emulated read', () => {
+      const fileManager = createProxiedFileManager()
+
+      void fileManager['promptForFolderDeletion']
+
+      expect(getApiGaps()).toEqual([
+        { shim: 'FileManager', property: 'promptForFolderDeletion', pluginId: 'unknown', reads: 1, calls: 0 },
+      ])
+    })
   })
 })

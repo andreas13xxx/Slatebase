@@ -45,11 +45,18 @@ export interface GraphNodeConfig {
   selectedPropertyKeys: string[]
 }
 
+/** Lokaler_Graph configuration (Nachbarschaftsradius). */
+export interface GraphLocalConfig {
+  /** Neighborhood radius in hops. Range: 1–5. */
+  hops: number
+}
+
 /** Complete graph configuration. */
 export interface GraphConfig {
   colors: GraphColorConfig
   layout: GraphLayoutConfig
   nodes: GraphNodeConfig
+  localGraph: GraphLocalConfig
 }
 
 // ─── Defaults ────────────────────────────────────────────────────────────────
@@ -74,6 +81,9 @@ export const DEFAULT_GRAPH_CONFIG: GraphConfig = {
     showTags: false,
     showProperties: false,
     selectedPropertyKeys: [],
+  },
+  localGraph: {
+    hops: 1,
   },
 }
 
@@ -157,7 +167,16 @@ function mergeWithDefaults(partial: Partial<GraphConfig>): GraphConfig {
     selectedPropertyKeys: getStringArrayValue(partial.nodes, 'selectedPropertyKeys', defaults.nodes.selectedPropertyKeys),
   }
 
-  return { colors, layout, nodes }
+  const localGraph: GraphLocalConfig = {
+    hops: clampHops(getNumberValue(partial.localGraph, 'hops', defaults.localGraph.hops)),
+  }
+
+  return { colors, layout, nodes, localGraph }
+}
+
+/** Clamps a hop count to the valid range [1, 5], rounding to the nearest integer. */
+function clampHops(value: number): number {
+  return Math.min(5, Math.max(1, Math.round(value)))
 }
 
 function getStringValue(obj: unknown, key: string, fallback: string): string {

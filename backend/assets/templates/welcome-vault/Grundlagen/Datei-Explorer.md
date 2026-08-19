@@ -47,7 +47,7 @@ Der neue Vault erscheint sofort im Datei-Explorer als eigener Abschnitt.
 4. Abbrechen mit **Escape**
 
 > [!tip] Tipp
-> Wikilinks, die auf eine umbenannte Datei verweisen, werden automatisch aktualisiert. Du musst dich nicht um kaputte Links kümmern.
+> Wikilinks, die auf eine umbenannte Datei verweisen, werden automatisch aktualisiert — überall im Vault, nicht nur in der Datei, die gerade geöffnet ist. Du musst dich nicht um kaputte Links kümmern.
 
 ---
 
@@ -66,6 +66,18 @@ Ein blauer Indikator zeigt dir, wohin das Element verschoben wird.
 1. Rechtsklick auf die Datei
 2. Wähle **Verschieben nach...**
 3. Wähle den Zielordner aus
+
+### Links überleben den Umzug
+
+Genau wie beim Umbenennen werden beim Verschieben einer Datei oder eines Ordners automatisch alle Wikilinks an anderer Stelle im Vault umgeschrieben, die auf den alten Ort verwiesen haben — auch Links, die nur den bloßen Dateinamen nutzen (z.B. `[[Pasta]]`) statt eines vollständigen Pfads, und selbst wenn ein ganzer Ordner mit vielen Dateien auf einmal verschoben wird.
+
+#### Live-Beispiel
+
+1. Erstelle einen Ordner `Sandbox/Rezepte` und darin eine Datei `Sandbox/Rezepte/Pasta.md`
+2. Erstelle eine zweite Datei `Sandbox/Notizen.md` und schreibe `[[Pasta]]` hinein — ein bloßer Link ohne Ordnerpfad
+3. Öffne `Sandbox/Notizen.md` — der Link löst sich normal zu `Sandbox/Rezepte/Pasta.md` auf
+4. Verschiebe jetzt `Sandbox/Rezepte/Pasta.md` aus `Rezepte/` heraus, direkt nach `Sandbox/` (Drag & Drop oder **Verschieben nach...**)
+5. Öffne `Sandbox/Notizen.md` erneut — `[[Pasta]]` löst sich weiterhin auf, jetzt zum neuen Ort, obwohl der Link nie einen Ordner erwähnt hat
 
 ---
 

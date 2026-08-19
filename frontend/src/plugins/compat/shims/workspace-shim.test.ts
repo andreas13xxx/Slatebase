@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { WorkspaceShim } from './workspace-shim';
 import { clearApiGaps } from '../api-gap-registry';
-import { ItemView, ViewRegistry } from '../view-registry';
+import { ItemView, ViewRegistry, WorkspaceLeaf, WorkspaceSplit, WorkspaceRibbon } from '../view-registry';
 import { resetLogDedup } from '../log';
+import { registerFileExplorerRow, clearFileExplorerDomRegistry } from '../file-explorer-dom-registry';
 import type { TFile } from '../types';
 
 function createMockTFile(path: string): TFile {
@@ -43,6 +44,27 @@ describe('WorkspaceShim', () => {
       expect(() => workspace.rightRibbon.hide()).not.toThrow();
       expect(() => workspace.rightRibbon.show()).not.toThrow();
       expect(() => workspace.rightRibbon.toggle()).not.toThrow();
+    });
+
+    it('is a real instance of WorkspaceRibbon, not a plain object literal', () => {
+      expect(workspace.leftRibbon).toBeInstanceOf(WorkspaceRibbon);
+      expect(workspace.rightRibbon).toBeInstanceOf(WorkspaceRibbon);
+    });
+  });
+
+  describe('rootSplit / leftSplit / rightSplit', () => {
+    it('is a real instance of WorkspaceSplit, not a plain object literal', () => {
+      expect(workspace.rootSplit).toBeInstanceOf(WorkspaceSplit);
+      expect(workspace.leftSplit).toBeInstanceOf(WorkspaceSplit);
+      expect(workspace.rightSplit).toBeInstanceOf(WorkspaceSplit);
+    });
+
+    it('still exposes the pre-existing stub shape (children/collapsed/toggle/collapse/expand)', () => {
+      expect(workspace.rootSplit.children).toEqual([]);
+      expect(workspace.leftSplit.collapsed).toBe(false);
+      expect(() => workspace.leftSplit.toggle()).not.toThrow();
+      expect(() => workspace.rightSplit.collapse()).not.toThrow();
+      expect(() => workspace.rightSplit.expand()).not.toThrow();
     });
   });
 
@@ -352,6 +374,11 @@ describe('WorkspaceShim', () => {
         expect(leaf.location).toBe('main');
       });
 
+      it('returns a real WorkspaceLeaf instance, so plugin `instanceof WorkspaceLeaf` checks hold', () => {
+        const leaf = workspace.getLeaf(true);
+        expect(leaf).toBeInstanceOf(WorkspaceLeaf);
+      });
+
       it('should return an existing leaf with null view when newLeaf is falsy', () => {
         // Create a leaf with no view
         const firstLeaf = workspace.getLeaf(true);
@@ -511,13 +538,18 @@ describe('WorkspaceShim', () => {
         const leaf = workspace.getRightLeaf();
         expect(leaf.getRoot()).toBe(workspace.rightSplit);
       });
+
+      it('returns workspace.leftSplit for a left-sidebar leaf', () => {
+        const leaf = workspace.getLeftLeaf();
+        expect(leaf.getRoot()).toBe(workspace.leftSplit);
+      });
     });
 
     describe('getLeftLeaf()', () => {
-      it('should create a leaf with location right-sidebar (Slatebase maps both to right)', () => {
+      it('should create a leaf with location left-sidebar', () => {
         const leaf = workspace.getLeftLeaf();
         expect(leaf).toBeDefined();
-        expect(leaf.location).toBe('right-sidebar');
+        expect(leaf.location).toBe('left-sidebar');
       });
     });
 
@@ -539,14 +571,26 @@ describe('WorkspaceShim', () => {
         expect(workspace.getActiveLeaf()).toBe(leaf);
       });
 
-      it('reuses an existing leaf of the same view type instead of creating another', async () => {
+      it('reuses an existing leaf of the same view type on the same side', async () => {
         registry.registerView('my-view', (leaf) => new FakeSideView(leaf), 'my-plugin');
 
         const first = await workspace.ensureSideLeaf('my-view', 'right');
-        const second = await workspace.ensureSideLeaf('my-view', 'left');
+        const second = await workspace.ensureSideLeaf('my-view', 'right');
 
         expect(second).toBe(first);
         expect(workspace.getLeavesOfType('my-view')).toHaveLength(1);
+      });
+
+      it('creates a distinct leaf per side instead of reusing across sides', async () => {
+        registry.registerView('my-view', (leaf) => new FakeSideView(leaf), 'my-plugin');
+
+        const right = await workspace.ensureSideLeaf('my-view', 'right');
+        const left = await workspace.ensureSideLeaf('my-view', 'left');
+
+        expect(left).not.toBe(right);
+        expect(right.location).toBe('right-sidebar');
+        expect(left.location).toBe('left-sidebar');
+        expect(workspace.getLeavesOfType('my-view')).toHaveLength(2);
       });
 
       it('does not activate the leaf when reveal is false', async () => {
@@ -555,6 +599,120 @@ describe('WorkspaceShim', () => {
         await workspace.ensureSideLeaf('my-view', 'right', { reveal: false });
 
         expect(workspace.getActiveLeaf()).toBeNull();
+      });
+    });
+
+    describe('moveLeafToSide()', () => {
+      // getRoot() needs app.workspace linked back to the real WorkspaceShim
+      // instance to resolve leftSplit/rightSplit — see the getRoot() describe
+      // block's beforeEach above for why the outer `{}` mock isn't enough.
+      beforeEach(() => {
+        workspace.setViewRegistry(registry, { workspace });
+      });
+
+      class FakeSideView extends ItemView {
+        getViewType(): string { return 'my-view'; }
+      }
+
+      it('moves an active leaf to the other side, updating location and getRoot()', async () => {
+        registry.registerView('my-view', (leaf) => new FakeSideView(leaf), 'my-plugin');
+        const leaf = await workspace.ensureSideLeaf('my-view', 'right');
+
+        registry.moveLeafToSide(leaf, 'left');
+
+        expect(leaf.location).toBe('left-sidebar');
+        expect(leaf.getRoot()).toBe(workspace.leftSplit);
+      });
+
+      it('fires the source side deactivate callback and the target side activate callback with the same view and leaf', async () => {
+        registry.registerView('my-view', (leaf) => new FakeSideView(leaf), 'my-plugin');
+        const leaf = await workspace.ensureSideLeaf('my-view', 'right');
+        const view = leaf.view;
+
+        const onSidebarDeactivated = vi.fn();
+        const onLeftSidebarActivated = vi.fn();
+        registry.setOnSidebarViewDeactivated(onSidebarDeactivated);
+        registry.setOnLeftSidebarViewActivated(onLeftSidebarActivated);
+
+        registry.moveLeafToSide(leaf, 'left');
+
+        expect(onSidebarDeactivated).toHaveBeenCalledWith('my-view');
+        expect(onLeftSidebarActivated).toHaveBeenCalledWith('my-view', view, leaf);
+      });
+
+      it('is a no-op when the leaf is already on the target side', async () => {
+        registry.registerView('my-view', (leaf) => new FakeSideView(leaf), 'my-plugin');
+        const leaf = await workspace.ensureSideLeaf('my-view', 'right');
+
+        const onSidebarDeactivated = vi.fn();
+        registry.setOnSidebarViewDeactivated(onSidebarDeactivated);
+
+        registry.moveLeafToSide(leaf, 'right');
+
+        expect(leaf.location).toBe('right-sidebar');
+        expect(onSidebarDeactivated).not.toHaveBeenCalled();
+      });
+
+      it('is a no-op for a main-area leaf', () => {
+        const leaf = workspace.getLeaf(true);
+
+        expect(() => registry.moveLeafToSide(leaf, 'left')).not.toThrow();
+        expect(leaf.location).toBe('main');
+      });
+
+      it('is a no-op for an unknown/foreign leaf', () => {
+        const foreignRegistry = new ViewRegistry();
+        const foreignWorkspace = new WorkspaceShim();
+        foreignWorkspace.setViewRegistry(foreignRegistry, {});
+        const foreignLeaf = foreignRegistry.createLeaf({}, 'right-sidebar');
+
+        expect(() => registry.moveLeafToSide(foreignLeaf, 'left')).not.toThrow();
+        expect(foreignLeaf.location).toBe('right-sidebar');
+      });
+    });
+
+    describe("getLeavesOfType('file-explorer')", () => {
+      afterEach(() => {
+        clearFileExplorerDomRegistry();
+      });
+
+      it('returns a single synthetic leaf whose view reports the real Obsidian view type', () => {
+        const leaves = workspace.getLeavesOfType('file-explorer');
+        expect(leaves).toHaveLength(1);
+        expect(leaves[0].view?.getViewType()).toBe('file-explorer');
+      });
+
+      it('returns the same leaf on repeated access (singleton, not re-created per call)', () => {
+        const first = workspace.getLeavesOfType('file-explorer')[0];
+        const second = workspace.getLeavesOfType('file-explorer')[0];
+        expect(second).toBe(first);
+      });
+
+      it('exposes fileItems backed by the live file-explorer DOM registry', () => {
+        const el = document.createElement('button');
+        registerFileExplorerRow('notes/hello.md', 'hello.md', 'file', el);
+
+        const leaf = workspace.getLeavesOfType('file-explorer')[0];
+        const fileItems = (leaf.view as unknown as { fileItems: Record<string, unknown> }).fileItems;
+        expect(fileItems['notes/hello.md']).toEqual(expect.objectContaining({ titleEl: el }));
+        expect(fileItems['does/not/exist.md']).toBeUndefined();
+      });
+
+      it('does not register the leaf in ViewRegistry — safe from ViewRegistry.clear() removing live DOM', async () => {
+        // ViewRegistry.clear() (invoked on every vault switch) calls
+        // view.containerEl.remove() on every tracked leaf. The file-explorer
+        // leaf must stay untracked, or the first vault switch after a plugin
+        // touches it would tear the real sidebar element out of the page.
+        workspace.getLeavesOfType('file-explorer');
+        expect(registry.getAllLeaves()).toHaveLength(0);
+        await expect(registry.clear()).resolves.not.toThrow();
+      });
+
+      it('falls back to a safe no-op for non-emulated view properties instead of crashing', () => {
+        const leaf = workspace.getLeavesOfType('file-explorer')[0];
+        const view = leaf.view as unknown as Record<string, unknown>;
+        expect(() => (view.requestSort as () => void)()).not.toThrow();
+        expect(typeof view.sortOrder).toBe('function');
       });
     });
 

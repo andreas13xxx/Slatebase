@@ -93,7 +93,7 @@ Diese Plugins wurden getestet und funktionieren in Slatebase:
 
 | Plugin | Kompatibilität | Hinweise |
 |--------|---------------|----------|
-| Calendar | Gut | Sidebar-Kalender, Daily-Note-Erstellung |
+| Calendar | Gut | Sidebar-Kalender, Daily-Note-Erstellung — ⚠️ seit ~2 Jahren kein Update mehr |
 | Dataview | Gut | DQL-Queries funktionieren, DataviewJS eingeschränkt |
 | Templater | Gut | Datums-/Datei-Funktionen, keine System-Commands |
 | Kanban | Gut | Board-Ansicht, Drag & Drop |
@@ -102,8 +102,9 @@ Diese Plugins wurden getestet und funktionieren in Slatebase:
 | Tasks | Gut | Emoji-Signifikatoren, Query-Blöcke, wiederkehrende Aufgaben |
 | Advanced Tables | Gut | Auto-Formatierung, Navigation, Sortierung, Formeln |
 | Git | Gut | Commit/Push/Pull über HTTPS + PAT, kein SSH |
-| Mind Map | Gut | Überschriften/Listen als interaktive Mindmap |
+| Mind Map | Gut | Überschriften/Listen als interaktive Mindmap — ⚠️ Plugin selbst vermutlich kaputt (siehe Plugin-Guide) |
 | Editing Toolbar | Gut | Fixe und schwebende Formatierungsleiste |
+| Iconize | Eingeschränkt | Icon-Picker funktioniert, Icons im Dateibaum meist nicht sichtbar |
 
 Siehe die einzelnen [[Fortgeschritten/Plugins/Calendar|Plugin-Guides]] für detaillierte Kompatibilitäts-Informationen.
 
@@ -179,6 +180,7 @@ Ausführliche Anleitungen mit Beispielen und Übungen für getestete Plugins:
 | Git | Versionierung mit externem Remote-Repository | [[Fortgeschritten/Plugins/Git]] |
 | Mind Map | Notizen als interaktive Mindmap darstellen | [[Fortgeschritten/Plugins/Mind Map]] |
 | Editing Toolbar | Formatierungsleiste für den Editor | [[Fortgeschritten/Plugins/Editing Toolbar]] |
+| Iconize | Individuelle Icons für Dateien und Ordner | [[Fortgeschritten/Plugins/Iconize]] |
 
 ### Praktische Übungen
 

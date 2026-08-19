@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { TagsView } from './TagsView'
-import type { TagEntry } from '../../state/contextPanelState'
+import type { TagEntry } from '../../state/documentPanelData'
 
 describe('TagsView', () => {
   const defaultProps = {

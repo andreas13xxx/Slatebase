@@ -1,5 +1,0 @@
-export { SidebarPanel } from './SidebarPanel'
-export { SidebarPanelTabBar } from './SidebarPanelTabBar'
-export { SidebarSplitContainer } from './SidebarSplitContainer'
-export { FavoritesView } from './FavoritesView'
-export { RecentFilesView } from './RecentFilesView'

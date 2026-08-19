@@ -10,7 +10,8 @@
 
 import { useMemo } from 'react'
 import { useTranslation } from '../../i18n'
-import type { TagEntry } from '../../state/contextPanelState'
+import type { TagEntry } from '../../state/documentPanelData'
+import './TagsView.css'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 

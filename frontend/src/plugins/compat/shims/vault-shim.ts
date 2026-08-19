@@ -71,8 +71,12 @@ export function treeNodeToTFile(node: DirectoryTree, parent: TFolder | null): TF
     basename,
     extension,
     stat: {
-      mtime: Date.now(),
-      ctime: Date.now(),
+      // Real timestamps come from the backend's directory-tree scan (fs.stat).
+      // Nodes without one (e.g. a just-created/renamed file the client synthesized
+      // locally, ahead of the next tree refresh) fall back to "now" — the honest
+      // answer for something that, as far as the client knows, just happened.
+      mtime: node.mtime ?? Date.now(),
+      ctime: node.ctime ?? Date.now(),
       size: node.size ?? 0,
     },
     parent,
@@ -328,6 +332,15 @@ export class VaultShim implements IVaultShim {
   /** Optional callback invoked after a file is read, with path and content. */
   onFileRead: ((path: string, content: string) => void) | null = null;
 
+  /**
+   * Optional callback invoked after a file is written (modify/create — append()
+   * and process() both funnel through modify()), with the file and its new
+   * content. Without this, a plugin that writes via the API and immediately
+   * reads back `metadataCache.getFileCache()` sees stale (or, for a fresh
+   * file, empty) metadata until something else happens to touch the cache.
+   */
+  onFileWrite: ((file: TFile, content: string) => void) | null = null;
+
   constructor(
     vaultId: string,
     vaultName: string,
@@ -339,7 +352,7 @@ export class VaultShim implements IVaultShim {
     this.apiClient = apiClient;
     this.directoryTree = directoryTree;
     this.events = new EventSystem();
-    this.adapter = new VaultAdapterShim(vaultId, apiClient, () => this.directoryTree);
+    this.adapter = VaultAdapterShim.wrapWithProxy(new VaultAdapterShim(vaultId, apiClient, () => this.directoryTree));
     // Set as active vault so treeNodeToTFile/treeNodeToTFolder can assign .vault
     setActiveVaultShimRef(this);
   }
@@ -408,6 +421,7 @@ export class VaultShim implements IVaultShim {
       await this.apiClient.saveFile(this.vaultId, file.path, content);
       markPluginWrite(file.path);
       this.events.trigger('modify', file);
+      this.onFileWrite?.(file, content);
     } catch (err: unknown) {
       const appErr = err as { code?: string; message?: string };
       throw new Error(
@@ -462,6 +476,7 @@ export class VaultShim implements IVaultShim {
 
       markPluginWrite(path);
       this.events.trigger('create', tFile);
+      this.onFileWrite?.(tFile, content ?? '');
 
       // Notify the app to refresh the file explorer tree
       dispatchRealtimeVaultChange({

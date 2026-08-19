@@ -1,14 +1,16 @@
-/* ===== Sidebar Panel ===== */
+/* ===== Side Panel (shared container styles for left and right panels) ===== */
 
-.sidebar-panel {
+.side-panel {
   display: flex;
   flex-direction: column;
   flex: 1;
   overflow: hidden;
   min-height: 0;
+  height: 100%;
+  font-family: var(--font-sans);
 }
 
-.sidebar-panel__body {
+.side-panel__body {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -16,7 +18,7 @@
   min-height: 0;
 }
 
-.sidebar-panel__single-view {
+.side-panel__single-view {
   flex: 1;
   overflow: hidden;
   display: flex;
@@ -26,14 +28,14 @@
 
 /* ─── View Wrapper with Header ────────────────────────────────────────────── */
 
-.sidebar-panel__view-wrapper {
+.side-panel__view-wrapper {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
 }
 
-.sidebar-panel__view-header {
+.side-panel__view-header {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -46,9 +48,30 @@
   flex-shrink: 0;
 }
 
-.sidebar-panel__view-content {
+.side-panel__view-content {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;
+}
+
+/* ─── Plugin Section (Container for plugin DOM) ───────────────────────────── */
+
+.side-panel__plugin-section {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+
+/* Right panel look: distinct background/text tokens, matching the
+   pre-unification ContextPanel appearance. */
+.app-right-panel .side-panel {
+  background: var(--right-panel-bg);
+  color: var(--right-panel-text);
+}
+
+.app-right-panel .side-panel__view-header {
+  color: var(--right-panel-text-muted);
+  opacity: 1;
 }

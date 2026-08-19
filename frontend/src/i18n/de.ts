@@ -535,6 +535,13 @@ export const de = {
     showProperties: 'Properties anzeigen',
     reset: 'Zurücksetzen',
     ariaLabel: 'Graph mit {nodeCount} Knoten und {edgeCount} Kanten',
+    localGraph: {
+      tabPrefix: 'Lokaler Graph:',
+      hopsLabel: 'Nachbarschaft',
+      decreaseHops: 'Nachbarschaftsradius verringern',
+      increaseHops: 'Nachbarschaftsradius erhöhen',
+      centerDeleted: 'Die Datei "{path}" wurde gelöscht.',
+    },
   },
 
   contextPanel: {
@@ -557,6 +564,12 @@ export const de = {
       backlinksError: 'Eingehende Links konnten nicht geladen werden.',
       backlinksLoading: 'Laden…',
       noDocument: 'Kein Dokument geöffnet.',
+      unlinkedMentions: 'Ungelinkte Erwähnungen',
+      emptyUnlinkedMentions: 'Keine ungelinkten Erwähnungen gefunden.',
+      unlinkedMentionsLoading: 'Wird durchsucht…',
+      unlinkedMentionsError: 'Ungelinkte Erwähnungen konnten nicht geladen werden.',
+      linkMention: 'Verlinken',
+      linking: 'Verlinke…',
     },
     tags: {
       empty: 'Keine Tags gefunden.',

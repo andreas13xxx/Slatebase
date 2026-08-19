@@ -6,6 +6,9 @@ tags: [fortgeschritten, plugins]
 
 Das Calendar-Plugin zeigt einen Monatskalender in der Seitenleiste. Per Klick auf ein Datum öffnest oder erstellst du die zugehörige Daily Note — ideal für Tagebücher, Journaling und tägliche Protokolle.
 
+> [!warning] Seit rund 2 Jahren kein Update mehr
+> Das Calendar-Plugin (`liamcain/obsidian-calendar-plugin`) hatte seinen letzten GitHub-Push am 2024-06-22 — seither erscheinen keine neuen Releases mehr. Es funktioniert aktuell weiterhin zuverlässig (siehe Tabelle unten), aber Fehlerbehebungen für zukünftige Obsidian- oder Slatebase-Änderungen sind nicht zu erwarten.
+
 ---
 
 ## Voraussetzungen

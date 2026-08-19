@@ -19,6 +19,7 @@ import {
 } from '../business/index.js'
 import type { DirectoryTree } from '../vault/index.js'
 import { PathTraversalError, isBinaryContent } from '../vault/index.js'
+import { computeAffectedFilePairs } from '../link-index/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { McpConfig } from './config.js'
 import {
@@ -106,6 +107,35 @@ interface SearchResult {
   hitCount: number
 }
 
+// ─── Helper: Run Link-Migration for a move/rename ─────────────────────────────
+
+/**
+ * Runs Link-Migration for a move/rename (Requirement 3, graph-polish-link-integrity):
+ * computes the {oldPath, newPath} pairs affected (one per descendant file for a
+ * folder operation) and invokes `deps.migrateLinks` for each. Returns undefined
+ * when nothing failed, or a flat list of failures otherwise — the move/rename
+ * itself already succeeded by this point and is never rolled back.
+ */
+async function runLinkMigration(
+  deps: ToolHandlerDeps,
+  vaultId: string,
+  oldTree: DirectoryTree,
+  sourcePath: string,
+  newPath: string,
+): Promise<{ path: string; reason: string }[] | undefined> {
+  if (!deps.migrateLinks) return undefined
+
+  const pairs = computeAffectedFilePairs(oldTree, sourcePath, newPath)
+  const failures: { path: string; reason: string }[] = []
+
+  for (const pair of pairs) {
+    const result = await deps.migrateLinks(vaultId, pair.oldPath, pair.newPath, oldTree)
+    failures.push(...result.failedFiles)
+  }
+
+  return failures.length > 0 ? failures : undefined
+}
+
 // ─── Tool Registration ───────────────────────────────────────────────────────
 
 /**
@@ -118,6 +148,17 @@ export interface ToolHandlerDeps {
   mcpConfig: McpConfig
   /** Returns the userId for the current MCP session. */
   getUserId: () => string
+  /**
+   * Optional — when set, move_file/rename_file rewrite wikilinks elsewhere in
+   * the vault that pointed at the old path (Link-Migration), mirroring the
+   * REST API's `moveContent`/`renameContent` behavior (see
+   * `.kiro/specs/graph-polish-link-integrity/`). `oldTree` must be the
+   * DirectoryTree snapshot taken just before the move/rename.
+   */
+  migrateLinks?: (vaultId: string, oldPath: string, newPath: string, oldTree: DirectoryTree) => Promise<{
+    migratedFiles: { path: string; replacements: number }[]
+    failedFiles: { path: string; reason: string }[]
+  }>
 }
 
 /**
@@ -663,13 +704,22 @@ function registerMoveFile(server: McpServer, deps: ToolHandlerDeps): void {
           throw error
         }
 
+        // Snapshot the tree before the move — Link-Migration needs it to
+        // resolve bare-name wikilinks against paths that are about to disappear.
+        const oldTree = deps.migrateLinks ? await deps.vaultService.getVaultTree(args.vaultId) : null
+
         // Move via VaultService (handles path validation, conflict check, tree refresh)
         const result = await deps.vaultService.moveContent(args.vaultId, args.sourcePath, args.destinationPath)
+
+        const linkMigrationWarnings = oldTree
+          ? await runLinkMigration(deps, args.vaultId, oldTree, args.sourcePath, result.newPath)
+          : undefined
 
         return mcpToolSuccess({
           sourcePath: args.sourcePath,
           newPath: result.newPath,
           message: 'Moved successfully',
+          ...(linkMigrationWarnings ? { linkMigrationWarnings } : {}),
         })
       } catch (error) {
         if (error instanceof VaultNotFoundError) {
@@ -724,13 +774,22 @@ function registerRenameFile(server: McpServer, deps: ToolHandlerDeps): void {
           throw error
         }
 
+        // Snapshot the tree before the rename — Link-Migration needs it to
+        // resolve bare-name wikilinks against paths that are about to disappear.
+        const oldTree = deps.migrateLinks ? await deps.vaultService.getVaultTree(args.vaultId) : null
+
         // Rename via VaultService (handles path validation, name validation, conflict check, tree refresh)
         const result = await deps.vaultService.renameContent(args.vaultId, args.path, args.newName)
+
+        const linkMigrationWarnings = oldTree
+          ? await runLinkMigration(deps, args.vaultId, oldTree, args.path, result.newPath)
+          : undefined
 
         return mcpToolSuccess({
           oldPath: args.path,
           newPath: result.newPath,
           message: 'Renamed successfully',
+          ...(linkMigrationWarnings ? { linkMigrationWarnings } : {}),
         })
       } catch (error) {
         if (error instanceof VaultNotFoundError) {

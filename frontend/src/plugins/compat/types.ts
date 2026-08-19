@@ -451,7 +451,7 @@ export interface IFileManagerShim {
   /** Create a new markdown file with the given name in the given folder. */
   createNewMarkdownFile(folder: TFolder, name: string): Promise<TFile>;
   /** Prompt user for deletion and delete the file (moves to trash). Resolves to whether it was deleted. */
-  promptForDeletion(file: TFile): Promise<boolean>;
+  promptForFileDeletion(file: TFile): Promise<boolean>;
 }
 
 /**

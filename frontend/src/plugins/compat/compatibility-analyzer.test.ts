@@ -51,65 +51,74 @@ describe('CompatibilityAnalyzer', () => {
   });
 
   describe('analyze() — Node.js module detection (Layer 2)', () => {
-    it('detects require("fs") but does not block (non-desktopOnly)', () => {
+    it('detects require("fs") and downgrades to partial (non-desktopOnly)', () => {
       const source = `const fs = require('fs'); class MyPlugin { onload() { fs.readFileSync('/tmp/x'); } }`;
       const report = analyzer.analyze(source);
-      // Not blocked — proceeds to API analysis (level depends on API calls)
-      expect(report.level).not.toBe('unknown');
+      // Not blocked outright — the sandbox's require() safely no-ops instead
+      // of crashing, but the missing functionality is real, so partial (not full).
+      expect(report.level).toBe('partial');
       expect(report.nodeModules).toContain('fs');
+      expect(report.apiCalls).toContainEqual({ method: 'nodeModule.fs', classification: 'partial' });
       expect(report.reasons[0]).toContain('Node.js');
     });
 
-    it('detects require("child_process") as warning', () => {
+    it('detects require("child_process") and downgrades to partial', () => {
       const source = `const { exec } = require('child_process'); class MyPlugin { onload() {} }`;
       const report = analyzer.analyze(source);
       expect(report.nodeModules).toContain('child_process');
-      // Plugin still installs — level based on API patterns
-      expect(report.level).toBe('full');
+      expect(report.level).toBe('partial');
     });
 
-    it('detects require("net") as warning', () => {
+    it('detects require("net") and downgrades to partial', () => {
       const source = `const net = require("net"); class MyPlugin { onload() {} }`;
       const report = analyzer.analyze(source);
       expect(report.nodeModules).toContain('net');
-      expect(report.level).toBe('full');
+      expect(report.level).toBe('partial');
     });
 
-    it('detects require("electron") as warning', () => {
+    it('detects require("electron") and downgrades to partial', () => {
       const source = `const { remote } = require('electron'); class MyPlugin { onload() {} }`;
       const report = analyzer.analyze(source);
       expect(report.nodeModules).toContain('electron');
-      expect(report.level).toBe('full');
+      expect(report.level).toBe('partial');
     });
 
-    it('detects node: prefixed imports as warning', () => {
+    it('detects node: prefixed imports and downgrades to partial', () => {
       const source = `const fs = require('node:fs'); class MyPlugin { onload() {} }`;
       const report = analyzer.analyze(source);
       expect(report.nodeModules).toContain('fs');
-      expect(report.level).toBe('full');
+      expect(report.level).toBe('partial');
     });
 
-    it('detects ESM import from node builtins as warning', () => {
+    it('detects ESM import from node builtins and downgrades to partial', () => {
       const source = `import { readFile } from 'fs'; class MyPlugin { onload() {} }`;
       const report = analyzer.analyze(source);
       expect(report.nodeModules).toContain('fs');
-      expect(report.level).toBe('full');
+      expect(report.level).toBe('partial');
     });
 
-    it('detects dynamic import of node builtins as warning', () => {
+    it('detects dynamic import of node builtins and downgrades to partial', () => {
       const source = `class MyPlugin { async onload() { const fs = await import('fs'); } }`;
       const report = analyzer.analyze(source);
       expect(report.nodeModules).toContain('fs');
-      expect(report.level).toBe('full');
+      expect(report.level).toBe('partial');
     });
 
-    it('detects multiple Node.js modules as warnings', () => {
+    it('detects multiple Node.js modules and downgrades to partial', () => {
       const source = `const fs = require('fs'); const path = require('path'); const net = require('net');`;
       const report = analyzer.analyze(source);
       expect(report.nodeModules).toContain('fs');
       expect(report.nodeModules).toContain('path');
       expect(report.nodeModules).toContain('net');
-      // Level depends on API analysis, not Node.js detection
+      expect(report.level).toBe('partial');
+    });
+
+    it('does not downgrade for path/buffer alone — the sandbox gives both a real shim', () => {
+      const source = `const path = require('path'); const { Buffer } = require('buffer'); class MyPlugin { onload() {} }`;
+      const report = analyzer.analyze(source);
+      expect(report.nodeModules).toContain('path');
+      expect(report.nodeModules).toContain('buffer');
+      expect(report.apiCalls.some(c => c.method.startsWith('nodeModule.'))).toBe(false);
       expect(report.level).toBe('full');
     });
 
@@ -134,11 +143,11 @@ describe('CompatibilityAnalyzer', () => {
       expect(report.nodeModules).toHaveLength(0);
     });
 
-    it('detects original-fs (Electron-specific) as warning', () => {
+    it('detects original-fs (Electron-specific) and downgrades to partial', () => {
       const source = `const fs = require('original-fs'); class MyPlugin { onload() {} }`;
       const report = analyzer.analyze(source);
       expect(report.nodeModules).toContain('original-fs');
-      expect(report.level).toBe('full');
+      expect(report.level).toBe('partial');
     });
   });
 
@@ -384,11 +393,28 @@ describe('CompatibilityAnalyzer', () => {
       expect(call?.classification).toBe('supported');
     });
 
-    it('classifies unknown methods as unsupported', () => {
+    it('classifies unknown methods as partial (deliberately not implemented, safely no-op\'d by the shim Proxy)', () => {
       const source = `this.app.workspace.someUnknownMethod()`;
       const report = analyzer.analyze(source);
       const call = report.apiCalls.find(c => c.method === 'workspace.someUnknownMethod');
-      expect(call?.classification).toBe('unsupported');
+      expect(call?.classification).toBe('partial');
+    });
+
+    it('classifies vault.copy as supported', () => {
+      const source = `this.app.vault.copy(file, newPath)`;
+      const report = analyzer.analyze(source);
+      const call = report.apiCalls.find(c => c.method === 'vault.copy');
+      expect(call?.classification).toBe('supported');
+    });
+
+    // Regression test: real Obsidian's method is `promptForFileDeletion`, not
+    // `promptForDeletion` — the analyzer's positive list previously used the
+    // wrong name, silently misclassifying real plugins (e.g. Calendar) as partial.
+    it('classifies fileManager.promptForFileDeletion (the real Obsidian method name) as supported', () => {
+      const source = `this.app.fileManager.promptForFileDeletion(file)`;
+      const report = analyzer.analyze(source);
+      const call = report.apiCalls.find(c => c.method === 'fileManager.promptForFileDeletion');
+      expect(call?.classification).toBe('supported');
     });
   });
 

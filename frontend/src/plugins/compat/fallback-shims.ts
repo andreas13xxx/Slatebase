@@ -9,7 +9,14 @@
  *
  * They live here as ordinary TypeScript instead, and are registered once —
  * *after* the real shims, so the real implementations always win. Everything is
- * guarded with `if (!obs[x])`, so this module only ever fills genuine gaps.
+ * guarded so this module only ever fills genuine gaps: each name is installed
+ * as a `get`/`set` accessor rather than a plain value, so the first time a
+ * plugin actually *reads* it, it logs one `console.warn` (via the same
+ * `recordGapRead`/`window.__slatebasePluginApiGaps()` mechanism every other
+ * shim's Proxy uses) before returning the fallback — no more silent stubs.
+ * The accessor's `set` trap still lets a later real implementation
+ * (`registerMarkdownRendererGlobal()`, for instance) plainly overwrite it
+ * without throwing.
  *
  * Anything implemented here is deliberately minimal: the goal is to keep a
  * plugin from crashing outright on an unimplemented API, not to be correct.
@@ -19,15 +26,22 @@
  */
 
 import { getStoredAuthToken, getStoredCsrfToken } from '../../state/authContext'
+import { recordGapRead } from './api-gap-registry'
 import { debugLog } from './log'
+import { MenuItem, MenuSeparator } from './menu'
 import { OBSIDIAN_API_VERSION, compareApiVersions } from './obsidian-api-extensions'
 
 type Obs = Record<string, unknown>
 
+/** A fallback accessor's getter, tagged with the value it warns-then-returns. */
+type FallbackGetter = (() => unknown) & { __fallbackValue: unknown }
+
 /** Minimal shape of the pieces of `window` these fallbacks touch. */
 interface FallbackWindow extends Window {
   obsidian?: Obs
-  __slatebaseShowNotice?: (message: string, duration?: number) => void
+  __slatebaseShowNotice?: (message: string, duration?: number) => string
+  __slatebaseUpdateNotice?: (id: string, message: string) => void
+  __slatebaseDismissNotice?: (id: string) => void
 }
 
 // ─── Lifecycle base classes ──────────────────────────────────────────────────────
@@ -336,16 +350,24 @@ class FallbackNotice {
   messageEl = document.createElement('div')
   containerEl = document.createElement('div')
   private _shown = true
+  private toastId: string | null = null
 
   constructor(message: string | { textContent?: string | null }, duration?: number) {
     ;(this.noticeEl as unknown as { isShown: () => boolean }).isShown = () => this._shown
-    ;(window as FallbackWindow).__slatebaseShowNotice?.(toMessage(message), duration)
+    const msg = toMessage(message)
+    this.messageEl.textContent = msg
+    this.toastId = (window as FallbackWindow).__slatebaseShowNotice?.(msg, duration) ?? null
   }
   setMessage(message: string | { textContent?: string | null }): this {
-    ;(window as FallbackWindow).__slatebaseShowNotice?.(toMessage(message))
+    const msg = toMessage(message)
+    this.messageEl.textContent = msg
+    if (this.toastId) (window as FallbackWindow).__slatebaseUpdateNotice?.(this.toastId, msg)
     return this
   }
-  hide(): void { this._shown = false }
+  hide(): void {
+    this._shown = false
+    if (this.toastId) (window as FallbackWindow).__slatebaseDismissNotice?.(this.toastId)
+  }
   isShown(): boolean { return this._shown }
 }
 
@@ -464,10 +486,48 @@ export function registerFallbackShims(): void {
   // invisible and very hard to diagnose from plugin behaviour alone.
   const filled: string[] = []
 
+  // Reads a name from `obs` without ever invoking a fallback's own warning
+  // getter — used both by set()'s idempotency guard (so registering a
+  // fallback never itself warns) and by every internal cross-reference below
+  // that needs to see "whichever Component/Modal/etc. ended up registered"
+  // (a real shim's plain property, or another fallback's cached value).
+  const peek = (name: string): unknown => {
+    const getter = Object.getOwnPropertyDescriptor(obs, name)?.get as FallbackGetter | undefined
+    return getter ? getter.__fallbackValue : obs[name]
+  }
+
   const set = (name: string, value: unknown): void => {
-    if (obs[name]) return
-    obs[name] = value
+    // A descriptor already exists — either a real shim's plain property, or
+    // our own accessor from an earlier call in this run. Either way, first
+    // writer wins; checking via the descriptor (not `obs[name]`) means this
+    // guard never triggers the warning below.
+    if (Object.getOwnPropertyDescriptor(obs, name)) return
     filled.push(name)
+
+    const getter: FallbackGetter = (() => {
+      if (recordGapRead('Fallback', name)) {
+        console.warn(
+          `[PluginCompat] Plugin read "obsidian.${name}", which resolves to a minimal ` +
+          `fallback stub rather than a real implementation. Inspect all gaps with ` +
+          `window.__slatebasePluginApiGaps().`
+        )
+      }
+      return value
+    }) as FallbackGetter
+    getter.__fallbackValue = value
+
+    Object.defineProperty(obs, name, {
+      configurable: true,
+      enumerable: true,
+      get: getter,
+      // A real implementation registering later (e.g. registerMarkdownRendererGlobal()'s
+      // unconditional `obsidian.MarkdownRenderer = ...`) must still be able to
+      // win — collapse back into a plain, writable data property instead of
+      // throwing on assignment to a getter-only accessor.
+      set(newValue: unknown) {
+        Object.defineProperty(obs, name, { value: newValue, writable: true, configurable: true, enumerable: true })
+      },
+    })
   }
 
   // Lifecycle base classes. `Plugin` and `MarkdownRenderChild` extend whichever
@@ -475,7 +535,7 @@ export function registerFallbackShims(): void {
   set('EditorSuggest', FallbackEditorSuggest)
   set('Component', FallbackComponent)
 
-  const Component = obs['Component'] as typeof FallbackComponent
+  const Component = peek('Component') as typeof FallbackComponent
   set('Plugin', class FallbackPlugin extends Component {
     manifest: Record<string, unknown> = {}
     scope = { keys: [] as unknown[], register: (): void => {}, unregister: (): void => {} }
@@ -520,7 +580,7 @@ export function registerFallbackShims(): void {
     constructor(containerEl?: HTMLElement) { super(); this.containerEl = containerEl }
   })
 
-  const Modal = (obs['Modal'] ?? class { open(): void {} close(): void {} onOpen(): void {} onClose(): void {} }) as new (
+  const Modal = (peek('Modal') ?? class { open(): void {} close(): void {} onOpen(): void {} onClose(): void {} }) as new (
     ...args: unknown[]
   ) => object
   set('ConfirmationModal', class FallbackConfirmationModal extends Modal {})
@@ -584,7 +644,7 @@ export function registerFallbackShims(): void {
   // Views
   set('MarkdownView', FallbackMarkdownView)
   set('FileSystemAdapter', FallbackFileSystemAdapter)
-  set('EditableFileView', obs['FileView'] ?? class {})
+  set('EditableFileView', peek('FileView') ?? class {})
 
   // UI components
   set('AbstractInputSuggest', FallbackAbstractInputSuggest)
@@ -606,14 +666,20 @@ export function registerFallbackShims(): void {
   // and `PopoverSuggest` extend the concrete classes already registered above,
   // so for those the test answers correctly rather than just safely.
   //
+  // MenuItem/MenuSeparator are the exact classes `Menu.addItem()`/
+  // `addSeparator()` construct (see `./menu`), not disposable markers — set()
+  // here only matters when registerFallbackShims() runs without
+  // installObsidianGlobals() having already claimed the names, so the
+  // instanceof check is correct either way instead of only in the common path.
+  //
   // PopoverSuggest is normally already set by installObsidianGlobals() (real
   // Component-chain base of EditorSuggest/AbstractInputSuggest) — `set()`'s
   // guard skips this in that case. EditorSuggest is the closer relative if this
   // fallback layer ever runs on its own; SuggestModal (unrelated in real
   // Obsidian — it only extends Modal) is the last-resort answer, not the first.
-  const textComponent = obs['TextComponent'] as (new () => object) | undefined
+  const textComponent = peek('TextComponent') as (new () => object) | undefined
   if (textComponent) set('AbstractTextComponent', textComponent)
-  const popoverSuggestFallback = (obs['EditorSuggest'] ?? obs['SuggestModal']) as (new (...args: never[]) => object) | undefined
+  const popoverSuggestFallback = (peek('EditorSuggest') ?? peek('SuggestModal')) as (new (...args: never[]) => object) | undefined
   if (popoverSuggestFallback) set('PopoverSuggest', popoverSuggestFallback)
   // MarkdownPreviewView is mostly an instanceof-only export (see the block
   // below), but real Obsidian also exposes a static `render()` on it, and at
@@ -628,7 +694,7 @@ export function registerFallbackShims(): void {
   // overwrites `obsidian.MarkdownRenderer` with the real implementation right
   // after this function runs (see plugin-context.ts), by which point any
   // plugin's actual render() call is long past module init.
-  const MarkdownViewBase = (obs['MarkdownView'] ?? class {}) as new (...args: never[]) => object
+  const MarkdownViewBase = (peek('MarkdownView') ?? class {}) as new (...args: never[]) => object
   class MarkdownPreviewViewFallback extends MarkdownViewBase {
     static async render(app: unknown, markdown: string, el: HTMLElement, sourcePath: string, component: unknown): Promise<void> {
       const renderer = obs['MarkdownRenderer'] as { render?: (...args: unknown[]) => Promise<void> } | undefined
@@ -641,14 +707,36 @@ export function registerFallbackShims(): void {
     static async renderMarkdown(markdown: string, el: HTMLElement, sourcePath: string, component: unknown): Promise<void> {
       return MarkdownPreviewViewFallback.render(null, markdown, el, sourcePath, component)
     }
+    private data = ''
+    /** MarkdownSubView contract. Scroll position is tracked on the inherited contentEl, if present. */
+    getScroll(): number {
+      return (this as unknown as { contentEl?: HTMLElement }).contentEl?.scrollTop ?? 0
+    }
+    applyScroll(scroll: number): void {
+      const el = (this as unknown as { contentEl?: HTMLElement }).contentEl
+      if (el) el.scrollTop = scroll
+    }
+    get(): string {
+      return this.data
+    }
+    set(data: string, _clear?: boolean): void {
+      this.data = data
+    }
+    rerender(_full?: boolean): void {}
   }
   set('MarkdownPreviewView', MarkdownPreviewViewFallback)
-  set('MenuItem', class MenuItem {})
-  set('MenuSeparator', class MenuSeparator {})
+  set('MenuItem', MenuItem)
+  set('MenuSeparator', MenuSeparator)
+  // WorkspaceSplit/WorkspaceRibbon are deliberately not in this list — they're
+  // registered as real classes by installObsidianGlobals() (see
+  // install-globals.ts) before this function ever runs, so `set()`'s guard
+  // always skips them here. The remaining layout-item classes below have no
+  // real counterpart anywhere in Slatebase (flat tab model, no split tree),
+  // so they stay generic empty stubs.
   for (const name of [
-    'WorkspaceItem', 'WorkspaceParent', 'WorkspaceContainer', 'WorkspaceSplit',
+    'WorkspaceItem', 'WorkspaceParent', 'WorkspaceContainer',
     'WorkspaceTabs', 'WorkspaceRoot', 'WorkspaceSidedock', 'WorkspaceMobileDrawer',
-    'WorkspaceWindow', 'WorkspaceFloating', 'WorkspaceRibbon',
+    'WorkspaceWindow', 'WorkspaceFloating',
   ]) {
     set(name, class WorkspaceLayoutItem {})
   }

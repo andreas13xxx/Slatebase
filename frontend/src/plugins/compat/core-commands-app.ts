@@ -30,8 +30,7 @@ import type { AppAction } from '../../types'
 import type { TabState, TabAction, TabEntry } from '../../state/tabState'
 import { openTab, saveTab } from '../../state/tabActions'
 import type { AuthState, AuthAction } from '../../state/authState'
-import type { ContextPanelAction, ContextPanelViewId, SplitSection as ContextPanelSection } from '../../state/contextPanelState'
-import type { SidebarPanelAction, SidebarViewId, SidebarSplitSection as SidebarPanelSection } from '../../state/sidebarPanelState'
+import type { PanelAction, PanelViewId, PanelSplitSection } from '../../state/panelState'
 import type { SettingsCategory, SettingsSection } from '../../state/settingsState'
 import { favoritesStore } from '../../state/favoritesStore'
 import { getActiveEditorView } from '../../editor/plugin-extensions'
@@ -57,10 +56,11 @@ export interface CoreAppCommandHandlers {
   authDispatch: Dispatch<AuthAction>
   showSidebar: boolean
   showRightPanel: boolean
-  contextPanelSections: ContextPanelSection[]
-  contextPanelDispatch: Dispatch<ContextPanelAction>
-  sidebarPanelSections: SidebarPanelSection[]
-  sidebarPanelDispatch: Dispatch<SidebarPanelAction>
+  /** Both panels' sections/dispatch are available since any built-in view can now live on either side. */
+  rightPanelSections: PanelSplitSection[]
+  rightPanelDispatch: Dispatch<PanelAction>
+  leftPanelSections: PanelSplitSection[]
+  leftPanelDispatch: Dispatch<PanelAction>
   onToggleSidebar: () => void
   onToggleRightPanel: () => void
   onOpenSettings: (nav?: { category: SettingsCategory; section: SettingsSection }) => void
@@ -69,6 +69,7 @@ export interface CoreAppCommandHandlers {
   onCreateFolder: () => void
   onCreateCanvas: () => void
   onOpenGraph: () => void
+  onOpenLocalGraph: (filePath: string) => void
   onDailyNote: () => void
   onOpenTemplateSelector: () => void
   onNavigateBack: () => void
@@ -146,16 +147,30 @@ function ensureSidebarVisible(h: CoreAppCommandHandlers): void {
   if (!h.showSidebar) h.onToggleSidebar()
 }
 
-function setSidebarPanelView(h: CoreAppCommandHandlers, viewId: SidebarViewId): void {
-  ensureSidebarVisible(h)
-  const section = h.sidebarPanelSections.find((s) => s.viewIds.includes(viewId))
-  if (section) h.sidebarPanelDispatch({ type: 'SET_ACTIVE_VIEW', sectionId: section.id, viewId })
+/**
+ * Activates a built-in view wherever it currently lives — left or right —
+ * since any of these can now be dragged to the other panel. Checks the right
+ * panel first (where outline/links/tags/properties/search start by default),
+ * falling back to the left (explorer/favorites/recent's default side).
+ */
+function setPanelView(h: CoreAppCommandHandlers, viewId: PanelViewId): void {
+  const rightSection = h.rightPanelSections.find((s) => s.viewIds.includes(viewId))
+  if (rightSection) {
+    ensureRightPanelVisible(h)
+    h.rightPanelDispatch({ type: 'SET_ACTIVE_VIEW', sectionId: rightSection.id, viewId })
+    return
+  }
+  const leftSection = h.leftPanelSections.find((s) => s.viewIds.includes(viewId))
+  if (leftSection) {
+    ensureSidebarVisible(h)
+    h.leftPanelDispatch({ type: 'SET_ACTIVE_VIEW', sectionId: leftSection.id, viewId })
+  }
 }
 
 function revealActiveFile(h: CoreAppCommandHandlers): void {
   const tab = getActiveTab(h)
   if (!tab) return
-  setSidebarPanelView(h, 'explorer')
+  setPanelView(h, 'explorer')
   window.dispatchEvent(new CustomEvent('slatebase:reveal-file', { detail: { path: tab.filePath } }))
 }
 
@@ -217,12 +232,6 @@ async function cycleTheme(h: CoreAppCommandHandlers, options: Array<'light' | 'd
 
 function ensureRightPanelVisible(h: CoreAppCommandHandlers): void {
   if (!h.showRightPanel) h.onToggleRightPanel()
-}
-
-function setContextPanelView(h: CoreAppCommandHandlers, viewId: ContextPanelViewId): void {
-  ensureRightPanelVisible(h)
-  const section = h.contextPanelSections.find((s) => s.viewIds.includes(viewId))
-  if (section) h.contextPanelDispatch({ type: 'SET_ACTIVE_VIEW', sectionId: section.id, viewId })
 }
 
 // ─── Follow link (editor:follow-link / open-link-in-new-*) ────────────────
@@ -436,7 +445,7 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'file-explorer:new-file-in-current-tab', name: 'Create new note in current tab', run: (h) => h.onCreateFile() },
     { id: 'file-explorer:new-file-in-new-pane', name: 'Create note to the right', run: (h) => h.onCreateFile() },
     { id: 'file-explorer:new-folder', name: 'Files: Create new folder', run: (h) => h.onCreateFolder() },
-    { id: 'file-explorer:open', name: 'Files: Show file explorer', run: (h) => setSidebarPanelView(h, 'explorer') },
+    { id: 'file-explorer:open', name: 'Files: Show file explorer', run: (h) => setPanelView(h, 'explorer') },
     { id: 'file-explorer:reveal-active-file', name: 'Files: Reveal current file in navigation', run: revealActiveFile },
     { id: 'file-explorer:duplicate-file', name: 'Make a copy of the current file', run: duplicateActiveFile },
     { id: 'file-explorer:move-file', name: 'Move current file to another folder', run: moveActiveFile },
@@ -473,7 +482,7 @@ function buildSpecs(): CoreAppCommandSpec[] {
 
     // ── Graph / Canvas / Daily Notes ──
     { id: 'graph:open', name: 'Graph view: Open graph view', run: (h) => h.onOpenGraph() },
-    { id: 'graph:open-local', name: 'Graph view: Open local graph', run: noop },
+    { id: 'graph:open-local', name: 'Graph view: Open local graph', run: (h) => { const t = getActiveTab(h); if (t && !t.filePath.startsWith('__')) h.onOpenLocalGraph(t.filePath) } },
     { id: 'graph:animate', name: 'Graph view: Start graph time-lapse animation', run: noop },
     { id: 'canvas:new-file', name: 'Canvas: Create new canvas', run: (h) => h.onCreateCanvas() },
     { id: 'canvas:jump-to-group', name: 'Canvas: Jump to group', run: noop },
@@ -492,15 +501,15 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'markdown:clear-metadata-properties', name: 'Clear file properties', run: noop },
 
     // ── Side panels ──
-    { id: 'outline:open', name: 'Outline: Show outline', run: (h) => setContextPanelView(h, 'outline') },
-    { id: 'outline:open-for-current', name: 'Outline: Open outline of the current file', run: (h) => setContextPanelView(h, 'outline') },
-    { id: 'backlink:open', name: 'Backlinks: Show backlinks', run: (h) => setContextPanelView(h, 'links') },
-    { id: 'backlink:open-backlinks', name: 'Backlinks: Open backlinks for the current note', run: (h) => setContextPanelView(h, 'links') },
-    { id: 'backlink:toggle-backlinks-in-document', name: 'Backlinks: Toggle backlinks in document', run: (h) => setContextPanelView(h, 'links') },
-    { id: 'outgoing-links:open', name: 'Outgoing links: Show outgoing links', run: (h) => setContextPanelView(h, 'links') },
-    { id: 'outgoing-links:open-for-current', name: 'Outgoing links: Open outgoing links for the current file', run: (h) => setContextPanelView(h, 'links') },
-    { id: 'tag-pane:open', name: 'Tags view: Show tags', run: (h) => setContextPanelView(h, 'tags') },
-    { id: 'bookmarks:open', name: 'Bookmarks: Show bookmarks', run: (h) => setSidebarPanelView(h, 'favorites') },
+    { id: 'outline:open', name: 'Outline: Show outline', run: (h) => setPanelView(h, 'outline') },
+    { id: 'outline:open-for-current', name: 'Outline: Open outline of the current file', run: (h) => setPanelView(h, 'outline') },
+    { id: 'backlink:open', name: 'Backlinks: Show backlinks', run: (h) => setPanelView(h, 'links') },
+    { id: 'backlink:open-backlinks', name: 'Backlinks: Open backlinks for the current note', run: (h) => setPanelView(h, 'links') },
+    { id: 'backlink:toggle-backlinks-in-document', name: 'Backlinks: Toggle backlinks in document', run: (h) => setPanelView(h, 'links') },
+    { id: 'outgoing-links:open', name: 'Outgoing links: Show outgoing links', run: (h) => setPanelView(h, 'links') },
+    { id: 'outgoing-links:open-for-current', name: 'Outgoing links: Open outgoing links for the current file', run: (h) => setPanelView(h, 'links') },
+    { id: 'tag-pane:open', name: 'Tags view: Show tags', run: (h) => setPanelView(h, 'tags') },
+    { id: 'bookmarks:open', name: 'Bookmarks: Show bookmarks', run: (h) => setPanelView(h, 'favorites') },
     { id: 'bookmarks:bookmark-current-view', name: 'Bookmarks: Bookmark...', run: (h) => { const t = getActiveTab(h); if (t && h.vaultId) favoritesStore.add(h.vaultId, t.filePath) } },
     { id: 'bookmarks:unbookmark-current-view', name: 'Bookmarks: Remove bookmark for the current file', run: (h) => { const t = getActiveTab(h); if (t && h.vaultId) favoritesStore.remove(h.vaultId, t.filePath) } },
     { id: 'file-recovery:open', name: 'File recovery: Open local history', run: (h) => { const t = getActiveTab(h); if (t) window.dispatchEvent(new CustomEvent('slatebase:open-file-recovery', { detail: { vaultId: t.vaultId, filePath: t.filePath } })) } },

@@ -32,6 +32,10 @@ export interface DirectoryTree {
   size?: number
   /** Number of direct child entries (only present when type === 'directory'). */
   itemCount?: number
+  /** Last-modified time, unix ms (only present when type === 'file'). */
+  mtime?: number
+  /** Creation time, unix ms (only present when type === 'file'). */
+  ctime?: number
 }
 
 /** Content and metadata of a single file. */

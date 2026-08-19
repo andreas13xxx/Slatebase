@@ -75,6 +75,7 @@ test. Config: `backend/vitest.config.ts` and the `test.coverage` block in `front
 | vite / vitest | Build + test |
 | @testing-library/react | Component testing |
 | playwright | E2E testing |
+| obsidian (dev) | Official Obsidian type declarations, so the compat shims are checked against the real `obsidian.d.ts` instead of hand-written shapes. Types only — nothing imports it at runtime. An npm `overrides` entry pins its `@codemirror/state`/`@codemirror/view` to the versions the app already uses, so plugin CM6 types resolve to one copy rather than a second, incompatible one |
 | vitest-axe | Automated accessibility testing (axe-core for Vitest) |
 | eslint-plugin-jsx-a11y-x | Static JSX accessibility lint rules (ESLint 10 compat fork) |
 | unified / remark-parse / remark-gfm / remark-frontmatter | Markdown (MDAST) |
@@ -102,6 +103,7 @@ test. Config: `backend/vitest.config.ts` and the `test.coverage` block in `front
 | buffer | Node `Buffer` polyfill for plugin bundles (obsidian-git/isomorphic-git reference it at module top level) |
 | dompurify | Sanitizes raw HTML blocks before they are rendered as real DOM (reading view) |
 | zod | Schema validation (canvas parser, frontend-side) |
+| obsidian (dev) | Official Obsidian API type definitions (`obsidian.d.ts`, MIT) — ground truth for auditing `plugins/compat/` against, never imported at runtime. Peer-deps on older `@codemirror/state`/`@codemirror/view` patch versions, resolved via `overrides` in `package.json` rather than `--legacy-peer-deps`. |
 
 ### Geplant
 - **better-sqlite3** — SQLite für Graph-Index (erst bei Performance-Bedarf, >10k Dateien)

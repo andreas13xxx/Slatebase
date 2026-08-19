@@ -24,7 +24,19 @@ Shows the heading structure of the current file. Click a heading to jump to that
 
 - **Forward links** — Files that the current file links to
 - **Backlinks** — Files that link back to the current file. Updates automatically when another file is saved, renamed, or deleted in the background — even from another tab, device, or user — no need to switch documents to refresh the list
+- **Unlinked Mentions** — Below Backlinks, files that mention the current file's name as plain text, without an actual wikilink to it. A mention already inside a wikilink to this file doesn't count — only genuinely unlinked text shows up here
 - Unresolved links are shown separately
+
+Each Unlinked Mentions entry shows the file and a short snippet of the matching line. Click an entry to open that file, or click **Link** next to it to turn just that one occurrence into a real `[[wikilink]]`, without touching anything else in the file — useful for catching references you wrote before the note existed, or before you realized a wikilink would make sense there.
+
+#### Live Example: Unlinked Mentions
+
+This very file already has real unlinked mentions in this vault — writers mention "Context Panel" by name without always wikilinking it. Try it:
+
+1. Keep this file (`Features/Context Panel.md`) open
+2. Scroll the Links section down to **Unlinked Mentions**
+3. You'll see entries like `Features/Tags and Properties`, `Features/Wikilinks`, and a few `Practice/` exercises — each mentions "Context Panel" as plain text
+4. Click **Link** on one of them — open that file afterward and confirm the mention is now a real `[[Features/Context Panel]]` link
 
 ### Tags
 
@@ -61,8 +73,9 @@ The Context Panel is visible by default on the right side. If it's hidden:
 1. Open any file with wikilinks (e.g., [[Start here]])
 2. Look at the Context Panel on the right
 3. Check the **Links** section — you'll see forward links and backlinks
-4. Check the **Outline** — the heading structure is clickable
-5. Check **Tags** — expand a tag to see all files using it
+4. Scroll down within Links to **Unlinked Mentions** — plain-text mentions of this file's name elsewhere in the vault
+5. Check the **Outline** — the heading structure is clickable
+6. Check **Tags** — expand a tag to see all files using it
 
 ---
 
@@ -85,8 +98,9 @@ This is useful for seeing the outline and backlinks together while editing.
 > [!todo] Exercise
 > 1. Open this file and check the Context Panel
 > 2. How many backlinks does this file have?
-> 3. Click on the Outline section and navigate to a heading
-> 4. Try splitting: drag the Tags tab below the Links section
+> 3. Check Unlinked Mentions — click **Link** on one entry and verify it becomes a real wikilink
+> 4. Click on the Outline section and navigate to a heading
+> 5. Try splitting: drag the Tags tab below the Links section
 
 ---
 

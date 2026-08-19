@@ -13,6 +13,7 @@ import { getRequestListener } from '@hono/node-server'
 import { ConfigService } from './config/index.js'
 import { createLogger, ServerLogStore } from './logger/index.js'
 import { VaultReader, VaultManager } from './vault/index.js'
+import type { DirectoryTree } from './vault/index.js'
 import { VaultRegistry, VaultShareRegistry } from './vault/registry.js'
 import { VaultService, VaultAccessControlService } from './business/index.js'
 import { ImportService } from './import/index.js'
@@ -45,7 +46,7 @@ import { McpServerFactory } from './mcp/server-factory.js'
 import { createMcpHttpHandler } from './api/mcpRoutes.js'
 import { createMcpTokenRoutes } from './api/mcpTokenRoutes.js'
 import { createMcpWellKnownHandler } from './api/mcpWellKnownRoute.js'
-import { LinkIndexService } from './link-index/index.js'
+import { LinkIndexService, LinkMigrationService } from './link-index/index.js'
 import { createGraphRoutes } from './api/graphRoutes.js'
 import { InstalledPluginStore, PluginInstaller, PluginService } from './plugin/index.js'
 import { createPluginRoutes } from './api/pluginRoutes.js'
@@ -268,6 +269,13 @@ if (featureToggleService.isEnabled('mcp')) {
       logger,
       mcpConfig,
       getUserId: () => currentUserId,
+      // Closure, not a direct reference: linkMigrationService is a `const`
+      // declared further down (4g2) — this MCP block (4c) runs first, but the
+      // arrow function body itself isn't evaluated until a move_file/
+      // rename_file call actually happens, well after the whole module has
+      // finished initializing.
+      migrateLinks: (vaultId, oldPath, newPath, oldTree) =>
+        linkMigrationService.migrateLinks(vaultId, oldPath, newPath, oldTree),
     },
     logger,
   })
@@ -326,6 +334,9 @@ const updateChecker = new UpdateChecker(
 // 4g. Search Module
 const searchService = new SearchService(vaultService, vaultAccessControl, logger)
 const replaceService = new ReplaceService(vaultService, logger)
+
+// 4g2. Link Migration Module (getLinkIndex is a hoisted function declaration, defined below)
+const linkMigrationService = new LinkMigrationService(vaultService, searchService, getLinkIndex, logger)
 
 // 4h. Realtime Services (SSE)
 const sseConfig = config.getSseConfig()
@@ -751,6 +762,9 @@ vaultController.setLinkIndexHook({
           })
       }
     }
+  },
+  migrateLinks(vaultId: string, oldPath: string, newPath: string, oldTree: DirectoryTree) {
+    return linkMigrationService.migrateLinks(vaultId, oldPath, newPath, oldTree)
   },
 })
 

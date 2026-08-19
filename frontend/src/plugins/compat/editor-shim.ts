@@ -118,7 +118,7 @@ export interface IEditor {
   hasFocus(): boolean
   listSelections(): EditorSelection[]
   setSelection(anchor: EditorPosition, head?: EditorPosition): void
-  setSelections(selections: Array<{ anchor: EditorPosition; head?: EditorPosition }>): void
+  setSelections(selections: Array<{ anchor: EditorPosition; head?: EditorPosition }>, main?: number): void
   posToOffset(pos: EditorPosition): number
   offsetToPos(offset: number): EditorPosition
   undo(): void
@@ -133,6 +133,7 @@ export interface IEditor {
   processLines<T>(
     read: (line: number, lineText: string) => T | null,
     write: (line: number, lineText: string, value: T | null) => { from: EditorPosition; to?: EditorPosition; text: string } | void,
+    ignoreEmpty?: boolean,
   ): void
 }
 
@@ -509,7 +510,7 @@ export class EditorShim implements IEditor {
   }
 
   /** Set multiple selections (multi-cursor). Falls back to the first range for textarea. */
-  setSelections(selections: Array<{ anchor: EditorPosition; head?: EditorPosition }>): void {
+  setSelections(selections: Array<{ anchor: EditorPosition; head?: EditorPosition }>, main?: number): void {
     if (selections.length === 0) return
     const cm = this.getCM6()
     if (cm) {
@@ -518,10 +519,10 @@ export class EditorShim implements IEditor {
         const headOffset = sel.head ? this.cm6PosToOffset(cm, sel.head) : anchorOffset
         return CmEditorSelection.range(anchorOffset, headOffset)
       })
-      cm.dispatch({ selection: CmEditorSelection.create(ranges) })
+      cm.dispatch({ selection: CmEditorSelection.create(ranges, main) })
       return
     }
-    const sel = selections[0]!
+    const sel = selections[main ?? 0] ?? selections[0]!
     this.setSelection(sel.anchor, sel.head)
   }
 
@@ -745,19 +746,23 @@ export class EditorShim implements IEditor {
     }
   }
 
-  /** Process lines: read values, then write changes. */
+  /** Process lines: read values, then write changes. `ignoreEmpty` skips empty lines for both passes. */
   processLines<T>(
     read: (line: number, lineText: string) => T | null,
     write: (line: number, lineText: string, value: T | null) => EditorChange | void,
+    ignoreEmpty?: boolean,
   ): void {
     const count = this.lineCount()
     const values: Array<T | null> = []
     for (let i = 0; i < count; i++) {
-      values.push(read(i, this.getLine(i)))
+      const lineText = this.getLine(i)
+      values.push(ignoreEmpty && lineText.length === 0 ? null : read(i, lineText))
     }
     // Apply writes in reverse order to preserve offsets
     for (let i = count - 1; i >= 0; i--) {
-      const change = write(i, this.getLine(i), values[i] ?? null)
+      const lineText = this.getLine(i)
+      if (ignoreEmpty && lineText.length === 0) continue
+      const change = write(i, lineText, values[i] ?? null)
       if (change) {
         this.replaceRange(change.text, change.from, change.to)
       }

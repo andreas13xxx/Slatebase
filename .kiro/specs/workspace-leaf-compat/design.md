@@ -4,11 +4,11 @@
 
 Dieses Design beschreibt die vollständige Emulation der Obsidian Workspace Leaf API in Slatebase. Das Ziel ist es, Plugin-Views (Calendar, Kanban, Excalidraw, etc.) nahtlos in Slatebase's bestehendes Tab-System und Context Panel zu integrieren.
 
-Die Kernidee: Ein `WorkspaceLeaf` in Obsidian ist ein "Slot" für eine View — in Slatebase wird dieser Slot entweder als Tab im Hauptbereich oder als Section im Context Panel realisiert. Die Location (`'main' | 'right-sidebar'`) wird bei Leaf-Erstellung durch die aufrufende Methode bestimmt (`getLeaf()` → main, `getRightLeaf()`/`getLeftLeaf()` → sidebar).
+Die Kernidee: Ein `WorkspaceLeaf` in Obsidian ist ein "Slot" für eine View — in Slatebase wird dieser Slot entweder als Tab im Hauptbereich oder als Section in einem der beiden Sidebar-Panels realisiert. Die Location (`'main' | 'right-sidebar' | 'left-sidebar'`) wird bei Leaf-Erstellung durch die aufrufende Methode bestimmt (`getLeaf()` → main, `getRightLeaf()` → rechtes Context Panel, `getLeftLeaf()` → linkes Sidebar-Panel).
 
 ### Design-Entscheidungen
 
-1. **Kein separates Left Panel**: Slatebase rendert beide Sidebar-Locations im existierenden Context Panel (vereinfacht UI, kein neues Layout nötig).
+1. **Separates Left Panel**: `getLeftLeaf()` erzeugt eine eigene `'left-sidebar'`-Location, gerendert im linken Sidebar-Panel (`SidebarPanel.tsx`, das bereits als struktureller Mirror des Context Panels gebaut ist — Tabs, Split-Sections, Resize). Rechts und links sind unabhängige Leaf-Gruppen mit eigenem Activate/Deactivate-Callback-Paar in der `ViewRegistry`; `ensureSideLeaf()` dedupliziert nur innerhalb derselben Seite.
 2. **Virtual Path Convention**: Plugin-View-Tabs nutzen `__view::{viewType}` als virtuellen Pfad im Tab-System — konsistent mit dem bestehenden `__graph__` Pattern.
 3. **DOM-basiertes Rendering**: Plugin-Views manipulieren DOM direkt via `containerEl` — React rendert nur den Container, die View-Logik ist imperativ (Obsidian-Muster).
 4. **Module-Level Bridge für Tab-Integration**: Tab-Dispatch wird über eine Bridge-Funktion bereitgestellt (wie `realtimeVaultBridge`), damit ViewRegistry/WorkspaceLeaf Tabs öffnen/schließen können ohne React-Context-Dependency.

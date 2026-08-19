@@ -7,8 +7,9 @@
  * fallbacks never overwrite a real implementation, and that the regex-heavy
  * helpers survived being un-escaped from the template literal.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { registerFallbackShims } from './fallback-shims'
+import { clearApiGaps, getApiGaps } from './api-gap-registry'
 
 type Obs = Record<string, unknown>
 
@@ -32,6 +33,7 @@ describe('registerFallbackShims', () => {
   beforeEach(() => {
     original = window.obsidian
     window.obsidian = {}
+    clearApiGaps()
   })
 
   afterEach(() => {
@@ -155,6 +157,64 @@ describe('registerFallbackShims', () => {
       const result = info('---\ntitle: x\n---\nbody')
       expect(result.exists).toBe(true)
       expect(result.frontmatter).toBe('title: x')
+    })
+  })
+
+  describe('warn-on-read protection', () => {
+    let warn: ReturnType<typeof vi.spyOn>
+
+    beforeEach(() => {
+      warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    })
+
+    afterEach(() => {
+      warn.mockRestore()
+    })
+
+    it('warns exactly once on first read of a fallback, not on a second read', () => {
+      registerFallbackShims()
+      const obs = window.obsidian as Obs
+
+      void obs['ColorComponent']
+      void obs['ColorComponent']
+
+      const colorComponentWarnings = warn.mock.calls.filter((c) => String(c[0]).includes('obsidian.ColorComponent'))
+      expect(colorComponentWarnings).toHaveLength(1)
+    })
+
+    it('records the read in the shared api-gap-registry', () => {
+      registerFallbackShims()
+      const obs = window.obsidian as Obs
+
+      void obs['ColorComponent']
+
+      expect(getApiGaps()).toContainEqual(
+        expect.objectContaining({ shim: 'Fallback', property: 'ColorComponent', reads: 1 })
+      )
+    })
+
+    it('still returns a working value despite the warning getter', () => {
+      registerFallbackShims()
+      const ColorComponent = (window.obsidian as Obs)['ColorComponent'] as new (el: HTMLElement) => { getValue(): string }
+
+      const instance = new ColorComponent(document.createElement('div'))
+
+      expect(instance.getValue()).toBeTypeOf('string')
+    })
+
+    it('registration itself never warns — only a plugin actually reading a name does', () => {
+      registerFallbackShims()
+
+      expect(warn).not.toHaveBeenCalled()
+    })
+
+    it('a later real assignment overwrites a fallback-claimed name without throwing', () => {
+      registerFallbackShims()
+      const obs = window.obsidian as Obs
+      class RealMarkdownRenderer {}
+
+      expect(() => { obs['MarkdownRenderer'] = RealMarkdownRenderer }).not.toThrow()
+      expect(obs['MarkdownRenderer']).toBe(RealMarkdownRenderer)
     })
   })
 })

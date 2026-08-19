@@ -99,6 +99,8 @@ export interface DirectoryTree {
   children?: DirectoryTree[]
   size?: number        // For type === 'file': file size in bytes
   itemCount?: number   // For type === 'directory': count of direct children
+  mtime?: number       // For type === 'file': last-modified time, unix ms
+  ctime?: number       // For type === 'file': creation time, unix ms (falls back to mtime on filesystems without birthtime)
 }
 
 export interface FileContent {
@@ -249,6 +251,9 @@ export class VaultReader implements IVaultReader {
           type: 'file',
           path: relativFilePath,
           size: stat.size,
+          mtime: stat.mtimeMs,
+          // Some filesystems (notably ext4 without birthtime support) report birthtime as epoch 0 — fall back to mtime rather than lying with a 1970 creation date.
+          ctime: stat.birthtimeMs > 0 ? stat.birthtimeMs : stat.mtimeMs,
         })
       } catch {
         // Skip files that can't be stat'd

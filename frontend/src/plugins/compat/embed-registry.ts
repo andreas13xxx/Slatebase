@@ -235,6 +235,12 @@ export function seedKanbanMarkdownEmbed(): void {
       // directly in its own focus handling. Without it, focusing a card editor throws
       // "can't access property setTimeout, this.win is undefined".
       win: Window
+      // Real Obsidian's MarkdownEditor stores the constructor's `app` argument as
+      // `this.app` — Kanban's card-editor subclass relies on inheriting it rather
+      // than setting its own, and reads `this.app.workspace` from event handlers
+      // (e.g. on focus). Without it, those handlers throw "can't access property
+      // workspace, this.app is undefined".
+      app: unknown
       constructor(...args: unknown[]) {
         // Real Obsidian's MarkdownEditor is constructed as (app, containerEl, config) —
         // Kanban's subclass forwards all of its own (app, containerEl, owner) args via
@@ -243,6 +249,7 @@ export function seedKanbanMarkdownEmbed(): void {
         // since other plugins reusing this same API may call it with a different arity.
         const containerEl = args.find((a): a is HTMLElement => a instanceof HTMLElement)
         this.containerEl = containerEl ?? document.createElement('div')
+        this.app = args[0]
         this.owner = args[2]
         this.win = this.containerEl.ownerDocument?.defaultView ?? window
         // Lazy-init CM6: dynamically import to avoid top-level dep issues

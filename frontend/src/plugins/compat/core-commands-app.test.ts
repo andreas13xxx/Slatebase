@@ -78,8 +78,8 @@ describe('registerCoreAppCommands', () => {
   let tabDispatch: ReturnType<typeof vi.fn>
   let appDispatch: ReturnType<typeof vi.fn>
   let authDispatch: ReturnType<typeof vi.fn>
-  let contextPanelDispatch: ReturnType<typeof vi.fn>
-  let sidebarPanelDispatch: ReturnType<typeof vi.fn>
+  let rightPanelDispatch: ReturnType<typeof vi.fn>
+  let leftPanelDispatch: ReturnType<typeof vi.fn>
   let onToggleSidebar: ReturnType<typeof vi.fn>
   let onToggleRightPanel: ReturnType<typeof vi.fn>
 
@@ -89,8 +89,8 @@ describe('registerCoreAppCommands', () => {
     tabDispatch = vi.fn()
     appDispatch = vi.fn()
     authDispatch = vi.fn()
-    contextPanelDispatch = vi.fn()
-    sidebarPanelDispatch = vi.fn()
+    rightPanelDispatch = vi.fn()
+    leftPanelDispatch = vi.fn()
     onToggleSidebar = vi.fn()
     onToggleRightPanel = vi.fn()
 
@@ -105,10 +105,10 @@ describe('registerCoreAppCommands', () => {
       authDispatch,
       showSidebar: false,
       showRightPanel: false,
-      contextPanelSections: [{ id: 'sec-1', viewIds: ['outline', 'links', 'tags', 'properties', 'search'], activeViewId: 'outline', heightFraction: 1 }],
-      contextPanelDispatch,
-      sidebarPanelSections: [{ id: 'side-1', viewIds: ['explorer', 'favorites', 'recent'], activeViewId: 'explorer', heightFraction: 1 }],
-      sidebarPanelDispatch,
+      rightPanelSections: [{ id: 'sec-1', viewIds: ['outline', 'links', 'tags', 'properties', 'search'], activeViewId: 'outline', heightFraction: 1 }],
+      rightPanelDispatch,
+      leftPanelSections: [{ id: 'side-1', viewIds: ['explorer', 'favorites', 'recent'], activeViewId: 'explorer', heightFraction: 1 }],
+      leftPanelDispatch,
       onToggleSidebar,
       onToggleRightPanel,
       onOpenSettings: vi.fn(),
@@ -117,6 +117,7 @@ describe('registerCoreAppCommands', () => {
       onCreateFolder: vi.fn(),
       onCreateCanvas: vi.fn(),
       onOpenGraph: vi.fn(),
+      onOpenLocalGraph: vi.fn(),
       onDailyNote: vi.fn(),
       onOpenTemplateSelector: vi.fn(),
       onNavigateBack: vi.fn(),
@@ -214,7 +215,7 @@ describe('registerCoreAppCommands', () => {
     registry.executeCommand('outline:open')
 
     expect(onToggleRightPanel).toHaveBeenCalled()
-    expect(contextPanelDispatch).toHaveBeenCalledWith({ type: 'SET_ACTIVE_VIEW', sectionId: 'sec-1', viewId: 'outline' })
+    expect(rightPanelDispatch).toHaveBeenCalledWith({ type: 'SET_ACTIVE_VIEW', sectionId: 'sec-1', viewId: 'outline' })
   })
 
   it('outline:open does not re-toggle an already-open right panel', () => {
@@ -236,6 +237,23 @@ describe('registerCoreAppCommands', () => {
 
     registry.executeCommand('canvas:new-file')
     expect(handlers.onCreateCanvas).toHaveBeenCalled()
+  })
+
+  it('graph:open-local opens a Lokaler_Graph for the active file tab', () => {
+    registry.executeCommand('graph:open-local')
+    expect(handlers.onOpenLocalGraph).toHaveBeenCalledWith('note.md')
+  })
+
+  it('graph:open-local has no effect when the active tab is a sentinel (non-file) tab', () => {
+    handlers.tabState = { tabs: [makeTab({ id: 'g', filePath: '__graph__' })], activeTabId: 'g' }
+    registry.executeCommand('graph:open-local')
+    expect(handlers.onOpenLocalGraph).not.toHaveBeenCalled()
+  })
+
+  it('graph:open-local has no effect when no tab is active', () => {
+    handlers.tabState = { tabs: [], activeTabId: null }
+    registry.executeCommand('graph:open-local')
+    expect(handlers.onOpenLocalGraph).not.toHaveBeenCalled()
   })
 
   it('global-search:open and command-palette:open dispatch the existing window events', () => {
@@ -323,10 +341,10 @@ describe('registerCoreAppCommands — editor:* commands needing app context', ()
       authDispatch: vi.fn(),
       showSidebar: false,
       showRightPanel: false,
-      contextPanelSections: [],
-      contextPanelDispatch: vi.fn(),
-      sidebarPanelSections: [],
-      sidebarPanelDispatch: vi.fn(),
+      rightPanelSections: [],
+      rightPanelDispatch: vi.fn(),
+      leftPanelSections: [],
+      leftPanelDispatch: vi.fn(),
       onToggleSidebar: vi.fn(),
       onToggleRightPanel: vi.fn(),
       onOpenSettings: vi.fn(),
@@ -335,6 +353,7 @@ describe('registerCoreAppCommands — editor:* commands needing app context', ()
       onCreateFolder: vi.fn(),
       onCreateCanvas: vi.fn(),
       onOpenGraph: vi.fn(),
+      onOpenLocalGraph: vi.fn(),
       onDailyNote: vi.fn(),
       onOpenTemplateSelector: vi.fn(),
       onNavigateBack: vi.fn(),
@@ -409,10 +428,10 @@ describe('registerCoreAppCommands — bookmark types (Requirements 11-14)', () =
       authDispatch: vi.fn(),
       showSidebar: false,
       showRightPanel: false,
-      contextPanelSections: [],
-      contextPanelDispatch: vi.fn(),
-      sidebarPanelSections: [],
-      sidebarPanelDispatch: vi.fn(),
+      rightPanelSections: [],
+      rightPanelDispatch: vi.fn(),
+      leftPanelSections: [],
+      leftPanelDispatch: vi.fn(),
       onToggleSidebar: vi.fn(),
       onToggleRightPanel: vi.fn(),
       onOpenSettings: vi.fn(),
@@ -421,6 +440,7 @@ describe('registerCoreAppCommands — bookmark types (Requirements 11-14)', () =
       onCreateFolder: vi.fn(),
       onCreateCanvas: vi.fn(),
       onOpenGraph: vi.fn(),
+      onOpenLocalGraph: vi.fn(),
       onDailyNote: vi.fn(),
       onOpenTemplateSelector: vi.fn(),
       onNavigateBack: vi.fn(),

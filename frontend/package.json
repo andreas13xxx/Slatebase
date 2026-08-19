@@ -13,6 +13,12 @@
     "test:coverage": "vitest --run --coverage",
     "test:e2e": "playwright test"
   },
+  "overrides": {
+    "obsidian": {
+      "@codemirror/state": "$@codemirror/state",
+      "@codemirror/view": "$@codemirror/view"
+    }
+  },
   "dependencies": {
     "@codemirror/autocomplete": "6.20.3",
     "@codemirror/commands": "6.10.4",
@@ -62,6 +68,7 @@
     "fast-check": "^4.9.0",
     "globals": "^17.9.0",
     "jsdom": "^30.0.1",
+    "obsidian": "^1.13.1",
     "tsx": "^4.23.12",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.66.0",

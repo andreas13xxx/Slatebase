@@ -29,6 +29,8 @@
 
 import { errorOnce, warnNoOp } from './log';
 import type { BlockCache, CachedMetadata, HeadingCache, Pos } from './types';
+import { renderLucideIconInto } from './lucide-icons';
+import { getCustomIconSvg, sizeCustomIconSvg } from '../../utils/pluginIcon';
 
 /**
  * The Obsidian API version Slatebase claims to implement.
@@ -510,12 +512,32 @@ export function htmlToMarkdown(html: string | HTMLElement | Document | DocumentF
 /**
  * Sanitize an HTML string to a DocumentFragment (strips scripts).
  */
+/** javascript:/vbscript: URLs execute code outright; no legitimate href/src ever needs them. */
+const DANGEROUS_URL_SCHEME = /^\s*(javascript|vbscript):/i;
+/** data: URLs whose payload itself is executable content (script, or SVG — which can carry an embedded <script>). */
+const DANGEROUS_DATA_URL = /^\s*data:(text\/html|application\/(x-)?javascript|image\/svg\+xml)/i;
+/** Attributes whose value is a URL a browser can navigate to or fetch. */
+const URL_ATTRIBUTES = new Set(['href', 'src', 'action', 'formaction', 'xlink:href']);
+
 export function sanitizeHTMLToDom(html: string): DocumentFragment {
   const template = document.createElement('template');
   template.innerHTML = html;
   // Remove script tags
   for (const script of template.content.querySelectorAll('script')) {
     script.remove();
+  }
+  // Strip inline event handlers (onclick=, onerror=, ...) and javascript:/dangerous-data: URLs —
+  // real Obsidian's sanitizer (DOMPurify) blocks both; without this a plugin rendering
+  // untrusted HTML (e.g. fetched web content) via this function could execute arbitrary JS.
+  for (const el of template.content.querySelectorAll('*')) {
+    for (const attr of [...el.attributes]) {
+      const name = attr.name.toLowerCase();
+      if (name.startsWith('on')) {
+        el.removeAttribute(attr.name);
+      } else if (URL_ATTRIBUTES.has(name) && (DANGEROUS_URL_SCHEME.test(attr.value) || DANGEROUS_DATA_URL.test(attr.value))) {
+        el.removeAttribute(attr.name);
+      }
+    }
   }
   return template.content;
 }
@@ -808,18 +830,39 @@ export class ExtraButtonComponent {
 
   constructor(containerEl: HTMLElement) {
     this.extraSettingsEl = document.createElement('div');
-    this.extraSettingsEl.className = 'extra-setting-button';
+    this.extraSettingsEl.className = 'extra-setting-button clickable-icon';
     containerEl.appendChild(this.extraSettingsEl);
     this.extraSettingsEl.addEventListener('click', () => {
       if (!this._disabled && this._callback) this._callback();
     });
   }
 
-  setDisabled(disabled: boolean): this { this._disabled = disabled; return this; }
+  setDisabled(disabled: boolean): this {
+    this._disabled = disabled;
+    this.extraSettingsEl.classList.toggle('is-disabled', disabled);
+    this.extraSettingsEl.style.pointerEvents = disabled ? 'none' : '';
+    return this;
+  }
   setTooltip(tooltip: string): this { this.extraSettingsEl.title = tooltip; return this; }
-  setIcon(_icon: string): this { return this; }
+  setIcon(icon: string): this { renderComponentIcon(this.extraSettingsEl, icon); return this; }
   onClick(callback: () => void): this { this._callback = callback; return this; }
   then(cb: (component: this) => void): this { cb(this); return this; }
+}
+
+/**
+ * Icon rendering shared by every settings-row icon button (ButtonComponent,
+ * ExtraButtonComponent, and their Setting.add*()/SettingGroup.add*() inline
+ * equivalents): a plugin's own addIcon()-registered SVG first, then the
+ * Lucide-only resolver — matches ButtonComponent.setIcon() in setting-tab.ts.
+ */
+export function renderComponentIcon(el: HTMLElement, icon: string): void {
+  el.innerHTML = '';
+  const customSvg = getCustomIconSvg(icon);
+  if (customSvg) {
+    el.innerHTML = sizeCustomIconSvg(customSvg, 16);
+    return;
+  }
+  renderLucideIconInto(el, icon);
 }
 
 /**
@@ -844,6 +887,65 @@ export class ColorComponent {
   setDisabled(disabled: boolean): this { this.colorEl.disabled = disabled; return this; }
   onChange(callback: (value: string) => void): this { this._callback = callback; return this; }
   then(cb: (component: this) => void): this { cb(this); return this; }
+
+  getValueRgb(): { r: number; g: number; b: number } {
+    return hexToRgb(this.colorEl.value);
+  }
+  setValueRgb(rgb: { r: number; g: number; b: number }): this {
+    this.colorEl.value = rgbToHex(rgb);
+    return this;
+  }
+  getValueHsl(): { h: number; s: number; l: number } {
+    return rgbToHsl(hexToRgb(this.colorEl.value));
+  }
+  setValueHsl(hsl: { h: number; s: number; l: number }): this {
+    this.colorEl.value = rgbToHex(hslToRgb(hsl));
+    return this;
+  }
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  if (!m) return { r: 0, g: 0, b: 0 };
+  return { r: parseInt(m[1]!, 16), g: parseInt(m[2]!, 16), b: parseInt(m[3]!, 16) };
+}
+
+function rgbToHex({ r, g, b }: { r: number; g: number; b: number }): string {
+  const clamp = (n: number) => Math.max(0, Math.min(255, Math.round(n)));
+  const toHex = (n: number) => clamp(n).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function rgbToHsl({ r, g, b }: { r: number; g: number; b: number }): { h: number; s: number; l: number } {
+  const rn = r / 255, gn = g / 255, bn = b / 255;
+  const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+  let h = 0;
+  const l = (max + min) / 2;
+  const d = max - min;
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  if (d !== 0) {
+    if (max === rn) h = ((gn - bn) / d) % 6;
+    else if (max === gn) h = (bn - rn) / d + 2;
+    else h = (rn - gn) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) };
+}
+
+function hslToRgb({ h, s, l }: { h: number; s: number; l: number }): { r: number; g: number; b: number } {
+  const sn = s / 100, ln = l / 100;
+  const c = (1 - Math.abs(2 * ln - 1)) * sn;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = ln - c / 2;
+  let rp: number, gp: number, bp: number;
+  if (h < 60) { rp = c; gp = x; bp = 0; }
+  else if (h < 120) { rp = x; gp = c; bp = 0; }
+  else if (h < 180) { rp = 0; gp = c; bp = x; }
+  else if (h < 240) { rp = 0; gp = x; bp = c; }
+  else if (h < 300) { rp = x; gp = 0; bp = c; }
+  else { rp = c; gp = 0; bp = x; }
+  return { r: (rp + m) * 255, g: (gp + m) * 255, b: (bp + m) * 255 };
 }
 
 /**
@@ -928,6 +1030,8 @@ export class MomentFormatComponent {
   setSampleEl(sampleEl: HTMLElement): this { this.sampleEl = sampleEl; return this; }
   getValue(): string { return this.inputEl.value || this._defaultFormat; }
   setValue(value: string): this { this.inputEl.value = value; this.updateSample(); return this; }
+  setPlaceholder(placeholder: string): this { this.inputEl.placeholder = placeholder; return this; }
+  setDisabled(disabled: boolean): this { this.inputEl.disabled = disabled; return this; }
   onChange(callback: (value: string) => void): this { this._callback = callback; return this; }
   onChanged(): void {
     this.updateSample();
@@ -958,6 +1062,11 @@ export class ProgressBarComponent {
   setValue(value: number): this {
     this._value = value;
     (this.progressEl as HTMLProgressElement).value = value;
+    return this;
+  }
+  /** Ground Truth: ProgressBarComponent extends ValueComponent, which carries setDisabled. */
+  setDisabled(disabled: boolean): this {
+    this.progressEl.classList.toggle('is-disabled', disabled);
     return this;
   }
   then(cb: (component: this) => void): this { cb(this); return this; }

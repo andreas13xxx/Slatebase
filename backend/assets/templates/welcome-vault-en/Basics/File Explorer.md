@@ -46,7 +46,7 @@ The new vault appears immediately in the file explorer as its own section.
 3. Change the name and confirm with Enter
 
 > [!tip] Tip
-> When you rename a file, all wikilinks pointing to it are updated automatically. You don't need to fix links manually.
+> When you rename a file, all wikilinks pointing to it are updated automatically — everywhere in the vault, not just in the file you happen to have open. You don't need to fix links manually.
 
 ---
 
@@ -63,6 +63,18 @@ The new vault appears immediately in the file explorer as its own section.
 1. Right-click on the file
 2. Select **Move to...**
 3. Choose the target folder
+
+### Links Survive the Move
+
+Just like renaming, moving a file or folder automatically rewrites every wikilink elsewhere in the vault that pointed at the old location — including links that only use the bare filename (e.g. `[[Pasta]]`) rather than a full path, and even when you move a whole folder full of files at once.
+
+#### Live Example
+
+1. Create a folder `Sandbox/Recipes` and, inside it, a file `Sandbox/Recipes/Pasta.md`
+2. Create a second file `Sandbox/Notes.md` and write `[[Pasta]]` in it — a bare link, no folder path
+3. Open `Sandbox/Notes.md` — the link resolves normally to `Sandbox/Recipes/Pasta.md`
+4. Now move `Sandbox/Recipes/Pasta.md` out of `Recipes/`, straight into `Sandbox/` (drag & drop or **Move to...**)
+5. Reopen `Sandbox/Notes.md` — `[[Pasta]]` still resolves, now pointing at the new location, even though the link never mentioned a folder to begin with
 
 ---
 

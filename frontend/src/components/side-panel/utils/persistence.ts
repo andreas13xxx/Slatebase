@@ -1,46 +1,52 @@
 /**
- * localStorage persistence utilities for the Sidebar Panel layout.
- * Handles serialization, deserialization, and validation of persisted layout data.
+ * localStorage persistence utilities for side panel layouts (left and right).
+ * Handles serialization, deserialization, and validation of persisted layout
+ * data. Shared by both panels — callers pass their own storage-key prefix so
+ * left/right layouts stay independent (and existing saved layouts from
+ * before the unification aren't lost).
  */
 
-/** Identifiers for the sidebar panel views */
-export type SidebarViewId = 'explorer' | 'favorites' | 'recent'
+import type { PanelViewId } from '../../../state/panelState'
 
-/** Persisted layout structure stored in localStorage */
-export interface PersistedSidebarPanelLayout {
-  tabOrder: SidebarViewId[]
+/** Persisted layout structure stored in localStorage. */
+export interface PersistedPanelLayout {
+  tabOrder: PanelViewId[]
   sections: Array<{
-    viewIds: SidebarViewId[]
-    activeViewId: SidebarViewId
+    viewIds: PanelViewId[]
+    activeViewId: PanelViewId
     heightFraction: number
   }>
 }
 
-const VALID_VIEW_IDS: ReadonlySet<string> = new Set<SidebarViewId>([
-  'explorer',
-  'favorites',
-  'recent',
+const VALID_BUILTIN_VIEW_IDS: ReadonlySet<string> = new Set([
+  'explorer', 'favorites', 'recent',
+  'outline', 'links', 'tags', 'properties', 'search',
 ])
 
 /**
- * Generates the localStorage key for a given user.
+ * Generates the localStorage key for a given user, scoped by the caller's
+ * prefix (e.g. `slatebase_sidebar_panel_` or `slatebase_context_panel_`).
  */
-function getStorageKey(userId: string): string {
-  return `slatebase_sidebar_panel_${userId}`
+function getStorageKey(prefix: string, userId: string): string {
+  return `${prefix}${userId}`
 }
 
 /**
- * Validates that a value is a valid SidebarViewId.
+ * Validates that a value is a valid PanelViewId.
+ * Accepts built-in IDs and plugin IDs (prefixed with 'plugin:').
  */
-function isValidViewId(value: unknown): value is SidebarViewId {
-  return typeof value === 'string' && VALID_VIEW_IDS.has(value)
+function isValidViewId(value: unknown): value is PanelViewId {
+  if (typeof value !== 'string') return false
+  if (VALID_BUILTIN_VIEW_IDS.has(value)) return true
+  if (value.startsWith('plugin:') && value.length > 7) return true
+  return false
 }
 
 /**
  * Validates the structure of a persisted layout object.
  * Returns true only if the entire structure is valid.
  */
-function isValidLayout(data: unknown): data is PersistedSidebarPanelLayout {
+function isValidLayout(data: unknown): data is PersistedPanelLayout {
   if (data === null || typeof data !== 'object') {
     return false
   }
@@ -115,18 +121,20 @@ function isValidLayout(data: unknown): data is PersistedSidebarPanelLayout {
 }
 
 /**
- * Saves the sidebar panel layout to localStorage.
+ * Saves a side panel layout to localStorage.
  * Silently fails if localStorage is unavailable.
  *
+ * @param prefix - Storage-key prefix identifying which panel (left/right)
  * @param userId - The current user's ID
  * @param layout - The layout to persist
  */
-export function saveSidebarPanelLayout(
+export function savePanelLayout(
+  prefix: string,
   userId: string,
-  layout: PersistedSidebarPanelLayout
+  layout: PersistedPanelLayout
 ): void {
   try {
-    const key = getStorageKey(userId)
+    const key = getStorageKey(prefix, userId)
     const serialized = JSON.stringify(layout)
     localStorage.setItem(key, serialized)
   } catch {
@@ -135,17 +143,19 @@ export function saveSidebarPanelLayout(
 }
 
 /**
- * Loads the sidebar panel layout from localStorage.
+ * Loads a side panel layout from localStorage.
  * Returns null if localStorage is unavailable, data is missing, or data is corrupted/invalid.
  *
+ * @param prefix - Storage-key prefix identifying which panel (left/right)
  * @param userId - The current user's ID
  * @returns The persisted layout or null
  */
-export function loadSidebarPanelLayout(
+export function loadPanelLayout(
+  prefix: string,
   userId: string
-): PersistedSidebarPanelLayout | null {
+): PersistedPanelLayout | null {
   try {
-    const key = getStorageKey(userId)
+    const key = getStorageKey(prefix, userId)
     const raw = localStorage.getItem(key)
 
     if (raw === null) {

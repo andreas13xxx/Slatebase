@@ -1,13 +1,16 @@
 import { useState, useRef, useCallback } from 'react'
-import { List, Link, Tag, FileText, Search } from 'lucide-react'
-import { isPluginViewId, getPluginViewType } from '../../state/contextPanelState'
-import type { ContextPanelViewId, BuiltinViewId } from '../../state/contextPanelState'
+import { FolderOpen, Star, Clock, List, Link, Tag, FileText, Search } from 'lucide-react'
+import { isPluginViewId, getPluginViewType } from '../../state/panelState'
+import type { PanelViewId, BuiltinPanelViewId } from '../../state/panelState'
 import { getCustomIconSvg, sizeCustomIconSvg, useIconResolutionTick } from '../../utils/pluginIcon'
 import { resolveIconMarkupSync } from '../../plugins/compat/lucide-icons'
-import './ContextPanelTabBar.css'
+import './PanelTabBar.css'
 
-/** Tab metadata mapping built-in view IDs to icons and labels. */
-const TAB_CONFIG: Record<BuiltinViewId, { icon: typeof List; label: string }> = {
+/** Tab metadata mapping every built-in view ID to its icon and label — shared by both panels, since any of these can now live on either side. */
+const TAB_CONFIG: Record<BuiltinPanelViewId, { icon: typeof FolderOpen; label: string }> = {
+  explorer: { icon: FolderOpen, label: 'Dateien' },
+  favorites: { icon: Star, label: 'Favoriten' },
+  recent: { icon: Clock, label: 'Zuletzt geöffnet' },
   outline: { icon: List, label: 'Gliederung' },
   links: { icon: Link, label: 'Links' },
   tags: { icon: Tag, label: 'Tags' },
@@ -22,25 +25,25 @@ export interface PluginViewMeta {
   icon: string
 }
 
-export interface ContextPanelTabBarProps {
-  tabs: ContextPanelViewId[]
-  activeTab: ContextPanelViewId
+export interface PanelTabBarProps {
+  tabs: PanelViewId[]
+  activeTab: PanelViewId
   sectionId?: string
-  onTabClick: (viewId: ContextPanelViewId) => void
-  onTabReorder: (newOrder: ContextPanelViewId[]) => void
-  onTabSplit: (viewId: ContextPanelViewId) => void
-  onTabReceive?: (viewId: ContextPanelViewId, targetSectionId: string) => void
+  onTabClick: (viewId: PanelViewId) => void
+  onTabReorder: (newOrder: PanelViewId[]) => void
+  onTabSplit: (viewId: PanelViewId) => void
+  onTabReceive?: (viewId: PanelViewId, targetSectionId: string) => void
   panelWidth: number
   /** Metadata for plugin views (icon + label lookup). Keyed by viewType. */
   pluginViewMeta?: Map<string, PluginViewMeta>
 }
 
 /**
- * Tab bar for the context panel with drag-and-drop reordering and split support.
- * Renders both built-in and plugin tabs from the unified tabs list.
- * Shows only icons with labels as tooltips on hover.
+ * Tab bar for a side panel (left or right) with drag-and-drop reordering and
+ * split support. Renders both built-in and plugin tabs from the unified tabs
+ * list. Shows only icons with labels as tooltips on hover.
  */
-export function ContextPanelTabBar({
+export function PanelTabBar({
   tabs,
   activeTab,
   sectionId,
@@ -48,20 +51,20 @@ export function ContextPanelTabBar({
   onTabReorder,
   onTabSplit,
   onTabReceive,
-  panelWidth: _panelWidth,  
+  panelWidth: _panelWidth,
   pluginViewMeta,
-}: ContextPanelTabBarProps) {
+}: PanelTabBarProps) {
   // Re-renders once any icon's (async, per-icon) Lucide resolution lands —
   // see PluginRibbonIcon.tsx for why this is needed.
   useIconResolutionTick()
-  const [draggedTab, setDraggedTab] = useState<ContextPanelViewId | null>(null)
+  const [draggedTab, setDraggedTab] = useState<PanelViewId | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   const tabBarRef = useRef<HTMLDivElement>(null)
 
   // Tabs are always draggable in split mode (sectionId provided) or when multiple tabs exist
   const isDraggable = sectionId !== undefined || tabs.length > 1
 
-  const handleDragStart = useCallback((e: React.DragEvent, viewId: ContextPanelViewId) => {
+  const handleDragStart = useCallback((e: React.DragEvent, viewId: PanelViewId) => {
     if (!isDraggable) {
       e.preventDefault()
       return
@@ -136,7 +139,7 @@ export function ContextPanelTabBar({
     e.preventDefault()
     e.stopPropagation()
 
-    const droppedViewId = e.dataTransfer.getData('text/plain') as ContextPanelViewId
+    const droppedViewId = e.dataTransfer.getData('text/plain') as PanelViewId
 
     if (!tabBarRef.current) {
       setDraggedTab(null)
@@ -217,7 +220,7 @@ export function ContextPanelTabBar({
   }, [])
 
   /** Render a single tab (built-in or plugin). */
-  function renderTab(viewId: ContextPanelViewId, index: number) {
+  function renderTab(viewId: PanelViewId, index: number) {
     const isActive = viewId === activeTab
     const isDragging = viewId === draggedTab
     const showInsertBefore = dropIndex === index
@@ -233,9 +236,9 @@ export function ContextPanelTabBar({
       const pluginIconMarkup = !customSvg && meta?.icon ? resolveIconMarkupSync(meta.icon, 14) : undefined
 
       return (
-        <div key={viewId} className="context-panel-tab-wrapper">
+        <div key={viewId} className="side-panel-tab-wrapper">
           {showInsertBefore && (
-            <div className="context-panel-tab-insert-line" aria-hidden="true" />
+            <div className="side-panel-tab-insert-line" aria-hidden="true" />
           )}
           <button
             type="button"
@@ -244,31 +247,31 @@ export function ContextPanelTabBar({
             aria-selected={isActive}
             aria-label={label}
             title={label}
-            className={`context-panel-tab${isActive ? ' context-panel-tab--active' : ''}${isDragging ? ' context-panel-tab--dragging' : ''}`}
+            className={`side-panel-tab${isActive ? ' side-panel-tab--active' : ''}${isDragging ? ' side-panel-tab--dragging' : ''}`}
             onClick={() => onTabClick(viewId)}
             draggable={isDraggable}
             onDragStart={(e) => handleDragStart(e, viewId)}
             onDragEnd={handleDragEnd}
           >
             {customSvg
-              ? <span className="context-panel-tab-icon" dangerouslySetInnerHTML={{ __html: sizeCustomIconSvg(customSvg, 14) }} />
+              ? <span className="side-panel-tab-icon" dangerouslySetInnerHTML={{ __html: sizeCustomIconSvg(customSvg, 14) }} />
               : pluginIconMarkup
-                ? <span className="context-panel-tab-icon" dangerouslySetInnerHTML={{ __html: pluginIconMarkup }} />
-                : <span className="context-panel-tab-icon">{viewType}</span>}
+                ? <span className="side-panel-tab-icon" dangerouslySetInnerHTML={{ __html: pluginIconMarkup }} />
+                : <span className="side-panel-tab-icon">{viewType}</span>}
           </button>
         </div>
       )
     }
 
     // Built-in tab
-    const config = TAB_CONFIG[viewId as BuiltinViewId]
+    const config = TAB_CONFIG[viewId as BuiltinPanelViewId]
     if (!config) return null
     const Icon = config.icon
 
     return (
-      <div key={viewId} className="context-panel-tab-wrapper">
+      <div key={viewId} className="side-panel-tab-wrapper">
         {showInsertBefore && (
-          <div className="context-panel-tab-insert-line" aria-hidden="true" />
+          <div className="side-panel-tab-insert-line" aria-hidden="true" />
         )}
         <button
           type="button"
@@ -277,13 +280,13 @@ export function ContextPanelTabBar({
           aria-selected={isActive}
           aria-label={config.label}
           title={config.label}
-          className={`context-panel-tab${isActive ? ' context-panel-tab--active' : ''}${isDragging ? ' context-panel-tab--dragging' : ''}`}
+          className={`side-panel-tab${isActive ? ' side-panel-tab--active' : ''}${isDragging ? ' side-panel-tab--dragging' : ''}`}
           onClick={() => onTabClick(viewId)}
           draggable={isDraggable}
           onDragStart={(e) => handleDragStart(e, viewId)}
           onDragEnd={handleDragEnd}
         >
-          <Icon size={14} className="context-panel-tab-icon" />
+          <Icon size={14} className="side-panel-tab-icon" />
         </button>
       </div>
     )
@@ -292,17 +295,17 @@ export function ContextPanelTabBar({
   return (
     <div
       ref={tabBarRef}
-      className="context-panel-tab-bar context-panel-tab-bar--icon-only"
+      className="side-panel-tab-bar side-panel-tab-bar--icon-only"
       role="tablist"
-      aria-label="Kontext-Panel Ansichten"
+      aria-label="Panel-Ansichten"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       {tabs.map((viewId, index) => renderTab(viewId, index))}
       {dropIndex === tabs.length && (
-        <div className="context-panel-tab-wrapper">
-          <div className="context-panel-tab-insert-line" aria-hidden="true" />
+        <div className="side-panel-tab-wrapper">
+          <div className="side-panel-tab-insert-line" aria-hidden="true" />
         </div>
       )}
     </div>

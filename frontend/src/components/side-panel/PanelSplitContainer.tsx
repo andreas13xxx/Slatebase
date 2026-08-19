@@ -1,18 +1,22 @@
 /**
- * SidebarSplitContainer component.
+ * PanelSplitContainer component — shared by both the left and right side panels.
  *
  * Renders split sections as vertically stacked areas with resize handles.
- * Each section displays its own TabBar (if multiple views) and
+ * Each section displays its own TabBar (if it has multiple views) and
  * the active view content via the renderView prop.
  *
- * Identical behavior to the right-side SplitSectionContainer but typed
- * for SidebarViewId and SidebarSplitSection.
+ * Supports:
+ * - Drag-to-resize between sections (4px handle, 80px minimum height)
+ * - Drop indicator when a tab is dragged below the TabBar threshold (30px)
+ * - Section merge: removes empty sections when last view is dragged out
+ * - Equal height redistribution among remaining sections after removal
  */
 
 import { useRef, useState, useCallback, useEffect } from 'react'
-import { SidebarPanelTabBar } from './SidebarPanelTabBar'
-import type { SidebarSplitSection, SidebarViewId } from '../../state/sidebarPanelState'
-import './SidebarSplitContainer.css'
+import { PanelTabBar } from './PanelTabBar'
+import type { PluginViewMeta } from './PanelTabBar'
+import type { PanelSplitSection, PanelViewId } from '../../state/panelState'
+import './PanelSplitContainer.css'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -21,35 +25,37 @@ const MIN_SECTION_HEIGHT = 80
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
-export interface SidebarSplitContainerProps {
+export interface PanelSplitContainerProps {
   /** Array of split sections to render. */
-  sections: SidebarSplitSection[]
+  sections: PanelSplitSection[]
   /** Panel width in pixels (passed to TabBar for responsive behavior). */
   panelWidth: number
   /** Panel body height in pixels (used to compute minimum height fractions during resize). */
   panelHeight: number
   /** Callback when a tab is clicked within a section. */
-  onTabClick: (sectionId: string, viewId: SidebarViewId) => void
+  onTabClick: (sectionId: string, viewId: PanelViewId) => void
   /** Callback when tabs are reordered within a section. */
-  onTabReorder: (sectionId: string, newOrder: SidebarViewId[]) => void
+  onTabReorder: (sectionId: string, newOrder: PanelViewId[]) => void
   /** Callback when a tab is split into a new section. */
-  onTabSplit: (viewId: SidebarViewId) => void
+  onTabSplit: (viewId: PanelViewId) => void
   /** Callback when a tab is moved from one section to another. */
-  onTabMove: (viewId: SidebarViewId, targetSectionId: string) => void
+  onTabMove: (viewId: PanelViewId, targetSectionId: string) => void
   /** Callback when section heights change (array of fractions summing to 1). */
   onResize: (heightFractions: number[]) => void
   /** Render function that returns the view component for a given viewId. */
-  renderView: (viewId: SidebarViewId) => React.ReactNode
+  renderView: (viewId: PanelViewId) => React.ReactNode
+  /** Metadata for plugin views (icon + label lookup). Keyed by viewType. */
+  pluginViewMeta?: Map<string, PluginViewMeta>
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 /**
- * Renders split sections of the sidebar panel as vertically stacked areas.
+ * Renders split sections of a side panel as vertically stacked areas.
  * Each section has its own TabBar (if multiple views) and is separated by
  * a 4px resize handle from adjacent sections.
  */
-export function SidebarSplitContainer({
+export function PanelSplitContainer({
   sections,
   panelWidth,
   panelHeight,
@@ -59,7 +65,8 @@ export function SidebarSplitContainer({
   onTabMove,
   onResize,
   renderView,
-}: SidebarSplitContainerProps) {
+  pluginViewMeta,
+}: PanelSplitContainerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [resizingIndex, setResizingIndex] = useState<number | null>(null)
   const [showDropIndicator, setShowDropIndicator] = useState(false)
@@ -71,6 +78,7 @@ export function SidebarSplitContainer({
 
   // ─── Resize Logic ────────────────────────────────────────────────────────
 
+  /** Handle mousedown on a resize handle between sections. */
   const handleResizeStart = useCallback((e: React.MouseEvent, handleIndex: number) => {
     e.preventDefault()
     setResizingIndex(handleIndex)
@@ -109,6 +117,7 @@ export function SidebarSplitContainer({
     onResize(fractions)
   }, [sections, panelHeight, onResize, KEYBOARD_STEP])
 
+  /** Handle mouse movement during resize. Enforces 80px minimum height. */
   useEffect(() => {
     if (resizingIndex === null) return
 
@@ -125,9 +134,11 @@ export function SidebarSplitContainer({
 
       if (topFraction === undefined || bottomFraction === undefined) return
 
+      // Calculate new fractions
       let newTop = topFraction + deltaFraction
       let newBottom = bottomFraction - deltaFraction
 
+      // Enforce minimum height constraint (80px)
       const minFraction = MIN_SECTION_HEIGHT / containerHeight
 
       if (newTop < minFraction) {
@@ -160,10 +171,12 @@ export function SidebarSplitContainer({
 
   // ─── Drop Indicator Logic ────────────────────────────────────────────────
 
+  /** Handle dragover on the container body to show drop indicator for tab split. */
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
 
+    // Show drop indicator when dragging in the lower portion of the container
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect()
       const isInDropZone = e.clientY > rect.top + rect.height * 0.7
@@ -181,7 +194,8 @@ export function SidebarSplitContainer({
     e.preventDefault()
     setShowDropIndicator(false)
 
-    const viewId = e.dataTransfer.getData('text/plain') as SidebarViewId
+    // The tab split is triggered via the dataTransfer payload set by PanelTabBar
+    const viewId = e.dataTransfer.getData('text/plain') as PanelViewId
     if (viewId) {
       onTabSplit(viewId)
     }
@@ -192,7 +206,7 @@ export function SidebarSplitContainer({
   return (
     <div
       ref={containerRef}
-      className={`sidebar-split-container${resizingIndex !== null ? ' sidebar-split-container--resizing' : ''}`}
+      className={`side-panel-split-container${resizingIndex !== null ? ' side-panel-split-container--resizing' : ''}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -201,10 +215,11 @@ export function SidebarSplitContainer({
         const heightPercent = section.heightFraction * 100
 
         return (
-          <div key={section.id} className="sidebar-split-wrapper">
+          <div key={section.id} className="side-panel-split-wrapper">
+            {/* Resize handle between sections (not before the first one) */}
             {index > 0 && (
               <div
-                className={`sidebar-split-resize-handle${resizingIndex === index - 1 ? ' sidebar-split-resize-handle--active' : ''}`}
+                className={`side-panel-split-resize-handle${resizingIndex === index - 1 ? ' side-panel-split-resize-handle--active' : ''}`}
                 onMouseDown={(e) => handleResizeStart(e, index - 1)}
                 onKeyDown={(e) => handleResizeKeyDown(e, index - 1)}
                 role="separator"
@@ -218,12 +233,13 @@ export function SidebarSplitContainer({
             )}
 
             <div
-              className="sidebar-split-section"
+              className="side-panel-split-section"
               style={{ height: `${heightPercent}%` }}
               data-section-id={section.id}
             >
+              {/* Section TabBar — always shown in split mode, hidden in single-section mode */}
               {sections.length > 1 && (
-                <SidebarPanelTabBar
+                <PanelTabBar
                   tabs={section.viewIds}
                   activeTab={section.activeViewId}
                   sectionId={section.id}
@@ -232,10 +248,12 @@ export function SidebarSplitContainer({
                   onTabSplit={onTabSplit}
                   onTabReceive={onTabMove}
                   panelWidth={panelWidth}
+                  pluginViewMeta={pluginViewMeta}
                 />
               )}
 
-              <div className="sidebar-split-content">
+              {/* Section content — renders the active view */}
+              <div className="side-panel-split-content">
                 {renderView(section.activeViewId)}
               </div>
             </div>
@@ -243,9 +261,10 @@ export function SidebarSplitContainer({
         )
       })}
 
+      {/* Drop indicator for creating a new section at the bottom */}
       {showDropIndicator && (
-        <div className="sidebar-split-drop-indicator" aria-hidden="true">
-          <div className="sidebar-split-drop-indicator-line" />
+        <div className="side-panel-split-drop-indicator" aria-hidden="true">
+          <div className="side-panel-split-drop-indicator-line" />
         </div>
       )}
     </div>

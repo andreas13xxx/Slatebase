@@ -215,4 +215,19 @@ describe('seedKanbanMarkdownEmbed', () => {
     seedKanbanMarkdownEmbed()
     expect(embedByExtension['md']).toBe(pluginCreator)
   })
+
+  it('sets this.app on the extracted MarkdownEditor class, matching real Obsidian', () => {
+    resetEmbedRegistry()
+    seedKanbanMarkdownEmbed()
+    const component = embedByExtension['md']({} as EmbedContext, {} as never, undefined) as EmbedComponent & { editMode: { app?: unknown; win?: Window } }
+    // Kanban pulls the MarkdownEditor class out of the prototype chain (see the
+    // seedKanbanMarkdownEmbed doc comment) instead of using editMode directly —
+    // reproduce that here rather than instantiating FakeEditor by name.
+    const MarkdownEditor = Object.getPrototypeOf(Object.getPrototypeOf(component.editMode)).constructor
+    const app = { workspace: {} }
+    const containerEl = document.createElement('div')
+    const instance = new MarkdownEditor(app, containerEl, {})
+    expect(instance.app).toBe(app)
+    expect(instance.win).toBe(window)
+  })
 })

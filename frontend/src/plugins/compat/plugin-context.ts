@@ -96,7 +96,7 @@ import type { RibbonIconEntry } from './ribbon-icon-registry'
 // Static: ToastNotification imports only React, icons and CSS, so there is no
 // cycle to break here, and the module is already statically bundled via App.tsx.
 // Importing it dynamically only delayed every Notice() by a microtask.
-import { showToast } from '../../components/ToastNotification'
+import { showToast, updateToastMessage, dismissToast } from '../../components/ToastNotification'
 
 /** Reads the global `window.app` stub installed by installObsidianGlobals/AppShim. */
 function getWindowApp(): { internalPlugins?: unknown; plugins?: unknown; embedRegistry?: unknown; getAccentColor?: () => string } | undefined {
@@ -136,6 +136,10 @@ export interface PluginContextValue {
   activeViews: Map<string, { viewType: string; displayText: string; containerEl: HTMLElement }>
   /** Active sidebar plugin views (view type → sidebar view info) */
   sidebarViews: Map<string, SidebarViewInfo>
+  /** Active left-sidebar plugin views (view type → sidebar view info) */
+  leftSidebarViews: Map<string, SidebarViewInfo>
+  /** Moves an active plugin sidebar view to the other side (cross-panel drag-and-drop). No-op if the view isn't currently active on the expected source side. */
+  moveSidebarView(viewType: string, targetSide: 'left' | 'right'): void
   /** Plugin ribbon icons (for rendering in the toolbar) */
   ribbonIcons: RibbonIconEntry[]
   /** Create a plugin file view for a given view type and file path. Returns container, leaf, and view or null. */
@@ -259,6 +263,7 @@ export function PluginProvider({
   const [plugins, setPlugins] = useState<PluginRegistryEntry[]>([])
   const [activeViews, setActiveViews] = useState<Map<string, { viewType: string; displayText: string; containerEl: HTMLElement }>>(new Map())
   const [sidebarViews, setSidebarViews] = useState<Map<string, SidebarViewInfo>>(new Map())
+  const [leftSidebarViews, setLeftSidebarViews] = useState<Map<string, SidebarViewInfo>>(new Map())
   const [ribbonIcons, setRibbonIcons] = useState<RibbonIconEntry[]>(() => getRibbonIcons())
 
   // Refs for mutable system instances (stable across renders)
@@ -532,6 +537,26 @@ export function PluginProvider({
         return next
       })
     })
+    newViewRegistry.setOnLeftSidebarViewActivated((viewType: string, view: ItemView, leaf: WorkspaceLeaf) => {
+      setLeftSidebarViews(prev => {
+        const next = new Map(prev)
+        next.set(viewType, {
+          viewType,
+          displayText: safeViewCall(viewType, 'getDisplayText', 'Plugin View', () => view.getDisplayText()),
+          icon: safeViewCall(viewType, 'getIcon', 'file', () => view.getIcon()),
+          containerEl: view.containerEl,
+          leaf,
+        })
+        return next
+      })
+    })
+    newViewRegistry.setOnLeftSidebarViewDeactivated((viewType: string) => {
+      setLeftSidebarViews(prev => {
+        const next = new Map(prev)
+        next.delete(viewType)
+        return next
+      })
+    })
     // Attach registry to workspace shim (needs a dummy app reference for leaf creation)
     // The app reference will be a minimal shared object — all plugins see the same vault/workspace/metadataCache
     const newVaultShim = VaultShim.wrapWithProxy(new VaultShim(newVaultId, vaultName, apiClient, directoryTree ?? { name: vaultName, type: 'directory' as const, children: [], itemCount: 0, path: '' }))
@@ -542,6 +567,13 @@ export function PluginProvider({
     // which are parsed from the file content on demand.
     newVaultShim.onFileRead = (path: string, content: string) => {
       newMetadataCacheShim.populateFromContent(path, content)
+    }
+    // Same reasoning, the write side: a plugin that calls vault.modify()/create()
+    // (append()/process()/fileManager.processFrontMatter() all funnel through
+    // these) and immediately reads back getFileCache() must see metadata for
+    // what it just wrote, not a stale or empty cache entry.
+    newVaultShim.onFileWrite = (file, content: string) => {
+      newMetadataCacheShim.refreshFileCache(file, content)
     }
     // Notify any open plugin view whose file was renamed — see
     // ViewRegistry.notifyFileRenamed()'s doc comment for why this can't just
@@ -593,11 +625,22 @@ export function PluginProvider({
     // Modal/SuggestModal/FuzzySuggestModal are registered by installObsidianGlobals()
     // above (guarded, Modal-extending) — no separate registration layered on top.
 
-    // Register Notice bridge on window so the require()-shim can call showToast
-    // eslint-disable-next-line react-hooks/immutability
-    ;(window as unknown as { __slatebaseShowNotice?: (msg: string, duration?: number) => void }).__slatebaseShowNotice = (msg: string, _duration?: number) => {
-      showToast('info', msg)
+    // Register the Notice bridge on window so the Notice compat shim (and the
+    // require()-shim's fallback Notice) can drive real toasts — including a
+    // stable id, so `notice.hide()` dismisses this specific toast rather than
+    // being unable to affect the toast system at all, and `duration: 0`
+    // (Obsidian's "stays until dismissed") actually suppresses auto-dismiss.
+    const noticeWindow = window as unknown as {
+      __slatebaseShowNotice?: (msg: string, duration?: number) => string
+      __slatebaseUpdateNotice?: (id: string, msg: string) => void
+      __slatebaseDismissNotice?: (id: string) => void
     }
+    // eslint-disable-next-line react-hooks/immutability
+    noticeWindow.__slatebaseShowNotice = (msg: string, duration?: number) => showToast('info', msg, duration)
+    // eslint-disable-next-line react-hooks/immutability
+    noticeWindow.__slatebaseUpdateNotice = (id: string, msg: string) => updateToastMessage(id, msg)
+    // eslint-disable-next-line react-hooks/immutability
+    noticeWindow.__slatebaseDismissNotice = (id: string) => dismissToast(id)
 
     // Wire the editor context resolver for editorCallback commands
     commandRegistryRef.current.setEditorContextResolver(() => {
@@ -1317,6 +1360,15 @@ export function PluginProvider({
     analyzer: analyzerRef.current, // eslint-disable-line react-hooks/refs
     activeViews,
     sidebarViews,
+    leftSidebarViews,
+    moveSidebarView: (viewType: string, targetSide: 'left' | 'right'): void => {
+      const workspace = workspaceShimRef.current
+      const viewRegistry = workspace?.getViewRegistry() ?? viewRegistryRef.current
+      if (!viewRegistry) return
+      const sourceInfo = targetSide === 'left' ? sidebarViews.get(viewType) : leftSidebarViews.get(viewType)
+      if (!sourceInfo) return
+      viewRegistry.moveLeafToSide(sourceInfo.leaf, targetSide)
+    },
     ribbonIcons,
     createFileView: async (viewType: string, filePath: string): Promise<{ containerEl: HTMLElement; leaf: WorkspaceLeaf; view: ItemView } | null> => {
       const workspace = workspaceShimRef.current

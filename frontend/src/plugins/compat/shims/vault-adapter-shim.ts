@@ -21,6 +21,7 @@ import type { IApiClient } from '../../../api/index'
 import { getStoredAuthToken, getStoredCsrfToken } from '../../../state/authContext'
 import type { DirectoryTree } from '../../../types'
 import { markPluginWrite } from '../plugin-event-bridge'
+import { recordGapRead, recordGapCall } from '../api-gap-registry'
 
 /**
  * Stat result for a file or folder.
@@ -50,6 +51,8 @@ export interface ListResult {
  * IVaultAdapter — Obsidian DataAdapter interface subset.
  */
 export interface IVaultAdapter {
+  /** Whether path lookups are case-insensitive. Slatebase's backend storage is case-sensitive. */
+  insensitive: boolean
   exists(path: string): Promise<boolean>
   read(path: string): Promise<string>
   readBinary(path: string): Promise<ArrayBuffer>
@@ -66,6 +69,9 @@ export interface IVaultAdapter {
  * VaultAdapterShim — Implements Obsidian's DataAdapter via Slatebase API.
  */
 export class VaultAdapterShim implements IVaultAdapter {
+  /** Slatebase's backend storage is case-sensitive, regardless of the host OS. */
+  readonly insensitive: boolean = false
+
   private readonly vaultId: string
   private readonly apiClient: IApiClient
   private getTree: () => DirectoryTree
@@ -155,8 +161,8 @@ export class VaultAdapterShim implements IVaultAdapter {
     return {
       type: node.type === 'file' ? 'file' : 'folder',
       size: node.size ?? 0,
-      mtime: Date.now(),
-      ctime: Date.now(),
+      mtime: node.mtime ?? Date.now(),
+      ctime: node.ctime ?? Date.now(),
     }
   }
 
@@ -249,6 +255,66 @@ export class VaultAdapterShim implements IVaultAdapter {
       const appErr = err as { message?: string }
       throw new Error(`adapter.writeBinary failed for "${path}": ${appErr.message ?? 'unknown error'}`, { cause: err })
     }
+  }
+
+  /**
+   * Wraps a VaultAdapterShim instance with a Proxy for non-emulated API
+   * interception. Real Obsidian's DataAdapter has methods this class doesn't
+   * implement (`copy`, `trashSystem`, `trashLocal`, `getResourcePath`,
+   * `process`, `append`, `getFullPath`, ...) — without this, reading one of
+   * those off the raw instance is `undefined`, and calling `undefined()` is
+   * an uncaught TypeError. Mirrors VaultShim/WorkspaceShim's pattern: a
+   * non-emulated method/property gets a warned no-op instead.
+   */
+  static wrapWithProxy(instance: VaultAdapterShim): VaultAdapterShim & Record<string, unknown> {
+    const emulatedProperties = new Set<string | symbol>([
+      'insensitive',
+      'exists',
+      'read',
+      'readBinary',
+      'write',
+      'writeBinary',
+      'list',
+      'stat',
+      'mkdir',
+      'remove',
+      'rename',
+    ])
+
+    return new Proxy(instance, {
+      get(target: VaultAdapterShim, prop: string | symbol): unknown {
+        if (emulatedProperties.has(prop)) {
+          const value = Reflect.get(target, prop, target)
+          if (typeof value === 'function') {
+            return value.bind(target)
+          }
+          return value
+        }
+
+        if (typeof prop === 'symbol') {
+          return Reflect.get(target, prop, target)
+        }
+
+        if (prop === 'then') {
+          return undefined
+        }
+
+        if (recordGapRead('VaultAdapter', prop)) {
+          console.warn(
+            `[VaultAdapterShim] Access to non-emulated adapter method/property "${prop}". ` +
+            `Slatebase returns a no-op function here, which is truthy — feature ` +
+            `detection like \`if (adapter.${prop})\` will take the wrong branch. ` +
+            `Inspect all gaps with window.__slatebasePluginApiGaps().`
+          )
+        }
+
+        return (...args: unknown[]) => {
+          recordGapCall('VaultAdapter', prop)
+          void args
+          return undefined
+        }
+      },
+    }) as VaultAdapterShim & Record<string, unknown>
   }
 }
 

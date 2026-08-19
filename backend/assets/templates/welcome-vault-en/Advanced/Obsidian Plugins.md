@@ -116,7 +116,7 @@ These plugins have been tested and work with Slatebase:
 
 | Plugin | Compatibility | Notes |
 |--------|--------------|-------|
-| Calendar | Good | Sidebar calendar, daily note creation |
+| Calendar | Good | Sidebar calendar, daily note creation — ⚠️ no update in ~2 years |
 | Dataview | Good | DQL queries work, DataviewJS limited |
 | Templater | Good | Date/file functions, no system commands |
 | Kanban | Good | Board view, drag & drop |
@@ -125,8 +125,9 @@ These plugins have been tested and work with Slatebase:
 | Tasks | Good | Emoji signifiers, query blocks, recurring tasks |
 | Advanced Tables | Good | Auto-formatting, navigation, sorting, formulas |
 | Git | Good | Commit/push/pull over HTTPS + PAT, no SSH |
-| Mind Map | Good | Headings/lists as an interactive mind map |
+| Mind Map | Good | Headings/lists as an interactive mind map — ⚠️ plugin itself is probably broken (see plugin guide) |
 | Editing Toolbar | Good | Fixed and floating formatting toolbar |
+| Iconize | Partial | Icon picker works, icons usually not visible in the file tree |
 
 See the individual [[Advanced/Plugins/Calendar|plugin guides]] for detailed compatibility information.
 
@@ -183,6 +184,7 @@ Detailed guides with examples and exercises for tested plugins:
 | Git | Versioning with an external remote repository | [[Advanced/Plugins/Git]] |
 | Mind Map | Turn notes into an interactive mind map | [[Advanced/Plugins/Mind Map]] |
 | Editing Toolbar | Formatting toolbar for the editor | [[Advanced/Plugins/Editing Toolbar]] |
+| Iconize | Custom icons for files and folders | [[Advanced/Plugins/Iconize]] |
 
 ### Hands-on Exercises
 

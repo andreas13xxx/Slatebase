@@ -24,7 +24,9 @@ import {
 } from '../business/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
 import { PathTraversalError } from '../vault/index.js'
+import type { DirectoryTree } from '../vault/index.js'
 import type { IVaultShareRegistry } from '../vault/registry.js'
+import { computeAffectedFilePairs } from '../link-index/index.js'
 import type { IImportService, UploadedFile } from '../import/index.js'
 import type { IUserRepository } from '../user/index.js'
 import type { IEventBus } from '../realtime/types.js'
@@ -86,6 +88,18 @@ export interface LinkIndexHook {
   onFileDeleted(vaultId: string, filePath: string): void
   /** Called after a file is renamed/moved (content may not be available). */
   onFileRenamed(vaultId: string, oldPath: string, newPath: string): void
+  /**
+   * Rewrites wikilinks elsewhere in the vault that point at `oldPath` so they
+   * point to `newPath` instead (Link-Migration). `oldTree` is the vault's
+   * DirectoryTree from just before the rename/move — needed to resolve
+   * bare-name wikilinks (e.g. `[[Note]]`) against a path that's about to
+   * disappear. Awaited before the rename/move response is returned
+   * (data-integrity takes precedence over latency here).
+   */
+  migrateLinks(vaultId: string, oldPath: string, newPath: string, oldTree: DirectoryTree): Promise<{
+    migratedFiles: { path: string; replacements: number }[]
+    failedFiles: { path: string; reason: string }[]
+  }>
 }
 
 /**
@@ -565,18 +579,31 @@ export class VaultController implements IVaultController {
       }
 
       const { sourcePath, destinationPath } = parsed.data
+
+      // Snapshot the tree before the move — Link-Migration needs it to resolve
+      // bare-name wikilinks against paths that are about to disappear.
+      const oldTree = this.linkIndexHook ? await this.vaultService.getVaultTree(vaultId) : null
+
       const result = await this.vaultService.moveContent(vaultId, sourcePath, destinationPath)
 
-      // Notify link index hook for markdown file moves (fire-and-forget)
+      // Notify link index hook for markdown file moves (fire-and-forget) —
+      // updates the moved file's own forward-link entry.
       if (this.linkIndexHook && sourcePath.endsWith('.md')) {
         this.linkIndexHook.onFileRenamed(vaultId, sourcePath, result.newPath)
       }
 
-      // Publish vault:change event (exclude triggering user)
       const session = c.get('session') as SessionContext
+
+      // Link-Migration: rewrite wikilinks in other files pointing at the old
+      // path(s), synchronously — awaited before the response is returned.
+      const linkMigrationWarnings = this.linkIndexHook && oldTree
+        ? await this.runLinkMigration(this.linkIndexHook, vaultId, oldTree, sourcePath, result.newPath, session)
+        : undefined
+
+      // Publish vault:change event (exclude triggering user)
       this.publishVaultChange(vaultId, 'renamed', result.newPath, session.userId, session.username)
 
-      return c.json(result, 200)
+      return c.json(linkMigrationWarnings ? { ...result, linkMigrationWarnings } : result, 200)
     } catch (error) {
       return this.handleError(c, error)
     }
@@ -610,21 +637,64 @@ export class VaultController implements IVaultController {
       }
 
       const { path: filePath, newName } = parsed.data
+
+      // Snapshot the tree before the rename — Link-Migration needs it to
+      // resolve bare-name wikilinks against paths that are about to disappear.
+      const oldTree = this.linkIndexHook ? await this.vaultService.getVaultTree(vaultId) : null
+
       const result = await this.vaultService.renameContent(vaultId, filePath, newName)
 
-      // Notify link index hook for markdown file renames (fire-and-forget)
+      // Notify link index hook for markdown file renames (fire-and-forget) —
+      // updates the renamed file's own forward-link entry.
       if (this.linkIndexHook && filePath.endsWith('.md')) {
         this.linkIndexHook.onFileRenamed(vaultId, filePath, result.newPath)
       }
 
-      // Publish vault:change event (exclude triggering user)
       const session = c.get('session') as SessionContext
+
+      // Link-Migration: rewrite wikilinks in other files pointing at the old
+      // path(s), synchronously — awaited before the response is returned.
+      const linkMigrationWarnings = this.linkIndexHook && oldTree
+        ? await this.runLinkMigration(this.linkIndexHook, vaultId, oldTree, filePath, result.newPath, session)
+        : undefined
+
+      // Publish vault:change event (exclude triggering user)
       this.publishVaultChange(vaultId, 'renamed', result.newPath, session.userId, session.username)
 
-      return c.json(result, 200)
+      return c.json(linkMigrationWarnings ? { ...result, linkMigrationWarnings } : result, 200)
     } catch (error) {
       return this.handleError(c, error)
     }
+  }
+
+  /**
+   * Runs Link-Migration for a rename/move: computes the {oldPath, newPath}
+   * pairs affected (one per descendant file for a folder operation), invokes
+   * the hook for each, publishes a `saved` vault:change event for every file
+   * it actually rewrote, and collects failures into a flat warnings list
+   * (the rename/move itself already succeeded by this point and is not
+   * rolled back on a partial migration failure).
+   */
+  private async runLinkMigration(
+    hook: LinkIndexHook,
+    vaultId: string,
+    oldTree: DirectoryTree,
+    sourcePath: string,
+    newPath: string,
+    session: SessionContext,
+  ): Promise<{ path: string; reason: string }[] | undefined> {
+    const pairs = computeAffectedFilePairs(oldTree, sourcePath, newPath)
+    const failures: { path: string; reason: string }[] = []
+
+    for (const pair of pairs) {
+      const migrationResult = await hook.migrateLinks(vaultId, pair.oldPath, pair.newPath, oldTree)
+      for (const migrated of migrationResult.migratedFiles) {
+        this.publishVaultChange(vaultId, 'saved', migrated.path, session.userId, session.username)
+      }
+      failures.push(...migrationResult.failedFiles)
+    }
+
+    return failures.length > 0 ? failures : undefined
   }
 
   /**

@@ -1,8 +1,8 @@
 # Implementierungsplan — Slatebase Ausstehende Features
 
-**Stand:** 14.08.2026. Security Hardening, Accessibility Audit (Runde 1), **Navigation & Verknüpfungs-Politur** und jetzt auch **UI-Politur (Bookmarks/Statusleiste/CSS-Snippets)** sind abgeschlossen. Kernfeatures sind umgesetzt. Es verbleiben 13 priorisierte offene Spec-Einheiten (decken ~23 Einzelfeatures ab, da mehrere thematisch verwandte Features gebündelt wurden). Zwei davon — **Workspaces/Split-Panes** und **Bases** — waren zuvor als "kein Äquivalent geplant" eingestuft und sind jetzt auf ausdrücklichen Nutzerwunsch in die aktive Roadmap aufgenommen.
+**Stand:** 18.08.2026. Security Hardening, Accessibility Audit (Runde 1), **Navigation & Verknüpfungs-Politur**, **UI-Politur (Bookmarks/Statusleiste/CSS-Snippets)** und jetzt auch **Graph-Politur & Link-Integrität** sind abgeschlossen. Kernfeatures sind umgesetzt. Es verbleiben 12 priorisierte offene Spec-Einheiten (decken ~20 Einzelfeatures ab, da mehrere thematisch verwandte Features gebündelt wurden). Zwei davon — **Workspaces/Split-Panes** und **Bases** — waren zuvor als "kein Äquivalent geplant" eingestuft und sind jetzt auf ausdrücklichen Nutzerwunsch in die aktive Roadmap aufgenommen.
 
-**Scope-Korrektur Navigation & Verknüpfungs-Politur:** Die umgesetzte Spec (`.kiro/specs/navigation-link-polish/`) deckt Quick Switcher (wie ursprünglich hier geplant) sowie zusätzlich Navigationsverlauf, Tab-Tastaturkürzel, Live-Backlinks, deterministische Link-Auflösung, Explorer-Auto-Reveal und eine Breadcrumb-Leiste ab — ein sinnvollerer, in sich geschlossener Scope als ursprünglich hier skizziert. Die drei übrigen ursprünglich hier gelisteten Punkte (Lokaler Graph, Ungelinkte Erwähnungen, Automatische Link-Aktualisierung beim Umbenennen/Verschieben) wurden **nicht** mitgeliefert und sind unten als eigener Prio 15 „Graph-Politur & Link-Integrität" weitergeführt.
+**Scope-Korrektur Navigation & Verknüpfungs-Politur:** Die umgesetzte Spec (`.kiro/specs/navigation-link-polish/`) deckt Quick Switcher (wie ursprünglich hier geplant) sowie zusätzlich Navigationsverlauf, Tab-Tastaturkürzel, Live-Backlinks, deterministische Link-Auflösung, Explorer-Auto-Reveal und eine Breadcrumb-Leiste ab — ein sinnvollerer, in sich geschlossener Scope als ursprünglich hier skizziert. Die drei übrigen ursprünglich hier gelisteten Punkte (Lokaler Graph, Ungelinkte Erwähnungen, Automatische Link-Aktualisierung beim Umbenennen/Verschieben) wurden **nicht** mitgeliefert und wurden als eigener Prio „Graph-Politur & Link-Integrität" weitergeführt — inzwischen ebenfalls abgeschlossen (siehe „Erledigt" unten).
 
 **Strategie:** Hybrid — Features mit bestehender Spec direkt umsetzen, komplexe Features erst vollständig spezifizieren. Kleinere, thematisch verwandte Features werden zu gemeinsamen Specs gebündelt statt einzeln spezifiziert (siehe Track A und H).
 
@@ -26,14 +26,14 @@
 | 12 | Fremdformat-Importer | I | ~20–30h | Geplant (keine Spec) |
 | 13 | Semantische Suche / AI-Embeddings | E | ~38–58h | Geplant (keine Spec) |
 | 14 | Collaborative Editing | D | ~68–88h | Nur Requirements |
-| 15 | Graph-Politur & Link-Integrität | A | ~15–24h | Geplant (keine Spec) — Rest-Scope aus Prio 2 |
+| ~~15~~ | ~~Graph-Politur & Link-Integrität~~ | A | ~~15–24h~~ | ✅ Erledigt (siehe unten) |
 
 ---
 
 ## Abhängigkeiten
 
 ```
-Track A (Politur):     PDF-Export → Editor-Erweiterungen (Mathe/Medien); Navigation & Verknüpfungs-Politur ✅ → Graph-Politur & Link-Integrität; UI-Politur ✅ (unabhängig erledigt)
+Track A (Politur):     PDF-Export → Editor-Erweiterungen (Mathe/Medien); Navigation & Verknüpfungs-Politur ✅ → Graph-Politur & Link-Integrität ✅; UI-Politur ✅ (unabhängig erledigt)
 Track B (Plugins):     Community Plugin Store ✅ → Obsidian Themes → Server-Side Plugins
 Track C (Sharing):     Public Sharing (unabhängig)
 Track D (Editor):      Collaborative Editing (braucht Realtime + CM6)
@@ -106,7 +106,7 @@ Verdrahtet mehrere bestehende No-Op-Befehle mit echtem Verhalten und schließt A
 - **Explorer-Auto-Reveal**: Toggle „Aktive Datei im Explorer verfolgen" in den Vault-Einstellungen.
 - **Breadcrumb-Leiste**: klickbarer Ordnerpfad der aktiven Datei oberhalb des Editors.
 
-**Scope-Korrektur:** Von den vier ursprünglich hier geplanten Punkten wurde nur der Quick Switcher wie vorgesehen umgesetzt — die übrigen drei (Lokaler Graph, Ungelinkte Erwähnungen, Automatische Link-Aktualisierung beim Umbenennen/Verschieben) waren nicht Teil der tatsächlich geschriebenen Spec und sind als eigener Prio 15 „Graph-Politur & Link-Integrität" weitergeführt. Im Gegenzug deckt die umgesetzte Spec vier Bereiche ab, die hier ursprünglich gar nicht geplant waren (Navigationsverlauf, Tab-Tastaturkürzel, Live-Backlinks, Explorer-Auto-Reveal, Breadcrumb).
+**Scope-Korrektur:** Von den vier ursprünglich hier geplanten Punkten wurde nur der Quick Switcher wie vorgesehen umgesetzt — die übrigen drei (Lokaler Graph, Ungelinkte Erwähnungen, Automatische Link-Aktualisierung beim Umbenennen/Verschieben) waren nicht Teil der tatsächlich geschriebenen Spec und wurden als eigener Prio „Graph-Politur & Link-Integrität" weitergeführt (siehe „Erledigt" unten — inzwischen ebenfalls abgeschlossen). Im Gegenzug deckt die umgesetzte Spec vier Bereiche ab, die hier ursprünglich gar nicht geplant waren (Navigationsverlauf, Tab-Tastaturkürzel, Live-Backlinks, Explorer-Auto-Reveal, Breadcrumb).
 
 **Zwei echte Bugs während der Umsetzung gefunden und behoben** (nicht nur Verschönerung): ein React-Ref-Mutation-während-Render-Fehler (von der strengeren `react-hooks/refs`-Lint-Regel gefangen) und ein Absturz beim App-Start, weil `PluginProvider` innerhalb von `AppContent`s eigenem Render-Baum sitzt statt darüber (`app.test.tsx` deckte das sofort auf). Details in `lessons-learned.md` #80–86.
 
@@ -127,6 +127,22 @@ Drei additive Verbesserungen an bestehenden bzw. eng verwandten Features:
 2. Favoriten-Einträge haben jetzt ein `id`-Feld (nicht ursprünglich geplant): Sobald mehrere Bookmark-Typen denselben Dateipfad teilen können (Datei- + Überschriften-Bookmark auf derselben Datei) oder gar keinen Pfad haben (Suche), ist `path` keine eindeutige Kennung mehr. `reorder()`/`setLabel()`/`removeById()` arbeiten deshalb über `id`, nicht `path`.
 
 **Nicht umgesetzt (dokumentierter Rand-Punkt):** Requirement 2.5 ("fehlend"-Markierung für eine favorisierte Datei, die inzwischen gelöscht wurde) — `FavoritesView.tsx` erhält aktuell keinen `DirectoryTree`, um das zu prüfen. Nachrüstbar durch eine Prop-Erweiterung von `SidebarPanel.tsx`.
+
+---
+
+## Erledigt — Graph-Politur & Link-Integrität (Track A) ✅
+
+**Spec:** `.kiro/specs/graph-polish-link-integrity/` — alle 3 Requirement-Bereiche umgesetzt (2026-08-18).
+
+Die drei Rest-Punkte aus der ursprünglich als „Navigation & Verknüpfungs-Politur" geplanten Spec (siehe oben):
+
+- **Lokaler Graph** (pro Notiz): `graph:open-local` (zuvor No-Op) öffnet jetzt einen Tab mit dem bestehenden `GraphView`, clientseitig gefiltert auf die N-Hop-Nachbarschaft (`local-graph-utils.ts`, reine BFS-Filterung der vorhandenen `/vaults/:id/graph`-Antwort, kein neuer Endpunkt). Nachbarschaftsradius (1–5) per Stepper einstellbar und persistiert, Zentrums-Notiz visuell hervorgehoben, Live-Update bei Vault-Änderungen, dedizierter Fehlerzustand bei Löschung der Zentrums-Notiz.
+- **Ungelinkte Erwähnungen**: neue Sektion in `LinksView.tsx` unterhalb der Backlinks — Volltextsuche nach dem Dateinamen (bestehender Such-Endpunkt), gefiltert um Treffer, die bereits Teil eines auf die Datei auflösenden Wikilinks sind (`extractWikilinks`/`resolveWikilinkTarget`), inkl. „Verlinken"-Aktion pro Fund.
+- **Automatische Link-Aktualisierung** beim Umbenennen/Verschieben: `moveContent`/`renameContent` schreiben jetzt synchron vor der Antwort vaultweit alle Wikilinks um, die auf den alten Pfad zeigen — auch bei Ordner-Operationen (ein Rewrite-Durchlauf pro betroffener Datei), mit `saved`-Realtime-Events pro umgeschriebener Datei und `linkMigrationWarnings` im Response bei Teilfehlern.
+
+**Wichtiger Fund während der Umsetzung:** Der bestehende Link-Index (`LinkIndexService.getBacklinks()`) matcht Wikilink-Ziele nur über exakten normalisierten Pfad-Abgleich — ein für Obsidian typischer Kurzform-Link (`[[Notiz]]` ohne Ordnerpfad) auf eine Datei in einem Unterordner wird vom Index nicht erfasst. Ein alleiniges `getBacklinks()` hätte die Link-Migration für genau die häufigste Link-Art stillschweigend übersehen. Fix: Backend-Port der bestehenden Frontend-Auflösungslogik (`link-match-resolver.ts`, portiert aus `link-resolver.ts`) plus ein Volltextsuche-Fallback für Kandidaten, die der Index nicht kennt — beide Quellen zusammen bilden die Kandidatenliste, bevor gegen den (vor der Operation eingefrorenen) `DirectoryTree` aufgelöst wird.
+
+**Nachgezogen:** Die MCP-Tools `move_file`/`rename_file` (`backend/src/mcp/tool-handlers.ts`) riefen ursprünglich `vaultService.moveContent`/`renameContent` direkt auf und umgingen damit den `VaultController`-HTTP-Pfad, an dem die Link-Migration hängt. `ToolHandlerDeps` hat jetzt ein optionales `migrateLinks`-Feld (im Composition Root auf denselben `LinkMigrationService` verdrahtet wie der REST-Pfad), sodass MCP-getriebene Verschiebungen/Umbenennungen ebenfalls vaultweit Links aktualisieren — inkl. Ordner-Operationen und `linkMigrationWarnings` im Tool-Ergebnis bei Teilfehlern. MCP-Tools publizieren weiterhin keine Realtime-`vault:change`-Events (bestehendes, unverändertes Verhalten aller MCP-Schreib-Tools, nicht nur dieser beiden).
 
 ---
 
@@ -347,27 +363,11 @@ Scope: ~8h Design + ~60–80h Implementierung.
 
 ---
 
-## Prio 15 — Graph-Politur & Link-Integrität (Track A)
-
-Scope: ~15–24h. Rest-Scope aus der ursprünglich als „Navigation & Verknüpfungs-Politur" geplanten Spec — die drei Punkte, die nicht in der tatsächlich umgesetzten `navigation-link-polish`-Spec (siehe „Erledigt" oben) mitgeliefert wurden. Kein Quick-Switcher-Punkt mehr, der ist erledigt.
-
-**Zusammenfassung:**
-
-- **Lokaler Graph** (pro Notiz): Filterung der bestehenden `/vaults/:id/graph`-Antwort auf n-Hop-Nachbarschaft, eigene GraphView-Instanz; aktuell No-Op
-- **Ungelinkte Erwähnungen**: Volltextsuche nach dem Dateinamen ohne Wikilink-Syntax, Anzeige im Context Panel unterhalb der Backlinks
-- **Automatische Link-Aktualisierung** beim Umbenennen/Verschieben: `renameContent`/`moveContent` müssen vaultweit alle Wikilinks auf die alte Datei umschreiben, statt sie brechen zu lassen — nutzt die im Graph Store bereits vorhandenen Backlink-Daten. Größte *unbeabsichtigte* Einzel-Lücke ggü. Obsidian-Kernverhalten (Datenintegrität).
-
-**Abhängigkeiten:** Braucht `knowledge-graph` ✅ (Backlink-/Adjazenzdaten) + `link-resolver.ts` ✅ (jetzt mit deterministischer Mehrdeutigkeits-Auflösung, siehe `navigation-link-polish` ✅).
-
-**Empfehlung:** Drei kleine, unabhängig testbare Tasks — die Link-Aktualisierung ist davon die mit dem größten wahrgenommenen Qualitätsgewinn (Datenintegrität beim Umbenennen).
-
----
-
 ## Gesamtaufwand (Schätzung)
 
 | Track | Aufwand |
 |-------|---------|
-| A: Politur (PDF, Mathe/Medien, Graph-Politur) | ~36–54h |
+| A: Politur (PDF, Mathe/Medien) | ~21–30h |
 | B: Plugins (Themes + Server-Side) | ~63–88h |
 | C: Sharing | ~19–24h |
 | D: Editor (Collaborative) | ~68–88h |
@@ -375,7 +375,7 @@ Scope: ~15–24h. Rest-Scope aus der ursprünglich als „Navigation & Verknüpf
 | F/G: Qualität & Layout (Responsive + Workspaces) | ~84–124h |
 | H: Strukturierte Daten (Properties/Suche + Bases) | ~80–110h |
 | I: Onboarding (Importer) | ~20–30h |
-| **Summe** | **~408–576h** |
+| **Summe** | **~393–552h** |
 
 ---
 

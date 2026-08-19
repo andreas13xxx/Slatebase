@@ -16,7 +16,7 @@
 
 import type { IAppShim, PluginInstance } from './types'
 import { renderLucideIconInto } from './lucide-icons'
-import { ProgressBarComponent } from './obsidian-api-extensions'
+import { ColorComponent, ExtraButtonComponent, ProgressBarComponent, setTooltip as applyTooltip } from './obsidian-api-extensions'
 import { getCustomIconSvg, sizeCustomIconSvg } from '../../utils/pluginIcon'
 
 // ─── PluginSettingTab ────────────────────────────────────────────────────────────
@@ -115,6 +115,16 @@ export class PluginSettingTab {
       this.containerEl.innerHTML = ''
       this.display()
     }
+  }
+
+  /**
+   * Re-evaluate visible/disabled predicates on the already-rendered settings
+   * without a full teardown (real Obsidian API). Slatebase's declarative
+   * renderer has no lighter-weight partial-refresh path, so this falls back
+   * to the same full re-render as `update()` — correct, just not as cheap.
+   */
+  refreshDomState(): void {
+    this.update()
   }
 }
 
@@ -404,6 +414,17 @@ export class ButtonComponent extends BaseComponent {
     this.buttonEl.classList.remove('setting-button--cta', 'mod-cta')
     return this
   }
+
+  /** Obsidian API since 1.13.0 — the destructive/red counterpart of setCta(). */
+  setDestructive(): this {
+    this.buttonEl.classList.add('setting-button--destructive', 'mod-destructive')
+    return this
+  }
+
+  removeDestructive(): this {
+    this.buttonEl.classList.remove('setting-button--destructive', 'mod-destructive')
+    return this
+  }
 }
 
 /**
@@ -481,9 +502,11 @@ export class SliderComponent extends ValueComponent<number> {
     return Number(this.sliderEl.value)
   }
 
-  setLimits(min: number, max: number, step: number): this {
-    this.sliderEl.min = String(min)
-    this.sliderEl.max = String(max)
+  setLimits(min: number | null, max: number | null, step: number | 'any'): this {
+    if (min === null) this.sliderEl.removeAttribute('min')
+    else this.sliderEl.min = String(min)
+    if (max === null) this.sliderEl.removeAttribute('max')
+    else this.sliderEl.max = String(max)
     this.sliderEl.step = String(step)
     return this
   }
@@ -569,6 +592,12 @@ export class DisplayValueComponent {
     this.valueEl.textContent = value ?? ''
     return this
   }
+
+  /** Obsidian API since 1.13.1 — validation-status affordance, mirrors SearchComponent's setStatus(). */
+  setStatus(status: 'warning' | null): this {
+    this.valueEl.classList.toggle('setting-display-value--warning', status === 'warning')
+    return this
+  }
 }
 
 /**
@@ -590,6 +619,8 @@ export class Setting {
    * only dimmed the row visually while its `<input>` stayed interactive.
    */
   components: Array<{ setDisabled(disabled: boolean): unknown }> = []
+  /** Obsidian API since 1.13.0. Hidden until `setErrorMessage()` sets non-empty text. */
+  errorEl: HTMLElement
   private nameEl: HTMLElement
   private descEl: HTMLElement
   private controlEl: HTMLElement
@@ -608,14 +639,28 @@ export class Setting {
     this.descEl = document.createElement('div')
     this.descEl.className = 'setting-item-description'
 
+    this.errorEl = document.createElement('div')
+    this.errorEl.className = 'setting-item-error'
+    this.errorEl.style.display = 'none'
+
     this.controlEl = document.createElement('div')
     this.controlEl.className = 'setting-item-control'
 
     this.infoEl.appendChild(this.nameEl)
     this.infoEl.appendChild(this.descEl)
+    this.infoEl.appendChild(this.errorEl)
     this.settingEl.appendChild(this.infoEl)
     this.settingEl.appendChild(this.controlEl)
     containerEl.appendChild(this.settingEl)
+  }
+
+  /** Obsidian API since 1.13.0. Empty string clears the error state. */
+  setErrorMessage(message: string): this {
+    const hasError = Boolean(message)
+    this.errorEl.textContent = message
+    this.errorEl.style.display = hasError ? '' : 'none'
+    this.settingEl.classList.toggle('setting-item--error', hasError)
+    return this
   }
 
   setName(name: string | DocumentFragment): this {
@@ -710,8 +755,8 @@ export class Setting {
   /**
    * Add a read-only computed-value label (Obsidian API since 1.13.1) — e.g.
    * showing a slider's value in words, or a cache size next to a "Clear cache"
-   * button. Not tracked in `components` — like ProgressBarComponent, a plain
-   * label has no `setDisabled`.
+   * button. Not tracked in `components` — real Obsidian's `DisplayValueComponent`
+   * is a plain class, not a `BaseComponent`, so it has no `setDisabled` to propagate to.
    */
   addDisplayValue(callback: (component: DisplayValueComponent) => void): this {
     const component = new DisplayValueComponent(this.controlEl)
@@ -719,31 +764,17 @@ export class Setting {
     return this
   }
 
-  /**
-   * Add a progress bar (Obsidian 1.4.4+).
-   * Not tracked in `components` — ProgressBarComponent has no setDisabled
-   * (a progress indicator isn't interactive, so there is nothing to disable).
-   */
+  /** Add a progress bar (Obsidian 1.4.4+). */
   addProgressBar(callback: (component: ProgressBarComponent) => void): this {
     const component = new ProgressBarComponent(this.controlEl)
+    this.components.push(component)
     callback(component)
     return this
   }
 
-  addColorPicker(callback: (component: { getValue(): string; setValue(value: string): unknown; onChange(cb: (value: string) => void): unknown; setDisabled(d: boolean): unknown; then(cb: (c: unknown) => void): unknown }) => void): this {
-    const input = document.createElement('input')
-    input.type = 'color'
-    input.className = 'setting-color-picker'
-    this.controlEl.appendChild(input)
-    let changeCb: ((v: string) => void) | null = null
-    input.addEventListener('input', () => { if (changeCb) changeCb(input.value) })
-    const component = {
-      getValue() { return input.value },
-      setValue(value: string) { input.value = value; return this },
-      onChange(cb: (value: string) => void) { changeCb = cb; return this },
-      setDisabled(d: boolean) { input.disabled = d; return this },
-      then(cb: (c: unknown) => void) { cb(this); return this },
-    }
+  addColorPicker(callback: (component: ColorComponent) => void): this {
+    const component = new ColorComponent(this.controlEl)
+    component.colorEl.className = 'setting-color-picker'
     this.components.push(component)
     callback(component)
     return this
@@ -864,22 +895,9 @@ export class Setting {
   }
 
   /** Add custom HTML element to the control area. */
-  addExtraButton(callback: (component: { extraSettingsEl: HTMLElement; setIcon(icon: string): unknown; setTooltip(tooltip: string): unknown; onClick(cb: () => void): unknown; setDisabled(d: boolean): unknown; then(cb: (c: unknown) => void): unknown }) => void): this {
-    const el = document.createElement('div')
-    el.className = 'setting-extra-button clickable-icon'
-    this.controlEl.appendChild(el)
-    const component = {
-      extraSettingsEl: el,
-      setIcon(_icon: string) { return this },
-      setTooltip(tooltip: string) { el.title = tooltip; return this },
-      onClick(cb: () => void) { el.addEventListener('click', cb); return this },
-      setDisabled(d: boolean) {
-        el.classList.toggle('is-disabled', d)
-        el.style.pointerEvents = d ? 'none' : ''
-        return this
-      },
-      then(cb: (c: unknown) => void) { cb(this); return this },
-    }
+  addExtraButton(callback: (component: ExtraButtonComponent) => void): this {
+    const component = new ExtraButtonComponent(this.controlEl)
+    component.extraSettingsEl.className = 'setting-extra-button clickable-icon'
     this.components.push(component)
     callback(component)
     return this
@@ -902,8 +920,19 @@ export class Setting {
     return this
   }
 
-  /** Set a tooltip on the setting row. */
-  setTooltip(_tooltip: string): this {
+  /** Set a tooltip on the setting row, via the same aria-label mechanism as window.obsidian.setTooltip(). */
+  setTooltip(tooltip: string): this {
+    applyTooltip(this.settingEl, tooltip)
+    return this
+  }
+
+  /**
+   * Show or hide the entire setting row (Obsidian API). Plugins use this to
+   * conditionally reveal settings that only apply when a related toggle is on
+   * (e.g. Tasks plugin's priority-dependent settings).
+   */
+  setVisibility(show: boolean): this {
+    this.settingEl.style.display = show ? '' : 'none'
     return this
   }
 
@@ -1022,22 +1051,9 @@ export class SettingGroup {
     return this
   }
 
-  addExtraButton(callback: (component: { extraSettingsEl: HTMLElement; setIcon(icon: string): unknown; setTooltip(tooltip: string): unknown; onClick(cb: () => void): unknown; setDisabled(d: boolean): unknown; then(cb: (c: unknown) => void): unknown }) => void): this {
-    const el = document.createElement('div')
-    el.className = 'setting-extra-button clickable-icon'
-    this.headerEl.appendChild(el)
-    const component = {
-      extraSettingsEl: el,
-      setIcon(_icon: string) { return this },
-      setTooltip(tooltip: string) { el.title = tooltip; return this },
-      onClick(cb: () => void) { el.addEventListener('click', cb); return this },
-      setDisabled(d: boolean) {
-        el.classList.toggle('is-disabled', d)
-        el.style.pointerEvents = d ? 'none' : ''
-        return this
-      },
-      then(cb: (c: unknown) => void) { cb(this); return this },
-    }
+  addExtraButton(callback: (component: ExtraButtonComponent) => void): this {
+    const component = new ExtraButtonComponent(this.headerEl)
+    component.extraSettingsEl.className = 'setting-extra-button clickable-icon'
     callback(component)
     return this
   }

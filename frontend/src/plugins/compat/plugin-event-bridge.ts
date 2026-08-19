@@ -18,7 +18,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import type { DirectoryTree } from '../../types'
 import type { TabState } from '../../state/tabState'
-import type { TFile } from './types'
+import type { TFile, TFolder } from './types'
 import type { WorkspaceShim } from './shims/workspace-shim'
 import type { MetadataCacheShim } from './shims/metadata-cache-shim'
 import type { VaultShim } from './shims/vault-shim'
@@ -89,6 +89,22 @@ export function buildTFileFromPath(filePath: string): TFile {
     extension,
     stat: { mtime: Date.now(), ctime: 0, size: 0 },
     parent: null,
+  }
+}
+
+/**
+ * Builds a TFolder object from a folder path.
+ * Used for the same synthetic-file-object needs as `buildTFileFromPath` above,
+ * wherever a plugin-facing folder reference is needed (file-menu targets,
+ * file-explorer DOM registry rows) without a real backend folder record.
+ */
+export function buildTFolderFromPath(folderPath: string, name?: string): TFolder {
+  return {
+    path: folderPath,
+    name: name ?? (folderPath.split('/').pop() ?? folderPath),
+    children: [],
+    parent: null,
+    isRoot: () => folderPath === '',
   }
 }
 

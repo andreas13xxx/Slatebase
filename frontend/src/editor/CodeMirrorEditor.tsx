@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useImperativeHandle, useCallback } from 'react'
 import { EditorState, Compartment, type Extension } from '@codemirror/state'
-import { EditorView, lineNumbers as cmLineNumbers, dropCursor } from '@codemirror/view'
+import { EditorView, lineNumbers as cmLineNumbers, dropCursor, keymap } from '@codemirror/view'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { GFM } from '@lezer/markdown'
@@ -23,7 +23,7 @@ const markdownLanguageWithProps: typeof markdownLanguage = Object.create(markdow
   parser: { value: markdownParserWithProps, configurable: true },
 })
 import { search } from '@codemirror/search'
-import { undo as cmUndo, redo as cmRedo } from '@codemirror/commands'
+import { undo as cmUndo, redo as cmRedo, defaultKeymap, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { autocompletion, type CompletionSource } from '@codemirror/autocomplete'
 import type { IEditorHandle, EditorFormattingAction } from './types'
 import { createSlatebaseTheme, createSlatebaseHighlightStyle } from './theme'
@@ -170,6 +170,10 @@ export function CodeMirrorEditor({
       ),
       // Plugin-provided CM6 extensions (each in its own Compartment)
       ...getActivePluginExtensions(),
+      // Core key bindings (Enter, Backspace, Tab, undo/redo shortcuts, etc.).
+      // Placed after plugin extensions so a plugin's own keymap gets first
+      // chance to handle a key and can fall through to these defaults.
+      keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
     ]
 
     // Include autocompletion with plugin completions if any are registered

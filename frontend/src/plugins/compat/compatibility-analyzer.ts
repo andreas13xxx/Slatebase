@@ -6,9 +6,18 @@
  *    - `isDesktopOnly: true` → immediately classified as 'unsupported'
  *    - `isDesktopOnly: false` or absent → proceed to deeper analysis
  * 2. **Node.js API detection**: Scans for require('fs'), require('net'), etc.
- *    - Presence of Node.js imports → 'unsupported' (cannot run in browser)
+ *    - Presence of a Node builtin without a real browser shim (i.e. anything
+ *      but `path`/`buffer`) → 'partial': the plugin sandbox's own require()
+ *      protects against a hard crash, but the functionality genuinely isn't
+ *      there, and static analysis can't tell "referenced" from "depended on".
  * 3. **Obsidian API pattern matching**: Classifies API accesses against
- *    Slatebase shim coverage (supported/partial/unsupported)
+ *    Slatebase shim coverage. A method in `SUPPORTED_METHODS` is 'supported'
+ *    (real, Obsidian-equivalent implementation). Anything else defaults to
+ *    'partial': every namespace this can detect is Proxy-wrapped and never
+ *    throws for an unrecognized member, so an unimplemented method is by
+ *    construction a safe, always-warning no-op, not a crash risk. Only
+ *    `UNSUPPORTED_METHODS` (an explicit, currently-empty escape hatch) or
+ *    `isDesktopOnly` produce 'unsupported'.
  *
  * Rationale: Plugins that work on Obsidian Mobile (iOS/Android WebView)
  * are very likely browser-compatible, since Mobile also lacks Node.js access.
@@ -62,6 +71,14 @@ const NODE_BUILTIN_MODULES: ReadonlySet<string> = new Set([
   'vm', 'v8', 'perf_hooks', 'readline', 'zlib', 'buffer',
   'electron', 'original-fs',
 ]);
+
+/**
+ * Node builtins the plugin sandbox's require() shim (plugin-loader.ts) hands
+ * a real, working implementation to (`window.__slatebasePath`, `window.Buffer`)
+ * — not a warn-and-no-op stub. Referencing these carries no actual risk, so
+ * they're excluded from the `nodeModule.*` partial signal below.
+ */
+const NODE_MODULES_WITH_REAL_SHIM: ReadonlySet<string> = new Set(['path', 'buffer']);
 
 /**
  * Patterns to detect Node.js module usage in bundle source code.
@@ -230,11 +247,14 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
   'fileManager.getNewFileParent',
   'fileManager.createNewMarkdownFile',
   'fileManager.createNewFile',
-  'fileManager.promptForDeletion',
+  'fileManager.promptForFileDeletion',
   'fileManager.trashFile',
   'fileManager.getAvailablePathForAttachment',
   // No rename dialog — the call logs a console message and leaves the file untouched.
   'fileManager.promptForFileRename',
+  // Real implementation (VaultShim.copy(), vault-shim.ts) — was missing from
+  // this positive list, causing plugins that use it to be misclassified.
+  'vault.copy',
   // Lifecycle methods — fully supported by the PluginLoader
   'onload',
   'onunload',
@@ -242,39 +262,28 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * API methods that exist and don't throw, but do less than Obsidian does.
- *
- * The distinction matters for what this analyzer is for. `unsupported` means a
- * plugin is likely to break outright; `partial` means it will run and quietly
- * do less — which is the harder failure to notice, and exactly what a user
- * deserves a warning about before installing.
- *
- * Methods whose degradation is graceful and self-explanatory (a split becomes
- * a plain tab, both sidebars merge into the Context Panel, layout/ribbon
- * structure becomes a stub) live in `SUPPORTED_METHODS` instead, with a
- * console message at call time explaining the substitution — that's enough
- * signal for a developer without turning the install-time compatibility
- * badge yellow for something that just works differently. This set is for
- * methods whose reduced behavior is more likely to actually break a plugin's
- * functionality and warrants a warning before install.
- *
  * `obsidian.Bases` and `obsidian.Cli` are synthetic keys (not `app.*` calls —
  * see BASES_USAGE_PATTERN/CLI_USAGE_PATTERN below) for two API areas that are
  * typed but never functionally implemented: Bases (database/formula-query
  * views, since 1.10.0 — no formula engine, no `.base` file rendering) and the
  * desktop CLI (`registerCliHandler`, since 1.12.2 — no CLI exists in a web
  * app). Both are real, non-crashing no-ops (`Plugin.registerBasesView()`/
- * `registerCliHandler()` in install-globals.ts), so `partial` — not
- * `unsupported` — is correct: the plugin still loads.
+ * `registerCliHandler()` in install-globals.ts). They classify as `partial`
+ * via `classifyMethod()`'s default (see below) like everything else not in
+ * `SUPPORTED_METHODS`; their specific reasons text in `analyze()` is keyed
+ * off the method name directly, not off a separate lookup table.
  */
-const PARTIAL_METHODS: ReadonlySet<string> = new Set([
-  'obsidian.Bases',
-  'obsidian.Cli',
-]);
 
 /**
- * Known unsupported workspace methods.
- * Any workspace/vault/metadataCache method not in supported or partial is also unsupported.
+ * Explicit escape hatch for API surfaces known to bypass the Proxy safety
+ * net and genuinely throw instead of degrading gracefully — checked in
+ * `classifyMethod()` before the default. Every `app.{vault,workspace,
+ * metadataCache,plugins,fileManager}.*` access that isn't in
+ * `SUPPORTED_METHODS` is, by construction, caught by that namespace's
+ * `wrapWithProxy()` (see shims/*.ts): it warns once and returns a no-op,
+ * never throws. So this set is empty unless/until a specific shim regression
+ * reintroduces an unprotected gap — it exists so such a case can be flagged
+ * as `unsupported` (red) without weakening the default for everything else.
  */
 export const UNSUPPORTED_METHODS: ReadonlySet<string> = new Set([]);
 
@@ -336,15 +345,24 @@ const CLI_USAGE_PATTERN = /\bregisterCliHandler\s*\(|\bCliFlag\b|\bCliData\b|\bC
 
 /**
  * Classify a detected API method call.
+ *
+ * Default for anything not explicitly known is `partial`, not `unsupported`:
+ * every namespace this regex can detect (vault/workspace/metadataCache/
+ * plugins/fileManager) is Proxy-wrapped (see shims/*.ts `wrapWithProxy()`),
+ * so an unrecognized method is architecturally guaranteed to warn once and
+ * return a no-op rather than throw — exactly the "deliberately unimplemented,
+ * safe, always warns" definition of yellow. `UNSUPPORTED_METHODS` is checked
+ * first as an explicit override for the rare case a shim doesn't hold that
+ * guarantee.
  */
 function classifyMethod(method: string): 'supported' | 'partial' | 'unsupported' {
   if (SUPPORTED_METHODS.has(method)) {
     return 'supported';
   }
-  if (PARTIAL_METHODS.has(method)) {
-    return 'partial';
+  if (UNSUPPORTED_METHODS.has(method)) {
+    return 'unsupported';
   }
-  return 'unsupported';
+  return 'partial';
 }
 
 /**
@@ -520,11 +538,20 @@ export class CompatibilityAnalyzer implements ICompatibilityAnalyzer {
         return { level: 'unknown', apiCalls: [], lifecycleCritical: [], nodeModules: [...nodeModules], isDesktopOnly: false, reasons };
       }
 
+      // Modules the require() shim hands a real implementation to (path, buffer)
+      // carry no risk and are excluded below — everything else the sandbox's
+      // require() only gives a warn-and-no-op stub, since there is no real
+      // filesystem/process/Electron access in a browser.
+      const riskyNodeModules = [...nodeModules].filter(m => !NODE_MODULES_WITH_REAL_SHIM.has(m)).sort();
+
       if (nodeModules.size > 0) {
         const moduleList = [...nodeModules].sort().join(', ');
-        // If the plugin does NOT declare isDesktopOnly, the Node.js imports are likely
-        // optional (try/catch, bundler shims, or dead code). The manifest declaration
-        // is the most reliable signal — if it runs on Obsidian Mobile, it can run here.
+        // If the plugin does NOT declare isDesktopOnly, the Node.js imports may
+        // still be optional (try/catch, bundler shims, or dead code) — the
+        // manifest declaration remains the strongest signal (if it runs on
+        // Obsidian Mobile, it can run here). But a mere reference is enough to
+        // warrant a yellow badge below: unlike Obsidian's own API surface, the
+        // sandbox can't tell "referenced" from "actually depended on" here.
         reasons.push(
           `Plugin bundle references Node.js modules: ${moduleList} — ` +
           'these may be optional/bundler-generated since the plugin is not marked as desktop-only'
@@ -547,6 +574,15 @@ export class CompatibilityAnalyzer implements ICompatibilityAnalyzer {
           method,
           classification: classifyMethod(method),
         });
+      }
+
+      // Synthetic markers for risky Node module references (not `app.*` calls,
+      // so detectApiCalls() above can't see them) — same precedent as the
+      // obsidian.Bases/obsidian.Cli markers. Always 'partial': the sandbox's
+      // require() now hands back a safe warn-and-no-op stub (never throws), so
+      // this never escalates to 'unsupported' on its own — only isDesktopOnly does.
+      for (const moduleName of riskyNodeModules) {
+        apiCalls.push({ method: `nodeModule.${moduleName}`, classification: 'partial' });
       }
 
       if (performance.now() - startTime > ANALYSIS_TIMEOUT_MS) {
@@ -572,12 +608,18 @@ export class CompatibilityAnalyzer implements ICompatibilityAnalyzer {
         }
       } else if (level === 'partial') {
         const unsupportedCalls = apiCalls.filter(c => c.classification === 'unsupported').map(c => c.method);
-        const partialCalls = apiCalls.filter(c => c.classification === 'partial').map(c => c.method);
+        const partialCalls = apiCalls.filter(c => c.classification === 'partial' && !c.method.startsWith('nodeModule.')).map(c => c.method);
         if (unsupportedCalls.length > 0) {
-          reasons.push(`Unsupported API methods detected: ${unsupportedCalls.join(', ')} — these may not function correctly`);
+          reasons.push(`Unsupported API methods detected: ${unsupportedCalls.join(', ')} — these are likely to break at runtime`);
+        }
+        if (riskyNodeModules.length > 0) {
+          reasons.push(
+            `Plugin depends on Node.js modules with no browser equivalent: ${riskyNodeModules.join(', ')} — ` +
+            'Slatebase returns a safe no-op and logs a console warning on first use, so the plugin still loads but this functionality won\'t work'
+          );
         }
         if (partialCalls.length > 0) {
-          reasons.push(`Partially supported API methods detected: ${partialCalls.join(', ')} — limited functionality`);
+          reasons.push(`API methods without a real implementation detected: ${partialCalls.join(', ')} — Slatebase returns a safe no-op and logs a console warning on first use, so the plugin still loads but this functionality won't work`);
         }
         if (partialCalls.includes('obsidian.Bases')) {
           reasons.push('Plugin references Obsidian Bases (database/formula-query views) — Slatebase has no formula engine or .base file rendering; the plugin loads but any Bases view it registers is never shown');

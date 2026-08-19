@@ -1,6 +1,6 @@
-/* ===== Sidebar Panel Tab Bar ===== */
+/* ===== Side Panel Tab Bar (shared by left and right panels) ===== */
 
-.sidebar-panel-tab-bar {
+.side-panel-tab-bar {
   display: flex;
   align-items: stretch;
   gap: 0;
@@ -11,17 +11,17 @@
   min-height: 32px;
 }
 
-.sidebar-panel-tab-bar--icon-only {
+.side-panel-tab-bar--icon-only {
   justify-content: center;
 }
 
-.sidebar-panel-tab-wrapper {
+.side-panel-tab-wrapper {
   display: flex;
   align-items: stretch;
   position: relative;
 }
 
-.sidebar-panel-tab {
+.side-panel-tab {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -39,30 +39,30 @@
   user-select: none;
 }
 
-.sidebar-panel-tab:hover {
+.side-panel-tab:hover {
   color: var(--sidebar-text-active);
   background: var(--sidebar-hover);
 }
 
-.sidebar-panel-tab--active {
+.side-panel-tab--active {
   color: var(--accent-text);
   border-bottom-color: var(--accent);
 }
 
-.sidebar-panel-tab--active:hover {
+.side-panel-tab--active:hover {
   color: var(--accent-text);
 }
 
-.sidebar-panel-tab--dragging {
+.side-panel-tab--dragging {
   opacity: 0.4;
 }
 
-.sidebar-panel-tab-icon {
+.side-panel-tab-icon {
   flex-shrink: 0;
 }
 
 /* Insertion line indicator during drag */
-.sidebar-panel-tab-insert-line {
+.side-panel-tab-insert-line {
   width: 2px;
   background: var(--accent);
   align-self: stretch;
@@ -71,6 +71,26 @@
 }
 
 /* Icon-only mode adjustments */
-.sidebar-panel-tab-bar--icon-only .sidebar-panel-tab {
+.side-panel-tab-bar--icon-only .side-panel-tab {
   padding: 5px 8px;
+}
+
+/* Right panel look: distinct background/text tokens and slightly taller bar,
+   matching the pre-unification ContextPanelTabBar appearance. */
+.app-right-panel .side-panel-tab-bar {
+  background: var(--right-panel-header-bg);
+  min-height: 36px;
+}
+
+.app-right-panel .side-panel-tab {
+  color: var(--right-panel-text-muted);
+  padding: 6px 10px;
+}
+
+.app-right-panel .side-panel-tab:hover {
+  color: var(--right-panel-text);
+}
+
+.app-right-panel .side-panel-tab-bar--icon-only .side-panel-tab {
+  padding: 6px 8px;
 }

@@ -11,7 +11,6 @@
 import React, { useMemo, useCallback, useState, useRef } from 'react'
 import { Star, Heading, Hash, Search as SearchIcon } from 'lucide-react'
 import { favoritesStore } from '../../state/favoritesStore'
-import { useSidebarPanelContext } from '../../state/sidebarPanelContext'
 import { useSearchContext } from '../../state/searchContext'
 import { useAppContext } from '../../state'
 import { performSearch } from '../../state/searchActions'
@@ -19,6 +18,8 @@ import { getFileIcon, getFileIconClass, getDisplayName } from '../../utils/fileI
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
 import { InlineInput } from '../InlineInput'
 import type { FavoriteEntry } from '../../state/favoritesStore'
+import type { PanelState, PanelAction } from '../../state/panelState'
+import type { Dispatch } from 'react'
 import './FavoritesView.css'
 
 export interface FavoritesViewProps {
@@ -36,6 +37,14 @@ export interface FavoritesViewProps {
   onOpenSearch?: (query: { query: string; caseSensitive?: boolean; regex?: boolean }) => void
   /** Forces re-render when favorites change. */
   refreshKey?: number
+  /**
+   * State/dispatch of whichever side panel is currently hosting this view —
+   * passed down by `SidePanel` rather than read via a fixed context hook,
+   * since Favorites can now live on either side. Used by "Reveal" to switch
+   * that same panel's active section over to Explorer.
+   */
+  panelState: PanelState
+  panelDispatch: Dispatch<PanelAction>
 }
 
 interface ContextMenuState {
@@ -107,8 +116,7 @@ function entryIconClass(entry: FavoriteEntry): string {
  * click according to its bookmark type. Supports drag-and-drop reordering,
  * a context menu (remove/reveal/rename), and custom labels.
  */
-export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _refreshKey }: FavoritesViewProps): React.ReactElement {
-  const { state: sidebarState, dispatch: sidebarDispatch } = useSidebarPanelContext()
+export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _refreshKey, panelState, panelDispatch }: FavoritesViewProps): React.ReactElement {
   const { dispatch: searchDispatch } = useSearchContext()
   const { apiClient } = useAppContext()
   const [internalRefreshTick, setInternalRefreshTick] = useState(0)
@@ -183,12 +191,12 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
     // Switch whichever split section is currently showing Favorites over to
     // the Explorer view, then ask FileExplorer to expand/scroll to the path
     // (same event 'file-explorer:reveal-active-file' dispatches).
-    const section = sidebarState.sections.find((s) => s.activeViewId === 'favorites')
+    const section = panelState.sections.find((s) => s.activeViewId === 'favorites')
     if (section) {
-      sidebarDispatch({ type: 'SET_ACTIVE_VIEW', sectionId: section.id, viewId: 'explorer' })
+      panelDispatch({ type: 'SET_ACTIVE_VIEW', sectionId: section.id, viewId: 'explorer' })
     }
     window.dispatchEvent(new CustomEvent('slatebase:reveal-file', { detail: { path: entry.path } }))
-  }, [sidebarState.sections, sidebarDispatch])
+  }, [panelState.sections, panelDispatch])
 
   const handleRenameStart = useCallback((entry: FavoriteEntry) => {
     setRenamingId(entry.id)

@@ -1180,6 +1180,19 @@
   color: var(--sidebar-text-active);
 }
 
+/*
+ * Wraps a row's icon + name (+ favorite star, for files) in one element —
+ * see TreeNode.tsx's comment on the title button for why this needs to be a
+ * single flex child rather than several direct children of the button.
+ */
+.tree-node-name-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+
 .tree-node-count {
   font-weight: 400;
   color: var(--sidebar-text);
@@ -5186,6 +5199,63 @@
 .graph-node-search-highlight circle {
   stroke: var(--graph-search-highlight) !important;
   stroke-width: 3 !important;
+}
+
+/* Lokaler_Graph: Zentrums-Notiz highlight */
+.graph-node-center circle {
+  stroke: var(--graph-search-highlight) !important;
+  stroke-width: 3 !important;
+}
+
+/* Lokaler_Graph: Nachbarschaftsradius toolbar */
+.graph-local-toolbar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm, 4px);
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.graph-local-toolbar-label {
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+
+.graph-local-toolbar-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.graph-local-toolbar-button:hover:not(:disabled) {
+  background: var(--bg-surface);
+}
+
+.graph-local-toolbar-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.graph-local-toolbar-value {
+  min-width: 14px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ===== Command Palette ===== */

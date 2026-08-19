@@ -541,6 +541,13 @@ export const en: TranslationShape = {
     showProperties: 'Show properties',
     reset: 'Reset',
     ariaLabel: 'Graph with {nodeCount} nodes and {edgeCount} edges',
+    localGraph: {
+      tabPrefix: 'Local graph:',
+      hopsLabel: 'Neighborhood',
+      decreaseHops: 'Decrease neighborhood radius',
+      increaseHops: 'Increase neighborhood radius',
+      centerDeleted: 'The file "{path}" was deleted.',
+    },
   },
 
   contextPanel: {
@@ -563,6 +570,12 @@ export const en: TranslationShape = {
       backlinksError: 'Incoming links could not be loaded.',
       backlinksLoading: 'Loading…',
       noDocument: 'No document open.',
+      unlinkedMentions: 'Unlinked Mentions',
+      emptyUnlinkedMentions: 'No unlinked mentions found.',
+      unlinkedMentionsLoading: 'Searching…',
+      unlinkedMentionsError: 'Unlinked mentions could not be loaded.',
+      linkMention: 'Link',
+      linking: 'Linking…',
     },
     tags: {
       empty: 'No tags found.',

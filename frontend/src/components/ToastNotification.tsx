@@ -11,22 +11,51 @@ export interface ToastItem {
   variant: ToastVariant
   message: string
   createdAt: number
+  /** Auto-dismiss delay in ms; 0 means stay until dismissed programmatically or by the user. */
+  duration: number
 }
 
-// Module-level event system for adding toasts from anywhere
-type ToastListener = (toast: Omit<ToastItem, 'id' | 'createdAt'>) => void
+// Module-level event system for adding/updating/dismissing toasts from anywhere.
+// The id is minted here (not inside the component) so callers — notably the
+// Obsidian `Notice` compat shim, which must hand a stable id back to the
+// plugin for `notice.hide()` — get it back synchronously from `showToast()`.
+type ToastListener = (toast: Omit<ToastItem, 'createdAt'>) => void
 let addToastListener: ToastListener | null = null
+type ToastUpdateListener = (id: string, message: string) => void
+let updateToastListener: ToastUpdateListener | null = null
+type ToastDismissListener = (id: string) => void
+let dismissToastListener: ToastDismissListener | null = null
 
-/** Add a toast notification from anywhere in the app. */
+let nextToastId = 0
+
+/**
+ * Add a toast notification from anywhere in the app.
+ * Returns the toast's id — pass it to `updateToastMessage()`/`dismissToast()`
+ * to change or close this specific toast later.
+ */
 // eslint-disable-next-line react-refresh/only-export-components
-export function showToast(variant: ToastVariant, message: string): void {
-  addToastListener?.({ variant, message })
+export function showToast(variant: ToastVariant, message: string, duration = AUTO_DISMISS_MS): string {
+  const id = `toast-${nextToastId++}`
+  addToastListener?.({ id, variant, message, duration })
+  return id
+}
+
+/** Replace the message of an already-shown toast in place, without spawning a new one. */
+// eslint-disable-next-line react-refresh/only-export-components
+export function updateToastMessage(id: string, message: string): void {
+  updateToastListener?.(id, message)
+}
+
+/** Dismiss a specific toast immediately (cancels its auto-dismiss timer first, if any). */
+// eslint-disable-next-line react-refresh/only-export-components
+export function dismissToast(id: string): void {
+  dismissToastListener?.(id)
 }
 
 /** Maximum number of simultaneously visible toasts. */
 const MAX_VISIBLE_TOASTS = 5
 
-/** Auto-dismiss duration in milliseconds. */
+/** Default auto-dismiss duration in milliseconds. */
 const AUTO_DISMISS_MS = 5000
 
 /** Fade-out animation duration in milliseconds. */
@@ -39,8 +68,6 @@ const VARIANT_ICONS = {
   warning: AlertTriangle,
   error: XCircle,
 } as const
-
-let nextToastId = 0
 
 /**
  * Toast notification stack component.
@@ -98,13 +125,11 @@ export function ToastNotification() {
     startFadeOut(id)
   }, [startFadeOut])
 
-  /** Add a new toast to the queue. */
-  const addToast = useCallback((incoming: Omit<ToastItem, 'id' | 'createdAt'>) => {
-    const id = `toast-${nextToastId++}`
+  /** Add a new toast to the queue. The id is supplied by the caller (see showToast()). */
+  const addToast = useCallback((incoming: Omit<ToastItem, 'createdAt'>) => {
+    const { id } = incoming
     const newToast: ToastItem = {
-      id,
-      variant: incoming.variant,
-      message: incoming.message,
+      ...incoming,
       createdAt: Date.now(),
     }
 
@@ -131,21 +156,32 @@ export function ToastNotification() {
       return updated
     })
 
-    // Auto-dismiss after 5 seconds
-    const dismissTimer = setTimeout(() => {
-      dismissTimersRef.current.delete(id)
-      startFadeOut(id)
-    }, AUTO_DISMISS_MS)
-    dismissTimersRef.current.set(id, dismissTimer)
+    // duration: 0 means "stay until dismissed" (Obsidian's Notice semantics) — no timer.
+    if (incoming.duration > 0) {
+      const dismissTimer = setTimeout(() => {
+        dismissTimersRef.current.delete(id)
+        startFadeOut(id)
+      }, incoming.duration)
+      dismissTimersRef.current.set(id, dismissTimer)
+    }
   }, [startFadeOut])
 
-  // Register the module-level listener on mount
+  /** Replace an already-shown toast's message in place. */
+  const updateToast = useCallback((id: string, message: string) => {
+    setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, message } : t)))
+  }, [])
+
+  // Register the module-level listeners on mount
   useEffect(() => {
     addToastListener = addToast
+    updateToastListener = updateToast
+    dismissToastListener = handleClose
     return () => {
       addToastListener = null
+      updateToastListener = null
+      dismissToastListener = null
     }
-  }, [addToast])
+  }, [addToast, updateToast, handleClose])
 
   // Clean up all timers on unmount
   useEffect(() => {

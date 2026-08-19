@@ -6,6 +6,9 @@ tags: [advanced, plugins]
 
 The Mind Map plugin turns a note's heading and list structure into an interactive, zoomable mind map — without requiring you to rewrite the note. Every heading level and every indentation level automatically becomes a node.
 
+> [!warning] Plugin is probably broken
+> The Mind Map plugin (`lynchjames/obsidian-mind-map`) hasn't been updated since 2024-02-25 and is confirmed broken by user reports on GitHub — it reportedly no longer works with current Obsidian versions (issue #117 "Doesn't work in latest version", 04/2025; issue #119 "Obsidian update", 09/2025). This is a problem with the plugin itself, unrelated to Slatebase's compatibility layer. Install it to experiment, but expect the mind map view to not open.
+
 ---
 
 ## Prerequisites

@@ -16,8 +16,7 @@ import { extractErrorMessage } from '../utils/error'
 import type { Command } from '../plugins/compat/command-registry'
 import type { IApiClient } from '../api'
 import type { SettingsCategory, SettingsSection } from '../state/settingsState'
-import { useContextPanelContext } from '../state/contextPanelContext'
-import { useSidebarPanelContext } from '../state/sidebarPanelContext'
+import { useLeftPanelContext, useRightPanelContext } from '../state/panelContext'
 import { useSearchContext } from '../state/searchContext'
 import { registerCoreAppCommands, type CoreAppCommandHandlers, type NavigablePage } from '../plugins/compat/core-commands-app'
 
@@ -87,6 +86,7 @@ export interface CommandPaletteContainerProps {
   onImportFolder: () => void
   onExportVault: () => void
   onOpenGraph: () => void
+  onOpenLocalGraph: (filePath: string) => void
   onDailyNote: () => void
   showSidebar: boolean
   showRightPanel: boolean
@@ -118,6 +118,7 @@ export function CommandPaletteContainer({
   onImportFolder,
   onExportVault,
   onOpenGraph,
+  onOpenLocalGraph,
   onDailyNote,
   showSidebar,
   showRightPanel,
@@ -132,8 +133,8 @@ export function CommandPaletteContainer({
   const { tabState, tabDispatch } = useTabContext()
   const { state, dispatch: appDispatch, apiClient } = useAppContext()
   const { authState, authDispatch } = useAuthContext()
-  const { state: contextPanelState, dispatch: contextPanelDispatch } = useContextPanelContext()
-  const { state: sidebarPanelState, dispatch: sidebarPanelDispatch } = useSidebarPanelContext()
+  const { state: rightPanelState, dispatch: rightPanelDispatch } = useRightPanelContext()
+  const { state: leftPanelState, dispatch: leftPanelDispatch } = useLeftPanelContext()
   const { state: searchState } = useSearchContext()
   const { goBack, goForward } = useNavigationHistory()
   const { t, locale } = useTranslation()
@@ -158,10 +159,10 @@ export function CommandPaletteContainer({
     authDispatch,
     showSidebar,
     showRightPanel,
-    contextPanelSections: contextPanelState.sections,
-    contextPanelDispatch,
-    sidebarPanelSections: sidebarPanelState.sections,
-    sidebarPanelDispatch,
+    rightPanelSections: rightPanelState.sections,
+    rightPanelDispatch,
+    leftPanelSections: leftPanelState.sections,
+    leftPanelDispatch,
     onToggleSidebar,
     onToggleRightPanel,
     onOpenSettings,
@@ -170,6 +171,7 @@ export function CommandPaletteContainer({
     onCreateFolder,
     onCreateCanvas,
     onOpenGraph,
+    onOpenLocalGraph,
     onDailyNote,
     onOpenTemplateSelector: () => setTemplateSelectorOpen(true),
     onNavigateBack: goBack,

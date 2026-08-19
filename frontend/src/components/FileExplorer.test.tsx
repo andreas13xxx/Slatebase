@@ -235,6 +235,80 @@ describe('FileExplorer', () => {
     })
   })
 
+  describe('Iconize-compatible DOM shape (data-path / nav-*-title-content)', () => {
+    // Real Iconize (obsidian-icon-folder v2.14.7, verified via static analysis
+    // of the installed bundle) scrapes the file explorer directly rather than
+    // going through `fileItems`: `document.querySelector('[data-path="…"]')`,
+    // then inserts an icon element immediately before
+    // `.nav-folder-title-content`/`.nav-file-title-content` via `insertBefore`
+    // — which throws unless that span is a *direct* child of the `[data-path]`
+    // element. Its icon-restore pass on plugin load additionally only touches
+    // a row whose title button has exactly 1 (file) or 2 (folder) direct
+    // children, matching real Obsidian's pristine title shape. See
+    // PLUGIN-COMPAT.md for the full writeup.
+
+    it('folder title button has data-path, nav-folder-title class, and exactly 2 direct children', async () => {
+      const user = userEvent.setup()
+      const mockApiClient = createMockApiClient({ fetchVaultTree: vi.fn().mockResolvedValue(sampleTree) })
+      renderFileExplorer(
+        { vaults: [testVault], vaultTrees: { 'vault-123': sampleTree }, vaultTreesLoading: new Set() },
+        mockApiClient,
+      )
+      await user.click(screen.getByText('Test Vault'))
+
+      const titleButton = screen.getByText('Documents').closest('button')
+      expect(titleButton).not.toBeNull()
+      expect(titleButton).toHaveAttribute('data-path', 'Documents')
+      expect(titleButton).toHaveClass('nav-folder-title')
+      expect(titleButton!.children).toHaveLength(2)
+
+      const titleContent = titleButton!.querySelector('.nav-folder-title-content')
+      expect(titleContent).not.toBeNull()
+      expect(titleContent!.parentElement).toBe(titleButton)
+    })
+
+    it('file title button has data-path, nav-file-title class, and exactly 1 direct child', async () => {
+      const user = userEvent.setup()
+      const mockApiClient = createMockApiClient({ fetchVaultTree: vi.fn().mockResolvedValue(sampleTree) })
+      renderFileExplorer(
+        { vaults: [testVault], vaultTrees: { 'vault-123': sampleTree }, vaultTreesLoading: new Set() },
+        mockApiClient,
+      )
+      await user.click(screen.getByText('Test Vault'))
+
+      const titleButton = screen.getByText('readme').closest('button')
+      expect(titleButton).not.toBeNull()
+      expect(titleButton).toHaveAttribute('data-path', 'readme.md')
+      expect(titleButton).toHaveClass('nav-file-title')
+      expect(titleButton!.children).toHaveLength(1)
+
+      const titleContent = titleButton!.querySelector('.nav-file-title-content')
+      expect(titleContent).not.toBeNull()
+      expect(titleContent!.parentElement).toBe(titleButton)
+    })
+
+    it('data-path resolves uniquely (the outer <li> carries data-node-path instead)', async () => {
+      const user = userEvent.setup()
+      const mockApiClient = createMockApiClient({ fetchVaultTree: vi.fn().mockResolvedValue(sampleTree) })
+      renderFileExplorer(
+        { vaults: [testVault], vaultTrees: { 'vault-123': sampleTree }, vaultTreesLoading: new Set() },
+        mockApiClient,
+      )
+      await user.click(screen.getByText('Test Vault'))
+
+      const li = screen.getByText('Documents').closest('li.tree-node--directory')
+      expect(li).not.toBeNull()
+      expect(li).toHaveAttribute('data-node-path', 'Documents')
+      expect(li).not.toHaveAttribute('data-path')
+      // A bare `document.querySelector('[data-path="…"]')` (Iconize's actual
+      // call) must resolve to exactly the title button, not also match an
+      // ancestor <li> — otherwise it'd hit the <li> first (document order)
+      // and its insertBefore(iconEl, titleContentSpan) would throw, since
+      // titleContentSpan isn't a direct child of the <li>.
+      expect(document.querySelectorAll('[data-path="Documents"]')).toHaveLength(1)
+    })
+  })
+
   describe('folder collapse/expand within vault', () => {
     it('folders within vault start collapsed', async () => {
       const user = userEvent.setup()

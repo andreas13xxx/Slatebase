@@ -76,6 +76,41 @@ Click the settings gear icon in the graph view to customize:
 
 ---
 
+## Local Graph
+
+The full graph above shows the whole vault — great for an overview, but noisy once a vault has hundreds of notes. The **Local Graph** shows only the neighborhood of a single note instead.
+
+### Opening the Local Graph
+
+1. Open the note you want to inspect — it must be the active tab
+2. Open the Command Palette and run **"Graph view: Open local graph"**
+3. A new tab opens with just that note and its connections; the note itself is highlighted at the center
+
+### Neighborhood Radius
+
+A stepper in the top-left corner of the local graph controls how many hops out from the center note are shown:
+
+| Radius | Shows |
+|--------|-------|
+| 1 hop (default) | Direct forward links and backlinks only |
+| 2 hops | Also the connections of those connections |
+| 3–5 hops | Wider neighborhoods, approaching the full graph in a densely linked vault |
+
+The radius is remembered the next time you open a local graph. No new data is fetched when you change it — the same graph data is just filtered differently.
+
+### Re-centering
+
+Use the search field to jump to a different note. In the local graph, selecting a search result **re-centers** the neighborhood on it instead of just panning to it — clicking a node still opens that file, exactly like in the full graph.
+
+### Live Example
+
+1. With this file (`Features/Knowledge Graph.md`) open, run **"Graph view: Open local graph"** from the Command Palette
+2. You'll see this note in the center, connected to [[Features/Wikilinks]], [[Features/Context Panel]], and [[Features/Tags and Properties]] — much easier to read than the full graph above
+3. Increase the radius to 2 — now you also see what those three files link to
+4. Search for "Start here" and select it — the graph re-centers on that hub note instead of just scrolling to it
+
+---
+
 ## Practical Example
 
 1. Open the Knowledge Graph for this vault
@@ -98,6 +133,7 @@ Click the settings gear icon in the graph view to customize:
 > 3. Identify the most connected file in this vault (the biggest hub)
 > 4. Open graph settings and toggle tag nodes on/off
 > 5. Create a new file with 3 links and watch it appear in the graph
+> 6. Open the local graph for this file and compare it to the full graph above
 
 ---
 

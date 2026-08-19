@@ -649,6 +649,26 @@ if (!window.__slatebaseXHRPatched) {
 const module = { exports: {} };
 const exports = module.exports;
 const __requireWarnedModules = new Set();
+const __requireStubGapsWarned = new Set();
+// A plain {} for an unrecognized require() target is a crash trap: the first
+// method call a plugin makes on it (e.g. require('fs').readFileSync(...))
+// throws an uncaught TypeError, unlike every other unimplemented API in this
+// app which is Proxy-protected and safely no-ops. This wraps the stub the
+// same way, so an unavailable module degrades like everything else instead
+// of being the one way a plugin can crash outright.
+function __unknownModuleStub(id) {
+  return new Proxy({}, {
+    get: function(target, prop) {
+      if (typeof prop === 'symbol' || prop === 'then') return target[prop];
+      var key = id + '::' + String(prop);
+      if (!__requireStubGapsWarned.has(key)) {
+        __requireStubGapsWarned.add(key);
+        console.warn('[PluginLoader] Plugin accessed "' + String(prop) + '" on unavailable module "' + id + '" — returning a no-op. Plugin features depending on this module will not work.');
+      }
+      return function() { return undefined; };
+    }
+  });
+}
 function require(id) {
   if (id === 'obsidian') {
     // The namespace is fully populated by the compat layer before any plugin
@@ -669,13 +689,13 @@ function require(id) {
   // Folded into @codemirror/commands during the CM6 beta; the shim re-exports
   // the real history API under the legacy module name.
   if (id === '@codemirror/history') return window.__codemirrorHistory || {};
-  if (id.startsWith('@codemirror/')) { if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.warn('[PluginLoader] Module "' + id + '" is not available — returning empty stub. Plugin features using this module may not work.'); } return {}; }
+  if (id.startsWith('@codemirror/')) { if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.warn('[PluginLoader] Module "' + id + '" is not available — returning a safe stub. Plugin features using this module may not work.'); } return __unknownModuleStub(id); }
   if (id === '@lezer/common') return window.__lezerCommon || {};
   if (id === '@lezer/lr') return window.__lezerLr || {};
   if (id === '@lezer/highlight') return window.__lezerHighlight || {};
-  if (id.startsWith('@lezer/')) { if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.warn('[PluginLoader] Module "' + id + '" is not available — returning empty stub.'); } return {}; }
-  if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.warn('[PluginLoader] Unknown module "' + id + '" — returning empty stub. Plugin features using this module will not work.'); }
-  return {};
+  if (id.startsWith('@lezer/')) { if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.warn('[PluginLoader] Module "' + id + '" is not available — returning a safe stub.'); } return __unknownModuleStub(id); }
+  if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.warn('[PluginLoader] Unknown module "' + id + '" — returning a safe stub. Plugin features using this module will not work.'); }
+  return __unknownModuleStub(id);
 }
 if (!window.CodeMirror) { window.CodeMirror = { defineMode: function(){}, defineMIME: function(){}, defineExtension: function(){}, defineOption: function(){}, registerHelper: function(){}, registerGlobalHelper: function(){}, modes: {}, mimeModes: {}, resolveMode: function(){return {};}, getMode: function(){return {token:function(){return null;}};}, Pass: {} }; }
 if (!window.CodeMirrorAdapter) { window.CodeMirrorAdapter = { commands: {}, Vim: { defineAction: function(){}, handleEx: function(){}, enterInsertMode: function(){}, mapCommand: function(){} } }; }

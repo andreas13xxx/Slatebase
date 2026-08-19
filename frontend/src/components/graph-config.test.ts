@@ -33,6 +33,9 @@ describe('GraphConfig', () => {
         showProperties: true,
         selectedPropertyKeys: ['status', 'priority'],
       },
+      localGraph: {
+        hops: 3,
+      },
     }
 
     saveGraphConfig(custom)
@@ -76,6 +79,18 @@ describe('GraphConfig', () => {
     expect(config.colors.fileNode).toBe('#aabbcc')
     expect(config.layout).toEqual(DEFAULT_GRAPH_CONFIG.layout)
     expect(config.nodes).toEqual(DEFAULT_GRAPH_CONFIG.nodes)
+    expect(config.localGraph).toEqual(DEFAULT_GRAPH_CONFIG.localGraph)
+  })
+
+  it('loadGraphConfig clamps localGraph.hops to the valid range [1, 5]', () => {
+    localStorage.setItem('slatebase-graph-config', JSON.stringify({ localGraph: { hops: 42 } }))
+    expect(loadGraphConfig().localGraph.hops).toBe(5)
+
+    localStorage.setItem('slatebase-graph-config', JSON.stringify({ localGraph: { hops: -3 } }))
+    expect(loadGraphConfig().localGraph.hops).toBe(1)
+
+    localStorage.setItem('slatebase-graph-config', JSON.stringify({ localGraph: { hops: 'not a number' } }))
+    expect(loadGraphConfig().localGraph.hops).toBe(DEFAULT_GRAPH_CONFIG.localGraph.hops)
   })
 
   it('loadGraphConfig uses defaults for invalid value types', () => {

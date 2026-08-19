@@ -3,25 +3,25 @@ import { render, screen, fireEvent, within } from '@testing-library/react'
 import { AuthProvider } from '../../state/authContext'
 import { AppProvider } from '../../state'
 import { SearchProvider } from '../../state/searchContext'
-import { SidebarPanelProvider } from '../../state/sidebarPanelContext'
+import { createInitialState } from '../../state/panelState'
 import { favoritesStore, add, addHeadingBookmark, addBlockBookmark, addSearchBookmark, getForVault } from '../../state/favoritesStore'
 import { FavoritesView } from './FavoritesView'
 
 function renderView(props: Partial<Parameters<typeof FavoritesView>[0]> = {}) {
   const onOpenFile = vi.fn()
   const onOpenSearch = vi.fn()
+  const panelState = createInitialState(['explorer', 'favorites', 'recent'])
+  const panelDispatch = vi.fn()
   const utils = render(
     <AuthProvider>
       <AppProvider>
         <SearchProvider>
-          <SidebarPanelProvider>
-            <FavoritesView vaultId="vault1" onOpenFile={onOpenFile} onOpenSearch={onOpenSearch} {...props} />
-          </SidebarPanelProvider>
+          <FavoritesView vaultId="vault1" onOpenFile={onOpenFile} onOpenSearch={onOpenSearch} panelState={panelState} panelDispatch={panelDispatch} {...props} />
         </SearchProvider>
       </AppProvider>
     </AuthProvider>
   )
-  return { ...utils, onOpenFile, onOpenSearch }
+  return { ...utils, onOpenFile, onOpenSearch, panelState, panelDispatch }
 }
 
 describe('FavoritesView', () => {
@@ -30,17 +30,7 @@ describe('FavoritesView', () => {
   })
 
   it('shows the empty state when no vault is selected', () => {
-    render(
-      <AuthProvider>
-        <AppProvider>
-          <SearchProvider>
-            <SidebarPanelProvider>
-              <FavoritesView vaultId={null} onOpenFile={vi.fn()} />
-            </SidebarPanelProvider>
-          </SearchProvider>
-        </AppProvider>
-      </AuthProvider>
-    )
+    renderView({ vaultId: null })
     expect(screen.getByText('Kein Vault ausgewählt')).toBeInTheDocument()
   })
 
@@ -92,9 +82,12 @@ describe('FavoritesView', () => {
       <AuthProvider>
         <AppProvider apiClient={mockApiClient}>
           <SearchProvider>
-            <SidebarPanelProvider>
-              <FavoritesView vaultId="vault1" onOpenFile={vi.fn()} />
-            </SidebarPanelProvider>
+            <FavoritesView
+              vaultId="vault1"
+              onOpenFile={vi.fn()}
+              panelState={createInitialState(['explorer', 'favorites', 'recent'])}
+              panelDispatch={vi.fn()}
+            />
           </SearchProvider>
         </AppProvider>
       </AuthProvider>

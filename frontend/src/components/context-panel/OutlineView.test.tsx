@@ -5,7 +5,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { OutlineView } from './OutlineView'
-import type { OutlineHeading } from '../../state/contextPanelState'
+import type { OutlineHeading } from '../../state/documentPanelData'
 
 describe('OutlineView', () => {
   const sampleHeadings: OutlineHeading[] = [

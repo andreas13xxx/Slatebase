@@ -1,14 +1,18 @@
 import { useEffect } from 'react'
 import type { Dispatch } from 'react'
 import { matchesShortcut } from '../state/keybindingsStore'
-import type { ContextPanelAction, ContextPanelState } from '../state/contextPanelState'
+import type { PanelAction, PanelState } from '../state/panelState'
 import type { TabAction, TabState } from '../state/tabState'
 
 /** Params for useGlobalShortcuts — the app-wide keyboard shortcuts registered on `document`/`window`. */
 export interface UseGlobalShortcutsParams {
-  contextPanelSections: ContextPanelState['sections']
-  contextPanelDispatch: Dispatch<ContextPanelAction>
+  /** Both panels' sections are searched for 'search', since it can now live on either side. */
+  leftPanelSections: PanelState['sections']
+  leftPanelDispatch: Dispatch<PanelAction>
+  rightPanelSections: PanelState['sections']
+  rightPanelDispatch: Dispatch<PanelAction>
   setShowRightPanel: (show: boolean) => void
+  setShowSidebar: (show: boolean) => void
   tabs: TabState['tabs']
   activeTabId: TabState['activeTabId']
   tabDispatch: Dispatch<TabAction>
@@ -38,9 +42,12 @@ export interface UseGlobalShortcutsParams {
  * listener effects with no rendering logic of their own.
  */
 export function useGlobalShortcuts({
-  contextPanelSections,
-  contextPanelDispatch,
+  leftPanelSections,
+  leftPanelDispatch,
+  rightPanelSections,
+  rightPanelDispatch,
   setShowRightPanel,
+  setShowSidebar,
   tabs,
   activeTabId,
   tabDispatch,
@@ -49,15 +56,22 @@ export function useGlobalShortcuts({
   onNavigateBack,
   onNavigateForward,
 }: UseGlobalShortcutsParams): void {
-  // Vault search: opens the right panel, activates the search view, and
+  // Vault search: opens whichever panel currently hosts the search view
+  // (right by default, but it can be dragged to the left), activates it, and
   // focuses the input. Shared between the keyboard shortcut and the Command
   // Palette's custom event since both need identical behavior.
   useEffect(() => {
     const openSearchPanel = () => {
-      setShowRightPanel(true)
-      const searchSection = contextPanelSections.find(s => s.viewIds.includes('search'))
-      if (searchSection) {
-        contextPanelDispatch({ type: 'SET_ACTIVE_VIEW', sectionId: searchSection.id, viewId: 'search' })
+      const rightSearchSection = rightPanelSections.find(s => s.viewIds.includes('search'))
+      if (rightSearchSection) {
+        setShowRightPanel(true)
+        rightPanelDispatch({ type: 'SET_ACTIVE_VIEW', sectionId: rightSearchSection.id, viewId: 'search' })
+      } else {
+        const leftSearchSection = leftPanelSections.find(s => s.viewIds.includes('search'))
+        if (leftSearchSection) {
+          setShowSidebar(true)
+          leftPanelDispatch({ type: 'SET_ACTIVE_VIEW', sectionId: leftSearchSection.id, viewId: 'search' })
+        }
       }
       // Focus the search input after the panel renders
       setTimeout(() => {
@@ -82,7 +96,7 @@ export function useGlobalShortcuts({
       document.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('slatebase:open-search', openSearchPanel)
     }
-  }, [contextPanelSections, contextPanelDispatch, setShowRightPanel])
+  }, [leftPanelSections, leftPanelDispatch, rightPanelSections, rightPanelDispatch, setShowRightPanel, setShowSidebar])
 
   // Toggle editor mode
   useEffect(() => {

@@ -1,0 +1,89 @@
+/* ===== Properties View ===== */
+
+.properties-view {
+  padding: 0.5rem;
+  overflow-y: auto;
+}
+
+.properties-view--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+}
+
+.properties-view--error {
+  padding: 0.5rem;
+}
+
+.properties-view__placeholder {
+  font-size: 0.8125rem;
+  color: var(--right-panel-text-muted);
+  font-style: italic;
+  margin: 0;
+  padding: 0.5rem;
+  text-align: center;
+}
+
+.properties-view__error-message {
+  font-size: 0.8125rem;
+  color: var(--danger-text);
+  margin: 0 0 0.5rem 0;
+  padding: 0;
+}
+
+.properties-view__raw-frontmatter {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  background: var(--sidebar-hover);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 0.5rem;
+  margin: 0;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--right-panel-text);
+}
+
+.properties-view__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  table-layout: fixed;
+}
+
+.properties-view__row {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.properties-view__row:last-child {
+  border-bottom: none;
+}
+
+.properties-view__row--group > .properties-view__key {
+  font-weight: 600;
+  color: var(--right-panel-text);
+}
+
+.properties-view__key {
+  padding: 0.3rem 0.5rem 0.3rem 0;
+  vertical-align: top;
+  font-weight: 500;
+  color: var(--right-panel-text-muted);
+  width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.properties-view__value {
+  padding: 0.3rem 0;
+  vertical-align: top;
+  color: var(--right-panel-text);
+  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

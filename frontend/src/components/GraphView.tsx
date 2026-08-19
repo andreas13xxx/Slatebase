@@ -1,22 +1,32 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from 'd3-force'
 import type { SimulationNodeDatum, SimulationLinkDatum } from 'd3-force'
 import { useAppContext } from '../state'
 import { useTabContext } from '../state/tabContext'
 import { openTab } from '../state/tabActions'
+import { onRealtimeVaultChange } from '../state/realtimeVaultBridge'
 import { useTranslation } from '../i18n'
 import type { GraphData, GraphNode, GraphMeta } from '../types'
 import { truncateLabel, clampZoom, computeNodeSize, filterNodes } from './graph-utils'
+import { filterToNeighborhood } from './local-graph-utils'
 import { loadGraphConfig, saveGraphConfig, resetGraphConfig } from './graph-config'
 import type { GraphConfig } from './graph-config'
 import { GraphSettingsPanel } from './GraphSettingsPanel'
-import { RefreshCw, Search } from 'lucide-react'
+import { RefreshCw, Search, Minus, Plus } from 'lucide-react'
+
+/** Debounce delay for local-graph refetch triggered by remote vault changes. */
+const LOCAL_GRAPH_REFRESH_DEBOUNCE_MS = 1000
 
 /**
  * Props for the GraphView component.
  */
 interface GraphViewProps {
   vaultId: string
+  /**
+   * When set, renders a Lokaler_Graph — the full graph filtered down to this
+   * note's N-hop neighborhood — instead of the full vault-wide graph.
+   */
+  localGraphCenterPath?: string
 }
 
 /** Internal simulation node with position data. */
@@ -57,10 +67,12 @@ interface SimLink extends SimulationLinkDatum<SimNode> {
  *
  * Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 9.1, 9.2, 9.3, 9.4, 9.5
  */
-export function GraphView({ vaultId }: GraphViewProps) {
+export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
   const { apiClient, dispatch: appDispatch } = useAppContext()
   const { tabDispatch } = useTabContext()
   const { t } = useTranslation()
+
+  const isLocalGraph = localGraphCenterPath !== undefined
 
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -75,6 +87,17 @@ export function GraphView({ vaultId }: GraphViewProps) {
   // Graph config state (persisted in localStorage)
   const [config, setConfig] = useState<GraphConfig>(() => loadGraphConfig())
   const [meta, setMeta] = useState<GraphMeta | null>(null)
+
+  // Lokaler_Graph: the note currently centered on. Initialized from the prop
+  // (the note the tab was opened for) but can move independently afterwards
+  // via search-select (Requirement 1.8) without changing the tab identity.
+  const [centerPath, setCenterPath] = useState<string | undefined>(localGraphCenterPath)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCenterPath(localGraphCenterPath)
+  }, [localGraphCenterPath])
+  /** Set when the Zentrums-Notiz was deleted while its Lokaler_Graph was open (Requirement 1.12) — non-retryable. */
+  const [centerDeletedPath, setCenterDeletedPath] = useState<string | null>(null)
 
   // Zoom and pan state
   const [zoom, setZoom] = useState(1)
@@ -140,6 +163,54 @@ export function GraphView({ vaultId }: GraphViewProps) {
     void fetchGraph()
   }, [fetchGraph])
 
+  /**
+   * Lokaler_Graph: the full graph response filtered to the neighborhood of
+   * `centerPath`. Purely client-side — no extra server round-trip (Requirement 1.3).
+   * Falls back to the unfiltered `graphData` for the vault-wide graph.
+   */
+  const displayData = useMemo<GraphData | null>(() => {
+    if (!graphData) return null
+    if (!isLocalGraph || centerPath === undefined) return graphData
+
+    const filtered = filterToNeighborhood(graphData, centerPath, config.localGraph.hops)
+    if (filtered.nodes.length > 0) return filtered
+
+    // The center note has no links at all, so it never appears as a node in
+    // the full-graph response — synthesize a standalone node (Requirement 1.10).
+    return {
+      nodes: [{ id: centerPath, type: 'file', path: centerPath, label: truncateLabel(centerPath), exists: true }],
+      edges: [],
+    }
+  }, [graphData, isLocalGraph, centerPath, config.localGraph.hops])
+
+  // Lokaler_Graph: live-update on remote vault changes (Requirement 1.11) and
+  // detect deletion of the Zentrums-Notiz itself (Requirement 1.12).
+  useEffect(() => {
+    if (!isLocalGraph) return
+
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null
+    const unsubscribe = onRealtimeVaultChange((event) => {
+      if (event.vaultId !== vaultId) return
+      if (event.action !== 'saved' && event.action !== 'renamed' && event.action !== 'deleted') return
+
+      if (event.action === 'deleted' && event.path === centerPath) {
+        setCenterDeletedPath(centerPath)
+        return
+      }
+
+      if (refreshTimer !== null) clearTimeout(refreshTimer)
+      refreshTimer = setTimeout(() => {
+        refreshTimer = null
+        void fetchGraph()
+      }, LOCAL_GRAPH_REFRESH_DEBOUNCE_MS)
+    })
+
+    return () => {
+      unsubscribe()
+      if (refreshTimer !== null) clearTimeout(refreshTimer)
+    }
+  }, [isLocalGraph, vaultId, centerPath, fetchGraph])
+
   // Observe container size for responsive SVG
   useEffect(() => {
     const container = containerRef.current
@@ -166,18 +237,18 @@ export function GraphView({ vaultId }: GraphViewProps) {
       simulationRef.current = null
     }
 
-    if (!graphData || graphData.nodes.length === 0) {
+    if (!displayData || displayData.nodes.length === 0) {
       setNodes([]) // eslint-disable-line react-hooks/set-state-in-effect
-      setLinks([])  
+      setLinks([])
       return
     }
 
     // Count connections per node
     const connectionCount = new Map<string, number>()
-    for (const node of graphData.nodes) {
+    for (const node of displayData.nodes) {
       connectionCount.set(node.id, 0)
     }
-    for (const edge of graphData.edges) {
+    for (const edge of displayData.edges) {
       connectionCount.set(edge.source, (connectionCount.get(edge.source) ?? 0) + 1)
       connectionCount.set(edge.target, (connectionCount.get(edge.target) ?? 0) + 1)
     }
@@ -185,7 +256,7 @@ export function GraphView({ vaultId }: GraphViewProps) {
     const maxConnections = Math.max(...Array.from(connectionCount.values()), 0)
 
     // Create simulation nodes
-    const simNodes: SimNode[] = graphData.nodes.map((node) => {
+    const simNodes: SimNode[] = displayData.nodes.map((node) => {
       const connections = connectionCount.get(node.id) ?? 0
       // Tag/Property nodes have smaller base radius
       const baseRadius = (node.type === 'tag' || node.type === 'property')
@@ -204,7 +275,7 @@ export function GraphView({ vaultId }: GraphViewProps) {
 
     // Create simulation links
     const nodeMap = new Map(simNodes.map((n) => [n.id, n]))
-    const simLinks: SimLink[] = graphData.edges
+    const simLinks: SimLink[] = displayData.edges
       .filter((edge) => nodeMap.has(edge.source) && nodeMap.has(edge.target))
       .map((edge) => ({
         source: edge.source,
@@ -241,7 +312,7 @@ export function GraphView({ vaultId }: GraphViewProps) {
     return () => {
       simulation.stop()
     }
-  }, [graphData, dimensions.width, dimensions.height])
+  }, [displayData, dimensions.width, dimensions.height])
 
   /**
    * Converts screen coordinates to SVG coordinates accounting for pan and zoom.
@@ -507,6 +578,19 @@ export function GraphView({ vaultId }: GraphViewProps) {
    */
   const handleSearchSelect = useCallback(
     (selectedNode: GraphNode) => {
+      // Lokaler_Graph: re-center the neighborhood on the selected node instead
+      // of just panning to it (Requirement 1.8) — a distinct interaction from
+      // the node-click-opens-file behavior (Requirement 1.7), which stays unchanged.
+      if (isLocalGraph) {
+        setCenterPath(selectedNode.path ?? selectedNode.id)
+        setPanX(0)
+        setPanY(0)
+        setShowDropdown(false)
+        setSearchQuery('')
+        setSearchResults([])
+        return
+      }
+
       // Find the simulation node to get its current position
       const simNode = nodes.find((n) => n.id === selectedNode.id)
       if (!simNode || simNode.x == null || simNode.y == null) return
@@ -525,7 +609,7 @@ export function GraphView({ vaultId }: GraphViewProps) {
       setSearchQuery('')
       setSearchResults([])
     },
-    [nodes, dimensions.width, dimensions.height, zoom],
+    [isLocalGraph, nodes, dimensions.width, dimensions.height, zoom],
   )
 
   /**
@@ -609,6 +693,19 @@ export function GraphView({ vaultId }: GraphViewProps) {
   }, [])
 
   /**
+   * Updates the Lokaler_Graph Nachbarschaftsradius (clamped to [1, 5]) and
+   * persists it alongside the rest of GraphConfig (Requirement 1.13).
+   */
+  const handleHopsChange = useCallback((newHops: number) => {
+    const clamped = Math.min(5, Math.max(1, newHops))
+    setConfig((prev) => {
+      const next = { ...prev, localGraph: { ...prev.localGraph, hops: clamped } }
+      saveGraphConfig(next)
+      return next
+    })
+  }, [])
+
+  /**
    * Fetches graph metadata (for the settings panel) when the panel needs it.
    */
   const fetchMeta = useCallback(async () => {
@@ -642,6 +739,16 @@ export function GraphView({ vaultId }: GraphViewProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
   useEffect(() => { void fetchMeta() }, [apiClient, vaultId])
 
+  // Zentrums-Notiz deleted while its Lokaler_Graph was open (Requirement 1.12) —
+  // dedicated, non-retryable state; takes priority over loading/error/empty.
+  if (centerDeletedPath !== null) {
+    return (
+      <div className="graph-view-status" role="alert">
+        <p className="graph-view-error">{t('graph.localGraph.centerDeleted', { path: centerDeletedPath })}</p>
+      </div>
+    )
+  }
+
   // Loading state
   if (loading) {
     return (
@@ -666,7 +773,7 @@ export function GraphView({ vaultId }: GraphViewProps) {
   }
 
   // Empty graph
-  if (!graphData || graphData.nodes.length === 0) {
+  if (!displayData || displayData.nodes.length === 0) {
     return (
       <div className="graph-view-status">
         <p className="graph-view-empty">{t('graph.empty')}</p>
@@ -683,6 +790,32 @@ export function GraphView({ vaultId }: GraphViewProps) {
         onConfigChange={handleConfigChange}
         onReset={handleConfigReset}
       />
+
+      {/* Lokaler_Graph toolbar: Nachbarschaftsradius stepper (Requirement 1.5) */}
+      {isLocalGraph && (
+        <div className="graph-local-toolbar">
+          <span className="graph-local-toolbar-label">{t('graph.localGraph.hopsLabel')}</span>
+          <button
+            type="button"
+            className="graph-local-toolbar-button"
+            onClick={() => handleHopsChange(config.localGraph.hops - 1)}
+            disabled={config.localGraph.hops <= 1}
+            aria-label={t('graph.localGraph.decreaseHops')}
+          >
+            <Minus size={12} />
+          </button>
+          <span className="graph-local-toolbar-value">{config.localGraph.hops}</span>
+          <button
+            type="button"
+            className="graph-local-toolbar-button"
+            onClick={() => handleHopsChange(config.localGraph.hops + 1)}
+            disabled={config.localGraph.hops >= 5}
+            aria-label={t('graph.localGraph.increaseHops')}
+          >
+            <Plus size={12} />
+          </button>
+        </div>
+      )}
 
       {/* Search UI — positioned absolutely over the SVG */}
       <div className="graph-search-container" ref={searchContainerRef}>
@@ -763,12 +896,13 @@ export function GraphView({ vaultId }: GraphViewProps) {
               if (node.x == null || node.y == null) return null
               const nodeOpacity = getNodeOpacity(node.id)
               const isSearchHighlighted = highlightedSearchNodeId === node.id
-              const displayRadius = isSearchHighlighted ? node.radius * 1.5 : node.radius
+              const isCenterNode = isLocalGraph && (node.path ?? node.id) === centerPath
+              const displayRadius = isSearchHighlighted || isCenterNode ? node.radius * 1.5 : node.radius
               return (
                 <g
                   key={node.id}
                   data-node-id={node.id}
-                  className={`${node.exists ? 'graph-node' : 'graph-node-unresolved'}${isSearchHighlighted ? ' graph-node-search-highlight' : ''}`}
+                  className={`${node.exists ? 'graph-node' : 'graph-node-unresolved'}${isSearchHighlighted ? ' graph-node-search-highlight' : ''}${isCenterNode ? ' graph-node-center' : ''}`}
                   onClick={(e) => handleNodeClick(e, node)}
                   onDoubleClick={(e) => handleNodeDoubleClick(e, node)}
                   onMouseEnter={() => handleNodeHoverEnter(node.id)}
@@ -780,7 +914,7 @@ export function GraphView({ vaultId }: GraphViewProps) {
                     cy={node.y}
                     r={displayRadius}
                     fill={getNodeFill(node)}
-                    style={isSearchHighlighted ? {
+                    style={isSearchHighlighted || isCenterNode ? {
                       stroke: 'var(--graph-search-highlight)',
                       strokeWidth: 3,
                     } : undefined}
@@ -800,7 +934,8 @@ export function GraphView({ vaultId }: GraphViewProps) {
             const label = truncateLabel(node.label)
             const nodeOpacity = getNodeOpacity(node.id)
             const isSearchHighlighted = highlightedSearchNodeId === node.id
-            const displayRadius = isSearchHighlighted ? node.radius * 1.5 : node.radius
+            const isCenterNode = isLocalGraph && (node.path ?? node.id) === centerPath
+            const displayRadius = isSearchHighlighted || isCenterNode ? node.radius * 1.5 : node.radius
             // Calculate screen position: apply zoom and pan manually
             const screenX = node.x * zoom + panX
             const screenY = (node.y + displayRadius + 12) * zoom + panY

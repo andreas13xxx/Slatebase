@@ -49,6 +49,27 @@ Alle Dateien, die **auf** die aktuelle Datei verlinken:
 - Besonders wertvoll, um zu entdecken, wo eine Notiz referenziert wird
 - Aktualisiert sich automatisch, wenn eine andere Datei im Hintergrund gespeichert, umbenannt oder gelöscht wird — auch wenn diese Änderung aus einem anderen Tab, Gerät oder von einem anderen Benutzer kommt. Kein manueller Wechsel des Dokuments nötig, um die Liste aufzufrischen
 
+### Ungelinkte Erwähnungen
+
+Unterhalb der Backlinks listet der Links-Bereich auch **Ungelinkte Erwähnungen** — andere Dateien, die den Namen der aktuellen Datei als reinen Text erwähnen, ohne dass dort ein echter Wikilink darauf verweist:
+
+- Wird über eine vault-weite Suche nach dem Dateinamen gefunden
+- Eine Erwähnung, die bereits Teil eines Wikilinks auf diese Datei ist, zählt nicht — nur wirklich ungelinkter Text taucht hier auf
+- Jeder Eintrag zeigt die Datei und einen kurzen Ausschnitt der Fundzeile
+- Klick auf einen Eintrag öffnet die entsprechende Datei
+- Klick auf **Verlinken** neben einem Eintrag macht nur diese eine Fundstelle zu einem echten `[[Wikilink]]`, ohne den Rest der Datei anzufassen
+
+So findest du Erwähnungen, die du geschrieben hast, bevor die Notiz existierte — oder bevor dir klar war, dass dort ein Wikilink sinnvoll wäre.
+
+#### Live-Beispiel
+
+Diese Datei hat bereits echte ungelinkte Erwähnungen in diesem Vault — beim Schreiben wird „Context Panel" oft erwähnt, ohne es jedes Mal zu verlinken. Probier es aus:
+
+1. Lass diese Datei (`Features/Context Panel.md`) geöffnet
+2. Scrolle im Links-Bereich nach unten zu **Ungelinkte Erwähnungen**
+3. Du siehst Einträge wie `Features/Tags und Properties`, `Features/Wikilinks` und einige `Praxis/`-Übungen — jede erwähnt „Context Panel" als reinen Text
+4. Klicke bei einem Eintrag auf **Verlinken** — öffne die Datei danach und prüfe, dass die Erwähnung jetzt ein echter `[[Features/Context Panel]]`-Link ist
+
 ### Tags
 
 Alle Tags im gesamten Vault als hierarchische Liste:
@@ -101,8 +122,9 @@ Die Reihenfolge bleibt über Sitzungen hinweg erhalten (localStorage).
 1. **Outline:** Du siehst die Überschriften dieser Datei (Panel öffnen, Splits, etc.)
 2. **Forward-Links:** Zeigt die ausgehenden Links (z.B. zu Wikilinks, Tags, Knowledge Graph)
 3. **Backlinks:** Zeigt, welche anderen Dateien auf diese Datei verlinken
-4. **Tags:** Du siehst `#features` (aus dem Frontmatter)
-5. **Properties:** Zeigt `tags: [features]`
+4. **Ungelinkte Erwähnungen:** Zeigt Dateien, die „Context Panel" als reinen Text erwähnen, ohne Wikilink
+5. **Tags:** Du siehst `#features` (aus dem Frontmatter)
+6. **Properties:** Zeigt `tags: [features]`
 
 Klicke auf eine Überschrift in der Outline — der Viewer scrollt zur entsprechenden Stelle.
 
@@ -120,7 +142,8 @@ Klicke auf eine Überschrift in der Outline — der Viewer scrollt zur entsprech
 > 1. Öffne das Context Panel (rechte Seite)
 > 2. Wechsle zwischen den Tabs (Outline, Links, Tags, Properties)
 > 3. Klicke auf einen Forward-Link, um die Zieldatei zu öffnen
-> 4. Erstelle einen Split: Ziehe einen Tab in die untere Hälfte
+> 4. Prüfe die Ungelinkten Erwähnungen — klicke bei einem Eintrag auf „Verlinken" und prüfe, dass daraus ein echter Wikilink wird
+> 5. Erstelle einen Split: Ziehe einen Tab in die untere Hälfte
 
 ---
 

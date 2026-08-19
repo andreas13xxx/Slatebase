@@ -239,6 +239,40 @@ Das Highlight-Feature ist besonders nützlich für:
 
 ---
 
+## Inline-HTML
+
+Über die Markdown-Syntax hinaus rendert auch eine kleine, sichere Auswahl an rohen HTML-Tags als echte Formatierung — nützlich für Dinge, die Markdown allein nicht kann, z.B. eine bestimmte Textfarbe oder Schriftgröße:
+
+```markdown
+<font color="#e63946">farbiger Text</font>
+<mark style="background: #ffd166;">Hervorhebung mit eigener Farbe</mark>
+<span style="font-size: 1.3em; font-weight: 600;">gestylter Span</span>
+Drücke <kbd>Strg</kbd>+<kbd>P</kbd>, um die Command Palette zu öffnen.
+H<sub>2</sub>O und E=mc<sup>2</sup>
+<abbr title="Hypertext Markup Language">HTML</abbr>
+```
+
+### Live-Beispiel
+
+<font color="#e63946">Dieser Text ist rot durch `<font color>`.</font>
+
+<mark style="background: #ffd166;">Diese Markierung nutzt eine eigene Hintergrundfarbe, anders als die Doppel-Gleichheitszeichen-Syntax oben, die immer die Theme-Farbe verwendet.</mark>
+
+<span style="font-size: 1.3em; font-weight: 600;">Dieser Span ist größer und fett gestylt.</span>
+
+Drücke <kbd>Strg</kbd>+<kbd>P</kbd>, um die Command Palette zu öffnen. H<sub>2</sub>O und E=mc<sup>2</sup> werden als echter Tief-/Hochstellung gerendert. Slatebase ist eine <abbr title="Hypertext Markup Language">HTML</abbr>-rendernde Web-App — fahre über die Abkürzung oben, um den Titel-Tooltip zu sehen.
+
+Auch Zentrierung auf Blockebene funktioniert, mit `<center>...</center>`:
+
+<center>
+Dieser Absatz ist zentriert mit dem HTML-Center-Block.
+</center>
+
+> [!info] Warum nur eine Teilmenge?
+> Nur eine feste Positivliste an Tags wird gerendert (`font`, `mark`, `span`, `b`/`strong`, `i`/`em`, `u`, `s`/`strike`, `sub`, `sup`, `small`, `kbd`, `abbr`, `code`, sowie das Block-Element `center`) — und nur ihre sicheren Attribute (`color`, `face`, `size`, `style`, `title`). Alles andere, einschließlich `<script>`, `<iframe>` und `on*`-Event-Handlern, wird nie ausgeführt — es erscheint als reiner Text statt gerendert oder ausgeführt zu werden.
+
+---
+
 ## Callouts
 
 Callouts sind spezielle Blockzitate mit Typ-Markierung:
@@ -297,6 +331,7 @@ Mehr Diagramm-Typen: [[Features/Mermaid Diagramme|Mermaid-Guide]]
 > 3. Eine Tabelle mit 3 Spalten
 > 4. Einen Code-Block mit einer beliebigen Sprache
 > 5. Eine Checkliste mit 3 Punkten
+> 6. Einen `<span style="color: ...">` mit einer eigenen Farbe
 >
 > Im Live-Preview-Modus siehst du das Ergebnis sofort.
 

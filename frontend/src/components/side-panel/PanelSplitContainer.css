@@ -1,6 +1,6 @@
-/* ===== Split Section Container ===== */
+/* ===== Side Panel Split Container (shared by left and right panels) ===== */
 
-.split-section-container {
+.side-panel-split-container {
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -9,27 +9,27 @@
   height: 100%;
 }
 
-.split-section-container--resizing {
+.side-panel-split-container--resizing {
   cursor: row-resize;
   user-select: none;
 }
 
 /* ─── Section Wrapper ─────────────────────────────────────────────────────── */
 
-.split-section-wrapper {
+.side-panel-split-wrapper {
   display: contents;
 }
 
 /* ─── Section ─────────────────────────────────────────────────────────────── */
 
-.split-section {
+.side-panel-split-section {
   display: flex;
   flex-direction: column;
   overflow: hidden;
   min-height: 80px;
 }
 
-.split-section-content {
+.side-panel-split-content {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
@@ -38,7 +38,7 @@
 
 /* ─── Resize Handle ───────────────────────────────────────────────────────── */
 
-.split-section-resize-handle {
+.side-panel-split-resize-handle {
   height: 4px;
   width: 100%;
   cursor: row-resize;
@@ -48,19 +48,19 @@
   transition: background-color 0.15s ease;
 }
 
-.split-section-resize-handle:hover,
-.split-section-resize-handle--active {
+.side-panel-split-resize-handle:hover,
+.side-panel-split-resize-handle--active {
   background: var(--accent);
 }
 
-.split-section-resize-handle:focus-visible {
+.side-panel-split-resize-handle:focus-visible {
   background: var(--accent);
   outline: 2px solid var(--accent);
   outline-offset: -1px;
 }
 
 /* Larger hit area for easier grabbing */
-.split-section-resize-handle::before {
+.side-panel-split-resize-handle::before {
   content: '';
   position: absolute;
   top: -4px;
@@ -71,7 +71,7 @@
 
 /* ─── Drop Indicator ──────────────────────────────────────────────────────── */
 
-.split-section-drop-indicator {
+.side-panel-split-drop-indicator {
   position: absolute;
   bottom: 0;
   left: 0;
@@ -87,7 +87,7 @@
   z-index: 10;
 }
 
-.split-section-drop-indicator-line {
+.side-panel-split-drop-indicator-line {
   width: 60%;
   height: 2px;
   background: var(--accent);

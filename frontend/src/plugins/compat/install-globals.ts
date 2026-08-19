@@ -88,13 +88,15 @@ import {
 // A deferred registration would let a plugin observe an incomplete namespace.
 import { MarkdownRenderer } from './markdown-renderer'
 import { EditorShim } from './editor-shim'
+import { Menu, MenuItem, MenuSeparator } from './menu'
 // Registered on the namespace under their Obsidian names, so plugin prototype
 // patches and `instanceof` checks act on the classes actually in use.
 import { WorkspaceShim } from './shims/workspace-shim'
+import { WorkspaceLeaf, WorkspaceSplit, WorkspaceRibbon } from './view-registry'
 import { MetadataCacheShim } from './shims/metadata-cache-shim'
 import { VaultShim } from './shims/vault-shim'
 import { FileManagerShim } from './shims/file-manager-shim'
-import { registerObsidianApiExtensions, OBSIDIAN_API_VERSION, compareApiVersions, dispatchKeydownToScopeStack, Scope } from './obsidian-api-extensions'
+import { registerObsidianApiExtensions, OBSIDIAN_API_VERSION, compareApiVersions, dispatchKeydownToScopeStack, Scope, renderMatches } from './obsidian-api-extensions'
 import { registerFallbackShims } from './fallback-shims'
 import { detectPlatform, readPlatformEnvironment } from './platform-detection'
 import { installObsidianBodyClasses } from './body-classes'
@@ -388,6 +390,33 @@ export function installObsidianGlobals(): void {
       configurable: true,
     })
   }
+  // Obsidian also patches `win`/`doc` onto UIEvent (MouseEvent, FocusEvent,
+  // KeyboardEvent, ...), not just Element — plugins read `evt.win` inside DOM
+  // event handlers to schedule follow-up work on the right window (e.g.
+  // `evt.win.setTimeout(...)`). Kanban's list-focus handler does exactly this
+  // when a new list is created, and without this patch `evt.win` is `undefined`,
+  // throwing "can't access property 'setTimeout', <evt>.win is undefined".
+  // Derived from `evt.target`'s owner window, same fallback chain as Element.win.
+  if (typeof UIEvent !== 'undefined' && !('win' in UIEvent.prototype)) {
+    Object.defineProperty(UIEvent.prototype, 'win', {
+      get: function (this: UIEvent): Window {
+        const target = this.target as Node | null
+        return (target && 'ownerDocument' in target ? (target as Node).ownerDocument?.defaultView : null)
+          ?? (this.view as Window | null)
+          ?? window
+      },
+      configurable: true,
+    })
+  }
+  if (typeof UIEvent !== 'undefined' && !('doc' in UIEvent.prototype)) {
+    Object.defineProperty(UIEvent.prototype, 'doc', {
+      get: function (this: UIEvent): Document {
+        const target = this.target as Node | null
+        return (target && 'ownerDocument' in target ? (target as Node).ownerDocument : null) ?? document
+      },
+      configurable: true,
+    })
+  }
   // Obsidian's window-aware `instanceOf` — plugins use `node.instanceOf(HTMLElement)`
   // instead of the native `instanceof` because Obsidian supports popout windows, where
   // an element's `HTMLElement` constructor belongs to a different realm than the main
@@ -555,11 +584,25 @@ export function installObsidianGlobals(): void {
   // that context when the deferred callback runs.
   const nativeSetTimeout = window.setTimeout.bind(window)
   const nativeSetInterval = window.setInterval.bind(window)
+  // Deferred timer callbacks run outside any leaf/view lifecycle try/catch
+  // (those only wrap the synchronous onOpen/onClose/onunload calls) — a
+  // plugin whose timer callback throws (e.g. a debounced-save reset that
+  // fires after its own view already tore down other state) would otherwise
+  // surface as an uncaught exception instead of the console.error every
+  // other plugin call-in point in this file uses.
+  const runPluginTimerHandler = (handler: TimerHandler, args: unknown[], pluginId: string | null): void => {
+    try {
+      (handler as (...a: unknown[]) => unknown)(...args)
+    } catch (err) {
+      console.error(`[PluginCompat] Uncaught error in timer callback${pluginId ? ` (plugin "${pluginId}")` : ''}:`, err)
+    }
+  }
   window.setTimeout = ((handler: TimerHandler, timeout?: number, ...args: unknown[]): number => {
     if (typeof handler !== 'function') return nativeSetTimeout(handler, timeout, ...args) as unknown as number
     const pluginId = getCurrentPluginId()
+    const runHandler = (): void => runPluginTimerHandler(handler, args, pluginId)
     const id = nativeSetTimeout(
-      pluginId ? () => withPluginContext(pluginId, () => handler(...args)) : () => handler(...args),
+      pluginId ? () => withPluginContext(pluginId, runHandler) : runHandler,
       timeout
     ) as unknown as number
     // Let the sandbox cancel this on unload — otherwise a plugin's pending
@@ -571,8 +614,9 @@ export function installObsidianGlobals(): void {
   window.setInterval = ((handler: TimerHandler, timeout?: number, ...args: unknown[]): number => {
     if (typeof handler !== 'function') return nativeSetInterval(handler, timeout, ...args) as unknown as number
     const pluginId = getCurrentPluginId()
+    const runHandler = (): void => runPluginTimerHandler(handler, args, pluginId)
     const id = nativeSetInterval(
-      pluginId ? () => withPluginContext(pluginId, () => handler(...args)) : () => handler(...args),
+      pluginId ? () => withPluginContext(pluginId, runHandler) : runHandler,
       timeout
     ) as unknown as number
     if (pluginId) trackPluginTimer(pluginId, id)
@@ -800,8 +844,22 @@ export function installObsidianGlobals(): void {
         return id
       }
       registerDomEvent(el: EventTarget, event: string, handler: EventListenerOrEventListenerObject): void {
-        el.addEventListener(event, handler)
-        this._events.push({ target: el, event, handler })
+        // Capture the owning plugin at registration time and re-enter that
+        // context when the DOM event actually fires — otherwise any
+        // setTimeout/setInterval the handler schedules (e.g. Excalidraw's
+        // forceSave -> resetAutosaveTimer) runs with no current plugin id,
+        // so trackPluginTimer() never records it and sandbox.cleanup() can't
+        // cancel it on unload: it fires later against a torn-down plugin and
+        // throws (same crash class as the setTimeout wrapper above).
+        const pluginId = getCurrentPluginId()
+        const wrapped: EventListenerOrEventListenerObject = pluginId
+          ? (evt: Event) => withPluginContext(pluginId, () => {
+              if (typeof handler === 'function') handler(evt)
+              else handler.handleEvent(evt)
+            })
+          : handler
+        el.addEventListener(event, wrapped)
+        this._events.push({ target: el, event, handler: wrapped })
       }
     } as unknown as Record<string, unknown>
   }
@@ -956,6 +1014,8 @@ export function installObsidianGlobals(): void {
       }
       getSuggestions(_context: unknown): T[] { return [] }
       onTrigger(_cursor: unknown, _editor: unknown, _file: unknown): unknown { return null }
+      /** Cosmetic no-op, like SuggestModal.setInstructions() — no popover renders here to attach instructions to. */
+      setInstructions(_instructions: unknown[]): void {}
     } as unknown as Record<string, unknown>
   }
 
@@ -1776,15 +1836,28 @@ export function installObsidianGlobals(): void {
     }) as unknown as Record<string, unknown>
   }
 
-  // WorkspaceLeaf stub — just enough for plugins to instantiate views with `new MyView(leaf)`
+  // WorkspaceLeaf — the real class from view-registry.ts, not a disconnected
+  // stub. Every leaf plugins actually see (workspace.activeLeaf, getLeaf(),
+  // getRightLeaf(), ...) is already an instance of this class, so aliasing it
+  // here (rather than declaring a lookalike) is what makes `leaf instanceof
+  // WorkspaceLeaf` hold for real leaves instead of always failing.
   if (!window.obsidian.WorkspaceLeaf) {
-    window.obsidian.WorkspaceLeaf = class WorkspaceLeaf {
-      app: unknown
-      view: unknown = null
-      constructor(app?: unknown) {
-        this.app = app ?? null
-      }
-    } as unknown as Record<string, unknown>
+    window.obsidian.WorkspaceLeaf = WorkspaceLeaf as unknown as Record<string, unknown>
+  }
+
+  // WorkspaceSplit/WorkspaceRibbon — same reasoning as WorkspaceLeaf above,
+  // for WorkspaceShim's rootSplit/leftSplit/rightSplit/leftRibbon/rightRibbon
+  // stub objects (see shims/workspace-shim.ts). The remaining layout-item
+  // classes (WorkspaceItem/Parent/Tabs/Root/Sidedock/MobileDrawer/Window/
+  // Floating/Container) stay as the generic empty stubs from
+  // registerFallbackShims() below — Slatebase's flat tab model never
+  // constructs an instance of any of them, so giving them a real hierarchy
+  // would have no observable effect on any plugin.
+  if (!window.obsidian.WorkspaceSplit) {
+    window.obsidian.WorkspaceSplit = WorkspaceSplit as unknown as Record<string, unknown>
+  }
+  if (!window.obsidian.WorkspaceRibbon) {
+    window.obsidian.WorkspaceRibbon = WorkspaceRibbon as unknown as Record<string, unknown>
   }
 
   // FileView — extends ItemView with a `file` property. Plugins use `view instanceof FileView`
@@ -2010,23 +2083,29 @@ export function installObsidianGlobals(): void {
       messageEl: HTMLElement = document.createElement('div')
       containerEl: HTMLElement = document.createElement('div')
       private _shown = true
-       
-      constructor(message: string | DocumentFragment, _timeout?: number) {
+      /** The id of the actual rendered toast, if the toast bridge is wired up yet. */
+      private toastId: string | null = null
+
+      constructor(message: string | DocumentFragment, timeout?: number) {
         this.noticeEl = document.createElement('div') as HTMLElement & { isShown?: () => boolean }
         this.noticeEl.isShown = () => this._shown
         const msg = typeof message === 'string' ? message : (message?.textContent ?? '')
-        if ((window as unknown as { __slatebaseShowNotice?: (msg: string, duration?: number) => void }).__slatebaseShowNotice) {
-          (window as unknown as { __slatebaseShowNotice: (msg: string, duration?: number) => void }).__slatebaseShowNotice(msg, _timeout)
-        }
+        this.messageEl.textContent = msg
+        const bridge = (window as unknown as { __slatebaseShowNotice?: (msg: string, duration?: number) => string }).__slatebaseShowNotice
+        if (bridge) this.toastId = bridge(msg, timeout)
       }
       setMessage(message: string | DocumentFragment): this {
         const msg = typeof message === 'string' ? message : (message?.textContent ?? '')
-        if ((window as unknown as { __slatebaseShowNotice?: (msg: string) => void }).__slatebaseShowNotice) {
-          (window as unknown as { __slatebaseShowNotice: (msg: string) => void }).__slatebaseShowNotice(msg)
-        }
+        this.messageEl.textContent = msg
+        const bridge = (window as unknown as { __slatebaseUpdateNotice?: (id: string, msg: string) => void }).__slatebaseUpdateNotice
+        if (bridge && this.toastId) bridge(this.toastId, msg)
         return this
       }
-      hide() { this._shown = false }
+      hide(): void {
+        this._shown = false
+        const bridge = (window as unknown as { __slatebaseDismissNotice?: (id: string) => void }).__slatebaseDismissNotice
+        if (bridge && this.toastId) bridge(this.toastId)
+      }
       isShown(): boolean { return this._shown }
     } as unknown as Record<string, unknown>
   }
@@ -2047,6 +2126,7 @@ export function installObsidianGlobals(): void {
       /** Whether to restore the previous text selection on close (real Obsidian field; cosmetic here). */
       shouldRestoreSelection: boolean = true
       private overlayEl: HTMLElement | null = null
+      private closeCallback: ((err?: Error) => unknown) | null = null
       constructor(app: unknown) {
         this.app = app
         this.containerEl = document.createElement('div')
@@ -2072,13 +2152,22 @@ export function installObsidianGlobals(): void {
         this.titleEl.textContent = title
         return this
       }
-      setContent(content: string): unknown {
+      setContent(content: string | DocumentFragment): unknown {
         this.contentEl.innerHTML = ''
-        this.contentEl.textContent = content
+        if (content instanceof DocumentFragment) {
+          this.contentEl.appendChild(content)
+        } else {
+          this.contentEl.textContent = content
+        }
         return this
       }
       isShown(): boolean {
         return this.overlayEl != null && this.overlayEl.parentNode != null
+      }
+      /** Registers a callback invoked once the modal has closed. */
+      setCloseCallback(closeCallback: (err?: Error) => unknown): unknown {
+        this.closeCallback = closeCallback
+        return this
       }
       open() {
         // Create overlay backdrop
@@ -2119,6 +2208,7 @@ export function installObsidianGlobals(): void {
           this.overlayEl.parentNode.removeChild(this.overlayEl)
         }
         this.overlayEl = null
+        this.closeCallback?.()
       }
       onOpen() {}
       onClose() {}
@@ -2295,413 +2385,9 @@ export function installObsidianGlobals(): void {
   }
 
   if (!window.obsidian.Menu) {
-    /**
-     * A menu entry. `kind` distinguishes real items from separators so both can
-     * live in one ordered list — Obsidian's `addSeparator()` position matters,
-     * and keeping separators in a side channel loses it.
-     */
-    interface MenuEntry {
-      kind: 'item' | 'separator'
-      title: string
-      icon: string
-      section: string
-      checked: boolean
-      disabled: boolean
-      warning: boolean
-      submenu: MenuInstance | null
-      callback: (evt: MouseEvent | KeyboardEvent) => void
-      /**
-       * The plugin that was executing when this item was built via addItem(),
-       * captured then because by the time the user actually clicks it —  a
-       * separate later event — any withPluginContext() from menu construction
-       * (e.g. the wrapped 'file-menu' dispatch in event-system.ts) has long
-       * since unwound. Without replaying it in invoke(), a callback that opens
-       * a Modal/picker builds DOM with getCurrentPluginId() === null, so
-       * CssInjector's [data-plugin-id] scoping matches nothing inside it and
-       * the plugin's own stylesheet (icon grids, layout, ...) never applies.
-       */
-      pluginId: string | null
-      /**
-       * Real Obsidian's MenuItem is imperative: `dom`/`titleEl`/`iconEl` exist
-       * the moment addItem()'s callback runs, not only once the menu opens.
-       * Plugins rely on that to embed extra components straight into an item
-       * — "Editing Toolbar"'s status-bar menu does
-       * `new ToggleComponent(item.dom)` inside the addItem() callback, which
-       * crashed with "containerEl is undefined" when `dom` didn't exist yet.
-       * Built eagerly in _createEntry() and reused as-is at show()-time
-       * instead of building fresh DOM there, so anything a plugin appended
-       * into `dom` survives into the rendered menu.
-       */
-      dom: HTMLElement
-      iconEl: HTMLElement | null
-      titleEl: HTMLElement | null
-    }
-    interface MenuInstance {
-      items: MenuEntry[]
-      close(): void
-    }
-
-    window.obsidian.Menu = class Menu {
-      items: MenuEntry[] = []
-      /**
-       * Obsidian creates the menu's root element eagerly in the constructor,
-       * not at show()-time — plugins routinely do `menu.dom.addClass(...)` or
-       * append custom content right after `new Menu()`, before ever calling
-       * showAtMouseEvent()/showAtPosition(). Making this lazy (only built in
-       * show(), nulled in close()) crashed those plugins with
-       * "can't access property addClass, dom is null" the moment they touched
-       * `.dom` pre-show, or reused a menu instance after it had closed.
-       */
-      dom: HTMLElement = document.createElement('div')
-      containerEl: HTMLElement | null = null
-      private onHideCallbacks: Array<() => void> = []
-      private submenuEl: HTMLElement | null = null
-
-      constructor() {
-        this.dom.className = 'menu'
-      }
-
-      addItem(cb: (item: unknown) => void): this {
-        const item = this._createEntry('item')
-        item.pluginId = getCurrentPluginId()
-        cb(item)
-        this.items.push(item)
-        return this
-      }
-
-      addSeparator(): this {
-        this.items.push(this._createEntry('separator'))
-        return this
-      }
-
-      /** Pre-declared section display order, populated by addSections(). */
-      private sectionOrder: string[] = []
-
-      /**
-       * Pre-declare the display order of named sections (Obsidian 1.x+). Plugins
-       * call this once per section, typically right before adding that
-       * section's items — "Editing Toolbar"'s status-bar menu is
-       * `addSections(["settings"]); <add settings items>; addSections(["viewType"]); ...`.
-       * Without this, items still group by `setSection()` (first-seen item
-       * order), but a section named before it has any items — as here — has no
-       * effect until an item actually claims it, which can visually reorder
-       * groups relative to what the plugin declared.
-       */
-      addSections(sections: string[]): this {
-        for (const section of sections) {
-          if (!this.sectionOrder.includes(section)) this.sectionOrder.push(section)
-        }
-        return this
-      }
-
-      /** Obsidian's opt-out of the icon gutter, for menus where no item has one. */
-      setNoIcon(): this {
-        // The class is the whole mechanism — Obsidian's own stylesheet keys the
-        // icon gutter off it, so there is no separate flag to track.
-        this.dom.classList.add('mod-no-icon')
-        return this
-      }
-
-      /** Register a callback for when the menu closes, by click or dismissal. */
-      onHide(cb: () => void): this {
-        this.onHideCallbacks.push(cb)
-        return this
-      }
-
-      /**
-       * Real Obsidian toggles between the OS-native (Electron) context menu and
-       * its own HTML one. Slatebase is a web app with no native menu to switch
-       * to — always renders the HTML menu — so this is a no-op kept only so
-       * plugins that call it (desktop-focused ones toggling native menus off
-       * for custom rendering) don't crash.
-       */
-      setUseNativeMenu(_useNativeMenu: boolean): this {
-        return this
-      }
-
-      /**
-       * @internal Create a menu entry with all methods Obsidian plugins
-       * expect. DOM is built here, not at show()-time, so `item.dom` is a
-       * real element the instant addItem()'s callback receives the item —
-       * see the MenuEntry.dom doc comment for why that matters. An instance
-       * method (not static) because the item's click/hover wiring calls back
-       * into this menu (`this.invoke`/`this.openSubmenu`/`this.closeSubmenu`).
-       */
-      private _createEntry(kind: 'item' | 'separator'): MenuEntry & Record<string, unknown> {
-        let dom: HTMLElement
-        let iconEl: HTMLElement | null = null
-        let titleEl: HTMLElement | null = null
-
-        if (kind === 'separator') {
-          dom = document.createElement('div')
-          dom.className = 'menu-separator'
-        } else {
-          dom = document.createElement('div')
-          dom.className = 'menu-item'
-          iconEl = document.createElement('div')
-          iconEl.className = 'menu-item-icon'
-          dom.appendChild(iconEl)
-          titleEl = document.createElement('div')
-          titleEl.className = 'menu-item-title'
-          dom.appendChild(titleEl)
-
-          // Wired once here rather than rebuilt per show(): `disabled`/`submenu`
-          // are read live off the entry at event time, so toggling either
-          // after creation (setDisabled()/setSubmenu() called later in the
-          // same addItem() callback, as most plugins do) still behaves
-          // correctly without re-attaching anything.
-          dom.setAttribute('tabindex', '0')
-          dom.addEventListener('click', (e) => {
-            if (entry.disabled) { e.stopPropagation(); return }
-            this.invoke(entry, e)
-          })
-          dom.addEventListener('mouseenter', () => {
-            if (entry.submenu) this.openSubmenu(entry, dom)
-            else this.closeSubmenu()
-          })
-        }
-
-        const entry = {
-          kind,
-          title: '', icon: '', section: '', checked: false, disabled: false, warning: false,
-          submenu: null as MenuInstance | null,
-          callback: (_evt: MouseEvent | KeyboardEvent) => {},
-          pluginId: null as string | null,
-          dom, iconEl, titleEl,
-          setTitle(t: string | DocumentFragment) {
-            // Obsidian accepts a DocumentFragment for rich titles; flatten it,
-            // since our renderer sets textContent.
-            this.title = typeof t === 'string' ? t : (t.textContent ?? '')
-            if (this.titleEl) this.titleEl.textContent = this.title
-            return this
-          },
-          setIcon(i: string | null) {
-            this.icon = i ?? ''
-            if (this.iconEl) {
-              this.iconEl.innerHTML = ''
-              if (this.icon) {
-                // Custom icons registered via addIcon() first, same as
-                // window.obsidian.setIcon — otherwise a plugin's own SVG used
-                // as a menu-item icon falls through to the Lucide-only
-                // resolver and warns as an unrecognized Obsidian id. Sized
-                // explicitly — see sizeCustomIconSvg's doc comment for why an
-                // unsized custom SVG renders invisible/oversized rather than
-                // just missing.
-                const customSvg = getCustomIconSvg(this.icon)
-                if (customSvg) this.iconEl.innerHTML = sizeCustomIconSvg(customSvg, 16)
-                else renderLucideIconInto(this.iconEl, this.icon)
-              }
-            }
-            return this
-          },
-          setSection(s: string) { this.section = s; return this },
-          setChecked(c: boolean | null) {
-            this.checked = c === true
-            this.dom.classList.toggle('is-checked', this.checked)
-            return this
-          },
-          setDisabled(d: boolean) {
-            this.disabled = d !== false
-            this.dom.classList.toggle('is-disabled', this.disabled)
-            // A disabled item that still fires its callback is worse than one
-            // that does nothing — the click listener checks `disabled` live,
-            // this attribute is presentational/a11y only.
-            if (this.disabled) this.dom.setAttribute('aria-disabled', 'true')
-            else this.dom.removeAttribute('aria-disabled')
-            return this
-          },
-          setIsLabel(isLabel: boolean) { return this.setDisabled(isLabel !== false) },
-          /** Red/destructive styling for the item, mirroring ButtonComponent.setWarning(). */
-          setWarning(w: boolean) {
-            this.warning = w !== false
-            this.dom.classList.toggle('is-warning', this.warning)
-            return this
-          },
-          onClick(fn: (evt: MouseEvent | KeyboardEvent) => void) { this.callback = fn; return this },
-          setSubmenu(cb?: unknown) {
-            // Obsidian API: setSubmenu() returns a new Menu (no-arg overload)
-            // OR setSubmenu(cb) calls cb with a new Menu (callback overload)
-            const submenu = new Menu()
-            this.submenu = submenu as unknown as MenuInstance
-            this.dom.classList.add('mod-submenu')
-            if (this.dom.querySelector('.mod-submenu-arrow') === null) {
-              const arrow = document.createElement('div')
-              arrow.className = 'menu-item-icon mod-submenu-arrow'
-              renderLucideIconInto(arrow, 'chevron-right')
-              this.dom.appendChild(arrow)
-            }
-            if (typeof cb === 'function') {
-              ;(cb as (m: unknown) => void)(submenu)
-              return this
-            }
-            // No-arg: return the submenu directly (Kanban uses this pattern)
-            return submenu
-          },
-        }
-        return entry as unknown as MenuEntry & Record<string, unknown>
-      }
-
-      showAtMouseEvent(evt: MouseEvent): this {
-        this.show(evt.clientX, evt.clientY)
-        return this
-      }
-
-      showAtPosition(pos: { x: number; y: number }): this {
-        this.show(pos.x, pos.y)
-        return this
-      }
-
-      /**
-       * Build and mount the menu.
-       *
-       * Everything visual is left to the `.menu`/`.menu-item` classes in
-       * obsidian-compat.css so plugin and theme CSS can restyle menus the way it
-       * does in Obsidian; only the caller-supplied position is set inline.
-       */
-      private show(x: number, y: number): void {
-        this.close()
-        const overlay = document.createElement('div')
-        overlay.className = 'menu-overlay'
-
-        // Reuse the eagerly-created `dom` (see the field doc comment) rather
-        // than building a fresh element, so any classes/content a plugin
-        // already added to `menu.dom` before calling show() survive into the
-        // rendered menu.
-        const menu = this.dom
-        menu.replaceChildren()
-        // Grouping by section is what keeps plugin-contributed entries together
-        // in the order the plugin declared the sections, as Obsidian does.
-        // Each entry's DOM was already built (and possibly added to, by a
-        // plugin reaching into `item.dom`) back in _createEntry() — appendChild
-        // here just moves it into the visible tree, it doesn't build it.
-        for (const entry of this.sortedBySection()) {
-          menu.appendChild(entry.dom)
-        }
-
-        overlay.appendChild(menu)
-        overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) this.close() })
-        document.body.appendChild(overlay)
-        this.containerEl = overlay
-
-        this.positionAt(menu, x, y)
-        this.attachKeyboardNavigation(menu)
-        menu.focus()
-      }
-
-      /**
-       * Entries grouped by `section`: sections declared via addSections() come
-       * first in that order, then any section only ever seen on an item (no
-       * addSections() call) in first-seen order.
-       */
-      private sortedBySection(): MenuEntry[] {
-        const sections: string[] = [...this.sectionOrder]
-        for (const entry of this.items) {
-          if (!sections.includes(entry.section)) sections.push(entry.section)
-        }
-        if (sections.length <= 1) return this.items
-        const result: MenuEntry[] = []
-        for (const section of sections) {
-          const entries = this.items.filter((e) => e.section === section)
-          // A section pre-declared via addSections() but never actually used
-          // by an item renders nothing — not even a stray leading separator.
-          if (entries.length === 0) continue
-          // A divider between sections, unless the plugin already placed one.
-          if (result.length > 0 && entries[0]?.kind !== 'separator') {
-            result.push(this._createEntry('separator'))
-          }
-          result.push(...entries)
-        }
-        return result
-      }
-
-      private invoke(entry: MenuEntry, evt: MouseEvent | KeyboardEvent): void {
-        // Close first: a callback that opens a modal must not leave the menu
-        // floating above it.
-        this.close()
-        try {
-          // Replay the plugin context captured at addItem()-time (see MenuEntry.pluginId)
-          // so DOM the callback builds synchronously — e.g. a picker Modal — is tagged
-          // for CssInjector's [data-plugin-id] scoping.
-          withPluginContext(entry.pluginId, () => entry.callback(evt))
-        } catch (err) {
-          console.error('[PluginCompat] Menu item callback threw', entry.title, err)
-        }
-      }
-
-      private openSubmenu(entry: MenuEntry, anchor: HTMLElement): void {
-        this.closeSubmenu()
-        const submenu = entry.submenu as unknown as Menu | null
-        if (!submenu || !this.containerEl) return
-        const rect = anchor.getBoundingClientRect()
-        submenu.show(rect.right, rect.top)
-        this.submenuEl = submenu.containerEl
-      }
-
-      private closeSubmenu(): void {
-        this.submenuEl?.remove()
-        this.submenuEl = null
-      }
-
-      /**
-       * Clamp the menu inside the viewport.
-       *
-       * Menus are opened at the pointer, so one raised near the right or bottom
-       * edge would otherwise extend past it and have its last items unreachable.
-       */
-      private positionAt(menu: HTMLElement, x: number, y: number): void {
-        menu.style.left = `${x}px`
-        menu.style.top = `${y}px`
-        const rect = menu.getBoundingClientRect()
-        const margin = 4
-        if (rect.right > window.innerWidth) {
-          menu.style.left = `${Math.max(margin, window.innerWidth - rect.width - margin)}px`
-        }
-        if (rect.bottom > window.innerHeight) {
-          menu.style.top = `${Math.max(margin, window.innerHeight - rect.height - margin)}px`
-        }
-      }
-
-      /** Arrow-key/Enter/Escape handling, as Obsidian's menus support. */
-      private attachKeyboardNavigation(menu: HTMLElement): void {
-        menu.setAttribute('tabindex', '-1')
-        menu.addEventListener('keydown', (evt: KeyboardEvent) => {
-          const selectable = [...menu.querySelectorAll<HTMLElement>('.menu-item:not(.is-disabled)')]
-          if (selectable.length === 0) return
-          const current = selectable.findIndex((el) => el === document.activeElement)
-          if (evt.key === 'Escape') {
-            evt.preventDefault()
-            this.close()
-          } else if (evt.key === 'ArrowDown') {
-            evt.preventDefault()
-            selectable[(current + 1) % selectable.length]?.focus()
-          } else if (evt.key === 'ArrowUp') {
-            evt.preventDefault()
-            selectable[(current - 1 + selectable.length) % selectable.length]?.focus()
-          } else if (evt.key === 'Enter' || evt.key === ' ') {
-            if (current >= 0) {
-              evt.preventDefault()
-              selectable[current]?.click()
-            }
-          }
-        })
-      }
-
-      close(): void {
-        this.closeSubmenu()
-        if (!this.containerEl) return
-        this.containerEl.remove()
-        this.containerEl = null
-        for (const cb of this.onHideCallbacks) {
-          try {
-            cb()
-          } catch (err) {
-            console.error('[PluginCompat] Menu onHide callback threw', err)
-          }
-        }
-      }
-
-      hide(): this { this.close(); return this }
-    } as unknown as Record<string, unknown>
+    window.obsidian.Menu = Menu as unknown as Record<string, unknown>
+    window.obsidian.MenuItem = MenuItem as unknown as Record<string, unknown>
+    window.obsidian.MenuSeparator = MenuSeparator as unknown as Record<string, unknown>
   }
   if (!window.obsidian.requestUrl) {
     window.obsidian.requestUrl = async (urlOrRequest: unknown) => {
@@ -3284,7 +2970,7 @@ export function installObsidianGlobals(): void {
       }
 
       renderSuggestion(fuzzyMatch: FuzzyMatchResult<T>, el: HTMLElement): void {
-        el.textContent = this.getItemText(fuzzyMatch.item)
+        renderMatches(el, this.getItemText(fuzzyMatch.item), fuzzyMatch.match.matches)
       }
 
       onChooseSuggestion(fuzzyMatch: FuzzyMatchResult<T>, evt: MouseEvent | KeyboardEvent): void {

@@ -239,6 +239,40 @@ The highlight feature is especially useful for:
 
 ---
 
+## Inline HTML
+
+Beyond Markdown syntax, a small, safe subset of raw HTML tags also renders as real formatting — useful for things Markdown alone can't do, like a specific text color or font size:
+
+```markdown
+<font color="#e63946">colored text</font>
+<mark style="background: #ffd166;">custom-colored highlight</mark>
+<span style="font-size: 1.3em; font-weight: 600;">styled span</span>
+Press <kbd>Ctrl</kbd>+<kbd>P</kbd> to open the Command Palette.
+H<sub>2</sub>O and E=mc<sup>2</sup>
+<abbr title="Hypertext Markup Language">HTML</abbr>
+```
+
+### Live Example
+
+<font color="#e63946">This text is red via `<font color>`.</font>
+
+<mark style="background: #ffd166;">This mark uses a custom background color, unlike the double-equals highlight syntax above which always uses the theme color.</mark>
+
+<span style="font-size: 1.3em; font-weight: 600;">This span is styled larger and bolder.</span>
+
+Press <kbd>Ctrl</kbd>+<kbd>P</kbd> to open the Command Palette. H<sub>2</sub>O and E=mc<sup>2</sup> render as real sub/superscript. Slatebase is an <abbr title="Hypertext Markup Language">HTML</abbr>-rendering web app — hover the abbreviation above to see its title tooltip.
+
+Block-level centering also works, wrapping content in `<center>...</center>`:
+
+<center>
+This paragraph is centered using the HTML center block.
+</center>
+
+> [!info] Why only a subset?
+> Only a fixed allowlist of tags renders (`font`, `mark`, `span`, `b`/`strong`, `i`/`em`, `u`, `s`/`strike`, `sub`, `sup`, `small`, `kbd`, `abbr`, `code`, plus the block-level `center`) — and only their safe attributes (`color`, `face`, `size`, `style`, `title`). Anything else, including `<script>`, `<iframe>`, and `on*` event handlers, is never executed — it's shown as literal text instead of being rendered or run.
+
+---
+
 ## Callouts
 
 Callouts are special block quotes with a type marker:
@@ -297,6 +331,7 @@ More diagram types: [[Features/Mermaid Diagrams|Mermaid Guide]]
 > 3. A table with 3 columns
 > 4. A code block with any language
 > 5. A checklist with 3 items
+> 6. A `<span style="color: ...">` with a custom color
 >
 > In Live Preview mode you see the result immediately.
 

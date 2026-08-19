@@ -20,6 +20,7 @@
 import { describe, it, expect } from 'vitest'
 import { installObsidianGlobals } from './install-globals'
 import { withPluginContext } from './plugin-execution-context'
+import { WorkspaceLeaf, WorkspaceSplit, WorkspaceRibbon } from './view-registry'
 
 // Captured synchronously, in the same turn as the install call — no microtask gap.
 installObsidianGlobals()
@@ -67,6 +68,21 @@ describe('installObsidianGlobals', () => {
       ) => (text: string) => unknown
 
       expect(prepareFuzzySearch('abc')('abc')).not.toBeNull()
+    })
+  })
+
+  describe('WorkspaceLeaf/WorkspaceSplit/WorkspaceRibbon are the real classes, not disconnected stubs', () => {
+    // Regression: window.obsidian.WorkspaceLeaf used to be a standalone stub
+    // class unrelated to the real WorkspaceLeaf that flows through the app
+    // (workspace.activeLeaf, getLeaf(), etc. — see view-registry.ts), so any
+    // plugin doing `activeLeaf instanceof WorkspaceLeaf` always got `false`.
+    it('registers the real WorkspaceLeaf class from view-registry.ts', () => {
+      expect(snapshot['WorkspaceLeaf']).toBe(WorkspaceLeaf)
+    })
+
+    it('registers the real WorkspaceSplit/WorkspaceRibbon classes from view-registry.ts', () => {
+      expect(snapshot['WorkspaceSplit']).toBe(WorkspaceSplit)
+      expect(snapshot['WorkspaceRibbon']).toBe(WorkspaceRibbon)
     })
   })
 
@@ -161,6 +177,57 @@ describe('installObsidianGlobals', () => {
     })
   })
 
+  describe('Component.registerDomEvent carries plugin-execution-context into the handler', () => {
+    // Regression: registerDomEvent() added the listener directly, so it ran
+    // with no current plugin id. A handler that itself schedules a
+    // setTimeout (e.g. Excalidraw's forceSave -> resetAutosaveTimer, run from
+    // a registered blur/visibilitychange listener) therefore scheduled that
+    // timer untagged: trackPluginTimer() never recorded it, so
+    // sandbox.cleanup() couldn't cancel it on unload — it fired later against
+    // a torn-down plugin and threw `this.plugin is undefined`.
+    it('createEl() inside the DOM event handler is tagged with the plugin that registered it', () => {
+      const createEl = (window as unknown as { createEl: (tag: string) => HTMLElement }).createEl
+      const ComponentClass = (window.obsidian as unknown as { Component: new () => {
+        registerDomEvent(el: EventTarget, event: string, handler: EventListenerOrEventListenerObject): void
+      } }).Component
+      const target = document.createElement('div')
+      let el: HTMLElement | undefined
+
+      withPluginContext('excalidraw', () => {
+        const component = new ComponentClass()
+        component.registerDomEvent(target, 'click', () => {
+          el = createEl('div')
+        })
+      })
+      target.dispatchEvent(new Event('click'))
+
+      expect(el?.getAttribute('data-plugin-id')).toBe('excalidraw')
+    })
+
+    it('a setTimeout scheduled from inside the handler is still tagged, so it survives an async hop', async () => {
+      const createEl = (window as unknown as { createEl: (tag: string) => HTMLElement }).createEl
+      const ComponentClass = (window.obsidian as unknown as { Component: new () => {
+        registerDomEvent(el: EventTarget, event: string, handler: EventListenerOrEventListenerObject): void
+      } }).Component
+      const target = document.createElement('div')
+      let el: HTMLElement | undefined
+
+      withPluginContext('excalidraw', () => {
+        const component = new ComponentClass()
+        component.registerDomEvent(target, 'click', () => {
+          window.setTimeout(() => {
+            el = createEl('div')
+          }, 0)
+        })
+      })
+      target.dispatchEvent(new Event('click'))
+
+      await new Promise((resolve) => window.setTimeout(resolve, 10))
+
+      expect(el?.getAttribute('data-plugin-id')).toBe('excalidraw')
+    })
+  })
+
   describe('window.app.plugins', () => {
     it('keys manifests by plugin id to the manifest, not to the instance', () => {
       // `app.plugins.manifests[id].version` is how plugins read each other's
@@ -226,6 +293,33 @@ describe('installObsidianGlobals', () => {
 
       expect(before['parseYaml']).toBe(parseYaml)
       expect(before['Plugin']).toBe(Plugin)
+    })
+  })
+
+  describe('UIEvent.win/doc', () => {
+    // Regression: Kanban's list-focus handler reads `evt.win.setTimeout(...)`
+    // on the FocusEvent it receives when a new list is created. Obsidian
+    // patches `win`/`doc` onto UIEvent (not just Element), so without this
+    // patch `evt.win` is undefined and the handler throws "can't access
+    // property 'setTimeout', <evt>.win is undefined".
+    it('evt.win resolves to the event target\'s owner window', () => {
+      const el = document.createElement('div')
+      document.body.appendChild(el)
+      let seenWin: unknown
+      el.addEventListener('focus', (evt) => { seenWin = (evt as unknown as { win?: Window }).win })
+      el.dispatchEvent(new FocusEvent('focus'))
+      expect(seenWin).toBe(window)
+      el.remove()
+    })
+
+    it('evt.doc resolves to the event target\'s owner document', () => {
+      const el = document.createElement('div')
+      document.body.appendChild(el)
+      let seenDoc: unknown
+      el.addEventListener('click', (evt) => { seenDoc = (evt as unknown as { doc?: Document }).doc })
+      el.dispatchEvent(new MouseEvent('click'))
+      expect(seenDoc).toBe(document)
+      el.remove()
     })
   })
 

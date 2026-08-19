@@ -272,4 +272,18 @@ describe('Menu', () => {
     menu.showAtPosition({ x: 20, y: 20 })
     expect(document.querySelectorAll('.menu')).toHaveLength(1)
   })
+
+  // Regression: addItem()/addSeparator() used to build plain object literals,
+  // not instances of any class — `item instanceof MenuItem` (a common
+  // Obsidian pattern for narrowing menu entries) was always false, even for
+  // items created by this very Menu shim.
+  it('produces real MenuItem/MenuSeparator instances', () => {
+    const ItemCtor = window.obsidian?.['MenuItem'] as unknown as { new (...args: never[]): unknown }
+    const SepCtor = window.obsidian?.['MenuSeparator'] as unknown as { new (...args: never[]): unknown }
+    const menu = new MenuCtor() as unknown as { items: unknown[] } & MenuLike
+    menu.addItem((i) => { expect(i).toBeInstanceOf(ItemCtor); i.setTitle('X') })
+    menu.addSeparator()
+    expect(menu.items[0]).toBeInstanceOf(ItemCtor)
+    expect(menu.items[1]).toBeInstanceOf(SepCtor)
+  })
 })

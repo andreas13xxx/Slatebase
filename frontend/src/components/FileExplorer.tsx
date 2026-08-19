@@ -21,7 +21,7 @@ import { getState as getWorkspaceState, updateExpandedState } from '../state/wor
 import { TreeNode } from './file-explorer'
 import type { DragState, ExternalDropState, ContextMenuState, InlineInputState } from './file-explorer'
 import { getActiveWorkspaceShim } from '../plugins/compat/active-workspace-shim'
-import { buildTFileFromPath } from '../plugins/compat/plugin-event-bridge'
+import { buildTFileFromPath, buildTFolderFromPath } from '../plugins/compat/plugin-event-bridge'
 import type { TFile, TFolder } from '../plugins/compat/types'
 import { withPluginContext } from '../plugins/compat/plugin-execution-context'
 
@@ -262,7 +262,12 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
     const pending = pendingRevealRef.current
     if (!pending) return
     const nodeClass = pending.kind === 'folder' ? 'tree-node--directory' : 'tree-node--file'
-    const el = document.querySelector(`[data-path="${CSS.escape(pending.path)}"].${nodeClass}`)
+    // data-node-path (not data-path): the <li> carries Slatebase's own internal
+    // tracking attribute, distinct from the `data-path` now on the row's title
+    // <button> (see TreeNode.tsx) — that one has to stay a unique, single-element
+    // match per row for plugins like Iconize that scrape it via a bare
+    // `document.querySelector('[data-path="..."]')`.
+    const el = document.querySelector(`[data-node-path="${CSS.escape(pending.path)}"].${nodeClass}`)
     if (el) {
       el.scrollIntoView({ block: 'center', behavior: 'smooth' })
       pendingRevealRef.current = null
@@ -469,13 +474,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
 
     const file: TFile | TFolder = node.type === 'file'
       ? buildTFileFromPath(node.path)
-      : {
-          path: node.path,
-          name: node.name,
-          children: [],
-          parent: null,
-          isRoot: () => node.path === '',
-        }
+      : buildTFolderFromPath(node.path, node.name)
 
     const menu = new MenuCtor()
     try {
