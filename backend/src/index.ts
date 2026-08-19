@@ -48,7 +48,7 @@ import { createMcpTokenRoutes } from './api/mcpTokenRoutes.js'
 import { createMcpWellKnownHandler } from './api/mcpWellKnownRoute.js'
 import { LinkIndexService, LinkMigrationService } from './link-index/index.js'
 import { createGraphRoutes } from './api/graphRoutes.js'
-import { InstalledPluginStore, PluginInstaller, PluginService } from './plugin/index.js'
+import { InstalledPluginStore, PluginInstaller, PluginService, PluginSecretKeyManager, PluginSecretStore } from './plugin/index.js'
 import { createPluginRoutes } from './api/pluginRoutes.js'
 import { SnippetStore } from './snippets/index.js'
 import { createSnippetRoutes } from './api/snippetRoutes.js'
@@ -139,6 +139,19 @@ if (!process.env['SLATEBASE_SYNC_SECRET']) {
     'SLATEBASE_SYNC_SECRET is not set — sync credential encryption uses an auto-generated key. ' +
     'Encrypted sync credentials will not survive server restarts without this variable. ' +
     'Set this environment variable in production if you use CouchDB vault synchronization.',
+  )
+}
+
+// --- Plugin Secret Key Manager ---
+const pluginSecretKeyManager = new PluginSecretKeyManager(serverConfig.dataDir, logger)
+await pluginSecretKeyManager.loadOrCreate()
+const pluginSecretStore = new PluginSecretStore(serverConfig.dataDir, pluginSecretKeyManager)
+
+if (!process.env['SLATEBASE_PLUGIN_SECRET_KEY']) {
+  logger.warn(
+    'SLATEBASE_PLUGIN_SECRET_KEY is not set — plugin secrets are encrypted with an auto-generated key. ' +
+    'Secrets will be unreadable if the key is lost (container rebuild, volume reset). ' +
+    'Set this environment variable in production for stable plugin secret persistence.',
   )
 }
 
@@ -546,6 +559,7 @@ const pluginRoutes = createPluginRoutes({
   accessControl: vaultAccessControl,
   vaultRegistry,
   logger,
+  secretStore: pluginSecretStore,
 })
 app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)
 

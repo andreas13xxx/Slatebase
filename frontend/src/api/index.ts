@@ -397,6 +397,17 @@ export interface IApiClient {
   loadSettings(vaultId: string, pluginId: string): Promise<unknown | null>
   /** Save a plugin's settings. */
   saveSettings(vaultId: string, pluginId: string, data: unknown): Promise<void>
+
+  // --- Plugin Secrets ---
+  /** List secret IDs for a plugin (NOT the values). */
+  listPluginSecrets(vaultId: string, pluginId: string): Promise<string[]>
+  /** Get a decrypted plugin secret value. */
+  getPluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<string | null>
+  /** Set/update a plugin secret. */
+  setPluginSecret(vaultId: string, pluginId: string, secretId: string, value: string): Promise<void>
+  /** Delete a plugin secret. */
+  deletePluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<void>
+
   /** Load the plugin registry for a vault. */
   loadRegistry(vaultId: string): Promise<PluginRegistryData>
   /** Save the plugin registry for a vault. */
@@ -908,6 +919,42 @@ export class ApiClient implements IApiClient {
   /** Save a plugin's settings. */
   async saveSettings(vaultId: string, pluginId: string, data: unknown): Promise<void> {
     await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/plugins/${pluginId}/settings`, data)
+  }
+
+  // --- Plugin Secrets ---
+
+  async listPluginSecrets(vaultId: string, pluginId: string): Promise<string[]> {
+    const result = await this.request<{ ids: string[] }>('GET', `/api/v1/vaults/${vaultId}/plugins/${pluginId}/secrets`)
+    return result.ids
+  }
+
+  async getPluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<string | null> {
+    const headers = this.buildHeaders('GET', false)
+    const response = await fetch(`/api/v1/vaults/${vaultId}/plugins/${pluginId}/secrets/${encodeURIComponent(secretId)}`, { method: 'GET', headers })
+
+    if (response.status === 401) {
+      await this.handleAuthFailure()
+      await handleErrorResponse(response)
+    }
+
+    if (response.status === 404) {
+      return null
+    }
+
+    if (!response.ok) {
+      await handleErrorResponse(response)
+    }
+
+    const result = await response.json() as { value: string }
+    return result.value
+  }
+
+  async setPluginSecret(vaultId: string, pluginId: string, secretId: string, value: string): Promise<void> {
+    await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/plugins/${pluginId}/secrets/${encodeURIComponent(secretId)}`, { value })
+  }
+
+  async deletePluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<void> {
+    await this.request<void>('DELETE', `/api/v1/vaults/${vaultId}/plugins/${pluginId}/secrets/${encodeURIComponent(secretId)}`)
   }
 
   /** Load the plugin registry for a vault. */

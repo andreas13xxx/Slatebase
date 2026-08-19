@@ -63,7 +63,7 @@ The `renameContent` method constructs the target path via `path.join(sourceDir, 
 
 | Finding | Severity | File(s) | Status |
 |---------|----------|---------|--------|
-| No findings in current codebase | — | — | — |
+| Plugin SecretStorage stored secrets in localStorage (clear text) | High (CodeQL) | `frontend/src/plugins/compat/obsidian-api-extensions.ts` | **Fixed** |
 
 ### Assessment
 
@@ -72,6 +72,7 @@ The `renameContent` method constructs the target path via `path.join(sourceDir, 
 - **CSRF tokens:** HMAC-SHA256 derived from session ID + server secret, compared with `timingSafeEqual` — no timing side-channel.
 - **MCP API tokens:** SHA-256 hash stored (never raw token) — standard approach for bearer-token storage.
 - **CSRF secret management:** Auto-generated on first start via `crypto.randomBytes(32)` and persisted to `data/.csrf-secret`. A startup warning is now emitted if `SLATEBASE_CSRF_SECRET` is not set in production (Task 19), since the auto-generated secret doesn't survive container restarts without persistent storage.
+- **Plugin secrets:** Stored server-side, encrypted at rest with AES-256-GCM (key derived via HKDF from `SLATEBASE_PLUGIN_SECRET_KEY` env var or auto-generated `data/.plugin-secret-key`). Frontend uses a write-through cache; localStorage fallback only activates if the backend is unreachable. Legacy localStorage entries are migrated to the backend on first access. CodeQL alert #10 dismissed as mitigated.
 
 **Baseline reference:** Biased random in temporary passwords (`Math.random()` → `crypto.randomBytes()`) was fixed in commit `d176e49`.
 

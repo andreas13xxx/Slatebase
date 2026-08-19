@@ -164,40 +164,174 @@ export class Events {
  * plugin's regular `data.json`. Exposed as `app.secretStorage`, and paired
  * with `SecretComponent` (setting-tab.ts) for the settings-UI side.
  *
- * Real Obsidian encrypts this at rest via the OS keychain; Slatebase has no
- * such facility in a browser, so this persists to `localStorage` under a
- * vault-scoped prefix — the same simplification already applied to
- * `App.loadLocalStorage`/`saveLocalStorage` (app-shim.ts). Not more secret
- * than any other browser-local data.
+ * Real Obsidian encrypts this at rest via the OS keychain; Slatebase stores
+ * secrets server-side, encrypted at rest with AES-256-GCM. The frontend uses a
+ * write-through cache pattern: reads are synchronous (from cache), writes
+ * update the cache immediately and fire an async PUT to the backend.
  */
 export class SecretStorage extends Events {
-  private prefix: string;
+  private readonly cache: Map<string, string> = new Map()
+  private initPromise: Promise<void> | null = null
+  private readonly apiClient: { listPluginSecrets(vaultId: string, pluginId: string): Promise<string[]>; getPluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<string | null>; setPluginSecret(vaultId: string, pluginId: string, secretId: string, value: string): Promise<void>; deletePluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<void> }
+  private readonly vaultId: string
+  private readonly pluginId: string
+  private readonly legacyPrefix: string
 
-  constructor(storagePrefix: string) {
-    super();
-    this.prefix = storagePrefix;
+  constructor(options: {
+    apiClient: { listPluginSecrets(vaultId: string, pluginId: string): Promise<string[]>; getPluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<string | null>; setPluginSecret(vaultId: string, pluginId: string, secretId: string, value: string): Promise<void>; deletePluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<void> }
+    vaultId: string
+    pluginId: string
+    legacyPrefix: string
+  }) {
+    super()
+    this.apiClient = options.apiClient
+    this.vaultId = options.vaultId
+    this.pluginId = options.pluginId
+    this.legacyPrefix = options.legacyPrefix
   }
 
-  private key(id: string): string {
-    return `${this.prefix}${id}`;
+  /** Eagerly loads all secrets from the backend into the cache. */
+  initialize(): Promise<void> {
+    if (this.initPromise) return this.initPromise
+    this.initPromise = this.doInitialize()
+    return this.initPromise
+  }
+
+  private async doInitialize(): Promise<void> {
+    try {
+      const ids = await this.apiClient.listPluginSecrets(this.vaultId, this.pluginId)
+      for (const id of ids) {
+        const value = await this.apiClient.getPluginSecret(this.vaultId, this.pluginId, id)
+        if (value !== null) {
+          this.cache.set(id, value)
+        }
+      }
+      if (ids.length === 0) {
+        await this.migrateLegacySecrets()
+      }
+    } catch {
+      this.loadFromLocalStorageFallback()
+    }
+  }
+
+  private cryptoKeyPromise: Promise<CryptoKey> | null = null
+
+  private async getCryptoKey(): Promise<CryptoKey> {
+    if (this.cryptoKeyPromise) return this.cryptoKeyPromise
+    this.cryptoKeyPromise = (async () => {
+      const encoder = new TextEncoder()
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(`slatebase-secret-storage:${this.vaultId}:${this.pluginId}`),
+        'PBKDF2',
+        false,
+        ['deriveKey'],
+      )
+      return crypto.subtle.deriveKey(
+        {
+          name: 'PBKDF2',
+          salt: encoder.encode(`slatebase-secret-storage-salt:${this.vaultId}:${this.pluginId}`),
+          iterations: 100000,
+          hash: 'SHA-256',
+        },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt'],
+      )
+    })()
+    return this.cryptoKeyPromise
+  }
+
+  private bytesToBase64(bytes: Uint8Array): string {
+    let binary = ''
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+    return btoa(binary)
+  }
+
+  private base64ToBytes(base64: string): Uint8Array {
+    const binary = atob(base64)
+    const out = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i)
+    return out
+  }
+
+  private async encryptForLocalStorage(plain: string): Promise<string> {
+    const key = await this.getCryptoKey()
+    const iv = crypto.getRandomValues(new Uint8Array(12))
+    const data = new TextEncoder().encode(plain)
+    const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv as BufferSource }, key, data as BufferSource)
+    return `enc:v1:${this.bytesToBase64(iv)}:${this.bytesToBase64(new Uint8Array(cipher))}`
+  }
+
+  private async decryptFromLocalStorage(encoded: string): Promise<string | null> {
+    if (!encoded.startsWith('enc:v1:')) return null
+    const parts = encoded.split(':')
+    if (parts.length !== 4) return null
+    const iv = this.base64ToBytes(parts[2])
+    const cipher = this.base64ToBytes(parts[3])
+    const key = await this.getCryptoKey()
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv as BufferSource }, key, cipher as BufferSource)
+    return new TextDecoder().decode(plain)
+  }
+
+  private async migrateLegacySecrets(): Promise<void> {
+    const keysToMigrate: Array<{ id: string; value: string; storageKey: string }> = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const storageKey = localStorage.key(i)
+      if (storageKey?.startsWith(this.legacyPrefix)) {
+        const id = storageKey.slice(this.legacyPrefix.length)
+        const value = localStorage.getItem(storageKey)
+        if (value !== null) {
+          keysToMigrate.push({ id, value, storageKey })
+        }
+      }
+    }
+    for (const entry of keysToMigrate) {
+      try {
+        const maybeDecrypted = await this.decryptFromLocalStorage(entry.value).catch(() => null)
+        const valueToPersist = maybeDecrypted ?? entry.value
+        await this.apiClient.setPluginSecret(this.vaultId, this.pluginId, entry.id, valueToPersist)
+        this.cache.set(entry.id, valueToPersist)
+        localStorage.removeItem(entry.storageKey)
+      } catch { /* keep in localStorage on failure */ }
+    }
+  }
+
+  private loadFromLocalStorageFallback(): void {
+    for (let i = 0; i < localStorage.length; i++) {
+      const storageKey = localStorage.key(i)
+      if (storageKey?.startsWith(this.legacyPrefix)) {
+        const id = storageKey.slice(this.legacyPrefix.length)
+        const value = localStorage.getItem(storageKey)
+        if (value !== null) {
+          this.decryptFromLocalStorage(value)
+            .then((decrypted) => this.cache.set(id, decrypted ?? value))
+            .catch(() => this.cache.set(id, value))
+        }
+      }
+    }
   }
 
   setSecret(id: string, secret: string): void {
-    localStorage.setItem(this.key(id), secret);
-    this.trigger('change', id);
+    this.cache.set(id, secret)
+    this.trigger('change', id)
+    this.apiClient.setPluginSecret(this.vaultId, this.pluginId, id, secret).catch(async () => {
+      try {
+        const encrypted = await this.encryptForLocalStorage(secret)
+        localStorage.setItem(`${this.legacyPrefix}${id}`, encrypted)
+      } catch {
+        // Last-resort failure path: keep behavior non-throwing and avoid cleartext persistence.
+      }
+    })
   }
 
   getSecret(id: string): string | null {
-    return localStorage.getItem(this.key(id));
+    return this.cache.get(id) ?? null
   }
 
   listSecrets(): string[] {
-    const ids: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const storageKey = localStorage.key(i);
-      if (storageKey?.startsWith(this.prefix)) ids.push(storageKey.slice(this.prefix.length));
-    }
-    return ids;
+    return Array.from(this.cache.keys())
   }
 }
 
@@ -1200,7 +1334,7 @@ export function base64ToArrayBuffer(base64: string): ArrayBuffer {
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
   }
-  return bytes.buffer;
+  return bytes.buffer as ArrayBuffer;
 }
 
 /**
@@ -1211,7 +1345,7 @@ export function hexToArrayBuffer(hex: string): ArrayBuffer {
   for (let i = 0; i < hex.length; i += 2) {
     bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
   }
-  return bytes.buffer;
+  return bytes.buffer as ArrayBuffer;
 }
 
 /**
