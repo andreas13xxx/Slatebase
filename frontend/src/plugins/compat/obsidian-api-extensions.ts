@@ -260,7 +260,7 @@ export class SecretStorage extends Events {
     const key = await this.getCryptoKey()
     const iv = crypto.getRandomValues(new Uint8Array(12))
     const data = new TextEncoder().encode(plain)
-    const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data)
+    const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv as BufferSource }, key, data as BufferSource)
     return `enc:v1:${this.bytesToBase64(iv)}:${this.bytesToBase64(new Uint8Array(cipher))}`
   }
 
@@ -271,7 +271,7 @@ export class SecretStorage extends Events {
     const iv = this.base64ToBytes(parts[2])
     const cipher = this.base64ToBytes(parts[3])
     const key = await this.getCryptoKey()
-    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipher)
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv as BufferSource }, key, cipher as BufferSource)
     return new TextDecoder().decode(plain)
   }
 
