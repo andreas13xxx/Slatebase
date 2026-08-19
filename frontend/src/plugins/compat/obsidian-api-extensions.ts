@@ -1334,7 +1334,7 @@ export function base64ToArrayBuffer(base64: string): ArrayBuffer {
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
   }
-  return bytes.buffer;
+  return bytes.buffer as ArrayBuffer;
 }
 
 /**
@@ -1345,7 +1345,7 @@ export function hexToArrayBuffer(hex: string): ArrayBuffer {
   for (let i = 0; i < hex.length; i += 2) {
     bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
   }
-  return bytes.buffer;
+  return bytes.buffer as ArrayBuffer;
 }
 
 /**
