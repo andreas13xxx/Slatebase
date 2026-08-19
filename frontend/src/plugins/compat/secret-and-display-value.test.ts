@@ -65,16 +65,35 @@ describe('Setting.addComponent()/addDisplayValue() (Obsidian 1.11.0+/1.13.1+)', 
 })
 
 describe('SecretStorage (Obsidian 1.11.4+)', () => {
-  it('setSecret()/getSecret() round-trip via localStorage', () => {
-    const storage = new SecretStorage('test-secret-prefix:')
+  function createMockApiClient() {
+    const secrets = new Map<string, string>()
+    return {
+      listPluginSecrets: async () => Array.from(secrets.keys()),
+      getPluginSecret: async (_v: string, _p: string, id: string) => secrets.get(id) ?? null,
+      setPluginSecret: async (_v: string, _p: string, id: string, value: string) => { secrets.set(id, value) },
+      deletePluginSecret: async (_v: string, _p: string, id: string) => { secrets.delete(id) },
+    }
+  }
+
+  function createStorage(prefix = 'test-secret-prefix:') {
+    return new SecretStorage({
+      apiClient: createMockApiClient(),
+      vaultId: 'test-vault',
+      pluginId: 'test-plugin',
+      legacyPrefix: prefix,
+    })
+  }
+
+  it('setSecret()/getSecret() round-trip via cache', () => {
+    const storage = createStorage()
     storage.setSecret('api-key', 'sk-xyz')
     expect(storage.getSecret('api-key')).toBe('sk-xyz')
     expect(storage.getSecret('missing')).toBeNull()
   })
 
-  it('listSecrets() returns only ids under this instance\'s prefix', () => {
-    const storage = new SecretStorage('test-secret-list:')
-    const other = new SecretStorage('test-secret-other:')
+  it('listSecrets() returns only ids for this instance', () => {
+    const storage = createStorage('test-secret-list:')
+    const other = createStorage('test-secret-other:')
     storage.setSecret('a', '1')
     storage.setSecret('b', '2')
     other.setSecret('c', '3')
@@ -82,10 +101,24 @@ describe('SecretStorage (Obsidian 1.11.4+)', () => {
   })
 
   it('setSecret() triggers a change event', () => {
-    const storage = new SecretStorage('test-secret-change:')
+    const storage = createStorage('test-secret-change:')
     const changed: string[] = []
     storage.on('change', (id) => changed.push(id as string))
     storage.setSecret('k', 'v')
     expect(changed).toEqual(['k'])
+  })
+
+  it('initialize() loads secrets from the API into cache', async () => {
+    const apiClient = createMockApiClient()
+    await apiClient.setPluginSecret('test-vault', 'test-plugin', 'existing', 'val1')
+
+    const storage = new SecretStorage({
+      apiClient,
+      vaultId: 'test-vault',
+      pluginId: 'test-plugin',
+      legacyPrefix: 'test-init:',
+    })
+    await storage.initialize()
+    expect(storage.getSecret('existing')).toBe('val1')
   })
 })

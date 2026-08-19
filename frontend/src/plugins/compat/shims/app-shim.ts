@@ -228,6 +228,8 @@ export class AppShim implements IAppShim {
     metadataCache: IMetadataCacheShim;
     pluginId: string;
     commandRegistry?: ICommandRegistry;
+    apiClient?: { listPluginSecrets(vaultId: string, pluginId: string): Promise<string[]>; getPluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<string | null>; setPluginSecret(vaultId: string, pluginId: string, secretId: string, value: string): Promise<void>; deletePluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<void> };
+    vaultId?: string;
     pluginManager?: {
       /** Re-fetch manifest data for installed plugins from the backend. */
       loadManifests(): Promise<void>;
@@ -240,7 +242,23 @@ export class AppShim implements IAppShim {
     };
   }) {
     this.vault = options.vault;
-    this.secretStorage = new SecretStorage(`slatebase-vault-${options.vault.getName()}-secret:`);
+    const legacyPrefix = `slatebase-vault-${options.vault.getName()}-secret:`;
+    if (options.apiClient && options.vaultId) {
+      this.secretStorage = new SecretStorage({
+        apiClient: options.apiClient,
+        vaultId: options.vaultId,
+        pluginId: options.pluginId,
+        legacyPrefix,
+      });
+      this.secretStorage.initialize().catch(() => { /* degraded mode */ });
+    } else {
+      this.secretStorage = new SecretStorage({
+        apiClient: { listPluginSecrets: async () => [], getPluginSecret: async () => null, setPluginSecret: async () => {}, deletePluginSecret: async () => {} },
+        vaultId: '',
+        pluginId: options.pluginId,
+        legacyPrefix,
+      });
+    }
     // Scoped per-plugin: `on`/`onLayoutReady` bind options.pluginId into a
     // closure so any callback registered through this plugin's `app.workspace`
     // (and its deferred/event-triggered invocations) is tagged correctly for
@@ -562,6 +580,8 @@ export class AppShim implements IAppShim {
     metadataCache: IMetadataCacheShim;
     pluginId: string;
     commandRegistry?: ICommandRegistry;
+    apiClient?: { listPluginSecrets(vaultId: string, pluginId: string): Promise<string[]>; getPluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<string | null>; setPluginSecret(vaultId: string, pluginId: string, secretId: string, value: string): Promise<void>; deletePluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<void> };
+    vaultId?: string;
     pluginManager?: {
       loadManifests(): Promise<void>;
       requestSaveConfig(): Promise<void>;

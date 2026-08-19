@@ -727,6 +727,8 @@ export function PluginProvider({
           metadataCache: newMetadataCacheShim,
           pluginId,
           commandRegistry: commandRegistryRef.current,
+          apiClient,
+          vaultId: newVaultId,
           pluginManager: {
             // Re-fetch manifest.json content for every installed plugin — the
             // same refresh loadPluginsForVault() does on startup — so a plugin
