@@ -214,6 +214,67 @@ export class SecretStorage extends Events {
     }
   }
 
+  private cryptoKeyPromise: Promise<CryptoKey> | null = null
+
+  private async getCryptoKey(): Promise<CryptoKey> {
+    if (this.cryptoKeyPromise) return this.cryptoKeyPromise
+    this.cryptoKeyPromise = (async () => {
+      const encoder = new TextEncoder()
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(`slatebase-secret-storage:${this.vaultId}:${this.pluginId}`),
+        'PBKDF2',
+        false,
+        ['deriveKey'],
+      )
+      return crypto.subtle.deriveKey(
+        {
+          name: 'PBKDF2',
+          salt: encoder.encode(`slatebase-secret-storage-salt:${this.vaultId}:${this.pluginId}`),
+          iterations: 100000,
+          hash: 'SHA-256',
+        },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt'],
+      )
+    })()
+    return this.cryptoKeyPromise
+  }
+
+  private bytesToBase64(bytes: Uint8Array): string {
+    let binary = ''
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+    return btoa(binary)
+  }
+
+  private base64ToBytes(base64: string): Uint8Array {
+    const binary = atob(base64)
+    const out = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i)
+    return out
+  }
+
+  private async encryptForLocalStorage(plain: string): Promise<string> {
+    const key = await this.getCryptoKey()
+    const iv = crypto.getRandomValues(new Uint8Array(12))
+    const data = new TextEncoder().encode(plain)
+    const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data)
+    return `enc:v1:${this.bytesToBase64(iv)}:${this.bytesToBase64(new Uint8Array(cipher))}`
+  }
+
+  private async decryptFromLocalStorage(encoded: string): Promise<string | null> {
+    if (!encoded.startsWith('enc:v1:')) return null
+    const parts = encoded.split(':')
+    if (parts.length !== 4) return null
+    const iv = this.base64ToBytes(parts[2])
+    const cipher = this.base64ToBytes(parts[3])
+    const key = await this.getCryptoKey()
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipher)
+    return new TextDecoder().decode(plain)
+  }
+
   private async migrateLegacySecrets(): Promise<void> {
     const keysToMigrate: Array<{ id: string; value: string; storageKey: string }> = []
     for (let i = 0; i < localStorage.length; i++) {
@@ -228,8 +289,10 @@ export class SecretStorage extends Events {
     }
     for (const entry of keysToMigrate) {
       try {
-        await this.apiClient.setPluginSecret(this.vaultId, this.pluginId, entry.id, entry.value)
-        this.cache.set(entry.id, entry.value)
+        const maybeDecrypted = await this.decryptFromLocalStorage(entry.value).catch(() => null)
+        const valueToPersist = maybeDecrypted ?? entry.value
+        await this.apiClient.setPluginSecret(this.vaultId, this.pluginId, entry.id, valueToPersist)
+        this.cache.set(entry.id, valueToPersist)
         localStorage.removeItem(entry.storageKey)
       } catch { /* keep in localStorage on failure */ }
     }
@@ -241,7 +304,11 @@ export class SecretStorage extends Events {
       if (storageKey?.startsWith(this.legacyPrefix)) {
         const id = storageKey.slice(this.legacyPrefix.length)
         const value = localStorage.getItem(storageKey)
-        if (value !== null) this.cache.set(id, value)
+        if (value !== null) {
+          this.decryptFromLocalStorage(value)
+            .then((decrypted) => this.cache.set(id, decrypted ?? value))
+            .catch(() => this.cache.set(id, value))
+        }
       }
     }
   }
@@ -249,8 +316,13 @@ export class SecretStorage extends Events {
   setSecret(id: string, secret: string): void {
     this.cache.set(id, secret)
     this.trigger('change', id)
-    this.apiClient.setPluginSecret(this.vaultId, this.pluginId, id, secret).catch(() => {
-      localStorage.setItem(`${this.legacyPrefix}${id}`, secret)
+    this.apiClient.setPluginSecret(this.vaultId, this.pluginId, id, secret).catch(async () => {
+      try {
+        const encrypted = await this.encryptForLocalStorage(secret)
+        localStorage.setItem(`${this.legacyPrefix}${id}`, encrypted)
+      } catch {
+        // Last-resort failure path: keep behavior non-throwing and avoid cleartext persistence.
+      }
     })
   }
 
