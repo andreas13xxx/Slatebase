@@ -17,11 +17,11 @@
     "test:coverage": "vitest --run --coverage"
   },
   "dependencies": {
-    "@hono/node-server": "^2.1.0",
+    "@hono/node-server": "^2.1.1",
     "@modelcontextprotocol/sdk": "1.30.0",
     "adm-zip": "0.6.0",
     "argon2": "0.45.1",
-    "hono": "^4.13.1",
+    "hono": "^4.13.2",
     "pino": "^10.3.1",
     "zod": "^3.24.0"
   },
@@ -32,10 +32,10 @@
     "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^10.8.1",
     "fast-check": "4.9.0",
-    "globals": "^17.9.0",
+    "globals": "^17.11.0",
     "tsx": "^4.23.12",
     "typescript": "^5.7.0",
-    "typescript-eslint": "^8.66.0",
+    "typescript-eslint": "^8.67.0",
     "vitest": "^4.1.10"
   }
 }
