@@ -68,8 +68,11 @@ export function navigationHistoryReducer(
 
       // Re-visiting the same file the user is already on is a no-op (avoids
       // duplicate back-stack entries e.g. from clicking the already-active tab).
+      // Exception: if a forward stack exists, the visit counts as a new navigation
+      // that must discard it (Property 2 / Requirement 1.6).
       if (state.current && sameEntry(state.current, entry)) {
-        return state
+        if (state.forward.length === 0) return state
+        return { ...state, forward: [] }
       }
 
       const nextBack = state.current ? [...state.back, state.current] : [...state.back]

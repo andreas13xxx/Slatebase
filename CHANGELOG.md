@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.33.1](https://github.com/andreas13xxx/Slatebase/compare/v0.33.0...v0.33.1) (2026-08-21)
+
+
+### Bugfixes
+
+* make ciphertext tamper test deterministic ([cdbb351](https://github.com/andreas13xxx/Slatebase/commit/cdbb35115a0c31830e066bb70385ebaab5303a9d))
+
+
+### Sonstige Änderungen
+
+* bump the minor-patch group in /backend with 4 updates ([#115](https://github.com/andreas13xxx/Slatebase/issues/115)) ([a67c33d](https://github.com/andreas13xxx/Slatebase/commit/a67c33dfd63b6d198517602cab0cf8cd1abe44af))
+* bump the minor-patch group in /frontend with 7 updates ([#116](https://github.com/andreas13xxx/Slatebase/issues/116)) ([46cfa1b](https://github.com/andreas13xxx/Slatebase/commit/46cfa1bfa4cf68d1ff7495881725cc46db424ab0))
+
 ## [0.33.0](https://github.com/andreas13xxx/Slatebase/compare/v0.32.0...v0.33.0) (2026-08-19)
 
 
