@@ -19,7 +19,7 @@ Diese Features bilden das Fundament einer vernetzten Wissensbasis. Mit Wikilinks
 | Guide | Beschreibung |
 |-------|--------------|
 | [[Features/Wikilinks\|Wikilinks]] | Notizen miteinander verlinken — Aliase, Heading-Links, Auto-Resolve |
-| [[Features/Embeds\|Embeds]] | Bilder, PDFs und Notizen direkt einbetten |
+| [[Features/Embeds\|Embeds]] | Bilder, PDFs, Audio, Video und Notizen direkt einbetten |
 | [[Features/Knowledge Graph\|Knowledge Graph]] | Dein Wissensnetz visuell erkunden |
 
 ## Organisation & Metadaten
@@ -40,6 +40,7 @@ Markdown muss nicht langweilig aussehen. Mit Callouts hebst du Informationen her
 |-------|--------------|
 | [[Features/Callouts\|Callouts]] | Farbige Hinweisboxen für Tipps, Warnungen und mehr |
 | [[Features/Mermaid Diagramme\|Mermaid Diagramme]] | Flowcharts, Sequenz- und Gantt-Diagramme im Markdown |
+| [[Features/Mathe (LaTeX)\|Mathe (LaTeX)]] | Mathematische Formeln mit KaTeX (Inline und Block) |
 
 ---
 
@@ -52,6 +53,7 @@ Neben den hier aufgelisteten Kern-Features findest du in den folgenden Guides we
 - [[Features/Canvas]] — Visuelle Whiteboards mit Nodes und Verbindungen
 - [[Features/Command Palette]] — Schnellzugriff auf alle Befehle per Tastatur
 - [[Features/Lesezeichen]] — Favoriten sortieren, umbenennen, Überschriften-/Block-/Such-Lesezeichen
+- [[Features/Statusleiste]] — Wortanzahl, Cursor-Position, Gehe zu Zeile, Plugin-Items
 - [[Features/Vault-Verwaltung]] — Vaults erstellen, teilen und verwalten
 - [[Features/Einstellungen]] — Alle Konfigurationsmöglichkeiten
 - [[Features/CSS-Snippets]] — Eigenes CSS pro Vault

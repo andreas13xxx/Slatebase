@@ -86,6 +86,40 @@ renders the inline viewer below — flip to page 2 to confirm navigation works:
 
 ---
 
+## Embedding Audio
+
+Supported formats: MP3, WAV, OGG, FLAC, M4A, AAC, WMA.
+
+```
+![[recording.mp3]]
+![[podcast-episode.ogg]]
+```
+
+Audio embeds are rendered as a native audio player with play/pause controls.
+
+---
+
+## Embedding Video
+
+Supported formats: MP4, WebM, OGV, MOV, MKV.
+
+```
+![[lecture.mp4]]
+![[screencast.webm|640]]
+```
+
+### Adjusting Size
+
+The same pipe syntax as images works for videos:
+
+| Syntax | Result |
+|--------|--------|
+| `![[video.mp4]]` | Full width |
+| `![[video.mp4\|640]]` | 640px width |
+| `![[video.mp4\|640x360]]` | 640×360px |
+
+---
+
 ## Embedding Notes
 
 You can embed the entire content of another Markdown file:
@@ -183,4 +217,5 @@ Pasted images are automatically saved in the vault and can be embedded immediate
 - [[Features/Wikilinks]] — Links instead of embeddings
 - [[Features/Callouts]] — Highlighted content blocks
 - [[Features/Mermaid Diagrams]] — Diagrams directly in Markdown
+- [[Features/Math (LaTeX)]] — Mathematical formulas with KaTeX
 - [[Basics/Editor and Viewer]] — Edit and View mode

@@ -12,6 +12,10 @@ import type {
   FailedVault,
 } from './types.js'
 import { validateRegexPattern } from './regex-safety.js'
+import { parseSearchQuery } from './query-parser.js'
+import type { ParsedOperator } from './query-parser.js'
+import { globMatch } from './glob-match.js'
+import type { ILinkIndex } from '../link-index/types.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -42,6 +46,7 @@ export class SearchService implements ISearchService {
     private readonly vaultService: IVaultService,
     private readonly _vaultAccessControl: IVaultAccessControl,
     private readonly logger: ILogger,
+    private readonly linkIndexResolver?: (vaultId: string) => ILinkIndex | undefined,
   ) {}
 
   /**
@@ -51,8 +56,13 @@ export class SearchService implements ISearchService {
   async search(vaultId: string, options: ISearchOptions): Promise<SearchResponse> {
     const startTime = Date.now()
 
-    // Validate regex pattern if regex mode is enabled
-    if (options.regex) {
+    // Parse operators from query
+    const parsed = parseSearchQuery(options.query)
+
+    // Validate regex pattern if regex mode is enabled (on the free-text portion)
+    if (options.regex && parsed.freeText.length > 0) {
+      validateRegexPattern(parsed.freeText)
+    } else if (options.regex && parsed.operators.length === 0) {
       validateRegexPattern(options.query)
     }
 
@@ -68,11 +78,20 @@ export class SearchService implements ISearchService {
     const tree = await this.vaultService.getVaultTree(vaultId)
     const allFiles = this.extractFilePaths(tree)
 
-    // Sort alphabetically and cap at MAX_FILES
+    // Sort alphabetically
     allFiles.sort((a, b) => a.localeCompare(b))
 
+    // Apply operator pre-filtering if operators are present
     let filesToSearch: string[]
-    if (allFiles.length > MAX_FILES) {
+    if (parsed.operators.length > 0) {
+      const filtered = this.resolveOperatorFilters(vaultId, parsed.operators, allFiles)
+      filesToSearch = filtered.length > MAX_FILES ? filtered.slice(0, MAX_FILES) : filtered
+      if (filtered.length > MAX_FILES) {
+        truncated = true
+        truncationReason = 'file_limit'
+        truncationMessage = `Dateilimit von ${MAX_FILES} erreicht. Nicht alle Dateien wurden durchsucht.`
+      }
+    } else if (allFiles.length > MAX_FILES) {
       filesToSearch = allFiles.slice(0, MAX_FILES)
       truncated = true
       truncationReason = 'file_limit'
@@ -81,8 +100,16 @@ export class SearchService implements ISearchService {
       filesToSearch = allFiles
     }
 
-    // Build regex or plain-text matcher
-    const matcher = this.buildMatcher(options)
+    // File-listing mode: operators present but no free-text query
+    if (parsed.operators.length > 0 && parsed.freeText.trim() === '') {
+      return this.buildFileListingResponse(filesToSearch, startTime)
+    }
+
+    // Build regex or plain-text matcher using the effective query (free-text portion)
+    const matcherOptions = parsed.operators.length > 0
+      ? { ...options, query: parsed.freeText }
+      : options
+    const matcher = this.buildMatcher(matcherOptions)
 
     // Iterate over files
     for (const filePath of filesToSearch) {
@@ -736,6 +763,144 @@ export class SearchService implements ISearchService {
       for (const child of node.children) {
         this.collectFiles(child, paths)
       }
+    }
+  }
+
+  /**
+   * Resolves operator filters against the vault's link-index and file list.
+   * Returns the filtered set of candidate file paths.
+   */
+  private resolveOperatorFilters(
+    vaultId: string,
+    operators: ParsedOperator[],
+    allFiles: string[],
+  ): string[] {
+    const linkIndex = this.linkIndexResolver?.(vaultId)
+
+    // Separate inclusion and exclusion operators
+    const inclusions = operators.filter((op) => !op.negated)
+    const exclusions = operators.filter((op) => op.negated)
+
+    // Inclusion phase: intersect results of all positive operators
+    let candidates: Set<string> | null = null
+
+    for (const op of inclusions) {
+      const matchSet = this.resolveOperatorToFileSet(op, allFiles, linkIndex)
+
+      if (candidates === null) {
+        candidates = matchSet
+      } else {
+        // AND: intersect
+        for (const fp of candidates) {
+          if (!matchSet.has(fp)) {
+            candidates.delete(fp)
+          }
+        }
+      }
+
+      if (candidates.size === 0) return []
+    }
+
+    // If no inclusion operators, start with all files
+    if (candidates === null) {
+      candidates = new Set(allFiles)
+    }
+
+    // Exclusion phase: subtract from candidates
+    for (const op of exclusions) {
+      const excludeSet = this.resolveOperatorToFileSet(op, allFiles, linkIndex)
+      for (const fp of excludeSet) {
+        candidates.delete(fp)
+      }
+    }
+
+    return Array.from(candidates)
+  }
+
+  /**
+   * Resolves a single operator to a set of matching file paths.
+   */
+  private resolveOperatorToFileSet(
+    op: ParsedOperator,
+    allFiles: string[],
+    linkIndex: ILinkIndex | undefined,
+  ): Set<string> {
+    switch (op.type) {
+      case 'path': {
+        const result = new Set<string>()
+        for (const fp of allFiles) {
+          if (globMatch(fp, op.value)) {
+            result.add(fp)
+          }
+        }
+        return result
+      }
+
+      case 'file': {
+        const pattern = op.value.toLowerCase()
+        const result = new Set<string>()
+        for (const fp of allFiles) {
+          const fileName = this.getFileName(fp).toLowerCase()
+          if (fileName.includes(pattern)) {
+            result.add(fp)
+          }
+        }
+        return result
+      }
+
+      case 'tag': {
+        if (!linkIndex) return new Set(allFiles)
+        // Use getFilesByTag if available, otherwise fall back to property-based lookup
+        const tagName = op.value.toLowerCase()
+        const result = new Set<string>()
+        // LinkIndexService doesn't expose getFilesByTag directly, but we can scan fileTags
+        // through the graph or property methods. Actually, tags are in the graph — let's
+        // use getGraph with includeTags and filter. But that's expensive.
+        // Better approach: iterate all files and check if they have the tag via the graph data.
+        // Actually the simplest: use the graph's tag data which is already indexed.
+        const graphData = linkIndex.getGraph({ includeTags: true })
+        const tagNodeId = `tag:${tagName}`
+        for (const edge of graphData.edges) {
+          if (edge.type === 'tag' && edge.target === tagNodeId) {
+            // source is the file node id (which is the normalized path)
+            result.add(edge.source)
+          }
+        }
+        return result
+      }
+
+      case 'property': {
+        if (!linkIndex) return new Set(allFiles)
+        const key = op.propertyKey ?? op.value
+        const value = op.propertyValue
+        const files = linkIndex.getFilesByProperty(key, value)
+        return new Set(files)
+      }
+
+      default:
+        return new Set(allFiles)
+    }
+  }
+
+  /**
+   * Builds a file-listing response when there's no free-text query (operator-only mode).
+   * Returns files matching the operators with empty match details.
+   */
+  private buildFileListingResponse(files: string[], startTime: number): SearchResponse {
+    const results: SearchFileResult[] = files.map((filePath) => ({
+      filePath,
+      fileName: this.getFileName(filePath),
+      hits: [],
+      hitCount: 0,
+    }))
+
+    return {
+      results,
+      totalHits: 0,
+      filesSearched: files.length,
+      truncated: false,
+      skippedFiles: [],
+      durationMs: Date.now() - startTime,
     }
   }
 

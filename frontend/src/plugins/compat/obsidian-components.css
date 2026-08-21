@@ -247,6 +247,24 @@
   text-align: center;
 }
 
+/* ─── EditorSuggest Popover ────────────────────────────────────────────────
+   The fixed-position dropdown rendered by EditorSuggestPopover when a plugin's
+   EditorSuggest triggers. Positioned near the cursor via coordsAtPos(). */
+.editor-suggest-popover {
+  position: fixed;
+  z-index: 9999;
+  min-width: 200px;
+  max-width: 400px;
+  max-height: 300px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--size-2-3, 6px);
+  background-color: var(--background-primary);
+  border: var(--prompt-border-width, 1px) solid var(--prompt-border-color, var(--background-modifier-border));
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-l);
+}
+
 /* ─── Notice ──────────────────────────────────────────────────────────── */
 .notice-container {
   position: fixed;

@@ -17,6 +17,7 @@ import { OutlineView } from '../context-panel/OutlineView'
 import { LinksView } from '../context-panel/LinksView'
 import { TagsView } from '../context-panel/TagsView'
 import { PropertiesView } from '../context-panel/PropertiesView'
+import { PropertiesEditor } from '../context-panel/PropertiesEditor'
 import { SearchPanel } from '../SearchPanel'
 import { isPluginViewId, getPluginViewType } from '../../state/panelState'
 import type { PanelViewId } from '../../state/panelState'
@@ -34,6 +35,16 @@ export interface SidePanelDocumentProps {
   tags: DocumentPanelState['tags']
   properties: DocumentPanelState['properties']
   hasDocument: boolean
+  /** Whether the document can be edited (write access + markdown + edit mode). */
+  canEditProperties: boolean
+  /** Tag suggestions for the properties editor autocomplete. */
+  tagSuggestions: string[]
+  /** Callback to commit a frontmatter property change. */
+  onPropertyCommit: (key: string, value: unknown) => void
+  /** Callback to add a new frontmatter property. */
+  onPropertyAdd: (key: string, value: unknown) => void
+  /** Callback to delete a frontmatter property. */
+  onPropertyDelete: (key: string) => void
   onHeadingClick: (anchor: string) => void
   onLinkClick: (target: string, resolved: boolean) => void
   onTagClick: (tagName: string) => void
@@ -266,12 +277,27 @@ export function SidePanel({
         return (
           <div className="side-panel__view-wrapper" key={viewId}>
             <h3 className="side-panel__view-header">Eigenschaften</h3>
-            <PropertiesView
-              data={documentPanel.properties.data}
-              parseError={documentPanel.properties.parseError}
-              rawFrontmatter={documentPanel.properties.rawFrontmatter}
-              hasDocument={documentPanel.hasDocument}
-            />
+            {documentPanel.canEditProperties ? (
+              <PropertiesEditor
+                data={documentPanel.properties.data}
+                parseError={documentPanel.properties.parseError}
+                rawFrontmatter={documentPanel.properties.rawFrontmatter}
+                typeRegistry={documentPanel.properties.typeRegistry}
+                onCommit={documentPanel.onPropertyCommit}
+                onAddProperty={documentPanel.onPropertyAdd}
+                onDeleteProperty={documentPanel.onPropertyDelete}
+                tagSuggestions={documentPanel.tagSuggestions}
+                propertySuggestions={documentPanel.properties.typeRegistry?.map((e) => e.key) ?? []}
+                hasDocument={documentPanel.hasDocument}
+              />
+            ) : (
+              <PropertiesView
+                data={documentPanel.properties.data}
+                parseError={documentPanel.properties.parseError}
+                rawFrontmatter={documentPanel.properties.rawFrontmatter}
+                hasDocument={documentPanel.hasDocument}
+              />
+            )}
           </div>
         )
       case 'search':

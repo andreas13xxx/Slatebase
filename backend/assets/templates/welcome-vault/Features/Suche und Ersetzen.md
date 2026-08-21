@@ -71,6 +71,57 @@ Nützlich, um verstreute Informationen zu finden oder Duplikate aufzuspüren.
 
 ---
 
+## Suchoperatoren
+
+Neben einfachem Text kannst du strukturierte **Operatoren** verwenden, um die Suche gezielt einzuschränken. Operatoren werden direkt ins Suchfeld geschrieben und vor der Volltextsuche als Filter angewendet.
+
+### Verfügbare Operatoren
+
+| Operator | Beispiel | Beschreibung |
+|----------|----------|--------------|
+| `path:<muster>` | `path:Projekte/**` | Nur Dateien im Pfad |
+| `file:<name>` | `file:meeting` | Nur Dateien mit dem Namen |
+| `tag:<tag>` | `tag:todo` | Nur Dateien mit dem Tag |
+| `property:<key>` | `property:status` | Nur Dateien mit der Eigenschaft |
+| `property:<key>=<wert>` | `property:status=aktiv` | Eigenschaft mit bestimmtem Wert |
+| `-path:<muster>` | `-path:Archiv/**` | Pfad ausschließen |
+| `-tag:<tag>` | `-tag:erledigt` | Tag ausschließen |
+| `-property:<key>` | `-property:draft` | Eigenschaft ausschließen |
+
+### Kombination
+
+Operatoren lassen sich frei kombinieren — sie werden mit UND verknüpft:
+
+```
+tag:projekt path:Arbeit/** meeting
+```
+
+Findet Dateien, die den Tag `#projekt` haben UND im Ordner `Arbeit/` liegen UND den Text "meeting" enthalten.
+
+### Werte mit Leerzeichen
+
+Verwende Anführungszeichen für Werte mit Leerzeichen:
+
+```
+property:status="in Arbeit" path:"Mein Ordner/**"
+```
+
+### Reiner Operator-Modus
+
+Wenn du nur Operatoren ohne Freitext eingibst, zeigt Slatebase eine Dateiliste aller passenden Dateien (ohne Text-Snippets):
+
+```
+tag:meeting -tag:archiviert
+```
+
+> [!tip] Autocomplete
+> Tippe `tag:` oder `property:` und warte — ein Dropdown zeigt dir passende Vorschläge aus deinem Vault. Navigation mit Pfeiltasten, Auswahl mit Enter.
+
+> [!tip] Operatoren-Hilfe
+> Klicke auf das `?`-Symbol neben dem Suchfeld für eine Schnellreferenz aller unterstützten Operatoren.
+
+---
+
 ## Ersetzen
 
 ### Einzelnes Ersetzen

@@ -101,6 +101,8 @@ export class LinkIndexService implements ILinkIndex {
   private readonly backlinks: Map<string, Set<string>> = new Map()
   private readonly fileTags: Map<string, Set<string>> = new Map()
   private readonly fileProperties: Map<string, Map<string, string[]>> = new Map()
+  /** Inverse property index: key (lowercase) → value (lowercase) → Set<filePath> */
+  private readonly propertyValueIndex: Map<string, Map<string, Set<string>>> = new Map()
   private ready = false
   private readonly persistPath: string
 
@@ -125,6 +127,7 @@ export class LinkIndexService implements ILinkIndex {
     this.backlinks.clear()
     this.fileTags.clear()
     this.fileProperties.clear()
+    this.propertyValueIndex.clear()
 
     const mdFiles = await this.findMarkdownFiles(this.vaultPath)
 
@@ -184,6 +187,9 @@ export class LinkIndexService implements ILinkIndex {
     // Build reverse map from forward links
     this.rebuildReverseMap()
 
+    // Build inverse property index from fileProperties
+    this.rebuildPropertyValueIndex()
+
     this.ready = true
 
     // Persist to disk
@@ -222,6 +228,7 @@ export class LinkIndexService implements ILinkIndex {
 
       // Canvas files don't have tags or properties
       this.fileTags.delete(normalizedPath)
+      this.removeFromPropertyValueIndex(normalizedPath)
       this.fileProperties.delete(normalizedPath)
     } else {
       // Parse new content — wikilinks
@@ -245,9 +252,11 @@ export class LinkIndexService implements ILinkIndex {
       }
 
       // Update properties
+      this.removeFromPropertyValueIndex(normalizedPath)
       const properties = extractProperties(content)
       if (Object.keys(properties).length > 0) {
         this.fileProperties.set(normalizedPath, new Map(Object.entries(properties)))
+        this.addToPropertyValueIndex(normalizedPath, properties)
       } else {
         this.fileProperties.delete(normalizedPath)
       }
@@ -284,6 +293,7 @@ export class LinkIndexService implements ILinkIndex {
 
     // Remove tags and properties
     this.fileTags.delete(normalizedPath)
+    this.removeFromPropertyValueIndex(normalizedPath)
     this.fileProperties.delete(normalizedPath)
 
     await this.persist()
@@ -304,6 +314,7 @@ export class LinkIndexService implements ILinkIndex {
     const oldTags = this.fileTags.get(normalizedOld)
     const oldProps = this.fileProperties.get(normalizedOld)
     this.fileTags.delete(normalizedOld)
+    this.removeFromPropertyValueIndex(normalizedOld)
     this.fileProperties.delete(normalizedOld)
 
     // Parse content for new path — wikilinks
@@ -330,8 +341,15 @@ export class LinkIndexService implements ILinkIndex {
     const properties = extractProperties(content)
     if (Object.keys(properties).length > 0) {
       this.fileProperties.set(normalizedNew, new Map(Object.entries(properties)))
+      this.addToPropertyValueIndex(normalizedNew, properties)
     } else if (oldProps && oldProps.size > 0) {
       this.fileProperties.set(normalizedNew, oldProps)
+      // Reconstruct properties record from old Map for addToPropertyValueIndex
+      const oldPropsRecord: Record<string, string[]> = {}
+      for (const [k, v] of oldProps) {
+        oldPropsRecord[k] = v
+      }
+      this.addToPropertyValueIndex(normalizedNew, oldPropsRecord)
     }
 
     // Transfer tags (re-extract from content, inline + frontmatter, Obsidian-compatible)
@@ -508,6 +526,176 @@ export class LinkIndexService implements ILinkIndex {
   }
 
   /**
+   * Returns file paths having the given property key (and optionally value).
+   * Case-insensitive comparison.
+   */
+  getFilesByProperty(key: string, value?: string): string[] {
+    const keyLower = key.toLowerCase()
+    const valueMap = this.propertyValueIndex.get(keyLower)
+    if (!valueMap) return []
+
+    if (value !== undefined) {
+      const valueLower = value.toLowerCase()
+      const filePaths = valueMap.get(valueLower)
+      return filePaths ? Array.from(filePaths) : []
+    }
+
+    // No value specified — union all files across all values for this key
+    const allFiles = new Set<string>()
+    for (const filePaths of valueMap.values()) {
+      for (const fp of filePaths) {
+        allFiles.add(fp)
+      }
+    }
+    return Array.from(allFiles)
+  }
+
+  /**
+   * Returns all observed property keys with their occurrence count.
+   * Sorted by count descending.
+   */
+  getPropertyKeys(): Array<{ key: string; count: number }> {
+    const result: Array<{ key: string; count: number }> = []
+
+    for (const [key, valueMap] of this.propertyValueIndex) {
+      // Count unique files across all values for this key
+      const allFiles = new Set<string>()
+      for (const filePaths of valueMap.values()) {
+        for (const fp of filePaths) {
+          allFiles.add(fp)
+        }
+      }
+      result.push({ key, count: allFiles.size })
+    }
+
+    result.sort((a, b) => b.count - a.count)
+    return result
+  }
+
+  /**
+   * Returns observed values for a property key with their occurrence count.
+   * Sorted by count descending, capped at `limit`.
+   */
+  getPropertyValues(key: string, limit = 100): Array<{ value: string; count: number }> {
+    const keyLower = key.toLowerCase()
+    const valueMap = this.propertyValueIndex.get(keyLower)
+    if (!valueMap) return []
+
+    const result: Array<{ value: string; count: number }> = []
+    for (const [value, filePaths] of valueMap) {
+      result.push({ value, count: filePaths.size })
+    }
+
+    result.sort((a, b) => b.count - a.count)
+    return result.slice(0, limit)
+  }
+
+  /**
+   * Returns file paths matching ALL given property filters (AND combination).
+   * Maximum 500 results.
+   */
+  queryByProperties(filters: import('./types.js').PropertyFilter[]): string[] {
+    const MAX_RESULTS = 500
+
+    if (filters.length === 0) return []
+
+    let candidateSet: Set<string> | null = null
+
+    for (const filter of filters) {
+      const filterResult = this.applyPropertyFilter(filter)
+
+      if (candidateSet === null) {
+        candidateSet = filterResult
+      } else {
+        // AND: intersect with current candidates
+        for (const fp of candidateSet) {
+          if (!filterResult.has(fp)) {
+            candidateSet.delete(fp)
+          }
+        }
+      }
+
+      // Early termination if no candidates remain
+      if (candidateSet.size === 0) return []
+    }
+
+    if (!candidateSet) return []
+
+    const result = Array.from(candidateSet)
+    return result.length > MAX_RESULTS ? result.slice(0, MAX_RESULTS) : result
+  }
+
+  /**
+   * Applies a single property filter and returns the set of matching file paths.
+   */
+  private applyPropertyFilter(filter: import('./types.js').PropertyFilter): Set<string> {
+    const keyLower = filter.key.toLowerCase()
+    const valueMap = this.propertyValueIndex.get(keyLower)
+
+    switch (filter.operator) {
+      case 'exists': {
+        if (!valueMap) return new Set()
+        const allFiles = new Set<string>()
+        for (const filePaths of valueMap.values()) {
+          for (const fp of filePaths) allFiles.add(fp)
+        }
+        return allFiles
+      }
+
+      case 'not_exists': {
+        // All indexed files MINUS those that have this property
+        const allFiles = new Set<string>(this.fileProperties.keys())
+        if (!valueMap) return allFiles
+        for (const filePaths of valueMap.values()) {
+          for (const fp of filePaths) allFiles.delete(fp)
+        }
+        return allFiles
+      }
+
+      case 'eq': {
+        if (!valueMap || filter.value === undefined) return new Set()
+        const valueLower = filter.value.toLowerCase()
+        const filePaths = valueMap.get(valueLower)
+        return filePaths ? new Set(filePaths) : new Set()
+      }
+
+      case 'neq': {
+        if (!valueMap) {
+          // Key doesn't exist for any file → all indexed files match "not equal"
+          return new Set(this.fileProperties.keys())
+        }
+        // All files that have this key, minus those that have the specific value
+        const allFilesWithKey = new Set<string>()
+        for (const filePaths of valueMap.values()) {
+          for (const fp of filePaths) allFilesWithKey.add(fp)
+        }
+        if (filter.value === undefined) return allFilesWithKey
+        const valueLower = filter.value.toLowerCase()
+        const matchingFiles = valueMap.get(valueLower)
+        if (matchingFiles) {
+          for (const fp of matchingFiles) allFilesWithKey.delete(fp)
+        }
+        return allFilesWithKey
+      }
+
+      case 'contains': {
+        if (!valueMap || filter.value === undefined) return new Set()
+        const searchLower = filter.value.toLowerCase()
+        const result = new Set<string>()
+        for (const [value, filePaths] of valueMap) {
+          if (value.includes(searchLower)) {
+            for (const fp of filePaths) result.add(fp)
+          }
+        }
+        return result
+      }
+
+      default:
+        return new Set()
+    }
+  }
+
+  /**
    * Attempts to load the index from disk.
    * On success, rebuilds the reverse map from persisted forward links.
    * On failure (missing file, invalid JSON, schema mismatch), triggers a full rebuild.
@@ -534,6 +722,7 @@ export class LinkIndexService implements ILinkIndex {
       this.backlinks.clear()
       this.fileTags.clear()
       this.fileProperties.clear()
+      this.propertyValueIndex.clear()
 
       if (data.version === 1) {
         // v1 → v2 migration: load forward links, then trigger full rebuild
@@ -569,6 +758,9 @@ export class LinkIndexService implements ILinkIndex {
 
       // Rebuild reverse map from forward links
       this.rebuildReverseMap()
+
+      // Rebuild inverse property index from loaded properties
+      this.rebuildPropertyValueIndex()
 
       this.ready = true
       this.logger.info('Link index loaded from disk', {
@@ -665,6 +857,87 @@ export class LinkIndexService implements ILinkIndex {
         if (sources.size === 0) {
           this.backlinks.delete(target)
         }
+      }
+    }
+  }
+
+  /**
+   * Rebuilds the inverse property index from fileProperties.
+   * Called after rebuild() and loadFromDisk() populate fileProperties.
+   */
+  private rebuildPropertyValueIndex(): void {
+    this.propertyValueIndex.clear()
+
+    for (const [filePath, propsMap] of this.fileProperties) {
+      for (const [key, values] of propsMap) {
+        const keyLower = key.toLowerCase()
+        let valueMap = this.propertyValueIndex.get(keyLower)
+        if (!valueMap) {
+          valueMap = new Map()
+          this.propertyValueIndex.set(keyLower, valueMap)
+        }
+        for (const value of values) {
+          const valueLower = value.toLowerCase()
+          const filePaths = valueMap.get(valueLower)
+          if (filePaths) {
+            filePaths.add(filePath)
+          } else {
+            valueMap.set(valueLower, new Set([filePath]))
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Adds a file's properties to the inverse property index.
+   */
+  private addToPropertyValueIndex(filePath: string, properties: Record<string, string[]>): void {
+    for (const [key, values] of Object.entries(properties)) {
+      const keyLower = key.toLowerCase()
+      let valueMap = this.propertyValueIndex.get(keyLower)
+      if (!valueMap) {
+        valueMap = new Map()
+        this.propertyValueIndex.set(keyLower, valueMap)
+      }
+      for (const value of values) {
+        const valueLower = value.toLowerCase()
+        const filePaths = valueMap.get(valueLower)
+        if (filePaths) {
+          filePaths.add(filePath)
+        } else {
+          valueMap.set(valueLower, new Set([filePath]))
+        }
+      }
+    }
+  }
+
+  /**
+   * Removes a file's entries from the inverse property index.
+   * Called before updating or removing a file's properties.
+   */
+  private removeFromPropertyValueIndex(filePath: string): void {
+    const propsMap = this.fileProperties.get(filePath)
+    if (!propsMap) return
+
+    for (const [key, values] of propsMap) {
+      const keyLower = key.toLowerCase()
+      const valueMap = this.propertyValueIndex.get(keyLower)
+      if (!valueMap) continue
+
+      for (const value of values) {
+        const valueLower = value.toLowerCase()
+        const filePaths = valueMap.get(valueLower)
+        if (filePaths) {
+          filePaths.delete(filePath)
+          if (filePaths.size === 0) {
+            valueMap.delete(valueLower)
+          }
+        }
+      }
+
+      if (valueMap.size === 0) {
+        this.propertyValueIndex.delete(keyLower)
       }
     }
   }

@@ -19,6 +19,8 @@ export interface WikilinkNode extends Literal {
  * - `![[image.jpg|300x200]]` → width=300, height=200
  * - `![[image.jpg|100%]]` → width=100%
  * - `![[image.jpg|alt text]]` → alt text (non-numeric)
+ *
+ * For video embeds, the same sizing syntax applies (width/height of the player).
  */
 export interface EmbedNode extends Literal {
   type: 'embed'
@@ -26,7 +28,7 @@ export interface EmbedNode extends Literal {
   heading: string | null
   blockRef: string | null
   display: string | null
-  embedType: 'image' | 'pdf' | 'note'
+  embedType: 'image' | 'pdf' | 'audio' | 'video' | 'note'
 }
 
 /**
@@ -80,6 +82,20 @@ export const IMAGE_EXTENSIONS: readonly string[] = [
  * Supported PDF extensions for embed type detection.
  */
 export const PDF_EXTENSIONS: readonly string[] = ['.pdf']
+
+/**
+ * Supported audio extensions for embed type detection.
+ */
+export const AUDIO_EXTENSIONS: readonly string[] = [
+  '.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac', '.wma'
+]
+
+/**
+ * Supported video extensions for embed type detection.
+ */
+export const VIDEO_EXTENSIONS: readonly string[] = [
+  '.mp4', '.webm', '.ogv', '.mov', '.mkv'
+]
 
 declare module 'mdast' {
   interface PhrasingContentMap {

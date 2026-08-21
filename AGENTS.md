@@ -86,7 +86,7 @@ Filesystem-based, no database. All under `backend/data/`:
 - `useHistoryStack` hook removed — CM6 handles undo/redo natively
 - `LineNumbers.tsx` removed — CM6 renders line numbers natively
 - Backend `event-replay-buffer.ts` (not `replay-buffer.ts`)
-- New remark plugins: `block-ref/`, `breaks/`, `preserve-table-code-escapes.ts`
+- New remark plugins: `block-ref/`, `breaks/`, `preserve-table-code-escapes.ts`, `math/` (inline `$...$` via micromark tokenizer + block `$$...$$` via MDAST transformer)
 - `@modelcontextprotocol/sdk` is a backend dependency (MCP transport)
 - Frontend uses Zod 4 (`zod@4.4.3`), backend uses Zod 3 (`zod@^3.24.0`)
 - Obsidian's view/modal classes live only in `plugins/compat/install-globals.ts` — the separate `suggest-modal*.ts` / `markdown-view-shim.ts` modules are gone; don't reintroduce a parallel definition

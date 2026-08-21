@@ -1,0 +1,169 @@
+/* Property type control styles */
+
+.property-control {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.property-control--display {
+  all: unset;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm, 3px);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.property-control--display:hover {
+  background: var(--bg-hover);
+}
+
+.property-control--editing {
+  width: 100%;
+  padding: 2px 4px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm, 3px);
+  background: var(--bg-elevated);
+  font-size: 12px;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.property-control__placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Checkbox */
+.property-control--checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.property-control__checkbox-input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+}
+
+.property-control__checkbox-label {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* Date */
+.property-control--date,
+.property-control--datetime {
+  width: 100%;
+  padding: 2px 4px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm, 3px);
+  background: var(--bg-elevated);
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.property-control--date:focus,
+.property-control--datetime:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* List / Chips */
+.property-control--list {
+  position: relative;
+}
+
+.property-control__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm, 3px);
+  background: var(--bg-elevated);
+  min-height: 26px;
+  align-items: center;
+}
+
+.property-control__chips:focus-within {
+  border-color: var(--accent);
+}
+
+.property-control__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--bg-hover);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.property-control__chip-remove {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  opacity: 0.6;
+  padding: 1px;
+  border-radius: 50%;
+}
+
+.property-control__chip-remove:hover {
+  opacity: 1;
+  background: var(--bg-active, rgba(0, 0, 0, 0.1));
+}
+
+.property-control__chip-input {
+  flex: 1;
+  min-width: 60px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 11px;
+  color: var(--text-primary);
+  padding: 2px 0;
+}
+
+.property-control__chip-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Suggestions dropdown */
+.property-control__suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 2px 0 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm, 3px);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.15));
+  z-index: 10;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.property-control__suggestion-item {
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.property-control__suggestion-item:hover {
+  background: var(--bg-hover);
+}

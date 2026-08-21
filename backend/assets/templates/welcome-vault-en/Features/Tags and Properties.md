@@ -97,6 +97,25 @@ The [[Features/Context Panel|Context Panel]] has dedicated sections for:
 - **Tags** — All tags in the vault, expandable to see which files use them
 - **Properties** — The frontmatter of the current file as a key-value table
 
+### Interactive Properties Editor
+
+When you have write access, the Properties tab shows an **interactive editor** instead of a plain table:
+
+- **Text fields:** Click to edit, Enter/Blur to save
+- **Numbers:** Numeric input with validation
+- **Date/Time:** Native date picker
+- **Checkbox:** Toggle switch for `true`/`false`
+- **Lists/Tags:** Chip editor with add/remove and autocomplete
+
+**Type detection:** The editor automatically infers the type from the value (e.g. `true` → checkbox, `2024-06-15` → date, `[a, b, c]` → list). You can also declare types explicitly via the vault settings.
+
+**Add a property:** Click "+ Add property" at the bottom. Key names get autocomplete suggestions from your vault.
+
+**Delete a property:** Via the trash icon next to each entry.
+
+> [!tip] No manual YAML
+> The Properties Editor saves you from editing raw YAML. Changes are written directly into the frontmatter and saved immediately.
+
 ### In the Knowledge Graph
 
 Tags appear as nodes in the [[Features/Knowledge Graph|Knowledge Graph]] when enabled in the graph settings.

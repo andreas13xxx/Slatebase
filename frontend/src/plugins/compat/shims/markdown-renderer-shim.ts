@@ -239,32 +239,24 @@ export class MarkdownRendererShim {
 }
 
 /**
- * MarkdownRenderChild — Base class for rendered content lifecycle management.
- * Plugins extend this to track when their rendered content is removed from the DOM.
- */
-export class MarkdownRenderChildShim {
-  containerEl: HTMLElement
-
-  constructor(containerEl: HTMLElement) {
-    this.containerEl = containerEl
-  }
-
-  load(): void {}
-  unload(): void {}
-  onload(): void {}
-  onunload(): void {}
-}
-
-/**
  * Register MarkdownRenderer and MarkdownRenderChild on window.obsidian.
+ *
+ * This is called AFTER installObsidianGlobals(), which registers an instanziable
+ * MarkdownRenderer class (extends MarkdownRenderChild). We only need to upgrade
+ * the static render methods to use the full remark pipeline — NOT replace the class,
+ * which would break the instanceof chain (MarkdownPreviewView extends MarkdownRenderer).
  */
 export function registerMarkdownRendererGlobal(): void {
   const obsidian = (window as unknown as { obsidian?: Record<string, unknown> }).obsidian
   if (obsidian) {
-    obsidian.MarkdownRenderer = MarkdownRendererShim
-    // Also expose as the class itself (plugins do `MarkdownRenderer.render()`)
-    if (!obsidian.MarkdownRenderChild) {
-      obsidian.MarkdownRenderChild = MarkdownRenderChildShim
+    const existingRenderer = obsidian.MarkdownRenderer as { render?: unknown; renderMarkdown?: unknown } | undefined
+    if (existingRenderer && typeof existingRenderer === 'function') {
+      // Patch static methods onto the existing instanziable class
+      (existingRenderer as unknown as { render: unknown }).render = MarkdownRendererShim.render;
+      (existingRenderer as unknown as { renderMarkdown: unknown }).renderMarkdown = MarkdownRendererShim.renderMarkdown
+    } else {
+      // Fallback: no existing class — use the shim directly
+      obsidian.MarkdownRenderer = MarkdownRendererShim
     }
   }
 }

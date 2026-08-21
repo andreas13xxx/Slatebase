@@ -58,6 +58,57 @@ For more regex details, see [[Advanced/Regex Search|Regex Search]].
 
 ---
 
+## Search Operators
+
+Beyond plain text, you can use structured **operators** to narrow your search. Operators are written directly into the search field and act as pre-filters before full-text matching.
+
+### Available Operators
+
+| Operator | Example | Description |
+|----------|---------|-------------|
+| `path:<pattern>` | `path:Projects/**` | Only files in the path |
+| `file:<name>` | `file:meeting` | Only files with matching name |
+| `tag:<tag>` | `tag:todo` | Only files with the tag |
+| `property:<key>` | `property:status` | Only files with the property |
+| `property:<key>=<value>` | `property:status=active` | Property with specific value |
+| `-path:<pattern>` | `-path:Archive/**` | Exclude path |
+| `-tag:<tag>` | `-tag:done` | Exclude tag |
+| `-property:<key>` | `-property:draft` | Exclude property |
+
+### Combining Operators
+
+Operators can be freely combined — they are AND-combined:
+
+```
+tag:project path:Work/** meeting
+```
+
+Finds files that have tag `#project` AND are in the `Work/` folder AND contain "meeting".
+
+### Values with Spaces
+
+Use quotes for values containing spaces:
+
+```
+property:status="in progress" path:"My Folder/**"
+```
+
+### Operator-Only Mode
+
+When you type only operators without free text, Slatebase shows a file list of all matching files (without text snippets):
+
+```
+tag:meeting -tag:archived
+```
+
+> [!tip] Autocomplete
+> Type `tag:` or `property:` and wait — a dropdown shows matching suggestions from your vault. Navigate with arrow keys, select with Enter.
+
+> [!tip] Operator Help
+> Click the `?` icon next to the search field for a quick reference of all supported operators.
+
+---
+
 ## Replace
 
 ### Single Replace

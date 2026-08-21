@@ -1,5 +1,6 @@
 import type { VaultInfo, DirectoryTree, FileContent, FileSaveResult, AppError, Conversation, PaginatedConversations, PaginatedMessages, Message, GraphData, GraphMeta, GraphQueryOptions, BacklinksResponse } from '../types'
 import type { PublicUserInfo } from '../state/authState'
+import type { PropertyTypeRegistry } from '../state/propertyTypes'
 
 /**
  * Login response returned by the backend on successful authentication.
@@ -379,6 +380,10 @@ export interface IApiClient {
   getVaultTags(vaultId: string): Promise<VaultTagsResponse>
   /** Get aggregated graph metadata (tag counts, property key counts). */
   getGraphMeta(vaultId: string): Promise<GraphMeta>
+
+  // --- Property type methods ---
+  /** Get the property type registry for a vault. */
+  getPropertyTypes(vaultId: string): Promise<PropertyTypeRegistry>
 
   // --- Plugin methods ---
   /** List all installed plugins for a vault. */
@@ -810,6 +815,13 @@ export class ApiClient implements IApiClient {
   /** Get aggregated graph metadata (tag counts, property key counts). */
   async getGraphMeta(vaultId: string): Promise<GraphMeta> {
     return this.request<GraphMeta>('GET', `/api/v1/vaults/${vaultId}/graph/meta`)
+  }
+
+  // --- Property type methods ---
+
+  /** Get the property type registry for a vault. */
+  async getPropertyTypes(vaultId: string): Promise<PropertyTypeRegistry> {
+    return this.request<PropertyTypeRegistry>('GET', `/api/v1/vaults/${vaultId}/property-types`)
   }
 
   // --- Plugin methods ---

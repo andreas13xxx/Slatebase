@@ -86,6 +86,40 @@ rendert den folgenden Inline-Viewer — blättere auf Seite 2, um zu sehen, dass
 
 ---
 
+## Audio einbetten
+
+Unterstützte Formate: MP3, WAV, OGG, FLAC, M4A, AAC, WMA.
+
+```
+![[aufnahme.mp3]]
+![[podcast-folge.ogg]]
+```
+
+Audio-Embeds werden als nativer Audio-Player mit Play/Pause-Button dargestellt.
+
+---
+
+## Video einbetten
+
+Unterstützte Formate: MP4, WebM, OGV, MOV, MKV.
+
+```
+![[vortrag.mp4]]
+![[screencast.webm|640]]
+```
+
+### Größe anpassen
+
+Die gleiche Pipe-Syntax wie bei Bildern funktioniert auch für Videos:
+
+| Syntax | Ergebnis |
+|--------|----------|
+| `![[video.mp4]]` | Volle Breite |
+| `![[video.mp4\|640]]` | 640px Breite |
+| `![[video.mp4\|640x360]]` | 640×360px |
+
+---
+
 ## Notizen einbetten
 
 Du kannst den gesamten Inhalt einer anderen Markdown-Datei einbetten:
@@ -183,4 +217,5 @@ Eingefügte Bilder werden automatisch im Vault gespeichert und können sofort ei
 - [[Features/Wikilinks]] — Links statt Einbettungen
 - [[Features/Callouts]] — Hervorgehobene Inhaltsblöcke
 - [[Features/Mermaid Diagramme]] — Diagramme direkt im Markdown
+- [[Features/Mathe (LaTeX)]] — Mathematische Formeln mit KaTeX
 - [[Grundlagen/Editor und Viewer]] — Edit- und View-Modus

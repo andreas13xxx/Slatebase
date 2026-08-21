@@ -96,6 +96,9 @@ Die Statusleiste am unteren Rand der Anwendung zeigt mehrere Informationen gleic
 - **Einzelne Elemente ein-/ausblenden:** Direkt darunter hat jedes Element einen eigenen Schalter — so zeigst du z.B. nur die Wortanzahl, ohne Uhr und Cursor-Position
 - Plugin-Statusanzeigen (falls die Obsidian-Plugin-Kompatibilität aktiv ist) erscheinen zusätzlich am rechten Rand der Leiste
 
+> [!info] Ausführlicher Guide
+> Alle Details zur Statusleiste (Gehe zu Zeile, Auswahl-Statistik, Plugin-Items) findest du unter [[Features/Statusleiste|Statusleiste]].
+
 ### CSS-Snippets
 
 Passe das Erscheinungsbild von Slatebase mit eigenem CSS an — pro Vault gespeichert und verwaltet unter Einstellungen → Darstellung → "CSS-Snippets":

@@ -110,12 +110,30 @@ class FallbackKeymap {
 }
 
 class FallbackSettingPage {
-  rootEl = document.createElement('div')
-  titlebarEl = document.createElement('div')
-  containerEl = document.createElement('div')
-  title = ''
+  rootEl: HTMLElement
+  titlebarEl: HTMLElement
+  containerEl: HTMLElement
+  private _title = ''
+
+  constructor() {
+    this.rootEl = document.createElement('div')
+    this.rootEl.className = 'setting-page'
+    this.titlebarEl = document.createElement('div')
+    this.titlebarEl.className = 'setting-page-titlebar'
+    this.containerEl = document.createElement('div')
+    this.containerEl.className = 'setting-page-content'
+    this.rootEl.appendChild(this.titlebarEl)
+    this.rootEl.appendChild(this.containerEl)
+  }
+
+  get title(): string { return this._title }
+  set title(value: string) {
+    this._title = value
+    this.titlebarEl.textContent = value
+  }
+
   display(): void {}
-  hide(): void {}
+  hide(): void { this.containerEl.innerHTML = '' }
 }
 
 class FallbackBaseComponent {

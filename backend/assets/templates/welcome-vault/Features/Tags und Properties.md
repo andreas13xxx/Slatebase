@@ -127,7 +127,24 @@ Das [[Features/Context Panel]] zeigt die Properties der aktuellen Datei in einer
 - Wechsle zum Tab "Properties"
 - Dort siehst du alle Frontmatter-Felder der aktiven Datei
 
-Dies ist besonders nützlich, um Metadaten im Blick zu behalten, ohne in den Quelltext wechseln zu müssen.
+### Interaktiver Properties-Editor
+
+Bei Dateien mit Schreibzugriff wird statt der einfachen Tabelle ein **interaktiver Editor** angezeigt:
+
+- **Text-Felder:** Klick zum Bearbeiten, Enter/Blur zum Speichern
+- **Zahlen:** Numerisches Eingabefeld mit Validierung
+- **Datum/Zeit:** Nativer Date-Picker
+- **Checkbox:** Toggle-Schalter für `true`/`false`
+- **Listen/Tags:** Chip-Editor mit Hinzufügen/Entfernen und Autocomplete
+
+**Typ-Erkennung:** Der Editor erkennt den Typ automatisch aus dem Wert (z.B. `true` → Checkbox, `2024-06-15` → Datum, `[a, b, c]` → Liste). Du kannst den Typ auch manuell über die Vault-Einstellungen festlegen.
+
+**Neue Eigenschaft hinzufügen:** Klicke auf "+ Eigenschaft hinzufügen" am Ende der Liste. Der neue Schlüssel bekommt Autocomplete-Vorschläge aus dem Vault.
+
+**Eigenschaft löschen:** Über den Papierkorb-Button rechts neben jedem Eintrag.
+
+> [!tip] Kein manuelles YAML
+> Der Properties-Editor erspart dir das manuelle Bearbeiten des YAML-Blocks. Änderungen werden direkt ins Frontmatter geschrieben und sofort gespeichert.
 
 ---
 

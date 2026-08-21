@@ -29,6 +29,12 @@ const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.sv
 /** PDF file extensions (lowercase, with dot) that get an inline PDF viewer. */
 const PDF_EXTENSIONS = new Set(['.pdf'])
 
+/** Audio file extensions (lowercase, with dot) that get an inline audio player. */
+const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac', '.wma'])
+
+/** Video file extensions (lowercase, with dot) that get an inline video player. */
+const VIDEO_EXTENSIONS = new Set(['.mp4', '.webm', '.ogv', '.mov', '.mkv'])
+
 /** Default inline PDF viewer height in pixels, when no `|height` is specified. */
 const DEFAULT_PDF_HEIGHT_PX = 500
 
@@ -63,7 +69,7 @@ export interface WidgetDecorationResult {
 // ---------------------------------------------------------------------------
 
 /** What kind of inline preview an embed target gets in Live Preview. */
-type EmbedKind = 'image' | 'pdf' | 'note'
+type EmbedKind = 'image' | 'pdf' | 'audio' | 'video' | 'note'
 
 /**
  * Widget for inline image/PDF/note embed previews.
@@ -151,6 +157,14 @@ class EmbedWidget extends WidgetType {
       return this.buildPdfDOM()
     }
 
+    if (this.kind === 'audio') {
+      return this.buildAudioDOM()
+    }
+
+    if (this.kind === 'video') {
+      return this.buildVideoDOM()
+    }
+
     return this.buildNoteDOM()
   }
 
@@ -194,6 +208,37 @@ class EmbedWidget extends WidgetType {
       })
 
     return container
+  }
+
+  /**
+   * Builds an inline audio player.
+   */
+  private buildAudioDOM(): HTMLElement {
+    const audio = document.createElement('audio')
+    audio.controls = true
+    audio.preload = 'metadata'
+    audio.className = 'cm-lp-embed-audio'
+    audio.setAttribute('aria-label', this.filename)
+    const source = document.createElement('source')
+    source.src = this.buildRawSrc()
+    audio.appendChild(source)
+    return audio
+  }
+
+  /**
+   * Builds an inline video player with optional sizing from the display param.
+   */
+  private buildVideoDOM(): HTMLElement {
+    const video = document.createElement('video')
+    video.controls = true
+    video.preload = 'metadata'
+    video.className = 'cm-lp-embed-video'
+    video.setAttribute('aria-label', this.filename)
+    applyEmbedMediaSize(video, this.display)
+    const source = document.createElement('source')
+    source.src = this.buildRawSrc()
+    video.appendChild(source)
+    return video
   }
 
   /**
@@ -1219,6 +1264,93 @@ class FrontmatterWidget extends WidgetType {
 }
 
 // ---------------------------------------------------------------------------
+// Math Widget Classes
+// ---------------------------------------------------------------------------
+
+/**
+ * Widget for inline math ($...$) in Live Preview.
+ * Renders the LaTeX source via KaTeX asynchronously.
+ */
+class InlineMathWidget extends WidgetType {
+  readonly source: string
+  constructor(source: string) {
+    super()
+    this.source = source
+  }
+
+  toDOM(): HTMLElement {
+    const span = document.createElement('span')
+    span.className = 'cm-lp-math-inline'
+    span.textContent = `$${this.source}$`
+
+    import('../../components/katex-loader').then(({ loadKaTeX, renderMathToString }) => {
+      loadKaTeX().then((katex) => {
+        if (!katex) {
+          span.classList.add('cm-lp-math-load-failed')
+          return
+        }
+        try {
+          span.innerHTML = renderMathToString(katex, this.source, false)
+          span.classList.remove('cm-lp-math-inline')
+          span.classList.add('cm-lp-math-inline', 'cm-lp-math-rendered')
+        } catch {
+          span.classList.add('cm-lp-math-error')
+        }
+      })
+    })
+
+    return span
+  }
+
+  eq(other: InlineMathWidget): boolean {
+    return this.source === other.source
+  }
+}
+
+/**
+ * Widget for block math ($$...$$) in Live Preview.
+ * Renders the LaTeX source via KaTeX asynchronously in display mode.
+ */
+class BlockMathWidget extends WidgetType {
+  readonly source: string
+  constructor(source: string) {
+    super()
+    this.source = source
+  }
+
+  toDOM(): HTMLElement {
+    const container = document.createElement('div')
+    container.className = 'cm-lp-math-block'
+    container.textContent = `$$${this.source}$$`
+
+    import('../../components/katex-loader').then(({ loadKaTeX, renderMathToString }) => {
+      loadKaTeX().then((katex) => {
+        if (!katex) {
+          container.classList.add('cm-lp-math-load-failed')
+          return
+        }
+        try {
+          container.innerHTML = renderMathToString(katex, this.source, true)
+          container.classList.add('cm-lp-math-rendered')
+        } catch {
+          container.classList.add('cm-lp-math-error')
+        }
+      })
+    })
+
+    return container
+  }
+
+  eq(other: BlockMathWidget): boolean {
+    return this.source === other.source
+  }
+
+  get estimatedHeight(): number {
+    return 40
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Builder Function
 // ---------------------------------------------------------------------------
 
@@ -1230,6 +1362,23 @@ const TASK_REGEX = /^(\s*)-\s\[([ xX])\]/
 
 /** Regex to detect callout headers: > [!type][+/-] optional title */
 const CALLOUT_REGEX = /^>\s*\[!(\w+)\]([+-])?\s*(.*)/
+
+/**
+ * Regex to detect inline math: $...$
+ * Boundary rules:
+ * - Not preceded by backslash (escaped)
+ * - Opening $ not followed by whitespace
+ * - Closing $ not preceded by whitespace
+ * - Closing $ not followed by a digit
+ * - No newlines within
+ */
+const INLINE_MATH_REGEX = /(?<![\\$])\$([^\s$](?:[^\n$\\]|\\.)*?[^\s$\\]|[^\s$\\])\$(?!\d)/g
+
+/**
+ * Regex to detect block math: $$...$$ (multiline or single-line).
+ * Matches $$ at the start, content (possibly spanning multiple lines), then $$.
+ */
+const BLOCK_MATH_REGEX = /^\$\$([\s\S]*?)\$\$\s*$/gm
 
 /**
  * Build widget decorations from the document.
@@ -1271,6 +1420,43 @@ export function buildWidgetDecorations(
         )
         hideableRanges.push({ from: 0, to: frontmatterEndPos, groupFrom: 0, groupTo: frontmatterEndPos })
       }
+    }
+  }
+
+  // --- Block Math: $$...$$ ---
+  // Scan full document for block math before the tree iterate
+  {
+    const fullText = doc.sliceString(0, doc.length)
+    BLOCK_MATH_REGEX.lastIndex = 0
+    let blockMathMatch: RegExpExecArray | null
+    while ((blockMathMatch = BLOCK_MATH_REGEX.exec(fullText)) !== null) {
+      const matchFrom = blockMathMatch.index
+      const matchTo = matchFrom + blockMathMatch[0].length
+      const key = `blockmath:${matchFrom}:${matchTo}`
+      if (processedBlocks.has(key)) continue
+      processedBlocks.add(key)
+
+      // Skip if inside a fenced code block
+      let insideCode = false
+      tree.iterate({
+        from: matchFrom, to: matchTo,
+        enter(n) {
+          if (n.name === 'FencedCode' || n.name === 'CodeBlock') {
+            insideCode = true
+            return false
+          }
+        }
+      })
+      if (insideCode) continue
+
+      const source = (blockMathMatch[1] ?? '').replace(/^\n+|\n+$/g, '')
+      if (!source) continue
+
+      const widget = new BlockMathWidget(source)
+      decorations.push(
+        Decoration.replace({ widget }).range(matchFrom, matchTo)
+      )
+      hideableRanges.push({ from: matchFrom, to: matchTo, groupFrom: matchFrom, groupTo: matchTo })
     }
   }
 
@@ -1317,6 +1503,8 @@ export function buildWidgetDecorations(
             const kind: EmbedKind =
               IMAGE_EXTENSIONS.has(ext) ? 'image' :
               PDF_EXTENSIONS.has(ext) ? 'pdf' :
+              AUDIO_EXTENSIONS.has(ext) ? 'audio' :
+              VIDEO_EXTENSIONS.has(ext) ? 'video' :
               'note'
 
             const widget = new EmbedWidget(
@@ -1334,6 +1522,38 @@ export function buildWidgetDecorations(
               Decoration.replace({ widget }).range(matchFrom, matchTo)
             )
             hideableRanges.push({ from: matchFrom, to: matchTo, groupFrom: matchFrom, groupTo: matchTo })
+          }
+
+          // --- Inline Math: $...$ ---
+          INLINE_MATH_REGEX.lastIndex = 0
+          let mathMatch: RegExpExecArray | null
+          while ((mathMatch = INLINE_MATH_REGEX.exec(text)) !== null) {
+            const mathSource = mathMatch[1]!
+            const mathFrom = node.from + mathMatch.index
+            const mathTo = mathFrom + mathMatch[0].length
+            const mathKey = `inlinemath:${mathFrom}:${mathTo}`
+
+            if (processedBlocks.has(mathKey)) continue
+            processedBlocks.add(mathKey)
+
+            // Skip if inside a code span or fenced code block
+            let insideMathCode = false
+            tree.iterate({
+              from: mathFrom, to: mathTo,
+              enter(n) {
+                if (n.name === 'FencedCode' || n.name === 'InlineCode' || n.name === 'CodeBlock') {
+                  insideMathCode = true
+                  return false
+                }
+              }
+            })
+            if (insideMathCode) continue
+
+            const mathWidget = new InlineMathWidget(mathSource)
+            decorations.push(
+              Decoration.replace({ widget: mathWidget }).range(mathFrom, mathTo)
+            )
+            hideableRanges.push({ from: mathFrom, to: mathTo, groupFrom: mathFrom, groupTo: mathTo })
           }
         }
       }
@@ -1844,6 +2064,35 @@ function applyEmbedImageSize(img: HTMLImageElement, display: string | null): voi
   if (widthMatch) {
     img.style.width = `${widthMatch[1]!}px`
     img.style.height = 'auto'
+  }
+}
+
+/**
+ * Applies width/height style to a media element (video) from its `|display` text.
+ * Same logic as applyEmbedImageSize but accepts any HTMLElement.
+ */
+function applyEmbedMediaSize(el: HTMLElement, display: string | null): void {
+  if (!display) return
+  const trimmed = display.trim()
+
+  const dimensionMatch = trimmed.match(/^(\d+)\s*x\s*(\d+)$/)
+  if (dimensionMatch) {
+    el.style.width = `${dimensionMatch[1]!}px`
+    el.style.height = `${dimensionMatch[2]!}px`
+    return
+  }
+
+  const percentMatch = trimmed.match(/^(\d+)%$/)
+  if (percentMatch) {
+    el.style.width = `${percentMatch[1]!}%`
+    el.style.height = 'auto'
+    return
+  }
+
+  const widthMatch = trimmed.match(/^(\d+)$/)
+  if (widthMatch) {
+    el.style.width = `${widthMatch[1]!}px`
+    el.style.height = 'auto'
   }
 }
 

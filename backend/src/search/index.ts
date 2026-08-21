@@ -43,3 +43,10 @@ export type {
 // Service implementations
 export { SearchService } from './search-service.js'
 export { ReplaceService } from './replace-service.js'
+
+// Query parser
+export { parseSearchQuery } from './query-parser.js'
+export type { ParsedQuery, ParsedOperator, OperatorType } from './query-parser.js'
+
+// Glob matching utility
+export { globMatch } from './glob-match.js'

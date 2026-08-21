@@ -153,6 +153,7 @@ Viele Plugins bringen eigene Settings mit:
 - `Workspace` (getLeaf, openLinkText, registerView)
 - `addCommand()`, `addSettingTab()`, `addStatusBarItem()`
 - `registerView()` für Sidebar und Tab-Views
+- `registerEditorSuggest()` — Autocomplete-Popover im Editor (Datum, Zeit, etc.)
 
 ### Sandbox-Isolation
 

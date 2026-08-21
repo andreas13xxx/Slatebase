@@ -950,14 +950,20 @@ export class WorkspaceShim implements IWorkspaceShim {
   /**
    * editorSuggest — Manager for registered EditorSuggest instances.
    * Kanban accesses this during suggest registration.
+   * The `suggests` array is populated by plugin-context.ts when plugins call
+   * registerEditorSuggest(), and the EditorSuggestManager drives the lifecycle.
    */
   private readonly _editorSuggest = {
     suggests: [] as unknown[],
-    removeSuggest: (_suggest: unknown) => {},
+    removeSuggest: (suggest: unknown) => {
+      const idx = this._editorSuggest.suggests.indexOf(suggest)
+      if (idx !== -1) {
+        this._editorSuggest.suggests.splice(idx, 1)
+      }
+    },
   }
 
   get editorSuggest(): { suggests: unknown[]; removeSuggest: (suggest: unknown) => void } {
-    debugOnce('WorkspaceShim.editorSuggest', '[WorkspaceShim] editorSuggest: Slatebase does not run the built-in suggest manager — registered suggesters are tracked but not driven by Slatebase.');
     return this._editorSuggest;
   }
 

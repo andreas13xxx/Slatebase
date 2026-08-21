@@ -17,11 +17,12 @@ import { AppContext } from '../state'
 import { requestHoverPreview, dismissHoverPreview } from '../plugins/compat/hover-link-bus'
 import { resolveWikilinkTargetWithAlternatives } from '../plugins/link-resolver'
 import { warnOnce } from '../plugins/compat/log'
-import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, remarkBreaks, remarkBlockRef, remarkPreserveTableCodeEscapes, createAnchorTracker } from '../plugins'
+import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, remarkBreaks, remarkBlockRef, remarkPreserveTableCodeEscapes, remarkMath, createAnchorTracker } from '../plugins'
 import type { WikilinkNode, EmbedNode, CalloutNode, TagNode } from '../plugins'
 import { INLINE_HTML_OPEN_TAG_RE, INLINE_HTML_CLOSE_TAG_RE, parseInlineHtmlAttrs, parseStyleString } from '../plugins/inline-html'
 import { PdfViewer } from './BinaryViewer'
 import { MermaidRenderer } from './MermaidRenderer'
+import { MathRenderer } from './MathRenderer'
 import { findEmbedCreatorForTarget, getLinktextExtension, mountRegisteredEmbed, type EmbedCreator, type EmbedContext } from '../plugins/compat/embed-registry'
 
 /**
@@ -100,6 +101,7 @@ const OBSIDIAN_PLUGINS: Array<Plugin<[], Root>> = [
   remarkTag,
   remarkBlockRef,
   remarkBreaks,
+  remarkMath,
 ]
 
 /**
@@ -748,6 +750,9 @@ function renderBlockNode(
     case 'embed':
       return renderEmbedNode(node as unknown as EmbedNode, vaultId, directoryTree, key, token, embedDepth)
 
+    case 'mathBlock':
+      return createElement(MathRenderer, { key, source: (node as unknown as { value: string }).value, displayMode: true })
+
     case 'code':
       return renderCodeBlock(node.value, node.lang, key)
 
@@ -1094,6 +1099,9 @@ function renderPhrasingNode(
 
     case 'tag':
       return renderTagNode(node as unknown as TagNode, key, onTagClick)
+
+    case 'mathInline':
+      return createElement(MathRenderer, { key, source: (node as unknown as { value: string }).value, displayMode: false })
 
     case 'embed' as PhrasingContent['type']:
       // Embeds can appear as phrasing content inside paragraphs
@@ -1694,6 +1702,44 @@ function renderEmbedNode(
       key,
       className: 'view-mode-embed view-mode-embed--missing',
     }, `PDF nicht gefunden: ${node.target}`)
+  }
+
+  if (node.embedType === 'audio') {
+    const resolvedPath = resolveWikilinkTarget(node.target, directoryTree)
+    if (resolvedPath) {
+      const src = buildImageSrc(vaultId, resolvedPath, token)
+      return createElement('audio', {
+        key,
+        controls: true,
+        preload: 'metadata',
+        className: 'view-mode-embed view-mode-embed--audio',
+        'aria-label': node.target,
+      }, createElement('source', { src }))
+    }
+    return createElement('span', {
+      key,
+      className: 'view-mode-embed view-mode-embed--missing',
+    }, `Audio nicht gefunden: ${node.target}`)
+  }
+
+  if (node.embedType === 'video') {
+    const resolvedPath = resolveWikilinkTarget(node.target, directoryTree)
+    if (resolvedPath) {
+      const src = buildImageSrc(vaultId, resolvedPath, token)
+      const videoStyle = parseEmbedImageStyle(node.display)
+      return createElement('video', {
+        key,
+        controls: true,
+        preload: 'metadata',
+        className: 'view-mode-embed view-mode-embed--video',
+        style: videoStyle,
+        'aria-label': node.target,
+      }, createElement('source', { src }))
+    }
+    return createElement('span', {
+      key,
+      className: 'view-mode-embed view-mode-embed--missing',
+    }, `Video nicht gefunden: ${node.target}`)
   }
 
   // Note embed — render as styled placeholder container

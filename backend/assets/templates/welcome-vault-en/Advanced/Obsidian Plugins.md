@@ -92,6 +92,7 @@ Click **Delete** in the plugin management to remove it completely. Plugin settin
 - Event listeners (file changes, layout changes)
 - Sidebar views
 - Workspace leaves (plugin views as tabs)
+- Editor autocomplete suggestions (EditorSuggest — date/time pickers, etc.)
 
 ### What Doesn't Work
 

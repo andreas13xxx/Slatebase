@@ -1,0 +1,109 @@
+/* PropertiesEditor styles */
+
+.properties-editor {
+  padding: 8px;
+  font-size: 12px;
+}
+
+.properties-editor--empty,
+.properties-editor--error {
+  padding: 12px;
+}
+
+.properties-editor__placeholder {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin: 0;
+}
+
+.properties-editor__error-message {
+  color: var(--text-error, #e53e3e);
+  font-size: 12px;
+  margin: 0 0 8px;
+}
+
+.properties-editor__raw-frontmatter {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  padding: 8px;
+  background: var(--bg-code, rgba(0, 0, 0, 0.05));
+  border-radius: var(--radius-sm, 3px);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--text-primary);
+}
+
+.properties-editor__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.properties-editor__row {
+  display: grid;
+  grid-template-columns: minmax(60px, 0.4fr) 1fr auto;
+  gap: 6px;
+  align-items: start;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.05));
+}
+
+.properties-editor__row:last-child {
+  border-bottom: none;
+}
+
+.properties-editor__key {
+  font-weight: 500;
+  color: var(--text-secondary, var(--text-muted));
+  font-size: 11px;
+  padding: 3px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.properties-editor__value {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.properties-editor__delete-btn {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border-radius: var(--radius-sm, 3px);
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.properties-editor__row:hover .properties-editor__delete-btn {
+  opacity: 1;
+}
+
+.properties-editor__delete-btn:hover {
+  color: var(--text-error, #e53e3e);
+  background: var(--bg-hover);
+}
+
+.properties-editor__add-btn {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm, 3px);
+  margin-top: 4px;
+}
+
+.properties-editor__add-btn:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
+}

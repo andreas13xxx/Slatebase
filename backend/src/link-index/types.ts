@@ -170,4 +170,49 @@ export interface ILinkIndex {
    * Whether the index has been initialized (loaded or rebuilt).
    */
   isReady(): boolean
+
+  /**
+   * Returns file paths having the given property key (and optionally value).
+   * Comparison is case-insensitive.
+   * @param key - Property key to filter by
+   * @param value - Optional value to match (case-insensitive)
+   * @returns Array of relative file paths
+   */
+  getFilesByProperty(key: string, value?: string): string[]
+
+  /**
+   * Returns all observed property keys with their occurrence count (number of files).
+   * Sorted by count descending.
+   */
+  getPropertyKeys(): Array<{ key: string; count: number }>
+
+  /**
+   * Returns observed values for a property key with their occurrence count.
+   * Sorted by count descending, capped at `limit`.
+   * @param key - Property key to get values for
+   * @param limit - Maximum number of values to return (default: 100)
+   */
+  getPropertyValues(key: string, limit?: number): Array<{ value: string; count: number }>
+
+  /**
+   * Returns file paths matching ALL given property filters (AND combination).
+   * Maximum 500 results.
+   * @param filters - Array of property filters to apply
+   */
+  queryByProperties(filters: PropertyFilter[]): string[]
+}
+
+// ─── Property Filter ─────────────────────────────────────────────────────────
+
+/** Operator for property-based file queries. */
+export type PropertyFilterOperator = 'eq' | 'neq' | 'contains' | 'exists' | 'not_exists'
+
+/** A single filter condition for property-based queries. */
+export interface PropertyFilter {
+  /** Property key to filter on. */
+  key: string
+  /** Comparison operator. */
+  operator: PropertyFilterOperator
+  /** Value to compare against (required for eq/neq/contains, ignored for exists/not_exists). */
+  value?: string | undefined
 }

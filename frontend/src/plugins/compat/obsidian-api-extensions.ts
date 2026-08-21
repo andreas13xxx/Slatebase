@@ -31,6 +31,8 @@ import { errorOnce, warnNoOp } from './log';
 import type { BlockCache, CachedMetadata, HeadingCache, Pos } from './types';
 import { renderLucideIconInto } from './lucide-icons';
 import { getCustomIconSvg, sizeCustomIconSvg } from '../../utils/pluginIcon';
+import { getCurrentPluginId } from './plugin-execution-context';
+import { registerPostProcessor as registerPostProcessorReal } from './code-block-processor-registry';
 
 /**
  * The Obsidian API version Slatebase claims to implement.
@@ -912,20 +914,16 @@ export async function loadMermaid(): Promise<unknown> {
 }
 
 /**
- * Register the loaders for libraries Slatebase does not ship.
+ * Register the loaders for libraries Slatebase does not ship (Prism, PDF.js)
+ * and the KaTeX-backed math rendering functions.
  *
- * MathJax, Prism and PDF.js are all in Obsidian's bundle, and plugins call these
- * loaders unguarded — `await loadMathJax()` on a namespace without the function
- * is a TypeError somewhere unrelated to the actual cause. Defining them means
- * the plugin gets a named, logged answer instead.
+ * Math rendering (renderMath/finishRenderMath/loadMathJax) is now backed by
+ * real KaTeX — see components/katex-loader.ts. The element returned by
+ * renderMath is synchronous (shows raw source initially) and hydrates
+ * asynchronously once KaTeX loads, matching plugins that immediately append
+ * the element to the DOM.
  *
- * They are deliberately *not* implemented: LaTeX rendering, Prism highlighting
- * and PDF rendering are each a feature Slatebase does not have, not an oversight
- * in the compat layer. Adding the dependency here would put a renderer behind
- * the plugin API that the app's own Markdown pipeline cannot use.
- *
- * `renderMath` returns an element containing the raw source, so a formula shows
- * up as its own LaTeX rather than vanishing.
+ * Prism and PDF.js remain unavailable stubs.
  */
 function registerUnsupportedLoaders(obs: Record<string, unknown>): void {
   const unavailable = (api: string, feature: string) => (): Promise<null> => {
@@ -933,23 +931,46 @@ function registerUnsupportedLoaders(obs: Record<string, unknown>): void {
     return Promise.resolve(null);
   };
 
-  if (!obs['loadMathJax']) obs['loadMathJax'] = unavailable('loadMathJax', 'MathJax');
   if (!obs['loadPrism']) obs['loadPrism'] = unavailable('loadPrism', 'Prism');
   if (!obs['loadPdfJs']) obs['loadPdfJs'] = unavailable('loadPdfJs', 'PDF.js');
 
+  // KaTeX-backed math rendering
+  if (!obs['loadMathJax']) {
+    obs['loadMathJax'] = async (): Promise<unknown> => {
+      const { loadKaTeX } = await import('../../components/katex-loader');
+      return loadKaTeX();
+    };
+  }
+
   if (!obs['renderMath']) {
     obs['renderMath'] = (source: string, display: boolean): HTMLElement => {
-      warnNoOp('obsidian', 'renderMath', 'Slatebase does not bundle MathJax; the formula source is shown verbatim.');
       const el = document.createElement(display ? 'div' : 'span');
       el.className = display ? 'math math-block' : 'math math-inline';
       el.textContent = source;
+
+      // Async hydration: replace text with rendered math once KaTeX loads
+      import('../../components/katex-loader').then(({ loadKaTeX, renderMathToString }) => {
+        loadKaTeX().then((katex) => {
+          if (!katex) return; // load failed — leave text as-is
+          try {
+            el.innerHTML = renderMathToString(katex, source, display);
+          } catch {
+            el.classList.add('math-error');
+            // Leave textContent as-is (raw source)
+          }
+        });
+      });
+
       return el;
     };
   }
-  // Paired with renderMath in Obsidian's typesetting cycle. Nothing to flush
-  // without MathJax, and renderMath already warned — staying quiet here avoids
-  // a second line for the same cause.
-  if (!obs['finishRenderMath']) obs['finishRenderMath'] = (): Promise<void> => Promise.resolve();
+
+  if (!obs['finishRenderMath']) {
+    obs['finishRenderMath'] = async (): Promise<void> => {
+      const { loadKaTeX } = await import('../../components/katex-loader');
+      await loadKaTeX(); // just ensure the library is loaded
+    };
+  }
 }
 
 // ─── Additional UI Components ────────────────────────────────────────────────────
@@ -1264,21 +1285,31 @@ function createAbstractInputSuggestClass(PopoverSuggest: PopoverSuggestBase) {
 
 // ─── MarkdownPreviewRenderer ─────────────────────────────────────────────────────
 
-/** Registered post processors */
-const postProcessors: Array<{ processor: (el: HTMLElement, ctx: unknown) => unknown; sortOrder: number }> = [];
+/** Local tracking array for unregister support (maps processor → pluginId). */
+const postProcessorTracking: Array<{ processor: (el: HTMLElement, ctx: unknown) => unknown; pluginId: string; sortOrder: number }> = [];
 
 /**
  * MarkdownPreviewRenderer — Static class for registering post processors.
+ *
+ * Now bridges into the real code-block-processor-registry so that registered
+ * post-processors actually run during markdown rendering (ViewMode + Live Preview).
  */
 export class MarkdownPreviewRenderer {
   static registerPostProcessor(postProcessor: (el: HTMLElement, ctx: unknown) => unknown, sortOrder?: number): void {
-    postProcessors.push({ processor: postProcessor, sortOrder: sortOrder ?? 0 });
-    postProcessors.sort((a, b) => a.sortOrder - b.sortOrder);
+    const pluginId = getCurrentPluginId() ?? 'unknown'
+    const order = sortOrder ?? 0
+    // Register in the REAL registry (the one that runPostProcessors() reads from)
+    registerPostProcessorReal(postProcessor as (el: HTMLElement, ctx: unknown) => Promise<void> | void, pluginId, order)
+    // Track locally for unregister support
+    postProcessorTracking.push({ processor: postProcessor, pluginId, sortOrder: order })
   }
 
   static unregisterPostProcessor(postProcessor: (el: HTMLElement, ctx: unknown) => unknown): void {
-    const idx = postProcessors.findIndex(p => p.processor === postProcessor);
-    if (idx >= 0) postProcessors.splice(idx, 1);
+    const idx = postProcessorTracking.findIndex(p => p.processor === postProcessor);
+    if (idx >= 0) postProcessorTracking.splice(idx, 1);
+    // Note: The real registry uses unregisterAllForPlugin(pluginId) for cleanup,
+    // which is called during plugin deactivation. Individual unregister is a
+    // best-effort removal from our tracking — the real cleanup happens at plugin unload.
   }
 
   static createCodeBlockPostProcessor(
@@ -1301,15 +1332,9 @@ export class MarkdownPreviewRenderer {
 
   /** Get all registered post processors (used internally). */
   static getPostProcessors(): Array<{ processor: (el: HTMLElement, ctx: unknown) => unknown; sortOrder: number }> {
-    return postProcessors;
+    return postProcessorTracking;
   }
 }
-
-// ─── EditableFileView (abstract base, extends FileView) ──────────────────────────
-
-// EditableFileView is just an abstract intermediate class between FileView and TextFileView.
-// We export a reference so plugins doing `instanceof EditableFileView` checks work.
-// The actual class is already handled by TextFileView extending FileView on window.obsidian.
 
 // ─── Encoding Utilities ──────────────────────────────────────────────────────────
 
@@ -1501,9 +1526,6 @@ export function registerObsidianApiExtensions(): void {
 
   // MarkdownPreviewRenderer
   if (!obs['MarkdownPreviewRenderer']) obs['MarkdownPreviewRenderer'] = MarkdownPreviewRenderer;
-
-  // EditableFileView — alias to FileView (abstract intermediate)
-  if (!obs['EditableFileView']) obs['EditableFileView'] = obs['FileView'];
 
   // apiVersion string
   if (!obs['apiVersion']) obs['apiVersion'] = OBSIDIAN_API_VERSION;

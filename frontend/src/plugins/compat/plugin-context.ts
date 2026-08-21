@@ -59,6 +59,9 @@ import { Scope } from './obsidian-api-extensions'
 import { setEditorViewAccessor } from './editor-shim'
 import { withPluginContextAsync } from './plugin-execution-context'
 import { getActiveEditorView, registerPluginExtension, removePluginExtensions, registerPluginCompletionSource, removePluginCompletionSources } from '../../editor/plugin-extensions'
+import { getEditorSuggestManager, destroyEditorSuggestManager } from './editor-suggest-manager'
+import type { EditorSuggestInstance } from './editor-suggest-manager'
+import { createEditorSuggestExtension, isEditorSuggestExtensionRegistered, markEditorSuggestExtensionRegistered, resetEditorSuggestExtensionState } from './editor-suggest-extension'
 import { registerMarkdownRendererGlobal } from './shims/markdown-renderer-shim'
 import { usePluginEventBridge } from './plugin-event-bridge'
 import { ViewRegistry } from './view-registry'
@@ -408,6 +411,8 @@ export function PluginProvider({
     clearAllRibbonIcons()
     // Clear status bar items (plugin-scoped)
     clearAllStatusBarItems()
+    // Destroy the EditorSuggest manager from the previous vault
+    destroyEditorSuggestManager()
     setActiveViews(new Map())
     setSidebarViews(new Map())
 
@@ -609,6 +614,15 @@ export function PluginProvider({
 
     // Wire EditorShim to use CM6 EditorView as backend
     setEditorViewAccessor(getActiveEditorView)
+
+    // Initialize the EditorSuggest manager for this vault
+    // (reset extension-registration state from the previous vault)
+    resetEditorSuggestExtensionState()
+    getEditorSuggestManager({
+      getActiveEditorView,
+      getEditor: () => newWorkspaceShim.activeEditor?.editor ?? null,
+      getActiveFile: () => newWorkspaceShim.getActiveFile(),
+    })
 
     // Install the base obsidian namespace before the context-specific shims
     // below layer onto it. Idempotent — the PluginLoader calls it too.
@@ -881,25 +895,41 @@ export function PluginProvider({
           if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) return
           registerPluginExtension(pluginId, extension as import('@codemirror/state').Extension)
         }
-        // Wire registerEditorSuggest to route to the CM6 completion source registry
+        // Wire registerEditorSuggest to route to the EditorSuggest manager
         ;(instance as unknown as { registerEditorSuggest: (suggest: unknown) => void }).registerEditorSuggest = (suggest: unknown) => {
           if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) return
-          // Only a CM6-shaped `provider` can be bridged directly. Obsidian's own
-          // EditorSuggest interface is onTrigger/getSuggestions/renderSuggestion/
-          // selectSuggestion, which has no CM6 equivalent we translate yet — a
-          // plugin passing one registers successfully and then never suggests
-          // anything, so say so rather than accept it silently.
-          const suggestObj = suggest as { provider?: unknown; getSuggestions?: unknown }
+          const suggestObj = suggest as { provider?: unknown; getSuggestions?: unknown; onTrigger?: unknown; renderSuggestion?: unknown; selectSuggestion?: unknown }
+
+          // Path A: Raw CM6 provider (backwards compat — some advanced plugins pass this directly)
           if (typeof suggestObj.provider === 'function') {
             registerPluginCompletionSource(pluginId, suggestObj.provider as import('@codemirror/autocomplete').CompletionSource)
             return
           }
+
+          // Path B: Real EditorSuggest instance with onTrigger/getSuggestions/renderSuggestion/selectSuggestion
+          if (typeof suggestObj.onTrigger === 'function' && typeof suggestObj.getSuggestions === 'function') {
+            const manager = getEditorSuggestManager()
+            if (!manager) return
+
+            // Register the suggest instance with the manager
+            manager.register(suggestObj as EditorSuggestInstance)
+
+            // Also push to workspace.editorSuggest.suggests (Kanban reads this)
+            const wsSuggests = (newWorkspaceShim as unknown as { editorSuggest: { suggests: unknown[] } }).editorSuggest.suggests
+            wsSuggests.push(suggestObj)
+
+            // Ensure the CM6 extension is registered (once per vault, not per plugin)
+            if (!isEditorSuggestExtensionRegistered()) {
+              markEditorSuggestExtensionRegistered()
+              registerPluginExtension('__editor-suggest__', createEditorSuggestExtension())
+            }
+            return
+          }
+
           warnNoOp(
             pluginId,
             'registerEditorSuggest',
-            typeof suggestObj.getSuggestions === 'function'
-              ? "Obsidian's EditorSuggest interface is not translated to CodeMirror 6; this suggester will never appear."
-              : 'The suggester exposes neither a CodeMirror `provider` nor `getSuggestions`, so it cannot be wired up.',
+            'The suggester exposes neither a CodeMirror `provider` nor the EditorSuggest interface (onTrigger/getSuggestions), so it cannot be wired up.',
           )
         }
       },

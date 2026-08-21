@@ -85,6 +85,10 @@ src/
 │   ├── welcomeVaultRoutes.ts — POST /api/v1/welcome-vault (on-demand tutorial vault creation, rate-limited)
 │   ├── welcomeVaultRoutes.test.ts — Integration tests for welcome vault route
 │   ├── proxyRoutes.ts    — POST /api/v1/proxy (CORS-free HTTP proxy for plugin requestUrl, SSRF protection, URL allowlist)
+│   ├── propertyTypeRoutes.ts — Property-type registry CRUD (GET/PUT /vaults/:vaultId/property-types, PUT /vaults/:vaultId/property-types/:key)
+│   ├── propertyTypeRoutes.test.ts — Integration tests for property-type routes
+│   ├── propertyRoutes.ts    — Property metadata routes (GET /vaults/:vaultId/properties, GET /properties/:key/values, POST /properties/query)
+│   ├── propertyRoutes.test.ts — Integration tests for property metadata routes
 │   ├── pluginStoreRoutes.ts — Community plugin store routes (browse, install, update; per-vault and global mounts)
 │   └── sseRoutes.ts      — GET /events (SSE stream)
 ├── chat/
@@ -119,10 +123,14 @@ src/
 │   ├── search-service.ts     — SearchService (linear file iteration, plain-text + regex, context lines, multi-vault)
 │   ├── replace-service.ts    — ReplaceService (atomic write, max 100 files, partial failure)
 │   ├── replace-service.test.ts — Unit tests for ReplaceService
+│   ├── query-parser.ts       — parseSearchQuery() (extracts path:/file:/tag:/property: operators + negation from query string, returns ParsedQuery with operators + freeText)
+│   ├── query-parser.test.ts  — Unit tests for query parser
+│   ├── glob-match.ts         — globMatch() (minimal glob matching for path: operator — *, **, ?, case-insensitive, no external dependency)
+│   ├── glob-match.test.ts    — Unit tests for glob-match
 │   └── (search-service.test.ts) — Optional: Unit tests for SearchService
 ├── link-index/
 │   ├── index.ts              — Barrel export for link-index module
-│   ├── types.ts              — ILinkIndex interface, GraphData, GraphNode, GraphEdge, GraphQueryOptions, GraphMeta, ParsedWikilink
+│   ├── types.ts              — ILinkIndex interface, GraphData, GraphNode, GraphEdge, GraphQueryOptions, GraphMeta, ParsedWikilink, PropertyFilter, PropertyFilterOperator
 │   ├── wikilink-parser.ts    — Backend extractWikilinks() (code-block-aware, all formats)
 │   ├── wikilink-parser.test.ts — Unit tests for parser
 │   ├── tag-extractor.ts      — extractTags() (code-block-aware, nested tags, dedup)
@@ -131,12 +139,19 @@ src/
 │   ├── property-extractor.test.ts — Unit tests for property extractor
 │   ├── canvas-parser.ts      — Canvas link extraction (extracts wikilinks from .canvas JSON files)
 │   ├── canvas-parser.test.ts — Unit tests for canvas link extraction
-│   ├── link-index-service.ts — LinkIndexService (rebuild, incremental updates, JSON v2 persistence, tags, properties, getGraph with options, getGraphMeta), extractFrontmatterTags (Obsidian-compatible frontmatter tag extraction)
+│   ├── link-index-service.ts — LinkIndexService (rebuild, incremental updates, JSON v2 persistence, tags, properties, getGraph with options, getGraphMeta, getFilesByProperty, getPropertyKeys, getPropertyValues, queryByProperties), extractFrontmatterTags (Obsidian-compatible frontmatter tag extraction)
 │   ├── link-index-service.test.ts — Unit tests for LinkIndexService v2
+│   ├── property-value-index.test.ts — Unit tests for inverse property-value-index and query methods
 │   ├── link-match-resolver.ts — resolveWikilinkTargetOnTree() — backend port of frontend/src/plugins/link-resolver.ts (same-folder → shortest-path → alphabetical disambiguation against a DirectoryTree). Needed because LinkIndexService.getBacklinks() only matches literal normalized paths and misses bare-name wikilinks (`[[Note]]`) to subfolder files
 │   ├── link-match-resolver.test.ts — Unit tests for the resolver (mirrors frontend link-resolver.test.ts fixtures)
 │   ├── link-migration-service.ts — LinkMigrationService.migrateLinks() (rewrites wikilinks vault-wide after a rename/move — candidates via getBacklinks() ∪ filename search, resolved against the pre-move DirectoryTree, written via IVaultService.saveFile), computeAffectedFilePairs() (file vs. folder move → {oldPath,newPath} pairs), rewriteWikilinksInContent()
 │   └── link-migration-service.test.ts — Unit tests for LinkMigrationService and its pure helpers
+├── property-type/                — Per-vault property type definitions for frontmatter keys.
+│   ├── index.ts              — Barrel export for property-type module
+│   ├── types.ts              — IPropertyTypeService, PropertyType, PropertyTypeEntry, PropertyTypeRegistry, RESERVED_PROPERTY_KEYS
+│   ├── validation.ts         — Zod schemas (propertyTypeSchema, propertyTypeEntrySchema, propertyTypeRegistrySchema)
+│   ├── property-type-store.ts — PropertyTypeStore (KeyedJsonFileStore in .slatebase/property-types.json, max 200 entries, reserved key enforcement for tags/aliases)
+│   └── property-type-store.test.ts — Unit tests for PropertyTypeStore
 ├── plugin/                   — Installed-plugin management (per vault). Not to be confused with `plugin-store/` (the marketplace).
 │   ├── index.ts              — Barrel export for plugin module
 │   ├── types.ts              — IInstalledPluginStore, PluginManifest, PluginFiles, PluginRegistryData interfaces
@@ -251,6 +266,8 @@ src/
 │   ├── fuzzyMatch.ts     — Case-insensitive subsequence fuzzy match (QuickSwitcher), lower score = better
 │   ├── internalLink.ts   — Builds the wikilink/embed text for a file dropped from the File Explorer; image/PDF extensions become `![[…]]` embeds, Markdown links drop its `.md` so the target matches what the wikilink resolver looks up
 │   ├── pluginIcon.ts     — Single resolution path for plugin icon names (addRibbonIcon, ItemView.getIcon, context-panel tabs): checks the plugin's own `addIcon()` SVGs first, then falls back to the shared Lucide resolver in `plugins/compat/lucide-icons.ts`. Centralized so a new render site cannot skip the custom-icon check — a second, independently maintained alias table used to live here and drifted
+│   ├── frontmatterWriter.ts — YAML frontmatter serialization + editing (locateFrontmatterBlock, serializeFrontmatter, applyFrontmatterChange) — custom line-builder for Obsidian-compatible output, no yaml lib for serialization
+│   ├── frontmatterWriter.test.ts — Unit tests for frontmatter writer
 ├── canvas/
 │   ├── index.ts          — Barrel export (parser, serializer, types)
 │   ├── types.ts          — CanvasDocument, CanvasNode (Text/File/Link/Group), CanvasEdge, parse result types
@@ -275,7 +292,7 @@ src/
 │       └── live-preview-extension.ts — Composes decorations into the CM6 extension (StateField, Compartment, click handler)
 ├── plugins/
 │   ├── index.ts          — Barrel export (all plugins, types, utilities)
-│   ├── types.ts          — MDAST node types (WikilinkNode, EmbedNode, CalloutNode, TagNode), IMAGE_EXTENSIONS, PDF_EXTENSIONS
+│   ├── types.ts          — MDAST node types (WikilinkNode, EmbedNode, CalloutNode, TagNode), IMAGE_EXTENSIONS, PDF_EXTENSIONS, AUDIO_EXTENSIONS, VIDEO_EXTENSIONS
 │   ├── link-resolver.ts  — Wikilink target resolution against DirectoryTree; `resolveWikilinkTargetWithAlternatives()`/`resolveAmbiguousMatch()` disambiguate multiple same-named files (optional `sourcePath` → same folder as source, then shortest path, then alphabetical) and report `alternativeCount` for link tooltips
 │   ├── heading-anchor.ts — Heading anchor generation + deduplication tracker
 │   ├── preserve-table-code-escapes.ts — Counters mdast-util-gfm-table's pipe-unescaping inside inline code spans (Obsidian verbatim rendering)
@@ -286,9 +303,10 @@ src/
 │   │   ├── plugin.ts     — remark plugin wrapper (remarkWikilink)
 │   │   └── extract.ts    — extractWikilinks() utility for knowledge graph
 │   ├── embed/
-│   │   ├── syntax.ts     — micromark tokenizer extension for ![[...|...]] syntax (with pipe separator for size/display), detectEmbedType() (image/pdf/note)
+│   │   ├── syntax.ts     — micromark tokenizer extension for ![[...|...]] syntax (with pipe separator for size/display), detectEmbedType() (image/pdf/audio/video/note)
 │   │   ├── mdast-util.ts — fromMarkdown + toMarkdown handlers (target, heading, display fields)
-│   │   └── plugin.ts     — remark plugin wrapper (remarkEmbed)
+│   │   ├── plugin.ts     — remark plugin wrapper (remarkEmbed)
+│   │   └── media-embed.test.ts — Unit tests for audio/video embed type detection (22 tests)
 │   ├── callout/
 │   │   ├── transform.ts  — MDAST transformer (blockquote → CalloutNode)
 │   │   ├── serializer.ts — toMarkdown serializer
@@ -303,6 +321,13 @@ src/
 │   │   └── plugin.ts           — remark plugin wrapper (remarkBlockRef)
 │   ├── breaks/
 │   │   └── plugin.ts     — remark plugin (remarkBreaks) converting soft line breaks to hard breaks (Obsidian default)
+│   ├── math/
+│   │   ├── syntax.ts     — micromark tokenizer extension for inline $...$ math (boundary rules)
+│   │   ├── mdast-util.ts — fromMarkdown/toMarkdown handlers + mathBlockTransformer ($$...$$ → MathBlockNode)
+│   │   ├── types.ts      — MathInlineNode, MathBlockNode interfaces + mdast module augmentation
+│   │   ├── plugin.ts     — remark plugin wrapper (remarkMath: inline tokenizer + block transformer)
+│   │   ├── index.ts      — Barrel export
+│   │   └── math.test.ts  — Unit tests for syntax/serialization (14 tests)
 │   ├── appearance/           — User-facing appearance customization (CSS Snippets), distinct from plugin CSS
 │   │   ├── snippet-injector.ts — SnippetInjector (unscoped `<style data-snippet-id>` injection — deliberately does NOT reuse compat/css-injector.ts's `[data-plugin-id]` scoping, since user snippets must affect the whole app, e.g. `body`/`:root` overrides)
 │   │   └── snippet-injector.test.ts — Unit tests for SnippetInjector
@@ -311,7 +336,7 @@ src/
 │       ├── errors.ts     — PluginError, ManifestValidationError, BundleEvaluationError, LifecycleError, etc.
 │       ├── event-system.ts — IEventEmitter (on/off/trigger/offref/removeAllListeners); `on(event, cb, context)` binds the optional third argument as the callback's `this`, as Obsidian's API does
 │       ├── manifest-parser.ts — Manifest parsing with Zod validation + semver comparison
-│       ├── install-globals.ts — Installs the `window.obsidian` namespace + DOM/window globals plugin bundles expect; explicit idempotent entry point (registration order: DOM patches → real API → obsidian-api-extensions → fallback-shims). Base classes are wrapped so plugins can extend them from native `class ... extends` *and* from the ES5-downlevel `_super.call(this, …)` output older community bundles ship (`new.target` tells the two call shapes apart). Node's `Buffer` and the `path` shim are installed here too — before bundle evaluation, not at `onload()`, since plugins reference them at module top level. Also home to the single real view/modal class chain (Component → View → ItemView → FileView → MarkdownView, and Modal → SuggestModal → FuzzySuggestModal) so `instanceof` and the prototype chain behave as plugins expect — these were previously duplicated across separate shim modules that overwrote each other
+│       ├── install-globals.ts — Installs the `window.obsidian` namespace + DOM/window globals plugin bundles expect; explicit idempotent entry point (registration order: DOM patches → real API → obsidian-api-extensions → fallback-shims). Base classes are wrapped so plugins can extend them from native `class ... extends` *and* from the ES5-downlevel `_super.call(this, …)` output older community bundles ship (`new.target` tells the two call shapes apart). Node's `Buffer` and the `path` shim are installed here too — before bundle evaluation, not at `onload()`, since plugins reference them at module top level. Also home to the single real view/modal class chain (Component → View → ItemView → FileView → EditableFileView → TextFileView → MarkdownView, and MarkdownRenderChild → MarkdownRenderer → MarkdownPreviewView, and MarkdownEditView, and Modal → SuggestModal → FuzzySuggestModal) so `instanceof` and the prototype chain behave as plugins expect — these were previously duplicated across separate shim modules that overwrote each other
 │       ├── global-extensions.ts — Obsidian-compatible prototype patches (Array.remove/first/last, String.contains, Element.find/findAll, Math.clamp, etc.) — imported synchronously before any plugin bundle evaluates
 │       ├── fallback-shims.ts — Last-resort no-op/minimal implementations for anything install-globals + obsidian-api-extensions leave unclaimed; registered last so real shims always win
 │       ├── plugin-loader.ts — PluginLoader (bundle evaluation, lifecycle, timeout, cleanup, @lezer/* stubs)
@@ -324,7 +349,10 @@ src/
 │       ├── obsidian-api-extensions.ts — Extended APIs: Events, Scope, Keymap, utility functions, MarkdownPreviewRenderer, DOM globals (async loaded as supplement) + `OBSIDIAN_API_VERSION` behind `requireApiVersion()`. `Scope.handleKey()` and the module-level `Keymap` scope stack really dispatch (a single global keydown listener walks the stack) instead of only collecting handlers — inert until a plugin calls `app.keymap.pushScope()`. `sanitizeHTMLToDom()` strips inline event-handler attributes and `javascript:`/dangerous `data:` URLs, not just `<script>` tags. `renderComponentIcon()` is `ExtraButtonComponent.setIcon()`'s Lucide/custom-SVG resolver (same logic `ButtonComponent.setIcon()` in `setting-tab.ts` implements separately) — `Setting`/`SettingGroup`'s `addExtraButton()` now construct a real `ExtraButtonComponent` instead of a third copy, so this one fix covers all three call sites.
 │       ├── metadata-parser.ts — `parseMetadata()`: the single producer of Obsidian-shaped `CachedMetadata` from raw Markdown — headings, embeds, sections, listItems, footnotes/footnoteRefs, referenceLinks, frontmatterLinks alongside frontmatter/tags/links/blocks. Best-effort CommonMark approximation (same bar as `parseBlocks`/`scanFencedCodeBlocks`), not a spec-compliant parser
 │       ├── editor-shim.ts — EditorShim (Obsidian Editor API; backend priority CM6 EditorView → textarea → internal buffer; setEditorViewAccessor wired once at vault init)
-│       ├── markdown-renderer.ts — MarkdownRenderer.render()/renderMarkdown() — lightweight markdown-to-HTML (not the full remark/unified pipeline) for plugin custom views (Kanban, Dataview)
+│       ├── editor-suggest-manager.ts — EditorSuggestManager (module-level singleton: registry of EditorSuggest instances, trigger-detection state machine, async generation guard, open/close lifecycle)
+│       ├── editor-suggest-popover.ts — EditorSuggestPopover (fixed-position dropdown DOM, coordsAtPos positioning, viewport clamping, renderSuggestion loop, keyboard-nav selection, scroll-into-view)
+│       ├── editor-suggest-extension.ts — CM6 ViewPlugin (trigger loop on selectionSet/docChanged) + Prec.highest keymap (↑↓ Enter Tab Esc interception when popover is open)
+│       ├── markdown-renderer.ts — MarkdownRenderer (lightweight regex-based markdown-to-HTML). Serves as the synchronous initial implementation during bundle evaluation; the full remark pipeline from `shims/markdown-renderer-shim.ts` patches over the static methods before any plugin's `onload()` fires
 │       ├── markdown-sections.ts — Maps rendered code blocks back to their source line range (getSectionInfo) by re-scanning the source for fenced blocks in document order
 │       ├── block-cache.ts — Parses `^block-id` markers out of Markdown so `[[note#^id]]` links and CachedMetadata.blocks resolve
 │       ├── ribbon-icon-registry.ts — Module-level ribbon icon registry (addRibbonIcon store + change listeners)
@@ -363,7 +391,7 @@ src/
 │           ├── workspace-shim.ts — WorkspaceShim (full Leaf API + getActiveViewOfType synthetic view for the MarkdownView/FileView/ItemView family, onLayoutReady error-isolation); active leaf falls back to an "empty"-type view instead of null, and layout/leaf events re-fire once the CM6 editor mounts
 │           ├── metadata-cache-shim.ts — MetadataCacheShim (getFileCache, resolvedLinks, changed/resolved events, getTags, fileToLinktext, blockCache, getCachedFiles); content parsing is delegated to `metadata-parser.ts`
 │           ├── file-manager-shim.ts — FileManagerShim (renameFile, processFrontMatter, generateMarkdownLink, getNewFileParent, trashFile, promptForFileRename, getAvailablePathForAttachment)
-│           └── markdown-renderer-shim.ts — MarkdownRenderer.render() (unified/remark MDAST→HTML pipeline, registered on window.obsidian)
+│           └── markdown-renderer-shim.ts — MarkdownRendererShim (unified/remark MDAST→HTML pipeline); `registerMarkdownRendererGlobal()` patches the static `render()`/`renderMarkdown()` methods onto the instanziable MarkdownRenderer class defined in `install-globals.ts` — does NOT replace the class (would break the instanceof chain)
 ├── state/
 │   ├── index.ts          — AppProvider, appReducer, action creators
 │   ├── authState.ts      — Auth reducer + types
@@ -380,8 +408,9 @@ src/
 │   ├── panelState.test.ts — Unit tests for panelState reducer
 │   ├── panelContext.tsx  — LeftPanelProvider/RightPanelProvider + useLeftPanelContext/useRightPanelContext — both wrap the same `usePanelState` hook (reducer + localStorage persistence scoped by userId), differing only in storage-key prefix and default view set
 │   ├── documentPanelData.ts — DocumentPanelState reducer + types (outline, forward/backlinks, unlinkedMentions, tags, properties) and the `useDocumentPanelData` hook (owns the 5 effects: document switch, debounced content re-parse, vault-change tag reload, live backlinks refresh, live unlinked-mentions refresh — all via `onRealtimeVaultChange`). Side-agnostic: doesn't care which panel currently hosts Outline/Links/Tags/Properties, see `panelState.ts`
-│   ├── documentPanelActions.ts — loadOutline, loadForwardLinks, loadBacklinks, loadUnlinkedMentions (search-based, filters out matches already inside a wikilink via extractWikilinks/resolveWikilinkTarget), linkUnlinkedMention (rewrites one occurrence into a wikilink and saves), loadTags, loadProperties, expandTag
+│   ├── documentPanelActions.ts — loadOutline, loadForwardLinks, loadBacklinks, loadUnlinkedMentions (search-based, filters out matches already inside a wikilink via extractWikilinks/resolveWikilinkTarget), linkUnlinkedMention (rewrites one occurrence into a wikilink and saves), loadTags, loadProperties, loadPropertyTypes, expandTag
 │   ├── documentPanelActions.test.ts — Unit tests for loadUnlinkedMentions/linkUnlinkedMention
+│   ├── propertyTypes.ts  — Frontend-side property type definitions (PropertyType, PropertyTypeEntry, PropertyTypeOptions, PropertyTypeRegistry) — mirrors backend types for API communication
 │   ├── featureState.ts   — Feature toggle reducer + types (FeatureToggleInfo, optimistic update/rollback)
 │   ├── featureContext.ts — FeatureProvider + useFeatureContext hook (isEnabled helper)
 │   ├── featureActions.ts — loadFeatures, toggleFeature action creators
@@ -447,8 +476,11 @@ src/
 │   ├── VersionBrowser.css — VersionBrowser styles
 │   ├── TemplateSelector.tsx — Two-step modal (template selection → filename input)
 │   ├── TemplateSelector.css — TemplateSelector styles
-│   ├── SearchPanel.tsx   — Vault-wide search + replace panel (replaces FileExplorer when open, debounced search, result navigation)
-│   ├── SearchPanel.css   — SearchPanel styles with design tokens
+│   ├── SearchPanel.tsx   — Vault-wide search + replace panel (replaces FileExplorer when open, debounced search, result navigation, operator syntax highlighting + autocomplete)
+│   ├── SearchPanel.css   — SearchPanel styles with design tokens (incl. highlight layer, autocomplete dropdown, operator help popover)
+│   ├── search-operator-highlight.ts — Client-side search operator highlighting (mirrors backend query-parser regex, produces HighlightedSegment[] for shadow-layer rendering)
+│   ├── search-operator-highlight.test.ts — Unit tests for search operator highlighting
+│   ├── SearchOperatorHelp.tsx — Popover with search operator syntax table and examples
 │   ├── TabBar.tsx        — Unified horizontal tab strip: settings-page tabs (not draggable) + file tabs (draggable/reorderable) in one row
 │   ├── NavigationControls.tsx — Back/forward buttons for the navigation history, disabled when the respective stack is empty
 │   ├── Breadcrumb.tsx    — Active file's folder path as clickable segments (vault name → folders → filename); collapses middle segments into a "…" dropdown past 2 visible folders; hidden for non-file tabs (graph, plugin views)
@@ -458,6 +490,8 @@ src/
 │   ├── ViewMode.tsx      — Markdown renderer (remark + highlight.js + Obsidian plugins)
 │   ├── MermaidRenderer.tsx — Mermaid diagram renderer (lazy-loaded, SVG inline, theme-aware, timeout, error fallback)
 │   ├── MermaidRenderer.test.tsx — Unit tests for MermaidRenderer
+│   ├── MathRenderer.tsx  — LaTeX math renderer (KaTeX, lazy-loaded, 5-state machine: loading/rendered/error/timeout/load-failed, same pattern as MermaidRenderer)
+│   ├── katex-loader.ts   — KaTeX lazy-loader (module-level cached promise, CSS injection, renderMathToString helper, MATH_RENDER_TIMEOUT_MS=2000)
 │   ├── BinaryViewer.tsx  — Binary file preview (images, PDF via PdfViewer, unsupported fallback)
 │   ├── LoginPage.tsx     — Login with logo + card design
 │   ├── ChangePasswordPage.tsx — Forced password change
@@ -518,9 +552,19 @@ src/
 │   │   ├── TagsView.tsx          — Vault-wide tags with expand/collapse
 │   │   ├── TagsView.test.tsx
 │   │   ├── TagsView.css
-│   │   ├── PropertiesView.tsx    — YAML frontmatter as key-value table
+│   │   ├── PropertiesView.tsx    — YAML frontmatter as key-value table (read-only, used when document is not editable)
 │   │   ├── PropertiesView.test.tsx
 │   │   ├── PropertiesView.css
+│   │   ├── PropertiesEditor.tsx  — Interactive typed frontmatter editor (replaces PropertiesView when editable): type resolution (registry > well-known keys > inference), typed controls per property, add/delete/commit
+│   │   ├── PropertiesEditor.css
+│   │   ├── property-controls/   — Individual type-aware input controls for the Properties Editor
+│   │   │   ├── index.ts          — Barrel export
+│   │   │   ├── TextPropertyControl.tsx — Click-to-edit text input (Enter/Blur commit, Escape cancel)
+│   │   │   ├── NumberPropertyControl.tsx — Numeric input with parseFloat validation
+│   │   │   ├── DatePropertyControl.tsx — Native date/datetime-local picker
+│   │   │   ├── CheckboxPropertyControl.tsx — Toggle for boolean values
+│   │   │   ├── ListPropertyControl.tsx — Chip editor with add/remove and optional autocomplete suggestions
+│   │   │   └── property-controls.css — Shared styles for all property controls
 │   │   └── utils/
 │   │       ├── extractHeadings.ts — Heading extraction from markdown
 │   │       └── parseFrontmatter.ts — YAML frontmatter parsing
@@ -635,6 +679,8 @@ Route modules in `src/api/`:
 - `vaultConfigRoutes.ts` — per-vault config (templates dir, daily notes dir, daily note template name)
 - `welcomeVaultRoutes.ts` — `POST /welcome-vault` (on-demand tutorial vault creation)
 - `proxyRoutes.ts` — `POST /proxy` (CORS-free HTTP proxy for plugin requestUrl, SSRF protection)
+- `propertyTypeRoutes.ts` — property-type registry CRUD (GET/PUT per vault)
+- `propertyRoutes.ts` — property metadata (keys, values, query) for Bases foundation
 - `sseRoutes.ts` — `GET /events` (SSE stream)
 
 ## Data Storage
@@ -715,6 +761,7 @@ data/plugins/
 data/vaults/<vaultId>/
 ├── .slatebase/
 │   ├── config.json           — Per-vault configuration (templatesDirectory, dailyNotesDirectory)
+│   ├── property-types.json   — Per-vault property type registry (PropertyTypeEntry[], max 200 — declared types for frontmatter keys)
 │   ├── link-index.json       — Persistent link index (v2: forwardLinks, tags, properties)
 │   ├── trash/
 │   │   ├── _index.json       — Trash index (entries with id, originalPath, deletedAt, isDirectory)

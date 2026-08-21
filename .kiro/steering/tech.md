@@ -87,6 +87,7 @@ test. Config: `backend/vitest.config.ts` and the `test.coverage` block in `front
 | jszip | ZIP export (Firefox fallback) |
 | d3-force | Knowledge graph layout |
 | mermaid | Diagram rendering (lazy-loaded) |
+| katex | LaTeX math rendering (lazy-loaded, same pattern as mermaid) |
 | @codemirror/view | CodeMirror 6 editor view layer |
 | @codemirror/state | CodeMirror 6 editor state |
 | @codemirror/commands | CodeMirror 6 standard commands |

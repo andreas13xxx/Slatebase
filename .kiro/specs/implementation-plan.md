@@ -1,6 +1,6 @@
 # Implementierungsplan — Slatebase Ausstehende Features
 
-**Stand:** 18.08.2026. Security Hardening, Accessibility Audit (Runde 1), **Navigation & Verknüpfungs-Politur**, **UI-Politur (Bookmarks/Statusleiste/CSS-Snippets)** und jetzt auch **Graph-Politur & Link-Integrität** sind abgeschlossen. Kernfeatures sind umgesetzt. Es verbleiben 12 priorisierte offene Spec-Einheiten (decken ~20 Einzelfeatures ab, da mehrere thematisch verwandte Features gebündelt wurden). Zwei davon — **Workspaces/Split-Panes** und **Bases** — waren zuvor als "kein Äquivalent geplant" eingestuft und sind jetzt auf ausdrücklichen Nutzerwunsch in die aktive Roadmap aufgenommen.
+**Stand:** 19.08.2026. Security Hardening, Accessibility Audit (Runde 1), **Navigation & Verknüpfungs-Politur**, **UI-Politur (Bookmarks/Statusleiste/CSS-Snippets)**, **Graph-Politur & Link-Integrität**, **Editor-Erweiterungen (Mathe & Medien)** und jetzt auch **Properties-Editor & Suchoperatoren** sind abgeschlossen. Kernfeatures sind umgesetzt. Es verbleiben 10 priorisierte offene Spec-Einheiten (decken ~18 Einzelfeatures ab, da mehrere thematisch verwandte Features gebündelt wurden). Zwei davon — **Workspaces/Split-Panes** und **Bases** — waren zuvor als "kein Äquivalent geplant" eingestuft und sind jetzt auf ausdrücklichen Nutzerwunsch in die aktive Roadmap aufgenommen.
 
 **Scope-Korrektur Navigation & Verknüpfungs-Politur:** Die umgesetzte Spec (`.kiro/specs/navigation-link-polish/`) deckt Quick Switcher (wie ursprünglich hier geplant) sowie zusätzlich Navigationsverlauf, Tab-Tastaturkürzel, Live-Backlinks, deterministische Link-Auflösung, Explorer-Auto-Reveal und eine Breadcrumb-Leiste ab — ein sinnvollerer, in sich geschlossener Scope als ursprünglich hier skizziert. Die drei übrigen ursprünglich hier gelisteten Punkte (Lokaler Graph, Ungelinkte Erwähnungen, Automatische Link-Aktualisierung beim Umbenennen/Verschieben) wurden **nicht** mitgeliefert und wurden als eigener Prio „Graph-Politur & Link-Integrität" weitergeführt — inzwischen ebenfalls abgeschlossen (siehe „Erledigt" unten).
 
@@ -15,11 +15,11 @@
 | 1 | PDF-Export / Drucken | A | ~6–10h | Geplant (keine Spec) |
 | ~~2~~ | ~~Navigation & Verknüpfungs-Politur~~ | A | ~~25–35h~~ | ✅ Erledigt (Teil-Scope, siehe unten) |
 | ~~3~~ | ~~UI-Politur (Bookmarks/Statusleiste/CSS-Snippets)~~ | A | ~~12–18h~~ | ✅ Erledigt (siehe unten) |
-| 4 | Editor-Erweiterungen (Mathe & Medien) | A | ~15–20h | Geplant (keine Spec) |
+| ~~4~~ | ~~Editor-Erweiterungen (Mathe & Medien)~~ | A | ~~15–20h~~ | ✅ Erledigt (siehe unten) |
 | 5 | Obsidian Themes | B | ~15–20h | Geplant (keine Spec) |
 | 6 | Public Sharing | C | ~15–20h | Geplant (keine Spec) |
 | 7 | Responsive/Mobile | F | ~24–34h | Spec vollständig (Req + Design + Tasks) |
-| 8 | Properties-Editor & Suchoperatoren | H | ~25–35h | Geplant (keine Spec) |
+| ~~8~~ | ~~Properties-Editor & Suchoperatoren~~ | H | ~~~25–35h~~ | ✅ Erledigt (siehe unten) |
 | 9 | Workspaces & Split-Panes | G | ~60–90h | Geplant (keine Spec) — Nutzerwunsch |
 | 10 | Bases | H | ~55–75h | Geplant (keine Spec) — Nutzerwunsch, braucht Prio 8 |
 | 11 | Server-Side Plugins | B | ~48–68h | Tasks vorhanden |
@@ -33,14 +33,14 @@
 ## Abhängigkeiten
 
 ```
-Track A (Politur):     PDF-Export → Editor-Erweiterungen (Mathe/Medien); Navigation & Verknüpfungs-Politur ✅ → Graph-Politur & Link-Integrität ✅; UI-Politur ✅ (unabhängig erledigt)
+Track A (Politur):     PDF-Export (unabhängig); Navigation & Verknüpfungs-Politur ✅ → Graph-Politur & Link-Integrität ✅; UI-Politur ✅; Editor-Erweiterungen (Mathe/Medien) ✅
 Track B (Plugins):     Community Plugin Store ✅ → Obsidian Themes → Server-Side Plugins
 Track C (Sharing):     Public Sharing (unabhängig)
 Track D (Editor):      Collaborative Editing (braucht Realtime + CM6)
 Track E (AI):          Semantische Suche (unabhängig)
 Track F (Qualität):    Security Hardening ✅ → Accessibility Audit ✅ → Responsive/Mobile
 Track G (Layout):      Responsive/Mobile (empfohlene Vorarbeit) → Workspaces & Split-Panes
-Track H (Daten):       Properties-Editor & Suchoperatoren → Bases
+Track H (Daten):       Properties-Editor & Suchoperatoren ✅ → Bases
 Track I (Onboarding):  Fremdformat-Importer (unabhängig)
 ```
 
@@ -130,6 +130,19 @@ Drei additive Verbesserungen an bestehenden bzw. eng verwandten Features:
 
 ---
 
+## Erledigt — Editor-Erweiterungen: Mathe & Medien (Track A) ✅
+
+**Spec:** `.kiro/specs/editor-extensions-math-media/` — alle 6 Requirements umgesetzt (2026-08-19).
+
+Zwei unabhängige Ergänzungen an der Rendering-Pipeline:
+
+- **KaTeX-Mathe-Rendering**: `katex@0.16.22` (MIT, lazy-loaded nach Mermaid-Pattern). Inline-Mathe (`$...$`) mit Obsidian-kompatiblen Boundary-Regeln (kein Whitespace nach öffnendem $, kein Whitespace vor schließendem $, keine Ziffer nach schließendem $, kein Zeilenumbruch). Block-Mathe (`$$...$$`) als MDAST-Transformer. Rendering in drei Schichten: ViewMode (`MathRenderer.tsx`, gleiche 5-Zustands-State-Machine wie MermaidRenderer), Live Preview (InlineMathWidget/BlockMathWidget mit async KaTeX-Hydration), Plugin-Compat (`renderMath`/`finishRenderMath`/`loadMathJax` ersetzen die bisherigen No-Op-Stubs mit echtem KaTeX — `renderMath` gibt synchron ein Element mit Rohtext zurück, das sich async mit gerenderter Mathe aktualisiert).
+- **Audio-/Video-Embeds**: `AUDIO_EXTENSIONS` (.mp3/.wav/.ogg/.flac/.m4a/.aac/.wma) und `VIDEO_EXTENSIONS` (.mp4/.webm/.ogv/.mov/.mkv). `detectEmbedType()` und `EmbedNode.embedType` um `'audio' | 'video'` erweitert. Reading View rendert native `<audio controls>` / `<video controls>` mit dem bestehenden Raw-File-Endpoint. Live Preview: eigene `buildAudioDOM()`/`buildVideoDOM()`-Methoden auf `EmbedWidget`. Video-Embeds unterstützen die bestehende Größensyntax (`![[video.mp4|640]]`).
+
+**Neue Dependency:** `katex` 0.16.22 (MIT, ~300 KB gzipped, keine globalen DOM-Patches, synchron renderbar). Obsidian selbst verwendet ebenfalls KaTeX (ab 1.4+).
+
+---
+
 ## Erledigt — Graph-Politur & Link-Integrität (Track A) ✅
 
 **Spec:** `.kiro/specs/graph-polish-link-integrity/` — alle 3 Requirement-Bereiche umgesetzt (2026-08-18).
@@ -161,37 +174,6 @@ Scope: ~6–10h. Keine Spec vorhanden.
 **Empfehlung:** Kleinster Aufwand im gesamten Backlog bei sofort sichtbarem Nutzen — guter Startpunkt.
 
 ---
-
-## Prio 3 — UI-Politur: Bookmarks, Statusleiste, CSS-Snippets (Track A)
-
-Scope: ~12–18h.
-
-**Spec:** `.kiro/specs/ui-polish-bookmarks-status-css-snippets/` — Requirements + Design + Tasks vorhanden (14 Requirements, 32 Correctness Properties, 20 Task-Blöcke).
-
-**Zusammenfassung:**
-
-- **Bookmarks vervollständigen**: Block-, Überschrift- und Such-Lesezeichen sowie "Alle Tabs bookmarken" (aktuell No-Ops in `core-commands-app.ts`) — Datei-Lesezeichen laufen bereits über die Favoriten. Zusätzlich, über den ursprünglichen Scope hinaus: manuelles Neuordnen (Drag & Drop), Kontextmenü (Entfernen/Im Explorer zeigen/Umbenennen) und eigene Anzeigenamen für Favoriten
-- **Wortanzahl/Zeichenanzahl, Cursor-Position** in der Statusleiste (bereits als erweiterbar angelegt, aktuell nur Uhr), granulare Pro-Item-Sichtbarkeit, Vault-Name-Item, sowie ein Flicker-Fix für Plugin-Items (Remount → Diffing)
-- **CSS-Snippets**: nutzereigenes CSS pro Vault. **Abweichung von der ursprünglichen Kurzfassung:** Der bestehende Plugin-CSS-Injection-Mechanismus (`css-injector.ts`) scoped zwingend auf `[data-plugin-id]`, was für global wirkende Benutzer-Snippets (z. B. `body`-Overrides) ungeeignet ist — die Spec sieht stattdessen einen eigenständigen, unscoped `SnippetInjector` vor, der nur das Grundmuster (ein `<style>`-Tag pro Einheit) teilt
-
-**Abhängigkeiten:** Braucht `sidebar-panel` ✅ (Favoriten) + `obsidian-plugin-compat` ✅ (CSS-Injection als Vorbild, nicht wiederverwendet) + Status Bar ✅.
-
-**Empfehlung:** Aufräum-Spec vor den großen Architektur-Features — schließt kleine, länger bekannte Lücken günstig ab. Bereit zur Umsetzung.
-
----
-
-## Prio 4 — Editor-Erweiterungen: Mathe & Medien (Track A)
-
-Scope: ~15–20h. Keine Spec vorhanden.
-
-**Zusammenfassung:**
-
-- **Mathe/LaTeX-Rendering**: KaTeX (leichtgewichtiger als MathJax) lazy-loaded nach dem bestehenden Mermaid-Muster; `renderMath`/`finishRenderMath` im Plugin-Shim ersetzen die aktuelle Rohtext-Ausgabe
-- **Audio-/Video-Embeds**: `![[datei.mp3]]` / `.mp4` im Embed-Modul, analog zur bestehenden Bild-/PDF-Embed-Pipeline
-
-**Abhängigkeiten:** Braucht `obsidian-markdown-compat` ✅ (Embed-Pipeline) + `mermaid-rendering` ✅ (Lazy-Load-Pattern als Vorlage).
-
-**Empfehlung:** Mathe ist eine der sichtbarsten verbliebenen Rendering-Lücken für technische/wissenschaftliche Nutzer — moderater Aufwand, hohe Sichtbarkeit.
 
 ---
 
@@ -248,19 +230,20 @@ Scope: ~4h Design + ~20–30h Implementierung.
 
 ---
 
-## Prio 8 — Properties-Editor & Suchoperatoren (Track H)
+## Erledigt — Properties-Editor & Suchoperatoren (Track H) ✅
 
-Scope: ~25–35h. Keine Spec vorhanden. Zwingende Vorarbeit für Bases (Prio 10) — bewusst vorgezogen, damit Bases auf einer bereits fertigen Query-/Property-Schicht aufbauen kann statt sie zu duplizieren.
+**Spec:** `.kiro/specs/properties-editor-search-operators/` — alle 22 Tasks abgeschlossen (2026-08-19).
 
-**Zusammenfassung:**
+Zwei zusammengehörende Erweiterungen auf einer gemeinsamen Property-/Metadaten-Schicht:
 
-- **Properties-Editor-UI**: typisierte Frontmatter-Felder (Text/Zahl/Datum/Checkbox/Liste/Tags) statt aktuell rohem YAML im Editor; Typ-Erkennung aus vorhandenen Werten, manuelle Typ-Umschaltung
-- **Such-Operatoren**: Query-Syntax-Parser für `path:`, `tag:`, `file:`, `line:`, `-tag:` u. Ä., vor die bestehende Regex-Suche geschaltet
-- Beide Teile greifen auf dieselbe Property-/Metadaten-Schicht zu, die auch Bases (Prio 10) als Query-Grundlage braucht
+- **Property-Type-Registry**: Pro-Vault-JSON-Speicher (`.slatebase/property-types.json`) mit deklarierten Frontmatter-Feld-Typen (text/number/date/datetime/checkbox/list/tags/aliases). REST-CRUD (`GET/PUT /vaults/:vaultId/property-types`), reservierte Keys (tags/aliases unveränderbar), max. 200 Einträge. `KeyedJsonFileStore`-Pattern.
+- **Property-Value-Index**: Inverser In-Memory-Index (`key→value→files`) im `LinkIndexService`, deterministisch aus dem bestehenden `fileProperties`-Map rekonstruiert (nicht extra persistiert). Neue Query-Methoden: `getFilesByProperty`, `getPropertyKeys`, `getPropertyValues`, `queryByProperties` (eq/neq/contains/exists/not_exists, UND-Verknüpfung, max 500 Ergebnisse).
+- **Such-Operatoren (Backend)**: Query-Parser extrahiert `path:`, `file:`, `tag:`, `property:` (inkl. Negation `-tag:`, Quoting `path:"Mein Ordner/**"`) als Pre-Filter vor der bestehenden Volltextsuche. Glob-Match-Utility für `path:`-Patterns (`*`/`**`/`?`). Datei-Listing-Modus bei reinen Operator-Queries. API-kompatibel (Operatoren im bestehenden `query`-Parameter, kein neuer Endpunkt).
+- **Such-Operatoren (Frontend)**: Shadow-Layer-Syntax-Highlighting im Suchfeld (farbige Operator-Keywords/-Werte/-Negation), Autocomplete-Dropdown für `tag:`/`property:`-Werte (geladen aus `getGraphMeta`), Operatoren-Hilfe-Popover mit Syntax-Tabelle.
+- **Properties-Editor UI**: Ersetzt die bisherige read-only `PropertiesView` im Context Panel durch einen interaktiven, typisierten Editor (im Edit-Modus bei Markdown-Dateien mit Schreibzugriff). Typ-Auflösung: Registry > well-known keys > Wert-Inferenz. Typ-Controls: Text (click-to-edit), Number (Validierung), Date/Datetime (native Picker), Checkbox (Toggle), List/Tags (Chip-Editor mit Autocomplete). Add/Delete/Commit über `applyFrontmatterChange()` → `UPDATE_EDIT_BUFFER` (gleicher Pfad wie manuelle Editor-Edits).
+- **Property-Metadaten-API**: `GET /vaults/:vaultId/properties` (Keys + Counts + Typen), `GET /properties/:key/values` (paginiert), `POST /properties/query` (Filter-basiertes Datei-Listing). Grundlage für Bases (Prio 10).
 
-**Abhängigkeiten:** Braucht `context-panel` ✅ (Properties-Anzeige) + `search-and-discovery` ✅.
-
-**Empfehlung:** Nicht überspringen, auch wenn beide Teile für sich genommen "nur" mittlere Priorität hätten — ohne diese Vorarbeit baut Bases sonst eine zweite, inkonsistente Query-Engine.
+**Testbilanz:** 130 neue Tests (98 Backend + 32 Frontend). Backend kompiliert fehlerfrei.
 
 ---
 
@@ -296,7 +279,7 @@ Scope: ~55–75h. Keine Spec vorhanden. **Nutzerwunsch** — zuvor als "kein Äq
 - Formeln: einfache Ausdrücke über Properties (Vergleiche, Verkettung, Basis-Arithmetik)
 - Bases-Tabs im Tab-System (bzw. in eigenen Panes, falls Workspaces/Prio 9 vorher landet)
 
-**Abhängigkeiten:** **Zwingend** Prio 8 (Properties-Editor & Suchoperatoren) zuerst. Profitiert von Prio 9 (Workspaces), ist davon aber nicht hart blockiert.
+**Abhängigkeiten:** Prio 8 (Properties-Editor & Suchoperatoren) ✅ — Vorarbeit erledigt. Profitiert von Prio 9 (Workspaces), ist davon aber nicht hart blockiert.
 
 **Empfehlung:** Größtes Einzelfeature nach Workspaces. Scope-Risiko liegt vor allem bei den Formeln — Obsidians Formel-Sprache ist nicht trivial nachzubauen; für die erste Version auf einfache Ausdrücke beschränken statt volle Parität in einem Zug anzustreben.
 
@@ -367,15 +350,15 @@ Scope: ~8h Design + ~60–80h Implementierung.
 
 | Track | Aufwand |
 |-------|---------|
-| A: Politur (PDF, Mathe/Medien) | ~21–30h |
+| A: Politur (PDF-Export) | ~6–10h |
 | B: Plugins (Themes + Server-Side) | ~63–88h |
 | C: Sharing | ~19–24h |
 | D: Editor (Collaborative) | ~68–88h |
 | E: AI (Semantische Suche) | ~38–58h |
 | F/G: Qualität & Layout (Responsive + Workspaces) | ~84–124h |
-| H: Strukturierte Daten (Properties/Suche + Bases) | ~80–110h |
+| H: Strukturierte Daten (Bases) | ~55–75h |
 | I: Onboarding (Importer) | ~20–30h |
-| **Summe** | **~393–552h** |
+| **Summe** | **~353–497h** |
 
 ---
 

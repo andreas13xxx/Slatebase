@@ -182,6 +182,55 @@
   color: var(--text-secondary);
 }
 
+/* --- Embed Audio --- */
+.cm-lp-embed-audio {
+  display: block;
+  max-width: 100%;
+  margin: 4px 0;
+}
+
+/* --- Embed Video --- */
+.cm-lp-embed-video {
+  display: block;
+  max-width: 100%;
+  margin: 4px 0;
+  border-radius: var(--radius-md);
+}
+
+/* --- Inline Math --- */
+.cm-lp-math-inline {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.cm-lp-math-inline.cm-lp-math-rendered {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.cm-lp-math-error {
+  color: var(--text-error, #d32f2f);
+  border-bottom: 1px dashed var(--text-error, #d32f2f);
+}
+
+.cm-lp-math-load-failed {
+  opacity: 0.6;
+}
+
+/* --- Block Math --- */
+.cm-lp-math-block {
+  display: block;
+  text-align: center;
+  margin: 0.8em 0;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.cm-lp-math-block.cm-lp-math-rendered {
+  font-family: inherit;
+  font-size: inherit;
+}
+
 /* --- Checkboxes --- */
 .cm-lp-checkbox {
   cursor: pointer;

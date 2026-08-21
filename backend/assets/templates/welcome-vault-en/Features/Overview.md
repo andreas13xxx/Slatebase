@@ -19,7 +19,7 @@ These features form the foundation of a connected knowledge base. With wikilinks
 | Guide | Description |
 |-------|-------------|
 | [[Features/Wikilinks\|Wikilinks]] | Link notes together — aliases, heading links, auto-resolve |
-| [[Features/Embeds\|Embeds]] | Embed images, PDFs, and notes inline |
+| [[Features/Embeds\|Embeds]] | Embed images, PDFs, audio, video, and notes inline |
 | [[Features/Knowledge Graph\|Knowledge Graph]] | Visually explore your knowledge network |
 
 ## Organization & Metadata
@@ -40,6 +40,7 @@ Markdown doesn't have to look plain. With callouts you highlight information, wi
 |-------|-------------|
 | [[Features/Callouts\|Callouts]] | Colored callout boxes for tips, warnings, and more |
 | [[Features/Mermaid Diagrams\|Mermaid Diagrams]] | Flowcharts, sequence, and Gantt diagrams in Markdown |
+| [[Features/Math (LaTeX)\|Math (LaTeX)]] | Mathematical formulas with KaTeX (inline and display) |
 
 ---
 
@@ -52,6 +53,7 @@ Beyond the core features listed above, you'll find these additional capabilities
 - [[Features/Canvas]] — Visual whiteboards with nodes and connections
 - [[Features/Command Palette]] — Quick access to all commands via keyboard
 - [[Features/Bookmarks]] — Reorder and rename favorites, heading/block/search bookmarks
+- [[Features/Status Bar]] — Word count, cursor position, go to line, plugin items
 - [[Features/Vault Management]] — Create, share, and manage vaults
 - [[Features/Settings]] — All configuration options
 - [[Features/CSS Snippets]] — Custom CSS per vault

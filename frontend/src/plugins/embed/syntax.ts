@@ -1,5 +1,5 @@
 import type { Extension, Effects, State, Code, TokenizeContext } from 'micromark-util-types'
-import { IMAGE_EXTENSIONS, PDF_EXTENSIONS } from '../types'
+import { IMAGE_EXTENSIONS, PDF_EXTENSIONS, AUDIO_EXTENSIONS, VIDEO_EXTENSIONS } from '../types'
 
 declare module 'micromark-util-types' {
   interface TokenTypeMap {
@@ -17,9 +17,11 @@ declare module 'micromark-util-types' {
  * Determines the embed type based on the target file extension.
  * Returns 'image' if the target ends with a known image extension,
  * 'pdf' if it ends with .pdf,
+ * 'audio' if it ends with a known audio extension,
+ * 'video' if it ends with a known video extension,
  * otherwise returns 'note'.
  */
-export function detectEmbedType(target: string): 'image' | 'pdf' | 'note' {
+export function detectEmbedType(target: string): 'image' | 'pdf' | 'audio' | 'video' | 'note' {
   const lower = target.toLowerCase()
   for (const ext of IMAGE_EXTENSIONS) {
     if (lower.endsWith(ext)) {
@@ -29,6 +31,16 @@ export function detectEmbedType(target: string): 'image' | 'pdf' | 'note' {
   for (const ext of PDF_EXTENSIONS) {
     if (lower.endsWith(ext)) {
       return 'pdf'
+    }
+  }
+  for (const ext of AUDIO_EXTENSIONS) {
+    if (lower.endsWith(ext)) {
+      return 'audio'
+    }
+  }
+  for (const ext of VIDEO_EXTENSIONS) {
+    if (lower.endsWith(ext)) {
+      return 'video'
     }
   }
   return 'note'

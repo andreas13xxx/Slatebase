@@ -12,6 +12,7 @@ const mockApiClient = {
   searchVault: vi.fn().mockResolvedValue({ results: [], totalHits: 0, truncated: false, truncationMessage: null }),
   searchMultiVault: vi.fn().mockResolvedValue({ results: [], totalHits: 0, truncated: false, truncationMessage: null }),
   replaceInVault: vi.fn().mockResolvedValue({ totalReplacements: 0, fileCount: 0, files: [], failed: [] }),
+  getGraphMeta: vi.fn().mockResolvedValue({ tags: [], properties: [] }),
 } as unknown as AppContextValue['apiClient']
 
 const mockAppContextValue: AppContextValue = {

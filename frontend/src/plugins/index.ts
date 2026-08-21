@@ -8,6 +8,8 @@ export type {
   CalloutTypeConfig,
 } from './types'
 
+export type { MathInlineNode, MathBlockNode } from './math/types'
+
 // Constants
 export { IMAGE_EXTENSIONS } from './types'
 
@@ -19,6 +21,7 @@ export { remarkTag } from './tag/plugin'
 export { remarkBreaks } from './breaks/plugin'
 export { remarkBlockRef } from './block-ref/plugin'
 export { remarkPreserveTableCodeEscapes } from './preserve-table-code-escapes'
+export { remarkMath } from './math/plugin'
 
 // Utilities
 export { extractWikilinks } from './wikilink/extract'

@@ -4940,6 +4940,25 @@
   border: none;
 }
 
+.view-mode-embed--audio {
+  max-width: 100%;
+  padding: 8px;
+}
+
+.view-mode-embed--audio audio {
+  width: 100%;
+}
+
+.view-mode-embed--video {
+  padding: 8px;
+  text-align: center;
+}
+
+.view-mode-embed--video video {
+  max-width: 100%;
+  height: auto;
+}
+
 /* â”€â”€â”€ MCP Tokens Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .mcp-tokens-page { padding: 20px 24px; max-width: 900px; }
@@ -6715,6 +6734,42 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   overflow-x: auto;
+}
+
+/* ===== Math (KaTeX) Renderer ===== */
+.math {
+  font-size: 1em;
+}
+
+.math-block {
+  display: block;
+  text-align: center;
+  margin-block: 1em;
+  overflow-x: auto;
+}
+
+.math-inline {
+  display: inline;
+  vertical-align: baseline;
+}
+
+.math-error {
+  color: var(--text-error, #d32f2f);
+  border-bottom: 1px dashed var(--text-error, #d32f2f);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.math-load-failed {
+  opacity: 0.6;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.math-loading {
+  opacity: 0.6;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
 }
 
 .mermaid-error pre code {

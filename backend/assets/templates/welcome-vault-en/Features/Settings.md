@@ -77,6 +77,9 @@ The status bar at the bottom of the app can show several pieces of information a
 
 Toggle the whole bar on/off, or toggle individual items independently (e.g. show only the word count, hide the clock and cursor position). Plugin status items (when the Obsidian plugin compatibility layer is enabled) appear on the right side of the bar.
 
+> [!info] Full guide
+> For all details on the status bar (go to line, selection stats, plugin items), see [[Features/Status Bar|Status Bar]].
+
 ### CSS Snippets
 
 Customize Slatebase's appearance with your own CSS, stored and managed per vault under Settings → Appearance → "CSS Snippets":

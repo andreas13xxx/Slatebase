@@ -92,12 +92,14 @@ Im Vim-Modus stehen die gewohnten Modi (Normal, Insert, Visual) und Befehle zur 
 | Inline-Code | `` `code` `` | Monospace-Styling |
 | Links | `[text](url)` | Klickbar (Ctrl+Click) |
 | Wikilinks | `[[Seite]]` | Klickbar, Brackets versteckt |
-| Embeds | `![[bild.png]]` | Inline-Bild |
+| Embeds | `![[bild.png]]` | Inline-Bild/Audio/Video |
 | Standard-Bilder | `![alt](url)` | Inline-Bild |
 | Checkboxen | `- [x] done` | Klickbare Checkbox |
 | Tabellen | Pipe-Syntax | HTML-Tabelle |
 | Code-Blöcke | ` ```js ` | Fences versteckt, Hintergrund |
 | Mermaid | ` ```mermaid ` | SVG-Diagramm |
+| Inline-Mathe | `$E=mc^2$` | Gerenderte Formel |
+| Block-Mathe | `$$...\n$$` | Zentrierte Formel |
 | Blockzitate | `> text` | Border-Left, Prefix versteckt |
 | Callouts | `> [!tip]` | Farbige Box mit Icon |
 | Horizontale Linie | `---` | Echte Trennlinie |

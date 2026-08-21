@@ -13,6 +13,8 @@ export type {
   GraphMeta,
   BacklinksResponse,
   ParsedWikilink,
+  PropertyFilter,
+  PropertyFilterOperator,
 } from './types.js'
 
 // Link migration types

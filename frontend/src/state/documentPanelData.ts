@@ -13,6 +13,7 @@ import type { Dispatch } from 'react'
 import type { IApiClient } from '../api'
 import type { DirectoryTree } from '../types'
 import { onRealtimeVaultChange } from './realtimeVaultBridge'
+import type { PropertyTypeEntry } from './propertyTypes'
 import {
   loadOutline,
   loadForwardLinks,
@@ -20,6 +21,7 @@ import {
   loadUnlinkedMentions,
   loadTags,
   loadProperties,
+  loadPropertyTypes,
   expandTag,
 } from './documentPanelActions'
 
@@ -89,6 +91,8 @@ export interface DocumentPanelState {
     data: Record<string, unknown> | null
     parseError: string | null
     rawFrontmatter: string | null
+    /** Per-vault property type registry, loaded once per vault switch. */
+    typeRegistry: PropertyTypeEntry[] | null
   }
 }
 
@@ -106,6 +110,7 @@ export type DocumentPanelAction =
   | { type: 'SET_TAGS_LOADING'; loading: boolean }
   | { type: 'SET_TAG_EXPANDED'; tag: string | null; files: string[] }
   | { type: 'SET_PROPERTIES'; data: Record<string, unknown> | null; parseError: string | null; rawFrontmatter: string | null }
+  | { type: 'SET_PROPERTY_TYPE_REGISTRY'; entries: PropertyTypeEntry[] | null }
   | { type: 'RESET_DOCUMENT_STATE' }
 
 function createInitialState(): DocumentPanelState {
@@ -121,7 +126,7 @@ function createInitialState(): DocumentPanelState {
       unlinkedMentionsError: null,
     },
     tags: { entries: [], loading: false, expandedTag: null, tagFiles: [] },
-    properties: { data: null, parseError: null, rawFrontmatter: null },
+    properties: { data: null, parseError: null, rawFrontmatter: null, typeRegistry: null },
   }
 }
 
@@ -152,7 +157,9 @@ function documentPanelReducer(state: DocumentPanelState, action: DocumentPanelAc
     case 'SET_TAG_EXPANDED':
       return { ...state, tags: { ...state.tags, expandedTag: action.tag, tagFiles: action.files } }
     case 'SET_PROPERTIES':
-      return { ...state, properties: { data: action.data, parseError: action.parseError, rawFrontmatter: action.rawFrontmatter } }
+      return { ...state, properties: { ...state.properties, data: action.data, parseError: action.parseError, rawFrontmatter: action.rawFrontmatter } }
+    case 'SET_PROPERTY_TYPE_REGISTRY':
+      return { ...state, properties: { ...state.properties, typeRegistry: action.entries } }
     case 'RESET_DOCUMENT_STATE':
       return {
         ...state,
@@ -167,7 +174,7 @@ function documentPanelReducer(state: DocumentPanelState, action: DocumentPanelAc
           unlinkedMentionsError: null,
         },
         tags: { ...state.tags, expandedTag: null, tagFiles: [] },
-        properties: { data: null, parseError: null, rawFrontmatter: null },
+        properties: { data: null, parseError: null, rawFrontmatter: null, typeRegistry: state.properties.typeRegistry },
       }
   }
 }
@@ -273,8 +280,10 @@ export function useDocumentPanelData({
     if (vaultId !== prevVaultIdRef.current) {
       if (vaultId !== null && apiClient) {
         void loadTags(dispatch, apiClient, vaultId)
+        void loadPropertyTypes(dispatch, apiClient, vaultId)
       } else {
         dispatch({ type: 'SET_TAGS', entries: [] })
+        dispatch({ type: 'SET_PROPERTY_TYPE_REGISTRY', entries: null })
       }
       prevVaultIdRef.current = vaultId
     }

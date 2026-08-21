@@ -337,3 +337,21 @@ function formatLinkDisplayName(filePath: string): string {
   }
   return filePath
 }
+
+/**
+ * Loads the property type registry for the active vault.
+ * Called once per vault switch (not per document switch).
+ */
+export async function loadPropertyTypes(
+  dispatch: Dispatch<DocumentPanelAction>,
+  apiClient: IApiClient,
+  vaultId: string,
+): Promise<void> {
+  try {
+    const response = await apiClient.getPropertyTypes(vaultId)
+    dispatch({ type: 'SET_PROPERTY_TYPE_REGISTRY', entries: response.entries })
+  } catch {
+    // Non-critical: editor works without registry (falls back to type inference)
+    dispatch({ type: 'SET_PROPERTY_TYPE_REGISTRY', entries: null })
+  }
+}

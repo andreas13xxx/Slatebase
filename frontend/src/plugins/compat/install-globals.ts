@@ -993,8 +993,18 @@ export function installObsidianGlobals(): void {
         this.suggestEl = document.createElement('div')
         this.suggestEl.className = 'suggestion-container'
       }
-      open(): void {}
-      close(): void {}
+      open(): void {
+        if (!this.suggestEl.parentElement) {
+          document.body.appendChild(this.suggestEl)
+        }
+        this.suggestEl.style.display = ''
+      }
+      close(): void {
+        this.suggestEl.style.display = 'none'
+        if (this.suggestEl.parentElement) {
+          this.suggestEl.parentElement.removeChild(this.suggestEl)
+        }
+      }
       /** Render a suggestion item. Plugins override this. */
       renderSuggestion(_value: T, _el: HTMLElement): void {}
       /** Handle the user choosing a suggestion. Plugins override this. */
@@ -1883,11 +1893,22 @@ export function installObsidianGlobals(): void {
     } as unknown as Record<string, unknown>
   }
 
-  // TextFileView — extends FileView with text content management.
+  // EditableFileView — abstract intermediate class between FileView and TextFileView.
+  // In real Obsidian this is an empty class that exists solely for the instanceof chain:
+  // FileView → EditableFileView → TextFileView → MarkdownView.
+  // Plugins use `view instanceof EditableFileView` to check editable file views.
+  if (!window.obsidian.EditableFileView) {
+    const FileViewClass = window.obsidian.FileView as { new (leaf: unknown): unknown; prototype: object }
+    window.obsidian.EditableFileView = class EditableFileView extends (FileViewClass as unknown as { new (leaf: unknown): { containerEl: HTMLElement; contentEl: HTMLElement; app: unknown; leaf: unknown; file: unknown } }) {
+      // Obsidian's EditableFileView is empty — exists only as an instanceof marker
+    } as unknown as Record<string, unknown>
+  }
+
+  // TextFileView — extends EditableFileView with text content management.
   // Plugins like Kanban extend this for file-backed views with getViewData/setViewData/requestSave.
   if (!window.obsidian.TextFileView) {
-    const FileViewClass = window.obsidian.FileView as { new (leaf: unknown): unknown; prototype: object }
-    window.obsidian.TextFileView = class TextFileView extends (FileViewClass as unknown as { new (leaf: unknown): { containerEl: HTMLElement; contentEl: HTMLElement; app: unknown; leaf: unknown; file: unknown; _loaded: boolean } }) {
+    const EditableFileViewClass = window.obsidian.EditableFileView as { new (leaf: unknown): unknown; prototype: object }
+    window.obsidian.TextFileView = class TextFileView extends (EditableFileViewClass as unknown as { new (leaf: unknown): { containerEl: HTMLElement; contentEl: HTMLElement; app: unknown; leaf: unknown; file: unknown; _loaded: boolean } }) {
       data: string = ''
       private _saveRequested: boolean = false
       private _saveTimerId: ReturnType<typeof setTimeout> | null = null
@@ -1989,15 +2010,16 @@ export function installObsidianGlobals(): void {
   }
 
   // MarkdownView — plugins use `getActiveViewOfType(MarkdownView)` to check if the
-  // active leaf is editing a markdown file. Extends FileView with editor property.
-  // This is the ONE canonical MarkdownView (Component -> View -> ItemView -> FileView
-  // -> MarkdownView chain) — WorkspaceShim.getActiveViewOfType() constructs instances
-  // of this exact class rather than a separate lookalike, so `instanceof MarkdownView`
-  // and inherited Component methods (registerEvent/registerDomEvent/addChild/...) work
-  // regardless of whether a plugin got the view from `activeLeaf.view` or by querying.
+  // active leaf is editing a markdown file. Extends TextFileView (matching the real
+  // Obsidian chain: Component → View → ItemView → FileView → EditableFileView →
+  // TextFileView → MarkdownView). This is the ONE canonical MarkdownView —
+  // WorkspaceShim.getActiveViewOfType() constructs instances of this exact class
+  // rather than a separate lookalike, so `instanceof MarkdownView`, `instanceof
+  // TextFileView`, and inherited Component methods (registerEvent/registerDomEvent/
+  // addChild/...) all work regardless of how a plugin obtained the view.
   if (!window.obsidian.MarkdownView) {
-    const FileViewClass = window.obsidian.FileView as { new (leaf: unknown): unknown; prototype: object }
-    window.obsidian.MarkdownView = class MarkdownView extends (FileViewClass as unknown as { new (leaf: unknown): { containerEl: HTMLElement; contentEl: HTMLElement; app: unknown; leaf: unknown; file: unknown } }) {
+    const TextFileViewClass = window.obsidian.TextFileView as { new (leaf: unknown): unknown; prototype: object }
+    window.obsidian.MarkdownView = class MarkdownView extends (TextFileViewClass as unknown as { new (leaf: unknown): { containerEl: HTMLElement; contentEl: HTMLElement; app: unknown; leaf: unknown; file: unknown; data: string; _loaded: boolean; requestSave(): void } }) {
       /** Returns 'markdown' as the view type identifier. */
       getViewType(): string { return 'markdown' }
       getDisplayText(): string { return (this.file as { basename?: string })?.basename ?? 'Markdown' }
@@ -2010,40 +2032,130 @@ export function installObsidianGlobals(): void {
       }
       /** Current edit mode: 'source' (editing) or 'preview' (reading). */
       getMode(): string { return 'source' }
-      /** Request save — no-op in our implementation, auto-save handles it. */
-      requestSave(): void { /* no-op */ }
-      /** Preview-mode stub (Live Preview only — no separate reading-mode renderer). */
-      previewMode: { rerender: () => void } = { rerender: () => {} }
-      /** Sub-view mode stub (source/preview toggle plugins may probe). */
-      currentMode: { get: () => string; set: (data: string, clear: boolean) => void } = {
-        get: () => 'source',
-        set: () => {},
-      }
-      /** Get the raw view data — delegates to the live editor. */
+      /** Preview-mode sub-view. Will be replaced with a real MarkdownPreviewView instance. */
+      previewMode: unknown = null
+      /** Current mode sub-view (MarkdownEditView in source, MarkdownPreviewView in preview). */
+      currentMode: unknown = null
+      /**
+       * Get the raw view data — delegates to the live editor, falling back to
+       * the inherited `data` property from TextFileView.
+       */
       getViewData(): string {
-        return (this.editor as { getValue: () => string } | null)?.getValue() ?? ''
+        return (this.editor as { getValue?: () => string } | null)?.getValue?.() ?? this.data ?? ''
       }
-      /** Set the view data — delegates to the live editor. */
+      /**
+       * Set the view data — updates both the editor and the inherited data field.
+       */
       setViewData(data: string, _clear?: boolean): void {
-        (this.editor as { setValue: (v: string) => void } | null)?.setValue(data)
+        this.data = data
+        ;(this.editor as { setValue?: (v: string) => void } | null)?.setValue?.(data)
       }
       /** Clear the view state. No-op — Slatebase re-renders from the editor directly. */
       clear(): void { /* no-op */ }
       /** Show the search bar. No-op — Slatebase has its own search panel. */
       showSearch(_replace?: boolean): void { /* no-op */ }
-      /**
-       * Force-write the current editor content to the vault.
-       * Real Obsidian's MarkdownView inherits this from TextFileView, which our
-       * shim chain skips (FileView -> MarkdownView, no TextFileView). Plugins like
-       * Templater call `view.save()` directly after programmatic edits to flush
-       * immediately rather than waiting on the debounced autosave.
-       */
-      async save(): Promise<void> {
-        if (!this.file) return
-        const vault = (this.app as { vault?: { modify: (f: unknown, content: string) => Promise<void> } })?.vault
-        if (vault) await vault.modify(this.file, this.getViewData())
+    } as unknown as Record<string, unknown>
+  }
+
+  // MarkdownEditView — implements MarkdownSubView, HoverParent, MarkdownFileInfo.
+  // In real Obsidian this represents the source/live-preview editing sub-view.
+  // `MarkdownView.currentMode` is set to an instance of this class in source mode.
+  if (!window.obsidian.MarkdownEditView) {
+    window.obsidian.MarkdownEditView = class MarkdownEditView {
+      app: unknown
+      hoverPopover: unknown = null
+      private _view: unknown
+
+      constructor(view: unknown) {
+        this._view = view
+        this.app = (view as { app?: unknown })?.app ?? null
+      }
+
+      get file(): unknown {
+        return (this._view as { file?: unknown })?.file ?? null
+      }
+
+      /** Get the editor content. */
+      get(): string {
+        const editor = (this._view as { editor?: { getValue?: () => string } })?.editor
+        return editor?.getValue?.() ?? (this._view as { data?: string })?.data ?? ''
+      }
+
+      /** Set the editor content. */
+      set(data: string, _clear: boolean): void {
+        const editor = (this._view as { editor?: { setValue?: (v: string) => void } })?.editor
+        if (editor?.setValue) {
+          editor.setValue(data)
+        }
+        const view = this._view as { data?: string }
+        if (view) view.data = data
+      }
+
+      /** Clear the editor state. */
+      clear(): void {
+        this.set('', true)
+      }
+
+      /** Get the current text selection. */
+      getSelection(): string {
+        const editor = (this._view as { editor?: { getSelection?: () => string } })?.editor
+        return editor?.getSelection?.() ?? ''
+      }
+
+      /** Get current scroll position. */
+      getScroll(): number {
+        const editor = this._view as { editor?: unknown }
+        const cm = (editor?.editor as { cm?: { scrollDOM?: HTMLElement } })?.cm
+        return cm?.scrollDOM?.scrollTop ?? 0
+      }
+
+      /** Apply a scroll position. */
+      applyScroll(scroll: number): void {
+        const editor = this._view as { editor?: unknown }
+        const cm = (editor?.editor as { cm?: { scrollDOM?: HTMLElement } })?.cm
+        if (cm?.scrollDOM) cm.scrollDOM.scrollTop = scroll
       }
     } as unknown as Record<string, unknown>
+  }
+
+  // Wire up MarkdownView.currentMode and previewMode after both classes are defined.
+  // We patch the MarkdownView prototype so every instance gets a proper currentMode.
+  {
+    const MV = window.obsidian.MarkdownView as { prototype?: Record<string, unknown> } | undefined
+    const MEV = window.obsidian.MarkdownEditView as { new (view: unknown): unknown } | undefined
+    if (MV?.prototype && MEV) {
+      // Override currentMode as a lazy getter that creates a MarkdownEditView on first access
+      const originalCurrentMode = Object.getOwnPropertyDescriptor(MV.prototype, 'currentMode')
+      if (!originalCurrentMode || originalCurrentMode.value === null) {
+        Object.defineProperty(MV.prototype, 'currentMode', {
+          get(this: unknown) {
+            const self = this as { _currentMode?: unknown }
+            if (!self._currentMode) {
+              self._currentMode = new (MEV as unknown as { new (v: unknown): unknown })(this)
+            }
+            return self._currentMode
+          },
+          set(this: unknown, value: unknown) {
+            (this as { _currentMode?: unknown })._currentMode = value
+          },
+          configurable: true,
+          enumerable: true,
+        })
+      }
+      // previewMode will be patched in Schritt 4 after MarkdownPreviewView is defined.
+      // For now, provide a minimal stub that won't crash on common access patterns.
+      if (MV.prototype.previewMode === null) {
+        MV.prototype.previewMode = {
+          get: () => '',
+          set: () => {},
+          clear: () => {},
+          rerender: () => {},
+          getScroll: () => 0,
+          applyScroll: () => {},
+          containerEl: document.createElement('div'),
+        }
+      }
+    }
   }
 
   // ─── Moment.js global (required by Calendar, Periodic Notes, and many others) ──
@@ -2362,13 +2474,16 @@ export function installObsidianGlobals(): void {
   }
 
   // SettingPage — Base class for sub-pages within a SettingTab (Obsidian 1.13.0+).
-  // Templater extends this for its settings pages.
+  // Plugins extend this for custom imperative settings pages (Templater v2.23+).
+  // The declarative-settings-renderer's openSubPage() calls page() → display() →
+  // mount containerEl, and hide() on back-navigation.
   if (!window.obsidian.SettingPage) {
-    window.obsidian.SettingPage = class SettingPage {
+    window.obsidian.SettingPage = makeExtendable(class SettingPage {
       rootEl: HTMLElement
       titlebarEl: HTMLElement
       containerEl: HTMLElement
-      title = ''
+      private _title = ''
+
       constructor() {
         this.rootEl = document.createElement('div')
         this.rootEl.className = 'setting-page'
@@ -2379,9 +2494,25 @@ export function installObsidianGlobals(): void {
         this.rootEl.appendChild(this.titlebarEl)
         this.rootEl.appendChild(this.containerEl)
       }
+
+      get title(): string { return this._title }
+      set title(value: string) {
+        this._title = value
+        this.titlebarEl.textContent = value
+      }
+
+      /** Subclass overrides this to render page content into containerEl. */
       display(): void {}
-      hide(): void {}
-    } as unknown as Record<string, unknown>
+
+      /**
+       * Called when the user navigates away from this page. Clears containerEl
+       * so registered components are removed from the DOM. Subclasses may
+       * override for additional cleanup (unload listeners, etc.).
+       */
+      hide(): void {
+        this.containerEl.innerHTML = ''
+      }
+    }) as unknown as Record<string, unknown>
   }
 
   if (!window.obsidian.Menu) {
@@ -2980,9 +3111,121 @@ export function installObsidianGlobals(): void {
   }
 
   // ─── MarkdownRenderer ──────────────────────────────────────────────────────
-
+  // In real Obsidian: abstract class MarkdownRenderer extends MarkdownRenderChild
+  // implements MarkdownPreviewEvents, HoverParent.
+  // Plugins use the static methods (render/renderMarkdown) and occasionally do
+  // `instanceof MarkdownRenderer` checks on MarkdownPreviewView instances.
+  // We make it a real class extending MarkdownRenderChild so that:
+  // 1. `instanceof MarkdownRenderChild` works on MarkdownRenderer/MarkdownPreviewView
+  // 2. The static render methods remain available
   if (!window.obsidian.MarkdownRenderer) {
-    window.obsidian.MarkdownRenderer = MarkdownRenderer as unknown as Record<string, unknown>
+    const MRCClass = window.obsidian.MarkdownRenderChild as { new (el: HTMLElement): unknown; prototype: object }
+    window.obsidian.MarkdownRenderer = class MarkdownRendererClass extends (MRCClass as unknown as { new (el: HTMLElement): { containerEl: HTMLElement; load(): void; unload(): void; onload(): void; onunload(): void; register(cb: unknown): void; registerEvent(ref: unknown): void } }) {
+      app: unknown = null
+      hoverPopover: unknown = null
+      get file(): unknown { return null }
+
+      // Static methods delegate to the imported lightweight MarkdownRenderer
+      static async render(
+        _app: unknown,
+        markdown: string,
+        el: HTMLElement,
+        sourcePath: string,
+        component?: unknown,
+      ): Promise<void> {
+        return MarkdownRenderer.render(_app, markdown, el, sourcePath, component)
+      }
+
+      static async renderMarkdown(
+        markdown: string,
+        el: HTMLElement,
+        sourcePath: string,
+        component?: unknown,
+      ): Promise<void> {
+        return MarkdownRenderer.renderMarkdown(markdown, el, sourcePath, component)
+      }
+    } as unknown as Record<string, unknown>
+  }
+
+  // ─── MarkdownPreviewView ─────────────────────────────────────────────────────
+  // In real Obsidian: class MarkdownPreviewView extends MarkdownRenderer
+  // implements MarkdownSubView, MarkdownPreviewEvents.
+  // Used as the type of MarkdownView.previewMode and for day-planner's
+  // static MarkdownPreviewView.render() call.
+  if (!window.obsidian.MarkdownPreviewView) {
+    const MRClass = window.obsidian.MarkdownRenderer as { new (el: HTMLElement): unknown; prototype: object }
+    window.obsidian.MarkdownPreviewView = class MarkdownPreviewView extends (MRClass as unknown as { new (el: HTMLElement): { containerEl: HTMLElement; app: unknown; hoverPopover: unknown } }) {
+      private _data = ''
+
+      get file(): unknown { return null }
+
+      /** MarkdownSubView: get current content. */
+      get(): string { return this._data }
+      /** MarkdownSubView: set content. */
+      set(data: string, _clear: boolean): void { this._data = data }
+      /** Clear content. */
+      clear(): void { this._data = '' }
+      /** Re-render the preview. No-op — Slatebase has no separate reading-mode renderer. */
+      rerender(_full?: boolean): void { /* no-op */ }
+
+      /** MarkdownSubView: get scroll position. */
+      getScroll(): number {
+        return this.containerEl?.scrollTop ?? 0
+      }
+      /** MarkdownSubView: apply scroll position. */
+      applyScroll(scroll: number): void {
+        if (this.containerEl) this.containerEl.scrollTop = scroll
+      }
+
+      // Static convenience methods — plugins (day-planner) call
+      // MarkdownPreviewView.render() directly.
+      static async render(
+        app: unknown,
+        markdown: string,
+        el: HTMLElement,
+        sourcePath: string,
+        component?: unknown,
+      ): Promise<void> {
+        const renderer = window.obsidian!.MarkdownRenderer as { render?: (...args: unknown[]) => Promise<void> } | undefined
+        if (renderer?.render) {
+          await renderer.render(app, markdown, el, sourcePath, component)
+        } else {
+          el.textContent = markdown
+        }
+      }
+
+      static async renderMarkdown(
+        markdown: string,
+        el: HTMLElement,
+        sourcePath: string,
+        component?: unknown,
+      ): Promise<void> {
+        return (window.obsidian!.MarkdownPreviewView as { render: (...args: unknown[]) => Promise<void> }).render(null, markdown, el, sourcePath, component)
+      }
+    } as unknown as Record<string, unknown>
+  }
+
+  // Wire MarkdownView.previewMode to a lazy MarkdownPreviewView instance
+  {
+    const MV = window.obsidian.MarkdownView as { prototype?: Record<string, unknown> } | undefined
+    const MPV = window.obsidian.MarkdownPreviewView as { new (el: HTMLElement): unknown } | undefined
+    if (MV?.prototype && MPV) {
+      Object.defineProperty(MV.prototype, 'previewMode', {
+        get(this: unknown) {
+          const self = this as { _previewMode?: unknown; contentEl?: HTMLElement }
+          if (!self._previewMode) {
+            const el = self.contentEl ?? document.createElement('div')
+            self._previewMode = new (MPV as unknown as { new (el: HTMLElement): unknown })(el)
+          }
+          return self._previewMode
+        },
+        set(this: unknown, value: unknown) {
+          (this as { _previewMode?: unknown })._previewMode = value
+        },
+        configurable: true,
+        enumerable: true,
+      })
+    }
   }
 
   // ─── Editor class stub ─────────────────────────────────────────────────────

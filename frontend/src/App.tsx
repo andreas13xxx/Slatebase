@@ -59,6 +59,7 @@ import type { PanelViewId } from './state/panelState'
 import { useDocumentPanelData } from './state/documentPanelData'
 import type { UnlinkedMentionEntry } from './state/documentPanelData'
 import { linkUnlinkedMention } from './state/documentPanelActions'
+import { applyFrontmatterChange } from './utils/frontmatterWriter'
 import { SidePanel } from './components/side-panel/SidePanel'
 import type { SidePanelDocumentProps, SidePanelSearchProps } from './components/side-panel/SidePanel'
 import { SettingsPanel } from './components/settings/SettingsPanel'
@@ -751,6 +752,29 @@ function AppContent() {
     tags: documentPanelData.state.tags,
     properties: documentPanelData.state.properties,
     hasDocument: documentContent !== null,
+    canEditProperties: documentContent !== null && activeTab !== null && !activeTab.isBinary && (activeTab.filePath?.endsWith('.md') ?? false) && (selectedVault?.permission === 'owner' || selectedVault?.permission === 'write'),
+    tagSuggestions: documentPanelData.state.tags.entries.map((t) => t.name),
+    onPropertyCommit: (key: string, value: unknown) => {
+      if (!documentContent || !activeTab) return
+      const currentData = { ...(documentPanelData.state.properties.data ?? {}) }
+      currentData[key] = value
+      const newContent = applyFrontmatterChange(documentContent, currentData)
+      tabDispatch({ type: 'UPDATE_EDIT_BUFFER', payload: { tabId: activeTab.id, content: newContent } })
+    },
+    onPropertyAdd: (key: string, value: unknown) => {
+      if (!documentContent || !activeTab) return
+      const currentData = { ...(documentPanelData.state.properties.data ?? {}) }
+      currentData[key] = value
+      const newContent = applyFrontmatterChange(documentContent, currentData)
+      tabDispatch({ type: 'UPDATE_EDIT_BUFFER', payload: { tabId: activeTab.id, content: newContent } })
+    },
+    onPropertyDelete: (key: string) => {
+      if (!documentContent || !activeTab) return
+      const currentData = { ...(documentPanelData.state.properties.data ?? {}) }
+      delete currentData[key]
+      const newContent = applyFrontmatterChange(documentContent, currentData)
+      tabDispatch({ type: 'UPDATE_EDIT_BUFFER', payload: { tabId: activeTab.id, content: newContent } })
+    },
     onHeadingClick: documentPanelData.onHeadingClick,
     onLinkClick: handleLinkClick,
     onTagClick: documentPanelData.onTagClick,

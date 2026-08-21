@@ -75,6 +75,9 @@ import { PreferencesStore } from './preferences/index.js'
 import { createPreferencesRoutes } from './api/preferencesRoutes.js'
 import { VaultConfigStore } from './vault-config/index.js'
 import { createVaultConfigRoutes } from './api/vaultConfigRoutes.js'
+import { PropertyTypeStore } from './property-type/index.js'
+import { createPropertyTypeRoutes } from './api/propertyTypeRoutes.js'
+import { createPropertyRoutes } from './api/propertyRoutes.js'
 import { WelcomeVaultService } from './welcome-vault/index.js'
 import { createWelcomeVaultRoutes, deduplicateVaultName } from './api/welcomeVaultRoutes.js'
 
@@ -345,7 +348,7 @@ const updateChecker = new UpdateChecker(
 )
 
 // 4g. Search Module
-const searchService = new SearchService(vaultService, vaultAccessControl, logger)
+const searchService = new SearchService(vaultService, vaultAccessControl, logger, (vaultId) => linkIndexMap.get(vaultId))
 const replaceService = new ReplaceService(vaultService, logger)
 
 // 4g2. Link Migration Module (getLinkIndex is a hoisted function declaration, defined below)
@@ -655,6 +658,28 @@ const vaultConfigRoutes = createVaultConfigRoutes({
   logger,
 })
 app.route('/api/v1', vaultConfigRoutes)
+
+// Property-type route registration (auth middleware applies via /api/v1/* pattern)
+const propertyTypeStore = new PropertyTypeStore(
+  (vaultId: string) => vaultRegistry.findById(vaultId)?.storagePath ?? null,
+  logger,
+)
+const propertyTypeRoutes = createPropertyTypeRoutes({
+  propertyTypeService: propertyTypeStore,
+  accessControl: vaultAccessControl,
+  vaultRegistry,
+  logger,
+})
+app.route('/api/v1', propertyTypeRoutes)
+
+// Property metadata route registration (auth middleware applies via /api/v1/* pattern)
+const propertyRoutes = createPropertyRoutes({
+  linkIndexResolver: (vaultId: string) => linkIndexMap.get(vaultId),
+  propertyTypeService: propertyTypeStore,
+  accessControl: vaultAccessControl,
+  logger,
+})
+app.route('/api/v1', propertyRoutes)
 
 // Welcome vault route registration (auth + CSRF middleware applies via /api/v1/* pattern)
 const welcomeVaultRoutes = createWelcomeVaultRoutes({
