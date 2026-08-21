@@ -79,7 +79,12 @@ describe('PluginSecretKeyManager', () => {
     await manager.loadOrCreate()
 
     const { iv, ciphertext } = manager.encrypt('secret')
-    const tampered = 'ff' + ciphertext.slice(2)
+    // XOR-flip (not overwrite) the first byte, so it's guaranteed to differ from the
+    // original regardless of its value — a fixed 'ff' has a ~1/256 chance of being a
+    // no-op if the ciphertext already happens to start with that byte.
+    const firstByte = parseInt(ciphertext.slice(0, 2), 16)
+    const flipped = (firstByte ^ 0xff).toString(16).padStart(2, '0')
+    const tampered = flipped + ciphertext.slice(2)
     expect(() => manager.decrypt(iv, tampered)).toThrow()
   })
 })
