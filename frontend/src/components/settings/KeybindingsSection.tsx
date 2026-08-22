@@ -19,6 +19,7 @@ import {
   type KeybindingCategory,
 } from '../../state/keybindingsStore'
 import { showToast } from '../ToastNotification'
+import { SettingSection, Button } from './ui'
 
 /** German labels for keybinding categories. */
 const CATEGORY_LABELS: Record<KeybindingCategory, string> = {
@@ -152,8 +153,7 @@ export function KeybindingsSection() {
       </p>
 
       {grouped.map(group => (
-        <div key={group.category} className="keybindings-group">
-          <h3 className="keybindings-group-title">{group.label}</h3>
+        <SettingSection key={group.category} title={group.label}>
           <table className="keybindings-table">
             <thead>
               <tr>
@@ -233,17 +233,13 @@ export function KeybindingsSection() {
               ))}
             </tbody>
           </table>
-        </div>
+        </SettingSection>
       ))}
 
       <div className="settings-actions">
-        <button
-          type="button"
-          className="settings-save-btn settings-save-btn--secondary"
-          onClick={handleResetAll}
-        >
+        <Button variant="secondary" onClick={handleResetAll}>
           Alle zurücksetzen
-        </button>
+        </Button>
       </div>
     </div>
   )

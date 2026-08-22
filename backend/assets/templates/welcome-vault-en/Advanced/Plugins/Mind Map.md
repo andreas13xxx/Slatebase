@@ -21,9 +21,10 @@ The Mind Map plugin turns a note's heading and list structure into an interactiv
 
 ## Installation
 
-1. Download plugin ZIP from GitHub
-2. Settings → Vault → Plugins → "Install Plugin"
-3. Upload ZIP → Activate
+1. Go to **Plugin Management** → **"Available Plugins"** tab and search for "Mind Map"
+2. Click **Install**, then switch on the **activation toggle**
+
+Not listed, or need a specific fork/version? Download the ZIP from GitHub instead and use **"Installed Plugins" → Upload Plugin**.
 
 ---
 
@@ -106,13 +107,17 @@ This kind of structure works especially well for mind maps because it's clearly 
 
 ## Limitations in Slatebase
 
+> [!warning] Plugin confirmed broken — nothing below actually opens
+> Slatebase's compatibility layer emulates every API call this plugin makes (static analysis shows full coverage), so it isn't the source of the problem. But the plugin itself is confirmed broken against current Obsidian versions upstream, so in practice it fails to render a mind map at all — the table below describes what *would* work if the plugin's own bug were fixed, not what you can rely on today.
+
 | Feature | Status |
 |---------|--------|
-| Headings/lists as mind map nodes | Works |
-| Zoom, pan, collapse/expand | Works |
-| Clicking a node jumps to the source line | Works |
-| Export as PNG/SVG | Limited |
-| Color themes from plugin settings | Works |
+| Plugin loads / mind map view opens | ⚠️ Confirmed broken upstream |
+| Headings/lists as mind map nodes | Not usable — view doesn't open |
+| Zoom, pan, collapse/expand | Not usable — view doesn't open |
+| Clicking a node jumps to the source line | Not usable — view doesn't open |
+| Export as PNG/SVG | Not usable — view doesn't open |
+| Color themes from plugin settings | Not usable — view doesn't open |
 
 ---
 

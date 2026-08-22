@@ -4,7 +4,7 @@ tags: [admin]
 
 # Feature Toggles
 
-Feature toggles allow you as an admin to enable or disable individual Slatebase features for all users — without a server restart and without code changes.
+Feature toggles allow you as an admin to enable or disable individual Slatebase features for all users — without code changes. Some take effect immediately, others require a server restart (see [[#Hot Toggles vs. Cold Toggles]] below).
 
 ---
 
@@ -19,14 +19,13 @@ Feature toggles allow you as an admin to enable or disable individual Slatebase 
 
 ## Available Features
 
-| Feature | Default | Description |
-|---------|---------|-------------|
-| `chat` | enabled | Chat between users |
-| `knowledge-graph` | enabled | Knowledge graph visualization |
-| `welcome-vault` | enabled | Create tutorial vault for new users |
-| `mcp` | enabled | Model Context Protocol server (AI integration) |
-| `obsidian-plugin-compat` | enabled | Obsidian plugin compatibility layer |
-| `live-preview` | enabled | Live Preview editor (CodeMirror 6) |
+Slatebase currently has three registered feature toggles:
+
+| Feature | Default | Type | Description |
+|---------|---------|------|-------------|
+| `chat` | enabled | hot | Real-time chat between users |
+| `mcp` | enabled | cold | Model Context Protocol server (AI integration) |
+| `obsidian-plugin-compat` | **disabled** | cold | Obsidian plugin compatibility layer |
 
 ---
 
@@ -34,7 +33,7 @@ Feature toggles allow you as an admin to enable or disable individual Slatebase 
 
 1. Open Feature Toggles in Settings
 2. Click the toggle switch next to the desired feature
-3. The change takes effect **immediately** (hot toggle)
+3. For a **hot** toggle, the change takes effect **immediately**. For a **cold** toggle, it takes effect after the next server restart
 
 ### Effects of Disabling
 
@@ -47,50 +46,34 @@ Feature toggles allow you as an admin to enable or disable individual Slatebase 
 
 ## Hot Toggles vs. Cold Toggles
 
-All current feature toggles are **hot toggles**:
-
 | Type | Description |
 |------|-------------|
 | Hot toggle | Takes effect immediately, no restart needed |
-| Cold toggle | Requires server restart (currently none) |
+| Cold toggle | Requires a server restart to take effect |
+
+Of the three current toggles, only `chat` is hot. Both `mcp` and `obsidian-plugin-compat` are **cold** — flipping them queues the change until the server is restarted.
 
 ---
 
 ## Feature Details
 
-### Chat (`chat`)
+### Chat (`chat`) — hot, enabled by default
 
 - **Enabled:** Chat icon in menu, unread badges, real-time messages
 - **Disabled:** No chat access, no notifications
 - **Data:** Conversations and messages are preserved
 
-### Knowledge Graph (`knowledge-graph`)
-
-- **Enabled:** Graph tab in tab bar, graph commands in Command Palette
-- **Disabled:** Graph not accessible
-- **Data:** Link index continues to be maintained (for backlinks in Context Panel)
-
-### Welcome Vault (`welcome-vault`)
-
-- **Enabled:** New users automatically receive a tutorial vault; users can manually create one
-- **Disabled:** No automatic vault on user creation, no button in settings
-
-### MCP (`mcp`)
+### MCP (`mcp`) — cold, enabled by default
 
 - **Enabled:** MCP endpoint active, token management available
 - **Disabled:** MCP endpoint responds with 403, existing tokens remain stored
-- **Note:** Experimental feature
+- **Note:** Experimental feature; change requires a server restart to take effect
 
-### Obsidian Plugin Compat (`obsidian-plugin-compat`)
+### Obsidian Plugin Compat (`obsidian-plugin-compat`) — cold, **disabled** by default
 
 - **Enabled:** Plugin management visible, plugins can be installed and loaded
 - **Disabled:** No plugin functionality, plugin commands not in Command Palette
-- **Note:** Experimental feature — plugins may affect stability
-
-### Live Preview (`live-preview`)
-
-- **Enabled:** Editor offers Source and Live Preview modes
-- **Disabled:** Only Source mode available, toggle button hidden
+- **Note:** Experimental feature — plugins may affect stability; change requires a server restart to take effect
 
 ---
 
@@ -111,11 +94,10 @@ SLATEBASE_FEATURE_CHAT=false
 
 | Situation | Recommendation |
 |-----------|---------------|
-| Small installation (1–3 users) | Keep all features enabled |
-| Corporate environment without AI | Disable `mcp` |
-| Stability prioritized | Disable `obsidian-plugin-compat` |
+| Small installation (1–3 users) | Keep all features at their default |
+| Corporate environment without AI | Disable `mcp` (restart required) |
+| Plugins not needed | Leave `obsidian-plugin-compat` disabled (its default) |
 | No team requirements | Disable `chat` |
-| Performance optimization | Disable `knowledge-graph` for very large vaults |
 
 ---
 

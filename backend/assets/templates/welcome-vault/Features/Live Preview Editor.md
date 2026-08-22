@@ -53,15 +53,14 @@ Markdown wird inline formatiert dargestellt. Überschriften erscheinen in der ri
 
 | Kürzel | Aktion |
 |--------|--------|
-| `Ctrl+B` | Fett |
-| `Ctrl+I` | Kursiv |
-| `Ctrl+K` | Link einfügen |
 | `Ctrl+E` | Modus wechseln (Source ↔ Live Preview) |
 | `Ctrl+Z` | Rückgängig |
 | `Ctrl+Shift+Z` | Wiederherstellen |
-| `Ctrl+D` | Zeile duplizieren |
 | `Tab` | Einrücken |
 | `Shift+Tab` | Ausrücken |
+
+> [!info] Fett, Kursiv, Link einfügen
+> Fett, Kursiv und Link einfügen sind über die Command Palette (`Ctrl+P`) erreichbar, haben aber kein Standard-Tastenkürzel und lassen sich nicht unter Einstellungen → Tastenkürzel anpassen.
 
 ---
 

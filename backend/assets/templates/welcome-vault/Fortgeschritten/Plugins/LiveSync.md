@@ -22,10 +22,11 @@ Self-hosted LiveSync ermöglicht bidirektionale Echtzeit-Synchronisation deines 
 
 ## Installation
 
-1. Plugin-ZIP von GitHub herunterladen (Release-Seite)
-2. Einstellungen → Vault → Plugins → "Plugin installieren"
-3. ZIP hochladen → Aktivieren
-4. Plugin zeigt Initial-Setup-Dialog
+1. **Plugin-Verwaltung** → Tab **"Verfügbare Plugins"** öffnen und nach "LiveSync" suchen
+2. **Installieren** klicken, dann den **Aktivierungs-Schalter** einschalten
+3. Plugin zeigt Initial-Setup-Dialog
+
+Nicht gelistet, oder ein bestimmter Fork/eine bestimmte Version nötig? Stattdessen die Plugin-ZIP von der GitHub-Release-Seite herunterladen und unter **"Installierte Plugins" → Plugin hochladen** verwenden.
 
 ---
 

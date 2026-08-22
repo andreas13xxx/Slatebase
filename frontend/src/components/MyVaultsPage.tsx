@@ -6,6 +6,7 @@ import type { VaultInfo } from '../types'
 import { Database, Eye, Pencil, Crown, Trash2, Users, RefreshCw, X, ArrowRightLeft, Download } from 'lucide-react'
 import { ConfirmModal } from './ConfirmModal'
 import { VaultDeletionWorkflow } from './VaultDeletionWorkflow'
+import { Button } from './settings/ui'
 
 interface ShareInfo {
   userId: string
@@ -182,13 +183,9 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
       <div className="my-vaults-header">
         <Database size={22} color="var(--accent-text)" />
         <h1 className="my-vaults-title">Meine Vaults</h1>
-        <button
-          className="admin-users-btn admin-users-btn--small"
-          onClick={handleRefresh}
-          style={{ marginLeft: 'auto' }}
-        >
+        <Button variant="secondary" size="sm" onClick={handleRefresh} style={{ marginLeft: 'auto' }}>
           <RefreshCw size={13} /> Aktualisieren
-        </button>
+        </Button>
       </div>
 
       {/* Owned vaults section */}

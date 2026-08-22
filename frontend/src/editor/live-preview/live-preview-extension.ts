@@ -4,6 +4,7 @@ import { type DecorationSet, Decoration, EditorView, ViewPlugin } from '@codemir
 import type { Range } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
 import type { DirectoryTree } from '../../types'
+import type { PropertyType, PropertyTypeEntry } from '../../state/propertyTypes'
 import { buildInlineDecorations, type HideableRange } from './inline-decorations'
 import { buildLinkDecorations } from './link-decorations'
 import { buildWidgetDecorations, toggleCalloutFoldEffect } from './widget-decorations'
@@ -24,6 +25,10 @@ export interface LivePreviewOptions {
   onInternalLinkClick?: (target: string) => void
   /** Callback when a checkbox is toggled. */
   onCheckboxToggle?: (line: number, checked: boolean) => void
+  /** Per-vault property type registry, for the interactive frontmatter editor. */
+  typeRegistry?: PropertyTypeEntry[] | null
+  /** Callback to persist an explicit type choice for a property key to the vault's type registry. */
+  onPropertyTypeChange?: (key: string, type: PropertyType) => void
 }
 
 /**
@@ -111,6 +116,8 @@ function buildDecorations(
     onCheckboxToggle: options.onCheckboxToggle,
     foldedCallouts,
     directoryTree: options.directoryTree,
+    typeRegistry: options.typeRegistry,
+    onPropertyTypeChange: options.onPropertyTypeChange,
   })
 
   // Merge all decorations and hideable ranges

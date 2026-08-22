@@ -21,9 +21,10 @@ Iconize (`obsidian-icon-folder`) assigns custom icons to files and folders that 
 
 ## Installation
 
-1. Download the plugin ZIP from GitHub (or install it via the Community Plugin browser)
-2. Settings → Vault → Plugins → "Install Plugin"
-3. Upload ZIP → Activate
+1. Go to **Plugin Management** → **"Available Plugins"** tab and search for "Iconize"
+2. Click **Install**, then switch on the **activation toggle**
+
+Not listed, or need a specific fork/version? Download the ZIP from GitHub instead and use **"Installed Plugins" → Upload Plugin**.
 
 ---
 

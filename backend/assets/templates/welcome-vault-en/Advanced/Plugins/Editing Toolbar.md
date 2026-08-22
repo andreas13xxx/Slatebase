@@ -18,9 +18,10 @@ Editing Toolbar adds a formatting bar above the editor — bold, italic, heading
 
 ## Installation
 
-1. Download plugin ZIP from GitHub
-2. Settings → Vault → Plugins → "Install Plugin"
-3. Upload ZIP → Activate
+1. Go to **Plugin Management** → **"Available Plugins"** tab and search for "Editing Toolbar"
+2. Click **Install**, then switch on the **activation toggle**
+
+Not listed, or need a specific fork/version? Download the ZIP from GitHub instead and use **"Installed Plugins" → Upload Plugin**.
 
 ---
 

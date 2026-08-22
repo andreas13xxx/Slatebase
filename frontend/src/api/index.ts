@@ -1,6 +1,6 @@
 import type { VaultInfo, DirectoryTree, FileContent, FileSaveResult, AppError, Conversation, PaginatedConversations, PaginatedMessages, Message, GraphData, GraphMeta, GraphQueryOptions, BacklinksResponse } from '../types'
 import type { PublicUserInfo } from '../state/authState'
-import type { PropertyTypeRegistry } from '../state/propertyTypes'
+import type { PropertyType, PropertyTypeRegistry } from '../state/propertyTypes'
 
 /**
  * Login response returned by the backend on successful authentication.
@@ -384,6 +384,8 @@ export interface IApiClient {
   // --- Property type methods ---
   /** Get the property type registry for a vault. */
   getPropertyTypes(vaultId: string): Promise<PropertyTypeRegistry>
+  /** Set (upsert) a single property key's type in the vault's type registry. */
+  setPropertyType(vaultId: string, key: string, type: PropertyType): Promise<PropertyTypeRegistry>
 
   // --- Plugin methods ---
   /** List all installed plugins for a vault. */
@@ -822,6 +824,11 @@ export class ApiClient implements IApiClient {
   /** Get the property type registry for a vault. */
   async getPropertyTypes(vaultId: string): Promise<PropertyTypeRegistry> {
     return this.request<PropertyTypeRegistry>('GET', `/api/v1/vaults/${vaultId}/property-types`)
+  }
+
+  /** Set (upsert) a single property key's type in the vault's type registry. */
+  async setPropertyType(vaultId: string, key: string, type: PropertyType): Promise<PropertyTypeRegistry> {
+    return this.request<PropertyTypeRegistry>('PUT', `/api/v1/vaults/${vaultId}/property-types/${encodeURIComponent(key)}`, { type })
   }
 
   // --- Plugin methods ---

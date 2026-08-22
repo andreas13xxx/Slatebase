@@ -28,6 +28,8 @@
 import { EditorView } from '@codemirror/view'
 import { EditorSelection as CmEditorSelection } from '@codemirror/state'
 import * as CmCommands from '@codemirror/commands'
+import { recordGapRead, recordGapCall } from './api-gap-registry'
+import { warnOnce } from './log'
 
 // Note: We import the getter function from plugin-extensions to access
 // the active CM6 EditorView without creating a circular dependency.
@@ -40,6 +42,19 @@ let getEditorViewFn: (() => import('@codemirror/view').EditorView | null) | null
  */
 export function setEditorViewAccessor(fn: () => import('@codemirror/view').EditorView | null): void {
   getEditorViewFn = fn
+}
+
+// Backs the `editorComponent` property below — the MarkdownFileInfo-shaped
+// object (`{ editor, file }`) real Obsidian returns as the sub-view owning
+// this editor. Wired once alongside the CM6 accessor during plugin init.
+let getEditorComponentFn: (() => unknown) | null = null
+
+/**
+ * Set the editorComponent accessor function.
+ * Called once during plugin system initialization to wire the dependency.
+ */
+export function setEditorComponentAccessor(fn: () => unknown): void {
+  getEditorComponentFn = fn
 }
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -171,6 +186,30 @@ export class EditorShim implements IEditor {
   /** Get the active CM6 EditorView, or null if unavailable. */
   private getCM6(): import('@codemirror/view').EditorView | null {
     return getEditorViewFn?.() ?? null
+  }
+
+  /**
+   * The raw CM6 EditorView backing this editor, or null if none is mounted.
+   * Real Obsidian exposes this same undocumented property (`Editor.cm`) for
+   * plugins that reach past the public Editor API for low-level access —
+   * e.g. Advanced Tables reads `editor.cm.scrollDOM` directly for scroll
+   * position. Without it, that access fell through the gap-proxy below and
+   * came back as an always-truthy no-op function instead of the real view
+   * (or null), breaking `if (editor.cm)` feature detection.
+   */
+  get cm(): import('@codemirror/view').EditorView | null {
+    return this.getCM6()
+  }
+
+  /**
+   * Back-reference to the MarkdownFileInfo-shaped sub-view that owns this
+   * editor (real Obsidian: `Editor.editorComponent`, typically the
+   * MarkdownEditView instance). Plugins use this to reach the current file
+   * without going through `app.workspace` — e.g. Iconize reads
+   * `editor.editorComponent?.file`.
+   */
+  get editorComponent(): unknown {
+    return getEditorComponentFn?.() ?? null
   }
 
   // ─── Obsidian Editor API ─────────────────────────────────────────────────
@@ -783,5 +822,60 @@ export class EditorShim implements IEditor {
     const clampedOffset = Math.max(0, Math.min(offset, view.state.doc.length))
     const line = view.state.doc.lineAt(clampedOffset)
     return { line: line.number - 1, ch: clampedOffset - line.from }
+  }
+
+  /**
+   * Build an EditorShim wrapped in the same non-emulated-access safety net every
+   * other shim has.
+   *
+   * Editor was the one major shim without it: an unemulated `editor.*` was a
+   * bare `TypeError` thrown from inside plugin code, with no record of what was
+   * asked for. Every other surface answers with a logged no-op that shows up in
+   * `window.__slatebasePluginApiGaps()`, and the editor is a surface plugins
+   * poke at hard (Obsidian has undocumented internals on it beyond the public
+   * `Editor` interface), so it should behave the same.
+   *
+   * Anything that genuinely exists on the instance or its prototype passes
+   * straight through, so this only ever intercepts real gaps.
+   */
+  static create(textarea: HTMLTextAreaElement | null = null): EditorShim {
+    const instance = new EditorShim(textarea)
+
+    return new Proxy(instance, {
+      get(target: EditorShim, prop: string | symbol): unknown {
+        // `target` as the receiver so getters run bound to the real instance,
+        // not the proxy — see MetadataCacheShim for why that matters.
+        if (prop in target) {
+          const value = Reflect.get(target, prop, target)
+          return typeof value === 'function' ? value.bind(target) : value
+        }
+
+        if (typeof prop === 'symbol') {
+          return Reflect.get(target, prop, target)
+        }
+
+        // A callable `then` would make the proxy thenable, and an `await` on it
+        // would hang forever since the no-op never resolves. Must stay undefined.
+        if (prop === 'then') {
+          return undefined
+        }
+
+        if (recordGapRead('Editor', prop)) {
+          warnOnce(
+            `editor-gap::${prop}`,
+            `[EditorShim] Access to non-emulated editor method/property "${prop}". ` +
+              `Slatebase returns a no-op function here, which is truthy — feature ` +
+              `detection like \`if (editor.${prop})\` will take the wrong branch. ` +
+              `Inspect all gaps with window.__slatebasePluginApiGaps().`,
+          )
+        }
+
+        return (...args: unknown[]) => {
+          recordGapCall('Editor', prop)
+          void args
+          return undefined
+        }
+      },
+    })
   }
 }

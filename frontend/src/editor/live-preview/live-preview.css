@@ -606,6 +606,9 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   font-size: 0.85em;
+  /* Clicking anywhere on the box places the cursor in the underlying raw
+     YAML (see FrontmatterWidget.ignoreEvent) and reveals it for editing. */
+  cursor: text;
 }
 
 .cm-lp-frontmatter--empty {

@@ -34,6 +34,7 @@ import { warnOnce } from '../plugins/compat/log'
 import { setActiveEditorView, setActiveEditorContainerEl, getActivePluginExtensions, getActivePluginCompletions } from './plugin-extensions'
 import { editorInfoField, editorEditorField, editorLivePreviewField, livePreviewStateTracker } from './editor-state-fields'
 import { setEditorInfo, setEditorEditor, setEditorLivePreview, type EditorFileInfo } from './editor-state-fields'
+import { EditorShim } from '../plugins/compat/editor-shim'
 import './live-preview/live-preview.css'
 
 /**
@@ -267,7 +268,17 @@ export function CodeMirrorEditor({
         extension: filePath.split('.').pop() ?? 'md',
         name: filePath.split('/').pop() ?? '',
       } : null,
-      editor: undefined,
+      // Real Obsidian's MarkdownFileInfo.editor is always a live Editor for an
+      // open file — plugins that read it via `state.field(editorInfoField)`
+      // (rather than the separate editorEditorField) rely on that guarantee
+      // without a null-check (obsidian-outliner's Settings.ts does exactly
+      // this: `state.field(editorInfoField).editor.getCursor()`). Leaving this
+      // undefined broke every such plugin the moment any OTHER plugin's CM6
+      // extension triggered a transaction — EditorShim.create() is stateless
+      // (proxies to the currently-active view via setActiveEditorView() below,
+      // same as editorEditorField), so a fresh instance here is equivalent to
+      // the one WorkspaceShim hands out elsewhere.
+      editor: EditorShim.create(),
     }
     view.dispatch({
       effects: [

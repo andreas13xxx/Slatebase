@@ -1,11 +1,17 @@
 /**
- * Document-derived panel data (outline, forward/backlinks, tags, properties)
- * for the active document — hoisted out of the old right-side-only
- * ContextPanel.tsx so either side panel can host these built-in views.
- * Unlike panel layout state (`panelState.ts`), this doesn't belong to a
- * specific side: it's a single, app-wide slice of "what does the currently
- * open document look like," fetched once and read by whichever panel
- * currently has Outline/Links/Tags/Properties in its tab order.
+ * Document-derived panel data (outline, forward/backlinks, tags) for the
+ * active document — hoisted out of the old right-side-only ContextPanel.tsx
+ * so either side panel can host these built-in views. Unlike panel layout
+ * state (`panelState.ts`), this doesn't belong to a specific side: it's a
+ * single, app-wide slice of "what does the currently open document look
+ * like," fetched once and read by whichever panel currently has
+ * Outline/Links/Tags in its tab order.
+ *
+ * Frontmatter properties are NOT part of this state: editing them happens
+ * inline in the document itself (see FrontmatterWidget in
+ * editor/live-preview/widget-decorations.ts), and browsing/curating the
+ * vault-wide property registry is PropertiesOverview's own self-contained
+ * concern (components/context-panel/PropertiesOverview.tsx).
  */
 
 import { useCallback, useEffect, useReducer, useRef } from 'react'
@@ -13,21 +19,18 @@ import type { Dispatch } from 'react'
 import type { IApiClient } from '../api'
 import type { DirectoryTree } from '../types'
 import { onRealtimeVaultChange } from './realtimeVaultBridge'
-import type { PropertyTypeEntry } from './propertyTypes'
 import {
   loadOutline,
   loadForwardLinks,
   loadBacklinks,
   loadUnlinkedMentions,
   loadTags,
-  loadProperties,
-  loadPropertyTypes,
   expandTag,
 } from './documentPanelActions'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-/** Debounce delay for content-change updates (outline, forward links, properties). */
+/** Debounce delay for content-change updates (outline, forward links). */
 const CONTENT_DEBOUNCE_MS = 500
 
 /** Debounce delay for backlinks re-fetch triggered by remote vault changes. */
@@ -87,13 +90,6 @@ export interface DocumentPanelState {
     expandedTag: string | null
     tagFiles: string[]
   }
-  properties: {
-    data: Record<string, unknown> | null
-    parseError: string | null
-    rawFrontmatter: string | null
-    /** Per-vault property type registry, loaded once per vault switch. */
-    typeRegistry: PropertyTypeEntry[] | null
-  }
 }
 
 export type DocumentPanelAction =
@@ -109,8 +105,6 @@ export type DocumentPanelAction =
   | { type: 'SET_TAGS'; entries: TagEntry[] }
   | { type: 'SET_TAGS_LOADING'; loading: boolean }
   | { type: 'SET_TAG_EXPANDED'; tag: string | null; files: string[] }
-  | { type: 'SET_PROPERTIES'; data: Record<string, unknown> | null; parseError: string | null; rawFrontmatter: string | null }
-  | { type: 'SET_PROPERTY_TYPE_REGISTRY'; entries: PropertyTypeEntry[] | null }
   | { type: 'RESET_DOCUMENT_STATE' }
 
 function createInitialState(): DocumentPanelState {
@@ -126,7 +120,6 @@ function createInitialState(): DocumentPanelState {
       unlinkedMentionsError: null,
     },
     tags: { entries: [], loading: false, expandedTag: null, tagFiles: [] },
-    properties: { data: null, parseError: null, rawFrontmatter: null, typeRegistry: null },
   }
 }
 
@@ -156,10 +149,6 @@ function documentPanelReducer(state: DocumentPanelState, action: DocumentPanelAc
       return { ...state, tags: { ...state.tags, loading: action.loading } }
     case 'SET_TAG_EXPANDED':
       return { ...state, tags: { ...state.tags, expandedTag: action.tag, tagFiles: action.files } }
-    case 'SET_PROPERTIES':
-      return { ...state, properties: { ...state.properties, data: action.data, parseError: action.parseError, rawFrontmatter: action.rawFrontmatter } }
-    case 'SET_PROPERTY_TYPE_REGISTRY':
-      return { ...state, properties: { ...state.properties, typeRegistry: action.entries } }
     case 'RESET_DOCUMENT_STATE':
       return {
         ...state,
@@ -174,7 +163,6 @@ function documentPanelReducer(state: DocumentPanelState, action: DocumentPanelAc
           unlinkedMentionsError: null,
         },
         tags: { ...state.tags, expandedTag: null, tagFiles: [] },
-        properties: { data: null, parseError: null, rawFrontmatter: null, typeRegistry: state.properties.typeRegistry },
       }
   }
 }
@@ -197,10 +185,10 @@ export interface UseDocumentPanelDataResult {
 }
 
 /**
- * Owns the outline/links/tags/properties data for the currently active
- * document — the 4 effects (document switch, debounced content re-parse,
- * vault-change tag reload, realtime backlinks refresh) that used to live
- * directly in ContextPanel.tsx, now independent of which panel renders them.
+ * Owns the outline/links/tags data for the currently active document — the 4
+ * effects (document switch, debounced content re-parse, vault-change tag
+ * reload, realtime backlinks refresh) that used to live directly in
+ * ContextPanel.tsx, now independent of which panel renders them.
  */
 export function useDocumentPanelData({
   documentContent,
@@ -229,7 +217,6 @@ export function useDocumentPanelData({
       if (documentContent !== null && documentPath !== null) {
         loadOutline(dispatch, documentContent)
         loadForwardLinks(dispatch, documentContent, directoryTree, documentPath ?? undefined)
-        loadProperties(dispatch, documentContent)
       }
 
       if (documentPath !== null && vaultId !== null && apiClient) {
@@ -262,7 +249,6 @@ export function useDocumentPanelData({
     debounceTimerRef.current = setTimeout(() => {
       loadOutline(dispatch, documentContent)
       loadForwardLinks(dispatch, documentContent, directoryTree, documentPath ?? undefined)
-      loadProperties(dispatch, documentContent)
       debounceTimerRef.current = null
     }, CONTENT_DEBOUNCE_MS)
 
@@ -280,10 +266,8 @@ export function useDocumentPanelData({
     if (vaultId !== prevVaultIdRef.current) {
       if (vaultId !== null && apiClient) {
         void loadTags(dispatch, apiClient, vaultId)
-        void loadPropertyTypes(dispatch, apiClient, vaultId)
       } else {
         dispatch({ type: 'SET_TAGS', entries: [] })
-        dispatch({ type: 'SET_PROPERTY_TYPE_REGISTRY', entries: null })
       }
       prevVaultIdRef.current = vaultId
     }

@@ -167,9 +167,10 @@ describe('AdminUsersPage', () => {
     render(React.createElement(AdminUsersPage, { apiClient }))
 
     await waitFor(() => {
-      expect(screen.getAllByText('Rolle ändern').length).toBe(3)
-      expect(screen.getAllByText('Passwort zurücksetzen').length).toBe(3)
-      expect(screen.getAllByText('Löschen').length).toBe(3)
+      // Actions are compact icon buttons; their accessible name carries the label.
+      expect(screen.getAllByRole('button', { name: 'Rolle ändern' }).length).toBe(3)
+      expect(screen.getAllByRole('button', { name: 'Passwort zurücksetzen' }).length).toBe(3)
+      expect(screen.getAllByRole('button', { name: 'Löschen' }).length).toBe(3)
     })
   })
 
@@ -178,8 +179,8 @@ describe('AdminUsersPage', () => {
     render(React.createElement(AdminUsersPage, { apiClient }))
 
     await waitFor(() => {
-      expect(screen.getAllByText('Sperren').length).toBe(2)
-      expect(screen.getByText('Entsperren')).toBeInTheDocument()
+      expect(screen.getAllByRole('button', { name: 'Sperren' }).length).toBe(2)
+      expect(screen.getByRole('button', { name: 'Entsperren' })).toBeInTheDocument()
     })
   })
 
@@ -192,7 +193,7 @@ describe('AdminUsersPage', () => {
       expect(screen.getByText('testuser')).toBeInTheDocument()
     })
 
-    const deleteButtons = screen.getAllByText('Löschen')
+    const deleteButtons = screen.getAllByRole('button', { name: 'Löschen' })
     await user.click(deleteButtons[1]!) // Click delete for testuser
 
     expect(screen.getByText('Benutzer „testuser" wirklich löschen?')).toBeInTheDocument()
@@ -209,7 +210,7 @@ describe('AdminUsersPage', () => {
       expect(screen.getByText('testuser')).toBeInTheDocument()
     })
 
-    const deleteButtons = screen.getAllByText('Löschen')
+    const deleteButtons = screen.getAllByRole('button', { name: 'Löschen' })
     await user.click(deleteButtons[1]!)
 
     await user.click(screen.getByText('Abbrechen'))
@@ -246,7 +247,7 @@ describe('AdminUsersPage', () => {
       })),
     })
 
-    const deleteButtons = screen.getAllByText('Löschen')
+    const deleteButtons = screen.getAllByRole('button', { name: 'Löschen' })
     await user.click(deleteButtons[1]!)
     await user.click(screen.getByText('Bestätigen'))
 
@@ -278,7 +279,7 @@ describe('AdminUsersPage', () => {
       })),
     })
 
-    const deleteButtons = screen.getAllByText('Löschen')
+    const deleteButtons = screen.getAllByRole('button', { name: 'Löschen' })
     await user.click(deleteButtons[0]!)
     await user.click(screen.getByText('Bestätigen'))
 
@@ -442,7 +443,7 @@ describe('AdminUsersPage', () => {
       })),
     })
 
-    const resetButtons = screen.getAllByText('Passwort zurücksetzen')
+    const resetButtons = screen.getAllByRole('button', { name: 'Passwort zurücksetzen' })
     await user.click(resetButtons[1]!)
 
     await waitFor(() => {

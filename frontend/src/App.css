@@ -2291,10 +2291,12 @@
   padding: 0 4px;
   line-height: 1;
 }
+/* Dense divider list, not a stack of gapped rows — cancel the card body's default gap. */
+.feature-toggles-section-card .setting-section__body { gap: 0; }
 .feature-toggle-item {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
+  padding: 12px 0;
   gap: 12px;
   border-bottom: 1px solid var(--border-subtle);
   transition: opacity 0.15s ease;
@@ -2541,16 +2543,14 @@
 .edit-mode-status--error { color: var(--danger-text); }
 
 /* ===== Admin Users Page ===== */
-.admin-users-page { padding: 28px 32px; max-width: 1100px; }
-.admin-users-title { font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0 0 20px; }
-.admin-users-section-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0 0 12px; }
+.admin-users-page { padding: 28px 32px; max-width: 1100px; display: flex; flex-direction: column; gap: 16px; }
+.admin-users-title { font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0; }
 .admin-users-loading { color: var(--text-muted); font-size: 13px; }
 .admin-users-message { padding: 10px 14px; border-radius: var(--radius-md); font-size: 13px; margin-bottom: 12px; }
 .admin-users-message--error { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger-text); }
 .admin-users-message--success { background: var(--success-bg); border: 1px solid var(--success-border); color: var(--success); }
 .admin-users-message--info { background: var(--info-bg); border: 1px solid var(--info-border); color: var(--info-text); }
 .admin-users-message--info code { background: var(--border-subtle); padding: 1px 6px; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 12px; user-select: all; }
-.admin-users-create { margin-bottom: 24px; padding: 16px 18px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); }
 .admin-users-create-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
 .admin-users-form-field { display: flex; flex-direction: column; gap: 4px; min-width: 150px; }
 .admin-users-form-field label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
@@ -2561,19 +2561,6 @@
 .admin-users-form-field input:focus, .admin-users-form-field select:focus {
   outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(13,148,136,0.12);
 }
-.admin-users-btn {
-  padding: 7px 14px; font-size: 13px; border: 1px solid var(--border-default);
-  border-radius: var(--radius-md); cursor: pointer; background: var(--bg-elevated);
-  color: var(--text-primary); white-space: nowrap; transition: background var(--transition-fast);
-  display: inline-flex; align-items: center; gap: 6px;
-}
-.admin-users-btn:hover:not(:disabled) { background: var(--bg-surface); border-color: var(--border-strong); }
-.admin-users-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.admin-users-btn--primary { background: var(--accent); color: white; border-color: var(--accent); }
-.admin-users-btn--primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
-.admin-users-btn--danger { color: var(--danger-text); border-color: var(--danger-border); }
-.admin-users-btn--danger:hover:not(:disabled) { background: var(--danger-bg); border-color: var(--danger); }
-.admin-users-btn--small { padding: 4px 10px; font-size: 12px; }
 .admin-users-table-wrapper { overflow-x: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); }
 .admin-users-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .admin-users-table th {
@@ -2585,19 +2572,13 @@
 .admin-users-table tr:last-child td { border-bottom: none; }
 .admin-users-table tr:hover td { background: var(--bg-surface); }
 .admin-users-row--suspended td { opacity: 0.55; }
-.admin-users-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+/* Actions column: compact icon buttons (not full-text) so 4 actions never wrap in a narrow modal. */
+.admin-users-actions { display: flex; gap: 2px; }
+.admin-users-actions .st-btn { padding: 5px; }
+.admin-users-actions .admin-users-btn--danger { color: var(--danger-text); }
+.admin-users-actions .admin-users-btn--danger:hover:not(:disabled) { background: var(--danger-bg); color: var(--danger-text); }
 .admin-users-pagination { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
 .admin-users-pagination-info { font-size: 12px; color: var(--text-muted); }
-.admin-users-dialog-overlay {
-  position: fixed; inset: 0; background: var(--bg-overlay);
-  display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(2px);
-}
-.admin-users-dialog {
-  background: var(--bg-elevated); border: 1px solid var(--border-default);
-  border-radius: var(--radius-xl); padding: 24px; max-width: 400px; width: 90%; box-shadow: var(--shadow-xl);
-}
-.admin-users-dialog-message { margin: 0 0 18px; font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
-.admin-users-dialog-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
 /* ===== Vault Sharing ===== */
 .vault-sharing { padding: 28px 32px; max-width: 640px; }
@@ -2676,23 +2657,22 @@
 }
 
 .profile-section {
-  background: var(--bg-elevated);
+  background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  padding: 20px 22px;
-  margin-bottom: 20px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
 }
 
 .profile-section--danger {
   border-color: var(--danger-border);
-  background: var(--danger-bg);
 }
 
 .profile-section-title {
-  font-size: 14px;
+  font-size: 0.9375rem;
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 16px;
+  margin: 0 0 14px;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -2781,13 +2761,13 @@
 }
 
 .profile-submit {
-  padding: 9px 18px;
+  padding: 8px 16px;
   background: var(--accent);
-  color: white;
+  color: var(--text-inverse);
   border: none;
   border-radius: var(--radius-md);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 0.8125rem;
+  font-weight: 500;
   cursor: pointer;
   align-self: flex-start;
   transition: background var(--transition-fast);
@@ -2798,12 +2778,12 @@
 }
 
 .profile-submit:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
 .profile-submit--danger {
-  background: var(--danger);
+  background: var(--danger-text);
 }
 
 .profile-submit--danger:hover:not(:disabled) {
@@ -4999,16 +4979,6 @@
 .mcp-tokens-status-active { background: var(--success-bg, rgba(34, 197, 94, 0.1)); color: var(--success, #22c55e); }
 .mcp-tokens-status-expired { background: var(--warning-bg, rgba(234, 179, 8, 0.1)); color: var(--warning, #eab308); }
 .mcp-tokens-status-revoked { background: var(--danger-bg, rgba(239, 68, 68, 0.1)); color: var(--danger, #ef4444); }
-
-.btn-primary { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; background: var(--accent); color: white; border: none; border-radius: var(--radius-md); font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.15s; }
-.btn-primary:hover { opacity: 0.9; }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.btn-secondary { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.15s; }
-.btn-secondary:hover { background: var(--bg-surface); }
-
-.btn-danger-small { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: transparent; color: var(--danger); border: 1px solid var(--danger-border, var(--danger)); border-radius: var(--radius-md); font-size: 12px; cursor: pointer; transition: background 0.15s; }
-.btn-danger-small:hover { background: var(--danger-bg, rgba(239, 68, 68, 0.1)); }
 
 
 /* ===== Graph View ===== */

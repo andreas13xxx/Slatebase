@@ -11,6 +11,9 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
+      // Otherwise a handful of failing tests (unrelated to coverage) blocks
+      // the report entirely, hiding coverage for everything else too.
+      reportOnFailure: true,
       // Explicit include, not just exclude — otherwise v8's "all files" scan
       // sweeps in backend/data/ (gitignored runtime state: uploaded vaults,
       // installed plugin bundles like Excalidraw/Kanban main.js, their
@@ -20,11 +23,15 @@ export default defineConfig({
       exclude: [
         'src/**/*.test.ts',
         'src/integration.test.ts',
+        // Composition root — dependency wiring and server bootstrap, not
+        // meaningfully unit-testable. Same call as excluding main.tsx on
+        // the frontend side.
+        'src/index.ts',
       ],
-      // Baseline as of introducing coverage tracking (2026-08-07), with a
-      // small safety margin below the measured numbers. Ratchet these up as
-      // coverage improves — the point is to catch regressions, not to gate
-      // on an aspirational target we're not at yet.
+      // Ratcheted up 2026-08-21 after bringing every directory to ≥20% line
+      // coverage (was 50/41/52/50). Small safety margin below the measured
+      // numbers (60.4/49.14/67.18/61.02) — the point is to catch
+      // regressions, not to gate on an aspirational target we're not at yet.
       //
       // Branch/function numbers are much lower than v8 reported under
       // coverage-v8 v3 (84%/78% vs. 42%/53% for identical tests): v4 made
@@ -32,10 +39,10 @@ export default defineConfig({
       // functions the tests never actually reach. Nothing got worse — the
       // measurement got honest. Don't "restore" the old figures.
       thresholds: {
-        statements: 50,
-        branches: 41,
-        functions: 52,
-        lines: 50,
+        statements: 58,
+        branches: 47,
+        functions: 65,
+        lines: 59,
       },
     },
   },

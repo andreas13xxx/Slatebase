@@ -120,14 +120,16 @@ src/
 │   ├── types.ts              — ISearchService, IReplaceService, SearchResponse, SearchHit, etc.
 │   ├── errors.ts             — SearchQueryValidationError, RegexValidationError, RegexTooLongError, SearchTimeoutError, ReplaceValidationError, FileChangedError
 │   ├── validation.ts         — Zod schemas (searchQuerySchema, multiVaultSearchSchema, replaceBodySchema)
+│   ├── regex-safety.ts       — MAX_REGEX_LENGTH + validateRegexPattern() (length check, syntax check, nested-quantifier ReDoS heuristic) — throws RegexTooLongError/RegexValidationError, shared by search and replace
+│   ├── regex-safety.test.ts  — Unit tests for regex-safety
 │   ├── search-service.ts     — SearchService (linear file iteration, plain-text + regex, context lines, multi-vault)
+│   ├── search-service.test.ts — Unit tests for SearchService
 │   ├── replace-service.ts    — ReplaceService (atomic write, max 100 files, partial failure)
 │   ├── replace-service.test.ts — Unit tests for ReplaceService
 │   ├── query-parser.ts       — parseSearchQuery() (extracts path:/file:/tag:/property: operators + negation from query string, returns ParsedQuery with operators + freeText)
 │   ├── query-parser.test.ts  — Unit tests for query parser
 │   ├── glob-match.ts         — globMatch() (minimal glob matching for path: operator — *, **, ?, case-insensitive, no external dependency)
-│   ├── glob-match.test.ts    — Unit tests for glob-match
-│   └── (search-service.test.ts) — Optional: Unit tests for SearchService
+│   └── glob-match.test.ts    — Unit tests for glob-match
 ├── link-index/
 │   ├── index.ts              — Barrel export for link-index module
 │   ├── types.ts              — ILinkIndex interface, GraphData, GraphNode, GraphEdge, GraphQueryOptions, GraphMeta, ParsedWikilink, PropertyFilter, PropertyFilterOperator
@@ -157,6 +159,8 @@ src/
 │   ├── types.ts              — IInstalledPluginStore, PluginManifest, PluginFiles, PluginRegistryData interfaces
 │   ├── errors.ts             — PluginNotFoundError, PluginFileTooLargeError, PluginSettingsTooLargeError
 │   ├── validation.ts         — Zod schemas (pluginManifestSchema, pluginRegistrySchema)
+│   ├── secret-key-manager.ts — PluginSecretKeyManager (encryption key for plugin secrets at rest: env `SLATEBASE_PLUGIN_SECRET_KEY` → file → generate, same pattern as CsrfSecretManager; HKDF-SHA256 down to an AES-256 key)
+│   ├── secret-store.ts   — PluginSecretStore (`data/plugins/<vaultId>/<pluginId>/secrets.json`, each value encrypted individually with AES-256-GCM; `listSecrets()` returns IDs only, never values)
 │   ├── installed-plugin-store.ts — InstalledPluginStore (filesystem persistence, atomic writes, per-vault per-plugin dirs); `loadManifest` normalizes `manifest.id` to the directory name, since every other lookup is keyed by that and a manifest's self-declared id is upstream-controlled and can drift. The atomic write retries on EPERM/EACCES (Windows file locking from OneDrive sync or antivirus), then unlinks and retries, then falls back to a direct write — a transient lock must never surface as a lost write
 │   ├── installed-plugin-store.test.ts — Unit tests for InstalledPluginStore
 │   ├── plugin-installer.ts   — PluginInstaller (ZIP extraction, manifest validation, bundle integrity, version comparison)
@@ -348,30 +352,30 @@ src/
 │       ├── declarative-settings-renderer.ts — Renders Obsidian 1.13+ `getSettingDefinitions()` declarative settings arrays (group/list/page/controls) into Setting/*Component UI
 │       ├── obsidian-api-extensions.ts — Extended APIs: Events, Scope, Keymap, utility functions, MarkdownPreviewRenderer, DOM globals (async loaded as supplement) + `OBSIDIAN_API_VERSION` behind `requireApiVersion()`. `Scope.handleKey()` and the module-level `Keymap` scope stack really dispatch (a single global keydown listener walks the stack) instead of only collecting handlers — inert until a plugin calls `app.keymap.pushScope()`. `sanitizeHTMLToDom()` strips inline event-handler attributes and `javascript:`/dangerous `data:` URLs, not just `<script>` tags. `renderComponentIcon()` is `ExtraButtonComponent.setIcon()`'s Lucide/custom-SVG resolver (same logic `ButtonComponent.setIcon()` in `setting-tab.ts` implements separately) — `Setting`/`SettingGroup`'s `addExtraButton()` now construct a real `ExtraButtonComponent` instead of a third copy, so this one fix covers all three call sites.
 │       ├── metadata-parser.ts — `parseMetadata()`: the single producer of Obsidian-shaped `CachedMetadata` from raw Markdown — headings, embeds, sections, listItems, footnotes/footnoteRefs, referenceLinks, frontmatterLinks alongside frontmatter/tags/links/blocks. Best-effort CommonMark approximation (same bar as `parseBlocks`/`scanFencedCodeBlocks`), not a spec-compliant parser
-│       ├── editor-shim.ts — EditorShim (Obsidian Editor API; backend priority CM6 EditorView → textarea → internal buffer; setEditorViewAccessor wired once at vault init)
+│       ├── editor-shim.ts — EditorShim (Obsidian Editor API; backend priority CM6 EditorView → textarea → internal buffer; setEditorViewAccessor wired once at vault init). Instantiate via `EditorShim.create()`, not `new`: that wraps it in the same non-emulated-access Proxy every other shim has, so an undocumented `editor.*` is a logged, enumerable gap rather than a bare TypeError thrown from inside plugin code
 │       ├── editor-suggest-manager.ts — EditorSuggestManager (module-level singleton: registry of EditorSuggest instances, trigger-detection state machine, async generation guard, open/close lifecycle)
 │       ├── editor-suggest-popover.ts — EditorSuggestPopover (fixed-position dropdown DOM, coordsAtPos positioning, viewport clamping, renderSuggestion loop, keyboard-nav selection, scroll-into-view)
 │       ├── editor-suggest-extension.ts — CM6 ViewPlugin (trigger loop on selectionSet/docChanged) + Prec.highest keymap (↑↓ Enter Tab Esc interception when popover is open)
 │       ├── markdown-renderer.ts — MarkdownRenderer (lightweight regex-based markdown-to-HTML). Serves as the synchronous initial implementation during bundle evaluation; the full remark pipeline from `shims/markdown-renderer-shim.ts` patches over the static methods before any plugin's `onload()` fires
 │       ├── markdown-sections.ts — Maps rendered code blocks back to their source line range (getSectionInfo) by re-scanning the source for fenced blocks in document order
 │       ├── block-cache.ts — Parses `^block-id` markers out of Markdown so `[[note#^id]]` links and CachedMetadata.blocks resolve
-│       ├── ribbon-icon-registry.ts — Module-level ribbon icon registry (addRibbonIcon store + change listeners)
-│       ├── status-bar-registry.ts — Module-level registry for addStatusBarItem() entries; notifies the StatusBar component on change
+│       ├── ribbon-icon-registry.ts — Module-level ribbon icon registry (addRibbonIcon store + change listeners). Rendered by `PluginRibbonIcon`, whose button also carries Obsidian's `side-dock-ribbon-action` class so plugin CSS matches
+│       ├── status-bar-registry.ts — Module-level registry for addStatusBarItem() entries; notifies the StatusBar component on change. Items carry both `status-bar__plugin-item` (ours, styled) and `status-bar-item` (Obsidian's, what plugin CSS targets)
 │       ├── command-registry.ts — CommandRegistry (addCommand → returns the Command like Obsidian does, getCommand, removeAll, search, hotkeys, editorCallback/editorCheckCallback; executes callbacks inside withPluginContext)
 │       ├── plugin-execution-context.ts — Tracks which plugin's code is currently executing (withPluginContext/getCurrentPluginId) so createEl() can tag elements with data-plugin-id; scopeForPlugin() binds the id into a closure for call sites that must survive `await`
 │       ├── lucide-icons.ts — Resolves Obsidian's built-in icon names (Lucide IDs + `-glyph` aliases) to SVG via lucide-react's per-icon dynamic-import map — real Obsidian ships the whole set, our addIcon() registry alone left plugin buttons blank. `preloadIconsReferencedIn(source)` scans a bundle's text for icon-id-shaped tokens and resolves those into the cache *before* the bundle evaluates, because Obsidian's `getIcon()` is synchronous and plugins may freeze its result into a vDOM tree at module load (Excalidraw), where a later async fill-in lands on a node nothing points at
 │       ├── browser-path-shim.ts — Browser-safe subset of Node's POSIX `path` (normalize/join/resolve/relative/dirname/basename/extname/parse/format, `posix`/`win32` self-aliases) for mobile-compatible plugins; transforms path strings only, never grants filesystem access
 │       ├── code-block-processor-registry.ts — CodeBlockProcessorRegistry (registerCodeBlockProcessor, processCodeBlocks, runPostProcessors, MarkdownRenderChild lifecycle)
-│       ├── css-injector.ts — CSS injection with scoped selectors (data-plugin-id); each rule emits both a descendant form (`[scope] sel`) and a self form (`sel[scope]`) so plugin UI inserted into shared workspace DOM — which has no scoped ancestor — still matches
+│       ├── css-injector.ts — CSS injection with scoped selectors (data-plugin-id); each rule emits both a descendant form (`[scope] sel`) and a self form (`sel[scope]`) so plugin UI inserted into shared workspace DOM — which has no scoped ancestor — still matches. Obsidian's host marker classes (`theme-dark`, `is-mobile`, …, from `OBSIDIAN_HOST_BODY_CLASSES`) are the one thing not folded into the scope: they sit on `<body>`, so they stay as a prefix in front of it — on *every* generated alternative, or a dark-mode rule would also apply in light mode
 │       ├── compatibility-analyzer.ts — Multi-layer browser compatibility analysis (isDesktopOnly gate, Node.js module detection, Obsidian API pattern matching, SUPPORTED_METHODS set). Methods that degrade gracefully and self-explanatorily (a split becomes a plain tab, both sidebars merge into the Context Panel) count as supported and explain the substitution in the console at call time; the pre-install warning list is reserved for reduced behavior likely to actually break a plugin
 │       ├── platform-detection.ts — Runtime device/Platform flags (Obsidian's are Electron build constants; Slatebase derives isMobile/isDesktop etc. at runtime since one build serves both)
-│       ├── api-gap-registry.ts — Records which no-op Proxy-trapped API a plugin read vs. actually called, so silently-unimplemented API usage is diagnosable instead of invisible
+│       ├── api-gap-registry.ts — Records which no-op Proxy-trapped API a plugin read vs. actually called, so silently-unimplemented API usage is diagnosable instead of invisible. Covers App, Workspace, WorkspaceLeaf, Vault, VaultAdapter, MetadataCache, FileManager, FileExplorerView, Editor and the fallback namespace; inspect at runtime via `window.__slatebasePluginApiGaps()`
 │       ├── log.ts — Shared console helpers with meaningful severity: `debug*` = deliberate compat trade-off (expected), `warn*` = real gap (actionable); `*Once` variants dedupe by key so render/event-path call sites log one line per session instead of flooding
 │       ├── core-commands.ts — Obsidian's built-in `editor:*` commands (formatting, lists, headings, tables) registered against the CommandRegistry, so `executeCommandById('editor:toggle-code')` resolves like a real install; no-Slatebase-equivalent commands are registered as literal no-ops rather than left unresolvable
 │       ├── core-commands-app.ts — The core commands needing app-level React state (`workspace:*`, `file-explorer:*`, `app:*`, `theme:*`, Graph/Canvas/Daily Notes, side panels); registered once by CommandPaletteContainer and fed fresh state via a ref. `app:go-back`/`app:go-forward`/`switcher:open` (formerly no-ops) now call `h.onNavigateBack`/`onNavigateForward`/`onOpenQuickSwitcher`; `workspace:next-tab`/`previous-tab` (`activateTabByOffset()`, wrap-around) predate this but only got a default keybinding now; `graph:open-local` (formerly a no-op) now calls `h.onOpenLocalGraph(activeTab.filePath)`, guarded against sentinel (non-file) active tabs
-│       ├── body-classes.ts — Syncs Obsidian's `theme-dark`/`theme-light` + platform marker classes (`is-mobile`, `mod-macos`, …) onto `document.body`; plugin CSS and runtime theme checks read those, while Slatebase's own state lives in `data-theme` on `<html>`
+│       ├── body-classes.ts — Syncs Obsidian's `theme-dark`/`theme-light` + platform marker classes (`is-mobile`, `mod-macos`, …) onto `document.body`; plugin CSS and runtime theme checks read those, while Slatebase's own state lives in `data-theme` on `<html>`. Exports `OBSIDIAN_HOST_BODY_CLASSES` as the single source of truth, which `css-injector.ts` imports so the setting and the scoping side cannot drift
 │       ├── active-workspace-shim.ts — Module-level get/set for the current vault's WorkspaceShim, so native UI outside the PluginProvider tree (file-explorer context menu) can fire `file-menu`/`files-menu`
-│       ├── obsidian-components.css — Styles for the Obsidian-compatible Setting/*Component controls rendered by setting-tab.ts
+│       ├── obsidian-components.css — Structural CSS for the Obsidian component classes the shims render (`.menu`, `.suggestion-item`, `.prompt`, `.notice`, `.svg-icon`, `.modal-title`, Setting/*Component controls). The sibling `obsidian-compat.css` maps our design tokens onto Obsidian's ~605 CSS variables (what plugins *read*); this file is the other half — the classes plugin CSS *writes against*, which Obsidian ships in its app stylesheet and plugin authors assume exists
 │       ├── plugin-context.ts — PluginProvider + usePluginContext hook (vault-scoped instances, FCP loading, activeViews/sidebarViews state)
 │       ├── plugin-event-bridge.ts — usePluginEventBridge hook (tab→workspace, save→cache, tree→resolved, leaf events)
 │       ├── core-command-i18n.ts — German/English display names for the core commands, keyed by the same full command ID. The IDs themselves stay fixed and language-independent (plugins resolve them); only the palette label is localized, and keeping it here means translating never touches the command spec arrays
@@ -384,6 +388,9 @@ src/
 │       ├── obsidian-compat.css — Obsidian-compatible CSS Custom Properties (~590 vars mapped to Slatebase tokens, Dark Mode: fonts/weights, sizing scale, code + tag tokens, accent HSL components, input shadows) + `position: relative` on `.markdown-source-view`/`.view-content` so plugin UI anchored to the editor pane sizes against the pane, as it does in real Obsidian
 │       ├── tab-view-bridge.ts — TabViewBridge (module-level bridge: ViewRegistry → TabProvider for plugin view tabs)
 │       ├── tab-view-bridge-wiring.test.ts — Integration tests for TabViewBridge wiring
+│       ├── notice.test.ts — Unit tests for the `Notice` shim: real container/notice/message tree, DocumentFragment kept as markup instead of flattened, and the live `noticeEl` — not a copy — handed to the toast bridge
+│       ├── deliberate-noops.test.ts — Pins down that every intentionally unimplemented stub logs (CM5 legacy, Vim adapter, foldManager, onNodeInserted/onWindowMigrated, bootstrap `app.commands`) and at the right severity — debug for a trade-off with a working alternative, warn where plugin code silently will not run
+│       ├── editor-shim.gap.test.ts — Unit tests for `EditorShim.create()`'s Proxy net: emulated methods pass through with `this` intact, unknown ones answer with a logged no-op recorded in the gap registry, and `then` stays undefined so an awaited editor cannot hang
 │       └── shims/
 │           ├── app-shim.ts — AppShim (Proxy-based, vault/workspace/metadataCache/fileManager/plugins/isMobile/appId/secretStorage/loadLocalStorage/saveLocalStorage); `commands` + `hotkeyManager` are backed by the shared CommandRegistry (findCommand/listCommands/executeCommandById, defaultKeys/addDefaultHotkeys), `workspace` is wrapped with scopeForPlugin so its callbacks stay plugin-tagged. `App.scope` is one shared `Scope` across every AppShim (real Obsidian has a single App, so `app.scope.register()` from different plugins accumulates into one hotkey set) and is pushed onto the scope stack once, never popped. Also `metadataTypeManager` (undocumented frontmatter property-type registry — obsidian-tasks registers its field types on startup; Slatebase has no Properties view to reflect them into, so it just echoes back what was registered)
 │           ├── vault-shim.ts — VaultShim (read/modify/create/delete/copy/getFileByPath/readBinary/modifyBinary/process/append/exists/configDir/events); create/delete/rename/createFolder also patch the local `directoryTree` snapshot immediately (returning a new tree, not mutating in place) so the synchronous cache-only APIs — `getAbstractFileByPath`/`exists`/`getFileByPath`, which cannot await — don't answer from stale state before the realtime round-trip lands (Templater creates a file and looks it up in the same tick). `onFileRead`/`onFileWrite` callbacks (wired in `plugin-context.ts`) feed `MetadataCacheShim.populateFromContent()`/`refreshFileCache()` after every read/write, so `getFileCache()` never answers from a stale or empty cache. `TFile.stat.mtime`/`ctime` come from the backend's directory-tree scan (real `fs.stat()`), falling back to "now" only for locally-synthesized nodes (e.g. a file just created, ahead of the next tree refresh)
@@ -421,6 +428,7 @@ src/
 │   ├── realtimeContext.ts — RealtimeProvider + useRealtimeContext hook
 │   ├── realtimeActions.ts — computeReconnectDelay, RealtimeAction types
 │   ├── realtimeChatBridge.ts — Module-level bridge: SSE chat events → ChatProvider (cross-provider communication)
+│   ├── revealFileBridge.ts — Bridge for `slatebase:reveal-file`. FileExplorer only listens while its tab is the active view, so a caller that just switched the panel to 'explorer' dispatches before the listener exists — a race the explorer always loses. `requestReveal` also parks the request at module scope, so the explorer can pick it up once on mount
 │   ├── realtimeVaultBridge.ts — Module-level bridge: SSE vault:change events → AppProvider (tree refresh + tab reload)
 │   ├── pluginSettingsChangeBridge.ts — Same module-level bridge pattern for SSE `plugin-settings:change` → PluginProvider, which resolves the PluginInstance and calls its `onExternalSettingsChange()` (RealtimeProvider sits above PluginProvider, so it cannot reach the loader directly)
 │   ├── useEventSource.ts — Custom hook managing EventSource lifecycle (backoff, visibility, reconnect)
@@ -435,9 +443,14 @@ src/
 │   ├── settingsRegistry.ts   — ISettingsRegistry, section definitions
 │   ├── settingsPersistence.ts — sessionStorage serialize/validate
 │   ├── settingsContext.ts    — SettingsProvider + useSettingsContext hook
+│   ├── settingsLabels.ts     — SECTION_LABELS/CATEGORY_LABELS (single source for sidebar nav + content heading, was duplicated — and had drifted — across SettingsNavList.tsx/SettingsContent.tsx)
 │   ├── canvasState.ts        — Canvas reducer + types (document, viewport, selection, undo/redo stacks, dirty)
 │   ├── canvasContext.ts      — CanvasProvider + useCanvasContext hook (parse, autosave, save)
 │   ├── realtimePresenceBridge.ts — Module-level bridge: SSE presence events → PresenceState
+├── i18n/
+│   ├── index.ts          — I18nProvider + useTranslation hook: locale from user profile (fallback to browser detection pre-login), dot-path key resolution against the DE/EN objects with German fallback on missing keys, `{param}` interpolation
+│   ├── de.ts             — German translation strings (default locale, source of truth for `TranslationKey` type)
+│   └── en.ts             — English translation strings (must mirror de.ts's structure)
 ├── hooks/
 │   ├── useLineNumbers.ts — Line numbers toggle state (localStorage persistence)
 │   ├── useResize.ts      — Mouse-driven panel resize hook (width, min, max, side)
@@ -552,10 +565,10 @@ src/
 │   │   ├── TagsView.tsx          — Vault-wide tags with expand/collapse
 │   │   ├── TagsView.test.tsx
 │   │   ├── TagsView.css
-│   │   ├── PropertiesView.tsx    — YAML frontmatter as key-value table (read-only, used when document is not editable)
-│   │   ├── PropertiesView.test.tsx
-│   │   ├── PropertiesView.css
-│   │   ├── PropertiesEditor.tsx  — Interactive typed frontmatter editor (replaces PropertiesView when editable): type resolution (registry > well-known keys > inference), typed controls per property, add/delete/commit
+│   │   ├── PropertiesOverview.tsx — Vault-wide list of every frontmatter property key in use, with occurrence count and type. Replaces the old per-document Properties tab: editing a note's own frontmatter now happens inline in the note (FrontmatterWidget), so this tab is for curating the vault's property *definitions* instead
+│   │   ├── PropertiesOverview.test.tsx
+│   │   ├── PropertiesOverview.css
+│   │   ├── PropertiesEditor.tsx  — Interactive typed frontmatter editor: type resolution (registry > well-known keys > inference), typed controls per property, add/delete/commit
 │   │   ├── PropertiesEditor.css
 │   │   ├── property-controls/   — Individual type-aware input controls for the Properties Editor
 │   │   │   ├── index.ts          — Barrel export
@@ -580,25 +593,32 @@ src/
 │   │       ├── persistence.ts    — localStorage layout persistence, shared by both panels (caller-supplied storage-key prefix keeps left/right independent)
 │   │       └── persistence.test.ts
 │   ├── settings/
+│   │   ├── ui/                    — Shared settings design-system primitives (all tabs render on top of these for a consistent look — card background/border/radius, button variants, label+control rows)
+│   │   │   ├── SettingSection.tsx — Card container (optional title → h3, optional description, danger variant); `min-width:0` on itself and its body so a wide child (e.g. a table) scrolls inside the card instead of silently overflowing it
+│   │   │   ├── SettingRow.tsx     — Label + control line (checkbox/input/etc.), optional hint text, `nested` indent variant for sub-options under a parent toggle
+│   │   │   ├── Button.tsx         — `variant`: primary/secondary/danger/ghost, `size`: md/sm — the one button component every settings tab uses
+│   │   │   ├── SettingUI.css      — Styles for SettingSection + SettingRow
+│   │   │   ├── Button.css         — Styles for Button
+│   │   │   └── index.ts           — Barrel export
 │   │   ├── SettingsPanel.tsx     — Unified settings overlay (Container Query, Ctrl+,, Escape/overlay close)
-│   │   ├── SettingsPanel.css     — Settings panel styles (responsive layout, embedded table overrides)
+│   │   ├── SettingsPanel.css     — Settings panel styles (responsive layout, embedded table overrides); also sets `min-width:0` on `.settings-panel-content` — it's a row-flex item once the container query goes wide, and without this a wide tab (a table) grows the flex item past the modal instead of scrolling inside it
 │   │   ├── SettingsSidebar.tsx   — Sidebar: search + nav list
 │   │   ├── SettingsSearch.tsx    — Debounced search input (150ms)
 │   │   ├── SettingsSearch.css    — Search styles
-│   │   ├── SettingsNavList.tsx   — Category/section nav (keyboard nav, aria-current, disabled vault sections)
+│   │   ├── SettingsNavList.tsx   — Category/section nav (keyboard nav, aria-current, disabled vault sections); labels from `state/settingsLabels.ts`
 │   │   ├── SettingsNavList.css   — Nav list styles
-│   │   ├── SettingsContent.tsx   — Section → Component mapping with focus management
+│   │   ├── SettingsContent.tsx   — Section → Component mapping with focus management; heading from `state/settingsLabels.ts`
 │   │   ├── AccountDeletionSection.tsx — Extracted account deletion form
-│   │   ├── FeatureTogglesSection.tsx  — Feature toggle UI; single consumer of state/featureActions.ts + the global FeatureContext (also embedded by AdminConfigPage, which no longer duplicates the load/toggle logic itself)
+│   │   ├── FeatureTogglesSection.tsx  — Feature toggle UI wrapped in one SettingSection card; single consumer of state/featureActions.ts + the global FeatureContext (also embedded by AdminConfigPage, which no longer duplicates the load/toggle logic itself)
 │   │   ├── ServerRestartSection.tsx   — Server restart with confirmation
-│   │   ├── VaultConfigSection.tsx     — Per-vault config (templates dir, daily notes dir) + "Aktive Datei im Explorer verfolgen" checkbox (client-only `workspaceStore.explorerFollowActiveFile`, applies instantly, no save button — unlike the server-persisted fields in the same section)
-│   │   ├── KeybindingsSection.tsx     — Configurable keyboard shortcuts (table, inline recording, conflict detection)
-│   │   ├── AppearanceSection.tsx      — Display preferences: global status bar toggle + one toggle per built-in item (clock/vault name/word stats/cursor position), plus the embedded SnippetManager
+│   │   ├── VaultConfigSection.tsx     — Per-vault config split into two SettingSection cards — "Anzeige" ("Aktive Datei im Explorer verfolgen", client-only `workspaceStore.explorerFollowActiveFile`, applies instantly, no save button) and "Verzeichnisse" (templates dir, daily notes dir, server-persisted, save button)
+│   │   ├── KeybindingsSection.tsx     — Configurable keyboard shortcuts; one SettingSection card per category (table, inline recording, conflict detection)
+│   │   ├── AppearanceSection.tsx      — Display preferences as two SettingSection cards: "Statusleiste" (global status bar toggle + one SettingRow per built-in item — clock/vault name/word stats/cursor position) and "CSS-Snippets" (embedded SnippetManager)
 │   │   ├── SnippetManager.tsx         — CSS snippet list (name/enabled toggle/size), upload (.css file), "create new" (opens SnippetEditorModal on an empty snippet), delete with ConfirmModal
 │   │   ├── SnippetManager.css         — SnippetManager + SnippetEditorModal styles
 │   │   ├── SnippetEditorModal.tsx     — Embedded snippet content editor (plain textarea — a small settings dialog, not the main document editor); loads on mount unless `initialContent` is already known (skips the round-trip for newly created snippets)
 │   │   └── WelcomeVaultSection.tsx    — On-demand tutorial vault creation (button, loading state, toast)
-│   ├── AdminUsersPage.tsx — User administration
+│   ├── AdminUsersPage.tsx — User administration; create form + user table each in a `settings/ui` SettingSection card, row actions as compact icon buttons (not full-text — that's what used to overflow the settings-modal-width table), delete confirmation via the shared ConfirmModal
 │   ├── AdminVaultsPage.tsx — Admin: all vaults overview with delete
 │   ├── AdminConfigPage.tsx — Server configuration (card-based layout)
 │   ├── AdminAuditPage.tsx — Audit log viewer
@@ -609,7 +629,7 @@ src/
 │   ├── QuickSwitcher.tsx — Fuzzy-open-by-name modal (Ctrl+O), structurally mirrors CommandPalette.tsx (overlay, useFocusTrap, Arrow/Enter/Escape) and reuses its `.command-palette-*` CSS classes; sources candidates via `collectFilesSorted()`, ranks via `fuzzyMatch()`, shows `recentFilesStore.getRecent()` for an empty query, offers "create new file" when nothing matches
 │   ├── CommandPaletteContainer.tsx — Built-in commands (navigation, vault ops, editor formatting, view toggles) + plugin commands, Ctrl+P shortcut, CustomEvent bridge to EditMode. Also owns QuickSwitcher's open state and the next/previous-tab keyboard shortcut (both need `commandRegistry`/`usePluginContext()`, only reachable from inside `<PluginProvider>` — see App.tsx note) and wires `app:go-back`/`app:go-forward`/`switcher:open` (previously no-ops in `core-commands-app.ts`) to `useNavigationHistory()`
 │   ├── RealtimeProvider.tsx — SSE event routing (chat, presence, vault:change, plugin-settings:change, toast, server events)
-│   ├── ToastNotification.tsx — Toast notification system (module-level state, CSS transitions). `showToast()` returns the toast's id; `updateToastMessage(id, msg)`/`dismissToast(id)` target that specific toast — the Obsidian `Notice` compat shim's `setMessage()`/`hide()` need this to affect the toast they actually created, not just fire another `showToast()` blind. `duration: 0` suppresses auto-dismiss (Notice's "stays until closed")
+│   ├── ToastNotification.tsx — Toast notification system (module-level state, CSS transitions). `showToast()` returns the toast's id; `updateToastMessage(id, msg)`/`dismissToast(id)` target that specific toast — the Obsidian `Notice` compat shim's `setMessage()`/`hide()` need this to affect the toast they actually created, not just fire another `showToast()` blind. `duration: 0` suppresses auto-dismiss (Notice's "stays until closed"). `showToast()` also takes an optional `messageEl`: the Obsidian `Notice` shim passes its own element and `MountedNode` mounts that exact node, so a plugin building into `Notice.messageEl` after construction (progress lines, spinners) is writing to something on screen rather than a detached div
 │   ├── ToastNotification.css — Toast notification styles
 │   ├── ConnectionIndicator.tsx — SSE connection status indicator (connected/connecting/disconnected)
 │   ├── PluginViewPanel.tsx — Plugin view rendering (imperative DOM mount for plugin ItemViews)
@@ -747,7 +767,8 @@ data/plugins/
         ├── manifest.json     — Plugin manifest (original from ZIP)
         ├── main.js           — Plugin bundle (JavaScript, max 5 MB)
         ├── styles.css        — Plugin styles (optional, max 512 KB)
-        └── data.json         — Plugin settings (max 1 MB, preserved across upgrades)
+        ├── data.json         — Plugin settings (max 1 MB, preserved across upgrades)
+        └── secrets.json      — Plugin secrets (SecretStorage API), each value AES-256-GCM encrypted; key from `SLATEBASE_PLUGIN_SECRET_KEY` or `data/.plugin-secret-key`
 ```
 
 - **Registry**: One JSON file per vault with all plugin states. Atomic writes.

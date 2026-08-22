@@ -105,6 +105,10 @@ Diese Plugins wurden getestet und funktionieren in Slatebase:
 | Mind Map | Gut | Überschriften/Listen als interaktive Mindmap — ⚠️ Plugin selbst vermutlich kaputt (siehe Plugin-Guide) |
 | Editing Toolbar | Gut | Fixe und schwebende Formatierungsleiste |
 | Iconize | Eingeschränkt | Icon-Picker funktioniert, Icons im Dateibaum meist nicht sichtbar |
+| Day Planner | Gut | Timeline-Ansicht + Time Tracker, mit echtem Plugin-Bundle verifiziert |
+| Outliner | Gut | Ganze Äste verschieben/einrücken/zoomen/falten, optionale Vim-Tastenüberschreibung nicht funktional |
+| Recent Files | Gut | Sidebar-Liste zuletzt geöffneter Notizen, Anpinnen/Ausschließen möglich |
+| Importer | Eingeschränkt | Migriert Notion/Evernote/Keep/HTML/Markdown; Apple Notes braucht macOS und funktioniert hier nicht |
 
 Siehe die einzelnen [[Fortgeschritten/Plugins/Calendar|Plugin-Guides]] für detaillierte Kompatibilitäts-Informationen.
 
@@ -118,7 +122,7 @@ Siehe die einzelnen [[Fortgeschritten/Plugins/Calendar|Plugin-Guides]] für deta
 | Problem | Lösung |
 |---------|--------|
 | Plugin lädt nicht | Browser-Konsole prüfen (F12), Plugin wird automatisch deaktiviert |
-| Styles sehen falsch aus | CSS wird per `[data-plugin-id]` isoliert, bei Konflikten deaktivieren |
+| Styles sehen falsch aus | Plugin-CSS wird per `[data-plugin-id]` auf das Plugin begrenzt. Regeln, die Slatebases eigene Oberfläche umgestalten wollen, greifen deshalb absichtlich nicht — Dark-Mode-Regeln des Plugins dagegen schon |
 | App wird langsam | Plugin deaktivieren, Seite neu laden |
 | "Umgebung nicht unterstützt" | Plugin ist Desktop-only, kein Workaround |
 
@@ -155,6 +159,14 @@ Viele Plugins bringen eigene Settings mit:
 - `registerView()` für Sidebar und Tab-Views
 - `registerEditorSuggest()` — Autocomplete-Popover im Editor (Datum, Zeit, etc.)
 
+### Plugin-CSS
+
+Die `styles.css` eines Plugins wird beim Aktivieren geladen und beim Deaktivieren wieder entfernt. Alle Selektoren werden dabei auf das Plugin begrenzt, damit ein Plugin nicht die übrige Oberfläche umbauen kann.
+
+Obsidians Theme- und Plattform-Klassen bleiben davon ausgenommen: Slatebase setzt `theme-dark`/`theme-light` sowie `is-mobile`, `mod-macos` & Co. auf `<body>`, genau wie Obsidian. Regeln wie `.theme-dark .mein-panel { … }` funktionieren deshalb, und Plugins, die zur Laufzeit das Theme abfragen, bekommen die richtige Antwort.
+
+Was **nicht** funktioniert, sind Regeln, die Slatebases eigene Oberfläche umgestalten (Dateibaum, Editor-Bereich, Tab-Leiste) — das ist die bewusste Grenze. Vollständige Obsidian-Themes werden aus demselben Grund nicht unterstützt.
+
 ### Sandbox-Isolation
 
 - Vault-Zugriff nur auf aktiven Vault
@@ -182,6 +194,10 @@ Ausführliche Anleitungen mit Beispielen und Übungen für getestete Plugins:
 | Mind Map | Notizen als interaktive Mindmap darstellen | [[Fortgeschritten/Plugins/Mind Map]] |
 | Editing Toolbar | Formatierungsleiste für den Editor | [[Fortgeschritten/Plugins/Editing Toolbar]] |
 | Iconize | Individuelle Icons für Dateien und Ordner | [[Fortgeschritten/Plugins/Iconize]] |
+| Day Planner | Zeitlich geblockte Aufgaben als visuelle Timeline | [[Fortgeschritten/Plugins/Day Planner]] |
+| Outliner | Outline-Bearbeitung für Aufzählungslisten | [[Fortgeschritten/Plugins/Outliner]] |
+| Recent Files | Sidebar-Liste zuletzt geöffneter Notizen | [[Fortgeschritten/Plugins/Recent Files]] |
+| Importer | Notizen aus Notion, Evernote und mehr migrieren | [[Fortgeschritten/Plugins/Importer]] |
 
 ### Praktische Übungen
 

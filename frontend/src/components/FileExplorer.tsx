@@ -18,6 +18,7 @@ import { TemplateSelector } from './TemplateSelector'
 import { getCachedStatistics, fetchVaultStatistics, invalidateStatisticsCache, formatStatisticsTooltip } from '../state/vaultStatisticsCache'
 import { onRealtimeVaultChange } from '../state/realtimeVaultBridge'
 import { getState as getWorkspaceState, updateExpandedState } from '../state/workspaceStore'
+import { consumePendingReveal } from '../state/revealFileBridge'
 import { TreeNode } from './file-explorer'
 import type { DragState, ExternalDropState, ContextMenuState, InlineInputState } from './file-explorer'
 import { getActiveWorkspaceShim } from '../plugins/compat/active-workspace-shim'
@@ -214,8 +215,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
   // ancestor folders, then scroll the target into view once it's rendered.
   const pendingRevealRef = useRef<{ path: string; kind: 'file' | 'folder' } | null>(null)
   useEffect(() => {
-    function handleRevealFile(e: Event) {
-      const detail = (e as CustomEvent<{ path: string; kind?: 'file' | 'folder' }>).detail
+    function applyReveal(detail: { path: string; kind?: 'file' | 'folder' } | null | undefined) {
       if (!detail || detail.path === undefined) return
       const vaultId = state.selectedVaultId
       if (!vaultId) return
@@ -246,10 +246,26 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
         let acc = ''
         for (let i = 0; i < depth; i++) {
           acc = acc ? `${acc}/${segments[i]}` : segments[i]
-          next.add(acc)
+          // TreeNode/handleToggleFolder key expandedPaths by `${vaultId}::${path}`
+          // (a folder can share its relative path across vaults), not the bare path.
+          next.add(`${vaultId}::${acc}`)
         }
         return next
       })
+    }
+
+    function handleRevealFile(e: Event) {
+      applyReveal((e as CustomEvent<{ path: string; kind?: 'file' | 'folder' }>).detail)
+    }
+
+    // Pick up a reveal request made before this listener existed — e.g. auto-reveal
+    // or the reveal-active-file command switch the panel to 'explorer' and dispatch
+    // in the same tick FileExplorer mounts, so the live event below can be missed.
+    // See revealFileBridge.ts. Only consume once a vault is actually selected —
+    // otherwise applyReveal would no-op and the request would be lost for good
+    // instead of staying pending until selectedVaultId is ready.
+    if (state.selectedVaultId) {
+      applyReveal(consumePendingReveal())
     }
 
     window.addEventListener('slatebase:reveal-file', handleRevealFile)

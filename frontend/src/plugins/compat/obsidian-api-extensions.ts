@@ -82,8 +82,8 @@ import { registerPostProcessor as registerPostProcessorReal } from './code-block
  *   BaseComponent slot; setting-tab.ts)
  * - 1.11.4: SecretComponent (setting-tab.ts), SecretStorage + App.
  *   secretStorage (obsidian-api-extensions.ts/app-shim.ts) — real Obsidian
- *   encrypts this via the OS keychain, this persists to a vault-scoped
- *   localStorage prefix instead (same simplification as loadLocalStorage)
+ *   encrypts this via the OS keychain, this stores it server-side with
+ *   AES-256-GCM instead, with localStorage only as a legacy/offline fallback
  * - 1.12.3: Vault.appendBinary()'s DataWriteOptions param (vault-shim.ts) —
  *   accepted, not persisted, same as every other DataWriteOptions call
  * - 1.13.0: ConfirmationModal/ConfirmationButton (install-globals.ts)

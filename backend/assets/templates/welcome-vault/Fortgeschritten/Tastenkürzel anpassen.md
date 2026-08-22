@@ -100,17 +100,15 @@ Folgende Befehle können mit eigenen Kürzeln belegt werden:
 | `Ctrl+S` | Datei speichern |
 | `Ctrl+Z` | Rückgängig machen |
 | `Ctrl+Shift+Z` | Wiederherstellen |
-| `Ctrl+B` | Fett formatieren |
-| `Ctrl+I` | Kursiv formatieren |
-| `Ctrl+K` | Link einfügen |
 | `Ctrl+E` | Zwischen Edit/View wechseln |
-| `Ctrl+W` | Aktiven Tab schließen |
-| `Ctrl+G` | Knowledge Graph öffnen |
 | `Ctrl+O` | Schnellwechsler öffnen |
 | `Alt+←` | Zurück navigieren |
 | `Alt+→` | Vor navigieren |
 | `Ctrl+Shift+]` | Nächster Tab |
 | `Ctrl+Shift+[` | Vorheriger Tab |
+
+> [!info] Fett, Kursiv, Link einfügen
+> Formatierungsbefehle wie Fett, Kursiv und Link einfügen sind über die Command Palette (`Ctrl+P`) erreichbar, haben aber kein Standard-Tastenkürzel und sind nicht Teil der konfigurierbaren Keybindings-Tabelle.
 
 ---
 

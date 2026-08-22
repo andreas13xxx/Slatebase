@@ -35,6 +35,28 @@ import { detectPlatform, readPlatformEnvironment } from './platform-detection'
 const THEME_CLASSES = ['theme-light', 'theme-dark'] as const
 
 /**
+ * Every marker class this module puts on `document.body`.
+ *
+ * Exported because the CSS injector needs the same list: a plugin rule written
+ * as `.theme-dark .panel { … }` addresses one of these on `<body>` and its own
+ * element underneath, so the injector has to leave the leading part in front of
+ * the plugin scope instead of folding it in (see `scopeSingleSelector`). The two
+ * must not drift — a class synced here but unknown there produces a selector
+ * that can never match, which is exactly the bug that list closes.
+ */
+export const OBSIDIAN_HOST_BODY_CLASSES: readonly string[] = [
+  ...THEME_CLASSES,
+  'is-mobile',
+  'is-phone',
+  'is-tablet',
+  'mod-macos',
+  'mod-windows',
+  'mod-linux',
+  'mod-ios',
+  'mod-android',
+]
+
+/**
  * Resolve the theme actually being displayed.
  *
  * `data-theme="system"` (and a missing attribute) defer to the OS, which is why

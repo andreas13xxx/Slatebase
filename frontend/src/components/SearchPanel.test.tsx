@@ -159,7 +159,7 @@ describe('SearchPanel — Replace UI', () => {
     fireEvent.click(screen.getByLabelText('Alle ersetzen'))
 
     // Confirmation modal should appear with preview
-    expect(screen.getByText('2 Treffer in 2 Dateien ersetzen?')).toBeTruthy()
+    expect(screen.getByText('2 Treffer in 2 Datei(en) ersetzen?')).toBeTruthy()
     // Modal has "Ersetzen" confirm button and "Abbrechen" cancel button
     const modal = screen.getByRole('alertdialog')
     expect(modal).toBeTruthy()
@@ -223,7 +223,7 @@ describe('SearchPanel — Replace UI', () => {
     const toggleBtn = screen.getByLabelText('Ersetzen-Bereich umschalten')
     fireEvent.click(toggleBtn)
 
-    expect(screen.getByText('5 Ersetzungen in 2 Dateien durchgeführt')).toBeTruthy()
+    expect(screen.getByText('5 Ersetzung(en) in 2 Datei(en) durchgeführt')).toBeTruthy()
   })
 
   it('shows error feedback after replace error', () => {
@@ -262,7 +262,7 @@ describe('SearchPanel — Replace UI', () => {
     fireEvent.click(screen.getByLabelText('Alle ersetzen'))
 
     // Modal should be open
-    expect(screen.getByText('1 Treffer in 1 Datei ersetzen?')).toBeTruthy()
+    expect(screen.getByText('1 Treffer in 1 Datei(en) ersetzen?')).toBeTruthy()
 
     // Cancel
     fireEvent.click(screen.getByText('Abbrechen'))

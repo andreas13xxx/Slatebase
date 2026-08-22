@@ -14,7 +14,6 @@ import { extractErrorMessage } from '../utils/error'
 import type { DirectoryTree } from '../types'
 import { extractHeadings } from '../components/context-panel/utils/extractHeadings'
 import { extractWikilinks } from '../plugins/wikilink/extract'
-import { parseFrontmatter } from '../components/context-panel/utils/parseFrontmatter'
 import { resolveWikilinkTarget } from '../plugins/link-resolver'
 
 /**
@@ -268,35 +267,6 @@ export async function loadTags(
 }
 
 /**
- * Parses YAML frontmatter from markdown content and dispatches SET_PROPERTIES.
- *
- * @param dispatch - The document panel dispatch function
- * @param content - Raw markdown content of the active document
- */
-export function loadProperties(
-  dispatch: Dispatch<DocumentPanelAction>,
-  content: string,
-): void {
-  try {
-    const result = parseFrontmatter(content)
-    dispatch({
-      type: 'SET_PROPERTIES',
-      data: result.data,
-      parseError: result.parseError,
-      rawFrontmatter: result.rawFrontmatter,
-    })
-  } catch {
-    // On unexpected failure, dispatch null properties
-    dispatch({
-      type: 'SET_PROPERTIES',
-      data: null,
-      parseError: null,
-      rawFrontmatter: null,
-    })
-  }
-}
-
-/**
  * Fetches files for a specific tag and dispatches SET_TAG_EXPANDED.
  * Uses the tags endpoint response which includes file lists per tag.
  *
@@ -336,22 +306,4 @@ function formatLinkDisplayName(filePath: string): string {
       : fileName.slice(0, -3)
   }
   return filePath
-}
-
-/**
- * Loads the property type registry for the active vault.
- * Called once per vault switch (not per document switch).
- */
-export async function loadPropertyTypes(
-  dispatch: Dispatch<DocumentPanelAction>,
-  apiClient: IApiClient,
-  vaultId: string,
-): Promise<void> {
-  try {
-    const response = await apiClient.getPropertyTypes(vaultId)
-    dispatch({ type: 'SET_PROPERTY_TYPE_REGISTRY', entries: response.entries })
-  } catch {
-    // Non-critical: editor works without registry (falls back to type inference)
-    dispatch({ type: 'SET_PROPERTY_TYPE_REGISTRY', entries: null })
-  }
 }

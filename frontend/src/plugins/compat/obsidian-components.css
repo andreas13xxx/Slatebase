@@ -265,7 +265,12 @@
   box-shadow: var(--shadow-l);
 }
 
-/* ─── Notice ──────────────────────────────────────────────────────────── */
+/* ─── Notice ────────────────────────────────────────────────────────────
+   The `Notice` shim builds Obsidian's container > notice > message tree
+   and hands `.notice` to the toast stack, which mounts that exact
+   element (see MountedNode in ToastNotification.tsx). `.notice` is
+   therefore live DOM, and plugin rules targeting it apply the way they
+   do in Obsidian. */
 .notice-container {
   position: fixed;
   top: var(--size-4-4, 16px);
@@ -285,6 +290,20 @@
   box-shadow: var(--shadow-l);
   font-size: var(--font-ui-small);
   cursor: pointer;
+}
+
+/* Inside a toast the surrounding item already provides the surface, so the
+   notice contributes only its content - otherwise every plugin notice would
+   render as a bordered card nested inside a bordered card. Plugin overrides
+   still win: they set these same properties at equal or higher specificity. */
+.toast-notification-item__message > .notice {
+  max-width: none;
+  padding: 0;
+  background-color: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  font-size: inherit;
+  cursor: inherit;
 }
 
 .notice.mod-error {

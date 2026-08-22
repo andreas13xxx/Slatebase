@@ -6,6 +6,11 @@
  * one `window.obsidian.setIcon`/`getIcon` use), 3) a generic puzzle-piece
  * fallback while that resolution is still in flight.
  *
+ * The button carries `side-dock-ribbon-action` alongside our own
+ * `toolbar-btn` classes. That is Obsidian's class for a ribbon button and what
+ * plugin stylesheets target when they restyle their own ribbon icon; our
+ * classes keep carrying the actual styling.
+ *
  * @module PluginRibbonIcon
  */
 
@@ -40,7 +45,7 @@ export function PluginRibbonIcon({ entry }: PluginRibbonIconProps) {
   if (markup) {
     return (
       <button
-        className="toolbar-btn toolbar-btn--plugin"
+        className="toolbar-btn toolbar-btn--plugin side-dock-ribbon-action"
         title={entry.title}
         aria-label={entry.title}
         onClick={entry.callback}
@@ -51,7 +56,7 @@ export function PluginRibbonIcon({ entry }: PluginRibbonIconProps) {
 
   return (
     <button
-      className="toolbar-btn toolbar-btn--plugin"
+      className="toolbar-btn toolbar-btn--plugin side-dock-ribbon-action"
       title={entry.title}
       aria-label={entry.title}
       onClick={entry.callback}

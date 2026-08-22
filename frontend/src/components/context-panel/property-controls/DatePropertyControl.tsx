@@ -4,6 +4,7 @@
  */
 
 import { useCallback } from 'react'
+import { useTranslation } from '../../../i18n'
 
 interface DatePropertyControlProps {
   value: string
@@ -12,6 +13,7 @@ interface DatePropertyControlProps {
 }
 
 export function DatePropertyControl({ value, onChange, includeTime = false }: DatePropertyControlProps) {
+  const { t } = useTranslation()
   const inputType = includeTime ? 'datetime-local' : 'date'
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -27,7 +29,7 @@ export function DatePropertyControl({ value, onChange, includeTime = false }: Da
       className={`property-control property-control--date${includeTime ? 'time' : ''}`}
       value={value || ''}
       onChange={handleChange}
-      aria-label={includeTime ? 'Datum und Zeit' : 'Datum'}
+      aria-label={includeTime ? t('contextPanel.propertyControls.dateTimeAriaLabel') : t('contextPanel.propertyControls.dateAriaLabel')}
     />
   )
 }

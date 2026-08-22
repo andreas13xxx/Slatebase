@@ -53,15 +53,14 @@ Markdown is rendered inline. Headings appear at the correct size, links become c
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+B` | Bold |
-| `Ctrl+I` | Italic |
-| `Ctrl+K` | Insert link |
 | `Ctrl+E` | Toggle mode (Source ↔ Live Preview) |
 | `Ctrl+Z` | Undo |
 | `Ctrl+Shift+Z` | Redo |
-| `Ctrl+D` | Duplicate line |
 | `Tab` | Indent |
 | `Shift+Tab` | Outdent |
+
+> [!info] Bold, Italic, Insert Link
+> Bold, Italic, and Insert Link are available from the Command Palette (`Ctrl+P`), but they have no default keyboard shortcut and are not customizable under Settings → Keybindings.
 
 ---
 

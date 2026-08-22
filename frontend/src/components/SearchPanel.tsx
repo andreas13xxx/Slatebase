@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { Search, ChevronDown, ChevronRight, Loader2, Replace, FileText, HelpCircle } from 'lucide-react'
 import { useSearchContext } from '../state/searchContext'
 import { useAppContext } from '../state'
+import { useTranslation } from '../i18n'
 import { performSearch, performMultiVaultSearch, performReplace, performSingleReplace } from '../state/searchActions'
 import { ConfirmModal } from './ConfirmModal'
 import { highlightSearchQuery } from './search-operator-highlight'
@@ -35,6 +36,7 @@ export function SearchPanel({
 }: SearchPanelProps) {
   const { state, dispatch } = useSearchContext()
   const { apiClient } = useAppContext()
+  const { t } = useTranslation()
   const [replaceExpanded, setReplaceExpanded] = useState(false)
   const [showReplaceConfirm, setShowReplaceConfirm] = useState(false)
   const [showOperatorHelp, setShowOperatorHelp] = useState(false)
@@ -274,8 +276,11 @@ export function SearchPanel({
         ? {
             type: 'success',
             message: state.lastReplaceResult.totalReplacements > 0
-              ? `${state.lastReplaceResult.totalReplacements} Ersetzung${state.lastReplaceResult.totalReplacements !== 1 ? 'en' : ''} in ${state.lastReplaceResult.fileCount} Datei${state.lastReplaceResult.fileCount !== 1 ? 'en' : ''} durchgeführt`
-              : 'Keine Treffer zum Ersetzen gefunden',
+              ? t('search.replaceSuccess', {
+                  count: state.lastReplaceResult.totalReplacements,
+                  fileCount: state.lastReplaceResult.fileCount,
+                })
+              : t('search.replaceNoHits'),
           }
         : null
 
@@ -427,13 +432,13 @@ export function SearchPanel({
               ref={inputRef}
               type="text"
               className="search-panel__input"
-              placeholder="Suchen..."
+              placeholder={t('search.placeholder')}
               value={state.query}
               onChange={handleQueryChange}
               onKeyDown={handleInputKeyDown}
               onInput={updateAutocomplete}
               onClick={updateAutocomplete}
-              aria-label="Suchen"
+              aria-label={t('search.inputAriaLabel')}
               role="combobox"
               aria-expanded={acVisible}
               aria-controls="search-operator-autocomplete"
@@ -457,27 +462,27 @@ export function SearchPanel({
           </div>
           <button
             className={`search-panel__toggle ${state.caseSensitive ? 'search-panel__toggle--active' : ''}`}
-            title="Groß-/Kleinschreibung"
+            title={t('search.caseSensitive')}
             onClick={handleToggleCaseSensitive}
             aria-pressed={state.caseSensitive}
-            aria-label="Groß-/Kleinschreibung"
+            aria-label={t('search.caseSensitive')}
           >
             Aa
           </button>
           <button
             className={`search-panel__toggle ${state.regex ? 'search-panel__toggle--active' : ''}`}
-            title="Regulärer Ausdruck"
+            title={t('search.regex')}
             onClick={handleToggleRegex}
             aria-pressed={state.regex}
-            aria-label="Regulärer Ausdruck"
+            aria-label={t('search.regex')}
           >
             .*
           </button>
           <button
             className="search-panel__toggle"
-            title="Operatoren-Hilfe"
+            title={t('search.operatorHelpButton')}
             onClick={() => setShowOperatorHelp((v) => !v)}
-            aria-label="Operatoren-Hilfe"
+            aria-label={t('search.operatorHelpButton')}
           >
             <HelpCircle size={14} />
           </button>
@@ -487,36 +492,36 @@ export function SearchPanel({
           <button
             className="search-panel__replace-toggle"
             onClick={handleToggleReplace}
-            title={replaceExpanded ? 'Ersetzen einklappen' : 'Ersetzen ausklappen'}
+            title={replaceExpanded ? t('search.collapseReplace') : t('search.expandReplace')}
             aria-expanded={replaceExpanded}
-            aria-label="Ersetzen-Bereich umschalten"
+            aria-label={t('search.replaceSectionAriaLabel')}
           >
             {replaceExpanded
               ? <ChevronDown size={14} />
               : <ChevronRight size={14} />
             }
-            <span className="search-panel__replace-label">Ersetzen</span>
+            <span className="search-panel__replace-label">{t('search.replace')}</span>
           </button>
           {replaceExpanded && hasWriteAccess && (
             <div className="search-panel__replace-input-row">
               <input
                 type="text"
                 className="search-panel__replace-input"
-                placeholder="Ersetzen..."
+                placeholder={t('search.replacePlaceholder')}
                 value={state.replacement}
                 onChange={handleReplacementChange}
-                aria-label="Ersetzen"
+                aria-label={t('search.replace')}
               />
               {showReplaceActions && (
                 <button
                   className="search-panel__replace-all-btn"
                   onClick={() => setShowReplaceConfirm(true)}
                   disabled={state.replaceLoading}
-                  title="Alle Treffer ersetzen"
-                  aria-label="Alle ersetzen"
+                  title={t('search.replaceAllTitle')}
+                  aria-label={t('search.replaceAll')}
                 >
                   <Replace size={12} />
-                  <span>Alle ersetzen</span>
+                  <span>{t('search.replaceAll')}</span>
                 </button>
               )}
             </div>
@@ -529,7 +534,7 @@ export function SearchPanel({
           {replaceExpanded && hasWriteAccess && state.replaceLoading && (
             <div className="search-panel__replace-feedback search-panel__replace-feedback--loading">
               <Loader2 size={12} className="search-panel__spinner" />
-              <span>Ersetzen läuft...</span>
+              <span>{t('search.replacing')}</span>
             </div>
           )}
         </div>
@@ -539,10 +544,10 @@ export function SearchPanel({
             className="search-panel__scope-select"
             value={state.scope}
             onChange={handleScopeChange}
-            aria-label="Suchbereich"
+            aria-label={t('search.scopeAriaLabel')}
           >
-            <option value="single">Aktueller Vault</option>
-            <option value="all">Alle Vaults</option>
+            <option value="single">{t('search.scopeCurrentVault')}</option>
+            <option value="all">{t('search.scopeAllVaults')}</option>
           </select>
         </div>
       </div>
@@ -551,13 +556,13 @@ export function SearchPanel({
         {state.loading && (
           <div className="search-panel__loading">
             <Loader2 size={20} className="search-panel__spinner" />
-            <span className="search-panel__loading-text">Suche läuft...</span>
+            <span className="search-panel__loading-text">{t('search.searching')}</span>
           </div>
         )}
 
         {showNoResults && (
           <div className="search-panel__empty">
-            Keine Ergebnisse
+            {t('search.noResults')}
           </div>
         )}
 
@@ -571,8 +576,8 @@ export function SearchPanel({
           <div className="search-panel__results-list">
             <div className="search-panel__results-summary">
               {state.totalHits > 0
-                ? `${state.totalHits} Treffer`
-                : `${state.results!.length} Datei${state.results!.length !== 1 ? 'en' : ''}`}
+                ? t('search.hitsCount', { count: state.totalHits })
+                : t('search.filesCount', { count: state.results!.length })}
               {state.truncated && state.truncationMessage && (
                 <span className="search-panel__truncation-hint">
                   {' '}— {state.truncationMessage}
@@ -609,10 +614,13 @@ export function SearchPanel({
 
       <ConfirmModal
         open={showReplaceConfirm}
-        title="Alle ersetzen"
-        message={`${replacePreviewCounts.hitCount} Treffer in ${replacePreviewCounts.fileCount} Datei${replacePreviewCounts.fileCount !== 1 ? 'en' : ''} ersetzen?`}
-        confirmLabel="Ersetzen"
-        cancelLabel="Abbrechen"
+        title={t('search.confirmReplaceAllTitle')}
+        message={t('search.confirmReplaceAllMessage', {
+          hitCount: replacePreviewCounts.hitCount,
+          fileCount: replacePreviewCounts.fileCount,
+        })}
+        confirmLabel={t('search.replace')}
+        cancelLabel={t('common.cancel')}
         variant="primary"
         onConfirm={handleReplaceAllConfirm}
         onCancel={() => setShowReplaceConfirm(false)}
@@ -757,6 +765,7 @@ function SearchFileGroup({
   replaceLoading,
 }: SearchFileGroupProps) {
   const [expanded, setExpanded] = useState(true)
+  const { t } = useTranslation()
 
   return (
     <div className="search-panel__file-group">
@@ -777,8 +786,8 @@ function SearchFileGroup({
             className="search-panel__replace-hit-btn"
             onClick={() => onReplace(fileResult.filePath)}
             disabled={replaceLoading}
-            title={`Treffer in ${fileResult.fileName} ersetzen`}
-            aria-label={`Ersetzen in ${fileResult.fileName}`}
+            title={t('search.replaceFileTitle', { fileName: fileResult.fileName })}
+            aria-label={t('search.replaceFileAriaLabel', { fileName: fileResult.fileName })}
           >
             <Replace size={11} />
           </button>

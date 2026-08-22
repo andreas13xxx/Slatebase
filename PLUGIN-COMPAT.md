@@ -1,6 +1,6 @@
 # Obsidian Plugin Compatibility — Slatebase
 
-**Datum:** 2026-08-16
+**Datum:** 2026-08-21
 **Scope:** Obsidian Community-Plugin-Kompatibilitätsschicht (`frontend/src/plugins/compat/`, `backend/src/plugin*`)
 **Methodik:** Quellcode-Audit der Shim-Implementierung gegen die offizielle `obsidian.d.ts` (npm-Paket `obsidian`, Version 1.13.1) + statische Bundle-Analyse der 100 meistheruntergeladenen Community-Plugins (Obsidians offizieller `community-plugin-stats.json`-Feed, `manifest.json`/`main.js` des jeweils aktuellen GitHub-Release) + manuelle Tests mit echten, aus GitHub geladenen Plugin-Bundles in der laufenden App + Wartungsstatus-Audit der 100 GitHub-Repos (siehe [Wartungsstatus der Top-100-Plugins](#wartungsstatus-der-top-100-plugins-upstream-pflege))
 
@@ -44,7 +44,7 @@ Slatebase API-Client / State
 Backend Plugin-Store (REST-API, dateibasierte Persistenz pro Vault)
 ```
 
-- **Proxy-basiertes API-Shimming**: Nicht emulierte Property-/Methodenzugriffe auf Shim-Objekten (`App`, `Vault`, `VaultAdapter`, `Workspace`, `MetadataCache`, `FileManager`) liefern `undefined`/No-Op zurück statt zu crashen, mit einer einmaligen `console.warn` pro Property und Plugin-Instanz. Dieselbe Garantie gilt für `fallback-shims.ts` (Warnung beim ersten Lesezugriff) und für den Plugin-Sandbox-`require()` bei unbekannten Node-Modulen.
+- **Proxy-basiertes API-Shimming**: Nicht emulierte Property-/Methodenzugriffe auf Shim-Objekten (`App`, `Vault`, `VaultAdapter`, `Workspace`, `MetadataCache`, `FileManager`, `WorkspaceLeaf`, `FileExplorerView`, `Editor`) liefern `undefined`/No-Op zurück statt zu crashen, mit einer einmaligen `console.warn` pro Property und Plugin-Instanz. Dieselbe Garantie gilt für `fallback-shims.ts` (Warnung beim ersten Lesezugriff) und für den Plugin-Sandbox-`require()` bei unbekannten Node-Modulen. Jeder dieser Zugriffe landet im `api-gap-registry` und ist zur Laufzeit über `window.__slatebasePluginApiGaps()` abfragbar — getrennt nach *gelesen* (oft harmlose Feature-Detection) und *aufgerufen* (das Plugin hat mit Wirkung gerechnet und bekam keine).
 - **Kein Web Worker**: Plugins erwarten synchronen DOM-Zugriff; die Sandbox arbeitet über API-Interception und Monitoring, nicht über Worker-Isolation.
 - **Vault-scoped Instanzen**: Jedes Plugin bekommt pro Vault eine eigene `AppShim`. Bei Vault-Wechsel: unload → neu instanziieren → load.
 - **Emulierte API-Version**: `1.13.2` (APIs bis einschließlich 1.13.1 sind implementiert). Plugins mit höherer `minAppVersion` gelten als inkompatibel. Bases (1.10.x) und der Desktop-CLI-Handler (1.12.2) sind bewusst nur typisiert, nicht funktional — Plugins, die sie referenzieren, stuft der `compatibility-analyzer` als „teilweise" ein.
@@ -122,13 +122,29 @@ Aus demselben Grund ist das Leaf **nicht** in der `ViewRegistry` getrackt (kein 
 `loadData`/`saveData` (Round-Trip, max. 1 MB, pro Plugin + Vault isoliert). Deklarative Settings-API (`getSettingDefinitions()`, ab Obsidian 1.13) wird automatisch gerendert (`group`, `list`, `page`, alle Standard-Controls). `Plugin.onExternalSettingsChange` ist über SSE End-to-End verdrahtet — eine Einstellungsänderung in einem Tab/Gerät erreicht die anderen live.
 
 ### CSS
-Plugin-`styles.css` (max. 512 KB) wird beim Aktivieren injiziert und beim Deaktivieren vollständig entfernt, alle Selektoren automatisch auf `[data-plugin-id="…"]` gescoped (Descendant- und Self-Form). `body.theme-dark`/`theme-light` und Plattform-Klassen (`is-mobile`, `mod-macos`) werden synchronisiert, damit Plugin-Dark-Mode-CSS und Runtime-Theme-Checks funktionieren.
+Plugin-`styles.css` (max. 512 KB) wird beim Aktivieren injiziert und beim Deaktivieren vollständig entfernt, alle Selektoren automatisch auf `[data-plugin-id="…"]` gescoped (Descendant- und Self-Form).
+
+`theme-dark`/`theme-light` und die Plattform-Klassen (`is-mobile`, `is-phone`, `is-tablet`, `mod-macos`, `mod-windows`, `mod-linux`, `mod-ios`, `mod-android`) werden auf `document.body` synchronisiert — sowohl für Runtime-Checks (`document.body.classList.contains('theme-dark')`) als auch für Plugin-CSS. Beim Scoping bleiben diese Host-Klassen **vor** dem Plugin-Scope stehen statt in ihn hineingefaltet zu werden, denn sie sitzen auf `<body>` und nicht auf dem Plugin-Element:
+
+```css
+/* Plugin schreibt */   .theme-dark .panel { … }
+/* injiziert wird */    body.theme-dark [data-plugin-id="x"].panel,
+                        body.theme-dark [data-plugin-id="x"] .panel { … }
+```
+
+Der Prefix wird auf **jede** erzeugte Alternative angewandt — sonst bliebe die Descendant-Form ungeschützt und eine Dark-Mode-Regel griffe auch im Light-Mode. Quelle der Klassenliste ist `OBSIDIAN_HOST_BODY_CLASSES` in `body-classes.ts`, dieselbe, die die Klassen setzt; `css-injector.ts` importiert sie, damit beide nicht auseinanderlaufen.
+
+Struktur-CSS für die Obsidian-Komponentenklassen, die die Shims rendern (`.menu`, `.suggestion-item`, `.prompt`, `.notice`, `.svg-icon`, `.modal-title`, …), liegt in `obsidian-components.css` und ist durchgehend in den Obsidian-Variablen aus `obsidian-compat.css` (605 Stück) formuliert, folgt also automatisch dem aktiven Theme.
+
+Wo Slatebase eigene Klassennamen hat, tragen die Elemente zusätzlich den Obsidian-Namen, damit Plugin-CSS trifft: Ribbon-Buttons `side-dock-ribbon-action`, Status-Bar-Items `status-bar-item`, Dateibaum-Zeilen `nav-file-title`/`nav-folder-title`, Tooltips `tooltip`. Die eigentliche Gestaltung bleibt bei den Slatebase-eigenen Klassen.
 
 ### Sicherheit / Sandbox
-Deny-by-default-Permissions (Netzwerk, Dateisystem-Schreibzugriff, DOM-Manipulation — alle `false` bei Neuinstallation). Cross-Origin-Requests laufen über einen Backend-Proxy mit Domain-Allowlist. Bundle-Integritätsprüfung lehnt `eval(`, `new Function(`, `document.write(` ab. Main-Thread-Blockierung >5s deaktiviert ein Plugin automatisch. Eine `ErrorBoundary` um den Plugin-Provider verhindert, dass ein Plugin-Fehler wie ein App-Absturz aussieht. `sanitizeHTMLToDom()` entfernt `<script>`-Tags, Inline-Event-Handler-Attribute (`onclick=`, `onerror=`, …), `javascript:`/`vbscript:`-URLs und gefährliche `data:`-URLs (`text/html`, `image/svg+xml`) aus `href`/`src`/`action`/`formaction`.
+Deny-by-default-Permissions (Netzwerk, Dateisystem-Schreibzugriff, DOM-Manipulation — alle `false` bei Neuinstallation). Cross-Origin-Requests laufen über einen Backend-Proxy mit Domain-Allowlist. Bundle-Integritätsprüfung lehnt `eval(`, `new Function(`, `document.write(` ab. Main-Thread-Blockierung >5s deaktiviert ein Plugin automatisch. Eine `ErrorBoundary` um den Plugin-Provider verhindert, dass ein Plugin-Fehler wie ein App-Absturz aussieht. `sanitizeHTMLToDom()` entfernt `<script>`-Tags, Inline-Event-Handler-Attribute (`onclick=`, `onerror=`, …), `javascript:`/`vbscript:`-URLs und gefährliche `data:`-URLs (`text/html`, `image/svg+xml`) aus `href`/`src`/`action`/`formaction`. `SecretStorage`/`SecretComponent`-Werte liegen serverseitig AES-256-GCM-verschlüsselt (`backend/src/plugin/secret-key-manager.ts`, `secret-store.ts`) unter `data/plugins/<vaultId>/<pluginId>/secrets.json`; der List-Endpunkt liefert nur IDs, nie Werte.
 
 ### Sonstiges
-Globale Obsidian-Prototype-Erweiterungen (`Array.prototype.remove/first/last`, `Element.prototype.find/findAll`, `String.prototype.contains`, `Math.clamp/square`, u.a.), vollständige Lucide-Icon-Auflösung (`setIcon`/`getIcon`, kein hartes `null` für gelistete IDs), `requestUrl()`, CodeMirror-6-Extensions (echte `@codemirror/*`-Module, kein Stub), `SuggestModal`/`FuzzySuggestModal`, `Notice`.
+Globale Obsidian-Prototype-Erweiterungen (`Array.prototype.remove/first/last`, `Element.prototype.find/findAll`, `String.prototype.contains`, `Math.clamp/square`, u.a.), vollständige Lucide-Icon-Auflösung (`setIcon`/`getIcon`, kein hartes `null` für gelistete IDs), `requestUrl()`, CodeMirror-6-Extensions (echte `@codemirror/*`-Module, kein Stub), `SuggestModal`/`FuzzySuggestModal`.
+
+`Notice` baut Obsidians echten DOM-Baum (`containerEl > noticeEl > messageEl`) und übergibt `noticeEl` an den Toast-Stack, der genau dieses Element einhängt. Ein Plugin, das nach dem Konstruktor in `messageEl` schreibt (fortlaufende Fortschrittszeile, Spinner, Link) oder ein `DocumentFragment` übergibt, sieht das also auf dem Bildschirm — vorher waren das drei nie eingehängte Divs und alles außer dem reinen Text ging still verloren.
 
 ---
 
@@ -162,7 +178,16 @@ Zwei grundsätzlich verschiedene Kategorien, die auch die Kompatibilitäts-Badge
 - **Tab-Pinning**: Slatebase hat kein Pinning-Konzept; `getUnpinnedLeaf()` erstellt einfach ein neues Leaf.
 - **Deferred Leaves** (`WorkspaceLeaf.isDeferred`/`loadIfDeferred`, seit Obsidian 1.7.2): immer `false`/No-Op, weil `setViewState()` in Slatebase Views immer synchron-eager erstellt — es gibt nie einen „deferred" Zustand zu melden.
 - **Obsidian Sync / Publish**: proprietäre Obsidian-Dienste, kein Bestandteil der Plugin-API-Emulation.
-- **Vim-Keybindings im Editor**: Slatebase hat keine eigene Vim-Keymap-Engine (`@replit/codemirror-vim`). `window.CodeMirrorAdapter.Vim` existiert nur als No-Op-Stub (`defineAction`/`handleEx`/`enterInsertMode`/`mapCommand`), damit Plugins, die optional daran andocken (z. B. Outliner, s. o.), nicht mit `console.error` abbrechen — echte Vim-Normalmodus-Befehle laufen dadurch aber nicht.
+- **Vim-Keybindings im Editor**: Slatebase hat keine eigene Vim-Keymap-Engine (`@replit/codemirror-vim`). `window.CodeMirrorAdapter.Vim` existiert nur als No-Op-Stub (`defineAction`/`handleEx`/`enterInsertMode`/`mapCommand`), damit Plugins, die optional daran andocken (z. B. Outliner, s. o.), nicht mit `console.error` abbrechen — echte Vim-Normalmodus-Befehle laufen dadurch aber nicht. Jeder Aufruf loggt einmal pro Methode ein `console.debug`.
+- **Weitere bewusste No-Ops, alle mit Log** — es gibt in der Compat-Schicht keinen stillen Stub mehr:
+  - `window.CodeMirror.*` (CM5-Legacy: `defineMode`/`defineMIME`/`defineExtension`/`defineOption`/`registerHelper`/`registerGlobalHelper`) → `console.debug`. Slatebases Editor ist CM6; Plugins, die CM5 ansprechen, nutzen eine von Obsidian selbst als veraltet geführte API und liefern in aller Regel zusätzlich einen CM6-Pfad.
+  - `MarkdownView.previewMode.set/clear/rerender/applyScroll` → `console.warn`. Reading-Mode läuft über Slatebases eigene React-Pipeline, nicht über eine Obsidian-`MarkdownPreviewView`.
+  - `app.foldManager.save/load` → `console.debug`. Fold-Zustand wird nicht über Sessions hinweg gespeichert.
+  - `HTMLElement.onNodeInserted` → `console.warn`. Feuert nie; Plugin-Code, der darauf wartet (verzögertes Messen/Layout), läuft dadurch nicht.
+  - `HTMLElement.onWindowMigrated` → `console.debug`. Ein Single-Window-App hat nichts zu melden.
+  - `hotkeyManager.setHotkeys`/`removeHotkeys` → `console.warn`. Slatebase hat keine Hotkey-Anpassung, in die geschrieben werden könnte.
+  - `loadPrism` und `loadPdfJs` → `console.warn` und `null`. Slatebase liefert weder Prism (Syntax-Highlighting läuft über `highlight.js`) noch PDF.js mit. `loadMathJax`/`renderMath`/`finishRenderMath` sind dagegen **echt** — sie laufen über das mitgelieferte KaTeX (`components/katex-loader.ts`).
+  - Der Bootstrap-`window.app.commands` (nur gültig bis der `PluginProvider` den echten, von der `CommandRegistry` gedeckten Manager einsetzt) warnt und liefert `false` statt still nichts zu tun, wenn ein Plugin schon während der Bundle-Auswertung Kommandos ausführen will.
 - **Alle übrigen Fallback-Klassen/-Funktionen ohne echte Implementierung** (`fallback-shims.ts`, u. a. `ColorComponent`, `SearchComponent`, `MomentFormatComponent`, `AbstractInputSuggest`): jeder erste lesende Zugriff auf `obsidian.<Name>` loggt eine `console.warn` und ist im `window.__slatebasePluginApiGaps()`-Register sichtbar — nie ein stiller Stub. Ebenso jeder nicht emulierte `vault.adapter.*`-Zugriff (z. B. `copy`, `getResourcePath`, `process` — Obsidians volles `DataAdapter`-Interface).
 
 **Geplant, aber noch nicht implementiert:** Server-seitige Ausführung von Desktop-only-Plugins in einer Node.js-VM-Sandbox steht auf der Roadmap, würde aber Dateisystem-/Prozess-APIs serverseitig statt im Browser bereitstellen — bis dahin bleiben Desktop-only-Plugins vollständig außen vor.
@@ -245,6 +270,9 @@ Diese Lücken sind echte Feature-Arbeit statt Bugfixes, tragen höheres Risiko i
 - **`AbstractInputSuggest`/`PopoverSuggest` — echtes Dropdown-Popover für Input-Felder**: `AbstractInputSuggest` hat zwar `setValue`/`getValue`/`onSelect`, rendert aber kein sichtbares Dropdown mit Tastatur-Navigation an einem `<input>`-Feld. `EditorSuggest` (Cursor-basiert im Editor) ist seit August 2026 voll implementiert; `AbstractInputSuggest` (an ein Input gebunden) profitiert von derselben `PopoverSuggest.open()/close()`-Infrastruktur, hat aber noch keinen eigenen Trigger-Loop.
 - **Bases-Klassen/Value-Typen**: Weiterhin bewusst nur typisiert (siehe [Was wird unterstützt](#was-wird-unterstützt)) — eine Formel-Engine liegt außerhalb des Scopes dieses Layers.
 - **Split-Pane-/Multi-Window-Layout** (`getLayout`/`rootSplit`/Popout-Fenster): Grundsätzliche Architekturentscheidung (flaches Tab-System), keine Einzelmethode zu patchen.
+- **Plugin-CSS gegen Slatebase-Kern-DOM**: Das Scoping auf `[data-plugin-id]` lässt Regeln, die Obsidians eigene App-Struktur umgestalten wollen (`.workspace-leaf`, `.markdown-preview-view`, `.tree-item`, `.callout`), bewusst ins Leere laufen — sonst könnte jedes Plugin die gesamte Oberfläche umbauen. Host-Klassen (`theme-dark`, `is-mobile`, …) sind die einzige Ausnahme, weil sie den *Kontext* des Plugin-Elements beschreiben und nicht fremdes DOM. Themes im Obsidian-Sinn (die genau das dürfen) sind kein Bestandteil dieses Layers.
+- **`.view-header` ist ein leerer Platzhalter**: `ItemView.containerEl` hat wie in Obsidian zwei Kinder (Header, Content), damit Plugins, die `children[1]` lesen, den Content-Bereich finden. Der Header bleibt aber leer und ungestylt — Slatebase rendert Titel und Aktionen der Tab-Leiste selbst. Plugin-CSS für `.view-header`/`.view-header-title` greift daher auf nichts.
+- **Animationsnamen kollidieren**: `@keyframes` wird korrekt *nicht* gescoped (sonst wären die Namen aus den Regeln heraus nicht mehr auflösbar) — dadurch sind sie aber auch nicht namespaced. Zwei Plugins mit gleichnamigen Keyframes überschreiben sich gegenseitig.
 
 ---
 

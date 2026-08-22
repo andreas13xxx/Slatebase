@@ -153,6 +153,62 @@ describe('scopeCss()', () => {
     });
   });
 
+  describe('host marker classes', () => {
+    // Regression: theme/platform classes live on <body>, never on a plugin's
+    // own element. Folding them into the scope produced
+    // `[data-plugin-id="x"].theme-dark .panel`, which asks a single element to
+    // be both at once — so every plugin's dark-mode block was dead CSS.
+    it('keeps a leading .theme-dark in front of the scope', () => {
+      const result = scopeCss('.theme-dark .panel { color: red; }', pluginId);
+      expect(result).toContain(`body.theme-dark [data-plugin-id="${pluginId}"]`);
+      expect(result).not.toContain(`[data-plugin-id="${pluginId}"].theme-dark`);
+    });
+
+    it('treats body.theme-dark the same as a bare .theme-dark', () => {
+      const bare = scopeCss('.theme-dark .panel { color: red; }', pluginId);
+      const explicit = scopeCss('body.theme-dark .panel { color: red; }', pluginId);
+      expect(explicit).toBe(bare);
+    });
+
+    it('guards every generated alternative, not just the first', () => {
+      // Prefixing only the joined string would leave the descendant form
+      // unguarded, so a dark-mode rule would also apply in light mode.
+      const result = scopeCss('.theme-dark .panel { color: red; }', pluginId);
+      for (const form of result.slice(0, result.indexOf('{')).split(',')) {
+        expect(form.trim().startsWith('body.theme-dark ')).toBe(true);
+      }
+    });
+
+    it('handles chained host classes', () => {
+      const result = scopeCss('.theme-dark.is-mobile .panel { color: red; }', pluginId);
+      expect(result).toContain(`body.theme-dark.is-mobile [data-plugin-id="${pluginId}"]`);
+    });
+
+    it('scopes platform classes the same way', () => {
+      const result = scopeCss('body.is-mobile .sidebar { display: none; }', pluginId);
+      expect(result).toContain(`body.is-mobile [data-plugin-id="${pluginId}"]`);
+    });
+
+    it('makes the plugin scope the subject when the host class stands alone', () => {
+      // `.theme-dark { --x: red }` defines a variable the plugin's own elements
+      // should inherit under the dark theme.
+      const result = scopeCss('.theme-dark { --my-var: red; }', pluginId);
+      expect(result).toContain(`body.theme-dark [data-plugin-id="${pluginId}"] {`);
+    });
+
+    it('applies the prefix per comma-separated selector', () => {
+      const result = scopeCss('.theme-dark .a, .theme-light .b { color: red; }', pluginId);
+      expect(result).toContain('body.theme-dark');
+      expect(result).toContain('body.theme-light');
+    });
+
+    it('leaves a plugin class that merely looks host-ish alone', () => {
+      const result = scopeCss('.theme-parade { color: red; }', pluginId);
+      expect(result).not.toContain('body.');
+      expect(result).toContain(`[data-plugin-id="${pluginId}"].theme-parade`);
+    });
+  });
+
   describe(':root handling', () => {
     it('replaces :root with scope', () => {
       const result = scopeCss(':root { --color: red; }', pluginId);
@@ -172,9 +228,14 @@ describe('scopeCss()', () => {
       expect(result).toContain(`${scope} {`);
     });
 
+    // `is-mobile` used to be the example here, which quietly asserted the
+    // host-class bug: it is one of Obsidian's body markers, so folding it into
+    // the scope produced a selector that could never match (see the
+    // 'host marker classes' block above, which now covers that case). A plugin's
+    // own body class is what this path is actually for.
     it('replaces body.class selector with scope.class', () => {
-      const result = scopeCss('body.is-mobile .sidebar { display: none; }', pluginId);
-      expect(result).toContain(`${scope}.is-mobile .sidebar`);
+      const result = scopeCss('body.my-plugin-active .sidebar { display: none; }', pluginId);
+      expect(result).toContain(`${scope}.my-plugin-active .sidebar`);
     });
 
     it('replaces body descendant selector', () => {

@@ -12,38 +12,8 @@ import { useCallback, useRef } from 'react'
 import type { SettingsAction, SettingsCategory, SettingsSection } from '../../state/settingsState'
 import type { SettingsNavState } from '../../state/settingsState'
 import type { ISettingsRegistry, ISettingsSectionDef } from '../../state/settingsRegistry'
+import { SECTION_LABELS, CATEGORY_LABELS } from '../../state/settingsLabels'
 import './SettingsNavList.css'
-
-/**
- * German labels for settings sections used in search matching.
- * Maps section ID to its display label.
- */
-const SECTION_LABELS: Record<SettingsSection, string> = {
-  'profile': 'Profil',
-  'password': 'Passwort ändern',
-  'sessions': 'Sitzungen',
-  'mcp-tokens': 'MCP-Tokens',
-  'keybindings': 'Tastaturkürzel',
-  'appearance': 'Darstellung',
-  'my-vaults': 'Meine Vaults',
-  'delete-account': 'Konto löschen',
-  'plugins': 'Plugins',
-  'vault-config': 'Vault-Konfiguration',
-  'server-config': 'Serverkonfiguration',
-  'user-management': 'Benutzerverwaltung',
-  'vault-management': 'Vault-Verwaltung',
-  'feature-toggles': 'Feature-Toggles',
-  'server-restart': 'Neustart',
-}
-
-/**
- * German labels for category headings.
- */
-const CATEGORY_LABELS: Record<SettingsCategory, string> = {
-  'account': 'Konto',
-  'vault': 'Vault',
-  'administration': 'Administration',
-}
 
 /** Props for the SettingsNavList component. */
 export interface SettingsNavListProps {

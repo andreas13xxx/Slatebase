@@ -3,23 +3,28 @@
  * Triggered by a help icon button next to the search input.
  */
 
+import { useTranslation } from '../i18n'
+import type { TranslationKey } from '../i18n'
+
 interface SearchOperatorHelpProps {
   open: boolean
   onClose: () => void
 }
 
-const OPERATORS = [
-  { syntax: 'path:<glob>', example: 'path:Projekte/**', description: 'Dateien im Pfad einschließen' },
-  { syntax: 'file:<muster>', example: 'file:notizen', description: 'Dateien mit passendem Namen' },
-  { syntax: 'tag:<tag>', example: 'tag:projekt', description: 'Dateien mit dem Tag' },
-  { syntax: 'property:<key>', example: 'property:status', description: 'Dateien mit der Eigenschaft' },
-  { syntax: 'property:<key>=<wert>', example: 'property:status=aktiv', description: 'Eigenschaft mit Wert' },
-  { syntax: '-path:<glob>', example: '-path:Archiv/**', description: 'Pfad ausschließen' },
-  { syntax: '-tag:<tag>', example: '-tag:erledigt', description: 'Tag ausschließen' },
-  { syntax: '-property:<key>', example: '-property:draft', description: 'Eigenschaft ausschließen' },
-] as const
+const OPERATORS: { syntax: string; example: string; descriptionKey: TranslationKey }[] = [
+  { syntax: 'path:<glob>', example: 'path:Projekte/**', descriptionKey: 'search.operatorHelp.operators.path' },
+  { syntax: 'file:<muster>', example: 'file:notizen', descriptionKey: 'search.operatorHelp.operators.file' },
+  { syntax: 'tag:<tag>', example: 'tag:projekt', descriptionKey: 'search.operatorHelp.operators.tag' },
+  { syntax: 'property:<key>', example: 'property:status', descriptionKey: 'search.operatorHelp.operators.property' },
+  { syntax: 'property:<key>=<wert>', example: 'property:status=aktiv', descriptionKey: 'search.operatorHelp.operators.propertyValue' },
+  { syntax: '-path:<glob>', example: '-path:Archiv/**', descriptionKey: 'search.operatorHelp.operators.excludePath' },
+  { syntax: '-tag:<tag>', example: '-tag:erledigt', descriptionKey: 'search.operatorHelp.operators.excludeTag' },
+  { syntax: '-property:<key>', example: '-property:draft', descriptionKey: 'search.operatorHelp.operators.excludeProperty' },
+]
 
 export function SearchOperatorHelp({ open, onClose }: SearchOperatorHelpProps) {
+  const { t } = useTranslation()
+
   if (!open) return null
 
   return (
@@ -28,15 +33,15 @@ export function SearchOperatorHelp({ open, onClose }: SearchOperatorHelpProps) {
         className="search-operator-help"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
-        aria-label="Suchoperatoren"
+        aria-label={t('search.operatorHelp.ariaLabel')}
       >
-        <h3 className="search-operator-help__title">Suchoperatoren</h3>
+        <h3 className="search-operator-help__title">{t('search.operatorHelp.title')}</h3>
         <table className="search-operator-help__table">
           <thead>
             <tr>
-              <th>Operator</th>
-              <th>Beispiel</th>
-              <th>Beschreibung</th>
+              <th>{t('search.operatorHelp.columnOperator')}</th>
+              <th>{t('search.operatorHelp.columnExample')}</th>
+              <th>{t('search.operatorHelp.columnDescription')}</th>
             </tr>
           </thead>
           <tbody>
@@ -44,13 +49,13 @@ export function SearchOperatorHelp({ open, onClose }: SearchOperatorHelpProps) {
               <tr key={op.syntax}>
                 <td className="search-operator-help__syntax"><code>{op.syntax}</code></td>
                 <td className="search-operator-help__example"><code>{op.example}</code></td>
-                <td>{op.description}</td>
+                <td>{t(op.descriptionKey)}</td>
               </tr>
             ))}
           </tbody>
         </table>
         <p className="search-operator-help__note">
-          Werte mit Leerzeichen in Anführungszeichen setzen: <code>path:&quot;Mein Ordner/**&quot;</code>
+          {t('search.operatorHelp.note')} <code>path:&quot;Mein Ordner/**&quot;</code>
         </p>
       </div>
     </div>

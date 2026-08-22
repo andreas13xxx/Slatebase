@@ -8,7 +8,7 @@ import type { ViewRegistry } from '../view-registry';
 import { EditorShim } from '../editor-shim';
 import type { IEditor } from '../editor-shim';
 import { refreshPluginExtensions, getActiveEditorContainerEl, setEditorContainerMountedListener } from '../../../editor/plugin-extensions';
-import { recordGapRead, recordGapCall } from '../api-gap-registry';
+import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry';
 import { createFileItemsProxy, type FileExplorerFileItem } from '../file-explorer-dom-registry';
 import {
   registerHoverLinkSource,
@@ -120,6 +120,10 @@ function wrapFileExplorerView(view: FileExplorerLeafView): FileExplorerLeafView 
       }
       if (typeof prop === 'symbol') return Reflect.get(target, prop, target);
       if (prop === 'then') return undefined;
+      if (isObjectPrototypeMember(prop)) {
+        const value = Reflect.get(target, prop, target);
+        return typeof value === 'function' ? value.bind(target) : value;
+      }
 
       if (recordGapRead('FileExplorerView', prop)) {
         console.warn(
@@ -194,7 +198,10 @@ export class WorkspaceShim implements IWorkspaceShim {
   private app: unknown = null;
   private directoryTree: DirectoryTree | null = null;
   private onOpenFile: ((filePath: string) => void) | null = null;
-  private editorShim: EditorShim = new EditorShim();
+  // EditorShim.create() rather than `new`: it wraps the instance in the
+  // non-emulated-access safety net, so an unemulated `editor.*` is a logged,
+  // enumerable gap instead of a bare TypeError inside plugin code.
+  private editorShim: EditorShim = EditorShim.create();
 
   /**
    * The currently active editor, or null if no markdown file is being edited.
@@ -1184,6 +1191,13 @@ export class WorkspaceShim implements IWorkspaceShim {
         // a plain `undefined`, not fall into the generic callable-no-op path.
         if (prop === 'then') {
           return undefined;
+        }
+
+        // Real Object.prototype members (hasOwnProperty, toString, valueOf, …)
+        // must pass through untouched — see isObjectPrototypeMember's doc comment.
+        if (isObjectPrototypeMember(prop)) {
+          const value = Reflect.get(target, prop, target);
+          return typeof value === 'function' ? value.bind(target) : value;
         }
 
         // Non-emulated property: record the gap and warn once. The workspace is

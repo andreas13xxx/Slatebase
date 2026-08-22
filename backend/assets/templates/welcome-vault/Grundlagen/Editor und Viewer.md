@@ -9,7 +9,7 @@ Slatebase bietet zwei Darstellungsmodi für jede Markdown-Datei: den **Source-Mo
 
 ![[Screenshots/editor-toolbar.png]]
 
-*Editor mit Toolbar im Bearbeitungsmodus*
+*Editor im Bearbeitungsmodus*
 
 ---
 
@@ -21,7 +21,6 @@ Im Source-Modus siehst du den rohen Markdown-Text mit Syntax-Highlighting. Alle 
 
 - Markdown-Syntax wird als Text angezeigt (`# Überschrift`, `**fett**`)
 - Cursor und Textauswahl sind aktiv
-- Die Toolbar bietet Formatierungs-Shortcuts
 - Zeilennummern können eingeblendet werden
 
 **Wann verwenden:** Bei komplexer Formatierung, Tabellen oder wenn du die volle Kontrolle über die Syntax brauchst.
@@ -49,33 +48,11 @@ Im Live-Preview-Modus wird dein Markdown **inline formatiert** dargestellt — u
 
 | Methode | Aktion |
 |---------|--------|
-| Toolbar | Klick auf das Modus-Symbol (Quelltext/Vorschau) |
 | Tastenkürzel | `Ctrl+E` |
 | Command Palette | `Ctrl+P` → "Editor-Modus wechseln" |
 
-| Symbol | Modus | Beschreibung |
-|--------|-------|--------------|
-| Quelltext-Symbol | Source | Roher Markdown-Text |
-| Vorschau-Symbol | Live Preview | Inline formatiert, editierbar |
-
----
-
-## Toolbar
-
-Die Toolbar am oberen Rand des Editors bietet Schnellzugriff auf häufige Aktionen:
-
-| Funktion | Beschreibung |
-|----------|--------------|
-| **Fett** | Markierten Text fett formatieren |
-| *Kursiv* | Markierten Text kursiv formatieren |
-| Überschrift | Überschrift einfügen |
-| Liste | Aufzählung einfügen |
-| Code | Code-Block einfügen |
-| Link | Wikilink einfügen |
-| Modus wechseln | Zwischen Source/Live Preview umschalten |
-
-> [!tip] Tipp
-> Markiere zuerst den Text, dann klicke auf eine Toolbar-Funktion. Der Text wird automatisch mit der passenden Syntax umschlossen.
+> [!info] Formatierungsleiste per Plugin
+> Slatebase selbst hat keine feste Toolbar über dem Editor — Formatierungen setzt du direkt über Markdown-Syntax (`**fett**`, `## Überschrift` usw.). Wer lieber per Klick statt per Syntax formatiert, kann das [[Fortgeschritten/Plugins/Editing Toolbar|Editing Toolbar Plugin]] installieren.
 
 ---
 
@@ -117,7 +94,7 @@ Der Verlauf speichert bis zu 100 Schritte und wird beim Wechsel der Datei zurüc
 1. Erstelle eine neue Datei oder öffne eine bestehende
 2. Wechsle in den **Source-Modus** (falls nicht schon aktiv)
 3. Schreibe einen Absatz mit normalem Text
-4. Markiere ein Wort und klicke **Fett** in der Toolbar
+4. Markiere ein Wort und umschließe es mit `**` für Fettschrift
 5. Wechsle in den **Live-Preview-Modus** — das Wort erscheint fettgedruckt
 6. Wechsle zurück und mache die Änderung mit `Strg+Z` rückgängig
 
@@ -139,3 +116,4 @@ Der Verlauf speichert bis zu 100 Schritte und wird beim Wechsel der Datei zurüc
 - [[Grundlagen/Navigation und Tabs|Navigation und Tabs]] — Nächster Guide
 - [[Features/Live Preview Editor|Live Preview Editor]] — Source-Modus und Live-Vorschau in einem Editor
 - [[Features/Vorlagen und Daily Notes|Vorlagen und Daily Notes]] — Schnell formatierte Notizen erstellen
+- [[Fortgeschritten/Plugins/Editing Toolbar|Editing Toolbar Plugin]] — Formatierungsleiste per Klick statt Markdown-Syntax

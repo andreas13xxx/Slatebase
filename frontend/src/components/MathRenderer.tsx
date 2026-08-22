@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from 'react'
 import { loadKaTeX, renderMathToString, MATH_RENDER_TIMEOUT_MS } from './katex-loader'
+import { useTranslation } from '../i18n'
 
 /**
  * Props for the MathRenderer component.
@@ -38,6 +39,7 @@ export type MathRenderState =
  * 3. Manages state transitions (loading → rendered | error | timeout | load-failed)
  */
 export function MathRenderer({ source, displayMode }: MathRendererProps) {
+  const { t } = useTranslation()
   const [state, setState] = useState<MathRenderState>({ status: 'loading' })
 
   useEffect(() => {
@@ -133,13 +135,13 @@ export function MathRenderer({ source, displayMode }: MathRendererProps) {
     case 'timeout':
       if (displayMode) {
         return (
-          <div className={`${baseClass} math-error`} title="Render timeout">
+          <div className={`${baseClass} math-error`} title={t('math.renderTimeout')}>
             {source}
           </div>
         )
       }
       return (
-        <span className={`${baseClass} math-error`} title="Render timeout">
+        <span className={`${baseClass} math-error`} title={t('math.renderTimeout')}>
           {source}
         </span>
       )

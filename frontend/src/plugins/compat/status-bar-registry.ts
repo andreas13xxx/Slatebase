@@ -44,7 +44,10 @@ const listeners = new Set<StatusBarChangeListener>()
  */
 export function addStatusBarItem(pluginId: string): HTMLElement {
   const element = document.createElement('div')
-  element.className = 'status-bar__plugin-item'
+  // `status-bar-item` is Obsidian's class for this element and plugin
+  // stylesheets target it; `status-bar__plugin-item` is ours and carries the
+  // actual styling. Both, so plugin CSS matches without giving up our own.
+  element.className = 'status-bar__plugin-item status-bar-item'
   element.dataset.pluginId = pluginId
   element.setAttribute('role', 'button')
   element.tabIndex = 0

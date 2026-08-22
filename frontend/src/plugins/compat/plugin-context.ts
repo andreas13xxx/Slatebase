@@ -56,7 +56,7 @@ import { registerCodeBlockProcessor, registerPostProcessor, unregisterAllForPlug
 import { warnNoOp } from './log'
 import { AppShim, createCommandManager, createHotkeyManager } from './shims/app-shim'
 import { Scope } from './obsidian-api-extensions'
-import { setEditorViewAccessor } from './editor-shim'
+import { setEditorComponentAccessor, setEditorViewAccessor } from './editor-shim'
 import { withPluginContextAsync } from './plugin-execution-context'
 import { getActiveEditorView, registerPluginExtension, removePluginExtensions, registerPluginCompletionSource, removePluginCompletionSources } from '../../editor/plugin-extensions'
 import { getEditorSuggestManager, destroyEditorSuggestManager } from './editor-suggest-manager'
@@ -133,6 +133,13 @@ export interface PluginContextValue {
   reload(): Promise<void>
   /** Enable or disable one plugin in the running vault context */
   setPluginEnabled(pluginId: string, enabled: boolean): Promise<void>
+  /**
+   * Unload an active plugin's running instance and reload the page so it comes
+   * back with a fresh instance, without persisting an 'inactive' status in
+   * between — unlike setPluginEnabled(id, false), the plugin is active again
+   * once the reload completes.
+   */
+  reloadPlugin(pluginId: string): Promise<void>
   /** Compatibility analyzer for plugin analysis */
   analyzer: ICompatibilityAnalyzer
   /** Active plugin views (view type → DOM container element) */
@@ -614,6 +621,8 @@ export function PluginProvider({
 
     // Wire EditorShim to use CM6 EditorView as backend
     setEditorViewAccessor(getActiveEditorView)
+    // Wire EditorShim.editorComponent to the same { editor, file } shape workspace.activeEditor exposes
+    setEditorComponentAccessor(() => newWorkspaceShim.activeEditor)
 
     // Initialize the EditorSuggest manager for this vault
     // (reset extension-registration state from the previous vault)
@@ -645,12 +654,17 @@ export function PluginProvider({
     // being unable to affect the toast system at all, and `duration: 0`
     // (Obsidian's "stays until dismissed") actually suppresses auto-dismiss.
     const noticeWindow = window as unknown as {
-      __slatebaseShowNotice?: (msg: string, duration?: number) => string
+      __slatebaseShowNotice?: (msg: string, duration?: number, messageEl?: HTMLElement) => string
       __slatebaseUpdateNotice?: (id: string, msg: string) => void
       __slatebaseDismissNotice?: (id: string) => void
     }
+    // `messageEl` is the Notice shim's own element. Passing it through means the
+    // toast mounts that exact node, so a plugin that builds into `messageEl`
+    // after construction (progress lines, spinners) is writing to something
+    // actually on screen rather than a detached div.
     // eslint-disable-next-line react-hooks/immutability
-    noticeWindow.__slatebaseShowNotice = (msg: string, duration?: number) => showToast('info', msg, duration)
+    noticeWindow.__slatebaseShowNotice = (msg: string, duration?: number, messageEl?: HTMLElement) =>
+      showToast('info', msg, duration, messageEl)
     // eslint-disable-next-line react-hooks/immutability
     noticeWindow.__slatebaseUpdateNotice = (id: string, msg: string) => updateToastMessage(id, msg)
     // eslint-disable-next-line react-hooks/immutability
@@ -1206,6 +1220,36 @@ export function PluginProvider({
     }
   }, [apiClient, vaultId])
 
+  /**
+   * Reload a single plugin: unload its running instance, then reload the page
+   * so it boots up fresh (same rationale as setPluginEnabled's disable path —
+   * some plugins, e.g. LiveSync, cannot reinitialize within the same session).
+   *
+   * Unlike toggling off and back on, this skips notifying the registry of the
+   * intermediate 'deactivated' status, so the persisted status stays 'active'
+   * throughout and the plugin auto-loads again once the reload completes,
+   * instead of being left disabled by a second call racing the navigation.
+   */
+  const reloadPlugin = useCallback(async (pluginId: string): Promise<void> => {
+    const targetVaultId = vaultId
+    const registry = pluginRegistryRef.current
+    const loader = pluginLoaderRef.current
+    const isCurrentContext = (): boolean => (
+      pluginSystemVaultIdRef.current === targetVaultId
+      && pluginRegistryRef.current === registry
+      && pluginLoaderRef.current === loader
+    )
+    if (!targetVaultId || !registry || !loader || !isCurrentContext()) {
+      throw new Error('Plugin system is not ready')
+    }
+
+    if (loader.getRecord(pluginId)) {
+      await deactivatePluginSafely(loader, pluginId, false)
+    }
+    await registry.waitForPersistence()
+    window.location.reload()
+  }, [vaultId])
+
   // ─── Event Bridge: connect Slatebase state changes to plugin shim events ──
 
   // eslint-disable-next-line react-hooks/refs
@@ -1389,6 +1433,7 @@ export function PluginProvider({
     isLoading,
     reload,
     setPluginEnabled,
+    reloadPlugin,
     analyzer: analyzerRef.current, // eslint-disable-line react-hooks/refs
     activeViews,
     sidebarViews,

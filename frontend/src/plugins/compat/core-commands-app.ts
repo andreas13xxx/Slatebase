@@ -33,6 +33,7 @@ import type { AuthState, AuthAction } from '../../state/authState'
 import type { PanelAction, PanelViewId, PanelSplitSection } from '../../state/panelState'
 import type { SettingsCategory, SettingsSection } from '../../state/settingsState'
 import { favoritesStore } from '../../state/favoritesStore'
+import { requestReveal } from '../../state/revealFileBridge'
 import { getActiveEditorView } from '../../editor/plugin-extensions'
 import { showToast } from '../../components/ToastNotification'
 import type { Locale } from '../../i18n'
@@ -171,7 +172,7 @@ function revealActiveFile(h: CoreAppCommandHandlers): void {
   const tab = getActiveTab(h)
   if (!tab) return
   setPanelView(h, 'explorer')
-  window.dispatchEvent(new CustomEvent('slatebase:reveal-file', { detail: { path: tab.filePath } }))
+  requestReveal(tab.filePath)
 }
 
 async function duplicateActiveFile(h: CoreAppCommandHandlers): Promise<void> {

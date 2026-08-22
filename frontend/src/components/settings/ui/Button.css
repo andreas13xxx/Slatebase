@@ -1,0 +1,77 @@
+/* ===== Button — shared button component for all settings tabs ===== */
+
+.st-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.st-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.st-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.st-btn--sm {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+}
+
+/* Primary — solid accent fill, main call to action per section */
+.st-btn--primary {
+  background: var(--accent);
+  color: var(--text-inverse);
+}
+
+.st-btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+/* Secondary — outlined, default action */
+.st-btn--secondary {
+  background: var(--bg-elevated);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+.st-btn--secondary:hover:not(:disabled) {
+  background: var(--bg-surface);
+  border-color: var(--border-strong);
+}
+
+/* Danger — destructive actions */
+.st-btn--danger {
+  background: var(--danger-text);
+  color: var(--text-inverse);
+}
+
+.st-btn--danger:hover:not(:disabled) {
+  background: var(--danger-hover);
+}
+
+/* Ghost — minimal chrome, for dense/inline contexts like table rows */
+.st-btn--ghost {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.st-btn--ghost:hover:not(:disabled) {
+  background: var(--sidebar-hover);
+  color: var(--text-primary);
+}

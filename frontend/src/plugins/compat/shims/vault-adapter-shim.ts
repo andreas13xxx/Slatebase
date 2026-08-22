@@ -21,7 +21,7 @@ import type { IApiClient } from '../../../api/index'
 import { getStoredAuthToken, getStoredCsrfToken } from '../../../state/authContext'
 import type { DirectoryTree } from '../../../types'
 import { markPluginWrite } from '../plugin-event-bridge'
-import { recordGapRead, recordGapCall } from '../api-gap-registry'
+import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry'
 
 /**
  * Stat result for a file or folder.
@@ -297,6 +297,11 @@ export class VaultAdapterShim implements IVaultAdapter {
 
         if (prop === 'then') {
           return undefined
+        }
+
+        if (isObjectPrototypeMember(prop)) {
+          const value = Reflect.get(target, prop, target)
+          return typeof value === 'function' ? value.bind(target) : value
         }
 
         if (recordGapRead('VaultAdapter', prop)) {

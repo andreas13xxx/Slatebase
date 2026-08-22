@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useCallback, useState, useContext } from 'react'
 import { usePanelContextForSide } from '../../state/panelContext'
+import { useTranslation } from '../../i18n'
 import { PanelTabBar } from './PanelTabBar'
 import { PanelSplitContainer } from './PanelSplitContainer'
 import { FavoritesView } from '../sidebar-panel/FavoritesView'
@@ -16,8 +17,7 @@ import { RecentFilesView } from '../sidebar-panel/RecentFilesView'
 import { OutlineView } from '../context-panel/OutlineView'
 import { LinksView } from '../context-panel/LinksView'
 import { TagsView } from '../context-panel/TagsView'
-import { PropertiesView } from '../context-panel/PropertiesView'
-import { PropertiesEditor } from '../context-panel/PropertiesEditor'
+import { PropertiesOverview } from '../context-panel/PropertiesOverview'
 import { SearchPanel } from '../SearchPanel'
 import { isPluginViewId, getPluginViewType } from '../../state/panelState'
 import type { PanelViewId } from '../../state/panelState'
@@ -33,18 +33,7 @@ export interface SidePanelDocumentProps {
   outline: DocumentPanelState['outline']
   links: DocumentPanelState['links']
   tags: DocumentPanelState['tags']
-  properties: DocumentPanelState['properties']
   hasDocument: boolean
-  /** Whether the document can be edited (write access + markdown + edit mode). */
-  canEditProperties: boolean
-  /** Tag suggestions for the properties editor autocomplete. */
-  tagSuggestions: string[]
-  /** Callback to commit a frontmatter property change. */
-  onPropertyCommit: (key: string, value: unknown) => void
-  /** Callback to add a new frontmatter property. */
-  onPropertyAdd: (key: string, value: unknown) => void
-  /** Callback to delete a frontmatter property. */
-  onPropertyDelete: (key: string) => void
   onHeadingClick: (anchor: string) => void
   onLinkClick: (target: string, resolved: boolean) => void
   onTagClick: (tagName: string) => void
@@ -95,6 +84,7 @@ export function SidePanel({
   onMoveBuiltinView,
 }: SidePanelProps) {
   const { state, dispatch } = usePanelContextForSide(side)
+  const { t } = useTranslation()
   const panelBodyRef = useRef<HTMLDivElement>(null)
   const [panelHeight, setPanelHeight] = useState(400)
 
@@ -124,15 +114,19 @@ export function SidePanel({
     }
 
     // Also clean up any persisted plugin views that are not currently active
-    // (handles case where layout was loaded from localStorage but plugin is no longer installed)
-    if (currentViewTypes.size > 0 || prevViewTypes.size > 0) {
-      for (const section of state.sections) {
-        for (const viewId of section.viewIds) {
-          if (isPluginViewId(viewId)) {
-            const viewType = getPluginViewType(viewId)
-            if (!currentViewTypes.has(viewType)) {
-              dispatch({ type: 'REMOVE_VIEW', viewId })
-            }
+    // (handles the case where the layout was loaded from localStorage — or
+    // survived an intervening SidePanel unmount/remount, e.g. the sidebar
+    // being collapsed and reopened — with a plugin view that's no longer
+    // active). Deliberately unconditional: the case this exists for is a
+    // freshly (re)mounted panel whose plugin was *already* deactivated while
+    // unmounted, where both currentViewTypes and prevViewTypes are empty —
+    // a `size > 0` guard here would skip the scan in exactly that case.
+    for (const section of state.sections) {
+      for (const viewId of section.viewIds) {
+        if (isPluginViewId(viewId)) {
+          const viewType = getPluginViewType(viewId)
+          if (!currentViewTypes.has(viewType)) {
+            dispatch({ type: 'REMOVE_VIEW', viewId })
           }
         }
       }
@@ -195,7 +189,7 @@ export function SidePanel({
       case 'explorer':
         return (
           <div className="side-panel__view-wrapper" key={viewId}>
-            <h3 className="side-panel__view-header">Dateien</h3>
+            <h3 className="side-panel__view-header">{t('sidePanel.tabs.explorer')}</h3>
             <div className="side-panel__view-content">
               {renderExplorer()}
             </div>
@@ -204,7 +198,7 @@ export function SidePanel({
       case 'favorites':
         return (
           <div className="side-panel__view-wrapper" key={viewId}>
-            <h3 className="side-panel__view-header">Favoriten</h3>
+            <h3 className="side-panel__view-header">{t('sidePanel.tabs.favorites')}</h3>
             <div className="side-panel__view-content">
               <FavoritesView
                 vaultId={vaultId}
@@ -219,7 +213,7 @@ export function SidePanel({
       case 'recent':
         return (
           <div className="side-panel__view-wrapper" key={viewId}>
-            <h3 className="side-panel__view-header">Zuletzt geöffnet</h3>
+            <h3 className="side-panel__view-header">{t('sidePanel.tabs.recent')}</h3>
             <div className="side-panel__view-content">
               <RecentFilesView
                 onOpenFile={onOpenFile}
@@ -231,7 +225,7 @@ export function SidePanel({
       case 'outline':
         return (
           <div className="side-panel__view-wrapper" key={viewId}>
-            <h3 className="side-panel__view-header">Gliederung</h3>
+            <h3 className="side-panel__view-header">{t('sidePanel.tabs.outline')}</h3>
             <OutlineView
               headings={documentPanel.outline.headings}
               activeAnchor={documentPanel.outline.activeAnchor}
@@ -243,7 +237,7 @@ export function SidePanel({
       case 'links':
         return (
           <div className="side-panel__view-wrapper" key={viewId}>
-            <h3 className="side-panel__view-header">Links</h3>
+            <h3 className="side-panel__view-header">{t('sidePanel.tabs.links')}</h3>
             <LinksView
               forwardLinks={documentPanel.links.forward}
               backlinks={documentPanel.links.backlinks}
@@ -262,7 +256,7 @@ export function SidePanel({
       case 'tags':
         return (
           <div className="side-panel__view-wrapper" key={viewId}>
-            <h3 className="side-panel__view-header">Tags</h3>
+            <h3 className="side-panel__view-header">{t('sidePanel.tabs.tags')}</h3>
             <TagsView
               tags={documentPanel.tags.entries}
               loading={documentPanel.tags.loading}
@@ -276,34 +270,14 @@ export function SidePanel({
       case 'properties':
         return (
           <div className="side-panel__view-wrapper" key={viewId}>
-            <h3 className="side-panel__view-header">Eigenschaften</h3>
-            {documentPanel.canEditProperties ? (
-              <PropertiesEditor
-                data={documentPanel.properties.data}
-                parseError={documentPanel.properties.parseError}
-                rawFrontmatter={documentPanel.properties.rawFrontmatter}
-                typeRegistry={documentPanel.properties.typeRegistry}
-                onCommit={documentPanel.onPropertyCommit}
-                onAddProperty={documentPanel.onPropertyAdd}
-                onDeleteProperty={documentPanel.onPropertyDelete}
-                tagSuggestions={documentPanel.tagSuggestions}
-                propertySuggestions={documentPanel.properties.typeRegistry?.map((e) => e.key) ?? []}
-                hasDocument={documentPanel.hasDocument}
-              />
-            ) : (
-              <PropertiesView
-                data={documentPanel.properties.data}
-                parseError={documentPanel.properties.parseError}
-                rawFrontmatter={documentPanel.properties.rawFrontmatter}
-                hasDocument={documentPanel.hasDocument}
-              />
-            )}
+            <h3 className="side-panel__view-header">{t('sidePanel.tabs.properties')}</h3>
+            <PropertiesOverview vaultId={vaultId} hasWriteAccess={search.hasWriteAccess} />
           </div>
         )
       case 'search':
         return (
           <div className="side-panel__view-wrapper" key={viewId}>
-            <h3 className="side-panel__view-header">Suche</h3>
+            <h3 className="side-panel__view-header">{t('sidePanel.tabs.search')}</h3>
             <SearchPanel
               vaults={search.vaults}
               selectedVaultId={search.selectedVaultId}
@@ -349,7 +323,7 @@ export function SidePanel({
     }
 
     return null
-  }, [vaultId, onOpenFile, renderExplorer, refreshKey, state, dispatch, documentPanel, search, pluginViews])
+  }, [vaultId, onOpenFile, renderExplorer, refreshKey, state, dispatch, documentPanel, search, pluginViews, t])
 
   // ─── Single-Section Body Drop (split trigger) ──────────────────────────────
 

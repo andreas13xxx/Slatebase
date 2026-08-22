@@ -392,7 +392,13 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
     try {
       if (pluginContext) {
         await pluginContext.setPluginEnabled(pluginId, newStatus === 'active')
-        setRegistryData(await apiClient.loadRegistry(vaultId))
+        // Deactivation reloads the whole page (plugin-context.ts setPluginEnabled) once it
+        // resolves, so fetching fresh registry data here would race the navigation: the GET
+        // gets aborted mid-flight and surfaces as a spurious "NetworkError when attempting to
+        // fetch resource" that this function's catch block then reports as a failed toggle.
+        if (newStatus === 'active') {
+          setRegistryData(await apiClient.loadRegistry(vaultId))
+        }
       } else {
         // Fallback for isolated rendering without PluginProvider.
         const currentRegistry = registryData ?? { version: 1 as const, plugins: {} }
@@ -462,9 +468,10 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
 
     try {
       if (pluginContext) {
-        await pluginContext.setPluginEnabled(pluginId, false)
-        await pluginContext.setPluginEnabled(pluginId, true)
-        setRegistryData(await apiClient.loadRegistry(vaultId))
+        // reloadPlugin() reloads the whole page once the unload completes (see
+        // plugin-context.ts), so there's no point fetching fresh registry data
+        // here — it would just race the navigation like the toggle path did.
+        await pluginContext.reloadPlugin(pluginId)
       } else {
         const currentRegistry = registryData ?? { version: 1 as const, plugins: {} }
         const updatedRegistry: PluginRegistryData = {

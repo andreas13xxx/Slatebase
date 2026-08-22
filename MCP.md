@@ -94,11 +94,11 @@ GET http://your-server:3000/.well-known/mcp.json
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SLATEBASE_MCP_ENABLED` | `true` | Enable/disable the MCP server |
+| `SLATEBASE_FEATURE_MCP` | `true` | Enable/disable the MCP server (overrides the `mcp` feature toggle) |
 | `SLATEBASE_MCP_MAX_FILE_SIZE` | `5242880` | Max file size for MCP reads (5 MB) |
 | `SLATEBASE_MCP_RATE_LIMIT` | `60` | Max requests per minute per token |
 
-Set `SLATEBASE_MCP_ENABLED=false` to completely disable the MCP server (no routes registered, `.well-known/mcp.json` returns 404).
+MCP is controlled by the `mcp` feature toggle, a `cold` toggle (requires a server restart to take effect). Set `SLATEBASE_FEATURE_MCP=false` to completely disable the MCP server (no routes registered, `.well-known/mcp.json` returns 404).
 
 ## Security
 

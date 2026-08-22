@@ -81,6 +81,9 @@ Hier sind alle Formatierungen live gerendert:
 > [!info] Checkboxen
 > Im Live-Preview kannst du Checkboxen direkt anklicken, um den Status zu wechseln.
 
+> [!tip] Fälligkeiten und Prioritäten
+> Für Checklisten mit Fälligkeitsdatum, Priorität und wiederkehrenden Aufgaben siehe das [[Fortgeschritten/Plugins/Tasks|Tasks Plugin]].
+
 ---
 
 ## Tabellen
@@ -105,6 +108,9 @@ Tabellen werden mit Pipe-Zeichen `|` und Bindestrichen erstellt:
 
 > [!tip] Ausrichtung
 > `:---` = linksbündig, `:---:` = zentriert, `---:` = rechtsbündig
+
+> [!tip] Komfortabler bearbeiten
+> Das [[Fortgeschritten/Plugins/Advanced Tables|Advanced Tables Plugin]] richtet Spalten automatisch aus und ergänzt einen Tabellen-Editor mit Formeln.
 
 ---
 

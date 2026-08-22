@@ -59,7 +59,6 @@ import type { PanelViewId } from './state/panelState'
 import { useDocumentPanelData } from './state/documentPanelData'
 import type { UnlinkedMentionEntry } from './state/documentPanelData'
 import { linkUnlinkedMention } from './state/documentPanelActions'
-import { applyFrontmatterChange } from './utils/frontmatterWriter'
 import { SidePanel } from './components/side-panel/SidePanel'
 import type { SidePanelDocumentProps, SidePanelSearchProps } from './components/side-panel/SidePanel'
 import { SettingsPanel } from './components/settings/SettingsPanel'
@@ -74,6 +73,7 @@ import { useStatusBar } from './hooks/useStatusBar'
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts'
 import { useWorkspaceRestore, LAST_VAULT_KEY } from './hooks/useWorkspaceRestore'
 import { initialize as initializeWorkspace, getState as getWorkspaceState, clear as clearWorkspace, subscribe as subscribeWorkspace, getSnapshot as getWorkspaceSnapshot } from './state/workspaceStore'
+import { requestReveal } from './state/revealFileBridge'
 import {
   User, Settings, Shield, FileText, Clock,
   Database, Share2, Trash2, Server,
@@ -750,31 +750,7 @@ function AppContent() {
     outline: documentPanelData.state.outline,
     links: documentPanelData.state.links,
     tags: documentPanelData.state.tags,
-    properties: documentPanelData.state.properties,
     hasDocument: documentContent !== null,
-    canEditProperties: documentContent !== null && activeTab !== null && !activeTab.isBinary && (activeTab.filePath?.endsWith('.md') ?? false) && (selectedVault?.permission === 'owner' || selectedVault?.permission === 'write'),
-    tagSuggestions: documentPanelData.state.tags.entries.map((t) => t.name),
-    onPropertyCommit: (key: string, value: unknown) => {
-      if (!documentContent || !activeTab) return
-      const currentData = { ...(documentPanelData.state.properties.data ?? {}) }
-      currentData[key] = value
-      const newContent = applyFrontmatterChange(documentContent, currentData)
-      tabDispatch({ type: 'UPDATE_EDIT_BUFFER', payload: { tabId: activeTab.id, content: newContent } })
-    },
-    onPropertyAdd: (key: string, value: unknown) => {
-      if (!documentContent || !activeTab) return
-      const currentData = { ...(documentPanelData.state.properties.data ?? {}) }
-      currentData[key] = value
-      const newContent = applyFrontmatterChange(documentContent, currentData)
-      tabDispatch({ type: 'UPDATE_EDIT_BUFFER', payload: { tabId: activeTab.id, content: newContent } })
-    },
-    onPropertyDelete: (key: string) => {
-      if (!documentContent || !activeTab) return
-      const currentData = { ...(documentPanelData.state.properties.data ?? {}) }
-      delete currentData[key]
-      const newContent = applyFrontmatterChange(documentContent, currentData)
-      tabDispatch({ type: 'UPDATE_EDIT_BUFFER', payload: { tabId: activeTab.id, content: newContent } })
-    },
     onHeadingClick: documentPanelData.onHeadingClick,
     onLinkClick: handleLinkClick,
     onTagClick: documentPanelData.onTagClick,
@@ -807,16 +783,38 @@ function AppContent() {
   // Auto-reveal effect (Requirement 4) — depends on `activeTab?.id` (a stable string,
   // unlike the `tabState.tabs` array which gets a new identity on every edit-buffer
   // keystroke) so it only re-fires when the active tab itself changes.
+  //
+  // FileExplorer only mounts (and listens for `slatebase:reveal-file`) while its own
+  // tab is the active view of its panel section, so — same as the manual
+  // `file-explorer:reveal-active-file` command and FavoritesView's "reveal in
+  // explorer" action — we must switch that section's active view to 'explorer'
+  // (and make its panel visible) before dispatching, or the event would be
+  // silently dropped. requestReveal (revealFileBridge.ts) also survives the case
+  // where FileExplorer hasn't finished (re)mounting yet when we dispatch.
   useEffect(() => {
     if (!explorerFollowActiveFile || !activeTab) return
     if (activeTab.filePath === '__graph__' || activeTab.filePath.startsWith('__view::')) return
-    window.dispatchEvent(new CustomEvent('slatebase:reveal-file', { detail: { path: activeTab.filePath } }))
+    const rightSection = rightPanelState.sections.find((s) => s.viewIds.includes('explorer'))
+    if (rightSection) {
+      // Must ensure the panel hosting 'explorer' is visible before dispatching the reveal event below.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (!showRightPanel) setShowRightPanel(true)
+      rightPanelDispatch({ type: 'SET_ACTIVE_VIEW', sectionId: rightSection.id, viewId: 'explorer' })
+    } else {
+      const leftSection = leftPanelState.sections.find((s) => s.viewIds.includes('explorer'))
+      if (leftSection) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
+        if (!showSidebar) setShowSidebar(true)
+        leftPanelDispatch({ type: 'SET_ACTIVE_VIEW', sectionId: leftSection.id, viewId: 'explorer' })
+      }
+    }
+    requestReveal(activeTab.filePath)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [explorerFollowActiveFile, activeTab?.id])
 
   const handleBreadcrumbSegmentClick = useCallback((folderPath: string) => {
     if (!showSidebar) setShowSidebar(true)
-    window.dispatchEvent(new CustomEvent('slatebase:reveal-file', { detail: { path: folderPath, kind: 'folder' } }))
+    requestReveal(folderPath, 'folder')
   }, [showSidebar])
 
   const settingsTabs: SettingsTabDescriptor[] = openSettingsPages.map((page) => {

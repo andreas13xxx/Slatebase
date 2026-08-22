@@ -27,6 +27,7 @@
 | 13 | Semantische Suche / AI-Embeddings | E | ~38–58h | Geplant (keine Spec) |
 | 14 | Collaborative Editing | D | ~68–88h | Nur Requirements |
 | ~~15~~ | ~~Graph-Politur & Link-Integrität~~ | A | ~~15–24h~~ | ✅ Erledigt (siehe unten) |
+| 16 | Echte E2E-Test-Suite | F | ~30–45h | Spec vollständig (Req + Design) |
 
 ---
 
@@ -38,7 +39,7 @@ Track B (Plugins):     Community Plugin Store ✅ → Obsidian Themes → Server
 Track C (Sharing):     Public Sharing (unabhängig)
 Track D (Editor):      Collaborative Editing (braucht Realtime + CM6)
 Track E (AI):          Semantische Suche (unabhängig)
-Track F (Qualität):    Security Hardening ✅ → Accessibility Audit ✅ → Responsive/Mobile
+Track F (Qualität):    Security Hardening ✅ → Accessibility Audit ✅ → Responsive/Mobile; Echte E2E-Test-Suite (unabhängig, kann parallel laufen)
 Track G (Layout):      Responsive/Mobile (empfohlene Vorarbeit) → Workspaces & Split-Panes
 Track H (Daten):       Properties-Editor & Suchoperatoren ✅ → Bases
 Track I (Onboarding):  Fremdformat-Importer (unabhängig)
@@ -71,6 +72,8 @@ OWASP-Top-10-strukturierter Security-Audit (`SECURITY-AUDIT.md`). 9 Findings (1 
 - **Plugin eval-Warnung**: UI-Bestätigungsschritt bei `hasEvalUsage: true` vor Aktivierung.
 
 **Fix-Backlog (nicht in diesem Pass, siehe Prio 11):** Per-User-Rate-Limiter für `/proxy` + `/shares` + `/search`, echte Plugin-Sandbox-Isolation (Worker/VM statt Proxy-basierter Soft-Isolation) — beides beim `server-side-plugins`-Spec (Prio 11) mit erledigen, nicht als eigener Nachfolge-Pass.
+
+**Nachträglicher Follow-up (2026-08-19):** Server-seitige verschlüsselte Ablage für Plugin-Secrets (`backend/src/plugin/secret-key-manager.ts`, `secret-store.ts`). `SecretStorage`/`SecretComponent`-Secrets lagen zuvor unverschlüsselt im Browser-`localStorage` (CodeQL-Alert CWE-312) — jetzt AES-256-GCM-verschlüsselt pro Vault/Plugin serverseitig gespeichert, Schlüsselableitung via HKDF aus `SLATEBASE_PLUGIN_SECRET_KEY` (Env → Datei → generiert, gleiches Muster wie das CSRF-Secret). REST-Endpunkte für Read/Write, `localStorage` dient nur noch als Legacy-Migrations-/Offline-Fallback.
 
 ---
 
@@ -156,6 +159,22 @@ Die drei Rest-Punkte aus der ursprünglich als „Navigation & Verknüpfungs-Pol
 **Wichtiger Fund während der Umsetzung:** Der bestehende Link-Index (`LinkIndexService.getBacklinks()`) matcht Wikilink-Ziele nur über exakten normalisierten Pfad-Abgleich — ein für Obsidian typischer Kurzform-Link (`[[Notiz]]` ohne Ordnerpfad) auf eine Datei in einem Unterordner wird vom Index nicht erfasst. Ein alleiniges `getBacklinks()` hätte die Link-Migration für genau die häufigste Link-Art stillschweigend übersehen. Fix: Backend-Port der bestehenden Frontend-Auflösungslogik (`link-match-resolver.ts`, portiert aus `link-resolver.ts`) plus ein Volltextsuche-Fallback für Kandidaten, die der Index nicht kennt — beide Quellen zusammen bilden die Kandidatenliste, bevor gegen den (vor der Operation eingefrorenen) `DirectoryTree` aufgelöst wird.
 
 **Nachgezogen:** Die MCP-Tools `move_file`/`rename_file` (`backend/src/mcp/tool-handlers.ts`) riefen ursprünglich `vaultService.moveContent`/`renameContent` direkt auf und umgingen damit den `VaultController`-HTTP-Pfad, an dem die Link-Migration hängt. `ToolHandlerDeps` hat jetzt ein optionales `migrateLinks`-Feld (im Composition Root auf denselben `LinkMigrationService` verdrahtet wie der REST-Pfad), sodass MCP-getriebene Verschiebungen/Umbenennungen ebenfalls vaultweit Links aktualisieren — inkl. Ordner-Operationen und `linkMigrationWarnings` im Tool-Ergebnis bei Teilfehlern. MCP-Tools publizieren weiterhin keine Realtime-`vault:change`-Events (bestehendes, unverändertes Verhalten aller MCP-Schreib-Tools, nicht nur dieser beiden).
+
+---
+
+## Erledigt — Settings-UI-Konsistenz (Direktauftrag, kein Roadmap-Track) ✅
+
+**Kein Spec-Verzeichnis** — kleinerer, direkt beauftragter UI-Konsistenz-Pass über alle 15 Settings-Tabs, nicht Teil der oben priorisierten Roadmap, deshalb nicht in der Prio-Tabelle/den Abhängigkeiten gelistet (2026-08-21).
+
+Auslöser: uneinheitliches Erscheinungsbild der Settings-Seiten (mal mit, mal ohne Karten-Rahmen/Hintergrund/Überschrift; mind. 6 unabhängige Button-Klassenfamilien; Darstellung-Tab faktisch ohne jedes CSS; Benutzerverwaltung-Tabelle passte nicht in die Modal-Breite).
+
+- **Neues gemeinsames UI-Kit** `frontend/src/components/settings/ui/` (`SettingSection`, `SettingRow`, `Button`) — alle Tabs auf dieselbe Karten-/Zeilen-/Button-Optik umgestellt statt weiterhin pro Tab eigene Klassennamen zu erfinden.
+- **Darstellung-Tab** (0 Zeilen eigenes CSS zuvor) neu strukturiert: zwei `SettingSection`-Karten ("Statusleiste", "CSS-Snippets").
+- **Benutzerverwaltung** neu gebaut: Aktionsspalte von 4 Text-Buttons auf kompakte Icon-Buttons, Lösch-Bestätigung über das bestehende `ConfirmModal` statt eines vierten eigenen Dialogs.
+- **Echter Bug gefunden und gefixt** (nicht nur Kosmetik): `.settings-panel-content` (Row-Flex-Item sobald die Container-Query ≥700px greift) hatte kein `min-width:0` — Flexbox' Default-Mindestbreite orientiert sich am Inhalt, wodurch breite Tab-Inhalte (Tabellen) die Karte lautlos über die Modal-Breite hinaus wachsen ließen und vom äußeren `overflow:hidden` hart abgeschnitten wurden, ohne nutzbaren Scrollbalken. Betraf die Benutzerverwaltung-Tabelle schon vor diesem Umbau. Details: `lessons-learned.md`.
+- Tastaturkürzel-Kategorien und Vault-Konfiguration jeweils in eigene `SettingSection`-Unterabschnitte gegliedert; doppelt gepflegte (und leicht widersprüchliche) Sidebar-Labels aus `SettingsContent.tsx`/`SettingsNavList.tsx` in `state/settingsLabels.ts` zusammengeführt.
+
+**Bewusst nicht angefasst:** `PluginManagementPage.tsx` (Store-Browser mit eigenem, absichtlich volle Breite nutzendem Grid-Layout).
 
 ---
 
@@ -247,6 +266,23 @@ Zwei zusammengehörende Erweiterungen auf einer gemeinsamen Property-/Metadaten-
 
 ---
 
+## Erledigt — Plugin-Compat QS-Pass: CSS-Host-Klassen, Notice-DOM, No-Op-Logging (Track B) ✅
+
+**Direktauftrag (2026-08-21), kein Roadmap-Track.** Zweiter QS-Durchlauf über die Plugin-Kompatibilitätsschicht. Die API-Oberfläche selbst war bereits praktisch vollständig (gegen `obsidian.d.ts` 1.13.1 fehlten nur noch `MarkdownSourceView`, `iterateCacheRefs`/`iterateRefs` — alle drei deprecated — und `Editor.processLines`); gefunden und behoben wurden fünf Verhaltensfehler dahinter:
+
+- **Plugin-Dark-Mode-CSS war komplett tot** (höchster Hebel): Der CSS-Injector faltete Obsidians Host-Marker-Klassen in den Plugin-Scope, so dass `.theme-dark .panel` zu `[data-plugin-id="x"].theme-dark .panel` wurde — ein Selektor, der von einem Element verlangt, gleichzeitig `<body>` und Plugin-Element zu sein, und deshalb nie matcht. Betraf jedes Plugin mit Dark-Mode-Styles. Host-Klassen bleiben jetzt als Prefix davor stehen, und zwar vor *jeder* erzeugten Alternative (nur die erste zu prefixen hätte Dark-Mode-Regeln auch im Light-Mode greifen lassen — schlimmer als der ursprüngliche Fehler). Klassenliste kommt aus `OBSIDIAN_HOST_BODY_CLASSES` (`body-classes.ts`), damit setzende und scopende Seite nicht auseinanderlaufen.
+- **`Notice` schrieb in detachtes DOM**: `noticeEl`/`messageEl`/`containerEl` wurden nie eingehängt; nur der geflattete Klartext erreichte den Toast. Plugins, die nach dem Konstruktor in `messageEl` bauen (Fortschrittszeilen, Spinner) oder ein `DocumentFragment` übergeben, verloren das still — genau das Anti-Pattern, das die eigene Quality-Regel verbietet. Der Shim baut jetzt Obsidians echten Baum und reicht `noticeEl` an den Toast durch, der es per `MountedNode` einhängt.
+- **Obsidian-Klassennamen ergänzt**: Ribbon-Buttons tragen zusätzlich `side-dock-ribbon-action`, Status-Bar-Items `status-bar-item`. Plugin-CSS zielt auf diese Namen; die Gestaltung bleibt bei den Slatebase-Klassen.
+- **Stille No-Ops sichtbar gemacht**: CM5-Legacy-Global, Vim-Adapter, `foldManager`, `previewMode`, `onNodeInserted`/`onWindowMigrated` und der Bootstrap-`app.commands` loggen jetzt — `console.debug` für einen bewussten Trade-off mit funktionierender Alternative, `console.warn` wo Plugin-Code stillschweigend nicht läuft. `executeCommand` liefert dabei `false` statt `undefined`, damit ein prüfendes Plugin den Fehlschlag sieht.
+- **`EditorShim` bekam das Proxy-Sicherheitsnetz**: War die einzige große Shim-Oberfläche ohne — ein nicht emuliertes `editor.*` war ein roher `TypeError` aus Plugin-Code heraus statt eines geloggten, über `window.__slatebasePluginApiGaps()` auffindbaren Eintrags. `GapShim` deckt damit neun Oberflächen ab.
+
+**Bewusst nicht angefasst:** Das Scoping-Modell als solches (Plugin-CSS darf Slatebases Kern-DOM weiterhin nicht umgestalten — Host-Klassen sind die einzige Ausnahme, weil sie den Kontext des Plugin-Elements beschreiben und nicht fremdes DOM), der leere `.view-header`-Platzhalter, und die fehlende Namespacing von `@keyframes`. Alle drei sind in `PLUGIN-COMPAT.md` unter den bekannten Lücken dokumentiert.
+
+**Testbilanz:** 32 neue Frontend-Tests (`css-injector` Host-Klassen, `notice`, `deliberate-noops`, `editor-shim.gap`); ein bestehender `css-injector`-Test kodierte den Host-Klassen-Bug als Erwartung und wurde korrigiert. Gesamtsuite 2509 grün, `tsc -b` und `eslint --quiet` fehlerfrei.
+
+---
+
+
 ## Prio 9 — Workspaces & Split-Panes (Track G)
 
 Scope: ~60–90h. Keine Spec vorhanden. **Nutzerwunsch** — zuvor als "kein Äquivalent geplant" eingestuft. Größter Architektur-Eingriff im gesamten Backlog.
@@ -316,6 +352,8 @@ Scope: ~20–30h. Keine Spec vorhanden.
 
 **Empfehlung:** Onboarding-Feature — sinnvoll, aber nicht zeitkritisch; niedrigere Priorität als die Kernparitäts-Lücken oben.
 
+**Kein Ersatz durch das Obsidian-Importer-Plugin:** Das Community-Plugin `obsidian-importer` (siehe [[Advanced/Plugins/Importer]] im Welcome Vault) deckt Notion/Evernote/HTML bereits ab, ist aber kein Substitut für dieses Feature — es läuft hinter dem experimentellen `obsidian-plugin-compat`-Toggle und erfordert manuelle Installation/Aktivierung, was für die Zielgruppe (neue Nutzer beim Onboarding) zu viel Reibung ist. Außerdem fehlt der geforderte Mapping-Report nach dem Import. Bewertet 2026-08-22.
+
 ---
 
 ## Prio 13 — Semantische Suche / AI-Embeddings (Track E)
@@ -346,6 +384,26 @@ Scope: ~8h Design + ~60–80h Implementierung.
 
 ---
 
+## Prio 16 — Echte E2E-Test-Suite (Track F)
+
+Scope: ~30–45h. **Spec:** `.kiro/specs/e2e-testing/` — Requirements + Design vollständig (2026-08-21).
+
+Playwright ist bereits als Dependency/Config vorhanden, aber der einzige Spec (`demo-recording.spec.ts`) hat keine Assertions (nur GIF-Aufnahme fürs Marketing) und läuft nicht in CI — es gibt aktuell keinen echten Test, der Frontend und Backend als reales, über HTTP verbundenes System prüft.
+
+**Zusammenfassung:**
+
+- Zwei-Stufen-Strategie: schneller Dev-Stack-Lauf (Vite + Backend-Dev-Prozess) bei jedem Push/PR, realitätsnaher Docker-Stack-Lauf (`docker-compose.dev.yml`, echte Container/Nginx) nightly + vor Releases
+- Test_Data_Isolation über dediziertes Datenverzeichnis/Volume pro Lauf, Seed-Daten (Admin-Login, Test-Vault) per API im `globalSetup` statt eingecheckter Fixtures
+- Page-Object-Modell + schrittweise `data-testid`-Einführung statt der fragilen CSS-/`title`-Selektoren im bestehenden Demo-Skript
+- Zwei-Browser-Kontext-Tests für Realtime/SSE-Szenarien (z.B. Vault-Sharing), die Unit-Tests strukturell nicht abdecken können
+- 4 Rollout-Phasen: Fundament (Login) → Kern-Workflow (Vault/Explorer/Editor) → Realtime/Sharing → Admin + Docker-Stufe
+
+**Abhängigkeiten:** Keine — unabhängig von den Produkt-Feature-Tracks, nutzt nur bestehende Infrastruktur (Playwright-Config, Docker-Compose, CI).
+
+**Empfehlung:** Trotz Nummer 16 kein Grund, bis zuletzt zu warten — reine Qualitätsinfrastruktur ohne Abhängigkeiten, sinnvoll parallel zu jedem anderen Track einschiebbar. Je früher etabliert, desto mehr der nachfolgenden Features (Workspaces, Bases, Collaborative Editing) profitieren von Regressionsschutz auf echtem Stack-Niveau.
+
+---
+
 ## Gesamtaufwand (Schätzung)
 
 | Track | Aufwand |
@@ -358,7 +416,8 @@ Scope: ~8h Design + ~60–80h Implementierung.
 | F/G: Qualität & Layout (Responsive + Workspaces) | ~84–124h |
 | H: Strukturierte Daten (Bases) | ~55–75h |
 | I: Onboarding (Importer) | ~20–30h |
-| **Summe** | **~353–497h** |
+| F: Echte E2E-Test-Suite | ~30–45h |
+| **Summe** | **~383–542h** |
 
 ---
 

@@ -24,7 +24,7 @@ Supported formats: PNG, JPG, JPEG, GIF, WEBP, SVG.
 
 ```
 ![[image.png]]
-![[Screenshots/overview.png]]
+![[Screenshots/gesamtansicht.png]]
 ```
 
 **Live example:** The vault has a test image at `Attachments/Demo-Image.png`. The following code
@@ -175,7 +175,7 @@ The following basics are essential:
 
 ## Reference Image
 
-![[Screenshots/overview.png|500]]
+![[Screenshots/gesamtansicht.png|500]]
 
 *The Slatebase interface at a glance*
 ```

@@ -22,10 +22,11 @@ Self-hosted LiveSync enables bidirectional real-time synchronization of your vau
 
 ## Installation
 
-1. Download plugin ZIP from GitHub (releases page)
-2. Settings → Vault → Plugins → "Install Plugin"
-3. Upload ZIP → Activate
-4. Plugin shows initial setup dialog
+1. Go to **Plugin Management** → **"Available Plugins"** tab and search for "LiveSync"
+2. Click **Install**, then switch on the **activation toggle**
+3. Plugin shows initial setup dialog
+
+Not listed, or need a specific fork/version? Download the ZIP from GitHub's releases page instead and use **"Installed Plugins" → Upload Plugin**.
 
 ---
 

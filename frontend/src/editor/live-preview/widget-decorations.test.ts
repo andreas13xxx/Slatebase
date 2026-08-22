@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { EditorState } from '@codemirror/state'
+import type { EditorView } from '@codemirror/view'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
 import { parseTableRow, parseTableRowWithPositions, renderCellInline, buildWidgetDecorations } from './widget-decorations'
@@ -279,5 +280,60 @@ describe('buildWidgetDecorations — app.embedRegistry integration', () => {
   it('falls back to the built-in note pipeline when no creator is registered for the extension', () => {
     const el = toDOMFor(makeState('![[Drawing.excalidraw]]'))
     expect(el.classList.contains('cm-lp-embed-note')).toBe(true)
+  })
+})
+
+describe('buildWidgetDecorations — frontmatter box', () => {
+  function frontmatterWidget(state: EditorState) {
+    const result = buildWidgetDecorations(state, { vaultId: 'v1' })
+    const deco = result.decorations.find((r) => {
+      const spec = r.value.spec as { widget?: { toDOM?: () => HTMLElement } }
+      return typeof spec.widget?.toDOM === 'function' && r.from === 0
+    })
+    return { result, widget: (deco!.value.spec as { widget: { toDOM: (view: EditorView) => HTMLElement; ignoreEvent?: () => boolean } }).widget }
+  }
+
+  /** Builds a read-only EditorState (frontmatter falls back to the static text-parsing render). */
+  function makeReadOnlyState(doc: string): EditorState {
+    return EditorState.create({ doc, extensions: [markdown({ extensions: GFM }), EditorState.readOnly.of(true)] })
+  }
+
+  it('replaces the whole --- ... --- block at the document start with one widget', () => {
+    const state = makeState('---\ntitle: Hello\ntags: [a, b]\n---\nBody text')
+    const { result } = frontmatterWidget(state)
+    const fmRange = result.decorations.find((r) => r.from === 0 && state.doc.sliceString(0, r.to).endsWith('---\n'))
+    expect(fmRange).toBeDefined()
+  })
+
+  it('renders key/value rows from the parsed YAML when read-only', () => {
+    const state = makeReadOnlyState('---\ntitle: Hello\n---\nBody')
+    const { widget } = frontmatterWidget(state)
+    // Unused by the read-only branch, which never dereferences `view`.
+    const el = widget.toDOM(undefined as unknown as EditorView)
+    expect(el.querySelector('.cm-lp-frontmatter-key')?.textContent).toBe('title')
+    expect(el.querySelector('.cm-lp-frontmatter-tag')?.textContent).toBe('Hello')
+  })
+
+  it('does not ignore DOM events when read-only, so a click can place the cursor inside the block and reveal raw YAML', () => {
+    // Regression test: WidgetType's default ignoreEvent() returns true, which
+    // makes CM6 swallow every click on the widget's DOM — the box looked
+    // clickable but a click never moved the cursor, so the reveal-on-cursor
+    // mechanism in live-preview-extension.ts could never kick in from a click,
+    // only via keyboard navigation from an adjacent line.
+    const state = makeReadOnlyState('---\ntitle: Hello\n---\nBody')
+    const { widget } = frontmatterWidget(state)
+    expect(widget.ignoreEvent?.()).toBe(false)
+  })
+
+  it('ignores DOM events when editable, so CM6 does not also move its cursor into the block and tear down the mounted editor', () => {
+    // The interactive PropertiesEditor (mounted in frontmatter-widget.test.ts)
+    // owns all interaction itself. If this returned false, CM6 would resolve
+    // every click to a boundary cursor position, which the cursor-aware
+    // reveal logic in live-preview-extension.ts reads as "cursor entered the
+    // block" — tearing the just-clicked editor down to raw YAML text on the
+    // very first click.
+    const state = makeState('---\ntitle: Hello\n---\nBody')
+    const { widget } = frontmatterWidget(state)
+    expect(widget.ignoreEvent?.()).toBe(true)
   })
 })

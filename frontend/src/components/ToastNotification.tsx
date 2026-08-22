@@ -13,6 +13,16 @@ export interface ToastItem {
   createdAt: number
   /** Auto-dismiss delay in ms; 0 means stay until dismissed programmatically or by the user. */
   duration: number
+  /**
+   * A caller-owned element to mount as the toast body instead of `message`.
+   *
+   * Obsidian's `Notice` exposes its `messageEl` and plugins build into it after
+   * construction — a progress line they keep rewriting, a spinner, a link. That
+   * only works if the element they hold is the one on screen, so the shim passes
+   * its `messageEl` here and React mounts that exact node. `message` stays the
+   * plain-text fallback for every other caller.
+   */
+  messageEl?: HTMLElement
 }
 
 // Module-level event system for adding/updating/dismissing toasts from anywhere.
@@ -34,9 +44,14 @@ let nextToastId = 0
  * to change or close this specific toast later.
  */
 // eslint-disable-next-line react-refresh/only-export-components
-export function showToast(variant: ToastVariant, message: string, duration = AUTO_DISMISS_MS): string {
+export function showToast(
+  variant: ToastVariant,
+  message: string,
+  duration = AUTO_DISMISS_MS,
+  messageEl?: HTMLElement,
+): string {
   const id = `toast-${nextToastId++}`
-  addToastListener?.({ id, variant, message, duration })
+  addToastListener?.({ id, variant, message, duration, ...(messageEl ? { messageEl } : {}) })
   return id
 }
 
@@ -68,6 +83,28 @@ const VARIANT_ICONS = {
   warning: AlertTriangle,
   error: XCircle,
 } as const
+
+/**
+ * Host a caller-owned DOM node inside the React tree.
+ *
+ * The node is appended rather than copied, so later mutations by whoever owns
+ * it (a plugin holding `Notice.messageEl`) show up without React re-rendering.
+ * React never touches the child, which is why the wrapper is empty on its own.
+ */
+function MountedNode({ node, className }: { node: HTMLElement; className: string }) {
+  const hostRef = useRef<HTMLSpanElement | null>(null)
+
+  useEffect(() => {
+    const host = hostRef.current
+    if (!host) return
+    host.appendChild(node)
+    // Detach on unmount so the same element can be re-mounted if the owner
+    // shows it again, instead of being torn out of a live tree.
+    return () => { node.remove() }
+  }, [node])
+
+  return <span ref={hostRef} className={className} />
+}
 
 /**
  * Toast notification stack component.
@@ -208,7 +245,9 @@ export function ToastNotification() {
             role="alert"
           >
             <Icon size={16} className="toast-notification-item__icon" />
-            <span className="toast-notification-item__message">{toast.message}</span>
+            {toast.messageEl
+              ? <MountedNode className="toast-notification-item__message" node={toast.messageEl} />
+              : <span className="toast-notification-item__message">{toast.message}</span>}
             <button
               type="button"
               className="toast-notification-item__close"

@@ -42,7 +42,7 @@
 
 .properties-editor__row {
   display: grid;
-  grid-template-columns: minmax(60px, 0.4fr) 1fr auto;
+  grid-template-columns: minmax(60px, 0.4fr) 1fr auto auto;
   gap: 6px;
   align-items: start;
   padding: 3px 0;
@@ -54,6 +54,8 @@
 }
 
 .properties-editor__key {
+  all: unset;
+  cursor: text;
   font-weight: 500;
   color: var(--text-secondary, var(--text-muted));
   font-size: 11px;
@@ -61,6 +63,39 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 100%;
+}
+
+.properties-editor__key:hover {
+  color: var(--text-primary);
+}
+
+.properties-editor__key-input {
+  font-weight: 500;
+  font-size: 11px;
+  padding: 2px 4px;
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm, 3px);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.properties-editor__type-select {
+  font-size: 10px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 3px);
+  padding: 2px 2px;
+  max-width: 72px;
+}
+
+.properties-editor__type-select:hover,
+.properties-editor__type-select:focus {
+  color: var(--text-primary);
+  border-color: var(--border-subtle, rgba(0, 0, 0, 0.1));
 }
 
 .properties-editor__value {

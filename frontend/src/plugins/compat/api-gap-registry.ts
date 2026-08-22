@@ -25,7 +25,7 @@
  */
 
 /** Which shim the missing API was reached for on. */
-export type GapShim = 'App' | 'Workspace' | 'Vault' | 'VaultAdapter' | 'MetadataCache' | 'FileManager' | 'WorkspaceLeaf' | 'FileExplorerView' | 'Fallback'
+export type GapShim = 'App' | 'Workspace' | 'Vault' | 'VaultAdapter' | 'MetadataCache' | 'FileManager' | 'WorkspaceLeaf' | 'FileExplorerView' | 'Editor' | 'Fallback'
 
 /** One unimplemented API, aggregated across accesses. */
 export interface ApiGap {
@@ -42,6 +42,25 @@ export interface ApiGap {
   reads: number
   /** How often the returned no-op was actually invoked. */
   calls: number
+}
+
+/**
+ * Real members of `Object.prototype` (`hasOwnProperty`, `toString`, `valueOf`,
+ * `constructor`, …). The shim proxies below gate access through an explicit
+ * `emulatedProperties` allowlist that (correctly) never lists these, so
+ * without this check they fell through to the generic gap path: a plugin (or
+ * a library doing `Object.prototype.hasOwnProperty.call`-style feature
+ * detection via `obj.hasOwnProperty(...)`) got a callable no-op back instead
+ * of the real, inherited method — silently wrong, since the no-op is also
+ * truthy. `prop in Object.prototype` alone isn't enough because the same
+ * check needs to run before the "record a gap" fallback in several different
+ * proxies, so it's centralized here rather than duplicated per shim.
+ */
+const OBJECT_PROTOTYPE_MEMBERS = new Set<string>(Object.getOwnPropertyNames(Object.prototype))
+
+/** Whether `prop` is a real `Object.prototype` member that must pass through, not be treated as a gap. */
+export function isObjectPrototypeMember(prop: string): boolean {
+  return OBJECT_PROTOTYPE_MEMBERS.has(prop)
 }
 
 const gaps = new Map<string, ApiGap>()

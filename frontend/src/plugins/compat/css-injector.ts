@@ -4,7 +4,15 @@
  * Injects plugin CSS into <style> elements with data-plugin-id attributes.
  * All selectors are scoped with [data-plugin-id="<pluginId>"] to prevent
  * style leakage between plugins and the host application.
+ *
+ * The one deliberate exception is Obsidian's host marker classes
+ * (`theme-dark`, `is-mobile`, `mod-macos`, …). Those sit on `<body>`, so a
+ * plugin rule that leads with one is addressing the host *and* its own element,
+ * and the scope has to go after the host part rather than merge into it — see
+ * splitHostPrefix().
  */
+
+import { OBSIDIAN_HOST_BODY_CLASSES } from './body-classes';
 
 /** Maximum allowed CSS size in bytes (512 KB). */
 const MAX_CSS_SIZE_BYTES = 512 * 1024;
@@ -158,10 +166,84 @@ function scopeSelector(selectorText: string, scope: string): string {
 }
 
 /**
+ * Split off a leading run of host marker classes, optionally on an explicit
+ * `body`/`html`.
+ *
+ * `theme-dark`, `is-mobile`, `mod-macos` and friends live on `<body>` (see
+ * body-classes.ts), never on a plugin's own element. A rule like
+ * `.theme-dark .panel` therefore addresses two different elements: the host
+ * body, and the plugin's element somewhere beneath it. Folding the whole thing
+ * into the scope — the old behaviour — produced
+ * `[data-plugin-id="x"].theme-dark .panel`, which asks one element to be both
+ * at once and so matches nothing. Every plugin's dark-mode block was dead CSS.
+ *
+ * Returning the host part separately lets the caller keep it in front of the
+ * scope, where it still refers to `<body>`.
+ *
+ * @returns The host prefix (`''` when there is none) and the rest of the
+ *          selector, which is scoped normally.
+ */
+function splitHostPrefix(selector: string): { hostPrefix: string; rest: string } {
+  let i = 0;
+
+  // An explicit `body`/`html` lead is part of the host prefix, but only when
+  // something host-ish follows or it is the whole lead — `body` alone keeps its
+  // existing "scope the plugin's own root" meaning below.
+  let sawElement = false;
+  for (const tag of ['body', 'html']) {
+    if (selector.startsWith(tag)) {
+      const next = selector[tag.length];
+      if (next === undefined || next === '.' || next === ' ' || next === '>') {
+        i = tag.length;
+        sawElement = true;
+      }
+      break;
+    }
+  }
+
+  // Then any number of `.host-class` segments, chained directly.
+  let sawHostClass = false;
+  for (;;) {
+    if (selector[i] !== '.') break;
+    const match = /^\.([A-Za-z0-9_-]+)/.exec(selector.slice(i));
+    const name = match?.[1];
+    if (!name || !OBSIDIAN_HOST_BODY_CLASSES.includes(name)) break;
+    i += match[0].length;
+    sawHostClass = true;
+  }
+
+  // `body` on its own, or `body .child`, is not a host-class rule — leave those
+  // to the existing body handling so plugin variables stay scoped to the plugin.
+  if (!sawHostClass) return { hostPrefix: '', rest: selector };
+
+  const rest = selector.slice(i).replace(/^[ >]+/, '');
+  // `html`/`body` is implied when the rule only named the class, and stating it
+  // keeps the prefix from accidentally matching a same-named plugin element.
+  const prefix = sawElement ? selector.slice(0, i) : `body${selector.slice(0, i)}`;
+  return { hostPrefix: prefix, rest };
+}
+
+/**
  * Scope a single selector (no commas).
  */
 function scopeSingleSelector(selector: string, scope: string): string {
   if (!selector) return scope;
+
+  // Host marker classes (theme-dark, is-mobile, …) stay in front of the scope:
+  // they describe <body>, not the plugin's element. See splitHostPrefix().
+  const { hostPrefix, rest: hostRest } = splitHostPrefix(selector);
+  if (hostPrefix) {
+    // `.theme-dark { --x: 1 }` with nothing after it sets a variable the
+    // plugin's own elements should inherit, so the scope becomes the subject.
+    if (!hostRest) return `${hostPrefix} ${scope}`;
+    // Scoping the remainder yields both a self and a descendant form; the host
+    // prefix has to go on each of them. Prefixing only the joined string would
+    // leave the second alternative unguarded, so a dark-mode rule would also
+    // apply in light mode — worse than the dead selector this replaced.
+    return splitSelectors(scopeSingleSelector(hostRest, scope))
+      .map((form) => `${hostPrefix} ${form.trim()}`)
+      .join(', ');
+  }
 
   // :root → replace with scope
   if (selector === ':root') {

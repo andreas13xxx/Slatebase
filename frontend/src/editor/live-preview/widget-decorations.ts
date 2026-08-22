@@ -12,6 +12,10 @@ import { ViewMode } from '../../components/ViewMode'
 import type { DirectoryTree } from '../../types'
 import { errorOnce } from '../../plugins/compat/log'
 import { findEmbedCreatorForTarget, getLinktextExtension, mountRegisteredEmbed, type EmbedComponent, type EmbedContext } from '../../plugins/compat/embed-registry'
+import { PropertiesEditor, type PropertiesEditorProps } from '../../components/context-panel/PropertiesEditor'
+import { parseFrontmatter } from '../../components/context-panel/utils/parseFrontmatter'
+import { serializeFrontmatter, locateFrontmatterBlock } from '../../utils/frontmatterWriter'
+import type { PropertyType, PropertyTypeEntry } from '../../state/propertyTypes'
 
 /**
  * State effect to toggle callout fold state.
@@ -54,6 +58,10 @@ export interface WidgetDecorationOptions {
   foldedCallouts?: Set<string>
   /** Directory tree, for resolving note-embed targets (bare names, missing .md). */
   directoryTree?: DirectoryTree | null
+  /** Per-vault property type registry, for resolving frontmatter property types in the interactive editor. */
+  typeRegistry?: PropertyTypeEntry[] | null
+  /** Callback to persist an explicit type choice for a property key to the vault's type registry. */
+  onPropertyTypeChange?: (key: string, type: PropertyType) => void
 }
 
 /**
@@ -360,8 +368,15 @@ class EmbedWidget extends WidgetType {
       this.objectUrl = null
     }
     if (this.reactRoot) {
-      this.reactRoot.unmount()
+      // Deferred: CM6 calls destroy() while it's still mid-update (often
+      // itself inside a React commit that's swapping tabs), and unmounting
+      // synchronously there trips React's "synchronously unmount a root
+      // while React was already rendering" warning. Nothing reads this DOM
+      // node again once CM6 has discarded the widget, so unmounting a tick
+      // later is safe.
+      const root = this.reactRoot
       this.reactRoot = null
+      queueMicrotask(() => root.unmount())
     }
     if (this.pluginEmbed) {
       this.pluginEmbed.unload?.()
@@ -1172,20 +1187,156 @@ class CalloutIconWidget extends WidgetType {
 
 /**
  * Widget for rendering YAML frontmatter as a compact properties box.
- * Shows key-value pairs in a styled container, similar to Obsidian's Properties view.
+ * When the document is editable, mounts the real `PropertiesEditor` (the same
+ * component used for the vault properties overview's type management) so the
+ * box is a genuine structured editor — values, key renames, type changes,
+ * add/delete — instead of a read-only summary. Read-only documents keep the
+ * original lightweight text-parsing render below (no interactive editor to
+ * mount, no react-dom cost).
  */
 class FrontmatterWidget extends WidgetType {
   private readonly yaml: string
+  private readonly readOnly: boolean
+  private readonly typeRegistry: PropertyTypeEntry[] | null
+  private readonly onPropertyTypeChange: ((key: string, type: PropertyType) => void) | undefined
+  private reactRoot: Root | null = null
 
-  constructor(yaml: string) {
+  constructor(
+    yaml: string,
+    readOnly: boolean,
+    typeRegistry: PropertyTypeEntry[] | null | undefined,
+    onPropertyTypeChange: ((key: string, type: PropertyType) => void) | undefined,
+  ) {
     super()
     this.yaml = yaml
+    this.readOnly = readOnly
+    this.typeRegistry = typeRegistry ?? null
+    this.onPropertyTypeChange = onPropertyTypeChange
   }
 
-  toDOM(): HTMLElement {
+  toDOM(view: EditorView): HTMLElement {
     const container = document.createElement('div')
     container.className = 'cm-lp-frontmatter'
 
+    if (this.readOnly) {
+      this.renderReadOnly(container)
+      return container
+    }
+
+    // Prevent CM6's own keymaps — and Prec.highest plugin keymaps, like the
+    // Advanced Tables "Enter moves to next row" binding that motivated this
+    // whole rework — from also reacting to keystrokes meant for a nested form
+    // control. CM6 attaches its key handling directly on `view.contentDOM`,
+    // an ancestor of this container in the real DOM, so a plain native
+    // listener here (not React's synthetic one, which is delegated further up
+    // the tree and would only see the event *after* CM6 already has) reliably
+    // stops it before it gets that far.
+    container.addEventListener('keydown', (e) => { e.stopPropagation() })
+
+    const mountPoint = document.createElement('div')
+    container.appendChild(mountPoint)
+    const root = createRoot(mountPoint)
+    this.reactRoot = root
+    // toDOM() runs inside CM6's own DOM-update pass. Calling flushSync() here
+    // used to force the render through immediately, but that reenters React's
+    // render/commit machinery from inside CM6's reconciliation — which could
+    // corrupt CM6's own viewport measurement mid-update. Deferring the render
+    // instead runs it after CM6's synchronous work has fully unwound — but
+    // CM6 then measures this widget's height (still just the empty mountPoint
+    // div at that point, since `estimatedHeight` is only a placeholder for
+    // the first paint) before PropertiesEditor's real content — several rows
+    // tall — actually lands. Without telling CM6 to re-measure once it does,
+    // CM6's cached height for this widget stays stuck at the empty-div
+    // measurement, which throws off its virtualized layout for everything
+    // below (seen as the document appearing to end right after the
+    // frontmatter box). `view.requestMeasure()` after the render tells CM6
+    // to redo that measurement against the now-real content.
+    const props = this.buildEditorProps(view)
+    queueMicrotask(() => {
+      if (this.reactRoot === root) {
+        root.render(createElement(PropertiesEditor, props))
+        view.requestMeasure()
+      }
+    })
+    return container
+  }
+
+  /**
+   * Builds the props for the mounted PropertiesEditor. Every callback re-reads
+   * the document fresh at call time (rather than closing over data captured
+   * at mount) so a rename following an earlier edit in the same session never
+   * operates on stale data — this widget is torn down and rebuilt on every
+   * successful commit anyway (its `yaml` changes, so `eq()` goes false), but
+   * re-parsing defensively costs nothing for a document-start YAML header.
+   */
+  private buildEditorProps(view: EditorView): PropertiesEditorProps {
+    const { data, parseError, rawFrontmatter } = parseFrontmatter(view.state.doc.toString())
+
+    const currentData = (): Record<string, unknown> => ({
+      ...(parseFrontmatter(view.state.doc.toString()).data ?? {}),
+    })
+
+    /**
+     * Writes a full replacement data object back into the document. Commits
+     * touch only the YAML span between the `---` delimiters (or, when the
+     * result is empty, the whole block including delimiters) — never the
+     * rest of the document — so the user's cursor/scroll position anywhere
+     * else in the note is left alone by CM6's change mapping instead of
+     * jumping to the top the way a full-document replace would.
+     */
+    const commitData = (newData: Record<string, unknown>): void => {
+      const freshContent = view.state.doc.toString()
+      const location = locateFrontmatterBlock(freshContent)
+      if (!location) return
+
+      const remaining = Object.entries(newData).filter(([, v]) => v !== undefined && v !== null)
+      if (remaining.length === 0) {
+        const blockEnd = freshContent.indexOf('\n', location.to + 1)
+        const to = blockEnd === -1 ? freshContent.length : blockEnd + 1
+        view.dispatch({ changes: { from: 0, to, insert: '' } })
+        return
+      }
+
+      view.dispatch({
+        changes: { from: location.from, to: location.to, insert: serializeFrontmatter(newData) },
+      })
+    }
+
+    return {
+      data,
+      parseError,
+      rawFrontmatter,
+      typeRegistry: this.typeRegistry,
+      onCommit: (key, value) => {
+        const next = currentData()
+        next[key] = value
+        commitData(next)
+      },
+      onAddProperty: (key, value) => {
+        const next = currentData()
+        next[key] = value
+        commitData(next)
+      },
+      onDeleteProperty: (key) => {
+        const next = currentData()
+        delete next[key]
+        commitData(next)
+      },
+      onRenameProperty: (oldKey, newKey) => {
+        const source = currentData()
+        const renamed: Record<string, unknown> = {}
+        for (const [k, v] of Object.entries(source)) {
+          renamed[k === oldKey ? newKey : k] = v
+        }
+        commitData(renamed)
+      },
+      onTypeChange: (key, type) => {
+        this.onPropertyTypeChange?.(key, type)
+      },
+    }
+  }
+
+  private renderReadOnly(container: HTMLElement): void {
     // Parse simple YAML key-value pairs
     const lines = this.yaml.trim().split('\n')
     let currentKey = ''
@@ -1250,16 +1401,52 @@ class FrontmatterWidget extends WidgetType {
       container.textContent = '(leere Properties)'
       container.classList.add('cm-lp-frontmatter--empty')
     }
+  }
 
-    return container
+  /** Unmounts the React root when CM6 discards this widget's DOM (e.g. on `eq()` going false). */
+  destroy(dom: HTMLElement): void {
+    // Deferred for the same reason as EmbedWidget.destroy() above: CM6 calls
+    // this mid-update, often itself inside a React commit swapping tabs, and
+    // unmounting synchronously there trips React's "already rendering"
+    // warning. The widget's DOM is already discarded by CM6 at this point,
+    // so unmounting a tick later has no observable effect.
+    if (this.reactRoot) {
+      const root = this.reactRoot
+      this.reactRoot = null
+      queueMicrotask(() => root.unmount())
+    }
+    void dom
   }
 
   eq(other: FrontmatterWidget): boolean {
-    return this.yaml === other.yaml
+    return this.yaml === other.yaml && this.readOnly === other.readOnly && this.typeRegistry === other.typeRegistry
   }
 
   get estimatedHeight(): number {
     return 40
+  }
+
+  /**
+   * Read-only branch: let clicks fall through to CM6 instead of the
+   * WidgetType default (which ignores every DOM event). CM6 resolves a click
+   * inside a replaced range to a cursor position at the nearest edge of that
+   * range; once the cursor is inside, live-preview-extension's cursor-aware
+   * filtering drops this widget and reveals the raw YAML as editable text —
+   * the same reveal-on-cursor mechanism every other Live Preview element
+   * (headings, bold, …) already uses. Without this, the box was inert:
+   * clicking anywhere on it did nothing, and the frontmatter was only
+   * reachable by keyboard navigation from an adjacent line.
+   *
+   * Editable branch: the opposite is true. Returning `false` here would let
+   * CM6 *also* resolve every click to a boundary cursor position — which
+   * immediately satisfies live-preview-extension's "cursor is inside this
+   * range" check and tears down the just-clicked PropertiesEditor to reveal
+   * raw YAML instead, on literally the first click. `PropertiesEditor`'s own
+   * inputs/buttons handle everything themselves, so CM6 must stay out of it
+   * entirely — hence `true` (the WidgetType default) in this branch.
+   */
+  ignoreEvent(): boolean {
+    return !this.readOnly
   }
 }
 
@@ -1414,7 +1601,7 @@ export function buildWidgetDecorations(
         const fullEnd = afterEnd === '\n' ? fmEnd + 1 : (afterEnd === '\r' ? fmEnd + 2 : fmEnd)
         frontmatterEndPos = Math.min(fullEnd, doc.length)
 
-        const widget = new FrontmatterWidget(yamlContent)
+        const widget = new FrontmatterWidget(yamlContent, state.readOnly, options.typeRegistry, options.onPropertyTypeChange)
         decorations.push(
           Decoration.replace({ widget }).range(0, frontmatterEndPos)
         )

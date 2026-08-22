@@ -11,7 +11,7 @@ Monorepo: `backend/` + `frontend/`. Separate `package.json` + `node_modules` eac
 - **Framework**: Hono (`@hono/node-server`)
 - **Validation**: Zod
 - **Logging**: Pino (structured JSON)
-- **Test**: Vitest (+ `@vitest/coverage-v8`, thresholds enforced in CI)
+- **Test**: Vitest (+ `@vitest/coverage-v8`, thresholds enforced in CI) + fast-check (property-based testing, `.pbt.test.ts` files)
 - **Module**: ESM (`"type": "module"`)
 
 ## Frontend
@@ -23,7 +23,7 @@ Monorepo: `backend/` + `frontend/`. Separate `package.json` + `node_modules` eac
 - **Icons**: Lucide React
 - **Styling**: CSS Custom Properties (Design Tokens), Dark Mode
 - **Markdown**: unified + remark-parse + remark-gfm + remark-frontmatter + custom Obsidian plugins
-- **Test**: Vitest (+ `@vitest/coverage-v8`) + Testing Library + Playwright (e2e)
+- **Test**: Vitest (+ `@vitest/coverage-v8`) + Testing Library + Playwright (e2e) + fast-check (property-based testing, `.pbt.test.ts` files, e.g. `navigationHistoryState.pbt.test.ts`)
 - **Lint**: ESLint (react-hooks, react-refresh, jsx-a11y)
 - **Proxy**: Vite → `http://localhost:3000`
 
@@ -62,11 +62,12 @@ test. Config: `backend/vitest.config.ts` and the `test.coverage` block in `front
 | hono | HTTP framework |
 | @hono/node-server | Node.js adapter for Hono |
 | @modelcontextprotocol/sdk | MCP SDK (Streamable HTTP transport) |
-| zod | Schema validation |
+| zod | Schema validation (v3 — frontend uses v4, versions are not shared across the two packages) |
 | pino | Structured logging |
 | tsx | Dev server |
 | argon2 | Password hashing (argon2id) |
 | adm-zip | ZIP extraction (plugin upload) |
+| fast-check | Property-based testing (devDependency, `.pbt.test.ts` files) |
 
 ### Frontend
 | Package | Purpose |
@@ -74,8 +75,8 @@ test. Config: `backend/vitest.config.ts` and the `test.coverage` block in `front
 | react / react-dom | UI framework |
 | vite / vitest | Build + test |
 | @testing-library/react | Component testing |
-| playwright | E2E testing |
-| obsidian (dev) | Official Obsidian type declarations, so the compat shims are checked against the real `obsidian.d.ts` instead of hand-written shapes. Types only — nothing imports it at runtime. An npm `overrides` entry pins its `@codemirror/state`/`@codemirror/view` to the versions the app already uses, so plugin CM6 types resolve to one copy rather than a second, incompatible one |
+| @playwright/test | E2E testing |
+| obsidian (dev) | Official Obsidian API type declarations (`obsidian.d.ts`, MIT) — ground truth for auditing `plugins/compat/` against, instead of hand-written shapes. Types only, never imported at runtime. It peer-deps on older `@codemirror/state`/`@codemirror/view` patch versions; an npm `overrides` entry pins those to the versions the app already uses (rather than `--legacy-peer-deps`), so plugin CM6 types resolve to one copy instead of a second, incompatible one |
 | vitest-axe | Automated accessibility testing (axe-core for Vitest) |
 | eslint-plugin-jsx-a11y-x | Static JSX accessibility lint rules (ESLint 10 compat fork) |
 | unified / remark-parse / remark-gfm / remark-frontmatter | Markdown (MDAST) |
@@ -103,8 +104,8 @@ test. Config: `backend/vitest.config.ts` and the `test.coverage` block in `front
 | moment | Date/time formatting (Calendar plugin compat) |
 | buffer | Node `Buffer` polyfill for plugin bundles (obsidian-git/isomorphic-git reference it at module top level) |
 | dompurify | Sanitizes raw HTML blocks before they are rendered as real DOM (reading view) |
-| zod | Schema validation (canvas parser, frontend-side) |
-| obsidian (dev) | Official Obsidian API type definitions (`obsidian.d.ts`, MIT) — ground truth for auditing `plugins/compat/` against, never imported at runtime. Peer-deps on older `@codemirror/state`/`@codemirror/view` patch versions, resolved via `overrides` in `package.json` rather than `--legacy-peer-deps`. |
+| zod | Schema validation (canvas parser, frontend-side; v4 — backend uses v3, versions are not shared across the two packages) |
+| fast-check | Property-based testing (devDependency, `.pbt.test.ts` files, e.g. `chatState.bugfix.test.ts`, `chatState.preservation.test.ts`) |
 
 ### Geplant
 - **better-sqlite3** — SQLite für Graph-Index (erst bei Performance-Bedarf, >10k Dateien)
@@ -167,6 +168,7 @@ Kein Express/Fastify/Koa, kein Redux/Zustand, kein ORM, kein DI-Container, kein 
 - Lösung, zwei Hälften: (1) `plugin-execution-context.ts` verfolgt, welches Plugin gerade läuft; `createEl`/`createDiv` taggen jedes erzeugte Element damit. (2) `scopeSingleSelector()` emittiert pro Regel zusätzlich eine Self-Form (`sel[data-plugin-id="x"]`) neben der Descendant-Form.
 - Kontext-Propagierung: synchron via `withPluginContext()` (Save/Restore, reentrant-sicher); über `await`-Grenzen hinweg via `scopeForPlugin()` (Proxy, bindet die ID in eine Closure und wrappt übergebene Callbacks). `EventSystem` speichert die ID am Listener und stellt sie beim `trigger()` wieder her.
 - Bewusst kein `AsyncLocalStorage`-Äquivalent: alle Plugins laufen im selben JS-Realm ohne Iframes/Worker, und die Call-Sites mit bekannter pluginId sind abzählbar.
+- Ausnahme vom Scoping: Obsidians Host-Marker-Klassen (`theme-dark`, `is-mobile`, `mod-macos`, … aus `OBSIDIAN_HOST_BODY_CLASSES` in `body-classes.ts`) sitzen auf `<body>` und bleiben deshalb als Prefix *vor* dem Scope stehen — in den Scope gefaltet ergeben sie einen Selektor, der von einem Element verlangt, gleichzeitig Body und Plugin-Element zu sein, und der nie matcht. Der Prefix muss auf jede erzeugte Alternative (Self- **und** Descendant-Form), sonst greift eine Dark-Mode-Regel auch im Light-Mode.
 
 ### Icon-Auflösung → lucide-react Dynamic-Import-Map
 - Obsidian bundlet den kompletten Lucide-Satz; `setIcon(el, 'chevron-down')` funktioniert dort für jeden Namen. Unsere `addIcon()`-Registry allein ließ Plugin-Buttons leer.

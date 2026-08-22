@@ -24,6 +24,9 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
+      // Otherwise a handful of failing tests (unrelated to coverage) blocks
+      // the report entirely, hiding coverage for everything else too.
+      reportOnFailure: true,
       // Explicit include, not just exclude — otherwise v8's "all files" scan
       // also sweeps in non-app TS files like scripts/take-screenshots.ts.
       include: ['src/**/*.{ts,tsx}'],
@@ -33,15 +36,15 @@ export default defineConfig({
         'src/test-setup.ts',
         'src/main.tsx',
       ],
-      // Baseline as of introducing coverage tracking (2026-08-07), with a
-      // small safety margin below the measured numbers. Ratchet these up as
-      // coverage improves — the point is to catch regressions, not to gate
-      // on an aspirational target we're not at yet.
+      // Ratcheted up 2026-08-21 after bringing every directory to ≥20% line
+      // coverage (was 36/31/34/38). Small safety margin below the measured
+      // numbers (48.25/40.54/45.44/49.96) — the point is to catch
+      // regressions, not to gate on an aspirational target we're not at yet.
       thresholds: {
-        statements: 36,
-        branches: 31,
-        functions: 34,
-        lines: 38,
+        statements: 46,
+        branches: 38,
+        functions: 43,
+        lines: 48,
       },
     },
   },

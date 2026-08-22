@@ -4,6 +4,7 @@ import type { IApiClient, McpTokenInfo, McpTokenCreateResult } from '../api'
 import { Key, Plus, Trash2, Copy, AlertTriangle } from 'lucide-react'
 import { ConfirmModal } from './ConfirmModal'
 import { extractErrorMessage } from '../utils/error'
+import { Button } from './settings/ui'
 
 /** Props for the McpTokensPage component. */
 export interface McpTokensPageProps {
@@ -139,13 +140,13 @@ export function McpTokensPage({ apiClient }: McpTokensPageProps) {
   return (
     <div className="mcp-tokens-page">
       <div className="admin-config-card">
-        <h2><Key size={18} /> {t('mcpTokens.title')}</h2>
+        <h2 className="admin-config-card-title"><Key size={18} /> {t('mcpTokens.title')}</h2>
         <p className="mcp-tokens-description">{t('mcpTokens.description')}</p>
       </div>
 
       {/* Create Token Form */}
       <div className="admin-config-card">
-        <h3>{t('mcpTokens.createTitle')}</h3>
+        <h3 className="admin-config-card-title">{t('mcpTokens.createTitle')}</h3>
         {limitReached && (
           <p className="mcp-tokens-limit-warning">
             <AlertTriangle size={14} /> {t('mcpTokens.limitReached')}
@@ -178,36 +179,36 @@ export function McpTokensPage({ apiClient }: McpTokensPageProps) {
             <span className="mcp-tokens-hint">{t('mcpTokens.expiryHint')}</span>
           </div>
           {createError && <p className="mcp-tokens-error">{createError}</p>}
-          <button type="submit" className="btn-primary" disabled={creating || limitReached}>
+          <Button type="submit" variant="primary" disabled={creating || limitReached}>
             <Plus size={14} />
             {creating ? t('mcpTokens.creating') : t('mcpTokens.create')}
-          </button>
+          </Button>
         </form>
       </div>
 
       {/* New Token Display (shown once after creation) */}
       {newToken && (
         <div className="admin-config-card mcp-tokens-new-token">
-          <h3>{t('mcpTokens.createSuccess')}</h3>
+          <h3 className="admin-config-card-title">{t('mcpTokens.createSuccess')}</h3>
           <p className="mcp-tokens-token-warning">
             <AlertTriangle size={14} /> {t('mcpTokens.tokenWarning')}
           </p>
           <div className="mcp-tokens-token-display">
             <code className="mcp-tokens-token-value">{newToken.token}</code>
-            <button onClick={handleCopy} className="btn-secondary" title={t('mcpTokens.copyToken')}>
+            <Button variant="secondary" onClick={handleCopy} title={t('mcpTokens.copyToken')}>
               <Copy size={14} />
               {copied ? t('mcpTokens.tokenCopied') : t('mcpTokens.copyToken')}
-            </button>
+            </Button>
           </div>
-          <button onClick={handleCloseTokenDialog} className="btn-secondary mcp-tokens-close-btn">
+          <Button variant="secondary" className="mcp-tokens-close-btn" onClick={handleCloseTokenDialog}>
             {t('mcpTokens.closeTokenDialog')}
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Token List */}
       <div className="admin-config-card">
-        <h3>{t('mcpTokens.title')}</h3>
+        <h3 className="admin-config-card-title">{t('mcpTokens.title')}</h3>
         {loading && <p>{t('mcpTokens.loading')}</p>}
         {error && <p className="mcp-tokens-error">{error}</p>}
         {!loading && !error && tokens.length === 0 && (
@@ -244,14 +245,15 @@ export function McpTokensPage({ apiClient }: McpTokensPageProps) {
                     <td>{token.lastUsedAt ? formatDate(token.lastUsedAt) : t('mcpTokens.neverUsed')}</td>
                     <td>
                       {token.status === 'active' && (
-                        <button
+                        <Button
+                          variant="danger"
+                          size="sm"
                           onClick={() => setRevokeTarget(token)}
-                          className="btn-danger-small"
                           title={t('mcpTokens.revoke')}
                         >
                           <Trash2 size={12} />
                           {t('mcpTokens.revoke')}
-                        </button>
+                        </Button>
                       )}
                     </td>
                   </tr>

@@ -14,7 +14,7 @@ import { dispatchRealtimeVaultChange } from '../../../state/realtimeVaultBridge'
 import { getStoredAuthToken, getStoredCsrfToken } from '../../../state/authContext';
 import { markPluginWrite } from '../plugin-event-bridge';
 import { warnNoOp } from '../log';
-import { recordGapRead, recordGapCall } from '../api-gap-registry';
+import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry';
 import { VaultAdapterShim } from './vault-adapter-shim';
 import type { IVaultAdapter } from './vault-adapter-shim';
 
@@ -1198,6 +1198,11 @@ export class VaultShim implements IVaultShim {
         // a plain `undefined`, not fall into the generic callable-no-op path.
         if (prop === 'then') {
           return undefined;
+        }
+
+        if (isObjectPrototypeMember(prop)) {
+          const value = Reflect.get(target, prop, target);
+          return typeof value === 'function' ? value.bind(target) : value;
         }
 
         if (recordGapRead('Vault', prop)) {

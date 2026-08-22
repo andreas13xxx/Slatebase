@@ -1,0 +1,104 @@
+/* ===== Shared vertical stack for a tab's top-level SettingSections ===== */
+
+.appearance-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ===== SettingSection — shared card container for all settings tabs ===== */
+
+.setting-section {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  /* Flex items default to min-width:auto, which lets wide content (e.g. a table)
+     grow the card past its column instead of scrolling inside it. */
+  min-width: 0;
+}
+
+.setting-section--danger {
+  border-color: var(--danger-border);
+}
+
+.setting-section__title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.setting-section--danger .setting-section__title {
+  color: var(--danger-text);
+}
+
+.setting-section__description {
+  margin: -8px 0 0;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.setting-section__body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* Flex items default to min-width:auto, which lets wide content (e.g. a table)
+   grow past the card's width instead of scrolling inside it. */
+.setting-section__body > * {
+  min-width: 0;
+}
+
+/* ===== SettingRow — label + control line inside a SettingSection ===== */
+
+.setting-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.setting-row__main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.setting-row--nested {
+  padding-left: 20px;
+  border-left: 2px solid var(--border-subtle);
+}
+
+.setting-row__label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.setting-row__control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.setting-row__control input[type='checkbox'] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.setting-row__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}

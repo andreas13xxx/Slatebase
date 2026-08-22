@@ -13,7 +13,7 @@
 
 import type { DataWriteOptions, IVaultShim, TFile, TFolder } from '../types'
 import { warnNoOp } from '../log'
-import { recordGapRead, recordGapCall } from '../api-gap-registry'
+import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry'
 
 /**
  * IFileManagerShim — Obsidian FileManager interface subset.
@@ -301,6 +301,11 @@ export class FileManagerShim implements IFileManagerShim {
         // a plain `undefined`, not fall into the generic callable-no-op path.
         if (prop === 'then') {
           return undefined;
+        }
+
+        if (isObjectPrototypeMember(prop)) {
+          const value = Reflect.get(target, prop, target);
+          return typeof value === 'function' ? value.bind(target) : value;
         }
 
         if (recordGapRead('FileManager', prop)) {

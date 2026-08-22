@@ -11,6 +11,7 @@
 import React, { useMemo, useCallback, useState, useRef } from 'react'
 import { Star, Heading, Hash, Search as SearchIcon } from 'lucide-react'
 import { favoritesStore } from '../../state/favoritesStore'
+import { requestReveal } from '../../state/revealFileBridge'
 import { useSearchContext } from '../../state/searchContext'
 import { useAppContext } from '../../state'
 import { performSearch } from '../../state/searchActions'
@@ -195,7 +196,7 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
     if (section) {
       panelDispatch({ type: 'SET_ACTIVE_VIEW', sectionId: section.id, viewId: 'explorer' })
     }
-    window.dispatchEvent(new CustomEvent('slatebase:reveal-file', { detail: { path: entry.path } }))
+    requestReveal(entry.path)
   }, [panelState.sections, panelDispatch])
 
   const handleRenameStart = useCallback((entry: FavoriteEntry) => {

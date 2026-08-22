@@ -9,7 +9,7 @@ Slatebase has two modes for working with your notes: **Source mode** for seeing 
 
 ![[Screenshots/editor-toolbar.png]]
 
-*Editor with toolbar in edit mode*
+*Editor in edit mode*
 
 ---
 
@@ -19,7 +19,6 @@ In Source mode you see the raw Markdown text with syntax highlighting. All marke
 
 ### Features
 
-- **Toolbar** — Buttons for common formatting (bold, italic, heading, list, link, code)
 - **Line Numbers** — Optional line numbers on the left (toggle in Settings)
 - **Auto-Save** — Your changes are saved automatically after a short pause
 - **Undo/Redo** — `Ctrl+Z` to undo, `Ctrl+Shift+Z` to redo
@@ -61,31 +60,11 @@ In Live Preview mode your Markdown is **rendered inline** while you type — hea
 
 | Method | Action |
 |--------|--------|
-| Toolbar button | Click the mode icon (Source/Preview) |
 | Keyboard shortcut | `Ctrl+E` toggles between modes |
 | Command Palette | `Ctrl+P` → "Toggle editor mode" |
 
-| Icon | Mode | Description |
-|------|------|-------------|
-| Source icon | Source | Raw Markdown text |
-| Preview icon | Live Preview | Inline formatted, editable |
-
----
-
-## Toolbar Functions
-
-The edit toolbar provides quick access to formatting:
-
-| Button | Action | Markdown |
-|--------|--------|----------|
-| **B** | Bold | `**text**` |
-| *I* | Italic | `*text*` |
-| H | Heading | `## text` |
-| List | Bullet list | `- item` |
-| 1. | Numbered list | `1. item` |
-| ☑ | Checklist | `- [ ] item` |
-| Link | Wikilink | `[[target]]` |
-| Code | Code block | `` `code` `` |
+> [!info] Formatting Toolbar via Plugin
+> Slatebase itself has no fixed toolbar above the editor — you format directly with Markdown syntax (`**bold**`, `## heading`, and so on). If you'd rather click than type syntax, install the [[Advanced/Plugins/Editing Toolbar|Editing Toolbar Plugin]].
 
 ---
 
@@ -154,3 +133,4 @@ Then switch to Live Preview mode to see it rendered inline.
 - [[Features/Live Preview Editor|Live Preview Editor]] — Source mode and inline Live Preview in one editor
 - [[Features/Embeds|Embeds]] — Embedding images and files
 - [[Features/Templates and Daily Notes|Templates and Daily Notes]] — Reusable templates
+- [[Advanced/Plugins/Editing Toolbar|Editing Toolbar Plugin]] — Click-based formatting toolbar

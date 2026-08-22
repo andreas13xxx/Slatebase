@@ -16,7 +16,7 @@ import { Scope } from './obsidian-api-extensions'
 import { getCustomIconSvg, sizeCustomIconSvg } from '../../utils/pluginIcon'
 import { EventSystem } from './event-system'
 import type { EventRef } from './types'
-import { recordGapRead, recordGapCall } from './api-gap-registry'
+import { recordGapRead, recordGapCall, isObjectPrototypeMember } from './api-gap-registry'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -54,7 +54,13 @@ export class ItemView {
     this.leaf = leaf
     this.app = leaf.app
     this.containerEl = document.createElement('div')
-    this.containerEl.className = 'view-content'
+    // `workspace-leaf-content` matches real Obsidian's actual class name for
+    // ItemView.containerEl — plugin stylesheets scope layout rules to it via
+    // `[data-type="..."] .view-content` (see the `dataset.type` assignment in
+    // setViewState()/open() below). `plugin-view-container` is Slatebase's
+    // own sizing class (App.css: flex column, height 100%) — kept alongside
+    // it, not replaced by it.
+    this.containerEl.className = 'plugin-view-container workspace-leaf-content'
     // Real Obsidian's ItemView.containerEl always has two children — a
     // header (children[0]) and the content pane (children[1] === contentEl).
     // Kept in sync with the equivalent constructor in install-globals.ts,
@@ -65,7 +71,9 @@ export class ItemView {
     headerEl.className = 'view-header'
     this.containerEl.appendChild(headerEl)
     this.contentEl = document.createElement('div')
-    this.contentEl.className = 'plugin-view-content'
+    // `view-content` matches real Obsidian's actual class name for
+    // ItemView.contentEl — see the containerEl comment above.
+    this.contentEl.className = 'plugin-view-content view-content'
     this.containerEl.appendChild(this.contentEl)
   }
 
@@ -628,6 +636,13 @@ export class WorkspaceLeaf {
     if (pluginId) {
       view.containerEl.dataset.pluginId = pluginId
     }
+    // Real Obsidian sets `data-type="<viewType>"` on `.workspace-leaf-content`
+    // (= ItemView.containerEl) — plugin stylesheets routinely scope layout
+    // rules to it (obsidian-day-planner's `[data-type="planner-timeline"]
+    // .view-content { display: grid; ... }` is what actually lays out its
+    // Timeline view; without this attribute the selector never matches and
+    // everything falls back to plain block stacking).
+    view.containerEl.dataset.type = viewType
     // Mount view's containerEl inside the leaf's containerEl (Obsidian pattern)
     this.containerEl.appendChild(view.containerEl)
 
@@ -707,6 +722,8 @@ export class WorkspaceLeaf {
     if (pluginId) {
       view.containerEl.dataset.pluginId = pluginId
     }
+    // See the same assignment in setViewState() above for why.
+    view.containerEl.dataset.type = viewType
     this.containerEl.appendChild(view.containerEl)
 
     this.runViewLoad(view, viewType)
@@ -890,6 +907,11 @@ export class WorkspaceLeaf {
           return undefined;
         }
 
+        if (isObjectPrototypeMember(prop)) {
+          const value = Reflect.get(target, prop, target);
+          return typeof value === 'function' ? value.bind(target) : value;
+        }
+
         if (recordGapRead('WorkspaceLeaf', prop)) {
           console.warn(
             `[WorkspaceLeaf] Access to non-emulated leaf method/property "${prop}". ` +
@@ -918,6 +940,18 @@ export class WorkspaceLeaf {
  */
 export class WorkspaceSplit {
   readonly type = 'split' as const
+
+  /**
+   * Real Obsidian's WorkspaceParent.getRoot() walks up to the root of its split
+   * tree via `this.parent ? this.parent.getRoot() : this`. Slatebase's
+   * rootSplit/leftSplit/rightSplit stubs (see WorkspaceShim) have no parent
+   * chain and are each already the root of their own area, so this just
+   * returns `this` — matching day-planner's `isLeafInSidebar`, which calls
+   * `.getRoot()` on the split a leaf's own `getRoot()` returned.
+   */
+  getRoot(): WorkspaceSplit {
+    return this
+  }
 }
 
 /**

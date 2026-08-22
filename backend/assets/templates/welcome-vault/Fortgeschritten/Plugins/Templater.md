@@ -28,10 +28,11 @@ Templater erweitert das Vorlagen-System um dynamische Befehle. Statt statischer 
 
 ## Installation
 
-1. Plugin-ZIP von GitHub herunterladen
-2. Einstellungen → Vault → Plugins → "Plugin installieren"
-3. ZIP hochladen → Aktivieren
-4. In den Plugin-Einstellungen: Templates-Ordner setzen
+1. **Plugin-Verwaltung** → Tab **"Verfügbare Plugins"** öffnen und nach "Templater" suchen
+2. **Installieren** klicken, dann den **Aktivierungs-Schalter** einschalten
+3. In den Plugin-Einstellungen: Templates-Ordner setzen
+
+Nicht gelistet, oder ein bestimmter Fork/eine bestimmte Version nötig? Stattdessen die Plugin-ZIP von GitHub herunterladen und unter **"Installierte Plugins" → Plugin hochladen** verwenden.
 
 ---
 

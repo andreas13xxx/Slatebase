@@ -83,6 +83,22 @@ describe('proxy gap recording', () => {
     expect(getApiGapsForPlugin('unknown')).toHaveLength(1)
   })
 
+  // Regression: real Object.prototype members (hasOwnProperty, toString, valueOf, …)
+  // aren't in any shim's emulatedProperties allowlist, so without an explicit
+  // passthrough they fell into the generic gap path — `workspace.hasOwnProperty`
+  // came back as a callable no-op instead of the real, inherited method, silently
+  // breaking any `obj.hasOwnProperty(x)`-style feature detection a plugin (or a
+  // library it pulls in) performs against the shim.
+  it('passes real Object.prototype members through instead of recording a gap', () => {
+    const workspace = WorkspaceShim.createProxied() as unknown as Record<string, unknown>
+
+    const hasOwnProperty = workspace['hasOwnProperty'] as (prop: string) => boolean
+
+    expect(hasOwnProperty('layoutReady')).toBe(true)
+    expect(hasOwnProperty('definitelyNotARealProperty')).toBe(false)
+    expect(getApiGaps()).toEqual([])
+  })
+
   describe('VaultAdapterShim', () => {
     function createProxiedAdapter(): Record<string, unknown> {
       const instance = new VaultAdapterShim('vault-1', {} as IApiClient, () => ({ name: '', path: '', type: 'directory', children: [] }))

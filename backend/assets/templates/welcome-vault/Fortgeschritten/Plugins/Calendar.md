@@ -21,9 +21,10 @@ Das Calendar-Plugin zeigt einen Monatskalender in der Seitenleiste. Per Klick au
 
 ## Installation
 
-1. Lade das Calendar-Plugin als ZIP von GitHub: `obsidian-calendar-plugin`
-2. Einstellungen → Vault → Plugins → "Plugin installieren"
-3. ZIP hochladen → Aktivieren
+1. **Plugin-Verwaltung** → Tab **"Verfügbare Plugins"** öffnen und nach "Calendar" suchen
+2. **Installieren** klicken, dann den **Aktivierungs-Schalter** einschalten
+
+Nicht gelistet, oder ein bestimmter Fork/eine bestimmte Version nötig? Stattdessen die Plugin-ZIP von GitHub herunterladen (`obsidian-calendar-plugin`) und unter **"Installierte Plugins" → Plugin hochladen** verwenden.
 
 ---
 

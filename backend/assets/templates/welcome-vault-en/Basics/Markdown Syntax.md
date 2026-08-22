@@ -81,6 +81,9 @@ Here are all formatting options rendered live:
 > [!info] Checkboxes
 > In Live Preview you can click checkboxes directly to toggle their state.
 
+> [!tip] Due Dates and Priorities
+> For checklists with due dates, priorities, and recurring tasks, see the [[Advanced/Plugins/Tasks|Tasks Plugin]].
+
 ---
 
 ## Tables
@@ -105,6 +108,9 @@ Tables are created with pipe characters `|` and hyphens:
 
 > [!tip] Alignment
 > `:---` = left-aligned, `:---:` = centered, `---:` = right-aligned
+
+> [!tip] Easier Editing
+> The [[Advanced/Plugins/Advanced Tables|Advanced Tables Plugin]] auto-aligns columns and adds a table editor with formulas.
 
 ---
 

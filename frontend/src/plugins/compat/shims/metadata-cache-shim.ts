@@ -11,7 +11,7 @@ import { parseMetadata } from '../metadata-parser';
 import { EventSystem } from '../event-system';
 import type { DirectoryTree } from '../../../types';
 import { resolveWikilinkTarget, collectFilesSorted } from '../../link-resolver';
-import { recordGapRead, recordGapCall } from '../api-gap-registry';
+import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry';
 
 /**
  * MetadataCacheShim — Obsidian-compatible MetadataCache emulation.
@@ -478,6 +478,11 @@ export class MetadataCacheShim implements IMetadataCacheShim {
         // a plain `undefined`, not fall into the generic callable-no-op path.
         if (prop === 'then') {
           return undefined;
+        }
+
+        if (isObjectPrototypeMember(prop)) {
+          const value = Reflect.get(target, prop, target);
+          return typeof value === 'function' ? value.bind(target) : value;
         }
 
         if (recordGapRead('MetadataCache', prop)) {

@@ -18,6 +18,8 @@
  * import is therefore absent from it.
  */
 import { describe, it, expect } from 'vitest'
+import { EditorView } from '@codemirror/view'
+import { EditorState } from '@codemirror/state'
 import { installObsidianGlobals } from './install-globals'
 import { withPluginContext } from './plugin-execution-context'
 import { WorkspaceLeaf, WorkspaceSplit, WorkspaceRibbon } from './view-registry'
@@ -174,6 +176,97 @@ describe('installObsidianGlobals', () => {
       await new Promise((resolve) => window.setTimeout(resolve, 10))
 
       expect(el?.hasAttribute('data-plugin-id')).toBe(false)
+    })
+  })
+
+  describe('document.createElement() carries plugin-execution-context, tagging raw DOM API calls like createEl() does', () => {
+    // Regression: obsidian-outliner's vertical-lines overlay is built via a
+    // bare `document.createElement("div")`, not createEl() — plugins are
+    // ordinary JS and commonly reach for the native DOM API directly. Before
+    // this fix, such elements came back untagged, so CssInjector's
+    // [data-plugin-id] scoping (both the self and ancestor forms) silently
+    // failed to match anything they built.
+    it('tags an element created via document.createElement() while a plugin is active', () => {
+      let el: HTMLElement | undefined
+      withPluginContext('obsidian-outliner', () => {
+        el = document.createElement('div')
+      })
+      expect(el?.getAttribute('data-plugin-id')).toBe('obsidian-outliner')
+    })
+
+    it('does not tag elements created outside any plugin context (the host app\'s own DOM creation)', () => {
+      const el = document.createElement('div')
+      expect(el.hasAttribute('data-plugin-id')).toBe(false)
+    })
+  })
+
+  describe('ViewPlugin.define()/fromClass() carry plugin-execution-context into CM6-driven calls', () => {
+    // Regression: a CM6 ViewPlugin's constructor and update()/destroy() are
+    // invoked by CodeMirror's own internal reconciliation, on its own
+    // schedule — not synchronously under registerEditorExtension()'s call
+    // frame, the same macrotask-boundary shape as setTimeout above, just via
+    // CM6's scheduler instead of a browser API. obsidian-outliner's
+    // vertical-lines overlay is built this way; before this fix, its
+    // document.createElement() calls came back untagged, the overlay fell
+    // back to `position: static` in the editor's flex layout, and squeezed
+    // CodeMirror's own `.cm-scroller` down to almost nothing.
+    function getViewPlugin() {
+      return (window as unknown as { __codemirrorView: { ViewPlugin: typeof import('@codemirror/view').ViewPlugin } })
+        .__codemirrorView.ViewPlugin
+    }
+
+    it('the create() factory runs with the plugin active when ViewPlugin.define() was called', () => {
+      const ViewPlugin = getViewPlugin()
+      let built: HTMLElement | undefined
+
+      const plugin = withPluginContext('obsidian-outliner', () =>
+        ViewPlugin.define(() => {
+          built = document.createElement('div')
+          return {}
+        })
+      )
+
+      const parent = document.createElement('div')
+      const view = new EditorView({ parent, state: EditorState.create({ extensions: [plugin] }) })
+
+      expect(built?.getAttribute('data-plugin-id')).toBe('obsidian-outliner')
+      view.destroy()
+    })
+
+    it('update() and destroy() also run tagged, even though CM6 calls them with no plugin context of its own', () => {
+      const ViewPlugin = getViewPlugin()
+      const built: HTMLElement[] = []
+
+      const plugin = withPluginContext('obsidian-outliner', () =>
+        ViewPlugin.define(() => ({
+          update() { built.push(document.createElement('span')) },
+          destroy() { built.push(document.createElement('i')) },
+        }))
+      )
+
+      const parent = document.createElement('div')
+      const view = new EditorView({ parent, state: EditorState.create({ doc: 'a', extensions: [plugin] }) })
+      view.dispatch({ changes: { from: 0, insert: 'b' } })
+      view.destroy()
+
+      expect(built.length).toBeGreaterThan(0)
+      expect(built.every((el) => el.getAttribute('data-plugin-id') === 'obsidian-outliner')).toBe(true)
+    })
+
+    it('does not tag a plugin value built outside any plugin context (Slatebase\'s own ViewPlugin.define() calls)', () => {
+      const ViewPlugin = getViewPlugin()
+      let built: HTMLElement | undefined
+
+      const plugin = ViewPlugin.define(() => {
+        built = document.createElement('div')
+        return {}
+      })
+
+      const parent = document.createElement('div')
+      const view = new EditorView({ parent, state: EditorState.create({ extensions: [plugin] }) })
+
+      expect(built?.hasAttribute('data-plugin-id')).toBe(false)
+      view.destroy()
     })
   })
 

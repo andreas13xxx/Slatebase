@@ -1,11 +1,12 @@
 /**
  * PropertiesEditor — interactive, typed frontmatter property editor.
- * Replaces the read-only PropertiesView when the active file is editable.
  * Renders type-aware controls per property key based on the type registry
- * or inference from the actual value.
+ * or inference from the actual value. Mounted inline inside the document
+ * editor itself (see FrontmatterWidget in editor/live-preview/widget-decorations.ts)
+ * — editing a document's frontmatter happens in the document, not the sidebar.
  */
 
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Trash2, Plus } from 'lucide-react'
 import {
   TextPropertyControl,
@@ -36,6 +37,10 @@ export interface PropertiesEditorProps {
   onAddProperty: (key: string, value: unknown) => void
   /** Callback to delete a property. */
   onDeleteProperty: (key: string) => void
+  /** Callback to rename a property key, preserving its value and position. */
+  onRenameProperty: (oldKey: string, newKey: string) => void
+  /** Callback to explicitly set a property's type in the vault's type registry. */
+  onTypeChange: (key: string, type: PropertyType) => void
   /** Tag suggestions for the tags property control. */
   tagSuggestions?: string[]
   /** Property key suggestions for the add-property autocomplete. */
@@ -61,6 +66,18 @@ function inferPropertyType(value: unknown): PropertyType {
   if (Array.isArray(value)) return 'list'
   return 'text'
 }
+
+/** All selectable property types, in the order shown in the type dropdown. */
+const ALL_PROPERTY_TYPES: PropertyType[] = [
+  'text',
+  'number',
+  'checkbox',
+  'date',
+  'datetime',
+  'list',
+  'tags',
+  'aliases',
+]
 
 /**
  * Resolves the effective property type for a key.
@@ -91,6 +108,8 @@ export function PropertiesEditor({
   onCommit,
   onAddProperty,
   onDeleteProperty,
+  onRenameProperty,
+  onTypeChange,
   tagSuggestions = [],
   propertySuggestions = [],
   hasDocument = true,
@@ -98,10 +117,20 @@ export function PropertiesEditor({
 }: PropertiesEditorProps) {
   const { t } = useTranslation()
 
+  // Tracks the key of a property just created via "Add property", so its row
+  // can open already in rename-edit mode — the generated placeholder key
+  // ("property", "property-1", …) is never what the user actually wants.
+  const [justAddedKey, setJustAddedKey] = useState<string | null>(null)
+
   const entries = useMemo(() => {
     if (!data) return []
     return Object.entries(data).filter(([, v]) => v !== undefined)
   }, [data])
+
+  const handleAdd = useCallback((key: string, value: unknown) => {
+    onAddProperty(key, value)
+    setJustAddedKey(key)
+  }, [onAddProperty])
 
   // ─── Non-editable states ───────────────────────────────────────────────────
 
@@ -119,7 +148,7 @@ export function PropertiesEditor({
     return (
       <div className="properties-editor properties-editor--empty">
         <p className="properties-editor__placeholder">
-          Keine Eigenschaften für diesen Dateityp
+          {t('contextPanel.properties.notMarkdown')}
         </p>
       </div>
     )
@@ -156,9 +185,14 @@ export function PropertiesEditor({
               propertyKey={key}
               value={value}
               type={resolvePropertyType(key, value, typeRegistry)}
+              existingKeys={entries.filter(([k]) => k !== key).map(([k]) => k)}
+              startInEditMode={key === justAddedKey}
+              onEditModeExited={() => setJustAddedKey((prev) => (prev === key ? null : prev))}
               tagSuggestions={tagSuggestions}
               onCommit={onCommit}
               onDelete={onDeleteProperty}
+              onRename={onRenameProperty}
+              onTypeChange={onTypeChange}
             />
           ))}
         </div>
@@ -167,7 +201,7 @@ export function PropertiesEditor({
       <AddPropertyRow
         existingKeys={entries.map(([k]) => k)}
         suggestions={propertySuggestions}
-        onAdd={onAddProperty}
+        onAdd={handleAdd}
       />
     </div>
   )
@@ -179,12 +213,44 @@ interface PropertyRowProps {
   propertyKey: string
   value: unknown
   type: PropertyType
+  /** Other properties' keys, for duplicate-name rejection on rename. */
+  existingKeys: string[]
+  /** Whether this row should open with the key already in rename-edit mode (just added). */
+  startInEditMode: boolean
+  /** Called once this row leaves rename-edit mode, however it got there. */
+  onEditModeExited: () => void
   tagSuggestions: string[]
   onCommit: (key: string, value: unknown) => void
   onDelete: (key: string) => void
+  onRename: (oldKey: string, newKey: string) => void
+  onTypeChange: (key: string, type: PropertyType) => void
 }
 
-function PropertyRow({ propertyKey, value, type, tagSuggestions, onCommit, onDelete }: PropertyRowProps) {
+function PropertyRow({
+  propertyKey,
+  value,
+  type,
+  existingKeys,
+  startInEditMode,
+  onEditModeExited,
+  tagSuggestions,
+  onCommit,
+  onDelete,
+  onRename,
+  onTypeChange,
+}: PropertyRowProps) {
+  const { t } = useTranslation()
+  const [isEditingKey, setIsEditingKey] = useState(startInEditMode)
+  const [draftKey, setDraftKey] = useState(propertyKey)
+  const keyInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (isEditingKey) {
+      keyInputRef.current?.focus()
+      keyInputRef.current?.select()
+    }
+  }, [isEditingKey])
+
   const handleChange = useCallback((newValue: unknown) => {
     onCommit(propertyKey, newValue)
   }, [propertyKey, onCommit])
@@ -193,9 +259,63 @@ function PropertyRow({ propertyKey, value, type, tagSuggestions, onCommit, onDel
     onDelete(propertyKey)
   }, [propertyKey, onDelete])
 
+  const handleTypeChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    onTypeChange(propertyKey, e.target.value as PropertyType)
+  }, [propertyKey, onTypeChange])
+
+  const startEditingKey = useCallback(() => {
+    setDraftKey(propertyKey)
+    setIsEditingKey(true)
+  }, [propertyKey])
+
+  const commitKeyEdit = useCallback(() => {
+    const trimmed = draftKey.trim()
+    if (trimmed !== '' && trimmed !== propertyKey && !existingKeys.includes(trimmed)) {
+      onRename(propertyKey, trimmed)
+    }
+    setIsEditingKey(false)
+    onEditModeExited()
+  }, [draftKey, propertyKey, existingKeys, onRename, onEditModeExited])
+
+  const cancelKeyEdit = useCallback(() => {
+    setDraftKey(propertyKey)
+    setIsEditingKey(false)
+    onEditModeExited()
+  }, [propertyKey, onEditModeExited])
+
+  const handleKeyInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      commitKeyEdit()
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      cancelKeyEdit()
+    }
+  }, [commitKeyEdit, cancelKeyEdit])
+
   return (
     <div className="properties-editor__row">
-      <span className="properties-editor__key" title={propertyKey}>{propertyKey}</span>
+      {isEditingKey ? (
+        <input
+          ref={keyInputRef}
+          type="text"
+          className="properties-editor__key-input"
+          value={draftKey}
+          onChange={(e) => setDraftKey(e.target.value)}
+          onBlur={commitKeyEdit}
+          onKeyDown={handleKeyInputKeyDown}
+          aria-label={t('contextPanel.properties.propertyNameAriaLabel')}
+        />
+      ) : (
+        <button
+          type="button"
+          className="properties-editor__key"
+          title={t('contextPanel.properties.renamePropertyTitle')}
+          onClick={startEditingKey}
+        >
+          {propertyKey}
+        </button>
+      )}
       <div className="properties-editor__value">
         <PropertyValueControl
           type={type}
@@ -204,12 +324,25 @@ function PropertyRow({ propertyKey, value, type, tagSuggestions, onCommit, onDel
           tagSuggestions={tagSuggestions}
         />
       </div>
+      <select
+        className="properties-editor__type-select"
+        value={type}
+        onChange={handleTypeChange}
+        aria-label={t('contextPanel.properties.typeAriaLabel')}
+        title={t('contextPanel.properties.typeAriaLabel')}
+      >
+        {ALL_PROPERTY_TYPES.map((option) => (
+          <option key={option} value={option}>
+            {t(`contextPanel.properties.types.${option}`)}
+          </option>
+        ))}
+      </select>
       <button
         type="button"
         className="properties-editor__delete-btn"
         onClick={handleDelete}
-        aria-label={`${propertyKey} entfernen`}
-        title="Eigenschaft entfernen"
+        aria-label={t('contextPanel.properties.deletePropertyAriaLabel', { key: propertyKey })}
+        title={t('contextPanel.properties.deleteProperty')}
       >
         <Trash2 size={12} />
       </button>
@@ -273,6 +406,8 @@ interface AddPropertyRowProps {
 }
 
 function AddPropertyRow({ existingKeys, suggestions: _suggestions, onAdd }: AddPropertyRowProps) {
+  const { t } = useTranslation()
+
   const handleAdd = useCallback(() => {
     // Generate a unique key name
     let keyName = 'property'
@@ -289,10 +424,10 @@ function AddPropertyRow({ existingKeys, suggestions: _suggestions, onAdd }: AddP
       type="button"
       className="properties-editor__add-btn"
       onClick={handleAdd}
-      title="Eigenschaft hinzufügen"
+      title={t('contextPanel.properties.addProperty')}
     >
       <Plus size={12} />
-      <span>Eigenschaft hinzufügen</span>
+      <span>{t('contextPanel.properties.addProperty')}</span>
     </button>
   )
 }

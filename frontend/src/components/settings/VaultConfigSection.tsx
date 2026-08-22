@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { IApiClient, VaultConfig } from '../../api'
 import { showToast } from '../ToastNotification'
 import { getState as getWorkspaceState, update as updateWorkspaceState } from '../../state/workspaceStore'
+import { SettingSection, SettingRow, Button } from './ui'
 
 interface VaultConfigSectionProps {
   apiClient: IApiClient
@@ -108,85 +109,82 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
     <div className="vault-config-section">
       {error && <p className="settings-error">{error}</p>}
 
-      <div className="settings-field settings-field--checkbox">
-        <label htmlFor="vault-explorer-follow-active-file" className="settings-field-checkbox-label">
+      <SettingSection title="Anzeige">
+        <SettingRow
+          label="Aktive Datei im Explorer verfolgen"
+          htmlFor="vault-explorer-follow-active-file"
+          hint="Klappt beim Wechsel des aktiven Tabs automatisch die übergeordneten Ordner der Datei im Datei-Explorer auf und markiert sie — persönliche Anzeigeeinstellung, wirkt sofort und wird nicht mit anderen Geräten synchronisiert."
+        >
           <input
             id="vault-explorer-follow-active-file"
             type="checkbox"
             checked={followActiveFile}
             onChange={handleToggleFollowActiveFile}
           />
-          Aktive Datei im Explorer verfolgen
-        </label>
-        <p className="settings-field-hint">
-          Klappt beim Wechsel des aktiven Tabs automatisch die übergeordneten Ordner der Datei im Datei-Explorer auf und markiert sie — persönliche Anzeigeeinstellung, wirkt sofort und wird nicht mit anderen Geräten synchronisiert.
-        </p>
-      </div>
+        </SettingRow>
+      </SettingSection>
 
-      <div className="settings-field">
-        <label htmlFor="vault-templates-dir" className="settings-field-label">
-          Vorlagen-Verzeichnis
-        </label>
-        <p className="settings-field-hint">
-          Relativer Pfad im Vault für Markdown-Vorlagen. Standard: <code>Templates</code>
-        </p>
-        <input
-          id="vault-templates-dir"
-          type="text"
-          className="settings-field-input"
-          value={templatesDir}
-          onChange={(e) => setTemplatesDir(e.target.value)}
-          placeholder="Templates"
-          disabled={saving}
-        />
-      </div>
+      <SettingSection title="Verzeichnisse">
+        <div className="settings-field">
+          <label htmlFor="vault-templates-dir" className="settings-field-label">
+            Vorlagen-Verzeichnis
+          </label>
+          <p className="settings-field-hint">
+            Relativer Pfad im Vault für Markdown-Vorlagen. Standard: <code>Templates</code>
+          </p>
+          <input
+            id="vault-templates-dir"
+            type="text"
+            className="settings-field-input"
+            value={templatesDir}
+            onChange={(e) => setTemplatesDir(e.target.value)}
+            placeholder="Templates"
+            disabled={saving}
+          />
+        </div>
 
-      <div className="settings-field">
-        <label htmlFor="vault-daily-notes-dir" className="settings-field-label">
-          Tagesnotizen-Verzeichnis
-        </label>
-        <p className="settings-field-hint">
-          Relativer Pfad im Vault für Tagesnotizen. Leer = Vault-Wurzel.
-        </p>
-        <input
-          id="vault-daily-notes-dir"
-          type="text"
-          className="settings-field-input"
-          value={dailyNotesDir}
-          onChange={(e) => setDailyNotesDir(e.target.value)}
-          placeholder="(Vault-Wurzel)"
-          disabled={saving}
-        />
-      </div>
+        <div className="settings-field">
+          <label htmlFor="vault-daily-notes-dir" className="settings-field-label">
+            Tagesnotizen-Verzeichnis
+          </label>
+          <p className="settings-field-hint">
+            Relativer Pfad im Vault für Tagesnotizen. Leer = Vault-Wurzel.
+          </p>
+          <input
+            id="vault-daily-notes-dir"
+            type="text"
+            className="settings-field-input"
+            value={dailyNotesDir}
+            onChange={(e) => setDailyNotesDir(e.target.value)}
+            placeholder="(Vault-Wurzel)"
+            disabled={saving}
+          />
+        </div>
 
-      <div className="settings-field">
-        <label htmlFor="vault-daily-note-template" className="settings-field-label">
-          Tagesnotiz-Vorlage
-        </label>
-        <p className="settings-field-hint">
-          Dateiname der Vorlage im Vorlagen-Verzeichnis, die für neue Tagesnotizen verwendet wird. Standard: <code>daily.md</code>
-        </p>
-        <input
-          id="vault-daily-note-template"
-          type="text"
-          className="settings-field-input"
-          value={dailyNoteTemplateName}
-          onChange={(e) => setDailyNoteTemplateName(e.target.value)}
-          placeholder="daily.md"
-          disabled={saving}
-        />
-      </div>
+        <div className="settings-field">
+          <label htmlFor="vault-daily-note-template" className="settings-field-label">
+            Tagesnotiz-Vorlage
+          </label>
+          <p className="settings-field-hint">
+            Dateiname der Vorlage im Vorlagen-Verzeichnis, die für neue Tagesnotizen verwendet wird. Standard: <code>daily.md</code>
+          </p>
+          <input
+            id="vault-daily-note-template"
+            type="text"
+            className="settings-field-input"
+            value={dailyNoteTemplateName}
+            onChange={(e) => setDailyNoteTemplateName(e.target.value)}
+            placeholder="daily.md"
+            disabled={saving}
+          />
+        </div>
 
-      <div className="settings-actions">
-        <button
-          type="button"
-          className="settings-save-btn"
-          onClick={handleSave}
-          disabled={saving || !hasChanges}
-        >
-          {saving ? 'Speichern…' : 'Speichern'}
-        </button>
-      </div>
+        <div className="settings-actions">
+          <Button variant="primary" onClick={handleSave} disabled={saving || !hasChanges}>
+            {saving ? 'Speichern…' : 'Speichern'}
+          </Button>
+        </div>
+      </SettingSection>
     </div>
   )
 }

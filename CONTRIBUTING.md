@@ -207,7 +207,7 @@ Config → Logger → Vault (Data Access) → Business → API (Controller)
    - `chore:` — Build, dependencies, tooling
 3. Short title (max 70 characters), optional body after blank line
 4. Stage specific files (`git add <file>`) rather than `git add .`
-5. Never push directly to `main`
+5. Never push directly to `master`
 
 ---
 
@@ -300,10 +300,15 @@ Backend configuration via `backend/config/default.json`, overridden by `SLATEBAS
 | `SLATEBASE_ALLOWED_ORIGINS` | `http://localhost:5173` | CORS origins (comma-separated) |
 | `SLATEBASE_TRUSTED_PROXIES` | *(empty)* | Trusted reverse proxy IPs/CIDRs |
 | `SLATEBASE_CSRF_SECRET` | *(random)* | Persistent CSRF secret |
-| `SLATEBASE_MCP_ENABLED` | `true` | Enable MCP server |
+| `SLATEBASE_SYNC_SECRET` | *(random)* | Encrypts CouchDB sync credentials at rest. Only needed if using LiveSync |
+| `SLATEBASE_PLUGIN_SECRET_KEY` | *(auto)* | Encrypts plugin secrets stored via Obsidian's SecretStorage API. Falls back to a key file in the data directory if unset |
+| `SLATEBASE_VAULT_PATHS` | *(from config)* | Comma-separated pre-configured vault paths (overrides `config/default.json` vaults) |
+| `SLATEBASE_TEMPLATES_DIR` | `./assets/templates` | Custom directory for welcome vault templates |
+| `SLATEBASE_GITHUB_TOKEN` | *(none)* | Optional GitHub token for the community plugin store, used to raise API rate limits |
 | `SLATEBASE_MCP_MAX_FILE_SIZE` | `5242880` | Max file size for MCP reads |
 | `SLATEBASE_MCP_RATE_LIMIT` | `60` | MCP requests per minute per token |
 | `SLATEBASE_EXTERNAL_PORT` | `8080` | Host port (Docker Compose only) |
+| `SLATEBASE_FEATURE_<NAME>` | *(per toggle)* | Overrides a feature toggle, e.g. `SLATEBASE_FEATURE_MCP=false` disables the `mcp` toggle. `cold` toggles require a restart to take effect |
 
 ---
 

@@ -187,17 +187,25 @@ describe('Property Value Index', () => {
       expect(result).toEqual([])
     })
 
+    // Explicit timeout: rebuild() has to read and parse every file, so this is
+    // the one genuinely heavy case in the file. Under `test:coverage` with the
+    // other workers running it lands just over vitest's 5s default (~5.3s), so
+    // it failed only in full runs and passed in isolation. Writes go out
+    // concurrently and the count is only just above the cap to keep the work
+    // down; the timeout covers slower CI machines rather than masking a bug.
     it('caps results at 500', async () => {
-      // Create 600 files with the same property
-      for (let i = 0; i < 600; i++) {
-        await fs.writeFile(path.join(tempDir, `file-${i}.md`), `---\nbulk: yes\n---\n# File ${i}`)
-      }
+      const FILE_COUNT = 520 // > 500 so the cap is exercised, without 600 files of parsing
+      await Promise.all(
+        Array.from({ length: FILE_COUNT }, (_, i) =>
+          fs.writeFile(path.join(tempDir, `file-${i}.md`), `---\nbulk: yes\n---\n# File ${i}`),
+        ),
+      )
       await service.rebuild()
 
       const filters: PropertyFilter[] = [{ key: 'bulk', operator: 'exists' }]
       const result = service.queryByProperties(filters)
       expect(result.length).toBeLessThanOrEqual(500)
-    })
+    }, 30000)
   })
 
   // ─── Inverse index consistency with updateFile/removeFile ──────────────────

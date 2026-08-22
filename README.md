@@ -95,12 +95,13 @@ For detailed reverse proxy setup (Nginx Proxy Manager, Traefik, etc.), see [CONT
 
 ### Production Secrets
 
-Slatebase uses two secrets that **must** be set in production. Without them, the server generates random secrets on each startup — meaning sessions are invalidated and encrypted data is lost on every restart.
+Slatebase uses three secrets in production. Without them it falls back to a value generated on startup or kept in the data directory — meaning sessions are invalidated and encrypted data becomes unreadable whenever that state is lost. The first is always required; the other two only if you use the feature they protect.
 
 | Variable | Purpose |
 |----------|---------|
 | `SLATEBASE_CSRF_SECRET` | HMAC-based CSRF token generation. Without it, all user sessions break on server restart. |
 | `SLATEBASE_SYNC_SECRET` | Encrypts CouchDB sync credentials at rest. Without it, vault sync stops working after restart. Only required if you use LiveSync. |
+| `SLATEBASE_PLUGIN_SECRET_KEY` | Encrypts secrets plugins store via Obsidian's SecretStorage API. Falls back to a key file in the data directory, so set this if that directory is not durable. Only required if you use plugins that store credentials. |
 
 **Generate a secure secret:**
 
@@ -125,7 +126,7 @@ Or directly with Docker:
 docker run -e SLATEBASE_CSRF_SECRET=... -e SLATEBASE_SYNC_SECRET=... ghcr.io/andreas13xxx/slatebase:latest
 ```
 
-The server logs a visible warning at startup if either secret is not set.
+The server logs a visible warning at startup for any of these that is not set.
 
 ### Updates
 
@@ -180,7 +181,7 @@ docker compose up -d
 | 🌐 **i18n** | German and English UI, switchable per user |
 | 🛡️ **Admin Panel** | User management, feature toggles, audit log, server configuration |
 | 🐳 **Docker Ready** | Pre-built multi-arch images (amd64 + arm64), runs as non-root user |
-| 📖 **Tutorial Vault** | Comprehensive welcome vault with 65+ guides (DE/EN), practice exercises, screenshots, and templates — auto-created for new users or on-demand via Settings/Command Palette |
+| 📖 **Tutorial Vault** | Comprehensive welcome vault with 70+ guides (DE/EN), practice exercises, screenshots, and templates — auto-created for new users or on-demand via Settings/Command Palette |
 
 ⚠️ = Experimental feature. Use with caution.
 

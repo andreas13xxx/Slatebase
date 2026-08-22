@@ -125,7 +125,7 @@ jobs:
             org.opencontainers.image.version=${{ env.TAG }}
             org.opencontainers.image.description=${{ matrix.description }}
             org.opencontainers.image.source=https://github.com/andreas13xxx/Slatebase
-            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.licenses=AGPL-3.0
 
       - name: Set GHCR package visibility to public
         run: |

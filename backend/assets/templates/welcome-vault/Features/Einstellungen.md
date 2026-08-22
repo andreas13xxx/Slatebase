@@ -171,18 +171,15 @@ Slatebase bietet konfigurierbare Tastenkürzel für häufig genutzte Befehle:
 
 ## Feature-Toggles (Admin)
 
-Administratoren können einzelne Features für alle Nutzer aktivieren oder deaktivieren:
+Administratoren können einzelne Features für alle Nutzer aktivieren oder deaktivieren. Slatebase hat aktuell drei registrierte Toggles:
 
-| Feature | Standard | Beschreibung |
-|---------|----------|--------------|
-| `chat` | aktiv | Chat-Funktion |
-| `vault-sync` | aktiv | Vault-Synchronisation |
-| `knowledge-graph` | aktiv | Knowledge Graph |
-| `welcome-vault` | aktiv | Anleitungs-Vault bei Registrierung |
-| `mcp` | aktiv | MCP Context Server |
-| `obsidian-plugin-compat` | aktiv | Obsidian-Plugin-Kompatibilität |
+| Feature | Standard | Typ | Beschreibung |
+|---------|----------|-----|--------------|
+| `chat` | aktiv | Hot | Chat-Funktion |
+| `mcp` | aktiv | Cold | MCP Context Server |
+| `obsidian-plugin-compat` | **inaktiv** | Cold | Obsidian-Plugin-Kompatibilität |
 
-Feature-Toggles wirken sofort (Hot-Toggles) — kein Server-Neustart nötig.
+Nur `chat` ist ein Hot-Toggle und wirkt sofort. `mcp` und `obsidian-plugin-compat` sind Cold-Toggles und erfordern einen Server-Neustart. Details siehe [[Admin/Feature-Toggles]].
 
 ---
 

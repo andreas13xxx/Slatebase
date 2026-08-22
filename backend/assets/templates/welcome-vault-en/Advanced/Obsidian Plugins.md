@@ -129,6 +129,10 @@ These plugins have been tested and work with Slatebase:
 | Mind Map | Good | Headings/lists as an interactive mind map — ⚠️ plugin itself is probably broken (see plugin guide) |
 | Editing Toolbar | Good | Fixed and floating formatting toolbar |
 | Iconize | Partial | Icon picker works, icons usually not visible in the file tree |
+| Day Planner | Good | Timeline view + Time Tracker, verified with a real plugin bundle |
+| Outliner | Good | Move/indent/zoom/fold whole branches, optional Vim key override non-functional |
+| Recent Files | Good | Sidebar pane of recently opened notes, pin/omit support |
+| Importer | Partial | Migrates Notion/Evernote/Keep/HTML/Markdown; Apple Notes needs macOS and doesn't work here |
 
 See the individual [[Advanced/Plugins/Calendar|plugin guides]] for detailed compatibility information.
 
@@ -150,7 +154,9 @@ See the individual [[Advanced/Plugins/Calendar|plugin guides]] for detailed comp
 
 ### Style Conflicts
 
-Plugin CSS is scoped with `[data-plugin-id]` to prevent conflicts. If styles look wrong, it may be a scoping issue with the plugin's CSS selectors.
+Plugin CSS is scoped with `[data-plugin-id]` so one plugin cannot restyle the rest of the app. Rules a plugin writes for its own elements apply normally, including its dark-mode rules — Slatebase keeps Obsidian's `theme-dark`/`theme-light` and platform classes (`is-mobile`, `mod-macos`, …) on `<body>` and leaves them in front of the scope.
+
+Rules aimed at Slatebase's own interface (the file tree, the editor pane, the tab bar) are the deliberate exception: they are scoped away, so a plugin cannot rebuild the surrounding UI. Full Obsidian themes work the same way and are not supported.
 
 ---
 
@@ -186,6 +192,10 @@ Detailed guides with examples and exercises for tested plugins:
 | Mind Map | Turn notes into an interactive mind map | [[Advanced/Plugins/Mind Map]] |
 | Editing Toolbar | Formatting toolbar for the editor | [[Advanced/Plugins/Editing Toolbar]] |
 | Iconize | Custom icons for files and folders | [[Advanced/Plugins/Iconize]] |
+| Day Planner | Time-blocked tasks as a visual timeline | [[Advanced/Plugins/Day Planner]] |
+| Outliner | Outline editing for bullet lists | [[Advanced/Plugins/Outliner]] |
+| Recent Files | Sidebar list of recently opened notes | [[Advanced/Plugins/Recent Files]] |
+| Importer | Migrate notes from Notion, Evernote, and more | [[Advanced/Plugins/Importer]] |
 
 ### Hands-on Exercises
 

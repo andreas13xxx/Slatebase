@@ -69,11 +69,11 @@ CI fährt `test:coverage` (nicht `test`) — ein Unterschreiten der Schwellen br
 ### Accessibility (WCAG 2.1 AA)
 - [ ] Neue Modals/Dialoge nutzen `useFocusTrap` aus `hooks/useFocusTrap.ts` (kein manueller `document`-Keydown-Listener)
 - [ ] Interaktive Elemente (`onClick`) auf nicht-interaktiven Tags (`div`, `span`) haben `role="button"`, `tabIndex={0}`, `onKeyDown` (Enter/Space)
-- [ ] Neue Farbtoken in `index.css`: Kontrast = 4.5:1 (Normal-Text) / 3:1 (Large Text, UI-Komponenten) pr�fen
+- [ ] Neue Farbtoken in `index.css`: Kontrast = 4.5:1 (Normal-Text) / 3:1 (Large Text, UI-Komponenten) prüfen
 - [ ] Resize-Handles: `role="separator"` + `aria-valuenow/min/max` + `tabIndex={0}` + Pfeiltasten-Handler
 - [ ] SVG-Visualisierungen: `role="img"` + beschreibendes `aria-label`
-- [ ] Ladezust�nde: `role="status" aria-live="polite"`; Fehler: `role="alert"`
-- [ ] axe-Test (`*.a11y.test.tsx`) f�r neue Kern-Komponenten (Modals, Panels, Listen)
+- [ ] Ladezustände: `role="status" aria-live="polite"`; Fehler: `role="alert"`
+- [ ] axe-Test (`*.a11y.test.tsx`) für neue Kern-Komponenten (Modals, Panels, Listen)
 
 ### CSS
 - [ ] Tokens existieren in `index.css` (nie hartcodierte Farben)
@@ -152,11 +152,15 @@ CI fährt `test:coverage` (nicht `test`) — ein Unterschreiten der Schwellen br
 - Keine sensiblen Daten in Einträgen
 
 ### Plugin-Compat-Shims (Fehlerbehandlung)
-- **Keine Silent Failures**: No-Op-Stubs MÜSSEN entweder die API korrekt implementieren oder einen sichtbaren Fehler erzeugen (console.warn bei Funktionsaufruf, Error im Modal bei onOpen-Crash). Niemals still `undefined` zurückgeben.
+- **Keine Silent Failures**: No-Op-Stubs MÜSSEN entweder die API korrekt implementieren oder einen sichtbaren Fehler erzeugen (console.warn bei Funktionsaufruf, Error im Modal bei onOpen-Crash). Niemals still `undefined` zurückgeben. Das gilt auch für bewusste Verzichtsentscheidungen — „wir haben das absichtlich nicht“ ist ein Grund für die richtige Log-Stufe, kein Grund für Stille.
+- **Log-Stufe nach Bedeutung wählen** (`log.ts`): `debugOnce`/`debugLog` für einen bewussten Trade-off, bei dem dem Plugin kein Weg fehlt (CM5-Legacy neben vorhandenem CM6-Pfad, nicht persistierter Fold-Zustand). `warnOnce`/`warnNoOp` für eine echte Lücke, bei der Plugin-Code stillschweigend nicht läuft (`onNodeInserted` feuert nie, Hotkey wird nicht gespeichert). `errorOnce` für Exceptions. In Render-/Event-Pfaden immer die `*Once`-Variante, sonst flutet ein einziger Auslöser die Konsole.
+- **Neue Shim-Oberflächen brauchen das Proxy-Sicherheitsnetz**: Jedes Objekt, das Plugins als Obsidian-API in die Hand bekommen, wird per `new Proxy` gewrapped und meldet nicht emulierte Zugriffe an `api-gap-registry` (Shim-Name in `GapShim` ergänzen). Zwei Fallstricke, die alle bestehenden Shims bereits gelöst haben: `target` (nicht der Proxy) als `receiver` an `Reflect.get`, sonst laufen Getter mit falschem `this`; und `then` MUSS `undefined` bleiben, sonst hängt ein `await` auf dem Objekt für immer.
 - **Modal.onOpen() in try/catch**: Fehler werden direkt im Modal-Content angezeigt — kein Auto-Close leerer Modals (versteckt Root Cause).
 - **Fehlermeldungen mit Detail**: `extractErrorMessage(err, fallback)` für aussagekräftige Fehlertexte bei Plugin-Reload, Settings-Rendering etc.
 - **DOM-Extensions synchron**: Alle Obsidian DOM-Prototype-Patches (`addClass`, `appendText`, `createEl` etc.) MÜSSEN synchron in `setting-tab.ts` registriert werden (vor Plugin-Bundle-Evaluation), nicht async per dynamic import.
 - **Icon-Registry synchron**: `addIcon()`/`getIcon()` und `window.__obsidianCustomIcons` MÜSSEN vor `onload()` verfügbar sein.
-- **Keine leeren DOM-Stubs für Einhängepunkte**: Ein detachtes `document.createElement('div')` als `containerEl` ist für Plugins nicht von „nichts gefunden" unterscheidbar — sie suchen darin per `querySelector()` und geben still auf. Entweder echtes, eingehängtes DOM liefern (siehe `getActiveEditorContainerEl()`) oder den Fall sichtbar machen.
+- **Keine leeren DOM-Stubs für Einhängepunkte**: Ein detachtes `document.createElement('div')` als `containerEl` ist für Plugins nicht von „nichts gefunden" unterscheidbar — sie suchen darin per `querySelector()` und geben still auf. Entweder echtes, eingehängtes DOM liefern (siehe `getActiveEditorContainerEl()`) oder den Fall sichtbar machen. Gilt genauso für Elemente, die das Plugin *selbst* bekommt und danach befüllt (`Notice.messageEl`, `StatusBarItem`): Es muss dasselbe Element sein, das auf dem Bildschirm hängt — sonst schreibt das Plugin in einen Waisenknoten und nichts passiert. Der Weg dahin ist, das Element an die React-Seite durchzureichen und dort einhängen zu lassen (siehe `MountedNode` in `ToastNotification.tsx`), nicht seinen Inhalt zu kopieren.
+- **Obsidian-Klassennamen zusätzlich vergeben**: Wo Slatebase eine eigene Klasse für ein Element hat, das es in Obsidian auch gibt, trägt das Element beide (`toolbar-btn toolbar-btn--plugin side-dock-ribbon-action`). Plugin-CSS zielt auf den Obsidian-Namen; die Gestaltung bleibt bei unserem.
+- **Host-Klassen beim CSS-Scoping nicht einfalten**: `theme-dark`/`is-mobile`/`mod-macos` sitzen auf `<body>`, nicht auf dem Plugin-Element. Im `css-injector` bleiben sie deshalb als Prefix *vor* dem `[data-plugin-id]`-Scope stehen — und zwar vor **jeder** erzeugten Alternative, sonst greift eine Dark-Mode-Regel auch im Light-Mode. Die Liste kommt aus `OBSIDIAN_HOST_BODY_CLASSES` (`body-classes.ts`), damit setzende und scopende Seite nicht auseinanderlaufen.
 - **Rückgabewerte der echten API nachbauen**: `addCommand()` gibt in Obsidian das `Command` zurück, `executeCommandById()` ein `boolean`. Plugins stashen/prüfen diese Werte; ein `void`/`undefined` crasht erst viel später und weit weg von der Ursache. Gilt auch für Guard-Pfade (z.B. Vault-Wechsel): Form der Rückgabe beibehalten statt früh leer zu returnen.
 - **Container-Objekte müssen existieren, auch wenn leer**: Plugins indizieren direkt (`hotkeyManager.customKeys[id]`) statt vorher zu prüfen. Ein fehlendes Feld ist ein `undefined[id]`-TypeError; `{}` ist ein sauberer Miss.

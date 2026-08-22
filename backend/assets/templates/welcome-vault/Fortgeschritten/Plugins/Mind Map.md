@@ -21,9 +21,10 @@ Das Mind-Map-Plugin verwandelt die Überschriften- und Listen-Struktur einer Not
 
 ## Installation
 
-1. Plugin-ZIP von GitHub herunterladen
-2. Einstellungen → Vault → Plugins → "Plugin installieren"
-3. ZIP hochladen → Aktivieren
+1. **Plugin-Verwaltung** → Tab **"Verfügbare Plugins"** öffnen und nach "Mind Map" suchen
+2. **Installieren** klicken, dann den **Aktivierungs-Schalter** einschalten
+
+Nicht gelistet, oder ein bestimmter Fork/eine bestimmte Version nötig? Stattdessen die Plugin-ZIP von GitHub herunterladen und unter **"Installierte Plugins" → Plugin hochladen** verwenden.
 
 ---
 
@@ -106,13 +107,17 @@ Diese Struktur eignet sich besonders gut für Mindmaps, weil sie klar hierarchis
 
 ## Einschränkungen in Slatebase
 
+> [!warning] Plugin bestätigt kaputt — nichts davon öffnet sich tatsächlich
+> Slatebases Kompatibilitätsschicht emuliert jeden API-Zugriff dieses Plugins (statische Analyse zeigt volle Abdeckung) — daran liegt es also nicht. Aber das Plugin selbst gilt gegenüber aktuellen Obsidian-Versionen als bestätigt kaputt und zeigt in der Praxis gar keine Mindmap an — die Tabelle unten beschreibt, was funktionieren *würde*, wenn der plugin-eigene Bug behoben wäre, nicht worauf du dich heute verlassen kannst.
+
 | Feature | Status |
 |---------|--------|
-| Überschriften/Listen als Mindmap-Knoten | Funktioniert |
-| Zoom, Pan, Ein-/Ausklappen | Funktioniert |
-| Klick auf Knoten springt zur Quellzeile | Funktioniert |
-| Export als PNG/SVG | Eingeschränkt |
-| Farbthemen aus den Plugin-Einstellungen | Funktioniert |
+| Plugin lädt / Mindmap-Ansicht öffnet sich | ⚠️ Bestätigt kaputt (Upstream) |
+| Überschriften/Listen als Mindmap-Knoten | Nicht nutzbar — Ansicht öffnet sich nicht |
+| Zoom, Pan, Ein-/Ausklappen | Nicht nutzbar — Ansicht öffnet sich nicht |
+| Klick auf Knoten springt zur Quellzeile | Nicht nutzbar — Ansicht öffnet sich nicht |
+| Export als PNG/SVG | Nicht nutzbar — Ansicht öffnet sich nicht |
+| Farbthemen aus den Plugin-Einstellungen | Nicht nutzbar — Ansicht öffnet sich nicht |
 
 ---
 

@@ -3,6 +3,7 @@ import type { IApiClient } from '../../api'
 import { useFeatureContext } from '../../state/featureContext'
 import { loadFeatures, toggleFeature } from '../../state/featureActions'
 import { AlertTriangle, Loader, AlertCircle } from 'lucide-react'
+import { SettingSection } from './ui'
 
 /** Props for the FeatureTogglesSection component. */
 export interface FeatureTogglesSectionProps {
@@ -59,7 +60,7 @@ export function FeatureTogglesSection({ apiClient }: FeatureTogglesSectionProps)
   }
 
   return (
-    <div className="feature-toggles-section">
+    <SettingSection className="feature-toggles-section-card">
       {toggleFailed && (
         <div className="feature-toggle-toast">
           <AlertCircle size={14} />
@@ -100,6 +101,6 @@ export function FeatureTogglesSection({ apiClient }: FeatureTogglesSectionProps)
           </label>
         </div>
       ))}
-    </div>
+    </SettingSection>
   )
 }

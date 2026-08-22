@@ -99,16 +99,15 @@ Enabled snippets are applied automatically whenever you open or switch to the va
 
 ## Feature Toggles
 
-Admins can enable or disable features via Settings → Admin → Feature Toggles:
+Admins can enable or disable features via Settings → Admin → Feature Toggles. Slatebase currently has three registered toggles:
 
-| Feature | Description |
-|---------|-------------|
-| Vault Sync | CouchDB synchronization |
-| Obsidian Plugins | Plugin compatibility layer |
-| Chat | Built-in messaging |
-| MCP | Model Context Protocol server |
-| Knowledge Graph | Graph visualization |
-| Welcome Vault | Auto-create tutorial vault for new users |
+| Feature | Default | Type | Description |
+|---------|---------|------|-------------|
+| Chat | enabled | hot | Built-in messaging |
+| MCP | enabled | cold | Model Context Protocol server |
+| Obsidian Plugins | **disabled** | cold | Plugin compatibility layer |
+
+See [[Admin/Feature Toggles]] for full details, including what hot vs. cold means for each toggle.
 
 ---
 

@@ -5,6 +5,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { useTranslation } from '../../../i18n'
 
 interface TextPropertyControlProps {
   value: string
@@ -12,6 +13,7 @@ interface TextPropertyControlProps {
 }
 
 export function TextPropertyControl({ value, onChange }: TextPropertyControlProps) {
+  const { t } = useTranslation()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -55,9 +57,9 @@ export function TextPropertyControl({ value, onChange }: TextPropertyControlProp
         className="property-control property-control--text property-control--display"
         onClick={startEditing}
         type="button"
-        title={value || '(leer)'}
+        title={value || t('contextPanel.propertyControls.emptyValue')}
       >
-        {value || <span className="property-control__placeholder">(leer)</span>}
+        {value || <span className="property-control__placeholder">{t('contextPanel.propertyControls.emptyValue')}</span>}
       </button>
     )
   }

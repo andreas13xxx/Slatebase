@@ -10,7 +10,7 @@ import type {
 } from '../types';
 import { FileManagerShim } from './file-manager-shim';
 import { detectPlatform, readPlatformEnvironment } from '../platform-detection';
-import { recordGapRead, recordGapCall } from '../api-gap-registry';
+import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry';
 import type { Command, ICommandRegistry } from '../command-registry';
 import { scopeForPlugin } from '../plugin-execution-context';
 import { warnNoOp } from '../log';
@@ -491,9 +491,9 @@ export class AppShim implements IAppShim {
   }
 
   /**
-   * SecretStorage (Obsidian API since 1.11.4) — vault-scoped, localStorage-backed.
-   * Same simplification as loadLocalStorage/saveLocalStorage below: no OS
-   * keychain in a browser, so "secret" means "not in data.json", not encrypted.
+   * SecretStorage (Obsidian API since 1.11.4) — vault-scoped, backed by a
+   * server-side AES-256-GCM encrypted store; localStorage is only a legacy-
+   * migration/offline fallback, not the source of truth.
    * Assigned in the constructor, not here — see the field-initializer-ordering
    * note above `this.commands = createCommandManager(...)`: this needs
    * `this.vault`, which isn't set yet when field initializers run.
@@ -657,6 +657,13 @@ export class AppShim implements IAppShim {
         // callable-no-op path below.
         if (prop === 'then') {
           return undefined;
+        }
+
+        // Real Object.prototype members (hasOwnProperty, toString, valueOf, …)
+        // must pass through untouched — see isObjectPrototypeMember's doc comment.
+        if (isObjectPrototypeMember(prop)) {
+          const value = Reflect.get(target, prop, target);
+          return typeof value === 'function' ? value.bind(target) : value;
         }
 
         // Non-emulated property: record the gap and warn once per property name.

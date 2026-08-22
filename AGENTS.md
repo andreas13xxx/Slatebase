@@ -71,6 +71,7 @@ Filesystem-based, no database. All under `backend/data/`:
 - `users/`, `sessions/`, `shares.json` — Auth data
 - `audit/` — Append-only JSONL (daily rotation)
 - `chat/`, `mcp/tokens/`, `plugins/<vaultId>/`, `features.json`
+- Plugin secrets: `plugins/<vaultId>/<pluginId>/secrets.json`, AES-256-GCM per value; key from `SLATEBASE_PLUGIN_SECRET_KEY`, else `data/.plugin-secret-key`
 
 ## Common Pitfalls
 

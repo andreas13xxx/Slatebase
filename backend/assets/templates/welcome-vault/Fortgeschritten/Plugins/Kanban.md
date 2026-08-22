@@ -18,9 +18,10 @@ Das Kanban-Plugin verwandelt Markdown-Dateien in visuelle Kanban-Boards. Du orga
 
 ## Installation
 
-1. Plugin-ZIP von GitHub herunterladen
-2. Einstellungen → Vault → Plugins → "Plugin installieren"
-3. ZIP hochladen → Aktivieren
+1. **Plugin-Verwaltung** → Tab **"Verfügbare Plugins"** öffnen und nach "Kanban" suchen
+2. **Installieren** klicken, dann den **Aktivierungs-Schalter** einschalten
+
+Nicht gelistet, oder ein bestimmter Fork/eine bestimmte Version nötig? Stattdessen die Plugin-ZIP von GitHub herunterladen und unter **"Installierte Plugins" → Plugin hochladen** verwenden.
 
 ---
 

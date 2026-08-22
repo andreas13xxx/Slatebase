@@ -101,7 +101,7 @@ import { registerFallbackShims } from './fallback-shims'
 import { detectPlatform, readPlatformEnvironment } from './platform-detection'
 import { installObsidianBodyClasses } from './body-classes'
 import { installApiGapInspector } from './api-gap-registry'
-import { warnNoOp, warnOnce } from './log'
+import { debugOnce, warnNoOp, warnOnce } from './log'
 import { isOwnedEventRef, offrefAtOwner } from './event-system'
 import type { EventRef } from './types'
 import { createEmbedRegistryShim } from './embed-registry'
@@ -498,6 +498,29 @@ export function installObsidianGlobals(): void {
       value: function (this: Element): string { return this.textContent ?? '' },
       writable: true, configurable: true,
     })
+  }
+
+  // document.createElement() — tags elements built via the raw browser API,
+  // the same way createEl()/createDiv() below already do for Obsidian's own
+  // helpers. Plugins are ordinary JS and commonly reach for the native DOM API
+  // directly instead of createEl() (obsidian-outliner's vertical-lines overlay,
+  // appended straight into the shared CM6 `view.dom`, is one) — without this,
+  // those elements come back untagged and CssInjector's [data-plugin-id]
+  // scoping (both the self and ancestor forms) silently fails to match
+  // anything they build. Safe for Slatebase's own DOM creation: with no
+  // flushSync anywhere in the app, React's own element creation always runs
+  // outside any synchronous plugin call frame, so getCurrentPluginId() is
+  // null whenever this fires for the host app's own rendering.
+  if (!(Document.prototype.createElement as unknown as { __pluginContextWrapped?: boolean }).__pluginContextWrapped) {
+    const nativeCreateElement = Document.prototype.createElement
+    const patchedCreateElement = function (this: Document, tagName: string, options?: ElementCreationOptions): HTMLElement {
+      const el = nativeCreateElement.call(this, tagName, options)
+      const pluginId = getCurrentPluginId()
+      if (pluginId) el.setAttribute('data-plugin-id', pluginId)
+      return el
+    }
+    patchedCreateElement.__pluginContextWrapped = true
+    Document.prototype.createElement = patchedCreateElement as typeof Document.prototype.createElement
   }
 
   // Global createEl / createDiv / createSpan
@@ -1110,7 +1133,13 @@ export function installObsidianGlobals(): void {
       vault: {},
       workspace: {},
       metadataCache: {},
-      foldManager: { save: () => {}, load: () => {}, getFolds: () => [] },
+      // Obsidian persists per-file fold state here. Slatebase does not store
+      // folds across sessions, so saving is dropped and loading finds nothing.
+      foldManager: {
+        save: (): void => { debugOnce('foldManager::save', '[PluginCompat] foldManager.save() is a no-op — Slatebase does not persist fold state.') },
+        load: (): void => { debugOnce('foldManager::load', '[PluginCompat] foldManager.load() is a no-op — Slatebase does not persist fold state.') },
+        getFolds: (): unknown[] => [],
+      },
       // See AppShim.getAccentColor() for why this exists — kept in sync here
       // so views opened via createFileView's `sharedApp` (which reads through
       // window.app rather than owning its own AppShim) get the same method.
@@ -1125,9 +1154,25 @@ export function installObsidianGlobals(): void {
       // extraction hack; see embed-registry.ts's seedKanbanMarkdownEmbed for
       // why). A plugin registering through one must be visible through all.
       embedRegistry: createEmbedRegistryShim(),
+      // Placeholder until PluginProvider swaps in the real manager backed by the
+      // shared CommandRegistry (see plugin-context.ts). A plugin that reads
+      // `window.app.commands` during bundle evaluation — before that swap — gets
+      // this one, where nothing is registered and nothing runs, so say so rather
+      // than silently dropping the call.
       commands: {
         commands: {},
-        executeCommand: (_command: unknown) => {},
+        executeCommand: (command: unknown): boolean => {
+          const id = (command as { id?: string } | null)?.id ?? 'unknown'
+          warnOnce(
+            'bootstrap-commands::executeCommand',
+            `[PluginCompat] window.app.commands.executeCommand("${id}") ran against the ` +
+              `bootstrap stub, before the command registry was wired up, and did nothing. ` +
+              `Move the call into onload() or later.`,
+          )
+          return false
+        },
+        findCommand: (): undefined => undefined,
+        listCommands: (): unknown[] => [],
       },
     }
   }
@@ -1293,7 +1338,14 @@ export function installObsidianGlobals(): void {
   if (!Object.hasOwn(HTMLElement.prototype, 'onWindowMigrated')) {
     Object.defineProperty(HTMLElement.prototype, 'onWindowMigrated', {
       value: function (_callback: () => void) {
-        // No-op — Slatebase has a single window (no pop-out support)
+        // Slatebase has a single window (no pop-out support), so an element can
+        // never migrate and the callback would never have anything to report.
+        // The returned unsubscribe is real in shape, just never needed.
+        debugOnce(
+          'dom::onWindowMigrated',
+          '[PluginCompat] onWindowMigrated() never fires — Slatebase runs in a ' +
+            'single window, so elements are never migrated between windows.',
+        )
         return () => {}
       },
       writable: true,
@@ -1303,6 +1355,15 @@ export function installObsidianGlobals(): void {
   if (!Object.hasOwn(HTMLElement.prototype, 'onNodeInserted')) {
     Object.defineProperty(HTMLElement.prototype, 'onNodeInserted', {
       value: function (_callback: () => void) {
+        // Obsidian fires this when the element enters the document. Plugins use
+        // it to defer measuring until layout exists; here it never fires, so
+        // that measurement never happens — worth saying out loud, because the
+        // symptom is a silently unsized widget rather than an error.
+        warnOnce(
+          'dom::onNodeInserted',
+          '[PluginCompat] onNodeInserted() is not implemented and never fires. ' +
+            'Plugin code waiting on it (deferred layout/measurement) will not run.',
+        )
         return () => {}
       },
       writable: true,
@@ -1782,7 +1843,17 @@ export function installObsidianGlobals(): void {
         this.leaf = leaf
         this.app = leaf && typeof leaf === 'object' && 'app' in leaf ? (leaf as { app: unknown }).app : null
         this.containerEl = document.createElement('div')
-        this.containerEl.className = 'plugin-view-container'
+        // `workspace-leaf-content` matches real Obsidian's actual class name
+        // for ItemView.containerEl — plugin stylesheets scope layout rules to
+        // it via `[data-type="..."] .view-content` (see the WorkspaceLeaf
+        // dataset.type assignment in view-registry.ts's setViewState()/open());
+        // obsidian-day-planner's Timeline view lays itself out entirely via
+        // `[data-type="planner-timeline"] .view-content { display: grid; ...
+        // }` — without this class (or the data-type attribute), that selector
+        // never matches and the view falls back to plain block stacking.
+        // `plugin-view-container` is Slatebase's own sizing class (App.css:
+        // flex column, height 100%) — kept alongside it, not replaced by it.
+        this.containerEl.className = 'plugin-view-container workspace-leaf-content'
         // Real Obsidian's ItemView.containerEl always has two children: a
         // header (children[0], holding the title/action icons) and the
         // content pane (children[1] === contentEl). Some plugins read
@@ -2032,10 +2103,20 @@ export function installObsidianGlobals(): void {
       }
       /** Current edit mode: 'source' (editing) or 'preview' (reading). */
       getMode(): string { return 'source' }
-      /** Preview-mode sub-view. Will be replaced with a real MarkdownPreviewView instance. */
-      previewMode: unknown = null
-      /** Current mode sub-view (MarkdownEditView in source, MarkdownPreviewView in preview). */
-      currentMode: unknown = null
+      /**
+       * Preview-mode sub-view. Will be replaced with a real MarkdownPreviewView instance.
+       * Declared (not initialized) so the class doesn't emit an own instance property —
+       * a `= null` field initializer here would use [[DefineOwnProperty]] semantics and
+       * permanently shadow the lazy getter/setter patched onto `MarkdownView.prototype`
+       * below, making every instance's `.previewMode` read back as `null` forever.
+       */
+      declare previewMode: unknown
+      /**
+       * Current mode sub-view (MarkdownEditView in source, MarkdownPreviewView in preview).
+       * Declared (not initialized) — see `previewMode` above for why a field initializer
+       * would break the prototype accessor patched in below this class definition.
+       */
+      declare currentMode: unknown
       /**
        * Get the raw view data — delegates to the live editor, falling back to
        * the inherited `data` property from TextFileView.
@@ -2144,14 +2225,22 @@ export function installObsidianGlobals(): void {
       }
       // previewMode will be patched in Schritt 4 after MarkdownPreviewView is defined.
       // For now, provide a minimal stub that won't crash on common access patterns.
-      if (MV.prototype.previewMode === null) {
+      // (undefined, not null — `previewMode` is now a `declare`-only field with no
+      // runtime initializer, so the prototype simply has nothing set yet here.)
+      if (MV.prototype.previewMode === undefined) {
+        // Reading-view controller. Slatebase renders reading mode through its
+        // own React pipeline, not an Obsidian MarkdownPreviewView, so there is
+        // nothing behind these to drive — they log instead of pretending.
+        const previewNoOp = (method: string) => (): void => {
+          warnNoOp('MarkdownView.previewMode', method, 'Slatebase renders reading mode outside the Obsidian preview pipeline.')
+        }
         MV.prototype.previewMode = {
           get: () => '',
-          set: () => {},
-          clear: () => {},
-          rerender: () => {},
+          set: previewNoOp('set'),
+          clear: previewNoOp('clear'),
+          rerender: previewNoOp('rerender'),
           getScroll: () => 0,
-          applyScroll: () => {},
+          applyScroll: previewNoOp('applyScroll'),
           containerEl: document.createElement('div'),
         }
       }
@@ -2191,26 +2280,62 @@ export function installObsidianGlobals(): void {
   // Common Obsidian API stubs that plugins may reference
   if (!window.obsidian.Notice) {
     window.obsidian.Notice = class Notice {
+      /**
+       * The notice's root, as Obsidian exposes it. Plugins style it directly
+       * (`notice.noticeEl.addClass('mod-error')`) and read `isShown()` off it.
+       */
       noticeEl: HTMLElement & { isShown?: () => boolean }
+      /**
+       * The notice body. Obsidian hands plugins this element and they build into
+       * it *after* the constructor — a progress line rewritten on every step, a
+       * spinner, a link. It is handed to the toast so the element the plugin
+       * holds is the one mounted on screen; it used to be a detached div, which
+       * meant all of that was silently invisible.
+       */
       messageEl: HTMLElement = document.createElement('div')
-      containerEl: HTMLElement = document.createElement('div')
+      containerEl: HTMLElement
       private _shown = true
       /** The id of the actual rendered toast, if the toast bridge is wired up yet. */
       private toastId: string | null = null
 
       constructor(message: string | DocumentFragment, timeout?: number) {
         this.noticeEl = document.createElement('div') as HTMLElement & { isShown?: () => boolean }
+        this.noticeEl.className = 'notice'
         this.noticeEl.isShown = () => this._shown
-        const msg = typeof message === 'string' ? message : (message?.textContent ?? '')
-        this.messageEl.textContent = msg
-        const bridge = (window as unknown as { __slatebaseShowNotice?: (msg: string, duration?: number) => string }).__slatebaseShowNotice
-        if (bridge) this.toastId = bridge(msg, timeout)
+        this.messageEl.className = 'notice-message'
+        // Obsidian's structure is container > notice > message. Building it for
+        // real means a plugin walking up from messageEl (or styling .notice)
+        // finds what it expects rather than three unrelated orphans.
+        this.containerEl = document.createElement('div')
+        this.containerEl.className = 'notice-container'
+        this.containerEl.appendChild(this.noticeEl)
+        this.noticeEl.appendChild(this.messageEl)
+        this.setMessageContent(message)
+        const bridge = (window as unknown as { __slatebaseShowNotice?: (msg: string, duration?: number, messageEl?: HTMLElement) => string }).__slatebaseShowNotice
+        if (bridge) this.toastId = bridge(this.messageEl.textContent ?? '', timeout, this.noticeEl)
+      }
+      /**
+       * Write a string or DocumentFragment into `messageEl`.
+       *
+       * A fragment is appended, not flattened to `textContent`: plugins pass one
+       * precisely when the notice has markup in it, and reducing it to text
+       * threw that away.
+       */
+      private setMessageContent(message: string | DocumentFragment): void {
+        this.messageEl.textContent = ''
+        if (typeof message === 'string') {
+          this.messageEl.textContent = message
+        } else if (message) {
+          this.messageEl.appendChild(message)
+        }
       }
       setMessage(message: string | DocumentFragment): this {
-        const msg = typeof message === 'string' ? message : (message?.textContent ?? '')
-        this.messageEl.textContent = msg
+        this.setMessageContent(message)
+        // The toast mounts noticeEl itself, so the DOM above is already live.
+        // This only keeps the plain-text mirror in the toast state in sync, for
+        // notices shown before the bridge mounted the element.
         const bridge = (window as unknown as { __slatebaseUpdateNotice?: (id: string, msg: string) => void }).__slatebaseUpdateNotice
-        if (bridge && this.toastId) bridge(this.toastId, msg)
+        if (bridge && this.toastId) bridge(this.toastId, this.messageEl.textContent ?? '')
         return this
       }
       hide(): void {
@@ -2557,6 +2682,18 @@ export function installObsidianGlobals(): void {
       return { status: data.status || 200, headers: data.headers || {}, text, json, arrayBuffer }
     }
   }
+  // request() is the legacy Obsidian convenience wrapper around requestUrl() —
+  // same network path, just resolving to the response body text directly.
+  // Registered here (not left to fallback-shims.ts) so it counts as a real
+  // implementation rather than tripping the "resolved to a minimal fallback"
+  // diagnostic, which it isn't: it's fully functional, just thin.
+  if (!window.obsidian.request) {
+    window.obsidian.request = async (urlOrRequest: unknown) => {
+      const requestUrlFn = window.obsidian!.requestUrl as (u: unknown) => Promise<{ text: string }>
+      const result = await requestUrlFn(urlOrRequest)
+      return result.text
+    }
+  }
 
   // ViewState — type-like object export. Kanban imports { ViewState } from 'obsidian'.
   // It's just used as a TypeScript type, but the bundled code may reference it at runtime.
@@ -2620,6 +2757,97 @@ export function installObsidianGlobals(): void {
       RangeSet: (CmState as unknown as Record<string, unknown>).RangeSet ?? { empty: {}, of: () => ({}) },
     }
   }
+  // ViewPlugin.define()/fromClass() — same macrotask-boundary problem as the
+  // setTimeout/MutationObserver/ResizeObserver wraps above, just via CM6's own
+  // scheduler instead of a browser API. A plugin calls registerEditorExtension()
+  // synchronously from onload() (plugin context is set), but CM6 constructs the
+  // plugin's value — and later calls its update()/docViewUpdate()/destroy(), and
+  // any DOMEventHandlers — from its own internal reconciliation, on its own
+  // schedule, with no plugin context on the stack at all. createEl()/createDiv()/
+  // document.createElement() calls made from inside any of those come back
+  // untagged, and CssInjector's [data-plugin-id] scoping silently fails to match
+  // anything they build — an element that falls back to `position: static` in the
+  // editor's flex layout can visibly squeeze the real content out of view (found
+  // via obsidian-outliner's vertical-lines overlay, appended straight into the
+  // shared CM6 `view.dom` via a raw `document.createElement`, not createDiv()).
+  // Patched once, in place, on the real (shared) ViewPlugin class — a no-op for
+  // Slatebase's own ViewPlugin.define() calls, since getCurrentPluginId() is
+  // null outside plugin code.
+  const RealViewPlugin = CmView.ViewPlugin as unknown as {
+    define: typeof CmView.ViewPlugin.define
+    fromClass: typeof CmView.ViewPlugin.fromClass
+    __pluginContextWrapped?: boolean
+  }
+  if (!RealViewPlugin.__pluginContextWrapped) {
+    RealViewPlugin.__pluginContextWrapped = true
+    // Must capture these before reassigning define/fromClass below — both
+    // are mutated in place on the same shared class, so calling
+    // `CmView.ViewPlugin.define(...)` from inside the new implementation
+    // would recurse into itself instead of the real, original behavior.
+    const originalDefine = RealViewPlugin.define.bind(CmView.ViewPlugin)
+    const originalFromClass = RealViewPlugin.fromClass.bind(CmView.ViewPlugin)
+
+    const wrapHandlers = <V extends CmView.PluginValue>(
+      handlers: CmView.DOMEventHandlers<V> | undefined,
+      pluginId: string,
+    ): CmView.DOMEventHandlers<V> | undefined => {
+      if (!handlers) return handlers
+      const wrapped: Record<string, unknown> = {}
+      for (const [event, handler] of Object.entries(handlers)) {
+        wrapped[event] = function (this: V, ...args: unknown[]): unknown {
+          return withPluginContext(pluginId, () => (handler as (...a: unknown[]) => unknown).apply(this, args))
+        }
+      }
+      return wrapped as CmView.DOMEventHandlers<V>
+    }
+
+    const wrapValueMethods = <V extends CmView.PluginValue>(value: V, pluginId: string): V => {
+      for (const method of ['update', 'docViewUpdate', 'destroy'] as const) {
+        const original = (value as Record<string, unknown>)[method]
+        if (typeof original === 'function') {
+          (value as Record<string, unknown>)[method] = function (this: unknown, ...args: unknown[]): unknown {
+            return withPluginContext(pluginId, () => (original as (...a: unknown[]) => unknown).apply(this, args))
+          }
+        }
+      }
+      return value
+    }
+
+    const wrapSpec = <V extends CmView.PluginValue>(
+      spec: CmView.PluginSpec<V> | undefined,
+      pluginId: string,
+    ): CmView.PluginSpec<V> | undefined => {
+      if (!spec) return spec
+      return {
+        ...spec,
+        eventHandlers: wrapHandlers(spec.eventHandlers, pluginId),
+        eventObservers: wrapHandlers(spec.eventObservers, pluginId),
+      }
+    }
+
+    RealViewPlugin.define = function define<V extends CmView.PluginValue, Arg = undefined>(
+      create: (view: CmView.EditorView, arg: Arg) => V,
+      spec?: CmView.PluginSpec<V>,
+    ) {
+      const pluginId = getCurrentPluginId()
+      if (!pluginId) return originalDefine(create, spec)
+      const wrappedCreate = (view: CmView.EditorView, arg: Arg): V =>
+        wrapValueMethods(withPluginContext(pluginId, () => create(view, arg)), pluginId)
+      return originalDefine(wrappedCreate, wrapSpec(spec, pluginId))
+    } as typeof CmView.ViewPlugin.define
+
+    RealViewPlugin.fromClass = function fromClass<V extends CmView.PluginValue, Arg = undefined>(
+      cls: { new (view: CmView.EditorView, arg: Arg): V },
+      spec?: CmView.PluginSpec<V>,
+    ) {
+      const pluginId = getCurrentPluginId()
+      if (!pluginId) return originalFromClass(cls, spec)
+      const wrappedCreate = (view: CmView.EditorView, arg: Arg): V =>
+        wrapValueMethods(withPluginContext(pluginId, () => new cls(view, arg)), pluginId)
+      return originalDefine(wrappedCreate, wrapSpec(spec, pluginId))
+    } as typeof CmView.ViewPlugin.fromClass
+  }
+
   if (!(window as unknown as { __codemirrorView?: unknown }).__codemirrorView) {
     ;(window as unknown as { __codemirrorView: Record<string, unknown> }).__codemirrorView = {
       ...CmView as unknown as Record<string, unknown>,
@@ -2696,15 +2924,26 @@ export function installObsidianGlobals(): void {
     }
   }
 
-  // CodeMirror 5 legacy global — Templater uses `CodeMirror.defineMode()`
+  // CodeMirror 5 legacy global — Templater uses `CodeMirror.defineMode()`.
+  // Slatebase's editor is CM6; there is no CM5 instance for any of this to
+  // register against, so every entry point is a deliberate no-op. It logs at
+  // debug rather than warn: a plugin reaching for CM5 is using an API Obsidian
+  // itself has deprecated, and the CM6 path it also ships normally still works.
   if (!(window as unknown as { CodeMirror?: unknown }).CodeMirror) {
+    const cm5NoOp = (method: string) => (): void => {
+      debugOnce(
+        `cm5::${method}`,
+        `[PluginCompat] CodeMirror.${method}() is a no-op — Slatebase's editor is ` +
+          `CodeMirror 6 and has no CodeMirror 5 instance to register against.`,
+      )
+    }
     ;(window as unknown as { CodeMirror: Record<string, unknown> }).CodeMirror = {
-      defineMode: () => {},
-      defineMIME: () => {},
-      defineExtension: () => {},
-      defineOption: () => {},
-      registerHelper: () => {},
-      registerGlobalHelper: () => {},
+      defineMode: cm5NoOp('defineMode'),
+      defineMIME: cm5NoOp('defineMIME'),
+      defineExtension: cm5NoOp('defineExtension'),
+      defineOption: cm5NoOp('defineOption'),
+      registerHelper: cm5NoOp('registerHelper'),
+      registerGlobalHelper: cm5NoOp('registerGlobalHelper'),
       modes: {},
       mimeModes: {},
       resolveMode: () => ({}),
@@ -2728,13 +2967,20 @@ export function installObsidianGlobals(): void {
   // keymap engine, so these are no-ops rather than a missing-adapter warning —
   // same graceful-degradation approach as the ribbon/split stubs above.
   if (!(window as unknown as { CodeMirrorAdapter?: unknown }).CodeMirrorAdapter) {
+    const vimNoOp = (method: string) => (): void => {
+      debugOnce(
+        `vim::${method}`,
+        `[PluginCompat] Vim.${method}() is a no-op — Slatebase has no Vim keymap ` +
+          `engine, so Vim normal-mode bindings a plugin registers never fire.`,
+      )
+    }
     ;(window as unknown as { CodeMirrorAdapter: Record<string, unknown> }).CodeMirrorAdapter = {
       commands: {},
       Vim: {
-        defineAction: () => {},
-        handleEx: () => {},
-        enterInsertMode: () => {},
-        mapCommand: () => {},
+        defineAction: vimNoOp('defineAction'),
+        handleEx: vimNoOp('handleEx'),
+        enterInsertMode: vimNoOp('enterInsertMode'),
+        mapCommand: vimNoOp('mapCommand'),
       },
     }
   }

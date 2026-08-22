@@ -4,7 +4,7 @@ tags: [admin]
 
 # Feature-Toggles
 
-Feature-Toggles erlauben dir als Admin, einzelne Funktionen von Slatebase für alle Nutzer ein- oder auszuschalten — ohne Server-Neustart und ohne Code-Änderungen.
+Feature-Toggles erlauben dir als Admin, einzelne Funktionen von Slatebase für alle Nutzer ein- oder auszuschalten — ohne Code-Änderungen. Manche wirken sofort, andere erfordern einen Server-Neustart (siehe [[#Hot-Toggles vs. Cold-Toggles]] weiter unten).
 
 ---
 
@@ -19,14 +19,13 @@ Feature-Toggles erlauben dir als Admin, einzelne Funktionen von Slatebase für a
 
 ## Verfügbare Features
 
-| Feature | Standard | Beschreibung |
-|---------|----------|--------------|
-| `chat` | aktiv | Chat-Funktion zwischen Nutzern |
-| `knowledge-graph` | aktiv | Wissens-Graph-Visualisierung |
-| `welcome-vault` | aktiv | Anleitungs-Vault bei neuen Nutzern erstellen |
-| `mcp` | aktiv | Model Context Protocol Server (KI-Integration) |
-| `obsidian-plugin-compat` | aktiv | Obsidian-Plugin-Kompatibilitätsschicht |
-| `live-preview` | aktiv | Live-Preview-Editor (CodeMirror 6) |
+Slatebase hat aktuell drei registrierte Feature-Toggles:
+
+| Feature | Standard | Typ | Beschreibung |
+|---------|----------|-----|--------------|
+| `chat` | aktiv | Hot | Echtzeit-Chat zwischen Nutzern |
+| `mcp` | aktiv | Cold | Model Context Protocol Server (KI-Integration) |
+| `obsidian-plugin-compat` | **inaktiv** | Cold | Obsidian-Plugin-Kompatibilitätsschicht |
 
 ---
 
@@ -34,7 +33,7 @@ Feature-Toggles erlauben dir als Admin, einzelne Funktionen von Slatebase für a
 
 1. Öffne die Feature-Toggles in den Einstellungen
 2. Klicke den Toggle-Schalter neben dem gewünschten Feature
-3. Die Änderung wirkt **sofort** (Hot-Toggle)
+3. Bei einem **Hot-Toggle** wirkt die Änderung **sofort**. Bei einem **Cold-Toggle** wirkt sie erst nach dem nächsten Server-Neustart
 
 ### Auswirkungen bei Deaktivierung
 
@@ -47,50 +46,34 @@ Feature-Toggles erlauben dir als Admin, einzelne Funktionen von Slatebase für a
 
 ## Hot-Toggles vs. Cold-Toggles
 
-Alle aktuellen Feature-Toggles sind **Hot-Toggles**:
-
 | Typ | Beschreibung |
 |-----|--------------|
 | Hot-Toggle | Wirkt sofort, kein Neustart nötig |
-| Cold-Toggle | Erfordert Server-Neustart (aktuell keine) |
+| Cold-Toggle | Erfordert einen Server-Neustart, um zu wirken |
+
+Von den drei aktuellen Toggles ist nur `chat` ein Hot-Toggle. `mcp` und `obsidian-plugin-compat` sind beide **Cold** — eine Änderung wird erst nach dem nächsten Server-Neustart wirksam.
 
 ---
 
 ## Feature-Details
 
-### Chat (`chat`)
+### Chat (`chat`) — Hot, standardmäßig aktiv
 
 - **Aktiviert:** Chat-Icon im Menü, Unread-Badges, Echtzeit-Nachrichten
 - **Deaktiviert:** Kein Chat-Zugang, keine Benachrichtigungen
 - **Daten:** Konversationen und Nachrichten bleiben erhalten
 
-### Knowledge Graph (`knowledge-graph`)
-
-- **Aktiviert:** Graph-Tab im Tab-Bar, Graph-Befehle in Command Palette
-- **Deaktiviert:** Graph nicht erreichbar
-- **Daten:** Link-Index wird weiterhin gepflegt (für Backlinks im Context Panel)
-
-### Welcome Vault (`welcome-vault`)
-
-- **Aktiviert:** Neue Nutzer erhalten automatisch ein Anleitungs-Vault; Nutzer können es manuell erstellen
-- **Deaktiviert:** Kein automatisches Vault bei Nutzererstellung, kein Button in Einstellungen
-
-### MCP (`mcp`)
+### MCP (`mcp`) — Cold, standardmäßig aktiv
 
 - **Aktiviert:** MCP-Endpunkt aktiv, Token-Verwaltung verfügbar
 - **Deaktiviert:** MCP-Endpunkt antwortet mit 403, bestehende Tokens bleiben gespeichert
-- **Hinweis:** Experimentelles Feature
+- **Hinweis:** Experimentelles Feature; Änderung wirkt erst nach Server-Neustart
 
-### Obsidian Plugin Compat (`obsidian-plugin-compat`)
+### Obsidian Plugin Compat (`obsidian-plugin-compat`) — Cold, standardmäßig **inaktiv**
 
 - **Aktiviert:** Plugin-Verwaltung sichtbar, Plugins können installiert und geladen werden
 - **Deaktiviert:** Keine Plugin-Funktionalität, Plugin-Commands nicht in Command Palette
-- **Hinweis:** Experimentelles Feature — Plugins können Stabilität beeinflussen
-
-### Live Preview (`live-preview`)
-
-- **Aktiviert:** Editor bietet Source- und Live-Preview-Modus
-- **Deaktiviert:** Nur Source-Modus verfügbar, Toggle-Button ausgeblendet
+- **Hinweis:** Experimentelles Feature — Plugins können Stabilität beeinflussen; Änderung wirkt erst nach Server-Neustart
 
 ---
 
@@ -111,11 +94,10 @@ SLATEBASE_FEATURE_CHAT=false
 
 | Situation | Empfehlung |
 |-----------|-----------|
-| Kleine Installation (1–3 Nutzer) | Alle Features aktiv lassen |
-| Firmenumgebung ohne KI | `mcp` deaktivieren |
-| Stabilität priorisiert | `obsidian-plugin-compat` deaktivieren |
+| Kleine Installation (1–3 Nutzer) | Alle Features auf Standard belassen |
+| Firmenumgebung ohne KI | `mcp` deaktivieren (Neustart nötig) |
+| Plugins nicht benötigt | `obsidian-plugin-compat` deaktiviert lassen (Standard) |
 | Kein Team-Bedarf | `chat` deaktivieren |
-| Performance-Optimierung | `knowledge-graph` bei sehr großen Vaults deaktivieren |
 
 ---
 

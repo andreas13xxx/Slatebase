@@ -66,6 +66,12 @@ describe('WorkspaceShim', () => {
       expect(() => workspace.rightSplit.collapse()).not.toThrow();
       expect(() => workspace.rightSplit.expand()).not.toThrow();
     });
+
+    it('getRoot() returns itself — these stubs have no parent chain and are each already their area\'s root', () => {
+      expect(workspace.rootSplit.getRoot()).toBe(workspace.rootSplit);
+      expect(workspace.leftSplit.getRoot()).toBe(workspace.leftSplit);
+      expect(workspace.rightSplit.getRoot()).toBe(workspace.rightSplit);
+    });
   });
 
   describe('iterateCodeMirrors()', () => {
@@ -513,6 +519,54 @@ describe('WorkspaceShim', () => {
       });
     });
 
+    describe('ItemView.containerEl — real Obsidian class names and data-type', () => {
+      // Regression: obsidian-day-planner's Timeline view lays itself out
+      // entirely via `[data-type="planner-timeline"] .view-content { display:
+      // grid; ... }` in its own stylesheet. containerEl used to get class
+      // "view-content" (real Obsidian's name for the *inner* contentEl, not
+      // the outer containerEl) and never got a data-type attribute at all —
+      // so that selector never matched anything, and the view fell back to
+      // plain block stacking (header at the bottom, hour labels spaced out
+      // with no grid to constrain them).
+      class FakeTimelineView extends ItemView {
+        getViewType(): string { return 'planner-timeline'; }
+      }
+
+      it('containerEl carries the real "workspace-leaf-content" class', async () => {
+        registry.registerView('planner-timeline', (leaf) => new FakeTimelineView(leaf), 'day-planner');
+        const leaf = registry.createLeaf({}, 'main');
+        await leaf.setViewState({ type: 'planner-timeline' });
+
+        expect(leaf.view!.containerEl.classList.contains('workspace-leaf-content')).toBe(true);
+      });
+
+      it('contentEl (containerEl.children[1]) carries the real "view-content" class', async () => {
+        registry.registerView('planner-timeline', (leaf) => new FakeTimelineView(leaf), 'day-planner');
+        const leaf = registry.createLeaf({}, 'main');
+        await leaf.setViewState({ type: 'planner-timeline' });
+
+        const contentEl = leaf.view!.containerEl.children[1] as HTMLElement;
+        expect(contentEl.classList.contains('view-content')).toBe(true);
+      });
+
+      it('containerEl gets data-type set to the view type, for plugin stylesheets scoped to it', async () => {
+        registry.registerView('planner-timeline', (leaf) => new FakeTimelineView(leaf), 'day-planner');
+        const leaf = registry.createLeaf({}, 'main');
+        await leaf.setViewState({ type: 'planner-timeline' });
+
+        expect(leaf.view!.containerEl.dataset.type).toBe('planner-timeline');
+      });
+
+      it('open() also sets data-type, for views attached via leaf.open() instead of setViewState()', async () => {
+        const leaf = registry.createLeaf({}, 'main');
+        const view = new FakeTimelineView(leaf);
+
+        await leaf.open(view);
+
+        expect(view.containerEl.dataset.type).toBe('planner-timeline');
+      });
+    });
+
     describe('getRightLeaf()', () => {
       it('should create a leaf with location right-sidebar', () => {
         const leaf = workspace.getRightLeaf();
@@ -542,6 +596,18 @@ describe('WorkspaceShim', () => {
       it('returns workspace.leftSplit for a left-sidebar leaf', () => {
         const leaf = workspace.getLeftLeaf();
         expect(leaf.getRoot()).toBe(workspace.leftSplit);
+      });
+
+      it('supports calling .getRoot() again on the returned split, like day-planner\'s isLeafInSidebar does', () => {
+        // Real Obsidian's WorkspaceParent.getRoot() walks up to the root via
+        // `this.parent ? this.parent.getRoot() : this`. Plugins that mirror
+        // that pattern (day-planner's isLeafInSidebar) call `.getRoot()` a
+        // second time on the split leaf.getRoot() returned — this used to
+        // throw "t.getRoot is not a function" since WorkspaceSplit had no
+        // getRoot() of its own.
+        const rightLeaf = workspace.getRightLeaf();
+        expect(() => rightLeaf.getRoot().getRoot()).not.toThrow();
+        expect(rightLeaf.getRoot().getRoot()).toBe(workspace.rightSplit);
       });
     });
 

@@ -18,9 +18,10 @@ The Tasks plugin turns ordinary checkbox lines (`- [ ]`) into a searchable task 
 
 ## Installation
 
-1. Download plugin ZIP from GitHub
-2. Settings → Vault → Plugins → "Install Plugin"
-3. Upload ZIP → Activate
+1. Go to **Plugin Management** → **"Available Plugins"** tab and search for "Tasks"
+2. Click **Install**, then switch on the **activation toggle**
+
+Not listed, or need a specific fork/version? Download the ZIP from GitHub instead and use **"Installed Plugins" → Upload Plugin**.
 
 ---
 

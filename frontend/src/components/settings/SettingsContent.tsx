@@ -10,6 +10,7 @@ import React, { useRef, useEffect } from 'react'
 import { useSettingsContext } from '../../state/settingsContext'
 import { useAppContext } from '../../state'
 import type { SettingsSection } from '../../state/settingsState'
+import { SECTION_LABELS } from '../../state/settingsLabels'
 import { ProfilePage } from '../ProfilePage'
 import { ChangePasswordPage } from '../ChangePasswordPage'
 import { SessionsPage } from '../SessionsPage'
@@ -26,25 +27,6 @@ import { KeybindingsSection } from './KeybindingsSection'
 import { AppearanceSection } from './AppearanceSection'
 import { WelcomeVaultSection } from './WelcomeVaultSection'
 import { MyVaultsPage } from '../MyVaultsPage'
-
-/** German labels for each settings section heading. */
-const SECTION_LABELS: Record<SettingsSection, string> = {
-  'profile': 'Profil',
-  'password': 'Passwort ändern',
-  'sessions': 'Sitzungen',
-  'mcp-tokens': 'MCP-Tokens',
-  'keybindings': 'Tastaturkürzel',
-  'appearance': 'Darstellung',
-  'my-vaults': 'Meine Vaults',
-  'delete-account': 'Konto löschen',
-  'plugins': 'Plugins',
-  'vault-config': 'Vault-Konfiguration',
-  'server-config': 'Serverkonfiguration',
-  'user-management': 'Benutzerverwaltung',
-  'vault-management': 'Vault-Verwaltung',
-  'feature-toggles': 'Feature-Toggles',
-  'server-restart': 'Server neu starten',
-}
 
 /**
  * Content component that renders the active settings section.

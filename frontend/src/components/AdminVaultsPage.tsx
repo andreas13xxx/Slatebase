@@ -5,6 +5,7 @@ import { useTranslation } from '../i18n'
 import { Server, RefreshCw, Users, FileText, HardDrive, Trash2 } from 'lucide-react'
 import { ConfirmModal } from './ConfirmModal'
 import { usePaginatedResource, type PaginatedResult } from '../hooks/usePaginatedResource'
+import { Button } from './settings/ui'
 
 interface VaultAdminEntry extends VaultInfo {
   fileCount?: number
@@ -97,9 +98,9 @@ export function AdminVaultsPage({ apiClient }: AdminVaultsPageProps) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <Server size={22} color="var(--accent-text)" />
         <h1 className="admin-users-title" style={{ margin: 0 }}>{t('admin.vaults.title')}</h1>
-        <button className="admin-users-btn admin-users-btn--small" onClick={() => void loadVaults()} style={{ marginLeft: 'auto' }}>
+        <Button variant="secondary" size="sm" onClick={() => void loadVaults()} style={{ marginLeft: 'auto' }}>
           <RefreshCw size={13} /> {t('admin.vaults.refresh')}
-        </button>
+        </Button>
       </div>
 
       {message && (
@@ -144,13 +145,14 @@ export function AdminVaultsPage({ apiClient }: AdminVaultsPageProps) {
                     }
                   </td>
                   <td>
-                    <button
-                      className="admin-users-btn admin-users-btn--small admin-users-btn--danger"
+                    <Button
+                      variant="danger"
+                      size="sm"
                       onClick={() => void handleDelete(vault.id, vault.name)}
                       title={t('admin.vaults.deleteTitle', { name: vault.name })}
                     >
                       <Trash2 size={12} /> {t('admin.vaults.delete')}
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}

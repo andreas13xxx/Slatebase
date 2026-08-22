@@ -8,6 +8,7 @@
 import { useStatusBar } from '../../hooks/useStatusBar'
 import { useStatusBarItemVisibility, type BuiltinStatusBarItemId } from '../../hooks/useStatusBarItemVisibility'
 import { SnippetManager } from './SnippetManager'
+import { SettingSection, SettingRow } from './ui'
 
 const BUILTIN_ITEMS: Array<{ id: BuiltinStatusBarItemId; label: string }> = [
   { id: 'clock', label: 'Uhr' },
@@ -22,18 +23,9 @@ function StatusBarItemToggle({ id, label }: { id: BuiltinStatusBarItemId; label:
   const inputId = `statusbar-item-toggle-${id}`
 
   return (
-    <div className="appearance-section__row appearance-section__row--nested">
-      <label className="appearance-section__label" htmlFor={inputId}>
-        {label}
-      </label>
-      <input
-        id={inputId}
-        type="checkbox"
-        checked={visible}
-        onChange={toggle}
-        className="appearance-section__checkbox"
-      />
-    </div>
+    <SettingRow label={label} htmlFor={inputId} nested>
+      <input id={inputId} type="checkbox" checked={visible} onChange={toggle} />
+    </SettingRow>
   )
 }
 
@@ -45,33 +37,19 @@ export function AppearanceSection() {
 
   return (
     <div className="appearance-section">
-      <div className="appearance-section__row">
-        <label className="appearance-section__label" htmlFor="statusbar-toggle">
-          Statusleiste anzeigen
-        </label>
-        <input
-          id="statusbar-toggle"
-          type="checkbox"
-          checked={visible}
-          onChange={toggle}
-          className="appearance-section__checkbox"
-        />
-      </div>
-      <p className="appearance-section__description">
-        Zeigt eine Leiste am unteren Rand mit Uhrzeit und weiteren Informationen.
-      </p>
+      <SettingSection title="Statusleiste" description="Zeigt eine Leiste am unteren Rand mit Uhrzeit und weiteren Informationen.">
+        <SettingRow label="Statusleiste anzeigen" htmlFor="statusbar-toggle">
+          <input id="statusbar-toggle" type="checkbox" checked={visible} onChange={toggle} />
+        </SettingRow>
 
-      {visible && (
-        <div className="appearance-section__group">
-          <p className="appearance-section__description">Einzelne Elemente der Statusleiste:</p>
-          {BUILTIN_ITEMS.map((item) => (
-            <StatusBarItemToggle key={item.id} id={item.id} label={item.label} />
-          ))}
-        </div>
-      )}
+        {visible && BUILTIN_ITEMS.map((item) => (
+          <StatusBarItemToggle key={item.id} id={item.id} label={item.label} />
+        ))}
+      </SettingSection>
 
-      <h3 className="appearance-section__subheading">CSS-Snippets</h3>
-      <SnippetManager />
+      <SettingSection title="CSS-Snippets" description="Eigene CSS-Snippets zur Anpassung des Erscheinungsbilds hinzufügen und verwalten.">
+        <SnippetManager />
+      </SettingSection>
     </div>
   )
 }

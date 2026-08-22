@@ -3,6 +3,7 @@ import { useTabContext } from '../state/tabContext'
 import { useAppContext } from '../state'
 import { openTab, saveTab } from '../state/tabActions'
 import type { DirectoryTree } from '../types'
+import type { PropertyType, PropertyTypeEntry } from '../state/propertyTypes'
 import { EditMode } from './EditMode'
 import { BinaryViewer } from './BinaryViewer'
 import { GraphView } from './GraphView'
@@ -79,6 +80,33 @@ export function TabContent() {
 
   const { tabs, activeTabId } = tabState
   const activeTab = activeTabId ? tabs.find((t) => t.id === activeTabId) ?? null : null
+
+  // ─── Property type registry (for the inline frontmatter editor) ──────────
+  // Self-contained fetch, same pattern SearchPanel.tsx uses for its own copy
+  // of vault-wide tag/property metadata — the inline editor only needs to
+  // *resolve* types while rendering, not own the vault-wide registry (that's
+  // PropertiesOverview's job in the sidebar).
+  const [typeRegistry, setTypeRegistry] = useState<PropertyTypeEntry[] | null>(null)
+  useEffect(() => {
+    // No vault to fetch for — leave the previous registry in place rather
+    // than resetting synchronously; nothing renders the inline editor for a
+    // non-existent tab anyway, so a briefly-stale registry is never read.
+    if (!activeTab?.vaultId || !apiClient) return
+    let cancelled = false
+    apiClient.getPropertyTypes(activeTab.vaultId).then((registry) => {
+      if (!cancelled) setTypeRegistry(registry.entries)
+    }).catch(() => {
+      if (!cancelled) setTypeRegistry(null)
+    })
+    return () => { cancelled = true }
+  }, [activeTab?.vaultId, apiClient])
+
+  const handlePropertyTypeChange = useCallback((key: string, type: PropertyType) => {
+    if (!activeTab?.vaultId || !apiClient) return
+    apiClient.setPropertyType(activeTab.vaultId, key, type).then((registry) => {
+      setTypeRegistry(registry.entries)
+    }).catch(() => { /* non-critical: the value still renders via inference */ })
+  }, [activeTab, apiClient])
 
   // Determine if the active tab's content matches a plugin file view
   const fileViewMatch = activeTab && !activeTab.loading && !activeTab.error && !activeTab.isBinary
@@ -457,6 +485,8 @@ export function TabContent() {
           directoryTree: appState.vaultTrees[activeTab.vaultId] ?? appState.directoryTree,
           token: apiClient?.getToken() ?? undefined,
           onInternalLinkClick: handleInternalLinkClick,
+          typeRegistry,
+          onPropertyTypeChange: handlePropertyTypeChange,
         }}
         onExternalFileDrop={handleExternalFileDrop}
         onImagePaste={handleImagePaste}

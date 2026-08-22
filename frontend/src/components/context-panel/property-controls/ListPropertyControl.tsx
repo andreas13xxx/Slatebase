@@ -6,6 +6,7 @@
 
 import { useState, useCallback, useRef } from 'react'
 import { X } from 'lucide-react'
+import { useTranslation } from '../../../i18n'
 
 interface ListPropertyControlProps {
   value: string[]
@@ -15,6 +16,7 @@ interface ListPropertyControlProps {
 }
 
 export function ListPropertyControl({ value, onChange, suggestions }: ListPropertyControlProps) {
+  const { t } = useTranslation()
   const [inputValue, setInputValue] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -64,7 +66,7 @@ export function ListPropertyControl({ value, onChange, suggestions }: ListProper
               type="button"
               className="property-control__chip-remove"
               onClick={() => removeItem(i)}
-              aria-label={`${item} entfernen`}
+              aria-label={t('contextPanel.propertyControls.removeItemAriaLabel', { item })}
             >
               <X size={10} />
             </button>
@@ -85,8 +87,8 @@ export function ListPropertyControl({ value, onChange, suggestions }: ListProper
             // Delay to allow click on suggestion
             setTimeout(() => setShowSuggestions(false), 150)
           }}
-          placeholder="Hinzufügen..."
-          aria-label="Eintrag hinzufügen"
+          placeholder={t('contextPanel.propertyControls.addItemPlaceholder')}
+          aria-label={t('contextPanel.propertyControls.addItemAriaLabel')}
         />
       </div>
       {showSuggestions && filteredSuggestions.length > 0 && (

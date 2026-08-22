@@ -1,9 +1,12 @@
 import { useState, useCallback, type FormEvent } from 'react'
+import { UserCog, KeyRound, Ban, Unlock, Trash2 } from 'lucide-react'
 import type { IApiClient } from '../api'
 import type { UserRole } from '../state/authState'
 import { useTranslation } from '../i18n'
 import { extractErrorMessage } from '../utils/error'
 import { usePaginatedResource } from '../hooks/usePaginatedResource'
+import { ConfirmModal } from './ConfirmModal'
+import { SettingSection, Button } from './settings/ui'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -278,8 +281,7 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
       )}
 
       {/* Create user form */}
-      <section className="admin-users-create">
-        <h2 className="admin-users-section-title">{t('admin.users.createTitle')}</h2>
+      <SettingSection title={t('admin.users.createTitle')}>
         <form className="admin-users-create-form" onSubmit={handleCreateUser} noValidate>
           <div className="admin-users-form-field">
             <label htmlFor="admin-create-username">{t('admin.users.usernameLabel')}</label>
@@ -327,13 +329,9 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
               <option value="en">{t('profile.languageEn')}</option>
             </select>
           </div>
-          <button
-            type="submit"
-            className="admin-users-btn admin-users-btn--primary"
-            disabled={createLoading}
-          >
+          <Button type="submit" variant="primary" disabled={createLoading}>
             {createLoading ? t('admin.users.creating') : t('admin.users.create')}
-          </button>
+          </Button>
         </form>
         {createError && (
           <p className="admin-users-message admin-users-message--error" role="alert">
@@ -345,14 +343,10 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
             {createSuccess}
           </p>
         )}
-      </section>
+      </SettingSection>
 
       {/* User list */}
-      <section className="admin-users-list-section">
-        <h2 className="admin-users-section-title">
-          {t('admin.users.listTitle')} ({total})
-        </h2>
-
+      <SettingSection title={`${t('admin.users.listTitle')} (${total})`}>
         {listLoading && <p className="admin-users-loading">{t('admin.users.loading')}</p>}
         {listError && (
           <p className="admin-users-message admin-users-message--error" role="alert">
@@ -388,34 +382,43 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
                     <td>{user.suspended ? t('admin.users.statusSuspended') : t('admin.users.statusActive')}</td>
                     <td>{formatDate(user.createdAt)}</td>
                     <td className="admin-users-actions">
-                      <button
-                        className="admin-users-btn admin-users-btn--small"
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => void handleChangeRole(user)}
                         title={user.role === 'admin' ? t('admin.users.changeRoleToUser') : t('admin.users.changeRoleToAdmin')}
+                        aria-label={t('admin.users.changeRole')}
                       >
-                        {t('admin.users.changeRole')}
-                      </button>
-                      <button
-                        className="admin-users-btn admin-users-btn--small"
+                        <UserCog size={15} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => void handleResetPassword(user)}
                         title={t('admin.users.resetPassword')}
+                        aria-label={t('admin.users.resetPassword')}
                       >
-                        {t('admin.users.resetPassword')}
-                      </button>
-                      <button
-                        className="admin-users-btn admin-users-btn--small"
+                        <KeyRound size={15} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => void handleToggleSuspend(user)}
                         title={user.suspended ? t('admin.users.unsuspendTitle') : t('admin.users.suspendTitle')}
+                        aria-label={user.suspended ? t('admin.users.unsuspend') : t('admin.users.suspend')}
                       >
-                        {user.suspended ? t('admin.users.unsuspend') : t('admin.users.suspend')}
-                      </button>
-                      <button
-                        className="admin-users-btn admin-users-btn--small admin-users-btn--danger"
+                        {user.suspended ? <Unlock size={15} /> : <Ban size={15} />}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="admin-users-btn--danger"
                         onClick={() => handleDeleteUser(user)}
                         title={t('admin.users.deleteUserTitle')}
+                        aria-label={t('admin.users.deleteUser')}
                       >
-                        {t('admin.users.deleteUser')}
-                      </button>
+                        <Trash2 size={15} />
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -427,49 +430,40 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
         {/* Pagination controls */}
         {totalPages > 1 && (
           <div className="admin-users-pagination">
-            <button
-              className="admin-users-btn admin-users-btn--small"
+            <Button
+              variant="secondary"
+              size="sm"
               disabled={page <= 1}
               onClick={() => void loadUsers(page - 1)}
             >
               {t('admin.users.previousPage')}
-            </button>
+            </Button>
             <span className="admin-users-pagination-info">
               {t('admin.users.pageInfo', { page: String(page), totalPages: String(totalPages) })}
             </span>
-            <button
-              className="admin-users-btn admin-users-btn--small"
+            <Button
+              variant="secondary"
+              size="sm"
               disabled={page >= totalPages}
               onClick={() => void loadUsers(page + 1)}
             >
               {t('admin.users.nextPage')}
-            </button>
+            </Button>
           </div>
         )}
-      </section>
+      </SettingSection>
 
       {/* Confirmation dialog */}
-      {confirmDialog && (
-        <div className="admin-users-dialog-overlay" role="dialog" aria-modal="true">
-          <div className="admin-users-dialog">
-            <p className="admin-users-dialog-message">{confirmDialog.message}</p>
-            <div className="admin-users-dialog-actions">
-              <button
-                className="admin-users-btn admin-users-btn--danger"
-                onClick={confirmDialog.onConfirm}
-              >
-                {t('admin.users.confirm')}
-              </button>
-              <button
-                className="admin-users-btn"
-                onClick={() => setConfirmDialog(null)}
-              >
-                {t('common.cancel')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmModal
+        open={confirmDialog !== null}
+        title={t('admin.users.deleteUserTitle')}
+        message={confirmDialog?.message ?? ''}
+        confirmLabel={t('admin.users.confirm')}
+        cancelLabel={t('common.cancel')}
+        variant="danger"
+        onConfirm={() => confirmDialog?.onConfirm()}
+        onCancel={() => setConfirmDialog(null)}
+      />
     </div>
   )
 }

@@ -4,18 +4,34 @@ import { isPluginViewId, getPluginViewType } from '../../state/panelState'
 import type { PanelViewId, BuiltinPanelViewId } from '../../state/panelState'
 import { getCustomIconSvg, sizeCustomIconSvg, useIconResolutionTick } from '../../utils/pluginIcon'
 import { resolveIconMarkupSync } from '../../plugins/compat/lucide-icons'
+import { useTranslation } from '../../i18n'
+import type { TranslateFn } from '../../i18n'
 import './PanelTabBar.css'
 
-/** Tab metadata mapping every built-in view ID to its icon and label — shared by both panels, since any of these can now live on either side. */
-const TAB_CONFIG: Record<BuiltinPanelViewId, { icon: typeof FolderOpen; label: string }> = {
-  explorer: { icon: FolderOpen, label: 'Dateien' },
-  favorites: { icon: Star, label: 'Favoriten' },
-  recent: { icon: Clock, label: 'Zuletzt geöffnet' },
-  outline: { icon: List, label: 'Gliederung' },
-  links: { icon: Link, label: 'Links' },
-  tags: { icon: Tag, label: 'Tags' },
-  properties: { icon: FileText, label: 'Eigenschaften' },
-  search: { icon: Search, label: 'Suche' },
+/** Icon mapping for every built-in view ID — shared by both panels, since any of these can now live on either side. */
+const TAB_ICONS: Record<BuiltinPanelViewId, typeof FolderOpen> = {
+  explorer: FolderOpen,
+  favorites: Star,
+  recent: Clock,
+  outline: List,
+  links: Link,
+  tags: Tag,
+  properties: FileText,
+  search: Search,
+}
+
+/** Resolves the translated tab config (icon + label) for every built-in view ID. */
+function getTabConfig(t: TranslateFn): Record<BuiltinPanelViewId, { icon: typeof FolderOpen; label: string }> {
+  return {
+    explorer: { icon: TAB_ICONS.explorer, label: t('sidePanel.tabs.explorer') },
+    favorites: { icon: TAB_ICONS.favorites, label: t('sidePanel.tabs.favorites') },
+    recent: { icon: TAB_ICONS.recent, label: t('sidePanel.tabs.recent') },
+    outline: { icon: TAB_ICONS.outline, label: t('sidePanel.tabs.outline') },
+    links: { icon: TAB_ICONS.links, label: t('sidePanel.tabs.links') },
+    tags: { icon: TAB_ICONS.tags, label: t('sidePanel.tabs.tags') },
+    properties: { icon: TAB_ICONS.properties, label: t('sidePanel.tabs.properties') },
+    search: { icon: TAB_ICONS.search, label: t('sidePanel.tabs.search') },
+  }
 }
 
 /** Plugin view metadata provided externally for label/icon resolution. */
@@ -57,6 +73,8 @@ export function PanelTabBar({
   // Re-renders once any icon's (async, per-icon) Lucide resolution lands —
   // see PluginRibbonIcon.tsx for why this is needed.
   useIconResolutionTick()
+  const { t } = useTranslation()
+  const tabConfig = getTabConfig(t)
   const [draggedTab, setDraggedTab] = useState<PanelViewId | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   const tabBarRef = useRef<HTMLDivElement>(null)
@@ -264,7 +282,7 @@ export function PanelTabBar({
     }
 
     // Built-in tab
-    const config = TAB_CONFIG[viewId as BuiltinPanelViewId]
+    const config = tabConfig[viewId as BuiltinPanelViewId]
     if (!config) return null
     const Icon = config.icon
 
@@ -297,7 +315,7 @@ export function PanelTabBar({
       ref={tabBarRef}
       className="side-panel-tab-bar side-panel-tab-bar--icon-only"
       role="tablist"
-      aria-label="Panel-Ansichten"
+      aria-label={t('sidePanel.tabListAriaLabel')}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}

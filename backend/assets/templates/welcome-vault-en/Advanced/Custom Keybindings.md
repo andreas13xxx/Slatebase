@@ -26,9 +26,6 @@ Keybindings can be configured for these actions:
 | Open search | `Ctrl+Shift+F` |
 | Open command palette | `Ctrl+P` |
 | Open settings | `Ctrl+,` |
-| Bold | `Ctrl+B` |
-| Italic | `Ctrl+I` |
-| Create link | `Ctrl+K` |
 | Open daily note | — |
 | Toggle sidebar | — |
 | Open Quick Switcher | `Ctrl+O` |
@@ -37,6 +34,9 @@ Keybindings can be configured for these actions:
 | Next tab | `Ctrl+Shift+]` |
 | Previous tab | `Ctrl+Shift+[` |
 | And more... | |
+
+> [!info] Bold, Italic, Create Link
+> Formatting actions like Bold, Italic, and Create Link are available from the Command Palette (`Ctrl+P`), but they have no default keyboard shortcut and are not part of the configurable Keybindings table above.
 
 ---
 
