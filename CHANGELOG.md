@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.34.0](https://github.com/andreas13xxx/Slatebase/compare/v0.33.1...v0.34.0) (2026-08-22)
+
+
+### Features
+
+* inline frontmatter editing, settings design system, test coverage push ([b35ad1e](https://github.com/andreas13xxx/Slatebase/commit/b35ad1ef39b671b98a7fe41fad46b911c99db743))
+
 ## [0.33.1](https://github.com/andreas13xxx/Slatebase/compare/v0.33.0...v0.33.1) (2026-08-21)
 
 
