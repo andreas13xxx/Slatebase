@@ -3,7 +3,19 @@
 # Stage 2: Serve static files with Nginx
 
 # --- Build Stage ---
-FROM node:22-slim AS build
+# Pinned to the *builder's* architecture, not the target's. This stage only
+# emits static HTML/CSS/JS, which is identical whatever platform produced it,
+# so running it under QEMU for the linux/arm64 leg buys nothing and costs a
+# lot: rolldown's minify pass ("rendering chunks") on this bundle — ~3.6 MB
+# plus mermaid, katex, cytoscape and codemirror — went from seconds natively
+# to over an hour emulated, while `tsc -b` alone took ~2.5 minutes.
+#
+# The nginx stage below stays target-native, so the published images are still
+# genuine per-architecture builds.
+#
+# Note this is the opposite of backend/Dockerfile, which must build per target:
+# argon2 is compiled natively there, so its output really is arch-specific.
+FROM --platform=$BUILDPLATFORM node:22-slim AS build
 
 WORKDIR /app
 
