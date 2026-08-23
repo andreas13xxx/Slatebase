@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.35.0](https://github.com/andreas13xxx/Slatebase/compare/v0.34.0...v0.35.0) (2026-08-23)
+
+
+### Sonstige Änderungen
+
+* release 0.35.0 ([c160d89](https://github.com/andreas13xxx/Slatebase/commit/c160d8921d3c372bb522faff76cda96562581039))
+
 ## [0.34.0](https://github.com/andreas13xxx/Slatebase/compare/v0.33.1...v0.34.0) (2026-08-22)
 
 
