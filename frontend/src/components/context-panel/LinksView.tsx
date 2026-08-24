@@ -11,10 +11,27 @@
  * Ungelinkte Erwähnungen — Requirements 2.1, 2.5, 2.6, 2.7, 2.8
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, type ReactNode } from 'react'
+import { FileText, FolderOpen, Pencil, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import type { LinkEntry, UnlinkedMentionEntry } from '../../state/documentPanelData'
+import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
+import { buildTFileFromPath } from '../../plugins/compat/plugin-event-bridge'
+import { buildPluginMenuItems } from '../../plugins/compat/plugin-menu-bridge'
+import { revealInExplorer, renameInExplorer, deleteInExplorer } from '../../state/fileNavigation'
 import './LinksView.css'
+
+/** Builds the shared 'open/reveal/rename/delete + plugin file-menu items' menu for a resolved file path. */
+function buildFileMenuItems(path: string, onOpen: () => void): ContextMenuItem[] {
+  const file = buildTFileFromPath(path)
+  return [
+    { id: 'open', label: 'Öffnen', icon: <FileText size={14} />, run: onOpen },
+    { id: 'reveal', label: 'Im Explorer zeigen', icon: <FolderOpen size={14} />, run: () => revealInExplorer(path) },
+    { id: 'rename', label: 'Umbenennen', icon: <Pencil size={14} />, run: () => renameInExplorer(path) },
+    { id: 'delete', label: 'Löschen', icon: <Trash2 size={14} />, run: () => deleteInExplorer(path) },
+    ...buildPluginMenuItems('file-menu', [file, 'link-context-menu'], 'links-view-plugin-menu'),
+  ]
+}
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -41,6 +58,41 @@ export interface LinksViewProps {
   onLinkMention: (entry: UnlinkedMentionEntry) => Promise<void>
   /** Whether a document is currently open */
   hasDocument?: boolean
+}
+
+// ─── CollapsibleSection Sub-Component ─────────────────────────────────────────
+
+interface CollapsibleSectionProps {
+  title: string
+  count: number
+  children: ReactNode
+}
+
+/** A links section with a click-to-collapse header showing the item count. */
+function CollapsibleSection({ title, count, children }: CollapsibleSectionProps) {
+  const { t } = useTranslation()
+  const [collapsed, setCollapsed] = useState(false)
+
+  return (
+    <section className="context-panel-links-section">
+      <button
+        type="button"
+        className="context-panel-links-section-header"
+        onClick={() => setCollapsed((prev) => !prev)}
+        aria-expanded={!collapsed}
+        aria-label={
+          collapsed
+            ? t('contextPanel.links.expandSection', { section: title })
+            : t('contextPanel.links.collapseSection', { section: title })
+        }
+      >
+        {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+        <h3 className="context-panel-links-section-title">{title}</h3>
+        <span className="context-panel-links-section-count">{count}</span>
+      </button>
+      {!collapsed && children}
+    </section>
+  )
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -74,10 +126,7 @@ export function LinksView({
   return (
     <div className="context-panel-links-view">
       {/* Forward Links Section */}
-      <section className="context-panel-links-section">
-        <h3 className="context-panel-links-section-title">
-          {t('contextPanel.links.forward')}
-        </h3>
+      <CollapsibleSection title={t('contextPanel.links.forward')} count={forwardLinks.length}>
         {forwardLinks.length === 0 ? (
           <p className="context-panel-links-placeholder">
             {t('contextPanel.links.emptyForward')}
@@ -93,13 +142,10 @@ export function LinksView({
             ))}
           </ul>
         )}
-      </section>
+      </CollapsibleSection>
 
       {/* Backlinks Section */}
-      <section className="context-panel-links-section">
-        <h3 className="context-panel-links-section-title">
-          {t('contextPanel.links.backlinks')}
-        </h3>
+      <CollapsibleSection title={t('contextPanel.links.backlinks')} count={backlinks.length}>
         {backlinksLoading ? (
           <p className="context-panel-links-loading">
             {t('contextPanel.links.backlinksLoading')}
@@ -123,13 +169,10 @@ export function LinksView({
             ))}
           </ul>
         )}
-      </section>
+      </CollapsibleSection>
 
       {/* Unlinked Mentions Section */}
-      <section className="context-panel-links-section">
-        <h3 className="context-panel-links-section-title">
-          {t('contextPanel.links.unlinkedMentions')}
-        </h3>
+      <CollapsibleSection title={t('contextPanel.links.unlinkedMentions')} count={unlinkedMentions.length}>
         {unlinkedMentionsLoading ? (
           <p className="context-panel-links-loading">
             {t('contextPanel.links.unlinkedMentionsLoading')}
@@ -154,7 +197,7 @@ export function LinksView({
             ))}
           </ul>
         )}
-      </section>
+      </CollapsibleSection>
     </div>
   )
 }
@@ -167,17 +210,29 @@ interface LinkItemProps {
 }
 
 function LinkItem({ link, onLinkClick }: LinkItemProps) {
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+
   if (link.resolved) {
     return (
       <li className="context-panel-link-item context-panel-link-resolved">
         <button
           className="context-panel-link-button"
           onClick={() => onLinkClick(link.target, true)}
+          onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY }) }}
           title={link.target}
           type="button"
         >
           {link.displayName}
         </button>
+        {contextMenu && (
+          <ContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            items={buildFileMenuItems(link.target, () => onLinkClick(link.target, true))}
+            onClose={() => setContextMenu(null)}
+            onSelect={() => setContextMenu(null)}
+          />
+        )}
       </li>
     )
   }
@@ -202,6 +257,7 @@ interface UnlinkedMentionItemProps {
 function UnlinkedMentionItem({ entry, onClick, onLinkMention }: UnlinkedMentionItemProps) {
   const { t } = useTranslation()
   const [linking, setLinking] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
 
   const handleLinkClick = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -218,12 +274,22 @@ function UnlinkedMentionItem({ entry, onClick, onLinkMention }: UnlinkedMentionI
       <button
         className="context-panel-link-button context-panel-unlinked-mention-button"
         onClick={() => onClick(entry.filePath)}
+        onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY }) }}
         title={entry.filePath}
         type="button"
       >
         <span className="context-panel-unlinked-mention-path">{entry.filePath}</span>
         <span className="context-panel-unlinked-mention-snippet">{entry.snippet}</span>
       </button>
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={buildFileMenuItems(entry.filePath, () => onClick(entry.filePath))}
+          onClose={() => setContextMenu(null)}
+          onSelect={() => setContextMenu(null)}
+        />
+      )}
       <button
         className="context-panel-unlinked-mention-link-button"
         onClick={(e) => void handleLinkClick(e)}

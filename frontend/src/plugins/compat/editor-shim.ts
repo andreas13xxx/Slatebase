@@ -30,6 +30,7 @@ import { EditorSelection as CmEditorSelection } from '@codemirror/state'
 import * as CmCommands from '@codemirror/commands'
 import { recordGapRead, recordGapCall } from './api-gap-registry'
 import { warnOnce } from './log'
+import { getActiveEditorContainerEl } from '../../editor/plugin-extensions'
 
 // Note: We import the getter function from plugin-extensions to access
 // the active CM6 EditorView without creating a circular dependency.
@@ -210,6 +211,60 @@ export class EditorShim implements IEditor {
    */
   get editorComponent(): unknown {
     return getEditorComponentFn?.() ?? null
+  }
+
+  /**
+   * The DOM element hosting the CM6 editor. Real Obsidian's internal Editor
+   * implementation exposes this same undocumented property — "Editing
+   * Toolbar" reads `editor.containerEl.getBoundingClientRect()` to position
+   * its floating selection toolbar. Without an emulated getter here, the
+   * access fell through the gap-proxy below as an always-truthy no-op
+   * function, and calling `.getBoundingClientRect` on that function threw
+   * instead of positioning the toolbar.
+   *
+   * Falls back to the raw CM6 DOM node, and finally a detached div, so this
+   * always returns a real HTMLElement rather than null — plugins call DOM
+   * methods on it without a null check.
+   */
+  get containerEl(): HTMLElement {
+    return getActiveEditorContainerEl() ?? this.getCM6()?.dom ?? document.createElement('div')
+  }
+
+  /**
+   * Screen coordinates of a document position. Real Obsidian's internal
+   * Editor exposes this same undocumented method (it delegates to CM6's own
+   * `EditorView.coordsAtPos`) — "Editing Toolbar" calls it after a selection
+   * to find where to anchor its floating toolbar. Without an emulated method
+   * here, the call fell through the gap-proxy below as an always-truthy
+   * no-op function returning `undefined`, and reading `.left` off that threw
+   * instead of positioning the toolbar.
+   *
+   * Returns null (matching real Obsidian/CM6) when no editor is mounted or
+   * the position hasn't been rendered — callers already handle that case.
+   */
+  coordsAtPos(pos: EditorPosition, moveUp?: boolean): { left: number; right: number; top: number; bottom: number } | null {
+    const cm = this.getCM6()
+    if (!cm) return null
+    const offset = this.cm6PosToOffset(cm, pos)
+    return cm.coordsAtPos(offset, moveUp ? -1 : 1)
+  }
+
+  /**
+   * CodeMirror 5's legacy coordinate-lookup shape, which real Obsidian's
+   * Editor still implements alongside `coordsAtPos` for plugins ported from
+   * CM5. "Editing Toolbar" checks `if (editor.cursorCoords)` first and only
+   * falls back to `coordsAtPos` when it's missing — since the gap-proxy
+   * hands back an always-truthy no-op for anything unemulated, that check
+   * was taking the "it exists" branch regardless, calling the no-op and
+   * reading `.bottom` off its `undefined` result. Implementing `coordsAtPos`
+   * alone didn't fix this plugin; the feature-detection gap needed closing
+   * too. `mode` is accepted for signature compatibility but unused — CM6's
+   * `coordsAtPos` already returns viewport-relative coordinates, matching
+   * CM5's `"window"` mode, which is the only mode real plugins pass here.
+   */
+  cursorCoords(where: boolean, mode?: 'page' | 'local' | 'window'): { left: number; right: number; top: number; bottom: number } | null {
+    void mode
+    return this.coordsAtPos(this.getCursor(where ? 'from' : 'to'))
   }
 
   // ─── Obsidian Editor API ─────────────────────────────────────────────────

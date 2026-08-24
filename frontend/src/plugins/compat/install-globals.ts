@@ -2411,7 +2411,7 @@ export function installObsidianGlobals(): void {
         this.overlayEl = document.createElement('div')
         this.overlayEl.className = 'modal-bg'
         this.overlayEl.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;'
-        this.containerEl.style.cssText = 'background:var(--bg-surface,#fff);border-radius:8px;padding:16px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;'
+        this.containerEl.style.cssText = 'background:var(--bg-surface,#fff);border-radius:8px;padding:16px;max-width:840px;width:90%;max-height:85vh;overflow-y:auto;'
         this.overlayEl.appendChild(this.containerEl)
         // Close on backdrop click
         this.overlayEl.addEventListener('mousedown', (e) => {
@@ -3218,6 +3218,14 @@ export function installObsidianGlobals(): void {
 
       constructor(app: unknown) {
         super(app)
+        // Real Obsidian's SuggestModal adds this to its modalEl. Plugin CSS
+        // routinely scopes suggest-modal-only rules under it (Iconize's
+        // `.prompt .iconize-subheadline` — the "Recently used icons" label —
+        // relies on it for its grid-column span; without it the label sits as
+        // an unspanned 1-column grid item and gets stretched to the height of
+        // a full icon row by the grid's own row-sizing). Also the only class
+        // our own `.prompt` layout rule (obsidian-components.css) targets.
+        this.modalEl.classList.add('prompt')
         this.inputEl = document.createElement('input')
         this.inputEl.type = 'text'
         this.inputEl.className = 'prompt-input'
@@ -3226,7 +3234,7 @@ export function installObsidianGlobals(): void {
 
         this.resultContainerEl = document.createElement('div')
         this.resultContainerEl.className = 'prompt-results'
-        this.resultContainerEl.style.cssText = 'max-height:300px;overflow-y:auto;'
+        this.resultContainerEl.style.cssText = 'max-height:65vh;overflow-y:auto;'
 
         this.modalEl.insertBefore(this.inputEl, this.contentEl)
         this.modalEl.insertBefore(this.resultContainerEl, this.contentEl)

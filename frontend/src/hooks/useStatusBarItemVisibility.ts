@@ -8,7 +8,7 @@ import { useCallback, useSyncExternalStore } from 'react'
 
 const STORAGE_PREFIX = 'slatebase:statusBarItem:'
 
-export type BuiltinStatusBarItemId = 'clock' | 'wordStats' | 'cursorPosition' | 'vaultName'
+export type BuiltinStatusBarItemId = 'clock' | 'wordStats' | 'cursorPosition' | 'vaultName' | 'linkCounts'
 
 export interface UseStatusBarItemVisibilityReturn {
   visible: boolean

@@ -738,7 +738,9 @@
 }
 
 /* ─── Dark Mode Overrides ───────────────────────────────────────────────────── */
-:root[data-theme="dark"] {
+/* `:where()` keeps specificity equal to the base `:root` block so a later,
+   equal-specificity injected CSS snippet can still win via source order. */
+:root:where([data-theme="dark"]) {
   /* ─── Backgrounds (Dark) ─────────────────────────────────────────────────── */
   --background-primary: var(--bg-base, #0d1117);
   --background-primary-alt: var(--bg-surface, #161b22);
@@ -850,7 +852,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:where(:not([data-theme="light"])) {
     /* ─── Backgrounds (Dark) ───────────────────────────────────────────────── */
     --background-primary: var(--bg-base, #0d1117);
     --background-primary-alt: var(--bg-surface, #161b22);

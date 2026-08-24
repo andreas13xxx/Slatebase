@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import ReactDOM from 'react-dom'
+import { ChevronRight, Check } from 'lucide-react'
 import { clampMenuPosition } from '../utils/pathUtils'
 import './ContextMenu.css'
 
@@ -15,6 +16,12 @@ export interface ContextMenuItem {
   icon?: React.ReactNode
   /** Whether the item is disabled (shown but not selectable). */
   disabled?: boolean
+  /**
+   * Renders a checkmark and `aria-checked` — mirrors `MenuItem.setChecked()`
+   * in the plugin `Menu` shim (menu.ts). Undefined means "not a checkbox
+   * item" (no `aria-checked` at all), matching a plain `MenuItem`.
+   */
+  checked?: boolean
   /** Whether this entry is a visual separator (renders a divider line). */
   separator?: boolean
   /**
@@ -24,6 +31,15 @@ export interface ContextMenuItem {
    * plugin rather than one of the owner's own fixed action ids.
    */
   run?: () => void
+  /**
+   * Nested items, shown in a submenu opened to the side of this item (hover
+   * or click/Enter/ArrowRight) instead of this item being directly
+   * selectable — mirrors `MenuItem.setSubmenu()` in the plugin `Menu` shim
+   * (menu.ts), so a plugin-contributed submenu (e.g. a "Text Tools" or
+   * "AI Tools" plugin grouping several actions under one entry) renders
+   * instead of silently disappearing.
+   */
+  submenu?: ContextMenuItem[]
 }
 
 /**
@@ -51,12 +67,15 @@ export interface ContextMenuProps {
  * - Closes on click-outside or Escape
  * - Keyboard navigation: Arrow Up/Down (cyclic wrapping), Enter to select
  * - Focuses first selectable item on open
+ * - Items with `submenu` open a nested menu on hover/click/Enter/ArrowRight
  * - Named export only (no default export)
  */
 export function ContextMenu({ x, y, items, onClose, onSelect }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
+  const itemRefs = useRef<Map<number, HTMLElement>>(new Map())
   const [position, setPosition] = useState<{ x: number; y: number }>({ x, y })
   const [focusedIndex, setFocusedIndex] = useState<number>(-1)
+  const [openSubmenu, setOpenSubmenu] = useState<{ index: number; x: number; y: number } | null>(null)
 
   /** Filter to only selectable (non-separator, non-disabled) items for keyboard nav. */
   const selectableIndices = items.reduce<number[]>((acc, item, i) => {
@@ -91,11 +110,15 @@ export function ContextMenu({ x, y, items, onClose, onSelect }: ContextMenuProps
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Close on click outside
+  // Close on click outside. A submenu renders through its own portal (a
+  // sibling of this menu's DOM node, not a descendant), so "outside" is
+  // determined by the shared `.context-menu` class across every open level
+  // rather than `menuRef.current.contains(...)` — otherwise interacting with
+  // an open submenu would look like an outside click and close everything.
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      const menu = menuRef.current
-      if (menu && !menu.contains(e.target as Node)) {
+      const target = e.target as Element | null
+      if (!target?.closest('.context-menu')) {
         onClose()
       }
     }
@@ -122,7 +145,20 @@ export function ContextMenu({ x, y, items, onClose, onSelect }: ContextMenuProps
     }
   }, [onClose])
 
-  // Keyboard navigation: Escape, Arrow Up/Down (cyclic), Enter
+  /** Opens the submenu of the item at `index` (if it has one), positioned beside its DOM element. */
+  const openSubmenuFor = useCallback((index: number) => {
+    const item = items[index]
+    if (!item?.submenu) {
+      setOpenSubmenu(null)
+      return
+    }
+    const el = itemRefs.current.get(index)
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    setOpenSubmenu({ index, x: rect.right, y: rect.top })
+  }, [items])
+
+  // Keyboard navigation: Escape, Arrow Up/Down (cyclic), ArrowRight/Enter, submenu
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     switch (e.key) {
       case 'Escape':
@@ -150,20 +186,33 @@ export function ContextMenu({ x, y, items, onClose, onSelect }: ContextMenuProps
         break
       }
 
+      case 'ArrowRight': {
+        const item = items[focusedIndex]
+        if (item?.submenu) {
+          e.preventDefault()
+          openSubmenuFor(focusedIndex)
+        }
+        break
+      }
+
       case 'Enter': {
         e.preventDefault()
         if (focusedIndex >= 0 && focusedIndex < items.length) {
           const item = items[focusedIndex]
           if (item && !item.disabled && !item.separator) {
-            if (item.run) item.run()
-            else onSelect(item.id)
-            onClose()
+            if (item.submenu) {
+              openSubmenuFor(focusedIndex)
+            } else {
+              if (item.run) item.run()
+              else onSelect(item.id)
+              onClose()
+            }
           }
         }
         break
       }
     }
-  }, [focusedIndex, items, onClose, onSelect, selectableIndices])
+  }, [focusedIndex, items, onClose, onSelect, selectableIndices, openSubmenuFor])
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown)
@@ -177,8 +226,12 @@ export function ContextMenu({ x, y, items, onClose, onSelect }: ContextMenuProps
     e.preventDefault()
   }
 
-  function handleItemClick(item: ContextMenuItem) {
+  function handleItemClick(item: ContextMenuItem, index: number) {
     if (item.disabled) return
+    if (item.submenu) {
+      openSubmenuFor(index)
+      return
+    }
     if (item.run) item.run()
     else onSelect(item.id)
     onClose()
@@ -188,6 +241,7 @@ export function ContextMenu({ x, y, items, onClose, onSelect }: ContextMenuProps
     const item = items[index]
     if (item && !item.separator && !item.disabled) {
       setFocusedIndex(index)
+      openSubmenuFor(index)
     }
   }
 
@@ -218,26 +272,162 @@ export function ContextMenu({ x, y, items, onClose, onSelect }: ContextMenuProps
             <li
               key={item.id}
               className="context-menu-item"
-              role="menuitem"
+              role={item.checked !== undefined ? 'menuitemcheckbox' : 'menuitem'}
               aria-disabled={item.disabled ? 'true' : undefined}
+              aria-checked={item.checked}
+              aria-haspopup={item.submenu ? 'menu' : undefined}
+              aria-expanded={item.submenu ? openSubmenu?.index === index : undefined}
+              ref={(el) => {
+                if (el) itemRefs.current.set(index, el)
+                else itemRefs.current.delete(index)
+              }}
             >
               <button
                 type="button"
                 className={`context-menu-btn${item.disabled ? ' context-menu-btn--disabled' : ''}`}
                 data-focused={isFocused ? 'true' : undefined}
-                onClick={() => handleItemClick(item)}
+                onClick={() => handleItemClick(item, index)}
                 onMouseEnter={() => handleItemMouseEnter(index)}
                 tabIndex={-1}
               >
-                {item.icon && (
-                  <span className="context-menu-icon">{item.icon}</span>
+                {(item.checked || item.icon) && (
+                  <span className="context-menu-icon">
+                    {item.checked ? <Check size={14} /> : item.icon}
+                  </span>
                 )}
-                <span>{item.label}</span>
+                <span className="context-menu-label">{item.label}</span>
+                {item.submenu && (
+                  <ChevronRight size={14} className="context-menu-submenu-arrow" />
+                )}
               </button>
             </li>
           )
         })}
       </ul>
+      {openSubmenu && items[openSubmenu.index]?.submenu && (
+        <ContextSubmenu
+          x={openSubmenu.x}
+          y={openSubmenu.y}
+          items={items[openSubmenu.index]!.submenu!}
+          onSelect={onSelect}
+          onCloseAll={onClose}
+        />
+      )}
+    </div>
+  )
+
+  return ReactDOM.createPortal(menu, document.body)
+}
+
+/**
+ * A nested submenu level. Purely hover/click-driven (matching the plugin
+ * `Menu` shim's own submenu behavior in menu.ts, which is hover-only too) —
+ * the outermost `ContextMenu` above owns all outside-click/Escape/window-blur
+ * handling, so a submenu doesn't register its own copies of those; selecting
+ * an item (at any depth) or clicking truly outside the whole `.context-menu`
+ * chain closes everything via `onCloseAll` (the root's `onClose`).
+ */
+function ContextSubmenu({
+  x, y, items, onSelect, onCloseAll,
+}: {
+  x: number
+  y: number
+  items: ContextMenuItem[]
+  onSelect: (action: string) => void
+  onCloseAll: () => void
+}) {
+  const menuRef = useRef<HTMLDivElement>(null)
+  const itemRefs = useRef<Map<number, HTMLElement>>(new Map())
+  const [position, setPosition] = useState<{ x: number; y: number }>({ x, y })
+  const [openSubmenu, setOpenSubmenu] = useState<{ index: number; x: number; y: number } | null>(null)
+
+  useEffect(() => {
+    const menu = menuRef.current
+    if (!menu) return
+    const clamped = clampMenuPosition(x, y, menu.offsetWidth, menu.offsetHeight, window.innerWidth, window.innerHeight)
+    setPosition(clamped)
+  }, [x, y])
+
+  function openSubmenuFor(index: number) {
+    const item = items[index]
+    if (!item?.submenu) {
+      setOpenSubmenu(null)
+      return
+    }
+    const el = itemRefs.current.get(index)
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    setOpenSubmenu({ index, x: rect.right, y: rect.top })
+  }
+
+  function handleItemClick(item: ContextMenuItem, index: number) {
+    if (item.disabled) return
+    if (item.submenu) {
+      openSubmenuFor(index)
+      return
+    }
+    if (item.run) item.run()
+    else onSelect(item.id)
+    onCloseAll()
+  }
+
+  const menu = (
+    <div
+      ref={menuRef}
+      className="context-menu"
+      style={{ left: position.x, top: position.y }}
+      role="menu"
+      aria-label="Untermenü"
+      onContextMenu={(e) => e.preventDefault()}
+      tabIndex={-1}
+    >
+      <ul className="context-menu-list">
+        {items.map((item, index) => {
+          if (item.separator) {
+            return <li key={item.id} className="context-menu-separator" role="separator" />
+          }
+          return (
+            <li
+              key={item.id}
+              className="context-menu-item"
+              role={item.checked !== undefined ? 'menuitemcheckbox' : 'menuitem'}
+              aria-disabled={item.disabled ? 'true' : undefined}
+              aria-checked={item.checked}
+              aria-haspopup={item.submenu ? 'menu' : undefined}
+              aria-expanded={item.submenu ? openSubmenu?.index === index : undefined}
+              ref={(el) => {
+                if (el) itemRefs.current.set(index, el)
+                else itemRefs.current.delete(index)
+              }}
+            >
+              <button
+                type="button"
+                className={`context-menu-btn${item.disabled ? ' context-menu-btn--disabled' : ''}`}
+                onClick={() => handleItemClick(item, index)}
+                onMouseEnter={() => openSubmenuFor(index)}
+                tabIndex={-1}
+              >
+                {(item.checked || item.icon) && (
+                  <span className="context-menu-icon">
+                    {item.checked ? <Check size={14} /> : item.icon}
+                  </span>
+                )}
+                <span className="context-menu-label">{item.label}</span>
+                {item.submenu && <ChevronRight size={14} className="context-menu-submenu-arrow" />}
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+      {openSubmenu && items[openSubmenu.index]?.submenu && (
+        <ContextSubmenu
+          x={openSubmenu.x}
+          y={openSubmenu.y}
+          items={items[openSubmenu.index]!.submenu!}
+          onSelect={onSelect}
+          onCloseAll={onCloseAll}
+        />
+      )}
     </div>
   )
 

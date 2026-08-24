@@ -29,6 +29,14 @@ export interface LivePreviewOptions {
   typeRegistry?: PropertyTypeEntry[] | null
   /** Callback to persist an explicit type choice for a property key to the vault's type registry. */
   onPropertyTypeChange?: (key: string, type: PropertyType) => void
+  /**
+   * Callback when the user right-clicks a rendered link (`.cm-lp-link` /
+   * `.cm-lp-wikilink`) in Live Preview — lets the caller show a link-specific
+   * context menu (Obsidian's `url-menu`/`file-menu`) instead of the generic
+   * editor one. Unset in raw source mode, where links aren't rendered as
+   * distinct DOM elements to target.
+   */
+  onLinkContextMenu?: (x: number, y: number, link: { kind: 'internal'; target: string } | { kind: 'external'; url: string }) => void
 }
 
 /**
@@ -281,7 +289,53 @@ export function createLivePreviewCompartmentExtension(
   return compartment.of([
     createLivePreviewField(options),
     createLivePreviewClickHandler(options),
+    createLinkContextMenuHandler(options),
   ])
+}
+
+/**
+ * Creates a ViewPlugin that shows a link-specific context menu on right-click
+ * over a rendered link (`.cm-lp-link` for standard Markdown links, matching
+ * Obsidian's `url-menu`; `.cm-lp-wikilink` for internal wikilinks, matching
+ * `file-menu`) instead of the editor's generic one. A right-click anywhere
+ * else in the document is left alone (`return false`) for the generic
+ * `contextmenu` listener on the editor container to handle.
+ */
+export function createLinkContextMenuHandler(options: LivePreviewOptions): Extension {
+  return ViewPlugin.define(
+    () => ({ update() { /* DOM-event-only plugin */ } }),
+    {
+      eventHandlers: {
+        contextmenu(event: MouseEvent) {
+          if (!options.onLinkContextMenu) return false
+          const target = event.target as HTMLElement | null
+          if (!target) return false
+
+          const linkElement = target.closest('.cm-lp-link') as HTMLElement | null
+          if (linkElement) {
+            const url = linkElement.getAttribute('data-url')
+            if (url) {
+              event.preventDefault()
+              options.onLinkContextMenu(event.clientX, event.clientY, { kind: 'external', url })
+              return true
+            }
+          }
+
+          const wikilinkElement = target.closest('.cm-lp-wikilink') as HTMLElement | null
+          if (wikilinkElement) {
+            const wikilinkTarget = wikilinkElement.getAttribute('data-target')
+            if (wikilinkTarget) {
+              event.preventDefault()
+              options.onLinkContextMenu(event.clientX, event.clientY, { kind: 'internal', target: wikilinkTarget })
+              return true
+            }
+          }
+
+          return false
+        },
+      },
+    },
+  )
 }
 
 /**

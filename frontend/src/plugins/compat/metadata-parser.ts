@@ -17,6 +17,7 @@
  * @module metadata-parser
  */
 
+import { parse as parseYamlDoc } from 'yaml'
 import type {
   BlockCache,
   CachedMetadata,
@@ -104,9 +105,15 @@ function extractWikilinks(
 /**
  * Parses the YAML frontmatter block, if the document opens with one.
  *
- * Only handles `key: value` pairs and inline `[a, b]` arrays — not a general
- * YAML parser, matching the scope this codebase's frontmatter reader has
- * always had (see `parseContentToMetadata`'s original implementation).
+ * The value shape comes from the real `yaml` parser (matching real Obsidian,
+ * which wraps js-yaml) so nested objects/arrays round-trip correctly —
+ * plugins are free to store structured data in frontmatter (e.g. Day
+ * Planner's `planner: { log: [...] }` clock entries), not just flat scalars.
+ * On malformed YAML, frontmatter comes back empty — the same "can't resolve
+ * it" outcome real Obsidian's cache has for unparsable frontmatter.
+ *
+ * Wikilink extraction below stays a line-by-line scan independent of the
+ * parsed value shape, matching the scope it has always had.
  */
 function parseFrontmatter(lines: string[], offsets: number[]): FrontmatterResult | null {
   if (lines[0]?.trim() !== '---') return null
@@ -120,7 +127,7 @@ function parseFrontmatter(lines: string[], offsets: number[]): FrontmatterResult
   }
   if (endLine === -1) return null
 
-  const frontmatter: Record<string, unknown> = {}
+  const frontmatter = parseFrontmatterYaml(lines.slice(1, endLine).join('\n'))
   const links: FrontmatterLinkCache[] = []
   const linkCounts = new Map<string, number>()
   let currentKey: string | null = null
@@ -130,12 +137,6 @@ function parseFrontmatter(lines: string[], offsets: number[]): FrontmatterResult
     const kvMatch = line.match(/^(\w[\w-]*)\s*:\s*(.*)$/)
     if (kvMatch) {
       currentKey = kvMatch[1]!
-      let value: unknown = kvMatch[2]!.trim()
-
-      if (typeof value === 'string' && value.startsWith('[') && value.endsWith(']')) {
-        value = value.slice(1, -1).split(',').map((s) => s.trim()).filter(Boolean)
-      }
-      if (value !== '') frontmatter[currentKey] = value
     }
 
     if (currentKey && line.includes('[[')) {
@@ -161,6 +162,19 @@ function parseFrontmatter(lines: string[], offsets: number[]): FrontmatterResult
     },
     links,
     endLine,
+  }
+}
+
+/** Parses a frontmatter YAML block; malformed YAML resolves to `{}` rather than throwing. */
+function parseFrontmatterYaml(yamlStr: string): Record<string, unknown> {
+  try {
+    const parsed: unknown = parseYamlDoc(yamlStr)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>
+    }
+    return {}
+  } catch {
+    return {}
   }
 }
 

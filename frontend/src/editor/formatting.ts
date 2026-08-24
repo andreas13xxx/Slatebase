@@ -52,6 +52,9 @@ export function applyFormatting(view: EditorView, action: EditorFormattingAction
     case 'table':
       insertTable(view)
       break
+    case 'callout':
+      insertCallout(view)
+      break
     case 'toggleLineNumbers':
       // No-op: handled by compartment in CodeMirrorEditor
       break
@@ -197,6 +200,26 @@ function insertHorizontalRule(view: EditorView): void {
   view.dispatch({
     changes: { from, insert: '\n---\n' },
     selection: { anchor: from + 5 },
+  })
+}
+
+/**
+ * Wraps the current selection (or line) in an Obsidian callout blockquote.
+ * Mirrors `insertCallout` in core-commands.ts, but operates on the CM6
+ * EditorView directly and replaces the selection rather than always
+ * inserting at the cursor.
+ */
+function insertCallout(view: EditorView): void {
+  const { state } = view
+  const { from, to } = state.selection.main
+  const selectedText = state.sliceDoc(from, to)
+  const body = selectedText.length > 0
+    ? selectedText.split('\n').map((line) => `> ${line}`).join('\n')
+    : '> '
+  const replacement = `> [!note]\n${body}`
+  view.dispatch({
+    changes: { from, to, insert: replacement },
+    selection: { anchor: from + replacement.length },
   })
 }
 

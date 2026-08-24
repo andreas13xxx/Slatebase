@@ -257,6 +257,15 @@ export class EditorSuggestManager {
       if (result instanceof Promise) {
         items = await result
       } else {
+        // Even for a synchronous result, force a microtask boundary before
+        // going any further. This is called from the CM6 ViewPlugin's
+        // update() (see editor-suggest-extension.ts) — without an `await`
+        // anywhere in this path, the function runs to completion inside that
+        // same synchronous update cycle, and popover.render()'s coordsAtPos()
+        // call throws "Reading the editor layout isn't allowed during an
+        // update". Yielding here defers rendering to right after CM6's
+        // update returns, regardless of whether the suggest is sync or async.
+        await Promise.resolve()
         items = result
       }
 

@@ -27,12 +27,14 @@
  * @module obsidian-api-extensions
  */
 
+import { parse as parseYamlDoc, stringify as stringifyYamlDoc } from 'yaml';
 import { errorOnce, warnNoOp } from './log';
 import type { BlockCache, CachedMetadata, HeadingCache, Pos } from './types';
 import { renderLucideIconInto } from './lucide-icons';
 import { getCustomIconSvg, sizeCustomIconSvg } from '../../utils/pluginIcon';
 import { getCurrentPluginId } from './plugin-execution-context';
 import { registerPostProcessor as registerPostProcessorReal } from './code-block-processor-registry';
+import { InputSuggestPopover } from './input-suggest-popover';
 
 /**
  * The Obsidian API version Slatebase claims to implement.
@@ -545,28 +547,14 @@ export function createFragment(callback?: (el: DocumentFragment) => void): Docum
 
 /**
  * Parse a YAML string into a JS object.
- * Uses a simple regex-based parser for common frontmatter patterns.
+ *
+ * Real Obsidian's `parseYaml()` is a thin wrapper around js-yaml; plugins
+ * (Day Planner's clock-in/out, among others) call it directly on frontmatter
+ * text and expect full nested object/array support, not just flat scalars.
  */
 export function parseYaml(yaml: string): unknown {
   try {
-    // Use the yaml library if available on window
-    const yamlLib = (window as unknown as { jsyaml?: { load: (s: string) => unknown } }).jsyaml;
-    if (yamlLib) return yamlLib.load(yaml);
-    // Fallback: simple line-based key:value parsing
-    const result: Record<string, unknown> = {};
-    for (const line of yaml.split('\n')) {
-      const match = line.match(/^(\w[\w-]*)\s*:\s*(.*)$/);
-      if (match) {
-        const key = match[1]!;
-        let val: unknown = match[2]!.trim();
-        if (val === 'true') val = true;
-        else if (val === 'false') val = false;
-        else if (val === 'null' || val === '') val = null;
-        else if (!isNaN(Number(val))) val = Number(val);
-        result[key] = val;
-      }
-    }
-    return result;
+    return parseYamlDoc(yaml);
   } catch {
     return {};
   }
@@ -574,22 +562,14 @@ export function parseYaml(yaml: string): unknown {
 
 /**
  * Stringify a JS object to YAML format.
+ *
+ * Real Obsidian's `stringifyYaml()` is a thin wrapper around js-yaml. A naive
+ * per-key `${value}` serializer stringifies a nested object to the literal
+ * text "[object Object]" instead of proper nested YAML — exactly what plugins
+ * like Day Planner write into frontmatter for structured data.
  */
 export function stringifyYaml(obj: unknown): string {
-  const yamlLib = (window as unknown as { jsyaml?: { dump: (o: unknown) => string } }).jsyaml;
-  if (yamlLib) return yamlLib.dump(obj);
-  // Fallback: simple serialization
-  if (!obj || typeof obj !== 'object') return String(obj ?? '');
-  const lines: string[] = [];
-  for (const [key, value] of Object.entries(obj)) {
-    if (Array.isArray(value)) {
-      lines.push(`${key}:`);
-      for (const item of value) lines.push(`  - ${String(item)}`);
-    } else {
-      lines.push(`${key}: ${String(value ?? '')}`);
-    }
-  }
-  return lines.join('\n') + '\n';
+  return stringifyYamlDoc(obj);
 }
 
 /**
@@ -981,14 +961,14 @@ function registerUnsupportedLoaders(obs: Record<string, unknown>): void {
 export class ExtraButtonComponent {
   extraSettingsEl: HTMLElement;
   private _disabled = false;
-  private _callback: (() => void) | null = null;
+  private _callback: ((evt: MouseEvent) => void) | null = null;
 
   constructor(containerEl: HTMLElement) {
     this.extraSettingsEl = document.createElement('div');
     this.extraSettingsEl.className = 'extra-setting-button clickable-icon';
     containerEl.appendChild(this.extraSettingsEl);
-    this.extraSettingsEl.addEventListener('click', () => {
-      if (!this._disabled && this._callback) this._callback();
+    this.extraSettingsEl.addEventListener('click', (evt) => {
+      if (!this._disabled && this._callback) this._callback(evt);
     });
   }
 
@@ -1000,7 +980,7 @@ export class ExtraButtonComponent {
   }
   setTooltip(tooltip: string): this { this.extraSettingsEl.title = tooltip; return this; }
   setIcon(icon: string): this { renderComponentIcon(this.extraSettingsEl, icon); return this; }
-  onClick(callback: () => void): this { this._callback = callback; return this; }
+  onClick(callback: (evt: MouseEvent) => void): this { this._callback = callback; return this; }
   then(cb: (component: this) => void): this { cb(this); return this; }
 }
 
@@ -1229,19 +1209,32 @@ export class ProgressBarComponent {
 
 /**
  * AbstractInputSuggest — Base class for input autocomplete.
- * Templater uses this for file/folder suggest inputs in settings.
+ * Templater, Various Complements and QuickAdd use this for file/folder/tag
+ * suggest inputs in settings tabs.
  *
  * Real Obsidian: Component -> PopoverSuggest -> AbstractInputSuggest. Built as a
  * factory (not a static class) because PopoverSuggest only exists on
  * `window.obsidian` once installObsidianGlobals() has run — see its call site in
  * registerObsidianApiExtensions() below, which passes that class in at register
- * time so open/close/renderSuggestion and Component's registerEvent/
- * registerDomEvent/addChild are all inherited for real, not reimplemented here.
+ * time so Component's registerEvent/registerDomEvent/addChild are inherited for
+ * real, not reimplemented here.
+ *
+ * Real Obsidian's own base implementation drives an `input`/`keydown`/`blur`
+ * trigger loop off `textInputEl` and renders into `this.suggestEl`; this mirrors
+ * that (own popover element assigned onto the inherited `suggestEl` field, so
+ * code that reads `this.suggestEl` directly — rare, but some plugins do it for
+ * custom CSS targeting — sees the real, live dropdown, not an unused stand-in).
+ * `EditorSuggest`'s CM6-driven trigger loop (editor-suggest-manager.ts) is the
+ * closer sibling in spirit than a literal code source here: same positioned
+ * popover + keyboard-nav pattern, different anchor (a plain element's
+ * `getBoundingClientRect()` instead of `coordsAtPos()`).
  */
 type PopoverSuggestBase = new (app: unknown) => {
   app: unknown;
+  suggestEl: HTMLElement;
   open(): void;
   close(): void;
+  registerDomEvent(el: EventTarget, event: string, handler: EventListenerOrEventListenerObject): void;
   renderSuggestion(value: unknown, el: HTMLElement): void;
   selectSuggestion(value: unknown, evt: MouseEvent | KeyboardEvent): void;
 };
@@ -1251,10 +1244,27 @@ function createAbstractInputSuggestClass(PopoverSuggest: PopoverSuggestBase) {
     textInputEl: HTMLInputElement | HTMLDivElement;
     limit = 100;
     private _selectCallback: ((value: unknown, evt: MouseEvent | KeyboardEvent) => void) | null = null;
+    private _popover: InputSuggestPopover;
+    private _items: unknown[] = [];
+    private _selectedIndex = -1;
+    private _generation = 0;
 
     constructor(app: unknown, textInputEl: HTMLInputElement | HTMLDivElement) {
       super(app);
       this.textInputEl = textInputEl;
+      this._popover = new InputSuggestPopover({
+        onSelect: (index, evt) => this._confirmSelectionAt(index, evt),
+        onHover: (index) => this._setSelectedIndex(index),
+      });
+      // See class doc: this makes `this.suggestEl` the actual rendered dropdown.
+      this.suggestEl = this._popover.element;
+
+      this.registerDomEvent(textInputEl, 'input', () => { void this._handleInput(); });
+      this.registerDomEvent(textInputEl, 'keydown', (evt) => this._handleKeydown(evt as KeyboardEvent));
+      // A suggestion's own mousedown handler (see InputSuggestPopover.render())
+      // preventDefault()s, so clicking a suggestion never blurs textInputEl and
+      // never reaches here. This only fires for a genuine focus-away.
+      this.registerDomEvent(textInputEl, 'blur', () => this.close());
     }
 
     setValue(value: string): void {
@@ -1279,7 +1289,88 @@ function createAbstractInputSuggestClass(PopoverSuggest: PopoverSuggestBase) {
       if (this._selectCallback) this._selectCallback(value, evt);
     }
 
-    getSuggestions(_query: string): unknown[] { return []; }
+    getSuggestions(_query: string): unknown[] | Promise<unknown[]> { return []; }
+
+    open(): void {
+      if (this._items.length > 0) this._popover.render(this._items, this, this.textInputEl);
+    }
+
+    close(): void {
+      this._popover.hide();
+      this._items = [];
+      this._selectedIndex = -1;
+      this._generation++;
+    }
+
+    // ─── Private: trigger loop ─────────────────────────────────────────────
+
+    private async _handleInput(): Promise<void> {
+      const gen = ++this._generation;
+      const query = this.getValue();
+
+      let items: unknown[];
+      try {
+        const result = this.getSuggestions(query);
+        items = result instanceof Promise ? await result : result;
+      } catch (err) {
+        console.error('[AbstractInputSuggest] Error in getSuggestions:', err);
+        items = [];
+      }
+
+      if (gen !== this._generation) return; // superseded by a later keystroke
+
+      const limit = this.limit > 0 ? this.limit : 100;
+      this._items = items.slice(0, limit);
+      this._selectedIndex = this._items.length > 0 ? 0 : -1;
+
+      if (this._items.length === 0) {
+        this._popover.hide();
+        return;
+      }
+      this._popover.render(this._items, this, this.textInputEl);
+      this._popover.setSelectedIndex(0);
+    }
+
+    private _handleKeydown(evt: KeyboardEvent): void {
+      if (!this._popover.isVisible || this._items.length === 0) return;
+      switch (evt.key) {
+        case 'ArrowDown':
+          evt.preventDefault();
+          this._setSelectedIndex((this._selectedIndex + 1 + this._items.length) % this._items.length);
+          break;
+        case 'ArrowUp':
+          evt.preventDefault();
+          this._setSelectedIndex((this._selectedIndex - 1 + this._items.length) % this._items.length);
+          break;
+        case 'Enter':
+          evt.preventDefault();
+          evt.stopPropagation();
+          this._confirmSelectionAt(this._selectedIndex, evt);
+          break;
+        case 'Escape':
+          evt.preventDefault();
+          evt.stopPropagation();
+          this.close();
+          break;
+      }
+    }
+
+    private _setSelectedIndex(index: number): void {
+      if (index < 0 || index >= this._items.length) return;
+      this._selectedIndex = index;
+      this._popover.setSelectedIndex(index);
+    }
+
+    private _confirmSelectionAt(index: number, evt: MouseEvent | KeyboardEvent): void {
+      if (index < 0 || index >= this._items.length) return;
+      const item = this._items[index];
+      // Close before selectSuggestion(): plugin overrides commonly call
+      // setValue()/close() themselves too, and closing first means a
+      // subsequent setValue()-triggered 'input' event starts from clean state
+      // instead of racing this trigger loop's own in-flight generation.
+      this.close();
+      this.selectSuggestion(item, evt);
+    }
   };
 }
 

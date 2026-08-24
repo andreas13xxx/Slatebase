@@ -15,6 +15,7 @@ const BUILTIN_ITEMS: Array<{ id: BuiltinStatusBarItemId; label: string }> = [
   { id: 'vaultName', label: 'Vault-Name' },
   { id: 'wordStats', label: 'Wort- und Zeichenanzahl' },
   { id: 'cursorPosition', label: 'Cursor-Position' },
+  { id: 'linkCounts', label: 'Aus-/eingehende Links' },
 ]
 
 /** One visibility toggle row for a built-in status bar item (Requirement 6.1). */

@@ -204,45 +204,54 @@
   color: var(--text-muted);
 }
 
-/* Replace action buttons */
-.search-panel__replace-actions {
+/* Replace action button (inline, next to replace input) */
+.search-panel__replace-all-btn {
+  flex-shrink: 0;
   display: flex;
+  align-items: center;
   gap: 4px;
-  padding-left: 20px;
-  padding-top: 4px;
-}
-
-.search-panel__replace-btn {
   padding: 4px 10px;
-  border: 1px solid var(--border-default);
+  border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
-  background: var(--bg-elevated);
-  color: var(--text-primary);
+  background: var(--accent);
+  color: var(--text-inverse);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
+  white-space: nowrap;
   transition: background-color var(--transition-fast), border-color var(--transition-fast);
 }
 
-.search-panel__replace-btn:hover {
-  background: var(--sidebar-hover);
-  border-color: var(--border-strong);
-}
-
-.search-panel__replace-btn--primary {
-  background: var(--accent);
-  color: var(--text-inverse);
-  border-color: var(--accent);
-}
-
-.search-panel__replace-btn--primary:hover {
+.search-panel__replace-all-btn:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
 }
 
-.search-panel__replace-btn:disabled {
+.search-panel__replace-all-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Replace feedback message (success / error / loading) */
+.search-panel__replace-feedback {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px 0 20px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.search-panel__replace-feedback--success {
+  color: var(--success);
+}
+
+.search-panel__replace-feedback--error {
+  color: var(--danger-text);
+}
+
+.search-panel__replace-feedback--loading {
+  color: var(--text-muted);
 }
 
 /* ===== Scope Select ===== */
@@ -422,10 +431,15 @@
 .search-panel__hit {
   display: flex;
   align-items: flex-start;
+  width: 100%;
   padding: 4px 12px 4px 24px;
+  border: none;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: inherit;
+  text-align: left;
   cursor: pointer;
   transition: background-color var(--transition-fast);
-  border-left: 2px solid transparent;
 }
 
 .search-panel__hit:hover {
@@ -555,9 +569,9 @@
   border-color: var(--accent-hover);
 }
 
-/* ===== Hit Replace Button (inline) ===== */
+/* ===== File Header Replace Button (inline) ===== */
 
-.search-panel__hit-replace-btn {
+.search-panel__replace-hit-btn {
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -573,13 +587,18 @@
   transition: opacity var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast);
 }
 
-.search-panel__hit:hover .search-panel__hit-replace-btn {
+.search-panel__file-header:hover .search-panel__replace-hit-btn {
   opacity: 1;
 }
 
-.search-panel__hit-replace-btn:hover {
+.search-panel__replace-hit-btn:hover:not(:disabled) {
   background: var(--accent-light);
   color: var(--accent);
+}
+
+.search-panel__replace-hit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ===== Vault Group (Multi-Vault Results) ===== */

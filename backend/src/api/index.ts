@@ -332,7 +332,7 @@ export class VaultController implements IVaultController {
 
       // Publish vault:change event (exclude triggering user)
       const session = c.get('session') as SessionContext
-      this.publishVaultChange(vaultId, 'saved', filePath, session.userId, session.username)
+      await this.publishVaultChange(vaultId, 'saved', filePath, session.userId, session.username)
 
       return c.json(result, 200)
     } catch (error) {
@@ -543,7 +543,7 @@ export class VaultController implements IVaultController {
 
       // Publish vault:change event (exclude triggering user)
       const session = c.get('session') as SessionContext
-      this.publishVaultChange(vaultId, 'deleted', decodedPath, session.userId, session.username)
+      await this.publishVaultChange(vaultId, 'deleted', decodedPath, session.userId, session.username)
 
       return c.body(null, 204)
     } catch (error) {
@@ -601,7 +601,7 @@ export class VaultController implements IVaultController {
         : undefined
 
       // Publish vault:change event (exclude triggering user)
-      this.publishVaultChange(vaultId, 'renamed', result.newPath, session.userId, session.username)
+      await this.publishVaultChange(vaultId, 'renamed', result.newPath, session.userId, session.username)
 
       return c.json(linkMigrationWarnings ? { ...result, linkMigrationWarnings } : result, 200)
     } catch (error) {
@@ -659,7 +659,7 @@ export class VaultController implements IVaultController {
         : undefined
 
       // Publish vault:change event (exclude triggering user)
-      this.publishVaultChange(vaultId, 'renamed', result.newPath, session.userId, session.username)
+      await this.publishVaultChange(vaultId, 'renamed', result.newPath, session.userId, session.username)
 
       return c.json(linkMigrationWarnings ? { ...result, linkMigrationWarnings } : result, 200)
     } catch (error) {
@@ -689,7 +689,7 @@ export class VaultController implements IVaultController {
     for (const pair of pairs) {
       const migrationResult = await hook.migrateLinks(vaultId, pair.oldPath, pair.newPath, oldTree)
       for (const migrated of migrationResult.migratedFiles) {
-        this.publishVaultChange(vaultId, 'saved', migrated.path, session.userId, session.username)
+        await this.publishVaultChange(vaultId, 'saved', migrated.path, session.userId, session.username)
       }
       failures.push(...migrationResult.failedFiles)
     }
@@ -699,20 +699,26 @@ export class VaultController implements IVaultController {
 
   /**
    * Publishes a vault:change event via the event bus after a file operation.
-   * Uses broadcast targeting with sender exclusion for simplicity (MVP).
-   * The frontend will ignore events for vaults it doesn't have access to.
+   * Targets only the vault's owner and users it's been explicitly shared
+   * with (falls back to broadcast if access control isn't wired, e.g. in tests).
    */
-  private publishVaultChange(
+  private async publishVaultChange(
     vaultId: string,
     action: 'saved' | 'deleted' | 'renamed',
     filePath: string,
     userId: string,
     username: string,
-  ): void {
-    this.eventBus?.publish({
+  ): Promise<void> {
+    if (!this.eventBus) return
+
+    const target = this.accessControl
+      ? { kind: 'users' as const, userIds: await this.accessControl.getUsersWithAccess(vaultId) }
+      : { kind: 'broadcast' as const }
+
+    this.eventBus.publish({
       type: 'vault:change',
       payload: { vaultId, action, path: filePath, userId, username },
-      target: { kind: 'broadcast' },
+      target,
       excludeUserId: userId,
     })
   }

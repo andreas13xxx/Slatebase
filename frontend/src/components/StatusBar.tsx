@@ -13,7 +13,7 @@
 
 import { useState, useEffect, useRef, useCallback, type FormEvent } from 'react'
 import { useTranslation } from '../i18n'
-import { Clock, Vault as VaultIcon, FileText, MoveVertical } from 'lucide-react'
+import { Clock, Vault as VaultIcon, FileText, MoveVertical, Link2 } from 'lucide-react'
 import {
   getStatusBarItems,
   onStatusBarItemsChange,
@@ -21,6 +21,7 @@ import {
 import type { StatusBarItemEntry } from '../plugins/compat/status-bar-registry'
 import { useStatusBarItemVisibility } from '../hooks/useStatusBarItemVisibility'
 import { useWordStats } from '../hooks/useWordStats'
+import { useLinkCounts } from '../hooks/useLinkCounts'
 import { useCursorPosition, goToLine } from '../hooks/useCursorPosition'
 import { useAppContext } from '../state'
 import { useFocusTrap } from '../hooks/useFocusTrap'
@@ -74,6 +75,22 @@ function WordStatsItem() {
     <div className="status-bar__item status-bar__word-stats" aria-label={t('statusBar.wordStatsAriaLabel')}>
       <FileText size={12} aria-hidden="true" />
       <span>{label}</span>
+    </div>
+  )
+}
+
+/** Outgoing/incoming link count item for the active document. */
+function LinkCountsItem() {
+  const { t } = useTranslation()
+  const { visible } = useStatusBarItemVisibility('linkCounts')
+  const counts = useLinkCounts()
+
+  if (!visible || !counts) return null
+
+  return (
+    <div className="status-bar__item status-bar__link-counts" aria-label={t('statusBar.linkCountsAriaLabel')}>
+      <Link2 size={12} aria-hidden="true" />
+      <span>{t('statusBar.linkCounts', { forward: counts.forward, backlinks: counts.backlinks })}</span>
     </div>
   )
 }
@@ -240,6 +257,7 @@ export function StatusBar() {
         )}
         <VaultNameItem />
         <WordStatsItem />
+        <LinkCountsItem />
         <CursorPositionItem />
       </div>
       <div

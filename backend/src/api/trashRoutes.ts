@@ -192,7 +192,7 @@ export function createTrashRoutes(deps: TrashRouteDependencies): Hono {
     try {
       const result = await trashService.restore(vaultId, entryId)
 
-      // Publish vault:change event on successful restore
+      // Publish vault:change event on successful restore, scoped to the vault's owner and shared users
       eventBus.publish({
         type: 'vault:change',
         payload: {
@@ -202,7 +202,7 @@ export function createTrashRoutes(deps: TrashRouteDependencies): Hono {
           userId: session.userId,
           username: session.username,
         },
-        target: { kind: 'broadcast' },
+        target: { kind: 'users', userIds: await accessControl.getUsersWithAccess(vaultId) },
         excludeUserId: session.userId,
       })
 

@@ -43,6 +43,18 @@ export interface FileExplorerFileItem {
   file: TAbstractFile
   /** The row's title element — safe to append/query custom child elements into. */
   titleEl: HTMLElement
+  /**
+   * The inner content wrapper inside `titleEl` (icon + name, `.nav-*-title-content`
+   * in TreeNode.tsx) — real Obsidian's `titleInnerEl`/`innerEl`. Plugins that
+   * insert an icon via `titleEl.insertBefore(iconEl, titleInnerEl)` (Iconize's
+   * `addAll()` reload path) rely on this to land the icon *before* the name;
+   * without it, `insertBefore`'s reference-node argument is `undefined`, which
+   * the DOM treats the same as `null` — i.e. "append at the end" — putting the
+   * icon after the name instead of before it. `undefined` here (rename state,
+   * no wrapper span in the DOM) mirrors that same fallback-to-append behavior
+   * rather than passing `titleEl` itself, which `insertBefore` would reject.
+   */
+  titleInnerEl: HTMLElement | undefined
   /** The row's outer container element (its `<li>`). */
   selfEl: HTMLElement
 }
@@ -57,8 +69,9 @@ export function registerFileExplorerRow(
   titleEl: HTMLElement,
 ): void {
   const selfEl = titleEl.closest('li') ?? titleEl
+  const titleInnerEl = titleEl.querySelector<HTMLElement>('.tree-node-name-wrapper') ?? undefined
   const file: TAbstractFile = type === 'file' ? buildTFileFromPath(path) : buildTFolderFromPath(path, name)
-  items.set(path, { file, titleEl, selfEl })
+  items.set(path, { file, titleEl, titleInnerEl, selfEl })
 }
 
 /** Called by TreeNode when a file/folder row's title element unmounts. */

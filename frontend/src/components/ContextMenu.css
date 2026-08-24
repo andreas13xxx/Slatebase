@@ -75,6 +75,19 @@
   color: var(--text-secondary);
 }
 
+.context-menu-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-menu-submenu-arrow {
+  flex-shrink: 0;
+  margin-left: 8px;
+  color: var(--text-secondary);
+}
+
 .context-menu-separator {
   height: 1px;
   margin: 4px 8px;

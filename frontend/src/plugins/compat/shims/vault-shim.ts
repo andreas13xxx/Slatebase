@@ -916,7 +916,12 @@ export class VaultShim implements IVaultShim {
    * Used by LiveSync for case-insensitive file matching.
    */
   getAbstractFileByPathInsensitive(path: string): TAbstractFile | null {
-    if (!path || path.trim() === '') return null;
+    // Root folder: same "/" === "" convention as getAbstractFileByPath() above —
+    // real Obsidian's root TFolder.path is "/", so plugins normalize an empty
+    // folder path (e.g. a root-level file's parent) to "/" before looking it up.
+    if (path === '/' || path === '') {
+      return treeNodeToTFolder(this.directoryTree, null);
+    }
     const lower = path.toLowerCase();
     const node = findNodeByPathInsensitive(this.directoryTree, lower);
     if (!node) return null;

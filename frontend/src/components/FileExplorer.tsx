@@ -19,12 +19,12 @@ import { getCachedStatistics, fetchVaultStatistics, invalidateStatisticsCache, f
 import { onRealtimeVaultChange } from '../state/realtimeVaultBridge'
 import { getState as getWorkspaceState, updateExpandedState } from '../state/workspaceStore'
 import { consumePendingReveal } from '../state/revealFileBridge'
+import { consumePendingRename, consumePendingDelete } from '../state/fileOpBridge'
 import { TreeNode } from './file-explorer'
 import type { DragState, ExternalDropState, ContextMenuState, InlineInputState } from './file-explorer'
-import { getActiveWorkspaceShim } from '../plugins/compat/active-workspace-shim'
 import { buildTFileFromPath, buildTFolderFromPath } from '../plugins/compat/plugin-event-bridge'
 import type { TFile, TFolder } from '../plugins/compat/types'
-import { withPluginContext } from '../plugins/compat/plugin-execution-context'
+import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
 
 /**
  * Monotonic per-vault sequence counter used to discard out-of-order fetchVaultTree
@@ -272,6 +272,76 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
     return () => window.removeEventListener('slatebase:reveal-file', handleRevealFile)
   }, [state.selectedVaultId])
 
+  // Rename/delete a specific file or folder from outside the explorer (tab bar,
+  // backlinks/outgoing links, search results, graph nodes — see fileNavigation.ts):
+  // expand ancestors so the target row exists in the DOM, then open the same
+  // inline-rename / delete-confirm UI a right-click inside the explorer would.
+  useEffect(() => {
+    function expandAncestors(vaultId: string, path: string, kind: 'file' | 'folder') {
+      setExpandedVaults((prev) => {
+        const next = new Set(prev)
+        next.add(vaultId)
+        return next
+      })
+      setExpandedPaths((prev) => {
+        const next = new Set(prev)
+        const segments = path.split('/')
+        const depth = kind === 'folder' ? segments.length : segments.length - 1
+        let acc = ''
+        for (let i = 0; i < depth; i++) {
+          acc = acc ? `${acc}/${segments[i]}` : segments[i]
+          next.add(`${vaultId}::${acc}`)
+        }
+        return next
+      })
+    }
+
+    function buildSyntheticNode(path: string, kind: 'file' | 'folder'): DirectoryTree {
+      return { name: path.split('/').pop() ?? path, path, type: kind === 'folder' ? 'directory' : 'file' }
+    }
+
+    function applyRename(detail: { path: string; kind?: 'file' | 'folder' } | null | undefined) {
+      const vaultId = state.selectedVaultId
+      if (!detail || !vaultId) return
+      const kind = detail.kind ?? 'file'
+      expandAncestors(vaultId, detail.path, kind)
+      setInlineInputState({
+        visible: true,
+        mode: 'rename',
+        parentPath: '',
+        node: buildSyntheticNode(detail.path, kind),
+        vaultId,
+      })
+    }
+
+    function applyDelete(detail: { path: string; kind?: 'file' | 'folder' } | null | undefined) {
+      const vaultId = state.selectedVaultId
+      if (!detail || !vaultId) return
+      const kind = detail.kind ?? 'file'
+      expandAncestors(vaultId, detail.path, kind)
+      setDeleteConfirm({ open: true, node: buildSyntheticNode(detail.path, kind), vaultId })
+    }
+
+    function handleRenameRequest(e: Event) {
+      applyRename((e as CustomEvent<{ path: string; kind?: 'file' | 'folder' }>).detail)
+    }
+    function handleDeleteRequest(e: Event) {
+      applyDelete((e as CustomEvent<{ path: string; kind?: 'file' | 'folder' }>).detail)
+    }
+
+    if (state.selectedVaultId) {
+      applyRename(consumePendingRename())
+      applyDelete(consumePendingDelete())
+    }
+
+    window.addEventListener('slatebase:rename-file', handleRenameRequest)
+    window.addEventListener('slatebase:delete-file', handleDeleteRequest)
+    return () => {
+      window.removeEventListener('slatebase:rename-file', handleRenameRequest)
+      window.removeEventListener('slatebase:delete-file', handleDeleteRequest)
+    }
+  }, [state.selectedVaultId])
+
   // Runs after every render: once the revealed file's/folder's ancestors are expanded
   // and it exists in the DOM, scroll to it and clear the pending request.
   useEffect(() => {
@@ -483,49 +553,11 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
    * explorer"). Returns [] when no plugin is listening (or none are loaded
    * yet), in which case the menu looks exactly as it did before this existed.
    */
-  function buildPluginMenuItems(node: DirectoryTree): ContextMenuItem[] {
-    const workspaceShim = getActiveWorkspaceShim()
-    const MenuCtor = (window as unknown as { obsidian?: { Menu?: new () => { items: Array<{ kind: string; title: string; icon: string; disabled: boolean; callback: (evt: MouseEvent | KeyboardEvent) => void; pluginId: string | null }> } } }).obsidian?.Menu
-    if (!workspaceShim || !MenuCtor) return []
-
+  function buildFileMenuItems(node: DirectoryTree): ContextMenuItem[] {
     const file: TFile | TFolder = node.type === 'file'
       ? buildTFileFromPath(node.path)
       : buildTFolderFromPath(node.path, node.name)
-
-    const menu = new MenuCtor()
-    try {
-      workspaceShim.trigger('file-menu', menu, file, 'file-explorer-context-menu')
-    } catch (err) {
-      console.error('[FileExplorer] A plugin\'s file-menu handler threw:', err)
-    }
-
-    const items: ContextMenuItem[] = []
-    menu.items.forEach((entry, index) => {
-      if (entry.kind === 'separator') {
-        items.push({ id: `plugin-menu-sep-${index}`, label: '', separator: true })
-        return
-      }
-      items.push({
-        id: `plugin-menu-item-${index}`,
-        label: entry.title,
-        disabled: entry.disabled,
-        run: () => {
-          try {
-            // Replay the plugin context captured when the item was built (see
-            // MenuEntry.pluginId) — the click happens on a later, separate event
-            // than the synchronous file-menu trigger above, so without this a
-            // callback that opens a Modal builds it with no plugin tagged, and
-            // CssInjector's [data-plugin-id] scoping matches nothing inside it.
-            withPluginContext(entry.pluginId, () => entry.callback(new MouseEvent('click')))
-          } catch (err) {
-            console.error('[FileExplorer] A plugin\'s file-menu item threw:', err)
-          }
-        },
-      })
-    })
-
-    if (items.length === 0) return []
-    return [{ id: 'plugin-menu-sep-leading', label: '', separator: true }, ...items]
+    return buildPluginMenuItems('file-menu', [file, 'file-explorer-context-menu'], 'file-explorer-plugin-menu')
   }
 
   function handleContextMenu(e: React.MouseEvent, node: DirectoryTree, vaultId: string) {
@@ -1217,10 +1249,6 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
                 && inlineInputState.parentPath === ''
                 && inlineInputState.vaultId === vault.id
 
-              const showRootDropZone = dragState.draggedPath !== null
-                && dragState.draggedVaultId === vault.id
-                && dragState.validTargets.has('')
-
               return (
                 <li key={vault.id} className="tree-node tree-node--vault">
                   <div
@@ -1310,17 +1338,6 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
                           </div>
                         </li>
                       )}
-                      {showRootDropZone && (
-                        <li className="tree-node">
-                          <div
-                            className="file-explorer-root-drop-zone"
-                            onDragOver={(e) => handleRootDragOver(e, vault.id)}
-                            onDrop={(e) => handleRootDrop(e, vault.id)}
-                          >
-                            {t('fileOps.dropToRoot')}
-                          </div>
-                        </li>
-                      )}
                     </ul>
                   )}
                 </li>
@@ -1390,7 +1407,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
             { id: 'separator-2', label: '', separator: true },
             { id: 'versions', label: 'Versionen', icon: <History size={14} /> },
           ]
-          menuItems = [...menuItems, ...buildPluginMenuItems(node)]
+          menuItems = [...menuItems, ...buildFileMenuItems(node)]
         } else if (isFolder) {
           // Folder context menu: Neuer Ordner, Neue Datei, Neues Canvas, Umbenennen, Löschen
           menuItems = [
@@ -1401,7 +1418,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
             { id: 'rename', label: t('contextMenu.rename'), icon: <Pencil size={14} /> },
             { id: 'delete', label: t('contextMenu.delete'), icon: <Trash2 size={14} /> },
           ]
-          menuItems = [...menuItems, ...buildPluginMenuItems(node)]
+          menuItems = [...menuItems, ...buildFileMenuItems(node)]
         } else {
           // Vault entry context menu: Neuer Ordner, Neue Datei, Neues Canvas, Neue Notiz aus Vorlage, Export
           menuItems = [

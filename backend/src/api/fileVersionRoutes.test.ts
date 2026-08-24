@@ -37,6 +37,7 @@ function createMockAccessControl(overrides: Partial<IVaultAccessControl> = {}): 
   return {
     checkReadAccess: async () => {},
     checkWriteAccess: async () => {},
+    getUsersWithAccess: async () => [],
     ...overrides,
   } as IVaultAccessControl
 }

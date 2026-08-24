@@ -75,6 +75,8 @@ OWASP-Top-10-strukturierter Security-Audit (`SECURITY-AUDIT.md`). 9 Findings (1 
 
 **Nachträglicher Follow-up (2026-08-19):** Server-seitige verschlüsselte Ablage für Plugin-Secrets (`backend/src/plugin/secret-key-manager.ts`, `secret-store.ts`). `SecretStorage`/`SecretComponent`-Secrets lagen zuvor unverschlüsselt im Browser-`localStorage` (CodeQL-Alert CWE-312) — jetzt AES-256-GCM-verschlüsselt pro Vault/Plugin serverseitig gespeichert, Schlüsselableitung via HKDF aus `SLATEBASE_PLUGIN_SECRET_KEY` (Env → Datei → generiert, gleiches Muster wie das CSRF-Secret). REST-Endpunkte für Read/Write, `localStorage` dient nur noch als Legacy-Migrations-/Offline-Fallback.
 
+**Nachträglicher Follow-up (2026-08-24):** Realtime-`vault:change`-Events (Speichern/Löschen/Umbenennen/Wiederherstellen — `VaultController`, Template-, Datei-Versions-, Trash-Restore- und Upload-Routen) liefen bisher per `target: { kind: 'broadcast' }` an **jeden** verbundenen Nutzer, mit dem expliziten Kommentar, das Frontend werde Events für nicht zugängliche Vaults schon selbst ignorieren — eine Client-seitige Filterung ist aber kein Zugriffsschutz und legte Vault-ID, Dateipfad, Aktion und Benutzername fremder privater Vault-Operationen gegenüber jedem angemeldeten Nutzer offen. Fix: neue `IVaultAccessControl.getUsersWithAccess(vaultId)`-Methode (Owner + alle Share-Empfänger, dedupliziert), jede `vault:change`-Publikation zielt jetzt auf `{ kind: 'users', userIds }` statt Broadcast (Fallback auf Broadcast nur, wenn `accessControl` nicht verdrahtet ist, z. B. in Tests). Details: `lessons-learned.md` #123.
+
 ---
 
 ## Erledigt — Accessibility Audit (Track F) ✅
@@ -279,6 +281,42 @@ Zwei zusammengehörende Erweiterungen auf einer gemeinsamen Property-/Metadaten-
 **Bewusst nicht angefasst:** Das Scoping-Modell als solches (Plugin-CSS darf Slatebases Kern-DOM weiterhin nicht umgestalten — Host-Klassen sind die einzige Ausnahme, weil sie den Kontext des Plugin-Elements beschreiben und nicht fremdes DOM), der leere `.view-header`-Platzhalter, und die fehlende Namespacing von `@keyframes`. Alle drei sind in `PLUGIN-COMPAT.md` unter den bekannten Lücken dokumentiert.
 
 **Testbilanz:** 32 neue Frontend-Tests (`css-injector` Host-Klassen, `notice`, `deliberate-noops`, `editor-shim.gap`); ein bestehender `css-injector`-Test kodierte den Host-Klassen-Bug als Erwartung und wurde korrigiert. Gesamtsuite 2509 grün, `tsc -b` und `eslint --quiet` fehlerfrei.
+
+---
+
+## Erledigt — Kontextmenü-Ausbau (Direktauftrag, kein Roadmap-Track) ✅
+
+**Kein Spec-Verzeichnis** — direkt beauftragter Ausbau des Rechtsklick-Kontextmenüs auf praktisch jede Oberfläche der App (2026-08-24).
+
+Vorher hatte nur der Datei-Explorer ein echtes Kontextmenü; alle übrigen Oberflächen (Tabs, Editor, gerenderte Links, Graph-Knoten, Links-Panel, Suchergebnisse) hatten entweder gar keins oder das native Browser-Menü. Zentrales neues Stück: `plugin-menu-bridge.ts` — feuert die echten Obsidian-Workspace-Events (`file-menu`/`files-menu`/`editor-menu`/`url-menu`) und übersetzt das von Plugins befüllte `Menu`-Objekt in `ContextMenuItem[]`, sodass jede neue Oberfläche automatisch plugin-erweiterbar ist.
+
+- **Tab-Leiste**: Schließen/Andere schließen/Rechts schließen (neue Reducer-Actions `CLOSE_OTHER_TABS`/`CLOSE_TABS_TO_RIGHT` in `tabState.ts`) + Reveal/Umbenennen/Löschen + `file-menu` mit Source `'tab-header'` (wie in echtem Obsidian, das Tab-Header-Menüs über denselben `file-menu`-Event abwickelt).
+- **Editor** (`editor-context-menu.ts`, neu): Ausschneiden/Kopieren/Einfügen, Link einfügen, Submenüs für Text-/Absatzformat/Element einfügen/Tabelle bearbeiten (delegieren an bestehende `editor:*`-Core-Commands — Verhalten bleibt automatisch identisch zur Befehlspalette), **neue Aktion „Auswahl in neue Notiz extrahieren"** (Note-Composer-Äquivalent: fragt nach Namen, nutzt `getAvailablePath()` für kollisionssichere Benennung, ersetzt die Auswahl durch einen Wikilink), Kopieren als Markdown, Zeilennummern umschalten (Checkbox-Item), `editor-menu`. Ersetzt den zuvor wirkungslosen Core-Command `editor:context-menu`. Neue Formatierungs-Aktion `'callout'` (`editor/formatting.ts`/`types.ts`, umschließt Auswahl/Zeile mit `> [!note]`) nur für diesen Menüeintrag.
+- **Links in Editor & Rendering**: Rechtsklick auf einen gerenderten Live-Preview-Link zeigt jetzt ein linkspezifisches Menü (`file-menu` für interne Wikilinks, `url-menu` für externe) statt des generischen Editor-Menüs; gleiche Behandlung für gerenderte Links im View Mode über ein neues `data-link-path`-Attribut.
+- **Links-Panel**: Datei-Menü pro Eintrag, zusätzlich einklappbare Abschnitte mit Trefferzahl (neue `CollapsibleSection`) und ein behobener `overflow-y`-Bug (Panel lief zuvor lautlos ohne Scrollbalken über). **Link-Zähler in der Statusleiste** (kleine, an dieselbe Datenquelle angehängte Ergänzung): neues `LinkCountsItem` zeigt "N aus- / M eingehend" für die aktive Datei — keine neue Berechnung, nur eine neue Präsentation der bereits fürs Links-Panel berechneten Zahlen (`linkCountsBridge.ts`/`useLinkCounts.ts`, Publish/Subscribe analog zu `VaultNameItem`/`WordStatsItem`), einzeln in Settings → Darstellung umschaltbar.
+- **Outline-Panel**: eigenständiges, lokales Mini-Menü (Überschriftentext kopieren / Link zur Überschrift kopieren) — bewusst nicht über die Plugin-Bridge geroutet, da Überschriften keine `TAbstractFile`s sind.
+- **Graph-Ansicht**: Öffnen/Reveal/Umbenennen/Löschen + `file-menu` für aufgelöste Datei-Knoten (Tag-/Property-/unresolved-Knoten bewusst ohne Menü, wie in echtem Obsidian).
+- **Suchergebnisse**: Datei-Menü pro Dateigruppen-Header, bei Multi-Vault-Suche auf den aktiven Vault beschränkt (Reveal/Umbenennen/Löschen ergeben nur im gerade ausgewählten Vault Sinn).
+- **Globaler Fallback** (`GlobalContextMenuFallback.tsx`, neu): unterdrückt das native Browser-Menü auf allen übrigen Flächen (Settings-Seiten, Chrome-Leerraum) mit einem einzelnen „Kopieren"-Eintrag bei aktiver Textauswahl, sonst leer — einmalig am App-Root gemountet, analog zu `GlobalTooltip`.
+- **Trägt-Infrastruktur** für Reveal/Umbenennen/Löschen von außerhalb des Explorers (Tab-Leiste, Links-Panel, Suche, Graph): neue `fileNavigation.ts` (aktiviert den Explorer über den bestehenden Core-Command `file-explorer:open`, dispatcht dann die Aktion) + `fileOpBridge.ts` (CustomEvent + Pending-Slot-Muster, analog zum bestehenden `revealFileBridge.ts`, damit ein noch nicht gemounteter Explorer die Anfrage beim Mount abholt).
+
+**Echter Bug gefunden und gefixt:** Synthetische `TFile`/`TFolder`-Objekte für Menü-Items (`plugin-event-bridge.ts`) hatten `parent: null` und kein korrektes Prototype — `file instanceof TFile` schlug fehl, `.parent` war immer `null`. Betraf u. a. **Excalidraws** Tab-/Datei-Menü-Handler „New drawing". Fix: echter Eltern-Ordner wird berechnet, `Object.setPrototypeOf()` gegen die globalen `obsidian.TFile`/`TFolder`-Prototypen (analog zu einem bestehenden Muster in `vault-shim.ts`). Details: `lessons-learned.md` #118–119, `PLUGIN-COMPAT.md`.
+
+**Nebenbei gefunden und behoben (unabhängig vom Kontextmenü-Scope):**
+- `SearchPanel.tsx`/`.css`: CSS-Klassenname des Einzeltreffer-„Ersetzen"-Buttons stimmte nie mit der tatsächlich im TSX verwendeten Klasse überein (`.search-panel__hit-replace-btn` vs. `search-panel__replace-hit-btn`) — bestehender, unbemerkter Mismatch, jetzt konsistent benannt (`.search-panel__replace-all-btn`) inkl. Erfolgs-/Fehler-/Lade-Styling; zusätzlich kollisionssicherer React-`key` (`${resultId}::${hitIndex}`) für die Treffer-Liste.
+- Scroll-Chaining-Fix (`html`/`body` jetzt `height:100%; overflow:hidden` + `overscroll-behavior`) und CSS-Snippets-Dark-Mode-Spezifitätsfix (`:where()`) — siehe `lessons-learned.md` #124–125.
+
+**Nicht angefasst:** Der veraltete, redundante „Drop-Zone am Root"-`<li>` im Datei-Explorer (eigener `dropToRoot`-i18n-String) wurde entfernt, weil Droppen direkt auf die Vault-Zeile selbst bereits funktionierte — reine Aufräumarbeit, kein Funktionsverlust.
+
+---
+
+## Erledigt — Plugin-Compat-Fixes: YAML-Frontmatter, Editor-Shim, EditorSuggest-Timing (Direktauftrag, kein Roadmap-Track) ✅
+
+**Kein Spec-Verzeichnis** — dritter QS-Durchlauf über die Plugin-Kompatibilitätsschicht, unabhängig vom Kontextmenü-Ausbau gefunden, vermutlich beim Durchtesten echter Plugins gegen die neuen Menü-Oberflächen (2026-08-24). Details siehe `PLUGIN-COMPAT.md`, `lessons-learned.md` #120–122.
+
+- **Handgestrickter YAML-Frontmatter-Parser durch echte `yaml`-Bibliothek ersetzt** (`file-manager-shim.ts`, `metadata-parser.ts`, `obsidian-api-extensions.ts`): Der bisherige Parser kannte nur flache `key: value`-Paare + Inline-Arrays (`[a,b]`); verschachtelte Objekte/Arrays wurden beim Schreiben still zu `"[object Object]"` oder beim Lesen verworfen. Auslösender Realfall: **Day Planners** verschachtelte `planner: { log: [...] }`-Frontmatter-Struktur. Echter Datenverlust-Bugfix, betrifft jedes Plugin mit strukturiertem Frontmatter.
+- **`Editor.containerEl`/`coordsAtPos()`/`cursorCoords()` ergänzt** (`editor-shim.ts`): reale, in Obsidians öffentlicher API nicht dokumentierte Editor-Member. **„Editing Toolbar"** ruft sie zur Positionierung seiner schwebenden Auswahl-Toolbar auf — der generische Gap-Proxy lieferte zuvor eine immer-truthy No-Op-Funktion, deren DOM-Methodenaufrufe auf dem Rückgabewert einen `TypeError` auslösten. Echter Absturz-Fix.
+- **`EditorSuggest`-Timing-Bug** (`editor-suggest-manager.ts`): fehlender Microtask-Yield vor dem Popover-Rendering ließ synchrone `getSuggestions()`-Implementierungen mit `"Reading the editor layout isn't allowed during an update"` abstürzen (Aufruf läuft aus einem CM6-`ViewPlugin.update()` heraus). Betrifft jedes `EditorSuggest`-Plugin mit synchroner Vorschlagsquelle.
 
 ---
 

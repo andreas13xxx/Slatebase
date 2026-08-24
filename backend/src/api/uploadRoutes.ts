@@ -311,7 +311,7 @@ export function createUploadRoutes(deps: UploadRouteDependencies): Hono {
       return c.json(apiError, 500)
     }
 
-    // 8. Publish vault:change event
+    // 8. Publish vault:change event, scoped to the vault's owner and shared users
     eventBus.publish({
       type: 'vault:change',
       payload: {
@@ -321,7 +321,7 @@ export function createUploadRoutes(deps: UploadRouteDependencies): Hono {
         userId: session.userId,
         username: session.username,
       },
-      target: { kind: 'broadcast' },
+      target: { kind: 'users', userIds: await accessControl.getUsersWithAccess(vaultId) },
       excludeUserId: session.userId,
     })
 

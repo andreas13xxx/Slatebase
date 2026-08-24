@@ -40,7 +40,8 @@
 }
 
 .status-bar__vault-name,
-.status-bar__word-stats {
+.status-bar__word-stats,
+.status-bar__link-counts {
   color: var(--status-bar-text);
   opacity: 0.85;
 }

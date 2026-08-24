@@ -311,6 +311,22 @@
   color: var(--text-error);
 }
 
+/* ─── Heading scale for plugin-rendered content ───────────────────────────
+   index.css's global `h1..h6` reset only zeroes margin/weight/color — it
+   never wires up Obsidian's real per-level size scale, so a raw <h1>-<h6> a
+   plugin builds itself (e.g. Iconize's "Recently used Icons" label in its
+   icon-picker modal) fell back to the browser's UA default sizes instead of
+   the app's compact scale. Scoped to `[data-plugin-id]` (every plugin-spawned
+   modal/view root carries it, see Modal constructor in install-globals.ts) so
+   Slatebase's own native headings — which already set their own sizes via
+   more specific selectors — are unaffected. */
+[data-plugin-id] h1 { font-size: var(--h1-size); font-weight: var(--h1-weight); color: var(--h1-color); }
+[data-plugin-id] h2 { font-size: var(--h2-size); font-weight: var(--h2-weight); color: var(--h2-color); }
+[data-plugin-id] h3 { font-size: var(--h3-size); font-weight: var(--h3-weight); color: var(--h3-color); }
+[data-plugin-id] h4 { font-size: var(--h4-size); font-weight: var(--h4-weight); color: var(--h4-color); }
+[data-plugin-id] h5 { font-size: var(--h5-size); font-weight: var(--h5-weight); color: var(--h5-color); }
+[data-plugin-id] h6 { font-size: var(--h6-size); font-weight: var(--h6-weight); color: var(--h6-color); }
+
 /* ─── Modal extras ────────────────────────────────────────────────────────
    .modal / .modal-bg / .modal-container / .modal-content are styled in
    App.css; these are the parts only the plugin shims render. */

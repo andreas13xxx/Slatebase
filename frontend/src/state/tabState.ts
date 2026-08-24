@@ -49,6 +49,8 @@ export type TabAction =
   | { type: 'UPDATE_TAB_PATHS'; payload: { oldPathPrefix: string; newPathPrefix: string } }
   | { type: 'CLOSE_TABS_BY_PATH'; payload: { pathPrefix: string } }
   | { type: 'REORDER_TABS'; payload: { fromIndex: number; toIndex: number } }
+  | { type: 'CLOSE_OTHER_TABS'; payload: { tabId: string } }
+  | { type: 'CLOSE_TABS_TO_RIGHT'; payload: { tabId: string } }
 
 /** Initial tab state with no open tabs. */
 export const initialTabState: TabState = {
@@ -341,6 +343,31 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
         }
       }
 
+      return {
+        ...state,
+        tabs: newTabs,
+        activeTabId: newActiveTabId,
+      }
+    }
+
+    case 'CLOSE_OTHER_TABS': {
+      const { tabId } = action.payload
+      if (!state.tabs.some((t) => t.id === tabId)) return state
+      return {
+        ...state,
+        tabs: state.tabs.filter((t) => t.id === tabId),
+        activeTabId: tabId,
+      }
+    }
+
+    case 'CLOSE_TABS_TO_RIGHT': {
+      const { tabId } = action.payload
+      const index = state.tabs.findIndex((t) => t.id === tabId)
+      if (index === -1) return state
+      const newTabs = state.tabs.slice(0, index + 1)
+      const newActiveTabId = state.activeTabId !== null && newTabs.some((t) => t.id === state.activeTabId)
+        ? state.activeTabId
+        : tabId
       return {
         ...state,
         tabs: newTabs,

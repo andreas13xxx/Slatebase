@@ -246,6 +246,12 @@ export interface IVaultAccessControl {
 
   /** Updates the permission level of an existing share. */
   updateSharePermission(vaultId: string, ownerId: string, targetUserId: string, permission: 'read' | 'write'): Promise<void>
+
+  /**
+   * Returns the owner plus every user with a share on the vault (deduplicated).
+   * Used to scope realtime broadcasts (e.g. vault:change) to authorized users only.
+   */
+  getUsersWithAccess(vaultId: string): Promise<string[]>
 }
 
 // --- Implementation ---
@@ -946,12 +952,17 @@ export class VaultService implements IVaultService {
       tree: updatedTree,
     })
 
-    // 6. Publish vault:change event
-    this.eventBus?.publish({
-      type: 'vault:change',
-      payload: { vaultId, action: 'deleted', path: relativePath },
-      target: { kind: 'broadcast' },
-    })
+    // 6. Publish vault:change event, scoped to the vault's owner and shared users
+    if (this.eventBus) {
+      const target = this.registry && this.shareRegistry
+        ? { kind: 'users' as const, userIds: await resolveVaultAccessUserIds(vaultId, this.registry, this.shareRegistry) }
+        : { kind: 'broadcast' as const }
+      this.eventBus.publish({
+        type: 'vault:change',
+        payload: { vaultId, action: 'deleted', path: relativePath },
+        target,
+      })
+    }
 
     this.logger.info('Content deleted', { vaultId, path: relativePath, resolvedPath })
   }
@@ -1193,6 +1204,31 @@ export class VaultService implements IVaultService {
 }
 
 
+// --- Shared Helpers ---
+
+/**
+ * Returns the owner plus every user with a share on the vault (deduplicated).
+ * Used to scope realtime broadcasts (e.g. vault:change) to authorized users only.
+ */
+async function resolveVaultAccessUserIds(
+  vaultId: string,
+  vaultRegistry: IVaultRegistry,
+  shareRegistry: IVaultShareRegistry,
+): Promise<string[]> {
+  const entry = vaultRegistry.findById(vaultId)
+  const shares = await shareRegistry.getSharesForVault(vaultId)
+
+  const userIds = new Set<string>()
+  if (entry?.ownerId) {
+    userIds.add(entry.ownerId)
+  }
+  for (const share of shares) {
+    userIds.add(share.userId)
+  }
+
+  return Array.from(userIds)
+}
+
 // --- Vault Access Control Implementation ---
 
 /**
@@ -1277,6 +1313,14 @@ export class VaultAccessControlService implements IVaultAccessControl {
     }
 
     return
+  }
+
+  /**
+   * Returns the owner plus every user with a share on the vault (deduplicated).
+   * Used to scope realtime broadcasts (e.g. vault:change) to authorized users only.
+   */
+  async getUsersWithAccess(vaultId: string): Promise<string[]> {
+    return resolveVaultAccessUserIds(vaultId, this.vaultRegistry, this.shareRegistry)
   }
 
   /**

@@ -328,7 +328,7 @@ export function createFileVersionRoutes(deps: FileVersionRouteDependencies): Hon
     try {
       await versionService.restoreVersion(vaultId, filePath, timestamp)
 
-      // Publish vault:change event (file was modified by restore)
+      // Publish vault:change event (file was modified by restore), scoped to the vault's owner and shared users
       eventBus.publish({
         type: 'vault:change',
         payload: {
@@ -338,7 +338,7 @@ export function createFileVersionRoutes(deps: FileVersionRouteDependencies): Hon
           userId: session.userId,
           username: session.username,
         },
-        target: { kind: 'broadcast' },
+        target: { kind: 'users', userIds: await accessControl.getUsersWithAccess(vaultId) },
         excludeUserId: session.userId,
       })
 

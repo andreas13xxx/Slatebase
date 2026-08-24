@@ -11,6 +11,7 @@
  * @module file-manager-shim
  */
 
+import { parse as parseYamlDoc, stringify as stringifyYamlDoc } from 'yaml'
 import type { DataWriteOptions, IVaultShim, TFile, TFolder } from '../types'
 import { warnNoOp } from '../log'
 import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry'
@@ -355,129 +356,38 @@ function parseFrontmatter(content: string): {
   // Strip leading newline from body if present
   const cleanBody = body.startsWith('\n') ? body.slice(1) : body;
 
-  // Parse simple YAML (key: value pairs, arrays)
-  const frontmatter = parseSimpleYaml(yamlStr);
+  const frontmatter = parseFrontmatterYaml(yamlStr);
 
   return { frontmatter, body: cleanBody, hasFrontmatter: true };
 }
 
 /**
- * Parse simple YAML key-value pairs.
- * Handles: strings, numbers, booleans, null, simple arrays (- item), and inline arrays [a, b].
- * Does NOT handle nested objects or complex YAML.
+ * Parse a frontmatter YAML block using the real `yaml` parser, so nested
+ * objects/arrays round-trip correctly (plugins like Day Planner store
+ * structured data — e.g. `planner: { log: [...] }` — in frontmatter).
+ * Falls back to an empty object on malformed YAML, matching Obsidian's
+ * tolerant behavior for unparsable frontmatter.
  */
-function parseSimpleYaml(yaml: string): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  const lines = yaml.split('\n');
-  let currentKey: string | null = null;
-  let currentArray: unknown[] | null = null;
-
-  for (const line of lines) {
-    // Skip empty lines
-    if (line.trim() === '') continue;
-
-    // Array item (continuation of previous key)
-    if (line.match(/^\s+-\s+/) && currentKey !== null) {
-      const value = line.replace(/^\s+-\s+/, '').trim();
-      if (currentArray === null) {
-        currentArray = [];
-      }
-      currentArray.push(parseYamlValue(value));
-      result[currentKey] = currentArray;
-      continue;
+function parseFrontmatterYaml(yamlStr: string): Record<string, unknown> {
+  try {
+    const parsed: unknown = parseYamlDoc(yamlStr);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
     }
-
-    // Key: value pair
-    const match = line.match(/^(\w[\w\s-]*):\s*(.*)/);
-    if (match) {
-      // Save previous array if any
-      currentKey = match[1]!.trim();
-      currentArray = null;
-      const rawValue = match[2]!.trim();
-
-      if (rawValue === '') {
-        // Could be followed by array items
-        result[currentKey] = null;
-      } else if (rawValue.startsWith('[') && rawValue.endsWith(']')) {
-        // Inline array: [a, b, c]
-        const items = rawValue.slice(1, -1).split(',').map(s => parseYamlValue(s.trim()));
-        result[currentKey] = items;
-        currentArray = items;
-      } else {
-        result[currentKey] = parseYamlValue(rawValue);
-      }
-    }
+    return {};
+  } catch (error) {
+    console.error('[FileManagerShim] Failed to parse frontmatter YAML:', error);
+    return {};
   }
-
-  return result;
 }
 
 /**
- * Parse a single YAML scalar value.
- */
-function parseYamlValue(value: string): unknown {
-  // Remove surrounding quotes
-  if ((value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))) {
-    return value.slice(1, -1);
-  }
-  // Boolean
-  if (value === 'true') return true;
-  if (value === 'false') return false;
-  // Null
-  if (value === 'null' || value === '~') return null;
-  // Number
-  const num = Number(value);
-  if (!isNaN(num) && value !== '') return num;
-  // String
-  return value;
-}
-
-/**
- * Serialize a frontmatter object back to YAML string.
- * Handles: strings, numbers, booleans, null, arrays.
+ * Serialize a frontmatter object back to a YAML string using the real
+ * `yaml` stringifier — handles nested objects/arrays, not just flat
+ * scalars, so a plugin-written value like `{log: [...]}` becomes proper
+ * nested YAML instead of stringifying to "[object Object]".
  */
 function serializeFrontmatter(frontmatter: Record<string, unknown>): string {
-  const lines: string[] = [];
-
-  for (const [key, value] of Object.entries(frontmatter)) {
-    if (value === null || value === undefined) {
-      lines.push(`${key}:`);
-    } else if (Array.isArray(value)) {
-      if (value.length === 0) {
-        lines.push(`${key}: []`);
-      } else {
-        lines.push(`${key}:`);
-        for (const item of value) {
-          lines.push(`  - ${serializeYamlValue(item)}`);
-        }
-      }
-    } else {
-      lines.push(`${key}: ${serializeYamlValue(value)}`);
-    }
-  }
-
-  return lines.length > 0 ? lines.join('\n') + '\n' : '';
-}
-
-/**
- * Serialize a single YAML scalar value.
- */
-function serializeYamlValue(value: unknown): string {
-  if (value === null || value === undefined) return 'null';
-  if (typeof value === 'boolean') return value ? 'true' : 'false';
-  if (typeof value === 'number') return String(value);
-  if (typeof value === 'string') {
-    // Quote strings that contain special characters
-    if (value.includes(':') || value.includes('#') || value.includes('\n') ||
-        value.includes('"') || value.includes("'") || value.startsWith('[') ||
-        value.startsWith('{') || value === '') {
-      // Escape backslashes first, so the ones just inserted for the quote/newline
-      // escapes below aren't themselves re-escaped.
-      const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
-      return `"${escaped}"`;
-    }
-    return value;
-  }
-  return String(value);
+  if (Object.keys(frontmatter).length === 0) return '';
+  return stringifyYamlDoc(frontmatter);
 }

@@ -81,15 +81,31 @@ export function buildTFileFromPath(filePath: string): TFile {
   const lastDot = name.lastIndexOf('.')
   const basename = lastDot > 0 ? name.slice(0, lastDot) : name
   const extension = lastDot > 0 ? name.slice(lastDot + 1) : ''
+  const lastSlash = filePath.lastIndexOf('/')
+  const parentPath = lastSlash >= 0 ? filePath.slice(0, lastSlash) : ''
 
-  return {
+  const file: TFile = {
     path: filePath,
     name,
     basename,
     extension,
     stat: { mtime: Date.now(), ctime: 0, size: 0 },
-    parent: null,
+    // Real Obsidian never leaves `parent` null — even root-level files point
+    // at the root TFolder.
+    parent: buildTFolderFromPath(parentPath),
   }
+
+  // Set prototype to global obsidian.TFile so `instanceof TFile` checks pass —
+  // mirrors treeNodeToTFile() in vault-shim.ts. Plugins (e.g. Excalidraw's
+  // tab/file-menu "New drawing" handler) branch on `file instanceof TFile`
+  // before doing path math; a plain object here silently took the wrong
+  // branch instead of stripping the filename off the folder path.
+  const globalTFile = (window as unknown as { obsidian?: { TFile?: { prototype: object } } }).obsidian?.TFile?.prototype
+  if (globalTFile) {
+    Object.setPrototypeOf(file, globalTFile)
+  }
+
+  return file
 }
 
 /**
@@ -99,13 +115,22 @@ export function buildTFileFromPath(filePath: string): TFile {
  * file-explorer DOM registry rows) without a real backend folder record.
  */
 export function buildTFolderFromPath(folderPath: string, name?: string): TFolder {
-  return {
+  const folder: TFolder = {
     path: folderPath,
     name: name ?? (folderPath.split('/').pop() ?? folderPath),
     children: [],
     parent: null,
     isRoot: () => folderPath === '',
   }
+
+  // See buildTFileFromPath() above — same `instanceof` requirement, this
+  // time for TFolder.
+  const globalTFolder = (window as unknown as { obsidian?: { TFolder?: { prototype: object } } }).obsidian?.TFolder?.prototype
+  if (globalTFolder) {
+    Object.setPrototypeOf(folder, globalTFolder)
+  }
+
+  return folder
 }
 
 /**

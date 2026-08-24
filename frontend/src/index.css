@@ -219,7 +219,11 @@
 
 /* ===== Dark Mode ===== */
 /* Explicit dark mode — user chose "dark" in profile */
-:root[data-theme="dark"] {
+/* `:where()` keeps this at the same specificity as the base `:root` block
+   above so a later, equal-specificity rule (e.g. an injected CSS snippet's
+   `:root { --accent: ... }`) can still win via source order — see
+   snippet-injector.ts's doc comment promising `:root` variable overrides. */
+:root:where([data-theme="dark"]) {
     --bg-base: #0d1117;
     --bg-surface: #131921;
     --bg-elevated: #1a2130;
@@ -407,7 +411,7 @@
 
 /* System preference: dark mode when OS prefers dark AND user chose "system" (or no explicit choice) */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:where(:not([data-theme="light"])) {
     --bg-base: #0d1117;
     --bg-surface: #131921;
     --bg-elevated: #1a2130;
@@ -599,9 +603,24 @@
   box-sizing: border-box;
 }
 
+/* html/body must be capped to the viewport too, not just #root/.app below —
+   otherwise, once any inner scroll region (editor, file tree, ...) hits its
+   own scroll limit, the wheel/trackpad gesture "chains" up to the document
+   and the whole page rubber-bands/scrolls instead of just that region. The
+   app's own scrolling always happens inside #root's flex layout (tab bar
+   pinned at the top, status bar pinned at the bottom, exactly one scrollable
+   content area in between) — html/body themselves should never scroll. */
+html {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   margin: 0;
   padding: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
   background: var(--bg-base);
   color: var(--text-primary);
   font-family: var(--font-sans);
@@ -609,7 +628,7 @@ body {
 
 #root {
   width: 100%;
-  height: 100vh;
+  height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;

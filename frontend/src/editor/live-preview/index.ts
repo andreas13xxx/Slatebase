@@ -3,7 +3,8 @@ export {
   createLivePreviewExtension,
   createLivePreviewCompartmentExtension,
   createLivePreviewField,
-  createLivePreviewClickHandler
+  createLivePreviewClickHandler,
+  createLinkContextMenuHandler
 } from './live-preview-extension'
 
 export type { InlineDecorationResult, HideableRange } from './inline-decorations'

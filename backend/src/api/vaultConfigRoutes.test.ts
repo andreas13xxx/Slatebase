@@ -34,6 +34,7 @@ function createMockAccessControl(overrides: Partial<IVaultAccessControl> = {}): 
     createShare: async () => {},
     revokeShare: async () => {},
     updateSharePermission: async () => {},
+    getUsersWithAccess: async () => [],
     ...overrides,
   }
 }

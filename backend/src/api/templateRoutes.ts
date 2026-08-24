@@ -190,7 +190,7 @@ export function createTemplateRoutes(deps: TemplateRouteDependencies): Hono {
     try {
       const result = await templateService.createFromTemplate(vaultId, templateName, targetDir, fileName)
 
-      // 5. Publish vault:change event
+      // 5. Publish vault:change event, scoped to the vault's owner and shared users
       eventBus.publish({
         type: 'vault:change',
         payload: {
@@ -200,7 +200,7 @@ export function createTemplateRoutes(deps: TemplateRouteDependencies): Hono {
           userId: session.userId,
           username: session.username,
         },
-        target: { kind: 'broadcast' },
+        target: { kind: 'users', userIds: await accessControl.getUsersWithAccess(vaultId) },
         excludeUserId: session.userId,
       })
 

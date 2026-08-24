@@ -8,7 +8,7 @@ export type EditorFormattingAction =
   | 'heading1' | 'heading2' | 'heading3'
   | 'bold' | 'italic' | 'strikethrough' | 'code'
   | 'link' | 'bulletList' | 'numberedList' | 'task'
-  | 'quote' | 'horizontalRule' | 'table'
+  | 'quote' | 'horizontalRule' | 'table' | 'callout'
   | 'toggleLineNumbers'
 
 /**

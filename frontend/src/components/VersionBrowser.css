@@ -13,7 +13,9 @@
 }
 
 /* Dark Mode Tokens */
-:root[data-theme="dark"] {
+/* `:where()` keeps specificity equal to the base `:root` block so a later,
+   equal-specificity injected CSS snippet can still win via source order. */
+:root:where([data-theme="dark"]) {
   --version-diff-added-bg: rgba(74, 222, 128, 0.1);
   --version-diff-added-text: #4ade80;
   --version-diff-removed-bg: rgba(248, 113, 113, 0.1);
@@ -25,7 +27,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:where(:not([data-theme="light"])) {
     --version-diff-added-bg: rgba(74, 222, 128, 0.1);
     --version-diff-added-text: #4ade80;
     --version-diff-removed-bg: rgba(248, 113, 113, 0.1);

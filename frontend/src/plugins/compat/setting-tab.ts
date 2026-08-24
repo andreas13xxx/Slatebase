@@ -333,15 +333,15 @@ export class DropdownComponent extends ValueComponent<string> {
  */
 export class ButtonComponent extends BaseComponent {
   buttonEl: HTMLButtonElement
-  private clickCallback: (() => void) | null = null
+  private clickCallback: ((evt: MouseEvent) => void) | null = null
 
   constructor(containerEl: HTMLElement) {
     super()
     this.buttonEl = document.createElement('button')
     this.buttonEl.className = 'setting-button'
-    this.buttonEl.addEventListener('click', () => {
+    this.buttonEl.addEventListener('click', (evt) => {
       if (this.clickCallback) {
-        this.clickCallback()
+        this.clickCallback(evt)
       }
     })
     containerEl.appendChild(this.buttonEl)
@@ -369,7 +369,7 @@ export class ButtonComponent extends BaseComponent {
     return super.setDisabled(disabled)
   }
 
-  onClick(callback: () => void): this {
+  onClick(callback: (evt: MouseEvent) => void): this {
     this.clickCallback = callback
     return this
   }

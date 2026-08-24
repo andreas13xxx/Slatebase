@@ -5,6 +5,8 @@ import { Eye, Pencil, X, Share2, Puzzle } from 'lucide-react'
 import { getFileIcon, getFileIconClass, getDisplayName } from '../utils/fileIcons'
 import { getCustomIconSvg, sizeCustomIconSvg, useIconResolutionTick } from '../utils/pluginIcon'
 import { resolveIconMarkupSync } from '../plugins/compat/lucide-icons'
+import { ContextMenu, type ContextMenuItem } from './ContextMenu'
+import { buildTabContextMenuItems } from './tab-context-menu'
 
 /** A single settings-page tab shown ahead of the file tabs (not draggable). */
 export interface SettingsTabDescriptor {
@@ -44,6 +46,7 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab }: T
   const { tabs, activeTabId } = tabState
   const dragIndexRef = useRef<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
 
   if (settingsTabs.length === 0 && tabs.length === 0) {
     return null
@@ -97,6 +100,17 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab }: T
     setDragOverIndex(null)
   }
 
+  function handleTabContextMenu(e: React.MouseEvent, index: number) {
+    e.preventDefault()
+    const tab = tabs[index]
+    if (!tab) return
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: buildTabContextMenuItems(tab, index === tabs.length - 1, tabDispatch),
+    })
+  }
+
   /** Dropping past the last tab (in the row's empty space) moves it to the end. */
   function handleRowDragOver(e: React.DragEvent) {
     if (dragIndexRef.current !== null) {
@@ -117,6 +131,7 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab }: T
   }
 
   return (
+    <>
     <div
       className="tab-bar"
       role="tablist"
@@ -175,6 +190,7 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab }: T
             aria-label={tab.filePath}
             className={`tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}${dragOverIndex === index ? ' tab-bar-tab--drag-over' : ''}`}
             onClick={() => handleActivate(tab.id)}
+            onContextMenu={(e) => handleTabContextMenu(e, index)}
             title={isGraphTab ? 'Graph' : tab.filePath}
             tabIndex={isActive ? 0 : -1}
             draggable
@@ -220,5 +236,15 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab }: T
         )
       })}
     </div>
+    {contextMenu && (
+      <ContextMenu
+        x={contextMenu.x}
+        y={contextMenu.y}
+        items={contextMenu.items}
+        onClose={() => setContextMenu(null)}
+        onSelect={() => setContextMenu(null)}
+      />
+    )}
+    </>
   )
 }

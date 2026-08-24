@@ -15,6 +15,8 @@ import { I18nProvider, useTranslation } from './i18n'
 import { RealtimeProvider, type RealtimeEventHandlers } from './components/RealtimeProvider'
 import { ToastNotification, showToast } from './components/ToastNotification'
 import { GlobalTooltip } from './components/GlobalTooltip'
+import { GlobalContextMenuFallback } from './components/GlobalContextMenuFallback'
+import { publishLinkCounts } from './state/linkCountsBridge'
 import { HoverPreview } from './components/HoverPreview'
 import { ConnectionIndicator } from './components/ConnectionIndicator'
 import { useRealtimeContext } from './state/realtimeContext'
@@ -707,6 +709,17 @@ function AppContent() {
     apiClient,
     directoryTree: state.directoryTree,
   })
+
+  // Publish the active document's link counts for the status bar (StatusBar
+  // reads them via useLinkCounts() rather than as a prop — see
+  // linkCountsBridge.ts for why).
+  useEffect(() => {
+    publishLinkCounts(documentContent === null ? null : {
+      forward: documentPanelData.state.links.forward.length,
+      backlinks: documentPanelData.state.links.backlinks.length,
+      backlinksLoading: documentPanelData.state.links.backlinksLoading,
+    })
+  }, [documentContent, documentPanelData.state.links])
 
   const handleLinkClick = useCallback((target: string, resolved: boolean) => {
     if (!resolved || !state.selectedVaultId) return
@@ -1457,6 +1470,7 @@ export function App() {
       </I18nBridge>
       <ToastNotification />
       <GlobalTooltip />
+      <GlobalContextMenuFallback />
     </AuthProvider>
   )
 }

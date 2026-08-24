@@ -9,7 +9,7 @@
  */
 
 import React, { useMemo, useCallback, useState, useRef } from 'react'
-import { Star, Heading, Hash, Search as SearchIcon } from 'lucide-react'
+import { Star, StarOff, Heading, Hash, Search as SearchIcon, FolderOpen, Pencil } from 'lucide-react'
 import { favoritesStore } from '../../state/favoritesStore'
 import { requestReveal } from '../../state/revealFileBridge'
 import { useSearchContext } from '../../state/searchContext'
@@ -273,9 +273,9 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
   }
 
   const menuItems: ContextMenuItem[] = contextMenu ? [
-    ...(contextMenu.entry.type !== 'search' ? [{ id: 'reveal', label: 'Im Datei-Explorer anzeigen' }] : []),
-    { id: 'rename', label: 'Umbenennen' },
-    { id: 'remove', label: 'Aus Favoriten entfernen' },
+    ...(contextMenu.entry.type !== 'search' ? [{ id: 'reveal', label: 'Im Datei-Explorer anzeigen', icon: <FolderOpen size={14} /> }] : []),
+    { id: 'rename', label: 'Umbenennen', icon: <Pencil size={14} /> },
+    { id: 'remove', label: 'Aus Favoriten entfernen', icon: <StarOff size={14} /> },
   ] : []
 
   return (

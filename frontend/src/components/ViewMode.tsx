@@ -1,4 +1,4 @@
-import { type ReactNode, createElement, useMemo, useState, useEffect, useContext, useId } from 'react'
+import { type ReactNode, Fragment, createElement, useMemo, useState, useEffect, useContext, useId } from 'react'
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
 import remarkGfm from 'remark-gfm'
@@ -9,6 +9,7 @@ import DOMPurify from 'dompurify'
 import {
   Hash, Pencil as PencilIcon, Info, Lightbulb, AlertTriangle, Zap, Bug, List as ListIcon,
   Quote, Check, HelpCircle, X as XIcon, ClipboardList,
+  FileText, FolderOpen, Copy, ExternalLink,
 } from 'lucide-react'
 import type { Plugin } from 'unified'
 import type { Root, RootContent, PhrasingContent, AlignType } from 'mdast'
@@ -24,6 +25,10 @@ import { PdfViewer } from './BinaryViewer'
 import { MermaidRenderer } from './MermaidRenderer'
 import { MathRenderer } from './MathRenderer'
 import { findEmbedCreatorForTarget, getLinktextExtension, mountRegisteredEmbed, type EmbedCreator, type EmbedContext } from '../plugins/compat/embed-registry'
+import { ContextMenu, type ContextMenuItem } from './ContextMenu'
+import { buildTFileFromPath } from '../plugins/compat/plugin-event-bridge'
+import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
+import { revealInExplorer } from '../state/fileNavigation'
 
 /**
  * Mapping of callout types to their Lucide icon component and CSS color token.
@@ -272,11 +277,70 @@ export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick,
     }
   }, [rendered, viewModeId])
 
-  return createElement('article', {
-    className: 'view-mode',
-    'aria-label': 'Markdown-Ansicht',
-    'data-viewmode-id': viewModeId,
-  }, rendered)
+  // Link context menu — delegated the same way as the hover preview above.
+  // Internal links (carrying `data-link-path`) get Obsidian's `file-menu`
+  // (source: 'link-context-menu'); external links get `url-menu`. A link
+  // with neither (a same-page `[[#Heading]]`/`[[#^block]]` link, which has
+  // no file target) is left to the browser's default handling.
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
+  useEffect(() => {
+    const el = document.querySelector(`[data-viewmode-id="${viewModeId}"]`) as HTMLElement | null
+    if (!el) return
+
+    const onContextMenu = (e: MouseEvent): void => {
+      if (!(e.target instanceof Element)) return
+
+      const internalLink = e.target.closest('a[data-link-path]')
+      if (internalLink instanceof HTMLElement) {
+        const path = internalLink.dataset['linkPath']
+        if (!path) return
+        e.preventDefault()
+        const file = buildTFileFromPath(path)
+        setContextMenu({
+          x: e.clientX, y: e.clientY,
+          items: [
+            { id: 'open', label: 'Öffnen', icon: <FileText size={14} />, run: () => onInternalLinkClick?.(path) },
+            { id: 'reveal', label: 'Im Explorer zeigen', icon: <FolderOpen size={14} />, run: () => revealInExplorer(path) },
+            { id: 'copy', label: 'Link kopieren', icon: <Copy size={14} />, run: () => { void navigator.clipboard.writeText(path).catch(() => {}) } },
+            ...buildPluginMenuItems('file-menu', [file, 'link-context-menu'], 'view-mode-link-menu'),
+          ],
+        })
+        return
+      }
+
+      const externalLink = e.target.closest('a.view-mode-link--external')
+      if (externalLink instanceof HTMLAnchorElement) {
+        e.preventDefault()
+        const url = externalLink.href
+        setContextMenu({
+          x: e.clientX, y: e.clientY,
+          items: [
+            { id: 'open', label: 'Link öffnen', icon: <ExternalLink size={14} />, run: () => window.open(url, '_blank', 'noopener,noreferrer') },
+            { id: 'copy', label: 'Link kopieren', icon: <Copy size={14} />, run: () => { void navigator.clipboard.writeText(url).catch(() => {}) } },
+            ...buildPluginMenuItems('url-menu', [url], 'view-mode-url-menu'),
+          ],
+        })
+      }
+    }
+
+    el.addEventListener('contextmenu', onContextMenu)
+    return () => el.removeEventListener('contextmenu', onContextMenu)
+  }, [rendered, viewModeId, onInternalLinkClick])
+
+  return createElement(Fragment, null,
+    createElement('article', {
+      className: 'view-mode',
+      'aria-label': 'Markdown-Ansicht',
+      'data-viewmode-id': viewModeId,
+    }, rendered),
+    contextMenu && createElement(ContextMenu, {
+      x: contextMenu.x,
+      y: contextMenu.y,
+      items: contextMenu.items,
+      onClose: () => setContextMenu(null),
+      onSelect: () => setContextMenu(null),
+    }),
+  )
 }
 
 /**
@@ -1387,6 +1451,9 @@ function renderTextWithEmbeds(
         href: '#',
         className,
         title: ambiguityTitle(resolution),
+        // Read by the hover-preview and context-menu delegation on the
+        // container — see the two useEffects in ViewMode().
+        'data-link-path': isBroken ? undefined : linkPath,
         onClick: (e: React.MouseEvent) => {
           e.preventDefault()
           onInternalLinkClick?.(linkPath)
@@ -1881,6 +1948,7 @@ function renderLink(
     key,
     href: '#',
     className,
+    'data-link-path': exists ? url : undefined,
     onClick: (e: React.MouseEvent) => {
       e.preventDefault()
       onInternalLinkClick?.(url)

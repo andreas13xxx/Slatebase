@@ -1,4 +1,5 @@
-import React, { useRef, useEffect, useImperativeHandle, useCallback } from 'react'
+import React, { useRef, useEffect, useImperativeHandle, useCallback, useState } from 'react'
+import { ExternalLink, Copy, FileText, FolderOpen } from 'lucide-react'
 import { EditorState, Compartment, type Extension } from '@codemirror/state'
 import { EditorView, lineNumbers as cmLineNumbers, dropCursor, keymap } from '@codemirror/view'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
@@ -29,12 +30,17 @@ import type { IEditorHandle, EditorFormattingAction } from './types'
 import { createSlatebaseTheme, createSlatebaseHighlightStyle } from './theme'
 import { getEditorState, saveEditorState, editorHistoryExtension } from './state-store'
 import { applyFormatting as applyFormattingAction } from './formatting'
-import { createLivePreviewCompartmentExtension, createLivePreviewField, createLivePreviewClickHandler, type LivePreviewOptions } from './live-preview'
+import { createLivePreviewCompartmentExtension, createLivePreviewField, createLivePreviewClickHandler, createLinkContextMenuHandler, type LivePreviewOptions } from './live-preview'
 import { warnOnce } from '../plugins/compat/log'
 import { setActiveEditorView, setActiveEditorContainerEl, getActivePluginExtensions, getActivePluginCompletions } from './plugin-extensions'
 import { editorInfoField, editorEditorField, editorLivePreviewField, livePreviewStateTracker } from './editor-state-fields'
 import { setEditorInfo, setEditorEditor, setEditorLivePreview, type EditorFileInfo } from './editor-state-fields'
 import { EditorShim } from '../plugins/compat/editor-shim'
+import { ContextMenu, type ContextMenuItem } from '../components/ContextMenu'
+import { buildEditorContextMenuItems } from './editor-context-menu'
+import { buildTFileFromPath } from '../plugins/compat/plugin-event-bridge'
+import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
+import { revealInExplorer } from '../state/fileNavigation'
 import './live-preview/live-preview.css'
 
 /**
@@ -94,6 +100,12 @@ export function CodeMirrorEditor({
   const viewRef = useRef<EditorView | null>(null)
   const prevTabIdRef = useRef<string>(tabId)
   const onContentChangeRef = useRef(onContentChange)
+  // Read by the mount-effect's contextmenu listener, which only re-runs on
+  // tabId change — without this ref, toggling line numbers would leave the
+  // context menu's checkbox showing the state from whenever the tab was
+  // last (re)mounted instead of the current one.
+  const showLineNumbersRef = useRef(showLineNumbers)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
 
   // Compartments for dynamic reconfiguration
   const readOnlyCompartment = useRef(new Compartment())
@@ -104,6 +116,57 @@ export function CodeMirrorEditor({
   useEffect(() => {
     onContentChangeRef.current = onContentChange
   }, [onContentChange])
+
+  useEffect(() => {
+    showLineNumbersRef.current = showLineNumbers
+  }, [showLineNumbers])
+
+  /**
+   * Shows a link-specific context menu (Obsidian's `file-menu` for internal
+   * wikilinks, `url-menu` for external ones) instead of the generic editor
+   * menu — wired into Live Preview's rendered link elements via
+   * `LivePreviewOptions.onLinkContextMenu` (see live-preview-extension.ts).
+   */
+  function handleLinkContextMenu(
+    x: number,
+    y: number,
+    link: { kind: 'internal'; target: string } | { kind: 'external'; url: string },
+  ): void {
+    if (link.kind === 'external') {
+      setContextMenu({
+        x, y,
+        items: [
+          { id: 'open', label: 'Link öffnen', icon: <ExternalLink size={14} />, run: () => window.open(link.url, '_blank', 'noopener,noreferrer') },
+          { id: 'copy', label: 'Link kopieren', icon: <Copy size={14} />, run: () => { void navigator.clipboard.writeText(link.url).catch(() => {}) } },
+          ...buildPluginMenuItems('url-menu', [link.url], 'editor-link-url-menu'),
+        ],
+      })
+      return
+    }
+
+    const file = buildTFileFromPath(link.target)
+    setContextMenu({
+      x, y,
+      items: [
+        { id: 'open', label: 'Öffnen', icon: <FileText size={14} />, run: () => livePreviewOptions?.onInternalLinkClick?.(link.target) },
+        { id: 'reveal', label: 'Im Explorer zeigen', icon: <FolderOpen size={14} />, run: () => revealInExplorer(link.target) },
+        { id: 'copy', label: 'Link kopieren', icon: <Copy size={14} />, run: () => { void navigator.clipboard.writeText(link.target).catch(() => {}) } },
+        ...buildPluginMenuItems('file-menu', [file, 'link-context-menu'], 'editor-link-file-menu'),
+      ],
+    })
+  }
+
+  /**
+   * Merges the caller-supplied Live Preview options with the link-context-menu
+   * callback above — kept out of `CodeMirrorEditorProps`/`LivePreviewOptions`'s
+   * caller-facing shape since it's purely an internal wiring detail of this
+   * component, not something a parent needs to configure.
+   */
+  const buildLivePreviewOptionsWithMenu = useCallback((): LivePreviewOptions => ({
+    ...(livePreviewOptions ?? { vaultId: '', directoryTree: null }),
+    onLinkContextMenu: handleLinkContextMenu,
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [livePreviewOptions])
 
   /**
    * Build the extensions array for a fresh EditorState.
@@ -166,7 +229,7 @@ export function CodeMirrorEditor({
       ),
       createLivePreviewCompartmentExtension(
         livePreviewCompartment.current,
-        livePreviewOptions ?? { vaultId: '', directoryTree: null },
+        buildLivePreviewOptionsWithMenu(),
         effectiveLivePreview
       ),
       // Plugin-provided CM6 extensions (each in its own Compartment)
@@ -183,7 +246,7 @@ export function CodeMirrorEditor({
     }
 
     return extensions
-  }, [readOnly, showLineNumbers, livePreview, livePreviewOptions, content])
+  }, [readOnly, showLineNumbers, livePreview, livePreviewOptions, content, buildLivePreviewOptionsWithMenu])
 
   /**
    * Save the current editor state to the store.
@@ -246,6 +309,21 @@ export function CodeMirrorEditor({
 
     viewRef.current = view
 
+    // Suppress the browser's native context menu inside the editor in favor
+    // of our own (native editing actions + plugin 'editor-menu' items — see
+    // editor-context-menu.ts).
+    const handleContextMenu = (e: MouseEvent) => {
+      // A right-click on a rendered Live Preview link is handled by
+      // createLinkContextMenuHandler (live-preview-extension.ts), which runs
+      // first (its listener sits on an element inside this container) and
+      // calls preventDefault() itself when it shows a link-specific menu —
+      // don't also show the generic one in that case.
+      if (e.defaultPrevented) return
+      e.preventDefault()
+      setContextMenu({ x: e.clientX, y: e.clientY, items: buildEditorContextMenuItems(view, showLineNumbersRef.current) })
+    }
+    container.addEventListener('contextmenu', handleContextMenu)
+
     // Register the active EditorView with the plugin extension manager
     setActiveEditorView(view)
     // Expose an ancestor of the mount node as the "MarkdownView.containerEl" that
@@ -296,6 +374,7 @@ export function CodeMirrorEditor({
 
     // Cleanup on unmount
     return () => {
+      container.removeEventListener('contextmenu', handleContextMenu)
       if (viewRef.current) {
         saveCurrentState(tabId)
         setActiveEditorView(null)
@@ -340,12 +419,15 @@ export function CodeMirrorEditor({
     if (livePreview && docLength > 50000) {
       warnOnce('CodeMirrorEditor.livePreviewAutoDisabled', '[CodeMirrorEditor] Live Preview auto-disabled: file exceeds 50,000 characters')
     }
-    const options = livePreviewOptions ?? { vaultId: '', directoryTree: null }
+    const options = buildLivePreviewOptionsWithMenu()
     view.dispatch({
       effects: livePreviewCompartment.current.reconfigure(
-        effectiveLivePreview ? [createLivePreviewField(options), createLivePreviewClickHandler(options)] : []
+        effectiveLivePreview
+          ? [createLivePreviewField(options), createLivePreviewClickHandler(options), createLinkContextMenuHandler(options)]
+          : []
       ),
     })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [livePreview, livePreviewOptions])
 
   // Update editorLivePreviewField StateField when live preview mode changes
@@ -401,9 +483,20 @@ export function CodeMirrorEditor({
   }), [])
 
   return (
-    <div
-      ref={containerRef}
-      className="cm-editor-wrapper"
-    />
+    <>
+      <div
+        ref={containerRef}
+        className="cm-editor-wrapper"
+      />
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenu.items}
+          onClose={() => setContextMenu(null)}
+          onSelect={() => setContextMenu(null)}
+        />
+      )}
+    </>
   )
 }

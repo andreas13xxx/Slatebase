@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
-import { Search, ChevronDown, ChevronRight, Loader2, Replace, FileText, HelpCircle } from 'lucide-react'
+import { Search, ChevronDown, ChevronRight, Loader2, Replace, FileText, HelpCircle, FolderOpen, Pencil, Trash2 } from 'lucide-react'
 import { useSearchContext } from '../state/searchContext'
 import { useAppContext } from '../state'
 import { useTranslation } from '../i18n'
@@ -7,6 +7,10 @@ import { performSearch, performMultiVaultSearch, performReplace, performSingleRe
 import { ConfirmModal } from './ConfirmModal'
 import { highlightSearchQuery } from './search-operator-highlight'
 import { SearchOperatorHelp } from './SearchOperatorHelp'
+import { ContextMenu, type ContextMenuItem } from './ContextMenu'
+import { buildTFileFromPath } from '../plugins/compat/plugin-event-bridge'
+import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
+import { revealInExplorer, renameInExplorer, deleteInExplorer } from '../state/fileNavigation'
 import type { SearchFileResult } from '../state/searchState'
 import type { VaultInfo } from '../types'
 import type { ISearchApiClient } from '../state/searchActions'
@@ -595,6 +599,7 @@ export function SearchPanel({
                 getResultId={getResultId}
                 onReplace={replaceExpanded && hasWriteAccess ? handleSingleReplace : undefined}
                 replaceLoading={state.replaceLoading}
+                selectedVaultId={selectedVaultId}
               />
             ) : (
               <SearchResultsFileGroups
@@ -689,6 +694,7 @@ interface SearchResultsMultiVaultProps {
   getResultId: (vaultId: string, filePath: string, line: number) => string
   onReplace?: (filePath: string) => void
   replaceLoading?: boolean
+  selectedVaultId: string | null
 }
 
 /**
@@ -704,6 +710,7 @@ function SearchResultsMultiVault({
   getResultId,
   onReplace,
   replaceLoading,
+  selectedVaultId,
 }: SearchResultsMultiVaultProps) {
   // Build sorted vault entries
   const sortedVaultEntries = Object.entries(vaultResults)
@@ -731,6 +738,7 @@ function SearchResultsMultiVault({
               getResultId={getResultId}
               onReplace={onReplace}
               replaceLoading={replaceLoading}
+              isActiveVault={vaultId === selectedVaultId}
             />
           ))}
         </div>
@@ -748,6 +756,8 @@ interface SearchFileGroupProps {
   getResultId: (vaultId: string, filePath: string, line: number) => string
   onReplace?: (filePath: string) => void
   replaceLoading?: boolean
+  /** False for a multi-vault search hit in a vault other than the currently selected one — the explorer-based reveal/rename/delete flow only operates on the selected vault, so those items are hidden. */
+  isActiveVault?: boolean
 }
 
 /**
@@ -763,9 +773,28 @@ function SearchFileGroup({
   getResultId,
   onReplace,
   replaceLoading,
+  isActiveVault = true,
 }: SearchFileGroupProps) {
   const [expanded, setExpanded] = useState(true)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const { t } = useTranslation()
+
+  function buildFileGroupMenuItems(): ContextMenuItem[] {
+    const firstLine = fileResult.hits[0]?.line ?? 1
+    const items: ContextMenuItem[] = [
+      { id: 'open', label: 'Öffnen', icon: <FileText size={14} />, run: () => onHitClick(vaultId, fileResult.filePath, firstLine) },
+    ]
+    if (isActiveVault) {
+      items.push(
+        { id: 'reveal', label: 'Im Explorer zeigen', icon: <FolderOpen size={14} />, run: () => revealInExplorer(fileResult.filePath) },
+        { id: 'rename', label: 'Umbenennen', icon: <Pencil size={14} />, run: () => renameInExplorer(fileResult.filePath) },
+        { id: 'delete', label: 'Löschen', icon: <Trash2 size={14} />, run: () => deleteInExplorer(fileResult.filePath) },
+      )
+    }
+    const file = buildTFileFromPath(fileResult.filePath)
+    items.push(...buildPluginMenuItems('file-menu', [file, 'search-context-menu'], 'search-plugin-menu'))
+    return items
+  }
 
   return (
     <div className="search-panel__file-group">
@@ -773,6 +802,7 @@ function SearchFileGroup({
         <button
           className="search-panel__file-header-toggle"
           onClick={() => setExpanded(prev => !prev)}
+          onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY }) }}
           title={fileResult.filePath}
           aria-expanded={expanded}
         >
@@ -781,6 +811,15 @@ function SearchFileGroup({
           <span className="search-panel__file-name">{fileResult.fileName}</span>
           <span className="search-panel__file-count">{fileResult.hitCount}</span>
         </button>
+        {contextMenu && (
+          <ContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            items={buildFileGroupMenuItems()}
+            onClose={() => setContextMenu(null)}
+            onSelect={() => setContextMenu(null)}
+          />
+        )}
         {onReplace && (
           <button
             className="search-panel__replace-hit-btn"
@@ -795,12 +834,12 @@ function SearchFileGroup({
       </div>
       {expanded && (
         <div className="search-panel__hits">
-          {fileResult.hits.map((hit) => {
+          {fileResult.hits.map((hit, hitIndex) => {
             const resultId = getResultId(vaultId, fileResult.filePath, hit.line)
             const isActive = resultId === activeResultId
             return (
               <button
-                key={resultId}
+                key={`${resultId}::${hitIndex}`}
                 className={`search-panel__hit ${isActive ? 'search-panel__hit--active' : ''}`}
                 onClick={() => onHitClick(vaultId, fileResult.filePath, hit.line)}
                 title={`${fileResult.filePath}:${hit.line}`}

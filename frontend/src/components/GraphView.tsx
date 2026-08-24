@@ -12,7 +12,11 @@ import { filterToNeighborhood } from './local-graph-utils'
 import { loadGraphConfig, saveGraphConfig, resetGraphConfig } from './graph-config'
 import type { GraphConfig } from './graph-config'
 import { GraphSettingsPanel } from './GraphSettingsPanel'
-import { RefreshCw, Search, Minus, Plus } from 'lucide-react'
+import { ContextMenu, type ContextMenuItem } from './ContextMenu'
+import { buildTFileFromPath } from '../plugins/compat/plugin-event-bridge'
+import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
+import { revealInExplorer, renameInExplorer, deleteInExplorer } from '../state/fileNavigation'
+import { RefreshCw, Search, Minus, Plus, FileText, FolderOpen, Pencil, Trash2 } from 'lucide-react'
 
 /** Debounce delay for local-graph refetch triggered by remote vault changes. */
 const LOCAL_GRAPH_REFRESH_DEBOUNCE_MS = 1000
@@ -124,6 +128,7 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [highlightedSearchNodeId, setHighlightedSearchNodeId] = useState<string | null>(null)
   const [clickedHighlightId, setClickedHighlightId] = useState<string | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
   const searchContainerRef = useRef<HTMLDivElement>(null)
 
   const simulationRef = useRef<ReturnType<typeof forceSimulation<SimNode>> | null>(null)
@@ -479,6 +484,38 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
       const filePath = node.path ?? node.id
       const fileName = filePath.split('/').pop() ?? filePath
       void openTab(tabDispatch, appDispatch, apiClient, vaultId, filePath, fileName)
+    },
+    [apiClient, tabDispatch, appDispatch, vaultId],
+  )
+
+  /**
+   * Right-click on a graph node: for a resolved file node, open/reveal/
+   * rename/delete plus plugin `file-menu` items. Tag/property nodes and
+   * unresolved links aren't backed by a real file, so no menu is shown for
+   * those — same as real Obsidian's graph view.
+   */
+  const handleNodeContextMenu = useCallback(
+    (e: React.MouseEvent, node: SimNode) => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (node.type === 'tag' || node.type === 'property' || !node.exists) return
+
+      const filePath = node.path ?? node.id
+      const fileName = filePath.split('/').pop() ?? filePath
+      const file = buildTFileFromPath(filePath)
+      const items: ContextMenuItem[] = [
+        {
+          id: 'open',
+          label: 'Öffnen',
+          icon: <FileText size={14} />,
+          run: () => { if (apiClient) void openTab(tabDispatch, appDispatch, apiClient, vaultId, filePath, fileName) },
+        },
+        { id: 'reveal', label: 'Im Explorer zeigen', icon: <FolderOpen size={14} />, run: () => revealInExplorer(filePath) },
+        { id: 'rename', label: 'Umbenennen', icon: <Pencil size={14} />, run: () => renameInExplorer(filePath) },
+        { id: 'delete', label: 'Löschen', icon: <Trash2 size={14} />, run: () => deleteInExplorer(filePath) },
+        ...buildPluginMenuItems('file-menu', [file, 'graph-context-menu'], 'graph-plugin-menu'),
+      ]
+      setContextMenu({ x: e.clientX, y: e.clientY, items })
     },
     [apiClient, tabDispatch, appDispatch, vaultId],
   )
@@ -905,6 +942,7 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
                   className={`${node.exists ? 'graph-node' : 'graph-node-unresolved'}${isSearchHighlighted ? ' graph-node-search-highlight' : ''}${isCenterNode ? ' graph-node-center' : ''}`}
                   onClick={(e) => handleNodeClick(e, node)}
                   onDoubleClick={(e) => handleNodeDoubleClick(e, node)}
+                  onContextMenu={(e) => handleNodeContextMenu(e, node)}
                   onMouseEnter={() => handleNodeHoverEnter(node.id)}
                   onMouseLeave={handleNodeHoverLeave}
                   style={{ cursor: node.exists ? 'pointer' : 'default', opacity: nodeOpacity }}
@@ -958,6 +996,15 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
           })}
         </g>
       </svg>
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenu.items}
+          onClose={() => setContextMenu(null)}
+          onSelect={() => setContextMenu(null)}
+        />
+      )}
     </div>
   )
 }
