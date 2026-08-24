@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.36.0](https://github.com/andreas13xxx/Slatebase/compare/v0.35.0...v0.36.0) (2026-08-24)
+
+
+### Features
+
+* context menu overhaul, link counts, and plugin-compat fixes ([3c13c3a](https://github.com/andreas13xxx/Slatebase/commit/3c13c3a3c9ca0bf484d2a148655b08b8c840121b))
+
 ## [0.35.0](https://github.com/andreas13xxx/Slatebase/compare/v0.34.0...v0.35.0) (2026-08-23)
 
 
