@@ -4,3 +4,9 @@
 # on Windows, editing these without this rule silently reintroduces CRLF and
 # breaks that parsing again — pin them to LF regardless of checkout platform.
 backend/assets/templates/** text eol=lf
+# The blanket rule above also matched binary screenshots/attachments under
+# the same tree, so Git tried to CRLF/LF-normalize PNG/PDF byte streams on
+# checkout — silently corrupting them (bytes that happen to look like line
+# endings get rewritten). Binary assets must opt back out explicitly.
+backend/assets/templates/**/*.png binary
+backend/assets/templates/**/*.pdf binary
