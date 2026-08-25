@@ -522,8 +522,14 @@ export function PluginProvider({
         }, 0)
       }
     })
-    newViewRegistry.setOnViewDeactivated((viewType: string) => {
+    newViewRegistry.setOnViewDeactivated((viewType: string, view: ItemView) => {
       setActiveViews(prev => {
+        // A stale deactivation (see `ViewRegistry.detachLeavesOfType()`'s doc
+        // comment) can resolve after a newer view of the same viewType has
+        // already been activated — only remove the entry if it's still the
+        // one being deactivated, so the newer one isn't wiped out from under it.
+        const current = prev.get(viewType)
+        if (!current || current.containerEl !== view.containerEl) return prev
         const next = new Map(prev)
         next.delete(viewType)
         return next
@@ -542,8 +548,11 @@ export function PluginProvider({
         return next
       })
     })
-    newViewRegistry.setOnSidebarViewDeactivated((viewType: string) => {
+    newViewRegistry.setOnSidebarViewDeactivated((viewType: string, view: ItemView) => {
       setSidebarViews(prev => {
+        // Guard against the stale-deactivation race — see setOnViewDeactivated above.
+        const current = prev.get(viewType)
+        if (!current || current.containerEl !== view.containerEl) return prev
         const next = new Map(prev)
         next.delete(viewType)
         return next
@@ -562,8 +571,11 @@ export function PluginProvider({
         return next
       })
     })
-    newViewRegistry.setOnLeftSidebarViewDeactivated((viewType: string) => {
+    newViewRegistry.setOnLeftSidebarViewDeactivated((viewType: string, view: ItemView) => {
       setLeftSidebarViews(prev => {
+        // Guard against the stale-deactivation race — see setOnViewDeactivated above.
+        const current = prev.get(viewType)
+        if (!current || current.containerEl !== view.containerEl) return prev
         const next = new Map(prev)
         next.delete(viewType)
         return next

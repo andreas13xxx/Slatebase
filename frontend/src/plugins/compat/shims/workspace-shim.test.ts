@@ -702,7 +702,7 @@ describe('WorkspaceShim', () => {
 
         registry.moveLeafToSide(leaf, 'left');
 
-        expect(onSidebarDeactivated).toHaveBeenCalledWith('my-view');
+        expect(onSidebarDeactivated).toHaveBeenCalledWith('my-view', view);
         expect(onLeftSidebarActivated).toHaveBeenCalledWith('my-view', view, leaf);
       });
 

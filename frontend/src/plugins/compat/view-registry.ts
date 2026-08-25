@@ -975,8 +975,14 @@ export interface ViewRegistration {
 /** Callback when a view is activated (for React state updates) */
 export type ViewActivatedCallback = (viewType: string, view: ItemView) => void
 
-/** Callback when a view is deactivated */
-export type ViewDeactivatedCallback = (viewType: string) => void
+/**
+ * Callback when a view is deactivated. Carries the specific `view` instance
+ * being torn down (not just its `viewType`) so React state updaters can
+ * ignore a stale deactivation that resolves after a newer activation of the
+ * same view type already replaced it — see `detachLeavesOfType()`'s doc
+ * comment for why that race is real.
+ */
+export type ViewDeactivatedCallback = (viewType: string, view: ItemView) => void
 
 /** Callback when a sidebar view is activated */
 export type SidebarViewActivatedCallback = (
@@ -985,8 +991,8 @@ export type SidebarViewActivatedCallback = (
   leaf: WorkspaceLeaf
 ) => void
 
-/** Callback when a sidebar view is deactivated */
-export type SidebarViewDeactivatedCallback = (viewType: string) => void
+/** Callback when a sidebar view is deactivated. See `ViewDeactivatedCallback` for why `view` is carried along. */
+export type SidebarViewDeactivatedCallback = (viewType: string, view: ItemView) => void
 
 /** Callback when a left-sidebar view is activated */
 export type LeftSidebarViewActivatedCallback = (
@@ -995,8 +1001,8 @@ export type LeftSidebarViewActivatedCallback = (
   leaf: WorkspaceLeaf
 ) => void
 
-/** Callback when a left-sidebar view is deactivated */
-export type LeftSidebarViewDeactivatedCallback = (viewType: string) => void
+/** Callback when a left-sidebar view is deactivated. See `ViewDeactivatedCallback` for why `view` is carried along. */
+export type LeftSidebarViewDeactivatedCallback = (viewType: string, view: ItemView) => void
 
 /**
  * Internal tracking entry for each leaf in the registry.
@@ -1249,9 +1255,9 @@ export class ViewRegistry {
     rawLeaf.location = targetLocation
 
     if (sourceLocation === 'right-sidebar') {
-      this.onSidebarViewDeactivated?.(viewType)
+      this.onSidebarViewDeactivated?.(viewType, view)
     } else {
-      this.onLeftSidebarViewDeactivated?.(viewType)
+      this.onLeftSidebarViewDeactivated?.(viewType, view)
     }
 
     if (targetLocation === 'right-sidebar') {
@@ -1314,31 +1320,35 @@ export class ViewRegistry {
   /**
    * Detach all leaves with a given view type.
    * Calls `onSidebarViewDeactivated` for sidebar leaves and `onViewDeactivated` for main leaves.
+   *
+   * Many Obsidian plugins (Recent Files among them) open their pane via the
+   * idiom `detachLeavesOfType(TYPE); await getRightLeaf(false).setViewState({
+   * type: TYPE }); revealLeaf(...)` — real Obsidian's `detachLeavesOfType` is
+   * synchronous, so plugins call it without awaiting. This method awaits
+   * `leaf.detach()` per matching leaf (running the view's own async
+   * `onClose()`), so its deactivation notification can resolve *after* the
+   * very next line's `setViewState()` has already activated a brand-new leaf
+   * of the same view type. The deactivated-callback therefore always carries
+   * the specific `view` instance it just tore down, not just the `viewType`
+   * string — so plugin-context's React state updater can tell this stale
+   * notification apart from the newer view and leave the newer one in place
+   * instead of deleting it out from under the just-opened pane.
    */
   async detachLeavesOfType(viewType: string): Promise<void> {
     const matching = this.getRawLeavesOfType(viewType)
-    let hasSidebar = false
-    let hasLeftSidebar = false
-    let hasMain = false
     for (const leaf of matching) {
       const entry = this.leaves.get(leaf)
-      if (entry?.location === 'right-sidebar') {
-        hasSidebar = true
-      } else if (entry?.location === 'left-sidebar') {
-        hasLeftSidebar = true
-      } else {
-        hasMain = true
-      }
+      const location = entry?.location
+      const view = leaf.view
       await leaf.detach()
-    }
-    if (hasSidebar) {
-      this.onSidebarViewDeactivated?.(viewType)
-    }
-    if (hasLeftSidebar) {
-      this.onLeftSidebarViewDeactivated?.(viewType)
-    }
-    if (hasMain && matching.length > 0) {
-      this.onViewDeactivated?.(viewType)
+      if (!view) continue
+      if (location === 'right-sidebar') {
+        this.onSidebarViewDeactivated?.(viewType, view)
+      } else if (location === 'left-sidebar') {
+        this.onLeftSidebarViewDeactivated?.(viewType, view)
+      } else {
+        this.onViewDeactivated?.(viewType, view)
+      }
     }
   }
 
@@ -1353,20 +1363,23 @@ export class ViewRegistry {
    */
   async detachAllForPlugin(pluginId: string): Promise<void> {
     const pluginLeaves: WorkspaceLeaf[] = []
-    const sidebarViewTypes = new Set<string>()
-    const leftSidebarViewTypes = new Set<string>()
-    const mainViewTypes = new Set<string>()
+    // Keyed by viewType, valued by the specific view instance being torn
+    // down — see `detachLeavesOfType()`'s doc comment for why identity (not
+    // just the viewType string) matters for the deactivated callbacks.
+    const sidebarViews = new Map<string, ItemView>()
+    const leftSidebarViews = new Map<string, ItemView>()
+    const mainViews = new Map<string, ItemView>()
 
     for (const [leaf, entry] of this.leaves) {
       if (entry.pluginId === pluginId) {
         pluginLeaves.push(leaf)
-        if (entry.viewType) {
+        if (entry.viewType && leaf.view) {
           if (entry.location === 'right-sidebar') {
-            sidebarViewTypes.add(entry.viewType)
+            sidebarViews.set(entry.viewType, leaf.view)
           } else if (entry.location === 'left-sidebar') {
-            leftSidebarViewTypes.add(entry.viewType)
+            leftSidebarViews.set(entry.viewType, leaf.view)
           } else {
-            mainViewTypes.add(entry.viewType)
+            mainViews.set(entry.viewType, leaf.view)
           }
         }
       }
@@ -1381,14 +1394,14 @@ export class ViewRegistry {
     }
 
     // Notify React state about deactivated views
-    for (const viewType of sidebarViewTypes) {
-      this.onSidebarViewDeactivated?.(viewType)
+    for (const [viewType, view] of sidebarViews) {
+      this.onSidebarViewDeactivated?.(viewType, view)
     }
-    for (const viewType of leftSidebarViewTypes) {
-      this.onLeftSidebarViewDeactivated?.(viewType)
+    for (const [viewType, view] of leftSidebarViews) {
+      this.onLeftSidebarViewDeactivated?.(viewType, view)
     }
-    for (const viewType of mainViewTypes) {
-      this.onViewDeactivated?.(viewType)
+    for (const [viewType, view] of mainViews) {
+      this.onViewDeactivated?.(viewType, view)
     }
 
     // Also remove all view type registrations for this plugin
