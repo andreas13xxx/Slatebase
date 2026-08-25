@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.36.1](https://github.com/andreas13xxx/Slatebase/compare/v0.36.0...v0.36.1) (2026-08-25)
+
+
+### Bugfixes
+
+* prevent stale leaf-detach race from hiding newly opened sidebar plugin views ([60a5325](https://github.com/andreas13xxx/Slatebase/commit/60a5325d59ca8299a12247e9fbc7cbe7bd4d1873))
+* stop CRLF/LF text normalization from corrupting binary template assets ([2a65f6f](https://github.com/andreas13xxx/Slatebase/commit/2a65f6fa2abc77a740a64903c4e1a5405c733b20))
+
 ## [0.36.0](https://github.com/andreas13xxx/Slatebase/compare/v0.35.0...v0.36.0) (2026-08-24)
 
 
