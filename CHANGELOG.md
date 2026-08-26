@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.37.0](https://github.com/andreas13xxx/Slatebase/compare/v0.36.1...v0.37.0) (2026-08-26)
+
+
+### Features
+
+* spellcheck, release notes/debug modals, canvas markdown export, and plugin-compat improvements ([0dd03ee](https://github.com/andreas13xxx/Slatebase/commit/0dd03ee2ef98654e66b605e4c6231c0f15ab2967))
+
 ## [0.36.1](https://github.com/andreas13xxx/Slatebase/compare/v0.36.0...v0.36.1) (2026-08-25)
 
 
