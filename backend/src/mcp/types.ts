@@ -9,6 +9,12 @@ export interface TokenRecord {
   tokenId: string
   /** SHA-256 hash of the raw token (hex-encoded). */
   tokenHash: string
+  /**
+   * Last 4 characters of the raw token, captured at creation time for display
+   * purposes (e.g. "****...ab3f"). Optional because tokens created before this
+   * field existed don't have one — negligible entropy leak (4 of 128 hex chars).
+   */
+  tokenSuffix?: string
   /** User ID of the token owner. */
   userId: string
   /** User-chosen name, 1–64 chars, unique per user. */

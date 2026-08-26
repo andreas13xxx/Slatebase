@@ -97,6 +97,9 @@ export class McpTokenService implements IMcpTokenService {
     // Compute SHA-256 hash
     const tokenHash = createHash('sha256').update(rawToken).digest('hex')
 
+    // Last 4 chars of the raw token, kept only for display masking (see TokenRecord.tokenSuffix)
+    const tokenSuffix = rawToken.slice(-4)
+
     // Generate token ID
     const tokenId = randomUUID()
 
@@ -108,6 +111,7 @@ export class McpTokenService implements IMcpTokenService {
     const record: TokenRecord = {
       tokenId,
       tokenHash,
+      tokenSuffix,
       userId,
       name,
       createdAt: now.toISOString(),
@@ -197,7 +201,7 @@ export class McpTokenService implements IMcpTokenService {
         expiresAt: record.expiresAt,
         lastUsedAt: record.lastUsedAt,
         status: this.computeStatus(record),
-        maskedToken: this.maskToken(record.tokenHash),
+        maskedToken: this.maskToken(record),
       })
     }
 
@@ -309,15 +313,17 @@ export class McpTokenService implements IMcpTokenService {
   }
 
   /**
-   * Mask a token hash for display purposes.
-   * Shows last 4 characters, masks the rest with asterisks.
-   * Format: "****...ab3f"
+   * Mask a token for display purposes: "****...ab3f", using the last 4
+   * characters of the raw token captured at creation time. Falls back to the
+   * hash's last 4 chars for tokens created before `tokenSuffix` existed —
+   * that fallback won't match the raw token the user was shown, but there's
+   * no way to recover it after the fact (raw tokens are never persisted).
    */
-  private maskToken(tokenHash: string): string {
-    if (tokenHash.length <= 4) {
-      return tokenHash
+  private maskToken(record: TokenRecord): string {
+    const source = record.tokenSuffix ?? record.tokenHash
+    if (source.length <= 4) {
+      return source
     }
-    const lastFour = tokenHash.slice(-4)
-    return `****...${lastFour}`
+    return `****...${source.slice(-4)}`
   }
 }
