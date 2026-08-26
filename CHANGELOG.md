@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.37.1](https://github.com/andreas13xxx/Slatebase/compare/v0.37.0...v0.37.1) (2026-08-26)
+
+
+### Bugfixes
+
+* MCP token list previews masked the token hash instead of the raw token ([7384357](https://github.com/andreas13xxx/Slatebase/commit/7384357a08c97c27dd1c31da83f77ce41793e44d))
+
 ## [0.37.0](https://github.com/andreas13xxx/Slatebase/compare/v0.36.1...v0.37.0) (2026-08-26)
 
 
