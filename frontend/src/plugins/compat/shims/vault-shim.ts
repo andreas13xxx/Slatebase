@@ -752,6 +752,11 @@ export class VaultShim implements IVaultShim {
    * - "showLineNumber": boolean (default: false)
    * - "spellcheck": boolean (default: false)
    * - "readableLineLength": boolean (default: true)
+   * - "updateInternalLinks": boolean (default: true) — the setting this key
+   *   reflects (rewrite wikilinks vault-wide on rename/move) always runs
+   *   server-side in Slatebase, unconditionally; there is no way to actually
+   *   turn it off, so the queryable value is fixed at true rather than backed
+   *   by a real toggle. See FileManager.renameFile().
    */
   getConfig(key: string): unknown {
     const defaults: Record<string, unknown> = {
@@ -768,6 +773,7 @@ export class VaultShim implements IVaultShim {
       newLinkFormat: 'shortest',
       useMarkdownLinks: false,
       attachmentFolderPath: './',
+      updateInternalLinks: true,
     };
     return defaults[key] ?? null;
   }
@@ -882,9 +888,15 @@ export class VaultShim implements IVaultShim {
   /**
    * Get a resource URL for a file (for embedding images, etc.).
    * Returns a data URL path that can be used in the browser.
+   *
+   * Plugins hand this straight to `<img src>`/`<video src>` (Recent Files'
+   * hover preview, image embeds, etc.), which can't attach an Authorization
+   * header — so the token has to ride along as the `?token=` query param the
+   * backend accepts for raw file routes (see extractBearerToken's fallback in
+   * middleware.ts), same as FileNodeRenderer's canvas image embeds do.
    */
   getResourcePath(file: TFile): string {
-    return `/api/v1/vaults/${this.vaultId}/files?path=${encodeURIComponent(file.path)}&raw=true`;
+    return `/api/v1/vaults/${this.vaultId}/files?path=${encodeURIComponent(file.path)}&raw=true&token=${encodeURIComponent(this.getToken())}`;
   }
 
   /**

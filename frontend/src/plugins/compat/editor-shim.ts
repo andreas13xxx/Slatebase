@@ -28,6 +28,7 @@
 import { EditorView } from '@codemirror/view'
 import { EditorSelection as CmEditorSelection } from '@codemirror/state'
 import * as CmCommands from '@codemirror/commands'
+import { toggleFold, foldAll, unfoldAll } from '@codemirror/language'
 import { recordGapRead, recordGapCall } from './api-gap-registry'
 import { warnOnce } from './log'
 import { getActiveEditorContainerEl } from '../../editor/plugin-extensions'
@@ -692,6 +693,13 @@ export class EditorShim implements IEditor {
       deleteLine: CmCommands.deleteLine,
       swapLineUp: CmCommands.moveLineUp,
       swapLineDown: CmCommands.moveLineDown,
+      // Backed by the same folding engine as the fold-all/toggle-fold/unfold-all
+      // command-palette commands (see editor/folding.ts) — codeFolding() +
+      // markdownFoldService are registered unconditionally in CodeMirrorEditor.tsx,
+      // so these work regardless of which path (plugin exec() vs. Command Palette) triggers them.
+      toggleFold: toggleFold,
+      foldAll: foldAll,
+      unfoldAll: unfoldAll,
     }
     const fn = cmdMap[command]
     if (fn) fn(cm)

@@ -701,6 +701,18 @@
   background: var(--danger-bg);
 }
 
+/* Pinned tabs show a pin icon in place of the close button, always visible
+   (not hover-only) since it doubles as the pinned-state indicator. */
+.tab-bar-pin-btn {
+  opacity: 1;
+  color: var(--accent-text);
+}
+
+.tab-bar-pin-btn:hover {
+  color: var(--accent-text);
+  background: var(--accent-bg, var(--bg-surface));
+}
+
 .tab-bar-tab--drag-over {
   border-left: 2px solid var(--accent);
 }
@@ -6747,4 +6759,27 @@
   text-align: center;
   padding: 24px 16px;
   font-size: 13px;
+}
+
+/* ===== Print (workspace:export-pdf) =====
+   Isolates ViewMode's rendered content (.view-mode, from ViewMode.tsx) as the
+   only thing printed — the command switches the active tab to reading mode
+   before calling window.print(), so the browser's own "Save as PDF" print
+   destination becomes the export path rather than a bundled PDF library. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .view-mode,
+  .view-mode * {
+    visibility: visible;
+  }
+
+  .view-mode {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
 }

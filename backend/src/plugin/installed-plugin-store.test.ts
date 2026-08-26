@@ -67,8 +67,8 @@ describe('InstalledPluginStore', () => {
       expect(styles).toBeNull()
     })
 
-    it('rejects plugin files exceeding 5 MB', async () => {
-      const largeContent = 'x'.repeat(5 * 1024 * 1024 + 1)
+    it('rejects plugin files exceeding 10 MB', async () => {
+      const largeContent = 'x'.repeat(10 * 1024 * 1024 + 1)
       const largeFiles: PluginFiles = {
         manifest: JSON.stringify(testManifest, null, 2),
         bundle: largeContent,
@@ -79,7 +79,7 @@ describe('InstalledPluginStore', () => {
     })
 
     it('rejects large manifest', async () => {
-      const largeManifest = 'x'.repeat(5 * 1024 * 1024 + 1)
+      const largeManifest = 'x'.repeat(10 * 1024 * 1024 + 1)
       const files: PluginFiles = {
         manifest: largeManifest,
         bundle: 'module.exports = class {}',
@@ -90,7 +90,7 @@ describe('InstalledPluginStore', () => {
     })
 
     it('rejects large styles', async () => {
-      const largeStyles = 'x'.repeat(5 * 1024 * 1024 + 1)
+      const largeStyles = 'x'.repeat(10 * 1024 * 1024 + 1)
       const files: PluginFiles = {
         manifest: JSON.stringify(testManifest, null, 2),
         bundle: 'module.exports = class {}',

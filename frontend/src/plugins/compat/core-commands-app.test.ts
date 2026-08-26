@@ -6,11 +6,19 @@ import { CommandRegistry } from './command-registry'
 import { registerCoreAppCommands, type CoreAppCommandHandlers } from './core-commands-app'
 import { EditorShim, setEditorViewAccessor } from './editor-shim'
 import { setActiveEditorView } from '../../editor/plugin-extensions'
+import { setActiveCanvasController } from '../../state/activeCanvasBridge'
 import { favoritesStore } from '../../state/favoritesStore'
 import * as ToastNotificationModule from '../../components/ToastNotification'
 import type { IApiClient } from '../../api'
 import type { TabEntry } from '../../state/tabState'
 import type { PublicUserInfo } from '../../state/authState'
+import { zoomIn, zoomOut, resetZoom } from '../../state/zoomStore'
+
+vi.mock('../../state/zoomStore', () => ({
+  zoomIn: vi.fn(),
+  zoomOut: vi.fn(),
+  resetZoom: vi.fn(),
+}))
 
 /** Minimal mock covering every IApiClient member (mirrors FileExplorer.test.tsx's helper). */
 function createMockApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
@@ -119,7 +127,11 @@ describe('registerCoreAppCommands', () => {
       onOpenGraph: vi.fn(),
       onOpenLocalGraph: vi.fn(),
       onDailyNote: vi.fn(),
+      onDailyNoteOffset: vi.fn(),
+      onCreateWelcomeVault: vi.fn(),
       onOpenTemplateSelector: vi.fn(),
+      onOpenReleaseNotes: vi.fn(),
+      onOpenDebugInfo: vi.fn(),
       onNavigateBack: vi.fn(),
       onNavigateForward: vi.fn(),
       onOpenQuickSwitcher: vi.fn(),
@@ -159,6 +171,47 @@ describe('registerCoreAppCommands', () => {
     expect(tabDispatch).not.toHaveBeenCalledWith({ type: 'CLOSE_TAB', payload: { tabId: 'b' } })
   })
 
+  it('workspace:close-others skips pinned tabs', () => {
+    handlers.tabState = {
+      tabs: [makeTab({ id: 'a', pinned: true }), makeTab({ id: 'b' }), makeTab({ id: 'c', pinned: true })],
+      activeTabId: 'b',
+    }
+
+    registry.executeCommand('workspace:close-others')
+
+    expect(tabDispatch).not.toHaveBeenCalledWith({ type: 'CLOSE_TAB', payload: { tabId: 'a' } })
+    expect(tabDispatch).not.toHaveBeenCalledWith({ type: 'CLOSE_TAB', payload: { tabId: 'c' } })
+  })
+
+  it('workspace:toggle-pin toggles the active tab\'s pinned flag', () => {
+    handlers.tabState = { tabs: [makeTab({ id: 'a' })], activeTabId: 'a' }
+
+    registry.executeCommand('workspace:toggle-pin')
+
+    expect(tabDispatch).toHaveBeenCalledWith({ type: 'TOGGLE_PIN', payload: { tabId: 'a' } })
+  })
+
+  it('workspace:undo-close-pane pops history and reopens the tab', async () => {
+    ;(apiClient.fetchFileContent as ReturnType<typeof vi.fn>).mockResolvedValue({
+      path: 'closed.md', name: 'closed.md', content: '', size: 0, encoding: 'utf-8', isBinary: false, isTruncated: false,
+    })
+    handlers.tabState = {
+      tabs: [],
+      activeTabId: null,
+      closedTabsHistory: [makeTab({ id: 'vault-1::closed.md', filePath: 'closed.md', fileName: 'closed.md' })],
+    }
+
+    registry.executeCommand('workspace:undo-close-pane')
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(tabDispatch).toHaveBeenCalledWith({ type: 'POP_CLOSED_TAB' })
+    expect(tabDispatch).toHaveBeenCalledWith({
+      type: 'OPEN_TAB',
+      payload: { vaultId: 'vault-1', filePath: 'closed.md', fileName: 'closed.md' },
+    })
+  })
+
   it('workspace:next-tab activates the next tab, wrapping around at the end', () => {
     handlers.tabState = {
       tabs: [makeTab({ id: 'a' }), makeTab({ id: 'b' }), makeTab({ id: 'c' })],
@@ -189,6 +242,45 @@ describe('registerCoreAppCommands', () => {
     await Promise.resolve()
 
     expect(writeText).toHaveBeenCalledWith('note.md')
+  })
+
+  it('workspace:export-pdf switches an edit-mode tab to reading mode, then prints', () => {
+    handlers.tabState = { tabs: [makeTab({ mode: 'edit' })], activeTabId: 'vault-1::note.md' }
+    const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {})
+    const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { cb(0); return 0 })
+
+    registry.executeCommand('workspace:export-pdf')
+
+    expect(tabDispatch).toHaveBeenCalledWith({ type: 'TOGGLE_MODE', payload: { tabId: 'vault-1::note.md' } })
+    expect(printSpy).toHaveBeenCalled()
+    printSpy.mockRestore()
+    rafSpy.mockRestore()
+  })
+
+  it('workspace:export-pdf does not toggle mode when already in reading mode', () => {
+    handlers.tabState = { tabs: [makeTab({ mode: 'view' })], activeTabId: 'vault-1::note.md' }
+    const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {})
+    const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { cb(0); return 0 })
+
+    registry.executeCommand('workspace:export-pdf')
+
+    expect(tabDispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'TOGGLE_MODE' }))
+    expect(printSpy).toHaveBeenCalled()
+    printSpy.mockRestore()
+    rafSpy.mockRestore()
+  })
+
+  it('workspace:export-pdf shows an error toast for a binary file', () => {
+    handlers.tabState = { tabs: [makeTab({ isBinary: true })], activeTabId: 'vault-1::note.md' }
+    const toastSpy = vi.spyOn(ToastNotificationModule, 'showToast').mockImplementation(() => {})
+    const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {})
+
+    registry.executeCommand('workspace:export-pdf')
+
+    expect(toastSpy).toHaveBeenCalledWith('error', expect.any(String))
+    expect(printSpy).not.toHaveBeenCalled()
+    toastSpy.mockRestore()
+    printSpy.mockRestore()
   })
 
   it('app:toggle-left-sidebar and app:toggle-right-sidebar delegate to the app callbacks', () => {
@@ -237,6 +329,38 @@ describe('registerCoreAppCommands', () => {
 
     registry.executeCommand('canvas:new-file')
     expect(handlers.onCreateCanvas).toHaveBeenCalled()
+  })
+
+  it('app:open-sandbox-vault delegates to onCreateWelcomeVault', () => {
+    registry.executeCommand('app:open-sandbox-vault')
+    expect(handlers.onCreateWelcomeVault).toHaveBeenCalled()
+  })
+
+  it('window:zoom-in/out/reset-zoom delegate to the zoom store', () => {
+    registry.executeCommand('window:zoom-in')
+    expect(zoomIn).toHaveBeenCalled()
+
+    registry.executeCommand('window:zoom-out')
+    expect(zoomOut).toHaveBeenCalled()
+
+    registry.executeCommand('window:reset-zoom')
+    expect(resetZoom).toHaveBeenCalled()
+  })
+
+  it('daily-notes:goto-next/goto-prev delegate to onDailyNoteOffset with +1/-1', () => {
+    registry.executeCommand('daily-notes:goto-next')
+    expect(handlers.onDailyNoteOffset).toHaveBeenCalledWith(1)
+
+    registry.executeCommand('daily-notes:goto-prev')
+    expect(handlers.onDailyNoteOffset).toHaveBeenCalledWith(-1)
+  })
+
+  it('app:show-release-notes and app:show-debug-info delegate to their open handlers', () => {
+    registry.executeCommand('app:show-release-notes')
+    expect(handlers.onOpenReleaseNotes).toHaveBeenCalled()
+
+    registry.executeCommand('app:show-debug-info')
+    expect(handlers.onOpenDebugInfo).toHaveBeenCalled()
   })
 
   it('graph:open-local opens a Lokaler_Graph for the active file tab', () => {
@@ -355,7 +479,11 @@ describe('registerCoreAppCommands — editor:* commands needing app context', ()
       onOpenGraph: vi.fn(),
       onOpenLocalGraph: vi.fn(),
       onDailyNote: vi.fn(),
+      onDailyNoteOffset: vi.fn(),
+      onCreateWelcomeVault: vi.fn(),
       onOpenTemplateSelector: vi.fn(),
+      onOpenReleaseNotes: vi.fn(),
+      onOpenDebugInfo: vi.fn(),
       onNavigateBack: vi.fn(),
       onNavigateForward: vi.fn(),
       onOpenQuickSwitcher: vi.fn(),
@@ -442,7 +570,11 @@ describe('registerCoreAppCommands — bookmark types (Requirements 11-14)', () =
       onOpenGraph: vi.fn(),
       onOpenLocalGraph: vi.fn(),
       onDailyNote: vi.fn(),
+      onDailyNoteOffset: vi.fn(),
+      onCreateWelcomeVault: vi.fn(),
       onOpenTemplateSelector: vi.fn(),
+      onOpenReleaseNotes: vi.fn(),
+      onOpenDebugInfo: vi.fn(),
       onNavigateBack: vi.fn(),
       onNavigateForward: vi.fn(),
       onOpenQuickSwitcher: vi.fn(),
@@ -621,3 +753,471 @@ describe('registerCoreAppCommands — bookmark types (Requirements 11-14)', () =
     })
   })
 })
+
+describe('registerCoreAppCommands — frontmatter properties (markdown:*)', () => {
+  let registry: CommandRegistry
+  let apiClient: IApiClient
+  let handlers: CoreAppCommandHandlers
+  let toastSpy: ReturnType<typeof vi.spyOn>
+
+  function makeHandlers(overrides: Partial<CoreAppCommandHandlers> = {}): CoreAppCommandHandlers {
+    return {
+      vaultId: 'vault-1',
+      vaultName: 'My Vault',
+      apiClient,
+      tabState: { tabs: [makeTab()], activeTabId: 'vault-1::note.md' },
+      tabDispatch: vi.fn(),
+      appDispatch: vi.fn(),
+      authState: { isAuthenticated: true, user: makeUser(), token: null, csrfToken: null, mustChangePassword: false, isLoading: false, error: null },
+      authDispatch: vi.fn(),
+      showSidebar: false,
+      showRightPanel: false,
+      rightPanelSections: [],
+      rightPanelDispatch: vi.fn(),
+      leftPanelSections: [],
+      leftPanelDispatch: vi.fn(),
+      onToggleSidebar: vi.fn(),
+      onToggleRightPanel: vi.fn(),
+      onOpenSettings: vi.fn(),
+      onNavigate: vi.fn(),
+      onCreateFile: vi.fn(),
+      onCreateFolder: vi.fn(),
+      onCreateCanvas: vi.fn(),
+      onOpenGraph: vi.fn(),
+      onOpenLocalGraph: vi.fn(),
+      onDailyNote: vi.fn(),
+      onDailyNoteOffset: vi.fn(),
+      onCreateWelcomeVault: vi.fn(),
+      onOpenTemplateSelector: vi.fn(),
+      onOpenReleaseNotes: vi.fn(),
+      onOpenDebugInfo: vi.fn(),
+      onNavigateBack: vi.fn(),
+      onNavigateForward: vi.fn(),
+      onOpenQuickSwitcher: vi.fn(),
+      searchQuery: '',
+      searchCaseSensitive: false,
+      searchRegex: false,
+      ...overrides,
+    }
+  }
+
+  beforeEach(() => {
+    registry = new CommandRegistry()
+    apiClient = createMockApiClient()
+    handlers = makeHandlers()
+    toastSpy = vi.spyOn(ToastNotificationModule, 'showToast').mockImplementation(() => {})
+    registerCoreAppCommands(registry, () => handlers)
+  })
+
+  afterEach(() => {
+    setActiveEditorView(null)
+    toastSpy.mockRestore()
+  })
+
+  describe('markdown:add-alias', () => {
+    it('creates a frontmatter block with an empty aliases array when none exists', () => {
+      const view = new EditorView({ state: EditorState.create({ doc: 'Just body text.' }), parent: document.body })
+      setActiveEditorView(view)
+
+      registry.executeCommand('markdown:add-alias')
+
+      expect(view.state.doc.toString()).toBe('---\naliases: []\n---\nJust body text.')
+      view.destroy()
+    })
+
+    it('adds an aliases key to an existing frontmatter block', () => {
+      const view = new EditorView({ state: EditorState.create({ doc: '---\ntags: [a]\n---\nBody.' }), parent: document.body })
+      setActiveEditorView(view)
+
+      registry.executeCommand('markdown:add-alias')
+
+      expect(view.state.doc.toString()).toBe('---\ntags: [a]\naliases: []\n---\nBody.')
+      view.destroy()
+    })
+
+    it('does nothing when aliases already exists', () => {
+      const doc = '---\naliases: [foo]\n---\nBody.'
+      const view = new EditorView({ state: EditorState.create({ doc }), parent: document.body })
+      setActiveEditorView(view)
+
+      registry.executeCommand('markdown:add-alias')
+
+      expect(view.state.doc.toString()).toBe(doc)
+      view.destroy()
+    })
+
+    it('shows an error toast and does nothing when no editor is active', () => {
+      setActiveEditorView(null)
+
+      registry.executeCommand('markdown:add-alias')
+
+      expect(toastSpy).toHaveBeenCalledWith('error', expect.any(String))
+    })
+  })
+
+  describe('markdown:add-metadata-property', () => {
+    it('adds a placeholder "property" key when no frontmatter exists', () => {
+      const view = new EditorView({ state: EditorState.create({ doc: 'Body.' }), parent: document.body })
+      setActiveEditorView(view)
+
+      registry.executeCommand('markdown:add-metadata-property')
+
+      expect(view.state.doc.toString()).toBe('---\nproperty: ""\n---\nBody.')
+      view.destroy()
+    })
+
+    it('increments the placeholder key when "property" is already taken', () => {
+      const view = new EditorView({ state: EditorState.create({ doc: '---\nproperty: existing\n---\nBody.' }), parent: document.body })
+      setActiveEditorView(view)
+
+      registry.executeCommand('markdown:add-metadata-property')
+
+      expect(view.state.doc.toString()).toBe('---\nproperty: existing\nproperty-1: ""\n---\nBody.')
+      view.destroy()
+    })
+  })
+
+  describe('markdown:clear-metadata-properties', () => {
+    it('removes the entire frontmatter block', () => {
+      const view = new EditorView({ state: EditorState.create({ doc: '---\ntags: [a]\naliases: [b]\n---\nBody.' }), parent: document.body })
+      setActiveEditorView(view)
+
+      registry.executeCommand('markdown:clear-metadata-properties')
+
+      expect(view.state.doc.toString()).toBe('Body.')
+      view.destroy()
+    })
+
+    it('does nothing when there is no frontmatter block', () => {
+      const view = new EditorView({ state: EditorState.create({ doc: 'Body.' }), parent: document.body })
+      setActiveEditorView(view)
+
+      registry.executeCommand('markdown:clear-metadata-properties')
+
+      expect(view.state.doc.toString()).toBe('Body.')
+      view.destroy()
+    })
+  })
+})
+
+describe('registerCoreAppCommands — canvas:jump-to-group', () => {
+  let registry: CommandRegistry
+  let apiClient: IApiClient
+  let handlers: CoreAppCommandHandlers
+  let toastSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    registry = new CommandRegistry()
+    apiClient = createMockApiClient()
+    handlers = {
+      vaultId: 'vault-1',
+      vaultName: 'My Vault',
+      apiClient,
+      tabState: { tabs: [makeTab()], activeTabId: 'vault-1::note.md' },
+      tabDispatch: vi.fn(),
+      appDispatch: vi.fn(),
+      authState: { isAuthenticated: true, user: makeUser(), token: null, csrfToken: null, mustChangePassword: false, isLoading: false, error: null },
+      authDispatch: vi.fn(),
+      showSidebar: false,
+      showRightPanel: false,
+      rightPanelSections: [],
+      rightPanelDispatch: vi.fn(),
+      leftPanelSections: [],
+      leftPanelDispatch: vi.fn(),
+      onToggleSidebar: vi.fn(),
+      onToggleRightPanel: vi.fn(),
+      onOpenSettings: vi.fn(),
+      onNavigate: vi.fn(),
+      onCreateFile: vi.fn(),
+      onCreateFolder: vi.fn(),
+      onCreateCanvas: vi.fn(),
+      onOpenGraph: vi.fn(),
+      onOpenLocalGraph: vi.fn(),
+      onDailyNote: vi.fn(),
+      onDailyNoteOffset: vi.fn(),
+      onCreateWelcomeVault: vi.fn(),
+      onOpenTemplateSelector: vi.fn(),
+      onOpenReleaseNotes: vi.fn(),
+      onOpenDebugInfo: vi.fn(),
+      onNavigateBack: vi.fn(),
+      onNavigateForward: vi.fn(),
+      onOpenQuickSwitcher: vi.fn(),
+      searchQuery: '',
+      searchCaseSensitive: false,
+      searchRegex: false,
+    }
+    toastSpy = vi.spyOn(ToastNotificationModule, 'showToast').mockImplementation(() => {})
+    registerCoreAppCommands(registry, () => handlers)
+  })
+
+  afterEach(() => {
+    setActiveCanvasController(null)
+    toastSpy.mockRestore()
+  })
+
+  it('delegates to the active canvas controller when one is registered', () => {
+    const jumpToSelectedGroup = vi.fn().mockReturnValue(true)
+    setActiveCanvasController({ jumpToSelectedGroup })
+
+    registry.executeCommand('canvas:jump-to-group')
+
+    expect(jumpToSelectedGroup).toHaveBeenCalled()
+    expect(toastSpy).not.toHaveBeenCalled()
+  })
+
+  it('shows an error toast when the controller reports nothing to jump to', () => {
+    setActiveCanvasController({ jumpToSelectedGroup: () => false })
+
+    registry.executeCommand('canvas:jump-to-group')
+
+    expect(toastSpy).toHaveBeenCalledWith('error', expect.any(String))
+  })
+
+  it('shows an error toast when no canvas is active', () => {
+    registry.executeCommand('canvas:jump-to-group')
+
+    expect(toastSpy).toHaveBeenCalledWith('error', expect.any(String))
+  })
+})
+
+describe('registerCoreAppCommands — canvas:convert-to-file', () => {
+  it('converts the active canvas to a .md file, saves it, and opens it', async () => {
+    const canvasJson = JSON.stringify({
+      nodes: [{ id: '1', type: 'text', x: 0, y: 0, width: 100, height: 100, text: 'Hello canvas' }],
+      edges: [],
+    })
+    const fetchFileContent = vi.fn()
+      .mockResolvedValueOnce({ content: canvasJson, isBinary: false })
+      .mockResolvedValueOnce({ content: 'Hello canvas', isBinary: false })
+    const saveFile = vi.fn().mockResolvedValue(undefined)
+    const apiClient = createMockApiClient({ fetchFileContent, saveFile })
+    const tabDispatch = vi.fn()
+    const registry = new CommandRegistry()
+    const handlers = makeMinimalHandlers({ apiClient, tabDispatch, activeTab: makeTab({ filePath: 'Board.canvas', fileName: 'Board.canvas' }) })
+    registerCoreAppCommands(registry, () => handlers)
+
+    registry.executeCommand('canvas:convert-to-file')
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(saveFile).toHaveBeenCalledWith('vault-1', 'Board.md', 'Hello canvas')
+    expect(tabDispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'OPEN_TAB', payload: expect.objectContaining({ filePath: 'Board.md' }) }))
+  })
+
+  it('shows an error toast when the active tab is not a canvas', () => {
+    const toastSpy = vi.spyOn(ToastNotificationModule, 'showToast').mockImplementation(() => {})
+    const registry = new CommandRegistry()
+    const handlers = makeMinimalHandlers({ activeTab: makeTab({ filePath: 'note.md' }) })
+    registerCoreAppCommands(registry, () => handlers)
+
+    registry.executeCommand('canvas:convert-to-file')
+
+    expect(toastSpy).toHaveBeenCalledWith('error', expect.any(String))
+    toastSpy.mockRestore()
+  })
+})
+
+describe('registerCoreAppCommands — note-composer:*', () => {
+  afterEach(() => {
+    setActiveEditorView(null)
+  })
+
+  describe('note-composer:split-file', () => {
+    it('extracts the current selection into a new file and replaces it with a wikilink', async () => {
+      const view = new EditorView({ state: EditorState.create({ doc: 'Before. Selected text. After.' }), parent: document.body })
+      const from = 'Before. '.length
+      const to = from + 'Selected text.'.length
+      view.dispatch({ selection: { anchor: from, head: to } })
+      setActiveEditorView(view)
+
+      const saveFile = vi.fn().mockResolvedValue(undefined)
+      const apiClient = createMockApiClient({ saveFile })
+      const registry = new CommandRegistry()
+      const handlers = makeMinimalHandlers({ apiClient, activeTab: makeTab({ filePath: 'notes/Doc.md' }) })
+      registerCoreAppCommands(registry, () => handlers)
+      const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('New Note')
+
+      registry.executeCommand('note-composer:split-file')
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(saveFile).toHaveBeenCalledWith('vault-1', 'notes/New Note.md', 'Selected text.')
+      expect(view.state.doc.toString()).toBe('Before. [[New Note]] After.')
+      promptSpy.mockRestore()
+      view.destroy()
+    })
+
+    it('shows an error toast when there is no selection', () => {
+      const view = new EditorView({ state: EditorState.create({ doc: 'No selection here.' }), parent: document.body })
+      setActiveEditorView(view)
+      const toastSpy = vi.spyOn(ToastNotificationModule, 'showToast').mockImplementation(() => {})
+      const registry = new CommandRegistry()
+      const handlers = makeMinimalHandlers({ activeTab: makeTab() })
+      registerCoreAppCommands(registry, () => handlers)
+
+      registry.executeCommand('note-composer:split-file')
+
+      expect(toastSpy).toHaveBeenCalledWith('error', expect.any(String))
+      toastSpy.mockRestore()
+      view.destroy()
+    })
+
+    it('does nothing when the user cancels the filename prompt', async () => {
+      const view = new EditorView({ state: EditorState.create({ doc: 'Selected text.' }), parent: document.body })
+      view.dispatch({ selection: { anchor: 0, head: 8 } })
+      setActiveEditorView(view)
+      const saveFile = vi.fn()
+      const apiClient = createMockApiClient({ saveFile })
+      const registry = new CommandRegistry()
+      const handlers = makeMinimalHandlers({ apiClient, activeTab: makeTab() })
+      registerCoreAppCommands(registry, () => handlers)
+      const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue(null)
+
+      registry.executeCommand('note-composer:split-file')
+      await Promise.resolve()
+
+      expect(saveFile).not.toHaveBeenCalled()
+      promptSpy.mockRestore()
+      view.destroy()
+    })
+  })
+
+  describe('note-composer:extract-heading', () => {
+    it('extracts the heading section at the cursor into a new file', async () => {
+      const doc = '# Title\n\n## My Heading\n\nSection body.'
+      const view = new EditorView({ state: EditorState.create({ doc }), parent: document.body })
+      view.dispatch({ selection: { anchor: doc.indexOf('Section body') } })
+      setActiveEditorView(view)
+
+      const saveFile = vi.fn().mockResolvedValue(undefined)
+      const apiClient = createMockApiClient({ saveFile })
+      const registry = new CommandRegistry()
+      const handlers = makeMinimalHandlers({ apiClient, activeTab: makeTab({ filePath: 'Doc.md' }) })
+      registerCoreAppCommands(registry, () => handlers)
+
+      registry.executeCommand('note-composer:extract-heading')
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(saveFile).toHaveBeenCalledWith('vault-1', 'My Heading.md', '## My Heading\n\nSection body.')
+      expect(view.state.doc.toString()).toBe('# Title\n\n[[My Heading]]')
+      view.destroy()
+    })
+
+    it('shows an error toast when there is no heading above the cursor', () => {
+      const view = new EditorView({ state: EditorState.create({ doc: 'No heading here.' }), parent: document.body })
+      setActiveEditorView(view)
+      const toastSpy = vi.spyOn(ToastNotificationModule, 'showToast').mockImplementation(() => {})
+      const registry = new CommandRegistry()
+      const handlers = makeMinimalHandlers({ activeTab: makeTab() })
+      registerCoreAppCommands(registry, () => handlers)
+
+      registry.executeCommand('note-composer:extract-heading')
+
+      expect(toastSpy).toHaveBeenCalledWith('error', expect.any(String))
+      toastSpy.mockRestore()
+      view.destroy()
+    })
+  })
+
+  describe('note-composer:merge-file', () => {
+    it('appends the active file to the prompted target, saves it, deletes the source, and closes its tab', async () => {
+      const fetchFileContent = vi.fn().mockResolvedValue({ content: 'Target content.', isBinary: false })
+      const saveFile = vi.fn().mockResolvedValue(undefined)
+      const deleteContent = vi.fn().mockResolvedValue(undefined)
+      const apiClient = createMockApiClient({ fetchFileContent, saveFile, deleteContent })
+      const tabDispatch = vi.fn()
+      const registry = new CommandRegistry()
+      const handlers = makeMinimalHandlers({
+        apiClient, tabDispatch,
+        activeTab: makeTab({ filePath: 'source.md', content: 'Source content.' }),
+      })
+      registerCoreAppCommands(registry, () => handlers)
+      const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('target.md')
+
+      registry.executeCommand('note-composer:merge-file')
+      await Promise.resolve()
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(fetchFileContent).toHaveBeenCalledWith('vault-1', 'target.md')
+      expect(saveFile).toHaveBeenCalledWith('vault-1', 'target.md', 'Target content.\n\nSource content.')
+      expect(deleteContent).toHaveBeenCalledWith('vault-1', 'source.md')
+      expect(tabDispatch).toHaveBeenCalledWith({ type: 'CLOSE_TABS_BY_PATH', payload: { pathPrefix: 'source.md' } })
+      promptSpy.mockRestore()
+    })
+
+    it('shows an error toast when the target equals the source', async () => {
+      const toastSpy = vi.spyOn(ToastNotificationModule, 'showToast').mockImplementation(() => {})
+      const registry = new CommandRegistry()
+      const handlers = makeMinimalHandlers({ activeTab: makeTab({ filePath: 'source.md' }) })
+      registerCoreAppCommands(registry, () => handlers)
+      const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('source.md')
+
+      registry.executeCommand('note-composer:merge-file')
+      await Promise.resolve()
+
+      expect(toastSpy).toHaveBeenCalledWith('error', expect.any(String))
+      toastSpy.mockRestore()
+      promptSpy.mockRestore()
+    })
+
+    it('does nothing when the user cancels the target prompt', async () => {
+      const saveFile = vi.fn()
+      const apiClient = createMockApiClient({ saveFile })
+      const registry = new CommandRegistry()
+      const handlers = makeMinimalHandlers({ apiClient, activeTab: makeTab() })
+      registerCoreAppCommands(registry, () => handlers)
+      const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue(null)
+
+      registry.executeCommand('note-composer:merge-file')
+      await Promise.resolve()
+
+      expect(saveFile).not.toHaveBeenCalled()
+      promptSpy.mockRestore()
+    })
+  })
+})
+
+/** Minimal CoreAppCommandHandlers builder shared by tests below that don't need the full beforeEach setup above. */
+function makeMinimalHandlers(overrides: { apiClient?: IApiClient; tabDispatch?: ReturnType<typeof vi.fn>; activeTab: TabEntry }): CoreAppCommandHandlers {
+  const apiClient = overrides.apiClient ?? createMockApiClient()
+  return {
+    vaultId: 'vault-1',
+    vaultName: 'My Vault',
+    apiClient,
+    tabState: { tabs: [overrides.activeTab], activeTabId: overrides.activeTab.id },
+    tabDispatch: overrides.tabDispatch ?? vi.fn(),
+    appDispatch: vi.fn(),
+    authState: { isAuthenticated: true, user: makeUser(), token: null, csrfToken: null, mustChangePassword: false, isLoading: false, error: null },
+    authDispatch: vi.fn(),
+    showSidebar: false,
+    showRightPanel: false,
+    rightPanelSections: [],
+    rightPanelDispatch: vi.fn(),
+    leftPanelSections: [],
+    leftPanelDispatch: vi.fn(),
+    onToggleSidebar: vi.fn(),
+    onToggleRightPanel: vi.fn(),
+    onOpenSettings: vi.fn(),
+    onNavigate: vi.fn(),
+    onCreateFile: vi.fn(),
+    onCreateFolder: vi.fn(),
+    onCreateCanvas: vi.fn(),
+    onOpenGraph: vi.fn(),
+    onOpenLocalGraph: vi.fn(),
+    onDailyNote: vi.fn(),
+    onDailyNoteOffset: vi.fn(),
+    onCreateWelcomeVault: vi.fn(),
+    onOpenTemplateSelector: vi.fn(),
+    onOpenReleaseNotes: vi.fn(),
+    onOpenDebugInfo: vi.fn(),
+    onNavigateBack: vi.fn(),
+    onNavigateForward: vi.fn(),
+    onOpenQuickSwitcher: vi.fn(),
+    searchQuery: '',
+    searchCaseSensitive: false,
+    searchRegex: false,
+  }
+}

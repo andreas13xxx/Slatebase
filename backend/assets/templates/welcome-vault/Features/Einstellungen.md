@@ -32,7 +32,7 @@ Das Settings-Panel hat eine Sidebar-Navigation mit Kategorien und Abschnitten:
 | Profil | Anzeigename, Benutzername (read-only) |
 | Passwort | Passwort ändern (aktuelles + neues) |
 | Sprache | Bevorzugte Sprache (DE/EN), bestimmt UI und Welcome-Vault-Sprache |
-| Anleitungs-Vault | Button zum nachträglichen Erstellen des Anleitungs-Vaults |
+| Anleitungs-Vault | Button zum nachträglichen Erstellen des Anleitungs-Vaults (auch über Command Palette → "Sandbox-Vault öffnen") |
 | Darstellung | Statusleiste (global + pro Element) ein-/ausblenden, CSS-Snippets verwalten |
 | Tastenkürzel | Benutzerdefinierte Tastenkombinationen (Keybindings) |
 | Account löschen | Eigenen Account permanent entfernen |
@@ -118,6 +118,10 @@ Aktivierte Snippets werden automatisch angewendet, sobald du den Vault öffnest 
 
 Das Theme lässt sich über die Command Palette umschalten:
 - `Ctrl+P` → "Dark Mode" oder "Light Mode"
+
+### Zoom
+
+Command Palette → "Vergrößern" / "Verkleinern" / "Zoom zurücksetzen" skaliert die gesamte Oberfläche in 10%-Schritten (50%–200%) und merkt sich die Stufe sitzungsübergreifend. Im Unterschied zum Browser-eigenen Zoom betrifft das nur die Slatebase-Seite selbst.
 
 ---
 

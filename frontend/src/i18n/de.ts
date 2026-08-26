@@ -131,6 +131,8 @@ export const de = {
     closePageAriaLabel: '{name} schließen',
     showPreview: 'Vorschau anzeigen',
     edit: 'Bearbeiten',
+    unpinTab: 'Lösen',
+    unpinTabAriaLabel: 'Tab lösen: {name}',
   },
 
   userMenu: {
@@ -803,5 +805,25 @@ export const de = {
 
   commands: {
     createWelcomeVault: 'Anleitungs-Vault erstellen',
+  },
+
+  releaseNotes: {
+    title: 'Versionshinweise',
+    loading: 'Versionshinweise werden geladen …',
+    error: 'Versionshinweise konnten nicht geladen werden.',
+    empty: 'Keine Versionshinweise verfügbar.',
+  },
+
+  debugInfo: {
+    title: 'Debug-Informationen',
+    version: 'Version',
+    latestVersion: 'Neueste Version',
+    upToDate: 'Aktuell',
+    browser: 'Browser',
+    platform: 'Plattform',
+    vault: 'Aktiver Vault',
+    noVault: 'Kein Vault ausgewählt',
+    copy: 'In Zwischenablage kopieren',
+    copied: 'Kopiert',
   },
 } as const

@@ -76,6 +76,49 @@ Im Edit-Modus können Zeilennummern am linken Rand eingeblendet werden:
 
 ---
 
+## Lesbare Zeilenlänge & Rechtschreibprüfung
+
+Zwei weitere Editor-Umschalter, erreichbar über die Command Palette (`Strg+P`):
+
+- **"Lesbare Zeilenlänge umschalten"** — begrenzt die Editor-Breite für angenehmeres Lesen (Standard: an)
+- **"Rechtschreibprüfung umschalten"** — schaltet die native Rechtschreibprüfung des Browsers im Editor ein/aus (Standard: an)
+
+---
+
+## Falten (Folding)
+
+Lange Dokumente lassen sich leichter überblicken, wenn du gerade nicht benötigte Abschnitte einklappst. Alle Falt-Befehle findest du in der Command Palette (`Strg+P`):
+
+| Befehl | Wirkung |
+|--------|---------|
+| „Einklappen der aktuellen Zeile umschalten" | Klappt den Überschriftenabschnitt oder die verschachtelte Liste am Cursor ein/aus |
+| „Alle Überschriften und Listen einklappen" | Klappt alles Faltbare im Dokument ein |
+| „Alle Überschriften und Listen ausklappen" | Klappt alles wieder auf |
+| „Mehr einklappen" / „Weniger einklappen" | Geht Überschriftenebene für Ebene durch — „Mehr einklappen" faltet zuerst die tiefste Ebene, „Weniger einklappen" öffnet zuerst die flachste eingeklappte Ebene |
+| „Einklappen der Eigenschaften umschalten" | Klappt nur den Frontmatter-Block ein, das öffnende `---` bleibt sichtbar |
+
+Eine eingeklappte Überschrift fasst alles bis zur nächsten gleich- oder höherrangigen Überschrift zusammen; ein eingeklappter Listeneintrag fasst seine verschachtelten Unterpunkte zusammen.
+
+---
+
+## Notizen aufteilen
+
+Drei Command-Palette-Befehle schneiden Inhalt aus der aktuellen Notiz in eine neue Datei aus und ersetzen ihn durch einen `[[Wikilink]]` zurück auf den extrahierten Teil:
+
+| Befehl | Extrahiert |
+|--------|------------|
+| „Notiz-Composer: Aktuelle Auswahl extrahieren …" | Den markierten Text (fragt nach einem Dateinamen) |
+| „Notiz-Composer: Diese Überschrift extrahieren …" | Die Überschrift am Cursor samt allem bis zur nächsten gleich- oder höherrangigen Überschrift (Dateiname = Überschriftentext) |
+| „Notiz-Composer: Aktuelle Datei mit anderer Datei zusammenführen …" | Umgekehrt: hängt die *gesamte* aktuelle Datei an eine von dir benannte Datei an und löscht anschließend die aktuelle Datei |
+
+---
+
+## Als PDF exportieren
+
+Command Palette → „Als PDF exportieren …" schaltet die aktive Datei in den Lesemodus und öffnet den Druckdialog deines Browsers — wähle dort „Als PDF speichern" als Ziel. Gedruckt wird nur der gerenderte Notizinhalt, nicht die Seitenleiste oder Tab-Leiste.
+
+---
+
 ## Undo / Redo
 
 Fehler lassen sich rückgängig machen:

@@ -79,10 +79,10 @@ export const pluginRegistrySchema = z.object({
  * Upload size constraints for plugin files.
  */
 export const pluginUploadConstraints = {
-  /** Maximum ZIP file size: 5 MB */
-  maxZipSize: 5 * 1024 * 1024,
-  /** Maximum individual file size: 5 MB */
-  maxFileSize: 5 * 1024 * 1024,
+  /** Maximum ZIP file size: 10 MB */
+  maxZipSize: 10 * 1024 * 1024,
+  /** Maximum individual file size: 10 MB */
+  maxFileSize: 10 * 1024 * 1024,
 } as const
 
 // ─── Inferred Types ──────────────────────────────────────────────────────────

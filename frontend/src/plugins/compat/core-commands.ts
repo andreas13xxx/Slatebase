@@ -17,12 +17,14 @@
  * context (save-file, search, follow-link, toggle-source, ...) are registered by
  * `core-commands-app.ts` instead — see that module for the split rationale.
  *
- * A handful of real commands have no Slatebase equivalent at all (context menu,
- * code folding — Slatebase's CM6 setup has no folding extension configured,
- * spellcheck/readable-line-length settings, multi-pane focus). Those are
- * registered as literal no-ops so `executeCommandById` finds them (matching real
- * Obsidian, where a command can exist but not always be actionable) instead of
- * silently failing to resolve at all.
+ * A handful of real commands have no Slatebase equivalent at all (attachments,
+ * multi-pane focus). Those are registered as literal no-ops so
+ * `executeCommandById` finds them (matching real Obsidian, where a command can
+ * exist but not always be actionable) instead of silently failing to resolve
+ * at all. Folding, the context menu, and readable-line-length/spellcheck used
+ * to be in that category too — see folding.ts for the fold-by-heading/
+ * fold-by-list `foldService` and core-commands-app.ts's `'slatebase:editor-command'`
+ * CustomEvent pattern for the other two.
  *
  * @module core-commands
  */
@@ -31,6 +33,9 @@ import type { ICommandRegistry } from './command-registry'
 import type { IEditor } from './editor-shim'
 import type { Locale } from '../../i18n'
 import { translateCoreCommandName } from './core-command-i18n'
+import { getActiveEditorView } from '../../editor/plugin-extensions'
+import { foldAll, unfoldAll, toggleFold } from '@codemirror/language'
+import { foldMore, foldLess, toggleFoldProperties } from '../../editor/folding'
 
 /** Insert `before`/`after` around the current selection (or at the cursor if empty). */
 function wrapSelection(editor: IEditor, before: string, after: string): void {
@@ -437,16 +442,16 @@ export function registerCoreEditorCommands(registry: ICommandRegistry, locale: L
 
     // ── No Slatebase equivalent — registered so lookups find a real (inert) command ──
     { id: 'attach-file', name: 'Insert attachment', run: noop },
-    { id: 'context-menu', name: 'Show context menu under cursor', run: noop },
+    { id: 'context-menu', name: 'Show context menu under cursor', run: () => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'showContextMenu' } })) },
     { id: 'download-attachments', name: 'Download attachments for current file', run: noop },
-    { id: 'fold-all', name: 'Fold all headings and lists', run: noop },
-    { id: 'fold-less', name: 'Fold less', run: noop },
-    { id: 'fold-more', name: 'Fold more', run: noop },
-    { id: 'toggle-fold', name: 'Toggle fold on the current line', run: noop },
-    { id: 'toggle-fold-properties', name: 'Toggle fold properties in current file', run: noop },
-    { id: 'unfold-all', name: 'Unfold all headings and lists', run: noop },
-    { id: 'toggle-readable-line-length', name: 'Toggle readable line length', run: noop },
-    { id: 'toggle-spellcheck', name: 'Toggle spellcheck', run: noop },
+    { id: 'fold-all', name: 'Fold all headings and lists', run: () => { const v = getActiveEditorView(); if (v) foldAll(v) } },
+    { id: 'fold-less', name: 'Fold less', run: () => { const v = getActiveEditorView(); if (v) foldLess(v) } },
+    { id: 'fold-more', name: 'Fold more', run: () => { const v = getActiveEditorView(); if (v) foldMore(v) } },
+    { id: 'toggle-fold', name: 'Toggle fold on the current line', run: () => { const v = getActiveEditorView(); if (v) toggleFold(v) } },
+    { id: 'toggle-fold-properties', name: 'Toggle fold properties in current file', run: () => { const v = getActiveEditorView(); if (v) toggleFoldProperties(v) } },
+    { id: 'unfold-all', name: 'Unfold all headings and lists', run: () => { const v = getActiveEditorView(); if (v) unfoldAll(v) } },
+    { id: 'toggle-readable-line-length', name: 'Toggle readable line length', run: () => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'toggleReadableLineLength' } })) },
+    { id: 'toggle-spellcheck', name: 'Toggle spellcheck', run: () => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'toggleSpellcheck' } })) },
     { id: 'focus-top', name: 'Focus on tab group above', run: noop },
     { id: 'focus-bottom', name: 'Focus on tab group below', run: noop },
     { id: 'focus-left', name: 'Focus on tab group to the left', run: noop },

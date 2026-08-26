@@ -8,7 +8,7 @@
  * @module tab-context-menu
  */
 import { createElement } from 'react'
-import { X, CopyX, PanelRightClose, FolderOpen, Pencil, Trash2 } from 'lucide-react'
+import { X, CopyX, PanelRightClose, FolderOpen, Pencil, Trash2, Pin, PinOff } from 'lucide-react'
 import type { ContextMenuItem } from './ContextMenu'
 import type { TabEntry } from '../state/tabState'
 import type { TabAction } from '../state/tabState'
@@ -25,6 +25,13 @@ export function buildTabContextMenuItems(
   tabDispatch: (action: TabAction) => void,
 ): ContextMenuItem[] {
   const items: ContextMenuItem[] = [
+    {
+      id: 'toggle-pin',
+      label: tab.pinned ? 'Lösen' : 'Anheften',
+      icon: createElement(tab.pinned ? PinOff : Pin, { size: ICON_SIZE }),
+      run: () => tabDispatch({ type: 'TOGGLE_PIN', payload: { tabId: tab.id } }),
+    },
+    { id: 'sep-pin', label: '', separator: true },
     { id: 'close', label: 'Tab schließen', icon: createElement(X, { size: ICON_SIZE }), run: () => tabDispatch({ type: 'CLOSE_TAB', payload: { tabId: tab.id } }) },
     { id: 'close-others', label: 'Andere schließen', icon: createElement(CopyX, { size: ICON_SIZE }), run: () => tabDispatch({ type: 'CLOSE_OTHER_TABS', payload: { tabId: tab.id } }) },
     {

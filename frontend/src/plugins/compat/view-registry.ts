@@ -567,7 +567,12 @@ export class WorkspaceLeaf {
         view.onunload()
       }
     } catch (err) {
-      console.error(`[WorkspaceLeaf] Error in onunload for view "${viewType}":`, err)
+      // Best-effort cleanup that never affects the leaf detaching (the view is
+      // already removed either way) — some plugins (e.g. Excalidraw) null out
+      // their own state in onClose() and then dereference it again in
+      // onunload(), which would throw here in real Obsidian too. Not worth
+      // surfacing as an error since there's nothing actionable on our end.
+      console.debug(`[WorkspaceLeaf] Error in onunload for view "${viewType}":`, err)
     }
   }
 

@@ -58,6 +58,14 @@ The active tab is highlighted. The content of this tab is displayed in the main 
 - `Ctrl+Shift+]` — next tab (wraps around to the first tab at the end)
 - `Ctrl+Shift+[` — previous tab (wraps around to the last tab at the start)
 
+### Pinning a Tab
+
+Right-click a tab → **Pin**, or use the Command Palette → "Toggle pin". A pinned tab shows a pin icon instead of the × and stays open when you use **Close others** — handy for a reference note you want to keep visible no matter what else you close.
+
+### Reopening a Closed Tab
+
+Closed a tab by accident? Command Palette → "Undo close tab" reopens the most recently closed tab (up to the last 20). Each additional use goes one step further back.
+
 ---
 
 ## Breadcrumb Bar

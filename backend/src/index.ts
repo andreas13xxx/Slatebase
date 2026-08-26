@@ -462,10 +462,16 @@ const router = createRouter(routeModules)
 const app = new Hono()
 
 // CORS middleware
+// `/.well-known/mcp.json` is public, unauthenticated MCP discovery metadata that
+// external MCP clients (e.g. Claude connectors) need to fetch cross-origin, so it
+// always allows the requesting origin regardless of `allowedOrigins`.
 app.use(
   '*',
   cors({
-    origin: serverConfig.allowedOrigins,
+    origin: (origin, c) => {
+      if (c.req.path === '/.well-known/mcp.json') return origin || '*'
+      return serverConfig.allowedOrigins.includes(origin) ? origin : null
+    },
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Request-Id'],
   }),

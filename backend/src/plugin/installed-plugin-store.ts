@@ -12,8 +12,8 @@ import { isNodeError } from '../shared/fs-utils.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-/** Maximum file size for plugin files (manifest, bundle, styles): 5 MB */
-const MAX_FILE_SIZE = 5 * 1024 * 1024
+/** Maximum file size for plugin files (manifest, bundle, styles): 10 MB */
+const MAX_FILE_SIZE = 10 * 1024 * 1024
 
 /** Maximum file size for plugin settings (data.json): 1 MB */
 const MAX_SETTINGS_SIZE = 1 * 1024 * 1024

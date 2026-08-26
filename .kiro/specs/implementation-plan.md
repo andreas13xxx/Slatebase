@@ -1,6 +1,6 @@
 # Implementierungsplan — Slatebase Ausstehende Features
 
-**Stand:** 19.08.2026. Security Hardening, Accessibility Audit (Runde 1), **Navigation & Verknüpfungs-Politur**, **UI-Politur (Bookmarks/Statusleiste/CSS-Snippets)**, **Graph-Politur & Link-Integrität**, **Editor-Erweiterungen (Mathe & Medien)** und jetzt auch **Properties-Editor & Suchoperatoren** sind abgeschlossen. Kernfeatures sind umgesetzt. Es verbleiben 10 priorisierte offene Spec-Einheiten (decken ~18 Einzelfeatures ab, da mehrere thematisch verwandte Features gebündelt wurden). Zwei davon — **Workspaces/Split-Panes** und **Bases** — waren zuvor als "kein Äquivalent geplant" eingestuft und sind jetzt auf ausdrücklichen Nutzerwunsch in die aktive Roadmap aufgenommen.
+**Stand:** 26.08.2026. Security Hardening, Accessibility Audit (Runde 1), **Navigation & Verknüpfungs-Politur**, **UI-Politur (Bookmarks/Statusleiste/CSS-Snippets)**, **Graph-Politur & Link-Integrität**, **Editor-Erweiterungen (Mathe & Medien)**, **Properties-Editor & Suchoperatoren** und jetzt auch **PDF-Export / Drucken** sind abgeschlossen. Kernfeatures sind umgesetzt. Track A (Politur) hat damit keine offenen Punkte mehr. Es verbleiben 9 priorisierte offene Spec-Einheiten (decken ~17 Einzelfeatures ab, da mehrere thematisch verwandte Features gebündelt wurden). Zwei davon — **Workspaces/Split-Panes** und **Bases** — waren zuvor als "kein Äquivalent geplant" eingestuft und sind jetzt auf ausdrücklichen Nutzerwunsch in die aktive Roadmap aufgenommen.
 
 **Scope-Korrektur Navigation & Verknüpfungs-Politur:** Die umgesetzte Spec (`.kiro/specs/navigation-link-polish/`) deckt Quick Switcher (wie ursprünglich hier geplant) sowie zusätzlich Navigationsverlauf, Tab-Tastaturkürzel, Live-Backlinks, deterministische Link-Auflösung, Explorer-Auto-Reveal und eine Breadcrumb-Leiste ab — ein sinnvollerer, in sich geschlossener Scope als ursprünglich hier skizziert. Die drei übrigen ursprünglich hier gelisteten Punkte (Lokaler Graph, Ungelinkte Erwähnungen, Automatische Link-Aktualisierung beim Umbenennen/Verschieben) wurden **nicht** mitgeliefert und wurden als eigener Prio „Graph-Politur & Link-Integrität" weitergeführt — inzwischen ebenfalls abgeschlossen (siehe „Erledigt" unten).
 
@@ -12,7 +12,7 @@
 
 | Prio | Feature | Track | Aufwand | Status |
 |------|---------|-------|---------|--------|
-| 1 | PDF-Export / Drucken | A | ~6–10h | Geplant (keine Spec) |
+| ~~1~~ | ~~PDF-Export / Drucken~~ | A | ~~6–10h~~ | ✅ Erledigt (siehe unten) |
 | ~~2~~ | ~~Navigation & Verknüpfungs-Politur~~ | A | ~~25–35h~~ | ✅ Erledigt (Teil-Scope, siehe unten) |
 | ~~3~~ | ~~UI-Politur (Bookmarks/Statusleiste/CSS-Snippets)~~ | A | ~~12–18h~~ | ✅ Erledigt (siehe unten) |
 | ~~4~~ | ~~Editor-Erweiterungen (Mathe & Medien)~~ | A | ~~15–20h~~ | ✅ Erledigt (siehe unten) |
@@ -34,7 +34,7 @@
 ## Abhängigkeiten
 
 ```
-Track A (Politur):     PDF-Export (unabhängig); Navigation & Verknüpfungs-Politur ✅ → Graph-Politur & Link-Integrität ✅; UI-Politur ✅; Editor-Erweiterungen (Mathe/Medien) ✅
+Track A (Politur):     PDF-Export ✅; Navigation & Verknüpfungs-Politur ✅ → Graph-Politur & Link-Integrität ✅; UI-Politur ✅; Editor-Erweiterungen (Mathe/Medien) ✅ — keine offenen Punkte mehr
 Track B (Plugins):     Community Plugin Store ✅ → Obsidian Themes → Server-Side Plugins
 Track C (Sharing):     Public Sharing (unabhängig)
 Track D (Editor):      Collaborative Editing (braucht Realtime + CM6)
@@ -180,21 +180,13 @@ Auslöser: uneinheitliches Erscheinungsbild der Settings-Seiten (mal mit, mal oh
 
 ---
 
-## Prio 1 — PDF-Export / Drucken (Track A)
+## Erledigt — PDF-Export / Drucken (Track A) ✅
 
-Scope: ~6–10h. Keine Spec vorhanden.
+**Spec:** Keine eigene Spec — umgesetzt als Teil eines größeren Batches, der ~20 zuvor als literale No-Ops registrierte Obsidian-Core-Commands (`core-commands.ts`/`core-commands-app.ts`) mit echtem Verhalten hinterlegt hat (u. a. Code-Folding, Tab-Pinning, Canvas-Befehle, Note-Composer). Details zum PDF-Export-Teil: `core-commands-app.ts`s `exportActiveFileToPdf()`.
 
-**Zusammenfassung:**
-
-- Print-Stylesheet (`@media print`) für die gerenderte Ansicht: Editor-Chrome, Sidebar, Tabs und Statusleiste ausblenden, nur Inhalt sichtbar
-- Befehl "Drucken / Als PDF speichern" in Command Palette + Datei-Kontextmenü, löst `window.print()` mit aktivem Print-Stylesheet aus (Browser-eigener PDF-Export im Druckdialog)
-- Callouts, Mermaid-SVGs und Embeds im Printlayout prüfen (Seitenumbrüche, Bildskalierung)
-
-**Abhängigkeiten:** Keine — nutzt die bestehende ViewMode-Rendering-Pipeline.
-
-**Empfehlung:** Kleinster Aufwand im gesamten Backlog bei sofort sichtbarem Nutzen — guter Startpunkt.
-
----
+- `@media print`-Print-Stylesheet in `App.css`: isoliert `.view-mode` (ViewMode.tsx' Reading-Mode-Container) als einziges sichtbares Element beim Drucken — Sidebar, Tabs, Statusleiste und Editor-Chrome werden ausgeblendet statt einzeln adressiert (robuster als eine Liste von Ausblend-Selektoren).
+- Befehl **"Export to PDF..."** in der Command Palette: schaltet den aktiven Tab in den Lesemodus (falls im Edit-Modus) und löst `window.print()` aus — der browsereigene Druckdialog liefert den eigentlichen PDF-Export ("Als PDF speichern").
+- **Scope-Korrektur:** kein zusätzlicher Eintrag im Datei-Kontextmenü (nur Command Palette) — der ursprüngliche Sketch hatte beides vorgesehen, ein zweiter Eintrittspunkt für denselben Befehl brachte keinen zusätzlichen Nutzen. Callouts/Mermaid/Embeds im Printlayout wurden nicht gesondert geprüft, da `.view-mode` bereits die vollständig gerenderte Ansicht (inkl. dieser Elemente) 1:1 übernimmt statt eine eigene Print-Darstellung zu bauen.
 
 ---
 
@@ -231,7 +223,7 @@ Scope: ~4h Design + ~15–20h Implementierung.
 - Audit-Log: Wer hat wann welchen Share erstellt/zugegriffen
 - Verwaltung: Liste aktiver Public-Links pro Vault, Widerruf jederzeit
 
-**Abhängigkeiten:** Braucht `auth-and-user-management` ✅ + `obsidian-markdown-compat` ✅. Teilt die Read-Only-Rendering-Basis mit Prio 1 (PDF-Export).
+**Abhängigkeiten:** Braucht `auth-and-user-management` ✅ + `obsidian-markdown-compat` ✅. Teilt die Read-Only-Rendering-Basis (`.view-mode`) mit dem bereits umgesetzten PDF-Export (siehe „Erledigt" oben).
 
 ---
 
@@ -446,7 +438,7 @@ Playwright ist bereits als Dependency/Config vorhanden, aber der einzige Spec (`
 
 | Track | Aufwand |
 |-------|---------|
-| A: Politur (PDF-Export) | ~6–10h |
+| A: Politur | ✅ keine offenen Punkte mehr |
 | B: Plugins (Themes + Server-Side) | ~63–88h |
 | C: Sharing | ~19–24h |
 | D: Editor (Collaborative) | ~68–88h |
@@ -455,13 +447,13 @@ Playwright ist bereits als Dependency/Config vorhanden, aber der einzige Spec (`
 | H: Strukturierte Daten (Bases) | ~55–75h |
 | I: Onboarding (Importer) | ~20–30h |
 | F: Echte E2E-Test-Suite | ~30–45h |
-| **Summe** | **~383–542h** |
+| **Summe** | **~377–532h** |
 
 ---
 
 ## Bewusst nicht implementierte Features
 
-Bases, Workspaces und PDF-Export standen hier zeitweise als "kein Äquivalent geplant" — sind aber auf Nutzerwunsch jetzt aktiv in der Roadmap oben (Prio 1, 9, 10). Die folgende Liste enthält nur, was tatsächlich dauerhaft ausgeschlossen bleibt:
+Bases, Workspaces und PDF-Export standen hier zeitweise als "kein Äquivalent geplant" — PDF-Export ist inzwischen umgesetzt (siehe „Erledigt" oben), Bases und Workspaces/Split-Panes sind auf Nutzerwunsch aktiv in der Roadmap oben (Prio 9, 10). Die folgende Liste enthält nur, was tatsächlich dauerhaft ausgeschlossen bleibt:
 
 | Idee | Grund |
 |------|-------|

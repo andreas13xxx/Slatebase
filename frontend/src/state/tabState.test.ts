@@ -636,6 +636,151 @@ describe('tabReducer', () => {
       expect(state.tabs).toHaveLength(1)
     })
   })
+
+  describe('TOGGLE_PIN', () => {
+    it('pins an unpinned tab', () => {
+      const stateWithTabs: TabState = {
+        tabs: [createTab('v1', 'a.md', 'a.md'), createTab('v1', 'b.md', 'b.md')],
+        activeTabId: 'v1::a.md',
+        closedTabsHistory: [],
+      }
+
+      const state = tabReducer(stateWithTabs, { type: 'TOGGLE_PIN', payload: { tabId: 'v1::a.md' } })
+
+      expect(state.tabs[0].pinned).toBe(true)
+      expect(state.tabs[1].pinned).toBe(false)
+    })
+
+    it('unpins a pinned tab', () => {
+      const stateWithTab: TabState = {
+        tabs: [createTab('v1', 'a.md', 'a.md', { pinned: true })],
+        activeTabId: 'v1::a.md',
+        closedTabsHistory: [],
+      }
+
+      const state = tabReducer(stateWithTab, { type: 'TOGGLE_PIN', payload: { tabId: 'v1::a.md' } })
+
+      expect(state.tabs[0].pinned).toBe(false)
+    })
+
+    it('does nothing for a non-existent tab ID', () => {
+      const stateWithTab: TabState = {
+        tabs: [createTab('v1', 'a.md', 'a.md')],
+        activeTabId: 'v1::a.md',
+        closedTabsHistory: [],
+      }
+
+      const state = tabReducer(stateWithTab, { type: 'TOGGLE_PIN', payload: { tabId: 'nonexistent' } })
+
+      expect(state.tabs[0].pinned).toBe(false)
+    })
+  })
+
+  describe('CLOSE_OTHER_TABS', () => {
+    it('closes every other tab and activates the target', () => {
+      const stateWithTabs: TabState = {
+        tabs: [createTab('v1', 'a.md', 'a.md'), createTab('v1', 'b.md', 'b.md'), createTab('v1', 'c.md', 'c.md')],
+        activeTabId: 'v1::a.md',
+        closedTabsHistory: [],
+      }
+
+      const state = tabReducer(stateWithTabs, { type: 'CLOSE_OTHER_TABS', payload: { tabId: 'v1::b.md' } })
+
+      expect(state.tabs.map((t) => t.id)).toEqual(['v1::b.md'])
+      expect(state.activeTabId).toBe('v1::b.md')
+    })
+
+    it('keeps pinned tabs alive even though they are not the target', () => {
+      const stateWithTabs: TabState = {
+        tabs: [
+          createTab('v1', 'a.md', 'a.md', { pinned: true }),
+          createTab('v1', 'b.md', 'b.md'),
+          createTab('v1', 'c.md', 'c.md', { pinned: true }),
+        ],
+        activeTabId: 'v1::b.md',
+        closedTabsHistory: [],
+      }
+
+      const state = tabReducer(stateWithTabs, { type: 'CLOSE_OTHER_TABS', payload: { tabId: 'v1::b.md' } })
+
+      expect(state.tabs.map((t) => t.id)).toEqual(['v1::a.md', 'v1::b.md', 'v1::c.md'])
+      expect(state.activeTabId).toBe('v1::b.md')
+    })
+
+    it('does nothing when the target tab does not exist', () => {
+      const stateWithTabs: TabState = {
+        tabs: [createTab('v1', 'a.md', 'a.md')],
+        activeTabId: 'v1::a.md',
+        closedTabsHistory: [],
+      }
+
+      const state = tabReducer(stateWithTabs, { type: 'CLOSE_OTHER_TABS', payload: { tabId: 'nonexistent' } })
+
+      expect(state).toEqual(stateWithTabs)
+    })
+  })
+
+  describe('CLOSE_TAB — closedTabsHistory', () => {
+    it('pushes the closed tab onto closedTabsHistory', () => {
+      const stateWithTabs: TabState = {
+        tabs: [createTab('v1', 'a.md', 'a.md'), createTab('v1', 'b.md', 'b.md')],
+        activeTabId: 'v1::a.md',
+        closedTabsHistory: [],
+      }
+
+      const state = tabReducer(stateWithTabs, { type: 'CLOSE_TAB', payload: { tabId: 'v1::b.md' } })
+
+      expect(state.closedTabsHistory).toHaveLength(1)
+      expect(state.closedTabsHistory[0]!.id).toBe('v1::b.md')
+    })
+
+    it('caps the history at MAX_CLOSED_TABS_HISTORY, dropping the oldest entry', () => {
+      const existingHistory = Array.from({ length: 20 }, (_, i) => createTab('v1', `old-${i}.md`, `old-${i}.md`))
+      const stateWithTabs: TabState = {
+        tabs: [createTab('v1', 'new.md', 'new.md')],
+        activeTabId: 'v1::new.md',
+        closedTabsHistory: existingHistory,
+      }
+
+      const state = tabReducer(stateWithTabs, { type: 'CLOSE_TAB', payload: { tabId: 'v1::new.md' } })
+
+      expect(state.closedTabsHistory).toHaveLength(20)
+      expect(state.closedTabsHistory[0]!.id).toBe('v1::old-1.md') // old-0.md dropped
+      expect(state.closedTabsHistory[19]!.id).toBe('v1::new.md')
+    })
+
+    it('falls back to an empty history when closedTabsHistory is missing from state (legacy fixtures)', () => {
+      const legacyState = {
+        tabs: [createTab('v1', 'a.md', 'a.md')],
+        activeTabId: 'v1::a.md',
+      } as TabState
+
+      expect(() => tabReducer(legacyState, { type: 'CLOSE_TAB', payload: { tabId: 'v1::a.md' } })).not.toThrow()
+    })
+  })
+
+  describe('POP_CLOSED_TAB', () => {
+    it('removes the most recently closed entry', () => {
+      const stateWithHistory: TabState = {
+        tabs: [],
+        activeTabId: null,
+        closedTabsHistory: [createTab('v1', 'a.md', 'a.md'), createTab('v1', 'b.md', 'b.md')],
+      }
+
+      const state = tabReducer(stateWithHistory, { type: 'POP_CLOSED_TAB' })
+
+      expect(state.closedTabsHistory).toHaveLength(1)
+      expect(state.closedTabsHistory[0]!.id).toBe('v1::a.md')
+    })
+
+    it('is a no-op when history is empty', () => {
+      const stateWithoutHistory: TabState = { tabs: [], activeTabId: null, closedTabsHistory: [] }
+
+      const state = tabReducer(stateWithoutHistory, { type: 'POP_CLOSED_TAB' })
+
+      expect(state).toEqual(stateWithoutHistory)
+    })
+  })
 })
 
 // --- Helper ---
@@ -657,6 +802,7 @@ function createTab(
     editBuffer: null,
     loading: false,
     error: null,
+    pinned: false,
     ...overrides,
   }
 }

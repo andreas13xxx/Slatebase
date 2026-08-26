@@ -872,7 +872,7 @@ export function PluginProvider({
           settingTabRegistryRef.current.register(pluginId, tab as import('./setting-tab').PluginSettingTab)
         }
         // Wire addRibbonIcon to route to the shared RibbonIconRegistry
-        instance.addRibbonIcon = (icon: string, title: string, callback: () => void) => {
+        instance.addRibbonIcon = (icon: string, title: string, callback: (evt: MouseEvent) => unknown) => {
           if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) {
             return document.createElement('div')
           }

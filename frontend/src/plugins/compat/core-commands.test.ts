@@ -1,10 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { EditorView } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { history } from '@codemirror/commands'
 import { EditorShim, setEditorViewAccessor } from './editor-shim'
 import { CommandRegistry } from './command-registry'
 import { registerCoreEditorCommands } from './core-commands'
+import { setActiveEditorView } from '../../editor/plugin-extensions'
+import { codeFolding, foldedRanges } from '@codemirror/language'
+import { markdownFoldService } from '../../editor/folding'
+import type { IEditor } from './editor-shim'
 
 describe('registerCoreEditorCommands', () => {
   let view: EditorView
@@ -220,6 +224,139 @@ describe('registerCoreEditorCommands', () => {
 
       expect(() => run('table-col-after')).not.toThrow()
       expect(editor.getValue()).toBe('just some text')
+    })
+  })
+
+  describe('commands wired via the slatebase:editor-command CustomEvent', () => {
+    it('context-menu dispatches a showContextMenu editor-command event', () => {
+      const listener = vi.fn()
+      window.addEventListener('slatebase:editor-command', listener)
+
+      run('context-menu')
+
+      expect(listener).toHaveBeenCalledTimes(1)
+      expect((listener.mock.calls[0]![0] as CustomEvent).detail).toEqual({ action: 'showContextMenu' })
+      window.removeEventListener('slatebase:editor-command', listener)
+    })
+
+    it('toggle-readable-line-length dispatches a toggleReadableLineLength editor-command event', () => {
+      const listener = vi.fn()
+      window.addEventListener('slatebase:editor-command', listener)
+
+      run('toggle-readable-line-length')
+
+      expect((listener.mock.calls[0]![0] as CustomEvent).detail).toEqual({ action: 'toggleReadableLineLength' })
+      window.removeEventListener('slatebase:editor-command', listener)
+    })
+
+    it('toggle-spellcheck dispatches a toggleSpellcheck editor-command event', () => {
+      const listener = vi.fn()
+      window.addEventListener('slatebase:editor-command', listener)
+
+      run('toggle-spellcheck')
+
+      expect((listener.mock.calls[0]![0] as CustomEvent).detail).toEqual({ action: 'toggleSpellcheck' })
+      window.removeEventListener('slatebase:editor-command', listener)
+    })
+  })
+
+  describe('folding commands', () => {
+    let foldingView: EditorView
+    let foldingRegistry: CommandRegistry
+
+    function setUpFoldingView(doc: string): void {
+      foldingView = new EditorView({
+        state: EditorState.create({ doc, extensions: [codeFolding(), markdownFoldService] }),
+        parent: document.body,
+      })
+      setActiveEditorView(foldingView)
+      foldingRegistry = new CommandRegistry()
+      // These six commands ignore the IEditor argument (they call
+      // getActiveEditorView() directly) — the resolver only needs to make
+      // CommandRegistry treat editor:* commands as invocable at all.
+      foldingRegistry.setEditorContextResolver(() => ({
+        editor: {} as IEditor,
+        file: { path: 'note.md', basename: 'note', extension: 'md' },
+      }))
+      registerCoreEditorCommands(foldingRegistry, 'de')
+    }
+
+    afterEach(() => {
+      foldingView.destroy()
+      setActiveEditorView(null)
+    })
+
+    it('editor:fold-all folds every heading section', () => {
+      setUpFoldingView('# Title\n\n## A\n\nBody A.')
+
+      foldingRegistry.executeCommand('editor:fold-all')
+
+      let count = 0
+      foldedRanges(foldingView.state).between(0, foldingView.state.doc.length, () => { count++ })
+      expect(count).toBeGreaterThan(0)
+    })
+
+    it('editor:unfold-all clears folds created by editor:fold-all', () => {
+      setUpFoldingView('# Title\n\n## A\n\nBody A.')
+      foldingRegistry.executeCommand('editor:fold-all')
+
+      foldingRegistry.executeCommand('editor:unfold-all')
+
+      let count = 0
+      foldedRanges(foldingView.state).between(0, foldingView.state.doc.length, () => { count++ })
+      expect(count).toBe(0)
+    })
+
+    it('editor:toggle-fold folds then unfolds the heading section at the cursor', () => {
+      const doc = '# Title\n\n## A\n\nBody A.'
+      setUpFoldingView(doc)
+      foldingView.dispatch({ selection: { anchor: doc.indexOf('## A') } })
+
+      foldingRegistry.executeCommand('editor:toggle-fold')
+      let count = 0
+      foldedRanges(foldingView.state).between(0, foldingView.state.doc.length, () => { count++ })
+      expect(count).toBeGreaterThan(0)
+
+      foldingRegistry.executeCommand('editor:toggle-fold')
+      count = 0
+      foldedRanges(foldingView.state).between(0, foldingView.state.doc.length, () => { count++ })
+      expect(count).toBe(0)
+    })
+
+    it('editor:toggle-fold-properties folds the frontmatter block', () => {
+      setUpFoldingView('---\ntags: [a]\n---\nBody.')
+
+      foldingRegistry.executeCommand('editor:toggle-fold-properties')
+
+      let count = 0
+      foldedRanges(foldingView.state).between(0, foldingView.state.doc.length, () => { count++ })
+      expect(count).toBe(1)
+    })
+
+    it('editor:fold-more folds the deepest heading level', () => {
+      setUpFoldingView('# Title\n\n## A\n\nBody A.')
+
+      foldingRegistry.executeCommand('editor:fold-more')
+
+      let count = 0
+      foldedRanges(foldingView.state).between(0, foldingView.state.doc.length, () => { count++ })
+      expect(count).toBeGreaterThan(0)
+    })
+
+    it('editor:fold-less is a no-op when nothing is folded', () => {
+      setUpFoldingView('# Title\n\n## A\n\nBody A.')
+
+      expect(() => foldingRegistry.executeCommand('editor:fold-less')).not.toThrow()
+      let count = 0
+      foldedRanges(foldingView.state).between(0, foldingView.state.doc.length, () => { count++ })
+      expect(count).toBe(0)
+    })
+
+    it('does nothing (no throw) when there is no active editor view', () => {
+      setUpFoldingView('# Title')
+      setActiveEditorView(null)
+
+      expect(() => foldingRegistry.executeCommand('editor:fold-all')).not.toThrow()
     })
   })
 })

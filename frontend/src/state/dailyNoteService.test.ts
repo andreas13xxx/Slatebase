@@ -4,6 +4,7 @@ import {
   getDailyNotesConfig,
   cacheDailyNotesConfig,
   getTodayDateString,
+  offsetDateString,
   validateDirectoryPath,
   NoActiveVaultError,
   InvalidDirectoryPathError,
@@ -323,6 +324,39 @@ describe('dailyNoteService', () => {
       })
 
       vi.useRealTimers()
+    })
+
+    it('uses the provided dateStr instead of today when given', async () => {
+      const fetchFileContent = vi.fn().mockRejectedValueOnce({ code: 'NOT_FOUND', message: 'File not found' })
+      const apiClient = createMockApiClient({ fetchFileContent })
+      const service = createDailyNoteService(apiClient)
+
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date(2024, 5, 15)) // today would be 2024-06-15
+
+      const result = await service.openOrCreate('vault1', 'journal', '2024-06-20')
+      expect(result).toBe('journal/2024-06-20.md')
+      expect(fetchFileContent).toHaveBeenCalledWith('vault1', 'journal/2024-06-20.md')
+
+      vi.useRealTimers()
+    })
+  })
+
+  describe('offsetDateString', () => {
+    it('adds days within the same month', () => {
+      expect(offsetDateString('2024-06-15', 1)).toBe('2024-06-16')
+    })
+
+    it('subtracts days within the same month', () => {
+      expect(offsetDateString('2024-06-15', -1)).toBe('2024-06-14')
+    })
+
+    it('rolls forward across a month boundary', () => {
+      expect(offsetDateString('2024-06-30', 1)).toBe('2024-07-01')
+    })
+
+    it('rolls backward across a year boundary', () => {
+      expect(offsetDateString('2024-01-01', -1)).toBe('2023-12-31')
     })
   })
 })

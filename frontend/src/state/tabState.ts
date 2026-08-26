@@ -25,12 +25,19 @@ export interface TabEntry {
   editBuffer: string | null
   loading: boolean
   error: string | null
+  /** Pinned tabs survive `CLOSE_OTHER_TABS`/`workspace:close-others` and are visually marked. */
+  pinned: boolean
 }
+
+/** Maximum number of recently-closed tabs kept for `workspace:undo-close-pane`. */
+export const MAX_CLOSED_TABS_HISTORY = 20
 
 /** Global tab state. */
 export interface TabState {
   tabs: TabEntry[]
   activeTabId: string | null
+  /** Recently-closed tabs, most-recent last, capped at MAX_CLOSED_TABS_HISTORY. */
+  closedTabsHistory: TabEntry[]
 }
 
 /** Discriminated union of all tab actions. */
@@ -51,11 +58,14 @@ export type TabAction =
   | { type: 'REORDER_TABS'; payload: { fromIndex: number; toIndex: number } }
   | { type: 'CLOSE_OTHER_TABS'; payload: { tabId: string } }
   | { type: 'CLOSE_TABS_TO_RIGHT'; payload: { tabId: string } }
+  | { type: 'TOGGLE_PIN'; payload: { tabId: string } }
+  | { type: 'POP_CLOSED_TAB' }
 
 /** Initial tab state with no open tabs. */
 export const initialTabState: TabState = {
   tabs: [],
   activeTabId: null,
+  closedTabsHistory: [],
 }
 
 /**
@@ -101,6 +111,7 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
         editBuffer: null,
         loading: true,
         error: null,
+        pinned: false,
       }
 
       return {
@@ -115,7 +126,12 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
       const closedIndex = state.tabs.findIndex((t) => t.id === tabId)
       if (closedIndex === -1) return state
 
+      const closedTab = state.tabs[closedIndex]!
       const newTabs = state.tabs.filter((t) => t.id !== tabId)
+      // Bounded stack for workspace:undo-close-pane — oldest entry dropped once
+      // the cap is exceeded, newest always last (drop-in / pop-from-end).
+      // Falls back to [] for TabState fixtures/legacy state predating this field.
+      const closedTabsHistory = [...(state.closedTabsHistory ?? []), closedTab].slice(-MAX_CLOSED_TABS_HISTORY)
 
       // Determine new active tab
       let newActiveTabId: string | null = state.activeTabId
@@ -136,6 +152,7 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
         ...state,
         tabs: newTabs,
         activeTabId: newActiveTabId,
+        closedTabsHistory,
       }
     }
 
@@ -353,9 +370,10 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
     case 'CLOSE_OTHER_TABS': {
       const { tabId } = action.payload
       if (!state.tabs.some((t) => t.id === tabId)) return state
+      // Pinned tabs survive "close others" (matches real Obsidian's pin behavior).
       return {
         ...state,
-        tabs: state.tabs.filter((t) => t.id === tabId),
+        tabs: state.tabs.filter((t) => t.id === tabId || t.pinned),
         activeTabId: tabId,
       }
     }
@@ -388,6 +406,22 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
       return {
         ...state,
         tabs: newTabs,
+      }
+    }
+
+    case 'TOGGLE_PIN': {
+      const { tabId } = action.payload
+      return {
+        ...state,
+        tabs: state.tabs.map((t) => t.id === tabId ? { ...t, pinned: !t.pinned } : t),
+      }
+    }
+
+    case 'POP_CLOSED_TAB': {
+      if (!state.closedTabsHistory || state.closedTabsHistory.length === 0) return state
+      return {
+        ...state,
+        closedTabsHistory: state.closedTabsHistory.slice(0, -1),
       }
     }
   }

@@ -20,6 +20,9 @@ In Source mode you see the raw Markdown text with syntax highlighting. All marke
 ### Features
 
 - **Line Numbers** — Optional line numbers on the left (toggle in Settings)
+- **Readable Line Length** — Constrains the editor width for comfortable reading; toggle via Command Palette → "Toggle readable line length"
+- **Spellcheck** — The browser's native spellcheck, toggleable via Command Palette → "Toggle spellcheck"
+- **Folding** — Collapse headings and nested lists (see [[#Folding]] below)
 - **Auto-Save** — Your changes are saved automatically after a short pause
 - **Undo/Redo** — `Ctrl+Z` to undo, `Ctrl+Shift+Z` to redo
 
@@ -65,6 +68,40 @@ In Live Preview mode your Markdown is **rendered inline** while you type — hea
 
 > [!info] Formatting Toolbar via Plugin
 > Slatebase itself has no fixed toolbar above the editor — you format directly with Markdown syntax (`**bold**`, `## heading`, and so on). If you'd rather click than type syntax, install the [[Advanced/Plugins/Editing Toolbar|Editing Toolbar Plugin]].
+
+---
+
+## Folding
+
+Long documents get easier to scan when you collapse the parts you're not working on right now. All folding commands live in the Command Palette (`Ctrl+P`):
+
+| Command | Effect |
+|---------|--------|
+| "Toggle fold on the current line" | Folds/unfolds the heading section or nested list at the cursor |
+| "Fold all headings and lists" | Collapses everything foldable in the document |
+| "Unfold all headings and lists" | Expands everything back |
+| "Fold more" / "Fold less" | Steps through heading levels one at a time — "Fold more" collapses the deepest level first, "Fold less" expands the shallowest folded level first |
+| "Toggle fold properties in current file" | Collapses just the frontmatter block, leaving the opening `---` visible |
+
+A folded heading collapses everything through the next heading of the same or higher level; a folded list item collapses its nested sub-items.
+
+---
+
+## Splitting Notes Apart
+
+Three Command Palette commands cut content out of the current note into a brand-new one, replacing it with a `[[wikilink]]` back to the extracted piece:
+
+| Command | Extracts |
+|---------|----------|
+| "Note composer: Extract current selection..." | The selected text (asks for a filename) |
+| "Note composer: Extract this heading..." | The heading at the cursor and everything through the next heading of the same or higher level (filename = the heading text) |
+| "Note composer: Merge current file with another file..." | The reverse: appends the *whole* current file onto a file you name, then deletes the current file |
+
+---
+
+## Exporting to PDF
+
+Command Palette → "Export to PDF..." switches the active file to reading view and opens your browser's print dialog — choose "Save as PDF" as the destination to get a PDF file. Only the rendered note content is printed, not the sidebar or tab bar.
 
 ---
 

@@ -1060,10 +1060,13 @@ export function installObsidianGlobals(): void {
         plugins: {
           'daily-notes': { enabled: true, instance: { options: { format: 'YYYY-MM-DD', folder: '', template: '' } } },
           'templates': { enabled: false, instance: { options: { folder: '' } } },
-          // Obsidian's built-in Canvas core plugin — Slatebase has no canvas
-          // feature, but Excalidraw's CanvasNodeFactory.initialize() (run from
-          // its view's onLayoutReady handler, to support embedding files as
-          // canvas nodes inside a drawing) unconditionally reaches into
+          // Obsidian's built-in Canvas core plugin — Slatebase's own native
+          // `.canvas` view (components/canvas/CanvasView.tsx) isn't wired to
+          // this plugin-facing internal API, so as far as a plugin is
+          // concerned there's no canvas to embed into. Excalidraw's
+          // CanvasNodeFactory.initialize() (run from its view's
+          // onLayoutReady handler, to support embedding files as canvas
+          // nodes inside a drawing) unconditionally reaches into
           // `internalPlugins.plugins.canvas._loaded`/`.load()`/`.views.canvas(leaf)`
           // with no null check and no try/catch around the await. Without this
           // entry that access throws "canvas is undefined", which aborts the
@@ -1072,7 +1075,7 @@ export function installObsidianGlobals(): void {
           // sliding-panes/parent-move listeners — leaving the view half
           // initialized (drawing canvas visible, toolbar controls missing).
           // Stubbed enough to satisfy that call path; actual node embedding
-          // through it is a no-op since there's no real canvas to render into.
+          // through it is a no-op since it isn't connected to the real view.
           'canvas': {
             enabled: false,
             _loaded: true,
@@ -1523,7 +1526,7 @@ export function installObsidianGlobals(): void {
       addSettingTab(_tab: unknown): void {}
 
       registerView(_viewType: string, _creator: unknown): void {}
-      addRibbonIcon(icon: string, title: string, callback: () => void): HTMLElement {
+      addRibbonIcon(icon: string, title: string, callback: (evt: MouseEvent) => unknown): HTMLElement {
         const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
         return registerRibbonIcon(pluginId, icon, title, callback)
       }

@@ -146,6 +146,12 @@ Bei Dateien mit Schreibzugriff wird statt der einfachen Tabelle ein **interaktiv
 > [!tip] Kein manuelles YAML
 > Der Properties-Editor erspart dir das manuelle Bearbeiten des YAML-Blocks. Änderungen werden direkt ins Frontmatter geschrieben und sofort gespeichert.
 
+### Command-Palette-Kürzel
+
+- **"Alias hinzufügen"** — fügt eine `aliases`-Liste ins Frontmatter ein (legt den Frontmatter-Block bei Bedarf neu an)
+- **"Dateieigenschaft hinzufügen"** — fügt eine neue leere Eigenschaft ein (`property`, `property-1`, … falls der Name schon vergeben ist)
+- **"Dateieigenschaften löschen"** — entfernt den gesamten Frontmatter-Block
+
 ---
 
 ## Tags im Context Panel

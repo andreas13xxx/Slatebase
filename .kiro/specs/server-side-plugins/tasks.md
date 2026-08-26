@@ -1,8 +1,16 @@
 # Server-Side Plugins — Tasks
 
+## Phase 0: Security-Hardening-Nachsorge (unabhängig, kann vorab laufen)
+
+Aus `SECURITY-AUDIT.md` (Fix-Backlog) und `implementation-plan.md` (Prio 11) explizit dieser Spec zugewiesen — siehe Design-Abschnitt "Security-Hardening-Nachsorge (R9)". Hängt nicht von Phase 1–7 ab, kann jederzeit separat umgesetzt werden.
+
+- [ ] Task 0a: Per-User-Rate-Limiter (`SlidingWindowRateLimiter`, 60/min) auf `POST /proxy` (`backend/src/api/proxyRoutes.ts`)
+- [ ] Task 0b: Per-User-Rate-Limiter (`SlidingWindowRateLimiter`, 20/Stunde) auf `POST /vaults/:vaultId/shares`
+- [ ] Task 0c: Per-User-Rate-Limiter auf `GET /search` und `GET /vaults/:vaultId/search` + Timeout in `SearchService`
+
 ## Phase 1: Klassifikation & Infrastruktur
 
-- [ ] Task 1: PluginClassifier implementieren (statische Bundle-Analyse: Node.js-Module, DOM-Zugriff, executionType)
+- [ ] Task 1: PluginClassifier implementieren (statische Bundle-Analyse: Node.js-Module, DOM-Zugriff, executionType) — Node-Modul-Erkennung aus `frontend/src/plugins/compat/compatibility-analyzer.ts` (`detectNodeModules()`) wiederverwenden/extrahieren statt neu implementieren (siehe R1.7); dabei `events`/`url` zur Modul-Liste ergänzen
 - [ ] Task 2: Registry-Schema um `executionType`-Feld erweitern (Backend + Frontend)
 - [ ] Task 3: PluginInstaller erweitern — Klassifikation bei Upload durchführen und in Registry speichern
 - [ ] Task 4: Frontend PluginManagementPage: executionType-Badge anzeigen ("Browser" / "Server" / "Hybrid" / "Unbekannt")
@@ -13,7 +21,7 @@
 - [ ] Task 6: ServerPluginSandbox implementieren (vm.createContext, Memory-Limits, Timeout)
 - [ ] Task 7: Selektiver require()-Proxy (erlaubte Node.js built-ins: tls, net, crypto, buffer, events, stream, path, url, https, http)
 - [ ] Task 8: VaultShim (Server) implementieren — Vault-I/O über VaultService
-- [ ] Task 9: NetworkShim implementieren — fetch/requestUrl mit Allowlist-Prüfung
+- [ ] Task 9: NetworkShim implementieren — fetch/requestUrl mit Allowlist-Prüfung; Credentials über bestehenden `PluginSecretStore`/`PluginSecretKeyManager` (nicht neu bauen, siehe Design)
 - [ ] Task 10: SettingsShim implementieren — loadData/saveData über PluginStore
 - [ ] Task 11: Minimaler DOM-Stub für SettingTab (createElement, appendChild, textContent, className, addEventListener, innerHTML)
 
@@ -55,4 +63,4 @@
 - [ ] Task 33: Netzwerk-Allowlist-UI (pro Plugin konfigurierbar)
 - [ ] Task 34: Memory/CPU-Monitoring mit Auto-Kill bei Überschreitung
 - [ ] Task 35: Audit-Logging für Plugin-Aktionen (Dateiänderungen, Netzwerk-Requests)
-- [ ] Task 36: Sicherheits-Review: Sandbox-Escape-Vektoren identifizieren und mitigieren
+- [ ] Task 36: Sicherheits-Review: Sandbox-Escape-Vektoren identifizieren und mitigieren; bestätigt Schließung von `SECURITY-AUDIT.md` Fix-Backlog #4 (echte Isolation für server-capable Plugins) — Scope-Klarstellung nicht vergessen: browser-only-Plugins bleiben bei Proxy-basierter Soft-Isolation

@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { useTabContext } from '../state/tabContext'
 import { useTranslation } from '../i18n'
-import { Eye, Pencil, X, Share2, Puzzle } from 'lucide-react'
+import { Eye, Pencil, X, Share2, Puzzle, Pin } from 'lucide-react'
 import { getFileIcon, getFileIconClass, getDisplayName } from '../utils/fileIcons'
 import { getCustomIconSvg, sizeCustomIconSvg, useIconResolutionTick } from '../utils/pluginIcon'
 import { resolveIconMarkupSync } from '../plugins/compat/lucide-icons'
@@ -65,6 +65,11 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab }: T
   function handleToggleMode(e: React.MouseEvent, tabId: string) {
     e.stopPropagation()
     tabDispatch({ type: 'TOGGLE_MODE', payload: { tabId } })
+  }
+
+  function handleTogglePin(e: React.MouseEvent, tabId: string) {
+    e.stopPropagation()
+    tabDispatch({ type: 'TOGGLE_PIN', payload: { tabId } })
   }
 
   function handleDragStart(e: React.DragEvent, index: number) {
@@ -223,15 +228,27 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab }: T
                 <ModeIcon size={12} />
               </button>
             )}
-            <button
-              type="button"
-              className="tab-bar-close-btn"
-              aria-label={t('tabs.closeTabAriaLabel', { name: tab.fileName })}
-              title={t('tabs.closeTab')}
-              onClick={(e) => handleClose(e, tab.id)}
-            >
-              <X size={12} />
-            </button>
+            {tab.pinned ? (
+              <button
+                type="button"
+                className="tab-bar-close-btn tab-bar-pin-btn"
+                aria-label={t('tabs.unpinTabAriaLabel', { name: tab.fileName })}
+                title={t('tabs.unpinTab')}
+                onClick={(e) => handleTogglePin(e, tab.id)}
+              >
+                <Pin size={12} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="tab-bar-close-btn"
+                aria-label={t('tabs.closeTabAriaLabel', { name: tab.fileName })}
+                title={t('tabs.closeTab')}
+                onClick={(e) => handleClose(e, tab.id)}
+              >
+                <X size={12} />
+              </button>
+            )}
           </div>
         )
       })}

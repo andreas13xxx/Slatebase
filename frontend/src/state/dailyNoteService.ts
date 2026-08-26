@@ -78,14 +78,31 @@ export async function loadDailyNotesConfigFromServer(apiClient: IApiClient, vaul
 }
 
 /**
+ * Formats a Date in YYYY-MM-DD using its local (not UTC) calendar fields.
+ */
+function formatDateString(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+/**
  * Formats today's date in YYYY-MM-DD using browser local timezone.
  */
 export function getTodayDateString(): string {
-  const today = new Date()
-  const year = today.getFullYear()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-  const day = String(today.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  return formatDateString(new Date())
+}
+
+/**
+ * Shifts a `YYYY-MM-DD` date string by `offsetDays` (may be negative), using
+ * local calendar arithmetic (so DST transitions land on the right calendar day).
+ */
+export function offsetDateString(dateStr: string, offsetDays: number): string {
+  const [year, month, day] = dateStr.split('-').map(Number) as [number, number, number]
+  const date = new Date(year, month - 1, day)
+  date.setDate(date.getDate() + offsetDays)
+  return formatDateString(date)
 }
 
 /**
@@ -93,12 +110,12 @@ export function getTodayDateString(): string {
  */
 export interface IDailyNoteService {
   /**
-   * Opens or creates today's daily note.
+   * Opens or creates the daily note for `dateStr` (defaults to today).
    * @returns The file path of the daily note.
    * @throws NoActiveVaultError if vaultId is empty.
    * @throws InvalidDirectoryPathError if dailyDir exceeds 255 chars.
    */
-  openOrCreate(vaultId: string, dailyDir: string): Promise<string>
+  openOrCreate(vaultId: string, dailyDir: string, dateStr?: string): Promise<string>
 }
 
 /**
@@ -107,15 +124,15 @@ export interface IDailyNoteService {
  */
 export function createDailyNoteService(apiClient: IApiClient): IDailyNoteService {
   return {
-    async openOrCreate(vaultId: string, dailyDir: string): Promise<string> {
+    async openOrCreate(vaultId: string, dailyDir: string, dateStr?: string): Promise<string> {
       if (!vaultId) {
         throw new NoActiveVaultError()
       }
 
       validateDirectoryPath(dailyDir)
 
-      const dateStr = getTodayDateString()
-      const filePath = dailyDir ? `${dailyDir}/${dateStr}.md` : `${dateStr}.md`
+      const resolvedDateStr = dateStr ?? getTodayDateString()
+      const filePath = dailyDir ? `${dailyDir}/${resolvedDateStr}.md` : `${resolvedDateStr}.md`
 
       // 1. Check if file exists
       try {
@@ -156,7 +173,7 @@ export function createDailyNoteService(apiClient: IApiClient): IDailyNoteService
         const minutes = String(now.getMinutes()).padStart(2, '0')
         const date = `${year}-${month}-${day}`
         const time = `${hours}:${minutes}`
-        const title = dateStr
+        const title = resolvedDateStr
 
         templateContent = templateContent
           .replace(/\{\{date\}\}/g, date)

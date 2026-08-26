@@ -1,7 +1,7 @@
 import type { Dispatch } from 'react'
 import type { IApiClient } from '../api'
 import type { AppAction } from '../types'
-import { generateTabId, type TabAction } from './tabState'
+import { generateTabId, type TabAction, type TabEntry } from './tabState'
 import { add as addRecentFile } from './recentFilesStore'
 
 /**
@@ -35,6 +35,32 @@ export async function openTab(
   } catch (err: unknown) {
     const message = toErrorMessage(err)
     tabDispatch({ type: 'TAB_ERROR', payload: { tabId, error: message } })
+  }
+}
+
+/**
+ * Reopens the most recently closed tab (`workspace:undo-close-pane`).
+ *
+ * Deliberately re-fetches content via `openTab` rather than restoring the
+ * closed `TabEntry`'s own `content`/`editBuffer` verbatim — that snapshot can
+ * be stale (the file may have changed since it was closed, e.g. via another
+ * session or a plugin), so treating "undo close" as "reopen this path" keeps
+ * the same freshness guarantee every other tab-open path already has.
+ * Restores the pinned flag, which OPEN_TAB always resets to false.
+ */
+export async function undoCloseTab(
+  tabDispatch: Dispatch<TabAction>,
+  appDispatch: Dispatch<AppAction>,
+  apiClient: IApiClient,
+  closedTabsHistory: TabEntry[],
+): Promise<void> {
+  const last = closedTabsHistory[closedTabsHistory.length - 1]
+  if (!last) return
+
+  tabDispatch({ type: 'POP_CLOSED_TAB' })
+  await openTab(tabDispatch, appDispatch, apiClient, last.vaultId, last.filePath, last.fileName)
+  if (last.pinned) {
+    tabDispatch({ type: 'TOGGLE_PIN', payload: { tabId: generateTabId(last.vaultId, last.filePath) } })
   }
 }
 

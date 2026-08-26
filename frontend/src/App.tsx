@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState, useMemo, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useRef, useCallback, useState, useMemo, useSyncExternalStore } from 'react'
 import { AppProvider, useAppContext, loadVaults, importFile, importFolder, exportVault, reloadVaultTree } from './state'
 import { ApiClient } from './api'
 import { AuthProvider, useAuthContext, getStoredAuthToken, getStoredCsrfToken } from './state/authContext'
@@ -6,11 +6,12 @@ import { TabProvider, useTabContext } from './state/tabContext'
 import { NavigationHistoryProvider, useNavigationHistory } from './state/navigationHistoryContext'
 import { FeatureProvider, useFeatureContext } from './state/featureContext'
 import { SearchProvider } from './state/searchContext'
-import { createDailyNoteService, loadDailyNotesConfigFromServer } from './state/dailyNoteService'
+import { createDailyNoteService, loadDailyNotesConfigFromServer, getTodayDateString, offsetDateString } from './state/dailyNoteService'
 import { openTab } from './state/tabActions'
 import { initialize as initializeRecentFiles, disconnect as disconnectRecentFiles } from './state/recentFilesStore'
 import { initialize as initializeFavorites, disconnect as disconnectFavorites } from './state/favoritesStore'
 import { initialize as initializeKeybindings, disconnect as disconnectKeybindings } from './state/keybindingsStore'
+import { useZoom } from './state/zoomStore'
 import { I18nProvider, useTranslation } from './i18n'
 import { RealtimeProvider, type RealtimeEventHandlers } from './components/RealtimeProvider'
 import { ToastNotification, showToast } from './components/ToastNotification'
@@ -60,7 +61,7 @@ import { LeftPanelProvider, RightPanelProvider, useLeftPanelContext, useRightPan
 import type { PanelViewId } from './state/panelState'
 import { useDocumentPanelData } from './state/documentPanelData'
 import type { UnlinkedMentionEntry } from './state/documentPanelData'
-import { linkUnlinkedMention } from './state/documentPanelActions'
+import { linkUnlinkedMention, loadUnlinkedMentions } from './state/documentPanelActions'
 import { SidePanel } from './components/side-panel/SidePanel'
 import type { SidePanelDocumentProps, SidePanelSearchProps } from './components/side-panel/SidePanel'
 import { SettingsPanel } from './components/settings/SettingsPanel'
@@ -590,6 +591,40 @@ function AppContent() {
     }
   }, [state.selectedVaultId, tabDispatch, dispatch])
 
+  /**
+   * Opens the next/previous daily note relative to the active tab's date (if it
+   * is itself a daily note) or relative to today otherwise.
+   */
+  const handleDailyNoteOffset = useCallback(async (offsetDays: number) => {
+    if (!state.selectedVaultId) {
+      showToast('error', 'Bitte zuerst einen Vault auswählen')
+      return
+    }
+
+    const vaultId = state.selectedVaultId
+    const dailyDir = await loadDailyNotesConfigFromServer(apiClient, vaultId)
+
+    const activeTab = tabState.tabs.find((t) => t.id === tabState.activeTabId)
+    const prefix = dailyDir ? `${dailyDir}/` : ''
+    const relativePath = activeTab && activeTab.filePath.startsWith(prefix)
+      ? activeTab.filePath.slice(prefix.length)
+      : null
+    const match = relativePath ? /^(\d{4}-\d{2}-\d{2})\.md$/.exec(relativePath) : null
+    const baseDateStr = match ? match[1]! : getTodayDateString()
+    const targetDateStr = offsetDateString(baseDateStr, offsetDays)
+
+    try {
+      const filePath = await dailyNoteService.openOrCreate(vaultId, dailyDir, targetDateStr)
+      const fileName = filePath.split('/').pop() ?? filePath
+      setActiveSettingsPage(null)
+      await openTab(tabDispatch, dispatch, apiClient, vaultId, filePath, fileName)
+      void reloadVaultTree(dispatch, apiClient, vaultId)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Tagesnotiz konnte nicht erstellt werden'
+      showToast('error', message)
+    }
+  }, [state.selectedVaultId, tabState.tabs, tabState.activeTabId, tabDispatch, dispatch])
+
   useGlobalShortcuts({
     leftPanelSections: leftPanelState.sections,
     leftPanelDispatch,
@@ -736,7 +771,14 @@ function AppContent() {
     void openTab(tabDispatch, dispatch, apiClient, state.selectedVaultId, filePath, fileName)
   }, [state.selectedVaultId, tabDispatch, dispatch])
 
-  /** Converts an Ungelinkte_Erwähnung into a real wikilink (Requirement 2.7). */
+  /**
+   * Converts an Ungelinkte_Erwähnung into a real wikilink (Requirement 2.7).
+   * The backend's `vault:change` broadcast excludes the triggering user (so a
+   * tab doesn't reload itself after its own edit) — but that write targets a
+   * *different* file than the one currently open, so this session would never
+   * otherwise hear about it. Re-run the search directly instead of waiting for
+   * a realtime event that will never arrive here.
+   */
   async function handleLinkMention(entry: UnlinkedMentionEntry): Promise<void> {
     const vaultId = state.selectedVaultId
     const path = documentPath
@@ -744,6 +786,7 @@ function AppContent() {
     const baseName = path.split('/').pop()?.replace(/\.md$/i, '') ?? path
     try {
       await linkUnlinkedMention(apiClient, vaultId, entry, baseName)
+      void loadUnlinkedMentions(documentPanelData.dispatch, apiClient, vaultId, path, state.directoryTree)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err)
       showToast('error', message)
@@ -891,6 +934,7 @@ function AppContent() {
         onOpenGraph={handleOpenGraph}
         onOpenLocalGraph={handleOpenLocalGraph}
         onDailyNote={handleDailyNote}
+        onDailyNoteOffset={handleDailyNoteOffset}
         showSidebar={showSidebar}
         showRightPanel={showRightPanel}
         onToggleSidebar={() => setShowSidebar((v) => !v)}
@@ -1212,11 +1256,23 @@ function I18nBridge({ children }: { children: React.ReactNode }) {
  * Obsidian plugins (e.g. Calendar) read localStorage("language") to determine
  * which moment locale to activate. This ensures the plugin locale always matches
  * the user's chosen language, not the browser default.
+ *
+ * Runs in a layout effect, not a passive one: some plugins (e.g. Excalidraw)
+ * read localStorage("language") exactly once, synchronously, at plugin-bundle
+ * evaluation time — a top-level `const LOCALE = getLanguage()` baked into their
+ * module scope, never re-read later. React guarantees every layout effect in a
+ * commit runs before any passive effect in that same commit, so a plain
+ * useEffect here could lose the race against PluginProvider's own useEffect
+ * (which kicks off plugin loading) when both mount together in one commit —
+ * e.g. a hard reload straight into an open vault. That left plugin bundles
+ * permanently English for the rest of the session even though the account is
+ * set to German, since the plugin's cached LOCALE never gets recomputed after
+ * a later locale change. useLayoutEffect closes that race.
  */
 function ObsidianLocaleSync() {
   const { locale } = useTranslation()
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     // Sync to localStorage — plugins read this via localStorage.getItem("language")
     localStorage.setItem('language', locale)
 
@@ -1463,6 +1519,14 @@ function FeatureLoader() {
  * ToastNotification rendered at root level (uses module-level state, independent of providers).
  */
 export function App() {
+  // Applied to <body> (not a wrapper div) so every child DOM node scales
+  // together, including modals/menus rendered via createPortal(document.body) —
+  // those live outside any single wrapper element React could style directly.
+  const zoom = useZoom()
+  useEffect(() => {
+    document.body.style.setProperty('zoom', String(zoom))
+  }, [zoom])
+
   return (
     <AuthProvider>
       <I18nBridge>

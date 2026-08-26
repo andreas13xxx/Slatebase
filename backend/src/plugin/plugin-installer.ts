@@ -11,11 +11,11 @@ import { compareSemver } from '../shared/semver.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-/** Maximum ZIP file size: 5 MB */
-const MAX_ZIP_SIZE = 5 * 1024 * 1024
+/** Maximum ZIP file size: 10 MB */
+const MAX_ZIP_SIZE = 10 * 1024 * 1024
 
-/** Maximum total extracted size: 10 MB */
-const MAX_EXTRACTED_SIZE = 10 * 1024 * 1024
+/** Maximum total extracted size: 20 MB */
+const MAX_EXTRACTED_SIZE = 20 * 1024 * 1024
 
 /** Patterns in bundle source that indicate unsafe code */
 const UNSAFE_PATTERNS: readonly string[] = [

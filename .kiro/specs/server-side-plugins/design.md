@@ -62,6 +62,8 @@ interface ClassificationResult {
 - Node-Module erkannt + DOM-Zugriff → `hybrid`
 - Kein Node-Module → `browser-only`
 
+**Wiederverwendung statt Neubau:** `frontend/src/plugins/compat/compatibility-analyzer.ts` (`CompatibilityAnalyzer`, Teil von `obsidian-plugin-compat`) enthält bereits eine produktiv genutzte `detectNodeModules()`-Funktion mit Regex-Patterns für `require()`/`import`/dynamisches `import()` und einer `NODE_BUILTIN_MODULES`-Liste. Diese Erkennung dient dort einem anderen Zweck (Browser-Kompatibilitäts-Badge, Feld `compatibilityLevel`), ist aber für die Node-Modul-Erkennung selbst 1:1 übertragbar. Empfehlung: Regex-Patterns + Modul-Liste in ein gemeinsames Modul extrahieren (z. B. `shared/node-module-detection.ts`, von Frontend und Backend importierbar, oder als reiner Kopie-Fork mit explizitem Sync-Kommentar, falls ein Shared-Package zwischen `frontend/` und `backend/` architektonisch nicht vorgesehen ist), statt eine zweite, driftende Implementierung zu pflegen. Dabei `events` und `url` zur Liste ergänzen (fehlen aktuell in `NODE_BUILTIN_MODULES`, werden aber von R5.6/Task 7 als bereitzustellende Built-ins verlangt).
+
 ### 2. PluginSandboxManager (Backend)
 
 **Standort:** `backend/src/plugin/server-sandbox.ts`
@@ -102,6 +104,7 @@ interface SandboxConfig {
 - `requestUrl(urlOrConfig)` → `fetch()` mit Allowlist-Prüfung
 - Blockiert Requests an nicht-erlaubte Hosts
 - Loggt alle Requests im Plugin-Log
+- Für Credentials (z. B. IMAP-Passwort im Motivations-Beispiel): bestehenden `PluginSecretStore`/`PluginSecretKeyManager` (`backend/src/plugin/secret-store.ts`, `secret-key-manager.ts`) wiederverwenden — AES-256-GCM-verschlüsselt, bereits vault-/plugin-scoped unter `data/plugins/<vaultId>/<pluginId>/secrets.json`, kein Grund für eine zweite Secret-Persistenz nur für Server-Plugins.
 
 **DomStub:**
 - Minimale `document`/`HTMLElement`-Implementierung für SettingTab
@@ -188,6 +191,15 @@ type PluginRuntimeStatus = 'running' | 'stopped' | 'error' | 'loading'
 
 ## Offene Entscheidungen
 
-1. **`vm` vs `isolated-vm` vs `worker_threads`**: `vm` ist einfacher aber weniger sicher; `isolated-vm` bietet echte Memory-Isolation; `worker_threads` ermöglicht parallele Ausführung. Empfehlung: Start mit `vm`, Migration zu `isolated-vm` wenn Security-Audit das verlangt.
+1. **`vm` vs `isolated-vm` vs `worker_threads`**: `vm` ist einfacher aber weniger sicher; `isolated-vm` bietet echte Memory-Isolation; `worker_threads` ermöglicht parallele Ausführung. Empfehlung: Start mit `vm`, Migration zu `isolated-vm` wenn Security-Audit das verlangt. **Stand (QA-Check):** Weder `isolated-vm` noch `jsdom` sind aktuell eine Dependency von `backend/package.json` — beide müssten bei Task 6 neu hinzugefügt werden, das ist keine bereits vorbereitete Altlast.
 2. **DOM-Stub-Tiefe**: Minimale Implementierung (nur was SettingTab braucht) vs. jsdom (volle Kompatibilität, aber 10 MB+ Dependency). Empfehlung: Eigene minimale Implementierung, jsdom als optionaler Fallback.
 3. **Settings-Bridge-Format**: Deklaratives JSON (einfacher, kontrollierbarer) vs. serialisiertes HTML (kompatibler mit beliebigem DOM). Empfehlung: Deklaratives JSON in V1.
+
+## Security-Hardening-Nachsorge (R9)
+
+`implementation-plan.md` (Prio 11) und `SECURITY-AUDIT.md` (Fix-Backlog #2–#4) weisen dieser Spec zwei bislang offene, unabhängig von der Plugin-Sandbox-Architektur stehende Punkte explizit zu, statt dafür einen eigenen Security-Nachfolge-Pass zu eröffnen:
+
+- **Rate-Limiter** für `POST /proxy` (60/min/userId), `POST /vaults/:vaultId/shares` (20/Stunde/userId) und `GET /search` + `GET /vaults/:vaultId/search` (inkl. `SearchService`-Timeout) — alle über die bestehende `SlidingWindowRateLimiter`-Klasse (`backend/src/shared/sliding-window-rate-limiter.ts`), dieselbe Middleware-Instanz-Bauart wie beim Login- und Passwort-Change-Limiter. Kein neuer Rate-Limiting-Mechanismus nötig, nur zusätzliche Instanzen + Middleware-Verdrahtung an drei bestehenden Routen (`proxyRoutes.ts`, vermutlich `vaultShareRoutes.ts`, `searchRoutes.ts`).
+- **Echte Plugin-Sandbox-Isolation**: Wird durch die in diesem Dokument beschriebene `vm`-Sandbox (Komponente 2) für `server-capable`-Plugins erfüllt — schließt `SECURITY-AUDIT.md` Fix-Backlog #4. Betrifft **nicht** die Browser-Ausführung von `browser-only`-Plugins; deren Proxy-basierte Soft-Isolation (`frontend/src/plugins/compat/sandbox.ts`) bleibt unverändert bestehen (dokumentiertes Trust-Modell, siehe dortiger "SECURITY NOTE"-Kommentar).
+
+**Terminologie-Hinweis:** `SECURITY-AUDIT.md` bezeichnet diese Spec an einer Stelle als "Priority 4", `implementation-plan.md` führt sie aktuell unter "Prio 11" — beide Dokumente meinen dieselbe Spec (`server-side-plugins`), die Nummerierungen stammen aus unterschiedlichen, zu unterschiedlichen Zeitpunkten geschriebenen Priorisierungslisten und sind nicht synchronisiert. Kein Handlungsbedarf für diese Spec selbst, aber beim nächsten Audit-Refresh in `SECURITY-AUDIT.md` erwähnenswert.

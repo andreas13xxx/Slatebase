@@ -56,6 +56,10 @@ A daily note is a file named with today's date (e.g., `2025-07-15.md`). It's cre
 
 If a note for today already exists, it's opened instead of creating a new one.
 
+### Navigating Daily Notes
+
+Command Palette → "Daily notes: Open next daily note" / "Daily notes: Open previous daily note" moves to the adjacent day's note, creating it from the template if it doesn't exist yet. If the active tab isn't itself a daily note, both commands are relative to today.
+
 ### Daily Note Template
 
 The daily note uses the template specified in your vault settings. A typical daily note template:

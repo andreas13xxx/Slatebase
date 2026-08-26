@@ -34,6 +34,12 @@ export interface IFileManagerShim {
   createNewFile(folder: TFolder, name: string, extension: string, data?: string): Promise<TFile>;
   /** Prompt user for deletion and delete the file (moves to trash). Resolves to whether it was deleted. */
   promptForFileDeletion(file: TFile): Promise<boolean>;
+  /** Prompt user for deletion and delete the folder (moves to trash). Resolves to whether it was deleted. */
+  promptForFolderDeletion(folder: TFolder): Promise<boolean>;
+  /** Create a new, uniquely-named folder inside the given parent folder. */
+  createNewFolder(parentFolder: TFolder, name?: string): Promise<TFolder>;
+  /** Create a new markdown file in the default new-file location and open it. */
+  createAndOpenMarkdownFile(filename: string): Promise<TFile>;
   /** Move a file to trash (soft-delete). Used by LiveSync and other plugins. */
   trashFile(file: TFile): Promise<void>;
   /** Get an available path for an attachment file. */
@@ -215,6 +221,48 @@ export class FileManagerShim implements IFileManagerShim {
   }
 
   /**
+   * Create a new, uniquely-named folder inside the given parent folder.
+   *
+   * Unlike createNewFile()/vault.create(), vault.createFolder() throws if the
+   * path already exists (folders have no "create or get" semantics) — this
+   * generates a unique name up front by appending a number suffix, mirroring
+   * createNewFile()'s conflict handling.
+   *
+   * @param parentFolder - Folder to create the new folder inside
+   * @param name - Desired folder name (default: "Untitled")
+   * @returns The created TFolder
+   */
+  async createNewFolder(parentFolder: TFolder, name = 'Untitled'): Promise<TFolder> {
+    let folderPath = parentFolder.path ? `${parentFolder.path}/${name}` : name;
+
+    let attempt = 0;
+    while (this.vault.getAbstractFileByPath(folderPath) !== null) {
+      attempt++;
+      const uniqueName = `${name} ${attempt}`;
+      folderPath = parentFolder.path ? `${parentFolder.path}/${uniqueName}` : uniqueName;
+    }
+
+    return await this.vault.createFolder(folderPath);
+  }
+
+  /**
+   * Create a new markdown file in the default new-file location and open it.
+   *
+   * In real Obsidian, createNewMarkdownFile() alone does not open the file —
+   * this method exists to do both. In Slatebase, vault.create() (which
+   * createNewMarkdownFile() delegates to) already opens every newly created
+   * file as a tab as a side effect, so this is a thin alias that resolves the
+   * default folder via getNewFileParent() before delegating.
+   *
+   * @param filename - Desired file name (without .md extension)
+   * @returns The created TFile
+   */
+  async createAndOpenMarkdownFile(filename: string): Promise<TFile> {
+    const folder = this.getNewFileParent('');
+    return this.createNewMarkdownFile(folder, filename);
+  }
+
+  /**
    * Prompt the user for file deletion, then delete the file.
    *
    * The prompt is the point of this method — a plugin calls it precisely when it
@@ -230,6 +278,21 @@ export class FileManagerShim implements IFileManagerShim {
       if (!window.confirm(`"${file.name}" löschen?`)) return false;
     }
     await this.vault.delete(file);
+    return true;
+  }
+
+  /**
+   * Prompt the user for folder deletion, then delete the folder.
+   * Mirrors promptForFileDeletion() — see its doc comment for why the prompt
+   * matters and isn't skipped.
+   *
+   * @param folder - The folder to delete
+   */
+  async promptForFolderDeletion(folder: TFolder): Promise<boolean> {
+    if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+      if (!window.confirm(`"${folder.name}" und alle enthaltenen Dateien löschen?`)) return false;
+    }
+    await this.vault.delete(folder);
     return true;
   }
 
@@ -270,7 +333,10 @@ export class FileManagerShim implements IFileManagerShim {
       'getNewFileParent',
       'createNewMarkdownFile',
       'createNewFile',
+      'createNewFolder',
+      'createAndOpenMarkdownFile',
       'promptForFileDeletion',
+      'promptForFolderDeletion',
       'trashFile',
       'promptForFileRename',
       'getAvailablePathForAttachment',

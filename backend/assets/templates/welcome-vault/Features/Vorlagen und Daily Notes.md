@@ -91,6 +91,10 @@ Daily Notes sind eine Sonderform der Vorlagen — eine Notiz pro Tag mit automat
 2. **Existiert die Datei:** Sie wird geöffnet
 3. **Existiert sie nicht:** Sie wird mit der Daily-Note-Vorlage erstellt und geöffnet
 
+### Zwischen Tagesnotizen navigieren
+
+Command Palette → "Tagesnotizen: Nächste Tagesnotiz öffnen" / "Tagesnotizen: Vorherige Tagesnotiz öffnen" springt zur Notiz des Nachbartags und legt sie bei Bedarf aus der Vorlage neu an. Ist der aktive Tab selbst keine Tagesnotiz, beziehen sich beide Befehle auf heute.
+
 ### Daily-Notes-Verzeichnis
 
 - **Standard:** Vault-Stammverzeichnis

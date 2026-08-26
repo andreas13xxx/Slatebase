@@ -15,6 +15,7 @@ import {
   unregisterHoverLinkSource,
   requestHoverPreview,
   hoverLinkEventToRequest,
+  getHoverLinkSources,
 } from '../hover-link-bus';
 
 /**
@@ -544,8 +545,10 @@ export class WorkspaceShim implements IWorkspaceShim {
   }
 
   /**
-   * Get an unpinned leaf. Slatebase has no pinning concept, so this always
-   * creates a new leaf with location 'main'.
+   * Get an unpinned leaf. Real Obsidian reuses an existing unpinned leaf;
+   * Slatebase doesn't implement that leaf-reuse search (tabs do have a real
+   * `pinned` flag as of the `workspace:toggle-pin` command, but nothing here
+   * queries it) — this always creates a new leaf with location 'main'.
    */
   getUnpinnedLeaf(): WorkspaceLeaf {
     if (!this.viewRegistry) {
@@ -749,6 +752,28 @@ export class WorkspaceShim implements IWorkspaceShim {
         console.error('[WorkspaceShim] iterateRootLeaves: callback threw for leaf:', err);
       }
     }
+  }
+
+  /**
+   * @deprecated Legacy pre-refactor Obsidian API, superseded by
+   * iterateAllLeaves()/iterateRootLeaves(). Slatebase has no split tree to
+   * recurse into (flat tab system), so this is a thin wrapper that calls back
+   * for every leaf — it does not honor the original's `item` scoping
+   * parameter or its truthy-return early-exit, since neither has a meaningful
+   * equivalent here.
+   */
+  iterateLeaves(callback: (leaf: WorkspaceLeaf) => unknown, _item?: unknown): void {
+    this.iterateAllLeaves(callback as (leaf: WorkspaceLeaf) => void);
+  }
+
+  /**
+   * @deprecated Legacy pre-refactor Obsidian API for manually signaling a
+   * layout change. Superseded by the 'layout-change' event, which Slatebase
+   * already fires automatically from leaf/tab operations — this is a thin
+   * pass-through for plugins that call it directly instead of listening.
+   */
+  onLayoutChange(): void {
+    this.events.trigger('layout-change');
   }
 
   /**
@@ -994,6 +1019,21 @@ export class WorkspaceShim implements IWorkspaceShim {
   }
 
   /**
+   * Read access to the declared hover-link sources, keyed by id — real
+   * Obsidian's internal registry backing the "Page preview" settings list.
+   * Write access happens through registerHoverLinkSource()/
+   * unregisterHoverLinkSource() above; this getter just exposes the current
+   * state of that same registry (hover-link-bus.ts).
+   */
+  get hoverLinkSources(): Record<string, { display: string }> {
+    const out: Record<string, { display: string }> = {};
+    for (const source of getHoverLinkSources()) {
+      out[source.id] = { display: source.display };
+    }
+    return out;
+  }
+
+  /**
    * Remove a listener by the ref `on()` returned.
    *
    * This used to be a no-op on the assumption that unload cleans everything up.
@@ -1115,6 +1155,8 @@ export class WorkspaceShim implements IWorkspaceShim {
       'getActiveViewOfType',
       'iterateAllLeaves',
       'iterateRootLeaves',
+      'iterateLeaves',
+      'onLayoutChange',
       'detachLeavesOfType',
       'getViewRegistry',
       'setActiveLeafInternal',
@@ -1128,6 +1170,7 @@ export class WorkspaceShim implements IWorkspaceShim {
       'requestSaveLayout',
       'registerHoverLinkSource',
       'unregisterHoverLinkSource',
+      'hoverLinkSources',
       'floatingSplit',
       'viewStateReceivers',
       'editorSuggest',

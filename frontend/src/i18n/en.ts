@@ -137,6 +137,8 @@ export const en: TranslationShape = {
     closePageAriaLabel: 'Close {name}',
     showPreview: 'Show preview',
     edit: 'Edit',
+    unpinTab: 'Unpin',
+    unpinTabAriaLabel: 'Unpin tab: {name}',
   },
 
   userMenu: {
@@ -809,6 +811,26 @@ export const en: TranslationShape = {
 
   commands: {
     createWelcomeVault: 'Create tutorial vault',
+  },
+
+  releaseNotes: {
+    title: 'Release Notes',
+    loading: 'Loading release notes …',
+    error: 'Could not load release notes.',
+    empty: 'No release notes available.',
+  },
+
+  debugInfo: {
+    title: 'Debug Info',
+    version: 'Version',
+    latestVersion: 'Latest version',
+    upToDate: 'Up to date',
+    browser: 'Browser',
+    platform: 'Platform',
+    vault: 'Active vault',
+    noVault: 'No vault selected',
+    copy: 'Copy to clipboard',
+    copied: 'Copied',
   },
 
 } as const

@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import dynamicIconImports from 'lucide-react/dynamicIconImports'
-import { getBuiltInIconIds, getCachedLucideIconNode, preloadIconsReferencedIn, resolveLucideIconNode } from './lucide-icons'
+import { getBuiltInIconIds, getCachedLucideIconNode, preloadAllBuiltInIcons, resolveLucideIconNode } from './lucide-icons'
 
 const lucideNames = new Set(Object.keys(dynamicIconImports as Record<string, unknown>))
 
@@ -59,20 +59,26 @@ describe('lucide-icons', () => {
     expect(icon?.lucideName).toBe('circle-help')
   })
 
-  describe('preloadIconsReferencedIn', () => {
-    it('warms the cache for icon ids that appear as string literals in a bundle', async () => {
-      // A never-before-requested icon name (unlikely to have been resolved by
-      // an earlier test in this file), embedded the way a minified plugin
-      // bundle would reference it: as an argument to some wrapper call.
-      const bundle = `getIconAsJSX("axe"), someOtherCall("not-an-icon-id")`
+  describe('preloadAllBuiltInIcons', () => {
+    it('warms the cache for every built-in icon id, not just ones a plugin bundle happens to reference literally', async () => {
+      // A never-before-requested icon name, chosen to prove this warms the
+      // *entire* set rather than scanning any particular bundle's text —
+      // no bundle source is passed in at all.
       expect(getCachedLucideIconNode('axe')).toBeUndefined()
-      await preloadIconsReferencedIn(bundle)
+      await preloadAllBuiltInIcons()
       expect(getCachedLucideIconNode('axe')).not.toBeNull()
       expect(getCachedLucideIconNode('axe')?.lucideName).toBe('axe')
+      // Spot-check a couple more, including an Obsidian-specific alias whose
+      // Lucide name differs from the requested id.
+      expect(getCachedLucideIconNode('gear')?.lucideName).toBe('settings')
+      expect(getCachedLucideIconNode('file-text')).not.toBeNull()
     })
 
-    it('is a no-op when the bundle references no known icon ids', async () => {
-      await expect(preloadIconsReferencedIn('const x = "totally-unrelated-string";')).resolves.toBeUndefined()
+    it('resolves the same promise on repeated calls instead of re-triggering ~2000 dynamic imports', async () => {
+      const first = preloadAllBuiltInIcons()
+      const second = preloadAllBuiltInIcons()
+      expect(second).toBe(first)
+      await first
     })
   })
 })

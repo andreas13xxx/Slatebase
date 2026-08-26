@@ -23,7 +23,7 @@ export interface RibbonIconEntry {
   /** Tooltip text for the icon button */
   title: string
   /** Callback invoked when the icon is clicked */
-  callback: () => void
+  callback: (evt: MouseEvent) => void
   /** The HTMLElement returned to the plugin (for compatibility) */
   element: HTMLElement
 }
@@ -55,7 +55,7 @@ export function addRibbonIcon(
   pluginId: string,
   icon: string,
   title: string,
-  callback: () => void,
+  callback: (evt: MouseEvent) => void,
 ): HTMLElement {
   const element = document.createElement('div')
   element.setAttribute('aria-label', title)
@@ -68,7 +68,13 @@ export function addRibbonIcon(
   // and CssInjector's [data-plugin-id] scoping silently matches nothing
   // inside it (the plugin's own stylesheet — icons, layout, ... — fails
   // to apply even though generic/JS-rendered content still looks fine).
-  const wrappedCallback = () => withPluginContext(pluginId, callback)
+  //
+  // The click event itself is forwarded too: Obsidian's real addRibbonIcon
+  // callback receives the MouseEvent, and plugins (e.g. Excalidraw) read
+  // evt.shiftKey/evt.ctrlKey off it — a bare wrappedCallback() would call
+  // callback with no arguments, leaving evt undefined and crashing plugins
+  // that assume it's always a real event.
+  const wrappedCallback = (evt: MouseEvent) => withPluginContext(pluginId, () => callback(evt))
   const entry: RibbonIconEntry = { pluginId, icon, title, callback: wrappedCallback, element }
   icons.push(entry)
   notifyListeners()

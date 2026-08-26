@@ -39,7 +39,7 @@ import { STORAGE_KEY_TOKEN, STORAGE_KEY_CSRF } from '../../state/authContext';
 import { installObsidianGlobals } from './install-globals';
 import { withPluginContextAsync } from './plugin-execution-context';
 import { createBrowserPathShim } from './browser-path-shim';
-import { preloadIconsReferencedIn } from './lucide-icons';
+import { preloadAllBuiltInIcons } from './lucide-icons';
 // Node's Buffer — plugins that bundle git/crypto tooling (e.g. obsidian-git's
 // isomorphic-git dependency) reference it directly at module top level, not
 // just inside onload(), so it must exist before the bundle evaluates.
@@ -137,9 +137,9 @@ export class PluginLoader implements IPluginLoader {
     try {
       // Some plugins (e.g. Excalidraw) resolve icons once into a frozen
       // React tree at module top level via getIcon() — see
-      // preloadIconsReferencedIn's docs for why that needs the icon cache
+      // preloadAllBuiltInIcons's docs for why that needs the icon cache
       // warmed *before* the bundle's own code runs, not just before onload().
-      await preloadIconsReferencedIn(bundle);
+      await preloadAllBuiltInIcons();
       module = await this.evaluateBundle(bundle);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));

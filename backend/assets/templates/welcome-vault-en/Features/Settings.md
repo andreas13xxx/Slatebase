@@ -31,7 +31,7 @@ The settings panel opens as an overlay with a sidebar for navigation.
 - **Profile** — Display name, preferred language
 - **Password** — Change your password
 - **Sessions** — View and revoke active sessions
-- **Welcome Vault** — Recreate the tutorial vault
+- **Welcome Vault** — Recreate the tutorial vault (also reachable via Command Palette → "Open sandbox vault")
 - **Account Deletion** — Permanently delete your account
 
 ### Appearance
@@ -94,6 +94,10 @@ Enabled snippets are applied automatically whenever you open or switch to the va
 
 > [!tip] Getting started
 > Try a snippet with `:root { --accent: #ff6b6b; }` to change the interface's accent color (find the exact variable names via your browser's dev tools).
+
+### Zoom
+
+Command Palette → "Zoom in" / "Zoom out" / "Reset zoom" scales the entire interface up or down in 10% steps (50%–200%), persisted across sessions. Unlike the browser's own zoom, this only affects the Slatebase page.
 
 ---
 

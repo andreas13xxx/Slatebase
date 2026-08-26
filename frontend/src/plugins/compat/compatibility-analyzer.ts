@@ -189,8 +189,14 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
   'workspace.onLayoutReady',
   'workspace.registerHoverLinkSource',
   'workspace.unregisterHoverLinkSource',
+  'workspace.hoverLinkSources',
   'workspace.containerEl',
   'workspace.updateOptions',
+  // Deprecated aliases from the pre-refactor Workspace API, kept as thin
+  // wrappers over their modern equivalents (iterateAllLeaves, the
+  // 'layout-change' event).
+  'workspace.iterateLeaves',
+  'workspace.onLayoutChange',
   // No split/popout/layout object model in Slatebase's flat-tab workspace —
   // these degrade to a plain tab or a stub, but log a console message
   // explaining the substitution, so plugins get an equivalent signal.
@@ -248,6 +254,9 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
   'fileManager.createNewMarkdownFile',
   'fileManager.createNewFile',
   'fileManager.promptForFileDeletion',
+  'fileManager.promptForFolderDeletion',
+  'fileManager.createNewFolder',
+  'fileManager.createAndOpenMarkdownFile',
   'fileManager.trashFile',
   'fileManager.getAvailablePathForAttachment',
   // No rename dialog — the call logs a console message and leaves the file untouched.

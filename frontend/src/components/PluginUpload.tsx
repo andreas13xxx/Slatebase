@@ -3,8 +3,8 @@ import { Upload, CheckCircle, AlertTriangle, Package, Loader, Download } from 'l
 import type { IApiClient, PluginInstallResult } from '../api'
 import { useTranslation } from '../i18n'
 
-/** Maximum ZIP file size in bytes (5 MB). */
-const MAX_ZIP_SIZE = 5 * 1024 * 1024
+/** Maximum ZIP file size in bytes (10 MB). */
+const MAX_ZIP_SIZE = 10 * 1024 * 1024
 
 /** Props for the PluginUpload component. */
 export interface PluginUploadProps {
@@ -81,7 +81,7 @@ export function PluginUpload({ apiClient, vaultId, onPluginInstalled }: PluginUp
 
     // Client-side size check
     if (file.size > MAX_ZIP_SIZE) {
-      setUploadError(`Die Datei ist zu groß (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximale Größe: 5 MB.`)
+      setUploadError(`Die Datei ist zu groß (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximale Größe: 10 MB.`)
       // Reset file input
       if (fileInputRef.current) fileInputRef.current.value = ''
       return

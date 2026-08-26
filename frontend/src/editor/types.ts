@@ -34,4 +34,6 @@ export interface IEditorHandle {
   insertAtCursor(text: string): void
   /** Insert text at a specific document position (e.g. a drag-and-drop target). */
   insertAtPos(text: string, pos: number): void
+  /** Opens the editor's right-click context menu positioned at the current cursor. */
+  showContextMenu(): void
 }

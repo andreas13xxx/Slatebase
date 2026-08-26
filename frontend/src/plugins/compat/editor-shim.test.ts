@@ -16,7 +16,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { EditorView } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { history } from '@codemirror/commands'
+import { codeFolding, foldedRanges } from '@codemirror/language'
 import { EditorShim, setEditorViewAccessor } from './editor-shim'
+import { markdownFoldService } from '../../editor/folding'
 
 describe('EditorShim CM6 operations are synchronous', () => {
   let view: EditorView
@@ -68,6 +70,53 @@ describe('EditorShim CM6 operations are synchronous', () => {
 
     expect(() => editor.exec('notARealCommand')).not.toThrow()
     expect(editor.getValue()).toBe(before)
+  })
+
+  describe('exec() folding commands (Obsidian EditorCommandName: toggleFold/foldAll/unfoldAll)', () => {
+    let foldingView: EditorView
+    let foldingEditor: EditorShim
+
+    beforeEach(() => {
+      const doc = '# Title\n\n## A\n\nBody A.'
+      foldingView = new EditorView({
+        state: EditorState.create({ doc, extensions: [codeFolding(), markdownFoldService] }),
+        parent: document.body,
+      })
+      setEditorViewAccessor(() => foldingView)
+      foldingEditor = new EditorShim()
+    })
+
+    afterEach(() => {
+      foldingView.destroy()
+    })
+
+    function foldedCount(): number {
+      let count = 0
+      foldedRanges(foldingView.state).between(0, foldingView.state.doc.length, () => { count++ })
+      return count
+    }
+
+    it('exec("foldAll") folds every heading section', () => {
+      foldingEditor.exec('foldAll')
+      expect(foldedCount()).toBeGreaterThan(0)
+    })
+
+    it('exec("unfoldAll") clears folds created by foldAll', () => {
+      foldingEditor.exec('foldAll')
+      foldingEditor.exec('unfoldAll')
+      expect(foldedCount()).toBe(0)
+    })
+
+    it('exec("toggleFold") folds then unfolds the section at the cursor', () => {
+      const doc = foldingView.state.doc.toString()
+      foldingView.dispatch({ selection: { anchor: doc.indexOf('## A') } })
+
+      foldingEditor.exec('toggleFold')
+      expect(foldedCount()).toBeGreaterThan(0)
+
+      foldingEditor.exec('toggleFold')
+      expect(foldedCount()).toBe(0)
+    })
   })
 
   it('scrollIntoView() dispatches without throwing', () => {

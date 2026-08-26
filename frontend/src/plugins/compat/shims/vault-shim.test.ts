@@ -178,6 +178,16 @@ describe('VaultShim', () => {
     });
   });
 
+  describe('getConfig()', () => {
+    it("returns true for 'updateInternalLinks' — the rewrite always runs server-side", () => {
+      expect(vault.getConfig('updateInternalLinks')).toBe(true);
+    });
+
+    it('returns null for an unknown key', () => {
+      expect(vault.getConfig('someUnknownKey')).toBeNull();
+    });
+  });
+
   describe('getAbstractFileByPath()', () => {
     it('returns TFile for existing file', () => {
       const result = vault.getAbstractFileByPath('notes/hello.md');

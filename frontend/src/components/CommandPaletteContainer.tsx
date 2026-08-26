@@ -9,6 +9,8 @@ import { useNavigationHistory } from '../state/navigationHistoryContext'
 import { openTab } from '../state/tabActions'
 import { TemplateSelector } from './TemplateSelector'
 import { QuickSwitcher } from './QuickSwitcher'
+import { ReleaseNotesModal } from './ReleaseNotesModal'
+import { DebugInfoModal } from './DebugInfoModal'
 import { matchesShortcut } from '../state/keybindingsStore'
 import { useTranslation } from '../i18n'
 import { showToast } from './ToastNotification'
@@ -88,6 +90,7 @@ export interface CommandPaletteContainerProps {
   onOpenGraph: () => void
   onOpenLocalGraph: (filePath: string) => void
   onDailyNote: () => void
+  onDailyNoteOffset: (offsetDays: number) => void
   showSidebar: boolean
   showRightPanel: boolean
   onToggleSidebar: () => void
@@ -120,6 +123,7 @@ export function CommandPaletteContainer({
   onOpenGraph,
   onOpenLocalGraph,
   onDailyNote,
+  onDailyNoteOffset,
   showSidebar,
   showRightPanel,
   onToggleSidebar,
@@ -141,6 +145,8 @@ export function CommandPaletteContainer({
   const [isOpen, setIsOpen] = useState(false)
   const [templateSelectorOpen, setTemplateSelectorOpen] = useState(false)
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false)
+  const [releaseNotesOpen, setReleaseNotesOpen] = useState(false)
+  const [debugInfoOpen, setDebugInfoOpen] = useState(false)
 
   // ─── Core command registration (Obsidian's workspace:*/app:*/theme:*/... commands) ──
   // Registered once; commands read fresh state via this ref instead of stale closures
@@ -173,7 +179,11 @@ export function CommandPaletteContainer({
     onOpenGraph,
     onOpenLocalGraph,
     onDailyNote,
+    onDailyNoteOffset,
+    onCreateWelcomeVault: () => { void handleCreateWelcomeVault() },
     onOpenTemplateSelector: () => setTemplateSelectorOpen(true),
+    onOpenReleaseNotes: () => setReleaseNotesOpen(true),
+    onOpenDebugInfo: () => setDebugInfoOpen(true),
     onNavigateBack: goBack,
     onNavigateForward: goForward,
     onOpenQuickSwitcher: () => { if (state.selectedVaultId) setQuickSwitcherOpen(true) },
@@ -747,6 +757,15 @@ export function CommandPaletteContainer({
           appDispatch={appDispatch}
         />
       )}
+      <ReleaseNotesModal
+        open={releaseNotesOpen}
+        onClose={() => setReleaseNotesOpen(false)}
+      />
+      <DebugInfoModal
+        open={debugInfoOpen}
+        onClose={() => setDebugInfoOpen(false)}
+        vaultName={selectedVault?.name ?? null}
+      />
     </>
   )
 }

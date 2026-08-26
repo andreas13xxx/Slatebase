@@ -108,6 +108,7 @@ Edges verbinden zwei Nodes miteinander:
 - **Zoomen:** Mausrad (oder Pinch-Geste)
 - **Verschieben:** Klicke auf die leere Fläche und ziehe (Pan)
 - **Fit:** Toolbar-Button "Einpassen" zentriert alle Nodes im sichtbaren Bereich
+- **Zu Gruppe springen:** Wähle genau einen Group-Node aus, dann Command Palette → "Canvas: Zu Gruppe springen"
 
 ### Minimap
 
@@ -146,6 +147,12 @@ Die Canvas-Toolbar bietet schnellen Zugriff auf:
 - Änderungen können direkt im JSON vorgenommen werden
 - "Anwenden" übernimmt Änderungen in die visuelle Darstellung
 - Nützlich für Batch-Operationen oder Debugging
+
+---
+
+## Canvas in Notiz umwandeln
+
+Command Palette → "Canvas: In Datei umwandeln …" wandelt das aktuelle Canvas in eine Markdown-Notiz um: Text-Nodes werden zu Absätzen, File-Nodes zu `[[Einbettungen]]`, Link-Nodes zu Markdown-Links und Group-Nodes zu Überschriften — angeordnet in Lesereihenfolge (oben nach unten, dann links nach rechts). Die neue Notiz öffnet sich automatisch; die ursprüngliche Canvas-Datei bleibt unverändert erhalten.
 
 ---
 

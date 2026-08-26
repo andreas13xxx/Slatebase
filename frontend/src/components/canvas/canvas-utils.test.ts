@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getCanvasColorClass, getCanvasColorVar, generateCanvasId } from './canvas-utils'
+import { getCanvasColorClass, getCanvasColorVar, generateCanvasId, computeFitViewport } from './canvas-utils'
 
 describe('getCanvasColorClass', () => {
   it('returns the empty string for undefined', () => {
@@ -57,5 +57,30 @@ describe('generateCanvasId', () => {
   it('generates unique ids on successive calls', () => {
     const ids = new Set(Array.from({ length: 20 }, () => generateCanvasId()))
     expect(ids.size).toBe(20)
+  })
+})
+
+describe('computeFitViewport', () => {
+  it('centers the bounds in the viewport at 100% zoom when it already fits with padding', () => {
+    // 100x100 content, 50px padding each side -> 200x200 needed; 400x400 rect has plenty of room, so zoom caps at 1.
+    const result = computeFitViewport({ minX: 0, minY: 0, maxX: 100, maxY: 100 }, { width: 400, height: 400 }, 50, 0.1)
+    expect(result.zoom).toBe(1)
+    expect(result.x).toBe(150) // -50 (centerX) + 400/2
+    expect(result.y).toBe(150)
+  })
+
+  it('zooms out (never in) to fit bounds larger than the viewport', () => {
+    const result = computeFitViewport({ minX: 0, minY: 0, maxX: 1000, maxY: 1000 }, { width: 500, height: 500 }, 0, 0.1)
+    expect(result.zoom).toBe(0.5)
+  })
+
+  it('clamps zoom to minZoom for extremely large bounds', () => {
+    const result = computeFitViewport({ minX: 0, minY: 0, maxX: 100000, maxY: 100000 }, { width: 500, height: 500 }, 0, 0.1)
+    expect(result.zoom).toBe(0.1)
+  })
+
+  it('never zooms in past 100% for bounds smaller than the viewport', () => {
+    const result = computeFitViewport({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, { width: 500, height: 500 }, 0, 0.1)
+    expect(result.zoom).toBe(1)
   })
 })

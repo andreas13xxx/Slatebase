@@ -1,7 +1,25 @@
 import { describe, it, expect, vi } from 'vitest'
-import { openTab, saveTab } from './tabActions'
+import { openTab, saveTab, undoCloseTab } from './tabActions'
 import type { IApiClient } from '../api'
 import type { FileContent, FileSaveResult } from '../types'
+import type { TabEntry } from './tabState'
+
+function makeClosedTab(overrides: Partial<TabEntry> = {}): TabEntry {
+  return {
+    id: 'vault1::notes/closed.md',
+    vaultId: 'vault1',
+    filePath: 'notes/closed.md',
+    fileName: 'closed.md',
+    mode: 'view',
+    isBinary: false,
+    content: 'stale content',
+    editBuffer: null,
+    loading: false,
+    error: null,
+    pinned: false,
+    ...overrides,
+  }
+}
 
 function createMockApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
   return {
@@ -153,5 +171,68 @@ describe('saveTab', () => {
       type: 'SAVE_ERROR',
       payload: { tabId: 'vault1::file.md', error: 'An unexpected error occurred' },
     })
+  })
+})
+
+describe('undoCloseTab', () => {
+  it('pops the most recent closed tab, then reopens it with fresh content', async () => {
+    const tabDispatch = vi.fn()
+    const appDispatch = vi.fn()
+    const fileContent: FileContent = {
+      path: 'notes/closed.md', name: 'closed.md', content: '# Fresh content',
+      size: 16, encoding: 'utf-8', isBinary: false, isTruncated: false,
+    }
+    const apiClient = createMockApiClient({ fetchFileContent: vi.fn().mockResolvedValue(fileContent) })
+    const history = [makeClosedTab({ id: 'vault1::a.md', filePath: 'a.md', fileName: 'a.md' }), makeClosedTab()]
+
+    await undoCloseTab(tabDispatch, appDispatch, apiClient, history)
+
+    expect(tabDispatch).toHaveBeenNthCalledWith(1, { type: 'POP_CLOSED_TAB' })
+    expect(tabDispatch).toHaveBeenNthCalledWith(2, {
+      type: 'OPEN_TAB',
+      payload: { vaultId: 'vault1', filePath: 'notes/closed.md', fileName: 'closed.md' },
+    })
+    expect(tabDispatch).toHaveBeenNthCalledWith(3, {
+      type: 'TAB_CONTENT_LOADED',
+      payload: { tabId: 'vault1::notes/closed.md', content: '# Fresh content', isBinary: false },
+    })
+    // Not restored from the stale closed-tab snapshot's own content:
+    expect(tabDispatch).not.toHaveBeenCalledWith(expect.objectContaining({
+      payload: expect.objectContaining({ content: 'stale content' }),
+    }))
+  })
+
+  it('restores the pinned flag for a reopened tab that was pinned', async () => {
+    const tabDispatch = vi.fn()
+    const appDispatch = vi.fn()
+    const apiClient = createMockApiClient({ fetchFileContent: vi.fn().mockResolvedValue({
+      path: 'notes/closed.md', name: 'closed.md', content: '', size: 0, encoding: 'utf-8', isBinary: false, isTruncated: false,
+    }) })
+
+    await undoCloseTab(tabDispatch, appDispatch, apiClient, [makeClosedTab({ pinned: true })])
+
+    expect(tabDispatch).toHaveBeenCalledWith({ type: 'TOGGLE_PIN', payload: { tabId: 'vault1::notes/closed.md' } })
+  })
+
+  it('does not dispatch TOGGLE_PIN for a reopened tab that was not pinned', async () => {
+    const tabDispatch = vi.fn()
+    const appDispatch = vi.fn()
+    const apiClient = createMockApiClient({ fetchFileContent: vi.fn().mockResolvedValue({
+      path: 'notes/closed.md', name: 'closed.md', content: '', size: 0, encoding: 'utf-8', isBinary: false, isTruncated: false,
+    }) })
+
+    await undoCloseTab(tabDispatch, appDispatch, apiClient, [makeClosedTab({ pinned: false })])
+
+    expect(tabDispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'TOGGLE_PIN' }))
+  })
+
+  it('does nothing when history is empty', async () => {
+    const tabDispatch = vi.fn()
+    const appDispatch = vi.fn()
+    const apiClient = createMockApiClient()
+
+    await undoCloseTab(tabDispatch, appDispatch, apiClient, [])
+
+    expect(tabDispatch).not.toHaveBeenCalled()
   })
 })

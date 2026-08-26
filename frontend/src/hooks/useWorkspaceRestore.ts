@@ -91,6 +91,7 @@ export function useWorkspaceRestore({
       filePath: t.filePath,
       fileName: t.fileName,
       mode: t.mode,
+      pinned: t.pinned,
     }))
     updateWorkspaceTabs(persistedTabs, activeTabId)
   }, [tabs, activeTabId])
@@ -144,8 +145,11 @@ export function useWorkspaceRestore({
         type: 'OPEN_TAB',
         payload: { vaultId: tab.vaultId, filePath: tab.filePath, fileName: tab.fileName },
       })
-      // Fetch content for regular file tabs (skip virtual tabs like __graph__, __view::*)
       const tabId = `${tab.vaultId}::${tab.filePath}`
+      if (tab.pinned) {
+        tabDispatch({ type: 'TOGGLE_PIN', payload: { tabId } })
+      }
+      // Fetch content for regular file tabs (skip virtual tabs like __graph__, __view::*)
       if (!tab.filePath.startsWith('__')) {
         apiClient.fetchFileContent(tab.vaultId, tab.filePath).then(
           (result) => {

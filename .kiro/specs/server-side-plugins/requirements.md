@@ -21,7 +21,8 @@ Diese Plugins haben typischerweise eine klare Trennung: Datenlogik (serverseitig
 - R1.3: Plugins die ausschließlich Node.js-Module nutzen (kein DOM-Zugriff) werden als "server-capable" klassifiziert.
 - R1.4: Plugins die sowohl Node.js-Module als auch DOM-APIs nutzen werden als "hybrid" klassifiziert.
 - R1.5: Plugins die nur Browser-APIs/DOM nutzen bleiben "browser-only" (bestehende Frontend-Ausführung).
-- R1.6: Die Klassifikation wird in der Plugin-Registry gespeichert und in der UI angezeigt.
+- R1.6: Die Klassifikation wird in der Plugin-Registry gespeichert und in der UI angezeigt. Sie ergänzt das bereits vorhandene Registry-Feld `compatibilityLevel: 'full' | 'partial' | 'unsupported' | 'unknown'` (`backend/src/plugin/types.ts`, `PluginRegistryData`) um eine zweite, unabhängige Achse — `compatibilityLevel` bewertet Browser-Kompatibilität, `executionType` bestimmt den Ausführungsort. Ein Plugin mit `compatibilityLevel: 'unsupported'` wegen `isDesktopOnly: true` ist der Hauptkandidat für `executionType: 'server-capable'`, aber die beiden Felder sind nicht 1:1 austauschbar (z. B. kann ein Plugin `compatibilityLevel: 'partial'` und trotzdem `executionType: 'server-capable'` sein).
+- R1.7: Die Node.js-Modul-Erkennung (R1.2) SOLL die bestehende `detectNodeModules()`-Logik aus `frontend/src/plugins/compat/compatibility-analyzer.ts` wiederverwenden bzw. in ein gemeinsames Modul extrahieren, statt sie für den Backend-Classifier neu zu implementieren — sonst laufen die Node-Modul-Listen (`NODE_BUILTIN_MODULES` dort vs. die in R5.6/Task 7 benötigten Module) auseinander. Bekannte Lücke bei der Übernahme: `NODE_BUILTIN_MODULES` enthält aktuell weder `events` noch `url`, obwohl R5.6 beide als bereitzustellende Built-ins listet — bei der Extraktion mit aufnehmen.
 
 ### R2: Server-Side Execution Environment
 
@@ -83,6 +84,16 @@ Diese Plugins haben typischerweise eine klare Trennung: Datenlogik (serverseitig
 - R8.3: Keine Code-Execution außerhalb der Sandbox (`eval`, `Function()`, `child_process` sind geblockt).
 - R8.4: Plugin-Updates werden vom Admin genehmigt (kein Auto-Update).
 - R8.5: Audit-Logging: Alle Plugin-Aktionen (Datei-Änderungen, Netzwerk-Requests) werden protokolliert.
+- R8.6: Die `vm`-basierte Server-Sandbox (R2.1) löst den in `SECURITY-AUDIT.md` (Fix-Backlog #4) offenen Punkt "echte Plugin-Sandbox-Isolation (Worker/VM statt Proxy-basierter Soft-Isolation)" für **server-capable** Plugins ein. Die Browser-seitige Ausführung von browser-only-Plugins bleibt bewusst bei der dokumentierten Proxy-basierten Soft-Isolation (`frontend/src/plugins/compat/sandbox.ts`, Abschnitt "SECURITY NOTE") — deren Trust-Modell ändert sich durch dieses Feature nicht; eine echte Browser-Isolation (Worker/iframe) ist laut Audit eine separate, hier nicht enthaltene Zukunftsentscheidung.
+
+### R9: Security-Hardening-Nachsorge (übernommen aus `security-hardening`)
+
+`implementation-plan.md` (Prio 11) und `SECURITY-AUDIT.md` (Fix-Backlog) weisen drei offene, als "Low"-Severity eingestufte Rate-Limiting-Lücken explizit dieser Spec zu, statt einen eigenen Security-Nachfolge-Pass zu eröffnen. Alle drei nutzen die bestehende `SlidingWindowRateLimiter`-Infrastruktur (`backend/src/shared/sliding-window-rate-limiter.ts`, bereits für Login/Passwort-Änderung/MCP-Tokens im Einsatz).
+
+- R9.1: `POST /proxy` erhält einen Per-User-Rate-Limiter (60 Requests/Minute pro `userId`) — mitigiert SSRF-Amplification über eine kompromittierte Session (URL-Allowlist, 30s-Timeout und 50-MB-Response-Cap bestehen bereits, siehe `SECURITY-AUDIT.md`).
+- R9.2: `POST /vaults/:vaultId/shares` erhält einen Per-User-Rate-Limiter (20/Stunde pro `userId`).
+- R9.3: `GET /search` und `GET /vaults/:vaultId/search` erhalten einen Per-User-Rate-Limiter sowie ein Timeout in `SearchService` (Schutz vor DoS durch aufwändige Regex-Queries).
+- R9.4: Diese drei Punkte sind unabhängig von der Plugin-Sandbox-Architektur (R1–R8) und können parallel/vorab umgesetzt werden — sie hängen nicht von der Klassifikation oder dem Runtime Manager ab.
 
 ## Nicht-funktionale Anforderungen
 

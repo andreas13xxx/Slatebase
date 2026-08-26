@@ -110,6 +110,7 @@ Diese Plugins wurden getestet und funktionieren in Slatebase:
 | Recent Files | Gut | Sidebar-Liste zuletzt geöffneter Notizen, Anpinnen/Ausschließen möglich |
 | Importer | Eingeschränkt | Migriert Notion/Evernote/Keep/HTML/Markdown; Apple Notes braucht macOS und funktioniert hier nicht |
 | Paste URL into Selection | Gut | URL über eine Markierung einfügen wandelt sie in einen Markdown-Link um |
+| Better Word Count | Gut | Erweiterte Statusleisten-Statistik (Sätze, Lesezeit, Seitenanzahl), mit echtem Plugin-Bundle verifiziert |
 
 Siehe die einzelnen [[Fortgeschritten/Plugins/Calendar|Plugin-Guides]] für detaillierte Kompatibilitäts-Informationen.
 
@@ -200,6 +201,7 @@ Ausführliche Anleitungen mit Beispielen und Übungen für getestete Plugins:
 | Recent Files | Sidebar-Liste zuletzt geöffneter Notizen | [[Fortgeschritten/Plugins/Recent Files]] |
 | Importer | Notizen aus Notion, Evernote und mehr migrieren | [[Fortgeschritten/Plugins/Importer]] |
 | Paste URL into Selection | Markierung durch Einfügen einer URL in einen Markdown-Link umwandeln | [[Fortgeschritten/Plugins/Paste URL into Selection]] |
+| Better Word Count | Erweiterte Statusleisten-Schreibstatistik | [[Fortgeschritten/Plugins/Better Word Count]] |
 
 ### Praktische Übungen
 

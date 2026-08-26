@@ -156,10 +156,10 @@ describe('proxy gap recording', () => {
     it('records a non-emulated read', () => {
       const fileManager = createProxiedFileManager()
 
-      void fileManager['promptForFolderDeletion']
+      void fileManager['iterateAllRefs']
 
       expect(getApiGaps()).toEqual([
-        { shim: 'FileManager', property: 'promptForFolderDeletion', pluginId: 'unknown', reads: 1, calls: 0 },
+        { shim: 'FileManager', property: 'iterateAllRefs', pluginId: 'unknown', reads: 1, calls: 0 },
       ])
     })
   })

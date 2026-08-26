@@ -82,6 +82,51 @@ describe('WorkspaceShim', () => {
     });
   });
 
+  describe('iterateLeaves() — legacy alias for iterateAllLeaves()', () => {
+    it('invokes the callback for every leaf, ignoring the item parameter', async () => {
+      const registry = new ViewRegistry();
+      registry.registerView('test-view', (leaf) => new ItemView(leaf), 'test-plugin');
+      workspace.setViewRegistry(registry, {});
+      const leaf1 = workspace.getLeaf(true);
+      await leaf1.setViewState({ type: 'test-view' });
+      const leaf2 = workspace.getLeaf(true);
+      await leaf2.setViewState({ type: 'test-view' });
+
+      const seen: WorkspaceLeaf[] = [];
+      workspace.iterateLeaves((leaf) => seen.push(leaf), undefined);
+
+      expect(seen).toEqual(expect.arrayContaining([leaf1, leaf2]));
+    });
+  });
+
+  describe('onLayoutChange()', () => {
+    it('fires the layout-change event', () => {
+      const callback = vi.fn();
+      workspace.on('layout-change', callback);
+
+      workspace.onLayoutChange();
+
+      expect(callback).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('hoverLinkSources', () => {
+    it('reflects sources declared via registerHoverLinkSource', () => {
+      workspace.registerHoverLinkSource('my-plugin', { display: 'My Plugin' });
+
+      expect(workspace.hoverLinkSources).toEqual({
+        'my-plugin': { display: 'My Plugin' },
+      });
+    });
+
+    it('drops a source once unregisterHoverLinkSource is called', () => {
+      workspace.registerHoverLinkSource('my-plugin', { display: 'My Plugin' });
+      workspace.unregisterHoverLinkSource('my-plugin');
+
+      expect(workspace.hoverLinkSources).toEqual({});
+    });
+  });
+
   describe('protocolHandlers / protocolHandler', () => {
     it('exposes a writable Map and a writable field instead of leaving them undefined', () => {
       expect(workspace.protocolHandlers).toBeInstanceOf(Map);

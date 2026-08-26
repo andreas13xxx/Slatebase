@@ -24,6 +24,8 @@ export interface PersistedTab {
   filePath: string
   fileName: string
   mode: TabMode
+  /** Optional for backward compat with state persisted before pinning existed. */
+  pinned?: boolean
 }
 
 /** Full persisted workspace state. */
@@ -137,6 +139,7 @@ function validateState(data: unknown): WorkspaceState | null {
       filePath: t.filePath,
       fileName: t.fileName,
       mode: t.mode,
+      pinned: typeof t.pinned === 'boolean' ? t.pinned : false,
     })
   }
 

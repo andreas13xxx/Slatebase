@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTranslation } from '../i18n'
 import { useLineNumbers } from '../hooks/useLineNumbers'
+import { useReadableLineLength } from '../hooks/useReadableLineLength'
+import { useSpellcheck } from '../hooks/useSpellcheck'
 import { DropZone } from './DropZone'
 import { showToast } from './ToastNotification'
 import { CodeMirrorEditor } from '../editor/CodeMirrorEditor'
@@ -59,6 +61,9 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
   // Line numbers toggle state (persisted to localStorage, translates to CM6 showLineNumbers prop).
   // Toggled via the Command Palette ('toggleLineNumbers' editor command).
   const { enabled: lineNumbersEnabled, toggle: toggleLineNumbers } = useLineNumbers()
+  // Same pattern as line numbers — persisted, toggled via Command Palette editor commands.
+  const { enabled: readableLineLengthEnabled, toggle: toggleReadableLineLength } = useReadableLineLength()
+  const { enabled: spellcheckEnabled, toggle: toggleSpellcheck } = useSpellcheck()
 
   // Compute effective live preview state (respects file size) — livePreviewMode is
   // driven by the tab mode (Variante 1).
@@ -126,6 +131,15 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
         case 'toggleLineNumbers':
           toggleLineNumbers()
           break
+        case 'toggleReadableLineLength':
+          toggleReadableLineLength()
+          break
+        case 'toggleSpellcheck':
+          toggleSpellcheck()
+          break
+        case 'showContextMenu':
+          editorRef.current?.showContextMenu()
+          break
         default:
           // Delegate all formatting actions to CM6
           editorRef.current?.applyFormatting(action as EditorFormattingAction)
@@ -137,7 +151,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
     return () => {
       window.removeEventListener('slatebase:editor-command', handleEditorCommand)
     }
-  }, [readOnly, toggleLineNumbers])
+  }, [readOnly, toggleLineNumbers, toggleReadableLineLength, toggleSpellcheck])
 
   // --- External file drop (from OS) via DropZone ---
 
@@ -282,6 +296,8 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
             livePreview={effectiveLivePreview}
             livePreviewOptions={livePreviewOptions}
             showLineNumbers={lineNumbersEnabled}
+            readableLineLength={readableLineLengthEnabled}
+            spellcheck={spellcheckEnabled}
             editorRef={editorRef}
           />
         </div>

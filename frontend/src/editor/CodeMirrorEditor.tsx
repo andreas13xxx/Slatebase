@@ -41,6 +41,8 @@ import { buildEditorContextMenuItems } from './editor-context-menu'
 import { buildTFileFromPath } from '../plugins/compat/plugin-event-bridge'
 import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
 import { revealInExplorer } from '../state/fileNavigation'
+import { codeFolding } from '@codemirror/language'
+import { markdownFoldService } from './folding'
 import './live-preview/live-preview.css'
 
 /**
@@ -64,6 +66,10 @@ export interface CodeMirrorEditorProps {
   livePreviewOptions?: LivePreviewOptions
   /** Whether line numbers should be shown. */
   showLineNumbers?: boolean
+  /** Whether the editor content is width-constrained (Obsidian's "readable line length"). Defaults to true. */
+  readableLineLength?: boolean
+  /** Whether the browser's native spellcheck is enabled on the editor content. */
+  spellcheck?: boolean
   /** Whether Vim mode is enabled. */
   vimMode?: boolean
   /** Whether bracket auto-close is enabled. */
@@ -90,6 +96,8 @@ export function CodeMirrorEditor({
   livePreview = false,
   livePreviewOptions,
   showLineNumbers = false,
+  readableLineLength = true,
+  spellcheck = true,
   vimMode: _vimMode,
   bracketAutoClose: _bracketAutoClose,
   pluginExtensions: _pluginExtensions,
@@ -218,6 +226,12 @@ export function CodeMirrorEditor({
       dropCursor(),
       editorHistoryExtension,
       search(),
+      // Markdown-specific fold-by-heading/fold-by-nested-list support for the
+      // fold-all/fold-less/fold-more/toggle-fold/unfold-all commands
+      // (core-commands.ts) — see folding.ts's module docstring for why this
+      // needs a custom foldService instead of CM6's syntax-node-based folding.
+      codeFolding(),
+      markdownFoldService,
       EditorView.updateListener.of((update) => {
         if (update.docChanged) {
           onContentChangeRef.current(update.state.doc.toString())
@@ -409,6 +423,14 @@ export function CodeMirrorEditor({
     })
   }, [showLineNumbers])
 
+  // Apply spellcheck attribute directly to the CM6 content DOM on prop change
+  // (a plain DOM attribute, not a CM6 extension — no compartment needed).
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.contentDOM.setAttribute('spellcheck', String(spellcheck))
+  }, [spellcheck])
+
   // Reconfigure livePreview compartment on prop change
   useEffect(() => {
     const view = viewRef.current
@@ -480,13 +502,21 @@ export function CodeMirrorEditor({
         selection: { anchor: clamped + text.length },
       })
     },
+    showContextMenu() {
+      const view = viewRef.current
+      if (!view) return
+      // Same fallback as editor-suggest-popover.ts's position(): coordsAtPos
+      // returns null for an off-screen/hidden position (e.g. scrolled out of view).
+      const coords = view.coordsAtPos(view.state.selection.main.head) ?? view.dom.getBoundingClientRect()
+      setContextMenu({ x: coords.left, y: coords.bottom, items: buildEditorContextMenuItems(view, showLineNumbersRef.current) })
+    },
   }), [])
 
   return (
     <>
       <div
         ref={containerRef}
-        className="cm-editor-wrapper"
+        className={`cm-editor-wrapper${readableLineLength ? '' : ' cm-full-width'}`}
       />
       {contextMenu && (
         <ContextMenu

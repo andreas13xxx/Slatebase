@@ -44,3 +44,35 @@ export function getCanvasColorVar(color: string | undefined): string | undefined
 export function generateCanvasId(): string {
   return crypto.randomUUID().replace(/-/g, '').slice(0, 16)
 }
+
+/** A bounding box in canvas-space coordinates. */
+export interface CanvasBounds { minX: number; minY: number; maxX: number; maxY: number }
+
+/**
+ * Computes the viewport (x/y/zoom) that fits `bounds` inside `rect` with
+ * `padding` canvas-space pixels of margin, never zooming in past 100%.
+ * Shared by CanvasView's fitToView (all nodes) and jumpToSelectedGroup
+ * (one group's bounds) — same fit-to-content math, different bounds source.
+ */
+export function computeFitViewport(
+  bounds: CanvasBounds,
+  rect: { width: number; height: number },
+  padding: number,
+  minZoom: number,
+): { x: number; y: number; zoom: number } {
+  const contentWidth = bounds.maxX - bounds.minX + padding * 2
+  const contentHeight = bounds.maxY - bounds.minY + padding * 2
+  const zoom = Math.min(
+    rect.width / contentWidth,
+    rect.height / contentHeight,
+    1, // Don't zoom in beyond 100%
+  )
+  const centerX = (bounds.minX + bounds.maxX) / 2
+  const centerY = (bounds.minY + bounds.maxY) / 2
+
+  return {
+    x: -centerX + (rect.width / 2) / zoom,
+    y: -centerY + (rect.height / 2) / zoom,
+    zoom: Math.max(minZoom, zoom),
+  }
+}

@@ -867,7 +867,12 @@ function renderCodeBlock(code: string, lang: string | null | undefined, key: str
 
   let highlighted: string | null = null
 
-  if (lang) {
+  // hljs.getLanguage() gate avoids calling highlight() for a fence tag it
+  // doesn't recognize — plugin data blocks routinely use non-language tags
+  // (Tasks' `tasks`, LiveSync's `compressed-json`, ...) as their fenced-code
+  // marker, and highlight() logs its own console warning before throwing for
+  // those, on top of the catch below already handling the fallback.
+  if (lang && hljs.getLanguage(lang)) {
     try {
       const result = hljs.highlight(code, { language: lang, ignoreIllegals: true })
       highlighted = result.value

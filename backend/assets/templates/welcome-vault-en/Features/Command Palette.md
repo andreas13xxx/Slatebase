@@ -47,6 +47,7 @@ The palette uses fuzzy matching — you don't need to type the exact name. For e
 | Editor | Bold, italic, heading, insert link, insert code block |
 | View | Toggle dark mode, toggle sidebar, toggle search |
 | Advanced | Create daily note, open graph, create welcome vault |
+| Diagnostics & Help | "Show debug info" (version, browser, active vault — handy for a bug report), "Show release notes" |
 
 ---
 

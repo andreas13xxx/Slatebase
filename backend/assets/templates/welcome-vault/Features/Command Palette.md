@@ -93,6 +93,11 @@ Die verfügbaren Befehle sind in Kategorien organisiert:
 - Admin-Bereich öffnen
 - Server neustarten
 
+### Diagnose & Hilfe
+
+- **Debug-Informationen anzeigen** — Version, Browser und aktiver Vault zum Kopieren, z.B. für einen Bug-Report
+- **Versionshinweise anzeigen** — die letzten Releases samt Änderungsprotokoll
+
 ---
 
 ## Immer verfügbar

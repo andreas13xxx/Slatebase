@@ -116,6 +116,12 @@ When you have write access, the Properties tab shows an **interactive editor** i
 > [!tip] No manual YAML
 > The Properties Editor saves you from editing raw YAML. Changes are written directly into the frontmatter and saved immediately.
 
+### Command Palette Shortcuts
+
+- **"Add alias"** — adds an `aliases` list to the frontmatter (creating the frontmatter block first if the file doesn't have one yet)
+- **"Add file property"** — inserts a new empty property (`property`, `property-1`, … if the name is taken)
+- **"Clear file properties"** — removes the entire frontmatter block
+
 ### In the Knowledge Graph
 
 Tags appear as nodes in the [[Features/Knowledge Graph|Knowledge Graph]] when enabled in the graph settings.

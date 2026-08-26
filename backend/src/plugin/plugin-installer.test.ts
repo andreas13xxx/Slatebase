@@ -107,9 +107,9 @@ describe('PluginInstaller', () => {
   })
 
   describe('installFromZip — ZIP size validation', () => {
-    it('rejects ZIP files larger than 5 MB', async () => {
-      // Create a buffer larger than 5 MB
-      const largeBuffer = Buffer.alloc(5 * 1024 * 1024 + 1, 0)
+    it('rejects ZIP files larger than 10 MB', async () => {
+      // Create a buffer larger than 10 MB
+      const largeBuffer = Buffer.alloc(10 * 1024 * 1024 + 1, 0)
 
       await expect(installer.installFromZip('vault-1', largeBuffer))
         .rejects.toThrow(PluginInstallError)
@@ -248,9 +248,9 @@ describe('PluginInstaller', () => {
   })
 
   describe('installFromZip — extracted size validation', () => {
-    it('rejects if total extracted size exceeds 10 MB', async () => {
-      // Create a ZIP with a large file (>10 MB uncompressed)
-      const largeContent = 'x'.repeat(10 * 1024 * 1024 + 1)
+    it('rejects if total extracted size exceeds 20 MB', async () => {
+      // Create a ZIP with a large file (>20 MB uncompressed)
+      const largeContent = 'x'.repeat(20 * 1024 * 1024 + 1)
       const zip = new AdmZip()
       zip.addFile('manifest.json', Buffer.from(JSON.stringify({
         id: 'large-plugin', name: 'Large', version: '1.0.0',

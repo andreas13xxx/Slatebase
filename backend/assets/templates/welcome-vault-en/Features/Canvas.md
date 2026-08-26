@@ -74,6 +74,7 @@ Connect nodes to show relationships:
 | Select node | Click on a node |
 | Multi-select | Hold Shift and click, or drag a selection box |
 | Fit to view | Toolbar button (fits all nodes into the viewport) |
+| Jump to group | Select a single group node, then Command Palette → "Canvas: Jump to group" |
 
 ---
 
@@ -99,6 +100,12 @@ Toggle the minimap in the bottom-right corner for an overview of your canvas. Cl
 ## Source View
 
 Switch to source view to see and edit the raw JSON of your canvas. Useful for precise adjustments or debugging.
+
+---
+
+## Converting a Canvas to a Note
+
+Command Palette → "Canvas: Convert to file..." turns the current canvas into a Markdown note: text nodes become paragraphs, file nodes become `[[embeds]]`, link nodes become Markdown links, and group nodes become headings — laid out in reading order (top-to-bottom, then left-to-right). The new note opens automatically; the original canvas file is left untouched.
 
 ---
 

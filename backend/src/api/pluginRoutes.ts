@@ -308,8 +308,8 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
         return c.json(createApiError('VALIDATION_ERROR', 'Missing required file field (multipart/form-data with "file" key)'), 400)
       }
 
-      // Check ZIP size limit (5 MB)
-      const maxZipSize = 5 * 1024 * 1024
+      // Check ZIP size limit (10 MB)
+      const maxZipSize = 10 * 1024 * 1024
       if (file.size > maxZipSize) {
         return c.json(
           createApiError('FILE_TOO_LARGE', `ZIP file exceeds maximum size of ${maxZipSize} bytes (actual: ${file.size})`),

@@ -3,13 +3,16 @@
  * e.g. "chevron-down", "file-text") to renderable SVG data.
  *
  * Real Obsidian ships the entire Lucide set in its app bundle, so plugin
- * calls to setIcon(el, 'lucide-name') work for any icon, not just ones the
- * plugin registered itself via addIcon(). Our compat layer only had the
- * addIcon() registry, so any plugin button using a built-in icon name (the
- * common case — e.g. Editing Toolbar's command buttons) rendered as an empty
- * pill. lucide-react is already a dependency (used by Slatebase's own UI),
- * and ships a per-icon dynamic-import map — we reuse that instead of adding
- * a new dependency or bundling all ~1500 icons up front.
+ * calls to setIcon(el, 'lucide-name') work synchronously for any icon, not
+ * just ones the plugin registered itself via addIcon(). lucide-react is
+ * already a dependency (used by Slatebase's own UI) and ships a per-icon
+ * dynamic-import map — reusing that instead of statically bundling the full
+ * ~2000-icon set keeps it out of the main app bundle. To still resolve
+ * synchronously by the time a plugin needs an icon (some plugins snapshot
+ * icons into a frozen vDOM tree at module load — see
+ * {@link preloadAllBuiltInIcons}), every dynamic import is kicked off eagerly
+ * and in parallel, once per session, before the first plugin bundle
+ * evaluates, rather than one at a time on first use.
  */
 
 import dynamicIconImports from 'lucide-react/dynamicIconImports'
@@ -253,47 +256,39 @@ export function getCachedLucideIconNode(iconId: string): ResolvedIcon | null | u
   return nodeCache.get(iconId)
 }
 
-let builtInIconIdSet: Set<string> | null = null
-function getBuiltInIconIdSet(): Set<string> {
-  builtInIconIdSet ??= new Set(getBuiltInIconIds())
-  return builtInIconIdSet
-}
-
-// Matches bare kebab-case tokens the way Lucide/Obsidian icon ids are shaped
-// ("image-down", "chevron-right"). Capped at 5 hyphenated segments — no real
-// icon id is longer — so it doesn't run away across unrelated minified code.
-const ICON_LITERAL_RE = /["']([a-z][a-z0-9]*(?:-[a-z0-9]+){0,4})["']/g
+let allIconsPreloadPromise: Promise<void> | null = null
 
 /**
- * Warm the icon cache for every valid icon id that appears as a string
- * literal anywhere in a plugin bundle's source, before the bundle evaluates.
+ * Eagerly resolve every built-in icon id into the cache, once per session.
  *
  * Real Obsidian's getIcon() is synchronous because the whole Lucide set ships
- * in its app bundle. Ours resolves per-icon on demand (see file header) —
+ * in its app bundle. Ours resolves per-icon on demand via dynamic import —
  * fine for icons appended straight into a live DOM element, since the async
  * fill-in shows up whenever it lands. It breaks for a pattern several plugins
  * use: resolving every icon once into a frozen React/vDOM tree at module load,
  * e.g. Excalidraw's `ICONS = { Foo: getIconAsJSX('image-down'), ... }` at its
- * top level. getIcon() hands back an empty shell there, the plugin snapshots
- * it into React elements before the dynamic import resolves, and the later
- * DOM mutation lands on a node nothing still points to — that icon stays
- * blank for the rest of the session, no matter how long it runs.
+ * top level. getIcon() would hand back an empty shell there, the plugin
+ * snapshots it into React elements before the dynamic import resolves, and
+ * the later DOM mutation lands on a node nothing still points to — that icon
+ * stays blank for the rest of the session, no matter how long it runs.
  *
- * Scanning the bundle text for tokens shaped like — and matching — a known
- * icon id, and resolving those first, gets them into the cache synchronously
- * before any of the plugin's own top-level code runs. It only costs as many
- * dynamic imports as the plugin actually references (typically a few dozen),
- * not the full ~1500-icon set.
+ * Called from {@link PluginLoader.loadPlugin} before the *first* plugin
+ * bundle of the session evaluates (subsequent calls just await the same
+ * memoized promise), so the cache is already fully warm by the time any
+ * plugin — not just ones a bundle-text scan happens to catch — asks for an
+ * icon. Previously this scanned each plugin bundle's source text for
+ * icon-id-shaped string literals and preloaded only those; that missed
+ * bundlers that hide icon names behind a computed lookup table instead of a
+ * literal string at the call site (see Iconize in PLUGIN-COMPAT.md). Eagerly
+ * loading the whole set removes that failure mode entirely, at the cost of
+ * ~2000 parallel dynamic imports the first time — acceptable since plugin
+ * loading is itself already deferred until after First Contentful Paint.
  */
-export async function preloadIconsReferencedIn(bundleSource: string): Promise<void> {
-  const validIds = getBuiltInIconIdSet()
-  const found = new Set<string>()
-  for (const match of bundleSource.matchAll(ICON_LITERAL_RE)) {
-    const token = match[1]
-    if (token && validIds.has(token)) found.add(token)
-  }
-  if (found.size === 0) return
-  await Promise.all([...found].map((id) => resolveLucideIconNode(id)))
+export function preloadAllBuiltInIcons(): Promise<void> {
+  allIconsPreloadPromise ??= Promise.all(
+    getBuiltInIconIds().map((id) => resolveLucideIconNode(id))
+  ).then(() => undefined)
+  return allIconsPreloadPromise
 }
 
 /** Load a single Lucide package icon by its exact name, or null if it doesn't exist. */

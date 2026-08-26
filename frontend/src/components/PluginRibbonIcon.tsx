@@ -48,7 +48,7 @@ export function PluginRibbonIcon({ entry }: PluginRibbonIconProps) {
         className="toolbar-btn toolbar-btn--plugin side-dock-ribbon-action"
         title={entry.title}
         aria-label={entry.title}
-        onClick={entry.callback}
+        onClick={e => entry.callback(e.nativeEvent)}
         dangerouslySetInnerHTML={{ __html: markup }}
       />
     )
@@ -59,7 +59,7 @@ export function PluginRibbonIcon({ entry }: PluginRibbonIconProps) {
       className="toolbar-btn toolbar-btn--plugin side-dock-ribbon-action"
       title={entry.title}
       aria-label={entry.title}
-      onClick={entry.callback}
+      onClick={e => entry.callback(e.nativeEvent)}
     >
       <Puzzle size={15} />
     </button>

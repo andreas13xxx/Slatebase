@@ -58,6 +58,14 @@ Der aktive Tab ist farblich hervorgehoben. Der Inhalt dieses Tabs wird im Hauptb
 - `Strg+Shift+]` — nächster Tab (springt am Ende wieder zum ersten)
 - `Strg+Shift+[` — vorheriger Tab (springt am Anfang wieder zum letzten)
 
+### Tab anheften
+
+Rechtsklick auf einen Tab → **Anheften**, oder über die Command Palette → "Anheften umschalten". Ein angehefteter Tab zeigt statt des × ein Pin-Symbol und bleibt beim Befehl **Andere schließen** erhalten — praktisch für eine Referenznotiz, die sichtbar bleiben soll, egal was du sonst schließt.
+
+### Geschlossenen Tab wiederherstellen
+
+Aus Versehen einen Tab geschlossen? Command Palette → "Tab-Schließen rückgängig machen" öffnet den zuletzt geschlossenen Tab erneut (bis zu den letzten 20). Jeder weitere Aufruf geht einen Schritt weiter zurück.
+
 ---
 
 ## Breadcrumb-Leiste

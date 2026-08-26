@@ -90,8 +90,31 @@ export function createMcpHttpHandler(deps: McpRouteDependencies & { onAuthentica
     return true
   }
 
+  /**
+   * This endpoint bypasses Hono (see the raw-handler comment at the top of this
+   * file), so it doesn't get the app-wide `cors()` middleware from index.ts —
+   * remote MCP clients (e.g. browser-based connector setups) need their own CORS
+   * handling here, applied unconditionally so it's present on error responses too.
+   */
+  function setCorsHeaders(req: IncomingMessage, res: ServerResponse): void {
+    const origin = req.headers['origin']
+    res.setHeader('Access-Control-Allow-Origin', origin ?? '*')
+    res.setHeader('Vary', 'Origin')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Mcp-Session-Id')
+    res.setHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id')
+    res.setHeader('Access-Control-Max-Age', '86400')
+  }
+
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const method = req.method ?? 'GET'
+    setCorsHeaders(req, res)
+
+    if (method === 'OPTIONS') {
+      res.writeHead(204)
+      res.end()
+      return
+    }
 
     // Authenticate
     const tokenContext = await authenticate(req, res)

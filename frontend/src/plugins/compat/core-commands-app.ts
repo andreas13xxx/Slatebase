@@ -28,7 +28,7 @@ import type { IEditor } from './editor-shim'
 import type { IApiClient } from '../../api'
 import type { AppAction } from '../../types'
 import type { TabState, TabAction, TabEntry } from '../../state/tabState'
-import { openTab, saveTab } from '../../state/tabActions'
+import { openTab, saveTab, undoCloseTab } from '../../state/tabActions'
 import type { AuthState, AuthAction } from '../../state/authState'
 import type { PanelAction, PanelViewId, PanelSplitSection } from '../../state/panelState'
 import type { SettingsCategory, SettingsSection } from '../../state/settingsState'
@@ -38,6 +38,13 @@ import { getActiveEditorView } from '../../editor/plugin-extensions'
 import { showToast } from '../../components/ToastNotification'
 import type { Locale } from '../../i18n'
 import { translateCoreCommandName } from './core-command-i18n'
+import { parseFrontmatter } from '../../components/context-panel/utils/parseFrontmatter'
+import { locateFrontmatterBlock, serializeFrontmatter } from '../../utils/frontmatterWriter'
+import { getActiveCanvasController } from '../../state/activeCanvasBridge'
+import { parseCanvas } from '../../canvas'
+import { canvasToMarkdown } from '../../canvas/canvasToMarkdown'
+import { zoomIn, zoomOut, resetZoom } from '../../state/zoomStore'
+import { findHeadingSectionAtCursor, sanitizeFileNameFromHeading, extractRangeToNewFile } from '../../state/noteComposer'
 
 /** Pages the CommandPalette / core commands can navigate to (mirrors CommandPaletteContainer's NavigablePage). */
 export type NavigablePage =
@@ -72,7 +79,11 @@ export interface CoreAppCommandHandlers {
   onOpenGraph: () => void
   onOpenLocalGraph: (filePath: string) => void
   onDailyNote: () => void
+  onDailyNoteOffset: (offsetDays: number) => void
+  onCreateWelcomeVault: () => void
   onOpenTemplateSelector: () => void
+  onOpenReleaseNotes: () => void
+  onOpenDebugInfo: () => void
   onNavigateBack: () => void
   onNavigateForward: () => void
   onOpenQuickSwitcher: () => void
@@ -105,8 +116,13 @@ function closeTab(h: CoreAppCommandHandlers): void {
 function closeOtherTabs(h: CoreAppCommandHandlers): void {
   const activeId = h.tabState.activeTabId
   for (const tab of h.tabState.tabs) {
-    if (tab.id !== activeId) h.tabDispatch({ type: 'CLOSE_TAB', payload: { tabId: tab.id } })
+    if (tab.id !== activeId && !tab.pinned) h.tabDispatch({ type: 'CLOSE_TAB', payload: { tabId: tab.id } })
   }
+}
+
+function toggleActiveTabPin(h: CoreAppCommandHandlers): void {
+  const tab = getActiveTab(h)
+  if (tab) h.tabDispatch({ type: 'TOGGLE_PIN', payload: { tabId: tab.id } })
 }
 
 function activateTabByOffset(h: CoreAppCommandHandlers, offset: number): void {
@@ -190,6 +206,121 @@ async function duplicateActiveFile(h: CoreAppCommandHandlers): Promise<void> {
     await h.apiClient.saveFile(h.vaultId, newPath, content)
     refreshTree(h)
   } catch { /* ignore */ }
+}
+
+async function convertCanvasToFile(h: CoreAppCommandHandlers): Promise<void> {
+  const tab = getActiveTab(h)
+  if (!tab || !h.vaultId || !tab.filePath.endsWith('.canvas')) {
+    showToast('error', 'Kein Canvas geöffnet')
+    return
+  }
+  const vaultId = h.vaultId
+  try {
+    const { content } = await h.apiClient.fetchFileContent(vaultId, tab.filePath)
+    const result = parseCanvas(content)
+    if (!result.success || !result.document) {
+      showToast('error', 'Canvas konnte nicht gelesen werden')
+      return
+    }
+    const markdown = canvasToMarkdown(result.document)
+    const newPath = `${tab.filePath.slice(0, -'.canvas'.length)}.md`
+    await h.apiClient.saveFile(vaultId, newPath, markdown)
+    refreshTree(h)
+    const fileName = newPath.split('/').pop() ?? newPath
+    await openTab(h.tabDispatch, h.appDispatch, h.apiClient, vaultId, newPath, fileName)
+  } catch {
+    showToast('error', 'Canvas konnte nicht konvertiert werden')
+  }
+}
+
+// ─── Note Composer (note-composer:split-file/extract-heading/merge-file) ──
+
+async function splitFileFromSelection(h: CoreAppCommandHandlers): Promise<void> {
+  const tab = getActiveTab(h)
+  const view = getActiveEditorView()
+  if (!tab || !view || !h.vaultId || tab.isBinary) {
+    showToast('error', 'Keine aktive Datei zum Aufteilen')
+    return
+  }
+  const { from, to } = view.state.selection.main
+  if (from === to) {
+    showToast('error', 'Bitte zuerst Text auswählen')
+    return
+  }
+  const fileName = window.prompt('Neuer Dateiname')
+  if (fileName === null || fileName.trim() === '') return
+  try {
+    await extractRangeToNewFile(view, { from, to }, tab.filePath, fileName.trim(), h.vaultId, h.apiClient)
+    refreshTree(h)
+  } catch {
+    showToast('error', 'Datei konnte nicht erstellt werden')
+  }
+}
+
+async function extractHeadingToFile(h: CoreAppCommandHandlers): Promise<void> {
+  const tab = getActiveTab(h)
+  const view = getActiveEditorView()
+  if (!tab || !view || !h.vaultId || tab.isBinary) {
+    showToast('error', 'Keine aktive Datei zum Extrahieren')
+    return
+  }
+  const section = findHeadingSectionAtCursor(view)
+  if (!section) {
+    showToast('error', 'Keine Überschrift oberhalb des Cursors gefunden')
+    return
+  }
+  try {
+    await extractRangeToNewFile(view, section, tab.filePath, sanitizeFileNameFromHeading(section.headingText), h.vaultId, h.apiClient)
+    refreshTree(h)
+  } catch {
+    showToast('error', 'Datei konnte nicht erstellt werden')
+  }
+}
+
+async function mergeActiveFileInto(h: CoreAppCommandHandlers): Promise<void> {
+  const tab = getActiveTab(h)
+  if (!tab || !h.vaultId || tab.isBinary) {
+    showToast('error', 'Keine aktive Datei zum Zusammenführen')
+    return
+  }
+  const targetPath = window.prompt('Zusammenführen mit Datei (Pfad relativ zum Vault-Root)')
+  if (targetPath === null || targetPath.trim() === '') return
+  const trimmedTarget = targetPath.trim()
+  if (trimmedTarget === tab.filePath) {
+    showToast('error', 'Kann Datei nicht mit sich selbst zusammenführen')
+    return
+  }
+  const vaultId = h.vaultId
+  const sourceContent = tab.editBuffer ?? tab.content
+  try {
+    const target = await h.apiClient.fetchFileContent(vaultId, trimmedTarget)
+    const merged = `${target.content}\n\n${sourceContent}`
+    await h.apiClient.saveFile(vaultId, trimmedTarget, merged)
+    await h.apiClient.deleteContent(vaultId, tab.filePath)
+    h.tabDispatch({ type: 'CLOSE_TABS_BY_PATH', payload: { pathPrefix: tab.filePath } })
+    refreshTree(h)
+  } catch {
+    showToast('error', 'Zusammenführen fehlgeschlagen')
+  }
+}
+
+/**
+ * `workspace:export-pdf` — switches the active tab to reading mode (printing
+ * the raw editor would look wrong) and defers to the browser's native print
+ * dialog, whose "Save as PDF" destination is the actual export mechanism —
+ * see the `.view-mode` print-isolation rules in App.css.
+ */
+function exportActiveFileToPdf(h: CoreAppCommandHandlers): void {
+  const tab = getActiveTab(h)
+  if (!tab || tab.isBinary) {
+    showToast('error', 'Keine Datei zum Exportieren geöffnet')
+    return
+  }
+  if (tab.mode === 'edit') {
+    h.tabDispatch({ type: 'TOGGLE_MODE', payload: { tabId: tab.id } })
+  }
+  // One frame is enough for the mode-switch re-render to paint the reading view.
+  requestAnimationFrame(() => window.print())
 }
 
 async function moveActiveFile(h: CoreAppCommandHandlers): Promise<void> {
@@ -396,6 +527,73 @@ function bookmarkAllTabs(h: CoreAppCommandHandlers): void {
   }
 }
 
+// ─── Frontmatter properties (markdown:add-alias/add-metadata-property/clear-metadata-properties) ──
+// Deliberately duplicates widget-decorations.ts's `commitData` pattern rather than
+// importing it — that version is private to the FrontmatterWidget class and also
+// carries CM6-measurement/React-render concerns that don't apply to a one-shot
+// command. Unlike the widget (which only ever edits an already-open frontmatter
+// block), this also handles the "no block yet" case via a full prepend, since a
+// command can fire on any file, not just one already showing its properties UI.
+
+function getFrontmatterEditingContext(h: CoreAppCommandHandlers): { view: EditorView; content: string } | null {
+  const tab = getActiveTab(h)
+  const view = getActiveEditorView()
+  if (!tab || !view || tab.isBinary) {
+    showToast('error', 'Keine aktive Datei zum Bearbeiten')
+    return null
+  }
+  return { view, content: view.state.doc.toString() }
+}
+
+function commitFrontmatterData(view: EditorView, content: string, newData: Record<string, unknown>): void {
+  const location = locateFrontmatterBlock(content)
+  const remaining = Object.entries(newData).filter(([, v]) => v !== undefined && v !== null)
+
+  if (!location) {
+    if (remaining.length === 0) return
+    view.dispatch({ changes: { from: 0, insert: `---\n${serializeFrontmatter(newData)}\n---\n` } })
+    return
+  }
+
+  if (remaining.length === 0) {
+    const blockEnd = content.indexOf('\n', location.to + 1)
+    const to = blockEnd === -1 ? content.length : blockEnd + 1
+    view.dispatch({ changes: { from: 0, to, insert: '' } })
+    return
+  }
+
+  view.dispatch({ changes: { from: location.from, to: location.to, insert: serializeFrontmatter(newData) } })
+}
+
+function addAliasProperty(h: CoreAppCommandHandlers): void {
+  const ctx = getFrontmatterEditingContext(h)
+  if (!ctx) return
+  const data = parseFrontmatter(ctx.content).data ?? {}
+  if (Array.isArray(data.aliases)) return // already present — nothing to do
+  commitFrontmatterData(ctx.view, ctx.content, { ...data, aliases: [] })
+}
+
+function addMetadataProperty(h: CoreAppCommandHandlers): void {
+  const ctx = getFrontmatterEditingContext(h)
+  if (!ctx) return
+  const data = parseFrontmatter(ctx.content).data ?? {}
+  const existingKeys = Object.keys(data)
+  let keyName = 'property'
+  let counter = 1
+  while (existingKeys.includes(keyName)) {
+    keyName = `property-${counter}`
+    counter++
+  }
+  commitFrontmatterData(ctx.view, ctx.content, { ...data, [keyName]: '' })
+}
+
+function clearMetadataProperties(h: CoreAppCommandHandlers): void {
+  const ctx = getFrontmatterEditingContext(h)
+  if (!ctx) return
+  if (!locateFrontmatterBlock(ctx.content)) return // nothing to clear
+  commitFrontmatterData(ctx.view, ctx.content, {})
+}
+
 const noop = (): void => { /* no Slatebase equivalent — see module docstring */ }
 
 interface CoreAppCommandSpec {
@@ -429,17 +627,17 @@ function buildSpecs(): CoreAppCommandSpec[] {
     // No Slatebase equivalent — no split panes/tab groups, no pinning, no popout/new-window,
     // no closed-tab history, no blank-tab concept, no stacked-tabs layout, no URL scheme.
     { id: 'workspace:new-tab', name: 'New tab', run: noop },
-    { id: 'workspace:toggle-pin', name: 'Toggle pin', run: noop },
+    { id: 'workspace:toggle-pin', name: 'Toggle pin', run: toggleActiveTabPin },
     { id: 'workspace:split-vertical', name: 'Split right', run: noop },
     { id: 'workspace:split-horizontal', name: 'Split down', run: noop },
-    { id: 'workspace:undo-close-pane', name: 'Undo close tab', run: noop },
+    { id: 'workspace:undo-close-pane', name: 'Undo close tab', run: (h) => { void undoCloseTab(h.tabDispatch, h.appDispatch, h.apiClient, h.tabState.closedTabsHistory) } },
     { id: 'workspace:move-to-new-window', name: 'Move current tab to new window', run: noop },
     { id: 'workspace:new-window', name: 'New window', run: noop },
     { id: 'workspace:close-window', name: 'Close window', run: noop },
     { id: 'workspace:open-in-new-window', name: 'Open current tab in new window', run: noop },
     { id: 'workspace:toggle-stacked-tabs', name: 'Toggle stacked tabs', run: noop },
     { id: 'workspace:copy-url', name: 'Copy Obsidian URL for current file', run: noop },
-    { id: 'workspace:export-pdf', name: 'Export to PDF...', run: noop },
+    { id: 'workspace:export-pdf', name: 'Export to PDF...', run: exportActiveFileToPdf },
 
     // ── file-explorer:* ──
     { id: 'file-explorer:new-file', name: 'Create new note', run: (h) => h.onCreateFile() },
@@ -465,10 +663,10 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'app:toggle-ribbon', name: 'Toggle ribbon', run: noop },
     { id: 'app:go-back', name: 'Navigate back', run: (h) => h.onNavigateBack() },
     { id: 'app:go-forward', name: 'Navigate forward', run: (h) => h.onNavigateForward() },
-    { id: 'app:open-sandbox-vault', name: 'Open sandbox vault', run: noop },
+    { id: 'app:open-sandbox-vault', name: 'Open sandbox vault', run: (h) => h.onCreateWelcomeVault() },
     { id: 'app:open-help', name: 'Open help', run: noop },
-    { id: 'app:show-debug-info', name: 'Show debug info', run: noop },
-    { id: 'app:show-release-notes', name: 'Show release notes', run: noop },
+    { id: 'app:show-debug-info', name: 'Show debug info', run: (h) => h.onOpenDebugInfo() },
+    { id: 'app:show-release-notes', name: 'Show release notes', run: (h) => h.onOpenReleaseNotes() },
     { id: 'app:toggle-default-new-pane-mode', name: 'Toggle default mode for new tabs', run: noop },
 
     // ── theme:* ──
@@ -476,9 +674,9 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'theme:switch', name: 'Change theme...', run: (h) => cycleTheme(h, ['light', 'dark', 'system']) },
 
     // ── window:* — no window/UI-scale management exists in a browser tab ──
-    { id: 'window:zoom-in', name: 'Zoom in', run: noop },
-    { id: 'window:zoom-out', name: 'Zoom out', run: noop },
-    { id: 'window:reset-zoom', name: 'Reset zoom', run: noop },
+    { id: 'window:zoom-in', name: 'Zoom in', run: () => zoomIn() },
+    { id: 'window:zoom-out', name: 'Zoom out', run: () => zoomOut() },
+    { id: 'window:reset-zoom', name: 'Reset zoom', run: () => resetZoom() },
     { id: 'window:toggle-always-on-top', name: 'Toggle window always on top', run: noop },
 
     // ── Graph / Canvas / Daily Notes ──
@@ -486,20 +684,29 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'graph:open-local', name: 'Graph view: Open local graph', run: (h) => { const t = getActiveTab(h); if (t && !t.filePath.startsWith('__')) h.onOpenLocalGraph(t.filePath) } },
     { id: 'graph:animate', name: 'Graph view: Start graph time-lapse animation', run: noop },
     { id: 'canvas:new-file', name: 'Canvas: Create new canvas', run: (h) => h.onCreateCanvas() },
-    { id: 'canvas:jump-to-group', name: 'Canvas: Jump to group', run: noop },
+    {
+      id: 'canvas:jump-to-group',
+      name: 'Canvas: Jump to group',
+      run: () => {
+        const controller = getActiveCanvasController()
+        if (!controller?.jumpToSelectedGroup()) {
+          showToast('error', 'Keine einzelne Gruppe ausgewählt')
+        }
+      },
+    },
     { id: 'canvas:export-as-image', name: 'Canvas: Export as image', run: noop },
-    { id: 'canvas:convert-to-file', name: 'Canvas: Convert to file...', run: noop },
+    { id: 'canvas:convert-to-file', name: 'Canvas: Convert to file...', run: (h) => { void convertCanvasToFile(h) } },
     { id: 'daily-notes', name: "Daily notes: Open today's daily note", run: (h) => h.onDailyNote() },
-    { id: 'daily-notes:goto-next', name: 'Daily notes: Open next daily note', run: noop },
-    { id: 'daily-notes:goto-prev', name: 'Daily notes: Open previous daily note', run: noop },
+    { id: 'daily-notes:goto-next', name: 'Daily notes: Open next daily note', run: (h) => h.onDailyNoteOffset(1) },
+    { id: 'daily-notes:goto-prev', name: 'Daily notes: Open previous daily note', run: (h) => h.onDailyNoteOffset(-1) },
     { id: 'insert-template', name: 'Templates: Insert template', run: (h) => h.onOpenTemplateSelector() },
 
     // ── markdown:* ──
     { id: 'markdown:toggle-preview', name: 'Toggle reading view', run: (h) => { const t = getActiveTab(h); if (t) h.tabDispatch({ type: 'TOGGLE_MODE', payload: { tabId: t.id } }) } },
     // No standalone "properties" editing API to script against outside the panel UI.
-    { id: 'markdown:add-alias', name: 'Add alias', run: noop },
-    { id: 'markdown:add-metadata-property', name: 'Add file property', run: noop },
-    { id: 'markdown:clear-metadata-properties', name: 'Clear file properties', run: noop },
+    { id: 'markdown:add-alias', name: 'Add alias', run: (h) => addAliasProperty(h) },
+    { id: 'markdown:add-metadata-property', name: 'Add file property', run: (h) => addMetadataProperty(h) },
+    { id: 'markdown:clear-metadata-properties', name: 'Clear file properties', run: (h) => clearMetadataProperties(h) },
 
     // ── Side panels ──
     { id: 'outline:open', name: 'Outline: Show outline', run: (h) => setPanelView(h, 'outline') },
@@ -518,9 +725,9 @@ function buildSpecs(): CoreAppCommandSpec[] {
     // feature, and "open in default app" / "show in system explorer" are desktop-only
     // concepts that cannot exist for a file stored on a remote server.
     { id: 'footnotes:open', name: 'Footnotes view: Show footnotes', run: noop },
-    { id: 'note-composer:extract-heading', name: 'Note composer: Extract this heading...', run: noop },
-    { id: 'note-composer:merge-file', name: 'Note composer: Merge current file with another file...', run: noop },
-    { id: 'note-composer:split-file', name: 'Note composer: Extract current selection...', run: noop },
+    { id: 'note-composer:extract-heading', name: 'Note composer: Extract this heading...', run: (h) => { void extractHeadingToFile(h) } },
+    { id: 'note-composer:merge-file', name: 'Note composer: Merge current file with another file...', run: (h) => { void mergeActiveFileInto(h) } },
+    { id: 'note-composer:split-file', name: 'Note composer: Extract current selection...', run: (h) => { void splitFileFromSelection(h) } },
     { id: 'bases:add-item', name: 'Bases: Add item', run: noop },
     { id: 'bases:add-view', name: 'Bases: Add view', run: noop },
     { id: 'bases:change-view', name: 'Bases: Change view', run: noop },

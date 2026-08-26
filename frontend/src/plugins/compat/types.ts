@@ -397,7 +397,7 @@ export interface PluginInstance {
   saveData(data: unknown): Promise<void>;
   addCommand(command: { id: string; name: string; callback: () => void; hotkeys?: Hotkey[] }): Command;
   addSettingTab(tab: unknown): void;
-  addRibbonIcon(icon: string, title: string, callback: () => void): HTMLElement;
+  addRibbonIcon(icon: string, title: string, callback: (evt: MouseEvent) => unknown): HTMLElement;
   registerEvent(eventRef: EventRef): void;
   registerView(viewType: string, creator: unknown): void;
   /**

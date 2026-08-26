@@ -21,7 +21,8 @@ import { CanvasToolbar } from './CanvasToolbar'
 import type { CanvasViewMode } from './CanvasToolbar'
 import { CanvasSourceView } from './CanvasSourceView'
 import { useViewportCulling } from './useViewportCulling'
-import { generateCanvasId } from './canvas-utils'
+import { generateCanvasId, computeFitViewport } from './canvas-utils'
+import { setActiveCanvasController } from '../../state/activeCanvasBridge'
 import './CanvasView.css'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -354,7 +355,6 @@ function CanvasViewInner({ vaultId, readOnly, onFileOpen, directoryTree, token, 
 
   const fitToView = useCallback(() => {
     if (!document || document.nodes.length === 0 || !containerRef.current) return
-    const padding = 50
     const rect = containerRef.current.getBoundingClientRect()
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -365,25 +365,30 @@ function CanvasViewInner({ vaultId, readOnly, onFileOpen, directoryTree, token, 
       maxY = Math.max(maxY, node.y + node.height)
     }
 
-    const contentWidth = maxX - minX + padding * 2
-    const contentHeight = maxY - minY + padding * 2
-    const zoom = Math.min(
-      rect.width / contentWidth,
-      rect.height / contentHeight,
-      1, // Don't zoom in beyond 100%
-    )
-    const centerX = (minX + maxX) / 2
-    const centerY = (minY + maxY) / 2
-
-    dispatch({
-      type: 'SET_VIEWPORT',
-      payload: {
-        x: -centerX + (rect.width / 2) / zoom,
-        y: -centerY + (rect.height / 2) / zoom,
-        zoom: Math.max(MIN_ZOOM, zoom),
-      },
-    })
+    dispatch({ type: 'SET_VIEWPORT', payload: computeFitViewport({ minX, minY, maxX, maxY }, rect, 50, MIN_ZOOM) })
   }, [document, dispatch])
+
+  /** `canvas:jump-to-group` — pans/zooms to the single selected group node. */
+  const jumpToSelectedGroup = useCallback((): boolean => {
+    if (!document || !containerRef.current || selectedNodeIds.size !== 1) return false
+    const [id] = selectedNodeIds
+    const node = document.nodes.find((n) => n.id === id)
+    if (!node || node.type !== 'group') return false
+
+    const rect = containerRef.current.getBoundingClientRect()
+    const bounds = { minX: node.x, minY: node.y, maxX: node.x + node.width, maxY: node.y + node.height }
+    dispatch({ type: 'SET_VIEWPORT', payload: computeFitViewport(bounds, rect, 50, MIN_ZOOM) })
+    return true
+  }, [document, selectedNodeIds, dispatch])
+
+  // Registers this canvas as the target for core commands that need to reach
+  // into a live canvas's viewport (only one canvas tab is ever the "active"
+  // one a command should affect — same single-active-instance pattern as
+  // editor/plugin-extensions.ts's setActiveEditorView).
+  useEffect(() => {
+    setActiveCanvasController({ jumpToSelectedGroup })
+    return () => setActiveCanvasController(null)
+  }, [jumpToSelectedGroup])
 
   /** Handle context menu action. */
   const handleContextMenuAction = useCallback((action: CanvasContextAction) => {
