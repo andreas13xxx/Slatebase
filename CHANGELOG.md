@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.37.2](https://github.com/andreas13xxx/Slatebase/compare/v0.37.1...v0.37.2) (2026-08-28)
+
+
+### Sonstige Änderungen
+
+* bump the minor-patch group in /backend with 4 updates ([#125](https://github.com/andreas13xxx/Slatebase/issues/125)) ([a61ef23](https://github.com/andreas13xxx/Slatebase/commit/a61ef23c507e99de22ebb552b79e8bf6f61ac5ee))
+* bump the minor-patch group in /frontend with 11 updates ([#126](https://github.com/andreas13xxx/Slatebase/issues/126)) ([19e8545](https://github.com/andreas13xxx/Slatebase/commit/19e854539458960cfa58448e2463c051e104594a))
+
 ## [0.37.1](https://github.com/andreas13xxx/Slatebase/compare/v0.37.0...v0.37.1) (2026-08-26)
 
 
