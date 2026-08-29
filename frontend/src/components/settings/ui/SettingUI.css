@@ -102,3 +102,22 @@
   color: var(--text-secondary);
   line-height: 1.5;
 }
+
+/* ===== FeatureDisabledHint — shown instead of a section's content when its feature toggle is off ===== */
+
+.feature-disabled-hint {
+  padding: 32px;
+  text-align: center;
+}
+
+.feature-disabled-hint__title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.feature-disabled-hint__note {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}

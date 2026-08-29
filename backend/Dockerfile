@@ -25,10 +25,16 @@ RUN npx tsc
 # --- Production Stage ---
 FROM node:22-slim AS production
 
+# python3/make/g++ are only needed to compile argon2 and are purged below.
+# git + openssh-client are needed at runtime by the git-sync module (shells
+# out to the native `git` binary; ssh is used for SSH-key remotes) and stay
+# in the final image.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     make \
     g++ \
+    git \
+    openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -37,7 +43,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && rm -rf /root/.npm
 
-# Remove build tools after argon2 is compiled
+# Remove build tools after argon2 is compiled (git/openssh-client stay — see above)
 RUN apt-get purge -y python3 make g++ && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
 # Copy compiled JavaScript from build stage

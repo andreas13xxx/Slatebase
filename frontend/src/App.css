@@ -125,6 +125,14 @@
   opacity: 1;
 }
 
+.app-version-mismatch {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--warning, #f59e0b);
+  white-space: nowrap;
+  cursor: help;
+}
+
 .app-sidebar-body {
   flex: 1;
   display: flex;
@@ -1163,7 +1171,12 @@
   color: var(--sidebar-text);
   flex: 1;
   text-align: left;
-  transition: color var(--transition-fast);
+  /* Also covers .tree-node-row's background transition: this button IS the
+     row (the wrapper div was folded into it — see TreeNode.tsx), so the
+     background-hover behavior from .tree-node-row's own `transition:
+     background` declaration would otherwise be silently overridden by this
+     shorthand when both classes land on the same element. */
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
 .tree-node-toggle:hover {
@@ -1217,7 +1230,8 @@
   color: var(--sidebar-text);
   text-align: left;
   flex: 1;
-  transition: color var(--transition-fast);
+  /* See .tree-node-toggle's identical comment above — same row/button merge. */
+  transition: background var(--transition-fast), color var(--transition-fast);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

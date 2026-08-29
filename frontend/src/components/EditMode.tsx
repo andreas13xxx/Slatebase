@@ -46,7 +46,7 @@ const INTERNAL_DRAG_TYPE = 'application/x-slatebase-path'
  * Validates: Requirements 1.1, 1.5, 1.6, 1.7, 1.8, 1.9, 10.1, 10.2, 10.3, 10.4, 10.5
  */
 
-export function EditMode({ content, onChange, onSave, onCancel: _onCancel, saving, error, readOnly, filePath, tabId, onExternalFileDrop, onImagePaste: _onImagePaste, livePreviewMode, livePreviewOptions }: EditModeProps) {
+export function EditMode({ content, onChange, onSave, onCancel: _onCancel, saving, error, readOnly, filePath, tabId, onExternalFileDrop, onImagePaste, livePreviewMode, livePreviewOptions }: EditModeProps) {
   const { t } = useTranslation()
   const [status, setStatus] = useState<SaveStatus>('idle')
   const [isDragOver, setIsDragOver] = useState(false)
@@ -299,6 +299,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
             readableLineLength={readableLineLengthEnabled}
             spellcheck={spellcheckEnabled}
             editorRef={editorRef}
+            onImagePaste={onImagePaste}
           />
         </div>
       </DropZone>

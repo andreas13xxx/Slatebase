@@ -9,8 +9,11 @@
 import React, { useRef, useEffect } from 'react'
 import { useSettingsContext } from '../../state/settingsContext'
 import { useAppContext } from '../../state'
+import { useFeatureContext } from '../../state/featureContext'
 import type { SettingsSection } from '../../state/settingsState'
 import { SECTION_LABELS } from '../../state/settingsLabels'
+import { SETTINGS_SECTIONS } from '../../state/settingsRegistry'
+import { FeatureDisabledHint } from './ui'
 import { ProfilePage } from '../ProfilePage'
 import { ChangePasswordPage } from '../ChangePasswordPage'
 import { SessionsPage } from '../SessionsPage'
@@ -23,6 +26,9 @@ import { AccountDeletionSection } from './AccountDeletionSection'
 import { FeatureTogglesSection } from './FeatureTogglesSection'
 import { ServerRestartSection } from './ServerRestartSection'
 import { VaultConfigSection } from './VaultConfigSection'
+import { CssSnippetsSection } from './CssSnippetsSection'
+import { GitSyncSection } from './GitSyncSection'
+import { MailImportSection } from './MailImportSection'
 import { KeybindingsSection } from './KeybindingsSection'
 import { AppearanceSection } from './AppearanceSection'
 import { WelcomeVaultSection } from './WelcomeVaultSection'
@@ -37,6 +43,7 @@ import { MyVaultsPage } from '../MyVaultsPage'
 export function SettingsContent() {
   const { state } = useSettingsContext()
   const { apiClient, state: appState } = useAppContext()
+  const { isEnabled } = useFeatureContext()
   const headingRef = useRef<HTMLHeadingElement>(null)
 
   // Focus heading on section change for accessibility
@@ -51,7 +58,7 @@ export function SettingsContent() {
       <h2 ref={headingRef} tabIndex={-1} className="settings-content-heading">
         {label}
       </h2>
-      {renderSection(state.section, appState.selectedVaultId, apiClient)}
+      {renderSection(state.section, appState.selectedVaultId, apiClient, isEnabled)}
     </div>
   )
 }
@@ -59,14 +66,25 @@ export function SettingsContent() {
 /**
  * Renders the appropriate component for the given section.
  * For vault-specific sections, shows a fallback message if no vault is selected.
+ * For sections gated behind a backend feature toggle (see `feature` on
+ * ISettingsSectionDef), shows FeatureDisabledHint instead when it's off —
+ * derived from the registry rather than a second per-case check, so a newly
+ * feature-gated section can't drift out of sync with the registry (see the
+ * same reasoning in settingsPersistence.ts's isValidSectionForCategory).
  */
 function renderSection(
   section: SettingsSection,
   selectedVaultId: string | null,
   apiClient: import('../../api').IApiClient | null,
+  isEnabled: (featureName: string) => boolean,
 ): React.JSX.Element | null {
   if (apiClient === null) {
     return <p className="settings-content-error">API-Client nicht verfügbar.</p>
+  }
+
+  const sectionDef = SETTINGS_SECTIONS.find((def) => def.id === section)
+  if (sectionDef?.feature !== undefined && !isEnabled(sectionDef.feature)) {
+    return <FeatureDisabledHint featureName={SECTION_LABELS[section]} />
   }
 
   switch (section) {
@@ -101,6 +119,21 @@ function renderSection(
         return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>
       }
       return <VaultConfigSection apiClient={apiClient} vaultId={selectedVaultId} />
+    case 'css-snippets':
+      if (selectedVaultId === null) {
+        return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>
+      }
+      return <CssSnippetsSection />
+    case 'git-sync':
+      if (selectedVaultId === null) {
+        return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>
+      }
+      return <GitSyncSection />
+    case 'mail-import':
+      if (selectedVaultId === null) {
+        return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>
+      }
+      return <MailImportSection />
     case 'server-config':
       return <AdminConfigPage apiClient={apiClient} hideFeatureToggles />
     case 'user-management':

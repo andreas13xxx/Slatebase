@@ -118,4 +118,4 @@ Import files into a vault:
 
 - [[Basics/File Explorer]] — Navigating within a vault
 - [[Features/Settings]] — Vault-specific configuration
-- [[Features/Sync]] — Synchronizing vaults across devices
+- [[Features/Git Sync]] — Synchronize a vault with an external Git remote

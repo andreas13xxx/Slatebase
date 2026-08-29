@@ -22,13 +22,18 @@
     "adm-zip": "0.6.0",
     "argon2": "0.45.1",
     "hono": "^4.13.4",
+    "imapflow": "^1.0.164",
+    "mailparser": "^3.7.5",
     "pino": "^10.3.1",
+    "turndown": "^7.2.1",
     "zod": "^3.24.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/adm-zip": "0.5.8",
+    "@types/mailparser": "^3.4.6",
     "@types/node": "^26.2.0",
+    "@types/turndown": "^5.0.5",
     "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^10.9.0",
     "fast-check": "4.9.0",

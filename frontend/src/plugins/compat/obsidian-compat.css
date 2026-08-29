@@ -55,6 +55,7 @@
   /* ─── UI ────────────────────────────────────────────────────────────────── */
   --icon-color: #475569;
   --icon-color-hover: #0f172a;
+  --icon-color-active: #0f172a;
   --icon-color-focused: #0f766e;
   --tab-text-color: #475569;
   --tab-text-color-focused: #0f172a;
@@ -348,6 +349,7 @@
   --cursor-link: pointer;
 
   /* ─── Foundations: Icons ─── */
+  --icon-size: var(--icon-m);
   --icon-stroke: var(--icon-m-stroke-width);
   --icon-xs: 14px;
   --icon-s: 16px;
@@ -486,6 +488,7 @@
 
   /* ─── Components: Toggle ─── */
   --toggle-border-width: 2px;
+  --toggle-width: 40px;
   --toggle-radius: 18px;
   --toggle-thumb-color: white;
   --toggle-thumb-radius: 18px;
@@ -785,6 +788,7 @@
   /* ─── UI (Dark) ──────────────────────────────────────────────────────────── */
   --icon-color: #8b949e;
   --icon-color-hover: #e6edf3;
+  --icon-color-active: #e6edf3;
   --icon-color-focused: var(--accent, #2dd4bf);
   --tab-text-color: #8b949e;
   --tab-text-color-focused: #e6edf3;

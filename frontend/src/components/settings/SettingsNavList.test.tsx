@@ -169,6 +169,46 @@ describe('SettingsNavList', () => {
     expect(vaultConfigBtn).not.toBeDisabled()
   })
 
+  it('disables a section whose feature toggle is off, with an admin hint as title', () => {
+    const dispatch = vi.fn()
+    render(
+      <SettingsNavList
+        state={createState({ selectedVaultId: 'v1' })}
+        isAdmin={false}
+        registry={registry}
+        dispatch={dispatch}
+        activeVaultId="v1"
+        isFeatureEnabled={(name) => name !== 'git-sync'}
+      />
+    )
+
+    const gitSyncBtn = screen.getByText('Git-Synchronisation')
+    expect(gitSyncBtn).toBeDisabled()
+    expect(gitSyncBtn).toHaveAttribute('title', expect.stringContaining('Administrator'))
+
+    // A vault section not gated by any feature stays enabled.
+    const vaultConfigBtn = screen.getByText('Vault-Konfiguration')
+    expect(vaultConfigBtn).not.toBeDisabled()
+  })
+
+  it('enables a feature-gated section when its toggle is on', () => {
+    const dispatch = vi.fn()
+    render(
+      <SettingsNavList
+        state={createState({ selectedVaultId: 'v1' })}
+        isAdmin={false}
+        registry={registry}
+        dispatch={dispatch}
+        activeVaultId="v1"
+        isFeatureEnabled={() => true}
+      />
+    )
+
+    const gitSyncBtn = screen.getByText('Git-Synchronisation')
+    expect(gitSyncBtn).not.toBeDisabled()
+    expect(gitSyncBtn).not.toHaveAttribute('title')
+  })
+
   it('sets aria-current="page" on active section', () => {
     const dispatch = vi.fn()
     render(

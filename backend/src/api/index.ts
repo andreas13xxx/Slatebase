@@ -407,9 +407,10 @@ export class VaultController implements IVaultController {
     const vaultId = c.req.param('vaultId') as string
 
     try {
+      const session = c.get('session') as SessionContext
+
       // Check write access before importing
       if (this.accessControl) {
-        const session = c.get('session') as SessionContext
         await this.accessControl.checkWriteAccess(vaultId, session.userId)
       }
 
@@ -429,6 +430,9 @@ export class VaultController implements IVaultController {
       }
 
       await this.importService.importFile(vaultId, uploadedFile)
+
+      // Publish vault:change event (exclude triggering user)
+      await this.publishVaultChange(vaultId, 'saved', file.name, session.userId, session.username)
 
       return c.json({ path: file.name, name: file.name, size: file.size }, 201)
     } catch (error) {
@@ -450,9 +454,10 @@ export class VaultController implements IVaultController {
     const vaultId = c.req.param('vaultId') as string
 
     try {
+      const session = c.get('session') as SessionContext
+
       // Check write access before importing
       if (this.accessControl) {
-        const session = c.get('session') as SessionContext
         await this.accessControl.checkWriteAccess(vaultId, session.userId)
       }
 
@@ -504,6 +509,10 @@ export class VaultController implements IVaultController {
       dirCount = createdDirs.size
 
       await this.importService.importFolder(vaultId, uploadedFiles)
+
+      // Publish vault:change event (exclude triggering user)
+      const changedPath = uploadedFiles.length === 1 ? uploadedFiles[0]!.relativePath : '/'
+      await this.publishVaultChange(vaultId, 'saved', changedPath, session.userId, session.username)
 
       return c.json({ importedFiles: uploadedFiles.length, importedFolders: dirCount }, 201)
     } catch (error) {

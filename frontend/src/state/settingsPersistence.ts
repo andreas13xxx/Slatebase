@@ -11,6 +11,7 @@ import {
   type SettingsSection,
   initialSettingsState,
 } from './settingsState'
+import { SETTINGS_SECTIONS } from './settingsRegistry'
 
 /** Persisted format — only navigation-relevant fields, no ephemeral UI state. */
 interface PersistedSettingsNav {
@@ -21,13 +22,6 @@ interface PersistedSettingsNav {
 
 /** Valid categories for validation. */
 const VALID_CATEGORIES: SettingsCategory[] = ['account', 'vault', 'administration']
-
-/** Valid sections per category for validation. */
-const CATEGORY_SECTIONS: Record<SettingsCategory, SettingsSection[]> = {
-  account: ['profile', 'password', 'sessions', 'mcp-tokens', 'keybindings', 'delete-account'],
-  vault: ['plugins', 'vault-config'],
-  administration: ['server-config', 'user-management', 'vault-management', 'feature-toggles'],
-}
 
 /**
  * Persists the current settings navigation state to sessionStorage.
@@ -129,7 +123,11 @@ function isValidCategory(value: string): value is SettingsCategory {
 
 /**
  * Checks if a section belongs to a specific category.
+ * Derived from the canonical SETTINGS_SECTIONS registry rather than a
+ * hand-maintained copy — a second list previously drifted out of sync
+ * (missing 'appearance', 'my-vaults', 'server-restart') because nothing
+ * enforced it stayed in lockstep with the registry.
  */
 function isValidSectionForCategory(section: string, category: SettingsCategory): section is SettingsSection {
-  return (CATEGORY_SECTIONS[category] as string[]).includes(section)
+  return SETTINGS_SECTIONS.some((def) => def.id === section && def.category === category)
 }

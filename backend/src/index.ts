@@ -80,6 +80,11 @@ import { createPropertyTypeRoutes } from './api/propertyTypeRoutes.js'
 import { createPropertyRoutes } from './api/propertyRoutes.js'
 import { WelcomeVaultService } from './welcome-vault/index.js'
 import { createWelcomeVaultRoutes, deduplicateVaultName } from './api/welcomeVaultRoutes.js'
+import { ModuleSecretKeyManager, ModuleSecretStore } from './shared-secrets/index.js'
+import { GitSyncConfigStore, GitSyncStatusStore, GitCli, GitSyncEngine, GitSyncScheduler, SshKeyGenerator } from './git-sync/index.js'
+import { createGitSyncRoutes } from './api/gitSyncRoutes.js'
+import { MailImportConfigStore, MailImportStatusStore, ImapClient, MailNoteWriter, MailImportEngine, MailImportScheduler } from './mail-import/index.js'
+import { createMailImportRoutes } from './api/mailImportRoutes.js'
 
 // --- Composition Root ---
 
@@ -97,6 +102,8 @@ const featureRegistry = new FeatureRegistry()
 featureRegistry.register({ name: 'obsidian-plugin-compat', description: 'Obsidian Community Plugin Compatibility Layer', defaultEnabled: false, type: 'cold' })
 featureRegistry.register({ name: 'chat', description: 'Echtzeit-Chat zwischen Benutzern', defaultEnabled: true, type: 'hot' })
 featureRegistry.register({ name: 'mcp', description: 'AI Context Server (MCP Integration)', defaultEnabled: true, type: 'cold' })
+featureRegistry.register({ name: 'git-sync', description: 'Git-Synchronisation von Vaults mit externen Remotes', defaultEnabled: true, type: 'cold' })
+featureRegistry.register({ name: 'mail-import', description: 'IMAP-Mail-Import als Markdown-Notizen', defaultEnabled: true, type: 'cold' })
 
 const featureToggleStore = new FeatureToggleStore(serverConfig.dataDir, logger)
 const persistedFeatureState = await featureToggleStore.load()
@@ -137,14 +144,6 @@ if (!process.env['SLATEBASE_CSRF_SECRET']) {
     'Set this environment variable in production for stable session persistence.',
   )
 }
-if (!process.env['SLATEBASE_SYNC_SECRET']) {
-  logger.warn(
-    'SLATEBASE_SYNC_SECRET is not set — sync credential encryption uses an auto-generated key. ' +
-    'Encrypted sync credentials will not survive server restarts without this variable. ' +
-    'Set this environment variable in production if you use CouchDB vault synchronization.',
-  )
-}
-
 // --- Plugin Secret Key Manager ---
 const pluginSecretKeyManager = new PluginSecretKeyManager(serverConfig.dataDir, logger)
 await pluginSecretKeyManager.loadOrCreate()
@@ -155,6 +154,19 @@ if (!process.env['SLATEBASE_PLUGIN_SECRET_KEY']) {
     'SLATEBASE_PLUGIN_SECRET_KEY is not set — plugin secrets are encrypted with an auto-generated key. ' +
     'Secrets will be unreadable if the key is lost (container rebuild, volume reset). ' +
     'Set this environment variable in production for stable plugin secret persistence.',
+  )
+}
+
+// --- Module Secret Key Manager (git-sync, mail-import) ---
+const moduleSecretKeyManager = new ModuleSecretKeyManager(serverConfig.dataDir, logger)
+await moduleSecretKeyManager.loadOrCreate()
+const moduleSecretStore = new ModuleSecretStore(serverConfig.dataDir, moduleSecretKeyManager)
+
+if (!process.env['SLATEBASE_MODULE_SECRET_KEY']) {
+  logger.warn(
+    'SLATEBASE_MODULE_SECRET_KEY is not set — git-sync/mail-import credentials are encrypted with an ' +
+    'auto-generated key. Credentials will be unreadable if the key is lost (container rebuild, volume reset). ' +
+    'Set this environment variable in production for stable credential persistence.',
   )
 }
 
@@ -292,6 +304,23 @@ if (featureToggleService.isEnabled('mcp')) {
       // finished initializing.
       migrateLinks: (vaultId, oldPath, newPath, oldTree) =>
         linkMigrationService.migrateLinks(vaultId, oldPath, newPath, oldTree),
+      // Closure, not a direct reference: `eventBus` is a `const` declared
+      // further down (4d) — this MCP block (4c) runs first, but the arrow
+      // function body isn't evaluated until a write/delete/move/rename tool
+      // call actually happens, well after the whole module has finished
+      // initializing. No excludeUserId: unlike a REST write, an MCP write has
+      // no browser session that already applied the change locally — the
+      // calling user's own open tabs need the refresh too.
+      publishVaultChange: async (vaultId, action, path, userId) => {
+        const user = await userRepository.findById(userId)
+        const username = user ? (user.displayName || user.username) : 'MCP'
+        const target = { kind: 'users' as const, userIds: await vaultAccessControl.getUsersWithAccess(vaultId) }
+        eventBus.publish({
+          type: 'vault:change',
+          payload: { vaultId, action, path, userId, username },
+          target,
+        })
+      },
     },
     logger,
   })
@@ -540,6 +569,10 @@ app.use('/api/v1/plugin-store/*', createFeatureGuard('obsidian-plugin-compat', f
 app.use('/api/v1/plugin-store', createFeatureGuard('obsidian-plugin-compat', featureToggleService))
 app.use('/api/v1/mcp/tokens', createFeatureGuard('mcp', featureToggleService))
 app.use('/api/v1/mcp/tokens/*', createFeatureGuard('mcp', featureToggleService))
+app.use('/api/v1/vaults/:vaultId/git-sync', createFeatureGuard('git-sync', featureToggleService))
+app.use('/api/v1/vaults/:vaultId/git-sync/*', createFeatureGuard('git-sync', featureToggleService))
+app.use('/api/v1/vaults/:vaultId/mail-import', createFeatureGuard('mail-import', featureToggleService))
+app.use('/api/v1/vaults/:vaultId/mail-import/*', createFeatureGuard('mail-import', featureToggleService))
 
 // Route registration
 app.route('/api/v1', router)
@@ -650,6 +683,44 @@ const trashRoutes = createTrashRoutes({
   logger,
 })
 app.route('/api/v1', trashRoutes)
+
+// Git-Sync route registration (auth middleware applies via /api/v1/* pattern; feature-gated below)
+const gitSyncConfigStore = new GitSyncConfigStore(serverConfig.dataDir)
+const gitSyncStatusStore = new GitSyncStatusStore(serverConfig.dataDir)
+const gitCli = new GitCli()
+const gitSyncEngine = new GitSyncEngine(gitCli, vaultRegistry, gitSyncConfigStore, gitSyncStatusStore, moduleSecretStore, serverConfig.dataDir, logger, eventBus, vaultAccessControl)
+const gitSyncScheduler = new GitSyncScheduler(gitSyncConfigStore, gitSyncStatusStore, gitSyncEngine, logger)
+const gitSshKeyGenerator = new SshKeyGenerator()
+const gitSyncRoutes = createGitSyncRoutes({
+  configStore: gitSyncConfigStore,
+  statusStore: gitSyncStatusStore,
+  secretStore: moduleSecretStore,
+  syncEngine: gitSyncEngine,
+  sshKeyGenerator: gitSshKeyGenerator,
+  accessControl: vaultAccessControl,
+  vaultRegistry,
+  logger,
+})
+app.route('/api/v1', gitSyncRoutes)
+
+// Mail-Import route registration (auth middleware applies via /api/v1/* pattern; feature-gated below)
+const mailImportConfigStore = new MailImportConfigStore(serverConfig.dataDir)
+const mailImportStatusStore = new MailImportStatusStore(serverConfig.dataDir)
+const imapClient = new ImapClient()
+const mailNoteWriter = new MailNoteWriter(vaultManager, vaultReader, serverConfig.maxDirectoryDepth, logger, eventBus, vaultAccessControl)
+const mailImportEngine = new MailImportEngine(mailImportConfigStore, mailImportStatusStore, moduleSecretStore, imapClient, mailNoteWriter, logger)
+const mailImportScheduler = new MailImportScheduler(mailImportConfigStore, mailImportStatusStore, mailImportEngine, logger)
+const mailImportRoutes = createMailImportRoutes({
+  configStore: mailImportConfigStore,
+  statusStore: mailImportStatusStore,
+  secretStore: moduleSecretStore,
+  importEngine: mailImportEngine,
+  imapClient,
+  accessControl: vaultAccessControl,
+  vaultRegistry,
+  logger,
+})
+app.route('/api/v1', mailImportRoutes)
 
 // Preferences route registration (auth middleware applies via /api/v1/* pattern)
 const preferencesStore = new PreferencesStore(serverConfig.dataDir, logger)
@@ -959,6 +1030,10 @@ server.listen(serverConfig.port, serverConfig.host, () => {
   if (pluginStoreConfig.autoCheckInterval > 0) {
     updateChecker.start()
   }
+
+  // Start git-sync and mail-import schedulers (no-op for vaults with no configured remotes/accounts)
+  gitSyncScheduler.start()
+  mailImportScheduler.start()
 })
 
 // --- Graceful Shutdown ---
@@ -968,6 +1043,10 @@ const gracefulShutdown = async (signal: string): Promise<void> => {
 
   // Stop periodic cleanup job
   cleanupJob.stop()
+
+  // Stop git-sync and mail-import schedulers
+  gitSyncScheduler.stop()
+  mailImportScheduler.stop()
 
   // Stop the session store's expired-file sweep
   sessionStore.stopCleanup()

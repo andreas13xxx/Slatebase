@@ -8,7 +8,7 @@ export type SettingsCategory = 'account' | 'vault' | 'administration'
 
 /** Sektions-Kennungen pro Kategorie. */
 export type AccountSection = 'profile' | 'password' | 'sessions' | 'mcp-tokens' | 'delete-account' | 'keybindings' | 'appearance' | 'my-vaults'
-export type VaultSection = 'plugins' | 'vault-config'
+export type VaultSection = 'plugins' | 'vault-config' | 'css-snippets' | 'git-sync' | 'mail-import'
 export type AdminSection = 'server-config' | 'user-management' | 'vault-management' | 'feature-toggles' | 'server-restart'
 export type SettingsSection = AccountSection | VaultSection | AdminSection
 
@@ -48,7 +48,7 @@ export const initialSettingsState: SettingsNavState = {
 /** Valid sections per category for validation. */
 const CATEGORY_SECTIONS: Record<SettingsCategory, SettingsSection[]> = {
   account: ['profile', 'password', 'sessions', 'mcp-tokens', 'keybindings', 'appearance', 'my-vaults', 'delete-account'],
-  vault: ['plugins', 'vault-config'],
+  vault: ['plugins', 'vault-config', 'css-snippets', 'git-sync', 'mail-import'],
   administration: ['server-config', 'user-management', 'vault-management', 'feature-toggles', 'server-restart'],
 }
 

@@ -17,6 +17,13 @@
 # argon2 is compiled natively there, so its output really is arch-specific.
 FROM --platform=$BUILDPLATFORM node:22-slim AS build
 
+# Release version (e.g. "v0.37.0"), passed by CI. Vite embeds any VITE_-prefixed
+# env var present at build time into the bundle via import.meta.env — this is how
+# the running frontend knows its own version, to compare against the backend's
+# (see useVersionInfo.ts) and warn if they came from different releases.
+ARG SLATEBASE_VERSION=development
+ENV VITE_APP_VERSION=$SLATEBASE_VERSION
+
 WORKDIR /app
 
 # Install dependencies first (layer caching)

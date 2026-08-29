@@ -73,7 +73,7 @@ GET http://your-server:3000/.well-known/mcp.json
 
 **Link migration on move/rename:** `move_file` and `rename_file` rewrite every wikilink in *other* files that pointed at the old path — including bare-name links (`[[Note]]`) to a file in a subfolder, and every descendant file when a whole folder is moved — the same behavior as moving/renaming through the web UI or REST API. This runs synchronously before the tool call returns. If rewriting fails for some of the affected files, the move/rename itself still succeeds and the result includes an additional `linkMigrationWarnings` field: `[{ "path": "...", "reason": "..." }, ...]`.
 
-**No realtime push:** None of the write tools (`write_file`, `create_directory`, `delete_file`, `move_file`, `rename_file`) publish a realtime `vault:change` event. Changes made via MCP are written to disk and picked up the next time something reads the vault (e.g. the web UI's file tree on next load/refresh), but other open sessions are not notified live the way they are for changes made through the web UI or REST API.
+**Realtime push:** Every write tool (`write_file`, `create_directory`, `delete_file`, `move_file`, `rename_file`) publishes a `vault:change` event on success, same as the web UI and REST API. All open sessions with access to the vault are notified — including the calling user's own browser tabs, since an MCP write bypasses them entirely and has no local state to already reflect the change.
 
 ## Available Resources
 

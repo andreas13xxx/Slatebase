@@ -65,6 +65,7 @@ import { linkUnlinkedMention, loadUnlinkedMentions } from './state/documentPanel
 import { SidePanel } from './components/side-panel/SidePanel'
 import type { SidePanelDocumentProps, SidePanelSearchProps } from './components/side-panel/SidePanel'
 import { SettingsPanel } from './components/settings/SettingsPanel'
+import { FeatureDisabledHint } from './components/settings/ui'
 import type { SettingsCategory, SettingsSection } from './state/settingsState'
 import { PluginProvider } from './plugins/compat/plugin-context'
 import { CommandPaletteContainer } from './components/CommandPaletteContainer'
@@ -152,17 +153,6 @@ const PAGE_ICONS: Partial<Record<AppPage, React.ReactNode>> = {
   'mcp-tokens': <Key size={13} />,
   plugins: <Plug size={13} />,
   trash: <Trash2 size={13} />,
-}
-
-/**
- * Hint shown when navigating directly to a disabled feature page.
- */
-function FeatureDisabledHint({ featureName }: { featureName: string }) {
-  return (
-    <div style={{ padding: 32, color: 'var(--text-muted)', textAlign: 'center' }}>
-      <p>Das Feature „{featureName}" ist derzeit deaktiviert.</p>
-    </div>
-  )
 }
 
 /**
@@ -1034,6 +1024,14 @@ function AppContent() {
                   <span className="app-title">Slatebase</span>
                   {!versionInfo.loading && versionInfo.installed && versionInfo.installed !== 'development' && (
                     <span className="app-version">v{versionInfo.installed}</span>
+                  )}
+                  {versionInfo.mismatch && (
+                    <span
+                      className="app-version-mismatch"
+                      title="Frontend und Backend laufen auf unterschiedlichen Versionen — evtl. hilft ein harter Reload (Strg+Shift+R) oder ein erneutes Deployment."
+                    >
+                      Versions-Mismatch
+                    </span>
                   )}
                   {versionInfo.latest && (
                     <a

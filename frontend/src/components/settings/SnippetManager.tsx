@@ -1,6 +1,6 @@
 /**
  * SnippetManager — CSS snippet list, upload, create, edit, toggle, delete
- * (Requirement 8, 9). Embedded in AppearanceSection.
+ * (Requirement 8, 9). Embedded in CssSnippetsSection.
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Trash2, Pencil, Upload, Plus, FileCode } from 'lucide-react'

@@ -17,6 +17,8 @@ export interface ISettingsSectionDef {
   requiresAdmin: boolean
   /** Whether this section is only interactive when a vault is selected. */
   requiresVault: boolean
+  /** Backend feature-toggle name gating this section, if any (e.g. 'git-sync'). Disabled/hidden when the feature is off. */
+  feature?: string
 }
 
 /** Registry of all available settings sections. */
@@ -45,6 +47,9 @@ export const SETTINGS_SECTIONS: ISettingsSectionDef[] = [
   // Vault
   { id: 'vault-config', labelKey: 'settings.sections.vaultConfig', category: 'vault', requiresAdmin: false, requiresVault: true },
   { id: 'plugins', labelKey: 'settings.sections.plugins', category: 'vault', requiresAdmin: false, requiresVault: true },
+  { id: 'css-snippets', labelKey: 'settings.sections.cssSnippets', category: 'vault', requiresAdmin: false, requiresVault: true },
+  { id: 'git-sync', labelKey: 'settings.sections.gitSync', category: 'vault', requiresAdmin: false, requiresVault: true, feature: 'git-sync' },
+  { id: 'mail-import', labelKey: 'settings.sections.mailImport', category: 'vault', requiresAdmin: false, requiresVault: true, feature: 'mail-import' },
   // Administration
   { id: 'server-config', labelKey: 'settings.sections.serverConfig', category: 'administration', requiresAdmin: true, requiresVault: false },
   { id: 'user-management', labelKey: 'settings.sections.userManagement', category: 'administration', requiresAdmin: true, requiresVault: false },

@@ -989,7 +989,12 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
 
   // --- Drag & Drop Handlers ---
 
-  const handleDragStart = useCallback((e: React.DragEvent<HTMLDivElement>, nodePath: string, nodeType: 'file' | 'directory', vaultId: string) => {
+  // HTMLElement: these five handlers are shared with TreeNode, where the
+  // title row is a <button> (the old drag-wrapper <div> was folded into it
+  // to close an Obsidian-DOM-compat gap — see TreeNode.tsx). The vault-row
+  // and explorer-container handlers below stay on HTMLDivElement since those
+  // wrappers are still plain divs.
+  const handleDragStart = useCallback((e: React.DragEvent<HTMLElement>, nodePath: string, nodeType: 'file' | 'directory', vaultId: string) => {
     const vault = state.vaults.find((v) => v.id === vaultId)
     if (vault?.permission === 'read' || dragState.isMoving) {
       e.preventDefault()
@@ -1020,7 +1025,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
     target.style.opacity = '0.5'
   }, [state.vaults, state.vaultTrees, dragState.isMoving])
 
-  const handleDragEnd = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragEnd = useCallback((e: React.DragEvent<HTMLElement>) => {
     const target = e.currentTarget as HTMLElement
     target.style.opacity = ''
     setDragState((prev) => ({
@@ -1031,7 +1036,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
     }))
   }, [])
 
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>, folderPath: string, vaultId: string) => {
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLElement>, folderPath: string, vaultId: string) => {
     // Internal DnD (moving files within the explorer)
     if (dragState.validTargets.has(folderPath)) {
       e.preventDefault()
@@ -1056,7 +1061,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
     }
   }, [dragState.validTargets, dragState.draggedPath, state.vaults])
 
-  const handleDragLeave = useCallback((_e: React.DragEvent<HTMLDivElement>, folderPath: string, vaultId: string) => {
+  const handleDragLeave = useCallback((_e: React.DragEvent<HTMLElement>, folderPath: string, vaultId: string) => {
     // Clear external drop target when leaving a folder
     setExternalDropState((prev) => {
       if (prev.targetPath === folderPath && prev.targetVaultId === vaultId) {
@@ -1066,7 +1071,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
     })
   }, [])
 
-  const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>, targetFolderPath: string, dropVaultId: string) => {
+  const handleDrop = useCallback(async (e: React.DragEvent<HTMLElement>, targetFolderPath: string, dropVaultId: string) => {
     e.preventDefault()
 
     // Clear external drop state
@@ -1235,7 +1240,14 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
       ) : (
         <>
           <nav className="file-explorer" aria-label="File explorer">
-          <ul className="file-explorer-tree" role="tree">
+          {/* nav-files-container: real Obsidian has one vault, so this class
+              wraps its whole tree. Slatebase shows several vaults side by
+              side with no single equivalent root — closest fit is the
+              overall tree container, so snippets styling nav-files-container
+              (padding, etc.) still apply, even though there's no matching
+              mod-root folder underneath it (see tree-node-children--vault
+              below for where that vault's own top-level children live). */}
+          <ul className="file-explorer-tree nav-files-container" role="tree">
             {state.vaults.map((vault) => {
               const isExpanded = expandedVaults.has(vault.id)
               const isSelected = state.selectedVaultId === vault.id
@@ -1279,7 +1291,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
 
                   {/* Vault content (expanded) */}
                   {isExpanded && (
-                    <ul className="tree-node-children tree-node-children--vault" role="group">
+                    <ul className="tree-node-children tree-node-children--vault tree-item-children nav-folder-children" role="group">
                       {isLoading && (
                         <li className="tree-node tree-node--loading">
                           <span className="tree-node-loading-text">{t('common.loading')}</span>

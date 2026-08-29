@@ -212,6 +212,148 @@ export interface SnippetRegistryData {
   snippets: Record<string, { enabled: boolean; updatedAt: string }>
 }
 
+/** Git-sync authentication method: an HTTPS personal access token or an SSH private key. */
+export type GitAuthMethod = 'https-token' | 'ssh-key'
+
+/** A single Git remote configured for a vault (credential is write-only, never returned). */
+export interface GitSyncRemoteInfo {
+  id: string
+  vaultId: string
+  name: string
+  remoteUrl: string
+  authMethod: GitAuthMethod
+  /** Public half of the SSH key, derived server-side for display (copy into GitHub as a deploy key). `null` for https-token remotes. */
+  publicKey: string | null
+  intervalMinutes: number
+  enabled: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+/** A freshly generated ed25519 keypair — the private key is returned once to be submitted via create/update, never persisted by the generate call itself. */
+export interface GeneratedSshKeyPair {
+  privateKey: string
+  publicKey: string
+}
+
+/** A vault's git-sync setup: the shared local branch and its remotes. */
+export interface GitSyncVaultInfo {
+  branch: string
+  remotes: GitSyncRemoteInfo[]
+}
+
+/** Last-run status for a single git-sync remote. */
+export interface GitSyncRemoteStatusInfo {
+  remoteId: string
+  lastRunAt: string | null
+  lastResult: 'success' | 'error' | 'conflict' | null
+  lastError: string | null
+  conflictFiles: string[]
+  /** Files brought in by the last successful merge. `null` when not applicable (error/conflict/no run yet). */
+  lastPulledFiles: number | null
+  /** Files committed locally and pushed in the last successful run. `null` when not applicable. */
+  lastPushedFiles: number | null
+}
+
+/** Result of a single git-sync run (manual trigger response). */
+export interface GitSyncRunOutcome {
+  result: 'success' | 'error' | 'conflict'
+  error?: string
+  conflictFiles?: string[]
+  pulledFiles?: number
+  pushedFiles?: number
+}
+
+export interface CreateGitSyncRemoteInput {
+  name: string
+  remoteUrl: string
+  authMethod: GitAuthMethod
+  /** Personal access token (https-token) or private key contents (ssh-key). Write-only. */
+  credential: string
+  intervalMinutes: number
+  enabled?: boolean
+}
+
+export interface UpdateGitSyncRemoteInput {
+  name?: string
+  remoteUrl?: string
+  authMethod?: GitAuthMethod
+  credential?: string
+  intervalMinutes?: number
+  enabled?: boolean
+}
+
+/** A single IMAP mail-import account configured for a vault (password is write-only, never returned). */
+export interface MailImportConfigInfo {
+  id: string
+  vaultId: string
+  name: string
+  host: string
+  port: number
+  secure: boolean
+  username: string
+  mailbox: string
+  targetFolder: string
+  intervalMinutes: number
+  enabled: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+/** Last-run status for a single mail-import config. */
+export interface MailImportRunStatusInfo {
+  configId: string
+  lastRunAt: string | null
+  lastResult: 'success' | 'error' | null
+  lastError: string | null
+  /** Unread messages found in the mailbox on the last run (before any per-message failures). */
+  lastFoundCount: number
+  lastImportedCount: number
+}
+
+/** One node of an IMAP account's mailbox folder tree, for a folder picker. */
+export interface MailboxTreeNode {
+  /** Exact IMAP path — this is the value to use as `mailbox` in a mail-import config. */
+  path: string
+  name: string
+  selectable: boolean
+  children: MailboxTreeNode[]
+}
+
+/** Result of a single mail-import run (manual trigger response). */
+export interface MailImportRunOutcome {
+  result: 'success' | 'error'
+  error?: string
+  foundCount: number
+  importedCount: number
+}
+
+export interface CreateMailImportConfigInput {
+  name: string
+  host: string
+  port: number
+  secure: boolean
+  username: string
+  password: string
+  mailbox?: string
+  targetFolder?: string
+  intervalMinutes: number
+  enabled?: boolean
+}
+
+export interface UpdateMailImportConfigInput {
+  name?: string
+  host?: string
+  port?: number
+  secure?: boolean
+  username?: string
+  password?: string
+  mailbox?: string
+  targetFolder?: string
+  intervalMinutes?: number
+  enabled?: boolean
+}
+
 /**
  * Trash entry info returned by the backend API.
  */
@@ -439,6 +581,40 @@ export interface IApiClient {
   loadSnippetRegistry(vaultId: string): Promise<SnippetRegistryData>
   /** Save the snippet activation registry for a vault. */
   saveSnippetRegistry(vaultId: string, registry: SnippetRegistryData): Promise<void>
+
+  // --- Git-Sync methods ---
+  /** Load a vault's git-sync branch + remotes (no credentials). */
+  getGitSyncData(vaultId: string): Promise<GitSyncVaultInfo>
+  /** Update the shared local branch used by all of a vault's remotes. */
+  setGitSyncBranch(vaultId: string, branch: string): Promise<{ branch: string }>
+  /** Generate a fresh ed25519 keypair server-side. Not persisted — submit the returned privateKey via create/update. */
+  generateGitSyncSshKey(vaultId: string): Promise<GeneratedSshKeyPair>
+  /** Create a new git-sync remote. */
+  createGitSyncRemote(vaultId: string, input: CreateGitSyncRemoteInput): Promise<GitSyncRemoteInfo>
+  /** Update an existing git-sync remote. */
+  updateGitSyncRemote(vaultId: string, remoteId: string, input: UpdateGitSyncRemoteInput): Promise<GitSyncRemoteInfo>
+  /** Delete a git-sync remote. */
+  deleteGitSyncRemote(vaultId: string, remoteId: string): Promise<void>
+  /** Manually trigger a sync run for one remote. */
+  triggerGitSyncNow(vaultId: string, remoteId: string): Promise<GitSyncRunOutcome>
+  /** Load the last-run status for one remote. */
+  getGitSyncStatus(vaultId: string, remoteId: string): Promise<GitSyncRemoteStatusInfo>
+
+  // --- Mail-Import methods ---
+  /** List a vault's mail-import configs (no passwords). */
+  listMailImportConfigs(vaultId: string): Promise<{ configs: MailImportConfigInfo[] }>
+  /** Create a new mail-import config. */
+  createMailImportConfig(vaultId: string, input: CreateMailImportConfigInput): Promise<MailImportConfigInfo>
+  /** Update an existing mail-import config. */
+  updateMailImportConfig(vaultId: string, configId: string, input: UpdateMailImportConfigInput): Promise<MailImportConfigInfo>
+  /** Delete a mail-import config. */
+  deleteMailImportConfig(vaultId: string, configId: string): Promise<void>
+  /** List the account's real IMAP mailbox folder tree, to pick an exact path instead of guessing it. */
+  getMailImportMailboxTree(vaultId: string, configId: string): Promise<{ tree: MailboxTreeNode[] }>
+  /** Manually trigger an import run for one config. */
+  triggerMailImportNow(vaultId: string, configId: string): Promise<MailImportRunOutcome>
+  /** Load the last-run status for one config. */
+  getMailImportStatus(vaultId: string, configId: string): Promise<MailImportRunStatusInfo>
 
   // --- Plugin Store methods ---
   /** Get community plugin list from store. */
@@ -1043,6 +1219,85 @@ export class ApiClient implements IApiClient {
   /** Save the snippet activation registry for a vault. */
   async saveSnippetRegistry(vaultId: string, registry: SnippetRegistryData): Promise<void> {
     await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/snippets/registry`, registry)
+  }
+
+  // --- Git-Sync methods ---
+
+  /** Load a vault's git-sync branch + remotes (no credentials). */
+  async getGitSyncData(vaultId: string): Promise<GitSyncVaultInfo> {
+    return this.request<GitSyncVaultInfo>('GET', `/api/v1/vaults/${vaultId}/git-sync`)
+  }
+
+  /** Update the shared local branch used by all of a vault's remotes. */
+  async setGitSyncBranch(vaultId: string, branch: string): Promise<{ branch: string }> {
+    return this.request<{ branch: string }>('PATCH', `/api/v1/vaults/${vaultId}/git-sync/branch`, { branch })
+  }
+
+  /** Generate a fresh ed25519 keypair server-side. Not persisted — submit the returned privateKey via create/update. */
+  async generateGitSyncSshKey(vaultId: string): Promise<GeneratedSshKeyPair> {
+    return this.request<GeneratedSshKeyPair>('POST', `/api/v1/vaults/${vaultId}/git-sync/generate-ssh-key`)
+  }
+
+  /** Create a new git-sync remote. */
+  async createGitSyncRemote(vaultId: string, input: CreateGitSyncRemoteInput): Promise<GitSyncRemoteInfo> {
+    return this.request<GitSyncRemoteInfo>('POST', `/api/v1/vaults/${vaultId}/git-sync/remotes`, input)
+  }
+
+  /** Update an existing git-sync remote. */
+  async updateGitSyncRemote(vaultId: string, remoteId: string, input: UpdateGitSyncRemoteInput): Promise<GitSyncRemoteInfo> {
+    return this.request<GitSyncRemoteInfo>('PATCH', `/api/v1/vaults/${vaultId}/git-sync/remotes/${remoteId}`, input)
+  }
+
+  /** Delete a git-sync remote. */
+  async deleteGitSyncRemote(vaultId: string, remoteId: string): Promise<void> {
+    await this.request<void>('DELETE', `/api/v1/vaults/${vaultId}/git-sync/remotes/${remoteId}`)
+  }
+
+  /** Manually trigger a sync run for one remote. */
+  async triggerGitSyncNow(vaultId: string, remoteId: string): Promise<GitSyncRunOutcome> {
+    return this.request<GitSyncRunOutcome>('POST', `/api/v1/vaults/${vaultId}/git-sync/remotes/${remoteId}/sync-now`)
+  }
+
+  /** Load the last-run status for one remote. */
+  async getGitSyncStatus(vaultId: string, remoteId: string): Promise<GitSyncRemoteStatusInfo> {
+    return this.request<GitSyncRemoteStatusInfo>('GET', `/api/v1/vaults/${vaultId}/git-sync/remotes/${remoteId}/status`)
+  }
+
+  // --- Mail-Import methods ---
+
+  /** List a vault's mail-import configs (no passwords). */
+  async listMailImportConfigs(vaultId: string): Promise<{ configs: MailImportConfigInfo[] }> {
+    return this.request<{ configs: MailImportConfigInfo[] }>('GET', `/api/v1/vaults/${vaultId}/mail-import`)
+  }
+
+  /** Create a new mail-import config. */
+  async createMailImportConfig(vaultId: string, input: CreateMailImportConfigInput): Promise<MailImportConfigInfo> {
+    return this.request<MailImportConfigInfo>('POST', `/api/v1/vaults/${vaultId}/mail-import`, input)
+  }
+
+  /** Update an existing mail-import config. */
+  async updateMailImportConfig(vaultId: string, configId: string, input: UpdateMailImportConfigInput): Promise<MailImportConfigInfo> {
+    return this.request<MailImportConfigInfo>('PATCH', `/api/v1/vaults/${vaultId}/mail-import/${configId}`, input)
+  }
+
+  /** Delete a mail-import config. */
+  async deleteMailImportConfig(vaultId: string, configId: string): Promise<void> {
+    await this.request<void>('DELETE', `/api/v1/vaults/${vaultId}/mail-import/${configId}`)
+  }
+
+  /** List the account's real IMAP mailbox folder tree, to pick an exact path instead of guessing it. */
+  async getMailImportMailboxTree(vaultId: string, configId: string): Promise<{ tree: MailboxTreeNode[] }> {
+    return this.request<{ tree: MailboxTreeNode[] }>('GET', `/api/v1/vaults/${vaultId}/mail-import/${configId}/mailbox-tree`)
+  }
+
+  /** Manually trigger an import run for one config. */
+  async triggerMailImportNow(vaultId: string, configId: string): Promise<MailImportRunOutcome> {
+    return this.request<MailImportRunOutcome>('POST', `/api/v1/vaults/${vaultId}/mail-import/${configId}/import-now`)
+  }
+
+  /** Load the last-run status for one config. */
+  async getMailImportStatus(vaultId: string, configId: string): Promise<MailImportRunStatusInfo> {
+    return this.request<MailImportRunStatusInfo>('GET', `/api/v1/vaults/${vaultId}/mail-import/${configId}/status`)
   }
 
   // --- Plugin Store methods ---

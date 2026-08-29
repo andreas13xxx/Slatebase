@@ -159,6 +159,14 @@ export interface ToolHandlerDeps {
     migratedFiles: { path: string; replacements: number }[]
     failedFiles: { path: string; reason: string }[]
   }>
+  /**
+   * Optional — when set, publishes a realtime vault:change event after a
+   * successful write/delete/move/rename, so open sessions (including the
+   * calling user's own browser tabs, which the MCP write bypasses entirely)
+   * refresh their file tree instead of only picking up the change on next
+   * manual reload.
+   */
+  publishVaultChange?: (vaultId: string, action: 'saved' | 'deleted' | 'renamed', path: string, userId: string) => Promise<void>
 }
 
 /**
@@ -545,6 +553,8 @@ function registerWriteFile(server: McpServer, deps: ToolHandlerDeps): void {
         // Save file via VaultService (handles path validation, size check, atomic write, tree refresh)
         const result = await deps.vaultService.saveFile(args.vaultId, args.path, args.content, args.ifMatch)
 
+        await deps.publishVaultChange?.(args.vaultId, 'saved', result.path, userId)
+
         return mcpToolSuccess({
           path: result.path,
           name: result.name,
@@ -616,6 +626,8 @@ function registerCreateDirectory(server: McpServer, deps: ToolHandlerDeps): void
         // Create directory (recursive — creates intermediate dirs)
         await fs.mkdir(resolvedPath, { recursive: true })
 
+        await deps.publishVaultChange?.(args.vaultId, 'saved', args.path, userId)
+
         return mcpToolSuccess({
           path: args.path,
           message: 'Directory created successfully',
@@ -657,6 +669,8 @@ function registerDeleteFile(server: McpServer, deps: ToolHandlerDeps): void {
 
         // Delete via VaultService (handles path validation, existence check, tree refresh)
         await deps.vaultService.deleteContent(args.vaultId, args.path)
+
+        await deps.publishVaultChange?.(args.vaultId, 'deleted', args.path, userId)
 
         return mcpToolSuccess({
           path: args.path,
@@ -714,6 +728,8 @@ function registerMoveFile(server: McpServer, deps: ToolHandlerDeps): void {
         const linkMigrationWarnings = oldTree
           ? await runLinkMigration(deps, args.vaultId, oldTree, args.sourcePath, result.newPath)
           : undefined
+
+        await deps.publishVaultChange?.(args.vaultId, 'renamed', result.newPath, userId)
 
         return mcpToolSuccess({
           sourcePath: args.sourcePath,
@@ -784,6 +800,8 @@ function registerRenameFile(server: McpServer, deps: ToolHandlerDeps): void {
         const linkMigrationWarnings = oldTree
           ? await runLinkMigration(deps, args.vaultId, oldTree, args.path, result.newPath)
           : undefined
+
+        await deps.publishVaultChange?.(args.vaultId, 'renamed', result.newPath, userId)
 
         return mcpToolSuccess({
           oldPath: args.path,

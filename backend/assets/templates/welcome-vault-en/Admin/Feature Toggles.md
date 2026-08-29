@@ -19,13 +19,15 @@ Feature toggles allow you as an admin to enable or disable individual Slatebase 
 
 ## Available Features
 
-Slatebase currently has three registered feature toggles:
+Slatebase currently has five registered feature toggles:
 
 | Feature | Default | Type | Description |
 |---------|---------|------|-------------|
 | `chat` | enabled | hot | Real-time chat between users |
 | `mcp` | enabled | cold | Model Context Protocol server (AI integration) |
 | `obsidian-plugin-compat` | **disabled** | cold | Obsidian plugin compatibility layer |
+| `git-sync` | enabled | cold | Server-side Git synchronization of vaults |
+| `mail-import` | enabled | cold | Server-side IMAP mail import as Markdown notes |
 
 ---
 
@@ -38,7 +40,7 @@ Slatebase currently has three registered feature toggles:
 ### Effects of Disabling
 
 - The feature becomes unavailable for **all users**
-- Associated UI elements (menu entries, buttons, pages) disappear
+- Associated UI elements (menu entries, buttons, pages) usually disappear entirely — the vault settings for Git Sync and Mail Import are an exception: their navigation entry stays visible but disabled, with a hint to contact an administrator
 - API endpoints for the feature return `403 FEATURE_DISABLED`
 - Existing data is **not deleted** — everything returns when re-enabled
 
@@ -51,7 +53,7 @@ Slatebase currently has three registered feature toggles:
 | Hot toggle | Takes effect immediately, no restart needed |
 | Cold toggle | Requires a server restart to take effect |
 
-Of the three current toggles, only `chat` is hot. Both `mcp` and `obsidian-plugin-compat` are **cold** — flipping them queues the change until the server is restarted.
+Of the five current toggles, only `chat` is hot. `mcp`, `obsidian-plugin-compat`, `git-sync`, and `mail-import` are **cold** — flipping them queues the change until the server is restarted.
 
 ---
 
@@ -74,6 +76,18 @@ Of the three current toggles, only `chat` is hot. Both `mcp` and `obsidian-plugi
 - **Enabled:** Plugin management visible, plugins can be installed and loaded
 - **Disabled:** No plugin functionality, plugin commands not in Command Palette
 - **Note:** Experimental feature — plugins may affect stability; change requires a server restart to take effect
+
+### Git Sync (`git-sync`) — cold, enabled by default
+
+- **Enabled:** Vault settings show the "Git Sync" section, remotes can be configured, the background scheduler syncs due remotes
+- **Disabled:** Nav entry stays visible but disabled; API endpoints respond with 403; existing remote configs and credentials remain stored
+- **Details:** [[Features/Git Sync]]
+
+### Mail Import (`mail-import`) — cold, enabled by default
+
+- **Enabled:** Vault settings show the "Mail Import" section, mailboxes can be configured, the background scheduler polls due mailboxes
+- **Disabled:** Nav entry stays visible but disabled; API endpoints respond with 403; existing mailbox configs and passwords remain stored
+- **Details:** [[Features/Mail Import]]
 
 ---
 
@@ -98,6 +112,8 @@ SLATEBASE_FEATURE_CHAT=false
 | Corporate environment without AI | Disable `mcp` (restart required) |
 | Plugins not needed | Leave `obsidian-plugin-compat` disabled (its default) |
 | No team requirements | Disable `chat` |
+| No external Git remotes needed | Disable `git-sync` (restart required) |
+| No IMAP mailbox import needed | Disable `mail-import` (restart required) |
 
 ---
 
@@ -131,3 +147,5 @@ Test the effect of a feature toggle:
 - [[Features/Settings]] — Settings panel overview
 - [[Advanced/MCP Context Server]] — MCP feature in detail
 - [[Advanced/Obsidian Plugins]] — Plugin feature in detail
+- [[Features/Git Sync]] — Git Sync feature in detail
+- [[Features/Mail Import]] — Mail Import feature in detail

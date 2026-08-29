@@ -6,6 +6,14 @@ interface VersionInfo {
   latest: string | null
   latestUrl: string | null
   loading: boolean
+  /** True when this frontend bundle's own build version differs from the backend's. */
+  mismatch: boolean
+}
+
+/** Strips a leading 'v' (e.g. from a git tag) so versions compare consistently. */
+function normalizeVersion(version: string | undefined | null): string | null {
+  if (!version) return null
+  return version.startsWith('v') ? version.slice(1) : version
 }
 
 /**
@@ -18,6 +26,7 @@ export function useVersionInfo(): VersionInfo {
     latest: null,
     latestUrl: null,
     loading: true,
+    mismatch: false,
   })
 
   useEffect(() => {
@@ -35,6 +44,19 @@ export function useVersionInfo(): VersionInfo {
       } catch {
         // Backend unreachable — leave as null
       }
+
+      // Compare against this frontend bundle's own build-time version (baked in by
+      // frontend/Dockerfile via VITE_APP_VERSION). A mismatch means the browser is
+      // running a frontend build from a different release than the backend it's
+      // talking to — e.g. a stale cache, or `:latest` images pulled at different
+      // times for the two containers.
+      const frontendVersion = normalizeVersion(import.meta.env.VITE_APP_VERSION)
+      const backendVersion = normalizeVersion(installed)
+      const mismatch =
+        frontendVersion !== null &&
+        backendVersion !== null &&
+        installed !== 'development' &&
+        frontendVersion !== backendVersion
 
       let latest: string | null = null
       let latestUrl: string | null = null
@@ -66,7 +88,7 @@ export function useVersionInfo(): VersionInfo {
       }
 
       if (!cancelled) {
-        setInfo({ installed, latest, latestUrl, loading: false })
+        setInfo({ installed, latest, latestUrl, loading: false, mismatch })
       }
     }
 

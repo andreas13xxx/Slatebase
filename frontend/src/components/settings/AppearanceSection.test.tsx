@@ -3,8 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { AppProvider } from '../../state'
 import { AppearanceSection } from './AppearanceSection'
 
-/** SnippetManager (rendered inside AppearanceSection) needs AppContext; with no
- * vault selected in the default state it renders null, so no apiClient mock is needed. */
 function renderSection() {
   return render(
     <AppProvider>
@@ -51,10 +49,5 @@ describe('AppearanceSection', () => {
     expect(screen.getByLabelText('Wort- und Zeichenanzahl')).not.toBeChecked()
     expect(screen.getByLabelText('Cursor-Position')).toBeChecked()
     expect(localStorage.getItem('slatebase:statusBarItem:wordStats')).toBe('false')
-  })
-
-  it('does not render the snippet manager list when no vault is selected', () => {
-    renderSection()
-    expect(screen.queryByText('Keine CSS-Snippets in diesem Vault.')).not.toBeInTheDocument()
   })
 })

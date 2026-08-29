@@ -19,13 +19,15 @@ Feature-Toggles erlauben dir als Admin, einzelne Funktionen von Slatebase für a
 
 ## Verfügbare Features
 
-Slatebase hat aktuell drei registrierte Feature-Toggles:
+Slatebase hat aktuell fünf registrierte Feature-Toggles:
 
 | Feature | Standard | Typ | Beschreibung |
 |---------|----------|-----|--------------|
 | `chat` | aktiv | Hot | Echtzeit-Chat zwischen Nutzern |
 | `mcp` | aktiv | Cold | Model Context Protocol Server (KI-Integration) |
 | `obsidian-plugin-compat` | **inaktiv** | Cold | Obsidian-Plugin-Kompatibilitätsschicht |
+| `git-sync` | aktiv | Cold | Serverseitige Git-Synchronisation von Vaults |
+| `mail-import` | aktiv | Cold | Serverseitiger IMAP-Mail-Import als Markdown-Notizen |
 
 ---
 
@@ -38,7 +40,7 @@ Slatebase hat aktuell drei registrierte Feature-Toggles:
 ### Auswirkungen bei Deaktivierung
 
 - Das Feature ist für **alle Nutzer** nicht mehr verfügbar
-- Zugehörige UI-Elemente (Menüeinträge, Buttons, Seiten) verschwinden
+- Zugehörige UI-Elemente (Menüeinträge, Buttons, Seiten) verschwinden meist vollständig — die Vault-Einstellungen für Git-Sync und Mail-Import bilden eine Ausnahme: dort bleibt der Navigationseintrag sichtbar, aber deaktiviert, mit einem Hinweis, sich an einen Administrator zu wenden
 - API-Endpunkte des Features geben `403 FEATURE_DISABLED` zurück
 - Bestehende Daten werden **nicht gelöscht** — bei Re-Aktivierung ist alles wieder da
 
@@ -51,7 +53,7 @@ Slatebase hat aktuell drei registrierte Feature-Toggles:
 | Hot-Toggle | Wirkt sofort, kein Neustart nötig |
 | Cold-Toggle | Erfordert einen Server-Neustart, um zu wirken |
 
-Von den drei aktuellen Toggles ist nur `chat` ein Hot-Toggle. `mcp` und `obsidian-plugin-compat` sind beide **Cold** — eine Änderung wird erst nach dem nächsten Server-Neustart wirksam.
+Von den fünf aktuellen Toggles ist nur `chat` ein Hot-Toggle. `mcp`, `obsidian-plugin-compat`, `git-sync` und `mail-import` sind **Cold** — eine Änderung wird erst nach dem nächsten Server-Neustart wirksam.
 
 ---
 
@@ -74,6 +76,18 @@ Von den drei aktuellen Toggles ist nur `chat` ein Hot-Toggle. `mcp` und `obsidia
 - **Aktiviert:** Plugin-Verwaltung sichtbar, Plugins können installiert und geladen werden
 - **Deaktiviert:** Keine Plugin-Funktionalität, Plugin-Commands nicht in Command Palette
 - **Hinweis:** Experimentelles Feature — Plugins können Stabilität beeinflussen; Änderung wirkt erst nach Server-Neustart
+
+### Git-Sync (`git-sync`) — Cold, standardmäßig aktiv
+
+- **Aktiviert:** Vault-Einstellungen zeigen den Abschnitt "Git-Synchronisation", Remotes können konfiguriert werden, der Hintergrund-Scheduler synchronisiert fällige Remotes
+- **Deaktiviert:** Nav-Eintrag bleibt sichtbar, aber deaktiviert; API-Endpunkte antworten mit 403; bestehende Remote-Konfigurationen und Credentials bleiben gespeichert
+- **Details:** [[Features/Git-Sync]]
+
+### Mail-Import (`mail-import`) — Cold, standardmäßig aktiv
+
+- **Aktiviert:** Vault-Einstellungen zeigen den Abschnitt "Mail-Import", Postfächer können konfiguriert werden, der Hintergrund-Scheduler pollt fällige Postfächer
+- **Deaktiviert:** Nav-Eintrag bleibt sichtbar, aber deaktiviert; API-Endpunkte antworten mit 403; bestehende Postfach-Konfigurationen und Passwörter bleiben gespeichert
+- **Details:** [[Features/Mail-Import]]
 
 ---
 
@@ -98,6 +112,8 @@ SLATEBASE_FEATURE_CHAT=false
 | Firmenumgebung ohne KI | `mcp` deaktivieren (Neustart nötig) |
 | Plugins nicht benötigt | `obsidian-plugin-compat` deaktiviert lassen (Standard) |
 | Kein Team-Bedarf | `chat` deaktivieren |
+| Keine externen Git-Remotes nötig | `git-sync` deaktivieren (Neustart nötig) |
+| Kein IMAP-Postfach-Import nötig | `mail-import` deaktivieren (Neustart nötig) |
 
 ---
 
@@ -131,3 +147,5 @@ Teste die Auswirkung eines Feature-Toggles:
 - [[Features/Einstellungen]] — Einstellungs-Panel-Übersicht
 - [[Fortgeschritten/MCP Context Server]] — MCP-Feature im Detail
 - [[Fortgeschritten/Obsidian Plugins]] — Plugin-Feature im Detail
+- [[Features/Git-Sync]] — Git-Sync-Feature im Detail
+- [[Features/Mail-Import]] — Mail-Import-Feature im Detail

@@ -148,5 +148,5 @@ Teste die Vault-Verwaltung mit einem temporären Vault:
 
 - [[Grundlagen/Datei-Explorer]] — Vault-Inhalte im Explorer verwalten
 - [[Features/Einstellungen]] — Vault-Konfiguration (Templates, Daily Notes)
-- [[Features/Sync]] — Vault mit externem Server synchronisieren
+- [[Features/Git-Sync]] — Vault mit einem externen Git-Remote synchronisieren
 - [[Features/Chat]] — Kommunikation mit geteilten Nutzern

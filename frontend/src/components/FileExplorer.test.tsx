@@ -309,6 +309,147 @@ describe('FileExplorer', () => {
     })
   })
 
+  describe('Obsidian-compatible structural classes (CSS snippet compatibility)', () => {
+    // Added alongside Slatebase's own tree-node-* classes (never replacing
+    // them) so that community CSS snippets targeting real Obsidian's file
+    // explorer selectors apply unmodified. See the structural comment in
+    // TreeNode.tsx for what's covered — including why .tree-item-self is a
+    // direct child of .tree-item (the drag-wrapper div that used to sit
+    // between them was folded into the title button itself).
+
+    it('folder row carries tree-item/nav-folder, tree-item-self/is-clickable, collapse-icon and tree-item-inner', async () => {
+      const user = userEvent.setup()
+      const mockApiClient = createMockApiClient({ fetchVaultTree: vi.fn().mockResolvedValue(sampleTree) })
+      renderFileExplorer(
+        { vaults: [testVault], vaultTrees: { 'vault-123': sampleTree }, vaultTreesLoading: new Set() },
+        mockApiClient,
+      )
+      await user.click(screen.getByText('Test Vault'))
+
+      const li = screen.getByText('Documents').closest('li.tree-node--directory')
+      expect(li).toHaveClass('tree-item', 'nav-folder', 'is-collapsed')
+
+      const titleButton = screen.getByText('Documents').closest('button')
+      expect(titleButton).toHaveClass('tree-item-self', 'is-clickable')
+      expect(titleButton!.querySelector('.tree-item-icon.collapse-icon')).not.toBeNull()
+      expect(titleButton!.querySelector('.nav-folder-title-content.tree-item-inner')).not.toBeNull()
+    })
+
+    it('expanding a folder drops is-collapsed and exposes tree-item-children/nav-folder-children', async () => {
+      const user = userEvent.setup()
+      const mockApiClient = createMockApiClient({ fetchVaultTree: vi.fn().mockResolvedValue(sampleTree) })
+      renderFileExplorer(
+        { vaults: [testVault], vaultTrees: { 'vault-123': sampleTree }, vaultTreesLoading: new Set() },
+        mockApiClient,
+      )
+      await user.click(screen.getByText('Test Vault'))
+      await user.click(screen.getByText('Documents'))
+
+      const li = screen.getByText('Documents').closest('li.tree-node--directory')
+      expect(li).toHaveClass('tree-item', 'nav-folder')
+      expect(li).not.toHaveClass('is-collapsed')
+      expect(li!.querySelector(':scope > .tree-item-children.nav-folder-children')).not.toBeNull()
+    })
+
+    it('file row carries tree-item/nav-file, tree-item-self/is-clickable and tree-item-inner', async () => {
+      const user = userEvent.setup()
+      const mockApiClient = createMockApiClient({ fetchVaultTree: vi.fn().mockResolvedValue(sampleTree) })
+      renderFileExplorer(
+        { vaults: [testVault], vaultTrees: { 'vault-123': sampleTree }, vaultTreesLoading: new Set() },
+        mockApiClient,
+      )
+      await user.click(screen.getByText('Test Vault'))
+
+      const li = screen.getByText('readme').closest('li.tree-node--file')
+      expect(li).toHaveClass('tree-item', 'nav-file')
+
+      const titleButton = screen.getByText('readme').closest('button')
+      expect(titleButton).toHaveClass('tree-item-self', 'is-clickable')
+      expect(titleButton!.querySelector('.nav-file-title-content.tree-item-inner')).not.toBeNull()
+    })
+
+    it('the top-level tree carries nav-files-container', async () => {
+      const mockApiClient = createMockApiClient()
+      renderFileExplorer(
+        { vaults: [testVault], vaultTrees: {}, vaultTreesLoading: new Set() },
+        mockApiClient,
+      )
+      expect(document.querySelector('ul.file-explorer-tree.nav-files-container')).not.toBeNull()
+    })
+
+    it('.tree-item-self is a direct child of .tree-item for both folders and files (no wrapper div between them)', async () => {
+      const user = userEvent.setup()
+      const mockApiClient = createMockApiClient({ fetchVaultTree: vi.fn().mockResolvedValue(sampleTree) })
+      renderFileExplorer(
+        { vaults: [testVault], vaultTrees: { 'vault-123': sampleTree }, vaultTreesLoading: new Set() },
+        mockApiClient,
+      )
+      await user.click(screen.getByText('Test Vault'))
+
+      const folderLi = screen.getByText('Documents').closest('li.tree-item.nav-folder')
+      expect(folderLi!.querySelector(':scope > .tree-item-self.nav-folder-title')).not.toBeNull()
+
+      const fileLi = screen.getByText('readme').closest('li.tree-item.nav-file')
+      expect(fileLi!.querySelector(':scope > .tree-item-self.nav-file-title')).not.toBeNull()
+    })
+
+    it('marks the open file is-active on its nav-file-title', async () => {
+      const user = userEvent.setup()
+      const mockApiClient = createMockApiClient({
+        fetchVaultTree: vi.fn().mockResolvedValue(sampleTree),
+        fetchFileContent: vi.fn().mockResolvedValue({ content: '', isBinary: false }),
+      })
+      renderFileExplorer(
+        { vaults: [testVault], vaultTrees: { 'vault-123': sampleTree }, vaultTreesLoading: new Set() },
+        mockApiClient,
+      )
+      await user.click(screen.getByText('Test Vault'))
+
+      const readmeButton = screen.getByText('readme').closest('button')!
+      expect(readmeButton).not.toHaveClass('is-active')
+
+      await user.click(readmeButton)
+      expect(readmeButton).toHaveClass('is-active')
+      expect(readmeButton).toHaveAttribute('aria-current', 'true')
+    })
+
+    it('marks a folder is-being-renamed on its tree-item while the inline rename input is open', async () => {
+      const user = userEvent.setup()
+      const mockApiClient = createMockApiClient({ fetchVaultTree: vi.fn().mockResolvedValue(sampleTree) })
+      renderFileExplorer(
+        { vaults: [testVault], vaultTrees: { 'vault-123': sampleTree }, vaultTreesLoading: new Set() },
+        mockApiClient,
+      )
+      await user.click(screen.getByText('Test Vault'))
+
+      const folderLi = screen.getByText('Documents').closest('li.tree-item.nav-folder')!
+      expect(folderLi).not.toHaveClass('is-being-renamed')
+
+      await user.pointer({ keys: '[MouseRight]', target: screen.getByText('Documents') })
+      await user.click(screen.getByText('Umbenennen'))
+
+      expect(folderLi).toHaveClass('is-being-renamed')
+    })
+
+    it('marks a file is-being-renamed on its tree-item while the inline rename input is open', async () => {
+      const user = userEvent.setup()
+      const mockApiClient = createMockApiClient({ fetchVaultTree: vi.fn().mockResolvedValue(sampleTree) })
+      renderFileExplorer(
+        { vaults: [testVault], vaultTrees: { 'vault-123': sampleTree }, vaultTreesLoading: new Set() },
+        mockApiClient,
+      )
+      await user.click(screen.getByText('Test Vault'))
+
+      const fileLi = screen.getByText('readme').closest('li.tree-item.nav-file')!
+      expect(fileLi).not.toHaveClass('is-being-renamed')
+
+      await user.pointer({ keys: '[MouseRight]', target: screen.getByText('readme') })
+      await user.click(screen.getByText('Umbenennen'))
+
+      expect(fileLi).toHaveClass('is-being-renamed')
+    })
+  })
+
   describe('folder collapse/expand within vault', () => {
     it('folders within vault start collapsed', async () => {
       const user = userEvent.setup()

@@ -1,5 +1,5 @@
 import { Decoration, WidgetType, type EditorView } from '@codemirror/view'
-import { StateEffect, type EditorState, type Range } from '@codemirror/state'
+import { EditorSelection, StateEffect, type EditorState, type Range } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
 import { createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -7,6 +7,7 @@ import type { HideableRange } from './inline-decorations'
 import { hasCodeBlockProcessor, getCodeBlockHandler, MarkdownRenderChild } from '../../plugins/compat/code-block-processor-registry'
 import type { MarkdownPostProcessorContext } from '../../plugins/compat/code-block-processor-registry'
 import { createWikilinkRegex, resolveWikilinkMatchTarget } from './link-decorations'
+import { DEFAULT_KEYBINDINGS, matchesShortcut } from '../../state/keybindingsStore'
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
 import { ViewMode } from '../../components/ViewMode'
 import type { DirectoryTree } from '../../types'
@@ -602,6 +603,12 @@ function wireCellEditing(el: HTMLElement, cell: TableCellSpan, view: EditorView)
     const selection = window.getSelection()
     selection?.removeAllRanges()
     selection?.addRange(range)
+    // The cell is a contentEditable island outside CodeMirror's own editable
+    // DOM, so the view's actual selection never moves here on its own. Sync
+    // it to the cell's document position so `editor.getCursor()` (and any
+    // plugin checking "is the cursor inside a table") sees the real position
+    // instead of wherever the selection last was before the click.
+    view.dispatch({ selection: EditorSelection.cursor(cell.to) })
   }
 
   el.addEventListener('click', (event) => {
@@ -612,17 +619,19 @@ function wireCellEditing(el: HTMLElement, cell: TableCellSpan, view: EditorView)
 
   el.addEventListener('keydown', (event) => {
     if (el.contentEditable !== 'true') return
-    event.stopPropagation()
 
     if (event.key === 'Escape') {
+      event.stopPropagation()
       event.preventDefault()
       cancel()
       el.blur()
     } else if (event.key === 'Enter') {
+      event.stopPropagation()
       event.preventDefault()
       commit()
       el.blur()
     } else if (event.key === 'Tab') {
+      event.stopPropagation()
       event.preventDefault()
       commit()
       const table = el.closest('table')
@@ -630,6 +639,17 @@ function wireCellEditing(el: HTMLElement, cell: TableCellSpan, view: EditorView)
       const index = cells.indexOf(el)
       const next = cells[index + (event.shiftKey ? -1 : 1)]
       next?.click()
+    } else if (DEFAULT_KEYBINDINGS.some(def => matchesShortcut(def.commandId, event))) {
+      // A registered app shortcut (e.g. Ctrl+P for the command palette) — let
+      // it bubble to the global `document` listeners that handle it, instead
+      // of swallowing it here and leaving the browser's own binding (e.g.
+      // print) fire because nothing else ever got a chance to preventDefault
+      // it.
+    } else {
+      // Everything else (plain typing, arrows, Ctrl+A/Z/etc.) stays scoped to
+      // this cell so it can't reach CodeMirror's own keymap, which would
+      // otherwise act on the real document at a position the user can't see.
+      event.stopPropagation()
     }
   })
 

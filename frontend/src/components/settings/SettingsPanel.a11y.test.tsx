@@ -5,6 +5,8 @@ import React from 'react'
 import { SettingsPanel } from './SettingsPanel'
 import { AuthContext, type AuthContextValue } from '../../state/authContext'
 import { AppContext, type AppContextValue } from '../../state'
+import { FeatureContext, type FeatureContextValue } from '../../state/featureContext'
+import { initialFeatureState } from '../../state/featureState'
 
 function createWrapper() {
   const authValue: AuthContextValue = {
@@ -36,10 +38,18 @@ function createWrapper() {
     apiClient: null,
   } as unknown as AppContextValue
 
+  const featureValue: FeatureContextValue = {
+    state: initialFeatureState,
+    dispatch: vi.fn(),
+    isEnabled: () => true,
+  }
+
   return ({ children }: { children: React.ReactNode }) => (
     <AuthContext.Provider value={authValue}>
       <AppContext.Provider value={appValue}>
-        {children}
+        <FeatureContext.Provider value={featureValue}>
+          {children}
+        </FeatureContext.Provider>
       </AppContext.Provider>
     </AuthContext.Provider>
   )

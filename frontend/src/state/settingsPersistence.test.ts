@@ -164,6 +164,30 @@ describe('settingsPersistence', () => {
       expect(result).toBeNull()
     })
 
+    // Regression: section validation used to be a hand-maintained copy of the
+    // registry's category/section mapping, which had silently drifted and was
+    // missing 'appearance', 'my-vaults', and 'server-restart' — restoring on
+    // any of those sections after a reload would fail validation and silently
+    // fall back to the default (Konto → Profil) instead of restoring the
+    // section the user was actually on.
+    it.each([
+      { category: 'account', section: 'appearance', isAdmin: false },
+      { category: 'account', section: 'my-vaults', isAdmin: false },
+      { category: 'vault', section: 'css-snippets', isAdmin: false },
+      { category: 'administration', section: 'server-restart', isAdmin: true },
+    ] as const)('restores $category/$section (previously missing from validation)', ({ category, section, isAdmin }) => {
+      sessionStorage.setItem(SETTINGS_NAV_KEY, JSON.stringify({
+        category,
+        section,
+        selectedVaultId: null,
+      }))
+
+      const result = restoreSettingsNav(isAdmin, [])
+      expect(result).not.toBeNull()
+      expect(result!.category).toBe(category)
+      expect(result!.section).toBe(section)
+    })
+
     it('allows administration category when isAdmin is true', () => {
       sessionStorage.setItem(SETTINGS_NAV_KEY, JSON.stringify({
         category: 'administration',

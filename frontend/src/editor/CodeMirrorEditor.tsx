@@ -43,7 +43,14 @@ import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
 import { revealInExplorer } from '../state/fileNavigation'
 import { codeFolding } from '@codemirror/language'
 import { markdownFoldService } from './folding'
+import { isEmbeddableFile } from '../utils/internalLink'
+import { showToast } from '../components/ToastNotification'
 import './live-preview/live-preview.css'
+
+/** MIME types accepted for clipboard-paste upload (screenshots and PDF files). */
+function isPasteableFile(file: File): boolean {
+  return file.type.startsWith('image/') || file.type === 'application/pdf'
+}
 
 /**
  * Props for the CodeMirror 6 editor component.
@@ -80,6 +87,8 @@ export interface CodeMirrorEditorProps {
   pluginCompletions?: CompletionSource[]
   /** Ref to expose imperative editor API to parent. */
   editorRef?: React.RefObject<IEditorHandle | null>
+  /** Optional handler for image/PDF paste from clipboard. Called once per pasted file. */
+  onImagePaste?: (file: File) => Promise<{ uploaded: Array<{ fileName: string; path: string }> }>
 }
 
 /**
@@ -103,6 +112,7 @@ export function CodeMirrorEditor({
   pluginExtensions: _pluginExtensions,
   pluginCompletions: _pluginCompletions,
   editorRef,
+  onImagePaste,
 }: CodeMirrorEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
@@ -113,6 +123,11 @@ export function CodeMirrorEditor({
   // context menu's checkbox showing the state from whenever the tab was
   // last (re)mounted instead of the current one.
   const showLineNumbersRef = useRef(showLineNumbers)
+  // The paste domEventHandler is baked into the extensions built once per
+  // tab mount (see buildExtensions) — read through refs so prop changes
+  // don't need a full editor remount to take effect.
+  const onImagePasteRef = useRef(onImagePaste)
+  const readOnlyRef = useRef(readOnly)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
 
   // Compartments for dynamic reconfiguration
@@ -128,6 +143,14 @@ export function CodeMirrorEditor({
   useEffect(() => {
     showLineNumbersRef.current = showLineNumbers
   }, [showLineNumbers])
+
+  useEffect(() => {
+    onImagePasteRef.current = onImagePaste
+  }, [onImagePaste])
+
+  useEffect(() => {
+    readOnlyRef.current = readOnly
+  }, [readOnly])
 
   /**
    * Shows a link-specific context menu (Obsidian's `file-menu` for internal
@@ -236,6 +259,44 @@ export function CodeMirrorEditor({
         if (update.docChanged) {
           onContentChangeRef.current(update.state.doc.toString())
         }
+      }),
+      EditorView.domEventHandlers({
+        paste(event, view) {
+          if (readOnlyRef.current) return false
+          const onPaste = onImagePasteRef.current
+          if (!onPaste) return false
+          // Only intercept genuine file pastes (screenshots, copied PDFs) —
+          // plain text paste (even from rich sources) carries no File entries.
+          const files = event.clipboardData?.files
+          const pasteFiles = files ? Array.from(files).filter(isPasteableFile) : []
+          if (pasteFiles.length === 0) return false
+
+          event.preventDefault()
+          let insertPos = view.state.selection.main.from
+
+          void (async () => {
+            for (const file of pasteFiles) {
+              try {
+                const result = await onPaste(file)
+                const embeds = result.uploaded
+                  .filter((u) => isEmbeddableFile(u.fileName))
+                  .map((u) => `![[${u.fileName}]]`)
+                if (embeds.length === 0) continue
+                const text = embeds.join('\n')
+                view.dispatch({
+                  changes: { from: insertPos, insert: text },
+                  selection: { anchor: insertPos + text.length },
+                })
+                insertPos += text.length
+              } catch (err) {
+                const reason = err instanceof Error ? err.message : 'Upload fehlgeschlagen'
+                showToast('error', `"${file.name || 'Zwischenablage'}": ${reason}`)
+              }
+            }
+          })()
+
+          return true
+        },
       }),
       readOnlyCompartment.current.of(EditorState.readOnly.of(readOnly)),
       lineNumbersCompartment.current.of(

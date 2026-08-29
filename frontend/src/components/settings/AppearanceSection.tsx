@@ -2,12 +2,16 @@
  * AppearanceSection — Display preferences for the unified settings panel.
  * Contains toggles for visual UI elements like the status bar.
  *
+ * Status bar visibility is a local/device preference (stored in
+ * localStorage, keyed by nothing vault-specific — see useStatusBar.ts), so
+ * it stays here under Account/Darstellung. CSS snippets, by contrast, are
+ * vault data and live in CssSnippetsSection under the Vault category.
+ *
  * @module components/settings/AppearanceSection
  */
 
 import { useStatusBar } from '../../hooks/useStatusBar'
 import { useStatusBarItemVisibility, type BuiltinStatusBarItemId } from '../../hooks/useStatusBarItemVisibility'
-import { SnippetManager } from './SnippetManager'
 import { SettingSection, SettingRow } from './ui'
 
 const BUILTIN_ITEMS: Array<{ id: BuiltinStatusBarItemId; label: string }> = [
@@ -46,10 +50,6 @@ export function AppearanceSection() {
         {visible && BUILTIN_ITEMS.map((item) => (
           <StatusBarItemToggle key={item.id} id={item.id} label={item.label} />
         ))}
-      </SettingSection>
-
-      <SettingSection title="CSS-Snippets" description="Eigene CSS-Snippets zur Anpassung des Erscheinungsbilds hinzufügen und verwalten.">
-        <SnippetManager />
       </SettingSection>
     </div>
   )

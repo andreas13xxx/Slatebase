@@ -9,6 +9,8 @@ import React from 'react'
 import { SettingsPanel } from './SettingsPanel'
 import { AuthContext, type AuthContextValue } from '../../state/authContext'
 import { AppContext, type AppContextValue } from '../../state'
+import { FeatureContext, type FeatureContextValue } from '../../state/featureContext'
+import { initialFeatureState } from '../../state/featureState'
 import type { AuthState } from '../../state/authState'
 import type { IApiClient } from '../../api'
 
@@ -85,11 +87,24 @@ function createAuthWrapper(overrides: Partial<AuthState> = {}) {
     apiClient: createMockApiClient(),
   }
 
+  // Feature-gated sections (git-sync, mail-import) should behave as enabled
+  // by default in these tests, which predate feature-gating and don't
+  // exercise it — SettingsNavList.test.tsx covers the disabled/hint states.
+  const featureValue: FeatureContextValue = {
+    state: initialFeatureState,
+    dispatch: vi.fn(),
+    isEnabled: () => true,
+  }
+
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return React.createElement(
       AuthContext.Provider,
       { value: authValue },
-      React.createElement(AppContext.Provider, { value: appValue }, children),
+      React.createElement(
+        AppContext.Provider,
+        { value: appValue },
+        React.createElement(FeatureContext.Provider, { value: featureValue }, children),
+      ),
     )
   }
 }
@@ -291,7 +306,11 @@ describe('SettingsPanel', () => {
           React.createElement(
             AppContext.Provider,
             { value: appValue as unknown as AppContextValue },
-            React.createElement(SettingsPanel, { open: true, onClose }),
+            React.createElement(
+              FeatureContext.Provider,
+              { value: { state: initialFeatureState, dispatch: vi.fn(), isEnabled: () => true } },
+              React.createElement(SettingsPanel, { open: true, onClose }),
+            ),
           ),
         ),
       )

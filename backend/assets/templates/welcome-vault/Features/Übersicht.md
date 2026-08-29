@@ -58,8 +58,9 @@ Neben den hier aufgelisteten Kern-Features findest du in den folgenden Guides we
 - [[Features/Einstellungen]] — Alle Konfigurationsmöglichkeiten
 - [[Features/CSS-Snippets]] — Eigenes CSS pro Vault
 - [[Features/Chat]] — Nachrichten mit anderen Nutzern
-- [[Features/Sync]] — Vault-Synchronisation (experimentell)
 - [[Features/Live Preview Editor]] — Source-Modus und inline-gerenderte Live-Vorschau
+- [[Features/Git-Sync]] — Vault serverseitig mit einem oder mehreren Git-Remotes synchronisieren
+- [[Features/Mail-Import]] — E-Mails aus einem IMAP-Postfach als Notizen mit Anhängen importieren
 
 ---
 

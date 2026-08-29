@@ -17,6 +17,7 @@ import { useEffect, useRef } from 'react'
 import { useSettingsContext } from '../../state/settingsContext'
 import { useAuthContext } from '../../state/authContext'
 import { useAppContext } from '../../state'
+import { useFeatureContext } from '../../state/featureContext'
 import { SettingsSearch } from './SettingsSearch'
 import { SettingsNavList } from './SettingsNavList'
 import type { SettingsCategory, SettingsSection } from '../../state/settingsState'
@@ -43,6 +44,7 @@ export function SettingsSidebar({ onNavSelect, initialNav }: SettingsSidebarProp
   const { state, dispatch, registry } = useSettingsContext()
   const { authState } = useAuthContext()
   const { state: appState } = useAppContext()
+  const { isEnabled } = useFeatureContext()
 
   const isAdmin = authState.user?.role === 'admin'
   const initialNavApplied = useRef(false)
@@ -69,6 +71,7 @@ export function SettingsSidebar({ onNavSelect, initialNav }: SettingsSidebarProp
         dispatch={dispatch}
         onNavSelect={onNavSelect}
         activeVaultId={appState.selectedVaultId}
+        isFeatureEnabled={isEnabled}
       />
     </div>
   )

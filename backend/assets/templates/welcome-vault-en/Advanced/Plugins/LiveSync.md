@@ -186,7 +186,6 @@ Slatebase automatically routes cross-origin requests through the backend proxy (
 
 ## Related Features
 
-- [[Advanced/Vault Sync Setup]] — Slatebase's built-in sync feature
-- [[Features/Sync]] — Sync from user perspective
+- [[Features/Git Sync]] — Slatebase's own Git-based sync feature
 - [[Advanced/Obsidian Plugins]] — Plugin basics
 - [[Admin/Feature Toggles]] — Enable plugin feature

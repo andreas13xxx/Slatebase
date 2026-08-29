@@ -148,4 +148,4 @@ Wenn du allein auf der Instanz bist, kannst du trotzdem eine Konversation erstel
 
 - [[Features/Einstellungen]] — Feature-Toggle `chat` (Admin)
 - [[Features/Vault-Verwaltung]] — Vaults teilen für Team-Arbeit
-- [[Features/Sync]] — Daten synchronisieren (unabhängig vom Chat)
+- [[Features/Git-Sync]] — Vault-Daten mit einem externen Remote synchronisieren (unabhängig vom Chat)

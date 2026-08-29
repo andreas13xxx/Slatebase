@@ -58,8 +58,9 @@ Beyond the core features listed above, you'll find these additional capabilities
 - [[Features/Settings]] — All configuration options
 - [[Features/CSS Snippets]] — Custom CSS per vault
 - [[Features/Chat]] — Messages with other users
-- [[Features/Sync]] — Vault synchronization (experimental)
 - [[Features/Live Preview Editor]] — Source mode and inline-rendered Live Preview
+- [[Features/Git Sync]] — Synchronize a vault server-side with one or more Git remotes
+- [[Features/Mail Import]] — Import emails from an IMAP mailbox as notes with attachments
 
 ---
 

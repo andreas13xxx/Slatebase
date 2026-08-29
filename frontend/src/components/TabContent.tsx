@@ -1,4 +1,4 @@
-import { useState, useCallback, useContext, useEffect, useRef } from 'react'
+import { useState, useCallback, useContext, useEffect, useMemo, useRef } from 'react'
 import { useTabContext } from '../state/tabContext'
 import { useAppContext } from '../state'
 import { openTab, saveTab } from '../state/tabActions'
@@ -80,6 +80,13 @@ export function TabContent() {
 
   const { tabs, activeTabId } = tabState
   const activeTab = activeTabId ? tabs.find((t) => t.id === activeTabId) ?? null : null
+  // Reducer updates replace the tab object on every keystroke (editBuffer
+  // changes), so anything that only needs the vault ID should depend on this
+  // instead of `activeTab` itself — otherwise every callback derived from it
+  // (and anything memoized off those callbacks, like livePreviewOptions
+  // below) gets a new identity per keystroke, which was tearing down and
+  // rebuilding the CodeMirror live-preview field mid-edit.
+  const activeTabVaultId = activeTab?.vaultId
 
   // ─── Property type registry (for the inline frontmatter editor) ──────────
   // Self-contained fetch, same pattern SearchPanel.tsx uses for its own copy
@@ -102,11 +109,11 @@ export function TabContent() {
   }, [activeTab?.vaultId, apiClient])
 
   const handlePropertyTypeChange = useCallback((key: string, type: PropertyType) => {
-    if (!activeTab?.vaultId || !apiClient) return
-    apiClient.setPropertyType(activeTab.vaultId, key, type).then((registry) => {
+    if (!activeTabVaultId || !apiClient) return
+    apiClient.setPropertyType(activeTabVaultId, key, type).then((registry) => {
       setTypeRegistry(registry.entries)
     }).catch(() => { /* non-critical: the value still renders via inference */ })
-  }, [activeTab, apiClient])
+  }, [activeTabVaultId, apiClient])
 
   // Determine if the active tab's content matches a plugin file view
   const fileViewMatch = activeTab && !activeTab.loading && !activeTab.error && !activeTab.isBinary
@@ -176,7 +183,7 @@ export function TabContent() {
 
   const handleInternalLinkClick = useCallback(
     async (targetPath: string) => {
-      if (!activeTab || !apiClient) return
+      if (!activeTabVaultId || !apiClient) return
       const fileName = targetPath.split('/').pop() ?? targetPath
 
       // Clear any previous link error
@@ -189,9 +196,9 @@ export function TabContent() {
         // Broken link: create the file with empty content first, then open tab
         // Validates: Requirements 6.4, 6.5
         try {
-          await apiClient.saveFile(activeTab.vaultId, targetPath, '')
+          await apiClient.saveFile(activeTabVaultId, targetPath, '')
           // Refresh the directory tree so the new file appears in the Explorer
-          const tree = await apiClient.fetchVaultTree(activeTab.vaultId)
+          const tree = await apiClient.fetchVaultTree(activeTabVaultId)
           appDispatch({ type: 'TREE_LOADED', payload: tree })
         } catch (err: unknown) {
           // File creation failed — show error notification, maintain current view
@@ -203,9 +210,9 @@ export function TabContent() {
 
       // Open the file in a new tab via the openTab action creator
       // Validates: Requirement 6.3
-      await openTab(tabDispatch, appDispatch, apiClient, activeTab.vaultId, targetPath, fileName)
+      await openTab(tabDispatch, appDispatch, apiClient, activeTabVaultId, targetPath, fileName)
     },
-    [activeTab, tabDispatch, appDispatch, appState.directoryTree, apiClient],
+    [activeTabVaultId, tabDispatch, appDispatch, appState.directoryTree, apiClient],
   )
 
   /** Handle external file drops in EditMode — uploads to same directory as current file. */
@@ -243,6 +250,30 @@ export function TabContent() {
 
     return result
   }, [activeTab, apiClient, appDispatch])
+
+  // Memoized so the object identity stays stable across keystrokes (editBuffer
+  // updates replace `activeTab` on every character typed). CodeMirrorEditor
+  // reconfigures its live-preview CM6 compartment whenever this prop's
+  // identity changes, which recreates the field's cursor-reveal state —
+  // an inline object literal here was collapsing an embed/link back to its
+  // rendered preview the instant the raw source was edited.
+  const directoryTreeForActiveVault = activeTabVaultId
+    ? appState.vaultTrees[activeTabVaultId] ?? appState.directoryTree
+    : null
+  const editModeLivePreviewOptions = useMemo(() => ({
+    vaultId: activeTabVaultId ?? '',
+    directoryTree: directoryTreeForActiveVault,
+    token: apiClient?.getToken() ?? undefined,
+    onInternalLinkClick: handleInternalLinkClick,
+  }), [activeTabVaultId, directoryTreeForActiveVault, apiClient, handleInternalLinkClick])
+  const previewModeLivePreviewOptions = useMemo(() => ({
+    vaultId: activeTabVaultId ?? '',
+    directoryTree: directoryTreeForActiveVault,
+    token: apiClient?.getToken() ?? undefined,
+    onInternalLinkClick: handleInternalLinkClick,
+    typeRegistry,
+    onPropertyTypeChange: handlePropertyTypeChange,
+  }), [activeTabVaultId, directoryTreeForActiveVault, apiClient, handleInternalLinkClick, typeRegistry, handlePropertyTypeChange])
 
   // No active tab — empty state
   if (!activeTab) {
@@ -438,12 +469,7 @@ export function TabContent() {
           filePath={activeTab.filePath}
           tabId={activeTab.id}
           livePreviewMode={false}
-          livePreviewOptions={{
-            vaultId: activeTab.vaultId,
-            directoryTree: appState.vaultTrees[activeTab.vaultId] ?? appState.directoryTree,
-            token: apiClient?.getToken() ?? undefined,
-            onInternalLinkClick: handleInternalLinkClick,
-          }}
+          livePreviewOptions={editModeLivePreviewOptions}
           onExternalFileDrop={handleExternalFileDrop}
           onImagePaste={handleImagePaste}
         />
@@ -480,14 +506,7 @@ export function TabContent() {
         filePath={activeTab.filePath}
         tabId={activeTab.id}
         livePreviewMode={true}
-        livePreviewOptions={{
-          vaultId: activeTab.vaultId,
-          directoryTree: appState.vaultTrees[activeTab.vaultId] ?? appState.directoryTree,
-          token: apiClient?.getToken() ?? undefined,
-          onInternalLinkClick: handleInternalLinkClick,
-          typeRegistry,
-          onPropertyTypeChange: handlePropertyTypeChange,
-        }}
+        livePreviewOptions={previewModeLivePreviewOptions}
         onExternalFileDrop={handleExternalFileDrop}
         onImagePaste={handleImagePaste}
       />

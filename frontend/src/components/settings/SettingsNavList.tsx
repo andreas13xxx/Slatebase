@@ -29,6 +29,8 @@ export interface SettingsNavListProps {
   onNavSelect?: () => void
   /** The app's currently active vault ID (used to enable/disable vault sections). */
   activeVaultId?: string | null
+  /** Checks whether a backend feature toggle is enabled — disables sections gated behind an off feature. */
+  isFeatureEnabled?: (featureName: string) => boolean
 }
 
 /** A filtered section with its resolved label. */
@@ -49,7 +51,7 @@ interface ResolvedSection {
  * - Active section has aria-current="page"
  * - Keyboard: Arrow Up/Down to move focus, Enter to activate
  */
-export function SettingsNavList({ state, isAdmin, registry, dispatch, onNavSelect, activeVaultId }: SettingsNavListProps) {
+export function SettingsNavList({ state, isAdmin, registry, dispatch, onNavSelect, activeVaultId, isFeatureEnabled }: SettingsNavListProps) {
   const listRef = useRef<HTMLUListElement>(null)
 
   const handleSectionClick = useCallback((category: SettingsCategory, section: SettingsSection) => {
@@ -131,7 +133,9 @@ export function SettingsNavList({ state, isAdmin, registry, dispatch, onNavSelec
             {sections.map(({ def, label }) => {
               const isActive = state.category === def.category && state.section === def.id
               const vaultId = activeVaultId !== undefined ? activeVaultId : state.selectedVaultId
-              const isDisabled = def.requiresVault && vaultId === null
+              const noVaultSelected = def.requiresVault && vaultId === null
+              const featureDisabled = def.feature !== undefined && isFeatureEnabled !== undefined && !isFeatureEnabled(def.feature)
+              const isDisabled = noVaultSelected || featureDisabled
 
               return (
                 <li key={def.id} role="presentation">
@@ -140,6 +144,7 @@ export function SettingsNavList({ state, isAdmin, registry, dispatch, onNavSelec
                     className="settings-nav-list__section-btn"
                     aria-current={isActive ? 'page' : undefined}
                     disabled={isDisabled}
+                    title={featureDisabled ? 'Dieses Feature ist deaktiviert. Bitte an einen Administrator wenden.' : undefined}
                     onClick={() => { handleSectionClick(def.category, def.id) }}
                   >
                     {label}

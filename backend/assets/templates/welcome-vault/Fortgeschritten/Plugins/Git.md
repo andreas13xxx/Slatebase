@@ -9,6 +9,9 @@ Das Git-Plugin (obsidian-git) versioniert deinen Vault mit einem echten Git-Repo
 > [!warning] Kein Live-Demo möglich
 > Git braucht ein echtes Remote-Repository mit Zugangsdaten. Dieses Kapitel zeigt Einrichtung und Bedienung, aber es gibt keine eingebettete Live-Demo wie bei anderen Plugins — probiere es mit einem eigenen Test-Repository aus.
 
+> [!tip] Native Alternative: Git-Sync
+> Slatebase bietet mit [[Features/Git-Sync]] inzwischen eine native, serverseitige Git-Synchronisation — läuft headless ohne Browser-Tab, unterstützt SSH-Remotes und braucht keinen CORS-Proxy. Für die meisten Anwendungsfälle die einfachere Wahl; dieses Plugin bleibt nützlich, wenn du das vertraute Source-Control-Panel mit Diff-Ansicht direkt im Editor willst.
+
 ---
 
 ## Voraussetzungen
@@ -137,6 +140,7 @@ Ergibt z.B.: `Vault-Backup: 2026-08-14 (3 Dateien)`
 
 ## Verwandte Features
 
+- [[Features/Git-Sync]] — Native, serverseitige Alternative mit SSH-Unterstützung und ohne CORS-Proxy
 - [[Features/Papierkorb und Versionen]] — Eingebaute Versionierung ohne externes Repository
 - [[Fortgeschritten/Plugins/LiveSync]] — Alternative: Echtzeit-Sync über CouchDB
 - [[Fortgeschritten/Obsidian Plugins]] — Plugin-Grundlagen
