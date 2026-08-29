@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.38.0](https://github.com/andreas13xxx/Slatebase/compare/v0.37.2...v0.38.0) (2026-08-29)
+
+
+### Features
+
+* Git Sync and Mail Import features, MCP realtime writes, settings/editor polish ([37fb31a](https://github.com/andreas13xxx/Slatebase/commit/37fb31a77777133d718cd382a3030d7db500b20f))
+
 ## [0.37.2](https://github.com/andreas13xxx/Slatebase/compare/v0.37.1...v0.37.2) (2026-08-28)
 
 
