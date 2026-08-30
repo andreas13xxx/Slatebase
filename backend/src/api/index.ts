@@ -1,7 +1,6 @@
 // API Router Layer — Route modules and controllers
 
 import fs from 'node:fs/promises'
-import path from 'node:path'
 import type { Context } from 'hono'
 import { Hono } from 'hono'
 import { z } from 'zod'
@@ -25,6 +24,7 @@ import {
 import type { IVaultAccessControl } from '../business/index.js'
 import { PathTraversalError } from '../vault/index.js'
 import type { DirectoryTree } from '../vault/index.js'
+import { getContentTypeFromExtension } from '../vault/mime.js'
 import type { IVaultShareRegistry } from '../vault/registry.js'
 import { computeAffectedFilePairs } from '../link-index/index.js'
 import type { IImportService, UploadedFile } from '../import/index.js'
@@ -871,37 +871,8 @@ export class VaultController implements IVaultController {
 }
 
 // --- Helper: Content-Type mapping from file extension ---
-
-const CONTENT_TYPE_MAP: Record<string, string> = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.svg': 'image/svg+xml',
-  '.avif': 'image/avif',
-  '.webp': 'image/webp',
-  '.pdf': 'application/pdf',
-  '.md': 'text/markdown; charset=utf-8',
-  '.txt': 'text/plain; charset=utf-8',
-  '.html': 'text/html; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.xml': 'application/xml; charset=utf-8',
-  '.mp3': 'audio/mpeg',
-  '.mp4': 'video/mp4',
-  '.wav': 'audio/wav',
-  '.ogg': 'audio/ogg',
-  '.ico': 'image/x-icon',
-  '.bmp': 'image/bmp',
-  '.tiff': 'image/tiff',
-  '.tif': 'image/tiff',
-}
-
-function getContentTypeFromExtension(filePath: string): string {
-  const ext = path.extname(filePath).toLowerCase()
-  return CONTENT_TYPE_MAP[ext] ?? 'application/octet-stream'
-}
+// The map itself lives in ../vault/mime.js — the MCP layer maps the same
+// extensions for its own (base64) payloads.
 
 /**
  * Content types that browsers will parse and execute as active documents

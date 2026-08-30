@@ -201,6 +201,18 @@
   color: var(--sidebar-text-active);
 }
 
+/* Unavailable buttons carry aria-disabled rather than the disabled attribute
+   (so their context menu still opens — see SidebarToolbar), which means the
+   hover affordances have to be suppressed here instead of by the browser. */
+.toolbar-btn[aria-disabled='true'] {
+  cursor: default;
+}
+
+.toolbar-btn[aria-disabled='true']:hover {
+  background: transparent;
+  color: var(--sidebar-text);
+}
+
 .toolbar-btn--dragging {
   opacity: 0.5;
 }
@@ -247,12 +259,26 @@
   pointer-events: none;
 }
 
-.toolbar-separator {
-  width: 24px;
-  height: 1px;
-  background: var(--sidebar-border);
-  margin: 4px 0;
-  flex-shrink: 0;
+/* Docked to the right of the editor pane — the divider swaps sides with it. */
+.app-toolbar--right {
+  border-right: none;
+  border-left: 1px solid var(--sidebar-border);
+}
+
+/* The right-panel toggle floats bottom-right of the layout. A right-docked
+   toolbar is only 44px wide, so the toggle would sit squarely on its last
+   button — move it clear of the bar instead of over it. */
+.app-vault-layout--toolbar-right .right-panel-toggle {
+  right: 56px;
+}
+
+/* Wrapper around a plugin ribbon icon's injected SVG markup, so a plugin glyph
+   centers in the button exactly like a built-in Lucide icon does. */
+.toolbar-btn-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
 }
 
 /* ===== Resize Handle ===== */

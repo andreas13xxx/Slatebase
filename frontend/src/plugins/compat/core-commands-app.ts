@@ -82,6 +82,12 @@ export interface CoreAppCommandHandlers {
   onDailyNoteOffset: (offsetDays: number) => void
   onCreateWelcomeVault: () => void
   onOpenTemplateSelector: () => void
+  /** Inserts a template into the note that is already open (Templates: Insert template). */
+  onInsertTemplate: () => void
+  /** Opens a random note from the current vault. */
+  onOpenRandomNote: () => void
+  /** Shows/hides the app toolbar (Obsidian's "ribbon"). */
+  onToggleToolbar: () => void
   onOpenReleaseNotes: () => void
   onOpenDebugInfo: () => void
   onNavigateBack: () => void
@@ -658,9 +664,10 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'app:open-vault', name: 'Manage vaults', run: (h) => h.onOpenSettings({ category: 'account', section: 'my-vaults' }) },
     { id: 'app:switch-vault', name: 'Change vault...', run: (h) => h.onOpenSettings({ category: 'account', section: 'my-vaults' }) },
     { id: 'app:open-another-vault', name: 'Open vault...', run: (h) => h.onOpenSettings({ category: 'account', section: 'my-vaults' }) },
-    // No Slatebase equivalent — no ribbon UI, no sandbox vault, no in-app
-    // help/debug pages, no split-pane default-mode setting.
-    { id: 'app:toggle-ribbon', name: 'Toggle ribbon', run: noop },
+    // Obsidian's "ribbon" is Slatebase's toolbar (SidebarToolbar) — same idea,
+    // same command. No sandbox vault, no in-app help page, and no split-pane
+    // default-mode setting, so those stay no-ops.
+    { id: 'app:toggle-ribbon', name: 'Toggle ribbon', run: (h) => h.onToggleToolbar() },
     { id: 'app:go-back', name: 'Navigate back', run: (h) => h.onNavigateBack() },
     { id: 'app:go-forward', name: 'Navigate forward', run: (h) => h.onNavigateForward() },
     { id: 'app:open-sandbox-vault', name: 'Open sandbox vault', run: (h) => h.onCreateWelcomeVault() },
@@ -699,7 +706,8 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'daily-notes', name: "Daily notes: Open today's daily note", run: (h) => h.onDailyNote() },
     { id: 'daily-notes:goto-next', name: 'Daily notes: Open next daily note', run: (h) => h.onDailyNoteOffset(1) },
     { id: 'daily-notes:goto-prev', name: 'Daily notes: Open previous daily note', run: (h) => h.onDailyNoteOffset(-1) },
-    { id: 'insert-template', name: 'Templates: Insert template', run: (h) => h.onOpenTemplateSelector() },
+    { id: 'insert-template', name: 'Templates: Insert template', run: (h) => h.onInsertTemplate() },
+    { id: 'random-note', name: 'Random note: Open random note', run: (h) => h.onOpenRandomNote() },
 
     // ── markdown:* ──
     { id: 'markdown:toggle-preview', name: 'Toggle reading view', run: (h) => { const t = getActiveTab(h); if (t) h.tabDispatch({ type: 'TOGGLE_MODE', payload: { tabId: t.id } }) } },

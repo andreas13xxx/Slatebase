@@ -1,5 +1,5 @@
 import { Decoration, WidgetType, type EditorView } from '@codemirror/view'
-import { EditorSelection, StateEffect, type EditorState, type Range } from '@codemirror/state'
+import { EditorSelection, StateEffect, type EditorState, type Range, type Text } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
 import { createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -71,6 +71,56 @@ export interface WidgetDecorationOptions {
 export interface WidgetDecorationResult {
   decorations: Range<Decoration>[]
   hideableRanges: HideableRange[]
+}
+
+/**
+ * When `[from, to)` (a widget's raw-syntax range, e.g. an image or embed) is
+ * the only non-whitespace content on its line, adds a `cm-lp-tight-block-line`
+ * line decoration so CSS can strip the phantom vertical gap around the
+ * rendered widget.
+ *
+ * The gap comes from CodeMirror's own cursor-placement spacers: such a line
+ * renders as
+ *
+ *   <div class="cm-line"><img class="cm-widgetBuffer">WIDGET<img class="cm-widgetBuffer"></div>
+ *
+ * and those `cm-widgetBuffer`s are <img> — *replaced* — elements carrying
+ * `height: 1em` from CM's base theme. Because our widgets are `display:
+ * block`, each buffer ends up in its own anonymous block box, adding roughly
+ * a text line's worth of empty space both above and below the element. See
+ * the matching CSS rule for what the class actually does.
+ *
+ * An earlier attempt used `Decoration.replace({ block: true })` over the
+ * whole line instead. That removed the gap but also stopped the line being a
+ * normal text line: it lost its gutter line number and could no longer be
+ * reached with the arrow keys. Hence this approach, which leaves the line
+ * structurally untouched and only adjusts its CSS.
+ *
+ * The line class is registered as a hideable range sharing the widget's own
+ * `[from, to)` group, so the same cursor-enters-the-range check that swaps
+ * the rendered widget back to raw text also removes this class — otherwise
+ * the raw Markdown would render squashed to zero height while being edited.
+ */
+function addStandaloneLineTightening(
+  doc: Text,
+  from: number,
+  to: number,
+  decorations: Range<Decoration>[],
+  hideableRanges: HideableRange[]
+): void {
+  const startLine = doc.lineAt(from)
+  const endLine = doc.lineAt(to)
+  // Nothing but whitespace may share the replaced range's lines: any real
+  // text left over renders in the same (now zero-line-height) box and would
+  // be squashed. A multi-line range is fine — CodeMirror collapses the lines
+  // it spans into a single rendered line, which is the one being tightened.
+  if (doc.sliceString(startLine.from, from).trim() !== '') return
+  if (doc.sliceString(to, endLine.to).trim() !== '') return
+
+  decorations.push(
+    Decoration.line({ attributes: { class: 'cm-lp-tight-block-line' } }).range(startLine.from)
+  )
+  hideableRanges.push({ from: startLine.from, to: startLine.from, groupFrom: from, groupTo: to })
 }
 
 // ---------------------------------------------------------------------------
@@ -1622,6 +1672,7 @@ export function buildWidgetDecorations(
         frontmatterEndPos = Math.min(fullEnd, doc.length)
 
         const widget = new FrontmatterWidget(yamlContent, state.readOnly, options.typeRegistry, options.onPropertyTypeChange)
+        addStandaloneLineTightening(doc, 0, frontmatterEndPos, decorations, hideableRanges)
         decorations.push(
           Decoration.replace({ widget }).range(0, frontmatterEndPos)
         )
@@ -1725,6 +1776,7 @@ export function buildWidgetDecorations(
             )
 
             // Replace the ![[...]] syntax with the widget
+            addStandaloneLineTightening(doc, matchFrom, matchTo, decorations, hideableRanges)
             decorations.push(
               Decoration.replace({ widget }).range(matchFrom, matchTo)
             )
@@ -1781,6 +1833,7 @@ export function buildWidgetDecorations(
           const src = altMatch[2] ?? ''
 
           const widget = new ImageWidget(src, alt, options.vaultId, options.token)
+          addStandaloneLineTightening(doc, node.from, node.to, decorations, hideableRanges)
           decorations.push(
             Decoration.replace({ widget }).range(node.from, node.to)
           )
@@ -1798,6 +1851,7 @@ export function buildWidgetDecorations(
         processedBlocks.add(key)
 
         const widget = new HorizontalRuleWidget()
+        addStandaloneLineTightening(doc, node.from, node.to, decorations, hideableRanges)
         decorations.push(
           Decoration.replace({ widget }).range(node.from, node.to)
         )

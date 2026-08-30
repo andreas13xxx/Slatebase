@@ -6,6 +6,12 @@ import { ItemView, ViewRegistry, WorkspaceLeaf, WorkspaceSplit, WorkspaceRibbon 
 import { resetLogDedup } from '../log';
 import { registerFileExplorerRow, clearFileExplorerDomRegistry } from '../file-explorer-dom-registry';
 import type { TFile } from '../types';
+import {
+  getToolbarPrefs,
+  setToolbarPosition,
+  setToolbarVisible,
+  __resetToolbarStoreForTests,
+} from '../../../state/toolbarStore';
 
 function createMockTFile(path: string): TFile {
   const name = path.split('/').pop() ?? path;
@@ -37,7 +43,11 @@ describe('WorkspaceShim', () => {
   });
 
   describe('leftRibbon / rightRibbon', () => {
-    it('exposes hide/show/toggle as no-ops instead of leaving the property undefined', () => {
+    beforeEach(() => {
+      __resetToolbarStoreForTests();
+    });
+
+    it('exposes hide/show/toggle without throwing on either side', () => {
       expect(() => workspace.leftRibbon.hide()).not.toThrow();
       expect(() => workspace.leftRibbon.show()).not.toThrow();
       expect(() => workspace.leftRibbon.toggle()).not.toThrow();
@@ -49,6 +59,35 @@ describe('WorkspaceShim', () => {
     it('is a real instance of WorkspaceRibbon, not a plain object literal', () => {
       expect(workspace.leftRibbon).toBeInstanceOf(WorkspaceRibbon);
       expect(workspace.rightRibbon).toBeInstanceOf(WorkspaceRibbon);
+    });
+
+    it('hides and shows the real toolbar from the side it is docked to', () => {
+      // Default dock is left
+      workspace.leftRibbon.hide();
+      expect(getToolbarPrefs().visible).toBe(false);
+      workspace.leftRibbon.show();
+      expect(getToolbarPrefs().visible).toBe(true);
+      workspace.leftRibbon.toggle();
+      expect(getToolbarPrefs().visible).toBe(false);
+    });
+
+    it('ignores calls on the side the toolbar is not docked to', () => {
+      workspace.rightRibbon.hide();
+      expect(getToolbarPrefs().visible).toBe(true);
+
+      setToolbarPosition('right');
+      workspace.leftRibbon.hide();
+      expect(getToolbarPrefs().visible).toBe(true);
+      workspace.rightRibbon.hide();
+      expect(getToolbarPrefs().visible).toBe(false);
+    });
+
+    it('reports `collapsed` live, and as collapsed for the empty side', () => {
+      expect(workspace.leftRibbon.collapsed).toBe(false);
+      expect(workspace.rightRibbon.collapsed).toBe(true);
+
+      setToolbarVisible(false);
+      expect(workspace.leftRibbon.collapsed).toBe(true);
     });
   });
 

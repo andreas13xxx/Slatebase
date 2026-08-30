@@ -176,7 +176,7 @@ export interface McpTokenContext {
 /** MCP module configuration. */
 export interface McpConfig {
   enabled: boolean           // SLATEBASE_MCP_ENABLED, default: true
-  maxFileSize: number        // SLATEBASE_MCP_MAX_FILE_SIZE, default: from server config
+  maxFileSize: number        // SLATEBASE_MCP_MAX_FILE_SIZE, default: config file mcp.maxFileSize (16 MB)
   rateLimit: number          // SLATEBASE_MCP_RATE_LIMIT, default: 60 req/min/token
   maxTokensPerUser: number   // Fixed: 10
 }
@@ -454,7 +454,7 @@ private readonly hashIndex: Map<string, string>  // tokenHash → tokenId (for f
 
 New environment variables:
 - `SLATEBASE_MCP_ENABLED` — `true`/`false` (default: `true`)
-- `SLATEBASE_MCP_MAX_FILE_SIZE` — bytes (default: value from `maxFileSize`)
+- `SLATEBASE_MCP_MAX_FILE_SIZE` — bytes (default: value from the config file section `mcp.maxFileSize`, 16777216)
 - `SLATEBASE_MCP_RATE_LIMIT` — requests per minute per token (default: `60`)
 
 ### API Routes Summary
@@ -660,15 +660,15 @@ The SDK provides `McpServer`, `StreamableHTTPServerTransport` (or `WebStandardSt
 
 **Validates: Requirements 4.5, 8.6**
 
-### Property 11: Binary files produce error -32003
+### Property 11: Binary files are served base64-encoded
 
-*For any* file that contains null bytes within its first 8192 bytes, reading it via resources or the `read_file` tool SHALL return MCP error code -32003.
+*For any* file that contains null bytes within its first 8192 bytes, reading it via resources SHALL return its bytes base64-encoded in `blob`, and via the `read_file` tool as an `image`/`audio` content block (image and audio media types) or an embedded resource `blob` (everything else). *(Originally: MCP error -32003 — superseded by binary file support.)*
 
 **Validates: Requirements 4.6, 8.7**
 
 ### Property 12: Path traversal attempts produce appropriate errors
 
-*For any* file path containing path traversal sequences (`../`), null bytes, or absolute path prefixes, the MCP server SHALL reject the request with an error (MCP -32602 for resources, -32003 for read_file tool) without accessing any file outside the vault root.
+*For any* file path containing path traversal sequences (`../`), null bytes, or absolute path prefixes, the MCP server SHALL reject the request with MCP error -32602 without accessing any file outside the vault root.
 
 **Validates: Requirements 4.9, 8.3, 8.4**
 
@@ -741,7 +741,7 @@ The SDK provides `McpServer`, `StreamableHTTPServerTransport` (or `WebStandardSt
 | MCP Protocol | Method not found | JSON-RPC -32601 |
 | Business | Access denied | MCP error -32001 |
 | Business | Resource not found | MCP error -32002 |
-| Business | Binary file / invalid path | MCP error -32003 |
+| Business | ~~Binary file~~ (retired — binary files are served base64-encoded) | MCP error -32003 (reserved, no longer emitted) |
 | Business | File too large | MCP error -32004 |
 | Business | Conflict (ETag mismatch / file exists) | MCP error -32005 |
 | Business | Storage error (write failure) | MCP error -32006 |

@@ -570,6 +570,48 @@
   background: var(--bg-elevated);
 }
 
+/*
+ * Applied to a line whose entire raw content is a standalone image/embed/HR
+ * currently rendered as a widget. Such a line renders as:
+ *
+ *   <div class="cm-line"><img class="cm-widgetBuffer">WIDGET<img class="cm-widgetBuffer"></div>
+ *
+ * CodeMirror puts a `cm-widgetBuffer` on each side of the widget so the
+ * cursor can still be placed before/after it. Those buffers are <img>
+ * elements — *replaced* elements — carrying `height: 1em` from CM's base
+ * theme, so their height survives `line-height: 0`. Since our widgets are
+ * `display: block`, each buffer lands in its own anonymous block box,
+ * producing a ~1em phantom gap both above and below the rendered element.
+ * Zeroing the buffer height removes those two gaps; `line-height: 0`
+ * collapses the line box strut that remains around them.
+ *
+ * The class is removed while the cursor is inside the line, so the raw
+ * Markdown is never squashed while being edited, and the line itself stays
+ * an ordinary `cm-line` — keeping its gutter number and arrow-key
+ * navigation intact. See addStandaloneLineTightening() in
+ * widget-decorations.ts.
+ */
+.cm-lp-tight-block-line {
+  /* Contains the widget's own vertical margins. With every child now
+     block-level (see below), an un-contained margin would collapse out
+     through this zero-padding line and shift the element instead of
+     spacing it. */
+  display: flow-root;
+}
+
+.cm-lp-tight-block-line .cm-widgetBuffer {
+  /* Block, not inline: as an inline the buffer sits in an anonymous block
+     box that keeps a line box open around it — measured at 16px with CM's
+     `vertical-align: text-top`, still 5px once baseline-aligned at height 0,
+     because the strut's descent survives. A zero-height *block* box
+     generates no line box at all, so both spacers vanish cleanly.
+     Deliberately not `display: none` — the buffers are what CodeMirror
+     measures to place the cursor before/after the widget, so they must keep
+     a real (if empty) box. */
+  display: block;
+  height: 0;
+}
+
 /* --- Standard Markdown Images --- */
 .cm-lp-image {
   max-width: 100%;
@@ -584,7 +626,7 @@
 .cm-lp-hr {
   border: none;
   border-top: 1px solid var(--border-default);
-  margin: 16px 0;
+  margin: 8px 0;
 }
 
 /* --- Highlight ==text== --- */
@@ -607,7 +649,7 @@
 /* --- Frontmatter Properties --- */
 .cm-lp-frontmatter {
   display: block;
-  margin: 0 0 12px 0;
+  margin: 0 0 8px 0;
   padding: 8px 12px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);

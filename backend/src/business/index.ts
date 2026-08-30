@@ -191,7 +191,7 @@ export interface IVaultService {
   getVaultTree(vaultId: string): DirectoryTree | Promise<DirectoryTree>
   getFileContent(vaultId: string, filePath: string): Promise<FileContent>
   resolveFilePath(vaultId: string, filePath: string): string
-  saveFile(vaultId: string, filePath: string, content: string, ifMatch?: string): Promise<FileSaveResult>
+  saveFile(vaultId: string, filePath: string, content: string | Buffer, ifMatch?: string, maxSize?: number): Promise<FileSaveResult>
   createVault(name: string, ownerId: string): Promise<VaultInfo>
   deleteVault(vaultId: string): Promise<void>
   deleteVaultWithChecks(vaultId: string, ownerId: string, force?: boolean): Promise<void>
@@ -485,8 +485,15 @@ export class VaultService implements IVaultService {
    * 6. Writes content atomically: write to temp file, then rename
    * 7. Refreshes the vault's in-memory directory tree
    * 8. Returns { path, name, size, etag }
+   *
+   * `content` is either UTF-8 text or a Buffer of raw bytes (binary files —
+   * images, PDFs — written via the MCP `write_file` tool or an import).
+   *
+   * `maxSize` overrides the server-wide `maxFileSize` for this write. MCP
+   * passes its own (larger) limit so binary attachments can be written back at
+   * the same size they can be read.
    */
-  async saveFile(vaultId: string, filePath: string, content: string, ifMatch?: string): Promise<FileSaveResult> {
+  async saveFile(vaultId: string, filePath: string, content: string | Buffer, ifMatch?: string, maxSize?: number): Promise<FileSaveResult> {
     // 1. Validate vault exists
     const vault = this.vaultManager.getVault(vaultId)
     if (!vault) {
@@ -513,8 +520,9 @@ export class VaultService implements IVaultService {
     }
 
     // 4. Check content size against maxFileSize
-    const contentBytes = Buffer.byteLength(content, 'utf-8')
-    const maxFileSize = this.configService.getServerConfig().maxFileSize
+    const contentBuffer = Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf-8')
+    const contentBytes = contentBuffer.length
+    const maxFileSize = maxSize ?? this.configService.getServerConfig().maxFileSize
     if (contentBytes > maxFileSize) {
       throw new FileTooLargeError(contentBytes, maxFileSize)
     }
@@ -546,7 +554,7 @@ export class VaultService implements IVaultService {
     // 6. Atomic write: write to temp file, then rename
     const tempPath = `${resolvedPath}.${Date.now()}.tmp`
     try {
-      await fs.writeFile(tempPath, content, 'utf-8')
+      await fs.writeFile(tempPath, contentBuffer)
       await fs.rename(tempPath, resolvedPath)
     } catch (error) {
       // Clean up temp file on failure
@@ -571,8 +579,7 @@ export class VaultService implements IVaultService {
     })
 
     // 8. Compute ETag of saved content
-    const savedBuffer = Buffer.from(content, 'utf-8')
-    const etag = computeEtag(savedBuffer)
+    const etag = computeEtag(contentBuffer)
 
     this.logger.info('File saved', { vaultId, filePath, size: contentBytes })
 

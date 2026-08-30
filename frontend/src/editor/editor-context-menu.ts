@@ -25,7 +25,7 @@ import {
   RemoveFormatting, Plus, Table, List, ListOrdered, ListChecks, FileCode,
   Asterisk, Minus, Brackets, Image, TableProperties, Columns3, Rows3,
   AlignLeft, AlignCenter, AlignRight, GripVertical, ArrowUp, ArrowDown,
-  Trash2, FileOutput,
+  Trash2, FileOutput, StretchHorizontal,
 } from 'lucide-react'
 import type { EditorView } from '@codemirror/view'
 import type { ContextMenuItem } from '../components/ContextMenu'
@@ -111,7 +111,7 @@ async function extractSelectionToNewNote(view: EditorView): Promise<void> {
   app.workspace.openFileDirectly(newPath)
 }
 
-export function buildEditorContextMenuItems(view: EditorView, showLineNumbers: boolean): ContextMenuItem[] {
+export function buildEditorContextMenuItems(view: EditorView, showLineNumbers: boolean, readableLineLength: boolean): ContextMenuItem[] {
   const { state } = view
   const sel = state.selection.main
   const hasSelection = !sel.empty
@@ -308,6 +308,16 @@ export function buildEditorContextMenuItems(view: EditorView, showLineNumbers: b
       // way: a window event, not a prop, since this menu is built from a
       // plain EditorView reference with no path back up to that hook.
       run: () => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'toggleLineNumbers' } })),
+    },
+    {
+      id: 'toggle-readable-line-length',
+      label: 'Lesbare Zeilenlänge',
+      icon: createElement(StretchHorizontal, { size: ICON_SIZE }),
+      checked: readableLineLength,
+      // Same pattern as toggle-line-numbers above: the actual toggle state
+      // lives in EditMode's useReadableLineLength() hook, reached via a
+      // window event since this menu only has a plain EditorView reference.
+      run: () => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'toggleReadableLineLength' } })),
     },
   )
 

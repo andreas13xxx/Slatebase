@@ -70,12 +70,6 @@ export class MailNoteWriter implements IMailNoteWriter {
     const targetDirAbsolute = targetFolder ? validateFilePath(vault.info.path, targetFolder) : vault.info.path
     await fs.mkdir(targetDirAbsolute, { recursive: true })
 
-    let noteMarkdown = mail.markdown
-    if (mail.attachments.length > 0) {
-      const embedLinks = await this.writeAttachments(vaultId, vault.info.path, targetFolder, mail)
-      noteMarkdown += `\n\n${embedLinks.join('\n')}\n`
-    }
-
     let existingNoteNames: string[] = []
     try {
       existingNoteNames = await fs.readdir(targetDirAbsolute)
@@ -87,6 +81,13 @@ export class MailNoteWriter implements IMailNoteWriter {
     const noteName = this.resolveUniqueName(desiredNoteName, existingNoteNames, vaultId, targetFolder || '/')
     const noteRelativePath = targetFolder ? `${targetFolder}/${noteName}` : noteName
     const noteAbsolutePath = validateFilePath(vault.info.path, noteRelativePath)
+
+    let noteMarkdown = mail.markdown
+    if (mail.attachments.length > 0) {
+      const noteBaseName = noteName.slice(0, -'.md'.length)
+      const embedLinks = await this.writeAttachments(vaultId, vault.info.path, targetFolder, noteBaseName, mail)
+      noteMarkdown += `\n\n${embedLinks.join('\n')}\n`
+    }
 
     await writeFileAtomic(noteAbsolutePath, noteMarkdown)
 
@@ -121,9 +122,9 @@ export class MailNoteWriter implements IMailNoteWriter {
     })
   }
 
-  /** Writes attachments into `<targetFolder>/attachments/` and returns their Obsidian-style embed links. */
-  private async writeAttachments(vaultId: string, vaultPath: string, targetFolder: string, mail: ConvertedMail): Promise<string[]> {
-    const attachmentsRelativeDir = targetFolder ? `${targetFolder}/attachments` : 'attachments'
+  /** Writes attachments into a subfolder named after the mail's own note (`<targetFolder>/<noteBaseName>/`), keeping each mail's attachments separate, and returns their Obsidian-style embed links. */
+  private async writeAttachments(vaultId: string, vaultPath: string, targetFolder: string, noteBaseName: string, mail: ConvertedMail): Promise<string[]> {
+    const attachmentsRelativeDir = targetFolder ? `${targetFolder}/${noteBaseName}` : noteBaseName
     const attachmentsAbsoluteDir = validateFilePath(vaultPath, attachmentsRelativeDir)
     await fs.mkdir(attachmentsAbsoluteDir, { recursive: true })
 

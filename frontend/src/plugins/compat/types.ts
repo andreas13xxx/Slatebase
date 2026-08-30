@@ -474,17 +474,19 @@ export interface IAppShim {
     requestSaveConfig(): Promise<void>;
     /**
      * Enable (loading it first if needed) and persist the plugin's enabled
-     * state. Mirrors the Settings page toggle exactly, including that it
-     * reloads the page after a successful disable (see disablePluginAndSave).
+     * state. Mirrors the Settings page toggle exactly, including that it may
+     * reload the page after a successful disable (see disablePluginAndSave).
      */
     enablePluginAndSave(pluginId: string): Promise<void>;
     /**
      * Disable and persist the plugin's disabled state. Reloads the page once
-     * the disable completes — the same unconditional reload the Settings page
-     * toggle triggers, needed because some plugins (e.g. LiveSync) cannot
-     * reinitialize within the same session after being unloaded. Calling this
-     * on ANY plugin id — including one the caller does not own — reloads the
-     * whole app; there is no per-plugin scoping.
+     * the disable completes, but only if the disabled id is in
+     * PLUGINS_REQUIRING_RELOAD_ON_DISABLE (plugin-context.ts) — currently just
+     * LiveSync, which cannot reinitialize within the same session after being
+     * unloaded. Every other plugin is cleaned up in-session, no reload.
+     * Calling this on ANY plugin id — including one the caller does not own —
+     * reloads the whole app for everyone if that id is in the set; there is
+     * no per-caller scoping.
      */
     disablePluginAndSave(pluginId: string): Promise<void>;
   };

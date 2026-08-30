@@ -61,6 +61,7 @@ export const DEFAULT_KEYBINDINGS: KeybindingDefinition[] = [
   { commandId: 'slatebase:open-settings', label: 'Einstellungen öffnen', defaultShortcut: 'Ctrl+,', category: 'navigation' },
   { commandId: 'slatebase:toggle-sidebar', label: 'Seitenleiste ein-/ausblenden', defaultShortcut: '', category: 'navigation' },
   { commandId: 'slatebase:toggle-right-panel', label: 'Kontextpanel ein-/ausblenden', defaultShortcut: '', category: 'navigation' },
+  { commandId: 'slatebase:toggle-toolbar', label: 'Werkzeugleiste ein-/ausblenden', defaultShortcut: '', category: 'navigation' },
   { commandId: 'slatebase:toggle-theme', label: 'Farbschema umschalten', defaultShortcut: '', category: 'navigation' },
   { commandId: 'slatebase:navigate-back', label: 'Zurück navigieren', defaultShortcut: 'Alt+ArrowLeft', category: 'navigation' },
   { commandId: 'slatebase:navigate-forward', label: 'Vor navigieren', defaultShortcut: 'Alt+ArrowRight', category: 'navigation' },
@@ -81,6 +82,8 @@ export const DEFAULT_KEYBINDINGS: KeybindingDefinition[] = [
   { commandId: 'slatebase:daily-note', label: 'Tagesnotiz öffnen/erstellen', defaultShortcut: '', category: 'vault' },
   { commandId: 'slatebase:create-file', label: 'Neue Datei', defaultShortcut: '', category: 'vault' },
   { commandId: 'slatebase:new-from-template', label: 'Neue Notiz aus Vorlage', defaultShortcut: '', category: 'vault' },
+  { commandId: 'slatebase:insert-template', label: 'Vorlage einfügen', defaultShortcut: '', category: 'vault' },
+  { commandId: 'slatebase:open-random-note', label: 'Zufällige Notiz öffnen', defaultShortcut: '', category: 'vault' },
   { commandId: 'slatebase:open-graph', label: 'Knowledge Graph öffnen', defaultShortcut: '', category: 'vault' },
   { commandId: 'slatebase:open-trash', label: 'Papierkorb öffnen', defaultShortcut: '', category: 'vault' },
 ]

@@ -19,13 +19,13 @@ import {
 } from '../business/index.js'
 import type { DirectoryTree } from '../vault/index.js'
 import { PathTraversalError, isBinaryContent } from '../vault/index.js'
+import { getMediaTypeFromExtension } from '../vault/mime.js'
 import { computeAffectedFilePairs } from '../link-index/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { McpConfig } from './config.js'
 import {
   MCP_ERROR_ACCESS_DENIED,
   MCP_ERROR_NOT_FOUND,
-  MCP_ERROR_BINARY_FILE,
   MCP_ERROR_FILE_TOO_LARGE,
   MCP_ERROR_INVALID_PARAMS,
   MCP_ERROR_CONFLICT,
@@ -449,13 +449,49 @@ async function searchFiles(
 
 // ─── read_file ───────────────────────────────────────────────────────────────
 
+/**
+ * Builds the `vault://` resource URI for a file, matching the resource
+ * template registered in handlers.ts. Each path segment is percent-encoded so
+ * spaces and non-ASCII names stay valid inside the URI.
+ */
+function vaultFileUri(vaultId: string, filePath: string): string {
+  const encodedPath = filePath.split('/').map(encodeURIComponent).join('/')
+  return `vault://${vaultId}/${encodedPath}`
+}
+
+/**
+ * Wraps raw file bytes in the MCP content block that fits its media type:
+ * images and audio get the dedicated `image`/`audio` blocks that clients can
+ * render or play directly, anything else an embedded resource carrying the
+ * bytes as a base64 `blob` under the file's `vault://` URI.
+ */
+function buildBinaryContent(vaultId: string, filePath: string, buffer: Buffer): CallToolResult['content'][number] {
+  const mimeType = getMediaTypeFromExtension(filePath)
+  const data = buffer.toString('base64')
+
+  if (mimeType.startsWith('image/')) {
+    return { type: 'image', data, mimeType }
+  }
+  if (mimeType.startsWith('audio/')) {
+    return { type: 'audio', data, mimeType }
+  }
+  return {
+    type: 'resource',
+    resource: { uri: vaultFileUri(vaultId, filePath), blob: data, mimeType },
+  }
+}
+
 function registerReadFile(server: McpServer, deps: ToolHandlerDeps): void {
   server.tool(
     'read_file',
-    'Read the content of a single file from a vault',
+    'Read the content of a single file from a vault. Text files are returned as text, binary files (images, audio, PDFs, ...) base64-encoded.',
     {
       vaultId: z.string().min(1, 'vaultId is required'),
       path: z.string().min(1, 'File path is required'),
+      encoding: z.enum(['auto', 'base64'])
+        .optional()
+        .default('auto')
+        .describe("'auto' (default): text files are returned as text, binary files base64-encoded. 'base64': always return the raw bytes base64-encoded, even for text files."),
     },
     async (args) => {
       try {
@@ -477,7 +513,7 @@ function registerReadFile(server: McpServer, deps: ToolHandlerDeps): void {
           resolvedPath = deps.vaultService.resolveFilePath(args.vaultId, args.path)
         } catch (error) {
           if (error instanceof PathTraversalError) {
-            return mcpToolError(MCP_ERROR_BINARY_FILE, 'Invalid file path')
+            return mcpToolError(MCP_ERROR_INVALID_PARAMS, 'Invalid file path')
           }
           if (error instanceof VaultNotFoundError) {
             return mcpToolError(MCP_ERROR_ACCESS_DENIED, 'Access denied')
@@ -493,7 +529,8 @@ function registerReadFile(server: McpServer, deps: ToolHandlerDeps): void {
           return mcpToolError(MCP_ERROR_NOT_FOUND, 'Resource not found')
         }
 
-        // Check file size
+        // Check file size — measured on the raw bytes, before base64 expands
+        // a binary payload by ~4/3 on the way to the client
         if (stat.size > deps.mcpConfig.maxFileSize) {
           return mcpToolError(MCP_ERROR_FILE_TOO_LARGE, `File too large: ${stat.size} bytes (max: ${deps.mcpConfig.maxFileSize} bytes)`)
         }
@@ -501,9 +538,12 @@ function registerReadFile(server: McpServer, deps: ToolHandlerDeps): void {
         // Read file content
         const buffer = await fs.readFile(resolvedPath)
 
-        // Binary detection
-        if (isBinaryContent(buffer)) {
-          return mcpToolError(MCP_ERROR_BINARY_FILE, 'Binary files not supported')
+        // Binary files (and any file when base64 was requested explicitly) go
+        // back base64-encoded; everything else stays plain UTF-8 text
+        if (args.encoding === 'base64' || isBinaryContent(buffer)) {
+          return {
+            content: [buildBinaryContent(args.vaultId, args.path, buffer)],
+          } satisfies CallToolResult
         }
 
         // Return text content
@@ -524,14 +564,36 @@ function registerReadFile(server: McpServer, deps: ToolHandlerDeps): void {
 
 // ─── write_file ──────────────────────────────────────────────────────────────
 
+/**
+ * Decodes base64 input into a Buffer, returning null for anything malformed.
+ * `Buffer.from(input, 'base64')` silently drops invalid characters, which
+ * would turn a truncated or mistyped payload into a corrupt file instead of an
+ * error — so the input is validated up front and the result re-encoded to
+ * confirm it round-trips. Whitespace (line-wrapped MIME base64) is tolerated.
+ */
+function decodeBase64Strict(input: string): Buffer | null {
+  const normalized = input.replace(/\s/g, '')
+  if (normalized.length === 0) return Buffer.alloc(0)
+  if (normalized.length % 4 !== 0) return null
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(normalized)) return null
+
+  const buffer = Buffer.from(normalized, 'base64')
+  if (buffer.toString('base64') !== normalized) return null
+  return buffer
+}
+
 function registerWriteFile(server: McpServer, deps: ToolHandlerDeps): void {
   server.tool(
     'write_file',
-    'Create or overwrite a text file in a vault. Supports ETag-based conflict detection via optional ifMatch parameter.',
+    'Create or overwrite a file in a vault — UTF-8 text, or binary content passed base64-encoded. Supports ETag-based conflict detection via optional ifMatch parameter.',
     {
       vaultId: z.string().min(1, 'vaultId is required'),
       path: z.string().min(1, 'File path is required'),
-      content: z.string().describe('File content (UTF-8 text)'),
+      content: z.string().describe('File content: UTF-8 text, or base64-encoded bytes when encoding is "base64"'),
+      encoding: z.enum(['utf-8', 'base64'])
+        .optional()
+        .default('utf-8')
+        .describe("'utf-8' (default) writes content as text. 'base64' decodes content into raw bytes first — use this for images, PDFs and other binary files."),
       ifMatch: z.string()
         .optional()
         .describe('Optional ETag for conflict detection. If provided, the write will fail with a conflict error if the file has been modified since the ETag was obtained.'),
@@ -550,8 +612,21 @@ function registerWriteFile(server: McpServer, deps: ToolHandlerDeps): void {
           throw error
         }
 
-        // Save file via VaultService (handles path validation, size check, atomic write, tree refresh)
-        const result = await deps.vaultService.saveFile(args.vaultId, args.path, args.content, args.ifMatch)
+        // Decode base64 payloads into raw bytes before handing them to the
+        // VaultService — a string would be written as literal base64 text
+        let content: string | Buffer = args.content
+        if (args.encoding === 'base64') {
+          const decoded = decodeBase64Strict(args.content)
+          if (decoded === null) {
+            return mcpToolError(MCP_ERROR_INVALID_PARAMS, 'Invalid base64 content')
+          }
+          content = decoded
+        }
+
+        // Save file via VaultService (handles path validation, size check, atomic write, tree refresh).
+        // The MCP limit is passed explicitly so a binary file can be written
+        // back at the same size read_file will serve it.
+        const result = await deps.vaultService.saveFile(args.vaultId, args.path, content, args.ifMatch, deps.mcpConfig.maxFileSize)
 
         await deps.publishVaultChange?.(args.vaultId, 'saved', result.path, userId)
 

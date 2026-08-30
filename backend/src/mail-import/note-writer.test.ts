@@ -89,7 +89,7 @@ describe('MailNoteWriter', () => {
     )
   })
 
-  it('writes attachments into <targetFolder>/attachments and embeds them as wikilinks', async () => {
+  it("writes attachments into a subfolder named after the mail's note and embeds them as wikilinks", async () => {
     const mail = makeMail({
       attachments: [{ filename: 'invoice.pdf', content: Buffer.from('pdf-bytes'), contentType: 'application/pdf' }],
     })
@@ -98,22 +98,48 @@ describe('MailNoteWriter', () => {
     const note = await readFile(join(vaultPath, relativePath), 'utf-8')
     expect(note).toContain('![[invoice.pdf]]')
 
-    const attachmentContent = await readFile(join(vaultPath, 'Mail', 'attachments', 'invoice.pdf'), 'utf-8')
+    const noteBaseName = `${expectedDatePrefix(MAIL_DATE)} Test`
+    const attachmentContent = await readFile(join(vaultPath, 'Mail', noteBaseName, 'invoice.pdf'), 'utf-8')
     expect(attachmentContent).toBe('pdf-bytes')
   })
 
-  it('de-duplicates attachment filenames across imports, and logs the collision', async () => {
+  it("keeps each mail's attachments in its own subfolder, separate from other mails", async () => {
     const mail = makeMail({
       attachments: [{ filename: 'invoice.pdf', content: Buffer.from('first'), contentType: 'application/pdf' }],
     })
     await writer.writeMail('vault-1', 'Mail', mail)
     vi.mocked(logger.warn).mockClear()
-    await writer.writeMail('vault-1', 'Mail', {
+    const secondRelativePath = await writer.writeMail('vault-1', 'Mail', {
       ...mail,
       attachments: [{ filename: 'invoice.pdf', content: Buffer.from('second'), contentType: 'application/pdf' }],
     })
 
-    const files = await readdir(join(vaultPath, 'Mail', 'attachments'))
+    const firstNoteBaseName = `${expectedDatePrefix(MAIL_DATE)} Test`
+    const secondNoteBaseName = `${expectedDatePrefix(MAIL_DATE)} Test-1`
+    expect(secondRelativePath).toBe(`Mail/${secondNoteBaseName}.md`)
+
+    const firstAttachmentContent = await readFile(join(vaultPath, 'Mail', firstNoteBaseName, 'invoice.pdf'), 'utf-8')
+    const secondAttachmentContent = await readFile(join(vaultPath, 'Mail', secondNoteBaseName, 'invoice.pdf'), 'utf-8')
+    expect(firstAttachmentContent).toBe('first')
+    expect(secondAttachmentContent).toBe('second')
+
+    expect(logger.warn).not.toHaveBeenCalledWith(
+      expect.stringContaining('filename collision'),
+      expect.objectContaining({ desiredName: 'invoice.pdf' }),
+    )
+  })
+
+  it('de-duplicates attachment filenames within the same mail, and logs the collision', async () => {
+    const mail = makeMail({
+      attachments: [
+        { filename: 'invoice.pdf', content: Buffer.from('first'), contentType: 'application/pdf' },
+        { filename: 'invoice.pdf', content: Buffer.from('second'), contentType: 'application/pdf' },
+      ],
+    })
+    await writer.writeMail('vault-1', 'Mail', mail)
+
+    const noteBaseName = `${expectedDatePrefix(MAIL_DATE)} Test`
+    const files = await readdir(join(vaultPath, 'Mail', noteBaseName))
     expect(files.sort()).toEqual(['invoice-1.pdf', 'invoice.pdf'])
 
     expect(logger.warn).toHaveBeenCalledWith(

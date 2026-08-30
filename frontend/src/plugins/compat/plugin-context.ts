@@ -106,6 +106,19 @@ function getWindowApp(): { internalPlugins?: unknown; plugins?: unknown; embedRe
   return (window as unknown as { app?: { internalPlugins?: unknown; plugins?: unknown; embedRegistry?: unknown; getAccentColor?: () => string } }).app
 }
 
+/**
+ * Plugin IDs that cannot reinitialize within the same session after being
+ * unloaded, so disabling them must be followed by a full page reload rather
+ * than the normal in-session unload path.
+ *
+ * Currently just LiveSync: its PouchDB/IndexedDB replication state gets left
+ * in a way its own startup code can't recover from without a fresh page load
+ * (see PLUGIN-COMPAT.md's obsidian-livesync entry). Add an ID here only once
+ * a plugin is confirmed to need it — an unnecessary reload is a UX cost paid
+ * by everyone toggling plugins, not just the one plugin that needs it.
+ */
+const PLUGINS_REQUIRING_RELOAD_ON_DISABLE = new Set(['obsidian-livesync'])
+
 // ─── Context Value ───────────────────────────────────────────────────────────
 
 /** Information about an active sidebar view (right-sidebar plugin section). */
@@ -798,9 +811,10 @@ export function PluginProvider({
             },
             // Both delegate to the exact same path the Settings page toggle
             // uses (setPluginEnabled, defined below) — including that
-            // disabling reloads the whole page once it completes. That reload
-            // is not scoped to the plugin being disabled: any plugin calling
-            // disablePluginAndSave(anyId) reloads the app for everyone.
+            // disabling a plugin in PLUGINS_REQUIRING_RELOAD_ON_DISABLE reloads
+            // the whole page once it completes. That reload is not scoped to
+            // the calling plugin: disablePluginAndSave(id) reloads the app for
+            // everyone whenever `id` is in that set, regardless of who called it.
             enablePluginAndSave: async (id: string): Promise<void> => {
               await setPluginEnabled(id, true)
             },
@@ -1173,9 +1187,13 @@ export function PluginProvider({
       if (isCurrentContext()) {
         setPlugins(registry.listPlugins())
       }
-      // Reload page to ensure clean state — some plugins (e.g. LiveSync) cannot
-      // reinitialize within the same session after unload due to IndexedDB/PouchDB state.
-      window.location.reload()
+      // Only plugins known not to survive an in-session unload (see
+      // PLUGINS_REQUIRING_RELOAD_ON_DISABLE) force a full page reload here —
+      // everything else is already fully cleaned up above via
+      // deactivatePluginSafely/sandbox.cleanup, with no reload needed.
+      if (PLUGINS_REQUIRING_RELOAD_ON_DISABLE.has(pluginId)) {
+        window.location.reload()
+      }
       return
     }
 

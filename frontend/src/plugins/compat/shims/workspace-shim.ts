@@ -10,6 +10,7 @@ import type { IEditor } from '../editor-shim';
 import { refreshPluginExtensions, getActiveEditorContainerEl, setEditorContainerMountedListener } from '../../../editor/plugin-extensions';
 import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry';
 import { createFileItemsProxy, type FileExplorerFileItem } from '../file-explorer-dom-registry';
+import { getToolbarPrefs, setToolbarVisible, toggleToolbarVisible, type ToolbarPosition } from '../../../state/toolbarStore';
 import {
   registerHoverLinkSource,
   unregisterHoverLinkSource,
@@ -17,6 +18,29 @@ import {
   hoverLinkEventToRequest,
   getHoverLinkSources,
 } from '../hover-link-bus';
+
+/**
+ * Builds a `leftRibbon`/`rightRibbon` handle bound to Slatebase's toolbar.
+ *
+ * The handle only acts while the toolbar is docked to `side`; on the other
+ * side there is no bar, so it reports `collapsed: true` and its calls do
+ * nothing. `collapsed` is a getter, not a stored flag, so it always reflects
+ * the live store rather than whatever it was at construction time.
+ */
+function createRibbonHandle(side: ToolbarPosition) {
+  const ownsToolbar = () => getToolbarPrefs().position === side;
+  const handle = Object.assign(new WorkspaceRibbon(), {
+    hide: () => { if (ownsToolbar()) setToolbarVisible(false); },
+    show: () => { if (ownsToolbar()) setToolbarVisible(true); },
+    toggle: () => { if (ownsToolbar()) toggleToolbarVisible(); },
+  });
+  Object.defineProperty(handle, 'collapsed', {
+    get: () => !(ownsToolbar() && getToolbarPrefs().visible),
+    enumerable: true,
+    configurable: true,
+  });
+  return handle as typeof handle & { collapsed: boolean };
+}
 
 /**
  * WorkspaceShim — Obsidian Workspace API emulation.
@@ -1067,25 +1091,22 @@ export class WorkspaceShim implements IWorkspaceShim {
   protocolHandler: ((params: Record<string, string>) => unknown) | null = null;
 
   /**
-   * Ribbon (the vertical icon bar) stubs — Slatebase has no ribbon UI, so hide/show/toggle
-   * are no-ops. Exists so plugins calling `workspace.leftRibbon.hide()` (e.g. Editing
-   * Toolbar's "Workplace Fullscreen" command) don't crash on `undefined.hide()`. Built on
-   * `WorkspaceRibbon` (rather than a plain object literal) so `instanceof WorkspaceRibbon`
-   * holds — real Obsidian's `WorkspaceRibbon` itself has no public members, so the extra
-   * hide/show/toggle/collapsed here are pragmatic additions, not a deviation from the base.
+   * Ribbon (the vertical icon bar) — Slatebase's toolbar (`SidebarToolbar`) is
+   * exactly that, so `hide()`/`show()`/`toggle()`/`collapsed` are real: a plugin
+   * calling `workspace.leftRibbon.hide()` (e.g. Editing Toolbar's "Workplace
+   * Fullscreen" command) hides the toolbar the same way the user's own
+   * "Werkzeugleiste ein-/ausblenden" command does.
+   *
+   * There is one toolbar, docked to one side (`toolbarStore.position`), so only
+   * the ribbon for the side it currently occupies acts; the other one reports
+   * itself collapsed and its calls are no-ops — there genuinely is no bar on
+   * that side to hide. Built on `WorkspaceRibbon` (rather than a plain object
+   * literal) so `instanceof WorkspaceRibbon` holds; real Obsidian's
+   * `WorkspaceRibbon` has no public members, so hide/show/toggle/collapsed are
+   * pragmatic additions, not a deviation from the base.
    */
-  readonly leftRibbon = Object.assign(new WorkspaceRibbon(), {
-    hide: () => debugOnce('WorkspaceShim.leftRibbon', '[WorkspaceShim] leftRibbon: Slatebase has no ribbon UI — hide/show/toggle are no-ops.'),
-    show: () => debugOnce('WorkspaceShim.leftRibbon', '[WorkspaceShim] leftRibbon: Slatebase has no ribbon UI — hide/show/toggle are no-ops.'),
-    toggle: () => debugOnce('WorkspaceShim.leftRibbon', '[WorkspaceShim] leftRibbon: Slatebase has no ribbon UI — hide/show/toggle are no-ops.'),
-    collapsed: false,
-  });
-  readonly rightRibbon = Object.assign(new WorkspaceRibbon(), {
-    hide: () => debugOnce('WorkspaceShim.rightRibbon', '[WorkspaceShim] rightRibbon: Slatebase has no ribbon UI — hide/show/toggle are no-ops.'),
-    show: () => debugOnce('WorkspaceShim.rightRibbon', '[WorkspaceShim] rightRibbon: Slatebase has no ribbon UI — hide/show/toggle are no-ops.'),
-    toggle: () => debugOnce('WorkspaceShim.rightRibbon', '[WorkspaceShim] rightRibbon: Slatebase has no ribbon UI — hide/show/toggle are no-ops.'),
-    collapsed: false,
-  });
+  readonly leftRibbon = createRibbonHandle('left');
+  readonly rightRibbon = createRibbonHandle('right');
 
   /**
    * Open a popout window leaf. Returns the active leaf (no popout support in web).

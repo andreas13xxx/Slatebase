@@ -11,10 +11,10 @@ import type { IVaultService, IVaultAccessControl } from '../business/index.js'
 import { VaultNotFoundError, VaultAccessDeniedError } from '../business/index.js'
 import { PathTraversalError, isBinaryContent } from '../vault/index.js'
 import type { IVaultReader, DirectoryTree } from '../vault/index.js'
+import { getMediaTypeFromExtension } from '../vault/mime.js'
 import {
   MCP_ERROR_ACCESS_DENIED,
   MCP_ERROR_NOT_FOUND,
-  MCP_ERROR_BINARY_FILE,
   MCP_ERROR_FILE_TOO_LARGE,
 } from './error-codes.js'
 
@@ -42,6 +42,17 @@ export interface McpHandlersDeps {
 
 /** Shorthand for the extra parameter passed to MCP handler callbacks. */
 type HandlerExtra = RequestHandlerExtra<ServerRequest, ServerNotification>
+
+/**
+ * One entry of a `resources/read` response: text files carry `text`, binary
+ * files (images, PDFs, ...) carry their bytes base64-encoded in `blob`.
+ */
+type ResourceContents =
+  | { uri: string; mimeType?: string; text: string }
+  | { uri: string; mimeType?: string; blob: string }
+
+/** Shape of a `resources/read` response. */
+type ResourceReadResult = { contents: ResourceContents[] }
 
 // ─── Implementation ──────────────────────────────────────────────────────────
 
@@ -80,7 +91,7 @@ export class McpHandlers implements IMcpHandlers {
    * Registers the vault resource template with list and read callbacks.
    * URI pattern: vault://{vaultId}/{+path}
    * - vault://<vaultId>/ → directory tree as JSON
-   * - vault://<vaultId>/<path> → file content as text
+   * - vault://<vaultId>/<path> → file content (text, or base64 blob if binary)
    */
   private registerResourceHandlers(server: McpServer): void {
     const template = new ResourceTemplate('vault://{vaultId}/{+path}', {
@@ -133,7 +144,7 @@ export class McpHandlers implements IMcpHandlers {
     uri: URL,
     variables: Record<string, string | string[]>,
     extra: HandlerExtra,
-  ): Promise<{ contents: Array<{ uri: string; text: string; mimeType?: string }> }> {
+  ): Promise<ResourceReadResult> {
     const userId = this.extractUserId(extra)
 
     const vaultId = typeof variables['vaultId'] === 'string'
@@ -176,7 +187,7 @@ export class McpHandlers implements IMcpHandlers {
   private async handleDirectoryTreeRead(
     vaultId: string,
     uriString: string,
-  ): Promise<{ contents: Array<{ uri: string; text: string; mimeType?: string }> }> {
+  ): Promise<ResourceReadResult> {
     let tree: DirectoryTree
     try {
       tree = await this.vaultService.getVaultTree(vaultId)
@@ -199,15 +210,15 @@ export class McpHandlers implements IMcpHandlers {
   }
 
   /**
-   * Returns file content for a specific path within a vault.
-   * Validates path traversal, binary detection, and file size.
-   * Assumes access control has already been checked.
+   * Returns file content for a specific path within a vault — `text` for text
+   * files, a base64 `blob` for binary ones. Validates path traversal and file
+   * size. Assumes access control has already been checked.
    */
   private async handleFileRead(
     vaultId: string,
     filePath: string,
     uriString: string,
-  ): Promise<{ contents: Array<{ uri: string; text: string; mimeType?: string }> }> {
+  ): Promise<ResourceReadResult> {
     // Resolve vault path (validates path traversal)
     let resolvedPath: string
     try {
@@ -238,34 +249,29 @@ export class McpHandlers implements IMcpHandlers {
       )
     }
 
-    // Binary detection: read first 8192 bytes
-    const sampleSize = Math.min(stat.size, 8192)
-    if (sampleSize > 0) {
-      const fileHandle = await fs.open(resolvedPath, 'r')
-      try {
-        const buffer = Buffer.alloc(sampleSize)
-        await fileHandle.read(buffer, 0, sampleSize, 0)
-        if (isBinaryContent(buffer)) {
-          throw new McpError(MCP_ERROR_BINARY_FILE, 'Binary files not supported')
-        }
-      } finally {
-        await fileHandle.close()
+    const buffer = await fs.readFile(resolvedPath)
+
+    // Binary files (images, PDFs, ...) go back as a base64 blob under their
+    // real media type; text files keep their UTF-8 `text` representation
+    if (isBinaryContent(buffer)) {
+      this.logger.debug('MCP resource read: binary file', { vaultId, filePath, size: stat.size })
+
+      return {
+        contents: [{
+          uri: uriString,
+          blob: buffer.toString('base64'),
+          mimeType: getMediaTypeFromExtension(filePath),
+        }],
       }
     }
-
-    // Read full file content
-    const content = await fs.readFile(resolvedPath, 'utf-8')
-
-    // Determine MIME type
-    const mimeType = getMimeType(filePath)
 
     this.logger.debug('MCP resource read: file', { vaultId, filePath, size: stat.size })
 
     return {
       contents: [{
         uri: uriString,
-        text: content,
-        mimeType,
+        text: buffer.toString('utf-8'),
+        mimeType: getMimeType(filePath),
       }],
     }
   }

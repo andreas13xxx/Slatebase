@@ -142,7 +142,7 @@ const NAMES: Record<string, { de: string; en: string }> = {
   'app:open-vault': { de: 'Vaults verwalten', en: 'Manage vaults' },
   'app:switch-vault': { de: 'Vault wechseln …', en: 'Change vault...' },
   'app:open-another-vault': { de: 'Vault öffnen …', en: 'Open vault...' },
-  'app:toggle-ribbon': { de: 'Ribbon umschalten', en: 'Toggle ribbon' },
+  'app:toggle-ribbon': { de: 'Werkzeugleiste ein-/ausblenden', en: 'Toggle ribbon' },
   'app:go-back': { de: 'Zurück navigieren', en: 'Navigate back' },
   'app:go-forward': { de: 'Vorwärts navigieren', en: 'Navigate forward' },
   'app:open-sandbox-vault': { de: 'Sandbox-Vault öffnen', en: 'Open sandbox vault' },
@@ -173,6 +173,7 @@ const NAMES: Record<string, { de: string; en: string }> = {
   'daily-notes:goto-next': { de: 'Tagesnotizen: Nächste Tagesnotiz öffnen', en: 'Daily notes: Open next daily note' },
   'daily-notes:goto-prev': { de: 'Tagesnotizen: Vorherige Tagesnotiz öffnen', en: 'Daily notes: Open previous daily note' },
   'insert-template': { de: 'Vorlagen: Vorlage einfügen', en: 'Templates: Insert template' },
+  'random-note': { de: 'Zufällige Notiz: Zufällige Notiz öffnen', en: 'Random note: Open random note' },
   'insert-current-date': { de: 'Vorlagen: Aktuelles Datum einfügen', en: 'Templates: Insert current date' },
   'insert-current-time': { de: 'Vorlagen: Aktuelle Uhrzeit einfügen', en: 'Templates: Insert current time' },
 

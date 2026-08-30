@@ -6,7 +6,11 @@
 export const MCP_ERROR_ACCESS_DENIED = -32001
 /** Resource not found — file or vault does not exist. */
 export const MCP_ERROR_NOT_FOUND = -32002
-/** Binary file or invalid path — cannot serve binary content. */
+/**
+ * Reserved. Was "Binary files not supported" — no longer emitted since binary
+ * files are served base64-encoded (`read_file`, `resources/read`). Kept so the
+ * code is not reused for something else.
+ */
 export const MCP_ERROR_BINARY_FILE = -32003
 /** File too large — exceeds configured maxFileSize. */
 export const MCP_ERROR_FILE_TOO_LARGE = -32004

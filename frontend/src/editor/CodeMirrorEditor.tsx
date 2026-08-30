@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useImperativeHandle, useCallback, useState } from 'react'
 import { ExternalLink, Copy, FileText, FolderOpen } from 'lucide-react'
-import { EditorState, Compartment, type Extension } from '@codemirror/state'
+import { EditorState, Compartment, Annotation, type Extension } from '@codemirror/state'
 import { EditorView, lineNumbers as cmLineNumbers, dropCursor, keymap } from '@codemirror/view'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
@@ -51,6 +51,17 @@ import './live-preview/live-preview.css'
 function isPasteableFile(file: File): boolean {
   return file.type.startsWith('image/') || file.type === 'application/pdf'
 }
+
+/**
+ * Marks a dispatch that replaces the document to match an externally-changed
+ * `content` prop (e.g. a realtime reload after another client/MCP tool saved
+ * the file) rather than the user typing. The updateListener checks for this
+ * annotation so that sync doesn't get reported back through onContentChange —
+ * without it, syncing content would look like a user edit, arming the
+ * auto-save debounce and marking the tab's editBuffer non-null, which would
+ * then block the *next* realtime reload (see EditMode's "no unsaved edits" guard).
+ */
+const externalContentSync = Annotation.define<boolean>()
 
 /**
  * Props for the CodeMirror 6 editor component.
@@ -123,6 +134,9 @@ export function CodeMirrorEditor({
   // context menu's checkbox showing the state from whenever the tab was
   // last (re)mounted instead of the current one.
   const showLineNumbersRef = useRef(showLineNumbers)
+  // Same reasoning as showLineNumbersRef — the context menu's checkbox needs
+  // the current value without re-running the mount-effect's listener.
+  const readableLineLengthRef = useRef(readableLineLength)
   // The paste domEventHandler is baked into the extensions built once per
   // tab mount (see buildExtensions) — read through refs so prop changes
   // don't need a full editor remount to take effect.
@@ -143,6 +157,10 @@ export function CodeMirrorEditor({
   useEffect(() => {
     showLineNumbersRef.current = showLineNumbers
   }, [showLineNumbers])
+
+  useEffect(() => {
+    readableLineLengthRef.current = readableLineLength
+  }, [readableLineLength])
 
   useEffect(() => {
     onImagePasteRef.current = onImagePaste
@@ -256,7 +274,7 @@ export function CodeMirrorEditor({
       codeFolding(),
       markdownFoldService,
       EditorView.updateListener.of((update) => {
-        if (update.docChanged) {
+        if (update.docChanged && !update.transactions.some((tr) => tr.annotation(externalContentSync))) {
           onContentChangeRef.current(update.state.doc.toString())
         }
       }),
@@ -395,7 +413,7 @@ export function CodeMirrorEditor({
       // don't also show the generic one in that case.
       if (e.defaultPrevented) return
       e.preventDefault()
-      setContextMenu({ x: e.clientX, y: e.clientY, items: buildEditorContextMenuItems(view, showLineNumbersRef.current) })
+      setContextMenu({ x: e.clientX, y: e.clientY, items: buildEditorContextMenuItems(view, showLineNumbersRef.current, readableLineLengthRef.current) })
     }
     container.addEventListener('contextmenu', handleContextMenu)
 
@@ -461,6 +479,25 @@ export function CodeMirrorEditor({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId])
+
+  // Sync the document when `content` changes without the tab itself changing —
+  // e.g. a realtime vault:change reload after another client or an MCP tool
+  // saved the file externally. Skipped whenever the prop already matches the
+  // doc, which is always the case while the user is typing (content mirrors
+  // what was just typed), so this never fights the user's own edits or resets
+  // the cursor mid-keystroke. The mount effect above already seeds the doc
+  // from `content` for a fresh or tab-switched view, so this only fires for a
+  // genuine external change to the already-mounted tab.
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    const currentDoc = view.state.doc.toString()
+    if (currentDoc === content) return
+    view.dispatch({
+      changes: { from: 0, to: currentDoc.length, insert: content },
+      annotations: externalContentSync.of(true),
+    })
+  }, [content])
 
   // Reconfigure readOnly compartment on prop change
   useEffect(() => {
@@ -569,7 +606,7 @@ export function CodeMirrorEditor({
       // Same fallback as editor-suggest-popover.ts's position(): coordsAtPos
       // returns null for an off-screen/hidden position (e.g. scrolled out of view).
       const coords = view.coordsAtPos(view.state.selection.main.head) ?? view.dom.getBoundingClientRect()
-      setContextMenu({ x: coords.left, y: coords.bottom, items: buildEditorContextMenuItems(view, showLineNumbersRef.current) })
+      setContextMenu({ x: coords.left, y: coords.bottom, items: buildEditorContextMenuItems(view, showLineNumbersRef.current, readableLineLengthRef.current) })
     },
   }), [])
 

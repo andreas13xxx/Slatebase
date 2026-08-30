@@ -121,7 +121,7 @@ Primitive statt einer einzigen "hol alles"-Methode, analog zum `IGitCli`-Zuschni
 
 ### Anhänge und Namenskollisionen
 
-`MailNoteWriter` schreibt Anhänge nach `<targetFolder>/attachments/`, wiederverwendet `generateUniqueFilename` (aus dem Upload-Modul) für Kollisionsfreiheit und verlinkt sie im Notiztext als `![[dateiname]]` (bloßer Dateiname, kein Pfad — konsistent mit der Wikilink-Embed-Erzeugung bei Paste-Uploads im Editor). Tritt dabei eine Namenskollision auf (Notiz oder Anhang), wird zusätzlich `logger.warn(...)` mit gewünschtem und tatsächlich geschriebenem Namen aufgerufen — der Kollisionsschutz selbst bleibt identisch zum Upload-Modul (nie überschreiben), nur eben mit sichtbarer Log-Meldung statt stillem Rename.
+`MailNoteWriter` schreibt Anhänge einer Mail nach `<targetFolder>/<notizbasisname>/` — einem eigenen Unterordner pro Mail, benannt nach dem (bereits kollisionsfrei aufgelösten) Notiznamen ohne `.md`-Endung. Dadurch landen die Anhänge verschiedener Mails nie im selben Ordner. `generateUniqueFilename` (aus dem Upload-Modul) wird weiterhin für Namenskollisionen *innerhalb* einer Mail (mehrere gleichnamige Anhänge) verwendet, und die Anhänge werden im Notiztext als `![[dateiname]]` verlinkt (bloßer Dateiname, kein Pfad — konsistent mit der Wikilink-Embed-Erzeugung bei Paste-Uploads im Editor). Tritt dabei eine Namenskollision auf (Notiz oder Anhang), wird zusätzlich `logger.warn(...)` mit gewünschtem und tatsächlich geschriebenem Namen aufgerufen — der Kollisionsschutz selbst bleibt identisch zum Upload-Modul (nie überschreiben), nur eben mit sichtbarer Log-Meldung statt stillem Rename.
 
 ### Duplikatschutz
 
@@ -141,7 +141,7 @@ Notiz- und Anhangs-Ablage im Vault:
 
 ```
 <targetFolder>/<YYYY-MM-DD HHmm> <Betreff-Slug>.md
-<targetFolder>/attachments/<dateiname>
+<targetFolder>/<YYYY-MM-DD HHmm> <Betreff-Slug>/<dateiname>
 ```
 
 ## Error Handling

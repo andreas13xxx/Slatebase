@@ -3,6 +3,7 @@ import { FileText, Search } from 'lucide-react'
 import type { IApiClient } from '../api'
 import { showToast } from './ToastNotification'
 import { useFocusTrap } from '../hooks/useFocusTrap'
+import { substituteTemplatePlaceholders } from '../utils/templatePlaceholders'
 import './TemplateSelector.css'
 
 /**
@@ -28,6 +29,17 @@ export interface TemplateSelectorProps {
   targetDir: string
   /** Called after a file is successfully created. Receives the file path. */
   onFileCreated: (filePath: string, fileName: string) => void
+  /**
+   * `'create'` (default) runs the two-step "new note from template" flow.
+   * `'insert'` stops after the template is picked and hands its rendered text
+   * to `onInsertContent` instead — the "Vorlage einfügen" command, which drops
+   * the template into the note that is already open.
+   */
+  mode?: 'create' | 'insert'
+  /** Insert mode: receives the template text with placeholders substituted. */
+  onInsertContent?: (content: string, templateName: string) => void
+  /** Insert mode: value substituted for `{{title}}` (usually the open note's name). */
+  insertTitle?: string
 }
 
 /**
@@ -49,6 +61,9 @@ export function TemplateSelector({
   vaultId,
   targetDir,
   onFileCreated,
+  mode = 'create',
+  onInsertContent,
+  insertTitle = '',
 }: TemplateSelectorProps) {
   const [step, setStep] = useState<'loading' | 'select' | 'filename'>('loading')
   const [templates, setTemplates] = useState<TemplateEntry[]>([])
@@ -126,7 +141,38 @@ export function TemplateSelector({
     }
   }, [selectedIndex])
 
+  /**
+   * Reads a template's raw text and hands it to `onInsertContent`.
+   *
+   * The template files live under the vault's configured templates directory,
+   * which only the server knows, so the directory is resolved via the vault
+   * config before the file itself is read.
+   */
+  const handleInsertTemplate = useCallback(async (template: TemplateEntry) => {
+    if (isCreating) return
+    setIsCreating(true)
+    try {
+      const config = await apiClient.getVaultConfig(vaultId)
+      const dir = config.templatesDirectory.replace(/\/+$/, '')
+      const path = dir ? `${dir}/${template.path}` : template.path
+      const file = await apiClient.fetchFileContent(vaultId, path)
+      onInsertContent?.(substituteTemplatePlaceholders(file.content, insertTitle), template.name)
+      onClose()
+    } catch (err) {
+      const message = err && typeof err === 'object' && 'message' in err
+        ? (err as { message: string }).message
+        : 'Vorlage konnte nicht gelesen werden'
+      showToast('error', message)
+    } finally {
+      setIsCreating(false)
+    }
+  }, [apiClient, vaultId, insertTitle, onInsertContent, onClose, isCreating])
+
   const handleSelectTemplate = useCallback((template: TemplateEntry) => {
+    if (mode === 'insert') {
+      void handleInsertTemplate(template)
+      return
+    }
     setSelectedTemplate(template)
     setStep('filename')
     setFileName('')
@@ -134,7 +180,7 @@ export function TemplateSelector({
     requestAnimationFrame(() => {
       fileNameInputRef.current?.focus()
     })
-  }, [])
+  }, [mode, handleInsertTemplate])
 
   const handleCreateFile = useCallback(async () => {
     if (!selectedTemplate || !fileName.trim()) return
@@ -229,7 +275,7 @@ export function TemplateSelector({
         className="template-selector"
         role="dialog"
         aria-modal="true"
-        aria-label="Neue Notiz aus Vorlage"
+        aria-label={mode === 'insert' ? 'Vorlage einfügen' : 'Neue Notiz aus Vorlage'}
       >
         {step === 'select' && (
           <>

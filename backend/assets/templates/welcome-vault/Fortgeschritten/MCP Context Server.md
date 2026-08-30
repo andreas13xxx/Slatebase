@@ -88,14 +88,14 @@ Jeder MCP-fähige Client kann sich verbinden:
 |------|--------------|
 | `list_vaults` | Alle zugänglichen Vaults auflisten |
 | `get_vault_structure` | Ordnerstruktur abrufen |
-| `read_file` | Datei-Inhalt lesen |
+| `read_file` | Datei-Inhalt lesen (Text sowie Binärdateien wie Bilder oder PDFs, base64-kodiert) |
 | `search_vault` | Volltextsuche im Vault |
 
 ### Schreib-Tools (nur mit Write-Berechtigung)
 
 | Tool | Beschreibung |
 |------|--------------|
-| `write_file` | Datei erstellen oder überschreiben |
+| `write_file` | Datei erstellen oder überschreiben (Text oder base64-kodierte Binärdaten) |
 | `create_directory` | Ordner erstellen |
 | `delete_file` | Datei löschen |
 | `move_file` | Datei verschieben/umbenennen |

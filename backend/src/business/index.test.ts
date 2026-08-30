@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import path from 'node:path'
 import fs from 'node:fs/promises'
 import os from 'node:os'
-import { VaultService, VaultNotFoundError, VaultValidationError, StorageError, ConflictError, FileConflictError, InvalidMoveError } from './index'
+import { VaultService, VaultNotFoundError, VaultValidationError, StorageError, ConflictError, FileConflictError, InvalidMoveError, FileTooLargeError } from './index'
 import type { IVaultService } from './index'
 import type { IVaultManager, IVaultReader, Vault, DirectoryTree, FileContent } from '../vault/index'
 import { PathTraversalError, computeEtag } from '../vault/index'
@@ -40,6 +40,7 @@ function createMockConfigService(overrides?: Partial<ServerConfig>): IConfigServ
     sessionDurationHours: 24,
     sessionMaxLifetimeDays: 7,
     features: {},
+    mcp: { maxFileSize: 16777216, rateLimit: 60 },
     sse: { maxConnections: 1000, maxPerUser: 3, heartbeatInterval: 30000, replayBufferSize: 100, replayTtl: 300000, batchWindow: 100, batchMax: 20 },
     trash: { retentionDays: 30 },
     versions: { maxPerFile: 20 },
@@ -818,6 +819,55 @@ describe('VaultService', () => {
       // Verify etag matches the content hash
       const expectedEtag = computeEtag(Buffer.from('# Hello', 'utf-8'))
       expect(result.etag).toBe(expectedEtag)
+
+      await fs.rm(tmpDir, { recursive: true, force: true })
+    })
+
+    it('honours the maxSize override, rejecting only above it (MCP writes its own limit)', async () => {
+      const tmpDir = path.join(process.env['TEMP'] || '/tmp', `slatebase-maxsize-test-${Date.now()}`)
+      const vaultDir = path.join(tmpDir, 'vault')
+      await fs.mkdir(vaultDir, { recursive: true })
+
+      const vault = createMockVault('abc123def456', 'Test Vault', vaultDir)
+      const vaultManager = createMockVaultManager([vault])
+      // Server-wide limit is far below the content being written
+      const configService = createMockConfigService({ maxFileSize: 100 })
+      const vaultReader = createMockVaultReader()
+      const logger = createMockLogger()
+
+      const service = new VaultService(vaultManager, vaultReader, configService, logger)
+      const content = 'x'.repeat(500)
+
+      const result = await service.saveFile('abc123def456', 'big.md', content, undefined, 1000)
+      expect(result.size).toBe(500)
+
+      await expect(service.saveFile('abc123def456', 'big.md', content, undefined, 400))
+        .rejects.toThrow(FileTooLargeError)
+
+      await fs.rm(tmpDir, { recursive: true, force: true })
+    })
+
+    it('writes Buffer content byte-for-byte (binary files via MCP write_file)', async () => {
+      const tmpDir = path.join(process.env['TEMP'] || '/tmp', `slatebase-binary-test-${Date.now()}`)
+      const vaultDir = path.join(tmpDir, 'vault')
+      await fs.mkdir(vaultDir, { recursive: true })
+
+      const vault = createMockVault('abc123def456', 'Test Vault', vaultDir)
+      const vaultManager = createMockVaultManager([vault])
+      const configService = createMockConfigService()
+      const vaultReader = createMockVaultReader()
+      const logger = createMockLogger()
+
+      // Bytes that would not survive a UTF-8 round trip (NUL, lone 0xff)
+      const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0xff, 0xfe, 0x01])
+
+      const service = new VaultService(vaultManager, vaultReader, configService, logger)
+      const result = await service.saveFile('abc123def456', 'Bilder/logo.png', bytes)
+
+      const written = await fs.readFile(path.join(vaultDir, 'Bilder', 'logo.png'))
+      expect(written.equals(bytes)).toBe(true)
+      expect(result.size).toBe(bytes.length)
+      expect(result.etag).toBe(computeEtag(bytes))
 
       await fs.rm(tmpDir, { recursive: true, force: true })
     })

@@ -64,8 +64,8 @@ GET http://your-server:3000/.well-known/mcp.json
 | `list_vaults` | Read | List all vaults you have access to (with name, permission, file count) |
 | `get_vault_structure` | Read | Get the directory tree of a vault as JSON |
 | `search_vault` | Read | Full-text search across all files in a vault |
-| `read_file` | Read | Read the content of a specific file |
-| `write_file` | Write | Create or overwrite a text file (supports ETag conflict detection) |
+| `read_file` | Read | Read the content of a specific file — text, or binary base64-encoded (see below) |
+| `write_file` | Write | Create or overwrite a file — UTF-8 text, or binary passed base64-encoded (supports ETag conflict detection) |
 | `create_directory` | Write | Create a directory (with intermediate directories) |
 | `delete_file` | Write | Delete a file or folder recursively |
 | `move_file` | Write | Move a file or folder to a new location (rewrites wikilinks elsewhere in the vault that pointed at the old path — see below) |
@@ -75,12 +75,31 @@ GET http://your-server:3000/.well-known/mcp.json
 
 **Realtime push:** Every write tool (`write_file`, `create_directory`, `delete_file`, `move_file`, `rename_file`) publishes a `vault:change` event on success, same as the web UI and REST API. All open sessions with access to the vault are notified — including the calling user's own browser tabs, since an MCP write bypasses them entirely and has no local state to already reflect the change.
 
+## Binary files
+
+Images, PDFs, audio and any other non-text file are supported — they travel base64-encoded. A file counts as binary when it contains a NUL byte in its first 8 KB, the same heuristic the rest of Slatebase uses.
+
+**Reading** (`read_file`): the returned content block depends on the file's media type (derived from its extension):
+
+| File | Content block |
+|------|---------------|
+| Text (`.md`, `.txt`, …) | `{ "type": "text", "text": "…" }` — unchanged |
+| Images (`.png`, `.jpg`, `.webp`, …) | `{ "type": "image", "data": "<base64>", "mimeType": "image/png" }` |
+| Audio (`.mp3`, `.wav`, `.ogg`) | `{ "type": "audio", "data": "<base64>", "mimeType": "audio/mpeg" }` |
+| Everything else (`.pdf`, `.zip`, …) | `{ "type": "resource", "resource": { "uri": "vault://<vaultId>/<path>", "blob": "<base64>", "mimeType": "application/pdf" } }` |
+
+Pass `encoding: "base64"` to force the base64 form for any file, including text ones (useful to get the exact bytes rather than a UTF-8 decode).
+
+**Writing** (`write_file`): pass `encoding: "base64"` and put the base64 payload in `content`; it is decoded into raw bytes before the file is written. Malformed base64 is rejected with `-32602` rather than written as a corrupt file. Without the parameter, `content` is written as UTF-8 text exactly as before.
+
+`search_vault` skips binary files — full-text search only covers text. The size limit (`mcp.maxFileSize`, 16 MB by default) applies to both reads and writes and is measured on the raw bytes, before base64 inflates the payload by ~⅓. It is deliberately higher than the server-wide `maxFileSize` (5 MB), which guards text files loaded into the editor — vault attachments such as screenshots and scans are routinely larger than a note.
+
 ## Available Resources
 
 | URI Pattern | Description |
 |-------------|-------------|
 | `vault://<vaultId>/` | Directory tree as JSON |
-| `vault://<vaultId>/<path>` | File content (`text/markdown` for `.md`, `text/plain` for others) |
+| `vault://<vaultId>/<path>` | File content — text files as `text` (`text/markdown` for `.md`, `text/plain` for others), binary files as a base64 `blob` with their real media type (`image/png`, `application/pdf`, …) |
 
 ## Token Management
 
@@ -95,8 +114,19 @@ GET http://your-server:3000/.well-known/mcp.json
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SLATEBASE_FEATURE_MCP` | `true` | Enable/disable the MCP server (overrides the `mcp` feature toggle) |
-| `SLATEBASE_MCP_MAX_FILE_SIZE` | `5242880` | Max file size for MCP reads (5 MB) |
-| `SLATEBASE_MCP_RATE_LIMIT` | `60` | Max requests per minute per token |
+| `SLATEBASE_MCP_MAX_FILE_SIZE` | `16777216` | Max file size for MCP reads and writes (16 MB) — overrides `mcp.maxFileSize` in the config file |
+| `SLATEBASE_MCP_RATE_LIMIT` | `60` | Max requests per minute per token — overrides `mcp.rateLimit` |
+
+Both limits can also be set in the config file without environment variables:
+
+```json
+{
+  "mcp": {
+    "maxFileSize": 16777216,
+    "rateLimit": 60
+  }
+}
+```
 
 MCP is controlled by the `mcp` feature toggle, a `cold` toggle (requires a server restart to take effect). Set `SLATEBASE_FEATURE_MCP=false` to completely disable the MCP server (no routes registered, `.well-known/mcp.json` returns 404).
 

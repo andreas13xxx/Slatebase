@@ -28,6 +28,18 @@ const SseConfigSchema = z.object({
   batchMax: z.number().int().positive().default(20),
 })
 
+/**
+ * MCP-specific limits. Separate from the server-wide `maxFileSize`, which
+ * guards text files loaded into the editor: MCP also serves binary files
+ * (images, PDFs) base64-encoded, and vault attachments are routinely larger
+ * than a note — 16 MB covers screenshots and scans with room to spare.
+ * Overridable per setting via SLATEBASE_MCP_* environment variables.
+ */
+const McpLimitsConfigSchema = z.object({
+  maxFileSize: z.number().int().positive().default(16777216),
+  rateLimit: z.number().int().positive().default(60),
+})
+
 const TrashConfigSchema = z.object({
   retentionDays: z.number().int().default(30),
 })
@@ -75,6 +87,7 @@ export const ServerConfigSchema = z.object({
   sessionDurationHours: z.number().positive().default(24),
   sessionMaxLifetimeDays: z.number().positive().default(7),
   features: FeaturesConfigSchema,
+  mcp: McpLimitsConfigSchema.default({}),
   sse: SseConfigSchema.default({}),
   trash: TrashConfigSchema.default({}),
   versions: VersionsConfigSchema.default({}),
@@ -88,6 +101,7 @@ export const ServerConfigSchema = z.object({
 
 export type ServerConfig = z.infer<typeof ServerConfigSchema>
 export type VaultConfig = z.infer<typeof VaultConfigSchema>
+export type McpLimitsConfig = z.infer<typeof McpLimitsConfigSchema>
 export type SseConfig = z.infer<typeof SseConfigSchema>
 export type TrashConfig = z.infer<typeof TrashConfigSchema>
 export type VersionsConfig = z.infer<typeof VersionsConfigSchema>

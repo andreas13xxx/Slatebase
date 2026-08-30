@@ -22,6 +22,7 @@ function createMockConfigService(overrides: Partial<ServerConfig> = {}): IConfig
     sessionDurationHours: 24,
     sessionMaxLifetimeDays: 7,
     features: {},
+    mcp: { maxFileSize: 16777216, rateLimit: 60 },
     sse: { maxConnections: 1000, maxPerUser: 3, heartbeatInterval: 30000, replayBufferSize: 100, replayTtl: 300000, batchWindow: 100, batchMax: 20 },
     trash: { retentionDays: 30 },
     versions: { maxPerFile: 20 },
@@ -61,7 +62,7 @@ describe('loadMcpConfig', () => {
   it('returns defaults when no env vars are set', () => {
     const config = loadMcpConfig(createMockConfigService())
 
-    expect(config.maxFileSize).toBe(5242880)
+    expect(config.maxFileSize).toBe(16777216)
     expect(config.rateLimit).toBe(60)
     expect(config.maxTokensPerUser).toBe(10)
   })
@@ -80,24 +81,31 @@ describe('loadMcpConfig', () => {
     expect(config.maxFileSize).toBe(1048576)
   })
 
-  it('uses server config maxFileSize as default', () => {
-    const config = loadMcpConfig(createMockConfigService({ maxFileSize: 10485760 }))
+  it('uses the mcp section of the config file as default', () => {
+    const config = loadMcpConfig(createMockConfigService({ mcp: { maxFileSize: 10485760, rateLimit: 90 } }))
 
     expect(config.maxFileSize).toBe(10485760)
+    expect(config.rateLimit).toBe(90)
   })
 
-  it('falls back to server default for invalid SLATEBASE_MCP_MAX_FILE_SIZE', () => {
+  it('is independent of the server-wide maxFileSize (which only guards editor reads)', () => {
+    const config = loadMcpConfig(createMockConfigService({ maxFileSize: 5242880 }))
+
+    expect(config.maxFileSize).toBe(16777216)
+  })
+
+  it('falls back to the config file value for invalid SLATEBASE_MCP_MAX_FILE_SIZE', () => {
     process.env['SLATEBASE_MCP_MAX_FILE_SIZE'] = 'not-a-number'
 
-    const config = loadMcpConfig(createMockConfigService({ maxFileSize: 2097152 }))
+    const config = loadMcpConfig(createMockConfigService({ mcp: { maxFileSize: 2097152, rateLimit: 60 } }))
 
     expect(config.maxFileSize).toBe(2097152)
   })
 
-  it('falls back to server default for negative SLATEBASE_MCP_MAX_FILE_SIZE', () => {
+  it('falls back to the config file value for negative SLATEBASE_MCP_MAX_FILE_SIZE', () => {
     process.env['SLATEBASE_MCP_MAX_FILE_SIZE'] = '-100'
 
-    const config = loadMcpConfig(createMockConfigService({ maxFileSize: 5242880 }))
+    const config = loadMcpConfig(createMockConfigService({ mcp: { maxFileSize: 5242880, rateLimit: 60 } }))
 
     expect(config.maxFileSize).toBe(5242880)
   })

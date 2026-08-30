@@ -48,6 +48,7 @@ import { VaultDeletionWorkflow } from './components/VaultDeletionWorkflow'
 import { ChatPage } from './components/ChatPage'
 import { SlatebaseLogo } from './components/SlatebaseLogo'
 import { SidebarToolbar } from './components/SidebarToolbar'
+import { useToolbarPrefs } from './state/toolbarStore'
 import { StatusBar } from './components/StatusBar'
 import { SnippetLifecycle } from './components/SnippetLifecycle'
 import { MyVaultsPage } from './components/MyVaultsPage'
@@ -237,6 +238,7 @@ function AppContent() {
 
   // Status bar visibility (persisted in localStorage)
   const { visible: statusBarVisible } = useStatusBar()
+  const toolbarPrefs = useToolbarPrefs()
 
   // Global unread count polling (30-second interval)
   // Disabled when SSE connection is active (realtime pushes unread counts)
@@ -878,6 +880,36 @@ function AppContent() {
     }
   })
 
+  // Built once and placed either before the editor pane or after the right
+  // panel, so switching sides is a move in the DOM rather than a second copy
+  // of this prop list. The palette/switcher/random-note/insert-template
+  // buttons go through the same window events the keyboard shortcuts and the
+  // command palette use, so the button and the command are one code path.
+  const toolbarElement = (
+    <SidebarToolbar
+      vaultId={state.selectedVaultId}
+      vaultPermission={selectedVault?.permission}
+      onCreateVault={handleCreateVault}
+      onCreateFile={handleCreateFile}
+      onCreateCanvas={handleCreateCanvas}
+      onImportFile={handleImportFile}
+      onImportFolder={handleImportFolder}
+      onExportVault={handleExportVault}
+      onNavigate={handleNavigate}
+      onOpenGraph={handleOpenGraph}
+      onOpenTrash={() => handleNavigate('trash')}
+      onDailyNote={handleDailyNote}
+      onOpenSettings={() => setSettingsOpen(true)}
+      onOpenCommandPalette={() => window.dispatchEvent(new CustomEvent('slatebase:open-command-palette'))}
+      onOpenQuickSwitcher={() => window.dispatchEvent(new CustomEvent('slatebase:open-quick-switcher'))}
+      onOpenRandomNote={() => window.dispatchEvent(new CustomEvent('slatebase:open-random-note'))}
+      onInsertTemplate={() => window.dispatchEvent(new CustomEvent('slatebase:insert-template'))}
+      isAdmin={user?.role === 'admin'}
+      isVaultOwner={selectedVault?.permission === 'owner'}
+      globalUnreadCount={globalUnreadCount}
+    />
+  )
+
   return (
     // PluginProvider wraps the entire vault view below, and third-party plugin
     // code (view.getDisplayText()/getIcon() overrides, onLayoutReady callbacks,
@@ -1013,7 +1045,7 @@ function AppContent() {
             real, on-screen node, not the shim's 0x0 stub. React mounts #root before the
             plugin system runs, so this element is earlier in document order and wins any
             document.querySelector('.workspace-split') lookup over the shim's hidden one. */}
-        <div className="app-vault-layout mod-vertical mod-root workspace-split">
+        <div className={`app-vault-layout mod-vertical mod-root workspace-split${toolbarPrefs.visible && toolbarPrefs.position === 'right' ? ' app-vault-layout--toolbar-right' : ''}`}>
 
           {/* ── Sidebar ── */}
           {showSidebar && (
@@ -1099,25 +1131,8 @@ function AppContent() {
             />
           )}
 
-          {/* ── Toolbar ── */}
-          <SidebarToolbar
-            vaultId={state.selectedVaultId}
-            vaultPermission={selectedVault?.permission}
-            onCreateVault={handleCreateVault}
-            onCreateFile={handleCreateFile}
-            onCreateCanvas={handleCreateCanvas}
-            onImportFile={handleImportFile}
-            onImportFolder={handleImportFolder}
-            onExportVault={handleExportVault}
-            onNavigate={handleNavigate}
-            onOpenGraph={handleOpenGraph}
-            onOpenTrash={() => handleNavigate('trash')}
-            onDailyNote={handleDailyNote}
-            onOpenSettings={() => setSettingsOpen(true)}
-            isAdmin={user?.role === 'admin'}
-            isVaultOwner={selectedVault?.permission === 'owner'}
-            globalUnreadCount={globalUnreadCount}
-          />
+          {/* ── Toolbar (docked left or right of the editor, per toolbarStore) ── */}
+          {toolbarPrefs.visible && toolbarPrefs.position === 'left' && toolbarElement}
 
           {/* ── Main Content ── */}
           {/* workspace-tab-container: Obsidian-parity marker class — see mod-vertical/mod-root
@@ -1194,6 +1209,8 @@ function AppContent() {
               </aside>
             </>
           )}
+
+          {toolbarPrefs.visible && toolbarPrefs.position === 'right' && toolbarElement}
 
           {/* Toggle right panel */}
           <button

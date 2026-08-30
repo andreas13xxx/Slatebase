@@ -21,6 +21,9 @@ import type { SettingsCategory, SettingsSection } from '../state/settingsState'
 import { useLeftPanelContext, useRightPanelContext } from '../state/panelContext'
 import { useSearchContext } from '../state/searchContext'
 import { registerCoreAppCommands, type CoreAppCommandHandlers, type NavigablePage } from '../plugins/compat/core-commands-app'
+import { collectFilesSorted } from '../plugins/link-resolver'
+import { getActiveEditorView } from '../editor/plugin-extensions'
+import { toggleToolbarVisible } from '../state/toolbarStore'
 
 /**
  * Obsidian core-command IDs (from core-commands.ts / core-commands-app.ts) that do
@@ -51,7 +54,10 @@ const DUPLICATE_OF_NATIVE_COMMAND = new Map<string, string>([
   ['workspace:show-trash', 'slatebase:open-trash'],
   ['graph:open', 'slatebase:open-graph'],
   ['daily-notes', 'slatebase:daily-note'],
-  ['insert-template', 'slatebase:new-from-template'],
+  ['insert-template', 'slatebase:insert-template'],
+  ['random-note', 'slatebase:open-random-note'],
+  ['app:toggle-ribbon', 'slatebase:toggle-toolbar'],
+  ['command-palette:open', 'slatebase:open-command-palette'],
   ['file-explorer:new-file', 'slatebase:create-file'],
   ['file-explorer:new-file-in-current-tab', 'slatebase:create-file'],
   ['file-explorer:new-file-in-new-pane', 'slatebase:create-file'],
@@ -144,9 +150,110 @@ export function CommandPaletteContainer({
   const { t, locale } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
   const [templateSelectorOpen, setTemplateSelectorOpen] = useState(false)
+  // 'create' opens the two-step "new note from template" flow, 'insert' drops
+  // the template's text into the note that is already open.
+  const [templateSelectorMode, setTemplateSelectorMode] = useState<'create' | 'insert'>('create')
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false)
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false)
   const [debugInfoOpen, setDebugInfoOpen] = useState(false)
+
+  /** Opens the template picker in "create a new note" mode. */
+  const openTemplateSelector = useCallback(() => {
+    setTemplateSelectorMode('create')
+    setTemplateSelectorOpen(true)
+  }, [])
+
+  /**
+   * Opens the template picker in "insert into the open note" mode.
+   * Refuses early when there is no editor to insert into, so the user gets a
+   * reason instead of a picker that silently does nothing on selection.
+   */
+  const openTemplateInserter = useCallback(() => {
+    if (!state.selectedVaultId) return
+    if (!getActiveEditorView()) {
+      showToast('info', 'Keine Notiz im Bearbeiten-Modus geöffnet.')
+      return
+    }
+    setTemplateSelectorMode('insert')
+    setTemplateSelectorOpen(true)
+  }, [state.selectedVaultId])
+
+  /** Inserts the chosen template's text at the cursor of the active editor. */
+  const handleTemplateContentInsert = useCallback((content: string) => {
+    const view = getActiveEditorView()
+    if (!view) {
+      showToast('error', 'Keine Notiz im Bearbeiten-Modus geöffnet.')
+      return
+    }
+    // A plain document change — the editor's updateListener picks it up and
+    // marks the tab unsaved, so autosave handles persistence as with typing.
+    view.dispatch(view.state.replaceSelection(content))
+    view.focus()
+  }, [])
+
+  /**
+   * Opens a random markdown note from the current vault.
+   *
+   * The note that is already open is excluded, so repeated invocations always
+   * move somewhere — unless it is the vault's only note, in which case
+   * excluding it would leave nothing to open.
+   */
+  const openRandomNote = useCallback(() => {
+    const vaultId = state.selectedVaultId
+    if (!vaultId || !apiClient) return
+    const tree = state.vaultTrees[vaultId] ?? state.directoryTree
+    if (!tree) return
+
+    const notes = collectFilesSorted(tree).filter((f) => f.name.toLowerCase().endsWith('.md'))
+    if (notes.length === 0) {
+      showToast('info', 'Keine Notizen in diesem Vault.')
+      return
+    }
+    const activePath = tabState.tabs.find((t) => t.id === tabState.activeTabId)?.filePath
+    const candidates = notes.length > 1 ? notes.filter((f) => f.path !== activePath) : notes
+    const pick = candidates[Math.floor(Math.random() * candidates.length)]
+    if (!pick) return
+
+    void openTab(tabDispatch, appDispatch, apiClient, vaultId, pick.path, pick.name)
+  }, [state.selectedVaultId, state.vaultTrees, state.directoryTree, apiClient, tabState, tabDispatch, appDispatch])
+
+  // ─── Custom events for the toolbar buttons ─────────────────────────────────
+  // The toolbar buttons and the palette commands must do the same thing, so the
+  // buttons dispatch these instead of carrying their own copies of the logic.
+  useEffect(() => {
+    function handleRandomNote() { openRandomNote() }
+    function handleInsertTemplate() { openTemplateInserter() }
+
+    window.addEventListener('slatebase:open-random-note', handleRandomNote)
+    window.addEventListener('slatebase:insert-template', handleInsertTemplate)
+    return () => {
+      window.removeEventListener('slatebase:open-random-note', handleRandomNote)
+      window.removeEventListener('slatebase:insert-template', handleInsertTemplate)
+    }
+  }, [openRandomNote, openTemplateInserter])
+
+  // ─── Keyboard shortcuts for the toolbar-related commands ───────────────────
+  // These ship without a default binding, so nothing fires until the user
+  // assigns one in Einstellungen → Tastenkürzel (matchesShortcut returns false
+  // for an unset shortcut). Registered here rather than in useGlobalShortcuts
+  // because the handlers live in this component.
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent): void {
+      if (matchesShortcut('slatebase:toggle-toolbar', e)) {
+        e.preventDefault()
+        toggleToolbarVisible()
+      } else if (matchesShortcut('slatebase:open-random-note', e)) {
+        e.preventDefault()
+        openRandomNote()
+      } else if (matchesShortcut('slatebase:insert-template', e)) {
+        e.preventDefault()
+        openTemplateInserter()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [openRandomNote, openTemplateInserter])
 
   // ─── Core command registration (Obsidian's workspace:*/app:*/theme:*/... commands) ──
   // Registered once; commands read fresh state via this ref instead of stale closures
@@ -181,7 +288,10 @@ export function CommandPaletteContainer({
     onDailyNote,
     onDailyNoteOffset,
     onCreateWelcomeVault: () => { void handleCreateWelcomeVault() },
-    onOpenTemplateSelector: () => setTemplateSelectorOpen(true),
+    onOpenTemplateSelector: openTemplateSelector,
+    onInsertTemplate: openTemplateInserter,
+    onOpenRandomNote: openRandomNote,
+    onToggleToolbar: toggleToolbarVisible,
     onOpenReleaseNotes: () => setReleaseNotesOpen(true),
     onOpenDebugInfo: () => setDebugInfoOpen(true),
     onNavigateBack: goBack,
@@ -304,7 +414,7 @@ export function CommandPaletteContainer({
 
   const handleExecute = useCallback((commandId: string) => {
     if (commandId === 'slatebase:new-from-template') {
-      setTemplateSelectorOpen(true)
+      openTemplateSelector()
       return
     }
     // Try built-in commands first (they use the callback directly)
@@ -371,6 +481,20 @@ export function CommandPaletteContainer({
       id: 'slatebase:toggle-right-panel',
       name: 'Kontextpanel ein-/ausblenden',
       callback: onToggleRightPanel,
+      pluginId: 'slatebase',
+    })
+
+    commands.push({
+      id: 'slatebase:toggle-toolbar',
+      name: 'Werkzeugleiste ein-/ausblenden',
+      callback: toggleToolbarVisible,
+      pluginId: 'slatebase',
+    })
+
+    commands.push({
+      id: 'slatebase:open-command-palette',
+      name: 'Befehlspalette öffnen',
+      callback: () => setIsOpen(true),
       pluginId: 'slatebase',
     })
 
@@ -488,6 +612,13 @@ export function CommandPaletteContainer({
         callback: () => setQuickSwitcherOpen(true),
         pluginId: 'slatebase',
       })
+
+      commands.push({
+        id: 'slatebase:open-random-note',
+        name: 'Zufällige Notiz öffnen',
+        callback: openRandomNote,
+        pluginId: 'slatebase',
+      })
     }
 
     commands.push({
@@ -536,7 +667,14 @@ export function CommandPaletteContainer({
       commands.push({
         id: 'slatebase:new-from-template',
         name: 'Neue Notiz aus Vorlage',
-        callback: () => setTemplateSelectorOpen(true),
+        callback: openTemplateSelector,
+        pluginId: 'slatebase',
+      })
+
+      commands.push({
+        id: 'slatebase:insert-template',
+        name: 'Vorlage einfügen',
+        callback: openTemplateInserter,
         pluginId: 'slatebase',
       })
 
@@ -717,6 +855,11 @@ export function CommandPaletteContainer({
     return commands
   }
 
+  // Value substituted for a template's {{title}} when inserting into an open
+  // note — the note's own name, mirroring what createFromTemplate uses for a
+  // newly created file.
+  const activeTabTitle = (tabState.tabs.find((tab) => tab.id === tabState.activeTabId)?.fileName ?? '').replace(/\.md$/, '')
+
   // Combine built-in + plugin commands
   const builtinCommands = buildBuiltinCommands()
   const visibleNativeIds = new Set(builtinCommands.map((c) => c.id))
@@ -744,6 +887,9 @@ export function CommandPaletteContainer({
           vaultId={state.selectedVaultId}
           targetDir=""
           onFileCreated={handleTemplateFileCreated}
+          mode={templateSelectorMode}
+          onInsertContent={handleTemplateContentInsert}
+          insertTitle={activeTabTitle}
         />
       )}
       {state.selectedVaultId && apiClient && (

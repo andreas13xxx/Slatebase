@@ -71,12 +71,24 @@ Detailed guides for individual Obsidian plugins:
 
 | Plugin | Description |
 |--------|-------------|
+| [[Advanced/Plugins/Advanced Tables\|Advanced Tables]] | Table editor with auto-formatting and tab navigation |
+| [[Advanced/Plugins/Better Word Count\|Better Word Count]] | Detailed writing statistics in the status bar |
 | [[Advanced/Plugins/Calendar\|Calendar]] | Monthly calendar + daily notes |
 | [[Advanced/Plugins/Dataview\|Dataview]] | Vault as queryable database |
-| [[Advanced/Plugins/Kanban\|Kanban]] | Visual task boards |
-| [[Advanced/Plugins/Templater\|Templater]] | Dynamic templates |
+| [[Advanced/Plugins/Day Planner\|Day Planner]] | Checkbox lines as a visual daily timeline |
+| [[Advanced/Plugins/Editing Toolbar\|Editing Toolbar]] | Formatting toolbar above the editor |
 | [[Advanced/Plugins/Excalidraw\|Excalidraw]] | Freehand drawings |
+| [[Advanced/Plugins/Git\|Git]] | Vault versioning via a real Git repository |
+| [[Advanced/Plugins/Iconize\|Iconize]] | Custom icons for files and folders |
+| [[Advanced/Plugins/Importer\|Importer]] | Migrate notes from other apps into Markdown |
+| [[Advanced/Plugins/Kanban\|Kanban]] | Visual task boards |
 | [[Advanced/Plugins/LiveSync\|LiveSync]] | Vault synchronization |
+| [[Advanced/Plugins/Mind Map\|Mind Map]] | Heading structure as an interactive mind map |
+| [[Advanced/Plugins/Outliner\|Outliner]] | Lists as a real outline editor |
+| [[Advanced/Plugins/Paste URL into Selection\|Paste URL into Selection]] | Turn a selection into a link by pasting |
+| [[Advanced/Plugins/Recent Files\|Recent Files]] | Sidebar with recently opened notes |
+| [[Advanced/Plugins/Tasks\|Tasks]] | Checkbox lines as task management with query blocks |
+| [[Advanced/Plugins/Templater\|Templater]] | Dynamic templates |
 
 Exercises: [[Practice/Plugins/Overview|Plugin Exercises]]
 

@@ -71,12 +71,24 @@ Detaillierte Anleitungen für einzelne Obsidian-Plugins:
 
 | Plugin | Beschreibung |
 |--------|--------------|
+| [[Fortgeschritten/Plugins/Advanced Tables\|Advanced Tables]] | Tabellen-Editor mit Auto-Formatierung und Tab-Navigation |
+| [[Fortgeschritten/Plugins/Better Word Count\|Better Word Count]] | Detaillierte Schreibstatistiken in der Statusleiste |
 | [[Fortgeschritten/Plugins/Calendar\|Calendar]] | Monatskalender + Daily Notes |
 | [[Fortgeschritten/Plugins/Dataview\|Dataview]] | Vault als abfragbare Datenbank |
-| [[Fortgeschritten/Plugins/Kanban\|Kanban]] | Visuelle Aufgaben-Boards |
-| [[Fortgeschritten/Plugins/Templater\|Templater]] | Dynamische Vorlagen |
+| [[Fortgeschritten/Plugins/Day Planner\|Day Planner]] | Checkbox-Zeilen als visuelle Tages-Timeline |
+| [[Fortgeschritten/Plugins/Editing Toolbar\|Editing Toolbar]] | Formatierungsleiste über dem Editor |
 | [[Fortgeschritten/Plugins/Excalidraw\|Excalidraw]] | Freihand-Zeichnungen |
+| [[Fortgeschritten/Plugins/Git\|Git]] | Vault-Versionierung über ein echtes Git-Repository |
+| [[Fortgeschritten/Plugins/Iconize\|Iconize]] | Individuelle Icons für Dateien und Ordner |
+| [[Fortgeschritten/Plugins/Importer\|Importer]] | Notizen aus anderen Apps zu Markdown migrieren |
+| [[Fortgeschritten/Plugins/Kanban\|Kanban]] | Visuelle Aufgaben-Boards |
 | [[Fortgeschritten/Plugins/LiveSync\|LiveSync]] | Vault-Synchronisation |
+| [[Fortgeschritten/Plugins/Mind Map\|Mind Map]] | Überschriften-Struktur als interaktive Mindmap |
+| [[Fortgeschritten/Plugins/Outliner\|Outliner]] | Listen als echter Outline-Editor |
+| [[Fortgeschritten/Plugins/Paste URL into Selection\|Paste URL into Selection]] | Markierten Text per Einfügen zum Link machen |
+| [[Fortgeschritten/Plugins/Recent Files\|Recent Files]] | Seitenleiste mit zuletzt geöffneten Notizen |
+| [[Fortgeschritten/Plugins/Tasks\|Tasks]] | Checkbox-Zeilen als Aufgabenverwaltung mit Query-Blöcken |
+| [[Fortgeschritten/Plugins/Templater\|Templater]] | Dynamische Vorlagen |
 
 Übungen: [[Praxis/Plugins/Übersicht|Plugin-Übungen]]
 

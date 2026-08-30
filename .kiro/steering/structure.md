@@ -37,6 +37,7 @@ src/
 │   └── sliding-window-rate-limiter.ts — SlidingWindowRateLimiter (generic sliding-window request limiter keyed by string; same algorithm as ChatRateLimiter/McpRateLimiter, generalized for new call sites instead of re-implementing it)
 ├── vault/
 │   ├── index.ts          — VaultReader, VaultManager, path utilities, data models
+│   ├── mime.ts           — getContentTypeFromExtension()/getMediaTypeFromExtension(): shared extension→MIME map for raw file responses (REST, with charset) and MCP content blocks (bare media type, base64 payload has no charset of its own)
 │   └── registry.ts       — VaultRegistry (persistent vault metadata in vaults.json)
 ├── business/
 │   ├── index.ts          — VaultService (business logic, orchestrates vault operations)
@@ -111,8 +112,9 @@ src/
 │   ├── token-store.ts    — TokenStore (filesystem persistence, in-memory hash index; per-token records and the per-user token-ID index are each a `KeyedJsonFileStore`, so the user-index update can't race and drop a tokenId — which would make it un-revocable via "revoke all")
 │   ├── token-service.ts  — McpTokenService (token lifecycle: create, validate, revoke, list)
 │   ├── rate-limiter.ts   — McpRateLimiter (sliding window per token)
-│   ├── handlers.ts       — McpHandlers (MCP resource handlers: list, read)
-│   ├── tool-handlers.ts  — MCP tool handlers (list_vaults, get_vault_structure, search_vault, read_file, write_file, create_directory, delete_file, move_file, rename_file). `move_file`/`rename_file` run Link-Migration too via the optional `ToolHandlerDeps.migrateLinks` (wired to the same `LinkMigrationService` as the REST API in the composition root) — snapshots the pre-move tree, rewrites wikilinks elsewhere in the vault pointing at the old path, reports partial failures as `linkMigrationWarnings`
+│   ├── handlers.ts       — McpHandlers (MCP resource handlers: list, read); binary files return a base64 `blob` + real media type (via `vault/mime.ts`) instead of `text`
+│   ├── tool-handlers.ts  — MCP tool handlers (list_vaults, get_vault_structure, search_vault, read_file, write_file, create_directory, delete_file, move_file, rename_file). `move_file`/`rename_file` run Link-Migration too via the optional `ToolHandlerDeps.migrateLinks` (wired to the same `LinkMigrationService` as the REST API in the composition root) — snapshots the pre-move tree, rewrites wikilinks elsewhere in the vault pointing at the old path, reports partial failures as `linkMigrationWarnings`. `read_file`/`write_file` support binary content via `encoding: 'base64'` (image/audio/resource content blocks by media type, `search_vault` skips binary files); size limit is `mcp.maxFileSize` (16 MB default), separate from and higher than the editor's `maxFileSize` (5 MB) since attachments run larger than notes
+│   ├── binary-files.test.ts — Unit tests for MCP binary read/write (base64 encode/decode, media-type dispatch)
 │   ├── tool-handlers-link-migration.test.ts — Unit tests for move_file/rename_file Link-Migration wiring
 │   └── server-factory.ts — McpServerFactory (creates configured McpServer instance)
 ├── search/
@@ -272,6 +274,8 @@ src/
 │   ├── pluginIcon.ts     — Single resolution path for plugin icon names (addRibbonIcon, ItemView.getIcon, context-panel tabs): checks the plugin's own `addIcon()` SVGs first, then falls back to the shared Lucide resolver in `plugins/compat/lucide-icons.ts`. Centralized so a new render site cannot skip the custom-icon check — a second, independently maintained alias table used to live here and drifted
 │   ├── frontmatterWriter.ts — YAML frontmatter serialization + editing (locateFrontmatterBlock, serializeFrontmatter, applyFrontmatterChange) — custom line-builder for Obsidian-compatible output, no yaml lib for serialization
 │   ├── frontmatterWriter.test.ts — Unit tests for frontmatter writer
+│   ├── templatePlaceholders.ts — substituteTemplatePlaceholders(): client-side `{{date}}`/`{{time}}`/`{{title}}` rendering for "Insert template" (`insert-template`, never writes a file, so the server's own substitution in `POST /templates/create` doesn't apply) — kept in step with `TemplateService.replacePlaceholders` by hand
+│   ├── templatePlaceholders.test.ts — Unit tests for templatePlaceholders
 │   ├── simpleMarkdownToHtml.ts — Regex-based Markdown→HTML for external, untrusted Markdown (plugin READMEs, GitHub release notes) — headings/bold/italic/code/links/images/lists/blockquotes/hr; sanitizes URLs (http(s)/mailto/relative only, others → `#`) and escapes attribute quotes before interpolation. Extracted from PluginDetailPanel.tsx so ReleaseNotesModal.tsx can reuse it
 │   ├── simpleMarkdownToHtml.test.ts — Unit tests for simpleMarkdownToHtml
 ├── canvas/
@@ -447,7 +451,8 @@ src/
 │   ├── dailyNoteService.ts — Daily note open/create logic (YYYY-MM-DD.md, template from vault config); `openOrCreate()` takes an optional `dateStr` (defaults to today) and `offsetDateString()` shifts one by N days via local-calendar arithmetic (DST-safe) — backs `daily-notes:goto-next/-prev`
 │   ├── keybindingsStore.ts — Configurable keyboard shortcuts (server-synced, defaults + user overrides, matchesShortcut(), formatShortcut()); includes `slatebase:navigate-back`/`-forward` (Alt+ArrowLeft/Right — the `event.key` form, not `Left`/`Right`), `slatebase:open-quick-switcher` (Mod+O), `slatebase:next-tab`/`previous-tab` (Ctrl+Tab/Ctrl+Shift+Tab)
 │   ├── workspaceStore.ts — Workspace UI state persistence (tabs, expanded folders, panel sizes/visibility, `explorerFollowActiveFile` auto-reveal toggle, debounced localStorage, per-vault tab memory); a `storage`-event listener adopts writes from other browser tabs, except while this tab has a pending debounced write of its own. `explorerFollowActiveFile` validates leniently (defaults `false` instead of invalidating the whole blob on old persisted state) since it was added after the initial schema. Same leniency for `PersistedTab.pinned` (optional, defaults `false`)
-│   └── vaultStatisticsCache.ts — Client-side vault statistics cache (invalidate on vault:change SSE)
+│   ├── vaultStatisticsCache.ts — Client-side vault statistics cache (invalidate on vault:change SSE)
+│   └── toolbarStore.ts   — Persisted toolbar (Werkzeugleiste) preferences: visible, docking `position` (left/right), button `order`, `hidden` ids, per-id colour overrides — `useSyncExternalStore` module-level store (same pattern as `hooks/useStatusBar.ts`). Built-ins and plugin ribbon icons (`plugin:<pluginId>:<title>` ids) share one preference set. `resolveOrder()`/`mergeOrder()` keep a saved customisation from silently dropping a newly added button or forgetting a hidden/not-currently-loaded one
 │   ├── settingsState.ts      — Settings reducer + types (categories, sections, nav state)
 │   ├── settingsRegistry.ts   — ISettingsRegistry, section definitions
 │   ├── settingsPersistence.ts — sessionStorage serialize/validate
@@ -484,14 +489,16 @@ src/
 │   ├── UserMenu.tsx      — User avatar and dropdown menu (navigation, import/export, admin)
 │   ├── ErrorBoundary.tsx — React Error Boundary (fallback UI, reset button)
 │   ├── ErrorBoundary.css — ErrorBoundary fallback styles
-│   ├── SidebarToolbar.tsx — Draggable vertical toolbar (+ Daily Note, Papierkorb buttons)
+│   ├── SidebarToolbar.tsx — Customisable vertical toolbar, dockable left/right of the editor pane (`toolbarStore.position`); built-in buttons and plugin ribbon icons (`PluginRibbonGlyph`) are normalized into one `ToolbarItem` shape (`buildEntries`) so ordering/hiding/colouring/drag-reorder and both context menus (`toolbar-context-menu.ts`) treat them identically
+│   ├── SidebarToolbar.test.tsx — Unit tests for SidebarToolbar
+│   ├── toolbar-context-menu.ts — Builds the toolbar's two right-click menus (background: per-button visibility/docking side/reset/hide-bar; button: hide/move/colour, with a toolbar submenu repeated at the bottom for a densely packed bar with no empty background to click)
 │   ├── VaultList.tsx     — Vault selector/manager dropdown (legacy, no longer rendered in App.tsx)
 │   ├── FileExplorer.tsx  — Unified multi-vault explorer (all vaults as expandable root entries, lazy-loading, DnD, context menu, favorites, statistics tooltip)
 │   ├── file-explorer/
 │   │   ├── index.ts      — Barrel export (TreeNode, shared types)
 │   │   ├── types.ts      — DragState, ExternalDropState, ContextMenuState, InlineInputState
 │   │   └── TreeNode.tsx  — Recursive tree node renderer (directory/file, drag/drop, inline input, favorites)
-│   ├── ContextMenu.tsx   — Generic positioned overlay menu (fixed positioning, keyboard nav, portal)
+│   ├── ContextMenu.tsx   — Generic positioned overlay menu (fixed positioning, keyboard nav, portal); `ContextMenuItem.keepOpen` skips the close-on-activate for items meant to be toggled repeatedly in one pass (toolbar button visibility checkboxes)
 │   ├── ContextMenu.css   — ContextMenu styles
 │   ├── DropZone.tsx      — File drag-and-drop wrapper (visual overlay, validation, upload)
 │   ├── DropZone.css      — DropZone styles
@@ -499,7 +506,7 @@ src/
 │   ├── TrashView.css     — TrashView styles
 │   ├── VersionBrowser.tsx — File version browser (version list, inline diff, restore)
 │   ├── VersionBrowser.css — VersionBrowser styles
-│   ├── TemplateSelector.tsx — Two-step modal (template selection → filename input)
+│   ├── TemplateSelector.tsx — Two-step modal (template selection → filename input) for `mode: 'create'` (default). `mode: 'insert'` stops after selection and hands the rendered text (via `templatePlaceholders.ts`) to `onInsertContent` instead of creating a file — backs the `insert-template` command ("Vorlage einfügen") that drops a template into the already-open note
 │   ├── TemplateSelector.css — TemplateSelector styles
 │   ├── SearchPanel.tsx   — Vault-wide search + replace panel (replaces FileExplorer when open, debounced search, result navigation, operator syntax highlighting + autocomplete)
 │   ├── SearchPanel.css   — SearchPanel styles with design tokens (incl. highlight layer, autocomplete dropdown, operator help popover)
@@ -651,7 +658,7 @@ src/
 │   ├── ToastNotification.css — Toast notification styles
 │   ├── ConnectionIndicator.tsx — SSE connection status indicator (connected/connecting/disconnected)
 │   ├── PluginViewPanel.tsx — Plugin view rendering (imperative DOM mount for plugin ItemViews)
-│   ├── PluginRibbonIcon.tsx — Plugin ribbon icon buttons (left toolbar)
+│   ├── PluginRibbonIcon.tsx — Plugin ribbon icon buttons (SidebarToolbar, dockable left or right)
 │   ├── McpTokensPage.tsx — MCP API token management UI (create, revoke, list)
 │   ├── AdminLogsPage.tsx — Admin server log viewer (ring buffer)
 │   ├── FileViewer.tsx    — File content viewer (legacy, redirects to TabContent)

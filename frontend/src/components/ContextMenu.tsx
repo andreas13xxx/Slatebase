@@ -32,6 +32,14 @@ export interface ContextMenuItem {
    */
   run?: () => void
   /**
+   * Keeps the menu open after this item is activated, instead of closing it.
+   * For items the user typically toggles several times in a row — the
+   * per-button visibility checkboxes in the toolbar's context menu, say —
+   * where closing after every click would mean reopening the menu for each
+   * button. Items without it keep the normal close-on-activate behaviour.
+   */
+  keepOpen?: boolean
+  /**
    * Nested items, shown in a submenu opened to the side of this item (hover
    * or click/Enter/ArrowRight) instead of this item being directly
    * selectable — mirrors `MenuItem.setSubmenu()` in the plugin `Menu` shim
@@ -205,7 +213,7 @@ export function ContextMenu({ x, y, items, onClose, onSelect }: ContextMenuProps
             } else {
               if (item.run) item.run()
               else onSelect(item.id)
-              onClose()
+              if (!item.keepOpen) onClose()
             }
           }
         }
@@ -234,7 +242,7 @@ export function ContextMenu({ x, y, items, onClose, onSelect }: ContextMenuProps
     }
     if (item.run) item.run()
     else onSelect(item.id)
-    onClose()
+    if (!item.keepOpen) onClose()
   }
 
   function handleItemMouseEnter(index: number) {
@@ -368,7 +376,7 @@ function ContextSubmenu({
     }
     if (item.run) item.run()
     else onSelect(item.id)
-    onCloseAll()
+    if (!item.keepOpen) onCloseAll()
   }
 
   const menu = (

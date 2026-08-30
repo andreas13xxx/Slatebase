@@ -48,6 +48,14 @@ describe('ConfigService', () => {
       expect(config.getVaultConfigs()).toEqual([{ path: '/path/to/vault' }])
     })
 
+    it('exposes the mcp limits section — 16 MB, above the server-wide maxFileSize', () => {
+      const config = new ConfigService()
+      const server = config.getServerConfig()
+
+      expect(server.mcp).toEqual({ maxFileSize: 16777216, rateLimit: 60 })
+      expect(server.mcp.maxFileSize).toBeGreaterThan(server.maxFileSize)
+    })
+
     it('returns the features config', () => {
       const config = new ConfigService()
       const features = config.getFeaturesConfig()

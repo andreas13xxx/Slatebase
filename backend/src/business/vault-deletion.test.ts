@@ -45,6 +45,7 @@ function createMockConfigService(overrides?: Partial<ServerConfig>): IConfigServ
     sessionDurationHours: 24,
     sessionMaxLifetimeDays: 7,
     features: {},
+    mcp: { maxFileSize: 16777216, rateLimit: 60 },
     sse: { maxConnections: 1000, maxPerUser: 3, heartbeatInterval: 30000, replayBufferSize: 100, replayTtl: 300000, batchWindow: 100, batchMax: 20 },
     trash: { retentionDays: 30 },
     versions: { maxPerFile: 20 },

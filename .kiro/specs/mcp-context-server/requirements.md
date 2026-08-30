@@ -82,9 +82,9 @@ Der MCP-Server wird als HTTP-basierter Transport (Streamable HTTP) in den besteh
 3. WHEN ein MCP_Client `resources/read` mit einer Vault-Datei-URI aufruft, THE MCP_Server SHALL den Pfad-Anteil der URI mit `validateFilePath()` gegen Path-Traversal validieren und den Dateiinhalt als Text-Content zurückgeben.
 4. THE MCP_Server SHALL Markdown-Dateien (.md) mit dem MIME-Type `text/markdown` und andere Textdateien mit `text/plain` kennzeichnen.
 5. IF ein MCP_Client eine Resource-URI für eine nicht existierende Datei anfragt, THEN THE MCP_Server SHALL einen MCP-Fehler mit Code -32002 ("Resource not found") zurückgeben.
-6. IF ein MCP_Client eine Resource-URI für eine Binärdatei anfragt, THEN THE MCP_Server SHALL einen MCP-Fehler mit Code -32003 ("Binary files not supported") zurückgeben.
+6. IF ein MCP_Client eine Resource-URI für eine Binärdatei anfragt, THEN THE MCP_Server SHALL den Dateiinhalt base64-kodiert im Feld `blob` mit dem MIME-Type der Dateiendung (z. B. `image/png`, `application/pdf`, sonst `application/octet-stream`) zurückgeben. *(Ursprünglich: Fehler -32003 "Binary files not supported" — durch Binärdatei-Unterstützung ersetzt.)*
 7. WHEN ein MCP_Client `resources/templates/list` aufruft, THE MCP_Server SHALL ein URI-Template `vault://{vaultId}/{path}` für den Zugriff auf beliebige Vault-Dateien bereitstellen.
-8. IF die angefragte Datei die konfigurierte maximale Dateigröße (`maxFileSize`, Standard: 5 MB) überschreitet, THEN THE MCP_Server SHALL einen MCP-Fehler mit Code -32004 ("File too large") zurückgeben.
+8. IF die angefragte Datei die konfigurierte maximale Dateigröße (`mcp.maxFileSize`, Standard: 16 MB) überschreitet, THEN THE MCP_Server SHALL einen MCP-Fehler mit Code -32004 ("File too large") zurückgeben.
 9. IF ein MCP_Client eine Resource-URI mit einem ungültigen Pfad (Path-Traversal, Null-Bytes, absoluter Pfad) anfragt, THEN THE MCP_Server SHALL einen MCP-Fehler mit Code -32602 ("Invalid params") zurückgeben.
 
 ---
@@ -142,12 +142,12 @@ Der MCP-Server wird als HTTP-basierter Transport (Streamable HTTP) in den besteh
 #### Acceptance Criteria
 
 1. THE MCP_Server SHALL ein Tool `read_file` mit den Parametern `vaultId` (string, required) und `path` (string, required) bereitstellen.
-2. WHEN ein MCP_Client das Tool `read_file` mit einem gültigen `vaultId` und `path` aufruft und die Datei kleiner oder gleich dem konfigurierten `maxFileSize`-Wert (Standard: 5.242.880 Bytes) ist, THE MCP_Server SHALL den vollständigen Textinhalt der Datei als UTF-8-String zurückgeben.
+2. WHEN ein MCP_Client das Tool `read_file` mit einem gültigen `vaultId` und `path` aufruft und die Datei kleiner oder gleich dem konfigurierten `mcp.maxFileSize`-Wert (Standard: 16.777.216 Bytes) ist, THE MCP_Server SHALL den vollständigen Textinhalt der Datei als UTF-8-String zurückgeben.
 3. THE MCP_Server SHALL den Dateipfad mit `validateFilePath()` gegen Path-Traversal-Angriffe validieren.
-4. IF der Dateipfad die Path-Traversal-Validierung nicht besteht, THEN THE MCP_Server SHALL einen MCP-Fehler mit Code -32003 ("Invalid file path") zurückgeben.
+4. IF der Dateipfad die Path-Traversal-Validierung nicht besteht, THEN THE MCP_Server SHALL einen MCP-Fehler mit Code -32602 ("Invalid file path") zurückgeben.
 5. IF die angegebene `vaultId` keinem registrierten Vault entspricht, THEN THE MCP_Server SHALL einen MCP-Fehler mit Code -32001 ("Vault not found") zurückgeben.
 6. IF die angegebene Datei nicht existiert, THEN THE MCP_Server SHALL einen MCP-Fehler mit Code -32002 ("Resource not found") zurückgeben.
-7. IF die angegebene Datei eine Binärdatei ist (Null-Byte in den ersten 8.192 Bytes erkannt), THEN THE MCP_Server SHALL einen MCP-Fehler mit Code -32003 ("Binary files not supported") zurückgeben.
+7. IF die angegebene Datei eine Binärdatei ist (Null-Byte in den ersten 8.192 Bytes erkannt), THEN THE MCP_Server SHALL den Inhalt base64-kodiert zurückgeben — als `image`- bzw. `audio`-Content-Block für Bild-/Audio-MIME-Types, sonst als eingebettete Resource mit `blob`. *(Ursprünglich: Fehler -32003 "Binary files not supported" — durch Binärdatei-Unterstützung ersetzt.)*
 8. IF die Dateigröße den konfigurierten `maxFileSize`-Wert überschreitet, THEN THE MCP_Server SHALL einen MCP-Fehler mit Code -32004 ("File too large") zurückgeben.
 
 ---
@@ -200,7 +200,7 @@ Der MCP-Server wird als HTTP-basierter Transport (Streamable HTTP) in den besteh
 
 1. THE MCP_Server SHALL über die Konfigurationsvariable `SLATEBASE_MCP_ENABLED` (Standard: true) aktivierbar und deaktivierbar sein.
 2. IF `SLATEBASE_MCP_ENABLED` auf false gesetzt ist, THEN THE MCP_Server SHALL alle eingehenden MCP-Anfragen mit einem JSON-RPC Error (Code -32600, "MCP disabled") ablehnen, ohne die Anfrage weiterzuverarbeiten.
-3. THE MCP_Server SHALL über die Konfigurationsvariable `SLATEBASE_MCP_MAX_FILE_SIZE` eine separate maximale Dateigröße in Bytes für MCP-Reads erlauben (Standard: Wert aus `maxFileSize` der Server-Config, 5242880 Bytes).
+3. THE MCP_Server SHALL über die Konfigurationsvariable `SLATEBASE_MCP_MAX_FILE_SIZE` eine separate maximale Dateigröße in Bytes für MCP-Reads und -Writes erlauben (Standard: Wert aus dem Config-Abschnitt `mcp.maxFileSize`, 16777216 Bytes).
 4. IF eine angeforderte Datei die konfigurierte `SLATEBASE_MCP_MAX_FILE_SIZE` überschreitet, THEN THE MCP_Server SHALL die Anfrage mit einem JSON-RPC Error ablehnen, der die maximale erlaubte Größe angibt.
 5. THE MCP_Server SHALL über die Konfigurationsvariable `SLATEBASE_MCP_RATE_LIMIT` die maximale Anzahl MCP-Anfragen pro Minute pro Token konfigurierbar machen (Standard: 60, Minimum: 1).
 6. IF ein MCP_Client die konfigurierte Anzahl an Anfragen innerhalb eines gleitenden 60-Sekunden-Fensters überschreitet, THEN THE MCP_Server SHALL weitere Anfragen mit HTTP 429 und einem `Retry-After`-Header (verbleibende Sekunden bis Fenster-Reset) ablehnen.
