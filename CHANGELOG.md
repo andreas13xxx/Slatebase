@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.39.0](https://github.com/andreas13xxx/Slatebase/compare/v0.38.0...v0.39.0) (2026-08-30)
+
+
+### Features
+
+* MCP binary file support, customizable toolbar, and template insert mode ([7d13b4f](https://github.com/andreas13xxx/Slatebase/commit/7d13b4f6cc78ad4b73c08f1893ffa163c3d51a17))
+
 ## [0.38.0](https://github.com/andreas13xxx/Slatebase/compare/v0.37.2...v0.38.0) (2026-08-29)
 
 
