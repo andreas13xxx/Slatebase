@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.40.1](https://github.com/andreas13xxx/Slatebase/compare/v0.40.0...v0.40.1) (2026-09-01)
+
+
+### Bugfixes
+
+* frontmatter null handling, date property control, and Obsidian 1.13 Setting row APIs ([b160498](https://github.com/andreas13xxx/Slatebase/commit/b160498afbafe0c7188249e454aaaafe1f009029))
+
 ## [0.40.0](https://github.com/andreas13xxx/Slatebase/compare/v0.39.0...v0.40.0) (2026-09-01)
 
 
