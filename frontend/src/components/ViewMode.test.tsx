@@ -235,6 +235,73 @@ describe('ViewMode', () => {
     })
   })
 
+  describe('Footnotes', () => {
+    it('renders the marker as a numbered link into the footnote list below the note', () => {
+      const { container } = render(
+        <ViewMode {...defaultProps} content={'Behauptung[^1].\n\n[^1]: Die Begruendung.\n'} />
+      )
+
+      const marker = container.querySelector('sup.view-mode-footnote-ref')
+      expect(marker?.getAttribute('id')).toBe('fnref-1')
+      expect(marker?.textContent).toBe('1')
+      expect(marker?.querySelector('a')?.getAttribute('href')).toBe('#fn-1')
+
+      const entry = container.querySelector('.view-mode-footnotes li')
+      expect(entry?.getAttribute('id')).toBe('fn-1')
+      expect(entry?.textContent).toContain('Die Begruendung.')
+    })
+
+    it('numbers markers by reference order and links each back to its own entry', () => {
+      const { container } = render(
+        <ViewMode {...defaultProps} content={'Erst[^zwei] dann[^eins].\n\n[^eins]: Eins\n[^zwei]: Zwei\n'} />
+      )
+
+      const markers = [...container.querySelectorAll('sup.view-mode-footnote-ref')]
+      expect(markers.map((m) => m.textContent)).toEqual(['1', '2'])
+      expect(markers.map((m) => m.querySelector('a')?.getAttribute('href'))).toEqual(['#fn-zwei', '#fn-eins'])
+
+      const entries = [...container.querySelectorAll('.view-mode-footnotes li')]
+      expect(entries.map((li) => li.getAttribute('id'))).toEqual(['fn-zwei', 'fn-eins'])
+    })
+
+    it('gives a referenced footnote a back-link to its marker', () => {
+      const { container } = render(
+        <ViewMode {...defaultProps} content={'Text[^q].\n\n[^q]: Quelle\n'} />
+      )
+
+      expect(container.querySelector('.view-mode-footnote-backref')?.getAttribute('href')).toBe('#fnref-q')
+    })
+
+    it('still shows a definition nothing references, without a back-link', () => {
+      const { container } = render(
+        <ViewMode {...defaultProps} content={'Kein Verweis mehr im Text.\n\n[^weg]: Der Text der Fussnote.\n'} />
+      )
+
+      const entry = container.querySelector('.view-mode-footnotes li')
+      expect(entry?.textContent).toContain('Der Text der Fussnote.')
+      expect(entry?.querySelector('.view-mode-footnote-backref')).toBeNull()
+    })
+
+    it('renders no footnote list for a note without footnotes', () => {
+      const { container } = render(<ViewMode {...defaultProps} content={'Nur Text.'} />)
+
+      expect(container.querySelector('.view-mode-footnotes')).toBeNull()
+    })
+
+    it('scrolls to the footnote entry when the marker is clicked', () => {
+      const scrollIntoView = vi.fn()
+      Element.prototype.scrollIntoView = scrollIntoView
+
+      const { container } = render(
+        <ViewMode {...defaultProps} content={'Text[^1].\n\n[^1]: Begruendung\n'} />
+      )
+      container.querySelector('sup.view-mode-footnote-ref a')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+      expect(scrollIntoView).toHaveBeenCalled()
+    })
+  })
+
   describe('Links', () => {
     it('renders external links with target="_blank" and rel="noopener noreferrer"', () => {
       const { container } = render(

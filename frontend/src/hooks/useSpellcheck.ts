@@ -1,74 +1,62 @@
-import { useCallback, useState } from 'react'
-
-const STORAGE_KEY = 'slatebase:spellcheck'
+/**
+ * useSpellcheck — Slatebase's own spellchecker for the editor: whether it runs
+ * and which dictionary it uses.
+ *
+ * Stored per user *and* per vault via `vaultSettingsStore`, so a German
+ * notebook and an English one each keep their own dictionary and the choice
+ * still follows the account across devices. Previously one device-local
+ * `localStorage` entry shared by every vault.
+ *
+ * Reached through the editor context menu, not the settings panel.
+ */
+import { useCallback } from 'react'
+import { useVaultSettings, updateVaultSettings, getVaultSettings } from '../state/vaultSettingsStore'
+import {
+  DEFAULT_SPELLCHECK_LANGUAGE,
+  isSpellcheckLanguage,
+  type SpellcheckLanguage,
+} from '../editor/spellcheck/protocol'
 
 /** Return value of the useSpellcheck hook. */
 export interface UseSpellcheckReturn {
-  /** Whether browser spellcheck is currently enabled for the editor. */
+  /** Whether spellchecking is currently enabled for the editor. */
   enabled: boolean
-  /** Toggles spellcheck on/off and persists to localStorage. */
+  /** Toggles spellchecking for the active vault. */
   toggle(): void
+  /** The dictionary currently in use. */
+  language: SpellcheckLanguage
+  /** Switches the dictionary without touching the on/off state. */
+  setLanguage(language: SpellcheckLanguage): void
 }
 
 /**
- * Reads the initial enabled state from localStorage.
- * Defaults to true (enabled) — a `contenteditable` element is spellchecked by
- * the browser by default when no `spellcheck` attribute is set at all, which
- * was CM6's de facto behavior here before this toggle existed. An unset
- * preference must preserve that rather than silently disabling spellcheck for
- * everyone on their next visit.
+ * The stored language, falling back to German for anything unrecognised —
+ * a dictionary that was removed, or a hand-edited value.
  */
-function readInitialState(): boolean {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw === null) {
-      return true
-    }
-    const parsed: unknown = JSON.parse(raw)
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      'enabled' in parsed &&
-      typeof (parsed as { enabled: unknown }).enabled === 'boolean'
-    ) {
-      return (parsed as { enabled: boolean }).enabled
-    }
-    return true
-  } catch {
-    return true
-  }
+export function getSpellcheckLanguage(): SpellcheckLanguage {
+  const stored = getVaultSettings().spellcheckLanguage
+  return isSpellcheckLanguage(stored) ? stored : DEFAULT_SPELLCHECK_LANGUAGE
 }
 
-/**
- * Persists the enabled state to localStorage.
- * Silently ignores errors if localStorage is unavailable.
- */
-function persistState(enabled: boolean): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ enabled }))
-  } catch {
-    // localStorage unavailable — silently ignore
-  }
+/** Toggles spellchecking from outside React (command palette, context menu). */
+export function toggleSpellcheck(): void {
+  updateVaultSettings({ spellcheck: !getVaultSettings().spellcheck })
 }
 
-/**
- * Custom hook managing editor spellcheck enabled/disabled state.
- *
- * - Reads initial state from localStorage key `slatebase:spellcheck`
- * - Defaults to enabled (matching the browser's implicit spellcheck-on-by-default
- *   behavior) if localStorage is unavailable or data is corrupted
- * - `toggle()` flips the boolean and persists the new value
- */
+/** Switches the dictionary from outside React. */
+export function setSpellcheckLanguage(language: SpellcheckLanguage): void {
+  updateVaultSettings({ spellcheckLanguage: language })
+}
+
+/** Spellcheck state and dictionary for the active vault. */
 export function useSpellcheck(): UseSpellcheckReturn {
-  const [enabled, setEnabled] = useState<boolean>(readInitialState)
+  const settings = useVaultSettings()
+  const language = isSpellcheckLanguage(settings.spellcheckLanguage)
+    ? settings.spellcheckLanguage
+    : DEFAULT_SPELLCHECK_LANGUAGE
 
-  const toggle = useCallback(() => {
-    setEnabled(prev => {
-      const next = !prev
-      persistState(next)
-      return next
-    })
-  }, [])
+  const toggle = useCallback(() => { toggleSpellcheck() }, [])
+  const setLanguage = useCallback((next: SpellcheckLanguage) => { setSpellcheckLanguage(next) }, [])
 
-  return { enabled, toggle }
+  return { enabled: settings.spellcheck, toggle, language, setLanguage }
 }

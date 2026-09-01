@@ -12,6 +12,7 @@ import { dispatchPresenceChange, getOnlineUserIds } from '../state/realtimePrese
 import { showToast } from './ToastNotification'
 import type { ConnectionStatus } from '../state/realtimeState'
 import { warnOnce } from '../plugins/compat/log'
+import { CLIENT_ID } from '../api'
 
 /** Callback props for communicating with other providers. */
 export interface RealtimeEventHandlers {
@@ -23,6 +24,13 @@ export interface RealtimeEventHandlers {
   onVaultChange?: (vaultId: string, data?: Record<string, unknown>) => void
   /** Called when a plugin-settings:change event is received. */
   onPluginSettingsChange?: (vaultId: string, pluginId: string) => void
+  /**
+   * Called when this user changed a preference on another device.
+   * `scope` names the bucket ('uiSettings', 'vaultSettings', 'keybindings',
+   * 'favorites', 'recentFiles'); `vaultId` is set for 'vaultSettings' only.
+   * Events originating from this tab are filtered out before this fires.
+   */
+  onPreferencesChange?: (scope: string, vaultId?: string) => void
   /** Called when a presence:update event is received. */
   onPresenceUpdate?: (userId: string, username: string, status: string) => void
   /** Called when a presence:init event is received with the initial online users list. */
@@ -171,6 +179,23 @@ function RealtimeInner({
         if (vaultId && pluginId) {
           handlersRef.current?.onPluginSettingsChange?.(vaultId, pluginId)
         }
+        break
+      }
+
+      case 'preferences:change': {
+        // This user changed a preference somewhere. The tab that made the
+        // change is named in `originId` and already holds the new value, so it
+        // skips its own echo rather than re-fetching what it just sent.
+        const originId = payload.originId as string | null | undefined
+        if (originId === CLIENT_ID) break
+
+        const scope = payload.scope as string | undefined
+        if (scope === undefined) break
+
+        handlersRef.current?.onPreferencesChange?.(
+          scope,
+          payload.vaultId as string | undefined,
+        )
         break
       }
 

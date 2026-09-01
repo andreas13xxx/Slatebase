@@ -29,6 +29,9 @@ function sanitizeConfig(raw: unknown): Partial<VaultConfig> {
   if (typeof parsed.dailyNoteTemplateName === 'string') {
     result.dailyNoteTemplateName = parsed.dailyNoteTemplateName
   }
+  if (typeof parsed.attachmentsDirectory === 'string') {
+    result.attachmentsDirectory = parsed.attachmentsDirectory
+  }
   return result
 }
 
@@ -61,6 +64,7 @@ export class VaultConfigStore implements IVaultConfigService {
       templatesDirectory: stored.templatesDirectory ?? this.globalTemplatesDirectory,
       dailyNotesDirectory: stored.dailyNotesDirectory ?? DEFAULT_VAULT_CONFIG.dailyNotesDirectory,
       dailyNoteTemplateName: stored.dailyNoteTemplateName ?? DEFAULT_VAULT_CONFIG.dailyNoteTemplateName,
+      attachmentsDirectory: stored.attachmentsDirectory ?? DEFAULT_VAULT_CONFIG.attachmentsDirectory,
     }
   }
 
@@ -69,6 +73,7 @@ export class VaultConfigStore implements IVaultConfigService {
       templatesDirectory: config.templatesDirectory ?? current.templatesDirectory ?? this.globalTemplatesDirectory,
       dailyNotesDirectory: config.dailyNotesDirectory ?? current.dailyNotesDirectory ?? DEFAULT_VAULT_CONFIG.dailyNotesDirectory,
       dailyNoteTemplateName: config.dailyNoteTemplateName ?? current.dailyNoteTemplateName ?? DEFAULT_VAULT_CONFIG.dailyNoteTemplateName,
+      attachmentsDirectory: config.attachmentsDirectory ?? current.attachmentsDirectory ?? DEFAULT_VAULT_CONFIG.attachmentsDirectory,
     }))
     return merged as VaultConfig
   }

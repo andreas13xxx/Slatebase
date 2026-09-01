@@ -97,7 +97,10 @@ test. Config: `backend/vitest.config.ts` and the `test.coverage` block in `front
 | @codemirror/language-data | CodeMirror 6 code-block language registry |
 | @codemirror/autocomplete | CodeMirror 6 autocompletion |
 | @codemirror/search | CodeMirror 6 search/replace |
-| @codemirror/lint | CodeMirror 6 lint infrastructure |
+| @codemirror/lint | CodeMirror 6 lint infrastructure — re-exported to plugins (`window.__codemirrorLint`) **and** used by the core editor to draw the spellchecker's underlines |
+| nspell | Hunspell-compatible spell checker (MIT), runs in the spellcheck Web Worker |
+| dictionary-de | German Hunspell dictionary, 1.1 MB (GPL-2.0 OR GPL-3.0 — compatible with Slatebase's AGPL-3.0; an MIT project could not ship it) |
+| dictionary-en | English Hunspell dictionary, 0.5 MB (MIT AND BSD) |
 | @lezer/highlight | Lezer syntax highlighting primitives |
 | @lezer/lr | Lezer LR parser runtime |
 | @react-symbols/icons | File type icons (file explorer) |
@@ -150,6 +153,15 @@ Kein Express/Fastify/Koa, kein Redux/Zustand, kein ORM, kein DI-Container, kein 
 - Parser wird in `CodeMirrorEditor.tsx` via `markdownLanguage.parser.configure({props: [tokenClassNodePropSource]})` konfiguriert.
 - **InlineCode-Range-Problem**: Standard-Lezer inkludiert Backticks in `node.from/to`, Obsidian nicht. Fix: `createObsidianCompatSyntaxTree()` in `setting-tab.ts` wrapped `syntaxTree()` mit Proxy der `iterate()`-Callbacks für `InlineCode`-Nodes adjustierte from/to liefert (CodeMark-Children-basiert).
 - Wichtig: Werte werden nach dem Callback wiederhergestellt (Tree-Navigation bleibt intakt).
+
+### Rechtschreibprüfung → Web Worker + statische Wörterbücher
+- **Nicht die Browser-Prüfung.** Der Editor ersetzt das native Kontextmenü durch ein eigenes (`editor-context-menu.ts`), und kein Browser gibt seine Rechtschreibvorschläge an JavaScript heraus — die native Prüfung könnte also nur unterringeln, nie korrigieren. `contentDOM` bekommt deshalb unbedingt `spellcheck="false"`, sonst stünden zwei verschiedene Unterringelungen unter denselben Wörtern.
+- **Worker, nicht Main Thread**: Der Wörterbuchaufbau dauert gemessen ~817 ms (Deutsch). `spellcheck.worker.ts` besitzt die nspell-Instanz; der Main Thread schickt nur Wortlisten und bekommt die unbekannten zurück.
+- **Wörterbücher als statische Assets**, nicht als Import: `dictionary-de@3` liest seine Daten mit `node:fs` (im Browser nicht auflösbar) und sperrt über `"exports": "./index.js"` den Deep Import der rohen `.aff`/`.dic`. Das `spellcheckDictionaries()`-Plugin in `vite.config.ts` liefert sie unter `/dictionaries/<lang>.{aff,dic}` aus — in Dev per Middleware, im Build per `emitFile` (inkl. GPL-Lizenztexten). Effekt: 1,6 MB bleiben aus dem JS-Bundle, der Browser cacht sie separat.
+- **nginx** (`frontend/nginx.conf`) deklariert `.aff`/`.dic` als `text/plain`, damit `gzip_types` greift (sonst `application/octet-stream`, ungzippt). Cache bewusst 7 Tage statt `immutable`: die Dateinamen sind nicht content-hashed.
+- **Nur der Haupteditor.** Die sieben `<textarea>`-Oberflächen (Canvas-Knoten, Canvas-Source, Snippet-Editor, Git-Sync-Felder, Plugin-Settings, Chat-Eingabe) haben keine Prüfung — sie sind bewusst keine CM6-Instanzen.
+- **CSP:** Das ausgelieferte Frontend-Dokument hat aktuell keine Content-Security-Policy (nginx setzt nur `X-Frame-Options`/`X-Content-Type-Options`/`Referrer-Policy`; die CSP in `backend/src/index.ts` gilt nur für die Backend-Antworten selbst). Falls das Frontend je eine bekommt: der Modul-Worker braucht `worker-src 'self' blob:` (bzw. Fallback über `script-src`) und der Wörterbuch-Abruf `connect-src 'self'`.
+- **Neue Sprache hinzufügen:** Eintrag in `SPELLCHECK_DICTIONARIES` (`vite.config.ts`) **und** in `SPELLCHECK_LANGUAGES`/`SPELLCHECK_LANGUAGE_LABELS` (`editor/spellcheck/protocol.ts`), plus je ein Core-Command in `core-commands.ts`/`core-command-i18n.ts`. Die Compound-Zerlegung (`compound.ts`) ist deutschspezifisch und wird über `compoundSplitting` nur für `de` aktiviert — für andere Sprachen mit produktiver Komposition müsste das explizit freigeschaltet werden.
 
 ### MetadataCacheShim → On-Demand-Parsing
 - Obsidian's MetadataCache wird automatisch vom internen Parser befüllt. In Slatebase fehlt dieser Parser.

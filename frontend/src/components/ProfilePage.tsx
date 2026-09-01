@@ -379,56 +379,12 @@ export function ProfilePage({ apiClient, mode = 'full' }: ProfilePageProps) {
             )}
           </div>
 
-          <div className="profile-field">
-            <label className="profile-label" htmlFor="profile-language">
-              {t('profile.preferredLanguage')}
-            </label>
-            <select
-              id="profile-language"
-              className="profile-select"
-              value={preferredLanguage}
-              onChange={(e) => {
-                setPreferredLanguage(e.target.value as 'de' | 'en')
-                if (profileErrors.preferredLanguage) setProfileErrors((prev) => ({ ...prev, preferredLanguage: null }))
-              }}
-              aria-invalid={profileErrors.preferredLanguage !== null}
-              aria-describedby={profileErrors.preferredLanguage ? 'profile-language-error' : undefined}
-            >
-              <option value="de">{t('profile.languageDe')}</option>
-              <option value="en">{t('profile.languageEn')}</option>
-            </select>
-            {profileErrors.preferredLanguage && (
-              <p id="profile-language-error" className="profile-field-error" role="alert">
-                {profileErrors.preferredLanguage}
-              </p>
-            )}
-          </div>
-
-          <div className="profile-field">
-            <label className="profile-label" htmlFor="profile-color-scheme">
-              {t('profile.colorScheme')}
-            </label>
-            <select
-              id="profile-color-scheme"
-              className="profile-select"
-              value={colorScheme}
-              onChange={(e) => {
-                setColorScheme(e.target.value as 'light' | 'dark' | 'system')
-                if (profileErrors.colorScheme) setProfileErrors((prev) => ({ ...prev, colorScheme: null }))
-              }}
-              aria-invalid={profileErrors.colorScheme !== null}
-              aria-describedby={profileErrors.colorScheme ? 'profile-color-scheme-error' : undefined}
-            >
-              <option value="light">{t('profile.colorSchemeLight')}</option>
-              <option value="dark">{t('profile.colorSchemeDark')}</option>
-              <option value="system">{t('profile.colorSchemeSystem')}</option>
-            </select>
-            {profileErrors.colorScheme && (
-              <p id="profile-color-scheme-error" className="profile-field-error" role="alert">
-                {profileErrors.colorScheme}
-              </p>
-            )}
-          </div>
+          {/*
+            Language and colour scheme moved to Einstellungen → Darstellung:
+            they are display settings, and this section is about who you are,
+            not how the app looks. They are still sent with this form's PATCH
+            (see handleProfileSubmit) so a save here never clears them.
+          */}
 
           {profileApiError && (
             <p className="profile-error" role="alert">

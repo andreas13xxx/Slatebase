@@ -1,86 +1,67 @@
-import { renderHook, act } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { zoomIn, zoomOut, resetZoom, getZoom, MIN_ZOOM, MAX_ZOOM } from './zoomStore'
+import {
+  _reset as resetVaultSettings,
+  setActiveVault,
+  getVaultSettings,
+} from './vaultSettingsStore'
+
+vi.mock('../components/ToastNotification', () => ({ showToast: vi.fn() }))
 
 describe('zoomStore', () => {
-  beforeEach(() => {
-    localStorage.clear()
-    vi.resetModules()
+  beforeEach(async () => {
+    resetVaultSettings()
+    await setActiveVault('vault-1')
   })
 
-  it('defaults to 1.0 (100%) when localStorage is empty', async () => {
-    const { useZoom } = await import('./zoomStore')
-    const { result } = renderHook(() => useZoom())
-    expect(result.current).toBe(1)
+  it('starts at 100%', () => {
+    expect(getZoom()).toBe(1)
   })
 
-  it('zoomIn increases by the step and notifies subscribers', async () => {
-    const { useZoom, zoomIn } = await import('./zoomStore')
-    const { result } = renderHook(() => useZoom())
-
-    act(() => { zoomIn() })
-
-    expect(result.current).toBeCloseTo(1.1)
-  })
-
-  it('zoomOut decreases by the step', async () => {
-    const { useZoom, zoomOut } = await import('./zoomStore')
-    const { result } = renderHook(() => useZoom())
-
-    act(() => { zoomOut() })
-
-    expect(result.current).toBeCloseTo(0.9)
-  })
-
-  it('clamps zoomIn at MAX_ZOOM', async () => {
-    const { useZoom, zoomIn, MAX_ZOOM } = await import('./zoomStore')
-    const { result } = renderHook(() => useZoom())
-
-    act(() => { for (let i = 0; i < 50; i++) zoomIn() })
-
-    expect(result.current).toBe(MAX_ZOOM)
-  })
-
-  it('clamps zoomOut at MIN_ZOOM', async () => {
-    const { useZoom, zoomOut, MIN_ZOOM } = await import('./zoomStore')
-    const { result } = renderHook(() => useZoom())
-
-    act(() => { for (let i = 0; i < 50; i++) zoomOut() })
-
-    expect(result.current).toBe(MIN_ZOOM)
-  })
-
-  it('resetZoom returns to 1.0 regardless of current level', async () => {
-    const { useZoom, zoomIn, resetZoom } = await import('./zoomStore')
-    const { result } = renderHook(() => useZoom())
-
-    act(() => { zoomIn(); zoomIn(); resetZoom() })
-
-    expect(result.current).toBe(1)
-  })
-
-  it('persists the zoom level to localStorage', async () => {
-    const { zoomIn } = await import('./zoomStore')
-
+  it('zoomIn increases by the step', () => {
     zoomIn()
-
-    expect(JSON.parse(localStorage.getItem('slatebase:zoom')!)).toBeCloseTo(1.1)
+    expect(getZoom()).toBeCloseTo(1.1, 5)
   })
 
-  it('reads a persisted zoom level on next load', async () => {
-    localStorage.setItem('slatebase:zoom', JSON.stringify(1.3))
-    const { useZoom } = await import('./zoomStore')
-
-    const { result } = renderHook(() => useZoom())
-
-    expect(result.current).toBeCloseTo(1.3)
+  it('zoomOut decreases by the step', () => {
+    zoomOut()
+    expect(getZoom()).toBeCloseTo(0.9, 5)
   })
 
-  it('falls back to 1.0 for corrupted localStorage data', async () => {
-    localStorage.setItem('slatebase:zoom', 'not-json')
-    const { useZoom } = await import('./zoomStore')
+  it('clamps zoomIn at MAX_ZOOM', () => {
+    for (let i = 0; i < 30; i++) zoomIn()
+    expect(getZoom()).toBe(MAX_ZOOM)
+  })
 
-    const { result } = renderHook(() => useZoom())
+  it('clamps zoomOut at MIN_ZOOM', () => {
+    for (let i = 0; i < 30; i++) zoomOut()
+    expect(getZoom()).toBe(MIN_ZOOM)
+  })
 
-    expect(result.current).toBe(1)
+  it('resetZoom returns to 100%', () => {
+    zoomIn()
+    zoomIn()
+    resetZoom()
+    expect(getZoom()).toBe(1)
+  })
+
+  it('stores the level in the active vault’s settings', () => {
+    zoomIn()
+    expect(getVaultSettings().zoom).toBeCloseTo(1.1, 5)
+  })
+
+  it('keeps the zoom level separate per vault', async () => {
+    zoomIn()
+    expect(getZoom()).toBeCloseTo(1.1, 5)
+
+    await setActiveVault('vault-2')
+
+    expect(getZoom()).toBe(1)
+  })
+
+  it('avoids float drift across repeated steps', () => {
+    for (let i = 0; i < 3; i++) zoomIn()
+    for (let i = 0; i < 3; i++) zoomOut()
+    expect(getZoom()).toBe(1)
   })
 })

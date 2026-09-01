@@ -72,6 +72,67 @@ export const serverConfigUpdateSchema = z.object({
   allowedOrigins: z.array(z.string()),
   trash: trashConfigUpdateSchema.optional(),
   versions: versionsConfigUpdateSchema.optional(),
+
+  // ── Limits previously reachable only by editing config/default.json ──
+  maxDirectoryDepth: z
+    .number()
+    .int('Directory depth must be an integer')
+    .min(1, 'Directory depth must be at least 1')
+    .max(200, 'Directory depth must be at most 200')
+    .optional(),
+  maxVaultsPerUser: z
+    .number()
+    .int('Vault limit must be an integer')
+    .min(1, 'Vault limit must be at least 1')
+    .max(1000, 'Vault limit must be at most 1000')
+    .optional(),
+  maxImportFileSize: z
+    .number()
+    .int('Import file size must be an integer')
+    .positive('Import file size must be greater than 0')
+    .optional(),
+  maxImportFiles: z
+    .number()
+    .int('Import file count must be an integer')
+    .positive('Import file count must be greater than 0')
+    .optional(),
+  maxImportDepth: z
+    .number()
+    .int('Import depth must be an integer')
+    .min(1, 'Import depth must be at least 1')
+    .max(100, 'Import depth must be at most 100')
+    .optional(),
+  cleanup: z.object({
+    intervalHours: z
+      .number()
+      .min(1, 'Cleanup interval must be at least 1 hour')
+      .max(720, 'Cleanup interval must be at most 720 hours'),
+  }).optional(),
+  upload: z.object({
+    maxFileSizeBytes: z
+      .number()
+      .int('Upload size must be an integer')
+      .positive('Upload size must be greater than 0'),
+    maxFilesPerDrop: z
+      .number()
+      .int('Files per drop must be an integer')
+      .positive('Files per drop must be greater than 0')
+      .max(1000, 'Files per drop must be at most 1000'),
+    maxImagePasteSize: z
+      .number()
+      .int('Image paste size must be an integer')
+      .positive('Image paste size must be greater than 0'),
+  }).optional(),
+  mcp: z.object({
+    maxFileSize: z
+      .number()
+      .int('MCP file size must be an integer')
+      .positive('MCP file size must be greater than 0'),
+    rateLimit: z
+      .number()
+      .int('MCP rate limit must be an integer')
+      .positive('MCP rate limit must be greater than 0'),
+  }).optional(),
 })
 
 // --- Inferred Types ---

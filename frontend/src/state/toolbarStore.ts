@@ -10,15 +10,18 @@
  * hiding/reordering/colouring works identically for both (that parity is the
  * whole point; see SidebarToolbar's `buildEntries`).
  *
- * Mirrors the module-level `useSyncExternalStore` pattern of
- * `hooks/useStatusBar.ts` — a single module-level snapshot every consumer
- * subscribes to, so a change made in a context menu is reflected everywhere
- * (toolbar, command palette, App layout) in the same commit.
+ * Stored per user on the server (`userSettingsStore.toolbar`) rather than in
+ * this browser, so a customised toolbar follows the account. This module keeps
+ * the pure ordering helpers and the intent-level API; the snapshot, its
+ * localStorage cache and the debounced sync live in `userSettingsStore`. A
+ * change made in a context menu is still reflected everywhere (toolbar,
+ * command palette, App layout, and the Darstellung settings section) in the
+ * same commit.
  *
  * @module state/toolbarStore
  */
 
-import { useSyncExternalStore } from 'react'
+import { useUiSettings, getUiSettings, updateUiSettings } from './userSettingsStore'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -47,8 +50,6 @@ export interface ToolbarPrefs {
 export type MoveTarget = 'up' | 'down' | 'start' | 'end'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-
-const STORAGE_KEY = 'slatebase:toolbar'
 
 /** Id prefix marking an entry as a plugin ribbon icon rather than a built-in. */
 export const PLUGIN_ENTRY_PREFIX = 'plugin:'
@@ -149,69 +150,21 @@ export function moveToIndexOf(ids: string[], dragId: string, targetId: string): 
   return next
 }
 
-// ─── Module-level state ──────────────────────────────────────────────────────
-
-let current: ToolbarPrefs = readFromStorage()
-const subscribers = new Set<() => void>()
+// ─── Backing store ───────────────────────────────────────────────────────────
 
 /**
- * Reads and validates persisted preferences. Any malformed field falls back to
- * its default individually, so one corrupted key never wipes the rest.
+ * Applies a partial change. The account-wide settings store owns the snapshot,
+ * the localStorage cache and the debounced sync, so this is a thin forward.
  */
-function readFromStorage(): ToolbarPrefs {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw === null) return { ...DEFAULT_TOOLBAR_PREFS }
-    const parsed: unknown = JSON.parse(raw)
-    if (typeof parsed !== 'object' || parsed === null) return { ...DEFAULT_TOOLBAR_PREFS }
-    const obj = parsed as Partial<Record<keyof ToolbarPrefs, unknown>>
-
-    return {
-      visible: typeof obj.visible === 'boolean' ? obj.visible : DEFAULT_TOOLBAR_PREFS.visible,
-      position: obj.position === 'right' || obj.position === 'left' ? obj.position : DEFAULT_TOOLBAR_PREFS.position,
-      order: isStringArray(obj.order) ? obj.order : [],
-      hidden: isStringArray(obj.hidden) ? obj.hidden : [],
-      colors: isColorMap(obj.colors) ? obj.colors : {},
-    }
-  } catch {
-    return { ...DEFAULT_TOOLBAR_PREFS }
-  }
-}
-
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((v) => typeof v === 'string')
-}
-
-function isColorMap(value: unknown): value is Record<string, string> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
-  return Object.values(value as Record<string, unknown>).every((v) => typeof v === 'string')
-}
-
-function persist(prefs: ToolbarPrefs): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs))
-  } catch {
-    // localStorage unavailable (private mode, quota) — state stays in memory
-  }
-}
-
 function update(patch: Partial<ToolbarPrefs>): void {
-  const next = { ...current, ...patch }
-  current = next
-  persist(next)
-  for (const cb of subscribers) cb()
-}
-
-function subscribe(callback: () => void): () => void {
-  subscribers.add(callback)
-  return () => { subscribers.delete(callback) }
+  updateUiSettings({ toolbar: patch })
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /** Current preferences snapshot (non-reactive — for command callbacks). */
 export function getToolbarPrefs(): ToolbarPrefs {
-  return current
+  return getUiSettings().toolbar
 }
 
 /** Show or hide the whole toolbar. */
@@ -221,7 +174,7 @@ export function setToolbarVisible(visible: boolean): void {
 
 /** Toggle the whole toolbar — backs the "Werkzeugleiste ein-/ausblenden" command. */
 export function toggleToolbarVisible(): void {
-  update({ visible: !current.visible })
+  update({ visible: !getToolbarPrefs().visible })
 }
 
 /** Dock the toolbar to the left or right of the editor pane. */
@@ -236,14 +189,14 @@ export function setToolbarOrder(order: string[]): void {
 
 /** Whether `id` is currently hidden. */
 export function isEntryHidden(id: string): boolean {
-  return current.hidden.includes(id)
+  return getToolbarPrefs().hidden.includes(id)
 }
 
 /** Show or hide a single button. */
 export function setEntryHidden(id: string, hidden: boolean): void {
-  const already = current.hidden.includes(id)
+  const already = getToolbarPrefs().hidden.includes(id)
   if (hidden === already) return
-  update({ hidden: hidden ? [...current.hidden, id] : current.hidden.filter((x) => x !== id) })
+  update({ hidden: hidden ? [...getToolbarPrefs().hidden, id] : getToolbarPrefs().hidden.filter((x) => x !== id) })
 }
 
 /** Flip a single button's visibility. */
@@ -253,7 +206,7 @@ export function toggleEntryHidden(id: string): void {
 
 /** Set (or, with `null`, clear) a button's colour override. */
 export function setEntryColor(id: string, color: string | null): void {
-  const colors = { ...current.colors }
+  const colors = { ...getToolbarPrefs().colors }
   if (color === null) delete colors[id]
   else colors[id] = color
   update({ colors })
@@ -267,14 +220,14 @@ export function setEntryColor(id: string, color: string | null): void {
 export function moveEntry(id: string, target: MoveTarget, visibleIds: string[]): void {
   const moved = moveWithin(visibleIds, id, target)
   if (moved === visibleIds) return
-  update({ order: mergeOrder(current.order, moved) })
+  update({ order: mergeOrder(getToolbarPrefs().order, moved) })
 }
 
 /** Drag-and-drop reorder: drop `dragId` onto `targetId`'s slot. */
 export function reorderEntry(dragId: string, targetId: string, visibleIds: string[]): void {
   const moved = moveToIndexOf(visibleIds, dragId, targetId)
   if (moved === visibleIds) return
-  update({ order: mergeOrder(current.order, moved) })
+  update({ order: mergeOrder(getToolbarPrefs().order, moved) })
 }
 
 /** Restore order, hidden state and colours (keeps visibility and position). */
@@ -318,12 +271,10 @@ function mergeOrder(persisted: string[], visibleOrder: string[]): string[] {
 
 /** Subscribe a component to the toolbar preferences. */
 export function useToolbarPrefs(): ToolbarPrefs {
-  return useSyncExternalStore(subscribe, getToolbarPrefs)
+  return useUiSettings().toolbar
 }
 
-/** Test-only: reset the in-memory snapshot and stored value. */
+/** Test-only: reset the toolbar back to its defaults. */
 export function __resetToolbarStoreForTests(): void {
-  try { localStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ }
-  current = { ...DEFAULT_TOOLBAR_PREFS }
-  for (const cb of subscribers) cb()
+  updateUiSettings({ toolbar: { ...DEFAULT_TOOLBAR_PREFS } })
 }

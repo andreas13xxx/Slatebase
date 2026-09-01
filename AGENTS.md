@@ -71,6 +71,8 @@ Filesystem-based, no database. All under `backend/data/`:
 - `users/`, `sessions/`, `shares.json` — Auth data
 - `audit/` — Append-only JSONL (daily rotation)
 - `chat/`, `mcp/tokens/`, `plugins/<vaultId>/`, `features.json`
+- `server-config.json` — admin overrides from `PUT /admin/config`. Precedence: `config/default.json` < this file < `SLATEBASE_*` env
+- `users/<userId>-preferences.json` — recent files, favorites, keybindings, `uiSettings` (account-wide), `vaultSettings[vaultId]` (per user *and* vault)
 - Plugin secrets: `plugins/<vaultId>/<pluginId>/secrets.json`, AES-256-GCM per value; key from `SLATEBASE_PLUGIN_SECRET_KEY`, else `data/.plugin-secret-key`
 
 ## Common Pitfalls
@@ -95,6 +97,12 @@ Filesystem-based, no database. All under `backend/data/`:
 - Core Obsidian command IDs are registered in `core-commands.ts` (editor-only) and `core-commands-app.ts` (needs React state, wired by `CommandPaletteContainer`)
 - Raw HTML is allowlist-only (`plugins/inline-html.ts`), shared by Live Preview and reading view — never widen it on one side alone
 - `erasableSyntaxOnly` is on in the frontend: no constructor parameter properties, no `enum`, no namespaces
+- Spellcheck is Slatebase's own (`editor/spellcheck/`), not the browser's — the editor owns the context menu and no browser exposes its suggestions to JS. `contentDOM` is therefore always `spellcheck="false"`; don't "fix" that back
+- Hunspell dictionaries are served as static assets from `/dictionaries/` by the `spellcheckDictionaries()` plugin in `vite.config.ts`, never imported — `dictionary-de`'s entry point uses `node:fs` and its `exports` field blocks deep imports. A new language needs an entry there **and** in `SPELLCHECK_LANGUAGES` (`editor/spellcheck/protocol.ts`)
+- User settings are server-backed, never `localStorage`-only: account-wide ones go through `state/userSettingsStore` (status bar, toolbar, explorer follow), per-vault ones through `state/vaultSettingsStore` (editor toggles, zoom, graph, panel layouts). `localStorage` is a synchronous cache, not the source of truth
+- A store's `initialize()` must treat an empty server response as authoritative *unless* `hasSyncedBefore()` is false — see `state/preferenceSync.ts`; the old "empty means no data" guard let the older state win across devices
+- Preference writes publish `preferences:change` over SSE, carrying the writer's `X-Client-Id` as `originId` so the originating tab skips its own echo
+- A settings section that is feature-gated needs `feature:` in `state/settingsRegistry.ts` — the nav and the content area both derive the gate from there, and `App.tsx`'s standalone page routes are a separate path
 - A `.githooks/pre-commit` hook runs lint + `tsc` for both packages before every commit
 - `CachedMetadata` is produced only by `plugins/compat/metadata-parser.ts` — extend it there, not in `metadata-cache-shim.ts`
 - `OBSIDIAN_API_VERSION` (`obsidian-api-extensions.ts`) may only be raised once the APIs of that version are actually implemented

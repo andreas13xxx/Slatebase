@@ -103,6 +103,28 @@ describe('CommandPalette', () => {
     expect(screen.getByText('p2')).toBeInTheDocument()
   })
 
+  describe('shortcut display', () => {
+    it('shows the configured shortcut for a bound command', () => {
+      render(<CommandPalette {...defaultProps} commands={[
+        createCommand({ id: 'slatebase:open-command-palette', name: 'Befehlspalette öffnen', pluginId: 'slatebase' }),
+      ]} />)
+      // Default binding is "Mod+P", displayed platform-specific (Ctrl+P in jsdom).
+      expect(screen.getByText('Ctrl+P')).toBeInTheDocument()
+    })
+
+    it('falls back to a hotkey declared by the plugin', () => {
+      render(<CommandPalette {...defaultProps} commands={[
+        createCommand({ hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'K' }] }),
+      ]} />)
+      expect(screen.getByText('Ctrl+Shift+K')).toBeInTheDocument()
+    })
+
+    it('renders no shortcut chip for an unbound command', () => {
+      const { container } = render(<CommandPalette {...defaultProps} />)
+      expect(container.querySelector('.command-palette-item-shortcut')).toBeNull()
+    })
+  })
+
   describe('keyboard navigation', () => {
     it('selects first item by default', () => {
       render(<CommandPalette {...defaultProps} />)

@@ -4862,6 +4862,75 @@
   opacity: 1;
 }
 
+/* ===== Markdown Elements: Footnotes ===== */
+/* The superscript marker in the text, and its counterpart list under the note. */
+.view-mode-footnote-ref {
+  font-size: 0.75em;
+  line-height: 0;
+  vertical-align: super;
+}
+
+.view-mode-footnote-ref a {
+  color: var(--accent-text);
+  text-decoration: none;
+  padding: 0 1px;
+  cursor: pointer;
+}
+
+.view-mode-footnote-ref a:hover {
+  text-decoration: underline;
+}
+
+/* Marks the jump target for a moment (class set by scrollToAnchorId), so the
+   reader can find the spot in a dense paragraph once the scrolling stops. */
+.view-mode-anchor-flash {
+  background: var(--accent-light);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-slow);
+}
+
+.view-mode-footnotes {
+  margin-top: 32px;
+}
+
+.view-mode-footnotes-divider {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  margin: 0 0 12px;
+}
+
+.view-mode-footnotes-list {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.view-mode-footnote {
+  margin-bottom: 6px;
+}
+
+.view-mode-footnote > p {
+  margin: 0;
+}
+
+/* Keeps the back-link on the same line as the footnote's closing text instead
+   of dropping it onto a line of its own after the paragraph block. */
+.view-mode-footnote > p:last-of-type {
+  display: inline;
+}
+
+.view-mode-footnote-backref {
+  margin-left: 6px;
+  color: var(--accent-text);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.view-mode-footnote-backref:hover {
+  text-decoration: underline;
+}
+
 /* ===== Obsidian Elements: Embeds ===== */
 .view-mode-embed {
   display: block;
@@ -5391,10 +5460,39 @@
   font-size: 13px;
   color: var(--text-primary);
   font-weight: 500;
+  /* Takes the leftover width so the shortcut chip and the plugin tag stay
+     right-aligned as a pair, and a long command name ellipsises instead of
+     pushing them out of the row. */
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .command-palette-item--selected .command-palette-item-name {
   color: var(--accent-text);
+}
+
+/* Transparent rather than filled: the row's background changes on hover and
+   selection, and a border-only chip stays legible against all three. */
+.command-palette-item-shortcut {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  margin-left: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.command-palette-item--selected .command-palette-item-shortcut {
+  color: var(--accent-text);
+  border-color: var(--accent-text);
 }
 
 .command-palette-item-plugin {

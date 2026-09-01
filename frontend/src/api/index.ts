@@ -421,11 +421,67 @@ export interface KeybindingEntry {
   shortcut: string
 }
 
+/** Which side of the editor the toolbar docks to. */
+export type ToolbarPosition = 'left' | 'right'
+
+/** Toolbar preferences, part of the account-wide UI settings. */
+export interface ToolbarSettings {
+  visible: boolean
+  position: ToolbarPosition
+  order: string[]
+  hidden: string[]
+  colors: Record<string, string>
+}
+
+/**
+ * Account-wide UI settings — Einstellungen → Darstellung. Stored per user on
+ * the server so they follow the account rather than the browser.
+ */
+export interface UserUiSettings {
+  statusBarVisible: boolean
+  statusBarItems: Record<string, boolean>
+  explorerFollowActiveFile: boolean
+  toolbar: ToolbarSettings
+}
+
+/** Partial UI settings update — one control saves only what it changed. */
+export type UserUiSettingsPatch = {
+  statusBarVisible?: boolean
+  statusBarItems?: Record<string, boolean>
+  explorerFollowActiveFile?: boolean
+  toolbar?: Partial<ToolbarSettings>
+}
+
+/**
+ * Settings scoped to one user *and* one vault: reading preferences that belong
+ * to the person, but are worth remembering separately per vault. Reached
+ * through context menus and the command palette, not the settings panel.
+ */
+export interface UserVaultSettings {
+  lineNumbers: boolean
+  readableLineLength: boolean
+  spellcheck: boolean
+  /** Dictionary the spellchecker loads (see `editor/spellcheck/protocol.ts`). */
+  spellcheckLanguage: string
+  zoom: number
+  /** Client-owned blob; the server stores it verbatim. */
+  graph: Record<string, unknown> | null
+  /** Client-owned blob; the server stores it verbatim. */
+  sidebarPanel: Record<string, unknown> | null
+  /** Client-owned blob; the server stores it verbatim. */
+  contextPanel: Record<string, unknown> | null
+}
+
+/** Partial per-vault settings update. */
+export type UserVaultSettingsPatch = Partial<UserVaultSettings>
+
 /** Per-vault configuration. */
 export interface VaultConfig {
   templatesDirectory: string
   dailyNotesDirectory: string
   dailyNoteTemplateName: string
+  /** Directory for new attachments. Empty = same folder as the note being edited. */
+  attachmentsDirectory: string
 }
 
 /**
@@ -699,6 +755,16 @@ export interface IApiClient {
   /** Save the current user's keybinding overrides. */
   saveKeybindings(entries: KeybindingEntry[]): Promise<{ entries: KeybindingEntry[] }>
 
+  // --- UI / per-vault settings methods ---
+  /** Get the current user's account-wide UI settings. */
+  getUiSettings(): Promise<{ settings: UserUiSettings }>
+  /** Merge a partial change into the current user's UI settings. */
+  saveUiSettings(patch: UserUiSettingsPatch): Promise<{ settings: UserUiSettings }>
+  /** Get the current user's settings for one vault. */
+  getVaultSettings(vaultId: string): Promise<{ settings: UserVaultSettings }>
+  /** Merge a partial change into the current user's settings for one vault. */
+  saveVaultSettings(vaultId: string, patch: UserVaultSettingsPatch): Promise<{ settings: UserVaultSettings }>
+
   // --- Vault Config methods ---
   /** Get the configuration for a vault. */
   getVaultConfig(vaultId: string): Promise<VaultConfig>
@@ -737,7 +803,18 @@ async function handleErrorResponse(response: Response): Promise<never> {
 }
 
 /** HTTP methods that require a CSRF token. */
-const CSRF_METHODS = new Set(['POST', 'PUT', 'DELETE'])
+const CSRF_METHODS = new Set(['POST', 'PUT', 'DELETE', 'PATCH'])
+
+/**
+ * Identifies this browser tab for the lifetime of the page. Sent as
+ * `X-Client-Id` on every request and echoed back on `preferences:change`
+ * events, so the tab that made a change ignores its own notification instead
+ * of re-fetching what it just sent.
+ */
+export const CLIENT_ID: string =
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `client-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 
 /**
  * Concrete implementation of IApiClient using the Fetch API.
@@ -1530,6 +1607,29 @@ export class ApiClient implements IApiClient {
     return this.request<{ entries: KeybindingEntry[] }>('PUT', '/api/v1/users/me/keybindings', { entries })
   }
 
+  /** Get the current user's account-wide UI settings. */
+  async getUiSettings(): Promise<{ settings: UserUiSettings }> {
+    return this.request<{ settings: UserUiSettings }>('GET', '/api/v1/users/me/ui-settings')
+  }
+
+  /** Merge a partial change into the current user's UI settings. */
+  async saveUiSettings(patch: UserUiSettingsPatch): Promise<{ settings: UserUiSettings }> {
+    return this.request<{ settings: UserUiSettings }>('PATCH', '/api/v1/users/me/ui-settings', patch)
+  }
+
+  /** Get the current user's settings for one vault. */
+  async getVaultSettings(vaultId: string): Promise<{ settings: UserVaultSettings }> {
+    return this.request<{ settings: UserVaultSettings }>('GET', `/api/v1/users/me/vault-settings/${vaultId}`)
+  }
+
+  /** Merge a partial change into the current user's settings for one vault. */
+  async saveVaultSettings(
+    vaultId: string,
+    patch: UserVaultSettingsPatch,
+  ): Promise<{ settings: UserVaultSettings }> {
+    return this.request<{ settings: UserVaultSettings }>('PATCH', `/api/v1/users/me/vault-settings/${vaultId}`, patch)
+  }
+
   // --- Vault Config methods ---
 
   /** Get the configuration for a vault. */
@@ -1568,6 +1668,10 @@ export class ApiClient implements IApiClient {
     if (CSRF_METHODS.has(method) && this.csrfToken) {
       headers['X-CSRF-Token'] = this.csrfToken
     }
+
+    // Identifies this tab so the server can echo it back on the resulting
+    // `preferences:change` event and this client can skip its own change.
+    headers['X-Client-Id'] = CLIENT_ID
 
     return headers
   }

@@ -81,3 +81,64 @@ describe('buildInlineDecorations — inline HTML tag pairs', () => {
     expect(mark?.style ?? '').toBe('')
   })
 })
+
+describe('buildInlineDecorations — footnotes', () => {
+  /** The class names of every mark/line decoration covering `text`, or the class at a position. */
+  function classesFor(state: EditorState, result: ReturnType<typeof buildInlineDecorations>, text: string) {
+    const from = state.doc.toString().indexOf(text)
+    const to = from + text.length
+    return result.decorations
+      .filter((r) => r.from >= from && r.to <= to && r.to > r.from)
+      .map((r) => (r.value.spec as { class?: string; attributes?: { class?: string } }).class
+        ?? (r.value.spec as { attributes?: { class?: string } }).attributes?.class)
+      .filter((c): c is string => c !== undefined)
+  }
+
+  it('raises a reference whose definition exists and hides its brackets', () => {
+    const state = makeState('Behauptung[^1].\n\n[^1]: Die Quelle\n')
+    const result = buildInlineDecorations(state)
+
+    expect(classesFor(state, result, '[^1].')).toContain('cm-lp-footnote-ref')
+    const hidden = result.decorations
+      .filter((r) => {
+        const spec = r.value.spec as { class?: unknown; attributes?: unknown }
+        return spec.class === undefined && spec.attributes === undefined
+      })
+      .map((r) => state.doc.sliceString(r.from, r.to))
+    expect(hidden).toContain('[^')
+    expect(hidden).toContain(']')
+  })
+
+  it('groups both hidden brackets so the cursor reveals the whole marker', () => {
+    const state = makeState('Text[^a].\n\n[^a]: Quelle\n')
+    const result = buildInlineDecorations(state)
+
+    const groups = new Set(result.hideableRanges.map((r) => `${r.groupFrom}:${r.groupTo}`))
+    expect(groups.size).toBe(1)
+  })
+
+  it('leaves a reference without a definition as literal text', () => {
+    const state = makeState('Behauptung[^1] ohne Definition.\n')
+    const result = buildInlineDecorations(state)
+
+    expect(classesFor(state, result, '[^1]')).not.toContain('cm-lp-footnote-ref')
+    expect(result.hideableRanges).toHaveLength(0)
+  })
+
+  it('marks the definition line and its own marker, not treating it as a reference', () => {
+    const state = makeState('[^q]: Die Quelle\n')
+    const result = buildInlineDecorations(state)
+
+    const classes = classesFor(state, result, '[^q]: Die Quelle')
+    expect(classes).toContain('cm-lp-footnote-def-marker')
+    expect(classes).not.toContain('cm-lp-footnote-ref')
+    expect(result.decorations.some((r) => (r.value.spec as { attributes?: { class?: string } }).attributes?.class === 'cm-lp-footnote-def')).toBe(true)
+  })
+
+  it('ignores a footnote marker inside a code span', () => {
+    const state = makeState('Schreibe `[^1]` fuer eine Fussnote.\n\n[^1]: Quelle\n')
+    const result = buildInlineDecorations(state)
+
+    expect(classesFor(state, result, '`[^1]`')).not.toContain('cm-lp-footnote-ref')
+  })
+})

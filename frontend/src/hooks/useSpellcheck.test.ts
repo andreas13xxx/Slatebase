@@ -1,65 +1,85 @@
 import { renderHook, act } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useSpellcheck } from './useSpellcheck'
+import {
+  _reset as resetVaultSettings,
+  setActiveVault,
+  updateVaultSettings,
+} from '../state/vaultSettingsStore'
+
+vi.mock('../components/ToastNotification', () => ({ showToast: vi.fn() }))
 
 describe('useSpellcheck', () => {
-  beforeEach(() => {
-    localStorage.clear()
+  beforeEach(async () => {
+    resetVaultSettings()
+    await setActiveVault('vault-1')
   })
 
   describe('initial state', () => {
-    it('defaults to enabled when localStorage is empty (matches browser default)', () => {
+    it('defaults to enabled (matches the browser default it replaced)', () => {
       const { result } = renderHook(() => useSpellcheck())
       expect(result.current.enabled).toBe(true)
     })
 
-    it('reads enabled=false from localStorage', () => {
-      localStorage.setItem('slatebase:spellcheck', JSON.stringify({ enabled: false }))
+    it('reads the active vault’s stored value', () => {
+      updateVaultSettings({ spellcheck: false })
       const { result } = renderHook(() => useSpellcheck())
       expect(result.current.enabled).toBe(false)
-    })
-
-    it('defaults to enabled when localStorage contains invalid JSON', () => {
-      localStorage.setItem('slatebase:spellcheck', 'not-json{{{')
-      const { result } = renderHook(() => useSpellcheck())
-      expect(result.current.enabled).toBe(true)
     })
   })
 
   describe('toggle', () => {
     it('toggles from enabled to disabled', () => {
       const { result } = renderHook(() => useSpellcheck())
-      expect(result.current.enabled).toBe(true)
 
       act(() => { result.current.toggle() })
       expect(result.current.enabled).toBe(false)
     })
 
     it('toggles from disabled to enabled', () => {
-      localStorage.setItem('slatebase:spellcheck', JSON.stringify({ enabled: false }))
+      updateVaultSettings({ spellcheck: false })
       const { result } = renderHook(() => useSpellcheck())
 
       act(() => { result.current.toggle() })
       expect(result.current.enabled).toBe(true)
     })
+  })
 
-    it('persists disabled state to localStorage', () => {
+  describe('language', () => {
+    it('defaults to German, matching <html lang="de">', () => {
       const { result } = renderHook(() => useSpellcheck())
-
-      act(() => { result.current.toggle() })
-      const stored = JSON.parse(localStorage.getItem('slatebase:spellcheck')!)
-      expect(stored).toEqual({ enabled: false })
+      expect(result.current.language).toBe('de')
     })
 
-    it('silently ignores localStorage write errors', () => {
-      const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-        throw new Error('QuotaExceededError')
-      })
+    it('reads a stored language', () => {
+      updateVaultSettings({ spellcheckLanguage: 'en' })
+      const { result } = renderHook(() => useSpellcheck())
+      expect(result.current.language).toBe('en')
+    })
+
+    it('falls back to German for an unknown stored language', () => {
+      updateVaultSettings({ spellcheckLanguage: 'kl' })
+      const { result } = renderHook(() => useSpellcheck())
+      expect(result.current.language).toBe('de')
+    })
+
+    it('switches the language without touching the toggle', () => {
       const { result } = renderHook(() => useSpellcheck())
 
-      act(() => { result.current.toggle() })
-      expect(result.current.enabled).toBe(false)
-      spy.mockRestore()
+      act(() => { result.current.setLanguage('en') })
+
+      expect(result.current.language).toBe('en')
+      expect(result.current.enabled).toBe(true)
+    })
+
+    it('keeps the dictionary separate per vault', async () => {
+      const { result } = renderHook(() => useSpellcheck())
+      act(() => { result.current.setLanguage('en') })
+      expect(result.current.language).toBe('en')
+
+      await act(async () => { await setActiveVault('vault-2') })
+
+      expect(result.current.language).toBe('de')
     })
   })
 })

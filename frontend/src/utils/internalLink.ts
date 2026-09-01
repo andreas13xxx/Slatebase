@@ -16,3 +16,17 @@ export function buildInternalLinkText(fileName: string): string {
   const target = fileName.toLowerCase().endsWith('.md') ? fileName.slice(0, -3) : fileName
   return isEmbeddableFile(fileName) ? `![[${target}]]` : `[[${target}]]`
 }
+
+/**
+ * Resolves the vault-relative directory new attachments (drag-drop, paste,
+ * "Insert attachment") should upload into.
+ *
+ * `configuredDir` is the vault's `attachmentsDirectory` setting: when set, every
+ * attachment goes there regardless of which note is open. Left empty, it falls
+ * back to `notePath`'s own folder — Slatebase's original, still-default behavior.
+ */
+export function resolveAttachmentTargetDir(configuredDir: string, notePath: string): string {
+  const trimmed = configuredDir.trim()
+  if (trimmed) return trimmed
+  return notePath.includes('/') ? notePath.slice(0, notePath.lastIndexOf('/')) : ''
+}

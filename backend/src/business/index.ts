@@ -616,6 +616,21 @@ export class VaultService implements IVaultService {
       throw new VaultValidationError(validationResult.code, validationResult.message)
     }
 
+    // 1b. Enforce the per-user vault cap. Every vault costs a link index, a
+    // watcher and a plugin directory, so the bound that matters is what one
+    // account can claim — not an instance-wide count.
+    const maxPerUser = this.configService.getServerConfig().maxVaultsPerUser
+    const ownedCount = this.vaultManager
+      .getAllVaults()
+      .filter((v) => v.info.ownerId === ownerId).length
+
+    if (ownedCount >= maxPerUser) {
+      throw new VaultValidationError(
+        'VAULT_LIMIT_REACHED',
+        `Maximum number of vaults reached (${maxPerUser}). Delete a vault or ask an administrator to raise the limit.`,
+      )
+    }
+
     // 2. Compute storage path and generate vault ID
     const dataDir = this.configService.getServerConfig().dataDir
     const resolvedDataDir = path.resolve(dataDir)

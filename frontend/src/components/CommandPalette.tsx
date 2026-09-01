@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Search } from 'lucide-react'
 import type { Command } from '../plugins/compat/command-registry'
 import { useFocusTrap } from '../hooks/useFocusTrap'
+import { getShortcut, formatShortcut } from '../state/keybindingsStore'
 
 export interface CommandPaletteProps {
   /** All available commands from the command registry */
@@ -170,24 +171,64 @@ export function CommandPalette({ commands, isOpen, onClose, onExecute }: Command
               Keine Befehle gefunden
             </li>
           ) : (
-            filteredCommands.map((cmd, index) => (
-              <li
-                key={cmd.id}
-                id={`command-palette-item-${index}`}
-                className={`command-palette-item${index === selectedIndex ? ' command-palette-item--selected' : ''}`}
-                role="option"
-                aria-selected={index === selectedIndex}
-                onClick={() => handleExecute(cmd.id)}
-              >
-                <span className="command-palette-item-name">{cmd.name}</span>
-                <span className="command-palette-item-plugin">{cmd.pluginId}</span>
-              </li>
-            ))
+            filteredCommands.map((cmd, index) => {
+              const shortcut = resolveShortcut(cmd)
+              return (
+                <li
+                  key={cmd.id}
+                  id={`command-palette-item-${index}`}
+                  className={`command-palette-item${index === selectedIndex ? ' command-palette-item--selected' : ''}`}
+                  role="option"
+                  aria-selected={index === selectedIndex}
+                  onClick={() => handleExecute(cmd.id)}
+                >
+                  <span className="command-palette-item-name">{cmd.name}</span>
+                  {shortcut && (
+                    <kbd className="command-palette-item-shortcut">{shortcut}</kbd>
+                  )}
+                  <span className="command-palette-item-plugin">{cmd.pluginId}</span>
+                </li>
+              )
+            })
           )}
         </ul>
       </div>
     </div>
   )
+}
+
+/**
+ * Resolve the keyboard shortcut to display for a command, already formatted for
+ * the current platform ("Mod" -> Ctrl / ⌘). Returns '' when the command has no
+ * binding, which is the common case: only the commands listed in
+ * DEFAULT_KEYBINDINGS are bindable in settings, and most plugins ship no hotkey.
+ *
+ * Two sources, in priority order:
+ *  1. The keybindings store — the user's override, else the shipped default.
+ *     This is the only source that reflects a rebinding in settings.
+ *  2. The command's own `hotkeys`, declared by a plugin at `addCommand()` time.
+ *     Only the first is shown; a list of alternatives would crowd the row.
+ *
+ * Compat commands that duplicate a native one (see DUPLICATE_OF_NATIVE_COMMAND in
+ * CommandPaletteContainer) are deliberately *not* resolved through their native
+ * twin: they only reach the palette when that native command is hidden because its
+ * gate isn't met (no open editor, no selected vault), and the native shortcut is
+ * gated the same way — so showing it would advertise a key combo that does nothing
+ * in exactly the situation the compat entry is visible.
+ */
+function resolveShortcut(command: Command): string {
+  const bound = getShortcut(command.id)
+  if (bound) return formatShortcut(bound)
+
+  const hotkey = command.hotkeys?.[0]
+  if (hotkey?.key) {
+    // Plugins are inconsistent about case ('p' vs 'P'); the store's own bindings
+    // are already normalized, so only this branch needs it.
+    const key = hotkey.key.length === 1 ? hotkey.key.toUpperCase() : hotkey.key
+    return formatShortcut([...hotkey.modifiers, key].join('+'))
+  }
+
+  return ''
 }
 
 /**

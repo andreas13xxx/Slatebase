@@ -1,13 +1,23 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { loadGraphConfig, saveGraphConfig, resetGraphConfig, DEFAULT_GRAPH_CONFIG } from './graph-config'
 import type { GraphConfig } from './graph-config'
+import { _reset as resetVaultSettings, setActiveVault, updateVaultSettings } from '../state/vaultSettingsStore'
+
+vi.mock('./ToastNotification', () => ({ showToast: vi.fn() }))
+
+/** Writes a raw (possibly partial or invalid) payload into the vault settings. */
+function seedStoredConfig(raw: string): void {
+  updateVaultSettings({ graph: JSON.parse(raw) as Record<string, unknown> })
+}
 
 describe('GraphConfig', () => {
-  beforeEach(() => {
-    localStorage.clear()
+  beforeEach(async () => {
+    // The config now lives in the active vault's settings, not localStorage.
+    resetVaultSettings()
+    await setActiveVault('vault-1')
   })
 
-  it('loadGraphConfig returns defaults when localStorage is empty', () => {
+  it('loadGraphConfig returns defaults when nothing is stored for the vault', () => {
     const config = loadGraphConfig()
     expect(config).toEqual(DEFAULT_GRAPH_CONFIG)
   })
@@ -55,8 +65,10 @@ describe('GraphConfig', () => {
     expect(config).toEqual(DEFAULT_GRAPH_CONFIG)
   })
 
-  it('loadGraphConfig returns defaults when localStorage contains corrupt JSON', () => {
-    localStorage.setItem('slatebase-graph-config', 'not valid json{{{')
+  it('loadGraphConfig returns defaults for a stored value of the wrong shape', () => {
+    // Parsing corrupt JSON is now the settings store's job; what this module
+    // still has to survive is a stored object that carries nothing it knows.
+    updateVaultSettings({ graph: { unrelated: 'value' } })
     const config = loadGraphConfig()
     expect(config).toEqual(DEFAULT_GRAPH_CONFIG)
   })
@@ -73,7 +85,7 @@ describe('GraphConfig', () => {
         highlight: '#ddeeff',
       },
     }
-    localStorage.setItem('slatebase-graph-config', JSON.stringify(partial))
+    seedStoredConfig(JSON.stringify(partial))
 
     const config = loadGraphConfig()
     expect(config.colors.fileNode).toBe('#aabbcc')
@@ -83,13 +95,13 @@ describe('GraphConfig', () => {
   })
 
   it('loadGraphConfig clamps localGraph.hops to the valid range [1, 5]', () => {
-    localStorage.setItem('slatebase-graph-config', JSON.stringify({ localGraph: { hops: 42 } }))
+    seedStoredConfig(JSON.stringify({ localGraph: { hops: 42 } }))
     expect(loadGraphConfig().localGraph.hops).toBe(5)
 
-    localStorage.setItem('slatebase-graph-config', JSON.stringify({ localGraph: { hops: -3 } }))
+    seedStoredConfig(JSON.stringify({ localGraph: { hops: -3 } }))
     expect(loadGraphConfig().localGraph.hops).toBe(1)
 
-    localStorage.setItem('slatebase-graph-config', JSON.stringify({ localGraph: { hops: 'not a number' } }))
+    seedStoredConfig(JSON.stringify({ localGraph: { hops: 'not a number' } }))
     expect(loadGraphConfig().localGraph.hops).toBe(DEFAULT_GRAPH_CONFIG.localGraph.hops)
   })
 
@@ -115,7 +127,7 @@ describe('GraphConfig', () => {
         selectedPropertyKeys: [1, 2, 3], // wrong element type
       },
     }
-    localStorage.setItem('slatebase-graph-config', JSON.stringify(invalid))
+    seedStoredConfig(JSON.stringify(invalid))
 
     const config = loadGraphConfig()
     // Invalid values should fall back to defaults
@@ -129,7 +141,7 @@ describe('GraphConfig', () => {
   })
 
   it('loadGraphConfig handles null stored value', () => {
-    localStorage.setItem('slatebase-graph-config', 'null')
+    seedStoredConfig('null')
     const config = loadGraphConfig()
     expect(config).toEqual(DEFAULT_GRAPH_CONFIG)
   })

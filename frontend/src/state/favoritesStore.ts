@@ -10,6 +10,13 @@
  */
 
 import type { IApiClient, FavoriteEntry as ApiFavoriteEntry } from '../api'
+import {
+  hasSyncedBefore,
+  markSyncedBefore,
+  clearSyncedBefore,
+  reportSyncFailure,
+  reportSyncSuccess,
+} from './preferenceSync'
 
 // ─── Data Models ─────────────────────────────────────────────────────────────
 
@@ -75,6 +82,9 @@ export interface IFavoritesStore {
 const STORAGE_PREFIX = 'slatebase:favorites:'
 const MAX_FAVORITES_PER_VAULT = 50
 const SYNC_DEBOUNCE_MS = 2000
+
+/** Identifies this store to the shared first-sync/failure bookkeeping. */
+const SYNC_STORE_KEY = 'favorites'
 const MAX_LABEL_LENGTH = 100
 
 /** Shape tolerated when reading raw (possibly pre-migration) storage/server data. */
@@ -107,35 +117,50 @@ let syncInProgress = false
 
 /**
  * Initialize the store with an API client and load server-side data.
- * Merges server data with local cache (server wins for conflicts).
+ *
+ * Once this device has synced before, the server list *replaces* the local
+ * cache rather than merging into it. Merging kept local-only entries alive,
+ * which resurrected favorites deleted on another device — the older state
+ * winning, not the newer one. See preferenceSync.ts for why an empty server
+ * response is only treated as "no record" before the first successful upload.
+ *
  * Called on login / app mount.
  */
 export async function initialize(client: IApiClient): Promise<void> {
   apiClient = client
   try {
     const response = await client.getFavorites()
-    if (response.entries.length > 0) {
-      // Group server entries by vault
-      const serverByVault = new Map<string, ApiFavoriteEntry[]>()
-      for (const entry of response.entries) {
-        const existing = serverByVault.get(entry.vaultId) ?? []
-        existing.push(entry)
-        serverByVault.set(entry.vaultId, existing)
-      }
 
-      // For each vault with server data, merge with local (dedup by id — path is no
-      // longer a unique key once heading/block/search bookmarks share it or are empty)
-      for (const [vaultId, rawServerEntries] of serverByVault) {
-        const { migrated: serverEntries } = migrateEntries(rawServerEntries)
-        const localEntries = loadFavorites(vaultId)
-        const serverIds = new Set(serverEntries.map(e => e.id))
-        const localOnly = localEntries.filter(e => !serverIds.has(e.id))
-        const merged = [...serverEntries, ...localOnly].slice(0, MAX_FAVORITES_PER_VAULT)
-        saveFavoritesLocal(vaultId, merged)
+    if (response.entries.length === 0 && !hasSyncedBefore(SYNC_STORE_KEY) && collectAllFavorites().length > 0) {
+      await syncToServer()
+      return
+    }
+
+    // Group server entries by vault
+    const serverByVault = new Map<string, ApiFavoriteEntry[]>()
+    for (const entry of response.entries) {
+      const existing = serverByVault.get(entry.vaultId) ?? []
+      existing.push(entry)
+      serverByVault.set(entry.vaultId, existing)
+    }
+
+    for (const [vaultId, rawServerEntries] of serverByVault) {
+      const { migrated } = migrateEntries(rawServerEntries)
+      saveFavoritesLocal(vaultId, migrated.slice(0, MAX_FAVORITES_PER_VAULT))
+    }
+
+    // Vaults the server no longer lists have had their last favorite removed
+    // elsewhere; drop the stale local copies so they aren't pushed back up.
+    for (const vaultId of listLocalVaultIds()) {
+      if (!serverByVault.has(vaultId)) {
+        saveFavoritesLocal(vaultId, [])
       }
     }
+
+    markSyncedBefore(SYNC_STORE_KEY)
   } catch {
-    // Server unavailable — continue with localStorage data
+    // Server unavailable — continue with localStorage data. No marker is set,
+    // so a later successful init can still seed from this cache.
   }
 }
 
@@ -148,6 +173,9 @@ export function disconnect(): void {
     syncTimer = null
   }
   apiClient = null
+  // The marker is per device *and* account: the next user to log in here must
+  // not inherit this one's "already synced" state.
+  clearSyncedBefore(SYNC_STORE_KEY)
 }
 
 // ─── Storage Helpers ─────────────────────────────────────────────────────────
@@ -316,37 +344,41 @@ async function syncToServer(): Promise<void> {
       searchRegex: e.searchRegex,
     }))
     await apiClient.saveFavorites(apiEntries)
-  } catch {
-    // Sync failed — data remains in localStorage, will retry on next change
+    markSyncedBefore(SYNC_STORE_KEY)
+    reportSyncSuccess(SYNC_STORE_KEY)
+  } catch (error) {
+    // Data remains in localStorage and retries on the next change; the user is
+    // told once per failure streak so a silent divergence can't build up.
+    reportSyncFailure(SYNC_STORE_KEY, error, 'Favoriten')
   } finally {
     syncInProgress = false
   }
 }
 
-/** Collect all favorites from localStorage across all vault keys (migrated). */
-function collectAllFavorites(): FavoriteEntry[] {
-  const all: FavoriteEntry[] = []
-
+/** Vault IDs that currently have a favorites entry in local storage. */
+function listLocalVaultIds(): string[] {
   if (!isLocalStorageAvailable()) {
-    for (const key of memoryStore.keys()) {
-      all.push(...loadFavorites(key.slice(STORAGE_PREFIX.length)))
-    }
-    return all
+    return Array.from(memoryStore.keys(), (key) => key.slice(STORAGE_PREFIX.length))
   }
 
+  const vaultIds: string[] = []
   try {
-    const vaultIds: string[] = []
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
       if (key && key.startsWith(STORAGE_PREFIX)) {
         vaultIds.push(key.slice(STORAGE_PREFIX.length))
       }
     }
-    for (const vaultId of vaultIds) {
-      all.push(...loadFavorites(vaultId))
-    }
   } catch { /* ignore */ }
+  return vaultIds
+}
 
+/** Collect all favorites from localStorage across all vault keys (migrated). */
+function collectAllFavorites(): FavoriteEntry[] {
+  const all: FavoriteEntry[] = []
+  for (const vaultId of listLocalVaultIds()) {
+    all.push(...loadFavorites(vaultId))
+  }
   return all
 }
 

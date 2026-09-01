@@ -167,6 +167,7 @@ Diese koennen inkrementell zu `error` verschaerft werden, sobald die betroffenen
 | DropZone ohne SR-Alternative | Drag-and-Drop ist per Screenreader grundsaetzlich nicht bedienbar; Upload-Button als Alternative existiert |
 | Per-Node-ARIA fuer Canvas | Vollstaendige Per-Node-Auszeichnung (Positionen, Verbindungen, Labels) uebersteigt den Scope dieses Audit-Passes. Grundlegende Tastatur-Navigation ist implementiert |
 | Plugin-UIs | Community-Plugins sind Drittanbieter-Code, ausserhalb der Kontrolle |
+| Rechtschreib-Unterringelung ohne Screenreader-Ansage | Nachgetragen 2026-08-31, nach dem Audit-Pass. Die Markierung ist nicht rein farblich (Wellenlinie = Form, erfuellt WCAG 1.4.1), aber sie wird Screenreadern nicht angesagt — CM6 rendert sie als Mark-Decoration ohne ARIA. Die Korrekturen sind per Tastatur erreichbar — der Befehl „Kontextmenue unter dem Cursor anzeigen" (`editor:context-menu`, Palette oder selbst vergebenes Hotkey) oeffnet dasselbe Menue inklusive Vorschlaegen fuer das Wort am Cursor; das Auffinden der Stelle bleibt aber visuell. Vollstaendige Ansage braucht eine eigene Diagnose-Liste als Live-Region — eigener Scope |
 
 ---
 

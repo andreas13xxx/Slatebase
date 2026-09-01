@@ -36,6 +36,10 @@ The palette uses fuzzy matching — you don't need to type the exact name. For e
 - "daily" matches "Open Daily Note"
 - "set" matches "Open Settings"
 
+### Shortcuts in the List
+
+If a command has a keyboard shortcut, it is shown to the right of the command name — e.g. `Ctrl+E` for "Toggle editor mode". That makes the palette double as a cheat sheet: search for the command once, then use the shortcut from then on. The shortcut shown is always the one currently in effect, including your own changes from **Settings → Keybindings**.
+
 ---
 
 ## Command Categories
@@ -45,7 +49,8 @@ The palette uses fuzzy matching — you don't need to type the exact name. For e
 | Navigation | Open file, go to vault, switch tab |
 | Vault operations | Create vault, delete vault, import/export |
 | Editor | Bold, italic, heading, insert link, insert code block |
-| View | Toggle dark mode, toggle sidebar, toggle search |
+| View | Toggle dark mode, toggle sidebar, toggle search, toggle line numbers, toggle readable line length |
+| Spellcheck | "Toggle spellcheck", "Spellcheck dictionary: German/English" — the corrections themselves live in the right-click menu on the underlined word, see [[Editor and Viewer]] |
 | Advanced | Create daily note, open graph, create welcome vault |
 | Diagnostics & Help | "Show debug info" (version, browser, active vault — handy for a bug report), "Show release notes" |
 

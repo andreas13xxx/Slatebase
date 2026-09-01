@@ -85,6 +85,8 @@ const NAMES: Record<string, { de: string; en: string }> = {
   'editor:unfold-all': { de: 'Alle Überschriften und Listen ausklappen', en: 'Unfold all headings and lists' },
   'editor:toggle-readable-line-length': { de: 'Lesbare Zeilenlänge umschalten', en: 'Toggle readable line length' },
   'editor:toggle-spellcheck': { de: 'Rechtschreibprüfung umschalten', en: 'Toggle spellcheck' },
+  'editor:spellcheck-language-de': { de: 'Wörterbuch: Deutsch', en: 'Spellcheck dictionary: German' },
+  'editor:spellcheck-language-en': { de: 'Wörterbuch: Englisch', en: 'Spellcheck dictionary: English' },
   'editor:focus-top': { de: 'Tab-Gruppe darüber fokussieren', en: 'Focus on tab group above' },
   'editor:focus-bottom': { de: 'Tab-Gruppe darunter fokussieren', en: 'Focus on tab group below' },
   'editor:focus-left': { de: 'Tab-Gruppe links fokussieren', en: 'Focus on tab group to the left' },
@@ -200,7 +202,7 @@ const NAMES: Record<string, { de: string; en: string }> = {
   'bookmarks:bookmark-current-search': { de: 'Lesezeichen: Aktuelle Suche mit Lesezeichen versehen …', en: 'Bookmarks: Bookmark current search...' },
   'bookmarks:bookmark-current-section': { de: 'Lesezeichen: Block unter dem Cursor mit Lesezeichen versehen …', en: 'Bookmarks: Bookmark block under cursor...' },
   'file-recovery:open': { de: 'Dateiwiederherstellung: Lokalen Verlauf öffnen', en: 'File recovery: Open local history' },
-  'footnotes:open': { de: 'Fußnoten-Ansicht: Fußnoten anzeigen', en: 'Footnotes view: Show footnotes' },
+  'footnotes:open': { de: 'Fußnoten anzeigen', en: 'Show footnotes' },
   'note-composer:extract-heading': { de: 'Notiz-Composer: Diese Überschrift extrahieren …', en: 'Note composer: Extract this heading...' },
   'note-composer:merge-file': { de: 'Notiz-Composer: Aktuelle Datei mit anderer Datei zusammenführen …', en: 'Note composer: Merge current file with another file...' },
   'note-composer:split-file': { de: 'Notiz-Composer: Aktuelle Auswahl extrahieren …', en: 'Note composer: Extract current selection...' },
@@ -226,6 +228,83 @@ const NAMES: Record<string, { de: string; en: string }> = {
   'editor:open-link-in-new-window': { de: 'Link unter dem Cursor in neuem Fenster öffnen', en: 'Open link under cursor in new window' },
   'editor:open-search': { de: 'Aktuelle Datei durchsuchen', en: 'Search current file' },
   'editor:open-search-replace': { de: 'Suchen & Ersetzen in aktueller Datei', en: 'Search & replace in current file' },
+}
+
+/**
+ * Why a command Slatebase registers but deliberately leaves inert does nothing.
+ *
+ * Keyed by the gap rather than by command ID, because one missing concept
+ * usually accounts for several commands at once (six `bases:*` commands, four
+ * window commands), and because the reason is what the user needs to read: a
+ * command that silently does nothing looks broken, while one that says "the
+ * file lives on the server, not on this machine" explains itself.
+ */
+export type UnsupportedReason =
+  | 'tab-layout'
+  | 'blank-tab'
+  | 'native-windows'
+  | 'url-scheme'
+  | 'attachments'
+  | 'bases'
+  | 'desktop-shell'
+  | 'in-app-help'
+  | 'new-tab-defaults'
+  | 'graph-animation'
+
+const UNSUPPORTED_REASONS: Record<UnsupportedReason, { de: string; en: string }> = {
+  'tab-layout': {
+    de: 'Slatebase hat keine geteilten Bereiche, Tab-Gruppen oder gestapelten Tabs',
+    en: 'Slatebase has no split panes, tab groups or stacked tabs',
+  },
+  'blank-tab': {
+    de: 'ein leerer Tab ohne Datei ist nicht vorgesehen — Tabs entstehen beim Öffnen einer Datei',
+    en: 'there is no empty tab without a file — a tab appears when you open one',
+  },
+  'native-windows': {
+    de: 'Slatebase läuft in einem Browser-Tab und verwaltet keine eigenen Fenster',
+    en: 'Slatebase runs in a browser tab and manages no windows of its own',
+  },
+  'url-scheme': {
+    de: 'es gibt kein obsidian://-URL-Schema; nutze stattdessen den Dateipfad',
+    en: 'there is no obsidian:// URL scheme — copy the file path instead',
+  },
+  attachments: {
+    de: 'externe Bild-Links lassen sich nicht automatisch in den Vault herunterladen — Anhänge kommen per Drag & Drop, Einfügen aus der Zwischenablage oder „Anhang einfügen“ hinein',
+    en: 'there is no automatic download of external image links into the vault — attachments come in via drag-and-drop, clipboard paste, or "Insert attachment"',
+  },
+  bases: {
+    de: 'Bases (Tabellenansichten über einen Ordner) gibt es in Slatebase nicht',
+    en: 'Slatebase has no Bases (table views over a folder)',
+  },
+  'desktop-shell': {
+    de: 'die Datei liegt auf dem Server, nicht auf diesem Rechner',
+    en: 'the file lives on the server, not on this machine',
+  },
+  'in-app-help': {
+    de: 'die Anleitung steht im Welcome-Vault statt in einer eigenen Hilfe-Ansicht',
+    en: 'the guide lives in the welcome vault instead of a help view of its own',
+  },
+  'new-tab-defaults': {
+    de: 'neue Tabs öffnen immer im zuletzt genutzten Modus',
+    en: 'new tabs always open in the mode you last used',
+  },
+  'graph-animation': {
+    de: 'der Graph hat keine Zeitraffer-Animation',
+    en: 'the graph has no time-lapse animation',
+  },
+}
+
+/**
+ * The message shown when someone runs a command Slatebase has no equivalent
+ * for — "<name> is not available in Slatebase: <reason>."
+ */
+export function unsupportedCommandMessage(name: string, reason: UnsupportedReason, locale: Locale): string {
+  const why = UNSUPPORTED_REASONS[reason]
+  // Indexing per branch rather than by `locale`, so an unset locale falls back
+  // to a whole English sentence the same way `translateCoreCommandName` does.
+  return locale === 'de'
+    ? `„${name}“ ist in Slatebase nicht verfügbar: ${why.de}.`
+    : `"${name}" is not available in Slatebase: ${why.en}.`
 }
 
 /**

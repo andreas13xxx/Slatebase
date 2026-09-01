@@ -63,7 +63,7 @@ beforeAll(async () => {
         vaults: [{ path: fixtureDir }],
         maxFileSize: 5242880,
         maxDirectoryDepth: 50,
-        maxVaults: 20,
+        maxVaultsPerUser: 50,
         allowedOrigins: ['http://localhost:5173'],
         dataDir: './data',
         templatesDir: './assets/templates',
@@ -110,6 +110,12 @@ beforeAll(async () => {
     },
     getWelcomeVaultConfig() {
       return { name: { de: 'Willkommen', en: 'Welcome' } }
+    },
+    getOverrides() {
+      return {}
+    },
+    async updateOverrides() {
+      return []
     },
   }
 

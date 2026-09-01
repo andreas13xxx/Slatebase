@@ -16,6 +16,14 @@ export interface ServerConfigData {
   logLevel: 'debug' | 'info' | 'warn' | 'error'
   trash?: { retentionDays: number }
   versions?: { maxPerFile: number }
+  maxVaultsPerUser?: number
+  maxDirectoryDepth?: number
+  cleanup?: { intervalHours: number }
+  upload?: { maxFileSizeBytes: number; maxFilesPerDrop: number; maxImagePasteSize: number }
+  maxImportFileSize?: number
+  maxImportFiles?: number
+  maxImportDepth?: number
+  mcp?: { maxFileSize: number; rateLimit: number }
 }
 
 /** Props for the AdminConfigPage component. */
@@ -39,6 +47,8 @@ interface ConfigFormErrors {
   maxFileSize?: string
   trashRetentionDays?: string
   versionsMaxPerFile?: string
+  maxVaultsPerUser?: string
+  limits?: string
 }
 
 /**
@@ -60,6 +70,19 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
   const [logLevel, setLogLevel] = useState('')
   const [trashRetentionDays, setTrashRetentionDays] = useState('')
   const [versionsMaxPerFile, setVersionsMaxPerFile] = useState('')
+  const [maxVaultsPerUser, setMaxVaultsPerUser] = useState('')
+  const [maxDirectoryDepth, setMaxDirectoryDepth] = useState('')
+  const [cleanupIntervalHours, setCleanupIntervalHours] = useState('')
+  const [uploadMaxFileSize, setUploadMaxFileSize] = useState('')
+  const [uploadMaxFilesPerDrop, setUploadMaxFilesPerDrop] = useState('')
+  const [uploadMaxImagePasteSize, setUploadMaxImagePasteSize] = useState('')
+  const [importMaxFileSize, setImportMaxFileSize] = useState('')
+  const [importMaxFiles, setImportMaxFiles] = useState('')
+  const [importMaxDepth, setImportMaxDepth] = useState('')
+  const [mcpMaxFileSize, setMcpMaxFileSize] = useState('')
+  const [mcpRateLimit, setMcpRateLimit] = useState('')
+  /** Keys the server reports as pinned by an environment variable. */
+  const [shadowedByEnv, setShadowedByEnv] = useState<string[]>([])
 
   // UI state
   const [errors, setErrors] = useState<ConfigFormErrors>({})
@@ -93,6 +116,17 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
           setLogLevel(data.logLevel)
           setTrashRetentionDays(String(data.trash?.retentionDays ?? 30))
           setVersionsMaxPerFile(String(data.versions?.maxPerFile ?? 20))
+          setMaxVaultsPerUser(String(data.maxVaultsPerUser ?? 50))
+          setMaxDirectoryDepth(String(data.maxDirectoryDepth ?? 50))
+          setCleanupIntervalHours(String(data.cleanup?.intervalHours ?? 24))
+          setUploadMaxFileSize(String(data.upload?.maxFileSizeBytes ?? 104857600))
+          setUploadMaxFilesPerDrop(String(data.upload?.maxFilesPerDrop ?? 50))
+          setUploadMaxImagePasteSize(String(data.upload?.maxImagePasteSize ?? 10485760))
+          setImportMaxFileSize(String(data.maxImportFileSize ?? 524288000))
+          setImportMaxFiles(String(data.maxImportFiles ?? 500))
+          setImportMaxDepth(String(data.maxImportDepth ?? 10))
+          setMcpMaxFileSize(String(data.mcp?.maxFileSize ?? 16777216))
+          setMcpRateLimit(String(data.mcp?.rateLimit ?? 60))
         }
       } catch (err: unknown) {
         if (!cancelled) {
@@ -131,6 +165,32 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
     if (isNaN(maxVersionsNum) || maxVersionsNum < 0 || maxVersionsNum > 100) {
       newErrors.versionsMaxPerFile = t('admin.config.versionsMaxPerFileError')
     }
+
+    const vaultsPerUser = parseInt(maxVaultsPerUser, 10)
+    if (isNaN(vaultsPerUser) || vaultsPerUser < 1 || vaultsPerUser > 1000) {
+      newErrors.maxVaultsPerUser = 'Muss zwischen 1 und 1000 liegen'
+    }
+
+    // The remaining limits share one message: they are all "a positive whole
+    // number", and a field-by-field message would repeat the same sentence
+    // eleven times without telling the admin anything new.
+    const positiveFields: Array<[string, number, number]> = [
+      ['Ordnertiefe', parseInt(maxDirectoryDepth, 10), 200],
+      ['Aufräum-Intervall', parseInt(cleanupIntervalHours, 10), 720],
+      ['Upload-Größe', parseInt(uploadMaxFileSize, 10), Number.MAX_SAFE_INTEGER],
+      ['Dateien pro Upload', parseInt(uploadMaxFilesPerDrop, 10), 1000],
+      ['Bild-Einfügegröße', parseInt(uploadMaxImagePasteSize, 10), Number.MAX_SAFE_INTEGER],
+      ['Import-Dateigröße', parseInt(importMaxFileSize, 10), Number.MAX_SAFE_INTEGER],
+      ['Import-Dateianzahl', parseInt(importMaxFiles, 10), Number.MAX_SAFE_INTEGER],
+      ['Import-Tiefe', parseInt(importMaxDepth, 10), 100],
+      ['MCP-Dateigröße', parseInt(mcpMaxFileSize, 10), Number.MAX_SAFE_INTEGER],
+      ['MCP-Rate-Limit', parseInt(mcpRateLimit, 10), Number.MAX_SAFE_INTEGER],
+    ]
+    const invalid = positiveFields.filter(([, value, max]) => isNaN(value) || value < 1 || value > max)
+    if (invalid.length > 0) {
+      newErrors.limits = `Ungültiger Wert: ${invalid.map(([label]) => label).join(', ')}`
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -151,6 +211,21 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
       allowedOrigins: originsArray,
       trash: { retentionDays: parseInt(trashRetentionDays, 10) },
       versions: { maxPerFile: parseInt(versionsMaxPerFile, 10) },
+      maxVaultsPerUser: parseInt(maxVaultsPerUser, 10),
+      maxDirectoryDepth: parseInt(maxDirectoryDepth, 10),
+      maxImportFileSize: parseInt(importMaxFileSize, 10),
+      maxImportFiles: parseInt(importMaxFiles, 10),
+      maxImportDepth: parseInt(importMaxDepth, 10),
+      cleanup: { intervalHours: parseInt(cleanupIntervalHours, 10) },
+      upload: {
+        maxFileSizeBytes: parseInt(uploadMaxFileSize, 10),
+        maxFilesPerDrop: parseInt(uploadMaxFilesPerDrop, 10),
+        maxImagePasteSize: parseInt(uploadMaxImagePasteSize, 10),
+      },
+      mcp: {
+        maxFileSize: parseInt(mcpMaxFileSize, 10),
+        rateLimit: parseInt(mcpRateLimit, 10),
+      },
     }
 
     try {
@@ -163,7 +238,10 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
         const body = await response.json().catch(() => ({ message: t('admin.config.saveError') }))
         throw new Error(body.message ?? `HTTP ${response.status}`)
       }
-      setSaveMessage(t('admin.config.saveSuccess'))
+      const body = await response.json().catch(() => null) as
+        { message?: string; shadowedByEnv?: string[] } | null
+      setShadowedByEnv(body?.shadowedByEnv ?? [])
+      setSaveMessage(body?.message ?? t('admin.config.saveSuccess'))
     } catch (err: unknown) {
       setSaveError(err instanceof Error ? err.message : t('admin.config.unknownError'))
     } finally {
@@ -317,8 +395,162 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
           </div>
         </section>
 
+        {/* Vaults & Uploads — limits that were previously config-file only */}
+        <section className="admin-config-card">
+          <h2 className="admin-config-card-title">Vaults &amp; Uploads</h2>
+          <p className="admin-config-hint">
+            Diese Grenzen galten bisher nur über <code>config/default.json</code>. Sie greifen sofort;
+            Port, Host und Log-Level brauchen weiterhin einen Neustart.
+          </p>
+          <div className="admin-config-grid">
+            <div className="admin-config-field">
+              <label htmlFor="config-max-vaults-per-user">Vaults pro Benutzer</label>
+              <input
+                id="config-max-vaults-per-user"
+                type="number"
+                min={1}
+                max={1000}
+                value={maxVaultsPerUser}
+                onChange={(e) => setMaxVaultsPerUser(e.target.value)}
+                aria-invalid={errors.maxVaultsPerUser !== undefined}
+              />
+              <p className="admin-config-hint">
+                Wie viele Vaults ein Konto besitzen darf. Freigegebene Vaults zählen nicht mit.
+              </p>
+              {errors.maxVaultsPerUser && <p className="admin-config-field-error">{errors.maxVaultsPerUser}</p>}
+            </div>
+            <div className="admin-config-field">
+              <label htmlFor="config-max-directory-depth">Maximale Ordnertiefe</label>
+              <input
+                id="config-max-directory-depth"
+                type="number"
+                min={1}
+                max={200}
+                value={maxDirectoryDepth}
+                onChange={(e) => setMaxDirectoryDepth(e.target.value)}
+              />
+              <p className="admin-config-hint">Verschachtelungsebenen, die der Datei-Explorer einliest.</p>
+            </div>
+            <div className="admin-config-field">
+              <label htmlFor="config-upload-max-size">Upload-Größe (Bytes)</label>
+              <input
+                id="config-upload-max-size"
+                type="number"
+                min={1}
+                value={uploadMaxFileSize}
+                onChange={(e) => setUploadMaxFileSize(e.target.value)}
+              />
+              <p className="admin-config-hint">Pro hochgeladener Datei. Standard: 100 MB.</p>
+            </div>
+            <div className="admin-config-field">
+              <label htmlFor="config-upload-max-files">Dateien pro Upload</label>
+              <input
+                id="config-upload-max-files"
+                type="number"
+                min={1}
+                max={1000}
+                value={uploadMaxFilesPerDrop}
+                onChange={(e) => setUploadMaxFilesPerDrop(e.target.value)}
+              />
+              <p className="admin-config-hint">Wie viele Dateien auf einmal abgelegt werden dürfen.</p>
+            </div>
+            <div className="admin-config-field">
+              <label htmlFor="config-upload-paste-size">Bild-Einfügegröße (Bytes)</label>
+              <input
+                id="config-upload-paste-size"
+                type="number"
+                min={1}
+                value={uploadMaxImagePasteSize}
+                onChange={(e) => setUploadMaxImagePasteSize(e.target.value)}
+              />
+              <p className="admin-config-hint">Grenze für Bilder, die aus der Zwischenablage eingefügt werden.</p>
+            </div>
+            <div className="admin-config-field">
+              <label htmlFor="config-cleanup-interval">Aufräum-Intervall (Stunden)</label>
+              <input
+                id="config-cleanup-interval"
+                type="number"
+                min={1}
+                max={720}
+                value={cleanupIntervalHours}
+                onChange={(e) => setCleanupIntervalHours(e.target.value)}
+              />
+              <p className="admin-config-hint">Abstand zwischen Papierkorb- und Versions-Aufräumläufen.</p>
+            </div>
+          </div>
+        </section>
+
+        {/* Import & MCP */}
+        <section className="admin-config-card">
+          <h2 className="admin-config-card-title">Import &amp; MCP</h2>
+          <div className="admin-config-grid">
+            <div className="admin-config-field">
+              <label htmlFor="config-import-max-size">Import-Dateigröße (Bytes)</label>
+              <input
+                id="config-import-max-size"
+                type="number"
+                min={1}
+                value={importMaxFileSize}
+                onChange={(e) => setImportMaxFileSize(e.target.value)}
+              />
+              <p className="admin-config-hint">Gesamtgröße eines Vault-Imports. Standard: 500 MB.</p>
+            </div>
+            <div className="admin-config-field">
+              <label htmlFor="config-import-max-files">Import-Dateianzahl</label>
+              <input
+                id="config-import-max-files"
+                type="number"
+                min={1}
+                value={importMaxFiles}
+                onChange={(e) => setImportMaxFiles(e.target.value)}
+              />
+            </div>
+            <div className="admin-config-field">
+              <label htmlFor="config-import-max-depth">Import-Ordnertiefe</label>
+              <input
+                id="config-import-max-depth"
+                type="number"
+                min={1}
+                max={100}
+                value={importMaxDepth}
+                onChange={(e) => setImportMaxDepth(e.target.value)}
+              />
+            </div>
+            <div className="admin-config-field">
+              <label htmlFor="config-mcp-max-size">MCP-Dateigröße (Bytes)</label>
+              <input
+                id="config-mcp-max-size"
+                type="number"
+                min={1}
+                value={mcpMaxFileSize}
+                onChange={(e) => setMcpMaxFileSize(e.target.value)}
+              />
+              <p className="admin-config-hint">
+                Getrennt von der Editor-Grenze: MCP liefert auch Bilder und PDFs base64-kodiert aus.
+              </p>
+            </div>
+            <div className="admin-config-field">
+              <label htmlFor="config-mcp-rate-limit">MCP-Anfragen pro Minute</label>
+              <input
+                id="config-mcp-rate-limit"
+                type="number"
+                min={1}
+                value={mcpRateLimit}
+                onChange={(e) => setMcpRateLimit(e.target.value)}
+              />
+              <p className="admin-config-hint">Pro Token.</p>
+            </div>
+          </div>
+          {errors.limits && <p className="admin-config-field-error">{errors.limits}</p>}
+        </section>
+
         {/* Messages */}
         {saveMessage && <div className="admin-config-message admin-config-message--success">{saveMessage}</div>}
+        {shadowedByEnv.length > 0 && (
+          <div className="admin-config-message admin-config-message--error">
+            Per Umgebungsvariable festgelegt und daher unverändert: {shadowedByEnv.join(', ')}
+          </div>
+        )}
         {saveError && <div className="admin-config-message admin-config-message--error">{saveError}</div>}
 
         <button type="submit" className="admin-config-btn admin-config-btn--primary" disabled={isSaving}>

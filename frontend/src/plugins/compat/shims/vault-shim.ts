@@ -17,6 +17,7 @@ import { warnNoOp } from '../log';
 import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry';
 import { VaultAdapterShim } from './vault-adapter-shim';
 import type { IVaultAdapter } from './vault-adapter-shim';
+import { resolveAttachmentTargetDir } from '../../../utils/internalLink';
 
 // ─── Module-Level Active Vault Reference ─────────────────────────────────────
 
@@ -825,13 +826,25 @@ export class VaultShim implements IVaultShim {
    * Get an available (non-conflicting) path for saving an attachment.
    * Returns a path that doesn't conflict with existing files.
    *
+   * Respects the vault's configured attachments directory (Einstellungen →
+   * Vault-Konfiguration), same as Slatebase's own drag-drop/paste/"Anhang
+   * einfügen" upload paths — so a plugin computing where to save e.g. a pasted
+   * image (via this method) agrees with where the native UI would put it. Async
+   * to match real Obsidian's `Vault.getAvailablePathForAttachments`, which is
+   * also a `Promise<string>`.
+   *
    * @param filename - Desired filename (e.g. "image.png")
    * @param sourcePath - Path of the source note (for relative attachment folders)
    * @returns A vault-relative path for the attachment
    */
-  getAvailablePathForAttachments(filename: string, sourcePath?: string): string {
-    // Default behavior: place attachments next to the source file
-    const dir = sourcePath?.includes('/') ? sourcePath.slice(0, sourcePath.lastIndexOf('/')) : '';
+  async getAvailablePathForAttachments(filename: string, sourcePath?: string): Promise<string> {
+    let configuredDir = '';
+    try {
+      configuredDir = (await this.apiClient.getVaultConfig(this.vaultId)).attachmentsDirectory;
+    } catch {
+      // Vault config unavailable — fall back to the source file's own folder.
+    }
+    const dir = resolveAttachmentTargetDir(configuredDir, sourcePath ?? '');
     const basePath = dir ? `${dir}/${filename}` : filename;
 
     // Check if file exists and append number if needed

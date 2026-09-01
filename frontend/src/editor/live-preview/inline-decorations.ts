@@ -256,6 +256,22 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
     }
   }
 
+  // The regex passes below all work on raw document text, where a match inside
+  // a code span or fence is literal text rather than markup.
+  const insideCode = (from: number, to: number): boolean => {
+    let found = false
+    tree.iterate({
+      from, to,
+      enter(n) {
+        if (n.name === 'FencedCode' || n.name === 'InlineCode' || n.name === 'CodeBlock') {
+          found = true
+          return false
+        }
+      }
+    })
+    return found
+  }
+
   // --- Highlight (==text==) ---
   // Not in Lezer grammar — detect via regex on the full document text
   const docText = state.doc.toString()
@@ -270,18 +286,7 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
     const contentFrom = from + markerLen
     const contentTo = to - markerLen
 
-    // Skip if inside a code block (check if the range intersects any FencedCode or InlineCode node)
-    let insideCode = false
-    tree.iterate({
-      from, to,
-      enter(n) {
-        if (n.name === 'FencedCode' || n.name === 'InlineCode' || n.name === 'CodeBlock') {
-          insideCode = true
-          return false
-        }
-      }
-    })
-    if (insideCode) continue
+    if (insideCode(from, to)) continue
 
     if (contentFrom < contentTo) {
       // Mark the content with highlight class
@@ -323,23 +328,65 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
       continue
     }
 
-    // Skip if inside a code block
-    let insideCodeBlock = false
-    tree.iterate({
-      from: fullFrom, to: fullTo,
-      enter(n) {
-        if (n.name === 'FencedCode' || n.name === 'InlineCode' || n.name === 'CodeBlock') {
-          insideCodeBlock = true
-          return false
-        }
-      }
-    })
-    if (insideCodeBlock) continue
+    if (insideCode(fullFrom, fullTo)) continue
 
     // Mark the entire tag (#value) with the tag class
     decorations.push(
       Decoration.mark({ class: 'cm-lp-tag' }).range(fullFrom, fullTo)
     )
+  }
+
+  // --- Footnotes ([^label] in the text, [^label]: at the start of a line) ---
+  // GFM footnotes are not part of @lezer/markdown's grammar either, so both
+  // halves are found by regex like the two passes above. Definitions are
+  // collected first: a `[^label]` whose definition is missing is literal text
+  // in GFM, and is left looking like the literal text it is.
+  const FOOTNOTE_DEF_REGEX = /^ {0,3}\[\^([^\]\s]+)\]:/gm
+  const definedLabels = new Set<string>()
+  let defMatch: RegExpExecArray | null
+
+  FOOTNOTE_DEF_REGEX.lastIndex = 0
+  while ((defMatch = FOOTNOTE_DEF_REGEX.exec(docText)) !== null) {
+    const from = defMatch.index
+    const to = from + defMatch[0].length
+    if (insideCode(from, to)) continue
+
+    definedLabels.add(defMatch[1]!)
+    // Sets the whole line apart as a footnote, the way the rendered list under
+    // the note does — the marker itself stays readable, it is what the
+    // reference points at.
+    decorations.push(
+      Decoration.line({ attributes: { class: 'cm-lp-footnote-def' } }).range(state.doc.lineAt(from).from)
+    )
+    decorations.push(
+      Decoration.mark({ class: 'cm-lp-footnote-def-marker' }).range(from, to)
+    )
+  }
+
+  const FOOTNOTE_REF_REGEX = /\[\^([^\]\s]+)\]/g
+  let refMatch: RegExpExecArray | null
+
+  FOOTNOTE_REF_REGEX.lastIndex = 0
+  while ((refMatch = FOOTNOTE_REF_REGEX.exec(docText)) !== null) {
+    const from = refMatch.index
+    const to = from + refMatch[0].length
+    if (!definedLabels.has(refMatch[1]!)) continue
+    if (insideCode(from, to)) continue
+    // The marker that opens a definition line is not a reference to itself.
+    if (docText[to] === ':' && /^ {0,3}$/.test(docText.slice(state.doc.lineAt(from).from, from))) continue
+
+    const labelFrom = from + 2 // after [^
+    const labelTo = to - 1 // before ]
+
+    decorations.push(
+      Decoration.mark({ class: 'cm-lp-footnote-ref' }).range(labelFrom, labelTo)
+    )
+    // Hiding the brackets leaves the bare label raised as a superscript; the
+    // cursor entering the marker reveals `[^label]` again, as everywhere else.
+    hideableRanges.push({ from, to: labelFrom, groupFrom: from, groupTo: to })
+    decorations.push(Decoration.replace({}).range(from, labelFrom))
+    hideableRanges.push({ from: labelTo, to, groupFrom: from, groupTo: to })
+    decorations.push(Decoration.replace({}).range(labelTo, to))
   }
 
   return { decorations, hideableRanges }

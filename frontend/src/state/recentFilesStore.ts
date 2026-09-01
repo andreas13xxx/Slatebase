@@ -7,6 +7,13 @@
  */
 
 import type { IApiClient, RecentFileEntry as ApiRecentFileEntry } from '../api'
+import {
+  hasSyncedBefore,
+  markSyncedBefore,
+  clearSyncedBefore,
+  reportSyncFailure,
+  reportSyncSuccess,
+} from './preferenceSync'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -24,6 +31,9 @@ const STORAGE_KEY = 'slatebase:recentFiles'
 const MAX_ENTRIES = 20
 const SYNC_DEBOUNCE_MS = 2000
 
+/** Identifies this store to the shared first-sync/failure bookkeeping. */
+const SYNC_STORE_KEY = 'recentFiles'
+
 // ─── Internal State ──────────────────────────────────────────────────────────
 
 let entries: RecentFileEntry[] = loadFromStorage()
@@ -35,22 +45,31 @@ let syncInProgress = false
 
 /**
  * Initialize the store with an API client and load server-side data.
- * Merges server data with local cache (server wins for conflicts).
+ *
+ * Once this device has synced before, the server list *replaces* the local
+ * cache rather than merging into it: an entry removed on another device must
+ * stay removed instead of being refilled from a stale local slot. See
+ * preferenceSync.ts for why an empty server response is only treated as
+ * "no record" before the first successful upload.
+ *
  * Called on login / app mount.
  */
 export async function initialize(client: IApiClient): Promise<void> {
   apiClient = client
   try {
     const response = await client.getRecentFiles()
-    if (response.entries.length > 0) {
-      // Merge: server entries take priority, then local-only entries fill remaining slots
-      const serverPaths = new Set(response.entries.map(e => `${e.vaultId}::${e.path}`))
-      const localOnly = entries.filter(e => !serverPaths.has(`${e.vaultId}::${e.path}`))
-      entries = [...response.entries, ...localOnly].slice(0, MAX_ENTRIES)
+
+    if (response.entries.length === 0 && !hasSyncedBefore(SYNC_STORE_KEY) && entries.length > 0) {
+      await syncToServer()
+      return
     }
+
+    entries = response.entries.slice(0, MAX_ENTRIES)
     persistLocal()
+    markSyncedBefore(SYNC_STORE_KEY)
   } catch {
-    // Server unavailable — continue with localStorage data
+    // Server unavailable — continue with localStorage data. No marker is set,
+    // so a later successful init can still seed from this cache.
   }
 }
 
@@ -64,6 +83,9 @@ export function disconnect(): void {
     syncTimer = null
   }
   apiClient = null
+  // The marker is per device *and* account: the next user to log in here must
+  // not inherit this one's "already synced" state.
+  clearSyncedBefore(SYNC_STORE_KEY)
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -195,8 +217,12 @@ async function syncToServer(): Promise<void> {
       timestamp: e.timestamp,
     }))
     await apiClient.saveRecentFiles(apiEntries)
-  } catch {
-    // Sync failed — data remains in localStorage, will retry on next change
+    markSyncedBefore(SYNC_STORE_KEY)
+    reportSyncSuccess(SYNC_STORE_KEY)
+  } catch (error) {
+    // Logged, not toasted: a lost recent-files entry is not worth interrupting
+    // the user over, unlike keybindings or favorites.
+    reportSyncFailure(SYNC_STORE_KEY, error)
   } finally {
     syncInProgress = false
   }

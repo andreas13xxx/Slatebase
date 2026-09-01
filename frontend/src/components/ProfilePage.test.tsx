@@ -94,8 +94,10 @@ describe('ProfilePage', () => {
 
       expect(screen.getByLabelText('E-Mail')).toHaveValue('test@example.com')
       expect(screen.getByLabelText('Avatar-URL')).toHaveValue('https://example.com/avatar.png')
-      expect(screen.getByLabelText('Bevorzugte Sprache')).toHaveValue('de')
-      expect(screen.getByLabelText('Farbschema')).toHaveValue('system')
+      // Sprache und Farbschema stehen jetzt unter Einstellungen → Darstellung,
+      // siehe AppearanceSection.test.tsx.
+      expect(screen.queryByLabelText('Bevorzugte Sprache')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Farbschema')).not.toBeInTheDocument()
     })
 
     it('shows error when profile loading fails', async () => {
@@ -405,8 +407,6 @@ describe('ProfilePage', () => {
 
       expect(screen.getByLabelText('E-Mail')).toBeInTheDocument()
       expect(screen.getByLabelText('Avatar-URL')).toBeInTheDocument()
-      expect(screen.getByLabelText('Bevorzugte Sprache')).toBeInTheDocument()
-      expect(screen.getByLabelText('Farbschema')).toBeInTheDocument()
       expect(screen.getByLabelText('Aktuelles Passwort')).toBeInTheDocument()
       expect(screen.getByLabelText('Neues Passwort')).toBeInTheDocument()
       expect(screen.getByLabelText('Passwort zur Bestätigung')).toBeInTheDocument()

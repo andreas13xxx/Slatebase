@@ -11,6 +11,13 @@
  */
 
 import type { IApiClient, KeybindingEntry as ApiKeybindingEntry } from '../api'
+import {
+  hasSyncedBefore,
+  markSyncedBefore,
+  clearSyncedBefore,
+  reportSyncFailure,
+  reportSyncSuccess,
+} from './preferenceSync'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -48,6 +55,9 @@ export interface ParsedShortcut {
 
 const STORAGE_KEY = 'slatebase:keybindings'
 const SYNC_DEBOUNCE_MS = 2000
+
+/** Identifies this store to the shared first-sync/failure bookkeeping. */
+const SYNC_STORE_KEY = 'keybindings'
 
 // ─── Default Keybindings ─────────────────────────────────────────────────────
 
@@ -106,13 +116,32 @@ export async function initialize(client: IApiClient): Promise<void> {
   apiClient = client
   try {
     const response = await client.getKeybindings()
-    if (response.entries.length > 0) {
-      overrides = new Map(response.entries.map(e => [e.commandId, e.shortcut]))
-      persistLocal()
+
+    // An empty response means "the user unbound everything" once this device
+    // has synced before, and "the server has no record yet" when it has not —
+    // see preferenceSync.ts. Only the latter keeps the local cache.
+    if (response.entries.length === 0 && !hasSyncedBefore(SYNC_STORE_KEY) && overrides.size > 0) {
+      await syncToServer()
+      return
     }
+
+    overrides = new Map(response.entries.map(e => [e.commandId, e.shortcut]))
+    persistLocal()
+    markSyncedBefore(SYNC_STORE_KEY)
   } catch {
-    // Server unavailable — continue with localStorage data
+    // Server unavailable — continue with localStorage data. No marker is set,
+    // so a later successful init can still seed from this cache.
   }
+}
+
+/**
+ * Re-read the overrides from localStorage, discarding in-memory state.
+ * Mirrors `recentFilesStore._reload`; used by tests, which share this
+ * module-level store across cases.
+ * @internal
+ */
+export function _reloadFromStorage(): void {
+  overrides = loadFromStorage()
 }
 
 /**
@@ -124,6 +153,9 @@ export function disconnect(): void {
     syncTimer = null
   }
   apiClient = null
+  // The marker is per device *and* account: the next user to log in here must
+  // not inherit this one's "already synced" state.
+  clearSyncedBefore(SYNC_STORE_KEY)
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -328,8 +360,12 @@ async function syncToServer(): Promise<void> {
       shortcut,
     }))
     await apiClient.saveKeybindings(entries)
-  } catch {
-    // Sync failed — data remains in localStorage, will retry on next change
+    markSyncedBefore(SYNC_STORE_KEY)
+    reportSyncSuccess(SYNC_STORE_KEY)
+  } catch (error) {
+    // Data remains in localStorage and retries on the next change; the user is
+    // told once per failure streak so a silent divergence can't build up.
+    reportSyncFailure(SYNC_STORE_KEY, error, 'Tastaturkürzel')
   } finally {
     syncInProgress = false
   }

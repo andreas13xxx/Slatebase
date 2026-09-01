@@ -21,7 +21,7 @@ In Source mode you see the raw Markdown text with syntax highlighting. All marke
 
 - **Line Numbers** — Optional line numbers on the left (toggle in Settings)
 - **Readable Line Length** — Constrains the editor width for comfortable reading; toggle via Command Palette → "Toggle readable line length"
-- **Spellcheck** — The browser's native spellcheck, toggleable via Command Palette → "Toggle spellcheck"
+- **Spellcheck** — Built-in, with corrections: unknown words are underlined, and a right-click offers suggestions plus "add to dictionary". Toggle it and pick the dictionary (German/English) via the context menu or Command Palette → "Toggle spellcheck"
 - **Folding** — Collapse headings and nested lists (see [[#Folding]] below)
 - **Auto-Save** — Your changes are saved automatically after a short pause
 - **Undo/Redo** — `Ctrl+Z` to undo, `Ctrl+Shift+Z` to redo

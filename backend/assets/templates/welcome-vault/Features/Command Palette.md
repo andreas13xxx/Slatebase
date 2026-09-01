@@ -37,6 +37,10 @@ Nach dem Öffnen erscheint ein Eingabefeld mit einer Liste aller verfügbaren Be
 | `täg` | Tägliche Notiz öffnen |
 | `sync` | Sync-Seite öffnen |
 
+### Tastenkürzel in der Liste
+
+Hat ein Befehl ein Tastenkürzel, steht es rechts neben dem Befehlsnamen — z.B. `Ctrl+E` bei „Editor-Modus wechseln“. So lässt sich die Palette auch als Nachschlagewerk nutzen: Befehl suchen, Kürzel merken, beim nächsten Mal direkt drücken. Angezeigt wird immer das aktuell gültige Kürzel, also auch deine eigenen Änderungen aus **Einstellungen → Tastenkürzel**.
+
 ---
 
 ## Keyboard-Navigation
@@ -87,6 +91,15 @@ Die verfügbaren Befehle sind in Kategorien organisiert:
 - Dark/Light Mode umschalten
 - Statusleiste ein-/ausblenden
 - Zwischen Edit-/View-Modus wechseln
+- Zeilennummern umschalten
+- Lesbare Zeilenlänge umschalten
+
+### Rechtschreibprüfung
+
+- **Rechtschreibprüfung umschalten** — unterringelt unbekannte Wörter im Editor (Standard: an)
+- **Wörterbuch: Deutsch** / **Wörterbuch: Englisch** — wählt das Wörterbuch
+
+Korrekturvorschläge selbst stehen nicht in der Palette, sondern im Rechtsklick-Menü auf dem unterringelten Wort — siehe [[Editor und Viewer#Rechtschreibprüfung]].
 
 ### Administration (nur für Admins)
 

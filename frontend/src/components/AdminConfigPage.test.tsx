@@ -232,6 +232,20 @@ describe('AdminConfigPage', () => {
           allowedOrigins: ['http://localhost:5173'],
           trash: { retentionDays: 30 },
           versions: { maxPerFile: 20 },
+          // Limits that used to be reachable only by editing config/default.json.
+          // SAMPLE_CONFIG omits them, so the form submits the shipped defaults.
+          maxVaultsPerUser: 50,
+          maxDirectoryDepth: 50,
+          maxImportFileSize: 524288000,
+          maxImportFiles: 500,
+          maxImportDepth: 10,
+          cleanup: { intervalHours: 24 },
+          upload: {
+            maxFileSizeBytes: 104857600,
+            maxFilesPerDrop: 50,
+            maxImagePasteSize: 10485760,
+          },
+          mcp: { maxFileSize: 16777216, rateLimit: 60 },
         }),
       }))
     })
@@ -240,7 +254,7 @@ describe('AdminConfigPage', () => {
   it('shows success message after saving', async () => {
     mockFetchWithVersion(
       new Response(JSON.stringify(SAMPLE_CONFIG), { status: 200 }),
-      new Response(JSON.stringify({ message: 'OK' }), { status: 200 })
+      new Response(JSON.stringify({ message: 'Konfiguration gespeichert.' }), { status: 200 })
     )
     const apiClient = createMockApiClient()
     const user = userEvent.setup()
@@ -253,8 +267,10 @@ describe('AdminConfigPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Konfiguration speichern' }))
 
+    // The server now persists and reports what it did, so the page shows its
+    // message rather than a fixed "Neustart erforderlich" string.
     await waitFor(() => {
-      expect(screen.getByText('Konfiguration gespeichert. Neustart erforderlich.')).toBeInTheDocument()
+      expect(screen.getByText('Konfiguration gespeichert.')).toBeInTheDocument()
     })
   })
 

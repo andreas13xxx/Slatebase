@@ -1,5 +1,9 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { add, getRecent, remove, updatePath, _reload } from './recentFilesStore'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { add, getRecent, remove, updatePath, _reload, initialize, disconnect } from './recentFilesStore'
+import type { IApiClient } from '../api'
+import { hasSyncedBefore, markSyncedBefore } from './preferenceSync'
+
+vi.mock('../components/ToastNotification', () => ({ showToast: vi.fn() }))
 
 describe('recentFilesStore', () => {
   beforeEach(() => {
@@ -263,6 +267,70 @@ describe('recentFilesStore', () => {
       } finally {
         localStorage.setItem = originalSetItem
       }
+    })
+  })
+
+  describe('initialize', () => {
+    /** Minimal API client stub — only the recent-files endpoints are exercised. */
+    function createMockApiClient(serverEntries: unknown[]) {
+      return {
+        getRecentFiles: vi.fn().mockResolvedValue({ entries: serverEntries }),
+        saveRecentFiles: vi.fn().mockResolvedValue(undefined),
+      } as unknown as IApiClient & {
+        getRecentFiles: ReturnType<typeof vi.fn>
+        saveRecentFiles: ReturnType<typeof vi.fn>
+      }
+    }
+
+    beforeEach(() => {
+      disconnect()
+      _reload()
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+    })
+
+    it('replaces the local list instead of merging local-only entries into it', async () => {
+      add('vault1', 'gone.md')
+      markSyncedBefore('recentFiles')
+
+      await initialize(createMockApiClient([
+        { vaultId: 'vault1', path: 'server.md', timestamp: new Date().toISOString() },
+      ]))
+
+      expect(getRecent().map((e) => e.path)).toEqual(['server.md'])
+    })
+
+    it('seeds the server from the local cache on the very first sync', async () => {
+      add('vault1', 'local.md')
+      const client = createMockApiClient([])
+
+      await initialize(client)
+
+      expect(client.saveRecentFiles).toHaveBeenCalled()
+      expect(getRecent()).toHaveLength(1)
+    })
+
+    it('honours an empty server list once this device has synced before', async () => {
+      add('vault1', 'stale.md')
+      markSyncedBefore('recentFiles')
+      const client = createMockApiClient([])
+
+      await initialize(client)
+
+      expect(client.saveRecentFiles).not.toHaveBeenCalled()
+      expect(getRecent()).toHaveLength(0)
+    })
+
+    it('keeps local data and sets no marker when the server is unreachable', async () => {
+      add('vault1', 'local.md')
+      const client = {
+        getRecentFiles: vi.fn().mockRejectedValue(new Error('offline')),
+        saveRecentFiles: vi.fn(),
+      } as unknown as IApiClient
+
+      await initialize(client)
+
+      expect(getRecent()).toHaveLength(1)
+      expect(hasSyncedBefore('recentFiles')).toBe(false)
     })
   })
 })

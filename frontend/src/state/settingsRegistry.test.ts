@@ -133,4 +133,27 @@ describe('settingsRegistry', () => {
       expect(registry.findSection('feature-toggles')?.labelKey).toBe('settings.sections.featureToggles')
     })
   })
+
+  describe('feature gating', () => {
+    // Both the nav (SettingsNavList) and the content area (SettingsContent)
+    // derive their feature gate solely from this field, so a section whose
+    // screen is feature-gated elsewhere but which is missing `feature` here
+    // stays reachable inside the settings panel — the exact drift this asserts
+    // against (mcp-tokens and plugins were gated in App.tsx's standalone page
+    // routes only).
+    it.each([
+      ['plugins', 'obsidian-plugin-compat'],
+      ['mcp-tokens', 'mcp'],
+      ['git-sync', 'git-sync'],
+      ['mail-import', 'mail-import'],
+    ] as const)('gates %s behind the %s feature', (sectionId, featureName) => {
+      expect(registry.findSection(sectionId)?.feature).toBe(featureName)
+    })
+
+    it('leaves sections without a backend feature ungated', () => {
+      for (const id of ['profile', 'password', 'sessions', 'keybindings', 'appearance', 'my-vaults', 'delete-account', 'vault-config', 'css-snippets'] as const) {
+        expect(registry.findSection(id)?.feature).toBeUndefined()
+      }
+    })
+  })
 })

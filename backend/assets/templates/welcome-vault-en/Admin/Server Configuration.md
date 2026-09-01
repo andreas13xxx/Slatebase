@@ -88,7 +88,7 @@ Important environment variables for server configuration:
 | `SLATEBASE_HOST` | Bind address (default: localhost, Docker: 0.0.0.0) |
 | `SLATEBASE_DATA_DIR` | Data directory |
 | `SLATEBASE_CSRF_SECRET` | CSRF token secret (min. 32 characters) |
-| `SLATEBASE_SYNC_SECRET` | Encryption secret for sync credentials |
+| `SLATEBASE_MODULE_SECRET_KEY` | Encryption secret for Git-Sync and Mail-Import credentials |
 | `SLATEBASE_TRUSTED_PROXIES` | Comma-separated IP ranges |
 | `SLATEBASE_PROXY_ALLOWED_ORIGINS` | Allowed domains for plugin proxy |
 

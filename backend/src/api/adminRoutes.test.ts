@@ -76,6 +76,8 @@ function createMockConfigService(): IConfigService {
     getTemplatesConfig: () => ({}) as ReturnType<IConfigService['getTemplatesConfig']>,
     getUploadConfig: () => ({}) as ReturnType<IConfigService['getUploadConfig']>,
     getWelcomeVaultConfig: () => ({}) as ReturnType<IConfigService['getWelcomeVaultConfig']>,
+    getOverrides: () => ({}),
+    updateOverrides: async () => [],
   }
 }
 

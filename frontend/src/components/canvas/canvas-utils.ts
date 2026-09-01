@@ -2,6 +2,8 @@
  * Canvas utility functions — color mapping, geometry helpers.
  */
 
+import type { CanvasNode } from '../../canvas/types'
+
 /**
  * Maps Obsidian color values ("1"–"6" or hex) to CSS class names.
  */
@@ -47,6 +49,25 @@ export function generateCanvasId(): string {
 
 /** A bounding box in canvas-space coordinates. */
 export interface CanvasBounds { minX: number; minY: number; maxX: number; maxY: number }
+
+/**
+ * Computes the bounding box spanning every node's rectangle. Returns null for
+ * an empty document — there's no meaningful bounds (and callers use this to
+ * distinguish "nothing to fit/export" from a real, if tiny, canvas).
+ * Shared by CanvasView's fitToView and the "export as image" command — both
+ * need the same fit-to-content rectangle, just for different consumers.
+ */
+export function computeContentBounds(nodes: CanvasNode[]): CanvasBounds | null {
+  if (nodes.length === 0) return null
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const node of nodes) {
+    minX = Math.min(minX, node.x)
+    minY = Math.min(minY, node.y)
+    maxX = Math.max(maxX, node.x + node.width)
+    maxY = Math.max(maxY, node.y + node.height)
+  }
+  return { minX, minY, maxX, maxY }
+}
 
 /**
  * Computes the viewport (x/y/zoom) that fits `bounds` inside `rect` with

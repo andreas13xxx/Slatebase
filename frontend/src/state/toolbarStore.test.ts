@@ -18,10 +18,12 @@ import {
   __resetToolbarStoreForTests,
   DEFAULT_TOOLBAR_PREFS,
 } from './toolbarStore'
+import { _reset as resetUiSettings, getUiSettings } from './userSettingsStore'
 
-const STORAGE_KEY = 'slatebase:toolbar'
+vi.mock('../components/ToastNotification', () => ({ showToast: vi.fn() }))
 
 beforeEach(() => {
+  resetUiSettings()
   __resetToolbarStoreForTests()
 })
 
@@ -100,19 +102,19 @@ describe('toolbar visibility and position', () => {
     expect(getToolbarPrefs()).toEqual(DEFAULT_TOOLBAR_PREFS)
   })
 
-  it('toggles and persists visibility', () => {
+  it('toggles visibility and stores it in the account settings', () => {
     toggleToolbarVisible()
     expect(getToolbarPrefs().visible).toBe(false)
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}').visible).toBe(false)
+    expect(getUiSettings().toolbar.visible).toBe(false)
 
     setToolbarVisible(true)
     expect(getToolbarPrefs().visible).toBe(true)
   })
 
-  it('persists the docking side', () => {
+  it('stores the docking side in the account settings', () => {
     setToolbarPosition('right')
     expect(getToolbarPrefs().position).toBe('right')
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}').position).toBe('right')
+    expect(getUiSettings().toolbar.position).toBe('right')
   })
 })
 
@@ -193,32 +195,9 @@ describe('resetToolbarLayout', () => {
 })
 
 describe('storage robustness', () => {
-  it('falls back to defaults for a corrupted payload', async () => {
-    localStorage.setItem(STORAGE_KEY, '{not json')
-    vi.resetModules()
-    const fresh = await import('./toolbarStore')
-    expect(fresh.getToolbarPrefs()).toEqual(DEFAULT_TOOLBAR_PREFS)
-  })
-
-  it('repairs individual malformed fields without discarding the valid ones', async () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      visible: 'nope',
-      position: 'right',
-      order: ['a', 7],
-      hidden: 'nope',
-      colors: { a: 1 },
-    }))
-    vi.resetModules()
-    const fresh = await import('./toolbarStore')
-    expect(fresh.getToolbarPrefs()).toEqual({
-      visible: true,
-      position: 'right',
-      order: [],
-      hidden: [],
-      colors: {},
-    })
-  })
-
+  // Parsing and repairing a malformed payload now belongs to userSettingsStore,
+  // which owns the cache; see userSettingsStore.test.ts. What stays here is
+  // that a failed write never breaks the in-memory state.
   it('survives localStorage throwing on write', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('QuotaExceeded')

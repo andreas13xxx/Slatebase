@@ -1,116 +1,89 @@
 import { renderHook, act } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useLineNumbers } from './useLineNumbers'
+import {
+  _reset as resetVaultSettings,
+  setActiveVault,
+  updateVaultSettings,
+} from '../state/vaultSettingsStore'
+
+vi.mock('../components/ToastNotification', () => ({ showToast: vi.fn() }))
 
 describe('useLineNumbers', () => {
-  beforeEach(() => {
-    localStorage.clear()
+  beforeEach(async () => {
+    // localStorage is cleared in test-setup.ts beforeEach
+    resetVaultSettings()
+    // No API client is connected, so this only sets the active vault and reads
+    // the (empty) local cache — enough to exercise the store's semantics.
+    await setActiveVault('vault-1')
   })
 
   describe('initial state', () => {
-    it('defaults to disabled when localStorage is empty', () => {
+    it('defaults to disabled', () => {
       const { result } = renderHook(() => useLineNumbers())
       expect(result.current.enabled).toBe(false)
     })
 
-    it('reads enabled=true from localStorage', () => {
-      localStorage.setItem('slatebase:lineNumbers', JSON.stringify({ enabled: true }))
+    it('reads the active vault’s stored value', () => {
+      updateVaultSettings({ lineNumbers: true })
       const { result } = renderHook(() => useLineNumbers())
       expect(result.current.enabled).toBe(true)
-    })
-
-    it('reads enabled=false from localStorage', () => {
-      localStorage.setItem('slatebase:lineNumbers', JSON.stringify({ enabled: false }))
-      const { result } = renderHook(() => useLineNumbers())
-      expect(result.current.enabled).toBe(false)
-    })
-
-    it('defaults to disabled when localStorage contains invalid JSON', () => {
-      localStorage.setItem('slatebase:lineNumbers', 'not-json{{{')
-      const { result } = renderHook(() => useLineNumbers())
-      expect(result.current.enabled).toBe(false)
-    })
-
-    it('defaults to disabled when localStorage contains wrong shape', () => {
-      localStorage.setItem('slatebase:lineNumbers', JSON.stringify({ foo: 'bar' }))
-      const { result } = renderHook(() => useLineNumbers())
-      expect(result.current.enabled).toBe(false)
-    })
-
-    it('defaults to disabled when enabled field is not boolean', () => {
-      localStorage.setItem('slatebase:lineNumbers', JSON.stringify({ enabled: 'yes' }))
-      const { result } = renderHook(() => useLineNumbers())
-      expect(result.current.enabled).toBe(false)
-    })
-
-    it('defaults to disabled when localStorage throws', () => {
-      const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-        throw new Error('SecurityError')
-      })
-      const { result } = renderHook(() => useLineNumbers())
-      expect(result.current.enabled).toBe(false)
-      spy.mockRestore()
     })
   })
 
   describe('toggle', () => {
     it('toggles from disabled to enabled', () => {
       const { result } = renderHook(() => useLineNumbers())
-      expect(result.current.enabled).toBe(false)
 
       act(() => { result.current.toggle() })
       expect(result.current.enabled).toBe(true)
     })
 
     it('toggles from enabled to disabled', () => {
-      localStorage.setItem('slatebase:lineNumbers', JSON.stringify({ enabled: true }))
+      updateVaultSettings({ lineNumbers: true })
       const { result } = renderHook(() => useLineNumbers())
-      expect(result.current.enabled).toBe(true)
 
       act(() => { result.current.toggle() })
       expect(result.current.enabled).toBe(false)
-    })
-
-    it('persists enabled state to localStorage', () => {
-      const { result } = renderHook(() => useLineNumbers())
-
-      act(() => { result.current.toggle() })
-      const stored = JSON.parse(localStorage.getItem('slatebase:lineNumbers')!)
-      expect(stored).toEqual({ enabled: true })
-    })
-
-    it('persists disabled state to localStorage', () => {
-      localStorage.setItem('slatebase:lineNumbers', JSON.stringify({ enabled: true }))
-      const { result } = renderHook(() => useLineNumbers())
-
-      act(() => { result.current.toggle() })
-      const stored = JSON.parse(localStorage.getItem('slatebase:lineNumbers')!)
-      expect(stored).toEqual({ enabled: false })
     })
 
     it('toggles multiple times correctly', () => {
       const { result } = renderHook(() => useLineNumbers())
 
       act(() => { result.current.toggle() })
-      expect(result.current.enabled).toBe(true)
-
       act(() => { result.current.toggle() })
-      expect(result.current.enabled).toBe(false)
-
       act(() => { result.current.toggle() })
       expect(result.current.enabled).toBe(true)
     })
 
-    it('silently ignores localStorage write errors', () => {
-      const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-        throw new Error('QuotaExceededError')
-      })
-      const { result } = renderHook(() => useLineNumbers())
+    it('shares state across hook instances', () => {
+      const first = renderHook(() => useLineNumbers())
+      const second = renderHook(() => useLineNumbers())
 
-      // Should not throw
+      act(() => { first.result.current.toggle() })
+
+      expect(second.result.current.enabled).toBe(true)
+    })
+  })
+
+  describe('vault scoping', () => {
+    it('keeps the setting separate per vault', async () => {
+      const { result } = renderHook(() => useLineNumbers())
       act(() => { result.current.toggle() })
       expect(result.current.enabled).toBe(true)
-      spy.mockRestore()
+
+      await act(async () => { await setActiveVault('vault-2') })
+
+      expect(result.current.enabled).toBe(false)
+    })
+
+    it('does nothing when no vault is active', async () => {
+      await act(async () => { await setActiveVault(null) })
+      const { result } = renderHook(() => useLineNumbers())
+
+      act(() => { result.current.toggle() })
+
+      expect(result.current.enabled).toBe(false)
     })
   })
 })

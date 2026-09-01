@@ -29,7 +29,7 @@ function createMockConfigService(overrides?: Partial<ServerConfig>): IConfigServ
     vaults: [{ path: '/test/vault' }],
     maxFileSize: 5242880,
     maxDirectoryDepth: 50,
-    maxVaults: 20,
+    maxVaultsPerUser: 50,
     allowedOrigins: ['http://localhost:5173'],
     dataDir: './data',
     templatesDir: './assets/templates',
@@ -61,6 +61,8 @@ function createMockConfigService(overrides?: Partial<ServerConfig>): IConfigServ
     getTemplatesConfig: () => config.templates,
     getUploadConfig: () => config.upload,
     getWelcomeVaultConfig: () => config.welcomeVault,
+    getOverrides: () => ({}),
+    updateOverrides: async () => [],
   }
 }
 
@@ -489,6 +491,48 @@ describe('VaultService', () => {
         .rejects.toThrow(StorageError)
       await expect(service.createVault('My Vault', 'test-owner-id'))
         .rejects.toThrow('VaultRegistry is not configured')
+    })
+
+    it('rejects a create once the owner reached maxVaultsPerUser', async () => {
+      const owned = Array.from({ length: 3 }, (_, i) => {
+        const vault = createMockVault(`vault-${i}`, `Vault ${i}`, `/data/vault-${i}`)
+        vault.info.ownerId = 'owner-a'
+        return vault
+      })
+      const vaultManager = createMockVaultManager(owned)
+      const configService = createMockConfigService({ maxVaultsPerUser: 3 })
+      const service = new VaultService(
+        vaultManager,
+        createMockVaultReader(),
+        configService,
+        createMockLogger(),
+        createMockRegistry(),
+      )
+
+      await expect(service.createVault('One More', 'owner-a'))
+        .rejects.toThrow(VaultValidationError)
+    })
+
+    it('counts only the vaults the requesting user owns', async () => {
+      // Someone else's vaults must not consume this user's allowance.
+      const owned = Array.from({ length: 3 }, (_, i) => {
+        const vault = createMockVault(`vault-${i}`, `Vault ${i}`, `/data/vault-${i}`)
+        vault.info.ownerId = 'someone-else'
+        return vault
+      })
+      const vaultManager = createMockVaultManager(owned)
+      const configService = createMockConfigService({ maxVaultsPerUser: 3 })
+      const service = new VaultService(
+        vaultManager,
+        createMockVaultReader(),
+        configService,
+        createMockLogger(),
+        createMockRegistry(),
+      )
+
+      const created = await service.createVault('Mine', 'owner-a')
+
+      expect(created.name).toBe('Mine')
     })
 
     it('throws VaultValidationError for empty name', async () => {

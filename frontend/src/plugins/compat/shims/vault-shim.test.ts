@@ -188,6 +188,38 @@ describe('VaultShim', () => {
     });
   });
 
+  describe('getAvailablePathForAttachments()', () => {
+    it("falls back to the source note's own folder when the vault has no configured attachments directory", async () => {
+      apiClient = createMockApiClient({
+        getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'Templates', dailyNotesDirectory: '', dailyNoteTemplateName: 'daily.md', attachmentsDirectory: '' }),
+      });
+      vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+
+      const result = await vault.getAvailablePathForAttachments('image.png', 'notes/hello.md');
+      expect(result).toBe('notes/image.png');
+    });
+
+    it("uses the vault's configured attachments directory regardless of the source note's folder", async () => {
+      apiClient = createMockApiClient({
+        getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'Templates', dailyNotesDirectory: '', dailyNoteTemplateName: 'daily.md', attachmentsDirectory: 'Attachments' }),
+      });
+      vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+
+      const result = await vault.getAvailablePathForAttachments('image.png', 'notes/hello.md');
+      expect(result).toBe('Attachments/image.png');
+    });
+
+    it('falls back to the source folder when the vault config request fails', async () => {
+      apiClient = createMockApiClient({
+        getVaultConfig: vi.fn().mockRejectedValue(new Error('network error')),
+      });
+      vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+
+      const result = await vault.getAvailablePathForAttachments('image.png', 'notes/hello.md');
+      expect(result).toBe('notes/image.png');
+    });
+  });
+
   describe('getAbstractFileByPath()', () => {
     it('returns TFile for existing file', () => {
       const result = vault.getAbstractFileByPath('notes/hello.md');

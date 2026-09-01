@@ -30,17 +30,21 @@ import { toggleToolbarVisible } from '../state/toolbarStore'
  * exactly what an existing native `slatebase:*` command already does, mapped to the
  * ID of the native command that duplicates them. Those core commands stay registered
  * in the command registry — real community plugins still resolve them via
- * `executeCommandById()` — but are hidden from the palette itself *only when the
- * native command they duplicate is actually visible right now*.
+ * `executeCommandById()` — but are unconditionally hidden from the palette itself.
  *
- * That condition matters: most native commands are gated (an open editor tab for
- * formatting commands, a selected vault for vault-scoped ones, ...), while these
- * compat commands are always registered unconditionally (matching real Obsidian,
- * where editor commands are always listed but no-op without an active note). A
- * static always-hide list would make the action disappear from the palette
- * entirely whenever the native gate isn't met — e.g. "Fett umschalten" vanishing
- * completely whenever no file is open in edit mode, instead of falling back to
- * the always-available compat entry the way it did before this dedup existed.
+ * This used to be conditional: hidden only while the native twin was actually
+ * visible, falling back to showing the compat entry once the native command's own
+ * gate (an open editor tab, a selected vault, ...) wasn't met — so e.g. "Fett
+ * umschalten" wouldn't vanish outright just because no file was open. That fallback
+ * turned out to be pointless rather than protective: whatever precondition hides
+ * the native command is the *same* precondition the compat command's own callback
+ * needs, so clicking the fallback is either a silent no-op (compat commands that
+ * only run via `editorCallback`, which requires the same active-editor context the
+ * native gate checks) or re-hits an identical guard inside the shared handler the
+ * native command would have called anyway (e.g. `onCreateFile`'s own
+ * `if (!state.selectedVaultId) return`). Either way nothing the user wants happens,
+ * so there's nothing worth falling back to — hiding it unconditionally, same as the
+ * native twin, is strictly less confusing.
  */
 const DUPLICATE_OF_NATIVE_COMMAND = new Map<string, string>([
   ['app:open-settings', 'slatebase:open-settings'],
@@ -79,6 +83,24 @@ const DUPLICATE_OF_NATIVE_COMMAND = new Map<string, string>([
   ['editor:toggle-blockquote', 'slatebase:editor-quote'],
   ['editor:insert-horizontal-rule', 'slatebase:editor-horizontal-rule'],
   ['editor:insert-table', 'slatebase:editor-table'],
+  ['editor:attach-file', 'slatebase:attach-file'],
+  ['editor:fold-all', 'slatebase:editor-fold-all'],
+  ['editor:fold-less', 'slatebase:editor-fold-less'],
+  ['editor:fold-more', 'slatebase:editor-fold-more'],
+  ['editor:toggle-fold', 'slatebase:editor-toggle-fold'],
+  ['editor:toggle-fold-properties', 'slatebase:editor-toggle-fold-properties'],
+  ['editor:unfold-all', 'slatebase:editor-unfold-all'],
+  ['note-composer:extract-heading', 'slatebase:note-composer-extract-heading'],
+  ['note-composer:merge-file', 'slatebase:note-composer-merge-file'],
+  ['note-composer:split-file', 'slatebase:note-composer-split-file'],
+  ['outline:open', 'slatebase:open-outline'],
+  ['backlink:open', 'slatebase:open-backlinks'],
+  ['tag-pane:open', 'slatebase:open-tags'],
+  ['bookmarks:open', 'slatebase:open-bookmarks'],
+  ['canvas:new-file', 'slatebase:canvas-new'],
+  ['canvas:jump-to-group', 'slatebase:canvas-jump-to-group'],
+  ['canvas:export-as-image', 'slatebase:canvas-export-image'],
+  ['canvas:convert-to-file', 'slatebase:canvas-convert-to-file'],
 ])
 
 /**
@@ -453,6 +475,7 @@ export function CommandPaletteContainer({
     // Determine if there's an active tab in edit mode (for editor commands)
     const activeTab = tabState.tabs.find((t) => t.id === tabState.activeTabId)
     const isEditing = activeTab !== undefined && activeTab.mode === 'edit' && !activeTab.isBinary && activeTab.filePath !== '__graph__'
+    const isCanvasActive = activeTab !== undefined && activeTab.fileName.endsWith('.canvas')
 
     // ── Navigation ──────────────────────────────────────────────────────────
 
@@ -691,6 +714,13 @@ export function CommandPaletteContainer({
         callback: onImportFolder,
         pluginId: 'slatebase',
       })
+
+      commands.push({
+        id: 'slatebase:canvas-new',
+        name: 'Neues Canvas erstellen',
+        callback: onCreateCanvas,
+        pluginId: 'slatebase',
+      })
     }
 
     if (hasVault) {
@@ -723,6 +753,67 @@ export function CommandPaletteContainer({
           pluginId: 'slatebase',
         })
       }
+    }
+
+    // ── Panel shortcuts (always available, panel just shows nothing without a vault) ──
+
+    commands.push({
+      id: 'slatebase:open-outline',
+      name: 'Gliederung anzeigen',
+      callback: () => commandRegistry.executeCommand('outline:open'),
+      pluginId: 'slatebase',
+    })
+
+    commands.push({
+      id: 'slatebase:open-backlinks',
+      name: 'Backlinks anzeigen',
+      callback: () => commandRegistry.executeCommand('backlink:open'),
+      pluginId: 'slatebase',
+    })
+
+    commands.push({
+      id: 'slatebase:open-tags',
+      name: 'Tags anzeigen',
+      callback: () => commandRegistry.executeCommand('tag-pane:open'),
+      pluginId: 'slatebase',
+    })
+
+    commands.push({
+      id: 'slatebase:open-bookmarks',
+      name: 'Lesezeichen anzeigen',
+      callback: () => commandRegistry.executeCommand('bookmarks:open'),
+      pluginId: 'slatebase',
+    })
+
+    // ── Canvas commands (only when the active tab is a .canvas file) ─────────
+    // Delegate to the compat implementation (getActiveCanvasController() /
+    // convertCanvasToFile() live in core-commands-app.ts) rather than
+    // reimplementing it here — these commands are still registered and fully
+    // functional even with the obsidian-plugin-compat feature toggle off (see
+    // registerCoreAppCommands's unconditional registration), only the palette
+    // listing below is what that toggle used to gate.
+
+    if (isCanvasActive) {
+      commands.push({
+        id: 'slatebase:canvas-jump-to-group',
+        name: 'Canvas: Zu Gruppe springen',
+        callback: () => commandRegistry.executeCommand('canvas:jump-to-group'),
+        pluginId: 'slatebase',
+      })
+
+      commands.push({
+        id: 'slatebase:canvas-export-image',
+        name: 'Canvas: Als Bild exportieren',
+        callback: () => commandRegistry.executeCommand('canvas:export-as-image'),
+        pluginId: 'slatebase',
+      })
+
+      commands.push({
+        id: 'slatebase:canvas-convert-to-file',
+        name: 'Canvas: In Datei umwandeln',
+        callback: () => commandRegistry.executeCommand('canvas:convert-to-file'),
+        pluginId: 'slatebase',
+      })
     }
 
     // ── Editor commands (only when a file is open in edit mode) ──────────────
@@ -831,6 +922,13 @@ export function CommandPaletteContainer({
       })
 
       commands.push({
+        id: 'slatebase:attach-file',
+        name: 'Anhang einfügen',
+        callback: dispatch('attachFile'),
+        pluginId: 'slatebase',
+      })
+
+      commands.push({
         id: 'slatebase:editor-undo',
         name: 'Editor: Rückgängig',
         callback: dispatch('undo'),
@@ -850,6 +948,74 @@ export function CommandPaletteContainer({
         callback: dispatch('toggleLineNumbers'),
         pluginId: 'slatebase',
       })
+
+      // Fold and note-composer operations delegate to the compat implementation
+      // (CM6 fold helpers / extractHeadingToFile & co. in core-commands-app.ts)
+      // rather than reimplementing them here — same rationale as the canvas
+      // commands above.
+
+      commands.push({
+        id: 'slatebase:editor-fold-all',
+        name: 'Editor: Alle Überschriften und Listen einklappen',
+        callback: () => commandRegistry.executeCommand('editor:fold-all'),
+        pluginId: 'slatebase',
+      })
+
+      commands.push({
+        id: 'slatebase:editor-fold-less',
+        name: 'Editor: Weniger einklappen',
+        callback: () => commandRegistry.executeCommand('editor:fold-less'),
+        pluginId: 'slatebase',
+      })
+
+      commands.push({
+        id: 'slatebase:editor-fold-more',
+        name: 'Editor: Mehr einklappen',
+        callback: () => commandRegistry.executeCommand('editor:fold-more'),
+        pluginId: 'slatebase',
+      })
+
+      commands.push({
+        id: 'slatebase:editor-toggle-fold',
+        name: 'Editor: Einklappen der aktuellen Zeile umschalten',
+        callback: () => commandRegistry.executeCommand('editor:toggle-fold'),
+        pluginId: 'slatebase',
+      })
+
+      commands.push({
+        id: 'slatebase:editor-toggle-fold-properties',
+        name: 'Editor: Einklappen der Eigenschaften umschalten',
+        callback: () => commandRegistry.executeCommand('editor:toggle-fold-properties'),
+        pluginId: 'slatebase',
+      })
+
+      commands.push({
+        id: 'slatebase:editor-unfold-all',
+        name: 'Editor: Alle Überschriften und Listen ausklappen',
+        callback: () => commandRegistry.executeCommand('editor:unfold-all'),
+        pluginId: 'slatebase',
+      })
+
+      commands.push({
+        id: 'slatebase:note-composer-extract-heading',
+        name: 'Editor: Überschrift extrahieren…',
+        callback: () => commandRegistry.executeCommand('note-composer:extract-heading'),
+        pluginId: 'slatebase',
+      })
+
+      commands.push({
+        id: 'slatebase:note-composer-merge-file',
+        name: 'Editor: Mit anderer Datei zusammenführen…',
+        callback: () => commandRegistry.executeCommand('note-composer:merge-file'),
+        pluginId: 'slatebase',
+      })
+
+      commands.push({
+        id: 'slatebase:note-composer-split-file',
+        name: 'Editor: Aktuelle Auswahl extrahieren…',
+        callback: () => commandRegistry.executeCommand('note-composer:split-file'),
+        pluginId: 'slatebase',
+      })
     }
 
     return commands
@@ -862,12 +1028,8 @@ export function CommandPaletteContainer({
 
   // Combine built-in + plugin commands
   const builtinCommands = buildBuiltinCommands()
-  const visibleNativeIds = new Set(builtinCommands.map((c) => c.id))
   const pluginCommands = pluginCompatEnabled
-    ? commandRegistry.getCommands().filter((c) => {
-        const nativeId = DUPLICATE_OF_NATIVE_COMMAND.get(c.id)
-        return nativeId === undefined || !visibleNativeIds.has(nativeId)
-      })
+    ? commandRegistry.getCommands().filter((c) => !DUPLICATE_OF_NATIVE_COMMAND.has(c.id))
     : []
   const allCommands = [...builtinCommands, ...pluginCommands]
 

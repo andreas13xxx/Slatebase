@@ -3,7 +3,7 @@ import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { EditMode, type EditModeProps } from './EditMode'
-import { isEmbeddableFile, buildInternalLinkText } from '../utils/internalLink'
+import { isEmbeddableFile, buildInternalLinkText, resolveAttachmentTargetDir } from '../utils/internalLink'
 
 describe('buildInternalLinkText', () => {
   it('links a markdown file without its .md extension', () => {
@@ -29,6 +29,24 @@ describe('isEmbeddableFile', () => {
   it('rejects non-embeddable extensions', () => {
     expect(isEmbeddableFile('note.md')).toBe(false)
     expect(isEmbeddableFile('archive.zip')).toBe(false)
+  })
+})
+
+describe('resolveAttachmentTargetDir', () => {
+  it('falls back to the note\'s own folder when no directory is configured', () => {
+    expect(resolveAttachmentTargetDir('', 'Projects/Notes/idea.md')).toBe('Projects/Notes')
+  })
+
+  it('falls back to the vault root when the note is at the vault root', () => {
+    expect(resolveAttachmentTargetDir('', 'idea.md')).toBe('')
+  })
+
+  it('uses the configured directory regardless of the note\'s own folder', () => {
+    expect(resolveAttachmentTargetDir('Attachments', 'Projects/Notes/idea.md')).toBe('Attachments')
+  })
+
+  it('treats a whitespace-only configured directory as unset', () => {
+    expect(resolveAttachmentTargetDir('   ', 'Projects/idea.md')).toBe('Projects')
   })
 })
 

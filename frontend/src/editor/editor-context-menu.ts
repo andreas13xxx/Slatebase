@@ -25,7 +25,7 @@ import {
   RemoveFormatting, Plus, Table, List, ListOrdered, ListChecks, FileCode,
   Asterisk, Minus, Brackets, Image, TableProperties, Columns3, Rows3,
   AlignLeft, AlignCenter, AlignRight, GripVertical, ArrowUp, ArrowDown,
-  Trash2, FileOutput, StretchHorizontal,
+  Trash2, FileOutput, StretchHorizontal, SpellCheck, BookPlus, Ban, Languages,
 } from 'lucide-react'
 import type { EditorView } from '@codemirror/view'
 import type { ContextMenuItem } from '../components/ContextMenu'
@@ -33,8 +33,31 @@ import { applyFormatting } from './formatting'
 import { editorInfoField } from './editor-state-fields'
 import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
 import { showToast } from '../components/ToastNotification'
+import {
+  learnWord, ignoreWordForSession, refreshSpellcheck,
+  SPELLCHECK_LANGUAGES, SPELLCHECK_LANGUAGE_LABELS,
+  type MisspelledWord, type SpellcheckLanguage,
+} from './spellcheck'
 
 const ICON_SIZE = 14
+
+/**
+ * What the menu needs to know about spelling at the clicked position.
+ *
+ * `suggestions` is `null` while the worker is still computing them — the menu
+ * opens immediately with a placeholder and is rebuilt when they arrive, rather
+ * than making the user wait on a right-click (see CodeMirrorEditor.tsx).
+ */
+export interface SpellcheckMenuContext {
+  /** The misspelled word under the pointer, or `null` if there is none. */
+  misspelled: MisspelledWord | null
+  /** Corrections for that word; `null` means "still loading". */
+  suggestions: string[] | null
+  /** Whether spellchecking is currently switched on. */
+  enabled: boolean
+  /** The dictionary being checked against. */
+  language: SpellcheckLanguage
+}
 
 /** Minimal shape of the plugin-facing `window.app` this module reaches into. */
 interface AppShimGlobal {
@@ -111,13 +134,112 @@ async function extractSelectionToNewNote(view: EditorView): Promise<void> {
   app.workspace.openFileDirectly(newPath)
 }
 
-export function buildEditorContextMenuItems(view: EditorView, showLineNumbers: boolean, readableLineLength: boolean): ContextMenuItem[] {
+/**
+ * The correction block shown above everything else when the user right-clicks
+ * a misspelled word — suggestions first, then the two ways of silencing the
+ * word for good ("learn") or for this session ("ignore").
+ *
+ * Returns `[]` when the click wasn't on a misspelling, which is the common
+ * case, so the menu keeps its familiar shape.
+ */
+function buildSpellingItems(view: EditorView, spellcheck: SpellcheckMenuContext | undefined): ContextMenuItem[] {
+  const misspelled = spellcheck?.misspelled
+  if (!spellcheck || !misspelled) return []
+
+  const items: ContextMenuItem[] = []
+
+  if (spellcheck.suggestions === null) {
+    items.push({ id: 'spell-loading', label: 'Vorschläge werden gesucht …', disabled: true })
+  } else if (spellcheck.suggestions.length === 0) {
+    items.push({ id: 'spell-none', label: 'Keine Vorschläge', disabled: true })
+  } else {
+    items.push(...spellcheck.suggestions.map((suggestion, index) => ({
+      id: `spell-suggestion-${index}`,
+      label: suggestion,
+      icon: createElement(SpellCheck, { size: ICON_SIZE }),
+      run: () => {
+        view.dispatch({ changes: { from: misspelled.from, to: misspelled.to, insert: suggestion } })
+        view.focus()
+      },
+    })))
+  }
+
+  items.push(
+    { id: 'sep-spell-actions', label: '', separator: true },
+    {
+      id: 'spell-learn',
+      label: 'Zum Wörterbuch hinzufügen',
+      icon: createElement(BookPlus, { size: ICON_SIZE }),
+      run: () => {
+        learnWord(misspelled.word)
+        view.focus()
+      },
+    },
+    {
+      id: 'spell-ignore',
+      label: 'Alle ignorieren (diese Sitzung)',
+      icon: createElement(Ban, { size: ICON_SIZE }),
+      run: () => {
+        ignoreWordForSession(misspelled.word)
+        refreshSpellcheck(view)
+        view.focus()
+      },
+    },
+    { id: 'sep-spell', label: '', separator: true },
+  )
+
+  return items
+}
+
+/**
+ * The "Rechtschreibprüfung" submenu grouping the on/off switch with the
+ * dictionary picker.
+ *
+ * Both dispatch the same `slatebase:editor-command` window event the command
+ * palette uses — the state lives in EditMode's `useSpellcheck()` hook, and this
+ * menu only ever holds a plain `EditorView` with no path back up to it.
+ */
+function buildSpellcheckSettingsItem(spellcheck: SpellcheckMenuContext | undefined): ContextMenuItem {
+  const languageItems: ContextMenuItem[] = SPELLCHECK_LANGUAGES.map((language) => ({
+    id: `spell-lang-${language}`,
+    label: SPELLCHECK_LANGUAGE_LABELS[language],
+    checked: spellcheck?.language === language,
+    run: () => window.dispatchEvent(new CustomEvent('slatebase:editor-command', {
+      detail: { action: 'setSpellcheckLanguage', language },
+    })),
+  }))
+
+  return {
+    id: 'spellcheck',
+    label: 'Rechtschreibprüfung',
+    icon: createElement(Languages, { size: ICON_SIZE }),
+    submenu: [
+      {
+        id: 'toggle-spellcheck',
+        label: 'Rechtschreibprüfung aktiv',
+        icon: createElement(SpellCheck, { size: ICON_SIZE }),
+        checked: spellcheck?.enabled ?? false,
+        run: () => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'toggleSpellcheck' } })),
+      },
+      { id: 'sep-spell-lang', label: '', separator: true },
+      ...languageItems,
+    ],
+  }
+}
+
+export function buildEditorContextMenuItems(
+  view: EditorView,
+  showLineNumbers: boolean,
+  readableLineLength: boolean,
+  spellcheck?: SpellcheckMenuContext,
+): ContextMenuItem[] {
   const { state } = view
   const sel = state.selection.main
   const hasSelection = !sel.empty
   const selectedText = state.sliceDoc(sel.from, sel.to)
 
   const items: ContextMenuItem[] = [
+    ...buildSpellingItems(view, spellcheck),
     {
       id: 'cut',
       label: 'Ausschneiden',
@@ -319,6 +441,7 @@ export function buildEditorContextMenuItems(view: EditorView, showLineNumbers: b
       // window event since this menu only has a plain EditorView reference.
       run: () => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'toggleReadableLineLength' } })),
     },
+    buildSpellcheckSettingsItem(spellcheck),
   )
 
   // 'editor-menu' fires with the real Editor + MarkdownFileInfo-shaped info,

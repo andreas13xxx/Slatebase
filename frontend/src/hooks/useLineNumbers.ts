@@ -1,71 +1,32 @@
-import { useCallback, useState } from 'react'
-
-const STORAGE_KEY = 'slatebase:lineNumbers'
+/**
+ * useLineNumbers — editor gutter line numbers, stored per user and per vault.
+ *
+ * Was a device-local `localStorage` flag shared across every vault. It now
+ * lives in `vaultSettingsStore`, so the setting follows the account and each
+ * vault remembers its own answer — a code-heavy vault usually wants line
+ * numbers where a prose vault does not.
+ *
+ * Reached through the editor context menu, not the settings panel.
+ */
+import { useCallback } from 'react'
+import { useVaultSetting, updateVaultSettings, getVaultSettings } from '../state/vaultSettingsStore'
 
 /** Return value of the useLineNumbers hook. */
 export interface UseLineNumbersReturn {
   /** Whether line numbers are currently enabled. */
   enabled: boolean
-  /** Toggles line numbers on/off and persists to localStorage. */
+  /** Toggles line numbers on/off for the active vault. */
   toggle(): void
 }
 
-/**
- * Reads the initial enabled state from localStorage.
- * Returns false (disabled) if localStorage is unavailable or data is corrupted.
- */
-function readInitialState(): boolean {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw === null) {
-      return false
-    }
-    const parsed: unknown = JSON.parse(raw)
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      'enabled' in parsed &&
-      typeof (parsed as { enabled: unknown }).enabled === 'boolean'
-    ) {
-      return (parsed as { enabled: boolean }).enabled
-    }
-    return false
-  } catch {
-    return false
-  }
+/** Toggles line numbers from outside React (command palette, context menu). */
+export function toggleLineNumbers(): void {
+  updateVaultSettings({ lineNumbers: !getVaultSettings().lineNumbers })
 }
 
-/**
- * Persists the enabled state to localStorage.
- * Silently ignores errors if localStorage is unavailable.
- */
-function persistState(enabled: boolean): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ enabled }))
-  } catch {
-    // localStorage unavailable — silently ignore
-  }
-}
-
-/**
- * Custom hook managing line numbers enabled/disabled state.
- *
- * - Reads initial state from localStorage key `slatebase:lineNumbers`
- * - Defaults to disabled if localStorage is unavailable or data is corrupted
- * - `toggle()` flips the boolean and persists the new value
- *
- * **Validates: Requirements 4.1, 4.5, 4.6**
- */
+/** Line numbers state for the active vault. */
 export function useLineNumbers(): UseLineNumbersReturn {
-  const [enabled, setEnabled] = useState<boolean>(readInitialState)
-
-  const toggle = useCallback(() => {
-    setEnabled(prev => {
-      const next = !prev
-      persistState(next)
-      return next
-    })
-  }, [])
-
+  const enabled = useVaultSetting('lineNumbers')
+  const toggle = useCallback(() => { toggleLineNumbers() }, [])
   return { enabled, toggle }
 }

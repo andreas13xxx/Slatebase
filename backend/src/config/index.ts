@@ -2,7 +2,8 @@
 
 import { z } from 'zod'
 import { readFileSync } from 'node:fs'
-import { resolve, dirname } from 'node:path'
+import { writeJsonFileAtomic } from '../shared/json-file-store.js'
+import { resolve, dirname, join, isAbsolute } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 // --- Zod Schema ---
@@ -76,7 +77,13 @@ export const ServerConfigSchema = z.object({
   vaults: z.array(VaultConfigSchema).default([]),
   maxFileSize: z.number().int().positive().default(5242880),
   maxDirectoryDepth: z.number().int().positive().default(50),
-  maxVaults: z.number().int().positive().default(20),
+  /**
+   * Maximum number of vaults a single user may own. Enforced in
+   * `BusinessService.createVault`. Instance-wide storage is bounded by the
+   * disk, not by a global vault count — the resource a limit can meaningfully
+   * protect here is what one account can claim.
+   */
+  maxVaultsPerUser: z.number().int().positive().default(50),
   allowedOrigins: z.array(z.string()).default(['http://localhost:5173']),
   dataDir: z.string().default('./data'),
   templatesDir: z.string().default('./assets/templates'),
@@ -112,6 +119,41 @@ export type WelcomeVaultConfig = z.infer<typeof WelcomeVaultConfigSchema>
 
 // --- Interface ---
 
+/**
+ * The subset of server settings an admin may change at runtime through
+ * `PUT /admin/config`. Everything else (data directory, vault paths, secrets,
+ * trusted proxies) stays file- or environment-only: those decide where the
+ * process reads and writes, and an HTTP endpoint is the wrong place to move
+ * them.
+ */
+export type OverridableConfigKey =
+  | 'port'
+  | 'host'
+  | 'logLevel'
+  | 'allowedOrigins'
+  | 'maxFileSize'
+  | 'maxDirectoryDepth'
+  | 'maxVaultsPerUser'
+  | 'maxImportFileSize'
+  | 'maxImportFiles'
+  | 'maxImportDepth'
+  | 'trash'
+  | 'versions'
+  | 'cleanup'
+  | 'upload'
+  | 'mcp'
+
+/**
+ * Each key is typed `| undefined` rather than merely optional: under
+ * `exactOptionalPropertyTypes` the Zod-inferred request body carries explicit
+ * `undefined` for absent optional fields, and a plain `Partial<>` would reject it.
+ */
+export type ServerConfigOverrides = {
+  [K in OverridableConfigKey]?: ServerConfig[K] | undefined
+}
+
+// --- Interface ---
+
 export interface IConfigService {
   getServerConfig(): ServerConfig
   getVaultConfigs(): VaultConfig[]
@@ -131,23 +173,136 @@ export interface IConfigService {
   getUploadConfig(): UploadConfig
   /** Returns the welcome vault configuration section */
   getWelcomeVaultConfig(): WelcomeVaultConfig
+  /** Returns the admin-set runtime overrides currently persisted on disk. */
+  getOverrides(): ServerConfigOverrides
+  /**
+   * Merges `overrides` into the persisted admin overrides, writes them to
+   * `<dataDir>/server-config.json`, and applies them to the live config.
+   *
+   * Values still under an environment variable keep the environment value —
+   * the env layer wins by design, so the caller is told which keys did not
+   * take effect rather than the UI silently showing a value the process does
+   * not use.
+   *
+   * @returns The keys whose new value is shadowed by an environment variable.
+   */
+  updateOverrides(overrides: ServerConfigOverrides): Promise<string[]>
+}
+
+// --- Merge Helpers ---
+
+/** True for plain objects — the only values `deepMerge` recurses into. */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
+ * Recursively merges `overlay` over `base`, one nested level of config
+ * sections at a time. A shallow spread would drop sibling keys: an admin
+ * setting only `upload.maxFilesPerDrop` would otherwise erase
+ * `upload.maxFileSizeBytes` back to its schema default. Arrays are replaced
+ * wholesale — `allowedOrigins` is a value, not a set to union.
+ */
+function deepMerge(
+  base: Record<string, unknown>,
+  overlay: Record<string, unknown>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = { ...base }
+  for (const [key, value] of Object.entries(overlay)) {
+    if (value === undefined) continue
+    const existing = result[key]
+    result[key] = isPlainObject(existing) && isPlainObject(value)
+      ? deepMerge(existing, value)
+      : value
+  }
+  return result
+}
+
+/**
+ * Resolves where the admin overrides file lives, honouring a `dataDir` set in
+ * the config file or the environment before the full config exists.
+ */
+function resolveOverridesPath(
+  fileConfig: Record<string, unknown>,
+  envOverlay: Record<string, unknown>,
+): string {
+  const raw = envOverlay['dataDir'] ?? fileConfig['dataDir']
+  const dataDir = typeof raw === 'string' && raw.length > 0 ? raw : './data'
+  const base = isAbsolute(dataDir) ? dataDir : resolve(process.cwd(), dataDir)
+  return join(base, 'server-config.json')
 }
 
 // --- Implementation ---
 
 export class ConfigService implements IConfigService {
-  private readonly config: ServerConfig
+  private config: ServerConfig
+  private readonly fileConfig: Record<string, unknown>
+  private readonly envOverlay: Record<string, unknown>
+  private overrides: ServerConfigOverrides
+  private readonly overridesPath: string
 
   constructor() {
-    const fileConfig = this.loadConfigFile()
-    const envOverlay = this.loadEnvOverlay()
-    const merged = { ...fileConfig, ...envOverlay }
-    this.config = ServerConfigSchema.parse(merged)
+    this.fileConfig = this.loadConfigFile()
+    this.envOverlay = this.loadEnvOverlay()
+
+    // The overrides live inside the data directory, whose location is itself a
+    // config value — so resolve the file/env layers first, then read them.
+    this.overridesPath = resolveOverridesPath(this.fileConfig, this.envOverlay)
+    this.overrides = this.loadOverridesFile()
+
+    this.config = this.buildConfig()
     this.validateRanges()
   }
 
   getServerConfig(): ServerConfig {
     return this.config
+  }
+
+  getOverrides(): ServerConfigOverrides {
+    return structuredClone(this.overrides)
+  }
+
+  async updateOverrides(overrides: ServerConfigOverrides): Promise<string[]> {
+    const next = deepMerge(
+      this.overrides as Record<string, unknown>,
+      overrides as Record<string, unknown>,
+    ) as ServerConfigOverrides
+
+    // Validate the *result* before persisting, so a bad partial can never be
+    // written and leave the next start-up parsing a broken file.
+    ServerConfigSchema.parse(deepMerge(this.fileConfig, next as Record<string, unknown>))
+
+    await writeJsonFileAtomic(this.overridesPath, next)
+    this.overrides = next
+    this.config = this.buildConfig()
+    this.validateRanges()
+
+    return Object.keys(overrides).filter((key) => key in this.envOverlay)
+  }
+
+  /**
+   * Layers the three sources in precedence order: the shipped config file,
+   * then the admin's runtime overrides, then the environment. The environment
+   * wins last so a deployment can pin a value that no admin can move — the
+   * same order the feature toggles use.
+   */
+  private buildConfig(): ServerConfig {
+    const merged = deepMerge(
+      deepMerge(this.fileConfig, this.overrides as Record<string, unknown>),
+      this.envOverlay,
+    )
+    return ServerConfigSchema.parse(merged)
+  }
+
+  private loadOverridesFile(): ServerConfigOverrides {
+    try {
+      const raw = readFileSync(this.overridesPath, 'utf-8')
+      return JSON.parse(raw) as ServerConfigOverrides
+    } catch {
+      // Absent on first run; unreadable or corrupt means the shipped config
+      // still starts the server rather than blocking it.
+      return {}
+    }
   }
 
   getVaultConfigs(): VaultConfig[] {

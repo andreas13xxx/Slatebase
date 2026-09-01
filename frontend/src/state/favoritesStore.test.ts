@@ -13,8 +13,14 @@ import {
   addBlockBookmark,
   addSearchBookmark,
   favoritesStore,
+  initialize,
+  disconnect,
 } from './favoritesStore'
 import type { FavoriteEntry } from './favoritesStore'
+import type { IApiClient } from '../api'
+import { hasSyncedBefore, markSyncedBefore } from './preferenceSync'
+
+vi.mock('../components/ToastNotification', () => ({ showToast: vi.fn() }))
 
 describe('favoritesStore', () => {
   beforeEach(() => {
@@ -473,6 +479,87 @@ describe('favoritesStore', () => {
       addSearchBookmark('vault1', 'one-too-many', false, false)
 
       expect(getForVault('vault1')).toHaveLength(50)
+    })
+  })
+
+  describe('initialize', () => {
+    /** Minimal API client stub — only the favorites endpoints are exercised. */
+    function createMockApiClient(serverEntries: unknown[]) {
+      return {
+        getFavorites: vi.fn().mockResolvedValue({ entries: serverEntries }),
+        saveFavorites: vi.fn().mockResolvedValue(undefined),
+      } as unknown as IApiClient & {
+        getFavorites: ReturnType<typeof vi.fn>
+        saveFavorites: ReturnType<typeof vi.fn>
+      }
+    }
+
+    beforeEach(() => {
+      disconnect()
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+    })
+
+    it('replaces the local list instead of merging local-only entries into it', async () => {
+      // The regression this guards: a favorite deleted on another device used
+      // to be resurrected here, because local-only entries were appended.
+      add('vault1', 'gone.md')
+      add('vault1', 'kept.md')
+      const kept = getForVault('vault1').find((e) => e.path === 'kept.md')!
+      markSyncedBefore('favorites')
+
+      await initialize(createMockApiClient([
+        { id: kept.id, vaultId: 'vault1', path: 'kept.md', addedAt: kept.addedAt, order: 0 },
+      ]))
+
+      expect(getForVault('vault1').map((e) => e.path)).toEqual(['kept.md'])
+    })
+
+    it('drops local vaults the server no longer lists', async () => {
+      add('vault1', 'a.md')
+      add('vault2', 'b.md')
+      const a = getForVault('vault1')[0]!
+      markSyncedBefore('favorites')
+
+      await initialize(createMockApiClient([
+        { id: a.id, vaultId: 'vault1', path: 'a.md', addedAt: a.addedAt, order: 0 },
+      ]))
+
+      expect(getForVault('vault1')).toHaveLength(1)
+      expect(getForVault('vault2')).toHaveLength(0)
+    })
+
+    it('seeds the server from the local cache on the very first sync', async () => {
+      add('vault1', 'local.md')
+      const client = createMockApiClient([])
+
+      await initialize(client)
+
+      expect(client.saveFavorites).toHaveBeenCalled()
+      expect(getForVault('vault1')).toHaveLength(1)
+    })
+
+    it('honours an empty server list once this device has synced before', async () => {
+      add('vault1', 'stale.md')
+      markSyncedBefore('favorites')
+      const client = createMockApiClient([])
+
+      await initialize(client)
+
+      expect(client.saveFavorites).not.toHaveBeenCalled()
+      expect(getForVault('vault1')).toHaveLength(0)
+    })
+
+    it('keeps local data and sets no marker when the server is unreachable', async () => {
+      add('vault1', 'local.md')
+      const client = {
+        getFavorites: vi.fn().mockRejectedValue(new Error('offline')),
+        saveFavorites: vi.fn(),
+      } as unknown as IApiClient
+
+      await initialize(client)
+
+      expect(getForVault('vault1')).toHaveLength(1)
+      expect(hasSyncedBefore('favorites')).toBe(false)
     })
   })
 })

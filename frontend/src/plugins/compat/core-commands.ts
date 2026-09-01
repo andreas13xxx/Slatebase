@@ -17,14 +17,17 @@
  * context (save-file, search, follow-link, toggle-source, ...) are registered by
  * `core-commands-app.ts` instead — see that module for the split rationale.
  *
- * A handful of real commands have no Slatebase equivalent at all (attachments,
- * multi-pane focus). Those are registered as literal no-ops so
- * `executeCommandById` finds them (matching real Obsidian, where a command can
- * exist but not always be actionable) instead of silently failing to resolve
- * at all. Folding, the context menu, and readable-line-length/spellcheck used
- * to be in that category too — see folding.ts for the fold-by-heading/
- * fold-by-list `foldService` and core-commands-app.ts's `'slatebase:editor-command'`
- * CustomEvent pattern for the other two.
+ * A handful of real commands have no Slatebase equivalent at all (downloading
+ * remote attachments into the vault, multi-pane focus). Those are still
+ * registered so `executeCommandById` finds them (matching real Obsidian, where
+ * a command can exist but not always be actionable) instead of silently
+ * failing to resolve at all — but marked `unsupported`, so running one
+ * explains the gap rather than doing nothing visible, which reads as a bug to
+ * whoever clicked it. Folding, the context menu, attaching a file, and
+ * readable-line-length/spellcheck used to be in that category too — see
+ * folding.ts for the fold-by-heading/fold-by-list `foldService` and
+ * core-commands-app.ts's `'slatebase:editor-command'` CustomEvent pattern for
+ * the others.
  *
  * @module core-commands
  */
@@ -32,7 +35,8 @@
 import type { ICommandRegistry } from './command-registry'
 import type { IEditor } from './editor-shim'
 import type { Locale } from '../../i18n'
-import { translateCoreCommandName } from './core-command-i18n'
+import { translateCoreCommandName, unsupportedCommandMessage, type UnsupportedReason } from './core-command-i18n'
+import { showToast } from '../../components/ToastNotification'
 import { getActiveEditorView } from '../../editor/plugin-extensions'
 import { foldAll, unfoldAll, toggleFold } from '@codemirror/language'
 import { foldMore, foldLess, toggleFoldProperties } from '../../editor/folding'
@@ -363,7 +367,6 @@ function tableRowMove(editor: IEditor, direction: -1 | 1): void {
   editor.setCursor({ line: target, ch: 0 })
 }
 
-const noop = (): void => { /* no Slatebase equivalent — see module docstring */ }
 
 /**
  * Register Obsidian's core `editor:*` commands under the `editor` namespace
@@ -372,7 +375,12 @@ const noop = (): void => { /* no Slatebase equivalent — see module docstring *
  * this on every vault switch is idempotent.
  */
 export function registerCoreEditorCommands(registry: ICommandRegistry, locale: Locale): void {
-  const commands: Array<{ id: string; name: string; run: (editor: IEditor) => void }> = [
+  // Mirrors core-commands-app.ts: `unsupported` marks a command registered only
+  // so plugin lookups resolve it, and names the gap the message explains.
+  const commands: Array<
+    | { id: string; name: string; run: (editor: IEditor) => void; unsupported?: never }
+    | { id: string; name: string; unsupported: UnsupportedReason; run?: never }
+  > = [
     // ── Already-shipped formatting/insertion commands ──
     { id: 'toggle-checklist-status', name: 'Cycle list and checklist', run: (e) => e.toggleCheckList() },
     { id: 'toggle-code', name: 'Toggle inline code', run: (e) => e.toggleMarkdownFormatting('code') },
@@ -440,10 +448,14 @@ export function registerCoreEditorCommands(registry: ICommandRegistry, locale: L
     { id: 'table-row-down', name: 'Table: Move row down', run: (e) => tableRowMove(e, 1) },
     { id: 'table-row-up', name: 'Table: Move row up', run: (e) => tableRowMove(e, -1) },
 
-    // ── No Slatebase equivalent — registered so lookups find a real (inert) command ──
-    { id: 'attach-file', name: 'Insert attachment', run: noop },
+    // ── Side-effecting UI actions with no IEditor equivalent — routed through the
+    // 'slatebase:editor-command' window event to EditMode's React state, same as
+    // 'slatebase:attach-file' (see CommandPaletteContainer) — both dispatch the
+    // identical action string, so they share one implementation in EditMode.tsx. ──
+    { id: 'attach-file', name: 'Insert attachment', run: () => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'attachFile' } })) },
     { id: 'context-menu', name: 'Show context menu under cursor', run: () => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'showContextMenu' } })) },
-    { id: 'download-attachments', name: 'Download attachments for current file', run: noop },
+    // ── No Slatebase equivalent — registered so lookups find a real (inert) command ──
+    { id: 'download-attachments', name: 'Download attachments for current file', unsupported: 'attachments' },
     { id: 'fold-all', name: 'Fold all headings and lists', run: () => { const v = getActiveEditorView(); if (v) foldAll(v) } },
     { id: 'fold-less', name: 'Fold less', run: () => { const v = getActiveEditorView(); if (v) foldLess(v) } },
     { id: 'fold-more', name: 'Fold more', run: () => { const v = getActiveEditorView(); if (v) foldMore(v) } },
@@ -452,13 +464,19 @@ export function registerCoreEditorCommands(registry: ICommandRegistry, locale: L
     { id: 'unfold-all', name: 'Unfold all headings and lists', run: () => { const v = getActiveEditorView(); if (v) unfoldAll(v) } },
     { id: 'toggle-readable-line-length', name: 'Toggle readable line length', run: () => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'toggleReadableLineLength' } })) },
     { id: 'toggle-spellcheck', name: 'Toggle spellcheck', run: () => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'toggleSpellcheck' } })) },
-    { id: 'focus-top', name: 'Focus on tab group above', run: noop },
-    { id: 'focus-bottom', name: 'Focus on tab group below', run: noop },
-    { id: 'focus-left', name: 'Focus on tab group to the left', run: noop },
-    { id: 'focus-right', name: 'Focus on tab group to the right', run: noop },
+    { id: 'spellcheck-language-de', name: 'Spellcheck dictionary: German', run: () => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'setSpellcheckLanguage', language: 'de' } })) },
+    { id: 'spellcheck-language-en', name: 'Spellcheck dictionary: English', run: () => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'setSpellcheckLanguage', language: 'en' } })) },
+    { id: 'focus-top', name: 'Focus on tab group above', unsupported: 'tab-layout' },
+    { id: 'focus-bottom', name: 'Focus on tab group below', unsupported: 'tab-layout' },
+    { id: 'focus-left', name: 'Focus on tab group to the left', unsupported: 'tab-layout' },
+    { id: 'focus-right', name: 'Focus on tab group to the right', unsupported: 'tab-layout' },
   ]
 
-  for (const { id, name, run } of commands) {
-    registry.addCommand('editor', { id, name: translateCoreCommandName(`editor:${id}`, locale, name), editorCallback: (editor) => run(editor) })
+  for (const spec of commands) {
+    const name = translateCoreCommandName(`editor:${spec.id}`, locale, spec.name)
+    const editorCallback = spec.unsupported
+      ? () => { showToast('info', unsupportedCommandMessage(name, spec.unsupported, locale)) }
+      : (editor: IEditor) => spec.run(editor)
+    registry.addCommand('editor', { id: spec.id, name, editorCallback })
   }
 }

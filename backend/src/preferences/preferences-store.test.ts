@@ -109,3 +109,136 @@ describe('PreferencesStore', () => {
     })
   })
 })
+
+describe('PreferencesStore — UI and per-vault settings', () => {
+  let dataDir: string
+  let store: PreferencesStore
+
+  beforeEach(async () => {
+    dataDir = await mkdtemp(path.join(tmpdir(), 'preferences-settings-test-'))
+    store = new PreferencesStore(dataDir, createMockLogger())
+  })
+
+  afterEach(async () => {
+    await rm(dataDir, { recursive: true, force: true })
+  })
+
+  describe('UI settings', () => {
+    it('returns defaults for a user who has never changed anything', async () => {
+      const settings = await store.getUiSettings('user-1')
+      expect(settings.statusBarVisible).toBe(true)
+      expect(settings.explorerFollowActiveFile).toBe(false)
+      expect(settings.toolbar.position).toBe('left')
+    })
+
+    it('merges a partial patch without clearing untouched fields', async () => {
+      await store.saveUiSettings('user-1', { statusBarVisible: false })
+      await store.saveUiSettings('user-1', { explorerFollowActiveFile: true })
+
+      const settings = await store.getUiSettings('user-1')
+      expect(settings.statusBarVisible).toBe(false)
+      expect(settings.explorerFollowActiveFile).toBe(true)
+    })
+
+    it('merges a partial toolbar patch without clearing sibling toolbar keys', async () => {
+      await store.saveUiSettings('user-1', { toolbar: { position: 'right', hidden: ['a'] } })
+      await store.saveUiSettings('user-1', { toolbar: { visible: false } })
+
+      const { toolbar } = await store.getUiSettings('user-1')
+      expect(toolbar.position).toBe('right')
+      expect(toolbar.hidden).toEqual(['a'])
+      expect(toolbar.visible).toBe(false)
+    })
+
+    it('ignores explicitly undefined values instead of erasing the stored one', async () => {
+      await store.saveUiSettings('user-1', { statusBarVisible: false })
+      await store.saveUiSettings('user-1', { statusBarVisible: undefined })
+
+      expect((await store.getUiSettings('user-1')).statusBarVisible).toBe(false)
+    })
+
+    it('keeps settings separate per user', async () => {
+      await store.saveUiSettings('user-1', { statusBarVisible: false })
+      expect((await store.getUiSettings('user-2')).statusBarVisible).toBe(true)
+    })
+
+    it('fills missing fields from defaults when reading a file written before they existed', async () => {
+      await mkdir(path.join(dataDir, 'users'), { recursive: true })
+      await writeFile(
+        path.join(dataDir, 'users', 'legacy-preferences.json'),
+        JSON.stringify({ recentFiles: [], favorites: [], keybindings: [] }),
+        'utf-8',
+      )
+
+      const settings = await store.getUiSettings('legacy')
+      expect(settings.statusBarVisible).toBe(true)
+      expect(settings.toolbar.order).toEqual([])
+    })
+  })
+
+  describe('per-vault settings', () => {
+    it('returns defaults for a vault the user has never configured', async () => {
+      const settings = await store.getVaultSettings('user-1', 'vault-1')
+      expect(settings.lineNumbers).toBe(false)
+      expect(settings.readableLineLength).toBe(true)
+      expect(settings.zoom).toBe(1)
+    })
+
+    it('keeps settings separate per vault for the same user', async () => {
+      await store.saveVaultSettings('user-1', 'vault-1', { lineNumbers: true, zoom: 1.5 })
+      await store.saveVaultSettings('user-1', 'vault-2', { lineNumbers: false })
+
+      expect((await store.getVaultSettings('user-1', 'vault-1')).lineNumbers).toBe(true)
+      expect((await store.getVaultSettings('user-1', 'vault-1')).zoom).toBe(1.5)
+      expect((await store.getVaultSettings('user-1', 'vault-2')).lineNumbers).toBe(false)
+      expect((await store.getVaultSettings('user-1', 'vault-2')).zoom).toBe(1)
+    })
+
+    it('keeps the same vault separate per user', async () => {
+      await store.saveVaultSettings('user-1', 'vault-1', { lineNumbers: true })
+      expect((await store.getVaultSettings('user-2', 'vault-1')).lineNumbers).toBe(false)
+    })
+
+    it('merges a partial patch without clearing untouched fields', async () => {
+      await store.saveVaultSettings('user-1', 'vault-1', { zoom: 1.25 })
+      await store.saveVaultSettings('user-1', 'vault-1', { spellcheck: false })
+
+      const settings = await store.getVaultSettings('user-1', 'vault-1')
+      expect(settings.zoom).toBe(1.25)
+      expect(settings.spellcheck).toBe(false)
+    })
+
+    it('stores opaque client-owned blobs verbatim', async () => {
+      const graph = { colors: { fileNode: '#fff' }, layout: { repulsion: 42 } }
+      await store.saveVaultSettings('user-1', 'vault-1', { graph })
+      expect((await store.getVaultSettings('user-1', 'vault-1')).graph).toEqual(graph)
+    })
+
+    it('removes a vault entry for the named users when the vault is deleted', async () => {
+      await store.saveVaultSettings('user-1', 'vault-1', { lineNumbers: true })
+      await store.saveVaultSettings('user-2', 'vault-1', { lineNumbers: true })
+
+      await store.deleteVaultSettings('vault-1', ['user-1', 'user-2'])
+
+      expect((await store.getVaultSettings('user-1', 'vault-1')).lineNumbers).toBe(false)
+      expect((await store.getVaultSettings('user-2', 'vault-1')).lineNumbers).toBe(false)
+    })
+
+    it('leaves other vaults untouched when one is deleted', async () => {
+      await store.saveVaultSettings('user-1', 'vault-1', { lineNumbers: true })
+      await store.saveVaultSettings('user-1', 'vault-2', { lineNumbers: true })
+
+      await store.deleteVaultSettings('vault-1', ['user-1'])
+
+      expect((await store.getVaultSettings('user-1', 'vault-2')).lineNumbers).toBe(true)
+    })
+
+    it('does not disturb the other preference buckets', async () => {
+      await store.saveKeybindings('user-1', [{ commandId: 'a', shortcut: 'Ctrl+A' }])
+      await store.saveVaultSettings('user-1', 'vault-1', { lineNumbers: true })
+      await store.saveUiSettings('user-1', { statusBarVisible: false })
+
+      expect(await store.getKeybindings('user-1')).toEqual([{ commandId: 'a', shortcut: 'Ctrl+A' }])
+    })
+  })
+})

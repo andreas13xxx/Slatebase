@@ -22,6 +22,7 @@ import {
   savePanelLayout,
   loadPanelLayout,
   type PersistedPanelLayout,
+  type PanelSide,
 } from '../components/side-panel/utils/persistence'
 import { useAuthContext } from './authContext'
 
@@ -75,7 +76,7 @@ function applyPersistedLayout(
  * Loads persisted layout from localStorage on mount and saves layout changes
  * with a 500ms debounce to avoid excessive writes, scoped per user.
  */
-function usePanelState(storageKeyPrefix: string, defaultViewIds: PanelViewId[]): PanelContextValue {
+function usePanelState(panel: PanelSide, defaultViewIds: PanelViewId[]): PanelContextValue {
   const { authState } = useAuthContext()
   const userId = authState.user?.userId ?? null
 
@@ -85,7 +86,7 @@ function usePanelState(storageKeyPrefix: string, defaultViewIds: PanelViewId[]):
     (initialUserId): PanelState => {
       const baseState = createInitialState(defaultViewIds)
       if (!initialUserId) return baseState
-      const persisted = loadPanelLayout(storageKeyPrefix, initialUserId)
+      const persisted = loadPanelLayout(panel)
       if (!persisted) return baseState
       return applyPersistedLayout(baseState, persisted, defaultViewIds)
     },
@@ -109,7 +110,7 @@ function usePanelState(storageKeyPrefix: string, defaultViewIds: PanelViewId[]):
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      savePanelLayout(storageKeyPrefix, userId, {
+      savePanelLayout(panel, {
         tabOrder: state.tabOrder,
         sections: state.sections.map((s) => ({
           viewIds: s.viewIds,
@@ -125,20 +126,19 @@ function usePanelState(storageKeyPrefix: string, defaultViewIds: PanelViewId[]):
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [userId, state.tabOrder, state.sections, storageKeyPrefix])
+  }, [userId, state.tabOrder, state.sections, panel])
 
   return { state, dispatch }
 }
 
 // ─── Left panel ────────────────────────────────────────────────────────────
 
-const LEFT_STORAGE_KEY_PREFIX = 'slatebase_sidebar_panel_'
 const LEFT_DEFAULT_VIEW_IDS: PanelViewId[] = ['explorer', 'favorites', 'recent']
 
 export const LeftPanelContext = createContext<PanelContextValue | null>(null)
 
 export function LeftPanelProvider({ children }: { children: ReactNode }) {
-  const value = usePanelState(LEFT_STORAGE_KEY_PREFIX, LEFT_DEFAULT_VIEW_IDS)
+  const value = usePanelState('sidebar', LEFT_DEFAULT_VIEW_IDS)
   return React.createElement(LeftPanelContext.Provider, { value }, children)
 }
 
@@ -153,13 +153,12 @@ export function useLeftPanelContext(): PanelContextValue {
 
 // ─── Right panel ───────────────────────────────────────────────────────────
 
-const RIGHT_STORAGE_KEY_PREFIX = 'slatebase_context_panel_'
 const RIGHT_DEFAULT_VIEW_IDS: PanelViewId[] = ['outline', 'links', 'tags', 'properties', 'search']
 
 export const RightPanelContext = createContext<PanelContextValue | null>(null)
 
 export function RightPanelProvider({ children }: { children: ReactNode }) {
-  const value = usePanelState(RIGHT_STORAGE_KEY_PREFIX, RIGHT_DEFAULT_VIEW_IDS)
+  const value = usePanelState('context', RIGHT_DEFAULT_VIEW_IDS)
   return React.createElement(RightPanelContext.Provider, { value }, children)
 }
 

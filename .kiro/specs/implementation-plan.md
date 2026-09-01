@@ -313,6 +313,28 @@ Vorher hatte nur der Datei-Explorer ein echtes Kontextmenü; alle übrigen Oberf
 ---
 
 
+## Erledigt — Eingebaute Rechtschreibprüfung (Direktauftrag, kein Roadmap-Track) ✅
+
+**Kein Spec-Verzeichnis** — aus der Frage „haben wir eigentlich eine Rechtschreibprüfung?" entstanden (2026-08-31). Details siehe `lessons-learned.md` #126–132.
+
+**Ausgangslage:** Es gab nur die native Browser-Prüfung, umschaltbar über `useSpellcheck.ts`. Die war seit dem Kontextmenü-Ausbau faktisch halbiert: der Editor ruft bei jedem Rechtsklick unbedingt `preventDefault()` und zeigt sein eigenes Menü, und kein Browser gibt Rechtschreibvorschläge an JavaScript heraus — es gab also Wellenlinien, aber keine Korrekturmöglichkeit. Zusätzlich hing die Prüfsprache fest an `<html lang="de">`, ohne Umschaltmöglichkeit.
+
+**Umgesetzt** (`frontend/src/editor/spellcheck/`, neu): eigener Checker auf Basis von `nspell` + `dictionary-de`/`dictionary-en`.
+
+- **Anzeige über `@codemirror/lint`** — war bereits Dependency (bisher nur an Plugins durchgereicht), kostet also kein zusätzliches Bundle-Gewicht. Geprüft wird nur `view.visibleRanges`.
+- **Web Worker** (`spellcheck.worker.ts`): der Wörterbuchaufbau dauert gemessen ~817 ms, gehört also nicht auf den Main Thread. Vorschläge kommen in 10–14 ms zurück.
+- **Wörterbücher als statische Assets** unter `/dictionaries/` statt im Bundle — ausgeliefert von einem neuen `spellcheckDictionaries()`-Plugin in `vite.config.ts` (Dev per Middleware, Build per `emitFile`, inkl. GPL-Lizenztexten). `nspell` taucht nachweislich 0× im Hauptbundle auf; der Worker-Chunk ist 11 KB.
+- **Deutsche Komposita** (`compound.ts`): rekursives Zerlegen mit Fugenlauten, weil `dictionary-de` auf `COMPOUNDBEGIN`/`MIDDLE`/`END` setzt und nspell nur `COMPOUNDRULE` beherrscht — ohne das wäre praktisch jedes zusammengesetzte Substantiv rot unterringelt gewesen. Gemessen 15/15 erkannt bei 0/9 fälschlich akzeptierten Tippfehlern, ~0,03 ms pro unbekanntem Wort.
+- **Tokenizer** (`tokenizer.ts`): Syntaxbaum überspringt Code/URLs/HTML-Tags, Regex-Pass zusätzlich `[[Wikilinks]]`, `$Mathe$`, `%%Kommentare%%`, `#Tags`, Frontmatter, Mailadressen.
+- **Bedienung**: Vorschläge, „Zum Wörterbuch hinzufügen" und „Alle ignorieren (diese Sitzung)" im bestehenden Editor-Kontextmenü, dazu ein Untermenü „Rechtschreibprüfung" (An/Aus + Deutsch/Englisch). Neue Palette-Befehle `editor:spellcheck-language-de`/`-en`. Das Menü öffnet sofort mit Platzhalter und tauscht die Vorschläge bei Ankunft ein.
+- **nginx**: `.aff`/`.dic` als `text/plain` deklariert, damit `gzip_types` greift; 7 Tage Cache statt `immutable`, da die Dateinamen nicht content-hashed sind.
+
+**Bewusste Verhaltensänderung:** `contentDOM` bekommt jetzt unbedingt `spellcheck="false"` — sonst stünden zwei verschiedene Unterringelungen unter denselben Wörtern.
+
+**Offen gelassen:** Das persönliche Wörterbuch liegt in localStorage, also pro Browser und nicht synchronisiert. Der Umzug nach `vault-config` (damit es über Git Sync mitreist) berührt nur zwei Funktionen in `personal-dictionary.ts`, ist aber ein Backend-Eingriff und wurde nicht mitgeliefert. Ebenfalls nicht abgedeckt: die sieben `<textarea>`-Oberflächen (Canvas-Knoten, Canvas-Source, Snippet-Editor, Git-Sync-Felder, Plugin-Settings, Chat-Eingabe) — sie sind bewusst keine CM6-Instanzen. Grammatikprüfung bleibt außen vor (dafür wäre LanguageTool als eigener Container nötig).
+
+---
+
 ## Prio 9 — Workspaces & Split-Panes (Track G)
 
 Scope: ~60–90h. Keine Spec vorhanden. **Nutzerwunsch** — zuvor als "kein Äquivalent geplant" eingestuft. Größter Architektur-Eingriff im gesamten Backlog.

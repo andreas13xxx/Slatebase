@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { getCanvasColorClass, getCanvasColorVar, generateCanvasId, computeFitViewport } from './canvas-utils'
+import { getCanvasColorClass, getCanvasColorVar, generateCanvasId, computeFitViewport, computeContentBounds } from './canvas-utils'
+import type { TextNode } from '../../canvas/types'
+
+function textNode(overrides: Partial<TextNode> = {}): TextNode {
+  return { id: 'n1', type: 'text', text: '', x: 0, y: 0, width: 100, height: 50, ...overrides }
+}
 
 describe('getCanvasColorClass', () => {
   it('returns the empty string for undefined', () => {
@@ -82,5 +87,24 @@ describe('computeFitViewport', () => {
   it('never zooms in past 100% for bounds smaller than the viewport', () => {
     const result = computeFitViewport({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, { width: 500, height: 500 }, 0, 0.1)
     expect(result.zoom).toBe(1)
+  })
+})
+
+describe('computeContentBounds', () => {
+  it('returns null for an empty node list', () => {
+    expect(computeContentBounds([])).toBeNull()
+  })
+
+  it("spans a single node's own rectangle", () => {
+    const bounds = computeContentBounds([textNode({ x: 10, y: 20, width: 100, height: 50 })])
+    expect(bounds).toEqual({ minX: 10, minY: 20, maxX: 110, maxY: 70 })
+  })
+
+  it('spans the union of multiple nodes, including negative coordinates', () => {
+    const bounds = computeContentBounds([
+      textNode({ id: 'a', x: -50, y: 0, width: 100, height: 100 }),
+      textNode({ id: 'b', x: 200, y: 300, width: 50, height: 50 }),
+    ])
+    expect(bounds).toEqual({ minX: -50, minY: 0, maxX: 250, maxY: 350 })
   })
 })

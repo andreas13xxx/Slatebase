@@ -317,7 +317,7 @@ export class FileManagerShim implements IFileManagerShim {
    * Delegates to the vault's getAvailablePathForAttachments helper.
    */
   async getAvailablePathForAttachment(filename: string, sourcePath?: string): Promise<string> {
-    return (this.vault as unknown as { getAvailablePathForAttachments: (f: string, s?: string) => string })
+    return (this.vault as unknown as { getAvailablePathForAttachments: (f: string, s?: string) => Promise<string> })
       .getAvailablePathForAttachments(filename, sourcePath);
   }
 

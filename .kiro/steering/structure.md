@@ -80,7 +80,7 @@ src/
 │   ├── fileVersionRoutes.ts — File version routes (list, get content, restore)
 │   ├── templateRoutes.ts — Template routes (list, create from template)
 │   ├── uploadRoutes.ts   — File upload routes (multipart, image paste mode)
-│   ├── preferencesRoutes.ts — User preferences routes (GET/PUT recent-files, favorites, keybindings)
+│   ├── preferencesRoutes.ts — User preferences routes (GET/PUT recent-files, favorites, keybindings; GET/PATCH `ui-settings`, GET/PATCH `vault-settings/:vaultId`). Every write publishes an SSE `preferences:change` event to the user's other sessions, carrying the writer's `X-Client-Id` as `originId` so the originating tab skips its own echo
 │   ├── vaultConfigRoutes.ts — Per-vault config routes (GET/PUT /vaults/:vaultId/config — templates dir, daily notes dir, daily note template name)
 │   ├── vaultConfigRoutes.test.ts — Integration tests for vault config routes
 │   ├── welcomeVaultRoutes.ts — POST /api/v1/welcome-vault (on-demand tutorial vault creation, rate-limited)
@@ -227,9 +227,9 @@ src/
 │   └── cleanup-job.ts        — CleanupJob (periodic trash purge + version prune, per-file error isolation)
 ├── preferences/
 │   ├── index.ts              — Barrel export for preferences module
-│   ├── types.ts              — IPreferencesService, UserPreferences, RecentFileEntry, FavoriteEntry (now a discriminated-by-`type` bookmark: file/heading/block/search, with `id`/`order`/`label` — see lessons-learned.md), KeybindingEntry
-│   ├── validation.ts         — Zod schemas (saveRecentFilesSchema, saveFavoritesSchema, saveKeybindingsSchema); optional fields typed `| undefined` (not just `?:`) to satisfy `exactOptionalPropertyTypes: true` against Zod's `.optional()` inference
-│   └── preferences-store.ts  — PreferencesStore (per-user JSON file via shared `KeyedJsonFileStore`; recent-files/favorites/keybindings updates go through `mutate()` so concurrent saves can't lose each other's field)
+│   ├── types.ts              — IPreferencesService, UserPreferences, RecentFileEntry, FavoriteEntry (now a discriminated-by-`type` bookmark: file/heading/block/search, with `id`/`order`/`label` — see lessons-learned.md), KeybindingEntry, UserUiSettings (account-wide: status bar, toolbar, explorer follow-active-file) + UserVaultSettings (per user *and* vault: line numbers, readable line length, spellcheck, zoom, graph/panel-layout blobs — shape owned by the client, stored as opaque JSON). `*Patch` variants spell out `| undefined` on every optional field (not just `?:`) so a Zod-parsed request body satisfies `exactOptionalPropertyTypes: true` without a cast
+│   ├── validation.ts         — Zod schemas (saveRecentFilesSchema, saveFavoritesSchema, saveKeybindingsSchema, saveUiSettingsSchema, saveVaultSettingsSchema — every field optional, so one control's save can't clobber another's); vault-settings blobs (graph/panel layouts) validated for size/type only, not shape — duplicating the client's schema server-side would mean every new panel field needs a backend change too
+│   └── preferences-store.ts  — PreferencesStore (per-user JSON file via shared `KeyedJsonFileStore`; recent-files/favorites/keybindings/uiSettings/vaultSettings updates go through `mutate()` so concurrent saves can't lose each other's field); `vaultSettings` is a per-vault map, `deleteVaultSettings()` prunes a vault's entry across every affected user's file on vault deletion (wired from `business/index.ts`)
 ├── vault-config/
 │   ├── index.ts              — Barrel export for vault-config module
 │   ├── types.ts              — IVaultConfigService, VaultConfig (templatesDirectory, dailyNotesDirectory)
@@ -294,9 +294,22 @@ src/
 │   ├── plugin-extensions.ts  — Plugin extension registry (per-plugin Compartment, add/remove/isolate, selection-dispatch after refresh) + active-editor-container tracking (get/setActiveEditorContainerEl, setEditorContainerMountedListener) so MarkdownView.containerEl points at real, attached DOM
 │   ├── editor-state-fields.ts — Obsidian-compatible StateFields (editorInfoField, editorLivePreviewField, editorEditorField) + `livePreviewState` (`{ mousedown }`) and the `livePreviewStateTracker` extension that maintains it (document-level mouseup, so a drag ending outside the editor still clears)
 │   ├── token-class-node-prop.ts — Singleton NodeProp + Mapping (tokenClassNodeProp polyfill for Obsidian compat)
-│   ├── CodeMirrorEditor.tsx  — React wrapper (EditorView in useRef, props→effects sync, mode toggle); marks the wrapper's parent `.markdown-source-view` and publishes its grandparent as containerEl for plugin toolbars; `readableLineLength`/`spellcheck` props toggle `cm-full-width` class / the DOM `spellcheck` attribute
+│   ├── CodeMirrorEditor.tsx  — React wrapper (EditorView in useRef, props→effects sync, mode toggle); marks the wrapper's parent `.markdown-source-view` and publishes its grandparent as containerEl for plugin toolbars; `readableLineLength` toggles the `cm-full-width` class, `spellcheck`/`spellcheckLanguage` drive the spellcheck Compartment (the DOM `spellcheck` attribute is now unconditionally `"false"` — Slatebase checks spelling itself). `openContextMenuAt()` is shared by the mouse handler and the keyboard-triggered `showContextMenu()`: it looks the misspelled word up in the lint diagnostics, opens the menu immediately, then swaps in the worker's suggestions when they arrive
 │   ├── folding.ts             — Markdown-specific CM6 `foldService` (heading-section + nested-list-item folding, since `@codemirror/lang-markdown` has no foldable-block grammar for the stock node-prop-based folding) + `foldMore`/`foldLess` (incremental by heading level) and `toggleFoldProperties` (frontmatter block); backs `fold-*`/`toggle-fold*`/`unfold-all`, registered via `codeFolding()` in CodeMirrorEditor.tsx
 │   ├── folding.test.ts        — Unit tests for folding
+│   ├── editor-context-menu.ts — Right-click menu inside the editor (replaces the browser's own): clipboard, link, text/paragraph/insert/table submenus (all delegating to `editor:*` core commands so the palette and the menu can't drift apart), "extract selection to new note", and the spelling block — suggestions, "add to dictionary", "ignore for this session", plus the Rechtschreibprüfung submenu (on/off + dictionary). Ends with plugin-contributed `editor-menu` items
+│   ├── spellcheck/
+│   │   ├── index.ts               — Barrel; module docstring records *why* this exists (the editor owns the context menu, and no browser hands its spelling suggestions to JavaScript)
+│   │   ├── protocol.ts            — Worker message types + language metadata (`SpellcheckLanguage`, labels, `DEFAULT_SPELLCHECK_LANGUAGE = 'de'`, `isSpellcheckLanguage()` guard). Separate module so the main thread can name a message without importing the worker's nspell dependency
+│   │   ├── spellcheck.worker.ts   — Owns the nspell instance. Fetches `/dictionaries/<lang>.{aff,dic}` as text, answers check/suggest, holds the personal words. `loadToken` drops responses from a superseded load (language switched mid-download); bounded verdict cache (20k entries), cleared on load and on learning a word
+│   │   ├── spellcheck-client.ts   — Main-thread front end: one shared lazily-created worker, request/response correlation with a 10 s timeout, change-notification for re-linting. Degrades to "no spellcheck" everywhere — missing `Worker` (jsdom), failed fetch, silent worker — never throws
+│   │   ├── spellcheck-extension.ts — `linter()` over `view.visibleRanges` + `misspelledWordAt()` (reads the lint diagnostics, so menu and underline can't disagree) + the wavy-underline theme (`.cm-lintRange.cm-spellError` outranks lint's own `-info` SVG background; `var(--danger)` follows dark mode) + a ViewPlugin that re-lints on `spellcheckRefreshEffect`
+│   │   ├── tokenizer.ts           — Which words are worth checking: syntax-tree pass skips code/URLs/HTML tags, regex pass skips `[[wikilinks]]`, `$math$`, `%%comments%%`, `#tags`, frontmatter, bare URLs and e-mail. Ranges widen to whole lines so a viewport edge inside a fenced block can't leak it. Hyphens split words; acronyms and internal-capital identifiers are skipped
+│   │   ├── compound.ts            — German compound fallback (see lessons-learned #126). Pure, takes the lookup as an argument so it is testable without a dictionary
+│   │   ├── personal-dictionary.ts — `slatebase:spellcheck-personal` localStorage word list + in-memory session ignore list. The two functions to change when this moves into `vault-config` so it travels with the vault
+│   │   ├── compound.test.ts       — Compound splitting against a hand-built vocabulary
+│   │   ├── tokenizer.test.ts      — What is and isn't offered up for checking
+│   │   └── personal-dictionary.test.ts — Persistence, corrupt-storage fallbacks, session ignores
 │   └── live-preview/
 │       ├── index.ts               — Barrel export for live-preview decorations + extension factory
 │       ├── inline-decorations.ts  — Cursor-aware inline formatting decorations (bold, italic, strikethrough, inline code), HideableRange model
@@ -335,6 +348,9 @@ src/
 │   │   └── plugin.ts           — remark plugin wrapper (remarkBlockRef)
 │   ├── breaks/
 │   │   └── plugin.ts     — remark plugin (remarkBreaks) converting soft line breaks to hard breaks (Obsidian default)
+│   ├── footnote/
+│   │   ├── plugin.ts     — remark plugin (remarkFootnotes) numbering GFM footnotes by reference order; stamps `fnNumber`/`fnFirstRef` on references and the ordered entry list on the root, which ViewMode renders as the footnote list below a note
+│   │   └── footnote.test.ts — Unit tests for numbering, repeated references, unreferenced definitions (6 tests)
 │   ├── math/
 │   │   ├── syntax.ts     — micromark tokenizer extension for inline $...$ math (boundary rules)
 │   │   ├── mdast-util.ts — fromMarkdown/toMarkdown handlers + mathBlockTransformer ($$...$$ → MathBlockNode)
@@ -418,7 +434,7 @@ src/
 │   ├── tabActions.ts     — openTab, saveTab action creators (+ recentFilesStore.add on open); undoCloseTab() re-fetches content fresh rather than restoring the closed TabEntry's stale snapshot, then restores its pinned flag (OPEN_TAB always resets pinned to false)
 │   ├── activeCanvasBridge.ts — Module-level "active canvas controller" registry (same active-instance pattern as `editor/plugin-extensions.ts`'s active-editor tracking) so `core-commands-app.ts` can reach the mounted CanvasView's `jumpToSelectedGroup()` without a direct reference into its CanvasProvider state
 │   ├── noteComposer.ts   — Shared logic for `note-composer:split-file/extract-heading/merge-file`: find the heading section at the cursor, sanitize a heading into a filename, cut a range into a new file linked back via `[[fileName]]`
-│   ├── zoomStore.ts      — App-wide zoom level (0.5–2.0, `useSyncExternalStore`, localStorage-persisted); backs `window:zoom-in/out/reset-zoom`, applied via `document.body.style.zoom` in App.tsx
+│   ├── zoomStore.ts      — App-wide zoom level (0.5–2.0), thin wrapper over `vaultSettingsStore` (per user *and* vault, was a flat localStorage value shared by every vault); backs `window:zoom-in/out/reset-zoom`, applied via `document.body.style.zoom` in App.tsx
 │   ├── navigationHistoryState.ts   — Back/forward navigation history reducer (RECORD_VISIT/GO_BACK/GO_FORWARD/DROP_ENTRY/CLEAR), session-only, MAX_STACK_SIZE 50
 │   ├── navigationHistoryContext.ts — NavigationHistoryProvider + useNavigationHistory hook. Records a visit centrally via a `useEffect` watching `tabState.activeTabId` (not threaded through every click handler) — GO_BACK/GO_FORWARD suppress the resulting auto-record via a ref flag so they don't re-record their own tab activation
 │   ├── chatState.ts      — Chat reducer + types (conversations, messages, unread)
@@ -426,7 +442,7 @@ src/
 │   ├── chatActions.ts    — loadConversations, sendMessage, leaveConversation, etc.
 │   ├── panelState.ts     — Generic split-section/tab-ordering reducer shared by both side panels (`side-panel/SidePanel.tsx`) — layout only, not document-derived content. MAX_SECTIONS 3
 │   ├── panelState.test.ts — Unit tests for panelState reducer
-│   ├── panelContext.tsx  — LeftPanelProvider/RightPanelProvider + useLeftPanelContext/useRightPanelContext — both wrap the same `usePanelState` hook (reducer + localStorage persistence scoped by userId), differing only in storage-key prefix and default view set
+│   ├── panelContext.ts   — LeftPanelProvider/RightPanelProvider + useLeftPanelContext/useRightPanelContext — both wrap the same `usePanelState` hook (reducer + `vaultSettingsStore`-backed persistence, per user *and* vault), differing only in which panel (`'sidebar'`/`'context'`) they pass to `persistence.ts` and their default view set
 │   ├── documentPanelData.ts — DocumentPanelState reducer + types (outline, forward/backlinks, unlinkedMentions, tags, properties) and the `useDocumentPanelData` hook (owns the 5 effects: document switch, debounced content re-parse, vault-change tag reload, live backlinks refresh, live unlinked-mentions refresh — all via `onRealtimeVaultChange`). Side-agnostic: doesn't care which panel currently hosts Outline/Links/Tags/Properties, see `panelState.ts`
 │   ├── documentPanelActions.ts — loadOutline, loadForwardLinks, loadBacklinks, loadUnlinkedMentions (search-based, filters out matches already inside a wikilink via extractWikilinks/resolveWikilinkTarget), linkUnlinkedMention (rewrites one occurrence into a wikilink and saves), loadTags, loadProperties, loadPropertyTypes, expandTag
 │   ├── documentPanelActions.test.ts — Unit tests for loadUnlinkedMentions/linkUnlinkedMention
@@ -450,9 +466,12 @@ src/
 │   ├── snippetStore.ts   — CSS snippet action-creator functions `(apiClient, vaultId, ...)` — not a module-level singleton like favoritesStore.ts, since snippets are only managed from one place (Settings) and gain nothing from hidden shared state
 │   ├── dailyNoteService.ts — Daily note open/create logic (YYYY-MM-DD.md, template from vault config); `openOrCreate()` takes an optional `dateStr` (defaults to today) and `offsetDateString()` shifts one by N days via local-calendar arithmetic (DST-safe) — backs `daily-notes:goto-next/-prev`
 │   ├── keybindingsStore.ts — Configurable keyboard shortcuts (server-synced, defaults + user overrides, matchesShortcut(), formatShortcut()); includes `slatebase:navigate-back`/`-forward` (Alt+ArrowLeft/Right — the `event.key` form, not `Left`/`Right`), `slatebase:open-quick-switcher` (Mod+O), `slatebase:next-tab`/`previous-tab` (Ctrl+Tab/Ctrl+Shift+Tab)
-│   ├── workspaceStore.ts — Workspace UI state persistence (tabs, expanded folders, panel sizes/visibility, `explorerFollowActiveFile` auto-reveal toggle, debounced localStorage, per-vault tab memory); a `storage`-event listener adopts writes from other browser tabs, except while this tab has a pending debounced write of its own. `explorerFollowActiveFile` validates leniently (defaults `false` instead of invalidating the whole blob on old persisted state) since it was added after the initial schema. Same leniency for `PersistedTab.pinned` (optional, defaults `false`)
+│   ├── preferenceSync.ts — Shared bookkeeping for the per-user preference stores that mirror `data/users/<userId>-preferences.json` (keybindings, favorites, recentFiles, userSettingsStore): `hasSyncedBefore()`/`markSyncedBefore()`/`clearSyncedBefore()` (localStorage-backed first-sync marker per store, distinguishes "server has never stored anything" from "user emptied it" — before first sync the local cache seeds the server, after it the server is authoritative even when empty, fixing an older-device-resurrects-deleted-entries bug) and `reportSyncFailure()`/`reportSyncSuccess()` (toasts only on the working→failing transition, not per debounced attempt). `vaultSettingsStore` only reuses the failure-toast half — it has server-always-wins semantics with no migration seed, so it doesn't need the marker
+│   ├── userSettingsStore.ts — Account-wide UI settings (status bar visibility + per-item visibility, toolbar prefs, `explorerFollowActiveFile`), server-backed via `PATCH /users/me/ui-settings` → `data/users/<id>-preferences.json`'s `uiSettings` field. `useSyncExternalStore` module store: localStorage cache for synchronous first paint, 800ms-debounced patch carrying only changed fields (two controls saved in quick succession can't clobber each other), `initialize()` seeds the server from a pre-migration local cache exactly once (see preferenceSync.ts). Was one flat localStorage value per device; now follows the account. `refreshFromServer()` handles the SSE `preferences:change` event from another of the same user's sessions
+│   ├── vaultSettingsStore.ts — Settings scoped to one user *and* one vault (line numbers, readable line length, spellcheck + language, zoom, graph config, both panel layouts) — personal reading preferences, not vault content, but worth remembering per vault (a code vault and a prose vault want different answers). Same shape as `userSettingsStore` plus an `activeVaultId` dimension: `setActiveVault()` shows the new vault's cached settings immediately, then overwrites with the server copy once fetched (no migration seed here, unlike `userSettingsStore` — these values were never vault-keyed locally, so a stale browser copy carries nothing the server lacks). Deliberately not in the settings panel — every one of these is reached through a context menu or the command palette
+│   ├── workspaceStore.ts — Workspace UI state persistence (tabs, expanded folders, panel sizes/visibility, debounced localStorage, per-vault tab memory); a `storage`-event listener adopts writes from other browser tabs, except while this tab has a pending debounced write of its own. `PersistedTab.pinned` validates leniently (defaults `false` instead of invalidating the whole blob on old persisted state) since it was added after the initial schema. Still carries an `explorerFollowActiveFile` field in its type/defaults/validation, but that toggle's actual read/write path moved to `userSettingsStore` (account-wide) — App.tsx reads `useUiSettings().explorerFollowActiveFile`, nothing reads or writes this copy any more
 │   ├── vaultStatisticsCache.ts — Client-side vault statistics cache (invalidate on vault:change SSE)
-│   └── toolbarStore.ts   — Persisted toolbar (Werkzeugleiste) preferences: visible, docking `position` (left/right), button `order`, `hidden` ids, per-id colour overrides — `useSyncExternalStore` module-level store (same pattern as `hooks/useStatusBar.ts`). Built-ins and plugin ribbon icons (`plugin:<pluginId>:<title>` ids) share one preference set. `resolveOrder()`/`mergeOrder()` keep a saved customisation from silently dropping a newly added button or forgetting a hidden/not-currently-loaded one
+│   └── toolbarStore.ts   — Toolbar (Werkzeugleiste) preferences: visible, docking `position` (left/right), button `order`, `hidden` ids, per-id colour overrides. Thin wrapper over `userSettingsStore.toolbar` (account-wide, was a flat localStorage value) — keeps the pure ordering helpers (`resolveOrder()`/`mergeOrder()`, which keep a saved customisation from silently dropping a newly added button or forgetting a hidden/not-currently-loaded one) and the intent-level API here, so none of its call sites (SidebarToolbar, toolbar-context-menu.ts, core-commands-app.ts) needed to change. Built-ins and plugin ribbon icons (`plugin:<pluginId>:<title>` ids) share one preference set
 │   ├── settingsState.ts      — Settings reducer + types (categories, sections, nav state)
 │   ├── settingsRegistry.ts   — ISettingsRegistry, section definitions
 │   ├── settingsPersistence.ts — sessionStorage serialize/validate
@@ -466,11 +485,11 @@ src/
 │   ├── de.ts             — German translation strings (default locale, source of truth for `TranslationKey` type)
 │   └── en.ts             — English translation strings (must mirror de.ts's structure)
 ├── hooks/
-│   ├── useLineNumbers.ts — Line numbers toggle state (localStorage persistence)
+│   ├── useLineNumbers.ts — Editor gutter line numbers, thin wrapper over `vaultSettingsStore` (per user *and* vault, was a flat localStorage value shared by every vault). Reached via the editor context menu, not the settings panel
 │   ├── useResize.ts      — Mouse-driven panel resize hook (width, min, max, side)
 │   ├── useDropZone.ts    — File drag-and-drop hook (drag counter, size/count validation, toast errors)
-│   ├── useStatusBar.ts   — Status bar visibility toggle (module-level store, useSyncExternalStore, localStorage) — global on/off, gates everything below
-│   ├── useStatusBarItemVisibility.ts — Per-built-in-item visibility toggle (`slatebase:statusBarItem:<itemId>`, same module-level useSyncExternalStore pattern as useStatusBar.ts)
+│   ├── useStatusBar.ts   — Status bar visibility toggle — global on/off, gates everything below; thin wrapper over `userSettingsStore` (account-wide, was a flat localStorage value)
+│   ├── useStatusBarItemVisibility.ts — Per-built-in-item visibility toggle, keyed by item id in `userSettingsStore`'s `statusBarItems` map (was `slatebase:statusBarItem:<itemId>` localStorage entries)
 │   ├── useWordStats.ts   — Word/character count (+ selection) for the active file. Polls `getActiveEditorView()` (300ms) rather than subscribing to CM6 transactions directly — no reactive content/selection stream exists without extending the core editor's extension pipeline
 │   ├── useCursorPosition.ts — Cursor line/column (100ms poll, same rationale as useWordStats.ts) + `goToLine()` helper
 │   ├── useVersionInfo.ts — Server version info hook (installed vs. latest, GitHub API check)
@@ -478,8 +497,8 @@ src/
 │   ├── useWorkspaceRestore.ts — Session-persistence lifecycle: restores vault/tabs/layout from workspaceStore on mount, persists changes back; extracted from AppContent
 │   ├── usePaginatedResource.ts — Shared list-loading state machine (page/loading/error, loadPage/reload) for admin list pages
 │   ├── useFocusTrap.ts    — Reusable focus trap hook (Tab cycling, Escape callback, focus return to trigger element)
-│   ├── useReadableLineLength.ts — `slatebase:readableLineLength` localStorage toggle (default enabled); backs `toggle-readable-line-length`, consumed by EditMode.tsx → CodeMirrorEditor.tsx
-│   ├── useSpellcheck.ts   — `slatebase:spellcheck` localStorage toggle (default enabled — matches the browser's implicit default); backs `toggle-spellcheck`, consumed by EditMode.tsx → CodeMirrorEditor.tsx
+│   ├── useReadableLineLength.ts — Constrains the editor to a readable measure, thin wrapper over `vaultSettingsStore` (per user *and* vault, default enabled); backs `toggle-readable-line-length`, consumed by EditMode.tsx → CodeMirrorEditor.tsx
+│   ├── useSpellcheck.ts   — Spellcheck on/off + dictionary language, thin wrapper over `vaultSettingsStore` (per user *and* vault; default: on, German). Backs `toggle-spellcheck` and `spellcheck-language-de`/`-en`, consumed by EditMode.tsx → CodeMirrorEditor.tsx; the actual checking happens in `editor/spellcheck/` — see there
 │   └── useReleaseNotes.ts — Fetches the last 5 GitHub releases (tag/name/body/htmlUrl) lazily (only while the Release Notes modal is open), 10s timeout, silent failure — same fetch pattern as useVersionInfo.ts
 ├── components/
 │   ├── SlatebaseLogo.tsx — SVG logo component
@@ -615,7 +634,7 @@ src/
 │   │   ├── PanelSplitContainer.tsx — Vertically stacked split sections with resize handles, each with its own PanelTabBar
 │   │   ├── PanelSplitContainer.css
 │   │   └── utils/
-│   │       ├── persistence.ts    — localStorage layout persistence, shared by both panels (caller-supplied storage-key prefix keeps left/right independent)
+│   │       ├── persistence.ts    — Panel-layout persistence for both panels, `savePanelLayout(panel: 'sidebar' | 'context', layout)`/`loadPanelLayout(panel)`; stores the layout in the active vault's `sidebarPanel`/`contextPanel` field via `vaultSettingsStore` (was a raw localStorage prefix keyed by userId only, shared across every vault)
 │   │       └── persistence.test.ts
 │   ├── settings/
 │   │   ├── ui/                    — Shared settings design-system primitives (all tabs render on top of these for a consistent look — card background/border/radius, button variants, label+control rows)
@@ -680,6 +699,8 @@ src/
 │       ├── FavoritesView.test.tsx
 │       └── FavoritesView.css     — Bookmarks view styles (incl. drag-over/dragging state)
 ├── assets/               — Static images
+├── types/
+│   └── nspell.d.ts       — Hand-written module declaration for `nspell`, which ships as untyped CommonJS with no `@types` package. Only the surface actually called is declared
 └── test-setup.ts         — Vitest/Testing Library setup
 ```
 
@@ -720,7 +741,7 @@ Route modules in `src/api/`:
 - `fileVersionRoutes.ts` — file version management (list, get content, restore)
 - `templateRoutes.ts` — template listing and creation
 - `uploadRoutes.ts` — file upload (multipart, image paste mode)
-- `preferencesRoutes.ts` — user preferences (recent files, bookmarks, keybindings)
+- `preferencesRoutes.ts` — user preferences (recent files, bookmarks, keybindings, account-wide UI settings, per-vault settings)
 - `vaultConfigRoutes.ts` — per-vault config (templates dir, daily notes dir, daily note template name)
 - `welcomeVaultRoutes.ts` — `POST /welcome-vault` (on-demand tutorial vault creation)
 - `proxyRoutes.ts` — `POST /proxy` (CORS-free HTTP proxy for plugin requestUrl, SSRF protection)

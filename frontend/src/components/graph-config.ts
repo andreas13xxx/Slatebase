@@ -1,9 +1,12 @@
 /**
  * GraphConfig — Configuration for the knowledge graph visualization.
  *
- * Manages graph appearance (colors, layout, node visibility) with
- * localStorage persistence. Falls back to Design Token defaults.
+ * Manages graph appearance (colors, layout, node visibility), persisted per
+ * user and per vault via `vaultSettingsStore`. Falls back to Design Token
+ * defaults.
  */
+
+import { getVaultSettings, updateVaultSettings } from '../state/vaultSettingsStore'
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -87,9 +90,16 @@ export const DEFAULT_GRAPH_CONFIG: GraphConfig = {
   },
 }
 
-// ─── localStorage Key ────────────────────────────────────────────────────────
+// ─── Backing store ───────────────────────────────────────────────────────────
 
-const STORAGE_KEY = 'slatebase-graph-config'
+/*
+ * The configuration lives in `vaultSettingsStore.graph` — per user and per
+ * vault, on the server. Colours and force strengths are a personal reading
+ * preference, so they must not be forced on everyone who shares a vault, but
+ * they are worth remembering per vault because graphs differ in size and
+ * density. It used to be one device-local `localStorage` blob shared across
+ * every vault.
+ */
 
 // ─── Public Functions ────────────────────────────────────────────────────────
 
@@ -101,22 +111,11 @@ const STORAGE_KEY = 'slatebase-graph-config'
  * @returns The current graph configuration
  */
 export function loadGraphConfig(): GraphConfig {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw === null) {
-      return { ...DEFAULT_GRAPH_CONFIG }
-    }
-
-    const parsed: unknown = JSON.parse(raw)
-    if (parsed === null || typeof parsed !== 'object') {
-      return { ...DEFAULT_GRAPH_CONFIG }
-    }
-
-    return mergeWithDefaults(parsed as Partial<GraphConfig>)
-  } catch {
-    // Corrupt JSON or other error — return defaults
+  const stored = getVaultSettings().graph
+  if (stored === null) {
     return { ...DEFAULT_GRAPH_CONFIG }
   }
+  return mergeWithDefaults(stored as Partial<GraphConfig>)
 }
 
 /**
@@ -125,7 +124,7 @@ export function loadGraphConfig(): GraphConfig {
  * @param config - The configuration to persist
  */
 export function saveGraphConfig(config: GraphConfig): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
+  updateVaultSettings({ graph: config as unknown as Record<string, unknown> })
 }
 
 /**
@@ -133,7 +132,7 @@ export function saveGraphConfig(config: GraphConfig): void {
  * The next `loadGraphConfig()` call will return defaults.
  */
 export function resetGraphConfig(): void {
-  localStorage.removeItem(STORAGE_KEY)
+  updateVaultSettings({ graph: null })
 }
 
 // ─── Private Helpers ─────────────────────────────────────────────────────────

@@ -957,7 +957,7 @@ describe('registerCoreAppCommands — canvas:jump-to-group', () => {
 
   it('delegates to the active canvas controller when one is registered', () => {
     const jumpToSelectedGroup = vi.fn().mockReturnValue(true)
-    setActiveCanvasController({ jumpToSelectedGroup })
+    setActiveCanvasController({ jumpToSelectedGroup, exportAsImage: vi.fn() })
 
     registry.executeCommand('canvas:jump-to-group')
 
@@ -966,7 +966,7 @@ describe('registerCoreAppCommands — canvas:jump-to-group', () => {
   })
 
   it('shows an error toast when the controller reports nothing to jump to', () => {
-    setActiveCanvasController({ jumpToSelectedGroup: () => false })
+    setActiveCanvasController({ jumpToSelectedGroup: () => false, exportAsImage: vi.fn() })
 
     registry.executeCommand('canvas:jump-to-group')
 
@@ -977,6 +977,24 @@ describe('registerCoreAppCommands — canvas:jump-to-group', () => {
     registry.executeCommand('canvas:jump-to-group')
 
     expect(toastSpy).toHaveBeenCalledWith('error', expect.any(String))
+  })
+
+  describe('canvas:export-as-image', () => {
+    it('delegates to the active canvas controller when one is registered', () => {
+      const exportAsImage = vi.fn().mockResolvedValue(true)
+      setActiveCanvasController({ jumpToSelectedGroup: () => false, exportAsImage })
+
+      registry.executeCommand('canvas:export-as-image')
+
+      expect(exportAsImage).toHaveBeenCalled()
+      expect(toastSpy).not.toHaveBeenCalled()
+    })
+
+    it('shows an error toast when no canvas is active', () => {
+      registry.executeCommand('canvas:export-as-image')
+
+      expect(toastSpy).toHaveBeenCalledWith('error', expect.any(String))
+    })
   })
 })
 
@@ -1181,6 +1199,60 @@ describe('registerCoreAppCommands — note-composer:*', () => {
 })
 
 /** Minimal CoreAppCommandHandlers builder shared by tests below that don't need the full beforeEach setup above. */
+describe('registerCoreAppCommands — footnotes and commands without an equivalent', () => {
+  afterEach(() => {
+    setActiveEditorView(null)
+  })
+
+  it('footnotes:open moves the cursor to the first footnote definition', () => {
+    const doc = 'Behauptung[^1] und noch eine[^2].\n\n[^1]: Erste Quelle\n[^2]: Zweite Quelle\n'
+    const view = new EditorView({ state: EditorState.create({ doc }), parent: document.body })
+    setActiveEditorView(view)
+    const registry = new CommandRegistry()
+    registerCoreAppCommands(registry, () => makeMinimalHandlers({ activeTab: makeTab() }))
+
+    registry.executeCommand('footnotes:open')
+
+    expect(view.state.selection.main.head).toBe(doc.indexOf('[^1]: '))
+    view.destroy()
+  })
+
+  it('footnotes:open says so when the note has no footnotes', () => {
+    const toastSpy = vi.spyOn(ToastNotificationModule, 'showToast').mockImplementation(() => {})
+    const view = new EditorView({ state: EditorState.create({ doc: 'Eine Notiz ohne Fussnoten.' }), parent: document.body })
+    setActiveEditorView(view)
+    const registry = new CommandRegistry()
+    registerCoreAppCommands(registry, () => makeMinimalHandlers({ activeTab: makeTab() }))
+
+    registry.executeCommand('footnotes:open')
+
+    expect(toastSpy).toHaveBeenCalledWith('info', expect.stringContaining('keine Fußnoten'))
+    toastSpy.mockRestore()
+    view.destroy()
+  })
+
+  it('explains a command Slatebase has no equivalent for instead of doing nothing', () => {
+    const toastSpy = vi.spyOn(ToastNotificationModule, 'showToast').mockImplementation(() => {})
+    const registry = new CommandRegistry()
+    registerCoreAppCommands(registry, () => makeMinimalHandlers({ activeTab: makeTab() }))
+
+    registry.executeCommand('bases:insert')
+    registry.executeCommand('open-with-default-app:open')
+
+    expect(toastSpy).toHaveBeenNthCalledWith(1, 'info', expect.stringContaining('Bases'))
+    expect(toastSpy).toHaveBeenNthCalledWith(2, 'info', expect.stringContaining('server'))
+    toastSpy.mockRestore()
+  })
+
+  it('still registers those commands, so a plugin lookup resolves them', () => {
+    const registry = new CommandRegistry()
+    registerCoreAppCommands(registry, () => makeMinimalHandlers({ activeTab: makeTab() }))
+
+    expect(registry.getCommand('bases:insert')).toBeDefined()
+    expect(registry.getCommand('workspace:split-vertical')).toBeDefined()
+  })
+})
+
 function makeMinimalHandlers(overrides: { apiClient?: IApiClient; tabDispatch?: ReturnType<typeof vi.fn>; activeTab: TabEntry }): CoreAppCommandHandlers {
   const apiClient = overrides.apiClient ?? createMockApiClient()
   return {

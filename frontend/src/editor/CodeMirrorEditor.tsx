@@ -38,6 +38,10 @@ import { setEditorInfo, setEditorEditor, setEditorLivePreview, type EditorFileIn
 import { EditorShim } from '../plugins/compat/editor-shim'
 import { ContextMenu, type ContextMenuItem } from '../components/ContextMenu'
 import { buildEditorContextMenuItems } from './editor-context-menu'
+import {
+  spellcheckExtension, misspelledWordAt, setSpellcheckLanguage, suggestCorrections,
+  DEFAULT_SPELLCHECK_LANGUAGE, type SpellcheckLanguage,
+} from './spellcheck'
 import { buildTFileFromPath } from '../plugins/compat/plugin-event-bridge'
 import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
 import { revealInExplorer } from '../state/fileNavigation'
@@ -86,8 +90,10 @@ export interface CodeMirrorEditorProps {
   showLineNumbers?: boolean
   /** Whether the editor content is width-constrained (Obsidian's "readable line length"). Defaults to true. */
   readableLineLength?: boolean
-  /** Whether the browser's native spellcheck is enabled on the editor content. */
+  /** Whether Slatebase's own spellchecker underlines unknown words. */
   spellcheck?: boolean
+  /** Dictionary the spellchecker checks against. */
+  spellcheckLanguage?: SpellcheckLanguage
   /** Whether Vim mode is enabled. */
   vimMode?: boolean
   /** Whether bracket auto-close is enabled. */
@@ -118,6 +124,7 @@ export function CodeMirrorEditor({
   showLineNumbers = false,
   readableLineLength = true,
   spellcheck = true,
+  spellcheckLanguage = DEFAULT_SPELLCHECK_LANGUAGE,
   vimMode: _vimMode,
   bracketAutoClose: _bracketAutoClose,
   pluginExtensions: _pluginExtensions,
@@ -137,6 +144,12 @@ export function CodeMirrorEditor({
   // Same reasoning as showLineNumbersRef — the context menu's checkbox needs
   // the current value without re-running the mount-effect's listener.
   const readableLineLengthRef = useRef(readableLineLength)
+  // Ditto for the spellcheck submenu's checkbox and language radio group.
+  const spellcheckRef = useRef(spellcheck)
+  const spellcheckLanguageRef = useRef(spellcheckLanguage)
+  // Guards the async suggestion fetch: a right-click on a second word (or a
+  // closed menu) must not be overwritten by suggestions for the first one.
+  const suggestionRequestRef = useRef(0)
   // The paste domEventHandler is baked into the extensions built once per
   // tab mount (see buildExtensions) — read through refs so prop changes
   // don't need a full editor remount to take effect.
@@ -148,6 +161,7 @@ export function CodeMirrorEditor({
   const readOnlyCompartment = useRef(new Compartment())
   const lineNumbersCompartment = useRef(new Compartment())
   const livePreviewCompartment = useRef(new Compartment())
+  const spellcheckCompartment = useRef(new Compartment())
 
   // Keep onContentChange ref up to date without recreating extensions
   useEffect(() => {
@@ -161,6 +175,11 @@ export function CodeMirrorEditor({
   useEffect(() => {
     readableLineLengthRef.current = readableLineLength
   }, [readableLineLength])
+
+  useEffect(() => {
+    spellcheckRef.current = spellcheck
+    spellcheckLanguageRef.current = spellcheckLanguage
+  }, [spellcheck, spellcheckLanguage])
 
   useEffect(() => {
     onImagePasteRef.current = onImagePaste
@@ -204,6 +223,39 @@ export function CodeMirrorEditor({
       ],
     })
   }
+
+  /**
+   * Opens the editor context menu at `x`/`y`, offering spelling corrections for
+   * the misspelled word at `pos` (if any).
+   *
+   * Suggestions are fetched from the spellcheck worker *after* the menu is
+   * already on screen and swapped in when they arrive — computing them first
+   * would add a visible delay to every right-click on a typo.
+   *
+   * Shared by the mouse handler and the keyboard-triggered `showContextMenu()`;
+   * reads all editor state through refs, so it never needs rebuilding.
+   */
+  const openContextMenuAt = useCallback((view: EditorView, x: number, y: number, pos: number | null): void => {
+    const misspelled = pos === null ? null : misspelledWordAt(view.state, pos)
+
+    const buildItems = (suggestions: string[] | null): ContextMenuItem[] =>
+      buildEditorContextMenuItems(view, showLineNumbersRef.current, readableLineLengthRef.current, {
+        misspelled,
+        suggestions,
+        enabled: spellcheckRef.current,
+        language: spellcheckLanguageRef.current,
+      })
+
+    setContextMenu({ x, y, items: buildItems(misspelled ? null : []) })
+    if (!misspelled) return
+
+    const requestId = ++suggestionRequestRef.current
+    void suggestCorrections(misspelled.word).then((suggestions) => {
+      // A second right-click, or a closed menu, wins over a late response.
+      if (requestId !== suggestionRequestRef.current) return
+      setContextMenu((previous) => (previous ? { ...previous, items: buildItems(suggestions) } : previous))
+    })
+  }, [])
 
   /**
    * Merges the caller-supplied Live Preview options with the link-context-menu
@@ -320,6 +372,9 @@ export function CodeMirrorEditor({
       lineNumbersCompartment.current.of(
         showLineNumbers ? cmLineNumbers() : []
       ),
+      spellcheckCompartment.current.of(
+        spellcheck ? spellcheckExtension() : []
+      ),
       createLivePreviewCompartmentExtension(
         livePreviewCompartment.current,
         buildLivePreviewOptionsWithMenu(),
@@ -339,7 +394,7 @@ export function CodeMirrorEditor({
     }
 
     return extensions
-  }, [readOnly, showLineNumbers, livePreview, livePreviewOptions, content, buildLivePreviewOptionsWithMenu])
+  }, [readOnly, showLineNumbers, spellcheck, livePreview, livePreviewOptions, content, buildLivePreviewOptionsWithMenu])
 
   /**
    * Save the current editor state to the store.
@@ -413,7 +468,7 @@ export function CodeMirrorEditor({
       // don't also show the generic one in that case.
       if (e.defaultPrevented) return
       e.preventDefault()
-      setContextMenu({ x: e.clientX, y: e.clientY, items: buildEditorContextMenuItems(view, showLineNumbersRef.current, readableLineLengthRef.current) })
+      openContextMenuAt(view, e.clientX, e.clientY, view.posAtCoords({ x: e.clientX, y: e.clientY }))
     }
     container.addEventListener('contextmenu', handleContextMenu)
 
@@ -521,13 +576,29 @@ export function CodeMirrorEditor({
     })
   }, [showLineNumbers])
 
-  // Apply spellcheck attribute directly to the CM6 content DOM on prop change
-  // (a plain DOM attribute, not a CM6 extension — no compartment needed).
+  // Add/remove the spellcheck extension on prop change.
+  //
+  // The browser's own spellchecker is switched off unconditionally: it draws a
+  // second, differently-styled underline under the same words, and its
+  // suggestions are unreachable anyway — they live only in the native context
+  // menu, which this editor replaces with its own (see handleContextMenu).
   useEffect(() => {
     const view = viewRef.current
     if (!view) return
-    view.contentDOM.setAttribute('spellcheck', String(spellcheck))
+    view.contentDOM.setAttribute('spellcheck', 'false')
+    view.dispatch({
+      effects: spellcheckCompartment.current.reconfigure(
+        spellcheck ? spellcheckExtension() : []
+      ),
+    })
   }, [spellcheck])
+
+  // Load the selected dictionary. The worker ignores a repeat of the language
+  // it already has, so this is free on every render but the first.
+  useEffect(() => {
+    if (!spellcheck) return
+    setSpellcheckLanguage(spellcheckLanguage)
+  }, [spellcheck, spellcheckLanguage])
 
   // Reconfigure livePreview compartment on prop change
   useEffect(() => {
@@ -606,9 +677,9 @@ export function CodeMirrorEditor({
       // Same fallback as editor-suggest-popover.ts's position(): coordsAtPos
       // returns null for an off-screen/hidden position (e.g. scrolled out of view).
       const coords = view.coordsAtPos(view.state.selection.main.head) ?? view.dom.getBoundingClientRect()
-      setContextMenu({ x: coords.left, y: coords.bottom, items: buildEditorContextMenuItems(view, showLineNumbersRef.current, readableLineLengthRef.current) })
+      openContextMenuAt(view, coords.left, coords.bottom, view.state.selection.main.head)
     },
-  }), [])
+  }), [openContextMenuAt])
 
   return (
     <>

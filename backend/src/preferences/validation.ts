@@ -48,3 +48,52 @@ const keybindingEntrySchema = z.object({
 export const saveKeybindingsSchema = z.object({
   entries: z.array(keybindingEntrySchema).max(200),
 })
+
+// ─── UI Settings ─────────────────────────────────────────────────────────────
+
+/** Bounded string→boolean map, used for status bar item visibility. */
+const booleanMapSchema = z.record(z.string().max(128), z.boolean())
+
+/** Bounded string→string map, used for toolbar entry colours. */
+const colorMapSchema = z.record(z.string().max(256), z.string().max(64))
+
+/** Toolbar preferences. Entry ids include `plugin:<id>:<title>` ribbon icons. */
+const toolbarSettingsSchema = z.object({
+  visible: z.boolean(),
+  position: z.enum(['left', 'right']),
+  order: z.array(z.string().max(256)).max(200),
+  hidden: z.array(z.string().max(256)).max(200),
+  colors: colorMapSchema,
+}).partial()
+
+/**
+ * Account-wide UI settings. Every field is optional: a single control saves
+ * only what it changed, so two controls cannot overwrite each other's value.
+ */
+export const saveUiSettingsSchema = z.object({
+  statusBarVisible: z.boolean().optional(),
+  statusBarItems: booleanMapSchema.optional(),
+  explorerFollowActiveFile: z.boolean().optional(),
+  toolbar: toolbarSettingsSchema.optional(),
+})
+
+// ─── Per-Vault Settings ──────────────────────────────────────────────────────
+
+/**
+ * Client-owned JSON blobs (graph config, panel layouts). Validated for size
+ * and type only — the server has no stake in their shape, and duplicating the
+ * client's schema here would mean every new panel field needs a backend change.
+ */
+const opaqueBlobSchema = z.record(z.string().max(128), z.unknown()).nullable()
+
+/** Per-user, per-vault settings. Partial for the same reason as UI settings. */
+export const saveVaultSettingsSchema = z.object({
+  lineNumbers: z.boolean().optional(),
+  readableLineLength: z.boolean().optional(),
+  spellcheck: z.boolean().optional(),
+  spellcheckLanguage: z.string().max(16).optional(),
+  zoom: z.number().min(0.5).max(2).optional(),
+  graph: opaqueBlobSchema.optional(),
+  sidebarPanel: opaqueBlobSchema.optional(),
+  contextPanel: opaqueBlobSchema.optional(),
+})

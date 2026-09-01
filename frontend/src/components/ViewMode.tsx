@@ -18,8 +18,8 @@ import { AppContext } from '../state'
 import { requestHoverPreview, dismissHoverPreview } from '../plugins/compat/hover-link-bus'
 import { resolveWikilinkTargetWithAlternatives } from '../plugins/link-resolver'
 import { warnOnce } from '../plugins/compat/log'
-import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, remarkBreaks, remarkBlockRef, remarkPreserveTableCodeEscapes, remarkMath, createAnchorTracker } from '../plugins'
-import type { WikilinkNode, EmbedNode, CalloutNode, TagNode } from '../plugins'
+import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, remarkBreaks, remarkBlockRef, remarkPreserveTableCodeEscapes, remarkMath, remarkFootnotes, getFootnoteEntries, createAnchorTracker } from '../plugins'
+import type { WikilinkNode, EmbedNode, CalloutNode, TagNode, FootnoteEntry, NumberedFootnoteReference } from '../plugins'
 import { INLINE_HTML_OPEN_TAG_RE, INLINE_HTML_CLOSE_TAG_RE, parseInlineHtmlAttrs, parseStyleString } from '../plugins/inline-html'
 import { PdfViewer } from './BinaryViewer'
 import { MermaidRenderer } from './MermaidRenderer'
@@ -107,6 +107,8 @@ const OBSIDIAN_PLUGINS: Array<Plugin<[], Root>> = [
   remarkBlockRef,
   remarkBreaks,
   remarkMath,
+  // Last: numbers the footnotes remarkGfm parsed, once the tree is otherwise final.
+  remarkFootnotes,
 ]
 
 /**
@@ -199,6 +201,7 @@ function createSafePipeline(content: string): Root {
  * - Ordered/unordered lists and task lists (non-interactive checkboxes)
  * - Code blocks with highlight.js syntax highlighting
  * - GFM tables, blockquotes, horizontal rules
+ * - GFM footnotes as numbered markers linked to a footnote list below the note
  * - Wikilinks [[target]] and [[target|display]] with resolution against DirectoryTree
  * - Obsidian embeds ![[file]], callouts > [!type], and inline tags #tag
  * - Standard Markdown links with external/internal/broken classification
@@ -613,7 +616,71 @@ function renderRoot(
     }
   })
 
+  // Footnote definitions render nowhere in place (see renderBlockNode) — they
+  // are collected into one numbered list below the note instead.
+  const footnotes = getFootnoteEntries(root)
+  if (footnotes.length > 0) {
+    elements.push(renderFootnoteSection(footnotes, vaultId, directoryTree, onInternalLinkClick, 'footnotes', token, anchorTracker, onTagClick))
+  }
+
   return elements
+}
+
+/** DOM id of the footnote's entry in the list under the note. */
+function footnoteAnchorId(identifier: string): string {
+  return `fn-${identifier}`
+}
+
+/** DOM id of the first `[^label]` marker in the text, the back-link's target. */
+function footnoteRefAnchorId(identifier: string): string {
+  return `fnref-${identifier}`
+}
+
+/**
+ * Renders the numbered footnote list that closes a note, one entry per
+ * definition in `remarkFootnotes`' order. Entries something references get a
+ * `↩` back-link to that marker; an unreferenced definition is still listed
+ * (its text would otherwise be invisible) but has nowhere to jump back to.
+ */
+function renderFootnoteSection(
+  entries: FootnoteEntry[],
+  vaultId: string,
+  directoryTree: DirectoryTree | null,
+  onInternalLinkClick: ((targetPath: string) => void) | undefined,
+  key: string,
+  token?: string,
+  anchorTracker?: ReturnType<typeof createAnchorTracker>,
+  onTagClick?: (tag: string) => void
+): ReactNode {
+  const items = entries.map((entry) => createElement('li', {
+    key: entry.identifier,
+    id: footnoteAnchorId(entry.identifier),
+    className: 'view-mode-footnote',
+  },
+    ...renderBlockNodes(entry.definition.children, vaultId, directoryTree, onInternalLinkClick, `fn-${entry.number}`, token, anchorTracker, onTagClick),
+    entry.referenced
+      ? createElement('a', {
+        key: 'backref',
+        href: `#${footnoteRefAnchorId(entry.identifier)}`,
+        className: 'view-mode-footnote-backref',
+        title: 'Zurück zum Verweis',
+        'aria-label': 'Zurück zum Verweis',
+        onClick: (e: React.MouseEvent) => {
+          e.preventDefault()
+          scrollToAnchorId(footnoteRefAnchorId(entry.identifier))
+        },
+      }, '↩')
+      : null,
+  ))
+
+  return createElement('section', {
+    key,
+    className: 'view-mode-footnotes',
+    'aria-label': 'Fußnoten',
+  },
+    createElement('hr', { className: 'view-mode-footnotes-divider' }),
+    createElement('ol', { className: 'view-mode-footnotes-list' }, items),
+  )
 }
 
 interface ContentGroup {
@@ -842,7 +909,8 @@ function renderBlockNode(
       return null
 
     case 'footnoteDefinition':
-      // Not rendered inline
+      // Not rendered where the author wrote it — renderRoot collects every
+      // definition into the numbered footnote list below the note instead.
       return null
 
     case 'yaml':
@@ -1191,10 +1259,29 @@ function renderPhrasingNode(
       return node.value
     }
 
-    case 'footnoteReference':
-      return createElement('sup', { key, className: 'view-mode-footnote-ref' },
-        `[${node.identifier}]`
+    case 'footnoteReference': {
+      const ref = node as NumberedFootnoteReference
+      // No number means no matching definition, so there is nothing to link to;
+      // show the raw label rather than a link into an empty list entry.
+      if (ref.fnNumber === undefined) {
+        return createElement('sup', { key, className: 'view-mode-footnote-ref' }, `[${ref.identifier}]`)
+      }
+      return createElement('sup', {
+        key,
+        className: 'view-mode-footnote-ref',
+        // Only the first marker of a label carries the id the back-link returns to.
+        ...(ref.fnFirstRef ? { id: footnoteRefAnchorId(ref.identifier) } : {}),
+      },
+        createElement('a', {
+          href: `#${footnoteAnchorId(ref.identifier)}`,
+          title: `Fußnote ${ref.fnNumber}`,
+          onClick: (e: React.MouseEvent) => {
+            e.preventDefault()
+            scrollToAnchorId(footnoteAnchorId(ref.identifier))
+          },
+        }, String(ref.fnNumber))
       )
+    }
 
     case 'imageReference':
       return createElement('span', { key }, `![${node.alt ?? ''}]`)
@@ -1573,6 +1660,26 @@ function scrollToHeadingAnchor(heading: string): void {
   if (element) {
     element.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
+}
+
+/**
+ * Scrolls to an element by its exact DOM id, expanding any collapsed heading
+ * sections (`<details>`) on the way — a footnote marker inside a folded section
+ * cannot be scrolled to while its section is shut.
+ */
+function scrollToAnchorId(id: string): void {
+  const element = document.getElementById(id)
+  if (!element) return
+  for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+    if (parent instanceof HTMLDetailsElement) parent.open = true
+  }
+  element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
+  // The jump lands mid-paragraph with nothing else marking the spot, so flash
+  // the target briefly. Self-clearing — no cleanup hook needed for a class the
+  // element drops on its own, and a re-render in between simply drops it early.
+  element.classList.add('view-mode-anchor-flash')
+  window.setTimeout(() => element.classList.remove('view-mode-anchor-flash'), 1200)
 }
 
 /**

@@ -97,6 +97,8 @@ function createMockConfigService(overrides: Partial<IConfigService> = {}): IConf
     getWelcomeVaultConfig: () => ({
       name: { de: 'Willkommen', en: 'Welcome' },
     }),
+    getOverrides: () => ({}),
+    updateOverrides: async () => [],
     ...overrides,
   }
 }

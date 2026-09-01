@@ -225,6 +225,32 @@ For linking between notes: [[Features/Wikilinks|Wikilinks]] — more in the Wiki
 
 ---
 
+## Footnotes
+
+A footnote has two halves: the **reference** in the middle of your text, and the **definition**, which usually sits at the end of the note.
+
+```markdown
+This claim needs a source[^1].
+
+[^1]: Source: handbook, page 42.
+```
+
+Labels work as well as numbers — `[^source]` with `[^source]: …`.
+
+### Live Example
+
+The reference shows up raised[^ex] — in Live Preview mode as you type, in Source mode as the raw `[^ex]` marker. Definitions normally live at the foot of the note; this one sits right under the paragraph so you can see both halves side by side.
+
+[^ex]: This is the footnote's text.
+
+> [!tip] Inserting and finding them
+> **Insert footnote** (command palette with `Ctrl+P`, or right-click in the editor) puts the reference at the cursor and adds its definition at the end of the file. **Show footnotes** jumps to the note's first definition.
+
+> [!info] Reference and definition belong together
+> A `[^1]` without a matching definition stays plain text — only the pair makes a footnote. A definition nobody references stays visible the other way round, so its text never disappears unnoticed.
+
+---
+
 ## Highlight
 
 The `==highlight==` syntax marks text with a background color:

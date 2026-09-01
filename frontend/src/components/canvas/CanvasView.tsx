@@ -4,10 +4,12 @@
  */
 
 import { useCallback, useRef, useState, useEffect } from 'react'
+import { toBlob } from 'html-to-image'
 import { CanvasProvider, useCanvasContext } from '../../state/canvasContext'
 import type { DirectoryTree } from '../../types'
 import type { CanvasNode, CanvasEdge, TextNode, FileNode, LinkNode, GroupNode } from '../../canvas/types'
 import { parseCanvas } from '../../canvas'
+import { showToast } from '../ToastNotification'
 import { TextNodeRenderer } from './TextNodeRenderer'
 import { FileNodeRenderer } from './FileNodeRenderer'
 import { LinkNodeRenderer } from './LinkNodeRenderer'
@@ -21,7 +23,7 @@ import { CanvasToolbar } from './CanvasToolbar'
 import type { CanvasViewMode } from './CanvasToolbar'
 import { CanvasSourceView } from './CanvasSourceView'
 import { useViewportCulling } from './useViewportCulling'
-import { generateCanvasId, computeFitViewport } from './canvas-utils'
+import { generateCanvasId, computeFitViewport, computeContentBounds } from './canvas-utils'
 import { setActiveCanvasController } from '../../state/activeCanvasBridge'
 import './CanvasView.css'
 
@@ -65,12 +67,17 @@ const ZOOM_STEP = 0.1
 const GRID_SIZE = 20
 /** Pixels (in canvas space) the viewport shifts per arrow key press. */
 const PAN_STEP = 50
+/** Canvas-space margin around content when exporting as an image. */
+const EXPORT_PADDING = 50
+/** Oversampling factor for the exported PNG, independent of the live viewport's zoom or the viewer's screen DPI — keeps the export crisp regardless of either. */
+const EXPORT_PIXEL_RATIO = 2
 
 // ─── Inner Component ──────────────────────────────────────────────────────────
 
-function CanvasViewInner({ vaultId, readOnly, onFileOpen, directoryTree, token, onFileSave }: CanvasViewProps) {
+function CanvasViewInner({ vaultId, filePath, readOnly, onFileOpen, directoryTree, token, onFileSave }: CanvasViewProps) {
   const { state, dispatch, save } = useCanvasContext()
   const containerRef = useRef<HTMLDivElement>(null)
+  const transformLayerRef = useRef<HTMLDivElement>(null)
   const [isPanning, setIsPanning] = useState(false)
   const [showGrid, setShowGrid] = useState(true)
   const [showMinimap, setShowMinimap] = useState(true)
@@ -354,18 +361,11 @@ function CanvasViewInner({ vaultId, readOnly, onFileOpen, directoryTree, token, 
   // ─── Fit to View ──────────────────────────────────────────────────────────
 
   const fitToView = useCallback(() => {
-    if (!document || document.nodes.length === 0 || !containerRef.current) return
+    if (!document || !containerRef.current) return
+    const bounds = computeContentBounds(document.nodes)
+    if (!bounds) return
     const rect = containerRef.current.getBoundingClientRect()
-
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-    for (const node of document.nodes) {
-      minX = Math.min(minX, node.x)
-      minY = Math.min(minY, node.y)
-      maxX = Math.max(maxX, node.x + node.width)
-      maxY = Math.max(maxY, node.y + node.height)
-    }
-
-    dispatch({ type: 'SET_VIEWPORT', payload: computeFitViewport({ minX, minY, maxX, maxY }, rect, 50, MIN_ZOOM) })
+    dispatch({ type: 'SET_VIEWPORT', payload: computeFitViewport(bounds, rect, 50, MIN_ZOOM) })
   }, [document, dispatch])
 
   /** `canvas:jump-to-group` — pans/zooms to the single selected group node. */
@@ -381,14 +381,87 @@ function CanvasViewInner({ vaultId, readOnly, onFileOpen, directoryTree, token, 
     return true
   }, [document, selectedNodeIds, dispatch])
 
+  /**
+   * `canvas:export-as-image` — rasterizes the *whole* canvas (not just the
+   * currently visible viewport) to a PNG and downloads it.
+   *
+   * Captures the live `.canvas-view__transform-layer` DOM subtree rather than
+   * re-deriving a parallel SVG from the document model: EdgeRenderer's Bézier
+   * routing, node markdown previews and theme colors would otherwise need a
+   * second implementation kept in sync with the real renderer. To capture
+   * content outside the currently-visible viewport, the canvas viewport is
+   * temporarily switched to a 1:1 framing of all content (restored after
+   * capture, in `finally`, along with the selection — cleared first so no
+   * selection outline/resize-handle chrome ends up in the exported image).
+   *
+   * Known gap: LinkNodeRenderer's iframe previews render as blank in the
+   * output — cross-origin iframe content can't be read into a canvas by any
+   * DOM-to-image approach, this one included.
+   */
+  const exportAsImage = useCallback(async (): Promise<boolean> => {
+    if (!document || !transformLayerRef.current || !containerRef.current) return false
+    const bounds = computeContentBounds(document.nodes)
+    if (!bounds) {
+      showToast('info', 'Canvas ist leer — nichts zu exportieren')
+      return false
+    }
+
+    const savedViewport = viewport
+    const savedSelectedNodeIds = [...selectedNodeIds]
+    const savedSelectedEdgeIds = [...selectedEdgeIds]
+
+    const width = Math.max(1, Math.round(bounds.maxX - bounds.minX + EXPORT_PADDING * 2))
+    const height = Math.max(1, Math.round(bounds.maxY - bounds.minY + EXPORT_PADDING * 2))
+
+    dispatch({ type: 'DESELECT_ALL' })
+    dispatch({
+      type: 'SET_VIEWPORT',
+      payload: { zoom: 1, x: EXPORT_PADDING - bounds.minX, y: EXPORT_PADDING - bounds.minY },
+    })
+
+    try {
+      // Let the viewport/selection change above actually paint before
+      // capturing. One rAF can still land before layout; two is the
+      // conventional "definitely painted" wait.
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+
+      const backgroundColor = getComputedStyle(containerRef.current).backgroundColor || undefined
+      const blob = await toBlob(transformLayerRef.current, { width, height, pixelRatio: EXPORT_PIXEL_RATIO, backgroundColor })
+      if (!blob) {
+        showToast('error', 'Canvas-Export fehlgeschlagen')
+        return false
+      }
+
+      // `document` above shadows the DOM global inside this component, hence
+      // the explicit `window.` qualification for the download-link dance.
+      const baseName = (filePath.split('/').pop() ?? 'canvas').replace(/\.canvas$/i, '')
+      const url = URL.createObjectURL(blob)
+      const a = window.document.createElement('a')
+      a.href = url
+      a.download = `${baseName}.png`
+      window.document.body.appendChild(a)
+      a.click()
+      window.document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      return true
+    } catch (err) {
+      showToast('error', `Canvas-Export fehlgeschlagen: ${err instanceof Error ? err.message : String(err)}`)
+      return false
+    } finally {
+      dispatch({ type: 'SET_VIEWPORT', payload: savedViewport })
+      dispatch({ type: 'SELECT_NODES', payload: { nodeIds: savedSelectedNodeIds, additive: false } })
+      dispatch({ type: 'SELECT_EDGES', payload: { edgeIds: savedSelectedEdgeIds, additive: true } })
+    }
+  }, [document, viewport, selectedNodeIds, selectedEdgeIds, dispatch, filePath])
+
   // Registers this canvas as the target for core commands that need to reach
   // into a live canvas's viewport (only one canvas tab is ever the "active"
   // one a command should affect — same single-active-instance pattern as
   // editor/plugin-extensions.ts's setActiveEditorView).
   useEffect(() => {
-    setActiveCanvasController({ jumpToSelectedGroup })
+    setActiveCanvasController({ jumpToSelectedGroup, exportAsImage })
     return () => setActiveCanvasController(null)
-  }, [jumpToSelectedGroup])
+  }, [jumpToSelectedGroup, exportAsImage])
 
   /** Handle context menu action. */
   const handleContextMenuAction = useCallback((action: CanvasContextAction) => {
@@ -738,7 +811,7 @@ function CanvasViewInner({ vaultId, readOnly, onFileOpen, directoryTree, token, 
             )}
 
             {/* Transformed content layer */}
-            <div className="canvas-view__transform-layer" style={{ transform }}>
+            <div ref={transformLayerRef} className="canvas-view__transform-layer" style={{ transform }}>
               {/* SVG layer for edges */}
               <EdgeRenderer
                 edges={document.edges}

@@ -3,12 +3,13 @@ import { useTranslation } from '../i18n'
 import { useLineNumbers } from '../hooks/useLineNumbers'
 import { useReadableLineLength } from '../hooks/useReadableLineLength'
 import { useSpellcheck } from '../hooks/useSpellcheck'
+import { isSpellcheckLanguage } from '../editor/spellcheck'
 import { DropZone } from './DropZone'
 import { showToast } from './ToastNotification'
 import { CodeMirrorEditor } from '../editor/CodeMirrorEditor'
 import type { IEditorHandle, EditorFormattingAction } from '../editor/types'
 import type { LivePreviewOptions } from '../editor/live-preview'
-import { isEmbeddableFile, buildInternalLinkText } from '../utils/internalLink'
+import { buildInternalLinkText } from '../utils/internalLink'
 
 /**
  * Props for the EditMode component.
@@ -57,13 +58,20 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
 
   // Editor handle ref for imperative operations (undo/redo, formatting commands)
   const editorRef = useRef<IEditorHandle>(null)
+  // Hidden <input type="file"> triggered by the "Anhang einfügen" editor command.
+  const attachFileInputRef = useRef<HTMLInputElement>(null)
 
   // Line numbers toggle state (persisted to localStorage, translates to CM6 showLineNumbers prop).
   // Toggled via the Command Palette ('toggleLineNumbers' editor command).
   const { enabled: lineNumbersEnabled, toggle: toggleLineNumbers } = useLineNumbers()
   // Same pattern as line numbers — persisted, toggled via Command Palette editor commands.
   const { enabled: readableLineLengthEnabled, toggle: toggleReadableLineLength } = useReadableLineLength()
-  const { enabled: spellcheckEnabled, toggle: toggleSpellcheck } = useSpellcheck()
+  const {
+    enabled: spellcheckEnabled,
+    toggle: toggleSpellcheck,
+    language: spellcheckLanguage,
+    setLanguage: setSpellcheckLanguage,
+  } = useSpellcheck()
 
   // Compute effective live preview state (respects file size) — livePreviewMode is
   // driven by the tab mode (Variante 1).
@@ -115,7 +123,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
   // ─── Listen for editor commands from the Command Palette ─────────────────
   useEffect(() => {
     function handleEditorCommand(e: Event) {
-      const detail = (e as CustomEvent<{ action: string }>).detail
+      const detail = (e as CustomEvent<{ action: string; language?: unknown }>).detail
       if (!detail?.action) return
       if (readOnly) return
 
@@ -137,8 +145,18 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
         case 'toggleSpellcheck':
           toggleSpellcheck()
           break
+        case 'setSpellcheckLanguage':
+          // The language rides along on the event from the editor context
+          // menu; anything else is ignored rather than trusted into the hook.
+          if (isSpellcheckLanguage(detail.language)) setSpellcheckLanguage(detail.language)
+          break
         case 'showContextMenu':
           editorRef.current?.showContextMenu()
+          break
+        case 'attachFile':
+          // The actual upload happens in handleAttachFileSelected, once the
+          // browser's native file picker resolves.
+          attachFileInputRef.current?.click()
           break
         default:
           // Delegate all formatting actions to CM6
@@ -151,39 +169,29 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
     return () => {
       window.removeEventListener('slatebase:editor-command', handleEditorCommand)
     }
-  }, [readOnly, toggleLineNumbers, toggleReadableLineLength, toggleSpellcheck])
+  }, [readOnly, toggleLineNumbers, toggleReadableLineLength, toggleSpellcheck, setSpellcheckLanguage])
 
-  // --- External file drop (from OS) via DropZone ---
+  // --- External file drop (from OS) via DropZone, and the "Anhang einfügen" command ---
 
   /** Derive target directory from the currently open file path. */
   const uploadTargetDir = filePath
     ? (filePath.includes('/') ? filePath.slice(0, filePath.lastIndexOf('/')) : '')
     : ''
 
-  /** Handle external file drop from OS — uploads to same directory as current file. */
-  const handleExternalFileDrop = useCallback(async (files: File[], _targetPath: string, dropPoint: { x: number; y: number }) => {
-    if (!onExternalFileDrop || !filePath) return
-
-    // Resolve the drop position in the document immediately (before the upload
-    // completes) so the image lands where the drop cursor was shown, not
-    // wherever the text cursor happens to be once the upload finishes.
-    const view = editorRef.current?.getView()
-    const insertPos = view?.posAtCoords(dropPoint) ?? view?.state.selection.main.from ?? 0
-
+  /**
+   * Uploads `files` via `onExternalFileDrop` and inserts a wikilink (or embed,
+   * for images/PDFs) for each at `insertPos`. Shared by the OS drag-drop handler
+   * and the "Anhang einfügen" file-picker handler below — they differ only in
+   * how `files` and `insertPos` are obtained.
+   */
+  const uploadAndInsertLinks = useCallback(async (files: File[], insertPos: number) => {
+    if (!onExternalFileDrop) return
     try {
       const result = await onExternalFileDrop(files)
 
-      // For image files, insert embed links via CM6
-      const imageEmbeds: string[] = []
-      for (const uploaded of result.uploaded) {
-        if (isEmbeddableFile(uploaded.fileName)) {
-          imageEmbeds.push(`![[${uploaded.fileName}]]`)
-        }
-      }
-
-      if (imageEmbeds.length > 0 && editorRef.current) {
-        const embedText = imageEmbeds.join('\n')
-        editorRef.current.insertAtPos(embedText, insertPos)
+      const linkTexts = result.uploaded.map((uploaded) => buildInternalLinkText(uploaded.fileName))
+      if (linkTexts.length > 0 && editorRef.current) {
+        editorRef.current.insertAtPos(linkTexts.join('\n'), insertPos)
         setStatus('unsaved')
         // Trigger auto-save
         if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -196,7 +204,35 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
         showToast('error', `"${file.name}": ${reason}`)
       }
     }
-  }, [onExternalFileDrop, filePath])
+  }, [onExternalFileDrop])
+
+  /** Handle external file drop from OS — uploads to same directory as current file. */
+  const handleExternalFileDrop = useCallback(async (files: File[], _targetPath: string, dropPoint: { x: number; y: number }) => {
+    if (!onExternalFileDrop || !filePath) return
+
+    // Resolve the drop position in the document immediately (before the upload
+    // completes) so the image lands where the drop cursor was shown, not
+    // wherever the text cursor happens to be once the upload finishes.
+    const view = editorRef.current?.getView()
+    const insertPos = view?.posAtCoords(dropPoint) ?? view?.state.selection.main.from ?? 0
+
+    await uploadAndInsertLinks(files, insertPos)
+  }, [onExternalFileDrop, filePath, uploadAndInsertLinks])
+
+  /**
+   * Handle the file(s) chosen via the hidden input triggered by the "Anhang
+   * einfügen" editor command. Inserts at the current cursor position, since
+   * there's no drop point for a file-picker selection.
+   */
+  const handleAttachFileSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : []
+    // Reset so picking the same file again still fires a change event.
+    e.target.value = ''
+    if (files.length === 0 || !onExternalFileDrop || !filePath) return
+
+    const insertPos = editorRef.current?.getView()?.state.selection.main.from ?? 0
+    await uploadAndInsertLinks(files, insertPos)
+  }, [onExternalFileDrop, filePath, uploadAndInsertLinks])
 
   // ─── DropZone drag-over state for external file drops ───────────────────
   // (The DropZone component handles its own drag state; this is for the internal
@@ -298,11 +334,24 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
             showLineNumbers={lineNumbersEnabled}
             readableLineLength={readableLineLengthEnabled}
             spellcheck={spellcheckEnabled}
+            spellcheckLanguage={spellcheckLanguage}
             editorRef={editorRef}
             onImagePaste={onImagePaste}
           />
         </div>
       </DropZone>
+
+      {/* Hidden file picker for the "Anhang einfügen" editor command (Command
+          Palette / Obsidian-compat plugins) — see the 'attachFile' case above. */}
+      <input
+        ref={attachFileInputRef}
+        type="file"
+        multiple
+        onChange={handleAttachFileSelected}
+        style={{ display: 'none' }}
+        aria-hidden="true"
+        tabIndex={-1}
+      />
 
       {/* Status bar */}
       {status !== 'idle' && (

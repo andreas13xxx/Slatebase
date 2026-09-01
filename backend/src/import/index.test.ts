@@ -36,7 +36,7 @@ function createMockConfig(overrides?: Partial<ServerConfig>): IConfigService {
     vaults: [],
     maxFileSize: 5242880,
     maxDirectoryDepth: 50,
-    maxVaults: 20,
+    maxVaultsPerUser: 50,
     allowedOrigins: [],
     dataDir: './data',
     templatesDir: './assets/templates',
@@ -68,6 +68,8 @@ function createMockConfig(overrides?: Partial<ServerConfig>): IConfigService {
     getTemplatesConfig: () => config.templates,
     getUploadConfig: () => config.upload,
     getWelcomeVaultConfig: () => config.welcomeVault,
+    getOverrides: () => ({}),
+    updateOverrides: async () => [],
   }
 }
 

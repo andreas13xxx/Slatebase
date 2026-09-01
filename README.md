@@ -72,7 +72,7 @@ All settings live in `docker.env`. Key options:
 | `SLATEBASE_EXTERNAL_PORT` | `8080` | Port exposed on the host |
 | `SLATEBASE_ALLOWED_ORIGINS` | `http://localhost:8080` | Your public URL (for CORS) |
 | `SLATEBASE_CSRF_SECRET` | *(random)* | Persistent CSRF secret — **set this!** |
-| `SLATEBASE_SYNC_SECRET` | *(random)* | Sync credential encryption — set if using LiveSync |
+| `SLATEBASE_MODULE_SECRET_KEY` | *(auto)* | Encrypts Git-Sync / Mail-Import credentials — set if you use either |
 | `SLATEBASE_TRUSTED_PROXIES` | *(empty)* | Reverse proxy IPs/CIDRs for real client IPs |
 | `SLATEBASE_MAX_FILE_SIZE` | `5242880` | Max upload size in bytes (5 MB) |
 | `SLATEBASE_LOG_LEVEL` | `info` | Log level: debug, info, warn, error |
@@ -100,7 +100,7 @@ Slatebase uses three secrets in production. Without them it falls back to a valu
 | Variable | Purpose |
 |----------|---------|
 | `SLATEBASE_CSRF_SECRET` | HMAC-based CSRF token generation. Without it, all user sessions break on server restart. |
-| `SLATEBASE_SYNC_SECRET` | Encrypts CouchDB sync credentials at rest. Without it, vault sync stops working after restart. Only required if you use LiveSync. |
+| `SLATEBASE_MODULE_SECRET_KEY` | Encrypts Git-Sync remote credentials and Mail-Import mailbox passwords at rest. Falls back to a key file in the data directory, so set this if that directory is not durable. Only required if you use Git-Sync or Mail-Import. |
 | `SLATEBASE_PLUGIN_SECRET_KEY` | Encrypts secrets plugins store via Obsidian's SecretStorage API. Falls back to a key file in the data directory, so set this if that directory is not durable. Only required if you use plugins that store credentials. |
 
 **Generate a secure secret:**
@@ -117,13 +117,14 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ```bash
 SLATEBASE_CSRF_SECRET=<your-64-char-hex-secret>
-SLATEBASE_SYNC_SECRET=<your-64-char-hex-secret>
+SLATEBASE_MODULE_SECRET_KEY=<your-64-char-hex-secret>
+SLATEBASE_PLUGIN_SECRET_KEY=<your-64-char-hex-secret>
 ```
 
 Or directly with Docker:
 
 ```bash
-docker run -e SLATEBASE_CSRF_SECRET=... -e SLATEBASE_SYNC_SECRET=... ghcr.io/andreas13xxx/slatebase:latest
+docker run -e SLATEBASE_CSRF_SECRET=... -e SLATEBASE_MODULE_SECRET_KEY=... ghcr.io/andreas13xxx/slatebase:latest
 ```
 
 The server logs a visible warning at startup for any of these that is not set.
@@ -158,6 +159,7 @@ docker compose up -d
 | 📁 **Multi-Vault Management** | Create, delete, import, and switch between multiple vaults |
 | 🌳 **File Explorer** | Navigate your vault's directory tree with context menus, drag & drop, and an optional "follow active file" auto-reveal |
 | 📝 **Markdown Editor** | CodeMirror 6 editor with Live Preview, auto-save, and keyboard shortcuts — formatting via Command Palette or an Obsidian toolbar plugin |
+| ✅ **Spellchecker** | Built in, with corrections — not the browser's. Unknown words are underlined; right-click offers suggestions, "add to dictionary", and "ignore for this session". German and English dictionaries, switchable per editor; German compounds are resolved by splitting |
 | 👁️ **Markdown Viewer** | Rendered view with GFM, syntax highlighting, frontmatter, and collapsible headings |
 | 🗂️ **Tabs & Navigation** | Open multiple files simultaneously with unsaved indicators; browser-like back/forward history, fuzzy Quick Switcher (Ctrl+O), Ctrl+Shift+]/[ tab cycling, and a clickable folder breadcrumb |
 | 👥 **Multi-User & Sharing** | Invite others to your vaults with read or write access, transfer ownership |

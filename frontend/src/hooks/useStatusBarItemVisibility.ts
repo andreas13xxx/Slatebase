@@ -1,12 +1,14 @@
 /**
- * useStatusBarItemVisibility — per-item visibility toggle for built-in status
- * bar items (Requirement 6). Mirrors useStatusBar.ts's module-level
- * useSyncExternalStore pattern (see lessons-learned.md: Status Bar uses
- * useSyncExternalStore, not useState, so all consumers stay in sync).
+ * useStatusBarItemVisibility — per-item visibility for built-in status bar
+ * items, backed by the account-wide UI settings.
+ *
+ * Was one `localStorage` key per item; now one map inside
+ * `userSettingsStore.statusBarItems`, so the choice follows the account
+ * instead of the browser. Items default to visible, matching the original
+ * single-item (clock) behaviour.
  */
-import { useCallback, useSyncExternalStore } from 'react'
-
-const STORAGE_PREFIX = 'slatebase:statusBarItem:'
+import { useCallback } from 'react'
+import { useUiSettings, updateUiSettings, getUiSettings } from '../state/userSettingsStore'
 
 export type BuiltinStatusBarItemId = 'clock' | 'wordStats' | 'cursorPosition' | 'vaultName' | 'linkCounts'
 
@@ -15,64 +17,22 @@ export interface UseStatusBarItemVisibilityReturn {
   toggle(): void
 }
 
-// ── Module-level state ──
-
-const currentVisible = new Map<BuiltinStatusBarItemId, boolean>()
-const subscribers = new Set<() => void>()
-
-function readFromStorage(itemId: BuiltinStatusBarItemId): boolean {
-  try {
-    const raw = localStorage.getItem(STORAGE_PREFIX + itemId)
-    if (raw === null) return true
-    return JSON.parse(raw) === true
-  } catch {
-    return true
-  }
+/** Visibility for one item; absent from the map means visible. */
+export function isStatusBarItemVisible(itemId: BuiltinStatusBarItemId): boolean {
+  return getUiSettings().statusBarItems[itemId] ?? true
 }
 
-function persistToStorage(itemId: BuiltinStatusBarItemId, visible: boolean): void {
-  try {
-    localStorage.setItem(STORAGE_PREFIX + itemId, JSON.stringify(visible))
-  } catch {
-    // localStorage unavailable — silently ignore
-  }
+/** Toggles one item from outside React. */
+export function toggleStatusBarItem(itemId: BuiltinStatusBarItemId): void {
+  const current = getUiSettings().statusBarItems
+  updateUiSettings({
+    statusBarItems: { ...current, [itemId]: !(current[itemId] ?? true) },
+  })
 }
 
-function getVisible(itemId: BuiltinStatusBarItemId): boolean {
-  let value = currentVisible.get(itemId)
-  if (value === undefined) {
-    value = readFromStorage(itemId)
-    currentVisible.set(itemId, value)
-  }
-  return value
-}
-
-function notifySubscribers(): void {
-  for (const cb of subscribers) cb()
-}
-
-function subscribe(callback: () => void): () => void {
-  subscribers.add(callback)
-  return () => { subscribers.delete(callback) }
-}
-
-function toggleItem(itemId: BuiltinStatusBarItemId): void {
-  const next = !getVisible(itemId)
-  currentVisible.set(itemId, next)
-  persistToStorage(itemId, next)
-  notifySubscribers()
-}
-
-/**
- * Per-item visibility toggle for a built-in status bar item.
- * Defaults to visible (true) — matches the pre-existing single-item (clock) behavior.
- */
+/** Per-item visibility toggle for a built-in status bar item. */
 export function useStatusBarItemVisibility(itemId: BuiltinStatusBarItemId): UseStatusBarItemVisibilityReturn {
-  const visible = useSyncExternalStore(subscribe, () => getVisible(itemId))
-
-  const toggle = useCallback(() => {
-    toggleItem(itemId)
-  }, [itemId])
-
+  const visible = useUiSettings().statusBarItems[itemId] ?? true
+  const toggle = useCallback(() => { toggleStatusBarItem(itemId) }, [itemId])
   return { visible, toggle }
 }

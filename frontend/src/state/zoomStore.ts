@@ -1,14 +1,15 @@
 /**
  * App-wide zoom level — backs `window:zoom-in/out/reset-zoom`.
- * Module-level useSyncExternalStore pattern (see useStatusBarItemVisibility.ts,
- * lessons-learned.md: shared UI toggles use useSyncExternalStore, not useState,
- * so every consumer — here just App.tsx's effect that applies it — stays in sync
- * even though a command dispatch (core-commands-app.ts) has no React state of
- * its own to update directly.
+ *
+ * Stored per user and per vault in `vaultSettingsStore`: the zoom that suits a
+ * dense reference vault is rarely the one that suits a writing vault, and it
+ * is a personal reading preference, so it must not be forced on everyone who
+ * shares the vault. Previously a device-local `localStorage` number.
+ *
+ * @module state/zoomStore
  */
-import { useSyncExternalStore } from 'react'
+import { useVaultSetting, updateVaultSettings, getVaultSettings } from './vaultSettingsStore'
 
-const STORAGE_KEY = 'slatebase:zoom'
 export const MIN_ZOOM = 0.5
 export const MAX_ZOOM = 2.0
 const ZOOM_STEP = 0.1
@@ -23,51 +24,15 @@ function round(zoom: number): number {
   return Math.round(zoom * 100) / 100
 }
 
-function readFromStorage(): number {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw === null) return DEFAULT_ZOOM
-    const parsed: unknown = JSON.parse(raw)
-    if (typeof parsed !== 'number' || !Number.isFinite(parsed)) return DEFAULT_ZOOM
-    return clamp(parsed)
-  } catch {
-    return DEFAULT_ZOOM
-  }
-}
-
-function persistToStorage(zoom: number): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(zoom))
-  } catch {
-    // localStorage unavailable — silently ignore
-  }
-}
-
-// ── Module-level state ──
-
-let currentZoom: number | null = null
-const subscribers = new Set<() => void>()
-
-function getZoom(): number {
-  if (currentZoom === null) currentZoom = readFromStorage()
-  return currentZoom
-}
-
-function notifySubscribers(): void {
-  for (const cb of subscribers) cb()
-}
-
-function subscribe(callback: () => void): () => void {
-  subscribers.add(callback)
-  return () => { subscribers.delete(callback) }
+/** Current zoom factor, read synchronously (for command handlers). */
+export function getZoom(): number {
+  return getVaultSettings().zoom
 }
 
 function setZoom(next: number): void {
   const clamped = clamp(round(next))
-  if (clamped === currentZoom) return
-  currentZoom = clamped
-  persistToStorage(clamped)
-  notifySubscribers()
+  if (clamped === getZoom()) return
+  updateVaultSettings({ zoom: clamped })
 }
 
 /** `window:zoom-in` */
@@ -85,7 +50,7 @@ export function resetZoom(): void {
   setZoom(DEFAULT_ZOOM)
 }
 
-/** Current zoom factor (1.0 = 100%), reactive — re-renders the calling component on change. */
+/** Current zoom factor (1.0 = 100%), reactive — re-renders on change. */
 export function useZoom(): number {
-  return useSyncExternalStore(subscribe, getZoom)
+  return useVaultSetting('zoom')
 }

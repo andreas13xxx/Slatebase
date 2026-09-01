@@ -9,6 +9,7 @@ export type {
 } from './types'
 
 export type { MathInlineNode, MathBlockNode } from './math/types'
+export type { FootnoteEntry, NumberedFootnoteReference } from './footnote/plugin'
 
 // Constants
 export { IMAGE_EXTENSIONS } from './types'
@@ -22,6 +23,7 @@ export { remarkBreaks } from './breaks/plugin'
 export { remarkBlockRef } from './block-ref/plugin'
 export { remarkPreserveTableCodeEscapes } from './preserve-table-code-escapes'
 export { remarkMath } from './math/plugin'
+export { remarkFootnotes, getFootnoteEntries } from './footnote/plugin'
 
 // Utilities
 export { extractWikilinks } from './wikilink/extract'

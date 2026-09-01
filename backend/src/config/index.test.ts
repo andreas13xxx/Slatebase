@@ -1,4 +1,7 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach } from 'vitest'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { ConfigService } from './index.js'
 
 const ENV_KEYS = [
@@ -201,5 +204,82 @@ describe('ConfigService', () => {
       const sse = new ConfigService().getSseConfig()
       expect(sse.maxConnections).toBe(1000)
     })
+  })
+})
+
+describe('ConfigService — admin overrides', () => {
+  let dataDir: string
+
+  beforeEach(async () => {
+    dataDir = await mkdtemp(path.join(tmpdir(), 'config-overrides-'))
+    process.env['SLATEBASE_DATA_DIR'] = dataDir
+  })
+
+  afterEach(async () => {
+    delete process.env['SLATEBASE_DATA_DIR']
+    await rm(dataDir, { recursive: true, force: true })
+  })
+
+  it('starts with no overrides', () => {
+    const config = new ConfigService()
+    expect(config.getOverrides()).toEqual({})
+  })
+
+  it('persists an override and applies it to the live config', async () => {
+    const config = new ConfigService()
+    await config.updateOverrides({ maxVaultsPerUser: 7 })
+
+    expect(config.getServerConfig().maxVaultsPerUser).toBe(7)
+    expect(config.getOverrides().maxVaultsPerUser).toBe(7)
+  })
+
+  it('reloads persisted overrides on the next start', async () => {
+    const first = new ConfigService()
+    await first.updateOverrides({ maxVaultsPerUser: 7 })
+
+    const second = new ConfigService()
+    expect(second.getServerConfig().maxVaultsPerUser).toBe(7)
+  })
+
+  it('merges nested sections instead of replacing them', async () => {
+    const config = new ConfigService()
+    await config.updateOverrides({
+      upload: { maxFileSizeBytes: 123, maxFilesPerDrop: 5, maxImagePasteSize: 99 },
+    })
+    // A later patch that touches one key must not reset its siblings to the
+    // schema defaults — the whole point of the deep merge.
+    await config.updateOverrides({
+      upload: { maxFileSizeBytes: 456, maxFilesPerDrop: 5, maxImagePasteSize: 99 },
+    })
+
+    const upload = config.getUploadConfig()
+    expect(upload.maxFileSizeBytes).toBe(456)
+    expect(upload.maxFilesPerDrop).toBe(5)
+    expect(upload.maxImagePasteSize).toBe(99)
+  })
+
+  it('reports keys that an environment variable pins, and keeps the env value', async () => {
+    process.env['SLATEBASE_MAX_FILE_SIZE'] = '1234'
+    const config = new ConfigService()
+
+    const shadowed = await config.updateOverrides({ maxFileSize: 9999 })
+
+    expect(shadowed).toEqual(['maxFileSize'])
+    expect(config.getServerConfig().maxFileSize).toBe(1234)
+    // Still recorded, so it takes effect once the variable is removed.
+    expect(config.getOverrides().maxFileSize).toBe(9999)
+  })
+
+  it('rejects an override that would produce an invalid config', async () => {
+    const config = new ConfigService()
+    await expect(config.updateOverrides({ port: -1 })).rejects.toThrow()
+    expect(config.getServerConfig().port).not.toBe(-1)
+  })
+
+  it('ignores an unreadable overrides file rather than failing to start', async () => {
+    await writeFile(path.join(dataDir, 'server-config.json'), '{not json', 'utf-8')
+    const config = new ConfigService()
+    expect(config.getOverrides()).toEqual({})
+    expect(config.getServerConfig().port).toBeGreaterThan(0)
   })
 })

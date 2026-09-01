@@ -98,24 +98,41 @@ Die synthetischen `TFile`/`TFolder`-Objekte, die für diese Menü-Events gebaut 
 `getPlugin`, `plugins`, `enabledPlugins`, `manifests`, `loadManifests`, `requestSaveConfig`, `enablePluginAndSave`, `disablePluginAndSave`. `loadManifests()` fragt `manifest.json` für alle installierten Plugins neu vom Backend ab (derselbe Refresh, den der Vault-Start ohnehin macht). `requestSaveConfig()` wartet auf ausstehende Registry-Writes — die selbst schon bei jeder Status-/Permission-Änderung sofort ans Backend persistiert werden, hier also ein ehrlicher Flush statt eines Leerlauf-Stubs. `enablePluginAndSave`/`disablePluginAndSave` delegieren 1:1 an denselben Pfad wie der Settings-Seiten-Toggle — **inklusive** eines `window.location.reload()` nach dem Disable, aber nur wenn die deaktivierte Plugin-ID in `PLUGINS_REQUIRING_RELOAD_ON_DISABLE` (`plugin-context.ts`) steht — aktuell nur `obsidian-livesync`, das nach einem Unload nicht sauber innerhalb derselben Session neu starten kann (siehe Eintrag oben). Alle anderen Plugins werden ohne Reload direkt im laufenden Tab bereinigt (`unload()`/Sandbox-Cleanup). Löst die Bedingung aus, gilt sie für **jeden** Aufruf von `disablePluginAndSave`, unabhängig davon, welches Plugin es aufruft oder welche ID übergeben wird — es gibt keine Scope-Beschränkung auf das aufrufende Plugin selbst.
 
 ### Commands, Hotkeys & Core-Commands
-`addCommand`/`removeCommand`, Command-ID-Namespacing (`<pluginId>:<commandId>`), Suche (case-insensitive, 50 Treffer-Limit). Obsidians eingebaute Commands (`editor:*`, `workspace:*`, `app:*`, `file-explorer:*`, `theme:*`) sind unter ihrer echten ID registriert, damit `executeCommandById()` funktioniert. Commands ohne Slatebase-Entsprechung existieren als expliziter No-Op statt gar nicht zu existieren. `app.commands` und `app.hotkeyManager.customKeys` sind echte, iterierbare Registries (keine leeren Platzhalter).
+`addCommand`/`removeCommand`, Command-ID-Namespacing (`<pluginId>:<commandId>`), Suche (case-insensitive, 50 Treffer-Limit). Obsidians eingebaute Commands (`editor:*`, `workspace:*`, `app:*`, `file-explorer:*`, `theme:*`) sind unter ihrer echten ID registriert, damit `executeCommandById()` funktioniert. Commands ohne Slatebase-Entsprechung existieren weiterhin, statt gar nicht zu existieren — sie sind im Spec als `unsupported: <Grund>` markiert und melden beim Ausführen als Toast, was fehlt, statt wirkungslos zu bleiben. `app.commands` und `app.hotkeyManager.customKeys` sind echte, iterierbare Registries (keine leeren Platzhalter).
+
+#### Native Zwillinge in der Command Palette
+
+Ein Teil der Core-Commands hat ein natives `slatebase:*`-Gegenstück, das der Command Palette als übersetzter, eigenständiger Eintrag angezeigt wird — der Core-Command selbst bleibt registriert (für `executeCommandById()`), wird aber aus der Palette-Liste gefiltert (`DUPLICATE_OF_NATIVE_COMMAND` in `CommandPaletteContainer.tsx`).
+
+Wo das native Gegenstück nur eine Palette-Fassade ist — also selbst nur `commandRegistry.executeCommand('<core-id>')` aufruft (Fold-Operationen, Notiz-Composer, Canvas-Befehle, Gliederung/Backlinks/Tags/Lesezeichen öffnen) — funktioniert es unabhängig vom `obsidian-plugin-compat`-Feature-Toggle: `registerCoreEditorCommands`/`registerCoreAppCommands` registrieren unconditional in die Registry, der Toggle steuert nur die *Palette-Sichtbarkeit* der Compat-IDs selbst, nicht `CommandRegistry.executeCommand()`. Ohne diesen nativen Zwilling würde das Ausschalten von Plugin-Kompatibilität rein native Slatebase-Funktionen (z.B. Canvas-Export) unerreichbar machen, obwohl sie mit Fremd-Plugins nichts zu tun haben.
+
+Die Filterung ist bedingungslos: ein Core-Command mit Eintrag in `DUPLICATE_OF_NATIVE_COMMAND` ist immer ausgeblendet, unabhängig davon, ob sein natives Gegenstück gerade selbst sichtbar ist (offener Editor-Tab, ausgewählter Vault, …). Das war früher anders — bei ausgeblendetem nativen Befehl erschien der Core-Command als Fallback. Das erwies sich als nutzlos: dieselbe Bedingung, die den nativen Befehl ausblendet, blockiert auch den Core-Command beim Ausführen (entweder weil sein `editorCallback` denselben aktiven Editor-Kontext braucht, oder weil der aufgerufene Handler dieselbe Vorbedingung selbst nochmal prüft) — der Fallback war also nie mehr als ein Klick ins Leere.
 
 #### Core-Commands ohne Slatebase-Entsprechung
 
-Diese Command-IDs sind registriert (damit `executeCommandById()` sie findet), lösen aber dauerhaft kein Verhalten aus — kein Bugfix-Kandidat, sondern Architekturentscheidung:
+Diese Command-IDs sind registriert (damit `executeCommandById()` sie findet), führen aber keine Aktion aus. Statt still zu bleiben — was sich für den Benutzer nicht von einem Bug unterscheidet — zeigen sie einen Info-Toast mit dem Grund. Grund und Text stehen in `UNSUPPORTED_REASONS` (`frontend/src/plugins/compat/core-command-i18n.ts`), die Zuordnung im jeweiligen Spec als `unsupported: '<key>'`.
 
-| Command-ID(s) | Grund |
-|---|---|
-| `bases:add-item`, `bases:add-view`, `bases:change-view`, `bases:copy-table`, `bases:insert`, `bases:new-file` | Bases (Formel-Engine über Ordner-Tabellen) liegt außerhalb des Scopes dieses Layers, siehe [Bases-Wertetypen/-Klassen](#was-wird-unterstützt) und [Bekannte, bewusst nicht behobene Lücken](#bekannte-bewusst-nicht-behobene-lücken). |
-| `open-with-default-app:open`, `open-with-default-app:show` | Desktop-only-Konzepte („in nativer App öffnen", „im System-Explorer anzeigen") — Dateien liegen serverseitig, es gibt kein lokales Dateisystem. |
-| `workspace:split-vertical`, `workspace:split-horizontal`, `workspace:toggle-stacked-tabs`, `workspace:new-window`, `workspace:close-window`, `workspace:move-to-new-window`, `workspace:open-in-new-window`, `app:toggle-default-new-pane-mode`, `focus-top`, `focus-bottom`, `focus-left`, `focus-right`, `window:toggle-always-on-top` | Command-ID-Ebene derselben Architekturentscheidung wie [Split-Pane-/Multi-Window-Layout](#bekannte-bewusst-nicht-behobene-lücken) — flaches Tab-System, kein Split-Baum, kein Popout-Fenster. |
-| `footnotes:open` | Kein Footnotes-Seitenpanel. Fußnoten-*Einfügen* funktioniert bereits über `editor:insert-footnote`; nur die dedizierte Übersichts-Ansicht fehlt. |
-| `attach-file`, `download-attachments` | Kein Attachment-Upload-/Verwaltungsmodell in Slatebases Server-Vault-Design. |
+**Dauerhaft ausgeschlossen** (Architekturentscheidung, kein Bugfix-Kandidat):
+
+| Command-ID(s) | `unsupported` | Grund |
+|---|---|---|
+| `workspace:split-vertical`, `workspace:split-horizontal`, `workspace:toggle-stacked-tabs`, `focus-top`, `focus-bottom`, `focus-left`, `focus-right` | `tab-layout` | Flaches Tab-System ohne Split-Baum, Tab-Gruppen oder gestapelte Tabs — dieselbe Entscheidung wie bei [Split-Pane-/Multi-Window-Layout](#bekannte-bewusst-nicht-behobene-lücken). |
+| `workspace:new-window`, `workspace:close-window`, `workspace:move-to-new-window`, `workspace:open-in-new-window`, `window:toggle-always-on-top` | `native-windows` | Slatebase läuft in einem Browser-Tab und verwaltet keine eigenen Fenster. |
+| `workspace:new-tab` | `blank-tab` | Ein leerer Tab ohne Datei ist nicht vorgesehen: Tabs entstehen beim Öffnen einer Datei. |
+| `bases:add-item`, `bases:add-view`, `bases:change-view`, `bases:copy-table`, `bases:insert`, `bases:new-file` | `bases` | Bases (Formel-Engine über Ordner-Tabellen) liegt außerhalb des Scopes dieses Layers, siehe [Bekannte, bewusst nicht behobene Lücken](#bekannte-bewusst-nicht-behobene-lücken). |
+| `open-with-default-app:open`, `open-with-default-app:show` | `desktop-shell` | Desktop-only-Konzepte („in nativer App öffnen", „im System-Explorer anzeigen") — Dateien liegen serverseitig, es gibt kein lokales Dateisystem. |
+| `download-attachments` | `attachments` | Es gibt keinen automatischen Download externer Bild-Links in den Vault — Anhänge kommen per Drag & Drop, Einfügen aus der Zwischenablage oder „Anhang einfügen" hinein. |
+| `app:open-help` | `in-app-help` | Die Anleitung steht im Welcome-Vault statt in einer eigenen Hilfe-Ansicht. |
+| `app:toggle-default-new-pane-mode` | `new-tab-defaults` | Neue Tabs öffnen immer im zuletzt genutzten Modus; es gibt keine Split-Pane-Voreinstellung zum Umschalten. |
 
 **Geplant, aber noch nicht umgesetzt** (im Unterschied zur Liste oben *nicht* dauerhaft ausgeschlossen, sondern bewusst auf später verschoben):
 
-- `workspace:copy-url` — es gibt (noch) kein URL-/Routing-Schema, das eine Vault+Datei auf einen wiederverwendbaren Link abbildet; Deep-Linking wäre ein eigenständiges Feature (Router, URL-Parsing beim Laden), keine reine Command-Verdrahtung.
-- `graph:animate` — der Graph trägt heute keine Datei-Erstellungsdatum-Metadaten je Knoten, und ein echter Zeitraffer bräuchte zusätzlich eine neue Scrubber-/Abspiel-UI.
+| Command-ID | `unsupported` | Was dafür fehlt |
+|---|---|---|
+| `workspace:copy-url` | `url-scheme` | Es gibt (noch) kein URL-/Routing-Schema, das Vault+Datei auf einen wiederverwendbaren Link abbildet; Deep-Linking wäre ein eigenständiges Feature (Router, URL-Parsing beim Laden), keine reine Command-Verdrahtung. |
+| `graph:animate` | `graph-animation` | Der Graph trägt heute keine Erstellungsdatum-Metadaten je Knoten, und ein echter Zeitraffer bräuchte zusätzlich eine Scrubber-/Abspiel-UI. |
+
+**Nicht mehr in dieser Liste:** `footnotes:open` führt inzwischen zur ersten Fußnoten-Definition der Notiz (Editor-Cursor bzw. gerenderte Fußnotenliste). Ein eigenes Seitenpanel gibt es weiterhin nicht — die Fußnoten stehen in der Notiz selbst. `editor:attach-file` öffnet inzwischen den nativen Datei-Dialog des Browsers, lädt die Auswahl in das vault-konfigurierte Anhänge-Verzeichnis (`attachmentsDirectory`, Einstellungen → Vault-Konfiguration; Default: gleicher Ordner wie die Notiz) hoch und fügt an der Cursorposition einen Wikilink (bzw. Embed für Bilder/PDFs) je Datei ein — denselben Weg, den auch Drag & Drop und der native Command `slatebase:attach-file` in der Command Palette nutzen (beide lösen dasselbe `slatebase:editor-command`-Fensterevent mit `action: 'attachFile'` aus, siehe `EditMode.tsx`). `canvas:export-as-image` rendert inzwischen die *live* DOM des sichtbaren Canvas (nicht eine zweite, aus dem Dokumentmodell abgeleitete Repräsentation) über `html-to-image` (`toBlob`) auf ein temporär auf 1:1-Zoom mit allen Knoten gefittetes Viewport und lädt das Ergebnis als PNG herunter — siehe `CanvasView.tsx`s `exportAsImage()` und den `ActiveCanvasController`-Bridge-Eintrag dafür. Bekannte Lücke: `LinkNodeRenderer`s iframe-Vorschauen erscheinen im Export leer, da Cross-Origin-iframe-Inhalte grundsätzlich nicht in ein `<canvas>` gelesen werden können.
 
 ### Events, Scope & Keymap
 `on`/`off`/`trigger`/`offref` mit garantierter Registrierungsreihenfolge und Exception-Isolation pro Callback. `Scope`/`Keymap` sind echt (nicht nur Attrappen): `app.keymap.pushScope`/`popScope` verwalten einen fenster-globalen Scope-Stack, `Scope.handleKey()` matcht Modifier+Taste gegen registrierte Handler.
@@ -149,6 +166,13 @@ Deny-by-default-Permissions (Netzwerk, Dateisystem-Schreibzugriff, DOM-Manipulat
 
 ### Sonstiges
 Globale Obsidian-Prototype-Erweiterungen (`Array.prototype.remove/first/last`, `Element.prototype.find/findAll`, `String.prototype.contains`, `Math.clamp/square`, u.a.), vollständige Lucide-Icon-Auflösung (`setIcon`/`getIcon`, kein hartes `null` für gelistete IDs), `requestUrl()`, CodeMirror-6-Extensions (echte `@codemirror/*`-Module, kein Stub), `SuggestModal`/`FuzzySuggestModal`.
+
+**`@codemirror/lint` wird seit der eingebauten Rechtschreibprüfung auch vom Kern selbst genutzt** (`editor/spellcheck/spellcheck-extension.ts`) — bisher wurde das Modul nur über `window.__codemirrorLint` an Plugin-Bundles durchgereicht. Für Plugins ändert sich nichts: `linter()`-Extensions koexistieren, CM6 führt die Diagnostics aller Quellen zusammen. Zwei Details, falls ein Plugin eigene Lint-Ergebnisse anzeigt:
+
+- Slatebases Diagnostics tragen `source: 'slatebase-spellcheck'` und die Marker-Klasse `cm-spellError`; sie sind über `forEachDiagnostic()` von Plugin-Diagnostics unterscheidbar.
+- Die Rechtschreibprüfung unterdrückt **nur ihre eigenen** Hover-Tooltips (`tooltipFilter` filtert nach `source`) — Tooltips fremder Linter bleiben unangetastet.
+
+Der Editor setzt `contentDOM.spellcheck = false`, weil er selbst prüft. Ein Plugin, das die native Browser-Prüfung erwartet, bekommt sie im Haupteditor nicht — in eigenen `<textarea>`/`contenteditable`-Elementen eines Plugins gilt das nicht, die bleiben unberührt.
 
 **Icons synchron wie in echtem Obsidian:** Der komplette eingebaute Icon-Satz (Lucide, per `dynamicIconImports`) wird einmal pro Session parallel eager aufgelöst (`preloadAllBuiltInIcons()`, `lucide-icons.ts`), bevor das erste Plugin-Bundle einer Session ausgewertet wird — nicht erst bei Bedarf pro Icon. Das hält den Haupt-Bundle klein (weiterhin dynamische Imports statt statischem Einbinden aller ~2000 Icons), verhält sich aber ab dem ersten Plugin-Load nach außen synchron: Auch Plugins, die Icons einmalig beim Modul-Load in einen eingefrorenen React/vDOM-Baum einbacken (z. B. Excalidraws `ICONS = { Foo: getIconAsJSX('image-down'), ... }`), bekommen bereits aufgelöste Icon-Daten statt einer leeren Hülle.
 

@@ -15,7 +15,7 @@
   "maxImportDepth": 10,
   "trustedProxies": [],
   "features": {
-    "obsidian-plugin-compat": { "enabled": false },
+    "obsidian-plugin-compat": { "enabled": true },
     "chat": { "enabled": true },
     "mcp": { "enabled": true }
   },

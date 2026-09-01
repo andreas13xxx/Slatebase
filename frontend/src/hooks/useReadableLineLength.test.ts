@@ -1,71 +1,66 @@
 import { renderHook, act } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useReadableLineLength } from './useReadableLineLength'
+import {
+  _reset as resetVaultSettings,
+  setActiveVault,
+  updateVaultSettings,
+} from '../state/vaultSettingsStore'
+
+vi.mock('../components/ToastNotification', () => ({ showToast: vi.fn() }))
 
 describe('useReadableLineLength', () => {
-  beforeEach(() => {
-    localStorage.clear()
+  beforeEach(async () => {
+    resetVaultSettings()
+    await setActiveVault('vault-1')
   })
 
   describe('initial state', () => {
-    it('defaults to enabled when localStorage is empty (preserves existing constrained-width look)', () => {
+    it('defaults to enabled', () => {
       const { result } = renderHook(() => useReadableLineLength())
       expect(result.current.enabled).toBe(true)
     })
 
-    it('reads enabled=false from localStorage', () => {
-      localStorage.setItem('slatebase:readableLineLength', JSON.stringify({ enabled: false }))
+    it('reads the active vault’s stored value', () => {
+      updateVaultSettings({ readableLineLength: false })
       const { result } = renderHook(() => useReadableLineLength())
       expect(result.current.enabled).toBe(false)
-    })
-
-    it('reads enabled=true from localStorage', () => {
-      localStorage.setItem('slatebase:readableLineLength', JSON.stringify({ enabled: true }))
-      const { result } = renderHook(() => useReadableLineLength())
-      expect(result.current.enabled).toBe(true)
-    })
-
-    it('defaults to enabled when localStorage contains invalid JSON', () => {
-      localStorage.setItem('slatebase:readableLineLength', 'not-json{{{')
-      const { result } = renderHook(() => useReadableLineLength())
-      expect(result.current.enabled).toBe(true)
     })
   })
 
   describe('toggle', () => {
     it('toggles from enabled to disabled', () => {
       const { result } = renderHook(() => useReadableLineLength())
-      expect(result.current.enabled).toBe(true)
 
       act(() => { result.current.toggle() })
       expect(result.current.enabled).toBe(false)
     })
 
     it('toggles from disabled to enabled', () => {
-      localStorage.setItem('slatebase:readableLineLength', JSON.stringify({ enabled: false }))
+      updateVaultSettings({ readableLineLength: false })
       const { result } = renderHook(() => useReadableLineLength())
 
       act(() => { result.current.toggle() })
       expect(result.current.enabled).toBe(true)
     })
 
-    it('persists disabled state to localStorage', () => {
-      const { result } = renderHook(() => useReadableLineLength())
+    it('shares state across hook instances', () => {
+      const first = renderHook(() => useReadableLineLength())
+      const second = renderHook(() => useReadableLineLength())
 
-      act(() => { result.current.toggle() })
-      const stored = JSON.parse(localStorage.getItem('slatebase:readableLineLength')!)
-      expect(stored).toEqual({ enabled: false })
+      act(() => { first.result.current.toggle() })
+
+      expect(second.result.current.enabled).toBe(false)
     })
+  })
 
-    it('silently ignores localStorage write errors', () => {
-      const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-        throw new Error('QuotaExceededError')
-      })
-      const { result } = renderHook(() => useReadableLineLength())
+  it('keeps the setting separate per vault', async () => {
+    const { result } = renderHook(() => useReadableLineLength())
+    act(() => { result.current.toggle() })
+    expect(result.current.enabled).toBe(false)
 
-      act(() => { result.current.toggle() })
-      expect(result.current.enabled).toBe(false)
-      spy.mockRestore()
-    })
+    await act(async () => { await setActiveVault('vault-2') })
+
+    expect(result.current.enabled).toBe(true)
   })
 })

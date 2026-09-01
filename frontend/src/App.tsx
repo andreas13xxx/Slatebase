@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useCallback, useState, useMemo, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useRef, useCallback, useState, useMemo } from 'react'
 import { AppProvider, useAppContext, loadVaults, importFile, importFolder, exportVault, reloadVaultTree } from './state'
 import { ApiClient } from './api'
 import { AuthProvider, useAuthContext, getStoredAuthToken, getStoredCsrfToken } from './state/authContext'
@@ -11,6 +11,18 @@ import { openTab } from './state/tabActions'
 import { initialize as initializeRecentFiles, disconnect as disconnectRecentFiles } from './state/recentFilesStore'
 import { initialize as initializeFavorites, disconnect as disconnectFavorites } from './state/favoritesStore'
 import { initialize as initializeKeybindings, disconnect as disconnectKeybindings } from './state/keybindingsStore'
+import {
+  initialize as initializeUiSettings,
+  disconnect as disconnectUiSettings,
+  refreshFromServer as refreshUiSettings,
+  useUiSettings,
+} from './state/userSettingsStore'
+import {
+  initialize as initializeVaultSettings,
+  disconnect as disconnectVaultSettings,
+  setActiveVault as setActiveVaultSettings,
+  refreshFromServer as refreshVaultSettings,
+} from './state/vaultSettingsStore'
 import { useZoom } from './state/zoomStore'
 import { I18nProvider, useTranslation } from './i18n'
 import { RealtimeProvider, type RealtimeEventHandlers } from './components/RealtimeProvider'
@@ -77,7 +89,7 @@ import { useResize } from './hooks/useResize'
 import { useStatusBar } from './hooks/useStatusBar'
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts'
 import { useWorkspaceRestore, LAST_VAULT_KEY } from './hooks/useWorkspaceRestore'
-import { initialize as initializeWorkspace, getState as getWorkspaceState, clear as clearWorkspace, subscribe as subscribeWorkspace, getSnapshot as getWorkspaceSnapshot } from './state/workspaceStore'
+import { initialize as initializeWorkspace, getState as getWorkspaceState, clear as clearWorkspace } from './state/workspaceStore'
 import { requestReveal } from './state/revealFileBridge'
 import {
   User, Settings, Shield, FileText, Clock,
@@ -220,10 +232,9 @@ function AppContent() {
   // the explicit `file-explorer:reveal-active-file` command already uses, just
   // triggered automatically instead of requiring the user to invoke it.
   // (Effect lives further down, right after `activeTab` is derived from tabState.)
-  const explorerFollowActiveFile = useSyncExternalStore(
-    subscribeWorkspace,
-    () => getWorkspaceSnapshot().explorerFollowActiveFile,
-  )
+  // Account setting (Einstellungen → Darstellung), not a workspace value: it
+  // follows the user across devices.
+  const explorerFollowActiveFile = useUiSettings().explorerFollowActiveFile
 
   const sidebar = useResize(260, 180, 400, 'left', 'sidebarWidth')
   const rightPanel = useResize(240, 160, 500, 'right', 'rightPanelWidth')
@@ -332,7 +343,18 @@ function AppContent() {
     initializeRecentFiles(apiClient).catch(() => { /* ignore */ })
     initializeFavorites(apiClient).catch(() => { /* ignore */ })
     initializeKeybindings(apiClient).catch(() => { /* ignore */ })
+    initializeUiSettings(apiClient).catch(() => { /* ignore */ })
+    // Per-vault settings only need the client here; the active vault is set by
+    // the effect below, which also fetches that vault's values.
+    initializeVaultSettings(apiClient)
   }, [dispatch])
+
+  // Keep the per-vault settings store pointed at the selected vault, so the
+  // editor toggles, zoom, graph config and panel layouts always describe the
+  // vault the user is actually looking at.
+  useEffect(() => {
+    void setActiveVaultSettings(state.selectedVaultId)
+  }, [state.selectedVaultId])
 
   useWorkspaceRestore({
     vaults: state.vaults,
@@ -1335,6 +1357,8 @@ function AuthGuard() {
       disconnectRecentFiles()
       disconnectFavorites()
       disconnectKeybindings()
+      disconnectUiSettings()
+      disconnectVaultSettings()
       authDispatch({ type: 'SESSION_EXPIRED' })
     })
     return () => { apiClient.setOnSessionExpired(null) }
@@ -1374,6 +1398,8 @@ function AuthGuard() {
           disconnectRecentFiles()
           disconnectFavorites()
           disconnectKeybindings()
+          disconnectUiSettings()
+          disconnectVaultSettings()
           authDispatch({ type: 'SESSION_EXPIRED' })
           return
         }
@@ -1482,6 +1508,23 @@ function RealtimeBridge({ children }: { children: React.ReactNode }) {
     },
     onPluginSettingsChange: (vaultId: string, pluginId: string) => {
       dispatchPluginSettingsChange({ vaultId, pluginId })
+    },
+    onPreferencesChange: (scope: string, vaultId?: string) => {
+      // Another device changed a preference of this account. Re-read the one
+      // bucket that changed rather than everything, so a status bar toggle on
+      // the phone does not churn the keybinding cache on the desktop.
+      switch (scope) {
+        case 'uiSettings':
+          void refreshUiSettings()
+          break
+        case 'vaultSettings':
+          if (vaultId !== undefined) void refreshVaultSettings(vaultId)
+          break
+        default:
+          // keybindings / favorites / recentFiles re-read on their own next
+          // initialize(); nothing to do here yet.
+          break
+      }
     },
   }), [])
 

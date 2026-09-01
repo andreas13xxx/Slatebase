@@ -76,12 +76,33 @@ Im Edit-Modus können Zeilennummern am linken Rand eingeblendet werden:
 
 ---
 
-## Lesbare Zeilenlänge & Rechtschreibprüfung
+## Lesbare Zeilenlänge
 
-Zwei weitere Editor-Umschalter, erreichbar über die Command Palette (`Strg+P`):
+Erreichbar über die Command Palette (`Strg+P`):
 
 - **"Lesbare Zeilenlänge umschalten"** — begrenzt die Editor-Breite für angenehmeres Lesen (Standard: an)
-- **"Rechtschreibprüfung umschalten"** — schaltet die native Rechtschreibprüfung des Browsers im Editor ein/aus (Standard: an)
+
+---
+
+## Rechtschreibprüfung
+
+Slatebase bringt eine eigene Rechtschreibprüfung mit — unbekannte Wörter werden im Edit-Modus rot unterringelt.
+
+**Korrigieren:** Rechtsklick auf ein unterringeltes Wort. Ganz oben im Kontextmenü stehen die Korrekturvorschläge; ein Klick ersetzt das Wort.
+
+Darunter zwei Wege, ein Wort dauerhaft zu akzeptieren:
+
+| Eintrag | Wirkung |
+|---------|---------|
+| „Zum Wörterbuch hinzufügen" | Merkt sich das Wort dauerhaft (pro Browser gespeichert) |
+| „Alle ignorieren (diese Sitzung)" | Gilt bis zum nächsten Neuladen |
+
+**Sprache und Ein/Aus:** im selben Kontextmenü unter „Rechtschreibprüfung", oder über die Command Palette:
+
+- **"Rechtschreibprüfung umschalten"** — schaltet die Prüfung ein/aus (Standard: an)
+- **"Wörterbuch: Deutsch"** / **"Wörterbuch: Englisch"** — wählt das Wörterbuch (Standard: Deutsch)
+
+Zusammengesetzte Wörter wie „Verzeichnisstruktur" oder „Benutzeroberfläche" werden erkannt, auch wenn sie so nicht im Wörterbuch stehen. Bei sehr eigenwilligen Komposita oder Fachbegriffen kann es trotzdem zu Fehlalarmen kommen — dafür gibt es das persönliche Wörterbuch.
 
 ---
 

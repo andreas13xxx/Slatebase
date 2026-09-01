@@ -13,6 +13,7 @@ import { useTranslation } from '../i18n'
 import { extractErrorMessage } from '../utils/error'
 import { PluginContext } from '../plugins/compat/plugin-context'
 import { findFileViewMatch, getActiveFileView, setActiveFileView, removeActiveFileView } from '../plugins/compat/file-view-registry'
+import { resolveAttachmentTargetDir } from '../utils/internalLink'
 import './TabContent.css'
 
 /**
@@ -215,15 +216,32 @@ export function TabContent() {
     [activeTabVaultId, tabDispatch, appDispatch, appState.directoryTree, apiClient],
   )
 
-  /** Handle external file drops in EditMode — uploads to same directory as current file. */
+  /**
+   * Resolves where a new attachment should land: the vault's configured
+   * attachments directory (Einstellungen → Vault-Konfiguration), or the current
+   * note's own folder if none is set. Config is re-fetched per upload rather than
+   * cached — this mirrors TemplateSelector/dailyNoteService, and uploads aren't
+   * hot-path enough to justify a cache.
+   */
+  const resolveTargetDir = useCallback(async (vaultId: string, filePath: string): Promise<string> => {
+    if (!apiClient) return resolveAttachmentTargetDir('', filePath)
+    try {
+      const config = await apiClient.getVaultConfig(vaultId)
+      return resolveAttachmentTargetDir(config.attachmentsDirectory, filePath)
+    } catch {
+      // Vault config unavailable — fall back to the note's own folder rather than
+      // blocking the upload.
+      return resolveAttachmentTargetDir('', filePath)
+    }
+  }, [apiClient])
+
+  /** Handle external file drops in EditMode — uploads to the resolved attachments directory. */
   const handleExternalFileDrop = useCallback(async (files: File[]) => {
     if (!activeTab || !apiClient) {
       return { uploaded: [] }
     }
 
-    const filePath = activeTab.filePath
-    const targetDir = filePath.includes('/') ? filePath.slice(0, filePath.lastIndexOf('/')) : ''
-
+    const targetDir = await resolveTargetDir(activeTab.vaultId, activeTab.filePath)
     const result = await apiClient.uploadFiles(activeTab.vaultId, files, targetDir)
 
     // Refresh file tree after successful upload
@@ -231,7 +249,7 @@ export function TabContent() {
     appDispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId: activeTab.vaultId, tree: newTree } })
 
     return result
-  }, [activeTab, apiClient, appDispatch])
+  }, [activeTab, apiClient, appDispatch, resolveTargetDir])
 
   /** Handle image paste in EditMode — uploads single image via paste mode. */
   const handleImagePaste = useCallback(async (file: File) => {
@@ -239,9 +257,7 @@ export function TabContent() {
       return { uploaded: [] }
     }
 
-    const filePath = activeTab.filePath
-    const targetDir = filePath.includes('/') ? filePath.slice(0, filePath.lastIndexOf('/')) : ''
-
+    const targetDir = await resolveTargetDir(activeTab.vaultId, activeTab.filePath)
     const result = await apiClient.uploadImagePaste(activeTab.vaultId, file, targetDir)
 
     // Refresh file tree after successful upload
@@ -249,7 +265,7 @@ export function TabContent() {
     appDispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId: activeTab.vaultId, tree: newTree } })
 
     return result
-  }, [activeTab, apiClient, appDispatch])
+  }, [activeTab, apiClient, appDispatch, resolveTargetDir])
 
   // Memoized so the object identity stays stable across keystrokes (editBuffer
   // updates replace `activeTab` on every character typed). CodeMirrorEditor

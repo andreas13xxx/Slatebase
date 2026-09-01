@@ -14,15 +14,16 @@
  * see that component for the wiring.
  *
  * Where Slatebase has no equivalent feature at all (native window management,
- * PDF export, a quick-switcher, Obsidian's Bases tables, ...), the command is
- * still registered, as a literal no-op — see core-commands.ts's docstring for why.
+ * Obsidian's Bases tables, split panes, ...), the command is still registered —
+ * see core-commands.ts's docstring for why — but as an `unsupported` spec: it
+ * names the gap, and running it says what is missing instead of doing nothing.
  *
  * @module core-commands-app
  */
 
 import type { Dispatch } from 'react'
 import { openSearchPanel } from '@codemirror/search'
-import type { EditorView } from '@codemirror/view'
+import { EditorView } from '@codemirror/view'
 import type { ICommandRegistry } from './command-registry'
 import type { IEditor } from './editor-shim'
 import type { IApiClient } from '../../api'
@@ -37,7 +38,7 @@ import { requestReveal } from '../../state/revealFileBridge'
 import { getActiveEditorView } from '../../editor/plugin-extensions'
 import { showToast } from '../../components/ToastNotification'
 import type { Locale } from '../../i18n'
-import { translateCoreCommandName } from './core-command-i18n'
+import { translateCoreCommandName, unsupportedCommandMessage, type UnsupportedReason } from './core-command-i18n'
 import { parseFrontmatter } from '../../components/context-panel/utils/parseFrontmatter'
 import { locateFrontmatterBlock, serializeFrontmatter } from '../../utils/frontmatterWriter'
 import { getActiveCanvasController } from '../../state/activeCanvasBridge'
@@ -373,8 +374,8 @@ function ensureRightPanelVisible(h: CoreAppCommandHandlers): void {
 }
 
 // ─── Follow link (editor:follow-link / open-link-in-new-*) ────────────────
-// No split-pane or popout-window support exists (see workspace:* no-ops below),
-// so "open in new tab/split/window" all degenerate to the same "open in a tab".
+// No split-pane or popout-window support exists (see the `unsupported` workspace:*
+// specs below), so "open in new tab/split/window" all degenerate to "open in a tab".
 
 function followLink(h: CoreAppCommandHandlers, editor: IEditor): void {
   const cursor = editor.getCursor('head')
@@ -419,7 +420,7 @@ function insertCurrentTime(editor: IEditor): void {
 }
 
 // ─── Bookmarks: heading/block/search/all-tabs (Requirements 11-14) ────────
-// The four `bookmarks:bookmark-*` no-ops below (see buildSpecs) complete the
+// The four `bookmarks:bookmark-*` commands below (see buildSpecs) complete the
 // bookmark types beyond plain file favorites, which already run through
 // `bookmarks:bookmark-current-view`/`unbookmark-current-view` above.
 
@@ -600,16 +601,62 @@ function clearMetadataProperties(h: CoreAppCommandHandlers): void {
   commitFrontmatterData(ctx.view, ctx.content, {})
 }
 
-const noop = (): void => { /* no Slatebase equivalent — see module docstring */ }
+/** Matches the `[^label]:` that opens a footnote definition line. */
+const FOOTNOTE_DEFINITION_RE = /^ {0,3}\[\^[^\]\s]+\]:/m
 
-interface CoreAppCommandSpec {
-  /** Full Obsidian command ID, e.g. `'workspace:close'` or the unprefixed `'daily-notes'`. */
-  id: string
-  name: string
-  /** When true, registers as editorCallback (only fires with an active editor) and `run` receives it. */
-  editor?: boolean
-  run: (h: CoreAppCommandHandlers, editor: IEditor) => void | Promise<void>
+/**
+ * Obsidian shows footnotes in a side panel; Slatebase shows them in the note
+ * itself — raised markers in the text, their definitions at its foot — so
+ * "show footnotes" jumps to where they already are. In the editor that is the
+ * first `[^label]:` line, in a rendered view (a hover preview, an embedded
+ * note) the footnote list that closes it.
+ */
+function showFootnotes(h: CoreAppCommandHandlers): void {
+  const view = getActiveEditorView()
+  const match = view ? FOOTNOTE_DEFINITION_RE.exec(view.state.doc.toString()) : null
+  if (view && match) {
+    view.dispatch({
+      selection: { anchor: match.index },
+      effects: EditorView.scrollIntoView(match.index, { y: 'center' }),
+    })
+    view.focus()
+    return
+  }
+
+  const rendered = document.querySelector('.view-mode-footnotes')
+  if (rendered) {
+    rendered.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    return
+  }
+
+  const tab = getActiveTab(h)
+  showToast('info', tab
+    ? 'Diese Notiz hat keine Fußnoten. Eine fügst du mit „Fußnote einfügen“ hinzu.'
+    : 'Keine Notiz geöffnet.')
 }
+
+/**
+ * A command Slatebase implements, or one it only registers so plugin lookups
+ * find something: `unsupported` names the gap, and `registerCoreAppCommands`
+ * turns it into a message instead of a callback that quietly does nothing.
+ */
+type CoreAppCommandSpec =
+  | {
+    /** Full Obsidian command ID, e.g. `'workspace:close'` or the unprefixed `'daily-notes'`. */
+    id: string
+    name: string
+    /** When true, registers as editorCallback (only fires with an active editor) and `run` receives it. */
+    editor?: boolean
+    run: (h: CoreAppCommandHandlers, editor: IEditor) => void | Promise<void>
+    unsupported?: never
+  }
+  | {
+    id: string
+    name: string
+    unsupported: UnsupportedReason
+    editor?: never
+    run?: never
+  }
 
 function splitId(fullId: string): { pluginId: string; id: string } {
   const i = fullId.indexOf(':')
@@ -630,19 +677,19 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'workspace:copy-full-path', name: 'Copy current file path from system root', run: (h) => { const t = getActiveTab(h); if (t) void copyToClipboard(`${h.vaultName}/${t.filePath}`) } },
     { id: 'workspace:edit-file-title', name: 'Rename file', run: renameActiveFile },
     { id: 'workspace:show-trash', name: 'Show trash', run: (h) => h.onNavigate('trash') },
-    // No Slatebase equivalent — no split panes/tab groups, no pinning, no popout/new-window,
-    // no closed-tab history, no blank-tab concept, no stacked-tabs layout, no URL scheme.
-    { id: 'workspace:new-tab', name: 'New tab', run: noop },
+    // The `unsupported` specs below each name the concept Slatebase lacks; pinning
+    // and closed-tab history sit among them because they *do* have an equivalent.
+    { id: 'workspace:new-tab', name: 'New tab', unsupported: 'blank-tab' },
     { id: 'workspace:toggle-pin', name: 'Toggle pin', run: toggleActiveTabPin },
-    { id: 'workspace:split-vertical', name: 'Split right', run: noop },
-    { id: 'workspace:split-horizontal', name: 'Split down', run: noop },
+    { id: 'workspace:split-vertical', name: 'Split right', unsupported: 'tab-layout' },
+    { id: 'workspace:split-horizontal', name: 'Split down', unsupported: 'tab-layout' },
     { id: 'workspace:undo-close-pane', name: 'Undo close tab', run: (h) => { void undoCloseTab(h.tabDispatch, h.appDispatch, h.apiClient, h.tabState.closedTabsHistory) } },
-    { id: 'workspace:move-to-new-window', name: 'Move current tab to new window', run: noop },
-    { id: 'workspace:new-window', name: 'New window', run: noop },
-    { id: 'workspace:close-window', name: 'Close window', run: noop },
-    { id: 'workspace:open-in-new-window', name: 'Open current tab in new window', run: noop },
-    { id: 'workspace:toggle-stacked-tabs', name: 'Toggle stacked tabs', run: noop },
-    { id: 'workspace:copy-url', name: 'Copy Obsidian URL for current file', run: noop },
+    { id: 'workspace:move-to-new-window', name: 'Move current tab to new window', unsupported: 'native-windows' },
+    { id: 'workspace:new-window', name: 'New window', unsupported: 'native-windows' },
+    { id: 'workspace:close-window', name: 'Close window', unsupported: 'native-windows' },
+    { id: 'workspace:open-in-new-window', name: 'Open current tab in new window', unsupported: 'native-windows' },
+    { id: 'workspace:toggle-stacked-tabs', name: 'Toggle stacked tabs', unsupported: 'tab-layout' },
+    { id: 'workspace:copy-url', name: 'Copy Obsidian URL for current file', unsupported: 'url-scheme' },
     { id: 'workspace:export-pdf', name: 'Export to PDF...', run: exportActiveFileToPdf },
 
     // ── file-explorer:* ──
@@ -665,16 +712,16 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'app:switch-vault', name: 'Change vault...', run: (h) => h.onOpenSettings({ category: 'account', section: 'my-vaults' }) },
     { id: 'app:open-another-vault', name: 'Open vault...', run: (h) => h.onOpenSettings({ category: 'account', section: 'my-vaults' }) },
     // Obsidian's "ribbon" is Slatebase's toolbar (SidebarToolbar) — same idea,
-    // same command. No sandbox vault, no in-app help page, and no split-pane
-    // default-mode setting, so those stay no-ops.
+    // same command. The sandbox vault maps to the welcome vault; the help page
+    // and the split-pane default-mode setting have nothing to map to.
     { id: 'app:toggle-ribbon', name: 'Toggle ribbon', run: (h) => h.onToggleToolbar() },
     { id: 'app:go-back', name: 'Navigate back', run: (h) => h.onNavigateBack() },
     { id: 'app:go-forward', name: 'Navigate forward', run: (h) => h.onNavigateForward() },
     { id: 'app:open-sandbox-vault', name: 'Open sandbox vault', run: (h) => h.onCreateWelcomeVault() },
-    { id: 'app:open-help', name: 'Open help', run: noop },
+    { id: 'app:open-help', name: 'Open help', unsupported: 'in-app-help' },
     { id: 'app:show-debug-info', name: 'Show debug info', run: (h) => h.onOpenDebugInfo() },
     { id: 'app:show-release-notes', name: 'Show release notes', run: (h) => h.onOpenReleaseNotes() },
-    { id: 'app:toggle-default-new-pane-mode', name: 'Toggle default mode for new tabs', run: noop },
+    { id: 'app:toggle-default-new-pane-mode', name: 'Toggle default mode for new tabs', unsupported: 'new-tab-defaults' },
 
     // ── theme:* ──
     { id: 'theme:toggle-light-dark', name: 'Toggle light/dark mode', run: (h) => cycleTheme(h, ['light', 'dark']) },
@@ -684,12 +731,12 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'window:zoom-in', name: 'Zoom in', run: () => zoomIn() },
     { id: 'window:zoom-out', name: 'Zoom out', run: () => zoomOut() },
     { id: 'window:reset-zoom', name: 'Reset zoom', run: () => resetZoom() },
-    { id: 'window:toggle-always-on-top', name: 'Toggle window always on top', run: noop },
+    { id: 'window:toggle-always-on-top', name: 'Toggle window always on top', unsupported: 'native-windows' },
 
     // ── Graph / Canvas / Daily Notes ──
     { id: 'graph:open', name: 'Graph view: Open graph view', run: (h) => h.onOpenGraph() },
     { id: 'graph:open-local', name: 'Graph view: Open local graph', run: (h) => { const t = getActiveTab(h); if (t && !t.filePath.startsWith('__')) h.onOpenLocalGraph(t.filePath) } },
-    { id: 'graph:animate', name: 'Graph view: Start graph time-lapse animation', run: noop },
+    { id: 'graph:animate', name: 'Graph view: Start graph time-lapse animation', unsupported: 'graph-animation' },
     { id: 'canvas:new-file', name: 'Canvas: Create new canvas', run: (h) => h.onCreateCanvas() },
     {
       id: 'canvas:jump-to-group',
@@ -701,7 +748,18 @@ function buildSpecs(): CoreAppCommandSpec[] {
         }
       },
     },
-    { id: 'canvas:export-as-image', name: 'Canvas: Export as image', run: noop },
+    {
+      id: 'canvas:export-as-image',
+      name: 'Canvas: Export as image',
+      run: () => {
+        const controller = getActiveCanvasController()
+        if (!controller) {
+          showToast('error', 'Kein Canvas-Tab geöffnet')
+          return
+        }
+        void controller.exportAsImage()
+      },
+    },
     { id: 'canvas:convert-to-file', name: 'Canvas: Convert to file...', run: (h) => { void convertCanvasToFile(h) } },
     { id: 'daily-notes', name: "Daily notes: Open today's daily note", run: (h) => h.onDailyNote() },
     { id: 'daily-notes:goto-next', name: 'Daily notes: Open next daily note', run: (h) => h.onDailyNoteOffset(1) },
@@ -729,21 +787,21 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'bookmarks:bookmark-current-view', name: 'Bookmarks: Bookmark...', run: (h) => { const t = getActiveTab(h); if (t && h.vaultId) favoritesStore.add(h.vaultId, t.filePath) } },
     { id: 'bookmarks:unbookmark-current-view', name: 'Bookmarks: Remove bookmark for the current file', run: (h) => { const t = getActiveTab(h); if (t && h.vaultId) favoritesStore.remove(h.vaultId, t.filePath) } },
     { id: 'file-recovery:open', name: 'File recovery: Open local history', run: (h) => { const t = getActiveTab(h); if (t) window.dispatchEvent(new CustomEvent('slatebase:open-file-recovery', { detail: { vaultId: t.vaultId, filePath: t.filePath } })) } },
-    // No footnotes panel, no note-merge/split wizard, no Bases (table-view-over-folder)
-    // feature, and "open in default app" / "show in system explorer" are desktop-only
-    // concepts that cannot exist for a file stored on a remote server.
-    { id: 'footnotes:open', name: 'Footnotes view: Show footnotes', run: noop },
+    // No Bases (table-view-over-folder) feature, and "open in default app" /
+    // "show in system explorer" are desktop-only concepts that cannot exist for
+    // a file stored on a remote server.
+    { id: 'footnotes:open', name: 'Show footnotes', run: showFootnotes },
     { id: 'note-composer:extract-heading', name: 'Note composer: Extract this heading...', run: (h) => { void extractHeadingToFile(h) } },
     { id: 'note-composer:merge-file', name: 'Note composer: Merge current file with another file...', run: (h) => { void mergeActiveFileInto(h) } },
     { id: 'note-composer:split-file', name: 'Note composer: Extract current selection...', run: (h) => { void splitFileFromSelection(h) } },
-    { id: 'bases:add-item', name: 'Bases: Add item', run: noop },
-    { id: 'bases:add-view', name: 'Bases: Add view', run: noop },
-    { id: 'bases:change-view', name: 'Bases: Change view', run: noop },
-    { id: 'bases:copy-table', name: 'Bases: Copy table to clipboard', run: noop },
-    { id: 'bases:insert', name: 'Bases: Insert new base', run: noop },
-    { id: 'bases:new-file', name: 'Bases: Create new base', run: noop },
-    { id: 'open-with-default-app:open', name: 'Open in default app', run: noop },
-    { id: 'open-with-default-app:show', name: 'Show in system explorer', run: noop },
+    { id: 'bases:add-item', name: 'Bases: Add item', unsupported: 'bases' },
+    { id: 'bases:add-view', name: 'Bases: Add view', unsupported: 'bases' },
+    { id: 'bases:change-view', name: 'Bases: Change view', unsupported: 'bases' },
+    { id: 'bases:copy-table', name: 'Bases: Copy table to clipboard', unsupported: 'bases' },
+    { id: 'bases:insert', name: 'Bases: Insert new base', unsupported: 'bases' },
+    { id: 'bases:new-file', name: 'Bases: Create new base', unsupported: 'bases' },
+    { id: 'open-with-default-app:open', name: 'Open in default app', unsupported: 'desktop-shell' },
+    { id: 'open-with-default-app:show', name: 'Show in system explorer', unsupported: 'desktop-shell' },
     { id: 'switcher:open', name: 'Quick switcher: Open quick switcher', run: (h) => h.onOpenQuickSwitcher() },
     { id: 'bookmarks:bookmark-all-tabs', name: 'Bookmarks: Bookmark all tabs...', run: bookmarkAllTabs },
     { id: 'bookmarks:bookmark-current-heading', name: 'Bookmarks: Bookmark heading under cursor...', run: bookmarkCurrentHeading },
@@ -788,7 +846,12 @@ export function registerCoreAppCommands(registry: ICommandRegistry, getHandlers:
   for (const spec of buildSpecs()) {
     const { pluginId, id } = splitId(spec.id)
     const name = translateCoreCommandName(spec.id, locale, spec.name)
-    if (spec.editor) {
+    if (spec.unsupported) {
+      // Registered so `executeCommandById()` still resolves it, but saying so
+      // beats a menu entry that swallows every click without a word.
+      const message = unsupportedCommandMessage(name, spec.unsupported, locale)
+      registry.addCommand(pluginId, { id, name, callback: () => { showToast('info', message) } })
+    } else if (spec.editor) {
       registry.addCommand(pluginId, { id, name, editorCallback: (editor) => { void spec.run(getHandlers(), editor) } })
     } else {
       registry.addCommand(pluginId, { id, name, callback: () => { void spec.run(getHandlers(), null as unknown as IEditor) } })

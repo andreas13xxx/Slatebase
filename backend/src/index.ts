@@ -99,7 +99,7 @@ logger.setLogStore(serverLogStore)
 
 // 1c. Feature Toggle System
 const featureRegistry = new FeatureRegistry()
-featureRegistry.register({ name: 'obsidian-plugin-compat', description: 'Obsidian Community Plugin Compatibility Layer', defaultEnabled: false, type: 'cold' })
+featureRegistry.register({ name: 'obsidian-plugin-compat', description: 'Obsidian Community Plugin Compatibility Layer', defaultEnabled: true, type: 'cold' })
 featureRegistry.register({ name: 'chat', description: 'Echtzeit-Chat zwischen Benutzern', defaultEnabled: true, type: 'hot' })
 featureRegistry.register({ name: 'mcp', description: 'AI Context Server (MCP Integration)', defaultEnabled: true, type: 'cold' })
 featureRegistry.register({ name: 'git-sync', description: 'Git-Synchronisation von Vaults mit externen Remotes', defaultEnabled: true, type: 'cold' })
@@ -724,7 +724,7 @@ app.route('/api/v1', mailImportRoutes)
 
 // Preferences route registration (auth middleware applies via /api/v1/* pattern)
 const preferencesStore = new PreferencesStore(serverConfig.dataDir, logger)
-const preferencesRoutes = createPreferencesRoutes({ preferencesService: preferencesStore, logger })
+const preferencesRoutes = createPreferencesRoutes({ preferencesService: preferencesStore, logger, eventBus })
 app.route('/api/v1', preferencesRoutes)
 
 // Vault config route registration (auth middleware applies via /api/v1/* pattern)

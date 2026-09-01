@@ -1,12 +1,27 @@
 /**
- * localStorage persistence utilities for side panel layouts (left and right).
- * Handles serialization, deserialization, and validation of persisted layout
- * data. Shared by both panels — callers pass their own storage-key prefix so
- * left/right layouts stay independent (and existing saved layouts from
- * before the unification aren't lost).
+ * Persistence for the two side panel layouts (left explorer, right context).
+ *
+ * Stored per user *and* per vault via `vaultSettingsStore`: a panel
+ * arrangement is a personal working preference, not vault content, but the
+ * layout that suits a project vault rarely suits a daily-notes vault. They
+ * used to be one localStorage key per user per panel, shared across vaults and
+ * never synced.
+ *
+ * Both panels share this module and pass their own side, so the two layouts
+ * stay independent.
  */
 
 import type { PanelViewId } from '../../../state/panelState'
+import { getVaultSettings, updateVaultSettings } from '../../../state/vaultSettingsStore'
+
+/** Which of the two side panels a layout belongs to. */
+export type PanelSide = 'sidebar' | 'context'
+
+/** Maps a panel to its field in the per-vault settings. */
+const PANEL_SETTING_KEY = {
+  sidebar: 'sidebarPanel',
+  context: 'contextPanel',
+} as const satisfies Record<PanelSide, 'sidebarPanel' | 'contextPanel'>
 
 /** Persisted layout structure stored in localStorage. */
 export interface PersistedPanelLayout {
@@ -22,14 +37,6 @@ const VALID_BUILTIN_VIEW_IDS: ReadonlySet<string> = new Set([
   'explorer', 'favorites', 'recent',
   'outline', 'links', 'tags', 'properties', 'search',
 ])
-
-/**
- * Generates the localStorage key for a given user, scoped by the caller's
- * prefix (e.g. `slatebase_sidebar_panel_` or `slatebase_context_panel_`).
- */
-function getStorageKey(prefix: string, userId: string): string {
-  return `${prefix}${userId}`
-}
 
 /**
  * Validates that a value is a valid PanelViewId.
@@ -129,17 +136,12 @@ function isValidLayout(data: unknown): data is PersistedPanelLayout {
  * @param layout - The layout to persist
  */
 export function savePanelLayout(
-  prefix: string,
-  userId: string,
+  panel: PanelSide,
   layout: PersistedPanelLayout
 ): void {
-  try {
-    const key = getStorageKey(prefix, userId)
-    const serialized = JSON.stringify(layout)
-    localStorage.setItem(key, serialized)
-  } catch {
-    // localStorage unavailable or quota exceeded — silently ignore
-  }
+  updateVaultSettings({
+    [PANEL_SETTING_KEY[panel]]: layout as unknown as Record<string, unknown>,
+  })
 }
 
 /**
@@ -150,27 +152,7 @@ export function savePanelLayout(
  * @param userId - The current user's ID
  * @returns The persisted layout or null
  */
-export function loadPanelLayout(
-  prefix: string,
-  userId: string
-): PersistedPanelLayout | null {
-  try {
-    const key = getStorageKey(prefix, userId)
-    const raw = localStorage.getItem(key)
-
-    if (raw === null) {
-      return null
-    }
-
-    const parsed: unknown = JSON.parse(raw)
-
-    if (!isValidLayout(parsed)) {
-      return null
-    }
-
-    return parsed
-  } catch {
-    // localStorage unavailable, JSON parse error, or any other error — return null
-    return null
-  }
+export function loadPanelLayout(panel: PanelSide): PersistedPanelLayout | null {
+  const stored = getVaultSettings()[PANEL_SETTING_KEY[panel]]
+  return isValidLayout(stored) ? stored : null
 }

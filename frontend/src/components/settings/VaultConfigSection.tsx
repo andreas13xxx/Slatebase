@@ -10,8 +10,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { IApiClient, VaultConfig } from '../../api'
 import { showToast } from '../ToastNotification'
-import { getState as getWorkspaceState, update as updateWorkspaceState } from '../../state/workspaceStore'
-import { SettingSection, SettingRow, Button } from './ui'
+import { SettingSection, Button } from './ui'
 
 interface VaultConfigSectionProps {
   apiClient: IApiClient
@@ -32,15 +31,11 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
   const [templatesDir, setTemplatesDir] = useState('')
   const [dailyNotesDir, setDailyNotesDir] = useState('')
   const [dailyNoteTemplateName, setDailyNoteTemplateName] = useState('')
+  const [attachmentsDir, setAttachmentsDir] = useState('')
 
-  // Personal display preference (Requirement 4) — client-only, applies instantly,
-  // not part of the server-persisted VaultConfig above.
-  const [followActiveFile, setFollowActiveFile] = useState(() => getWorkspaceState().explorerFollowActiveFile)
-  const handleToggleFollowActiveFile = useCallback(() => {
-    const next = !followActiveFile
-    setFollowActiveFile(next)
-    updateWorkspaceState({ explorerFollowActiveFile: next })
-  }, [followActiveFile])
+  // "Aktive Datei im Explorer verfolgen" used to live here. It is an account
+  // preference that applies to every vault, so it moved to
+  // Einstellungen → Darstellung — this section is only the vault's own config.
 
   // Load config on mount / vault change
   useEffect(() => {
@@ -54,6 +49,7 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
         setTemplatesDir(cfg.templatesDirectory)
         setDailyNotesDir(cfg.dailyNotesDirectory)
         setDailyNoteTemplateName(cfg.dailyNoteTemplateName)
+        setAttachmentsDir(cfg.attachmentsDirectory)
         setError(null)
       } catch (err: unknown) {
         if (cancelled) return
@@ -78,11 +74,13 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
         templatesDirectory: templatesDir.trim(),
         dailyNotesDirectory: dailyNotesDir.trim(),
         dailyNoteTemplateName: dailyNoteTemplateName.trim(),
+        attachmentsDirectory: attachmentsDir.trim(),
       })
       setConfig(updated)
       setTemplatesDir(updated.templatesDirectory)
       setDailyNotesDir(updated.dailyNotesDirectory)
       setDailyNoteTemplateName(updated.dailyNoteTemplateName)
+      setAttachmentsDir(updated.attachmentsDirectory)
       showToast('success', 'Vault-Konfiguration gespeichert')
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'message' in err
@@ -93,12 +91,13 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
     } finally {
       setSaving(false)
     }
-  }, [apiClient, vaultId, templatesDir, dailyNotesDir, dailyNoteTemplateName])
+  }, [apiClient, vaultId, templatesDir, dailyNotesDir, dailyNoteTemplateName, attachmentsDir])
 
   const hasChanges = config !== null && (
     templatesDir.trim() !== config.templatesDirectory ||
     dailyNotesDir.trim() !== config.dailyNotesDirectory ||
-    dailyNoteTemplateName.trim() !== config.dailyNoteTemplateName
+    dailyNoteTemplateName.trim() !== config.dailyNoteTemplateName ||
+    attachmentsDir.trim() !== config.attachmentsDirectory
   )
 
   if (loading) {
@@ -108,21 +107,6 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
   return (
     <div className="vault-config-section">
       {error && <p className="settings-error">{error}</p>}
-
-      <SettingSection title="Anzeige">
-        <SettingRow
-          label="Aktive Datei im Explorer verfolgen"
-          htmlFor="vault-explorer-follow-active-file"
-          hint="Klappt beim Wechsel des aktiven Tabs automatisch die übergeordneten Ordner der Datei im Datei-Explorer auf und markiert sie — persönliche Anzeigeeinstellung, wirkt sofort und wird nicht mit anderen Geräten synchronisiert."
-        >
-          <input
-            id="vault-explorer-follow-active-file"
-            type="checkbox"
-            checked={followActiveFile}
-            onChange={handleToggleFollowActiveFile}
-          />
-        </SettingRow>
-      </SettingSection>
 
       <SettingSection title="Verzeichnisse">
         <div className="settings-field">
@@ -175,6 +159,24 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
             value={dailyNoteTemplateName}
             onChange={(e) => setDailyNoteTemplateName(e.target.value)}
             placeholder="daily.md"
+            disabled={saving}
+          />
+        </div>
+
+        <div className="settings-field">
+          <label htmlFor="vault-attachments-dir" className="settings-field-label">
+            Anhänge-Verzeichnis
+          </label>
+          <p className="settings-field-hint">
+            Relativer Pfad im Vault, in den neue Anhänge (Drag &amp; Drop, Einfügen aus der Zwischenablage, „Anhang einfügen“) hochgeladen werden. Leer = gleicher Ordner wie die gerade geöffnete Notiz.
+          </p>
+          <input
+            id="vault-attachments-dir"
+            type="text"
+            className="settings-field-input"
+            value={attachmentsDir}
+            onChange={(e) => setAttachmentsDir(e.target.value)}
+            placeholder="(gleicher Ordner wie die Notiz)"
             disabled={saving}
           />
         </div>

@@ -62,6 +62,8 @@ function createMockConfigService(overrides?: {
     getTemplatesConfig: vi.fn().mockReturnValue({ directory: 'Templates' }),
     getUploadConfig: vi.fn().mockReturnValue({}),
     getWelcomeVaultConfig: vi.fn().mockReturnValue({ name: { de: 'Willkommen', en: 'Welcome' } }),
+    getOverrides: vi.fn().mockReturnValue({}),
+    updateOverrides: vi.fn().mockResolvedValue([]),
   }
 }
 

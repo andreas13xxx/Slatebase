@@ -88,7 +88,7 @@ describe('Vault Config Routes', () => {
   describe('GET /vaults/:vaultId/config', () => {
     it('returns the vault config on success', async () => {
       const vaultConfigService = createMockVaultConfigService({
-        getConfig: async () => ({ templatesDirectory: 'Templates', dailyNotesDirectory: 'Journal', dailyNoteTemplateName: 'custom-daily.md' }),
+        getConfig: async () => ({ templatesDirectory: 'Templates', dailyNotesDirectory: 'Journal', dailyNoteTemplateName: 'custom-daily.md', attachmentsDirectory: 'Attachments' }),
       })
       const app = createTestApp({ vaultConfigService })
 
@@ -155,6 +155,40 @@ describe('Vault Config Routes', () => {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dailyNoteTemplateName: 'sub/daily.md' }),
+      })
+
+      expect(res.status).toBe(400)
+    })
+
+    it('persists attachmentsDirectory', async () => {
+      let savedPartial: Partial<VaultConfig> | undefined
+      const vaultConfigService = createMockVaultConfigService({
+        saveConfig: async (_vaultId, partial) => {
+          savedPartial = partial
+          return { ...DEFAULT_VAULT_CONFIG, ...partial }
+        },
+      })
+      const app = createTestApp({ vaultConfigService })
+
+      const res = await app.request('/api/v1/vaults/vault-1/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attachmentsDirectory: 'Attachments' }),
+      })
+
+      expect(res.status).toBe(200)
+      const body = await res.json() as VaultConfig
+      expect(body.attachmentsDirectory).toBe('Attachments')
+      expect(savedPartial?.attachmentsDirectory).toBe('Attachments')
+    })
+
+    it('rejects an attachments directory with parent traversal', async () => {
+      const app = createTestApp()
+
+      const res = await app.request('/api/v1/vaults/vault-1/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attachmentsDirectory: '../outside' }),
       })
 
       expect(res.status).toBe(400)

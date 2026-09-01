@@ -225,6 +225,32 @@ Für Verlinkungen zwischen Notizen: [[Features/Wikilinks|Wikilinks]] — mehr da
 
 ---
 
+## Fußnoten
+
+Eine Fußnote besteht aus zwei Teilen: dem **Verweis** mitten im Text und der **Definition**, die üblicherweise am Ende der Notiz steht.
+
+```markdown
+Diese Aussage braucht einen Beleg[^1].
+
+[^1]: Quelle: Handbuch, Seite 42.
+```
+
+Statt Zahlen funktionieren auch sprechende Kürzel — `[^quelle]` mit `[^quelle]: …`.
+
+### Live-Beispiel
+
+Der Verweis erscheint hochgestellt[^bsp] — im Live-Preview-Modus schon beim Schreiben, im Source-Modus als roher `[^bsp]`-Marker. Üblicherweise sammelst du die Definitionen unten in der Notiz; diese hier steht direkt unter dem Absatz, damit du beide Teile nebeneinander siehst.
+
+[^bsp]: Das ist der Text der Fußnote.
+
+> [!tip] Einfügen und finden
+> **Fußnote einfügen** (Command Palette mit `Strg+P`, oder Rechtsklick im Editor) setzt den Verweis an den Cursor und legt die passende Definition am Dateiende an. **Fußnoten anzeigen** springt zur ersten Definition der Notiz.
+
+> [!info] Verweis und Definition gehören zusammen
+> Ein `[^1]` ohne passende Definition bleibt normaler Text — erst das Paar ergibt eine Fußnote. Umgekehrt bleibt eine Definition ohne Verweis sichtbar, damit ihr Text nicht unbemerkt verschwindet.
+
+---
+
 ## Hervorhebung (Highlight)
 
 Die `==Highlight==`-Syntax markiert Text mit einer Hintergrundfarbe:

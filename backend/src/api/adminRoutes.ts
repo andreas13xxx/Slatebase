@@ -437,24 +437,36 @@ export class AdminController implements IAdminController {
         return c.json(createApiError('VALIDATION_ERROR', message), 400)
       }
 
-      // Log the config change attempt
       const session = c.get('session') as SessionContext
+
+      // Persist to <dataDir>/server-config.json and apply to the live config.
+      // Keys pinned by an environment variable keep the environment value; the
+      // response names them so the UI can say so instead of showing a number
+      // the process is not using.
+      const shadowedByEnv = await this.configService.updateOverrides(parsed.data)
+
       await this.auditService.log({
         userId: session.userId,
         action: 'CONFIG_CHANGED' as AuditAction,
         target: 'server-config',
         ipAddress: (c.get('clientIp') as string | undefined) ?? '0.0.0.0',
         success: true,
-        details: JSON.stringify({ updatedFields: Object.keys(parsed.data) }),
+        details: JSON.stringify({ updatedFields: Object.keys(parsed.data), shadowedByEnv }),
       })
 
-      this.logger.info('Server configuration update requested', {
+      this.logger.info('Server configuration updated', {
         userId: session.userId,
         fields: Object.keys(parsed.data),
+        shadowedByEnv,
       })
 
-      // Return the validated config (actual persistence would require restart)
-      return c.json({ message: 'Configuration validated. Restart required to apply changes.', config: parsed.data }, 200)
+      return c.json({
+        message: shadowedByEnv.length > 0
+          ? 'Konfiguration gespeichert. Einige Werte sind per Umgebungsvariable festgelegt und bleiben unverändert.'
+          : 'Konfiguration gespeichert. Netzwerk- und Log-Einstellungen greifen erst nach einem Neustart.',
+        config: this.configService.getServerConfig(),
+        shadowedByEnv,
+      }, 200)
     } catch (error) {
       return this.handleError(c, error)
     }

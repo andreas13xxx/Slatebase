@@ -300,7 +300,7 @@ Backend configuration via `backend/config/default.json`, overridden by `SLATEBAS
 | `SLATEBASE_ALLOWED_ORIGINS` | `http://localhost:5173` | CORS origins (comma-separated) |
 | `SLATEBASE_TRUSTED_PROXIES` | *(empty)* | Trusted reverse proxy IPs/CIDRs |
 | `SLATEBASE_CSRF_SECRET` | *(random)* | Persistent CSRF secret |
-| `SLATEBASE_SYNC_SECRET` | *(random)* | Encrypts CouchDB sync credentials at rest. Only needed if using LiveSync |
+| `SLATEBASE_MODULE_SECRET_KEY` | *(auto)* | Encrypts Git-Sync remote credentials and Mail-Import mailbox passwords. Falls back to a key file in the data directory if unset |
 | `SLATEBASE_PLUGIN_SECRET_KEY` | *(auto)* | Encrypts plugin secrets stored via Obsidian's SecretStorage API. Falls back to a key file in the data directory if unset |
 | `SLATEBASE_VAULT_PATHS` | *(from config)* | Comma-separated pre-configured vault paths (overrides `config/default.json` vaults) |
 | `SLATEBASE_TEMPLATES_DIR` | `./assets/templates` | Custom directory for welcome vault templates |
