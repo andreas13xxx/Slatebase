@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.40.0](https://github.com/andreas13xxx/Slatebase/compare/v0.39.0...v0.40.0) (2026-09-01)
+
+
+### Features
+
+* built-in spellchecker, account/vault-scoped settings sync, footnotes ([395d497](https://github.com/andreas13xxx/Slatebase/commit/395d497b6eba91f333526138c021739a59f0d63a))
+
 ## [0.39.0](https://github.com/andreas13xxx/Slatebase/compare/v0.38.0...v0.39.0) (2026-08-30)
 
 
