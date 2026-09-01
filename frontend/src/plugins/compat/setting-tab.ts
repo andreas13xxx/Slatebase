@@ -621,10 +621,17 @@ export class Setting {
   components: Array<{ setDisabled(disabled: boolean): unknown }> = []
   /** Obsidian API since 1.13.0. Hidden until `setErrorMessage()` sets non-empty text. */
   errorEl: HTMLElement
+  /** Leading row icon, created on demand by `setIcon()` (Obsidian 1.13). */
+  iconEl: HTMLElement | null = null
   private nameEl: HTMLElement
   private descEl: HTMLElement
   private controlEl: HTMLElement
   private infoEl: HTMLElement
+  /** Chevron marking a `setNavigable()` row, created on demand. */
+  private arrowEl: HTMLElement | null = null
+  /** Current `setAction()`/`setNavigable()` callback — replaced, not stacked, on a re-call. */
+  private activateCallback: (() => void) | null = null
+  private activationBound = false
 
   constructor(containerEl: HTMLElement) {
     this.settingEl = document.createElement('div')
@@ -694,6 +701,93 @@ export class Setting {
   setClass(cls: string): this {
     this.settingEl.classList.add(cls)
     return this
+  }
+
+  /**
+   * Leading icon for the row (Obsidian 1.13). `null` removes it.
+   *
+   * Missing from the published `obsidian.d.ts` — Obsidian's own plugins declare
+   * it themselves (Importer ships an `augment.d.ts` for exactly this method,
+   * `setAction()` and `setNavigable()`) and then call it, so a shim without them
+   * throws `is not a function` on real first-party bundles.
+   *
+   * The element is `.setting-item-icon` prepended to the row, matching where
+   * Obsidian puts it: plugins that build their own icon (Importer's app logos)
+   * prepend the same class to `settingEl` and style both through one rule.
+   */
+  setIcon(icon: string | null): this {
+    if (icon === null) {
+      this.iconEl?.remove()
+      this.iconEl = null
+      return this
+    }
+    if (!this.iconEl) {
+      this.iconEl = document.createElement('div')
+      this.iconEl.className = 'setting-item-icon'
+      this.settingEl.prepend(this.iconEl)
+    }
+    this.iconEl.innerHTML = ''
+    // Custom icons registered via addIcon() first, same as ButtonComponent.setIcon().
+    const customSvg = getCustomIconSvg(icon)
+    if (customSvg) {
+      this.iconEl.innerHTML = sizeCustomIconSvg(customSvg, 18)
+      return this
+    }
+    renderLucideIconInto(this.iconEl, icon)
+    return this
+  }
+
+  /**
+   * Make the whole row activate a callback — clicking anywhere on it, or
+   * pressing Enter/Space while it has focus, runs `onAction` (Obsidian 1.13,
+   * undocumented in `obsidian.d.ts`). Used for rows that are a button rather
+   * than a labelled control, e.g. Importer's "Choose files…" row.
+   */
+  setAction(onAction: () => void): this {
+    this.settingEl.classList.add('setting-item--clickable', 'mod-clickable')
+    this.bindActivation(onAction)
+    return this
+  }
+
+  /**
+   * Make the row a navigation target — same activation as `setAction()`, plus
+   * the chevron and `mod-navigable` class that mark a row as opening another
+   * page (Obsidian 1.13, undocumented in `obsidian.d.ts`). Importer's format
+   * list is built entirely out of these.
+   */
+  setNavigable(onNavigate: () => void): this {
+    this.settingEl.classList.add('setting-item--navigable', 'mod-navigable')
+    if (!this.arrowEl) {
+      this.arrowEl = document.createElement('div')
+      this.arrowEl.className = 'setting-item-arrow'
+      this.arrowEl.textContent = '›'
+      this.controlEl.appendChild(this.arrowEl)
+    }
+    this.bindActivation(onNavigate)
+    return this
+  }
+
+  /** Wire click/keyboard activation once; later calls only swap the callback. */
+  private bindActivation(callback: () => void): void {
+    this.activateCallback = callback
+    if (this.activationBound) return
+    this.activationBound = true
+
+    this.settingEl.setAttribute('role', 'button')
+    if (!this.settingEl.hasAttribute('tabindex')) this.settingEl.tabIndex = 0
+
+    this.settingEl.addEventListener('click', () => { this.activateCallback?.() })
+    this.settingEl.addEventListener('keydown', (evt: KeyboardEvent) => {
+      if (evt.key !== 'Enter' && evt.key !== ' ') return
+      evt.preventDefault()
+      // In real Obsidian the keyboard half of this lives in the settings shell,
+      // not on the row, so plugins hosting these rows elsewhere (Importer's
+      // modal) bind their own Enter/Space handler on `settingEl` and would run
+      // the same callback twice. Ours runs first — stop the row's other
+      // listeners for the keys we just handled, and only for those.
+      evt.stopImmediatePropagation()
+      this.activateCallback?.()
+    })
   }
 
   addText(callback: (component: TextComponent) => void): this {

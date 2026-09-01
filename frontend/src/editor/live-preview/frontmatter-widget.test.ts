@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { within } from '@testing-library/dom'
-import { act } from '@testing-library/react'
+import { act, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { EditorView, keymap } from '@codemirror/view'
 import { EditorState, Prec } from '@codemirror/state'
@@ -135,6 +135,39 @@ describe('Interactive frontmatter box', () => {
 
     expect(received).toEqual({ key: 'title', type: 'checkbox' })
     expect(view.state.doc.toString()).toBe(DOC)
+  })
+
+  it('editing a date & time property leaves every other property intact', async () => {
+    // Regression test: the date control used to commit on every `change` the
+    // native input fired, and serializeFrontmatter dropped blank properties —
+    // together, touching a date wiped the rest of the block.
+    const { view, parent } = mount('---\ntitle: Hello\nstatus:\ncreated: 2026-09-01T10:30\ntags: [a, b]\n---\nBody\n')
+    cleanup = () => { view.destroy(); parent.remove() }
+    await flushMicrotasks()
+
+    const input = view.dom.querySelector('input[type="datetime-local"]') as HTMLInputElement
+    await act(async () => {
+      fireEvent.change(input, { target: { value: '2026-12-24T18:00' } })
+      fireEvent.blur(input)
+    })
+
+    expect(view.state.doc.toString()).toBe(
+      '---\ntitle: Hello\nstatus:\ncreated: 2026-12-24T18:00\ntags: [a, b]\n---\nBody\n',
+    )
+  })
+
+  it('keeps a blank property when an unrelated property is edited', async () => {
+    const user = userEvent.setup()
+    const { view, parent } = mount('---\ntitle: Hello\nstatus:\n---\nBody\n')
+    cleanup = () => { view.destroy(); parent.remove() }
+    await flushMicrotasks()
+
+    const scope = within(view.dom.querySelector('.properties-editor') as HTMLElement)
+    await user.click(scope.getByRole('button', { name: 'Hello' }))
+    await user.clear(scope.getByRole('textbox'))
+    await user.type(scope.getByRole('textbox'), 'Changed{Enter}')
+
+    expect(view.state.doc.toString()).toBe('---\ntitle: Changed\nstatus:\n---\nBody\n')
   })
 
   it('does not let a plugin-style Prec.highest Enter keymap fire while typing inside the widget', async () => {

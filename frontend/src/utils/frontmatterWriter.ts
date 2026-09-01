@@ -11,7 +11,9 @@
  * - Arrays (>3 items): multi-line dash syntax
  * - Booleans: `true`/`false` (lowercase)
  * - Dates: ISO string unquoted
- * - null/undefined: key omitted entirely
+ * - null: kept as an empty value (`key:`) — a property whose value the user
+ *   left blank must survive a round-trip, not be silently deleted from the file
+ * - undefined: key omitted entirely
  */
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -84,7 +86,7 @@ export function serializeFrontmatter(
   data: Record<string, unknown>,
   originalKeyOrder?: string[],
 ): string {
-  const entries = Object.entries(data).filter(([, v]) => v !== null && v !== undefined)
+  const entries = Object.entries(data).filter(([, v]) => v !== undefined)
   if (entries.length === 0) return ''
 
   // Sort entries by original key order if provided
@@ -95,8 +97,17 @@ export function serializeFrontmatter(
   const lines: string[] = []
 
   for (const [key, value] of orderedEntries) {
+    // An empty property (`status:` with nothing after it) parses as null. It is
+    // a property the user deliberately left blank, so write the bare key back
+    // instead of dropping the line — dropping it deleted such properties from
+    // the file on every unrelated commit.
+    if (value === null) {
+      lines.push(`${key}:`)
+      continue
+    }
+
     const serialized = serializeValue(value)
-    if (serialized === null) continue // skip null/undefined
+    if (serialized === null) continue // skip undefined
 
     if (serialized.multiline) {
       lines.push(`${key}:`)
@@ -140,8 +151,11 @@ export function applyFrontmatterChange(
     // Replace existing frontmatter content
     const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
     const before = normalized.slice(0, location.from)
+    // `location.to` is the index of the newline *before* the closing `---`, so
+    // `after` already starts with it — adding another would grow a blank line
+    // inside the block on every write.
     const after = normalized.slice(location.to)
-    return `${before}${yaml}\n${after}`
+    return `${before}${yaml}${after}`
   }
 
   // No existing frontmatter — prepend new block
@@ -160,6 +174,8 @@ type SerializedValue = {
 }
 
 function serializeValue(value: unknown): SerializedValue | null {
+  // null is handled by the caller (written as an empty value); only undefined
+  // means "no line at all".
   if (value === null || value === undefined) return null
 
   if (typeof value === 'boolean') {
@@ -172,6 +188,15 @@ function serializeValue(value: unknown): SerializedValue | null {
 
   if (typeof value === 'string') {
     return { multiline: false, text: quoteIfNeeded(value) }
+  }
+
+  // A Date can reach here from a plugin or a YAML 1.1 parser; JSON.stringify
+  // would wrap it in its own quotes below, so handle it before the object case.
+  if (value instanceof Date) {
+    return {
+      multiline: false,
+      text: Number.isNaN(value.getTime()) ? '' : value.toISOString(),
+    }
   }
 
   if (Array.isArray(value)) {
@@ -199,6 +224,14 @@ function serializeValue(value: unknown): SerializedValue | null {
 }
 
 /**
+ * Matches an ISO date or date-time, with optional seconds and zone offset.
+ * The YAML core schema resolves these to plain strings, so they need no quotes
+ * — and leaving them bare keeps the file matching what Obsidian and
+ * hand-written frontmatter use, instead of re-quoting every date on each save.
+ */
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/
+
+/**
  * Quotes a string value if it contains YAML-special characters.
  * Otherwise returns it unquoted.
  */
@@ -209,10 +242,22 @@ function quoteIfNeeded(value: string): string {
   // Check if it looks like a number
   if (/^-?\d+(\.\d+)?$/.test(value)) return `"${value}"`
 
+  // Dates and date-times are safe bare, despite the `:` in the time part
+  if (ISO_DATE_RE.test(value)) return value
+
   // Check for YAML-special characters that require quoting
-  if (/[:{}[\],&#*?|>!%@`'"\\\n]/.test(value) || value.startsWith(' ') || value.endsWith(' ')) {
-    // Escape internal quotes and wrap
-    const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  if (/[:{}[\],&#*?|>!%@`'"\\\n\r\t]/.test(value) || value.startsWith(' ') || value.endsWith(' ')) {
+    // Escape internal quotes and wrap. Line breaks and tabs have to become
+    // escape sequences too: a raw newline inside a double-quoted scalar
+    // continues that scalar onto the next line, which turns the remaining keys
+    // into part of the string and the block as a whole into invalid YAML — at
+    // which point the properties editor can no longer read *any* property.
+    const escaped = value
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r')
+      .replace(/\t/g, '\\t')
     return `"${escaped}"`
   }
 

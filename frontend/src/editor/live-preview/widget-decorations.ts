@@ -1359,7 +1359,9 @@ class FrontmatterWidget extends WidgetType {
       const location = locateFrontmatterBlock(freshContent)
       if (!location) return
 
-      const remaining = Object.entries(newData).filter(([, v]) => v !== undefined && v !== null)
+      // null is a property left blank, not an absent one — it still gets a
+      // line, so only a genuinely empty object may drop the whole block.
+      const remaining = Object.entries(newData).filter(([, v]) => v !== undefined)
       if (remaining.length === 0) {
         const blockEnd = freshContent.indexOf('\n', location.to + 1)
         const to = blockEnd === -1 ? freshContent.length : blockEnd + 1

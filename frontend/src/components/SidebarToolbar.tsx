@@ -121,6 +121,9 @@ export function SidebarToolbar({
     { id: 'chat', icon: <MessageCircle size={ICON_SIZE} />, label: 'Chat', action: () => onNavigate('chat'), feature: 'chat' },
     { id: 'admin-audit', icon: <FileText size={ICON_SIZE} />, label: 'Audit-Log', action: () => onNavigate('admin-audit'), adminOnly: true },
     { id: 'admin-logs', icon: <ScrollText size={ICON_SIZE} />, label: 'Server-Logs', action: () => onNavigate('admin-logs'), adminOnly: true },
+    // Hidden by default (toolbarStore's DEFAULT_TOOLBAR_PREFS) — the toolbar
+    // context menu and the "Werkzeugleiste ein-/ausblenden" command already do
+    // this. Users who want it back tick it in the "Buttons" submenu.
     { id: 'toggle-toolbar', icon: <PanelLeftClose size={ICON_SIZE} />, label: 'Werkzeugleiste ausblenden', action: () => setToolbarVisible(false) },
     { id: 'settings', icon: <Settings size={ICON_SIZE} />, label: 'Einstellungen (Ctrl+,)', action: () => onOpenSettings?.() },
   ]

@@ -21,7 +21,9 @@
  * @module state/toolbarStore
  */
 
-import { useUiSettings, getUiSettings, updateUiSettings } from './userSettingsStore'
+import {
+  useUiSettings, getUiSettings, updateUiSettings, DEFAULT_UI_SETTINGS,
+} from './userSettingsStore'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -54,14 +56,15 @@ export type MoveTarget = 'up' | 'down' | 'start' | 'end'
 /** Id prefix marking an entry as a plugin ribbon icon rather than a built-in. */
 export const PLUGIN_ENTRY_PREFIX = 'plugin:'
 
-/** Defaults used when nothing is persisted yet (or storage is unusable). */
-export const DEFAULT_TOOLBAR_PREFS: ToolbarPrefs = {
-  visible: true,
-  position: 'left',
-  order: [],
-  hidden: [],
-  colors: {},
-}
+/**
+ * Defaults used when nothing is persisted yet (or storage is unusable).
+ *
+ * Taken from the account settings defaults rather than restated, so the two
+ * cannot drift apart. Note that `hidden` is not empty by default: entries
+ * listed there stay fully available (the "Buttons" submenu shows them
+ * unchecked) but are kept off a fresh toolbar.
+ */
+export const DEFAULT_TOOLBAR_PREFS: ToolbarPrefs = structuredClone(DEFAULT_UI_SETTINGS.toolbar)
 
 /**
  * Colour choices offered in the "Farbe wählen" submenu.
@@ -230,9 +233,12 @@ export function reorderEntry(dragId: string, targetId: string, visibleIds: strin
   update({ order: mergeOrder(getToolbarPrefs().order, moved) })
 }
 
-/** Restore order, hidden state and colours (keeps visibility and position). */
+/**
+ * Restore order, hidden state and colours (keeps visibility and position).
+ * "Restore" means back to `DEFAULT_TOOLBAR_PREFS`, not to nothing hidden.
+ */
 export function resetToolbarLayout(): void {
-  update({ order: [], hidden: [], colors: {} })
+  update({ order: [], hidden: [...DEFAULT_TOOLBAR_PREFS.hidden], colors: {} })
 }
 
 /**
@@ -276,5 +282,5 @@ export function useToolbarPrefs(): ToolbarPrefs {
 
 /** Test-only: reset the toolbar back to its defaults. */
 export function __resetToolbarStoreForTests(): void {
-  updateUiSettings({ toolbar: { ...DEFAULT_TOOLBAR_PREFS } })
+  updateUiSettings({ toolbar: structuredClone(DEFAULT_TOOLBAR_PREFS) })
 }

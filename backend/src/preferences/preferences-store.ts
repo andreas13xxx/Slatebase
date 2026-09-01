@@ -87,7 +87,7 @@ function sanitizeUiSettings(raw: unknown): UserUiSettings {
         : [],
       hidden: Array.isArray(toolbarRaw['hidden'])
         ? toolbarRaw['hidden'].filter((v): v is string => typeof v === 'string')
-        : [],
+        : [...DEFAULT_UI_SETTINGS.toolbar.hidden],
       colors: isRecord(toolbarRaw['colors'])
         ? Object.fromEntries(
             Object.entries(toolbarRaw['colors']).filter(([, v]) => typeof v === 'string'),

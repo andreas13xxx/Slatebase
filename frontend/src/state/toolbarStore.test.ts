@@ -111,6 +111,12 @@ describe('toolbar visibility and position', () => {
     expect(getToolbarPrefs().visible).toBe(true)
   })
 
+  it('leaves the toolbar-hide button hidden by default', () => {
+    // Redundant with the context menu entry and the toggle command, so it is
+    // off unless the user ticks it in the "Buttons" submenu.
+    expect(isEntryHidden('toggle-toolbar')).toBe(true)
+  })
+
   it('stores the docking side in the account settings', () => {
     setToolbarPosition('right')
     expect(getToolbarPrefs().position).toBe('right')
@@ -130,7 +136,7 @@ describe('per-entry visibility and colour', () => {
   it('does not add duplicate hidden entries', () => {
     setEntryHidden('graph', true)
     setEntryHidden('graph', true)
-    expect(getToolbarPrefs().hidden).toEqual(['graph'])
+    expect(getToolbarPrefs().hidden).toEqual([...DEFAULT_TOOLBAR_PREFS.hidden, 'graph'])
   })
 
   it('sets and clears a colour override', () => {
@@ -177,7 +183,7 @@ describe('moveEntry / reorderEntry', () => {
 })
 
 describe('resetToolbarLayout', () => {
-  it('clears order, hidden entries and colours but keeps visibility and side', () => {
+  it('restores order, hidden entries and colours but keeps visibility and side', () => {
     setToolbarPosition('right')
     setToolbarOrder(['b', 'a'])
     setEntryHidden('a', true)
@@ -187,7 +193,7 @@ describe('resetToolbarLayout', () => {
 
     const prefs = getToolbarPrefs()
     expect(prefs.order).toEqual([])
-    expect(prefs.hidden).toEqual([])
+    expect(prefs.hidden).toEqual(DEFAULT_TOOLBAR_PREFS.hidden)
     expect(prefs.colors).toEqual({})
     expect(prefs.position).toBe('right')
     expect(prefs.visible).toBe(true)

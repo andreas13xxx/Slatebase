@@ -332,10 +332,6 @@ function renderPageLink(
     }
   }
 
-  // Make the row navigable (clickable → opens sub-page)
-  setting.settingEl.classList.add('setting-item--navigable')
-  setting.settingEl.style.cursor = 'pointer'
-
   // displayValue (Obsidian 1.13.1+) — a computed value shown next to the arrow,
   // e.g. a sub-page link showing "3 aktiv" for how many items are configured.
   const displayValue = typeof page.displayValue === 'function' ? page.displayValue() : page.displayValue
@@ -357,14 +353,9 @@ function renderPageLink(
     setting.settingEl.querySelector('.setting-item-control')?.appendChild(statusEl)
   }
 
-  // Arrow indicator
-  const arrow = document.createElement('span')
-  arrow.className = 'setting-item-arrow'
-  arrow.textContent = '›'
-  arrow.style.cssText = 'margin-left:auto;font-size:1.2em;opacity:0.5;padding-left:8px;'
-  setting.settingEl.querySelector('.setting-item-control')?.appendChild(arrow)
-
-  setting.settingEl.addEventListener('click', () => {
+  // Clickable/keyboard-activatable row plus the chevron, last so the arrow sits
+  // after the display value and status indicator added above.
+  setting.setNavigable(() => {
     openSubPage(page, tab, depth)
   })
 }

@@ -6129,6 +6129,28 @@
 .setting-item--heading { border-bottom: none; padding-bottom: 4px; }
 .setting-item--heading .setting-item-name { font-size: 15px; font-weight: 600; }
 .setting-item--disabled { opacity: 0.5; pointer-events: none; }
+/* Rows turned into a button or a page link by Setting.setAction()/setNavigable()
+   (Obsidian 1.13). Both our BEM name and Obsidian's `mod-*` are matched, since
+   plugin CSS (e.g. Importer's format list) is written against the latter. */
+.setting-item--clickable, .setting-item.mod-clickable,
+.setting-item--navigable, .setting-item.mod-navigable { cursor: pointer; align-items: center; }
+.setting-item--clickable:hover, .setting-item.mod-clickable:hover,
+.setting-item--navigable:hover, .setting-item.mod-navigable:hover { background: var(--bg-surface); }
+.setting-item--clickable:focus-visible, .setting-item.mod-clickable:focus-visible,
+.setting-item--navigable:focus-visible, .setting-item.mod-navigable:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: -2px;
+}
+/* Leading icon (Setting.setIcon(), or a plugin prepending its own logo with the
+   same class) and the chevron a navigable row is marked with. */
+.setting-item-icon {
+  display: flex; align-items: center; justify-content: center; align-self: center;
+  flex-shrink: 0; width: var(--icon-s, 16px); height: var(--icon-s, 16px);
+  margin-inline-end: 10px; color: var(--text-muted);
+}
+.setting-item-arrow {
+  margin-left: auto; padding-left: 8px; font-size: 1.2em; line-height: 1;
+  color: var(--text-muted); opacity: 0.6;
+}
 .setting-item-info { flex: 1; min-width: 0; }
 .setting-item-name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
 .setting-item-description { font-size: 12px; color: var(--text-muted); margin-top: 3px; line-height: 1.5; }

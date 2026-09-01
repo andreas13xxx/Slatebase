@@ -43,7 +43,10 @@ export const DEFAULT_UI_SETTINGS: UserUiSettings = {
     visible: true,
     position: 'left',
     order: [],
-    hidden: [],
+    // The toolbar's own "ausblenden" button starts hidden — the context menu
+    // and the command already cover it. Mirrored by the backend defaults and
+    // re-exported as `DEFAULT_TOOLBAR_PREFS` from `toolbarStore`.
+    hidden: ['toggle-toolbar'],
     colors: {},
   },
 }
@@ -77,7 +80,7 @@ function normalize(raw: unknown): UserUiSettings {
       visible: toolbar.visible ?? DEFAULT_UI_SETTINGS.toolbar.visible,
       position: toolbar.position ?? DEFAULT_UI_SETTINGS.toolbar.position,
       order: toolbar.order ?? [],
-      hidden: toolbar.hidden ?? [],
+      hidden: toolbar.hidden ?? [...DEFAULT_UI_SETTINGS.toolbar.hidden],
       colors: toolbar.colors ?? {},
     },
   }

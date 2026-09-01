@@ -79,9 +79,29 @@ describe('serializeFrontmatter', () => {
     expect(result).toBe('empty: ""')
   })
 
-  it('omits null/undefined values', () => {
-    const result = serializeFrontmatter({ keep: 'yes', remove: null, also: undefined })
-    expect(result).toBe('keep: yes')
+  it('keeps null values as blank properties and omits undefined ones', () => {
+    const result = serializeFrontmatter({ keep: 'yes', blank: null, also: undefined })
+    expect(result).toBe('keep: yes\nblank:')
+  })
+
+  it('leaves ISO dates and date-times unquoted', () => {
+    const result = serializeFrontmatter({
+      day: '2026-09-01',
+      moment: '2026-09-01T10:30',
+      precise: '2026-09-01T10:30:00+02:00',
+    })
+    expect(result).toBe('day: 2026-09-01\nmoment: 2026-09-01T10:30\nprecise: 2026-09-01T10:30:00+02:00')
+  })
+
+  it('escapes line breaks and tabs instead of emitting a broken quoted scalar', () => {
+    const result = serializeFrontmatter({ note: 'Zeile 1\nZeile 2\tEnde' })
+    expect(result).toBe('note: "Zeile 1\\nZeile 2\\tEnde"')
+    expect(result.split('\n')).toHaveLength(1)
+  })
+
+  it('serializes Date values as an ISO string', () => {
+    const result = serializeFrontmatter({ when: new Date('2026-09-01T10:30:00.000Z') })
+    expect(result).toBe('when: 2026-09-01T10:30:00.000Z')
   })
 
   it('returns empty string for empty data', () => {
@@ -99,7 +119,7 @@ describe('applyFrontmatterChange', () => {
   it('replaces existing frontmatter content', () => {
     const content = '---\ntitle: Old\n---\n# Heading'
     const result = applyFrontmatterChange(content, { title: 'New' })
-    expect(result).toBe('---\ntitle: New\n\n---\n# Heading')
+    expect(result).toBe('---\ntitle: New\n---\n# Heading')
   })
 
   it('prepends new frontmatter block when none exists', () => {
@@ -114,10 +134,10 @@ describe('applyFrontmatterChange', () => {
     expect(result).toBe('# Heading')
   })
 
-  it('removes frontmatter block when all values are null', () => {
+  it('keeps the block when a value is null, writing the property as blank', () => {
     const content = '---\ntitle: x\n---\n# Heading'
     const result = applyFrontmatterChange(content, { title: null })
-    expect(result).toBe('# Heading')
+    expect(result).toBe('---\ntitle:\n---\n# Heading')
   })
 
   it('returns content unchanged when no frontmatter and empty data', () => {

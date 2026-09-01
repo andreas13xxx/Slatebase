@@ -554,7 +554,8 @@ function getFrontmatterEditingContext(h: CoreAppCommandHandlers): { view: Editor
 
 function commitFrontmatterData(view: EditorView, content: string, newData: Record<string, unknown>): void {
   const location = locateFrontmatterBlock(content)
-  const remaining = Object.entries(newData).filter(([, v]) => v !== undefined && v !== null)
+  // Matches serializeFrontmatter: null is a blank property that keeps its line.
+  const remaining = Object.entries(newData).filter(([, v]) => v !== undefined)
 
   if (!location) {
     if (remaining.length === 0) return

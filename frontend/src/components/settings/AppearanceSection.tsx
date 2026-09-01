@@ -24,6 +24,7 @@ import {
   setToolbarVisible,
   setToolbarPosition,
   resetToolbarLayout,
+  DEFAULT_TOOLBAR_PREFS,
   type ToolbarPosition,
 } from '../../state/toolbarStore'
 import { useAuthContext } from '../../state/authContext'
@@ -118,8 +119,13 @@ export function AppearanceSection() {
   const uiSettings = useUiSettings()
   const toolbar = useToolbarPrefs()
 
-  const hiddenCount = toolbar.hidden.length
-  const customisedCount = hiddenCount + Object.keys(toolbar.colors).length + toolbar.order.length
+  // The default layout already hides a button, so "customised" means the
+  // layout *differs* from the default — not merely that something is hidden.
+  const hiddenDiffers =
+    toolbar.hidden.length !== DEFAULT_TOOLBAR_PREFS.hidden.length ||
+    toolbar.hidden.some((id) => !DEFAULT_TOOLBAR_PREFS.hidden.includes(id))
+  const isCustomised =
+    hiddenDiffers || Object.keys(toolbar.colors).length > 0 || toolbar.order.length > 0
 
   return (
     <div className="appearance-section">
@@ -166,15 +172,15 @@ export function AppearanceSection() {
         <SettingRow
           label="Anordnung zurücksetzen"
           hint={
-            customisedCount === 0
-              ? 'Die Leiste ist unverändert.'
-              : `Stellt Reihenfolge, Farben und ${hiddenCount} ausgeblendete Schaltfläche(n) wieder her.`
+            isCustomised
+              ? 'Stellt Reihenfolge, Farben und ausgeblendete Schaltflächen wieder her.'
+              : 'Die Leiste ist unverändert.'
           }
         >
           <Button
             variant="secondary"
             onClick={resetToolbarLayout}
-            disabled={customisedCount === 0}
+            disabled={!isCustomised}
           >
             Zurücksetzen
           </Button>

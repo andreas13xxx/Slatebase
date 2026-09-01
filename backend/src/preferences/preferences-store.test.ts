@@ -129,6 +129,7 @@ describe('PreferencesStore — UI and per-vault settings', () => {
       expect(settings.statusBarVisible).toBe(true)
       expect(settings.explorerFollowActiveFile).toBe(false)
       expect(settings.toolbar.position).toBe('left')
+      expect(settings.toolbar.hidden).toEqual(['toggle-toolbar'])
     })
 
     it('merges a partial patch without clearing untouched fields', async () => {
@@ -173,6 +174,7 @@ describe('PreferencesStore — UI and per-vault settings', () => {
       const settings = await store.getUiSettings('legacy')
       expect(settings.statusBarVisible).toBe(true)
       expect(settings.toolbar.order).toEqual([])
+      expect(settings.toolbar.hidden).toEqual(['toggle-toolbar'])
     })
   })
 

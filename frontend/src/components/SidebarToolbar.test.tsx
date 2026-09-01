@@ -6,6 +6,7 @@ import {
   getToolbarPrefs,
   setToolbarOrder,
   setEntryHidden,
+  DEFAULT_TOOLBAR_PREFS,
 } from '../state/toolbarStore'
 import type { RibbonIconEntry } from '../plugins/compat/ribbon-icon-registry'
 
@@ -91,7 +92,18 @@ describe('SidebarToolbar — built-in buttons', () => {
     expect(screen.getByLabelText(/Schnellwechsler öffnen/)).toBeTruthy()
     expect(screen.getByLabelText('Zufällige Notiz öffnen')).toBeTruthy()
     expect(screen.getByLabelText('Vorlage einfügen')).toBeTruthy()
-    expect(screen.getByLabelText('Werkzeugleiste ausblenden')).toBeTruthy()
+  })
+
+  it('leaves the "Werkzeugleiste ausblenden" button off the default layout', () => {
+    renderToolbar()
+    expect(screen.queryByLabelText('Werkzeugleiste ausblenden')).toBeNull()
+    // Still offered, just unchecked, in the toolbar's own "Buttons" submenu.
+    fireEvent.contextMenu(screen.getByRole('toolbar'))
+    openSubmenu('Buttons')
+    expect(
+      screen.getByRole('menuitemcheckbox', { name: 'Werkzeugleiste ausblenden' })
+        .getAttribute('aria-checked'),
+    ).toBe('false')
   })
 
   it('invokes the handler behind each new button', () => {
@@ -112,7 +124,8 @@ describe('SidebarToolbar — built-in buttons', () => {
     expect(onInsertTemplate).toHaveBeenCalledOnce()
   })
 
-  it('hides the whole toolbar from its own button', () => {
+  it('hides the whole toolbar from its own button once that button is shown', () => {
+    setEntryHidden('toggle-toolbar', false)
     renderToolbar()
     fireEvent.click(screen.getByLabelText('Werkzeugleiste ausblenden'))
     expect(getToolbarPrefs().visible).toBe(false)
@@ -277,7 +290,7 @@ describe('SidebarToolbar — toolbar context menu', () => {
     clickMenuItem('Layout zurücksetzen')
 
     expect(getToolbarPrefs().order).toEqual([])
-    expect(getToolbarPrefs().hidden).toEqual([])
+    expect(getToolbarPrefs().hidden).toEqual(DEFAULT_TOOLBAR_PREFS.hidden)
   })
 })
 
