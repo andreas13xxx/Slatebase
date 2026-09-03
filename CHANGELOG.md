@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.41.0](https://github.com/andreas13xxx/Slatebase/compare/v0.40.1...v0.41.0) (2026-09-03)
+
+
+### Features
+
+* nested tag hierarchy, live tag overlay, and link-index folder handling ([ff2aa69](https://github.com/andreas13xxx/Slatebase/commit/ff2aa695bacf0191822dce75e9d4b32e55699d29))
+
 ## [0.40.1](https://github.com/andreas13xxx/Slatebase/compare/v0.40.0...v0.40.1) (2026-09-01)
 
 
