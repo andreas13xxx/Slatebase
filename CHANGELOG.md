@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.41.1](https://github.com/andreas13xxx/Slatebase/compare/v0.41.0...v0.41.1) (2026-09-03)
+
+
+### Bugfixes
+
+* **backend:** bump fast-uri and qs to close high/moderate audit findings ([081d139](https://github.com/andreas13xxx/Slatebase/commit/081d13967761f01769b7cdd1e75dc7e300232bd7))
+* **frontend:** bump browserslist, nanoid, and @babel/core transitives to close audit findings ([dc5cc84](https://github.com/andreas13xxx/Slatebase/commit/dc5cc848ecca3cf1905a80babc66bdb43ff4ace9))
+
 ## [0.41.0](https://github.com/andreas13xxx/Slatebase/compare/v0.40.1...v0.41.0) (2026-09-03)
 
 
