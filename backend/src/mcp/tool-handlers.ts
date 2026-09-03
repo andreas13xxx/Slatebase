@@ -167,6 +167,17 @@ export interface ToolHandlerDeps {
    * manual reload.
    */
   publishVaultChange?: (vaultId: string, action: 'saved' | 'deleted' | 'renamed', path: string, userId: string) => Promise<void>
+  /**
+   * Optional — when set, write/delete/move/rename keep the link index in sync,
+   * the same way the REST API does. Without it an MCP client can delete a note
+   * whose tags and properties then linger in the Graph and in the context
+   * panel's tag list until the index is rebuilt.
+   */
+  linkIndexHook?: {
+    onFileSaved(vaultId: string, filePath: string, content: string): void
+    onFileDeleted(vaultId: string, filePath: string): void
+    onFileRenamed(vaultId: string, oldPath: string, newPath: string): void | Promise<void>
+  }
 }
 
 /**
@@ -628,6 +639,11 @@ function registerWriteFile(server: McpServer, deps: ToolHandlerDeps): void {
         // back at the same size read_file will serve it.
         const result = await deps.vaultService.saveFile(args.vaultId, args.path, content, args.ifMatch, deps.mcpConfig.maxFileSize)
 
+        // Only text markdown is indexed — a base64 payload is a Buffer here.
+        if (typeof content === 'string' && (result.path.endsWith('.md') || result.path.endsWith('.canvas'))) {
+          deps.linkIndexHook?.onFileSaved(args.vaultId, result.path, content)
+        }
+
         await deps.publishVaultChange?.(args.vaultId, 'saved', result.path, userId)
 
         return mcpToolSuccess({
@@ -745,6 +761,10 @@ function registerDeleteFile(server: McpServer, deps: ToolHandlerDeps): void {
         // Delete via VaultService (handles path validation, existence check, tree refresh)
         await deps.vaultService.deleteContent(args.vaultId, args.path)
 
+        // Not restricted to `.md`: deleting a folder removes every note inside
+        // it, and that path carries no extension.
+        deps.linkIndexHook?.onFileDeleted(args.vaultId, args.path)
+
         await deps.publishVaultChange?.(args.vaultId, 'deleted', args.path, userId)
 
         return mcpToolSuccess({
@@ -799,6 +819,10 @@ function registerMoveFile(server: McpServer, deps: ToolHandlerDeps): void {
 
         // Move via VaultService (handles path validation, conflict check, tree refresh)
         const result = await deps.vaultService.moveContent(args.vaultId, args.sourcePath, args.destinationPath)
+
+        // Folders included, and awaited before the migration below — see the
+        // REST moveContent for why the ordering matters.
+        await deps.linkIndexHook?.onFileRenamed(args.vaultId, args.sourcePath, result.newPath)
 
         const linkMigrationWarnings = oldTree
           ? await runLinkMigration(deps, args.vaultId, oldTree, args.sourcePath, result.newPath)
@@ -871,6 +895,10 @@ function registerRenameFile(server: McpServer, deps: ToolHandlerDeps): void {
 
         // Rename via VaultService (handles path validation, name validation, conflict check, tree refresh)
         const result = await deps.vaultService.renameContent(args.vaultId, args.path, args.newName)
+
+        // Folders included, and awaited before the migration below — see
+        // move_file above.
+        await deps.linkIndexHook?.onFileRenamed(args.vaultId, args.path, result.newPath)
 
         const linkMigrationWarnings = oldTree
           ? await runLinkMigration(deps, args.vaultId, oldTree, args.path, result.newPath)

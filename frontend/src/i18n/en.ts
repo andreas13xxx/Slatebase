@@ -583,6 +583,8 @@ export const en: TranslationShape = {
     tags: {
       empty: 'No tags found.',
       loading: 'Loading tags…',
+      expandBranch: 'Show tags under {tag}',
+      collapseBranch: 'Hide tags under {tag}',
     },
     properties: {
       empty: 'No properties found.',

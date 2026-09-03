@@ -1,6 +1,6 @@
 // Unit tests for trashRoutes — HTTP integration tests
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { Hono } from 'hono'
 import type { SessionContext } from '../auth/index.js'
 import type { ILogger } from '../logger/index.js'
@@ -93,6 +93,7 @@ function createTestApp(options: {
   trashService?: ITrashService
   eventBus?: IEventBus & { publishCalls: PublishOptions[] }
   session?: SessionContext | null
+  linkIndexHook?: { onFileRestored: (vaultId: string, filePath: string) => void }
 } = {}) {
   const logger = createMockLogger()
   const vaultAccessControl = options.vaultAccessControl ?? createMockVaultAccessControl()
@@ -111,7 +112,14 @@ function createTestApp(options: {
     })
   }
 
-  const routes = createTrashRoutes({ trashService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger })
+  const routes = createTrashRoutes({
+    trashService,
+    accessControl: vaultAccessControl,
+    vaultRegistry,
+    eventBus,
+    logger,
+    ...(options.linkIndexHook ? { linkIndexHook: options.linkIndexHook } : {}),
+  })
   app.route('/api/v1', routes)
   return { app, eventBus }
 }
@@ -219,6 +227,18 @@ describe('Trash Routes', () => {
       expect(res.status).toBe(500)
       const body = await res.json() as { code: string }
       expect(body.code).toBe('TRASH_RESTORE_FAILED')
+    })
+
+    it('re-indexes the restored file so its tags come back', async () => {
+      const onFileRestored = vi.fn()
+      const trashService = createMockTrashService({
+        restore: async () => ({ restoredPath: 'notes/restored-file.md' }),
+      })
+      const { app } = createTestApp({ trashService, linkIndexHook: { onFileRestored } })
+
+      await app.request('/api/v1/vaults/vault-1/trash/entry-1/restore', { method: 'POST' })
+
+      expect(onFileRestored).toHaveBeenCalledWith('vault-1', 'notes/restored-file.md')
     })
 
     it('returns 200 with restoredPath on success', async () => {

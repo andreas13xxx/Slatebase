@@ -35,6 +35,47 @@
   border-radius: 4px;
 }
 
+.context-panel-tags-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Chevron for a nested-tag branch. Fixed width so the labels of siblings with
+   and without children still line up. */
+.context-panel-tags-toggle {
+  flex-shrink: 0;
+  width: 14px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.625rem;
+  line-height: 1;
+  color: var(--right-panel-text-muted);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.context-panel-tags-toggle:hover {
+  background: var(--sidebar-hover);
+  color: var(--accent-text);
+}
+
+.context-panel-tags-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.context-panel-tags-toggle-spacer {
+  flex-shrink: 0;
+  width: 14px;
+}
+
 .context-panel-tags-button {
   display: flex;
   align-items: center;
@@ -85,7 +126,8 @@
 .context-panel-tags-files {
   list-style: none;
   margin: 0;
-  padding: 0 0 0 1rem;
+  /* Horizontal padding is set per row so nested tags indent with their depth. */
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 1px;

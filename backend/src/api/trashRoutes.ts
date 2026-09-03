@@ -55,6 +55,13 @@ export interface TrashRouteDependencies {
   vaultRegistry: IVaultRegistry
   eventBus: IEventBus
   logger: ILogger
+  /**
+   * Optional — when set, a restored file is put back into the link index.
+   * Deleting drops the file's tags, properties and links from the index; without
+   * this the note comes back to the vault but stays invisible to the Graph and
+   * the context panel's tag list until the index is rebuilt.
+   */
+  linkIndexHook?: { onFileRestored(vaultId: string, filePath: string): void }
 }
 
 // --- Trash Route Factory ---
@@ -70,7 +77,7 @@ export interface TrashRouteDependencies {
  * @returns A Hono instance with trash routes registered.
  */
 export function createTrashRoutes(deps: TrashRouteDependencies): Hono {
-  const { trashService, accessControl, vaultRegistry, eventBus, logger } = deps
+  const { trashService, accessControl, vaultRegistry, eventBus, logger, linkIndexHook } = deps
   const app = new Hono()
 
   /**
@@ -191,6 +198,10 @@ export function createTrashRoutes(deps: TrashRouteDependencies): Hono {
     // Restore from trash
     try {
       const result = await trashService.restore(vaultId, entryId)
+
+      // Put the file back into the link index (fire-and-forget) — deleting it
+      // took its tags and properties out.
+      linkIndexHook?.onFileRestored(vaultId, result.restoredPath)
 
       // Publish vault:change event on successful restore, scoped to the vault's owner and shared users
       eventBus.publish({

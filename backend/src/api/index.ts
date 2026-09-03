@@ -86,8 +86,13 @@ export interface LinkIndexHook {
   onFileSaved(vaultId: string, filePath: string, content: string): void
   /** Called after a file or folder is deleted. */
   onFileDeleted(vaultId: string, filePath: string): void
-  /** Called after a file is renamed/moved (content may not be available). */
-  onFileRenamed(vaultId: string, oldPath: string, newPath: string): void
+  /**
+   * Called after a file or folder is renamed/moved (content may not be
+   * available). Awaited before Link-Migration runs so the migration queries an
+   * index that already knows the new paths; implementations report their own
+   * failures rather than rejecting, since the move itself already succeeded.
+   */
+  onFileRenamed(vaultId: string, oldPath: string, newPath: string): void | Promise<void>
   /**
    * Rewrites wikilinks elsewhere in the vault that point at `oldPath` so they
    * point to `newPath` instead (Link-Migration). `oldTree` is the vault's
@@ -545,8 +550,10 @@ export class VaultController implements IVaultController {
 
       await this.vaultService.deleteContent(vaultId, decodedPath)
 
-      // Notify link index hook for markdown files (fire-and-forget)
-      if (this.linkIndexHook && decodedPath.endsWith('.md')) {
+      // Notify link index hook (fire-and-forget). Not restricted to `.md`:
+      // deleting a folder removes every note inside it, and that path carries
+      // no extension. The hook is a no-op for paths that aren't indexed.
+      if (this.linkIndexHook) {
         this.linkIndexHook.onFileDeleted(vaultId, decodedPath)
       }
 
@@ -595,10 +602,13 @@ export class VaultController implements IVaultController {
 
       const result = await this.vaultService.moveContent(vaultId, sourcePath, destinationPath)
 
-      // Notify link index hook for markdown file moves (fire-and-forget) —
-      // updates the moved file's own forward-link entry.
-      if (this.linkIndexHook && sourcePath.endsWith('.md')) {
-        this.linkIndexHook.onFileRenamed(vaultId, sourcePath, result.newPath)
+      // Re-home the moved path in the link index — its own forward-link entry
+      // for a file, every descendant's for a folder. Not restricted to `.md`
+      // (a folder path has no extension) and awaited, so the Link-Migration
+      // below resolves backlinks against the new paths rather than paths that
+      // no longer exist.
+      if (this.linkIndexHook) {
+        await this.linkIndexHook.onFileRenamed(vaultId, sourcePath, result.newPath)
       }
 
       const session = c.get('session') as SessionContext
@@ -653,10 +663,10 @@ export class VaultController implements IVaultController {
 
       const result = await this.vaultService.renameContent(vaultId, filePath, newName)
 
-      // Notify link index hook for markdown file renames (fire-and-forget) —
-      // updates the renamed file's own forward-link entry.
-      if (this.linkIndexHook && filePath.endsWith('.md')) {
-        this.linkIndexHook.onFileRenamed(vaultId, filePath, result.newPath)
+      // Re-home the renamed path in the link index — see moveContent above for
+      // why this covers folders and is awaited.
+      if (this.linkIndexHook) {
+        await this.linkIndexHook.onFileRenamed(vaultId, filePath, result.newPath)
       }
 
       const session = c.get('session') as SessionContext

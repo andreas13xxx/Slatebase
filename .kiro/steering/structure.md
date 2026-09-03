@@ -113,8 +113,9 @@ src/
 │   ├── token-service.ts  — McpTokenService (token lifecycle: create, validate, revoke, list)
 │   ├── rate-limiter.ts   — McpRateLimiter (sliding window per token)
 │   ├── handlers.ts       — McpHandlers (MCP resource handlers: list, read); binary files return a base64 `blob` + real media type (via `vault/mime.ts`) instead of `text`
-│   ├── tool-handlers.ts  — MCP tool handlers (list_vaults, get_vault_structure, search_vault, read_file, write_file, create_directory, delete_file, move_file, rename_file). `move_file`/`rename_file` run Link-Migration too via the optional `ToolHandlerDeps.migrateLinks` (wired to the same `LinkMigrationService` as the REST API in the composition root) — snapshots the pre-move tree, rewrites wikilinks elsewhere in the vault pointing at the old path, reports partial failures as `linkMigrationWarnings`. `read_file`/`write_file` support binary content via `encoding: 'base64'` (image/audio/resource content blocks by media type, `search_vault` skips binary files); size limit is `mcp.maxFileSize` (16 MB default), separate from and higher than the editor's `maxFileSize` (5 MB) since attachments run larger than notes
+│   ├── tool-handlers.ts  — MCP tool handlers (list_vaults, get_vault_structure, search_vault, read_file, write_file, create_directory, delete_file, move_file, rename_file). `move_file`/`rename_file` run Link-Migration too via the optional `ToolHandlerDeps.migrateLinks` (wired to the same `LinkMigrationService` as the REST API in the composition root) — snapshots the pre-move tree, rewrites wikilinks elsewhere in the vault pointing at the old path, reports partial failures as `linkMigrationWarnings`. `read_file`/`write_file` support binary content via `encoding: 'base64'` (image/audio/resource content blocks by media type, `search_vault` skips binary files); size limit is `mcp.maxFileSize` (16 MB default), separate from and higher than the editor's `maxFileSize` (5 MB) since attachments run larger than notes. `write_file`/`delete_file`/`move_file`/`rename_file` also keep the link index in sync via the optional `ToolHandlerDeps.linkIndexHook` (same hook shape as the REST `VaultController`) — before this, a note deleted/moved/edited over MCP left stale tags/properties/links in the Graph and Tags panel until the index was rebuilt
 │   ├── binary-files.test.ts — Unit tests for MCP binary read/write (base64 encode/decode, media-type dispatch)
+│   ├── tool-handlers-link-index.test.ts — Unit tests for the MCP tool handlers' linkIndexHook wiring
 │   ├── tool-handlers-link-migration.test.ts — Unit tests for move_file/rename_file Link-Migration wiring
 │   └── server-factory.ts — McpServerFactory (creates configured McpServer instance)
 ├── search/
@@ -143,7 +144,7 @@ src/
 │   ├── property-extractor.test.ts — Unit tests for property extractor
 │   ├── canvas-parser.ts      — Canvas link extraction (extracts wikilinks from .canvas JSON files)
 │   ├── canvas-parser.test.ts — Unit tests for canvas link extraction
-│   ├── link-index-service.ts — LinkIndexService (rebuild, incremental updates, JSON v2 persistence, tags, properties, getGraph with options, getGraphMeta, getFilesByProperty, getPropertyKeys, getPropertyValues, queryByProperties), extractFrontmatterTags (Obsidian-compatible frontmatter tag extraction)
+│   ├── link-index-service.ts — LinkIndexService (rebuild, incremental updates, JSON v2 persistence, tags, properties, getGraph with options, getGraphMeta, getFilesByProperty, getPropertyKeys, getPropertyValues, queryByProperties), extractFrontmatterTags (Obsidian-compatible frontmatter tag extraction). `removeFile()`/new `renameDirectory()` handle folder paths — a folder delete/move used to leave every file that was inside it (tags, properties, forward links) stale in the index, since only single-file entries were pruned. `rebuild()` now also runs `pruneMissingFiles()` on load: entries for files gone from disk (a delete that predates the hook, an external edit, a restored backup) are dropped once at startup instead of persisting forever, since the index is loaded verbatim and nothing else re-checks disk state
 │   ├── link-index-service.test.ts — Unit tests for LinkIndexService v2
 │   ├── property-value-index.test.ts — Unit tests for inverse property-value-index and query methods
 │   ├── link-match-resolver.ts — resolveWikilinkTargetOnTree() — backend port of frontend/src/plugins/link-resolver.ts (same-folder → shortest-path → alphabetical disambiguation against a DirectoryTree). Needed because LinkIndexService.getBacklinks() only matches literal normalized paths and misses bare-name wikilinks (`[[Note]]`) to subfolder files
@@ -341,7 +342,9 @@ src/
 │   ├── tag/
 │   │   ├── syntax.ts     — micromark tokenizer extension for #tag syntax
 │   │   ├── mdast-util.ts — fromMarkdown + toMarkdown handlers
-│   │   └── plugin.ts     — remark plugin wrapper (remarkTag)
+│   │   ├── plugin.ts     — remark plugin wrapper (remarkTag)
+│   │   ├── extract.ts    — extractTags()/extractInlineTags()/extractFrontmatterTags(): a deliberate port of the backend's `link-index/tag-extractor.ts`, not a reuse of this folder's tokenizer — predicts what the *indexer* will record for the currently-edited document (documentPanelActions.ts's `loadDocumentTags`, for TagsView's live overlay), so it must match the indexer's rules, not the editor's rendering rules. The two differ on `#` at a line start and a leading underscore; keep this in sync with the backend file by hand
+│   │   └── extract.test.ts — Unit tests for extract.ts
 │   ├── block-ref/
 │   │   ├── marker-parser.ts    — MDAST transformer for block reference markers (^block-id)
 │   │   ├── marker-serializer.ts — toMarkdown extension for block refs
@@ -443,8 +446,8 @@ src/
 │   ├── panelState.ts     — Generic split-section/tab-ordering reducer shared by both side panels (`side-panel/SidePanel.tsx`) — layout only, not document-derived content. MAX_SECTIONS 3
 │   ├── panelState.test.ts — Unit tests for panelState reducer
 │   ├── panelContext.ts   — LeftPanelProvider/RightPanelProvider + useLeftPanelContext/useRightPanelContext — both wrap the same `usePanelState` hook (reducer + `vaultSettingsStore`-backed persistence, per user *and* vault), differing only in which panel (`'sidebar'`/`'context'`) they pass to `persistence.ts` and their default view set
-│   ├── documentPanelData.ts — DocumentPanelState reducer + types (outline, forward/backlinks, unlinkedMentions, tags, properties) and the `useDocumentPanelData` hook (owns the 5 effects: document switch, debounced content re-parse, vault-change tag reload, live backlinks refresh, live unlinked-mentions refresh — all via `onRealtimeVaultChange`). Side-agnostic: doesn't care which panel currently hosts Outline/Links/Tags/Properties, see `panelState.ts`
-│   ├── documentPanelActions.ts — loadOutline, loadForwardLinks, loadBacklinks, loadUnlinkedMentions (search-based, filters out matches already inside a wikilink via extractWikilinks/resolveWikilinkTarget), linkUnlinkedMention (rewrites one occurrence into a wikilink and saves), loadTags, loadProperties, loadPropertyTypes, expandTag
+│   ├── documentPanelData.ts — DocumentPanelState reducer + types (outline, forward/backlinks, unlinkedMentions, tags, properties) and the `useDocumentPanelData` hook (owns the effects: document switch, debounced content re-parse, tag list reload — now on vault change, `directoryTree` change (create/delete/move/rename elsewhere going stale, most visibly a deleted note's tags lingering) or `documentPath` change (a save re-indexes without changing the file set) — live backlinks refresh, live unlinked-mentions refresh, all via `onRealtimeVaultChange`). `applyDocumentTags()` layers the open document's own live-parsed tags (see `documentPanelActions.ts`'s `loadDocumentTags`) over the backend's vault-wide list, so typing a tag or deleting one shows up in the panel immediately rather than after the next save. Side-agnostic: doesn't care which panel currently hosts Outline/Links/Tags/Properties, see `panelState.ts`
+│   ├── documentPanelActions.ts — loadOutline, loadForwardLinks, loadBacklinks, loadUnlinkedMentions (search-based, filters out matches already inside a wikilink via extractWikilinks/resolveWikilinkTarget), linkUnlinkedMention (rewrites one occurrence into a wikilink and saves), loadTags (optional `showLoading` — false for a background refresh after a mutation, so an already-visible list doesn't flicker to "Loading…"), loadDocumentTags (parses the open document's tags client-side via `plugins/tag/extract.ts`, purely local), loadProperties, loadPropertyTypes, expandTag
 │   ├── documentPanelActions.test.ts — Unit tests for loadUnlinkedMentions/linkUnlinkedMention
 │   ├── propertyTypes.ts  — Frontend-side property type definitions (PropertyType, PropertyTypeEntry, PropertyTypeOptions, PropertyTypeRegistry) — mirrors backend types for API communication
 │   ├── featureState.ts   — Feature toggle reducer + types (FeatureToggleInfo, optimistic update/rollback)
@@ -606,7 +609,7 @@ src/
 │   │   ├── LinksView.tsx         — Forward links, backlinks, and Ungelinkte_Erwähnungen (three sections: resolved/unresolved forward+back links; unlinked mentions found via search + filtered against extractWikilinks/resolveWikilinkTarget, with a "Verlinken" action per entry)
 │   │   ├── LinksView.test.tsx
 │   │   ├── LinksView.css
-│   │   ├── TagsView.tsx          — Vault-wide tags with expand/collapse
+│   │   ├── TagsView.tsx          — Vault-wide tags, grouped via `utils/tagTree.ts` into the hierarchy nested tag names describe (`#Rezepte/Hauptspeise` collapses under a `Rezepte` branch); branches start collapsed, clicking a leaf expands its file list, clicking a file opens it. A branch with no notes of its own (`Rezepte` when only the nested tag exists) has no file list — its row toggles the branch instead
 │   │   ├── TagsView.test.tsx
 │   │   ├── TagsView.css
 │   │   ├── PropertiesOverview.tsx — Vault-wide list of every frontmatter property key in use, with occurrence count and type. Replaces the old per-document Properties tab: editing a note's own frontmatter now happens inline in the note (FrontmatterWidget), so this tab is for curating the vault's property *definitions* instead
@@ -624,7 +627,9 @@ src/
 │   │   │   └── property-controls.css — Shared styles for all property controls
 │   │   └── utils/
 │   │       ├── extractHeadings.ts — Heading extraction from markdown
-│   │       └── parseFrontmatter.ts — YAML frontmatter parsing
+│   │       ├── parseFrontmatter.ts — YAML frontmatter parsing
+│   │       ├── tagTree.ts    — buildTagTree(): groups a flat TagEntry[] into the hierarchy nested tag names (`Rezepte/Hauptspeise`) describe, sorted alphabetically at every level. `totalCount` per node counts distinct notes in the whole subtree (not summed child counts — a note tagged both parent and child is one note, matching what a click's file list shows); falls back to summing when a `TagEntry` has no `files` list
+│   │       └── tagTree.test.ts — Unit tests for tagTree
 │   ├── side-panel/               — Unified left/right side-panel shell (layout only — document content lives in `context-panel/` + `documentPanelData.ts`)
 │   │   ├── SidePanel.tsx         — Single shared implementation for both panels; `side` prop only selects which `PanelContext` instance, plugin view source, and CSS look applies — every built-in/plugin view can move freely between sides
 │   │   ├── SidePanel.css
@@ -737,7 +742,7 @@ Route modules in `src/api/`:
 - `featureRoutes.ts` — feature toggles (admin + public)
 - `versionRoutes.ts` — `GET /version` (public)
 - `statisticsRoutes.ts` — vault statistics (file/folder count, total size)
-- `trashRoutes.ts` — trash CRUD (list, restore, permanent delete)
+- `trashRoutes.ts` — trash CRUD (list, restore, permanent delete); restore re-indexes the file via the optional `linkIndexHook.onFileRestored` (deletion had removed its tags/properties from the link index, so it stayed invisible to Graph/Tags otherwise)
 - `fileVersionRoutes.ts` — file version management (list, get content, restore)
 - `templateRoutes.ts` — template listing and creation
 - `uploadRoutes.ts` — file upload (multipart, image paste mode)

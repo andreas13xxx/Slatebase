@@ -137,44 +137,7 @@ export class LinkIndexService implements ILinkIndex {
 
       try {
         const content = await fs.readFile(absoluteFilePath, 'utf-8')
-
-        if (absoluteFilePath.endsWith('.canvas')) {
-          // Canvas files: extract file references only (no tags/properties)
-          const fileRefs = extractCanvasFileRefs(content)
-          const targets = new Set<string>()
-          for (const ref of fileRefs) {
-            const normalizedTarget = normalizeLinkPath(ref)
-            targets.add(normalizedTarget)
-          }
-          this.forwardLinks.set(normalizedPath, targets)
-        } else {
-          // Markdown files: extract wikilinks, tags, properties
-          const links = extractWikilinks(content)
-          const targets = new Set<string>()
-          for (const link of links) {
-            if (link.target === '') continue
-            const normalizedTarget = normalizeLinkPath(link.target)
-            targets.add(normalizedTarget)
-          }
-          this.forwardLinks.set(normalizedPath, targets)
-
-          // Extract properties
-          const properties = extractProperties(content)
-          if (Object.keys(properties).length > 0) {
-            this.fileProperties.set(normalizedPath, new Map(Object.entries(properties)))
-          }
-
-          // Extract tags (inline + frontmatter, Obsidian-compatible)
-          const inlineTags = extractTags(content)
-          const frontmatterTags = extractFrontmatterTags(properties)
-          const allTags = new Set(inlineTags)
-          for (const fmTag of frontmatterTags) {
-            allTags.add(fmTag)
-          }
-          if (allTags.size > 0) {
-            this.fileTags.set(normalizedPath, allTags)
-          }
-        }
+        this.indexFileContent(normalizedPath, content, absoluteFilePath.endsWith('.canvas'))
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         this.logger.warn('Skipping unreadable file during rebuild', {
@@ -279,22 +242,54 @@ export class LinkIndexService implements ILinkIndex {
   }
 
   /**
-   * Removes all index entries for a deleted file.
+   * Removes all index entries for a deleted file or folder.
    * Cleans up forward links, tags, properties, and backlink references.
+   *
+   * Folder deletes arrive here as the folder path: every indexed file beneath
+   * it went with it, so the whole subtree is pruned. For a plain file path the
+   * subtree prefix can never match another entry, so this stays a single-entry
+   * removal. Paths that aren't indexed at all (attachments, images, empty
+   * folders) are a no-op and skip the disk write.
    */
   async removeFile(filePath: string): Promise<void> {
-    const normalizedPath = normalizeLinkPath(filePath)
+    if (this.removeSubtree(filePath).size === 0) return
+    await this.persist()
+  }
 
-    // Remove from reverse map
-    this.removeFromReverseMap(normalizedPath)
+  /**
+   * Handles a folder rename or move by re-homing every indexed file under it.
+   *
+   * The notes themselves are untouched by the move, so their tags, properties
+   * and outgoing links stay the same — only the paths they are filed under
+   * change. Everything below the old path is dropped and the folder is re-read
+   * at its new location, in one pass with a single persist: notifying per
+   * descendant would rewrite the whole index file once per note.
+   */
+  async renameDirectory(oldPath: string, newPath: string): Promise<void> {
+    const removed = this.removeSubtree(oldPath)
 
-    // Remove forward links entry
-    this.forwardLinks.delete(normalizedPath)
+    const files = await this.findMarkdownFiles(path.join(this.vaultPath, newPath))
+    for (const absoluteFilePath of files) {
+      const normalizedPath = normalizeLinkPath(this.toRelativePath(absoluteFilePath))
+      try {
+        const content = await fs.readFile(absoluteFilePath, 'utf-8')
+        this.indexFileContent(normalizedPath, content, absoluteFilePath.endsWith('.canvas'))
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        this.logger.warn('Skipping unreadable file during folder rename', {
+          file: normalizedPath,
+          error: message,
+        })
+      }
+    }
 
-    // Remove tags and properties
-    this.fileTags.delete(normalizedPath)
-    this.removeFromPropertyValueIndex(normalizedPath)
-    this.fileProperties.delete(normalizedPath)
+    if (removed.size === 0 && files.length === 0) return
+
+    // Both derived maps are rebuilt wholesale rather than patched per file:
+    // the moved notes appear on both sides of the index (as link sources and
+    // as link targets), and a full pass over in-memory data costs no I/O.
+    this.rebuildReverseMap()
+    this.rebuildPropertyValueIndex()
 
     await this.persist()
   }
@@ -756,6 +751,15 @@ export class LinkIndexService implements ILinkIndex {
         }
       }
 
+      // Drop entries for files that no longer exist on disk before the derived
+      // maps are built. The index is only kept in sync through the API hooks,
+      // so anything that removed a file behind their back (a deleted folder
+      // before the hook covered it, an external editor, a restored backup)
+      // would otherwise keep its tags and properties in the vault metadata
+      // forever — the persisted index is loaded verbatim, so a restart doesn't
+      // clear it either.
+      const pruned = await this.pruneMissingFiles()
+
       // Rebuild reverse map from forward links
       this.rebuildReverseMap()
 
@@ -763,6 +767,16 @@ export class LinkIndexService implements ILinkIndex {
       this.rebuildPropertyValueIndex()
 
       this.ready = true
+
+      if (pruned > 0) {
+        this.logger.info('Pruned link index entries for files that no longer exist', {
+          vaultId: this.vaultId,
+          vaultName: this.vaultName,
+          prunedCount: pruned,
+        })
+        await this.persist()
+      }
+
       this.logger.info('Link index loaded from disk', {
         vaultId: this.vaultId,
         vaultName: this.vaultName,
@@ -781,6 +795,135 @@ export class LinkIndexService implements ILinkIndex {
   }
 
   // ─── Private Helpers ─────────────────────────────────────────────────────────
+
+  /**
+   * Removes a path and everything indexed below it from the source-side maps
+   * and the reverse map, without persisting.
+   *
+   * Folder paths must NOT go through normalizeLinkPath for the subtree prefix:
+   * it appends `.md` to any last segment without an extension, which would turn
+   * the folder `Projekte/Alpha` into `Projekte/Alpha.md` and never match. For a
+   * plain file path the prefix can't match another entry, leaving a
+   * single-entry removal.
+   *
+   * @returns The paths that were actually removed
+   */
+  private removeSubtree(filePath: string): Set<string> {
+    const normalizedPath = normalizeLinkPath(filePath)
+    const rawPath = filePath
+      .replace(/\\/g, '/')
+      .replace(/^(?:\.\/)+/, '')
+      .replace(/^\/+/, '')
+      .replace(/\/+$/, '')
+    const subtreePrefix = rawPath === '' ? null : `${rawPath}/`
+
+    const targets = new Set<string>()
+    for (const indexedPath of [
+      ...this.forwardLinks.keys(),
+      ...this.fileTags.keys(),
+      ...this.fileProperties.keys(),
+    ]) {
+      if (indexedPath === normalizedPath) {
+        targets.add(indexedPath)
+      } else if (subtreePrefix !== null && indexedPath.startsWith(subtreePrefix)) {
+        targets.add(indexedPath)
+      }
+    }
+
+    for (const target of targets) {
+      // Reverse map first — it reads the forward links that follow it.
+      this.removeFromReverseMap(target)
+      this.forwardLinks.delete(target)
+      this.fileTags.delete(target)
+      this.removeFromPropertyValueIndex(target)
+      this.fileProperties.delete(target)
+    }
+
+    return targets
+  }
+
+  /**
+   * Parses one file's content into the source-side maps (forward links, tags,
+   * properties). The derived maps (`backlinks`, `propertyValueIndex`) are left
+   * alone — callers that run this over many files rebuild those once at the
+   * end instead of patching them per file.
+   */
+  private indexFileContent(normalizedPath: string, content: string, isCanvas: boolean): void {
+    if (isCanvas) {
+      // Canvas files: file references only, no tags or properties.
+      const targets = new Set<string>()
+      for (const ref of extractCanvasFileRefs(content)) {
+        targets.add(normalizeLinkPath(ref))
+      }
+      this.forwardLinks.set(normalizedPath, targets)
+      this.fileTags.delete(normalizedPath)
+      this.fileProperties.delete(normalizedPath)
+      return
+    }
+
+    const targets = new Set<string>()
+    for (const link of extractWikilinks(content)) {
+      if (link.target === '') continue
+      targets.add(normalizeLinkPath(link.target))
+    }
+    this.forwardLinks.set(normalizedPath, targets)
+
+    const properties = extractProperties(content)
+    if (Object.keys(properties).length > 0) {
+      this.fileProperties.set(normalizedPath, new Map(Object.entries(properties)))
+    } else {
+      this.fileProperties.delete(normalizedPath)
+    }
+
+    // Tags: inline + frontmatter, Obsidian-compatible
+    const allTags = new Set(extractTags(content))
+    for (const fmTag of extractFrontmatterTags(properties)) {
+      allTags.add(fmTag)
+    }
+    if (allTags.size > 0) {
+      this.fileTags.set(normalizedPath, allTags)
+    } else {
+      this.fileTags.delete(normalizedPath)
+    }
+  }
+
+  /**
+   * Removes index entries whose file is gone from the vault directory.
+   * Only source-side maps are pruned — `backlinks` keys are link *targets*,
+   * which legitimately point at files that don't exist (broken wikilinks).
+   *
+   * @returns Number of pruned file entries
+   */
+  private async pruneMissingFiles(): Promise<number> {
+    const existing = new Set<string>()
+    for (const absoluteFilePath of await this.findMarkdownFiles(this.vaultPath)) {
+      existing.add(normalizeLinkPath(this.toRelativePath(absoluteFilePath)))
+    }
+
+    // An empty walk of a non-empty index means the vault directory was
+    // unreadable or temporarily unmounted, not that every note was deleted —
+    // keep the index rather than wiping it.
+    if (existing.size === 0) return 0
+
+    const stale = new Set<string>()
+    for (const indexedPath of [
+      ...this.forwardLinks.keys(),
+      ...this.fileTags.keys(),
+      ...this.fileProperties.keys(),
+    ]) {
+      if (!existing.has(indexedPath)) {
+        stale.add(indexedPath)
+      }
+    }
+
+    for (const indexedPath of stale) {
+      this.forwardLinks.delete(indexedPath)
+      this.fileTags.delete(indexedPath)
+      this.fileProperties.delete(indexedPath)
+    }
+
+    return stale.size
+  }
 
   /**
    * Recursively finds all .md and .canvas files in the given directory.

@@ -96,6 +96,150 @@ describe('LinkIndexService (extended v2)', () => {
       const meta = service.getGraphMeta()
       expect(meta.propertyKeys).toHaveLength(0)
     })
+
+    it('removes tags of every note inside a deleted folder', async () => {
+      await fs.mkdir(path.join(tempDir, 'Projekte', 'Alpha'), { recursive: true })
+      await fs.writeFile(path.join(tempDir, 'Projekte', 'Alpha', 'a.md'), '#alpha')
+      await fs.writeFile(path.join(tempDir, 'Projekte', 'Alpha', 'b.md'), '---\nstatus: active\n---\n#alpha')
+      await fs.writeFile(path.join(tempDir, 'keep.md'), '#keep')
+      await service.rebuild()
+
+      // The folder path carries no extension — it must not be normalized to
+      // `Projekte/Alpha.md`, or nothing below it would ever be pruned.
+      await service.removeFile('Projekte/Alpha')
+
+      const meta = service.getGraphMeta()
+      expect(meta.tags).toEqual([{ name: 'keep', count: 1 }])
+      expect(meta.propertyKeys).toHaveLength(0)
+    })
+
+    it('leaves the index untouched when the deleted path is not indexed', async () => {
+      await fs.writeFile(path.join(tempDir, 'a.md'), '#tag1')
+      await service.rebuild()
+
+      await service.removeFile('assets/diagram.png')
+
+      const meta = service.getGraphMeta()
+      expect(meta.tags).toEqual([{ name: 'tag1', count: 1 }])
+    })
+  })
+
+  describe('renameDirectory re-homes a moved folder', () => {
+    /** Moves `from` to `to` on disk, creating the destination's parent. */
+    async function moveOnDisk(from: string, to: string): Promise<void> {
+      await fs.mkdir(path.dirname(path.join(tempDir, to)), { recursive: true })
+      await fs.rename(path.join(tempDir, from), path.join(tempDir, to))
+    }
+
+    it('files the moved notes tags and properties under their new paths', async () => {
+      await fs.mkdir(path.join(tempDir, 'Projekte', 'Alpha'), { recursive: true })
+      await fs.writeFile(path.join(tempDir, 'Projekte', 'Alpha', 'a.md'), '---\nstatus: active\n---\n#alpha')
+      await fs.writeFile(path.join(tempDir, 'keep.md'), '#keep')
+      await service.rebuild()
+
+      await moveOnDisk('Projekte', 'Archiv/Projekte')
+      await service.renameDirectory('Projekte', 'Archiv/Projekte')
+
+      // The notes' content never changed, so the tag itself survives — only the
+      // path it is filed under moves.
+      expect(service.getGraphMeta().tags).toContainEqual({ name: 'alpha', count: 1 })
+      expect(service.getGraphMeta().tags).toContainEqual({ name: 'keep', count: 1 })
+      expect(service.getFilesByProperty('status')).toEqual(['Archiv/Projekte/Alpha/a.md'])
+    })
+
+    it('rebuilds backlinks against the new source paths', async () => {
+      await fs.mkdir(path.join(tempDir, 'Projekte'), { recursive: true })
+      await fs.writeFile(path.join(tempDir, 'Projekte', 'a.md'), '[[target]]')
+      await fs.writeFile(path.join(tempDir, 'target.md'), 'content')
+      await service.rebuild()
+      expect(service.getBacklinks('target.md')).toEqual(['Projekte/a.md'])
+
+      await moveOnDisk('Projekte', 'Archiv')
+      await service.renameDirectory('Projekte', 'Archiv')
+
+      expect(service.getBacklinks('target.md')).toEqual(['Archiv/a.md'])
+      expect(service.getForwardLinks('Archiv/a.md')).toEqual(['target.md'])
+      expect(service.getForwardLinks('Projekte/a.md')).toEqual([])
+    })
+
+    it('leaves a sibling folder that only shares a name prefix alone', async () => {
+      await fs.mkdir(path.join(tempDir, 'Projekt'), { recursive: true })
+      await fs.mkdir(path.join(tempDir, 'Projekte'), { recursive: true })
+      await fs.writeFile(path.join(tempDir, 'Projekt', 'a.md'), '#eins')
+      await fs.writeFile(path.join(tempDir, 'Projekte', 'b.md'), '#zwei')
+      await service.rebuild()
+
+      await moveOnDisk('Projekt', 'Archiv/Projekt')
+      await service.renameDirectory('Projekt', 'Archiv/Projekt')
+
+      // `Projekte/b.md` starts with the string `Projekt` but not with the
+      // folder `Projekt/` — it must stay where it is.
+      expect(service.getFilesByProperty('status')).toEqual([])
+      expect(service.getGraph({ includeTags: true }).edges).toContainEqual(
+        expect.objectContaining({ source: 'Projekte/b.md', target: 'tag:zwei' }),
+      )
+      expect(service.getGraph({ includeTags: true }).edges).toContainEqual(
+        expect.objectContaining({ source: 'Archiv/Projekt/a.md', target: 'tag:eins' }),
+      )
+    })
+
+    it('persists the new paths so a reload keeps them', async () => {
+      await fs.mkdir(path.join(tempDir, 'Projekte'), { recursive: true })
+      await fs.writeFile(path.join(tempDir, 'Projekte', 'a.md'), '#alpha')
+      await service.rebuild()
+
+      await moveOnDisk('Projekte', 'Archiv')
+      await service.renameDirectory('Projekte', 'Archiv')
+
+      const raw = await fs.readFile(path.join(tempDir, '.slatebase', 'link-index.json'), 'utf-8')
+      expect(JSON.parse(raw).tags).toEqual({ 'Archiv/a.md': ['alpha'] })
+    })
+  })
+
+  describe('loadFromDisk prunes entries for files that are gone', () => {
+    it('drops tags and properties of notes deleted while the index was not running', async () => {
+      await fs.writeFile(path.join(tempDir, 'gone.md'), '---\nstatus: active\n---\n#verschwunden')
+      await fs.writeFile(path.join(tempDir, 'kept.md'), '#geblieben')
+      await service.rebuild()
+
+      // Deleted behind the index's back — no removeFile call, as happens when
+      // the vault is edited outside the app.
+      await fs.rm(path.join(tempDir, 'gone.md'))
+
+      const reloaded = new LinkIndexService(tempDir, 'test-vault', 'Test Vault', logger)
+      await reloaded.loadFromDisk()
+
+      const meta = reloaded.getGraphMeta()
+      expect(meta.tags).toEqual([{ name: 'geblieben', count: 1 }])
+      expect(meta.propertyKeys).toHaveLength(0)
+    })
+
+    it('persists the pruned index so the next load starts clean', async () => {
+      await fs.writeFile(path.join(tempDir, 'gone.md'), '#verschwunden')
+      await fs.writeFile(path.join(tempDir, 'kept.md'), '#geblieben')
+      await service.rebuild()
+      await fs.rm(path.join(tempDir, 'gone.md'))
+
+      await new LinkIndexService(tempDir, 'test-vault', 'Test Vault', logger).loadFromDisk()
+
+      const raw = await fs.readFile(path.join(tempDir, '.slatebase', 'link-index.json'), 'utf-8')
+      expect(JSON.parse(raw).tags).toEqual({ 'kept.md': ['geblieben'] })
+    })
+
+    it('keeps the index when the vault directory yields no files at all', async () => {
+      await fs.writeFile(path.join(tempDir, 'a.md'), '#tag1')
+      await service.rebuild()
+
+      // Every note gone at once reads as an unreadable or unmounted vault
+      // rather than a mass delete — wiping the index there would lose data
+      // that comes back with the directory.
+      await fs.rm(path.join(tempDir, 'a.md'))
+
+      const reloaded = new LinkIndexService(tempDir, 'test-vault', 'Test Vault', logger)
+      await reloaded.loadFromDisk()
+
+      expect(reloaded.getGraphMeta().tags).toEqual([{ name: 'tag1', count: 1 }])
+    })
   })
 
   describe('v2 persistence round-trip', () => {

@@ -577,6 +577,8 @@ export const de = {
     tags: {
       empty: 'Keine Tags gefunden.',
       loading: 'Tags werden geladen…',
+      expandBranch: 'Tags unter {tag} anzeigen',
+      collapseBranch: 'Tags unter {tag} ausblenden',
     },
     properties: {
       empty: 'Keine Eigenschaften gefunden.',

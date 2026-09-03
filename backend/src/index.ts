@@ -304,6 +304,13 @@ if (featureToggleService.isEnabled('mcp')) {
       // finished initializing.
       migrateLinks: (vaultId, oldPath, newPath, oldTree) =>
         linkMigrationService.migrateLinks(vaultId, oldPath, newPath, oldTree),
+      // Closure, not a direct reference: `linkIndexHook` is a `const` declared
+      // further down (4h) — see the note on migrateLinks above.
+      linkIndexHook: {
+        onFileSaved: (vaultId, filePath, content) => { linkIndexHook.onFileSaved(vaultId, filePath, content) },
+        onFileDeleted: (vaultId, filePath) => { linkIndexHook.onFileDeleted(vaultId, filePath) },
+        onFileRenamed: (vaultId, oldPath, newPath) => linkIndexHook.onFileRenamed(vaultId, oldPath, newPath),
+      },
       // Closure, not a direct reference: `eventBus` is a `const` declared
       // further down (4d) — this MCP block (4c) runs first, but the arrow
       // function body isn't evaluated until a write/delete/move/rename tool
@@ -681,6 +688,12 @@ const trashRoutes = createTrashRoutes({
   vaultRegistry,
   eventBus,
   logger,
+  // Closure, not a direct reference: `linkIndexHook` is a `const` declared
+  // further down — the arrow body only runs on an actual restore, long after
+  // the module finished initializing.
+  linkIndexHook: {
+    onFileRestored: (vaultId, filePath) => { linkIndexHook.onFileRestored(vaultId, filePath) },
+  },
 })
 app.route('/api/v1', trashRoutes)
 
@@ -835,8 +848,11 @@ for (const entry of vaultEntries) {
   })
 }
 
-// Set up link index hook on VaultController for incremental updates
-vaultController.setLinkIndexHook({
+// Set up link index hook on VaultController for incremental updates.
+// Held in a named const because the MCP tool handlers (4c above) reuse it via
+// closure — an MCP write/delete has to keep the index in sync just like a REST
+// one, or its tags and properties linger in the Graph and the context panel.
+const linkIndexHook = {
   onFileSaved(vaultId: string, filePath: string, content: string): void {
     let linkIndex = getLinkIndex(vaultId)
     // Create link index on-demand for newly created vaults
@@ -863,26 +879,54 @@ vaultController.setLinkIndexHook({
       })
     }
   },
-  onFileRenamed(vaultId: string, oldPath: string, newPath: string): void {
+  onFileRestored(vaultId: string, filePath: string): void {
+    // Inverse of onFileDeleted: the file is back on disk but the index dropped
+    // it, so re-read and re-index it. Markdown only — a restored folder has no
+    // content to parse, and its notes are picked up by the next rebuild.
+    if (!filePath.endsWith('.md') && !filePath.endsWith('.canvas')) return
     const linkIndex = getLinkIndex(vaultId)
-    if (linkIndex) {
-      // Read the file content at the new path, then update the index
-      const entry = vaultRegistry.findById(vaultId)
-      if (entry) {
-        const absolutePath = path.join(entry.storagePath, newPath)
-        fs.readFile(absolutePath, 'utf-8')
-          .then((content) => linkIndex.renameFile(oldPath, newPath, content))
-          .catch((error: unknown) => {
-            const message = error instanceof Error ? error.message : String(error)
-            logger.error('Link index renameFile failed', { vaultId, oldPath, newPath, error: message })
-          })
-      }
-    }
+    const entry = vaultRegistry.findById(vaultId)
+    if (!linkIndex || !entry) return
+    fs.readFile(path.join(entry.storagePath, filePath), 'utf-8')
+      .then((content) => linkIndex.updateFile(filePath, content))
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error)
+        logger.error('Link index restore failed', { vaultId, filePath, error: message })
+      })
+  },
+  onFileRenamed(vaultId: string, oldPath: string, newPath: string): Promise<void> {
+    const linkIndex = getLinkIndex(vaultId)
+    const entry = vaultRegistry.findById(vaultId)
+    if (!linkIndex || !entry) return Promise.resolve()
+
+    const absolutePath = path.join(entry.storagePath, newPath)
+    // The caller only knows a path moved, not what kind of thing it is — a
+    // folder has no content to read, and its notes have to be re-homed one
+    // level down instead.
+    return fs.stat(absolutePath)
+      .then((stats) => {
+        if (stats.isDirectory()) {
+          return linkIndex.renameDirectory(oldPath, newPath)
+        }
+        if (newPath.endsWith('.md') || newPath.endsWith('.canvas')) {
+          return fs.readFile(absolutePath, 'utf-8')
+            .then((content) => linkIndex.renameFile(oldPath, newPath, content))
+        }
+        // Renamed out of the indexed formats (`Note.md` → `Note.txt`), or never
+        // indexed to begin with — drop any entry the old path still holds.
+        return linkIndex.removeFile(oldPath)
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error)
+        logger.error('Link index renameFile failed', { vaultId, oldPath, newPath, error: message })
+      })
   },
   migrateLinks(vaultId: string, oldPath: string, newPath: string, oldTree: DirectoryTree) {
     return linkMigrationService.migrateLinks(vaultId, oldPath, newPath, oldTree)
   },
-})
+}
+
+vaultController.setLinkIndexHook(linkIndexHook)
 
 // Set up vault deletion hook for resource cleanup (plugin data, link index)
 vaultController.setVaultDeletionHook({

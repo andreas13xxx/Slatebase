@@ -14,6 +14,7 @@ import { extractErrorMessage } from '../utils/error'
 import type { DirectoryTree } from '../types'
 import { extractHeadings } from '../components/context-panel/utils/extractHeadings'
 import { extractWikilinks } from '../plugins/wikilink/extract'
+import { extractTags } from '../plugins/tag/extract'
 import { resolveWikilinkTarget } from '../plugins/link-resolver'
 
 /**
@@ -240,24 +241,61 @@ function lineHasWikilinkTo(
 }
 
 /**
+ * Parses the open document's tags and dispatches SET_DOCUMENT_TAGS.
+ *
+ * Purely local — the vault-wide tag list is the backend's, but it can only
+ * change on save, so the panel layers the document's live tags over it (see
+ * `applyDocumentTags`). Parses with the same rules the indexer uses, so the
+ * overlay agrees with what the save will produce.
+ *
+ * @param dispatch - The document panel dispatch function
+ * @param documentPath - Path of the open document, or null when none is open
+ * @param content - Raw markdown content of the open document
+ */
+export function loadDocumentTags(
+  dispatch: Dispatch<DocumentPanelAction>,
+  documentPath: string | null,
+  content: string | null,
+): void {
+  if (documentPath === null || content === null) {
+    dispatch({ type: 'SET_DOCUMENT_TAGS', path: null, tags: null })
+    return
+  }
+
+  try {
+    dispatch({ type: 'SET_DOCUMENT_TAGS', path: documentPath, tags: extractTags(content) })
+  } catch {
+    // Malformed frontmatter shouldn't blank the panel — fall back to the
+    // backend's list by dropping the overlay.
+    dispatch({ type: 'SET_DOCUMENT_TAGS', path: null, tags: null })
+  }
+}
+
+/**
  * Fetches vault-wide tags from the backend and dispatches SET_TAGS.
  * Sets loading state before the request.
  *
  * @param dispatch - The document panel dispatch function
  * @param apiClient - The API client instance
  * @param vaultId - The current vault ID
+ * @param showLoading - Whether to flip the view into its loading state first.
+ *   `false` for background refreshes after a vault mutation: the list is
+ *   already on screen and only needs to be corrected, so blanking it out to
+ *   "Loading…" for one round-trip reads as a flicker rather than progress.
  */
 export async function loadTags(
   dispatch: Dispatch<DocumentPanelAction>,
   apiClient: IApiClient,
   vaultId: string,
+  showLoading = true,
 ): Promise<void> {
-  dispatch({ type: 'SET_TAGS_LOADING', loading: true })
+  if (showLoading) dispatch({ type: 'SET_TAGS_LOADING', loading: true })
   try {
     const response = await apiClient.getVaultTags(vaultId)
     const entries: TagEntry[] = response.tags.map((tag) => ({
       name: tag.name,
       count: tag.count,
+      files: tag.files,
     }))
     dispatch({ type: 'SET_TAGS', entries })
   } catch {

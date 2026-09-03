@@ -14,7 +14,7 @@
  * concern (components/context-panel/PropertiesOverview.tsx).
  */
 
-import { useCallback, useEffect, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
 import type { Dispatch } from 'react'
 import type { IApiClient } from '../api'
 import type { DirectoryTree } from '../types'
@@ -25,6 +25,7 @@ import {
   loadBacklinks,
   loadUnlinkedMentions,
   loadTags,
+  loadDocumentTags,
   expandTag,
 } from './documentPanelActions'
 
@@ -59,6 +60,13 @@ export interface LinkEntry {
 export interface TagEntry {
   name: string
   count: number
+  /**
+   * Files carrying this tag. Comes along with the tag list from the same
+   * request the expand uses, so a refresh can correct an already-open tag's
+   * file list without a second round-trip. Optional: consumers that only
+   * render the tag row don't need to supply it.
+   */
+  files?: string[]
 }
 
 /** A single Ungelinkte_Erwähnung: a plain-text occurrence of the active file's name in another file. */
@@ -89,6 +97,15 @@ export interface DocumentPanelState {
     loading: boolean
     expandedTag: string | null
     tagFiles: string[]
+    /**
+     * Tags of the open document as it currently reads in the editor, including
+     * unsaved edits — `null` when no markdown document is open. The vault-wide
+     * `entries` only change when the backend re-indexes on save, so a tag being
+     * typed or deleted right now is layered on top of them from here.
+     */
+    documentTags: string[] | null
+    /** Path `documentTags` was parsed from, so the overlay edits the right file. */
+    documentTagsPath: string | null
   }
 }
 
@@ -105,7 +122,78 @@ export type DocumentPanelAction =
   | { type: 'SET_TAGS'; entries: TagEntry[] }
   | { type: 'SET_TAGS_LOADING'; loading: boolean }
   | { type: 'SET_TAG_EXPANDED'; tag: string | null; files: string[] }
+  | { type: 'SET_DOCUMENT_TAGS'; path: string | null; tags: string[] | null }
   | { type: 'RESET_DOCUMENT_STATE' }
+
+/** Order-insensitive comparison, so a re-parse that found nothing new is a no-op. */
+function sameTags(a: string[] | null, b: string[] | null): boolean {
+  if (a === b) return true
+  if (a === null || b === null || a.length !== b.length) return false
+  const set = new Set(a)
+  return b.every((tag) => set.has(tag))
+}
+
+/**
+ * Layers the open document's current tags over the vault-wide list.
+ *
+ * The list comes from the link index, which only learns about a tag once the
+ * note is saved. Rather than wait for that round-trip, the open document's
+ * contribution is recomputed here: its saved contribution is subtracted and its
+ * current one added, so a tag typed just now appears immediately and one just
+ * deleted disappears — and re-applying after the save that makes it official
+ * lands on the same answer.
+ *
+ * Entries without a `files` list are passed through untouched: without it there
+ * is no way to tell whether the open document is already counted.
+ *
+ * @param entries - Vault-wide tag list as the backend reported it
+ * @param documentPath - Path of the open document, or null when none is
+ * @param documentTags - Its tags as currently edited, or null when unknown
+ */
+export function applyDocumentTags(
+  entries: TagEntry[],
+  documentPath: string | null,
+  documentTags: string[] | null,
+): TagEntry[] {
+  if (documentPath === null || documentTags === null) return entries
+
+  const current = new Set(documentTags)
+  const result: TagEntry[] = []
+  const seen = new Set<string>()
+
+  for (const entry of entries) {
+    seen.add(entry.name)
+
+    if (!entry.files) {
+      result.push(entry)
+      continue
+    }
+
+    const counted = entry.files.includes(documentPath)
+    const shouldCount = current.has(entry.name)
+    if (counted === shouldCount) {
+      result.push(entry)
+      continue
+    }
+
+    const files = shouldCount
+      ? [...entry.files, documentPath]
+      : entry.files.filter((file) => file !== documentPath)
+
+    // The open document was the tag's last note — the tag is gone with it.
+    if (files.length === 0) continue
+
+    result.push({ ...entry, count: files.length, files })
+  }
+
+  for (const name of documentTags) {
+    if (seen.has(name)) continue
+    seen.add(name)
+    result.push({ name, count: 1, files: [documentPath] })
+  }
+
+  return result
+}
 
 function createInitialState(): DocumentPanelState {
   return {
@@ -119,7 +207,7 @@ function createInitialState(): DocumentPanelState {
       unlinkedMentionsLoading: false,
       unlinkedMentionsError: null,
     },
-    tags: { entries: [], loading: false, expandedTag: null, tagFiles: [] },
+    tags: { entries: [], loading: false, expandedTag: null, tagFiles: [], documentTags: null, documentTagsPath: null },
   }
 }
 
@@ -143,12 +231,38 @@ function documentPanelReducer(state: DocumentPanelState, action: DocumentPanelAc
       return { ...state, links: { ...state.links, unlinkedMentionsLoading: action.loading } }
     case 'SET_UNLINKED_MENTIONS_ERROR':
       return { ...state, links: { ...state.links, unlinkedMentionsError: action.error, unlinkedMentionsLoading: false } }
-    case 'SET_TAGS':
-      return { ...state, tags: { ...state.tags, entries: action.entries, loading: false } }
+    case 'SET_TAGS': {
+      const expanded = state.tags.expandedTag
+      if (expanded === null) {
+        return { ...state, tags: { ...state.tags, entries: action.entries, loading: false } }
+      }
+      // Keep an open tag in sync with the refreshed list: the tag itself can be
+      // gone (its last note was deleted), or still exist with fewer files.
+      const match = action.entries.find((entry) => entry.name === expanded)
+      if (!match) {
+        return { ...state, tags: { ...state.tags, entries: action.entries, loading: false, expandedTag: null, tagFiles: [] } }
+      }
+      return {
+        ...state,
+        tags: {
+          ...state.tags,
+          entries: action.entries,
+          loading: false,
+          tagFiles: match.files ?? state.tags.tagFiles,
+        },
+      }
+    }
     case 'SET_TAGS_LOADING':
       return { ...state, tags: { ...state.tags, loading: action.loading } }
     case 'SET_TAG_EXPANDED':
       return { ...state, tags: { ...state.tags, expandedTag: action.tag, tagFiles: action.files } }
+    case 'SET_DOCUMENT_TAGS': {
+      const unchanged =
+        state.tags.documentTagsPath === action.path &&
+        sameTags(state.tags.documentTags, action.tags)
+      if (unchanged) return state
+      return { ...state, tags: { ...state.tags, documentTags: action.tags, documentTagsPath: action.path } }
+    }
     case 'RESET_DOCUMENT_STATE':
       return {
         ...state,
@@ -162,7 +276,7 @@ function documentPanelReducer(state: DocumentPanelState, action: DocumentPanelAc
           unlinkedMentionsLoading: false,
           unlinkedMentionsError: null,
         },
-        tags: { ...state.tags, expandedTag: null, tagFiles: [] },
+        tags: { ...state.tags, expandedTag: null, tagFiles: [], documentTags: null, documentTagsPath: null },
       }
   }
 }
@@ -217,6 +331,7 @@ export function useDocumentPanelData({
       if (documentContent !== null && documentPath !== null) {
         loadOutline(dispatch, documentContent)
         loadForwardLinks(dispatch, documentContent, directoryTree, documentPath ?? undefined)
+        loadDocumentTags(dispatch, documentPath, documentContent)
       }
 
       if (documentPath !== null && vaultId !== null && apiClient) {
@@ -249,6 +364,7 @@ export function useDocumentPanelData({
     debounceTimerRef.current = setTimeout(() => {
       loadOutline(dispatch, documentContent)
       loadForwardLinks(dispatch, documentContent, directoryTree, documentPath ?? undefined)
+      loadDocumentTags(dispatch, documentPath, documentContent)
       debounceTimerRef.current = null
     }, CONTENT_DEBOUNCE_MS)
 
@@ -260,19 +376,35 @@ export function useDocumentPanelData({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentContent])
 
-  // ─── Vault Change: Load Tags ───────────────────────────────────────────────
+  // ─── Vault, File-Set or Document Change: Load Tags ─────────────────────────
+  //
+  // The tag list is vault-wide, not document-scoped, so it goes stale whenever
+  // files elsewhere in the vault change — most visibly on delete, where the
+  // removed note's tags kept showing up until the vault was switched or the app
+  // reloaded. `directoryTree` is the signal for that: it is re-fetched (new
+  // object identity) after every create/delete/move/rename, local or remote.
+  //
+  // `documentPath` is the second trigger, and it covers saves. A save re-indexes
+  // the note without touching the file set, so the list would stay stale — while
+  // that note is open the live overlay below hides that, but the overlay drops
+  // away the moment another document takes its place. Re-fetching on the switch
+  // hands over to a list that already knows what the save produced.
+  //
+  // Only a switch to a different vault shows the loading state; a refresh after
+  // a mutation corrects a list that is already on screen.
 
   useEffect(() => {
-    if (vaultId !== prevVaultIdRef.current) {
-      if (vaultId !== null && apiClient) {
-        void loadTags(dispatch, apiClient, vaultId)
-      } else {
-        dispatch({ type: 'SET_TAGS', entries: [] })
-      }
-      prevVaultIdRef.current = vaultId
+    const vaultChanged = vaultId !== prevVaultIdRef.current
+    prevVaultIdRef.current = vaultId
+
+    if (vaultId === null || !apiClient) {
+      dispatch({ type: 'SET_TAGS', entries: [] })
+      return
     }
+
+    void loadTags(dispatch, apiClient, vaultId, vaultChanged)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vaultId])
+  }, [vaultId, directoryTree, documentPath])
 
   // ─── Live Backlinks: Refresh on Remote Vault Changes ───────────────────────
 
@@ -335,5 +467,24 @@ export function useDocumentPanelData({
     }
   }, [state.tags.expandedTag, vaultId, apiClient])
 
-  return { state, dispatch, onHeadingClick, onTagClick }
+  // The vault-wide list only moves when the backend re-indexes on save; the
+  // open document's own tags are layered on live so setting or deleting one
+  // shows up in the panel as it is typed rather than a save later.
+  const liveTags = useMemo(
+    () => applyDocumentTags(state.tags.entries, state.tags.documentTagsPath, state.tags.documentTags),
+    [state.tags.entries, state.tags.documentTagsPath, state.tags.documentTags],
+  )
+
+  const liveTagFiles = useMemo(() => {
+    if (state.tags.expandedTag === null) return state.tags.tagFiles
+    const match = liveTags.find((entry) => entry.name === state.tags.expandedTag)
+    return match?.files ?? state.tags.tagFiles
+  }, [liveTags, state.tags.expandedTag, state.tags.tagFiles])
+
+  const liveState = useMemo(
+    () => ({ ...state, tags: { ...state.tags, entries: liveTags, tagFiles: liveTagFiles } }),
+    [state, liveTags, liveTagFiles],
+  )
+
+  return { state: liveState, dispatch, onHeadingClick, onTagClick }
 }

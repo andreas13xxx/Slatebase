@@ -123,8 +123,9 @@ export interface ILinkIndex {
   updateFile(filePath: string, content: string): Promise<void>
 
   /**
-   * Removes all index entries for a deleted file.
-   * Cleans up forward links and backlink references.
+   * Removes all index entries for a deleted file or folder.
+   * Cleans up forward links and backlink references; a folder path takes
+   * everything indexed below it with it.
    * @param filePath - Relative path from vault root
    */
   removeFile(filePath: string): Promise<void>
@@ -136,6 +137,15 @@ export interface ILinkIndex {
    * @param content - Current markdown content
    */
   renameFile(oldPath: string, newPath: string, content: string): Promise<void>
+
+  /**
+   * Handles a folder rename or move: drops everything indexed under the old
+   * path and re-reads the folder at its new location. Content is read from the
+   * vault directory rather than passed in — a folder has none of its own.
+   * @param oldPath - Previous relative folder path
+   * @param newPath - New relative folder path
+   */
+  renameDirectory(oldPath: string, newPath: string): Promise<void>
 
   /**
    * Returns forward links for a specific file.

@@ -43,6 +43,7 @@ function createMockLinkIndex(overrides: Partial<ILinkIndex> = {}): ILinkIndex {
     updateFile: async () => {},
     removeFile: async () => {},
     renameFile: async () => {},
+    renameDirectory: async () => {},
     getForwardLinks: () => [],
     getBacklinks: () => [],
     getGraph: () => ({ nodes: [], edges: [] }),

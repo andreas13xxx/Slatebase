@@ -190,7 +190,7 @@ describe('VaultController — Link-Migration on move (folder)', () => {
     expect(migrateLinks).toHaveBeenCalledTimes(2)
   })
 
-  it('does not call the per-file onFileRenamed hook for a folder move (only migrateLinks applies)', async () => {
+  it('notifies the link index of a folder move with the folder path itself', async () => {
     const tree = dir('vault', '', [dir('Folder', 'Folder', [file('A.md', 'Folder/A.md')])])
     const vaultService = createMockVaultService(tree, {
       moveContent: vi.fn().mockResolvedValue({ newPath: 'Moved' }),
@@ -205,7 +205,40 @@ describe('VaultController — Link-Migration on move (folder)', () => {
       body: JSON.stringify({ sourcePath: 'Folder', destinationPath: 'Moved' }),
     })
 
-    // sourcePath 'Folder' doesn't end with .md, so the self-update hook is skipped, as before.
-    expect(onFileRenamed).not.toHaveBeenCalled()
+    // One call with the folder path, not one per descendant: the index re-homes
+    // the whole subtree in a single pass rather than persisting per note.
+    expect(onFileRenamed).toHaveBeenCalledTimes(1)
+    expect(onFileRenamed).toHaveBeenCalledWith('v1', 'Folder', 'Moved')
+  })
+
+  it('re-homes the moved paths in the index before Link-Migration reads it', async () => {
+    const tree = dir('vault', '', [dir('Folder', 'Folder', [file('A.md', 'Folder/A.md')])])
+    const vaultService = createMockVaultService(tree, {
+      moveContent: vi.fn().mockResolvedValue({ newPath: 'Moved' }),
+    })
+    const order: string[] = []
+    const hook: LinkIndexHook = {
+      onFileSaved: vi.fn(),
+      onFileDeleted: vi.fn(),
+      // Resolves on a later tick: only an awaited hook can still order ahead of
+      // the migration, which resolves backlinks against the index.
+      onFileRenamed: vi.fn().mockImplementation(async () => {
+        await Promise.resolve()
+        order.push('index')
+      }),
+      migrateLinks: vi.fn().mockImplementation(async () => {
+        order.push('migrate')
+        return emptyMigration
+      }),
+    }
+    const app = buildApp(vaultService, hook, createMockEventBus())
+
+    await app.request('/vaults/v1/move', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sourcePath: 'Folder', destinationPath: 'Moved' }),
+    })
+
+    expect(order).toEqual(['index', 'migrate'])
   })
 })
