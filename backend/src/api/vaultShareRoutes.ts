@@ -60,7 +60,7 @@ const vaultShareParamsSchema = z.object({
  * Valid share permission levels.
  */
 const permissionEnum = z.enum(['read', 'write'], {
-  errorMap: () => ({ message: 'Field permission must be "read" or "write"' }),
+  error: 'Field permission must be "read" or "write"',
 })
 
 /**

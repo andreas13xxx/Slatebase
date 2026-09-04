@@ -61,7 +61,7 @@ export interface ProxyRoutesDeps {
 const proxyRequestSchema = z.object({
   url: z.string().url().max(2048),
   method: z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS']).optional().default('GET'),
-  headers: z.record(z.string()).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
   body: z.string().optional(),
   contentType: z.string().optional(),
 })
