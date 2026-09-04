@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.42.2](https://github.com/andreas13xxx/Slatebase/compare/v0.42.1...v0.42.2) (2026-09-04)
+
+
+### Bugfixes
+
+* close real-plugin CSP gaps found once the SPA document policy went live ([#146](https://github.com/andreas13xxx/Slatebase/issues/146)) ([421f85c](https://github.com/andreas13xxx/Slatebase/commit/421f85c4b7be59efae41c6057c7c2419da66b943))
+
+
+### Sonstige Änderungen
+
+* bump zod from 3.25.76 to 4.5.4 in /backend ([#135](https://github.com/andreas13xxx/Slatebase/issues/135)) ([2171bef](https://github.com/andreas13xxx/Slatebase/commit/2171befaaea2a63b7c7798b6695ff65f7cc832e7))
+
 ## [0.42.1](https://github.com/andreas13xxx/Slatebase/compare/v0.42.0...v0.42.1) (2026-09-04)
 
 
