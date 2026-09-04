@@ -11,10 +11,12 @@ still open. It is not a change log — resolved findings are removed once they a
 | 1 | Per-user rate limiter on `POST /vaults/:vaultId/shares` (20/hour) | A01 Access Control | Low | When share notifications are added (there is no notification channel today) |
 | 2 | Per-user rate limiter + timeout for `GET /search` and `GET /vaults/:vaultId/search` | A05 Misconfiguration | Low | If DoS via complex regex queries becomes a concern; add the `SearchService` timeout first |
 | 3 | Real plugin sandbox isolation (Worker / VM / iframe) | A08 Data Integrity | Low | Scoped in the `server-side-plugins` spec — do not attempt without it |
-| 4 | Manual browser CSP regression pass (editor, canvas link nodes, plugin install, graph view) with DevTools open, against the now-live `frontend/nginx.conf` CSP | A05 Misconfiguration | Low | Before a production deploy; CI has no real browser, and no Docker/browser was available in the environment that made this change — still outstanding |
 
 Items 1–2 are ~1h each using the existing `SlidingWindowRateLimiter`. The `POST /proxy`
 rate limiter formerly listed here is implemented (`proxyRoutes.ts`, 60 req/min per userId).
+The manual browser CSP regression pass formerly listed here happened — against production,
+via real plugin usage rather than a staged pre-deploy check — and found three gaps, since
+fixed; see the A05 correction below.
 
 ## Accepted Risks
 
@@ -100,10 +102,11 @@ untrusted content is covered by the XSS rules in `.kiro/steering/quality.md`.
 | Directive | Value | Rationale |
 |-----------|-------|-----------|
 | `default-src` | `'self'` | Restrictive fallback for anything unspecified |
-| `script-src` | `'self' blob:` | `blob:` is required for plugin bundle execution (Blob URL + dynamic `import()` in `plugin-loader.ts`) |
+| `script-src` | `'self' blob: 'unsafe-eval' 'wasm-unsafe-eval'` | `blob:` for plugin bundle execution (Blob URL + dynamic `import()` in `plugin-loader.ts`); `unsafe-eval`/`wasm-unsafe-eval` because plugins are trust-on-install (see A08) and several real, popular ones (Templater's WASM engine, Excalidraw, Kanban) use `eval`/`new Function`/WebAssembly internally |
 | `style-src` | `'self' 'unsafe-inline'` | Plugin CSS injection via `<style>` tags, inline styles in rendered content |
 | `img-src` | `'self' data: https:` | `data:` for base64 images in Markdown, `https:` for external images in notes |
-| `connect-src` | `'self'` | API and SSE are same-origin in production |
+| `font-src` | `'self' https:` | Plugins load webfonts from their own CDN of choice (e.g. Excalidraw pulls from unpkg.com) |
+| `connect-src` | `'self' https://api.github.com` | API and SSE are same-origin in production; `api.github.com` for the built-in update checker (`useVersionInfo.ts`, `useReleaseNotes.ts`), which calls it directly from the browser |
 | `frame-src` | `'self' https:` | Canvas link-node iframes load external URLs |
 | `object-src` | `'none'` | No plugin/embed/object elements needed |
 | `frame-ancestors` | `'none'` | Clickjacking protection |
@@ -111,9 +114,17 @@ untrusted content is covered by the XSS rules in `.kiro/steering/quality.md`.
 Plus `Strict-Transport-Security: max-age=63072000; includeSubDomains`,
 `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`.
 
-**No `unsafe-eval` is needed** — plugin bundles run via Blob URL + dynamic `import()`, not
-`eval()`/`new Function()`. Mermaid, KaTeX, d3-force and highlight.js work without eval
-too. Don't add it back for convenience.
+**`unsafe-eval`/`wasm-unsafe-eval` (2026-09):** previously believed unnecessary — "plugin
+bundles run via Blob URL + dynamic `import()`, not `eval()`/`new Function()`... don't add it
+back for convenience." That held for Slatebase's own bundled code (Mermaid, KaTeX, d3-force,
+highlight.js), but was never checked against real community plugins running under a live
+*document* CSP, because the CSP wasn't reaching the document at all until this point (see the
+correction below). It doesn't hold for plugins in general: A08 already documents plugins as
+trust-on-install, with the install-time scanner *detecting and warning about* eval usage
+rather than blocking it — CSP blocking it outright contradicted that existing, deliberate
+model rather than adding a new one. A plugin with eval blocked still has full same-origin
+DOM/fetch/storage access, so the boundary this removes was mostly nominal; the compatibility
+cost (Templater, Excalidraw, Kanban all failed to load) was real.
 
 `crossOriginResourcePolicy` is deliberately disabled: frontend and backend can run on
 different origins, and `same-origin` CORP would block `<img src>` loads from the raw-file
@@ -136,7 +147,13 @@ adding the document policy there as well would duplicate it on every proxied res
 No extra `worker-src` was needed for the spellcheck module worker: it loads as a
 same-origin module chunk, and CSP's fetch-directive fallback chain
 (`worker-src → child-src → script-src`) means `script-src 'self' blob:` already covers it.
-Verified in a manual DevTools pass — see Open Items #5.
+
+Once the policy actually reached the document for the first time, real usage (rather than a
+staged pre-deploy pass — no Docker/browser was available in the environment that shipped this
+change) surfaced three gaps within a day: the update checker's direct `api.github.com` call
+(`connect-src`), a plugin loading webfonts from its own CDN (`font-src`, previously absent
+and falling back to `default-src 'self'`), and `eval`/`new Function`/WebAssembly used by
+several real community plugins (`script-src`) — all three fixed above.
 
 ---
 
