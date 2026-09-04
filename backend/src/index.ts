@@ -519,8 +519,18 @@ app.use(
 // block cross-origin <img> loads of vault files served from here.
 // Content-Security-Policy: explicit directives per resource type.
 // - `blob:` in scriptSrc: plugin bundles execute via Blob URL + dynamic import()
+// - `'unsafe-eval'` + `'wasm-unsafe-eval'` in scriptSrc: plugins are trust-on-install
+//   (see SECURITY-AUDIT.md A08) and the install-time scanner already detects and warns
+//   about eval/new Function usage rather than blocking it — several real, popular
+//   community plugins (Templater's WASM engine, Excalidraw, Kanban) rely on eval/Function/
+//   WebAssembly internally. Blocking it via CSP breaks them without adding a real boundary:
+//   a plugin already has full same-origin DOM/fetch/storage access either way.
 // - `'unsafe-inline'` in styleSrc: plugin CSS injection uses <style> tags
 // - `data:` + `https:` in imgSrc: inline images and external images in notes
+// - `https:` in fontSrc: plugins load webfonts from their own CDN of choice (e.g. the
+//   Excalidraw plugin pulls from unpkg.com) — same latitude already given to imgSrc
+// - `https://api.github.com` in connectSrc: the built-in update checker
+//   (useVersionInfo.ts, useReleaseNotes.ts) calls the GitHub API directly from the browser
 // - `https:` in frameSrc: Canvas link-node iframes embed external URLs
 // - `crossOriginResourcePolicy: false`: frontend and backend run on different origins
 //   (allowedOrigins config) — `same-origin` CORP would block <img src> loads from
@@ -534,10 +544,11 @@ app.use(
     referrerPolicy: 'strict-origin-when-cross-origin',
     contentSecurityPolicy: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "blob:"],
+      scriptSrc: ["'self'", "blob:", "'unsafe-eval'", "'wasm-unsafe-eval'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'"],
+      fontSrc: ["'self'", "https:"],
+      connectSrc: ["'self'", "https://api.github.com"],
       frameSrc: ["'self'", "https:"],
       objectSrc: ["'none'"],
       frameAncestors: ["'none'"],
