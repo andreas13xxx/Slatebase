@@ -90,22 +90,33 @@ Slatebase erkennt automatisch, wenn du ein Kürzel zuweist, das bereits von eine
 
 Folgende Befehle können mit eigenen Kürzeln belegt werden:
 
-| Standard-Kürzel | Befehl |
-|-----------------|--------|
-| `Ctrl+Shift+F` | Vault-weite Suche öffnen |
-| `Ctrl+P` | Command Palette öffnen |
-| `Ctrl+,` | Einstellungen öffnen |
-| `Ctrl+N` | Neue Datei erstellen |
-| `Ctrl+Shift+N` | Neuen Ordner erstellen |
-| `Ctrl+S` | Datei speichern |
-| `Ctrl+Z` | Rückgängig machen |
-| `Ctrl+Shift+Z` | Wiederherstellen |
-| `Ctrl+E` | Zwischen Edit/View wechseln |
-| `Ctrl+O` | Schnellwechsler öffnen |
-| `Alt+←` | Zurück navigieren |
-| `Alt+→` | Vor navigieren |
-| `Ctrl+Shift+]` | Nächster Tab |
-| `Ctrl+Shift+[` | Vorheriger Tab |
+| Befehl | Standard-Kürzel | Kategorie |
+|--------|-----------------|-----------|
+| Befehlspalette öffnen | `Ctrl+P` | Navigation |
+| Einstellungen öffnen | `Ctrl+,` | Navigation |
+| Schnellwechsler öffnen | `Ctrl+O` | Navigation |
+| Zurück navigieren | `Alt+←` | Navigation |
+| Vor navigieren | `Alt+→` | Navigation |
+| Nächster Tab | `Ctrl+Shift+]` | Navigation |
+| Vorheriger Tab | `Ctrl+Shift+[` | Navigation |
+| Seitenleiste ein-/ausblenden | — | Navigation |
+| Kontextpanel ein-/ausblenden | — | Navigation |
+| Werkzeugleiste ein-/ausblenden | — | Navigation |
+| Farbschema umschalten | — | Navigation |
+| Vault-Suche öffnen | `Ctrl+Shift+F` | Panel |
+| Editor-Modus wechseln | `Ctrl+E` | Panel |
+| Datei speichern | `Ctrl+S` | Editor |
+| Rückgängig | `Ctrl+Z` | Editor |
+| Wiederholen | `Ctrl+Shift+Z` | Editor |
+| Tagesnotiz öffnen/erstellen | — | Vault |
+| Neue Datei | — | Vault |
+| Neue Notiz aus Vorlage | — | Vault |
+| Vorlage einfügen | — | Vault |
+| Zufällige Notiz öffnen | — | Vault |
+| Knowledge Graph öffnen | — | Vault |
+| Papierkorb öffnen | — | Vault |
+
+Befehle ohne Standard-Kürzel (—) sind über die Command Palette erreichbar und können hier ein eigenes Kürzel bekommen. Auf macOS steht `Cmd` an der Stelle von `Ctrl`.
 
 > [!info] Fett, Kursiv, Link einfügen
 > Formatierungsbefehle wie Fett, Kursiv und Link einfügen sind über die Command Palette (`Ctrl+P`) erreichbar, haben aber kein Standard-Tastenkürzel und sind nicht Teil der konfigurierbaren Keybindings-Tabelle.

@@ -47,6 +47,7 @@ npm run lint           # ESLint
 
 CI runs `test:coverage`, not `test` — a coverage-threshold miss fails the build like a failing
 test. Config: `backend/vitest.config.ts` and the `test.coverage` block in `frontend/vite.config.ts`.
+Threshold rules live in `quality.md`.
 
 ## Terminal-Regeln
 
@@ -67,6 +68,9 @@ test. Config: `backend/vitest.config.ts` and the `test.coverage` block in `front
 | tsx | Dev server |
 | argon2 | Password hashing (argon2id) |
 | adm-zip | ZIP extraction (plugin upload) |
+| imapflow | IMAP client (mail-import) |
+| postal-mime | MIME parsing of fetched mails (mail-import) |
+| turndown | HTML → Markdown conversion for HTML mail bodies (mail-import) |
 | fast-check | Property-based testing (devDependency, `.pbt.test.ts` files) |
 
 ### Frontend
@@ -86,6 +90,7 @@ test. Config: `backend/vitest.config.ts` and the `test.coverage` block in `front
 | highlight.js | Syntax highlighting |
 | lucide-react | Icons |
 | jszip | ZIP export (Firefox fallback) |
+| html-to-image | Renders the live canvas DOM to a PNG blob (`canvas:export-as-image`) |
 | d3-force | Knowledge graph layout |
 | mermaid | Diagram rendering (lazy-loaded) |
 | katex | LaTeX math rendering (lazy-loaded, same pattern as mermaid) |
@@ -180,7 +185,7 @@ Kein Express/Fastify/Koa, kein Redux/Zustand, kein ORM, kein DI-Container, kein 
 - Lösung, zwei Hälften: (1) `plugin-execution-context.ts` verfolgt, welches Plugin gerade läuft; `createEl`/`createDiv` taggen jedes erzeugte Element damit. (2) `scopeSingleSelector()` emittiert pro Regel zusätzlich eine Self-Form (`sel[data-plugin-id="x"]`) neben der Descendant-Form.
 - Kontext-Propagierung: synchron via `withPluginContext()` (Save/Restore, reentrant-sicher); über `await`-Grenzen hinweg via `scopeForPlugin()` (Proxy, bindet die ID in eine Closure und wrappt übergebene Callbacks). `EventSystem` speichert die ID am Listener und stellt sie beim `trigger()` wieder her.
 - Bewusst kein `AsyncLocalStorage`-Äquivalent: alle Plugins laufen im selben JS-Realm ohne Iframes/Worker, und die Call-Sites mit bekannter pluginId sind abzählbar.
-- Ausnahme vom Scoping: Obsidians Host-Marker-Klassen (`theme-dark`, `is-mobile`, `mod-macos`, … aus `OBSIDIAN_HOST_BODY_CLASSES` in `body-classes.ts`) sitzen auf `<body>` und bleiben deshalb als Prefix *vor* dem Scope stehen — in den Scope gefaltet ergeben sie einen Selektor, der von einem Element verlangt, gleichzeitig Body und Plugin-Element zu sein, und der nie matcht. Der Prefix muss auf jede erzeugte Alternative (Self- **und** Descendant-Form), sonst greift eine Dark-Mode-Regel auch im Light-Mode.
+- Ausnahme vom Scoping: Obsidians Host-Marker-Klassen (`OBSIDIAN_HOST_BODY_CLASSES` in `body-classes.ts`) sitzen auf `<body>` und bleiben als Prefix *vor* dem Scope stehen — auf jeder erzeugten Alternative. Siehe `lessons-learned.md`.
 
 ### Icon-Auflösung → lucide-react Dynamic-Import-Map
 - Obsidian bundlet den kompletten Lucide-Satz; `setIcon(el, 'chevron-down')` funktioniert dort für jeden Namen. Unsere `addIcon()`-Registry allein ließ Plugin-Buttons leer.

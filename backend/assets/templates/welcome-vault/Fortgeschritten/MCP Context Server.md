@@ -125,4 +125,4 @@ Claude kann dann selbstständig die Vault-Struktur erkunden, Dateien lesen und e
 
 - [[Features/Einstellungen]] — Token-Verwaltung in den Einstellungen
 - [[Features/Suche und Ersetzen]] — Die Suche, die auch MCP nutzt
-- [[Fortgeschritten/Vault Sync einrichten]] — Alternative für Datenzugriff auf anderen Geräten
+- [[Features/Git-Sync]] — Alternative für Datenzugriff auf anderen Geräten

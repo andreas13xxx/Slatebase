@@ -25,7 +25,7 @@ Slatebase hat aktuell fünf registrierte Feature-Toggles:
 |---------|----------|-----|--------------|
 | `chat` | aktiv | Hot | Echtzeit-Chat zwischen Nutzern |
 | `mcp` | aktiv | Cold | Model Context Protocol Server (KI-Integration) |
-| `obsidian-plugin-compat` | **inaktiv** | Cold | Obsidian-Plugin-Kompatibilitätsschicht |
+| `obsidian-plugin-compat` | aktiv | Cold | Obsidian-Plugin-Kompatibilitätsschicht (⚠️ experimentell) |
 | `git-sync` | aktiv | Cold | Serverseitige Git-Synchronisation von Vaults |
 | `mail-import` | aktiv | Cold | Serverseitiger IMAP-Mail-Import als Markdown-Notizen |
 
@@ -71,7 +71,7 @@ Von den fünf aktuellen Toggles ist nur `chat` ein Hot-Toggle. `mcp`, `obsidian-
 - **Deaktiviert:** MCP-Endpunkt antwortet mit 403, bestehende Tokens bleiben gespeichert
 - **Hinweis:** Experimentelles Feature; Änderung wirkt erst nach Server-Neustart
 
-### Obsidian Plugin Compat (`obsidian-plugin-compat`) — Cold, standardmäßig **inaktiv**
+### Obsidian Plugin Compat (`obsidian-plugin-compat`) — Cold, standardmäßig aktiv
 
 - **Aktiviert:** Plugin-Verwaltung sichtbar, Plugins können installiert und geladen werden
 - **Deaktiviert:** Keine Plugin-Funktionalität, Plugin-Commands nicht in Command Palette
@@ -110,7 +110,7 @@ SLATEBASE_FEATURE_CHAT=false
 |-----------|-----------|
 | Kleine Installation (1–3 Nutzer) | Alle Features auf Standard belassen |
 | Firmenumgebung ohne KI | `mcp` deaktivieren (Neustart nötig) |
-| Plugins nicht benötigt | `obsidian-plugin-compat` deaktiviert lassen (Standard) |
+| Plugins nicht benötigt | `obsidian-plugin-compat` deaktivieren (Neustart nötig) |
 | Kein Team-Bedarf | `chat` deaktivieren |
 | Keine externen Git-Remotes nötig | `git-sync` deaktivieren (Neustart nötig) |
 | Kein IMAP-Postfach-Import nötig | `mail-import` deaktivieren (Neustart nötig) |

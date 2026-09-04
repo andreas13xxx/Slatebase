@@ -101,9 +101,11 @@ backend/           — Node.js REST API (Hono + TypeScript, ESM)
 │   ├── chat/      — Messaging system
 │   ├── mcp/       — MCP server (AI integration)
 │   ├── search/    — Full-text search + replace
-│   ├── link-index/— Knowledge graph indexing
+│   ├── link-index/— Knowledge graph indexing, backlinks, link migration on rename/move
+│   ├── property-type/ — Per-vault frontmatter property type registry
 │   ├── plugin/    — Installed-plugin management (per vault)
 │   ├── plugin-store/ — Community plugin marketplace (browse/install/update from GitHub)
+│   ├── snippets/  — Per-vault user CSS snippets
 │   ├── feature-toggle/ — Feature flag system
 │   ├── realtime/  — SSE connections + event bus
 │   ├── audit/     — Audit logging
@@ -113,19 +115,26 @@ backend/           — Node.js REST API (Hono + TypeScript, ESM)
 │   ├── statistics/ — Vault file/folder/size statistics
 │   ├── cleanup/   — Periodic trash purge + version pruning job
 │   ├── preferences/ — Per-user preferences (recent files, favorites, keybindings)
-│   ├── vault-config/ — Per-vault configuration (templates dir, daily notes dir)
+│   ├── vault-config/ — Per-vault configuration (templates, daily notes, attachments directory)
 │   ├── welcome-vault/ — Tutorial vault creation
+│   ├── shared-secrets/ — Encrypted at-rest credentials shared by git-sync and mail-import
+│   ├── git-sync/  — Per-vault git remotes (sync engine, scheduler, SSH keygen)
+│   ├── mail-import/ — IMAP polling → Markdown notes (client, converter, writer, scheduler)
+│   ├── upload/    — File upload handling
 │   └── import/    — File/folder import
 ├── config/        — Default configuration (default.json)
 └── data/          — Runtime data (created at startup)
 
-Vault synchronization runs client-side via the Obsidian LiveSync plugin inside the plugin-compat layer (server-side CORS proxy only) — there is no backend sync module.
+Two sync paths exist side by side: **Git-Sync** (`git-sync/`) runs server-side against git remotes, while **LiveSync** (CouchDB) runs client-side in the Obsidian plugin-compat layer and only uses the backend as a CORS proxy.
 
 frontend/          — React SPA (Vite + TypeScript)
 ├── src/
 │   ├── components/  — React components
 │   ├── state/       — Reducers, contexts, action creators
 │   ├── plugins/     — Markdown plugins + Obsidian compat layer
+│   ├── editor/      — CodeMirror 6 Live Preview editor + spellchecker
+│   ├── canvas/      — Obsidian `.canvas` whiteboard editor
+│   ├── hooks/       — Reusable hooks (focus trap, resize, shortcuts, workspace restore)
 │   ├── i18n/        — Internationalization (de, en)
 │   ├── api/         — API client (IApiClient interface)
 │   └── utils/       — Shared utilities
@@ -147,7 +156,7 @@ Config → Logger → Vault (Data Access) → Business → API (Controller)
 
 **Frontend:** React with useReducer + Context.
 
-- Separate providers per concern (App, Tab, Auth, Chat, Sync, Search, Realtime, ContextPanel, Feature)
+- Separate providers per concern: `AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvider → SearchProvider → TabProvider → NavigationHistoryProvider → LeftPanelProvider → RightPanelProvider`
 - Action creators are standalone async functions (not hooks)
 - Singleton `IApiClient` — never instantiate in components
 
@@ -305,7 +314,7 @@ Backend configuration via `backend/config/default.json`, overridden by `SLATEBAS
 | `SLATEBASE_VAULT_PATHS` | *(from config)* | Comma-separated pre-configured vault paths (overrides `config/default.json` vaults) |
 | `SLATEBASE_TEMPLATES_DIR` | `./assets/templates` | Custom directory for welcome vault templates |
 | `SLATEBASE_GITHUB_TOKEN` | *(none)* | Optional GitHub token for the community plugin store, used to raise API rate limits |
-| `SLATEBASE_MCP_MAX_FILE_SIZE` | `5242880` | Max file size for MCP reads |
+| `SLATEBASE_MCP_MAX_FILE_SIZE` | `16777216` | Max file size for MCP reads and writes (16 MB) |
 | `SLATEBASE_MCP_RATE_LIMIT` | `60` | MCP requests per minute per token |
 | `SLATEBASE_EXTERNAL_PORT` | `8080` | Host port (Docker Compose only) |
 | `SLATEBASE_FEATURE_<NAME>` | *(per toggle)* | Overrides a feature toggle, e.g. `SLATEBASE_FEATURE_MCP=false` disables the `mcp` toggle. `cold` toggles require a restart to take effect |
@@ -402,9 +411,15 @@ data/
 ├── shares.json           — Vault sharing
 ├── audit/                — Append-only audit logs (JSONL, daily rotation)
 ├── chat/                 — Conversations, messages, unread counts
-├── sync/<vaultId>/       — Sync config, checkpoints, conflicts, logs
-├── mcp/tokens/           — API tokens (SHA-256 hashes)
-└── plugins/<vaultId>/    — Plugin files (manifest, bundle, styles, settings)
+├── mcp/tokens/            — API tokens (SHA-256 hashes)
+├── plugins/<vaultId>/     — Plugin files (manifest, bundle, styles, settings, secrets)
+├── plugin-store/          — Cached community plugin list and manifests
+├── snippets/<vaultId>/    — User CSS snippets + registry
+├── git-sync/              — Remote configs, run status, known-hosts
+├── mail-import/           — IMAP configs and run status
+├── module-secrets/        — Encrypted git-sync / mail-import credentials
+├── features.json          — Feature toggle overrides
+└── server-config.json     — Admin overrides from PUT /admin/config
 ```
 
 ---

@@ -6,104 +6,93 @@ inclusion: manual
 
 ## Ziel
 
-Slatebase als Self-Hosted-Alternative für Obsidian-Vault-Zugriff in der Community bekannt machen. Zielgruppen: Self-Hoster, Obsidian-Nutzer, PKM-Community, AI/MCP-Interessierte.
+Slatebase als Self-Hosted-Alternative für Obsidian-Vault-Zugriff in der Community bekannt
+machen. Zielgruppen: Self-Hoster, Obsidian-Nutzer, PKM-Community, AI/MCP-Interessierte.
 
-## Maßnahmen
+Repo ist public, README/About/Demo-GIF stehen, Lizenz ist **AGPL-3.0**, CI/CD veröffentlicht
+Multi-Arch-Images auf GHCR (`ghcr.io/andreas13xxx/slatebase-backend` + `-frontend`) und
+Release Please erzeugt Releases samt Changelog. Die Grundlagenphase ist damit abgeschlossen.
 
-### Phase 1: Grundlagen (Repo & Präsenz)
+## Offene Maßnahmen
 
-| # | Maßnahme | Status | Details |
-|---|----------|--------|---------|
-| 1 | GitHub Repo auf public setzen | ✅ Fertig | Sichtbarkeit geändert |
-| 2 | README aufpolieren (Hero, Quick Start, Features) | ✅ Fertig | Docker-Compose-Beispiel, Feature-Tabelle, Tech Stack |
-| 3 | GitHub About-Bereich füllen (Description + Topics) | ✅ Fertig | Topics: obsidian, markdown, self-hosted, knowledge-management, collaboration, real-time-chat, team, etc. |
-| 4 | Screenshots / Demo-GIF erstellen | ✅ Fertig | `demo.gif` im Projekt-Root vorhanden |
-| 5 | LICENSE-Datei hinzufügen (MIT) | ✅ Fertig | `LICENSE` im Projekt-Root vorhanden |
-| 6 | CONTRIBUTING.md erstellen | 📋 Geplant | Kurze Anleitung: Issues first, Dev-Setup, Code-Konventionen |
-| 7 | Docker Images auf GHCR veröffentlichen | ✅ Pipeline fertig | CI/CD-Pipeline konfiguriert — `ghcr.io/andreas13xxx/slatebase-backend` + `-frontend`, automatischer Push bei Release |
-| 8 | GitHub Releases mit Changelog starten | ✅ Pipeline fertig | Release Please konfiguriert, erster Release bei Merge auf `main` |
-
-### Phase 2: Community-Reichweite
+### Community-Reichweite
 
 | # | Maßnahme | Status | Details |
 |---|----------|--------|---------|
-| 9 | Post auf r/selfhosted | ✍️ Entwurf fertig | Flair: "Self-Hosted Alternatives", englisch, mit demo.gif + GitHub-Link. Collaboration hervorheben: Chat, Sharing, Multi-User |
-| 10 | Post auf r/ObsidianMD | ✍️ Entwurf fertig | Flair: "Resources & Workflows", englisch, mit demo.gif + GitHub-Link. Fokus: Vault-Sharing + Chat als Team-Feature |
-| 11 | Show HN (Hacker News) | 📋 Geplant | Kurzer Pitch: Self-hosted, no DB, Obsidian-kompatibel, Collaboration (Chat + Sharing), MCP-ready |
-| 12 | PR an awesome-selfhosted | 📋 Geplant | Kategorie: Knowledge Management / Wikis |
-| 13 | Obsidian Discord/Forum Post | 📋 Geplant | Kanal: #third-party-tools oder Plugin-Showcase |
-| 14 | PR an awesome-obsidian | 📋 Geplant | Unter "Tools" oder "Web Access" |
+| 1 | Post auf r/selfhosted | Entwurf fertig (`.kiro/marketing/reddit-selfhosted.md`) | Flair „Self-Hosted Alternatives", englisch, mit demo.gif + GitHub-Link. Collaboration hervorheben |
+| 2 | Post auf r/ObsidianMD | Entwurf fertig (`.kiro/marketing/reddit-obsidianmd.md`) | Flair „Resources & Workflows", englisch. Fokus: Vault-Sharing, Plugin-Kompatibilität, LiveSync |
+| 3 | PR an awesome-selfhosted | Geplant | Kategorie: Knowledge Management / Wikis |
+| 4 | PR an awesome-obsidian | Geplant | Unter „Tools" oder „Web Access" |
+| 5 | Obsidian Discord/Forum Post | Geplant | Kanal: #third-party-tools oder Plugin-Showcase |
+| 6 | Show HN | Geplant | Erst wenn Docker-Images stabil sind. Pitch: Self-hosted, no DB, Obsidian-kompatibel, Plugin-Runtime im Browser, MCP-ready |
 
-### Phase 3: Content & Storytelling
-
-| # | Maßnahme | Status | Details |
-|---|----------|--------|---------|
-| 15 | Dev.to / Blog-Artikel: Architektur-Entscheidungen | 📋 Geplant | "Why no database?", Filesystem-basiert, opake Tokens statt JWT |
-| 16 | Dev.to / Blog-Artikel: MCP-Integration | 📋 Geplant | MCP-Server ist implementiert — AI-Community ansprechen |
-| 17 | Kurzes YouTube/Loom-Video (2–3 Min) | 📋 Geplant | Setup → Login → Vault browsen → Datei editieren → Vault teilen → Chat-Nachricht senden |
-| 18 | Twitter/X Thread: "Building a self-hosted Obsidian web UI" | 📋 Geplant | Build-in-public Narrative, Screenshots, Learnings |
-
-### Phase 4: Ökosystem & Wachstum
+### Content
 
 | # | Maßnahme | Status | Details |
 |---|----------|--------|---------|
-| 19 | Docker Hub Listing (zusätzlich zu GHCR) | 📋 Geplant | Breitere Sichtbarkeit, gute Beschreibung |
-| 20 | Obsidian Community Plugin (Sync zu Slatebase) | ✅ Anders gelöst | Custom `vault-sync`-Backend/Frontend-Modul wieder entfernt — stattdessen läuft das echte Obsidian-Community-Plugin „LiveSync" nativ im Plugin-Compat-Layer (bidirektionale CouchDB-Replikation via Server-Proxy). Kein eigenes Sync-Plugin nötig. |
-| 21 | MCP-Server im MCP-Verzeichnis listen | 📋 Geplant | MCP-Server implementiert — Listing vorbereiten |
-| 22 | Vergleichsseite: Slatebase vs. Obsidian Publish vs. Quartz | 📋 Geplant | Faire Gegenüberstellung — Differenzierung: Multi-User, Chat, granulare Rechte, Vault-Transfer, Sync (alles was die anderen nicht haben) |
-| 23 | Localization: Englische UI als Default für internationale Reichweite | 📋 Geplant | i18n ist vorhanden — English als Default für breitere Adoption |
+| 7 | Blog: Architektur-Entscheidungen | Geplant | „Why no database?", Filesystem-basiert, opake Tokens statt JWT |
+| 8 | Blog: MCP-Integration | Geplant | AI-Community ansprechen |
+| 9 | Blog/Video: Obsidian-Plugins im Browser | Geplant | Stärkstes technisches Alleinstellungsmerkmal — echte Community-Bundles laufen ohne Electron |
+| 10 | Kurzvideo (2–3 Min) | Geplant | Setup → Login → Vault browsen → editieren → teilen → Plugin installieren |
+| 11 | Twitter/X Thread | Geplant | Build-in-public Narrative, Screenshots, Learnings |
 
-## Priorisierung
+### Ökosystem
 
-**Sofort (diese Woche):**
-- Screenshots/GIF (#4)
-- LICENSE-Datei (#5)
-- Docker Images bauen und pushen (#7)
+| # | Maßnahme | Status | Details |
+|---|----------|--------|---------|
+| 12 | MCP-Server im MCP-Verzeichnis listen | Geplant | Server ist implementiert, Listing vorbereiten |
+| 13 | Docker Hub Listing zusätzlich zu GHCR | Geplant | Breitere Sichtbarkeit |
+| 14 | Vergleichsseite vs. Obsidian Publish / Quartz / BookStack / Wiki.js | Geplant | Tabelle mit ✅/❌ pro Feature |
+| 15 | Englische UI als Default | Geplant | i18n ist vorhanden — English als Default für breitere Adoption |
 
-**Kurzfristig (nächste 2 Wochen):**
-- r/selfhosted Post (#9) — größter Hebel für erste Nutzer
-- r/ObsidianMD Post (#10)
-- awesome-selfhosted PR (#12)
-- Erster GitHub Release v0.1.0 (#8)
+**Reihenfolge:** Reddit-Posts zuerst (größter Hebel für erste Nutzer), dann die
+awesome-*-PRs, dann Content. Show HN erst danach.
 
-**Mittelfristig (1–2 Monate):**
-- Show HN (#11) — erst wenn Docker-Images stabil und Screenshots vorhanden
-- Blog-Artikel Architektur (#15)
-- Video (#17)
+**Kein eigenes Sync-Plugin:** Ein Custom-`vault-sync`-Modul wurde bewusst verworfen —
+stattdessen läuft das echte Community-Plugin „LiveSync" nativ im Plugin-Compat-Layer
+(bidirektionale CouchDB-Replikation über den Server-Proxy).
 
-**Langfristig (abhängig von Feature-Entwicklung):**
-- MCP-Artikel + Listing (#16, #21) — MCP-Server ist implementiert, Artikel und Listing vorbereiten
-- Obsidian Plugin (#20) — Sync-Backend steht, Plugin-Seite noch offen
-- Vergleichsseite (#22) — wenn genug Differenzierung vorhanden
+## Differenzierungsmerkmale
 
-## Collaboration als Differenzierungsmerkmal
-
-Die Collaboration-Features sind Slatebase's stärkstes Alleinstellungsmerkmal gegenüber allen Alternativen. Sie sollten in JEDEM Post, jeder README-Feature-Tabelle und jedem Video prominent vorkommen.
-
-### Implementierte Collaboration-Features (sofort bewerbbar)
+In jedem Post, jeder README-Feature-Tabelle und jedem Video prominent:
 
 | Feature | Differenzierung vs. Alternativen |
 |---------|----------------------------------|
+| **Obsidian Plugin Compatibility** | Echte Community-Plugins laufen im Web-Frontend, inkl. Plugin-Store zum Installieren aus GitHub-Releases. Obsidian Publish: kein Plugin-Support; Quartz/MkDocs: statisch, keine Runtime |
 | **Echtzeit-Chat** | Obsidian Publish, Quartz, MkDocs — keines hat Chat |
 | **Granulare Vault-Freigaben (Read/Write)** | Obsidian Publish: nur read-only, keine Rechte-Granularität |
 | **Vault-Besitz-Transfer** | Nirgends sonst vorhanden — Team-Übergaben ohne Datenverlust |
 | **Multi-User mit Rollen (Admin/User)** | Quartz/MkDocs: Single-User; Obsidian Publish: kein Multi-User |
-| **Unread-Badges & Archivierung** | Vollwertiges Messaging, nicht nur Kommentare |
-| **Multi-Session / Multi-Device** | Gleichzeitig auf Handy und Desktop — ohne Sync-Dienst |
-| **User-Suche mit Autocomplete** | Einfaches Teilen ohne E-Mail-Einladungen oder externe Accounts |
-| **CouchDB/LiveSync Vault-Synchronisation** | Bidirektional & Read-Only, Intervall-basiert, Konflikterkennung, E2E-Verschlüsselung — kompatibel mit obsidian-livesync |
-| **Obsidian Plugin Compatibility** | Obsidian Community Plugins direkt im Web-Frontend ausführen — keine Alternative unterstützt das (Obsidian Publish: kein Plugin-Support; Quartz/MkDocs: statisch, keine Runtime) |
-| **Knowledge Graph** | Interaktive Visualisierung der Vault-Verlinkungsstruktur — Obsidian Publish/Quartz haben keinen interaktiven Graph mit Zoom/Pan/Drag |
-| **Context Panel (Outline, Links, Tags, Properties)** | Obsidian Publish: kein Outline/Tags-Panel; Quartz: nur statisch. Slatebase: interaktiv, splittbar, Drag & Drop |
-| **MCP-Server mit Lese- UND Schreibzugriff** | AI-Assistenten (Claude, Cursor, etc.) können Vaults durchsuchen, Dateien erstellen/bearbeiten/löschen/verschieben — keine Alternative bietet das |
-| **Volltextsuche mit Find & Replace** | Vault-weite Suche (Plain-Text + Regex), Multi-Vault-Suche, Kontext-Zeilen, Replace mit Bestätigung — Obsidian Publish/Quartz haben keine Suche, nur statische Indizes |
+| **MCP-Server mit Lese- UND Schreibzugriff** | AI-Assistenten durchsuchen Vaults und erstellen/bearbeiten/löschen/verschieben Dateien — keine Alternative bietet das |
+| **Git-Sync serverseitig** | Vault gegen beliebige Git-Remotes synchronisieren, ohne Client-Software |
+| **Mail-Import via IMAP** | Postfächer landen als Markdown-Notizen im Vault — kein Zapier, kein Drittdienst |
+| **CouchDB/LiveSync-Kompatibilität** | Bidirektional, intervallbasiert, E2E-verschlüsselt — kompatibel mit obsidian-livesync |
+| **Knowledge Graph** | Interaktive Visualisierung inkl. lokalem Graph — Obsidian Publish/Quartz haben keinen interaktiven Graph |
+| **Context Panel (Outline, Links, Tags, Properties)** | Interaktiv, splittbar, Drag & Drop. Obsidian Publish: kein Outline/Tags-Panel |
+| **Volltextsuche mit Find & Replace** | Vault-weit, Regex, Multi-Vault, Suchoperatoren, Replace mit Bestätigung — die Alternativen haben nur statische Indizes |
+| **Eingebaute Rechtschreibprüfung** | Eigene Hunspell-Wörterbücher mit echten Korrekturvorschlägen, nicht die des Browsers |
+| **Canvas** | Obsidian-`.canvas`-Whiteboards lesen und bearbeiten |
 
-### Messaging für Posts & Content
+## Messaging
 
-- **r/selfhosted:** "Collaboration without SaaS" — viele suchen self-hosted Notion/Confluence-Alternativen mit Team-Features. Sync mit CouchDB/LiveSync als Killer-Feature für bestehende Obsidian-Nutzer.
-- **r/ObsidianMD:** "Share your vault with teammates, chat about notes, sync via LiveSync — all self-hosted" — Pain Point der Community. LiveSync-Kompatibilität ist ein starker Hook.
-- **Show HN:** "Not just a viewer — a collaborative knowledge platform with CouchDB sync" — hebt sich von Static-Site-Generatoren ab
-- **Vergleichsseite:** Tabelle mit ✅/❌ pro Feature vs. Obsidian Publish, Quartz, BookStack, Wiki.js
+- **r/selfhosted:** „Collaboration without SaaS" — viele suchen self-hosted
+  Notion/Confluence-Alternativen mit Team-Features.
+- **r/ObsidianMD:** „Run your plugins, share your vault, chat about notes — all
+  self-hosted." Die Plugin-Runtime ist hier der stärkste Hook.
+- **Show HN:** „Not just a viewer — Obsidian community plugins running in the browser,
+  with CouchDB and git sync."
+- **Vergleichsseite:** Tabelle mit ✅/❌ pro Feature vs. Obsidian Publish, Quartz,
+  BookStack, Wiki.js.
+
+## Kernbotschaften
+
+1. **„Deine Notizen, dein Server, jeder Browser."** — Self-Hosting + Web-Zugriff
+2. **„Obsidian-kompatibel, ohne Obsidian."** — Kein Vendor-Lock-in, inklusive Plugins
+3. **„Kein Sync-Dienst, keine Datenbank, keine Magie."** — Transparenz, Plain Files
+4. **„Teile Wissen, nicht Accounts."** — Multi-User mit granularen Rechten
+5. **„Zusammenarbeiten, nicht nur speichern."** — Chat, Vault-Sharing, Realtime
+6. **„Sync, wie es dir passt."** — Git-Remotes serverseitig oder CouchDB via LiveSync
+7. **„AI-ready: MCP-Integration für deine Wissensbasis."** — Lesen UND Schreiben
 
 ## Erfolgskriterien
 
@@ -114,13 +103,3 @@ Die Collaboration-Features sind Slatebase's stärkstes Alleinstellungsmerkmal ge
 | Unique Visitors (GitHub Insights) | 500+ |
 | Community-Feedback (Issues/Discussions) | 10+ sinnvolle Interaktionen |
 | Externe Erwähnungen (Reddit, HN, Blogs) | 3+ |
-
-## Kernbotschaften
-
-1. **"Deine Notizen, dein Server, jeder Browser."** — Self-Hosting + Web-Zugriff
-2. **"Obsidian-kompatibel, ohne Obsidian."** — Kein Vendor-Lock-in
-3. **"Kein Sync-Dienst, keine Datenbank, keine Magie."** — Transparenz, Plain Files
-4. **"Teile Wissen, nicht Accounts."** — Multi-User mit granularen Rechten
-5. **"Zusammenarbeiten, nicht nur speichern."** — Built-in Chat, Vault-Sharing, Echtzeit-Kollaboration ohne dritte App
-6. **"Sync mit CouchDB/LiveSync — bidirektional, verschlüsselt, konfliktfrei."** — Nahtlose Integration mit obsidian-livesync
-7. **"AI-ready: MCP-Integration für deine Wissensbasis."** — Lesen UND Schreiben via MCP — AI-Assistenten können Vaults durchsuchen, Dateien erstellen, bearbeiten und organisieren

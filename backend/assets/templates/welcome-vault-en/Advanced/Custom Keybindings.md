@@ -20,20 +20,34 @@ Slatebase lets you customize keyboard shortcuts to match your workflow. Remap ex
 
 Keybindings can be configured for these actions:
 
-| Command | Default Shortcut |
-|---------|-----------------|
-| Toggle edit/view mode | `Ctrl+E` |
-| Open search | `Ctrl+Shift+F` |
-| Open command palette | `Ctrl+P` |
-| Open settings | `Ctrl+,` |
-| Open daily note | — |
-| Toggle sidebar | — |
-| Open Quick Switcher | `Ctrl+O` |
-| Navigate back | `Alt+←` |
-| Navigate forward | `Alt+→` |
-| Next tab | `Ctrl+Shift+]` |
-| Previous tab | `Ctrl+Shift+[` |
-| And more... | |
+| Command | Default Shortcut | Category |
+|---------|------------------|----------|
+| Open command palette | `Ctrl+P` | Navigation |
+| Open settings | `Ctrl+,` | Navigation |
+| Open Quick Switcher | `Ctrl+O` | Navigation |
+| Navigate back | `Alt+←` | Navigation |
+| Navigate forward | `Alt+→` | Navigation |
+| Next tab | `Ctrl+Shift+]` | Navigation |
+| Previous tab | `Ctrl+Shift+[` | Navigation |
+| Toggle sidebar | — | Navigation |
+| Toggle context panel | — | Navigation |
+| Toggle toolbar | — | Navigation |
+| Toggle color scheme | — | Navigation |
+| Open vault search | `Ctrl+Shift+F` | Panel |
+| Toggle edit/view mode | `Ctrl+E` | Panel |
+| Save file | `Ctrl+S` | Editor |
+| Undo | `Ctrl+Z` | Editor |
+| Redo | `Ctrl+Shift+Z` | Editor |
+| Open/create daily note | — | Vault |
+| New file | — | Vault |
+| New note from template | — | Vault |
+| Insert template | — | Vault |
+| Open random note | — | Vault |
+| Open knowledge graph | — | Vault |
+| Open trash | — | Vault |
+
+Commands without a default shortcut (—) are reachable from the Command Palette and can be
+given one here. On macOS, `Cmd` takes the place of `Ctrl`.
 
 > [!info] Bold, Italic, Create Link
 > Formatting actions like Bold, Italic, and Create Link are available from the Command Palette (`Ctrl+P`), but they have no default keyboard shortcut and are not part of the configurable Keybindings table above.

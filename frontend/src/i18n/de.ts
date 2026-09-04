@@ -75,11 +75,8 @@ export const de = {
 
   vault: {
     label: 'Vault',
-    select: 'Vault auswählen…',
-    selectAriaLabel: 'Vault auswählen',
     empty: 'Vault ist leer',
     noVaults: 'Keine Vaults vorhanden',
-    newVault: 'Neuer Vault',
     vaultNamePlaceholder: 'Vault-Name…',
     vaultNameLabel: 'Vault-Name',
     nameEmpty: 'Vault-Name darf nicht leer sein',
@@ -87,7 +84,6 @@ export const de = {
     nameExists: 'Ein Vault mit dem Namen "{name}" existiert bereits',
     deleteConfirm: 'Vault "{name}" wirklich löschen? Alle Dateien werden unwiderruflich entfernt.',
     deleteVault: 'Vault löschen',
-    deleteVaultAriaLabel: 'Vault "{name}" löschen',
     treeLoadError: 'Fehler beim Laden der Verzeichnisstruktur',
     permissionRead: 'Nur Lesen',
     permissionWrite: 'Bearbeiten',
@@ -183,12 +179,6 @@ export const de = {
   binaryViewer: {
     imageLoadError: 'Das Bild „{name}" konnte nicht geladen werden.',
     unsupported: 'Datei „{name}" ({type}) kann nicht angezeigt werden.',
-  },
-
-  fileViewer: {
-    ariaLabel: 'Dateiansicht',
-    binaryNotice: 'Diese Datei ist eine Binärdatei und kann nicht als Klartext dargestellt werden',
-    truncatedNotice: 'Datei wurde abgeschnitten (nur die ersten 5 MB werden angezeigt)',
   },
 
   profile: {
@@ -437,7 +427,6 @@ export const de = {
     ariaLabel: 'Kontextmenü',
     newFile: 'Neue Datei',
     newFolder: 'Neuer Ordner',
-    newVault: 'Neuer Vault',
     rename: 'Umbenennen',
     delete: 'Löschen',
     copy: 'Kopieren',

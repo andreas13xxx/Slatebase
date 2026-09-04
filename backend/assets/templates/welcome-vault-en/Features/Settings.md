@@ -26,39 +26,36 @@ The settings panel opens as an overlay with a sidebar for navigation.
 
 ## Categories
 
+The settings sidebar has three categories and 18 sections.
+
 ### Account
 
-- **Profile** — Display name, preferred language
-- **Password** — Change your password
-- **Sessions** — View and revoke active sessions
-- **Welcome Vault** — Recreate the tutorial vault (also reachable via Command Palette → "Open sandbox vault")
-- **Account Deletion** — Permanently delete your account
+- **Profile** — Display name and preferred language (DE/EN — also decides the language of the tutorial vault)
+- **Change Password** — Current plus new password
+- **Sessions** — View and revoke active sessions individually
+- **MCP Tokens** — Create and revoke API tokens for AI access (only while the `mcp` toggle is on)
+- **Keybindings** — View, record and reset keyboard shortcuts, with conflict detection
+- **Appearance** — Status bar (globally and per item), toolbar, file explorer behavior
+- **My Vaults** — Manage your own vaults; also holds the button that recreates the tutorial vault
+- **Delete Account** — Permanently delete your own account
 
-### Appearance
+### Vault
 
-- **Status Bar** — Toggle the bottom status bar globally, plus a separate toggle per built-in item (clock, vault name, word/character count, cursor position)
-- **CSS Snippets** — Manage custom per-vault CSS (upload or create/edit in an embedded editor, enable/disable, delete)
+These need an open vault; the writable ones are owner-only:
 
-### Vault Configuration
+- **Vault Configuration** — Templates directory (default: `Templates`), daily notes directory, attachments directory, "follow active file in explorer"
+- **Plugins** — Install, update and manage Obsidian community plugins (only while the `obsidian-plugin-compat` toggle is on)
+- **CSS Snippets** — Per-vault custom CSS, uploaded or written in the embedded editor, enabled and disabled individually
+- **Git Sync** — Configure git remotes per vault (only while the `git-sync` toggle is on) — see [[Features/Git Sync]]
+- **Mail Import** — Import IMAP mailboxes as Markdown notes (only while the `mail-import` toggle is on) — see [[Features/Mail Import]]
 
-(Only visible when a vault is selected)
+### Administration (admins only)
 
-- **Templates Directory** — Folder where templates are stored (default: `Templates`)
-- **Daily Notes Directory** — Folder for daily notes (default: vault root)
-
-### Keybindings
-
-- View and customize keyboard shortcuts
-- Record new shortcuts
-- Conflict detection (warns if a shortcut is already used)
-
-### Admin (Admin users only)
-
-- **User Management** — Create, edit, delete, lock users
-- **Vault Overview** — See all vaults on the server
-- **Server Configuration** — Runtime configuration
-- **Feature Toggles** — Enable/disable features (sync, MCP, plugins, etc.)
-- **Audit Log** — View security-relevant events
+- **Server Configuration** — Runtime configuration, audit log and server logs
+- **User Management** — Create, edit, delete and lock users, assign roles
+- **Vault Management** — See all vaults on the server
+- **Feature Toggles** — Enable/disable features — see [[Admin/Feature Toggles]]
+- **Restart Server** — Restart with a confirmation prompt
 
 ---
 

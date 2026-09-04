@@ -135,4 +135,5 @@ Prüfe und optimiere deine Server-Konfiguration:
 - [[Admin/Feature-Toggles]] — Features ein-/ausschalten
 - [[Admin/Audit-Log]] — Sicherheitsereignisse prüfen
 - [[Features/Papierkorb und Versionen]] — Papierkorb aus Nutzersicht
-- [[Fortgeschritten/Vault Sync einrichten]] — Sync-Konfiguration
+- [[Features/Git-Sync]] — Vault mit einem Git-Remote synchronisieren
+- [[Fortgeschritten/Plugins/LiveSync]] — Sync über CouchDB via Obsidian-LiveSync-Plugin

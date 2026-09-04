@@ -5,7 +5,10 @@
  * to rendered HTML inside a given container element.
  *
  * Uses our existing unified/remark pipeline to parse Markdown into MDAST,
- * then serializes the MDAST to an HTML string.
+ * then serializes the MDAST to an HTML string. Obsidian wikilinks are part of
+ * that pipeline (remarkWikilink) and become clickable `a.internal-link`
+ * anchors — Dataview and friends emit their file references as `[[…]]`, so
+ * without it every link in a query result would show up as raw text.
  *
  * Obsidian API signature:
  *   MarkdownRenderer.render(app, markdown, el, sourcePath, component): Promise<void>
@@ -21,6 +24,10 @@ import remarkParse from 'remark-parse'
 import remarkGfm from 'remark-gfm'
 import remarkFrontmatter from 'remark-frontmatter'
 import type { Root, RootContent, PhrasingContent, AlignType } from 'mdast'
+import { remarkWikilink } from '../../wikilink/plugin'
+import type { WikilinkNode } from '../../types'
+import { getActiveWorkspaceShim } from '../active-workspace-shim'
+import { requestHoverPreview, dismissHoverPreview } from '../hover-link-bus'
 
 // ─── MDAST → HTML Serializer ───────────────────────────────────────────────────
 
@@ -36,6 +43,25 @@ function escapeHtml(text: string): string {
 }
 
 /**
+ * Serialize a wikilink node to an Obsidian-style internal link.
+ *
+ * Plugins hand their output to us as markdown — Dataview renders every file
+ * reference as `[[path/to/note.md|Display]]` — so without this the whole link
+ * ends up as literal `[[…]]` text in the rendered table.
+ *
+ * The markup mirrors Obsidian's (`a.internal-link` carrying `data-href`),
+ * which is what plugin stylesheets target and what
+ * {@link attachInternalLinkBehaviour} listens for.
+ */
+function serializeWikilink(node: WikilinkNode): string {
+  const target = node.target ?? ''
+  const subpath = node.blockRef ? `#^${node.blockRef}` : node.heading ? `#${node.heading}` : ''
+  const href = `${target}${subpath}`
+  const text = node.display || href
+  return `<a class="internal-link" href="#" data-href="${escapeHtml(href)}">${escapeHtml(text)}</a>`
+}
+
+/**
  * Serialize an array of MDAST phrasing content nodes to an HTML string.
  */
 function serializeInline(nodes: PhrasingContent[]): string {
@@ -46,6 +72,13 @@ function serializeInline(nodes: PhrasingContent[]): string {
  * Serialize a single inline (phrasing) MDAST node to HTML.
  */
 function serializeInlineNode(node: PhrasingContent): string {
+  // `wikilink` is not part of mdast's phrasing union (remarkWikilink adds it),
+  // so it has to be matched before the switch narrows on the known types —
+  // otherwise it falls into `default:` and renders as literal `[[…]]` text.
+  if ((node as { type: string }).type === 'wikilink') {
+    return serializeWikilink(node as unknown as WikilinkNode)
+  }
+
   switch (node.type) {
     case 'text':
       return escapeHtml(node.value)
@@ -66,7 +99,7 @@ function serializeInlineNode(node: PhrasingContent): string {
     case 'html':
       return node.value
     default: {
-      // For unknown inline nodes (wikilinks, tags, embeds), try to extract text
+      // For unknown inline nodes (tags, embeds), try to extract text
       const unknownNode = node as unknown as { value?: string; children?: PhrasingContent[] }
       if (unknownNode.children) {
         return serializeInline(unknownNode.children)
@@ -186,6 +219,7 @@ function markdownToHtml(markdown: string): string {
       .use(remarkParse)
       .use(remarkFrontmatter, ['yaml'])
       .use(remarkGfm)
+      .use(remarkWikilink)
       .parse(markdown)
 
     return serializeBlocks((tree as Root).children)
@@ -193,6 +227,76 @@ function markdownToHtml(markdown: string): string {
     console.error('[MarkdownRenderer] Failed to parse markdown:', err)
     return `<p>${escapeHtml(markdown)}</p>`
   }
+}
+
+// ─── Internal Link Behaviour ───────────────────────────────────────────────────
+
+/** Containers that already carry the delegated listeners. */
+const linkBehaviourBound = new WeakSet<HTMLElement>()
+
+/** The `a.internal-link` under an event target, if there is one. */
+function internalLinkUnder(target: EventTarget | null): HTMLElement | null {
+  if (!(target instanceof Element)) return null
+  const link = target.closest('a.internal-link[data-href]')
+  return link instanceof HTMLElement ? link : null
+}
+
+/**
+ * The file part of a link's `data-href`. The subpath (`#heading` / `#^block`)
+ * stays on the element for context, but neither the link resolver nor the
+ * preview popover understands one.
+ */
+function linkFileTarget(link: HTMLElement): string {
+  const href = link.dataset['href'] ?? ''
+  return href.split('#')[0] ?? ''
+}
+
+/**
+ * Give the `a.internal-link` anchors from {@link serializeWikilink} the same
+ * behaviour they have in a note Slatebase renders itself: click to open, hover
+ * for a preview.
+ *
+ * Delegated on the container the plugin rendered into (rather than bound per
+ * anchor) so it keeps working when the plugin re-renders its own output, and
+ * registered at most once per element so repeated render() calls for the same
+ * container don't stack listeners.
+ */
+function attachInternalLinkBehaviour(el: HTMLElement, sourcePath: string): void {
+  if (linkBehaviourBound.has(el)) return
+  linkBehaviourBound.add(el)
+
+  el.addEventListener('click', (event) => {
+    const link = internalLinkUnder(event.target)
+    if (!link) return
+
+    const target = linkFileTarget(link)
+    if (!target) return
+
+    event.preventDefault()
+    // Don't let the click reach the editor underneath: in Live Preview that
+    // would put the cursor inside the code block and swap the rendered widget
+    // back to its source.
+    event.stopPropagation()
+
+    void getActiveWorkspaceShim()?.openLinkText(target, sourcePath)
+  })
+
+  // Hover previews, delegated the same way ViewMode does it for Slatebase's
+  // own links. The popover lives at the app root, so this works in Live
+  // Preview and in Reading View alike.
+  el.addEventListener('mouseover', (event) => {
+    const link = internalLinkUnder(event.target)
+    if (!link) return
+
+    const target = linkFileTarget(link)
+    if (!target) return
+
+    requestHoverPreview({ linkPath: target, targetEl: link, source: 'internal-link', sourcePath })
+  })
+
+  el.addEventListener('mouseout', (event) => {
+    if (internalLinkUnder(event.target)) dismissHoverPreview()
+  })
 }
 
 // ─── MarkdownRenderer Public API ───────────────────────────────────────────────
@@ -211,18 +315,21 @@ export class MarkdownRendererShim {
    * @param _app - App reference (ignored in Slatebase)
    * @param markdown - The Markdown source string to render
    * @param el - The target HTML element to render into
-   * @param _sourcePath - Source file path for resolving relative links (reserved for future use)
+   * @param sourcePath - Source file path, passed on when an internal link is followed or previewed
    * @param _component - Parent component for lifecycle (ignored in Slatebase)
    */
   static async render(
     _app: unknown,
     markdown: string,
     el: HTMLElement,
-    _sourcePath: string,
+    sourcePath: string,
     _component: unknown,
   ): Promise<void> {
     const html = markdownToHtml(markdown)
     el.innerHTML = html
+    if (html.includes('class="internal-link"')) {
+      attachInternalLinkBehaviour(el, sourcePath ?? '')
+    }
   }
 
   /**

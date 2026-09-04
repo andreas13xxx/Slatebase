@@ -1,70 +1,77 @@
 # Slatebase — Product Overview
 
-Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for Obsidian-compatible vaults — no database, no sync service, no desktop app required.
+Self-hosted Knowledge-Context-Server for Markdown vaults. Multi-user web UI for
+Obsidian-compatible vaults — no database, no sync service, no desktop app required.
 
 ## Implemented Features
 
-- Multi-vault management (CRUD, import/export, unified file explorer)
-- Tabbed Markdown editor/viewer (auto-save, GFM, syntax highlighting, collapsible headings)
-- Obsidian-compatible rendering (Wikilinks, Embeds with inline PDF/Audio/Video, Callouts, Tags incl. Frontmatter-Tags, Block References, Soft→Hard Line Breaks, LaTeX Math via KaTeX)
-- Authentication (opaque tokens, argon2id, CSRF, sliding sessions, rate limiting)
+### Vaults & Files
+- Multi-vault management (CRUD, import/export, unified file explorer, statistics tooltip, context menu, drag & drop upload)
+- Trash & file versioning (soft-delete with retention, version browser with inline diff, periodic cleanup job)
+- Per-vault configuration (templates, daily notes and attachments directory — owner-configurable; an empty attachments directory means „same folder as the note")
+- Automatic link migration on rename/move: every wikilink pointing at the old path is rewritten vault-wide, including bare-name links and whole-folder moves; runs before the response returns and reports partial failures
+- Advanced file operations (move, rename, unique-filename conflict resolution, templates, daily notes)
+
+### Editor & Rendering
+- Tabbed editor/viewer (auto-save, GFM, syntax highlighting, collapsible headings, recent files, image paste)
+- Live Preview Editor (CodeMirror 6 — Source + Live Preview mode, cursor-aware inline rendering, plugin extensions via Compartments; tables, Mermaid, KaTeX, images, audio/video, highlights, frontmatter properties box, readable line length, click-to-follow links, callout folding)
+- Obsidian-compatible rendering (Wikilinks, Embeds incl. inline PDF/Audio/Video, Callouts, Tags incl. frontmatter tags, Block References, soft→hard line breaks)
+- Mermaid diagrams and LaTeX math (KaTeX), both lazy-loaded, dark/light aware, with error/timeout fallback to raw source
+- Audio/video embeds (`![[file.mp3]]` → `<audio>`, `![[file.mp4]]` → `<video>` with size syntax)
+- Inline raw HTML subset: allowlisted inline tags (`<font color>`, `<mark>`, `<span style>`) and `<center>` blocks render in both Live Preview and reading view; everything else — `on*` handlers, `script`, `iframe` — stays literal text
+- Built-in spellchecker (own Hunspell dictionaries via nspell in a Web Worker, German/English switchable per editor, German compound splitting, personal dictionary per browser). Main editor only — `<textarea>` surfaces are not covered
+- Obsidian Canvas (`.canvas` whiteboards: text/file/link/group nodes, edges, drag/resize, zoom/pan, minimap, source view, auto-save)
+- PDF export via `@media print` stylesheet + browser print dialog (Command Palette: "Export to PDF…")
+
+### Navigation & Discovery
+- Search & Replace (regex, context lines, multi-vault, atomic writes) with search operators `path:`/`file:`/`tag:`/`property:`, negation, quoted values, syntax highlighting and autocomplete
+- Knowledge Graph (d3-force SVG, zoom/pan/drag/search, configurable colors/layout, tag + property nodes) plus a per-note Local Graph filtered to a configurable N-hop neighborhood
+- Context Panel (Outline, Links incl. Unlinked Mentions with one-click linking, Tags, Properties — splittable, DnD)
+- Properties editor: typed frontmatter editing (text/number/date/datetime/checkbox/list/tags) with type inference and a per-vault Property-Type-Registry
+- Sidebar Panel (Recent Files + Bookmarks views, splittable, tabbed)
+- Bookmarks for files, headings, blocks and saved searches — drag-and-drop reordering, context menu, custom labels
+- Navigation history (back/forward with Alt+←/→), Quick Switcher (Ctrl+O), tab cycling (Ctrl+Shift+]/[), breadcrumb bar, File Explorer "follow active file"
+- Command Palette (Ctrl+P, 40+ built-in commands; plugin commands when compat is enabled)
+- Hover Preview (rendered Markdown popover on internal links), file-type icons in the explorer
+
+### Multi-User & Realtime
+- Authentication (opaque tokens, argon2id, CSRF, sliding sessions, rate limiting). Only a server 401 ends a session — an unreachable backend is retried
 - Multi-user & sharing (granular read/write, ownership transfer)
 - Real-time chat (unread badges, archiving, pagination)
-- Admin panel (user management, audit log, config, feature toggles)
-- Vault sync via Obsidian LiveSync plugin (CouchDB/livesync, bidirectional, running natively in the plugin compat layer with server-side CORS proxy; PouchDB IndexedDB local DB, vault event bridge for push sync)
-- MCP Context Server (AI read+write via Model Context Protocol)
-- Context Panel (Outline, Links, Tags, Properties — splittable, DnD; Links view also surfaces Unlinked Mentions — plain-text filename occurrences not yet wikilinked, with a one-click "Verlinken" action)
-- Knowledge Graph (d3-force SVG, zoom/pan/drag/search, konfigurierbare Farben/Layout, Tag-Nodes, Property-Nodes; plus a per-note Local Graph — `graph:open-local`, formerly a no-op — filtering the same graph data to a configurable N-hop neighborhood, no extra server round-trip)
-- Search & Replace (regex, context lines, multi-vault, atomic writes)
-- Realtime infrastructure (SSE: chat push, presence, vault changes, plugin settings changes, toasts, reconnect with replay — always active when authenticated)
-- Obsidian plugin compat ⚠️ experimental (API shims, sandbox, command palette, CSS injection, workspace leaf API with plugin views as tabs/sidebar sections; extended API coverage, with twelve plugins manually run from their real GitHub bundles (Calendar, Dataview, Templater, LiveSync, Excalidraw, Editing Toolbar, Kanban, Tasks, Git, Day Planner, Iconize, Outliner — see `PLUGIN-COMPAT.md`) — full EditorShim with CM6 backend, MarkdownView (full Obsidian-konform class chain: Component→View→ItemView→FileView→EditableFileView→TextFileView→MarkdownView, with real MarkdownEditView as currentMode and MarkdownPreviewView as previewMode), editorCallback commands, MarkdownRenderer (instanziierbar, extends MarkdownRenderChild, unified/remark pipeline), Notice→Toast bridge, requestUrl() backend proxy, registerExtensions file routing, CodeBlockProcessor registry with ViewMode integration, SuggestModal/FuzzySuggestModal, EditorSuggest (full `onTrigger`/`getSuggestions`/`renderSuggestion`/`selectSuggestion` lifecycle with positioned dropdown popover and keyboard navigation), getAllTags, debounce, App.loadLocalStorage/saveLocalStorage, Vault.copy, Obsidian CSS variables, DOM extensions, icon registry; **Dataview full inline-query compat**: syntaxTree wrapper for InlineCode range adjustment, MetadataCacheShim on-demand parsing (frontmatter/tags/links), VaultShim root-folder for PrefixIndex, selection-dispatch for immediate decoration rendering; **LiveSync full compat**: CORS proxy for cross-origin fetch/XHR, PouchDB IndexedDB local DB, bidirectional CouchDB replication via server-side proxy, vault event bridge for push sync, binary file upload support, plugin view tabs; **Kanban partial compat**: TextFileView file-view-registry routing, Board layout rendering with lanes, CSS scoping via data-plugin-id, Component.addChild lifecycle — lane titles/card text not yet rendered due to Preact/MarkdownDomRenderer lifecycle gap; **Editing Toolbar compat**: real attached `MarkdownView.containerEl` (`.markdown-source-view` marker on the editor pane), layout/leaf events re-fired on editor mount, `getActiveViewOfType` covering the ItemView/FileView family, `app.commands`/`hotkeyManager` backed by the shared CommandRegistry, full Lucide icon resolution, dual self+descendant CSS scoping for plugin UI in shared workspace DOM; **Templater compat**: `getActiveViewOfType` returns a genuine `instanceof MarkdownView` built from the real class chain, core `editor:*`/`workspace:*` command IDs resolve, `Templates/Templater/` examples shipped in the Welcome Vault; **cross-cutting**: `theme-dark`/platform marker classes on `document.body` so plugin dark-mode CSS and runtime theme checks work, `aria-label` tooltips actually render, `EventRef` `offref()` really deregisters, plugin-contributed `file-menu`/`files-menu` items in the file explorer's context menu; **API level 1.13.2** after a full audit against `obsidianmd/obsidian-api`'s `obsidian.d.ts` `@since` tags (the official CHANGELOG.md stopped being updated past 1.7.2) — working `Scope`/`Keymap` key dispatch and `app.keymap`, complete `CachedMetadata` (headings, embeds, sections, listItems, footnotes, reference/frontmatter links), `Plugin.onExternalSettingsChange` wired end-to-end over SSE so a settings change in one tab or device reaches the others, `Workspace.ensureSideLeaf`, `WorkspaceLeaf.isDeferred`/`loadIfDeferred`; `SettingGroup.addComponent`/`Setting.addComponent` (1.11.0), `SecretComponent`/`SecretStorage` (1.11.4) backed by server-side storage, each value encrypted individually with AES-256-GCM under a key resolved env → file → generated (same pattern as the CSRF secret); values live in `data/plugins/<vaultId>/<pluginId>/secrets.json` and the list endpoint returns only IDs, never values, `ConfirmationModal`/`ConfirmationButton` (1.13.0), `DisplayValueComponent`/`Setting.addDisplayValue`/`SliderComponent.setDisplayFormat` (1.13.1); Bases (database/formula-query views, 1.10.0+) and the desktop CLI API (`registerCliHandler`, 1.12.2) are typed and registered as real no-ops — never crash, never do anything — rather than implemented, flagged `partial` by the CompatibilityAnalyzer so this stays visible in the install-time compat report instead of silently reading as full support; **hardened against real bundles** — ES5-downlevel `extends` output, synchronous icon resolution for plugins that freeze icons at module load, `Buffer`/`path` globals before bundle evaluation, immediate local tree updates so synchronous file lookups after a create are correct, `App.scope` hotkeys, and an ErrorBoundary so a plugin bug no longer looks like an app crash)
-- Community Plugin Store (browse the full Obsidian community plugin list in Settings, text/compatible/installed filters, install straight from GitHub releases, single + bulk updates, manual and 24h automatic update check, download counts from Obsidian's aggregated stats feed; desktop-only gate, domain allowlist, size limits, rate-limit tracking, optional `SLATEBASE_GITHUB_TOKEN`)
-- Feature toggles (hot/cold toggle, env overlay, API + admin UI; registered toggles: `obsidian-plugin-compat` (cold, default off), `chat` (hot, default on), `mcp` (cold, default on) — see `featureRegistry.register()` calls in `backend/src/index.ts`)
-- CI/CD (GitHub Actions, Release Please, multi-arch Docker, GHCR)
-- i18n (German/English), Dark Mode, Docker deployment
-- Vault Explorer enhancements (statistics tooltip, custom context menu, drag & drop file upload)
-- Editor improvements (line numbers, undo/redo history stack, recent files, templates, daily notes, image paste, bookmarks). Formatting runs through the Command Palette or an Obsidian-compatible plugin toolbar — there is no native formatting toolbar
-- Built-in spellchecker (own Hunspell dictionaries via nspell in a Web Worker, not the browser's — the browser exposes no suggestions to JavaScript). Underlines unknown words in the editor; right-click gives corrections, "add to dictionary" (persisted per browser) and "ignore for this session"; German/English switchable per editor. German compounds ("Verzeichnisstruktur", "Benutzeroberfläche") are resolved by splitting into known parts, since the German Hunspell dictionary relies on `COMPOUNDBEGIN`/`MIDDLE`/`END` rules that nspell does not implement. Main editor only — the `<textarea>` surfaces (canvas nodes, snippet editor, chat input) are not covered
-- Trash & file versioning (soft-delete with retention, version browser with inline diff, configurable cleanup job)
-- Login version display (server version shown on login screen)
-- Unified Settings Panel (Ctrl+,, categorized sidebar, responsive, keyboard-navigable, search; every tab built on one shared `settings/ui` card/row/button design system, so cards, headings, and buttons look identical across all 15 tabs instead of each tab inventing its own CSS)
-- Mermaid diagram rendering (lazy-loaded mermaid.js, SVG inline, Dark/Light mode, error fallback, 5s timeout)
-- LaTeX math rendering (KaTeX, lazy-loaded same pattern as Mermaid; inline `$...$` with Obsidian boundary rules, block `$$...$$`; Reading View + Live Preview + Plugin-Compat `renderMath`/`finishRenderMath`/`loadMathJax` with real KaTeX instead of no-op stubs; error/timeout fallback to raw source)
-- Audio/Video embeds (`![[file.mp3]]` → native `<audio controls>`, `![[file.mp4]]` → native `<video controls>` with size syntax; .mp3/.wav/.ogg/.flac/.m4a/.aac/.wma audio, .mp4/.webm/.ogv/.mov/.mkv video)
-- Command Palette (Ctrl+P, always active, 40+ built-in commands: navigation, vault ops, editor formatting, admin; plugin commands when compat enabled)
-- Per-user preferences persistence (recent files, bookmarks synced to server with localStorage cache)
-- Per-vault configuration (templates directory, daily notes directory — owner-configurable via Settings)
-- Configurable keyboard shortcuts (per-user overrides, 14 commands, conflict detection, Settings UI)
-- Welcome Vault v2 (comprehensive tutorial vault with 70+ guides DE/EN, screenshots, practice exercises, templates; API endpoint for on-demand creation, Settings button, Command Palette integration, name deduplication)
-- Obsidian Canvas (`.canvas` whiteboards: text/file/link/group nodes, edges, drag/resize, zoom/pan, minimap, source view, auto-save; link-node iframe preview, file-node content/path editing with vault-wide file-path search)
-- Status Bar (bottom bar with clock, vault name, word/character count incl. selection, cursor position with click-to-"go to line" popover, and extensible plugin items; each built-in item independently toggleable in Settings → Darstellung on top of the existing global show/hide toggle; plugin items synced via DOM diffing, not full remount, so a plugin mutating its own element never flickers)
-- Sidebar Panel (left panel with Recent Files + Bookmarks views, splittable, tabbed)
-- Bookmarks (star-toggle file bookmarks plus, via Command Palette, heading/block/saved-search bookmarks and "bookmark all open tabs"; manual drag-and-drop reordering, right-click context menu — remove/reveal in explorer/rename — and custom display labels)
-- CSS Snippets (per-vault custom CSS managed in Settings → Darstellung — upload or create/edit in an embedded editor, per-snippet enable/disable, applied globally and unscoped, distinct from the plugin-CSS injector which is scoped to `[data-plugin-id]`; applied automatically on vault open/switch)
-- Session verification (lightweight session-alive check on app mount, graceful expiry handling); only a server 401 ends a session — an unreachable or restarting backend is retried instead of logging the user out, concurrent failures share one probe, and expired session files are swept periodically
-- Live Preview Editor (CodeMirror 6 — Source + Live Preview mode, cursor-aware inline rendering, plugin extensions via Compartments; GFM tables, Mermaid diagrams, LaTeX math (KaTeX, inline + block), standard images, audio/video embeds, horizontal rules, highlight ==text==, frontmatter properties box, readable line length, click-to-follow links, callout fold/unfold with todo type; feature toggle `live-preview`)
-- Workspace State Persistence (open tabs, expanded folders, panel sizes/visibility, active page restored across page reloads; per-vault tab memory on vault switch)
-- Hover Preview (internal link hover popover with rendered Markdown preview, plugin compat via workspace hover-link event)
-- File Type Icons (file-extension-based icons in explorer via @react-symbols/icons with Lucide fallback)
-- Canvas link extraction (wikilinks inside .canvas JSON files included in knowledge graph)
-- Obsidian core commands (`editor:*`, `workspace:*`, `file-explorer:*`, `app:*`, `theme:*` registered under their real IDs, so plugins calling `executeCommandById(...)` reuse Slatebase's implementations instead of silently doing nothing; commands without a Slatebase equivalent are registered as explicit no-ops)
-- Global tooltips (`aria-label` renders a visible tooltip anywhere in the app, matching Obsidian's tooltip mechanism that plugins and `setTooltip()` rely on)
-- Inline raw HTML subset (allowlisted inline tags like `<font color>`, `<mark>`, `<span style>` and `<center>` blocks render in both Live Preview and reading view; everything else — including `on*` handlers, `script`/`iframe` — stays literal text)
-- Templater templates in the Welcome Vault (`Templates/Templater/` — daily note, meeting notes, project, weekly review)
-- Security hardening (OWASP Top 10 audit with SECURITY-AUDIT.md report, full CSP — script-src/style-src/img-src/connect-src/frame-src, HSTS 2yr + nosniff + strict referrer-policy, path traversal fix in renameContent, zod input validation on all 24 route modules, npm audit in CI with --omit=dev, plugin eval-usage UI warning, sandbox bypass documentation, production secrets startup warnings, README deployment secrets section)
-- Accessibility audit pass 1 (WCAG 2.1 AA partial � axe-core CI, eslint-plugin-jsx-a11y, useFocusTrap hook in all modals, skip-link, keyboard-operable splitters/canvas/status-bar, 8 contrast token fixes, Graph/Canvas aria-labels, 200% zoom check, screenreader static analysis; report at ACCESSIBILITY-AUDIT.md)
-- Navigation & Link Polish (browser-like back/forward navigation history with toolbar buttons + Alt+←/→, centrally recorded from `tabState.activeTabId` rather than threaded through every trigger; Quick Switcher fuzzy file finder on Ctrl+O — formerly a no-op; Ctrl+Tab/Ctrl+Shift+Tab tab cycling; live backlinks refresh via the existing realtime vault-change bus instead of only on document switch; deterministic ambiguous-wikilink resolution — same folder as source, then shortest path, then alphabetical, replacing an arbitrary depth-first-tree-walk result, with a disambiguation tooltip; File Explorer "follow active file" auto-reveal toggle; clickable folder-path breadcrumb above the editor)
-- Automatic link migration on rename/move (renaming or moving a file or folder rewrites every wikilink elsewhere in the vault that pointed at the old path — including bare-name links like `[[Note]]` to a file in a subfolder, which the persisted link index alone can't resolve, and whole-folder moves affecting many files at once; runs synchronously before the rename/move response returns, publishes a live-update event per rewritten file, and reports partial failures instead of silently leaving some links broken)
-- Properties-Editor & Suchoperatoren (typed frontmatter editing in the Context Panel — text/number/date/datetime/checkbox/list/tags controls with type inference and per-vault Property-Type-Registry in `.slatebase/property-types.json`; search operators `path:`, `file:`, `tag:`, `property:` with negation `-tag:` and quoted values, parsed as pre-filter before full-text search; operator syntax highlighting + autocomplete in the search field; Property-Value-Index for efficient metadata queries; Property-Metadaten-API for vault-wide property key/value listing and filter-based file queries — foundation for Bases)
+- Realtime infrastructure (SSE: chat push, presence, vault changes, plugin/preference changes, toasts, reconnect with replay — always active when authenticated)
+- Admin panel (user management, audit log, server config, log viewer, feature toggles, restart)
+
+### Sync & Integration
+- MCP Context Server (AI read+write via Model Context Protocol, incl. binary files and link-index-consistent writes)
+- Git-Sync (per-vault git remotes with HTTPS-token or SSH-key auth, vault-level branch, per-remote interval, manual sync, conflict reporting; credentials encrypted at rest)
+- Mail-Import (IMAP polling per vault, unread mails written as Markdown notes into a target folder, mailbox tree browser, per-config interval and status)
+- Vault sync via the Obsidian LiveSync plugin (CouchDB, bidirectional, running natively in the plugin compat layer with server-side CORS proxy)
+
+### Plugins & Customization
+- Obsidian plugin compat ⚠️ experimental — API shims at level 1.13.2, sandbox, command palette, CSS injection, workspace leaf API with plugin views as tabs/sidebar sections. Twelve real community plugin bundles verified. Full details and per-plugin status: `PLUGIN-COMPAT.md`
+- Community Plugin Store (browse the full Obsidian list in Settings, filters, install from GitHub releases, single + bulk updates, 24h update check, download counts; desktop-only gate, domain allowlist, size limits)
+- CSS Snippets (per-vault custom CSS in Settings, per-snippet enable/disable, applied unscoped — distinct from the plugin-CSS injector scoped to `[data-plugin-id]`)
+- Unified Settings Panel (Ctrl+`,`, categorized sidebar, searchable, keyboard-navigable, one shared `settings/ui` design system across all tabs)
+- Configurable keyboard shortcuts (per-user overrides, conflict detection)
+- Status Bar (clock, vault name, word/character count, cursor position with go-to-line popover, extensible plugin items; each item toggleable)
+- Global tooltips (`aria-label` renders a visible tooltip, matching Obsidian's mechanism)
+
+### State & Preferences
+- Per-user preferences on the server with localStorage as cache only: account-wide via `userSettingsStore`, per-vault via `vaultSettingsStore`
+- Workspace state persistence (open tabs, expanded folders, panel sizes/visibility, active page; per-vault tab memory on vault switch)
+
+### Platform
+- Feature toggles (hot/cold, env overlay, API + admin UI). Registered: `obsidian-plugin-compat`, `chat`, `mcp`, `git-sync`, `mail-import` — see `featureRegistry.register()` in `backend/src/index.ts`
+- Welcome Vault (tutorial vault with 70+ guides DE/EN, screenshots, exercises, templates incl. Templater examples; on-demand creation via API, Settings and Command Palette)
+- Security hardening (OWASP Top 10 audit, full CSP, HSTS, path-traversal defense in depth, Zod validation on every route module, npm audit in CI) — see `SECURITY-AUDIT.md`
+- Accessibility (WCAG 2.1 AA, partial: axe-core in CI, jsx-a11y lint, focus traps, skip link, keyboard-operable splitters/canvas/status bar) — see `ACCESSIBILITY-AUDIT.md`
+- CI/CD (GitHub Actions, Release Please, multi-arch Docker, GHCR), i18n (German/English), dark mode, Docker deployment
 
 ## Planned
 
-- Obsidian Themes (CSS variable mapping, theme loader + picker)
-- Public sharing (token links, read-only rendering)
-- Semantic search / AI embeddings
-- Server-Side Plugins (Node.js APIs in vm sandbox)
-- Responsive/mobile
-- Collaborative editing (CRDT)
+See `.kiro/specs/implementation-plan.md` for the prioritized roadmap: Obsidian Themes,
+Public Sharing, Responsive/Mobile, Workspaces & Split-Panes, Bases, Server-Side Plugins,
+foreign-format importer, semantic search, collaborative editing, E2E test suite.
 
 ## Language Convention
 

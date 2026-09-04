@@ -81,11 +81,8 @@ export const en: TranslationShape = {
 
   vault: {
     label: 'Vault',
-    select: 'Select vault…',
-    selectAriaLabel: 'Select vault',
     empty: 'Vault is empty',
     noVaults: 'No vaults available',
-    newVault: 'New Vault',
     vaultNamePlaceholder: 'Vault name…',
     vaultNameLabel: 'Vault name',
     nameEmpty: 'Vault name must not be empty',
@@ -93,7 +90,6 @@ export const en: TranslationShape = {
     nameExists: 'A vault named "{name}" already exists',
     deleteConfirm: 'Really delete vault "{name}"? All files will be permanently removed.',
     deleteVault: 'Delete vault',
-    deleteVaultAriaLabel: 'Delete vault "{name}"',
     treeLoadError: 'Failed to load directory structure',
     permissionRead: 'Read only',
     permissionWrite: 'Edit',
@@ -189,12 +185,6 @@ export const en: TranslationShape = {
   binaryViewer: {
     imageLoadError: 'The image "{name}" could not be loaded.',
     unsupported: 'File "{name}" ({type}) cannot be displayed.',
-  },
-
-  fileViewer: {
-    ariaLabel: 'File viewer',
-    binaryNotice: 'This file is a binary file and cannot be displayed as plain text',
-    truncatedNotice: 'File was truncated (only the first 5 MB are shown)',
   },
 
   profile: {
@@ -443,7 +433,6 @@ export const en: TranslationShape = {
     ariaLabel: 'Context menu',
     newFile: 'New File',
     newFolder: 'New Folder',
-    newVault: 'New Vault',
     rename: 'Rename',
     delete: 'Delete',
     copy: 'Copy',

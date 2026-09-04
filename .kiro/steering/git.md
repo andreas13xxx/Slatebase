@@ -14,7 +14,7 @@
 
 ## Branching
 
-- Nie direkt auf `main` pushen
+- Nie direkt auf `master` (Default-Branch) pushen
 - `feature/<beschreibung>` oder `fix/<beschreibung>`
 - `git push -u origin <branch>` für Tracking
 

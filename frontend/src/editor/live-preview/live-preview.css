@@ -484,6 +484,21 @@
   background: var(--bg-elevated);
 }
 
+/* Dataview's result count, which it renders as a bare number glued to the
+   first header cell ("File5"). Set apart as "File (5)". */
+.cm-lp-code-block-processed .dataview.small-text {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.cm-lp-code-block-processed .dataview.small-text::before {
+  content: '\00a0(';
+}
+
+.cm-lp-code-block-processed .dataview.small-text::after {
+  content: ')';
+}
+
 /* Dataview lists */
 .cm-lp-code-block-processed .dataview.list-view-ul {
   padding-left: 20px;

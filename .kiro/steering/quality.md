@@ -24,7 +24,7 @@ Wenn ein Check fehlschlägt: **erst fixen, dann pushen**. Kein `--no-verify` ohn
 
 ### Coverage-Schwellen
 
-CI fährt `test:coverage` (nicht `test`) — ein Unterschreiten der Schwellen bricht den Build wie ein roter Test. Die Werte in `backend/vitest.config.ts` bzw. `frontend/vite.config.ts` sind eine **Regressions-Baseline** (gemessener Stand vom 2026-08-07 minus kleiner Puffer), kein Zielwert.
+CI fährt `test:coverage` (nicht `test`) — ein Unterschreiten der Schwellen bricht den Build wie ein roter Test. Die Werte in `backend/vitest.config.ts` bzw. `frontend/vite.config.ts` sind eine **Regressions-Baseline** (gemessener Stand minus kleiner Puffer), kein Zielwert.
 
 - Schwellen nach oben nachziehen, wenn Coverage steigt. **Nie senken**, um einen Push durchzubekommen — dann fehlen Tests.
 - `include` explizit auf `src/**` lassen: v8 scannt sonst „all files" und zieht Backend-`data/` (installierte Plugin-Bundles) bzw. Frontend-`scripts/` mit rein, die im CI-Checkout gar nicht existieren.
@@ -95,7 +95,7 @@ CI fährt `test:coverage` (nicht `test`) — ein Unterschreiten der Schwellen br
 - Zod im Controller-Layer, BEVOR Business-Logik aufgerufen wird
 - Zwei Schichten: Zod (Controller) + Business-Validierung
 - Max-Längen definieren (Vault-Name: 128, Pfade: sinnvoll)
-- Alle 24 Route-Module haben Zod-Schemas (Stand August 2026 Security Audit). Neue Routen MÜSSEN vor Merge validiert sein — CI-Test prüft die 400-Responses.
+- Jedes Route-Modul, das Body/Query/Params entgegennimmt, hat Zod-Schemas (aktuell 24; die übrigen fünf nehmen gar keine Eingabe entgegen). Neue Routen MÜSSEN vor Merge validiert sein — ein CI-Test prüft die 400-Responses.
 
 ### Secrets & Credentials
 - Keine Secrets in Logs (Pino: sensible Felder exclude)
@@ -106,7 +106,7 @@ CI fährt `test:coverage` (nicht `test`) — ein Unterschreiten der Schwellen br
 ### Auth & Sessions
 - Opake Tokens: `crypto.randomBytes(64).toString('hex')` (128 Zeichen)
 - CSRF: `crypto.randomBytes(32).toString('hex')`, `X-CSRF-Token`-Header bei POST/PUT/DELETE
-- Session: 24h Gültigkeit, sliding expiry
+- Session: 24h sliding expiry, 7d absolute Lebensdauer; abgelaufene Session-Dateien werden periodisch aufgeräumt
 - Rate-Limiting: In-Memory Map, Composite Key `username:ip` (verhindert Account-Lockout), Reset bei Neustart OK
 - Login-Fehler: Identische Antwort (kein Username/Passwort-Unterschied)
 - Passwort-Hashing: argon2id
@@ -161,6 +161,6 @@ CI fährt `test:coverage` (nicht `test`) — ein Unterschreiten der Schwellen br
 - **Icon-Registry synchron**: `addIcon()`/`getIcon()` und `window.__obsidianCustomIcons` MÜSSEN vor `onload()` verfügbar sein.
 - **Keine leeren DOM-Stubs für Einhängepunkte**: Ein detachtes `document.createElement('div')` als `containerEl` ist für Plugins nicht von „nichts gefunden" unterscheidbar — sie suchen darin per `querySelector()` und geben still auf. Entweder echtes, eingehängtes DOM liefern (siehe `getActiveEditorContainerEl()`) oder den Fall sichtbar machen. Gilt genauso für Elemente, die das Plugin *selbst* bekommt und danach befüllt (`Notice.messageEl`, `StatusBarItem`): Es muss dasselbe Element sein, das auf dem Bildschirm hängt — sonst schreibt das Plugin in einen Waisenknoten und nichts passiert. Der Weg dahin ist, das Element an die React-Seite durchzureichen und dort einhängen zu lassen (siehe `MountedNode` in `ToastNotification.tsx`), nicht seinen Inhalt zu kopieren.
 - **Obsidian-Klassennamen zusätzlich vergeben**: Wo Slatebase eine eigene Klasse für ein Element hat, das es in Obsidian auch gibt, trägt das Element beide (`toolbar-btn toolbar-btn--plugin side-dock-ribbon-action`). Plugin-CSS zielt auf den Obsidian-Namen; die Gestaltung bleibt bei unserem.
-- **Host-Klassen beim CSS-Scoping nicht einfalten**: `theme-dark`/`is-mobile`/`mod-macos` sitzen auf `<body>`, nicht auf dem Plugin-Element. Im `css-injector` bleiben sie deshalb als Prefix *vor* dem `[data-plugin-id]`-Scope stehen — und zwar vor **jeder** erzeugten Alternative, sonst greift eine Dark-Mode-Regel auch im Light-Mode. Die Liste kommt aus `OBSIDIAN_HOST_BODY_CLASSES` (`body-classes.ts`), damit setzende und scopende Seite nicht auseinanderlaufen.
+- **Host-Klassen beim CSS-Scoping nicht einfalten**: `theme-dark`/`is-mobile`/`mod-macos` sitzen auf `<body>`, nicht auf dem Plugin-Element — sie bleiben als Prefix *vor* dem `[data-plugin-id]`-Scope, und zwar vor **jeder** erzeugten Alternative. Liste zentral in `OBSIDIAN_HOST_BODY_CLASSES` (`body-classes.ts`). Begründung: `lessons-learned.md`.
 - **Rückgabewerte der echten API nachbauen**: `addCommand()` gibt in Obsidian das `Command` zurück, `executeCommandById()` ein `boolean`. Plugins stashen/prüfen diese Werte; ein `void`/`undefined` crasht erst viel später und weit weg von der Ursache. Gilt auch für Guard-Pfade (z.B. Vault-Wechsel): Form der Rückgabe beibehalten statt früh leer zu returnen.
 - **Container-Objekte müssen existieren, auch wenn leer**: Plugins indizieren direkt (`hotkeyManager.customKeys[id]`) statt vorher zu prüfen. Ein fehlendes Feld ist ein `undefined[id]`-TypeError; `{}` ist ein sauberer Miss.

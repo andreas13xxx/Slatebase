@@ -166,15 +166,19 @@ docker compose up -d
 | 💬 **Real-time Chat** | Messaging between users with unread badges, archiving, and pagination |
 | 🔒 **Authentication** | Session-based auth with argon2id hashing, CSRF protection, rate limiting |
 | 🔄 **Vault Sync** | Via Obsidian LiveSync plugin (running in plugin compat layer with server-side CORS proxy) |
+| 🗃️ **Git-Sync** | Sync a vault with one or more git remotes — HTTPS token or SSH deploy key, shared branch, per-remote interval, manual sync; credentials encrypted at rest |
+| 📧 **Mail-Import** | Poll IMAP mailboxes server-side and file unread mails as Markdown notes with attachments — mailbox tree picker, target folder, per-config interval |
 | 🤖 **MCP Context Server** | AI assistants (Claude, Cursor, etc.) read and write your vaults via MCP |
 | 🎨 **Canvas** | Open and edit Obsidian `.canvas` whiteboards: text, file, link, and group nodes with edges, drag, resize, zoom/pan, minimap, file-path search, and auto-save |
 | 🕸️ **Knowledge Graph** | Interactive visualization of vault link structure with zoom, pan, drag, and search |
-| 📑 **Context Panel** | Right-side panel with document outline, forward/backlinks, tags, and properties |
+| 📑 **Context Panel** | Right-side panel with document outline, forward/backlinks, unlinked mentions, tags, and typed frontmatter properties |
 | 🔖 **Bookmarks** | Bookmark files, headings, blocks, or saved searches — reorder by drag and drop, rename, and bookmark all open tabs at once |
 | 📟 **Status Bar** | Clock, vault name, word/character count, and cursor position with click-to-"go to line" — each item toggleable |
 | 🎨 **CSS Snippets** | Per-vault custom CSS, uploaded or written in an embedded editor, enabled and disabled individually |
-| 🔍 **Search & Replace** | Vault-wide full-text search with regex, context lines, multi-vault, and find & replace |
-| 📊 **Mermaid Diagrams** | Render Mermaid code blocks as interactive SVG diagrams with dark mode support |
+| 🔍 **Search & Replace** | Vault-wide full-text search with regex, context lines, multi-vault, find & replace, and `path:`/`file:`/`tag:`/`property:` operators |
+| 📊 **Mermaid & LaTeX** | Mermaid code blocks as interactive SVG diagrams and KaTeX math (inline `$…$` and block `$$…$$`), both dark-mode aware |
+| 🗑️ **Trash & Versions** | Soft-delete with configurable retention plus a per-file version browser with inline diff |
+| 🖨️ **PDF Export** | "Export to PDF…" in the Command Palette prints the reading view through the browser's print dialog |
 | 🧩 **Plugin Compat** ⚠️ | Run browser-compatible Obsidian Community Plugins in the web UI |
 | 🛒 **Plugin Store** | Browse the Obsidian community plugin list, install from GitHub releases, and keep plugins updated — all from Settings |
 | 📦 **Import & Export** | Import files/folders, export vaults as ZIP or to a local directory |
@@ -227,9 +231,27 @@ All routes under `/api/v1`. Authentication required (session cookie or Bearer to
 | GET | `/vaults/:vaultId/tree` | Directory tree |
 | GET | `/vaults/:vaultId/files?path=` | Read file |
 | PUT | `/vaults/:vaultId/files` | Save file |
+| POST | `/vaults/:vaultId/rename` | Rename file/folder (rewrites wikilinks vault-wide) |
+| POST | `/vaults/:vaultId/move` | Move file/folder (rewrites wikilinks vault-wide) |
+| POST | `/vaults/:vaultId/upload` | Upload file (multipart) |
 | POST | `/vaults/:vaultId/import/file` | Import file |
 | POST | `/vaults/:vaultId/import/folder` | Import folder |
-| DELETE | `/vaults/:vaultId/content?path=` | Delete file/folder |
+| DELETE | `/vaults/:vaultId/content?path=` | Delete file/folder (moves to trash) |
+| GET | `/vaults/:vaultId/statistics` | File/folder count and total size |
+| GET/PUT | `/vaults/:vaultId/config` | Per-vault config (templates, daily notes, attachments directory) |
+
+### Trash, Versions & Templates
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/vaults/:vaultId/trash` | List trash entries |
+| POST | `/vaults/:vaultId/trash/:entryId/restore` | Restore entry |
+| DELETE | `/vaults/:vaultId/trash/:entryId` | Delete permanently |
+| GET | `/vaults/:vaultId/versions` | List versions of a file |
+| GET | `/vaults/:vaultId/versions/content` | Read one version |
+| POST | `/vaults/:vaultId/versions/restore` | Restore a version |
+| GET | `/vaults/:vaultId/templates` | List templates |
+| POST | `/vaults/:vaultId/templates/create` | Create a file from a template |
 
 ### Sharing
 
@@ -270,6 +292,8 @@ All routes under `/api/v1`. Authentication required (session cookie or Bearer to
 | PUT | `/admin/config` | Update config |
 | GET | `/admin/features` | List feature toggles |
 | PUT | `/admin/features/:name` | Toggle feature |
+| GET | `/admin/logs` | Recent server logs (in-memory ring buffer) |
+| POST | `/admin/restart` | Restart the server |
 
 ### Chat
 
@@ -297,7 +321,18 @@ All routes under `/api/v1`. Authentication required (session cookie or Bearer to
 |--------|------|-------------|
 | GET | `/vaults/:vaultId/graph` | Full link graph |
 | GET | `/vaults/:vaultId/backlinks?path=` | Backlinks for a file |
+| GET | `/vaults/:vaultId/graph/meta` | Graph metadata (counts, tags, property keys) |
 | GET | `/vaults/:vaultId/tags` | All tags in vault |
+
+### Properties
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/vaults/:vaultId/properties` | All frontmatter property keys in use |
+| GET | `/vaults/:vaultId/properties/:key/values` | Distinct values for one key |
+| POST | `/vaults/:vaultId/properties/query` | Files matching property filters |
+| GET/PUT | `/vaults/:vaultId/property-types` | Per-vault property type registry |
+| PUT | `/vaults/:vaultId/property-types/:key` | Declare the type of one key |
 
 ### Plugins ⚠️
 
@@ -310,6 +345,54 @@ All routes under `/api/v1`. Authentication required (session cookie or Bearer to
 | GET | `/vaults/:vaultId/plugins/:pluginId/styles` | CSS styles |
 | GET/PUT | `/vaults/:vaultId/plugins/:pluginId/settings` | Settings |
 | GET/PUT | `/vaults/:vaultId/plugins/registry` | Registry |
+| GET | `/vaults/:vaultId/plugins/:pluginId/secrets` | Plugin SecretStorage — IDs only, never values |
+| GET/PUT/DELETE | `/vaults/:vaultId/plugins/:pluginId/secrets/:secretId` | Read / set / delete one secret |
+| GET | `/vaults/:vaultId/plugins/detected` | Plugins found in the vault's `.obsidian/plugins/` |
+| GET | `/plugins` | Community plugin list (store) |
+| POST | `/vaults/:vaultId/plugins/store-install` | Install from a GitHub release |
+| POST | `/vaults/:vaultId/plugins/detected/:pluginId/install` | Adopt a plugin found in `.obsidian/plugins/` |
+| POST | `/vaults/:vaultId/plugins/check-updates` | Check all installed plugins for updates |
+| POST | `/vaults/:vaultId/plugins/:pluginId/update` | Update one plugin |
+| POST | `/vaults/:vaultId/plugins/update-all` | Update all plugins |
+| POST | `/proxy` | CORS-free HTTP proxy for plugin `requestUrl` (SSRF-protected, allowlisted) |
+
+### CSS Snippets
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/vaults/:vaultId/snippets` | List snippets |
+| POST | `/vaults/:vaultId/snippets` | Create snippet |
+| GET/PUT | `/vaults/:vaultId/snippets/:snippetId` | Read / write snippet content |
+| DELETE | `/vaults/:vaultId/snippets/:snippetId` | Delete snippet (also prunes its registry entry) |
+| GET/PUT | `/vaults/:vaultId/snippets/registry` | Enabled/disabled state |
+
+### Git-Sync & Mail-Import
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/vaults/:vaultId/git-sync` | Remotes + branch for a vault |
+| PUT | `/vaults/:vaultId/git-sync/branch` | Set the shared local branch |
+| POST | `/vaults/:vaultId/git-sync/remotes` | Add a remote |
+| PUT/DELETE | `/vaults/:vaultId/git-sync/remotes/:remoteId` | Update / remove a remote |
+| POST | `/vaults/:vaultId/git-sync/generate-ssh-key` | Generate an SSH deploy keypair |
+| GET | `/vaults/:vaultId/git-sync/remotes/:remoteId/status` | Last run, result, error |
+| POST | `/vaults/:vaultId/git-sync/remotes/:remoteId/sync-now` | Run a sync immediately |
+| GET | `/vaults/:vaultId/mail-import` | List IMAP configs |
+| POST | `/vaults/:vaultId/mail-import` | Create IMAP config |
+| PUT/DELETE | `/vaults/:vaultId/mail-import/:configId` | Update / remove a config |
+| GET | `/vaults/:vaultId/mail-import/:configId/mailbox-tree` | Browse the account's mailboxes |
+| GET | `/vaults/:vaultId/mail-import/:configId/status` | Last run, counts, error |
+| POST | `/vaults/:vaultId/mail-import/:configId/import-now` | Run an import immediately |
+
+### Preferences
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET/PUT | `/users/me/recent-files` | Recent files |
+| GET/PUT | `/users/me/favorites` | Bookmarks |
+| GET/PUT | `/users/me/keybindings` | Keyboard shortcut overrides |
+| GET/PATCH | `/users/me/ui-settings` | Account-wide UI settings |
+| GET/PATCH | `/users/me/vault-settings/:vaultId` | Per-vault UI settings |
 
 ### MCP
 
@@ -324,7 +407,8 @@ All routes under `/api/v1`. Authentication required (session cookie or Bearer to
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/events` | SSE stream (chat, presence, vault changes) |
+| POST | `/auth/sse-ticket` | One-time ticket for the SSE stream (30s TTL) |
+| GET | `/events` | SSE stream (chat, presence, vault changes, toasts) |
 | GET | `/version` | Installed version (public, no auth) |
 | GET | `/.well-known/mcp.json` | MCP discovery (public) |
 | POST | `/welcome-vault` | Create tutorial vault on-demand |

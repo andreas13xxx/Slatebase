@@ -23,38 +23,42 @@ Die Einstellungen in Slatebase sind zentral in einem übersichtlichen Panel orga
 
 ## Übersicht der Bereiche
 
-Das Settings-Panel hat eine Sidebar-Navigation mit Kategorien und Abschnitten:
+Das Settings-Panel hat eine Sidebar-Navigation mit drei Kategorien und 18 Abschnitten.
 
 ### Konto
 
 | Abschnitt | Inhalt |
 |-----------|--------|
-| Profil | Anzeigename, Benutzername (read-only) |
-| Passwort | Passwort ändern (aktuelles + neues) |
-| Sprache | Bevorzugte Sprache (DE/EN), bestimmt UI und Welcome-Vault-Sprache |
-| Anleitungs-Vault | Button zum nachträglichen Erstellen des Anleitungs-Vaults (auch über Command Palette → "Sandbox-Vault öffnen") |
-| Darstellung | Statusleiste (global + pro Element) ein-/ausblenden, CSS-Snippets verwalten |
-| Tastenkürzel | Benutzerdefinierte Tastenkombinationen (Keybindings) |
-| Account löschen | Eigenen Account permanent entfernen |
+| Profil | Anzeigename, bevorzugte Sprache (DE/EN — bestimmt UI und Sprache des Anleitungs-Vaults) |
+| Passwort ändern | Aktuelles + neues Passwort |
+| Sitzungen | Aktive Anmeldungen einsehen und einzeln beenden |
+| MCP-Tokens | API-Tokens für KI-Zugriff anlegen und widerrufen (nur bei aktivem `mcp`-Toggle) |
+| Tastaturkürzel | Benutzerdefinierte Tastenkombinationen |
+| Darstellung | Statusleiste global und pro Element ein-/ausblenden, Werkzeugleiste, Explorer-Verhalten |
+| Meine Vaults | Eigene Vaults verwalten; Button zum nachträglichen Erstellen des Anleitungs-Vaults |
+| Konto löschen | Eigenes Konto permanent entfernen |
 
-### Vault-Konfiguration
+### Vault
 
-Diese Abschnitte sind nur sichtbar, wenn ein Vault geöffnet ist (und du der Besitzer bist):
+Diese Abschnitte brauchen einen geöffneten Vault; die schreibenden sind dem Besitzer vorbehalten:
 
 | Abschnitt | Inhalt |
 |-----------|--------|
-| Vorlagen-Verzeichnis | Pfad zum Template-Ordner (Standard: `Templates`) |
-| Daily-Notes-Verzeichnis | Pfad für tägliche Notizen (Standard: Vault-Root) |
+| Vault-Konfiguration | Vorlagen-Verzeichnis (Standard: `Templates`), Daily-Notes-Verzeichnis, Anhänge-Verzeichnis, "Aktive Datei im Explorer verfolgen" |
+| Plugins | Obsidian-Community-Plugins installieren, aktualisieren, verwalten (nur bei aktivem `obsidian-plugin-compat`-Toggle) |
+| CSS-Snippets | Eigenes CSS pro Vault hochladen oder im eingebauten Editor schreiben, einzeln ein-/ausschalten |
+| Git-Synchronisation | Git-Remotes pro Vault einrichten (nur bei aktivem `git-sync`-Toggle) — siehe [[Features/Git-Sync]] |
+| Mail-Import | IMAP-Postfächer als Markdown-Notizen importieren (nur bei aktivem `mail-import`-Toggle) — siehe [[Features/Mail-Import]] |
 
 ### Administration (nur Admins)
 
 | Abschnitt | Inhalt |
 |-----------|--------|
-| Benutzerverwaltung | Nutzer anlegen, sperren, löschen, Rollen |
-| Server-Konfiguration | Globale Einstellungen |
-| Feature-Toggles | Features aktivieren/deaktivieren |
-| Audit-Log | Sicherheitsprotokoll einsehen |
-| Server neustarten | Server-Neustart mit Bestätigung |
+| Serverkonfiguration | Globale Einstellungen, Audit-Log und Server-Logs |
+| Benutzerverwaltung | Nutzer anlegen, sperren, löschen, Rollen vergeben |
+| Vault-Verwaltung | Übersicht aller Vaults auf dem Server |
+| Feature-Toggles | Features aktivieren/deaktivieren — siehe [[Admin/Feature-Toggles]] |
+| Server neu starten | Server-Neustart mit Bestätigung |
 
 ---
 

@@ -775,244 +775,13 @@
   min-height: 0;
 }
 
-/* ===== Vault Dropdown ===== */
-.vault-dropdown {
-  position: relative;
-  padding: 0 8px;
-}
-
-.vault-dropdown-trigger {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 7px 10px;
-  background: var(--sidebar-hover);
-  border: 1px solid var(--sidebar-border);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--sidebar-text-active);
-  text-align: left;
-  transition: background var(--transition-fast), border-color var(--transition-fast);
-}
-
-.vault-dropdown-trigger:hover {
-  background: var(--sidebar-active);
-  border-color: var(--accent);
-}
-
-.vault-dropdown-trigger:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.vault-dropdown-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-}
-
-.vault-dropdown-chevron {
-  color: var(--sidebar-text);
-  margin-left: 6px;
-  flex-shrink: 0;
-  transition: transform var(--transition-fast);
-}
-
-.vault-dropdown-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 8px;
-  right: 8px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xl);
-  z-index: 200;
-  max-height: 320px;
-  overflow-y: auto;
-}
-
-.vault-dropdown-empty {
-  padding: 16px;
-  color: var(--text-muted);
-  font-size: 13px;
-  text-align: center;
-  margin: 0;
-}
-
-.vault-dropdown-list {
-  list-style: none;
-  padding: 4px;
-  margin: 0;
-}
-
-.vault-dropdown-item {
-  display: flex;
-  align-items: center;
-  border-radius: var(--radius-md);
-}
-
-.vault-dropdown-item--selected {
-  background: var(--accent-light);
-}
-
-.vault-dropdown-item-btn {
-  flex: 1;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 8px 10px;
-  font-size: 13px;
-  color: var(--text-primary);
-  text-align: left;
-  border-radius: var(--radius-md);
-  transition: background var(--transition-fast);
-}
-
-.vault-dropdown-item-btn:hover {
-  background: var(--bg-surface);
-}
-
-.vault-dropdown-item--selected .vault-dropdown-item-btn {
-  color: var(--accent-text);
-  font-weight: 500;
-}
-
-.vault-dropdown-item-delete {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-muted);
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  opacity: 0;
-  transition: opacity var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
-  display: flex;
-  align-items: center;
-}
-
-.vault-dropdown-item:hover .vault-dropdown-item-delete {
-  opacity: 1;
-}
-
-.vault-dropdown-item-delete:hover {
-  color: var(--danger-text);
-  background: var(--danger-bg);
-}
-
-.vault-dropdown-create {
-  border-top: 1px solid var(--border-subtle);
-  padding: 4px;
-}
-
-.vault-dropdown-create-btn {
-  width: 100%;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 8px 10px;
-  font-size: 13px;
-  color: var(--accent-text);
-  text-align: left;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition: background var(--transition-fast);
-}
-
-.vault-dropdown-create-btn:hover {
-  background: var(--accent-light);
-}
-
-.vault-dropdown-create-form {
-  padding: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.vault-dropdown-create-input {
-  width: 100%;
-  padding: 7px 10px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  box-sizing: border-box;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-.vault-dropdown-create-input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
-}
-
-.vault-dropdown-create-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.vault-dropdown-create-submit {
-  flex: 1;
-  padding: 6px 10px;
-  background: var(--accent);
-  color: white;
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  transition: background var(--transition-fast);
-}
-
-.vault-dropdown-create-submit:hover {
-  background: var(--accent-hover);
-}
-
-.vault-dropdown-create-cancel {
-  padding: 6px 10px;
-  background: none;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--text-secondary);
-  transition: background var(--transition-fast);
-}
-
-.vault-dropdown-create-cancel:hover {
-  background: var(--bg-surface);
-}
-
-.vault-dropdown-create-error {
-  margin: 0;
-  padding: 6px 8px;
-  font-size: 12px;
-  color: var(--danger-text);
-  background: var(--danger-bg);
-  border-radius: var(--radius-sm);
-}
-
-/* Vault permission badges in dropdown */
-.vault-permission-badge { display: inline-flex; align-items: center; margin-left: 6px; padding: 1px 5px; border-radius: var(--radius-full); font-size: 10px; font-weight: 600; vertical-align: middle; }
-.vault-permission-badge--read { background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border-subtle); }
-.vault-permission-badge--write { background: var(--accent-light, rgba(13,148,136,0.1)); color: var(--accent-text, #0d9488); border: 1px solid var(--accent, #0d9488); border-opacity: 0.3; }
-.vault-permission-badge--sync { background: var(--success-bg, rgba(34, 197, 94, 0.1)); color: var(--success, #16a34a); border: 1px solid rgba(34, 197, 94, 0.3); }
-.vault-permission-badge--shared { background: rgba(13, 148, 136, 0.1); color: var(--accent-text, #0d9488); border: 1px solid rgba(13, 148, 136, 0.3); }
-
-/* Vault status icons in dropdown trigger (collapsed state) */
+/* Vault status icons (permission/shared/sync indicators in the file explorer) */
 .vault-status-icon { display: inline-flex; align-items: center; margin-left: 6px; opacity: 0.8; }
 .vault-status-icon--read { color: var(--warning, #f59e0b); }
 .vault-status-icon--shared { color: var(--accent-text, #0d9488); }
 .vault-status-icon--sync { color: var(--success, #16a34a); }
 
-/* Vault Deletion Workflow Overlay (shown from VaultList dropdown) */
+/* Vault Deletion Workflow Overlay (shown from My Vaults page) */
 .vault-deletion-workflow-overlay {
   position: fixed;
   inset: 0;
@@ -4860,6 +4629,36 @@
 
 .view-mode-link--broken:hover {
   opacity: 1;
+}
+
+/* ===== Plugin Output (Dataview & co.) in Reading View ===== */
+/* Code block processors render their own DOM into the note, with Obsidian's
+   class names rather than Slatebase's — `a.internal-link` is what the
+   MarkdownRenderer shim emits for a `[[wikilink]]` in plugin output. */
+.view-mode .internal-link {
+  color: var(--accent-text);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.view-mode .internal-link:hover {
+  text-decoration: underline;
+}
+
+/* Dataview's result count, which it renders as a bare number glued to the
+   first header cell ("File5"). Set apart as "File (5)" — the same rule lives
+   in live-preview.css for the editor's rendered code blocks. */
+.view-mode .dataview.small-text {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.view-mode .dataview.small-text::before {
+  content: '\00a0(';
+}
+
+.view-mode .dataview.small-text::after {
+  content: ')';
 }
 
 /* ===== Markdown Elements: Footnotes ===== */

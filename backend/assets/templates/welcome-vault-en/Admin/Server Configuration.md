@@ -135,4 +135,5 @@ Review and optimize your server configuration:
 - [[Admin/Feature Toggles]] — Enable/disable features
 - [[Admin/Audit Log]] — Review security events
 - [[Features/Trash and Versions]] — Trash from the user perspective
-- [[Advanced/Vault Sync Setup]] — Sync configuration
+- [[Features/Git Sync]] — Sync a vault with a git remote
+- [[Advanced/Plugins/LiveSync]] — CouchDB sync via the Obsidian LiveSync plugin
