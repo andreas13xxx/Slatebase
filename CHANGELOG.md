@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.42.1](https://github.com/andreas13xxx/Slatebase/compare/v0.42.0...v0.42.1) (2026-09-04)
+
+
+### Sonstige Änderungen
+
+* bump the minor-patch group across 1 directory with 7 updates ([#144](https://github.com/andreas13xxx/Slatebase/issues/144)) ([0f7ccb9](https://github.com/andreas13xxx/Slatebase/commit/0f7ccb965c9f572258bdf6f9ee5826e253a5dadc))
+
 ## [0.42.0](https://github.com/andreas13xxx/Slatebase/compare/v0.41.3...v0.42.0) (2026-09-04)
 
 
