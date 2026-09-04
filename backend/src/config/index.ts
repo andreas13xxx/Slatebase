@@ -67,7 +67,7 @@ const WelcomeVaultConfigSchema = z.object({
   name: z.object({
     de: z.string().min(1).max(128).default('Willkommen'),
     en: z.string().min(1).max(128).default('Welcome'),
-  }).default({}),
+  }).prefault({}),
 })
 
 export const ServerConfigSchema = z.object({
@@ -94,14 +94,14 @@ export const ServerConfigSchema = z.object({
   sessionDurationHours: z.number().positive().default(24),
   sessionMaxLifetimeDays: z.number().positive().default(7),
   features: FeaturesConfigSchema,
-  mcp: McpLimitsConfigSchema.default({}),
-  sse: SseConfigSchema.default({}),
-  trash: TrashConfigSchema.default({}),
-  versions: VersionsConfigSchema.default({}),
-  cleanup: CleanupConfigSchema.default({}),
-  templates: TemplatesConfigSchema.default({}),
-  upload: UploadConfigSchema.default({}),
-  welcomeVault: WelcomeVaultConfigSchema.default({}),
+  mcp: McpLimitsConfigSchema.prefault({}),
+  sse: SseConfigSchema.prefault({}),
+  trash: TrashConfigSchema.prefault({}),
+  versions: VersionsConfigSchema.prefault({}),
+  cleanup: CleanupConfigSchema.prefault({}),
+  templates: TemplatesConfigSchema.prefault({}),
+  upload: UploadConfigSchema.prefault({}),
+  welcomeVault: WelcomeVaultConfigSchema.prefault({}),
 })
 
 // --- Types ---
