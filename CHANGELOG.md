@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.42.0](https://github.com/andreas13xxx/Slatebase/compare/v0.41.3...v0.42.0) (2026-09-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* **backend:** an empty/unset SLATEBASE_PROXY_ALLOWED_ORIGINS now disables the proxy entirely (403 PROXY_NOT_CONFIGURED) instead of allowing every public address. Plugins using requestUrl() need the env var set to their target hosts to keep working. Documented in docker.env.example and README.md.
+
+### Features
+
+* **backend:** default-deny plugin proxy + DNS-rebinding fix, serve CSP on the SPA document ([#142](https://github.com/andreas13xxx/Slatebase/issues/142)) ([ae71308](https://github.com/andreas13xxx/Slatebase/commit/ae71308632798e94f2078c59ff8714419fa19c65))
+
 ## [0.41.3](https://github.com/andreas13xxx/Slatebase/compare/v0.41.2...v0.41.3) (2026-09-04)
 
 
