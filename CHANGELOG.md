@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.41.3](https://github.com/andreas13xxx/Slatebase/compare/v0.41.2...v0.41.3) (2026-09-04)
+
+
+### Sonstige Änderungen
+
+* refresh steering, plugin-compat, and welcome vault docs; add wikilink support to plugin markdown renderer ([2d1f97b](https://github.com/andreas13xxx/Slatebase/commit/2d1f97b0941636fd60b736aeef5ffbab52a433dc))
+
 ## [0.41.2](https://github.com/andreas13xxx/Slatebase/compare/v0.41.1...v0.41.2) (2026-09-03)
 
 
