@@ -7,10 +7,19 @@
  *
  * Security:
  * - Requires authentication (session token)
- * - URL validated against an allowlist (global config + per-plugin networkAllowlist)
+ * - Default-deny: an empty `allowedOrigins` disables the route entirely (`PROXY_NOT_CONFIGURED`) —
+ *   there is no "allow everything public" fallback, an admin must opt in per origin
+ * - URL validated against `allowedOrigins` (`SLATEBASE_PROXY_ALLOWED_ORIGINS`)
+ * - Rate-limited per user (`rateLimiter` — 60 requests/minute, configured where this
+ *   module is wired up in `index.ts`)
  * - Request body size limited (max 10 MB)
- * - Response body size limited (max 50 MB)
+ * - Response body size limited (max 50 MB), enforced while streaming — the response is never
+ *   buffered in full before the limit is checked
  * - Private/internal IPs blocked (127.x, 10.x, 192.168.x, 172.16-31.x, ::1)
+ * - DNS-rebinding protection: the hostname is resolved and validated once, and the resulting
+ *   IP is pinned for the actual connection via a per-request `undici.Agent` with a custom
+ *   `connect.lookup` — closing the window between validation and `fetch()` doing its own,
+ *   unpinned resolution
  * - Timeout: 30 seconds
  *
  * Route:
@@ -24,8 +33,11 @@ import type { Context } from 'hono'
 import { z } from 'zod'
 import dns from 'node:dns/promises'
 import net from 'node:net'
+import type { LookupFunction } from 'node:net'
+import { Agent, fetch as undiciFetch } from 'undici'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
+import type { SlidingWindowRateLimiter } from '../shared/sliding-window-rate-limiter.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -38,10 +50,10 @@ interface ApiError {
 /** Dependencies for the proxy routes. */
 export interface ProxyRoutesDeps {
   logger: ILogger
-  /** Global allowlist of URL patterns (from server config). Empty = all allowed. */
+  /** Allowlist of URL patterns (from `SLATEBASE_PROXY_ALLOWED_ORIGINS`). Empty = proxy disabled. */
   allowedOrigins: string[]
-  /** Function to get per-plugin allowlists from the plugin registry. */
-  getPluginAllowlists?: () => string[]
+  /** Per-user rate limiter — shared instance so `destroy()` can be called during shutdown. */
+  rateLimiter: SlidingWindowRateLimiter
 }
 
 // ─── Validation ──────────────────────────────────────────────────────────────
@@ -80,6 +92,14 @@ class ProxyBlockedError extends Error {
   }
 }
 
+/** Thrown when a streamed response body exceeds `MAX_RESPONSE_BODY`. */
+class ProxyResponseTooLargeError extends Error {
+  constructor() {
+    super('Response body exceeds 50 MB limit')
+    this.name = 'ProxyResponseTooLargeError'
+  }
+}
+
 /** Checks whether a raw IP address falls within a private/loopback/link-local IPv4 range. */
 function isPrivateIPv4(ip: string): boolean {
   const parts = ip.split('.').map((p) => Number.parseInt(p, 10))
@@ -115,43 +135,59 @@ function isPrivateIp(ip: string): boolean {
   return true // Not a recognizable IP — block defensively
 }
 
+/** A validated, resolved connection target: the exact IP to pin the socket to. */
+interface SafeAddress {
+  ip: string
+  family: 4 | 6
+}
+
 /**
- * Checks if a URL's hostname resolves to a private/internal IP range.
- * Resolves DNS (rather than pattern-matching the hostname string) so that a public
- * domain name which resolves to a private/loopback address (DNS rebinding) is also blocked.
+ * Resolves a URL's hostname and validates that it (and, for a DNS name, every address it
+ * resolves to) is not a private/internal/loopback address. Returns the specific address to
+ * pin the actual connection to, or `null` if the URL is blocked.
+ *
+ * Resolving here — once — and reusing the result for the connection itself (instead of
+ * letting `fetch()` resolve again independently) is what closes the DNS-rebinding window:
+ * a hostname that resolves to a public IP at validation time and a private one moments later
+ * (e.g. a low-TTL record swapped between the two lookups) can no longer slip through.
  */
-async function isPrivateUrl(urlStr: string): Promise<boolean> {
+async function resolveSafeAddress(urlStr: string): Promise<SafeAddress | null> {
   let hostname: string
   try {
     hostname = new URL(urlStr).hostname
   } catch {
-    return true // Invalid URL = block
+    return null // Invalid URL = block
   }
 
-  if (hostname.toLowerCase() === 'localhost') return true
+  if (hostname.toLowerCase() === 'localhost') return null
 
-  // Literal IP in the URL — check directly, no DNS lookup needed
-  if (net.isIP(hostname) !== 0) {
-    return isPrivateIp(hostname)
+  // Literal IP in the URL — no DNS lookup needed, pin to itself
+  const literalFamily = net.isIP(hostname)
+  if (literalFamily !== 0) {
+    if (isPrivateIp(hostname)) return null
+    return { ip: hostname, family: literalFamily as 4 | 6 }
   }
 
   try {
     const records = await dns.lookup(hostname, { all: true, verbatim: true })
-    if (records.length === 0) return true
-    return records.some((record) => isPrivateIp(record.address))
+    if (records.length === 0) return null
+    if (records.some((record) => isPrivateIp(record.address))) return null
+    const chosen = records[0]
+    if (chosen === undefined) return null
+    return { ip: chosen.address, family: chosen.family as 4 | 6 }
   } catch {
-    return true // Unresolvable hostname = block
+    return null // Unresolvable hostname = block
   }
 }
 
 /**
- * Check if a URL is allowed by the combined allowlist.
- * If the allowlist is empty, all non-private URLs are allowed.
+ * Check if a URL is allowed by the allowlist. The caller guarantees the allowlist is
+ * non-empty (an empty allowlist disables the whole route before this is ever reached) —
+ * an empty list here is treated as deny, not allow, to fail closed defensively.
  * Allowlist entries are domain patterns (e.g. "*.couchdb.example.com", "fonts.googleapis.com").
  */
 function isUrlAllowed(urlStr: string, allowlist: string[]): boolean {
-  // If no allowlist configured, allow all non-private URLs
-  if (allowlist.length === 0) return true
+  if (allowlist.length === 0) return false
 
   try {
     const url = new URL(urlStr)
@@ -177,6 +213,45 @@ function isUrlAllowed(urlStr: string, allowlist: string[]): boolean {
   }
 }
 
+/** Builds a `net.LookupFunction` that ignores the requested hostname and always returns the pinned address. */
+function createPinnedLookup(pinned: SafeAddress): LookupFunction {
+  return (_hostname, _options, callback) => {
+    callback(null, pinned.ip, pinned.family)
+  }
+}
+
+/** Creates a per-hop undici Agent whose connections are pinned to a single validated IP. */
+function createPinnedDispatcher(pinned: SafeAddress): Agent {
+  return new Agent({ connect: { lookup: createPinnedLookup(pinned) } })
+}
+
+/**
+ * Reads a fetch Response body while enforcing `maxBytes`, aborting the stream (rather than
+ * buffering the whole response first) as soon as the limit is exceeded.
+ */
+async function readLimitedBody(response: Response, maxBytes: number): Promise<Buffer> {
+  const reader = response.body?.getReader()
+  if (!reader) return Buffer.alloc(0)
+
+  const chunks: Buffer[] = []
+  let total = 0
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > maxBytes) {
+        await reader.cancel().catch(() => {})
+        throw new ProxyResponseTooLargeError()
+      }
+      chunks.push(Buffer.from(value))
+    }
+  } finally {
+    reader.releaseLock()
+  }
+  return Buffer.concat(chunks)
+}
+
 // ─── Route Factory ───────────────────────────────────────────────────────────
 
 /**
@@ -184,7 +259,7 @@ function isUrlAllowed(urlStr: string, allowlist: string[]): boolean {
  * Requires authentication middleware to be applied upstream.
  */
 export function createProxyRoutes(deps: ProxyRoutesDeps): Hono {
-  const { logger, allowedOrigins, getPluginAllowlists } = deps
+  const { logger, allowedOrigins, rateLimiter } = deps
   const app = new Hono()
 
   /**
@@ -196,6 +271,26 @@ export function createProxyRoutes(deps: ProxyRoutesDeps): Hono {
    */
   app.post('/proxy', async (c: Context) => {
     const session = c.get('session') as SessionContext
+
+    if (allowedOrigins.length === 0) {
+      return c.json(
+        createApiError(
+          'PROXY_NOT_CONFIGURED',
+          'The plugin request proxy is disabled. An administrator must set SLATEBASE_PROXY_ALLOWED_ORIGINS to enable it for specific origins.',
+        ),
+        403,
+      )
+    }
+
+    const limit = rateLimiter.checkLimit(session.userId)
+    if (!limit.allowed) {
+      c.header('Retry-After', String(limit.retryAfter))
+      return c.json(
+        createApiError('RATE_LIMITED', `Too many proxy requests. Retry after ${limit.retryAfter} seconds`),
+        429,
+      )
+    }
+    rateLimiter.recordRequest(session.userId)
 
     // Parse request body
     let rawBody: unknown
@@ -218,18 +313,13 @@ export function createProxyRoutes(deps: ProxyRoutesDeps): Hono {
     const effectiveContentType = contentType
       ?? (headers ? (headers['Content-Type'] ?? headers['content-type']) : undefined)
 
-    // Security: Block private/internal URLs (SSRF protection)
-    if (await isPrivateUrl(url)) {
+    // Security: Resolve + validate the initial URL, and check it against the allowlist
+    const initialAddress = await resolveSafeAddress(url)
+    if (initialAddress === null) {
       logger.warn('Proxy request blocked: private URL', { userId: session.userId, url })
       return c.json(createApiError('PROXY_BLOCKED', 'Requests to private/internal addresses are not allowed'), 403)
     }
-
-    // Security: Check against allowlist
-    const combinedAllowlist = [
-      ...allowedOrigins,
-      ...(getPluginAllowlists?.() ?? []),
-    ]
-    if (!isUrlAllowed(url, combinedAllowlist)) {
+    if (!isUrlAllowed(url, allowedOrigins)) {
       logger.warn('Proxy request blocked: URL not in allowlist', { userId: session.userId, url })
       return c.json(createApiError('PROXY_BLOCKED', 'URL is not in the allowed origins list'), 403)
     }
@@ -261,25 +351,32 @@ export function createProxyRoutes(deps: ProxyRoutesDeps): Hono {
     // Execute the proxied request with timeout
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS)
+    const dispatchers: Agent[] = []
 
     try {
       let currentUrl = url
+      let currentAddress = initialAddress
       let response: Response
 
-      // Follow redirects manually, re-validating each hop against the SSRF/allowlist
-      // checks above — a compromised or malicious server could otherwise redirect the
-      // request to a private address or an off-allowlist origin after the initial check.
+      // Follow redirects manually, re-validating (and re-pinning) each hop against the
+      // SSRF/allowlist checks above — a compromised or malicious server could otherwise
+      // redirect the request to a private address or an off-allowlist origin after the
+      // initial check, or to a hostname whose DNS answer changes between hops.
       for (let redirectCount = 0; ; redirectCount++) {
         if (redirectCount > MAX_PROXY_REDIRECTS) {
           throw new ProxyBlockedError('PROXY_BLOCKED', 'Too many redirects')
         }
 
-        response = await fetch(currentUrl, {
+        const dispatcher = createPinnedDispatcher(currentAddress)
+        dispatchers.push(dispatcher)
+
+        response = await undiciFetch(currentUrl, {
           method,
           headers: outgoingHeaders,
           body: (method !== 'GET' && method !== 'HEAD' && body) ? Buffer.from(body, 'utf-8') : null,
           signal: controller.signal,
           redirect: 'manual',
+          dispatcher,
         })
 
         if (response.status < 300 || response.status >= 400) break
@@ -288,22 +385,22 @@ export function createProxyRoutes(deps: ProxyRoutesDeps): Hono {
         if (!location) break
 
         const nextUrl = new URL(location, currentUrl).toString()
-        if (await isPrivateUrl(nextUrl)) {
+        const nextAddress = await resolveSafeAddress(nextUrl)
+        if (nextAddress === null) {
           throw new ProxyBlockedError('PROXY_BLOCKED', 'Redirect target is a private/internal address')
         }
-        if (!isUrlAllowed(nextUrl, combinedAllowlist)) {
+        if (!isUrlAllowed(nextUrl, allowedOrigins)) {
           throw new ProxyBlockedError('PROXY_BLOCKED', 'Redirect target is not in the allowed origins list')
         }
         currentUrl = nextUrl
+        currentAddress = nextAddress
       }
 
       clearTimeout(timeoutId)
 
-      // Read response body (with size limit)
-      const responseBuffer = await response.arrayBuffer()
-      if (responseBuffer.byteLength > MAX_RESPONSE_BODY) {
-        return c.json(createApiError('RESPONSE_TOO_LARGE', 'Response body exceeds 50 MB limit'), 502)
-      }
+      // Read response body while streaming, enforcing the size limit as bytes arrive
+      // rather than buffering the whole response before checking it.
+      const responseBuffer = await readLimitedBody(response, MAX_RESPONSE_BODY)
 
       // Build response headers map
       const responseHeaders: Record<string, string> = {}
@@ -327,7 +424,7 @@ export function createProxyRoutes(deps: ProxyRoutesDeps): Hono {
         }, 200)
       } else {
         // Binary response: encode as base64
-        const base64 = Buffer.from(responseBuffer).toString('base64')
+        const base64 = responseBuffer.toString('base64')
         return c.json({
           status: response.status,
           headers: responseHeaders,
@@ -342,6 +439,10 @@ export function createProxyRoutes(deps: ProxyRoutesDeps): Hono {
         return c.json(createApiError(error.apiCode, error.message), 403)
       }
 
+      if (error instanceof ProxyResponseTooLargeError) {
+        return c.json(createApiError('RESPONSE_TOO_LARGE', error.message), 502)
+      }
+
       if (error instanceof Error && error.name === 'AbortError') {
         logger.warn('Proxy request timed out', { userId: session.userId, url })
         return c.json(createApiError('PROXY_TIMEOUT', 'Request timed out after 30 seconds'), 504)
@@ -350,6 +451,8 @@ export function createProxyRoutes(deps: ProxyRoutesDeps): Hono {
       const message = error instanceof Error ? error.message : String(error)
       logger.error('Proxy request failed', { userId: session.userId, url, error: message })
       return c.json(createApiError('PROXY_ERROR', 'Failed to fetch the remote URL'), 502)
+    } finally {
+      await Promise.all(dispatchers.map((dispatcher) => dispatcher.close().catch(() => {})))
     }
   })
 

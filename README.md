@@ -75,6 +75,7 @@ All settings live in `docker.env`. Key options:
 | `SLATEBASE_MODULE_SECRET_KEY` | *(auto)* | Encrypts Git-Sync / Mail-Import credentials — set if you use either |
 | `SLATEBASE_TRUSTED_PROXIES` | *(empty)* | Reverse proxy IPs/CIDRs for real client IPs |
 | `SLATEBASE_MAX_FILE_SIZE` | `5242880` | Max upload size in bytes (5 MB) |
+| `SLATEBASE_PROXY_ALLOWED_ORIGINS` | *(empty — proxy disabled)* | Comma-separated hosts the plugin request proxy (`POST /api/v1/proxy`) may reach, `*.` prefix for subdomains — e.g. `api.example.com,*.couchdb.example.com`. Empty means the route is off, not "allow everything" |
 | `SLATEBASE_LOG_LEVEL` | `info` | Log level: debug, info, warn, error |
 
 See `docker.env.example` for the full list with documentation.

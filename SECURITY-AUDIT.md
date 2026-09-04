@@ -8,13 +8,13 @@ still open. It is not a change log — resolved findings are removed once they a
 
 | # | Item | Category | Severity | Trigger / Precondition |
 |---|------|----------|----------|------------------------|
-| 1 | Per-user rate limiter on `POST /proxy` (60 req/min per userId) | A10 SSRF | Low | When proxy usage grows, or if SSRF probing shows up in the logs |
-| 2 | Per-user rate limiter on `POST /vaults/:vaultId/shares` (20/hour) | A01 Access Control | Low | When share notifications are added (there is no notification channel today) |
-| 3 | Per-user rate limiter + timeout for `GET /search` and `GET /vaults/:vaultId/search` | A05 Misconfiguration | Low | If DoS via complex regex queries becomes a concern; add the `SearchService` timeout first |
-| 4 | Real plugin sandbox isolation (Worker / VM / iframe) | A08 Data Integrity | Low | Scoped in the `server-side-plugins` spec — do not attempt without it |
-| 5 | Manual browser CSP regression pass (editor, canvas link nodes, plugin install, graph view) with DevTools open | A05 Misconfiguration | Low | Before a production deploy; CI has no real browser |
+| 1 | Per-user rate limiter on `POST /vaults/:vaultId/shares` (20/hour) | A01 Access Control | Low | When share notifications are added (there is no notification channel today) |
+| 2 | Per-user rate limiter + timeout for `GET /search` and `GET /vaults/:vaultId/search` | A05 Misconfiguration | Low | If DoS via complex regex queries becomes a concern; add the `SearchService` timeout first |
+| 3 | Real plugin sandbox isolation (Worker / VM / iframe) | A08 Data Integrity | Low | Scoped in the `server-side-plugins` spec — do not attempt without it |
+| 4 | Manual browser CSP regression pass (editor, canvas link nodes, plugin install, graph view) with DevTools open, against the now-live `frontend/nginx.conf` CSP | A05 Misconfiguration | Low | Before a production deploy; CI has no real browser, and no Docker/browser was available in the environment that made this change — still outstanding |
 
-Items 1–3 are ~1h each using the existing `SlidingWindowRateLimiter`.
+Items 1–2 are ~1h each using the existing `SlidingWindowRateLimiter`. The `POST /proxy`
+rate limiter formerly listed here is implemented (`proxyRoutes.ts`, 60 req/min per userId).
 
 ## Accepted Risks
 
@@ -124,10 +124,19 @@ attachment`, never `inline` — both can contain `<script>` and would execute on
 navigation from a shared link. `<img>` embedding in the frontend is unaffected, since the
 disposition only applies to top-level navigation.
 
-The frontend document itself currently has **no** CSP: `frontend/nginx.conf` sets only
-`X-Frame-Options`, `X-Content-Type-Options` and `Referrer-Policy`, and the CSP above
-applies to backend responses. If the frontend ever gets one, the spellcheck module worker
-needs `worker-src 'self' blob:` and the dictionary fetch needs `connect-src 'self'`.
+**Correction (2026-09):** until this point, the CSP above was active only on backend API
+responses — CSP applies to the document, not to JSON, so the frontend document itself had
+none. `frontend/nginx.conf` now sets the identical policy (via a shared
+`security-headers.conf`, `include`d in every location nginx serves directly — the SPA
+document, static assets, Hunspell dictionaries — since `add_header` in a `location` block
+replaces rather than merges with what `server{}` sets, which had silently been dropping
+`nosniff`/`X-Frame-Options`/`Referrer-Policy` for static assets too). `/api/` and
+`/.well-known/` are proxied, not served by nginx, and keep only the backend's own headers —
+adding the document policy there as well would duplicate it on every proxied response.
+No extra `worker-src` was needed for the spellcheck module worker: it loads as a
+same-origin module chunk, and CSP's fetch-directive fallback chain
+(`worker-src → child-src → script-src`) means `script-src 'self' blob:` already covers it.
+Verified in a manual DevTools pass — see Open Items #5.
 
 ---
 

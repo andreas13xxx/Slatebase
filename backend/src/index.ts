@@ -782,14 +782,18 @@ const welcomeVaultRoutes = createWelcomeVaultRoutes({
 })
 app.route('/api/v1', welcomeVaultRoutes)
 
-// Proxy route — CORS-free HTTP forwarding for Obsidian plugin compat (requestUrl)
+// Proxy route — CORS-free HTTP forwarding for Obsidian plugin compat (requestUrl).
+// Default-deny: an empty allowlist (the unset-env default) disables the route entirely,
+// see PROXY_NOT_CONFIGURED in proxyRoutes.ts — there is no "allow everything public" fallback.
 import { createProxyRoutes } from './api/proxyRoutes.js'
 const proxyAllowedOrigins = process.env['SLATEBASE_PROXY_ALLOWED_ORIGINS']
   ? process.env['SLATEBASE_PROXY_ALLOWED_ORIGINS'].split(',').map(s => s.trim())
   : []
+const proxyRateLimiter = new SlidingWindowRateLimiter(60, 60_000)
 const proxyRoutes = createProxyRoutes({
   logger,
   allowedOrigins: proxyAllowedOrigins,
+  rateLimiter: proxyRateLimiter,
 })
 app.route('/api/v1', proxyRoutes)
 
@@ -1103,6 +1107,7 @@ const gracefulShutdown = async (signal: string): Promise<void> => {
   replayBuffer.destroy()
   chatRateLimiter.destroy()
   mcpRateLimiter?.destroy()
+  proxyRateLimiter.destroy()
 
   // Shutdown realtime connections (sends server:shutdown event, closes all streams)
   await realtimeConnectionManager.shutdown()
