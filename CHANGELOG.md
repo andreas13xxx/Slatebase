@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.42.3](https://github.com/andreas13xxx/Slatebase/compare/v0.42.2...v0.42.3) (2026-09-05)
+
+
+### Bugfixes
+
+* allow data: URIs in font-src for plugins embedding fonts inline ([#148](https://github.com/andreas13xxx/Slatebase/issues/148)) ([861020b](https://github.com/andreas13xxx/Slatebase/commit/861020b74f2e45b91108b76a0c0adc82b5eca98d))
+
 ## [0.42.2](https://github.com/andreas13xxx/Slatebase/compare/v0.42.1...v0.42.2) (2026-09-04)
 
 
