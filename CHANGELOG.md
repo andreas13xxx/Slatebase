@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.42.5](https://github.com/andreas13xxx/Slatebase/compare/v0.42.4...v0.42.5) (2026-09-05)
+
+
+### Bugfixes
+
+* stop dropping frontmatter edits, contain async plugin lifecycle hooks ([#152](https://github.com/andreas13xxx/Slatebase/issues/152)) ([af54e08](https://github.com/andreas13xxx/Slatebase/commit/af54e0871c0b49b96a793b5b9675cbcfc0aef048))
+
 ## [0.42.4](https://github.com/andreas13xxx/Slatebase/compare/v0.42.3...v0.42.4) (2026-09-05)
 
 
