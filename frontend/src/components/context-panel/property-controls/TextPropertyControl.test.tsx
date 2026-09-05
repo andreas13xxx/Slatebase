@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TextPropertyControl } from './TextPropertyControl'
 
@@ -54,6 +54,49 @@ describe('TextPropertyControl', () => {
     render(<TextPropertyControl value="hello" onChange={onChange} />)
     await userEvent.click(screen.getByRole('button'))
     await userEvent.keyboard('{Enter}')
+
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('commits an open draft when the control is unmounted without a blur', async () => {
+    // The frontmatter editor is rebuilt whenever the document changes, which
+    // unmounts this control mid-edit — and React fires no blur then, so the
+    // draft has to be flushed explicitly or the typed value is lost.
+    const onChange = vi.fn()
+    const { unmount } = render(<TextPropertyControl value="hello" onChange={onChange} />)
+    await userEvent.click(screen.getByRole('button'))
+    const input = screen.getByRole('textbox')
+    await userEvent.clear(input)
+    await userEvent.type(input, 'typed but not committed')
+
+    unmount()
+    await act(async () => {})
+
+    expect(onChange).toHaveBeenCalledWith('typed but not committed')
+  })
+
+  it('does not re-commit on unmount after the draft was already committed', async () => {
+    const onChange = vi.fn()
+    const { unmount } = render(<TextPropertyControl value="hello" onChange={onChange} />)
+    await userEvent.click(screen.getByRole('button'))
+    const input = screen.getByRole('textbox')
+    await userEvent.clear(input)
+    await userEvent.type(input, 'world{Enter}')
+
+    unmount()
+    await act(async () => {})
+
+    expect(onChange).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not commit on unmount after Escape', async () => {
+    const onChange = vi.fn()
+    const { unmount } = render(<TextPropertyControl value="hello" onChange={onChange} />)
+    await userEvent.click(screen.getByRole('button'))
+    await userEvent.type(screen.getByRole('textbox'), ' extra{Escape}')
+
+    unmount()
+    await act(async () => {})
 
     expect(onChange).not.toHaveBeenCalled()
   })

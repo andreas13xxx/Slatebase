@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
+import { within } from '@testing-library/dom'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { EditMode, type EditModeProps } from './EditMode'
@@ -290,5 +291,94 @@ describe('EditMode', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
 
     vi.useRealTimers()
+  })
+})
+
+/**
+ * Auto-save is a 1.5s debounce. These cover the moments where that timer would
+ * otherwise be thrown away with the edit still only in the tab's edit buffer:
+ * the editor unmounting, being handed a different tab, or the page going away.
+ * Frontmatter edits are what made this visible — committing a property and
+ * immediately clicking away or switching notes is the normal gesture there.
+ */
+describe('EditMode auto-save flush', () => {
+  const DOC = '---\ntitle: Hello\n---\nBody text\n'
+
+  /**
+   * Commits a frontmatter property through the inline properties editor, which
+   * writes into the document and so arms the auto-save debounce.
+   */
+  async function armPendingSave(container: HTMLElement) {
+    const user = userEvent.setup()
+    await act(async () => {})
+    const editor = container.querySelector('.properties-editor') as HTMLElement
+    await user.click(within(editor).getByRole('button', { name: 'Hello' }))
+    const input = within(editor).getByRole('textbox')
+    await user.clear(input)
+    await user.type(input, 'Changed{Enter}')
+  }
+
+  function props(overrides: Partial<EditModeProps>): EditModeProps {
+    return {
+      content: DOC,
+      onChange: vi.fn(),
+      onSave: vi.fn(),
+      onCancel: vi.fn(),
+      saving: false,
+      error: null,
+      livePreviewMode: true,
+      livePreviewOptions: { vaultId: 'v1', directoryTree: null },
+      ...overrides,
+    }
+  }
+
+  it('saves a still-pending edit when the editor unmounts', async () => {
+    const onSave = vi.fn()
+    const { container, unmount } = render(React.createElement(EditMode, props({ onSave, tabId: 't1' })))
+    await armPendingSave(container)
+    expect(onSave).not.toHaveBeenCalled()
+
+    unmount()
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+  })
+
+  it('saves the outgoing tab before switching to another one', async () => {
+    // This component stays mounted across tab switches — only `tabId` changes.
+    // A pending timer would otherwise fire against the new tab's onSave, and the
+    // previous note's edit would never be written anywhere.
+    const firstSave = vi.fn()
+    const secondSave = vi.fn()
+    const { container, rerender } = render(
+      React.createElement(EditMode, props({ onSave: firstSave, tabId: 't1' })),
+    )
+    await armPendingSave(container)
+
+    rerender(React.createElement(EditMode, props({ onSave: secondSave, tabId: 't2', content: '---\ntitle: Other\n---\n' })))
+
+    expect(firstSave).toHaveBeenCalledTimes(1)
+    expect(secondSave).not.toHaveBeenCalled()
+  })
+
+  it('saves a still-pending edit when the page is hidden or unloaded', async () => {
+    const onSave = vi.fn()
+    const { container } = render(React.createElement(EditMode, props({ onSave, tabId: 't1' })))
+    await armPendingSave(container)
+
+    act(() => { window.dispatchEvent(new Event('pagehide')) })
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not save again once the debounce has already fired', async () => {
+    const onSave = vi.fn()
+    const { container, unmount } = render(React.createElement(EditMode, props({ onSave, tabId: 't1' })))
+    await armPendingSave(container)
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 1800)) })
+    expect(onSave).toHaveBeenCalledTimes(1)
+
+    unmount()
+
+    expect(onSave).toHaveBeenCalledTimes(1)
   })
 })

@@ -73,6 +73,10 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
     setLanguage: setSpellcheckLanguage,
   } = useSpellcheck()
 
+  // Compute the effective tabId — the prop when given, else the file path.
+  // Declared up here because the auto-save flush effect keys on it.
+  const effectiveTabId = tabId ?? filePath ?? 'default'
+
   // Compute effective live preview state (respects file size) — livePreviewMode is
   // driven by the tab mode (Variante 1).
   const isFileTooLarge = content.length > 50000
@@ -103,10 +107,55 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
     wasSavingRef.current = saving
   }, [saving, error])
 
-  // Cleanup debounce timer on unmount
-  useEffect(() => {
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  /** (Re)starts the auto-save debounce. Cleared by `flushPendingSave`. */
+  const scheduleSave = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      debounceRef.current = null
+      onSaveRef.current()
+    }, 1500)
   }, [])
+
+  /**
+   * Saves immediately when the debounce is still pending, so an edit made in
+   * the last 1.5s isn't dropped once this editor can no longer save it.
+   * Cancelling the timer alone (what the unmount cleanup used to do) lost that
+   * edit silently: it stayed in the tab's edit buffer and never reached disk.
+   *
+   * Frontmatter edits hit this hardest — committing a property and immediately
+   * clicking away or switching notes is the normal gesture there, while typing
+   * prose usually keeps the timer alive until it fires on its own.
+   */
+  const flushPendingSave = useCallback(() => {
+    if (!debounceRef.current) return
+    clearTimeout(debounceRef.current)
+    debounceRef.current = null
+    onSaveRef.current()
+  }, [])
+
+  // Flush on unmount and on every tab switch. The switch matters as much as the
+  // unmount: this component stays mounted across tabs (only `tabId` changes), so
+  // a pending timer would otherwise fire against the *new* tab's onSave while the
+  // previous note's edit was never written. Effect cleanups all run before any
+  // effect body in the same commit, so `onSaveRef` still holds the outgoing tab's
+  // save callback at this point.
+  useEffect(() => {
+    return () => { flushPendingSave() }
+  }, [effectiveTabId, flushPendingSave])
+
+  // A pending timer dies with the page, so flush when the page goes away:
+  // `pagehide` covers close/navigate/bfcache, `visibilitychange` the
+  // switch-to-another-window case where the browser may freeze timers.
+  useEffect(() => {
+    const handlePageHide = () => { flushPendingSave() }
+    const handleVisibilityChange = () => { if (document.hidden) flushPendingSave() }
+    window.addEventListener('pagehide', handlePageHide)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [flushPendingSave])
 
   /**
    * Called by CodeMirrorEditor when content changes.
@@ -115,10 +164,8 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
   const handleContentChange = useCallback((newContent: string) => {
     onChange(newContent)
     setStatus('unsaved')
-    // Debounce auto-save
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => { onSaveRef.current() }, 1500)
-  }, [onChange])
+    scheduleSave()
+  }, [onChange, scheduleSave])
 
   // ─── Listen for editor commands from the Command Palette ─────────────────
   useEffect(() => {
@@ -193,9 +240,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
       if (linkTexts.length > 0 && editorRef.current) {
         editorRef.current.insertAtPos(linkTexts.join('\n'), insertPos)
         setStatus('unsaved')
-        // Trigger auto-save
-        if (debounceRef.current) clearTimeout(debounceRef.current)
-        debounceRef.current = setTimeout(() => { onSaveRef.current() }, 1500)
+        scheduleSave()
       }
     } catch (err) {
       // Show toast for individual file errors with filename + reason
@@ -204,7 +249,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
         showToast('error', `"${file.name}": ${reason}`)
       }
     }
-  }, [onExternalFileDrop])
+  }, [onExternalFileDrop, scheduleSave])
 
   /** Handle external file drop from OS — uploads to same directory as current file. */
   const handleExternalFileDrop = useCallback(async (files: File[], _targetPath: string, dropPoint: { x: number; y: number }) => {
@@ -281,9 +326,8 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
 
     editorRef.current?.insertAtPos(buildInternalLinkText(fileName), insertPos)
     setStatus('unsaved')
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => { onSaveRef.current() }, 1500)
-  }, [readOnly, currentVaultId, t])
+    scheduleSave()
+  }, [readOnly, currentVaultId, t, scheduleSave])
 
   const internalDropHandlers = { onDragOver: handleInternalDragOver, onDrop: handleInternalDrop }
 
@@ -299,9 +343,6 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
   })()
 
   const statusClass = `edit-mode-status${status === 'saving' ? ' edit-mode-status--saving' : status === 'saved' ? ' edit-mode-status--saved' : status === 'error' ? ' edit-mode-status--error' : ''}`
-
-  // Compute the effective tabId — use prop if provided, fall back to filePath
-  const effectiveTabId = tabId ?? filePath ?? 'default'
 
   return (
     <div className="edit-mode-container">

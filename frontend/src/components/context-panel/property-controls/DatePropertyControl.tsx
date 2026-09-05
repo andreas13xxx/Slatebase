@@ -10,8 +10,9 @@
  * segment the user touched destroyed the field they were still typing into.
  */
 
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useTranslation } from '../../../i18n'
+import { useCommitOnUnmount } from './useCommitOnUnmount'
 
 interface DatePropertyControlProps {
   value: string
@@ -30,19 +31,33 @@ export function DatePropertyControl({ value, onChange, includeTime = false }: Da
   // render (React's documented prop-change reset) rather than in an effect,
   // which would render the stale draft first.
   const [lastValue, setLastValue] = useState(value)
+
+  // Whether the draft has already been resolved (committed or reverted). A ref,
+  // not state: committing rewrites the frontmatter and unmounts this control
+  // before another render can happen. An external change needs no reset here —
+  // it also resets the draft, and `commit` ignores a draft equal to the value.
+  const settledRef = useRef(true)
+
   if (value !== lastValue) {
     setLastValue(value)
     setDraft(value || '')
   }
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    settledRef.current = false
     setDraft(e.target.value)
   }, [])
 
   const commit = useCallback(() => {
+    settledRef.current = true
     if (draft === (value || '')) return
     onChange(draft === '' ? null : draft)
   }, [draft, value, onChange])
+
+  // Blur commits, but unmounting fires no blur — commit the open draft anyway.
+  // This is what keeps a date half-entered in one field from being lost when a
+  // change to another property rebuilds the properties editor.
+  useCommitOnUnmount(() => { if (!settledRef.current) commit() })
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -50,6 +65,7 @@ export function DatePropertyControl({ value, onChange, includeTime = false }: Da
       commit()
     } else if (e.key === 'Escape') {
       e.preventDefault()
+      settledRef.current = true
       setDraft(value || '')
     }
   }, [commit, value])

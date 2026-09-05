@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { DatePropertyControl } from './DatePropertyControl'
 
 describe('DatePropertyControl', () => {
@@ -98,5 +98,33 @@ describe('DatePropertyControl', () => {
     const { container, rerender } = render(<DatePropertyControl value="2026-01-15" onChange={vi.fn()} />)
     rerender(<DatePropertyControl value="2026-03-01" onChange={vi.fn()} />)
     expect(container.querySelector('input')!.value).toBe('2026-03-01')
+  })
+
+  it('commits an open draft when the input is unmounted without a blur', async () => {
+    // A commit on another property rebuilds the whole frontmatter editor and
+    // takes this input with it — React fires no blur on unmount, so a date
+    // that was typed but not yet committed has to be flushed explicitly.
+    const onChange = vi.fn()
+    const { container, unmount } = render(<DatePropertyControl value="2026-01-15" onChange={onChange} />)
+    const input = container.querySelector('input') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '2026-03-01' } })
+
+    unmount()
+    await act(async () => {})
+
+    expect(onChange).toHaveBeenCalledWith('2026-03-01')
+  })
+
+  it('does not re-commit on unmount after the draft was already committed', async () => {
+    const onChange = vi.fn()
+    const { container, unmount } = render(<DatePropertyControl value="2026-01-15" onChange={onChange} />)
+    const input = container.querySelector('input') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '2026-03-01' } })
+    fireEvent.blur(input)
+
+    unmount()
+    await act(async () => {})
+
+    expect(onChange).toHaveBeenCalledTimes(1)
   })
 })

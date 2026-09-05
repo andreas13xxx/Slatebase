@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { PropertiesEditor } from './PropertiesEditor'
 import type { PropertiesEditorProps } from './PropertiesEditor'
@@ -51,6 +51,23 @@ describe('PropertiesEditor — key renaming', () => {
     await userEvent.clear(input)
     await userEvent.type(input, 'heading')
     await userEvent.tab()
+
+    expect(onRenameProperty).toHaveBeenCalledWith('title', 'heading')
+  })
+
+  it('commits an in-progress rename when the row is unmounted without a blur', async () => {
+    // Same reason as the value controls: a change elsewhere in the document
+    // rebuilds this editor, and React fires no blur on unmount — so the new
+    // key would be lost while the row was still showing it.
+    const onRenameProperty = vi.fn()
+    const { unmount } = renderEditor({ onRenameProperty })
+    await userEvent.click(screen.getByRole('button', { name: 'title' }))
+    const input = screen.getByRole('textbox', { name: 'Name der Eigenschaft' })
+    await userEvent.clear(input)
+    await userEvent.type(input, 'heading')
+
+    unmount()
+    await act(async () => {})
 
     expect(onRenameProperty).toHaveBeenCalledWith('title', 'heading')
   })

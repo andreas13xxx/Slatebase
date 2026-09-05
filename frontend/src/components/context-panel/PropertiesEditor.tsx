@@ -15,6 +15,7 @@ import {
   CheckboxPropertyControl,
   ListPropertyControl,
 } from './property-controls'
+import { useCommitOnUnmount } from './property-controls/useCommitOnUnmount'
 import type { PropertyType, PropertyTypeEntry } from '../../state/propertyTypes'
 import { useTranslation } from '../../i18n'
 import './property-controls/property-controls.css'
@@ -243,6 +244,11 @@ function PropertyRow({
   const [isEditingKey, setIsEditingKey] = useState(startInEditMode)
   const [draftKey, setDraftKey] = useState(propertyKey)
   const keyInputRef = useRef<HTMLInputElement>(null)
+  // Whether the open rename has been resolved. A ref for the same reason as in
+  // the value controls: committing rebuilds the properties editor, so the state
+  // flag may not have re-rendered by the time this row unmounts. A row that
+  // opens in rename mode (just added) starts out unresolved.
+  const keyEditSettledRef = useRef(!startInEditMode)
 
   useEffect(() => {
     if (isEditingKey) {
@@ -264,11 +270,13 @@ function PropertyRow({
   }, [propertyKey, onTypeChange])
 
   const startEditingKey = useCallback(() => {
+    keyEditSettledRef.current = false
     setDraftKey(propertyKey)
     setIsEditingKey(true)
   }, [propertyKey])
 
   const commitKeyEdit = useCallback(() => {
+    keyEditSettledRef.current = true
     const trimmed = draftKey.trim()
     if (trimmed !== '' && trimmed !== propertyKey && !existingKeys.includes(trimmed)) {
       onRename(propertyKey, trimmed)
@@ -278,10 +286,16 @@ function PropertyRow({
   }, [draftKey, propertyKey, existingKeys, onRename, onEditModeExited])
 
   const cancelKeyEdit = useCallback(() => {
+    keyEditSettledRef.current = true
     setDraftKey(propertyKey)
     setIsEditingKey(false)
     onEditModeExited()
   }, [propertyKey, onEditModeExited])
+
+  // The key input commits on blur, and unmounting fires no blur — so an
+  // in-progress rename would be dropped when the row goes away (a change to
+  // another property, a tab switch, leaving Live Preview).
+  useCommitOnUnmount(() => { if (!keyEditSettledRef.current) commitKeyEdit() })
 
   const handleKeyInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
