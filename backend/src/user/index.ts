@@ -331,6 +331,11 @@ export class UserRepository implements IUserRepository {
 
   /**
    * Writes a user record to disk atomically.
+   * The temp file is created with mode 0o600 (owner read/write only) — user
+   * records carry the argon2 password hash. `rename()` preserves the temp
+   * file's mode, not the target's, so the mode must be set here rather than
+   * after the rename. On Windows this POSIX mode is largely a no-op (ACL-based
+   * permissions apply instead) — that's expected, not a bug.
    */
   private async writeUserFile(user: UserRecord): Promise<void> {
     await this.ensureDirectory()
@@ -338,7 +343,7 @@ export class UserRepository implements IUserRepository {
     const content = JSON.stringify(user, null, 2)
     const tempPath = filePath + `.${crypto.randomBytes(8).toString('hex')}.tmp`
 
-    await fs.writeFile(tempPath, content, 'utf-8')
+    await fs.writeFile(tempPath, content, { encoding: 'utf-8', mode: 0o600 })
 
     try {
       await fs.rename(tempPath, filePath)

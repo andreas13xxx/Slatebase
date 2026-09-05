@@ -1,6 +1,6 @@
 import { mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { randomBytes, randomUUID, createHmac, timingSafeEqual } from 'node:crypto'
+import { randomBytes, randomUUID, createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import { hash, verify } from 'argon2'
 import type { UserRole, PublicUserInfo, IUserRepository } from '../user/index.js'
 import { AccountSuspendedError, ARGON2_OPTIONS } from '../user/index.js'
@@ -15,8 +15,7 @@ import { isNodeError } from '../shared/fs-utils.js'
  */
 export interface Session {
   sessionId: string
-  token: string
-  csrfToken: string
+  tokenHash: string
   userId: string
   role: UserRole
   userAgent: string
@@ -75,16 +74,19 @@ export interface ISessionStore {
   /** Persist a new session to the store. */
   create(session: Session): Promise<void>
 
-  /** Look up a session by its opaque token. Returns null if not found or expired. */
+  /** Look up a session by its opaque raw token (hashed internally before lookup). Returns null if not found or expired. */
   findByToken(token: string): Promise<Session | null>
 
   /** Find all sessions belonging to a specific user. */
   findByUserId(userId: string): Promise<Session[]>
 
-  /** Invalidate (delete) a single session by its token. */
+  /** Invalidate (delete) a single session by its raw token (hashed internally before lookup). */
   invalidate(token: string): Promise<void>
 
-  /** Invalidate all sessions for a user, optionally keeping one token active. */
+  /** Invalidate (delete) a single session by its sessionId, without needing the raw token. */
+  invalidateBySessionId(sessionId: string): Promise<void>
+
+  /** Invalidate all sessions for a user, optionally keeping one (identified by its raw token) active. */
   invalidateAllForUser(userId: string, exceptToken?: string): Promise<void>
 
   /** Update an existing session in the store (e.g. lastActivity). */
@@ -165,12 +167,27 @@ export class CsrfError extends Error {
   }
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Hashes a raw session token with SHA-256 (hex-encoded) for at-rest storage and
+ * in-memory indexing. The token is a 512-bit random value, not a human-chosen
+ * secret — there is nothing to brute-force, so a plain fast hash is used rather
+ * than a slow KDF (which would add latency to every authenticated request).
+ * Mirrors the pattern used by the MCP `TokenStore`.
+ */
+function sha256Hex(value: string): string {
+  return createHash('sha256').update(value).digest('hex')
+}
+
 // ─── SessionStore Implementation ─────────────────────────────────────────────
 
 /**
  * Filesystem-backed session store with in-memory token index.
  * Sessions are persisted as individual JSON files under `data/sessions/`.
- * A `Map<token, sessionId>` is maintained in memory for fast lookups.
+ * Only the SHA-256 hash of each session token is ever persisted or indexed —
+ * the raw token exists solely at issuance time (see AuthService.login()).
+ * A `Map<tokenHash, sessionId>` is maintained in memory for fast lookups.
  * A secondary `Map<userId, Set<sessionId>>` enables O(1) user-session lookups.
  */
 export class SessionStore implements ISessionStore {
@@ -247,7 +264,7 @@ export class SessionStore implements ISessionStore {
         const content = await readFile(filePath, 'utf-8')
         const session: unknown = JSON.parse(content)
         if (this.isValidSession(session)) {
-          this.tokenIndex.set(session.token, session.sessionId)
+          this.tokenIndex.set(session.tokenHash, session.sessionId)
           this.addToUserIndex(session.userId, session.sessionId)
           loaded++
         }
@@ -266,7 +283,7 @@ export class SessionStore implements ISessionStore {
     await this.ensureDir()
     const filePath = join(this.sessionsDir, `${session.sessionId}.json`)
     await this.atomicWrite(filePath, JSON.stringify(session, null, 2))
-    this.tokenIndex.set(session.token, session.sessionId)
+    this.tokenIndex.set(session.tokenHash, session.sessionId)
     this.addToUserIndex(session.userId, session.sessionId)
   }
 
@@ -280,11 +297,13 @@ export class SessionStore implements ISessionStore {
   }
 
   /**
-   * Look up a session by its opaque token.
+   * Look up a session by its opaque raw token. The token is hashed internally
+   * before the index lookup — only the hash is ever stored or compared.
    * Returns null if not found or if the session has expired.
    */
   async findByToken(token: string): Promise<Session | null> {
-    const sessionId = this.tokenIndex.get(token)
+    const tokenHash = sha256Hex(token)
+    const sessionId = this.tokenIndex.get(tokenHash)
     if (sessionId === undefined) {
       return null
     }
@@ -293,7 +312,7 @@ export class SessionStore implements ISessionStore {
     if (result.session === null) {
       if (result.gone) {
         // The file really is absent or unusable — the session no longer exists.
-        this.tokenIndex.delete(token)
+        this.tokenIndex.delete(tokenHash)
       } else {
         // A transient read failure (a lock held by antivirus, a synced folder,
         // a concurrent rewrite) is not evidence that the session is gone.
@@ -313,7 +332,7 @@ export class SessionStore implements ISessionStore {
     // Check expiry
     if (new Date(session.expiresAt).getTime() <= Date.now()) {
       // Session expired — remove from indexes and filesystem
-      this.tokenIndex.delete(token)
+      this.tokenIndex.delete(tokenHash)
       this.removeFromUserIndex(session.userId, sessionId)
       await this.deleteSessionFile(sessionId)
       return null
@@ -345,10 +364,12 @@ export class SessionStore implements ISessionStore {
   }
 
   /**
-   * Invalidate (delete) a single session by its token.
+   * Invalidate (delete) a single session by its raw token (hashed internally
+   * before the index lookup).
    */
   async invalidate(token: string): Promise<void> {
-    const sessionId = this.tokenIndex.get(token)
+    const tokenHash = sha256Hex(token)
+    const sessionId = this.tokenIndex.get(tokenHash)
     if (sessionId === undefined) {
       return
     }
@@ -359,12 +380,30 @@ export class SessionStore implements ISessionStore {
       this.removeFromUserIndex(session.userId, sessionId)
     }
 
-    this.tokenIndex.delete(token)
+    this.tokenIndex.delete(tokenHash)
     await this.deleteSessionFile(sessionId)
   }
 
   /**
-   * Invalidate all sessions for a user, optionally keeping one token active.
+   * Invalidate (delete) a single session by its sessionId, without needing the
+   * raw token. Used by callers (e.g. AuthService.invalidateSession()) that only
+   * have the sessionId on hand — the raw token is never persisted, so it can't
+   * be recovered from a stored Session record.
+   */
+  async invalidateBySessionId(sessionId: string): Promise<void> {
+    const session = await this.readSession(sessionId)
+    if (session === null) {
+      return
+    }
+
+    this.tokenIndex.delete(session.tokenHash)
+    this.removeFromUserIndex(session.userId, sessionId)
+    await this.deleteSessionFile(sessionId)
+  }
+
+  /**
+   * Invalidate all sessions for a user, optionally keeping one (identified by
+   * its raw token) active. The raw token is hashed internally before comparison.
    */
   async invalidateAllForUser(userId: string, exceptToken?: string): Promise<void> {
     const sessionIds = this.userIndex.get(userId)
@@ -372,21 +411,23 @@ export class SessionStore implements ISessionStore {
       return
     }
 
-    // Find which tokens belong to these sessions
-    const tokensToRemove: string[] = []
-    for (const [token, sessionId] of this.tokenIndex) {
-      if (exceptToken !== undefined && token === exceptToken) {
+    const exceptTokenHash = exceptToken !== undefined ? sha256Hex(exceptToken) : undefined
+
+    // Find which token hashes belong to these sessions
+    const tokenHashesToRemove: string[] = []
+    for (const [tokenHash, sessionId] of this.tokenIndex) {
+      if (exceptTokenHash !== undefined && tokenHash === exceptTokenHash) {
         continue
       }
       if (sessionIds.has(sessionId)) {
-        tokensToRemove.push(token)
+        tokenHashesToRemove.push(tokenHash)
       }
     }
 
-    for (const token of tokensToRemove) {
-      const sessionId = this.tokenIndex.get(token)
+    for (const tokenHash of tokenHashesToRemove) {
+      const sessionId = this.tokenIndex.get(tokenHash)
       if (sessionId !== undefined) {
-        this.tokenIndex.delete(token)
+        this.tokenIndex.delete(tokenHash)
         this.removeFromUserIndex(userId, sessionId)
         await this.deleteSessionFile(sessionId)
       }
@@ -399,30 +440,30 @@ export class SessionStore implements ISessionStore {
    */
   async cleanup(): Promise<number> {
     const now = Date.now()
-    const tokensToRemove: Array<{ token: string; sessionId: string; userId: string | null }> = []
+    const tokenHashesToRemove: Array<{ tokenHash: string; sessionId: string; userId: string | null }> = []
 
-    for (const [token, sessionId] of this.tokenIndex) {
+    for (const [tokenHash, sessionId] of this.tokenIndex) {
       const session = await this.readSession(sessionId)
       if (session === null) {
-        tokensToRemove.push({ token, sessionId, userId: null })
+        tokenHashesToRemove.push({ tokenHash, sessionId, userId: null })
       } else if (new Date(session.expiresAt).getTime() <= now) {
-        tokensToRemove.push({ token, sessionId, userId: session.userId })
+        tokenHashesToRemove.push({ tokenHash, sessionId, userId: session.userId })
       }
     }
 
-    for (const { token, sessionId, userId } of tokensToRemove) {
-      this.tokenIndex.delete(token)
+    for (const { tokenHash, sessionId, userId } of tokenHashesToRemove) {
+      this.tokenIndex.delete(tokenHash)
       if (userId !== null) {
         this.removeFromUserIndex(userId, sessionId)
       }
       await this.deleteSessionFile(sessionId)
     }
 
-    if (tokensToRemove.length > 0) {
-      this.logger.info('Expired sessions cleaned up', { count: tokensToRemove.length })
+    if (tokenHashesToRemove.length > 0) {
+      this.logger.info('Expired sessions cleaned up', { count: tokenHashesToRemove.length })
     }
 
-    return tokensToRemove.length
+    return tokenHashesToRemove.length
   }
 
   // ─── Private Helpers ─────────────────────────────────────────────────────────
@@ -527,11 +568,18 @@ export class SessionStore implements ISessionStore {
    * Write data atomically: write to a temp file, then rename to target.
    * On Windows, rename can fail with EPERM if the target is briefly locked
    * (e.g. by antivirus or file watchers). Retries with delay and unlink-before-rename.
+   *
+   * The temp file is created with mode 0o600 (owner read/write only) — session
+   * files carry a token hash and other session data, so they get the same
+   * restrictive permissions as other secret-bearing files. `rename()` preserves
+   * the temp file's mode, not the target's, so the mode must be set here rather
+   * than after the rename. On Windows this POSIX mode is largely a no-op
+   * (ACL-based permissions apply instead) — that's expected, not a bug.
    */
   private async atomicWrite(targetPath: string, data: string): Promise<void> {
     const tempName = `${randomBytes(16).toString('hex')}.tmp`
     const tempPath = join(this.sessionsDir, tempName)
-    await writeFile(tempPath, data, 'utf-8')
+    await writeFile(tempPath, data, { encoding: 'utf-8', mode: 0o600 })
 
     try {
       await rename(tempPath, targetPath)
@@ -550,7 +598,7 @@ export class SessionStore implements ISessionStore {
             await rename(tempPath, targetPath)
           } catch {
             // Last resort: direct overwrite (loses atomicity but avoids crash)
-            await writeFile(targetPath, data, 'utf-8')
+            await writeFile(targetPath, data, { encoding: 'utf-8', mode: 0o600 })
             try { await unlink(tempPath) } catch { /* cleanup */ }
           }
         }
@@ -564,6 +612,9 @@ export class SessionStore implements ISessionStore {
 
   /**
    * Type guard to validate that a parsed JSON value is a valid Session object.
+   * A record from the pre-AP5 format (raw `token`/`csrfToken`, no `tokenHash`)
+   * fails this check and is treated as unreadable/gone — it gets swept up by
+   * the next cleanup() run rather than accepted as a valid session.
    */
   private isValidSession(value: unknown): value is Session {
     if (typeof value !== 'object' || value === null) {
@@ -572,8 +623,7 @@ export class SessionStore implements ISessionStore {
     const obj = value as Record<string, unknown>
     return (
       typeof obj['sessionId'] === 'string' &&
-      typeof obj['token'] === 'string' &&
-      typeof obj['csrfToken'] === 'string' &&
+      typeof obj['tokenHash'] === 'string' &&
       typeof obj['userId'] === 'string' &&
       typeof obj['role'] === 'string' &&
       typeof obj['userAgent'] === 'string' &&
@@ -707,8 +757,7 @@ export class AuthService implements IAuthService {
 
     const session: Session = {
       sessionId,
-      token,
-      csrfToken,
+      tokenHash: sha256Hex(token),
       userId: user.userId,
       role: user.role,
       userAgent: meta.userAgent,
@@ -876,7 +925,7 @@ export class AuthService implements IAuthService {
     const sessions = await this.sessionStore.findByUserId(userId)
     const target = sessions.find(s => s.sessionId === sessionId)
     if (target !== undefined) {
-      await this.sessionStore.invalidate(target.token)
+      await this.sessionStore.invalidateBySessionId(target.sessionId)
       this.logger.info('Session invalidated', { userId, sessionId })
     }
   }

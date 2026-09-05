@@ -94,9 +94,22 @@ Dateisystemzugriff folgt. Wer liest oder schreibt, braucht zusätzlich
 ## A02 Cryptographic Failures
 
 - **Password hashing:** argon2id (`argon2` package), default cost parameters.
-- **Session tokens:** 128-character opaque tokens from `crypto.randomBytes(64)` (512 bits).
+- **Session tokens:** 128-character opaque tokens from `crypto.randomBytes(64)` (512 bits) —
+  adequate entropy, and was never the question. What was missing, and is fixed as of AP5:
+  only `SHA-256(rawToken)` is persisted to `data/sessions/<id>.json` and held in the
+  in-memory lookup index; the raw token exists solely at issuance (`login()`'s return
+  value) and is never written to disk or kept in the index. Previously the raw,
+  directly-reusable-as-`Bearer` token was stored in both places — a single read of
+  `data/` (via the symlink escape in A01, a backup, a misconfigured volume mount, a heap
+  dump) handed over any active session outright. No `timingSafeEqual` on the lookup: the
+  token is a 512-bit random value, not a human-chosen secret, so a Map lookup over the
+  hash is not a practical oracle — this is the same reasoning already applied to the MCP
+  token store below, now applied consistently to sessions. The CSRF token (see below) is
+  no longer persisted alongside it either, since it's fully derivable from the session ID
+  and the server's CSRF secret and carried no independent value at rest.
 - **CSRF tokens:** HMAC-SHA256 over session ID + server secret, compared with `timingSafeEqual`.
-- **MCP API tokens:** only the SHA-256 hash is stored; the raw token is shown once.
+- **MCP API tokens:** only the SHA-256 hash is stored; the raw token is shown once. This was
+  the correct pattern from the start — session tokens (above) now follow it too.
 - **CSRF secret:** env `SLATEBASE_CSRF_SECRET` → `data/.csrf-secret` → generated. A startup
   warning is emitted at `warn` level when the env var is unset, because a generated secret
   does not survive a container restart without persistent storage.
