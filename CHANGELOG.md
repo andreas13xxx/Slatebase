@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.42.7](https://github.com/andreas13xxx/Slatebase/compare/v0.42.6...v0.42.7) (2026-09-05)
+
+
+### Bugfixes
+
+* **backend:** close symlink escape from vault directories ([#156](https://github.com/andreas13xxx/Slatebase/issues/156)) ([63fd6f1](https://github.com/andreas13xxx/Slatebase/commit/63fd6f1190748a0b514e29d4ee8ab8816ce80aa1))
+
 ## [0.42.6](https://github.com/andreas13xxx/Slatebase/compare/v0.42.5...v0.42.6) (2026-09-05)
 
 
