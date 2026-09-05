@@ -196,6 +196,33 @@ interface SyntheticFileLeafView {
   };
 }
 
+/** Duck-typed shape of the built-in "empty state" view `getLeaf()` stubs onto an unassigned leaf. */
+interface EmptyLeafView {
+  view: {
+    file: null;
+    getViewType: () => string;
+    getDisplayText: () => string;
+    getIcon: () => string;
+    getState: () => Record<string, unknown>;
+    setState: () => Promise<void>;
+    getEphemeralState: () => Record<string, unknown>;
+    setEphemeralState: () => void;
+    readonly containerEl: HTMLElement;
+    onClose: () => Promise<void>;
+    onunload: () => void;
+  };
+}
+
+/**
+ * A leaf is "reusable" by `getLeaf()`'s falsy-newLeaf branch if it either never got a
+ * view assigned, or still carries the synthetic empty-state view this same function
+ * stubs on below — real Obsidian's `getLeaf(false)` reuses an idle "New tab" leaf rather
+ * than piling up empty tabs, and that's exactly what an empty-view leaf here represents.
+ */
+function isReusableEmptyLeaf(leaf: WorkspaceLeaf): boolean {
+  return leaf.view === null || leaf.view.getViewType() === 'empty';
+}
+
 export class WorkspaceShim implements IWorkspaceShim {
   private events: EventSystem;
   private activeFile: TFile | null = null;
@@ -463,27 +490,51 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Get or create a workspace leaf for hosting a view.
    *
    * - If `newLeaf === true`: always creates a new leaf with location 'main'.
-   * - If `newLeaf` is falsy/undefined: returns an existing leaf with null view,
-   *   or creates a new leaf with location 'main' if none available.
+   * - If `newLeaf` is falsy/undefined: returns an existing empty leaf, or creates a new
+   *   leaf with location 'main' if none available.
+   *
+   * Every leaf returned here carries the built-in empty-state view stubbed on by
+   * `withEmptyView()` — real Obsidian's active leaf is (almost) never null, and plugins
+   * (Excalidraw's `openLeaf()` is one) routinely call `leaf.view.getViewType()` right
+   * after `getLeaf()`, before `setViewState()` gets a chance to attach a real view.
    */
-  getLeaf(newLeaf?: boolean | string): WorkspaceLeaf {  
+  getLeaf(newLeaf?: boolean | string): WorkspaceLeaf {
     if (!this.viewRegistry) {
       // Should not happen in practice — create a leaf anyway if registry is available later
-      return this.viewRegistry!.createLeaf(this.app, 'main');
+      return this.withEmptyView(this.viewRegistry!.createLeaf(this.app, 'main'));
     }
 
     if (newLeaf === true) {
-      return this.viewRegistry.createLeaf(this.app, 'main');
+      return this.withEmptyView(this.viewRegistry.createLeaf(this.app, 'main'));
     }
 
-    // Find an existing leaf with no view (null view)
+    // Find an existing leaf that's still idle (never assigned, or still on the empty view)
     const allLeaves = this.viewRegistry.getAllLeaves();
-    const emptyLeaf = allLeaves.find(l => l.view === null);
+    const emptyLeaf = allLeaves.find(isReusableEmptyLeaf);
     if (emptyLeaf) {
-      return emptyLeaf;
+      return this.withEmptyView(emptyLeaf);
     }
 
-    return this.viewRegistry.createLeaf(this.app, 'main');
+    return this.withEmptyView(this.viewRegistry.createLeaf(this.app, 'main'));
+  }
+
+  /** Stubs the built-in empty-state view onto `leaf` if it doesn't have a view yet. */
+  private withEmptyView(leaf: WorkspaceLeaf): WorkspaceLeaf {
+    if (leaf.view !== null) return leaf;
+    (leaf as unknown as EmptyLeafView).view = {
+      file: null,
+      getViewType: () => 'empty',
+      getDisplayText: () => 'New tab',
+      getIcon: () => 'file',
+      getState: () => ({}),
+      setState: async () => {},
+      getEphemeralState: () => ({}),
+      setEphemeralState: () => {},
+      containerEl: document.createElement('div'),
+      onClose: async () => {},
+      onunload: () => {},
+    };
+    return leaf;
   }
 
   /**
