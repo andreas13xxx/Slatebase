@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.42.6](https://github.com/andreas13xxx/Slatebase/compare/v0.42.5...v0.42.6) (2026-09-05)
+
+
+### Bugfixes
+
+* **frontend:** load KaTeX's CSS through Vite's pipeline, not new URL() ([#154](https://github.com/andreas13xxx/Slatebase/issues/154)) ([8fb05bf](https://github.com/andreas13xxx/Slatebase/commit/8fb05bf082e0e7e8884b11e052f036e081ab8706))
+
 ## [0.42.5](https://github.com/andreas13xxx/Slatebase/compare/v0.42.4...v0.42.5) (2026-09-05)
 
 
