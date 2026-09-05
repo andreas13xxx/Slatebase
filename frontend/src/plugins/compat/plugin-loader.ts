@@ -38,6 +38,7 @@ import { STORAGE_KEY_TOKEN, STORAGE_KEY_CSRF } from '../../state/authContext';
 // which entry point reaches the loader first. Idempotent.
 import { installObsidianGlobals } from './install-globals';
 import { withPluginContextAsync } from './plugin-execution-context';
+import { containAsyncUnload, takePendingUnload } from './async-lifecycle';
 import { createBrowserPathShim } from './browser-path-shim';
 import { preloadAllBuiltInIcons } from './lucide-icons';
 // Node's Buffer — plugins that bundle git/crypto tooling (e.g. obsidian-git's
@@ -99,6 +100,13 @@ export interface PluginLoaderDeps {
 
 /** Timeout for onload() in milliseconds */
 const ONLOAD_TIMEOUT_MS = 10_000;
+
+/**
+ * How long deactivatePlugin() waits for an `async onunload()` to settle before
+ * cleaning up anyway. Short: teardown that takes longer than this is hung, and
+ * the vault switch waiting on it must not be.
+ */
+const ONUNLOAD_TIMEOUT_MS = 3_000;
 
 // ─── Implementation ────────────────────────────────────────────────────────────
 
@@ -307,18 +315,45 @@ export class PluginLoader implements IPluginLoader {
     // (registered cleanups, event refs, intervals, child components) and calls
     // onunload() itself. Calling onunload() directly would skip all of that.
     // Fall back for instances that only define onunload().
-    const instance = record.instance as { unload?: () => void; onunload: () => void };
+    const instance = record.instance as { unload?: () => unknown; onunload: () => unknown };
     try {
       if (typeof instance.unload === 'function') {
+        // Component.unload() returns void but parks an async onunload() on the
+        // instance for takePendingUnload() below (see async-lifecycle.ts).
         instance.unload();
       } else {
-        instance.onunload();
+        containAsyncUnload(instance, pluginId, instance.onunload());
       }
     } catch (err) {
       console.error(
         `[PluginLoader] Plugin "${pluginId}" threw during onunload:`,
         err
       );
+    }
+
+    // A plugin that declared `async onunload()` is still tearing itself down
+    // here. Wait for it — bounded, because a teardown that hangs must not
+    // block a vault switch — so the sandbox cleanup below doesn't pull state
+    // out from under work the plugin is still doing. Rejections are already
+    // contained and logged by containAsyncUnload(); this never throws.
+    const pendingUnload = takePendingUnload(instance);
+    if (pendingUnload) {
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        pendingUnload,
+        new Promise<void>(resolve => {
+          timeoutId = setTimeout(() => {
+            console.warn(
+              `[PluginLoader] Plugin "${pluginId}" async onunload() did not settle within ${ONUNLOAD_TIMEOUT_MS}ms — continuing cleanup`
+            );
+            resolve();
+          }, ONUNLOAD_TIMEOUT_MS);
+        }),
+      ]);
+      // The loser of the race is never cancelled by Promise.race itself: leave
+      // the timer running and a teardown that finished in time still gets a
+      // "did not settle" warning three seconds later.
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
     }
 
     // Full resource cleanup via sandbox — regardless of onunload exceptions

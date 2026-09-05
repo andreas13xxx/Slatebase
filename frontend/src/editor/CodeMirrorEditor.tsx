@@ -409,6 +409,22 @@ export function CodeMirrorEditor({
     })
   }, [])
 
+  /**
+   * Blurs whatever inside the editor currently holds focus, so a widget-hosted
+   * form control gets its blur handler before the view goes away. The
+   * frontmatter property inputs commit their draft on blur, and React fires no
+   * blur when an input is unmounted — so without this, destroying the view
+   * (switching tabs by keyboard, say, with the caret still in a property field)
+   * would drop what was typed. Called while the view is still alive, so the
+   * resulting transaction still lands.
+   */
+  const commitFocusedWidgetEdit = useCallback((view: EditorView) => {
+    const active = view.dom.ownerDocument.activeElement
+    if (active instanceof HTMLElement && active !== view.contentDOM && view.dom.contains(active)) {
+      active.blur()
+    }
+  }, [])
+
   // Mount / tab switch effect
   useEffect(() => {
     const container = containerRef.current
@@ -420,6 +436,7 @@ export function CodeMirrorEditor({
 
     // If tab changed, save old state
     if (prevTabIdRef.current !== tabId && viewRef.current) {
+      commitFocusedWidgetEdit(viewRef.current)
       saveCurrentState(prevTabIdRef.current)
       viewRef.current.destroy()
       viewRef.current = null
@@ -524,6 +541,7 @@ export function CodeMirrorEditor({
     return () => {
       container.removeEventListener('contextmenu', handleContextMenu)
       if (viewRef.current) {
+        commitFocusedWidgetEdit(viewRef.current)
         saveCurrentState(tabId)
         setActiveEditorView(null)
         setActiveEditorContainerEl(null)

@@ -116,6 +116,8 @@ When you have write access, the Properties tab shows an **interactive editor** i
 > [!tip] No manual YAML
 > The Properties Editor saves you from editing raw YAML. Changes are written directly into the frontmatter and saved immediately.
 
+A field you still have open is not lost along the way: if the editor is rebuilt because you changed another property, switched tabs, or left Live Preview, whatever you had typed is committed — even without pressing Enter or clicking away first. The same holds for a key rename you started.
+
 ### Command Palette Shortcuts
 
 - **"Add alias"** — adds an `aliases` list to the frontmatter (creating the frontmatter block first if the file doesn't have one yet)

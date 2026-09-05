@@ -23,7 +23,7 @@ In Source mode you see the raw Markdown text with syntax highlighting. All marke
 - **Readable Line Length** — Constrains the editor width for comfortable reading; toggle via Command Palette → "Toggle readable line length"
 - **Spellcheck** — Built-in, with corrections: unknown words are underlined, and a right-click offers suggestions plus "add to dictionary". Toggle it and pick the dictionary (German/English) via the context menu or Command Palette → "Toggle spellcheck"
 - **Folding** — Collapse headings and nested lists (see [[#Folding]] below)
-- **Auto-Save** — Your changes are saved automatically after a short pause
+- **Auto-Save** — Your changes are saved automatically after a short pause (about 1.5 seconds). Switching tabs, closing the note, or leaving the page writes a still-pending change immediately rather than dropping it
 - **Undo/Redo** — `Ctrl+Z` to undo, `Ctrl+Shift+Z` to redo
 
 **When to use:** For complex formatting, tables, or when you need full control over the syntax.
@@ -32,7 +32,7 @@ In Source mode you see the raw Markdown text with syntax highlighting. All marke
 
 The tab shows a dot when there are unsaved changes:
 - **No dot** = file is saved
-- **Dot on tab name** = unsaved changes (auto-save will handle it shortly)
+- **Dot on tab name** = unsaved changes (auto-save will handle it shortly — or right away if you switch tabs or leave the page first)
 
 ---
 

@@ -146,6 +146,8 @@ Bei Dateien mit Schreibzugriff wird statt der einfachen Tabelle ein **interaktiv
 > [!tip] Kein manuelles YAML
 > Der Properties-Editor erspart dir das manuelle Bearbeiten des YAML-Blocks. Änderungen werden direkt ins Frontmatter geschrieben und sofort gespeichert.
 
+Ein Feld, das du noch offen hast, geht dabei nicht verloren: Wird der Editor neu aufgebaut, weil du parallel eine andere Eigenschaft änderst, den Tab wechselst oder Live Preview verlässt, wird der bereits getippte Wert übernommen — auch ohne dass du vorher Enter gedrückt oder ins Leere geklickt hast. Das gilt auch für eine begonnene Umbenennung eines Schlüssels.
+
 ### Command-Palette-Kürzel
 
 - **"Alias hinzufügen"** — fügt eine `aliases`-Liste ins Frontmatter ein (legt den Frontmatter-Block bei Bedarf neu an)

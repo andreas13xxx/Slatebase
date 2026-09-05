@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NumberPropertyControl } from './NumberPropertyControl'
 
@@ -61,6 +61,20 @@ describe('NumberPropertyControl', () => {
     await userEvent.keyboard('{Enter}')
 
     expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('commits an open draft when the control is unmounted without a blur', async () => {
+    const onChange = vi.fn()
+    const { unmount } = render(<NumberPropertyControl value={5} onChange={onChange} />)
+    await userEvent.click(screen.getByRole('button', { name: '5' }))
+    const input = screen.getByRole('spinbutton')
+    await userEvent.clear(input)
+    await userEvent.type(input, '42')
+
+    unmount()
+    await act(async () => {})
+
+    expect(onChange).toHaveBeenCalledWith(42)
   })
 
   it('cancels editing on Escape without calling onChange', async () => {

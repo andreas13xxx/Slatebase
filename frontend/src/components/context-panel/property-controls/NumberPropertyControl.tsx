@@ -5,6 +5,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { useCommitOnUnmount } from './useCommitOnUnmount'
 
 interface NumberPropertyControlProps {
   value: number | string
@@ -24,22 +25,36 @@ export function NumberPropertyControl({ value, onChange }: NumberPropertyControl
     }
   }, [editing])
 
+  // See TextPropertyControl: a ref, because an explicit commit unmounts this
+  // control before `editing` has a chance to re-render as false.
+  const settledRef = useRef(true)
+
   const startEditing = useCallback(() => {
+    settledRef.current = false
     setDraft(String(numValue))
     setEditing(true)
   }, [numValue])
 
-  const commit = useCallback(() => {
-    setEditing(false)
+  const commitDraft = useCallback(() => {
+    settledRef.current = true
     const parsed = parseFloat(draft)
     if (!isNaN(parsed) && parsed !== numValue) {
       onChange(parsed)
     }
   }, [draft, numValue, onChange])
 
+  const commit = useCallback(() => {
+    setEditing(false)
+    commitDraft()
+  }, [commitDraft])
+
   const cancel = useCallback(() => {
+    settledRef.current = true
     setEditing(false)
   }, [])
+
+  // Blur commits, but unmounting fires no blur — commit the open draft anyway.
+  useCommitOnUnmount(() => { if (!settledRef.current) commitDraft() })
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {

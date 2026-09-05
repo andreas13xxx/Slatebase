@@ -90,6 +90,29 @@ describe('Interactive frontmatter box', () => {
     expect(view.state.doc.toString()).toBe('---\ntitle: Changed\n---\nBody text\n')
   })
 
+  it('keeps a value typed into one property when the document changes underneath it', async () => {
+    // Any change to the frontmatter rebuilds this widget and unmounts the open
+    // input with it. React fires no blur then, so the draft used to disappear
+    // without ever reaching the document — not saved, not even marked unsaved.
+    const user = userEvent.setup()
+    const { view, parent } = mount(DOC)
+    cleanup = () => { view.destroy(); parent.remove() }
+    await flushMicrotasks()
+
+    const scope = within(view.dom.querySelector('.properties-editor') as HTMLElement)
+    await user.click(scope.getByRole('button', { name: 'Hello' }))
+    const input = scope.getByRole('textbox')
+    await user.clear(input)
+    await user.type(input, 'Changed')
+
+    // Something else rewrites the block: a plugin, an undo, a realtime reload.
+    view.dispatch({ changes: { from: 4, to: 4, insert: 'author: me\n' } })
+    await flushMicrotasks()
+    await flushMicrotasks()
+
+    expect(view.state.doc.toString()).toBe('---\nauthor: me\ntitle: Changed\n---\nBody text\n')
+  })
+
   it('renaming a key preserves its value and position', async () => {
     const user = userEvent.setup()
     const { view, parent } = mount('---\ntitle: Hello\ntags: [a, b]\n---\nBody\n')

@@ -10,8 +10,9 @@
  * These tests pin the behaviour at the level plugins actually rely on: unload
  * releases everything registered through the base class.
  */
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, vi } from 'vitest'
 import { installObsidianGlobals } from './install-globals'
+import { takePendingUnload } from './async-lifecycle'
 import { EventSystem } from './event-system'
 
 beforeAll(() => {
@@ -97,6 +98,35 @@ describe.each(['Component', 'Plugin'] as const)('%s teardown', (name) => {
 
     instance.unload()
     expect(childCleanup).toBe(1)
+  })
+
+  it('contains a rejecting async onunload() rather than leaking it', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const rejections: unknown[] = []
+    const capture = (event: PromiseRejectionEvent): void => { rejections.push(event.reason) }
+    window.addEventListener('unhandledrejection', capture)
+
+    const instance = construct(name) as Lifecycle & { onunload: () => unknown }
+    instance.onunload = async (): Promise<void> => {
+      await Promise.resolve()
+      // What obsidian-livesync does on a vault switch: its teardown logs an
+      // error through a notice manager its own unload had already disposed.
+      throw new Error('KeyedNoticeManager has been disposed')
+    }
+    instance.load()
+
+    expect(() => instance.unload()).not.toThrow()
+    // unload() is synchronous, so the teardown is parked for the loader to await
+    await takePendingUnload(instance as object)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    window.removeEventListener('unhandledrejection', capture)
+
+    expect(rejections).toEqual([])
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('rejected'),
+      expect.any(Error)
+    )
+    consoleError.mockRestore()
   })
 
   it('ignores an event ref from an emitter it cannot reach', () => {

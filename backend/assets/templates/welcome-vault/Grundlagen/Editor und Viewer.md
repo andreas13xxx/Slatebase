@@ -58,11 +58,11 @@ Im Live-Preview-Modus wird dein Markdown **inline formatiert** dargestellt — u
 
 ## Auto-Save
 
-Slatebase speichert deine Änderungen **automatisch** nach einer kurzen Verzögerung (ca. 2 Sekunden Inaktivität). Du musst nicht manuell speichern.
+Slatebase speichert deine Änderungen **automatisch** nach einer kurzen Verzögerung (rund 1,5 Sekunden Inaktivität). Du musst nicht manuell speichern.
 
-- Kein Datenverlust bei Browser-Tab-Wechsel
 - Kein explizites Speichern nötig
 - Änderungen sind sofort für andere Nutzer sichtbar (bei geteilten Vaults)
+- Kein Datenverlust, wenn du vor Ablauf der Verzögerung weiterklickst: Beim Wechsel auf einen anderen Tab, beim Schließen der Notiz und beim Verlassen der Seite wird eine noch ausstehende Änderung sofort geschrieben statt verworfen
 
 ---
 
