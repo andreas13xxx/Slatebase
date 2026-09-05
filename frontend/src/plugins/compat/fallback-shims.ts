@@ -27,6 +27,7 @@
 
 import { getStoredAuthToken, getStoredCsrfToken } from '../../state/authContext'
 import { recordGapRead } from './api-gap-registry'
+import { containAsyncLoad, containAsyncUnload } from './async-lifecycle'
 import { debugLog } from './log'
 import { MenuItem, MenuSeparator } from './menu'
 import { OBSIDIAN_API_VERSION, compareApiVersions } from './obsidian-api-extensions'
@@ -48,8 +49,8 @@ interface FallbackWindow extends Window {
 
 class FallbackComponent {
   _loaded = false
-  load(): void { this._loaded = true; this.onload() }
-  unload(): void { this._loaded = false; this.onunload() }
+  load(): void { this._loaded = true; containAsyncLoad('FallbackComponent', this.onload()) }
+  unload(): void { this._loaded = false; containAsyncUnload(this, 'FallbackComponent', this.onunload()) }
   onload(): void {}
   onunload(): void {}
   addChild<T>(c: T): T { (c as { load?: () => void })?.load?.(); return c }

@@ -22,6 +22,7 @@ import { getStoredAuthToken, getStoredCsrfToken } from '../../state/authContext'
 import { addRibbonIcon as registerRibbonIcon } from './ribbon-icon-registry'
 import { addStatusBarItem as registerStatusBarItem } from './status-bar-registry'
 import { getCurrentPluginId, trackPluginTimer, withPluginContext } from './plugin-execution-context'
+import { containAsyncLoad, containAsyncUnload } from './async-lifecycle'
 import { getBuiltInIconIds, getLucideIconElement, renderLucideIconInto } from './lucide-icons'
 import { getCustomIconSvg, sizeCustomIconSvg } from '../../utils/pluginIcon'
 import moment from 'moment/min/moment-with-locales'
@@ -802,7 +803,7 @@ export function installObsidianGlobals(): void {
 
       load(): void {
         this._loaded = true
-        this.onload()
+        containAsyncLoad(this.constructor?.name || 'Component', this.onload())
       }
       onload(): void {}
       unload(): void {
@@ -824,11 +825,15 @@ export function installObsidianGlobals(): void {
         // Unload children
         for (const child of this._children) {
           if (child && typeof child === 'object' && 'unload' in child) {
-            (child as { unload: () => void }).unload()
+            // A child whose unload() is async (or whose onunload() is, for a
+            // child that isn't one of ours) must not leak an uncaught rejection.
+            containAsyncUnload(undefined, 'child component', (child as { unload: () => unknown }).unload())
           }
         }
         this._children = []
-        this.onunload()
+        // Parked on the instance so PluginLoader.deactivatePlugin() can await an
+        // async onunload() before the sandbox is torn down underneath it.
+        containAsyncUnload(this, this.constructor?.name || 'Component', this.onunload())
       }
       onunload(): void {}
       addChild<T>(child: T): T {
@@ -842,7 +847,7 @@ export function installObsidianGlobals(): void {
         const idx = this._children.indexOf(child)
         if (idx >= 0) this._children.splice(idx, 1)
         if (child && typeof child === 'object' && 'unload' in child) {
-          (child as { unload: () => void }).unload()
+          containAsyncUnload(undefined, 'child component', (child as { unload: () => unknown }).unload())
         }
         return child
       }
@@ -2054,7 +2059,7 @@ export function installObsidianGlobals(): void {
       }
       removeChild<T>(child: T): T {
         if (child && typeof child === 'object' && 'unload' in child) {
-          (child as { unload: () => void }).unload()
+          containAsyncUnload(undefined, 'child component', (child as { unload: () => unknown }).unload())
         }
         return child
       }

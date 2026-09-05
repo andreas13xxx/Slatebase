@@ -39,7 +39,7 @@ function createMockSandbox(): IPluginSandbox {
  */
 function createMockBundleEvaluator(options?: {
   onloadFn?: () => void | Promise<void>;
-  onunloadFn?: () => void;
+  onunloadFn?: () => unknown;
   noDefaultExport?: boolean;
   nonFunctionExport?: boolean;
   constructorThrows?: boolean;
@@ -74,7 +74,7 @@ function createMockBundleEvaluator(options?: {
           this.app = app;
         }
         onload() { return options?.onloadFn?.(); }
-        onunload() { options?.onunloadFn?.(); }
+        onunload() { return options?.onunloadFn?.(); }
         loadData() { return Promise.resolve(null); }
         saveData(_data: unknown) { return Promise.resolve(); }  
         addCommand() {}
@@ -334,6 +334,115 @@ describe('PluginLoader', () => {
       await loader.deactivatePlugin('unknown');
       // No error thrown
       expect(deps.sandbox.cleanup).not.toHaveBeenCalled();
+    });
+
+    it('should wait for an async onunload() before cleaning up the sandbox', async () => {
+      const order: string[] = [];
+      const onunloadFn = async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+        order.push('onunload settled');
+      };
+      deps = createMockDeps({ bundleEvaluator: createMockBundleEvaluator({ onunloadFn }) });
+      (deps.sandbox.cleanup as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        order.push('sandbox cleanup');
+      });
+      loader = new PluginLoader(deps);
+
+      await loader.loadPlugin('test-plugin', 'bundle', createValidManifest());
+      await loader.activatePlugin('test-plugin');
+
+      await loader.deactivatePlugin('test-plugin');
+
+      expect(order).toEqual(['onunload settled', 'sandbox cleanup']);
+      expect(loader.getStatus('test-plugin')).toBe('deactivated');
+    });
+
+    it('should contain a rejecting async onunload() instead of leaking an unhandled rejection', async () => {
+      const rejections: unknown[] = [];
+      const captureRejection = (event: PromiseRejectionEvent): void => {
+        rejections.push(event.reason);
+      };
+      window.addEventListener('unhandledrejection', captureRejection);
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const onunloadFn = async () => {
+        await Promise.resolve();
+        throw new Error('KeyedNoticeManager has been disposed');
+      };
+      deps = createMockDeps({ bundleEvaluator: createMockBundleEvaluator({ onunloadFn }) });
+      loader = new PluginLoader(deps);
+
+      await loader.loadPlugin('test-plugin', 'bundle', createValidManifest());
+      await loader.activatePlugin('test-plugin');
+
+      await loader.deactivatePlugin('test-plugin');
+      // Let any escaped rejection reach the global handler
+      await new Promise(resolve => setTimeout(resolve, 0));
+      window.removeEventListener('unhandledrejection', captureRejection);
+
+      expect(rejections).toEqual([]);
+      expect(consoleError).toHaveBeenCalledWith(
+        expect.stringContaining('Async unload of "test-plugin" rejected'),
+        expect.any(Error)
+      );
+      expect(deps.sandbox.cleanup).toHaveBeenCalledWith('test-plugin');
+      expect(loader.getStatus('test-plugin')).toBe('deactivated');
+
+      consoleError.mockRestore();
+    });
+
+    it('should not warn about a slow teardown once the async onunload() settled in time', async () => {
+      vi.useFakeTimers();
+      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const onunloadFn = async () => { await Promise.resolve(); };
+      deps = createMockDeps({ bundleEvaluator: createMockBundleEvaluator({ onunloadFn }) });
+      loader = new PluginLoader(deps);
+
+      await loader.loadPlugin('test-plugin', 'bundle', createValidManifest());
+      const activation = loader.activatePlugin('test-plugin');
+      await vi.advanceTimersByTimeAsync(101);
+      await activation;
+
+      await loader.deactivatePlugin('test-plugin');
+      // Past the timeout the race set up — its timer must have been cleared
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      expect(consoleWarn).not.toHaveBeenCalledWith(
+        expect.stringContaining('did not settle')
+      );
+
+      consoleWarn.mockRestore();
+      vi.useRealTimers();
+    });
+
+    it('should stop waiting on a hung async onunload() and clean up anyway', async () => {
+      vi.useFakeTimers();
+      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      // Never settles — a teardown that hangs must not block a vault switch
+      const onunloadFn = () => new Promise<void>(() => {});
+      deps = createMockDeps({ bundleEvaluator: createMockBundleEvaluator({ onunloadFn }) });
+      loader = new PluginLoader(deps);
+
+      await loader.loadPlugin('test-plugin', 'bundle', createValidManifest());
+      const activation = loader.activatePlugin('test-plugin');
+      await vi.advanceTimersByTimeAsync(101);
+      await activation;
+
+      const deactivation = loader.deactivatePlugin('test-plugin');
+      await vi.advanceTimersByTimeAsync(3_001);
+      await deactivation;
+
+      expect(consoleWarn).toHaveBeenCalledWith(
+        expect.stringContaining('did not settle within 3000ms')
+      );
+      expect(deps.sandbox.cleanup).toHaveBeenCalledWith('test-plugin');
+      expect(loader.getStatus('test-plugin')).toBe('deactivated');
+
+      consoleWarn.mockRestore();
+      vi.useRealTimers();
     });
   });
 
