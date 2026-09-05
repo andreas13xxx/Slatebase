@@ -11,7 +11,7 @@ import type {
   DirectoryTree,
   FileContent,
 } from '../vault/index.js'
-import { validateFilePath, generateVaultId, computeEtag } from '../vault/index.js'
+import { validateFilePath, assertRealPathInsideVault, generateVaultId, computeEtag } from '../vault/index.js'
 import type { IVaultRegistry, IVaultShareRegistry, VaultShareEntry } from '../vault/registry.js'
 import type { IUserRepository } from '../user/index.js'
 import type { IAuditService } from '../audit/index.js'
@@ -272,17 +272,35 @@ export class VaultService implements IVaultService {
   ) {}
 
   /**
-   * Initializes vaults on startup.
+   * Initializes vaults on startup: loads them, then reports any symlinks that
+   * already exist in them.
+   */
+  async initializeVaults(): Promise<void> {
+    await this.loadConfiguredVaults()
+
+    // Pre-existing symlinks (synced in before this protection existed, or part
+    // of a directory an operator mounted as a vault) are reported once, not
+    // removed — deleting an operator's files is not this layer's call. File
+    // access through them is refused by assertRealPathInsideVault regardless.
+    // Fire-and-forget: a large vault must not delay the server start.
+    this.warnAboutExistingSymlinks().catch((error: unknown) => {
+      this.logger.warn('Symlink scan failed', {
+        error: error instanceof Error ? error.message : String(error),
+      })
+    })
+  }
+
+  /**
+   * Loads the configured vaults into VaultManager's in-memory map.
    *
    * If a VaultRegistry is configured, loads vault entries from the registry,
-   * verifies each storage directory exists, reads the directory tree, and adds
-   * valid vaults to VaultManager's in-memory map. Missing directories are
-   * skipped with a warning log.
+   * verifies each storage directory exists, and reads the directory tree.
+   * Missing directories are skipped with a warning log.
    *
    * Falls back to static config loading (via IVaultManager.loadVaults) when
    * no registry is configured, maintaining backward compatibility.
    */
-  async initializeVaults(): Promise<void> {
+  private async loadConfiguredVaults(): Promise<void> {
     if (!this.registry) {
       // Backward compatibility: no registry configured, use static config
       const configs = this.configService.getVaultConfigs()
@@ -340,6 +358,49 @@ export class VaultService implements IVaultService {
           path: entry.storagePath,
           error: message,
         })
+      }
+    }
+  }
+
+  /**
+   * Logs a warning for every symlink found in the loaded vaults.
+   *
+   * Visibility only: an operator who mounted an existing directory as a vault,
+   * or who synced from a remote before `core.symlinks=false` was in place, has
+   * no other way to notice that those entries are now inert.
+   *
+   * `readdir` with `withFileTypes` reports symlinks with lstat semantics, so
+   * they are never followed here — recursion cannot loop. Dot-prefixed
+   * directories are skipped, as everywhere else in the vault code.
+   */
+  private async warnAboutExistingSymlinks(): Promise<void> {
+    for (const vault of this.vaultManager.getAllVaults()) {
+      await this.scanForSymlinks(vault.info.id, vault.info.path, vault.info.path)
+    }
+  }
+
+  private async scanForSymlinks(vaultId: string, rootPath: string, dirPath: string): Promise<void> {
+    let entries
+    try {
+      entries = await fs.readdir(dirPath, { withFileTypes: true })
+    } catch {
+      return // Unreadable directory — nothing to report, and not worth failing over
+    }
+
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue
+
+      const absolutePath = path.join(dirPath, entry.name)
+
+      if (entry.isSymbolicLink()) {
+        const target = await fs.readlink(absolutePath).catch(() => '<unreadable>')
+        this.logger.warn('Symlink found in vault — file access through it is refused', {
+          vaultId,
+          path: path.relative(rootPath, absolutePath).replaceAll('\\', '/'),
+          target,
+        })
+      } else if (entry.isDirectory()) {
+        await this.scanForSymlinks(vaultId, rootPath, absolutePath)
       }
     }
   }
@@ -467,7 +528,10 @@ export class VaultService implements IVaultService {
 
     this.logger.debug('Reading file', { vaultId, filePath, resolvedPath })
 
-    const fileContent = await this.vaultReader.readFile(resolvedPath, maxFileSize)
+    const fileContent = await this.vaultReader.readFile(resolvedPath, maxFileSize, {
+      vaultId,
+      rootPath: vault.info.path,
+    })
 
     // Override path with the relative path from vault root
     fileContent.path = filePath
@@ -500,8 +564,13 @@ export class VaultService implements IVaultService {
       throw new VaultNotFoundError(vaultId)
     }
 
-    // 2. Validate file path (path traversal protection)
+    // 2. Validate file path (path traversal protection, string level + symlinks)
     const resolvedPath = validateFilePath(vault.info.path, filePath)
+    await assertRealPathInsideVault(vault.info.path, resolvedPath, {
+      vaultId,
+      requestedPath: filePath,
+      logger: this.logger,
+    })
 
     // 3. ETag conflict detection (only if If-Match header was provided)
     if (ifMatch !== undefined) {
@@ -911,8 +980,13 @@ export class VaultService implements IVaultService {
       throw new VaultNotFoundError(vaultId)
     }
 
-    // 2. Validate path (path traversal protection)
+    // 2. Validate path (path traversal protection, string level + symlinks)
     const resolvedPath = validateFilePath(vault.info.path, relativePath)
+    await assertRealPathInsideVault(vault.info.path, resolvedPath, {
+      vaultId,
+      requestedPath: relativePath,
+      logger: this.logger,
+    })
 
     // 3. Check if path exists on filesystem
     try {
@@ -1008,9 +1082,19 @@ export class VaultService implements IVaultService {
       throw new VaultNotFoundError(vaultId)
     }
 
-    // 2. Validate both paths (path traversal protection)
+    // 2. Validate both paths (path traversal protection, string level + symlinks)
     const absoluteSourcePath = validateFilePath(vault.info.path, sourcePath)
     const absoluteDestPath = validateFilePath(vault.info.path, destinationPath)
+    await assertRealPathInsideVault(vault.info.path, absoluteSourcePath, {
+      vaultId,
+      requestedPath: sourcePath,
+      logger: this.logger,
+    })
+    await assertRealPathInsideVault(vault.info.path, absoluteDestPath, {
+      vaultId,
+      requestedPath: destinationPath,
+      logger: this.logger,
+    })
 
     // 3. Check for circular move (destination is subdirectory of source)
     // Normalize paths for comparison using forward slashes
@@ -1097,8 +1181,13 @@ export class VaultService implements IVaultService {
       throw new VaultNotFoundError(vaultId)
     }
 
-    // 2. Validate file path (path traversal protection)
+    // 2. Validate file path (path traversal protection, string level + symlinks)
     const resolvedSourcePath = validateFilePath(vault.info.path, filePath)
+    await assertRealPathInsideVault(vault.info.path, resolvedSourcePath, {
+      vaultId,
+      requestedPath: filePath,
+      logger: this.logger,
+    })
 
     // 3. Validate new name (invalid characters, length, path traversal sequences)
     validateContentName(newName)
@@ -1112,6 +1201,11 @@ export class VaultService implements IVaultService {
     if (!resolvedTargetPath.startsWith(vault.info.path + path.sep)) {
       throw new InvalidMoveError(filePath, newName)
     }
+    await assertRealPathInsideVault(vault.info.path, resolvedTargetPath, {
+      vaultId,
+      requestedPath: newName,
+      logger: this.logger,
+    })
 
     // 5. Check if source exists (and determine whether it's a file or directory)
     let sourceStat

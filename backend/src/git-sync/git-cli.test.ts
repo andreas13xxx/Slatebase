@@ -4,7 +4,7 @@
 // verified rather than a mocked approximation of it.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtemp, rm, writeFile, readFile, mkdir } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile, readFile, mkdir, lstat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
@@ -26,7 +26,11 @@ async function mkWorkDir(prefix: string): Promise<string> {
   return mkdtemp(join(tmpdir(), prefix))
 }
 
-describe('GitCli', () => {
+// Every test here shells out to the real `git` binary several times. Vitest's
+// 5s default is not enough for that on Windows under coverage instrumentation,
+// where process spawn plus antivirus/OneDrive file locking (see AGENTS.md) adds
+// up — the suite was flaky for that reason, not for a logic reason.
+describe('GitCli', { timeout: 30000 }, () => {
   let workDir: string
   let remoteDir: string
   let cli: GitCli
@@ -185,5 +189,92 @@ describe('GitCli', () => {
     const content = await readFile(join(workDir, 'note.md'), 'utf-8')
     expect(content).toContain('<<<<<<<')
     expect(content).toContain('>>>>>>>')
+  })
+})
+
+describe('GitCli — symlinks from a remote', { timeout: 30000 }, () => {
+  let workDir: string
+  let remoteDir: string
+  let scratchDir: string
+  let hostileDir: string
+  let cli: GitCli
+
+  async function git(cwd: string, args: string[]): Promise<string> {
+    const { stdout } = await execFileAsync('git', args, { cwd })
+    return stdout
+  }
+
+  beforeEach(async () => {
+    workDir = await mkWorkDir('git-symlink-work-')
+    scratchDir = await mkWorkDir('git-symlink-scratch-')
+    hostileDir = await mkWorkDir('git-symlink-hostile-')
+    remoteDir = await mkWorkDir('git-symlink-remote-')
+    await rm(remoteDir, { recursive: true, force: true })
+    await initBareRemote(remoteDir)
+    cli = new GitCli()
+  })
+
+  afterEach(async () => {
+    for (const dir of [workDir, scratchDir, hostileDir, remoteDir]) {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  /**
+   * Publishes a commit containing a symlink entry (mode 120000) to the bare
+   * remote. Built with plumbing rather than `fs.symlink` on purpose: it needs
+   * no symlink privilege, so this runs on Windows CI as well.
+   */
+  async function pushCommitWithSymlink(linkName: string, linkTarget: string): Promise<void> {
+    await cli.init(hostileDir, 'main')
+    await cli.configureIdentity(hostileDir)
+
+    const targetFile = join(scratchDir, 'link-target')
+    await writeFile(targetFile, linkTarget) // no trailing newline — the blob IS the target path
+    const blobHash = (await git(hostileDir, ['hash-object', '-w', targetFile])).trim()
+
+    await git(hostileDir, ['update-index', '--add', '--cacheinfo', `120000,${blobHash},${linkName}`])
+    await git(hostileDir, ['commit', '-m', 'add symlink'])
+    await cli.remoteAddOrSetUrl(hostileDir, 'origin', remoteDir)
+    await cli.push(hostileDir, 'origin', 'main', DUMMY_AUTH)
+  }
+
+  it('materializes a merged-in symlink as a regular file, not a link', async () => {
+    // The attack this closes: a symlink synced into a vault passes the
+    // string-level path validation, and every read then follows it out of the
+    // vault (`data/sessions/*.json` is one directory up). `core.symlinks=false`
+    // is injected in GitCli.run(), the single chokepoint for every git call,
+    // so it covers fetch/merge/checkout alike.
+    await pushCommitWithSymlink('escape', '../..')
+
+    await cli.init(workDir, 'main')
+    await cli.configureIdentity(workDir)
+    // Persist the opposite setting locally: only a `-c` override on the
+    // command line beats it, which is exactly what this asserts.
+    await git(workDir, ['config', 'core.symlinks', 'true'])
+    await cli.remoteAddOrSetUrl(workDir, 'origin', remoteDir)
+    await cli.fetch(workDir, 'origin', 'main', DUMMY_AUTH)
+
+    expect(await cli.mergeNoEdit(workDir, 'origin', 'main')).toBe('merged')
+
+    const entry = await lstat(join(workDir, 'escape'))
+    expect(entry.isSymbolicLink()).toBe(false)
+    expect(entry.isFile()).toBe(true)
+    expect(await readFile(join(workDir, 'escape'), 'utf-8')).toBe('../..')
+  })
+
+  it('keeps the entry a symlink in git history — nothing is lost for legitimate repos', async () => {
+    await pushCommitWithSymlink('link.md', 'note.md')
+
+    await cli.init(workDir, 'main')
+    await cli.configureIdentity(workDir)
+    await cli.remoteAddOrSetUrl(workDir, 'origin', remoteDir)
+    await cli.fetch(workDir, 'origin', 'main', DUMMY_AUTH)
+    await cli.mergeNoEdit(workDir, 'origin', 'main')
+
+    // Still recorded as mode 120000, so a later push hands the remote back the
+    // symlink it sent — and the worktree does not look dirty because of it.
+    expect(await git(workDir, ['ls-files', '-s', 'link.md'])).toMatch(/^120000 /)
+    expect(await cli.hasUncommittedChanges(workDir)).toBe(false)
   })
 })

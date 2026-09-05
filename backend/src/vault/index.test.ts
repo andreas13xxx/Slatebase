@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
 import path from 'node:path'
 import fs from 'node:fs/promises'
 import os from 'node:os'
-import { isBinaryContent, validateFilePath, PathTraversalError, VaultReader, computeEtag } from './index'
+import { isBinaryContent, validateFilePath, assertRealPathInsideVault, clearVaultRootRealPathCache, PathTraversalError, VaultReader, computeEtag } from './index'
 
 describe('isBinaryContent', () => {
   it('returns false for a pure text buffer', () => {
@@ -220,7 +220,7 @@ describe('VaultReader', () => {
   describe('readFile', () => {
     it('returns full content for file under maxSize limit', async () => {
       const filePath = path.join(fixtureDir, 'file-a.md')
-      const result = await reader.readFile(filePath, 1024)
+      const result = await reader.readFile(filePath, 1024, { vaultId: 'fixture', rootPath: fixtureDir })
 
       expect(result.content).toBe('Hello World')
       expect(result.name).toBe('file-a.md')
@@ -233,7 +233,7 @@ describe('VaultReader', () => {
     it('sets isTruncated=true and returns first maxSize bytes for oversized file', async () => {
       const filePath = path.join(fixtureDir, 'file-a.md')
       // maxSize=5 is less than "Hello World" (11 bytes)
-      const result = await reader.readFile(filePath, 5)
+      const result = await reader.readFile(filePath, 5, { vaultId: 'fixture', rootPath: fixtureDir })
 
       expect(result.isTruncated).toBe(true)
       expect(result.content).toBe('Hello')
@@ -242,7 +242,7 @@ describe('VaultReader', () => {
 
     it('sets isBinary=true and empty content for binary file', async () => {
       const filePath = path.join(fixtureDir, 'binary.bin')
-      const result = await reader.readFile(filePath, 1024)
+      const result = await reader.readFile(filePath, 1024, { vaultId: 'fixture', rootPath: fixtureDir })
 
       expect(result.isBinary).toBe(true)
       expect(result.content).toBe('')
@@ -251,7 +251,7 @@ describe('VaultReader', () => {
 
     it('preserves UTF-8 special characters and Umlauts', async () => {
       const filePath = path.join(fixtureDir, 'File-B.txt')
-      const result = await reader.readFile(filePath, 1024)
+      const result = await reader.readFile(filePath, 1024, { vaultId: 'fixture', rootPath: fixtureDir })
 
       expect(result.content).toBe('Ümlauts: äöü ß')
       expect(result.isBinary).toBe(false)
@@ -259,7 +259,7 @@ describe('VaultReader', () => {
 
     it('includes etag computed from file content', async () => {
       const filePath = path.join(fixtureDir, 'file-a.md')
-      const result = await reader.readFile(filePath, 1024)
+      const result = await reader.readFile(filePath, 1024, { vaultId: 'fixture', rootPath: fixtureDir })
 
       expect(result.etag).toBeDefined()
       expect(result.etag).toHaveLength(16)
@@ -272,8 +272,8 @@ describe('VaultReader', () => {
 
     it('returns consistent etag for same file content', async () => {
       const filePath = path.join(fixtureDir, 'file-a.md')
-      const result1 = await reader.readFile(filePath, 1024)
-      const result2 = await reader.readFile(filePath, 1024)
+      const result1 = await reader.readFile(filePath, 1024, { vaultId: 'fixture', rootPath: fixtureDir })
+      const result2 = await reader.readFile(filePath, 1024, { vaultId: 'fixture', rootPath: fixtureDir })
 
       expect(result1.etag).toBe(result2.etag)
     })
@@ -519,5 +519,179 @@ describe('VaultManager', () => {
 
       expect(manager.getAllVaults()).toHaveLength(2)
     })
+  })
+})
+
+// --- Symlink Escape Protection ---
+//
+// Creating symlinks needs SeCreateSymbolicLinkPrivilege on Windows, which a
+// normal CI account does not have. The protection itself is platform-agnostic
+// and its Windows specifics (case-insensitive comparison) are covered by the
+// non-symlink cases in this block.
+describe.skipIf(process.platform === 'win32')('symlink escape protection', () => {
+  let dataDir: string
+  let vaultRoot: string
+  const vault = () => ({ vaultId: 'v1', rootPath: vaultRoot })
+
+  beforeEach(async () => {
+    // Mirrors the production layout: the vault is a sibling of the directories
+    // holding session tokens and password hashes.
+    //   <dataDir>/vaults/v1/   ← the vault
+    //   <dataDir>/sessions/    ← what an escape is after
+    dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'slatebase-symlink-'))
+    vaultRoot = path.join(dataDir, 'vaults', 'v1')
+    await fs.mkdir(vaultRoot, { recursive: true })
+    await fs.mkdir(path.join(dataDir, 'sessions'), { recursive: true })
+    await fs.writeFile(path.join(dataDir, 'sessions', 'abc.json'), '{"token":"secret"}')
+    await fs.writeFile(path.join(vaultRoot, 'note.md'), '# note')
+    clearVaultRootRealPathCache()
+  })
+
+  afterEach(async () => {
+    clearVaultRootRealPathCache()
+    await fs.rm(dataDir, { recursive: true, force: true })
+  })
+
+  it('refuses to read a file outside the vault through an in-vault symlink', async () => {
+    await fs.symlink(dataDir, path.join(vaultRoot, 'escape'), 'dir')
+
+    // The string-level check passes — this is exactly why the realpath check exists.
+    const resolved = validateFilePath(vaultRoot, 'escape/sessions/abc.json')
+    expect(resolved.startsWith(vaultRoot + path.sep)).toBe(true)
+
+    const reader = new VaultReader()
+    await expect(reader.readFile(resolved, 1024, vault())).rejects.toThrow(PathTraversalError)
+  })
+
+  it('logs a warning identifying the vault and the requested path on a blocked escape', async () => {
+    await fs.symlink(dataDir, path.join(vaultRoot, 'escape'), 'dir')
+    const logger = createMockLogger()
+    const reader = new VaultReader(logger)
+    const resolved = validateFilePath(vaultRoot, 'escape/sessions/abc.json')
+
+    await expect(reader.readFile(resolved, 1024, vault())).rejects.toThrow(PathTraversalError)
+
+    const warning = logger.messages.find((m) => m.level === 'warn')
+    expect(warning).toBeDefined()
+    expect(warning!.meta).toMatchObject({
+      vaultId: 'v1',
+      requestedPath: 'escape/sessions/abc.json',
+    })
+  })
+
+  it('still allows a symlink that points at another file inside the same vault', async () => {
+    await fs.writeFile(path.join(vaultRoot, 'target.md'), '# target')
+    await fs.symlink(path.join(vaultRoot, 'target.md'), path.join(vaultRoot, 'alias.md'), 'file')
+
+    const reader = new VaultReader()
+    const resolved = validateFilePath(vaultRoot, 'alias.md')
+    const result = await reader.readFile(resolved, 1024, vault())
+
+    expect(result.content).toBe('# target')
+  })
+
+  it('regression: a vault root behind a symlink keeps working for every operation', async () => {
+    // Docker and NAS setups routinely have dataDir behind a symlink or bind
+    // mount. Comparing a resolved child against an unresolved root would
+    // reject every file in the vault.
+    const realDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'slatebase-real-'))
+    const linkedDataDir = path.join(dataDir, 'linked-data')
+    await fs.symlink(realDataDir, linkedDataDir, 'dir')
+
+    const linkedVaultRoot = path.join(linkedDataDir, 'vault')
+    await fs.mkdir(linkedVaultRoot, { recursive: true })
+    await fs.mkdir(path.join(linkedVaultRoot, 'sub'), { recursive: true })
+    await fs.writeFile(path.join(linkedVaultRoot, 'sub', 'note.md'), '# through a symlinked root')
+
+    const reader = new VaultReader()
+    const linked = { vaultId: 'linked', rootPath: linkedVaultRoot }
+
+    const tree = await reader.readDirectory(linkedVaultRoot, 10)
+    expect(tree.children!.find((c) => c.name === 'sub')).toBeDefined()
+
+    const result = await reader.readFile(
+      validateFilePath(linkedVaultRoot, 'sub/note.md'),
+      1024,
+      linked,
+    )
+    expect(result.content).toBe('# through a symlinked root')
+
+    // A not-yet-existing write target below a symlinked root must pass too.
+    await expect(
+      assertRealPathInsideVault(linkedVaultRoot, validateFilePath(linkedVaultRoot, 'sub/new.md'), {
+        vaultId: 'linked',
+        requestedPath: 'sub/new.md',
+      }),
+    ).resolves.toBeUndefined()
+
+    await fs.rm(realDataDir, { recursive: true, force: true })
+  })
+})
+
+describe('assertRealPathInsideVault', () => {
+  let vaultRoot: string
+
+  beforeEach(async () => {
+    vaultRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'slatebase-realpath-'))
+    clearVaultRootRealPathCache()
+  })
+
+  afterEach(async () => {
+    clearVaultRootRealPathCache()
+    await fs.rm(vaultRoot, { recursive: true, force: true })
+  })
+
+  it('accepts an existing file inside the vault', async () => {
+    await fs.writeFile(path.join(vaultRoot, 'note.md'), 'x')
+
+    await expect(
+      assertRealPathInsideVault(vaultRoot, path.join(vaultRoot, 'note.md'), {
+        vaultId: 'v1',
+        requestedPath: 'note.md',
+      }),
+    ).resolves.toBeUndefined()
+  })
+
+  it('accepts a target whose parent directories do not exist yet', async () => {
+    // Writes are checked before mkdir runs, so realpath() would throw ENOENT
+    // on the target itself — the nearest existing ancestor has to carry it.
+    await expect(
+      assertRealPathInsideVault(vaultRoot, path.join(vaultRoot, 'a', 'b', 'c', 'new.md'), {
+        vaultId: 'v1',
+        requestedPath: 'a/b/c/new.md',
+      }),
+    ).resolves.toBeUndefined()
+  })
+
+  it('rejects a path outside the vault root', async () => {
+    const outside = path.join(path.dirname(vaultRoot), 'elsewhere.json')
+
+    await expect(
+      assertRealPathInsideVault(vaultRoot, outside, {
+        vaultId: 'v1',
+        requestedPath: '../elsewhere.json',
+      }),
+    ).rejects.toThrow(PathTraversalError)
+  })
+
+  it('does not treat a sibling directory with the vault name as a prefix as inside', async () => {
+    const sibling = `${vaultRoot}-evil`
+    await fs.mkdir(sibling, { recursive: true })
+    try {
+      await expect(
+        assertRealPathInsideVault(vaultRoot, path.join(sibling, 'note.md'), {
+          vaultId: 'v1',
+          requestedPath: 'note.md',
+        }),
+      ).rejects.toThrow(PathTraversalError)
+    } finally {
+      await fs.rm(sibling, { recursive: true, force: true })
+    }
+  })
+
+  it('accepts the vault root itself', async () => {
+    await expect(
+      assertRealPathInsideVault(vaultRoot, vaultRoot, { vaultId: 'v1', requestedPath: '' }),
+    ).resolves.toBeUndefined()
   })
 })
