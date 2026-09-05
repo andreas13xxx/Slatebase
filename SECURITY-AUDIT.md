@@ -105,7 +105,7 @@ untrusted content is covered by the XSS rules in `.kiro/steering/quality.md`.
 | `script-src` | `'self' blob: 'unsafe-eval' 'wasm-unsafe-eval'` | `blob:` for plugin bundle execution (Blob URL + dynamic `import()` in `plugin-loader.ts`); `unsafe-eval`/`wasm-unsafe-eval` because plugins are trust-on-install (see A08) and several real, popular ones (Templater's WASM engine, Excalidraw, Kanban) use `eval`/`new Function`/WebAssembly internally |
 | `style-src` | `'self' 'unsafe-inline'` | Plugin CSS injection via `<style>` tags, inline styles in rendered content |
 | `img-src` | `'self' data: https:` | `data:` for base64 images in Markdown, `https:` for external images in notes |
-| `font-src` | `'self' https:` | Plugins load webfonts from their own CDN of choice (e.g. Excalidraw pulls from unpkg.com) |
+| `font-src` | `'self' data: https:` | Plugins load webfonts from their own CDN of choice (e.g. Excalidraw pulls from unpkg.com) or embed one inline as a base64 `data:` URI (e.g. Excalidraw's bundled "Excalifont") |
 | `connect-src` | `'self' https://api.github.com` | API and SSE are same-origin in production; `api.github.com` for the built-in update checker (`useVersionInfo.ts`, `useReleaseNotes.ts`), which calls it directly from the browser |
 | `frame-src` | `'self' https:` | Canvas link-node iframes load external URLs |
 | `object-src` | `'none'` | No plugin/embed/object elements needed |
@@ -150,10 +150,13 @@ same-origin module chunk, and CSP's fetch-directive fallback chain
 
 Once the policy actually reached the document for the first time, real usage (rather than a
 staged pre-deploy pass — no Docker/browser was available in the environment that shipped this
-change) surfaced three gaps within a day: the update checker's direct `api.github.com` call
+change) surfaced gaps within a day: the update checker's direct `api.github.com` call
 (`connect-src`), a plugin loading webfonts from its own CDN (`font-src`, previously absent
-and falling back to `default-src 'self'`), and `eval`/`new Function`/WebAssembly used by
-several real community plugins (`script-src`) — all three fixed above.
+and falling back to `default-src 'self'`), `eval`/`new Function`/WebAssembly used by
+several real community plugins (`script-src`), and — found in the very next round of the same
+plugin, once it got far enough to actually render text — a plugin embedding its own font
+inline as a base64 `data:` URI rather than fetching it (`font-src` again, needing `data:`
+alongside `https:`, mirroring `img-src`) — all fixed above.
 
 ---
 
