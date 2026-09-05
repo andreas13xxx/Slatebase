@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.42.4](https://github.com/andreas13xxx/Slatebase/compare/v0.42.3...v0.42.4) (2026-09-05)
+
+
+### Bugfixes
+
+* **frontend:** stub the empty-state view so getLeaf() never hands back null ([#150](https://github.com/andreas13xxx/Slatebase/issues/150)) ([606466b](https://github.com/andreas13xxx/Slatebase/commit/606466b8ea47ca26fc27b3905acedcb1bcb17ec7))
+
 ## [0.42.3](https://github.com/andreas13xxx/Slatebase/compare/v0.42.2...v0.42.3) (2026-09-05)
 
 
