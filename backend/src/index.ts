@@ -114,7 +114,7 @@ featureToggleService.setPersistCallback(async (toggles) => {
 })
 
 // 2. Data Layer: VaultReader, VaultManager, VaultRegistry, VaultShareRegistry
-const vaultReader = new VaultReader()
+const vaultReader = new VaultReader(logger)
 const vaultManager = new VaultManager(vaultReader, logger, serverConfig.maxDirectoryDepth)
 const vaultRegistry = new VaultRegistry(serverConfig.dataDir, logger)
 const vaultShareRegistry = new VaultShareRegistry(serverConfig.dataDir)

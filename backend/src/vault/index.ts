@@ -90,6 +90,127 @@ export function validateFilePath(vaultAbsolutePath: string, rawFilePath: string)
   return resolved
 }
 
+/**
+ * Cache of vault root → its symlink-free real path.
+ *
+ * A vault root does not move while the server runs, and resolving it on every
+ * file operation would double the syscall cost of the check for no gain.
+ * Only successful resolutions are cached: a root that does not exist yet must
+ * be re-resolved once it does, otherwise a symlinked root created later would
+ * be compared against its unresolved literal path and reject every file in it.
+ */
+const vaultRootRealPathCache = new Map<string, string>()
+
+/**
+ * Clears the vault-root realpath cache.
+ * Only relevant when a vault directory is replaced at the same absolute path
+ * (tests, vault deletion followed by re-creation) — real paths are otherwise
+ * stable for the lifetime of the process.
+ */
+export function clearVaultRootRealPathCache(): void {
+  vaultRootRealPathCache.clear()
+}
+
+/** Context for the symlink guard's warning log — makes a hit visible in operation. */
+export interface RealPathCheckContext {
+  vaultId: string
+  /** The relative path as requested by the client, for the log and the thrown error. */
+  requestedPath: string
+  logger?: ILogger
+}
+
+/**
+ * Compares two absolute paths for containment.
+ * Windows path comparison is case-insensitive (and `realpath` may hand back a
+ * different case than the caller used), so both sides are folded there.
+ */
+function isInsideRoot(realRoot: string, realTarget: string): boolean {
+  const fold = (value: string) => (process.platform === 'win32' ? value.toLowerCase() : value)
+  const root = fold(realRoot.endsWith(path.sep) ? realRoot.slice(0, -1) : realRoot)
+  const target = fold(realTarget)
+  return target === root || target.startsWith(root + path.sep)
+}
+
+/**
+ * Resolves the real path of the vault root, caching the result.
+ * Falls back to the literal path when the root does not exist — the caller's
+ * own filesystem access will fail with a proper ENOENT a moment later.
+ */
+async function resolveVaultRootRealPath(vaultAbsolutePath: string): Promise<string> {
+  const cached = vaultRootRealPathCache.get(vaultAbsolutePath)
+  if (cached !== undefined) return cached
+
+  try {
+    const real = await fs.realpath(vaultAbsolutePath)
+    vaultRootRealPathCache.set(vaultAbsolutePath, real)
+    return real
+  } catch {
+    return path.resolve(vaultAbsolutePath)
+  }
+}
+
+/**
+ * Resolves symlinks in `target` even when `target` itself does not exist yet.
+ * Walks up to the nearest existing ancestor, resolves that, and re-appends the
+ * missing segments — writes create their file (and sometimes its parent
+ * directories) only after the check has run.
+ */
+async function realPathAllowingMissing(target: string): Promise<string> {
+  const missingSegments: string[] = []
+  let current = path.resolve(target)
+
+  for (;;) {
+    try {
+      const real = await fs.realpath(current)
+      return missingSegments.length > 0 ? path.join(real, ...missingSegments) : real
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      // ENOTDIR: a path component is a regular file. The caller's own access
+      // will fail on that too, but the ancestor still has to be checked.
+      if (code !== 'ENOENT' && code !== 'ENOTDIR') throw error
+
+      const parent = path.dirname(current)
+      if (parent === current) return path.resolve(target) // reached the filesystem root
+      missingSegments.unshift(path.basename(current))
+      current = parent
+    }
+  }
+}
+
+/**
+ * Asserts that `resolvedPath` still lies inside the vault once every symlink
+ * on the way has been resolved. Throws PathTraversalError otherwise.
+ *
+ * `validateFilePath()` is a pure string check: a symlink *inside* the vault
+ * (`notes/x -> /app/data`) passes it, because `notes/x/sessions/a.json`
+ * resolves inside the root as a string — and `readFile`/`stat`/`open` then
+ * follow the link out of the vault. This is the filesystem-level counterpart,
+ * async by necessity, and therefore applied at the points that actually touch
+ * the disk rather than at all 34 `validateFilePath()` call sites.
+ *
+ * Both sides are resolved: `dataDir` regularly sits behind a symlink or bind
+ * mount (Docker, NAS), and comparing a resolved child against an unresolved
+ * root would reject every single file.
+ */
+export async function assertRealPathInsideVault(
+  vaultAbsolutePath: string,
+  resolvedPath: string,
+  context: RealPathCheckContext,
+): Promise<void> {
+  const realRoot = await resolveVaultRootRealPath(vaultAbsolutePath)
+  const realTarget = await realPathAllowingMissing(resolvedPath)
+
+  if (!isInsideRoot(realRoot, realTarget)) {
+    context.logger?.warn('Blocked symlink escape from vault', {
+      vaultId: context.vaultId,
+      requestedPath: context.requestedPath,
+      realTarget,
+      realRoot,
+    })
+    throw new PathTraversalError(context.requestedPath)
+  }
+}
+
 // --- Data Models ---
 
 export interface DirectoryTree {
@@ -118,12 +239,21 @@ export interface FileContent {
 
 export interface IVaultReader {
   readDirectory(absolutePath: string, maxDepth: number): Promise<DirectoryTree>
-  readFile(absolutePath: string, maxSize: number): Promise<FileContent>
+  readFile(absolutePath: string, maxSize: number, vault: VaultLocation): Promise<FileContent>
+}
+
+/** Identifies the vault a file operation must stay inside. */
+export interface VaultLocation {
+  vaultId: string
+  /** Absolute path of the vault root directory (may itself be a symlink). */
+  rootPath: string
 }
 
 // --- VaultReader Implementation ---
 
 export class VaultReader implements IVaultReader {
+  constructor(private readonly logger?: ILogger) {}
+
   /**
    * Recursively reads a directory structure from the filesystem.
    * Sorts entries: directories first, then files, case-insensitive alphabetical.
@@ -141,8 +271,20 @@ export class VaultReader implements IVaultReader {
    * Sets `isTruncated` if the file exceeds `maxSize`.
    * Decodes content as UTF-8 (empty string for binary files).
    * Computes an ETag from the raw file content bytes.
+   *
+   * `vault` locates the vault the file must stay inside: before any filesystem
+   * access, the file's real path is checked against the vault root, so a
+   * symlink inside the vault cannot be used to read a file outside of it.
+   * `stat`, `open` and `readFile` all follow symlinks — the string-level
+   * `validateFilePath()` the caller ran cannot see that.
    */
-  async readFile(absolutePath: string, maxSize: number): Promise<FileContent> {
+  async readFile(absolutePath: string, maxSize: number, vault: VaultLocation): Promise<FileContent> {
+    await assertRealPathInsideVault(vault.rootPath, absolutePath, {
+      vaultId: vault.vaultId,
+      requestedPath: path.relative(vault.rootPath, absolutePath).replaceAll('\\', '/'),
+      ...(this.logger ? { logger: this.logger } : {}),
+    })
+
     const stat = await fs.stat(absolutePath)
     const fileSize = stat.size
     const isTruncated = fileSize > maxSize

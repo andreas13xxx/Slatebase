@@ -48,6 +48,47 @@ privilege-escalation paths identified.
 check is the layer that actually contains it. Any new endpoint that builds a path from user
 input needs both, and a path-traversal test first.
 
+### Nachtrag: Symlink-Escape aus dem Vault — Status: **Fixed**
+
+Die Prüfung der `path.join`/`path.resolve`-Call-Sites oben hat die *String*-Ebene bewertet
+und für ausreichend befunden. Symlink-Auflösung war schlicht nicht Teil der Fragestellung —
+und genau dort lag eine Lücke:
+
+**Befund.** `validateFilePath()` ist rein stringbasiert (`decodeURIComponent` →
+`normalize` → `resolve` → Prefix-Check). Ein Symlink *innerhalb* des Vaults besteht diese
+Prüfung: `notes/x -> ../..` lässt `notes/x/sessions/<id>.json` stringseitig sauber
+innerhalb des Vault-Roots auflösen, und `fs.stat`/`fs.open`/`fs.readFile` folgen dem Link
+anschließend nach draußen. Weil Vaults unter `<dataDir>/vaults/<vaultId>/` liegen, ist das
+ein Ein-Sprung-Zugriff auf `data/sessions/*.json` (Session-Tokens im Klartext) und
+`data/users/*.json` (argon2-Hashes). Über die API selbst ließ sich kein Symlink anlegen —
+Upload, Import und Mail-Import schreiben ausschließlich reguläre Dateien. Der Weg hinein
+war Git-Sync: ein `merge` aus einem bösartigen oder kompromittierten Remote materialisiert
+Symlinks echt im Worktree. Zweiter, harmloserer Weg: ein per Config eingebundenes
+bestehendes Verzeichnis, das bereits Symlinks enthält.
+
+Nicht über die Verzeichnisliste auffindbar, aber ausnutzbar: `readdir` mit
+`withFileTypes` hat lstat-Semantik, ein Symlink ist dort weder `isDirectory()` noch
+`isFile()` und fällt aus dem Tree-Scan heraus. Der Lese-Endpunkt nimmt aber einen
+beliebigen `path`-Query-Parameter und konsultiert den Tree gar nicht.
+
+**Fix (zwei Ebenen).**
+
+| Ebene | Maßnahme |
+|-------|----------|
+| Entstehung | `GitCli.run()` — dem einzigen Chokepoint für jeden `git`-Aufruf — wird `-c core.symlinks=false` vor jedes Subkommando gesetzt. Git checkt Symlinks damit als reguläre Dateien mit dem Zielpfad als Inhalt aus. Bewusst per `-c` statt `git config` in `init()`: Letzteres erreicht nur selbst initialisierte Repos und ließe bestehende Arbeitskopien ungeschützt. Für legitime Repos geht nichts verloren — der Eintrag bleibt in der History Modus `120000`. |
+| Zugriff | `assertRealPathInsideVault()` (`vault/index.ts`) prüft asynchron den `realpath` gegen den ebenfalls aufgelösten Vault-Root, bei Verstoß `PathTraversalError` (403 `PATH_TRAVERSAL`) plus `logger.warn` mit Vault-ID und angefragtem Pfad. Angewendet an den Stellen, die das Dateisystem tatsächlich anfassen: `VaultReader.readFile` sowie `saveFile`, `deleteContent`, `moveContent`, `renameContent`. `validateFilePath()` bleibt synchron und unverändert der billige erste Filter vor allen 34 Call-Sites. |
+| Bestand | `VaultService.initializeVaults()` scannt jeden geladenen Vault einmalig (fire-and-forget) und loggt pro vorhandenem Symlink eine Warnung mit Pfad und Ziel. Nur Sichtbarkeit — es wird nichts gelöscht oder blockiert. |
+
+Der Root wird selbst aufgelöst und gecacht: `dataDir` liegt in Docker- und NAS-Setups
+regelmäßig hinter einem Symlink oder Bind-Mount, und ein aufgelöster Kindpfad gegen einen
+nicht aufgelösten Root verglichen würde *jede* Datei abweisen. Beim Schreiben existiert
+das Ziel oft noch nicht — dann wird das nächste existierende Elternverzeichnis aufgelöst
+und der Rest angehängt. Der Vergleich ist auf Windows case-insensitiv.
+
+**Regel für neue Endpunkte:** `validateFilePath()` allein genügt nur, solange kein
+Dateisystemzugriff folgt. Wer liest oder schreibt, braucht zusätzlich
+`assertRealPathInsideVault()`.
+
 ---
 
 ## A02 Cryptographic Failures

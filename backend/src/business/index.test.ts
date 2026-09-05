@@ -5,7 +5,7 @@ import os from 'node:os'
 import { VaultService, VaultNotFoundError, VaultValidationError, StorageError, ConflictError, FileConflictError, InvalidMoveError, FileTooLargeError } from './index'
 import type { IVaultService } from './index'
 import type { IVaultManager, IVaultReader, Vault, DirectoryTree, FileContent } from '../vault/index'
-import { PathTraversalError, computeEtag } from '../vault/index'
+import { PathTraversalError, clearVaultRootRealPathCache, computeEtag } from '../vault/index'
 import type { IConfigService, ServerConfig, VaultConfig } from '../config/index'
 import type { ILogger } from '../logger/index'
 import type { IVaultRegistry, VaultRegistryEntry } from '../vault/registry'
@@ -238,7 +238,7 @@ describe('VaultService', () => {
       const vaultManager = createMockVaultManager()
       const configService = createMockConfigService()
       const vaultReader = createMockVaultReader()
-      const warnings: { message: string; meta?: object }[] = []
+      const warnings: { message: string; meta?: object | undefined }[] = []
       const logger: ILogger = {
         debug() {},
         info() {},
@@ -1221,4 +1221,178 @@ describe('VaultService', () => {
       expect(error).toBeInstanceOf(Error)
     })
   })
+})
+
+// --- Symlink Escape Protection ---
+//
+// Symlink creation needs a privilege a normal Windows CI account lacks; the
+// guard itself is covered platform-independently in vault/index.test.ts.
+describe.skipIf(process.platform === 'win32')('VaultService — symlink escape protection', () => {
+  let dataDir: string
+  let vaultDir: string
+
+  function createCapturingLogger(): ILogger & { warnings: { message: string; meta?: object | undefined }[] } {
+    const warnings: { message: string; meta?: object | undefined }[] = []
+    return {
+      warnings,
+      debug() {},
+      info() {},
+      warn(message: string, meta?: object) { warnings.push({ message, meta }) },
+      error() {},
+    }
+  }
+
+  // Production layout: the vault sits next to the directories holding session
+  // tokens and password hashes, which is what an escape is after.
+  async function setup(logger: ILogger = createMockLogger()) {
+    dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'symlink-service-'))
+    vaultDir = path.join(dataDir, 'vaults', 'v1')
+    await fs.mkdir(vaultDir, { recursive: true })
+    await fs.mkdir(path.join(dataDir, 'sessions'), { recursive: true })
+    await fs.writeFile(path.join(dataDir, 'sessions', 'abc.json'), '{"token":"secret"}')
+
+    const vault = createMockVault('abc123def456', 'Test Vault', vaultDir)
+    const service = new VaultService(
+      createMockVaultManager([vault]),
+      createMockVaultReader(),
+      createMockConfigService(),
+      logger,
+    )
+    clearVaultRootRealPathCache()
+    return service
+  }
+
+  async function cleanup() {
+    clearVaultRootRealPathCache()
+    await fs.rm(dataDir, { recursive: true, force: true })
+  }
+
+  it('refuses to write through a symlink that leaves the vault', async () => {
+    const service = await setup()
+    try {
+      await fs.symlink(path.join(dataDir, 'sessions'), path.join(vaultDir, 'escape'), 'dir')
+
+      await expect(service.saveFile('abc123def456', 'escape/abc.json', 'overwritten'))
+        .rejects.toThrow(PathTraversalError)
+
+      // The file outside the vault is untouched.
+      const outside = await fs.readFile(path.join(dataDir, 'sessions', 'abc.json'), 'utf-8')
+      expect(outside).toBe('{"token":"secret"}')
+    } finally {
+      await cleanup()
+    }
+  })
+
+  it('refuses to delete through a symlink that leaves the vault', async () => {
+    const service = await setup()
+    try {
+      await fs.symlink(path.join(dataDir, 'sessions'), path.join(vaultDir, 'escape'), 'dir')
+
+      await expect(service.deleteContent('abc123def456', 'escape/abc.json'))
+        .rejects.toThrow(PathTraversalError)
+
+      await expect(fs.access(path.join(dataDir, 'sessions', 'abc.json'))).resolves.toBeUndefined()
+    } finally {
+      await cleanup()
+    }
+  })
+
+  it('refuses to move a file out of the vault through a symlinked destination', async () => {
+    const service = await setup()
+    try {
+      await fs.symlink(path.join(dataDir, 'sessions'), path.join(vaultDir, 'escape'), 'dir')
+      await fs.writeFile(path.join(vaultDir, 'note.md'), '# note')
+
+      await expect(service.moveContent('abc123def456', 'note.md', 'escape/leaked.md'))
+        .rejects.toThrow(PathTraversalError)
+
+      await expect(fs.access(path.join(dataDir, 'sessions', 'leaked.md'))).rejects.toThrow()
+      await expect(fs.access(path.join(vaultDir, 'note.md'))).resolves.toBeUndefined()
+    } finally {
+      await cleanup()
+    }
+  })
+
+  it('refuses to rename a symlink that points out of the vault', async () => {
+    const service = await setup()
+    try {
+      await fs.symlink(path.join(dataDir, 'sessions', 'abc.json'), path.join(vaultDir, 'escape.json'), 'file')
+
+      await expect(service.renameContent('abc123def456', 'escape.json', 'renamed.json'))
+        .rejects.toThrow(PathTraversalError)
+    } finally {
+      await cleanup()
+    }
+  })
+
+  it('regression: a vault behind a symlinked data directory works normally', async () => {
+    dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'symlink-service-'))
+    const realDir = await fs.mkdtemp(path.join(os.tmpdir(), 'symlink-real-'))
+    try {
+      const linkedVaultDir = path.join(dataDir, 'linked-vault')
+      await fs.symlink(realDir, linkedVaultDir, 'dir')
+
+      const vault = createMockVault('abc123def456', 'Linked Vault', linkedVaultDir)
+      const service = new VaultService(
+        createMockVaultManager([vault]),
+        createMockVaultReader(),
+        createMockConfigService(),
+        createMockLogger(),
+      )
+      clearVaultRootRealPathCache()
+
+      const saved = await service.saveFile('abc123def456', 'sub/note.md', '# Hello')
+      expect(saved.path).toBe('sub/note.md')
+      expect(await fs.readFile(path.join(realDir, 'sub', 'note.md'), 'utf-8')).toBe('# Hello')
+
+      const renamed = await service.renameContent('abc123def456', 'sub/note.md', 'renamed.md')
+      expect(renamed.newPath).toBe('sub/renamed.md')
+
+      const moved = await service.moveContent('abc123def456', 'sub/renamed.md', 'moved.md')
+      expect(moved.newPath).toBe('moved.md')
+
+      await service.deleteContent('abc123def456', 'moved.md')
+      await expect(fs.access(path.join(realDir, 'moved.md'))).rejects.toThrow()
+    } finally {
+      clearVaultRootRealPathCache()
+      await fs.rm(realDir, { recursive: true, force: true })
+      await cleanup()
+    }
+  })
+
+  it('warns once per pre-existing symlink when vaults are initialized', async () => {
+    const logger = createCapturingLogger()
+    const service = await setup(logger)
+    try {
+      await fs.mkdir(path.join(vaultDir, 'notes'), { recursive: true })
+      await fs.mkdir(path.join(vaultDir, '.slatebase'), { recursive: true })
+      await fs.symlink(dataDir, path.join(vaultDir, 'notes', 'escape'), 'dir')
+      // Dot-directories are skipped everywhere else in the vault code, here too.
+      await fs.symlink(dataDir, path.join(vaultDir, '.slatebase', 'hidden-escape'), 'dir')
+
+      await service.initializeVaults()
+
+      // The scan is fire-and-forget so it cannot delay the server start.
+      const found = await waitFor(() => logger.warnings.find((w) => w.message.includes('Symlink found in vault')))
+      expect(found!.meta).toMatchObject({
+        vaultId: 'abc123def456',
+        path: 'notes/escape',
+        target: dataDir,
+      })
+      expect(logger.warnings.filter((w) => w.message.includes('Symlink found in vault'))).toHaveLength(1)
+    } finally {
+      await cleanup()
+    }
+  })
+
+  /** Polls until `predicate` returns something truthy — for the fire-and-forget scan. */
+  async function waitFor<T>(predicate: () => T | undefined, timeoutMs = 2000): Promise<T> {
+    const deadline = Date.now() + timeoutMs
+    for (;;) {
+      const result = predicate()
+      if (result) return result
+      if (Date.now() > deadline) throw new Error('Timed out waiting for condition')
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    }
+  }
 })

@@ -43,6 +43,24 @@ function shellQuoteSingle(value: string): string {
   return `'${value.replaceAll("'", `'\\''`)}'`
 }
 
+/**
+ * Config overrides prepended to *every* `git` invocation (before the
+ * subcommand, which is where `-c` has to sit).
+ *
+ * `core.symlinks=false` makes git check symlinks out as regular files whose
+ * content is the link target instead of materializing real links in the
+ * worktree. A vault is a directory the API serves files from, and a symlink
+ * merged in from a hostile or compromised remote (`notes/x -> ../..`) would
+ * otherwise point straight at the sibling `sessions/` and `users/`
+ * directories under the same data dir. Nothing is lost for legitimate repos —
+ * the entry still round-trips as a symlink on push.
+ *
+ * Deliberately passed via `-c` rather than written with `git config` in
+ * `init()`: the latter only ever reaches repos Slatebase initialized itself
+ * and would leave pre-existing working copies unprotected.
+ */
+const GLOBAL_CONFIG_ARGS = ['-c', 'core.symlinks=false']
+
 export const CONFLICT_STATUS_CODES = new Set(['UU', 'AA', 'DD', 'AU', 'UA', 'UD', 'DU'])
 
 /** Git's well-known empty-tree object hash — valid in every repository, used to diff a ref against "nothing" (e.g. a repo's very first commit). */
@@ -179,7 +197,7 @@ export class GitCli implements IGitCli {
 
   private async run(cwd: string, args: string[], extraEnv?: Record<string, string>): Promise<{ stdout: string; stderr: string }> {
     try {
-      return await execFileAsync('git', args, {
+      return await execFileAsync('git', [...GLOBAL_CONFIG_ARGS, ...args], {
         cwd,
         timeout: GIT_TIMEOUT_MS,
         env: { ...process.env, GIT_TERMINAL_PROMPT: '0', ...extraEnv },
