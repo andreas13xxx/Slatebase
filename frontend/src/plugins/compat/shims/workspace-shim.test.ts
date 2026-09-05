@@ -469,12 +469,20 @@ describe('WorkspaceShim', () => {
         expect(leaf).toBeInstanceOf(WorkspaceLeaf);
       });
 
-      it('should return an existing leaf with null view when newLeaf is falsy', () => {
-        // Create a leaf with no view
-        const firstLeaf = workspace.getLeaf(true);
-        expect(firstLeaf.view).toBeNull();
+      it('stubs the built-in empty-state view onto a freshly created leaf, matching real Obsidian', () => {
+        // Real Obsidian's active leaf is (almost) never null — plugins (Excalidraw's
+        // openLeaf() among them) call leaf.view.getViewType() right after getLeaf(),
+        // before setViewState() attaches a real view.
+        const leaf = workspace.getLeaf(true);
+        expect(leaf.view).not.toBeNull();
+        expect(leaf.view?.getViewType()).toBe('empty');
+      });
 
-        // Now getLeaf() without true should return the existing empty leaf
+      it('should return the existing empty leaf when newLeaf is falsy', () => {
+        const firstLeaf = workspace.getLeaf(true);
+
+        // Now getLeaf() without true should reuse the still-idle leaf rather than
+        // creating a new tab
         const secondLeaf = workspace.getLeaf();
         expect(secondLeaf).toBe(firstLeaf);
       });
