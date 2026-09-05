@@ -527,8 +527,10 @@ app.use(
 //   a plugin already has full same-origin DOM/fetch/storage access either way.
 // - `'unsafe-inline'` in styleSrc: plugin CSS injection uses <style> tags
 // - `data:` + `https:` in imgSrc: inline images and external images in notes
-// - `https:` in fontSrc: plugins load webfonts from their own CDN of choice (e.g. the
-//   Excalidraw plugin pulls from unpkg.com) — same latitude already given to imgSrc
+// - `data:` + `https:` in fontSrc: plugins load webfonts from their own CDN of choice (e.g.
+//   the Excalidraw plugin pulls from unpkg.com) — same latitude already given to imgSrc;
+//   `data:` additionally covers a plugin embedding its own font inline as a base64 URI
+//   (e.g. Excalidraw's bundled "Excalifont" handwriting font)
 // - `https://api.github.com` in connectSrc: the built-in update checker
 //   (useVersionInfo.ts, useReleaseNotes.ts) calls the GitHub API directly from the browser
 // - `https:` in frameSrc: Canvas link-node iframes embed external URLs
@@ -547,7 +549,7 @@ app.use(
       scriptSrc: ["'self'", "blob:", "'unsafe-eval'", "'wasm-unsafe-eval'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
-      fontSrc: ["'self'", "https:"],
+      fontSrc: ["'self'", "data:", "https:"],
       connectSrc: ["'self'", "https://api.github.com"],
       frameSrc: ["'self'", "https:"],
       objectSrc: ["'none'"],
