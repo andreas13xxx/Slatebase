@@ -1,5 +1,17 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { showToast } from '../components/ToastNotification'
+
+/**
+ * True when the drag carries files from outside the app (OS file manager).
+ *
+ * Internal drags — a node from the File Explorer, a tab, a toolbar button —
+ * carry only custom MIME types, and must not light up the file drop zone:
+ * their drop is handled elsewhere and never reaches this hook's drop handler.
+ */
+function isExternalFileDrag(e: { dataTransfer: DataTransfer | null }): boolean {
+  const types = e.dataTransfer?.types
+  return types ? Array.from(types).includes('Files') : false
+}
 
 /** Default maximum files per drop operation. */
 const DEFAULT_MAX_FILES = 50
@@ -62,7 +74,14 @@ export function useDropZone(options: UseDropZoneOptions): UseDropZoneReturn {
   const dropRef = useRef<HTMLDivElement | null>(null)
   const dragCounterRef = useRef(0)
 
+  /** Clears the drag-over state and the nesting counter. */
+  const resetDragState = useCallback(() => {
+    dragCounterRef.current = 0
+    setIsDragOver(false)
+  }, [])
+
   const onDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    if (!isExternalFileDrag(e)) return
     e.preventDefault()
     e.stopPropagation()
     dragCounterRef.current += 1
@@ -72,6 +91,8 @@ export function useDropZone(options: UseDropZoneOptions): UseDropZoneReturn {
   }, [])
 
   const onDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    // Nothing to unwind for internal drags, which never incremented the counter.
+    if (dragCounterRef.current === 0) return
     e.preventDefault()
     e.stopPropagation()
     dragCounterRef.current -= 1
@@ -81,15 +102,29 @@ export function useDropZone(options: UseDropZoneOptions): UseDropZoneReturn {
   }, [])
 
   const onDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    if (!isExternalFileDrag(e)) return
     e.preventDefault()
     e.stopPropagation()
   }, [])
 
+  // Safety net: any drop or cancelled drag anywhere ends the highlight, even
+  // when the drop event never reaches our handler — an inner handler may stop
+  // propagation (the editor's File-Explorer drop does), or the user may release
+  // outside the zone. Capture phase, so this runs before React's own listener.
+  useEffect(() => {
+    if (!isDragOver) return
+    window.addEventListener('drop', resetDragState, true)
+    window.addEventListener('dragend', resetDragState, true)
+    return () => {
+      window.removeEventListener('drop', resetDragState, true)
+      window.removeEventListener('dragend', resetDragState, true)
+    }
+  }, [isDragOver, resetDragState])
+
   const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
-    dragCounterRef.current = 0
-    setIsDragOver(false)
+    resetDragState()
     const dropPoint = { x: e.clientX, y: e.clientY }
 
     // Reject drop when disabled (e.g. no file open in editor)
@@ -138,7 +173,7 @@ export function useDropZone(options: UseDropZoneOptions): UseDropZoneReturn {
       const message = err instanceof Error ? err.message : 'Upload fehlgeschlagen'
       showToast('error', message)
     }
-  }, [disabled, disabledMessage, maxFiles, maxFileSize, accept, onDrop, targetPath])
+  }, [disabled, disabledMessage, maxFiles, maxFileSize, accept, onDrop, targetPath, resetDragState])
 
   return {
     isDragOver,
