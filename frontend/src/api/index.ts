@@ -463,6 +463,10 @@ export interface UserVaultSettings {
   spellcheck: boolean
   /** Dictionary the spellchecker loads (see `editor/spellcheck/protocol.ts`). */
   spellcheckLanguage: string
+  /** Dictation language for voice transcription: a Whisper code or 'auto'. */
+  transcriptionLanguage: string
+  /** Whether a dictation recording is also saved as a vault audio attachment. */
+  saveAudioAttachment: boolean
   zoom: number
   /** Client-owned blob; the server stores it verbatim. */
   graph: Record<string, unknown> | null
@@ -474,6 +478,20 @@ export interface UserVaultSettings {
 
 /** Partial per-vault settings update. */
 export type UserVaultSettingsPatch = Partial<UserVaultSettings>
+
+/** Result of a voice-transcription request. */
+export interface TranscriptionResult {
+  /** The recognized text. */
+  text: string
+  /** The language the backend detected (when auto-detection ran). */
+  detectedLanguage?: string
+}
+
+/** Options for a transcription request. */
+export interface TranscribeOptions {
+  /** Whisper language code ('de', 'en', …) or 'auto' to let the backend detect. */
+  language?: string
+}
 
 /** Per-vault configuration. */
 export interface VaultConfig {
@@ -715,6 +733,10 @@ export interface IApiClient {
   uploadFiles(vaultId: string, files: File[], targetDir: string): Promise<{ uploaded: Array<{ fileName: string; path: string }> }>
   /** Upload a single image from clipboard paste. Uses paste mode (10 MB limit, auto-generated filename). */
   uploadImagePaste(vaultId: string, file: File, targetDir: string): Promise<{ uploaded: Array<{ fileName: string; path: string }> }>
+
+  // --- Voice transcription ---
+  /** Transcribe a recorded audio blob to text via the self-hosted Whisper backend. */
+  transcribe(vaultId: string, audio: Blob, options?: TranscribeOptions): Promise<TranscriptionResult>
 
   // --- Template methods ---
   /** List available templates for a vault. */
@@ -1515,6 +1537,32 @@ export class ApiClient implements IApiClient {
       body: formData,
     })
     return this.handleResponse<{ uploaded: Array<{ fileName: string; path: string }> }>(response)
+  }
+
+  // --- Voice transcription ---
+
+  /** Transcribe a recorded audio blob to text via the self-hosted Whisper backend. */
+  async transcribe(vaultId: string, audio: Blob, options?: TranscribeOptions): Promise<TranscriptionResult> {
+    const formData = new FormData()
+    formData.append('audio', audio, 'recording')
+    if (options?.language) {
+      formData.append('language', options.language)
+    }
+
+    const headers: Record<string, string> = {}
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`
+    }
+    if (this.csrfToken) {
+      headers['X-CSRF-Token'] = this.csrfToken
+    }
+
+    const response = await fetch(`/api/v1/vaults/${vaultId}/transcribe`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    })
+    return this.handleResponse<TranscriptionResult>(response)
   }
 
   // --- Template methods ---

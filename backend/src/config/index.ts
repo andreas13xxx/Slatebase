@@ -41,6 +41,20 @@ const McpLimitsConfigSchema = z.object({
   rateLimit: z.number().int().positive().default(60),
 })
 
+/**
+ * Voice-transcription operational limits (feature `voice-transcription`).
+ * The Whisper backend URL is NOT here — it is deployment-specific and read
+ * only from the environment (SLATEBASE_TRANSCRIPTION_BACKEND_URL), like a
+ * secret/endpoint rather than an admin-editable value. This section only holds
+ * the tunable limits. Timeout is generous by default: Whisper is slow,
+ * especially without a GPU.
+ */
+const TranscriptionConfigSchema = z.object({
+  timeoutMs: z.number().int().positive().default(120000),
+  maxAudioBytes: z.number().int().positive().default(26214400),
+  supportedLanguages: z.array(z.string().min(1)).default(['de', 'en']),
+})
+
 const TrashConfigSchema = z.object({
   retentionDays: z.number().int().default(30),
 })
@@ -95,6 +109,7 @@ export const ServerConfigSchema = z.object({
   sessionMaxLifetimeDays: z.number().positive().default(7),
   features: FeaturesConfigSchema,
   mcp: McpLimitsConfigSchema.prefault({}),
+  transcription: TranscriptionConfigSchema.prefault({}),
   sse: SseConfigSchema.prefault({}),
   trash: TrashConfigSchema.prefault({}),
   versions: VersionsConfigSchema.prefault({}),
@@ -109,6 +124,7 @@ export const ServerConfigSchema = z.object({
 export type ServerConfig = z.infer<typeof ServerConfigSchema>
 export type VaultConfig = z.infer<typeof VaultConfigSchema>
 export type McpLimitsConfig = z.infer<typeof McpLimitsConfigSchema>
+export type TranscriptionLimitsConfig = z.infer<typeof TranscriptionConfigSchema>
 export type SseConfig = z.infer<typeof SseConfigSchema>
 export type TrashConfig = z.infer<typeof TrashConfigSchema>
 export type VersionsConfig = z.infer<typeof VersionsConfigSchema>
@@ -161,6 +177,8 @@ export interface IConfigService {
   getFeaturesConfig(): Record<string, { enabled: boolean }>
   /** Returns the SSE configuration section */
   getSseConfig(): SseConfig
+  /** Returns the voice-transcription limits section */
+  getTranscriptionConfig(): TranscriptionLimitsConfig
   /** Returns the trash configuration section */
   getTrashConfig(): TrashConfig
   /** Returns the versions configuration section */
@@ -315,6 +333,10 @@ export class ConfigService implements IConfigService {
 
   getSseConfig(): SseConfig {
     return this.config.sse
+  }
+
+  getTranscriptionConfig(): TranscriptionLimitsConfig {
+    return this.config.transcription
   }
 
   getTrashConfig(): TrashConfig {

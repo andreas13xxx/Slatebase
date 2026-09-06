@@ -63,6 +63,7 @@ import { SidebarToolbar } from './components/SidebarToolbar'
 import { useToolbarPrefs } from './state/toolbarStore'
 import { StatusBar } from './components/StatusBar'
 import { SnippetLifecycle } from './components/SnippetLifecycle'
+import { DictationIndicator } from './components/DictationIndicator'
 import { MyVaultsPage } from './components/MyVaultsPage'
 import { McpTokensPage } from './components/McpTokensPage'
 import { PluginManagementPage } from './components/PluginManagementPage'
@@ -1258,6 +1259,9 @@ function AppContent() {
         </div>
         {statusBarVisible && <StatusBar />}
         <SnippetLifecycle />
+        {isEnabled('voice-transcription') && (
+          <DictationIndicator vaultId={state.selectedVaultId} apiClient={apiClient} />
+        )}
       </main>
     </div>
     </PluginProvider>

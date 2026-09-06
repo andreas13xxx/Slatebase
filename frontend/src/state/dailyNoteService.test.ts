@@ -75,6 +75,7 @@ function createMockApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
     getVaultStatistics: vi.fn(),
     uploadFiles: vi.fn(),
     uploadImagePaste: vi.fn(),
+    transcribe: vi.fn(),
     listTemplates: vi.fn(),
     createFromTemplate: vi.fn(),
     listTrash: vi.fn(),

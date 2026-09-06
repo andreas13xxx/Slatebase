@@ -23,6 +23,8 @@ import { useSearchContext } from '../state/searchContext'
 import { registerCoreAppCommands, type CoreAppCommandHandlers, type NavigablePage } from '../plugins/compat/core-commands-app'
 import { collectFilesSorted } from '../plugins/link-resolver'
 import { getActiveEditorView } from '../editor/plugin-extensions'
+import { getDictationController } from '../editor/dictation/dictation-controller'
+import { getTranscriptionLanguage, getSaveAudioAttachment } from '../hooks/useTranscriptionLanguage'
 import { toggleToolbarVisible } from '../state/toolbarStore'
 
 /**
@@ -199,6 +201,23 @@ export function CommandPaletteContainer({
     setTemplateSelectorMode('insert')
     setTemplateSelectorOpen(true)
   }, [state.selectedVaultId])
+
+  /**
+   * Starts/stops a dictation session. The controller owns the recording state
+   * machine; here we just hand it the current vault, client, and the per-vault
+   * language / save-audio preference (read from the module-level getters, not
+   * React state, so the callback identity stays stable).
+   */
+  const toggleDictation = useCallback(() => {
+    const vaultId = state.selectedVaultId
+    if (!vaultId || !apiClient) return
+    void getDictationController().toggle({
+      apiClient,
+      vaultId,
+      language: getTranscriptionLanguage(),
+      saveAudio: getSaveAudioAttachment(),
+    })
+  }, [state.selectedVaultId, apiClient])
 
   /** Inserts the chosen template's text at the cursor of the active editor. */
   const handleTemplateContentInsert = useCallback((content: string) => {
@@ -700,6 +719,15 @@ export function CommandPaletteContainer({
         callback: openTemplateInserter,
         pluginId: 'slatebase',
       })
+
+      if (isEnabled('voice-transcription')) {
+        commands.push({
+          id: 'voice:toggle-dictation',
+          name: 'Diktat starten/stoppen',
+          callback: toggleDictation,
+          pluginId: 'slatebase',
+        })
+      }
 
       commands.push({
         id: 'slatebase:import-file',

@@ -20,6 +20,7 @@ Obsidian-compatible vaults — no database, no sync service, no desktop app requ
 - Audio/video embeds (`![[file.mp3]]` → `<audio>`, `![[file.mp4]]` → `<video>` with size syntax)
 - Inline raw HTML subset: allowlisted inline tags (`<font color>`, `<mark>`, `<span style>`) and `<center>` blocks render in both Live Preview and reading view; everything else — `on*` handlers, `script`, `iframe` — stays literal text
 - Built-in spellchecker (own Hunspell dictionaries via nspell in a Web Worker, German/English switchable per editor, German compound splitting, personal dictionary per browser). Main editor only — `<textarea>` surfaces are not covered
+- Voice transcription / dictation (record in the browser via `MediaRecorder`, transcribe on a self-hosted Whisper backend, insert text at the cursor; multilingual, optional audio attachment + embed). Feature toggle `voice-transcription` (cold, default off, admin-disableable); audio never leaves the operator's server. **Compute-intensive — GPU recommended, slow on a small VPS.** The Whisper backend is not part of the Slatebase image; the operator provides it and sets `SLATEBASE_TRANSCRIPTION_BACKEND_URL`. Rationale + rejected plugin alternatives: `PLUGIN-COMPAT.md`
 - Obsidian Canvas (`.canvas` whiteboards: text/file/link/group nodes, edges, drag/resize, zoom/pan, minimap, source view, auto-save)
 - PDF export via `@media print` stylesheet + browser print dialog (Command Palette: "Export to PDF…")
 
@@ -61,7 +62,7 @@ Obsidian-compatible vaults — no database, no sync service, no desktop app requ
 - Workspace state persistence (open tabs, expanded folders, panel sizes/visibility, active page; per-vault tab memory on vault switch)
 
 ### Platform
-- Feature toggles (hot/cold, env overlay, API + admin UI). Registered: `obsidian-plugin-compat`, `chat`, `mcp`, `git-sync`, `mail-import` — see `featureRegistry.register()` in `backend/src/index.ts`
+- Feature toggles (hot/cold, env overlay, API + admin UI). Registered: `obsidian-plugin-compat`, `chat`, `mcp`, `git-sync`, `mail-import`, `voice-transcription` — see `featureRegistry.register()` in `backend/src/index.ts`
 - Welcome Vault (tutorial vault with 70+ guides DE/EN, screenshots, exercises, templates incl. Templater examples; on-demand creation via API, Settings and Command Palette)
 - Security hardening (OWASP Top 10 audit, full CSP, HSTS, path-traversal defense in depth, Zod validation on every route module, npm audit in CI) — see `SECURITY-AUDIT.md`
 - Accessibility (WCAG 2.1 AA, partial: axe-core in CI, jsx-a11y lint, focus traps, skip link, keyboard-operable splitters/canvas/status bar) — see `ACCESSIBILITY-AUDIT.md`

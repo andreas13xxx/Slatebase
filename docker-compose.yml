@@ -30,6 +30,36 @@ services:
     networks:
       - slatebase-net
 
+  # --- Optional: self-hosted Whisper backend for the Voice Transcription feature ---
+  # Uncomment this service to enable dictation. Then, in docker.env, set:
+  #   SLATEBASE_FEATURE_VOICE_TRANSCRIPTION=true
+  #   SLATEBASE_TRANSCRIPTION_BACKEND_URL=http://whisper:9000/asr
+  #
+  # WARNING: Speech recognition is compute-intensive. On a CPU-only host it is
+  # noticeably slow — a GPU is strongly recommended (see the deploy.resources
+  # block below and https://github.com/ahmetoner/whisper-asr-webservice for
+  # GPU image tags/instructions). Choose ASR_MODEL to trade accuracy for speed
+  # (tiny/base/small/medium/large-v3).
+  #
+  # whisper:
+  #   image: onerahmet/openai-whisper-asr-webservice:latest
+  #   container_name: slatebase-whisper
+  #   restart: unless-stopped
+  #   environment:
+  #     - ASR_MODEL=base
+  #     - ASR_ENGINE=faster_whisper
+  #   networks:
+  #     - slatebase-net
+  #   # GPU (NVIDIA) — requires the NVIDIA Container Toolkit on the host and a
+  #   # CUDA-enabled image tag. Remove this block for CPU-only operation.
+  #   # deploy:
+  #   #   resources:
+  #   #     reservations:
+  #   #       devices:
+  #   #         - driver: nvidia
+  #   #           count: 1
+  #   #           capabilities: [gpu]
+
 volumes:
   slatebase-data:
     driver: local

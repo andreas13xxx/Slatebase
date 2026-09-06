@@ -111,6 +111,10 @@ function sanitizeVaultSettings(raw: unknown): UserVaultSettings {
     spellcheckLanguage: typeof parsed['spellcheckLanguage'] === 'string' && parsed['spellcheckLanguage'].length <= 16
       ? parsed['spellcheckLanguage']
       : DEFAULT_VAULT_SETTINGS.spellcheckLanguage,
+    transcriptionLanguage: typeof parsed['transcriptionLanguage'] === 'string' && parsed['transcriptionLanguage'].length <= 16
+      ? parsed['transcriptionLanguage']
+      : DEFAULT_VAULT_SETTINGS.transcriptionLanguage,
+    saveAudioAttachment: bool('saveAudioAttachment', DEFAULT_VAULT_SETTINGS.saveAudioAttachment),
     zoom: typeof zoom === 'number' && Number.isFinite(zoom) && zoom >= 0.5 && zoom <= 2
       ? zoom
       : DEFAULT_VAULT_SETTINGS.zoom,

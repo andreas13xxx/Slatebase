@@ -21,9 +21,10 @@ Specs gebündelt statt einzeln spezifiziert.
 | 7 | Server-Side Plugins | B | ~48–68h | Tasks vorhanden |
 | 8 | Fremdformat-Importer | I | ~20–30h | Keine Spec |
 | 9 | Semantische Suche / AI-Embeddings | E | ~38–58h | Keine Spec |
-| 10 | Collaborative Editing | D | ~68–88h | Nur Requirements |
+| 10 | Voice Transcription (Diktieren) | E | ~24–34h | Vollständig (Req + Design + Tasks) |
+| 11 | Collaborative Editing | D | ~68–88h | Nur Requirements |
 
-**Summe:** ~377–532h.
+**Summe:** ~401–566h.
 
 ## Abhängigkeiten
 
@@ -31,7 +32,7 @@ Specs gebündelt statt einzeln spezifiziert.
 Track B (Plugins):    Obsidian Themes → Server-Side Plugins
 Track C (Sharing):    Public Sharing (unabhängig)
 Track D (Editor):     Collaborative Editing (braucht Realtime + CM6, beide vorhanden)
-Track E (AI):         Semantische Suche (unabhängig)
+Track E (AI):         Semantische Suche (unabhängig); Voice Transcription (unabhängig)
 Track F (Qualität):   Responsive/Mobile; E2E-Test-Suite (unabhängig, parallel möglich)
 Track G (Layout):     Responsive/Mobile (empfohlene Vorarbeit) → Workspaces & Split-Panes
 Track H (Daten):      Bases (Properties-/Metadaten-Schicht ist vorhanden)
@@ -184,7 +185,29 @@ Optionales Feature hinter Feature-Toggle `semantic-search`, lokal-first (Ollama)
 
 ---
 
-## Prio 10 — Collaborative Editing (Track D)
+## Prio 10 — Voice Transcription / Diktieren (Track E)
+
+Scope: ~24–34h. **Spec:** `.kiro/specs/voice-transcription/` (Requirements + Design + Tasks
+vollständig).
+
+Native Diktier-/Spracherkennungsfunktion mit **self-hosted Whisper** — bewusst statt eines
+Obsidian-Community-Diktier-Plugins (Einordnung + Vorlagen in `PLUGIN-COMPAT.md`, Abschnitt
+„Diktier-/Spracherkennungs-Plugins → native Lösung statt Compat-Layer").
+
+- Aufnahme im Browser via `MediaRecorder`, serverseitige Transkription über ein vom
+  Betreiber konfiguriertes Whisper-Backend (Audio verlässt den Server nie), Text-Insert am Cursor
+- Optional: Aufnahme als Vault-Anhang (über den bestehenden Upload-Pfad) + Audio-Embed
+- Mehrsprachig (Whisper-nativ), Sprache pro Nutzer/Vault gemerkt (`vaultSettingsStore`)
+- Feature-Toggle `voice-transcription` (cold, default: false), admin-abschaltbar; Whisper-Backend
+  ist **nicht** Teil des Slatebase-Images (Betreiber stellt es bereit, URL per Env)
+
+**Serveranforderung** ist der Hauptvorbehalt: Whisper braucht spürbar Rechenleistung (GPU
+empfohlen), auf kleinem VPS langsam — Doku und UI weisen ausdrücklich darauf hin. Deshalb
+default-aus.
+
+---
+
+## Prio 11 — Collaborative Editing (Track D)
 
 Scope: ~8h Design + ~60–80h Implementierung. **Spec:**
 `.kiro/specs/collaborative-editing/` (nur Requirements).

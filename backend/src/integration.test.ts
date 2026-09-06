@@ -75,6 +75,7 @@ beforeAll(async () => {
         sessionMaxLifetimeDays: 7,
         features: {},
         mcp: { maxFileSize: 16777216, rateLimit: 60 },
+        transcription: { timeoutMs: 120000, maxAudioBytes: 26214400, supportedLanguages: ['de', 'en'] },
         sse: { maxConnections: 1000, maxPerUser: 3, heartbeatInterval: 30000, replayBufferSize: 100, replayTtl: 300000, batchWindow: 100, batchMax: 20 },
         trash: { retentionDays: 30 },
         versions: { maxPerFile: 20 },
@@ -92,6 +93,9 @@ beforeAll(async () => {
     },
     getSseConfig() {
       return { maxConnections: 1000, maxPerUser: 3, heartbeatInterval: 30000, replayBufferSize: 100, replayTtl: 300000, batchWindow: 100, batchMax: 20 }
+    },
+    getTranscriptionConfig() {
+      return { timeoutMs: 120000, maxAudioBytes: 26214400, supportedLanguages: ['de', 'en'] }
     },
     getTrashConfig() {
       return { retentionDays: 30 }

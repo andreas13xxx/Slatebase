@@ -70,6 +70,7 @@ function createMockConfigService(): IConfigService {
     getVaultConfigs: () => [],
     getFeaturesConfig: () => ({}),
     getSseConfig: () => ({}) as ReturnType<IConfigService['getSseConfig']>,
+    getTranscriptionConfig: () => ({}) as ReturnType<IConfigService['getTranscriptionConfig']>,
     getTrashConfig: () => ({}) as ReturnType<IConfigService['getTrashConfig']>,
     getVersionsConfig: () => ({}) as ReturnType<IConfigService['getVersionsConfig']>,
     getCleanupConfig: () => ({}) as ReturnType<IConfigService['getCleanupConfig']>,
