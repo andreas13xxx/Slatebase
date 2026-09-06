@@ -177,6 +177,7 @@ export class CsrfError extends Error {
  * Mirrors the pattern used by the MCP `TokenStore`.
  */
 function sha256Hex(value: string): string {
+  // codeql[js/insufficient-password-hash] -- hashes a random 512-bit session token, not a password (argon2 verifies the password in login() below).
   return createHash('sha256').update(value).digest('hex')
 }
 

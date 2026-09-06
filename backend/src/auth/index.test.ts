@@ -67,6 +67,7 @@ function createMockUser(overrides?: Partial<UserRecord>): UserRecord {
 
 /** Mirrors SessionStore's internal hashing so the mock spies on raw tokens the same way. */
 function hashToken(token: string): string {
+  // codeql[js/insufficient-password-hash] -- mirrors SessionStore's hashing of a random session token, not a password.
   return createHash('sha256').update(token).digest('hex')
 }
 
