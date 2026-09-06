@@ -1564,9 +1564,6 @@ export class ApiClient implements IApiClient {
     }
 
     const headers: Record<string, string> = {}
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`
-    }
     if (this.csrfToken) {
       headers['X-CSRF-Token'] = this.csrfToken
     }
