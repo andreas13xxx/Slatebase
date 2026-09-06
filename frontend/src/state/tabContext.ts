@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, type Dispatch, type ReactNode } from 'react'
+import { createContext, useContext, useMemo, useReducer, type Dispatch, type ReactNode } from 'react'
 import React from 'react'
 import { tabReducer, initialTabState, type TabState, type TabAction } from './tabState'
 
@@ -22,10 +22,11 @@ interface TabProviderProps {
  */
 export function TabProvider({ children }: TabProviderProps) {
   const [tabState, tabDispatch] = useReducer(tabReducer, initialTabState)
+  const value = useMemo(() => ({ tabState, tabDispatch }), [tabState, tabDispatch])
 
   return React.createElement(
     TabContext.Provider,
-    { value: { tabState, tabDispatch } },
+    { value },
     children,
   )
 }

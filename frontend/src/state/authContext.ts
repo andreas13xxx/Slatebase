@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, useEffect, type Dispatch, type ReactNode } from 'react'
+import { createContext, useContext, useReducer, useEffect, useMemo, type Dispatch, type ReactNode } from 'react'
 import React from 'react'
 import { authReducer, initialAuthState, type AuthState, type AuthAction } from './authState'
 
@@ -54,9 +54,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.__slatebaseCsrfToken = authState.csrfToken
   }, [authState.csrfToken])
 
+  const value = useMemo(() => ({ authState, authDispatch }), [authState, authDispatch])
+
   return React.createElement(
     AuthContext.Provider,
-    { value: { authState, authDispatch } },
+    { value },
     children,
   )
 }

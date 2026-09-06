@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, type Dispatch, type ReactNode } from 'react'
+import { createContext, useContext, useMemo, useReducer, type Dispatch, type ReactNode } from 'react'
 import React from 'react'
 import { realtimeReducer, initialRealtimeState, type RealtimeState, type RealtimeAction } from './realtimeState'
 
@@ -22,10 +22,11 @@ interface RealtimeProviderProps {
  */
 export function RealtimeProvider({ children }: RealtimeProviderProps) {
   const [state, dispatch] = useReducer(realtimeReducer, initialRealtimeState)
+  const value = useMemo(() => ({ state, dispatch }), [state, dispatch])
 
   return React.createElement(
     RealtimeContext.Provider,
-    { value: { state, dispatch } },
+    { value },
     children,
   )
 }

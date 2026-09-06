@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
+import { renderHook, act, render } from '@testing-library/react'
 import React from 'react'
+import type { Dispatch } from 'react'
 import { TabProvider, useTabContext } from './tabContext'
-import { initialTabState } from './tabState'
+import { initialTabState, type TabAction } from './tabState'
 
 describe('TabProvider and useTabContext', () => {
   it('provides initial tab state', () => {
@@ -90,5 +91,78 @@ describe('TabProvider and useTabContext', () => {
     })
 
     expect(result.current.tabState.tabs[0].mode).toBe('edit')
+  })
+
+  it('keeps the context value referentially stable across re-renders with unchanged state', () => {
+    // Regression test for AP6a: the provider used to build a fresh { tabState,
+    // tabDispatch } object literal on every render, so a memoized consumer
+    // would re-render even when neither tabState nor tabDispatch had changed
+    // (e.g. when TabProvider's own parent re-renders for unrelated reasons).
+    const seenValues: unknown[] = []
+
+    function Consumer() {
+      const value = useTabContext()
+      seenValues.push(value)
+      return null
+    }
+    const MemoConsumer = React.memo(Consumer)
+
+    function Harness({ tick }: { tick: number }) {
+      return React.createElement(
+        TabProvider,
+        null,
+        React.createElement('span', null, tick),
+        React.createElement(MemoConsumer),
+      )
+    }
+
+    const { rerender } = render(React.createElement(Harness, { tick: 0 }))
+    expect(seenValues).toHaveLength(1)
+
+    // Re-render TabProvider's parent with no dispatch in between — tabState
+    // and tabDispatch are unchanged, so the memoized consumer must not
+    // receive a new context value (and therefore must not re-render).
+    rerender(React.createElement(Harness, { tick: 1 }))
+
+    expect(seenValues).toHaveLength(1)
+  })
+
+  it('documents that UPDATE_EDIT_BUFFER (fired per keystroke) still re-renders every consumer', () => {
+    // AP6a's memoization fix removes *spurious* re-renders caused by an
+    // unrelated parent re-render. It does not and cannot prevent a re-render
+    // when tabState genuinely changes on every keystroke of the active tab's
+    // editBuffer — that's a legitimate state change, not the bug this AP
+    // targets. Recorded here so the limitation is explicit rather than
+    // silently assumed away.
+    let renderCount = 0
+    let dispatchRef: Dispatch<TabAction> | null = null
+
+    function Consumer() {
+      const { tabDispatch } = useTabContext()
+      dispatchRef = tabDispatch
+      renderCount++
+      return null
+    }
+    const MemoConsumer = React.memo(Consumer)
+
+    render(React.createElement(TabProvider, null, React.createElement(MemoConsumer)))
+    expect(renderCount).toBe(1)
+
+    act(() => {
+      dispatchRef!({
+        type: 'OPEN_TAB',
+        payload: { vaultId: 'v1', filePath: 'doc.md', fileName: 'doc.md' },
+      })
+    })
+    expect(renderCount).toBe(2)
+
+    // Simulate one keystroke's worth of editing.
+    act(() => {
+      dispatchRef!({
+        type: 'UPDATE_EDIT_BUFFER',
+        payload: { tabId: 'v1::doc.md', content: 'a' },
+      })
+    })
+    expect(renderCount).toBe(3)
   })
 })

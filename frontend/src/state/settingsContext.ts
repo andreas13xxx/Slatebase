@@ -41,6 +41,10 @@ export function SettingsProvider({ children, isAdmin, vaults }: SettingsProvider
   const [state, dispatch] = useReducer(settingsReducer, initialSettingsState)
 
   const registry = useMemo(() => createSettingsRegistry(), [])
+  const value = useMemo(
+    () => ({ state, dispatch, registry, vaults }),
+    [state, dispatch, registry, vaults],
+  )
 
   // Restore persisted navigation state on mount
   useEffect(() => {
@@ -58,7 +62,7 @@ export function SettingsProvider({ children, isAdmin, vaults }: SettingsProvider
 
   return React.createElement(
     SettingsContext.Provider,
-    { value: { state, dispatch, registry, vaults } },
+    { value },
     children,
   )
 }

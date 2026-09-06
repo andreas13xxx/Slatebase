@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, type Dispatch, type ReactNode } from 'react'
+import { createContext, useContext, useMemo, useReducer, type Dispatch, type ReactNode } from 'react'
 import React from 'react'
 import { searchReducer, initialSearchState, type SearchState, type SearchAction } from './searchState'
 
@@ -22,10 +22,11 @@ interface SearchProviderProps {
  */
 export function SearchProvider({ children }: SearchProviderProps) {
   const [state, dispatch] = useReducer(searchReducer, initialSearchState)
+  const value = useMemo(() => ({ state, dispatch }), [state, dispatch])
 
   return React.createElement(
     SearchContext.Provider,
-    { value: { state, dispatch } },
+    { value },
     children,
   )
 }

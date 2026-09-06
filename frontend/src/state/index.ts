@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, type Dispatch, type ReactNode } from 'react'
+import { createContext, useContext, useMemo, useReducer, type Dispatch, type ReactNode } from 'react'
 import React from 'react'
 import type { AppState, AppAction, AppError } from '../types'
 import type { IApiClient } from '../api'
@@ -158,10 +158,14 @@ interface AppProviderProps {
  */
 export function AppProvider({ children, apiClient }: AppProviderProps) {
   const [state, dispatch] = useReducer(appReducer, initialState)
+  const value = useMemo(
+    () => ({ state, dispatch, apiClient: apiClient ?? null }),
+    [state, dispatch, apiClient],
+  )
 
   return React.createElement(
     AppContext.Provider,
-    { value: { state, dispatch, apiClient: apiClient ?? null } },
+    { value },
     children,
   )
 }

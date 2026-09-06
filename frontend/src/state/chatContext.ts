@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, type Dispatch, type ReactNode } from 'react'
+import { createContext, useContext, useMemo, useReducer, type Dispatch, type ReactNode } from 'react'
 import React from 'react'
 import { chatReducer, initialChatState, type ChatState, type ChatAction } from './chatState'
 
@@ -22,10 +22,11 @@ interface ChatProviderProps {
  */
 export function ChatProvider({ children }: ChatProviderProps) {
   const [state, dispatch] = useReducer(chatReducer, initialChatState)
+  const value = useMemo(() => ({ state, dispatch }), [state, dispatch])
 
   return React.createElement(
     ChatContext.Provider,
-    { value: { state, dispatch } },
+    { value },
     children,
   )
 }
