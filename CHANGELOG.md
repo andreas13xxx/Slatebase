@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.42.8](https://github.com/andreas13xxx/Slatebase/compare/v0.42.7...v0.42.8) (2026-09-06)
+
+
+### Bugfixes
+
+* **backend:** hash session tokens at rest, drop persisted CSRF token, harden secret file permissions ([#158](https://github.com/andreas13xxx/Slatebase/issues/158)) ([58ba3cd](https://github.com/andreas13xxx/Slatebase/commit/58ba3cd298ae44d5a8924aced22516522c461776))
+
 ## [0.42.7](https://github.com/andreas13xxx/Slatebase/compare/v0.42.6...v0.42.7) (2026-09-05)
 
 
