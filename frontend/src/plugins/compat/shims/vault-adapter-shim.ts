@@ -18,7 +18,7 @@
  */
 
 import type { IApiClient } from '../../../api/index'
-import { getStoredAuthToken, getStoredCsrfToken } from '../../../state/authContext'
+import { getCsrfToken } from '../../../state/authContext'
 import type { DirectoryTree } from '../../../types'
 import { markPluginWrite } from '../plugin-event-bridge'
 import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry'
@@ -208,10 +208,7 @@ export class VaultAdapterShim implements IVaultAdapter {
    */
   async readBinary(path: string): Promise<ArrayBuffer> {
     try {
-      const token = getStoredAuthToken() ?? ''
-      const response = await fetch(`/api/v1/vaults/${this.vaultId}/files?path=${encodeURIComponent(path)}&raw=true`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
+      const response = await fetch(`/api/v1/vaults/${this.vaultId}/files?path=${encodeURIComponent(path)}&raw=true`)
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
@@ -237,12 +234,10 @@ export class VaultAdapterShim implements IVaultAdapter {
       formData.append('file', file, name)
       formData.append('targetDir', targetDir)
 
-      const token = getStoredAuthToken() ?? ''
-      const csrf = getStoredCsrfToken() ?? ''
+      const csrf = getCsrfToken() ?? ''
       const response = await fetch(`/api/v1/vaults/${this.vaultId}/upload`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'X-CSRF-Token': csrf,
         },
         body: formData,

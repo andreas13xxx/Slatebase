@@ -362,21 +362,18 @@ describe('AdminUsersPage', () => {
     })
   })
 
-  it('sends auth headers with requests', async () => {
+  it('does not send an Authorization header — the session authenticates via the HttpOnly cookie', async () => {
     const fetchMock = mockFetchUsers()
     global.fetch = fetchMock
     render(React.createElement(AdminUsersPage, { apiClient }))
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/admin/users'),
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
-          }),
-        }),
-      )
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/v1/admin/users'), expect.anything())
     })
+
+    const call = fetchMock.mock.calls.find((c) => typeof c[0] === 'string' && c[0].includes('/api/v1/admin/users'))
+    const headers = call?.[1]?.headers as Record<string, string> | undefined
+    expect(headers?.['Authorization']).toBeUndefined()
   })
 
   it('shows pagination controls when multiple pages exist', async () => {

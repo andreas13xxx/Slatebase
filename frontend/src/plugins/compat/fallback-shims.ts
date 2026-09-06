@@ -25,7 +25,7 @@
  * @module fallback-shims
  */
 
-import { getStoredAuthToken, getStoredCsrfToken } from '../../state/authContext'
+import { getCsrfToken } from '../../state/authContext'
 import { recordGapRead } from './api-gap-registry'
 import { containAsyncLoad, containAsyncUnload } from './async-lifecycle'
 import { debugLog } from './log'
@@ -312,8 +312,7 @@ function base64ToArrayBuffer(b64: string): ArrayBuffer {
 
 function fallbackRequestUrl(params: RequestUrlParams | string): RequestUrlPromise {
   const opts = typeof params === 'string' ? { url: params } : params
-  const token = getStoredAuthToken() ?? ''
-  const csrf = getStoredCsrfToken() ?? ''
+  const csrf = getCsrfToken() ?? ''
 
   const encodedBody =
     opts.body === undefined
@@ -326,7 +325,6 @@ function fallbackRequestUrl(params: RequestUrlParams | string): RequestUrlPromis
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: 'Bearer ' + token,
       'X-CSRF-Token': csrf,
     },
     body: JSON.stringify({

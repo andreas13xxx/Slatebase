@@ -52,6 +52,26 @@ export interface PublicUserInfo {
 }
 
 /**
+ * Strips sensitive fields (passwordHash) from a full user record for
+ * inclusion in API responses.
+ */
+export function toPublicUserInfo(user: UserRecord): PublicUserInfo {
+  return {
+    userId: user.userId,
+    username: user.username,
+    displayName: user.displayName,
+    email: user.email,
+    avatarUrl: user.avatarUrl,
+    role: user.role,
+    preferredLanguage: user.preferredLanguage,
+    colorScheme: user.colorScheme,
+    suspended: user.suspended,
+    mustChangePassword: user.mustChangePassword,
+    createdAt: user.createdAt,
+  }
+}
+
+/**
  * Data required to create a new user.
  */
 export interface CreateUserData {

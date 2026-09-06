@@ -194,11 +194,7 @@ class EmbedWidget extends WidgetType {
   }
 
   private buildRawSrc(path: string = this.resolveFilePath()): string {
-    let src = `/api/v1/vaults/${this.vaultId}/files?path=${encodeURIComponent(path)}&raw=true`
-    if (this.token) {
-      src += `&token=${encodeURIComponent(this.token)}`
-    }
-    return src
+    return `/api/v1/vaults/${this.vaultId}/files?path=${encodeURIComponent(path)}&raw=true`
   }
 
   toDOM(): HTMLElement {
@@ -335,15 +331,7 @@ class EmbedWidget extends WidgetType {
     status.textContent = '…'
     container.appendChild(status)
 
-    // The non-raw JSON endpoint only accepts the auth token via a real
-    // Authorization header — unlike raw=true (used by the image/PDF embeds
-    // above), which also allows a ?token= query param specifically so plain
-    // <img src>/<object data> tags can authenticate without custom headers.
-    const fetchInit: RequestInit = this.token
-      ? { headers: { Authorization: `Bearer ${this.token}` } }
-      : {}
-
-    fetch(this.buildFileContentSrc(resolvedPath), fetchInit)
+    fetch(this.buildFileContentSrc(resolvedPath))
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${String(res.status)}`)
         return res.json() as Promise<{ content: string; isBinary: boolean }>
@@ -379,7 +367,7 @@ class EmbedWidget extends WidgetType {
 
   /**
    * Builds the JSON (non-raw) file-content URL used to fetch note text.
-   * No `?token=` here — see the Authorization-header comment above.
+   * Authenticates via the HttpOnly session cookie, sent automatically.
    */
   private buildFileContentSrc(path: string): string {
     return `/api/v1/vaults/${this.vaultId}/files?path=${encodeURIComponent(path)}`
@@ -1077,12 +1065,8 @@ class ImageWidget extends WidgetType {
     if (this.src.startsWith('http://') || this.src.startsWith('https://') || this.src.startsWith('data:')) {
       img.src = this.src
     } else {
-      // Vault-relative path — use the files API
-      let src = `/api/v1/vaults/${this.vaultId}/files?path=${encodeURIComponent(this.src)}&raw=true`
-      if (this.token) {
-        src += `&token=${encodeURIComponent(this.token)}`
-      }
-      img.src = src
+      // Vault-relative path — use the files API (cookie authenticates automatically)
+      img.src = `/api/v1/vaults/${this.vaultId}/files?path=${encodeURIComponent(this.src)}&raw=true`
     }
 
     img.alt = this.alt

@@ -4,9 +4,11 @@
  */
 
 import type { Context, Next } from 'hono'
+import { getCookie } from 'hono/cookie'
 import type { IAuthService, SessionContext } from './index.js'
 import type { RateLimiter } from './ratelimit.js'
 import type { IUserRepository } from '../user/index.js'
+import { SESSION_COOKIE_NAME } from './cookies.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -22,12 +24,8 @@ const VERSION_PATH = '/api/v1/version'
 /** The password change endpoint path allowed during mustChangePassword. */
 const PASSWORD_CHANGE_PATH = '/api/v1/users/me/password'
 
-/**
- * The raw file content endpoint — the only route allowed to authenticate via a
- * `?token=` query parameter, since it's loaded via `<img src="...">` tags that
- * can't set an Authorization header.
- */
-const RAW_FILE_CONTENT_PATH_PATTERN = /^\/api\/v1\/vaults\/[^/]+\/files$/
+/** The session-probe endpoint path allowed during mustChangePassword. */
+const SESSION_PATH = '/api/v1/auth/session'
 
 /** HTTP methods that require CSRF validation. */
 const CSRF_METHODS = new Set(['POST', 'PUT', 'DELETE'])
@@ -49,14 +47,14 @@ function createErrorResponse(c: Context, status: number, code: string, message: 
 }
 
 /**
- * Extracts the Bearer token from the Authorization header.
- * Falls back to the `token` query parameter, but only for the raw file content
- * endpoint (e.g. <img src="...">), which cannot set an Authorization header.
- * Accepting it for every route would leak the full session token into access
- * logs, Referer headers, and browser history far more broadly than necessary.
+ * Extracts the session token from the Authorization header, falling back to
+ * the HttpOnly session cookie. The header path stays for external API
+ * clients (and MCP-adjacent tooling) that can't rely on a browser cookie jar;
+ * the cookie path is what browser requests (including `<img src="...">`,
+ * which can't set an Authorization header) authenticate with.
  * Returns null if no token is found.
  */
-function extractBearerToken(c: Context): string | null {
+export function extractBearerToken(c: Context): string | null {
   const authHeader = c.req.header('Authorization')
   if (authHeader !== undefined && authHeader.startsWith('Bearer ')) {
     const token = authHeader.slice(7)
@@ -65,15 +63,9 @@ function extractBearerToken(c: Context): string | null {
     }
   }
 
-  const isRawFileContentRequest = c.req.method === 'GET'
-    && RAW_FILE_CONTENT_PATH_PATTERN.test(c.req.path)
-    && c.req.query('raw') === 'true'
-
-  if (isRawFileContentRequest) {
-    const queryToken = c.req.query('token')
-    if (queryToken !== undefined && queryToken.length > 0) {
-      return queryToken
-    }
+  const cookieToken = getCookie(c, SESSION_COOKIE_NAME)
+  if (cookieToken !== undefined && cookieToken.length > 0) {
+    return cookieToken
   }
 
   return null
@@ -274,6 +266,13 @@ export function createMustChangePasswordMiddleware(
 
     // Also allow logout so the user can log out if they choose
     if (c.req.method === 'POST' && c.req.path === '/api/v1/auth/logout') {
+      return next()
+    }
+
+    // Allow the session probe through — otherwise a page reload while
+    // mustChangePassword is set gets a 403 instead of session info, and the
+    // frontend can't tell "not logged in" apart from "must change password".
+    if (c.req.method === 'GET' && c.req.path === SESSION_PATH) {
       return next()
     }
 

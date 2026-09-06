@@ -15,23 +15,11 @@ describe('ApiClient', () => {
     vi.restoreAllMocks()
   })
 
-  describe('token management', () => {
-    it('stores and retrieves auth token', () => {
-      expect(client.getToken()).toBeNull()
-      client.setToken('my-token')
-      expect(client.getToken()).toBe('my-token')
-    })
-
+  describe('CSRF token management', () => {
     it('stores and retrieves CSRF token', () => {
       expect(client.getCsrfToken()).toBeNull()
       client.setCsrfToken('csrf-123')
       expect(client.getCsrfToken()).toBe('csrf-123')
-    })
-
-    it('clears token when set to null', () => {
-      client.setToken('my-token')
-      client.setToken(null)
-      expect(client.getToken()).toBeNull()
     })
 
     it('clears CSRF token when set to null', () => {
@@ -42,46 +30,19 @@ describe('ApiClient', () => {
   })
 
   describe('Authorization header', () => {
-    it('includes Bearer token on GET requests when token is set', async () => {
-      client.setToken('session-token-abc')
-      fetchMock.mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }))
-
-      await client.fetchVaults()
-
-      expect(fetchMock).toHaveBeenCalledWith('/api/v1/vaults', expect.objectContaining({
-        headers: expect.objectContaining({
-          'Authorization': 'Bearer session-token-abc',
-        }),
-      }))
-    })
-
-    it('does not include Authorization header when no token is set', async () => {
-      fetchMock.mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }))
-
-      await client.fetchVaults()
-
-      const headers = fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>
-      expect(headers['Authorization']).toBeUndefined()
-    })
-
-    it('includes Bearer token on POST requests', async () => {
-      client.setToken('my-token')
+    it('never sends an Authorization header — the session authenticates via the HttpOnly cookie', async () => {
       client.setCsrfToken('csrf-token')
       fetchMock.mockResolvedValue(new Response(JSON.stringify({ id: 'v1', name: 'Test' }), { status: 201 }))
 
       await client.createVault('Test')
 
-      expect(fetchMock).toHaveBeenCalledWith('/api/v1/vaults', expect.objectContaining({
-        headers: expect.objectContaining({
-          'Authorization': 'Bearer my-token',
-        }),
-      }))
+      const headers = fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>
+      expect(headers['Authorization']).toBeUndefined()
     })
   })
 
   describe('CSRF token header', () => {
     it('includes X-CSRF-Token on POST requests', async () => {
-      client.setToken('token')
       client.setCsrfToken('csrf-value')
       fetchMock.mockResolvedValue(new Response(JSON.stringify({ id: 'v1', name: 'Test' }), { status: 201 }))
 
@@ -95,7 +56,6 @@ describe('ApiClient', () => {
     })
 
     it('includes X-CSRF-Token on PUT requests', async () => {
-      client.setToken('token')
       client.setCsrfToken('csrf-value')
       fetchMock.mockResolvedValue(new Response(JSON.stringify({ path: 'a.md', name: 'a.md', size: 5 }), { status: 200 }))
 
@@ -109,7 +69,6 @@ describe('ApiClient', () => {
     })
 
     it('includes X-CSRF-Token on DELETE requests', async () => {
-      client.setToken('token')
       client.setCsrfToken('csrf-value')
       fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
 
@@ -123,7 +82,6 @@ describe('ApiClient', () => {
     })
 
     it('does not include X-CSRF-Token on GET requests', async () => {
-      client.setToken('token')
       client.setCsrfToken('csrf-value')
       fetchMock.mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }))
 
@@ -134,7 +92,6 @@ describe('ApiClient', () => {
     })
 
     it('does not include X-CSRF-Token when csrfToken is null', async () => {
-      client.setToken('token')
       fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
 
       await client.deleteVault('vault-1')
@@ -147,7 +104,6 @@ describe('ApiClient', () => {
   describe('401 response interceptor', () => {
     it('calls onSessionExpired when the server confirms the session is dead', async () => {
       const onExpired = vi.fn()
-      client.setToken('expired-token')
       client.setCsrfToken('csrf')
       client.setOnSessionExpired(onExpired)
 
@@ -166,7 +122,6 @@ describe('ApiClient', () => {
     })
 
     it('clears token and csrfToken once the probe confirms the session is dead', async () => {
-      client.setToken('my-token')
       client.setCsrfToken('my-csrf')
       client.setOnSessionExpired(vi.fn())
 
@@ -177,12 +132,10 @@ describe('ApiClient', () => {
 
       await expect(client.fetchVaults()).rejects.toBeDefined()
 
-      expect(client.getToken()).toBeNull()
       expect(client.getCsrfToken()).toBeNull()
     })
 
     it('does not call onSessionExpired when callback is null', async () => {
-      client.setToken('token')
       client.setOnSessionExpired(null)
 
       fetchMock.mockResolvedValue(new Response(
@@ -196,7 +149,6 @@ describe('ApiClient', () => {
 
     it('does not call onSessionExpired on other error statuses', async () => {
       const onExpired = vi.fn()
-      client.setToken('token')
       client.setOnSessionExpired(onExpired)
 
       fetchMock.mockResolvedValue(new Response(
@@ -213,7 +165,6 @@ describe('ApiClient', () => {
       // network hiccup (dropped connection, backend mid-restart after a plugin
       // reload) must NOT be treated as proof the session is dead.
       const onExpired = vi.fn()
-      client.setToken('my-token')
       client.setCsrfToken('my-csrf')
       client.setOnSessionExpired(onExpired)
 
@@ -230,13 +181,11 @@ describe('ApiClient', () => {
       })
 
       expect(onExpired).not.toHaveBeenCalled()
-      expect(client.getToken()).toBe('my-token')
       expect(client.getCsrfToken()).toBe('my-csrf')
     })
 
     it('keeps the session when the confirming probe gets a 5xx', async () => {
       const onExpired = vi.fn()
-      client.setToken('my-token')
       client.setCsrfToken('my-csrf')
       client.setOnSessionExpired(onExpired)
 
@@ -253,13 +202,11 @@ describe('ApiClient', () => {
       })
 
       expect(onExpired).not.toHaveBeenCalled()
-      expect(client.getToken()).toBe('my-token')
       expect(client.getCsrfToken()).toBe('my-csrf')
     })
 
     it('shares one probe across concurrent 401s instead of probing per request', async () => {
       const onExpired = vi.fn()
-      client.setToken('my-token')
       client.setCsrfToken('my-csrf')
       client.setOnSessionExpired(onExpired)
 
@@ -285,7 +232,6 @@ describe('ApiClient', () => {
   describe('403 CSRF_INVALID recovery', () => {
     it('probes the session on 403 CSRF_INVALID and triggers onSessionExpired if session is dead', async () => {
       const onExpired = vi.fn()
-      client.setToken('my-token')
       client.setCsrfToken('old-csrf')
       client.setOnSessionExpired(onExpired)
 
@@ -307,7 +253,6 @@ describe('ApiClient', () => {
       })
 
       expect(onExpired).toHaveBeenCalledOnce()
-      expect(client.getToken()).toBeNull()
       expect(client.getCsrfToken()).toBeNull()
       // Verify the probe was called
       expect(fetchMock).toHaveBeenCalledTimes(2)
@@ -316,7 +261,6 @@ describe('ApiClient', () => {
 
     it('does NOT call onSessionExpired on 403 CSRF_INVALID if session is alive', async () => {
       const onExpired = vi.fn()
-      client.setToken('my-token')
       client.setCsrfToken('old-csrf')
       client.setOnSessionExpired(onExpired)
 
@@ -340,12 +284,10 @@ describe('ApiClient', () => {
       // Session is alive — should NOT trigger logout
       expect(onExpired).not.toHaveBeenCalled()
       // Tokens should NOT be cleared (session is still valid)
-      expect(client.getToken()).toBe('my-token')
       expect(client.getCsrfToken()).toBe('old-csrf')
     })
 
     it('re-throws CSRF_INVALID error regardless of session liveness', async () => {
-      client.setToken('my-token')
       client.setCsrfToken('csrf')
       client.setOnSessionExpired(vi.fn())
 
@@ -365,7 +307,6 @@ describe('ApiClient', () => {
 
     it('handles non-CSRF 403 responses normally without probing the session', async () => {
       const onExpired = vi.fn()
-      client.setToken('token')
       client.setCsrfToken('csrf')
       client.setOnSessionExpired(onExpired)
 
@@ -385,7 +326,6 @@ describe('ApiClient', () => {
     })
 
     it('handles 403 with unparseable body without probing the session', async () => {
-      client.setToken('token')
       client.setCsrfToken('csrf')
       client.setOnSessionExpired(vi.fn())
 
@@ -405,7 +345,6 @@ describe('ApiClient', () => {
       // the server proves nothing, so the session must survive a CSRF blip
       // that coincides with a dropped connection.
       const onExpired = vi.fn()
-      client.setToken('my-token')
       client.setCsrfToken('old-csrf')
       client.setOnSessionExpired(onExpired)
 
@@ -422,7 +361,6 @@ describe('ApiClient', () => {
       })
 
       expect(onExpired).not.toHaveBeenCalled()
-      expect(client.getToken()).toBe('my-token')
       expect(client.getCsrfToken()).toBe('old-csrf')
     })
   })
@@ -452,9 +390,38 @@ describe('ApiClient', () => {
     })
   })
 
+  describe('getSession', () => {
+    it('returns "alive" with user, csrfToken, and expiresAt on a 2xx response', async () => {
+      const body = { user: { userId: 'u1', username: 'admin' }, csrfToken: 'csrf-1', expiresAt: '2025-01-02T00:00:00Z' }
+      fetchMock.mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }))
+
+      const result = await client.getSession()
+
+      expect(result).toEqual({ status: 'alive', ...body })
+      expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/session', expect.objectContaining({ method: 'GET' }))
+    })
+
+    it('returns "dead" on a 401 response', async () => {
+      fetchMock.mockResolvedValue(new Response(
+        JSON.stringify({ code: 'UNAUTHORIZED', message: 'Not authenticated' }),
+        { status: 401 },
+      ))
+      await expect(client.getSession()).resolves.toEqual({ status: 'dead' })
+    })
+
+    it('returns "unknown" on a non-401 error status', async () => {
+      fetchMock.mockResolvedValue(new Response('Bad Gateway', { status: 502 }))
+      await expect(client.getSession()).resolves.toEqual({ status: 'unknown' })
+    })
+
+    it('returns "unknown" when the request itself fails', async () => {
+      fetchMock.mockRejectedValue(new Error('Network error'))
+      await expect(client.getSession()).resolves.toEqual({ status: 'unknown' })
+    })
+  })
+
   describe('login', () => {
     it('sends POST to /api/v1/auth/login without Authorization header', async () => {
-      client.setToken('existing-token')
       const loginResponse = {
         token: 'new-token',
         csrfToken: 'new-csrf',
@@ -490,7 +457,6 @@ describe('ApiClient', () => {
 
   describe('logout', () => {
     it('sends POST to /api/v1/auth/logout with auth headers', async () => {
-      client.setToken('my-token')
       client.setCsrfToken('my-csrf')
       fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
 
@@ -499,7 +465,6 @@ describe('ApiClient', () => {
       expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/logout', expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
-          'Authorization': 'Bearer my-token',
           'X-CSRF-Token': 'my-csrf',
         }),
       }))
@@ -508,7 +473,6 @@ describe('ApiClient', () => {
 
   describe('getSessions', () => {
     it('sends GET to /api/v1/auth/sessions', async () => {
-      client.setToken('token')
       const sessions = [{ sessionId: 's1', userAgent: 'Chrome', ipAddress: '127.0.0.1', createdAt: '2025-01-01', lastActivity: '2025-01-01' }]
       fetchMock.mockResolvedValue(new Response(JSON.stringify(sessions), { status: 200 }))
 
@@ -523,7 +487,6 @@ describe('ApiClient', () => {
 
   describe('invalidateSession', () => {
     it('sends DELETE to /api/v1/auth/sessions/:sessionId', async () => {
-      client.setToken('token')
       client.setCsrfToken('csrf')
       fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
 
@@ -532,7 +495,6 @@ describe('ApiClient', () => {
       expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/sessions/session-123', expect.objectContaining({
         method: 'DELETE',
         headers: expect.objectContaining({
-          'Authorization': 'Bearer token',
           'X-CSRF-Token': 'csrf',
         }),
       }))
@@ -541,7 +503,6 @@ describe('ApiClient', () => {
 
   describe('getProfile', () => {
     it('sends GET to /api/v1/users/me', async () => {
-      client.setToken('token')
       const profile = { userId: 'u1', username: 'admin', displayName: 'Admin', email: 'a@b.com', role: 'admin', preferredLanguage: 'de', colorScheme: 'system', suspended: false, mustChangePassword: false, createdAt: '2025-01-01' }
       fetchMock.mockResolvedValue(new Response(JSON.stringify(profile), { status: 200 }))
 
@@ -556,7 +517,6 @@ describe('ApiClient', () => {
 
   describe('updateProfile', () => {
     it('sends PUT to /api/v1/users/me with profile data', async () => {
-      client.setToken('token')
       client.setCsrfToken('csrf')
       const updatedProfile = { userId: 'u1', username: 'admin', displayName: 'New Name', email: 'new@email.com', role: 'admin', preferredLanguage: 'en', colorScheme: 'dark', suspended: false, mustChangePassword: false, createdAt: '2025-01-01' }
       fetchMock.mockResolvedValue(new Response(JSON.stringify(updatedProfile), { status: 200 }))
@@ -576,7 +536,6 @@ describe('ApiClient', () => {
 
   describe('changePassword', () => {
     it('sends PUT to /api/v1/users/me/password', async () => {
-      client.setToken('token')
       client.setCsrfToken('csrf')
       fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
 
@@ -585,7 +544,6 @@ describe('ApiClient', () => {
       expect(fetchMock).toHaveBeenCalledWith('/api/v1/users/me/password', expect.objectContaining({
         method: 'PUT',
         headers: expect.objectContaining({
-          'Authorization': 'Bearer token',
           'X-CSRF-Token': 'csrf',
         }),
         body: JSON.stringify({ currentPassword: 'oldpass', newPassword: 'newpass123' }),
@@ -595,7 +553,6 @@ describe('ApiClient', () => {
 
   describe('deleteSelf', () => {
     it('sends DELETE to /api/v1/users/me with password', async () => {
-      client.setToken('token')
       client.setCsrfToken('csrf')
       fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
 
@@ -604,7 +561,6 @@ describe('ApiClient', () => {
       expect(fetchMock).toHaveBeenCalledWith('/api/v1/users/me', expect.objectContaining({
         method: 'DELETE',
         headers: expect.objectContaining({
-          'Authorization': 'Bearer token',
           'X-CSRF-Token': 'csrf',
         }),
         body: JSON.stringify({ password: 'mypassword' }),
@@ -613,8 +569,7 @@ describe('ApiClient', () => {
   })
 
   describe('FormData requests with auth', () => {
-    it('includes auth and CSRF headers on file import', async () => {
-      client.setToken('token')
+    it('includes the CSRF header (no Authorization — the cookie authenticates) on file import', async () => {
       client.setCsrfToken('csrf')
       fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
 
@@ -622,7 +577,7 @@ describe('ApiClient', () => {
       await client.importFile('vault-1', file)
 
       const callHeaders = fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>
-      expect(callHeaders['Authorization']).toBe('Bearer token')
+      expect(callHeaders['Authorization']).toBeUndefined()
       expect(callHeaders['X-CSRF-Token']).toBe('csrf')
       // Content-Type should NOT be set (browser sets multipart boundary)
       expect(callHeaders['Content-Type']).toBeUndefined()
@@ -631,7 +586,6 @@ describe('ApiClient', () => {
 
   describe('error handling', () => {
     it('throws structured AppError on non-2xx responses', async () => {
-      client.setToken('token')
       fetchMock.mockResolvedValue(new Response(
         JSON.stringify({ code: 'VAULT_NOT_FOUND', message: 'Vault not found', timestamp: '2025-01-01T00:00:00Z' }),
         { status: 404 },
@@ -644,7 +598,6 @@ describe('ApiClient', () => {
     })
 
     it('throws generic error when response body is not JSON', async () => {
-      client.setToken('token')
       fetchMock.mockResolvedValue(new Response('Internal Server Error', { status: 500 }))
 
       await expect(client.fetchVaults()).rejects.toEqual({

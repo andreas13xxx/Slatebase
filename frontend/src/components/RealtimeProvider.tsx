@@ -42,16 +42,16 @@ export interface RealtimeEventHandlers {
 /** Props for the RealtimeProvider component. */
 export interface RealtimeProviderProps {
   children: React.ReactNode
-  /** Session token for SSE authentication. */
-  token: string | null
+  /** Whether the SSE connection should be active (the user is authenticated). */
+  enabled: boolean
   /** Event handler callbacks for integration with other providers. */
   handlers?: RealtimeEventHandlers
   /** Set of message IDs already in chat state (for deduplication). */
   knownMessageIds?: Set<string>
   /** Current conversation ID (for routing chat:message events). */
   currentConversationId?: string | null
-  /** Optional function to fetch a short-lived SSE ticket (preferred over token in URL). */
-  getTicket?: () => Promise<{ ticket: string }>
+  /** Fetches a short-lived SSE ticket. See {@link UseEventSourceOptions.getTicket}. */
+  getTicket: () => Promise<{ ticket: string }>
 }
 
 /**
@@ -59,7 +59,7 @@ export interface RealtimeProviderProps {
  * Separated so it can access useRealtimeContext() inside the provider.
  */
 function RealtimeInner({
-  token,
+  enabled,
   handlers,
   knownMessageIds,
   currentConversationId,
@@ -222,8 +222,7 @@ function RealtimeInner({
 
   // Connect the EventSource hook
   useEventSource({
-    token,
-    enabled: token !== null,
+    enabled,
     dispatch,
     onEvent: handleEvent,
     getTicket,
@@ -262,7 +261,7 @@ function RealtimeInner({
  */
 export function RealtimeProviderComponent({
   children,
-  token,
+  enabled,
   handlers,
   knownMessageIds,
   currentConversationId,
@@ -272,7 +271,7 @@ export function RealtimeProviderComponent({
     RealtimeStateProvider,
     null,
     React.createElement(RealtimeInner, {
-      token,
+      enabled,
       handlers,
       knownMessageIds,
       currentConversationId,

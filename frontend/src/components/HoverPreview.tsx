@@ -162,7 +162,6 @@ export function HoverPreview() {
           content={content}
           vaultId={vaultId ?? ''}
           directoryTree={directoryTree}
-          token={apiClient?.getToken() ?? undefined}
           // No navigation from inside a preview, and no nested previews.
         />
       </div>

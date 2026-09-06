@@ -24,6 +24,7 @@ import { AdminRouteModule } from './api/adminRoutes.js'
 import { VaultShareRouteModule } from './api/vaultShareRoutes.js'
 import { SessionStore, AuthService } from './auth/index.js'
 import { CsrfSecretManager } from './auth/csrf-secret.js'
+import { SESSION_COOKIE_NAME } from './auth/cookies.js'
 import { createAuthMiddleware, createCsrfMiddleware, createRateLimitMiddleware, createMustChangePasswordMiddleware } from './auth/middleware.js'
 import { createClientIpMiddleware } from './api/client-ip.js'
 import { createRequestIdMiddleware } from './api/request-id.js'
@@ -466,7 +467,17 @@ function getLinkIndex(vaultId: string): LinkIndexService | undefined {
 // 5. Controllers
 const sseTicketStore = new SseTicketStore()
 const vaultController = new VaultController(vaultService, logger, importService, userRepository, vaultAccessControl, vaultShareRegistry)
-const authController = new AuthController(authService, logger, sseTicketStore)
+const authController = new AuthController(
+  authService,
+  logger,
+  userRepository,
+  {
+    trustedProxies: serverConfig.trustedProxies,
+    cookieSecureMode: serverConfig.cookieSecure,
+    sessionMaxLifetimeDays: serverConfig.sessionMaxLifetimeDays,
+  },
+  sseTicketStore,
+)
 // Same thresholds as the login rate limiter (5 attempts / 15 minutes) — caps
 // how many times a hijacked or CSRF-forged session can try to brute-force
 // the current password via PUT /users/me/password.
@@ -995,6 +1006,28 @@ vaultController.setVaultDeletionHook({
   },
 })
 
+/**
+ * Parses a raw `Cookie` header into a name → value map. Used only by the
+ * SSE interceptor below, which runs on raw node:http before Hono (and its
+ * `hono/cookie` helpers) ever see the request.
+ */
+function parseCookieHeader(header: string | undefined): Record<string, string> {
+  const cookies: Record<string, string> = {}
+  if (header === undefined) {
+    return cookies
+  }
+  for (const pair of header.split(';')) {
+    const separatorIndex = pair.indexOf('=')
+    if (separatorIndex === -1) continue
+    const name = pair.slice(0, separatorIndex).trim()
+    const value = pair.slice(separatorIndex + 1).trim()
+    if (name.length > 0) {
+      cookies[name] = decodeURIComponent(value)
+    }
+  }
+  return cookies
+}
+
 // Create the Hono request listener for non-MCP requests
 const honoListener = getRequestListener(app.fetch)
 
@@ -1023,11 +1056,13 @@ const server = createHttpServer(async (req, res) => {
       }
       userId = result.userId
     } else {
-      // Fallback: token query param or Authorization header
-      const token = parsedUrl.searchParams.get('token') ?? undefined
+      // Fallback: Authorization header or the HttpOnly session cookie. This is
+      // raw node:http, not Hono, so there's no getCookie() helper — parse the
+      // Cookie header by hand.
       const authHeader = req.headers['authorization']
       const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined
-      const sessionToken = token ?? bearerToken
+      const cookieToken = parseCookieHeader(req.headers['cookie'])[SESSION_COOKIE_NAME]
+      const sessionToken = bearerToken ?? cookieToken
 
       if (!sessionToken) {
         res.writeHead(401, { 'Content-Type': 'application/json' })

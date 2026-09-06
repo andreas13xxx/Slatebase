@@ -22,10 +22,6 @@ export interface ServerRestartSectionProps {
  */
 function buildAuthHeaders(apiClient: IApiClient): Record<string, string> {
   const headers: Record<string, string> = {}
-  const token = apiClient.getToken()
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
   const csrfToken = apiClient.getCsrfToken()
   if (csrfToken) {
     headers['X-CSRF-Token'] = csrfToken

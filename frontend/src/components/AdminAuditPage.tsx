@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react'
-import type { IApiClient } from '../api'
 import { useTranslation } from '../i18n'
 import { usePaginatedResource } from '../hooks/usePaginatedResource'
 
@@ -63,18 +62,12 @@ interface AuditResponse {
   totalPages: number
 }
 
-/** Props for the AdminAuditPage component. */
-export interface AdminAuditPageProps {
-  /** API client instance for fetching audit log entries. */
-  apiClient: IApiClient
-}
-
 /**
  * Admin audit log page component.
  * Displays paginated audit entries with filters for action type and date range.
  * Fetches data from GET /api/v1/admin/audit with query params.
  */
-export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
+export function AdminAuditPage() {
   const { t, locale } = useTranslation()
 
   // Filter state
@@ -102,9 +95,7 @@ export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
     params.set('pageSize', String(pageSize))
 
     const url = `/api/v1/admin/audit?${params.toString()}`
-    const response = await fetch(url, {
-      headers: buildHeaders(apiClient),
-    })
+    const response = await fetch(url)
 
     if (!response.ok) {
       const body = await response.json().catch(() => ({ message: t('admin.audit.errorStatus', { status: String(response.status) }) }))
@@ -112,7 +103,7 @@ export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
     }
 
     return (await response.json()) as AuditResponse
-  }, [apiClient, actionFilter, startDate, endDate, t])
+  }, [actionFilter, startDate, endDate, t])
 
   // Fetches page 1 on mount, and again whenever a filter changes (fetchAuditEntries's
   // identity changes with the filters, which usePaginatedResource reacts to).
@@ -277,14 +268,3 @@ function formatAction(action: string): string {
   return action.replace(/_/g, ' ')
 }
 
-/**
- * Builds request headers including auth token from the API client.
- */
-function buildHeaders(apiClient: IApiClient): Record<string, string> {
-  const headers: Record<string, string> = {}
-  const token = apiClient.getToken()
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  return headers
-}

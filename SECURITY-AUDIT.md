@@ -107,7 +107,21 @@ Dateisystemzugriff folgt. Wer liest oder schreibt, braucht zusätzlich
   token store below, now applied consistently to sessions. The CSRF token (see below) is
   no longer persisted alongside it either, since it's fully derivable from the session ID
   and the server's CSRF secret and carried no independent value at rest.
-- **CSRF tokens:** HMAC-SHA256 over session ID + server secret, compared with `timingSafeEqual`.
+- **Session token transport (AP3):** the raw token now travels in an `HttpOnly`,
+  `SameSite=Lax` cookie (`slatebase_session`) rather than `localStorage` — JavaScript,
+  including third-party plugin code running in the same document, can no longer read it.
+  `Secure` is set based on `SLATEBASE_COOKIE_SECURE` (`auto` detects HTTPS via a trusted
+  proxy's `X-Forwarded-Proto`, or force `true`/`false`). The `Authorization: Bearer` path
+  is unchanged for external API clients. `GET /api/v1/auth/session` lets the frontend
+  recover its (memory-only, never persisted) CSRF token and user info from the cookie
+  after a reload without a second login. The query-string `?token=` fallback that raw
+  file (`<img src>`) and SSE requests used is gone — those now authenticate via the
+  cookie automatically, closing the token-in-URL leak via access logs, `Referer`, and
+  browser history that the old fallback's own docstring already called out.
+- **CSRF tokens:** HMAC-SHA256 over session ID + server secret, compared with
+  `timingSafeEqual`. Kept in memory only on the frontend (never persisted) — the
+  double-submit property depends on it being readable by same-origin JS but not carried
+  automatically like a cookie would be.
 - **MCP API tokens:** only the SHA-256 hash is stored; the raw token is shown once. This was
   the correct pattern from the start — session tokens (above) now follow it too.
 - **CSRF secret:** env `SLATEBASE_CSRF_SECRET` → `data/.csrf-secret` → generated. A startup
@@ -266,6 +280,15 @@ Obsidian community list (domain-allowlisted GitHub releases) or a ZIP the vault 
 uploads themselves. The install-time `eval`/`new Function` scan surfaces elevated-risk
 bundles in the UI; `hasEvalUsage` is persisted in the plugin registry, not just returned in
 the install response, so the warning survives a page reload.
+
+Session-token theft via plugin code is no longer part of this residual risk (AP3, see
+A02): the token now lives in an `HttpOnly` cookie plugins can't read regardless of the
+sandbox bypasses above. What the shared-JS-context bypasses still grant a plugin is the
+ambient authenticated session itself (any same-origin request it makes carries the
+cookie automatically, sandbox or not) and read access to the in-memory CSRF token —
+neither is new: a plugin could already act as the logged-in user before this change, and
+the CSRF token was never meant to be secret from same-origin code, only from an
+off-origin attacker who can't reach it at all.
 
 Real process-level isolation is scoped in the `server-side-plugins` spec.
 

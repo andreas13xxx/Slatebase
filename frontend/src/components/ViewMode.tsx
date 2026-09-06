@@ -1205,7 +1205,7 @@ function renderPhrasingNode(
 ): ReactNode {
   switch (node.type) {
     case 'text':
-      return renderTextWithEmbeds(node.value, vaultId, directoryTree, onInternalLinkClick, key, token)
+      return renderTextWithEmbeds(node.value, vaultId, directoryTree, onInternalLinkClick, key)
 
     case 'strong':
       return createElement('strong', { key },
@@ -1247,7 +1247,7 @@ function renderPhrasingNode(
     case 'image':
       // Req 7.5: Render inline images with max-width 100%
       // Req 7.6: Show placeholder for images not found
-      return renderImage(node.url, node.alt, vaultId, directoryTree, key, token)
+      return renderImage(node.url, node.alt, vaultId, directoryTree, key)
 
     case 'html': {
       // Paired/allowlisted tags are handled by renderPhrasingNodes' matchInlineHtmlPair
@@ -1389,14 +1389,12 @@ function pathExistsInTree(tree: DirectoryTree | null, filePath: string): boolean
 }
 
 /**
- * Constructs the image src URL for a vault file.
+ * Constructs the image src URL for a vault file. Authenticates via the
+ * HttpOnly session cookie, sent automatically by the browser — no token
+ * needs to (or safely can) travel in the URL itself.
  */
-function buildImageSrc(vaultId: string, resolvedPath: string, token?: string): string {
-  let url = `/api/v1/vaults/${vaultId}/files?path=${encodeURIComponent(resolvedPath)}&raw=true`
-  if (token) {
-    url += `&token=${encodeURIComponent(token)}`
-  }
-  return url
+function buildImageSrc(vaultId: string, resolvedPath: string): string {
+  return `/api/v1/vaults/${vaultId}/files?path=${encodeURIComponent(resolvedPath)}&raw=true`
 }
 
 /**
@@ -1410,7 +1408,6 @@ function renderImage(
   vaultId: string,
   directoryTree: DirectoryTree | null,
   key: string,
-  token?: string
 ): ReactNode {
   // Normalize the path (backslashes → forward slashes, strip ./ prefix)
   const normalizedUrl = normalizeImagePath(url)
@@ -1427,7 +1424,7 @@ function renderImage(
 
   return createElement('img', {
     key,
-    src: buildImageSrc(vaultId, normalizedUrl, token),
+    src: buildImageSrc(vaultId, normalizedUrl),
     alt: alt ?? '',
     style: { maxWidth: '100%', height: 'auto' },
     className: 'view-mode-image',
@@ -1453,7 +1450,6 @@ function renderTextWithEmbeds(
   directoryTree: DirectoryTree | null,
   onInternalLinkClick: ((targetPath: string) => void) | undefined,
   key: string,
-  token?: string
 ): ReactNode | ReactNode[] {
   // Quick check: if no embed or wikilink syntax present, return plain text
   if (!text.includes('![[') && !text.includes('[[')) {
@@ -1493,7 +1489,7 @@ function renderTextWithEmbeds(
 
           parts.push(createElement('img', {
             key: `${key}-embed-${matchStart}`,
-            src: buildImageSrc(vaultId, resolvedPath, token),
+            src: buildImageSrc(vaultId, resolvedPath),
             alt: altText,
             style: imageStyle,
             className: 'view-mode-image',
@@ -1509,7 +1505,7 @@ function renderTextWithEmbeds(
         const resolvedPath = findFileInTree(directoryTree, filename)
 
         if (resolvedPath) {
-          const rawSrc = buildImageSrc(vaultId, resolvedPath, token)
+          const rawSrc = buildImageSrc(vaultId, resolvedPath)
           parts.push(createElement('div', {
             key: `${key}-embed-${matchStart}`,
             className: 'view-mode-embed view-mode-embed--pdf',
@@ -1853,7 +1849,7 @@ function renderEmbedNode(
       // Render <img> with vault API URL and optional sizing
       return createElement('img', {
         key,
-        src: buildImageSrc(vaultId, resolvedPath, token),
+        src: buildImageSrc(vaultId, resolvedPath),
         alt: altText,
         style: imageStyle,
         className: 'view-mode-image view-mode-embed view-mode-embed--image',
@@ -1870,7 +1866,7 @@ function renderEmbedNode(
     // Resolve PDF target in the directory tree
     const resolvedPath = resolveWikilinkTarget(node.target, directoryTree)
     if (resolvedPath) {
-      const rawSrc = buildImageSrc(vaultId, resolvedPath, token)
+      const rawSrc = buildImageSrc(vaultId, resolvedPath)
       const heightPx = parseEmbedPdfHeight(node.display)
       return createElement('div', {
         key,
@@ -1886,7 +1882,7 @@ function renderEmbedNode(
   if (node.embedType === 'audio') {
     const resolvedPath = resolveWikilinkTarget(node.target, directoryTree)
     if (resolvedPath) {
-      const src = buildImageSrc(vaultId, resolvedPath, token)
+      const src = buildImageSrc(vaultId, resolvedPath)
       return createElement('audio', {
         key,
         controls: true,
@@ -1904,7 +1900,7 @@ function renderEmbedNode(
   if (node.embedType === 'video') {
     const resolvedPath = resolveWikilinkTarget(node.target, directoryTree)
     if (resolvedPath) {
-      const src = buildImageSrc(vaultId, resolvedPath, token)
+      const src = buildImageSrc(vaultId, resolvedPath)
       const videoStyle = parseEmbedImageStyle(node.display)
       return createElement('video', {
         key,

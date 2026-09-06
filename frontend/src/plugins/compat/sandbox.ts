@@ -66,7 +66,7 @@ import type {
   SandboxContext,
   TrackedResources,
 } from './types';
-import { getStoredAuthToken, getStoredCsrfToken } from '../../state/authContext';
+import { getCsrfToken } from '../../state/authContext';
 import { setTimerTracker } from './plugin-execution-context';
 
 /** Maximum storage size per plugin per storage type (5 MB) */
@@ -746,8 +746,7 @@ function isCrossOrigin(url: string): boolean {
  * receive a standard Response object.
  */
 async function fetchViaProxy(url: string, init?: RequestInit): Promise<Response> {
-  const token = getStoredAuthToken() || '';
-  const csrfToken = getStoredCsrfToken() || '';
+  const csrfToken = getCsrfToken() || '';
   const method = init?.method?.toUpperCase() || 'GET';
 
   // Extract headers from init
@@ -784,7 +783,6 @@ async function fetchViaProxy(url: string, init?: RequestInit): Promise<Response>
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
       'X-CSRF-Token': csrfToken,
     },
     body: JSON.stringify({

@@ -1,17 +1,65 @@
 import { createContext, useContext, useReducer, useEffect, type Dispatch, type ReactNode } from 'react'
 import React from 'react'
-import { authReducer, initialAuthState, type AuthState, type AuthAction, type PublicUserInfo } from './authState'
+import { authReducer, initialAuthState, type AuthState, type AuthAction } from './authState'
 
 /**
- * Storage keys for persisting auth tokens and user info.
- * Exported as the single source of truth — the plugin compatibility layer
- * (plugins/compat/**) also needs to read the raw token/CSRF pair directly
- * (outside React) to authenticate its own proxied fetches, and must import
- * these instead of re-hardcoding the key strings.
+ * Stale keys from the pre-cookie auth design (session token + CSRF token +
+ * user info in localStorage, with a sessionStorage migration path before
+ * that). Cleared once on startup below — nothing reads these anymore, they'd
+ * otherwise just sit there as dead weight.
  */
-export const STORAGE_KEY_TOKEN = 'slatebase_token'
-export const STORAGE_KEY_CSRF = 'slatebase_csrf'
-const STORAGE_KEY_USER = 'slatebase_user'
+const STALE_STORAGE_KEYS = ['slatebase_token', 'slatebase_csrf', 'slatebase_user']
+
+/**
+ * Window-scoped in-memory holder for the current CSRF token, kept in sync by
+ * AuthProvider below. This exists (rather than just closing over React state)
+ * because the CSRF token must reach two consumers outside this module's own
+ * import graph:
+ * - `plugins/compat/sandbox.ts` imports `getCsrfToken()` directly (same JS
+ *   context, ordinary import).
+ * - `plugins/compat/plugin-loader.ts` interpolates `window.__slatebaseCsrfToken`
+ *   as a literal string into a Blob-URL-imported plugin bundle, which runs in
+ *   its own module scope with no access to this file's imports at all.
+ *
+ * The token is never persisted (no localStorage/sessionStorage) — only ever
+ * held in memory for the lifetime of the tab.
+ */
+declare global {
+  interface Window {
+    __slatebaseCsrfToken?: string | null
+  }
+}
+
+/**
+ * Provider component that wraps the app with auth state management.
+ *
+ * The session token lives in an HttpOnly cookie the browser manages —
+ * there's nothing for this provider to read or persist for it. On mount,
+ * `AuthGuard` (in App.tsx, which owns the `apiClient` instance) resolves the
+ * initial `isAuthenticated`/`user`/`csrfToken` state via `GET /api/v1/auth/session`.
+ */
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [authState, authDispatch] = useReducer(authReducer, initialAuthState)
+
+  // One-time cleanup of the pre-cookie storage keys — see STALE_STORAGE_KEYS.
+  useEffect(() => {
+    for (const key of STALE_STORAGE_KEYS) {
+      localStorage.removeItem(key)
+      sessionStorage.removeItem(key)
+    }
+  }, [])
+
+  // Keep the window-global CSRF token in sync with auth state.
+  useEffect(() => {
+    window.__slatebaseCsrfToken = authState.csrfToken
+  }, [authState.csrfToken])
+
+  return React.createElement(
+    AuthContext.Provider,
+    { value: { authState, authDispatch } },
+    children,
+  )
+}
 
 /** Context value shape exposing auth state and dispatch. */
 export interface AuthContextValue {
@@ -21,115 +69,6 @@ export interface AuthContextValue {
 
 /** React Context for auth state management. */
 export const AuthContext = createContext<AuthContextValue | null>(null)
-
-/** Props for the AuthProvider component. */
-interface AuthProviderProps {
-  children: ReactNode
-}
-
-/**
- * Attempts to read auth state from a given Storage instance.
- * Returns the restored AuthState if all keys are present and valid, or null otherwise.
- */
-function readFromStorage(storage: Storage): AuthState | null {
-  const token = storage.getItem(STORAGE_KEY_TOKEN)
-  const csrfToken = storage.getItem(STORAGE_KEY_CSRF)
-  const userJson = storage.getItem(STORAGE_KEY_USER)
-
-  if (token && csrfToken && userJson) {
-    const user: PublicUserInfo = JSON.parse(userJson)
-    return {
-      isAuthenticated: true,
-      user,
-      token,
-      csrfToken,
-      mustChangePassword: user.mustChangePassword,
-      isLoading: false,
-      error: null,
-    }
-  }
-  return null
-}
-
-/**
- * Reads persisted session from localStorage (primary) or sessionStorage (migration).
- * Migration path: if sessionStorage has keys but localStorage doesn't, copies to
- * localStorage and clears sessionStorage.
- * Returns the initial auth state — either restored or default.
- */
-function getRestoredState(): AuthState {
-  try {
-    // 1. Try localStorage first (new primary storage)
-    const fromLocal = readFromStorage(localStorage)
-    if (fromLocal) {
-      return fromLocal
-    }
-
-    // 2. If not found, try sessionStorage (migration from old format)
-    const fromSession = readFromStorage(sessionStorage)
-    if (fromSession) {
-      // Migrate: copy to localStorage and clear sessionStorage
-      localStorage.setItem(STORAGE_KEY_TOKEN, sessionStorage.getItem(STORAGE_KEY_TOKEN)!)
-      localStorage.setItem(STORAGE_KEY_CSRF, sessionStorage.getItem(STORAGE_KEY_CSRF)!)
-      localStorage.setItem(STORAGE_KEY_USER, sessionStorage.getItem(STORAGE_KEY_USER)!)
-      sessionStorage.removeItem(STORAGE_KEY_TOKEN)
-      sessionStorage.removeItem(STORAGE_KEY_CSRF)
-      sessionStorage.removeItem(STORAGE_KEY_USER)
-      return fromSession
-    }
-  } catch {
-    // Corrupted storage — clean up both and start fresh
-    localStorage.removeItem(STORAGE_KEY_TOKEN)
-    localStorage.removeItem(STORAGE_KEY_CSRF)
-    localStorage.removeItem(STORAGE_KEY_USER)
-    sessionStorage.removeItem(STORAGE_KEY_TOKEN)
-    sessionStorage.removeItem(STORAGE_KEY_CSRF)
-    sessionStorage.removeItem(STORAGE_KEY_USER)
-  }
-
-  // 3. Neither found — return default initial state
-  return initialAuthState
-}
-
-/**
- * Persists or clears auth data in localStorage based on auth state changes.
- * On logout/session-expired: clears both localStorage and sessionStorage (belt-and-suspenders).
- */
-function syncStorage(state: AuthState): void {
-  if (state.isAuthenticated && state.token && state.csrfToken && state.user) {
-    localStorage.setItem(STORAGE_KEY_TOKEN, state.token)
-    localStorage.setItem(STORAGE_KEY_CSRF, state.csrfToken)
-    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(state.user))
-  } else {
-    // Clear both storages on logout/session-expired
-    localStorage.removeItem(STORAGE_KEY_TOKEN)
-    localStorage.removeItem(STORAGE_KEY_CSRF)
-    localStorage.removeItem(STORAGE_KEY_USER)
-    sessionStorage.removeItem(STORAGE_KEY_TOKEN)
-    sessionStorage.removeItem(STORAGE_KEY_CSRF)
-    sessionStorage.removeItem(STORAGE_KEY_USER)
-  }
-}
-
-/**
- * Provider component that wraps the app with auth state management.
- * Uses useReducer for predictable auth state transitions.
- * Tokens are persisted in localStorage (survives page reload AND tab close).
- */
-export function AuthProvider({ children }: AuthProviderProps) {
-  const [authState, authDispatch] = useReducer(authReducer, undefined, getRestoredState)
-
-  // Sync to localStorage whenever auth state changes
-  useEffect(() => {
-    syncStorage(authState)
-  }, [authState])
-
-  return React.createElement(
-    AuthContext.Provider,
-    { value: { authState, authDispatch } },
-    children,
-  )
-}
 
 /**
  * Hook to access the AuthContext. Throws if used outside AuthProvider.
@@ -143,19 +82,12 @@ export function useAuthContext(): AuthContextValue {
 }
 
 /**
- * Reads the persisted auth token directly from storage, outside of React.
- * The single point of access for code that can't use useAuthContext() —
- * the initial ApiClient seed in App.tsx and the plugin compatibility layer,
- * which authenticates its own proxied fetches on the plugin's behalf.
+ * Reads the current in-memory CSRF token, outside of React. The single point
+ * of access for code that can't use useAuthContext() — the plugin
+ * compatibility layer's `sandbox.ts`, which authenticates its own proxied
+ * fetches on the plugin's behalf. See the `window.__slatebaseCsrfToken` doc
+ * comment above for why this is window-scoped rather than a closure.
  */
-export function getStoredAuthToken(): string | null {
-  return localStorage.getItem(STORAGE_KEY_TOKEN)
-}
-
-/**
- * Reads the persisted CSRF token directly from storage, outside of React.
- * See getStoredAuthToken() for why this accessor exists.
- */
-export function getStoredCsrfToken(): string | null {
-  return localStorage.getItem(STORAGE_KEY_CSRF)
+export function getCsrfToken(): string | null {
+  return window.__slatebaseCsrfToken ?? null
 }

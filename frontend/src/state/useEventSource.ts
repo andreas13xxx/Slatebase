@@ -18,16 +18,21 @@ export interface SseEventData {
 
 /** Options passed to the useEventSource hook. */
 export interface UseEventSourceOptions {
-  /** Session token for authentication (fallback: appended as query param). */
-  token: string | null
   /** Whether the SSE connection should be active (feature enabled + authenticated). */
   enabled: boolean
   /** Dispatch function for RealtimeAction state updates. */
   dispatch: Dispatch<RealtimeAction>
   /** Callback invoked for each successfully parsed SSE event. */
   onEvent: (eventType: string, data: SseEventData) => void
-  /** Optional function to fetch a short-lived SSE ticket (preferred over token in URL). */
-  getTicket?: () => Promise<{ ticket: string }>
+  /**
+   * Fetches a short-lived, one-time SSE ticket. The session itself would
+   * authenticate the connection via the HttpOnly cookie automatically (an
+   * EventSource sends cookies like any other same-origin request), but the
+   * ticket avoids a long-lived credential ever appearing in a URL — the
+   * cookie stays the belt, this is the suspenders. Required: without it,
+   * connect() has no way to authenticate and never opens a connection.
+   */
+  getTicket: () => Promise<{ ticket: string }>
 }
 
 /** Maximum consecutive reconnect failures before giving up. */
@@ -51,7 +56,7 @@ const SSE_EVENT_TYPES = [
 
 /**
  * Manages an EventSource connection lifecycle including:
- * - Connect to /api/v1/events?token=<sessionToken> when enabled
+ * - Connect to /api/v1/events?ticket=<oneTimeTicket> when enabled
  * - Track Last-Event-ID from received events
  * - Exponential backoff reconnect on disconnect (1s initial, 60s max, factor 2, jitter ±500ms)
  * - After 5 consecutive failures: stop reconnecting, set status disconnected
@@ -64,7 +69,7 @@ const SSE_EVENT_TYPES = [
  * - Dispatch incoming events to onEvent callback
  */
 export function useEventSource(options: UseEventSourceOptions): void {
-  const { token, enabled, dispatch, onEvent, getTicket } = options
+  const { enabled, dispatch, onEvent, getTicket } = options
 
   // Refs for mutable state that persists across renders without causing re-renders
   const eventSourceRef = useRef<EventSource | null>(null)
@@ -116,11 +121,41 @@ export function useEventSource(options: UseEventSourceOptions): void {
 
   /** Establish a new EventSource connection. */
   const connect = useCallback(() => {
-    if (!token || !enabled) return
+    if (!enabled) return
     if (isConnectingRef.current) return
 
     isConnectingRef.current = true
     setStatus('connecting')
+
+    /**
+     * Gives up on this attempt and schedules a retry with exponential
+     * backoff, same accounting whether the failure came from the ticket
+     * fetch itself or from the EventSource connection it opened.
+     */
+    const scheduleRetry = () => {
+      isConnectingRef.current = false
+
+      if (!shouldReconnectRef.current) {
+        setStatus('disconnected')
+        return
+      }
+
+      attemptCountRef.current += 1
+      dispatchRef.current({ type: 'RECONNECT_ATTEMPT' })
+
+      // After 5 consecutive failures: stop reconnecting
+      if (attemptCountRef.current >= MAX_RECONNECT_ATTEMPTS) {
+        setStatus('disconnected')
+        return
+      }
+
+      setStatus('connecting')
+      const delay = computeReconnectDelay(attemptCountRef.current - 1)
+      reconnectTimerRef.current = setTimeout(() => {
+        reconnectTimerRef.current = null
+        connectRef.current()
+      }, delay)
+    }
 
     /** Actually open the EventSource with the resolved URL. */
     const openConnection = (url: string) => {
@@ -174,67 +209,35 @@ export function useEventSource(options: UseEventSourceOptions): void {
       }
 
       es.onerror = () => {
-        isConnectingRef.current = false
         es.close()
         eventSourceRef.current = null
-
-        if (!shouldReconnectRef.current) {
-          setStatus('disconnected')
-          return
-        }
-
-        // Increment attempt counter
-        attemptCountRef.current += 1
-        dispatchRef.current({ type: 'RECONNECT_ATTEMPT' })
-
-        // After 5 consecutive failures: stop reconnecting
-        if (attemptCountRef.current >= MAX_RECONNECT_ATTEMPTS) {
-          setStatus('disconnected')
-          return
-        }
-
-        // Schedule reconnect with exponential backoff
-        setStatus('connecting')
-        const delay = computeReconnectDelay(attemptCountRef.current - 1)
-        reconnectTimerRef.current = setTimeout(() => {
-          reconnectTimerRef.current = null
-          connectRef.current()
-        }, delay)
+        scheduleRetry()
       }
     }
 
     // Build base URL with optional Last-Event-ID
-    const buildUrl = (authParam: string): string => {
-      let url = `/api/v1/events?${authParam}`
+    const buildUrl = (ticket: string): string => {
+      let url = `/api/v1/events?ticket=${encodeURIComponent(ticket)}`
       if (lastEventIdRef.current) {
         url += `&lastEventId=${encodeURIComponent(lastEventIdRef.current)}`
       }
       return url
     }
 
-    // Try ticket-based auth first (preferred — avoids session token in URL)
-    if (getTicketRef.current) {
-      getTicketRef.current()
-        .then(({ ticket }) => {
-          if (!shouldReconnectRef.current) {
-            isConnectingRef.current = false
-            return
-          }
-          openConnection(buildUrl(`ticket=${encodeURIComponent(ticket)}`))
-        })
-        .catch(() => {
-          // Ticket fetch failed — fall back to legacy token in URL
-          if (!shouldReconnectRef.current) {
-            isConnectingRef.current = false
-            return
-          }
-          openConnection(buildUrl(`token=${encodeURIComponent(token)}`))
-        })
-    } else {
-      // No ticket provider — use legacy token in URL
-      openConnection(buildUrl(`token=${encodeURIComponent(token)}`))
-    }
-  }, [token, enabled, setStatus])
+    getTicketRef.current()
+      .then((result) => {
+        if (!shouldReconnectRef.current) {
+          isConnectingRef.current = false
+          return
+        }
+        openConnection(buildUrl(result.ticket))
+      })
+      .catch(() => {
+        // Couldn't get a ticket — retry with backoff rather than falling
+        // back to a raw session token in the URL.
+        scheduleRetry()
+      })
+  }, [enabled, setStatus])
 
   // Keep connectRef in sync
   useEffect(() => {
@@ -243,7 +246,7 @@ export function useEventSource(options: UseEventSourceOptions): void {
 
   // Main effect: manage connection lifecycle
   useEffect(() => {
-    if (!enabled || !token) {
+    if (!enabled) {
       // On logout or disabled: close connection synchronously
       closeConnection()
       shouldReconnectRef.current = false
@@ -263,11 +266,11 @@ export function useEventSource(options: UseEventSourceOptions): void {
       shouldReconnectRef.current = false
       closeConnection()
     }
-  }, [enabled, token, connect, closeConnection, setStatus])
+  }, [enabled, connect, closeConnection, setStatus])
 
   // Page Visibility API effect
   useEffect(() => {
-    if (!enabled || !token) return
+    if (!enabled) return
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
@@ -300,5 +303,5 @@ export function useEventSource(options: UseEventSourceOptions): void {
         visibilityTimerRef.current = null
       }
     }
-  }, [enabled, token, closeConnection, setStatus])
+  }, [enabled, closeConnection, setStatus])
 }

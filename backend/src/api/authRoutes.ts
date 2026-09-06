@@ -5,14 +5,33 @@
 
 import type { Context } from 'hono'
 import { Hono } from 'hono'
+import { setCookie, deleteCookie } from 'hono/cookie'
 import { z } from 'zod'
 import type { IAuthService, SessionContext } from '../auth/index.js'
 import { AuthenticationError, RateLimitError } from '../auth/index.js'
-import { AccountSuspendedError } from '../user/index.js'
+import { extractBearerToken } from '../auth/middleware.js'
+import { SESSION_COOKIE_NAME, resolveCookieSecure } from '../auth/cookies.js'
+import type { IUserRepository } from '../user/index.js'
+import { AccountSuspendedError, toPublicUserInfo } from '../user/index.js'
 import { loginRequestSchema } from '../auth/validation.js'
 import type { ILogger } from '../logger/index.js'
 import type { ISseTicketStore } from '../auth/sse-ticket-store.js'
+import type { TrustedProxyConfig } from './client-ip.js'
+import { isRequestSecure } from './client-ip.js'
 import type { RouteModule } from './index.js'
+
+/** Session cookie policy, resolved once at startup from ServerConfig. */
+export interface CookieConfig extends TrustedProxyConfig {
+  cookieSecureMode: 'auto' | 'true' | 'false'
+  /**
+   * How long the cookie itself persists, in days. Matches the session's
+   * absolute max lifetime (not the shorter sliding-expiry window) so the
+   * cookie doesn't vanish client-side while the server would still have
+   * accepted an active session — AuthService.validateSession() enforces the
+   * real sliding/absolute rules independently either way.
+   */
+  sessionMaxLifetimeDays: number
+}
 
 // ─── Zod Schemas ─────────────────────────────────────────────────────────────
 
@@ -40,25 +59,6 @@ function createApiError(code: string, message: string): { code: string; message:
   }
 }
 
-/**
- * Extracts the Bearer token from the Authorization header.
- * Returns null if the header is missing or malformed.
- */
-function extractBearerToken(c: Context): string | null {
-  const authHeader = c.req.header('Authorization')
-  if (authHeader === undefined) {
-    return null
-  }
-  if (!authHeader.startsWith('Bearer ')) {
-    return null
-  }
-  const token = authHeader.slice(7)
-  if (token.length === 0) {
-    return null
-  }
-  return token
-}
-
 // ─── IAuthController Interface ───────────────────────────────────────────────
 
 /**
@@ -69,6 +69,8 @@ export interface IAuthController {
   login(c: Context): Promise<Response>
   /** POST /auth/logout — Invalidate the current session. */
   logout(c: Context): Promise<Response>
+  /** GET /auth/session — Return the current session's user + CSRF token. */
+  getSession(c: Context): Promise<Response>
   /** GET /auth/sessions — List current user's active sessions. */
   getSessions(c: Context): Promise<Response>
   /** DELETE /auth/sessions/:sessionId — Invalidate a specific session. */
@@ -89,8 +91,21 @@ export class AuthController implements IAuthController {
   constructor(
     private readonly authService: IAuthService,
     private readonly logger: ILogger,
+    private readonly userRepository: IUserRepository,
+    private readonly cookieConfig: CookieConfig,
     private readonly sseTicketStore?: ISseTicketStore,
   ) {}
+
+  /** Sets the HttpOnly session cookie on a successful login. */
+  private setSessionCookie(c: Context, token: string): void {
+    setCookie(c, SESSION_COOKIE_NAME, token, {
+      httpOnly: true,
+      sameSite: 'Lax',
+      path: '/',
+      secure: resolveCookieSecure(this.cookieConfig.cookieSecureMode, isRequestSecure(c, this.cookieConfig)),
+      maxAge: this.cookieConfig.sessionMaxLifetimeDays * 24 * 60 * 60,
+    })
+  }
 
   /**
    * POST /auth/login — Validate input with Zod, authenticate user, return token + csrfToken + user info.
@@ -121,6 +136,7 @@ export class AuthController implements IAuthController {
 
     try {
       const result = await this.authService.login(username, password, { ipAddress, userAgent })
+      this.setSessionCookie(c, result.token)
       return c.json(result, 200)
     } catch (err) {
       if (err instanceof AuthenticationError) {
@@ -158,6 +174,7 @@ export class AuthController implements IAuthController {
 
     try {
       await this.authService.logout(token)
+      deleteCookie(c, SESSION_COOKIE_NAME, { path: '/' })
       return c.body(null, 204)
     } catch (err) {
       this.logger.error('Unexpected error during logout', {
@@ -166,6 +183,34 @@ export class AuthController implements IAuthController {
       const error = createApiError('INTERNAL_ERROR', 'Internal server error')
       return c.json(error, 500)
     }
+  }
+
+  /**
+   * GET /auth/session — Return the current session's user info + a freshly
+   * derived CSRF token. This is what the frontend calls on startup instead of
+   * reading a token from storage: after a reload, the in-memory CSRF token is
+   * gone but the session cookie is still valid, and without this endpoint
+   * there'd be no way to recover the CSRF token without logging in again.
+   * Returns 401 if not authenticated.
+   */
+  async getSession(c: Context): Promise<Response> {
+    const session = c.get('session') as SessionContext | undefined
+    if (session === undefined) {
+      const error = createApiError('UNAUTHORIZED', 'Not authenticated')
+      return c.json(error, 401)
+    }
+
+    const user = await this.userRepository.findById(session.userId)
+    if (user === null) {
+      const error = createApiError('UNAUTHORIZED', 'Not authenticated')
+      return c.json(error, 401)
+    }
+
+    const csrfToken = this.authService.generateCsrfToken(session.sessionId)
+    return c.json(
+      { user: toPublicUserInfo(user), csrfToken, expiresAt: session.expiresAt },
+      200,
+    )
   }
 
   /**
@@ -295,6 +340,7 @@ export class AuthRouteModule implements RouteModule {
   register(router: Hono): void {
     router.post('/auth/login', (c) => this.controller.login(c))
     router.post('/auth/logout', (c) => this.controller.logout(c))
+    router.get('/auth/session', (c) => this.controller.getSession(c))
     router.get('/auth/sessions', (c) => this.controller.getSessions(c))
     router.delete('/auth/sessions/:sessionId', (c) => this.controller.invalidateSession(c))
     router.delete('/auth/sessions', (c) => this.controller.invalidateOtherSessions(c))

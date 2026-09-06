@@ -34,8 +34,6 @@ export interface FileNodeRendererProps {
   onEditEnd?: () => void
   /** Vault ID for constructing preview URLs. */
   vaultId?: string
-  /** Auth token for fetching file content. */
-  token?: string
   /** Callback to save file content (for inline MD editing). */
   onFileSave?: (filePath: string, content: string) => Promise<void>
 }
@@ -81,7 +79,7 @@ function getCategoryIcon(category: ReturnType<typeof getFileCategory>) {
 
 export const FileNodeRenderer = memo(function FileNodeRenderer({
   node, selected, onSelect, onFileOpen, onFilePathChange, directoryTree, readOnly,
-  editing, editPath, onEditEnd, vaultId, token, onFileSave,
+  editing, editPath, onEditEnd, vaultId, onFileSave,
 }: FileNodeRendererProps) {
   const colorClass = getCanvasColorClass(node.color)
   const exists = fileExistsInTree(directoryTree, node.file)
@@ -129,15 +127,13 @@ export const FileNodeRenderer = memo(function FileNodeRenderer({
 
   // Fetch markdown file content for preview or editing
   useEffect(() => {
-    if (category !== 'markdown' || !exists || !vaultId || !token) {
+    if (category !== 'markdown' || !exists || !vaultId) {
       setMdContent(null)
       return
     }
     let cancelled = false
     const url = `/api/v1/vaults/${vaultId}/files?path=${encodeURIComponent(node.file)}`
-    fetch(url, {
-      headers: { 'Authorization': `Bearer ${token}` },
-    })
+    fetch(url)
       .then((res) => {
         if (!res.ok) throw new Error('fetch failed')
         return res.json()
@@ -152,7 +148,7 @@ export const FileNodeRenderer = memo(function FileNodeRenderer({
         if (!cancelled) setMdContent(null)
       })
     return () => { cancelled = true }
-  }, [category, exists, vaultId, token, node.file, editing, showPathEditor])
+  }, [category, exists, vaultId, node.file, editing, showPathEditor])
 
   // Focus the editor when entering edit mode. Deferred via rAF so focus wins
   // the race against the context menu (portal) unmounting in the same commit.
@@ -205,13 +201,13 @@ export const FileNodeRenderer = memo(function FileNodeRenderer({
       }
     } else {
       // Editing the markdown file CONTENT.
-      if (mdContent != null && editValue !== mdContent && onFileSave && vaultId && token) {
+      if (mdContent != null && editValue !== mdContent && onFileSave && vaultId) {
         onFileSave(node.file, editValue)
         setMdContent(editValue) // optimistic: keep preview in sync
       }
     }
     onEditEnd?.()
-  }, [showPathEditor, editValue, mdContent, node.file, onFilePathChange, onFileSave, vaultId, token, onEditEnd])
+  }, [showPathEditor, editValue, mdContent, node.file, onFilePathChange, onFileSave, vaultId, onEditEnd])
 
   // Prevent mouse events from closing edit mode prematurely
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -345,8 +341,8 @@ export const FileNodeRenderer = memo(function FileNodeRenderer({
       )
     }
 
-    if (category === 'image' && vaultId && token) {
-      const imgSrc = `/api/v1/vaults/${vaultId}/files?path=${encodeURIComponent(node.file)}&raw=true&token=${encodeURIComponent(token)}`
+    if (category === 'image' && vaultId) {
+      const imgSrc = `/api/v1/vaults/${vaultId}/files?path=${encodeURIComponent(node.file)}&raw=true`
       return (
         <div className="canvas-node__content canvas-node__file-preview">
           <img

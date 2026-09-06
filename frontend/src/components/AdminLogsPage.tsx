@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { IApiClient } from '../api'
 import { useTranslation } from '../i18n'
 
 /** Log levels matching the backend. */
@@ -22,12 +21,6 @@ interface LogsResponse {
   totalPages: number
 }
 
-/** Props for the AdminLogsPage component. */
-export interface AdminLogsPageProps {
-  /** API client instance for fetching server log entries. */
-  apiClient: IApiClient
-}
-
 /** All log level options for the filter dropdown. */
 const LOG_LEVELS: LogLevel[] = ['debug', 'info', 'warn', 'error']
 
@@ -36,7 +29,7 @@ const LOG_LEVELS: LogLevel[] = ['debug', 'info', 'warn', 'error']
  * Displays paginated server log entries with filters for level, date range, and search.
  * Fetches data from GET /api/v1/admin/logs with query params.
  */
-export function AdminLogsPage({ apiClient }: AdminLogsPageProps) {
+export function AdminLogsPage() {
   const { t, locale } = useTranslation()
 
   const [entries, setEntries] = useState<LogEntry[]>([])
@@ -72,9 +65,7 @@ export function AdminLogsPage({ apiClient }: AdminLogsPageProps) {
       params.set('pageSize', String(pageSize))
 
       const url = `/api/v1/admin/logs?${params.toString()}`
-      const response = await fetch(url, {
-        headers: buildHeaders(apiClient),
-      })
+      const response = await fetch(url)
 
       if (!response.ok) {
         const body = await response.json().catch(() => ({ message: t('admin.logs.errorStatus', { status: String(response.status) }) }))
@@ -95,7 +86,7 @@ export function AdminLogsPage({ apiClient }: AdminLogsPageProps) {
     } finally {
       setIsLoading(false)
     }
-  }, [apiClient, levelFilter, startDate, endDate, search, t])
+  }, [levelFilter, startDate, endDate, search, t])
 
   // Fetch on mount and when filters or page change
   useEffect(() => {
@@ -295,14 +286,3 @@ export function AdminLogsPage({ apiClient }: AdminLogsPageProps) {
   )
 }
 
-/**
- * Builds request headers including auth token from the API client.
- */
-function buildHeaders(apiClient: IApiClient): Record<string, string> {
-  const headers: Record<string, string> = {}
-  const token = apiClient.getToken()
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  return headers
-}

@@ -181,14 +181,13 @@ describe('LoginPage', () => {
       expect(authDispatch).toHaveBeenCalledWith({
         type: 'LOGIN_SUCCESS',
         payload: expect.objectContaining({
-          token: 'test-token',
           csrfToken: 'test-csrf',
         }),
       })
     })
   })
 
-  it('sets token and csrfToken on apiClient after successful login', async () => {
+  it('sets csrfToken on apiClient after successful login (no token — the session cookie authenticates)', async () => {
     const user = userEvent.setup()
     const { apiClient } = renderLoginPage()
 
@@ -197,7 +196,6 @@ describe('LoginPage', () => {
     await user.click(screen.getByRole('button', { name: 'Anmelden' }))
 
     await waitFor(() => {
-      expect(apiClient.setToken).toHaveBeenCalledWith('test-token')
       expect(apiClient.setCsrfToken).toHaveBeenCalledWith('test-csrf')
     })
   })

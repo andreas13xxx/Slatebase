@@ -54,10 +54,7 @@ export function AdminVaultsPage({ apiClient }: AdminVaultsPageProps) {
           countFiles(tree)
         } catch { /* ignore */ }
         try {
-          const token = apiClient.getToken()
-          const headers: Record<string, string> = {}
-          if (token) headers['Authorization'] = `Bearer ${token}`
-          const res = await fetch(`/api/v1/vaults/${v.id}/shares`, { headers })
+          const res = await fetch(`/api/v1/vaults/${v.id}/shares`)
           if (res.ok) {
             const shares: unknown[] = await res.json()
             shareCount = shares.length

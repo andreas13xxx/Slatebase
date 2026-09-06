@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { Hono } from 'hono'
-import { AuthController, AuthRouteModule } from './authRoutes.js'
+import { AuthController, AuthRouteModule, type CookieConfig } from './authRoutes.js'
 import type { IAuthService, LoginResult, SessionContext, SessionInfo } from '../auth/index.js'
 import { AuthenticationError, RateLimitError } from '../auth/index.js'
+import type { IUserRepository, UserRecord } from '../user/index.js'
 import { AccountSuspendedError } from '../user/index.js'
 import type { ILogger } from '../logger/index.js'
 
@@ -48,11 +49,54 @@ function createMockAuthService(overrides: Partial<IAuthService> = {}): IAuthServ
   }
 }
 
+function createMockUser(overrides: Partial<UserRecord> = {}): UserRecord {
+  return {
+    userId: 'user-1',
+    username: 'testuser',
+    passwordHash: 'hash',
+    role: 'user',
+    displayName: 'Test User',
+    email: 'test@example.com',
+    avatarUrl: '',
+    preferredLanguage: 'en',
+    colorScheme: 'system',
+    suspended: false,
+    mustChangePassword: false,
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+function createMockUserRepository(overrides: Partial<IUserRepository> = {}): IUserRepository {
+  return {
+    findById: async () => createMockUser(),
+    findByUsername: async () => null,
+    searchByUsernamePrefix: async () => [],
+    findAll: async () => ({ items: [], total: 0, page: 1, pageSize: 100, totalPages: 1 }),
+    save: async () => {},
+    delete: async () => {},
+    count: async () => 0,
+    countByRole: async () => 0,
+    ...overrides,
+  }
+}
+
+const defaultCookieConfig: CookieConfig = {
+  trustedProxies: [],
+  cookieSecureMode: 'false',
+  sessionMaxLifetimeDays: 7,
+}
+
 // ─── Test App Factory ────────────────────────────────────────────────────────
 
-function createTestApp(authService: IAuthService, sessionContext?: SessionContext) {
+function createTestApp(
+  authService: IAuthService,
+  sessionContext?: SessionContext,
+  userRepository: IUserRepository = createMockUserRepository(),
+) {
   const logger = createMockLogger()
-  const controller = new AuthController(authService, logger)
+  const controller = new AuthController(authService, logger, userRepository, defaultCookieConfig)
   const routeModule = new AuthRouteModule(controller)
 
   const app = new Hono()
@@ -96,6 +140,23 @@ describe('AuthController', () => {
       expect(body.csrfToken).toBe('b'.repeat(64))
       expect(body.user.username).toBe('testuser')
       expect(body.expiresAt).toBe('2025-01-02T00:00:00.000Z')
+    })
+
+    it('sets an HttpOnly session cookie with the raw token', async () => {
+      const authService = createMockAuthService()
+      const app = createTestApp(authService)
+
+      const res = await app.request('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'testuser', password: 'password123' }),
+      })
+
+      const setCookie = res.headers.get('Set-Cookie')
+      expect(setCookie).toContain(`slatebase_session=${'a'.repeat(128)}`)
+      expect(setCookie).toContain('HttpOnly')
+      expect(setCookie).toContain('SameSite=Lax')
+      expect(setCookie).not.toContain('Secure')
     })
 
     it('returns 400 on invalid JSON body', async () => {
@@ -221,7 +282,38 @@ describe('AuthController', () => {
       expect(loggedOutToken).toBe('my-session-token')
     })
 
-    it('returns 401 when no Authorization header is present', async () => {
+    it('clears the session cookie', async () => {
+      const authService = createMockAuthService()
+      const app = createTestApp(authService, defaultSession)
+
+      const res = await app.request('/auth/logout', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer my-session-token' },
+      })
+
+      const setCookie = res.headers.get('Set-Cookie')
+      expect(setCookie).toContain('slatebase_session=;')
+    })
+
+    it('authenticates the logout via the session cookie when no header is present', async () => {
+      let loggedOutToken: string | undefined
+      const authService = createMockAuthService({
+        logout: async (token: string) => {
+          loggedOutToken = token
+        },
+      })
+      const app = createTestApp(authService, defaultSession)
+
+      const res = await app.request('/auth/logout', {
+        method: 'POST',
+        headers: { Cookie: 'slatebase_session=cookie-token' },
+      })
+
+      expect(res.status).toBe(204)
+      expect(loggedOutToken).toBe('cookie-token')
+    })
+
+    it('returns 401 when no Authorization header or cookie is present', async () => {
       const authService = createMockAuthService()
       const app = createTestApp(authService, defaultSession)
 
@@ -232,6 +324,43 @@ describe('AuthController', () => {
       expect(res.status).toBe(401)
       const body = await res.json() as { code: string }
       expect(body.code).toBe('UNAUTHORIZED')
+    })
+  })
+
+  describe('GET /auth/session', () => {
+    it('returns 200 with user, csrfToken, and expiresAt', async () => {
+      const sessionWithExpiry: SessionContext = { ...defaultSession, expiresAt: '2025-01-02T00:00:00.000Z' }
+      const authService = createMockAuthService({
+        generateCsrfToken: (sessionId: string) => `csrf-for-${sessionId}`,
+      })
+      const app = createTestApp(authService, sessionWithExpiry)
+
+      const res = await app.request('/auth/session', { method: 'GET' })
+
+      expect(res.status).toBe(200)
+      const body = await res.json() as { user: { username: string }; csrfToken: string; expiresAt: string }
+      expect(body.user.username).toBe('testuser')
+      expect(body.csrfToken).toBe('csrf-for-session-1')
+      expect(body.expiresAt).toBe('2025-01-02T00:00:00.000Z')
+    })
+
+    it('returns 401 when no session context is set', async () => {
+      const authService = createMockAuthService()
+      const app = createTestApp(authService) // no session context
+
+      const res = await app.request('/auth/session', { method: 'GET' })
+
+      expect(res.status).toBe(401)
+    })
+
+    it('returns 401 when the session user no longer exists', async () => {
+      const authService = createMockAuthService()
+      const userRepository = createMockUserRepository({ findById: async () => null })
+      const app = createTestApp(authService, defaultSession, userRepository)
+
+      const res = await app.request('/auth/session', { method: 'GET' })
+
+      expect(res.status).toBe(401)
     })
   })
 

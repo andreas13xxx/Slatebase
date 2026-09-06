@@ -132,7 +132,7 @@ describe('AdminConfigPage', () => {
     })
   })
 
-  it('sends Authorization and CSRF headers on load', async () => {
+  it('sends the CSRF header on load (no Authorization — the cookie authenticates)', async () => {
     mockFetchWithVersion(new Response(JSON.stringify(SAMPLE_CONFIG), { status: 200 }))
     const apiClient = createMockApiClient()
 
@@ -142,7 +142,6 @@ describe('AdminConfigPage', () => {
       expect(fetchSpy).toHaveBeenCalledWith('/api/v1/admin/config', expect.objectContaining({
         method: 'GET',
         headers: expect.objectContaining({
-          'Authorization': 'Bearer test-token',
           'X-CSRF-Token': 'test-csrf',
         }),
       }))

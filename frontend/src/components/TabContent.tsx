@@ -279,17 +279,15 @@ export function TabContent() {
   const editModeLivePreviewOptions = useMemo(() => ({
     vaultId: activeTabVaultId ?? '',
     directoryTree: directoryTreeForActiveVault,
-    token: apiClient?.getToken() ?? undefined,
     onInternalLinkClick: handleInternalLinkClick,
-  }), [activeTabVaultId, directoryTreeForActiveVault, apiClient, handleInternalLinkClick])
+  }), [activeTabVaultId, directoryTreeForActiveVault, handleInternalLinkClick])
   const previewModeLivePreviewOptions = useMemo(() => ({
     vaultId: activeTabVaultId ?? '',
     directoryTree: directoryTreeForActiveVault,
-    token: apiClient?.getToken() ?? undefined,
     onInternalLinkClick: handleInternalLinkClick,
     typeRegistry,
     onPropertyTypeChange: handlePropertyTypeChange,
-  }), [activeTabVaultId, directoryTreeForActiveVault, apiClient, handleInternalLinkClick, typeRegistry, handlePropertyTypeChange])
+  }), [activeTabVaultId, directoryTreeForActiveVault, handleInternalLinkClick, typeRegistry, handlePropertyTypeChange])
 
   // No active tab — empty state
   if (!activeTab) {
@@ -397,7 +395,6 @@ export function TabContent() {
           fileExtension={extension}
           vaultId={activeTab.vaultId}
           filePath={activeTab.filePath}
-          token={apiClient?.getToken() ?? undefined}
         />
       </div>
     )
@@ -429,7 +426,6 @@ export function TabContent() {
               appDispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId: activeTab.vaultId, tree: newTree } })
             }}
             directoryTree={appState.vaultTrees[activeTab.vaultId] ?? appState.directoryTree}
-            token={apiClient?.getToken() ?? undefined}
           />
         </ErrorBoundary>
       </div>
