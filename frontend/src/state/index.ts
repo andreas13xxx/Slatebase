@@ -463,13 +463,9 @@ async function exportVaultViaFSA(
     }
 
     // Download and write each file
-    const token = apiClient.getToken()
-    const headers: Record<string, string> = {}
-    if (token) headers['Authorization'] = `Bearer ${token}`
-
     for (const filePath of filePaths) {
       const encodedPath = encodeURIComponent(filePath)
-      const response = await fetch(`/api/v1/vaults/${vaultId}/files?path=${encodedPath}&raw=true`, { headers })
+      const response = await fetch(`/api/v1/vaults/${vaultId}/files?path=${encodedPath}&raw=true`)
 
       if (!response.ok) {
         // Skip files that can't be fetched
@@ -545,13 +541,9 @@ async function exportVaultViaZip(
     collectPaths(tree)
 
     // Download each file and add to ZIP
-    const token = apiClient.getToken()
-    const headers: Record<string, string> = {}
-    if (token) headers['Authorization'] = `Bearer ${token}`
-
     for (const filePath of filePaths) {
       const encodedPath = encodeURIComponent(filePath)
-      const response = await fetch(`/api/v1/vaults/${vaultId}/files?path=${encodedPath}&raw=true`, { headers })
+      const response = await fetch(`/api/v1/vaults/${vaultId}/files?path=${encodedPath}&raw=true`)
 
       if (!response.ok) continue
 

@@ -17,7 +17,6 @@ export interface BinaryViewerProps {
   fileExtension: string
   vaultId: string
   filePath: string
-  token?: string
 }
 
 const SUPPORTED_IMAGE_EXTENSIONS = ['.png', '.jpeg', '.jpg', '.gif', '.avif', '.webp', '.svg']
@@ -30,7 +29,7 @@ function isPdf(extension: string): boolean {
   return extension.toLowerCase() === '.pdf'
 }
 
-export function BinaryViewer({ fileName, fileExtension, vaultId, filePath, token }: BinaryViewerProps) {
+export function BinaryViewer({ fileName, fileExtension, vaultId, filePath }: BinaryViewerProps) {
   const { t } = useTranslation()
   const [imageError, setImageError] = useState(false)
 
@@ -38,11 +37,8 @@ export function BinaryViewer({ fileName, fileExtension, vaultId, filePath, token
   const isImage = isSupportedImage(normalizedExtension)
   const isPdfFile = isPdf(normalizedExtension)
 
-  // Build raw file URL
-  let rawSrc = `/api/v1/vaults/${vaultId}/files?path=${encodeURIComponent(filePath)}&raw=true`
-  if (token) {
-    rawSrc += `&token=${encodeURIComponent(token)}`
-  }
+  // Raw file URL — authenticates via the HttpOnly session cookie, sent automatically.
+  const rawSrc = `/api/v1/vaults/${vaultId}/files?path=${encodeURIComponent(filePath)}&raw=true`
 
   // Image load error fallback
   if (isImage && imageError) {

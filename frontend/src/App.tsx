@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useCallback, useState, useMemo } from 'react'
 import { AppProvider, useAppContext, loadVaults, importFile, importFolder, exportVault, reloadVaultTree } from './state'
 import { ApiClient } from './api'
-import { AuthProvider, useAuthContext, getStoredAuthToken, getStoredCsrfToken } from './state/authContext'
+import { AuthProvider, useAuthContext } from './state/authContext'
 import { TabProvider, useTabContext } from './state/tabContext'
 import { NavigationHistoryProvider, useNavigationHistory } from './state/navigationHistoryContext'
 import { FeatureProvider, useFeatureContext } from './state/featureContext'
@@ -104,13 +104,6 @@ const apiClient = new ApiClient()
 
 /** Singleton DailyNoteService instance. */
 const dailyNoteService = createDailyNoteService(apiClient)
-
-// Synchronous token restore from localStorage — eliminates race condition
-// where API calls fire before the useEffect in AuthGuard sets the token.
-const _storedToken = getStoredAuthToken()
-const _storedCsrf = getStoredCsrfToken()
-if (_storedToken) apiClient.setToken(_storedToken)
-if (_storedCsrf) apiClient.setCsrfToken(_storedCsrf)
 
 // Synchronous workspace state restore from localStorage — must run before
 // any component reads getWorkspaceState() in their useState initializers.
@@ -488,7 +481,6 @@ function AppContent() {
 
   const handleLogout = useCallback(async () => {
     try { await apiClient.logout() } catch { /* ignore */ }
-    apiClient.setToken(null)
     apiClient.setCsrfToken(null)
     authDispatch({ type: 'LOGOUT' })
     localStorage.removeItem(LAST_VAULT_KEY)
@@ -1326,36 +1318,33 @@ function ObsidianLocaleSync() {
   return null
 }
 
-/** How many times the session probe retries while the server is unreachable. */
+/** How many quick retries the startup session bootstrap does while the server is unreachable. */
 const SESSION_PROBE_ATTEMPTS = 3
 
-/** Base delay between session probe retries (grows linearly per attempt). */
+/** Base delay between the initial bootstrap retries (grows linearly per attempt). */
 const SESSION_PROBE_RETRY_MS = 700
+
+/** Delay between bootstrap retries once the initial ramp-up is exhausted (server still unreachable). */
+const SESSION_PROBE_STEADY_RETRY_MS = SESSION_PROBE_RETRY_MS * SESSION_PROBE_ATTEMPTS
 
 /**
  * Auth guard component.
- * When a token is restored from localStorage, verifies the session is still valid
- * before rendering authenticated content — prevents stale-token API noise (401s).
- * An unreachable server is never treated as an invalid session.
+ *
+ * The session token lives in an HttpOnly cookie — there is no synchronous
+ * signal (unlike the old localStorage read) for whether one exists, so on
+ * mount this resolves auth state via `GET /api/v1/auth/session` before
+ * rendering either the login page or the app. A confirmed 401 means "not
+ * logged in"; an unreachable server never means that — it just keeps
+ * retrying, same rationale as the old post-restore probe: a plugin toggle
+ * reloads the page (see plugins/compat/plugin-context.ts) and can hit a
+ * backend that's still busy or restarting.
  */
 function AuthGuard() {
   const { authState, authDispatch } = useAuthContext()
-  const [sessionVerified, setSessionVerified] = useState(false)
-
-  // Restore apiClient tokens from persisted auth state (after page reload)
-  useEffect(() => {
-    if (authState.token) {
-      apiClient.setToken(authState.token)
-    }
-    if (authState.csrfToken) {
-      apiClient.setCsrfToken(authState.csrfToken)
-    }
-  }, [authState.token, authState.csrfToken])
 
   useEffect(() => {
     apiClient.setOnSessionExpired(() => {
       // Workspace state is already persisted continuously — no need to save explicitly
-      apiClient.setToken(null)
       apiClient.setCsrfToken(null)
       // Disconnect server-synced stores
       disconnectRecentFiles()
@@ -1368,64 +1357,53 @@ function AuthGuard() {
     return () => { apiClient.setOnSessionExpired(null) }
   }, [authDispatch])
 
-  // Verify session validity when auth state is restored from localStorage.
-  // Skip when mustChangePassword is true — the session is valid but the
-  // mustChangePassword middleware blocks all other endpoints with 403.
-  // The ChangePasswordPage is rendered before the sessionVerified check,
-  // so skipping verification here does not cause a stuck spinner.
+  // Startup session bootstrap.
   useEffect(() => {
-    if (!authState.isAuthenticated || authState.mustChangePassword) {
-      return
-    }
+    if (!authState.isBootstrapping) return
 
     let cancelled = false
 
-    async function verify() {
-      // A probe that cannot reach the server says nothing about the session, so
-      // retry a few times before deciding. This matters most right after a
-      // plugin toggle, which reloads the page (see plugins/compat/plugin-context.ts)
-      // and re-runs this check against a backend that may still be busy or restarting.
-      for (let attempt = 0; attempt < SESSION_PROBE_ATTEMPTS; attempt++) {
-        const probe = await apiClient.probeSession()
+    async function bootstrap() {
+      let attempt = 0
+      while (!cancelled) {
+        const result = await apiClient.getSession()
         if (cancelled) return
 
-        if (probe === 'alive') {
-          setSessionVerified(true)
+        if (result.status === 'alive') {
+          apiClient.setCsrfToken(result.csrfToken)
+          authDispatch({ type: 'LOGIN_SUCCESS', payload: { user: result.user, csrfToken: result.csrfToken } })
           return
         }
 
-        if (probe === 'dead') {
-          // Server confirmed the session is gone — clear auth state (triggers login page).
-          // Workspace state is already persisted continuously — no explicit save needed
-          apiClient.setToken(null)
-          apiClient.setCsrfToken(null)
-          disconnectRecentFiles()
-          disconnectFavorites()
-          disconnectKeybindings()
-          disconnectUiSettings()
-          disconnectVaultSettings()
-          authDispatch({ type: 'SESSION_EXPIRED' })
+        if (result.status === 'dead') {
+          authDispatch({ type: 'BOOTSTRAP_FAILED' })
           return
         }
 
-        const isLastAttempt = attempt === SESSION_PROBE_ATTEMPTS - 1
-        if (!isLastAttempt) {
-          await new Promise(resolve => setTimeout(resolve, SESSION_PROBE_RETRY_MS * (attempt + 1)))
-          if (cancelled) return
-        }
+        // 'unknown' — could not reach the server. This says nothing about
+        // whether a session exists, so never conclude "logged out" from it;
+        // keep retrying (fast at first, then at a steady slower cadence)
+        // until the server actually answers one way or the other.
+        const delay = attempt < SESSION_PROBE_ATTEMPTS
+          ? SESSION_PROBE_RETRY_MS * (attempt + 1)
+          : SESSION_PROBE_STEADY_RETRY_MS
+        attempt++
+        await new Promise(resolve => setTimeout(resolve, delay))
+        if (cancelled) return
       }
-
-      // Still unreachable. Keep the session and let the app render: individual
-      // requests surface their own errors, and a confirmed 401 will tear the
-      // session down through the ApiClient. Throwing the login away here would
-      // punish the user for the server being briefly unavailable.
-      console.warn('[AuthGuard] Could not reach the server to verify the session — continuing with the stored session')
-      setSessionVerified(true)
     }
 
-    void verify()
+    void bootstrap()
     return () => { cancelled = true }
-  }, [authState.isAuthenticated, authState.mustChangePassword, authDispatch])
+  }, [authState.isBootstrapping, authDispatch])
+
+  if (authState.isBootstrapping) {
+    return (
+      <div className="app-loading" role="status" aria-live="polite">
+        <span className="app-loading-spinner" aria-hidden="true" />
+      </div>
+    )
+  }
 
   if (!authState.isAuthenticated) {
     return <LoginPage apiClient={apiClient} />
@@ -1433,15 +1411,6 @@ function AuthGuard() {
 
   if (authState.mustChangePassword) {
     return <ChangePasswordPage apiClient={apiClient} />
-  }
-
-  // Wait for session verification before rendering the app tree
-  if (!sessionVerified) {
-    return (
-      <div className="app-loading" role="status" aria-live="polite">
-        <span className="app-loading-spinner" aria-hidden="true" />
-      </div>
-    )
   }
 
   return (
@@ -1472,13 +1441,10 @@ function AuthGuard() {
 /**
  * Bridge component that connects the RealtimeProvider with auth state.
  * Sits inside AuthProvider, wrapping the app content.
- * Reads the session token from auth state.
  * Wires SSE event handlers to the module-level chat bridge for cross-provider communication.
  */
 function RealtimeBridge({ children }: { children: React.ReactNode }) {
   const { authState } = useAuthContext()
-
-  const token = authState.token ?? null
 
   const handlers = useMemo<RealtimeEventHandlers>(() => ({
     onChatMessage: (data: Record<string, unknown>) => {
@@ -1534,7 +1500,7 @@ function RealtimeBridge({ children }: { children: React.ReactNode }) {
 
   return (
     <RealtimeProvider
-      token={token}
+      enabled={authState.isAuthenticated}
       handlers={handlers}
       getTicket={() => apiClient.getSseTicket()}
     >

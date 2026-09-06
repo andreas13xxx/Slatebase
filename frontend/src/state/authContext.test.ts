@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import React from 'react'
-import { AuthProvider, useAuthContext } from './authContext'
+import { AuthProvider, useAuthContext, getCsrfToken } from './authContext'
 import type { PublicUserInfo } from './authState'
 
 const mockUser: PublicUserInfo = {
@@ -32,8 +32,8 @@ describe('useAuthContext', () => {
     const { result } = renderHook(() => useAuthContext(), { wrapper })
 
     expect(result.current.authState.isAuthenticated).toBe(false)
+    expect(result.current.authState.isBootstrapping).toBe(true)
     expect(result.current.authState.user).toBeNull()
-    expect(result.current.authState.token).toBeNull()
     expect(result.current.authState.csrfToken).toBeNull()
     expect(result.current.authState.isLoading).toBe(false)
     expect(result.current.authState.error).toBeNull()
@@ -62,7 +62,6 @@ describe('useAuthContext', () => {
       result.current.authDispatch({
         type: 'LOGIN_SUCCESS',
         payload: {
-          token: 'test-token',
           csrfToken: 'test-csrf',
           user: mockUser,
         },
@@ -71,7 +70,6 @@ describe('useAuthContext', () => {
 
     expect(result.current.authState.isAuthenticated).toBe(true)
     expect(result.current.authState.user).toEqual(mockUser)
-    expect(result.current.authState.token).toBe('test-token')
     expect(result.current.authState.csrfToken).toBe('test-csrf')
   })
 
@@ -86,7 +84,6 @@ describe('useAuthContext', () => {
       result.current.authDispatch({
         type: 'LOGIN_SUCCESS',
         payload: {
-          token: 'test-token',
           csrfToken: 'test-csrf',
           user: mockUser,
         },
@@ -100,7 +97,7 @@ describe('useAuthContext', () => {
 
     expect(result.current.authState.isAuthenticated).toBe(false)
     expect(result.current.authState.user).toBeNull()
-    expect(result.current.authState.token).toBeNull()
+    expect(result.current.authState.csrfToken).toBeNull()
   })
 })
 
@@ -114,5 +111,43 @@ describe('AuthProvider', () => {
     expect(result.current).toBeDefined()
     expect(result.current.authState).toBeDefined()
     expect(result.current.authDispatch).toBeDefined()
+  })
+
+  it('clears stale pre-cookie localStorage keys on mount', () => {
+    localStorage.setItem('slatebase_token', 'leftover-token')
+    localStorage.setItem('slatebase_csrf', 'leftover-csrf')
+    localStorage.setItem('slatebase_user', '{}')
+
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(AuthProvider, null, children)
+    renderHook(() => useAuthContext(), { wrapper })
+
+    expect(localStorage.getItem('slatebase_token')).toBeNull()
+    expect(localStorage.getItem('slatebase_csrf')).toBeNull()
+    expect(localStorage.getItem('slatebase_user')).toBeNull()
+  })
+
+  it('keeps the window-global CSRF token in sync with auth state, in memory only', () => {
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(AuthProvider, null, children)
+    const { result } = renderHook(() => useAuthContext(), { wrapper })
+
+    expect(getCsrfToken()).toBeNull()
+
+    act(() => {
+      result.current.authDispatch({
+        type: 'LOGIN_SUCCESS',
+        payload: { csrfToken: 'sync-csrf', user: mockUser },
+      })
+    })
+
+    expect(getCsrfToken()).toBe('sync-csrf')
+    expect(localStorage.getItem('slatebase_csrf')).toBeNull()
+
+    act(() => {
+      result.current.authDispatch({ type: 'LOGOUT' })
+    })
+
+    expect(getCsrfToken()).toBeNull()
   })
 })

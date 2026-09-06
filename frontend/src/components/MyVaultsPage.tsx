@@ -50,14 +50,11 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
   const loadAllShares = useCallback(async () => {
     if (ownedVaults.length === 0) { setSharesMap(new Map()); return }
     const map = new Map<string, ShareInfo[]>()
-    const token = apiClient.getToken()
-    const headers: Record<string, string> = {}
-    if (token) headers['Authorization'] = `Bearer ${token}`
 
     await Promise.all(
       ownedVaults.map(async (vault) => {
         try {
-          const res = await fetch(`/api/v1/vaults/${vault.id}/shares`, { headers })
+          const res = await fetch(`/api/v1/vaults/${vault.id}/shares`)
           if (res.ok) {
             const data: ShareInfo[] = await res.json()
             map.set(vault.id, data)
@@ -126,10 +123,8 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
   }
 
   async function handleRevokeShare(vaultId: string, userId: string): Promise<void> {
-    const token = apiClient.getToken()
     const csrf = apiClient.getCsrfToken()
     const headers: Record<string, string> = {}
-    if (token) headers['Authorization'] = `Bearer ${token}`
     if (csrf) headers['X-CSRF-Token'] = csrf
     try {
       await fetch(`/api/v1/vaults/${vaultId}/shares/${userId}`, { method: 'DELETE', headers })
@@ -138,10 +133,8 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
   }
 
   async function handleChangePermission(vaultId: string, userId: string, newPermission: 'read' | 'write'): Promise<void> {
-    const token = apiClient.getToken()
     const csrf = apiClient.getCsrfToken()
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    if (token) headers['Authorization'] = `Bearer ${token}`
     if (csrf) headers['X-CSRF-Token'] = csrf
     try {
       await fetch(`/api/v1/vaults/${vaultId}/shares/${userId}`, {
@@ -152,10 +145,8 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
   }
 
   async function handleTransfer(vaultId: string, newOwnerId: string): Promise<void> {
-    const token = apiClient.getToken()
     const csrf = apiClient.getCsrfToken()
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    if (token) headers['Authorization'] = `Bearer ${token}`
     if (csrf) headers['X-CSRF-Token'] = csrf
 
     try {
@@ -428,10 +419,8 @@ function AddShareForm({ apiClient, vaultId, onShareAdded }: AddShareFormProps) {
     setLoading(true)
 
     try {
-      const token = apiClient.getToken()
       const csrf = apiClient.getCsrfToken()
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (token) headers['Authorization'] = `Bearer ${token}`
       if (csrf) headers['X-CSRF-Token'] = csrf
 
       const res = await fetch(`/api/v1/vaults/${vaultId}/shares`, {

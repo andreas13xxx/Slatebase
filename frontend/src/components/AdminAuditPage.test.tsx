@@ -228,7 +228,7 @@ describe('AdminAuditPage', () => {
     })
   })
 
-  it('includes Authorization header in fetch request', async () => {
+  it('does not send an Authorization header — the session authenticates via the HttpOnly cookie', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(createAuditResponse()),
@@ -242,7 +242,7 @@ describe('AdminAuditPage', () => {
 
     const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls
     const firstCall = calls[0]
-    expect(firstCall?.[1]?.headers?.['Authorization']).toBe('Bearer test-token')
+    expect(firstCall?.[1]?.headers?.['Authorization']).toBeUndefined()
   })
 
   it('renders table headers with correct German labels', async () => {

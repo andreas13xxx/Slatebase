@@ -62,12 +62,8 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
     setLoading(true)
     setError(null)
     try {
-      const token = apiClient.getToken()
       const csrfToken = apiClient.getCsrfToken()
       const headers: Record<string, string> = {}
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
-      }
       if (csrfToken) {
         headers['X-CSRF-Token'] = csrfToken
       }
@@ -225,13 +221,9 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
 
     setAddLoading(true)
     try {
-      const token = apiClient.getToken()
       const csrfToken = apiClient.getCsrfToken()
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-      }
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
       }
       if (csrfToken) {
         headers['X-CSRF-Token'] = csrfToken
@@ -266,12 +258,8 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
   async function handleRevoke(targetUserId: string): Promise<void> {
     setError(null)
     try {
-      const token = apiClient.getToken()
       const csrfToken = apiClient.getCsrfToken()
       const headers: Record<string, string> = {}
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
-      }
       if (csrfToken) {
         headers['X-CSRF-Token'] = csrfToken
       }
@@ -299,13 +287,9 @@ export function VaultSharing({ apiClient, vaultId }: VaultSharingProps) {
   async function handleChangePermission(targetUserId: string, newPermission: 'read' | 'write'): Promise<void> {
     setError(null)
     try {
-      const token = apiClient.getToken()
       const csrfToken = apiClient.getCsrfToken()
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-      }
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
       }
       if (csrfToken) {
         headers['X-CSRF-Token'] = csrfToken

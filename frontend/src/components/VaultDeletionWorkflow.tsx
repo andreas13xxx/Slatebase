@@ -57,11 +57,7 @@ export function VaultDeletionWorkflow({ apiClient, vaultId, onComplete }: VaultD
    */
   const buildHeaders = useCallback((includeJson: boolean): Record<string, string> => {
     const headers: Record<string, string> = {}
-    const token = apiClient.getToken()
     const csrfToken = apiClient.getCsrfToken()
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`
-    }
     if (csrfToken) {
       headers['X-CSRF-Token'] = csrfToken
     }

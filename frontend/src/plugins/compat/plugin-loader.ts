@@ -26,11 +26,6 @@ import type {
 } from './types';
 import { BundleEvaluationError, LifecycleError } from './errors';
 import { Scope } from './obsidian-api-extensions';
-// Interpolated (not imported!) into the wrappedBundle string template below —
-// that string is Blob-URL-imported into the plugin's own module scope, which
-// has no access to this file's imports. Keeping the storage key in one place
-// still avoids a hardcoded 'slatebase_token' literal drifting out of sync.
-import { STORAGE_KEY_TOKEN, STORAGE_KEY_CSRF } from '../../state/authContext';
 
 // Populates the `window.obsidian` namespace that the injected
 // `require('obsidian')` hands to every evaluated bundle. Called here rather than
@@ -531,8 +526,7 @@ if (!window.__slatebaseProxyWarned) {
 }
 if (!window.__slatebaseProxyFetch) {
   const __originalFetch = window.__slatebaseOriginalFetch;
-  const __slatebaseToken = () => localStorage.getItem('${STORAGE_KEY_TOKEN}') || '';
-  const __slatebaseCsrf = () => localStorage.getItem('${STORAGE_KEY_CSRF}') || '';
+  const __slatebaseCsrf = () => window.__slatebaseCsrfToken || '';
   function __isCrossOrigin(url) {
     try { return new URL(url, window.location.origin).origin !== window.location.origin; }
     catch { return false; }
@@ -540,7 +534,7 @@ if (!window.__slatebaseProxyFetch) {
   async function __proxyFetch(url, method, headers, body, contentType) {
     const r = await __originalFetch('/api/v1/proxy', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + __slatebaseToken(), 'X-CSRF-Token': __slatebaseCsrf() },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': __slatebaseCsrf() },
       body: JSON.stringify({ url, method: method || 'GET', headers, body: typeof body === 'string' ? body : undefined, contentType })
     });
     const data = await r.json();

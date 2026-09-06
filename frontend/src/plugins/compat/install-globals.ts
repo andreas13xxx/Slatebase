@@ -18,7 +18,7 @@
  * @module install-globals
  */
 
-import { getStoredAuthToken, getStoredCsrfToken } from '../../state/authContext'
+import { getCsrfToken } from '../../state/authContext'
 import { addRibbonIcon as registerRibbonIcon } from './ribbon-icon-registry'
 import { addStatusBarItem as registerStatusBarItem } from './status-bar-registry'
 import { getCurrentPluginId, trackPluginTimer, withPluginContext } from './plugin-execution-context'
@@ -2657,8 +2657,7 @@ export function installObsidianGlobals(): void {
     window.obsidian.requestUrl = async (urlOrRequest: unknown) => {
       const url = typeof urlOrRequest === 'string' ? urlOrRequest : (urlOrRequest as { url: string }).url
       const reqOptions = typeof urlOrRequest === 'string' ? {} : urlOrRequest as { method?: string; headers?: Record<string, string>; body?: string; contentType?: string }
-      const token = getStoredAuthToken() || ''
-      const csrfToken = getStoredCsrfToken() || ''
+      const csrfToken = getCsrfToken() || ''
       const proxyBody = {
         url,
         method: reqOptions.method || 'GET',
@@ -2668,7 +2667,7 @@ export function installObsidianGlobals(): void {
       }
       const proxyResponse = await fetch('/api/v1/proxy', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'X-CSRF-Token': csrfToken },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
         body: JSON.stringify(proxyBody),
       })
       const data = await proxyResponse.json() as { status?: number; headers?: Record<string, string>; text?: string; arrayBuffer?: string; message?: string }

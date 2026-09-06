@@ -72,9 +72,7 @@ export function AdminLogsPage({ apiClient }: AdminLogsPageProps) {
       params.set('pageSize', String(pageSize))
 
       const url = `/api/v1/admin/logs?${params.toString()}`
-      const response = await fetch(url, {
-        headers: buildHeaders(apiClient),
-      })
+      const response = await fetch(url)
 
       if (!response.ok) {
         const body = await response.json().catch(() => ({ message: t('admin.logs.errorStatus', { status: String(response.status) }) }))
@@ -295,14 +293,3 @@ export function AdminLogsPage({ apiClient }: AdminLogsPageProps) {
   )
 }
 
-/**
- * Builds request headers including auth token from the API client.
- */
-function buildHeaders(apiClient: IApiClient): Record<string, string> {
-  const headers: Record<string, string> = {}
-  const token = apiClient.getToken()
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  return headers
-}

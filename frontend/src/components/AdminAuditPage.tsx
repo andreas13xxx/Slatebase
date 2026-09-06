@@ -102,9 +102,7 @@ export function AdminAuditPage({ apiClient }: AdminAuditPageProps) {
     params.set('pageSize', String(pageSize))
 
     const url = `/api/v1/admin/audit?${params.toString()}`
-    const response = await fetch(url, {
-      headers: buildHeaders(apiClient),
-    })
+    const response = await fetch(url)
 
     if (!response.ok) {
       const body = await response.json().catch(() => ({ message: t('admin.audit.errorStatus', { status: String(response.status) }) }))
@@ -277,14 +275,3 @@ function formatAction(action: string): string {
   return action.replace(/_/g, ' ')
 }
 
-/**
- * Builds request headers including auth token from the API client.
- */
-function buildHeaders(apiClient: IApiClient): Record<string, string> {
-  const headers: Record<string, string> = {}
-  const token = apiClient.getToken()
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  return headers
-}

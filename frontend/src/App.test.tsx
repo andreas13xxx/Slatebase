@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-const { mockFetchVaults, mockFetchVaultTree, mockFetchFileContent, mockCreateVault, mockDeleteVault, mockImportFile, mockImportFolder, mockDeleteContent, mockLogin, mockLogout, mockSetToken, mockSetCsrfToken, mockSetOnSessionExpired, mockLoadFeatures } = vi.hoisted(() => ({
+const { mockFetchVaults, mockFetchVaultTree, mockFetchFileContent, mockCreateVault, mockDeleteVault, mockImportFile, mockImportFolder, mockDeleteContent, mockLogin, mockLogout, mockGetSession, mockSetCsrfToken, mockSetOnSessionExpired, mockLoadFeatures } = vi.hoisted(() => ({
   mockFetchVaults: vi.fn(),
   mockFetchVaultTree: vi.fn(),
   mockFetchFileContent: vi.fn(),
@@ -13,7 +13,7 @@ const { mockFetchVaults, mockFetchVaultTree, mockFetchFileContent, mockCreateVau
   mockDeleteContent: vi.fn(),
   mockLogin: vi.fn(),
   mockLogout: vi.fn(),
-  mockSetToken: vi.fn(),
+  mockGetSession: vi.fn(),
   mockSetCsrfToken: vi.fn(),
   mockSetOnSessionExpired: vi.fn(),
   mockLoadFeatures: vi.fn(),
@@ -32,11 +32,10 @@ vi.mock('./api', () => {
     deleteContent = mockDeleteContent
     login = mockLogin
     logout = mockLogout
-    setToken = mockSetToken
+    getSession = mockGetSession
     setCsrfToken = mockSetCsrfToken
     setOnSessionExpired = mockSetOnSessionExpired
     loadFeatures = mockLoadFeatures
-    getToken = vi.fn().mockReturnValue(null)
     getCsrfToken = vi.fn().mockReturnValue(null)
     getVersion = vi.fn().mockResolvedValue({ version: '1.0.0' })
     getVaultConfig = vi.fn().mockResolvedValue({ templatesDirectory: '', dailyNotesDirectory: '', dailyNoteTemplateName: '', attachmentsDirectory: '' })
@@ -52,6 +51,9 @@ import { App } from './App'
 describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default: no session cookie — tests that need an authenticated start
+    // override this per-case (see the mustChangePassword test below).
+    mockGetSession.mockResolvedValue({ status: 'dead' })
     mockLoadFeatures.mockResolvedValue([
       { name: 'chat', enabled: true },
       { name: 'mcp', enabled: true },
@@ -99,10 +101,12 @@ describe('App', () => {
     mockLogout.mockResolvedValue(undefined)
   })
 
-  it('shows login page when not authenticated', () => {
+  it('shows login page when not authenticated', async () => {
     render(<App />)
 
-    expect(screen.getByLabelText('Benutzername')).toBeInTheDocument()
+    // The startup session bootstrap (GET /auth/session) resolves
+    // asynchronously — the login page only appears once it settles.
+    expect(await screen.findByLabelText('Benutzername')).toBeInTheDocument()
     expect(screen.getByLabelText('Passwort')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Anmelden' })).toBeInTheDocument()
   })
@@ -112,7 +116,7 @@ describe('App', () => {
     render(<App />)
 
     // Fill in login form
-    await user.type(screen.getByLabelText('Benutzername'), 'admin')
+    await user.type(await screen.findByLabelText('Benutzername'), 'admin')
     await user.type(screen.getByLabelText('Passwort'), 'admin123')
     await user.click(screen.getByRole('button', { name: 'Anmelden' }))
 
@@ -120,7 +124,6 @@ describe('App', () => {
     await waitFor(() => {
       expect(screen.getByText('Slatebase')).toBeInTheDocument()
     })
-    expect(mockSetToken).toHaveBeenCalledWith('test-token')
     expect(mockSetCsrfToken).toHaveBeenCalledWith('test-csrf')
   })
 
@@ -129,7 +132,7 @@ describe('App', () => {
     render(<App />)
 
     // Login first
-    await user.type(screen.getByLabelText('Benutzername'), 'admin')
+    await user.type(await screen.findByLabelText('Benutzername'), 'admin')
     await user.type(screen.getByLabelText('Passwort'), 'admin123')
     await user.click(screen.getByRole('button', { name: 'Anmelden' }))
 
@@ -150,7 +153,6 @@ describe('App', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Benutzername')).toBeInTheDocument()
     })
-    expect(mockSetToken).toHaveBeenCalledWith(null)
     expect(mockSetCsrfToken).toHaveBeenCalledWith(null)
   })
 
@@ -177,7 +179,7 @@ describe('App', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.type(screen.getByLabelText('Benutzername'), 'admin')
+    await user.type(await screen.findByLabelText('Benutzername'), 'admin')
     await user.type(screen.getByLabelText('Passwort'), 'admin123')
     await user.click(screen.getByRole('button', { name: 'Anmelden' }))
 
@@ -198,7 +200,7 @@ describe('App', () => {
     render(<App />)
 
     // Login first
-    await user.type(screen.getByLabelText('Benutzername'), 'admin')
+    await user.type(await screen.findByLabelText('Benutzername'), 'admin')
     await user.type(screen.getByLabelText('Passwort'), 'admin123')
     await user.click(screen.getByRole('button', { name: 'Anmelden' }))
 
@@ -222,7 +224,7 @@ describe('App', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.type(screen.getByLabelText('Benutzername'), 'admin')
+    await user.type(await screen.findByLabelText('Benutzername'), 'admin')
     await user.type(screen.getByLabelText('Passwort'), 'admin123')
     await user.click(screen.getByRole('button', { name: 'Anmelden' }))
 
@@ -272,7 +274,7 @@ describe('App', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.type(screen.getByLabelText('Benutzername'), 'admin')
+    await user.type(await screen.findByLabelText('Benutzername'), 'admin')
     await user.type(screen.getByLabelText('Passwort'), 'admin123')
     await user.click(screen.getByRole('button', { name: 'Anmelden' }))
 

@@ -88,11 +88,10 @@ export function LoginPage({ apiClient }: LoginPageProps) {
     authDispatch({ type: 'LOGIN_STARTED' })
     try {
       const result = await apiClient.login(username, password)
-      apiClient.setToken(result.token)
       apiClient.setCsrfToken(result.csrfToken)
       authDispatch({
         type: 'LOGIN_SUCCESS',
-        payload: { token: result.token, csrfToken: result.csrfToken, user: result.user },
+        payload: { csrfToken: result.csrfToken, user: result.user },
       })
     } catch (err: unknown) {
       if (isRateLimitError(err)) {

@@ -210,7 +210,7 @@ describe('VaultSharing', () => {
     expect(screen.queryByText('Freigabe hinzufügen')).not.toBeInTheDocument()
   })
 
-  it('sends authorization headers with requests', async () => {
+  it('does not send an Authorization header — the session authenticates via the HttpOnly cookie', async () => {
     fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
     const apiClient = createMockApiClient()
 
@@ -222,6 +222,6 @@ describe('VaultSharing', () => {
 
     const firstCall = fetchSpy.mock.calls[0]
     const headers = (firstCall![1] as RequestInit).headers as Record<string, string>
-    expect(headers['Authorization']).toBe('Bearer test-token')
+    expect(headers['Authorization']).toBeUndefined()
   })
 })

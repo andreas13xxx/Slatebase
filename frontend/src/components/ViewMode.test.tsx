@@ -505,13 +505,13 @@ def hello():
       expect(img?.getAttribute('alt')).toBe('photo.png')
     })
 
-    it('renders image embed with token in URL when provided', () => {
+    it('renders image embed without a token in the URL — the session cookie authenticates automatically', () => {
       const { container } = render(
-        <ViewMode content="![[photo.png]]" vaultId="v1" directoryTree={treeWithFiles} token="my-token" />
+        <ViewMode content="![[photo.png]]" vaultId="v1" directoryTree={treeWithFiles} />
       )
       const img = container.querySelector('img.view-mode-embed--image')
       expect(img).not.toBeNull()
-      expect(img?.getAttribute('src')).toContain('token=my-token')
+      expect(img?.getAttribute('src')).not.toContain('token=')
     })
 
     it('renders missing image placeholder when file not found (Req 5.2)', () => {

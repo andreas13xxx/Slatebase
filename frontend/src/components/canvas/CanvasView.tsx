@@ -870,7 +870,6 @@ function CanvasViewInner({ vaultId, filePath, readOnly, onFileOpen, directoryTre
                         editPath={editingMode === 'path'}
                         onEditEnd={() => { setEditingNodeId(null); setEditingMode('content') }}
                         vaultId={vaultId}
-                        token={token}
                       />
                     )
                   case 'link':

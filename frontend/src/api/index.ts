@@ -514,14 +514,22 @@ export interface VaultConfig {
 export type SessionProbe = 'alive' | 'dead' | 'unknown'
 
 /**
+ * Outcome of the startup session bootstrap (`GET /api/v1/auth/session`). The
+ * session token itself lives in an HttpOnly cookie sent automatically by the
+ * browser — this is how the app finds out, after a reload, whether that
+ * cookie is still valid and recovers the (memory-only) CSRF token and user
+ * info it can no longer read from storage.
+ */
+export type SessionBootstrapResult =
+  | { status: 'alive'; user: PublicUserInfo; csrfToken: string; expiresAt: string }
+  | { status: 'dead' }
+  | { status: 'unknown' }
+
+/**
  * Interface for the Slatebase API client.
  * All methods throw an AppError on non-2xx responses.
  */
 export interface IApiClient {
-  /** Set the auth token for subsequent requests. */
-  setToken(token: string | null): void
-  /** Get the current auth token. */
-  getToken(): string | null
   /** Set the CSRF token for state-changing requests. */
   setCsrfToken(csrfToken: string | null): void
   /** Get the current CSRF token. */
@@ -530,6 +538,8 @@ export interface IApiClient {
   setOnSessionExpired(callback: (() => void) | null): void
   /** Lightweight session probe. See {@link SessionProbe} for the three outcomes. */
   probeSession(): Promise<SessionProbe>
+  /** Resolves the current session from the HttpOnly cookie. See {@link SessionBootstrapResult}. */
+  getSession(): Promise<SessionBootstrapResult>
 
   // --- Vault methods ---
   fetchVaults(): Promise<VaultInfo[]>
@@ -842,26 +852,16 @@ export const CLIENT_ID: string =
  * Concrete implementation of IApiClient using the Fetch API.
  * Uses relative URLs — the Vite dev proxy forwards /api to the backend.
  *
- * Includes Authorization header on all authenticated requests and
- * X-CSRF-Token header on state-changing requests (POST, PUT, DELETE).
- * Calls onSessionExpired callback when a 401 response is received.
+ * The session itself authenticates via an HttpOnly cookie the browser
+ * attaches automatically; this client only manages the X-CSRF-Token header
+ * on state-changing requests (POST, PUT, DELETE). Calls onSessionExpired
+ * callback when a 401 response is received.
  */
 export class ApiClient implements IApiClient {
-  private token: string | null = null
   private csrfToken: string | null = null
   private onSessionExpired: (() => void) | null = null
   /** In-flight session probe shared by concurrent auth failures. See handleAuthFailure(). */
   private authFailureProbe: Promise<SessionProbe> | null = null
-
-  /** Set the auth token for subsequent requests. */
-  setToken(token: string | null): void {
-    this.token = token
-  }
-
-  /** Get the current auth token. */
-  getToken(): string | null {
-    return this.token
-  }
 
   /** Set the CSRF token for state-changing requests. */
   setCsrfToken(csrfToken: string | null): void {
@@ -981,6 +981,30 @@ export class ApiClient implements IApiClient {
   /** Request a short-lived one-time ticket for SSE connections. */
   async getSseTicket(): Promise<{ ticket: string }> {
     return this.request<{ ticket: string }>('POST', '/api/v1/auth/sse-ticket')
+  }
+
+  /**
+   * Resolves the current session from the HttpOnly cookie via
+   * `GET /api/v1/auth/session`. Uses a raw fetch (like probeSession()) rather
+   * than request()/handleResponse() — this call happens before any session is
+   * known to exist, so there's nothing for handleAuthFailure()'s recovery
+   * logic to react to, and a 401 here is the ordinary "not logged in" case,
+   * not a session that just died.
+   */
+  async getSession(): Promise<SessionBootstrapResult> {
+    try {
+      const response = await fetch('/api/v1/auth/session', { method: 'GET' })
+      if (response.status === 401) {
+        return { status: 'dead' }
+      }
+      if (!response.ok) {
+        return { status: 'unknown' }
+      }
+      const body = await response.json() as { user: PublicUserInfo; csrfToken: string; expiresAt: string }
+      return { status: 'alive', ...body }
+    } catch {
+      return { status: 'unknown' }
+    }
   }
 
   /** Get the current user's profile. */
@@ -1119,10 +1143,6 @@ export class ApiClient implements IApiClient {
     formData.append('file', file)
 
     const headers: Record<string, string> = {}
-
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`
-    }
 
     if (this.csrfToken) {
       headers['X-CSRF-Token'] = this.csrfToken
@@ -1502,9 +1522,6 @@ export class ApiClient implements IApiClient {
     formData.append('targetDir', targetDir)
 
     const headers: Record<string, string> = {}
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`
-    }
     if (this.csrfToken) {
       headers['X-CSRF-Token'] = this.csrfToken
     }
@@ -1524,9 +1541,6 @@ export class ApiClient implements IApiClient {
     formData.append('targetDir', targetDir)
 
     const headers: Record<string, string> = {}
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`
-    }
     if (this.csrfToken) {
       headers['X-CSRF-Token'] = this.csrfToken
     }
@@ -1700,17 +1714,14 @@ export class ApiClient implements IApiClient {
   // --- Internal helpers ---
 
   /**
-   * Builds the headers for a request, including auth and CSRF tokens.
+   * Builds the headers for a request, including the CSRF token. The session
+   * itself authenticates via the HttpOnly cookie, sent automatically.
    */
   private buildHeaders(method: string, isJson: boolean): Record<string, string> {
     const headers: Record<string, string> = {}
 
     if (isJson) {
       headers['Content-Type'] = 'application/json'
-    }
-
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`
     }
 
     if (CSRF_METHODS.has(method) && this.csrfToken) {
@@ -1787,10 +1798,6 @@ export class ApiClient implements IApiClient {
   private async requestFormData(method: string, url: string, formData: FormData): Promise<void> {
     const headers: Record<string, string> = {}
 
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`
-    }
-
     if (CSRF_METHODS.has(method) && this.csrfToken) {
       headers['X-CSRF-Token'] = this.csrfToken
     }
@@ -1809,14 +1816,7 @@ export class ApiClient implements IApiClient {
    */
   async probeSession(): Promise<SessionProbe> {
     try {
-      const headers: Record<string, string> = {}
-      if (this.token) {
-        headers['Authorization'] = `Bearer ${this.token}`
-      }
-      const resp = await fetch('/api/v1/auth/sessions', {
-        method: 'GET',
-        headers,
-      })
+      const resp = await fetch('/api/v1/auth/sessions', { method: 'GET' })
       if (resp.ok) return 'alive'
       return resp.status === 401 ? 'dead' : 'unknown'
     } catch {
@@ -1832,16 +1832,16 @@ export class ApiClient implements IApiClient {
    * Two properties matter here:
    *
    * - Concurrent failures share one probe. A page load fires many requests at
-   *   once; without this, the first 401 would clear the token, every already
-   *   queued request would then go out with no Authorization header, each would
-   *   come back 401, and a single spurious failure would avalanche into a
-   *   guaranteed logout.
+   *   once; without this, the first 401 would clear the CSRF token, every
+   *   already queued mutating request would then go out without one, each
+   *   would come back 401/CSRF_INVALID, and a single spurious failure would
+   *   avalanche into a guaranteed logout.
    * - An unconfirmed failure changes nothing. The caller still gets its error,
    *   but the session survives, so a backend restart or a dropped connection no
    *   longer costs the user their login.
    */
   private async handleAuthFailure(): Promise<void> {
-    if (this.token === null && this.csrfToken === null) {
+    if (this.csrfToken === null) {
       // Already torn down by a concurrent failure — nothing left to do.
       return
     }
@@ -1862,14 +1862,13 @@ export class ApiClient implements IApiClient {
       return
     }
 
-    if (this.token === null && this.csrfToken === null) {
+    if (this.csrfToken === null) {
       // A concurrent caller that shared this same probe already tore the
       // session down (see the guard above) — avoid firing onSessionExpired twice.
       return
     }
 
     console.warn('[ApiClient] Server confirmed the session is invalid — clearing local auth state')
-    this.token = null
     this.csrfToken = null
     if (this.onSessionExpired) {
       this.onSessionExpired()

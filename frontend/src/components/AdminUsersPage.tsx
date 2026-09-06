@@ -84,11 +84,6 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
   ): Promise<T> {
     const headers: Record<string, string> = {}
 
-    const token = apiClient.getToken()
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`
-    }
-
     const csrfToken = apiClient.getCsrfToken()
     if (csrfToken && (method === 'POST' || method === 'PUT' || method === 'DELETE')) {
       headers['X-CSRF-Token'] = csrfToken

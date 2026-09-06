@@ -11,7 +11,7 @@ import type { DirectoryTree } from '../../../types';
 import type { DataWriteOptions, EventRef, IVaultShim, TAbstractFile, TFile, TFolder } from '../types';
 import { EventSystem } from '../event-system';
 import { dispatchRealtimeVaultChange } from '../../../state/realtimeVaultBridge';
-import { getStoredAuthToken, getStoredCsrfToken } from '../../../state/authContext';
+import { getCsrfToken } from '../../../state/authContext';
 import { markPluginWrite } from '../plugin-event-bridge';
 import { warnNoOp } from '../log';
 import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry';
@@ -903,13 +903,11 @@ export class VaultShim implements IVaultShim {
    * Returns a data URL path that can be used in the browser.
    *
    * Plugins hand this straight to `<img src>`/`<video src>` (Recent Files'
-   * hover preview, image embeds, etc.), which can't attach an Authorization
-   * header — so the token has to ride along as the `?token=` query param the
-   * backend accepts for raw file routes (see extractBearerToken's fallback in
-   * middleware.ts), same as FileNodeRenderer's canvas image embeds do.
+   * hover preview, image embeds, etc.) — the request authenticates via the
+   * HttpOnly session cookie, which the browser attaches automatically.
    */
   getResourcePath(file: TFile): string {
-    return `/api/v1/vaults/${this.vaultId}/files?path=${encodeURIComponent(file.path)}&raw=true&token=${encodeURIComponent(this.getToken())}`;
+    return `/api/v1/vaults/${this.vaultId}/files?path=${encodeURIComponent(file.path)}&raw=true`;
   }
 
   /**
@@ -978,11 +976,7 @@ export class VaultShim implements IVaultShim {
   async readBinary(file: TFile): Promise<ArrayBuffer> {
     validatePath(file.path);
     try {
-      const response = await fetch(`/api/v1/vaults/${this.vaultId}/files?path=${encodeURIComponent(file.path)}&raw=true`, {
-        headers: {
-          'Authorization': `Bearer ${this.getToken()}`,
-        },
-      });
+      const response = await fetch(`/api/v1/vaults/${this.vaultId}/files?path=${encodeURIComponent(file.path)}&raw=true`);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
@@ -1015,8 +1009,7 @@ export class VaultShim implements IVaultShim {
       const response = await fetch(`/api/v1/vaults/${this.vaultId}/upload`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.getToken()}`,
-          'X-CSRF-Token': getStoredCsrfToken() ?? '',
+          'X-CSRF-Token': getCsrfToken() ?? '',
         },
         body: formData,
       });
@@ -1069,13 +1062,6 @@ export class VaultShim implements IVaultShim {
     await this.modifyBinary(file, combined.buffer);
   }
 
-  /**
-   * Helper: get auth token from localStorage.
-   */
-  private getToken(): string {
-    return getStoredAuthToken() ?? '';
-  }
-
   async createBinary(path: string, data: ArrayBuffer): Promise<TFile> {
     validatePath(path);
 
@@ -1093,8 +1079,7 @@ export class VaultShim implements IVaultShim {
       const response = await fetch(`/api/v1/vaults/${this.vaultId}/upload`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.getToken()}`,
-          'X-CSRF-Token': getStoredCsrfToken() ?? '',
+          'X-CSRF-Token': getCsrfToken() ?? '',
         },
         body: formData,
       });
@@ -1153,12 +1138,6 @@ export class VaultShim implements IVaultShim {
    * Wraps a VaultShim instance with a Proxy for non-emulated API interception.
    * Mirrors AppShim/WorkspaceShim's pattern: a plugin calling a non-emulated
    * vault method/property gets a warned no-op instead of a hard crash.
-   *
-   * `getToken()` is deliberately excluded from the whitelist below — it's a
-   * private implementation detail (returns the raw auth token from
-   * localStorage) that TypeScript's `private` doesn't actually hide at
-   * runtime; a plugin reaching `vault.getToken()` through this proxy must get
-   * the same no-op as any other non-emulated method, not the real token.
    */
   static wrapWithProxy(instance: VaultShim): VaultShim & Record<string, unknown> {
     const emulatedProperties = new Set<string | symbol>([

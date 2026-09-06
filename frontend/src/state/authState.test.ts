@@ -29,6 +29,16 @@ const mockAdminUser: PublicUserInfo = {
   mustChangePassword: true,
 }
 
+const authenticatedState: AuthState = {
+  isAuthenticated: true,
+  isBootstrapping: false,
+  user: mockUser,
+  csrfToken: 'some-csrf',
+  mustChangePassword: false,
+  isLoading: false,
+  error: null,
+}
+
 describe('authReducer', () => {
   describe('LOGIN_STARTED', () => {
     it('sets isLoading to true and clears error', () => {
@@ -46,12 +56,11 @@ describe('authReducer', () => {
   })
 
   describe('LOGIN_SUCCESS', () => {
-    it('stores user, token, csrfToken and sets authenticated', () => {
+    it('stores user, csrfToken and sets authenticated (also used for a successful session bootstrap)', () => {
       const loadingState: AuthState = { ...initialAuthState, isLoading: true }
       const action: AuthAction = {
         type: 'LOGIN_SUCCESS',
         payload: {
-          token: 'session-token-abc',
           csrfToken: 'csrf-token-xyz',
           user: mockUser,
         },
@@ -60,8 +69,8 @@ describe('authReducer', () => {
       const result = authReducer(loadingState, action)
 
       expect(result.isAuthenticated).toBe(true)
+      expect(result.isBootstrapping).toBe(false)
       expect(result.user).toEqual(mockUser)
-      expect(result.token).toBe('session-token-abc')
       expect(result.csrfToken).toBe('csrf-token-xyz')
       expect(result.mustChangePassword).toBe(false)
       expect(result.isLoading).toBe(false)
@@ -72,7 +81,6 @@ describe('authReducer', () => {
       const action: AuthAction = {
         type: 'LOGIN_SUCCESS',
         payload: {
-          token: 'token',
           csrfToken: 'csrf',
           user: mockAdminUser,
         },
@@ -95,8 +103,8 @@ describe('authReducer', () => {
       const result = authReducer(loadingState, action)
 
       expect(result.isAuthenticated).toBe(false)
+      expect(result.isBootstrapping).toBe(false)
       expect(result.user).toBeNull()
-      expect(result.token).toBeNull()
       expect(result.csrfToken).toBeNull()
       expect(result.mustChangePassword).toBe(false)
       expect(result.isLoading).toBe(false)
@@ -104,43 +112,40 @@ describe('authReducer', () => {
     })
   })
 
+  describe('BOOTSTRAP_FAILED', () => {
+    it('settles into "not authenticated" with no error', () => {
+      const bootstrappingState: AuthState = { ...initialAuthState, isBootstrapping: true }
+      const action: AuthAction = { type: 'BOOTSTRAP_FAILED' }
+
+      const result = authReducer(bootstrappingState, action)
+
+      expect(result.isAuthenticated).toBe(false)
+      expect(result.isBootstrapping).toBe(false)
+      expect(result.user).toBeNull()
+      expect(result.csrfToken).toBeNull()
+      expect(result.error).toBeNull()
+    })
+  })
+
   describe('LOGOUT', () => {
-    it('resets to initial state', () => {
-      const authenticatedState: AuthState = {
-        isAuthenticated: true,
-        user: mockUser,
-        token: 'some-token',
-        csrfToken: 'some-csrf',
-        mustChangePassword: false,
-        isLoading: false,
-        error: null,
-      }
+    it('resets to initial state (bootstrapping already resolved)', () => {
       const action: AuthAction = { type: 'LOGOUT' }
 
       const result = authReducer(authenticatedState, action)
 
-      expect(result).toEqual(initialAuthState)
+      expect(result).toEqual({ ...initialAuthState, isBootstrapping: false })
     })
   })
 
   describe('SESSION_EXPIRED', () => {
     it('resets to initial state with error message', () => {
-      const authenticatedState: AuthState = {
-        isAuthenticated: true,
-        user: mockUser,
-        token: 'some-token',
-        csrfToken: 'some-csrf',
-        mustChangePassword: false,
-        isLoading: false,
-        error: null,
-      }
       const action: AuthAction = { type: 'SESSION_EXPIRED' }
 
       const result = authReducer(authenticatedState, action)
 
       expect(result.isAuthenticated).toBe(false)
+      expect(result.isBootstrapping).toBe(false)
       expect(result.user).toBeNull()
-      expect(result.token).toBeNull()
       expect(result.csrfToken).toBeNull()
       expect(result.error).toBe('auth.sessionExpired')
     })
@@ -149,13 +154,9 @@ describe('authReducer', () => {
   describe('PASSWORD_CHANGED', () => {
     it('clears mustChangePassword flag', () => {
       const mustChangeState: AuthState = {
-        isAuthenticated: true,
+        ...authenticatedState,
         user: mockAdminUser,
-        token: 'token',
-        csrfToken: 'csrf',
         mustChangePassword: true,
-        isLoading: false,
-        error: null,
       }
       const action: AuthAction = { type: 'PASSWORD_CHANGED' }
 
@@ -169,10 +170,10 @@ describe('authReducer', () => {
 })
 
 describe('initialAuthState', () => {
-  it('starts unauthenticated with no user data', () => {
+  it('starts unauthenticated, bootstrapping, with no user data', () => {
     expect(initialAuthState.isAuthenticated).toBe(false)
+    expect(initialAuthState.isBootstrapping).toBe(true)
     expect(initialAuthState.user).toBeNull()
-    expect(initialAuthState.token).toBeNull()
     expect(initialAuthState.csrfToken).toBeNull()
     expect(initialAuthState.mustChangePassword).toBe(false)
     expect(initialAuthState.isLoading).toBe(false)
