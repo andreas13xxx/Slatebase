@@ -499,4 +499,34 @@ Die ES5-Downlevel-Basisklassen-Kompatibilität (`_super.call(this, …)`-Aufruff
 
 ---
 
+## Diktier-/Spracherkennungs-Plugins → native Lösung statt Compat-Layer
+
+**Datum:** 2026-09-06
+
+Für Sprache-zu-Text („Diktieren") gibt es im Obsidian-Ökosystem mehrere Community-Plugins. Wir haben geprüft, ob eines davon unter der Compat-Schicht *gut und kostenlos* laufen würde, und uns bewusst gegen den Plugin-Weg und **für eine native Slatebase-Lösung** entschieden. Diese ist in der eigenen Spec `.kiro/specs/voice-transcription/` beschrieben (self-hosted Whisper im Backend, feature-getoggelt, admin-abschaltbar).
+
+### Warum kein Compat-Plugin
+
+Die Analyse ordnet die vorhandenen Plugins in drei technische Kategorien ein — keine davon erfüllt „kostenlos **und** gut **und** zum Self-Hosted-Charakter passend":
+
+| Kategorie | Beispiele (Vorlage/Referenz) | Verhalten unter Slatebase | Urteil |
+|---|---|---|---|
+| **Lokale Whisper-Transkription** (lokales Binary / `ffmpeg` / lokaler Prozess) | [Voice Scribe](https://community.obsidian.md/plugins/voice-scribe), [cdiak/local-whisper](https://github.com/cdiak/local-whisper), [obsidian-transcription](https://community.obsidian.md/plugins/obsidian-transcription), [iahmedani/obsidian-voice-notes](https://github.com/iahmedani/obsidian-voice-notes) | Brauchen `child_process`/`fs`/`ffmpeg`; meist `isDesktopOnly: true`. Der Analyzer stuft sie als 🔴 **unsupported** ein, die Node-Builtins sind im Browser nur warn-and-no-op-Stubs. | Läuft nicht |
+| **Cloud-Whisper (OpenAI o. ä.)** | [nikdanilov/whisper-obsidian-plugin](https://github.com/nikdanilov/whisper-obsidian-plugin), [asyouplz/SpeechNote](https://github.com/asyouplz/SpeechNote), [lukehollenback/obsidian-whisper](https://github.com/lukehollenback/obsidian-whisper) | Aufnahme via `MediaRecorder` (Mikrofon ist unproxied, funktioniert unter HTTPS); API-Call ginge über den Sandbox-CORS-Proxy — aber nur, wenn `api.openai.com` beidseitig auf der Allowlist steht (Plugin-`networkAllowlist` **und** server-seitige `SLATEBASE_PROXY_ALLOWED_ORIGINS`). Zusätzlich deckelt das Proxy-Limit (10 MB Request / 30 s Timeout) längere Aufnahmen. | 🟡 partial, **nicht kostenlos** (API-Gebühren) |
+| **Browser Web Speech API** | diverse „Speech-to-Text"-Plugins ohne externen Dienst | Kostenlos, kein Node-Modul, kein Vault-API-Konflikt (grün/gelb im Analyzer). Aber: Chromium-gebunden (in Firefox praktisch nicht verfügbar), unzuverlässig, und das Audio geht bei Chrome/Edge still an Google-Server — ein Fremdkörper für ein self-hosted, datenschutzorientiertes Produkt. | Läuft, aber Datenschutz/Portabilität untragbar |
+
+### Was wir uns davon abgeschaut haben
+
+Die native Lösung übernimmt aus den obigen Plugins die bewährten UX-/Architektur-Bausteine, ersetzt aber die Transkriptions-Quelle durch ein **self-hosted Whisper-Backend** (kein externer Dienst, keine API-Gebühren, browserunabhängig):
+
+- **Aufnahme im Browser via `MediaRecorder`** (aus den Cloud-Whisper-Plugins) — funktioniert ohne Compat-Layer, da `navigator.mediaDevices` in der Sandbox unproxied ist; setzt HTTPS voraus.
+- **Audiodatei als Vault-Anhang speichern** (aus Voice-Notes-Plugins) — nutzt Slatebases vorhandenen Upload-/`vault.createBinary`-Pfad und die per-Vault-Attachments-Konfiguration.
+- **Mehrsprachige Transkription** (aus Whisper-Plugins) — Whisper ist von Haus aus mehrsprachig; Sprache pro Aufnahme wählbar, Default aus den Editor-Spracheinstellungen abgeleitet.
+
+### Bewusste Abweichung: Serveranforderung
+
+Whisper braucht spürbar Rechenleistung — auf einem kleinen VPS ohne GPU ist die Transkription zäh. Das ist der Preis dafür, dass Audio den eigenen Server nie verlässt. Deshalb ist das Feature **feature-getoggelt (kalt, standardmäßig aus)**, nur nutzbar wenn der Betreiber eine Whisper-Instanz konfiguriert hat, und **vom Admin serverweit abschaltbar**. Sowohl die Doku als auch die Oberfläche weisen ausdrücklich auf die Geschwindigkeits-/Serveranforderung hin. Details in `.kiro/specs/voice-transcription/`.
+
+---
+
 *Dieses Dokument wurde aus dem aktuellen Stand der Compat-Schicht (`frontend/src/plugins/compat/compatibility-analyzer.ts`), den Projekt-Steering-Docs (`.kiro/steering/product.md`, `.kiro/steering/lessons-learned.md`) und einer automatisierten Analyse der 100 meistheruntergeladenen Community-Plugins erzeugt. Bei Abweichungen zwischen diesem Dokument und dem tatsächlichen Verhalten der App gilt der Code als Quelle der Wahrheit.*

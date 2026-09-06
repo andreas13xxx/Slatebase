@@ -259,6 +259,14 @@ src/
 │   ├── note-writer.ts         — MailNoteWriter (writes the note + attachments into the target folder via IVaultService, unique-filename resolution)
 │   ├── import-engine.ts       — MailImportEngine (one run: fetch → convert → write → mark seen, per-message error isolation)
 │   └── mail-import-scheduler.ts — MailImportScheduler (per-config interval timer, lifecycle owned by the composition root)
+├── transcription/            — Voice-to-text (dictation) via a self-hosted Whisper HTTP backend. Feature toggle `voice-transcription` (cold, default off). Audio is forwarded to the operator-configured backend and never persisted here.
+│   ├── index.ts              — Barrel export for transcription module
+│   ├── types.ts              — ITranscriptionService, IWhisperClient, TranscriptionRequest/Result/Config, SUPPORTED_TRANSCRIPTION_LANGUAGES (['de','en'])
+│   ├── config.ts             — loadTranscriptionConfig() (backend URL env-only via SLATEBASE_TRANSCRIPTION_BACKEND_URL; timeout/max-audio/languages from the `transcription` server-config section + env)
+│   ├── errors.ts             — TranscriptionNotConfiguredError, AudioTooLargeError, TranscriptionTimeoutError, TranscriptionBackendUnavailableError
+│   ├── validation.ts         — Zod schemas (transcribeFieldsSchema: language + saveAudio, vaultId param)
+│   ├── whisper-client.ts     — WhisperClient (multipart POST to the backend, AbortSignal timeout, lenient text-field parsing; the ONLY file that knows the backend's request/response shape)
+│   └── transcription-service.ts — TranscriptionService (isConfigured gate, max-audio enforcement, lazy client via factory; never persists audio)
 ├── welcome-vault/
 │   ├── index.ts              — IWelcomeVaultService, WelcomeVaultService (never-throw, language-aware template copy)
 │   └── types.ts              — WelcomeVaultConfig, WelcomeVaultLanguage, OnUserCreatedFn
@@ -341,6 +349,9 @@ src/
 │       ├── widget-decorations.ts  — Block widgets (callouts with fold/unfold, GFM checkboxes, code-block-processor integration)
 │       ├── live-preview.css       — CSS styles for live-preview decorations (readable line length, editor wrapper)
 │       └── live-preview-extension.ts — Composes decorations into the CM6 extension (StateField, Compartment, click handler)
+│   └── dictation/                — Voice dictation (feature `voice-transcription`). Uses the plain `MediaRecorder` Web API, NOT the plugin-compat layer.
+│       ├── dictation-recorder.ts   — DictationRecorder (MediaRecorder wrapper; getUserMedia errors → DictationRecorderError with a stable `reason`: unsupported/permission-denied/insecure-context/failed; picks a supported audio MIME type)
+│       └── dictation-controller.ts — DictationController (module singleton, state machine idle/recording/processing/error; records → `apiClient.transcribe` → inserts text at the CM6 cursor via `view.dispatch`; optional audio attachment via the upload path + `![[…]]` embed). Backs the `voice:toggle-dictation` command and DictationIndicator
 ├── plugins/
 │   ├── index.ts          — Barrel export (all plugins, types, utilities)
 │   ├── types.ts          — MDAST node types (WikilinkNode, EmbedNode, CalloutNode, TagNode), IMAGE_EXTENSIONS, PDF_EXTENSIONS, AUDIO_EXTENSIONS, VIDEO_EXTENSIONS
@@ -532,6 +543,7 @@ src/
 │   ├── useFocusTrap.ts    — Reusable focus trap hook (Tab cycling, Escape callback, focus return to trigger element)
 │   ├── useReadableLineLength.ts — Constrains the editor to a readable measure, thin wrapper over `vaultSettingsStore` (per user *and* vault, default enabled); backs `toggle-readable-line-length`, consumed by EditMode.tsx → CodeMirrorEditor.tsx
 │   ├── useSpellcheck.ts   — Spellcheck on/off + dictionary language, thin wrapper over `vaultSettingsStore` (per user *and* vault; default: on, German). Backs `toggle-spellcheck` and `spellcheck-language-de`/`-en`, consumed by EditMode.tsx → CodeMirrorEditor.tsx; the actual checking happens in `editor/spellcheck/` — see there
+│   ├── useTranscriptionLanguage.ts — Dictation language ('auto'/'de'/'en') + "save audio attachment" preference, thin wrapper over `vaultSettingsStore` (per user *and* vault); non-React getters `getTranscriptionLanguage()`/`getSaveAudioAttachment()` for the command handler
 │   └── useReleaseNotes.ts — Fetches the last 5 GitHub releases (tag/name/body/htmlUrl) lazily (only while the Release Notes modal is open), 10s timeout, silent failure — same fetch pattern as useVersionInfo.ts
 ├── components/
 │   ├── SlatebaseLogo.tsx — SVG logo component
@@ -718,6 +730,7 @@ src/
 │   ├── ToastNotification.tsx — Toast notification system (module-level state, CSS transitions). `showToast()` returns the toast's id; `updateToastMessage(id, msg)`/`dismissToast(id)` target that specific toast — the Obsidian `Notice` compat shim's `setMessage()`/`hide()` need this to affect the toast they actually created, not just fire another `showToast()` blind. `duration: 0` suppresses auto-dismiss (Notice's "stays until closed"). `showToast()` also takes an optional `messageEl`: the Obsidian `Notice` shim passes its own element and `MountedNode` mounts that exact node, so a plugin building into `Notice.messageEl` after construction (progress lines, spinners) is writing to something on screen rather than a detached div
 │   ├── ToastNotification.css — Toast notification styles
 │   ├── ConnectionIndicator.tsx — SSE connection status indicator (connected/connecting/disconnected)
+│   ├── DictationIndicator.tsx — Floating dictation status panel (subscribes to DictationController via useSyncExternalStore): recording (stop button, language picker, save-audio toggle), processing (wait hint), error (role="alert"). Mounted in App.tsx, gated on `voice-transcription`. `.css` uses design tokens + prefers-reduced-motion
 │   ├── PluginViewPanel.tsx — Plugin view rendering (imperative DOM mount for plugin ItemViews)
 │   ├── PluginRibbonIcon.tsx — Plugin ribbon icon buttons (SidebarToolbar, dockable left or right)
 │   ├── McpTokensPage.tsx — MCP API token management UI (create, revoke, list)

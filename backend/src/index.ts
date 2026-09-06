@@ -86,6 +86,9 @@ import { createGitSyncRoutes } from './api/gitSyncRoutes.js'
 import { MailImportConfigStore, MailImportStatusStore, ImapClient, MailNoteWriter, MailImportEngine, MailImportScheduler } from './mail-import/index.js'
 import { createMailImportRoutes } from './api/mailImportRoutes.js'
 
+import { loadTranscriptionConfig, TranscriptionService, WhisperClient } from './transcription/index.js'
+import { createTranscriptionRoutes } from './api/transcriptionRoutes.js'
+
 // --- Composition Root ---
 
 // 1. Config + Logger
@@ -104,6 +107,7 @@ featureRegistry.register({ name: 'chat', description: 'Echtzeit-Chat zwischen Be
 featureRegistry.register({ name: 'mcp', description: 'AI Context Server (MCP Integration)', defaultEnabled: true, type: 'cold' })
 featureRegistry.register({ name: 'git-sync', description: 'Git-Synchronisation von Vaults mit externen Remotes', defaultEnabled: true, type: 'cold' })
 featureRegistry.register({ name: 'mail-import', description: 'IMAP-Mail-Import als Markdown-Notizen', defaultEnabled: true, type: 'cold' })
+featureRegistry.register({ name: 'voice-transcription', description: 'Diktieren / Spracherkennung via self-hosted Whisper (rechenintensiv, GPU empfohlen)', defaultEnabled: false, type: 'cold' })
 
 const featureToggleStore = new FeatureToggleStore(serverConfig.dataDir, logger)
 const persistedFeatureState = await featureToggleStore.load()
@@ -593,6 +597,7 @@ app.use('/api/v1/vaults/:vaultId/git-sync', createFeatureGuard('git-sync', featu
 app.use('/api/v1/vaults/:vaultId/git-sync/*', createFeatureGuard('git-sync', featureToggleService))
 app.use('/api/v1/vaults/:vaultId/mail-import', createFeatureGuard('mail-import', featureToggleService))
 app.use('/api/v1/vaults/:vaultId/mail-import/*', createFeatureGuard('mail-import', featureToggleService))
+app.use('/api/v1/vaults/:vaultId/transcribe', createFeatureGuard('voice-transcription', featureToggleService))
 
 // Route registration
 app.route('/api/v1', router)
@@ -747,6 +752,31 @@ const mailImportRoutes = createMailImportRoutes({
   logger,
 })
 app.route('/api/v1', mailImportRoutes)
+
+// Voice-Transcription route registration (auth middleware applies via /api/v1/* pattern; feature-gated above).
+// The Whisper backend URL is env-only (SLATEBASE_TRANSCRIPTION_BACKEND_URL); without it the
+// service reports isConfigured()=false and the route answers 503 — the feature toggle alone
+// does not make it work. Own per-user rate limit (10/min): a session-only, resource-heavy endpoint.
+const transcriptionConfig = loadTranscriptionConfig(config)
+const transcriptionService = new TranscriptionService(
+  transcriptionConfig,
+  (backendUrl) => new WhisperClient({ backendUrl, timeoutMs: transcriptionConfig.timeoutMs }, logger),
+)
+const transcriptionRateLimiter = new SlidingWindowRateLimiter(10, 60_000)
+const transcriptionRoutes = createTranscriptionRoutes({
+  transcriptionService,
+  accessControl: vaultAccessControl,
+  vaultRegistry,
+  rateLimiter: transcriptionRateLimiter,
+  logger,
+})
+app.route('/api/v1', transcriptionRoutes)
+if (featureToggleService.isEnabled('voice-transcription') && !transcriptionService.isConfigured()) {
+  logger.warn(
+    'Feature "voice-transcription" is enabled but no Whisper backend is configured — ' +
+    'set SLATEBASE_TRANSCRIPTION_BACKEND_URL. Dictation requests will return 503 until then.',
+  )
+}
 
 // Preferences route registration (auth middleware applies via /api/v1/* pattern)
 const preferencesStore = new PreferencesStore(serverConfig.dataDir, logger)

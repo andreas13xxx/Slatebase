@@ -134,6 +134,14 @@ export interface UserVaultSettings {
    * string rather than an enum the server would have to keep in step.
    */
   spellcheckLanguage: string
+  /**
+   * Dictation language for the voice-transcription feature: a Whisper language
+   * code ('de', 'en', …) or 'auto'. Client-owned like `spellcheckLanguage`,
+   * hence a bounded string.
+   */
+  transcriptionLanguage: string
+  /** Whether a dictation recording is also kept as a vault audio attachment. */
+  saveAudioAttachment: boolean
   /** App zoom factor (0.5–2.0). */
   zoom: number
   /** Knowledge-graph configuration; shape owned by the client. */
@@ -182,6 +190,8 @@ export const DEFAULT_VAULT_SETTINGS: UserVaultSettings = {
   readableLineLength: true,
   spellcheck: true,
   spellcheckLanguage: 'de',
+  transcriptionLanguage: 'auto',
+  saveAudioAttachment: false,
   zoom: 1,
   graph: null,
   sidebarPanel: null,

@@ -92,6 +92,8 @@ export const saveVaultSettingsSchema = z.object({
   readableLineLength: z.boolean().optional(),
   spellcheck: z.boolean().optional(),
   spellcheckLanguage: z.string().max(16).optional(),
+  transcriptionLanguage: z.string().max(16).optional(),
+  saveAudioAttachment: z.boolean().optional(),
   zoom: z.number().min(0.5).max(2).optional(),
   graph: opaqueBlobSchema.optional(),
   sidebarPanel: opaqueBlobSchema.optional(),

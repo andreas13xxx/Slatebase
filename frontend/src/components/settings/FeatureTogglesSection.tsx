@@ -12,6 +12,19 @@ export interface FeatureTogglesSectionProps {
 }
 
 /**
+ * Extra per-feature warnings shown beneath the description. Currently only the
+ * voice-transcription feature, whose real cost (compute/GPU) and prerequisite
+ * (a configured Whisper backend) an admin must understand before enabling it.
+ */
+const FEATURE_WARNINGS: Record<string, string> = {
+  'voice-transcription':
+    'Rechenintensiv: Die Spracherkennung (Whisper) läuft auf dem eigenen Server. ' +
+    'Ohne GPU ist die Umwandlung spürbar langsam. Zusätzlich muss ein Whisper-Backend ' +
+    'konfiguriert sein (SLATEBASE_TRANSCRIPTION_BACKEND_URL) — sonst bleibt die Funktion ' +
+    'trotz aktiviertem Schalter ohne Wirkung.',
+}
+
+/**
  * Self-contained feature toggles section for the unified Settings panel.
  * Renders the list of feature toggles with on/off switches, optimistic updates,
  * and rollback on failure. Reads/writes the global FeatureContext directly via
@@ -87,6 +100,12 @@ export function FeatureTogglesSection({ apiClient }: FeatureTogglesSectionProps)
               <div className="feature-toggle-cold-hint">
                 <AlertTriangle size={12} />
                 Neustart erforderlich
+              </div>
+            )}
+            {FEATURE_WARNINGS[feature.name] && (
+              <div className="feature-toggle-warning" role="note">
+                <AlertTriangle size={12} />
+                <span>{FEATURE_WARNINGS[feature.name]}</span>
               </div>
             )}
           </div>

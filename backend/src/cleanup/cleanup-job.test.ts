@@ -56,6 +56,7 @@ function createMockConfigService(overrides?: {
     getVaultConfigs: vi.fn().mockReturnValue([]),
     getFeaturesConfig: vi.fn().mockReturnValue({}),
     getSseConfig: vi.fn().mockReturnValue({}),
+    getTranscriptionConfig: vi.fn().mockReturnValue({ timeoutMs: 120000, maxAudioBytes: 26214400, supportedLanguages: ['de', 'en'] }),
     getTrashConfig: vi.fn().mockReturnValue({ retentionDays: overrides?.retentionDays ?? 30 }),
     getVersionsConfig: vi.fn().mockReturnValue({ maxPerFile: overrides?.maxPerFile ?? 20 }),
     getCleanupConfig: vi.fn().mockReturnValue({ intervalHours: overrides?.intervalHours ?? 24 }),

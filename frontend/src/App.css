@@ -2128,6 +2128,20 @@
   gap: 4px;
   margin-top: 4px;
 }
+.feature-toggle-warning {
+  font-size: 0.75rem;
+  color: var(--warning);
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin-top: 6px;
+  max-width: 60ch;
+  line-height: 1.4;
+}
+.feature-toggle-warning svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
 /* Toggle switch */
 .feature-toggle-switch {
   position: relative;

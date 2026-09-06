@@ -40,6 +40,8 @@ export const DEFAULT_VAULT_SETTINGS: UserVaultSettings = {
   readableLineLength: true,
   spellcheck: true,
   spellcheckLanguage: 'de',
+  transcriptionLanguage: 'auto',
+  saveAudioAttachment: false,
   zoom: 1,
   graph: null,
   sidebarPanel: null,
@@ -70,6 +72,8 @@ function normalize(raw: unknown): UserVaultSettings {
     readableLineLength: parsed.readableLineLength ?? DEFAULT_VAULT_SETTINGS.readableLineLength,
     spellcheck: parsed.spellcheck ?? DEFAULT_VAULT_SETTINGS.spellcheck,
     spellcheckLanguage: parsed.spellcheckLanguage ?? DEFAULT_VAULT_SETTINGS.spellcheckLanguage,
+    transcriptionLanguage: parsed.transcriptionLanguage ?? DEFAULT_VAULT_SETTINGS.transcriptionLanguage,
+    saveAudioAttachment: parsed.saveAudioAttachment ?? DEFAULT_VAULT_SETTINGS.saveAudioAttachment,
     zoom: typeof parsed.zoom === 'number' && parsed.zoom >= 0.5 && parsed.zoom <= 2
       ? parsed.zoom
       : DEFAULT_VAULT_SETTINGS.zoom,
