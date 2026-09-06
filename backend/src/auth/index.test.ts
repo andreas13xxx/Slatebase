@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as argon2 from 'argon2'
-import { mkdtemp, rm, readFile } from 'node:fs/promises'
+import { mkdtemp, rm, readFile, mkdir, writeFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { createHash } from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
 import type { IUserRepository } from '../user/index.js'
 import type { UserRecord } from '../user/index.js'
@@ -64,11 +65,20 @@ function createMockUser(overrides?: Partial<UserRecord>): UserRecord {
   }
 }
 
+/** Mirrors SessionStore's internal hashing so the mock spies on raw tokens the same way. */
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex')
+}
+
 function createMockSessionStore(): ISessionStore & {
   sessions: Session[]
   invalidatedTokens: string[]
 } {
   const sessions: Session[] = []
+  // What actually got invalidated: invalidate() records the raw token it was
+  // called with, invalidateAllForUser() records the tokenHash of each removed
+  // session (it never sees the raw token) — tests compare against whichever
+  // matches how the code under test reached this store.
   const invalidatedTokens: string[] = []
 
   return {
@@ -84,7 +94,8 @@ function createMockSessionStore(): ISessionStore & {
       }
     },
     async findByToken(token: string): Promise<Session | null> {
-      const session = sessions.find(s => s.token === token)
+      const tokenHash = hashToken(token)
+      const session = sessions.find(s => s.tokenHash === tokenHash)
       if (session === undefined) return null
       if (new Date(session.expiresAt).getTime() <= Date.now()) return null
       return session
@@ -94,20 +105,28 @@ function createMockSessionStore(): ISessionStore & {
     },
     async invalidate(token: string): Promise<void> {
       invalidatedTokens.push(token)
-      const idx = sessions.findIndex(s => s.token === token)
+      const tokenHash = hashToken(token)
+      const idx = sessions.findIndex(s => s.tokenHash === tokenHash)
+      if (idx !== -1) {
+        sessions.splice(idx, 1)
+      }
+    },
+    async invalidateBySessionId(sessionId: string): Promise<void> {
+      const idx = sessions.findIndex(s => s.sessionId === sessionId)
       if (idx !== -1) {
         sessions.splice(idx, 1)
       }
     },
     async invalidateAllForUser(userId: string, exceptToken?: string): Promise<void> {
+      const exceptTokenHash = exceptToken !== undefined ? hashToken(exceptToken) : undefined
       const toRemove = sessions.filter(
-        s => s.userId === userId && (exceptToken === undefined || s.token !== exceptToken)
+        s => s.userId === userId && (exceptTokenHash === undefined || s.tokenHash !== exceptTokenHash)
       )
       for (const s of toRemove) {
-        invalidatedTokens.push(s.token)
+        invalidatedTokens.push(s.tokenHash)
       }
       const remaining = sessions.filter(
-        s => s.userId !== userId || (exceptToken !== undefined && s.token === exceptToken)
+        s => s.userId !== userId || (exceptTokenHash !== undefined && s.tokenHash === exceptTokenHash)
       )
       sessions.length = 0
       sessions.push(...remaining)
@@ -467,8 +486,9 @@ describe('AuthService', () => {
       expect(session.ipAddress).toBe('127.0.0.1')
       expect(session.createdAt).toBeDefined()
       expect(session.lastActivity).toBeDefined()
-      // Should NOT contain token or csrfToken
+      // Should NOT contain the token hash or any token material
       expect((session as unknown as Record<string, unknown>)['token']).toBeUndefined()
+      expect((session as unknown as Record<string, unknown>)['tokenHash']).toBeUndefined()
       expect((session as unknown as Record<string, unknown>)['csrfToken']).toBeUndefined()
     })
   })
@@ -481,12 +501,15 @@ describe('AuthService', () => {
       const userRepo = createMockUserRepository([user])
       const authService = new AuthService(sessionStore, userRepo, logger, csrfSecret)
 
-      const result = await authService.login('testuser', 'password123', loginMeta)
+      await authService.login('testuser', 'password123', loginMeta)
       const sessionId = sessionStore.sessions[0]!.sessionId
 
       await authService.invalidateSession('user-1', sessionId)
 
-      expect(sessionStore.invalidatedTokens).toContain(result.token)
+      // invalidateSession() goes through invalidateBySessionId() — it never
+      // needs (and after AP5 can no longer obtain) the raw token, so the
+      // session's removal from the store is the only observable effect.
+      expect(sessionStore.sessions).toHaveLength(0)
     })
 
     it('should not invalidate sessions belonging to other users', async () => {
@@ -502,7 +525,6 @@ describe('AuthService', () => {
       // Try to invalidate with wrong userId
       await authService.invalidateSession('other-user', sessionId)
 
-      expect(sessionStore.invalidatedTokens).toHaveLength(0)
       expect(sessionStore.sessions).toHaveLength(1)
     })
   })
@@ -523,9 +545,9 @@ describe('AuthService', () => {
 
       // First session should remain
       expect(sessionStore.sessions).toHaveLength(1)
-      expect(sessionStore.sessions[0]!.token).toBe(result1.token)
+      expect(sessionStore.sessions[0]!.tokenHash).toBe(hashToken(result1.token))
       // Second session should be invalidated
-      expect(sessionStore.invalidatedTokens).toContain(result2.token)
+      expect(sessionStore.invalidatedTokens).toContain(hashToken(result2.token))
     })
   })
 
@@ -605,12 +627,14 @@ describe('AuthService', () => {
 
 // ─── SessionStore (filesystem-backed) ─────────────────────────────────────────
 
+/** The raw token behind every createTestSession() session, unless overridden via tokenHash. */
+const TEST_RAW_TOKEN = 'token-1'
+
 function createTestSession(overrides?: Partial<Session>): Session {
   const now = new Date()
   return {
     sessionId: 'session-1',
-    token: 'token-1',
-    csrfToken: 'csrf-1',
+    tokenHash: hashToken(TEST_RAW_TOKEN),
     userId: 'user-1',
     role: 'user',
     userAgent: 'TestAgent/1.0',
@@ -641,10 +665,52 @@ describe('SessionStore (filesystem)', () => {
     const session = createTestSession()
     await store.create(session)
 
-    const found = await store.findByToken(session.token)
+    const found = await store.findByToken(TEST_RAW_TOKEN)
 
     expect(found).not.toBeNull()
     expect(found!.sessionId).toBe(session.sessionId)
+  })
+
+  it('never persists the raw token — only its SHA-256 hash', async () => {
+    const store = new SessionStore(dataDir, logger)
+    const session = createTestSession()
+    await store.create(session)
+
+    const filePath = join(dataDir, 'sessions', `${session.sessionId}.json`)
+    const raw = await readFile(filePath, 'utf-8')
+
+    expect(raw).not.toContain(TEST_RAW_TOKEN)
+    expect(raw).toContain(session.tokenHash)
+
+    const parsed: unknown = JSON.parse(raw)
+    expect((parsed as Record<string, unknown>)['token']).toBeUndefined()
+    expect((parsed as Record<string, unknown>)['csrfToken']).toBeUndefined()
+  })
+
+  it('rejects a legacy session record without tokenHash instead of accepting it', async () => {
+    // Pre-AP5 format: raw `token` + `csrfToken`, no `tokenHash`. Must be treated
+    // as invalid so it can never be loaded as a live session.
+    const sessionsDir = join(dataDir, 'sessions')
+    await mkdir(sessionsDir, { recursive: true })
+    const legacyRecord = {
+      sessionId: 'legacy-session',
+      token: TEST_RAW_TOKEN,
+      csrfToken: 'csrf-1',
+      userId: 'user-1',
+      role: 'user',
+      userAgent: 'TestAgent/1.0',
+      ipAddress: '127.0.0.1',
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+      lastActivity: new Date().toISOString(),
+    }
+    await writeFile(join(sessionsDir, 'legacy-session.json'), JSON.stringify(legacyRecord, null, 2), 'utf-8')
+
+    const store = new SessionStore(dataDir, logger)
+    await store.loadIndex()
+
+    const found = await store.findByToken(TEST_RAW_TOKEN)
+    expect(found).toBeNull()
   })
 
   it('keeps the token indexed after a transient read failure, and recovers on retry', async () => {
@@ -660,7 +726,7 @@ describe('SessionStore (filesystem)', () => {
     )
     const warnSpy = vi.spyOn(logger, 'warn')
 
-    const duringFailure = await store.findByToken(session.token)
+    const duringFailure = await store.findByToken(TEST_RAW_TOKEN)
     expect(duringFailure).toBeNull()
     expect(warnSpy).toHaveBeenCalledWith(
       'Session file temporarily unreadable — keeping token index entry',
@@ -669,7 +735,7 @@ describe('SessionStore (filesystem)', () => {
 
     // The mock only rejects once — the retry hits the real filesystem and succeeds,
     // proving the token was never removed from the index.
-    const afterRecovery = await store.findByToken(session.token)
+    const afterRecovery = await store.findByToken(TEST_RAW_TOKEN)
     expect(afterRecovery).not.toBeNull()
     expect(afterRecovery!.sessionId).toBe(session.sessionId)
   })
@@ -684,7 +750,7 @@ describe('SessionStore (filesystem)', () => {
     await rm(join(dataDir, 'sessions', `${session.sessionId}.json`))
     const warnSpy = vi.spyOn(logger, 'warn')
 
-    const found = await store.findByToken(session.token)
+    const found = await store.findByToken(TEST_RAW_TOKEN)
 
     expect(found).toBeNull()
     // ENOENT is a confirmed deletion, not a transient failure — no warning expected.
@@ -698,7 +764,22 @@ describe('SessionStore (filesystem)', () => {
     })
     await store.create(expired)
 
-    const found = await store.findByToken(expired.token)
+    const found = await store.findByToken(TEST_RAW_TOKEN)
     expect(found).toBeNull()
+  })
+
+  it('creates and updates session files with restrictive (owner-only) permissions', async () => {
+    if (process.platform === 'win32') {
+      // POSIX mode bits are largely a no-op on Windows (ACLs apply instead) —
+      // this assertion is only meaningful on POSIX filesystems.
+      return
+    }
+    const store = new SessionStore(dataDir, logger)
+    const session = createTestSession()
+    await store.create(session)
+
+    const filePath = join(dataDir, 'sessions', `${session.sessionId}.json`)
+    const st = await stat(filePath)
+    expect(st.mode & 0o777).toBe(0o600)
   })
 })

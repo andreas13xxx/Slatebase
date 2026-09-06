@@ -37,8 +37,7 @@ function createTestUser(overrides: Partial<UserRecord> = {}): UserRecord {
 function createTestSession(overrides: Partial<Session> = {}): Session {
   return {
     sessionId: 'session-1',
-    token: 'token-abc',
-    csrfToken: 'csrf-xyz',
+    tokenHash: 'token-hash-abc',
     userId: 'user-1',
     role: 'user',
     userAgent: 'TestAgent/1.0',
@@ -109,9 +108,9 @@ function createMockSessionStore(sessions: Session[] = []): ISessionStore & { upd
     async create(session: Session): Promise<void> {
       store.set(session.sessionId, session)
     },
-    async findByToken(token: string): Promise<Session | null> {
+    async findByToken(tokenHash: string): Promise<Session | null> {
       for (const session of store.values()) {
-        if (session.token === token) return session
+        if (session.tokenHash === tokenHash) return session
       }
       return null
     },
@@ -122,17 +121,20 @@ function createMockSessionStore(sessions: Session[] = []): ISessionStore & { upd
       }
       return result
     },
-    async invalidate(token: string): Promise<void> {
+    async invalidate(tokenHash: string): Promise<void> {
       for (const [id, session] of store.entries()) {
-        if (session.token === token) {
+        if (session.tokenHash === tokenHash) {
           store.delete(id)
           break
         }
       }
     },
-    async invalidateAllForUser(userId: string, exceptToken?: string): Promise<void> {
+    async invalidateBySessionId(sessionId: string): Promise<void> {
+      store.delete(sessionId)
+    },
+    async invalidateAllForUser(userId: string, exceptTokenHash?: string): Promise<void> {
       for (const [id, session] of store.entries()) {
-        if (session.userId === userId && session.token !== exceptToken) {
+        if (session.userId === userId && session.tokenHash !== exceptTokenHash) {
           store.delete(id)
         }
       }
@@ -191,8 +193,8 @@ describe('RoleService', () => {
 
     it('should update all active sessions with the new role', async () => {
       const user = createTestUser({ userId: 'u1', role: 'user' })
-      const session1 = createTestSession({ sessionId: 's1', userId: 'u1', role: 'user', token: 'tok1' })
-      const session2 = createTestSession({ sessionId: 's2', userId: 'u1', role: 'user', token: 'tok2' })
+      const session1 = createTestSession({ sessionId: 's1', userId: 'u1', role: 'user', tokenHash: 'tok1' })
+      const session2 = createTestSession({ sessionId: 's2', userId: 'u1', role: 'user', tokenHash: 'tok2' })
 
       userRepo = createMockUserRepository([user])
       sessionStore = createMockSessionStore([session1, session2])
@@ -209,8 +211,8 @@ describe('RoleService', () => {
     it('should not update sessions of other users', async () => {
       const user1 = createTestUser({ userId: 'u1', role: 'user', username: 'user1' })
       const user2 = createTestUser({ userId: 'u2', role: 'user', username: 'user2' })
-      const session1 = createTestSession({ sessionId: 's1', userId: 'u1', role: 'user', token: 'tok1' })
-      const session2 = createTestSession({ sessionId: 's2', userId: 'u2', role: 'user', token: 'tok2' })
+      const session1 = createTestSession({ sessionId: 's1', userId: 'u1', role: 'user', tokenHash: 'tok1' })
+      const session2 = createTestSession({ sessionId: 's2', userId: 'u2', role: 'user', tokenHash: 'tok2' })
 
       userRepo = createMockUserRepository([user1, user2])
       sessionStore = createMockSessionStore([session1, session2])

@@ -25,13 +25,20 @@ export type JsonFileParser<T> = (raw: unknown) => T | null
  * the target can make `rename` fail with EPERM/EACCES; in that case the target
  * is unlinked first and the rename retried, falling back to a direct write as
  * a last resort so the operation never silently loses data.
+ *
+ * `mode` (optional) sets POSIX file permissions (e.g. `0o600` for a
+ * secret-bearing file). It must be passed to the temp file's `writeFile` call —
+ * `rename()` preserves the temp file's mode, not the target's — so it's applied
+ * at both write sites here (the initial temp write and the last-resort direct
+ * write). On Windows this POSIX mode is largely a no-op (ACL-based permissions
+ * apply instead) — that's expected, not a bug.
  */
-export async function writeJsonFileAtomic(filePath: string, value: unknown): Promise<void> {
+export async function writeJsonFileAtomic(filePath: string, value: unknown, mode?: number): Promise<void> {
   await mkdir(dirname(filePath), { recursive: true })
 
   const content = JSON.stringify(value, null, 2)
   const tempPath = `${filePath}.${randomBytes(8).toString('hex')}.tmp`
-  await writeFile(tempPath, content, 'utf-8')
+  await writeFile(tempPath, content, { encoding: 'utf-8', mode })
 
   let renamed = false
   try {
@@ -48,7 +55,7 @@ export async function writeJsonFileAtomic(filePath: string, value: unknown): Pro
       } catch {
         // Last resort. This can throw too if the lock outlives every attempt —
         // the `finally` below still removes the temp file in that case.
-        await writeFile(filePath, content, 'utf-8')
+        await writeFile(filePath, content, { encoding: 'utf-8', mode })
       }
     }
   } finally {

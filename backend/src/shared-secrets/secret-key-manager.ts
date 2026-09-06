@@ -136,10 +136,16 @@ export class ModuleSecretKeyManager implements IModuleSecretKeyManager {
     return /^[0-9a-f]{64}$/i.test(secret)
   }
 
+  /**
+   * The temp file is created with mode 0o600 (owner read/write only) — `rename()`
+   * preserves the temp file's mode, not the target's, so the mode must be set
+   * here rather than after the rename. On Windows this POSIX mode is largely a
+   * no-op (ACL-based permissions apply instead) — that's expected, not a bug.
+   */
   private async persistSecret(secret: string): Promise<void> {
     await mkdir(this.dataDir, { recursive: true })
     const tempPath = `${this.secretPath}.${randomBytes(8).toString('hex')}.tmp`
-    await writeFile(tempPath, secret, 'utf-8')
+    await writeFile(tempPath, secret, { encoding: 'utf-8', mode: 0o600 })
     await rename(tempPath, this.secretPath)
   }
 }
