@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtemp, rm, readFile } from 'node:fs/promises'
+import { mkdtemp, rm, readFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PluginSecretKeyManager } from './secret-key-manager.js'
@@ -172,5 +172,37 @@ describe('PluginSecretStore', () => {
     expect(raw).not.toContain('super-secret-value')
     expect(raw).toContain('"iv"')
     expect(raw).toContain('"ciphertext"')
+  })
+
+  it('writes the secrets file with restrictive (owner-only) permissions', async () => {
+    if (process.platform === 'win32') {
+      // POSIX mode bits are largely a no-op on Windows (ACLs apply instead) —
+      // this assertion is only meaningful on POSIX filesystems.
+      return
+    }
+    await store.setSecret('vault-1', 'my-plugin', 'token', 'value')
+    const filePath = join(dataDir, 'plugins', 'vault-1', 'my-plugin', 'secrets.json')
+    const st = await stat(filePath)
+    expect(st.mode & 0o777).toBe(0o600)
+  })
+
+  it('does not lose either secret when two setSecret calls for different plugins race (AP9)', async () => {
+    await Promise.all([
+      store.setSecret('vault-1', 'plugin-a', 'key', 'val-a'),
+      store.setSecret('vault-1', 'plugin-b', 'key', 'val-b'),
+    ])
+
+    expect(await store.getSecret('vault-1', 'plugin-a', 'key')).toBe('val-a')
+    expect(await store.getSecret('vault-1', 'plugin-b', 'key')).toBe('val-b')
+  })
+
+  it('does not lose either secret when two setSecret calls for the same plugin race', async () => {
+    await Promise.all([
+      store.setSecret('vault-1', 'my-plugin', 'key-a', 'val-a'),
+      store.setSecret('vault-1', 'my-plugin', 'key-b', 'val-b'),
+    ])
+
+    expect(await store.getSecret('vault-1', 'my-plugin', 'key-a')).toBe('val-a')
+    expect(await store.getSecret('vault-1', 'my-plugin', 'key-b')).toBe('val-b')
   })
 })

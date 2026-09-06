@@ -38,6 +38,8 @@ export interface IPluginService {
   saveRegistry(vaultId: string, registry: PluginRegistryData): Promise<void>
   /** Loads the plugin registry. */
   loadRegistry(vaultId: string): Promise<PluginRegistryData | null>
+  /** Atomically read-modify-write the registry. See `IInstalledPluginStore.mutateRegistry`. */
+  mutateRegistry(vaultId: string, fn: (current: PluginRegistryData | null) => PluginRegistryData): Promise<PluginRegistryData>
   /** Lists all plugins installed for a vault. */
   listPlugins(vaultId: string): Promise<PluginManifest[]>
   /** Loads a single plugin's manifest. */
@@ -81,6 +83,13 @@ export class PluginService implements IPluginService {
 
   async loadRegistry(vaultId: string): Promise<PluginRegistryData | null> {
     return this.pluginStore.loadRegistry(vaultId)
+  }
+
+  async mutateRegistry(
+    vaultId: string,
+    fn: (current: PluginRegistryData | null) => PluginRegistryData,
+  ): Promise<PluginRegistryData> {
+    return this.pluginStore.mutateRegistry(vaultId, fn)
   }
 
   async listPlugins(vaultId: string): Promise<PluginManifest[]> {

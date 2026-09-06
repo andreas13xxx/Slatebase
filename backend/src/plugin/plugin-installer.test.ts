@@ -26,6 +26,9 @@ function createMockPluginStore(overrides?: Partial<IInstalledPluginStore>): IIns
     async deleteAllForVault(): Promise<void> { /* no-op */ },
     async saveRegistry(): Promise<void> { /* no-op */ },
     async loadRegistry(): Promise<PluginRegistryData | null> { return null },
+    async mutateRegistry(_vaultId: string, fn: (current: PluginRegistryData | null) => PluginRegistryData): Promise<PluginRegistryData> {
+      return fn(null)
+    },
     ...overrides,
   }
 }

@@ -81,4 +81,12 @@ export interface IInstalledPluginStore {
   saveRegistry(vaultId: string, registry: PluginRegistryData): Promise<void>;
   /** Load plugin registry */
   loadRegistry(vaultId: string): Promise<PluginRegistryData | null>;
+  /**
+   * Atomically read-modify-write the registry: `fn` receives the current
+   * registry (`null` if none exists yet) and returns the value to persist.
+   * Runs inside the registry's per-vault mutex, so two concurrent callers
+   * (e.g. two plugin installs racing on the same vault) can't each read a
+   * stale registry and have one's update silently overwrite the other's.
+   */
+  mutateRegistry(vaultId: string, fn: (current: PluginRegistryData | null) => PluginRegistryData): Promise<PluginRegistryData>;
 }

@@ -41,6 +41,13 @@ export interface ISnippetStore {
   saveRegistry(vaultId: string, registry: SnippetRegistryData): Promise<void>;
   /** Load the snippet activation registry for a vault. Returns null if it does not exist. */
   loadRegistry(vaultId: string): Promise<SnippetRegistryData | null>;
+  /**
+   * Atomically read-modify-write the registry: `fn` receives the current
+   * registry (`null` if none exists yet) and returns the value to persist.
+   * Runs inside the registry's per-vault mutex, so a delete's registry-entry
+   * cleanup can't lose a concurrent delete of a different snippet.
+   */
+  mutateRegistry(vaultId: string, fn: (current: SnippetRegistryData | null) => SnippetRegistryData): Promise<SnippetRegistryData>;
   /** Delete all snippet data for a vault (files + registry). */
   deleteAllForVault(vaultId: string): Promise<void>;
 }

@@ -6,6 +6,7 @@ import type { ISessionStore } from '../auth/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { IAuditService } from '../audit/index.js'
 import type { OnUserCreatedFn } from '../welcome-vault/types.js'
+import { readJsonFile, writeJsonFileAtomic, JsonFileStore } from '../shared/json-file-store.js'
 import { isNodeError } from '../shared/fs-utils.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -287,15 +288,28 @@ interface UsernameIndex {
  * Stores user records as individual JSON files under `data/users/<userId>.json`.
  * Maintains a `_index.json` file mapping usernames to user IDs for fast lookups.
  * All write operations use atomic temp-file-then-rename to prevent corruption.
+ *
+ * The index is a `JsonFileStore`, so every read-modify-write cycle against it
+ * (username uniqueness check + claim, or removal on delete) runs inside that
+ * store's mutex. Two concurrent `save()` calls for different usernames can no
+ * longer race a stale read against each other's write and lose one of the
+ * mappings — and a `save()` that tries to claim a username already owned by a
+ * different userId now throws `UserConflictError` instead of silently
+ * clobbering the winner.
  */
 export class UserRepository implements IUserRepository {
   private readonly usersDir: string
-  private readonly indexPath: string
+  private readonly indexStore: JsonFileStore<UsernameIndex>
   private initialized = false
 
   constructor(dataDir: string) {
     this.usersDir = path.join(dataDir, 'users')
-    this.indexPath = path.join(this.usersDir, '_index.json')
+    const indexPath = path.join(this.usersDir, '_index.json')
+    this.indexStore = new JsonFileStore<UsernameIndex>(
+      indexPath,
+      {},
+      (raw) => (raw !== null && typeof raw === 'object' && !Array.isArray(raw) ? raw as UsernameIndex : null),
+    )
   }
 
   /**
@@ -308,73 +322,15 @@ export class UserRepository implements IUserRepository {
   }
 
   /**
-   * Reads the username→userId index from disk.
-   * Returns an empty object if the file does not exist.
-   */
-  private async readIndex(): Promise<UsernameIndex> {
-    try {
-      const raw = await fs.readFile(this.indexPath, 'utf-8')
-      const parsed: unknown = JSON.parse(raw)
-      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        return {}
-      }
-      return parsed as UsernameIndex
-    } catch (error: unknown) {
-      if (isNodeError(error) && error.code === 'ENOENT') {
-        return {}
-      }
-      throw error
-    }
-  }
-
-  /**
-   * Writes the username→userId index to disk atomically.
-   */
-  private async writeIndex(index: UsernameIndex): Promise<void> {
-    await this.ensureDirectory()
-    const content = JSON.stringify(index, null, 2)
-    const tempPath = this.indexPath + `.${crypto.randomBytes(8).toString('hex')}.tmp`
-
-    await fs.writeFile(tempPath, content, 'utf-8')
-
-    try {
-      await fs.rename(tempPath, this.indexPath)
-    } catch (renameError) {
-      try {
-        await fs.unlink(tempPath)
-      } catch {
-        // Ignore cleanup errors
-      }
-      throw renameError
-    }
-  }
-
-  /**
-   * Writes a user record to disk atomically.
-   * The temp file is created with mode 0o600 (owner read/write only) — user
-   * records carry the argon2 password hash. `rename()` preserves the temp
-   * file's mode, not the target's, so the mode must be set here rather than
-   * after the rename. On Windows this POSIX mode is largely a no-op (ACL-based
+   * Writes a user record to disk atomically. The file is created with mode
+   * 0o600 (owner read/write only) — user records carry the argon2 password
+   * hash. On Windows this POSIX mode is largely a no-op (ACL-based
    * permissions apply instead) — that's expected, not a bug.
    */
   private async writeUserFile(user: UserRecord): Promise<void> {
     await this.ensureDirectory()
     const filePath = path.join(this.usersDir, `${user.userId}.json`)
-    const content = JSON.stringify(user, null, 2)
-    const tempPath = filePath + `.${crypto.randomBytes(8).toString('hex')}.tmp`
-
-    await fs.writeFile(tempPath, content, { encoding: 'utf-8', mode: 0o600 })
-
-    try {
-      await fs.rename(tempPath, filePath)
-    } catch (renameError) {
-      try {
-        await fs.unlink(tempPath)
-      } catch {
-        // Ignore cleanup errors
-      }
-      throw renameError
-    }
+    await writeJsonFileAtomic(filePath, user, 0o600)
   }
 
   /**
@@ -383,15 +339,7 @@ export class UserRepository implements IUserRepository {
    */
   private async readUserFile(userId: string): Promise<UserRecord | null> {
     const filePath = path.join(this.usersDir, `${userId}.json`)
-    try {
-      const raw = await fs.readFile(filePath, 'utf-8')
-      return JSON.parse(raw) as UserRecord
-    } catch (error: unknown) {
-      if (isNodeError(error) && error.code === 'ENOENT') {
-        return null
-      }
-      throw error
-    }
+    return readJsonFile<UserRecord | null>(filePath, null)
   }
 
   /** Find a user by their unique ID. */
@@ -403,7 +351,7 @@ export class UserRepository implements IUserRepository {
   /** Find a user by their username using the index for fast lookup. */
   async findByUsername(username: string): Promise<UserRecord | null> {
     await this.ensureDirectory()
-    const index = await this.readIndex()
+    const index = await this.indexStore.read()
     const userId = index[username]
     if (userId === undefined) {
       return null
@@ -414,7 +362,7 @@ export class UserRepository implements IUserRepository {
   /** Search users by username prefix (case-insensitive). Returns up to `limit` results. */
   async searchByUsernamePrefix(prefix: string, limit: number = 10): Promise<UserRecord[]> {
     await this.ensureDirectory()
-    const index = await this.readIndex()
+    const index = await this.indexStore.read()
     const lowerPrefix = prefix.toLowerCase()
     const matchingUsernames = Object.keys(index)
       .filter((name) => name.toLowerCase().startsWith(lowerPrefix))
@@ -436,7 +384,7 @@ export class UserRepository implements IUserRepository {
   /** List all users with pagination, sorted by username ascending. */
   async findAll(options?: PaginationOptions): Promise<PaginatedResult<UserRecord>> {
     await this.ensureDirectory()
-    const index = await this.readIndex()
+    const index = await this.indexStore.read()
     const usernames = Object.keys(index).sort((a, b) => a.localeCompare(b))
     const total = usernames.length
 
@@ -466,26 +414,41 @@ export class UserRepository implements IUserRepository {
     }
   }
 
-  /** Save (create or update) a user record atomically. */
+  /**
+   * Save (create or update) a user record.
+   *
+   * The username uniqueness check-and-claim and the user file write all run
+   * inside the index store's mutex, so two concurrent saves — e.g. two
+   * `createUser()` calls racing on the same username — can't both observe
+   * the username as free. The second one to acquire the lock sees the
+   * first's claim and throws `UserConflictError` instead of silently
+   * overwriting the index entry.
+   */
   async save(user: UserRecord): Promise<void> {
     await this.ensureDirectory()
 
-    // Read current index
-    const index = await this.readIndex()
+    await this.indexStore.mutate(async (index) => {
+      // Check if this is an update with a username change
+      const existingUser = await this.readUserFile(user.userId)
+      if (existingUser !== null && existingUser.username !== user.username) {
+        // Remove old username from index
+        delete index[existingUser.username]
+      }
 
-    // Check if this is an update with a username change
-    const existingUser = await this.readUserFile(user.userId)
-    if (existingUser !== null && existingUser.username !== user.username) {
-      // Remove old username from index
-      delete index[existingUser.username]
-    }
+      // Reject if another user already claimed this username while we were
+      // waiting for the lock (or was already holding it before us).
+      const claimedBy = index[user.username]
+      if (claimedBy !== undefined && claimedBy !== user.userId) {
+        throw new UserConflictError(user.username)
+      }
 
-    // Write user file atomically
-    await this.writeUserFile(user)
+      // Write user file atomically
+      await this.writeUserFile(user)
 
-    // Update index with current username → userId mapping
-    index[user.username] = user.userId
-    await this.writeIndex(index)
+      // Claim the current username → userId mapping
+      index[user.username] = user.userId
+      return index
+    })
   }
 
   /** Delete a user record by ID and remove from index. */
@@ -510,23 +473,25 @@ export class UserRepository implements IUserRepository {
       }
     }
 
-    // Remove from index
-    const index = await this.readIndex()
-    delete index[user.username]
-    await this.writeIndex(index)
+    // Remove from index, inside the same mutex as save() so a concurrent
+    // save() for a different user can't lose this removal (or vice versa).
+    await this.indexStore.mutate((index) => {
+      delete index[user.username]
+      return index
+    })
   }
 
   /** Count total number of users. */
   async count(): Promise<number> {
     await this.ensureDirectory()
-    const index = await this.readIndex()
+    const index = await this.indexStore.read()
     return Object.keys(index).length
   }
 
   /** Count users with a specific role. */
   async countByRole(role: UserRole): Promise<number> {
     await this.ensureDirectory()
-    const index = await this.readIndex()
+    const index = await this.indexStore.read()
     const userIds = Object.values(index)
 
     let count = 0

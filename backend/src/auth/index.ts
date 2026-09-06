@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomBytes, randomUUID, createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import { hash, verify } from 'argon2'
@@ -7,6 +7,7 @@ import { AccountSuspendedError, ARGON2_OPTIONS, toPublicUserInfo } from '../user
 import type { ILogger } from '../logger/index.js'
 import type { IAuditService } from '../audit/index.js'
 import { isNodeError } from '../shared/fs-utils.js'
+import { writeJsonFileAtomic } from '../shared/json-file-store.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -288,7 +289,7 @@ export class SessionStore implements ISessionStore {
   async create(session: Session): Promise<void> {
     await this.ensureDir()
     const filePath = join(this.sessionsDir, `${session.sessionId}.json`)
-    await this.atomicWrite(filePath, JSON.stringify(session, null, 2))
+    await writeJsonFileAtomic(filePath, session, 0o600)
     this.tokenIndex.set(session.tokenHash, session.sessionId)
     this.addToUserIndex(session.userId, session.sessionId)
   }
@@ -299,7 +300,7 @@ export class SessionStore implements ISessionStore {
   async update(session: Session): Promise<void> {
     await this.ensureDir()
     const filePath = join(this.sessionsDir, `${session.sessionId}.json`)
-    await this.atomicWrite(filePath, JSON.stringify(session, null, 2))
+    await writeJsonFileAtomic(filePath, session, 0o600)
   }
 
   /**
@@ -567,52 +568,6 @@ export class SessionStore implements ISessionStore {
       await unlink(filePath)
     } catch {
       // File may already be deleted — ignore
-    }
-  }
-
-  /**
-   * Write data atomically: write to a temp file, then rename to target.
-   * On Windows, rename can fail with EPERM if the target is briefly locked
-   * (e.g. by antivirus or file watchers). Retries with delay and unlink-before-rename.
-   *
-   * The temp file is created with mode 0o600 (owner read/write only) — session
-   * files carry a token hash and other session data, so they get the same
-   * restrictive permissions as other secret-bearing files. `rename()` preserves
-   * the temp file's mode, not the target's, so the mode must be set here rather
-   * than after the rename. On Windows this POSIX mode is largely a no-op
-   * (ACL-based permissions apply instead) — that's expected, not a bug.
-   */
-  private async atomicWrite(targetPath: string, data: string): Promise<void> {
-    const tempName = `${randomBytes(16).toString('hex')}.tmp`
-    const tempPath = join(this.sessionsDir, tempName)
-    await writeFile(tempPath, data, { encoding: 'utf-8', mode: 0o600 })
-
-    try {
-      await rename(tempPath, targetPath)
-    } catch (err: unknown) {
-      const code = (err as NodeJS.ErrnoException).code
-      if (code === 'EPERM' || code === 'EACCES') {
-        // Windows: target may be locked — wait briefly for lock release, then retry
-        await new Promise(resolve => setTimeout(resolve, 50))
-        try { await unlink(targetPath) } catch { /* may not exist */ }
-        try {
-          await rename(tempPath, targetPath)
-        } catch {
-          // Second retry after another short delay
-          await new Promise(resolve => setTimeout(resolve, 100))
-          try {
-            await rename(tempPath, targetPath)
-          } catch {
-            // Last resort: direct overwrite (loses atomicity but avoids crash)
-            await writeFile(targetPath, data, { encoding: 'utf-8', mode: 0o600 })
-            try { await unlink(tempPath) } catch { /* cleanup */ }
-          }
-        }
-      } else {
-        // Clean up temp file and rethrow
-        try { await unlink(tempPath) } catch { /* ignore */ }
-        throw err
-      }
     }
   }
 

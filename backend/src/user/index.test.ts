@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from 'vitest'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
-import { UserRepository, ensureDefaultAdmin } from './index.js'
+import { UserRepository, ensureDefaultAdmin, UserConflictError } from './index.js'
 import type { UserRecord } from './index.js'
 import type { ILogger } from '../logger/index.js'
 
@@ -237,6 +237,47 @@ describe('UserRepository', () => {
 
       const dirExists = await fs.stat(path.join(freshDir, 'users')).then(() => true).catch(() => false)
       expect(dirExists).toBe(true)
+    })
+  })
+
+  describe('concurrency (AP9 regression: lost username -> userId mapping)', () => {
+    it('does not lose either mapping when two saves for different usernames race', async () => {
+      const userA = createTestUser({ userId: 'user-a', username: 'alice' })
+      const userB = createTestUser({ userId: 'user-b', username: 'bob' })
+
+      await Promise.all([repo.save(userA), repo.save(userB)])
+
+      const foundA = await repo.findByUsername('alice')
+      const foundB = await repo.findByUsername('bob')
+      expect(foundA?.userId).toBe('user-a')
+      expect(foundB?.userId).toBe('user-b')
+
+      const indexPath = path.join(tempDir, 'users', '_index.json')
+      const index = JSON.parse(await fs.readFile(indexPath, 'utf-8'))
+      expect(index).toEqual({ alice: 'user-a', bob: 'user-b' })
+    })
+
+    it('lets exactly one of two concurrent saves claim the same username', async () => {
+      const userA = createTestUser({ userId: 'user-a', username: 'shared-name' })
+      const userB = createTestUser({ userId: 'user-b', username: 'shared-name' })
+
+      const results = await Promise.allSettled([repo.save(userA), repo.save(userB)])
+
+      const fulfilled = results.filter((r) => r.status === 'fulfilled')
+      const rejected = results.filter((r) => r.status === 'rejected')
+      expect(fulfilled).toHaveLength(1)
+      expect(rejected).toHaveLength(1)
+      expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(UserConflictError)
+
+      // The index must point at whichever userId actually won the race —
+      // never left half-updated or pointing at neither.
+      const winner = await repo.findByUsername('shared-name')
+      expect(winner).not.toBeNull()
+      expect(['user-a', 'user-b']).toContain(winner!.userId)
+
+      const indexPath = path.join(tempDir, 'users', '_index.json')
+      const index = JSON.parse(await fs.readFile(indexPath, 'utf-8'))
+      expect(index).toEqual({ 'shared-name': winner!.userId })
     })
   })
 })

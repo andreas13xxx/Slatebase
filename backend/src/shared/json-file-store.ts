@@ -112,6 +112,8 @@ export class JsonFileStore<T> {
     private readonly defaultValue: T,
     private readonly parse?: JsonFileParser<T>,
     private readonly onError?: (error: unknown) => void,
+    /** POSIX mode for written files (e.g. `0o600` for a secret-bearing store). See `writeJsonFileAtomic`. */
+    private readonly mode?: number,
   ) {}
 
   /** Reads the current value. Not serialized against writes — renames are atomic. */
@@ -121,7 +123,7 @@ export class JsonFileStore<T> {
 
   /** Overwrites the value, serialized against other writes/mutations to this path. */
   async write(value: T): Promise<void> {
-    await this.mutex.runExclusive(() => writeJsonFileAtomic(this.filePath, value))
+    await this.mutex.runExclusive(() => writeJsonFileAtomic(this.filePath, value, this.mode))
   }
 
   /**
@@ -133,7 +135,7 @@ export class JsonFileStore<T> {
     return this.mutex.runExclusive(async () => {
       const current = await readJsonFile(this.filePath, this.defaultValue, this.parse, this.onError)
       const next = await fn(current)
-      await writeJsonFileAtomic(this.filePath, next)
+      await writeJsonFileAtomic(this.filePath, next, this.mode)
       return next
     })
   }
@@ -153,6 +155,8 @@ export class KeyedJsonFileStore<T> {
     private readonly defaultValue: T,
     private readonly parse?: JsonFileParser<T>,
     private readonly onError?: (error: unknown) => void,
+    /** POSIX mode for written files (e.g. `0o600` for a secret-bearing store). See `writeJsonFileAtomic`. */
+    private readonly mode?: number,
   ) {}
 
   /** Reads the current value for `key`. Not serialized against writes — renames are atomic. */
@@ -162,7 +166,7 @@ export class KeyedJsonFileStore<T> {
 
   /** Overwrites the value for `key`, serialized against other writes/mutations to that key. */
   async write(key: string, value: T): Promise<void> {
-    await this.locks.runExclusive(key, () => writeJsonFileAtomic(this.keyToPath(key), value))
+    await this.locks.runExclusive(key, () => writeJsonFileAtomic(this.keyToPath(key), value, this.mode))
   }
 
   /**
@@ -175,7 +179,7 @@ export class KeyedJsonFileStore<T> {
     return this.locks.runExclusive(key, async () => {
       const current = await readJsonFile(filePath, this.defaultValue, this.parse, this.onError)
       const next = await fn(current)
-      await writeJsonFileAtomic(filePath, next)
+      await writeJsonFileAtomic(filePath, next, this.mode)
       return next
     })
   }

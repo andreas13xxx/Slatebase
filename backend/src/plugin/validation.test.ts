@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { isValidPluginId, PLUGIN_ID_PATTERN, pluginManifestSchema } from './validation.js'
+import type { PluginRegistryData } from './types.js'
 
 // ─── isValidPluginId ─────────────────────────────────────────────────────────
 
@@ -150,6 +151,7 @@ describe('PluginInstaller — manifest ID path traversal', () => {
       deleteAllForVault: async () => {},
       saveRegistry: async () => {},
       loadRegistry: async () => null,
+      mutateRegistry: async (_v: string, fn: (current: PluginRegistryData | null) => PluginRegistryData) => fn(null),
     }
 
     const installer = new PluginInstaller(mockStore)

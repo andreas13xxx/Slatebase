@@ -110,6 +110,26 @@ describe('SnippetStore', () => {
     })
   })
 
+  describe('mutateRegistry (AP9: concurrent registry updates must not lose either entry)', () => {
+    it('does not lose either snippet entry when two mutateRegistry calls race', async () => {
+      const vaultId = 'vault-registry-race'
+
+      await Promise.all([
+        store.mutateRegistry(vaultId, (current) => ({
+          version: 1,
+          snippets: { ...(current?.snippets ?? {}), 'snippet-a': { enabled: true, updatedAt: '2026-01-01T00:00:00.000Z' } },
+        })),
+        store.mutateRegistry(vaultId, (current) => ({
+          version: 1,
+          snippets: { ...(current?.snippets ?? {}), 'snippet-b': { enabled: false, updatedAt: '2026-01-01T00:00:00.000Z' } },
+        })),
+      ])
+
+      const registry = await store.loadRegistry(vaultId)
+      expect(Object.keys(registry?.snippets ?? {}).sort()).toEqual(['snippet-a', 'snippet-b'])
+    })
+  })
+
   describe('deleteAllForVault', () => {
     it('removes all snippet files and the registry for a vault', async () => {
       const vaultId = 'vault-delete-all-test'

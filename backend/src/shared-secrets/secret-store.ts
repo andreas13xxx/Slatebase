@@ -10,11 +10,9 @@
  * implementation instead of each reinventing encrypted-at-rest storage.
  */
 
-import fs from 'node:fs/promises'
 import path from 'node:path'
-import crypto from 'node:crypto'
 import type { IModuleSecretKeyManager } from './secret-key-manager.js'
-import { isNodeError } from '../shared/fs-utils.js'
+import { KeyedJsonFileStore } from '../shared/json-file-store.js'
 
 // ─── Interface ───────────────────────────────────────────────────────────────
 
@@ -56,20 +54,38 @@ export class ModuleSecretTooLargeError extends Error {
 
 // ─── Implementation ──────────────────────────────────────────────────────────
 
+/** Empty secrets file, returned as the default for a module with none set yet. */
+function emptySecretsFile(): SecretsFile {
+  return { secrets: {} }
+}
+
+function parseSecretsFile(raw: unknown): SecretsFile | null {
+  if (raw === null || typeof raw !== 'object') return null
+  const secrets = (raw as { secrets?: unknown }).secrets
+  if (typeof secrets !== 'object' || secrets === null) return null
+  return raw as SecretsFile
+}
+
 export class ModuleSecretStore implements IModuleSecretStore {
   private readonly baseDir: string
+  private readonly store: KeyedJsonFileStore<SecretsFile>
 
   constructor(
     dataDir: string,
     private readonly keyManager: IModuleSecretKeyManager
   ) {
     this.baseDir = path.join(dataDir, 'module-secrets')
+    this.store = new KeyedJsonFileStore<SecretsFile>(
+      (key) => path.join(this.baseDir, key, SECRETS_FILENAME),
+      emptySecretsFile(),
+      parseSecretsFile,
+      undefined,
+      0o600, // owner read/write only — secrets carry git-sync/mail-import credentials
+    )
   }
 
   async getSecret(vaultId: string, moduleId: string, entryId: string): Promise<string | null> {
-    const data = await this.readSecretsFile(vaultId, moduleId)
-    if (!data) return null
-
+    const data = await this.store.read(this.key(vaultId, moduleId))
     const entry = data.secrets[entryId]
     if (!entry) return null
 
@@ -87,51 +103,25 @@ export class ModuleSecretStore implements IModuleSecretStore {
       throw new ModuleSecretTooLargeError(entryId)
     }
 
-    const data = await this.readSecretsFile(vaultId, moduleId) ?? { secrets: {} }
-    data.secrets[entryId] = this.keyManager.encrypt(value)
-    await this.writeSecretsFile(vaultId, moduleId, data)
+    // Encrypt outside the critical section — it's pure CPU work, no need to hold the lock for it.
+    const encrypted = this.keyManager.encrypt(value)
+
+    await this.store.mutate(this.key(vaultId, moduleId), (data) => {
+      data.secrets[entryId] = encrypted
+      return data
+    })
   }
 
   async deleteSecret(vaultId: string, moduleId: string, entryId: string): Promise<void> {
-    const data = await this.readSecretsFile(vaultId, moduleId)
-    if (!data || !(entryId in data.secrets)) return
-
-    delete data.secrets[entryId]
-    await this.writeSecretsFile(vaultId, moduleId, data)
+    await this.store.mutate(this.key(vaultId, moduleId), (data) => {
+      delete data.secrets[entryId]
+      return data
+    })
   }
 
   // ─── Private ─────────────────────────────────────────────────────────────
 
-  private getModuleDir(vaultId: string, moduleId: string): string {
-    return path.join(this.baseDir, vaultId, moduleId)
-  }
-
-  private getSecretsFilePath(vaultId: string, moduleId: string): string {
-    return path.join(this.getModuleDir(vaultId, moduleId), SECRETS_FILENAME)
-  }
-
-  private async readSecretsFile(vaultId: string, moduleId: string): Promise<SecretsFile | null> {
-    const filePath = this.getSecretsFilePath(vaultId, moduleId)
-    try {
-      const content = await fs.readFile(filePath, 'utf-8')
-      const parsed = JSON.parse(content) as SecretsFile
-      if (!parsed || typeof parsed.secrets !== 'object') return null
-      return parsed
-    } catch (err: unknown) {
-      if (isNodeError(err) && err.code === 'ENOENT') return null
-      throw err
-    }
-  }
-
-  private async writeSecretsFile(vaultId: string, moduleId: string, data: SecretsFile): Promise<void> {
-    const dir = this.getModuleDir(vaultId, moduleId)
-    await fs.mkdir(dir, { recursive: true })
-
-    const filePath = this.getSecretsFilePath(vaultId, moduleId)
-    const tempPath = `${filePath}.${crypto.randomBytes(8).toString('hex')}.tmp`
-    const content = JSON.stringify(data, null, 2)
-
-    await fs.writeFile(tempPath, content, 'utf-8')
-    await fs.rename(tempPath, filePath)
+  private key(vaultId: string, moduleId: string): string {
+    return `${vaultId}/${moduleId}`
   }
 }

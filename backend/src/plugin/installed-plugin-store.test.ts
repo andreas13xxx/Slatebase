@@ -187,6 +187,33 @@ describe('InstalledPluginStore', () => {
     })
   })
 
+  describe('mutateRegistry (AP9: concurrent registry updates must not lose either entry)', () => {
+    const entry = (overrides: Partial<PluginRegistryData['plugins'][string]> = {}): PluginRegistryData['plugins'][string] => ({
+      status: 'inactive',
+      permissions: { network: false, networkAllowlist: [], filesystemWrite: false, domManipulation: false },
+      compatibilityLevel: 'unknown',
+      installedAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+      ...overrides,
+    })
+
+    it('does not lose either plugin entry when two mutateRegistry calls race', async () => {
+      await Promise.all([
+        store.mutateRegistry('vault-3', (current) => ({
+          version: 1,
+          plugins: { ...(current?.plugins ?? {}), 'plugin-a': entry() },
+        })),
+        store.mutateRegistry('vault-3', (current) => ({
+          version: 1,
+          plugins: { ...(current?.plugins ?? {}), 'plugin-b': entry() },
+        })),
+      ])
+
+      const registry = await store.loadRegistry('vault-3')
+      expect(Object.keys(registry?.plugins ?? {}).sort()).toEqual(['plugin-a', 'plugin-b'])
+    })
+  })
+
   describe('listPlugins', () => {
     it('lists all plugins for a vault', async () => {
       const vaultId = 'vault-list-test'

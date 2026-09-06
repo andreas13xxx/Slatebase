@@ -6,9 +6,9 @@
 
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import crypto from 'node:crypto'
 import type { IPluginSecretKeyManager } from './secret-key-manager.js'
 import { isNodeError } from '../shared/fs-utils.js'
+import { KeyedJsonFileStore } from '../shared/json-file-store.js'
 
 // ─── Interface ───────────────────────────────────────────────────────────────
 
@@ -60,20 +60,38 @@ export class SecretTooLargeError extends Error {
 
 // ─── Implementation ──────────────────────────────────────────────────────────
 
+/** Empty secrets file, returned as the default for a plugin with none set yet. */
+function emptySecretsFile(): SecretsFile {
+  return { secrets: {} }
+}
+
+function parseSecretsFile(raw: unknown): SecretsFile | null {
+  if (raw === null || typeof raw !== 'object') return null
+  const secrets = (raw as { secrets?: unknown }).secrets
+  if (typeof secrets !== 'object' || secrets === null) return null
+  return raw as SecretsFile
+}
+
 export class PluginSecretStore implements IPluginSecretStore {
   private readonly pluginsDir: string
+  private readonly store: KeyedJsonFileStore<SecretsFile>
 
   constructor(
     dataDir: string,
     private readonly keyManager: IPluginSecretKeyManager
   ) {
     this.pluginsDir = path.join(dataDir, 'plugins')
+    this.store = new KeyedJsonFileStore<SecretsFile>(
+      (key) => path.join(this.pluginsDir, key, SECRETS_FILENAME),
+      emptySecretsFile(),
+      parseSecretsFile,
+      undefined,
+      0o600, // owner read/write only — secrets carry the plugin's raw values, AES-GCM-encrypted at rest
+    )
   }
 
   async getSecret(vaultId: string, pluginId: string, secretId: string): Promise<string | null> {
-    const data = await this.readSecretsFile(vaultId, pluginId)
-    if (!data) return null
-
+    const data = await this.store.read(this.key(vaultId, pluginId))
     const entry = data.secrets[secretId]
     if (!entry) return null
 
@@ -92,39 +110,37 @@ export class PluginSecretStore implements IPluginSecretStore {
       throw new SecretTooLargeError(secretId)
     }
 
-    const data = await this.readSecretsFile(vaultId, pluginId) ?? { secrets: {} }
-
-    // Check limit (only if adding a NEW secret)
-    if (!(secretId in data.secrets)) {
-      const currentCount = Object.keys(data.secrets).length
-      if (currentCount >= MAX_SECRETS_PER_PLUGIN) {
-        throw new SecretLimitExceededError(pluginId)
-      }
-    }
-
-    // Encrypt and store
+    // Encrypt outside the critical section — it's pure CPU work, no need to hold the lock for it.
     const encrypted = this.keyManager.encrypt(value)
-    data.secrets[secretId] = encrypted
 
-    await this.writeSecretsFile(vaultId, pluginId, data)
+    await this.store.mutate(this.key(vaultId, pluginId), (data) => {
+      // Check limit (only if adding a NEW secret)
+      if (!(secretId in data.secrets)) {
+        const currentCount = Object.keys(data.secrets).length
+        if (currentCount >= MAX_SECRETS_PER_PLUGIN) {
+          throw new SecretLimitExceededError(pluginId)
+        }
+      }
+
+      data.secrets[secretId] = encrypted
+      return data
+    })
   }
 
   async deleteSecret(vaultId: string, pluginId: string, secretId: string): Promise<void> {
-    const data = await this.readSecretsFile(vaultId, pluginId)
-    if (!data || !(secretId in data.secrets)) return
-
-    delete data.secrets[secretId]
-    await this.writeSecretsFile(vaultId, pluginId, data)
+    await this.store.mutate(this.key(vaultId, pluginId), (data) => {
+      delete data.secrets[secretId]
+      return data
+    })
   }
 
   async listSecrets(vaultId: string, pluginId: string): Promise<string[]> {
-    const data = await this.readSecretsFile(vaultId, pluginId)
-    if (!data) return []
+    const data = await this.store.read(this.key(vaultId, pluginId))
     return Object.keys(data.secrets)
   }
 
   async deleteAllForPlugin(vaultId: string, pluginId: string): Promise<void> {
-    const filePath = this.getSecretsFilePath(vaultId, pluginId)
+    const filePath = path.join(this.pluginsDir, this.key(vaultId, pluginId), SECRETS_FILENAME)
     try {
       await fs.unlink(filePath)
     } catch (err: unknown) {
@@ -135,36 +151,7 @@ export class PluginSecretStore implements IPluginSecretStore {
 
   // ─── Private ─────────────────────────────────────────────────────────────
 
-  private getPluginDir(vaultId: string, pluginId: string): string {
-    return path.join(this.pluginsDir, vaultId, pluginId)
-  }
-
-  private getSecretsFilePath(vaultId: string, pluginId: string): string {
-    return path.join(this.getPluginDir(vaultId, pluginId), SECRETS_FILENAME)
-  }
-
-  private async readSecretsFile(vaultId: string, pluginId: string): Promise<SecretsFile | null> {
-    const filePath = this.getSecretsFilePath(vaultId, pluginId)
-    try {
-      const content = await fs.readFile(filePath, 'utf-8')
-      const parsed = JSON.parse(content) as SecretsFile
-      if (!parsed || typeof parsed.secrets !== 'object') return null
-      return parsed
-    } catch (err: unknown) {
-      if (isNodeError(err) && err.code === 'ENOENT') return null
-      throw err
-    }
-  }
-
-  private async writeSecretsFile(vaultId: string, pluginId: string, data: SecretsFile): Promise<void> {
-    const dir = this.getPluginDir(vaultId, pluginId)
-    await fs.mkdir(dir, { recursive: true })
-
-    const filePath = this.getSecretsFilePath(vaultId, pluginId)
-    const tempPath = `${filePath}.${crypto.randomBytes(8).toString('hex')}.tmp`
-    const content = JSON.stringify(data, null, 2)
-
-    await fs.writeFile(tempPath, content, 'utf-8')
-    await fs.rename(tempPath, filePath)
+  private key(vaultId: string, pluginId: string): string {
+    return `${vaultId}/${pluginId}`
   }
 }

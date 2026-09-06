@@ -25,6 +25,7 @@ function createMockSnippetStore(overrides: Partial<ISnippetStore> = {}): ISnippe
     listSnippets: async () => [],
     saveRegistry: async () => {},
     loadRegistry: async () => null,
+    mutateRegistry: async (_v, fn) => fn(null),
     deleteAllForVault: async () => {},
     ...overrides,
   }
@@ -218,8 +219,11 @@ describe('Snippet Routes', () => {
         snippetStore: createMockSnippetStore({
           loadSnippet: async () => 'body {}',
           deleteSnippet: async (_v, id) => { deletedId = id },
-          loadRegistry: async () => registry,
-          saveRegistry: async (_v, r) => { savedRegistry = r },
+          mutateRegistry: async (_v, fn) => {
+            const next = fn(registry)
+            savedRegistry = next
+            return next
+          },
         }),
       })
 

@@ -280,11 +280,13 @@ export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
 
       await snippetStore.deleteSnippet(vaultId, snippetId)
 
-      const registry = await snippetStore.loadRegistry(vaultId)
-      if (registry !== null && snippetId in registry.snippets) {
+      await snippetStore.mutateRegistry(vaultId, (registry) => {
+        if (registry === null || !(snippetId in registry.snippets)) {
+          return registry ?? { version: 1, snippets: {} }
+        }
         const { [snippetId]: _removed, ...rest } = registry.snippets
-        await snippetStore.saveRegistry(vaultId, { version: 1, snippets: rest })
-      }
+        return { version: 1, snippets: rest }
+      })
 
       return c.body(null, 204)
     } catch (error) {

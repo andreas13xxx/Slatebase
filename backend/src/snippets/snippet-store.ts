@@ -8,6 +8,7 @@ import type { ISnippetStore, SnippetMeta, SnippetRegistryData } from './types.js
 import { SnippetTooLargeError } from './errors.js'
 import { isValidSnippetFilename, snippetIdFromFilename, MAX_SNIPPET_SIZE } from './validation.js'
 import { isNodeError } from '../shared/fs-utils.js'
+import { KeyedJsonFileStore } from '../shared/json-file-store.js'
 
 /**
  * Filesystem-based persistence for CSS snippets.
@@ -16,9 +17,14 @@ import { isNodeError } from '../shared/fs-utils.js'
  */
 export class SnippetStore implements ISnippetStore {
   private readonly snippetsDir: string
+  private readonly registryStore: KeyedJsonFileStore<SnippetRegistryData | null>
 
   constructor(dataDir: string) {
     this.snippetsDir = path.join(dataDir, 'snippets')
+    this.registryStore = new KeyedJsonFileStore<SnippetRegistryData | null>(
+      (vaultId) => path.join(this.getVaultDir(vaultId), '_registry.json'),
+      null,
+    )
   }
 
   /**
@@ -104,12 +110,7 @@ export class SnippetStore implements ISnippetStore {
    * Saves the snippet activation registry (_registry.json) atomically.
    */
   async saveRegistry(vaultId: string, registry: SnippetRegistryData): Promise<void> {
-    const dir = this.getVaultDir(vaultId)
-    await fs.mkdir(dir, { recursive: true })
-
-    const filePath = path.join(dir, '_registry.json')
-    const content = JSON.stringify(registry, null, 2)
-    await this.atomicWrite(filePath, content)
+    await this.registryStore.write(vaultId, registry)
   }
 
   /**
@@ -117,8 +118,21 @@ export class SnippetStore implements ISnippetStore {
    * Returns null if the file does not exist or cannot be parsed.
    */
   async loadRegistry(vaultId: string): Promise<SnippetRegistryData | null> {
-    const filePath = path.join(this.getVaultDir(vaultId), '_registry.json')
-    return this.readJsonFile<SnippetRegistryData>(filePath)
+    return this.registryStore.read(vaultId)
+  }
+
+  /**
+   * Atomically read-modify-write the registry inside its per-vault mutex —
+   * e.g. deleting a snippet must remove its registry entry without racing a
+   * concurrent delete of a different snippet in the same vault (AP9).
+   */
+  async mutateRegistry(
+    vaultId: string,
+    fn: (current: SnippetRegistryData | null) => SnippetRegistryData,
+  ): Promise<SnippetRegistryData> {
+    // fn always returns a non-null SnippetRegistryData; the store's generic
+    // type is nullable only to represent "no registry file yet" on read.
+    return this.registryStore.mutate(vaultId, (current) => fn(current)) as Promise<SnippetRegistryData>
   }
 
   /**
@@ -222,19 +236,6 @@ export class SnippetStore implements ISnippetStore {
       // Ignore cleanup errors
     }
     throw lastError
-  }
-
-  /**
-   * Reads and parses a JSON file from disk.
-   * Returns null if the file does not exist or cannot be parsed.
-   */
-  private async readJsonFile<T>(filePath: string): Promise<T | null> {
-    try {
-      const raw = await fs.readFile(filePath, 'utf-8')
-      return JSON.parse(raw) as T
-    } catch {
-      return null
-    }
   }
 
   /**

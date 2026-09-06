@@ -9,6 +9,7 @@ import type { IInstalledPluginStore, PluginFiles, PluginManifest, PluginRegistry
 import { PluginFileTooLargeError, PluginSettingsTooLargeError } from './errors.js'
 import { isValidPluginId } from './validation.js'
 import { isNodeError } from '../shared/fs-utils.js'
+import { KeyedJsonFileStore } from '../shared/json-file-store.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -27,9 +28,14 @@ const MAX_SETTINGS_SIZE = 1 * 1024 * 1024
  */
 export class InstalledPluginStore implements IInstalledPluginStore {
   private readonly pluginsDir: string
+  private readonly registryStore: KeyedJsonFileStore<PluginRegistryData | null>
 
   constructor(dataDir: string) {
     this.pluginsDir = path.join(dataDir, 'plugins')
+    this.registryStore = new KeyedJsonFileStore<PluginRegistryData | null>(
+      (vaultId) => path.join(this.getVaultDir(vaultId), '_registry.json'),
+      null,
+    )
   }
 
   /**
@@ -195,12 +201,7 @@ export class InstalledPluginStore implements IInstalledPluginStore {
    * Contains activation status, permissions, and compatibility info.
    */
   async saveRegistry(vaultId: string, registry: PluginRegistryData): Promise<void> {
-    const dir = this.getVaultDir(vaultId)
-    await fs.mkdir(dir, { recursive: true })
-
-    const filePath = path.join(dir, '_registry.json')
-    const content = JSON.stringify(registry, null, 2)
-    await this.atomicWrite(filePath, content)
+    await this.registryStore.write(vaultId, registry)
   }
 
   /**
@@ -208,8 +209,22 @@ export class InstalledPluginStore implements IInstalledPluginStore {
    * Returns null if the file does not exist or cannot be parsed.
    */
   async loadRegistry(vaultId: string): Promise<PluginRegistryData | null> {
-    const filePath = path.join(this.getVaultDir(vaultId), '_registry.json')
-    return this.readJsonFile<PluginRegistryData>(filePath)
+    return this.registryStore.read(vaultId)
+  }
+
+  /**
+   * Atomically read-modify-write the registry inside its per-vault mutex.
+   * See `IInstalledPluginStore.mutateRegistry` for why this matters — two
+   * plugin installs racing on the same vault must not lose each other's
+   * registry update.
+   */
+  async mutateRegistry(
+    vaultId: string,
+    fn: (current: PluginRegistryData | null) => PluginRegistryData,
+  ): Promise<PluginRegistryData> {
+    // fn always returns a non-null PluginRegistryData; the store's generic
+    // type is nullable only to represent "no registry file yet" on read.
+    return this.registryStore.mutate(vaultId, (current) => fn(current)) as Promise<PluginRegistryData>
   }
 
   // ─── Private Helpers ─────────────────────────────────────────────────────────

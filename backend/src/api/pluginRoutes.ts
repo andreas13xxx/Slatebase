@@ -175,29 +175,29 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
       if (result.warnings.length > 0) {
         const hasEvalUsage = result.warnings.some((w) => w.includes('eval(') || w.includes('new Function('))
         if (hasEvalUsage) {
-          const registry = await pluginService.loadRegistry(vaultId)
-          const now = new Date().toISOString()
-          const existingEntry = registry?.plugins?.[result.pluginId]
-          const updatedRegistry = {
-            version: 1 as const,
-            plugins: {
-              ...(registry?.plugins ?? {}),
-              [result.pluginId]: {
-                status: existingEntry?.status ?? ('inactive' as const),
-                permissions: existingEntry?.permissions ?? {
-                  network: false,
-                  networkAllowlist: [],
-                  filesystemWrite: false,
-                  domManipulation: false,
+          await pluginService.mutateRegistry(vaultId, (registry) => {
+            const now = new Date().toISOString()
+            const existingEntry = registry?.plugins?.[result.pluginId]
+            return {
+              version: 1 as const,
+              plugins: {
+                ...(registry?.plugins ?? {}),
+                [result.pluginId]: {
+                  status: existingEntry?.status ?? ('inactive' as const),
+                  permissions: existingEntry?.permissions ?? {
+                    network: false,
+                    networkAllowlist: [],
+                    filesystemWrite: false,
+                    domManipulation: false,
+                  },
+                  compatibilityLevel: existingEntry?.compatibilityLevel ?? ('unknown' as const),
+                  installedAt: existingEntry?.installedAt ?? now,
+                  updatedAt: now,
+                  hasEvalUsage: true,
                 },
-                compatibilityLevel: existingEntry?.compatibilityLevel ?? ('unknown' as const),
-                installedAt: existingEntry?.installedAt ?? now,
-                updatedAt: now,
-                hasEvalUsage: true,
               },
-            },
-          }
-          await pluginService.saveRegistry(vaultId, updatedRegistry)
+            }
+          })
         }
       }
 
@@ -325,29 +325,29 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
       if (result.warnings.length > 0) {
         const hasEvalUsage = result.warnings.some((w) => w.includes('eval(') || w.includes('new Function('))
         if (hasEvalUsage) {
-          const registry = await pluginService.loadRegistry(vaultId)
-          const now = new Date().toISOString()
-          const existingEntry = registry?.plugins?.[result.pluginId]
-          const updatedRegistry = {
-            version: 1 as const,
-            plugins: {
-              ...(registry?.plugins ?? {}),
-              [result.pluginId]: {
-                status: existingEntry?.status ?? ('inactive' as const),
-                permissions: existingEntry?.permissions ?? {
-                  network: false,
-                  networkAllowlist: [],
-                  filesystemWrite: false,
-                  domManipulation: false,
+          await pluginService.mutateRegistry(vaultId, (registry) => {
+            const now = new Date().toISOString()
+            const existingEntry = registry?.plugins?.[result.pluginId]
+            return {
+              version: 1 as const,
+              plugins: {
+                ...(registry?.plugins ?? {}),
+                [result.pluginId]: {
+                  status: existingEntry?.status ?? ('inactive' as const),
+                  permissions: existingEntry?.permissions ?? {
+                    network: false,
+                    networkAllowlist: [],
+                    filesystemWrite: false,
+                    domManipulation: false,
+                  },
+                  compatibilityLevel: existingEntry?.compatibilityLevel ?? ('unknown' as const),
+                  installedAt: existingEntry?.installedAt ?? now,
+                  updatedAt: now,
+                  hasEvalUsage: true,
                 },
-                compatibilityLevel: existingEntry?.compatibilityLevel ?? ('unknown' as const),
-                installedAt: existingEntry?.installedAt ?? now,
-                updatedAt: now,
-                hasEvalUsage: true,
               },
-            },
-          }
-          await pluginService.saveRegistry(vaultId, updatedRegistry)
+            }
+          })
         }
       }
 

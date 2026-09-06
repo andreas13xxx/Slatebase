@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtemp, rm, readFile } from 'node:fs/promises'
+import { mkdtemp, rm, readFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ModuleSecretKeyManager } from './secret-key-manager.js'
@@ -126,5 +126,27 @@ describe('ModuleSecretStore', () => {
     expect(raw).not.toContain('super-secret-password')
     expect(raw).toContain('"iv"')
     expect(raw).toContain('"ciphertext"')
+  })
+
+  it('writes the secrets file with restrictive (owner-only) permissions', async () => {
+    if (process.platform === 'win32') {
+      // POSIX mode bits are largely a no-op on Windows (ACLs apply instead) —
+      // this assertion is only meaningful on POSIX filesystems.
+      return
+    }
+    await store.setSecret('vault-1', 'git-sync', 'remote-a', 'token')
+    const filePath = join(dataDir, 'module-secrets', 'vault-1', 'git-sync', 'secrets.json')
+    const st = await stat(filePath)
+    expect(st.mode & 0o777).toBe(0o600)
+  })
+
+  it('does not lose either secret when two setSecret calls for different modules race (AP9)', async () => {
+    await Promise.all([
+      store.setSecret('vault-1', 'git-sync', 'remote-a', 'token-a'),
+      store.setSecret('vault-1', 'mail-import', 'account-a', 'password-a'),
+    ])
+
+    expect(await store.getSecret('vault-1', 'git-sync', 'remote-a')).toBe('token-a')
+    expect(await store.getSecret('vault-1', 'mail-import', 'account-a')).toBe('password-a')
   })
 })
