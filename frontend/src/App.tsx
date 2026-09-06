@@ -700,8 +700,8 @@ function AppContent() {
       case 'admin-users': return <AdminUsersPage apiClient={apiClient} />
       case 'admin-vaults': return <AdminVaultsPage apiClient={apiClient} />
       case 'admin-config': return <AdminConfigPage apiClient={apiClient} />
-      case 'admin-audit': return <AdminAuditPage apiClient={apiClient} />
-      case 'admin-logs': return <AdminLogsPage apiClient={apiClient} />
+      case 'admin-audit': return <AdminAuditPage />
+      case 'admin-logs': return <AdminLogsPage />
       case 'vault-sharing':
         return state.selectedVaultId
           ? <VaultSharing apiClient={apiClient} vaultId={state.selectedVaultId} />

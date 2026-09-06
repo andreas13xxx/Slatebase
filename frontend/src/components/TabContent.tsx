@@ -280,14 +280,14 @@ export function TabContent() {
     vaultId: activeTabVaultId ?? '',
     directoryTree: directoryTreeForActiveVault,
     onInternalLinkClick: handleInternalLinkClick,
-  }), [activeTabVaultId, directoryTreeForActiveVault, apiClient, handleInternalLinkClick])
+  }), [activeTabVaultId, directoryTreeForActiveVault, handleInternalLinkClick])
   const previewModeLivePreviewOptions = useMemo(() => ({
     vaultId: activeTabVaultId ?? '',
     directoryTree: directoryTreeForActiveVault,
     onInternalLinkClick: handleInternalLinkClick,
     typeRegistry,
     onPropertyTypeChange: handlePropertyTypeChange,
-  }), [activeTabVaultId, directoryTreeForActiveVault, apiClient, handleInternalLinkClick, typeRegistry, handlePropertyTypeChange])
+  }), [activeTabVaultId, directoryTreeForActiveVault, handleInternalLinkClick, typeRegistry, handlePropertyTypeChange])
 
   // No active tab — empty state
   if (!activeTab) {
