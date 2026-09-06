@@ -429,7 +429,6 @@ export interface VaultInfo {
 
 export interface Vault {
   info: VaultInfo
-  tree: DirectoryTree  // In-Memory-Cache der Verzeichnisstruktur
 }
 
 // --- IVaultManager Interface ---
@@ -448,15 +447,13 @@ export class VaultManager implements IVaultManager {
   private readonly vaults: Map<string, Vault> = new Map()
 
   constructor(
-    private readonly vaultReader: IVaultReader,
     private readonly logger: ILogger,
-    private readonly maxDepth: number,
   ) {}
 
   /**
    * Loads vaults from the provided configurations.
    * For each config: validates path exists, generates ID, resolves name (deduplication),
-   * reads directory tree, and stores the Vault in memory.
+   * and stores the Vault in memory.
    * On error: logs and skips (graceful degradation).
    * Logs a warning if no vaults are configured.
    */
@@ -483,10 +480,7 @@ export class VaultManager implements IVaultManager {
         const name = resolveVaultName(dirName, existingNames)
         existingNames.add(name)
 
-        // 4. Read directory tree
-        const tree = await this.vaultReader.readDirectory(absolutePath, this.maxDepth)
-
-        // 5. Store vault
+        // 4. Store vault
         const vault: Vault = {
           info: {
             id,
@@ -494,7 +488,6 @@ export class VaultManager implements IVaultManager {
             path: absolutePath,
             status: 'loaded',
           },
-          tree,
         }
 
         this.vaults.set(id, vault)

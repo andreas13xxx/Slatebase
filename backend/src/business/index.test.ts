@@ -90,7 +90,6 @@ function createMockVault(id: string, name: string, vaultPath: string): Vault {
       path: vaultPath,
       status: 'loaded',
     },
-    tree: createMockTree(),
   }
 }
 

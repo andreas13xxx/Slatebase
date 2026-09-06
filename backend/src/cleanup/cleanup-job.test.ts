@@ -85,7 +85,6 @@ function createTestVault(id: string, vaultPath: string): Vault {
       path: vaultPath,
       status: 'loaded',
     },
-    tree: { name: 'root', type: 'directory', path: '' },
   }
 }
 

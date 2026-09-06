@@ -6,7 +6,7 @@ import { pipeline } from 'node:stream/promises'
 import { createWriteStream } from 'node:fs'
 import type { ILogger } from '../logger/index.js'
 import type { IConfigService } from '../config/index.js'
-import type { IVaultManager, IVaultReader } from '../vault/index.js'
+import type { IVaultManager } from '../vault/index.js'
 import { validateFilePath } from '../vault/index.js'
 import { VaultNotFoundError } from '../business/index.js'
 
@@ -91,7 +91,6 @@ export interface IImportService {
 export class ImportService implements IImportService {
   constructor(
     private readonly vaultManager: IVaultManager,
-    private readonly vaultReader: IVaultReader,
     private readonly configService: IConfigService,
     private readonly logger: ILogger,
   ) {}
@@ -105,7 +104,6 @@ export class ImportService implements IImportService {
    * 3. Validate file size (≤ maxImportFileSize from config)
    * 4. Check for name conflict at root level
    * 5. Write file to vault storage; on failure, clean up partial file
-   * 6. Refresh the vault's directory tree
    */
   async importFile(vaultId: string, file: UploadedFile): Promise<void> {
     // 1. Validate vault exists
@@ -163,14 +161,6 @@ export class ImportService implements IImportService {
       throw error
     }
 
-    // 6. Refresh the vault's directory tree
-    const maxDepth = this.configService.getServerConfig().maxDirectoryDepth
-    const updatedTree = await this.vaultReader.readDirectory(vault.info.path, maxDepth)
-    this.vaultManager.addVault({
-      info: vault.info,
-      tree: updatedTree,
-    })
-
     this.logger.info('File imported successfully', { vaultId, filename: file.name, size: file.size })
   }
 
@@ -184,7 +174,6 @@ export class ImportService implements IImportService {
    * 4. Check for name conflicts at all target paths before writing
    * 5. Create directory structure preserving relative paths, including empty subfolders
    * 6. Track all created paths; on failure, remove them in reverse order (files first, then directories)
-   * 7. Refresh the vault's directory tree
    */
   async importFolder(vaultId: string, files: UploadedFile[]): Promise<void> {
     // 1. Validate vault exists
@@ -315,14 +304,6 @@ export class ImportService implements IImportService {
 
       throw error
     }
-
-    // 7. Refresh the vault's directory tree
-    const treeDepth = config.maxDirectoryDepth
-    const updatedTree = await this.vaultReader.readDirectory(vault.info.path, treeDepth)
-    this.vaultManager.addVault({
-      info: vault.info,
-      tree: updatedTree,
-    })
 
     this.logger.info('Folder imported successfully', {
       vaultId,

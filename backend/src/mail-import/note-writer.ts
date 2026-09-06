@@ -1,12 +1,11 @@
 // MailNoteWriter — writes one converted mail as a Markdown note (+ attachments)
-// into a vault. Mirrors the write/refresh pattern of ../import/index.ts
-// (ImportService) and the atomic temp-file-then-rename pattern of
+// into a vault. Mirrors the atomic temp-file-then-rename pattern of
 // ../api/uploadRoutes.ts.
 
 import fs from 'node:fs/promises'
 import crypto from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
-import type { IVaultManager, IVaultReader } from '../vault/index.js'
+import type { IVaultManager } from '../vault/index.js'
 import { validateFilePath } from '../vault/index.js'
 import { generateUniqueFilename } from '../business/unique-filename.js'
 import type { IVaultAccessControl } from '../business/index.js'
@@ -54,8 +53,6 @@ export interface IMailNoteWriter {
 export class MailNoteWriter implements IMailNoteWriter {
   constructor(
     private readonly vaultManager: IVaultManager,
-    private readonly vaultReader: IVaultReader,
-    private readonly maxDirectoryDepth: number,
     private readonly logger: ILogger,
     private readonly eventBus?: IEventBus,
     private readonly accessControl?: IVaultAccessControl,
@@ -90,9 +87,6 @@ export class MailNoteWriter implements IMailNoteWriter {
     }
 
     await writeFileAtomic(noteAbsolutePath, noteMarkdown)
-
-    const updatedTree = await this.vaultReader.readDirectory(vault.info.path, this.maxDirectoryDepth)
-    this.vaultManager.addVault({ info: vault.info, tree: updatedTree })
 
     this.logger.info('Mail imported as note', {
       vaultId, notePath: noteRelativePath, attachments: mail.attachments.length,

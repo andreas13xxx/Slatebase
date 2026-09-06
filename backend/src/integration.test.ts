@@ -42,7 +42,7 @@ beforeAll(async () => {
 
   // Wire up the app manually (no ConfigService — just direct instantiation)
   const vaultReader = new VaultReader()
-  const vaultManager = new VaultManager(vaultReader, silentLogger, 50)
+  const vaultManager = new VaultManager(silentLogger)
 
   // Load the fixture vault
   await vaultManager.loadVaults([{ path: fixtureDir }])

@@ -87,7 +87,6 @@ function createMockTree(): DirectoryTree {
 function createMockVault(id: string, name: string, vaultPath: string): Vault {
   return {
     info: { id, name, path: vaultPath, status: 'loaded' },
-    tree: createMockTree(),
   }
 }
 

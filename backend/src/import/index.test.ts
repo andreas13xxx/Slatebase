@@ -12,7 +12,7 @@ import {
   FileCountExceededError,
 } from './index.js'
 import { VaultNotFoundError } from '../business/index.js'
-import type { IVaultManager, IVaultReader, Vault, DirectoryTree } from '../vault/index.js'
+import type { IVaultManager, Vault } from '../vault/index.js'
 import type { IConfigService, ServerConfig } from '../config/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { UploadedFile } from './index.js'
@@ -73,29 +73,6 @@ function createMockConfig(overrides?: Partial<ServerConfig>): IConfigService {
     getWelcomeVaultConfig: () => config.welcomeVault,
     getOverrides: () => ({}),
     updateOverrides: async () => [],
-  }
-}
-
-function createMockVaultReader(): IVaultReader {
-  const emptyTree: DirectoryTree = {
-    name: 'root',
-    type: 'directory',
-    path: '',
-    children: [],
-    itemCount: 0,
-  }
-  return {
-    readDirectory: async () => emptyTree,
-    readFile: async () => ({
-      path: '',
-      name: '',
-      content: '',
-      size: 0,
-      encoding: 'utf-8' as const,
-      isBinary: false,
-      isTruncated: false,
-      etag: '0000000000000000',
-    }),
   }
 }
 
@@ -173,13 +150,6 @@ describe('ImportService', () => {
         path: vaultPath,
         status: 'loaded',
       },
-      tree: {
-        name: 'vault',
-        type: 'directory',
-        path: '',
-        children: [],
-        itemCount: 0,
-      },
     }
   }
 
@@ -189,7 +159,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig(),
         createMockLogger(),
       )
@@ -207,7 +176,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(null)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig(),
         createMockLogger(),
       )
@@ -222,7 +190,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig(),
         createMockLogger(),
       )
@@ -237,7 +204,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig(),
         createMockLogger(),
       )
@@ -253,7 +219,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig(),
         createMockLogger(),
       )
@@ -268,7 +233,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig(),
         createMockLogger(),
       )
@@ -283,7 +247,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig({ maxImportFileSize: 100 }),
         createMockLogger(),
       )
@@ -299,7 +262,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig(),
         createMockLogger(),
       )
@@ -317,7 +279,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig(),
         createMockLogger(),
       )
@@ -350,7 +311,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig(),
         createMockLogger(),
       )
@@ -369,7 +329,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig({ maxImportFileSize: 10 }),
         createMockLogger(),
       )
@@ -383,33 +342,6 @@ describe('ImportService', () => {
       expect(content).toBe('0123456789')
     })
 
-    it('should refresh the vault tree after successful import', async () => {
-      const vault = createTestVault()
-      const vaultManager = createMockVaultManager(vault)
-      let readDirectoryCalled = false
-      const vaultReader: IVaultReader = {
-        readDirectory: async () => {
-          readDirectoryCalled = true
-          return { name: 'vault', type: 'directory' as const, path: '', children: [], itemCount: 1 }
-        },
-        readFile: async () => ({
-          path: '', name: '', content: '', size: 0,
-          encoding: 'utf-8' as const, isBinary: false, isTruncated: false, etag: '0000000000000000',
-        }),
-      }
-
-      const service = new ImportService(
-        vaultManager,
-        vaultReader,
-        createMockConfig(),
-        createMockLogger(),
-      )
-
-      const file = createUploadedFile('new.txt', 'data')
-      await service.importFile('testvault123', file)
-
-      expect(readDirectoryCalled).toBe(true)
-    })
   })
 
   describe('importFolder', () => {
@@ -418,7 +350,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig(),
         createMockLogger(),
       )
@@ -446,7 +377,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(null)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig(),
         createMockLogger(),
       )
@@ -461,7 +391,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig({ maxImportFiles: 2 }),
         createMockLogger(),
       )
@@ -481,7 +410,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig({ maxImportDepth: 3 }),
         createMockLogger(),
       )
@@ -500,7 +428,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig({ maxImportDepth: 3 }),
         createMockLogger(),
       )
@@ -521,7 +448,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig(),
         createMockLogger(),
       )
@@ -543,7 +469,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig(),
         createMockLogger(),
       )
@@ -564,7 +489,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig(),
         createMockLogger(),
       )
@@ -590,7 +514,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig(),
         createMockLogger(),
       )
@@ -641,7 +564,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig(),
         createMockLogger(),
       )
@@ -665,7 +587,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig(),
         createMockLogger(),
       )
@@ -685,7 +606,6 @@ describe('ImportService', () => {
       const vaultManager = createMockVaultManager(vault)
       const service = new ImportService(
         vaultManager,
-        createMockVaultReader(),
         createMockConfig({ maxImportFiles: 3 }),
         createMockLogger(),
       )
@@ -702,32 +622,5 @@ describe('ImportService', () => {
       expect(contentA).toBe('a')
     })
 
-    it('should refresh the vault tree after successful folder import', async () => {
-      const vault = createTestVault()
-      const vaultManager = createMockVaultManager(vault)
-      let readDirectoryCalled = false
-      const vaultReader: IVaultReader = {
-        readDirectory: async () => {
-          readDirectoryCalled = true
-          return { name: 'vault', type: 'directory' as const, path: '', children: [], itemCount: 1 }
-        },
-        readFile: async () => ({
-          path: '', name: '', content: '', size: 0,
-          encoding: 'utf-8' as const, isBinary: false, isTruncated: false, etag: '0000000000000000',
-        }),
-      }
-
-      const service = new ImportService(
-        vaultManager,
-        vaultReader,
-        createMockConfig(),
-        createMockLogger(),
-      )
-
-      const files = [createUploadedFileWithPath('file.txt', 'data')]
-      await service.importFolder('testvault123', files)
-
-      expect(readDirectoryCalled).toBe(true)
-    })
   })
 })

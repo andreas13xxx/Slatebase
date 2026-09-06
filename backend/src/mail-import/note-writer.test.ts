@@ -3,7 +3,7 @@ import { mkdtemp, rm, readFile, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MailNoteWriter } from './note-writer.js'
-import { VaultReader, VaultManager } from '../vault/index.js'
+import { VaultManager } from '../vault/index.js'
 import type { ConvertedMail } from './mail-to-markdown.js'
 
 function createMockLogger() {
@@ -46,14 +46,12 @@ describe('MailNoteWriter', () => {
 
   beforeEach(async () => {
     vaultPath = await mkdtemp(join(tmpdir(), 'mail-note-writer-vault-'))
-    const vaultReader = new VaultReader()
-    vaultManager = new VaultManager(vaultReader, createMockLogger(), 10)
+    vaultManager = new VaultManager(createMockLogger())
     vaultManager.addVault({
       info: { id: 'vault-1', name: 'Vault', path: vaultPath, status: 'loaded' },
-      tree: await vaultReader.readDirectory(vaultPath, 10),
     })
     logger = createMockLogger()
-    writer = new MailNoteWriter(vaultManager, vaultReader, 10, logger)
+    writer = new MailNoteWriter(vaultManager, logger)
   })
 
   afterEach(async () => {

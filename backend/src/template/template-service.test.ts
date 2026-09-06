@@ -28,7 +28,6 @@ function createMockVaultManager(vaultPath: string): IVaultManager {
       path: vaultPath,
       status: 'loaded',
     },
-    tree: { name: 'TestVault', type: 'directory', path: '', children: [] },
   }
 
   return {

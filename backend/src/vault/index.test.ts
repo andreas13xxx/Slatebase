@@ -281,7 +281,6 @@ describe('VaultReader', () => {
 })
 
 import { VaultManager, generateVaultId } from './index'
-import type { IVaultReader, DirectoryTree, FileContent } from './index'
 import type { ILogger } from '../logger/index'
 
 // --- Test Helpers ---
@@ -294,34 +293,6 @@ function createMockLogger(): ILogger & { messages: { level: string; message: str
     info(message: string, meta?: object) { messages.push({ level: 'info', message, meta }) },
     warn(message: string, meta?: object) { messages.push({ level: 'warn', message, meta }) },
     error(message: string, meta?: object) { messages.push({ level: 'error', message, meta }) },
-  }
-}
-
-function createMockVaultReader(trees: Map<string, DirectoryTree> = new Map()): IVaultReader {
-  return {
-    async readDirectory(absolutePath: string, _maxDepth: number): Promise<DirectoryTree> {
-      const tree = trees.get(absolutePath)
-      if (tree) return tree
-      return {
-        name: path.basename(absolutePath),
-        type: 'directory',
-        path: '',
-        children: [],
-        itemCount: 0,
-      }
-    },
-    async readFile(_absolutePath: string, _maxSize: number): Promise<FileContent> {
-      return {
-        path: '',
-        name: '',
-        content: '',
-        size: 0,
-        encoding: 'utf-8',
-        isBinary: false,
-        isTruncated: false,
-        etag: '0000000000000000',
-      }
-    },
   }
 }
 
@@ -345,8 +316,7 @@ describe('VaultManager', () => {
   describe('loadVaults', () => {
     it('logs a warning when no vaults are configured', async () => {
       const logger = createMockLogger()
-      const reader = createMockVaultReader()
-      const manager = new VaultManager(reader, logger, 50)
+      const manager = new VaultManager(logger)
 
       await manager.loadVaults([])
 
@@ -358,8 +328,7 @@ describe('VaultManager', () => {
 
     it('loads a vault successfully from a valid path', async () => {
       const logger = createMockLogger()
-      const reader = createMockVaultReader()
-      const manager = new VaultManager(reader, logger, 50)
+      const manager = new VaultManager(logger)
 
       await manager.loadVaults([{ path: tempVaultDir }])
 
@@ -371,8 +340,7 @@ describe('VaultManager', () => {
 
     it('generates a stable vault ID from the absolute path', async () => {
       const logger = createMockLogger()
-      const reader = createMockVaultReader()
-      const manager = new VaultManager(reader, logger, 50)
+      const manager = new VaultManager(logger)
 
       await manager.loadVaults([{ path: tempVaultDir }])
 
@@ -383,8 +351,7 @@ describe('VaultManager', () => {
 
     it('uses directory basename as vault name when no name override provided', async () => {
       const logger = createMockLogger()
-      const reader = createMockVaultReader()
-      const manager = new VaultManager(reader, logger, 50)
+      const manager = new VaultManager(logger)
 
       await manager.loadVaults([{ path: tempVaultDir }])
 
@@ -394,8 +361,7 @@ describe('VaultManager', () => {
 
     it('uses config.name as vault name when provided', async () => {
       const logger = createMockLogger()
-      const reader = createMockVaultReader()
-      const manager = new VaultManager(reader, logger, 50)
+      const manager = new VaultManager(logger)
 
       await manager.loadVaults([{ path: tempVaultDir, name: 'My Vault' }])
 
@@ -405,8 +371,7 @@ describe('VaultManager', () => {
 
     it('deduplicates vault names with numeric suffix', async () => {
       const logger = createMockLogger()
-      const reader = createMockVaultReader()
-      const manager = new VaultManager(reader, logger, 50)
+      const manager = new VaultManager(logger)
 
       // Both vaults get the same name override
       await manager.loadVaults([
@@ -423,8 +388,7 @@ describe('VaultManager', () => {
 
     it('skips vaults with non-existent paths (graceful degradation)', async () => {
       const logger = createMockLogger()
-      const reader = createMockVaultReader()
-      const manager = new VaultManager(reader, logger, 50)
+      const manager = new VaultManager(logger)
 
       await manager.loadVaults([
         { path: '/non/existent/path/that/does/not/exist' },
@@ -442,8 +406,7 @@ describe('VaultManager', () => {
 
     it('logs info for each successfully loaded vault', async () => {
       const logger = createMockLogger()
-      const reader = createMockVaultReader()
-      const manager = new VaultManager(reader, logger, 50)
+      const manager = new VaultManager(logger)
 
       await manager.loadVaults([{ path: tempVaultDir }])
 
@@ -451,32 +414,12 @@ describe('VaultManager', () => {
       expect(infoLogs).toHaveLength(1)
       expect(infoLogs[0]!.message).toBe('Vault loaded')
     })
-
-    it('passes maxDepth to vaultReader.readDirectory', async () => {
-      const logger = createMockLogger()
-      let capturedMaxDepth: number | undefined
-      const reader: IVaultReader = {
-        async readDirectory(_absolutePath: string, maxDepth: number): Promise<DirectoryTree> {
-          capturedMaxDepth = maxDepth
-          return { name: 'test', type: 'directory', path: '', children: [], itemCount: 0 }
-        },
-        async readFile(): Promise<FileContent> {
-          return { path: '', name: '', content: '', size: 0, encoding: 'utf-8', isBinary: false, isTruncated: false, etag: '0000000000000000' }
-        },
-      }
-      const manager = new VaultManager(reader, logger, 25)
-
-      await manager.loadVaults([{ path: tempVaultDir }])
-
-      expect(capturedMaxDepth).toBe(25)
-    })
   })
 
   describe('getVault', () => {
     it('returns vault by ID', async () => {
       const logger = createMockLogger()
-      const reader = createMockVaultReader()
-      const manager = new VaultManager(reader, logger, 50)
+      const manager = new VaultManager(logger)
 
       await manager.loadVaults([{ path: tempVaultDir }])
 
@@ -488,8 +431,7 @@ describe('VaultManager', () => {
 
     it('returns null for unknown vault ID', async () => {
       const logger = createMockLogger()
-      const reader = createMockVaultReader()
-      const manager = new VaultManager(reader, logger, 50)
+      const manager = new VaultManager(logger)
 
       await manager.loadVaults([{ path: tempVaultDir }])
 
@@ -501,16 +443,14 @@ describe('VaultManager', () => {
   describe('getAllVaults', () => {
     it('returns empty array when no vaults loaded', () => {
       const logger = createMockLogger()
-      const reader = createMockVaultReader()
-      const manager = new VaultManager(reader, logger, 50)
+      const manager = new VaultManager(logger)
 
       expect(manager.getAllVaults()).toEqual([])
     })
 
     it('returns all loaded vaults', async () => {
       const logger = createMockLogger()
-      const reader = createMockVaultReader()
-      const manager = new VaultManager(reader, logger, 50)
+      const manager = new VaultManager(logger)
 
       await manager.loadVaults([
         { path: tempVaultDir },

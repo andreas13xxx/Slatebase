@@ -120,7 +120,7 @@ featureToggleService.setPersistCallback(async (toggles) => {
 
 // 2. Data Layer: VaultReader, VaultManager, VaultRegistry, VaultShareRegistry
 const vaultReader = new VaultReader(logger)
-const vaultManager = new VaultManager(vaultReader, logger, serverConfig.maxDirectoryDepth)
+const vaultManager = new VaultManager(logger)
 const vaultRegistry = new VaultRegistry(serverConfig.dataDir, logger)
 const vaultShareRegistry = new VaultShareRegistry(serverConfig.dataDir)
 
@@ -238,7 +238,7 @@ const trashService = new TrashService(
 )
 
 const vaultService = new VaultService(vaultManager, vaultReader, config, logger, vaultRegistry, vaultShareRegistry, userRepository, auditService, trashService, versionService)
-const importService = new ImportService(vaultManager, vaultReader, config, logger)
+const importService = new ImportService(vaultManager, config, logger)
 
 // 4a. Welcome Vault Service (wires onUserCreated callback)
 const welcomeVaultService = new WelcomeVaultService(
@@ -749,7 +749,7 @@ app.route('/api/v1', gitSyncRoutes)
 const mailImportConfigStore = new MailImportConfigStore(serverConfig.dataDir)
 const mailImportStatusStore = new MailImportStatusStore(serverConfig.dataDir)
 const imapClient = new ImapClient()
-const mailNoteWriter = new MailNoteWriter(vaultManager, vaultReader, serverConfig.maxDirectoryDepth, logger, eventBus, vaultAccessControl)
+const mailNoteWriter = new MailNoteWriter(vaultManager, logger, eventBus, vaultAccessControl)
 const mailImportEngine = new MailImportEngine(mailImportConfigStore, mailImportStatusStore, moduleSecretStore, imapClient, mailNoteWriter, logger)
 const mailImportScheduler = new MailImportScheduler(mailImportConfigStore, mailImportStatusStore, mailImportEngine, logger)
 const mailImportRoutes = createMailImportRoutes({

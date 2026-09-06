@@ -318,8 +318,6 @@ export class VaultService implements IVaultService {
       return
     }
 
-    const maxDepth = this.configService.getServerConfig().maxDirectoryDepth
-
     for (const entry of entries) {
       try {
         await fs.access(entry.storagePath)
@@ -332,33 +330,21 @@ export class VaultService implements IVaultService {
         continue
       }
 
-      try {
-        const tree = await this.vaultReader.readDirectory(entry.storagePath, maxDepth)
-
-        const vaultInfo: VaultInfo = {
-          id: entry.id,
-          name: entry.name,
-          path: entry.storagePath,
-          status: 'loaded',
-          ...(entry.ownerId !== undefined ? { ownerId: entry.ownerId } : {}),
-        }
-
-        this.vaultManager.addVault({ info: vaultInfo, tree })
-
-        this.logger.info('Vault loaded from registry', {
-          vaultId: entry.id,
-          name: entry.name,
-          path: entry.storagePath,
-        })
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        this.logger.error('Failed to load vault from registry', {
-          vaultId: entry.id,
-          name: entry.name,
-          path: entry.storagePath,
-          error: message,
-        })
+      const vaultInfo: VaultInfo = {
+        id: entry.id,
+        name: entry.name,
+        path: entry.storagePath,
+        status: 'loaded',
+        ...(entry.ownerId !== undefined ? { ownerId: entry.ownerId } : {}),
       }
+
+      this.vaultManager.addVault({ info: vaultInfo })
+
+      this.logger.info('Vault loaded from registry', {
+        vaultId: entry.id,
+        name: entry.name,
+        path: entry.storagePath,
+      })
     }
   }
 
@@ -480,7 +466,6 @@ export class VaultService implements IVaultService {
 
   /**
    * Retrieves the directory tree for a vault, freshly read from disk.
-   * Updates the in-memory cache so subsequent calls reflect filesystem changes.
    * Throws VaultNotFoundError if the vault does not exist.
    */
   getVaultTree(vaultId: string): DirectoryTree | Promise<DirectoryTree> {
@@ -492,10 +477,7 @@ export class VaultService implements IVaultService {
     return this.vaultReader.readDirectory(
       vault.info.path,
       this.configService.getServerConfig().maxDirectoryDepth,
-    ).then((tree) => {
-      vault.tree = tree
-      return tree
-    })
+    )
   }
 
   /**
@@ -637,17 +619,7 @@ export class VaultService implements IVaultService {
       throw new StorageError(`Failed to write file: ${message}`)
     }
 
-    // 7. Refresh the vault's in-memory directory tree
-    const updatedTree = await this.vaultReader.readDirectory(
-      vault.info.path,
-      this.configService.getServerConfig().maxDirectoryDepth,
-    )
-    this.vaultManager.addVault({
-      info: vault.info,
-      tree: updatedTree,
-    })
-
-    // 8. Compute ETag of saved content
+    // 7. Compute ETag of saved content
     const etag = computeEtag(contentBuffer)
 
     this.logger.info('File saved', { vaultId, filePath, size: contentBytes })
@@ -752,8 +724,6 @@ export class VaultService implements IVaultService {
     }
 
     // 5. Load vault into VaultManager's in-memory map
-    const tree = await this.vaultReader.readDirectory(finalStoragePath, this.configService.getServerConfig().maxDirectoryDepth)
-
     const vaultInfo: VaultInfo = {
       id: vaultId,
       name,
@@ -763,10 +733,7 @@ export class VaultService implements IVaultService {
       permission: 'owner',
     }
 
-    this.vaultManager.addVault({
-      info: vaultInfo,
-      tree,
-    })
+    this.vaultManager.addVault({ info: vaultInfo })
 
     this.logger.info('Vault created', { vaultId, name, path: finalStoragePath, ownerId })
 
@@ -971,7 +938,6 @@ export class VaultService implements IVaultService {
    * 2. Validates the path using validateFilePath (path traversal protection)
    * 3. Checks if the path exists on the filesystem (throws ENOENT error if not)
    * 4. Removes the file or folder recursively
-   * 5. Refreshes the vault's in-memory directory tree
    */
   async deleteContent(vaultId: string, relativePath: string): Promise<void> {
     // 1. Verify vault exists
@@ -1037,18 +1003,7 @@ export class VaultService implements IVaultService {
       }
     }
 
-    // 5. Refresh the vault's in-memory directory tree
-    const updatedTree = await this.vaultReader.readDirectory(
-      vault.info.path,
-      this.configService.getServerConfig().maxDirectoryDepth,
-    )
-
-    this.vaultManager.addVault({
-      info: vault.info,
-      tree: updatedTree,
-    })
-
-    // 6. Publish vault:change event, scoped to the vault's owner and shared users
+    // 5. Publish vault:change event, scoped to the vault's owner and shared users
     if (this.eventBus) {
       const target = this.registry && this.shareRegistry
         ? { kind: 'users' as const, userIds: await resolveVaultAccessUserIds(vaultId, this.registry, this.shareRegistry) }
@@ -1072,8 +1027,7 @@ export class VaultService implements IVaultService {
    * 5. Creates intermediate directories at destination
    * 6. Moves, atomically detecting a destination conflict for files via
    *    moveNoClobber (directories fall back to check-then-rename)
-   * 7. Refreshes the vault's in-memory directory tree
-   * 8. Returns { newPath: destinationPath }
+   * 7. Returns { newPath: destinationPath }
    */
   async moveContent(vaultId: string, sourcePath: string, destinationPath: string): Promise<{ newPath: string }> {
     // 1. Verify vault exists
@@ -1146,17 +1100,6 @@ export class VaultService implements IVaultService {
       }
     }
 
-    // 8. Refresh the vault's in-memory directory tree
-    const updatedTree = await this.vaultReader.readDirectory(
-      vault.info.path,
-      this.configService.getServerConfig().maxDirectoryDepth,
-    )
-
-    this.vaultManager.addVault({
-      info: vault.info,
-      tree: updatedTree,
-    })
-
     this.logger.info('Content moved', { vaultId, sourcePath, destinationPath })
 
     return { newPath: destinationPath }
@@ -1171,8 +1114,7 @@ export class VaultService implements IVaultService {
    * 5. Checks if source exists (throws ENOENT error if not)
    * 6. Renames, atomically detecting a target conflict for files via
    *    moveNoClobber (directories fall back to check-then-rename)
-   * 7. Refreshes the vault's in-memory directory tree
-   * 8. Returns { newPath } — the new relative path
+   * 7. Returns { newPath } — the new relative path
    */
   async renameContent(vaultId: string, filePath: string, newName: string): Promise<{ newPath: string }> {
     // 1. Verify vault exists
@@ -1249,18 +1191,7 @@ export class VaultService implements IVaultService {
       }
     }
 
-    // 8. Refresh the vault's in-memory directory tree
-    const updatedTree = await this.vaultReader.readDirectory(
-      vault.info.path,
-      this.configService.getServerConfig().maxDirectoryDepth,
-    )
-
-    this.vaultManager.addVault({
-      info: vault.info,
-      tree: updatedTree,
-    })
-
-    // 9. Compute and return the new relative path
+    // 8. Compute and return the new relative path
     this.logger.info('Content renamed', { vaultId, oldPath: filePath, newName, newPath: newRelativePath })
 
     return { newPath: newRelativePath }
