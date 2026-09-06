@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.43.0](https://github.com/andreas13xxx/Slatebase/compare/v0.42.8...v0.43.0) (2026-09-06)
+
+
+### Features
+
+* add native voice transcription (self-hosted Whisper dictation) ([#160](https://github.com/andreas13xxx/Slatebase/issues/160)) ([f5d95c8](https://github.com/andreas13xxx/Slatebase/commit/f5d95c84f6db7fa78e36780e3badfac5cedd48c6))
+
 ## [0.42.8](https://github.com/andreas13xxx/Slatebase/compare/v0.42.7...v0.42.8) (2026-09-06)
 
 
