@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { randomBytes, randomUUID, createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import { hash, verify } from 'argon2'
 import type { UserRole, PublicUserInfo, IUserRepository } from '../user/index.js'
-import { AccountSuspendedError, ARGON2_OPTIONS } from '../user/index.js'
+import { AccountSuspendedError, ARGON2_OPTIONS, toPublicUserInfo } from '../user/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { IAuditService } from '../audit/index.js'
 import { isNodeError } from '../shared/fs-utils.js'
@@ -51,6 +51,12 @@ export interface SessionContext {
   username: string
   role: UserRole
   sessionId: string
+  /**
+   * Optional so existing hand-rolled test mocks (built as plain object
+   * literals across the test suite) keep compiling without this field —
+   * `validateSession()` always sets it for a real session.
+   */
+  expiresAt?: string
 }
 
 /**
@@ -779,24 +785,10 @@ export class AuthService implements IAuthService {
       success: true,
     })
 
-    const publicUser: PublicUserInfo = {
-      userId: user.userId,
-      username: user.username,
-      displayName: user.displayName,
-      email: user.email,
-      avatarUrl: user.avatarUrl,
-      role: user.role,
-      preferredLanguage: user.preferredLanguage,
-      colorScheme: user.colorScheme,
-      suspended: user.suspended,
-      mustChangePassword: user.mustChangePassword,
-      createdAt: user.createdAt,
-    }
-
     return {
       token,
       csrfToken,
-      user: publicUser,
+      user: toPublicUserInfo(user),
       expiresAt: expiresAt.toISOString(),
     }
   }
@@ -875,12 +867,14 @@ export class AuthService implements IAuthService {
     const isStale = now.getTime() - lastWrite >= LAST_ACTIVITY_WRITE_INTERVAL_MS
     const roleChanged = session.role !== user.role
 
+    let expiresAt = session.expiresAt
     if (isStale || roleChanged) {
       const newExpiresAt = new Date(now.getTime() + this.sessionDurationMs)
+      expiresAt = newExpiresAt.toISOString()
       const updatedSession: Session = {
         ...session,
         lastActivity: now.toISOString(),
-        expiresAt: newExpiresAt.toISOString(),
+        expiresAt,
         role: user.role, // Always use current role from user record
       }
       try {
@@ -900,6 +894,7 @@ export class AuthService implements IAuthService {
       username: user.username,
       role: user.role,
       sessionId: session.sessionId,
+      expiresAt,
     }
   }
 

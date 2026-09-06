@@ -105,6 +105,13 @@ export const ServerConfigSchema = z.object({
   maxImportFiles: z.number().int().positive().default(500),
   maxImportDepth: z.number().int().positive().default(10),
   trustedProxies: z.array(z.string()).default([]),
+  /**
+   * Controls the `Secure` attribute on the session cookie. `'auto'` sets it
+   * only when the request is confirmed HTTPS (via a trusted proxy's
+   * X-Forwarded-Proto); `'true'`/`'false'` override that for deployments
+   * that don't fit the auto-detection (e.g. a pure-HTTP LAN setup).
+   */
+  cookieSecure: z.enum(['auto', 'true', 'false']).default('auto'),
   sessionDurationHours: z.number().positive().default(24),
   sessionMaxLifetimeDays: z.number().positive().default(7),
   features: FeaturesConfigSchema,
@@ -469,6 +476,13 @@ export class ConfigService implements IConfigService {
         .split(',')
         .map((p) => p.trim())
         .filter((p) => p.length > 0)
+    }
+
+    if (process.env['SLATEBASE_COOKIE_SECURE'] !== undefined) {
+      const value = process.env['SLATEBASE_COOKIE_SECURE']
+      if (value === 'auto' || value === 'true' || value === 'false') {
+        overlay['cookieSecure'] = value
+      }
     }
 
     if (process.env['SLATEBASE_SESSION_DURATION_HOURS'] !== undefined) {

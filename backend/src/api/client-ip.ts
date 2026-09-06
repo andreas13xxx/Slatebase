@@ -94,6 +94,32 @@ function matchesTrustedProxy(clientIp: string, proxyEntry: string): boolean {
 // ─── IP Extraction ───────────────────────────────────────────────────────────
 
 /**
+ * Gets the direct socket connection IP, or undefined if unavailable
+ * (e.g. not running on a Node.js HTTP server, such as in tests).
+ */
+function getRemoteIp(c: Context): string | undefined {
+  try {
+    const connInfo = getConnInfo(c)
+    return connInfo.remote.address ?? undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * True if the direct connection came from a configured trusted proxy.
+ * Shared by client-IP resolution and HTTPS detection (X-Forwarded-Proto) —
+ * both headers are only meaningful once the immediate peer is known to be a
+ * proxy we operate, otherwise a direct client could spoof either one.
+ */
+function isTrustedRemote(remoteIp: string | undefined, config: TrustedProxyConfig): boolean {
+  if (remoteIp === undefined || config.trustedProxies.length === 0) {
+    return false
+  }
+  return config.trustedProxies.some((proxy) => matchesTrustedProxy(remoteIp, proxy))
+}
+
+/**
  * Extracts the real client IP address from a Hono request context.
  *
  * Logic:
@@ -108,35 +134,22 @@ function matchesTrustedProxy(clientIp: string, proxyEntry: string): boolean {
  * @returns The resolved client IP address
  */
 export function getClientIp(c: Context, config: TrustedProxyConfig): string {
-  // Get direct connection IP from socket
-  let remoteIp: string | undefined
-  try {
-    const connInfo = getConnInfo(c)
-    remoteIp = connInfo.remote.address ?? undefined
-  } catch {
-    // getConnInfo may throw if not running on Node.js HTTP server (e.g., in tests)
-    remoteIp = undefined
-  }
+  const remoteIp = getRemoteIp(c)
 
-  // If we have trusted proxies configured and the direct connection is from one
-  if (config.trustedProxies.length > 0 && remoteIp !== undefined) {
-    const isTrusted = config.trustedProxies.some((proxy) => matchesTrustedProxy(remoteIp, proxy))
-
-    if (isTrusted) {
-      // Trust X-Forwarded-For — take the leftmost IP (original client)
-      const forwarded = c.req.header('X-Forwarded-For')
-      if (forwarded !== undefined && forwarded.length > 0) {
-        const firstIp = forwarded.split(',')[0]?.trim()
-        if (firstIp !== undefined && firstIp.length > 0) {
-          return firstIp
-        }
+  if (isTrustedRemote(remoteIp, config)) {
+    // Trust X-Forwarded-For — take the leftmost IP (original client)
+    const forwarded = c.req.header('X-Forwarded-For')
+    if (forwarded !== undefined && forwarded.length > 0) {
+      const firstIp = forwarded.split(',')[0]?.trim()
+      if (firstIp !== undefined && firstIp.length > 0) {
+        return firstIp
       }
+    }
 
-      // Fallback to X-Real-IP if X-Forwarded-For is absent
-      const realIp = c.req.header('X-Real-IP')
-      if (realIp !== undefined && realIp.length > 0) {
-        return realIp.trim()
-      }
+    // Fallback to X-Real-IP if X-Forwarded-For is absent
+    const realIp = c.req.header('X-Real-IP')
+    if (realIp !== undefined && realIp.length > 0) {
+      return realIp.trim()
     }
   }
 
@@ -146,6 +159,35 @@ export function getClientIp(c: Context, config: TrustedProxyConfig): string {
   }
 
   return '0.0.0.0'
+}
+
+/**
+ * Determines whether the original client request arrived over HTTPS.
+ *
+ * The Node process itself only ever sees plain HTTP when TLS is terminated at
+ * a reverse proxy (the documented deployment model), so this only trusts
+ * `X-Forwarded-Proto` when the direct connection comes from a configured
+ * trusted proxy — otherwise any client could spoof `X-Forwarded-Proto: https`
+ * to defeat a `Secure`-cookie check. Absent a trusted proxy, the request is
+ * treated as insecure.
+ *
+ * @param c - Hono request context
+ * @param config - Trusted proxy configuration
+ * @returns Whether the request should be treated as HTTPS
+ */
+export function isRequestSecure(c: Context, config: TrustedProxyConfig): boolean {
+  const remoteIp = getRemoteIp(c)
+  if (!isTrustedRemote(remoteIp, config)) {
+    return false
+  }
+
+  const forwardedProto = c.req.header('X-Forwarded-Proto')
+  if (forwardedProto === undefined) {
+    return false
+  }
+
+  const firstProto = forwardedProto.split(',')[0]?.trim().toLowerCase()
+  return firstProto === 'https'
 }
 
 // ─── Middleware ──────────────────────────────────────────────────────────────

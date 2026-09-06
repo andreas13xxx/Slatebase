@@ -151,7 +151,10 @@ describe('createAuthMiddleware', () => {
     expect(body.session).toEqual(validSession)
   })
 
-  it('should accept a ?token= query param on the raw file content endpoint (raw=true)', async () => {
+  it('should reject a ?token= query param on any route', async () => {
+    // Regression test: the query-param fallback (originally scoped to the raw
+    // file content endpoint for <img src="...">) is gone now that the same
+    // requests authenticate via the HttpOnly session cookie instead.
     const authService = createMockAuthService({
       validateSession: async () => validSession,
     })
@@ -160,14 +163,10 @@ describe('createAuthMiddleware', () => {
     app.get('/api/v1/vaults/:vaultId/files', (c) => c.json({ ok: true }))
 
     const res = await app.request('/api/v1/vaults/vault-1/files?path=img.png&raw=true&token=valid-token-123')
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(401)
   })
 
-  it('should reject a ?token= query param on the raw file content endpoint without raw=true', async () => {
-    // Regression test: the query-param fallback used to be accepted on every
-    // route. It's now scoped to exactly the raw file content endpoint used by
-    // <img src="..."> tags — the JSON content variant (no raw=true) must still
-    // require a real Authorization header.
+  it('should accept the session token from the session cookie', async () => {
     const authService = createMockAuthService({
       validateSession: async () => validSession,
     })
@@ -175,23 +174,32 @@ describe('createAuthMiddleware', () => {
     app.use('*', createAuthMiddleware(authService))
     app.get('/api/v1/vaults/:vaultId/files', (c) => c.json({ ok: true }))
 
-    const res = await app.request('/api/v1/vaults/vault-1/files?path=note.md&token=valid-token-123')
-    expect(res.status).toBe(401)
+    const res = await app.request('/api/v1/vaults/vault-1/files?path=img.png&raw=true', {
+      headers: { Cookie: 'slatebase_session=valid-token-123' },
+    })
+    expect(res.status).toBe(200)
   })
 
-  it('should reject a ?token= query param on unrelated routes', async () => {
-    // Regression test: previously, ?token= was accepted on ANY route, risking
-    // leaking the full session token via access logs, Referer headers, and
-    // browser history far more broadly than the <img src> use case requires.
+  it('prefers the Authorization header over the session cookie when both are present', async () => {
+    let receivedToken: string | undefined
     const authService = createMockAuthService({
-      validateSession: async () => validSession,
+      validateSession: async (token) => {
+        receivedToken = token
+        return validSession
+      },
     })
     const app = new Hono()
     app.use('*', createAuthMiddleware(authService))
     app.get('/api/v1/vaults', (c) => c.json({ ok: true }))
 
-    const res = await app.request('/api/v1/vaults?token=valid-token-123')
-    expect(res.status).toBe(401)
+    const res = await app.request('/api/v1/vaults', {
+      headers: {
+        Authorization: 'Bearer header-token',
+        Cookie: 'slatebase_session=cookie-token',
+      },
+    })
+    expect(res.status).toBe(200)
+    expect(receivedToken).toBe('header-token')
   })
 })
 
@@ -477,6 +485,27 @@ describe('createMustChangePasswordMiddleware', () => {
 
     const res = await app.request('/api/v1/auth/logout', {
       method: 'POST',
+      headers: { Authorization: 'Bearer valid-token' },
+    })
+    expect(res.status).toBe(200)
+  })
+
+  it('should allow the session probe when mustChangePassword is true', async () => {
+    // Otherwise a reload while mustChangePassword is set gets a 403 instead of
+    // session info, and the frontend can't tell "not logged in" apart from
+    // "must change password".
+    const user = createMockUser({ mustChangePassword: true })
+    const userRepo = createMockUserRepository({
+      findById: async () => user,
+    })
+    const authService = createMockAuthService({ validateSession: async () => validSession })
+
+    const app = new Hono()
+    app.use('*', createAuthMiddleware(authService))
+    app.use('*', createMustChangePasswordMiddleware(userRepo))
+    app.get('/api/v1/auth/session', (c) => c.json({ ok: true }))
+
+    const res = await app.request('/api/v1/auth/session', {
       headers: { Authorization: 'Bearer valid-token' },
     })
     expect(res.status).toBe(200)

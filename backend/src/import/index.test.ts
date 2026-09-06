@@ -46,6 +46,7 @@ function createMockConfig(overrides?: Partial<ServerConfig>): IConfigService {
     trustedProxies: [],
     sessionDurationHours: 24,
     sessionMaxLifetimeDays: 7,
+    cookieSecure: 'auto',
     features: {},
     mcp: { maxFileSize: 16777216, rateLimit: 60 },
     transcription: { timeoutMs: 120000, maxAudioBytes: 26214400, supportedLanguages: ['de', 'en'] },
