@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.43.1](https://github.com/andreas13xxx/Slatebase/compare/v0.43.0...v0.43.1) (2026-09-06)
+
+
+### Bugfixes
+
+* move session token from localStorage into an HttpOnly cookie (AP3) ([#162](https://github.com/andreas13xxx/Slatebase/issues/162)) ([cd61d75](https://github.com/andreas13xxx/Slatebase/commit/cd61d75e389f9bb3ccf1cdde10f893157a0f91c2))
+
 ## [0.43.0](https://github.com/andreas13xxx/Slatebase/compare/v0.42.8...v0.43.0) (2026-09-06)
 
 
