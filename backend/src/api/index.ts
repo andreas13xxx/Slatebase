@@ -24,6 +24,7 @@ import {
 import type { IVaultAccessControl } from '../business/index.js'
 import { PathTraversalError } from '../vault/index.js'
 import type { DirectoryTree } from '../vault/index.js'
+import { putFileBodySchema } from '@slatebase/shared-contracts'
 import { getContentTypeFromExtension } from '../vault/mime.js'
 import type { IVaultShareRegistry } from '../vault/registry.js'
 import { computeAffectedFilePairs } from '../link-index/index.js'
@@ -312,18 +313,16 @@ export class VaultController implements IVaultController {
       }
 
       const body = await c.req.json()
-      const filePath = body?.path
-      const content = body?.content
+      const parsed = putFileBodySchema.safeParse(body)
 
-      if (!filePath || typeof filePath !== 'string') {
-        const apiError = createApiError('VALIDATION_ERROR', 'Missing required field: path')
+      if (!parsed.success) {
+        const firstError = parsed.error.issues[0]
+        const message = firstError ? firstError.message : 'Missing required field: content'
+        const apiError = createApiError('VALIDATION_ERROR', message)
         return c.json(apiError, 400)
       }
 
-      if (content === undefined || content === null || typeof content !== 'string') {
-        const apiError = createApiError('VALIDATION_ERROR', 'Missing required field: content')
-        return c.json(apiError, 400)
-      }
+      const { path: filePath, content } = parsed.data
 
       // Extract optional If-Match header for ETag conflict detection
       const ifMatch = c.req.header('If-Match')

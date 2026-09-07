@@ -4,65 +4,15 @@
  * the data structures exchanged with the backend REST API.
  */
 
-/** Vault metadata as exposed by the API (no internal fields like path or status). */
-export interface VaultInfo {
-  /** SHA-256-Hash (first 12 hex characters) of the normalized vault path. */
-  id: string
-  /** Derived from directory name, max 128 characters, unique across vaults. */
-  name: string
-  /** User ID of the vault owner. */
-  ownerId?: string
-  /** Username of the vault owner (resolved by the backend). */
-  ownerName?: string
-  /** Access level for the current user: 'owner', 'read', or 'write'. */
-  permission?: 'owner' | 'read' | 'write'
-  /** Number of active shares for this vault (only for owned vaults). */
-  shareCount?: number
-}
-
-/** Recursive directory/file tree structure for a vault. */
-export interface DirectoryTree {
-  name: string
-  type: 'directory' | 'file'
-  /** Relative path from vault root. */
-  path: string
-  /** Child entries (only present for directories). */
-  children?: DirectoryTree[]
-  /** File size in bytes (only present when type === 'file'). */
-  size?: number
-  /** Number of direct child entries (only present when type === 'directory'). */
-  itemCount?: number
-  /** Last-modified time, unix ms (only present when type === 'file'). */
-  mtime?: number
-  /** Creation time, unix ms (only present when type === 'file'). */
-  ctime?: number
-}
-
-/** Content and metadata of a single file. */
-export interface FileContent {
-  /** Relative path from vault root. */
-  path: string
-  name: string
-  /** UTF-8 decoded text content (empty string when isBinary === true). */
-  content: string
-  /** Original file size in bytes. */
-  size: number
-  encoding: 'utf-8'
-  /** True if the file contains binary data (null bytes detected). */
-  isBinary: boolean
-  /** True if the file exceeded maxFileSize and content was truncated. */
-  isTruncated: boolean
-}
-
-/** Result of a successful file save operation. */
-export interface FileSaveResult {
-  /** Relative path from vault root. */
-  path: string
-  /** Filename (last segment of path). */
-  name: string
-  /** Written file size in bytes. */
-  size: number
-}
+// VaultInfo, DirectoryTree, FileContent, FileSaveResult are derived from the
+// Zod schemas in @slatebase/shared-contracts (AP10 feasibility proof) rather
+// than hand-maintained here — the backend validates/produces these same
+// shapes from the identical schema, so a field rename on one side is a
+// compile error on the other instead of a runtime surprise. See that
+// package's README/AP10 PR description for what's covered so far (just the
+// vault routes) and what rolling this out further would take.
+import type { VaultInfo, DirectoryTree, FileContent } from '@slatebase/shared-contracts'
+export type { VaultInfo, DirectoryTree, FileContent, FileSaveResult } from '@slatebase/shared-contracts'
 
 /** Application-level error representation. */
 export interface AppError {

@@ -1297,9 +1297,9 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
                           <span className="tree-node-loading-text">{t('common.loading')}</span>
                         </li>
                       )}
-                      {!isLoading && tree && tree.children && tree.children.length > 0 && (
+                      {!isLoading && tree?.children && tree.children.length > 0 && (
                         tree.children
-                          .filter((child) => child.name !== '.trash' && child.name !== '.versions')
+                          .filter((child: DirectoryTree) => child.name !== '.trash' && child.name !== '.versions')
                           .map((child) => (
                           <TreeNode
                             key={child.path}

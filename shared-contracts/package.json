@@ -1,0 +1,25 @@
+{
+  "name": "@slatebase/shared-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AP10 feasibility proof: Zod schemas shared between backend and frontend for the vault routes (GET /vaults, /tree, /files; PUT /files). Not a workspace package — consumed via a file: dependency from each side's own package.json.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "peerDependencies": {
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "zod": "^4.5.4"
+  }
+}

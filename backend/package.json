@@ -7,18 +7,23 @@
     "node": ">=22.0.0"
   },
   "scripts": {
+    "predev": "npm run build --prefix ../shared-contracts",
     "dev": "tsx watch --env-file=.env src/index.ts",
     "start": "node --experimental-strip-types --env-file=.env src/index.ts",
     "start:dist": "node --env-file=.env dist/index.js",
+    "prebuild": "npm run build --prefix ../shared-contracts",
     "build": "tsc",
     "lint": "eslint .",
+    "pretest": "npm run build --prefix ../shared-contracts",
     "test": "vitest --run",
     "test:watch": "vitest",
+    "pretest:coverage": "npm run build --prefix ../shared-contracts",
     "test:coverage": "vitest --run --coverage"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",
     "@modelcontextprotocol/sdk": "1.30.0",
+    "@slatebase/shared-contracts": "file:../shared-contracts",
     "adm-zip": "0.6.0",
     "argon2": "0.45.1",
     "hono": "^4.13.5",
