@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.43.3](https://github.com/andreas13xxx/Slatebase/compare/v0.43.2...v0.43.3) (2026-09-07)
+
+
+### Bugfixes
+
+* **docker:** build shared-contracts inside the image, root build context ([7795d15](https://github.com/andreas13xxx/Slatebase/commit/7795d157e814e5e6ce3f4e58e45fc4d1408e39db))
+
 ## [0.43.2](https://github.com/andreas13xxx/Slatebase/compare/v0.43.1...v0.43.2) (2026-09-07)
 
 
