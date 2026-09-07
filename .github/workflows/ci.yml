@@ -25,6 +25,14 @@ jobs:
           node-version: '24'
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
+      # shared-contracts is a file: dependency with a tsc build step. Build it
+      # (with its own devDependencies) BEFORE the consumer's `npm ci`, so the
+      # compiled dist/ is present when npm links/copies the package into
+      # node_modules — otherwise the consumer resolves against missing types.
+      - run: npm ci
+        working-directory: shared-contracts
+      - run: npm run build
+        working-directory: shared-contracts
       - run: npm ci
         working-directory: backend
       - name: Dependency audit
@@ -46,6 +54,14 @@ jobs:
           node-version: '24'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
+      # shared-contracts is a file: dependency with a tsc build step. Build it
+      # (with its own devDependencies) BEFORE the consumer's `npm ci`, so the
+      # compiled dist/ is present when npm links/copies the package into
+      # node_modules — otherwise the consumer resolves against missing types.
+      - run: npm ci
+        working-directory: shared-contracts
+      - run: npm run build
+        working-directory: shared-contracts
       - run: npm ci
         working-directory: frontend
       - name: Dependency audit

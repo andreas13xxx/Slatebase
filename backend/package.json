@@ -7,17 +7,18 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "predev": "npm run build --prefix ../shared-contracts",
+    "build:contracts": "npm ci --prefix ../shared-contracts && npm run build --prefix ../shared-contracts",
+    "predev": "npm run build:contracts",
     "dev": "tsx watch --env-file=.env src/index.ts",
     "start": "node --experimental-strip-types --env-file=.env src/index.ts",
     "start:dist": "node --env-file=.env dist/index.js",
-    "prebuild": "npm run build --prefix ../shared-contracts",
+    "prebuild": "npm run build:contracts",
     "build": "tsc",
     "lint": "eslint .",
-    "pretest": "npm run build --prefix ../shared-contracts",
+    "pretest": "npm run build:contracts",
     "test": "vitest --run",
     "test:watch": "vitest",
-    "pretest:coverage": "npm run build --prefix ../shared-contracts",
+    "pretest:coverage": "npm run build:contracts",
     "test:coverage": "vitest --run --coverage"
   },
   "dependencies": {
