@@ -67,12 +67,17 @@ jobs:
       matrix:
         include:
           - image: slatebase-backend
-            context: ./backend
+            # Build context is the repo root, not ./backend: the images depend
+            # on the sibling `shared-contracts/` (a file: dependency with its
+            # own tsc build step), which a ./backend context cannot reach. The
+            # Dockerfiles COPY both `backend/`|`frontend/` and `shared-contracts/`
+            # out of the root context. Root .dockerignore keeps the context lean.
+            context: .
             dockerfile: ./backend/Dockerfile
             description: Slatebase Backend API Server
             build-args: ''
           - image: slatebase-frontend
-            context: ./frontend
+            context: .
             dockerfile: ./frontend/Dockerfile
             description: Slatebase Frontend Web Application
             # Embedded into the bundle at build time so the running frontend can

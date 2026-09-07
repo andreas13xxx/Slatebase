@@ -1,8 +1,10 @@
 services:
   backend:
+    # Context is the repo root, not ./backend: the image depends on the sibling
+    # shared-contracts/ package (a file: dependency built inside the image).
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: slatebase-backend
     restart: unless-stopped
     env_file:
@@ -19,9 +21,10 @@ services:
       start_period: 10s
 
   frontend:
+    # Context is the repo root, not ./frontend (see backend above).
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
     container_name: slatebase-frontend
     restart: unless-stopped
     ports:

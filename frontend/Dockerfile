@@ -24,23 +24,44 @@ FROM --platform=$BUILDPLATFORM node:22-slim AS build
 ARG SLATEBASE_VERSION=development
 ENV VITE_APP_VERSION=$SLATEBASE_VERSION
 
-WORKDIR /app
+# NOTE: the build context is the repo ROOT (see .github/workflows/release.yml
+# and docker-compose), not ./frontend — the frontend type-imports the sibling
+# `shared-contracts/` package (a file:../shared-contracts dependency with its
+# own tsc build step). COPY paths are prefixed with frontend/ or
+# shared-contracts/, and the two sit as siblings under /src so the
+# `file:../shared-contracts` relative path resolves inside the image. The nginx
+# production stage below serves only the static bundle, so shared-contracts is
+# a build-stage concern only.
 
-# Install dependencies first (layer caching)
-COPY package.json package-lock.json ./
+# Build the shared-contracts package first: install its own devDependencies
+# (zod, typescript) and emit dist/, which the frontend's `npm ci` links into
+# node_modules and `tsc -b` resolves `@slatebase/shared-contracts` against.
+WORKDIR /src/shared-contracts
+COPY shared-contracts/package.json shared-contracts/package-lock.json ./
+RUN npm ci
+COPY shared-contracts/tsconfig.json ./
+COPY shared-contracts/src/ ./src/
+RUN npm run build
+
+WORKDIR /src/frontend
+
+# Install dependencies first (layer caching). The file:../shared-contracts link
+# resolves to the sibling package built above.
+COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 
 # Copy source files
-COPY src/ ./src/
-COPY public/ ./public/
-COPY index.html ./
-COPY vite.config.ts ./
-COPY tsconfig.json ./
-COPY tsconfig.app.json ./
-COPY tsconfig.node.json ./
-COPY eslint.config.js ./
+COPY frontend/src/ ./src/
+COPY frontend/public/ ./public/
+COPY frontend/index.html ./
+COPY frontend/vite.config.ts ./
+COPY frontend/tsconfig.json ./
+COPY frontend/tsconfig.app.json ./
+COPY frontend/tsconfig.node.json ./
+COPY frontend/eslint.config.js ./
 
-# Build production bundle
+# Build production bundle. The prebuild hook (npm run build:contracts) rebuilds
+# shared-contracts idempotently — harmless here since it was already built above.
 RUN npm run build
 
 # --- Production Stage ---
@@ -50,11 +71,11 @@ FROM nginx:alpine AS production
 RUN rm /etc/nginx/conf.d/default.conf
 
 # Copy custom nginx config
-COPY nginx.conf /etc/nginx/conf.d/slatebase.conf
-COPY security-headers.conf /etc/nginx/security-headers.conf
+COPY frontend/nginx.conf /etc/nginx/conf.d/slatebase.conf
+COPY frontend/security-headers.conf /etc/nginx/security-headers.conf
 
 # Copy built frontend assets
-COPY --from=build /app/dist /usr/share/nginx/html
+COPY --from=build /src/frontend/dist /usr/share/nginx/html
 
 EXPOSE 80
 
