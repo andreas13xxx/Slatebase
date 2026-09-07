@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.44.0](https://github.com/andreas13xxx/Slatebase/compare/v0.43.3...v0.44.0) (2026-09-07)
+
+
+### Features
+
+* add dictation toggle to sidebar toolbar ([091d86d](https://github.com/andreas13xxx/Slatebase/commit/091d86da1fa1b0a893018d8c5cdbc93ec0c24ce9))
+
 ## [0.43.3](https://github.com/andreas13xxx/Slatebase/compare/v0.43.2...v0.43.3) (2026-09-07)
 
 
