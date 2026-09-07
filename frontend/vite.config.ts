@@ -91,6 +91,32 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Vendor libraries that change far less often than app code, split
+        // into their own chunks so a release only invalidates the browser's
+        // cache for the app code that actually changed (AP8). Grouped by
+        // "changes together" rather than one chunk per package: CodeMirror's
+        // own packages plus its @lezer parser dependencies always ship
+        // together; the two icon sets are used the same way throughout the
+        // UI and are similarly small/stable.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (id.includes('@codemirror') || id.includes('@lezer') || id.includes('/codemirror/')) {
+            return 'vendor-codemirror'
+          }
+          if (id.includes('highlight.js')) {
+            return 'vendor-highlight'
+          }
+          if (id.includes('lucide-react') || id.includes('@react-symbols')) {
+            return 'vendor-icons'
+          }
+          return undefined
+        },
+      },
+    },
+  },
   test: {
     globals: true,
     environment: 'jsdom',

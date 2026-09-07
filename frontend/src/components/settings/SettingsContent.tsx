@@ -6,7 +6,7 @@
  * @module components/settings/SettingsContent
  */
 
-import React, { useRef, useEffect } from 'react'
+import React, { useRef, useEffect, lazy, Suspense } from 'react'
 import { useSettingsContext } from '../../state/settingsContext'
 import { useAppContext } from '../../state'
 import { useFeatureContext } from '../../state/featureContext'
@@ -14,14 +14,7 @@ import type { SettingsSection } from '../../state/settingsState'
 import { SECTION_LABELS } from '../../state/settingsLabels'
 import { SETTINGS_SECTIONS } from '../../state/settingsRegistry'
 import { FeatureDisabledHint } from './ui'
-import { ProfilePage } from '../ProfilePage'
 import { ChangePasswordPage } from '../ChangePasswordPage'
-import { SessionsPage } from '../SessionsPage'
-import { McpTokensPage } from '../McpTokensPage'
-import { PluginManagementPage } from '../PluginManagementPage'
-import { AdminConfigPage } from '../AdminConfigPage'
-import { AdminUsersPage } from '../AdminUsersPage'
-import { AdminVaultsPage } from '../AdminVaultsPage'
 import { AccountDeletionSection } from './AccountDeletionSection'
 import { FeatureTogglesSection } from './FeatureTogglesSection'
 import { ServerRestartSection } from './ServerRestartSection'
@@ -32,7 +25,20 @@ import { MailImportSection } from './MailImportSection'
 import { KeybindingsSection } from './KeybindingsSection'
 import { AppearanceSection } from './AppearanceSection'
 import { WelcomeVaultSection } from './WelcomeVaultSection'
-import { MyVaultsPage } from '../MyVaultsPage'
+import { PageLoadingFallback } from '../PageLoadingFallback'
+
+// Same standalone pages App.tsx lazy-loads for its settings tabs — this panel
+// is the *other* place they're reachable from (AGENTS.md: "App.tsx's
+// standalone page routes are a separate path"), so both import sites need
+// React.lazy or Rollup keeps the module in the eagerly-loaded chunk anyway.
+const ProfilePage = lazy(() => import('../ProfilePage').then((m) => ({ default: m.ProfilePage })))
+const SessionsPage = lazy(() => import('../SessionsPage').then((m) => ({ default: m.SessionsPage })))
+const McpTokensPage = lazy(() => import('../McpTokensPage').then((m) => ({ default: m.McpTokensPage })))
+const PluginManagementPage = lazy(() => import('../PluginManagementPage').then((m) => ({ default: m.PluginManagementPage })))
+const AdminConfigPage = lazy(() => import('../AdminConfigPage').then((m) => ({ default: m.AdminConfigPage })))
+const AdminUsersPage = lazy(() => import('../AdminUsersPage').then((m) => ({ default: m.AdminUsersPage })))
+const AdminVaultsPage = lazy(() => import('../AdminVaultsPage').then((m) => ({ default: m.AdminVaultsPage })))
+const MyVaultsPage = lazy(() => import('../MyVaultsPage').then((m) => ({ default: m.MyVaultsPage })))
 
 /**
  * Content component that renders the active settings section.
@@ -58,7 +64,9 @@ export function SettingsContent() {
       <h2 ref={headingRef} tabIndex={-1} className="settings-content-heading">
         {label}
       </h2>
-      {renderSection(state.section, appState.selectedVaultId, apiClient, isEnabled)}
+      <Suspense fallback={<PageLoadingFallback />}>
+        {renderSection(state.section, appState.selectedVaultId, apiClient, isEnabled)}
+      </Suspense>
     </div>
   )
 }

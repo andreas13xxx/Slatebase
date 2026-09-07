@@ -1,12 +1,16 @@
-import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react'
+import { useState, useEffect, useCallback, useRef, lazy, Suspense, type FormEvent } from 'react'
 import { useAppContext, loadVaults, deleteVault, exportVault } from '../state'
 import { useTranslation } from '../i18n'
 import type { IApiClient, UserSearchResult } from '../api'
 import type { VaultInfo } from '../types'
 import { Database, Eye, Pencil, Crown, Trash2, Users, RefreshCw, X, ArrowRightLeft, Download } from 'lucide-react'
 import { ConfirmModal } from './ConfirmModal'
-import { VaultDeletionWorkflow } from './VaultDeletionWorkflow'
 import { Button } from './settings/ui'
+import { PageLoadingFallback } from './PageLoadingFallback'
+
+// Only rendered inside a modal overlay when a vault delete hits active shares
+// — code-split so the workflow's own bundle isn't paid for on every MyVaultsPage view.
+const VaultDeletionWorkflow = lazy(() => import('./VaultDeletionWorkflow').then((m) => ({ default: m.VaultDeletionWorkflow })))
 
 interface ShareInfo {
   userId: string
@@ -351,11 +355,13 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
       {deletionWorkflow?.open && (
         <div className="vault-deletion-workflow-overlay">
           <div className="vault-deletion-workflow-modal">
-            <VaultDeletionWorkflow
-              apiClient={apiClient}
-              vaultId={deletionWorkflow.vaultId}
-              onComplete={handleDeletionWorkflowComplete}
-            />
+            <Suspense fallback={<PageLoadingFallback />}>
+              <VaultDeletionWorkflow
+                apiClient={apiClient}
+                vaultId={deletionWorkflow.vaultId}
+                onComplete={handleDeletionWorkflowComplete}
+              />
+            </Suspense>
           </div>
         </div>
       )}

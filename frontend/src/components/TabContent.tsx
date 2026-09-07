@@ -1,4 +1,4 @@
-import { useState, useCallback, useContext, useEffect, useMemo, useRef } from 'react'
+import { useState, useCallback, useContext, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
 import { useTabContext } from '../state/tabContext'
 import { useAppContext } from '../state'
 import { openTab, saveTab } from '../state/tabActions'
@@ -6,9 +6,13 @@ import type { DirectoryTree } from '../types'
 import type { PropertyType, PropertyTypeEntry } from '../state/propertyTypes'
 import { EditMode } from './EditMode'
 import { BinaryViewer } from './BinaryViewer'
-import { GraphView } from './GraphView'
-import { CanvasView } from './canvas/CanvasView'
 import { ErrorBoundary } from './ErrorBoundary'
+import { PageLoadingFallback } from './PageLoadingFallback'
+
+// Graph (pulls in d3-force) and Canvas are only needed for their respective
+// tab types — code-split so a plain note tab never pays for either bundle (AP8).
+const GraphView = lazy(() => import('./GraphView').then((m) => ({ default: m.GraphView })))
+const CanvasView = lazy(() => import('./canvas/CanvasView').then((m) => ({ default: m.CanvasView })))
 import { useTranslation } from '../i18n'
 import { extractErrorMessage } from '../utils/error'
 import { PluginContext } from '../plugins/compat/plugin-context'
@@ -310,7 +314,9 @@ export function TabContent() {
     return (
       <div className="tab-content tab-content--graph" role="tabpanel" aria-label={activeTab.fileName}>
         <ErrorBoundary>
-          <GraphView vaultId={activeTab.vaultId} />
+          <Suspense fallback={<PageLoadingFallback />}>
+            <GraphView vaultId={activeTab.vaultId} />
+          </Suspense>
         </ErrorBoundary>
       </div>
     )
@@ -329,7 +335,9 @@ export function TabContent() {
     return (
       <div className="tab-content tab-content--graph" role="tabpanel" aria-label={activeTab.fileName}>
         <ErrorBoundary>
-          <GraphView vaultId={activeTab.vaultId} localGraphCenterPath={centerPath} />
+          <Suspense fallback={<PageLoadingFallback />}>
+            <GraphView vaultId={activeTab.vaultId} localGraphCenterPath={centerPath} />
+          </Suspense>
         </ErrorBoundary>
       </div>
     )
@@ -407,26 +415,28 @@ export function TabContent() {
     return (
       <div className="tab-content tab-content--canvas" role="tabpanel" aria-label={activeTab.fileName}>
         <ErrorBoundary>
-          <CanvasView
-            vaultId={activeTab.vaultId}
-            filePath={activeTab.filePath}
-            content={activeTab.content}
-            readOnly={isReadOnly ?? false}
-            onSave={async (content) => {
-              await saveTab(tabDispatch, apiClient!, activeTab.vaultId, activeTab.filePath, content)
-            }}
-            onFileOpen={(path) => {
-              const fileName = path.split('/').pop() ?? path
-              void openTab(tabDispatch, appDispatch, apiClient!, activeTab.vaultId, path, fileName)
-            }}
-            onFileSave={async (filePath, content) => {
-              await apiClient!.saveFile(activeTab.vaultId, filePath, content)
-              // Refresh tree to update any changed references
-              const newTree = await apiClient!.fetchVaultTree(activeTab.vaultId)
-              appDispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId: activeTab.vaultId, tree: newTree } })
-            }}
-            directoryTree={appState.vaultTrees[activeTab.vaultId] ?? appState.directoryTree}
-          />
+          <Suspense fallback={<PageLoadingFallback />}>
+            <CanvasView
+              vaultId={activeTab.vaultId}
+              filePath={activeTab.filePath}
+              content={activeTab.content}
+              readOnly={isReadOnly ?? false}
+              onSave={async (content) => {
+                await saveTab(tabDispatch, apiClient!, activeTab.vaultId, activeTab.filePath, content)
+              }}
+              onFileOpen={(path) => {
+                const fileName = path.split('/').pop() ?? path
+                void openTab(tabDispatch, appDispatch, apiClient!, activeTab.vaultId, path, fileName)
+              }}
+              onFileSave={async (filePath, content) => {
+                await apiClient!.saveFile(activeTab.vaultId, filePath, content)
+                // Refresh tree to update any changed references
+                const newTree = await apiClient!.fetchVaultTree(activeTab.vaultId)
+                appDispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId: activeTab.vaultId, tree: newTree } })
+              }}
+              directoryTree={appState.vaultTrees[activeTab.vaultId] ?? appState.directoryTree}
+            />
+          </Suspense>
         </ErrorBoundary>
       </div>
     )

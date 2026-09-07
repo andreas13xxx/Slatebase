@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useCallback, useState, useMemo } from 'react'
+import { useEffect, useLayoutEffect, useRef, useCallback, useState, useMemo, lazy, Suspense } from 'react'
 import { AppProvider, useAppContext, loadVaults, importFile, importFolder, exportVault, reloadVaultTree } from './state'
 import { ApiClient } from './api'
 import { AuthProvider, useAuthContext } from './state/authContext'
@@ -48,28 +48,33 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { UserMenu } from './components/UserMenu'
 import { LoginPage } from './components/LoginPage'
 import { ChangePasswordPage } from './components/ChangePasswordPage'
-import { ProfilePage } from './components/ProfilePage'
-import { SessionsPage } from './components/SessionsPage'
-import { AdminUsersPage } from './components/AdminUsersPage'
-import { AdminConfigPage } from './components/AdminConfigPage'
-import { AdminAuditPage } from './components/AdminAuditPage'
-import { AdminLogsPage } from './components/AdminLogsPage'
-import { AdminVaultsPage } from './components/AdminVaultsPage'
-import { VaultSharing } from './components/VaultSharing'
-import { VaultDeletionWorkflow } from './components/VaultDeletionWorkflow'
-import { ChatPage } from './components/ChatPage'
 import { SlatebaseLogo } from './components/SlatebaseLogo'
 import { SidebarToolbar } from './components/SidebarToolbar'
 import { useToolbarPrefs } from './state/toolbarStore'
 import { StatusBar } from './components/StatusBar'
 import { SnippetLifecycle } from './components/SnippetLifecycle'
 import { DictationIndicator } from './components/DictationIndicator'
-import { MyVaultsPage } from './components/MyVaultsPage'
-import { McpTokensPage } from './components/McpTokensPage'
-import { PluginManagementPage } from './components/PluginManagementPage'
 import { PluginViewPanel } from './components/PluginViewPanel'
-import { TrashView } from './components/TrashView'
 import { VersionBrowser } from './components/VersionBrowser'
+import { PageLoadingFallback } from './components/PageLoadingFallback'
+
+// Standalone settings/admin pages — code-split (AP8). Each is only ever
+// reachable via renderSettingsPage() below, never on the initial vault/editor
+// path, so none of them belong in the main chunk.
+const ProfilePage = lazy(() => import('./components/ProfilePage').then((m) => ({ default: m.ProfilePage })))
+const SessionsPage = lazy(() => import('./components/SessionsPage').then((m) => ({ default: m.SessionsPage })))
+const AdminUsersPage = lazy(() => import('./components/AdminUsersPage').then((m) => ({ default: m.AdminUsersPage })))
+const AdminConfigPage = lazy(() => import('./components/AdminConfigPage').then((m) => ({ default: m.AdminConfigPage })))
+const AdminAuditPage = lazy(() => import('./components/AdminAuditPage').then((m) => ({ default: m.AdminAuditPage })))
+const AdminLogsPage = lazy(() => import('./components/AdminLogsPage').then((m) => ({ default: m.AdminLogsPage })))
+const AdminVaultsPage = lazy(() => import('./components/AdminVaultsPage').then((m) => ({ default: m.AdminVaultsPage })))
+const VaultSharing = lazy(() => import('./components/VaultSharing').then((m) => ({ default: m.VaultSharing })))
+const VaultDeletionWorkflow = lazy(() => import('./components/VaultDeletionWorkflow').then((m) => ({ default: m.VaultDeletionWorkflow })))
+const ChatPage = lazy(() => import('./components/ChatPage').then((m) => ({ default: m.ChatPage })))
+const MyVaultsPage = lazy(() => import('./components/MyVaultsPage').then((m) => ({ default: m.MyVaultsPage })))
+const McpTokensPage = lazy(() => import('./components/McpTokensPage').then((m) => ({ default: m.McpTokensPage })))
+const PluginManagementPage = lazy(() => import('./components/PluginManagementPage').then((m) => ({ default: m.PluginManagementPage })))
+const TrashView = lazy(() => import('./components/TrashView').then((m) => ({ default: m.TrashView })))
 import { useVersionInfo } from './hooks/useVersionInfo'
 import { LeftPanelProvider, RightPanelProvider, useLeftPanelContext, useRightPanelContext } from './state/panelContext'
 import type { PanelViewId } from './state/panelState'
@@ -1166,7 +1171,9 @@ function AppContent() {
             {/* Content: settings page or vault editor */}
             {isShowingSettings ? (
               <div className="tab-content" style={{ overflow: 'auto' }}>
-                {renderSettingsPage(activeSettingsPage!)}
+                <Suspense fallback={<PageLoadingFallback />}>
+                  {renderSettingsPage(activeSettingsPage!)}
+                </Suspense>
               </div>
             ) : (
               <>
