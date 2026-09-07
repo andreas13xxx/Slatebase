@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.43.2](https://github.com/andreas13xxx/Slatebase/compare/v0.43.1...v0.43.2) (2026-09-07)
+
+
+### Bugfixes
+
+* **backend:** fix lost username-&gt;userId mapping race in UserRepository, consolidate persistence onto the shared JSON store (AP9) ([8041aad](https://github.com/andreas13xxx/Slatebase/commit/8041aad25aa2f57ab38e39ba99ff4e8ee8618910))
+* **ci:** build shared-contracts before consumer install ([68c8060](https://github.com/andreas13xxx/Slatebase/commit/68c8060256797f1b6af4d760e0449c1e4719faa6))
+
+
+### Sonstige Änderungen
+
+* **api:** shared Zod contract for the vault routes — feasibility proof (AP10) ([ce2e99e](https://github.com/andreas13xxx/Slatebase/commit/ce2e99eb41381264987e126afb88cdabd67d0c58))
+* **frontend,backend:** memoize context provider values, align TS versions (AP6) ([8ce9928](https://github.com/andreas13xxx/Slatebase/commit/8ce99284ed355932638fdbbf866b35afa3356311))
+* **search:** search-index spike — measurement + FTS5 vs. inverted-index decision (AP11) ([aa182e8](https://github.com/andreas13xxx/Slatebase/commit/aa182e88705f51740ee1aa8865cee24591d07945))
+
 ## [0.43.1](https://github.com/andreas13xxx/Slatebase/compare/v0.43.0...v0.43.1) (2026-09-06)
 
 
