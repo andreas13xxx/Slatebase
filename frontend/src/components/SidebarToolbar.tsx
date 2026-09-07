@@ -3,7 +3,7 @@ import {
   Upload, FolderOpen, Download, Settings,
   FileText, FilePlus, MessageCircle, ScrollText,
   Plus, Share2, CalendarDays, Trash2, LayoutDashboard,
-  Command, FileSearch, Shuffle, FileInput, PanelLeftClose,
+  Command, FileSearch, Shuffle, FileInput, PanelLeftClose, Mic,
 } from 'lucide-react'
 import { useFeatureContext } from '../state/featureContext'
 import { usePluginContext } from '../plugins/compat/plugin-context'
@@ -62,6 +62,7 @@ interface SidebarToolbarProps {
   onOpenQuickSwitcher?: () => void
   onOpenRandomNote?: () => void
   onInsertTemplate?: () => void
+  onToggleDictation?: () => void
   isAdmin: boolean
   isVaultOwner?: boolean
   globalUnreadCount?: number
@@ -91,7 +92,7 @@ export function SidebarToolbar({
   vaultId, vaultPermission, onCreateVault, onCreateFile, onCreateCanvas,
   onImportFile, onImportFolder, onExportVault, onNavigate, onOpenGraph,
   onOpenTrash, onDailyNote, onOpenSettings, onOpenCommandPalette,
-  onOpenQuickSwitcher, onOpenRandomNote, onInsertTemplate,
+  onOpenQuickSwitcher, onOpenRandomNote, onInsertTemplate, onToggleDictation,
   isAdmin, isVaultOwner, globalUnreadCount,
 }: SidebarToolbarProps) {
   const { isEnabled } = useFeatureContext()
@@ -110,6 +111,7 @@ export function SidebarToolbar({
     { id: 'create-canvas', icon: <LayoutDashboard size={ICON_SIZE} />, label: 'Neues Canvas', action: onCreateCanvas, requiresVault: true, requiresWrite: true },
     { id: 'daily-note', icon: <CalendarDays size={ICON_SIZE} />, label: 'Tagesnotiz (Ctrl+Alt+D)', action: () => onDailyNote?.(), requiresVault: true, requiresWrite: true },
     { id: 'insert-template', icon: <FileInput size={ICON_SIZE} />, label: 'Vorlage einfügen', action: () => onInsertTemplate?.(), requiresVault: true, requiresWrite: true },
+    { id: 'dictation', icon: <Mic size={ICON_SIZE} />, label: 'Diktat starten/stoppen', action: () => onToggleDictation?.(), requiresVault: true, requiresWrite: true, feature: 'voice-transcription' },
     { id: 'command-palette', icon: <Command size={ICON_SIZE} />, label: 'Befehlspalette öffnen (Ctrl+P)', action: () => onOpenCommandPalette?.() },
     { id: 'quick-switcher', icon: <FileSearch size={ICON_SIZE} />, label: 'Schnellwechsler öffnen (Ctrl+O)', action: () => onOpenQuickSwitcher?.(), requiresVault: true },
     { id: 'random-note', icon: <Shuffle size={ICON_SIZE} />, label: 'Zufällige Notiz öffnen', action: () => onOpenRandomNote?.(), requiresVault: true },

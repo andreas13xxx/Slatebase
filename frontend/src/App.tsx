@@ -924,6 +924,7 @@ function AppContent() {
       onOpenQuickSwitcher={() => window.dispatchEvent(new CustomEvent('slatebase:open-quick-switcher'))}
       onOpenRandomNote={() => window.dispatchEvent(new CustomEvent('slatebase:open-random-note'))}
       onInsertTemplate={() => window.dispatchEvent(new CustomEvent('slatebase:insert-template'))}
+      onToggleDictation={() => window.dispatchEvent(new CustomEvent('slatebase:toggle-dictation'))}
       isAdmin={user?.role === 'admin'}
       isVaultOwner={selectedVault?.permission === 'owner'}
       globalUnreadCount={globalUnreadCount}

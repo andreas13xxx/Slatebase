@@ -264,14 +264,17 @@ export function CommandPaletteContainer({
   useEffect(() => {
     function handleRandomNote() { openRandomNote() }
     function handleInsertTemplate() { openTemplateInserter() }
+    function handleToggleDictation() { toggleDictation() }
 
     window.addEventListener('slatebase:open-random-note', handleRandomNote)
     window.addEventListener('slatebase:insert-template', handleInsertTemplate)
+    window.addEventListener('slatebase:toggle-dictation', handleToggleDictation)
     return () => {
       window.removeEventListener('slatebase:open-random-note', handleRandomNote)
       window.removeEventListener('slatebase:insert-template', handleInsertTemplate)
+      window.removeEventListener('slatebase:toggle-dictation', handleToggleDictation)
     }
-  }, [openRandomNote, openTemplateInserter])
+  }, [openRandomNote, openTemplateInserter, toggleDictation])
 
   // ─── Keyboard shortcuts for the toolbar-related commands ───────────────────
   // These ship without a default binding, so nothing fires until the user
