@@ -15,7 +15,13 @@
 #
 # Note this is the opposite of backend/Dockerfile, which must build per target:
 # argon2 is compiled natively there, so its output really is arch-specific.
-FROM --platform=$BUILDPLATFORM node:22-slim AS build
+#
+# Pinned by digest, not just the `24-slim` tag, so two builds of the same
+# commit produce the same image — see backend/Dockerfile for how to update it.
+# Same Node major as backend/Dockerfile and CI, kept in sync deliberately (see
+# CI's node-version and backend's engines field) even though this stage has no
+# native addon of its own to tie it to a specific build.
+FROM --platform=$BUILDPLATFORM node:24-slim@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e AS build
 
 # Release version (e.g. "v0.37.0"), passed by CI. Vite embeds any VITE_-prefixed
 # env var present at build time into the bundle via import.meta.env — this is how
@@ -65,7 +71,8 @@ COPY frontend/eslint.config.js ./
 RUN npm run build
 
 # --- Production Stage ---
-FROM nginx:alpine AS production
+# Pinned by digest — see the node:24-slim note above for why and how to update.
+FROM nginx:alpine@sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5ffd29f1d3 AS production
 
 # Remove default nginx config
 RUN rm /etc/nginx/conf.d/default.conf
