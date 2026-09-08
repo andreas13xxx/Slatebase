@@ -73,3 +73,40 @@ jobs:
         working-directory: frontend
       - run: npm run build
         working-directory: frontend
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      # Both backend and frontend depend on shared-contracts (see the backend/
+      # frontend jobs above). Playwright's webServer starts the backend via
+      # `npx tsx src/index.ts` directly rather than `npm run dev` — the latter's
+      # --env-file=.env would fail in CI, where no .env file exists — which
+      # also skips backend's predev hook, so shared-contracts has to already
+      # be built here instead.
+      - run: npm ci
+        working-directory: shared-contracts
+      - run: npm run build
+        working-directory: shared-contracts
+      - run: npm ci
+        working-directory: backend
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: npm run test:e2e
+        working-directory: frontend
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
