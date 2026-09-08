@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.44.1](https://github.com/andreas13xxx/Slatebase/compare/v0.44.0...v0.44.1) (2026-09-08)
+
+
+### Bugfixes
+
+* **backend:** survive unhandled rejections and add health probes ([#167](https://github.com/andreas13xxx/Slatebase/issues/167)) ([6b1c2f8](https://github.com/andreas13xxx/Slatebase/commit/6b1c2f8a4512c45299ef2ee26ee35fa6fd5c418f))
+* **security:** remove committed credentials, gate secrets at commit and in CI ([#168](https://github.com/andreas13xxx/Slatebase/issues/168)) ([bfe0a46](https://github.com/andreas13xxx/Slatebase/commit/bfe0a46e282c6e36c108a924c4b87d2e0da5ec95))
+
 ## [0.44.0](https://github.com/andreas13xxx/Slatebase/compare/v0.43.3...v0.44.0) (2026-09-07)
 
 
