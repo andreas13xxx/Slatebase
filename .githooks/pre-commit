@@ -63,8 +63,9 @@ fi
 # The broad, entropy-based net is gitleaks in CI (see .gitleaks.toml) — this is
 # the fast local pre-filter, not the authority.
 #
-# Escape hatch for a genuine false positive: put `secret:allow` in a comment on
-# the same line.
+# Escape hatch for a genuine false positive: put `gitleaks:allow` in a comment
+# on the same line. That is gitleaks' own inline marker, deliberately reused
+# here so one annotation satisfies both this hook and the CI scan.
 
 # Well-known credential formats. The private-key header is anchored to the line
 # start on purpose: a real PEM block starts a line, whereas the same string
@@ -77,7 +78,7 @@ PASSWORD_ASSIGN='(PASS|PASSWORD|PASSWD|PWD)[A-Za-z_]*[[:space:]]*[=:][[:space:]]
 # list is the set of dummy passwords the existing test fixtures use — naming
 # them explicitly beats a cleverer regex that tries to tell 'ValidPass1!' from
 # a real one and gets it wrong in both directions.
-PASSWORD_ALLOW='process\.env|import\.meta\.env|requireEnv|_CHARS|<[^>]*>|\$\{|\$[A-Z_]+|your-|YOUR_|xxx|changeme|example|placeholder|REPLACE|TODO|\*\*\*|ASKPASS|secret:allow|ValidPass1!|password123|securepass123|wrongpass1|mypassword|secret123|unused-in-config-store'
+PASSWORD_ALLOW='process\.env|import\.meta\.env|requireEnv|_CHARS|<[^>]*>|\$\{|\$[A-Z_]+|your-|YOUR_|xxx|changeme|example|placeholder|REPLACE|TODO|\*\*\*|ASKPASS|gitleaks:allow|ValidPass1!|password123|securepass123|wrongpass1|mypassword|secret123|unused-in-config-store'
 
 CONTENT_HITS=""
 while IFS= read -r f; do
@@ -85,7 +86,7 @@ while IFS= read -r f; do
   # Skip binaries: a line-based pattern would not find anything in them anyway.
   git show ":$f" 2>/dev/null | head -c 8000 | grep -qI . || continue
 
-  hit=$(git show ":$f" 2>/dev/null | grep -nE "$SECRET_CONTENT" | grep -v 'secret:allow' || true)
+  hit=$(git show ":$f" 2>/dev/null | grep -nE "$SECRET_CONTENT" | grep -v 'gitleaks:allow' || true)
   if [ -n "$hit" ]; then
     CONTENT_HITS="$CONTENT_HITS\n  $f:\n$(echo "$hit" | sed 's/^/    /')"
   fi
@@ -97,7 +98,7 @@ while IFS= read -r f; do
 done <<< "$STAGED"
 
 if [ -n "$CONTENT_HITS" ]; then
-  fail "Mögliches Secret im Dateiinhalt:$CONTENT_HITS\n\nCredentials gehören in Umgebungsvariablen, nie ins Repo — auch nicht in Kommentare oder Beispielaufrufe.\nEchter Fehlalarm? 'secret:allow' als Kommentar in die Zeile schreiben."
+  fail "Mögliches Secret im Dateiinhalt:$CONTENT_HITS\n\nCredentials gehören in Umgebungsvariablen, nie ins Repo — auch nicht in Kommentare oder Beispielaufrufe.\nEchter Fehlalarm? 'gitleaks:allow' als Kommentar in die Zeile schreiben."
 fi
 
 # --- 4. Lint + type-check per package (only if that package has changes) ---

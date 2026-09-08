@@ -306,14 +306,15 @@ Wenn ein Skript Zugangsdaten braucht:
 
 ```ts
 // So nicht - der Wert landet im öffentlichen Repo:
-const PASSWORD = 'meinEchtesPasswort' // secret:allow (Gegenbeispiel in der Doku)
+const PASSWORD = 'meinEchtesPasswort' // gitleaks:allow (Gegenbeispiel in der Doku)
 
 // So: aus der Umgebung lesen, mit klarer Fehlermeldung wenn sie fehlt.
 const PASSWORD = requireEnv('SCREENSHOT_PASS')
 ```
 
-(Das `secret:allow` in der ersten Zeile ist der Escape-Hatch des Hooks in
-Aktion - ohne ihn würde dieses Gegenbeispiel den eigenen Commit blockieren.)
+(Das `gitleaks:allow` in der ersten Zeile ist der Escape-Hatch in Aktion - ohne
+ihn würde dieses Gegenbeispiel den eigenen Commit blockieren und anschließend
+den CI-Scan rot färben. Beide Ebenen erkennen denselben Marker.)
 
 Im Docstring nur Platzhalter (`<your-password>`), nie einen echten Wert.
 
@@ -329,8 +330,10 @@ Der Hook ist nur ein Vorfilter - er läuft erst, nachdem
 Setup](#development-setup)), und lässt sich mit `--no-verify` übergehen. Die
 verbindliche Prüfung ist gitleaks in CI.
 
-Echter Fehlalarm im Hook: `secret:allow` als Kommentar in dieselbe Zeile. Für
-gitleaks gehört der Wert in die Allowlist in `.gitleaks.toml`, mit Begründung.
+Echter Fehlalarm: `gitleaks:allow` als Kommentar in dieselbe Zeile - den Marker
+erkennen Hook und CI-Scan gleichermaßen. Lässt sich der Wert nicht annotieren
+(etwa in einer generierten Datei), gehört er mit Begründung in die Allowlist in
+`.gitleaks.toml`.
 
 **Wenn doch einmal ein echtes Secret committet wurde:** Zuerst rotieren -
 Passwort ändern, Token widerrufen. Das ist die eigentliche Behebung. Es aus der

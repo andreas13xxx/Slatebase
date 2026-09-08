@@ -4,6 +4,9 @@
 # gate. The pre-commit hook (.githooks/pre-commit, section 3b) carries a much
 # narrower pattern set as a fast local pre-filter - if you change what counts
 # as a secret, change it in both places.
+#
+# Both layers honour gitleaks' inline `gitleaks:allow` marker, so annotating a
+# false positive once satisfies the hook and this scan alike.
 
 [extend]
 useDefault = true
