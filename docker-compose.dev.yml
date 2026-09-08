@@ -14,7 +14,7 @@ services:
     networks:
       - slatebase-net
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/v1/vaults').then(r => process.exit(r.status === 401 ? 0 : 1)).catch(() => process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/healthz').then(r => process.exit(r.status === 200 ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
