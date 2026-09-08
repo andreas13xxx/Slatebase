@@ -57,6 +57,7 @@ import { GitHubClient, PluginStoreCache, PluginStoreService, UpdateChecker } fro
 import type { IPluginStoreConfig } from './plugin-store/index.js'
 import { createPluginStoreRoutes, createVaultPluginStoreRoutes } from './api/pluginStoreRoutes.js'
 import { versionRoutes } from './api/versionRoutes.js'
+import { createHealthRoutes } from './api/healthRoutes.js'
 import { SearchService, ReplaceService } from './search/index.js'
 import { EventReplayBuffer, RateLimiter as SseRateLimiter, ConnectionManager, PresenceService, EventBus, ConnectionLimitError } from './realtime/index.js'
 import type { SseEvent } from './realtime/index.js'
@@ -508,6 +509,13 @@ const routeModules = [
 ]
 const router = createRouter(routeModules)
 
+// --- Readiness state (for GET /readyz) ---
+// Flipped once the corresponding load completes further down, in the
+// "Initialize & Start Server" section.
+let sessionIndexReady = false
+let vaultRegistryReady = false
+const isReady = (): boolean => sessionIndexReady && vaultRegistryReady
+
 // --- Hono App ---
 
 const app = new Hono()
@@ -629,6 +637,7 @@ if (featureToggleService.isEnabled('mcp') && mcpTokenService !== undefined && mc
 }
 app.get('/.well-known/mcp.json', createMcpWellKnownHandler(featureToggleService))
 app.route('', versionRoutes)
+app.route('', createHealthRoutes({ isReady }))
 
 // Plugin route registration (auth middleware applies via /api/v1/* pattern)
 const pluginService = new PluginService(pluginStore, pluginInstaller, eventBus)
@@ -876,6 +885,7 @@ eventBus.subscribe('vault:change', (options) => {
 
 // Load session index from filesystem
 await sessionStore.loadIndex()
+sessionIndexReady = true
 
 // Periodically sweep expired session files — nothing else calls cleanup(),
 // so without this, sessions nobody revisits (an abandoned tab, a token that
@@ -896,6 +906,7 @@ await vaultService.initializeVaults()
 
 // Initialize link indexes for all vaults (load from disk or rebuild)
 const vaultEntries = await vaultRegistry.load()
+vaultRegistryReady = true
 for (const entry of vaultEntries) {
   const linkIndex = new LinkIndexService(entry.storagePath, entry.id, entry.name, logger)
   linkIndexMap.set(entry.id, linkIndex)
@@ -1164,7 +1175,7 @@ server.listen(serverConfig.port, serverConfig.host, () => {
 
 // --- Graceful Shutdown ---
 
-const gracefulShutdown = async (signal: string): Promise<void> => {
+const gracefulShutdown = async (signal: string, exitCode = 0): Promise<void> => {
   logger.info('Received shutdown signal', { signal })
 
   // Stop periodic cleanup job
@@ -1192,9 +1203,34 @@ const gracefulShutdown = async (signal: string): Promise<void> => {
 
   server.close(() => {
     logger.info('Server closed')
-    process.exit(0)
+    process.exit(exitCode)
   })
 }
 
 process.on('SIGTERM', () => { gracefulShutdown('SIGTERM').catch(() => process.exit(1)) })
 process.on('SIGINT', () => { gracefulShutdown('SIGINT').catch(() => process.exit(1)) })
+
+/** Grace period for gracefulShutdown() to finish before a fatal error forces the process down anyway. */
+const FATAL_SHUTDOWN_TIMEOUT_MS = 10_000
+
+/**
+ * Handles unhandledRejection/uncaughtException: logs the failure, then tears the process
+ * down via gracefulShutdown. These handlers exist to make the failure visible and exit
+ * cleanly, not to keep an already-broken process alive — a `.unref()`'d timer forces
+ * `process.exit(1)` if gracefulShutdown itself hangs in the broken state.
+ */
+function handleFatalError(kind: 'unhandledRejection' | 'uncaughtException', error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error)
+  const stack = error instanceof Error ? error.stack : undefined
+  logger.error(`Fatal error: ${kind}`, stack !== undefined ? { message, stack } : { message })
+
+  setTimeout(() => {
+    logger.error('gracefulShutdown did not complete in time — forcing exit', { kind })
+    process.exit(1)
+  }, FATAL_SHUTDOWN_TIMEOUT_MS).unref()
+
+  gracefulShutdown(kind, 1).catch(() => process.exit(1))
+}
+
+process.on('unhandledRejection', (reason) => { handleFatalError('unhandledRejection', reason) })
+process.on('uncaughtException', (error) => { handleFatalError('uncaughtException', error) })
