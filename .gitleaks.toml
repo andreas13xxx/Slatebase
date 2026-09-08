@@ -31,6 +31,12 @@ regexes = [
   '''secret123''',
   '''unused-in-config-store''',
   '''ABCDEFGHJKLMNPQRSTUVWXYZ''',
+  # The "how NOT to do it" example in CONTRIBUTING.md. It carries an inline
+  # `gitleaks:allow`, but that only clears the commit it appears in - a PR scan
+  # walks every commit in the range, so a line that was introduced without the
+  # marker and annotated later still fails. An allowlist entry covers the whole
+  # range.
+  '''meinEchtesPasswort''',
 ]
 
 [allowlist]
