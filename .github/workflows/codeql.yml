@@ -1,0 +1,43 @@
+# Static analysis (SAST) for JavaScript/TypeScript across both backend/ and
+# frontend/ — a single repo-wide scan, since CodeQL's JS/TS extractor doesn't
+# need a build step and node_modules is excluded automatically.
+#
+# On pull_request and a weekly cron only, not on every push to master — a
+# push-triggered run would just re-scan what the PR already covered.
+#
+# Not blocking yet: see the "Zu tun" note in the PR that added this — sight
+# the existing findings first, suppress false positives, then flip to
+# required once the backlog is real signal instead of noise.
+name: CodeQL
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches:
+      - '**'
+  schedule:
+    - cron: '30 3 * * 1'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4

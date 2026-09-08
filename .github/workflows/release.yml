@@ -148,3 +148,16 @@ jobs:
             -f visibility=public || true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Scans the image that was just pushed (single-arch — whatever the
+      # runner's own platform is, currently amd64 — not the full manifest
+      # list; good enough for a dependency/OS-package vulnerability sweep).
+      # Not blocking yet: report only, until the existing backlog has been
+      # triaged — see the CodeQL workflow's comment for the same reasoning.
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/andreas13xxx/${{ matrix.image }}:${{ env.TAG }}
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: '0'
