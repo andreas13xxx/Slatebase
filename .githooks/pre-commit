@@ -46,11 +46,59 @@ if [ -n "$CONFLICT_FILES" ]; then
   fail "Merge-Konflikt-Marker gefunden in:$CONFLICT_FILES"
 fi
 
-# --- 3. Block likely secrets / credential files -----------------------------
+# --- 3a. Block likely secret/credential FILES (by name) ---------------------
 SECRET_PATTERN='(^|/)\.env($|\.[^.]+$)|\.pem$|\.key$|(^|/)id_rsa(\.|$)|credentials\.json$'
 SECRETS=$(echo "$STAGED" | grep -Ei "$SECRET_PATTERN" || true)
 if [ -n "$SECRETS" ]; then
   fail "Mögliche Secrets/Zugangsdaten im Commit:\n$SECRETS\nFalls das ein Fehlalarm ist, Datei mit 'git commit --no-verify' committen."
+fi
+
+# --- 3b. Block secret CONTENT inside staged files ---------------------------
+# A credential once sat in a doc comment of a .ts file and passed 3a untouched,
+# because that rule only ever looks at file NAMES. These patterns look at the
+# staged content itself.
+#
+# Deliberately narrow: only shapes that cannot plausibly be anything else, so
+# the hook stays quiet and nobody starts reflexively reaching for --no-verify.
+# The broad, entropy-based net is gitleaks in CI (see .gitleaks.toml) — this is
+# the fast local pre-filter, not the authority.
+#
+# Escape hatch for a genuine false positive: put `gitleaks:allow` in a comment
+# on the same line. That is gitleaks' own inline marker, deliberately reused
+# here so one annotation satisfies both this hook and the CI scan.
+
+# Well-known credential formats. The private-key header is anchored to the line
+# start on purpose: a real PEM block starts a line, whereas the same string
+# quoted inside a test or a placeholder attribute never does.
+SECRET_CONTENT='^-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{22}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9]{10}|eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|sk-(ant-)?[A-Za-z0-9_-]{24}'
+
+# A password-shaped literal assigned to a password-shaped name.
+PASSWORD_ASSIGN='(PASS|PASSWORD|PASSWD|PWD)[A-Za-z_]*[[:space:]]*[=:][[:space:]]*["'"'"'`]?[A-Za-z0-9!@#$%^&*_+-]{8,}'
+# Names and values that are demonstrably not a credential. The tail of this
+# list is the set of dummy passwords the existing test fixtures use — naming
+# them explicitly beats a cleverer regex that tries to tell 'ValidPass1!' from
+# a real one and gets it wrong in both directions.
+PASSWORD_ALLOW='process\.env|import\.meta\.env|requireEnv|_CHARS|<[^>]*>|\$\{|\$[A-Z_]+|your-|YOUR_|xxx|changeme|example|placeholder|REPLACE|TODO|\*\*\*|ASKPASS|gitleaks:allow|ValidPass1!|password123|securepass123|wrongpass1|mypassword|secret123|unused-in-config-store'
+
+CONTENT_HITS=""
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  # Skip binaries: a line-based pattern would not find anything in them anyway.
+  git show ":$f" 2>/dev/null | head -c 8000 | grep -qI . || continue
+
+  hit=$(git show ":$f" 2>/dev/null | grep -nE "$SECRET_CONTENT" | grep -v 'gitleaks:allow' || true)
+  if [ -n "$hit" ]; then
+    CONTENT_HITS="$CONTENT_HITS\n  $f:\n$(echo "$hit" | sed 's/^/    /')"
+  fi
+
+  hit=$(git show ":$f" 2>/dev/null | grep -nE "$PASSWORD_ASSIGN" | grep -vEi "$PASSWORD_ALLOW" || true)
+  if [ -n "$hit" ]; then
+    CONTENT_HITS="$CONTENT_HITS\n  $f:\n$(echo "$hit" | sed 's/^/    /')"
+  fi
+done <<< "$STAGED"
+
+if [ -n "$CONTENT_HITS" ]; then
+  fail "Mögliches Secret im Dateiinhalt:$CONTENT_HITS\n\nCredentials gehören in Umgebungsvariablen, nie ins Repo — auch nicht in Kommentare oder Beispielaufrufe.\nEchter Fehlalarm? 'gitleaks:allow' als Kommentar in die Zeile schreiben."
 fi
 
 # --- 4. Lint + type-check per package (only if that package has changes) ---

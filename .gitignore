@@ -36,6 +36,9 @@ coverage/
 # Test output artifacts
 vitest-output.txt
 
+# Lint output artifacts (embed absolute local paths - do not commit)
+eslint-output.json
+
 # Playwright
 playwright-report/
 test-results/

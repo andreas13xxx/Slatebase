@@ -50,7 +50,7 @@ Falls du bereits eine LiveSync-Konfiguration hast (z.B. von einem anderen Gerät
 | Server-URL | `https://couchdb.example.com` |
 | Datenbank | `slatebase-vault` |
 | Benutzername | `sync_user` |
-| Passwort | `sicheres_passwort` |
+| Passwort | `<dein-sicheres-Passwort>` |
 
 3. Klicke "Verbindung testen"
 4. Bei Erfolg: "Setup abschließen"
@@ -102,7 +102,7 @@ services:
     image: couchdb:3
     environment:
       COUCHDB_USER: admin
-      COUCHDB_PASSWORD: sicheres_passwort
+      COUCHDB_PASSWORD: "<dein-sicheres-Passwort>"
     ports:
       - "5984:5984"
     volumes:
