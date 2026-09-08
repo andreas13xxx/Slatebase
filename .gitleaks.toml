@@ -1,0 +1,55 @@
+# gitleaks configuration for Slatebase.
+#
+# Runs in CI (.github/workflows/secret-scan.yml) as the authoritative secret
+# gate. The pre-commit hook (.githooks/pre-commit, section 3b) carries a much
+# narrower pattern set as a fast local pre-filter - if you change what counts
+# as a secret, change it in both places.
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "slatebase-password-literal"
+description = "Password-shaped literal assigned to a password-shaped name"
+regex = '''(?i)(pass|passwd|password|pwd)[a-z_]*\s*[=:]\s*["'`]([A-Za-z0-9!@#$%^&*_+-]{8,})["'`]'''
+secretGroup = 2
+keywords = ["pass", "passwd", "password", "pwd"]
+
+# Dummy credentials used by the existing test fixtures. Listed by value rather
+# than matched by a cleverer rule: a regex that tries to tell "ValidPass1!"
+# from a real password gets it wrong in both directions.
+[rules.allowlist]
+regexes = [
+  '''ValidPass1!''',
+  '''password123''',
+  '''securepass123''',
+  '''wrongpass1''',
+  '''mypassword''',
+  '''secret123''',
+  '''unused-in-config-store''',
+  '''ABCDEFGHJKLMNPQRSTUVWXYZ''',
+]
+
+[allowlist]
+description = "Known non-secrets in this repository"
+
+paths = [
+  # Lockfiles: integrity hashes trip entropy rules, nothing secret goes in.
+  '''package-lock\.json$''',
+  # Hunspell dictionaries: megabytes of words, entropy heuristics have a field day.
+  '''\.(aff|dic)$''',
+]
+
+regexes = [
+  # The PEM header as a literal string in tests and as an input placeholder -
+  # a header with no key material after it.
+  '''-----BEGIN OPENSSH PRIVATE KEY-----''',
+]
+
+# The credential removed in this branch is still reachable in history at commit
+# 6921bc3 (2026-05-26). It is allowlisted so a full-history scan reports a clean
+# result rather than a permanent known failure. The real remediation was
+# rotating the password - see CONTRIBUTING.md, "Keine Secrets im Repository".
+commits = [
+  "6921bc37b7899b90bc248dc0ec23698e93be6db0",
+]

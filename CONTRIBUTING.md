@@ -290,9 +290,53 @@ Express/Fastify, Redux/Zustand, ORMs, DI containers, Tailwind/CSS frameworks, JW
 - [ ] `validateFilePath()` before every vault file access
 - [ ] Zod validation on all new endpoints (controller layer)
 - [ ] No secrets in logs or API responses
+- [ ] No secrets in the repository (see below)
 - [ ] No `eval()` or dynamic code execution with user input
 - [ ] File size limits enforced before reading
 - [ ] Atomic writes for all persistent data
+
+### Keine Secrets im Repository
+
+Zugangsdaten gehören ausschließlich in Umgebungsvariablen - **auch in
+Beispielaufrufen, Docstrings und Kommentaren**. Genau dort ist schon einmal ein
+echtes Admin-Passwort gelandet (`frontend/e2e/demo-recording.spec.ts`), weil es
+kein Code, sondern ein Kommentar war und deshalb niemandem auffiel.
+
+Wenn ein Skript Zugangsdaten braucht:
+
+```ts
+// So nicht - der Wert landet im öffentlichen Repo:
+const PASSWORD = 'meinEchtesPasswort' // secret:allow (Gegenbeispiel in der Doku)
+
+// So: aus der Umgebung lesen, mit klarer Fehlermeldung wenn sie fehlt.
+const PASSWORD = requireEnv('SCREENSHOT_PASS')
+```
+
+(Das `secret:allow` in der ersten Zeile ist der Escape-Hatch des Hooks in
+Aktion - ohne ihn würde dieses Gegenbeispiel den eigenen Commit blockieren.)
+
+Im Docstring nur Platzhalter (`<your-password>`), nie einen echten Wert.
+
+**Zwei Netze fangen Verstöße ab:**
+
+| Netz | Wo | Umfang |
+|------|-----|--------|
+| Pre-Commit-Hook | `.githooks/pre-commit`, Abschnitt 3b | Eng gefasste Muster (bekannte Token-Formate, passwortförmige Literale). Schnell, läuft lokal. |
+| gitleaks | `.github/workflows/secret-scan.yml` + `.gitleaks.toml` | Vollständiger Regelsatz inkl. Entropie-Heuristik. Bei jedem PR, plus wöchentlicher History-Sweep. |
+
+Der Hook ist nur ein Vorfilter - er läuft erst, nachdem
+`git config core.hooksPath .githooks` gesetzt wurde (siehe [Development
+Setup](#development-setup)), und lässt sich mit `--no-verify` übergehen. Die
+verbindliche Prüfung ist gitleaks in CI.
+
+Echter Fehlalarm im Hook: `secret:allow` als Kommentar in dieselbe Zeile. Für
+gitleaks gehört der Wert in die Allowlist in `.gitleaks.toml`, mit Begründung.
+
+**Wenn doch einmal ein echtes Secret committet wurde:** Zuerst rotieren -
+Passwort ändern, Token widerrufen. Das ist die eigentliche Behebung. Es aus der
+History zu entfernen ist Kosmetik: Sobald der Commit gepusht war, muss der Wert
+als kompromittiert gelten, und ein `force-push` auf `master` bricht jeden Klon
+und jeden Fork, ohne den Wert bei denen zu löschen, die ihn schon haben.
 
 ---
 

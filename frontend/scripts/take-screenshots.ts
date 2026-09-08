@@ -5,22 +5,42 @@
  * Prerequisites:
  * - Backend running on http://localhost:3000
  * - Frontend running on http://localhost:5173
- * - User "Slate" with password "Slatebase" exists
+ * - An existing user account, supplied via the environment:
+ *     SCREENSHOT_USER=<username> SCREENSHOT_PASS=<password>
+ * - Optionally SCREENSHOT_OUT_DE / SCREENSHOT_OUT_EN to override where the
+ *   images are written (defaults to the welcome-vault templates in this repo).
+ *
+ * Never hardcode credentials here - this file is public.
  */
 
 import { chromium, type Page, type BrowserContext } from '@playwright/test'
 import * as path from 'node:path'
 import * as fs from 'node:fs'
 
-const BASE_URL = 'http://localhost:5173'
-const USERNAME = 'Slate'
-const PASSWORD = 'Slatebase'
+/** Reads a required environment variable, or exits with a usage hint. */
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (value === undefined || value === '') {
+    console.error(
+      `Missing ${name}. Run with: SCREENSHOT_USER=<username> SCREENSHOT_PASS=<password> npx tsx scripts/take-screenshots.ts`
+    )
+    process.exit(1)
+  }
+  return value
+}
 
+const BASE_URL = 'http://localhost:5173'
+const USERNAME = requireEnv('SCREENSHOT_USER')
+const PASSWORD = requireEnv('SCREENSHOT_PASS')
+
+const REPO_ROOT = path.resolve(import.meta.dirname, '..', '..')
 const OUTPUT_DIR_DE = path.resolve(
-  'd:\\Users\\BKU\\AndreasAnScholz\\OneDrive - Deutsche Bahn\\Kiro\\Slatebase\\backend\\data\\templates\\welcome-vault\\Screenshots'
+  process.env['SCREENSHOT_OUT_DE']
+    ?? path.join(REPO_ROOT, 'backend', 'assets', 'templates', 'welcome-vault', 'Screenshots')
 )
 const OUTPUT_DIR_EN = path.resolve(
-  'd:\\Users\\BKU\\AndreasAnScholz\\OneDrive - Deutsche Bahn\\Kiro\\Slatebase\\backend\\data\\templates\\welcome-vault-en\\Screenshots'
+  process.env['SCREENSHOT_OUT_EN']
+    ?? path.join(REPO_ROOT, 'backend', 'assets', 'templates', 'welcome-vault-en', 'Screenshots')
 )
 
 // Ensure output directories exist

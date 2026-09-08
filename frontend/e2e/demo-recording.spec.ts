@@ -7,8 +7,8 @@
  *
  * Usage:
  *   cd frontend
- *   set DEMO_USER=admin
- *   set DEMO_PASS=ndy1213Slatebase!
+ *   set DEMO_USER=<your-admin-username>
+ *   set DEMO_PASS=<your-admin-password>
  *   npx playwright test e2e/demo-recording.spec.ts --headed --reporter=list
  *
  * Output:
