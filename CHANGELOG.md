@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.44.2](https://github.com/andreas13xxx/Slatebase/compare/v0.44.1...v0.44.2) (2026-09-09)
+
+
+### Sonstige Änderungen
+
+* **backend:** default-deny authorization middleware for vault routes ([f8f62bb](https://github.com/andreas13xxx/Slatebase/commit/f8f62bba6666e60402ba24a827ec4578cd944f22))
+
 ## [0.44.1](https://github.com/andreas13xxx/Slatebase/compare/v0.44.0...v0.44.1) (2026-09-08)
 
 
