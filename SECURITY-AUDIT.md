@@ -34,6 +34,48 @@ fixed; see the A05 correction below.
 **Authorization model:** owner/read/write ACL per vault plus a separate admin role. No
 privilege-escalation paths identified.
 
+### Nachtrag: Default-Deny-Middleware für Vault-Routen — Status: **Implemented**
+
+Die bisherige Bewertung ("Checks vorhanden") war zutreffend — Autorisierung lag in jedem
+Handler einzeln (drei Idiome: `checkVaultReadAccess()`-Helper, direkter
+`accessControl.check*Access()`, Inline-Owner-Vergleich), und Checks fehlten nirgends
+nachweislich. Das Problem war die **Richtung des Defaults**: eine neu hinzugefügte Route
+unter `/vaults/:vaultId/*` war offen, bis jemand explizit einen Check einbaute.
+
+Eine Middleware auf `/api/v1/vaults/:vaultId/*` (`api/vault-authorization-middleware.ts`)
+erzwingt jetzt für jede Route mindestens `write`, sofern keine explizite Ausnahme greift —
+Methode als Default (`GET`/`HEAD` → `read`, sonst → `write`), Ausnahmen in einer
+Tabelle (`VAULT_ROUTE_LEVEL_EXCEPTIONS`), aus demselben vollständigen Routeninventar
+gezogen wie der Test, der jede Route automatisch durchgeht
+(`vault-authorization-middleware.test.ts`, `VAULT-ROUTE-AUTHORIZATION.md`). Bestehende
+Handler-Checks bleiben in diesem Schritt bewusst zusätzlich bestehen (Sicherheitsgurt beim
+Umbau); ihr Abbau ist ein separater, nachgelagerter Schritt.
+
+`IVaultAccessControl` hat dabei eine dritte Stufe bekommen (`checkOwnerAccess`), auf die die
+beiden bisherigen Inline-Owner-Vergleiche (`vaultConfigRoutes.ts`, `vaultShareRoutes.ts`)
+jetzt umgestellt sind — die Entscheidungslogik liegt an einer Stelle statt an zweien.
+
+Der Umbau ist ausdrücklich verhaltensneutral — keine Route hat heute eine andere effektive
+Berechtigungsstufe als vorher. Dabei aufgefallene, nicht behobene Einzelbefunde:
+
+- **Vier `pluginStoreRoutes.ts`-Routen** (`store-install`, `check-updates`, `update-all`,
+  `:pluginId/update`) mutieren Plugin-Zustand, prüfen aber nur Lesezugriff. Sieht zu
+  schwach aus, wurde in diesem Umbau aber bewusst nicht verschärft (verhaltensneutral
+  bleibt Priorität; eine Verschärfung als Nebeneffekt eines Autorisierungsumbaus ist nicht
+  mehr risikoarm zurückzunehmen, falls sie etwas kaputt macht).
+- **`GET /vaults/:vaultId/mail-import/:configId/mailbox-tree`** verlangt nur Lesezugriff,
+  entschlüsselt aber das gespeicherte IMAP-Passwort und baut eine ausgehende Verbindung
+  auf — Nutzung eines Secrets auf Read-Niveau.
+- **404 vs. 403** bleibt uneinheitlich: `checkVaultReadAccess()` und die beiden
+  Owner-Checks liefern 404 für einen unbekannten Vault und 403 für einen bekannten ohne
+  Zugriff; `DELETE /vaults/:vaultId` liefert dagegen 404 für beide Fälle (delegiert an
+  `deleteVaultWithChecks()`, das Nichteigentümer und unbekannten Vault nicht
+  unterscheidet). Eine Vereinheitlichung würde das heutige Antwortverhalten ändern, auf das
+  das Frontend gebaut haben könnte — bewusst nicht angefasst.
+
+Details, vollständiges Routeninventar und die Begründung jeder Ausnahme:
+`VAULT-ROUTE-AUTHORIZATION.md`.
+
 **Path traversal:** every `path.join`/`path.resolve` with user-influenced input is guarded:
 
 | Guard | Applies to |

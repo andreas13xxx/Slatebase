@@ -224,6 +224,37 @@ describe('VaultAccessControlService', () => {
     })
   })
 
+  describe('checkOwnerAccess', () => {
+    it('allows the owner', async () => {
+      const { service } = createService()
+      await expect(service.checkOwnerAccess(vaultId, ownerId)).resolves.toBeUndefined()
+    })
+
+    it('rejects a user with a write share', async () => {
+      const { service } = createService({
+        shares: [createTestShare(vaultId, writeUserId, 'write', ownerId)],
+      })
+      await expect(service.checkOwnerAccess(vaultId, writeUserId)).rejects.toThrow(VaultAccessDeniedError)
+    })
+
+    it('rejects a user with a read share', async () => {
+      const { service } = createService({
+        shares: [createTestShare(vaultId, readUserId, 'read', ownerId)],
+      })
+      await expect(service.checkOwnerAccess(vaultId, readUserId)).rejects.toThrow(VaultAccessDeniedError)
+    })
+
+    it('rejects a user without share or ownership', async () => {
+      const { service } = createService()
+      await expect(service.checkOwnerAccess(vaultId, noAccessUserId)).rejects.toThrow(VaultAccessDeniedError)
+    })
+
+    it('throws VaultNotFoundError for non-existent vault', async () => {
+      const { service } = createService()
+      await expect(service.checkOwnerAccess('non-existent', ownerId)).rejects.toThrow(VaultNotFoundError)
+    })
+  })
+
   describe('createShare', () => {
     it('creates a share with read permission', async () => {
       const { service, shareRegistry } = createService()

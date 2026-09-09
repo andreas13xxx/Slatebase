@@ -7,8 +7,7 @@ import type { ILogger } from '../logger/index.js'
 import type { IVaultConfigService, VaultConfig } from '../vault-config/index.js'
 import { DEFAULT_VAULT_CONFIG } from '../vault-config/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
-import { VaultAccessDeniedError } from '../business/index.js'
-import type { IVaultRegistry, VaultRegistryEntry } from '../vault/registry.js'
+import { VaultAccessDeniedError, VaultNotFoundError } from '../business/index.js'
 import { createVaultConfigRoutes } from './vaultConfigRoutes.js'
 
 // ─── Mock Factories ──────────────────────────────────────────────────────────
@@ -31,6 +30,7 @@ function createMockAccessControl(overrides: Partial<IVaultAccessControl> = {}): 
   return {
     checkReadAccess: async () => {},
     checkWriteAccess: async () => {},
+    checkOwnerAccess: async () => {},
     createShare: async () => {},
     revokeShare: async () => {},
     updateSharePermission: async () => {},
@@ -39,36 +39,14 @@ function createMockAccessControl(overrides: Partial<IVaultAccessControl> = {}): 
   }
 }
 
-function createMockVaultRegistry(entry: VaultRegistryEntry | null): IVaultRegistry {
-  return {
-    load: async () => [],
-    save: async () => {},
-    addEntry: async () => {},
-    removeEntry: async () => {},
-    findById: () => entry,
-    findByName: () => null,
-    updateEntries: async (mutator) => mutator([]),
-  }
-}
-
-const defaultEntry: VaultRegistryEntry = {
-  id: 'vault-1',
-  name: 'Test Vault',
-  storagePath: '/data/vaults/vault-1',
-  createdAt: '2024-01-01T00:00:00.000Z',
-  ownerId: 'owner-1',
-}
-
 function createTestApp(options: {
   vaultConfigService?: IVaultConfigService
   accessControl?: IVaultAccessControl
-  entry?: VaultRegistryEntry | null
   session?: SessionContext
 } = {}) {
   const logger = createMockLogger()
   const vaultConfigService = options.vaultConfigService ?? createMockVaultConfigService()
   const accessControl = options.accessControl ?? createMockAccessControl()
-  const vaultRegistry = createMockVaultRegistry(options.entry ?? defaultEntry)
   const session: SessionContext = options.session ?? { userId: 'owner-1', username: 'owner', role: 'user', sessionId: 'sess-1' }
 
   const app = new Hono()
@@ -77,7 +55,7 @@ function createTestApp(options: {
     return next()
   })
 
-  const routes = createVaultConfigRoutes({ vaultConfigService, accessControl, vaultRegistry, logger })
+  const routes = createVaultConfigRoutes({ vaultConfigService, accessControl, logger })
   app.route('/api/v1', routes)
   return app
 }
@@ -137,7 +115,13 @@ describe('Vault Config Routes', () => {
     })
 
     it('rejects updates from non-owners', async () => {
-      const app = createTestApp({ session: { userId: 'someone-else', username: 'x', role: 'user', sessionId: 'sess-2' } })
+      const accessControl = createMockAccessControl({
+        checkOwnerAccess: async () => { throw new VaultAccessDeniedError('vault-1', 'someone-else', 'owner') },
+      })
+      const app = createTestApp({
+        accessControl,
+        session: { userId: 'someone-else', username: 'x', role: 'user', sessionId: 'sess-2' },
+      })
 
       const res = await app.request('/api/v1/vaults/vault-1/config', {
         method: 'PUT',
@@ -146,6 +130,21 @@ describe('Vault Config Routes', () => {
       })
 
       expect(res.status).toBe(403)
+    })
+
+    it('returns 404 when the vault does not exist', async () => {
+      const accessControl = createMockAccessControl({
+        checkOwnerAccess: async () => { throw new VaultNotFoundError('vault-1') },
+      })
+      const app = createTestApp({ accessControl })
+
+      const res = await app.request('/api/v1/vaults/vault-1/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dailyNoteTemplateName: 'daily.md' }),
+      })
+
+      expect(res.status).toBe(404)
     })
 
     it('rejects a template name containing a path separator', async () => {

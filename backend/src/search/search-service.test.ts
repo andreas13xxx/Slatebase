@@ -20,6 +20,7 @@ function createMockVaultAccessControl(): IVaultAccessControl {
   return {
     checkReadAccess: async () => {},
     checkWriteAccess: async () => {},
+    checkOwnerAccess: async () => {},
     createShare: async () => {},
     revokeShare: async () => {},
     updateSharePermission: async () => {},

@@ -9,10 +9,14 @@ import path from 'node:path'
 import os from 'node:os'
 
 import { VaultReader, VaultManager, generateVaultId } from './vault/index.js'
-import { VaultService } from './business/index.js'
+import { VaultService, VaultAccessControlService } from './business/index.js'
 import { VaultController, VaultRouteModule, createRouter } from './api/index.js'
+import { createVaultAuthorizationMiddleware } from './api/vault-authorization-middleware.js'
 import type { IConfigService, ServerConfig, VaultConfig } from './config/index.js'
 import type { ILogger } from './logger/index.js'
+import type { IVaultRegistry, IVaultShareRegistry, VaultRegistryEntry, VaultShareEntry } from './vault/registry.js'
+import type { IUserRepository } from './user/index.js'
+import type { SessionContext } from './auth/index.js'
 
 // --- Silent logger for tests ---
 const silentLogger: ILogger = {
@@ -27,6 +31,14 @@ const silentLogger: ILogger = {
 let fixtureDir: string
 let vaultId: string
 let app: Hono
+
+// --- Test users for authorization coverage ---
+// OWNER_USER_ID matches the pre-existing 'test-user-id' every test above already assumes.
+const OWNER_USER_ID = 'test-user-id'
+const READER_USER_ID = 'reader-user-id'
+const STRANGER_USER_ID = 'stranger-user-id'
+
+let currentSession: SessionContext = { userId: OWNER_USER_ID, username: 'testuser', role: 'admin', sessionId: 'sess-owner' }
 
 beforeAll(async () => {
   // Create a temp fixture vault directory
@@ -125,7 +137,51 @@ beforeAll(async () => {
   }
 
   const vaultService = new VaultService(vaultManager, vaultReader, configStub, silentLogger)
-  const vaultController = new VaultController(vaultService, silentLogger)
+
+  // Real access-control stack (in-memory) so the authorization middleware below enforces
+  // actual read/write/owner decisions, not just a stub that always allows.
+  const registryEntries: VaultRegistryEntry[] = [
+    { id: vaultId, name: 'Integration Test Vault', storagePath: fixtureDir, createdAt: new Date().toISOString(), ownerId: OWNER_USER_ID },
+  ]
+  const shareEntries: VaultShareEntry[] = [
+    { vaultId, userId: READER_USER_ID, permission: 'read', grantedBy: OWNER_USER_ID, grantedAt: new Date().toISOString() },
+  ]
+  const vaultRegistry: IVaultRegistry = {
+    load: async () => [...registryEntries],
+    save: async () => {},
+    addEntry: async (entry) => { registryEntries.push(entry) },
+    removeEntry: async (id) => {
+      const idx = registryEntries.findIndex((e) => e.id === id)
+      if (idx !== -1) registryEntries.splice(idx, 1)
+    },
+    findById: (id) => registryEntries.find((e) => e.id === id) ?? null,
+    findByName: (name) => registryEntries.find((e) => e.name === name) ?? null,
+    updateEntries: async (mutator) => mutator(registryEntries),
+  }
+  const vaultShareRegistry: IVaultShareRegistry = {
+    getSharesForVault: async (id) => shareEntries.filter((s) => s.vaultId === id),
+    getSharesForUser: async (userId) => shareEntries.filter((s) => s.userId === userId),
+    addShare: async (share) => { shareEntries.push(share) },
+    removeShare: async (id, userId) => {
+      const idx = shareEntries.findIndex((s) => s.vaultId === id && s.userId === userId)
+      if (idx !== -1) shareEntries.splice(idx, 1)
+    },
+    removeAllSharesForVault: async (id) => {
+      for (let i = shareEntries.length - 1; i >= 0; i--) {
+        if (shareEntries[i]?.vaultId === id) shareEntries.splice(i, 1)
+      }
+    },
+    updatePermission: async (id, userId, permission) => {
+      const share = shareEntries.find((s) => s.vaultId === id && s.userId === userId)
+      if (share) share.permission = permission
+    },
+  }
+  // Never invoked by checkReadAccess/checkWriteAccess (only createShare uses it), so a
+  // never-called stub is sufficient here.
+  const userRepository = {} as unknown as IUserRepository
+  const accessControl = new VaultAccessControlService(vaultRegistry, vaultShareRegistry, userRepository, silentLogger)
+
+  const vaultController = new VaultController(vaultService, silentLogger, undefined, undefined, accessControl)
   const routeModules = [new VaultRouteModule(vaultController)]
   const router = createRouter(routeModules)
 
@@ -139,11 +195,15 @@ beforeAll(async () => {
       allowHeaders: ['Content-Type'],
     }),
   )
-  // Fake session middleware for integration tests (no real auth)
+  // Fake session middleware for integration tests (no real auth) — reads the mutable
+  // `currentSession`, so individual tests can swap in a different caller.
   app.use('*', async (c, next) => {
-    ;(c as unknown as { set(key: string, value: unknown): void }).set('session', { userId: 'test-user-id', username: 'testuser', role: 'admin' })
+    ;(c as unknown as { set(key: string, value: unknown): void }).set('session', currentSession)
     await next()
   })
+  // Default-deny vault authorization — registered before the route mount below, mirroring
+  // production wiring (index.ts). Exercises the real middleware stack, not an isolated unit.
+  app.use('/api/v1/vaults/:vaultId/*', createVaultAuthorizationMiddleware({ vaultRegistry, accessControl }))
   app.route('/api/v1', router)
 })
 
@@ -232,5 +292,42 @@ describe('Backend Integration: CORS headers', () => {
 
     expect(res.status).toBe(200)
     expect(res.headers.get('access-control-allow-origin')).toBe('http://localhost:5173')
+  })
+})
+
+// End-to-end coverage of the default-deny vault authorization middleware, over the real
+// middleware stack wired in beforeAll above (not an isolated unit) — see
+// vault-authorization-middleware.test.ts for the exhaustive per-route sweep.
+describe('Backend Integration: vault authorization middleware', () => {
+  afterAll(() => {
+    currentSession = { userId: OWNER_USER_ID, username: 'testuser', role: 'admin', sessionId: 'sess-owner' }
+  })
+
+  it('denies GET /tree to a user with no access to the vault', async () => {
+    currentSession = { userId: STRANGER_USER_ID, username: 'stranger', role: 'user', sessionId: 'sess-stranger' }
+
+    const res = await app.request(`/api/v1/vaults/${vaultId}/tree`)
+
+    expect(res.status).toBe(403)
+  })
+
+  it('denies PUT /files to a user with only a read share', async () => {
+    currentSession = { userId: READER_USER_ID, username: 'reader', role: 'user', sessionId: 'sess-reader' }
+
+    const res = await app.request(`/api/v1/vaults/${vaultId}/files?path=readme.md`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: 'attempted overwrite' }),
+    })
+
+    expect(res.status).toBe(403)
+  })
+
+  it('still allows GET /tree for the read-share user (read-share must keep working)', async () => {
+    currentSession = { userId: READER_USER_ID, username: 'reader', role: 'user', sessionId: 'sess-reader' }
+
+    const res = await app.request(`/api/v1/vaults/${vaultId}/tree`)
+
+    expect(res.status).toBe(200)
   })
 })

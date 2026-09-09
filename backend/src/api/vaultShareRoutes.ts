@@ -13,7 +13,6 @@ import {
   VaultHasActiveSharesError,
   SharesNotRevokedError,
 } from '../business/index.js'
-import type { IVaultRegistry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
 import type { IUserRepository } from '../user/index.js'
@@ -103,28 +102,29 @@ function validationErrorResponse(c: Context, zodError: z.ZodError): Response {
 
 /**
  * Verifies that the authenticated user is the owner of the specified vault.
- * Returns the session context if authorized, or a 403/404 Response if not.
+ * Returns the session context if authorized, or a 401/403/404 Response if not.
  */
-function checkOwnership(
+async function checkOwnership(
   c: Context,
   vaultId: string,
-  vaultRegistry: IVaultRegistry,
-): { authorized: true; session: SessionContext } | { authorized: false; response: Response } {
+  accessControl: IVaultAccessControl,
+): Promise<{ authorized: true; session: SessionContext } | { authorized: false; response: Response }> {
   const session = c.get('session') as SessionContext | undefined
   if (session === undefined) {
     const error = createApiError('UNAUTHORIZED', 'Missing session context')
     return { authorized: false, response: c.json(error, 401) }
   }
 
-  const entry = vaultRegistry.findById(vaultId)
-  if (entry === null) {
-    const error = createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`)
-    return { authorized: false, response: c.json(error, 404) }
-  }
-
-  if (entry.ownerId !== session.userId) {
-    const error = createApiError('ACCESS_DENIED', 'Only the vault owner can manage shares')
-    return { authorized: false, response: c.json(error, 403) }
+  try {
+    await accessControl.checkOwnerAccess(vaultId, session.userId)
+  } catch (error) {
+    if (error instanceof VaultNotFoundError) {
+      return { authorized: false, response: c.json(createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`), 404) }
+    }
+    if (error instanceof VaultAccessDeniedError) {
+      return { authorized: false, response: c.json(createApiError('ACCESS_DENIED', 'Only the vault owner can manage shares'), 403) }
+    }
+    throw error
   }
 
   return { authorized: true, session }
@@ -192,7 +192,6 @@ export class VaultShareRouteModule implements RouteModule {
   constructor(
     private readonly accessControl: IVaultAccessControl,
     private readonly vaultService: IVaultService,
-    private readonly vaultRegistry: IVaultRegistry,
     private readonly logger: ILogger,
     private readonly shareRegistry?: IVaultShareRegistry,
     private readonly userRepository?: IUserRepository,
@@ -230,7 +229,7 @@ export class VaultShareRouteModule implements RouteModule {
     }
     const { vaultId } = paramsParsed.data
 
-    const ownerCheck = checkOwnership(c, vaultId, this.vaultRegistry)
+    const ownerCheck = await checkOwnership(c, vaultId, this.accessControl)
     if (!ownerCheck.authorized) {
       return ownerCheck.response
     }
@@ -276,7 +275,7 @@ export class VaultShareRouteModule implements RouteModule {
     }
     const { vaultId } = paramsParsed.data
 
-    const ownerCheck = checkOwnership(c, vaultId, this.vaultRegistry)
+    const ownerCheck = await checkOwnership(c, vaultId, this.accessControl)
     if (!ownerCheck.authorized) {
       return ownerCheck.response
     }
@@ -319,7 +318,7 @@ export class VaultShareRouteModule implements RouteModule {
     }
     const { vaultId, userId: targetUserId } = paramsParsed.data
 
-    const ownerCheck = checkOwnership(c, vaultId, this.vaultRegistry)
+    const ownerCheck = await checkOwnership(c, vaultId, this.accessControl)
     if (!ownerCheck.authorized) {
       return ownerCheck.response
     }
@@ -347,7 +346,7 @@ export class VaultShareRouteModule implements RouteModule {
     }
     const { vaultId, userId: targetUserId } = paramsParsed.data
 
-    const ownerCheck = checkOwnership(c, vaultId, this.vaultRegistry)
+    const ownerCheck = await checkOwnership(c, vaultId, this.accessControl)
     if (!ownerCheck.authorized) {
       return ownerCheck.response
     }
@@ -388,7 +387,7 @@ export class VaultShareRouteModule implements RouteModule {
     }
     const { vaultId } = paramsParsed.data
 
-    const ownerCheck = checkOwnership(c, vaultId, this.vaultRegistry)
+    const ownerCheck = await checkOwnership(c, vaultId, this.accessControl)
     if (!ownerCheck.authorized) {
       return ownerCheck.response
     }

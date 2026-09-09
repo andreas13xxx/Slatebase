@@ -15,13 +15,17 @@ export type AccessCheckResult =
   | { authorized: true }
   | { authorized: false; response: Response }
 
+/** Vault access level a route may require. */
+export type VaultAccessLevel = 'read' | 'write' | 'owner'
+
 /**
- * Checks authentication and vault access (read permission).
+ * Checks authentication and vault access at the given level.
  * Returns 401 if no session, 404 if vault not found, 403 if access denied.
  */
-export async function checkVaultReadAccess(
+export async function checkVaultAccess(
   c: Context,
   vaultId: string,
+  level: VaultAccessLevel,
   vaultRegistry: IVaultRegistry,
   accessControl: IVaultAccessControl,
 ): Promise<AccessCheckResult> {
@@ -42,7 +46,13 @@ export async function checkVaultReadAccess(
   }
 
   try {
-    await accessControl.checkReadAccess(vaultId, session.userId)
+    if (level === 'read') {
+      await accessControl.checkReadAccess(vaultId, session.userId)
+    } else if (level === 'write') {
+      await accessControl.checkWriteAccess(vaultId, session.userId)
+    } else {
+      await accessControl.checkOwnerAccess(vaultId, session.userId)
+    }
   } catch (error) {
     if (error instanceof VaultAccessDeniedError) {
       return {
@@ -54,4 +64,17 @@ export async function checkVaultReadAccess(
   }
 
   return { authorized: true }
+}
+
+/**
+ * Checks authentication and vault access (read permission).
+ * Returns 401 if no session, 404 if vault not found, 403 if access denied.
+ */
+export async function checkVaultReadAccess(
+  c: Context,
+  vaultId: string,
+  vaultRegistry: IVaultRegistry,
+  accessControl: IVaultAccessControl,
+): Promise<AccessCheckResult> {
+  return checkVaultAccess(c, vaultId, 'read', vaultRegistry, accessControl)
 }

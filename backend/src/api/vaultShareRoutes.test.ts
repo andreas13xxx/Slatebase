@@ -4,11 +4,12 @@ import { VaultShareRouteModule } from './vaultShareRoutes.js'
 import type { IVaultAccessControl, IVaultService } from '../business/index.js'
 import {
   VaultNotFoundError,
+  VaultAccessDeniedError,
   ShareLimitError,
   InvalidShareTargetError,
   SharesNotRevokedError,
 } from '../business/index.js'
-import type { IVaultRegistry, VaultRegistryEntry } from '../vault/registry.js'
+import type { VaultRegistryEntry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
 
@@ -23,21 +24,11 @@ function createMockLogger(): ILogger {
   } as unknown as ILogger
 }
 
-function createMockVaultRegistry(entries: VaultRegistryEntry[]): IVaultRegistry {
-  return {
-    load: async () => entries,
-    save: async () => {},
-    addEntry: async () => {},
-    removeEntry: async () => {},
-    findById: (vaultId: string) => entries.find((e) => e.id === vaultId) ?? null,
-    findByName: (name: string) => entries.find((e) => e.name === name) ?? null,
-  } as unknown as IVaultRegistry
-}
-
 function createMockAccessControl(overrides?: Partial<IVaultAccessControl>): IVaultAccessControl {
   return {
     checkReadAccess: async () => {},
     checkWriteAccess: async () => {},
+    checkOwnerAccess: async () => {},
     createShare: async () => {},
     revokeShare: async () => {},
     updateSharePermission: async () => {},
@@ -92,10 +83,22 @@ function createApp(options?: {
   registryEntries?: VaultRegistryEntry[]
   session?: SessionContext | null
 }): Hono {
-  const accessControl = options?.accessControl ?? createMockAccessControl()
-  const vaultService = options?.vaultService ?? createMockVaultService()
   const entries = options?.registryEntries ?? [registryEntry]
-  const vaultRegistry = createMockVaultRegistry(entries)
+  // Default accessControl mirrors what the real VaultAccessControlService would decide for
+  // these fixture entries, so tests that only vary `registryEntries`/`session` (not
+  // `accessControl`) keep exercising real 403/404 ownership behavior.
+  const accessControl = options?.accessControl ?? createMockAccessControl({
+    checkOwnerAccess: async (checkedVaultId, userId) => {
+      const entry = entries.find((e) => e.id === checkedVaultId)
+      if (!entry) {
+        throw new VaultNotFoundError(checkedVaultId)
+      }
+      if (entry.ownerId !== userId) {
+        throw new VaultAccessDeniedError(checkedVaultId, userId, 'owner')
+      }
+    },
+  })
+  const vaultService = options?.vaultService ?? createMockVaultService()
   const logger = createMockLogger()
   const session = options?.session !== undefined ? options.session : ownerSession
 
@@ -109,7 +112,7 @@ function createApp(options?: {
     await next()
   })
 
-  const routeModule = new VaultShareRouteModule(accessControl, vaultService, vaultRegistry, logger)
+  const routeModule = new VaultShareRouteModule(accessControl, vaultService, logger)
   routeModule.register(app)
 
   return app

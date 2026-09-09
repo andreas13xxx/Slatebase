@@ -115,7 +115,7 @@ export class VaultAccessDeniedError extends Error {
   constructor(
     public readonly vaultId: string,
     public readonly userId: string,
-    public readonly requiredPermission: 'read' | 'write',
+    public readonly requiredPermission: 'read' | 'write' | 'owner',
   ) {
     super(`Access denied: user ${userId} does not have ${requiredPermission} access to vault ${vaultId}`)
     this.name = 'VaultAccessDeniedError'
@@ -237,6 +237,9 @@ export interface IVaultAccessControl {
 
   /** Checks if the user has write access to the vault. Throws VaultAccessDeniedError if denied. */
   checkWriteAccess(vaultId: string, userId: string): Promise<void>
+
+  /** Checks if the user owns the vault. Throws VaultAccessDeniedError if the caller is not the owner. */
+  checkOwnerAccess(vaultId: string, userId: string): Promise<void>
 
   /** Creates a share for a target user on a vault owned by ownerId. */
   createShare(vaultId: string, ownerId: string, targetUserId: string, permission: 'read' | 'write'): Promise<void>
@@ -1357,6 +1360,25 @@ export class VaultAccessControlService implements IVaultAccessControl {
 
     if (userShare.permission !== 'write') {
       throw new VaultAccessDeniedError(vaultId, userId, 'write')
+    }
+
+    return
+  }
+
+  /**
+   * Checks if the user owns the vault.
+   * Only the owner passes; shares of any permission do not grant ownership.
+   * Throws VaultAccessDeniedError if the caller is not the owner.
+   * Throws VaultNotFoundError if the vault does not exist in the registry.
+   */
+  async checkOwnerAccess(vaultId: string, userId: string): Promise<void> {
+    const entry = this.vaultRegistry.findById(vaultId)
+    if (entry === null) {
+      throw new VaultNotFoundError(vaultId)
+    }
+
+    if (entry.ownerId !== userId) {
+      throw new VaultAccessDeniedError(vaultId, userId, 'owner')
     }
 
     return

@@ -49,6 +49,7 @@ import { createMcpTokenRoutes } from './api/mcpTokenRoutes.js'
 import { createMcpWellKnownHandler } from './api/mcpWellKnownRoute.js'
 import { LinkIndexService, LinkMigrationService } from './link-index/index.js'
 import { createGraphRoutes } from './api/graphRoutes.js'
+import { createVaultAuthorizationMiddleware } from './api/vault-authorization-middleware.js'
 import { InstalledPluginStore, PluginInstaller, PluginService, PluginSecretKeyManager, PluginSecretStore } from './plugin/index.js'
 import { createPluginRoutes } from './api/pluginRoutes.js'
 import { SnippetStore } from './snippets/index.js'
@@ -503,7 +504,7 @@ const routeModules = [
     logger,
     serverLogStore,
   }),
-  new VaultShareRouteModule(vaultAccessControl, vaultService, vaultRegistry, logger, vaultShareRegistry, userRepository),
+  new VaultShareRouteModule(vaultAccessControl, vaultService, logger, vaultShareRegistry, userRepository),
   new ChatRouteModule(chatController),
   createGraphRoutes({ getLinkIndex, accessControl: vaultAccessControl, vaultRegistry, logger }),
 ]
@@ -603,6 +604,10 @@ app.onError((err, c) => {
   })
   return c.json({ code: 'INTERNAL_ERROR', message: 'Internal server error', timestamp: new Date().toISOString() }, 500)
 })
+
+// Default-deny vault authorization — must be registered before every vault-related route
+// mount below (Hono only runs middleware registered ahead of the routes it guards).
+app.use('/api/v1/vaults/:vaultId/*', createVaultAuthorizationMiddleware({ vaultRegistry, accessControl: vaultAccessControl }))
 
 // Feature guards for route protection
 app.use('/api/v1/chat/*', createFeatureGuard('chat', featureToggleService))
@@ -807,7 +812,6 @@ app.route('/api/v1', preferencesRoutes)
 const vaultConfigRoutes = createVaultConfigRoutes({
   vaultConfigService: vaultConfigStore,
   accessControl: vaultAccessControl,
-  vaultRegistry,
   logger,
 })
 app.route('/api/v1', vaultConfigRoutes)
