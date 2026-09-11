@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.44.3](https://github.com/andreas13xxx/Slatebase/compare/v0.44.2...v0.44.3) (2026-09-11)
+
+
+### Sonstige Änderungen
+
+* **backend:** bump vitest and @vitest/coverage-v8 to 5.0.0 ([#181](https://github.com/andreas13xxx/Slatebase/issues/181)) ([185a4b8](https://github.com/andreas13xxx/Slatebase/commit/185a4b801eb0fb78421721daa068398cdb23d448))
+* bump gitleaks/gitleaks-action from 2 to 3 ([#174](https://github.com/andreas13xxx/Slatebase/issues/174)) ([eab83f1](https://github.com/andreas13xxx/Slatebase/commit/eab83f10a22081bb409512da40398452c4ab9438))
+* bump the minor-patch group in /backend with 4 updates ([#173](https://github.com/andreas13xxx/Slatebase/issues/173)) ([8e61aee](https://github.com/andreas13xxx/Slatebase/commit/8e61aee2ec12eec3a228fe301cc81d359ff49f5a))
+* bump the minor-patch group in /frontend with 14 updates ([#177](https://github.com/andreas13xxx/Slatebase/issues/177)) ([7d6f305](https://github.com/andreas13xxx/Slatebase/commit/7d6f305b17d06a8e00ef3e8d1e105afcfdb5c254))
+* **frontend:** bump vitest and @vitest/coverage-v8 to 5.0.0 ([#182](https://github.com/andreas13xxx/Slatebase/issues/182)) ([280d3b5](https://github.com/andreas13xxx/Slatebase/commit/280d3b5a8682b540b499ee175562a06021e1dbd9))
+
 ## [0.44.2](https://github.com/andreas13xxx/Slatebase/compare/v0.44.1...v0.44.2) (2026-09-09)
 
 
