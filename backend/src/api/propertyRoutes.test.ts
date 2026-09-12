@@ -7,7 +7,6 @@ import type { ILogger } from '../logger/index.js'
 import type { ILinkIndex, PropertyFilter } from '../link-index/index.js'
 import type { IPropertyTypeService } from '../property-type/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
-import { VaultAccessDeniedError } from '../business/index.js'
 import { createPropertyRoutes } from './propertyRoutes.js'
 
 // ─── Mock Factories ──────────────────────────────────────────────────────────
@@ -112,16 +111,6 @@ describe('Property Metadata Routes', () => {
       expect(body.keys[1]).toEqual({ key: 'priority', count: 3, type: null })
     })
 
-    it('returns 403 when access is denied', async () => {
-      const accessControl = createMockAccessControl({
-        checkReadAccess: async () => { throw new VaultAccessDeniedError('vault-1', 'user-1', 'read') },
-      })
-      const app = createTestApp({ accessControl })
-
-      const res = await app.request('/api/v1/vaults/vault-1/properties')
-      expect(res.status).toBe(403)
-    })
-
     it('returns 503 when link index is not ready', async () => {
       const linkIndex = createMockLinkIndex({ isReady: () => false })
       const app = createTestApp({ linkIndex })
@@ -178,15 +167,6 @@ describe('Property Metadata Routes', () => {
       expect(body.total).toBe(50)
     })
 
-    it('returns 403 when access is denied', async () => {
-      const accessControl = createMockAccessControl({
-        checkReadAccess: async () => { throw new VaultAccessDeniedError('vault-1', 'user-1', 'read') },
-      })
-      const app = createTestApp({ accessControl })
-
-      const res = await app.request('/api/v1/vaults/vault-1/properties/key/values')
-      expect(res.status).toBe(403)
-    })
   })
 
   describe('POST /vaults/:vaultId/properties/query', () => {
@@ -264,20 +244,5 @@ describe('Property Metadata Routes', () => {
       expect(res.status).toBe(400)
     })
 
-    it('returns 403 when access is denied', async () => {
-      const accessControl = createMockAccessControl({
-        checkReadAccess: async () => { throw new VaultAccessDeniedError('vault-1', 'user-1', 'read') },
-      })
-      const app = createTestApp({ accessControl })
-
-      const res = await app.request('/api/v1/vaults/vault-1/properties/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filters: [{ key: 'x', operator: 'exists' }],
-        }),
-      })
-      expect(res.status).toBe(403)
-    })
   })
 })

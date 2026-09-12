@@ -98,33 +98,20 @@ function validationErrorResponse(c: Context, zodError: z.ZodError): Response {
   return c.json(createApiError('VALIDATION_ERROR', message), 400)
 }
 
-// --- Helper: Owner Authorization Check ---
+// --- Helper: Session Extraction ---
 
 /**
- * Verifies that the authenticated user is the owner of the specified vault.
- * Returns the session context if authorized, or a 401/403/404 Response if not.
+ * Extracts the session context for the request.
+ * Owner-level authorization for these routes is enforced by
+ * vault-authorization-middleware before the handler runs; this only
+ * guards against a missing session.
+ * Returns the session context if present, or a 401 Response if not.
  */
-async function checkOwnership(
-  c: Context,
-  vaultId: string,
-  accessControl: IVaultAccessControl,
-): Promise<{ authorized: true; session: SessionContext } | { authorized: false; response: Response }> {
+function requireSession(c: Context): { authorized: true; session: SessionContext } | { authorized: false; response: Response } {
   const session = c.get('session') as SessionContext | undefined
   if (session === undefined) {
     const error = createApiError('UNAUTHORIZED', 'Missing session context')
     return { authorized: false, response: c.json(error, 401) }
-  }
-
-  try {
-    await accessControl.checkOwnerAccess(vaultId, session.userId)
-  } catch (error) {
-    if (error instanceof VaultNotFoundError) {
-      return { authorized: false, response: c.json(createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`), 404) }
-    }
-    if (error instanceof VaultAccessDeniedError) {
-      return { authorized: false, response: c.json(createApiError('ACCESS_DENIED', 'Only the vault owner can manage shares'), 403) }
-    }
-    throw error
   }
 
   return { authorized: true, session }
@@ -229,7 +216,7 @@ export class VaultShareRouteModule implements RouteModule {
     }
     const { vaultId } = paramsParsed.data
 
-    const ownerCheck = await checkOwnership(c, vaultId, this.accessControl)
+    const ownerCheck = requireSession(c)
     if (!ownerCheck.authorized) {
       return ownerCheck.response
     }
@@ -275,7 +262,7 @@ export class VaultShareRouteModule implements RouteModule {
     }
     const { vaultId } = paramsParsed.data
 
-    const ownerCheck = await checkOwnership(c, vaultId, this.accessControl)
+    const ownerCheck = requireSession(c)
     if (!ownerCheck.authorized) {
       return ownerCheck.response
     }
@@ -318,7 +305,7 @@ export class VaultShareRouteModule implements RouteModule {
     }
     const { vaultId, userId: targetUserId } = paramsParsed.data
 
-    const ownerCheck = await checkOwnership(c, vaultId, this.accessControl)
+    const ownerCheck = requireSession(c)
     if (!ownerCheck.authorized) {
       return ownerCheck.response
     }
@@ -346,7 +333,7 @@ export class VaultShareRouteModule implements RouteModule {
     }
     const { vaultId, userId: targetUserId } = paramsParsed.data
 
-    const ownerCheck = await checkOwnership(c, vaultId, this.accessControl)
+    const ownerCheck = requireSession(c)
     if (!ownerCheck.authorized) {
       return ownerCheck.response
     }
@@ -387,7 +374,7 @@ export class VaultShareRouteModule implements RouteModule {
     }
     const { vaultId } = paramsParsed.data
 
-    const ownerCheck = await checkOwnership(c, vaultId, this.accessControl)
+    const ownerCheck = requireSession(c)
     if (!ownerCheck.authorized) {
       return ownerCheck.response
     }

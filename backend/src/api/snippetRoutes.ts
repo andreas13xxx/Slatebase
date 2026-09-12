@@ -9,7 +9,6 @@ import { saveSnippetSchema, updateSnippetContentSchema, snippetRegistrySchema } 
 import type { IVaultAccessControl } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
-import { checkVaultReadAccess } from './access-check.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -86,7 +85,7 @@ export interface SnippetRouteDependencies {
  * manage vault-scoped customization, not just content.
  */
 export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
-  const { snippetStore, accessControl, vaultRegistry, logger } = deps
+  const { snippetStore, logger } = deps
   const app = new Hono()
 
   // ─── Registry Routes (BEFORE :snippetId to avoid "registry" being parsed as param) ───
@@ -96,9 +95,6 @@ export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
     const vaultId = c.req.param('vaultId') as string
     const vaultIdError = validateVaultIdParam(c, vaultId)
     if (vaultIdError) return vaultIdError
-
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) return authResult.response
 
     let body: unknown
     try {
@@ -128,9 +124,6 @@ export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
     const vaultIdError = validateVaultIdParam(c, vaultId)
     if (vaultIdError) return vaultIdError
 
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) return authResult.response
-
     try {
       const registry = await snippetStore.loadRegistry(vaultId)
       return c.json(registry ?? { version: 1, snippets: {} }, 200)
@@ -147,9 +140,6 @@ export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
     const vaultIdError = validateVaultIdParam(c, vaultId)
     if (vaultIdError) return vaultIdError
 
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) return authResult.response
-
     try {
       const snippets = await snippetStore.listSnippets(vaultId)
       return c.json({ snippets }, 200)
@@ -163,9 +153,6 @@ export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
     const vaultId = c.req.param('vaultId') as string
     const vaultIdError = validateVaultIdParam(c, vaultId)
     if (vaultIdError) return vaultIdError
-
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) return authResult.response
 
     let body: unknown
     try {
@@ -209,9 +196,6 @@ export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
     const snippetIdError = validateSnippetIdParam(c, snippetId)
     if (snippetIdError) return snippetIdError
 
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) return authResult.response
-
     try {
       const content = await snippetStore.loadSnippet(vaultId, snippetId)
       if (content === null) {
@@ -234,9 +218,6 @@ export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
     if (vaultIdError) return vaultIdError
     const snippetIdError = validateSnippetIdParam(c, snippetId)
     if (snippetIdError) return snippetIdError
-
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) return authResult.response
 
     let body: unknown
     try {
@@ -268,9 +249,6 @@ export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
     if (vaultIdError) return vaultIdError
     const snippetIdError = validateSnippetIdParam(c, snippetId)
     if (snippetIdError) return snippetIdError
-
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) return authResult.response
 
     try {
       const existing = await snippetStore.loadSnippet(vaultId, snippetId)

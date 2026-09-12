@@ -9,7 +9,6 @@ import { z } from 'zod'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
-import { VaultNotFoundError, VaultAccessDeniedError } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import { validateFilePath, PathTraversalError } from '../vault/index.js'
 import type { IEventBus } from '../realtime/types.js'
@@ -159,21 +158,6 @@ export function createUploadRoutes(deps: UploadRouteDependencies): Hono {
     if (!entry) {
       const error = createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`)
       return c.json(error, 404)
-    }
-
-    // 2. Check write access
-    try {
-      await accessControl.checkWriteAccess(vaultId, session.userId)
-    } catch (error) {
-      if (error instanceof VaultAccessDeniedError) {
-        const apiError = createApiError('FORBIDDEN', error.message)
-        return c.json(apiError, 403)
-      }
-      if (error instanceof VaultNotFoundError) {
-        const apiError = createApiError('VAULT_NOT_FOUND', error.message)
-        return c.json(apiError, 404)
-      }
-      throw error
     }
 
     // 3. Determine if paste mode

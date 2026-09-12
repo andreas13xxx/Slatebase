@@ -143,9 +143,9 @@ export class VaultController implements IVaultController {
   constructor(
     private readonly vaultService: IVaultService,
     private readonly logger: ILogger,
-    private readonly importService?: IImportService,
-    private readonly userRepository?: IUserRepository,
-    private readonly accessControl?: IVaultAccessControl,
+    private readonly importService: IImportService | undefined,
+    private readonly userRepository: IUserRepository | undefined,
+    private readonly accessControl: IVaultAccessControl,
     private readonly shareRegistry?: IVaultShareRegistry,
   ) {}
 
@@ -214,12 +214,6 @@ export class VaultController implements IVaultController {
     const vaultId = c.req.param('vaultId') as string
 
     try {
-      // Check read access before returning the tree
-      if (this.accessControl) {
-        const session = c.get('session') as SessionContext
-        await this.accessControl.checkReadAccess(vaultId, session.userId)
-      }
-
       const tree = await this.vaultService.getVaultTree(vaultId)
       return c.json(tree, 200)
     } catch (error) {
@@ -250,16 +244,6 @@ export class VaultController implements IVaultController {
     } catch {
       const error = createApiError('PATH_TRAVERSAL', 'Invalid path encoding')
       return c.json(error, 400)
-    }
-
-    // Check read access before returning any file content
-    if (this.accessControl) {
-      try {
-        const session = c.get('session') as SessionContext
-        await this.accessControl.checkReadAccess(vaultId, session.userId)
-      } catch (error) {
-        return this.handleError(c, error)
-      }
     }
 
     // When raw=true, serve the file as binary with appropriate Content-Type
@@ -306,12 +290,6 @@ export class VaultController implements IVaultController {
     const vaultId = c.req.param('vaultId') as string
 
     try {
-      // Check write access before saving
-      if (this.accessControl) {
-        const session = c.get('session') as SessionContext
-        await this.accessControl.checkWriteAccess(vaultId, session.userId)
-      }
-
       const body = await c.req.json()
       const parsed = putFileBodySchema.safeParse(body)
 
@@ -413,11 +391,6 @@ export class VaultController implements IVaultController {
     try {
       const session = c.get('session') as SessionContext
 
-      // Check write access before importing
-      if (this.accessControl) {
-        await this.accessControl.checkWriteAccess(vaultId, session.userId)
-      }
-
       const body = await c.req.parseBody()
       const file = body['file']
 
@@ -459,11 +432,6 @@ export class VaultController implements IVaultController {
 
     try {
       const session = c.get('session') as SessionContext
-
-      // Check write access before importing
-      if (this.accessControl) {
-        await this.accessControl.checkWriteAccess(vaultId, session.userId)
-      }
 
       const body = await c.req.parseBody({ all: true })
 
@@ -541,12 +509,6 @@ export class VaultController implements IVaultController {
     const decodedPath = decodeURIComponent(rawPath)
 
     try {
-      // Check write access before deleting
-      if (this.accessControl) {
-        const session = c.get('session') as SessionContext
-        await this.accessControl.checkWriteAccess(vaultId, session.userId)
-      }
-
       await this.vaultService.deleteContent(vaultId, decodedPath)
 
       // Notify link index hook (fire-and-forget). Not restricted to `.md`:
@@ -577,12 +539,6 @@ export class VaultController implements IVaultController {
     const vaultId = c.req.param('vaultId') as string
 
     try {
-      // Check write access before executing the operation
-      if (this.accessControl) {
-        const session = c.get('session') as SessionContext
-        await this.accessControl.checkWriteAccess(vaultId, session.userId)
-      }
-
       const body = await c.req.json()
       const parsed = moveRequestSchema.safeParse(body)
 
@@ -638,12 +594,6 @@ export class VaultController implements IVaultController {
     const vaultId = c.req.param('vaultId') as string
 
     try {
-      // Check write access before executing the operation
-      if (this.accessControl) {
-        const session = c.get('session') as SessionContext
-        await this.accessControl.checkWriteAccess(vaultId, session.userId)
-      }
-
       const body = await c.req.json()
       const parsed = renameRequestSchema.safeParse(body)
 
@@ -717,8 +667,7 @@ export class VaultController implements IVaultController {
 
   /**
    * Publishes a vault:change event via the event bus after a file operation.
-   * Targets only the vault's owner and users it's been explicitly shared
-   * with (falls back to broadcast if access control isn't wired, e.g. in tests).
+   * Targets only the vault's owner and users it's been explicitly shared with.
    */
   private async publishVaultChange(
     vaultId: string,
@@ -729,9 +678,7 @@ export class VaultController implements IVaultController {
   ): Promise<void> {
     if (!this.eventBus) return
 
-    const target = this.accessControl
-      ? { kind: 'users' as const, userIds: await this.accessControl.getUsersWithAccess(vaultId) }
-      : { kind: 'broadcast' as const }
+    const target = { kind: 'users' as const, userIds: await this.accessControl.getUsersWithAccess(vaultId) }
 
     this.eventBus.publish({
       type: 'vault:change',

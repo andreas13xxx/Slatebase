@@ -5,7 +5,6 @@ import { Hono } from 'hono'
 import type { SessionContext } from '../auth/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
-import { VaultAccessDeniedError } from '../business/index.js'
 import type { IVaultRegistry, VaultRegistryEntry } from '../vault/registry.js'
 import { SlidingWindowRateLimiter } from '../shared/sliding-window-rate-limiter.js'
 import {
@@ -134,15 +133,6 @@ describe('Transcription Routes', () => {
     const { app } = createTestApp({ entry: null })
     const res = await post(app, 'missing', audioForm())
     expect(res.status).toBe(404)
-  })
-
-  it('returns 403 when write access is denied', async () => {
-    const accessControl = createMockAccessControl({
-      checkWriteAccess: async () => { throw new VaultAccessDeniedError('vault-1', 'owner-1', 'write') },
-    })
-    const { app } = createTestApp({ accessControl })
-    const res = await post(app, 'vault-1', audioForm())
-    expect(res.status).toBe(403)
   })
 
   it('returns 503 when the backend is not configured', async () => {

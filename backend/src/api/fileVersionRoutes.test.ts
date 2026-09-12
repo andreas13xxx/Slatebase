@@ -9,7 +9,6 @@ import { createFileVersionRoutes } from './fileVersionRoutes.js'
 import type { FileVersionRouteDependencies } from './fileVersionRoutes.js'
 import type { IVersionService, VersionEntry } from '../version/types.js'
 import type { IVaultAccessControl } from '../business/index.js'
-import { VaultAccessDeniedError } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { IEventBus } from '../realtime/types.js'
 import type { ILogger } from '../logger/index.js'
@@ -147,22 +146,6 @@ describe('fileVersionRoutes', () => {
       expect(body.code).toBe('VAULT_NOT_FOUND')
     })
 
-    it('returns 403 when user lacks read access', async () => {
-      const { app } = createTestApp({
-        accessControl: createMockAccessControl({
-          checkReadAccess: async () => {
-            throw new VaultAccessDeniedError('vault-123', 'user-1', 'read')
-          },
-        }),
-      })
-
-      const res = await app.request('/api/v1/vaults/vault-123/versions?path=test.md')
-
-      expect(res.status).toBe(403)
-      const body = await res.json() as { code: string }
-      expect(body.code).toBe('FORBIDDEN')
-    })
-
     it('returns 400 on path traversal attempt', async () => {
       const { app } = createTestApp()
 
@@ -225,21 +208,6 @@ describe('fileVersionRoutes', () => {
       expect(body.code).toBe('VERSION_NOT_FOUND')
     })
 
-    it('returns 403 when user lacks read access', async () => {
-      const { app } = createTestApp({
-        accessControl: createMockAccessControl({
-          checkReadAccess: async () => {
-            throw new VaultAccessDeniedError('vault-123', 'user-1', 'read')
-          },
-        }),
-      })
-
-      const res = await app.request('/api/v1/vaults/vault-123/versions/content?path=test.md&timestamp=20240120T143000123')
-
-      expect(res.status).toBe(403)
-      const body = await res.json() as { code: string }
-      expect(body.code).toBe('FORBIDDEN')
-    })
   })
 
   describe('POST /vaults/:vaultId/versions/restore', () => {
@@ -319,26 +287,6 @@ describe('fileVersionRoutes', () => {
       expect(res.status).toBe(404)
       const body = await res.json() as { code: string }
       expect(body.code).toBe('VERSION_NOT_FOUND')
-    })
-
-    it('returns 403 when user lacks write access', async () => {
-      const { app } = createTestApp({
-        accessControl: createMockAccessControl({
-          checkWriteAccess: async () => {
-            throw new VaultAccessDeniedError('vault-123', 'user-1', 'write')
-          },
-        }),
-      })
-
-      const res = await app.request('/api/v1/vaults/vault-123/versions/restore', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: 'notes/test.md', timestamp: '20240120T143000123' }),
-      })
-
-      expect(res.status).toBe(403)
-      const body = await res.json() as { code: string }
-      expect(body.code).toBe('FORBIDDEN')
     })
 
     it('returns 400 on path traversal attempt', async () => {

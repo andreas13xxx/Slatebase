@@ -12,7 +12,6 @@ import { pluginRegistrySchema } from '../plugin/validation.js'
 import type { IVaultAccessControl } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
-import { checkVaultReadAccess } from './access-check.js'
 import type { IPluginSecretStore } from '../plugin/secret-store.js'
 import { SecretLimitExceededError, SecretTooLargeError } from '../plugin/secret-store.js'
 
@@ -112,7 +111,7 @@ export interface PluginRouteDependencies {
  * @returns A Hono instance with plugin management routes registered.
  */
 export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
-  const { pluginService, accessControl, vaultRegistry, logger, secretStore } = deps
+  const { pluginService, vaultRegistry, logger, secretStore } = deps
   const app = new Hono()
 
   // ─── Detected plugins route (scans .obsidian/plugins/ inside vault filesystem) ───
@@ -123,11 +122,6 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
 
     const vaultIdError = validateVaultIdParam(c, vaultId)
     if (vaultIdError) return vaultIdError
-
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
-    }
 
     try {
       const entry = vaultRegistry.findById(vaultId)
@@ -156,11 +150,6 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
       const firstIssue = pluginIdParsed.error.issues[0]
       const message = firstIssue ? firstIssue.message : 'Invalid plugin ID'
       return c.json(createApiError('VALIDATION_ERROR', message), 400)
-    }
-
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
     }
 
     try {
@@ -216,11 +205,6 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     const vaultIdError = validateVaultIdParam(c, vaultId)
     if (vaultIdError) return vaultIdError
 
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
-    }
-
     let body: unknown
     try {
       body = await c.req.json()
@@ -250,11 +234,6 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     const vaultIdError = validateVaultIdParam(c, vaultId)
     if (vaultIdError) return vaultIdError
 
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
-    }
-
     try {
       const registry = await pluginService.loadRegistry(vaultId)
       if (registry === null) {
@@ -275,11 +254,6 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     const vaultIdError = validateVaultIdParam(c, vaultId)
     if (vaultIdError) return vaultIdError
 
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
-    }
-
     try {
       const manifests = await pluginService.listPlugins(vaultId)
       return c.json({ plugins: manifests }, 200)
@@ -294,11 +268,6 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
 
     const vaultIdError = validateVaultIdParam(c, vaultId)
     if (vaultIdError) return vaultIdError
-
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
-    }
 
     try {
       const body = await c.req.parseBody()
@@ -375,11 +344,6 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
       return c.json(createApiError('VALIDATION_ERROR', message), 400)
     }
 
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
-    }
-
     try {
       const manifest = await pluginService.getManifest(vaultId, pluginId)
       if (manifest === null) {
@@ -405,11 +369,6 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
       const firstIssue = pluginIdParsed.error.issues[0]
       const message = firstIssue ? firstIssue.message : 'Invalid plugin ID'
       return c.json(createApiError('VALIDATION_ERROR', message), 400)
-    }
-
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
     }
 
     try {
@@ -440,11 +399,6 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
       const firstIssue = pluginIdParsed.error.issues[0]
       const message = firstIssue ? firstIssue.message : 'Invalid plugin ID'
       return c.json(createApiError('VALIDATION_ERROR', message), 400)
-    }
-
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
     }
 
     try {
@@ -479,11 +433,6 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
       const firstIssue = pluginIdParsed.error.issues[0]
       const message = firstIssue ? firstIssue.message : 'Invalid plugin ID'
       return c.json(createApiError('VALIDATION_ERROR', message), 400)
-    }
-
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
     }
 
     try {
@@ -523,11 +472,6 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
       return c.json(createApiError('VALIDATION_ERROR', message), 400)
     }
 
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
-    }
-
     try {
       const settings = await pluginService.loadSettings(vaultId, pluginId)
       if (settings === null) {
@@ -560,11 +504,6 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
       const firstIssue = pluginIdParsed.error.issues[0]
       const message = firstIssue ? firstIssue.message : 'Invalid plugin ID'
       return c.json(createApiError('VALIDATION_ERROR', message), 400)
-    }
-
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
     }
 
     try {
@@ -615,11 +554,6 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
       return c.json(createApiError('VALIDATION_ERROR', message), 400)
     }
 
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
-    }
-
     try {
       const ids = await secretStore.listSecrets(vaultId, pluginId)
       return c.json({ ids }, 200)
@@ -653,11 +587,6 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
       const firstIssue = secretIdParsed.error.issues[0]
       const message = firstIssue ? firstIssue.message : 'Invalid secret ID'
       return c.json(createApiError('VALIDATION_ERROR', message), 400)
-    }
-
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
     }
 
     try {
@@ -696,11 +625,6 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
       const firstIssue = secretIdParsed.error.issues[0]
       const message = firstIssue ? firstIssue.message : 'Invalid secret ID'
       return c.json(createApiError('VALIDATION_ERROR', message), 400)
-    }
-
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
     }
 
     try {
@@ -750,11 +674,6 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
       const firstIssue = secretIdParsed.error.issues[0]
       const message = firstIssue ? firstIssue.message : 'Invalid secret ID'
       return c.json(createApiError('VALIDATION_ERROR', message), 400)
-    }
-
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
     }
 
     try {

@@ -8,7 +8,6 @@ import os from 'node:os'
 import type { SessionContext } from '../auth/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
-import { VaultAccessDeniedError } from '../business/index.js'
 import type { IVaultRegistry, VaultRegistryEntry } from '../vault/registry.js'
 import type { IEventBus, PublishOptions } from '../realtime/types.js'
 import type { UploadConfig } from '../config/index.js'
@@ -159,27 +158,6 @@ describe('Upload Routes', () => {
 
       const body = await res.json() as { code: string }
       expect(body.code).toBe('VAULT_NOT_FOUND')
-    })
-
-    it('returns 403 if user has no write access', async () => {
-      const vaultAccessControl = createMockVaultAccessControl({
-        checkWriteAccess: async (vaultId, userId) => {
-          throw new VaultAccessDeniedError(vaultId, userId, 'write')
-        },
-      })
-      const { app } = createTestApp({ vaultAccessControl })
-
-      const formData = new FormData()
-      formData.append('file', new File(['hello'], 'test.txt'))
-
-      const res = await app.request('/api/v1/vaults/vault-1/upload', {
-        method: 'POST',
-        body: formData,
-      })
-      expect(res.status).toBe(403)
-
-      const body = await res.json() as { code: string }
-      expect(body.code).toBe('FORBIDDEN')
     })
 
     it('returns 400 if no files provided', async () => {

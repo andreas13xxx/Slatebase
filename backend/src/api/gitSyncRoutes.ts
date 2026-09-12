@@ -5,7 +5,6 @@ import { Hono } from 'hono'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
-import { VaultNotFoundError, VaultAccessDeniedError } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import {
   createGitSyncRemoteSchema,
@@ -55,14 +54,13 @@ export interface GitSyncRouteDependencies {
 // --- Route Factory ---
 
 export function createGitSyncRoutes(deps: GitSyncRouteDependencies): Hono {
-  const { configStore, statusStore, secretStore, syncEngine, sshKeyGenerator, accessControl, vaultRegistry, logger } = deps
+  const { configStore, statusStore, secretStore, syncEngine, sshKeyGenerator, vaultRegistry, logger } = deps
   const app = new Hono()
 
-  async function requireVaultAccess(
-    c: Context,
-    vaultId: string,
-    level: 'read' | 'write',
-  ): Promise<{ session: SessionContext } | { response: Response }> {
+  // Access-level enforcement happens in vault-authorization-middleware before
+  // the handler runs; this only guards against a missing session and an
+  // unknown vault (the latter needed by handlers before issuing 404s of their own).
+  function requireVaultContext(c: Context, vaultId: string): { session: SessionContext } | { response: Response } {
     const session = c.get('session') as SessionContext | undefined
     if (!session) {
       return { response: c.json(createApiError('UNAUTHORIZED', 'Missing session context'), 401) }
@@ -71,22 +69,6 @@ export function createGitSyncRoutes(deps: GitSyncRouteDependencies): Hono {
     const entry = vaultRegistry.findById(vaultId)
     if (!entry) {
       return { response: c.json(createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`), 404) }
-    }
-
-    try {
-      if (level === 'read') {
-        await accessControl.checkReadAccess(vaultId, session.userId)
-      } else {
-        await accessControl.checkWriteAccess(vaultId, session.userId)
-      }
-    } catch (error) {
-      if (error instanceof VaultAccessDeniedError) {
-        return { response: c.json(createApiError('FORBIDDEN', error.message), 403) }
-      }
-      if (error instanceof VaultNotFoundError) {
-        return { response: c.json(createApiError('VAULT_NOT_FOUND', error.message), 404) }
-      }
-      throw error
     }
 
     return { session }
@@ -100,7 +82,7 @@ export function createGitSyncRoutes(deps: GitSyncRouteDependencies): Hono {
     }
     const { vaultId } = params.data
 
-    const access = await requireVaultAccess(c, vaultId, 'read')
+    const access = requireVaultContext(c, vaultId)
     if ('response' in access) return access.response
 
     const data = await configStore.getVaultData(vaultId)
@@ -115,7 +97,7 @@ export function createGitSyncRoutes(deps: GitSyncRouteDependencies): Hono {
     }
     const { vaultId } = params.data
 
-    const access = await requireVaultAccess(c, vaultId, 'write')
+    const access = requireVaultContext(c, vaultId)
     if ('response' in access) return access.response
 
     let body: unknown
@@ -142,7 +124,7 @@ export function createGitSyncRoutes(deps: GitSyncRouteDependencies): Hono {
     }
     const { vaultId } = params.data
 
-    const access = await requireVaultAccess(c, vaultId, 'write')
+    const access = requireVaultContext(c, vaultId)
     if ('response' in access) return access.response
 
     const { privateKey, publicKey } = await sshKeyGenerator.generateKeyPair(`slatebase-sync@${vaultId}`)
@@ -157,7 +139,7 @@ export function createGitSyncRoutes(deps: GitSyncRouteDependencies): Hono {
     }
     const { vaultId } = params.data
 
-    const access = await requireVaultAccess(c, vaultId, 'write')
+    const access = requireVaultContext(c, vaultId)
     if ('response' in access) return access.response
 
     let body: unknown
@@ -207,7 +189,7 @@ export function createGitSyncRoutes(deps: GitSyncRouteDependencies): Hono {
     }
     const { vaultId, remoteId } = params.data
 
-    const access = await requireVaultAccess(c, vaultId, 'write')
+    const access = requireVaultContext(c, vaultId)
     if ('response' in access) return access.response
 
     let body: unknown
@@ -272,7 +254,7 @@ export function createGitSyncRoutes(deps: GitSyncRouteDependencies): Hono {
     }
     const { vaultId, remoteId } = params.data
 
-    const access = await requireVaultAccess(c, vaultId, 'write')
+    const access = requireVaultContext(c, vaultId)
     if ('response' in access) return access.response
 
     try {
@@ -299,7 +281,7 @@ export function createGitSyncRoutes(deps: GitSyncRouteDependencies): Hono {
     }
     const { vaultId, remoteId } = params.data
 
-    const access = await requireVaultAccess(c, vaultId, 'write')
+    const access = requireVaultContext(c, vaultId)
     if ('response' in access) return access.response
 
     try {
@@ -327,7 +309,7 @@ export function createGitSyncRoutes(deps: GitSyncRouteDependencies): Hono {
     }
     const { vaultId, remoteId } = params.data
 
-    const access = await requireVaultAccess(c, vaultId, 'read')
+    const access = requireVaultContext(c, vaultId)
     if ('response' in access) return access.response
 
     const status = await statusStore.getStatus(vaultId, remoteId)
