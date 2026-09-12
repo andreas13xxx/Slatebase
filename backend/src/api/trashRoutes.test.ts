@@ -5,7 +5,6 @@ import { Hono } from 'hono'
 import type { SessionContext } from '../auth/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
-import { VaultAccessDeniedError } from '../business/index.js'
 import type { IVaultRegistry, VaultRegistryEntry } from '../vault/registry.js'
 import type { IEventBus, PublishOptions } from '../realtime/types.js'
 import type { ITrashService, TrashEntry } from '../trash/index.js'
@@ -145,17 +144,6 @@ describe('Trash Routes', () => {
       expect(body.code).toBe('VAULT_NOT_FOUND')
     })
 
-    it('returns 403 when user has no read access', async () => {
-      const accessControl = createMockVaultAccessControl({
-        checkReadAccess: async () => { throw new VaultAccessDeniedError('vault-1', 'user-1', 'read') },
-      })
-      const { app } = createTestApp({ vaultAccessControl: accessControl })
-      const res = await app.request('/api/v1/vaults/vault-1/trash')
-      expect(res.status).toBe(403)
-      const body = await res.json() as { code: string }
-      expect(body.code).toBe('FORBIDDEN')
-    })
-
     it('returns 200 with empty entries array', async () => {
       const { app } = createTestApp()
       const res = await app.request('/api/v1/vaults/vault-1/trash')
@@ -195,17 +183,6 @@ describe('Trash Routes', () => {
       expect(res.status).toBe(404)
       const body = await res.json() as { code: string }
       expect(body.code).toBe('VAULT_NOT_FOUND')
-    })
-
-    it('returns 403 when user has no write access', async () => {
-      const accessControl = createMockVaultAccessControl({
-        checkWriteAccess: async () => { throw new VaultAccessDeniedError('vault-1', 'user-1', 'write') },
-      })
-      const { app } = createTestApp({ vaultAccessControl: accessControl })
-      const res = await app.request('/api/v1/vaults/vault-1/trash/entry-1/restore', { method: 'POST' })
-      expect(res.status).toBe(403)
-      const body = await res.json() as { code: string }
-      expect(body.code).toBe('FORBIDDEN')
     })
 
     it('returns 404 when trash entry not found', async () => {
@@ -282,17 +259,6 @@ describe('Trash Routes', () => {
       expect(res.status).toBe(404)
       const body = await res.json() as { code: string }
       expect(body.code).toBe('VAULT_NOT_FOUND')
-    })
-
-    it('returns 403 when user has no write access', async () => {
-      const accessControl = createMockVaultAccessControl({
-        checkWriteAccess: async () => { throw new VaultAccessDeniedError('vault-1', 'user-1', 'write') },
-      })
-      const { app } = createTestApp({ vaultAccessControl: accessControl })
-      const res = await app.request('/api/v1/vaults/vault-1/trash/entry-1', { method: 'DELETE' })
-      expect(res.status).toBe(403)
-      const body = await res.json() as { code: string }
-      expect(body.code).toBe('FORBIDDEN')
     })
 
     it('returns 404 when trash entry not found', async () => {

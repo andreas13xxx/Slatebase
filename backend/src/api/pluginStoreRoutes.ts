@@ -17,7 +17,6 @@ import { VaultAccessDeniedError } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
-import { checkVaultReadAccess } from './access-check.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -145,17 +144,12 @@ export function createPluginStoreRoutes(deps: PluginStoreRouteDependencies): Hon
  * @returns A Hono instance with vault-specific plugin store routes registered.
  */
 export function createVaultPluginStoreRoutes(deps: PluginStoreRouteDependencies): Hono {
-  const { pluginStoreService, accessControl, vaultRegistry, logger } = deps
+  const { pluginStoreService, logger } = deps
   const app = new Hono()
 
   // POST /store-install — Install a plugin from the community store
   app.post('/store-install', async (c: Context): Promise<Response> => {
     const vaultId = c.req.param('vaultId') as string
-
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
-    }
 
     let body: unknown
     try {
@@ -185,11 +179,6 @@ export function createVaultPluginStoreRoutes(deps: PluginStoreRouteDependencies)
   app.post('/check-updates', async (c: Context): Promise<Response> => {
     const vaultId = c.req.param('vaultId') as string
 
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
-    }
-
     try {
       const result = await pluginStoreService.checkUpdates(vaultId)
       return c.json(result, 200)
@@ -201,11 +190,6 @@ export function createVaultPluginStoreRoutes(deps: PluginStoreRouteDependencies)
   // POST /update-all — Bulk update all plugins (BEFORE :pluginId/update to avoid param conflict)
   app.post('/update-all', async (c: Context): Promise<Response> => {
     const vaultId = c.req.param('vaultId') as string
-
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
-    }
 
     try {
       const result = await pluginStoreService.updateAll(vaultId)
@@ -219,11 +203,6 @@ export function createVaultPluginStoreRoutes(deps: PluginStoreRouteDependencies)
   app.post('/:pluginId/update', async (c: Context): Promise<Response> => {
     const vaultId = c.req.param('vaultId') as string
     const pluginId = c.req.param('pluginId') as string
-
-    const authResult = await checkVaultReadAccess(c, vaultId, vaultRegistry, accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
-    }
 
     try {
       const result = await pluginStoreService.updatePlugin(vaultId, pluginId)

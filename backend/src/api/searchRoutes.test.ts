@@ -5,7 +5,7 @@ import { Hono } from 'hono'
 import type { SessionContext } from '../auth/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
-import { VaultNotFoundError, VaultAccessDeniedError } from '../business/index.js'
+import { VaultNotFoundError } from '../business/index.js'
 import type { ISearchService, IReplaceService, ISearchOptions, SearchResponse, MultiVaultSearchResponse, IReplaceOptions, ReplaceResponse } from '../search/index.js'
 import { SearchQueryValidationError, RegexValidationError, RegexTooLongError, ReplaceValidationError } from '../search/index.js'
 import { createSearchRoutes } from './searchRoutes.js'
@@ -136,21 +136,6 @@ describe('Search Routes', () => {
 
       const body = await res.json() as { code: string }
       expect(body.code).toBe('INVALID_QUERY')
-    })
-
-    it('returns 403 if user has no read access', async () => {
-      const vaultAccessControl = createMockVaultAccessControl({
-        checkReadAccess: async (vaultId, userId) => {
-          throw new VaultAccessDeniedError(vaultId, userId, 'read')
-        },
-      })
-      const app = createTestApp({ vaultAccessControl })
-
-      const res = await app.request('/api/v1/vaults/vault-1/search?query=hello')
-      expect(res.status).toBe(403)
-
-      const body = await res.json() as { code: string }
-      expect(body.code).toBe('ACCESS_DENIED')
     })
 
     it('returns 404 if vault not found', async () => {
@@ -394,25 +379,6 @@ describe('Search Routes', () => {
 
       const body = await res.json() as { code: string }
       expect(body.code).toBe('INVALID_REPLACE')
-    })
-
-    it('returns 403 if user has no write access', async () => {
-      const vaultAccessControl = createMockVaultAccessControl({
-        checkWriteAccess: async (vaultId, userId) => {
-          throw new VaultAccessDeniedError(vaultId, userId, 'write')
-        },
-      })
-      const app = createTestApp({ vaultAccessControl })
-
-      const res = await app.request('/api/v1/vaults/vault-1/replace', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: 'old', replacement: 'new', caseSensitive: false, regex: false }),
-      })
-      expect(res.status).toBe(403)
-
-      const body = await res.json() as { code: string }
-      expect(body.code).toBe('ACCESS_DENIED')
     })
 
     it('returns 404 if vault not found', async () => {

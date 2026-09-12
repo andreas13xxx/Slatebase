@@ -287,38 +287,9 @@ describe('Plugin Store Routes', () => {
       expect(body.code).toBe('UNAUTHORIZED')
     })
 
-    it('returns 401 when no session on vault route', async () => {
-      const app = createTestApp({ session: null })
-
-      const res = await app.request('/api/v1/vaults/vault-1/plugins/store-install', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pluginId: 'calendar', repo: 'liamcain/obsidian-calendar-plugin' }),
-      })
-      expect(res.status).toBe(401)
-
-      const body = await res.json() as { code: string }
-      expect(body.code).toBe('UNAUTHORIZED')
-    })
-  })
-
-  describe('Error: Vault Not Found', () => {
-    it('returns 404 when vault does not exist', async () => {
-      const vaultRegistry = createMockVaultRegistry({
-        findById: () => null,
-      })
-      const app = createTestApp({ vaultRegistry })
-
-      const res = await app.request('/api/v1/vaults/nonexistent-vault/plugins/store-install', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pluginId: 'calendar', repo: 'liamcain/obsidian-calendar-plugin' }),
-      })
-      expect(res.status).toBe(404)
-
-      const body = await res.json() as { code: string }
-      expect(body.code).toBe('VAULT_NOT_FOUND')
-    })
+    // The vault-scoped routes' own 401/404 guards were removed — that
+    // enforcement now lives in vault-authorization-middleware (see
+    // vault-authorization-middleware.test.ts and integration.test.ts).
   })
 
   describe('Error: Validation', () => {

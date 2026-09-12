@@ -4,12 +4,10 @@ import { VaultShareRouteModule } from './vaultShareRoutes.js'
 import type { IVaultAccessControl, IVaultService } from '../business/index.js'
 import {
   VaultNotFoundError,
-  VaultAccessDeniedError,
   ShareLimitError,
   InvalidShareTargetError,
   SharesNotRevokedError,
 } from '../business/index.js'
-import type { VaultRegistryEntry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
 
@@ -69,35 +67,15 @@ const ownerSession: SessionContext = {
   sessionId: 'session-1',
 }
 
-const registryEntry: VaultRegistryEntry = {
-  id: VAULT_ID,
-  name: 'Test Vault',
-  storagePath: '/data/vaults/test-vault-123',
-  createdAt: '2025-01-01T00:00:00.000Z',
-  ownerId: OWNER_ID,
-}
-
 function createApp(options?: {
   accessControl?: IVaultAccessControl
   vaultService?: IVaultService
-  registryEntries?: VaultRegistryEntry[]
   session?: SessionContext | null
 }): Hono {
-  const entries = options?.registryEntries ?? [registryEntry]
-  // Default accessControl mirrors what the real VaultAccessControlService would decide for
-  // these fixture entries, so tests that only vary `registryEntries`/`session` (not
-  // `accessControl`) keep exercising real 403/404 ownership behavior.
-  const accessControl = options?.accessControl ?? createMockAccessControl({
-    checkOwnerAccess: async (checkedVaultId, userId) => {
-      const entry = entries.find((e) => e.id === checkedVaultId)
-      if (!entry) {
-        throw new VaultNotFoundError(checkedVaultId)
-      }
-      if (entry.ownerId !== userId) {
-        throw new VaultAccessDeniedError(checkedVaultId, userId, 'owner')
-      }
-    },
-  })
+  // Owner-only enforcement for these routes now lives in
+  // vault-authorization-middleware (tested there), not in this route module —
+  // so the default accessControl here is the plain, permissive mock.
+  const accessControl = options?.accessControl ?? createMockAccessControl()
   const vaultService = options?.vaultService ?? createMockVaultService()
   const logger = createMockLogger()
   const session = options?.session !== undefined ? options.session : ownerSession
@@ -162,40 +140,6 @@ describe('VaultShareRouteModule', () => {
       expect(res.status).toBe(400)
       const body = await res.json() as { code: string }
       expect(body.code).toBe('VALIDATION_ERROR')
-    })
-
-    it('returns 403 when caller is not the owner', async () => {
-      const nonOwnerSession: SessionContext = {
-        userId: 'other-user',
-        username: 'other',
-        role: 'user',
-        sessionId: 'session-2',
-      }
-      const app = createApp({ session: nonOwnerSession })
-
-      const res = await app.request(`/vaults/${VAULT_ID}/shares`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: TARGET_USER_ID, permission: 'read' }),
-      })
-
-      expect(res.status).toBe(403)
-      const body = await res.json() as { code: string }
-      expect(body.code).toBe('ACCESS_DENIED')
-    })
-
-    it('returns 404 when vault does not exist', async () => {
-      const app = createApp({ registryEntries: [] })
-
-      const res = await app.request(`/vaults/${VAULT_ID}/shares`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: TARGET_USER_ID, permission: 'read' }),
-      })
-
-      expect(res.status).toBe(404)
-      const body = await res.json() as { code: string }
-      expect(body.code).toBe('VAULT_NOT_FOUND')
     })
 
     it('returns 409 when share limit is reached', async () => {
@@ -267,32 +211,6 @@ describe('VaultShareRouteModule', () => {
       expect(res.status).toBe(204)
     })
 
-    it('returns 403 when caller is not the owner', async () => {
-      const nonOwnerSession: SessionContext = {
-        userId: 'other-user',
-        username: 'other',
-        role: 'user',
-        sessionId: 'session-2',
-      }
-      const app = createApp({ session: nonOwnerSession })
-
-      const res = await app.request(`/vaults/${VAULT_ID}/shares/${TARGET_USER_ID}`, {
-        method: 'DELETE',
-      })
-
-      expect(res.status).toBe(403)
-    })
-
-    it('returns 404 when vault does not exist', async () => {
-      const app = createApp({ registryEntries: [] })
-
-      const res = await app.request(`/vaults/${VAULT_ID}/shares/${TARGET_USER_ID}`, {
-        method: 'DELETE',
-      })
-
-      expect(res.status).toBe(404)
-    })
-
     it('maps VaultNotFoundError from service to 404', async () => {
       const accessControl = createMockAccessControl({
         revokeShare: async () => {
@@ -338,23 +256,6 @@ describe('VaultShareRouteModule', () => {
       expect(body.code).toBe('VALIDATION_ERROR')
     })
 
-    it('returns 403 when caller is not the owner', async () => {
-      const nonOwnerSession: SessionContext = {
-        userId: 'other-user',
-        username: 'other',
-        role: 'user',
-        sessionId: 'session-2',
-      }
-      const app = createApp({ session: nonOwnerSession })
-
-      const res = await app.request(`/vaults/${VAULT_ID}/shares/${TARGET_USER_ID}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ permission: 'write' }),
-      })
-
-      expect(res.status).toBe(403)
-    })
   })
 
   describe('POST /vaults/:vaultId/transfer', () => {
@@ -386,24 +287,6 @@ describe('VaultShareRouteModule', () => {
       expect(body.code).toBe('VALIDATION_ERROR')
     })
 
-    it('returns 403 when caller is not the owner', async () => {
-      const nonOwnerSession: SessionContext = {
-        userId: 'other-user',
-        username: 'other',
-        role: 'user',
-        sessionId: 'session-2',
-      }
-      const app = createApp({ session: nonOwnerSession })
-
-      const res = await app.request(`/vaults/${VAULT_ID}/transfer`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newOwnerId: TARGET_USER_ID }),
-      })
-
-      expect(res.status).toBe(403)
-    })
-
     it('returns 409 when shares are not revoked', async () => {
       const vaultService = createMockVaultService({
         transferOwnership: async () => {
@@ -425,27 +308,16 @@ describe('VaultShareRouteModule', () => {
       expect(body.code).toBe('SHARES_NOT_REVOKED')
     })
 
-    it('returns 404 when vault does not exist', async () => {
-      const app = createApp({ registryEntries: [] })
-
-      const res = await app.request(`/vaults/${VAULT_ID}/transfer`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newOwnerId: TARGET_USER_ID }),
-      })
-
-      expect(res.status).toBe(404)
-    })
   })
 
   describe('Error response format', () => {
     it('includes code, message, and timestamp in error responses', async () => {
-      const app = createApp({ registryEntries: [] })
+      const app = createApp()
 
       const res = await app.request(`/vaults/${VAULT_ID}/shares`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: TARGET_USER_ID, permission: 'read' }),
+        body: JSON.stringify({ permission: 'read' }), // missing userId -> validation error
       })
 
       const body = await res.json() as { code: string; message: string; timestamp: string }

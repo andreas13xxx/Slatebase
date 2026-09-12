@@ -90,7 +90,7 @@ export interface SearchRouteDependencies {
  * @returns A Hono instance with search routes registered.
  */
 export function createSearchRoutes(deps: SearchRouteDependencies): Hono {
-  const { searchService, replaceService, vaultAccessControl, logger } = deps
+  const { searchService, replaceService, logger } = deps
   const app = new Hono()
 
   // ─── GET /vaults/:vaultId/search — Single-vault search ───────────────────
@@ -102,7 +102,6 @@ export function createSearchRoutes(deps: SearchRouteDependencies): Hono {
     }
 
     const vaultId = c.req.param('vaultId') as string
-    const userId = session.userId
 
     // Parse and validate query parameters
     const rawQuery = {
@@ -121,9 +120,6 @@ export function createSearchRoutes(deps: SearchRouteDependencies): Hono {
     }
 
     try {
-      // Check read access
-      await vaultAccessControl.checkReadAccess(vaultId, userId)
-
       // Execute search
       const response = await searchService.search(vaultId, parsed.data)
       return c.json(response, 200)
@@ -184,7 +180,6 @@ export function createSearchRoutes(deps: SearchRouteDependencies): Hono {
     }
 
     const vaultId = c.req.param('vaultId') as string
-    const userId = session.userId
 
     // Parse and validate JSON body
     let body: unknown
@@ -202,9 +197,6 @@ export function createSearchRoutes(deps: SearchRouteDependencies): Hono {
     }
 
     try {
-      // Check write access
-      await vaultAccessControl.checkWriteAccess(vaultId, userId)
-
       // Build replace options, omitting paths if undefined (exactOptionalPropertyTypes)
       const replaceOptions = {
         query: parsed.data.query,

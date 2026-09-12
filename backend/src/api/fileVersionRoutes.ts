@@ -5,7 +5,6 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import type { IVersionService } from '../version/types.js'
 import type { IVaultAccessControl } from '../business/index.js'
-import { VaultNotFoundError, VaultAccessDeniedError } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import { validateFilePath, PathTraversalError } from '../vault/index.js'
 import type { ILogger } from '../logger/index.js'
@@ -113,21 +112,6 @@ export function createFileVersionRoutes(deps: FileVersionRouteDependencies): Hon
       return c.json(error, 404)
     }
 
-    // Check read access
-    try {
-      await accessControl.checkReadAccess(vaultId, session.userId)
-    } catch (error) {
-      if (error instanceof VaultAccessDeniedError) {
-        const apiError = createApiError('FORBIDDEN', error.message)
-        return c.json(apiError, 403)
-      }
-      if (error instanceof VaultNotFoundError) {
-        const apiError = createApiError('VAULT_NOT_FOUND', error.message)
-        return c.json(apiError, 404)
-      }
-      throw error
-    }
-
     // Validate path query param
     const rawPath = c.req.query('path')
     const parsed = filePathQuerySchema.safeParse({ path: rawPath })
@@ -191,21 +175,6 @@ export function createFileVersionRoutes(deps: FileVersionRouteDependencies): Hon
     if (!entry) {
       const error = createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`)
       return c.json(error, 404)
-    }
-
-    // Check read access
-    try {
-      await accessControl.checkReadAccess(vaultId, session.userId)
-    } catch (error) {
-      if (error instanceof VaultAccessDeniedError) {
-        const apiError = createApiError('FORBIDDEN', error.message)
-        return c.json(apiError, 403)
-      }
-      if (error instanceof VaultNotFoundError) {
-        const apiError = createApiError('VAULT_NOT_FOUND', error.message)
-        return c.json(apiError, 404)
-      }
-      throw error
     }
 
     // Validate query params
@@ -277,21 +246,6 @@ export function createFileVersionRoutes(deps: FileVersionRouteDependencies): Hon
     if (!entry) {
       const error = createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`)
       return c.json(error, 404)
-    }
-
-    // Check write access (restore modifies the file)
-    try {
-      await accessControl.checkWriteAccess(vaultId, session.userId)
-    } catch (error) {
-      if (error instanceof VaultAccessDeniedError) {
-        const apiError = createApiError('FORBIDDEN', error.message)
-        return c.json(apiError, 403)
-      }
-      if (error instanceof VaultNotFoundError) {
-        const apiError = createApiError('VAULT_NOT_FOUND', error.message)
-        return c.json(apiError, 404)
-      }
-      throw error
     }
 
     // Parse and validate body

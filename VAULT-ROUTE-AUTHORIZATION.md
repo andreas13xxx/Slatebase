@@ -16,6 +16,13 @@ the source-of-truth document for:
 Verified against `origin/master` @ `010785d` (2026-09-09). Line numbers reference that
 commit — if drifted, re-verify rather than trust this file blindly.
 
+**PR 2 status (2026-09-12, verified against `8e61aee`): done.** The handler-level checks
+for every row below have been removed except the six structurally-excluded routes (§19's
+list) and the findings F1–F4 (unchanged by design). See "PR 2 — handler-check removal"
+below for the per-section breakdown and the exact lines each removal is justified against.
+This document is now the reference for **where** authorization happens — keep it current
+when a route's enforcement moves again.
+
 **Default rule:** `GET`/`HEAD` → `read`. `POST`/`PUT`/`DELETE`/`PATCH` → `write`. Every row
 where the "Level today" column differs from that default is flagged **Exception** and must
 appear verbatim in the middleware's exception table — the whole point of this document is
@@ -255,6 +262,77 @@ Same model as pluginRoutes.ts (doc comment `snippetRoutes.ts:84-86`): every rout
 
 ---
 
+## PR 2 — handler-check removal (2026-09-12)
+
+For every route below, the handler-level check was **removed** because §-referenced row
+above shows the middleware now enforces the identical level — removal is belegt
+(evidenced) by that row, not a fresh decision. Routes not listed here either kept their
+check (it checked more than the middleware) or are one of the six structurally-excluded
+routes / F1–F4 findings, both untouched.
+
+- **§1 `index.ts` core CRUD** — `getVaultTree`, `getFileContent`, `saveFile`, `importFile`,
+  `importFolder`, `deleteContent`, `moveContent`, `renameContent` all dropped their
+  `this.accessControl.checkReadAccess`/`checkWriteAccess` call (previously guarded by
+  `if (this.accessControl)` — see Finding F5 below for why that guard itself is gone too).
+  `DELETE /vaultId`'s ownership check in `business/index.ts` (`deleteVaultWithChecks`) is
+  untouched — it's not an `accessControl.check*` call, see Finding F3.
+- **§2 `vaultShareRoutes.ts`** — all 5 routes' `checkOwnership()` helper no longer calls
+  `accessControl.checkOwnerAccess()`; renamed to `requireSession()`, now only extracts the
+  session (401 if missing).
+- **§3 `graphRoutes.ts`** — all 4 routes dropped their `checkVaultReadAccess()` call; the
+  now-unused `accessControl`/`vaultRegistry` constructor fields were removed from the class.
+- **§4 `vaultConfigRoutes.ts`** — both GET (read) and PUT (owner) dropped their check.
+- **§5 `propertyRoutes.ts`** — all 3 routes dropped their `checkReadAccess()` call.
+- **§6 `propertyTypeRoutes.ts`** — GET and both PUT routes dropped their check.
+- **§7 `searchRoutes.ts`** — only the vault-scoped `GET /vaults/:vaultId/search` and
+  `POST /vaults/:vaultId/replace` dropped their check. `GET /search` (global, §19 list) is
+  untouched — it has no handler-level check to remove; its per-vault filtering inside
+  `SearchService.searchMultiVault` is exactly what makes it safe and was not touched.
+- **§8 `uploadRoutes.ts`** — the one route dropped its check.
+- **§9 `trashRoutes.ts`** — all 3 routes dropped their check.
+- **§10 `gitSyncRoutes.ts`** — all 8 routes' local `requireVaultAccess(c, vaultId, level)`
+  helper no longer calls `accessControl.check*`; renamed to `requireVaultContext(c, vaultId)`
+  (session + vault-existence only, no `level` param).
+- **§11 `mailImportRoutes.ts`** — same pattern as gitSyncRoutes.ts, all 7 routes.
+  `mailbox-tree`'s check removal is covered by this row too — Finding F1 (spending a
+  write-tier credential on a read-level route) is about the route's *policy*, not this
+  check's redundancy with the middleware, and is otherwise unchanged.
+- **§12 `transcriptionRoutes.ts`** — the one route dropped its check.
+- **§13 `templateRoutes.ts`** — both routes dropped their check.
+- **§14 `statisticsRoutes.ts`** — the one route dropped its check.
+- **§15 `fileVersionRoutes.ts`** — all 3 routes dropped their check.
+- **§16 `pluginRoutes.ts`** — all 16 routes (including the 7 **Exception** rows) dropped
+  their `checkVaultReadAccess()` call — the middleware's exception table enforces the same
+  `read` level via `VAULT_ROUTE_LEVEL_EXCEPTIONS`.
+- **§17 `snippetRoutes.ts`** — all 7 routes (including the 4 **Exception** rows), same as
+  pluginRoutes.ts.
+- **§18a `pluginStoreRoutes.ts` (vault-scoped)** — all 4 routes (all **Exception** rows,
+  `read` per F2) dropped their check. Finding F2 (arguably too weak) is unchanged — the
+  level itself was not tightened, only where it's enforced moved.
+- **§18b `pluginStoreRoutes.ts` (global `/plugin-store`)** — untouched; never had a
+  vault-scoped check to remove (confirmed: `accessControl`/`vaultRegistry` are on
+  `PluginStoreRouteDependencies` but this factory never destructures them).
+
+**Not touched, by design:**
+- The six structurally-excluded routes in §19's summary (`GET`/`POST /vaults`, `GET
+  /search`, `GET`/`PATCH /users/me/vault-settings/:vaultId`, `POST /welcome-vault`).
+- Findings F1–F4 (policy decisions, not this PR's scope).
+- `mcp/tool-handlers.ts`, `mcp/handlers.ts`, `search/search-service.ts` — these call
+  `accessControl.check*` too, but over MCP's own transport or as search's internal
+  per-vault filtering, neither of which the Hono vault-authorization-middleware covers.
+
+**Finding F5 resolved.** `VaultController`'s `accessControl` constructor parameter is no
+longer optional (`api/index.ts`) — every construction site must now pass a real
+`IVaultAccessControl`. `vault-controller-access.test.ts`'s back-compat "skips the access
+check when no accessControl is wired" test was deleted along with the rest of that file's
+now-obsolete handler-level 403 assertions (equivalent coverage already existed at the
+correct layer in `vault-authorization-middleware.test.ts`/`integration.test.ts`); the file
+keeps only the success-path and `VaultNotFoundError` 404-mapping tests, which are unrelated
+to access control and still valid. `publishVaultChange()`'s broadcast fallback for an
+unwired `accessControl` was removed accordingly — it can no longer be unwired.
+
+---
+
 ## Findings (documentation only — not changed in this PR)
 
 **F1 — `GET /vaults/:vaultId/mail-import/:configId/mailbox-tree` exercises a stored secret on read access.**
@@ -294,7 +372,7 @@ opt-in per wiring rather than structural.** `index.ts:143-150` (constructor),
 back-compat skip-when-unwired behavior). Always correctly wired in production
 (`index.ts:470`), so not a live gap — but it's the exact failure mode this AP's middleware
 eliminates: enforcement no longer depends on every call site remembering to pass
-`accessControl` in.
+`accessControl` in. **Resolved in PR 2** — see "PR 2 — handler-check removal" above.
 
 ---
 

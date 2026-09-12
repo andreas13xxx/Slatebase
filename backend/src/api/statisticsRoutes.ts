@@ -5,7 +5,6 @@ import { Hono } from 'hono'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
-import { VaultNotFoundError, VaultAccessDeniedError } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { IVaultStatisticsService } from '../statistics/index.js'
 import { StatisticsTimeoutError, formatSize } from '../statistics/index.js'
@@ -50,7 +49,7 @@ export interface StatisticsRouteDependencies {
  * @returns A Hono instance with statistics routes registered.
  */
 export function createStatisticsRoutes(deps: StatisticsRouteDependencies): Hono {
-  const { accessControl, vaultRegistry, statisticsService, logger } = deps
+  const { vaultRegistry, statisticsService, logger } = deps
   const app = new Hono()
 
   /**
@@ -61,7 +60,7 @@ export function createStatisticsRoutes(deps: StatisticsRouteDependencies): Hono 
    *
    * Returns 200 with `{ fileCount, folderCount, totalSizeBytes, formattedSize }`
    * Returns 401 if no session
-   * Returns 403 if read access denied
+   * Returns 403 if read access denied (enforced by vault-authorization-middleware)
    * Returns 404 if vault not found
    * Returns 408 if statistics computation times out
    */
@@ -82,22 +81,7 @@ export function createStatisticsRoutes(deps: StatisticsRouteDependencies): Hono 
       return c.json(error, 404)
     }
 
-    // 3. Read access check
-    try {
-      await accessControl.checkReadAccess(vaultId, session.userId)
-    } catch (error) {
-      if (error instanceof VaultAccessDeniedError) {
-        const apiError = createApiError('FORBIDDEN', error.message)
-        return c.json(apiError, 403)
-      }
-      if (error instanceof VaultNotFoundError) {
-        const apiError = createApiError('VAULT_NOT_FOUND', error.message)
-        return c.json(apiError, 404)
-      }
-      throw error
-    }
-
-    // 4. Get statistics
+    // 3. Get statistics
     try {
       const stats = await statisticsService.getStatistics(vaultId)
       const formattedSize = formatSize(stats.totalSizeBytes)
@@ -109,7 +93,7 @@ export function createStatisticsRoutes(deps: StatisticsRouteDependencies): Hono 
         formattedSize,
       }, 200)
     } catch (error) {
-      // 5. Map StatisticsTimeoutError → 408
+      // 4. Map StatisticsTimeoutError → 408
       if (error instanceof StatisticsTimeoutError) {
         logger.warn('Statistics computation timed out', { vaultId })
         const apiError = createApiError('STATISTICS_TIMEOUT', error.message)

@@ -7,7 +7,6 @@ import type { ILogger } from '../logger/index.js'
 import type { ISnippetStore, SnippetMeta, SnippetRegistryData } from '../snippets/types.js'
 import { SnippetTooLargeError } from '../snippets/errors.js'
 import type { IVaultAccessControl } from '../business/index.js'
-import { VaultAccessDeniedError } from '../business/index.js'
 import type { IVaultRegistry, VaultRegistryEntry } from '../vault/registry.js'
 import { createSnippetRoutes } from './snippetRoutes.js'
 
@@ -101,15 +100,6 @@ describe('Snippet Routes', () => {
       expect(body.snippets).toEqual([meta])
     })
 
-    it('returns 403 when access is denied', async () => {
-      const accessControl = createMockAccessControl({
-        checkReadAccess: async () => { throw new VaultAccessDeniedError('vault-1', 'owner-1', 'read') },
-      })
-      const app = createTestApp({ accessControl })
-
-      const res = await app.request('/api/v1/vaults/vault-1/snippets')
-      expect(res.status).toBe(403)
-    })
   })
 
   describe('POST /vaults/:vaultId/snippets', () => {
