@@ -154,6 +154,32 @@ docker run --rm -v slatebase_slatebase-data:/data -v $(pwd):/backup alpine \
 docker compose up -d
 ```
 
+## Operating Model
+
+Slatebase is built to run as **one process**. There's no supported way to run two instances
+of the same deployment (e.g. behind a load balancer for horizontal scaling) — they would
+silently corrupt each other's state rather than fail loudly:
+
+- Session store, live SSE connections, presence, and login/rate-limit counters all live in
+  process memory. A second instance wouldn't see any of it, so users would get logged out
+  or rate-limited at random depending on which instance handled a given request.
+- Writes to the JSON files under the data directory (vault registry, shares, preferences,
+  etc.) are serialized by an in-process lock. Two processes writing the same file via
+  read-modify-write with no shared lock **will** race and can corrupt or drop data — this
+  is a real risk, not a theoretical one, the moment two instances share a data directory.
+
+This is a deliberate trade-off for a self-hosted, single-tenant-per-deployment tool, not an
+oversight — but it means:
+
+- **Run exactly one instance per data directory.** Never point two containers or processes
+  at the same `SLATEBASE_DATA_DIR` (or the same Docker volume).
+- **No load balancing across instances.** If you need TLS termination or a public hostname,
+  put a reverse proxy in front of the single instance (see [Reverse Proxy](#reverse-proxy-https)
+  above) — don't fan requests out across multiple backend instances.
+- **For resilience, restart the same instance rather than replicate it.** The provided
+  `docker-compose.yml` uses `restart: unless-stopped`; that's the supported recovery model.
+  Vertical scaling (more CPU/RAM for the one instance) is fine — horizontal scaling isn't.
+
 ## Features
 
 | Feature | Description |
