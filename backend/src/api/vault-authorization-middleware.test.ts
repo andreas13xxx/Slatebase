@@ -271,7 +271,7 @@ app.route('/api/v1', vaultConfigRoutes)
 const propertyTypeRoutes = createPropertyTypeRoutes({ propertyTypeService: stub<IPropertyTypeService>('propertyTypeService'), accessControl, vaultRegistry, logger: silentLogger })
 app.route('/api/v1', propertyTypeRoutes)
 
-const propertyRoutes = createPropertyRoutes({ linkIndexResolver: () => undefined as ILinkIndex | undefined, propertyTypeService: stub<IPropertyTypeService>('propertyTypeService'), accessControl, logger: silentLogger })
+const propertyRoutes = createPropertyRoutes({ linkIndexResolver: async () => undefined as ILinkIndex | undefined, propertyTypeService: stub<IPropertyTypeService>('propertyTypeService'), accessControl, logger: silentLogger })
 app.route('/api/v1', propertyRoutes)
 
 // ─── Route discovery — the single source of truth, shared with the middleware ─────────────

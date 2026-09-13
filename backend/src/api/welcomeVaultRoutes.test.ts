@@ -9,9 +9,10 @@ import type { IUserService, PublicUserInfo } from '../user/index.js'
 import type { IVaultService } from '../business/index.js'
 import type { VaultInfo } from '../vault/index.js'
 import type { IConfigService } from '../config/index.js'
-import { LinkIndexService } from '../link-index/index.js'
+import { LinkIndexCache } from '../link-index/index.js'
 import { createWelcomeVaultRoutes, deduplicateVaultName } from './welcomeVaultRoutes.js'
 import type { WelcomeVaultRouteDependencies } from './welcomeVaultRoutes.js'
+import type { IVaultRegistry } from '../vault/registry.js'
 
 // ─── Mock Factories ──────────────────────────────────────────────────────────
 
@@ -126,14 +127,18 @@ function createTestApp(options: {
   const userService = options.userService ?? createMockUserService()
   const vaultService = options.vaultService ?? createMockVaultService()
   const configService = options.configService ?? createMockConfigService()
-  const linkIndexMap = new Map<string, InstanceType<typeof LinkIndexService>>()
+  // createFresh() never consults the registry, so a never-called stub is sufficient here.
+  const linkIndexCache = new LinkIndexCache({
+    vaultRegistry: { findById: () => null } as unknown as IVaultRegistry,
+    logger,
+  })
 
   const deps: WelcomeVaultRouteDependencies = {
     welcomeVaultService,
     userService,
     vaultService,
     configService,
-    linkIndexMap,
+    linkIndexCache,
     logger,
   }
 

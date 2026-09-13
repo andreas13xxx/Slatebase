@@ -9,7 +9,7 @@ import type { WelcomeVaultLanguage } from '../welcome-vault/types.js'
 import type { IUserService } from '../user/index.js'
 import type { IVaultService } from '../business/index.js'
 import type { IConfigService } from '../config/index.js'
-import { LinkIndexService } from '../link-index/index.js'
+import type { LinkIndexCache } from '../link-index/index.js'
 
 // --- Helper: API Error Response ---
 
@@ -114,7 +114,7 @@ export interface WelcomeVaultRouteDependencies {
   userService: IUserService
   vaultService: IVaultService
   configService: IConfigService
-  linkIndexMap: Map<string, InstanceType<typeof LinkIndexService>>
+  linkIndexCache: LinkIndexCache
   logger: ILogger
 }
 
@@ -138,7 +138,7 @@ export function createWelcomeVaultRoutes(deps: WelcomeVaultRouteDependencies): H
     userService,
     vaultService,
     configService,
-    linkIndexMap,
+    linkIndexCache,
     logger,
   } = deps
   const app = new Hono()
@@ -197,8 +197,7 @@ export function createWelcomeVaultRoutes(deps: WelcomeVaultRouteDependencies): H
       }
 
       // 5. Fire-and-forget: rebuild link index for the new vault
-      const linkIndex = new LinkIndexService(result.storagePath, result.vaultId, result.vaultName, logger)
-      linkIndexMap.set(result.vaultId, linkIndex)
+      const linkIndex = linkIndexCache.createFresh(result.vaultId, result.storagePath, result.vaultName)
       linkIndex.rebuild().catch((err: unknown) => {
         const message = err instanceof Error ? err.message : String(err)
         logger.warn('Failed to rebuild link index for welcome vault', { vaultId: result.vaultId, error: message })

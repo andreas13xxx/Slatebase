@@ -46,7 +46,7 @@ export class SearchService implements ISearchService {
     private readonly vaultService: IVaultService,
     private readonly _vaultAccessControl: IVaultAccessControl,
     private readonly logger: ILogger,
-    private readonly linkIndexResolver?: (vaultId: string) => ILinkIndex | undefined,
+    private readonly linkIndexResolver?: (vaultId: string) => Promise<ILinkIndex | undefined>,
   ) {}
 
   /**
@@ -84,7 +84,7 @@ export class SearchService implements ISearchService {
     // Apply operator pre-filtering if operators are present
     let filesToSearch: string[]
     if (parsed.operators.length > 0) {
-      const filtered = this.resolveOperatorFilters(vaultId, parsed.operators, allFiles)
+      const filtered = await this.resolveOperatorFilters(vaultId, parsed.operators, allFiles)
       filesToSearch = filtered.length > MAX_FILES ? filtered.slice(0, MAX_FILES) : filtered
       if (filtered.length > MAX_FILES) {
         truncated = true
@@ -770,12 +770,12 @@ export class SearchService implements ISearchService {
    * Resolves operator filters against the vault's link-index and file list.
    * Returns the filtered set of candidate file paths.
    */
-  private resolveOperatorFilters(
+  private async resolveOperatorFilters(
     vaultId: string,
     operators: ParsedOperator[],
     allFiles: string[],
-  ): string[] {
-    const linkIndex = this.linkIndexResolver?.(vaultId)
+  ): Promise<string[]> {
+    const linkIndex = await this.linkIndexResolver?.(vaultId)
 
     // Separate inclusion and exclusion operators
     const inclusions = operators.filter((op) => !op.negated)

@@ -47,7 +47,8 @@ import { McpServerFactory } from './mcp/server-factory.js'
 import { createMcpHttpHandler } from './api/mcpRoutes.js'
 import { createMcpTokenRoutes } from './api/mcpTokenRoutes.js'
 import { createMcpWellKnownHandler } from './api/mcpWellKnownRoute.js'
-import { LinkIndexService, LinkMigrationService } from './link-index/index.js'
+import { LinkIndexCache, LinkMigrationService } from './link-index/index.js'
+import type { ILinkIndex } from './link-index/index.js'
 import { createGraphRoutes } from './api/graphRoutes.js'
 import { createVaultAuthorizationMiddleware } from './api/vault-authorization-middleware.js'
 import { InstalledPluginStore, PluginInstaller, PluginService, PluginSecretKeyManager, PluginSecretStore } from './plugin/index.js'
@@ -260,8 +261,7 @@ welcomeVaultCreator = async (userId: string, language: 'de' | 'en'): Promise<voi
   const result = await welcomeVaultService.createWelcomeVault(userId, language, deduplicatedName)
   // After welcome vault creation: initialize link index so Knowledge Graph is available
   if (result) {
-    const linkIndex = new LinkIndexService(result.storagePath, result.vaultId, result.vaultName, logger)
-    linkIndexMap.set(result.vaultId, linkIndex)
+    const linkIndex = linkIndexCache.createFresh(result.vaultId, result.storagePath, result.vaultName)
     linkIndex.rebuild().catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error)
       logger.error('Failed to build link index for welcome vault', { vaultId: result.vaultId, error: message })
@@ -358,8 +358,16 @@ if (featureToggleService.isEnabled('mcp')) {
   logger.info('MCP server disabled')
 }
 
-// 4d. Link Index Module (per-vault instances)
-const linkIndexMap = new Map<string, LinkIndexService>()
+// 4d. Link Index Module — lazy-loaded per vault, LRU-bounded so memory tracks
+// the number of vaults actually in use rather than the total vault count.
+const linkIndexMaxLoaded = process.env['SLATEBASE_LINK_INDEX_MAX_LOADED'] !== undefined
+  ? Number(process.env['SLATEBASE_LINK_INDEX_MAX_LOADED'])
+  : undefined
+const linkIndexCache = new LinkIndexCache({
+  vaultRegistry,
+  logger,
+  ...(linkIndexMaxLoaded !== undefined && Number.isFinite(linkIndexMaxLoaded) ? { maxLoaded: linkIndexMaxLoaded } : {}),
+})
 
 // 4e. Plugin Module
 const pluginStore = new InstalledPluginStore(serverConfig.dataDir)
@@ -386,12 +394,12 @@ const updateChecker = new UpdateChecker(
   pluginStoreCache,
   pluginStoreConfig,
   serverConfig.dataDir,
-  () => Array.from(linkIndexMap.keys()),
+  async () => (await vaultRegistry.load()).map((entry) => entry.id),
   logger,
 )
 
 // 4g. Search Module
-const searchService = new SearchService(vaultService, vaultAccessControl, logger, (vaultId) => linkIndexMap.get(vaultId))
+const searchService = new SearchService(vaultService, vaultAccessControl, logger, (vaultId) => linkIndexCache.getAsync(vaultId))
 const replaceService = new ReplaceService(vaultService, logger)
 
 // 4g2. Link Migration Module (getLinkIndex is a hoisted function declaration, defined below)
@@ -460,10 +468,11 @@ realtimeConnectionManager.startHeartbeat()
 chatService.setEventBus(eventBus)
 
 /**
- * Returns the LinkIndexService instance for a given vault, or undefined if not found.
+ * Returns the link index for a given vault, lazily creating and loading it on
+ * first access. Undefined only if the vault doesn't exist in the registry.
  */
-function getLinkIndex(vaultId: string): LinkIndexService | undefined {
-  return linkIndexMap.get(vaultId)
+function getLinkIndex(vaultId: string): ILinkIndex | undefined {
+  return linkIndexCache.get(vaultId)
 }
 
 // 5. Controllers
@@ -831,7 +840,7 @@ app.route('/api/v1', propertyTypeRoutes)
 
 // Property metadata route registration (auth middleware applies via /api/v1/* pattern)
 const propertyRoutes = createPropertyRoutes({
-  linkIndexResolver: (vaultId: string) => linkIndexMap.get(vaultId),
+  linkIndexResolver: (vaultId: string) => linkIndexCache.getAsync(vaultId),
   propertyTypeService: propertyTypeStore,
   accessControl: vaultAccessControl,
   logger,
@@ -844,7 +853,7 @@ const welcomeVaultRoutes = createWelcomeVaultRoutes({
   userService,
   vaultService,
   configService: config,
-  linkIndexMap,
+  linkIndexCache,
   logger,
 })
 app.route('/api/v1', welcomeVaultRoutes)
@@ -908,18 +917,10 @@ await ensureDefaultAdmin(userRepository, logger)
 // Initialize vaults
 await vaultService.initializeVaults()
 
-// Initialize link indexes for all vaults (load from disk or rebuild)
-const vaultEntries = await vaultRegistry.load()
+// Vault registry ready — link indexes are no longer loaded eagerly here; each
+// one is lazily created and loaded by linkIndexCache on first access.
+await vaultRegistry.load()
 vaultRegistryReady = true
-for (const entry of vaultEntries) {
-  const linkIndex = new LinkIndexService(entry.storagePath, entry.id, entry.name, logger)
-  linkIndexMap.set(entry.id, linkIndex)
-  // Fire-and-forget: load index in background (don't block server startup)
-  linkIndex.loadFromDisk().catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error)
-    logger.error('Failed to initialize link index', { vaultId: entry.id, error: message })
-  })
-}
 
 // Set up link index hook on VaultController for incremental updates.
 // Held in a named const because the MCP tool handlers (4c above) reuse it via
@@ -932,8 +933,7 @@ const linkIndexHook = {
     if (!linkIndex) {
       const entry = vaultRegistry.findById(vaultId)
       if (entry) {
-        linkIndex = new LinkIndexService(entry.storagePath, entry.id, entry.name, logger)
-        linkIndexMap.set(entry.id, linkIndex)
+        linkIndex = linkIndexCache.createFresh(entry.id, entry.storagePath, entry.name)
       }
     }
     if (linkIndex) {
@@ -1017,7 +1017,7 @@ vaultController.setVaultDeletionHook({
     })
 
     // Clean up link index for the deleted vault
-    linkIndexMap.delete(vaultId)
+    linkIndexCache.delete(vaultId)
   },
 })
 
