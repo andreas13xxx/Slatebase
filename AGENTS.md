@@ -18,6 +18,8 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Monorepo: `backend/` (
 
 **Frontend:** React 19 + useReducer/Context. Separate providers per concern. Action creators are standalone async functions. Singleton `IApiClient`.
 
+**Operating model:** Slatebase runs as a single process — see README.md's "Operating Model" section. In-memory state (session store, SSE connections, rate limiters, caches, mutexes serializing JSON-file writes, etc.) is normal and expected; it does not need to work across instances, and no PR should be designed around eventually supporting horizontal scaling.
+
 ## Key Rules
 
 1. Interface first, then implementation
@@ -29,6 +31,7 @@ Self-hosted Knowledge-Context-Server for Markdown vaults. Monorepo: `backend/` (
 7. Named exports only (no default exports)
 8. JSDoc on public methods/interfaces
 9. Barrel exports via `index.ts` per module
+10. Single-instance only: in-memory state never needs cross-instance coordination
 
 ## Naming
 
