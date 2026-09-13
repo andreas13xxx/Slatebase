@@ -14,7 +14,6 @@ import type { IVaultAccessControl } from '../business/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
 import { updateVaultConfigSchema } from '../vault-config/validation.js'
-import { VaultAccessDeniedError, VaultNotFoundError } from '../business/index.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -43,7 +42,7 @@ function createApiError(code: string, message: string): ApiError {
  * Mounted under /vaults/:vaultId/config in the authenticated router.
  */
 export function createVaultConfigRoutes(deps: VaultConfigRoutesDeps): Hono {
-  const { vaultConfigService, accessControl, logger } = deps
+  const { vaultConfigService, logger } = deps
   const app = new Hono()
 
   // GET /vaults/:vaultId/config — Any user with vault access can read config
@@ -52,14 +51,9 @@ export function createVaultConfigRoutes(deps: VaultConfigRoutesDeps): Hono {
     const vaultId = c.req.param('vaultId') as string
 
     try {
-      // Check at least read access
-      await accessControl.checkReadAccess(vaultId, session.userId)
       const config = await vaultConfigService.getConfig(vaultId)
       return c.json(config, 200)
     } catch (error) {
-      if (error instanceof VaultAccessDeniedError) {
-        return c.json(createApiError('FORBIDDEN', error.message), 403)
-      }
       logger.error('Failed to get vault config', { vaultId, userId: session.userId, error: String(error) })
       return c.json(createApiError('INTERNAL_ERROR', 'Internal server error'), 500)
     }
@@ -69,19 +63,6 @@ export function createVaultConfigRoutes(deps: VaultConfigRoutesDeps): Hono {
   app.put('/vaults/:vaultId/config', async (c: Context) => {
     const session = c.get('session') as SessionContext
     const vaultId = c.req.param('vaultId') as string
-
-    // Only owner can change vault configuration
-    try {
-      await accessControl.checkOwnerAccess(vaultId, session.userId)
-    } catch (error) {
-      if (error instanceof VaultNotFoundError) {
-        return c.json(createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`), 404)
-      }
-      if (error instanceof VaultAccessDeniedError) {
-        return c.json(createApiError('FORBIDDEN', 'Only the vault owner can modify vault configuration'), 403)
-      }
-      throw error
-    }
 
     let body: unknown
     try {

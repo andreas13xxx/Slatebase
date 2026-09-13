@@ -7,7 +7,6 @@ import type { ILogger } from '../logger/index.js'
 import type { IVaultConfigService, VaultConfig } from '../vault-config/index.js'
 import { DEFAULT_VAULT_CONFIG } from '../vault-config/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
-import { VaultAccessDeniedError, VaultNotFoundError } from '../business/index.js'
 import { createVaultConfigRoutes } from './vaultConfigRoutes.js'
 
 // ─── Mock Factories ──────────────────────────────────────────────────────────
@@ -76,15 +75,6 @@ describe('Vault Config Routes', () => {
       expect(body.dailyNoteTemplateName).toBe('custom-daily.md')
     })
 
-    it('returns 403 when access is denied', async () => {
-      const accessControl = createMockAccessControl({
-        checkReadAccess: async () => { throw new VaultAccessDeniedError('vault-1', 'owner-1', 'read') },
-      })
-      const app = createTestApp({ accessControl })
-
-      const res = await app.request('/api/v1/vaults/vault-1/config')
-      expect(res.status).toBe(403)
-    })
   })
 
   describe('PUT /vaults/:vaultId/config', () => {
@@ -112,39 +102,6 @@ describe('Vault Config Routes', () => {
       const body = await res.json() as VaultConfig
       expect(body.dailyNoteTemplateName).toBe('my-daily-template.md')
       expect(savedPartial?.dailyNoteTemplateName).toBe('my-daily-template.md')
-    })
-
-    it('rejects updates from non-owners', async () => {
-      const accessControl = createMockAccessControl({
-        checkOwnerAccess: async () => { throw new VaultAccessDeniedError('vault-1', 'someone-else', 'owner') },
-      })
-      const app = createTestApp({
-        accessControl,
-        session: { userId: 'someone-else', username: 'x', role: 'user', sessionId: 'sess-2' },
-      })
-
-      const res = await app.request('/api/v1/vaults/vault-1/config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dailyNoteTemplateName: 'daily.md' }),
-      })
-
-      expect(res.status).toBe(403)
-    })
-
-    it('returns 404 when the vault does not exist', async () => {
-      const accessControl = createMockAccessControl({
-        checkOwnerAccess: async () => { throw new VaultNotFoundError('vault-1') },
-      })
-      const app = createTestApp({ accessControl })
-
-      const res = await app.request('/api/v1/vaults/vault-1/config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dailyNoteTemplateName: 'daily.md' }),
-      })
-
-      expect(res.status).toBe(404)
     })
 
     it('rejects a template name containing a path separator', async () => {

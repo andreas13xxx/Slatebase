@@ -5,7 +5,6 @@ import { Hono } from 'hono'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
-import { VaultNotFoundError, VaultAccessDeniedError } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import {
   createMailImportConfigSchema,
@@ -53,14 +52,13 @@ export interface MailImportRouteDependencies {
 // --- Route Factory ---
 
 export function createMailImportRoutes(deps: MailImportRouteDependencies): Hono {
-  const { configStore, statusStore, secretStore, importEngine, imapClient, accessControl, vaultRegistry, logger } = deps
+  const { configStore, statusStore, secretStore, importEngine, imapClient, vaultRegistry, logger } = deps
   const app = new Hono()
 
-  async function requireVaultAccess(
-    c: Context,
-    vaultId: string,
-    level: 'read' | 'write',
-  ): Promise<{ session: SessionContext } | { response: Response }> {
+  // Access-level enforcement happens in vault-authorization-middleware before
+  // the handler runs; this only guards against a missing session and an
+  // unknown vault (the latter needed by handlers before issuing 404s of their own).
+  function requireVaultContext(c: Context, vaultId: string): { session: SessionContext } | { response: Response } {
     const session = c.get('session') as SessionContext | undefined
     if (!session) {
       return { response: c.json(createApiError('UNAUTHORIZED', 'Missing session context'), 401) }
@@ -69,22 +67,6 @@ export function createMailImportRoutes(deps: MailImportRouteDependencies): Hono 
     const entry = vaultRegistry.findById(vaultId)
     if (!entry) {
       return { response: c.json(createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`), 404) }
-    }
-
-    try {
-      if (level === 'read') {
-        await accessControl.checkReadAccess(vaultId, session.userId)
-      } else {
-        await accessControl.checkWriteAccess(vaultId, session.userId)
-      }
-    } catch (error) {
-      if (error instanceof VaultAccessDeniedError) {
-        return { response: c.json(createApiError('FORBIDDEN', error.message), 403) }
-      }
-      if (error instanceof VaultNotFoundError) {
-        return { response: c.json(createApiError('VAULT_NOT_FOUND', error.message), 404) }
-      }
-      throw error
     }
 
     return { session }
@@ -98,7 +80,7 @@ export function createMailImportRoutes(deps: MailImportRouteDependencies): Hono 
     }
     const { vaultId } = params.data
 
-    const access = await requireVaultAccess(c, vaultId, 'read')
+    const access = requireVaultContext(c, vaultId)
     if ('response' in access) return access.response
 
     const configs = await configStore.listByVault(vaultId)
@@ -113,7 +95,7 @@ export function createMailImportRoutes(deps: MailImportRouteDependencies): Hono 
     }
     const { vaultId } = params.data
 
-    const access = await requireVaultAccess(c, vaultId, 'write')
+    const access = requireVaultContext(c, vaultId)
     if ('response' in access) return access.response
 
     let body: unknown
@@ -151,7 +133,7 @@ export function createMailImportRoutes(deps: MailImportRouteDependencies): Hono 
     }
     const { vaultId, configId } = params.data
 
-    const access = await requireVaultAccess(c, vaultId, 'write')
+    const access = requireVaultContext(c, vaultId)
     if ('response' in access) return access.response
 
     let body: unknown
@@ -191,7 +173,7 @@ export function createMailImportRoutes(deps: MailImportRouteDependencies): Hono 
     }
     const { vaultId, configId } = params.data
 
-    const access = await requireVaultAccess(c, vaultId, 'write')
+    const access = requireVaultContext(c, vaultId)
     if ('response' in access) return access.response
 
     try {
@@ -218,7 +200,7 @@ export function createMailImportRoutes(deps: MailImportRouteDependencies): Hono 
     }
     const { vaultId, configId } = params.data
 
-    const access = await requireVaultAccess(c, vaultId, 'write')
+    const access = requireVaultContext(c, vaultId)
     if ('response' in access) return access.response
 
     try {
@@ -249,7 +231,7 @@ export function createMailImportRoutes(deps: MailImportRouteDependencies): Hono 
     }
     const { vaultId, configId } = params.data
 
-    const access = await requireVaultAccess(c, vaultId, 'read')
+    const access = requireVaultContext(c, vaultId)
     if ('response' in access) return access.response
 
     const config = await configStore.get(vaultId, configId)
@@ -289,7 +271,7 @@ export function createMailImportRoutes(deps: MailImportRouteDependencies): Hono 
     }
     const { vaultId, configId } = params.data
 
-    const access = await requireVaultAccess(c, vaultId, 'read')
+    const access = requireVaultContext(c, vaultId)
     if ('response' in access) return access.response
 
     const status = await statusStore.getStatus(vaultId, configId)
