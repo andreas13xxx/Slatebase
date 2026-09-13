@@ -10,7 +10,6 @@ import type { IVaultRegistry } from '../vault/registry.js'
 import type { IEventBus } from '../realtime/types.js'
 import type { ILogger } from '../logger/index.js'
 import { TemplateNotFoundError, TemplateConflictError } from '../template/errors.js'
-import { VaultAccessDeniedError } from '../business/index.js'
 
 // --- Mock Factories ---
 
@@ -116,21 +115,6 @@ describe('GET /api/v1/vaults/:vaultId/templates', () => {
     expect(body.code).toBe('VAULT_NOT_FOUND')
   })
 
-  it('returns 403 when read access denied', async () => {
-    const app = createTestApp({
-      accessControl: createMockAccessControl({
-        checkReadAccess: async () => {
-          throw new VaultAccessDeniedError('vault1', 'user1', 'read')
-        },
-      }),
-    })
-
-    const res = await app.request('/api/v1/vaults/vault1/templates')
-
-    expect(res.status).toBe(403)
-    const body = await res.json() as { code: string }
-    expect(body.code).toBe('FORBIDDEN')
-  })
 })
 
 describe('POST /api/v1/vaults/:vaultId/templates/create', () => {
@@ -243,29 +227,6 @@ describe('POST /api/v1/vaults/:vaultId/templates/create', () => {
     expect(body.code).toBe('TEMPLATE_CONFLICT')
   })
 
-  it('returns 403 when write access denied', async () => {
-    const app = createTestApp({
-      accessControl: createMockAccessControl({
-        checkWriteAccess: async () => {
-          throw new VaultAccessDeniedError('vault1', 'user1', 'write')
-        },
-      }),
-    })
-
-    const res = await app.request('/api/v1/vaults/vault1/templates/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        templateName: 'Daily',
-        targetDir: '',
-        fileName: 'test',
-      }),
-    })
-
-    expect(res.status).toBe(403)
-    const body = await res.json() as { code: string }
-    expect(body.code).toBe('FORBIDDEN')
-  })
 
   it('returns 404 when vault not found', async () => {
     const app = createTestApp({

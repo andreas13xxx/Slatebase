@@ -1,9 +1,11 @@
-// Shared vault-access-check helper for route handlers
+// Shared vault-access-check helper.
 //
-// Checks session presence, vault existence, and read access in one call,
-// returning either { authorized: true } or a ready-to-return 401/404/403
-// Response — used by any route module where a handler needs read access to
-// a vault before doing its own work (graph, plugin, and plugin-store routes).
+// Checks session presence, vault existence, and access at the given level in
+// one call, returning either { authorized: true } or a ready-to-return
+// 401/404/403 Response. `checkVaultAccess` and `VaultAccessLevel` are imported
+// by vault-authorization-middleware.ts, which is what now enforces this for
+// every /api/v1/vaults/:vaultId/* route — this module is its implementation,
+// not a second place route handlers call into.
 
 import type { Context } from 'hono'
 import type { IVaultAccessControl } from '../business/index.js'
@@ -64,17 +66,4 @@ export async function checkVaultAccess(
   }
 
   return { authorized: true }
-}
-
-/**
- * Checks authentication and vault access (read permission).
- * Returns 401 if no session, 404 if vault not found, 403 if access denied.
- */
-export async function checkVaultReadAccess(
-  c: Context,
-  vaultId: string,
-  vaultRegistry: IVaultRegistry,
-  accessControl: IVaultAccessControl,
-): Promise<AccessCheckResult> {
-  return checkVaultAccess(c, vaultId, 'read', vaultRegistry, accessControl)
 }

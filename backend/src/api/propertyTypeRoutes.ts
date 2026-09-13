@@ -17,7 +17,6 @@ import type { IVaultAccessControl } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
-import { VaultAccessDeniedError } from '../business/index.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -47,7 +46,7 @@ function createApiError(code: string, message: string): ApiError {
  * Mounted under /vaults/:vaultId/property-types in the authenticated router.
  */
 export function createPropertyTypeRoutes(deps: PropertyTypeRoutesDeps): Hono {
-  const { propertyTypeService, accessControl, vaultRegistry, logger } = deps
+  const { propertyTypeService, vaultRegistry, logger } = deps
   const app = new Hono()
 
   // GET /vaults/:vaultId/property-types — Any user with read access can view
@@ -56,13 +55,9 @@ export function createPropertyTypeRoutes(deps: PropertyTypeRoutesDeps): Hono {
     const vaultId = c.req.param('vaultId') as string
 
     try {
-      await accessControl.checkReadAccess(vaultId, session.userId)
       const registry = await propertyTypeService.getRegistry(vaultId)
       return c.json(registry, 200)
     } catch (error) {
-      if (error instanceof VaultAccessDeniedError) {
-        return c.json(createApiError('FORBIDDEN', error.message), 403)
-      }
       logger.error('Failed to get property type registry', { vaultId, userId: session.userId, error: String(error) })
       return c.json(createApiError('INTERNAL_ERROR', 'Internal server error'), 500)
     }
@@ -77,15 +72,6 @@ export function createPropertyTypeRoutes(deps: PropertyTypeRoutesDeps): Hono {
     const entry = vaultRegistry.findById(vaultId)
     if (entry === null) {
       return c.json(createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`), 404)
-    }
-
-    try {
-      await accessControl.checkWriteAccess(vaultId, session.userId)
-    } catch (error) {
-      if (error instanceof VaultAccessDeniedError) {
-        return c.json(createApiError('FORBIDDEN', error.message), 403)
-      }
-      throw error
     }
 
     let body: unknown
@@ -124,15 +110,6 @@ export function createPropertyTypeRoutes(deps: PropertyTypeRoutesDeps): Hono {
     const vaultEntry = vaultRegistry.findById(vaultId)
     if (vaultEntry === null) {
       return c.json(createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`), 404)
-    }
-
-    try {
-      await accessControl.checkWriteAccess(vaultId, session.userId)
-    } catch (error) {
-      if (error instanceof VaultAccessDeniedError) {
-        return c.json(createApiError('FORBIDDEN', error.message), 403)
-      }
-      throw error
     }
 
     let body: unknown

@@ -15,8 +15,6 @@ import type { ILinkIndex, PropertyFilter, PropertyFilterOperator } from '../link
 import type { IPropertyTypeService } from '../property-type/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
 import type { ILogger } from '../logger/index.js'
-import type { SessionContext } from '../auth/index.js'
-import { VaultAccessDeniedError } from '../business/index.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -59,22 +57,12 @@ function createApiError(code: string, message: string): ApiError {
  * Creates a Hono sub-app with property metadata routes.
  */
 export function createPropertyRoutes(deps: PropertyRoutesDeps): Hono {
-  const { linkIndexResolver, propertyTypeService, accessControl, logger } = deps
+  const { linkIndexResolver, propertyTypeService, logger } = deps
   const app = new Hono()
 
   // GET /vaults/:vaultId/properties — All property keys with counts and registered types
   app.get('/vaults/:vaultId/properties', async (c: Context) => {
-    const session = c.get('session') as SessionContext
     const vaultId = c.req.param('vaultId') as string
-
-    try {
-      await accessControl.checkReadAccess(vaultId, session.userId)
-    } catch (error) {
-      if (error instanceof VaultAccessDeniedError) {
-        return c.json(createApiError('FORBIDDEN', error.message), 403)
-      }
-      throw error
-    }
 
     const linkIndex = linkIndexResolver(vaultId)
     if (!linkIndex || !linkIndex.isReady()) {
@@ -102,18 +90,8 @@ export function createPropertyRoutes(deps: PropertyRoutesDeps): Hono {
 
   // GET /vaults/:vaultId/properties/:key/values — Values for a specific key (paginated)
   app.get('/vaults/:vaultId/properties/:key/values', async (c: Context) => {
-    const session = c.get('session') as SessionContext
     const vaultId = c.req.param('vaultId') as string
     const key = c.req.param('key') as string
-
-    try {
-      await accessControl.checkReadAccess(vaultId, session.userId)
-    } catch (error) {
-      if (error instanceof VaultAccessDeniedError) {
-        return c.json(createApiError('FORBIDDEN', error.message), 403)
-      }
-      throw error
-    }
 
     const linkIndex = linkIndexResolver(vaultId)
     if (!linkIndex || !linkIndex.isReady()) {
@@ -141,17 +119,7 @@ export function createPropertyRoutes(deps: PropertyRoutesDeps): Hono {
 
   // POST /vaults/:vaultId/properties/query — Filter-based file listing
   app.post('/vaults/:vaultId/properties/query', async (c: Context) => {
-    const session = c.get('session') as SessionContext
     const vaultId = c.req.param('vaultId') as string
-
-    try {
-      await accessControl.checkReadAccess(vaultId, session.userId)
-    } catch (error) {
-      if (error instanceof VaultAccessDeniedError) {
-        return c.json(createApiError('FORBIDDEN', error.message), 403)
-      }
-      throw error
-    }
 
     const linkIndex = linkIndexResolver(vaultId)
     if (!linkIndex || !linkIndex.isReady()) {

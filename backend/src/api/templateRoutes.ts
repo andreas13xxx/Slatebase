@@ -6,7 +6,6 @@ import { z } from 'zod'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
-import { VaultNotFoundError, VaultAccessDeniedError } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { IEventBus } from '../realtime/types.js'
 import type { ITemplateService } from '../template/index.js'
@@ -94,21 +93,6 @@ export function createTemplateRoutes(deps: TemplateRouteDependencies): Hono {
       return c.json(error, 404)
     }
 
-    // 2. Check read access
-    try {
-      await accessControl.checkReadAccess(vaultId, session.userId)
-    } catch (error) {
-      if (error instanceof VaultAccessDeniedError) {
-        const apiError = createApiError('FORBIDDEN', error.message)
-        return c.json(apiError, 403)
-      }
-      if (error instanceof VaultNotFoundError) {
-        const apiError = createApiError('VAULT_NOT_FOUND', error.message)
-        return c.json(apiError, 404)
-      }
-      throw error
-    }
-
     // 3. List templates
     try {
       const templates = await templateService.listTemplates(vaultId)
@@ -150,21 +134,6 @@ export function createTemplateRoutes(deps: TemplateRouteDependencies): Hono {
     if (!entry) {
       const error = createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`)
       return c.json(error, 404)
-    }
-
-    // 2. Check write access
-    try {
-      await accessControl.checkWriteAccess(vaultId, session.userId)
-    } catch (error) {
-      if (error instanceof VaultAccessDeniedError) {
-        const apiError = createApiError('FORBIDDEN', error.message)
-        return c.json(apiError, 403)
-      }
-      if (error instanceof VaultNotFoundError) {
-        const apiError = createApiError('VAULT_NOT_FOUND', error.message)
-        return c.json(apiError, 404)
-      }
-      throw error
     }
 
     // 3. Validate request body

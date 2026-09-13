@@ -4,7 +4,6 @@ import { describe, it, expect, vi } from 'vitest'
 import { Hono } from 'hono'
 import { createStatisticsRoutes } from './statisticsRoutes.js'
 import type { StatisticsRouteDependencies } from './statisticsRoutes.js'
-import { VaultAccessDeniedError } from '../business/index.js'
 import { StatisticsTimeoutError } from '../statistics/index.js'
 import type { IVaultStatisticsService } from '../statistics/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
@@ -105,32 +104,6 @@ describe('GET /vaults/:vaultId/statistics', () => {
     expect(res.status).toBe(404)
     const body = await res.json() as { code: string }
     expect(body.code).toBe('VAULT_NOT_FOUND')
-  })
-
-  it('returns 403 when read access is denied', async () => {
-    const vaultRegistry = createMockVaultRegistry()
-    ;(vaultRegistry.findById as ReturnType<typeof vi.fn>).mockReturnValue({
-      id: 'vault1',
-      name: 'Test Vault',
-      storagePath: '/data/vaults/vault1',
-      createdAt: '2024-01-01T00:00:00.000Z',
-    })
-
-    const accessControl = createMockAccessControl()
-    ;(accessControl.checkReadAccess as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new VaultAccessDeniedError('vault1', 'user1', 'read'),
-    )
-
-    const { app } = createAppWithSession(
-      { userId: 'user1', username: 'testuser' },
-      { vaultRegistry, accessControl },
-    )
-
-    const res = await app.request('/vaults/vault1/statistics')
-
-    expect(res.status).toBe(403)
-    const body = await res.json() as { code: string }
-    expect(body.code).toBe('FORBIDDEN')
   })
 
   it('returns 200 with statistics on success', async () => {

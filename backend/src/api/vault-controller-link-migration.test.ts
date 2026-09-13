@@ -11,7 +11,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { Hono } from 'hono'
 import { VaultController } from './index.js'
 import type { LinkIndexHook } from './index.js'
-import type { IVaultService } from '../business/index.js'
+import type { IVaultService, IVaultAccessControl } from '../business/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { DirectoryTree } from '../vault/index.js'
 import type { IEventBus } from '../realtime/types.js'
@@ -51,8 +51,12 @@ function createMockEventBus(): IEventBus {
   return { publish: vi.fn(), subscribe: vi.fn() } as unknown as IEventBus
 }
 
+function createMockAccessControl(): IVaultAccessControl {
+  return { getUsersWithAccess: vi.fn().mockResolvedValue([]) } as unknown as IVaultAccessControl
+}
+
 function buildApp(vaultService: IVaultService, hook: LinkIndexHook | undefined, eventBus: IEventBus) {
-  const controller = new VaultController(vaultService, createMockLogger())
+  const controller = new VaultController(vaultService, createMockLogger(), undefined, undefined, createMockAccessControl())
   if (hook) controller.setLinkIndexHook(hook)
   controller.setEventBus(eventBus)
 

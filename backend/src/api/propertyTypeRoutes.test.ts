@@ -7,7 +7,6 @@ import type { ILogger } from '../logger/index.js'
 import type { IPropertyTypeService, PropertyTypeRegistry } from '../property-type/index.js'
 import { PropertyTypeReservedKeyError, PropertyTypeMaxEntriesError } from '../property-type/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
-import { VaultAccessDeniedError } from '../business/index.js'
 import type { IVaultRegistry, VaultRegistryEntry } from '../vault/registry.js'
 import { createPropertyTypeRoutes } from './propertyTypeRoutes.js'
 
@@ -104,15 +103,6 @@ describe('Property Type Routes', () => {
       expect(body.entries[0]!.key).toBe('status')
     })
 
-    it('returns 403 when read access is denied', async () => {
-      const accessControl = createMockAccessControl({
-        checkReadAccess: async () => { throw new VaultAccessDeniedError('vault-1', 'user-1', 'read') },
-      })
-      const app = createTestApp({ accessControl })
-
-      const res = await app.request('/api/v1/vaults/vault-1/property-types')
-      expect(res.status).toBe(403)
-    })
   })
 
   describe('PUT /vaults/:vaultId/property-types', () => {
@@ -147,21 +137,6 @@ describe('Property Type Routes', () => {
       })
 
       expect(res.status).toBe(404)
-    })
-
-    it('returns 403 when write access is denied', async () => {
-      const accessControl = createMockAccessControl({
-        checkWriteAccess: async () => { throw new VaultAccessDeniedError('vault-1', 'user-1', 'write') },
-      })
-      const app = createTestApp({ accessControl })
-
-      const res = await app.request('/api/v1/vaults/vault-1/property-types', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entries: [] }),
-      })
-
-      expect(res.status).toBe(403)
     })
 
     it('returns 400 for invalid body (invalid type)', async () => {

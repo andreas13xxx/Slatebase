@@ -8,7 +8,6 @@ import type { IVaultAccessControl } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
 import type { RouteModule } from './index.js'
-import { checkVaultReadAccess } from './access-check.js'
 
 // --- Helper: API Error Response ---
 
@@ -70,14 +69,10 @@ export interface GraphRouteDependencies {
  */
 export class GraphRouteModule implements RouteModule {
   private readonly getLinkIndex: (vaultId: string) => ILinkIndex | undefined
-  private readonly accessControl: IVaultAccessControl
-  private readonly vaultRegistry: IVaultRegistry
   private readonly logger: ILogger
 
   constructor(deps: GraphRouteDependencies) {
     this.getLinkIndex = deps.getLinkIndex
-    this.accessControl = deps.accessControl
-    this.vaultRegistry = deps.vaultRegistry
     this.logger = deps.logger
   }
 
@@ -104,11 +99,6 @@ export class GraphRouteModule implements RouteModule {
    */
   private async getGraph(c: Context): Promise<Response> {
     const vaultId = c.req.param('vaultId') as string
-
-    const authResult = await checkVaultReadAccess(c, vaultId, this.vaultRegistry, this.accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
-    }
 
     const linkIndex = this.getLinkIndex(vaultId)
     if (linkIndex === undefined) {
@@ -148,11 +138,6 @@ export class GraphRouteModule implements RouteModule {
   private async getGraphMeta(c: Context): Promise<Response> {
     const vaultId = c.req.param('vaultId') as string
 
-    const authResult = await checkVaultReadAccess(c, vaultId, this.vaultRegistry, this.accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
-    }
-
     const linkIndex = this.getLinkIndex(vaultId)
     if (linkIndex === undefined) {
       return c.json({ tags: [], propertyKeys: [] }, 200)
@@ -175,11 +160,6 @@ export class GraphRouteModule implements RouteModule {
    */
   private async getBacklinks(c: Context): Promise<Response> {
     const vaultId = c.req.param('vaultId') as string
-
-    const authResult = await checkVaultReadAccess(c, vaultId, this.vaultRegistry, this.accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
-    }
 
     // Validate path query parameter with Zod
     const rawPath = c.req.query('path')
@@ -217,11 +197,6 @@ export class GraphRouteModule implements RouteModule {
    */
   private async getTags(c: Context): Promise<Response> {
     const vaultId = c.req.param('vaultId') as string
-
-    const authResult = await checkVaultReadAccess(c, vaultId, this.vaultRegistry, this.accessControl)
-    if (!authResult.authorized) {
-      return authResult.response
-    }
 
     const linkIndex = this.getLinkIndex(vaultId)
     if (linkIndex === undefined) {

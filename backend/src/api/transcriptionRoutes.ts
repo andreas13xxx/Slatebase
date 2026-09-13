@@ -15,7 +15,6 @@ import { Hono } from 'hono'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
-import { VaultNotFoundError, VaultAccessDeniedError } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { SlidingWindowRateLimiter } from '../shared/sliding-window-rate-limiter.js'
 import {
@@ -54,7 +53,7 @@ export interface TranscriptionRouteDependencies {
 // --- Route Factory ---
 
 export function createTranscriptionRoutes(deps: TranscriptionRouteDependencies): Hono {
-  const { transcriptionService, accessControl, vaultRegistry, rateLimiter, logger } = deps
+  const { transcriptionService, vaultRegistry, rateLimiter, logger } = deps
   const app = new Hono()
 
   // POST /vaults/:vaultId/transcribe — transcribe an audio recording to text
@@ -75,18 +74,6 @@ export function createTranscriptionRoutes(deps: TranscriptionRouteDependencies):
     if (!entry) {
       return c.json(createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`), 404)
     }
-    try {
-      await accessControl.checkWriteAccess(vaultId, session.userId)
-    } catch (error) {
-      if (error instanceof VaultAccessDeniedError) {
-        return c.json(createApiError('ACCESS_DENIED', error.message), 403)
-      }
-      if (error instanceof VaultNotFoundError) {
-        return c.json(createApiError('VAULT_NOT_FOUND', error.message), 404)
-      }
-      throw error
-    }
-
     // Not configured → surface a clear 503 rather than attempting a request.
     if (!transcriptionService.isConfigured()) {
       const err = new TranscriptionNotConfiguredError()
