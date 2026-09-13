@@ -5,6 +5,9 @@
       "changelog-sections": [
         { "type": "feat", "section": "Features" },
         { "type": "fix", "section": "Bugfixes" },
+        { "type": "perf", "section": "Sonstige Änderungen" },
+        { "type": "build", "section": "Sonstige Änderungen" },
+        { "type": "ci", "section": "Sonstige Änderungen" },
         { "type": "refactor", "section": "Sonstige Änderungen" },
         { "type": "docs", "section": "Sonstige Änderungen" },
         { "type": "chore", "section": "Sonstige Änderungen" },
