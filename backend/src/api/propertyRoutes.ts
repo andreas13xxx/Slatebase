@@ -25,7 +25,7 @@ interface ApiError {
 }
 
 interface PropertyRoutesDeps {
-  linkIndexResolver: (vaultId: string) => ILinkIndex | undefined
+  linkIndexResolver: (vaultId: string) => Promise<ILinkIndex | undefined>
   propertyTypeService: IPropertyTypeService
   accessControl: IVaultAccessControl
   logger: ILogger
@@ -64,7 +64,7 @@ export function createPropertyRoutes(deps: PropertyRoutesDeps): Hono {
   app.get('/vaults/:vaultId/properties', async (c: Context) => {
     const vaultId = c.req.param('vaultId') as string
 
-    const linkIndex = linkIndexResolver(vaultId)
+    const linkIndex = await linkIndexResolver(vaultId)
     if (!linkIndex || !linkIndex.isReady()) {
       return c.json(createApiError('NOT_READY', 'Link index not yet available for this vault'), 503)
     }
@@ -93,7 +93,7 @@ export function createPropertyRoutes(deps: PropertyRoutesDeps): Hono {
     const vaultId = c.req.param('vaultId') as string
     const key = c.req.param('key') as string
 
-    const linkIndex = linkIndexResolver(vaultId)
+    const linkIndex = await linkIndexResolver(vaultId)
     if (!linkIndex || !linkIndex.isReady()) {
       return c.json(createApiError('NOT_READY', 'Link index not yet available for this vault'), 503)
     }
@@ -121,7 +121,7 @@ export function createPropertyRoutes(deps: PropertyRoutesDeps): Hono {
   app.post('/vaults/:vaultId/properties/query', async (c: Context) => {
     const vaultId = c.req.param('vaultId') as string
 
-    const linkIndex = linkIndexResolver(vaultId)
+    const linkIndex = await linkIndexResolver(vaultId)
     if (!linkIndex || !linkIndex.isReady()) {
       return c.json(createApiError('NOT_READY', 'Link index not yet available for this vault'), 503)
     }

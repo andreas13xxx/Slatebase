@@ -76,7 +76,7 @@ function createTestApp(options: {
   })
 
   const routes = createPropertyRoutes({
-    linkIndexResolver: () => linkIndex,
+    linkIndexResolver: async () => linkIndex,
     propertyTypeService,
     accessControl,
     logger,

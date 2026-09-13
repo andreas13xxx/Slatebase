@@ -40,6 +40,10 @@ export { extractCanvasFileRefs } from './canvas-parser.js'
 // Link index service implementation
 export { LinkIndexService, normalizeLinkPath, extractFrontmatterTags } from './link-index-service.js'
 
+// Lazy-loading, LRU-bounded cache of per-vault LinkIndexService instances
+export { LinkIndexCache, DEFAULT_LINK_INDEX_MAX_LOADED } from './link-index-cache.js'
+export type { LinkIndexCacheDependencies } from './link-index-cache.js'
+
 // Link match resolution (used by link migration to resolve bare-name wikilinks)
 export { resolveWikilinkTargetOnTree } from './link-match-resolver.js'
 

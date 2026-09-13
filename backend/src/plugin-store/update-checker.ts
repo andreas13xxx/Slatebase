@@ -45,7 +45,7 @@ export class UpdateChecker implements IUpdateChecker {
   private readonly cache: IPluginStoreCache
   private readonly config: IPluginStoreConfig
   private readonly dataDir: string
-  private readonly getVaultIds: () => string[]
+  private readonly getVaultIds: () => Promise<string[]>
   private readonly logger: ILogger
 
   private intervalHandle: ReturnType<typeof setInterval> | null = null
@@ -57,7 +57,7 @@ export class UpdateChecker implements IUpdateChecker {
     cache: IPluginStoreCache,
     config: IPluginStoreConfig,
     dataDir: string,
-    getVaultIds: () => string[],
+    getVaultIds: () => Promise<string[]>,
     logger: ILogger
   ) {
     this.pluginStoreService = pluginStoreService
@@ -143,7 +143,7 @@ export class UpdateChecker implements IUpdateChecker {
     this.running = true
     this.logger.info('Running periodic update check')
 
-    const vaultIds = this.getVaultIds()
+    const vaultIds = await this.getVaultIds()
 
     if (vaultIds.length === 0) {
       this.logger.debug('No vaults to check for updates')
