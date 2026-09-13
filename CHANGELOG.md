@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.44.4](https://github.com/andreas13xxx/Slatebase/compare/v0.44.3...v0.44.4) (2026-09-13)
+
+
+### Sonstige Änderungen
+
+* **backend:** load link indexes lazily instead of eagerly at startup ([#185](https://github.com/andreas13xxx/Slatebase/issues/185)) ([1df85ae](https://github.com/andreas13xxx/Slatebase/commit/1df85ae92fa10bc134a69e98c19efa35ebb0e6a7))
+* **backend:** remove handler-level vault access checks superseded by default-deny middleware ([#183](https://github.com/andreas13xxx/Slatebase/issues/183)) ([e151451](https://github.com/andreas13xxx/Slatebase/commit/e15145126ec6d3124bad763fe09eeb5890e7b0a5))
+* document the single-instance operating model ([#184](https://github.com/andreas13xxx/Slatebase/issues/184)) ([97721ed](https://github.com/andreas13xxx/Slatebase/commit/97721edc4f11d252ea72b801701a38cb194edc05))
+* inventory the plugin-compat layer's coupling into the rest of the frontend ([#186](https://github.com/andreas13xxx/Slatebase/issues/186)) ([83f8a89](https://github.com/andreas13xxx/Slatebase/commit/83f8a89a9338a8a98b26f8cf5a072fbacae1550c))
+* list perf, build and ci in the changelog sections ([#188](https://github.com/andreas13xxx/Slatebase/issues/188)) ([48e252c](https://github.com/andreas13xxx/Slatebase/commit/48e252c6f1bb8fe31a8da525a66946fd5e70f74e))
+
 ## [0.44.3](https://github.com/andreas13xxx/Slatebase/compare/v0.44.2...v0.44.3) (2026-09-11)
 
 
