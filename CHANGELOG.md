@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.44.5](https://github.com/andreas13xxx/Slatebase/compare/v0.44.4...v0.44.5) (2026-09-15)
+
+
+### Bugfixes
+
+* allowlist gitleaks false positives from history sweep ([#189](https://github.com/andreas13xxx/Slatebase/issues/189)) ([22787dc](https://github.com/andreas13xxx/Slatebase/commit/22787dc302bc2ab36878e63e7affaac74983667c))
+* allowlist remaining gitleaks history findings ([7042868](https://github.com/andreas13xxx/Slatebase/commit/70428687576ee54e3eb26aa8ce9a13f462cf1d58))
+* allowlist temp-password generator alphabet globally (generic-api-key rule) ([2a2a9f6](https://github.com/andreas13xxx/Slatebase/commit/2a2a9f610f504a3c059dce956fc4173e2a61cf6e))
+
+
+### Sonstige Änderungen
+
+* add workflow_dispatch to secret-scan for on-demand full-history sweep ([931e5ab](https://github.com/andreas13xxx/Slatebase/commit/931e5ab0c4fc93e81c2f738cf72a17acb7f261f5))
+
 ## [0.44.4](https://github.com/andreas13xxx/Slatebase/compare/v0.44.3...v0.44.4) (2026-09-13)
 
 
