@@ -44,9 +44,6 @@ regexes = [
   # Screenshot script demo password (history only; the literal is now read from
   # the SCREENSHOT_PASS env var).
   '''Slatebase''',
-  # Alphabet for the temporary-password GENERATOR in user/index.ts - a character
-  # set, not a secret. (The uppercase half is already listed above.)
-  '''ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789''',
   # i18n display strings and their test assertions: a key like `passwordLabel`
   # or `passwordPlaceholder` carries UI text ("Passwort", "Mindestens 8
   # Zeichen"), never a secret, but still matches the password-shaped-name rule.
@@ -87,6 +84,11 @@ regexes = [
   # The PEM header as a literal string in tests and as an input placeholder -
   # a header with no key material after it.
   '''-----BEGIN OPENSSH PRIVATE KEY-----''',
+  # Alphabet for the temporary-password GENERATOR in backend/src/user/index.ts.
+  # A high-entropy character set, not a credential - the default generic-api-key
+  # rule flags it, so it has to sit in the global allowlist (a rule-scoped entry
+  # would only cover slatebase-password-literal).
+  '''ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789''',
 ]
 
 # The credential removed in this branch is still reachable in history at commit
