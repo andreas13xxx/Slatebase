@@ -22,6 +22,11 @@ keywords = ["pass", "passwd", "password", "pwd"]
 # than matched by a cleverer rule: a regex that tries to tell "ValidPass1!"
 # from a real password gets it wrong in both directions.
 [rules.allowlist]
+# Test against the whole matched line, not just the secret. The i18n-label
+# entry below keys on the property name (`passwordLabel:`), which is not part
+# of the captured secret. gitleaks defaults RegexTarget to the secret; the
+# value-based entries below match as substrings against the line just the same.
+regexTarget = "line"
 regexes = [
   '''ValidPass1!''',
   '''password123''',
@@ -31,6 +36,11 @@ regexes = [
   '''secret123''',
   '''unused-in-config-store''',
   '''ABCDEFGHJKLMNPQRSTUVWXYZ''',
+  # i18n display strings and their test assertions: a key like `passwordLabel`
+  # or `passwordPlaceholder` carries UI text ("Passwort", "Mindestens 8
+  # Zeichen"), never a secret, but still matches the password-shaped-name rule.
+  # Matched on the key name so new labels are covered without a per-string entry.
+  '''(?i)(pass|passwd|password|passphrase|pwd)[a-z]*(label|placeholder)\s*[=:]''',
   # The "how NOT to do it" example in CONTRIBUTING.md. It carries an inline
   # `gitleaks:allow`, but that only clears the commit it appears in - a PR scan
   # walks every commit in the range, so a line that was introduced without the
@@ -47,6 +57,15 @@ paths = [
   '''package-lock\.json$''',
   # Hunspell dictionaries: megabytes of words, entropy heuristics have a field day.
   '''\.(aff|dic)$''',
+  # Removed Vault-Sync module: its tests carried dummy passphrases/passwords
+  # (e2ePassphrase, passwordEncrypted, ...). The code no longer exists in the
+  # tree; the full-history sweep still walks the commits that introduced it.
+  '''backend/src/sync/.*\.test\.ts$''',
+  # Documentation with illustrative-only API tokens ("abc123...def456",
+  # "tokenId": "...", tokenHash placeholders) — prose examples, not real values.
+  '''(^|/)MCP\.md$''',
+  '''(^|/)README\.md$''',
+  '''\.kiro/specs/.*\.md$''',
 ]
 
 regexes = [
