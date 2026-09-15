@@ -36,6 +36,17 @@ regexes = [
   '''secret123''',
   '''unused-in-config-store''',
   '''ABCDEFGHJKLMNPQRSTUVWXYZ''',
+  # Dummy passwords in current frontend test fixtures (change-password and
+  # admin-user-creation flows).
+  '''newpass123''',
+  '''TempPass123''',
+  '''oldpass''',
+  # Screenshot script demo password (history only; the literal is now read from
+  # the SCREENSHOT_PASS env var).
+  '''Slatebase''',
+  # Alphabet for the temporary-password GENERATOR in user/index.ts - a character
+  # set, not a secret. (The uppercase half is already listed above.)
+  '''ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789''',
   # i18n display strings and their test assertions: a key like `passwordLabel`
   # or `passwordPlaceholder` carries UI text ("Passwort", "Mindestens 8
   # Zeichen"), never a secret, but still matches the password-shaped-name rule.
@@ -66,6 +77,10 @@ paths = [
   '''(^|/)MCP\.md$''',
   '''(^|/)README\.md$''',
   '''\.kiro/specs/.*\.md$''',
+  # i18n message catalogs: display text only (`password: 'Passwort'`, button
+  # labels, placeholders). Never secret values. The password-shaped-name rule
+  # matches the plain `password` key, which no *Label/*Placeholder pattern covers.
+  '''frontend/src/i18n/.*\.ts$''',
 ]
 
 regexes = [
