@@ -28,7 +28,7 @@
     "adm-zip": "0.6.0",
     "argon2": "0.45.1",
     "hono": "^4.13.7",
-    "imapflow": "^1.7.8",
+    "imapflow": "^2.0.2",
     "pino": "^10.3.1",
     "postal-mime": "^3.0.0",
     "turndown": "^7.2.1",
