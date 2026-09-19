@@ -25,7 +25,7 @@
     "@hono/node-server": "^2.1.1",
     "@modelcontextprotocol/sdk": "1.30.0",
     "@slatebase/shared-contracts": "file:../shared-contracts",
-    "adm-zip": "0.6.0",
+    "adm-zip": "0.6.1",
     "argon2": "0.45.1",
     "hono": "^4.13.7",
     "imapflow": "^1.7.8",
