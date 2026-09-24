@@ -18,6 +18,13 @@
 import dynamicIconImports from 'lucide-react/dynamicIconImports'
 import { warnOnce } from './log'
 
+// The subset of a Lucide icon node we actually render: each entry is one SVG
+// child element as [tag, string attributes]. Our renderers (fillIconShell /
+// iconNodeToSvgString) only read these two and feed the attributes straight to
+// setAttribute, so string values are exactly what we want. lucide-react's own
+// node type is richer (attributes are Partial<SVGProps> with non-string values
+// like `suppressHydrationWarning`, plus an optional third `children` element),
+// which is why the import below is cast through `unknown` at that one boundary.
 type IconNode = readonly (readonly [string, Record<string, string>])[]
 
 /** Resolved icon data plus the Lucide name it resolved through. */
@@ -27,7 +34,16 @@ export interface ResolvedIcon {
   lucideName: string
 }
 
-const iconImports = dynamicIconImports as Record<string, (() => Promise<{ __iconNode: IconNode }>) | undefined>
+// lucide-react 1.47.0 changed each icon module's exports: the node data moved
+// from a top-level `__iconNode` to `__iconData.node` (`__iconData` also carries
+// name/size). We read whichever is present so a future revert or version skew
+// doesn't silently fall through to the placeholder for every icon.
+interface LucideIconModule {
+  __iconData?: { node: IconNode }
+  __iconNode?: IconNode
+}
+
+const iconImports = dynamicIconImports as unknown as Record<string, (() => Promise<LucideIconModule>) | undefined>
 
 // undefined = never attempted, null = attempted and no such icon
 const nodeCache = new Map<string, ResolvedIcon | null>()
@@ -297,7 +313,7 @@ async function loadLucideIcon(name: string): Promise<IconNode | null> {
   if (!loader) return null
   try {
     const mod = await loader()
-    return mod.__iconNode
+    return mod.__iconData?.node ?? mod.__iconNode ?? null
   } catch {
     return null
   }
