@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.44.6](https://github.com/andreas13xxx/Slatebase/compare/v0.44.5...v0.44.6) (2026-09-24)
+
+
+### Sonstige Änderungen
+
+* bump adm-zip from 0.6.0 to 0.6.1 in /backend ([#195](https://github.com/andreas13xxx/Slatebase/issues/195)) ([2b33360](https://github.com/andreas13xxx/Slatebase/commit/2b333604ed1559504877cc24cb85697c01beb2e0))
+* bump imapflow from 1.7.8 to 2.0.5 in /backend ([#192](https://github.com/andreas13xxx/Slatebase/issues/192)) ([3b99b5e](https://github.com/andreas13xxx/Slatebase/commit/3b99b5ec4d8c52ab8d09323a632f78400b2b81ed))
+* bump the minor-patch group across 1 directory with 21 updates ([#197](https://github.com/andreas13xxx/Slatebase/issues/197)) ([24606d6](https://github.com/andreas13xxx/Slatebase/commit/24606d625ea0cde3f78df792e94c4fb50cd0b576))
+* bump the minor-patch group across 1 directory with 9 updates ([#196](https://github.com/andreas13xxx/Slatebase/issues/196)) ([e07601d](https://github.com/andreas13xxx/Slatebase/commit/e07601d886122a8dc5965198f7a0e887ee76ece1))
+
 ## [0.44.5](https://github.com/andreas13xxx/Slatebase/compare/v0.44.4...v0.44.5) (2026-09-15)
 
 
