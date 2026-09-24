@@ -3,6 +3,15 @@
  * using @react-symbols/icons for known types and Lucide as fallback.
  * Also handles stripping known extensions from display names.
  */
+// This is a utility module, not a component module — its public surface is
+// functions (getFileIcon, getDisplayName, ...), and the internal EXTENSION_ICON_MAP /
+// FILENAME_ICON_MAP objects map string keys to icon components. Since
+// eslint-plugin-react-refresh 0.5.7's `allowCompoundComponents` (on by default in
+// the Vite config) treats any object whose values are components as a compound-
+// component export and demands component-shaped keys, those lowercase-extension
+// maps trip the rule. Fast Refresh does not apply to a module that exports no
+// components, so the rule is a false positive here.
+/* eslint-disable react-refresh/only-export-components */
 import { createElement } from 'react'
 import type { ComponentType, SVGProps } from 'react'
 import {
