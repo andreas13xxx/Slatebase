@@ -21,7 +21,8 @@
   "overrides": {
     "obsidian": {
       "@codemirror/state": "$@codemirror/state",
-      "@codemirror/view": "$@codemirror/view"
+      "@codemirror/view": "$@codemirror/view",
+      "moment": "$moment"
     }
   },
   "dependencies": {
