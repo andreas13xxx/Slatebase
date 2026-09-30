@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.44.7](https://github.com/andreas13xxx/Slatebase/compare/v0.44.6...v0.44.7) (2026-09-30)
+
+
+### Bugfixes
+
+* **deps:** bump moment to 2.31.0 and override obsidian's nested copy ([#204](https://github.com/andreas13xxx/Slatebase/issues/204)) ([d9be8bd](https://github.com/andreas13xxx/Slatebase/commit/d9be8bde424b84ce9c0a0f984cba31d3d1d79550))
+
+
+### Sonstige Änderungen
+
+* bump brace-expansion from 5.0.9 to 5.0.12 in /backend ([#202](https://github.com/andreas13xxx/Slatebase/issues/202)) ([a4b2f64](https://github.com/andreas13xxx/Slatebase/commit/a4b2f641756c4baa05c8df8e380470f5ca3eb840))
+* bump brace-expansion from 5.0.9 to 5.0.12 in /frontend ([#201](https://github.com/andreas13xxx/Slatebase/issues/201)) ([6498f93](https://github.com/andreas13xxx/Slatebase/commit/6498f93ac55533478cf05a883fc137373404881a))
+* bump fast-uri from 3.1.7 to 3.1.8 in /backend ([#203](https://github.com/andreas13xxx/Slatebase/issues/203)) ([98da675](https://github.com/andreas13xxx/Slatebase/commit/98da675eb62a2e645901a720b5934e93e9f12963))
+* bump ip-address from 10.4.0 to 10.7.2 in /backend ([998d7c2](https://github.com/andreas13xxx/Slatebase/commit/998d7c2b5f373b2126b4e5fb241e2b4365a71ea7))
+* bump ip-address from 10.4.0 to 10.7.2 in /backend ([26a53f5](https://github.com/andreas13xxx/Slatebase/commit/26a53f5be6e6827a938df9f21c218855e91be215))
+
 ## [0.44.6](https://github.com/andreas13xxx/Slatebase/compare/v0.44.5...v0.44.6) (2026-09-24)
 
 
