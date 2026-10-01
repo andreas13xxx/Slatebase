@@ -332,4 +332,94 @@ describe('AppShim', () => {
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('plugin-b'));
     });
   });
+  describe('loadLocalStorage / saveLocalStorage', () => {
+    function createApp(): AppShim {
+      return new AppShim({ vault, workspace, metadataCache, pluginId: 'test-plugin' });
+    }
+
+    beforeEach(() => {
+      localStorage.clear();
+    });
+
+    it('round-trips objects as objects (Templater local settings)', () => {
+      const app = createApp();
+      app.saveLocalStorage('templater-local-settings', { enable_system_commands: true });
+
+      expect(app.loadLocalStorage('templater-local-settings')).toEqual({ enable_system_commands: true });
+    });
+
+    it('round-trips booleans and strings', () => {
+      const app = createApp();
+      app.saveLocalStorage('flag', false);
+      app.saveLocalStorage('text', 'hello');
+
+      expect(app.loadLocalStorage('flag')).toBe(false);
+      expect(app.loadLocalStorage('text')).toBe('hello');
+    });
+
+    it('returns null for missing keys and after clearing with null', () => {
+      const app = createApp();
+      expect(app.loadLocalStorage('missing')).toBeNull();
+
+      app.saveLocalStorage('key', 1);
+      app.saveLocalStorage('key', null);
+      expect(app.loadLocalStorage('key')).toBeNull();
+    });
+
+    it('returns legacy non-JSON entries as raw strings', () => {
+      localStorage.setItem('slatebase-vault-TestVault-legacy', 'not json {');
+
+      expect(createApp().loadLocalStorage('legacy')).toBe('not json {');
+    });
+
+    it('keeps the value in memory when localStorage.setItem throws, without throwing', () => {
+      const app = createApp();
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new DOMException('quota', 'QuotaExceededError');
+      });
+
+      expect(() => app.saveLocalStorage('quota-key', { a: 1 })).not.toThrow();
+      expect(app.loadLocalStorage('quota-key')).toEqual({ a: 1 });
+    });
+
+    it('prefers the in-memory value over a stale stored entry after a failed save', () => {
+      const app = createApp();
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      app.saveLocalStorage('stale-key', { v: 1 });
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new DOMException('quota', 'QuotaExceededError');
+      });
+      app.saveLocalStorage('stale-key', { v: 2 });
+
+      expect(app.loadLocalStorage('stale-key')).toEqual({ v: 2 });
+    });
+
+    it('drops the fallback once storage accepts the key again', () => {
+      const app = createApp();
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
+        throw new DOMException('quota', 'QuotaExceededError');
+      });
+      app.saveLocalStorage('recover-key', { v: 1 });
+      app.saveLocalStorage('recover-key', { v: 2 });
+      setItem.mockRestore();
+
+      expect(app.loadLocalStorage('recover-key')).toEqual({ v: 2 });
+      expect(localStorage.getItem('slatebase-vault-TestVault-recover-key')).toBe('{"v":2}');
+    });
+
+    it('does not throw when getItem or removeItem throw', () => {
+      const app = createApp();
+      vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new Error('blocked');
+      });
+      vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+        throw new Error('blocked');
+      });
+
+      expect(app.loadLocalStorage('any')).toBeNull();
+      expect(() => app.saveLocalStorage('any', null)).not.toThrow();
+    });
+  });
 });

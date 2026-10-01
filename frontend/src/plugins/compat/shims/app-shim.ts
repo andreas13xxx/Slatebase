@@ -13,7 +13,7 @@ import { detectPlatform, readPlatformEnvironment } from '../platform-detection';
 import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry';
 import type { Command, ICommandRegistry } from '../command-registry';
 import { scopeForPlugin } from '../plugin-execution-context';
-import { warnNoOp } from '../log';
+import { warnNoOp, warnOnce } from '../log';
 import { Keymap, Scope, SecretStorage } from '../obsidian-api-extensions';
 import { createEmbedRegistryShim } from '../embed-registry';
 
@@ -504,11 +504,36 @@ export class AppShim implements IAppShim {
    * Retrieve value from localStorage for this vault (Obsidian API since 1.8.7).
    * Uses a vault-scoped prefix to isolate per-vault data.
    */
-  loadLocalStorage(key: string): string | null {
+  loadLocalStorage(key: string): unknown {
     const vaultName = this.vault.getName()
     const prefixedKey = `slatebase-vault-${vaultName}-${key}`
-    return localStorage.getItem(prefixedKey)
+    // The fallback holds the newest value for keys localStorage refused to
+    // store, so it must win over a stale entry still sitting in storage.
+    let stored: string | null = this.localStorageFallback.get(prefixedKey) ?? null
+    if (stored === null) {
+      try {
+        stored = localStorage.getItem(prefixedKey)
+      } catch {
+        // storage unavailable — nothing persisted to read
+      }
+    }
+    if (stored === null) return null
+    // Obsidian stores JSON and returns the parsed value (booleans, objects,
+    // ...). Entries written by older Slatebase versions may be raw strings.
+    try {
+      return JSON.parse(stored) as unknown
+    } catch {
+      return stored
+    }
   }
+
+  /**
+   * In-memory values for keys `localStorage` refused to store (quota exceeded,
+   * blocked storage). Keeps the value readable for the rest of the session, so
+   * plugin flows (e.g. Templater's "I understand the risks" confirmation)
+   * don't break — Obsidian's saveLocalStorage never throws either.
+   */
+  private readonly localStorageFallback = new Map<string, string>()
 
   /**
    * Save vault-specific value to localStorage (Obsidian API since 1.8.7).
@@ -518,9 +543,25 @@ export class AppShim implements IAppShim {
     const vaultName = this.vault.getName()
     const prefixedKey = `slatebase-vault-${vaultName}-${key}`
     if (data === null || data === undefined) {
-      localStorage.removeItem(prefixedKey)
-    } else {
-      localStorage.setItem(prefixedKey, typeof data === 'string' ? data : JSON.stringify(data))
+      this.localStorageFallback.delete(prefixedKey)
+      try {
+        localStorage.removeItem(prefixedKey)
+      } catch {
+        // ignore — nothing to clear if storage is unavailable
+      }
+      return
+    }
+    const serialized = JSON.stringify(data)
+    try {
+      localStorage.setItem(prefixedKey, serialized)
+      this.localStorageFallback.delete(prefixedKey)
+    } catch (error) {
+      this.localStorageFallback.set(prefixedKey, serialized)
+      warnOnce(
+        `saveLocalStorage:${prefixedKey}`,
+        `saveLocalStorage("${key}") could not be persisted (browser storage full or blocked); kept in memory for this session.`,
+        error,
+      )
     }
   }
 
