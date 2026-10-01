@@ -22,7 +22,23 @@ import type { GitAuthContext, GitSyncResult } from './types.js'
 import { GitSyncRemoteNotFoundError } from './errors.js'
 
 export const GIT_SYNC_SECRET_MODULE_ID = 'git-sync'
-const REQUIRED_GITIGNORE_LINES = ['.slatebase/', '.obsidian/']
+const GITIGNORE_BLOCK_START = '# >>> slatebase managed (do not edit) >>>'
+const GITIGNORE_BLOCK_END = '# <<< slatebase managed <<<'
+/**
+ * Vault-specific settings (`.slatebase/config.json`, property types, Obsidian config/themes/plugins)
+ * are synced; per-instance data (trash, versions, link-index cache) and per-device state
+ * (workspace layout, plugin `data.json` which may hold tokens) are not. `.slatebase/*` rather than
+ * `.slatebase/` because git cannot re-include a file inside an excluded directory.
+ */
+const MANAGED_GITIGNORE_LINES = [
+  '.slatebase/*',
+  '!.slatebase/config.json',
+  '!.slatebase/property-types.json',
+  '.obsidian/workspace*.json',
+  '.obsidian/plugins/*/data.json',
+]
+/** Lines older versions wrote on their own — superseded by the managed block. */
+const LEGACY_GITIGNORE_LINES = ['.slatebase/', '.obsidian/']
 /** Synthetic actor identity used for realtime events published by the background sync job (no browser session is involved). */
 const GIT_SYNC_ACTOR = { userId: 'system:git-sync', username: 'Git-Sync' }
 
@@ -249,11 +265,34 @@ export class GitSyncEngine implements IGitSyncEngine {
       if (!isNodeError(error) || error.code !== 'ENOENT') throw error
     }
 
-    const missing = REQUIRED_GITIGNORE_LINES.filter((line) => !existingLines.includes(line))
-    if (missing.length === 0) return
+    const next = applyManagedGitignoreBlock(existingLines)
+    if (next === existingLines.join('\n')) return
 
     await mkdir(cwd, { recursive: true })
-    const content = [...existingLines.filter((l) => l.length > 0), ...missing].join('\n') + '\n'
-    await writeFile(gitignorePath, content, 'utf-8')
+    await writeFile(gitignorePath, next, 'utf-8')
   }
+}
+
+/**
+ * Returns the `.gitignore` content with Slatebase's managed block inserted or refreshed.
+ * User lines outside the block are kept; legacy lines from older versions are dropped.
+ * Output is deterministic so every instance converges on identical content.
+ */
+function applyManagedGitignoreBlock(existingLines: string[]): string {
+  const userLines: string[] = []
+  let insideBlock = false
+  for (const raw of existingLines) {
+    const line = raw.replace(/\r$/, '')
+    if (line === GITIGNORE_BLOCK_START) { insideBlock = true; continue }
+    if (insideBlock) {
+      if (line === GITIGNORE_BLOCK_END) insideBlock = false
+      continue
+    }
+    if (LEGACY_GITIGNORE_LINES.includes(line.trim())) continue
+    userLines.push(line)
+  }
+  while (userLines.length > 0 && userLines[userLines.length - 1] === '') userLines.pop()
+
+  const block = [GITIGNORE_BLOCK_START, ...MANAGED_GITIGNORE_LINES, GITIGNORE_BLOCK_END]
+  return [...userLines, ...(userLines.length > 0 ? [''] : []), ...block, ''].join('\n')
 }

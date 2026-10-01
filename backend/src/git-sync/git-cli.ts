@@ -153,7 +153,10 @@ export class GitCli implements IGitCli {
 
   async mergeNoEdit(cwd: string, remoteName: string, branch: string): Promise<'merged' | 'up-to-date' | 'conflict'> {
     try {
-      const { stdout } = await this.run(cwd, ['merge', '--no-edit', `${remoteName}/${branch}`])
+      // --allow-unrelated-histories: a fresh vault gets its own root commit (the
+      // generated .gitignore) before the first fetch, so it shares no history
+      // with an already-populated remote. Overlapping files surface as conflicts.
+      const { stdout } = await this.run(cwd, ['merge', '--no-edit', '--allow-unrelated-histories', `${remoteName}/${branch}`])
       return /already up to date/i.test(stdout) ? 'up-to-date' : 'merged'
     } catch (error) {
       const conflicts = await this.conflictedFiles(cwd)

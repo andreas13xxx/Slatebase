@@ -141,6 +141,27 @@ describe('GitCli', { timeout: 30000 }, () => {
     expect(content).toBe('# Hello')
   })
 
+  it('merges a remote with unrelated history into a fresh local repo', async () => {
+    await cli.init(workDir, 'main')
+    await cli.configureIdentity(workDir)
+    await writeFile(join(workDir, 'note.md'), '# Remote')
+    await cli.commitAll(workDir, 'remote note')
+    await cli.remoteAddOrSetUrl(workDir, 'origin', remoteDir)
+    await cli.push(workDir, 'origin', 'main', DUMMY_AUTH)
+
+    const workDir2 = await mkWorkDir('git-cli-work2-')
+    extraDirs.push(workDir2)
+    await cli.init(workDir2, 'main')
+    await cli.configureIdentity(workDir2)
+    await writeFile(join(workDir2, '.gitignore'), '.slatebase/\n')
+    await cli.commitAll(workDir2, 'local root commit')
+    await cli.remoteAddOrSetUrl(workDir2, 'origin', remoteDir)
+    await cli.fetch(workDir2, 'origin', 'main', DUMMY_AUTH)
+
+    expect(await cli.mergeNoEdit(workDir2, 'origin', 'main')).toBe('merged')
+    expect(await readFile(join(workDir2, 'note.md'), 'utf-8')).toBe('# Remote')
+  })
+
   it('reports up-to-date when nothing new was fetched', async () => {
     await cli.init(workDir, 'main')
     await cli.configureIdentity(workDir)

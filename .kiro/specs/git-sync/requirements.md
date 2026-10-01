@@ -45,7 +45,7 @@ Vaults sollen sich mit einem oder mehreren externen Git-Remotes synchronisieren 
 2. THE Sync_Engine SHALL vor jedem Fetch alle lokalen Änderungen committen (Autor "Slatebase Sync <sync@slatebase.local>")
 3. WHEN der Fetch fehlschlägt (z.B. leerer/neuer Remote ohne Branch), THE Sync_Engine SHALL den Merge-Schritt überspringen und direkt pushen
 4. WHEN der Merge ohne Konflikt gelingt, THE Sync_Engine SHALL anschließend pushen
-5. THE Sync_Engine SHALL `.slatebase/` und `.obsidian/` automatisch zur `.gitignore` des Vaults hinzufügen, falls nicht vorhanden
+5. THE Sync_Engine SHALL einen verwalteten Block in der `.gitignore` des Vaults pflegen (anlegen bzw. aktualisieren), der instanz- und geräte-spezifische Daten ausschließt (`.slatebase/` außer `config.json` und `property-types.json`, `.obsidian/workspace*.json`, `.obsidian/plugins/*/data.json`); vault-spezifische Einstellungen werden synchronisiert. Ältere Zeilen `.slatebase/` und `.obsidian/` werden dabei entfernt
 
 ### Requirement 4: Konfliktbehandlung
 

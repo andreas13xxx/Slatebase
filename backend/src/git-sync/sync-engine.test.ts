@@ -120,11 +120,48 @@ describe('GitSyncEngine', () => {
     ])
 
     const gitignore = await readFile(join(vaultPath, '.gitignore'), 'utf-8')
-    expect(gitignore).toContain('.slatebase/')
-    expect(gitignore).toContain('.obsidian/')
+    expect(gitignore).toContain('.slatebase/*')
+    expect(gitignore).toContain('!.slatebase/config.json')
+    expect(gitignore).toContain('.obsidian/workspace*.json')
+    expect(gitignore).not.toMatch(/^\.obsidian\/$/m)
 
     expect(recordedStatuses).toHaveLength(1)
     expect(recordedStatuses[0]).toMatchObject({ remoteId: 'remote-1', lastResult: 'success' })
+  })
+
+  describe('.gitignore migration', () => {
+    const readGitignore = () => readFile(join(vaultPath, '.gitignore'), 'utf-8')
+
+    it('replaces legacy lines with the managed block and keeps user lines', async () => {
+      await writeFile(join(vaultPath, '.gitignore'), '*.tmp\n.slatebase/\n.obsidian/\nprivate/\n')
+
+      await engine.runOne('vault-1', 'remote-1')
+
+      const content = await readGitignore()
+      expect(content).not.toMatch(/^\.slatebase\/$/m)
+      expect(content).not.toMatch(/^\.obsidian\/$/m)
+      expect(content).toContain('*.tmp\nprivate/\n')
+      expect(content).toContain('# >>> slatebase managed')
+    })
+
+    it('is idempotent and refreshes a stale managed block', async () => {
+      await engine.runOne('vault-1', 'remote-1')
+      const first = await readGitignore()
+      await engine.runOne('vault-1', 'remote-1')
+      expect(await readGitignore()).toBe(first)
+
+      await writeFile(join(vaultPath, '.gitignore'), first.replace('!.slatebase/config.json\n', ''))
+      await engine.runOne('vault-1', 'remote-1')
+      expect(await readGitignore()).toBe(first)
+    })
+
+    it('handles CRLF files', async () => {
+      await writeFile(join(vaultPath, '.gitignore'), 'mine/\r\n.slatebase/\r\n')
+      await engine.runOne('vault-1', 'remote-1')
+      const content = await readGitignore()
+      expect(content).toContain('mine/\n')
+      expect(content).not.toMatch(/^\.slatebase\/$/m)
+    })
   })
 
   it('reports how many files were pulled from the merge and pushed from the local commit', async () => {
