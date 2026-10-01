@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.44.8](https://github.com/andreas13xxx/Slatebase/compare/v0.44.7...v0.44.8) (2026-10-01)
+
+
+### Bugfixes
+
+* **git-sync:** merge unrelated histories and sync vault settings via managed .gitignore block ([aa605fe](https://github.com/andreas13xxx/Slatebase/commit/aa605fedce8c4f09c8b2a2faab585b1a31002dff))
+* **plugins:** make loadLocalStorage/saveLocalStorage JSON-symmetric with in-memory fallback ([ae9ded8](https://github.com/andreas13xxx/Slatebase/commit/ae9ded8fea62c3eee6150c64b54002c7ff30b403))
+
+
+### Sonstige Änderungen
+
+* bump postal-mime from 3.0.0 to 4.0.0 in /backend ([#206](https://github.com/andreas13xxx/Slatebase/issues/206)) ([f446deb](https://github.com/andreas13xxx/Slatebase/commit/f446debe1e6f37b09a9e29a4774a41162dbfc7f7))
+* bump the minor-patch group in /backend with 8 updates ([#205](https://github.com/andreas13xxx/Slatebase/issues/205)) ([6384d31](https://github.com/andreas13xxx/Slatebase/commit/6384d31029407e5f7a6735f6e3139a80d7cdbcfe))
+* bump the minor-patch group in /frontend with 12 updates ([#207](https://github.com/andreas13xxx/Slatebase/issues/207)) ([605d9d1](https://github.com/andreas13xxx/Slatebase/commit/605d9d15c5e223b97c1e0ae537db53448c096c81))
+
 ## [0.44.7](https://github.com/andreas13xxx/Slatebase/compare/v0.44.6...v0.44.7) (2026-09-30)
 
 
