@@ -17,7 +17,7 @@ Specs gebündelt statt einzeln spezifiziert.
 | 3 | Responsive/Mobile | F/G | ~24–34h | Vollständig (Req + Design + Tasks) |
 | 4 | Echte E2E-Test-Suite | F | ~30–45h | Req + Design vollständig |
 | 5 | Workspaces & Split-Panes | G | ~60–90h | Keine Spec — Nutzerwunsch |
-| 6 | Bases | H | ~55–75h | Keine Spec — Nutzerwunsch |
+| 6 | Bases | H | ~55–75h | Spec: `.kiro/specs/bases/` — Phasen 1–7 umgesetzt |
 | 7 | Server-Side Plugins | B | ~48–68h | Tasks vorhanden |
 | 8 | Fremdformat-Importer | I | ~20–30h | Keine Spec |
 | 9 | Semantische Suche / AI-Embeddings | E | ~38–58h | Keine Spec |
@@ -122,7 +122,12 @@ Plugin-Sidebar-Views, Canvas-/Graph-Fullscreen) einplanen.
 
 ## Prio 6 — Bases (Track H)
 
-Scope: ~55–75h. Keine Spec. **Nutzerwunsch.**
+Scope: ~55–75h. **Spec:** `.kiro/specs/bases/` (Nutzerwunsch). **Stand:** Phasen 1–7
+umgesetzt (`.base`-Parser/Serializer, Query-Engine auf dem Link-Index, Formel-Interpreter,
+editierbare Tabellen-View, Tab-Integration, Feature-Toggle `bases` kalt/default-aus,
+Welcome-Vault-Guides DE/EN). Offen: Phase 8 (restliche Steering-Doku), Karten-/Board-Views,
+die volle Obsidian-Formelsprache und die Freigabe an fremde Plugins (eigene Spec:
+`.kiro/specs/bases-plugin-api/`, siehe Bases-Spec „Out of Scope").
 
 - `.base`-Dateiformat lesen/schreiben (YAML: Filter, Views, Formeln) — kompatibel zu
   Obsidians Format, damit importierte Vaults funktionieren

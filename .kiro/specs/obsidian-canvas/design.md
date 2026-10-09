@@ -35,8 +35,8 @@ Obsidian Canvas Support für Slatebase. Liest, rendert und bearbeitet `.canvas`-
 ### Komponenten
 
 1. **CanvasParser** (`frontend/src/canvas/parser.ts`)
-   - Zod-Schema-Validierung des Canvas-JSON
-   - Forward-compatible: unbekannte Felder werden durchgereicht (passthrough)
+   - Manuelle Schema-Validierung des Canvas-JSON (bewusst kein Zod — siehe `lessons-learned.md`, „Dateiformat-Parser: manuelle Validierung statt Zod")
+   - Forward-compatible: unbekannte Felder werden durchgereicht (passthrough) und beim Serialisieren wieder zurückgeschrieben
    - Erzeugt typsichere `CanvasDocument`-Struktur
 
 2. **CanvasSerializer** (`frontend/src/canvas/serializer.ts`)

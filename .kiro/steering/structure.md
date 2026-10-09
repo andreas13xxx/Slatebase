@@ -85,6 +85,8 @@ src/
 │   ├── propertyTypeRoutes.test.ts — Integration tests for property-type routes
 │   ├── propertyRoutes.ts    — Property metadata routes (GET /vaults/:vaultId/properties, GET /properties/:key/values, POST /properties/query)
 │   ├── propertyRoutes.test.ts — Integration tests for property metadata routes
+│   ├── basesRoutes.ts       — Bases query route (POST /vaults/:vaultId/bases/query — translates a parsed `.base`'s filter/sort/column spec into `LinkIndexService.queryForBase`; feature-gated `bases`, vault auth via shared middleware). A `.base` file itself is a normal vault file read/written through the regular file endpoints — this is the only Bases-specific backend code
+│   ├── basesRoutes.test.ts  — Integration tests for the Bases query route
 │   ├── pluginStoreRoutes.ts — Community plugin store routes (browse, install, update; per-vault and global mounts)
 │   └── sseRoutes.ts      — GET /events (SSE stream)
 ├── chat/
@@ -318,6 +320,20 @@ src/
 │   ├── canvasToMarkdown.ts — Linearizes a canvas document into flat Markdown (reading order top-to-bottom/left-to-right, edges dropped); backs `canvas:convert-to-file`
 │   ├── canvasToMarkdown.test.ts — Unit tests for canvasToMarkdown
 │   └── parser.test.ts    — Unit tests for parser/serializer round-trip
+├── bases/                — Obsidian-compatible `.base` files (Bases feature, toggle `bases`, cold/default-off). Frontend-only parser/engine; the backend contributes only the query route (`api/basesRoutes.ts` → `LinkIndexService.queryForBase`).
+│   ├── index.ts          — Barrel export (types, parser, serializer, query-engine, formula API)
+│   ├── types.ts          — `BaseDocument`, `BaseFilterNode` (AND/OR tree), `BaseFormulas`, `BaseView`, `BaseRow`, plus the query wire types (`BaseQuerySpecWire`/`BaseQueryResultWire`) shared with the ApiClient
+│   ├── parser.ts         — `parseBase(yaml)` — manual validation + `_unknown` passthrough (Canvas-parser pattern, deliberately not Zod — see lessons-learned.md)
+│   ├── serializer.ts     — `serializeBase(doc)` — stable key order, round-trip-safe
+│   ├── parser.test.ts    — Round-trip, error cases, passthrough
+│   ├── query-engine.ts   — `buildQuerySpec(doc, view)` (drops formula columns, keeps `file.*`) + `runBaseQuery()` (calls the backend query route, maps to `BaseRow[]`)
+│   ├── query-engine.test.ts — Unit tests for buildQuerySpec
+│   └── formula/          — Formula interpreter — NO `eval` (own tokenizer → Pratt parser → tree evaluator), CSP-safe
+│       ├── tokenizer.ts  — Expression tokenizer
+│       ├── parser.ts     — Pratt parser → AST
+│       ├── evaluator.ts  — `evaluateFormula(src, ctx)` (never throws: error/empty value instead) + `formatFormulaValue()`
+│       ├── functions.ts  — The limited built-in set (`if`, `concat`, `now`/`today`, `date`, `days`, `length`) — NOT the full Obsidian formula language
+│       └── evaluator.test.ts — Tokenizer/parser/evaluator/function tests incl. error paths
 ├── editor/
 │   ├── types.ts              — Editor mode types, LivePreviewConfig, EditorMode ('source' | 'live-preview')
 │   ├── theme.ts              — CodeMirror theme (Design Tokens mapping, Dark/Light mode)
@@ -645,6 +661,14 @@ src/
 │   │   ├── useViewportCulling.ts — Viewport culling for off-screen nodes
 │   │   ├── canvas-utils.ts       — generateCanvasId, getCanvasColorClass
 │   │   └── markdown-render.tsx   — renderSimpleMarkdown for node previews
+│   ├── bases/                    — Bases table UI (feature `bases`); routed from `TabContent.tsx` for `.base` files
+│   │   ├── BasesView.tsx         — Container: parse → query → render table / raw-source toggle, error state, `vault:change` live-refresh, cell-commit (frontmatter save), sort write-back
+│   │   ├── BasesTableView.tsx    — Sortable table: one row per note, property cells editable, formula columns evaluated client-side (read-only)
+│   │   ├── BaseCell.tsx          — One cell: formula/`file.*` read-only, property editable via the Properties-editor controls (`useCommitOnUnmount` semantics inherited)
+│   │   ├── base-cell-type.ts     — `inferCellType()` + `BaseCellType` (kept out of the component files for the react-refresh single-export rule)
+│   │   ├── BasesSourceView.tsx   — Raw `.base` YAML editor (CanvasSourceView pattern)
+│   │   ├── BasesView.css         — Styles (Design Tokens)
+│   │   └── BasesTableView.test.tsx — Rendering, formula eval, sort toggle, note-open, empty state
 │   ├── context-panel/            — Built-in Outline/Links/Tags/Properties view components only; layout and orchestration live in `side-panel/SidePanel.tsx`, since every built-in view can sit on either side panel
 │   │   ├── OutlineView.tsx       — Document heading hierarchy (navigable)
 │   │   ├── OutlineView.test.tsx

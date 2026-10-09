@@ -375,13 +375,23 @@ Aus dem Härten gegen echte Community-Plugin-Bundles statt gegen die API-Doku.
 
 ## Obsidian Canvas
 
-- Parser/Serializer Frontend-only. Zod + Passthrough (Forward-Compat, Round-Trip).
+- Parser/Serializer Frontend-only. Manuelle Validierung + `_unknown`-Passthrough (Forward-Compat, Round-Trip) — bewusst KEIN Zod, siehe „Dateiformat-Parser: manuelle Validierung statt Zod" unten.
 - `.canvas-node { user-select: none }` — Formularfelder brauchen explizit `user-select: text`
 - Wheel-Handler: `target.closest('.canvas-node')` → abort (Node scrollt statt zu zoomen)
 - Kontextmenü: Capture-Phase + `window blur` (cross-origin iframes)
 - Editor-Fokus: `requestAnimationFrame` nach Kontextmenü-Entry
 - File-Node: Zwei Aktionen (Inhalt bearbeiten vs. Pfad ändern) — nie verwechseln
 - Link-Nodes: min 300×220, iframe nur wenn selektiert `pointer-events: auto`
+
+## Dateiformat-Parser: manuelle Validierung statt Zod
+
+Gilt für die Frontend-Parser Obsidian-kompatibler Dateiformate — `canvas/parser.ts` und `bases/parser.ts`. Beide validieren von Hand (`isObject`/`isString`-Guards + `extractUnknown()`), **nicht** mit Zod, obwohl Zod sonst die Projekt-Konvention für Validierung ist. Das ist eine bewusste Entscheidung, kein Versehen — die Gründe:
+
+- **Zod ist die Konvention für den Backend-Controller-Layer** (Request-Body-Validierung, Verwerfen bei Fehler). Ein Dateiformat-Parser hat das gegenteilige Ziel: nichts verwerfen, alles erhalten, round-trip-fest. Zwei verschiedene Jobs — derselbe Hammer passt nicht auf beide.
+- **Forward-Compat verlangt, unbekannte Felder zu BEWAHREN, nicht nur durchzulassen.** `.canvas`/`.base` sollen Obsidian-Felder, die unsere Version noch nicht kennt, beim Lesen behalten und beim Serialisieren wieder zurückschreiben (`_unknown`). Zods `.passthrough()` lässt sie zwar durch die Validierung, aber einsammeln und beim Schreiben wieder zusammenführen muss man trotzdem von Hand — der Zod-Teil spart dann kaum noch Code und verdeckt, dass die eigentliche Arbeit das Passthrough-Handling ist.
+- **Teilerfolg mit pfadgenauen Fehlern.** Der Parser sammelt Fehler mit Pfad (`nodes[2].text`, `views[0].sort[1].direction`) und parst den Rest trotzdem weiter — eine kaputte Node/Zeile macht nicht die ganze Datei ungültig. Nicht-fatale Fehler kommen als `errors`-Liste neben einem erfolgreichen `document` zurück; nur unparsebares JSON/YAML oder ein Nicht-Objekt-Root scheitert hart. Zods „alles-oder-Issue-Liste" ist dafür umständlicher.
+- **Konsistenz zwischen Nachbarmodulen schlägt Spec-Wortlaut.** Die Canvas-Spec forderte ursprünglich „Zod", der Code wich dann (unkommentiert) auf manuelle Validierung aus — ein stiller Drift. Bei Bases wurde dieselbe Entscheidung bewusst getroffen und beide Specs (`obsidian-canvas`, `bases`) nachgezogen. Merkregel: Für einen NEUEN Frontend-Dateiformat-Parser den Canvas/Bases-Weg kopieren, nicht Zod — und wenn Spec und Code auseinanderlaufen, zuerst prüfen, ob der Code recht hat und die Spec nachgezogen gehört.
+- **Abgrenzung:** Das betrifft NUR die Dateiformat-Parser. Die Bases-**Backend-Query-Route** (`basesRoutes.ts`) bleibt Zod-validiert — sie ist ein Controller-Request, kein Dateiformat.
 
 ## Editor-Toolbar → Plugin-Ökosystem
 
