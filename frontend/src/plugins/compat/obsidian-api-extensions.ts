@@ -94,18 +94,20 @@ import { InputSuggestPopover } from './input-suggest-popover';
  *   addSearch()/SettingGroup.addSearch() (setting-tab.ts); displayValue/status
  *   on declarative-settings SettingDefinitionPage rows
  *   (declarative-settings-renderer.ts)
+ * - Bases plugin API (database/formula-query views, 1.10.0/1.10.2): now
+ *   functionally implemented. `Plugin.registerBasesView()` stores the
+ *   registration (bases-view-registry.ts), the Value hierarchy has real
+ *   toString/isTruthy/equals/renderTo per type (bases-values.ts), and a
+ *   plugin-registered view type is mounted and fed real query data via the
+ *   existing Bases query route + formula interpreter (bases-query-controller.ts,
+ *   BasesPluginViewHost.tsx). `compatibility-analyzer.ts` now classifies a
+ *   Bases-only plugin as supported.
  *
- * Two areas from this range are deliberately typed but NOT functionally
- * implemented — real, non-crashing no-ops, not silent gaps:
- * - Bases (database/formula-query views, 1.10.0/1.10.2): no formula engine,
- *   no `.base` file rendering. `Plugin.registerBasesView()` stores the
- *   registration and warns; the ~20 Bases/Value classes exist only so a
- *   plugin referencing them at module-eval time doesn't crash
- *   (install-globals.ts). `compatibility-analyzer.ts` flags any plugin that
- *   references them as 'partial' rather than silently 'full'.
+ * One area from this range is deliberately typed but NOT functionally
+ * implemented — a real, non-crashing no-op, not a silent gap:
  * - Desktop CLI (`registerCliHandler`, 1.12.2): no CLI exists in a web app
  *   for a handler to attach to; the call warns and is a no-op
- *   (install-globals.ts), also flagged 'partial' by the analyzer.
+ *   (install-globals.ts), flagged 'partial' by the analyzer.
  */
 export const OBSIDIAN_API_VERSION = '1.13.2';
 

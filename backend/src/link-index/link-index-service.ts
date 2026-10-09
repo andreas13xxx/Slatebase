@@ -11,11 +11,12 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
-import type { ILinkIndex, GraphData, GraphNode, GraphEdge, GraphQueryOptions, GraphMeta } from './types.js'
+import type { ILinkIndex, GraphData, GraphNode, GraphEdge, GraphQueryOptions, GraphMeta, BaseQuerySpec, BaseQueryNode, BaseQueryCondition, BaseQueryRow, BaseQueryResult, BaseQueryOperator } from './types.js'
 import { extractWikilinks } from './wikilink-parser.js'
 import { extractTags } from './tag-extractor.js'
 import { extractProperties } from './property-extractor.js'
 import { extractCanvasFileRefs } from './canvas-parser.js'
+import { globMatch } from '../search/glob-match.js'
 
 /** JSON schema v1 for backward compatibility. */
 interface LinkIndexJsonV1 {
@@ -618,6 +619,243 @@ export class LinkIndexService implements ILinkIndex {
 
     const result = Array.from(candidateSet)
     return result.length > MAX_RESULTS ? result.slice(0, MAX_RESULTS) : result
+  }
+
+  /**
+   * Runs a Bases query: evaluates a nested AND/OR filter tree over properties,
+   * tags, path globs and file metadata; sorts; and returns matching notes with
+   * the raw values of the requested columns. File-metadata (ctime/mtime) is
+   * read from disk only for the notes that reach the sort/return stage.
+   */
+  async queryForBase(spec: BaseQuerySpec): Promise<BaseQueryResult> {
+    const MAX_ROWS = 1000
+    const limit = spec.limit !== undefined ? Math.min(Math.max(1, spec.limit), MAX_ROWS) : MAX_ROWS
+
+    // Candidate universe: every real note the index has parsed (link sources,
+    // tagged files, files with properties). Backlink *targets* are excluded —
+    // they can be broken wikilinks that point at nonexistent files.
+    const candidates = new Set<string>([
+      ...this.forwardLinks.keys(),
+      ...this.fileTags.keys(),
+      ...this.fileProperties.keys(),
+    ])
+
+    // Whether any sort/column needs file stats — avoids a stat() per note otherwise.
+    const needsStat =
+      (spec.sort ?? []).some((s) => s.column === 'file.ctime' || s.column === 'file.mtime') ||
+      this.baseFilterTouchesFileTime(spec.filters)
+
+    const rows: BaseQueryRow[] = []
+    for (const filePath of candidates) {
+      if (spec.filters && !(await this.evaluateBaseNode(spec.filters, filePath, needsStat))) {
+        continue
+      }
+      rows.push(await this.buildBaseRow(filePath, spec.columns, needsStat))
+    }
+
+    const total = rows.length
+    this.sortBaseRows(rows, spec.sort ?? [])
+    return { rows: rows.slice(0, limit), total }
+  }
+
+  /** Whether a filter tree contains any file ctime/mtime condition. */
+  private baseFilterTouchesFileTime(node: BaseQueryNode | undefined): boolean {
+    if (!node) return false
+    if ('and' in node) return node.and.some((n) => this.baseFilterTouchesFileTime(n))
+    if ('or' in node) return node.or.some((n) => this.baseFilterTouchesFileTime(n))
+    return node.file === 'ctime' || node.file === 'mtime'
+  }
+
+  /** Recursively evaluates a Bases filter node against one file. */
+  private async evaluateBaseNode(node: BaseQueryNode, filePath: string, needsStat: boolean): Promise<boolean> {
+    if ('and' in node) {
+      for (const child of node.and) {
+        if (!(await this.evaluateBaseNode(child, filePath, needsStat))) return false
+      }
+      return true
+    }
+    if ('or' in node) {
+      for (const child of node.or) {
+        if (await this.evaluateBaseNode(child, filePath, needsStat)) return true
+      }
+      return false
+    }
+    const matched = await this.evaluateBaseCondition(node, filePath)
+    return node.not ? !matched : matched
+  }
+
+  /** Evaluates a single leaf condition against one file. */
+  private async evaluateBaseCondition(cond: BaseQueryCondition, filePath: string): Promise<boolean> {
+    if (cond.tag !== undefined) {
+      const tags = this.fileTags.get(filePath)
+      const has = tags ? tags.has(cond.tag) : false
+      // Default operator for a tag is presence; `op: 'empty'` means "not present".
+      return cond.op === 'empty' ? !has : has
+    }
+
+    if (cond.path !== undefined) {
+      return globMatch(filePath, cond.path)
+    }
+
+    if (cond.file !== undefined) {
+      let fieldValue: string | number
+      if (cond.file === 'name') {
+        fieldValue = this.extractLabel(filePath)
+      } else {
+        const stat = await this.statFile(filePath)
+        if (!stat) return cond.op === 'empty'
+        fieldValue = cond.file === 'ctime' ? stat.ctime : stat.mtime
+      }
+      return this.compareScalar(fieldValue, cond.op ?? 'eq', cond.value)
+    }
+
+    if (cond.property !== undefined) {
+      const propsMap = this.fileProperties.get(filePath)
+      const values = propsMap?.get(cond.property) ?? propsMap?.get(cond.property.toLowerCase()) ?? []
+      return this.compareProperty(values, cond.op ?? 'eq', cond.value)
+    }
+
+    return false
+  }
+
+  /** Compares a property's value list against an operator + comparison value. */
+  private compareProperty(values: string[], op: BaseQueryOperator, value: string | number | boolean | undefined): boolean {
+    switch (op) {
+      case 'exists':
+        return values.length > 0
+      case 'empty':
+        return values.length === 0
+      case 'contains':
+        if (value === undefined) return false
+        return values.some((v) => v.toLowerCase().includes(String(value).toLowerCase()))
+      case 'eq':
+        if (value === undefined) return false
+        return values.some((v) => v.toLowerCase() === String(value).toLowerCase())
+      case 'neq':
+        if (value === undefined) return values.length > 0
+        return !values.some((v) => v.toLowerCase() === String(value).toLowerCase())
+      case 'lt':
+      case 'lte':
+      case 'gt':
+      case 'gte':
+        return values.some((v) => this.compareScalar(v, op, value))
+      default:
+        return false
+    }
+  }
+
+  /** Compares a scalar (string/number) against an operator + comparison value. */
+  private compareScalar(field: string | number, op: BaseQueryOperator, value: string | number | boolean | undefined): boolean {
+    if (op === 'exists') return true
+    if (op === 'empty') return field === '' || field === undefined
+    if (value === undefined) return false
+
+    // Numeric comparison when both sides parse as numbers; otherwise string/date compare.
+    const fieldNum = typeof field === 'number' ? field : Number(field)
+    const valueNum = typeof value === 'number' ? value : Number(value)
+    const bothNumeric = !Number.isNaN(fieldNum) && !Number.isNaN(valueNum)
+
+    let cmp: number
+    if (bothNumeric) {
+      cmp = fieldNum - valueNum
+    } else {
+      cmp = String(field).toLowerCase().localeCompare(String(value).toLowerCase())
+    }
+
+    switch (op) {
+      case 'eq':
+        return cmp === 0
+      case 'neq':
+        return cmp !== 0
+      case 'contains':
+        return String(field).toLowerCase().includes(String(value).toLowerCase())
+      case 'lt':
+        return cmp < 0
+      case 'lte':
+        return cmp <= 0
+      case 'gt':
+        return cmp > 0
+      case 'gte':
+        return cmp >= 0
+      default:
+        return false
+    }
+  }
+
+  /** Builds a result row with the requested column values and (optionally) file times. */
+  private async buildBaseRow(filePath: string, columns: string[], needsStat: boolean): Promise<BaseQueryRow> {
+    const propsMap = this.fileProperties.get(filePath)
+    const values: Record<string, string[]> = {}
+    for (const col of columns) {
+      if (col.startsWith('file.')) continue
+      const v = propsMap?.get(col) ?? propsMap?.get(col.toLowerCase())
+      if (v) values[col] = v
+    }
+
+    const row: BaseQueryRow = {
+      path: filePath,
+      fileName: this.extractLabel(filePath),
+      values,
+    }
+
+    if (needsStat) {
+      const stat = await this.statFile(filePath)
+      if (stat) {
+        row.ctime = stat.ctime
+        row.mtime = stat.mtime
+      }
+    }
+
+    return row
+  }
+
+  /** Reads a file's ctime/mtime from disk; returns undefined when unreadable. */
+  private async statFile(filePath: string): Promise<{ ctime: number; mtime: number } | undefined> {
+    try {
+      const abs = path.join(this.vaultPath, filePath)
+      const stat = await fs.stat(abs)
+      const birth = stat.birthtimeMs > 0 ? stat.birthtimeMs : stat.mtimeMs
+      return { ctime: birth, mtime: stat.mtimeMs }
+    } catch {
+      return undefined
+    }
+  }
+
+  /** Sorts rows in place by the given clauses, stable on ties (path tiebreak). */
+  private sortBaseRows(rows: BaseQueryRow[], sort: BaseQuerySpec['sort']): void {
+    const clauses = sort ?? []
+    rows.sort((a, b) => {
+      for (const clause of clauses) {
+        const dir = clause.direction === 'desc' ? -1 : 1
+        const cmp = this.compareRowColumn(a, b, clause.column)
+        if (cmp !== 0) return cmp * dir
+      }
+      // Deterministic tiebreak so equal rows keep a stable order.
+      return a.path.localeCompare(b.path)
+    })
+  }
+
+  /** Compares two rows by one column (property or file.* field). */
+  private compareRowColumn(a: BaseQueryRow, b: BaseQueryRow, column: string): number {
+    const av = this.rowColumnValue(a, column)
+    const bv = this.rowColumnValue(b, column)
+    if (av === undefined && bv === undefined) return 0
+    if (av === undefined) return 1
+    if (bv === undefined) return -1
+
+    const an = typeof av === 'number' ? av : Number(av)
+    const bn = typeof bv === 'number' ? bv : Number(bv)
+    if (!Number.isNaN(an) && !Number.isNaN(bn)) return an - bn
+    return String(av).toLowerCase().localeCompare(String(bv).toLowerCase())
+  }
+
+  /** Resolves a column id to a comparable scalar for one row. */
+  private rowColumnValue(row: BaseQueryRow, column: string): string | number | undefined {
+    if (column === 'file.name') return row.fileName
+    if (column === 'file.ctime') return row.ctime
+    if (column === 'file.mtime') return row.mtime
+    const values = row.values[column]
+    return values && values.length > 0 ? values[0] : undefined
   }
 
   /**

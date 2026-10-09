@@ -29,6 +29,7 @@ Obsidian-compatible vaults — no database, no sync service, no desktop app requ
 - Knowledge Graph (d3-force SVG, zoom/pan/drag/search, configurable colors/layout, tag + property nodes) plus a per-note Local Graph filtered to a configurable N-hop neighborhood
 - Context Panel (Outline, Links incl. Unlinked Mentions with one-click linking, Tags, Properties — splittable, DnD)
 - Properties editor: typed frontmatter editing (text/number/date/datetime/checkbox/list/tags) with type inference and a per-vault Property-Type-Registry
+- Bases ⚠️ experimental (feature toggle `bases`, cold/default-off): Obsidian-compatible `.base` files as a filterable, sortable, editable table over the vault's metadata — AND/OR filters on properties/tags/path/file-metadata, read-only formula columns (own CSP-safe interpreter, not the full Obsidian formula language), inline cell editing writing back to each note's frontmatter, raw-YAML source view. Third-party plugins can contribute their own Bases view types via `Plugin.registerBasesView()` (the Bases plugin API is functional — the plugin's view is mounted and fed the same query data as the built-in table). Cards/board and the full formula language are later stages
 - Sidebar Panel (Recent Files + Bookmarks views, splittable, tabbed)
 - Bookmarks for files, headings, blocks and saved searches — drag-and-drop reordering, context menu, custom labels
 - Navigation history (back/forward with Alt+←/→), Quick Switcher (Ctrl+O), tab cycling (Ctrl+Shift+]/[), breadcrumb bar, File Explorer "follow active file"
@@ -62,7 +63,7 @@ Obsidian-compatible vaults — no database, no sync service, no desktop app requ
 - Workspace state persistence (open tabs, expanded folders, panel sizes/visibility, active page; per-vault tab memory on vault switch)
 
 ### Platform
-- Feature toggles (hot/cold, env overlay, API + admin UI). Registered: `obsidian-plugin-compat`, `chat`, `mcp`, `git-sync`, `mail-import`, `voice-transcription` — see `featureRegistry.register()` in `backend/src/index.ts`
+- Feature toggles (hot/cold, env overlay, API + admin UI). Registered: `obsidian-plugin-compat`, `chat`, `mcp`, `git-sync`, `mail-import`, `voice-transcription`, `bases` — see `featureRegistry.register()` in `backend/src/index.ts`
 - Welcome Vault (tutorial vault with 70+ guides DE/EN, screenshots, exercises, templates incl. Templater examples; on-demand creation via API, Settings and Command Palette)
 - Security hardening (OWASP Top 10 audit, full CSP, HSTS, path-traversal defense in depth, Zod validation on every route module, npm audit in CI) — see `SECURITY-AUDIT.md`
 - Accessibility (WCAG 2.1 AA, partial: axe-core in CI, jsx-a11y lint, focus traps, skip link, keyboard-operable splitters/canvas/status bar) — see `ACCESSIBILITY-AUDIT.md`
@@ -71,8 +72,10 @@ Obsidian-compatible vaults — no database, no sync service, no desktop app requ
 ## Planned
 
 See `.kiro/specs/implementation-plan.md` for the prioritized roadmap: Obsidian Themes,
-Public Sharing, Responsive/Mobile, Workspaces & Split-Panes, Bases, Server-Side Plugins,
-foreign-format importer, semantic search, collaborative editing, E2E test suite.
+Public Sharing, Responsive/Mobile, Workspaces & Split-Panes, Server-Side Plugins,
+foreign-format importer, semantic search, collaborative editing, E2E test suite. Bases
+later stages (plugin-contributed views via `registerBasesView()`, card/board views, the
+full formula language) are tracked in `.kiro/specs/bases-plugin-api/` and the Bases spec.
 
 ## Language Convention
 

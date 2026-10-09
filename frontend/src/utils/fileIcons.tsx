@@ -43,6 +43,7 @@ import {
   Presentation,
   ScrollText,
   StickyNote,
+  Table2,
   File,
   type LucideIcon,
 } from 'lucide-react'
@@ -80,6 +81,8 @@ const KNOWN_EXTENSIONS = new Set([
   'log', 'lock', 'map', 'wasm', 'dll', 'so', 'dylib', 'exe',
   // Canvas
   'canvas',
+  // Bases
+  'base',
 ])
 
 /** Extension to icon mapping. Uses @react-symbols/icons where available. */
@@ -248,6 +251,8 @@ const EXTENSION_ICON_MAP: Record<string, IconComponent> = {
   diff: Patch,
   // Canvas
   canvas: LayoutDashboard,
+  // Bases (database-table view)
+  base: Table2,
 }
 
 /** Filename-based icon mapping for special config files. */

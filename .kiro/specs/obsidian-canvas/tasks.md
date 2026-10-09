@@ -12,9 +12,9 @@ Implementierung der Obsidian-Canvas-Unterstützung für Slatebase. Umfasst Parsi
     - Include `_unknown` passthrough fields for forward compatibility
     - _Requirements: 2.1, 2.2, 2.3_
 
-  - [x] 1.2 Implement canvas parser with Zod validation
+  - [x] 1.2 Implement canvas parser with manual validation (deliberately not Zod — see `lessons-learned.md`)
     - Create `frontend/src/canvas/parser.ts`
-    - Zod schemas for all node types and edges (passthrough for unknown fields)
+    - Manual field validation for all node types and edges, with `_unknown` passthrough for unknown fields
     - `parseCanvas(json: string): CanvasParseResult` — validate, return typed document or errors
     - Validate node ID uniqueness, edge references against existing node IDs
     - Handle malformed JSON gracefully (try/catch around JSON.parse)

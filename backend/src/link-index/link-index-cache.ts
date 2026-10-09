@@ -28,6 +28,8 @@ import type {
   GraphMeta,
   GraphQueryOptions,
   PropertyFilter,
+  BaseQuerySpec,
+  BaseQueryResult,
 } from './types.js'
 
 /** Default cap on simultaneously loaded vault indexes; override via `SLATEBASE_LINK_INDEX_MAX_LOADED`. */
@@ -136,6 +138,12 @@ class PinningLinkIndex implements ILinkIndex {
 
   queryByProperties(filters: PropertyFilter[]): string[] {
     return this.service.queryByProperties(filters)
+  }
+
+  queryForBase(spec: BaseQuerySpec): Promise<BaseQueryResult> {
+    // Pinned: the query reads file stats from disk and must not have its
+    // backing service evicted mid-flight.
+    return this.pinned(() => this.service.queryForBase(spec))
   }
 }
 

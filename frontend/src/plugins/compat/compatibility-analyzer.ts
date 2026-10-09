@@ -268,19 +268,24 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
   'onload',
   'onunload',
   'Plugin.registerEvent',
+  // Bases plugin API (since 1.10.0) — registerBasesView, the Value hierarchy,
+  // BasesView/QueryController/BasesEntry are now functional: a plugin-registered
+  // Bases view type is actually mounted and fed real query data (see
+  // bases-view-registry.ts / bases-query-controller.ts / BasesPluginViewHost.tsx).
+  'obsidian.Bases',
 ]);
 
 /**
  * `obsidian.Bases` and `obsidian.Cli` are synthetic keys (not `app.*` calls —
- * see BASES_USAGE_PATTERN/CLI_USAGE_PATTERN below) for two API areas that are
- * typed but never functionally implemented: Bases (database/formula-query
- * views, since 1.10.0 — no formula engine, no `.base` file rendering) and the
- * desktop CLI (`registerCliHandler`, since 1.12.2 — no CLI exists in a web
- * app). Both are real, non-crashing no-ops (`Plugin.registerBasesView()`/
- * `registerCliHandler()` in install-globals.ts). They classify as `partial`
- * via `classifyMethod()`'s default (see below) like everything else not in
- * `SUPPORTED_METHODS`; their specific reasons text in `analyze()` is keyed
- * off the method name directly, not off a separate lookup table.
+ * see BASES_USAGE_PATTERN/CLI_USAGE_PATTERN below). `obsidian.Bases` is now in
+ * `SUPPORTED_METHODS`: the Bases plugin API (registerBasesView, the Value
+ * hierarchy, BasesView/QueryController/BasesEntry) is functionally implemented
+ * (bases-view-registry.ts / bases-query-controller.ts / BasesPluginViewHost.tsx),
+ * so a plugin that only touches Bases is no longer flagged `partial`.
+ * `obsidian.Cli` (the desktop CLI `registerCliHandler`, since 1.12.2) stays a
+ * no-op — no CLI exists in a web app — and classifies as `partial` via
+ * `classifyMethod()`'s default; its reason text in `analyze()` is keyed off
+ * the method name directly, not a separate lookup table.
  */
 
 /**
@@ -629,9 +634,6 @@ export class CompatibilityAnalyzer implements ICompatibilityAnalyzer {
         }
         if (partialCalls.length > 0) {
           reasons.push(`API methods without a real implementation detected: ${partialCalls.join(', ')} — Slatebase returns a safe no-op and logs a console warning on first use, so the plugin still loads but this functionality won't work`);
-        }
-        if (partialCalls.includes('obsidian.Bases')) {
-          reasons.push('Plugin references Obsidian Bases (database/formula-query views) — Slatebase has no formula engine or .base file rendering; the plugin loads but any Bases view it registers is never shown');
         }
         if (partialCalls.includes('obsidian.Cli')) {
           reasons.push('Plugin registers a desktop CLI handler — Slatebase is a web app with no CLI, so this handler is unreachable');

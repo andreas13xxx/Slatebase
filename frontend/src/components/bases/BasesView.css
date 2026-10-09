@@ -1,0 +1,230 @@
+.bases-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-primary);
+  color: var(--text-normal);
+}
+
+.bases-view__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--border-subtle);
+  flex: 0 0 auto;
+}
+
+.bases-view__title {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.bases-view__modes {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.bases-view__mode {
+  appearance: none;
+  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 2px 10px;
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+.bases-view__mode--active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.bases-view__error {
+  padding: var(--spacing-sm) var(--spacing-md);
+  color: var(--text-on-accent);
+  background: var(--danger);
+}
+
+.bases-view__loading {
+  padding: var(--spacing-xs) var(--spacing-md);
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+/* ── Table ─────────────────────────────────────────────────────────────── */
+
+.bases-table-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.bases-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.bases-table__header {
+  position: sticky;
+  top: 0;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-default);
+  text-align: left;
+  z-index: 1;
+}
+
+.bases-table__header-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-normal);
+  font-weight: 600;
+  cursor: pointer;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  width: 100%;
+  text-align: left;
+}
+
+.bases-table__row {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.bases-table__cell {
+  padding: 2px var(--spacing-sm);
+  vertical-align: middle;
+  max-width: 320px;
+}
+
+.bases-table__cell--formula {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.bases-table__link {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-accent);
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  text-decoration: none;
+}
+
+.bases-table__link:hover {
+  text-decoration: underline;
+}
+
+.bases-table__formula-error {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.bases-table-view__empty {
+  padding: var(--spacing-md);
+  color: var(--text-muted);
+}
+
+.base-cell--readonly {
+  color: var(--text-normal);
+}
+
+/* ── Source view ───────────────────────────────────────────────────────── */
+
+.bases-source-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.bases-source-view__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.bases-source-view__title {
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+.bases-source-view__apply-btn {
+  appearance: none;
+  border: 1px solid var(--interactive-accent);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-radius: var(--radius-sm);
+  padding: 2px 10px;
+  cursor: pointer;
+}
+
+.bases-source-view__apply-btn:disabled {
+  opacity: 1;
+  filter: grayscale(1);
+  cursor: not-allowed;
+}
+
+.bases-source-view__error {
+  padding: var(--spacing-xs) var(--spacing-md);
+  color: var(--text-on-accent);
+  background: var(--danger);
+  font-size: 0.85em;
+}
+
+.bases-source-view__editor {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  resize: none;
+  border: none;
+  background: var(--bg-primary);
+  color: var(--text-normal);
+  font-family: var(--font-monospace, monospace);
+  font-size: 0.85em;
+  padding: var(--spacing-md);
+}
+
+/* View switcher: one tab per declared view (plugin or built-in table). */
+.bases-view__views {
+  display: flex;
+  gap: var(--spacing-xs);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.bases-view__view {
+  appearance: none;
+  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 2px 10px;
+  font-size: 0.85em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bases-view__view--active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+/* Container a plugin-contributed Bases view renders its own DOM into. */
+.bases-view__plugin-container {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--spacing-md);
+}

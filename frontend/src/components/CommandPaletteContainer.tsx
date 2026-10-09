@@ -114,6 +114,7 @@ export interface CommandPaletteContainerProps {
   onCreateFile: () => void
   onCreateFolder: () => void
   onCreateCanvas: () => void
+  onCreateBase: () => void
   onImportFile: () => void
   onImportFolder: () => void
   onExportVault: () => void
@@ -147,6 +148,7 @@ export function CommandPaletteContainer({
   onCreateFile,
   onCreateFolder,
   onCreateCanvas,
+  onCreateBase,
   onImportFile,
   onImportFolder,
   onExportVault,
@@ -327,6 +329,7 @@ export function CommandPaletteContainer({
     onCreateFile,
     onCreateFolder,
     onCreateCanvas,
+    onCreateBase,
     onOpenGraph,
     onOpenLocalGraph,
     onDailyNote,
@@ -752,6 +755,15 @@ export function CommandPaletteContainer({
         callback: onCreateCanvas,
         pluginId: 'slatebase',
       })
+
+      if (isEnabled('bases')) {
+        commands.push({
+          id: 'slatebase:base-new',
+          name: 'Neue Base erstellen',
+          callback: onCreateBase,
+          pluginId: 'slatebase',
+        })
+      }
     }
 
     if (hasVault) {

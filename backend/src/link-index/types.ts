@@ -210,6 +210,16 @@ export interface ILinkIndex {
    * @param filters - Array of property filters to apply
    */
   queryByProperties(filters: PropertyFilter[]): string[]
+
+  /**
+   * Runs a Bases query: filters notes by a nested AND/OR tree over properties,
+   * tags, path globs and file metadata, sorts by one or more columns, and
+   * returns each matching note's path plus the raw values of the requested
+   * columns. Reads file-metadata (ctime/mtime) from disk on demand. The result
+   * is hard-capped; `total` reports the match count before the cap.
+   * @param spec - Normalized Bases query specification
+   */
+  queryForBase(spec: BaseQuerySpec): Promise<BaseQueryResult>
 }
 
 // ─── Property Filter ─────────────────────────────────────────────────────────
@@ -225,4 +235,98 @@ export interface PropertyFilter {
   operator: PropertyFilterOperator
   /** Value to compare against (required for eq/neq/contains, ignored for exists/not_exists). */
   value?: string | undefined
+}
+
+// ─── Bases Query ───────────────────────────────────────────────────────────
+
+/**
+ * Comparison operators for a Bases filter condition. Superset of
+ * PropertyFilterOperator: adds ordered comparisons (lt/lte/gt/gte) and an
+ * `empty` check, which the richer Bases query surface needs and the simpler
+ * property query does not.
+ */
+export type BaseQueryOperator =
+  | 'eq'
+  | 'neq'
+  | 'contains'
+  | 'exists'
+  | 'empty'
+  | 'lt'
+  | 'lte'
+  | 'gt'
+  | 'gte'
+
+/**
+ * A single leaf condition in a Bases query. Targets exactly one of a property
+ * key, a tag, a path glob, or a file-metadata field.
+ */
+export interface BaseQueryCondition {
+  /** Property key to test (mutually exclusive with tag/path/file). */
+  property?: string | undefined
+  /** Tag name to test for presence/absence. */
+  tag?: string | undefined
+  /** Path glob (same syntax as the search module's `path:` operator). */
+  path?: string | undefined
+  /** File-metadata field. */
+  file?: 'name' | 'ctime' | 'mtime' | undefined
+  /** Operator; implementation defaults per target type. */
+  op?: BaseQueryOperator | undefined
+  /** Comparison value. */
+  value?: string | number | boolean | undefined
+  /** Negate the condition. */
+  not?: boolean | undefined
+}
+
+/** An AND group — every child must match. */
+export interface BaseQueryAnd {
+  and: BaseQueryNode[]
+}
+
+/** An OR group — at least one child must match. */
+export interface BaseQueryOr {
+  or: BaseQueryNode[]
+}
+
+/** A Bases filter node: a leaf condition or a nested AND/OR group. */
+export type BaseQueryNode = BaseQueryCondition | BaseQueryAnd | BaseQueryOr
+
+/** A single sort clause for a Bases query. */
+export interface BaseQuerySort {
+  /** Column id to sort by: a property key, `file.name`, `file.ctime`, or `file.mtime`. */
+  column: string
+  /** Direction; defaults to ascending. */
+  direction?: 'asc' | 'desc' | undefined
+}
+
+/** A normalized Bases query specification sent to the index. */
+export interface BaseQuerySpec {
+  /** Root filter node, or undefined to include every visible note. */
+  filters?: BaseQueryNode | undefined
+  /** Property keys whose raw values should be returned for each row. */
+  columns: string[]
+  /** Sort clauses applied in order (property keys or `file.*` fields). */
+  sort?: BaseQuerySort[] | undefined
+  /** Maximum number of rows to return (hard-capped by the implementation). */
+  limit?: number | undefined
+}
+
+/** A single resolved Bases query row. */
+export interface BaseQueryRow {
+  /** Vault-relative file path. */
+  path: string
+  /** File name without extension (the `file.name` pseudo-column). */
+  fileName: string
+  /** Creation time (ms since epoch), when available. */
+  ctime?: number | undefined
+  /** Modification time (ms since epoch), when available. */
+  mtime?: number | undefined
+  /** Raw property values for the requested columns, keyed by property key. */
+  values: Record<string, string[]>
+}
+
+/** Result of a Bases query. */
+export interface BaseQueryResult {
+  rows: BaseQueryRow[]
+  /** Total matches before the limit was applied. */
+  total: number
 }

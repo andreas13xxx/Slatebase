@@ -365,7 +365,7 @@ describe('CompatibilityAnalyzer', () => {
       expect(call?.classification).toBe('supported');
     });
 
-    it('classifies obsidian.Bases as partial (loads, but .base files never render) and overall level as partial', () => {
+    it('classifies obsidian.Bases as supported (plugin-registered Bases views render) and overall level as full', () => {
       const source = `
         class MyPlugin extends Plugin {
           onload() { this.registerBasesView('my-view', {}); }
@@ -373,9 +373,8 @@ describe('CompatibilityAnalyzer', () => {
       `;
       const report = analyzer.analyze(source);
       const call = report.apiCalls.find(c => c.method === 'obsidian.Bases');
-      expect(call?.classification).toBe('partial');
-      expect(report.level).toBe('partial');
-      expect(report.reasons.some(r => r.includes('Bases'))).toBe(true);
+      expect(call?.classification).toBe('supported');
+      expect(report.level).toBe('full');
     });
 
     it('classifies obsidian.Cli as partial (no CLI in a web app)', () => {

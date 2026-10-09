@@ -82,6 +82,7 @@ import { createVaultConfigRoutes } from './api/vaultConfigRoutes.js'
 import { PropertyTypeStore } from './property-type/index.js'
 import { createPropertyTypeRoutes } from './api/propertyTypeRoutes.js'
 import { createPropertyRoutes } from './api/propertyRoutes.js'
+import { createBasesRoutes } from './api/basesRoutes.js'
 import { WelcomeVaultService } from './welcome-vault/index.js'
 import { createWelcomeVaultRoutes, deduplicateVaultName } from './api/welcomeVaultRoutes.js'
 import { ModuleSecretKeyManager, ModuleSecretStore } from './shared-secrets/index.js'
@@ -112,6 +113,7 @@ featureRegistry.register({ name: 'mcp', description: 'AI Context Server (MCP Int
 featureRegistry.register({ name: 'git-sync', description: 'Git-Synchronisation von Vaults mit externen Remotes', defaultEnabled: true, type: 'cold' })
 featureRegistry.register({ name: 'mail-import', description: 'IMAP-Mail-Import als Markdown-Notizen', defaultEnabled: true, type: 'cold' })
 featureRegistry.register({ name: 'voice-transcription', description: 'Diktieren / Spracherkennung via self-hosted Whisper (rechenintensiv, GPU empfohlen)', defaultEnabled: false, type: 'cold' })
+featureRegistry.register({ name: 'bases', description: 'Bases — filterbare, editierbare Tabellen über die Vault-Metadaten (experimentell)', defaultEnabled: false, type: 'cold' })
 
 const featureToggleStore = new FeatureToggleStore(serverConfig.dataDir, logger)
 const persistedFeatureState = await featureToggleStore.load()
@@ -631,6 +633,7 @@ app.use('/api/v1/vaults/:vaultId/git-sync/*', createFeatureGuard('git-sync', fea
 app.use('/api/v1/vaults/:vaultId/mail-import', createFeatureGuard('mail-import', featureToggleService))
 app.use('/api/v1/vaults/:vaultId/mail-import/*', createFeatureGuard('mail-import', featureToggleService))
 app.use('/api/v1/vaults/:vaultId/transcribe', createFeatureGuard('voice-transcription', featureToggleService))
+app.use('/api/v1/vaults/:vaultId/bases/*', createFeatureGuard('bases', featureToggleService))
 
 // Route registration
 app.route('/api/v1', router)
@@ -846,6 +849,13 @@ const propertyRoutes = createPropertyRoutes({
   logger,
 })
 app.route('/api/v1', propertyRoutes)
+
+// Bases query routes (feature-gated on `bases`; vault auth via shared middleware)
+const basesRoutes = createBasesRoutes({
+  linkIndexResolver: (vaultId: string) => linkIndexCache.getAsync(vaultId),
+  logger,
+})
+app.route('/api/v1', basesRoutes)
 
 // Welcome vault route registration (auth + CSRF middleware applies via /api/v1/* pattern)
 const welcomeVaultRoutes = createWelcomeVaultRoutes({

@@ -1,6 +1,7 @@
 import type { VaultInfo, DirectoryTree, FileContent, FileSaveResult, AppError, Conversation, PaginatedConversations, PaginatedMessages, Message, GraphData, GraphMeta, GraphQueryOptions, BacklinksResponse } from '../types'
 import type { PublicUserInfo } from '../state/authState'
 import type { PropertyType, PropertyTypeRegistry } from '../state/propertyTypes'
+import type { BaseQuerySpecWire, BaseQueryResultWire } from '../bases/types'
 
 /**
  * Login response returned by the backend on successful authentication.
@@ -607,6 +608,10 @@ export interface IApiClient {
   /** Get aggregated graph metadata (tag counts, property key counts). */
   getGraphMeta(vaultId: string): Promise<GraphMeta>
 
+  // --- Bases methods ---
+  /** Run a Bases query (filter/sort/columns) against a vault's metadata index. */
+  queryBase(vaultId: string, spec: BaseQuerySpecWire): Promise<BaseQueryResultWire>
+
   // --- Property type methods ---
   /** Get the property type registry for a vault. */
   getPropertyTypes(vaultId: string): Promise<PropertyTypeRegistry>
@@ -1116,6 +1121,11 @@ export class ApiClient implements IApiClient {
   /** Get aggregated graph metadata (tag counts, property key counts). */
   async getGraphMeta(vaultId: string): Promise<GraphMeta> {
     return this.request<GraphMeta>('GET', `/api/v1/vaults/${vaultId}/graph/meta`)
+  }
+
+  /** Run a Bases query (filter/sort/columns) against a vault's metadata index. */
+  async queryBase(vaultId: string, spec: BaseQuerySpecWire): Promise<BaseQueryResultWire> {
+    return this.request<BaseQueryResultWire>('POST', `/api/v1/vaults/${vaultId}/bases/query`, spec)
   }
 
   // --- Property type methods ---
