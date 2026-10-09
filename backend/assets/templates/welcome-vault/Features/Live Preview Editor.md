@@ -64,6 +64,29 @@ Markdown wird inline formatiert dargestellt. Überschriften erscheinen in der ri
 
 ---
 
+## Hervorhebungs-Farben
+
+Text wird mit `==doppelten Gleichzeichen==` hervorgehoben. Eine einfache Hervorhebung ist gelb. Ein Farb-Emoji am Anfang ändert die Farbe:
+
+| Syntax | Farbe |
+|--------|-------|
+| `==Text==` | Gelb (Standard) |
+| `==🔴 Text==` | Rot |
+| `==🟠 Text==` | Orange |
+| `==🟢 Text==` | Grün |
+| `==🔵 Text==` | Blau |
+| `==🟣 Text==` | Lila |
+
+Drei Wege, eine Farbe zu setzen:
+
+- **Tippen:** Nach dem öffnenden `==` schlägt ein Autovervollständigen-Menü die Farben vor — eine auswählen und weiterschreiben.
+- **Markieren & Rechtsklick:** Text markieren, Rechtsklick → **Textformatierung → Markieren**, Farbe wählen.
+- **Von Hand:** einfach das Emoji nach dem öffnenden `==` tippen.
+
+Das Farb-Emoji bleibt im Markdown stehen, eine farbige Hervorhebung ist also portabel — sie wird in jedem Obsidian-kompatiblen Werkzeug gleich dargestellt. Die Farben folgen automatisch dem Dark Mode.
+
+---
+
 ## Vim-Modus
 
 Für erfahrene Vim-Nutzer steht ein optionaler Vim-Modus zur Verfügung. Aktivierung über die Einstellungen (Ctrl+,) → Darstellung → Vim-Modus.
@@ -87,7 +110,7 @@ Im Vim-Modus stehen die gewohnten Modi (Normal, Insert, Visual) und Befehle zur 
 | Überschriften | `## Titel` | Schriftgröße + Marker versteckt |
 | Fett/Kursiv | `**fett**` / `*kursiv*` | Formatiert, Marker versteckt |
 | Durchgestrichen | `~~text~~` | Durchgestrichen |
-| Highlight | `==text==` | Farbiger Hintergrund |
+| Highlight | `==Text==` / `==🟢 Text==` | Farbiger Hintergrund (6 Farben) |
 | Inline-Code | `` `code` `` | Monospace-Styling |
 | Links | `[text](url)` | Klickbar (Ctrl+Click) |
 | Wikilinks | `[[Seite]]` | Klickbar, Brackets versteckt |

@@ -360,10 +360,11 @@ src/
 │   │   └── personal-dictionary.test.ts — Persistence, corrupt-storage fallbacks, session ignores
 │   └── live-preview/
 │       ├── index.ts               — Barrel export for live-preview decorations + extension factory
-│       ├── inline-decorations.ts  — Cursor-aware inline formatting decorations (bold, italic, strikethrough, inline code), HideableRange model
+│       ├── inline-decorations.ts  — Cursor-aware inline formatting decorations (bold, italic, strikethrough, inline code, `==highlight==` incl. the Obsidian 1.14 emoji color classes via `highlight-colors.ts`), HideableRange model
 │       ├── link-decorations.ts    — Wikilink + standard-link decorations, click-to-navigate
 │       ├── widget-decorations.ts  — Block widgets (callouts with fold/unfold, GFM checkboxes, code-block-processor integration)
-│       ├── live-preview.css       — CSS styles for live-preview decorations (readable line length, editor wrapper)
+│       ├── highlight-color-complete.ts — CM6 completion source: typing the opening `==` suggests the five highlight colors (inserts `==🔴 ` etc.); colors come from `plugins/highlight-colors.ts`. Mounted in CodeMirrorEditor alongside plugin completion sources
+│       ├── live-preview.css       — CSS styles for live-preview decorations (readable line length, editor wrapper, highlight color classes `cm-lp-hl-*`)
 │       └── live-preview-extension.ts — Composes decorations into the CM6 extension (StateField, Compartment, click handler)
 │   └── dictation/                — Voice dictation (feature `voice-transcription`). Uses the plain `MediaRecorder` Web API, NOT the plugin-compat layer.
 │       ├── dictation-recorder.ts   — DictationRecorder (MediaRecorder wrapper; getUserMedia errors → DictationRecorderError with a stable `reason`: unsupported/permission-denied/insecure-context/failed; picks a supported audio MIME type)
@@ -375,6 +376,9 @@ src/
 │   ├── heading-anchor.ts — Heading anchor generation + deduplication tracker
 │   ├── preserve-table-code-escapes.ts — Counters mdast-util-gfm-table's pipe-unescaping inside inline code spans (Obsidian verbatim rendering)
 │   ├── inline-html.ts    — Allowlist + attribute parsing for the safe subset of inline raw HTML (`<font color>`, `<mark>`, `<span style>`, …); shared by Live Preview (inline-decorations.ts, styled span) and reading view (ViewMode.tsx, real element) so both agree on what renders vs. stays literal text
+│   ├── highlight-colors.ts — Single source of truth for the six highlight colors (`==text==` yellow default + 🔴🟠🟢🔵🟣), their emoji→name→CSS-class mapping and `matchHighlightColor()`. Imported by the Live Preview decorator, the reading-view remark plugin AND the `==`-autocomplete so the three surfaces can't drift on which emoji means which color
+│   ├── highlight/
+│   │   └── plugin.ts     — remarkHighlight: transformer that rewrites `==...==` runs in text nodes into `highlight` mdast nodes → `<mark class="hl-<color>">` (ViewMode). Reading view rendered `==` as literal text before this existed (Live Preview already decorated it); transformer-only, same pattern as breaks/block-ref
 │   ├── wikilink/
 │   │   ├── syntax.ts     — micromark tokenizer extension for [[...]] syntax
 │   │   ├── mdast-util.ts — fromMarkdown + toMarkdown handlers
@@ -489,7 +493,7 @@ src/
 │   ├── tabContext.ts     — TabProvider + useTabContext hook
 │   ├── tabActions.ts     — openTab, saveTab action creators (+ recentFilesStore.add on open); undoCloseTab() re-fetches content fresh rather than restoring the closed TabEntry's stale snapshot, then restores its pinned flag (OPEN_TAB always resets pinned to false)
 │   ├── activeCanvasBridge.ts — Module-level "active canvas controller" registry (same active-instance pattern as `editor/plugin-extensions.ts`'s active-editor tracking) so `core-commands-app.ts` can reach the mounted CanvasView's `jumpToSelectedGroup()` without a direct reference into its CanvasProvider state
-│   ├── noteComposer.ts   — Shared logic for `note-composer:split-file/extract-heading/merge-file`: find the heading section at the cursor, sanitize a heading into a filename, cut a range into a new file linked back via `[[fileName]]`
+│   ├── noteComposer.ts   — Shared logic for `note-composer:split-file/extract-heading/merge-file`: find the heading section at the cursor, sanitize a heading into a filename, cut a range into a new file linked back via `[[fileName]]`. `rewriteExtractedLinks()` relativizes bare-name wikilinks in the extracted text that would resolve differently from the new note's location (Obsidian 1.13 "update links on extract"); a no-op while the new note stays in the source folder
 │   ├── zoomStore.ts      — App-wide zoom level (0.5–2.0), thin wrapper over `vaultSettingsStore` (per user *and* vault, was a flat localStorage value shared by every vault); backs `window:zoom-in/out/reset-zoom`, applied via `document.body.style.zoom` in App.tsx
 │   ├── navigationHistoryState.ts   — Back/forward navigation history reducer (RECORD_VISIT/GO_BACK/GO_FORWARD/DROP_ENTRY/CLEAR), session-only, MAX_STACK_SIZE 50
 │   ├── navigationHistoryContext.ts — NavigationHistoryProvider + useNavigationHistory hook. Records a visit centrally via a `useEffect` watching `tabState.activeTabId` (not threaded through every click handler) — GO_BACK/GO_FORWARD suppress the resulting auto-record via a ref flag so they don't re-record their own tab activation
@@ -664,6 +668,7 @@ src/
 │   ├── bases/                    — Bases table UI (feature `bases`); routed from `TabContent.tsx` for `.base` files
 │   │   ├── BasesView.tsx         — Container: parse → query → render table / raw-source toggle, error state, `vault:change` live-refresh, cell-commit (frontmatter save), sort write-back
 │   │   ├── BasesTableView.tsx    — Sortable table: one row per note, property cells editable, formula columns evaluated client-side (read-only)
+│   │   ├── BasesKanbanView.tsx   — Cards/Kanban view (`type: cards`): groups rows into collapsible columns by `view.groupBy`, cards link to their note and show other columns as chips; read-only (no drag-between-columns yet)
 │   │   ├── BaseCell.tsx          — One cell: formula/`file.*` read-only, property editable via the Properties-editor controls (`useCommitOnUnmount` semantics inherited)
 │   │   ├── base-cell-type.ts     — `inferCellType()` + `BaseCellType` (kept out of the component files for the react-refresh single-export rule)
 │   │   ├── BasesSourceView.tsx   — Raw `.base` YAML editor (CanvasSourceView pattern)

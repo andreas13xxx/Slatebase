@@ -325,6 +325,12 @@ Aus dem Härten gegen echte Community-Plugin-Bundles statt gegen die API-Doku.
 - `extractPlainText()` bei neuen Inline-Nodes erweitern
 - `preserve-table-code-escapes.ts`: Inline-Code in GFM-Tabellen vor Pipe-Unescaping schützen
 - Transitive Deps (`micromark`, `mdast-util-*`, `unist-util-visit`) direkt nutzbar
+- **„Live Preview rendert es" heißt nicht „der Lesemodus auch"**: `==highlight==` wurde im CM6-Editor seit jeher per Regex dekoriert, im Lesemodus (`ViewMode`) aber als Klartext ausgegeben — remarkGfm kennt `==` nicht, und es gab kein Highlight-Remark-Plugin. Die beiden Renderpfade sind getrennt; ein inline-Konstrukt, das nur in einem auftaucht, ist im anderen stumm fehlend (kein Fehler, nur fehlende Formatierung). Bei JEDEM neuen Inline-Syntaxelement beide Pfade prüfen: den CM6-Dekorator in `editor/live-preview/inline-decorations.ts` UND das Remark-Plugin in `plugins/`. Die 1.14-Highlight-Farben nutzen deshalb ein gemeinsames `plugins/highlight-colors.ts` (Emoji→Farbe→CSS-Klasse), das Live-Preview-Dekorator, `remarkHighlight` UND die `==`-Autocomplete gleichermaßen importieren — drei Oberflächen, eine Wahrheit.
+
+## Bases: eingebaute vs. Plugin-View-Typen
+
+- **`table` und `cards` sind eingebaute View-Typen, alles andere gehört Plugins**: `BasesView` entscheidet per `BUILT_IN_VIEW_TYPES`-Set, ob eine Ansicht in-app (Tabelle/Kanban) oder über den Plugin-Host (`registerBasesView`) rendert. Als Kanban hinzukam, brach ein bestehender Test, der `cards` als beliebigen „irgendein Plugin-View-Typ"-Platzhalter benutzt hatte — `cards` hat jetzt eingebaute Bedeutung. Lehre: Ein Test, der einen String als Platzhalter für „ein fremder Typ" wählt, muss einen Typ nehmen, der garantiert NICHT eingebaut ist (hier `gallery`), sonst kollidiert er, sobald der Platzhalter-String echte Bedeutung bekommt.
+- **Ein `cards`-View braucht die `groupBy`-Property in der Abfrage, auch wenn sie keine angezeigte Spalte ist**: `buildQuerySpec` fügt `view.groupBy` den angeforderten Spalten hinzu (sofern Property, nicht `file.*`/Formel), sonst käme der Gruppierungswert nie vom Backend und jede Karte landete in „Ohne …". Neue View-Typen, die eine Eigenschaft zum Rendern BRAUCHEN, die der Nutzer nicht als Spalte gelistet hat, müssen sie selbst in die Query aufnehmen.
 
 ## Frontmatter-Writer: null ≠ undefined, und Escaping ist kein Nice-to-have
 

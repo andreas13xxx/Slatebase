@@ -22,7 +22,7 @@ A `.base` file is Obsidian-compatible YAML with four parts:
 | **Filters** | Which notes appear — by property, tag, path, or file metadata, combined with AND/OR |
 | **Properties** | Which columns to show and their display names |
 | **Formulas** | Calculated columns (read-only), e.g. days until a deadline |
-| **Views** | One or more named layouts (table first; cards/board are a later stage) |
+| **Views** | One or more named layouts: a **table** or a **cards** board (Kanban), switchable in the toolbar |
 
 ---
 
@@ -67,6 +67,29 @@ Property cells are editable inline, using the same typed controls as the [[Featu
 A cell you have open isn't lost if the table rebuilds (because another cell changed, you switched tabs, or the Base refreshed) — whatever you typed is committed, the same safety net the Properties editor has.
 
 Click a column header to sort; the chosen sort is written back into the `.base` file.
+
+---
+
+## Views: table and cards (Kanban)
+
+A Base can hold more than one view. When it does, a view switcher appears in the toolbar. Two built-in view types exist:
+
+- **Table** — one row per note, editable cells (described above).
+- **Cards (Kanban)** — notes grouped into columns of cards by one property. Set `type: cards` and `groupBy: <property>` on the view. Each distinct value of that property becomes a column; notes with no value for it fall into an "Ohne …" / "No …" column. Columns are collapsible, and clicking a card opens its note. Cards show the view's other columns as small labelled chips.
+
+```yaml
+views:
+  - type: table
+    name: All tasks
+    order: [file.name, status, priority]
+  - type: cards
+    name: Board
+    groupBy: status
+    order: [file.name, priority]
+```
+
+> [!note] Cards are read-only for now
+> The Kanban view opens notes and groups/collapses, but you can't yet drag a card between columns to change its grouping property. Edit the property in the table view or the note itself. Dragging between columns is a later stage.
 
 ---
 

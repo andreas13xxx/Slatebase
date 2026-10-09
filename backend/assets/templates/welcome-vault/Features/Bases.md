@@ -22,7 +22,7 @@ Eine `.base`-Datei ist Obsidian-kompatibles YAML mit vier Teilen:
 | **Filter** | Welche Notizen erscheinen — nach Property, Tag, Pfad oder Datei-Metadaten, kombiniert mit UND/ODER |
 | **Properties** | Welche Spalten gezeigt werden und ihre Anzeigenamen |
 | **Formeln** | Berechnete Spalten (schreibgeschützt), z. B. Tage bis zur Deadline |
-| **Views** | Eine oder mehrere benannte Ansichten (zuerst Tabelle; Karten/Board als spätere Ausbaustufe) |
+| **Views** | Eine oder mehrere benannte Ansichten: eine **Tabelle** oder ein **Karten**-Board (Kanban), über die Werkzeugleiste umschaltbar |
 
 ---
 
@@ -67,6 +67,29 @@ Property-Zellen sind inline editierbar, über dieselben typisierten Controls wie
 Eine Zelle, die du gerade offen hast, geht nicht verloren, wenn die Tabelle neu aufgebaut wird (weil sich eine andere Zelle geändert hat, du den Tab gewechselt hast oder die Base aktualisiert wurde) — was du getippt hast, wird committet, dasselbe Sicherheitsnetz wie beim Properties-Editor.
 
 Klick auf einen Spalten-Header sortiert; die gewählte Sortierung wird in die `.base`-Datei zurückgeschrieben.
+
+---
+
+## Ansichten: Tabelle und Karten (Kanban)
+
+Eine Base kann mehrere Ansichten enthalten. Dann erscheint oben ein Ansichts-Umschalter. Zwei eingebaute Ansichtstypen gibt es:
+
+- **Tabelle** — eine Zeile pro Notiz, editierbare Zellen (siehe oben).
+- **Karten (Kanban)** — Notizen nach einer Eigenschaft in Spalten aus Karten gruppiert. Setze `type: cards` und `groupBy: <Eigenschaft>` in der Ansicht. Jeder Wert dieser Eigenschaft wird eine Spalte; Notizen ohne Wert landen in einer „Ohne …"-Spalte. Spalten sind einklappbar, ein Klick auf eine Karte öffnet die Notiz. Karten zeigen die übrigen Spalten der Ansicht als kleine beschriftete Chips.
+
+```yaml
+views:
+  - type: table
+    name: Alle Aufgaben
+    order: [file.name, status, priority]
+  - type: cards
+    name: Board
+    groupBy: status
+    order: [file.name, priority]
+```
+
+> [!note] Karten sind vorerst schreibgeschützt
+> Die Kanban-Ansicht öffnet Notizen und gruppiert/klappt ein, aber eine Karte lässt sich noch nicht per Drag zwischen Spalten verschieben, um ihre Gruppierungs-Eigenschaft zu ändern. Ändere die Eigenschaft in der Tabellen-Ansicht oder in der Notiz selbst. Das Ziehen zwischen Spalten ist eine spätere Ausbaustufe.
 
 ---
 
