@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.44.9](https://github.com/andreas13xxx/Slatebase/compare/v0.44.8...v0.44.9) (2026-10-09)
+
+
+### Bugfixes
+
+* **deps:** bump proxy-addr to 2.0.8 in backend lockfile ([#211](https://github.com/andreas13xxx/Slatebase/issues/211)) ([75c04ba](https://github.com/andreas13xxx/Slatebase/commit/75c04bae22e88cb886e2061ec9304b6798fa3a01))
+
+
+### Sonstige Änderungen
+
+* bump source-map-js from 1.2.1 to 1.2.2 in /frontend ([#215](https://github.com/andreas13xxx/Slatebase/issues/215)) ([6e3d908](https://github.com/andreas13xxx/Slatebase/commit/6e3d908855cb6022fc49152a64d99ea05eb1c63b))
+* bump the minor-patch group in /backend with 12 updates ([#209](https://github.com/andreas13xxx/Slatebase/issues/209)) ([99ee888](https://github.com/andreas13xxx/Slatebase/commit/99ee88841868c922a07fb6ffdaa9ffecb10846e4))
+* bump the minor-patch group in /frontend with 11 updates ([#210](https://github.com/andreas13xxx/Slatebase/issues/210)) ([f98cc5c](https://github.com/andreas13xxx/Slatebase/commit/f98cc5c26e7a895ac4727b78f4717e2216005403))
+
 ## [0.44.8](https://github.com/andreas13xxx/Slatebase/compare/v0.44.7...v0.44.8) (2026-10-01)
 
 
