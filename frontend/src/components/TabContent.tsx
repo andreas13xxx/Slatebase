@@ -1,6 +1,7 @@
 import { useState, useCallback, useContext, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
 import { useTabContext } from '../state/tabContext'
 import { useAppContext } from '../state'
+import { useFeatureContext } from '../state/featureContext'
 import { openTab, saveTab } from '../state/tabActions'
 import type { DirectoryTree } from '../types'
 import type { PropertyType, PropertyTypeEntry } from '../state/propertyTypes'
@@ -13,6 +14,7 @@ import { PageLoadingFallback } from './PageLoadingFallback'
 // tab types — code-split so a plain note tab never pays for either bundle (AP8).
 const GraphView = lazy(() => import('./GraphView').then((m) => ({ default: m.GraphView })))
 const CanvasView = lazy(() => import('./canvas/CanvasView').then((m) => ({ default: m.CanvasView })))
+const BasesView = lazy(() => import('./bases/BasesView').then((m) => ({ default: m.BasesView })))
 import { useTranslation } from '../i18n'
 import { extractErrorMessage } from '../utils/error'
 import { PluginContext } from '../plugins/compat/plugin-context'
@@ -69,6 +71,7 @@ function pathExistsInTree(tree: DirectoryTree | null, filePath: string): boolean
 export function TabContent() {
   const { tabState, tabDispatch } = useTabContext()
   const { state: appState, dispatch: appDispatch, apiClient } = useAppContext()
+  const { isEnabled } = useFeatureContext()
   const { t } = useTranslation()
   const [saving, setSaving] = useState(false)
   const [linkError, setLinkError] = useState<string | null>(null)
@@ -124,6 +127,7 @@ export function TabContent() {
   const fileViewMatch = activeTab && !activeTab.loading && !activeTab.error && !activeTab.isBinary
     && !activeTab.filePath.startsWith('__view::') && !activeTab.filePath.startsWith('__graph__')
     && !activeTab.fileName.endsWith('.canvas')
+    && !activeTab.fileName.endsWith('.base')
     ? findFileViewMatch(activeTab.filePath, activeTab.content)
     : null
 
@@ -404,6 +408,34 @@ export function TabContent() {
           vaultId={activeTab.vaultId}
           filePath={activeTab.filePath}
         />
+      </div>
+    )
+  }
+
+  // Base file — render BasesView (feature-gated; otherwise falls through to the
+  // Markdown editor so a `.base` stays a plain, editable file).
+  if (activeTab.fileName.endsWith('.base') && isEnabled('bases')) {
+    const currentVault = appState.vaults.find((v) => v.id === activeTab.vaultId)
+    const isReadOnly = currentVault?.permission === 'read'
+    return (
+      <div className="tab-content tab-content--bases" role="tabpanel" aria-label={activeTab.fileName}>
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoadingFallback />}>
+            <BasesView
+              apiClient={apiClient!}
+              vaultId={activeTab.vaultId}
+              source={activeTab.content ?? ''}
+              readOnly={isReadOnly ?? false}
+              onOpenNote={(path) => {
+                const fileName = path.split('/').pop() ?? path
+                void openTab(tabDispatch, appDispatch, apiClient!, activeTab.vaultId, path, fileName)
+              }}
+              onSaveSource={(yaml) => {
+                void saveTab(tabDispatch, apiClient!, activeTab.vaultId, activeTab.filePath, yaml)
+              }}
+            />
+          </Suspense>
+        </ErrorBoundary>
       </div>
     )
   }

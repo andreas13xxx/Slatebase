@@ -53,6 +53,7 @@ function createMockLinkIndex(overrides: Partial<ILinkIndex> = {}): ILinkIndex {
     getPropertyKeys: () => [],
     getPropertyValues: () => [],
     queryByProperties: () => [],
+    queryForBase: async () => ({ rows: [], total: 0 }),
     ...overrides,
   }
 }

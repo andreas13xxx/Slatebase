@@ -15,6 +15,15 @@ export type {
   ParsedWikilink,
   PropertyFilter,
   PropertyFilterOperator,
+  BaseQueryOperator,
+  BaseQueryCondition,
+  BaseQueryAnd,
+  BaseQueryOr,
+  BaseQueryNode,
+  BaseQuerySort,
+  BaseQuerySpec,
+  BaseQueryRow,
+  BaseQueryResult,
 } from './types.js'
 
 // Link migration types

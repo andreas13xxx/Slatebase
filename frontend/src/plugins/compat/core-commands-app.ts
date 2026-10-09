@@ -77,6 +77,8 @@ export interface CoreAppCommandHandlers {
   onCreateFile: () => void
   onCreateFolder: () => void
   onCreateCanvas: () => void
+  /** Creates a new empty `.base` file in the current vault (feature `bases`). */
+  onCreateBase: () => void
   onOpenGraph: () => void
   onOpenLocalGraph: (filePath: string) => void
   onDailyNote: () => void
@@ -739,6 +741,7 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'graph:open-local', name: 'Graph view: Open local graph', run: (h) => { const t = getActiveTab(h); if (t && !t.filePath.startsWith('__')) h.onOpenLocalGraph(t.filePath) } },
     { id: 'graph:animate', name: 'Graph view: Start graph time-lapse animation', unsupported: 'graph-animation' },
     { id: 'canvas:new-file', name: 'Canvas: Create new canvas', run: (h) => h.onCreateCanvas() },
+    { id: 'bases:new-file', name: 'Bases: Create new base', run: (h) => h.onCreateBase() },
     {
       id: 'canvas:jump-to-group',
       name: 'Canvas: Jump to group',

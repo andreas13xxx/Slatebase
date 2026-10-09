@@ -523,6 +523,39 @@ function AppContent() {
     }
   }
 
+  function handleCreateBase() {
+    if (!state.selectedVaultId) return
+    const vaultId = state.selectedVaultId
+    // A minimal, valid starter base: whole vault, a table showing the file name.
+    const starter = [
+      'properties:',
+      '  file.name:',
+      '    displayName: Name',
+      'views:',
+      '  - type: table',
+      '    name: Neue Base',
+      '    order:',
+      '      - file.name',
+      '',
+    ].join('\n')
+    void (async () => {
+      // Pick a non-colliding name at the vault root.
+      let name = 'Neue Base.base'
+      let i = 2
+      const tree = state.vaultTrees[vaultId] ?? state.directoryTree
+      const existing = new Set((tree?.children ?? []).map((c) => c.name))
+      while (existing.has(name)) {
+        name = `Neue Base ${i}.base`
+        i++
+      }
+      await apiClient.saveFile(vaultId, name, starter)
+      const newTree = await apiClient.fetchVaultTree(vaultId)
+      dispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree: newTree } })
+      setActiveSettingsPage(null)
+      void openTab(tabDispatch, dispatch, apiClient, vaultId, name, name)
+    })()
+  }
+
   function handleExportVault() {
     if (state.selectedVaultId) {
       const vault = state.vaults.find((v) => v.id === state.selectedVaultId)
@@ -971,6 +1004,7 @@ function AppContent() {
         onCreateFile={handleCreateFile}
         onCreateFolder={handleCreateFolder}
         onCreateCanvas={handleCreateCanvas}
+        onCreateBase={handleCreateBase}
         onImportFile={handleImportFile}
         onImportFolder={handleImportFolder}
         onExportVault={handleExportVault}

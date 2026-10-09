@@ -1,0 +1,18 @@
+filters:
+  and:
+    - { path: "Features/Beispiel-Aufgaben" }
+    - { property: "type", op: "eq", value: "task" }
+formulas:
+  days_left: "date(deadline) - today()"
+properties:
+  file.name: { displayName: "Aufgabe" }
+  status: { displayName: "Status" }
+  priority: { displayName: "Priorität" }
+  deadline: { displayName: "Deadline" }
+  days_left: { displayName: "Tage übrig" }
+views:
+  - type: table
+    name: "Offene Aufgaben"
+    order: [file.name, status, priority, deadline, days_left]
+    sort:
+      - { column: "priority", direction: "desc" }
