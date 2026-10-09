@@ -18,8 +18,8 @@ import { AppContext } from '../state'
 import { requestHoverPreview, dismissHoverPreview } from '../plugins/compat/hover-link-bus'
 import { resolveWikilinkTargetWithAlternatives } from '../plugins/link-resolver'
 import { warnOnce } from '../plugins/compat/log'
-import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, remarkBreaks, remarkBlockRef, remarkPreserveTableCodeEscapes, remarkMath, remarkFootnotes, getFootnoteEntries, createAnchorTracker } from '../plugins'
-import type { WikilinkNode, EmbedNode, CalloutNode, TagNode, FootnoteEntry, NumberedFootnoteReference } from '../plugins'
+import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, remarkBreaks, remarkBlockRef, remarkPreserveTableCodeEscapes, remarkMath, remarkFootnotes, remarkHighlight, getFootnoteEntries, createAnchorTracker } from '../plugins'
+import type { WikilinkNode, EmbedNode, CalloutNode, TagNode, FootnoteEntry, NumberedFootnoteReference, HighlightNode } from '../plugins'
 import { INLINE_HTML_OPEN_TAG_RE, INLINE_HTML_CLOSE_TAG_RE, parseInlineHtmlAttrs, parseStyleString } from '../plugins/inline-html'
 import { PdfViewer } from './BinaryViewer'
 import { MermaidRenderer } from './MermaidRenderer'
@@ -107,6 +107,7 @@ const OBSIDIAN_PLUGINS: Array<Plugin<[], Root>> = [
   remarkBlockRef,
   remarkBreaks,
   remarkMath,
+  remarkHighlight,
   // Last: numbers the footnotes remarkGfm parsed, once the tree is otherwise final.
   remarkFootnotes,
 ]
@@ -1221,6 +1222,13 @@ function renderPhrasingNode(
       return createElement('del', { key },
         renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token, onTagClick)
       )
+
+    case 'highlight' as PhrasingContent['type']: {
+      const hl = node as unknown as HighlightNode
+      return createElement('mark', { key, className: `hl-${hl.color}` },
+        renderPhrasingNodes(hl.children, vaultId, directoryTree, onInternalLinkClick, key, token, onTagClick)
+      )
+    }
 
     case 'inlineCode':
       return createElement('code', { key, className: 'view-mode-inline-code' }, node.value)

@@ -2253,6 +2253,21 @@
   border-radius: var(--radius-sm);
   padding: 1px 5px;
 }
+/* Highlight ==text== in reading view (Obsidian 1.14 colored highlights).
+   Default (==text==) is yellow; a leading color emoji picks another color.
+   Palette tokens live in index.css and follow dark mode. */
+.view-mode mark,
+.view-mode mark.hl-yellow {
+  background: var(--hl-yellow-bg);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+.view-mode mark.hl-red { background: var(--hl-red-bg); }
+.view-mode mark.hl-orange { background: var(--hl-orange-bg); }
+.view-mode mark.hl-green { background: var(--hl-green-bg); }
+.view-mode mark.hl-blue { background: var(--hl-blue-bg); }
+.view-mode mark.hl-purple { background: var(--hl-purple-bg); }
 .view-mode-table {
   width: 100%;
   border-collapse: collapse;

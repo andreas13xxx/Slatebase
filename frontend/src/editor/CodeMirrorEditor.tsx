@@ -26,6 +26,7 @@ const markdownLanguageWithProps: typeof markdownLanguage = Object.create(markdow
 import { search } from '@codemirror/search'
 import { undo as cmUndo, redo as cmRedo, defaultKeymap, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { autocompletion, type CompletionSource } from '@codemirror/autocomplete'
+import { highlightColorCompletions } from './live-preview/highlight-color-complete'
 import type { IEditorHandle, EditorFormattingAction } from './types'
 import { createSlatebaseTheme, createSlatebaseHighlightStyle } from './theme'
 import { getEditorState, saveEditorState, editorHistoryExtension } from './state-store'
@@ -388,10 +389,9 @@ export function CodeMirrorEditor({
       keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
     ]
 
-    // Include autocompletion with plugin completions if any are registered
-    if (pluginCompletionSources.length > 0) {
-      extensions.push(autocompletion({ override: pluginCompletionSources }))
-    }
+    // Autocompletion: the built-in `==` highlight-color source is always
+    // available; plugin-registered completion sources are added when present.
+    extensions.push(autocompletion({ override: [highlightColorCompletions, ...pluginCompletionSources] }))
 
     return extensions
   }, [readOnly, showLineNumbers, spellcheck, livePreview, livePreviewOptions, content, buildLivePreviewOptionsWithMenu])

@@ -39,9 +39,11 @@ const tableSource = [
   '  title: {}',
 ].join('\n')
 
-const cardsSource = [
+// A plugin-registered view type (NOT one of the built-in `table`/`cards`
+// types, which render in-app). Used to exercise the plugin-host path.
+const pluginSource = [
   'views:',
-  '  - type: cards',
+  '  - type: gallery',
   '    name: Karten',
   '    order: [title]',
   '  - type: table',
@@ -72,10 +74,10 @@ describe('BasesView plugin views', () => {
       }
       return inst
     })
-    registerBasesView('cards', { name: 'Karten', factory }, 'card-plugin')
+    registerBasesView('gallery', { name: 'Karten', factory }, 'card-plugin')
 
     const { container } = render(
-      <BasesView apiClient={makeApiClient()} vaultId="v1" source={cardsSource} readOnly={false} onOpenNote={() => {}} onSaveSource={() => {}} />,
+      <BasesView apiClient={makeApiClient()} vaultId="v1" source={pluginSource} readOnly={false} onOpenNote={() => {}} onSaveSource={() => {}} />,
     )
 
     await waitFor(() => expect(factory).toHaveBeenCalledTimes(1))
@@ -86,18 +88,18 @@ describe('BasesView plugin views', () => {
   })
 
   it('shows a view switcher for a multi-view base', () => {
-    registerBasesView('cards', { name: 'Karten', factory: (_c, el) => ({ containerEl: el, load() {}, onDataUpdated() {} }) }, 'card-plugin')
+    registerBasesView('gallery', { name: 'Karten', factory: (_c, el) => ({ containerEl: el, load() {}, onDataUpdated() {} }) }, 'card-plugin')
     render(
-      <BasesView apiClient={makeApiClient()} vaultId="v1" source={cardsSource} readOnly={false} onOpenNote={() => {}} onSaveSource={() => {}} />,
+      <BasesView apiClient={makeApiClient()} vaultId="v1" source={pluginSource} readOnly={false} onOpenNote={() => {}} onSaveSource={() => {}} />,
     )
     expect(screen.getByRole('tab', { name: 'Karten' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'Tabelle' })).toBeTruthy()
   })
 
   it('falls back to the table when the plugin factory throws', async () => {
-    registerBasesView('cards', { name: 'Karten', factory: () => { throw new Error('factory boom') } }, 'card-plugin')
+    registerBasesView('gallery', { name: 'Karten', factory: () => { throw new Error('factory boom') } }, 'card-plugin')
     render(
-      <BasesView apiClient={makeApiClient()} vaultId="v1" source={cardsSource} readOnly={false} onOpenNote={() => {}} onSaveSource={() => {}} />,
+      <BasesView apiClient={makeApiClient()} vaultId="v1" source={pluginSource} readOnly={false} onOpenNote={() => {}} onSaveSource={() => {}} />,
     )
     // Error banner shows, and the built-in table renders the note.
     await waitFor(() => expect(screen.getByRole('button', { name: 'Alpha' })).toBeTruthy())
@@ -105,9 +107,9 @@ describe('BasesView plugin views', () => {
   })
 
   it('switching to the table view renders the built-in table', async () => {
-    registerBasesView('cards', { name: 'Karten', factory: (_c, el) => ({ containerEl: el, load() {}, onDataUpdated() {} }) }, 'card-plugin')
+    registerBasesView('gallery', { name: 'Karten', factory: (_c, el) => ({ containerEl: el, load() {}, onDataUpdated() {} }) }, 'card-plugin')
     render(
-      <BasesView apiClient={makeApiClient()} vaultId="v1" source={cardsSource} readOnly={false} onOpenNote={() => {}} onSaveSource={() => {}} />,
+      <BasesView apiClient={makeApiClient()} vaultId="v1" source={pluginSource} readOnly={false} onOpenNote={() => {}} onSaveSource={() => {}} />,
     )
     fireEvent.click(screen.getByRole('tab', { name: 'Tabelle' }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Alpha' })).toBeTruthy())

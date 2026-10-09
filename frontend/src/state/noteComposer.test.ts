@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
 import { EditorView } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
-import { findHeadingSectionAtCursor, sanitizeFileNameFromHeading, extractRangeToNewFile } from './noteComposer'
+import { findHeadingSectionAtCursor, sanitizeFileNameFromHeading, extractRangeToNewFile, rewriteExtractedLinks } from './noteComposer'
 import type { IApiClient } from '../api'
+import type { DirectoryTree } from '../types'
 
 function makeView(doc: string, cursorPos?: number): EditorView {
   const view = new EditorView({ state: EditorState.create({ doc }), parent: document.body })
@@ -109,5 +110,56 @@ describe('extractRangeToNewFile', () => {
 
     expect(saveFile).toHaveBeenCalledWith('vault-1', 'Extracted.md', 'text')
     view.destroy()
+  })
+})
+
+describe('rewriteExtractedLinks', () => {
+  // Two files named "Note" in different folders: a bare [[Note]] in projects/
+  // resolves to projects/Note.md (same folder), but from archive/ it would
+  // resolve elsewhere — the exact case the rewrite exists for.
+  const tree: DirectoryTree = {
+    name: 'root', type: 'directory', path: '',
+    children: [
+      {
+        name: 'projects', type: 'directory', path: 'projects',
+        children: [
+          { name: 'Doc.md', type: 'file', path: 'projects/Doc.md' },
+          { name: 'Note.md', type: 'file', path: 'projects/Note.md' },
+        ],
+      },
+      {
+        name: 'archive', type: 'directory', path: 'archive',
+        children: [
+          { name: 'Note.md', type: 'file', path: 'archive/Note.md' },
+        ],
+      },
+    ],
+  }
+
+  it('returns content unchanged when the tree is null', () => {
+    expect(rewriteExtractedLinks('see [[Note]]', 'projects/Doc.md', 'archive/Doc.md', null)).toBe('see [[Note]]')
+  })
+
+  it('leaves links that resolve the same from both locations untouched', () => {
+    // Same source + destination folder → resolution identical, no rewrite.
+    const out = rewriteExtractedLinks('see [[Note]]', 'projects/Doc.md', 'projects/Extracted.md', tree)
+    expect(out).toBe('see [[Note]]')
+  })
+
+  it('pins a bare link whose resolution changes to an explicit path', () => {
+    // From projects/ the bare [[Note]] means projects/Note.md; extracting into
+    // archive/ would make it mean archive/Note.md, so it is rewritten explicit.
+    const out = rewriteExtractedLinks('see [[Note]]', 'projects/Doc.md', 'archive/Extracted.md', tree)
+    expect(out).toBe('see [[projects/Note]]')
+  })
+
+  it('preserves display text when rewriting', () => {
+    const out = rewriteExtractedLinks('see [[Note|the note]]', 'projects/Doc.md', 'archive/Extracted.md', tree)
+    expect(out).toBe('see [[projects/Note|the note]]')
+  })
+
+  it('leaves already path-qualified links untouched', () => {
+    const out = rewriteExtractedLinks('see [[archive/Note]]', 'projects/Doc.md', 'archive/Extracted.md', tree)
+    expect(out).toBe('see [[archive/Note]]')
   })
 })

@@ -106,6 +106,12 @@ export interface BaseView {
   order?: string[]
   /** Sort clauses applied in order. */
   sort?: BaseSortClause[]
+  /**
+   * Column id (property key) to group rows by. Used by the `cards` (Kanban)
+   * view: each distinct value becomes a column of cards; notes with no value
+   * fall into an "Ohne {property}" column. Ignored by the table view.
+   */
+  groupBy?: string
   /** Unknown fields preserved for round-trip compatibility. */
   _unknown?: Record<string, unknown>
 }

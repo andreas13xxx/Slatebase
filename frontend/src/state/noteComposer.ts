@@ -5,6 +5,9 @@
  */
 import type { EditorView } from '@codemirror/view'
 import type { IApiClient } from '../api'
+import type { DirectoryTree } from '../types'
+import { extractWikilinks } from '../plugins/wikilink/extract'
+import { resolveWikilinkTarget } from '../plugins/link-resolver'
 
 /** A character-offset range plus the heading text it was found under (if any). */
 export interface HeadingSectionRange {
@@ -62,10 +65,65 @@ export function sanitizeFileNameFromHeading(headingText: string): string {
 }
 
 /**
+ * Rewrites bare-name wikilinks in extracted content so they still point at the
+ * same file from the new note's location (Obsidian 1.13 "update links on
+ * extract"). A bare `[[Note]]` resolves against the vault via same-folder →
+ * shortest-path → alphabetical disambiguation (`resolveWikilinkTarget`); moving
+ * the text to a note in a different folder can change which file that bare name
+ * resolves to. For every wikilink whose resolution from `sourcePath` differs
+ * from its resolution from `newPath`, the target is rewritten to the explicit
+ * resolved path (minus the `.md` extension), which is unambiguous from anywhere.
+ *
+ * Links that already resolve identically from both locations — the common case,
+ * and always true when the new note stays in the source folder — are left
+ * exactly as written. Display text, headings and block refs are preserved.
+ *
+ * @param content - The extracted Markdown.
+ * @param sourcePath - Path of the note the content came from.
+ * @param newPath - Path of the new note the content is moving to.
+ * @param tree - The vault directory tree used for resolution; when null, nothing is rewritten.
+ * @returns The content with any now-ambiguous links made explicit.
+ */
+export function rewriteExtractedLinks(
+  content: string,
+  sourcePath: string,
+  newPath: string,
+  tree: DirectoryTree | null,
+): string {
+  if (!tree) return content
+
+  let result = content
+  // Rewrite from the end backwards so earlier offsets stay valid as we splice.
+  const links = extractWikilinks(content)
+  for (const link of links) {
+    // Path-qualified links (containing `/`) are already unambiguous.
+    if (link.target.includes('/')) continue
+
+    const fromSource = resolveWikilinkTarget(link.target, tree, sourcePath)
+    const fromNew = resolveWikilinkTarget(link.target, tree, newPath)
+    if (!fromSource || fromSource === fromNew) continue
+
+    // Resolution changed: pin the link to the file it meant in the source note.
+    const explicit = fromSource.replace(/\.md$/i, '')
+    const headingPart = link.heading ? `#${link.heading}` : link.blockRef ? `#^${link.blockRef}` : ''
+    const displayPart = link.display && link.display !== link.target ? `|${link.display}` : ''
+    const oldLink = `[[${link.target}${headingPart ? headingPart : ''}${displayPart}]]`
+    const newLink = `[[${explicit}${headingPart}${displayPart}]]`
+    // Replace the first occurrence of this exact link text that still appears.
+    result = result.replace(oldLink, newLink)
+  }
+  return result
+}
+
+/**
  * Cuts `range` out of `view`'s document, replaces it with a `[[fileName]]`
  * link, and creates a new file at `fileName` (same directory as `sourcePath`)
  * containing the cut text. Used by both `split-file` and `extract-heading` —
  * they differ only in how `range` and `fileName` are computed.
+ *
+ * When `tree` is supplied, bare-name wikilinks inside the cut text that would
+ * resolve differently from the new file's location are rewritten to explicit
+ * paths (Obsidian 1.13 "update links on extract"). Omit `tree` to skip that.
  */
 export async function extractRangeToNewFile(
   view: EditorView,
@@ -74,12 +132,14 @@ export async function extractRangeToNewFile(
   fileName: string,
   vaultId: string,
   apiClient: IApiClient,
+  tree?: DirectoryTree | null,
 ): Promise<void> {
   const extracted = view.state.doc.sliceString(range.from, range.to)
   const dir = sourcePath.includes('/') ? sourcePath.slice(0, sourcePath.lastIndexOf('/') + 1) : ''
   const baseName = fileName.endsWith('.md') ? fileName.slice(0, -3) : fileName
   const newPath = `${dir}${baseName}.md`
 
-  await apiClient.saveFile(vaultId, newPath, extracted)
+  const toWrite = tree === undefined ? extracted : rewriteExtractedLinks(extracted, sourcePath, newPath, tree)
+  await apiClient.saveFile(vaultId, newPath, toWrite)
   view.dispatch({ changes: { from: range.from, to: range.to, insert: `[[${baseName}]]` } })
 }

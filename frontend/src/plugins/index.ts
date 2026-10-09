@@ -10,9 +10,12 @@ export type {
 
 export type { MathInlineNode, MathBlockNode } from './math/types'
 export type { FootnoteEntry, NumberedFootnoteReference } from './footnote/plugin'
+export type { HighlightNode } from './highlight/plugin'
 
 // Constants
 export { IMAGE_EXTENSIONS } from './types'
+export type { HighlightColor, HighlightColorName } from './highlight-colors'
+export { HIGHLIGHT_COLORS, matchHighlightColor } from './highlight-colors'
 
 // Remark plugins
 export { remarkWikilink } from './wikilink/plugin'
@@ -24,6 +27,7 @@ export { remarkBlockRef } from './block-ref/plugin'
 export { remarkPreserveTableCodeEscapes } from './preserve-table-code-escapes'
 export { remarkMath } from './math/plugin'
 export { remarkFootnotes, getFootnoteEntries } from './footnote/plugin'
+export { remarkHighlight } from './highlight/plugin'
 
 // Utilities
 export { extractWikilinks } from './wikilink/extract'

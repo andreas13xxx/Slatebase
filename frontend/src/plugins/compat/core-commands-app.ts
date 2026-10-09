@@ -28,6 +28,7 @@ import type { ICommandRegistry } from './command-registry'
 import type { IEditor } from './editor-shim'
 import type { IApiClient } from '../../api'
 import type { AppAction } from '../../types'
+import type { DirectoryTree } from '../../types'
 import type { TabState, TabAction, TabEntry } from '../../state/tabState'
 import { openTab, saveTab, undoCloseTab } from '../../state/tabActions'
 import type { AuthState, AuthAction } from '../../state/authState'
@@ -57,6 +58,8 @@ export type NavigablePage =
 export interface CoreAppCommandHandlers {
   vaultId: string | null
   vaultName: string
+  /** Active vault's directory tree, for link resolution (e.g. Note Composer link rewrite on extract). */
+  directoryTree: DirectoryTree | null
   apiClient: IApiClient
   tabState: TabState
   tabDispatch: Dispatch<TabAction>
@@ -259,7 +262,7 @@ async function splitFileFromSelection(h: CoreAppCommandHandlers): Promise<void> 
   const fileName = window.prompt('Neuer Dateiname')
   if (fileName === null || fileName.trim() === '') return
   try {
-    await extractRangeToNewFile(view, { from, to }, tab.filePath, fileName.trim(), h.vaultId, h.apiClient)
+    await extractRangeToNewFile(view, { from, to }, tab.filePath, fileName.trim(), h.vaultId, h.apiClient, h.directoryTree)
     refreshTree(h)
   } catch {
     showToast('error', 'Datei konnte nicht erstellt werden')
@@ -279,7 +282,7 @@ async function extractHeadingToFile(h: CoreAppCommandHandlers): Promise<void> {
     return
   }
   try {
-    await extractRangeToNewFile(view, section, tab.filePath, sanitizeFileNameFromHeading(section.headingText), h.vaultId, h.apiClient)
+    await extractRangeToNewFile(view, section, tab.filePath, sanitizeFileNameFromHeading(section.headingText), h.vaultId, h.apiClient, h.directoryTree)
     refreshTree(h)
   } catch {
     showToast('error', 'Datei konnte nicht erstellt werden')
