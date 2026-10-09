@@ -122,12 +122,13 @@ Plugin-Sidebar-Views, Canvas-/Graph-Fullscreen) einplanen.
 
 ## Prio 6 — Bases (Track H)
 
-Scope: ~55–75h. **Spec:** `.kiro/specs/bases/` (Nutzerwunsch). **Stand:** Phasen 1–7
+Scope: ~55–75h. **Spec:** `.kiro/specs/bases/` (Nutzerwunsch). **Stand:** Phasen 1–8
 umgesetzt (`.base`-Parser/Serializer, Query-Engine auf dem Link-Index, Formel-Interpreter,
 editierbare Tabellen-View, Tab-Integration, Feature-Toggle `bases` kalt/default-aus,
-Welcome-Vault-Guides DE/EN). Offen: Phase 8 (restliche Steering-Doku), Karten-/Board-Views,
-die volle Obsidian-Formelsprache und die Freigabe an fremde Plugins (eigene Spec:
-`.kiro/specs/bases-plugin-api/`, siehe Bases-Spec „Out of Scope").
+Welcome-Vault-Guides DE/EN, Steering-Doku). **Plugin-View-Freigabe umgesetzt:** die
+Bases-**Plugin-API** (`.kiro/specs/bases-plugin-api/`) ist implementiert — fremde Plugins
+können über `Plugin.registerBasesView()` eigene Bases-Views beisteuern, die mit echten
+Vault-Daten gerendert werden. Offen: Karten-/Board-Views und die volle Obsidian-Formelsprache.
 
 - `.base`-Dateiformat lesen/schreiben (YAML: Filter, Views, Formeln) — kompatibel zu
   Obsidians Format, damit importierte Vaults funktionieren
@@ -140,9 +141,10 @@ die volle Obsidian-Formelsprache und die Freigabe an fremde Plugins (eigene Spec
 **Scope-Risiko** liegt bei den Formeln — Obsidians Formel-Sprache ist nicht trivial
 nachzubauen; für die erste Version bewusst auf einfache Ausdrücke beschränken.
 
-Die Obsidian-API-Typen für Bases sind in `plugins/compat/` bereits als bewusste No-Ops
-registriert und vom CompatibilityAnalyzer als `partial` markiert — sie bleiben sichtbar,
-bis dieses Feature sie ablöst.
+Die Obsidian-Bases-Plugin-API in `plugins/compat/` ist nicht mehr No-Op, sondern
+funktional (`registerBasesView()`, `Value`-Hierarchie, `BasesView`/`QueryController`/
+`BasesEntry`) — der CompatibilityAnalyzer stuft ein reines Bases-Plugin als `supported`
+ein. Nur der Desktop-CLI-Handler bleibt ein bewusster No-Op (`partial`).
 
 ---
 

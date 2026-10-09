@@ -62,6 +62,7 @@ import { getActiveEditorView, registerPluginExtension, removePluginExtensions, r
 import { getEditorSuggestManager, destroyEditorSuggestManager } from './editor-suggest-manager'
 import type { EditorSuggestInstance } from './editor-suggest-manager'
 import { createEditorSuggestExtension, isEditorSuggestExtensionRegistered, markEditorSuggestExtensionRegistered, resetEditorSuggestExtensionState } from './editor-suggest-extension'
+import { clearForPlugin as clearBasesViewsForPlugin, resetForVault as resetBasesViewsForVault } from './bases-view-registry'
 import { registerMarkdownRendererGlobal } from './shims/markdown-renderer-shim'
 import { usePluginEventBridge } from './plugin-event-bridge'
 import { ViewRegistry } from './view-registry'
@@ -330,6 +331,8 @@ export function PluginProvider({
     removePluginCompletionSources(pluginId)
     // Remove code block processors and post-processors for this plugin
     unregisterAllCodeBlocksForPlugin(pluginId)
+    // Remove any Bases view types this plugin registered
+    clearBasesViewsForPlugin(pluginId)
   }
 
   /**
@@ -652,6 +655,8 @@ export function PluginProvider({
     // Initialize the EditorSuggest manager for this vault
     // (reset extension-registration state from the previous vault)
     resetEditorSuggestExtensionState()
+    // Clear Bases view registrations from the previous vault's plugins
+    resetBasesViewsForVault()
     getEditorSuggestManager({
       getActiveEditorView,
       getEditor: () => newWorkspaceShim.activeEditor?.editor ?? null,

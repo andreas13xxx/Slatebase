@@ -193,3 +193,38 @@
   font-size: 0.85em;
   padding: var(--spacing-md);
 }
+
+/* View switcher: one tab per declared view (plugin or built-in table). */
+.bases-view__views {
+  display: flex;
+  gap: var(--spacing-xs);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.bases-view__view {
+  appearance: none;
+  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 2px 10px;
+  font-size: 0.85em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bases-view__view--active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+/* Container a plugin-contributed Bases view renders its own DOM into. */
+.bases-view__plugin-container {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--spacing-md);
+}

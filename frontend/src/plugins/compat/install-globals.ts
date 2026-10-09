@@ -22,6 +22,8 @@ import { getCsrfToken } from '../../state/authContext'
 import { addRibbonIcon as registerRibbonIcon } from './ribbon-icon-registry'
 import { addStatusBarItem as registerStatusBarItem } from './status-bar-registry'
 import { getCurrentPluginId, trackPluginTimer, withPluginContext } from './plugin-execution-context'
+import { registerBasesView as registerBasesViewInRegistry, type BasesViewRegistration } from './bases-view-registry'
+import { BASES_VALUE_CLASSES } from './bases-values'
 import { containAsyncLoad, containAsyncUnload } from './async-lifecycle'
 import { getBuiltInIconIds, getLucideIconElement, renderLucideIconInto } from './lucide-icons'
 import { getCustomIconSvg, sizeCustomIconSvg } from '../../utils/pluginIcon'
@@ -903,95 +905,110 @@ export function installObsidianGlobals(): void {
   // flags plugins that reference any of these as 'partial', so this isn't
   // silently invisible in the install-time compat report.
   if (!window.obsidian.Value) {
-    /** Base of the whole formula-result type hierarchy. Real API: abstract class Value. */
-    class ValueBase {
-      value: unknown
-      constructor(value?: unknown) { this.value = value }
-      toString(): string { return this.value == null ? '' : String(this.value) }
-      isTruthy(): boolean { return !!this.value }
-      equals(other: unknown): boolean { return this === other }
-      looseEquals(other: unknown): boolean { return this.equals(other) }
-      renderTo(el: HTMLElement, _ctx: unknown): void { el.textContent = this.toString() }
-      static equals(a: unknown, b: unknown): boolean { return a === b }
-      static looseEquals(a: unknown, b: unknown): boolean { return a === b }
-    }
-    /** Builds a named subclass so devtools/console show a real name instead of "ValueBase". */
-    const namedValueClass = (name: string, Base: typeof ValueBase): typeof ValueBase => {
-      const cls = class extends Base {}
-      Object.defineProperty(cls, 'name', { value: name })
-      return cls
-    }
-    window.obsidian.Value = ValueBase as unknown as Record<string, unknown>
-    const NotNullValue = namedValueClass('NotNullValue', ValueBase)
-    window.obsidian.NotNullValue = NotNullValue as unknown as Record<string, unknown>
-    const NullValueClass = namedValueClass('NullValue', ValueBase) as unknown as { new (): ValueBase; value?: ValueBase }
-    NullValueClass.value = new NullValueClass()
-    window.obsidian.NullValue = NullValueClass as unknown as Record<string, unknown>
-    const PrimitiveValue = namedValueClass('PrimitiveValue', NotNullValue)
-    window.obsidian.PrimitiveValue = PrimitiveValue as unknown as Record<string, unknown>
-    window.obsidian.BooleanValue = namedValueClass('BooleanValue', PrimitiveValue) as unknown as Record<string, unknown>
-    window.obsidian.NumberValue = namedValueClass('NumberValue', PrimitiveValue) as unknown as Record<string, unknown>
-    const StringValue = namedValueClass('StringValue', PrimitiveValue)
-    window.obsidian.StringValue = StringValue as unknown as Record<string, unknown>
-    for (const name of ['HTMLValue', 'IconValue', 'ImageValue', 'LinkValue', 'TagValue', 'UrlValue']) {
-      (window.obsidian as Record<string, unknown>)[name] = namedValueClass(name, StringValue) as unknown as Record<string, unknown>
-    }
-    const DateValue = namedValueClass('DateValue', NotNullValue)
-    window.obsidian.DateValue = DateValue as unknown as Record<string, unknown>
-    window.obsidian.RelativeDateValue = namedValueClass('RelativeDateValue', DateValue) as unknown as Record<string, unknown>
-    for (const name of ['DurationValue', 'FileValue', 'ListValue', 'ObjectValue', 'RegExpValue']) {
-      (window.obsidian as Record<string, unknown>)[name] = namedValueClass(name, NotNullValue) as unknown as Record<string, unknown>
+    // Functional Value hierarchy (see bases-values.ts). A plugin-contributed
+    // Bases view receives these objects and renders/compares them, so each
+    // has real toString/isTruthy/equals/looseEquals/renderTo per type.
+    for (const [name, cls] of Object.entries(BASES_VALUE_CLASSES)) {
+      (window.obsidian as Record<string, unknown>)[name] = cls as unknown as Record<string, unknown>
     }
   }
 
   if (!window.obsidian.BasesView) {
     const ComponentClass = window.obsidian.Component as { new (): { load(): void; unload(): void; onload(): void; onunload(): void; addChild<C>(c: C): C; removeChild<C>(c: C): C; register(cb: unknown): void; registerEvent(ref: unknown): void; registerDomEvent(el: EventTarget, event: string, handler: EventListenerOrEventListenerObject): void; registerInterval(id: number): number } }
-    /** Real API: `class BasesViewConfig` — the per-view config object handed to a BasesView. Options/formula queries are never evaluated. */
+    const nullValue = () => (window.obsidian!.NullValue as { value: unknown }).value
+    /**
+     * `class BasesViewConfig` — the per-view config object a BasesView reads.
+     * Backed by a plain data map the host populates from the `.base` view
+     * (name, column order). Formula evaluation is delegated to the host via
+     * an injectable resolver, falling back to NullValue when unset.
+     */
     window.obsidian.BasesViewConfig = class BasesViewConfig {
       name = ''
-      getOption(_key: string): unknown { return undefined }
-      getAsPropertyId(_key: string): unknown { return undefined }
-      getOrder(): unknown[] { return [] }
-      getEvaluatedFormula(_view: unknown, _key: string): unknown { return (window.obsidian!.NullValue as { value: unknown }).value }
-      setViewData(_key: string, _value: unknown): void {}
-      getViewData(_key: string): unknown { return undefined }
+      private _data: Record<string, unknown> = {}
+      private _order: string[] = []
+      /** Host-injected formula resolver; returns a Value. */
+      _resolveFormula?: (key: string) => unknown
+      getOption(key: string): unknown { return this._data[key] }
+      get(key: string): unknown { return this._data[key] }
+      getAsPropertyId(key: string): unknown { return this._data[key] ?? null }
+      getOrder(): string[] { return this._order }
+      setOrder(order: string[]): void { this._order = order }
+      getEvaluatedFormula(_view: unknown, key: string): unknown {
+        return this._resolveFormula ? this._resolveFormula(key) : nullValue()
+      }
+      setViewData(key: string, value: unknown): void { this._data[key] = value }
+      getViewData(key: string): unknown { return this._data[key] }
     } as unknown as Record<string, unknown>
-    /** Real API: `abstract class BasesView extends Component`. Never instantiated by Slatebase — `registerBasesView()` stores the registration but never calls its factory. */
+    /**
+     * `abstract class BasesView extends Component`. A plugin subclasses this
+     * and implements `onDataUpdated()`. The factory receives `(controller,
+     * containerEl)`; the host sets `config`/`allProperties`/`data` before each
+     * `onDataUpdated()` call. Subclasses render into `this.containerEl`.
+     */
     window.obsidian.BasesView = class BasesView extends (ComponentClass as unknown as { new (): object }) {
+      type = ''
       app: unknown
+      controller: unknown
       containerEl: HTMLElement
       config: unknown
+      allProperties: string[] = []
+      data: unknown
       constructor(controller: unknown, containerEl: HTMLElement) {
         super()
+        this.controller = controller
         this.containerEl = containerEl
         this.app = (controller as { app?: unknown } | undefined)?.app
+        this.config = (controller as { config?: unknown } | undefined)?.config
       }
       onDataUpdated(): void {}
     } as unknown as Record<string, unknown>
-    /** Real API: `class QueryController extends Component` — drives a BasesView's data. Slatebase never constructs one. */
+    /**
+     * `class QueryController extends Component` — drives a BasesView's data.
+     * The real controller lives in `bases-query-controller.ts`; this base
+     * class only has to exist and carry `app`/`config` so plugin code that
+     * reads `controller.app` works, and so `instanceof QueryController` holds.
+     */
     window.obsidian.QueryController = class QueryController extends (ComponentClass as unknown as { new (): object }) {
       app: unknown
+      config: unknown
       constructor(app: unknown) { super(); this.app = app }
     } as unknown as Record<string, unknown>
-    /** Real API: `class RenderContext implements HoverParent` — passed to Value.renderTo(). */
+    /** `class RenderContext implements HoverParent` — passed to Value.renderTo(). */
     window.obsidian.RenderContext = class RenderContext {
-      hoverPopover = null
+      hoverPopover: unknown = null
+      /** Host-injected note-open callback so LinkValue renders a working link. */
+      onOpenNote?: (path: string) => void
     } as unknown as Record<string, unknown>
-    /** Real API: `class BasesEntry` / `class BasesEntryGroup` / `class BasesQueryResult` — query results. Never populated since no query ever runs. */
+    /**
+     * `class BasesEntry implements FormulaContext` — one result row. Carries
+     * the note's `file` and a column→Value map; `getValue(propertyId)` returns
+     * the Value (NullValue when absent), matching the real API.
+     */
     window.obsidian.BasesEntry = class BasesEntry {
       file: unknown = null
       app: unknown
-      constructor(app: unknown) { this.app = app }
-      get(_key: string): unknown { return (window.obsidian!.NullValue as { value: unknown }).value }
+      private _values: Map<string, unknown> = new Map()
+      constructor(app?: unknown) { this.app = app }
+      setValue(key: string, value: unknown): void { this._values.set(key, value) }
+      getValue(propertyId: string): unknown { return this._values.get(propertyId) ?? nullValue() }
+      /** Legacy alias some plugin code uses. */
+      get(key: string): unknown { return this.getValue(key) }
     } as unknown as Record<string, unknown>
     window.obsidian.BasesEntryGroup = class BasesEntryGroup {
       key: unknown = null
-      items: unknown[] = []
+      entries: unknown[] = []
+      hasKey(): boolean { return this.key != null }
     } as unknown as Record<string, unknown>
+    /**
+     * `class BasesQueryResult` — the data object on `BasesView.data`. Holds the
+     * entries the QueryController produced; `length()`/`get()` iterate them.
+     */
     window.obsidian.BasesQueryResult = class BasesQueryResult {
+      data: unknown[] = []
+      constructor(entries?: unknown[]) { if (entries) this.data = entries }
       hasKey(): boolean { return false }
-      length(): number { return 0 }
-      get(_index: number): unknown { return (window.obsidian!.NullValue as { value: unknown }).value }
+      length(): number { return this.data.length }
+      get(index: number): unknown { return this.data[index] ?? nullValue() }
     } as unknown as Record<string, unknown>
   }
 
@@ -1573,13 +1590,17 @@ export function installObsidianGlobals(): void {
         warnNoOp(pluginId, 'registerExtensions')
       }
       /**
-       * Register a Bases view type (Obsidian's built-in database/table view
-       * feature, since 1.9). Slatebase has no Bases concept — plugins that
-       * extend it (custom Bases view types) have nothing to render into.
+       * Register a Bases view type (Obsidian's database/table view feature,
+       * API since 1.10.0). The registration is stored in the Bases view
+       * registry; when a `.base` file's active view `type` matches `id`, the
+       * container (`components/bases/BasesView.tsx`) calls this factory and
+       * mounts the plugin's view instead of the built-in table. Returns
+       * `true` if stored, `false` if the id was already taken — matching
+       * Obsidian's boolean return.
        */
-      registerBasesView(_id: string, _config: unknown): void {
+      registerBasesView(id: string, registration: BasesViewRegistration): boolean {
         const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
-        warnNoOp(pluginId, 'registerBasesView', 'Slatebase does not implement Bases; this view type is never rendered.')
+        return registerBasesViewInRegistry(id, registration, pluginId)
       }
       /**
        * Register an `obsidian://` protocol handler. Deliberately unsupported:

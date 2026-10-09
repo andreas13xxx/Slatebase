@@ -16,13 +16,16 @@ import type { IApiClient } from '../../api'
 import { parseBase } from '../../bases/parser'
 import { serializeBase } from '../../bases/serializer'
 import { runBaseQuery } from '../../bases/query-engine'
-import type { BaseDocument, BaseRow, BaseSortClause } from '../../bases/types'
+import type { BaseDocument, BaseRow, BaseSortClause, BaseView } from '../../bases/types'
 import { applyFrontmatterChange } from '../../utils/frontmatterWriter'
 import { parseFrontmatter } from '../context-panel/utils/parseFrontmatter'
 import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
 import { extractErrorMessage } from '../../utils/error'
+import { hasBasesViewRegistration } from '../../plugins/compat/bases-view-registry'
+import { ErrorBoundary } from '../ErrorBoundary'
 import { BasesTableView } from './BasesTableView'
 import { BasesSourceView } from './BasesSourceView'
+import { BasesPluginViewHost } from './BasesPluginViewHost'
 
 export interface BasesViewProps {
   apiClient: IApiClient
@@ -37,20 +40,32 @@ export interface BasesViewProps {
   onSaveSource: (yaml: string) => void
 }
 
-type Mode = 'table' | 'source'
+type Mode = 'view' | 'source'
 
 export const BasesView = memo(function BasesView({
   apiClient, vaultId, source, readOnly, onOpenNote, onSaveSource,
 }: BasesViewProps) {
-  const [mode, setMode] = useState<Mode>('table')
+  const [mode, setMode] = useState<Mode>('view')
+  const [selectedViewIndex, setSelectedViewIndex] = useState(0)
   const [rows, setRows] = useState<BaseRow[]>([])
   const [queryError, setQueryError] = useState<string | null>(null)
+  const [pluginViewError, setPluginViewError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   // Parse the base source. A parse failure keeps the raw source reachable.
   const parseResult = useMemo(() => parseBase(source), [source])
   const doc: BaseDocument | null = parseResult.success ? parseResult.document : null
-  const activeView = doc?.views[0]
+  const views = doc?.views ?? []
+  const safeIndex = selectedViewIndex < views.length ? selectedViewIndex : 0
+  const activeView: BaseView | undefined = views[safeIndex]
+
+  // A view whose `type` a plugin registered renders via the plugin host; any
+  // other type (incl. `table`) renders the built-in table. An errored plugin
+  // view falls back to the built-in table.
+  const isPluginView = useMemo(
+    () => !!activeView && activeView.type !== 'table' && hasBasesViewRegistration(activeView.type) && !pluginViewError,
+    [activeView, pluginViewError],
+  )
 
   const runQuery = useCallback(async () => {
     if (!doc || !activeView) return
@@ -66,17 +81,30 @@ export const BasesView = memo(function BasesView({
     }
   }, [apiClient, vaultId, doc, activeView])
 
-  // Initial + on-document-change query.
-  useEffect(() => { void runQuery() }, [runQuery])
+  // The built-in table owns the row fetch; a plugin view fetches via its own
+  // QueryController, so only query here when the table is what renders.
+  const tableIsActive = mode === 'view' && !isPluginView
+  useEffect(() => { if (tableIsActive) void runQuery() }, [runQuery, tableIsActive])
 
-  // Live refresh: re-query when any note in this vault changes.
+  // Live refresh: re-query when any note in this vault changes (table only;
+  // the plugin host's QueryController handles its own live refresh).
   const runQueryRef = useRef(runQuery)
   useEffect(() => { runQueryRef.current = runQuery }, [runQuery])
   useEffect(() => {
     return onRealtimeVaultChange((event) => {
-      if (event.vaultId === vaultId) void runQueryRef.current()
+      if (event.vaultId === vaultId && tableIsActive) void runQueryRef.current()
     })
-  }, [vaultId])
+  }, [vaultId, tableIsActive])
+
+  // Reset a plugin-view error when the user switches to a different view
+  // (but not on the initial mount, where the host may legitimately raise one).
+  const prevIndexRef = useRef(safeIndex)
+  useEffect(() => {
+    if (prevIndexRef.current !== safeIndex) {
+      prevIndexRef.current = safeIndex
+      setPluginViewError(null)
+    }
+  }, [safeIndex])
 
   // Commit a property-cell edit into the target note's frontmatter.
   const handleCommitCell = useCallback(async (path: string, property: string, values: string[]) => {
@@ -98,12 +126,17 @@ export const BasesView = memo(function BasesView({
     }
   }, [apiClient, vaultId, rows])
 
-  // Write a sort change back into the `.base` file.
+  // Write a sort change back into the selected view in the `.base` file.
   const handleSortChange = useCallback((sort: BaseSortClause[]) => {
     if (!doc || !activeView || readOnly) return
-    const nextViews = doc.views.map((v, i) => (i === 0 ? { ...v, sort } : v))
+    const nextViews = doc.views.map((v, i) => (i === safeIndex ? { ...v, sort } : v))
     onSaveSource(serializeBase({ ...doc, views: nextViews }))
-  }, [doc, activeView, readOnly, onSaveSource])
+  }, [doc, activeView, readOnly, onSaveSource, safeIndex])
+
+  // Stable callback for the plugin host to report a render/query failure.
+  const handlePluginViewError = useCallback((message: string) => {
+    setPluginViewError(message)
+  }, [])
 
   if (!doc) {
     return (
@@ -120,13 +153,30 @@ export const BasesView = memo(function BasesView({
     <div className="bases-view">
       <div className="bases-view__toolbar">
         <span className="bases-view__title">{activeView?.name ?? 'Base'}</span>
+        {/* View switcher: one button per declared view (plugin or built-in table). */}
+        {views.length > 1 && (
+          <div className="bases-view__views" role="tablist" aria-label="Ansichten">
+            {views.map((v, i) => (
+              <button
+                key={`${v.type}-${i}`}
+                type="button"
+                role="tab"
+                aria-selected={i === safeIndex}
+                className={i === safeIndex ? 'bases-view__view bases-view__view--active' : 'bases-view__view'}
+                onClick={() => { setSelectedViewIndex(i); setMode('view') }}
+              >
+                {v.name ?? v.type}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="bases-view__modes">
           <button
             type="button"
-            className={mode === 'table' ? 'bases-view__mode bases-view__mode--active' : 'bases-view__mode'}
-            onClick={() => setMode('table')}
+            className={mode === 'view' ? 'bases-view__mode bases-view__mode--active' : 'bases-view__mode'}
+            onClick={() => setMode('view')}
           >
-            Tabelle
+            Ansicht
           </button>
           <button
             type="button"
@@ -139,9 +189,30 @@ export const BasesView = memo(function BasesView({
       </div>
 
       {queryError && <div className="bases-view__error" role="alert">{queryError}</div>}
-      {loading && <div className="bases-view__loading" role="status" aria-live="polite">Lädt…</div>}
+      {pluginViewError && (
+        <div className="bases-view__error" role="alert">
+          Die Plugin-Ansicht ist fehlgeschlagen ({pluginViewError}) — es wird die Tabelle angezeigt.
+        </div>
+      )}
+      {loading && tableIsActive && <div className="bases-view__loading" role="status" aria-live="polite">Lädt…</div>}
 
-      {mode === 'table' && activeView && (
+      {mode === 'view' && isPluginView && activeView && (
+        <ErrorBoundary
+          onError={(err) => setPluginViewError(err.message)}
+          fallback={<div className="bases-view__error" role="alert">Die Plugin-Ansicht ist abgestürzt — es wird die Tabelle angezeigt.</div>}
+        >
+          <BasesPluginViewHost
+            apiClient={apiClient}
+            vaultId={vaultId}
+            doc={doc}
+            view={activeView}
+            onOpenNote={onOpenNote}
+            onError={handlePluginViewError}
+          />
+        </ErrorBoundary>
+      )}
+
+      {mode === 'view' && !isPluginView && activeView && (
         <BasesTableView
           doc={doc}
           view={activeView}
