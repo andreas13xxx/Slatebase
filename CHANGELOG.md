@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.45.0](https://github.com/andreas13xxx/Slatebase/compare/v0.44.9...v0.45.0) (2026-10-09)
+
+
+### Features
+
+* Bases — Obsidian .base files + plugin-view API ([#216](https://github.com/andreas13xxx/Slatebase/issues/216)) ([e27d0fc](https://github.com/andreas13xxx/Slatebase/commit/e27d0fce65f14bf6c089931eb9c11cc76873c82a))
+
 ## [0.44.9](https://github.com/andreas13xxx/Slatebase/compare/v0.44.8...v0.44.9) (2026-10-09)
 
 
