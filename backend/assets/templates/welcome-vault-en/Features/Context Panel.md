@@ -46,6 +46,15 @@ All tags used in the current vault, with counts. Expand a tag to see which files
 
 The YAML frontmatter of the current file displayed as a readable key-value table.
 
+### Footnotes
+
+Lists every footnote in the current file:
+
+- Each entry shows its number, a preview of the definition text, and — for footnotes used more than once — how many times it is referenced
+- Numbering follows the order footnotes are **referenced** in the text (not the order of their definitions), matching the rendered footnote list at the foot of the note
+- A definition nothing points at is still listed and flagged "unreferenced", so no footnote goes missing
+- Clicking an entry jumps to the footnote's first use in the text, so you don't lose your place in a long note
+
 ---
 
 ## Tab Management
@@ -94,6 +103,9 @@ This is useful for seeing the outline and backlinks together while editing.
 
 > [!tip] Tip: Backlinks Discovery
 > The backlinks section is one of the most powerful features for rediscovering connections. Even if you forget where you mentioned something, backlinks show you all references automatically.
+
+> [!tip] Edit properties in the link preview
+> Hovering over a wikilink shows a preview of the target note. Its frontmatter properties are editable right there — change a value, add or remove a property — without opening the file. The change is saved to the target file immediately.
 
 > [!todo] Exercise
 > 1. Open this file and check the Context Panel
