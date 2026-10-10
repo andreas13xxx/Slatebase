@@ -7,8 +7,13 @@ import {
   getActiveTabId,
   listPanes,
   MIN_PANE_RATIO,
+  serializePaneTree,
+  rehydratePaneTree,
+  migrateFlatTabsToPaneTree,
+  parsePersistedPaneTree,
   type PaneTree,
   type SplitNode,
+  type PersistedPaneTab,
 } from './paneTreeState'
 import { initialTabState, type TabState } from './tabState'
 
@@ -401,6 +406,193 @@ describe('paneTreeReducer', () => {
         payload: { paneId: 'p1', action: { type: 'OPEN_TAB', payload: { vaultId: 'v', filePath: 'a.md', fileName: 'a.md' } } },
       })
       expect(JSON.stringify(initialTabState)).toBe(before)
+    })
+  })
+})
+
+describe('pane-tree persistence', () => {
+  /** Build a two-pane split tree with one tab in each pane. */
+  function twoPaneTree(): PaneTree {
+    const left = createPane('p1', tabStateWith('v', 'a.md'))
+    const right = createPane('p2', tabStateWith('v', 'b.md'))
+    const split: SplitNode = {
+      kind: 'split',
+      id: 'split-1',
+      direction: 'horizontal',
+      children: [left, right],
+      sizes: [0.6, 0.4],
+    }
+    return { root: split, activePaneId: 'p2' }
+  }
+
+  describe('serialize', () => {
+    it('serializes structure, sizes, per-pane tabs and active pane', () => {
+      const persisted = serializePaneTree(twoPaneTree())
+      expect(persisted.activePaneId).toBe('p2')
+      expect(persisted.root.kind).toBe('split')
+      const root = persisted.root as Extract<typeof persisted.root, { kind: 'split' }>
+      expect(root.direction).toBe('horizontal')
+      expect(root.sizes).toEqual([0.6, 0.4])
+      expect(root.children).toHaveLength(2)
+      const left = root.children[0]!
+      expect(left.kind).toBe('pane')
+      if (left.kind === 'pane') {
+        expect(left.tabs).toEqual([
+          { vaultId: 'v', filePath: 'a.md', fileName: 'a.md', mode: 'edit', pinned: false },
+        ])
+        expect(left.activeTabId).toBe('v::a.md')
+      }
+    })
+
+    it('omits content and buffers (content-free persisted shape)', () => {
+      const persisted = serializePaneTree(seededTree('p1', 'v', 'a.md'))
+      const json = JSON.stringify(persisted)
+      expect(json).not.toContain('editBuffer')
+      expect(json).not.toContain('closedTabsHistory')
+      // A persisted tab carries only metadata keys.
+      const root = persisted.root as Extract<typeof persisted.root, { kind: 'pane' }>
+      expect(Object.keys(root.tabs[0]!).sort()).toEqual(['fileName', 'filePath', 'mode', 'pinned', 'vaultId'])
+    })
+  })
+
+  describe('round-trip', () => {
+    it('serialize → rehydrate preserves structure, sizes, tabs and active ids', () => {
+      const persisted = serializePaneTree(twoPaneTree())
+      const live = rehydratePaneTree(persisted)
+      expect(live.activePaneId).toBe('p2')
+      expect(live.root.kind).toBe('split')
+      const split = live.root as SplitNode
+      expect(split.sizes).toEqual([0.6, 0.4])
+      expect(findPane(live, 'p1')?.tabState.activeTabId).toBe('v::a.md')
+      expect(findPane(live, 'p2')?.tabState.activeTabId).toBe('v::b.md')
+      // Re-serializing yields the same persisted shape.
+      expect(serializePaneTree(live)).toEqual(persisted)
+    })
+
+    it('rehydrated tabs start in the loading state with empty content', () => {
+      const live = rehydratePaneTree(serializePaneTree(seededTree('p1', 'v', 'a.md')))
+      const tab = findPane(live, 'p1')!.tabState.tabs[0]!
+      expect(tab.loading).toBe(true)
+      expect(tab.content).toBe('')
+      expect(tab.editBuffer).toBeNull()
+    })
+
+    it('normalizes sizes on rehydrate (raises a sub-minimum ratio, keeps sum 1)', () => {
+      const persisted = serializePaneTree(twoPaneTree())
+      const root = persisted.root as Extract<typeof persisted.root, { kind: 'split' }>
+      root.sizes = [0.98, 0.02] // second child below MIN_PANE_RATIO
+      const live = rehydratePaneTree(persisted)
+      const split = live.root as SplitNode
+      // The floor nudges the tiny child well above its raw 0.02 (soft floor
+      // applied before the final rescale), and sizes always sum to 1.
+      expect(split.sizes[1]!).toBeGreaterThan(0.02)
+      expect(split.sizes.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 5)
+    })
+  })
+
+  describe('migration (legacy flat tabs)', () => {
+    it('migrates a flat tab list into a single active pane', () => {
+      const tabs: PersistedPaneTab[] = [
+        { vaultId: 'v', filePath: 'a.md', fileName: 'a.md', mode: 'edit', pinned: false },
+        { vaultId: 'v', filePath: 'b.md', fileName: 'b.md', mode: 'view', pinned: true },
+      ]
+      const persisted = migrateFlatTabsToPaneTree(tabs, 'v::b.md', 'pane-root')
+      expect(persisted.activePaneId).toBe('pane-root')
+      expect(persisted.root.kind).toBe('pane')
+      const live = rehydratePaneTree(persisted)
+      const pane = findPane(live, 'pane-root')!
+      expect(pane.tabState.tabs).toHaveLength(2)
+      expect(pane.tabState.activeTabId).toBe('v::b.md')
+      expect(pane.tabState.tabs[1]!.pinned).toBe(true)
+    })
+
+    it('migrates an empty flat list into an empty single pane', () => {
+      const persisted = migrateFlatTabsToPaneTree([], null, 'pane-root')
+      const live = rehydratePaneTree(persisted)
+      expect(listPanes(live)).toHaveLength(1)
+      expect(getActiveTabId(live)).toBeNull()
+    })
+  })
+
+  describe('lenient parse', () => {
+    it('parses a well-formed persisted tree', () => {
+      const persisted = serializePaneTree(twoPaneTree())
+      const parsed = parsePersistedPaneTree(persisted)
+      expect(parsed).not.toBeNull()
+      expect(parsed!.activePaneId).toBe('p2')
+    })
+
+    it('returns null for a missing or non-object tree', () => {
+      expect(parsePersistedPaneTree(undefined)).toBeNull()
+      expect(parsePersistedPaneTree(null)).toBeNull()
+      expect(parsePersistedPaneTree('nope')).toBeNull()
+      expect(parsePersistedPaneTree({})).toBeNull()
+    })
+
+    it('drops unusable tabs but keeps the usable ones', () => {
+      const parsed = parsePersistedPaneTree({
+        root: {
+          kind: 'pane',
+          id: 'p1',
+          tabs: [
+            { vaultId: 'v', filePath: 'a.md', fileName: 'a.md', mode: 'edit' },
+            { vaultId: 'v', filePath: 'bad', mode: 'edit' }, // missing fileName
+            { foo: 'bar' }, // garbage
+          ],
+          activeTabId: null,
+        },
+        activePaneId: 'p1',
+      })
+      expect(parsed).not.toBeNull()
+      const root = parsed!.root as Extract<typeof parsed.root, { kind: 'pane' }>
+      expect(root.tabs).toHaveLength(1)
+      expect(root.tabs[0]!.filePath).toBe('a.md')
+    })
+
+    it('collapses a split that loses all but one child', () => {
+      const parsed = parsePersistedPaneTree({
+        root: {
+          kind: 'split',
+          id: 'split-1',
+          direction: 'horizontal',
+          children: [
+            { kind: 'pane', id: 'p1', tabs: [], activeTabId: null },
+            { kind: 'garbage' }, // dropped
+          ],
+          sizes: [0.5, 0.5],
+        },
+        activePaneId: 'p1',
+      })
+      expect(parsed).not.toBeNull()
+      // Split with a single surviving child collapses to that pane.
+      expect(parsed!.root.kind).toBe('pane')
+      expect(parsed!.root.id).toBe('p1')
+    })
+
+    it('rebuilds equal sizes when the sizes array is wrong length', () => {
+      const parsed = parsePersistedPaneTree({
+        root: {
+          kind: 'split',
+          id: 'split-1',
+          direction: 'vertical',
+          children: [
+            { kind: 'pane', id: 'p1', tabs: [], activeTabId: null },
+            { kind: 'pane', id: 'p2', tabs: [], activeTabId: null },
+          ],
+          sizes: [0.9], // wrong length
+        },
+        activePaneId: 'p1',
+      })
+      const root = parsed!.root as Extract<typeof parsed.root, { kind: 'split' }>
+      expect(root.sizes).toEqual([0.5, 0.5])
+    })
+
+    it('falls back the active pane id to the first pane when it does not resolve', () => {
+      const live = rehydratePaneTree({
+        root: { kind: 'pane', id: 'p1', tabs: [], activeTabId: null },
+        activePaneId: 'does-not-exist',
+      })
+      expect(live.activePaneId).toBe('p1')
     })
   })
 })

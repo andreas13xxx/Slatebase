@@ -16,9 +16,11 @@
 import {
   tabReducer,
   initialTabState,
+  generateTabId,
   type TabState,
   type TabEntry,
   type TabAction,
+  type TabMode,
 } from './tabState'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -391,4 +393,228 @@ function resizeSplit(
     return { ...node, sizes: normalizeSizes(sizes) }
   }
   return { ...node, children: node.children.map((c) => resizeSplit(c, splitId, childIndex, ratio)) }
+}
+
+
+// ─── Persistence (pure serialize / parse / migrate) ───────────────────────────
+
+/**
+ * Persisted tab entry — the minimal metadata needed to rebuild a tab on
+ * restore. Content/buffers are deliberately omitted (re-fetched from the
+ * server on restore), mirroring `PersistedTab` in `workspaceStore`.
+ */
+export interface PersistedPaneTab {
+  vaultId: string
+  filePath: string
+  fileName: string
+  mode: TabMode
+  pinned: boolean
+  /** Plugin-view icon, preserved for `__view::` tabs. */
+  icon?: string
+}
+
+/** Persisted pane leaf. */
+export interface PersistedPaneNode {
+  kind: 'pane'
+  id: string
+  tabs: PersistedPaneTab[]
+  activeTabId: string | null
+}
+
+/** Persisted split node. */
+export interface PersistedSplitNode {
+  kind: 'split'
+  id: string
+  direction: SplitDirection
+  children: PersistedPaneTreeNode[]
+  sizes: number[]
+}
+
+/** A persisted pane-tree node. */
+export type PersistedPaneTreeNode = PersistedPaneNode | PersistedSplitNode
+
+/** Full persisted pane-tree layout. */
+export interface PersistedPaneTree {
+  root: PersistedPaneTreeNode
+  activePaneId: string
+}
+
+/** Serialize one tab entry to its persisted (content-free) shape. */
+function serializeTab(tab: TabEntry): PersistedPaneTab {
+  const persisted: PersistedPaneTab = {
+    vaultId: tab.vaultId,
+    filePath: tab.filePath,
+    fileName: tab.fileName,
+    mode: tab.mode,
+    pinned: tab.pinned,
+  }
+  if (tab.icon !== undefined) persisted.icon = tab.icon
+  return persisted
+}
+
+/** Serialize a live pane-tree node to its persisted shape. */
+function serializeNode(node: PaneTreeNode): PersistedPaneTreeNode {
+  if (node.kind === 'pane') {
+    return {
+      kind: 'pane',
+      id: node.id,
+      tabs: node.tabState.tabs.map(serializeTab),
+      activeTabId: node.tabState.activeTabId,
+    }
+  }
+  return {
+    kind: 'split',
+    id: node.id,
+    direction: node.direction,
+    children: node.children.map(serializeNode),
+    sizes: node.sizes,
+  }
+}
+
+/** Serialize a live pane tree to its persisted (content-free) shape. */
+export function serializePaneTree(tree: PaneTree): PersistedPaneTree {
+  return { root: serializeNode(tree.root), activePaneId: tree.activePaneId }
+}
+
+/**
+ * Rehydrate a persisted tab into a full `TabEntry`. Content is empty until the
+ * restore effect fetches it (`loading: true`), so a freshly restored tab is
+ * visually in its loading state, exactly as an opened-then-fetched tab is.
+ */
+function rehydrateTab(tab: PersistedPaneTab): TabEntry {
+  const entry: TabEntry = {
+    id: generateTabId(tab.vaultId, tab.filePath),
+    vaultId: tab.vaultId,
+    filePath: tab.filePath,
+    fileName: tab.fileName,
+    mode: tab.mode,
+    isBinary: false,
+    content: '',
+    editBuffer: null,
+    loading: true,
+    error: null,
+    pinned: tab.pinned,
+  }
+  if (tab.icon !== undefined) entry.icon = tab.icon
+  return entry
+}
+
+/** Rehydrate a persisted node into a live pane-tree node. */
+function rehydrateNode(node: PersistedPaneTreeNode): PaneTreeNode {
+  if (node.kind === 'pane') {
+    const tabs = node.tabs.map(rehydrateTab)
+    const activeTabId =
+      node.activeTabId !== null && tabs.some((t) => t.id === node.activeTabId)
+        ? node.activeTabId
+        : (tabs[0]?.id ?? null)
+    return { kind: 'pane', id: node.id, tabState: { tabs, activeTabId, closedTabsHistory: [] } }
+  }
+  return {
+    kind: 'split',
+    id: node.id,
+    direction: node.direction,
+    children: node.children.map(rehydrateNode),
+    sizes: normalizeSizes(node.sizes),
+  }
+}
+
+/** Rehydrate a persisted pane tree into a live `PaneTree` (loading tabs). */
+export function rehydratePaneTree(persisted: PersistedPaneTree): PaneTree {
+  const root = rehydrateNode(persisted.root)
+  const activePaneId = findPaneIn(root, persisted.activePaneId)
+    ? persisted.activePaneId
+    : firstPaneId(root)
+  return { root, activePaneId }
+}
+
+/**
+ * Migrate the legacy flat tab list (persisted before Split Panes existed) into
+ * a single-pane persisted tree. The flat `activeTabId` becomes the pane's
+ * active tab. Called when no `paneTree` field is present in persisted state.
+ */
+export function migrateFlatTabsToPaneTree(
+  tabs: PersistedPaneTab[],
+  activeTabId: string | null,
+  paneId: string,
+): PersistedPaneTree {
+  return {
+    root: { kind: 'pane', id: paneId, tabs, activeTabId },
+    activePaneId: paneId,
+  }
+}
+
+/** True iff a value is a non-null object. */
+function isObject(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object'
+}
+
+/** Leniently parse one persisted tab, or null if it is unusable. */
+function parsePersistedTab(data: unknown): PersistedPaneTab | null {
+  if (!isObject(data)) return null
+  if (typeof data.vaultId !== 'string') return null
+  if (typeof data.filePath !== 'string') return null
+  if (typeof data.fileName !== 'string') return null
+  if (data.mode !== 'edit' && data.mode !== 'view') return null
+  const tab: PersistedPaneTab = {
+    vaultId: data.vaultId,
+    filePath: data.filePath,
+    fileName: data.fileName,
+    mode: data.mode,
+    pinned: typeof data.pinned === 'boolean' ? data.pinned : false,
+  }
+  if (typeof data.icon === 'string') tab.icon = data.icon
+  return tab
+}
+
+/**
+ * Leniently parse a persisted pane-tree node. Returns null when the node is
+ * structurally unusable; a split that loses all children collapses to null so
+ * the caller falls back to a single pane.
+ */
+function parsePersistedNode(data: unknown): PersistedPaneTreeNode | null {
+  if (!isObject(data)) return null
+
+  if (data.kind === 'pane') {
+    if (typeof data.id !== 'string') return null
+    const rawTabs = Array.isArray(data.tabs) ? data.tabs : []
+    const tabs = rawTabs
+      .map(parsePersistedTab)
+      .filter((t): t is PersistedPaneTab => t !== null)
+    const activeTabId =
+      typeof data.activeTabId === 'string' && tabs.some((t) => generateTabId(t.vaultId, t.filePath) === data.activeTabId)
+        ? data.activeTabId
+        : null
+    return { kind: 'pane', id: data.id, tabs, activeTabId }
+  }
+
+  if (data.kind === 'split') {
+    if (typeof data.id !== 'string') return null
+    if (data.direction !== 'horizontal' && data.direction !== 'vertical') return null
+    const rawChildren = Array.isArray(data.children) ? data.children : []
+    const children = rawChildren
+      .map(parsePersistedNode)
+      .filter((c): c is PersistedPaneTreeNode => c !== null)
+    if (children.length === 0) return null
+    if (children.length === 1) return children[0]! // collapse a split that lost siblings
+    const rawSizes = Array.isArray(data.sizes) ? data.sizes : []
+    const sizes =
+      rawSizes.length === children.length && rawSizes.every((s) => typeof s === 'number')
+        ? (rawSizes as number[])
+        : children.map(() => 1 / children.length)
+    return { kind: 'split', id: data.id, direction: data.direction, children, sizes }
+  }
+
+  return null
+}
+
+/**
+ * Leniently parse a persisted pane tree. Returns null when it is missing or
+ * unusable, so the caller can fall back to migration or a fresh single pane.
+ */
+export function parsePersistedPaneTree(data: unknown): PersistedPaneTree | null {
+  if (!isObject(data)) return null
+  const root = parsePersistedNode(data.root)
+  if (!root) return null
+  const activePaneId = typeof data.activePaneId === 'string' ? data.activePaneId : firstPaneId(rehydrateNode(root))
+  return { root, activePaneId }
 }

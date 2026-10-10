@@ -97,7 +97,7 @@ import { Breadcrumb } from './components/Breadcrumb'
 import { useResize } from './hooks/useResize'
 import { useStatusBar } from './hooks/useStatusBar'
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts'
-import { useWorkspaceRestore, LAST_VAULT_KEY } from './hooks/useWorkspaceRestore'
+import { useWorkspaceRestore, LAST_VAULT_KEY, getInitialPaneTree } from './hooks/useWorkspaceRestore'
 import { initialize as initializeWorkspace, getState as getWorkspaceState, clear as clearWorkspace } from './state/workspaceStore'
 import { requestReveal } from './state/revealFileBridge'
 import {
@@ -116,6 +116,11 @@ const dailyNoteService = createDailyNoteService(apiClient)
 // Synchronous workspace state restore from localStorage — must run before
 // any component reads getWorkspaceState() in their useState initializers.
 initializeWorkspace()
+
+// Compute the restored/migrated pane-tree layout once, synchronously, so
+// PaneTreeProvider is seeded with it before the first render (no post-mount
+// patching). null = nothing persisted → PaneTreeProvider's fresh single pane.
+const restoredPaneTree = getInitialPaneTree()
 
 /** Available navigation pages in the app (opened as tabs in the main content area). */
 export type AppPage =
@@ -365,7 +370,8 @@ function AppContent() {
     dispatch,
     tabs: tabState.tabs,
     activeTabId: tabState.activeTabId,
-    tabDispatch,
+    paneTree,
+    paneTreeDispatch,
     activeSettingsPage,
     showSidebar,
     showRightPanel,
@@ -1524,7 +1530,7 @@ function AuthGuard() {
       <RealtimeBridge>
         <AppProvider apiClient={apiClient}>
           <SearchProvider>
-            <PaneTreeProvider>
+            <PaneTreeProvider initialTree={restoredPaneTree ?? undefined}>
               <TabProvider>
                 <NavigationHistoryProvider>
                   <LeftPanelProvider>

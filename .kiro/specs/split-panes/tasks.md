@@ -50,12 +50,12 @@ Dies ist die größte einzelne Architekturänderung am Layout-System — die bes
   - [x] 6.2 `core-command-i18n.ts` — DE/EN-Labels „Rechts teilen"/„Unten teilen" (bereits vorhanden)
   - [ ] 6.3 `keybindingsStore.ts` — Defaults für Split: bewusst KEINE (Obsidian liefert Split ohne Default-Hotkey; vermeidet Browser-Kollisionen). Über Command Palette erreichbar.
 
-- [ ] 4. Persistenz + Migration
-  - [ ] 4.1 `workspaceStore.ts` — `PersistedPaneTree` serialisieren (Struktur, Größen, Tabs/aktiv pro Pane, `activePaneId`), per Vault
-  - [ ] 4.2 Migration alter flacher `tabs`-Blob → Einzel-Pane; ungültiger Baum → Fallback-Einzel-Pane (lenient)
-  - [ ] 4.3 `useWorkspaceRestore.ts` — Baum vor erstem Render, Inhalt jedes Tabs nachladen, `cancelled`-Guard pro Fetch
-  - [ ] 4.4 Cross-Tab-`storage`-Event-Übernahme nur ohne eigenen pendenten Debounce-Write
-  - [ ] 4.5 Tests: Round-Trip, Migration, Fallback, Vault-Wechsel-Race
+- [x] 4. Persistenz + Migration
+  - [x] 4.1 `workspaceStore.ts` — `PersistedPaneTree` serialisieren (Struktur, Größen, Tabs/aktiv pro Pane, `activePaneId`), optionales `paneTree`-Feld (content-frei), `updatePaneTree`-Updater; Serialisierung in `paneTreeState.ts` (`serializePaneTree`/`rehydratePaneTree`)
+  - [x] 4.2 Migration alter flacher `tabs`-Blob → Einzel-Pane (`migrateFlatTabsToPaneTree`); ungültiger Baum → Fallback-Einzel-Pane (`parsePersistedPaneTree` lenient, Split mit nur einem überlebenden Kind kollabiert, kaputtes `paneTree` invalidiert nie den restlichen Workspace-State)
+  - [x] 4.3 `useWorkspaceRestore.ts` — Baum vor erstem Render via `getInitialPaneTree()` → `PaneTreeProvider initialTree` (modul-level, synchron); Inhalt jedes Tabs pro Pane via `PANE_TAB_ACTION` nachgeladen, `cancelled`-Guard pro Restore
+  - [x] 4.4 Cross-Tab-`storage`-Event-Übernahme unverändert (nur ohne eigenen pendenten Debounce-Write; `paneTree` fährt im geteilten Workspace-Blob mit)
+  - [x] 4.5 Tests: Round-Trip, Migration, Fallback, lenient-Parse (13 in `paneTreeState.test.ts`); `workspaceStore.test.ts` (Persist-Durchlauf, Lenient-Fallback, Legacy-Blob)
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
 - [ ] 5. Plugin-Workspace-Kompatibilität
