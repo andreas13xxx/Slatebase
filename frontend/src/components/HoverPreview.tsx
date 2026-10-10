@@ -12,10 +12,12 @@
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { AppContext } from '../state'
 import { ViewMode } from './ViewMode'
+import { HoverPreviewProperties } from './HoverPreviewProperties'
 import { resolveWikilinkTarget } from '../plugins/link-resolver'
 import { detectPlatform, readPlatformEnvironment } from '../plugins/compat/platform-detection'
 import { onHoverPreview, type HoverPreviewRequest } from '../plugins/compat/hover-link-bus'
 import { placeHoverPreview, type PopoverPlacement } from './hover-preview-position'
+import { locateFrontmatterBlock } from '../utils/frontmatterWriter'
 import './HoverPreview.css'
 
 /** How long the pointer must rest on a link before a preview appears. */
@@ -33,6 +35,7 @@ export function HoverPreview() {
 
   const [request, setRequest] = useState<HoverPreviewRequest | null>(null)
   const [content, setContent] = useState<string | null>(null)
+  const [resolvedPath, setResolvedPath] = useState<string | null>(null)
   const [placement, setPlacement] = useState<PopoverPlacement | null>(null)
   const popoverRef = useRef<HTMLDivElement | null>(null)
   const showTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -61,6 +64,7 @@ export function HoverPreview() {
         hideTimer.current = setTimeout(() => {
           setRequest(null)
           setContent(null)
+          setResolvedPath(null)
           setPlacement(null)
         }, HIDE_DELAY_MS)
       },
@@ -73,6 +77,7 @@ export function HoverPreview() {
     const dismiss = (): void => {
       setRequest(null)
       setContent(null)
+      setResolvedPath(null)
       setPlacement(null)
     }
     const onKey = (e: KeyboardEvent): void => {
@@ -102,12 +107,16 @@ export function HoverPreview() {
       .then((file) => {
         if (cancelled) return
         const text = file.content ?? ''
+        setResolvedPath(path)
         setContent(
           text.length > MAX_PREVIEW_CHARS ? `${text.slice(0, MAX_PREVIEW_CHARS)}\n\n…` : text,
         )
       })
       .catch(() => {
-        if (!cancelled) setContent(null)
+        if (!cancelled) {
+          setContent(null)
+          setResolvedPath(null)
+        }
       })
 
     return () => {
@@ -139,8 +148,29 @@ export function HoverPreview() {
     hideTimer.current = setTimeout(() => {
       setRequest(null)
       setContent(null)
+      setResolvedPath(null)
       setPlacement(null)
     }, HIDE_DELAY_MS)
+  }
+
+  // Editing frontmatter is only safe when the full note is loaded — a truncated
+  // preview would save a truncated note back. The loader appends "\n\n…" when it
+  // cuts the content, which is the signal.
+  const isTruncated = content.endsWith('\n\n…')
+  const isMarkdown = (resolvedPath ?? '').toLowerCase().endsWith('.md')
+  const selectedVault = appContext?.state.vaults.find((v) => v.id === vaultId)
+  const hasWriteAccess = selectedVault?.permission === 'owner' || selectedVault?.permission === 'write'
+  const propertiesEditable = !isTruncated && isMarkdown && resolvedPath !== null && apiClient !== null && vaultId !== null
+
+  // When properties are shown as an editable block, strip the frontmatter from
+  // the body so it is not rendered a second time by ViewMode's read-only table.
+  let bodyContent = content
+  if (propertiesEditable) {
+    const location = locateFrontmatterBlock(content)
+    if (location) {
+      const blockEnd = content.indexOf('\n', location.to + 1)
+      bodyContent = blockEnd === -1 ? '' : content.slice(blockEnd + 1)
+    }
   }
 
   return (
@@ -158,8 +188,18 @@ export function HoverPreview() {
       onMouseLeave={leave}
     >
       <div className="hover-preview__content">
+        {propertiesEditable && resolvedPath && apiClient && vaultId && (
+          <HoverPreviewProperties
+            content={content}
+            vaultId={vaultId}
+            filePath={resolvedPath}
+            apiClient={apiClient}
+            hasWriteAccess={hasWriteAccess}
+            onContentChange={setContent}
+          />
+        )}
         <ViewMode
-          content={content}
+          content={bodyContent}
           vaultId={vaultId ?? ''}
           directoryTree={directoryTree}
           // No navigation from inside a preview, and no nested previews.

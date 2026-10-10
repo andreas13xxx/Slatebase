@@ -598,6 +598,14 @@ export const de = {
       hint: 'Alle im Vault verwendeten Eigenschaften. Typ ändern, um festzulegen, wie eine Eigenschaft bearbeitet wird.',
       typeAriaLabel: 'Typ von {key}',
     },
+    footnotes: {
+      empty: 'Keine Fußnoten in diesem Dokument.',
+      noDocument: 'Kein Dokument geöffnet.',
+      noText: '(ohne Text)',
+      unreferenced: 'nicht referenziert',
+      refCount: '{count}×',
+      ariaLabel: 'Fußnoten des Dokuments',
+    },
     propertyControls: {
       addItemPlaceholder: 'Hinzufügen...',
       addItemAriaLabel: 'Eintrag hinzufügen',
@@ -622,6 +630,7 @@ export const de = {
       properties: 'Eigenschaften',
       search: 'Suche',
       activity: 'Aktivität',
+      footnotes: 'Fußnoten',
     },
     tabListAriaLabel: 'Panel-Ansichten',
   },

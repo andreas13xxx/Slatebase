@@ -61,8 +61,8 @@ describe('extractFrontmatterTags', () => {
     expect(extractFrontmatterTags('---\ntags:\n  - a\n  - b\n---\n')).toEqual(['a', 'b'])
   })
 
-  it('reads the singular key', () => {
-    expect(extractFrontmatterTags('---\ntag: solo\n---\n')).toEqual(['solo'])
+  it('ignores the singular "tag" key (Obsidian 1.9.10 removed it)', () => {
+    expect(extractFrontmatterTags('---\ntag: solo\n---\n')).toEqual([])
   })
 
   it('splits a comma-separated scalar', () => {
