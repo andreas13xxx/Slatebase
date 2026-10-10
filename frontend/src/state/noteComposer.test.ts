@@ -162,4 +162,37 @@ describe('rewriteExtractedLinks', () => {
     const out = rewriteExtractedLinks('see [[archive/Note]]', 'projects/Doc.md', 'archive/Extracted.md', tree)
     expect(out).toBe('see [[archive/Note]]')
   })
+
+  it('rewrites a link that carries a #heading (previously a silent no-op)', () => {
+    // Reconstructing the link from parsed fields failed to match the real text
+    // for heading/alias links, so they were silently left unchanged. The raw
+    // token scan edits only the target and keeps the heading intact.
+    const out = rewriteExtractedLinks('see [[Note#Intro]]', 'projects/Doc.md', 'archive/Extracted.md', tree)
+    expect(out).toBe('see [[projects/Note#Intro]]')
+  })
+
+  it('rewrites a link with both #heading and |alias, preserving both', () => {
+    const out = rewriteExtractedLinks('see [[Note#Intro|the intro]]', 'projects/Doc.md', 'archive/Extracted.md', tree)
+    expect(out).toBe('see [[projects/Note#Intro|the intro]]')
+  })
+
+  it('rewrites a link with a block ref, preserving the ^id', () => {
+    const out = rewriteExtractedLinks('see [[Note#^abc123]]', 'projects/Doc.md', 'archive/Extracted.md', tree)
+    expect(out).toBe('see [[projects/Note#^abc123]]')
+  })
+
+  it('leaves image embeds (![[...]]) untouched', () => {
+    const out = rewriteExtractedLinks('![[Note]]', 'projects/Doc.md', 'archive/Extracted.md', tree)
+    expect(out).toBe('![[Note]]')
+  })
+
+  it('rewrites multiple links in one pass', () => {
+    const out = rewriteExtractedLinks(
+      'first [[Note]] then [[Note#Intro|x]]',
+      'projects/Doc.md',
+      'archive/Extracted.md',
+      tree,
+    )
+    expect(out).toBe('first [[projects/Note]] then [[projects/Note#Intro|x]]')
+  })
 })

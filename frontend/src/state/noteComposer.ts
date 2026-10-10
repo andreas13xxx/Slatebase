@@ -6,8 +6,18 @@
 import type { EditorView } from '@codemirror/view'
 import type { IApiClient } from '../api'
 import type { DirectoryTree } from '../types'
-import { extractWikilinks } from '../plugins/wikilink/extract'
 import { resolveWikilinkTarget } from '../plugins/link-resolver'
+
+/**
+ * Matches a single `[[...]]` wikilink in raw Markdown and splits its inner body
+ * into target / `#heading` or `#^block` / `|display` parts without losing the
+ * exact original text. Capture 1 is the whole `[[...]]`, capture 2 the inner
+ * body. We decompose the body ourselves (rather than reconstructing the link
+ * from parsed fields) so the replacement edits only the target segment and the
+ * rest of the link — heading, block ref, alias, and any spacing — survives
+ * byte-for-byte. An image embed (`![[...]]`) is excluded via the leading `(?<!!)`.
+ */
+const WIKILINK_TOKEN_REGEX = /(?<!!)\[\[([^\]]+)\]\]/g
 
 /** A character-offset range plus the heading text it was found under (if any). */
 export interface HeadingSectionRange {
@@ -92,27 +102,34 @@ export function rewriteExtractedLinks(
 ): string {
   if (!tree) return content
 
-  let result = content
-  // Rewrite from the end backwards so earlier offsets stay valid as we splice.
-  const links = extractWikilinks(content)
-  for (const link of links) {
-    // Path-qualified links (containing `/`) are already unambiguous.
-    if (link.target.includes('/')) continue
+  // Scan the raw `[[...]]` tokens directly instead of reconstructing each link
+  // from parsed fields. Reconstruction silently failed to match (and so left
+  // the link unchanged) whenever the original differed from the rebuilt string
+  // — most visibly for links carrying a `#heading` or `|alias`. Editing only
+  // the target segment of the real matched text makes the rewrite exact.
+  return content.replace(WIKILINK_TOKEN_REGEX, (whole, body: string) => {
+    // Split the inner body into target + the trailing `#heading`/`#^block`/`|alias`.
+    // The alias (`|...`) always comes last; a `#` before it is the heading/block.
+    const pipeIndex = body.indexOf('|')
+    const beforeAlias = pipeIndex === -1 ? body : body.slice(0, pipeIndex)
+    const aliasPart = pipeIndex === -1 ? '' : body.slice(pipeIndex) // includes the leading `|`
 
-    const fromSource = resolveWikilinkTarget(link.target, tree, sourcePath)
-    const fromNew = resolveWikilinkTarget(link.target, tree, newPath)
-    if (!fromSource || fromSource === fromNew) continue
+    const hashIndex = beforeAlias.indexOf('#')
+    const target = hashIndex === -1 ? beforeAlias : beforeAlias.slice(0, hashIndex)
+    const headingPart = hashIndex === -1 ? '' : beforeAlias.slice(hashIndex) // includes the leading `#`
+
+    // Path-qualified links (containing `/`) are already unambiguous.
+    const trimmedTarget = target.trim()
+    if (trimmedTarget === '' || trimmedTarget.includes('/')) return whole
+
+    const fromSource = resolveWikilinkTarget(trimmedTarget, tree, sourcePath)
+    const fromNew = resolveWikilinkTarget(trimmedTarget, tree, newPath)
+    if (!fromSource || fromSource === fromNew) return whole
 
     // Resolution changed: pin the link to the file it meant in the source note.
     const explicit = fromSource.replace(/\.md$/i, '')
-    const headingPart = link.heading ? `#${link.heading}` : link.blockRef ? `#^${link.blockRef}` : ''
-    const displayPart = link.display && link.display !== link.target ? `|${link.display}` : ''
-    const oldLink = `[[${link.target}${headingPart ? headingPart : ''}${displayPart}]]`
-    const newLink = `[[${explicit}${headingPart}${displayPart}]]`
-    // Replace the first occurrence of this exact link text that still appears.
-    result = result.replace(oldLink, newLink)
-  }
-  return result
+    return `[[${explicit}${headingPart}${aliasPart}]]`
+  })
 }
 
 /**

@@ -19,20 +19,34 @@ import type { CompletionSource, CompletionResult } from '@codemirror/autocomplet
 import { HIGHLIGHT_COLORS } from '../../plugins/highlight-colors'
 
 /**
- * Completion source that fires right after an opening `==`. It matches when the
- * text immediately before the cursor ends in `==` that is not itself preceded
- * by another `=` (so `===` or a closing `==` of an existing highlight does not
- * trigger it), and the `==` is not already followed by a color emoji.
+ * Completion source that fires right after an *opening* `==`. It matches when
+ * the text immediately before the cursor ends in `==` that is not itself
+ * preceded by another `=` (so `===` does not trigger it), AND that `==` opens a
+ * highlight rather than closing one. "Opening" is decided by counting the `==`
+ * delimiters already on the current line before this one: an even count means
+ * the new `==` starts a highlight (suggest colors), an odd count means it closes
+ * the highlight the user just typed into (stay silent) — otherwise finishing
+ * `==🔴 text==` would pop the color menu again on the closing delimiter.
  */
 export const highlightColorCompletions: CompletionSource = (context): CompletionResult | null => {
   // Look back a few characters for the opening `==`.
   const before = context.state.sliceDoc(Math.max(0, context.pos - 3), context.pos)
-  // Trigger only on exactly `==` at the cursor, not `===` and not after a `=` run.
-  if (!/(?:^|[^=])==$/.test(before)) {
+  // Require exactly `==` at the cursor, not `===` and not after a `=` run.
+  const endsInDelimiter = /(?:^|[^=])==$/.test(before)
+  if (!endsInDelimiter) {
     if (!context.explicit) return null
     // On an explicit invoke (Ctrl+Space) still require the cursor to sit after `==`.
     if (!context.state.sliceDoc(Math.max(0, context.pos - 2), context.pos).endsWith('==')) return null
   }
+
+  // Only an opening `==` should suggest colors. Count the `==` delimiters earlier
+  // on this line (excluding the one at the cursor): an even number means we are
+  // between highlights and this `==` opens a new one; an odd number means an
+  // earlier `==` is still open and this one is its closing delimiter.
+  const line = context.state.doc.lineAt(context.pos)
+  const beforeCursorOnLine = context.state.sliceDoc(line.from, Math.max(line.from, context.pos - 2))
+  const precedingDelimiters = (beforeCursorOnLine.match(/==/g) ?? []).length
+  if (precedingDelimiters % 2 !== 0) return null
 
   return {
     from: context.pos,
