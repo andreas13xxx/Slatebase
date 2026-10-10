@@ -3,7 +3,9 @@ import { AppProvider, useAppContext, loadVaults, importFile, importFolder, expor
 import { ApiClient } from './api'
 import { AuthProvider, useAuthContext } from './state/authContext'
 import { TabProvider, useTabContext } from './state/tabContext'
-import { PaneTreeProvider } from './state/paneTreeContext'
+import { PaneTreeProvider, usePaneTree } from './state/paneTreeContext'
+import { PaneTabProvider } from './state/paneTabContext'
+import { PaneTreeView } from './components/panes/PaneTreeView'
 import { NavigationHistoryProvider, useNavigationHistory } from './state/navigationHistoryContext'
 import { FeatureProvider, useFeatureContext } from './state/featureContext'
 import { SearchProvider } from './state/searchContext'
@@ -188,6 +190,7 @@ function AppContent() {
   const { state, dispatch } = useAppContext()
   const { authState, authDispatch } = useAuthContext()
   const { tabState, tabDispatch } = useTabContext()
+  const { paneTree, paneTreeDispatch } = usePaneTree()
   const { isEnabled } = useFeatureContext()
   const { state: leftPanelState, dispatch: leftPanelDispatch } = useLeftPanelContext()
   const { state: rightPanelState, dispatch: rightPanelDispatch } = useRightPanelContext()
@@ -1244,7 +1247,18 @@ function AppContent() {
                   />
                 )}
                 <ErrorBoundary>
-                  <TabContent />
+                  <PaneTreeView
+                    tree={paneTree}
+                    dispatch={paneTreeDispatch}
+                    resizeLabel={t('resize.adjustWidth')}
+                    renderPane={(pane) => (
+                      <PaneTabProvider paneId={pane.id}>
+                        <ErrorBoundary>
+                          <TabContent />
+                        </ErrorBoundary>
+                      </PaneTabProvider>
+                    )}
+                  />
                 </ErrorBoundary>
               </>
             )}
