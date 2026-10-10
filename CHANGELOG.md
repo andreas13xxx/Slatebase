@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.46.0](https://github.com/andreas13xxx/Slatebase/compare/v0.45.0...v0.46.0) (2026-10-10)
+
+
+### Features
+
+* highlight colors, Bases Kanban view, Note Composer link rewrite ([#218](https://github.com/andreas13xxx/Slatebase/issues/218)) ([f85d633](https://github.com/andreas13xxx/Slatebase/commit/f85d6336ef018d2268c5789b12396cde6a596530))
+
 ## [0.45.0](https://github.com/andreas13xxx/Slatebase/compare/v0.44.9...v0.45.0) (2026-10-09)
 
 
