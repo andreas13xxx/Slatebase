@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.47.0](https://github.com/andreas13xxx/Slatebase/compare/v0.46.0...v0.47.0) (2026-10-10)
+
+
+### Features
+
+* **activity:** Activity Timeline (per-vault event log, tab + sidebar) ([#220](https://github.com/andreas13xxx/Slatebase/issues/220)) ([0a1aa7f](https://github.com/andreas13xxx/Slatebase/commit/0a1aa7f5d6740be63c24426cdf98d6e536f0594c))
+
 ## [0.46.0](https://github.com/andreas13xxx/Slatebase/compare/v0.45.0...v0.46.0) (2026-10-10)
 
 
