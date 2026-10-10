@@ -873,11 +873,13 @@ function AppContent() {
     outline: documentPanelData.state.outline,
     links: documentPanelData.state.links,
     tags: documentPanelData.state.tags,
+    footnotes: documentPanelData.state.footnotes,
     hasDocument: documentContent !== null,
     onHeadingClick: documentPanelData.onHeadingClick,
     onLinkClick: handleLinkClick,
     onTagClick: documentPanelData.onTagClick,
     onFileClick: handleFileClick,
+    onFootnoteClick: documentPanelData.onHeadingClick,
     onLinkMention: handleLinkMention,
   }
 

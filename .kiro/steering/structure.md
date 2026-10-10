@@ -510,7 +510,7 @@ src/
 │   ├── panelState.ts     — Generic split-section/tab-ordering reducer shared by both side panels (`side-panel/SidePanel.tsx`) — layout only, not document-derived content. MAX_SECTIONS 3
 │   ├── panelState.test.ts — Unit tests for panelState reducer
 │   ├── panelContext.ts   — LeftPanelProvider/RightPanelProvider + useLeftPanelContext/useRightPanelContext — both wrap the same `usePanelState` hook (reducer + `vaultSettingsStore`-backed persistence, per user *and* vault), differing only in which panel (`'sidebar'`/`'context'`) they pass to `persistence.ts` and their default view set
-│   ├── documentPanelData.ts — DocumentPanelState reducer + types (outline, forward/backlinks, unlinkedMentions, tags, properties) and the `useDocumentPanelData` hook (owns the effects: document switch, debounced content re-parse, tag list reload — now on vault change, `directoryTree` change (create/delete/move/rename elsewhere going stale, most visibly a deleted note's tags lingering) or `documentPath` change (a save re-indexes without changing the file set) — live backlinks refresh, live unlinked-mentions refresh, all via `onRealtimeVaultChange`). `applyDocumentTags()` layers the open document's own live-parsed tags (see `documentPanelActions.ts`'s `loadDocumentTags`) over the backend's vault-wide list, so typing a tag or deleting one shows up in the panel immediately rather than after the next save. Side-agnostic: doesn't care which panel currently hosts Outline/Links/Tags/Properties, see `panelState.ts`
+│   ├── documentPanelData.ts — DocumentPanelState reducer + types (outline, forward/backlinks, unlinkedMentions, tags, properties, footnotes) and the `useDocumentPanelData` hook (owns the effects: document switch, debounced content re-parse, tag list reload — now on vault change, `directoryTree` change (create/delete/move/rename elsewhere going stale, most visibly a deleted note's tags lingering) or `documentPath` change (a save re-indexes without changing the file set) — live backlinks refresh, live unlinked-mentions refresh, all via `onRealtimeVaultChange`). Footnotes are parsed from the editor buffer in the document-switch and debounced-content effects (`extractFootnotes`). `applyDocumentTags()` layers the open document's own live-parsed tags (see `documentPanelActions.ts`'s `loadDocumentTags`) over the backend's vault-wide list, so typing a tag or deleting one shows up in the panel immediately rather than after the next save. Side-agnostic: doesn't care which panel currently hosts Outline/Links/Tags/Properties/Footnotes, see `panelState.ts`
 │   ├── documentPanelActions.ts — loadOutline, loadForwardLinks, loadBacklinks, loadUnlinkedMentions (search-based, filters out matches already inside a wikilink via extractWikilinks/resolveWikilinkTarget), linkUnlinkedMention (rewrites one occurrence into a wikilink and saves), loadTags (optional `showLoading` — false for a background refresh after a mutation, so an already-visible list doesn't flicker to "Loading…"), loadDocumentTags (parses the open document's tags client-side via `plugins/tag/extract.ts`, purely local), loadProperties, loadPropertyTypes, expandTag
 │   ├── documentPanelActions.test.ts — Unit tests for loadUnlinkedMentions/linkUnlinkedMention
 │   ├── propertyTypes.ts  — Frontend-side property type definitions (PropertyType, PropertyTypeEntry, PropertyTypeOptions, PropertyTypeRegistry) — mirrors backend types for API communication
@@ -634,7 +634,8 @@ src/
 │   ├── MessageInput.tsx  — Message input with validation + rate limit handling
 │   ├── NewConversation.tsx — Create conversation dialog with user search
 │   ├── ConfirmModal.tsx  — Reusable confirmation modal
-│   ├── HoverPreview.tsx  — Hover preview popover for internal links (hover-link bus, plugin compat)
+│   ├── HoverPreview.tsx  — Hover preview popover for internal links (hover-link bus, plugin compat). Renders the previewed note's frontmatter via `HoverPreviewProperties` as an editable block above the body (frontmatter stripped from the body so it isn't shown twice); editing is gated on write access + a non-truncated preview (`MAX_PREVIEW_CHARS`), since saving a truncated note back would lose content
+│   ├── HoverPreviewProperties.tsx — Editable frontmatter block for the hover preview (Obsidian 1.9.10 "property editor in page preview" parity). Reuses the shared `PropertiesEditor`; since the previewed note is a different read-only file, commits rewrite its frontmatter via `applyFrontmatterChange()` + `apiClient.saveFile()` and hand the new content up via `onContentChange`, rather than dispatching into a CM6 view like the in-document FrontmatterWidget
 │   ├── HoverPreview.css  — HoverPreview styles
 │   ├── hover-preview-position.ts — Pure geometry positioning logic for hover preview popover
 │   ├── GlobalTooltip.tsx — Renders a visible tooltip for any element carrying an `aria-label` (Obsidian's tooltip mechanism — plugins and our own `setTooltip()` just set the attribute and expect a bubble; browsers only do that for `title`). Mounted once near the root, independent of vault/auth state
@@ -685,6 +686,8 @@ src/
 │   │   ├── OutlineView.tsx       — Document heading hierarchy (navigable)
 │   │   ├── OutlineView.test.tsx
 │   │   ├── OutlineView.css
+│   │   ├── FootnotesView.tsx     — Lists the active document's footnotes (number, definition preview, ref count, orphan flag); click jumps to the first reference marker (`fnref-<id>`). Obsidian 1.9.10 "Footnotes" core-plugin sidebar-tab parity. Parses via `utils/extractFootnotes.ts`
+│   │   ├── FootnotesView.css
 │   │   ├── LinksView.tsx         — Forward links, backlinks, and Ungelinkte_Erwähnungen (three sections: resolved/unresolved forward+back links; unlinked mentions found via search + filtered against extractWikilinks/resolveWikilinkTarget, with a "Verlinken" action per entry)
 │   │   ├── LinksView.test.tsx
 │   │   ├── LinksView.css
@@ -707,6 +710,7 @@ src/
 │   │   │   └── property-controls.css — Shared styles for all property controls
 │   │   └── utils/
 │   │       ├── extractHeadings.ts — Heading extraction from markdown
+│   │       ├── extractFootnotes.ts — Footnote extraction (regex port of plugins/footnote/plugin.ts's MDAST numbering: reference-order numbering, orphan definitions flagged, fenced-code skipped) for FootnotesView
 │   │       ├── parseFrontmatter.ts — YAML frontmatter parsing
 │   │       ├── tagTree.ts    — buildTagTree(): groups a flat TagEntry[] into the hierarchy nested tag names (`Rezepte/Hauptspeise`) describe, sorted alphabetically at every level. `totalCount` per node counts distinct notes in the whole subtree (not summed child counts — a note tagged both parent and child is one note, matching what a click's file list shows); falls back to summing when a `TagEntry` has no `files` list
 │   │       └── tagTree.test.ts — Unit tests for tagTree

@@ -18,6 +18,7 @@ import { OutlineView } from '../context-panel/OutlineView'
 import { LinksView } from '../context-panel/LinksView'
 import { TagsView } from '../context-panel/TagsView'
 import { PropertiesOverview } from '../context-panel/PropertiesOverview'
+import { FootnotesView } from '../context-panel/FootnotesView'
 import { SearchPanel } from '../SearchPanel'
 import { ActivityTimelineView } from '../activity/ActivityTimelineView'
 import { isPluginViewId, getPluginViewType } from '../../state/panelState'
@@ -34,11 +35,14 @@ export interface SidePanelDocumentProps {
   outline: DocumentPanelState['outline']
   links: DocumentPanelState['links']
   tags: DocumentPanelState['tags']
+  footnotes: DocumentPanelState['footnotes']
   hasDocument: boolean
   onHeadingClick: (anchor: string) => void
   onLinkClick: (target: string, resolved: boolean) => void
   onTagClick: (tagName: string) => void
   onFileClick: (filePath: string) => void
+  /** Scrolls the active note to a footnote's first reference marker. */
+  onFootnoteClick: (anchor: string) => void
   /** Converts an Ungelinkte_Erwähnung into a real wikilink (Requirement 2.7). */
   onLinkMention: (entry: UnlinkedMentionEntry) => Promise<void>
 }
@@ -273,6 +277,17 @@ export function SidePanel({
           <div className="side-panel__view-wrapper" key={viewId}>
             <h3 className="side-panel__view-header">{t('sidePanel.tabs.properties')}</h3>
             <PropertiesOverview vaultId={vaultId} hasWriteAccess={search.hasWriteAccess} />
+          </div>
+        )
+      case 'footnotes':
+        return (
+          <div className="side-panel__view-wrapper" key={viewId}>
+            <h3 className="side-panel__view-header">{t('sidePanel.tabs.footnotes')}</h3>
+            <FootnotesView
+              footnotes={documentPanel.footnotes}
+              onFootnoteClick={documentPanel.onFootnoteClick}
+              hasDocument={documentPanel.hasDocument}
+            />
           </div>
         )
       case 'search':
