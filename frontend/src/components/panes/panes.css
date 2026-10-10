@@ -86,3 +86,48 @@
     transition: none;
   }
 }
+
+/* Edge-drop zones for split-on-drop (Phase 3). Each pane carries four thin
+   zones along its edges; they are only hit-tested while a cross-pane tab drag
+   is in flight (the dragover handler gates on the tab MIME), so they never
+   intercept ordinary clicks. The active one shows an accent band previewing
+   where the new split lands. */
+.pane-drop-edge {
+  position: absolute;
+  z-index: 5;
+  background: transparent;
+  transition: background var(--transition-fast, 120ms) ease;
+}
+
+.pane-drop-edge--left,
+.pane-drop-edge--right {
+  top: 0;
+  bottom: 0;
+  width: 28%;
+  max-width: 160px;
+}
+
+.pane-drop-edge--left { left: 0; }
+.pane-drop-edge--right { right: 0; }
+
+.pane-drop-edge--top,
+.pane-drop-edge--bottom {
+  left: 0;
+  right: 0;
+  height: 28%;
+  max-height: 160px;
+}
+
+.pane-drop-edge--top { top: 0; }
+.pane-drop-edge--bottom { bottom: 0; }
+
+.pane-drop-edge--active {
+  background: var(--accent);
+  opacity: 0.25;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pane-drop-edge {
+    transition: none;
+  }
+}

@@ -176,6 +176,10 @@ export const de = {
     adjustWidth: 'Breite anpassen',
   },
 
+  splitPanes: {
+    noActiveTab: 'Kein aktiver Tab zum Teilen.',
+  },
+
   binaryViewer: {
     imageLoadError: 'Das Bild „{name}" konnte nicht geladen werden.',
     unsupported: 'Datei „{name}" ({type}) kann nicht angezeigt werden.',

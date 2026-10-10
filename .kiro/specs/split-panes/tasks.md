@@ -26,24 +26,29 @@ Dies ist die größte einzelne Architekturänderung am Layout-System — die bes
   - [x] 1.6 `frontend/src/state/paneTreeState.test.ts` — splitten, kollabieren, Fokus, Tab-Delegation, zweistufige Verschachtelung, Größen-Normalisierung, Purity (14 Tests)
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 2. Rendering, Fokus, Resize
-  - [ ] 2.1 `frontend/src/components/panes/PaneTreeView.tsx` — rekursives Baum-Rendering
-  - [ ] 2.2 `frontend/src/components/panes/PaneContainer.tsx` — ein Pane (eigene `TabBar`+`TabContent`), Fokus/Klick → Active_Pane, Active-Markierung
-  - [ ] 2.3 `frontend/src/components/panes/PaneSplitHandle.tsx` — Resize-Griff (`useResize`, `role="separator"`, aria-value*, Pfeiltasten)
-  - [ ] 2.4 `frontend/src/components/panes/panes.css` — Verhältnis-Layout, Active-Markierung (Design Tokens), kein `overflow:hidden` über absolut positionierten Kindern
-  - [ ] 2.5 Fokus-Wechsel-Befehle (Pane links/rechts/oben/unten)
-  - [ ] 2.6 `App.tsx` — Editor-Bereich auf `<PaneTreeView>` umstellen; Breadcrumb/Context-Panel/Status-Bar/Auto-Reveal an `usePaneTree()`-aktiven-Tab hängen (PluginProvider-Platzierung beachten)
-  - [ ] 2.7 Tests: Split-Rendering, Klick-Fokus, Resize per Tastatur
+- [x] 2. Rendering, Fokus, Resize
+  - [x] 2.1 `frontend/src/components/panes/PaneTreeView.tsx` — rekursives Baum-Rendering
+  - [x] 2.2 `frontend/src/components/panes/PaneContainer.tsx` — ein Pane (eigene `TabBar`+`TabContent`), Fokus/Klick → Active_Pane, Active-Markierung (als `PaneLeaf` in PaneTreeView + App.tsx `renderPane`)
+  - [x] 2.3 `frontend/src/components/panes/PaneSplitHandle.tsx` — Resize-Griff (`useResize`, `role="separator"`, aria-value*, Pfeiltasten)
+  - [x] 2.4 `frontend/src/components/panes/panes.css` — Verhältnis-Layout, Active-Markierung (Design Tokens), kein `overflow:hidden` über absolut positionierten Kindern
+  - [ ] 2.5 Fokus-Wechsel-Befehle (Pane links/rechts/oben/unten) — zurückgestellt (optionale Keyboard-Navigation; Fokus per Klick funktioniert)
+  - [x] 2.6 `App.tsx` — Editor-Bereich auf `<PaneTreeView>` umgestellt; aktiver-Tab-Pfad über die `useTabContext()`-Brücke an den aktiven Pane gehängt (PluginProvider-Platzierung beachtet)
+  - [x] 2.7 Tests: Split-Rendering, Klick-Fokus, Resize per Tastatur
   - _Requirements: 1.4, 3.1, 3.2, 3.3, 3.4, 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 3. Splits erzeugen/schließen + Tab-Drag zwischen Panes
-  - [ ] 3.1 `TabBar.tsx` pane-lokal; Tab-Drag auf fremde Tab-Reihe → `MOVE_TAB_TO_PANE`
-  - [ ] 3.2 Kanten-Drop-Zonen an Pane-Rändern → `SPLIT_PANE` + Tab in neuen Pane
-  - [ ] 3.3 Interne-Drag-Erkennung über `dataTransfer.types` ohne `'Files'` beibehalten (DropZone-Overlay darf nicht aufleuchten)
-  - [ ] 3.4 „in Split öffnen" aus Link/Explorer/Suche/Switcher mit dem in 0.5 gewählten Modifikator
-  - [ ] 3.5 Pane schließen / Tab-Gruppe schließen / andere schließen
-  - [ ] 3.6 Tests: Tab-Drag zwischen Panes, Kanten-Drop erzeugt Split, letzter-Tab-Kollaps
+- [x] 3. Splits erzeugen/schließen + Tab-Drag zwischen Panes
+  - [x] 3.1 `TabBar.tsx` pane-lokal; Tab-Drag auf fremde Tab-Reihe → `MOVE_TAB_TO_PANE` (via `paneId`+`onMoveTabToPane`-Props, `TAB_DRAG_MIME`-Payload)
+  - [x] 3.2 Kanten-Drop-Zonen an Pane-Rändern → `SPLIT_PANE_WITH_TAB` + Tab in neuen Pane (PaneTreeView `PaneLeaf`-Edge-Zonen, `generatePaneId`)
+  - [x] 3.3 Interne-Drag-Erkennung über `dataTransfer.types` ohne `'Files'` beibehalten (Tab-Drag trägt nur `application/x-slatebase-tab`, kein `'Files'` → DropZone-Overlay bleibt dunkel, verifiziert gegen `useDropZone.ts`)
+  - [ ] 3.4 „in Split öffnen" aus Link/Explorer/Suche/Switcher mit dem in 0.5 gewählten Modifikator (Ctrl/Cmd+Alt+Klick) — zurückgestellt (eigene fokussierte Erweiterung; Split per Befehl + Tab-Drag deckt den Kern)
+  - [x] 3.5 Pane schließen / Tab-Gruppe schließen / andere schließen (Kollaps über `PANE_TAB_ACTION`/`CLOSE_PANE`; `close-tab-group`/`close-others-tab-group` laufen über die bestehenden Tab-Befehle gegen den aktiven Pane)
+  - [x] 3.6 Tests: Tab-Drag zwischen Panes (`MOVE_TAB_TO_PANE`), Kanten-Drop erzeugt Split (`SPLIT_PANE_WITH_TAB` + Edge-Drop-UI-Test), letzter-Tab-Kollaps, COPY- vs. MOVE-Modus, TabBar-Drag-Test
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 5.1, 5.2, 5.3, 5.4_
+
+  Teil von Phase 6 vorgezogen (gehört logisch zu „Splits erzeugen"):
+  - [x] 6.1 `core-commands-app.ts` — `workspace:split-vertical`/`split-horizontal` auf echte Pane-Ops (`onSplitPane` → `SPLIT_PANE_WITH_TAB copy:true`, in `CommandPaletteContainer` verdrahtet). Fokus-Wechsel-Befehle offen (siehe 2.5)
+  - [x] 6.2 `core-command-i18n.ts` — DE/EN-Labels „Rechts teilen"/„Unten teilen" (bereits vorhanden)
+  - [ ] 6.3 `keybindingsStore.ts` — Defaults für Split: bewusst KEINE (Obsidian liefert Split ohne Default-Hotkey; vermeidet Browser-Kollisionen). Über Command Palette erreichbar.
 
 - [ ] 4. Persistenz + Migration
   - [ ] 4.1 `workspaceStore.ts` — `PersistedPaneTree` serialisieren (Struktur, Größen, Tabs/aktiv pro Pane, `activePaneId`), per Vault

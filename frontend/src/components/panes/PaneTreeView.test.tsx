@@ -81,4 +81,70 @@ describe('PaneTreeView', () => {
     expect(sep).toHaveAttribute('aria-valuenow')
     expect(sep).toHaveAttribute('tabindex', '0')
   })
+
+  describe('edge-drop zones (split-on-drop)', () => {
+    it('renders no edge zones when generatePaneId is omitted', () => {
+      const { container } = render(
+        <PaneTreeView tree={createInitialPaneTree('p1')} dispatch={vi.fn()} renderPane={renderPane} resizeLabel="Resize" />,
+      )
+      expect(container.querySelectorAll('.pane-drop-edge')).toHaveLength(0)
+    })
+
+    it('renders four edge zones per pane when generatePaneId is provided', () => {
+      const { container } = render(
+        <PaneTreeView
+          tree={createInitialPaneTree('p1')}
+          dispatch={vi.fn()}
+          renderPane={renderPane}
+          resizeLabel="Resize"
+          generatePaneId={() => 'new'}
+        />,
+      )
+      expect(container.querySelectorAll('.pane-drop-edge')).toHaveLength(4)
+    })
+
+    it('dispatches SPLIT_PANE_WITH_TAB on an edge drop carrying a tab payload', () => {
+      const dispatch = vi.fn()
+      const { container } = render(
+        <PaneTreeView
+          tree={createInitialPaneTree('p1')}
+          dispatch={dispatch}
+          renderPane={renderPane}
+          resizeLabel="Resize"
+          generatePaneId={() => 'p2'}
+        />,
+      )
+      const rightEdge = container.querySelector('.pane-drop-edge--right') as HTMLElement
+      expect(rightEdge).not.toBeNull()
+      const dataTransfer = {
+        types: ['application/x-slatebase-tab'],
+        getData: (type: string) =>
+          type === 'application/x-slatebase-tab' ? JSON.stringify({ paneId: 'p1', tabId: 'v::a.md' }) : '',
+        dropEffect: 'none',
+      }
+      fireEvent.drop(rightEdge, { dataTransfer })
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'SPLIT_PANE_WITH_TAB',
+        payload: { paneId: 'p1', direction: 'horizontal', newPaneId: 'p2', tabId: 'v::a.md' },
+      })
+    })
+
+    it('ignores an edge drop without a tab payload', () => {
+      const dispatch = vi.fn()
+      const { container } = render(
+        <PaneTreeView
+          tree={createInitialPaneTree('p1')}
+          dispatch={dispatch}
+          renderPane={renderPane}
+          resizeLabel="Resize"
+          generatePaneId={() => 'p2'}
+        />,
+      )
+      const topEdge = container.querySelector('.pane-drop-edge--top') as HTMLElement
+      fireEvent.drop(topEdge, { dataTransfer: { types: [], getData: () => '', dropEffect: 'none' } })
+      expect(dispatch).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'SPLIT_PANE_WITH_TAB' }),
+      )
+    })
+  })
 })

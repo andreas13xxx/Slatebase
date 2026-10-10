@@ -29,7 +29,19 @@ export interface TabBarProps {
   isShowingSettings: boolean
   /** Called when a file tab is clicked, before activating it — lets the caller deactivate any settings tab. */
   onActivateFileTab: () => void
+  /**
+   * Pane-aware tab drag (Split Panes). When set, this tab bar belongs to the
+   * pane `paneId`, and dragging a tab onto ANOTHER pane's tab bar triggers a
+   * cross-pane move via `onMoveTabToPane`. Unset = the legacy single-row bar
+   * (reorder only), so the component is backward-compatible.
+   */
+  paneId?: string
+  /** Move a tab from one pane to another at a target index (append when omitted). */
+  onMoveTabToPane?: (fromPaneId: string, toPaneId: string, tabId: string, toIndex?: number) => void
 }
+
+/** MIME type carrying a cross-pane tab drag payload (`{ paneId, tabId }`). */
+export const TAB_DRAG_MIME = 'application/x-slatebase-tab'
 
 /**
  * TabBar renders the unified horizontal tab strip: settings-page tabs first
@@ -37,7 +49,7 @@ export interface TabBarProps {
  * Each file tab shows the filename (truncated to fit), a mode toggle icon,
  * and a close button. The active tab is visually distinguished.
  */
-export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab }: TabBarProps) {
+export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab, paneId, onMoveTabToPane }: TabBarProps) {
   const { t } = useTranslation()
   // Re-renders once any icon's (async, per-icon) Lucide resolution lands —
   // see PluginRibbonIcon.tsx for why this is needed.
@@ -48,7 +60,9 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab }: T
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
 
-  if (settingsTabs.length === 0 && tabs.length === 0) {
+  // A pane-local bar always renders (even empty) so an empty pane stays a valid
+  // drop target for a cross-pane move; the legacy single row collapses when empty.
+  if (paneId === undefined && settingsTabs.length === 0 && tabs.length === 0) {
     return null
   }
 
@@ -76,12 +90,40 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab }: T
     dragIndexRef.current = index
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', String(index))
+    // Cross-pane payload: identifies the source pane + tab so another pane's
+    // bar (or an edge-drop zone) can claim the tab. Only when pane-aware.
+    const tab = tabs[index]
+    if (paneId && tab) {
+      e.dataTransfer.setData(TAB_DRAG_MIME, JSON.stringify({ paneId, tabId: tab.id }))
+    }
+  }
+
+  /** Read a cross-pane tab payload from a drag, or null if it isn't one. */
+  function readTabDrag(e: React.DragEvent): { paneId: string; tabId: string } | null {
+    const raw = e.dataTransfer.getData(TAB_DRAG_MIME)
+    if (!raw) return null
+    try {
+      const parsed = JSON.parse(raw) as { paneId?: unknown; tabId?: unknown }
+      if (typeof parsed.paneId === 'string' && typeof parsed.tabId === 'string') {
+        return { paneId: parsed.paneId, tabId: parsed.tabId }
+      }
+    } catch { /* malformed payload — treat as not a tab drag */ }
+    return null
+  }
+
+  /** True while a cross-pane drag from ANOTHER pane hovers this bar. */
+  function isForeignTabDrag(e: React.DragEvent): boolean {
+    // During dragover the payload is not readable (browser security), so fall
+    // back to the type list; the source pane can't be told apart here, so an
+    // own-pane reorder still works through dragIndexRef.
+    return paneId !== undefined && e.dataTransfer.types.includes(TAB_DRAG_MIME)
   }
 
   function handleDragOver(e: React.DragEvent, index: number) {
+    if (dragIndexRef.current === null && !isForeignTabDrag(e)) return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
-    if (dragIndexRef.current !== null && dragIndexRef.current !== index) {
+    if (dragIndexRef.current !== index) {
       setDragOverIndex(index)
     }
   }
@@ -92,7 +134,16 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab }: T
 
   function handleDrop(e: React.DragEvent, toIndex: number) {
     e.preventDefault()
+    e.stopPropagation()
     setDragOverIndex(null)
+    const payload = readTabDrag(e)
+    // Cross-pane move: payload from a different pane than this one.
+    if (payload && paneId && onMoveTabToPane && payload.paneId !== paneId) {
+      onMoveTabToPane(payload.paneId, paneId, payload.tabId, toIndex)
+      dragIndexRef.current = null
+      return
+    }
+    // Same-pane reorder (either no pane context, or same-pane payload).
     const fromIndex = dragIndexRef.current
     if (fromIndex !== null && fromIndex !== toIndex) {
       tabDispatch({ type: 'REORDER_TABS', payload: { fromIndex, toIndex } })
@@ -116,9 +167,9 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab }: T
     })
   }
 
-  /** Dropping past the last tab (in the row's empty space) moves it to the end. */
+  /** Dropping in the row's empty space moves/appends the tab to the end. */
   function handleRowDragOver(e: React.DragEvent) {
-    if (dragIndexRef.current !== null) {
+    if (dragIndexRef.current !== null || isForeignTabDrag(e)) {
       e.preventDefault()
       e.dataTransfer.dropEffect = 'move'
     }
@@ -127,6 +178,13 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab }: T
   function handleRowDrop(e: React.DragEvent) {
     e.preventDefault()
     setDragOverIndex(null)
+    const payload = readTabDrag(e)
+    if (payload && paneId && onMoveTabToPane && payload.paneId !== paneId) {
+      // Append to the end of this pane.
+      onMoveTabToPane(payload.paneId, paneId, payload.tabId)
+      dragIndexRef.current = null
+      return
+    }
     const fromIndex = dragIndexRef.current
     const lastIndex = tabs.length - 1
     if (fromIndex !== null && fromIndex !== lastIndex) {

@@ -215,6 +215,173 @@ describe('paneTreeReducer', () => {
     })
   })
 
+  describe('MOVE_TAB_TO_PANE', () => {
+    /** Two side-by-side panes: p1 has a.md+c.md (c active), p2 has b.md. */
+    function twoPaneTree(): PaneTree {
+      let tree = seededTree('p1', 'v', 'a.md')
+      tree = paneTreeReducer(tree, {
+        type: 'SPLIT_PANE',
+        payload: { paneId: 'p1', direction: 'horizontal', newPaneId: 'p2' },
+      })
+      tree = paneTreeReducer(tree, {
+        type: 'PANE_TAB_ACTION',
+        payload: { paneId: 'p2', action: { type: 'OPEN_TAB', payload: { vaultId: 'v', filePath: 'b.md', fileName: 'b.md' } } },
+      })
+      // Give p1 a second tab so moving one does not collapse it.
+      tree = paneTreeReducer(tree, {
+        type: 'PANE_TAB_ACTION',
+        payload: { paneId: 'p1', action: { type: 'OPEN_TAB', payload: { vaultId: 'v', filePath: 'c.md', fileName: 'c.md' } } },
+      })
+      return paneTreeReducer(tree, { type: 'FOCUS_PANE', payload: { paneId: 'p1' } })
+    }
+
+    it('moves a tab to another pane, activating it there and focusing that pane', () => {
+      const tree = twoPaneTree()
+      const next = paneTreeReducer(tree, {
+        type: 'MOVE_TAB_TO_PANE',
+        payload: { fromPaneId: 'p1', toPaneId: 'p2', tabId: 'v::c.md' },
+      })
+      // c.md left p1, joined p2 (appended + active); p2 is now the active pane.
+      expect(findPane(next, 'p1')?.tabState.tabs.map((t) => t.id)).toEqual(['v::a.md'])
+      expect(findPane(next, 'p2')?.tabState.tabs.map((t) => t.id)).toEqual(['v::b.md', 'v::c.md'])
+      expect(findPane(next, 'p2')?.tabState.activeTabId).toBe('v::c.md')
+      expect(next.activePaneId).toBe('p2')
+    })
+
+    it('inserts at the requested index', () => {
+      const tree = twoPaneTree()
+      const next = paneTreeReducer(tree, {
+        type: 'MOVE_TAB_TO_PANE',
+        payload: { fromPaneId: 'p1', toPaneId: 'p2', tabId: 'v::c.md', toIndex: 0 },
+      })
+      expect(findPane(next, 'p2')?.tabState.tabs.map((t) => t.id)).toEqual(['v::c.md', 'v::b.md'])
+    })
+
+    it('does not record the moved tab in the source closed-tabs history', () => {
+      const tree = twoPaneTree()
+      const next = paneTreeReducer(tree, {
+        type: 'MOVE_TAB_TO_PANE',
+        payload: { fromPaneId: 'p1', toPaneId: 'p2', tabId: 'v::c.md' },
+      })
+      expect(findPane(next, 'p1')?.tabState.closedTabsHistory).toHaveLength(0)
+    })
+
+    it('collapses the source pane when it moves its last tab away', () => {
+      // p1 has only a.md; move it to p2 → p1 collapses, p2 survives.
+      let tree = seededTree('p1', 'v', 'a.md')
+      tree = paneTreeReducer(tree, {
+        type: 'SPLIT_PANE',
+        payload: { paneId: 'p1', direction: 'horizontal', newPaneId: 'p2' },
+      })
+      tree = paneTreeReducer(tree, {
+        type: 'PANE_TAB_ACTION',
+        payload: { paneId: 'p2', action: { type: 'OPEN_TAB', payload: { vaultId: 'v', filePath: 'b.md', fileName: 'b.md' } } },
+      })
+      const next = paneTreeReducer(tree, {
+        type: 'MOVE_TAB_TO_PANE',
+        payload: { fromPaneId: 'p1', toPaneId: 'p2', tabId: 'v::a.md' },
+      })
+      expect(next.root.kind).toBe('pane')
+      expect(findPane(next, 'p1')).toBeNull()
+      expect(findPane(next, 'p2')?.tabState.tabs.map((t) => t.id)).toEqual(['v::b.md', 'v::a.md'])
+      expect(next.activePaneId).toBe('p2')
+    })
+
+    it('is a no-op when source === target', () => {
+      const tree = twoPaneTree()
+      const next = paneTreeReducer(tree, {
+        type: 'MOVE_TAB_TO_PANE',
+        payload: { fromPaneId: 'p1', toPaneId: 'p1', tabId: 'v::a.md' },
+      })
+      expect(next).toBe(tree)
+    })
+
+    it('activates in place instead of duplicating when the tab already exists in the target', () => {
+      // Both panes hold a.md (same deterministic id); move from p1 to p2.
+      let tree = seededTree('p1', 'v', 'a.md')
+      tree = paneTreeReducer(tree, {
+        type: 'SPLIT_PANE',
+        payload: { paneId: 'p1', direction: 'horizontal', newPaneId: 'p2' },
+      })
+      tree = paneTreeReducer(tree, {
+        type: 'PANE_TAB_ACTION',
+        payload: { paneId: 'p2', action: { type: 'OPEN_TAB', payload: { vaultId: 'v', filePath: 'a.md', fileName: 'a.md' } } },
+      })
+      // p1 also still has a second tab so it does not collapse.
+      tree = paneTreeReducer(tree, {
+        type: 'PANE_TAB_ACTION',
+        payload: { paneId: 'p1', action: { type: 'OPEN_TAB', payload: { vaultId: 'v', filePath: 'z.md', fileName: 'z.md' } } },
+      })
+      const next = paneTreeReducer(tree, {
+        type: 'MOVE_TAB_TO_PANE',
+        payload: { fromPaneId: 'p1', toPaneId: 'p2', tabId: 'v::a.md' },
+      })
+      // p2 keeps a single a.md (no duplicate) and makes it active.
+      expect(findPane(next, 'p2')?.tabState.tabs.filter((t) => t.id === 'v::a.md')).toHaveLength(1)
+      expect(findPane(next, 'p2')?.tabState.activeTabId).toBe('v::a.md')
+    })
+  })
+
+  describe('SPLIT_PANE_WITH_TAB', () => {
+    /** A pane with two tabs (a.md active, b.md). */
+    function twoTabPane(): PaneTree {
+      let tree = seededTree('p1', 'v', 'a.md')
+      tree = paneTreeReducer(tree, {
+        type: 'PANE_TAB_ACTION',
+        payload: { paneId: 'p1', action: { type: 'OPEN_TAB', payload: { vaultId: 'v', filePath: 'b.md', fileName: 'b.md' } } },
+      })
+      return paneTreeReducer(tree, {
+        type: 'PANE_TAB_ACTION',
+        payload: { paneId: 'p1', action: { type: 'ACTIVATE_TAB', payload: { tabId: 'v::a.md' } } },
+      })
+    }
+
+    it('MOVE mode: splits and relocates the tab into the new pane', () => {
+      const tree = twoTabPane()
+      const next = paneTreeReducer(tree, {
+        type: 'SPLIT_PANE_WITH_TAB',
+        payload: { paneId: 'p1', direction: 'vertical', newPaneId: 'p2', tabId: 'v::b.md' },
+      })
+      expect(next.root.kind).toBe('split')
+      expect((next.root as SplitNode).direction).toBe('vertical')
+      // b.md left p1, lives alone in p2 (active); p2 is active.
+      expect(findPane(next, 'p1')?.tabState.tabs.map((t) => t.id)).toEqual(['v::a.md'])
+      expect(findPane(next, 'p2')?.tabState.tabs.map((t) => t.id)).toEqual(['v::b.md'])
+      expect(next.activePaneId).toBe('p2')
+    })
+
+    it('MOVE mode: no-op when the pane has a single tab (nothing gained)', () => {
+      const tree = seededTree('p1', 'v', 'a.md')
+      const next = paneTreeReducer(tree, {
+        type: 'SPLIT_PANE_WITH_TAB',
+        payload: { paneId: 'p1', direction: 'horizontal', newPaneId: 'p2', tabId: 'v::a.md' },
+      })
+      expect(next).toBe(tree)
+    })
+
+    it('COPY mode: duplicates the tab into the new pane, keeping it in the source', () => {
+      const tree = seededTree('p1', 'v', 'a.md')
+      const next = paneTreeReducer(tree, {
+        type: 'SPLIT_PANE_WITH_TAB',
+        payload: { paneId: 'p1', direction: 'horizontal', newPaneId: 'p2', tabId: 'v::a.md', copy: true },
+      })
+      expect(next.root.kind).toBe('split')
+      // a.md still in p1 AND copied into p2.
+      expect(findPane(next, 'p1')?.tabState.tabs.map((t) => t.id)).toEqual(['v::a.md'])
+      expect(findPane(next, 'p2')?.tabState.tabs.map((t) => t.id)).toEqual(['v::a.md'])
+      expect(next.activePaneId).toBe('p2')
+    })
+
+    it('is a no-op when the tab is not in the pane', () => {
+      const tree = twoTabPane()
+      const next = paneTreeReducer(tree, {
+        type: 'SPLIT_PANE_WITH_TAB',
+        payload: { paneId: 'p1', direction: 'vertical', newPaneId: 'p2', tabId: 'v::nope.md' },
+      })
+      expect(next).toBe(tree)
+    })
+  })
+
   describe('purity', () => {
     it('does not mutate the previous tree on split', () => {
       const tree = createInitialPaneTree('p1')

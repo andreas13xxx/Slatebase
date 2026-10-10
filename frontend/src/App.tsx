@@ -944,6 +944,19 @@ function AppContent() {
     requestReveal(folderPath, 'folder')
   }, [showSidebar])
 
+  // ── Split Panes: id generation + cross-pane tab move ──
+  // Stable unique pane ids for splits (edge-drop and the split commands).
+  const generatePaneId = useCallback(
+    () => `pane-${(crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)).slice(0, 8)}`,
+    [],
+  )
+  const handleMoveTabToPane = useCallback(
+    (fromPaneId: string, toPaneId: string, tabId: string, toIndex?: number) => {
+      paneTreeDispatch({ type: 'MOVE_TAB_TO_PANE', payload: { fromPaneId, toPaneId, tabId, toIndex } })
+    },
+    [paneTreeDispatch],
+  )
+
   const settingsTabs: SettingsTabDescriptor[] = openSettingsPages.map((page) => {
     const isActive = isShowingSettings && page === activeSettingsPage
     const pageLabel = t(PAGE_LABEL_KEYS[page] as Parameters<typeof t>[0])
@@ -1220,7 +1233,9 @@ function AppContent() {
           {/* workspace-tab-container: Obsidian-parity marker class — see mod-vertical/mod-root
               note above. Some plugins requestFullscreen() this element by selector. */}
           <section className="app-content workspace-tab-container">
-            {/* Back/forward navigation history + unified tab bar (settings tabs + file tabs) in one row */}
+            {/* Back/forward navigation history + settings-page tab bar in one
+                row. File tabs now live INSIDE each pane (see renderPane below),
+                so this app-level bar carries only the settings-page tabs. */}
             <div className="tab-bar-row">
               <NavigationControls />
               <TabBar
@@ -1251,8 +1266,18 @@ function AppContent() {
                     tree={paneTree}
                     dispatch={paneTreeDispatch}
                     resizeLabel={t('resize.adjustWidth')}
+                    generatePaneId={generatePaneId}
                     renderPane={(pane) => (
                       <PaneTabProvider paneId={pane.id}>
+                        {/* Each pane shows its OWN file-tab bar; a tab dragged
+                            onto another pane's bar (or a pane edge) moves there. */}
+                        <TabBar
+                          settingsTabs={[]}
+                          isShowingSettings={false}
+                          onActivateFileTab={() => setActiveSettingsPage(null)}
+                          paneId={pane.id}
+                          onMoveTabToPane={handleMoveTabToPane}
+                        />
                         <ErrorBoundary>
                           <TabContent />
                         </ErrorBoundary>

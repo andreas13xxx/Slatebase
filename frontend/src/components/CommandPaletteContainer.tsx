@@ -3,6 +3,8 @@ import { CommandPalette } from './CommandPalette'
 import { usePluginContext } from '../plugins/compat/plugin-context'
 import { useFeatureContext } from '../state/featureContext'
 import { useTabContext } from '../state/tabContext'
+import { usePaneTree } from '../state/paneTreeContext'
+import { getActivePaneTabState } from '../state/paneTreeState'
 import { useAppContext, loadVaults } from '../state/index'
 import { useAuthContext } from '../state/authContext'
 import { useNavigationHistory } from '../state/navigationHistoryContext'
@@ -169,6 +171,7 @@ export function CommandPaletteContainer({
   const { commandRegistry } = usePluginContext()
   const { isEnabled } = useFeatureContext()
   const { tabState, tabDispatch } = useTabContext()
+  const { paneTree, paneTreeDispatch } = usePaneTree()
   const { state, dispatch: appDispatch, apiClient } = useAppContext()
   const { authState, authDispatch } = useAuthContext()
   const { state: rightPanelState, dispatch: rightPanelDispatch } = useRightPanelContext()
@@ -347,6 +350,20 @@ export function CommandPaletteContainer({
     onNavigateBack: goBack,
     onNavigateForward: goForward,
     onOpenQuickSwitcher: () => { if (state.selectedVaultId) setQuickSwitcherOpen(true) },
+    onSplitPane: (direction) => {
+      // Split the active pane, moving its active tab into the new pane. With no
+      // active tab there is nothing to show in the new pane, so skip.
+      const activeTabId = getActivePaneTabState(paneTree)?.activeTabId
+      if (!activeTabId) {
+        showToast('info', t('splitPanes.noActiveTab'))
+        return
+      }
+      const newPaneId = `pane-${(crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)).slice(0, 8)}`
+      paneTreeDispatch({
+        type: 'SPLIT_PANE_WITH_TAB',
+        payload: { paneId: paneTree.activePaneId, direction, newPaneId, tabId: activeTabId, copy: true },
+      })
+    },
     searchQuery: searchState.query,
     searchCaseSensitive: searchState.caseSensitive,
     searchRegex: searchState.regex,

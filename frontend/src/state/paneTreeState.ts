@@ -17,6 +17,7 @@ import {
   tabReducer,
   initialTabState,
   type TabState,
+  type TabEntry,
   type TabAction,
 } from './tabState'
 
@@ -76,6 +77,26 @@ export type PaneTreeAction =
    * pane is collapsed (unless it is the last one).
    */
   | { type: 'PANE_TAB_ACTION'; payload: { paneId: string; action: TabAction } }
+  /**
+   * Move a tab from one pane to another (tab-drag between panes). The tab is
+   * removed from the source pane (collapsing it if it empties, unless it is the
+   * last pane) and inserted into the target pane at `toIndex` (appended when
+   * omitted), where it becomes active. The target pane also becomes the active
+   * pane. A no-op when source === target (reordering is a plain tab action).
+   */
+  | { type: 'MOVE_TAB_TO_PANE'; payload: { fromPaneId: string; toPaneId: string; tabId: string; toIndex?: number } }
+  /**
+   * Split a pane and place one of its tabs into the freshly-created pane. With
+   * `copy: false` (edge-drop) the tab is MOVED — removed from the source — and
+   * splitting a single-tab pane is a no-op (nothing would be gained). With
+   * `copy: true` (the split command) the tab is DUPLICATED into the new pane so
+   * both panes show it, matching Obsidian's "split" — this works even for a
+   * single-tab pane. The new pane becomes active.
+   */
+  | {
+      type: 'SPLIT_PANE_WITH_TAB'
+      payload: { paneId: string; direction: SplitDirection; newPaneId: string; tabId: string; copy?: boolean }
+    }
 
 // ─── Helpers (pure) ──────────────────────────────────────────────────────────
 
@@ -181,6 +202,39 @@ function firstPaneId(node: PaneTreeNode): string {
   return n.id
 }
 
+/**
+ * Remove a tab from a tab state WITHOUT recording it in `closedTabsHistory` —
+ * a move is not a close, so the entry must not become undo-close material. The
+ * active tab falls back to its neighbour, mirroring `tabReducer`'s CLOSE_TAB.
+ */
+function removeTabFromState(state: TabState, tabId: string): TabState {
+  const index = state.tabs.findIndex((t) => t.id === tabId)
+  if (index === -1) return state
+  const tabs = state.tabs.filter((t) => t.id !== tabId)
+  let activeTabId = state.activeTabId
+  if (state.activeTabId === tabId) {
+    if (tabs.length === 0) activeTabId = null
+    else if (index < tabs.length) activeTabId = tabs[index]!.id
+    else activeTabId = tabs[index - 1]!.id
+  }
+  return { ...state, tabs, activeTabId }
+}
+
+/**
+ * Insert a tab into a tab state at `index` (appended when omitted) and make it
+ * active. If a tab with the same id already exists (same file dragged back),
+ * it is activated in place rather than duplicated.
+ */
+function insertTabIntoState(state: TabState, tab: TabEntry, index?: number): TabState {
+  if (state.tabs.some((t) => t.id === tab.id)) {
+    return { ...state, activeTabId: tab.id }
+  }
+  const tabs = [...state.tabs]
+  const at = index === undefined ? tabs.length : Math.min(Math.max(index, 0), tabs.length)
+  tabs.splice(at, 0, tab)
+  return { ...state, tabs, activeTabId: tab.id }
+}
+
 // ─── Reducer (pure) ──────────────────────────────────────────────────────────
 
 /** Pure reducer for all pane-tree layout transitions. */
@@ -248,6 +302,67 @@ export function paneTreeReducer(state: PaneTree, action: PaneTreeAction): PaneTr
         if (activePaneId === paneId) activePaneId = firstPaneId(root)
       }
       return { root, activePaneId }
+    }
+
+    case 'MOVE_TAB_TO_PANE': {
+      const { fromPaneId, toPaneId, tabId, toIndex } = action.payload
+      if (fromPaneId === toPaneId) return state
+      const from = findPane(state, fromPaneId)
+      const to = findPane(state, toPaneId)
+      if (!from || !to) return state
+      const moved = from.tabState.tabs.find((t) => t.id === tabId)
+      if (!moved) return state
+
+      const fromTabState = removeTabFromState(from.tabState, tabId)
+      // If the tab already lives in the target (same deterministic id), just
+      // activate it there rather than inserting a duplicate.
+      const toTabState = insertTabIntoState(to.tabState, moved, toIndex)
+
+      let root = mapTree(state.root, (pane) => {
+        if (pane.id === fromPaneId) return { ...pane, tabState: fromTabState }
+        if (pane.id === toPaneId) return { ...pane, tabState: toTabState }
+        return pane
+      })
+
+      // Collapse the source pane if it emptied (unless it is the last pane).
+      const activePaneId = toPaneId
+      if (fromTabState.tabs.length === 0 && root.kind === 'split') {
+        root = removePane(root, fromPaneId)
+      }
+      return { root, activePaneId }
+    }
+
+    case 'SPLIT_PANE_WITH_TAB': {
+      const { paneId, direction, newPaneId, tabId, copy = false } = action.payload
+      const source = findPane(state, paneId)
+      if (!source) return state
+      const moved = source.tabState.tabs.find((t) => t.id === tabId)
+      if (!moved) return state
+      // MOVE mode: splitting a single-tab pane to relocate its only tab gains
+      // nothing. COPY mode (the split command) duplicates, so it is allowed.
+      if (!copy && source.tabState.tabs.length <= 1) return state
+
+      const sourceTabState = copy ? source.tabState : removeTabFromState(source.tabState, tabId)
+      const newPaneTabState: TabState = {
+        tabs: [moved],
+        activeTabId: moved.id,
+        closedTabsHistory: [],
+      }
+      const newPane = createPane(newPaneId, newPaneTabState)
+
+      const root = mapTree(state.root, (pane) => {
+        if (pane.id !== paneId) return pane
+        const updatedSource: PaneNode = { ...pane, tabState: sourceTabState }
+        const split: SplitNode = {
+          kind: 'split',
+          id: `split-${newPaneId}`,
+          direction,
+          children: [updatedSource, newPane],
+          sizes: [0.5, 0.5],
+        }
+        return split
+      })
+      return { root, activePaneId: newPaneId }
     }
 
     default:
