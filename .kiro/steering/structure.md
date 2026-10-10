@@ -87,6 +87,8 @@ src/
 │   ├── propertyRoutes.test.ts — Integration tests for property metadata routes
 │   ├── basesRoutes.ts       — Bases query route (POST /vaults/:vaultId/bases/query — translates a parsed `.base`'s filter/sort/column spec into `LinkIndexService.queryForBase`; feature-gated `bases`, vault auth via shared middleware). A `.base` file itself is a normal vault file read/written through the regular file endpoints — this is the only Bases-specific backend code
 │   ├── basesRoutes.test.ts  — Integration tests for the Bases query route
+│   ├── activityRoutes.ts    — Activity timeline read route (GET /vaults/:vaultId/activity — cursor-paginated, type/time filters; feature-gated `activity-timeline`, vault auth via shared middleware). Recording happens as a side effect of vault mutations (VaultController, trashRoutes, MCP tool-handlers); this route only reads back what ActivityStore wrote
+│   ├── activityRoutes.test.ts — Integration tests for the activity read route
 │   ├── pluginStoreRoutes.ts — Community plugin store routes (browse, install, update; per-vault and global mounts)
 │   └── sseRoutes.ts      — GET /events (SSE stream)
 ├── chat/
@@ -223,7 +225,12 @@ src/
 ├── cleanup/
 │   ├── index.ts              — Barrel export for cleanup module
 │   ├── types.ts              — ICleanupJob, CleanupConfig interfaces
-│   └── cleanup-job.ts        — CleanupJob (periodic trash purge + version prune, per-file error isolation)
+│   └── cleanup-job.ts        — CleanupJob (periodic trash purge + version prune + activity purge, per-file error isolation). Activity purge is per-vault (`activityRetentionDays` from vault-config) and only wired when the `activity-timeline` feature is on
+├── activity/                 — Per-vault activity event log for the Activity Timeline (feature toggle `activity-timeline`, cold/default-off). Append-only JSONL under `.slatebase/activity/YYYY-MM-DD.jsonl`, modeled on the audit logger but per-vault (visibility + retention are vault-bound).
+│   ├── index.ts              — Barrel export for activity module
+│   ├── types.ts              — IActivityService, ActivityEvent, ActivityEventType, ActivityQuery, ActivityPage
+│   ├── activity-store.ts     — ActivityStore (implements IActivityService directly, no separate service layer — like PreferencesStore). `record()` applies the 60-s trailing coalescing window for `note.edited` (frozen decision D1: one typing session = one event, `lastModified` advanced in place via temp→rename rewrite); `note.moved` is one event with old+new path (D3); `.slatebase/` dot-paths are never recorded (R1.5); recording is fire-and-forget (never fails the triggering write). `query()` is cursor-paginated newest-first with type/time filters; `purgeExpired()` drops day-files past retention (D2). Per-vault `KeyedMutex`
+│   └── activity-store.test.ts — Unit tests (coalescing window, filters, pagination, purge, hidden-path exclusion, swallowed write failure)
 ├── preferences/
 │   ├── index.ts              — Barrel export for preferences module
 │   ├── types.ts              — IPreferencesService, UserPreferences, RecentFileEntry, FavoriteEntry (now a discriminated-by-`type` bookmark: file/heading/block/search, with `id`/`order`/`label` — see lessons-learned.md), KeybindingEntry, UserUiSettings (account-wide: status bar, toolbar, explorer follow-active-file) + UserVaultSettings (per user *and* vault: line numbers, readable line length, spellcheck, zoom, graph/panel-layout blobs — shape owned by the client, stored as opaque JSON). `*Patch` variants spell out `| undefined` on every optional field (not just `?:`) so a Zod-parsed request body satisfies `exactOptionalPropertyTypes: true` without a cast

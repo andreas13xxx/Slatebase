@@ -1,0 +1,223 @@
+.activity-timeline {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  color: var(--text-normal);
+}
+
+/* ─── Filter chips ─────────────────────────────────────────────────────── */
+
+.activity-timeline__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  border-bottom: 1px solid var(--border-subtle);
+  flex: 0 0 auto;
+}
+
+.activity-chip {
+  appearance: none;
+  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 0.15rem 0.7rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.activity-chip:hover {
+  background: var(--bg-hover);
+  color: var(--text-normal);
+}
+
+.activity-chip--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent, #fff);
+}
+
+/* ─── Status / empty ───────────────────────────────────────────────────── */
+
+.activity-timeline__status {
+  padding: var(--space-3, 0.75rem);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.activity-timeline__error {
+  color: var(--danger);
+}
+
+.activity-timeline__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-6, 1.5rem);
+  color: var(--text-muted);
+  text-align: center;
+  flex: 1 1 auto;
+}
+
+/* ─── Buckets ──────────────────────────────────────────────────────────── */
+
+.activity-timeline__buckets {
+  overflow-y: auto;
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem) var(--space-4, 1rem);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.activity-bucket {
+  margin-bottom: var(--space-4, 1rem);
+}
+
+.activity-bucket__header {
+  position: sticky;
+  top: 0;
+  margin: 0 0 var(--space-2, 0.5rem);
+  padding: 0.25rem 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: var(--bg-primary);
+  z-index: 1;
+}
+
+.activity-bucket__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Vertical timeline rail — full variant only */
+.activity-timeline--full .activity-bucket__list {
+  position: relative;
+  padding-left: 1.1rem;
+}
+
+.activity-timeline--full .activity-bucket__list::before {
+  content: '';
+  position: absolute;
+  left: 0.45rem;
+  top: 0.3rem;
+  bottom: 0.3rem;
+  width: 2px;
+  background: var(--border-subtle);
+}
+
+/* ─── Rows ─────────────────────────────────────────────────────────────── */
+
+.activity-row {
+  position: relative;
+}
+
+.activity-row__btn {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2, 0.5rem);
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm, 4px);
+  padding: 0.4rem 0.5rem;
+  cursor: pointer;
+  color: inherit;
+}
+
+.activity-row__btn:hover:not(.activity-row__btn--disabled) {
+  background: var(--bg-hover);
+}
+
+.activity-row__btn--disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.activity-row__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+}
+
+.activity-row__icon--notes { color: var(--accent); }
+.activity-row__icon--canvas { color: var(--text-accent, var(--accent)); }
+.activity-row__icon--bases { color: var(--text-accent, var(--accent)); }
+.activity-row__icon--snippets { color: var(--text-accent, var(--accent)); }
+
+.activity-row__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.activity-row__title {
+  font-size: 0.88rem;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activity-row__from {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.activity-row__meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Load more ────────────────────────────────────────────────────────── */
+
+.activity-timeline__more {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-2, 0.5rem);
+  padding: 0.4rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.activity-timeline__more:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-normal);
+}
+
+.activity-timeline__more:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activity-chip,
+  .activity-row__btn {
+    transition: none;
+  }
+}

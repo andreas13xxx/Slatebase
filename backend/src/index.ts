@@ -73,6 +73,8 @@ import { TemplateService } from './template/index.js'
 import { VersionService } from './version/index.js'
 import { createFileVersionRoutes } from './api/fileVersionRoutes.js'
 import { TrashService } from './trash/index.js'
+import { ActivityStore } from './activity/index.js'
+import { createActivityRoutes } from './api/activityRoutes.js'
 import { createTrashRoutes } from './api/trashRoutes.js'
 import { CleanupJob } from './cleanup/index.js'
 import { PreferencesStore } from './preferences/index.js'
@@ -114,6 +116,7 @@ featureRegistry.register({ name: 'git-sync', description: 'Git-Synchronisation v
 featureRegistry.register({ name: 'mail-import', description: 'IMAP-Mail-Import als Markdown-Notizen', defaultEnabled: true, type: 'cold' })
 featureRegistry.register({ name: 'voice-transcription', description: 'Diktieren / Spracherkennung via self-hosted Whisper (rechenintensiv, GPU empfohlen)', defaultEnabled: false, type: 'cold' })
 featureRegistry.register({ name: 'bases', description: 'Bases — filterbare, editierbare Tabellen über die Vault-Metadaten (experimentell)', defaultEnabled: false, type: 'cold' })
+featureRegistry.register({ name: 'activity-timeline', description: 'Aktivitätszeitleiste — chronologische Vault-Aktivität als Tab und Seitenleiste (experimentell)', defaultEnabled: false, type: 'cold' })
 
 const featureToggleStore = new FeatureToggleStore(serverConfig.dataDir, logger)
 const persistedFeatureState = await featureToggleStore.load()
@@ -242,6 +245,18 @@ const trashService = new TrashService(
   logger,
 )
 
+// Activity timeline store — same per-vault path resolver as the trash service.
+// Only wired into the mutation hooks + routes when the feature is enabled (below).
+const activityStore = new ActivityStore(
+  (vaultId: string) => {
+    const entry = vaultRegistry.findById(vaultId)
+    if (!entry) throw new Error(`Vault not found: ${vaultId}`)
+    return entry.storagePath
+  },
+  logger,
+)
+const activityEnabled = featureToggleService.isEnabled('activity-timeline')
+
 const vaultService = new VaultService(vaultManager, vaultReader, config, logger, vaultRegistry, vaultShareRegistry, userRepository, auditService, trashService, versionService)
 const importService = new ImportService(vaultManager, config, logger)
 
@@ -337,6 +352,26 @@ if (featureToggleService.isEnabled('mcp')) {
           target,
         })
       },
+      // Record timeline activity for MCP writes (second entry point). Resolves
+      // the username asynchronously; fire-and-forget, never blocks the tool.
+      // No-op unless the activity-timeline feature is enabled.
+      recordActivity: activityEnabled
+        ? (vaultId, event) => {
+            void (async () => {
+              try {
+                const user = await userRepository.findById(event.userId)
+                const username = user ? (user.displayName || user.username) : 'MCP'
+                if (event.type === 'note.moved') {
+                  await activityStore.record(vaultId, { type: 'note.moved', path: event.path, oldPath: event.oldPath, user: username })
+                } else {
+                  await activityStore.record(vaultId, { type: event.type, path: event.path, user: username })
+                }
+              } catch {
+                // recording is a side effect; swallow
+              }
+            })()
+          }
+        : undefined,
     },
     logger,
   })
@@ -501,6 +536,12 @@ const chatController = new ChatController(chatService, chatRateLimiter, logger, 
 // Wire EventBus to VaultController for vault:change events
 vaultController.setEventBus(eventBus)
 
+// Wire the activity store into the VaultController when the feature is enabled,
+// so file create/edit/delete/move record timeline events.
+if (activityEnabled) {
+  vaultController.setActivityService(activityStore)
+}
+
 // 6. Route Modules
 const routeModules = [
   new VaultRouteModule(vaultController),
@@ -634,6 +675,7 @@ app.use('/api/v1/vaults/:vaultId/mail-import', createFeatureGuard('mail-import',
 app.use('/api/v1/vaults/:vaultId/mail-import/*', createFeatureGuard('mail-import', featureToggleService))
 app.use('/api/v1/vaults/:vaultId/transcribe', createFeatureGuard('voice-transcription', featureToggleService))
 app.use('/api/v1/vaults/:vaultId/bases/*', createFeatureGuard('bases', featureToggleService))
+app.use('/api/v1/vaults/:vaultId/activity', createFeatureGuard('activity-timeline', featureToggleService))
 
 // Route registration
 app.route('/api/v1', router)
@@ -749,6 +791,8 @@ const trashRoutes = createTrashRoutes({
   linkIndexHook: {
     onFileRestored: (vaultId, filePath) => { linkIndexHook.onFileRestored(vaultId, filePath) },
   },
+  // Record a note.restored timeline event (no-op unless the feature is on).
+  activityService: activityEnabled ? activityStore : undefined,
 })
 app.route('/api/v1', trashRoutes)
 
@@ -857,6 +901,13 @@ const basesRoutes = createBasesRoutes({
 })
 app.route('/api/v1', basesRoutes)
 
+// Activity timeline read route (feature-gated on `activity-timeline`; vault auth via shared middleware)
+const activityRoutes = createActivityRoutes({
+  activityService: activityStore,
+  logger,
+})
+app.route('/api/v1', activityRoutes)
+
 // Welcome vault route registration (auth + CSRF middleware applies via /api/v1/* pattern)
 const welcomeVaultRoutes = createWelcomeVaultRoutes({
   welcomeVaultService,
@@ -884,7 +935,15 @@ const proxyRoutes = createProxyRoutes({
 app.route('/api/v1', proxyRoutes)
 
 // CleanupJob — periodic trash purge and version pruning
-const cleanupJob = new CleanupJob(trashService, versionService, vaultManager, config, logger)
+const cleanupJob = new CleanupJob(
+  trashService,
+  versionService,
+  vaultManager,
+  config,
+  logger,
+  activityEnabled ? activityStore : undefined,
+  activityEnabled ? vaultConfigStore : undefined,
+)
 
 // SSE route registration (realtime events endpoint)
 const sseRoutes = createSseRoutes({

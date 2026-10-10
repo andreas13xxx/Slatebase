@@ -15,6 +15,7 @@ import { PageLoadingFallback } from './PageLoadingFallback'
 const GraphView = lazy(() => import('./GraphView').then((m) => ({ default: m.GraphView })))
 const CanvasView = lazy(() => import('./canvas/CanvasView').then((m) => ({ default: m.CanvasView })))
 const BasesView = lazy(() => import('./bases/BasesView').then((m) => ({ default: m.BasesView })))
+const ActivityTimelineView = lazy(() => import('./activity/ActivityTimelineView').then((m) => ({ default: m.ActivityTimelineView })))
 import { useTranslation } from '../i18n'
 import { extractErrorMessage } from '../utils/error'
 import { PluginContext } from '../plugins/compat/plugin-context'
@@ -320,6 +321,25 @@ export function TabContent() {
         <ErrorBoundary>
           <Suspense fallback={<PageLoadingFallback />}>
             <GraphView vaultId={activeTab.vaultId} />
+          </Suspense>
+        </ErrorBoundary>
+      </div>
+    )
+  }
+
+  // Activity timeline tab — render the full-variant ActivityTimelineView
+  if (activeTab.filePath === '__view::activity') {
+    return (
+      <div className="tab-content tab-content--activity" role="tabpanel" aria-label={activeTab.fileName}>
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoadingFallback />}>
+            <ActivityTimelineView
+              variant="full"
+              onOpenFile={(vId, path) => {
+                const fileName = path.split('/').pop() ?? path
+                void openTab(tabDispatch, appDispatch, apiClient!, vId, path, fileName)
+              }}
+            />
           </Suspense>
         </ErrorBoundary>
       </div>

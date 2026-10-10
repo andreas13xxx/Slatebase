@@ -69,7 +69,7 @@ function createMockVaultService(opts: MockVaultServiceOptions = {}): IVaultServi
     },
     resolveFilePath: (_vaultId: string, filePath: string) => `/data/vaults/test/${filePath}`,
     saveFile: async (_vaultId: string, filePath: string, content: string) => ({
-      path: filePath, name: filePath.split('/').pop() ?? filePath, size: content.length, etag: 'new-etag',
+      path: filePath, name: filePath.split('/').pop() ?? filePath, size: content.length, etag: 'new-etag', created: false,
     }),
     createVault: async () => ({ id: '', name: '', path: '', status: 'loaded' as const }),
     deleteVault: async () => {},

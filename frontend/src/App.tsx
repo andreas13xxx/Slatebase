@@ -589,6 +589,28 @@ function AppContent() {
     }
   }
 
+  function handleOpenActivity() {
+    if (!state.selectedVaultId) return
+    const existing = tabState.tabs.find((t) => t.filePath === '__view::activity' && t.vaultId === state.selectedVaultId)
+    if (existing) {
+      setActiveSettingsPage(null)
+      tabDispatch({ type: 'ACTIVATE_TAB', payload: { tabId: existing.id } })
+    } else {
+      setActiveSettingsPage(null)
+      const vault = state.vaults.find((v) => v.id === state.selectedVaultId)
+      const tabName = vault ? `Aktivität — ${vault.name}` : 'Aktivität'
+      tabDispatch({
+        type: 'OPEN_TAB',
+        payload: { vaultId: state.selectedVaultId, filePath: '__view::activity', fileName: tabName },
+      })
+      const tabId = `${state.selectedVaultId}::__view::activity`
+      tabDispatch({
+        type: 'TAB_CONTENT_LOADED',
+        payload: { tabId, content: '', isBinary: false },
+      })
+    }
+  }
+
   /** Opens (or activates) a Lokaler_Graph tab centered on the given note. */
   function handleOpenLocalGraph(filePath: string) {
     if (!state.selectedVaultId) return
@@ -1009,6 +1031,7 @@ function AppContent() {
         onImportFolder={handleImportFolder}
         onExportVault={handleExportVault}
         onOpenGraph={handleOpenGraph}
+        onOpenActivity={handleOpenActivity}
         onOpenLocalGraph={handleOpenLocalGraph}
         onDailyNote={handleDailyNote}
         onDailyNoteOffset={handleDailyNoteOffset}

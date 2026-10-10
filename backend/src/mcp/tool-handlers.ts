@@ -178,6 +178,20 @@ export interface ToolHandlerDeps {
     onFileDeleted(vaultId: string, filePath: string): void
     onFileRenamed(vaultId: string, oldPath: string, newPath: string): void | Promise<void>
   }
+  /**
+   * Optional — when set, write/delete/move/rename record a timeline activity
+   * event, the same way the REST API does. The MCP write path is a SECOND
+   * entry point to these operations and must carry the same side effect, or an
+   * MCP client leaves blind spots in the activity timeline (see
+   * `.kiro/specs/activity-timeline/`, lesson in `lessons-learned.md`).
+   * `user` is a human-readable actor label resolved by the composition root.
+   */
+  recordActivity?: ((
+    vaultId: string,
+    event:
+      | { type: 'note.created' | 'note.edited' | 'note.deleted'; path: string; userId: string }
+      | { type: 'note.moved'; path: string; oldPath: string; userId: string },
+  ) => void) | undefined
 }
 
 /**
@@ -646,6 +660,13 @@ function registerWriteFile(server: McpServer, deps: ToolHandlerDeps): void {
 
         await deps.publishVaultChange?.(args.vaultId, 'saved', result.path, userId)
 
+        // Record timeline activity (second entry point; same side effect as REST)
+        deps.recordActivity?.(args.vaultId, {
+          type: result.created ? 'note.created' : 'note.edited',
+          path: result.path,
+          userId,
+        })
+
         return mcpToolSuccess({
           path: result.path,
           name: result.name,
@@ -767,6 +788,13 @@ function registerDeleteFile(server: McpServer, deps: ToolHandlerDeps): void {
 
         await deps.publishVaultChange?.(args.vaultId, 'deleted', args.path, userId)
 
+        // Record timeline activity (second entry point; same side effect as REST)
+        deps.recordActivity?.(args.vaultId, {
+          type: 'note.deleted',
+          path: args.path,
+          userId,
+        })
+
         return mcpToolSuccess({
           path: args.path,
           message: 'Deleted successfully',
@@ -829,6 +857,14 @@ function registerMoveFile(server: McpServer, deps: ToolHandlerDeps): void {
           : undefined
 
         await deps.publishVaultChange?.(args.vaultId, 'renamed', result.newPath, userId)
+
+        // Record timeline activity: one note.moved with old + new path (D3)
+        deps.recordActivity?.(args.vaultId, {
+          type: 'note.moved',
+          path: result.newPath,
+          oldPath: args.sourcePath,
+          userId,
+        })
 
         return mcpToolSuccess({
           sourcePath: args.sourcePath,
@@ -905,6 +941,14 @@ function registerRenameFile(server: McpServer, deps: ToolHandlerDeps): void {
           : undefined
 
         await deps.publishVaultChange?.(args.vaultId, 'renamed', result.newPath, userId)
+
+        // Record timeline activity: one note.moved with old + new path (D3)
+        deps.recordActivity?.(args.vaultId, {
+          type: 'note.moved',
+          path: result.newPath,
+          oldPath: args.path,
+          userId,
+        })
 
         return mcpToolSuccess({
           oldPath: args.path,

@@ -140,6 +140,47 @@ export interface BacklinksResponse {
   backlinks: string[]
 }
 
+// ─── Activity Timeline ─────────────────────────────────────────────────────
+
+/** The type of a recorded vault activity (mirrors the backend union). */
+export type ActivityEventType =
+  | 'note.created' | 'note.edited' | 'note.deleted' | 'note.moved' | 'note.restored'
+  | 'canvas.created' | 'canvas.edited' | 'canvas.deleted'
+  | 'base.created' | 'base.edited' | 'base.deleted'
+  | 'snippet.created' | 'snippet.edited' | 'snippet.deleted'
+
+/** A single activity-timeline event. */
+export interface ActivityEvent {
+  id: string
+  type: ActivityEventType
+  /** ISO 8601 — for a coalesced edit, the window start. */
+  timestamp: string
+  /** ISO 8601 — most recent edit folded in; equals timestamp otherwise. */
+  lastModified: string
+  /** Affected path. For note.moved this is the NEW path. */
+  path: string
+  /** Previous path — present only for note.moved. */
+  oldPath?: string
+  /** Username that triggered the activity. */
+  user: string
+}
+
+/** One page of activity events, newest first. */
+export interface ActivityPage {
+  items: ActivityEvent[]
+  /** Cursor for the next (older) page, or null when exhausted. */
+  nextCursor: string | null
+}
+
+/** Query parameters for a page of activity. */
+export interface ActivityQueryParams {
+  types?: ActivityEventType[]
+  from?: string
+  to?: string
+  cursor?: string
+  limit?: number
+}
+
 /** Discriminated union of all actions dispatched to the app reducer. */
 export type AppAction =
   | { type: 'VAULTS_LOADED'; payload: VaultInfo[] }

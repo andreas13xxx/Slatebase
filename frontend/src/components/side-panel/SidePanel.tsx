@@ -19,6 +19,7 @@ import { LinksView } from '../context-panel/LinksView'
 import { TagsView } from '../context-panel/TagsView'
 import { PropertiesOverview } from '../context-panel/PropertiesOverview'
 import { SearchPanel } from '../SearchPanel'
+import { ActivityTimelineView } from '../activity/ActivityTimelineView'
 import { isPluginViewId, getPluginViewType } from '../../state/panelState'
 import type { PanelViewId } from '../../state/panelState'
 import type { DocumentPanelState, UnlinkedMentionEntry } from '../../state/documentPanelData'
@@ -284,6 +285,13 @@ export function SidePanel({
               hasWriteAccess={search.hasWriteAccess}
               onNavigateToResult={search.onNavigateToResult}
             />
+          </div>
+        )
+      case 'activity':
+        return (
+          <div className="side-panel__view-wrapper" key={viewId}>
+            <h3 className="side-panel__view-header">{t('sidePanel.tabs.activity')}</h3>
+            <ActivityTimelineView variant="compact" onOpenFile={onOpenFile} />
           </div>
         )
     }

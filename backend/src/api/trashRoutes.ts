@@ -61,6 +61,11 @@ export interface TrashRouteDependencies {
    * the context panel's tag list until the index is rebuilt.
    */
   linkIndexHook?: { onFileRestored(vaultId: string, filePath: string): void }
+  /**
+   * Optional — when set, a restored file records a `note.restored` activity
+   * event for the timeline. Fire-and-forget; a failure never fails the restore.
+   */
+  activityService?: { record(vaultId: string, event: { type: 'note.restored'; path: string; user: string }): Promise<void> } | undefined
 }
 
 // --- Trash Route Factory ---
@@ -76,7 +81,7 @@ export interface TrashRouteDependencies {
  * @returns A Hono instance with trash routes registered.
  */
 export function createTrashRoutes(deps: TrashRouteDependencies): Hono {
-  const { trashService, accessControl, vaultRegistry, eventBus, logger, linkIndexHook } = deps
+  const { trashService, accessControl, vaultRegistry, eventBus, logger, linkIndexHook, activityService } = deps
   const app = new Hono()
 
   /**
@@ -187,6 +192,13 @@ export function createTrashRoutes(deps: TrashRouteDependencies): Hono {
       })
 
       logger.info('Trash entry restored', { vaultId, entryId, restoredPath: result.restoredPath })
+
+      // Record activity (fire-and-forget; never fails the restore)
+      void activityService?.record(vaultId, {
+        type: 'note.restored',
+        path: result.restoredPath,
+        user: session.username,
+      })
 
       return c.json({ restoredPath: result.restoredPath }, 200)
     } catch (error) {

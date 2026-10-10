@@ -65,7 +65,7 @@ describe('Vault Config Routes', () => {
   describe('GET /vaults/:vaultId/config', () => {
     it('returns the vault config on success', async () => {
       const vaultConfigService = createMockVaultConfigService({
-        getConfig: async () => ({ templatesDirectory: 'Templates', dailyNotesDirectory: 'Journal', dailyNoteTemplateName: 'custom-daily.md', attachmentsDirectory: 'Attachments' }),
+        getConfig: async () => ({ templatesDirectory: 'Templates', dailyNotesDirectory: 'Journal', dailyNoteTemplateName: 'custom-daily.md', attachmentsDirectory: 'Attachments', activityRetentionDays: 90 }),
       })
       const app = createTestApp({ vaultConfigService })
 

@@ -33,6 +33,7 @@ Obsidian-compatible vaults — no database, no sync service, no desktop app requ
 - Properties editor: typed frontmatter editing (text/number/date/datetime/checkbox/list/tags) with type inference and a per-vault Property-Type-Registry
 - Bases ⚠️ experimental (feature toggle `bases`, cold/default-off): Obsidian-compatible `.base` files as filterable, sortable, editable views over the vault's metadata — a table view (inline cell editing) and a cards/Kanban view (notes grouped into collapsible columns by a `groupBy` property, read-only cards), AND/OR filters on properties/tags/path/file-metadata, read-only formula columns (own CSP-safe interpreter, not the full Obsidian formula language), inline cell editing writing back to each note's frontmatter, raw-YAML source view. Third-party plugins can contribute their own Bases view types via `Plugin.registerBasesView()` (the Bases plugin API is functional — the plugin's view is mounted and fed the same query data as the built-in views). Card drag-between-columns and the full formula language are later stages
 - Sidebar Panel (Recent Files + Bookmarks views, splittable, tabbed)
+- Activity Timeline ⚠️ experimental (feature toggle `activity-timeline`, cold/default-off): a chronological per-vault log of note create/edit/delete/move/restore, recorded as a side effect of every vault mutation (REST and MCP write paths), coalescing rapid edits into one entry; viewable as a full tab or a compact side-panel view, grouped into time buckets, filterable by type, live-refreshed on `vault:change`, with per-vault retention pruned by the existing cleanup job
 - Bookmarks for files, headings, blocks and saved searches — drag-and-drop reordering, context menu, custom labels
 - Navigation history (back/forward with Alt+←/→), Quick Switcher (Ctrl+O), tab cycling (Ctrl+Shift+]/[), breadcrumb bar, File Explorer "follow active file"
 - Command Palette (Ctrl+P, 40+ built-in commands; plugin commands when compat is enabled)
@@ -65,7 +66,7 @@ Obsidian-compatible vaults — no database, no sync service, no desktop app requ
 - Workspace state persistence (open tabs, expanded folders, panel sizes/visibility, active page; per-vault tab memory on vault switch)
 
 ### Platform
-- Feature toggles (hot/cold, env overlay, API + admin UI). Registered: `obsidian-plugin-compat`, `chat`, `mcp`, `git-sync`, `mail-import`, `voice-transcription`, `bases` — see `featureRegistry.register()` in `backend/src/index.ts`
+- Feature toggles (hot/cold, env overlay, API + admin UI). Registered: `obsidian-plugin-compat`, `chat`, `mcp`, `git-sync`, `mail-import`, `voice-transcription`, `bases`, `activity-timeline` — see `featureRegistry.register()` in `backend/src/index.ts`
 - Welcome Vault (tutorial vault with 70+ guides DE/EN, screenshots, exercises, templates incl. Templater examples; on-demand creation via API, Settings and Command Palette)
 - Security hardening (OWASP Top 10 audit, full CSP, HSTS, path-traversal defense in depth, Zod validation on every route module, npm audit in CI) — see `SECURITY-AUDIT.md`
 - Accessibility (WCAG 2.1 AA, partial: axe-core in CI, jsx-a11y lint, focus traps, skip link, keyboard-operable splitters/canvas/status bar) — see `ACCESSIBILITY-AUDIT.md`

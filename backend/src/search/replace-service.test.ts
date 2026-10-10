@@ -66,7 +66,7 @@ function createMockVaultService(opts: MockVaultServiceOptions = {}): IVaultServi
         throw opts.saveFileError[filePath]
       }
       savedFiles.push({ vaultId, path: filePath, content })
-      return { path: filePath, name: filePath.split('/').pop() ?? filePath, size: content.length, etag: 'new-etag' }
+      return { path: filePath, name: filePath.split('/').pop() ?? filePath, size: content.length, etag: 'new-etag', created: false }
     },
     createVault: async () => ({ id: '', name: '', path: '', status: 'loaded' as const }),
     deleteVault: async () => {},

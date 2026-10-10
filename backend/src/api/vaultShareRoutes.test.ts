@@ -42,7 +42,7 @@ function createMockVaultService(overrides?: Partial<IVaultService>): IVaultServi
     getVaultTree: () => ({ name: '', type: 'directory' as const, path: '', children: [] }),
     getFileContent: async () => ({ path: '', name: '', content: '', isBinary: false, size: 0, encoding: 'utf-8' as const, isTruncated: false, etag: '' }),
     resolveFilePath: () => '',
-    saveFile: async () => ({ path: '', name: '', size: 0, etag: '' }),
+    saveFile: async () => ({ path: '', name: '', size: 0, etag: '', created: false }),
     createVault: async () => ({ id: '', name: '', path: '', status: 'loaded' as const }),
     deleteVault: async () => {},
     deleteVaultWithChecks: async () => {},

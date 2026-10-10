@@ -181,6 +181,7 @@ export interface FileSaveResult {
   name: string    // filename
   size: number    // written file size in bytes
   etag: string    // SHA-256 first 16 hex chars of saved content
+  created: boolean // true if the file did not exist before this save (vs. an update)
 }
 
 // --- Interface ---
@@ -605,6 +606,15 @@ export class VaultService implements IVaultService {
     const dir = path.dirname(resolvedPath)
     await fs.mkdir(dir, { recursive: true })
 
+    // 5b. Determine whether this is a create or an update (for activity recording).
+    let fileExistedBefore = false
+    try {
+      await fs.stat(resolvedPath)
+      fileExistedBefore = true
+    } catch {
+      // ENOENT — a new file
+    }
+
     // 6. Atomic write: write to temp file, then rename
     const tempPath = `${resolvedPath}.${Date.now()}.tmp`
     try {
@@ -632,6 +642,7 @@ export class VaultService implements IVaultService {
       name: path.basename(filePath),
       size: contentBytes,
       etag,
+      created: !fileExistedBefore,
     }
   }
 

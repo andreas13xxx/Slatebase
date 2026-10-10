@@ -41,6 +41,12 @@ export const updateVaultConfigSchema = z.object({
       'Attachments directory must be a relative path without parent traversal',
     )
     .optional(),
+  activityRetentionDays: z
+    .number()
+    .int('Activity retention must be a whole number of days')
+    .min(0, 'Activity retention must be 0 or more days')
+    .max(3650, 'Activity retention must be at most 3650 days')
+    .optional(),
 })
 
 export type UpdateVaultConfigInput = z.infer<typeof updateVaultConfigSchema>

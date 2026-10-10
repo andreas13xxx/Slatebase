@@ -21,6 +21,11 @@ export interface VaultConfig {
    * regardless of which note is open, mirroring Obsidian's "specified folder" mode.
    */
   attachmentsDirectory: string
+  /**
+   * How many days of activity-timeline events to retain for this vault before
+   * the periodic cleanup job prunes them. Default 90. 0 disables pruning.
+   */
+  activityRetentionDays: number
 }
 
 /** Default vault configuration values. */
@@ -29,6 +34,7 @@ export const DEFAULT_VAULT_CONFIG: VaultConfig = {
   dailyNotesDirectory: '',
   dailyNoteTemplateName: 'daily.md',
   attachmentsDirectory: '',
+  activityRetentionDays: 90,
 }
 
 // ─── Service Interface ───────────────────────────────────────────────────────

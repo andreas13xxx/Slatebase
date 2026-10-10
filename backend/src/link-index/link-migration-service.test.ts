@@ -120,7 +120,7 @@ describe('computeAffectedFilePairs', () => {
 function createMockVaultService(files: Record<string, string>, overrides: Partial<IVaultService> = {}): IVaultService {
   const saveFile = vi.fn(async (_vaultId: string, filePath: string, content: string): Promise<FileSaveResult> => {
     files[filePath] = content
-    return { path: filePath, name: filePath, size: content.length, etag: 'etag' }
+    return { path: filePath, name: filePath, size: content.length, etag: 'etag', created: false }
   })
   const getFileContent = vi.fn(async (_vaultId: string, filePath: string): Promise<FileContent> => {
     const content = files[filePath]
