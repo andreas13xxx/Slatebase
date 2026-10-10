@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.48.0](https://github.com/andreas13xxx/Slatebase/compare/v0.47.0...v0.48.0) (2026-10-10)
+
+
+### Features
+
+* Footnotes view, editable hover-preview properties, drop singular tag property ([#222](https://github.com/andreas13xxx/Slatebase/issues/222)) ([4123938](https://github.com/andreas13xxx/Slatebase/commit/41239385faae493f6dbbb8012e319a439279b0e2))
+
 ## [0.47.0](https://github.com/andreas13xxx/Slatebase/compare/v0.46.0...v0.47.0) (2026-10-10)
 
 
