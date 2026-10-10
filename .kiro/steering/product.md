@@ -36,6 +36,7 @@ Obsidian-compatible vaults — no database, no sync service, no desktop app requ
 - Activity Timeline ⚠️ experimental (feature toggle `activity-timeline`, cold/default-off): a chronological per-vault log of note create/edit/delete/move/restore, recorded as a side effect of every vault mutation (REST and MCP write paths), coalescing rapid edits into one entry; viewable as a full tab or a compact side-panel view, grouped into time buckets, filterable by type, live-refreshed on `vault:change`, with per-vault retention pruned by the existing cleanup job
 - Bookmarks for files, headings, blocks and saved searches — drag-and-drop reordering, context menu, custom labels
 - Navigation history (back/forward with Alt+←/→), Quick Switcher (Ctrl+O), tab cycling (Ctrl+Shift+]/[), breadcrumb bar, File Explorer "follow active file"
+- Split panes (split the editor into a nestable pane tree — "Split right"/"Split down" commands, edge-drop split, cross-pane tab drag, keyboard-operable resize; layout persisted per vault with migration from the legacy flat tab row; plugin split APIs — `createLeafBySplit`/`splitActiveLeaf`/`getLeaf('split')` — create real panes)
 - Command Palette (Ctrl+P, 40+ built-in commands; plugin commands when compat is enabled)
 - Hover Preview (rendered Markdown popover on internal links), file-type icons in the explorer
 

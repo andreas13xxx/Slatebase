@@ -61,6 +61,7 @@ Neben den hier aufgelisteten Kern-Features findest du in den folgenden Guides we
 - [[Features/CSS-Snippets]] — Eigenes CSS pro Vault
 - [[Features/Chat]] — Nachrichten mit anderen Nutzern
 - [[Features/Live Preview Editor]] — Source-Modus und inline-gerenderte Live-Vorschau
+- [[Features/Geteilte Ansichten]] — Mehrere Notizen nebeneinander in geteilten Panes
 - [[Features/Git-Sync]] — Vault serverseitig mit einem oder mehreren Git-Remotes synchronisieren
 - [[Features/Mail-Import]] — E-Mails aus einem IMAP-Postfach als Notizen mit Anhängen importieren
 - [[Features/Diktieren]] — Sprache per Whisper in Text umwandeln (self-hosted, standardmäßig aus)

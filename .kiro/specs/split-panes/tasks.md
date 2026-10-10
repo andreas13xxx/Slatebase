@@ -72,11 +72,11 @@ Dies ist die größte einzelne Architekturänderung am Layout-System — die bes
   - [ ] 6.3 `keybindingsStore.ts` — Defaults für Split + Pane-Fokus (Browser-Reservierungen meiden)
   - _Requirements: 2.1, 2.4, 3.3_
 
-- [ ] 7. Dokumentation & Steering
-  - [ ] 7.1 Welcome-Vault DE: `Features/Geteilte-Ansichten.md` (Standard-Guide-Struktur)
-  - [ ] 7.2 Welcome-Vault EN: `Features/Split-Panes.md`
-  - [ ] 7.3 In `Features/Übersicht.md` (DE) + `Features/Overview.md` (EN) verlinken; `_meta.md` (DE+EN) Version/`updated` anheben
-  - [ ] 7.4 `structure.md` (Pane-Baum-Architektur, neue Dateien), `product.md` (Feature-Zeile), `implementation-plan.md` (Prio 5 auf „Spec vorhanden")
+- [x] 7. Dokumentation & Steering
+  - [x] 7.1 Welcome-Vault DE: `Features/Geteilte Ansichten.md` (Standard-Guide-Struktur)
+  - [x] 7.2 Welcome-Vault EN: `Features/Split Panes.md`
+  - [x] 7.3 In `Features/Übersicht.md` (DE) + `Features/Overview.md` (EN) verlinkt; `_meta.md` (DE+EN) 1.7.0 → 1.8.0
+  - [x] 7.4 `structure.md` (Pane-Baum-Architektur: paneTreeState/-Context/-TabContext, panes/, pane-split-bridge, workspace-shim/analyzer/useWorkspaceRestore/workspaceStore-Notizen), `product.md` (Feature-Zeile), `implementation-plan.md` (Prio 5 auf „Spec vorhanden, Phasen 0–5 umgesetzt")
   - _Requirements: 8.1, 8.2, 8.3_
 
 ## Verifikation vor Abschluss

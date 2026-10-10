@@ -61,6 +61,7 @@ Beyond the core features listed above, you'll find these additional capabilities
 - [[Features/CSS Snippets]] — Custom CSS per vault
 - [[Features/Chat]] — Messages with other users
 - [[Features/Live Preview Editor]] — Source mode and inline-rendered Live Preview
+- [[Features/Split Panes]] — Several notes side by side in split panes
 - [[Features/Git Sync]] — Synchronize a vault server-side with one or more Git remotes
 - [[Features/Mail Import]] — Import emails from an IMAP mailbox as notes with attachments
 - [[Features/Dictation]] — Turn speech into text via Whisper (self-hosted, off by default)
