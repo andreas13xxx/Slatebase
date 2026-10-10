@@ -74,17 +74,26 @@ export class ActivityStore implements IActivityService {
    */
   async record(vaultId: string, event: ActivityEventInput): Promise<void> {
     try {
-      // Internal .slatebase / dot-segment paths are never recorded (R1.5).
-      if (this.isHiddenPath(event.path) || (event.oldPath !== undefined && this.isHiddenPath(event.oldPath))) {
+      // Recordability is decided by the DESTINATION path: a `.slatebase/`
+      // dot-path write is never recorded (R1.5). A move OUT of a hidden folder
+      // into a visible one is a legitimate, visible result and must be kept —
+      // so only the destination `path` gates the event, not `oldPath`.
+      if (this.isHiddenPath(event.path)) {
         return
       }
+      // If only the old path was hidden (move into visibility), still record
+      // the move but omit the hidden source so it is not surfaced.
+      const normalized: ActivityEventInput =
+        event.oldPath !== undefined && this.isHiddenPath(event.oldPath)
+          ? { type: event.type, path: event.path, user: event.user }
+          : event
 
       const activityDir = this.activityDir(vaultId)
       await this.locks.runExclusive(activityDir, async () => {
-        if (event.type === 'note.edited') {
-          await this.recordEditCoalesced(vaultId, activityDir, event)
+        if (normalized.type === 'note.edited') {
+          await this.recordEditCoalesced(vaultId, activityDir, normalized)
         } else {
-          await this.appendNew(activityDir, event)
+          await this.appendNew(activityDir, normalized)
         }
       })
     } catch (err) {
@@ -110,8 +119,13 @@ export class ActivityStore implements IActivityService {
       const files = await this.relevantFiles(activityDir, query.from, query.to)
       const matched: ActivityEvent[] = []
 
-      // Read newest day-files first so we can stop once we have a full page.
+      // Day-files are newest-first and each file is append-ordered (oldest line
+      // first). Read file by file and stop as soon as the page is settled:
+      // once we hold at least `limit` matches, any match in a strictly-older
+      // day-file cannot outrank the `limit` newest we already have (a later
+      // day is always a newer timestamp), so there is no need to read on.
       for (const file of files) {
+        if (matched.length >= limit) break
         const content = await this.readFileSafe(path.join(activityDir, file))
         if (content === null) continue
 

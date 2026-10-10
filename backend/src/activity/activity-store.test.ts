@@ -73,10 +73,24 @@ describe('ActivityStore', () => {
 
   // ─── R1.5: hidden paths never recorded ─────────────────────────────────────
 
-  it('never records a .slatebase-internal or dot-segment path (R1.5)', async () => {
+  it('never records a .slatebase-internal or dot-segment destination path (R1.5)', async () => {
     await store.record(VAULT_ID, { type: 'note.edited', path: '.slatebase/link-index.json', user: 'andreas' })
     await store.record(VAULT_ID, { type: 'note.edited', path: '.obsidian/app.json', user: 'andreas' })
+    expect(await readAll()).toHaveLength(0)
+  })
+
+  it('records a move OUT of a hidden folder into a visible path, omitting the hidden oldPath', async () => {
     await store.record(VAULT_ID, { type: 'note.moved', path: 'Visible.md', oldPath: '.trash/x.md', user: 'andreas' })
+    const events = await readAll()
+    expect(events).toHaveLength(1)
+    expect(events[0]?.type).toBe('note.moved')
+    expect(events[0]?.path).toBe('Visible.md')
+    // The hidden source is dropped so it is not surfaced in the timeline.
+    expect(events[0]?.oldPath).toBeUndefined()
+  })
+
+  it('still drops a move whose DESTINATION is hidden (R1.5)', async () => {
+    await store.record(VAULT_ID, { type: 'note.moved', path: '.trash/x.md', oldPath: 'Visible.md', user: 'andreas' })
     expect(await readAll()).toHaveLength(0)
   })
 
@@ -150,6 +164,30 @@ describe('ActivityStore', () => {
     const page = await store.query(VAULT_ID, { limit: 50 })
     expect(page.items[0]?.path).toBe('New.md')
     expect(page.items[1]?.path).toBe('Old.md')
+  })
+
+  it('returns only the newest page across multiple day-files (early-stop correctness)', async () => {
+    const activityDir = path.join(vaultDir, '.slatebase', 'activity')
+    await fs.mkdir(activityDir, { recursive: true })
+    // Three day-files, newest to oldest; one event each.
+    const days = ['2026-10-10', '2026-10-09', '2026-10-08']
+    for (let i = 0; i < days.length; i++) {
+      const day = days[i]
+      await fs.writeFile(
+        path.join(activityDir, `${day}.jsonl`),
+        `{"id":"id${i}","type":"note.created","timestamp":"${day}T00:00:00.000Z","lastModified":"${day}T00:00:00.000Z","path":"D${i}.md","user":"a"}\n`,
+      )
+    }
+
+    // A limit smaller than the corpus returns exactly the newest events, in order.
+    const page = await store.query(VAULT_ID, { limit: 1 })
+    expect(page.items).toHaveLength(1)
+    expect(page.items[0]?.path).toBe('D0.md')
+    expect(page.nextCursor).not.toBeNull()
+
+    // The next page continues from the cursor without gaps or overlap.
+    const next = await store.query(VAULT_ID, page.nextCursor ? { limit: 1, cursor: page.nextCursor } : { limit: 1 })
+    expect(next.items[0]?.path).toBe('D1.md')
   })
 
   it('paginates with a cursor without overlap or gaps', async () => {

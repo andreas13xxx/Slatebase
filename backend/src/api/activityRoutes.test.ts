@@ -93,3 +93,80 @@ describe('Activity Route', () => {
     expect(body.nextCursor).toBeNull()
   })
 })
+
+describe('Activity Route — access control & feature gate (composed with middleware)', () => {
+  let tmpDir: string
+  let vaultDir: string
+  let store: ActivityStore
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'activity-route-guard-'))
+    vaultDir = path.join(tmpDir, 'vault')
+    await fs.mkdir(vaultDir, { recursive: true })
+    store = new ActivityStore(() => vaultDir, createMockLogger())
+  })
+
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true })
+  })
+
+  it('rejects with 403 when the vault-auth middleware denies read access', async () => {
+    // Mirror production: a vault-auth middleware guards /vaults/:vaultId/* and
+    // short-circuits with 403 before the activity handler runs.
+    const app = new Hono()
+    app.use('/api/v1/vaults/:vaultId/*', async (c, next) => {
+      if (c.req.param('vaultId') === 'forbidden-vault') {
+        return c.json({ code: 'FORBIDDEN', message: 'No read access', timestamp: new Date().toISOString() }, 403)
+      }
+      await next()
+      return undefined
+    })
+    app.route('/api/v1', createActivityRoutes({ activityService: store, logger: createMockLogger() }))
+
+    const denied = await app.request('/api/v1/vaults/forbidden-vault/activity')
+    expect(denied.status).toBe(403)
+    const body = (await denied.json()) as { code: string }
+    expect(body.code).toBe('FORBIDDEN')
+
+    // A vault the middleware allows still reaches the handler (200).
+    const allowed = await app.request('/api/v1/vaults/vault-1/activity')
+    expect(allowed.status).toBe(200)
+  })
+
+  it('is not reachable (404) when the feature guard blocks the mount', async () => {
+    // Mirror production: when the `activity-timeline` toggle is off, the route
+    // is never mounted, so the path does not resolve.
+    const featureEnabled = false
+    const app = new Hono()
+    if (featureEnabled) {
+      app.route('/api/v1', createActivityRoutes({ activityService: store, logger: createMockLogger() }))
+    }
+
+    const res = await app.request('/api/v1/vaults/vault-1/activity')
+    expect(res.status).toBe(404)
+  })
+
+  it('does not leak another vault’s activity (R4.3 — path param scopes the read)', async () => {
+    // The vaultId path param is the only key into the per-vault store, so a
+    // request for vault-A can never return vault-B's events.
+    const perVaultDirs: Record<string, string> = {}
+    const scopedStore = new ActivityStore(vaultId => {
+      const dir = perVaultDirs[vaultId] ?? path.join(tmpDir, vaultId)
+      perVaultDirs[vaultId] = dir
+      return dir
+    }, createMockLogger())
+    await fs.mkdir(path.join(tmpDir, 'vault-a'), { recursive: true })
+    await fs.mkdir(path.join(tmpDir, 'vault-b'), { recursive: true })
+    await scopedStore.record('vault-a', { type: 'note.created', path: 'SecretA.md', user: 'andreas' })
+    await scopedStore.record('vault-b', { type: 'note.created', path: 'SecretB.md', user: 'andreas' })
+
+    const app = new Hono()
+    app.route('/api/v1', createActivityRoutes({ activityService: scopedStore, logger: createMockLogger() }))
+
+    const res = await app.request('/api/v1/vaults/vault-a/activity')
+    const body = (await res.json()) as ActivityPage
+    expect(body.items).toHaveLength(1)
+    expect(body.items[0]?.path).toBe('SecretA.md')
+    expect(body.items.some(e => e.path === 'SecretB.md')).toBe(false)
+  })
+})

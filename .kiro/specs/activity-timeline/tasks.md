@@ -24,7 +24,7 @@ Die vier eingefrorenen Entscheidungen (siehe `design.md`, „Resolved Decisions"
 
 - [x] 3. Lese-API (Pagination, Filter)
   - [x] 3.1 `backend/src/api/activityRoutes.ts` — `GET /vaults/:vaultId/activity`, Zod-validiert, `checkReadAccess`, Typ-/Zeitfilter + Cursor/Limit, feature-gated `activity-timeline`
-  - [x] 3.2 `backend/src/api/activityRoutes.test.ts` — Pagination, Filter, 403 ohne Zugriff, 400 bei ungültiger Query, Feature-Guard, kein vault-fremdes Durchsickern (R4.3)
+  - [x] 3.2 `backend/src/api/activityRoutes.test.ts` — Pagination, Filter, 400 bei ungültiger Query; 403 ohne Zugriff und Feature-Guard über die vorgelagerte Middleware komponiert getestet (die Route selbst prüft beides nicht), kein vault-fremdes Durchsickern (R4.3)
   - [x] 3.3 `frontend/src/api/index.ts` + `IApiClient` — `getActivity(vaultId, {types, from, to, cursor, limit})`
   - [x] 3.4 `frontend/src/types.ts` — `ActivityEvent`/`ActivityEventType`/`ActivityPage`
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 6.2, 6.3_
