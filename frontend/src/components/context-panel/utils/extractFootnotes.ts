@@ -14,8 +14,10 @@
  *
  * This is a deliberate regex port of the renderer's MDAST pass, not a reuse of
  * it: the panel needs a synchronous, dependency-free parse of the raw editor
- * buffer (same bar as `extractHeadings`), and fenced code blocks are skipped so
- * a `[^note]` written inside a code sample is not mistaken for a real footnote.
+ * buffer (same bar as `extractHeadings`). Code is skipped so a `[^note]` written
+ * inside a sample is not mistaken for a real footnote — fenced blocks, inline
+ * code spans and 4-space/tab-indented code blocks all, matching what the
+ * renderer counts, so the sidebar list and the rendered list cannot disagree.
  */
 
 /** One footnote entry for the Footnotes view, in rendered order. */
@@ -40,6 +42,20 @@ const DEFINITION_REGEX = /^\[\^([^\]]+)\]:\s?(.*)$/
 const REFERENCE_REGEX = /\[\^([^\]]+)\]/g
 /** Matches a fenced code-block delimiter (``` or ~~~, any indent/info string). */
 const FENCE_REGEX = /^\s*(```+|~~~+)/
+/** Matches an inline code span (`` `...` `` with any run of backticks). */
+const INLINE_CODE_REGEX = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g
+/** A line indented by 4+ spaces or a tab is a CommonMark indented code block. */
+const INDENTED_CODE_REGEX = /^(?: {4,}|\t)/
+
+/**
+ * Blanks out inline code spans on a line, replacing their contents with spaces
+ * of equal length so column offsets are preserved. A `[^x]` written inside
+ * `` `...` `` is code, not a footnote — the renderer never treats it as one, so
+ * neither must the parser, or the sidebar list would disagree with the note.
+ */
+function blankInlineCode(line: string): string {
+  return line.replace(INLINE_CODE_REGEX, (match) => ' '.repeat(match.length))
+}
 
 /**
  * Strips inline formatting markers from definition text so the preview reads
@@ -79,10 +95,18 @@ export function extractFootnotes(content: string): FootnoteEntry[] {
     }
     if (inFence) continue
 
+    // A line indented as a CommonMark code block is code, not prose — its
+    // `[^x]` tokens are not footnotes. (A real definition line is never
+    // indented 4+ spaces: that would make it part of a code block too.)
+    if (INDENTED_CODE_REGEX.test(line)) continue
+
+    // Blank inline code spans so a `[^x]` inside `` `...` `` is not counted.
+    const scanLine = blankInlineCode(line)
+
     // A definition line also contains a `[^id]` token, but that is the
     // definition's own marker, not a reference — handle it first and skip the
     // reference scan for this line.
-    const defMatch = line.match(DEFINITION_REGEX)
+    const defMatch = scanLine.match(DEFINITION_REGEX)
     if (defMatch) {
       const id = defMatch[1]!
       const text = defMatch[2] ?? ''
@@ -94,7 +118,7 @@ export function extractFootnotes(content: string): FootnoteEntry[] {
     // Count every reference occurrence; remember first-seen order for numbering.
     REFERENCE_REGEX.lastIndex = 0
     let refMatch: RegExpExecArray | null
-    while ((refMatch = REFERENCE_REGEX.exec(line)) !== null) {
+    while ((refMatch = REFERENCE_REGEX.exec(scanLine)) !== null) {
       const id = refMatch[1]!
       refCounts.set(id, (refCounts.get(id) ?? 0) + 1)
       if (!referenceOrder.includes(id)) referenceOrder.push(id)

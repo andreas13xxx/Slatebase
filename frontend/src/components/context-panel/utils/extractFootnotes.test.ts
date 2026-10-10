@@ -58,6 +58,44 @@ describe('extractFootnotes', () => {
     expect(result.map((f) => f.identifier)).toEqual(['real'])
   })
 
+  it('ignores footnote-like tokens inside inline code spans', () => {
+    const md = [
+      'Real reference[^real] but `see [^fake]` is code.',
+      '',
+      '[^real]: The real one.',
+    ].join('\n')
+
+    const result = extractFootnotes(md)
+    expect(result.map((f) => f.identifier)).toEqual(['real'])
+  })
+
+  it('ignores a reference where only part of a line is inline code', () => {
+    const md = 'Prose[^a] then `code[^b]` then more[^a].\n\n[^a]: Note.'
+    const result = extractFootnotes(md)
+    expect(result.map((f) => f.identifier)).toEqual(['a'])
+    expect(result[0]!.refCount).toBe(2)
+  })
+
+  it('ignores footnote-like tokens in 4-space indented code blocks', () => {
+    const md = [
+      'Real reference[^real].',
+      '',
+      '    not a reference[^fake]',
+      '    [^fake]: not a definition',
+      '',
+      '[^real]: The real one.',
+    ].join('\n')
+
+    const result = extractFootnotes(md)
+    expect(result.map((f) => f.identifier)).toEqual(['real'])
+  })
+
+  it('ignores footnote-like tokens in tab-indented code blocks', () => {
+    const md = ['Real[^real].', '', '\tcode[^fake]', '', '[^real]: The real one.'].join('\n')
+    const result = extractFootnotes(md)
+    expect(result.map((f) => f.identifier)).toEqual(['real'])
+  })
+
   it('strips inline formatting from the definition preview', () => {
     const md = 'Ref[^f].\n\n[^f]: A **bold** and *italic* note.'
     const result = extractFootnotes(md)
