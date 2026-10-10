@@ -44,6 +44,8 @@ export const de = {
     passwordsDoNotMatch: 'Passwörter stimmen nicht überein.',
     changePasswordFailed: 'Passwortänderung fehlgeschlagen. Bitte versuchen Sie es erneut.',
     passwordChanged: 'Passwort erfolgreich geändert.',
+    showPassword: 'Passwort anzeigen',
+    hidePassword: 'Passwort verbergen',
   },
 
   chat: {

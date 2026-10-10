@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useAuthContext } from '../../state/authContext'
 import { useTranslation } from '../../i18n'
 import type { IApiClient } from '../../api'
+import { PasswordInput } from '../PasswordInput'
 
 /** Props for the AccountDeletionSection component. */
 export interface AccountDeletionSectionProps {
@@ -76,10 +77,9 @@ export function AccountDeletionSection({ apiClient }: AccountDeletionSectionProp
           <label className="profile-label" htmlFor="settings-delete-password">
             {t('profile.deletePasswordLabel')}
           </label>
-          <input
+          <PasswordInput
             id="settings-delete-password"
             className="profile-input"
-            type="password"
             maxLength={128}
             value={deletePassword}
             onChange={(e) => {

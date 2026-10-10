@@ -4,6 +4,7 @@ import { useTranslation } from '../i18n'
 import type { IApiClient, UpdateProfileData } from '../api'
 import type { PublicUserInfo } from '../state/authState'
 import { extractErrorMessage } from '../utils/error'
+import { PasswordInput } from './PasswordInput'
 
 /** Props for the ProfilePage component. */
 export interface ProfilePageProps {
@@ -417,10 +418,9 @@ export function ProfilePage({ apiClient, mode = 'full' }: ProfilePageProps) {
             <label className="profile-label" htmlFor="profile-current-password">
               {t('auth.currentPassword')}
             </label>
-            <input
+            <PasswordInput
               id="profile-current-password"
               className="profile-input"
-              type="password"
               maxLength={128}
               value={currentPassword}
               onChange={(e) => {
@@ -442,10 +442,9 @@ export function ProfilePage({ apiClient, mode = 'full' }: ProfilePageProps) {
             <label className="profile-label" htmlFor="profile-new-password">
               {t('auth.newPassword')}
             </label>
-            <input
+            <PasswordInput
               id="profile-new-password"
               className="profile-input"
-              type="password"
               maxLength={128}
               value={newPassword}
               onChange={(e) => {
@@ -498,10 +497,9 @@ export function ProfilePage({ apiClient, mode = 'full' }: ProfilePageProps) {
             <label className="profile-label" htmlFor="profile-delete-password">
               {t('profile.deletePasswordLabel')}
             </label>
-            <input
+            <PasswordInput
               id="profile-delete-password"
               className="profile-input"
-              type="password"
               maxLength={128}
               value={deletePassword}
               onChange={(e) => {

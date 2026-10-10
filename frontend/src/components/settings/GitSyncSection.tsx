@@ -11,6 +11,7 @@ import { useAppContext } from '../../state'
 import type { GitSyncRemoteInfo, GitSyncRemoteStatusInfo, GitAuthMethod } from '../../api'
 import { extractErrorMessage } from '../../utils/error'
 import { ConfirmModal } from '../ConfirmModal'
+import { PasswordInput } from '../PasswordInput'
 import { SettingSection, Button } from './ui'
 import { formatLastRun, resultLabel, resultBadgeClass } from './syncStatusFormat'
 import './SyncSection.css'
@@ -467,9 +468,8 @@ export function GitSyncSection() {
                     : 'Vollständiger Inhalt der privaten Schlüsseldatei, inklusive der Zeilen "-----BEGIN ... PRIVATE KEY-----" und "-----END ... PRIVATE KEY-----". Wird verschlüsselt gespeichert und nie im Klartext zurückgegeben.'}
               </p>
               {form.authMethod === 'https-token' ? (
-                <input
+                <PasswordInput
                   id="git-sync-form-credential"
-                  type="password"
                   className="settings-field-input"
                   value={form.credential}
                   onChange={(e) => setForm((f) => ({ ...f, credential: e.target.value }))}

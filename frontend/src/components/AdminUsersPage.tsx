@@ -7,6 +7,7 @@ import { extractErrorMessage } from '../utils/error'
 import { usePaginatedResource } from '../hooks/usePaginatedResource'
 import { ConfirmModal } from './ConfirmModal'
 import { SettingSection, Button } from './settings/ui'
+import { PasswordInput } from './PasswordInput'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -292,9 +293,8 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
           </div>
           <div className="admin-users-form-field">
             <label htmlFor="admin-create-password">{t('admin.users.passwordLabel')}</label>
-            <input
+            <PasswordInput
               id="admin-create-password"
-              type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder={t('admin.users.passwordPlaceholder')}

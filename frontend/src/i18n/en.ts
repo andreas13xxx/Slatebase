@@ -50,6 +50,8 @@ export const en: TranslationShape = {
     passwordsDoNotMatch: 'Passwords do not match.',
     changePasswordFailed: 'Password change failed. Please try again.',
     passwordChanged: 'Password changed successfully.',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
   },
 
   chat: {

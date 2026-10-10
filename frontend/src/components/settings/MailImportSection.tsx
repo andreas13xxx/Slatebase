@@ -11,6 +11,7 @@ import { useAppContext } from '../../state'
 import type { MailImportConfigInfo, MailImportRunStatusInfo, MailboxTreeNode } from '../../api'
 import { extractErrorMessage } from '../../utils/error'
 import { ConfirmModal } from '../ConfirmModal'
+import { PasswordInput } from '../PasswordInput'
 import { SettingSection, Button } from './ui'
 import { formatLastRun, resultLabel, resultBadgeClass } from './syncStatusFormat'
 import './SyncSection.css'
@@ -440,9 +441,8 @@ export function MailImportSection() {
               </div>
               <div className="settings-field">
                 <label htmlFor="mail-import-form-password" className="settings-field-label">Passwort</label>
-                <input
+                <PasswordInput
                   id="mail-import-form-password"
-                  type="password"
                   className="settings-field-input"
                   value={form.password}
                   onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}

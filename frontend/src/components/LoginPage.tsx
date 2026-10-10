@@ -3,6 +3,7 @@ import { useAuthContext } from '../state/authContext'
 import { useTranslation } from '../i18n'
 import type { IApiClient } from '../api'
 import { SlatebaseLogo } from './SlatebaseLogo'
+import { PasswordInput } from './PasswordInput'
 
 /** Props for the LoginPage component. */
 export interface LoginPageProps {
@@ -144,10 +145,9 @@ export function LoginPage({ apiClient }: LoginPageProps) {
 
           <div className="login-field">
             <label className="login-label" htmlFor="login-password">{t('auth.password')}</label>
-            <input
+            <PasswordInput
               id="login-password"
               className="login-input"
-              type="password"
               maxLength={256}
               value={password}
               onChange={(e) => { setPassword(e.target.value); if (passwordError) setPasswordError(null) }}
