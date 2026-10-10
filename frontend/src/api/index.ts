@@ -1,4 +1,4 @@
-import type { VaultInfo, DirectoryTree, FileContent, FileSaveResult, AppError, Conversation, PaginatedConversations, PaginatedMessages, Message, GraphData, GraphMeta, GraphQueryOptions, BacklinksResponse } from '../types'
+import type { VaultInfo, DirectoryTree, FileContent, FileSaveResult, AppError, Conversation, PaginatedConversations, PaginatedMessages, Message, GraphData, GraphMeta, GraphQueryOptions, BacklinksResponse, ActivityPage, ActivityQueryParams } from '../types'
 import type { PublicUserInfo } from '../state/authState'
 import type { PropertyType, PropertyTypeRegistry } from '../state/propertyTypes'
 import type { BaseQuerySpecWire, BaseQueryResultWire } from '../bases/types'
@@ -603,6 +603,8 @@ export interface IApiClient {
   getGraph(vaultId: string, options?: GraphQueryOptions): Promise<GraphData>
   /** Get backlinks for a specific file in a vault. */
   getBacklinks(vaultId: string, filePath: string): Promise<BacklinksResponse>
+  /** Get a page of activity-timeline events for a vault (newest first). */
+  getActivity(vaultId: string, params?: ActivityQueryParams): Promise<ActivityPage>
   /** Get all tags for a vault with occurrence counts and file lists. */
   getVaultTags(vaultId: string): Promise<VaultTagsResponse>
   /** Get aggregated graph metadata (tag counts, property key counts). */
@@ -1111,6 +1113,18 @@ export class ApiClient implements IApiClient {
   async getBacklinks(vaultId: string, filePath: string): Promise<BacklinksResponse> {
     const encodedPath = encodeURIComponent(filePath)
     return this.request<BacklinksResponse>('GET', `/api/v1/vaults/${vaultId}/backlinks?path=${encodedPath}`)
+  }
+
+  /** Get a page of activity-timeline events for a vault (newest first). */
+  async getActivity(vaultId: string, params?: ActivityQueryParams): Promise<ActivityPage> {
+    const search = new URLSearchParams()
+    if (params?.types && params.types.length > 0) search.set('types', params.types.join(','))
+    if (params?.from) search.set('from', params.from)
+    if (params?.to) search.set('to', params.to)
+    if (params?.cursor) search.set('cursor', params.cursor)
+    if (params?.limit !== undefined) search.set('limit', String(params.limit))
+    const qs = search.toString()
+    return this.request<ActivityPage>('GET', `/api/v1/vaults/${vaultId}/activity${qs ? '?' + qs : ''}`)
   }
 
   /** Get all tags for a vault with occurrence counts and file lists. */

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { FolderOpen, Star, Clock, List, Link, Tag, FileText, Search } from 'lucide-react'
+import { FolderOpen, Star, Clock, List, Link, Tag, FileText, Search, History } from 'lucide-react'
 import { isPluginViewId, getPluginViewType } from '../../state/panelState'
 import type { PanelViewId, BuiltinPanelViewId } from '../../state/panelState'
 import { getCustomIconSvg, sizeCustomIconSvg, useIconResolutionTick } from '../../utils/pluginIcon'
@@ -18,6 +18,7 @@ const TAB_ICONS: Record<BuiltinPanelViewId, typeof FolderOpen> = {
   tags: Tag,
   properties: FileText,
   search: Search,
+  activity: History,
 }
 
 /** Resolves the translated tab config (icon + label) for every built-in view ID. */
@@ -31,6 +32,7 @@ function getTabConfig(t: TranslateFn): Record<BuiltinPanelViewId, { icon: typeof
     tags: { icon: TAB_ICONS.tags, label: t('sidePanel.tabs.tags') },
     properties: { icon: TAB_ICONS.properties, label: t('sidePanel.tabs.properties') },
     search: { icon: TAB_ICONS.search, label: t('sidePanel.tabs.search') },
+    activity: { icon: TAB_ICONS.activity, label: t('sidePanel.tabs.activity') },
   }
 }
 

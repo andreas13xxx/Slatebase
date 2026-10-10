@@ -32,6 +32,7 @@ Bring order without rigid hierarchies. Tags enable cross-cutting categories, pro
 | [[Features/Context Panel\|Context Panel]] | Outline, links, tags, and properties at a glance |
 | [[Features/Search and Replace\|Search and Replace]] | Full-text search, regex, and batch replace |
 | [[Features/Bases\|Bases]] | Metadata as a filterable, editable table (experimental) |
+| [[Features/Activity Timeline\|Activity Timeline]] | A chronicle of vault activity as a tab and side panel (experimental) |
 
 ## Display & Diagrams
 

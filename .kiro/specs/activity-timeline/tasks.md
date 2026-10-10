@@ -15,53 +15,53 @@ Die vier eingefrorenen Entscheidungen (siehe `design.md`, „Resolved Decisions"
   - [x] 1.4 `backend/src/activity/activity-store.test.ts` — Coalescing-Fenster (öffnen/fortschreiben/ablaufen), Typ-/Zeitfilter, Pagination, Purge, `.slatebase/`-Pfade werden nie aufgezeichnet (R1.5), Write-Fehler verschluckt
   - _Requirements: 1.1, 1.4, 1.5, 1.6, 2.1, 2.2, 2.3, 2.4_
 
-- [ ] 2. Aufzeichnung verdrahten (REST + MCP, D3)
-  - [ ] 2.1 `backend/src/api/index.ts` (`VaultController`) — am bestehenden `linkIndexHook`/`vault:change`-Punkt `activityStore.record(...)` für create/edit/delete/move aufrufen; create vs. edit unterscheiden; move/rename → **ein** `note.moved` mit `oldPath`+`newPath` (D3); Record-Fehler darf Request nicht scheitern lassen
-  - [ ] 2.2 `backend/src/api/trashRoutes.ts` — beim Restore `note.restored` aufzeichnen
-  - [ ] 2.3 `backend/src/mcp/tool-handlers.ts` — `write_file`/`delete_file`/`move_file`/`rename_file` dieselbe Record-Nebenwirkung wie REST (zweiter Eintrittspunkt, R1.3)
-  - [ ] 2.4 Tests: ein Backend-Test, der den MCP-Schreibpfad als Ereignisquelle abdeckt; Move erzeugt genau ein `note.moved`
+- [x] 2. Aufzeichnung verdrahten (REST + MCP, D3)
+  - [x] 2.1 `backend/src/api/index.ts` (`VaultController`) — am bestehenden `linkIndexHook`/`vault:change`-Punkt `activityStore.record(...)` für create/edit/delete/move aufrufen; create vs. edit unterscheiden; move/rename → **ein** `note.moved` mit `oldPath`+`newPath` (D3); Record-Fehler darf Request nicht scheitern lassen
+  - [x] 2.2 `backend/src/api/trashRoutes.ts` — beim Restore `note.restored` aufzeichnen
+  - [x] 2.3 `backend/src/mcp/tool-handlers.ts` — `write_file`/`delete_file`/`move_file`/`rename_file` dieselbe Record-Nebenwirkung wie REST (zweiter Eintrittspunkt, R1.3)
+  - [x] 2.4 Tests: ein Backend-Test, der den MCP-Schreibpfad als Ereignisquelle abdeckt; Move erzeugt genau ein `note.moved`
   - _Requirements: 1.2, 1.3, 2.4_
 
-- [ ] 3. Lese-API (Pagination, Filter)
-  - [ ] 3.1 `backend/src/api/activityRoutes.ts` — `GET /vaults/:vaultId/activity`, Zod-validiert, `checkReadAccess`, Typ-/Zeitfilter + Cursor/Limit, feature-gated `activity-timeline`
-  - [ ] 3.2 `backend/src/api/activityRoutes.test.ts` — Pagination, Filter, 403 ohne Zugriff, 400 bei ungültiger Query, Feature-Guard, kein vault-fremdes Durchsickern (R4.3)
-  - [ ] 3.3 `frontend/src/api/index.ts` + `IApiClient` — `getActivity(vaultId, {types, from, to, cursor, limit})`
-  - [ ] 3.4 `frontend/src/types.ts` — `ActivityEvent`/`ActivityEventType`/`ActivityPage`
+- [x] 3. Lese-API (Pagination, Filter)
+  - [x] 3.1 `backend/src/api/activityRoutes.ts` — `GET /vaults/:vaultId/activity`, Zod-validiert, `checkReadAccess`, Typ-/Zeitfilter + Cursor/Limit, feature-gated `activity-timeline`
+  - [x] 3.2 `backend/src/api/activityRoutes.test.ts` — Pagination, Filter, 403 ohne Zugriff, 400 bei ungültiger Query, Feature-Guard, kein vault-fremdes Durchsickern (R4.3)
+  - [x] 3.3 `frontend/src/api/index.ts` + `IApiClient` — `getActivity(vaultId, {types, from, to, cursor, limit})`
+  - [x] 3.4 `frontend/src/types.ts` — `ActivityEvent`/`ActivityEventType`/`ActivityPage`
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 6.2, 6.3_
 
-- [ ] 4. Zeitleisten-Ansicht (Tab + Seitenleiste)
-  - [ ] 4.1 `frontend/src/components/activity/time-buckets.ts` — reine Gruppierung in Heute/Gestern/Diese Woche/Älter (+ Unit-Test)
-  - [ ] 4.2 `frontend/src/components/activity/activity-event-meta.ts` — Typ → Icon + Label-i18n-Key + Legenden-Zugehörigkeit (einzige Wahrheit)
-  - [ ] 4.3 `frontend/src/state/activityState.ts` + `activityActions.ts` (+ `activityActions.test.ts`) — Reducer, `loadActivity`/`loadMoreActivity`/`refreshRecentActivity`
-  - [ ] 4.4 `frontend/src/components/activity/ActivityTimelineView.tsx` — `variant` voll (Tab, zweispaltig) vs. kompakt (Seitenleiste), Buckets, Filter-Chips (nur vorhandene Typen), Legende, Klick-öffnet-Datei, Lade-/Fehler-/Leerzustand mit a11y-Rollen
-  - [ ] 4.5 `frontend/src/components/activity/ActivityTimelineView.css` — Design Tokens, Dark Mode, vertikale Zeitachse, reduced-motion
-  - [ ] 4.6 `frontend/src/state/panelState.ts` — `'activity'` in `BuiltinPanelViewId` + Guard; `SidePanel.tsx` auf compact-Variante routen
-  - [ ] 4.7 `frontend/src/components/TabContent.tsx` + `App.tsx` — Sentinel `__view::activity` auf full-Variante routen; als Nicht-Datei-Tab behandeln (Breadcrumb/Auto-Reveal überspringen)
-  - [ ] 4.8 `core-commands-app.ts` + `core-command-i18n.ts` — Befehl „Aktivitätszeitleiste öffnen"/„Open activity timeline" (feature-gated)
-  - [ ] 4.9 `frontend/src/i18n/de.ts` + `en.ts` — alle Strings; `*.test.tsx` + `*.a11y.test.tsx`
+- [x] 4. Zeitleisten-Ansicht (Tab + Seitenleiste)
+  - [x] 4.1 `frontend/src/components/activity/time-buckets.ts` — reine Gruppierung in Heute/Gestern/Diese Woche/Älter (+ Unit-Test)
+  - [x] 4.2 `frontend/src/components/activity/activity-event-meta.ts` — Typ → Icon + Label-i18n-Key + Legenden-Zugehörigkeit (einzige Wahrheit)
+  - [x] 4.3 `frontend/src/state/activityState.ts` + `activityActions.ts` (+ `activityActions.test.ts`) — Reducer, `loadActivity`/`loadMoreActivity`/`refreshRecentActivity`
+  - [x] 4.4 `frontend/src/components/activity/ActivityTimelineView.tsx` — `variant` voll (Tab, zweispaltig) vs. kompakt (Seitenleiste), Buckets, Filter-Chips (nur vorhandene Typen), Legende, Klick-öffnet-Datei, Lade-/Fehler-/Leerzustand mit a11y-Rollen
+  - [x] 4.5 `frontend/src/components/activity/ActivityTimelineView.css` — Design Tokens, Dark Mode, vertikale Zeitachse, reduced-motion
+  - [x] 4.6 `frontend/src/state/panelState.ts` — `'activity'` in `BuiltinPanelViewId` + Guard; `SidePanel.tsx` auf compact-Variante routen
+  - [x] 4.7 `frontend/src/components/TabContent.tsx` + `App.tsx` — Sentinel `__view::activity` auf full-Variante routen; als Nicht-Datei-Tab behandeln (Breadcrumb/Auto-Reveal überspringen)
+  - [x] 4.8 `core-commands-app.ts` + `core-command-i18n.ts` — Befehl „Aktivitätszeitleiste öffnen"/„Open activity timeline" (feature-gated)
+  - [x] 4.9 `frontend/src/i18n/de.ts` + `en.ts` — alle Strings; `*.test.tsx` + `*.a11y.test.tsx`
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
 
-- [ ] 5. Aufbewahrung & Cleanup (D2)
-  - [ ] 5.1 `backend/src/vault-config/types.ts` + `validation.ts` + `vault-config-store.ts` — `activityRetentionDays` (Standard 90)
-  - [ ] 5.2 `backend/src/cleanup/cleanup-job.ts` — `activityStore.purgeExpired(vaultId, retentionDays)` in den bestehenden Lauf aufnehmen, pro Datei fehlertolerant
-  - [ ] 5.3 Tests: Purge löscht nur abgelaufene Tagesfiles, überspringt gesperrte
+- [x] 5. Aufbewahrung & Cleanup (D2)
+  - [x] 5.1 `backend/src/vault-config/types.ts` + `validation.ts` + `vault-config-store.ts` — `activityRetentionDays` (Standard 90)
+  - [x] 5.2 `backend/src/cleanup/cleanup-job.ts` — `activityStore.purgeExpired(vaultId, retentionDays)` in den bestehenden Lauf aufnehmen, pro Datei fehlertolerant
+  - [x] 5.3 Tests: Purge löscht nur abgelaufene Tagesfiles, überspringt gesperrte
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 6. Feature-Toggle
-  - [ ] 6.1 `backend/src/index.ts` — `featureRegistry.register('activity-timeline', …)` (kalt, default aus); `ActivityStore` im Composition Root instanziieren und in `VaultController`/`trashRoutes`/`tool-handlers`/`cleanup-job` verdrahten; `activityRoutes` feature-gated mounten
-  - [ ] 6.2 Frontend-Feature-Set um `activity-timeline` ergänzen; Tab-/Panel-Routing + Öffnen-Befehl gaten; bei ausgeschaltetem Toggle keine Aufzeichnung (R7.2)
+- [x] 6. Feature-Toggle
+  - [x] 6.1 `backend/src/index.ts` — `featureRegistry.register('activity-timeline', …)` (kalt, default aus); `ActivityStore` im Composition Root instanziieren und in `VaultController`/`trashRoutes`/`tool-handlers`/`cleanup-job` verdrahten; `activityRoutes` feature-gated mounten
+  - [x] 6.2 Frontend-Feature-Set um `activity-timeline` ergänzen; Tab-/Panel-Routing + Öffnen-Befehl gaten; bei ausgeschaltetem Toggle keine Aufzeichnung (R7.2)
   - _Requirements: 7.1, 7.2_
 
-- [ ] 7. Welcome-Vault-Dokumentation (DE + EN)
-  - [ ] 7.1 `backend/assets/templates/welcome-vault/Features/Aktivitätszeitleiste.md` (DE) — Standard-Guide-Struktur
-  - [ ] 7.2 `backend/assets/templates/welcome-vault-en/Features/Activity Timeline.md` (EN)
-  - [ ] 7.3 Guide in `Features/Übersicht.md` (DE) + `Features/Overview.md` (EN) verlinken
-  - [ ] 7.4 `_meta.md` (DE+EN) Version + `updated` anheben
+- [x] 7. Welcome-Vault-Dokumentation (DE + EN)
+  - [x] 7.1 `backend/assets/templates/welcome-vault/Features/Aktivitätszeitleiste.md` (DE) — Standard-Guide-Struktur
+  - [x] 7.2 `backend/assets/templates/welcome-vault-en/Features/Activity Timeline.md` (EN)
+  - [x] 7.3 Guide in `Features/Übersicht.md` (DE) + `Features/Overview.md` (EN) verlinken
+  - [x] 7.4 `_meta.md` (DE+EN) Version + `updated` anheben
   - _Requirements: 7.3, 7.4, 7.5_
 
-- [ ] 8. Dokumentation & Steering
-  - [ ] 8.1 `structure.md` (activity-Modul, activityRoutes, Panel-/Sentinel-Routing), `product.md` (Feature-Zeile), `implementation-plan.md` (Status) aktualisieren
-  - [ ] 8.2 `tech.md` falls eine Dependency hinzukäme (erwartet: keine) — sonst nur die Entscheidung „kein neuer Scheduler, bestehender Cleanup-Job" festhalten
+- [x] 8. Dokumentation & Steering
+  - [x] 8.1 `structure.md` (activity-Modul, activityRoutes, Panel-/Sentinel-Routing), `product.md` (Feature-Zeile), `implementation-plan.md` (Status) aktualisieren
+  - [x] 8.2 `tech.md` falls eine Dependency hinzukäme (erwartet: keine) — sonst nur die Entscheidung „kein neuer Scheduler, bestehender Cleanup-Job" festhalten
   - _Requirements: —_
 
 ## Verifikation vor Abschluss

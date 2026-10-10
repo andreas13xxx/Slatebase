@@ -32,6 +32,7 @@ Ordnung schaffen, ohne starre Hierarchien. Tags ermöglichen Querschnittskategor
 | [[Features/Context Panel\|Context Panel]] | Outline, Links, Tags und Properties auf einen Blick |
 | [[Features/Suche und Ersetzen\|Suche und Ersetzen]] | Volltextsuche, Regex und Batch-Replace |
 | [[Features/Bases\|Bases]] | Metadaten als filterbare, editierbare Tabelle (experimentell) |
+| [[Features/Aktivitätszeitleiste\|Aktivitätszeitleiste]] | Chronik der Vault-Aktivität als Tab und Seitenleiste (experimentell) |
 
 ## Darstellung & Diagramme
 

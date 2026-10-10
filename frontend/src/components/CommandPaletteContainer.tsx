@@ -119,6 +119,7 @@ export interface CommandPaletteContainerProps {
   onImportFolder: () => void
   onExportVault: () => void
   onOpenGraph: () => void
+  onOpenActivity: () => void
   onOpenLocalGraph: (filePath: string) => void
   onDailyNote: () => void
   onDailyNoteOffset: (offsetDays: number) => void
@@ -153,6 +154,7 @@ export function CommandPaletteContainer({
   onImportFolder,
   onExportVault,
   onOpenGraph,
+  onOpenActivity,
   onOpenLocalGraph,
   onDailyNote,
   onDailyNoteOffset,
@@ -788,6 +790,15 @@ export function CommandPaletteContainer({
         callback: onOpenGraph,
         pluginId: 'slatebase',
       })
+
+      if (isEnabled('activity-timeline')) {
+        commands.push({
+          id: 'slatebase:open-activity',
+          name: 'Aktivitätszeitleiste öffnen',
+          callback: onOpenActivity,
+          pluginId: 'slatebase',
+        })
+      }
 
       if (isEnabled('obsidian-plugin-compat')) {
         commands.push({
