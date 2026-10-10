@@ -32,6 +32,9 @@ function sanitizeConfig(raw: unknown): Partial<VaultConfig> {
   if (typeof parsed.attachmentsDirectory === 'string') {
     result.attachmentsDirectory = parsed.attachmentsDirectory
   }
+  if (typeof parsed.activityRetentionDays === 'number' && Number.isInteger(parsed.activityRetentionDays)) {
+    result.activityRetentionDays = parsed.activityRetentionDays
+  }
   return result
 }
 
@@ -65,6 +68,7 @@ export class VaultConfigStore implements IVaultConfigService {
       dailyNotesDirectory: stored.dailyNotesDirectory ?? DEFAULT_VAULT_CONFIG.dailyNotesDirectory,
       dailyNoteTemplateName: stored.dailyNoteTemplateName ?? DEFAULT_VAULT_CONFIG.dailyNoteTemplateName,
       attachmentsDirectory: stored.attachmentsDirectory ?? DEFAULT_VAULT_CONFIG.attachmentsDirectory,
+      activityRetentionDays: stored.activityRetentionDays ?? DEFAULT_VAULT_CONFIG.activityRetentionDays,
     }
   }
 
@@ -74,6 +78,7 @@ export class VaultConfigStore implements IVaultConfigService {
       dailyNotesDirectory: config.dailyNotesDirectory ?? current.dailyNotesDirectory ?? DEFAULT_VAULT_CONFIG.dailyNotesDirectory,
       dailyNoteTemplateName: config.dailyNoteTemplateName ?? current.dailyNoteTemplateName ?? DEFAULT_VAULT_CONFIG.dailyNoteTemplateName,
       attachmentsDirectory: config.attachmentsDirectory ?? current.attachmentsDirectory ?? DEFAULT_VAULT_CONFIG.attachmentsDirectory,
+      activityRetentionDays: config.activityRetentionDays ?? current.activityRetentionDays ?? DEFAULT_VAULT_CONFIG.activityRetentionDays,
     }))
     return merged as VaultConfig
   }

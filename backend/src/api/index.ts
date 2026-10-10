@@ -31,6 +31,7 @@ import { computeAffectedFilePairs } from '../link-index/index.js'
 import type { IImportService, UploadedFile } from '../import/index.js'
 import type { IUserRepository } from '../user/index.js'
 import type { IEventBus } from '../realtime/types.js'
+import type { IActivityService } from '../activity/index.js'
 import {
   InvalidFilenameError,
   FileTooLargeError,
@@ -139,6 +140,7 @@ export class VaultController implements IVaultController {
   private linkIndexHook?: LinkIndexHook
   private vaultDeletionHook?: VaultDeletionHook
   private eventBus?: IEventBus
+  private activityService?: IActivityService
 
   constructor(
     private readonly vaultService: IVaultService,
@@ -163,6 +165,15 @@ export class VaultController implements IVaultController {
    */
   setLinkIndexHook(hook: LinkIndexHook): void {
     this.linkIndexHook = hook
+  }
+
+  /**
+   * Sets the activity service for recording vault activity (timeline feature).
+   * Called from the composition root when the `activity-timeline` feature is on.
+   * Recording is a fire-and-forget side effect — a failure never fails the request.
+   */
+  setActivityService(service: IActivityService): void {
+    this.activityService = service
   }
 
   /**
@@ -315,6 +326,13 @@ export class VaultController implements IVaultController {
       // Publish vault:change event (exclude triggering user)
       const session = c.get('session') as SessionContext
       await this.publishVaultChange(vaultId, 'saved', filePath, session.userId, session.username)
+
+      // Record activity (fire-and-forget; never fails the save)
+      void this.activityService?.record(vaultId, {
+        type: result.created ? 'note.created' : 'note.edited',
+        path: filePath,
+        user: session.username,
+      })
 
       return c.json(result, 200)
     } catch (error) {
@@ -522,6 +540,13 @@ export class VaultController implements IVaultController {
       const session = c.get('session') as SessionContext
       await this.publishVaultChange(vaultId, 'deleted', decodedPath, session.userId, session.username)
 
+      // Record activity (fire-and-forget)
+      void this.activityService?.record(vaultId, {
+        type: 'note.deleted',
+        path: decodedPath,
+        user: session.username,
+      })
+
       return c.body(null, 204)
     } catch (error) {
       return this.handleError(c, error)
@@ -577,6 +602,14 @@ export class VaultController implements IVaultController {
       // Publish vault:change event (exclude triggering user)
       await this.publishVaultChange(vaultId, 'renamed', result.newPath, session.userId, session.username)
 
+      // Record activity: a move is one note.moved carrying old + new path (D3)
+      void this.activityService?.record(vaultId, {
+        type: 'note.moved',
+        path: result.newPath,
+        oldPath: sourcePath,
+        user: session.username,
+      })
+
       return c.json(linkMigrationWarnings ? { ...result, linkMigrationWarnings } : result, 200)
     } catch (error) {
       return this.handleError(c, error)
@@ -628,6 +661,14 @@ export class VaultController implements IVaultController {
 
       // Publish vault:change event (exclude triggering user)
       await this.publishVaultChange(vaultId, 'renamed', result.newPath, session.userId, session.username)
+
+      // Record activity: a rename is one note.moved carrying old + new path (D3)
+      void this.activityService?.record(vaultId, {
+        type: 'note.moved',
+        path: result.newPath,
+        oldPath: filePath,
+        user: session.username,
+      })
 
       return c.json(linkMigrationWarnings ? { ...result, linkMigrationWarnings } : result, 200)
     } catch (error) {

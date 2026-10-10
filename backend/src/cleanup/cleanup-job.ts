@@ -9,6 +9,8 @@ import { VERSIONS_DIR_SEGMENTS } from '../version/types.js'
 import type { IVaultManager } from '../vault/index.js'
 import type { IConfigService } from '../config/index.js'
 import type { ILogger } from '../logger/index.js'
+import type { IActivityService } from '../activity/index.js'
+import type { IVaultConfigService } from '../vault-config/types.js'
 
 /**
  * Periodic job that removes expired trash entries and prunes excess file versions.
@@ -25,6 +27,9 @@ export class CleanupJob implements ICleanupJob {
     private readonly vaultManager: IVaultManager,
     private readonly configService: IConfigService,
     private readonly logger: ILogger,
+    /** Optional — when both are set, expired activity-timeline events are pruned too. */
+    private readonly activityService?: IActivityService,
+    private readonly vaultConfigService?: IVaultConfigService,
   ) {}
 
   /**
@@ -121,6 +126,24 @@ export class CleanupJob implements ICleanupJob {
             vaultId,
             error: String(err),
           })
+        }
+
+        // --- Activity timeline pruning (per-vault retention, D2) ---
+        if (this.activityService && this.vaultConfigService) {
+          try {
+            const config = await this.vaultConfigService.getConfig(vaultId)
+            if (config.activityRetentionDays > 0) {
+              const purged = await this.activityService.purgeExpired(vaultId, config.activityRetentionDays)
+              if (purged > 0) {
+                this.logger.info('Activity day-files purged', { vaultId, purged })
+              }
+            }
+          } catch (err) {
+            this.logger.error('Activity cleanup failed for vault', {
+              vaultId,
+              error: String(err),
+            })
+          }
         }
       }
 
