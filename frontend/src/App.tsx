@@ -3,6 +3,7 @@ import { AppProvider, useAppContext, loadVaults, importFile, importFolder, expor
 import { ApiClient } from './api'
 import { AuthProvider, useAuthContext } from './state/authContext'
 import { TabProvider, useTabContext } from './state/tabContext'
+import { PaneTreeProvider } from './state/paneTreeContext'
 import { NavigationHistoryProvider, useNavigationHistory } from './state/navigationHistoryContext'
 import { FeatureProvider, useFeatureContext } from './state/featureContext'
 import { SearchProvider } from './state/searchContext'
@@ -1484,18 +1485,20 @@ function AuthGuard() {
       <RealtimeBridge>
         <AppProvider apiClient={apiClient}>
           <SearchProvider>
-            <TabProvider>
-              <NavigationHistoryProvider>
-                <LeftPanelProvider>
-                  <RightPanelProvider>
-                    <AppContent />
-                    {/* Inside AppProvider: the popover reads the vault and API
-                        client from AppContext to load the previewed note. */}
-                    <HoverPreview />
-                  </RightPanelProvider>
-                </LeftPanelProvider>
-              </NavigationHistoryProvider>
-            </TabProvider>
+            <PaneTreeProvider>
+              <TabProvider>
+                <NavigationHistoryProvider>
+                  <LeftPanelProvider>
+                    <RightPanelProvider>
+                      <AppContent />
+                      {/* Inside AppProvider: the popover reads the vault and API
+                          client from AppContext to load the previewed note. */}
+                      <HoverPreview />
+                    </RightPanelProvider>
+                  </LeftPanelProvider>
+                </NavigationHistoryProvider>
+              </TabProvider>
+            </PaneTreeProvider>
           </SearchProvider>
         </AppProvider>
       </RealtimeBridge>
