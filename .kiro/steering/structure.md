@@ -376,6 +376,12 @@ src/
 │   └── dictation/                — Voice dictation (feature `voice-transcription`). Uses the plain `MediaRecorder` Web API, NOT the plugin-compat layer.
 │       ├── dictation-recorder.ts   — DictationRecorder (MediaRecorder wrapper; getUserMedia errors → DictationRecorderError with a stable `reason`: unsupported/permission-denied/insecure-context/failed; picks a supported audio MIME type)
 │       └── dictation-controller.ts — DictationController (module singleton, state machine idle/recording/processing/error; records → `apiClient.transcribe` → inserts text at the CM6 cursor via `view.dispatch`; optional audio attachment via the upload path + `![[…]]` embed). Backs the `voice:toggle-dictation` command and DictationIndicator
+│   └── slash/                    — In-editor slash-command (`/`) menu. Registered as an INTERNAL EditorSuggest source in `plugins/compat/plugin-context.ts` at vault init (works with no plugin installed), reusing the whole `editor-suggest-*` infrastructure (trigger loop, popover, keymap, stale-guard, one-suggest-at-a-time). Actions delegate to the existing `editor:*`/core commands via the CommandRegistry — one shared implementation with the Command Palette.
+│       ├── slash-commands.ts        — The curated `SlashCommand[]` (id, icon, `commandId` OR direct `insert`); single source of truth for the menu. Date/time entries dispatch straight to CM6
+│       ├── slash-command-i18n.ts    — DE/EN labels keyed by stable slash id (`core-command-i18n.ts` pattern)
+│       ├── slash-trigger.ts         — `detectSlashTrigger()`: `/` at line start / after whitespace, outside code/wikilink/math (syntax tree + cheap same-line scan); returns replacement range + filter query
+│       ├── slash-suggest-source.ts  — `createSlashSuggestSource()`: the internal `EditorSuggestInstance` (onTrigger/getSuggestions/renderSuggestion/selectSuggestion). On select, deletes the `/…` trigger text FIRST, then runs the action; filters out entries whose core command does not resolve (never a silent no-op)
+│       └── slash-*.test.ts          — Trigger positive/negative + suggest filtering/execution/date-insert tests
 ├── plugins/
 │   ├── index.ts          — Barrel export (all plugins, types, utilities)
 │   ├── types.ts          — MDAST node types (WikilinkNode, EmbedNode, CalloutNode, TagNode), IMAGE_EXTENSIONS, PDF_EXTENSIONS, AUDIO_EXTENSIONS, VIDEO_EXTENSIONS

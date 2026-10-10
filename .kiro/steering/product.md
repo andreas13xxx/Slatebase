@@ -37,6 +37,7 @@ Obsidian-compatible vaults — no database, no sync service, no desktop app requ
 - Bookmarks for files, headings, blocks and saved searches — drag-and-drop reordering, context menu, custom labels
 - Navigation history (back/forward with Alt+←/→), Quick Switcher (Ctrl+O), tab cycling (Ctrl+Shift+]/[), breadcrumb bar, File Explorer "follow active file"
 - Command Palette (Ctrl+P, 40+ built-in commands; plugin commands when compat is enabled)
+- Slash commands: in-editor `/` menu at the cursor (headings, lists, quote, code block, callout, table, horizontal rule, internal link, insert template, date/time), filtered by fuzzy match, delegating to the same core commands as the palette — triggers only at a line start / after whitespace, never inside code, wikilinks or math
 - Hover Preview (rendered Markdown popover on internal links), file-type icons in the explorer
 
 ### Multi-User & Realtime

@@ -158,6 +158,22 @@ Beachte, wie schnell du zwischen verschiedenen Bereichen wechseln kannst — all
 
 ---
 
+## Slash-Befehle im Editor
+
+Neben der globalen Palette (`Ctrl+P`) gibt es im Editor ein Inline-**Slash-Menü**: Tippe `/` am Zeilenanfang (oder nach einem Leerzeichen), und direkt am Cursor öffnet sich ein kleines Befehlsmenü.
+
+- **Auslöser:** `/` am Zeilenanfang oder nach Leerraum. Ein Slash mitten im Wort, in einem Pfad (`a/b`), in einem Codeblock, in einem Wikilink oder in Mathe bleibt normaler Text.
+- **Filtern:** Weitertippen schränkt die Liste ein (gleiche Fuzzy-Suche wie die Palette).
+- **Auswählen:** `↑` / `↓` zum Navigieren, `Enter` oder `Tab` zum Bestätigen, `Escape` zum Abbrechen — oder per Mausklick.
+- **Ergebnis:** Der getippte `/…`-Text wird entfernt und der Befehl an der Cursorposition ausgeführt.
+
+Verfügbare Einträge u.a.: Überschrift H1–H3, Aufzählung / nummerierte / Aufgabenliste, Zitat, Codeblock, Callout, Tabelle, Trennlinie, interner Link, Vorlage einfügen, Datum einfügen, Zeit einfügen. Die Aktionen sind dieselben Core-Commands wie in der Palette — beide können also nicht auseinanderdriften.
+
+> [!tip] Palette vs. Slash-Menü
+> Nutze `Ctrl+P` für *jede* Aktion von überall; nutze `/` im Editor für schnelle *Einfüge-/Formatier*-Aktionen, ohne Tastatur oder Cursorposition zu verlassen.
+
+---
+
 ## Verwandte Features
 
 - [[Features/Einstellungen]] — Tastenkürzel für die Palette konfigurieren
