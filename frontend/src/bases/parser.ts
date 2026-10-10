@@ -182,7 +182,7 @@ function parseProperties(raw: unknown, errors: BaseValidationError[]): BasePrope
 
 // ─── View parsing ─────────────────────────────────────────────────────────────
 
-const VIEW_KEYS = ['type', 'name', 'order', 'sort']
+const VIEW_KEYS = ['type', 'name', 'order', 'sort', 'groupBy']
 
 function parseSort(raw: unknown, path: string, errors: BaseValidationError[]): BaseSortClause[] | undefined {
   if (raw === undefined) return undefined
@@ -228,6 +228,11 @@ function parseView(raw: unknown, index: number, errors: BaseValidationError[]): 
   }
   const sort = parseSort(raw['sort'], `views[${index}].sort`, errors)
   if (sort) view.sort = sort
+  if (isString(raw['groupBy'])) {
+    view.groupBy = raw['groupBy']
+  } else if (raw['groupBy'] !== undefined) {
+    errors.push({ message: 'view "groupBy" must be a property id', path: `views[${index}].groupBy` })
+  }
 
   const _unknown = extractUnknown(raw, VIEW_KEYS)
   if (_unknown) view._unknown = _unknown

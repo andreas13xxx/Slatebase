@@ -24,6 +24,7 @@ import { extractErrorMessage } from '../../utils/error'
 import { hasBasesViewRegistration } from '../../plugins/compat/bases-view-registry'
 import { ErrorBoundary } from '../ErrorBoundary'
 import { BasesTableView } from './BasesTableView'
+import { BasesKanbanView } from './BasesKanbanView'
 import { BasesSourceView } from './BasesSourceView'
 import { BasesPluginViewHost } from './BasesPluginViewHost'
 
@@ -59,13 +60,15 @@ export const BasesView = memo(function BasesView({
   const safeIndex = selectedViewIndex < views.length ? selectedViewIndex : 0
   const activeView: BaseView | undefined = views[safeIndex]
 
-  // A view whose `type` a plugin registered renders via the plugin host; any
-  // other type (incl. `table`) renders the built-in table. An errored plugin
-  // view falls back to the built-in table.
+  // A view whose `type` a plugin registered renders via the plugin host; the
+  // built-in types (`table`, `cards`) and any other unregistered type render
+  // in-app. An errored plugin view falls back to the built-in table.
+  const BUILT_IN_VIEW_TYPES = useMemo(() => new Set(['table', 'cards']), [])
   const isPluginView = useMemo(
-    () => !!activeView && activeView.type !== 'table' && hasBasesViewRegistration(activeView.type) && !pluginViewError,
-    [activeView, pluginViewError],
+    () => !!activeView && !BUILT_IN_VIEW_TYPES.has(activeView.type) && hasBasesViewRegistration(activeView.type) && !pluginViewError,
+    [activeView, pluginViewError, BUILT_IN_VIEW_TYPES],
   )
+  const isKanbanView = !!activeView && activeView.type === 'cards' && !isPluginView
 
   const runQuery = useCallback(async () => {
     if (!doc || !activeView) return
@@ -212,7 +215,16 @@ export const BasesView = memo(function BasesView({
         </ErrorBoundary>
       )}
 
-      {mode === 'view' && !isPluginView && activeView && (
+      {mode === 'view' && !isPluginView && isKanbanView && activeView && (
+        <BasesKanbanView
+          doc={doc}
+          view={activeView}
+          rows={rows}
+          onOpenNote={onOpenNote}
+        />
+      )}
+
+      {mode === 'view' && !isPluginView && !isKanbanView && activeView && (
         <BasesTableView
           doc={doc}
           view={activeView}

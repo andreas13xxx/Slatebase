@@ -190,7 +190,7 @@ oversight — but it means:
 | 📝 **Markdown Editor** | CodeMirror 6 editor with Live Preview, auto-save, and keyboard shortcuts — formatting via Command Palette or an Obsidian toolbar plugin |
 | ✅ **Spellchecker** | Built in, with corrections — not the browser's. Unknown words are underlined; right-click offers suggestions, "add to dictionary", and "ignore for this session". German and English dictionaries, switchable per editor; German compounds are resolved by splitting |
 | 🎙️ **Voice Dictation** ⚠️ | Record in the browser and transcribe to text at the cursor via a self-hosted Whisper backend — multilingual, optional audio attachment. Experimental, off by default (`voice-transcription` toggle); the Whisper backend is operator-provided |
-| 👁️ **Markdown Viewer** | Rendered view with GFM, syntax highlighting, frontmatter, and collapsible headings |
+| 👁️ **Markdown Viewer** | Rendered view with GFM, syntax highlighting, frontmatter, collapsible headings, and colored `==highlights==` (yellow + 🔴🟠🟢🔵🟣, with `==` autocomplete) |
 | 🗂️ **Tabs & Navigation** | Open multiple files simultaneously with unsaved indicators; browser-like back/forward history, fuzzy Quick Switcher (Ctrl+O), Ctrl+Shift+]/[ tab cycling, and a clickable folder breadcrumb |
 | 👥 **Multi-User & Sharing** | Invite others to your vaults with read or write access, transfer ownership |
 | 💬 **Real-time Chat** | Messaging between users with unread badges, archiving, and pagination |
@@ -202,7 +202,7 @@ oversight — but it means:
 | 🎨 **Canvas** | Open and edit Obsidian `.canvas` whiteboards: text, file, link, and group nodes with edges, drag, resize, zoom/pan, minimap, file-path search, and auto-save |
 | 🕸️ **Knowledge Graph** | Interactive visualization of vault link structure with zoom, pan, drag, and search |
 | 📑 **Context Panel** | Right-side panel with document outline, forward/backlinks, unlinked mentions, tags, and typed frontmatter properties |
-| 🧮 **Bases** ⚠️ | Obsidian-compatible `.base` files as a filterable, sortable, editable table over your notes' metadata — AND/OR filters, read-only formula columns, inline cell editing. Experimental, off by default (`bases` toggle) |
+| 🧮 **Bases** ⚠️ | Obsidian-compatible `.base` files as filterable, sortable, editable views over your notes' metadata — a table and a cards/Kanban board (grouped, collapsible columns), AND/OR filters, read-only formula columns, inline cell editing. Experimental, off by default (`bases` toggle) |
 | 🔖 **Bookmarks** | Bookmark files, headings, blocks, or saved searches — reorder by drag and drop, rename, and bookmark all open tabs at once |
 | 📟 **Status Bar** | Clock, vault name, word/character count, and cursor position with click-to-"go to line" — each item toggleable |
 | 🎨 **CSS Snippets** | Per-vault custom CSS, uploaded or written in an embedded editor, enabled and disabled individually |

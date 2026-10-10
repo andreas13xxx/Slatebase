@@ -33,6 +33,7 @@ import { applyFormatting } from './formatting'
 import { editorInfoField } from './editor-state-fields'
 import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
 import { showToast } from '../components/ToastNotification'
+import { HIGHLIGHT_COLORS } from '../plugins/highlight-colors'
 import {
   learnWord, ignoreWordForSession, refreshSpellcheck,
   SPELLCHECK_LANGUAGES, SPELLCHECK_LANGUAGE_LABELS,
@@ -132,6 +133,26 @@ async function extractSelectionToNewNote(view: EditorView): Promise<void> {
 
   view.dispatch({ changes: { from: sel.from, to: sel.to, insert: `[[${name.trim()}]]` } })
   app.workspace.openFileDirectly(newPath)
+}
+
+/**
+ * Wraps the selection in a colored highlight (`==🔴 selection==`). The leading
+ * color emoji is Obsidian 1.14's colored-highlight syntax; a plain
+ * `==selection==` (the default yellow) stays on the dedicated menu entry that
+ * delegates to the `toggle-highlight` core command. With no selection the menu
+ * item is disabled, so `sel.empty` here is only a defensive guard.
+ */
+function applyColoredHighlight(view: EditorView, emoji: string): void {
+  const sel = view.state.selection.main
+  if (sel.empty) return
+  const selected = view.state.sliceDoc(sel.from, sel.to)
+  const insert = `==${emoji} ${selected}==`
+  view.dispatch({
+    changes: { from: sel.from, to: sel.to, insert },
+    // Place the cursor just after the inserted highlight.
+    selection: { anchor: sel.from + insert.length },
+  })
+  view.focus()
 }
 
 /**
@@ -287,7 +308,20 @@ export function buildEditorContextMenuItems(
         { id: 'italic', label: 'Kursiv', icon: createElement(Italic, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-italics', view) },
         { id: 'strikethrough', label: 'Durchgestrichen', icon: createElement(Strikethrough, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-strikethrough', view) },
         { id: 'inline-code', label: 'Code', icon: createElement(Code, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-code', view) },
-        { id: 'highlight', label: 'Markieren', icon: createElement(Highlighter, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-highlight', view) },
+        {
+          id: 'highlight',
+          label: 'Markieren',
+          icon: createElement(Highlighter, { size: ICON_SIZE }),
+          submenu: [
+            { id: 'highlight-default', label: 'Markieren (Gelb)', icon: createElement(Highlighter, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-highlight', view) },
+            ...HIGHLIGHT_COLORS.filter((c) => c.emoji !== null).map((c) => ({
+              id: `highlight-${c.name}`,
+              label: `${c.emoji} ${c.label}`,
+              disabled: !hasSelection,
+              run: () => applyColoredHighlight(view, c.emoji!),
+            })),
+          ],
+        },
         { id: 'inline-math', label: 'Inline-Formel', icon: createElement(Sigma, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-inline-math', view) },
         { id: 'comment', label: 'Kommentar', icon: createElement(MessageSquareOff, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-comments', view) },
         { id: 'sep-clear', label: '', separator: true },

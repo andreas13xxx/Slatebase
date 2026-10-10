@@ -2,6 +2,7 @@ import { Decoration } from '@codemirror/view'
 import type { EditorState, Range } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
 import { INLINE_HTML_OPEN_TAG_RE, INLINE_HTML_CLOSE_TAG_RE, parseInlineHtmlAttrs, inlineHtmlToCssText } from '../../plugins/inline-html'
+import { matchHighlightColor } from '../../plugins/highlight-colors'
 
 /**
  * Decoration ranges that should be hidden when cursor is outside them.
@@ -289,9 +290,13 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
     if (insideCode(from, to)) continue
 
     if (contentFrom < contentTo) {
-      // Mark the content with highlight class
+      // Mark the content with highlight class. A leading color emoji
+      // (==🔴 text==) selects the color; the emoji stays visible, as in
+      // reading view. Default (no emoji) is yellow.
+      const inner = docText.slice(contentFrom, contentTo)
+      const { color } = matchHighlightColor(inner)
       decorations.push(
-        Decoration.mark({ class: 'cm-lp-highlight' }).range(contentFrom, contentTo)
+        Decoration.mark({ class: `cm-lp-highlight cm-lp-hl-${color}` }).range(contentFrom, contentTo)
       )
 
       // Opening marker ==

@@ -46,4 +46,23 @@ describe('buildQuerySpec', () => {
     const spec = buildQuerySpec(doc, view)
     expect(spec.sort).toBeUndefined()
   })
+
+  it('adds a cards view groupBy property to the requested columns', () => {
+    const view: BaseView = { type: 'cards', order: ['file.name'], groupBy: 'status' }
+    const spec = buildQuerySpec(doc, view)
+    expect(spec.columns).toContain('status')
+  })
+
+  it('does not duplicate groupBy when it is already a displayed column', () => {
+    const view: BaseView = { type: 'cards', order: ['status', 'priority'], groupBy: 'status' }
+    const spec = buildQuerySpec(doc, view)
+    expect(spec.columns.filter((c) => c === 'status')).toHaveLength(1)
+  })
+
+  it('ignores a groupBy on a file.* or formula column', () => {
+    const specFile = buildQuerySpec(doc, { type: 'cards', order: ['status'], groupBy: 'file.name' })
+    expect(specFile.columns).not.toContain('file.name')
+    const specFormula = buildQuerySpec(doc, { type: 'cards', order: ['status'], groupBy: 'days_left' })
+    expect(specFormula.columns).not.toContain('days_left')
+  })
 })

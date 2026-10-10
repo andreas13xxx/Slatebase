@@ -105,6 +105,7 @@ describe('registerCoreAppCommands', () => {
     handlers = {
       vaultId: 'vault-1',
       vaultName: 'My Vault',
+      directoryTree: null,
       apiClient,
       tabState: { tabs: [makeTab()], activeTabId: 'vault-1::note.md' },
       tabDispatch,
@@ -458,6 +459,7 @@ describe('registerCoreAppCommands — editor:* commands needing app context', ()
     handlers = {
       vaultId: 'vault-1',
       vaultName: 'My Vault',
+      directoryTree: null,
       apiClient,
       tabState: { tabs: [makeTab({ editBuffer: 'unsaved content' })], activeTabId: 'vault-1::note.md' },
       tabDispatch,
@@ -550,6 +552,7 @@ describe('registerCoreAppCommands — bookmark types (Requirements 11-14)', () =
     return {
       vaultId: 'vault-1',
       vaultName: 'My Vault',
+      directoryTree: null,
       apiClient,
       tabState: { tabs: [makeTab()], activeTabId: 'vault-1::note.md' },
       tabDispatch: vi.fn(),
@@ -767,6 +770,7 @@ describe('registerCoreAppCommands — frontmatter properties (markdown:*)', () =
     return {
       vaultId: 'vault-1',
       vaultName: 'My Vault',
+      directoryTree: null,
       apiClient,
       tabState: { tabs: [makeTab()], activeTabId: 'vault-1::note.md' },
       tabDispatch: vi.fn(),
@@ -916,6 +920,7 @@ describe('registerCoreAppCommands — canvas:jump-to-group', () => {
     handlers = {
       vaultId: 'vault-1',
       vaultName: 'My Vault',
+      directoryTree: null,
       apiClient,
       tabState: { tabs: [makeTab()], activeTabId: 'vault-1::note.md' },
       tabDispatch: vi.fn(),
@@ -1263,6 +1268,7 @@ function makeMinimalHandlers(overrides: { apiClient?: IApiClient; tabDispatch?: 
   return {
     vaultId: 'vault-1',
     vaultName: 'My Vault',
+    directoryTree: null,
     apiClient,
     tabState: { tabs: [overrides.activeTab], activeTabId: overrides.activeTab.id },
     tabDispatch: overrides.tabDispatch ?? vi.fn(),

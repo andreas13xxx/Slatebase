@@ -27,6 +27,12 @@ export function buildQuerySpec(doc: BaseDocument, view: BaseView): BaseQuerySpec
   const columnIds = view.order ?? Object.keys(doc.properties ?? {})
   const propertyColumns = columnIds.filter((id) => !id.startsWith('file.') && !formulaKeys.has(id))
 
+  // A `cards` view groups by `view.groupBy`; make sure that property is fetched
+  // even when it isn't among the displayed columns.
+  if (view.groupBy && !view.groupBy.startsWith('file.') && !formulaKeys.has(view.groupBy) && !propertyColumns.includes(view.groupBy)) {
+    propertyColumns.push(view.groupBy)
+  }
+
   const spec: BaseQuerySpecWire = { columns: propertyColumns }
   if (doc.filters) spec.filters = doc.filters
   if (view.sort && view.sort.length > 0) {

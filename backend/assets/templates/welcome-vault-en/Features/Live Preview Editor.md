@@ -64,6 +64,29 @@ Markdown is rendered inline. Headings appear at the correct size, links become c
 
 ---
 
+## Highlight Colors
+
+Highlight text with `==double equals==`. A plain highlight is yellow. Add a color emoji at the start to change the color:
+
+| Syntax | Color |
+|--------|-------|
+| `==text==` | Yellow (default) |
+| `==🔴 text==` | Red |
+| `==🟠 text==` | Orange |
+| `==🟢 text==` | Green |
+| `==🔵 text==` | Blue |
+| `==🟣 text==` | Purple |
+
+Three ways to apply a color:
+
+- **Type it:** after typing the opening `==`, an autocomplete menu suggests the colors — pick one and keep typing.
+- **Select & right-click:** highlight some text, right-click → **Text formatting → Markieren**, and choose a color.
+- **By hand:** just type the emoji after the opening `==`.
+
+The color emoji stays in the Markdown, so a colored highlight is portable — it renders the same in any Obsidian-compatible tool. Colors follow dark mode automatically.
+
+---
+
 ## Vim Mode
 
 An optional Vim mode is available for experienced Vim users. Enable it via Settings (Ctrl+,) → Appearance → Vim Mode.
@@ -87,7 +110,7 @@ In Vim mode, the familiar modes (Normal, Insert, Visual) and commands are availa
 | Headings | `## Title` | Font size + markers hidden |
 | Bold/Italic | `**bold**` / `*italic*` | Formatted, markers hidden |
 | Strikethrough | `~~text~~` | Strikethrough |
-| Highlight | `==text==` | Colored background |
+| Highlight | `==text==` / `==🟢 text==` | Colored background (6 colors) |
 | Inline code | `` `code` `` | Monospace styling |
 | Links | `[text](url)` | Clickable (Ctrl+Click) |
 | Wikilinks | `[[Page]]` | Clickable, brackets hidden |

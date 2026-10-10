@@ -74,6 +74,7 @@ function serializeView(view: BaseView): Record<string, unknown> {
   if (view.name !== undefined) out['name'] = view.name
   if (view.order !== undefined) out['order'] = view.order
   if (view.sort !== undefined) out['sort'] = serializeSort(view.sort)
+  if (view.groupBy !== undefined) out['groupBy'] = view.groupBy
   mergeUnknown(out, view._unknown)
   return out
 }

@@ -644,16 +644,19 @@
   margin: 8px 0;
 }
 
-/* --- Highlight ==text== --- */
+/* --- Highlight ==text== (default yellow) --- */
 .cm-lp-highlight {
-  background: rgba(255, 208, 0, 0.3);
+  background: var(--hl-yellow-bg);
   border-radius: 2px;
   padding: 1px 0;
 }
 
-:root[data-theme="dark"] .cm-lp-highlight {
-  background: rgba(255, 208, 0, 0.2);
-}
+/* Color highlights ==🔴 text== etc. (shared palette in index.css) */
+.cm-lp-hl-red { background: var(--hl-red-bg); }
+.cm-lp-hl-orange { background: var(--hl-orange-bg); }
+.cm-lp-hl-green { background: var(--hl-green-bg); }
+.cm-lp-hl-blue { background: var(--hl-blue-bg); }
+.cm-lp-hl-purple { background: var(--hl-purple-bg); }
 
 /* --- Callout Default Title --- */
 .cm-lp-callout-default-title {

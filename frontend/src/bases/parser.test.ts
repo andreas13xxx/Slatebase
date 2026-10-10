@@ -129,6 +129,21 @@ views:
     if (!result.success) return
     expect(result.errors?.some((e) => /op/.test(e.message))).toBe(true)
   })
+
+  it('parses a cards view with a groupBy property', () => {
+    const result = parseBase('views:\n  - type: cards\n    name: Board\n    groupBy: status\n')
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.document.views[0]?.type).toBe('cards')
+    expect(result.document.views[0]?.groupBy).toBe('status')
+  })
+
+  it('reports a non-fatal error for a non-string groupBy', () => {
+    const result = parseBase('views:\n  - type: cards\n    groupBy: [1, 2]\n')
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.errors?.some((e) => /groupBy/.test(e.message))).toBe(true)
+  })
 })
 
 describe('serializeBase', () => {
@@ -145,5 +160,16 @@ describe('serializeBase', () => {
       .filter((line) => /^[a-z]/.test(line))
       .map((line) => line.split(':')[0])
     expect(keys).toEqual(['filters', 'formulas', 'properties', 'views'])
+  })
+
+  it('round-trips a cards view groupBy field', () => {
+    const doc: BaseDocument = {
+      views: [{ type: 'cards', name: 'Board', groupBy: 'status' }],
+    }
+    const yaml = serializeBase(doc)
+    const reparsed = parseBase(yaml)
+    expect(reparsed.success).toBe(true)
+    if (!reparsed.success) return
+    expect(reparsed.document.views[0]?.groupBy).toBe('status')
   })
 })

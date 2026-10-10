@@ -375,6 +375,14 @@
   --graph-tag-node: #10b981;
   --graph-property-node: #f59e0b;
 
+  /* Highlight Color Tokens — Light (==text==, Obsidian 1.14 colored highlights) */
+  --hl-yellow-bg: rgba(255, 208, 0, 0.35);
+  --hl-red-bg: rgba(239, 68, 68, 0.30);
+  --hl-orange-bg: rgba(249, 115, 22, 0.30);
+  --hl-green-bg: rgba(34, 197, 94, 0.30);
+  --hl-blue-bg: rgba(59, 130, 246, 0.30);
+  --hl-purple-bg: rgba(168, 85, 247, 0.30);
+
   /* Toast Notification Tokens — Light */
   --toast-info-bg: #eff6ff;
   --toast-info-border: #bfdbfe;
@@ -591,6 +599,14 @@
  --graph-tag-node: #34d399;
  --graph-property-node: #fbbf24;
 
+    /* Highlight Color Tokens — Dark */
+    --hl-yellow-bg: rgba(255, 208, 0, 0.22);
+    --hl-red-bg: rgba(239, 68, 68, 0.28);
+    --hl-orange-bg: rgba(249, 115, 22, 0.28);
+    --hl-green-bg: rgba(34, 197, 94, 0.26);
+    --hl-blue-bg: rgba(59, 130, 246, 0.30);
+    --hl-purple-bg: rgba(168, 85, 247, 0.30);
+
     /* Toast Notification Tokens — Dark */
     --toast-info-bg: #1e293b;
     --toast-info-border: #1e40af;
@@ -778,6 +794,14 @@
     --graph-search-highlight: #fbbf24;
  --graph-tag-node: #34d399;
  --graph-property-node: #fbbf24;
+
+    /* Highlight Color Tokens — Dark */
+    --hl-yellow-bg: rgba(255, 208, 0, 0.22);
+    --hl-red-bg: rgba(239, 68, 68, 0.28);
+    --hl-orange-bg: rgba(249, 115, 22, 0.28);
+    --hl-green-bg: rgba(34, 197, 94, 0.26);
+    --hl-blue-bg: rgba(59, 130, 246, 0.30);
+    --hl-purple-bg: rgba(168, 85, 247, 0.30);
 
     /* Toast Notification Tokens — Dark */
     --toast-info-bg: #1e293b;

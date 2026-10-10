@@ -308,6 +308,7 @@ export function CommandPaletteContainer({
   coreHandlersRef.current = {
     vaultId: state.selectedVaultId,
     vaultName: state.vaults.find((v) => v.id === state.selectedVaultId)?.name ?? '',
+    directoryTree: (state.selectedVaultId ? state.vaultTrees[state.selectedVaultId] : null) ?? state.directoryTree,
     // App.tsx always provides a real ApiClient to AppProvider; the context type
     // is nullable only to give tests a no-client default.
     apiClient: apiClient as IApiClient,
