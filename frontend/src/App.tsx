@@ -6,6 +6,8 @@ import { TabProvider, useTabContext } from './state/tabContext'
 import { PaneTreeProvider, usePaneTree } from './state/paneTreeContext'
 import { PaneTabProvider } from './state/paneTabContext'
 import { PaneTreeView } from './components/panes/PaneTreeView'
+import type { SplitDirection } from './state/paneTreeState'
+import { onRequestPaneSplit, offRequestPaneSplit } from './plugins/compat/pane-split-bridge'
 import { NavigationHistoryProvider, useNavigationHistory } from './state/navigationHistoryContext'
 import { FeatureProvider, useFeatureContext } from './state/featureContext'
 import { SearchProvider } from './state/searchContext'
@@ -962,6 +964,27 @@ function AppContent() {
     },
     [paneTreeDispatch],
   )
+
+  // Plugin workspace-shim splits (createLeafBySplit / splitActiveLeaf /
+  // getLeaf('split')) request a real pane split through the module-level
+  // pane-split bridge. We split the ACTIVE pane; SPLIT_PANE makes the new empty
+  // pane active, so the plugin's subsequent setViewState routes its view into
+  // it via the useTabContext bridge. The active pane id is read from a ref so
+  // the subscription mounts once and never captures a stale value.
+  const activePaneIdRef = useRef(paneTree.activePaneId)
+  useEffect(() => {
+    activePaneIdRef.current = paneTree.activePaneId
+  }, [paneTree.activePaneId])
+  useEffect(() => {
+    const handleSplit = (direction: SplitDirection) => {
+      paneTreeDispatch({
+        type: 'SPLIT_PANE',
+        payload: { paneId: activePaneIdRef.current, direction, newPaneId: generatePaneId() },
+      })
+    }
+    onRequestPaneSplit(handleSplit)
+    return () => { offRequestPaneSplit(handleSplit) }
+  }, [paneTreeDispatch, generatePaneId])
 
   const settingsTabs: SettingsTabDescriptor[] = openSettingsPages.map((page) => {
     const isActive = isShowingSettings && page === activeSettingsPage

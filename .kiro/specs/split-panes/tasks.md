@@ -58,12 +58,12 @@ Dies ist die größte einzelne Architekturänderung am Layout-System — die bes
   - [x] 4.5 Tests: Round-Trip, Migration, Fallback, lenient-Parse (13 in `paneTreeState.test.ts`); `workspaceStore.test.ts` (Persist-Durchlauf, Lenient-Fallback, Legacy-Blob)
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
-- [ ] 5. Plugin-Workspace-Kompatibilität
-  - [ ] 5.1 `workspace-shim.ts` — `createLeafBySplit`/`splitActiveLeaf`/`getLeaf('split'|'tab'|false)` erzeugen echte Panes/Tabs; `WorkspaceLeaf` an Pane gebunden
-  - [ ] 5.2 `iterateAllLeaves`/`getLeavesOfType`/`getMostRecentLeaf`/`activeLeaf` über alle Panes
-  - [ ] 5.3 `view-registry.ts` — Location-/`getRoot()`-Logik berücksichtigt Pane-Baum; Sidebar-Views bleiben getrennt
-  - [ ] 5.4 `compatibility-analyzer.ts` — Split-abhängige Methoden auf „supported"
-  - [ ] 5.5 Wiring-Test für `createLeafBySplit` → echter Pane
+- [x] 5. Plugin-Workspace-Kompatibilität
+  - [x] 5.1 `workspace-shim.ts` — `createLeafBySplit`/`splitActiveLeaf`/`getLeaf('split')` erzeugen echte Panes über die neue `pane-split-bridge.ts` (fordert einen Split des aktiven Panes an → neuer Pane wird aktiv → das danach via `setViewState` geöffnete View landet dort über die `useTabContext`-Brücke). Obsidian-Richtung (benennt den Trenner) → unsere `SplitDirection` (benennt das Layout) via `obsidianToPaneDirection`. Fallback auf einfachen Tab, wenn kein Pane-Host gemountet ist (`requestPaneSplit` → false) — unverändertes Vor-Phase-5-Verhalten in Tests/headless
+  - [x] 5.2 `iterateAllLeaves`/`getLeavesOfType`/`getMostRecentLeaf`/`activeLeaf` decken bereits alle Panes ab: Leaves sind nicht pane-gebunden (die `ViewRegistry` trackt sie global, der Pane-Baum hält Tabs), also partitioniert nichts sie pro Pane — keine Änderung nötig
+  - [x] 5.3 `view-registry.ts` — `getRoot()` meldet weiterhin korrekt `rootSplit` (Main) vs. `left/rightSplit` (Sidebar); Sidebar-Views bleiben eine getrennte Layout-Schicht (Design-Befund #4), unabhängig vom Editor-Pane-Baum
+  - [x] 5.4 `compatibility-analyzer.ts` — `createLeafBySplit`/`splitActiveLeaf` bleiben `supported`, Kommentar aktualisiert: echte Splits statt „degradiert zum Tab"; Popout/Layout-Objektmodell bleiben Stubs
+  - [x] 5.5 Wiring-Test `pane-split-bridge.test.ts`: Bridge-Kontrakt (subscribe/dispatch/unsubscribe), Shim `createLeafBySplit`/`splitActiveLeaf`/`getLeaf('split')` → `requestPaneSplit` mit korrektem Richtungs-Mapping, Plain-Tab-Fallback ohne Host; zwei bestehende Shim-Tests auf die neue Fallback-Meldung aktualisiert
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
 - [ ] 6. Befehle + Keybindings

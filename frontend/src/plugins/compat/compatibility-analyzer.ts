@@ -197,10 +197,13 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
   // 'layout-change' event).
   'workspace.iterateLeaves',
   'workspace.onLayoutChange',
-  // No split/popout/layout object model in Slatebase's flat-tab workspace —
-  // these degrade to a plain tab or a stub, but log a console message
-  // explaining the substitution, so plugins get an equivalent signal.
+  // Split panes are real as of the Split Panes feature: createLeafBySplit /
+  // splitActiveLeaf / getLeaf('split') split the active pane into a genuine
+  // new pane (see pane-split-bridge). The remaining layout APIs below have no
+  // object model in Slatebase (no popout windows, no serialized layout tree) —
+  // they degrade to a plain tab or an inert stub and log the substitution.
   'workspace.createLeafBySplit',
+  'workspace.splitActiveLeaf',
   'workspace.openPopoutLeaf',
   'workspace.getLayout',
   'workspace.rootSplit',
@@ -208,7 +211,6 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
   'workspace.rightSplit',
   'workspace.floatingSplit',
   'workspace.getLeafById',
-  'workspace.splitActiveLeaf',
   'workspace.createLeafInParent',
   'workspace.ensureSideLeaf',
   'workspace.leftRibbon',
