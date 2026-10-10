@@ -9,21 +9,21 @@ Dies ist die größte einzelne Architekturänderung am Layout-System — die bes
 ## Tasks
 
 - [ ] 0. Design-Spike (verbindliche Vorarbeit, Wegwerf-Prototyp)
-  - [ ] 0.1 Zustandsform entscheiden: Pane-gebundener `TabProvider` vs. globaler Baum-Reducer mit Selektoren (Re-Render-Kosten gegen bestehende `useTabContext()`-Aufrufmenge)
-  - [ ] 0.2 Aktiver-Tab-Ableitung prototypisch an EINEN Wert hängen und gegen Breadcrumb/Context-Panel/Status-Bar/Navigationsverlauf/Auto-Reveal gegenprüfen
-  - [ ] 0.3 Canvas/Graph/Plugin-File-View (TextFileView) in einem schmalen Split testen (Fullscreen-Annahmen, Resize-Observer)
-  - [ ] 0.4 Plugin-Sidebar-Views gegen „geraten nicht in den Editor-Pane-Baum" absichern
-  - [ ] 0.5 Modifikator für „in Split öffnen" gegen bestehende Shortcuts/Browser-Reservierungen festlegen
-  - [ ] 0.6 Erkenntnisse ins Design-Dokument zurückschreiben (offene Fragen 1–5 schließen), DANN Phase 1 beginnen
+  - [x] 0.1 Zustandsform entscheiden: Pane-gebundener `TabProvider` vs. globaler Baum-Reducer mit Selektoren (Re-Render-Kosten gegen bestehende `useTabContext()`-Aufrufmenge) — ENTSCHIEDEN: Pane-gebundener `TabProvider` (Design-Befunde #1)
+  - [x] 0.2 Aktiver-Tab-Ableitung prototypisch an EINEN Wert hängen und gegen Breadcrumb/Context-Panel/Status-Bar/Navigationsverlauf/Auto-Reveal gegenprüfen — BESTÄTIGT: heute ein Pfad über `tabState.activeTabId` (Design-Befund #3)
+  - [x] 0.3 Canvas/Graph/Plugin-File-View (TextFileView) in einem schmalen Split testen (Fullscreen-Annahmen, Resize-Observer) — container-relativ, Prüfpunkt in Phase 2 (Design-Befund #4)
+  - [x] 0.4 Plugin-Sidebar-Views gegen „geraten nicht in den Editor-Pane-Baum" absichern — Sidebar-Views bleiben eigene Layout-Schicht (Design-Befund #4/Requirement 7.5)
+  - [x] 0.5 Modifikator für „in Split öffnen" gegen bestehende Shortcuts/Browser-Reservierungen festlegen — Ctrl/Cmd+Alt+Klick (Design-Befund #2)
+  - [x] 0.6 Erkenntnisse ins Design-Dokument zurückschreiben (offene Fragen 1–5 schließen), DANN Phase 1 beginnen — Abschnitt „Phase-0-Befunde" im Design
   - _Requirements: Risiko & verbindliche Vorarbeit_
 
-- [ ] 1. Pane-Baum: Datenmodell + Reducer
-  - [ ] 1.1 `frontend/src/state/paneTreeState.ts` — `PaneNode`/`SplitNode`/`PaneTree`-Typen, Start = ein `PaneNode`
-  - [ ] 1.2 Reducer-Aktionen: `SPLIT_PANE`, `CLOSE_PANE`, `FOCUS_PANE`, `MOVE_TAB_TO_PANE`, `RESIZE_SPLIT`, `COLLAPSE_EMPTY_PANE`; Tab-Aktionen an den vorhandenen `tabReducer` je Pane delegieren
-  - [ ] 1.3 Kollaps-Logik: letzter Tab → Pane weg + Split kollabiert; letzter Pane bleibt leer
-  - [ ] 1.4 Größen als Verhältnisse (Summe 1), Mindestgröße, Normalisierung
-  - [ ] 1.5 `frontend/src/state/paneTreeContext.ts` — `PaneTreeProvider` + `usePaneTree` + abgeleiteter aktiver Tab
-  - [ ] 1.6 `frontend/src/state/paneTreeState.test.ts` — splitten, kollabieren, Fokus, Tab verschieben, zweistufige Verschachtelung, Größen-Normalisierung
+- [x] 1. Pane-Baum: Datenmodell + Reducer
+  - [x] 1.1 `frontend/src/state/paneTreeState.ts` — `PaneNode`/`SplitNode`/`PaneTree`-Typen, Start = ein `PaneNode`
+  - [x] 1.2 Reducer-Aktionen: `SPLIT_PANE`, `CLOSE_PANE`, `FOCUS_PANE`, `RESIZE_SPLIT`, `PANE_TAB_ACTION` (delegiert an den vorhandenen `tabReducer` je Pane); `MOVE_TAB_TO_PANE`/`COLLAPSE_EMPTY_PANE` folgen in Phase 3 (Kollaps ist bereits in `PANE_TAB_ACTION`/`CLOSE_PANE` eingebaut)
+  - [x] 1.3 Kollaps-Logik: letzter Tab → Pane weg + Split kollabiert; letzter Pane bleibt leer
+  - [x] 1.4 Größen als Verhältnisse (Summe 1), Mindestgröße (`MIN_PANE_RATIO`), Normalisierung
+  - [x] 1.5 `frontend/src/state/paneTreeContext.ts` — `PaneTreeProvider` + `usePaneTree` + abgeleiteter aktiver Tab
+  - [x] 1.6 `frontend/src/state/paneTreeState.test.ts` — splitten, kollabieren, Fokus, Tab-Delegation, zweistufige Verschachtelung, Größen-Normalisierung, Purity (14 Tests)
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
 - [ ] 2. Rendering, Fokus, Resize
