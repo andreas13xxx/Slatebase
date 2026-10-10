@@ -8,11 +8,11 @@ Die vier eingefrorenen Entscheidungen (siehe `design.md`, „Resolved Decisions"
 
 ## Tasks
 
-- [ ] 1. Aktivitäts-Ereignis-Schicht (Store)
-  - [ ] 1.1 `backend/src/activity/types.ts` — `IActivityService`, `ActivityEvent`, `ActivityEventType`, `ActivityQuery`, `ActivityPage`
-  - [ ] 1.2 `backend/src/activity/activity-store.ts` — append-only JSONL pro Vault unter `.slatebase/activity/YYYY-MM-DD.jsonl` (täglich rotiert), `record(event)` mit 60-s-Coalescing für `note.edited` (D1), `query(...)` → `ActivityPage`, `purgeExpired(vaultId, retentionDays)`; append-sicher wie der Audit-Logger; fehlertolerant (R1.6)
-  - [ ] 1.3 `backend/src/activity/index.ts` — Barrel-Export
-  - [ ] 1.4 `backend/src/activity/activity-store.test.ts` — Coalescing-Fenster (öffnen/fortschreiben/ablaufen), Typ-/Zeitfilter, Pagination, Purge, `.slatebase/`-Pfade werden nie aufgezeichnet (R1.5), Write-Fehler verschluckt
+- [x] 1. Aktivitäts-Ereignis-Schicht (Store)
+  - [x] 1.1 `backend/src/activity/types.ts` — `IActivityService`, `ActivityEvent`, `ActivityEventType`, `ActivityQuery`, `ActivityPage`
+  - [x] 1.2 `backend/src/activity/activity-store.ts` — append-only JSONL pro Vault unter `.slatebase/activity/YYYY-MM-DD.jsonl` (täglich rotiert), `record(event)` mit 60-s-Coalescing für `note.edited` (D1), `query(...)` → `ActivityPage`, `purgeExpired(vaultId, retentionDays)`; append-sicher wie der Audit-Logger; fehlertolerant (R1.6)
+  - [x] 1.3 `backend/src/activity/index.ts` — Barrel-Export
+  - [x] 1.4 `backend/src/activity/activity-store.test.ts` — Coalescing-Fenster (öffnen/fortschreiben/ablaufen), Typ-/Zeitfilter, Pagination, Purge, `.slatebase/`-Pfade werden nie aufgezeichnet (R1.5), Write-Fehler verschluckt
   - _Requirements: 1.1, 1.4, 1.5, 1.6, 2.1, 2.2, 2.3, 2.4_
 
 - [ ] 2. Aufzeichnung verdrahten (REST + MCP, D3)
