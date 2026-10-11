@@ -65,9 +65,35 @@ describe('detectSlashTrigger', () => {
       expect(triggerAt(doc, doc.length)).toBeNull()
     })
 
-    it('does not fire inside inline math', () => {
-      const doc = '$x /y'
-      expect(triggerAt(doc, doc.length)).toBeNull()
+    it('does not fire inside a closed inline-math span', () => {
+      // Cursor between a real `$…$` pair: an opening `$` whose closing `$`
+      // is at or after the slash.
+      const doc = '$x + /y$'
+      const cursor = doc.indexOf('/y') + 2
+      expect(triggerAt(doc, cursor)).toBeNull()
+    })
+
+    it('fires after a lone literal `$` (price) — regression for #228 review', () => {
+      // A single literal `$` must not block the menu via naive $-parity.
+      const doc = 'costs $5, now type /'
+      const t = triggerAt(doc, doc.length)
+      expect(t).not.toBeNull()
+      expect(t?.query).toBe('')
+    })
+
+    it('fires after a lone literal `$` with a filter typed', () => {
+      const doc = '$PATH is set, /tab'
+      const t = triggerAt(doc, doc.length)
+      expect(t).not.toBeNull()
+      expect(t?.query).toBe('tab')
+    })
+
+    it('fires when the `$` opener is followed by a space (not math)', () => {
+      // Inline math opens tight (`$x$`); `$ ` is not an opener.
+      const doc = 'a $ b /head'
+      const t = triggerAt(doc, doc.length)
+      expect(t).not.toBeNull()
+      expect(t?.query).toBe('head')
     })
   })
 })

@@ -9,9 +9,11 @@
  *
  * The trigger deliberately does NOT fire inside code, wikilinks or math, so a
  * `/` in a path (`a/b`), a fenced block or a `[[link]]` stays literal text.
- * Code/math regions are detected via the Lezer syntax tree the editor already
- * parses; wikilink/inline-math are caught by a cheap same-line scan (they are
- * single-line constructs by Slatebase's own conventions).
+ * Code regions are detected via the Lezer syntax tree the editor already
+ * parses; wikilink/embed and inline `$…$` math are caught by a cheap same-line
+ * scan (they are single-line constructs by Slatebase's own conventions, and
+ * `@codemirror/lang-markdown` is wired without a math grammar, so the tree
+ * carries no math nodes to lean on).
  *
  * @module editor/slash/slash-trigger
  */
@@ -31,17 +33,17 @@ export interface SlashTriggerInfo {
 
 /**
  * Lezer Markdown node names whose interior must not trigger the slash menu.
- * `FencedCode`/`CodeBlock` cover fenced + indented code; `InlineCode` covers
- * backtick spans; `InlineMath`/`BlockMath` cover `$…$` / `$$…$$`.
+ * `FencedCode`/`CodeBlock` cover fenced + indented code; `InlineCode`/`CodeText`
+ * cover backtick spans. Math has no entry here: Slatebase wires
+ * `@codemirror/lang-markdown` without a math grammar (see editor/folding.ts),
+ * so no `InlineMath`/`BlockMath` nodes are ever produced — inline math is
+ * instead caught by the same-line `$…$` scan in `isInInlineConstruct`.
  */
 const SUPPRESSED_NODES = new Set([
   'FencedCode',
   'CodeBlock',
   'InlineCode',
   'CodeText',
-  'InlineMath',
-  'BlockMath',
-  'Math',
 ])
 
 /**
@@ -68,12 +70,20 @@ function isInInlineConstruct(lineText: string, chBeforeSlash: number): boolean {
     const closeAfter = lineText.indexOf(']]', lastOpenLink)
     if (closeAfter === -1 || closeAfter >= chBeforeSlash) return true
   }
-  // Odd number of `$` before the slash → inside inline math.
-  let dollars = 0
-  for (let i = 0; i < chBeforeSlash && i < lineText.length; i++) {
-    if (lineText[i] === '$') dollars++
+  // Inside an inline-math span `$…$`: the cursor sits after an opening `$`
+  // whose matching closing `$` is at or after the slash — a real pair the
+  // cursor is between. Mirrors the `[[…]]` pair logic above. A lone literal
+  // `$` (a price like `$5`, a shell var like `$PATH`) has no closing partner
+  // and must NOT block the menu, so raw $-parity is deliberately avoided.
+  // The opening `$` must hug a non-space, as inline math opens tight (`$x$`).
+  const openDollar = lineText.lastIndexOf('$', chBeforeSlash - 1)
+  if (openDollar !== -1) {
+    const afterOpen = lineText[openDollar + 1]
+    if (afterOpen !== undefined && afterOpen !== ' ') {
+      const closeDollar = lineText.indexOf('$', openDollar + 1)
+      if (closeDollar !== -1 && closeDollar >= chBeforeSlash) return true
+    }
   }
-  if (dollars % 2 === 1) return true
   return false
 }
 
