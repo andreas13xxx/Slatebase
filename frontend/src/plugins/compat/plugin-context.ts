@@ -63,6 +63,8 @@ import { getEditorSuggestManager, destroyEditorSuggestManager } from './editor-s
 import type { EditorSuggestInstance } from './editor-suggest-manager'
 import { createEditorSuggestExtension, isEditorSuggestExtensionRegistered, markEditorSuggestExtensionRegistered, resetEditorSuggestExtensionState } from './editor-suggest-extension'
 import { clearForPlugin as clearBasesViewsForPlugin, resetForVault as resetBasesViewsForVault } from './bases-view-registry'
+import { createSlashSuggestSource } from '../../editor/slash/slash-suggest-source'
+import type { SlashLocale } from '../../editor/slash/slash-command-i18n'
 import { registerMarkdownRendererGlobal } from './shims/markdown-renderer-shim'
 import { usePluginEventBridge } from './plugin-event-bridge'
 import { ViewRegistry } from './view-registry'
@@ -306,6 +308,9 @@ export function PluginProvider({
   const loadedRef = useRef(false)
   const mountedRef = useRef(true)
   const cancelScheduledLoadRef = useRef<(() => void) | null>(null)
+  // Current UI locale, read lazily by the slash-command suggest source so its
+  // labels follow a language change without re-registering the source.
+  const localeRef = useRef<SlashLocale>(locale === 'en' ? 'en' : 'de')
 
   // Shared shim instances per vault (used by all plugins and the event bridge)
   const workspaceShimRef = useRef<WorkspaceShim | null>(null)
@@ -371,6 +376,11 @@ export function PluginProvider({
       cancelScheduledLoadRef.current = null
     }
   }, [])
+
+  // Keep the locale ref current for the slash-command suggest source's labels.
+  useEffect(() => {
+    localeRef.current = locale === 'en' ? 'en' : 'de'
+  }, [locale])
 
   // ─── Vault Switch: unload all → rebuild instances → reload ───────────────
 
@@ -662,6 +672,25 @@ export function PluginProvider({
       getEditor: () => newWorkspaceShim.activeEditor?.editor ?? null,
       getActiveFile: () => newWorkspaceShim.getActiveFile(),
     })
+
+    // Register Slatebase's own slash-command (`/`) menu as an internal suggest
+    // source. Unlike plugin suggests, it must work with no plugin installed, so
+    // it is registered here at vault init and the shared CM6 suggest extension
+    // is ensured regardless of whether any plugin registered one.
+    const slashManager = getEditorSuggestManager()
+    if (slashManager) {
+      slashManager.register(
+        createSlashSuggestSource({
+          getActiveEditorView,
+          getCommandRegistry: () => commandRegistryRef.current,
+          getLocale: () => localeRef.current,
+        }),
+      )
+      if (!isEditorSuggestExtensionRegistered()) {
+        markEditorSuggestExtensionRegistered()
+        registerPluginExtension('__editor-suggest__', createEditorSuggestExtension())
+      }
+    }
 
     // Install the base obsidian namespace before the context-specific shims
     // below layer onto it. Idempotent — the PluginLoader calls it too.

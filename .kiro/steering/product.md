@@ -38,6 +38,7 @@ Obsidian-compatible vaults — no database, no sync service, no desktop app requ
 - Navigation history (back/forward with Alt+←/→), Quick Switcher (Ctrl+O), tab cycling (Ctrl+Shift+]/[), breadcrumb bar, File Explorer "follow active file"
 - Split panes (split the editor into a nestable pane tree — "Split right"/"Split down" commands, edge-drop split, cross-pane tab drag, keyboard-operable resize; layout persisted per vault with migration from the legacy flat tab row; plugin split APIs — `createLeafBySplit`/`splitActiveLeaf`/`getLeaf('split')` — create real panes)
 - Command Palette (Ctrl+P, 40+ built-in commands; plugin commands when compat is enabled)
+- Slash commands: in-editor `/` menu at the cursor (headings, lists, quote, code block, callout, table, horizontal rule, internal link, insert template, date/time), filtered by fuzzy match, delegating to the same core commands as the palette — triggers only at a line start / after whitespace, never inside code, wikilinks or math
 - Hover Preview (rendered Markdown popover on internal links, with inline-editable frontmatter properties), file-type icons in the explorer
 
 ### Multi-User & Realtime

@@ -85,6 +85,21 @@ When the Obsidian plugin compatibility feature is enabled, plugin commands also 
 
 ---
 
+## Slash Commands in the Editor
+
+Besides the global palette (`Ctrl+P`), the editor has an inline **slash menu**: type `/` at the start of a line (or after a space) and a small command menu opens right at your cursor.
+
+- **Trigger:** `/` at the line start or after whitespace. A slash inside a word, a path (`a/b`), a code block, a wikilink or math stays literal text.
+- **Filter:** keep typing to narrow the list (same fuzzy match as the palette).
+- **Choose:** `↑` / `↓` to move, `Enter` or `Tab` to confirm, `Escape` to cancel, or click an entry.
+- **Result:** the typed `/…` text is removed and the command runs at the cursor.
+
+Available entries include: headings H1–H3, bullet / numbered / task lists, quote, code block, callout, table, horizontal rule, internal link, insert template, insert date, insert time. The actions are the same core commands the palette runs, so the two never drift apart.
+
+> [!tip] Palette vs. slash menu
+> Use `Ctrl+P` to reach *any* action from anywhere; use `/` in the editor for quick *insert/format* actions without leaving the keyboard or the cursor position.
+
+---
 ## Related Features
 
 - [[Advanced/Custom Keybindings]] — Configure keyboard shortcuts
