@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.49.0](https://github.com/andreas13xxx/Slatebase/compare/v0.48.1...v0.49.0) (2026-10-11)
+
+
+### Features
+
+* Split Panes — nestable editor pane tree ([#225](https://github.com/andreas13xxx/Slatebase/issues/225)) ([4755b56](https://github.com/andreas13xxx/Slatebase/commit/4755b5696166d752128ca8aa0b7f5204c3631d37))
+
 ## [0.48.1](https://github.com/andreas13xxx/Slatebase/compare/v0.48.0...v0.48.1) (2026-10-11)
 
 
