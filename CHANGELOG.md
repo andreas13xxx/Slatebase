@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.48.1](https://github.com/andreas13xxx/Slatebase/compare/v0.48.0...v0.48.1) (2026-10-11)
+
+
+### Sonstige Änderungen
+
+* **specs:** add Split Panes and Slash Commands specs ([#224](https://github.com/andreas13xxx/Slatebase/issues/224)) ([9deb98d](https://github.com/andreas13xxx/Slatebase/commit/9deb98d0e0bca12f687d222767d8fbc339043782))
+
 ## [0.48.0](https://github.com/andreas13xxx/Slatebase/compare/v0.47.0...v0.48.0) (2026-10-10)
 
 
