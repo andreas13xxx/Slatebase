@@ -86,6 +86,15 @@ Frontmatter-Felder der aktuellen Datei als Schlüssel-Wert-Tabelle:
 - Read-only Ansicht (Bearbeitung im Editor)
 - Listen werden kommasepariert angezeigt
 
+### Fußnoten
+
+Listet alle Fußnoten der aktuellen Datei:
+
+- Jeder Eintrag zeigt die Nummer, einen Vorschautext der Definition und — bei mehrfach verwendeten Fußnoten — wie oft sie referenziert wird
+- Die Nummerierung folgt der Reihenfolge, in der die Fußnoten im Text **referenziert** werden (nicht der Reihenfolge der Definitionen), genau wie in der gerenderten Fußnotenliste am Ende der Notiz
+- Eine Definition, auf die nichts verweist, wird trotzdem gelistet und als „nicht referenziert" markiert — so geht keine Fußnote verloren
+- Klick auf einen Eintrag springt zur ersten Verwendungsstelle im Text, ohne dass du deinen Platz in einer langen Notiz verlierst
+
 ---
 
 ## Splits (Mehrere Abschnitte)
@@ -137,6 +146,9 @@ Klicke auf eine Überschrift in der Outline — der Viewer scrollt zur entsprech
 > Die Split-Ansicht ist ideal für die Kombination:
 > - **Outline + Backlinks** — Wo bin ich + Wer verweist auf mich?
 > - **Forward-Links + Tags** — Wohin verlinke ich + Wie ist diese Datei kategorisiert?
+
+> [!tip] Properties in der Link-Vorschau bearbeiten
+> Wenn du mit der Maus über einen Wikilink fährst, erscheint eine Vorschau der Zielnotiz. Deren Frontmatter-Properties sind dort direkt bearbeitbar — Wert ändern, Property hinzufügen oder entfernen — ohne die Datei öffnen zu müssen. Die Änderung wird sofort in der Zieldatei gespeichert.
 
 > [!todo] Übung
 > 1. Öffne das Context Panel (rechte Seite)

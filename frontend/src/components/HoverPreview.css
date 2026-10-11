@@ -27,6 +27,21 @@
   margin-bottom: 0;
 }
 
+/* Editable frontmatter block at the top of the preview (Obsidian 1.9.10
+   parity: property editor inside page preview). */
+.hover-preview__properties {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle, #e5e5e5);
+}
+
+.hover-preview__properties:empty {
+  display: none;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
 /* Headings inside a preview should not dwarf the surrounding text. */
 .hover-preview__content h1,
 .hover-preview__content h2,

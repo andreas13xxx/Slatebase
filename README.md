@@ -201,7 +201,7 @@ oversight — but it means:
 | 🤖 **MCP Context Server** | AI assistants (Claude, Cursor, etc.) read and write your vaults via MCP |
 | 🎨 **Canvas** | Open and edit Obsidian `.canvas` whiteboards: text, file, link, and group nodes with edges, drag, resize, zoom/pan, minimap, file-path search, and auto-save |
 | 🕸️ **Knowledge Graph** | Interactive visualization of vault link structure with zoom, pan, drag, and search |
-| 📑 **Context Panel** | Right-side panel with document outline, forward/backlinks, unlinked mentions, tags, and typed frontmatter properties |
+| 📑 **Context Panel** | Right-side panel with document outline, forward/backlinks, unlinked mentions, tags, a footnotes list, and typed frontmatter properties — properties are also editable inline in the link hover preview |
 | 🧮 **Bases** ⚠️ | Obsidian-compatible `.base` files as filterable, sortable, editable views over your notes' metadata — a table and a cards/Kanban board (grouped, collapsible columns), AND/OR filters, read-only formula columns, inline cell editing. Experimental, off by default (`bases` toggle) |
 | 🔖 **Bookmarks** | Bookmark files, headings, blocks, or saved searches — reorder by drag and drop, rename, and bookmark all open tabs at once |
 | 📟 **Status Bar** | Clock, vault name, word/character count, and cursor position with click-to-"go to line" — each item toggleable |

@@ -390,13 +390,13 @@ describe('LinkIndexService (extended v2)', () => {
       expect(result).toEqual(['foo', 'bar', 'baz'])
     })
 
-    it('extracts tags from "tag" property (singular)', () => {
+    it('ignores the singular "tag" property (Obsidian 1.9.10 removed it)', () => {
       const properties = { tag: ['single'] }
       const result = extractFrontmatterTags(properties)
-      expect(result).toEqual(['single'])
+      expect(result).toEqual([])
     })
 
-    it('prefers "tags" over "tag" when both present', () => {
+    it('reads only "tags", ignoring a legacy "tag" alongside it', () => {
       const properties = { tags: ['from-tags'], tag: ['from-tag'] }
       const result = extractFrontmatterTags(properties)
       expect(result).toEqual(['from-tags'])
@@ -498,7 +498,7 @@ describe('LinkIndexService (extended v2)', () => {
       expect(tagEdges).toContainEqual({ source: 'a.md', target: 'tag:fm-only', type: 'tag' })
     })
 
-    it('handles "tag" singular property (Obsidian compat)', async () => {
+    it('ignores a singular "tag" property (Obsidian 1.9.10 removed it)', async () => {
       await fs.writeFile(
         path.join(tempDir, 'a.md'),
         '---\ntag: singular-tag\n---\n',
@@ -506,7 +506,7 @@ describe('LinkIndexService (extended v2)', () => {
       await service.rebuild()
 
       const meta = service.getGraphMeta()
-      expect(meta.tags).toContainEqual({ name: 'singular-tag', count: 1 })
+      expect(meta.tags.find((t) => t.name === 'singular-tag')).toBeUndefined()
     })
 
     it('strips # prefix from frontmatter tags', async () => {
