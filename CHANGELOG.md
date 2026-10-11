@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.50.0](https://github.com/andreas13xxx/Slatebase/compare/v0.49.0...v0.50.0) (2026-10-11)
+
+
+### Features
+
+* in-editor slash command menu ([#228](https://github.com/andreas13xxx/Slatebase/issues/228)) ([25668c2](https://github.com/andreas13xxx/Slatebase/commit/25668c26817c71438fc2ef07318b30730aa598de))
+
 ## [0.49.0](https://github.com/andreas13xxx/Slatebase/compare/v0.48.1...v0.49.0) (2026-10-11)
 
 
