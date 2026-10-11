@@ -191,7 +191,7 @@ oversight — but it means:
 | ✅ **Spellchecker** | Built in, with corrections — not the browser's. Unknown words are underlined; right-click offers suggestions, "add to dictionary", and "ignore for this session". German and English dictionaries, switchable per editor; German compounds are resolved by splitting |
 | 🎙️ **Voice Dictation** ⚠️ | Record in the browser and transcribe to text at the cursor via a self-hosted Whisper backend — multilingual, optional audio attachment. Experimental, off by default (`voice-transcription` toggle); the Whisper backend is operator-provided |
 | 👁️ **Markdown Viewer** | Rendered view with GFM, syntax highlighting, frontmatter, collapsible headings, and colored `==highlights==` (yellow + 🔴🟠🟢🔵🟣, with `==` autocomplete) |
-| 🗂️ **Tabs & Navigation** | Open multiple files simultaneously with unsaved indicators; browser-like back/forward history, fuzzy Quick Switcher (Ctrl+O), Ctrl+Shift+]/[ tab cycling, and a clickable folder breadcrumb |
+| 🗂️ **Tabs & Navigation** | Open multiple files simultaneously with unsaved indicators; split the editor into resizable panes (side-by-side or stacked, drag tabs between them); browser-like back/forward history, fuzzy Quick Switcher (Ctrl+O), Ctrl+Shift+]/[ tab cycling, and a clickable folder breadcrumb |
 | 👥 **Multi-User & Sharing** | Invite others to your vaults with read or write access, transfer ownership |
 | 💬 **Real-time Chat** | Messaging between users with unread badges, archiving, and pagination |
 | 🔒 **Authentication** | Session-based auth with argon2id hashing, CSRF protection, rate limiting |
@@ -201,7 +201,7 @@ oversight — but it means:
 | 🤖 **MCP Context Server** | AI assistants (Claude, Cursor, etc.) read and write your vaults via MCP |
 | 🎨 **Canvas** | Open and edit Obsidian `.canvas` whiteboards: text, file, link, and group nodes with edges, drag, resize, zoom/pan, minimap, file-path search, and auto-save |
 | 🕸️ **Knowledge Graph** | Interactive visualization of vault link structure with zoom, pan, drag, and search |
-| 📑 **Context Panel** | Right-side panel with document outline, forward/backlinks, unlinked mentions, tags, and typed frontmatter properties |
+| 📑 **Context Panel** | Right-side panel with document outline, forward/backlinks, unlinked mentions, tags, a footnotes list, and typed frontmatter properties — properties are also editable inline in the link hover preview |
 | 🧮 **Bases** ⚠️ | Obsidian-compatible `.base` files as filterable, sortable, editable views over your notes' metadata — a table and a cards/Kanban board (grouped, collapsible columns), AND/OR filters, read-only formula columns, inline cell editing. Experimental, off by default (`bases` toggle) |
 | 🔖 **Bookmarks** | Bookmark files, headings, blocks, or saved searches — reorder by drag and drop, rename, and bookmark all open tabs at once |
 | 📟 **Status Bar** | Clock, vault name, word/character count, and cursor position with click-to-"go to line" — each item toggleable |

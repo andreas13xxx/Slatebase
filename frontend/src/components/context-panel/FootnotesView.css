@@ -1,0 +1,100 @@
+/* ===== Footnotes View ===== */
+
+.footnotes-view {
+  padding: 0.5rem;
+  overflow-y: auto;
+}
+
+.footnotes-view--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+}
+
+.footnotes-view__placeholder {
+  font-size: 0.8125rem;
+  color: var(--right-panel-text-muted);
+  font-style: italic;
+  margin: 0;
+  padding: 0.5rem;
+  text-align: center;
+}
+
+.footnotes-view__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.footnotes-view__item {
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.footnotes-view__button {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--right-panel-text);
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.footnotes-view__button:hover {
+  background: var(--sidebar-hover);
+}
+
+.footnotes-view__button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.footnotes-view__number {
+  flex-shrink: 0;
+  min-width: 1.25rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--accent-text);
+  text-align: right;
+}
+
+.footnotes-view__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.footnotes-view__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--right-panel-text);
+}
+
+.footnotes-view__badge {
+  align-self: flex-start;
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--sidebar-active);
+  color: var(--right-panel-text-muted);
+}
+
+.footnotes-view__badge--orphan {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  color: var(--danger);
+}

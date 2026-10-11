@@ -28,6 +28,7 @@ import {
   loadDocumentTags,
   expandTag,
 } from './documentPanelActions'
+import { extractFootnotes, type FootnoteEntry } from '../components/context-panel/utils/extractFootnotes'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -107,6 +108,8 @@ export interface DocumentPanelState {
     /** Path `documentTags` was parsed from, so the overlay edits the right file. */
     documentTagsPath: string | null
   }
+  /** Footnotes of the active document, parsed live from the editor buffer. */
+  footnotes: FootnoteEntry[]
 }
 
 export type DocumentPanelAction =
@@ -123,6 +126,7 @@ export type DocumentPanelAction =
   | { type: 'SET_TAGS_LOADING'; loading: boolean }
   | { type: 'SET_TAG_EXPANDED'; tag: string | null; files: string[] }
   | { type: 'SET_DOCUMENT_TAGS'; path: string | null; tags: string[] | null }
+  | { type: 'SET_FOOTNOTES'; footnotes: FootnoteEntry[] }
   | { type: 'RESET_DOCUMENT_STATE' }
 
 /** Order-insensitive comparison, so a re-parse that found nothing new is a no-op. */
@@ -208,6 +212,7 @@ function createInitialState(): DocumentPanelState {
       unlinkedMentionsError: null,
     },
     tags: { entries: [], loading: false, expandedTag: null, tagFiles: [], documentTags: null, documentTagsPath: null },
+    footnotes: [],
   }
 }
 
@@ -263,6 +268,8 @@ function documentPanelReducer(state: DocumentPanelState, action: DocumentPanelAc
       if (unchanged) return state
       return { ...state, tags: { ...state.tags, documentTags: action.tags, documentTagsPath: action.path } }
     }
+    case 'SET_FOOTNOTES':
+      return { ...state, footnotes: action.footnotes }
     case 'RESET_DOCUMENT_STATE':
       return {
         ...state,
@@ -277,6 +284,7 @@ function documentPanelReducer(state: DocumentPanelState, action: DocumentPanelAc
           unlinkedMentionsError: null,
         },
         tags: { ...state.tags, expandedTag: null, tagFiles: [], documentTags: null, documentTagsPath: null },
+        footnotes: [],
       }
   }
 }
@@ -332,6 +340,7 @@ export function useDocumentPanelData({
         loadOutline(dispatch, documentContent)
         loadForwardLinks(dispatch, documentContent, directoryTree, documentPath ?? undefined)
         loadDocumentTags(dispatch, documentPath, documentContent)
+        dispatch({ type: 'SET_FOOTNOTES', footnotes: extractFootnotes(documentContent) })
       }
 
       if (documentPath !== null && vaultId !== null && apiClient) {
@@ -365,6 +374,7 @@ export function useDocumentPanelData({
       loadOutline(dispatch, documentContent)
       loadForwardLinks(dispatch, documentContent, directoryTree, documentPath ?? undefined)
       loadDocumentTags(dispatch, documentPath, documentContent)
+      dispatch({ type: 'SET_FOOTNOTES', footnotes: extractFootnotes(documentContent) })
       debounceTimerRef.current = null
     }, CONTENT_DEBOUNCE_MS)
 

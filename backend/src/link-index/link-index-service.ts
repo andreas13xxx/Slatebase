@@ -83,7 +83,10 @@ export function normalizeLinkPath(rawPath: string): string {
  * @returns Array of normalized tag names (without `#` prefix)
  */
 export function extractFrontmatterTags(properties: Record<string, string[]>): string[] {
-  const fmTags = properties['tags'] ?? properties['tag'] ?? []
+  // Obsidian 1.9.10 removed support for the singular `tag` property: only the
+  // list-valued `tags` is recognized now. Matching that keeps Slatebase's index
+  // in step with how current Obsidian reads the same vault.
+  const fmTags = properties['tags'] ?? []
   const result: string[] = []
 
   for (const raw of fmTags) {

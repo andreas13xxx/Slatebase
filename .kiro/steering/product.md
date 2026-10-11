@@ -29,16 +29,17 @@ Obsidian-compatible vaults — no database, no sync service, no desktop app requ
 ### Navigation & Discovery
 - Search & Replace (regex, context lines, multi-vault, atomic writes) with search operators `path:`/`file:`/`tag:`/`property:`, negation, quoted values, syntax highlighting and autocomplete
 - Knowledge Graph (d3-force SVG, zoom/pan/drag/search, configurable colors/layout, tag + property nodes) plus a per-note Local Graph filtered to a configurable N-hop neighborhood
-- Context Panel (Outline, Links incl. Unlinked Mentions with one-click linking, Tags, Properties — splittable, DnD)
+- Context Panel (Outline, Links incl. Unlinked Mentions with one-click linking, Tags, Properties, Footnotes list — splittable, DnD)
 - Properties editor: typed frontmatter editing (text/number/date/datetime/checkbox/list/tags) with type inference and a per-vault Property-Type-Registry
 - Bases ⚠️ experimental (feature toggle `bases`, cold/default-off): Obsidian-compatible `.base` files as filterable, sortable, editable views over the vault's metadata — a table view (inline cell editing) and a cards/Kanban view (notes grouped into collapsible columns by a `groupBy` property, read-only cards), AND/OR filters on properties/tags/path/file-metadata, read-only formula columns (own CSP-safe interpreter, not the full Obsidian formula language), inline cell editing writing back to each note's frontmatter, raw-YAML source view. Third-party plugins can contribute their own Bases view types via `Plugin.registerBasesView()` (the Bases plugin API is functional — the plugin's view is mounted and fed the same query data as the built-in views). Card drag-between-columns and the full formula language are later stages
 - Sidebar Panel (Recent Files + Bookmarks views, splittable, tabbed)
 - Activity Timeline ⚠️ experimental (feature toggle `activity-timeline`, cold/default-off): a chronological per-vault log of note create/edit/delete/move/restore, recorded as a side effect of every vault mutation (REST and MCP write paths), coalescing rapid edits into one entry; viewable as a full tab or a compact side-panel view, grouped into time buckets, filterable by type, live-refreshed on `vault:change`, with per-vault retention pruned by the existing cleanup job
 - Bookmarks for files, headings, blocks and saved searches — drag-and-drop reordering, context menu, custom labels
 - Navigation history (back/forward with Alt+←/→), Quick Switcher (Ctrl+O), tab cycling (Ctrl+Shift+]/[), breadcrumb bar, File Explorer "follow active file"
+- Split panes (split the editor into a nestable pane tree — "Split right"/"Split down" commands, edge-drop split, cross-pane tab drag, keyboard-operable resize; layout persisted per vault with migration from the legacy flat tab row; plugin split APIs — `createLeafBySplit`/`splitActiveLeaf`/`getLeaf('split')` — create real panes)
 - Command Palette (Ctrl+P, 40+ built-in commands; plugin commands when compat is enabled)
 - Slash commands: in-editor `/` menu at the cursor (headings, lists, quote, code block, callout, table, horizontal rule, internal link, insert template, date/time), filtered by fuzzy match, delegating to the same core commands as the palette — triggers only at a line start / after whitespace, never inside code, wikilinks or math
-- Hover Preview (rendered Markdown popover on internal links), file-type icons in the explorer
+- Hover Preview (rendered Markdown popover on internal links, with inline-editable frontmatter properties), file-type icons in the explorer
 
 ### Multi-User & Realtime
 - Authentication (opaque tokens, argon2id, CSRF, sliding sessions, rate limiting). Only a server 401 ends a session — an unreachable backend is retried

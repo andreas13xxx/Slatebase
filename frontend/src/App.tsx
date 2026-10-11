@@ -3,6 +3,11 @@ import { AppProvider, useAppContext, loadVaults, importFile, importFolder, expor
 import { ApiClient } from './api'
 import { AuthProvider, useAuthContext } from './state/authContext'
 import { TabProvider, useTabContext } from './state/tabContext'
+import { PaneTreeProvider, usePaneTree } from './state/paneTreeContext'
+import { PaneTabProvider } from './state/paneTabContext'
+import { PaneTreeView } from './components/panes/PaneTreeView'
+import type { SplitDirection } from './state/paneTreeState'
+import { onRequestPaneSplit, offRequestPaneSplit } from './plugins/compat/pane-split-bridge'
 import { NavigationHistoryProvider, useNavigationHistory } from './state/navigationHistoryContext'
 import { FeatureProvider, useFeatureContext } from './state/featureContext'
 import { SearchProvider } from './state/searchContext'
@@ -94,7 +99,7 @@ import { Breadcrumb } from './components/Breadcrumb'
 import { useResize } from './hooks/useResize'
 import { useStatusBar } from './hooks/useStatusBar'
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts'
-import { useWorkspaceRestore, LAST_VAULT_KEY } from './hooks/useWorkspaceRestore'
+import { useWorkspaceRestore, LAST_VAULT_KEY, getInitialPaneTree } from './hooks/useWorkspaceRestore'
 import { initialize as initializeWorkspace, getState as getWorkspaceState, clear as clearWorkspace } from './state/workspaceStore'
 import { requestReveal } from './state/revealFileBridge'
 import {
@@ -113,6 +118,11 @@ const dailyNoteService = createDailyNoteService(apiClient)
 // Synchronous workspace state restore from localStorage — must run before
 // any component reads getWorkspaceState() in their useState initializers.
 initializeWorkspace()
+
+// Compute the restored/migrated pane-tree layout once, synchronously, so
+// PaneTreeProvider is seeded with it before the first render (no post-mount
+// patching). null = nothing persisted → PaneTreeProvider's fresh single pane.
+const restoredPaneTree = getInitialPaneTree()
 
 /** Available navigation pages in the app (opened as tabs in the main content area). */
 export type AppPage =
@@ -187,6 +197,7 @@ function AppContent() {
   const { state, dispatch } = useAppContext()
   const { authState, authDispatch } = useAuthContext()
   const { tabState, tabDispatch } = useTabContext()
+  const { paneTree, paneTreeDispatch } = usePaneTree()
   const { isEnabled } = useFeatureContext()
   const { state: leftPanelState, dispatch: leftPanelDispatch } = useLeftPanelContext()
   const { state: rightPanelState, dispatch: rightPanelDispatch } = useRightPanelContext()
@@ -361,7 +372,8 @@ function AppContent() {
     dispatch,
     tabs: tabState.tabs,
     activeTabId: tabState.activeTabId,
-    tabDispatch,
+    paneTree,
+    paneTreeDispatch,
     activeSettingsPage,
     showSidebar,
     showRightPanel,
@@ -873,11 +885,13 @@ function AppContent() {
     outline: documentPanelData.state.outline,
     links: documentPanelData.state.links,
     tags: documentPanelData.state.tags,
+    footnotes: documentPanelData.state.footnotes,
     hasDocument: documentContent !== null,
     onHeadingClick: documentPanelData.onHeadingClick,
     onLinkClick: handleLinkClick,
     onTagClick: documentPanelData.onTagClick,
     onFileClick: handleFileClick,
+    onFootnoteClick: documentPanelData.onHeadingClick,
     onLinkMention: handleLinkMention,
   }
 
@@ -939,6 +953,40 @@ function AppContent() {
     if (!showSidebar) setShowSidebar(true)
     requestReveal(folderPath, 'folder')
   }, [showSidebar])
+
+  // ── Split Panes: id generation + cross-pane tab move ──
+  // Stable unique pane ids for splits (edge-drop and the split commands).
+  const generatePaneId = useCallback(
+    () => `pane-${(crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)).slice(0, 8)}`,
+    [],
+  )
+  const handleMoveTabToPane = useCallback(
+    (fromPaneId: string, toPaneId: string, tabId: string, toIndex?: number) => {
+      paneTreeDispatch({ type: 'MOVE_TAB_TO_PANE', payload: { fromPaneId, toPaneId, tabId, toIndex } })
+    },
+    [paneTreeDispatch],
+  )
+
+  // Plugin workspace-shim splits (createLeafBySplit / splitActiveLeaf /
+  // getLeaf('split')) request a real pane split through the module-level
+  // pane-split bridge. We split the ACTIVE pane; SPLIT_PANE makes the new empty
+  // pane active, so the plugin's subsequent setViewState routes its view into
+  // it via the useTabContext bridge. The active pane id is read from a ref so
+  // the subscription mounts once and never captures a stale value.
+  const activePaneIdRef = useRef(paneTree.activePaneId)
+  useEffect(() => {
+    activePaneIdRef.current = paneTree.activePaneId
+  }, [paneTree.activePaneId])
+  useEffect(() => {
+    const handleSplit = (direction: SplitDirection) => {
+      paneTreeDispatch({
+        type: 'SPLIT_PANE',
+        payload: { paneId: activePaneIdRef.current, direction, newPaneId: generatePaneId() },
+      })
+    }
+    onRequestPaneSplit(handleSplit)
+    return () => { offRequestPaneSplit(handleSplit) }
+  }, [paneTreeDispatch, generatePaneId])
 
   const settingsTabs: SettingsTabDescriptor[] = openSettingsPages.map((page) => {
     const isActive = isShowingSettings && page === activeSettingsPage
@@ -1216,7 +1264,9 @@ function AppContent() {
           {/* workspace-tab-container: Obsidian-parity marker class — see mod-vertical/mod-root
               note above. Some plugins requestFullscreen() this element by selector. */}
           <section className="app-content workspace-tab-container">
-            {/* Back/forward navigation history + unified tab bar (settings tabs + file tabs) in one row */}
+            {/* Back/forward navigation history + settings-page tab bar in one
+                row. File tabs now live INSIDE each pane (see renderPane below),
+                so this app-level bar carries only the settings-page tabs. */}
             <div className="tab-bar-row">
               <NavigationControls />
               <TabBar
@@ -1243,7 +1293,28 @@ function AppContent() {
                   />
                 )}
                 <ErrorBoundary>
-                  <TabContent />
+                  <PaneTreeView
+                    tree={paneTree}
+                    dispatch={paneTreeDispatch}
+                    resizeLabel={t('resize.adjustWidth')}
+                    generatePaneId={generatePaneId}
+                    renderPane={(pane) => (
+                      <PaneTabProvider paneId={pane.id}>
+                        {/* Each pane shows its OWN file-tab bar; a tab dragged
+                            onto another pane's bar (or a pane edge) moves there. */}
+                        <TabBar
+                          settingsTabs={[]}
+                          isShowingSettings={false}
+                          onActivateFileTab={() => setActiveSettingsPage(null)}
+                          paneId={pane.id}
+                          onMoveTabToPane={handleMoveTabToPane}
+                        />
+                        <ErrorBoundary>
+                          <TabContent />
+                        </ErrorBoundary>
+                      </PaneTabProvider>
+                    )}
+                  />
                 </ErrorBoundary>
               </>
             )}
@@ -1484,18 +1555,20 @@ function AuthGuard() {
       <RealtimeBridge>
         <AppProvider apiClient={apiClient}>
           <SearchProvider>
-            <TabProvider>
-              <NavigationHistoryProvider>
-                <LeftPanelProvider>
-                  <RightPanelProvider>
-                    <AppContent />
-                    {/* Inside AppProvider: the popover reads the vault and API
-                        client from AppContext to load the previewed note. */}
-                    <HoverPreview />
-                  </RightPanelProvider>
-                </LeftPanelProvider>
-              </NavigationHistoryProvider>
-            </TabProvider>
+            <PaneTreeProvider initialTree={restoredPaneTree ?? undefined}>
+              <TabProvider>
+                <NavigationHistoryProvider>
+                  <LeftPanelProvider>
+                    <RightPanelProvider>
+                      <AppContent />
+                      {/* Inside AppProvider: the popover reads the vault and API
+                          client from AppContext to load the previewed note. */}
+                      <HoverPreview />
+                    </RightPanelProvider>
+                  </LeftPanelProvider>
+                </NavigationHistoryProvider>
+              </TabProvider>
+            </PaneTreeProvider>
           </SearchProvider>
         </AppProvider>
       </RealtimeBridge>
