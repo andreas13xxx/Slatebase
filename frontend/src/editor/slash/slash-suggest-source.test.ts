@@ -126,5 +126,39 @@ describe('createSlashSuggestSource', () => {
       expect(executed).toEqual([])
       expect(dispatched.length).toBeGreaterThanOrEqual(1)
     })
+
+    it('still deletes the trigger + runs the command after close() nulled context (manager ordering, PR #228 regression)', () => {
+      // Reproduces EditorSuggestManager.confirmSelectionAt(): it calls close()
+      // — which nulls this.context — BEFORE selectSuggestion(). The source must
+      // delete the `/…` text and run the command from its OWN surviving snapshot,
+      // not from the (now-null) context. Previously this was a silent no-op.
+      const { source, executed, dispatched } = make()
+      const ctx = contextFor('tab', 0, 4) // "/tab" occupies ch 0..4
+      source.context = ctx
+      const items = source.getSuggestions(ctx) as unknown[] // captures the snapshot
+      const table = (items as Array<{ label: string }>).findIndex((i) => i.label === 'Tabelle')
+
+      // The manager closes the suggest (nulls context) before invoking select.
+      source.close()
+      expect(source.context).toBeNull()
+
+      source.selectSuggestion(items[table], new MouseEvent('click'))
+
+      // Despite the nulled context, the trigger text is deleted and the command runs.
+      expect(dispatched).toHaveLength(1)
+      expect(dispatched[0]).toMatchObject({ changes: { from: 0, to: 4, insert: '' } })
+      expect(executed).toEqual(['editor:insert-table'])
+    })
+
+    it('is a no-op if selectSuggestion runs before any getSuggestions snapshot and with no context', () => {
+      // Defensive: a fresh source has captured no snapshot and has no context →
+      // selecting dispatches nothing and runs no command.
+      const { source, executed, dispatched } = make()
+      expect(source.context).toBeNull()
+      const fakeItem = { command: { id: 'x', icon: 'x', commandId: 'editor:insert-table' }, label: 'Tabelle' }
+      source.selectSuggestion(fakeItem, new MouseEvent('click'))
+      expect(dispatched).toHaveLength(0)
+      expect(executed).toEqual([])
+    })
   })
 })

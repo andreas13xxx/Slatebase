@@ -50,6 +50,14 @@ interface SlashItem {
  * `EditorSuggestManager.register()`.
  */
 export function createSlashSuggestSource(deps: SlashSuggestDeps): EditorSuggestInstance {
+  // The manager calls close() — which nulls `this.context` — BEFORE it calls
+  // selectSuggestion(). So we cannot read the trigger range off `this.context`
+  // at selection time; it is already gone. Keep our own snapshot in this
+  // closure (the manager never touches our private fields) and clear it on
+  // close(). Captured in getSuggestions, which the manager calls on every
+  // (re-)trigger with the current context.
+  let triggerSnapshot: { editor: IEditor; start: EditorPosition; end: EditorPosition } | null = null
+
   return {
     context: null,
     limit: 20,
@@ -68,6 +76,10 @@ export function createSlashSuggestSource(deps: SlashSuggestDeps): EditorSuggestI
     },
 
     getSuggestions(context: EditorSuggestContext): SlashItem[] {
+      // Snapshot the trigger range so selectSuggestion can delete the `/…`
+      // text even after the manager has closed (and nulled this.context).
+      triggerSnapshot = { editor: context.editor, start: context.start, end: context.end }
+
       const registry = deps.getCommandRegistry()
       const locale = deps.getLocale()
       const query = context.query.trim()
@@ -97,6 +109,9 @@ export function createSlashSuggestSource(deps: SlashSuggestDeps): EditorSuggestI
 
     renderSuggestion(value: unknown, el: HTMLElement): void {
       const item = value as SlashItem
+      // Defensive: the shared popover clears rows before re-render today, but
+      // decouple from that assumption so a non-clearing host can't stack rows.
+      el.textContent = ''
       el.classList.add('slash-suggestion-item')
 
       const iconEl = document.createElement('span')
@@ -115,14 +130,19 @@ export function createSlashSuggestSource(deps: SlashSuggestDeps): EditorSuggestI
 
     selectSuggestion(value: unknown): void {
       const item = value as SlashItem
-      const ctx = this.context
       const view = deps.getActiveEditorView()
-      if (!ctx || !view) return
+      // Prefer our own snapshot: the manager has already nulled this.context
+      // by the time this runs (close() before selectSuggestion). Fall back to
+      // this.context for any caller that does NOT follow that ordering.
+      const range = triggerSnapshot ?? (this.context
+        ? { editor: this.context.editor, start: this.context.start, end: this.context.end }
+        : null)
+      if (!range || !view) return
 
       // Delete the typed `/…` trigger text FIRST, so the action runs at a
       // clean cursor rather than behind the leftover `/filter`.
-      const from = ctx.editor.posToOffset(ctx.start)
-      const to = ctx.editor.posToOffset(ctx.end)
+      const from = range.editor.posToOffset(range.start)
+      const to = range.editor.posToOffset(range.end)
       view.dispatch({
         changes: { from, to, insert: '' },
         selection: { anchor: from },
@@ -140,6 +160,10 @@ export function createSlashSuggestSource(deps: SlashSuggestDeps): EditorSuggestI
     // The manager drives open/close; these satisfy the interface and reset state.
     close(): void {
       this.context = null
+      // Deliberately do NOT clear triggerSnapshot here: the manager calls
+      // close() immediately BEFORE selectSuggestion(), which still needs the
+      // range. The snapshot is overwritten on the next trigger's getSuggestions,
+      // so it cannot leak into an unrelated later selection.
     },
     open(): void {
       // No-op: the manager renders via the shared popover.
