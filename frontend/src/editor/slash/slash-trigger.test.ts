@@ -95,5 +95,15 @@ describe('detectSlashTrigger', () => {
       expect(t).not.toBeNull()
       expect(t?.query).toBe('head')
     })
+
+    it('fires with two literal `$` straddling the slash — regression for #228 review', () => {
+      // `$5` opens tight but `$9`'s closer has a space before it, so it is not
+      // a real `$…$` pair — the slash menu must still open.
+      const doc = '$5 /tab $9'
+      const cursor = doc.indexOf('/tab') + 4
+      const t = triggerAt(doc, cursor)
+      expect(t).not.toBeNull()
+      expect(t?.query).toBe('tab')
+    })
   })
 })

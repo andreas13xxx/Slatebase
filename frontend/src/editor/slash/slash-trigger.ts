@@ -75,13 +75,18 @@ function isInInlineConstruct(lineText: string, chBeforeSlash: number): boolean {
   // cursor is between. Mirrors the `[[…]]` pair logic above. A lone literal
   // `$` (a price like `$5`, a shell var like `$PATH`) has no closing partner
   // and must NOT block the menu, so raw $-parity is deliberately avoided.
-  // The opening `$` must hug a non-space, as inline math opens tight (`$x$`).
+  // Both delimiters must hug a non-space on their inner side, as inline math
+  // is tight (`$x$`) — this also rejects two unrelated literal `$` straddling
+  // the slash (e.g. `$5 /tab $9`), where the later `$` has a space before it.
   const openDollar = lineText.lastIndexOf('$', chBeforeSlash - 1)
   if (openDollar !== -1) {
     const afterOpen = lineText[openDollar + 1]
     if (afterOpen !== undefined && afterOpen !== ' ') {
       const closeDollar = lineText.indexOf('$', openDollar + 1)
-      if (closeDollar !== -1 && closeDollar >= chBeforeSlash) return true
+      if (closeDollar !== -1 && closeDollar >= chBeforeSlash) {
+        const beforeClose = lineText[closeDollar - 1]
+        if (beforeClose !== undefined && beforeClose !== ' ') return true
+      }
     }
   }
   return false
