@@ -182,6 +182,10 @@ export const en: TranslationShape = {
     adjustWidth: 'Adjust width',
   },
 
+  splitPanes: {
+    noActiveTab: 'No active tab to split.',
+  },
+
   binaryViewer: {
     imageLoadError: 'The image "{name}" could not be loaded.',
     unsupported: 'File "{name}" ({type}) cannot be displayed.',

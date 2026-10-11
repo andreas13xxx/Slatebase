@@ -15,6 +15,7 @@
 
 import type { TabMode } from './tabState'
 import type { AppPage } from '../App'
+import { parsePersistedPaneTree, type PersistedPaneTree } from './paneTreeState'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -54,6 +55,14 @@ export interface WorkspaceState {
   selectedVaultId: string | null
   /** Whether the file explorer auto-reveals the active tab's file (Requirement 4). */
   explorerFollowActiveFile: boolean
+  /**
+   * Split-pane layout (Phase 4). Authoritative when present: the pane tree
+   * carries every pane's tabs and the active pane. Absent in state persisted
+   * before Split Panes existed — the restore path then migrates the flat
+   * `tabs`/`activeTabId` above into a single-pane tree. Content-free; tab
+   * content is re-fetched on restore.
+   */
+  paneTree?: PersistedPaneTree
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -168,6 +177,10 @@ function validateState(data: unknown): WorkspaceState | null {
     // Lenient (not strictly validated above): added after the initial schema, so
     // older persisted blobs won't have it — default to false rather than invalidating them.
     explorerFollowActiveFile: typeof obj.explorerFollowActiveFile === 'boolean' ? obj.explorerFollowActiveFile : false,
+    // Lenient: Split-Panes layout, absent in pre-Phase-4 blobs. parsePersistedPaneTree
+    // returns null for a missing/unusable tree; the restore path then migrates the
+    // flat tabs above. An unusable tree never invalidates the whole workspace state.
+    ...(parsePersistedPaneTree(obj.paneTree) ? { paneTree: parsePersistedPaneTree(obj.paneTree)! } : {}),
   }
 }
 
@@ -278,6 +291,17 @@ export function update(patch: Partial<Omit<WorkspaceState, 'version'>>): void {
  */
 export function updateTabs(tabs: PersistedTab[], activeTabId: string | null): void {
   currentState = { ...currentState, tabs, activeTabId, version: 1 }
+  notifySubscribers()
+  schedulePersist()
+}
+
+/**
+ * Update the persisted split-pane layout (convenience helper). Debounced like
+ * the others; the pane tree is content-free, so this is cheap to call on every
+ * layout/tab change.
+ */
+export function updatePaneTree(paneTree: PersistedPaneTree): void {
+  currentState = { ...currentState, paneTree, version: 1 }
   notifySubscribers()
   schedulePersist()
 }
