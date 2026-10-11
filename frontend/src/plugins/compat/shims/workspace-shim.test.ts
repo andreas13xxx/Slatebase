@@ -1018,7 +1018,7 @@ describe('WorkspaceShim', () => {
     });
 
     describe('createLeafBySplit()', () => {
-      it('should create a new leaf and log a debug notice about no split support', () => {
+      it('creates a leaf and logs the fallback notice when no pane host is mounted', () => {
         const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
         const existingLeaf = workspace.getLeaf(true);
         const newLeaf = workspace.createLeafBySplit(existingLeaf);
@@ -1027,7 +1027,7 @@ describe('WorkspaceShim', () => {
         expect(newLeaf.location).toBe('main');
         expect(newLeaf).not.toBe(existingLeaf);
         expect(debugSpy).toHaveBeenCalledWith(
-          '[WorkspaceShim] createLeafBySplit: Slatebase does not support split panes — created new tab instead.'
+          '[WorkspaceShim] createLeafBySplit: no pane host mounted — created a new tab instead.'
         );
 
         debugSpy.mockRestore();
@@ -1035,14 +1035,14 @@ describe('WorkspaceShim', () => {
     });
 
     describe('splitActiveLeaf()', () => {
-      it('should create a new leaf and log a debug notice about no split support', () => {
+      it('creates a leaf and logs the fallback notice when no pane host is mounted', () => {
         const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
         const leaf = workspace.splitActiveLeaf();
 
         expect(leaf).toBeDefined();
         expect(leaf.location).toBe('main');
         expect(debugSpy).toHaveBeenCalledWith(
-          '[WorkspaceShim] splitActiveLeaf: Slatebase does not support split panes — created new tab instead.'
+          '[WorkspaceShim] splitActiveLeaf: no pane host mounted — created a new tab instead.'
         );
 
         debugSpy.mockRestore();

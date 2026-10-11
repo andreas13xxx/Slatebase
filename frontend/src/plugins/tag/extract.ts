@@ -65,10 +65,11 @@ export function extractInlineTags(content: string): string[] {
 /**
  * Extracts the tag names a frontmatter block contributes.
  *
- * Obsidian treats the `tags` (and `tag`) property identically to an inline
- * `#tag`. Values may be a list or a single scalar, with or without a leading
- * `#`; a comma-separated scalar (`tags: a, b`) is split the way the inline
- * array form would be.
+ * Obsidian treats the `tags` property identically to an inline `#tag`. Values
+ * may be a list or a single scalar, with or without a leading `#`; a
+ * comma-separated scalar (`tags: a, b`) is split the way the inline array form
+ * would be. As of Obsidian 1.9.10 the singular `tag` property is no longer
+ * recognized — only `tags` — so this does not fall back to it.
  *
  * @param content - The full markdown document content
  * @returns Array of tag names (without `#` prefix)
@@ -77,7 +78,7 @@ export function extractFrontmatterTags(content: string): string[] {
   const { data } = parseFrontmatter(content)
   if (data === null) return []
 
-  const raw = data['tags'] ?? data['tag']
+  const raw = data['tags']
   if (raw === null || raw === undefined) return []
 
   const values = Array.isArray(raw) ? raw : [raw]

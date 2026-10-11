@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.49.0](https://github.com/andreas13xxx/Slatebase/compare/v0.48.1...v0.49.0) (2026-10-11)
+
+
+### Features
+
+* Split Panes — nestable editor pane tree ([#225](https://github.com/andreas13xxx/Slatebase/issues/225)) ([4755b56](https://github.com/andreas13xxx/Slatebase/commit/4755b5696166d752128ca8aa0b7f5204c3631d37))
+
+## [0.48.1](https://github.com/andreas13xxx/Slatebase/compare/v0.48.0...v0.48.1) (2026-10-11)
+
+
+### Sonstige Änderungen
+
+* **specs:** add Split Panes and Slash Commands specs ([#224](https://github.com/andreas13xxx/Slatebase/issues/224)) ([9deb98d](https://github.com/andreas13xxx/Slatebase/commit/9deb98d0e0bca12f687d222767d8fbc339043782))
+
+## [0.48.0](https://github.com/andreas13xxx/Slatebase/compare/v0.47.0...v0.48.0) (2026-10-10)
+
+
+### Features
+
+* Footnotes view, editable hover-preview properties, drop singular tag property ([#222](https://github.com/andreas13xxx/Slatebase/issues/222)) ([4123938](https://github.com/andreas13xxx/Slatebase/commit/41239385faae493f6dbbb8012e319a439279b0e2))
+
+## [0.47.0](https://github.com/andreas13xxx/Slatebase/compare/v0.46.0...v0.47.0) (2026-10-10)
+
+
+### Features
+
+* **activity:** Activity Timeline (per-vault event log, tab + sidebar) ([#220](https://github.com/andreas13xxx/Slatebase/issues/220)) ([0a1aa7f](https://github.com/andreas13xxx/Slatebase/commit/0a1aa7f5d6740be63c24426cdf98d6e536f0594c))
+
 ## [0.46.0](https://github.com/andreas13xxx/Slatebase/compare/v0.45.0...v0.46.0) (2026-10-10)
 
 

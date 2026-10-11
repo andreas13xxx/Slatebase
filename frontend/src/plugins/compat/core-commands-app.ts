@@ -99,6 +99,11 @@ export interface CoreAppCommandHandlers {
   onNavigateBack: () => void
   onNavigateForward: () => void
   onOpenQuickSwitcher: () => void
+  /**
+   * Split the active pane in a direction, moving the active tab into the new
+   * pane (Split Panes). A no-op when the active pane has no active tab.
+   */
+  onSplitPane: (direction: 'horizontal' | 'vertical') => void
   /** Current vault-search panel query/flags, for `bookmarks:bookmark-current-search`. */
   searchQuery: string
   searchCaseSensitive: boolean
@@ -687,8 +692,8 @@ function buildSpecs(): CoreAppCommandSpec[] {
     // and closed-tab history sit among them because they *do* have an equivalent.
     { id: 'workspace:new-tab', name: 'New tab', unsupported: 'blank-tab' },
     { id: 'workspace:toggle-pin', name: 'Toggle pin', run: toggleActiveTabPin },
-    { id: 'workspace:split-vertical', name: 'Split right', unsupported: 'tab-layout' },
-    { id: 'workspace:split-horizontal', name: 'Split down', unsupported: 'tab-layout' },
+    { id: 'workspace:split-vertical', name: 'Split right', run: (h) => h.onSplitPane('horizontal') },
+    { id: 'workspace:split-horizontal', name: 'Split down', run: (h) => h.onSplitPane('vertical') },
     { id: 'workspace:undo-close-pane', name: 'Undo close tab', run: (h) => { void undoCloseTab(h.tabDispatch, h.appDispatch, h.apiClient, h.tabState.closedTabsHistory) } },
     { id: 'workspace:move-to-new-window', name: 'Move current tab to new window', unsupported: 'native-windows' },
     { id: 'workspace:new-window', name: 'New window', unsupported: 'native-windows' },

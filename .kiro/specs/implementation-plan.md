@@ -16,7 +16,7 @@ Specs gebündelt statt einzeln spezifiziert.
 | 2 | Public Sharing | C | ~19–24h | Keine Spec |
 | 3 | Responsive/Mobile | F/G | ~24–34h | Vollständig (Req + Design + Tasks) |
 | 4 | Echte E2E-Test-Suite | F | ~30–45h | Req + Design vollständig |
-| 5 | Workspaces & Split-Panes | G | ~60–90h | Keine Spec — Nutzerwunsch |
+| 5 | Workspaces & Split-Panes | G | ~60–90h | Spec: `.kiro/specs/split-panes/` — Phasen 0–5 umgesetzt (Branch `feat/split-panes`); offen: Phase 7 (Doku teils erledigt) + zurückgestellte Keyboard-Pane-Fokus/„in Split öffnen" |
 | 6 | Bases | H | ~55–75h | Spec: `.kiro/specs/bases/` — Phasen 1–7 umgesetzt |
 | 7 | Server-Side Plugins | B | ~48–68h | Tasks vorhanden |
 | 8 | Fremdformat-Importer | I | ~20–30h | Keine Spec |
@@ -105,7 +105,7 @@ desto mehr profitieren die großen Features darunter von Regressionsschutz.
 
 ## Prio 5 — Workspaces & Split-Panes (Track G)
 
-Scope: ~60–90h. Keine Spec. **Nutzerwunsch.** Größter Architektur-Eingriff im Backlog.
+Scope: ~60–90h. Spec: `.kiro/specs/split-panes/` (+ `slash-commands/`). **Nutzerwunsch.** Größter Architektur-Eingriff im Backlog. **Phasen 0–5 umgesetzt** auf `feat/split-panes` (Pane-Baum-Reducer, Rendering/Resize, Splits + Tab-Drag + Kanten-Split, Persistenz/Migration, Plugin-Workspace-Shim). Offen: Phase 7 (Doku, teils erledigt) sowie bewusst zurückgestellt Keyboard-Pane-Fokus und „in Split öffnen" per Modifikator.
 
 - Pane-Baum statt einzelner Tab-Reihe: horizontale/vertikale Splits, verschachtelbar
 - Gespeicherte, benannte Workspace-Layouts + Workspace-Switcher

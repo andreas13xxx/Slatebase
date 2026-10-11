@@ -18,6 +18,18 @@ import {
   hoverLinkEventToRequest,
   getHoverLinkSources,
 } from '../hover-link-bus';
+import { requestPaneSplit } from '../pane-split-bridge';
+import type { SplitDirection } from '../../../state/paneTreeState';
+
+/**
+ * Map an Obsidian split direction (which names the DIVIDER) to our
+ * `SplitDirection` (which names the LAYOUT). Obsidian `'vertical'` = a vertical
+ * divider = panes side by side = our `'horizontal'`; Obsidian `'horizontal'` =
+ * stacked = our `'vertical'`.
+ */
+function obsidianToPaneDirection(direction: 'horizontal' | 'vertical'): SplitDirection {
+  return direction === 'vertical' ? 'horizontal' : 'vertical';
+}
 
 /**
  * Builds a `leftRibbon`/`rightRibbon` handle bound to Slatebase's toolbar.
@@ -504,7 +516,18 @@ export class WorkspaceShim implements IWorkspaceShim {
       return this.withEmptyView(this.viewRegistry!.createLeaf(this.app, 'main'));
     }
 
-    if (newLeaf === true) {
+    // getLeaf('split') — real split into a new pane. requestPaneSplit flips the
+    // active pane to a fresh empty one, so the leaf's subsequent setViewState
+    // (or the plugin opening a file into it) lands in that new pane via the
+    // useTabContext bridge. Obsidian's 'split' defaults to a side-by-side
+    // (vertical-divider) split → our 'horizontal' direction. Falls back to a
+    // plain new tab when no pane listener is mounted (requestPaneSplit → false).
+    if (newLeaf === 'split') {
+      requestPaneSplit('horizontal');
+      return this.withEmptyView(this.viewRegistry.createLeaf(this.app, 'main'));
+    }
+
+    if (newLeaf === true || newLeaf === 'tab' || newLeaf === 'window') {
       return this.withEmptyView(this.viewRegistry.createLeaf(this.app, 'main'));
     }
 
@@ -646,26 +669,41 @@ export class WorkspaceShim implements IWorkspaceShim {
   }
 
   /**
-   * Create a new leaf by splitting an existing leaf.
-   * Slatebase does not support split panes — creates a new tab instead.
+   * Create a new leaf by splitting an existing leaf into a REAL pane.
+   *
+   * `requestPaneSplit` flips the active pane to a fresh empty one; the leaf
+   * returned here then has its view opened into that new pane (the
+   * useTabContext bridge routes an opened tab to whichever pane is active).
+   * Obsidian's `direction` names the DIVIDER: `'vertical'` = side-by-side
+   * panes (a vertical divider) → our `'horizontal'`; `'horizontal'` = stacked
+   * panes → our `'vertical'`. Falls back to a plain new tab when no pane
+   * listener is mounted (`requestPaneSplit` returns false), preserving the
+   * pre-Phase-5 behaviour in tests and headless contexts.
    */
-  createLeafBySplit(_leaf: WorkspaceLeaf): WorkspaceLeaf {
-    debugOnce('WorkspaceShim.createLeafBySplit', '[WorkspaceShim] createLeafBySplit: Slatebase does not support split panes — created new tab instead.');
+  createLeafBySplit(_leaf: WorkspaceLeaf, direction: 'horizontal' | 'vertical' = 'vertical'): WorkspaceLeaf {
+    const split = requestPaneSplit(obsidianToPaneDirection(direction));
+    if (!split) {
+      debugOnce('WorkspaceShim.createLeafBySplit.fallback', '[WorkspaceShim] createLeafBySplit: no pane host mounted — created a new tab instead.');
+    }
     if (!this.viewRegistry) {
       return this.viewRegistry!.createLeaf(this.app, 'main');
     }
-    return this.viewRegistry.createLeaf(this.app, 'main');
+    return this.withEmptyView(this.viewRegistry.createLeaf(this.app, 'main'));
   }
 
   /**
-   * Split the active leaf. Slatebase does not support split panes — creates a new tab instead.
+   * Split the active leaf into a REAL pane (see `createLeafBySplit`). Obsidian
+   * defaults `splitActiveLeaf()` to a `'vertical'` divider (side-by-side).
    */
-  splitActiveLeaf(): WorkspaceLeaf {
-    debugOnce('WorkspaceShim.splitActiveLeaf', '[WorkspaceShim] splitActiveLeaf: Slatebase does not support split panes — created new tab instead.');
+  splitActiveLeaf(direction: 'horizontal' | 'vertical' = 'vertical'): WorkspaceLeaf {
+    const split = requestPaneSplit(obsidianToPaneDirection(direction));
+    if (!split) {
+      debugOnce('WorkspaceShim.splitActiveLeaf.fallback', '[WorkspaceShim] splitActiveLeaf: no pane host mounted — created a new tab instead.');
+    }
     if (!this.viewRegistry) {
       return this.viewRegistry!.createLeaf(this.app, 'main');
     }
-    return this.viewRegistry.createLeaf(this.app, 'main');
+    return this.withEmptyView(this.viewRegistry.createLeaf(this.app, 'main'));
   }
 
   /**

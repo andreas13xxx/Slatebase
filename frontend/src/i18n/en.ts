@@ -184,6 +184,10 @@ export const en: TranslationShape = {
     adjustWidth: 'Adjust width',
   },
 
+  splitPanes: {
+    noActiveTab: 'No active tab to split.',
+  },
+
   binaryViewer: {
     imageLoadError: 'The image "{name}" could not be loaded.',
     unsupported: 'File "{name}" ({type}) cannot be displayed.',
@@ -606,6 +610,14 @@ export const en: TranslationShape = {
       hint: 'All properties used in the vault. Change the type to control how a property is edited.',
       typeAriaLabel: 'Type of {key}',
     },
+    footnotes: {
+      empty: 'No footnotes in this document.',
+      noDocument: 'No document open.',
+      noText: '(no text)',
+      unreferenced: 'unreferenced',
+      refCount: '{count}×',
+      ariaLabel: 'Document footnotes',
+    },
     propertyControls: {
       addItemPlaceholder: 'Add...',
       addItemAriaLabel: 'Add item',
@@ -630,6 +642,7 @@ export const en: TranslationShape = {
       properties: 'Properties',
       search: 'Search',
       activity: 'Activity',
+      footnotes: 'Footnotes',
     },
     tabListAriaLabel: 'Panel views',
   },
