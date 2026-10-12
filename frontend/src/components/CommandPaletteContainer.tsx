@@ -5,10 +5,14 @@ import { useFeatureContext } from '../state/featureContext'
 import { useTabContext } from '../state/tabContext'
 import { usePaneTree } from '../state/paneTreeContext'
 import { getActivePaneTabState } from '../state/paneTreeState'
+import { findPaneInDirection, type PaneRect, type FocusDirection } from './panes/pane-focus-direction'
 import { useAppContext, loadVaults } from '../state/index'
 import { useAuthContext } from '../state/authContext'
 import { useNavigationHistory } from '../state/navigationHistoryContext'
 import { openTab } from '../state/tabActions'
+import { onOpenInSplit } from '../state/openInSplitBridge'
+import { generateTabId } from '../state/tabState'
+import { add as addRecentFile } from '../state/recentFilesStore'
 import { TemplateSelector } from './TemplateSelector'
 import { QuickSwitcher } from './QuickSwitcher'
 import { ReleaseNotesModal } from './ReleaseNotesModal'
@@ -364,6 +368,20 @@ export function CommandPaletteContainer({
         payload: { paneId: paneTree.activePaneId, direction, newPaneId, tabId: activeTabId, copy: true },
       })
     },
+    onFocusPaneDirection: (direction: FocusDirection) => {
+      // Read live pane rectangles from the DOM (each pane leaf carries
+      // data-pane-id) and let the pure geometry helper pick the neighbour —
+      // the tree shape alone can't say which pane is visually "to the left"
+      // once splits nest. A no-op when there is no pane that way.
+      const rects: PaneRect[] = Array.from(
+        document.querySelectorAll<HTMLElement>('.pane-leaf[data-pane-id]'),
+      ).map((el) => {
+        const r = el.getBoundingClientRect()
+        return { paneId: el.dataset.paneId ?? '', left: r.left, right: r.right, top: r.top, bottom: r.bottom }
+      })
+      const targetId = findPaneInDirection(rects, paneTree.activePaneId, direction)
+      if (targetId) paneTreeDispatch({ type: 'FOCUS_PANE', payload: { paneId: targetId } })
+    },
     searchQuery: searchState.query,
     searchCaseSensitive: searchState.caseSensitive,
     searchRegex: searchState.regex,
@@ -372,6 +390,43 @@ export function CommandPaletteContainer({
   useEffect(() => {
     registerCoreAppCommands(commandRegistry, () => coreHandlersRef.current, locale)
   }, [commandRegistry, locale])
+
+  // ─── Open-in-split bridge (Ctrl/Cmd+Alt+click from any open surface) ─────────
+  // A ref keeps the latest pane tree + wiring without re-subscribing on every
+  // render; the subscription itself is mounted once.
+  const openInSplitRef = useRef<(vaultId: string, filePath: string, fileName: string) => void>(() => {})
+  openInSplitRef.current = (vaultId, filePath, fileName) => {
+    if (!apiClient) return
+    // Split the active pane into a fresh EMPTY pane, then open the file into
+    // THAT pane explicitly. We can't reuse the active-pane `tabDispatch` here:
+    // its closure still targets the OLD active pane within this synchronous
+    // tick (it only re-binds to the new pane on the next render), so OPEN_TAB
+    // would land in the wrong pane. Dispatching PANE_TAB_ACTION with the new
+    // pane id is tick-safe.
+    const newPaneId = `pane-${(crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)).slice(0, 8)}`
+    paneTreeDispatch({ type: 'SPLIT_PANE', payload: { paneId: paneTree.activePaneId, direction: 'horizontal', newPaneId } })
+    paneTreeDispatch({
+      type: 'PANE_TAB_ACTION',
+      payload: { paneId: newPaneId, action: { type: 'OPEN_TAB', payload: { vaultId, filePath, fileName } } },
+    })
+    addRecentFile(vaultId, filePath)
+    const tabId = generateTabId(vaultId, filePath)
+    apiClient.fetchFileContent(vaultId, filePath).then(
+      (fc) =>
+        paneTreeDispatch({
+          type: 'PANE_TAB_ACTION',
+          payload: { paneId: newPaneId, action: { type: 'TAB_CONTENT_LOADED', payload: { tabId, content: fc.content, isBinary: fc.isBinary } } },
+        }),
+      (err: unknown) =>
+        paneTreeDispatch({
+          type: 'PANE_TAB_ACTION',
+          payload: { paneId: newPaneId, action: { type: 'TAB_ERROR', payload: { tabId, error: extractErrorMessage(err, 'An unexpected error occurred') } } },
+        }),
+    )
+  }
+  useEffect(() => {
+    return onOpenInSplit((req) => openInSplitRef.current(req.vaultId, req.filePath, req.fileName))
+  }, [])
 
   const pluginCompatEnabled = isEnabled('obsidian-plugin-compat')
   const isAdmin = authState.user?.role === 'admin'

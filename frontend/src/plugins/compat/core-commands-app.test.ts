@@ -1300,6 +1300,7 @@ function makeMinimalHandlers(overrides: { apiClient?: IApiClient; tabDispatch?: 
     onNavigateForward: vi.fn(),
     onOpenQuickSwitcher: vi.fn(),
     onSplitPane: vi.fn(),
+    onFocusPaneDirection: vi.fn(),
     searchQuery: '',
     searchCaseSensitive: false,
     searchRegex: false,

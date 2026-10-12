@@ -31,7 +31,7 @@ Dies ist die größte einzelne Architekturänderung am Layout-System — die bes
   - [x] 2.2 `frontend/src/components/panes/PaneContainer.tsx` — ein Pane (eigene `TabBar`+`TabContent`), Fokus/Klick → Active_Pane, Active-Markierung (als `PaneLeaf` in PaneTreeView + App.tsx `renderPane`)
   - [x] 2.3 `frontend/src/components/panes/PaneSplitHandle.tsx` — Resize-Griff (`useResize`, `role="separator"`, aria-value*, Pfeiltasten)
   - [x] 2.4 `frontend/src/components/panes/panes.css` — Verhältnis-Layout, Active-Markierung (Design Tokens), kein `overflow:hidden` über absolut positionierten Kindern
-  - [ ] 2.5 Fokus-Wechsel-Befehle (Pane links/rechts/oben/unten) — zurückgestellt (optionale Keyboard-Navigation; Fokus per Klick funktioniert)
+  - [x] 2.5 Fokus-Wechsel-Befehle (Pane links/rechts/oben/unten) — `editor:focus-left/right/top/bottom` auf echte Pane-Fokus-Ops (`onFocusPaneDirection` in `CommandPaletteContainer`, geometrie-basiert über `components/panes/pane-focus-direction.ts` gegen live DOM-Rects; `data-pane-id` am Pane-Leaf). Aus `core-commands.ts` (editor-only) nach `core-commands-app.ts` verschoben, da Pane-Baum-Zugriff nötig. Kein Default-Keybinding (Obsidian-Konvention)
   - [x] 2.6 `App.tsx` — Editor-Bereich auf `<PaneTreeView>` umgestellt; aktiver-Tab-Pfad über die `useTabContext()`-Brücke an den aktiven Pane gehängt (PluginProvider-Platzierung beachtet)
   - [x] 2.7 Tests: Split-Rendering, Klick-Fokus, Resize per Tastatur
   - _Requirements: 1.4, 3.1, 3.2, 3.3, 3.4, 4.1, 4.2, 4.3, 4.4_
@@ -40,13 +40,13 @@ Dies ist die größte einzelne Architekturänderung am Layout-System — die bes
   - [x] 3.1 `TabBar.tsx` pane-lokal; Tab-Drag auf fremde Tab-Reihe → `MOVE_TAB_TO_PANE` (via `paneId`+`onMoveTabToPane`-Props, `TAB_DRAG_MIME`-Payload)
   - [x] 3.2 Kanten-Drop-Zonen an Pane-Rändern → `SPLIT_PANE_WITH_TAB` + Tab in neuen Pane (PaneTreeView `PaneLeaf`-Edge-Zonen, `generatePaneId`)
   - [x] 3.3 Interne-Drag-Erkennung über `dataTransfer.types` ohne `'Files'` beibehalten (Tab-Drag trägt nur `application/x-slatebase-tab`, kein `'Files'` → DropZone-Overlay bleibt dunkel, verifiziert gegen `useDropZone.ts`)
-  - [ ] 3.4 „in Split öffnen" aus Link/Explorer/Suche/Switcher mit dem in 0.5 gewählten Modifikator (Ctrl/Cmd+Alt+Klick) — zurückgestellt (eigene fokussierte Erweiterung; Split per Befehl + Tab-Drag deckt den Kern)
+  - [x] 3.4 „in Split öffnen" mit dem in 0.5 gewählten Modifikator (Ctrl/Cmd+Alt+Klick) — `state/openInSplitBridge.ts` (Modul-Level-Bridge + `isOpenInSplitModifier`-Helper, Muster wie `fileOpBridge.ts`); `CommandPaletteContainer` abonniert einmal, splittet den aktiven Pane in einen leeren Pane und öffnet die Datei dort explizit per `PANE_TAB_ACTION` auf die neue Pane-ID (tick-sicher — die aktive-Pane-`tabDispatch`-Closure zeigt im selben Tick noch auf den alten Pane). Verdrahtet im **Datei-Explorer** (`TreeNode` Row-Klick, Haupt-Oberfläche). Suche/Schnellwechsler/Editor-Wikilink können dieselbe Bridge adoptieren (ihre Open-Pfade laufen über Callbacks ohne Event bzw. der Editor-Wikilink nutzt Ctrl/Cmd+Klick bereits zum Folgen) — bewusst auf den Explorer fokussiert gehalten
   - [x] 3.5 Pane schließen / Tab-Gruppe schließen / andere schließen (Kollaps über `PANE_TAB_ACTION`/`CLOSE_PANE`; `close-tab-group`/`close-others-tab-group` laufen über die bestehenden Tab-Befehle gegen den aktiven Pane)
   - [x] 3.6 Tests: Tab-Drag zwischen Panes (`MOVE_TAB_TO_PANE`), Kanten-Drop erzeugt Split (`SPLIT_PANE_WITH_TAB` + Edge-Drop-UI-Test), letzter-Tab-Kollaps, COPY- vs. MOVE-Modus, TabBar-Drag-Test
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 5.1, 5.2, 5.3, 5.4_
 
   Teil von Phase 6 vorgezogen (gehört logisch zu „Splits erzeugen"):
-  - [x] 6.1 `core-commands-app.ts` — `workspace:split-vertical`/`split-horizontal` auf echte Pane-Ops (`onSplitPane` → `SPLIT_PANE_WITH_TAB copy:true`, in `CommandPaletteContainer` verdrahtet). Fokus-Wechsel-Befehle offen (siehe 2.5)
+  - [x] 6.1 `core-commands-app.ts` — `workspace:split-vertical`/`split-horizontal` auf echte Pane-Ops (`onSplitPane` → `SPLIT_PANE_WITH_TAB copy:true`, in `CommandPaletteContainer` verdrahtet). Fokus-Wechsel-Befehle (`editor:focus-*`) jetzt ebenfalls umgesetzt (siehe 2.5)
   - [x] 6.2 `core-command-i18n.ts` — DE/EN-Labels „Rechts teilen"/„Unten teilen" (bereits vorhanden)
   - [ ] 6.3 `keybindingsStore.ts` — Defaults für Split: bewusst KEINE (Obsidian liefert Split ohne Default-Hotkey; vermeidet Browser-Kollisionen). Über Command Palette erreichbar.
 

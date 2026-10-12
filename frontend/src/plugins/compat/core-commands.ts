@@ -466,10 +466,9 @@ export function registerCoreEditorCommands(registry: ICommandRegistry, locale: L
     { id: 'toggle-spellcheck', name: 'Toggle spellcheck', run: () => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'toggleSpellcheck' } })) },
     { id: 'spellcheck-language-de', name: 'Spellcheck dictionary: German', run: () => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'setSpellcheckLanguage', language: 'de' } })) },
     { id: 'spellcheck-language-en', name: 'Spellcheck dictionary: English', run: () => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'setSpellcheckLanguage', language: 'en' } })) },
-    { id: 'focus-top', name: 'Focus on tab group above', unsupported: 'tab-layout' },
-    { id: 'focus-bottom', name: 'Focus on tab group below', unsupported: 'tab-layout' },
-    { id: 'focus-left', name: 'Focus on tab group to the left', unsupported: 'tab-layout' },
-    { id: 'focus-right', name: 'Focus on tab group to the right', unsupported: 'tab-layout' },
+    // `editor:focus-top/bottom/left/right` moved to core-commands-app.ts: they
+    // move pane focus (Split Panes) and need the pane tree, which the editor-
+    // only handler context here cannot reach.
   ]
 
   for (const spec of commands) {
