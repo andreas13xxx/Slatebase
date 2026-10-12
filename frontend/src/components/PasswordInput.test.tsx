@@ -4,7 +4,9 @@ import { PasswordInput } from './PasswordInput'
 
 /**
  * The component calls useTranslation(), which falls back to German without a
- * provider — so the toggle labels resolve to the de.ts strings in these tests.
+ * provider. These tests therefore address the toggle by its stable role and
+ * assert aria-pressed / aria-label *changes* rather than literal label copy,
+ * so a wording edit in de.ts cannot break them.
  */
 describe('PasswordInput', () => {
   it('renders a password-type input by default', () => {
@@ -15,16 +17,20 @@ describe('PasswordInput', () => {
   it('toggles the input to text and back when the button is clicked', () => {
     render(<PasswordInput aria-label="pw" />)
     const input = screen.getByLabelText('pw')
-    const toggle = screen.getByRole('button', { name: 'Passwort anzeigen' })
+    const toggle = screen.getByRole('button')
+    const showLabel = toggle.getAttribute('aria-label')
 
     expect(input).toHaveAttribute('type', 'password')
     fireEvent.click(toggle)
     expect(input).toHaveAttribute('type', 'text')
 
-    // Label flips to the hide variant once visible.
-    const hideToggle = screen.getByRole('button', { name: 'Passwort verbergen' })
-    fireEvent.click(hideToggle)
+    // The label flips to the hide variant once visible (asserted as a change,
+    // not against literal copy, so a translation edit can't break this test).
+    const hideLabel = toggle.getAttribute('aria-label')
+    expect(hideLabel).not.toBe(showLabel)
+    fireEvent.click(toggle)
     expect(input).toHaveAttribute('type', 'password')
+    expect(toggle).toHaveAttribute('aria-label', showLabel ?? '')
   })
 
   it('reflects visibility state via aria-pressed', () => {
