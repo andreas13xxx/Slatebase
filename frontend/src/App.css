@@ -1528,17 +1528,6 @@
   box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
 }
 
-/* Browser native password reveal icon â€” improve contrast in dark mode (Edge) */
-:root[data-theme="dark"] .login-input::-ms-reveal {
-  filter: invert(1);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .login-input::-ms-reveal {
-    filter: invert(1);
-  }
-}
-
 .login-field-error {
   margin: 4px 0 0;
   font-size: 12px;
