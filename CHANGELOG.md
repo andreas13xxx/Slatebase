@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.52.0](https://github.com/andreas13xxx/Slatebase/compare/v0.51.0...v0.52.0) (2026-10-12)
+
+
+### Features
+
+* **split-panes:** directional pane focus + open-in-split modifier ([#232](https://github.com/andreas13xxx/Slatebase/issues/232)) ([3b98601](https://github.com/andreas13xxx/Slatebase/commit/3b98601ddbbf6285bab5022ab1e25f863371719a))
+
 ## [0.51.0](https://github.com/andreas13xxx/Slatebase/compare/v0.50.0...v0.51.0) (2026-10-12)
 
 
