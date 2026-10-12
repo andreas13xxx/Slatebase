@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useAuthContext } from '../state/authContext'
 import { useTranslation } from '../i18n'
 import type { IApiClient } from '../api'
+import { PasswordInput } from './PasswordInput'
 
 /** Props for the ChangePasswordPage component. */
 export interface ChangePasswordPageProps {
@@ -115,10 +116,9 @@ export function ChangePasswordPage({ apiClient, embedded }: ChangePasswordPagePr
         <label className={labelClass} htmlFor="change-current-password">
           {t('auth.currentPassword')}
         </label>
-        <input
+        <PasswordInput
           id="change-current-password"
           className={inputClass}
-          type="password"
           maxLength={128}
           value={currentPassword}
           onChange={(e) => {
@@ -140,10 +140,9 @@ export function ChangePasswordPage({ apiClient, embedded }: ChangePasswordPagePr
         <label className={labelClass} htmlFor="change-new-password">
           {t('auth.newPassword')}
         </label>
-        <input
+        <PasswordInput
           id="change-new-password"
           className={inputClass}
-          type="password"
           maxLength={128}
           value={newPassword}
           onChange={(e) => {
@@ -165,10 +164,9 @@ export function ChangePasswordPage({ apiClient, embedded }: ChangePasswordPagePr
         <label className={labelClass} htmlFor="change-confirm-password">
           {t('auth.confirmPassword')}
         </label>
-        <input
+        <PasswordInput
           id="change-confirm-password"
           className={inputClass}
-          type="password"
           maxLength={128}
           value={confirmPassword}
           onChange={(e) => {
