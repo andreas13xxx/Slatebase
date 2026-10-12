@@ -1,14 +1,17 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, type Dispatch } from 'react'
 import { CommandPalette } from './CommandPalette'
 import { usePluginContext } from '../plugins/compat/plugin-context'
 import { useFeatureContext } from '../state/featureContext'
 import { useTabContext } from '../state/tabContext'
 import { usePaneTree } from '../state/paneTreeContext'
-import { getActivePaneTabState } from '../state/paneTreeState'
+import { getActivePaneTabState, generatePaneId } from '../state/paneTreeState'
+import { findPaneInDirection, type PaneRect, type FocusDirection } from './panes/pane-focus-direction'
 import { useAppContext, loadVaults } from '../state/index'
 import { useAuthContext } from '../state/authContext'
 import { useNavigationHistory } from '../state/navigationHistoryContext'
 import { openTab } from '../state/tabActions'
+import { onOpenInSplit } from '../state/openInSplitBridge'
+import type { TabAction } from '../state/tabState'
 import { TemplateSelector } from './TemplateSelector'
 import { QuickSwitcher } from './QuickSwitcher'
 import { ReleaseNotesModal } from './ReleaseNotesModal'
@@ -358,11 +361,25 @@ export function CommandPaletteContainer({
         showToast('info', t('splitPanes.noActiveTab'))
         return
       }
-      const newPaneId = `pane-${(crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)).slice(0, 8)}`
+      const newPaneId = generatePaneId()
       paneTreeDispatch({
         type: 'SPLIT_PANE_WITH_TAB',
         payload: { paneId: paneTree.activePaneId, direction, newPaneId, tabId: activeTabId, copy: true },
       })
+    },
+    onFocusPaneDirection: (direction: FocusDirection) => {
+      // Read live pane rectangles from the DOM (each pane leaf carries
+      // data-pane-id) and let the pure geometry helper pick the neighbour —
+      // the tree shape alone can't say which pane is visually "to the left"
+      // once splits nest. A no-op when there is no pane that way.
+      const rects: PaneRect[] = Array.from(
+        document.querySelectorAll<HTMLElement>('.pane-leaf[data-pane-id]'),
+      ).map((el) => {
+        const r = el.getBoundingClientRect()
+        return { paneId: el.dataset.paneId ?? '', left: r.left, right: r.right, top: r.top, bottom: r.bottom }
+      })
+      const targetId = findPaneInDirection(rects, paneTree.activePaneId, direction)
+      if (targetId) paneTreeDispatch({ type: 'FOCUS_PANE', payload: { paneId: targetId } })
     },
     searchQuery: searchState.query,
     searchCaseSensitive: searchState.caseSensitive,
@@ -372,6 +389,32 @@ export function CommandPaletteContainer({
   useEffect(() => {
     registerCoreAppCommands(commandRegistry, () => coreHandlersRef.current, locale)
   }, [commandRegistry, locale])
+
+  // ─── Open-in-split bridge (Ctrl/Cmd+Alt+click from any open surface) ─────────
+  // A ref keeps the latest pane tree + wiring without re-subscribing on every
+  // render; the subscription itself is mounted once.
+  const openInSplitRef = useRef<(vaultId: string, filePath: string, fileName: string) => void>(() => {})
+  openInSplitRef.current = (vaultId, filePath, fileName) => {
+    if (!apiClient) return
+    // Split the active pane into a fresh EMPTY pane, then open the file into
+    // THAT pane by reusing openTab with a PANE-SCOPED dispatch adapter. We
+    // can't reuse the active-pane `tabDispatch` here: its closure still targets
+    // the OLD active pane within this synchronous tick (it only re-binds to the
+    // new pane on the next render). The adapter below retargets openTab's own
+    // dispatches at the new pane, so open-in-split and a normal open share one
+    // implementation (recent-files, error normalisation, every TAB_* step).
+    const newPaneId = generatePaneId()
+    paneTreeDispatch({ type: 'SPLIT_PANE', payload: { paneId: paneTree.activePaneId, direction: 'horizontal', newPaneId } })
+    // Route openTab's TabActions to the new pane. If the user closes that pane
+    // before the content load resolves, the paneTreeReducer's PANE_TAB_ACTION
+    // no-ops a missing pane (findPane guard), so a late dispatch is harmless.
+    const paneDispatch: Dispatch<TabAction> = (action) =>
+      paneTreeDispatch({ type: 'PANE_TAB_ACTION', payload: { paneId: newPaneId, action } })
+    void openTab(paneDispatch, appDispatch, apiClient, vaultId, filePath, fileName)
+  }
+  useEffect(() => {
+    return onOpenInSplit((req) => openInSplitRef.current(req.vaultId, req.filePath, req.fileName))
+  }, [])
 
   const pluginCompatEnabled = isEnabled('obsidian-plugin-compat')
   const isAdmin = authState.user?.role === 'admin'

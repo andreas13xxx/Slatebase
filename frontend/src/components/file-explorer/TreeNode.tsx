@@ -6,6 +6,7 @@ import { validateFileName, normalizeFileName, getSelectionRange } from '../../ut
 import type { DirectoryTree } from '../../types'
 import type { DragState, ExternalDropState, InlineInputState } from './types'
 import { registerFileExplorerRow, unregisterFileExplorerRow } from '../../plugins/compat/file-explorer-dom-registry'
+import { isOpenInSplitModifier, requestOpenInSplit } from '../../state/openInSplitBridge'
 
 /**
  * Props for the recursive TreeNode component.
@@ -294,7 +295,16 @@ export function TreeNode({
         data-path={node.path}
         aria-current={isSelected ? 'true' : undefined}
         draggable={canDrag}
-        onClick={() => onSelectFile(node.path, node.name)}
+        onClick={(e) => {
+          // Ctrl/Cmd+Alt+click → open in a new split pane (Split Panes task 3.4).
+          // Plain click (and Ctrl/Cmd+click handled elsewhere) opens normally.
+          if (isOpenInSplitModifier(e)) {
+            e.preventDefault()
+            requestOpenInSplit(vaultId, node.path, node.name)
+            return
+          }
+          onSelectFile(node.path, node.name)
+        }}
         onDragStart={(e) => onDragStart(e, node.path, node.type, vaultId)}
         onDragEnd={onDragEnd}
         onContextMenu={(e) => onContextMenu(e, node, vaultId)}

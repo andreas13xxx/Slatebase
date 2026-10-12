@@ -100,6 +100,9 @@ function PaneLeaf({ pane, isActive, onFocus, renderPane, dispatch, generatePaneI
   return (
     <div
       className={`pane-leaf${isActive ? ' pane-leaf--active' : ''}`}
+      // `data-pane-id` lets directional-focus commands map a live DOM rect back
+      // to a pane id (see pane-focus-direction.ts).
+      data-pane-id={pane.id}
       // Focus bubbles up from the tab bar / editor; a click anywhere in the
       // pane also claims focus. Capture phase so it runs before inner handlers.
       onMouseDownCapture={onFocus}

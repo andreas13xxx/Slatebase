@@ -104,6 +104,11 @@ export interface CoreAppCommandHandlers {
    * pane (Split Panes). A no-op when the active pane has no active tab.
    */
   onSplitPane: (direction: 'horizontal' | 'vertical') => void
+  /**
+   * Move focus to the pane adjacent to the active one in a direction (Split
+   * Panes keyboard navigation). A no-op when there is no pane that way.
+   */
+  onFocusPaneDirection: (direction: 'left' | 'right' | 'up' | 'down') => void
   /** Current vault-search panel query/flags, for `bookmarks:bookmark-current-search`. */
   searchQuery: string
   searchCaseSensitive: boolean
@@ -694,6 +699,14 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'workspace:toggle-pin', name: 'Toggle pin', run: toggleActiveTabPin },
     { id: 'workspace:split-vertical', name: 'Split right', run: (h) => h.onSplitPane('horizontal') },
     { id: 'workspace:split-horizontal', name: 'Split down', run: (h) => h.onSplitPane('vertical') },
+    // Directional pane focus (Split Panes). Obsidian namespaces these under
+    // `editor:` even though they move pane focus rather than edit text; kept
+    // here (not in core-commands.ts) because they need the pane tree, which
+    // only the app-level handler context reaches.
+    { id: 'editor:focus-left', name: 'Focus on tab group to the left', run: (h) => h.onFocusPaneDirection('left') },
+    { id: 'editor:focus-right', name: 'Focus on tab group to the right', run: (h) => h.onFocusPaneDirection('right') },
+    { id: 'editor:focus-top', name: 'Focus on tab group above', run: (h) => h.onFocusPaneDirection('up') },
+    { id: 'editor:focus-bottom', name: 'Focus on tab group below', run: (h) => h.onFocusPaneDirection('down') },
     { id: 'workspace:undo-close-pane', name: 'Undo close tab', run: (h) => { void undoCloseTab(h.tabDispatch, h.appDispatch, h.apiClient, h.tabState.closedTabsHistory) } },
     { id: 'workspace:move-to-new-window', name: 'Move current tab to new window', unsupported: 'native-windows' },
     { id: 'workspace:new-window', name: 'New window', unsupported: 'native-windows' },

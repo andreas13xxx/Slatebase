@@ -107,6 +107,15 @@ export function createPane(id: string, tabState: TabState = initialTabState): Pa
   return { kind: 'pane', id, tabState }
 }
 
+/**
+ * Generate a stable, collision-resistant pane id (`pane-<8 hex/base36>`). The
+ * single source of this scheme — the split command, open-in-split and edge-drop
+ * split all call it, so the format cannot drift between entry points.
+ */
+export function generatePaneId(): string {
+  return `pane-${(crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)).slice(0, 8)}`
+}
+
 /** Initial single-pane tree. */
 export function createInitialPaneTree(paneId: string): PaneTree {
   return { root: createPane(paneId), activePaneId: paneId }
