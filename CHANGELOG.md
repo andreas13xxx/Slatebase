@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.51.0](https://github.com/andreas13xxx/Slatebase/compare/v0.50.0...v0.51.0) (2026-10-12)
+
+
+### Features
+
+* **auth:** password show/hide toggle on all password fields ([#230](https://github.com/andreas13xxx/Slatebase/issues/230)) ([a9d09c1](https://github.com/andreas13xxx/Slatebase/commit/a9d09c1461b93463510be39731925cee967b8d44))
+
 ## [0.50.0](https://github.com/andreas13xxx/Slatebase/compare/v0.49.0...v0.50.0) (2026-10-11)
 
 
