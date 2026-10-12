@@ -6,7 +6,7 @@ import { TabProvider, useTabContext } from './state/tabContext'
 import { PaneTreeProvider, usePaneTree } from './state/paneTreeContext'
 import { PaneTabProvider } from './state/paneTabContext'
 import { PaneTreeView } from './components/panes/PaneTreeView'
-import type { SplitDirection } from './state/paneTreeState'
+import { generatePaneId, type SplitDirection } from './state/paneTreeState'
 import { onRequestPaneSplit, offRequestPaneSplit } from './plugins/compat/pane-split-bridge'
 import { NavigationHistoryProvider, useNavigationHistory } from './state/navigationHistoryContext'
 import { FeatureProvider, useFeatureContext } from './state/featureContext'
@@ -955,11 +955,6 @@ function AppContent() {
   }, [showSidebar])
 
   // ── Split Panes: id generation + cross-pane tab move ──
-  // Stable unique pane ids for splits (edge-drop and the split commands).
-  const generatePaneId = useCallback(
-    () => `pane-${(crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)).slice(0, 8)}`,
-    [],
-  )
   const handleMoveTabToPane = useCallback(
     (fromPaneId: string, toPaneId: string, tabId: string, toIndex?: number) => {
       paneTreeDispatch({ type: 'MOVE_TAB_TO_PANE', payload: { fromPaneId, toPaneId, tabId, toIndex } })
@@ -986,7 +981,7 @@ function AppContent() {
     }
     onRequestPaneSplit(handleSplit)
     return () => { offRequestPaneSplit(handleSplit) }
-  }, [paneTreeDispatch, generatePaneId])
+  }, [paneTreeDispatch])
 
   const settingsTabs: SettingsTabDescriptor[] = openSettingsPages.map((page) => {
     const isActive = isShowingSettings && page === activeSettingsPage

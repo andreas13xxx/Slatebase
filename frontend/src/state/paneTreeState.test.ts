@@ -3,6 +3,7 @@ import {
   paneTreeReducer,
   createInitialPaneTree,
   createPane,
+  generatePaneId,
   findPane,
   getActiveTabId,
   listPanes,
@@ -594,5 +595,16 @@ describe('pane-tree persistence', () => {
       })
       expect(live.activePaneId).toBe('p1')
     })
+  })
+})
+
+describe('generatePaneId', () => {
+  it('produces a pane- prefixed id', () => {
+    expect(generatePaneId()).toMatch(/^pane-[a-z0-9]+$/)
+  })
+
+  it('produces distinct ids across calls', () => {
+    const ids = new Set(Array.from({ length: 50 }, () => generatePaneId()))
+    expect(ids.size).toBe(50)
   })
 })
