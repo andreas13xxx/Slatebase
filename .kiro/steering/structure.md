@@ -327,20 +327,23 @@ src/
 │   ├── canvasToMarkdown.ts — Linearizes a canvas document into flat Markdown (reading order top-to-bottom/left-to-right, edges dropped); backs `canvas:convert-to-file`
 │   ├── canvasToMarkdown.test.ts — Unit tests for canvasToMarkdown
 │   └── parser.test.ts    — Unit tests for parser/serializer round-trip
-├── bases/                — Obsidian-compatible `.base` files (Bases feature, toggle `bases`, cold/default-off). Frontend-only parser/engine; the backend contributes only the query route (`api/basesRoutes.ts` → `LinkIndexService.queryForBase`).
-│   ├── index.ts          — Barrel export (types, parser, serializer, query-engine, formula API)
-│   ├── types.ts          — `BaseDocument`, `BaseFilterNode` (AND/OR tree), `BaseFormulas`, `BaseView`, `BaseRow`, plus the query wire types (`BaseQuerySpecWire`/`BaseQueryResultWire`) shared with the ApiClient
-│   ├── parser.ts         — `parseBase(yaml)` — manual validation + `_unknown` passthrough (Canvas-parser pattern, deliberately not Zod — see lessons-learned.md)
+├── bases/                — Obsidian-compatible `.base` files (Bases feature, toggle `bases`, cold/default-off), REAL Obsidian format (expression-string filters, `groupBy` object, summaries, view limit). Frontend-only parser/engine + client-side filtering; the backend contributes only the query route (`api/basesRoutes.ts` → `LinkIndexService.queryForBase`), which returns candidate rows with property + file-metadata values (ext/folder/tags/links).
+│   ├── index.ts          — Barrel export (types, parser, serializer, query-engine, expression API)
+│   ├── types.ts          — `BaseDocument`, `BaseFilterNode` (`string | and | or | not` — a leaf is an EXPRESSION STRING, not an object condition), `BaseFormulas`, `BaseGroupBy` (object), `BaseSummaries`, `BaseView` (order/sort/groupBy/filters/limit/summaries), `BaseRow`, plus the query wire types (`BaseQuerySpecWire`/`BaseQueryResultWire`) shared with the ApiClient
+│   ├── parser.ts         — `parseBase(yaml)` — real Obsidian format: expression-string filters in and/or/not groups, `groupBy` object, summaries, limit; manual validation + `_unknown` passthrough (Canvas-parser pattern, deliberately not Zod — see lessons-learned.md); the removed legacy object-condition schema is rejected with a migration hint
 │   ├── serializer.ts     — `serializeBase(doc)` — stable key order, round-trip-safe
-│   ├── parser.test.ts    — Round-trip, error cases, passthrough
-│   ├── query-engine.ts   — `buildQuerySpec(doc, view)` (drops formula columns, keeps `file.*`) + `runBaseQuery()` (calls the backend query route, maps to `BaseRow[]`)
-│   ├── query-engine.test.ts — Unit tests for buildQuerySpec
-│   └── formula/          — Formula interpreter — NO `eval` (own tokenizer → Pratt parser → tree evaluator), CSP-safe
-│       ├── tokenizer.ts  — Expression tokenizer
-│       ├── parser.ts     — Pratt parser → AST
-│       ├── evaluator.ts  — `evaluateFormula(src, ctx)` (never throws: error/empty value instead) + `formatFormulaValue()`
-│       ├── functions.ts  — The limited built-in set (`if`, `concat`, `now`/`today`, `date`, `days`, `length`) — NOT the full Obsidian formula language
-│       └── evaluator.test.ts — Tokenizer/parser/evaluator/function tests incl. error paths
+│   ├── parser.test.ts    — Round-trip, error cases, passthrough, legacy-reject
+│   ├── real-format-fixture.test.ts — Parses + round-trips the canonical example from help.obsidian.md/bases/syntax verbatim (drift guard against the real format)
+│   ├── query-engine.ts   — `buildQuerySpec(doc, view)` (requests displayed + filter-referenced columns, drops formulas/`file.*`, no backend filter) + `rowContext(row)` (resolves `note.`/`file.`/`formula.` prefixes + a `fileApi` for `file.hasTag`/`inFolder`/`hasLink`) + `runBaseQuery()` (fetches candidate rows, then evaluates the doc+view filter expressions CLIENT-SIDE via the expression engine). Filters run client-side because the Obsidian filter language is too rich to push into the structured backend query
+│   ├── query-engine.test.ts — Unit tests for buildQuerySpec + client-side filtering
+│   └── formula/          — Shared Obsidian Bases EXPRESSION ENGINE (filters AND formulas) — NO `eval` (own tokenizer → Pratt parser → tree evaluator), CSP-safe
+│       ├── ast.ts        — `ExprNode` types (number/string/boolean/property/unary/binary/logical/call/member/method/index)
+│       ├── tokenizer.ts  — Expression tokenizer (incl. `&& || ! %`, brackets, standalone member-access dot)
+│       ├── parser.ts     — Pratt parser → AST (logical ops, postfix member/index/method, dotted-path method split)
+│       ├── functions.ts  — `FormulaValue` model (scalar/list/link) + the pragmatic global function set (`if`/`concat`/`now`/`today`/`date`/`number`/`list`/`link`/`min`/`max`/`days`/`length`) + duration parsing — NOT the full Obsidian function library
+│       ├── methods.ts    — Per-type method tables (string/number/date/list), unknown method → visible error, not a crash
+│       ├── evaluator.ts  — `evaluateFormula(src, ctx)` (never throws) + `evaluateCondition(src, ctx)` (filter entry, broken → false) + `formatFormulaValue()`; `date - date` returns milliseconds (Obsidian semantics); `FormulaContext.fileApi` backs `file.*` predicates
+│       └── evaluator.test.ts — Tokenizer/parser/evaluator/method/function tests incl. error paths
 ├── editor/
 │   ├── types.ts              — Editor mode types, LivePreviewConfig, EditorMode ('source' | 'live-preview')
 │   ├── theme.ts              — CodeMirror theme (Design Tokens mapping, Dark/Light mode)

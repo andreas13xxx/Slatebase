@@ -10,7 +10,7 @@ const doc: BaseDocument = {
 
 const view: BaseView = {
   type: 'cards',
-  groupBy: 'status',
+  groupBy: { property: 'status' },
   order: ['file.name', 'status', 'priority'],
 }
 

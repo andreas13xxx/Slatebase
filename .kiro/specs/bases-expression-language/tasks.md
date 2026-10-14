@@ -44,15 +44,18 @@ Umsetzung in Phasen; jede Phase einzeln committbar + grün (tsc/build/test/lint)
 - [x] 4.4 Bestehende Bases-Tests (parser/query-engine/Kanban/Table) auf neues Format umgestellt, grün
 
 ## Phase 5 — Migration & Doku
-- [ ] 5.1 Beide Welcome-Vault-`.base`-Beispiele auf Obsidian-Format umschreiben
-- [ ] 5.2 `product.md`/`lessons-learned.md`/`structure.md` nachziehen (expr-Verzeichnis, Format-Hinweis)
-- [ ] 5.3 Echtes-Format-`.base`-Fixture als Round-Trip- + Query-Test (schließt „Punkt 5")
+- [x] 5.1 Beide Welcome-Vault-`.base`-Beispiele auf Obsidian-Format umgeschrieben (`file.inFolder(...)` +
+      Ausdruck-Filter, `formula.`-Präfixe, `days()` statt `date - date`)
+- [x] 5.2 `product.md`/`lessons-learned.md`/`structure.md` nachgezogen
+- [x] 5.3 `real-format-fixture.test.ts`: kanonisches Obsidian-Doku-Beispiel wörtlich geparst +
+      round-getrippt + file-Prädikat ausgewertet (schließt „Punkt 5")
 
 ## Phase 6 — Optional
 - [ ] 6.1 (optional) Formelspalten editierbar — nur falls 1–5 stabil (R5, realistisch offen)
 - [ ] 6.2 (später) `summaries`-Auswertung/Summenzeile — ausdrücklich NICHT in dieser Spec
 
 ## Abschluss-Gate (vor „fertig")
-- [ ] Backend `npx tsc --noEmit` + `npm run test:coverage` grün
-- [ ] Frontend `npm run build` + `npm run test:coverage` grün, `npx eslint . --quiet` 0 Errors
-- [ ] Ein echtes-Obsidian-`.base` lädt, filtert und rendert korrekt (manuell/Fixture verifiziert)
+- [x] Backend `npx tsc --noEmit` + `npm run test:coverage` grün (117 Dateien, Schwellen gehalten)
+- [x] Frontend `npm run build` + `npm run test:coverage` grün (241 Dateien), `npx eslint . --quiet` 0 Errors
+- [x] Ein echtes-Obsidian-`.base` lädt, filtert und rendert korrekt (`real-format-fixture.test.ts`,
+      kanonisches Doku-Beispiel verbatim)

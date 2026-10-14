@@ -19,6 +19,17 @@ import { callMethod, DATE_MEMBERS } from './methods'
 export interface FormulaContext {
   /** Resolves a property reference to a value, or null when absent. */
   resolve(name: string): FormulaValue
+  /**
+   * Optional file-method API for `file.hasTag(...)`, `file.inFolder(...)`,
+   * `file.hasLink(...)` — predicates that act on the whole file rather than a
+   * single property value. Omitted in a bare formula context (they then
+   * return false).
+   */
+  fileApi?: {
+    hasTag(tag: string): boolean
+    inFolder(folder: string): boolean
+    hasLink(target: string): boolean
+  }
 }
 
 /** Result of evaluating an expression: a value, or a flagged error. */
@@ -57,6 +68,18 @@ function evalNode(node: ExprNode, ctx: FormulaContext): FormulaValue {
       return fn(node.args.map((a) => evalNode(a, ctx)))
     }
     case 'method': {
+      // File predicates: `file.hasTag(...)`, `file.inFolder(...)`, `file.hasLink(...)`
+      // act on the whole file, not a resolved value — route to the file API.
+      if (node.object.kind === 'property' && node.object.name === 'file') {
+        const arg = node.args.length > 0 ? stringify(evalNode(node.args[0]!, ctx)) : ''
+        const api = ctx.fileApi
+        if (!api) return false
+        if (node.method === 'hasTag') return api.hasTag(arg)
+        if (node.method === 'inFolder') return api.inFolder(arg)
+        if (node.method === 'hasLink') return api.hasLink(arg)
+        // Fall through for other file.* methods (none supported yet).
+        throw new EvalError(`Unknown file method '${node.method}'`)
+      }
       const receiver = evalNode(node.object, ctx)
       const args = node.args.map((a) => evalNode(a, ctx))
       return callMethod(receiver, node.method, args)

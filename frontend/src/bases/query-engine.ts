@@ -101,12 +101,31 @@ function firstScalar(v: unknown): FormulaValue {
  */
 export function rowContext(row: BaseRow): FormulaContext {
   const values = row.values
+  const tags = Array.isArray(values['file.tags']) ? (values['file.tags'] as string[]) : []
+  const links = Array.isArray(values['file.links']) ? (values['file.links'] as string[]) : []
+  const folder = typeof values['file.folder'] === 'string' ? (values['file.folder'] as string) : ''
   return {
     resolve(name: string): FormulaValue {
       if (name === 'file.name') return row.fileName
       if (name.startsWith('file.')) return firstScalar(values[name])
       const key = name.startsWith('note.') ? name.slice('note.'.length) : name
       return firstScalar(values[key] ?? values[name])
+    },
+    fileApi: {
+      hasTag: (tag: string) => {
+        const needle = tag.replace(/^#/, '').toLowerCase()
+        return tags.some((t) => t.replace(/^#/, '').toLowerCase() === needle)
+      },
+      inFolder: (f: string) => {
+        const target = f.replace(/\/+$/, '').toLowerCase()
+        const own = folder.toLowerCase()
+        // Match the folder itself or any descendant path.
+        return own === target || own.startsWith(target + '/') || row.path.toLowerCase().startsWith(target + '/')
+      },
+      hasLink: (target: string) => {
+        const needle = target.toLowerCase()
+        return links.some((l) => l.toLowerCase() === needle || l.toLowerCase().endsWith('/' + needle))
+      },
     },
   }
 }

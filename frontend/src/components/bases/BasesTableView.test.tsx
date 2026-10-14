@@ -5,7 +5,7 @@ import { inferCellType } from './base-cell-type'
 import type { BaseDocument, BaseRow, BaseView } from '../../bases/types'
 
 const doc: BaseDocument = {
-  formulas: { days_left: 'date(deadline) - date("2026-01-01")' },
+  formulas: { days_left: 'days(date(deadline), date("2026-01-01"))' },
   properties: {
     'file.name': { displayName: 'Task' },
     status: { displayName: 'Status' },
