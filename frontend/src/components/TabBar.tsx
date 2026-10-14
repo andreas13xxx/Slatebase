@@ -38,6 +38,13 @@ export interface TabBarProps {
   paneId?: string
   /** Move a tab from one pane to another at a target index (append when omitted). */
   onMoveTabToPane?: (fromPaneId: string, toPaneId: string, tabId: string, toIndex?: number) => void
+  /**
+   * Render the file tabs (default `true`). The app-level row passes `false`:
+   * file tabs live in each pane's own bar, so outside a pane the tab context
+   * resolves to the active pane and would show its tabs a second time. With
+   * `false` the bar always renders (even empty) so the row keeps its full width.
+   */
+  showFileTabs?: boolean
 }
 
 /** MIME type carrying a cross-pane tab drag payload (`{ paneId, tabId }`). */
@@ -49,20 +56,21 @@ export const TAB_DRAG_MIME = 'application/x-slatebase-tab'
  * Each file tab shows the filename (truncated to fit), a mode toggle icon,
  * and a close button. The active tab is visually distinguished.
  */
-export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab, paneId, onMoveTabToPane }: TabBarProps) {
+export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab, paneId, onMoveTabToPane, showFileTabs = true }: TabBarProps) {
   const { t } = useTranslation()
   // Re-renders once any icon's (async, per-icon) Lucide resolution lands —
   // see PluginRibbonIcon.tsx for why this is needed.
   useIconResolutionTick()
   const { tabState, tabDispatch } = useTabContext()
-  const { tabs, activeTabId } = tabState
+  const { activeTabId } = tabState
+  const tabs = showFileTabs ? tabState.tabs : []
   const dragIndexRef = useRef<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
 
   // A pane-local bar always renders (even empty) so an empty pane stays a valid
   // drop target for a cross-pane move; the legacy single row collapses when empty.
-  if (paneId === undefined && settingsTabs.length === 0 && tabs.length === 0) {
+  if (paneId === undefined && showFileTabs && settingsTabs.length === 0 && tabs.length === 0) {
     return null
   }
 

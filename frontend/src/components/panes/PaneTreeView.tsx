@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Dispatch } from 'react'
 import type { PaneTree, PaneTreeNode, PaneNode, SplitNode, PaneTreeAction, SplitDirection } from '../../state/paneTreeState'
 import { PaneSplitHandle } from './PaneSplitHandle'
@@ -27,6 +27,7 @@ interface PaneTreeViewProps {
 
 /** Recursively render the pane tree into nested flex containers. */
 export function PaneTreeView({ tree, dispatch, renderPane, resizeLabel, generatePaneId }: PaneTreeViewProps) {
+  const tabDragActive = useTabDragActive()
   const renderNode = (node: PaneTreeNode): ReactNode => {
     if (node.kind === 'pane') {
       const isActive = node.id === tree.activePaneId
@@ -38,7 +39,9 @@ export function PaneTreeView({ tree, dispatch, renderPane, resizeLabel, generate
           onFocus={() => dispatch({ type: 'FOCUS_PANE', payload: { paneId: node.id } })}
           renderPane={renderPane}
           dispatch={dispatch}
-          generatePaneId={generatePaneId}
+          // Edge zones overlay the pane's edges (tab bar, editor margins), so
+          // they exist only while a tab drag is in flight — never for clicks.
+          {...(tabDragActive && generatePaneId && { generatePaneId })}
         />
       )
     }
@@ -48,12 +51,42 @@ export function PaneTreeView({ tree, dispatch, renderPane, resizeLabel, generate
   return <div className="pane-tree-root">{renderNode(tree.root)}</div>
 }
 
+/**
+ * True while a tab drag (payload `TAB_DRAG_MIME`) is in flight anywhere in the
+ * document. `dragstart` is watched in the bubble phase, after the tab bar has
+ * set the payload. `dragend`/`drop` are watched in the capture phase because
+ * tab bars and edge zones stop `drop` propagation; `drop` is needed too since
+ * `dragend` never fires when the move unmounts the dragged tab element.
+ * Both updates are deferred to a task: mutating the DOM inside `dragstart` can
+ * make Chrome abort the drag, and a capture-phase `drop` must not unmount the
+ * edge zone before its own handler runs.
+ */
+function useTabDragActive(): boolean {
+  const [active, setActive] = useState(false)
+  useEffect(() => {
+    const onStart = (e: DragEvent): void => {
+      if (e.dataTransfer?.types.includes(TAB_DRAG_MIME)) setTimeout(() => setActive(true), 0)
+    }
+    const onEnd = (): void => { setTimeout(() => setActive(false), 0) }
+    document.addEventListener('dragstart', onStart)
+    document.addEventListener('dragend', onEnd, true)
+    document.addEventListener('drop', onEnd, true)
+    return () => {
+      document.removeEventListener('dragstart', onStart)
+      document.removeEventListener('dragend', onEnd, true)
+      document.removeEventListener('drop', onEnd, true)
+    }
+  }, [])
+  return active
+}
+
 interface PaneLeafProps {
   pane: PaneNode
   isActive: boolean
   onFocus: () => void
   renderPane: PaneTreeViewProps['renderPane']
   dispatch: Dispatch<PaneTreeAction>
+  /** Set only while a tab drag is in flight; enables the edge-drop zones. */
   generatePaneId?: () => string
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { PaneTreeView } from './PaneTreeView'
 import {
   createInitialPaneTree,
@@ -13,6 +13,14 @@ function twoPaneTree(): PaneTree {
   return paneTreeReducer(createInitialPaneTree('p1'), {
     type: 'SPLIT_PANE',
     payload: { paneId: 'p1', direction: 'horizontal', newPaneId: 'p2' },
+  })
+}
+
+/** Simulate a tab drag starting somewhere in the document (edge zones appear). */
+async function startTabDrag() {
+  await act(async () => {
+    fireEvent.dragStart(document.body, { dataTransfer: { types: ['application/x-slatebase-tab'] } })
+    await new Promise((r) => setTimeout(r, 0))
   })
 }
 
@@ -90,7 +98,7 @@ describe('PaneTreeView', () => {
       expect(container.querySelectorAll('.pane-drop-edge')).toHaveLength(0)
     })
 
-    it('renders four edge zones per pane when generatePaneId is provided', () => {
+    it('renders no edge zones while no tab drag is in flight (they would block clicks)', () => {
       const { container } = render(
         <PaneTreeView
           tree={createInitialPaneTree('p1')}
@@ -100,10 +108,43 @@ describe('PaneTreeView', () => {
           generatePaneId={() => 'new'}
         />,
       )
+      expect(container.querySelectorAll('.pane-drop-edge')).toHaveLength(0)
+    })
+
+    it('removes the edge zones again once the drag ends', async () => {
+      const { container } = render(
+        <PaneTreeView
+          tree={createInitialPaneTree('p1')}
+          dispatch={vi.fn()}
+          renderPane={renderPane}
+          resizeLabel="Resize"
+          generatePaneId={() => 'new'}
+        />,
+      )
+      await startTabDrag()
+      expect(container.querySelectorAll('.pane-drop-edge')).toHaveLength(4)
+      await act(async () => {
+        fireEvent.dragEnd(document.body)
+        await new Promise((r) => setTimeout(r, 0))
+      })
+      expect(container.querySelectorAll('.pane-drop-edge')).toHaveLength(0)
+    })
+
+    it('renders four edge zones per pane during a tab drag', async () => {
+      const { container } = render(
+        <PaneTreeView
+          tree={createInitialPaneTree('p1')}
+          dispatch={vi.fn()}
+          renderPane={renderPane}
+          resizeLabel="Resize"
+          generatePaneId={() => 'new'}
+        />,
+      )
+      await startTabDrag()
       expect(container.querySelectorAll('.pane-drop-edge')).toHaveLength(4)
     })
 
-    it('dispatches SPLIT_PANE_WITH_TAB on an edge drop carrying a tab payload', () => {
+    it('dispatches SPLIT_PANE_WITH_TAB on an edge drop carrying a tab payload', async () => {
       const dispatch = vi.fn()
       const { container } = render(
         <PaneTreeView
@@ -114,6 +155,7 @@ describe('PaneTreeView', () => {
           generatePaneId={() => 'p2'}
         />,
       )
+      await startTabDrag()
       const rightEdge = container.querySelector('.pane-drop-edge--right') as HTMLElement
       expect(rightEdge).not.toBeNull()
       const dataTransfer = {
@@ -129,7 +171,7 @@ describe('PaneTreeView', () => {
       })
     })
 
-    it('ignores an edge drop without a tab payload', () => {
+    it('ignores an edge drop without a tab payload', async () => {
       const dispatch = vi.fn()
       const { container } = render(
         <PaneTreeView
@@ -140,6 +182,7 @@ describe('PaneTreeView', () => {
           generatePaneId={() => 'p2'}
         />,
       )
+      await startTabDrag()
       const topEdge = container.querySelector('.pane-drop-edge--top') as HTMLElement
       fireEvent.drop(topEdge, { dataTransfer: { types: [], getData: () => '', dropEffect: 'none' } })
       expect(dispatch).not.toHaveBeenCalledWith(

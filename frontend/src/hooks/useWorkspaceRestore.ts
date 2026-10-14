@@ -183,6 +183,17 @@ export function useWorkspaceRestore({
   // already exists in its loading state; this effect only fetches each tab's
   // content and delivers it to the pane that owns it.
   const hasRestoredRef = useRef(false)
+  // Unmount guard for the content fetches below. It must NOT live in the
+  // restore effect's own cleanup: that effect runs once (hasRestoredRef), so a
+  // cleanup on a dep change or StrictMode's dev re-run would cancel every fetch
+  // while the re-run bails out early — leaving all restored tabs on "Laden…".
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
   useEffect(() => {
     if (hasRestoredRef.current) return
     if (vaults.length === 0) return
@@ -203,10 +214,8 @@ export function useWorkspaceRestore({
       dispatch({ type: 'VAULT_SELECTED', payload: wsState.selectedVaultId })
     }
 
-    // Fetch content for every pane's tabs. `cancelled` guards against a late
-    // fetch resolving after the restore was torn down (StrictMode double-mount,
-    // fast logout) and dispatching into a stale tree.
-    let cancelled = false
+    // Fetch content for every pane's tabs. `mountedRef` guards against a late
+    // fetch resolving after unmount (fast logout) and dispatching into a stale tree.
     const validVaultIds = new Set(vaults.map((v) => v.id))
 
     for (const pane of listPanes(paneTree)) {
@@ -233,7 +242,7 @@ export function useWorkspaceRestore({
         }
         apiClient.fetchFileContent(tab.vaultId, tab.filePath).then(
           (result) => {
-            if (cancelled) return
+            if (!mountedRef.current) return
             paneTreeDispatch({
               type: 'PANE_TAB_ACTION',
               payload: {
@@ -246,7 +255,7 @@ export function useWorkspaceRestore({
             })
           },
           () => {
-            if (cancelled) return
+            if (!mountedRef.current) return
             // File no longer exists — close the tab in its pane.
             paneTreeDispatch({
               type: 'PANE_TAB_ACTION',
@@ -259,10 +268,6 @@ export function useWorkspaceRestore({
 
     // Enable persistence now that restore is complete.
     isRestoringRef.current = false
-
-    return () => {
-      cancelled = true
-    }
     // paneTree is intentionally read once at restore time (it is pre-seeded and
     // stable on mount); re-running on every tree change would re-fetch content.
     // eslint-disable-next-line react-hooks/exhaustive-deps
