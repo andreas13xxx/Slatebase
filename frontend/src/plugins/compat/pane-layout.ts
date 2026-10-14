@@ -124,7 +124,10 @@ export function buildLayoutJson(tree: PaneTree): Record<string, unknown> {
     return {
       id: n.id,
       type: 'tabs',
-      ...(activeIndex > 0 ? { currentTab: activeIndex } : {}),
+      // Obsidian's getLayout() always carries currentTab for a tabs node — a
+      // reader cannot distinguish "active tab is index 0" from "no selection"
+      // if we drop it at 0. Emit it whenever the pane has at least one tab.
+      ...(n.tabState.tabs.length ? { currentTab: Math.max(activeIndex, 0) } : {}),
       children: n.tabState.tabs.map((tab) => ({
         id: tab.id,
         type: 'leaf',

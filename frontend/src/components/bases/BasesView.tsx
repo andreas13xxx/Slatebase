@@ -20,7 +20,8 @@ import type { BaseDocument, BaseRow, BaseSortClause, BaseView } from '../../base
 import { applyFrontmatterChange } from '../../utils/frontmatterWriter'
 import { parseFrontmatter } from '../context-panel/utils/parseFrontmatter'
 import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
-import { setActiveBasesController, tableToTsv } from '../../state/activeBasesBridge'
+import { setActiveBasesController, clearActiveBasesController, tableToTsv } from '../../state/activeBasesBridge'
+import type { ActiveBasesController } from '../../state/activeBasesBridge'
 import { extractErrorMessage } from '../../utils/error'
 import { hasBasesViewRegistration } from '../../plugins/compat/bases-view-registry'
 import { ErrorBoundary } from '../ErrorBoundary'
@@ -141,7 +142,7 @@ export const BasesView = memo(function BasesView({
   // same as activeCanvasBridge).
   const rootRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    setActiveBasesController({
+    const controller: ActiveBasesController = {
       nextView: () => {
         if (views.length < 2) return false
         setSelectedViewIndex((safeIndex + 1) % views.length)
@@ -166,8 +167,9 @@ export const BasesView = memo(function BasesView({
           return false
         }
       },
-    })
-    return () => setActiveBasesController(null)
+    }
+    setActiveBasesController(controller)
+    return () => clearActiveBasesController(controller)
   }, [views.length, safeIndex, doc, readOnly, onSaveSource])
 
   // Stable callback for the plugin host to report a render/query failure.

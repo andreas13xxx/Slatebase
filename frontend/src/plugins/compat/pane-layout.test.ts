@@ -115,9 +115,26 @@ describe('buildLayoutJson', () => {
             { id: 't2', type: 'leaf', state: { type: 'kanban', state: {} } },
           ],
         },
-        { type: 'tabs', children: [{ id: 't3', type: 'leaf', pinned: true, state: { type: 'canvas' } }] },
+        { type: 'tabs', currentTab: 0, children: [{ id: 't3', type: 'leaf', pinned: true, state: { type: 'canvas' } }] },
       ],
     })
+  })
+
+  it('emits currentTab even when the active tab is index 0 (Obsidian always carries it)', () => {
+    // Regression: dropping currentTab at index 0 made "active = first tab"
+    // indistinguishable from "no selection" for a layout-reading plugin.
+    const tree: PaneTree = {
+      activePaneId: 'p',
+      root: { kind: 'pane', id: 'p', tabState: tabs([tab('t1', 'A.md'), tab('t2', 'B.md')], 't1') },
+    }
+    const layout = buildLayoutJson(tree) as { main: { children: Array<{ currentTab?: number }> } }
+    expect(layout.main.children[0]?.currentTab).toBe(0)
+  })
+
+  it('omits currentTab only for a pane with no tabs at all', () => {
+    const tree: PaneTree = { activePaneId: 'p', root: { kind: 'pane', id: 'p', tabState: tabs([], null) } }
+    const layout = buildLayoutJson(tree) as { main: { children: Array<Record<string, unknown>> } }
+    expect(layout.main.children[0]).not.toHaveProperty('currentTab')
   })
 
   it('wraps a single pane in a split, as Obsidian does', () => {

@@ -379,8 +379,8 @@ export class Scope {
    */
   keys: unknown[] = [];
 
-  /** Scope that gets a key no handler here consumed, as in Obsidian. */
-  private readonly parent: Scope | null;
+  /** Scope that gets a key no handler here consumed, as in Obsidian. Public like Obsidian's `Scope.parent`; the stack dispatcher walks this chain. */
+  readonly parent: Scope | null;
 
   constructor(parent?: Scope) {
     this.parent = parent ?? null;
@@ -398,11 +398,16 @@ export class Scope {
   }
 
   /**
-   * Try every registered handler against a keydown event, most recently
-   * registered first. A handler "handles" the event unless it explicitly
-   * returns `false`, matching Obsidian's convention — at which point the
-   * event is prevented from its default action and no further scope on the
-   * stack is consulted. Unhandled keys fall through to the parent scope.
+   * Try every registered handler on THIS scope against a keydown event, most
+   * recently registered first. A handler "handles" the event unless it
+   * explicitly returns `false`, matching Obsidian's convention — at which
+   * point the event is prevented from its default action.
+   *
+   * This checks only the scope's own handlers; fallthrough to the parent (and
+   * across the stack) is driven by {@link dispatchKeydownToScopeStack}, which
+   * walks each scope's parent chain exactly once. Having both this method AND
+   * the dispatcher recurse into `parent` would consult a shared parent twice
+   * for one keydown (see PLUGIN-COMPAT.md).
    */
   handleKey(evt: KeyboardEvent): boolean {
     for (let i = this.handlers.length - 1; i >= 0; i--) {
@@ -415,7 +420,7 @@ export class Scope {
         return true;
       }
     }
-    return this.parent?.handleKey(evt) ?? false;
+    return false;
   }
 }
 
@@ -438,8 +443,18 @@ const scopeStack: Scope[] = [];
  * @returns Whether a handler consumed the event (and therefore already called `preventDefault()`).
  */
 export function dispatchKeydownToScopeStack(evt: KeyboardEvent): boolean {
+  // One traversal only: walk from the top of the stack down, and for each
+  // scope follow its parent chain. A scope reachable both as a stack entry
+  // and as another entry's parent must be asked exactly once — `visited`
+  // enforces that (handleKey itself no longer recurses into parent).
+  const visited = new Set<Scope>();
   for (let i = scopeStack.length - 1; i >= 0; i--) {
-    if (scopeStack[i]!.handleKey(evt)) return true;
+    let scope: Scope | null = scopeStack[i]!;
+    while (scope && !visited.has(scope)) {
+      visited.add(scope);
+      if (scope.handleKey(evt)) return true;
+      scope = scope.parent;
+    }
   }
   return false;
 }

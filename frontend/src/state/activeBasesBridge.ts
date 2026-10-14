@@ -25,6 +25,18 @@ export function setActiveBasesController(controller: ActiveBasesController | nul
   activeController = controller
 }
 
+/**
+ * Clears the active controller ONLY if `controller` is still the registered
+ * one. With Split Panes two BasesView instances can be mounted at once; the
+ * last to mount owns the slot, and an unconditional clear on the other's
+ * unmount would null a slot it no longer owns (the `bases:*` commands would
+ * then report "no base open" while one is visibly active). An unmounting
+ * instance passes its own identity so it clears only its own registration.
+ */
+export function clearActiveBasesController(controller: ActiveBasesController): void {
+  if (activeController === controller) activeController = null
+}
+
 /** Gets the currently-mounted base's controller, or null if no base tab is active. */
 export function getActiveBasesController(): ActiveBasesController | null {
   return activeController
