@@ -79,8 +79,9 @@ Obsidian-compatible vaults — no database, no sync service, no desktop app requ
 See `.kiro/specs/implementation-plan.md` for the prioritized roadmap: Obsidian Themes,
 Public Sharing, Responsive/Mobile, Workspaces & Split-Panes, Server-Side Plugins,
 foreign-format importer, semantic search, collaborative editing, E2E test suite. Bases
-later stages (plugin-contributed views via `registerBasesView()`, card/board views, the
-full formula language) are tracked in `.kiro/specs/bases-plugin-api/` and the Bases spec.
+later stages (card drag-between-columns and the full Obsidian formula language) are tracked
+in `.kiro/specs/bases-plugin-api/` and the Bases spec; plugin-contributed views via
+`registerBasesView()` and the cards/Kanban view are already shipped (see the Bases line above).
 
 ## Language Convention
 
