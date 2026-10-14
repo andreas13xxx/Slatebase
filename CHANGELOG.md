@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.52.1](https://github.com/andreas13xxx/Slatebase/compare/v0.52.0...v0.52.1) (2026-10-14)
+
+
+### Bugfixes
+
+* split-pane tab bar & restore, plugin-compat gaps and split tree for plugins ([#234](https://github.com/andreas13xxx/Slatebase/issues/234)) ([41bb705](https://github.com/andreas13xxx/Slatebase/commit/41bb7058a4dc38b369f8b795d4650dad50524c4a))
+
 ## [0.52.0](https://github.com/andreas13xxx/Slatebase/compare/v0.51.0...v0.52.0) (2026-10-12)
 
 
