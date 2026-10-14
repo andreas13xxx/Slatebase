@@ -5,8 +5,11 @@
  * Requirements: 6.3, 6.4, 7.5, 7.6
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
+import { THEME_CHANGE_EVENT } from './body-classes'
+import { publishPaneLayout, resetPaneLayoutForTests } from './pane-split-bridge'
+import type { PaneTree } from '../../state/paneTreeState'
 import { usePluginEventBridge } from './plugin-event-bridge'
 import { WorkspaceShim } from './shims/workspace-shim'
 import { MetadataCacheShim } from './shims/metadata-cache-shim'
@@ -894,6 +897,49 @@ describe('usePluginEventBridge', () => {
       rerender({ tabState: updatedTabState })
 
       expect(changedCb).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('Pane tree → workspace layout mirror', () => {
+    afterEach(() => resetPaneLayoutForTests())
+
+    it('applies the latest published tree on mount and every later one', () => {
+      const single: PaneTree = {
+        activePaneId: 'p1',
+        root: { kind: 'pane', id: 'p1', tabState: { tabs: [], activeTabId: null, closedTabsHistory: [] } },
+      }
+      publishPaneLayout(single)
+      renderHook(() =>
+        usePluginEventBridge({ tabState: baseTabState, directoryTree: mockTree, workspaceShim, metadataCacheShim }),
+      )
+      expect(workspaceShim.rootSplit.children).toHaveLength(1)
+
+      publishPaneLayout({
+        activePaneId: 'p1',
+        root: {
+          kind: 'split', id: 's', direction: 'vertical', sizes: [0.5, 0.5],
+          children: [single.root, { kind: 'pane', id: 'p2', tabState: { tabs: [], activeTabId: null, closedTabsHistory: [] } }],
+        },
+      })
+      expect(workspaceShim.rootSplit.children).toHaveLength(2)
+      expect(workspaceShim.rootSplit.direction).toBe('horizontal')
+    })
+  })
+
+  describe('Theme flip → workspace css-change', () => {
+    it('triggers css-change on the workspace when the theme changes', () => {
+      const cssChange = vi.fn()
+      workspaceShim.on('css-change', cssChange)
+      renderHook(() =>
+        usePluginEventBridge({
+          tabState: baseTabState,
+          directoryTree: mockTree,
+          workspaceShim,
+          metadataCacheShim,
+        }),
+      )
+      window.dispatchEvent(new Event(THEME_CHANGE_EVENT))
+      expect(cssChange).toHaveBeenCalledTimes(1)
     })
   })
 })

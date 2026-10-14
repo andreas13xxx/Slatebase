@@ -13,6 +13,7 @@ import type { IApiClient } from '../../api'
 import type { TabEntry } from '../../state/tabState'
 import type { PublicUserInfo } from '../../state/authState'
 import { zoomIn, zoomOut, resetZoom } from '../../state/zoomStore'
+import { setActiveBasesController } from '../../state/activeBasesBridge'
 
 vi.mock('../../state/zoomStore', () => ({
   zoomIn: vi.fn(),
@@ -1251,6 +1252,56 @@ describe('registerCoreAppCommands — footnotes and commands without an equivale
 
     expect(toastSpy).toHaveBeenNthCalledWith(1, 'info', expect.stringContaining('Bases'))
     expect(toastSpy).toHaveBeenNthCalledWith(2, 'info', expect.stringContaining('server'))
+    toastSpy.mockRestore()
+  })
+
+  it('registers every core command ID exactly once (a later duplicate silently wins)', () => {
+    const registry = new CommandRegistry()
+    const addSpy = vi.spyOn(registry, 'addCommand')
+    registerCoreAppCommands(registry, () => makeMinimalHandlers({ activeTab: makeTab() }))
+
+    const ids = addSpy.mock.calls.map(([pluginId, cmd]) => `${pluginId}:${cmd.id}`)
+    expect(ids.filter((id, i) => ids.indexOf(id) !== i)).toEqual([])
+  })
+
+  it('creates a base for bases:new-file instead of a stale "unsupported" duplicate', () => {
+    const registry = new CommandRegistry()
+    const handlers = { ...makeMinimalHandlers({ activeTab: makeTab() }), onCreateBase: vi.fn() }
+    registerCoreAppCommands(registry, () => handlers)
+
+    registry.executeCommand('bases:new-file')
+
+    expect(handlers.onCreateBase).toHaveBeenCalledTimes(1)
+  })
+
+  it('routes bases:change-view / add-view / copy-table to the active base', async () => {
+    const toastSpy = vi.spyOn(ToastNotificationModule, 'showToast').mockImplementation(() => {})
+    const controller = { nextView: vi.fn(() => true), addView: vi.fn(() => true), copyTable: vi.fn(async () => true) }
+    setActiveBasesController(controller)
+    const registry = new CommandRegistry()
+    registerCoreAppCommands(registry, () => makeMinimalHandlers({ activeTab: makeTab() }))
+
+    registry.executeCommand('bases:change-view')
+    registry.executeCommand('bases:add-view')
+    registry.executeCommand('bases:copy-table')
+    await Promise.resolve()
+
+    expect(controller.nextView).toHaveBeenCalled()
+    expect(controller.addView).toHaveBeenCalled()
+    expect(controller.copyTable).toHaveBeenCalled()
+    expect(toastSpy).toHaveBeenCalledWith('success', expect.any(String))
+    setActiveBasesController(null)
+    toastSpy.mockRestore()
+  })
+
+  it('reports when no base is open', () => {
+    const toastSpy = vi.spyOn(ToastNotificationModule, 'showToast').mockImplementation(() => {})
+    const registry = new CommandRegistry()
+    registerCoreAppCommands(registry, () => makeMinimalHandlers({ activeTab: makeTab() }))
+
+    registry.executeCommand('bases:add-view')
+
+    expect(toastSpy).toHaveBeenCalledWith('error', expect.stringContaining('Base'))
     toastSpy.mockRestore()
   })
 

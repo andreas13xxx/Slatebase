@@ -43,6 +43,7 @@ import { translateCoreCommandName, unsupportedCommandMessage, type UnsupportedRe
 import { parseFrontmatter } from '../../components/context-panel/utils/parseFrontmatter'
 import { locateFrontmatterBlock, serializeFrontmatter } from '../../utils/frontmatterWriter'
 import { getActiveCanvasController } from '../../state/activeCanvasBridge'
+import { getActiveBasesController } from '../../state/activeBasesBridge'
 import { parseCanvas } from '../../canvas'
 import { canvasToMarkdown } from '../../canvas/canvasToMarkdown'
 import { zoomIn, zoomOut, resetZoom } from '../../state/zoomStore'
@@ -712,7 +713,7 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'workspace:new-window', name: 'New window', unsupported: 'native-windows' },
     { id: 'workspace:close-window', name: 'Close window', unsupported: 'native-windows' },
     { id: 'workspace:open-in-new-window', name: 'Open current tab in new window', unsupported: 'native-windows' },
-    { id: 'workspace:toggle-stacked-tabs', name: 'Toggle stacked tabs', unsupported: 'tab-layout' },
+    { id: 'workspace:toggle-stacked-tabs', name: 'Toggle stacked tabs', unsupported: 'stacked-tabs' },
     { id: 'workspace:copy-url', name: 'Copy Obsidian URL for current file', unsupported: 'url-scheme' },
     { id: 'workspace:export-pdf', name: 'Export to PDF...', run: exportActiveFileToPdf },
 
@@ -812,19 +813,34 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'bookmarks:bookmark-current-view', name: 'Bookmarks: Bookmark...', run: (h) => { const t = getActiveTab(h); if (t && h.vaultId) favoritesStore.add(h.vaultId, t.filePath) } },
     { id: 'bookmarks:unbookmark-current-view', name: 'Bookmarks: Remove bookmark for the current file', run: (h) => { const t = getActiveTab(h); if (t && h.vaultId) favoritesStore.remove(h.vaultId, t.filePath) } },
     { id: 'file-recovery:open', name: 'File recovery: Open local history', run: (h) => { const t = getActiveTab(h); if (t) window.dispatchEvent(new CustomEvent('slatebase:open-file-recovery', { detail: { vaultId: t.vaultId, filePath: t.filePath } })) } },
-    // No Bases (table-view-over-folder) feature, and "open in default app" /
-    // "show in system explorer" are desktop-only concepts that cannot exist for
-    // a file stored on a remote server.
+    // "Open in default app" / "show in system explorer" are desktop-only
+    // concepts that cannot exist for a file stored on a remote server.
     { id: 'footnotes:open', name: 'Show footnotes', run: showFootnotes },
     { id: 'note-composer:extract-heading', name: 'Note composer: Extract this heading...', run: (h) => { void extractHeadingToFile(h) } },
     { id: 'note-composer:merge-file', name: 'Note composer: Merge current file with another file...', run: (h) => { void mergeActiveFileInto(h) } },
     { id: 'note-composer:split-file', name: 'Note composer: Extract current selection...', run: (h) => { void splitFileFromSelection(h) } },
-    { id: 'bases:add-item', name: 'Bases: Add item', unsupported: 'bases' },
-    { id: 'bases:add-view', name: 'Bases: Add view', unsupported: 'bases' },
-    { id: 'bases:change-view', name: 'Bases: Change view', unsupported: 'bases' },
-    { id: 'bases:copy-table', name: 'Bases: Copy table to clipboard', unsupported: 'bases' },
-    { id: 'bases:insert', name: 'Bases: Insert new base', unsupported: 'bases' },
-    { id: 'bases:new-file', name: 'Bases: Create new base', unsupported: 'bases' },
+    // bases:new-file is registered with the canvas commands above.
+    { id: 'bases:add-item', name: 'Bases: Add item', unsupported: 'bases-add-item' },
+    { id: 'bases:insert', name: 'Bases: Insert new base', unsupported: 'bases-embed' },
+    {
+      id: 'bases:add-view',
+      name: 'Bases: Add view',
+      run: () => { if (!getActiveBasesController()?.addView()) showToast('error', 'Keine bearbeitbare Base geöffnet') },
+    },
+    {
+      id: 'bases:change-view',
+      name: 'Bases: Change view',
+      run: () => { if (!getActiveBasesController()?.nextView()) showToast('info', 'Diese Base hat nur eine Ansicht') },
+    },
+    {
+      id: 'bases:copy-table',
+      name: 'Bases: Copy table to clipboard',
+      run: async () => {
+        const controller = getActiveBasesController()
+        if (await controller?.copyTable()) showToast('success', 'Tabelle in die Zwischenablage kopiert')
+        else showToast('error', 'Keine Tabellenansicht einer Base geöffnet')
+      },
+    },
     { id: 'open-with-default-app:open', name: 'Open in default app', unsupported: 'desktop-shell' },
     { id: 'open-with-default-app:show', name: 'Show in system explorer', unsupported: 'desktop-shell' },
     { id: 'switcher:open', name: 'Quick switcher: Open quick switcher', run: (h) => h.onOpenQuickSwitcher() },

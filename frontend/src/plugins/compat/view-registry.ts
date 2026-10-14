@@ -436,6 +436,74 @@ export class TextFileView extends ItemView {
   }
 }
 
+// ─── Layout tree (Obsidian's WorkspaceItem hierarchy) ─────────────────────────
+//
+// Real Obsidian: WorkspaceItem ← WorkspaceParent ← WorkspaceSplit/WorkspaceTabs,
+// WorkspaceSplit ← WorkspaceContainer ← WorkspaceRoot, WorkspaceSplit ←
+// WorkspaceSidedock, and WorkspaceItem ← WorkspaceLeaf. `WorkspaceShim.rootSplit`
+// mirrors Slatebase's pane tree with these classes (see
+// `WorkspaceShim.setPaneLayout()`), so plugins that walk `rootSplit.children`
+// or check `leaf.parent instanceof WorkspaceTabs` see the actual split panes.
+
+/** Base of every layout node. */
+export class WorkspaceItem {
+  /** The enclosing split or tab group; `null` at the root of an area. */
+  parent: WorkspaceParent | null = null
+
+  /** Walks up to the root of this item's area (`rootSplit`, `leftSplit`, `rightSplit`). */
+  getRoot(): WorkspaceItem {
+    return this.parent ? this.parent.getRoot() : this
+  }
+
+  /** The nearest enclosing container (the window root in a single-window app). */
+  getContainer(): WorkspaceContainer | null {
+    const root = this.getRoot()
+    return root instanceof WorkspaceContainer ? root : null
+  }
+}
+
+/** A layout node with children (split or tab group). */
+export class WorkspaceParent extends WorkspaceItem {
+  children: WorkspaceItem[] = []
+}
+
+/**
+ * A split. `direction` uses Obsidian's naming, which names the *divider*:
+ * `'vertical'` = children side by side, `'horizontal'` = children stacked.
+ */
+export class WorkspaceSplit extends WorkspaceParent {
+  readonly type: string = 'split'
+  direction: 'vertical' | 'horizontal' = 'vertical'
+}
+
+/** A tab group — one Slatebase pane. `children` are its leaves. */
+export class WorkspaceTabs extends WorkspaceParent {
+  readonly type: string = 'tabs'
+  /** Index of the active tab within `children`. */
+  currentTab = 0
+}
+
+/** A split that owns a window/document (Obsidian: root split or popout window). */
+export class WorkspaceContainer extends WorkspaceSplit {
+  get win(): Window { return window }
+  get doc(): Document { return document }
+}
+
+/** The main editing area's root split (`workspace.rootSplit`). */
+export class WorkspaceRoot extends WorkspaceContainer {}
+
+/**
+ * A sidebar split (`workspace.leftSplit`/`rightSplit`). Collapsing is not
+ * wired to Slatebase's sidebars, so these stay no-ops and `collapsed` stays
+ * `false` rather than reporting a state the UI does not show.
+ */
+export class WorkspaceSidedock extends WorkspaceSplit {
+  readonly collapsed = false
+  toggle(): void {}
+  collapse(): void {}
+  expand(): void {}
+}
+
 /**
  * WorkspaceLeaf — Stub for Obsidian's WorkspaceLeaf.
  *
@@ -443,7 +511,7 @@ export class TextFileView extends ItemView {
  * In Slatebase, we use a simplified version that just holds the view instance
  * and provides the `setViewState` / `open` interface.
  */
-export class WorkspaceLeaf {
+export class WorkspaceLeaf extends WorkspaceItem {
   /** The view currently rendered in this leaf */
   view: ItemView | null = null
   /** Reference to the app instance */
@@ -466,18 +534,21 @@ export class WorkspaceLeaf {
    */
   hoverPopover: unknown = null
   /**
-   * The leaf's direct parent (a WorkspaceTabs/WorkspaceMobileDrawer in real
-   * Obsidian). Slatebase has no such split/tab-group hierarchy to expose, so
-   * this stays null — plugins doing `leaf.parent instanceof WorkspaceTabs`
-   * (tab-group detection) get a clean `false` instead of a crash.
+   * Linked-view group id (`setGroup()`/`setGroupMember()`), `null` when the
+   * leaf is in no group. `workspace.getGroupLeaves(group)` reads it.
    */
-  parent: unknown = null
+  group: string | null = null
+
+  // `parent` (inherited from WorkspaceItem) is the WorkspaceTabs of the pane
+  // that shows this leaf's tab — kept current by WorkspaceShim.setPaneLayout().
+  // Sidebar leaves and leaves without a tab stay `null`.
 
   private readonly registry: ViewRegistry
   private readonly leafEvents = new EventSystem()
   private pinned = false
 
   constructor(app: unknown, registry: ViewRegistry, location: LeafLocation) {
+    super()
     this.app = app
     this.registry = registry
     this.location = location
@@ -507,10 +578,8 @@ export class WorkspaceLeaf {
   }
 
   /**
-   * Pinning/tab-groups have no equivalent in Slatebase's tab model. These
-   * track just enough state for `togglePinned()`/`setPinned()` round-trips
-   * and fire the real 'pinned-change' event plugins may listen for; the
-   * group methods are no-ops since there's nothing to group leaves into.
+   * Leaf pinning tracks just enough state for `togglePinned()`/`setPinned()`
+   * round-trips and fires the real 'pinned-change' event plugins may listen for.
    */
   togglePinned(): void {
     this.setPinned(!this.pinned)
@@ -522,9 +591,23 @@ export class WorkspaceLeaf {
     this.leafEvents.trigger('pinned-change', pinned)
   }
 
-  setGroupMember(_other: WorkspaceLeaf): void {}
+  /**
+   * Link this leaf with `other` (Obsidian's linked views, e.g. a linked
+   * outline or backlinks pane). Joins `other`'s group, creating one first if
+   * `other` has none.
+   */
+  setGroupMember(other: WorkspaceLeaf): void {
+    if (!other.group) other.setGroup(`group-${Math.random().toString(36).slice(2, 10)}`)
+    this.setGroup(other.group ?? '')
+  }
 
-  setGroup(_group: string): void {}
+  /** Put this leaf into a linked-view group (empty string leaves every group). */
+  setGroup(group: string): void {
+    const next = group || null
+    if (this.group === next) return
+    this.group = next
+    this.leafEvents.trigger('group-change', next)
+  }
 
   /** Called by Obsidian when the leaf is resized. No layout to react to here. */
   onResize(): void {}
@@ -776,8 +859,8 @@ export class WorkspaceLeaf {
    * against `workspace.leftSplit`/`rightSplit`/`rootSplit` to tell sidebar
    * leaves from main-area ones and which sidebar they're in.
    */
-  getRoot(): unknown {
-    const workspace = (this.app as { workspace?: { rootSplit?: unknown; rightSplit?: unknown; leftSplit?: unknown } })?.workspace
+  override getRoot(): WorkspaceItem {
+    const workspace = (this.app as { workspace?: { rootSplit?: WorkspaceItem; rightSplit?: WorkspaceItem; leftSplit?: WorkspaceItem } })?.workspace
     if (this.location === 'right-sidebar') {
       return workspace?.rightSplit ?? this
     }
@@ -860,6 +943,8 @@ export class WorkspaceLeaf {
       'containerEl',
       'hoverPopover',
       'parent',
+      'group',
+      'getContainer',
       'on',
       'off',
       'offref',
@@ -933,29 +1018,6 @@ export class WorkspaceLeaf {
         };
       },
     }) as WorkspaceLeaf & Record<string, unknown>;
-  }
-}
-
-/**
- * WorkspaceSplit — real Obsidian's layout-tree node for split panes. Slatebase
- * has no split tree (flat tab model), so `WorkspaceShim.rootSplit`/`leftSplit`/
- * `rightSplit` never form an actual tree — this class exists purely so those
- * stub objects have a correct `instanceof` identity instead of being anonymous
- * object literals, for plugins that defensively probe layout objects.
- */
-export class WorkspaceSplit {
-  readonly type = 'split' as const
-
-  /**
-   * Real Obsidian's WorkspaceParent.getRoot() walks up to the root of its split
-   * tree via `this.parent ? this.parent.getRoot() : this`. Slatebase's
-   * rootSplit/leftSplit/rightSplit stubs (see WorkspaceShim) have no parent
-   * chain and are each already the root of their own area, so this just
-   * returns `this` — matching day-planner's `isLeafInSidebar`, which calls
-   * `.getRoot()` on the split a leaf's own `getRoot()` returned.
-   */
-  getRoot(): WorkspaceSplit {
-    return this
   }
 }
 

@@ -147,6 +147,17 @@ describe('Keymap scope stack / dispatchKeydownToScopeStack', () => {
     expect(order).toEqual(['inner'])
   })
 
+  it('passes a key its own handlers did not consume to the parent scope', () => {
+    const parent = new Scope()
+    const child = new Scope(parent)
+    let parentCalled = false
+    parent.register([], 'Escape', () => { parentCalled = true })
+    push(child)
+
+    expect(dispatchKeydownToScopeStack(keydown('Escape'))).toBe(true)
+    expect(parentCalled).toBe(true)
+  })
+
   it('falls through to an outer scope when the inner one does not handle the key', () => {
     const outer = new Scope()
     const inner = new Scope()

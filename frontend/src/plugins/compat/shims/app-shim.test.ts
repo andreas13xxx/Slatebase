@@ -422,4 +422,23 @@ describe('AppShim', () => {
       expect(() => app.saveLocalStorage('any', null)).not.toThrow();
     });
   });
+
+  describe('theme helpers through the plugin-facing proxy', () => {
+    afterEach(() => {
+      document.documentElement.removeAttribute('data-theme');
+    });
+
+    it('isDarkMode() follows the displayed theme', () => {
+      const app = AppShim.wrapWithProxy(new AppShim({ vault, workspace, metadataCache, pluginId: 'test-plugin' }));
+      document.documentElement.setAttribute('data-theme', 'dark');
+      expect(app.isDarkMode()).toBe(true);
+      document.documentElement.setAttribute('data-theme', 'light');
+      expect(app.isDarkMode()).toBe(false);
+    });
+
+    it('getAccentColor() reaches the real implementation instead of the gap no-op', () => {
+      const app = AppShim.wrapWithProxy(new AppShim({ vault, workspace, metadataCache, pluginId: 'test-plugin' }));
+      expect(typeof app.getAccentColor()).toBe('string');
+    });
+  });
 });

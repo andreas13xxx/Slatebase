@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { detectPlatform, type PlatformEnvironment } from './platform-detection'
+import { VaultShim } from './shims/vault-shim'
+import type { IApiClient } from '../../api/index'
+import type { DirectoryTree } from '../../types'
+import type { TFile } from './types'
 
 /** Real user-agent strings, so the heuristics are pinned to actual devices. */
 const UA = {
@@ -176,5 +180,12 @@ describe('detectPlatform', () => {
         expect(p.isPhone && p.isTablet).toBe(false)
       }
     })
+  })
+
+  it('reports a resourcePathPrefix that vault.getResourcePath() URLs start with', () => {
+    const p = detectPlatform(desktop(UA.macChrome))
+    const resourcePath = new VaultShim('v1', 'Vault', {} as IApiClient, null as unknown as DirectoryTree)
+      .getResourcePath({ path: 'a b.png' } as TFile)
+    expect(resourcePath.startsWith(p.resourcePathPrefix)).toBe(true)
   })
 })

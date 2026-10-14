@@ -7,7 +7,7 @@ import { PaneTreeProvider, usePaneTree } from './state/paneTreeContext'
 import { PaneTabProvider } from './state/paneTabContext'
 import { PaneTreeView } from './components/panes/PaneTreeView'
 import { generatePaneId, type SplitDirection } from './state/paneTreeState'
-import { onRequestPaneSplit, offRequestPaneSplit } from './plugins/compat/pane-split-bridge'
+import { onRequestPaneSplit, offRequestPaneSplit, publishPaneLayout } from './plugins/compat/pane-split-bridge'
 import { NavigationHistoryProvider, useNavigationHistory } from './state/navigationHistoryContext'
 import { FeatureProvider, useFeatureContext } from './state/featureContext'
 import { SearchProvider } from './state/searchContext'
@@ -985,6 +985,12 @@ function AppContent() {
     onRequestPaneSplit(handleSplit)
     return () => { offRequestPaneSplit(handleSplit) }
   }, [paneTreeDispatch])
+
+  // The reverse direction: publish every pane tree so the plugin workspace
+  // shim can mirror it into rootSplit / leaf.parent / getLayout().
+  useEffect(() => {
+    publishPaneLayout(paneTree)
+  }, [paneTree])
 
   const settingsTabs: SettingsTabDescriptor[] = openSettingsPages.map((page) => {
     const isActive = isShowingSettings && page === activeSettingsPage

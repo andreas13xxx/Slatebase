@@ -20,6 +20,7 @@ import type { BaseDocument, BaseRow, BaseSortClause, BaseView } from '../../base
 import { applyFrontmatterChange } from '../../utils/frontmatterWriter'
 import { parseFrontmatter } from '../context-panel/utils/parseFrontmatter'
 import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
+import { setActiveBasesController, tableToTsv } from '../../state/activeBasesBridge'
 import { extractErrorMessage } from '../../utils/error'
 import { hasBasesViewRegistration } from '../../plugins/compat/bases-view-registry'
 import { ErrorBoundary } from '../ErrorBoundary'
@@ -136,6 +137,39 @@ export const BasesView = memo(function BasesView({
     onSaveSource(serializeBase({ ...doc, views: nextViews }))
   }, [doc, activeView, readOnly, onSaveSource, safeIndex])
 
+  // Expose this base to the `bases:*` core commands (single-active-instance,
+  // same as activeCanvasBridge).
+  const rootRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    setActiveBasesController({
+      nextView: () => {
+        if (views.length < 2) return false
+        setSelectedViewIndex((safeIndex + 1) % views.length)
+        setMode('view')
+        return true
+      },
+      addView: () => {
+        if (!doc || readOnly) return false
+        const name = `Tabelle ${doc.views.length + 1}`
+        onSaveSource(serializeBase({ ...doc, views: [...doc.views, { type: 'table', name }] }))
+        setSelectedViewIndex(doc.views.length)
+        setMode('view')
+        return true
+      },
+      copyTable: async () => {
+        const table = rootRef.current?.querySelector<HTMLTableElement>('table.bases-table')
+        if (!table) return false
+        try {
+          await navigator.clipboard.writeText(tableToTsv(table))
+          return true
+        } catch {
+          return false
+        }
+      },
+    })
+    return () => setActiveBasesController(null)
+  }, [views.length, safeIndex, doc, readOnly, onSaveSource])
+
   // Stable callback for the plugin host to report a render/query failure.
   const handlePluginViewError = useCallback((message: string) => {
     setPluginViewError(message)
@@ -153,7 +187,7 @@ export const BasesView = memo(function BasesView({
   }
 
   return (
-    <div className="bases-view">
+    <div className="bases-view" ref={rootRef}>
       <div className="bases-view__toolbar">
         <span className="bases-view__title">{activeView?.name ?? 'Base'}</span>
         {/* View switcher: one button per declared view (plugin or built-in table). */}

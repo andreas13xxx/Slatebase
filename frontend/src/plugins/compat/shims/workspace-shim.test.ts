@@ -2,7 +2,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { WorkspaceShim } from './workspace-shim';
 import { clearApiGaps } from '../api-gap-registry';
-import { ItemView, ViewRegistry, WorkspaceLeaf, WorkspaceSplit, WorkspaceRibbon } from '../view-registry';
+import { ItemView, ViewRegistry, WorkspaceLeaf, WorkspaceSplit, WorkspaceRibbon, WorkspaceRoot, WorkspaceSidedock, WorkspaceTabs } from '../view-registry';
+import type { PaneTree } from '../../../state/paneTreeState';
+import type { TabEntry } from '../../../state/tabState';
 import { resetLogDedup } from '../log';
 import { registerFileExplorerRow, clearFileExplorerDomRegistry } from '../file-explorer-dom-registry';
 import type { TFile } from '../types';
@@ -110,6 +112,91 @@ describe('WorkspaceShim', () => {
       expect(workspace.rootSplit.getRoot()).toBe(workspace.rootSplit);
       expect(workspace.leftSplit.getRoot()).toBe(workspace.leftSplit);
       expect(workspace.rightSplit.getRoot()).toBe(workspace.rightSplit);
+    });
+
+    it('uses the Obsidian root/sidedock classes', () => {
+      expect(workspace.rootSplit).toBeInstanceOf(WorkspaceRoot);
+      expect(workspace.leftSplit).toBeInstanceOf(WorkspaceSidedock);
+    });
+  });
+
+  describe('pane layout mirror', () => {
+    function tabEntry(id: string, filePath: string): TabEntry {
+      return { id, vaultId: 'v', filePath, fileName: filePath, mode: 'edit', isBinary: false, content: '', editBuffer: null, loading: false, error: null, pinned: false };
+    }
+
+    function twoPanes(rightTabs: TabEntry[]): PaneTree {
+      return {
+        activePaneId: 'left',
+        root: {
+          kind: 'split', id: 's', direction: 'horizontal', sizes: [0.5, 0.5],
+          children: [
+            { kind: 'pane', id: 'left', tabState: { tabs: [tabEntry('t1', 'Note.md')], activeTabId: 't1', closedTabsHistory: [] } },
+            { kind: 'pane', id: 'right', tabState: { tabs: rightTabs, activeTabId: rightTabs[0]?.id ?? null, closedTabsHistory: [] } },
+          ],
+        },
+      };
+    }
+
+    it('mirrors panes into rootSplit and parents a plugin view leaf to its pane', async () => {
+      const registry = new ViewRegistry();
+      workspace.setViewRegistry(registry, {});
+      class KanbanView extends ItemView {
+        override getViewType(): string { return 'kanban'; }
+      }
+      registry.registerView('kanban', (leaf) => new KanbanView(leaf as WorkspaceLeaf), 'kanban-plugin');
+      const leaf = workspace.getLeaf(true);
+      await leaf.setViewState({ type: 'kanban' });
+
+      workspace.setPaneLayout(twoPanes([tabEntry('t2', '__view::kanban')]));
+
+      expect(workspace.rootSplit.direction).toBe('vertical');
+      const right = workspace.rootSplit.children[1];
+      expect(right).toBeInstanceOf(WorkspaceTabs);
+      expect(leaf.parent).toBe(right);
+      expect((right as WorkspaceTabs).children).toContain(leaf);
+    });
+
+    it('fires layout-change on structural changes only', () => {
+      const onLayout = vi.fn();
+      workspace.on('layout-change', onLayout);
+
+      workspace.setPaneLayout(twoPanes([]));
+      expect(onLayout).not.toHaveBeenCalled(); // first tree is the baseline
+
+      const edited = twoPanes([]);
+      workspace.setPaneLayout(edited);
+      expect(onLayout).not.toHaveBeenCalled();
+
+      workspace.setPaneLayout(twoPanes([tabEntry('t9', 'Other.md')]));
+      expect(onLayout).toHaveBeenCalledTimes(1);
+    });
+
+    it('getLayout() returns the real pane tree', () => {
+      workspace.setPaneLayout(twoPanes([tabEntry('t2', 'Board.canvas')]));
+      const layout = workspace.getLayout() as { main: { type: string; children: unknown[] } };
+      expect(layout.main.type).toBe('split');
+      expect(layout.main.children).toHaveLength(2);
+    });
+  });
+
+  describe('getGroupLeaves()', () => {
+    it('returns the leaves linked via setGroup / setGroupMember', () => {
+      const registry = new ViewRegistry();
+      workspace.setViewRegistry(registry, {});
+      const a = workspace.getLeaf(true);
+      const b = workspace.getLeaf(true);
+      const c = workspace.getLeaf(true);
+      const groupChange = vi.fn();
+      b.on('group-change', groupChange);
+
+      b.setGroupMember(a);
+
+      expect(a.group).toBeTruthy();
+      expect(workspace.getGroupLeaves(a.group!)).toEqual([a, b]);
+      expect(groupChange).toHaveBeenCalledWith(a.group);
+      expect(workspace.getGroupLeaves('nope')).toEqual([]);
+      void c;
     });
   });
 
@@ -1014,6 +1101,23 @@ describe('WorkspaceShim', () => {
         const leaf = workspace.getUnpinnedLeaf();
         expect(leaf).toBeDefined();
         expect(leaf.location).toBe('main');
+      });
+
+      it('behaves like getLeaf(false): reuses an idle leaf instead of opening a new tab', () => {
+        const first = workspace.getUnpinnedLeaf();
+        expect(workspace.getUnpinnedLeaf()).toBe(first);
+      });
+    });
+
+    describe('before a ViewRegistry is attached', () => {
+      it('returns detached leaves instead of throwing', () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const detached = new WorkspaceShim();
+        expect(detached.getLeaf(true).location).toBe('main');
+        expect(detached.getRightLeaf().location).toBe('right-sidebar');
+        expect(detached.getLeftLeaf().location).toBe('left-sidebar');
+        expect(detached.getUnpinnedLeaf().location).toBe('main');
+        warnSpy.mockRestore();
       });
     });
 

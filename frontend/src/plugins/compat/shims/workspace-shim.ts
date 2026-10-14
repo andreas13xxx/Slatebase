@@ -3,8 +3,9 @@ import { debugOnce, warnOnce } from '../log';
 import { resolveWikilinkTarget } from '../../link-resolver';
 import type { DirectoryTree } from '../../../types';
 import type { EventRef, IWorkspaceShim, TFile } from '../types';
-import { WorkspaceLeaf, WorkspaceSplit, WorkspaceRibbon } from '../view-registry';
-import type { ViewRegistry } from '../view-registry';
+import { ViewRegistry, WorkspaceLeaf, WorkspaceRibbon, WorkspaceRoot, WorkspaceSidedock } from '../view-registry';
+import { buildLayoutJson, mirrorPaneTree, paneLayoutSignature, VIEW_TAB_PREFIX } from '../pane-layout';
+import type { TabEntry } from '../../../state/tabState';
 import { EditorShim } from '../editor-shim';
 import type { IEditor } from '../editor-shim';
 import { refreshPluginExtensions, getActiveEditorContainerEl, setEditorContainerMountedListener } from '../../../editor/plugin-extensions';
@@ -19,7 +20,7 @@ import {
   getHoverLinkSources,
 } from '../hover-link-bus';
 import { requestPaneSplit } from '../pane-split-bridge';
-import type { SplitDirection } from '../../../state/paneTreeState';
+import type { PaneTree, SplitDirection } from '../../../state/paneTreeState';
 
 /**
  * Map an Obsidian split direction (which names the DIVIDER) to our
@@ -259,6 +260,8 @@ export class WorkspaceShim implements IWorkspaceShim {
    */
   private fileExplorerLeaf: WorkspaceLeaf | null = null;
   private viewRegistry: ViewRegistry | null = null;
+  /** Fallback for leaf requests before `setViewRegistry()` — see `leafRegistry()`. */
+  private detachedRegistry: ViewRegistry | null = null;
   private app: unknown = null;
   private directoryTree: DirectoryTree | null = null;
   private onOpenFile: ((filePath: string) => void) | null = null;
@@ -307,6 +310,22 @@ export class WorkspaceShim implements IWorkspaceShim {
   setViewRegistry(registry: ViewRegistry, app: unknown): void {
     this.viewRegistry = registry;
     this.app = app;
+  }
+
+  /**
+   * The attached ViewRegistry, or — if a plugin asks for a leaf before the
+   * PluginProvider attached one — a private detached registry, so the leaf
+   * factories below return a usable (if never rendered) leaf instead of
+   * throwing on `null.createLeaf()`.
+   */
+  private leafRegistry(): ViewRegistry {
+    if (this.viewRegistry) return this.viewRegistry;
+    warnOnce(
+      'WorkspaceShim.leafRegistry.notAttached',
+      '[WorkspaceShim] leaf requested before ViewRegistry attached — returning a detached leaf.',
+    );
+    this.detachedRegistry ??= new ViewRegistry();
+    return this.detachedRegistry;
   }
 
   /**
@@ -512,8 +531,7 @@ export class WorkspaceShim implements IWorkspaceShim {
    */
   getLeaf(newLeaf?: boolean | string): WorkspaceLeaf {
     if (!this.viewRegistry) {
-      // Should not happen in practice — create a leaf anyway if registry is available later
-      return this.withEmptyView(this.viewRegistry!.createLeaf(this.app, 'main'));
+      return this.withEmptyView(this.leafRegistry().createLeaf(this.app, 'main'));
     }
 
     // getLeaf('split') — real split into a new pane. requestPaneSplit flips the
@@ -565,10 +583,7 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Creates a leaf with location 'right-sidebar'.
    */
   getRightLeaf(_split?: boolean): WorkspaceLeaf {  
-    if (!this.viewRegistry) {
-      return this.viewRegistry!.createLeaf(this.app, 'right-sidebar');
-    }
-    return this.viewRegistry.createLeaf(this.app, 'right-sidebar');
+    return this.leafRegistry().createLeaf(this.app, 'right-sidebar');
   }
 
   /**
@@ -576,10 +591,7 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Creates a leaf with location 'left-sidebar'.
    */
   getLeftLeaf(_split?: boolean): WorkspaceLeaf {
-    if (!this.viewRegistry) {
-      return this.viewRegistry!.createLeaf(this.app, 'left-sidebar');
-    }
-    return this.viewRegistry.createLeaf(this.app, 'left-sidebar');
+    return this.leafRegistry().createLeaf(this.app, 'left-sidebar');
   }
 
   /**
@@ -643,16 +655,12 @@ export class WorkspaceShim implements IWorkspaceShim {
   }
 
   /**
-   * Get an unpinned leaf. Real Obsidian reuses an existing unpinned leaf;
-   * Slatebase doesn't implement that leaf-reuse search (tabs do have a real
-   * `pinned` flag as of the `workspace:toggle-pin` command, but nothing here
-   * queries it) — this always creates a new leaf with location 'main'.
+   * Deprecated alias of `getLeaf(false)` — obsidian.d.ts: "use getLeaf(false)
+   * instead which does the same thing". Reuses an idle leaf rather than
+   * always opening a new tab.
    */
   getUnpinnedLeaf(): WorkspaceLeaf {
-    if (!this.viewRegistry) {
-      return this.viewRegistry!.createLeaf(this.app, 'main');
-    }
-    return this.viewRegistry.createLeaf(this.app, 'main');
+    return this.getLeaf(false);
   }
 
   /**
@@ -685,10 +693,7 @@ export class WorkspaceShim implements IWorkspaceShim {
     if (!split) {
       debugOnce('WorkspaceShim.createLeafBySplit.fallback', '[WorkspaceShim] createLeafBySplit: no pane host mounted — created a new tab instead.');
     }
-    if (!this.viewRegistry) {
-      return this.viewRegistry!.createLeaf(this.app, 'main');
-    }
-    return this.withEmptyView(this.viewRegistry.createLeaf(this.app, 'main'));
+    return this.withEmptyView(this.leafRegistry().createLeaf(this.app, 'main'));
   }
 
   /**
@@ -700,10 +705,7 @@ export class WorkspaceShim implements IWorkspaceShim {
     if (!split) {
       debugOnce('WorkspaceShim.splitActiveLeaf.fallback', '[WorkspaceShim] splitActiveLeaf: no pane host mounted — created a new tab instead.');
     }
-    if (!this.viewRegistry) {
-      return this.viewRegistry!.createLeaf(this.app, 'main');
-    }
-    return this.withEmptyView(this.viewRegistry.createLeaf(this.app, 'main'));
+    return this.withEmptyView(this.leafRegistry().createLeaf(this.app, 'main'));
   }
 
   /**
@@ -1159,15 +1161,63 @@ export class WorkspaceShim implements IWorkspaceShim {
   }
 
   /**
-   * Workspace splits — stub objects for plugins that access layout structure.
-   * Built on `WorkspaceSplit` (rather than plain object literals) so that
-   * `rootSplit instanceof WorkspaceSplit` etc. hold for plugins that probe
-   * layout objects defensively — Slatebase still has no real split tree, so
-   * `children` stays permanently empty and collapse/expand stay no-ops.
+   * Layout roots. `rootSplit` mirrors the pane tree (splits → `WorkspaceSplit`,
+   * panes → `WorkspaceTabs`, see `setPaneLayout()`); it keeps its identity
+   * across updates, only its `children`/`direction` are rebuilt. The sidebar
+   * splits are `WorkspaceSidedock`s without a tree (Slatebase's sidebars are
+   * section lists, not tab groups).
    */
-  readonly rootSplit = Object.assign(new WorkspaceSplit(), { children: [] as unknown[] });
-  readonly leftSplit = Object.assign(new WorkspaceSplit(), { collapsed: false, toggle() {}, collapse() {}, expand() {} });
-  readonly rightSplit = Object.assign(new WorkspaceSplit(), { collapsed: false, toggle() {}, collapse() {}, expand() {} });
+  readonly rootSplit = new WorkspaceRoot();
+  readonly leftSplit = new WorkspaceSidedock();
+  readonly rightSplit = new WorkspaceSidedock();
+
+  /** Latest pane tree from the pane-split bridge, null until the first publish. */
+  private paneTree: PaneTree | null = null;
+  /** Structural signature of `paneTree` — a change fires 'layout-change'. */
+  private paneLayoutSignature = '';
+  /** Leaves `mirrorPaneTree()` gave a parent last time. */
+  private parentedLeaves: Set<WorkspaceLeaf> = new Set();
+
+  /**
+   * Take a new pane tree and mirror it into `rootSplit` / `leaf.parent`.
+   * Fires 'layout-change' only when the structure (splits, tabs, active tab)
+   * changed — the tree object also changes on every edit, which is not a
+   * layout change.
+   */
+  setPaneLayout(tree: PaneTree | null): void {
+    this.paneTree = tree;
+    this.refreshPaneLayout();
+    const signature = tree ? paneLayoutSignature(tree) : '';
+    if (signature !== this.paneLayoutSignature) {
+      const first = this.paneLayoutSignature === '';
+      this.paneLayoutSignature = signature;
+      if (!first) this.events.trigger('layout-change');
+    }
+  }
+
+  /** Re-run the mirror against the current tree, e.g. after the active leaf changed. */
+  refreshPaneLayout(): void {
+    if (!this.paneTree) return;
+    this.parentedLeaves = mirrorPaneTree(this.rootSplit, this.paneTree, (tab, ctx) => this.leafForTab(tab, ctx), this.parentedLeaves);
+  }
+
+  /**
+   * The leaf object representing a tab: the plugin view's leaf for a
+   * `__view::<type>` tab, the active-file leaf for the active file tab of the
+   * active pane, otherwise none (see pane-layout.ts for why).
+   */
+  private leafForTab(tab: TabEntry, ctx: { isActivePane: boolean; isActiveTab: boolean }): WorkspaceLeaf | null {
+    if (tab.filePath.startsWith(VIEW_TAB_PREFIX)) {
+      const viewType = tab.filePath.slice(VIEW_TAB_PREFIX.length);
+      // A view tab duplicated into a second pane still has one leaf;
+      // mirrorPaneTree places it in the first pane only.
+      return this.viewRegistry?.getLeavesOfType(viewType).find((l) => l.location === 'main') ?? null;
+    }
+    if (ctx.isActivePane && ctx.isActiveTab && this.fileLeaf && this.activeFile?.path === tab.filePath) {
+      return this.fileLeaf;
+    }
+    return null;
+  }
 
   /**
    * `obsidian://` protocol-handler registry. Slatebase is a web app and cannot
@@ -1206,10 +1256,21 @@ export class WorkspaceShim implements IWorkspaceShim {
   }
 
   /**
-   * Get the current workspace layout. Returns minimal stub.
+   * The current workspace layout in Obsidian's `getLayout()` shape: `main` is
+   * the pane tree as nested split/tabs/leaf nodes, one leaf per open tab
+   * (see `buildLayoutJson`). Before the first pane tree arrives, an empty split.
    */
   getLayout(): Record<string, unknown> {
-    return { main: { type: 'split', children: [] } };
+    if (!this.paneTree) return { main: { type: 'split', children: [] } };
+    return buildLayoutJson(this.paneTree);
+  }
+
+  /**
+   * All leaves in a linked-view group (`leaf.setGroup()`/`setGroupMember()`).
+   */
+  getGroupLeaves(group: string): WorkspaceLeaf[] {
+    if (!group || !this.viewRegistry) return [];
+    return this.viewRegistry.getAllLeaves().filter((leaf) => leaf.group === group);
   }
 
   /**
@@ -1220,10 +1281,12 @@ export class WorkspaceShim implements IWorkspaceShim {
   }
 
   /**
-   * Create a leaf in a parent split at a given index. Returns a new leaf.
+   * Create a leaf in a parent split at a given index. The layout tree is a
+   * read-only mirror of the pane tree, so this opens a new tab in the active
+   * pane instead.
    */
   createLeafInParent(_parent: unknown, _index: number): WorkspaceLeaf {
-    debugOnce('WorkspaceShim.createLeafInParent', '[WorkspaceShim] createLeafInParent: Slatebase has no split/parent structure — created a new tab instead.');
+    debugOnce('WorkspaceShim.createLeafInParent', '[WorkspaceShim] createLeafInParent: the layout tree is read-only — created a new tab in the active pane instead.');
     return this.getLeaf(true);
   }
 
@@ -1296,6 +1359,9 @@ export class WorkspaceShim implements IWorkspaceShim {
       'rightRibbon',
       'openPopoutLeaf',
       'getLayout',
+      'getGroupLeaves',
+      'setPaneLayout',
+      'refreshPaneLayout',
       'getLeafById',
       'createLeafInParent',
       'getActiveFileView',

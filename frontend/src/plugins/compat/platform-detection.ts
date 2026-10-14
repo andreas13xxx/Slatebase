@@ -48,7 +48,17 @@ export interface ObsidianPlatform {
   isIosOS: boolean
   isAndroidOS: boolean
   isSafari: boolean
+  /** Prefix of every URL `vault.getResourcePath()` returns. */
+  resourcePathPrefix: string
 }
+
+/**
+ * Obsidian's resource paths start with `app://…/` (desktop) or `file:///`
+ * (mobile). Slatebase serves vault files from the REST API instead, so this is
+ * the common prefix of `VaultShim.getResourcePath()` — plugins test
+ * `src.startsWith(Platform.resourcePathPrefix)` to recognize vault resources.
+ */
+export const RESOURCE_PATH_PREFIX = '/api/v1/vaults/'
 
 /** Largest short-side, in CSS px, still treated as a phone rather than a tablet. */
 const PHONE_MAX_SHORT_SIDE = 600
@@ -113,6 +123,8 @@ export function detectPlatform(env: PlatformEnvironment): ObsidianPlatform {
     isIosOS,
     isAndroidOS,
     isSafari: /^((?!chrome|android|crios|fxios).)*safari/i.test(ua),
+
+    resourcePathPrefix: RESOURCE_PATH_PREFIX,
   }
 }
 

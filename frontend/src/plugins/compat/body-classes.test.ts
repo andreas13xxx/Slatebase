@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { resolveActiveTheme, syncThemeBodyClass } from './body-classes'
+import { resolveActiveTheme, syncThemeBodyClass, THEME_CHANGE_EVENT } from './body-classes'
 
 /**
  * Replace `window.matchMedia` with one that answers the dark-scheme query.
@@ -60,6 +60,20 @@ describe('body-classes', () => {
   })
 
   describe('syncThemeBodyClass', () => {
+    it('announces a real theme flip, but not the initial sync or a no-op re-sync', () => {
+      mockMatchMedia(false)
+      const listener = vi.fn()
+      window.addEventListener(THEME_CHANGE_EVENT, listener)
+      document.documentElement.setAttribute('data-theme', 'light')
+      syncThemeBodyClass()
+      syncThemeBodyClass()
+      expect(listener).not.toHaveBeenCalled()
+      document.documentElement.setAttribute('data-theme', 'dark')
+      syncThemeBodyClass()
+      expect(listener).toHaveBeenCalledTimes(1)
+      window.removeEventListener(THEME_CHANGE_EVENT, listener)
+    })
+
     it('sets theme-dark for a dark theme', () => {
       mockMatchMedia(false)
       document.documentElement.setAttribute('data-theme', 'dark')

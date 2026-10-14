@@ -14,6 +14,7 @@
 import { parse as parseYamlDoc, stringify as stringifyYamlDoc } from 'yaml'
 import type { DataWriteOptions, IVaultShim, TFile, TFolder } from '../types'
 import { warnNoOp } from '../log'
+import { computeLinkpath, toNewLinkFormat } from '../link-text'
 import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry'
 
 /**
@@ -121,26 +122,29 @@ export class FileManagerShim implements IFileManagerShim {
    * - Wikilinks (default): `[[filename]]` or `[[filename|alias]]` or `[[filename#heading]]`
    * - Markdown links: `[alias](path)` or `[filename](path#heading)`
    *
+   * The link path follows the vault's `newLinkFormat` (shortest / relative /
+   * absolute), so a file name shared by two files falls back to its full path.
+   * Wikilinks drop `.md` but keep every other extension; markdown links keep
+   * the extension and are URL-encoded.
+   *
    * @param file - Target file
-   * @param _sourcePath - Source file path (for relative path calculation, currently unused)
+   * @param sourcePath - Path of the note the link is written into
    * @param subpath - Optional heading/block reference (e.g. "#heading")
-   * @param alias - Optional display text
+   * @param alias - Optional display text; empty string means "use the file name"
    */
-  generateMarkdownLink(file: TFile, _sourcePath: string, subpath?: string, alias?: string): string {
-    const useMarkdownLinks = this.vault.getConfig('useMarkdownLinks') as boolean;
-    const linkTarget = file.basename + (subpath ?? '');
+  generateMarkdownLink(file: TFile, sourcePath: string, subpath?: string, alias?: string): string {
+    const useMarkdownLinks = this.vault.getConfig('useMarkdownLinks') === true;
+    const format = toNewLinkFormat(this.vault.getConfig('newLinkFormat'));
+    const allPaths = this.vault.getFiles().map((f) => f.path);
+    const linkpath = computeLinkpath(file, sourcePath, allPaths, format, !useMarkdownLinks);
 
     if (useMarkdownLinks) {
-      const displayText = alias ?? file.basename;
-      const encodedPath = file.path + (subpath ?? '');
-      return `[${displayText}](${encodedPath})`;
+      const displayText = alias || file.basename;
+      return `[${displayText}](${encodeURI(linkpath + (subpath ?? ''))})`;
     }
 
-    // Wikilink format
-    if (alias) {
-      return `[[${linkTarget}|${alias}]]`;
-    }
-    return `[[${linkTarget}]]`;
+    const linkTarget = linkpath + (subpath ?? '');
+    return alias ? `[[${linkTarget}|${alias}]]` : `[[${linkTarget}]]`;
   }
 
   /**

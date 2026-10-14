@@ -234,27 +234,28 @@ const NAMES: Record<string, { de: string; en: string }> = {
  * Why a command Slatebase registers but deliberately leaves inert does nothing.
  *
  * Keyed by the gap rather than by command ID, because one missing concept
- * usually accounts for several commands at once (six `bases:*` commands, four
- * window commands), and because the reason is what the user needs to read: a
+ * usually accounts for several commands at once (five window commands share
+ * one reason), and because the reason is what the user needs to read: a
  * command that silently does nothing looks broken, while one that says "the
  * file lives on the server, not on this machine" explains itself.
  */
 export type UnsupportedReason =
-  | 'tab-layout'
+  | 'stacked-tabs'
   | 'blank-tab'
   | 'native-windows'
   | 'url-scheme'
   | 'attachments'
-  | 'bases'
+  | 'bases-add-item'
+  | 'bases-embed'
   | 'desktop-shell'
   | 'in-app-help'
   | 'new-tab-defaults'
   | 'graph-animation'
 
 const UNSUPPORTED_REASONS: Record<UnsupportedReason, { de: string; en: string }> = {
-  'tab-layout': {
-    de: 'Slatebase hat keine geteilten Bereiche, Tab-Gruppen oder gestapelten Tabs',
-    en: 'Slatebase has no split panes, tab groups or stacked tabs',
+  'stacked-tabs': {
+    de: 'Slatebase zeigt Tabs nebeneinander in einer Leiste, nicht gestapelt',
+    en: 'Slatebase shows tabs side by side in one bar, not stacked',
   },
   'blank-tab': {
     de: 'ein leerer Tab ohne Datei ist nicht vorgesehen — Tabs entstehen beim Öffnen einer Datei',
@@ -272,9 +273,13 @@ const UNSUPPORTED_REASONS: Record<UnsupportedReason, { de: string; en: string }>
     de: 'externe Bild-Links lassen sich nicht automatisch in den Vault herunterladen — Anhänge kommen per Drag & Drop, Einfügen aus der Zwischenablage oder „Anhang einfügen“ hinein',
     en: 'there is no automatic download of external image links into the vault — attachments come in via drag-and-drop, clipboard paste, or "Insert attachment"',
   },
-  bases: {
-    de: 'Bases (Tabellenansichten über einen Ordner) gibt es in Slatebase nicht',
-    en: 'Slatebase has no Bases (table views over a folder)',
+  'bases-add-item': {
+    de: 'neue Einträge passend zu den Filtern einer Base anzulegen ist noch nicht umgesetzt — lege die Notiz direkt an',
+    en: 'creating an entry that matches a base\'s filters is not implemented yet — create the note directly',
+  },
+  'bases-embed': {
+    de: 'Bases lassen sich nicht als Codeblock in Notizen einbetten — lege eine eigene .base-Datei an',
+    en: 'bases cannot be embedded as a code block in notes — create a separate .base file',
   },
   'desktop-shell': {
     de: 'die Datei liegt auf dem Server, nicht auf diesem Rechner',

@@ -58,14 +58,18 @@ export interface IWorkspaceShim {
   getActiveLeaf(): WorkspaceLeaf | null;
   /** Set the given leaf as the active leaf (activates the associated tab). */
   setActiveLeaf(leaf: WorkspaceLeaf): void;
-  /** Get an unpinned leaf (creates a new leaf; Slatebase has no pinning). */
+  /** Deprecated alias of `getLeaf(false)` (reuses an idle leaf). */
   getUnpinnedLeaf(): WorkspaceLeaf;
   /** Reveal a leaf by activating its tab or sidebar section. */
   revealLeaf(leaf: WorkspaceLeaf): void;
-  /** Create a new leaf by splitting an existing leaf (opens as new tab). */
+  /** Create a new leaf by splitting an existing leaf into a real pane (new tab without a pane host). */
   createLeafBySplit(leaf: WorkspaceLeaf): WorkspaceLeaf;
-  /** Split the active leaf (opens as new tab). */
+  /** Split the active leaf into a real pane (new tab without a pane host). */
   splitActiveLeaf(): WorkspaceLeaf;
+  /** The pane tree as Obsidian layout JSON (split/tabs/leaf nodes, one leaf per tab). */
+  getLayout(): Record<string, unknown>;
+  /** All leaves in a linked-view group (`leaf.setGroup()`). */
+  getGroupLeaves(group: string): WorkspaceLeaf[];
 
   // ─── View Management ───────────────────────────────────────────────────────
 

@@ -11,6 +11,7 @@ import { parseMetadata } from '../metadata-parser';
 import { EventSystem } from '../event-system';
 import type { DirectoryTree } from '../../../types';
 import { resolveWikilinkTarget, collectFilesSorted } from '../../link-resolver';
+import { computeLinkpath } from '../link-text';
 import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry';
 
 /**
@@ -391,11 +392,13 @@ export class MetadataCacheShim implements IMetadataCacheShim {
 
   /**
    * Generate a linktext for a file relative to a source path.
-   * Uses the shortest unique basename if possible, otherwise full path.
+   * Uses the file name if it is unique in the vault, otherwise the full path
+   * (Slatebase's link format is always Obsidian's default, `shortest`).
+   * `omitMdExtension` defaults to `true`, as in Obsidian.
    */
-  fileToLinktext(file: TFile, _sourcePath: string, omitMdExtension?: boolean): string {
-    const name = omitMdExtension && file.extension === 'md' ? file.basename : file.name;
-    return name;
+  fileToLinktext(file: TFile, sourcePath: string, omitMdExtension = true): string {
+    const allPaths = this.tree ? collectFilesSorted(this.tree).map((f) => f.path) : [];
+    return computeLinkpath(file, sourcePath, allPaths, 'shortest', omitMdExtension);
   }
 
   /**
