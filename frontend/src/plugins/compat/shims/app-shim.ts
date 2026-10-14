@@ -16,6 +16,7 @@ import { scopeForPlugin } from '../plugin-execution-context';
 import { warnNoOp, warnOnce } from '../log';
 import { Keymap, Scope, SecretStorage } from '../obsidian-api-extensions';
 import { createEmbedRegistryShim } from '../embed-registry';
+import { resolveActiveTheme } from '../body-classes';
 
 /** The shape of Obsidian's internal `app.commands`. */
 export type CommandManagerShim = ReturnType<typeof createCommandManager>
@@ -491,6 +492,16 @@ export class AppShim implements IAppShim {
   }
 
   /**
+   * Whether the dark theme is displayed (Obsidian API since 1.10.0). Resolves
+   * `system` against the OS scheme, same as the `theme-dark` body class.
+   * Without it the proxy fallback returned `undefined`, so every plugin
+   * asking took the light branch.
+   */
+  isDarkMode(): boolean {
+    return resolveActiveTheme() === 'dark'
+  }
+
+  /**
    * SecretStorage (Obsidian API since 1.11.4) — vault-scoped, backed by a
    * server-side AES-256-GCM encrypted store; localStorage is only a legacy-
    * migration/offline fallback, not the source of truth.
@@ -661,6 +672,8 @@ export class AppShim implements IAppShim {
       'secretStorage',
       'setting',
       'showReleaseNotes',
+      'getAccentColor',
+      'isDarkMode',
       // Internal/utility properties
       'pluginId',
       'pluginsMap',

@@ -379,7 +379,12 @@ export class Scope {
    */
   keys: unknown[] = [];
 
-  constructor(_parent?: Scope) {}
+  /** Scope that gets a key no handler here consumed, as in Obsidian. Public like Obsidian's `Scope.parent`; the stack dispatcher walks this chain. */
+  readonly parent: Scope | null;
+
+  constructor(parent?: Scope) {
+    this.parent = parent ?? null;
+  }
 
   register(modifiers: string[] | null, key: string | null, func: (...args: unknown[]) => unknown): { modifiers: string[] | null; key: string | null; func: (...args: unknown[]) => unknown } {
     const handler = { modifiers, key, func };
@@ -393,11 +398,16 @@ export class Scope {
   }
 
   /**
-   * Try every registered handler against a keydown event, most recently
-   * registered first. A handler "handles" the event unless it explicitly
-   * returns `false`, matching Obsidian's convention — at which point the
-   * event is prevented from its default action and no further scope on the
-   * stack is consulted.
+   * Try every registered handler on THIS scope against a keydown event, most
+   * recently registered first. A handler "handles" the event unless it
+   * explicitly returns `false`, matching Obsidian's convention — at which
+   * point the event is prevented from its default action.
+   *
+   * This checks only the scope's own handlers; fallthrough to the parent (and
+   * across the stack) is driven by {@link dispatchKeydownToScopeStack}, which
+   * walks each scope's parent chain exactly once. Having both this method AND
+   * the dispatcher recurse into `parent` would consult a shared parent twice
+   * for one keydown (see PLUGIN-COMPAT.md).
    */
   handleKey(evt: KeyboardEvent): boolean {
     for (let i = this.handlers.length - 1; i >= 0; i--) {
@@ -433,8 +443,18 @@ const scopeStack: Scope[] = [];
  * @returns Whether a handler consumed the event (and therefore already called `preventDefault()`).
  */
 export function dispatchKeydownToScopeStack(evt: KeyboardEvent): boolean {
+  // One traversal only: walk from the top of the stack down, and for each
+  // scope follow its parent chain. A scope reachable both as a stack entry
+  // and as another entry's parent must be asked exactly once — `visited`
+  // enforces that (handleKey itself no longer recurses into parent).
+  const visited = new Set<Scope>();
   for (let i = scopeStack.length - 1; i >= 0; i--) {
-    if (scopeStack[i]!.handleKey(evt)) return true;
+    let scope: Scope | null = scopeStack[i]!;
+    while (scope && !visited.has(scope)) {
+      visited.add(scope);
+      if (scope.handleKey(evt)) return true;
+      scope = scope.parent;
+    }
   }
   return false;
 }
@@ -1086,59 +1106,6 @@ function hslToRgb({ h, s, l }: { h: number; s: number; l: number }): { r: number
 }
 
 /**
- * SearchComponent — Search input for settings.
- */
-export class SearchComponent {
-  /**
-   * The `.search-input-container` Obsidian wraps the input in. The clear button
-   * is positioned against it, so it is structural rather than cosmetic — plugin
-   * CSS that styles the search box targets this element.
-   */
-  containerEl: HTMLElement;
-  inputEl: HTMLInputElement;
-  clearButtonEl: HTMLElement;
-  private _callback: ((value: string) => void) | null = null;
-
-  constructor(containerEl: HTMLElement) {
-    this.containerEl = document.createElement('div');
-    this.containerEl.className = 'search-input-container';
-    this.inputEl = document.createElement('input');
-    this.inputEl.type = 'search';
-    this.inputEl.className = 'search-input';
-    this.inputEl.spellcheck = false;
-    this.clearButtonEl = document.createElement('div');
-    this.clearButtonEl.className = 'search-input-clear-button is-hidden';
-    this.clearButtonEl.setAttribute('aria-label', 'Clear search');
-    this.containerEl.appendChild(this.inputEl);
-    this.containerEl.appendChild(this.clearButtonEl);
-    containerEl.appendChild(this.containerEl);
-    this.inputEl.addEventListener('input', () => {
-      this.syncClearButton();
-      if (this._callback) this._callback(this.inputEl.value);
-    });
-    this.clearButtonEl.addEventListener('click', () => {
-      this.inputEl.value = '';
-      this.syncClearButton();
-      this.inputEl.focus();
-      if (this._callback) this._callback('');
-    });
-  }
-
-  /** Obsidian only shows the clear button once the field has content. */
-  private syncClearButton(): void {
-    this.clearButtonEl.classList.toggle('is-hidden', this.inputEl.value.length === 0);
-  }
-
-  getValue(): string { return this.inputEl.value; }
-  setValue(value: string): this { this.inputEl.value = value; this.syncClearButton(); return this; }
-  setPlaceholder(placeholder: string): this { this.inputEl.placeholder = placeholder; return this; }
-  setDisabled(disabled: boolean): this { this.inputEl.disabled = disabled; return this; }
-  onChange(callback: (value: string) => void): this { this._callback = callback; return this; }
-  onChanged(): void { if (this._callback) this._callback(this.inputEl.value); }
-  then(cb: (component: this) => void): this { cb(this); return this; }
-}
-
-/**
  * MomentFormatComponent — Date format input with live preview.
  */
 export class MomentFormatComponent {
@@ -1607,7 +1574,6 @@ export function registerObsidianApiExtensions(): void {
   // UI Components
   if (!obs['ExtraButtonComponent']) obs['ExtraButtonComponent'] = ExtraButtonComponent;
   if (!obs['ColorComponent']) obs['ColorComponent'] = ColorComponent;
-  if (!obs['SearchComponent']) obs['SearchComponent'] = SearchComponent;
   if (!obs['MomentFormatComponent']) obs['MomentFormatComponent'] = MomentFormatComponent;
   if (!obs['ProgressBarComponent']) obs['ProgressBarComponent'] = ProgressBarComponent;
   if (!obs['AbstractInputSuggest']) {

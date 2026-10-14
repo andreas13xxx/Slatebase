@@ -235,6 +235,22 @@ describe('MetadataCacheShim', () => {
     });
   });
 
+  describe('fileToLinktext()', () => {
+    it('omits .md by default and keeps other extensions', () => {
+      const shim = new MetadataCacheShim(makeTree());
+      expect(shim.fileToLinktext(makeTFile('notes/hello.md'), 'readme.md')).toBe('hello');
+      expect(shim.fileToLinktext(makeTFile('notes/hello.md'), 'readme.md', false)).toBe('hello.md');
+      expect(shim.fileToLinktext(makeTFile('image.png'), 'readme.md')).toBe('image.png');
+    });
+
+    it('uses the full path when the file name is not unique', () => {
+      const tree = makeTree();
+      tree.children?.push({ name: 'hello.md', type: 'file', path: 'hello.md', size: 1 });
+      const shim = new MetadataCacheShim(tree);
+      expect(shim.fileToLinktext(makeTFile('notes/hello.md'), 'readme.md')).toBe('notes/hello');
+    });
+  });
+
   describe('isUserIgnored()', () => {
     it('always returns false — Slatebase has no excluded-files setting', () => {
       const shim = new MetadataCacheShim(makeTree());

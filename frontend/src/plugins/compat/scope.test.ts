@@ -147,6 +147,17 @@ describe('Keymap scope stack / dispatchKeydownToScopeStack', () => {
     expect(order).toEqual(['inner'])
   })
 
+  it('passes a key its own handlers did not consume to the parent scope', () => {
+    const parent = new Scope()
+    const child = new Scope(parent)
+    let parentCalled = false
+    parent.register([], 'Escape', () => { parentCalled = true })
+    push(child)
+
+    expect(dispatchKeydownToScopeStack(keydown('Escape'))).toBe(true)
+    expect(parentCalled).toBe(true)
+  })
+
   it('falls through to an outer scope when the inner one does not handle the key', () => {
     const outer = new Scope()
     const inner = new Scope()
@@ -160,5 +171,22 @@ describe('Keymap scope stack / dispatchKeydownToScopeStack', () => {
 
     expect(handled).toBe(true)
     expect(outerCalled).toBe(true)
+  })
+
+  it('consults a scope reachable both as a stack entry and as a child\'s parent exactly once', () => {
+    // Regression: handleKey used to recurse into parent while the dispatcher
+    // also walks the stack, so a parent that is BOTH pushed and the parent of
+    // a pushed child was asked twice. A non-consuming side-effectful handler
+    // would then double-apply.
+    const parent = new Scope()
+    const child = new Scope(parent)
+    let parentCalls = 0
+    parent.register([], 'a', () => { parentCalls++; return false }) // declines, so traversal continues
+    push(parent)
+    push(child)
+
+    dispatchKeydownToScopeStack(keydown('a'))
+
+    expect(parentCalls).toBe(1)
   })
 })

@@ -58,6 +58,11 @@
   border-radius: var(--radius-s, 4px);
 }
 
+/* Unsplit (the lone pane is the root's direct child): nothing to tell apart. */
+.pane-tree-root > .pane-leaf--active::after {
+  display: none;
+}
+
 /* Resize handles between siblings. */
 .pane-split-handle {
   flex: 0 0 auto;

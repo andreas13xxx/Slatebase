@@ -159,9 +159,12 @@ export abstract class AbstractTextComponent<E extends HTMLInputElement | HTMLTex
   constructor(inputEl: E) {
     super()
     this.inputEl = inputEl
-    this.inputEl.addEventListener('input', () => {
-      if (this.changeCallback) this.changeCallback(this.inputEl.value)
-    })
+    this.inputEl.addEventListener('input', () => { this.onChanged() })
+  }
+
+  /** Called on every edit. Subclasses (SearchComponent, plugin components) override it. */
+  onChanged(): void {
+    if (this.changeCallback) this.changeCallback(this.inputEl.value)
   }
 
   getValue(): string { return this.inputEl.value }
@@ -199,6 +202,64 @@ export class TextAreaComponent extends AbstractTextComponent<HTMLTextAreaElement
 }
 
 /**
+ * SearchComponent — search box with a clear button.
+ * Real Obsidian: `SearchComponent extends AbstractTextComponent<HTMLInputElement>`.
+ *
+ * The DOM mirrors Obsidian's: a `.search-input-container` wrapping the input
+ * and a `.search-input-clear-button`. Both are load-bearing — plugin CSS
+ * positions the button against the container.
+ */
+export class SearchComponent extends AbstractTextComponent<HTMLInputElement> {
+  /** The `.search-input-container` Obsidian wraps the input in. */
+  containerEl: HTMLElement
+  clearButtonEl: HTMLElement
+
+  constructor(containerEl: HTMLElement) {
+    const container = document.createElement('div')
+    container.className = 'search-input-container'
+    const inputEl = document.createElement('input')
+    inputEl.type = 'search'
+    inputEl.className = 'search-input'
+    inputEl.spellcheck = false
+    container.appendChild(inputEl)
+    containerEl.appendChild(container)
+    super(inputEl)
+    this.containerEl = container
+    this.clearButtonEl = document.createElement('div')
+    this.clearButtonEl.className = 'search-input-clear-button is-hidden'
+    this.clearButtonEl.setAttribute('aria-label', 'Clear search')
+    container.appendChild(this.clearButtonEl)
+    this.clearButtonEl.addEventListener('click', () => {
+      this.inputEl.value = ''
+      this.inputEl.focus()
+      this.onChanged()
+    })
+  }
+
+  /** Obsidian only shows the clear button once the field has content. */
+  override onChanged(): void {
+    this.syncClearButton()
+    super.onChanged()
+  }
+
+  override setValue(value: string): this {
+    super.setValue(value)
+    this.syncClearButton()
+    return this
+  }
+
+  /** Obsidian API since 1.13.1 — validation-status affordance on search-like inputs. */
+  setStatus(status: 'warning' | null): this {
+    this.containerEl.classList.toggle('setting-search--warning', status === 'warning')
+    return this
+  }
+
+  private syncClearButton(): void {
+    this.clearButtonEl.classList.toggle('is-hidden', this.inputEl.value.length === 0)
+  }
+}
+
+/**
  * ToggleComponent — Wraps a toggle switch element with fluent API.
  * Real Obsidian: `ToggleComponent extends ValueComponent<boolean>`.
  */
@@ -227,12 +288,20 @@ export class ToggleComponent extends ValueComponent<boolean> {
     this.toggleEl.appendChild(slider)
     containerEl.appendChild(this.toggleEl)
 
+    // The native checkbox has already flipped by the time `change` fires; undo
+    // that and route through onClick() so a subclass override of the
+    // Obsidian hook decides what a click does, as in Obsidian.
     this.inputEl.addEventListener('change', () => {
-      this.syncEnabledClass()
-      if (this.changeCallback) {
-        this.changeCallback(this.inputEl.checked)
-      }
+      this.inputEl.checked = !this.inputEl.checked
+      this.onClick()
     })
+  }
+
+  /** Obsidian's click hook: flips the value and notifies `onChange`. */
+  onClick(): void {
+    if (this.inputEl.disabled) return
+    this.setValue(!this.inputEl.checked)
+    if (this.changeCallback) this.changeCallback(this.inputEl.checked)
   }
 
   /** Obsidian marks the on-state with `is-enabled` on the container, not with :checked. */
@@ -500,6 +569,11 @@ export class SliderComponent extends ValueComponent<number> {
 
   getValue(): number {
     return Number(this.sliderEl.value)
+  }
+
+  /** The value as shown in the tooltip, i.e. after `setDisplayFormat()`. */
+  getValuePretty(): string {
+    return this.formatValue(this.sliderEl.value)
   }
 
   setLimits(min: number | null, max: number | null, step: number | 'any'): this {
@@ -875,52 +949,12 @@ export class Setting {
   }
 
   /**
-   * Add a search box.
-   *
-   * The DOM mirrors Obsidian's: a `.search-input-container` wrapping the input
-   * and a `.search-input-clear-button`. Both the structure and the clear button
-   * are load-bearing — plugin CSS positions the button against the container,
-   * and `containerEl`/`clearButtonEl` are part of Obsidian's SearchComponent.
+   * Add a search box — a real `SearchComponent`, so `instanceof` holds.
    */
-  addSearch(callback: (component: { inputEl: HTMLInputElement; containerEl: HTMLElement; clearButtonEl: HTMLElement; getValue(): string; setValue(value: string): unknown; setPlaceholder(p: string): unknown; onChange(cb: (value: string) => void): unknown; setDisabled(d: boolean): unknown; setStatus(status: 'warning' | null): unknown; then(cb: (c: unknown) => void): unknown }) => void): this {
-    const container = document.createElement('div')
-    container.className = 'search-input-container'
-    const input = document.createElement('input')
-    input.type = 'search'
-    input.className = 'setting-search-input search-input'
-    input.spellcheck = false
-    const clearButton = document.createElement('div')
-    clearButton.className = 'search-input-clear-button is-hidden'
-    clearButton.setAttribute('aria-label', 'Clear search')
-    container.appendChild(input)
-    container.appendChild(clearButton)
-    this.controlEl.appendChild(container)
-
-    let changeCb: ((v: string) => void) | null = null
-    const syncClearButton = (): void => {
-      clearButton.classList.toggle('is-hidden', input.value.length === 0)
-    }
-    const emit = (): void => { if (changeCb) changeCb(input.value) }
-    input.addEventListener('input', () => { syncClearButton(); emit() })
-    clearButton.addEventListener('click', () => {
-      input.value = ''
-      syncClearButton()
-      input.focus()
-      emit()
-    })
-    const component = {
-      inputEl: input,
-      containerEl: container,
-      clearButtonEl: clearButton,
-      getValue() { return input.value },
-      setValue(value: string) { input.value = value; syncClearButton(); return this },
-      setPlaceholder(p: string) { input.placeholder = p; return this },
-      onChange(cb: (value: string) => void) { changeCb = cb; return this },
-      setDisabled(d: boolean) { input.disabled = d; return this },
-      // Obsidian API since 1.13.1 — validation-status affordance on search-like inputs.
-      setStatus(status: 'warning' | null) { container.classList.toggle('setting-search--warning', status === 'warning'); return this },
-      then(cb: (c: unknown) => void) { cb(this); return this },
-    }
+  addSearch(callback: (component: SearchComponent) => void): this {
+    const component = new SearchComponent(this.controlEl)
+    // Slatebase's own settings styling hooks onto `setting-search-input`.
+    component.inputEl.classList.add('setting-search-input')
     this.components.push(component)
     callback(component)
     return this

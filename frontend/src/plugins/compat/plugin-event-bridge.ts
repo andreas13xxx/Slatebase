@@ -23,6 +23,8 @@ import type { WorkspaceShim } from './shims/workspace-shim'
 import type { MetadataCacheShim } from './shims/metadata-cache-shim'
 import type { VaultShim } from './shims/vault-shim'
 import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
+import { THEME_CHANGE_EVENT } from './body-classes'
+import { getPaneLayout, onPaneLayoutChange } from './pane-split-bridge'
 
 /** The prefix for plugin-view-tab virtual paths. */
 const VIEW_PATH_PREFIX = '__view::'
@@ -379,6 +381,30 @@ export function usePluginEventBridge({
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [workspaceShim, handleResize])
+
+  // ─── Pane tree → rootSplit / leaf.parent / getLayout() ────────────────────
+  //
+  // AppContent publishes every pane tree; the shim mirrors it into Obsidian's
+  // layout model. The latest tree is applied immediately, so a shim created
+  // after the last change (vault switch) starts with the current layout.
+
+  useEffect(() => {
+    if (!workspaceShim) return
+    workspaceShim.setPaneLayout(getPaneLayout())
+    return onPaneLayoutChange((tree) => workspaceShim.setPaneLayout(tree))
+  }, [workspaceShim])
+
+  // ─── Theme flip → workspace 'css-change' event ────────────────────────────
+  //
+  // Obsidian emits 'css-change' when the theme or loaded CSS changes; plugins
+  // that render to a canvas (Excalidraw, charts) re-read their colors on it.
+
+  useEffect(() => {
+    if (!workspaceShim) return
+    const handleThemeChange = () => workspaceShim.trigger('css-change')
+    window.addEventListener(THEME_CHANGE_EVENT, handleThemeChange)
+    return () => window.removeEventListener(THEME_CHANGE_EVENT, handleThemeChange)
+  }, [workspaceShim])
 
   // ─── Editor change → workspace 'editor-change' event ──────────────────────
   //

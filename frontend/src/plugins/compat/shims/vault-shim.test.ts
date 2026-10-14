@@ -178,6 +178,13 @@ describe('VaultShim', () => {
     });
   });
 
+  describe('configDir', () => {
+    it('reaches plugins through the proxy as a string, not the gap no-op', () => {
+      const proxied = VaultShim.wrapWithProxy(vault) as unknown as { configDir: unknown };
+      expect(proxied.configDir).toBe('.obsidian');
+    });
+  });
+
   describe('getConfig()', () => {
     it("returns true for 'updateInternalLinks' — the rewrite always runs server-side", () => {
       expect(vault.getConfig('updateInternalLinks')).toBe(true);

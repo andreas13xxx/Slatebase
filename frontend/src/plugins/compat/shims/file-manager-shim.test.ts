@@ -109,6 +109,54 @@ describe('FileManagerShim', () => {
     });
   });
 
+  describe('generateMarkdownLink()', () => {
+    function makeTypedFile(path: string): TFile {
+      const name = path.slice(path.lastIndexOf('/') + 1);
+      const dot = name.lastIndexOf('.');
+      return { path, name, basename: name.slice(0, dot), extension: name.slice(dot + 1), stat: { mtime: 0, ctime: 0, size: 0 }, parent: null };
+    }
+
+    function vaultWith(paths: string[], config: Record<string, unknown> = {}): IVaultShim {
+      return {
+        ...createFakeVault(),
+        getFiles: () => paths.map(makeTypedFile),
+        getConfig: (key: string) => config[key] ?? null,
+      };
+    }
+
+    it('drops .md for a unique markdown file', () => {
+      const fileManager = new FileManagerShim(vaultWith(['notes/Idea.md']));
+      expect(fileManager.generateMarkdownLink(makeTypedFile('notes/Idea.md'), 'index.md')).toBe('[[Idea]]');
+    });
+
+    it('keeps the extension of an attachment', () => {
+      const fileManager = new FileManagerShim(vaultWith(['assets/photo.png']));
+      expect(fileManager.generateMarkdownLink(makeTypedFile('assets/photo.png'), 'index.md')).toBe('[[photo.png]]');
+    });
+
+    it('uses the full path when two files share a name', () => {
+      const fileManager = new FileManagerShim(vaultWith(['a/Idea.md', 'b/Idea.md']));
+      expect(fileManager.generateMarkdownLink(makeTypedFile('b/Idea.md'), 'index.md', '#Goal', 'the idea'))
+        .toBe('[[b/Idea#Goal|the idea]]');
+    });
+
+    it('treats an empty alias as "use the file name"', () => {
+      const fileManager = new FileManagerShim(vaultWith(['Idea.md']));
+      expect(fileManager.generateMarkdownLink(makeTypedFile('Idea.md'), 'index.md', undefined, '')).toBe('[[Idea]]');
+    });
+
+    it('URL-encodes markdown links and keeps the extension', () => {
+      const fileManager = new FileManagerShim(vaultWith(['my notes/Big Idea.md'], { useMarkdownLinks: true }));
+      expect(fileManager.generateMarkdownLink(makeTypedFile('my notes/Big Idea.md'), 'index.md', '#Next Step'))
+        .toBe('[Big Idea](Big%20Idea.md#Next%20Step)');
+    });
+
+    it('honours the relative link format', () => {
+      const fileManager = new FileManagerShim(vaultWith(['notes/Idea.md'], { newLinkFormat: 'relative' }));
+      expect(fileManager.generateMarkdownLink(makeTypedFile('notes/Idea.md'), 'journal/today.md')).toBe('[[../notes/Idea]]');
+    });
+  });
+
   describe('promptForFolderDeletion()', () => {
     it('deletes the folder and resolves true when the user confirms', async () => {
       confirmSpy.mockReturnValue(true);

@@ -91,3 +91,26 @@ describe('TabBar cross-pane drag', () => {
     expect(container.querySelector('.tab-bar')).not.toBeNull()
   })
 })
+
+describe('TabBar app-level row (showFileTabs=false)', () => {
+  function renderAppBar(tabs: TabEntry[]) {
+    const tabState: TabState = { ...initialTabState, tabs, activeTabId: tabs[0]?.id ?? null }
+    return render(
+      <I18nProvider>
+        <TabContext.Provider value={{ tabState, tabDispatch: vi.fn() as unknown as (a: TabAction) => void }}>
+          <TabBar settingsTabs={[]} isShowingSettings={false} onActivateFileTab={() => {}} showFileTabs={false} />
+        </TabContext.Provider>
+      </I18nProvider>,
+    )
+  }
+
+  it('does not duplicate the active pane\'s file tabs', () => {
+    renderAppBar([makeTab('v1', 'a.md'), makeTab('v1', 'b.md')])
+    expect(screen.queryAllByRole('tab')).toHaveLength(0)
+  })
+
+  it('still renders the (empty) bar so the row keeps its full width', () => {
+    const { container } = renderAppBar([makeTab('v1', 'a.md')])
+    expect(container.querySelector('.tab-bar')).not.toBeNull()
+  })
+})

@@ -81,6 +81,7 @@ import {
   DropdownComponent,
   ButtonComponent,
   SliderComponent,
+  SearchComponent,
   SecretComponent,
   DisplayValueComponent,
 } from './setting-tab'
@@ -95,7 +96,17 @@ import { Menu, MenuItem, MenuSeparator } from './menu'
 // Registered on the namespace under their Obsidian names, so plugin prototype
 // patches and `instanceof` checks act on the classes actually in use.
 import { WorkspaceShim } from './shims/workspace-shim'
-import { WorkspaceLeaf, WorkspaceSplit, WorkspaceRibbon } from './view-registry'
+import {
+  WorkspaceLeaf,
+  WorkspaceItem,
+  WorkspaceParent,
+  WorkspaceSplit,
+  WorkspaceTabs,
+  WorkspaceContainer,
+  WorkspaceRoot,
+  WorkspaceSidedock,
+  WorkspaceRibbon,
+} from './view-registry'
 import { MetadataCacheShim } from './shims/metadata-cache-shim'
 import { VaultShim } from './shims/vault-shim'
 import { FileManagerShim } from './shims/file-manager-shim'
@@ -894,16 +905,12 @@ export function installObsidianGlobals(): void {
     } as unknown as Record<string, unknown>
   }
 
-  // ─── Bases (Obsidian API since 1.10.0) — types + no-op registration only ───
-  // Bases is Obsidian's database/formula-query view over vault properties.
-  // Slatebase does not implement it: no formula engine, no `.base` file
-  // rendering, no query UI — `Plugin.registerBasesView()` (above, in the
-  // Plugin prototype) already no-ops with a `warnNoOp`. These class stand-ins
-  // exist only so a plugin that references the names at module-eval time
-  // (`class MyView extends BasesView`, `new NumberValue(...)`) doesn't crash
-  // on load; every method is an inert default. `compatibility-analyzer.ts`
-  // flags plugins that reference any of these as 'partial', so this isn't
-  // silently invisible in the install-time compat report.
+  // ─── Bases plugin API (Obsidian API since 1.10.0) ──────────────────────────
+  // Functional: `Plugin.registerBasesView()` (above, in the Plugin prototype)
+  // records the view type in bases-view-registry.ts, BasesView.tsx mounts it
+  // via BasesPluginViewHost, and QueryController feeds it real query rows as
+  // the classes below. `compatibility-analyzer.ts` counts `obsidian.Bases` as
+  // supported.
   if (!window.obsidian.Value) {
     // Functional Value hierarchy (see bases-values.ts). A plugin-contributed
     // Bases view receives these objects and renders/compares them, so each
@@ -1658,6 +1665,7 @@ export function installObsidianGlobals(): void {
   window.obsidian.DropdownComponent = DropdownComponent
   window.obsidian.ButtonComponent = ButtonComponent
   window.obsidian.SliderComponent = SliderComponent
+  window.obsidian.SearchComponent = SearchComponent
   // SecretComponent (1.11.4) / DisplayValueComponent (1.13.1) — see setting-tab.ts.
   window.obsidian.SecretComponent = SecretComponent
   window.obsidian.DisplayValueComponent = DisplayValueComponent
@@ -1955,19 +1963,17 @@ export function installObsidianGlobals(): void {
     window.obsidian.WorkspaceLeaf = WorkspaceLeaf as unknown as Record<string, unknown>
   }
 
-  // WorkspaceSplit/WorkspaceRibbon — same reasoning as WorkspaceLeaf above,
-  // for WorkspaceShim's rootSplit/leftSplit/rightSplit/leftRibbon/rightRibbon
-  // stub objects (see shims/workspace-shim.ts). The remaining layout-item
-  // classes (WorkspaceItem/Parent/Tabs/Root/Sidedock/MobileDrawer/Window/
-  // Floating/Container) stay as the generic empty stubs from
-  // registerFallbackShims() below — Slatebase's flat tab model never
-  // constructs an instance of any of them, so giving them a real hierarchy
-  // would have no observable effect on any plugin.
-  if (!window.obsidian.WorkspaceSplit) {
-    window.obsidian.WorkspaceSplit = WorkspaceSplit as unknown as Record<string, unknown>
+  // Layout tree classes — same reasoning as WorkspaceLeaf above: these are the
+  // classes WorkspaceShim actually builds `rootSplit` and its pane mirror from
+  // (see pane-layout.ts), so `x instanceof WorkspaceTabs` etc. hold. Only
+  // WorkspaceMobileDrawer/WorkspaceWindow/WorkspaceFloating stay generic stubs
+  // from registerFallbackShims(): Slatebase has no mobile drawer or popout.
+  const layoutClasses: Record<string, unknown> = {
+    WorkspaceItem, WorkspaceParent, WorkspaceSplit, WorkspaceTabs,
+    WorkspaceContainer, WorkspaceRoot, WorkspaceSidedock, WorkspaceRibbon,
   }
-  if (!window.obsidian.WorkspaceRibbon) {
-    window.obsidian.WorkspaceRibbon = WorkspaceRibbon as unknown as Record<string, unknown>
+  for (const [name, cls] of Object.entries(layoutClasses)) {
+    if (!window.obsidian[name]) window.obsidian[name] = cls as Record<string, unknown>
   }
 
   // FileView — extends ItemView with a `file` property. Plugins use `view instanceof FileView`

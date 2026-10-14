@@ -1142,6 +1142,7 @@ export class VaultShim implements IVaultShim {
   static wrapWithProxy(instance: VaultShim): VaultShim & Record<string, unknown> {
     const emulatedProperties = new Set<string | symbol>([
       'adapter',
+      'configDir',
       'onFileRead',
       'updateTree',
       'read',

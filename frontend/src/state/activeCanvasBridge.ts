@@ -29,6 +29,17 @@ export function setActiveCanvasController(controller: ActiveCanvasController | n
   activeController = controller
 }
 
+/**
+ * Clears the active controller ONLY if `controller` is still the registered
+ * one. With Split Panes two CanvasView instances can be mounted at once; the
+ * last to mount owns the slot, and an unconditional clear on the other's
+ * unmount would null a slot it no longer owns. An unmounting instance passes
+ * its own identity so it clears only its own registration.
+ */
+export function clearActiveCanvasController(controller: ActiveCanvasController): void {
+  if (activeController === controller) activeController = null
+}
+
 /** Gets the currently-mounted canvas's controller, or null if no canvas tab is active. */
 export function getActiveCanvasController(): ActiveCanvasController | null {
   return activeController

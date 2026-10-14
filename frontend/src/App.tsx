@@ -7,7 +7,7 @@ import { PaneTreeProvider, usePaneTree } from './state/paneTreeContext'
 import { PaneTabProvider } from './state/paneTabContext'
 import { PaneTreeView } from './components/panes/PaneTreeView'
 import { generatePaneId, type SplitDirection } from './state/paneTreeState'
-import { onRequestPaneSplit, offRequestPaneSplit } from './plugins/compat/pane-split-bridge'
+import { onRequestPaneSplit, offRequestPaneSplit, publishPaneLayout } from './plugins/compat/pane-split-bridge'
 import { NavigationHistoryProvider, useNavigationHistory } from './state/navigationHistoryContext'
 import { FeatureProvider, useFeatureContext } from './state/featureContext'
 import { SearchProvider } from './state/searchContext'
@@ -806,6 +806,9 @@ function AppContent() {
   }
 
   const isShowingSettings = activeSettingsPage !== null
+  // Unsplit layout: the single pane's file tabs sit in the top row (as before
+  // Split Panes); pane-local tab bars appear only once the editor is split.
+  const singlePaneId = paneTree.root.kind === 'pane' ? paneTree.root.id : null
   const user = authState.user
   const selectedVault = state.vaults.find((v) => v.id === state.selectedVaultId) ?? null
   const activeTab = tabState.tabs.find((tab) => tab.id === tabState.activeTabId) ?? null
@@ -982,6 +985,12 @@ function AppContent() {
     onRequestPaneSplit(handleSplit)
     return () => { offRequestPaneSplit(handleSplit) }
   }, [paneTreeDispatch])
+
+  // The reverse direction: publish every pane tree so the plugin workspace
+  // shim can mirror it into rootSplit / leaf.parent / getLayout().
+  useEffect(() => {
+    publishPaneLayout(paneTree)
+  }, [paneTree])
 
   const settingsTabs: SettingsTabDescriptor[] = openSettingsPages.map((page) => {
     const isActive = isShowingSettings && page === activeSettingsPage
@@ -1260,14 +1269,19 @@ function AppContent() {
               note above. Some plugins requestFullscreen() this element by selector. */}
           <section className="app-content workspace-tab-container">
             {/* Back/forward navigation history + settings-page tab bar in one
-                row. File tabs now live INSIDE each pane (see renderPane below),
-                so this app-level bar carries only the settings-page tabs. */}
+                row. While unsplit (or while a settings page hides the panes)
+                this row also carries the file tabs; once split, each pane
+                shows its own bar instead (see renderPane below). */}
             <div className="tab-bar-row">
               <NavigationControls />
               <TabBar
                 settingsTabs={settingsTabs}
                 isShowingSettings={isShowingSettings}
                 onActivateFileTab={() => setActiveSettingsPage(null)}
+                showFileTabs={isShowingSettings || singlePaneId !== null}
+                // Pane-aware drag keeps "drop a tab on a pane edge to split"
+                // working from the top row in the unsplit layout.
+                {...(singlePaneId !== null && { paneId: singlePaneId, onMoveTabToPane: handleMoveTabToPane })}
               />
             </div>
 
@@ -1295,15 +1309,18 @@ function AppContent() {
                     generatePaneId={generatePaneId}
                     renderPane={(pane) => (
                       <PaneTabProvider paneId={pane.id}>
-                        {/* Each pane shows its OWN file-tab bar; a tab dragged
-                            onto another pane's bar (or a pane edge) moves there. */}
-                        <TabBar
-                          settingsTabs={[]}
-                          isShowingSettings={false}
-                          onActivateFileTab={() => setActiveSettingsPage(null)}
-                          paneId={pane.id}
-                          onMoveTabToPane={handleMoveTabToPane}
-                        />
+                        {/* Once split, each pane shows its OWN file-tab bar; a tab
+                            dragged onto another pane's bar (or a pane edge) moves
+                            there. Unsplit, the top row carries the tabs. */}
+                        {singlePaneId === null && (
+                          <TabBar
+                            settingsTabs={[]}
+                            isShowingSettings={false}
+                            onActivateFileTab={() => setActiveSettingsPage(null)}
+                            paneId={pane.id}
+                            onMoveTabToPane={handleMoveTabToPane}
+                          />
+                        )}
                         <ErrorBoundary>
                           <TabContent />
                         </ErrorBoundary>

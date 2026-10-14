@@ -24,7 +24,7 @@ import type { CanvasViewMode } from './CanvasToolbar'
 import { CanvasSourceView } from './CanvasSourceView'
 import { useViewportCulling } from './useViewportCulling'
 import { generateCanvasId, computeFitViewport, computeContentBounds } from './canvas-utils'
-import { setActiveCanvasController } from '../../state/activeCanvasBridge'
+import { setActiveCanvasController, clearActiveCanvasController } from '../../state/activeCanvasBridge'
 import './CanvasView.css'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -459,8 +459,9 @@ function CanvasViewInner({ vaultId, filePath, readOnly, onFileOpen, directoryTre
   // one a command should affect — same single-active-instance pattern as
   // editor/plugin-extensions.ts's setActiveEditorView).
   useEffect(() => {
-    setActiveCanvasController({ jumpToSelectedGroup, exportAsImage })
-    return () => setActiveCanvasController(null)
+    const controller = { jumpToSelectedGroup, exportAsImage }
+    setActiveCanvasController(controller)
+    return () => clearActiveCanvasController(controller)
   }, [jumpToSelectedGroup, exportAsImage])
 
   /** Handle context menu action. */

@@ -199,14 +199,16 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
   'workspace.onLayoutChange',
   // Split panes are real as of the Split Panes feature: createLeafBySplit /
   // splitActiveLeaf / getLeaf('split') split the active pane into a genuine
-  // new pane (see pane-split-bridge). The remaining layout APIs below have no
-  // object model in Slatebase (no popout windows, no serialized layout tree) —
-  // they degrade to a plain tab or an inert stub and log the substitution.
+  // new pane (see pane-split-bridge), and rootSplit / getLayout() mirror the
+  // pane tree (pane-layout.ts). getGroupLeaves reads real linked-view groups.
+  // The remaining layout APIs have no object model in Slatebase (no popout
+  // windows) — they degrade to a plain tab or an inert stub and log it.
   'workspace.createLeafBySplit',
   'workspace.splitActiveLeaf',
-  'workspace.openPopoutLeaf',
   'workspace.getLayout',
   'workspace.rootSplit',
+  'workspace.getGroupLeaves',
+  'workspace.openPopoutLeaf',
   'workspace.leftSplit',
   'workspace.rightSplit',
   'workspace.floatingSplit',

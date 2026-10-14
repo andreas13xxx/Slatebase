@@ -69,11 +69,24 @@ export function resolveActiveTheme(): 'light' | 'dark' {
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
-/** Apply the `theme-light`/`theme-dark` pair for the currently active theme. */
+/**
+ * Window event dispatched whenever the resolved theme actually flips. The
+ * plugin event bridge forwards it as Obsidian's workspace `css-change`.
+ */
+export const THEME_CHANGE_EVENT = 'slatebase:theme-change'
+
+/**
+ * Apply the `theme-light`/`theme-dark` pair for the currently active theme,
+ * and announce a real flip via {@link THEME_CHANGE_EVENT}.
+ */
 export function syncThemeBodyClass(): void {
   const theme = resolveActiveTheme()
+  const themeClass = theme === 'dark' ? 'theme-dark' : 'theme-light'
+  const hadTheme = document.body.classList.contains('theme-dark') || document.body.classList.contains('theme-light')
+  const changed = hadTheme && !document.body.classList.contains(themeClass)
   document.body.classList.remove(...THEME_CLASSES)
-  document.body.classList.add(theme === 'dark' ? 'theme-dark' : 'theme-light')
+  document.body.classList.add(themeClass)
+  if (changed) window.dispatchEvent(new Event(THEME_CHANGE_EVENT))
 }
 
 /**

@@ -19,7 +19,7 @@
  * @module pane-split-bridge
  */
 
-import type { SplitDirection } from '../../state/paneTreeState'
+import type { PaneTree, SplitDirection } from '../../state/paneTreeState'
 
 /** Callback invoked when the plugin shim requests a pane split. */
 export type RequestPaneSplitFn = (direction: SplitDirection) => void
@@ -54,4 +54,40 @@ export function requestPaneSplit(direction: SplitDirection): boolean {
     fn(direction)
   }
   return true
+}
+
+// ─── Layout snapshot (pane tree → plugin layout tree) ────────────────────────
+//
+// The reverse direction: the owner of the pane tree publishes every new tree,
+// so the workspace shim can mirror it into `rootSplit.children` /
+// `leaf.parent` / `getLayout()`. The latest tree is kept, so a shim created
+// after the last change (vault switch) can still read it.
+
+/** Callback invoked whenever a new pane tree is published. */
+export type PaneLayoutListener = (tree: PaneTree) => void
+
+let latestPaneTree: PaneTree | null = null
+const layoutSubscribers: Set<PaneLayoutListener> = new Set()
+
+/** Publish the current pane tree. Called by the component that owns it (AppContent). */
+export function publishPaneLayout(tree: PaneTree): void {
+  latestPaneTree = tree
+  for (const fn of layoutSubscribers) fn(tree)
+}
+
+/** The most recently published pane tree, or null before the first publish. */
+export function getPaneLayout(): PaneTree | null {
+  return latestPaneTree
+}
+
+/** Subscribe to pane-tree changes. @returns an unsubscribe function. */
+export function onPaneLayoutChange(fn: PaneLayoutListener): () => void {
+  layoutSubscribers.add(fn)
+  return () => { layoutSubscribers.delete(fn) }
+}
+
+/** Reset the published tree (tests only). */
+export function resetPaneLayoutForTests(): void {
+  latestPaneTree = null
+  layoutSubscribers.clear()
 }
