@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { tokenize, FormulaTokenizeError } from './tokenizer'
 import { parseFormula, FormulaParseError } from './parser'
-import { evaluateFormula, formatFormulaValue } from './evaluator'
+import { evaluateFormula, evaluateCondition, formatFormulaValue } from './evaluator'
 import type { FormulaContext, FormulaValue } from './functions'
 
 function ctxOf(values: Record<string, FormulaValue>): FormulaContext {
@@ -74,9 +74,10 @@ describe('evaluateFormula', () => {
     expect(r).toEqual({ ok: true, value: '✓' })
   })
 
-  it('computes a day difference between two dates', () => {
+  it('computes a millisecond difference between two dates (Obsidian semantics)', () => {
     const r = evaluateFormula('date("2026-01-10") - date("2026-01-01")', ctxOf({}))
-    expect(r).toEqual({ ok: true, value: 9 })
+    // 9 days in milliseconds
+    expect(r).toEqual({ ok: true, value: 9 * 86_400_000 })
   })
 
   it('returns an error on division by zero (no crash)', () => {
@@ -109,5 +110,69 @@ describe('formatFormulaValue', () => {
 
   it('renders null as an empty string', () => {
     expect(formatFormulaValue(null)).toBe('')
+  })
+})
+
+describe('expression language — logical operators', () => {
+  it('evaluates && and || with short-circuit truthiness', () => {
+    expect(evaluateFormula('true && false', ctxOf({}))).toEqual({ ok: true, value: false })
+    expect(evaluateFormula('false || true', ctxOf({}))).toEqual({ ok: true, value: true })
+  })
+  it('evaluates logical not', () => {
+    expect(evaluateFormula('!done', ctxOf({ done: false }))).toEqual({ ok: true, value: true })
+  })
+  it('precedence: || binds looser than &&', () => {
+    // true || (false && false) === true
+    expect(evaluateFormula('true || false && false', ctxOf({}))).toEqual({ ok: true, value: true })
+  })
+})
+
+describe('expression language — methods', () => {
+  it('number.toFixed(n)', () => {
+    expect(evaluateFormula('price.toFixed(2)', ctxOf({ price: 3 }))).toEqual({ ok: true, value: '3.00' })
+  })
+  it('string.contains', () => {
+    expect(evaluateFormula('name.contains("ab")', ctxOf({ name: 'cabd' }))).toEqual({ ok: true, value: true })
+  })
+  it('string.upper', () => {
+    expect(evaluateFormula('name.upper()', ctxOf({ name: 'hi' }))).toEqual({ ok: true, value: 'HI' })
+  })
+  it('list.contains / length', () => {
+    expect(evaluateFormula('tags.contains("x")', ctxOf({ tags: ['a', 'x'] }))).toEqual({ ok: true, value: true })
+    expect(evaluateFormula('tags.length()', ctxOf({ tags: ['a', 'x'] }))).toEqual({ ok: true, value: 2 })
+  })
+  it('date.format via moment', () => {
+    const r = evaluateFormula('d.format("YYYY")', ctxOf({ d: new Date(2026, 0, 1) }))
+    expect(r).toEqual({ ok: true, value: '2026' })
+  })
+  it('unknown method is an error, not a crash', () => {
+    expect(evaluateFormula('name.bogus()', ctxOf({ name: 'x' })).ok).toBe(false)
+  })
+})
+
+describe('expression language — members, index, durations', () => {
+  it('date member field', () => {
+    expect(evaluateFormula('now().year', ctxOf({})).ok).toBe(true)
+  })
+  it('list index access', () => {
+    expect(evaluateFormula('tags[0]', ctxOf({ tags: ['first', 'second'] }))).toEqual({ ok: true, value: 'first' })
+  })
+  it('date + duration string', () => {
+    const r = evaluateFormula('date("2026-01-01") + "1d"', ctxOf({}))
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(formatFormulaValue(r.value)).toBe('2026-01-02')
+  })
+})
+
+describe('evaluateCondition (filter entry point)', () => {
+  it('returns true/false for a comparison', () => {
+    expect(evaluateCondition('status == "done"', ctxOf({ status: 'done' }))).toBe(true)
+    expect(evaluateCondition('status == "done"', ctxOf({ status: 'open' }))).toBe(false)
+  })
+  it('combines conditions with && / ||', () => {
+    expect(evaluateCondition('a > 1 && b < 5', ctxOf({ a: 2, b: 3 }))).toBe(true)
+  })
+  it('a broken condition is false, not a crash', () => {
+    expect(evaluateCondition('1 +', ctxOf({}))).toBe(false)
   })
 })

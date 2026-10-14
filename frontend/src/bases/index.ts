@@ -28,6 +28,6 @@ export type {
 export { parseBase } from './parser'
 export { serializeBase } from './serializer'
 export { buildQuerySpec, runBaseQuery } from './query-engine'
-export { evaluateFormula, formatFormulaValue } from './formula/evaluator'
+export { evaluateFormula, evaluateCondition, formatFormulaValue } from './formula/evaluator'
 export type { FormulaContext, FormulaResult } from './formula/evaluator'
 export type { FormulaValue } from './formula/functions'

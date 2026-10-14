@@ -6,14 +6,21 @@ Umsetzung in Phasen; jede Phase einzeln committbar + grün (tsc/build/test/lint)
 - [x] 0.1 Requirements, Design, Tasks schreiben und committen
 
 ## Phase 1 — Ausdrucks-Engine erweitern
-- [ ] 1.1 `formula/` → `expr/` umziehen (Dateien verschieben, Importe nachziehen), `ast.ts` extrahieren
-- [ ] 1.2 Tokenizer: `&&` `||` `!` `%`, `.`, `[` `]` ergänzen (+ Tests)
-- [ ] 1.3 Parser: `member`/`index`/`method`/`logical`-Knoten + Präzedenz (+ Tests, fast-check Präzedenz)
-- [ ] 1.4 `values.ts`: `list`/`link` ergänzen; Abgleich mit `bases-values.ts`, Doppelmodell vermeiden
-- [ ] 1.5 `methods.ts`: String/Number/Date/List-Methodentabelle (+ Tests, inkl. unbekannte Methode → Fehlerwert)
-- [ ] 1.6 `functions.ts`: Funktionsliste erweitern (`number`, `link`, `list`, `min`, `max`) (+ Tests)
-- [ ] 1.7 Evaluator: Member/Index/Method/Logical + Datums-Durationen (`date ± "1M"`) (+ Tests)
-- [ ] 1.8 `FormulaContext`: Präfix-Auflösung `note.`/`file.`/`formula.` (+ Tests)
+- [x] 1.1 `formula/` AN ORT UND STELLE erweitern (KEIN Umzug nach `expr/` — ein reiner Verzeichnis-
+      Rename bläht die Diffs mit Pfad-Rauschen auf und bringt keinen funktionalen Wert; die öffentliche
+      API `evaluateFormula`/`FormulaContext`/`FormulaValue` + Barrel bleiben stabil). `ast.ts` aus
+      `parser.ts` extrahieren.
+- [x] 1.2 Tokenizer: `&&` `||` `!` `%`, `.`, `[` `]` ergänzen (+ Tests)
+- [x] 1.3 Parser: `member`/`index`/`method`/`logical`-Knoten + Präzedenz (+ Tests, fast-check Präzedenz)
+- [x] 1.4 `values.ts`: `list`/`link` ergänzen; Abgleich mit `bases-values.ts` (zwei bewusst getrennte
+      Modelle: internes Rechenmodell `FormulaValue` vs. Plugin-API-Oberflächenmodell `Value`), Doppelmodell vermieden
+- [x] 1.5 `methods.ts`: String/Number/Date/List-Methodentabelle (+ Tests, inkl. unbekannte Methode → Fehlerwert)
+- [x] 1.6 `functions.ts`: Funktionsliste erweitern (`number`, `link`, `list`, `min`, `max`) (+ Tests)
+- [x] 1.7 Evaluator: Member/Index/Method/Logical + Datums-Durationen (`date ± "1M"`) (+ Tests). HINWEIS:
+      `date - date` liefert jetzt Millisekunden (Obsidian-Semantik), nicht mehr Tage — betrifft die
+      Welcome-Vault-Formel `date(deadline) - today()`, in Phase 5 migrieren.
+- [ ] 1.8 `FormulaContext`: Präfix-Auflösung `note.`/`file.`/`formula.` → in Phase 4 beim konkreten
+      Row-Context gebaut (die Engine kennt nur `resolve(name)`, die Präfix-Semantik gehört zum Caller)
 
 ## Phase 2 — Datei-Metadaten für Filter (Backend)
 - [ ] 2.1 `BaseQueryRowWire`/`BaseRow` um `ext`/`folder`/`tags`/`links` ergänzen (ctime/mtime prüfen)
