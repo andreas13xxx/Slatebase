@@ -23,9 +23,10 @@ Umsetzung in Phasen; jede Phase einzeln committbar + grün (tsc/build/test/lint)
       Row-Context gebaut (die Engine kennt nur `resolve(name)`, die Präfix-Semantik gehört zum Caller)
 
 ## Phase 2 — Datei-Metadaten für Filter (Backend)
-- [ ] 2.1 `BaseQueryRowWire`/`BaseRow` um `ext`/`folder`/`tags`/`links` ergänzen (ctime/mtime prüfen)
-- [ ] 2.2 `LinkIndexService.queryForBase` liefert diese Felder (+ Backend-Tests)
-- [ ] 2.3 `basesRoutes` + `IApiClient.queryBase` Wire-Typen nachziehen
+- [x] 2.1 `BaseQueryRowWire`/`BaseRow` um `ext`/`folder`/`tags`/`links` ergänzen (ctime/mtime vorhanden)
+- [x] 2.2 `LinkIndexService.queryForBase`/`buildBaseRow` liefert diese Felder (+ 2 Backend-Tests)
+- [x] 2.3 `basesRoutes` gibt `result` direkt als JSON zurück → Felder fließen ohne Code-Änderung mit;
+      `BaseQueryRowWire` + `IApiClient.queryBase` typkonsistent (kein Signatur-Change nötig)
 
 ## Phase 3 — Parser/Serializer auf Obsidian-Format
 - [ ] 3.1 `types.ts`: `BaseFilterNode` = `string | {and} | {or} | {not}`; altes `BaseFilterCondition` entfernen; `groupBy`-Objekt; `summaries`; View-`limit`

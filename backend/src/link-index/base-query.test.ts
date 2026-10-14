@@ -137,4 +137,21 @@ describe('LinkIndexService.queryForBase', () => {
     expect(result.total).toBe(3)
     expect(result.rows).toHaveLength(2)
   })
+
+  it('populates file-metadata fields (ext/folder/tags) on each row', async () => {
+    await setupVault()
+    const result = await service.queryForBase({ filters: { path: 'Tasks/a.md' }, columns: [] })
+    expect(result.rows).toHaveLength(1)
+    const row = result.rows[0]!
+    expect(row.ext).toBe('md')
+    expect(row.folder).toBe('Tasks')
+    expect(row.tags).toEqual(['urgent'])
+  })
+
+  it('reports an empty folder for a vault-root file', async () => {
+    await setupVault()
+    const result = await service.queryForBase({ filters: { path: 'note.md' }, columns: [] })
+    expect(result.rows).toHaveLength(1)
+    expect(result.rows[0]!.folder).toBe('')
+  })
 })

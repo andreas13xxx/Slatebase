@@ -179,6 +179,14 @@ export interface BaseQueryRowWire {
   fileName: string
   ctime?: number
   mtime?: number
+  /** File extension without the dot (`file.ext`), e.g. `md`. */
+  ext?: string
+  /** Parent folder path (`file.folder`), '' for a vault-root file. */
+  folder?: string
+  /** All tags on the file (`file.tags`), without the leading `#`. */
+  tags?: string[]
+  /** Internal link targets in the file (`file.links`), vault-relative. */
+  links?: string[]
   values: Record<string, string[]>
 }
 

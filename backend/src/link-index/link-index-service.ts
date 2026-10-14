@@ -801,6 +801,19 @@ export class LinkIndexService implements ILinkIndex {
       values,
     }
 
+    // File-metadata fields that are cheap (already in the index or derivable
+    // from the path) are always populated — the client's expression engine
+    // reads `file.ext`/`file.folder`/`file.tags`/`file.links` from them.
+    const slash = filePath.lastIndexOf('/')
+    row.folder = slash === -1 ? '' : filePath.slice(0, slash)
+    const basename = slash === -1 ? filePath : filePath.slice(slash + 1)
+    const dot = basename.lastIndexOf('.')
+    row.ext = dot > 0 ? basename.slice(dot + 1) : ''
+    const tags = this.fileTags.get(filePath)
+    if (tags && tags.size > 0) row.tags = Array.from(tags)
+    const links = this.forwardLinks.get(filePath)
+    if (links && links.size > 0) row.links = Array.from(links)
+
     if (needsStat) {
       const stat = await this.statFile(filePath)
       if (stat) {
