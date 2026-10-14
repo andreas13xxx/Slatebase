@@ -2,22 +2,19 @@ import { describe, it, expect } from 'vitest'
 import { parse as parseYaml } from 'yaml'
 import { parseBase } from './parser'
 import { serializeBase } from './serializer'
-import type { BaseDocument, BaseFilterAnd, BaseFilterCondition } from './types'
+import type { BaseDocument, BaseFilterAnd } from './types'
 
 /**
- * Fixture modelled on a real Obsidian `.base` file: AND/OR-nested filters, a
- * formula column, property display metadata, and a table view with sort.
+ * Fixture in the real Obsidian `.base` format: AND/OR-nested filters as
+ * expression strings, a formula column, property display metadata, and a table
+ * view with sort.
  */
 const FIXTURE = `filters:
   and:
-    - property: status
-      op: neq
-      value: done
+    - 'status != "done"'
     - or:
-        - property: priority
-          op: eq
-          value: high
-        - tag: urgent
+        - 'priority == "high"'
+        - file.hasTag("urgent")
 formulas:
   days_left: date(deadline) - today()
 properties:
@@ -25,7 +22,7 @@ properties:
     displayName: Task
   status:
     displayName: Status
-  days_left:
+  formula.days_left:
     displayName: Days left
 views:
   - type: table
@@ -34,7 +31,7 @@ views:
       - file.name
       - status
       - priority
-      - days_left
+      - formula.days_left
     sort:
       - column: priority
         direction: desc
@@ -50,7 +47,7 @@ describe('parseBase', () => {
     expect(doc.views).toHaveLength(1)
     expect(doc.views[0]?.type).toBe('table')
     expect(doc.views[0]?.name).toBe('Open tasks')
-    expect(doc.views[0]?.order).toEqual(['file.name', 'status', 'priority', 'days_left'])
+    expect(doc.views[0]?.order).toEqual(['file.name', 'status', 'priority', 'formula.days_left'])
     expect(doc.views[0]?.sort).toEqual([{ column: 'priority', direction: 'desc' }])
 
     expect(doc.formulas?.['days_left']).toBe('date(deadline) - today()')
@@ -58,10 +55,7 @@ describe('parseBase', () => {
 
     const root = doc.filters as BaseFilterAnd
     expect(root.and).toHaveLength(2)
-    const first = root.and[0] as BaseFilterCondition
-    expect(first.property).toBe('status')
-    expect(first.op).toBe('neq')
-    expect(first.value).toBe('done')
+    expect(root.and[0]).toBe('status != "done"')
     expect('or' in (root.and[1] as object)).toBe(true)
   })
 
@@ -116,29 +110,45 @@ views:
     expect(result.errors[0]?.message).toMatch(/must be a YAML mapping/)
   })
 
-  it('reports a non-fatal error for a condition targeting nothing', () => {
-    const result = parseBase('filters:\n  op: eq\n  value: x\nviews: []\n')
+  it('rejects the removed legacy object-condition schema with a migration hint', () => {
+    const result = parseBase('filters:\n  property: x\n  op: eq\n  value: y\nviews: []\n')
     expect(result.success).toBe(true)
     if (!result.success) return
-    expect(result.errors?.some((e) => /must target one of/.test(e.message))).toBe(true)
+    expect(result.errors?.some((e) => /no longer supported|expression string/.test(e.message))).toBe(true)
   })
 
-  it('reports a non-fatal error for an unknown operator', () => {
-    const result = parseBase('filters:\n  property: x\n  op: between\nviews: []\n')
+  it('parses a filters list group of expression strings', () => {
+    const result = parseBase('filters:\n  not:\n    - \'status == "archived"\'\nviews: []\n')
     expect(result.success).toBe(true)
     if (!result.success) return
-    expect(result.errors?.some((e) => /op/.test(e.message))).toBe(true)
+    const root = result.document.filters as { not: unknown[] }
+    expect(root.not).toEqual(['status == "archived"'])
   })
 
-  it('parses a cards view with a groupBy property', () => {
-    const result = parseBase('views:\n  - type: cards\n    name: Board\n    groupBy: status\n')
+  it('parses a cards view with a groupBy object', () => {
+    const result = parseBase('views:\n  - type: cards\n    name: Board\n    groupBy:\n      property: status\n      direction: ASC\n')
     expect(result.success).toBe(true)
     if (!result.success) return
     expect(result.document.views[0]?.type).toBe('cards')
-    expect(result.document.views[0]?.groupBy).toBe('status')
+    expect(result.document.views[0]?.groupBy).toEqual({ property: 'status', direction: 'ASC' })
   })
 
-  it('reports a non-fatal error for a non-string groupBy', () => {
+  it('tolerates a bare-string groupBy as { property }', () => {
+    const result = parseBase('views:\n  - type: cards\n    groupBy: status\n')
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.document.views[0]?.groupBy).toEqual({ property: 'status' })
+  })
+
+  it('parses a view limit and summaries', () => {
+    const result = parseBase('views:\n  - type: table\n    limit: 10\n    summaries:\n      price: Average\n')
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.document.views[0]?.limit).toBe(10)
+    expect(result.document.views[0]?.summaries).toEqual({ price: 'Average' })
+  })
+
+  it('reports a non-fatal error for a non-object groupBy', () => {
     const result = parseBase('views:\n  - type: cards\n    groupBy: [1, 2]\n')
     expect(result.success).toBe(true)
     if (!result.success) return
@@ -149,9 +159,10 @@ views:
 describe('serializeBase', () => {
   it('emits a stable top-level key order', () => {
     const doc: BaseDocument = {
-      filters: { property: 'status', op: 'eq', value: 'open' },
+      filters: 'status == "open"',
       formulas: { x: '1 + 1' },
       properties: { status: { displayName: 'Status' } },
+      summaries: { price: 'Average' },
       views: [{ type: 'table', name: 'All' }],
     }
     const yaml = serializeBase(doc)
@@ -159,17 +170,17 @@ describe('serializeBase', () => {
       .split('\n')
       .filter((line) => /^[a-z]/.test(line))
       .map((line) => line.split(':')[0])
-    expect(keys).toEqual(['filters', 'formulas', 'properties', 'views'])
+    expect(keys).toEqual(['filters', 'formulas', 'properties', 'summaries', 'views'])
   })
 
-  it('round-trips a cards view groupBy field', () => {
+  it('round-trips a cards view groupBy object', () => {
     const doc: BaseDocument = {
-      views: [{ type: 'cards', name: 'Board', groupBy: 'status' }],
+      views: [{ type: 'cards', name: 'Board', groupBy: { property: 'status', direction: 'DESC' } }],
     }
     const yaml = serializeBase(doc)
     const reparsed = parseBase(yaml)
     expect(reparsed.success).toBe(true)
     if (!reparsed.success) return
-    expect(reparsed.document.views[0]?.groupBy).toBe('status')
+    expect(reparsed.document.views[0]?.groupBy).toEqual({ property: 'status', direction: 'DESC' })
   })
 })

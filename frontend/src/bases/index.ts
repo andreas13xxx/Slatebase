@@ -4,16 +4,17 @@
  */
 
 export type {
-  BaseFilterOperator,
-  BaseFilterCondition,
+  BaseFilterNode,
   BaseFilterAnd,
   BaseFilterOr,
-  BaseFilterNode,
+  BaseFilterNot,
   BaseFormulas,
   BaseColumnMeta,
   BaseProperties,
   BaseSortDirection,
   BaseSortClause,
+  BaseGroupBy,
+  BaseSummaries,
   BaseView,
   BaseDocument,
   BaseRow,

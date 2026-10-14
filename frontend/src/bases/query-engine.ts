@@ -1,14 +1,47 @@
 /**
  * Bases query engine (frontend) — turns a parsed `BaseDocument` + a chosen view
- * into a backend query, calls the metadata query route, and returns table rows.
+ * into a backend query, calls the metadata query route, evaluates the base's
+ * filter expressions CLIENT-SIDE against the returned rows, and returns table
+ * rows.
  *
- * The engine owns no vault state: it reads live from the backend's link index
- * on each run, and callers re-run it on a `vault:change` event (via the shared
- * realtime bridge) so a base refreshes when notes change — see `BasesView`.
+ * Why client-side filters: the Obsidian filter language is a full expression
+ * language (methods, durations, arithmetic) that does not translate losslessly
+ * into the backend's structured query spec, so the backend returns candidate
+ * rows (with their property + file-metadata values) and the shared expression
+ * engine filters them here. The engine owns no vault state: it reads live from
+ * the backend on each run, and callers re-run it on `vault:change`.
  */
 
 import type { IApiClient } from '../api'
-import type { BaseDocument, BaseRow, BaseView, BaseQuerySpecWire } from './types'
+import type { BaseDocument, BaseFilterNode, BaseRow, BaseView, BaseQuerySpecWire } from './types'
+import { evaluateCondition } from './formula/evaluator'
+import type { FormulaContext } from './formula/evaluator'
+import type { FormulaValue } from './formula/functions'
+
+// ─── Filter column collection ──────────────────────────────────────────────────
+
+/** Pull every bare word that looks like a property reference out of an expression. */
+function collectRefsFromExpression(expr: string, into: Set<string>): void {
+  // Match identifiers incl. dotted paths; skip quoted string contents.
+  const withoutStrings = expr.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, ' ')
+  const idRe = /[A-Za-z_][A-Za-z0-9_.]*/g
+  let m: RegExpExecArray | null
+  while ((m = idRe.exec(withoutStrings)) !== null) {
+    const id = m[0]
+    // Skip the common function/global names + boolean literals.
+    if (['true', 'false', 'if', 'and', 'or', 'not', 'date', 'now', 'today', 'concat', 'number', 'list', 'link', 'min', 'max', 'days', 'length'].includes(id)) continue
+    into.add(id)
+  }
+}
+
+/** Walk a filter tree collecting every referenced property column. */
+function collectFilterRefs(node: BaseFilterNode | undefined, into: Set<string>): void {
+  if (!node) return
+  if (typeof node === 'string') { collectRefsFromExpression(node, into); return }
+  if ('and' in node) node.and.forEach((n) => collectFilterRefs(n, into))
+  else if ('or' in node) node.or.forEach((n) => collectFilterRefs(n, into))
+  else if ('not' in node) node.not.forEach((n) => collectFilterRefs(n, into))
+}
 
 // ─── Spec construction ────────────────────────────────────────────────────────
 
@@ -16,39 +49,81 @@ import type { BaseDocument, BaseRow, BaseView, BaseQuerySpecWire } from './types
  * Builds a backend query spec from a base document and the view being rendered.
  *
  * - Columns are the view's explicit `order`, falling back to the document's
- *   declared property keys. Formula columns (`doc.formulas` keys) are dropped —
- *   they are evaluated client-side, not fetched.
- * - `file.*` pseudo-columns stay in the sort/order but are not requested as
- *   property values (the backend derives them).
+ *   declared property keys, PLUS any property referenced in a filter (so the
+ *   client has the values it needs to filter), minus formula columns and
+ *   `file.*`/`note.` prefixed pseudo-columns (the backend derives those).
+ * - Filters are NOT pushed to the backend — they are evaluated client-side.
  */
 export function buildQuerySpec(doc: BaseDocument, view: BaseView): BaseQuerySpecWire {
   const formulaKeys = new Set(Object.keys(doc.formulas ?? {}))
 
-  const columnIds = view.order ?? Object.keys(doc.properties ?? {})
-  const propertyColumns = columnIds.filter((id) => !id.startsWith('file.') && !formulaKeys.has(id))
+  const wanted = new Set<string>()
+  for (const id of view.order ?? Object.keys(doc.properties ?? {})) wanted.add(id)
+  if (view.groupBy) wanted.add(view.groupBy.property)
+  collectFilterRefs(doc.filters, wanted)
+  collectFilterRefs(view.filters, wanted)
 
-  // A `cards` view groups by `view.groupBy`; make sure that property is fetched
-  // even when it isn't among the displayed columns.
-  if (view.groupBy && !view.groupBy.startsWith('file.') && !formulaKeys.has(view.groupBy) && !propertyColumns.includes(view.groupBy)) {
-    propertyColumns.push(view.groupBy)
-  }
+  const propertyColumns = Array.from(wanted).filter((id) => {
+    if (formulaKeys.has(id)) return false
+    if (id.startsWith('file.')) return false
+    if (id === 'file' || id === 'note') return false
+    return true
+  }).map((id) => (id.startsWith('note.') ? id.slice('note.'.length) : id))
 
-  const spec: BaseQuerySpecWire = { columns: propertyColumns }
-  if (doc.filters) spec.filters = doc.filters
+  const spec: BaseQuerySpecWire = { columns: Array.from(new Set(propertyColumns)) }
+
   if (view.sort && view.sort.length > 0) {
-    // A sort on a formula column can't be pushed to the backend; drop it there
-    // (client-side formula sort is a later refinement).
     const serverSort = view.sort
       .filter((s) => !formulaKeys.has(s.column))
       .map((s) => (s.direction ? { column: s.column, direction: s.direction } : { column: s.column }))
     if (serverSort.length > 0) spec.sort = serverSort
   }
+  if (view.limit !== undefined) spec.limit = view.limit
   return spec
+}
+
+// ─── Row context + filter evaluation ───────────────────────────────────────────
+
+/** First scalar of a string-list value, as the expression engine wants it. */
+function firstScalar(v: unknown): FormulaValue {
+  if (Array.isArray(v)) {
+    if (v.length === 0) return null
+    if (v.length === 1) return v[0] as FormulaValue
+    return v as FormulaValue[]
+  }
+  return (v as FormulaValue) ?? null
+}
+
+/**
+ * Builds the expression `FormulaContext` for one row, resolving the Obsidian
+ * property prefixes: `file.*` → file metadata, `note.`/bare → frontmatter,
+ * `formula.x` → another formula (evaluated lazily, cycle-guarded by the caller).
+ */
+export function rowContext(row: BaseRow): FormulaContext {
+  const values = row.values
+  return {
+    resolve(name: string): FormulaValue {
+      if (name === 'file.name') return row.fileName
+      if (name.startsWith('file.')) return firstScalar(values[name])
+      const key = name.startsWith('note.') ? name.slice('note.'.length) : name
+      return firstScalar(values[key] ?? values[name])
+    },
+  }
+}
+
+/** Evaluate a filter tree against one row's context. */
+function matchesFilter(node: BaseFilterNode | undefined, ctx: FormulaContext): boolean {
+  if (!node) return true
+  if (typeof node === 'string') return evaluateCondition(node, ctx)
+  if ('and' in node) return node.and.every((n) => matchesFilter(n, ctx))
+  if ('or' in node) return node.or.some((n) => matchesFilter(n, ctx))
+  // 'not': none of the children may match.
+  return node.not.every((n) => !matchesFilter(n, ctx))
 }
 
 // ─── Execution ──────────────────────────────────────────────────────────────
 
-/** Runs a base query against the backend and maps the result to `BaseRow[]`. */
+/** Runs a base query against the backend and maps + filters the result to `BaseRow[]`. */
 export async function runBaseQuery(
   apiClient: IApiClient,
   vaultId: string,
@@ -57,11 +132,23 @@ export async function runBaseQuery(
 ): Promise<{ rows: BaseRow[]; total: number }> {
   const spec = buildQuerySpec(doc, view)
   const result = await apiClient.queryBase(vaultId, spec)
-  const rows: BaseRow[] = result.rows.map((r) => {
+
+  const allRows: BaseRow[] = result.rows.map((r) => {
     const values: Record<string, unknown> = { ...r.values }
     if (r.ctime !== undefined) values['file.ctime'] = r.ctime
     if (r.mtime !== undefined) values['file.mtime'] = r.mtime
+    if (r.ext !== undefined) values['file.ext'] = r.ext
+    if (r.folder !== undefined) values['file.folder'] = r.folder
+    if (r.tags !== undefined) values['file.tags'] = r.tags
+    if (r.links !== undefined) values['file.links'] = r.links
     return { path: r.path, fileName: r.fileName, values }
   })
-  return { rows, total: result.total }
+
+  // Apply the document filter AND the view filter (concatenated), client-side.
+  const rows = allRows.filter((row) => {
+    const ctx = rowContext(row)
+    return matchesFilter(doc.filters, ctx) && matchesFilter(view.filters, ctx)
+  })
+
+  return { rows, total: rows.length }
 }

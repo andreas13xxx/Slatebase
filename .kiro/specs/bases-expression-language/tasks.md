@@ -19,8 +19,8 @@ Umsetzung in Phasen; jede Phase einzeln committbar + grün (tsc/build/test/lint)
 - [x] 1.7 Evaluator: Member/Index/Method/Logical + Datums-Durationen (`date ± "1M"`) (+ Tests). HINWEIS:
       `date - date` liefert jetzt Millisekunden (Obsidian-Semantik), nicht mehr Tage — betrifft die
       Welcome-Vault-Formel `date(deadline) - today()`, in Phase 5 migrieren.
-- [ ] 1.8 `FormulaContext`: Präfix-Auflösung `note.`/`file.`/`formula.` → in Phase 4 beim konkreten
-      Row-Context gebaut (die Engine kennt nur `resolve(name)`, die Präfix-Semantik gehört zum Caller)
+- [x] 1.8 `FormulaContext`: Präfix-Auflösung `note.`/`file.`/`formula.` → erledigt via `rowContext()`
+      in `query-engine.ts` (Phase 4): `file.*` → Datei-Metadaten, `note.`/bare → frontmatter
 
 ## Phase 2 — Datei-Metadaten für Filter (Backend)
 - [x] 2.1 `BaseQueryRowWire`/`BaseRow` um `ext`/`folder`/`tags`/`links` ergänzen (ctime/mtime vorhanden)
@@ -29,15 +29,19 @@ Umsetzung in Phasen; jede Phase einzeln committbar + grün (tsc/build/test/lint)
       `BaseQueryRowWire` + `IApiClient.queryBase` typkonsistent (kein Signatur-Change nötig)
 
 ## Phase 3 — Parser/Serializer auf Obsidian-Format
-- [ ] 3.1 `types.ts`: `BaseFilterNode` = `string | {and} | {or} | {not}`; altes `BaseFilterCondition` entfernen; `groupBy`-Objekt; `summaries`; View-`limit`
-- [ ] 3.2 `parser.ts`: Filter-Strings + `not`-Gruppe, `groupBy`-Objekt, `summaries`, `limit` (+ Tests, Fehler bei Alt-Schema)
-- [ ] 3.3 `serializer.ts`: verlustfreier Round-Trip (+ Round-Trip-Test gegen echtes-Format-Fixture)
+- [x] 3.1 `types.ts`: `BaseFilterNode` = `string | {and} | {or} | {not}`; altes `BaseFilterCondition`
+      entfernt; `groupBy`-Objekt (`BaseGroupBy`); `summaries` (`BaseSummaries`); View-`limit`
+- [x] 3.2 `parser.ts`: Filter-Strings + `not`-Gruppe, `groupBy`-Objekt, `summaries`, `limit`; Alt-Schema
+      wird mit Migrations-Hinweis abgelehnt (+ Tests)
+- [x] 3.3 `serializer.ts`: verlustfreier Round-Trip (+ Round-Trip-Tests)
 
 ## Phase 4 — Query-Engine (clientseitige Filterung)
-- [ ] 4.1 `query-engine.ts`: `buildQuerySpec` fragt auch filter-referenzierte Properties an
-- [ ] 4.2 Filter-Auswertung: Ausdruck-Strings gegen Zeilen auswerten (and/or/not) über die Engine (+ Tests)
-- [ ] 4.3 `BasesView`/`BasesTableView`/`BasesKanbanView` an neues `groupBy`-Objekt + Filterformat anpassen
-- [ ] 4.4 Bestehende Bases-Tests auf neues Format umstellen, grün
+- [x] 4.1 `query-engine.ts`: `buildQuerySpec` fragt auch filter-referenzierte Properties an, pusht KEINEN
+      Filter mehr ans Backend
+- [x] 4.2 Filter-Auswertung: Ausdruck-Strings gegen Zeilen clientseitig über `evaluateCondition`
+      (and/or/not), Doc- + View-Filter (+ Tests)
+- [x] 4.3 `BasesKanbanView` an `groupBy`-Objekt angepasst; `BasesView`/`BasesTableView` unverändert kompatibel
+- [x] 4.4 Bestehende Bases-Tests (parser/query-engine/Kanban/Table) auf neues Format umgestellt, grün
 
 ## Phase 5 — Migration & Doku
 - [ ] 5.1 Beide Welcome-Vault-`.base`-Beispiele auf Obsidian-Format umschreiben

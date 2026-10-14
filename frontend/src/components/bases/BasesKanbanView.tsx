@@ -56,7 +56,8 @@ interface KanbanColumn {
 export const BasesKanbanView = memo(function BasesKanbanView({
   doc, view, rows, onOpenNote, onMoveCard,
 }: BasesKanbanViewProps) {
-  const groupBy = view.groupBy
+  // The grouping property name (the new `groupBy` is an object `{property, direction}`).
+  const groupBy = view.groupBy?.property
   // Chip columns: the view's configured columns minus the grouping property
   // itself (redundant on every card in a column) and the file name (it is the
   // card title). Formula columns are left out — the table view evaluates those.
