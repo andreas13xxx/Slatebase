@@ -131,6 +131,27 @@ export const BasesView = memo(function BasesView({
     }
   }, [apiClient, vaultId, rows])
 
+  // Move a Kanban card to another column: write the grouping property of the
+  // dragged note's frontmatter to the target column's value ('' clears it).
+  // Reuses the same frontmatter-write path as a cell edit.
+  const handleMoveCard = useCallback(async (path: string, property: string, newValue: string) => {
+    const prevRows = rows
+    try {
+      const file = await apiClient.fetchFileContent(vaultId, path)
+      const { data } = parseFrontmatter(file.content)
+      const fm: Record<string, unknown> = { ...(data ?? {}) }
+      if (newValue === '') fm[property] = undefined
+      else fm[property] = newValue
+      const keyOrder = Object.keys(fm)
+      const next = applyFrontmatterChange(file.content, fm, keyOrder)
+      await apiClient.saveFile(vaultId, path, next)
+      // The save triggers vault:change → runQuery refreshes the row set.
+    } catch (err) {
+      setQueryError(extractErrorMessage(err, 'Karte konnte nicht verschoben werden'))
+      setRows(prevRows)
+    }
+  }, [apiClient, vaultId, rows])
+
   // Write a sort change back into the selected view in the `.base` file.
   const handleSortChange = useCallback((sort: BaseSortClause[]) => {
     if (!doc || !activeView || readOnly) return
@@ -257,6 +278,7 @@ export const BasesView = memo(function BasesView({
           view={activeView}
           rows={rows}
           onOpenNote={onOpenNote}
+          onMoveCard={readOnly ? undefined : (path, property, value) => void handleMoveCard(path, property, value)}
         />
       )}
 

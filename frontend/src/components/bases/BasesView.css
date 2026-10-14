@@ -320,6 +320,20 @@
   border-color: var(--accent);
 }
 
+.bases-kanban__card[draggable='true'] {
+  cursor: grab;
+}
+
+.bases-kanban__card--dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.bases-kanban__column--drop-target {
+  border-color: var(--accent);
+  background: var(--bg-elevated);
+}
+
 .bases-kanban__card-title {
   font-weight: 600;
   font-size: 0.9em;
