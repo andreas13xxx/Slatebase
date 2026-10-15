@@ -64,6 +64,7 @@ GET http://your-server:3000/.well-known/mcp.json
 | `list_vaults` | Read | List all vaults you have access to (with name, permission, file count) |
 | `get_vault_structure` | Read | Get the directory tree of a vault as JSON |
 | `search_vault` | Read | Full-text search across all files in a vault |
+| `query_base` | Read | Evaluate a Bases (`.base`) file server-side: filters, formulas, sort and limit of one view → rows as JSON (`view`, `limit` optional) |
 | `read_file` | Read | Read the content of a specific file — text, or binary base64-encoded (see below) |
 | `write_file` | Write | Create or overwrite a file — UTF-8 text, or binary passed base64-encoded (supports ETag conflict detection) |
 | `create_directory` | Write | Create a directory (with intermediate directories) |
