@@ -14,20 +14,20 @@ describe('buildQuerySpec', () => {
   it('takes columns from the view order, dropping file.* and formula columns', () => {
     const view: BaseView = { type: 'table', order: ['file.name', 'priority', 'days_left'] }
     const spec = buildQuerySpec(doc, view)
-    // priority from order; status pulled in because the filter references it.
-    expect(spec.columns.sort()).toEqual(['priority', 'status'])
+    // priority from order; status pulled in by the filter, deadline by the formula.
+    expect(spec.columns.sort()).toEqual(['deadline', 'priority', 'status'])
   })
 
   it('falls back to the document property keys when the view has no order', () => {
     const view: BaseView = { type: 'table' }
     const spec = buildQuerySpec(doc, view)
-    // days_left is a formula → excluded; status/priority remain.
-    expect(spec.columns.sort()).toEqual(['priority', 'status'])
+    // days_left is a formula → excluded, but the property it reads (deadline) is fetched.
+    expect(spec.columns.sort()).toEqual(['deadline', 'priority', 'status'])
   })
 
   it('does NOT push the filter to the backend (client-side evaluation)', () => {
     const spec = buildQuerySpec(doc, { type: 'table', order: ['status'] })
-    expect(spec.filters).toBeUndefined()
+    expect('filters' in spec).toBe(false)
   })
 
   it('requests properties referenced only in the filter', () => {

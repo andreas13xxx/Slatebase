@@ -43,10 +43,18 @@ function selectView(doc: BaseDocument, name: string | undefined): BaseView | { e
   return { error: `View not found: ${name}. Available views: ${known.length > 0 ? known.join(', ') : '(none named)'}` }
 }
 
-/** Column ids to output: the view's explicit order, else the declared properties plus formulas. */
+/**
+ * Column ids to output: the view's explicit order, else the declared properties
+ * plus formulas. A cards view's `groupBy` property is always included so a
+ * client can actually group the rows.
+ */
 function outputColumns(doc: BaseDocument, view: BaseView): string[] {
-  if (view.order && view.order.length > 0) return view.order
-  return ['file.name', ...Object.keys(doc.properties ?? {}), ...Object.keys(doc.formulas ?? {}).map((f) => `formula.${f}`)]
+  const columns = view.order && view.order.length > 0
+    ? [...view.order]
+    : ['file.name', ...Object.keys(doc.properties ?? {}), ...Object.keys(doc.formulas ?? {}).map((f) => `formula.${f}`)]
+  const groupBy = view.groupBy?.property
+  if (groupBy !== undefined && !columns.includes(groupBy)) columns.push(groupBy)
+  return columns
 }
 
 /** One cell as JSON: formulas evaluated, single-element property lists unwrapped. */

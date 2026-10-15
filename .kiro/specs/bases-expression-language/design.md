@@ -2,15 +2,21 @@
 
 ## Leitidee
 
-Eine gemeinsame Ausdrucks-Engine für Filter UND Formeln, aufgebaut auf dem bestehenden
-`frontend/src/bases/formula/` (Tokenizer → Pratt-Parser → Evaluator). Der Parser (`parser.ts`)
-und Serializer (`serializer.ts`) für `.base`-Dateien werden auf das echte Obsidian-Format
-umgestellt. Alles frontend-seitig; das Backend bleibt (Query-Route liefert Zeilen+Werte), die
-Filterung geschieht clientseitig über die Engine (siehe R2 unten).
+Eine gemeinsame Ausdrucks-Engine für Filter UND Formeln (Tokenizer → Pratt-Parser →
+Evaluator). Parser und Serializer für `.base`-Dateien arbeiten auf dem echten Obsidian-Format.
+
+**Stand (ausgeliefert):** Die reine Logik — Typen, `parser.ts`, `serializer.ts`, die Engine unter
+`formula/` und die I/O-freie Auswertung `base-eval.ts` — liegt in `shared-contracts/src/bases/`
+(nicht in `frontend/src/bases/`), damit Frontend und das MCP-Werkzeug `query_base` identisch
+rechnen. Das Frontend behält nur `runBaseQuery` (API-Aufruf). Das Backend liefert Kandidatenzeilen
++ Werte (Query-Route), die Filterung und das View-`limit` geschehen danach clientseitig bzw. im
+MCP-Werkzeug über dieselbe Engine (siehe R2 unten). Die Abschnitte unten beschreiben den Entwurf;
+wo sie `expr/` oder `values.ts` nennen, gilt das ausgelieferte Layout: Engine in
+`shared-contracts/src/bases/formula/` (kein `expr/`-Umzug), Wertmodell in `formula/functions.ts`.
 
 ## Komponenten
 
-### 1. Ausdrucks-Engine (`frontend/src/bases/expr/`)
+### 1. Ausdrucks-Engine (ausgeliefert: `shared-contracts/src/bases/formula/`)
 
 Neues Unterverzeichnis, in das der bestehende `formula/`-Code hineinwächst (umbenannt/erweitert,
 nicht dupliziert). Struktur analog zu `formula/`:
@@ -25,13 +31,13 @@ nicht dupliziert). Struktur analog zu `formula/`:
 - `functions.ts` — erweiterte globale Funktionsliste (siehe unten).
 - `methods.ts` — NEU: Methodentabelle pro Werttyp (String/Number/Date/List/Link).
 - `evaluator.ts` — erweitert um Member-/Index-/Method-/Logical-Auswertung und Datums-Durationen.
-- `values.ts` — Wertmodell: der bestehende `FormulaValue` (`string|number|boolean|Date|null`)
+- Wertmodell (ausgeliefert in `functions.ts`, kein eigenes `values.ts`): der bestehende `FormulaValue` (`string|number|boolean|Date|null`)
   wird um `list` (`FormulaValue[]`) und `link` (`{ path, display? }`) ergänzt. Mapping auf die
   bereits existierende Bases-`Value`-Hierarchie (`bases-values.ts` im compat-Layer) prüfen und
   wo sinnvoll wiederverwenden — NICHT zwei Wertmodelle pflegen.
 
 Pragmatische Funktionsliste (R1/Nicht-Ziel „nicht 1:1"):
-- global: `if`, `concat`, `now`, `today`, `date`, `number`, `link`, `list`, `min`, `max`, `max`.
+- global: `if`, `concat`, `now`, `today`, `date`, `number`, `link`, `list`, `min`, `max`, `days`, `length`.
 - String-Methoden: `.toFixed(n)`? (number), `.contains(s)`, `.startsWith`, `.endsWith`, `.lower`,
   `.upper`, `.replace`, `.split`, `.length` (als Methode UND Property).
 - Number-Methoden: `.toFixed(n)`, `.round(n)`, `.abs`.

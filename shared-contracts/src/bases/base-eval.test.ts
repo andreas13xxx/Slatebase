@@ -17,6 +17,18 @@ describe('buildQuerySpec', () => {
 })
 
 describe('buildQuerySpec filter references', () => {
+  it('requests the receiver property of a method-call filter, not "prop.method"', () => {
+    const doc: BaseDocument = { filters: { and: ['title.contains("x")', 'price.toFixed(2) > 1', 'file.hasTag("t")'] }, views: [] }
+    const spec = buildQuerySpec(doc, { type: 'table', order: [] })
+    expect(spec.columns.sort()).toEqual(['price', 'title'])
+  })
+
+  it('requests properties read by formulas, but not formula.* references', () => {
+    const doc: BaseDocument = { formulas: { double: 'price * 2', plus: 'formula.double + 1' }, views: [] }
+    const spec = buildQuerySpec(doc, { type: 'table', order: ['formula.plus'] })
+    expect(spec.columns).toEqual(['price'])
+  })
+
   it('ignores identifiers inside quoted strings but keeps real references', () => {
     const doc: BaseDocument = { filters: `status == "other_prop" && 'x y' != prio`, views: [] }
     const spec = buildQuerySpec(doc, { type: 'table', order: [] })
@@ -43,6 +55,18 @@ describe('filterRows', () => {
     const out = filterRows(rows, doc, { type: 'table', limit: 1 })
     expect(out.rows.map((r) => r.path)).toEqual(['b.md'])
     expect(out.total).toBe(2)
+  })
+
+  it('matches a method-call filter on the fetched property value end to end', () => {
+    const rows = [wire('a.md', { title: ['Plan A'] }), wire('b.md', { title: ['Notes'] })]
+    const d: BaseDocument = { filters: 'title.contains("Plan")', views: [] }
+    expect(filterRows(rows, d, { type: 'table' }).rows.map((r) => r.path)).toEqual(['a.md'])
+  })
+
+  it('file.inFolder("") matches nothing', () => {
+    const rows = [wire('root.md', {}, { folder: '' }), wire('Tasks/a.md', {}, { folder: 'Tasks' })]
+    const d: BaseDocument = { filters: 'file.inFolder("")', views: [] }
+    expect(filterRows(rows, d, { type: 'table' }).rows).toEqual([])
   })
 
   it('folds file metadata into file.* values and honours file.hasTag / file.inFolder', () => {

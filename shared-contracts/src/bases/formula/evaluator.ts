@@ -229,3 +229,51 @@ export function formatFormulaValue(value: FormulaValue): string {
   }
   return stringify(value)
 }
+
+/** Walks an AST adding every property reference (`status`, `note.price`, `file.tags`, `formula.x`) to `into`. */
+function collectRefs(node: ExprNode, into: Set<string>): void {
+  switch (node.kind) {
+    case 'property':
+      // Bare `file` is only the receiver of `file.hasTag(...)` & co., not a column.
+      if (node.name !== 'file') into.add(node.name)
+      return
+    case 'unary':
+      collectRefs(node.operand, into)
+      return
+    case 'binary':
+    case 'logical':
+      collectRefs(node.left, into)
+      collectRefs(node.right, into)
+      return
+    case 'call':
+      node.args.forEach((a) => collectRefs(a, into))
+      return
+    case 'member':
+      collectRefs(node.object, into)
+      return
+    case 'method':
+      collectRefs(node.object, into)
+      node.args.forEach((a) => collectRefs(a, into))
+      return
+    case 'index':
+      collectRefs(node.object, into)
+      collectRefs(node.index, into)
+      return
+    default:
+      return
+  }
+}
+
+/**
+ * Collects the property references an expression reads, by parsing it — so
+ * `title.contains("x")` yields `title`, not `title.contains`, and names inside
+ * string literals are ignored. An unparseable expression references nothing
+ * (it evaluates to false / `#ERR` anyway).
+ */
+export function collectExpressionRefs(source: string, into: Set<string>): void {
+  try {
+    collectRefs(parseFormula(source), into)
+  } catch {
+    // unparseable: nothing to fetch
+  }
+}

@@ -133,6 +133,30 @@ describe('query_base', () => {
     expect(capped['truncated']).toBe(true)
   })
 
+  it('includes the groupBy property of a cards view and fetches properties used by method filters', async () => {
+    const content = `filters:
+  and:
+    - 'status.contains("op")'
+views:
+  - type: cards
+    name: Board
+    order:
+      - file.name
+    groupBy:
+      property: status
+`
+    const { call, linkIndex } = await setup({ content })
+    const out = parse(await call({ vaultId: 'v1', path: 'tasks.base', limit: 100 }))
+    expect(out['columns']).toEqual(['file.name', 'status'])
+    expect(out['total']).toBe(2)
+    expect(out['rows']).toEqual([
+      { path: 'Tasks/a.md', cells: { 'file.name': 'a', status: 'open' } },
+      { path: 'Tasks/c.md', cells: { 'file.name': 'c', status: 'open' } },
+    ])
+    const spec = vi.mocked(linkIndex.queryForBase).mock.calls[0]![0]
+    expect(spec.columns).toEqual(['status'])
+  })
+
   it('rejects an unknown view and lists the available ones', async () => {
     const { call } = await setup()
     const result = await call({ vaultId: 'v1', path: 'tasks.base', view: 'Nope', limit: 100 })

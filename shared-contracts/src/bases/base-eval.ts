@@ -8,52 +8,16 @@
  */
 
 import type { BaseDocument, BaseFilterNode, BaseRow, BaseView, BaseQuerySpecWire, BaseQueryRowWire } from './types.js'
-import { evaluateCondition, evaluateFormula } from './formula/evaluator.js'
+import { evaluateCondition, evaluateFormula, collectExpressionRefs } from './formula/evaluator.js'
 import type { FormulaContext, FormulaResult } from './formula/evaluator.js'
 import type { FormulaValue } from './formula/functions.js'
 
 // ─── Filter column collection ──────────────────────────────────────────────────
 
-/**
- * Blanks out quoted string literals (`"..."` / `'...'`, backslash escapes) in a
- * single linear pass. Deliberately not a regex: this runs on `.base` content
- * (also server-side), where a backtracking pattern over many `\"` is a ReDoS
- * vector. An unterminated string blanks to the end of the input.
- */
-function stripQuotedStrings(expr: string): string {
-  let out = ''
-  let quote: string | null = null
-  for (let i = 0; i < expr.length; i++) {
-    const ch = expr.charAt(i)
-    if (quote === null) {
-      if (ch === '"' || ch === "'") { quote = ch; out += ' ' } else out += ch
-    } else if (ch === '\\') {
-      i++
-    } else if (ch === quote) {
-      quote = null
-    }
-  }
-  return out
-}
-
-/** Pull every bare word that looks like a property reference out of an expression. */
-function collectRefsFromExpression(expr: string, into: Set<string>): void {
-  // Match identifiers incl. dotted paths; skip quoted string contents.
-  const withoutStrings = stripQuotedStrings(expr)
-  const idRe = /[A-Za-z_][A-Za-z0-9_.]*/g
-  let m: RegExpExecArray | null
-  while ((m = idRe.exec(withoutStrings)) !== null) {
-    const id = m[0]
-    // Skip the common function/global names + boolean literals.
-    if (['true', 'false', 'if', 'and', 'or', 'not', 'date', 'now', 'today', 'concat', 'number', 'list', 'link', 'min', 'max', 'days', 'length'].includes(id)) continue
-    into.add(id)
-  }
-}
-
 /** Walk a filter tree collecting every referenced property column. */
 function collectFilterRefs(node: BaseFilterNode | undefined, into: Set<string>): void {
   if (!node) return
-  if (typeof node === 'string') { collectRefsFromExpression(node, into); return }
+  if (typeof node === 'string') { collectExpressionRefs(node, into); return }
   if ('and' in node) node.and.forEach((n) => collectFilterRefs(n, into))
   else if ('or' in node) node.or.forEach((n) => collectFilterRefs(n, into))
   else if ('not' in node) node.not.forEach((n) => collectFilterRefs(n, into))
@@ -80,10 +44,12 @@ export function buildQuerySpec(doc: BaseDocument, view: BaseView): BaseQuerySpec
   if (view.groupBy) wanted.add(view.groupBy.property)
   collectFilterRefs(doc.filters, wanted)
   collectFilterRefs(view.filters, wanted)
+  // Properties read by formula columns must reach the client too.
+  for (const src of Object.values(doc.formulas ?? {})) collectExpressionRefs(src, wanted)
 
   const propertyColumns = Array.from(wanted).filter((id) => {
     if (formulaKeys.has(id)) return false
-    if (id.startsWith('file.')) return false
+    if (id.startsWith('file.') || id.startsWith('formula.')) return false
     if (id === 'file' || id === 'note') return false
     return true
   }).map((id) => (id.startsWith('note.') ? id.slice('note.'.length) : id))
@@ -135,6 +101,8 @@ export function rowContext(row: BaseRow): FormulaContext {
       },
       inFolder: (f: string) => {
         const target = f.replace(/\/+$/, '').toLowerCase()
+        // An empty folder argument names no folder — match nothing, not the vault root.
+        if (target === '') return false
         const own = folder.toLowerCase()
         // Match the folder itself or any descendant path.
         return own === target || own.startsWith(target + '/') || row.path.toLowerCase().startsWith(target + '/')
