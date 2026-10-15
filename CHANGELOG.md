@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.53.0](https://github.com/andreas13xxx/Slatebase/compare/v0.52.1...v0.53.0) (2026-10-15)
+
+
+### Features
+
+* **bases:** echtes Obsidian-Format, gemeinsame Ausdrucks-Engine, Kanban-Drag, MCP query_base ([#236](https://github.com/andreas13xxx/Slatebase/issues/236)) ([63599ae](https://github.com/andreas13xxx/Slatebase/commit/63599ae27edca88ad746fe52a760ea3761b8f072))
+
+
+### Sonstige Änderungen
+
+* bump the minor-patch group in /backend with 9 updates ([#237](https://github.com/andreas13xxx/Slatebase/issues/237)) ([0ceef4e](https://github.com/andreas13xxx/Slatebase/commit/0ceef4e1121e254ffa72c5d46f249cd274d4c9a0))
+* bump the minor-patch group in /frontend with 11 updates ([#238](https://github.com/andreas13xxx/Slatebase/issues/238)) ([fccb94d](https://github.com/andreas13xxx/Slatebase/commit/fccb94d8ea81efb538fb25e61b33ff11b8a38f38))
+
 ## [0.52.1](https://github.com/andreas13xxx/Slatebase/compare/v0.52.0...v0.52.1) (2026-10-14)
 
 
