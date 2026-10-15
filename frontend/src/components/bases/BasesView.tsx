@@ -16,7 +16,7 @@ import type { IApiClient } from '../../api'
 import { parseBase } from '@slatebase/shared-contracts'
 import { serializeBase } from '@slatebase/shared-contracts'
 import { runBaseQuery } from '../../bases/query-engine'
-import type { BaseDocument, BaseRow, BaseSortClause, BaseView } from '@slatebase/shared-contracts'
+import type { BaseDocument, BaseRow, BaseSortClause, BaseView, FileContent } from '@slatebase/shared-contracts'
 import { applyFrontmatterChange } from '../../utils/frontmatterWriter'
 import { parseFrontmatter } from '../context-panel/utils/parseFrontmatter'
 import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
@@ -111,46 +111,56 @@ export const BasesView = memo(function BasesView({
     }
   }, [safeIndex])
 
-  // Commit a property-cell edit into the target note's frontmatter.
-  const handleCommitCell = useCallback(async (path: string, property: string, values: string[]) => {
-    const prevRows = rows
-    try {
-      const file = await apiClient.fetchFileContent(vaultId, path)
+  // Write one note's frontmatter back to disk with optimistic concurrency:
+  // read (capturing its ETag), apply `mutate`, save with `If-Match`. If the
+  // file changed between read and write the backend returns CONFLICT; we then
+  // re-read the current content, re-apply the mutation on top of it and retry
+  // once, so a concurrent edit elsewhere is merged rather than overwritten.
+  // Backs both the cell edit and the Kanban card move — one code path so the
+  // two cannot drift. The save triggers vault:change → runQuery refreshes the
+  // rows, so there is no optimistic row state to roll back here.
+  const writeFrontmatter = useCallback(async (
+    path: string,
+    mutate: (fm: Record<string, unknown>) => void,
+    conflictFallbackError: string,
+  ): Promise<void> => {
+    const applyAndSave = async (file: FileContent): Promise<void> => {
       const { data } = parseFrontmatter(file.content)
       const fm: Record<string, unknown> = { ...(data ?? {}) }
+      mutate(fm)
+      const next = applyFrontmatterChange(file.content, fm, Object.keys(fm))
+      await apiClient.saveFile(vaultId, path, next, file.etag)
+    }
+    try {
+      await applyAndSave(await apiClient.fetchFileContent(vaultId, path))
+    } catch (err) {
+      if ((err as { code?: string }).code === 'CONFLICT') {
+        // The note changed since we read it — re-read and re-apply on top of
+        // the current content, then save once more.
+        await applyAndSave(await apiClient.fetchFileContent(vaultId, path))
+        return
+      }
+      setQueryError(extractErrorMessage(err, conflictFallbackError))
+    }
+  }, [apiClient, vaultId])
+
+  // Commit a property-cell edit into the target note's frontmatter.
+  const handleCommitCell = useCallback((path: string, property: string, values: string[]) => {
+    void writeFrontmatter(path, (fm) => {
       if (values.length === 0) fm[property] = undefined
       else if (values.length === 1) fm[property] = values[0]
       else fm[property] = values
-      const keyOrder = Object.keys(fm)
-      const next = applyFrontmatterChange(file.content, fm, keyOrder)
-      await apiClient.saveFile(vaultId, path, next)
-      // The save triggers vault:change → runQuery refreshes the row set.
-    } catch (err) {
-      setQueryError(extractErrorMessage(err, 'Zelle konnte nicht gespeichert werden'))
-      setRows(prevRows) // restore the previous value on failure
-    }
-  }, [apiClient, vaultId, rows])
+    }, 'Zelle konnte nicht gespeichert werden')
+  }, [writeFrontmatter])
 
   // Move a Kanban card to another column: write the grouping property of the
   // dragged note's frontmatter to the target column's value ('' clears it).
-  // Reuses the same frontmatter-write path as a cell edit.
-  const handleMoveCard = useCallback(async (path: string, property: string, newValue: string) => {
-    const prevRows = rows
-    try {
-      const file = await apiClient.fetchFileContent(vaultId, path)
-      const { data } = parseFrontmatter(file.content)
-      const fm: Record<string, unknown> = { ...(data ?? {}) }
+  const handleMoveCard = useCallback((path: string, property: string, newValue: string) => {
+    void writeFrontmatter(path, (fm) => {
       if (newValue === '') fm[property] = undefined
       else fm[property] = newValue
-      const keyOrder = Object.keys(fm)
-      const next = applyFrontmatterChange(file.content, fm, keyOrder)
-      await apiClient.saveFile(vaultId, path, next)
-      // The save triggers vault:change → runQuery refreshes the row set.
-    } catch (err) {
-      setQueryError(extractErrorMessage(err, 'Karte konnte nicht verschoben werden'))
-      setRows(prevRows)
-    }
-  }, [apiClient, vaultId, rows])
+    }, 'Karte konnte nicht verschoben werden')
+  }, [writeFrontmatter])
 
   // Write a sort change back into the selected view in the `.base` file.
   const handleSortChange = useCallback((sort: BaseSortClause[]) => {
@@ -278,7 +288,7 @@ export const BasesView = memo(function BasesView({
           view={activeView}
           rows={rows}
           onOpenNote={onOpenNote}
-          onMoveCard={readOnly ? undefined : (path, property, value) => void handleMoveCard(path, property, value)}
+          onMoveCard={readOnly ? undefined : handleMoveCard}
         />
       )}
 
@@ -288,7 +298,7 @@ export const BasesView = memo(function BasesView({
           view={activeView}
           rows={rows}
           onOpenNote={onOpenNote}
-          onCommitCell={(path, property, values) => void handleCommitCell(path, property, values)}
+          onCommitCell={handleCommitCell}
           onSortChange={handleSortChange}
         />
       )}

@@ -115,3 +115,107 @@ describe('BasesView plugin views', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Alpha' })).toBeTruthy())
   })
 })
+
+// ── Kanban card move: optimistic concurrency (ETag) ─────────────────────────
+
+const kanbanResult: BaseQueryResultWire = {
+  rows: [
+    { path: 'a.md', fileName: 'Task A', values: { status: ['todo'] } },
+    { path: 'b.md', fileName: 'Task B', values: { status: ['done'] } },
+  ],
+  total: 2,
+}
+
+const kanbanSource = [
+  'views:',
+  '  - type: cards',
+  '    name: Board',
+  '    groupBy:',
+  '      property: status',
+  '    order: [file.name, status]',
+  'properties:',
+  '  status: {}',
+].join('\n')
+
+/** Minimal DataTransfer stub for jsdom (no native drag support). */
+function dt(): DataTransfer {
+  const store: Record<string, string> = {}
+  return {
+    effectAllowed: '', dropEffect: '',
+    setData: (k: string, v: string) => { store[k] = v },
+    getData: (k: string) => store[k] ?? '',
+  } as unknown as DataTransfer
+}
+
+async function dragTaskAToDone(apiClient: IApiClient): Promise<void> {
+  render(
+    <BasesView apiClient={apiClient} vaultId="v1" source={kanbanSource} readOnly={false} onOpenNote={() => {}} onSaveSource={() => {}} />,
+  )
+  await waitFor(() => expect(screen.getByText('Task A')).toBeTruthy())
+  const data = dt()
+  const card = screen.getByText('Task A').closest('button') as HTMLElement
+  fireEvent.dragStart(card, { dataTransfer: data })
+  const done = screen.getByText('done').closest('section') as HTMLElement
+  fireEvent.dragOver(done, { dataTransfer: data })
+  fireEvent.drop(done, { dataTransfer: data })
+}
+
+describe('BasesView Kanban card move — ETag concurrency', () => {
+  it('passes the fetched file ETag as If-Match when saving the moved card', async () => {
+    const fetchFileContent = vi.fn().mockResolvedValue({ content: '---\nstatus: todo\n---\n', etag: 'etag-1' })
+    const saveFile = vi.fn().mockResolvedValue({ path: 'a.md', name: 'a.md', size: 1, etag: 'etag-2' })
+    const apiClient = {
+      queryBase: vi.fn().mockResolvedValue(kanbanResult),
+      getPropertyTypes: vi.fn().mockResolvedValue({ entries: [] }),
+      fetchFileContent, saveFile,
+    } as unknown as IApiClient
+
+    await dragTaskAToDone(apiClient)
+
+    await waitFor(() => expect(saveFile).toHaveBeenCalledTimes(1))
+    // 4th arg is the ifMatch ETag from the read.
+    expect(saveFile.mock.calls[0]?.[3]).toBe('etag-1')
+    expect(saveFile.mock.calls[0]?.[1]).toBe('a.md')
+  })
+
+  it('re-reads and retries once when the first save conflicts', async () => {
+    const fetchFileContent = vi.fn()
+      .mockResolvedValueOnce({ content: '---\nstatus: todo\n---\n', etag: 'stale' })
+      .mockResolvedValueOnce({ content: '---\nstatus: todo\nextra: kept\n---\n', etag: 'fresh' })
+    const saveFile = vi.fn()
+      .mockRejectedValueOnce({ code: 'CONFLICT', message: 'changed' })
+      .mockResolvedValueOnce({ path: 'a.md', name: 'a.md', size: 1, etag: 'done' })
+    const apiClient = {
+      queryBase: vi.fn().mockResolvedValue(kanbanResult),
+      getPropertyTypes: vi.fn().mockResolvedValue({ entries: [] }),
+      fetchFileContent, saveFile,
+    } as unknown as IApiClient
+
+    await dragTaskAToDone(apiClient)
+
+    await waitFor(() => expect(saveFile).toHaveBeenCalledTimes(2))
+    // Re-read before the retry, and the retry carries the fresh ETag.
+    expect(fetchFileContent).toHaveBeenCalledTimes(2)
+    expect(saveFile.mock.calls[1]?.[3]).toBe('fresh')
+    // The concurrent edit's content is the base for the retry (merged, not clobbered).
+    expect(saveFile.mock.calls[1]?.[2]).toContain('extra: kept')
+    // No error banner on a successful retry.
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('surfaces an error banner for a non-conflict save failure', async () => {
+    const fetchFileContent = vi.fn().mockResolvedValue({ content: '---\nstatus: todo\n---\n', etag: 'e1' })
+    const saveFile = vi.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', message: 'boom' })
+    const apiClient = {
+      queryBase: vi.fn().mockResolvedValue(kanbanResult),
+      getPropertyTypes: vi.fn().mockResolvedValue({ entries: [] }),
+      fetchFileContent, saveFile,
+    } as unknown as IApiClient
+
+    await dragTaskAToDone(apiClient)
+
+    // The banner surfaces the server's own message (extractErrorMessage prefers it).
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('boom'))
+    expect(saveFile).toHaveBeenCalledTimes(1) // no retry for a non-conflict error
+  })
+})
