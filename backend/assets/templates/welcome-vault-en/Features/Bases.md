@@ -4,116 +4,172 @@ tags: [features]
 
 # Bases
 
-Bases turn the metadata already in your vault into a live, filterable table. A `.base` file declares — in plain YAML — which notes to include, which properties to show as columns, how to sort them, and optional calculated columns (formulas). The result opens like any other file: a table where each row is a note and each cell can be edited in place.
+Bases turn the metadata already in your vault into a live, filterable table. A `.base` file declares — in plain YAML — which notes to include, which properties to show as columns, how to sort them, and optional calculated columns (formulas). The result opens like any other file: a table or a Kanban board where each row or card is a note.
 
 Think of it as a saved, structured view over your notes — the database layer that sits on top of [[Features/Tags and Properties|tags and properties]].
 
-> [!warning] Experimental / rolling out
-> Bases is an in-progress feature (roadmap Prio 6). Depending on your Slatebase version it may be behind the `bases` feature toggle or not yet available. If the table doesn't render, your server either has the toggle off (ask an administrator — see [[Admin/Feature Toggles]]) or runs a version without Bases yet. The `.base` files themselves stay valid and portable either way.
+> [!warning] Experimental
+> Bases is behind the `bases` feature toggle (off by default). If the table doesn't render, the toggle is off on your server — ask an administrator, see [[Admin/Feature Toggles]]. The file format is the **real Obsidian `.base` format**: a `.base` file from Obsidian opens here and vice versa. Not every Obsidian capability is implemented, though — the [[#Limits and gaps|list below]] says plainly what is missing.
 
 ---
 
-## What a Base is made of
+## What a base is made of
 
-A `.base` file is Obsidian-compatible YAML with four parts:
-
-| Part | What it does |
-|------|--------------|
-| **Filters** | Which notes appear — by property, tag, path, or file metadata, combined with AND/OR |
-| **Properties** | Which columns to show and their display names |
-| **Formulas** | Calculated columns (read-only), e.g. days until a deadline |
-| **Views** | One or more named layouts: a **table** or a **cards** board (Kanban), switchable in the toolbar |
+| Part | Purpose |
+|------|---------|
+| **`filters`** | Which notes appear — as an expression, combinable with `and` / `or` / `not` |
+| **`properties`** | Display names of the columns |
+| **`formulas`** | Calculated columns (read-only), e.g. days until a deadline |
+| **`views`** | One or more named views: **table** or **cards** (Kanban), each with its own column order, sort, filter and `limit` |
+| **`summaries`** | Per-column summaries — read and preserved on save, but not computed yet (see limits) |
 
 ---
 
-## Opening and creating a Base
+## Opening and creating a base
 
-- **Open:** click a `.base` file in the [[Basics/File Explorer|File Explorer]], follow a wikilink to it, or find it in the Quick Switcher (`Ctrl+O`). It renders as a table, not as the Markdown editor.
-- **Create:** run **"Create new base"** from the [[Features/Command Palette|Command Palette]] (`Ctrl+P`). An empty `.base` is created in the current folder.
-- **Raw mode:** every Base has a raw-source view (edit the YAML directly) as a fallback and for fields the UI doesn't expose yet — the same idea as the Canvas source view.
+- **Open:** Click a `.base` file in the [[Basics/File Explorer|File Explorer]], follow a wikilink to it, or find it in the quick switcher (`Ctrl+O`). It renders as a view, not a Markdown editor. This also works inside a split pane.
+- **Create:** Run **"Create new Base"** from the [[Features/Command Palette|Command Palette]] (`Ctrl+P`).
+- **Raw source:** Every base has a raw-source mode (edit the YAML directly) — useful for anything the UI doesn't expose.
 
 ---
 
 ## Filtering
 
-Filters decide which notes become rows. You can combine conditions with AND/OR:
+A filter condition is an **expression written as text** — the same language as in Obsidian. Combine several with `and`, `or` and `not` (each takes a list):
 
-- **Property conditions** — equals, not-equals, contains, exists/empty, numeric and date comparisons (e.g. `priority == high`, `deadline < today`)
-- **Tag conditions** — has / doesn't have a tag
-- **Path conditions** — a `path:` glob, the same syntax as [[Features/Search and Replace|Search]]
-- **File metadata** — name, created/modified date
+```yaml
+filters:
+  and:
+    - file.inFolder("Projects")
+    - 'status != "done"'
+    - or:
+        - file.hasTag("important")
+        - 'priority > 2'
+```
 
-The engine reads from the vault's live metadata index, so a Base updates automatically when you add, edit, delete, or rename notes — no need to reopen it.
+What you can use in conditions:
+
+- **Properties** — `status`, `priority`, `note.status` (the note's frontmatter)
+- **File fields** — `file.name`, `file.ext`, `file.folder`, `file.tags`, `file.links`, `file.ctime`, `file.mtime`
+- **File checks** — `file.hasTag("x")`, `file.inFolder("folder")`, `file.hasLink("note")`
+- **Comparison and logic** — `==  !=  <  <=  >  >=`, `&&  ||  !`, arithmetic with `+ - * / %`
+- **Methods** on text, numbers, dates and lists, e.g. `title.contains("Plan")`, `deadline < today()`
+
+A filter on a **view** is applied in addition to the base-wide filter (AND). A condition that cannot be evaluated (typo, unknown function) excludes the note — it does not break the table.
+
+The base refreshes automatically when you add, edit, delete or rename notes.
 
 ---
 
 ## Formulas (calculated columns)
 
-Formulas are read-only columns computed per row. The first version supports a deliberately small, documented set:
+Formulas live under `formulas:` and are read-only columns computed per row. They use the same expression language as filters. In columns and sorting they are called `formula.name`; a formula can refer to another (`formula.other`).
 
-- Property references, string/number/boolean literals
-- Comparisons (`== != < <= > >=`), basic arithmetic (`+ - * /`), string concatenation
-- A handful of helpers: `if(...)`, `concat(...)`, `now()`/`today()`, a simple date difference, `length(...)`
+```yaml
+formulas:
+  days_left: 'days(date(deadline), today())'
+```
 
-> [!note] Not the full Obsidian formula language
-> The first version is intentionally limited to simple expressions. Lambdas and list map/filter operations are a later stage. A formula never writes back into a note — it's display-only.
+**Built-in functions:** `if`, `concat`, `now`, `today`, `date`, `number`, `list`, `link`, `min`, `max`, `days`, `length`.
+
+**Methods:**
+
+| Type | Methods |
+|------|---------|
+| Text | `contains`, `startsWith`, `endsWith`, `lower`, `upper`, `trim`, `replace`, `split`, `length` |
+| Number | `toFixed`, `round`, `abs` |
+| Date | `format`, `date`, `time`, plus `year`, `month`, `day`, `hour`, `minute`, `second` |
+| List | `contains`, `length`, `join`, `first`, `last` |
+
+> [!note] Date difference
+> `date1 - date2` returns **milliseconds** (as in Obsidian). Use `days(a, b)` when you want days.
 
 ---
 
 ## Editing in the table
 
-Property cells are editable inline, using the same typed controls as the [[Features/Tags and Properties|Properties editor]] — text, number, date/datetime, checkbox, list/tags. Editing a cell writes straight into that note's frontmatter and saves it. Formula columns are read-only.
+Property cells are editable inline, using the same typed controls as the [[Features/Tags and Properties|Properties editor]] — text, number, date, checkbox, list/tags. A change goes straight into the note's frontmatter. Formula columns are read-only.
 
-A cell you have open isn't lost if the table rebuilds (because another cell changed, you switched tabs, or the Base refreshed) — whatever you typed is committed, the same safety net the Properties editor has.
-
-Click a column header to sort; the chosen sort is written back into the `.base` file.
+Click a column header to sort; the sort is written back into the `.base` file.
 
 ---
 
 ## Views: table and cards (Kanban)
 
-A Base can hold more than one view. When it does, a view switcher appears in the toolbar. Two built-in view types exist:
+A base can hold several views; a view switcher appears at the top.
 
-- **Table** — one row per note, editable cells (described above).
-- **Cards (Kanban)** — notes grouped into columns of cards by one property. Set `type: cards` and `groupBy: <property>` on the view. Each distinct value of that property becomes a column; notes with no value for it fall into an "Ohne …" / "No …" column. Columns are collapsible, and clicking a card opens its note. Cards show the view's other columns as small labelled chips.
+- **Table** — one row per note, editable cells.
+- **Cards (Kanban)** — notes grouped into columns by a property. Each value becomes a column; notes without a value land in a "No …" column. Columns collapse, and clicking a card opens the note.
+  **Drag a card to another column** to change the grouping property's value in the note; dropping on "No …" removes the property. (Requires write access to the vault.)
 
 ```yaml
 views:
   - type: table
     name: All tasks
     order: [file.name, status, priority]
+    limit: 50
   - type: cards
     name: Board
-    groupBy: status
+    groupBy:
+      property: status
+      direction: ASC
     order: [file.name, priority]
 ```
 
-> [!note] Cards are read-only for now
-> The Kanban view opens notes and groups/collapses, but you can't yet drag a card between columns to change its grouping property. Edit the property in the table view or the note itself. Dragging between columns is a later stage.
+`limit` caps a view's rows — applied **after** filtering.
+
+Other view types come from Obsidian plugins.
 
 ---
 
-## Practical example
+## Limits and gaps
 
-This vault ships a ready-made example: [[Features/Example Tasks (Base)]]. It filters a small set of task notes by status and shows a formula column. Open it to see a non-empty table, then:
+So nothing surprises you:
 
-1. Edit a `status` cell directly in the table — the change lands in the underlying note's frontmatter.
+**Data volume**
+- Each query returns **at most 1000 notes** from the index as candidates (in the view's sort order); filtering happens afterwards. In very large vaults a base can therefore miss matches beyond those 1000 — even a filter like `file.inFolder(...)` does not shrink that pool, because it only applies afterwards.
+
+**Expression language**
+- This is a **pragmatic subset** of Obsidian's functions (see the lists above), not the full library. An unknown function yields `#ERR` in a formula column and drops the note in a filter.
+- **No lambdas** and no `map`/`filter` operations on lists.
+- Unsupported file fields: `file.path`, `file.size`, `file.backlinks`, `file.embeds`.
+
+**Formulas and summaries**
+- Formula columns are **read-only** and **cannot be sorted** (sorting only works for properties, `file.name`, `file.ctime`, `file.mtime`).
+- **`summaries` are not computed:** the block is read and preserved unchanged on save, but no summary row is shown.
+
+**Views**
+- Only **table** and **cards** are built in; anything else needs a plugin. Plugin views run in the browser only, never on the server.
+- A base **cannot be embedded as a code block in a note**, only opened as its own `.base` file.
+- Obsidian's "add item to base" command (`bases:add-item`) is missing: create new notes yourself; they appear as soon as they match the filter.
+
+**AI access via MCP**
+- The `query_base` tool evaluates a `.base` server-side with the same engine ([[Advanced/MCP Context Server|MCP interface]] for AI clients). It has the same 1000-note limit, returns 100 rows by default (maximum 1000) and returns formula values as text.
+
+---
+
+## Worked example
+
+This vault ships a ready-made example: [[Features/Example Tasks (Base)]]. It filters a small set of task notes with `file.inFolder(...)` and `type == "task"` and shows a "Days left" formula column. Open it, then:
+
+1. Edit a `status` cell directly in the table — the change lands in the note's frontmatter.
 2. Click the **Priority** column header to sort.
-3. Open the raw-source view to see the YAML behind the table.
+3. Open raw-source mode to see the YAML behind the table.
 
 ---
 
 > [!todo] Exercise
-> 1. Open the example Base and change one note's `status` from the table.
-> 2. Create a new note with a `status` and `priority` property, then reopen the Base — your note should appear as a new row.
-> 3. Run **"Create new base"** from the Command Palette and build a tiny Base of your own that filters for one tag.
+> 1. Open the example base and change a note's `status` from the table.
+> 2. Create a new note with `type: task`, `status` and `priority` in the example tasks folder — it should appear as a new row.
+> 3. Run **"Create new Base"** and build a small base of your own with the filter `file.hasTag("features")`.
+> 4. Add a second view `type: cards` with `groupBy: { property: status }` and drag a card to another column.
 
 ---
 
-## Related Features
+## Related features
 
 - [[Features/Tags and Properties]] — The metadata layer Bases build on
-- [[Features/Search and Replace]] — The `path:`/`tag:`/`property:` operators Bases filters mirror
+- [[Features/Search and Replace]] — The `path:`/`tag:`/`property:` operators
 - [[Features/Context Panel]] — Per-note view of the same properties
 - [[Advanced/Plugins/Dataview]] — The plugin-based alternative for querying notes
-- [[Admin/Feature Toggles]] — Enable/disable Bases server-wide
+- [[Admin/Feature Toggles]] — Switch Bases on/off server-wide

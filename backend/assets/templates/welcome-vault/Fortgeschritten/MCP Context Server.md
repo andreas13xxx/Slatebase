@@ -90,6 +90,7 @@ Jeder MCP-fähige Client kann sich verbinden:
 | `get_vault_structure` | Ordnerstruktur abrufen |
 | `read_file` | Datei-Inhalt lesen (Text sowie Binärdateien wie Bilder oder PDFs, base64-kodiert) |
 | `search_vault` | Volltextsuche im Vault |
+| `query_base` | Eine Bases-Datei (`.base`) auswerten: Filter, Formeln, Sortierung und Limit einer Ansicht → Zeilen als JSON (siehe [[Features/Bases]]) |
 
 ### Schreib-Tools (nur mit Write-Berechtigung)
 

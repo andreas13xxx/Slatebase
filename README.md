@@ -202,7 +202,7 @@ oversight — but it means:
 | 🎨 **Canvas** | Open and edit Obsidian `.canvas` whiteboards: text, file, link, and group nodes with edges, drag, resize, zoom/pan, minimap, file-path search, and auto-save |
 | 🕸️ **Knowledge Graph** | Interactive visualization of vault link structure with zoom, pan, drag, and search |
 | 📑 **Context Panel** | Right-side panel with document outline, forward/backlinks, unlinked mentions, tags, a footnotes list, and typed frontmatter properties — properties are also editable inline in the link hover preview |
-| 🧮 **Bases** ⚠️ | Obsidian-compatible `.base` files as filterable, sortable, editable views over your notes' metadata — a table and a cards/Kanban board (grouped, collapsible columns), AND/OR filters, read-only formula columns, inline cell editing. Experimental, off by default (`bases` toggle) |
+| 🧮 **Bases** ⚠️ | Real Obsidian `.base` files as filterable, sortable, editable views over your notes' metadata — a table and a cards/Kanban board (drag cards between columns), filters and formulas written in Obsidian's expression language (a pragmatic subset), inline cell editing, and an MCP tool (`query_base`) to evaluate a base from AI clients. Limits: at most 1000 candidate notes per query, read-only unsortable formula columns, `summaries` not computed yet. Experimental, off by default (`bases` toggle) |
 | 🔖 **Bookmarks** | Bookmark files, headings, blocks, or saved searches — reorder by drag and drop, rename, and bookmark all open tabs at once |
 | 📟 **Status Bar** | Clock, vault name, word/character count, and cursor position with click-to-"go to line" — each item toggleable |
 | 🎨 **CSS Snippets** | Per-vault custom CSS, uploaded or written in an embedded editor, enabled and disabled individually |
