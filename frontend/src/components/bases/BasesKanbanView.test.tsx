@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { BasesKanbanView } from './BasesKanbanView'
-import type { BaseDocument, BaseRow, BaseView } from '../../bases/types'
+import type { BaseDocument, BaseRow, BaseView } from '@slatebase/shared-contracts'
 
 const doc: BaseDocument = {
   properties: { status: {}, priority: {} },

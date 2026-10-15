@@ -17,11 +17,11 @@
  */
 
 import type { IApiClient } from '../../api'
-import type { BaseDocument, BaseRow, BaseView } from '../../bases/types'
+import type { BaseDocument, BaseRow, BaseView } from '@slatebase/shared-contracts'
 import type { PropertyType } from '../../state/propertyTypes'
 import { runBaseQuery } from '../../bases/query-engine'
-import { evaluateFormula } from '../../bases/formula/evaluator'
-import type { FormulaContext } from '../../bases/formula/evaluator'
+import { evaluateFormula } from '@slatebase/shared-contracts'
+import type { FormulaContext } from '@slatebase/shared-contracts'
 import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
 import { extractErrorMessage } from '../../utils/error'
 import { toValue } from './bases-value-factory'

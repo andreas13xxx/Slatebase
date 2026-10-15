@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { tokenize, FormulaTokenizeError } from './tokenizer'
-import { parseFormula, FormulaParseError } from './parser'
-import { evaluateFormula, evaluateCondition, formatFormulaValue } from './evaluator'
-import type { FormulaContext, FormulaValue } from './functions'
+import { tokenize, FormulaTokenizeError } from './tokenizer.js'
+import { parseFormula, FormulaParseError } from './parser.js'
+import { evaluateFormula, evaluateCondition, formatFormulaValue } from './evaluator.js'
+import type { FormulaContext } from './evaluator.js'
+import type { FormulaValue } from './functions.js'
 
 function ctxOf(values: Record<string, FormulaValue>): FormulaContext {
   return { resolve: (name) => (name in values ? values[name]! : null) }

@@ -9,11 +9,11 @@
  * < unary < postfix (member / index / method).
  */
 
-import { tokenize } from './tokenizer'
-import type { Token } from './tokenizer'
-import type { ExprNode, BinaryOp, LogicalOp } from './ast'
+import { tokenize } from './tokenizer.js'
+import type { Token } from './tokenizer.js'
+import type { ExprNode, BinaryOp, LogicalOp } from './ast.js'
 
-export type { ExprNode, FormulaNode, BinaryOp, LogicalOp } from './ast'
+export type { ExprNode, FormulaNode, BinaryOp, LogicalOp } from './ast.js'
 
 /** Raised on a malformed expression. */
 export class FormulaParseError extends Error {

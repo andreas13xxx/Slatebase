@@ -8,7 +8,7 @@
  */
 
 import moment from 'moment'
-import { toDate, toNumber, stringify, isLink, type FormulaValue } from './functions'
+import { toDate, toNumber, stringify, isLink, type FormulaValue } from './functions.js'
 
 /** A method implementation: receiver + evaluated args → value. */
 export type MethodFn = (receiver: FormulaValue, args: FormulaValue[]) => FormulaValue

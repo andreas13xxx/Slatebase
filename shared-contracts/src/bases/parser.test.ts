@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { parse as parseYaml } from 'yaml'
-import { parseBase } from './parser'
-import { serializeBase } from './serializer'
-import type { BaseDocument, BaseFilterAnd } from './types'
+import { parseBase } from './parser.js'
+import { serializeBase } from './serializer.js'
+import type { BaseDocument, BaseFilterAnd } from './types.js'
 
 /**
  * Fixture in the real Obsidian `.base` format: AND/OR-nested filters as

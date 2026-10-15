@@ -7,11 +7,26 @@ dependency in its own `package.json`.
 
 ## What's here
 
-Zod schemas for the vault routes only (`GET /vaults`, `GET /vaults/:id/tree`,
+Zod schemas for the vault routes (plus the Bases engine below) (`GET /vaults`, `GET /vaults/:id/tree`,
 `GET`/`PUT /vaults/:id/files`): `src/vault.ts`. The backend validates the
 `PUT /files` request body against `putFileBodySchema`
 (`backend/src/api/index.ts`); both sides derive their TypeScript types via
 `z.infer<>` instead of hand-maintaining parallel interfaces.
+
+## Bases engine (`src/bases/`)
+
+Besides the vault schemas, this package holds the **pure** Bases logic —
+types, the real-Obsidian-format `.base` parser/serializer, the expression
+engine (`formula/`: tokenizer → Pratt parser → evaluator, no `eval`) and the
+I/O-free evaluation helpers in `base-eval.ts` (`buildQuerySpec`, `rowContext`,
+`filterRows`, `evaluateFormulaColumn`). The frontend (`bases/query-engine.ts`)
+and the backend MCP tool `query_base` (`backend/src/mcp/query-base-tool.ts`)
+both import it, so a base is filtered and its formulas are computed identically
+in the browser and over MCP. It is the one place that needs runtime
+dependencies (`yaml`, `moment`) and its own tests (`npm test`, run in CI).
+
+Keep it free of DOM, Node and API-client imports; relative imports need the
+`.js` extension (it runs as plain ESM in the backend).
 
 ## Why a `file:` dependency instead of a relative import
 
@@ -51,3 +66,7 @@ were missing the `etag` field the backend has always sent). Whether
 `@hono/zod-openapi` (generated OpenAPI spec + generated client) is worth
 adopting instead of continuing to hand-write shared Zod schemas per route
 is an open decision for the maintainer — not made here.
+
+**After changing this package**, consumers keep a *copy* in their own
+`node_modules` (not a symlink): run `npm run build` here, then `npm install`
+in `backend/` and `frontend/` to refresh that copy.

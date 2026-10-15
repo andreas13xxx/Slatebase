@@ -15,7 +15,7 @@
 
 import { useEffect, useRef } from 'react'
 import type { IApiClient } from '../../api'
-import type { BaseDocument, BaseView } from '../../bases/types'
+import type { BaseDocument, BaseView } from '@slatebase/shared-contracts'
 import { getBasesViewRegistrationWithOwner } from '../../plugins/compat/bases-view-registry'
 import { BasesQueryController, type DrivableBasesView } from '../../plugins/compat/bases-query-controller'
 import { withPluginContext } from '../../plugins/compat/plugin-execution-context'

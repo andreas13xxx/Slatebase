@@ -7,11 +7,11 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { parseBase } from './parser'
-import { serializeBase } from './serializer'
-import { evaluateCondition } from './formula/evaluator'
-import type { FormulaContext } from './formula/evaluator'
-import type { BaseFilterAnd, BaseGroupBy } from './types'
+import { parseBase } from './parser.js'
+import { serializeBase } from './serializer.js'
+import { evaluateCondition } from './formula/evaluator.js'
+import type { FormulaContext } from './formula/evaluator.js'
+import type { BaseFilterAnd, BaseGroupBy } from './types.js'
 
 // Verbatim from the official Obsidian Bases syntax reference.
 const OFFICIAL = `filters:

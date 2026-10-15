@@ -15,7 +15,7 @@ import type {
   BaseGroupBy,
   BaseSortClause,
   BaseView,
-} from './types'
+} from './types.js'
 
 function mergeUnknown(target: Record<string, unknown>, unknown: Record<string, unknown> | undefined): void {
   if (!unknown) return

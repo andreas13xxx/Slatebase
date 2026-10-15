@@ -166,9 +166,12 @@ export interface BaseQuerySortWire {
   direction?: 'asc' | 'desc'
 }
 
-/** Normalized query spec posted to `POST /vaults/:vaultId/bases/query`. */
+/**
+ * Normalized query spec posted to `POST /vaults/:vaultId/bases/query`. Carries
+ * no filters: the Obsidian filter expressions are evaluated by the caller
+ * (`filterRows`), the backend only returns candidate rows.
+ */
 export interface BaseQuerySpecWire {
-  filters?: BaseFilterNode
   columns: string[]
   sort?: BaseQuerySortWire[]
   limit?: number
@@ -178,16 +181,16 @@ export interface BaseQuerySpecWire {
 export interface BaseQueryRowWire {
   path: string
   fileName: string
-  ctime?: number
-  mtime?: number
+  ctime?: number | undefined
+  mtime?: number | undefined
   /** File extension without the dot (`file.ext`), e.g. `md`. */
-  ext?: string
+  ext?: string | undefined
   /** Parent folder path (`file.folder`), '' for a vault-root file. */
-  folder?: string
+  folder?: string | undefined
   /** All tags on the file (`file.tags`), without the leading `#`. */
-  tags?: string[]
+  tags?: string[] | undefined
   /** Internal link targets in the file (`file.links`), vault-relative. */
-  links?: string[]
+  links?: string[] | undefined
   values: Record<string, string[]>
 }
 

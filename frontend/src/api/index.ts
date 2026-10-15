@@ -1,7 +1,7 @@
 import type { VaultInfo, DirectoryTree, FileContent, FileSaveResult, AppError, Conversation, PaginatedConversations, PaginatedMessages, Message, GraphData, GraphMeta, GraphQueryOptions, BacklinksResponse, ActivityPage, ActivityQueryParams } from '../types'
 import type { PublicUserInfo } from '../state/authState'
 import type { PropertyType, PropertyTypeRegistry } from '../state/propertyTypes'
-import type { BaseQuerySpecWire, BaseQueryResultWire } from '../bases/types'
+import type { BaseQuerySpecWire, BaseQueryResultWire } from '@slatebase/shared-contracts'
 
 /**
  * Login response returned by the backend on successful authentication.

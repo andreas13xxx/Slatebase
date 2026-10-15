@@ -9,11 +9,11 @@
  * `evaluateCondition` for the filter entry point.
  */
 
-import { parseFormula } from './parser'
-import type { ExprNode, BinaryOp } from './ast'
-import { FORMULA_FUNCTIONS, toDate, toNumber, stringify, isTruthy, isLink, parseDurationMs } from './functions'
-import type { FormulaValue } from './functions'
-import { callMethod, DATE_MEMBERS } from './methods'
+import { parseFormula } from './parser.js'
+import type { ExprNode, BinaryOp } from './ast.js'
+import { FORMULA_FUNCTIONS, toDate, toNumber, stringify, isTruthy, isLink, parseDurationMs } from './functions.js'
+import type { FormulaValue } from './functions.js'
+import { callMethod, DATE_MEMBERS } from './methods.js'
 
 /** The context one expression is evaluated against: a row's property values. */
 export interface FormulaContext {

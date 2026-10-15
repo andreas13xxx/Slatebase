@@ -33,6 +33,8 @@ jobs:
         working-directory: shared-contracts
       - run: npm run build
         working-directory: shared-contracts
+      - run: npm test
+        working-directory: shared-contracts
       - run: npm ci
         working-directory: backend
       - name: Dependency audit

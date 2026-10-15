@@ -17,7 +17,7 @@
 import { memo, useCallback, useMemo, useState } from 'react'
 import type { DragEvent } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import type { BaseDocument, BaseRow, BaseView } from '../../bases/types'
+import type { BaseDocument, BaseRow, BaseView } from '@slatebase/shared-contracts'
 
 export interface BasesKanbanViewProps {
   doc: BaseDocument

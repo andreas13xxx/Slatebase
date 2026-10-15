@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { buildQuerySpec, runBaseQuery } from './query-engine'
-import type { BaseDocument, BaseView } from './types'
+import type { BaseDocument, BaseView } from '@slatebase/shared-contracts'
 import type { IApiClient } from '../api'
 
 describe('buildQuerySpec', () => {
@@ -49,9 +49,9 @@ describe('buildQuerySpec', () => {
     expect(spec.sort).toEqual([{ column: 'file.name', direction: 'asc' }])
   })
 
-  it('passes the view limit through', () => {
+  it('does not push the view limit to the backend (it would cut rows before filtering)', () => {
     const spec = buildQuerySpec(doc, { type: 'table', order: ['status'], limit: 25 })
-    expect(spec.limit).toBe(25)
+    expect(spec.limit).toBeUndefined()
   })
 
   it('adds a cards view groupBy property to the requested columns', () => {
@@ -104,5 +104,18 @@ describe('runBaseQuery (client-side filtering)', () => {
     ])
     const { rows } = await runBaseQuery(api, 'v1', doc, view)
     expect(rows.map((r) => r.path)).toEqual(['a.md'])
+  })
+
+  it('applies the view limit after filtering and reports the pre-limit total', async () => {
+    const doc: BaseDocument = { filters: 'status == "open"', views: [] }
+    const view: BaseView = { type: 'table', order: [], limit: 1 }
+    const api = makeApiClient([
+      { path: 'a.md', fileName: 'A', values: { status: ['done'] } },
+      { path: 'b.md', fileName: 'B', values: { status: ['open'] } },
+      { path: 'c.md', fileName: 'C', values: { status: ['open'] } },
+    ])
+    const { rows, total } = await runBaseQuery(api, 'v1', doc, view)
+    expect(rows.map((r) => r.path)).toEqual(['b.md'])
+    expect(total).toBe(2)
   })
 })

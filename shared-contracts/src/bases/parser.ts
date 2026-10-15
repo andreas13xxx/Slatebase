@@ -24,7 +24,7 @@ import type {
   BaseSummaries,
   BaseValidationError,
   BaseView,
-} from './types'
+} from './types.js'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

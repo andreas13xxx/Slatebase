@@ -13,10 +13,10 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { IApiClient } from '../../api'
-import { parseBase } from '../../bases/parser'
-import { serializeBase } from '../../bases/serializer'
+import { parseBase } from '@slatebase/shared-contracts'
+import { serializeBase } from '@slatebase/shared-contracts'
 import { runBaseQuery } from '../../bases/query-engine'
-import type { BaseDocument, BaseRow, BaseSortClause, BaseView } from '../../bases/types'
+import type { BaseDocument, BaseRow, BaseSortClause, BaseView } from '@slatebase/shared-contracts'
 import { applyFrontmatterChange } from '../../utils/frontmatterWriter'
 import { parseFrontmatter } from '../context-panel/utils/parseFrontmatter'
 import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'

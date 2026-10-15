@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { BasesTableView } from './BasesTableView'
 import { inferCellType } from './base-cell-type'
-import type { BaseDocument, BaseRow, BaseView } from '../../bases/types'
+import type { BaseDocument, BaseRow, BaseView } from '@slatebase/shared-contracts'
 
 const doc: BaseDocument = {
   formulas: { days_left: 'days(date(deadline), date("2026-01-01"))' },

@@ -12,7 +12,7 @@ import { installObsidianGlobals } from '../../plugins/compat/install-globals'
 import { registerBasesView, resetForVault } from '../../plugins/compat/bases-view-registry'
 import { BasesView } from './BasesView'
 import type { IApiClient } from '../../api'
-import type { BaseQueryResultWire } from '../../bases/types'
+import type { BaseQueryResultWire } from '@slatebase/shared-contracts'
 
 installObsidianGlobals()
 
