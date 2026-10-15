@@ -14,10 +14,32 @@ import type { FormulaValue } from './formula/functions.js'
 
 // ─── Filter column collection ──────────────────────────────────────────────────
 
+/**
+ * Blanks out quoted string literals (`"..."` / `'...'`, backslash escapes) in a
+ * single linear pass. Deliberately not a regex: this runs on `.base` content
+ * (also server-side), where a backtracking pattern over many `\"` is a ReDoS
+ * vector. An unterminated string blanks to the end of the input.
+ */
+function stripQuotedStrings(expr: string): string {
+  let out = ''
+  let quote: string | null = null
+  for (let i = 0; i < expr.length; i++) {
+    const ch = expr.charAt(i)
+    if (quote === null) {
+      if (ch === '"' || ch === "'") { quote = ch; out += ' ' } else out += ch
+    } else if (ch === '\\') {
+      i++
+    } else if (ch === quote) {
+      quote = null
+    }
+  }
+  return out
+}
+
 /** Pull every bare word that looks like a property reference out of an expression. */
 function collectRefsFromExpression(expr: string, into: Set<string>): void {
   // Match identifiers incl. dotted paths; skip quoted string contents.
-  const withoutStrings = expr.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, ' ')
+  const withoutStrings = stripQuotedStrings(expr)
   const idRe = /[A-Za-z_][A-Za-z0-9_.]*/g
   let m: RegExpExecArray | null
   while ((m = idRe.exec(withoutStrings)) !== null) {

@@ -16,6 +16,21 @@ describe('buildQuerySpec', () => {
   })
 })
 
+describe('buildQuerySpec filter references', () => {
+  it('ignores identifiers inside quoted strings but keeps real references', () => {
+    const doc: BaseDocument = { filters: `status == "other_prop" && 'x y' != prio`, views: [] }
+    const spec = buildQuerySpec(doc, { type: 'table', order: [] })
+    expect(spec.columns.sort()).toEqual(['prio', 'status'])
+  })
+
+  it('stays fast on a long unterminated string with many escaped quotes', () => {
+    const doc: BaseDocument = { filters: '"' + '\\"'.repeat(50_000), views: [] }
+    const t0 = Date.now()
+    buildQuerySpec(doc, { type: 'table', order: [] })
+    expect(Date.now() - t0).toBeLessThan(500)
+  })
+})
+
 describe('filterRows', () => {
   const doc: BaseDocument = { filters: 'status == "open"', views: [] }
 

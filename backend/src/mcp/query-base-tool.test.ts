@@ -74,7 +74,7 @@ async function setup(opts: { content?: string; rows?: BaseQueryRow[]; ready?: bo
   const server = createMockServer()
   const accessControl = {
     checkReadAccess: opts.denyRead
-      ? vi.fn().mockRejectedValue(new VaultAccessDeniedError('v1', 'user-1'))
+      ? vi.fn().mockRejectedValue(new VaultAccessDeniedError('v1', 'user-1', 'read'))
       : vi.fn().mockResolvedValue(undefined),
   } as unknown as IVaultAccessControl
   const linkIndex = createMockLinkIndex(opts.rows ?? ROWS, opts.ready ?? true)
