@@ -8,7 +8,7 @@
  *
  * Dotted paths vs. member access: a run like `file.name` scans as ONE
  * `identifier` (it is a property reference in Obsidian). A `.` that follows a
- * `)` or `]` — e.g. `now().hour`, `list[0].x` — scans as a standalone `dot`
+ * `)`, `]`, string or number — e.g. `now().hour`, `"a,b".split(",")` — scans as a standalone `dot`
  * operator, because the left side is a computed value, not a property path.
  * The parser decides method calls (`path.method(...)`) by re-splitting a
  * dotted identifier whose tail is followed by `(`.
@@ -57,9 +57,13 @@ function isIdentifierStart(ch: string): boolean {
   return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch === '_'
 }
 
-/** Characters that continue an identifier. `.` is handled specially (see below). */
+/**
+ * Characters that continue an identifier. `.` is handled specially (see below).
+ * `-` is deliberately NOT one: as in Obsidian, `end-start` is a subtraction;
+ * a property whose name contains a hyphen is written `note["due-date"]`.
+ */
 function isIdentifierPartNoDot(ch: string): boolean {
-  return isIdentifierStart(ch) || isDigit(ch) || ch === '-'
+  return isIdentifierStart(ch) || isDigit(ch)
 }
 
 /**
@@ -108,9 +112,21 @@ export function tokenize(source: string): Token[] {
     if (isDigit(ch) || (ch === '.' && i + 1 < n && isDigit(source[i + 1]!))) {
       const start = i
       let value = ''
-      while (i < n && (isDigit(source[i]!) || source[i] === '.')) {
-        value += source[i]
-        i++
+      let seenDot = false
+      // A `.` belongs to the number only when a digit follows (`1.5`, `.5`);
+      // `5.toFixed(2)` is the number 5 followed by a member-access dot.
+      while (i < n) {
+        const c = source[i]!
+        if (isDigit(c)) {
+          value += c
+          i++
+        } else if (c === '.' && !seenDot && i + 1 < n && isDigit(source[i + 1]!)) {
+          seenDot = true
+          value += c
+          i++
+        } else {
+          break
+        }
       }
       tokens.push({ type: 'number', value, pos: start })
       continue
@@ -123,12 +139,12 @@ export function tokenize(source: string): Token[] {
     if (ch === ']') { tokens.push({ type: 'rbracket', value: ch, pos: i }); i++; continue }
     if (ch === ',') { tokens.push({ type: 'comma', value: ch, pos: i }); i++; continue }
 
-    // A standalone member-access dot: a `.` directly after a `)` or `]` (a
-    // computed value). A `.` elsewhere is part of a dotted identifier (handled
-    // in the identifier branch below).
+    // A standalone member-access dot: a `.` directly after a `)`, `]`, string
+    // or number literal (a computed/literal value). A `.` elsewhere is part of
+    // a dotted identifier (handled in the identifier branch below).
     if (ch === '.') {
       const prev = lastSignificant()
-      if (prev && (prev.type === 'rparen' || prev.type === 'rbracket')) {
+      if (prev && (prev.type === 'rparen' || prev.type === 'rbracket' || prev.type === 'string' || prev.type === 'number')) {
         tokens.push({ type: 'dot', value: '.', pos: i })
         i++
         continue

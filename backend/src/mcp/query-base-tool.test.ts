@@ -122,15 +122,45 @@ describe('query_base', () => {
     expect(spec.filters).toBeUndefined()
   })
 
-  it('applies the view limit after filtering and the tool limit on top', async () => {
+  it('applies the view limit after filtering; only the tool limit counts as truncation', async () => {
     const { call } = await setup()
     const limited = parse(await call({ vaultId: 'v1', path: 'tasks.base', view: 'Limited', limit: 100 }))
     expect(limited['returned']).toBe(1)
-    expect(limited['total']).toBe(2)
+    expect(limited['total']).toBe(1) // what the view shows
+    expect(limited['matches']).toBe(2) // matches before the view's own limit
+    expect(limited['truncated']).toBe(false)
 
     const capped = parse(await call({ vaultId: 'v1', path: 'tasks.base', limit: 1 }))
     expect(capped['returned']).toBe(1)
+    expect(capped['total']).toBe(2)
     expect(capped['truncated']).toBe(true)
+  })
+
+  it('rejects a directory named *.base', async () => {
+    const { call } = await setup()
+    await fs.mkdir(path.join(dir, 'folder.base'))
+    const result = await call({ vaultId: 'v1', path: 'folder.base', limit: 100 })
+    expect(parse(result)['code']).toBe(-32602)
+  })
+
+  it('retries a transiently locked file and succeeds', async () => {
+    const { call } = await setup()
+    const real = fs.readFile.bind(fs)
+    const spy = vi.spyOn(fs, 'readFile')
+      .mockRejectedValueOnce(Object.assign(new Error('locked'), { code: 'EPERM' }))
+      .mockImplementation(real as never)
+    const out = parse(await call({ vaultId: 'v1', path: 'tasks.base', limit: 100 }))
+    expect(out['total']).toBe(2)
+    expect(spy).toHaveBeenCalledTimes(2)
+    spy.mockRestore()
+  })
+
+  it('reports a persistently unreadable file as a storage error, not "not found"', async () => {
+    const { call } = await setup()
+    const spy = vi.spyOn(fs, 'readFile').mockRejectedValue(Object.assign(new Error('locked'), { code: 'EACCES' }))
+    const result = await call({ vaultId: 'v1', path: 'tasks.base', limit: 100 })
+    spy.mockRestore()
+    expect(parse(result)['code']).toBe(-32006)
   })
 
   it('includes the groupBy property of a cards view and fetches properties used by method filters', async () => {

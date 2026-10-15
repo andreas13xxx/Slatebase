@@ -39,6 +39,41 @@ export type FormulaResult =
 
 class EvalError extends Error {}
 
+/** Member names the evaluator understands on a value (`x.length`, `d.year`, `link.path`). */
+const MEMBER_NAMES: ReadonlySet<string> = new Set(['length', 'path', ...Object.keys(DATE_MEMBERS)])
+
+/** Member access on an evaluated value. Throws on an unknown member. */
+function memberOf(obj: FormulaValue, property: string): FormulaValue {
+  if (property === 'length') {
+    if (Array.isArray(obj)) return obj.length
+    if (typeof obj === 'string') return obj.length
+  }
+  // Dates also arrive as epoch numbers (`file.ctime`) or ISO strings.
+  const asDate = obj instanceof Date ? obj : typeof obj === 'number' || typeof obj === 'string' ? toDate(obj) : null
+  if (asDate) {
+    const field = DATE_MEMBERS[property]
+    if (field) return field(asDate)
+  }
+  if (isLink(obj) && property === 'path') return obj.path
+  throw new EvalError(`Unknown member '${property}'`)
+}
+
+/**
+ * Resolves a (possibly dotted) property reference. The tokenizer keeps
+ * `file.tags.length` / `due.year` as ONE dotted name; when the whole name is
+ * empty, the last segment is tried as a member of the shorter path.
+ */
+function evalProperty(name: string, ctx: FormulaContext): FormulaValue {
+  const direct = ctx.resolve(name)
+  if (direct !== null) return direct
+  const dot = name.lastIndexOf('.')
+  if (dot > 0 && MEMBER_NAMES.has(name.slice(dot + 1))) {
+    const base = evalProperty(name.slice(0, dot), ctx)
+    return base === null ? null : memberOf(base, name.slice(dot + 1))
+  }
+  return null
+}
+
 function evalNode(node: ExprNode, ctx: FormulaContext): FormulaValue {
   switch (node.kind) {
     case 'number':
@@ -46,7 +81,7 @@ function evalNode(node: ExprNode, ctx: FormulaContext): FormulaValue {
     case 'boolean':
       return node.value
     case 'property':
-      return ctx.resolve(node.name)
+      return evalProperty(node.name, ctx)
     case 'unary': {
       const v = evalNode(node.operand, ctx)
       if (node.op === '!') return !isTruthy(v)
@@ -56,9 +91,12 @@ function evalNode(node: ExprNode, ctx: FormulaContext): FormulaValue {
     }
     case 'logical': {
       const left = evalNode(node.left, ctx)
-      if (node.op === '&&') return isTruthy(left) ? isTruthy(evalNode(node.right, ctx)) : false
+      // JavaScript-style short circuit: the operand VALUE is returned, not a
+      // boolean, so `status || "none"` works as a default (filters still go
+      // through isTruthy in evaluateCondition).
+      if (node.op === '&&') return isTruthy(left) ? evalNode(node.right, ctx) : left
       // '||'
-      return isTruthy(left) ? true : isTruthy(evalNode(node.right, ctx))
+      return isTruthy(left) ? left : evalNode(node.right, ctx)
     }
     case 'binary':
       return evalBinary(node.op, node.left, node.right, ctx)
@@ -84,18 +122,17 @@ function evalNode(node: ExprNode, ctx: FormulaContext): FormulaValue {
       const args = node.args.map((a) => evalNode(a, ctx))
       return callMethod(receiver, node.method, args)
     }
-    case 'member': {
-      const obj = evalNode(node.object, ctx)
-      if (obj instanceof Date) {
-        const field = DATE_MEMBERS[node.property]
-        if (field) return field(obj)
-      }
-      if (isLink(obj) && node.property === 'path') return obj.path
-      throw new EvalError(`Unknown member '${node.property}'`)
-    }
+    case 'member':
+      return memberOf(evalNode(node.object, ctx), node.property)
     case 'index': {
-      const obj = evalNode(node.object, ctx)
       const idx = evalNode(node.index, ctx)
+      // `note["due-date"]` / `file["x"]` / `formula["x"]`: property access by
+      // string key (the way to name a property that is not a plain identifier).
+      if (node.object.kind === 'property' && typeof idx === 'string'
+        && (node.object.name === 'note' || node.object.name === 'file' || node.object.name === 'formula')) {
+        return ctx.resolve(`${node.object.name}.${idx}`)
+      }
+      const obj = evalNode(node.object, ctx)
       if (Array.isArray(obj)) {
         const n = toNumber(idx)
         if (n === null) return null
@@ -181,6 +218,9 @@ function looseEquals(a: FormulaValue, b: FormulaValue): boolean {
 
 /** Returns negative/zero/positive, or null when the two are not comparable. */
 function compare(a: FormulaValue, b: FormulaValue): number | null {
+  // A missing (empty) value is not ordered against anything: `price < 10` is
+  // false for a note without `price`, never an accident of string ordering.
+  if (a === null || b === null) return null
   const ad = a instanceof Date ? a : toDate(a)
   const bd = b instanceof Date ? b : toDate(b)
   if (ad && bd && (a instanceof Date || b instanceof Date)) {
@@ -233,10 +273,18 @@ export function formatFormulaValue(value: FormulaValue): string {
 /** Walks an AST adding every property reference (`status`, `note.price`, `file.tags`, `formula.x`) to `into`. */
 function collectRefs(node: ExprNode, into: Set<string>): void {
   switch (node.kind) {
-    case 'property':
+    case 'property': {
       // Bare `file` is only the receiver of `file.hasTag(...)` & co., not a column.
-      if (node.name !== 'file') into.add(node.name)
+      if (node.name === 'file') return
+      // `title.length` / `due.year` read a member of `title` / `due`.
+      const dot = node.name.lastIndexOf('.')
+      if (dot > 0 && MEMBER_NAMES.has(node.name.slice(dot + 1))) {
+        collectRefs({ kind: 'property', name: node.name.slice(0, dot) }, into)
+        return
+      }
+      into.add(node.name)
       return
+    }
     case 'unary':
       collectRefs(node.operand, into)
       return
@@ -256,6 +304,11 @@ function collectRefs(node: ExprNode, into: Set<string>): void {
       node.args.forEach((a) => collectRefs(a, into))
       return
     case 'index':
+      if (node.object.kind === 'property' && node.index.kind === 'string'
+        && (node.object.name === 'note' || node.object.name === 'file' || node.object.name === 'formula')) {
+        into.add(`${node.object.name}.${node.index.value}`)
+        return
+      }
       collectRefs(node.object, into)
       collectRefs(node.index, into)
       return

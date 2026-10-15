@@ -50,9 +50,9 @@ filters:
 Das kannst du in Bedingungen verwenden:
 
 - **Properties** — `status`, `priority`, `note.status` (Frontmatter der Notiz)
-- **Datei-Felder** — `file.name`, `file.ext`, `file.folder`, `file.tags`, `file.links`, `file.ctime`, `file.mtime`
+- **Datei-Felder** — `file.name`, `file.basename`, `file.path`, `file.ext`, `file.folder`, `file.tags`, `file.links`, `file.ctime`, `file.mtime`
 - **Datei-Prüfungen** — `file.hasTag("x")`, `file.inFolder("Ordner")`, `file.hasLink("Notiz")`
-- **Vergleiche und Logik** — `==  !=  <  <=  >  >=`, `&&  ||  !`, Rechnen mit `+ - * / %`
+- **Vergleiche und Logik** — `==  !=  <  <=  >  >=`, `&&  ||  !`, Rechnen mit `+ - * / %`. `a || "x"` liefert den Wert von `a` bzw. den Ersatzwert `"x"`. Eine fehlende Property ist mit `<`, `>` usw. nie vergleichbar (Ergebnis: falsch). Mit Minus brauchst du keine Leerzeichen (`end-start`); eine Property mit Bindestrich schreibst du `note["due-date"]`
 - **Methoden** auf Text, Zahlen, Daten und Listen, z. B. `title.contains("Plan")`, `deadline < today()`
 
 Ein Filter in einer **Ansicht** wird zusätzlich zum Filter der ganzen Base angewandt (UND). Eine Bedingung, die sich nicht auswerten lässt (Tippfehler, unbekannte Funktion), schließt die Notiz aus — sie bricht die Tabelle nicht.
@@ -132,7 +132,8 @@ Damit du nicht überrascht wirst:
 **Ausdruckssprache**
 - Es ist eine **pragmatische Teilmenge** von Obsidians Funktionen (siehe Liste oben), nicht die vollständige Bibliothek. Eine unbekannte Funktion ergibt in einer Formelspalte `#ERR` und lässt in einem Filter die Notiz weg.
 - **Keine Lambdas** und keine `map`/`filter`-Operationen auf Listen.
-- Nicht unterstützte Datei-Felder: `file.path`, `file.size`, `file.backlinks`, `file.embeds`.
+- Nicht unterstützte Datei-Felder: `file.size`, `file.backlinks`, `file.embeds`.
+- **Listen mit einem Eintrag:** Der Index liefert jede Property als Liste, ein einzelner Wert und eine Ein-Element-Liste sind dort nicht zu unterscheiden. Nur `tags`, `aliases`, `cssclasses`, `file.tags` und `file.links` gelten immer als Liste; bei jeder anderen Property wird eine Liste mit genau einem Eintrag wie ein einzelner Wert behandelt (`.contains()` prüft dann Text statt Listenelement).
 
 **Formeln und Zusammenfassungen**
 - Formelspalten sind **schreibgeschützt** und lassen sich **nicht sortieren** (die Sortierung greift nur für Properties, `file.name`, `file.ctime`, `file.mtime`).
@@ -144,7 +145,7 @@ Damit du nicht überrascht wirst:
 - Der Obsidian-Befehl „Eintrag zur Base hinzufügen" (`bases:add-item`) fehlt: Neue Notizen legst du selbst an; sie erscheinen, sobald sie den Filter erfüllen.
 
 **KI-Zugriff über MCP**
-- Das Werkzeug `query_base` wertet eine `.base` serverseitig mit derselben Engine aus ([[Fortgeschritten/MCP Context Server|MCP-Schnittstelle]] für KI-Clients). Es hat dieselbe 1000er-Grenze, liefert standardmäßig 100 Zeilen (maximal 1000) und gibt Formelwerte als Text zurück.
+- Das Werkzeug `query_base` wertet eine `.base` serverseitig mit derselben Engine aus ([[Fortgeschritten/MCP Context Server|MCP-Schnittstelle]] für KI-Clients). Es hat dieselbe 1000er-Grenze, liefert standardmäßig 100 Zeilen (maximal 1000) und gibt Formelwerte als Text zurück. `total` ist die Zeilenzahl der Ansicht (nach deren eigenem `limit`), `truncated` zeigt nur, ob das `limit` des Aufrufs weitere Zeilen abgeschnitten hat.
 
 ---
 

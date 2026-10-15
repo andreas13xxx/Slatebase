@@ -111,10 +111,16 @@ export function callMethod(receiver: FormulaValue, method: string, args: Formula
   } else if (typeof receiver === 'number' || typeof receiver === 'boolean') {
     const fn = numberMethods[method] ?? stringMethods[method]
     if (fn) return fn(receiver, args)
+    // An epoch number (`file.mtime`) used as a date: `.format(...)`, `.date()`.
+    const dateFn = typeof receiver === 'number' && toDate(receiver) ? dateMethods[method] : undefined
+    if (dateFn) return dateFn(receiver, args)
   } else {
     // string or null → string methods (null stringifies to '')
     const fn = stringMethods[method]
     if (fn) return fn(receiver, args)
+    // A date-like string (`due: 2026-10-01`) used as a date.
+    const dateFn = typeof receiver === 'string' && toDate(receiver) ? dateMethods[method] : undefined
+    if (dateFn) return dateFn(receiver, args)
   }
   throw new MethodError(`Unknown method '${method}' on ${describeType(receiver)}`)
 }

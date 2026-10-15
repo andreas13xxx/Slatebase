@@ -137,7 +137,8 @@ das MCP-Werkzeug `query_base`.
 **Bekannte Grenzen/Lücken (bewusst offen):**
 - Kandidaten-Obergrenze: der Link-Index liefert höchstens 1000 Zeilen, gefiltert wird erst danach
 - Ausdruckssprache ist eine pragmatische Teilmenge der Obsidian-Funktionen; keine Lambdas/`map`/`filter`
-- `file.path`, `file.size`, `file.backlinks`, `file.embeds` fehlen
+- `file.size`, `file.backlinks`, `file.embeds` fehlen (`file.path`/`basename` gibt es)
+- Der Index liefert Properties nur als Listen: außer `tags`/`aliases`/`cssclasses`/`file.tags`/`file.links` wird eine Ein-Element-Liste als Einzelwert gelesen
 - Formelspalten read-only und nicht sortierbar (Sortierung nur Properties/`file.name`/`ctime`/`mtime`)
 - `summaries` werden geparst und erhalten, aber nicht aggregiert (Spec 6.2)
 - kein Einbetten einer Base als Codeblock (`bases:insert`), kein `bases:add-item`

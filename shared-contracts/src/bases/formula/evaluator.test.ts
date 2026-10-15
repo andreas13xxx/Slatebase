@@ -177,3 +177,45 @@ describe('evaluateCondition (filter entry point)', () => {
     expect(evaluateCondition('1 +', ctxOf({}))).toBe(false)
   })
 })
+
+describe('review follow-ups', () => {
+  const run = (src: string, values: Record<string, FormulaValue> = {}) => evaluateFormula(src, ctxOf(values))
+
+  it('treats a missing value as not comparable (no string-ordering accident)', () => {
+    expect(evaluateCondition('price < 10', ctxOf({}))).toBe(false)
+    expect(evaluateCondition('price <= 10', ctxOf({}))).toBe(false)
+    expect(evaluateCondition('price > 3', ctxOf({}))).toBe(false)
+    expect(evaluateCondition('price < 10', ctxOf({ price: 4 }))).toBe(true)
+  })
+
+  it('|| and && return the operand value (default idiom)', () => {
+    expect(run('status || "none"', { status: 'open' })).toEqual({ ok: true, value: 'open' })
+    expect(run('status || "none"', {})).toEqual({ ok: true, value: 'none' })
+    expect(run('status && "set"', { status: 'open' })).toEqual({ ok: true, value: 'set' })
+    expect(run('status && "set"', {})).toEqual({ ok: true, value: null })
+  })
+
+  it('reads `end-start` as a subtraction, not one identifier', () => {
+    expect(run('end-start', { end: 10, start: 4 })).toEqual({ ok: true, value: 6 })
+    expect(run('count-1', { count: 5 })).toEqual({ ok: true, value: 4 })
+  })
+
+  it('reaches a hyphenated property via note["..."]', () => {
+    expect(run('note["due-date"]', { 'note.due-date': 'x' })).toEqual({ ok: true, value: 'x' })
+  })
+
+  it('allows method calls on string and number literals', () => {
+    expect(run('"a,b".split(",").length')).toEqual({ ok: true, value: 2 })
+    expect(run('"abc".contains("b")')).toEqual({ ok: true, value: true })
+    expect(run('5.toFixed(2)')).toEqual({ ok: true, value: '5.00' })
+    expect(run('1.5 + 1')).toEqual({ ok: true, value: 2.5 })
+  })
+
+  it('treats epoch numbers and date strings as dates for methods and members', () => {
+    const ms = new Date(2026, 9, 5, 12, 0, 0).getTime()
+    expect(run('t.format("YYYY-MM-DD")', { t: ms })).toEqual({ ok: true, value: '2026-10-05' })
+    expect(run('t.year', { t: ms })).toEqual({ ok: true, value: 2026 })
+    expect(run('d.format("YYYY")', { d: '2026-10-01' })).toEqual({ ok: true, value: '2026' })
+  })
+})
+

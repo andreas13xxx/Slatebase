@@ -30,6 +30,23 @@ import {
   MCP_ERROR_STORAGE,
 } from './error-codes.js'
 
+const READ_ATTEMPTS = 3
+const READ_RETRY_DELAY_MS = 50
+
+/** Reads a text file, retrying transient lock errors (EPERM/EACCES/EBUSY). */
+async function readWithRetry(file: string): Promise<string> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fs.readFile(file, 'utf-8')
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      const transient = code === 'EPERM' || code === 'EACCES' || code === 'EBUSY'
+      if (!transient || attempt >= READ_ATTEMPTS) throw error
+      await new Promise((resolve) => setTimeout(resolve, READ_RETRY_DELAY_MS * attempt))
+    }
+  }
+}
+
 const DEFAULT_LIMIT = 100
 const MAX_LIMIT = 1000
 
@@ -125,11 +142,24 @@ export function registerQueryBase(
         } catch {
           return mcpToolError(MCP_ERROR_NOT_FOUND, 'Resource not found')
         }
+        if (!stat.isFile()) {
+          return mcpToolError(MCP_ERROR_INVALID_PARAMS, 'Path must point to a .base file')
+        }
         if (stat.size > deps.mcpConfig.maxFileSize) {
           return mcpToolError(MCP_ERROR_FILE_TOO_LARGE, `File too large: ${stat.size} bytes (max: ${deps.mcpConfig.maxFileSize} bytes)`)
         }
 
-        const parsed = parseBase(await fs.readFile(resolvedPath, 'utf-8'))
+        let content: string
+        try {
+          content = await readWithRetry(resolvedPath)
+        } catch (error) {
+          // A failed read is "unknown", never "gone" (EPERM/EACCES from
+          // antivirus/OneDrive is routine on Windows) — say so explicitly.
+          deps.logger.warn('query_base could not read the base file', { error: error instanceof Error ? error.message : String(error) })
+          return mcpToolError(MCP_ERROR_STORAGE, 'Could not read the .base file (temporarily locked?) — try again')
+        }
+
+        const parsed = parseBase(content)
         if (!parsed.success) {
           return mcpToolError(MCP_ERROR_INVALID_PARAMS, `Invalid .base file: ${parsed.errors.map((e) => e.message).join('; ')}`)
         }
@@ -148,6 +178,10 @@ export function registerQueryBase(
         const { rows, total } = filterRows(candidates.rows, doc, view)
 
         const returned = rows.slice(0, args.limit)
+        // `filterRows` counts matches before the view's own limit. The view limit
+        // is part of the base's definition, not a truncation: report what the
+        // view shows, so `truncated` only reflects the caller's `limit`.
+        const available = rows.length
         const columns = outputColumns(doc, view)
 
         return mcpToolSuccess({
@@ -158,9 +192,10 @@ export function registerQueryBase(
             path: row.path,
             cells: Object.fromEntries(columns.map((c) => [c, cellValue(doc, row, c)])),
           })),
-          total,
+          total: available,
+          matches: total,
           returned: returned.length,
-          truncated: returned.length < total,
+          truncated: returned.length < available,
           ...(parsed.errors && parsed.errors.length > 0
             ? { warnings: parsed.errors.map((e) => e.message) }
             : {}),

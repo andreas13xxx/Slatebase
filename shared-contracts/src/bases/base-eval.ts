@@ -67,9 +67,18 @@ export function buildQuerySpec(doc: BaseDocument, view: BaseView): BaseQuerySpec
 
 // ─── Row context + filter evaluation ───────────────────────────────────────────
 
-/** First scalar of a string-list value, as the expression engine wants it. */
-function firstScalar(v: unknown): FormulaValue {
+/**
+ * Properties that are always lists in Obsidian. The index hands every property
+ * over as a string list, so a one-element list cannot be told from a scalar;
+ * these keys are therefore never unwrapped (`tags.contains(..)` must behave the
+ * same for one tag and for two).
+ */
+const LIST_KEYS: ReadonlySet<string> = new Set(['tags', 'aliases', 'cssclasses', 'file.tags', 'file.links'])
+
+/** Converts an index value to an expression value; one-element lists of other properties read as scalars. */
+function toExprValue(key: string, v: unknown): FormulaValue {
   if (Array.isArray(v)) {
+    if (LIST_KEYS.has(key)) return v as FormulaValue[]
     if (v.length === 0) return null
     if (v.length === 1) return v[0] as FormulaValue
     return v as FormulaValue[]
@@ -79,20 +88,32 @@ function firstScalar(v: unknown): FormulaValue {
 
 /**
  * Builds the expression `FormulaContext` for one row, resolving the Obsidian
- * property prefixes: `file.*` → file metadata, `note.`/bare → frontmatter,
- * `formula.x` → another formula (evaluated lazily, cycle-guarded by the caller).
+ * property prefixes: `file.*` → file metadata, `note.`/bare → frontmatter.
+ * With `doc`, `formula.x` (or a bare formula id) resolves to that formula of
+ * the base, evaluated on demand — so filters can use formula values too.
  */
-export function rowContext(row: BaseRow): FormulaContext {
+export function rowContext(row: BaseRow, doc?: BaseDocument): FormulaContext {
+  return buildContext(row, doc, new Set())
+}
+
+function buildContext(row: BaseRow, doc: BaseDocument | undefined, active: ReadonlySet<string>): FormulaContext {
   const values = row.values
   const tags = Array.isArray(values['file.tags']) ? (values['file.tags'] as string[]) : []
   const links = Array.isArray(values['file.links']) ? (values['file.links'] as string[]) : []
   const folder = typeof values['file.folder'] === 'string' ? (values['file.folder'] as string) : ''
   return {
     resolve(name: string): FormulaValue {
-      if (name === 'file.name') return row.fileName
-      if (name.startsWith('file.')) return firstScalar(values[name])
+      const formulaKey = name.startsWith('formula.') ? name.slice('formula.'.length) : name
+      if (doc?.formulas && formulaKey in doc.formulas && (name.startsWith('formula.') || !(name in values))) {
+        const r = evaluateFormulaIn(doc, row, formulaKey, active)
+        if (!r.ok) throw new Error(r.error)
+        return r.value
+      }
+      if (name === 'file.name' || name === 'file.basename') return row.fileName
+      if (name === 'file.path') return row.path
+      if (name.startsWith('file.')) return toExprValue(name, values[name])
       const key = name.startsWith('note.') ? name.slice('note.'.length) : name
-      return firstScalar(values[key] ?? values[name])
+      return toExprValue(key, values[key] ?? values[name])
     },
     fileApi: {
       hasTag: (tag: string) => {
@@ -150,7 +171,7 @@ export function filterRows(
   })
 
   const matched = allRows.filter((row) => {
-    const ctx = rowContext(row)
+    const ctx = rowContext(row, doc)
     return matchesFilter(doc.filters, ctx) && matchesFilter(view.filters, ctx)
   })
   const rows = view.limit !== undefined ? matched.slice(0, view.limit) : matched
@@ -164,29 +185,13 @@ export function filterRows(
  * bare id `other`) inside a formula resolves to that other formula, evaluated
  * on demand; a reference cycle yields an error result instead of recursing.
  */
-export function evaluateFormulaColumn(
-  doc: BaseDocument,
-  row: BaseRow,
-  id: string,
-  active: ReadonlySet<string> = new Set(),
-): FormulaResult {
+export function evaluateFormulaColumn(doc: BaseDocument, row: BaseRow, id: string): FormulaResult {
+  return evaluateFormulaIn(doc, row, id, new Set())
+}
+
+function evaluateFormulaIn(doc: BaseDocument, row: BaseRow, id: string, active: ReadonlySet<string>): FormulaResult {
   const source = doc.formulas?.[id]
   if (source === undefined) return { ok: false, error: `Unknown formula: ${id}` }
   if (active.has(id)) return { ok: false, error: `Formula cycle at: ${id}` }
-
-  const base = rowContext(row)
-  const nextActive = new Set(active).add(id)
-  const ctx: FormulaContext = {
-    ...base,
-    resolve(name: string): FormulaValue {
-      const key = name.startsWith('formula.') ? name.slice('formula.'.length) : name
-      if (doc.formulas && key in doc.formulas && (name.startsWith('formula.') || !(name in row.values))) {
-        const r = evaluateFormulaColumn(doc, row, key, nextActive)
-        if (!r.ok) throw new Error(r.error)
-        return r.value
-      }
-      return base.resolve(name)
-    },
-  }
-  return evaluateFormula(source, ctx)
+  return evaluateFormula(source, buildContext(row, doc, new Set(active).add(id)))
 }

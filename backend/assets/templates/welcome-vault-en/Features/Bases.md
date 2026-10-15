@@ -50,9 +50,9 @@ filters:
 What you can use in conditions:
 
 - **Properties** — `status`, `priority`, `note.status` (the note's frontmatter)
-- **File fields** — `file.name`, `file.ext`, `file.folder`, `file.tags`, `file.links`, `file.ctime`, `file.mtime`
+- **File fields** — `file.name`, `file.basename`, `file.path`, `file.ext`, `file.folder`, `file.tags`, `file.links`, `file.ctime`, `file.mtime`
 - **File checks** — `file.hasTag("x")`, `file.inFolder("folder")`, `file.hasLink("note")`
-- **Comparison and logic** — `==  !=  <  <=  >  >=`, `&&  ||  !`, arithmetic with `+ - * / %`
+- **Comparison and logic** — `==  !=  <  <=  >  >=`, `&&  ||  !`, arithmetic with `+ - * / %`. `a || "x"` yields the value of `a`, or the fallback `"x"`. A missing property is never comparable with `<`, `>` etc. (the result is false). Minus needs no spaces (`end-start`); write a property with a hyphen as `note["due-date"]`
 - **Methods** on text, numbers, dates and lists, e.g. `title.contains("Plan")`, `deadline < today()`
 
 A filter on a **view** is applied in addition to the base-wide filter (AND). A condition that cannot be evaluated (typo, unknown function) excludes the note — it does not break the table.
@@ -132,7 +132,8 @@ So nothing surprises you:
 **Expression language**
 - This is a **pragmatic subset** of Obsidian's functions (see the lists above), not the full library. An unknown function yields `#ERR` in a formula column and drops the note in a filter.
 - **No lambdas** and no `map`/`filter` operations on lists.
-- Unsupported file fields: `file.path`, `file.size`, `file.backlinks`, `file.embeds`.
+- Unsupported file fields: `file.size`, `file.backlinks`, `file.embeds`.
+- **One-element lists:** the index hands over every property as a list, so a single value and a one-element list cannot be told apart. Only `tags`, `aliases`, `cssclasses`, `file.tags` and `file.links` are always lists; for any other property a list with exactly one entry is treated like a single value (`.contains()` then checks text, not a list element).
 
 **Formulas and summaries**
 - Formula columns are **read-only** and **cannot be sorted** (sorting only works for properties, `file.name`, `file.ctime`, `file.mtime`).
@@ -144,7 +145,7 @@ So nothing surprises you:
 - Obsidian's "add item to base" command (`bases:add-item`) is missing: create new notes yourself; they appear as soon as they match the filter.
 
 **AI access via MCP**
-- The `query_base` tool evaluates a `.base` server-side with the same engine ([[Advanced/MCP Context Server|MCP interface]] for AI clients). It has the same 1000-note limit, returns 100 rows by default (maximum 1000) and returns formula values as text.
+- The `query_base` tool evaluates a `.base` server-side with the same engine ([[Advanced/MCP Context Server|MCP interface]] for AI clients). It has the same 1000-note limit, returns 100 rows by default (maximum 1000) and returns formula values as text. `total` is the number of rows the view shows (after its own `limit`); `truncated` only says whether the call's `limit` cut further rows.
 
 ---
 

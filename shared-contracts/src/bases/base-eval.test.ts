@@ -81,6 +81,39 @@ describe('filterRows', () => {
   })
 })
 
+describe('filters over formulas, lists and file fields', () => {
+  it('filters on a formula value', () => {
+    const rows = [wire('a.md', { due: ['2000-01-01'] }), wire('b.md', { due: ['2999-01-01'] })]
+    const d: BaseDocument = { formulas: { overdue: 'date(due) < today()' }, filters: 'formula.overdue', views: [] }
+    expect(filterRows(rows, d, { type: 'table' }).rows.map((r) => r.path)).toEqual(['a.md'])
+  })
+
+  it('keeps tags/aliases and file.tags/links lists even with a single entry', () => {
+    const rows = [
+      wire('one.md', { tags: ['urgent'] }, { tags: ['urgent'] }),
+      wire('two.md', { tags: ['urgent', 'home'] }, { tags: ['urgent', 'home'] }),
+    ]
+    // exact element match, identical behaviour for one and two entries
+    const d: BaseDocument = { filters: 'tags.contains("urg")', views: [] }
+    expect(filterRows(rows, d, { type: 'table' }).rows).toEqual([])
+    const lengths = filterRows(rows, { filters: 'file.tags.length >= 1', views: [] }, { type: 'table' })
+    expect(lengths.rows.map((r) => r.path)).toEqual(['one.md', 'two.md'])
+    const one = filterRows(rows, { filters: 'tags.length == 1', views: [] }, { type: 'table' })
+    expect(one.rows.map((r) => r.path)).toEqual(['one.md'])
+  })
+
+  it('exposes file.path and file.basename', () => {
+    const rows = [wire('Projects/a.md', {}), wire('Other/b.md', {})]
+    const d: BaseDocument = { filters: 'file.path.startsWith("Projects/") && file.basename == "a"', views: [] }
+    expect(filterRows(rows, d, { type: 'table' }).rows.map((r) => r.path)).toEqual(['Projects/a.md'])
+  })
+
+  it('collects refs from note["..."] indexing', () => {
+    const d: BaseDocument = { filters: 'note["due-date"] != ""', views: [] }
+    expect(buildQuerySpec(d, { type: 'table', order: [] }).columns).toEqual(['due-date'])
+  })
+})
+
 describe('evaluateFormulaColumn', () => {
   const row: BaseRow = { path: 'a.md', fileName: 'a', values: { price: 4 } }
 
