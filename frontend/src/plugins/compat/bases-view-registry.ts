@@ -57,6 +57,13 @@ export type BasesViewFactory = (controller: unknown, containerEl: HTMLElement) =
  * optional `options` describing per-view config controls (unused by Slatebase
  * today — we render the view, not an options toolbar — but preserved so a
  * plugin that supplies it is not treated as incompatible).
+ *
+ * Deliberate deviation from `obsidian.d.ts` (verified against 1.10.0): the
+ * official `BasesViewRegistration.icon` is REQUIRED (`icon: IconName`); we keep
+ * it OPTIONAL. A compat surface must be more lenient than the spec, not
+ * stricter — a plugin that omits `icon` (against the typed contract) still
+ * registers rather than being silently dropped. The view selector falls back
+ * to the view-type id when no icon is given.
  */
 export interface BasesViewRegistration {
   name: string

@@ -26,6 +26,7 @@ When an AI client connects to Slatebase's MCP server, it can:
 | `list_vaults` | List all vaults the token has access to |
 | `get_vault_structure` | Get the file tree of a vault |
 | `search_vault` | Full-text search within a vault |
+| `query_base` | Evaluate a Bases (`.base`) file: filters, formulas, sort and limit of one view → rows as JSON (see [[Features/Bases]]) |
 | `read_file` | Read the content of a file (text, or binary files such as images and PDFs, base64-encoded) |
 | `write_file` | Create or update a file (text, or base64-encoded binary content) |
 | `create_directory` | Create a folder |

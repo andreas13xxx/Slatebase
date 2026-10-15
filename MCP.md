@@ -64,6 +64,7 @@ GET http://your-server:3000/.well-known/mcp.json
 | `list_vaults` | Read | List all vaults you have access to (with name, permission, file count) |
 | `get_vault_structure` | Read | Get the directory tree of a vault as JSON |
 | `search_vault` | Read | Full-text search across all files in a vault |
+| `query_base` | Read | Evaluate a Bases (`.base`) file server-side: filters, formulas, sort and limit of one view → rows as JSON (`view`, `limit` optional) |
 | `read_file` | Read | Read the content of a specific file — text, or binary base64-encoded (see below) |
 | `write_file` | Write | Create or overwrite a file — UTF-8 text, or binary passed base64-encoded (supports ETag conflict detection) |
 | `create_directory` | Write | Create a directory (with intermediate directories) |
@@ -93,6 +94,8 @@ Pass `encoding: "base64"` to force the base64 form for any file, including text 
 **Writing** (`write_file`): pass `encoding: "base64"` and put the base64 payload in `content`; it is decoded into raw bytes before the file is written. Malformed base64 is rejected with `-32602` rather than written as a corrupt file. Without the parameter, `content` is written as UTF-8 text exactly as before.
 
 `search_vault` skips binary files — full-text search only covers text. The size limit (`mcp.maxFileSize`, 16 MB by default) applies to both reads and writes and is measured on the raw bytes, before base64 inflates the payload by ~⅓. It is deliberately higher than the server-wide `maxFileSize` (5 MB), which guards text files loaded into the editor — vault attachments such as screenshots and scans are routinely larger than a note.
+
+**Bases** (`query_base`): evaluates a `.base` file server-side with the same expression engine the web UI uses. Arguments: `vaultId`, `path` (must end in `.base`), optional `view` (name; defaults to the first view) and `limit` (default 100, max 1000, applied on top of the view's own `limit`). The result lists `columns`, one row per matching note (`path` + `cells`), `total` (rows the view shows, i.e. after the view's own `limit`), `matches` (before that limit), `returned` and `truncated` (true only when the call's `limit` cut further rows). Formula cells come back as text (`#ERR: …` when a formula fails). Known limits: the link index supplies at most 1000 candidate notes and filtering runs after that cut, so very large vaults can miss matches; formula columns are not sorted; `summaries` are not computed. The tool is only registered when the link index is available.
 
 ## Available Resources
 

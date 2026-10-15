@@ -4,7 +4,7 @@
  */
 
 import { memo, useState, useCallback, useRef, useEffect } from 'react'
-import { parseBase } from '../../bases/parser'
+import { parseBase } from '@slatebase/shared-contracts'
 
 export interface BasesSourceViewProps {
   /** Current raw `.base` YAML. */

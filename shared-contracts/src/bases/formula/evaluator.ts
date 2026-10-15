@@ -1,0 +1,332 @@
+/**
+ * Bases expression evaluator — walks the AST against one row's values and
+ * returns a value. Pure interpretation, no `eval`. A thrown error, a missing
+ * property, a division by zero or an unknown method becomes a visible
+ * error/empty value rather than crashing the caller: `evaluateFormula` never
+ * throws.
+ *
+ * Shared by formulas (display values) and filters (truthiness) — see
+ * `evaluateCondition` for the filter entry point.
+ */
+
+import { parseFormula } from './parser.js'
+import type { ExprNode, BinaryOp } from './ast.js'
+import { FORMULA_FUNCTIONS, toDate, toNumber, stringify, isTruthy, isLink, parseDurationMs } from './functions.js'
+import type { FormulaValue } from './functions.js'
+import { callMethod, DATE_MEMBERS } from './methods.js'
+
+/** The context one expression is evaluated against: a row's property values. */
+export interface FormulaContext {
+  /** Resolves a property reference to a value, or null when absent. */
+  resolve(name: string): FormulaValue
+  /**
+   * Optional file-method API for `file.hasTag(...)`, `file.inFolder(...)`,
+   * `file.hasLink(...)` — predicates that act on the whole file rather than a
+   * single property value. Omitted in a bare formula context (they then
+   * return false).
+   */
+  fileApi?: {
+    hasTag(tag: string): boolean
+    inFolder(folder: string): boolean
+    hasLink(target: string): boolean
+  }
+}
+
+/** Result of evaluating an expression: a value, or a flagged error. */
+export type FormulaResult =
+  | { ok: true; value: FormulaValue }
+  | { ok: false; error: string }
+
+class EvalError extends Error {}
+
+/** Member names the evaluator understands on a value (`x.length`, `d.year`, `link.path`). */
+const MEMBER_NAMES: ReadonlySet<string> = new Set(['length', 'path', ...Object.keys(DATE_MEMBERS)])
+
+/** Member access on an evaluated value. Throws on an unknown member. */
+function memberOf(obj: FormulaValue, property: string): FormulaValue {
+  if (property === 'length') {
+    if (Array.isArray(obj)) return obj.length
+    if (typeof obj === 'string') return obj.length
+  }
+  // Dates also arrive as epoch numbers (`file.ctime`) or ISO strings.
+  const asDate = obj instanceof Date ? obj : typeof obj === 'number' || typeof obj === 'string' ? toDate(obj) : null
+  if (asDate) {
+    const field = DATE_MEMBERS[property]
+    if (field) return field(asDate)
+  }
+  if (isLink(obj) && property === 'path') return obj.path
+  throw new EvalError(`Unknown member '${property}'`)
+}
+
+/**
+ * Resolves a (possibly dotted) property reference. The tokenizer keeps
+ * `file.tags.length` / `due.year` as ONE dotted name; when the whole name is
+ * empty, the last segment is tried as a member of the shorter path.
+ */
+function evalProperty(name: string, ctx: FormulaContext): FormulaValue {
+  const direct = ctx.resolve(name)
+  if (direct !== null) return direct
+  const dot = name.lastIndexOf('.')
+  if (dot > 0 && MEMBER_NAMES.has(name.slice(dot + 1))) {
+    const base = evalProperty(name.slice(0, dot), ctx)
+    return base === null ? null : memberOf(base, name.slice(dot + 1))
+  }
+  return null
+}
+
+function evalNode(node: ExprNode, ctx: FormulaContext): FormulaValue {
+  switch (node.kind) {
+    case 'number':
+    case 'string':
+    case 'boolean':
+      return node.value
+    case 'property':
+      return evalProperty(node.name, ctx)
+    case 'unary': {
+      const v = evalNode(node.operand, ctx)
+      if (node.op === '!') return !isTruthy(v)
+      const n = toNumber(v)
+      if (n === null) throw new EvalError('Cannot negate non-numeric value')
+      return -n
+    }
+    case 'logical': {
+      const left = evalNode(node.left, ctx)
+      // JavaScript-style short circuit: the operand VALUE is returned, not a
+      // boolean, so `status || "none"` works as a default (filters still go
+      // through isTruthy in evaluateCondition).
+      if (node.op === '&&') return isTruthy(left) ? evalNode(node.right, ctx) : left
+      // '||'
+      return isTruthy(left) ? left : evalNode(node.right, ctx)
+    }
+    case 'binary':
+      return evalBinary(node.op, node.left, node.right, ctx)
+    case 'call': {
+      const fn = FORMULA_FUNCTIONS[node.name]
+      if (!fn) throw new EvalError(`Unknown function '${node.name}'`)
+      return fn(node.args.map((a) => evalNode(a, ctx)))
+    }
+    case 'method': {
+      // File predicates: `file.hasTag(...)`, `file.inFolder(...)`, `file.hasLink(...)`
+      // act on the whole file, not a resolved value — route to the file API.
+      if (node.object.kind === 'property' && node.object.name === 'file') {
+        const arg = node.args.length > 0 ? stringify(evalNode(node.args[0]!, ctx)) : ''
+        const api = ctx.fileApi
+        if (!api) return false
+        if (node.method === 'hasTag') return api.hasTag(arg)
+        if (node.method === 'inFolder') return api.inFolder(arg)
+        if (node.method === 'hasLink') return api.hasLink(arg)
+        // Fall through for other file.* methods (none supported yet).
+        throw new EvalError(`Unknown file method '${node.method}'`)
+      }
+      const receiver = evalNode(node.object, ctx)
+      const args = node.args.map((a) => evalNode(a, ctx))
+      return callMethod(receiver, node.method, args)
+    }
+    case 'member':
+      return memberOf(evalNode(node.object, ctx), node.property)
+    case 'index': {
+      const idx = evalNode(node.index, ctx)
+      // `note["due-date"]` / `file["x"]` / `formula["x"]`: property access by
+      // string key (the way to name a property that is not a plain identifier).
+      if (node.object.kind === 'property' && typeof idx === 'string'
+        && (node.object.name === 'note' || node.object.name === 'file' || node.object.name === 'formula')) {
+        return ctx.resolve(`${node.object.name}.${idx}`)
+      }
+      const obj = evalNode(node.object, ctx)
+      if (Array.isArray(obj)) {
+        const n = toNumber(idx)
+        if (n === null) return null
+        return obj[Math.trunc(n)] ?? null
+      }
+      return null
+    }
+    default:
+      throw new EvalError('Unknown expression')
+  }
+}
+
+function evalBinary(op: BinaryOp, leftNode: ExprNode, rightNode: ExprNode, ctx: FormulaContext): FormulaValue {
+  const left = evalNode(leftNode, ctx)
+  const right = evalNode(rightNode, ctx)
+
+  // Comparisons
+  if (op === '==' || op === '!=') {
+    const eq = looseEquals(left, right)
+    return op === '==' ? eq : !eq
+  }
+  if (op === '<' || op === '<=' || op === '>' || op === '>=') {
+    const cmp = compare(left, right)
+    if (cmp === null) return false
+    switch (op) {
+      case '<': return cmp < 0
+      case '<=': return cmp <= 0
+      case '>': return cmp > 0
+      case '>=': return cmp >= 0
+    }
+  }
+
+  // Date ± duration string: `date + "1M"`, `now() - "1 week"`.
+  if (op === '+' || op === '-') {
+    const ld = left instanceof Date ? left : null
+    const rd = right instanceof Date ? right : null
+    if (ld && typeof right === 'string') {
+      const ms = parseDurationMs(right)
+      if (ms !== null) return new Date(ld.getTime() + (op === '+' ? ms : -ms))
+    }
+    // Date - Date → millisecond difference (Obsidian semantics).
+    if (op === '-' && ld && rd) return ld.getTime() - rd.getTime()
+  }
+
+  // String concatenation when either side is a non-numeric string under `+`.
+  if (op === '+') {
+    const ln = toNumber(left)
+    const rn = toNumber(right)
+    if (ln === null || rn === null) {
+      return stringify(left) + stringify(right)
+    }
+    return ln + rn
+  }
+
+  // Remaining arithmetic
+  const ln = toNumber(left)
+  const rn = toNumber(right)
+  if (ln === null || rn === null) throw new EvalError('Arithmetic on non-numeric value')
+  switch (op) {
+    case '-': return ln - rn
+    case '*': return ln * rn
+    case '/':
+      if (rn === 0) throw new EvalError('Division by zero')
+      return ln / rn
+    case '%':
+      if (rn === 0) throw new EvalError('Modulo by zero')
+      return ln % rn
+    default:
+      throw new EvalError(`Unsupported operator '${op}'`)
+  }
+}
+
+function looseEquals(a: FormulaValue, b: FormulaValue): boolean {
+  // Link equality: same path.
+  if (isLink(a) && isLink(b)) return a.path === b.path
+  if (isLink(a)) return a.path.toLowerCase() === stringify(b).toLowerCase()
+  if (isLink(b)) return b.path.toLowerCase() === stringify(a).toLowerCase()
+  const an = toNumber(a)
+  const bn = toNumber(b)
+  if (an !== null && bn !== null) return an === bn
+  return stringify(a).toLowerCase() === stringify(b).toLowerCase()
+}
+
+/** Returns negative/zero/positive, or null when the two are not comparable. */
+function compare(a: FormulaValue, b: FormulaValue): number | null {
+  // A missing (empty) value is not ordered against anything: `price < 10` is
+  // false for a note without `price`, never an accident of string ordering.
+  if (a === null || b === null) return null
+  const ad = a instanceof Date ? a : toDate(a)
+  const bd = b instanceof Date ? b : toDate(b)
+  if (ad && bd && (a instanceof Date || b instanceof Date)) {
+    return ad.getTime() - bd.getTime()
+  }
+  const an = toNumber(a)
+  const bn = toNumber(b)
+  if (an !== null && bn !== null) return an - bn
+  return stringify(a).toLowerCase().localeCompare(stringify(b).toLowerCase())
+}
+
+/**
+ * Parses and evaluates an expression against a row context. Never throws:
+ * returns `{ ok: false, error }` on any parse or evaluation failure.
+ */
+export function evaluateFormula(source: string, ctx: FormulaContext): FormulaResult {
+  try {
+    const ast = parseFormula(source)
+    const value = evalNode(ast, ctx)
+    return { ok: true, value }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Formula error'
+    return { ok: false, error: message }
+  }
+}
+
+/**
+ * Evaluates an expression as a boolean filter condition. A parse/eval failure
+ * is `false` (a broken condition excludes the row rather than crashing the
+ * query) — this is the filter entry point for the query engine.
+ */
+export function evaluateCondition(source: string, ctx: FormulaContext): boolean {
+  try {
+    return isTruthy(evalNode(parseFormula(source), ctx))
+  } catch {
+    return false
+  }
+}
+
+/** Formats a value for display in a table cell. */
+export function formatFormulaValue(value: FormulaValue): string {
+  if (value === null) return ''
+  if (value instanceof Date) {
+    const iso = value.toISOString()
+    return iso.endsWith('T00:00:00.000Z') ? iso.slice(0, 10) : iso
+  }
+  return stringify(value)
+}
+
+/** Walks an AST adding every property reference (`status`, `note.price`, `file.tags`, `formula.x`) to `into`. */
+function collectRefs(node: ExprNode, into: Set<string>): void {
+  switch (node.kind) {
+    case 'property': {
+      // Bare `file` is only the receiver of `file.hasTag(...)` & co., not a column.
+      if (node.name === 'file') return
+      // `title.length` / `due.year` read a member of `title` / `due`.
+      const dot = node.name.lastIndexOf('.')
+      if (dot > 0 && MEMBER_NAMES.has(node.name.slice(dot + 1))) {
+        collectRefs({ kind: 'property', name: node.name.slice(0, dot) }, into)
+        return
+      }
+      into.add(node.name)
+      return
+    }
+    case 'unary':
+      collectRefs(node.operand, into)
+      return
+    case 'binary':
+    case 'logical':
+      collectRefs(node.left, into)
+      collectRefs(node.right, into)
+      return
+    case 'call':
+      node.args.forEach((a) => collectRefs(a, into))
+      return
+    case 'member':
+      collectRefs(node.object, into)
+      return
+    case 'method':
+      collectRefs(node.object, into)
+      node.args.forEach((a) => collectRefs(a, into))
+      return
+    case 'index':
+      if (node.object.kind === 'property' && node.index.kind === 'string'
+        && (node.object.name === 'note' || node.object.name === 'file' || node.object.name === 'formula')) {
+        into.add(`${node.object.name}.${node.index.value}`)
+        return
+      }
+      collectRefs(node.object, into)
+      collectRefs(node.index, into)
+      return
+    default:
+      return
+  }
+}
+
+/**
+ * Collects the property references an expression reads, by parsing it — so
+ * `title.contains("x")` yields `title`, not `title.contains`, and names inside
+ * string literals are ignored. An unparseable expression references nothing
+ * (it evaluates to false / `#ERR` anyway).
+ */
+export function collectExpressionRefs(source: string, into: Set<string>): void {
+  try {
+    collectRefs(parseFormula(source), into)
+  } catch {
+    // unparseable: nothing to fetch
+  }
+}

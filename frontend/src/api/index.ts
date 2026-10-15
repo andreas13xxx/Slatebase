@@ -1,7 +1,7 @@
 import type { VaultInfo, DirectoryTree, FileContent, FileSaveResult, AppError, Conversation, PaginatedConversations, PaginatedMessages, Message, GraphData, GraphMeta, GraphQueryOptions, BacklinksResponse, ActivityPage, ActivityQueryParams } from '../types'
 import type { PublicUserInfo } from '../state/authState'
 import type { PropertyType, PropertyTypeRegistry } from '../state/propertyTypes'
-import type { BaseQuerySpecWire, BaseQueryResultWire } from '../bases/types'
+import type { BaseQuerySpecWire, BaseQueryResultWire } from '@slatebase/shared-contracts'
 
 /**
  * Login response returned by the backend on successful authentication.
@@ -552,7 +552,12 @@ export interface IApiClient {
   importFile(vaultId: string, file: File): Promise<void>
   importFolder(vaultId: string, files: FileList): Promise<void>
   deleteContent(vaultId: string, path: string): Promise<void>
-  saveFile(vaultId: string, filePath: string, content: string): Promise<FileSaveResult>
+  /**
+   * Saves file content. Pass `ifMatch` (an {@link FileContent.etag} from a
+   * prior read) to opt into optimistic concurrency: the backend rejects the
+   * write with a `CONFLICT` error if the file changed since that read.
+   */
+  saveFile(vaultId: string, filePath: string, content: string, ifMatch?: string): Promise<FileSaveResult>
 
   /** Moves a file or folder within a vault. */
   moveContent(vaultId: string, sourcePath: string, destinationPath: string): Promise<{ newPath: string }>
@@ -933,8 +938,9 @@ export class ApiClient implements IApiClient {
     await this.request<void>('DELETE', `/api/v1/vaults/${vaultId}/content?path=${encodedPath}`)
   }
 
-  async saveFile(vaultId: string, filePath: string, content: string): Promise<FileSaveResult> {
-    return this.request<FileSaveResult>('PUT', `/api/v1/vaults/${vaultId}/files`, { path: filePath, content })
+  async saveFile(vaultId: string, filePath: string, content: string, ifMatch?: string): Promise<FileSaveResult> {
+    const extraHeaders = ifMatch ? { 'If-Match': ifMatch } : undefined
+    return this.request<FileSaveResult>('PUT', `/api/v1/vaults/${vaultId}/files`, { path: filePath, content }, extraHeaders)
   }
 
   /** Moves a file or folder within a vault. */
@@ -1799,9 +1805,9 @@ export class ApiClient implements IApiClient {
   /**
    * Generic JSON request with auth headers and 401 interception.
    */
-  private async request<T>(method: string, url: string, body?: unknown): Promise<T> {
+  private async request<T>(method: string, url: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<T> {
     const hasBody = body !== undefined
-    const headers = this.buildHeaders(method, hasBody)
+    const headers = { ...this.buildHeaders(method, hasBody), ...extraHeaders }
 
     const init: RequestInit = { method, headers }
     if (hasBody) {

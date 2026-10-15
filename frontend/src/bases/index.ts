@@ -1,19 +1,22 @@
 /**
  * Bases module barrel export.
- * Types, parser, and serializer for Obsidian-compatible `.base` files.
+ * Types, parser, serializer and expression engine live in
+ * `@slatebase/shared-contracts` (shared with the backend); this barrel
+ * re-exports them next to the frontend-only query runner.
  */
 
 export type {
-  BaseFilterOperator,
-  BaseFilterCondition,
+  BaseFilterNode,
   BaseFilterAnd,
   BaseFilterOr,
-  BaseFilterNode,
+  BaseFilterNot,
   BaseFormulas,
   BaseColumnMeta,
   BaseProperties,
   BaseSortDirection,
   BaseSortClause,
+  BaseGroupBy,
+  BaseSummaries,
   BaseView,
   BaseDocument,
   BaseRow,
@@ -23,11 +26,16 @@ export type {
   BaseQuerySpecWire,
   BaseQueryRowWire,
   BaseQueryResultWire,
-} from './types'
+  FormulaContext,
+  FormulaResult,
+  FormulaValue,
+} from '@slatebase/shared-contracts'
 
-export { parseBase } from './parser'
-export { serializeBase } from './serializer'
+export {
+  parseBase,
+  serializeBase,
+  evaluateFormula,
+  evaluateCondition,
+  formatFormulaValue,
+} from '@slatebase/shared-contracts'
 export { buildQuerySpec, runBaseQuery } from './query-engine'
-export { evaluateFormula, formatFormulaValue } from './formula/evaluator'
-export type { FormulaContext, FormulaResult } from './formula/evaluator'
-export type { FormulaValue } from './formula/functions'

@@ -69,3 +69,6 @@ docker.env
 
 # Sync URI (contains credentials)
 uri.txt
+
+# Local AI tool config (not part of the project)
+.claude/

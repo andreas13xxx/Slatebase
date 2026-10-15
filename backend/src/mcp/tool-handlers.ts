@@ -1,5 +1,5 @@
 // MCP Tool Handlers — list_vaults, get_vault_structure, search_vault, read_file,
-//                     write_file, create_directory, delete_file, move_file, rename_file
+//                     query_base, write_file, create_directory, delete_file, move_file, rename_file
 
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -22,7 +22,10 @@ import { PathTraversalError, isBinaryContent } from '../vault/index.js'
 import { getMediaTypeFromExtension } from '../vault/mime.js'
 import { computeAffectedFilePairs } from '../link-index/index.js'
 import type { ILogger } from '../logger/index.js'
+import type { ILinkIndex } from '../link-index/index.js'
 import type { McpConfig } from './config.js'
+import { mcpToolError, mcpToolSuccess } from './tool-results.js'
+import { registerQueryBase } from './query-base-tool.js'
 import {
   MCP_ERROR_ACCESS_DENIED,
   MCP_ERROR_NOT_FOUND,
@@ -72,29 +75,6 @@ function collectFilePathsRecursive(node: DirectoryTree, paths: string[], maxFile
       if (paths.length >= maxFiles) return
       collectFilePathsRecursive(child, paths, maxFiles)
     }
-  }
-}
-
-// ─── Helper: McpError for tool results ───────────────────────────────────────
-
-/**
- * Creates an MCP error result for tool handlers.
- */
-function mcpToolError(code: number, message: string): CallToolResult {
-  return {
-    content: [{ type: 'text', text: JSON.stringify({ code, message }) }],
-    isError: true,
-  }
-}
-
-// ─── Helper: McpSuccess for tool results ─────────────────────────────────────
-
-/**
- * Creates a successful MCP tool result.
- */
-function mcpToolSuccess(data: unknown): CallToolResult {
-  return {
-    content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
   }
 }
 
@@ -168,6 +148,11 @@ export interface ToolHandlerDeps {
    */
   publishVaultChange?: (vaultId: string, action: 'saved' | 'deleted' | 'renamed', path: string, userId: string) => Promise<void>
   /**
+   * Optional — resolves a vault's link index. When set, the `query_base` tool
+   * is registered (it evaluates a `.base` file against the index's metadata).
+   */
+  linkIndexResolver?: (vaultId: string) => Promise<ILinkIndex | undefined>
+  /**
    * Optional — when set, write/delete/move/rename keep the link index in sync,
    * the same way the REST API does. Without it an MCP client can delete a note
    * whose tags and properties then linger in the Graph and in the context
@@ -208,6 +193,8 @@ export function registerToolHandlers(server: McpServer, deps: ToolHandlerDeps): 
   registerGetVaultStructure(server, deps)
   registerSearchVault(server, deps)
   registerReadFile(server, deps)
+  // Bases (needs the link index; omitted when no resolver is wired)
+  if (deps.linkIndexResolver) registerQueryBase(server, deps, deps.linkIndexResolver)
   // Write tools
   registerWriteFile(server, deps)
   registerCreateDirectory(server, deps)

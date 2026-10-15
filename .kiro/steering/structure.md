@@ -112,7 +112,7 @@ src/
 │   ├── token-service.ts  — McpTokenService (token lifecycle: create, validate, revoke, list)
 │   ├── rate-limiter.ts   — McpRateLimiter (sliding window per token)
 │   ├── handlers.ts       — McpHandlers (MCP resource handlers: list, read); binary files return a base64 `blob` + real media type (via `vault/mime.ts`) instead of `text`
-│   ├── tool-handlers.ts  — MCP tool handlers (list_vaults, get_vault_structure, search_vault, read_file, write_file, create_directory, delete_file, move_file, rename_file). `move_file`/`rename_file` run Link-Migration too via the optional `ToolHandlerDeps.migrateLinks` (wired to the same `LinkMigrationService` as the REST API in the composition root) — snapshots the pre-move tree, rewrites wikilinks elsewhere in the vault pointing at the old path, reports partial failures as `linkMigrationWarnings`. `read_file`/`write_file` support binary content via `encoding: 'base64'` (image/audio/resource content blocks by media type, `search_vault` skips binary files); size limit is `mcp.maxFileSize` (16 MB default), separate from and higher than the editor's `maxFileSize` (5 MB) since attachments run larger than notes. `write_file`/`delete_file`/`move_file`/`rename_file` also keep the link index in sync via the optional `ToolHandlerDeps.linkIndexHook` (same hook shape as the REST `VaultController`)
+│   ├── tool-handlers.ts  — MCP tool handlers (list_vaults, get_vault_structure, search_vault, read_file, write_file, create_directory, delete_file, move_file, rename_file, plus `query_base` from `query-base-tool.ts` when `ToolHandlerDeps.linkIndexResolver` is wired). `move_file`/`rename_file` run Link-Migration too via the optional `ToolHandlerDeps.migrateLinks` (wired to the same `LinkMigrationService` as the REST API in the composition root) — snapshots the pre-move tree, rewrites wikilinks elsewhere in the vault pointing at the old path, reports partial failures as `linkMigrationWarnings`. `read_file`/`write_file` support binary content via `encoding: 'base64'` (image/audio/resource content blocks by media type, `search_vault` skips binary files); size limit is `mcp.maxFileSize` (16 MB default), separate from and higher than the editor's `maxFileSize` (5 MB) since attachments run larger than notes. `write_file`/`delete_file`/`move_file`/`rename_file` also keep the link index in sync via the optional `ToolHandlerDeps.linkIndexHook` (same hook shape as the REST `VaultController`)
 │   ├── binary-files.test.ts — Unit tests for MCP binary read/write (base64 encode/decode, media-type dispatch)
 │   ├── tool-handlers-link-index.test.ts — Unit tests for the MCP tool handlers' linkIndexHook wiring
 │   ├── tool-handlers-link-migration.test.ts — Unit tests for move_file/rename_file Link-Migration wiring
@@ -327,20 +327,9 @@ src/
 │   ├── canvasToMarkdown.ts — Linearizes a canvas document into flat Markdown (reading order top-to-bottom/left-to-right, edges dropped); backs `canvas:convert-to-file`
 │   ├── canvasToMarkdown.test.ts — Unit tests for canvasToMarkdown
 │   └── parser.test.ts    — Unit tests for parser/serializer round-trip
-├── bases/                — Obsidian-compatible `.base` files (Bases feature, toggle `bases`, cold/default-off). Frontend-only parser/engine; the backend contributes only the query route (`api/basesRoutes.ts` → `LinkIndexService.queryForBase`).
-│   ├── index.ts          — Barrel export (types, parser, serializer, query-engine, formula API)
-│   ├── types.ts          — `BaseDocument`, `BaseFilterNode` (AND/OR tree), `BaseFormulas`, `BaseView`, `BaseRow`, plus the query wire types (`BaseQuerySpecWire`/`BaseQueryResultWire`) shared with the ApiClient
-│   ├── parser.ts         — `parseBase(yaml)` — manual validation + `_unknown` passthrough (Canvas-parser pattern, deliberately not Zod — see lessons-learned.md)
-│   ├── serializer.ts     — `serializeBase(doc)` — stable key order, round-trip-safe
-│   ├── parser.test.ts    — Round-trip, error cases, passthrough
-│   ├── query-engine.ts   — `buildQuerySpec(doc, view)` (drops formula columns, keeps `file.*`) + `runBaseQuery()` (calls the backend query route, maps to `BaseRow[]`)
-│   ├── query-engine.test.ts — Unit tests for buildQuerySpec
-│   └── formula/          — Formula interpreter — NO `eval` (own tokenizer → Pratt parser → tree evaluator), CSP-safe
-│       ├── tokenizer.ts  — Expression tokenizer
-│       ├── parser.ts     — Pratt parser → AST
-│       ├── evaluator.ts  — `evaluateFormula(src, ctx)` (never throws: error/empty value instead) + `formatFormulaValue()`
-│       ├── functions.ts  — The limited built-in set (`if`, `concat`, `now`/`today`, `date`, `days`, `length`) — NOT the full Obsidian formula language
-│       └── evaluator.test.ts — Tokenizer/parser/evaluator/function tests incl. error paths
+├── bases/                — Frontend-only part of the Bases feature (toggle `bases`, cold/default-off). The REAL-Obsidian-format parser/serializer/types and the expression engine are NOT here any more: they live in `shared-contracts/src/bases/` (see `shared-contracts/README.md`) so the backend MCP `query_base` tool evaluates bases with the exact same code. This directory re-exports them and adds the API round-trip.
+│   ├── index.ts          — Barrel: re-exports the shared types/parser/serializer/expression API from `@slatebase/shared-contracts` + `buildQuerySpec`/`runBaseQuery`
+│   └── query-engine.ts   — `runBaseQuery(apiClient, vaultId, doc, view)` — fetches candidate rows from the query route, then `filterRows()` (shared) applies doc+view filters CLIENT-SIDE and the view `limit` AFTER filtering (the backend never sees filters or limit)
 ├── editor/
 │   ├── types.ts              — Editor mode types, LivePreviewConfig, EditorMode ('source' | 'live-preview')
 │   ├── theme.ts              — CodeMirror theme (Design Tokens mapping, Dark/Light mode)
@@ -696,7 +685,7 @@ src/
 │   ├── bases/                    — Bases table UI (feature `bases`); routed from `TabContent.tsx` for `.base` files
 │   │   ├── BasesView.tsx         — Container: parse → query → render table / raw-source toggle, error state, `vault:change` live-refresh, cell-commit (frontmatter save), sort write-back
 │   │   ├── BasesTableView.tsx    — Sortable table: one row per note, property cells editable, formula columns evaluated client-side (read-only)
-│   │   ├── BasesKanbanView.tsx   — Cards/Kanban view (`type: cards`): groups rows into collapsible columns by `view.groupBy`, cards link to their note and show other columns as chips; read-only (no drag-between-columns yet)
+│   │   ├── BasesKanbanView.tsx   — Cards/Kanban view (`type: cards`): groups rows into collapsible columns by `view.groupBy`, cards link to their note and show other columns as chips; drag-between-columns rewrites the groupBy property
 │   │   ├── BaseCell.tsx          — One cell: formula/`file.*` read-only, property editable via the Properties-editor controls (`useCommitOnUnmount` semantics inherited)
 │   │   ├── base-cell-type.ts     — `inferCellType()` + `BaseCellType` (kept out of the component files for the react-refresh single-export rule)
 │   │   ├── BasesSourceView.tsx   — Raw `.base` YAML editor (CanvasSourceView pattern)

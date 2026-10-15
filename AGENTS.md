@@ -89,6 +89,7 @@ Filesystem-based, no database. All under `backend/data/`:
 - Only a server 401 ends a session — a failed read (backend) or a failed request (frontend) is "unknown", never "gone"
 - New per-file/per-key JSON persistence goes through `shared/json-file-store.ts`, not a hand-rolled copy
 - `@modelcontextprotocol/sdk` is a backend dependency (MCP transport)
+- `shared-contracts/` is installed into `backend/` and `frontend/` as a *copy* (`file:`), not a symlink — after editing it, `npm run build` there and `npm install` in both consumers, or they keep compiling against the stale copy. The Bases parser/expression engine lives there (shared with the MCP `query_base` tool), not in `frontend/src/bases/`
 
 **Frontend**
 - `noUncheckedIndexedAccess` → null-check array/object access

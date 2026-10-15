@@ -13,37 +13,15 @@
 
 // ─── Filters ────────────────────────────────────────────────────────────────
 
-/** Comparison operators usable in a property filter condition. */
-export type BaseFilterOperator =
-  | 'eq'
-  | 'neq'
-  | 'contains'
-  | 'exists'
-  | 'empty'
-  | 'lt'
-  | 'lte'
-  | 'gt'
-  | 'gte'
-
-/** A single leaf condition — matches on a property, a tag, a path glob, or a file-metadata field. */
-export interface BaseFilterCondition {
-  /** Property key this condition tests (mutually exclusive with `tag`/`path`/`file`). */
-  property?: string
-  /** Tag name this condition tests (presence/absence). */
-  tag?: string
-  /** Path glob (same syntax as the search module's `path:` operator). */
-  path?: string
-  /** File-metadata field: `name`, `ctime`, or `mtime`. */
-  file?: 'name' | 'ctime' | 'mtime'
-  /** Operator; defaults to `eq` for property/file, to presence for `tag`/`path`. */
-  op?: BaseFilterOperator
-  /** Comparison value (string, number, or boolean). */
-  value?: string | number | boolean
-  /** Negate the condition. */
-  not?: boolean
-  /** Unknown fields preserved for round-trip compatibility. */
-  _unknown?: Record<string, unknown>
-}
+/**
+ * A filter node in the Obsidian `.base` format. A leaf is an EXPRESSION STRING
+ * (`'status != "done"'`, `file.hasTag("book")`), evaluated by the shared
+ * expression engine (`formula/`); a group is one of `and`/`or`/`not` holding
+ * further nodes. `not` is a group operator (every child must be false), not a
+ * per-condition flag — this matches Obsidian, and replaces the earlier
+ * invented object-condition schema (removed; no backward compatibility).
+ */
+export type BaseFilterNode = string | BaseFilterAnd | BaseFilterOr | BaseFilterNot
 
 /** An AND group — every child must match. */
 export interface BaseFilterAnd {
@@ -55,8 +33,10 @@ export interface BaseFilterOr {
   or: BaseFilterNode[]
 }
 
-/** A filter node is either a leaf condition or a nested AND/OR group. */
-export type BaseFilterNode = BaseFilterCondition | BaseFilterAnd | BaseFilterOr
+/** A NOT group — none of the children may match. */
+export interface BaseFilterNot {
+  not: BaseFilterNode[]
+}
 
 // ─── Formulas ─────────────────────────────────────────────────────────────────
 
@@ -94,11 +74,24 @@ export interface BaseSortClause {
 }
 
 /**
- * A named view within a base. Only `table` is modelled functionally in the
- * first version; other `type` values are preserved verbatim via `_unknown`.
+ * Grouping spec for a view (the Obsidian `groupBy` object). `property` is the
+ * column id to group by; `direction` orders the groups (case preserved from
+ * the file, compared case-insensitively).
+ */
+export interface BaseGroupBy {
+  property: string
+  direction?: string
+}
+
+/** Per-view summary assignment: column id → named summary (e.g. `Average`). */
+export type BaseSummaries = Record<string, string>
+
+/**
+ * A named view within a base. `table` and `cards` render in-app; other
+ * `type` values are handed to a plugin-registered view or round-trip untouched.
  */
 export interface BaseView {
-  /** View type. The first version renders `table`; others round-trip untouched. */
+  /** View type. `table`/`cards` render in-app; others via a plugin or `_unknown`. */
   type: string
   /** View name shown in the view switcher. */
   name?: string
@@ -107,11 +100,17 @@ export interface BaseView {
   /** Sort clauses applied in order. */
   sort?: BaseSortClause[]
   /**
-   * Column id (property key) to group rows by. Used by the `cards` (Kanban)
-   * view: each distinct value becomes a column of cards; notes with no value
-   * fall into an "Ohne {property}" column. Ignored by the table view.
+   * Grouping spec. Used by the `cards` (Kanban) view: each distinct value of
+   * `groupBy.property` becomes a column of cards; notes with no value fall into
+   * an "Ohne {property}" column. Ignored by the table view.
    */
-  groupBy?: string
+  groupBy?: BaseGroupBy
+  /** View-level filter (concatenated with the document filter via AND). */
+  filters?: BaseFilterNode
+  /** Maximum rows this view shows. */
+  limit?: number
+  /** Column id → named summary aggregation. */
+  summaries?: BaseSummaries
   /** Unknown fields preserved for round-trip compatibility. */
   _unknown?: Record<string, unknown>
 }
@@ -126,6 +125,8 @@ export interface BaseDocument {
   formulas?: BaseFormulas
   /** Per-column display metadata. */
   properties?: BaseProperties
+  /** Custom summary formula definitions (id → expression). */
+  summaries?: BaseSummaries
   /** Named views; at least one is expected for rendering. */
   views: BaseView[]
   /** Unknown top-level fields preserved for round-trip compatibility. */
@@ -165,9 +166,12 @@ export interface BaseQuerySortWire {
   direction?: 'asc' | 'desc'
 }
 
-/** Normalized query spec posted to `POST /vaults/:vaultId/bases/query`. */
+/**
+ * Normalized query spec posted to `POST /vaults/:vaultId/bases/query`. Carries
+ * no filters: the Obsidian filter expressions are evaluated by the caller
+ * (`filterRows`), the backend only returns candidate rows.
+ */
 export interface BaseQuerySpecWire {
-  filters?: BaseFilterNode
   columns: string[]
   sort?: BaseQuerySortWire[]
   limit?: number
@@ -177,8 +181,16 @@ export interface BaseQuerySpecWire {
 export interface BaseQueryRowWire {
   path: string
   fileName: string
-  ctime?: number
-  mtime?: number
+  ctime?: number | undefined
+  mtime?: number | undefined
+  /** File extension without the dot (`file.ext`), e.g. `md`. */
+  ext?: string | undefined
+  /** Parent folder path (`file.folder`), '' for a vault-root file. */
+  folder?: string | undefined
+  /** All tags on the file (`file.tags`), without the leading `#`. */
+  tags?: string[] | undefined
+  /** Internal link targets in the file (`file.links`), vault-relative. */
+  links?: string[] | undefined
   values: Record<string, string[]>
 }
 

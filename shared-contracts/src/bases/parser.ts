@@ -1,24 +1,30 @@
 /**
  * Bases parser — validates and parses `.base` YAML files into a typed
- * `BaseDocument`. Uses manual validation with `_unknown` passthrough for
- * forward compatibility, mirroring the Canvas parser: unknown fields survive
- * a parse → serialize round-trip so newer Obsidian `.base` fields are not lost.
+ * `BaseDocument`, in the real Obsidian `.base` format (verified against
+ * https://help.obsidian.md/bases/syntax). Manual validation with `_unknown`
+ * passthrough for forward compatibility, mirroring the Canvas parser.
+ *
+ * Filters are EXPRESSION STRINGS in `and`/`or`/`not` groups (the shared
+ * expression engine evaluates them); `groupBy` is an object; `summaries` and
+ * a view `limit` are preserved. The earlier invented object-condition schema
+ * is gone — a `.base` still using it fails with a clear error (full migration,
+ * no backward compatibility).
  */
 
 import { parse as parseYaml } from 'yaml'
 import type {
   BaseColumnMeta,
   BaseDocument,
-  BaseFilterCondition,
   BaseFilterNode,
-  BaseFilterOperator,
   BaseFormulas,
+  BaseGroupBy,
   BaseParseResult,
   BaseProperties,
   BaseSortClause,
+  BaseSummaries,
   BaseValidationError,
   BaseView,
-} from './types'
+} from './types.js'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -30,8 +36,6 @@ function isString(v: unknown): v is string {
   return typeof v === 'string'
 }
 
-const VALID_OPERATORS: BaseFilterOperator[] = ['eq', 'neq', 'contains', 'exists', 'empty', 'lt', 'lte', 'gt', 'gte']
-const VALID_FILE_FIELDS = ['name', 'ctime', 'mtime']
 const VALID_SORT_DIRECTIONS = ['asc', 'desc']
 
 /**
@@ -52,109 +56,68 @@ function extractUnknown(raw: Record<string, unknown>, knownKeys: string[]): Reco
 
 // ─── Filter parsing ─────────────────────────────────────────────────────────
 
-const CONDITION_KEYS = ['property', 'tag', 'path', 'file', 'op', 'value', 'not']
-
-/** Parses a single leaf filter condition. */
-function parseCondition(raw: Record<string, unknown>, path: string, errors: BaseValidationError[]): BaseFilterCondition | null {
-  const targets = [raw['property'], raw['tag'], raw['path'], raw['file']].filter((v) => v !== undefined)
-  if (targets.length === 0) {
-    errors.push({ message: 'Filter condition must target one of: property, tag, path, file', path })
-    return null
-  }
-  if (targets.length > 1) {
-    errors.push({ message: 'Filter condition must target exactly one of: property, tag, path, file', path })
-    return null
-  }
-
-  const condition: BaseFilterCondition = {}
-
-  if (isString(raw['property'])) condition.property = raw['property']
-  if (isString(raw['tag'])) condition.tag = raw['tag']
-  if (isString(raw['path'])) condition.path = raw['path']
-  if (raw['file'] !== undefined) {
-    if (!isString(raw['file']) || !VALID_FILE_FIELDS.includes(raw['file'])) {
-      errors.push({ message: 'Filter "file" must be one of: name, ctime, mtime', path })
-      return null
-    }
-    condition.file = raw['file'] as 'name' | 'ctime' | 'mtime'
-  }
-
-  if (raw['op'] !== undefined) {
-    if (!isString(raw['op']) || !VALID_OPERATORS.includes(raw['op'] as BaseFilterOperator)) {
-      errors.push({ message: `Filter "op" must be one of: ${VALID_OPERATORS.join(', ')}`, path })
-      return null
-    }
-    condition.op = raw['op'] as BaseFilterOperator
-  }
-
-  const value = raw['value']
-  if (value !== undefined) {
-    if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
-      errors.push({ message: 'Filter "value" must be a string, number, or boolean', path })
-      return null
-    }
-    condition.value = value
-  }
-
-  if (raw['not'] !== undefined) {
-    if (typeof raw['not'] !== 'boolean') {
-      errors.push({ message: 'Filter "not" must be a boolean', path })
-      return null
-    }
-    condition.not = raw['not']
-  }
-
-  const _unknown = extractUnknown(raw, CONDITION_KEYS)
-  if (_unknown) condition._unknown = _unknown
-
-  return condition
-}
-
-/** Parses a filter node (leaf condition or nested AND/OR group), recursively. */
+/**
+ * Parses a filter node: a string expression (leaf), or an `and`/`or`/`not`
+ * group. A legacy object condition (`{property, op, value}`) is rejected with
+ * a clear migration error.
+ */
 function parseFilterNode(raw: unknown, path: string, errors: BaseValidationError[]): BaseFilterNode | null {
+  if (isString(raw)) return raw
+
   if (!isObject(raw)) {
-    errors.push({ message: 'Filter node must be an object', path })
+    errors.push({ message: 'Filter node must be an expression string or an and/or/not group', path })
     return null
   }
 
-  if (Array.isArray(raw['and'])) {
-    const children: BaseFilterNode[] = []
-    ;(raw['and'] as unknown[]).forEach((child, i) => {
-      const parsed = parseFilterNode(child, `${path}.and[${i}]`, errors)
-      if (parsed) children.push(parsed)
-    })
-    return { and: children }
+  const groupKey = (['and', 'or', 'not'] as const).find((k) => Array.isArray(raw[k]))
+  if (!groupKey) {
+    // Most likely the removed object-condition schema.
+    if ('property' in raw || 'tag' in raw || 'op' in raw || 'value' in raw) {
+      errors.push({
+        message: 'Legacy object filter condition is no longer supported — use an Obsidian expression string, e.g. \'status == "done"\'',
+        path,
+      })
+    } else {
+      errors.push({ message: 'Filter group must be one of: and, or, not (a list of nodes)', path })
+    }
+    return null
   }
 
-  if (Array.isArray(raw['or'])) {
-    const children: BaseFilterNode[] = []
-    ;(raw['or'] as unknown[]).forEach((child, i) => {
-      const parsed = parseFilterNode(child, `${path}.or[${i}]`, errors)
-      if (parsed) children.push(parsed)
-    })
-    return { or: children }
-  }
-
-  return parseCondition(raw, path, errors)
+  const children: BaseFilterNode[] = []
+  ;(raw[groupKey] as unknown[]).forEach((child, i) => {
+    const parsed = parseFilterNode(child, `${path}.${groupKey}[${i}]`, errors)
+    if (parsed !== null) children.push(parsed)
+  })
+  if (groupKey === 'and') return { and: children }
+  if (groupKey === 'or') return { or: children }
+  return { not: children }
 }
 
-// ─── Formula / properties parsing ─────────────────────────────────────────────
+// ─── Formula / summaries / properties parsing ────────────────────────────────
 
-function parseFormulas(raw: unknown, errors: BaseValidationError[]): BaseFormulas | undefined {
+function parseStringMap(raw: unknown, label: string, errors: BaseValidationError[]): Record<string, string> | undefined {
   if (raw === undefined) return undefined
   if (!isObject(raw)) {
-    errors.push({ message: 'formulas must be a mapping of id → expression string', path: 'formulas' })
+    errors.push({ message: `${label} must be a mapping of id → string`, path: label })
     return undefined
   }
-  const formulas: BaseFormulas = {}
+  const out: Record<string, string> = {}
   for (const [key, value] of Object.entries(raw)) {
     if (!isString(value)) {
-      errors.push({ message: `formula "${key}" must be an expression string`, path: `formulas.${key}` })
+      errors.push({ message: `${label} "${key}" must be a string`, path: `${label}.${key}` })
       continue
     }
-    formulas[key] = value
+    out[key] = value
   }
-  return formulas
+  return out
+}
+
+function parseFormulas(raw: unknown, errors: BaseValidationError[]): BaseFormulas | undefined {
+  return parseStringMap(raw, 'formulas', errors)
+}
+
+function parseSummaries(raw: unknown, errors: BaseValidationError[], label = 'summaries'): BaseSummaries | undefined {
+  return parseStringMap(raw, label, errors)
 }
 
 const COLUMN_META_KEYS = ['displayName']
@@ -182,7 +145,7 @@ function parseProperties(raw: unknown, errors: BaseValidationError[]): BasePrope
 
 // ─── View parsing ─────────────────────────────────────────────────────────────
 
-const VIEW_KEYS = ['type', 'name', 'order', 'sort', 'groupBy']
+const VIEW_KEYS = ['type', 'name', 'order', 'sort', 'groupBy', 'filters', 'limit', 'summaries']
 
 function parseSort(raw: unknown, path: string, errors: BaseValidationError[]): BaseSortClause[] | undefined {
   if (raw === undefined) return undefined
@@ -198,15 +161,29 @@ function parseSort(raw: unknown, path: string, errors: BaseValidationError[]): B
     }
     const clause: BaseSortClause = { column: entry['column'] }
     if (entry['direction'] !== undefined) {
-      if (!isString(entry['direction']) || !VALID_SORT_DIRECTIONS.includes(entry['direction'])) {
+      const dir = isString(entry['direction']) ? entry['direction'].toLowerCase() : ''
+      if (!VALID_SORT_DIRECTIONS.includes(dir)) {
         errors.push({ message: 'sort "direction" must be asc or desc', path: `${path}[${i}].direction` })
       } else {
-        clause.direction = entry['direction'] as 'asc' | 'desc'
+        clause.direction = dir as 'asc' | 'desc'
       }
     }
     clauses.push(clause)
   })
   return clauses
+}
+
+function parseGroupBy(raw: unknown, path: string, errors: BaseValidationError[]): BaseGroupBy | undefined {
+  if (raw === undefined) return undefined
+  // Obsidian uses an object; tolerate a bare string as `{ property }`.
+  if (isString(raw)) return { property: raw }
+  if (!isObject(raw) || !isString(raw['property'])) {
+    errors.push({ message: 'view "groupBy" must be an object with a "property" string', path })
+    return undefined
+  }
+  const group: BaseGroupBy = { property: raw['property'] }
+  if (isString(raw['direction'])) group.direction = raw['direction']
+  return group
 }
 
 function parseView(raw: unknown, index: number, errors: BaseValidationError[]): BaseView | null {
@@ -228,11 +205,19 @@ function parseView(raw: unknown, index: number, errors: BaseValidationError[]): 
   }
   const sort = parseSort(raw['sort'], `views[${index}].sort`, errors)
   if (sort) view.sort = sort
-  if (isString(raw['groupBy'])) {
-    view.groupBy = raw['groupBy']
-  } else if (raw['groupBy'] !== undefined) {
-    errors.push({ message: 'view "groupBy" must be a property id', path: `views[${index}].groupBy` })
+  const groupBy = parseGroupBy(raw['groupBy'], `views[${index}].groupBy`, errors)
+  if (groupBy) view.groupBy = groupBy
+  if (raw['filters'] !== undefined) {
+    const vf = parseFilterNode(raw['filters'], `views[${index}].filters`, errors)
+    if (vf !== null) view.filters = vf
   }
+  if (typeof raw['limit'] === 'number') {
+    view.limit = raw['limit']
+  } else if (raw['limit'] !== undefined) {
+    errors.push({ message: 'view "limit" must be a number', path: `views[${index}].limit` })
+  }
+  const summaries = parseSummaries(raw['summaries'], errors, `views[${index}].summaries`)
+  if (summaries) view.summaries = summaries
 
   const _unknown = extractUnknown(raw, VIEW_KEYS)
   if (_unknown) view._unknown = _unknown
@@ -242,14 +227,10 @@ function parseView(raw: unknown, index: number, errors: BaseValidationError[]): 
 
 // ─── Main parser ──────────────────────────────────────────────────────────────
 
-const TOP_LEVEL_KEYS = ['filters', 'formulas', 'properties', 'views']
+const TOP_LEVEL_KEYS = ['filters', 'formulas', 'properties', 'summaries', 'views']
 
 /**
  * Parses a `.base` YAML string into a typed `BaseDocument`.
- *
- * - Validates YAML syntax
- * - Validates filters, formulas, properties, and views
- * - Preserves unknown fields for round-trip compatibility
  *
  * A document with recoverable issues still returns `success: true` with a
  * non-fatal `errors` list; only unparseable YAML or a non-object root fails.
@@ -279,6 +260,7 @@ export function parseBase(yaml: string): BaseParseResult {
     : undefined
   const formulas = parseFormulas(raw['formulas'], errors)
   const properties = parseProperties(raw['properties'], errors)
+  const summaries = parseSummaries(raw['summaries'], errors)
 
   const views: BaseView[] = []
   if (raw['views'] !== undefined) {
@@ -295,9 +277,10 @@ export function parseBase(yaml: string): BaseParseResult {
   const _unknown = extractUnknown(raw, TOP_LEVEL_KEYS)
 
   const document: BaseDocument = { views }
-  if (filters) document.filters = filters
+  if (filters !== undefined) document.filters = filters
   if (formulas) document.formulas = formulas
   if (properties) document.properties = properties
+  if (summaries) document.summaries = summaries
   if (_unknown) document._unknown = _unknown
 
   return { success: true, document, errors: errors.length > 0 ? errors : undefined }

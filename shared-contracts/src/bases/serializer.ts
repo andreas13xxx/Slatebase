@@ -9,12 +9,13 @@ import type {
   BaseColumnMeta,
   BaseDocument,
   BaseFilterAnd,
-  BaseFilterCondition,
+  BaseFilterNot,
   BaseFilterNode,
   BaseFilterOr,
+  BaseGroupBy,
   BaseSortClause,
   BaseView,
-} from './types'
+} from './types.js'
 
 function mergeUnknown(target: Record<string, unknown>, unknown: Record<string, unknown> | undefined): void {
   if (!unknown) return
@@ -24,34 +25,24 @@ function mergeUnknown(target: Record<string, unknown>, unknown: Record<string, u
 }
 
 function isAnd(node: BaseFilterNode): node is BaseFilterAnd {
-  return (node as BaseFilterAnd).and !== undefined
+  return typeof node === 'object' && (node as BaseFilterAnd).and !== undefined
 }
 
 function isOr(node: BaseFilterNode): node is BaseFilterOr {
-  return (node as BaseFilterOr).or !== undefined
+  return typeof node === 'object' && (node as BaseFilterOr).or !== undefined
 }
 
-function serializeCondition(c: BaseFilterCondition): Record<string, unknown> {
-  const out: Record<string, unknown> = {}
-  if (c.property !== undefined) out['property'] = c.property
-  if (c.tag !== undefined) out['tag'] = c.tag
-  if (c.path !== undefined) out['path'] = c.path
-  if (c.file !== undefined) out['file'] = c.file
-  if (c.op !== undefined) out['op'] = c.op
-  if (c.value !== undefined) out['value'] = c.value
-  if (c.not !== undefined) out['not'] = c.not
-  mergeUnknown(out, c._unknown)
-  return out
+function isNot(node: BaseFilterNode): node is BaseFilterNot {
+  return typeof node === 'object' && (node as BaseFilterNot).not !== undefined
 }
 
-function serializeFilterNode(node: BaseFilterNode): Record<string, unknown> {
-  if (isAnd(node)) {
-    return { and: node.and.map(serializeFilterNode) }
-  }
-  if (isOr(node)) {
-    return { or: node.or.map(serializeFilterNode) }
-  }
-  return serializeCondition(node)
+/** A filter node serializes to a string (leaf) or an and/or/not group object. */
+function serializeFilterNode(node: BaseFilterNode): string | Record<string, unknown> {
+  if (typeof node === 'string') return node
+  if (isAnd(node)) return { and: node.and.map(serializeFilterNode) }
+  if (isOr(node)) return { or: node.or.map(serializeFilterNode) }
+  if (isNot(node)) return { not: node.not.map(serializeFilterNode) }
+  return {}
 }
 
 function serializeColumnMeta(meta: BaseColumnMeta): Record<string, unknown> {
@@ -69,12 +60,21 @@ function serializeSort(clauses: BaseSortClause[]): Record<string, unknown>[] {
   })
 }
 
+function serializeGroupBy(group: BaseGroupBy): Record<string, unknown> {
+  const out: Record<string, unknown> = { property: group.property }
+  if (group.direction !== undefined) out['direction'] = group.direction
+  return out
+}
+
 function serializeView(view: BaseView): Record<string, unknown> {
   const out: Record<string, unknown> = { type: view.type }
   if (view.name !== undefined) out['name'] = view.name
   if (view.order !== undefined) out['order'] = view.order
   if (view.sort !== undefined) out['sort'] = serializeSort(view.sort)
-  if (view.groupBy !== undefined) out['groupBy'] = view.groupBy
+  if (view.groupBy !== undefined) out['groupBy'] = serializeGroupBy(view.groupBy)
+  if (view.filters !== undefined) out['filters'] = serializeFilterNode(view.filters)
+  if (view.limit !== undefined) out['limit'] = view.limit
+  if (view.summaries !== undefined) out['summaries'] = { ...view.summaries }
   mergeUnknown(out, view._unknown)
   return out
 }
@@ -82,17 +82,14 @@ function serializeView(view: BaseView): Record<string, unknown> {
 /**
  * Serializes a `BaseDocument` to an Obsidian-compatible `.base` YAML string.
  *
- * - Stable top-level key order: filters, formulas, properties, views
+ * - Stable top-level key order: filters, formulas, properties, summaries, views
  * - Preserves unknown fields from the original document
  */
 export function serializeBase(doc: BaseDocument): string {
   const out: Record<string, unknown> = {}
 
   if (doc.filters !== undefined) out['filters'] = serializeFilterNode(doc.filters)
-
-  if (doc.formulas !== undefined) {
-    out['formulas'] = { ...doc.formulas }
-  }
+  if (doc.formulas !== undefined) out['formulas'] = { ...doc.formulas }
 
   if (doc.properties !== undefined) {
     const props: Record<string, unknown> = {}
@@ -101,6 +98,8 @@ export function serializeBase(doc: BaseDocument): string {
     }
     out['properties'] = props
   }
+
+  if (doc.summaries !== undefined) out['summaries'] = { ...doc.summaries }
 
   out['views'] = doc.views.map(serializeView)
 

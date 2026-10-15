@@ -9,9 +9,9 @@
  */
 
 import { memo, useCallback, useMemo } from 'react'
-import type { BaseDocument, BaseRow, BaseView, BaseSortClause } from '../../bases/types'
-import { evaluateFormula, formatFormulaValue } from '../../bases/formula/evaluator'
-import type { FormulaContext } from '../../bases/formula/evaluator'
+import type { BaseDocument, BaseRow, BaseView, BaseSortClause } from '@slatebase/shared-contracts'
+import { evaluateFormula, formatFormulaValue } from '@slatebase/shared-contracts'
+import type { FormulaContext } from '@slatebase/shared-contracts'
 import { BaseCell } from './BaseCell'
 import { inferCellType } from './base-cell-type'
 

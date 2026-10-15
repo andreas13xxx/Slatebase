@@ -8,7 +8,7 @@ import { installObsidianGlobals } from './install-globals'
 import { BasesQueryController, type DrivableBasesView } from './bases-query-controller'
 import { dispatchRealtimeVaultChange } from '../../state/realtimeVaultBridge'
 import type { IApiClient } from '../../api'
-import type { BaseDocument, BaseView, BaseQueryResultWire } from '../../bases/types'
+import type { BaseDocument, BaseView, BaseQueryResultWire } from '@slatebase/shared-contracts'
 
 installObsidianGlobals()
 

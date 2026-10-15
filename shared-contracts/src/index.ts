@@ -13,3 +13,5 @@ export type {
   PutFileBody,
   FileSaveResult,
 } from './vault.js'
+
+export * from './bases/index.js'

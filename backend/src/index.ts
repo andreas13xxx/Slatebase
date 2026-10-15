@@ -321,6 +321,8 @@ if (featureToggleService.isEnabled('mcp')) {
       logger,
       mcpConfig,
       getUserId: () => currentUserId,
+      // Closure: linkIndexCache is declared further down, like linkMigrationService below.
+      linkIndexResolver: (vaultId: string) => linkIndexCache.getAsync(vaultId),
       // Closure, not a direct reference: linkMigrationService is a `const`
       // declared further down (4g2) — this MCP block (4c) runs first, but the
       // arrow function body itself isn't evaluated until a move_file/

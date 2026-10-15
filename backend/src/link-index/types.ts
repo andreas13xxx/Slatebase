@@ -320,6 +320,14 @@ export interface BaseQueryRow {
   ctime?: number | undefined
   /** Modification time (ms since epoch), when available. */
   mtime?: number | undefined
+  /** File extension without the dot (the `file.ext` field), e.g. `md`. */
+  ext?: string | undefined
+  /** Parent folder path (the `file.folder` field), '' for a vault-root file. */
+  folder?: string | undefined
+  /** All tags on the file (the `file.tags` field), without the leading `#`. */
+  tags?: string[] | undefined
+  /** Internal link targets in the file (the `file.links` field), vault-relative. */
+  links?: string[] | undefined
   /** Raw property values for the requested columns, keyed by property key. */
   values: Record<string, string[]>
 }

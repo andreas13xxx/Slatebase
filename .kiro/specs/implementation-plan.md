@@ -128,18 +128,32 @@ editierbare Tabellen-View, Tab-Integration, Feature-Toggle `bases` kalt/default-
 Welcome-Vault-Guides DE/EN, Steering-Doku). **Plugin-View-Freigabe umgesetzt:** die
 Bases-**Plugin-API** (`.kiro/specs/bases-plugin-api/`) ist implementiert — fremde Plugins
 können über `Plugin.registerBasesView()` eigene Bases-Views beisteuern, die mit echten
-Vault-Daten gerendert werden. Offen: Karten-/Board-Views und die volle Obsidian-Formelsprache.
+Vault-Daten gerendert werden. **Umgesetzt (Branch `bases-v3`):** Karten-/Kanban-View inkl.
+Drag zwischen Spalten, echtes Obsidian-`.base`-Format (Ausdrucks-String-Filter, `groupBy`-Objekt,
+View-`limit`) mit gemeinsamer Ausdrucks-Engine für Filter und Formeln
+(`.kiro/specs/bases-expression-language/`, Phasen 1–5; Engine liegt in `shared-contracts/`) und
+das MCP-Werkzeug `query_base`.
+
+**Bekannte Grenzen/Lücken (bewusst offen):**
+- Kandidaten-Obergrenze: der Link-Index liefert höchstens 1000 Zeilen, gefiltert wird erst danach
+- Ausdruckssprache ist eine pragmatische Teilmenge der Obsidian-Funktionen; keine Lambdas/`map`/`filter`
+- `file.size`, `file.backlinks`, `file.embeds` fehlen (`file.path`/`basename` gibt es)
+- Der Index liefert Properties nur als Listen: außer `tags`/`aliases`/`cssclasses`/`file.tags`/`file.links` wird eine Ein-Element-Liste als Einzelwert gelesen
+- Formelspalten read-only und nicht sortierbar (Sortierung nur Properties/`file.name`/`ctime`/`mtime`)
+- `summaries` werden geparst und erhalten, aber nicht aggregiert (Spec 6.2)
+- kein Einbetten einer Base als Codeblock (`bases:insert`), kein `bases:add-item`
+- Plugin-Views laufen nur im Browser (Architekturgrenze, kein Serverpfad)
 
 - `.base`-Dateiformat lesen/schreiben (YAML: Filter, Views, Formeln) — kompatibel zu
   Obsidians Format, damit importierte Vaults funktionieren
 - Query-Engine auf der vorhandenen Property-/Metadaten-Schicht: Filter nach
   Properties/Tags/Pfad, Sortierung
 - View-Typen: Tabelle (editierbare Zellen) zuerst; Karten-/Board-Ansicht als Ausbaustufe
-- Formeln: einfache Ausdrücke über Properties (Vergleiche, Verkettung, Basis-Arithmetik)
+- Formeln/Filter: Obsidian-Ausdruckssprache als pragmatische Teilmenge (siehe Grenzen oben)
 - Bases-Tabs im Tab-System (bzw. in eigenen Panes, falls Prio 5 vorher landet)
 
-**Scope-Risiko** liegt bei den Formeln — Obsidians Formel-Sprache ist nicht trivial
-nachzubauen; für die erste Version bewusst auf einfache Ausdrücke beschränken.
+**Scope-Risiko** liegt bei der Ausdruckssprache — Obsidians Funktionsbibliothek ist groß;
+Umfang wird bewusst schrittweise erweitert statt vollständig nachgebaut.
 
 Die Obsidian-Bases-Plugin-API in `plugins/compat/` ist nicht mehr No-Op, sondern
 funktional (`registerBasesView()`, `Value`-Hierarchie, `BasesView`/`QueryController`/
