@@ -39,11 +39,17 @@ COPY shared-contracts/src/ ./src/
 RUN npm run build
 RUN rm -rf node_modules src tsconfig.json README.md
 
-# Install backend dependencies (the file:../shared-contracts link resolves to
-# the sibling package built above).
+# Install backend dependencies. --install-links packs the file:../shared-contracts
+# sibling (built above) into node_modules instead of symlinking it. This MUST
+# match the prod install's --install-links below AND the lockfile's form:
+# shared-contracts declares runtime deps (moment, yaml), and on npm 11 a lockfile
+# generated with --install-links (packed, deps inlined) is rejected by a plain
+# `npm ci` and vice-versa — the two forms are mutually exclusive. The backend
+# lockfile is kept in packed form, so every backend `npm ci` here and in CI uses
+# --install-links. (The frontend never uses --install-links and stays symlinked.)
 WORKDIR /src/backend
 COPY backend/package.json backend/package-lock.json ./
-RUN npm ci
+RUN npm ci --install-links
 
 # Copy source and compile
 COPY backend/src/ ./src/
