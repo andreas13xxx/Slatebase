@@ -35,7 +35,11 @@ jobs:
         working-directory: shared-contracts
       - run: npm test
         working-directory: shared-contracts
-      - run: npm ci
+      # --install-links: the backend lockfile is in packed form because the
+      # Dockerfile's prod install needs it (see backend/Dockerfile). On npm 11
+      # that form is rejected by a plain `npm ci`, so backend installs use
+      # --install-links everywhere. (The frontend lockfile stays symlinked.)
+      - run: npm ci --install-links
         working-directory: backend
       - name: Dependency audit
         run: npm audit --audit-level=high --omit=dev
@@ -97,7 +101,10 @@ jobs:
         working-directory: shared-contracts
       - run: npm run build
         working-directory: shared-contracts
-      - run: npm ci
+      # --install-links for backend only (packed lockfile — see the backend job
+      # and backend/Dockerfile). The frontend lockfile is symlinked, so its
+      # install stays a plain `npm ci`.
+      - run: npm ci --install-links
         working-directory: backend
       - run: npm ci
         working-directory: frontend
