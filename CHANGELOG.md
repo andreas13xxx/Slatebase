@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.53.1](https://github.com/andreas13xxx/Slatebase/compare/v0.53.0...v0.53.1) (2026-10-16)
+
+
+### Bugfixes
+
+* sync backend lockfile with shared-contracts moment/yaml deps ([#240](https://github.com/andreas13xxx/Slatebase/issues/240)) ([64775f4](https://github.com/andreas13xxx/Slatebase/commit/64775f4717cb7cea3320fa7c286622d3f2a512e3))
+
 ## [0.53.0](https://github.com/andreas13xxx/Slatebase/compare/v0.52.1...v0.53.0) (2026-10-15)
 
 
