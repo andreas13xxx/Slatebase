@@ -187,4 +187,31 @@ describe('LinkIndexService.queryForBase', () => {
       expect(result.listKeys).toEqual([])
     })
   })
+
+  describe('file.size and file.backlinks (R4)', () => {
+    it('populates file.size when requested via fileColumns', async () => {
+      await fs.writeFile(path.join(tempDir, 'big.md'), '---\ntype: note\n---\n# Big\n' + 'x'.repeat(2000))
+      await service.rebuild()
+      const result = await service.queryForBase({ columns: [], fileColumns: ['file.size'] })
+      const row = result.rows.find((r) => r.path === 'big.md')!
+      expect(row.size).toBeGreaterThan(2000)
+    })
+
+    it('does NOT stat for size when file.size is not referenced', async () => {
+      await fs.writeFile(path.join(tempDir, 'plain.md'), '---\ntype: note\n---\n# Plain')
+      await service.rebuild()
+      const result = await service.queryForBase({ columns: [] })
+      const row = result.rows.find((r) => r.path === 'plain.md')!
+      expect(row.size).toBeUndefined()
+    })
+
+    it('populates backlinks from the reverse map (always, cheap)', async () => {
+      await fs.writeFile(path.join(tempDir, 'target.md'), '# Target')
+      await fs.writeFile(path.join(tempDir, 'source.md'), '# Source\n[[target]]')
+      await service.rebuild()
+      const result = await service.queryForBase({ columns: [] })
+      const target = result.rows.find((r) => r.path === 'target.md')!
+      expect(target.backlinks).toContain('source.md')
+    })
+  })
 })

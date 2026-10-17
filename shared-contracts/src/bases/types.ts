@@ -186,6 +186,13 @@ export interface BaseQuerySpecWire {
   limit?: number
   /** Conservative structured prefilter (backend `BaseQueryNode` shape). */
   filters?: unknown
+  /**
+   * `file.*` pseudo-columns referenced by the base (column, sort, filter or
+   * formula), e.g. `file.size`. The backend derives these itself, but a stat()
+   * is only worth doing when actually referenced; `file.size` is the one that
+   * needs it. Cheap fields (`file.backlinks`) are always populated regardless.
+   */
+  fileColumns?: string[]
 }
 
 /** A single row returned by the backend query. */
@@ -202,6 +209,10 @@ export interface BaseQueryRowWire {
   tags?: string[] | undefined
   /** Internal link targets in the file (`file.links`), vault-relative. */
   links?: string[] | undefined
+  /** File size in bytes (`file.size`), when the base referenced it. */
+  size?: number | undefined
+  /** Vault-relative paths of files linking to this one (`file.backlinks`). */
+  backlinks?: string[] | undefined
   values: Record<string, string[]>
 }
 

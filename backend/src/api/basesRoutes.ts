@@ -79,6 +79,7 @@ const queryBodySchema = z.object({
   columns: z.array(z.string().min(1).max(200)).max(50),
   sort: z.array(sortSchema).max(10).optional(),
   limit: z.number().int().min(1).max(1000).optional(),
+  fileColumns: z.array(z.string().min(1).max(50)).max(20).optional(),
 })
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -125,6 +126,7 @@ export function createBasesRoutes(deps: BasesRoutesDeps): Hono {
         columns: parsed.data.columns,
         sort: parsed.data.sort,
         limit: parsed.data.limit,
+        fileColumns: parsed.data.fileColumns,
       }
 
       const result = await linkIndex.queryForBase(spec)

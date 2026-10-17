@@ -649,9 +649,12 @@ export class LinkIndexService implements ILinkIndex {
       ...this.fileProperties.keys(),
     ])
 
-    // Whether any sort/column needs file stats — avoids a stat() per note otherwise.
+    // Whether any sort/column/filter needs file stats — avoids a stat() per
+    // note otherwise. ctime/mtime and file.size all come from the same stat().
     const needsStat =
-      (spec.sort ?? []).some((s) => s.column === 'file.ctime' || s.column === 'file.mtime') ||
+      (spec.sort ?? []).some((s) => s.column === 'file.ctime' || s.column === 'file.mtime' || s.column === 'file.size') ||
+      spec.columns.includes('file.size') ||
+      (spec.fileColumns ?? []).includes('file.size') ||
       this.baseFilterTouchesFileTime(spec.filters)
 
     const rows: BaseQueryRow[] = []
@@ -837,25 +840,29 @@ export class LinkIndexService implements ILinkIndex {
     if (tags && tags.size > 0) row.tags = Array.from(tags)
     const links = this.forwardLinks.get(filePath)
     if (links && links.size > 0) row.links = Array.from(links)
+    // Backlinks are cheap (reverse map already built) — always included.
+    const backlinks = this.getBacklinks(filePath)
+    if (backlinks.length > 0) row.backlinks = backlinks
 
     if (needsStat) {
       const stat = await this.statFile(filePath)
       if (stat) {
         row.ctime = stat.ctime
         row.mtime = stat.mtime
+        row.size = stat.size
       }
     }
 
     return row
   }
 
-  /** Reads a file's ctime/mtime from disk; returns undefined when unreadable. */
-  private async statFile(filePath: string): Promise<{ ctime: number; mtime: number } | undefined> {
+  /** Reads a file's ctime/mtime/size from disk; returns undefined when unreadable. */
+  private async statFile(filePath: string): Promise<{ ctime: number; mtime: number; size: number } | undefined> {
     try {
       const abs = path.join(this.vaultPath, filePath)
       const stat = await fs.stat(abs)
       const birth = stat.birthtimeMs > 0 ? stat.birthtimeMs : stat.mtimeMs
-      return { ctime: birth, mtime: stat.mtimeMs }
+      return { ctime: birth, mtime: stat.mtimeMs, size: stat.size }
     } catch {
       return undefined
     }

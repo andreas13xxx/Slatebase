@@ -70,6 +70,13 @@ export function buildQuerySpec(doc: BaseDocument, view: BaseView): BaseQuerySpec
   const prefilter = buildCombinedPrefilter(doc.filters, view.filters)
   if (prefilter !== null) spec.filters = prefilter
 
+  // file.* pseudo-columns referenced anywhere (columns/filters/formulas/sort),
+  // so the backend knows whether a stat() for file.size is worth doing.
+  const fileColumns = new Set<string>()
+  for (const id of wanted) if (id.startsWith('file.')) fileColumns.add(id)
+  for (const s of view.sort ?? []) if (s.column.startsWith('file.')) fileColumns.add(s.column)
+  if (fileColumns.size > 0) spec.fileColumns = Array.from(fileColumns)
+
   return spec
 }
 
@@ -81,7 +88,7 @@ export function buildQuerySpec(doc: BaseDocument, view: BaseView): BaseQuerySpec
  * these keys are therefore never unwrapped (`tags.contains(..)` must behave the
  * same for one tag and for two).
  */
-const LIST_KEYS: ReadonlySet<string> = new Set(['tags', 'aliases', 'cssclasses', 'file.tags', 'file.links'])
+const LIST_KEYS: ReadonlySet<string> = new Set(['tags', 'aliases', 'cssclasses', 'file.tags', 'file.links', 'file.backlinks'])
 
 /**
  * Converts an index value to an expression value. A one-element list reads as a
@@ -188,6 +195,8 @@ export function filterRows(
     if (r.folder !== undefined) values['file.folder'] = r.folder
     if (r.tags !== undefined) values['file.tags'] = r.tags
     if (r.links !== undefined) values['file.links'] = r.links
+    if (r.size !== undefined) values['file.size'] = r.size
+    if (r.backlinks !== undefined) values['file.backlinks'] = r.backlinks
     return listKeySet
       ? { path: r.path, fileName: r.fileName, values, listKeys: listKeySet }
       : { path: r.path, fileName: r.fileName, values }

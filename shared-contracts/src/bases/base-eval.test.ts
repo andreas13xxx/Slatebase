@@ -114,6 +114,47 @@ describe('filters over formulas, lists and file fields', () => {
   })
 })
 
+describe('file.size and file.backlinks (R4)', () => {
+  it('resolves file.size as a number in a filter', () => {
+    const rows = [wire('a.md', {}, { size: 5000 }), wire('b.md', {}, { size: 100 })]
+    const d: BaseDocument = { filters: 'file.size > 1000', views: [] }
+    expect(filterRows(rows, d, { type: 'table' }).rows.map((r) => r.path)).toEqual(['a.md'])
+  })
+
+  it('resolves file.size in a formula', () => {
+    const rows = [wire('a.md', {}, { size: 2048 })]
+    const d: BaseDocument = { formulas: { kb: 'file.size / 1024' }, filters: 'formula.kb == 2', views: [] }
+    expect(filterRows(rows, d, { type: 'table' }).rows.map((r) => r.path)).toEqual(['a.md'])
+  })
+
+  it('resolves file.backlinks as a list (length + contains)', () => {
+    const rows = [
+      wire('a.md', {}, { backlinks: ['x.md', 'y.md'] }),
+      wire('b.md', {}, { backlinks: ['x.md'] }),
+      wire('c.md', {}, {}),
+    ]
+    expect(
+      filterRows(rows, { filters: 'file.backlinks.length >= 2', views: [] }, { type: 'table' }).rows.map((r) => r.path),
+    ).toEqual(['a.md'])
+    expect(
+      filterRows(rows, { filters: 'file.backlinks.contains("x.md")', views: [] }, { type: 'table' }).rows.map((r) => r.path),
+    ).toEqual(['a.md', 'b.md'])
+  })
+
+  it('keeps file.backlinks a list even with a single entry', () => {
+    const rows = [wire('b.md', {}, { backlinks: ['x.md'] })]
+    expect(
+      filterRows(rows, { filters: 'file.backlinks.length == 1', views: [] }, { type: 'table' }).rows.map((r) => r.path),
+    ).toEqual(['b.md'])
+  })
+
+  it('declares referenced file.* columns in the query spec', () => {
+    const d: BaseDocument = { filters: 'file.size > 0', views: [] }
+    const spec = buildQuerySpec(d, { type: 'table', order: ['file.size'] })
+    expect(spec.fileColumns).toContain('file.size')
+  })
+})
+
 describe('evaluateFormulaColumn', () => {
   const row: BaseRow = { path: 'a.md', fileName: 'a', values: { price: 4 } }
 

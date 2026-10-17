@@ -52,6 +52,12 @@ beide, eslint 0 Errors.
   als Liste auf (`.length`, `.contains`).
 - [ ] 4.3 `file.embeds` (optional): prüfen, ob der Embed-Parser die Teilmenge günstig markieren
   kann; umsetzen oder dokumentiert offen lassen.
+  → ENTSCHEIDUNG: dokumentiert OFFEN gelassen. Der Backend-`extractWikilinks`-Parser erfasst
+  `[[...]]` und `![[...]]` NICHT getrennt (das führende `!` wird nicht als Embed-Marker geführt),
+  und `forwardLinks` ist eine reine Ziel-Menge ohne Embed-/Link-Unterscheidung. `file.embeds`
+  bräuchte eine neue Index-Map + Parser-Änderung + v2→v3-Persistenz-Migration + Rebuild/Rename-
+  Pfade — kein Graph-Problem, aber über „günstig" hinaus. Daher aus R4 ausgeklammert; `file.size`
+  und `file.backlinks` sind umgesetzt.
 - [ ] 4.4 Tests: `file.size` + `file.backlinks` in Filter und Formel; `file.embeds` falls
   umgesetzt.
 

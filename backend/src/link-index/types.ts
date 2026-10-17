@@ -308,6 +308,12 @@ export interface BaseQuerySpec {
   sort?: BaseQuerySort[] | undefined
   /** Maximum number of rows to return (hard-capped by the implementation). */
   limit?: number | undefined
+  /**
+   * `file.*` pseudo-columns the base references (e.g. `file.size`). Used to
+   * decide whether a per-file stat() is worth doing; cheap fields are always
+   * populated regardless.
+   */
+  fileColumns?: string[] | undefined
 }
 
 /** A single resolved Bases query row. */
@@ -328,6 +334,10 @@ export interface BaseQueryRow {
   tags?: string[] | undefined
   /** Internal link targets in the file (the `file.links` field), vault-relative. */
   links?: string[] | undefined
+  /** File size in bytes (the `file.size` field), when the base referenced it. */
+  size?: number | undefined
+  /** Vault-relative paths of files linking to this one (`file.backlinks`). */
+  backlinks?: string[] | undefined
   /** Raw property values for the requested columns, keyed by property key. */
   values: Record<string, string[]>
 }

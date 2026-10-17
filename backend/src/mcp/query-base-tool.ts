@@ -182,6 +182,7 @@ export function registerQueryBase(
           columns: wireSpec.columns,
           sort: wireSpec.sort,
           filters: wireSpec.filters as BaseQuerySpec['filters'],
+          fileColumns: wireSpec.fileColumns,
         }
         const candidates = await linkIndex.queryForBase(indexSpec)
         const { rows, total, truncated: candidatesTruncated } = filterRows(candidates.rows, doc, view, candidates.truncated, candidates.listKeys)
