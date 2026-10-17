@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.54.0](https://github.com/andreas13xxx/Slatebase/compare/v0.53.2...v0.54.0) (2026-10-17)
+
+
+### Features
+
+* **frontend:** Long-Press-Kontextmenüs für Touch und Pane-Menü in der Kopfzeile ([#245](https://github.com/andreas13xxx/Slatebase/issues/245)) ([80fef61](https://github.com/andreas13xxx/Slatebase/commit/80fef617b328bebb224604252fea45fbab39bd4e))
+
 ## [0.53.2](https://github.com/andreas13xxx/Slatebase/compare/v0.53.1...v0.53.2) (2026-10-16)
 
 
