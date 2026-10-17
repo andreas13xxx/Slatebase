@@ -107,6 +107,13 @@ export class LinkIndexService implements ILinkIndex {
   private readonly fileProperties: Map<string, Map<string, string[]>> = new Map()
   /** Inverse property index: key (lowercase) → value (lowercase) → Set<filePath> */
   private readonly propertyValueIndex: Map<string, Map<string, Set<string>>> = new Map()
+  /**
+   * Memoized result of `collectObservedListKeys()`. The observed list-key set
+   * changes only when `fileProperties` changes, not per query, so it is cached
+   * and invalidated (set to null) at each public mutation entry point rather
+   * than recomputed on every `queryForBase` call. `null` = stale/not computed.
+   */
+  private observedListKeysCache: readonly string[] | null = null
   private ready = false
   private readonly persistPath: string
 
@@ -127,6 +134,7 @@ export class LinkIndexService implements ILinkIndex {
    * Skips unreadable files (logs warning, continues).
    */
   async rebuild(): Promise<void> {
+    this.invalidateObservedListKeys()
     this.forwardLinks.clear()
     this.backlinks.clear()
     this.fileTags.clear()
@@ -168,6 +176,7 @@ export class LinkIndexService implements ILinkIndex {
    * Parses the content and updates forward links, tags, properties, and reverse map.
    */
   async updateFile(filePath: string, content: string): Promise<void> {
+    this.invalidateObservedListKeys()
     const normalizedPath = normalizeLinkPath(filePath)
 
     // Remove old forward links for this file from reverse map
@@ -257,6 +266,7 @@ export class LinkIndexService implements ILinkIndex {
    */
   async removeFile(filePath: string): Promise<void> {
     if (this.removeSubtree(filePath).size === 0) return
+    this.invalidateObservedListKeys()
     await this.persist()
   }
 
@@ -270,6 +280,7 @@ export class LinkIndexService implements ILinkIndex {
    * descendant would rewrite the whole index file once per note.
    */
   async renameDirectory(oldPath: string, newPath: string): Promise<void> {
+    this.invalidateObservedListKeys()
     const removed = this.removeSubtree(oldPath)
 
     const files = await this.findMarkdownFiles(path.join(this.vaultPath, newPath))
@@ -302,6 +313,7 @@ export class LinkIndexService implements ILinkIndex {
    * Handles a file rename by removing the old path and adding the new path.
    */
   async renameFile(oldPath: string, newPath: string, content: string): Promise<void> {
+    this.invalidateObservedListKeys()
     const normalizedOld = normalizeLinkPath(oldPath)
     const normalizedNew = normalizeLinkPath(newPath)
 
@@ -679,13 +691,28 @@ export class LinkIndexService implements ILinkIndex {
    * route layer; this is the index-observed half.
    */
   private collectObservedListKeys(): string[] {
-    const keys = new Set<string>()
-    for (const propsMap of this.fileProperties.values()) {
-      for (const [key, values] of propsMap) {
-        if (values.length >= 2) keys.add(key)
+    if (this.observedListKeysCache === null) {
+      const keys = new Set<string>()
+      for (const propsMap of this.fileProperties.values()) {
+        for (const [key, values] of propsMap) {
+          if (values.length >= 2) keys.add(key)
+        }
       }
+      this.observedListKeysCache = [...keys]
     }
-    return [...keys]
+    // Return a fresh copy: the route layer unions declared registry keys into
+    // this array, so handing out the cached reference would corrupt the cache.
+    return [...this.observedListKeysCache]
+  }
+
+  /**
+   * Drops the memoized observed-list-key set so the next `collectObservedListKeys()`
+   * recomputes it. Called from every public entry point that mutates
+   * `fileProperties` (rebuild / load / updateFile / removeFile / renameFile /
+   * renameDirectory), so the cache can never serve a stale set.
+   */
+  private invalidateObservedListKeys(): void {
+    this.observedListKeysCache = null
   }
 
   /** Whether a filter tree contains any file ctime/mtime condition. */
@@ -982,6 +1009,7 @@ export class LinkIndexService implements ILinkIndex {
    * Handles v1 → v2 migration by loading links and triggering rebuild for tags/properties.
    */
   async loadFromDisk(): Promise<void> {
+    this.invalidateObservedListKeys()
     try {
       const raw = await fs.readFile(this.persistPath, 'utf-8')
       const parsed: unknown = JSON.parse(raw)

@@ -186,6 +186,27 @@ describe('LinkIndexService.queryForBase', () => {
       const result = await service.queryForBase({ columns: [] })
       expect(result.listKeys).toEqual([])
     })
+
+    it('invalidates the cached list keys after a mutation adds a multi-value property', async () => {
+      await fs.writeFile(path.join(tempDir, 'note.md'), '---\nstatus: open\n---\n# Note')
+      await service.rebuild()
+      // First query: no multi-value property yet.
+      expect((await service.queryForBase({ columns: [] })).listKeys).not.toContain('authors')
+      // A mutation introduces a two-value property; the memo must be invalidated.
+      await service.updateFile('note.md', '---\nauthors: [Ada, Bob]\nstatus: open\n---\n# Note')
+      expect((await service.queryForBase({ columns: [] })).listKeys).toContain('authors')
+    })
+
+    it('returns a fresh listKeys array so a caller mutating it cannot corrupt the cache', async () => {
+      await fs.writeFile(path.join(tempDir, 'multi.md'), '---\nauthors: [Ada, Bob]\n---\n# Multi')
+      await service.rebuild()
+      const first = await service.queryForBase({ columns: [] })
+      // The route layer unions declared keys into this array in place.
+      first.listKeys!.push('injected-by-route')
+      const second = await service.queryForBase({ columns: [] })
+      expect(second.listKeys).toContain('authors')
+      expect(second.listKeys).not.toContain('injected-by-route')
+    })
   })
 
   describe('file.size and file.backlinks (R4)', () => {
