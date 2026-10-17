@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.55.0](https://github.com/andreas13xxx/Slatebase/compare/v0.54.0...v0.55.0) (2026-10-17)
+
+
+### Features
+
+* **bases:** complete deferred Bases features (R1-R7) ([#247](https://github.com/andreas13xxx/Slatebase/issues/247)) ([2d395fb](https://github.com/andreas13xxx/Slatebase/commit/2d395fbcd69b690a6f8caf556e5ef5009a373a1a))
+
 ## [0.54.0](https://github.com/andreas13xxx/Slatebase/compare/v0.53.2...v0.54.0) (2026-10-17)
 
 
