@@ -30,6 +30,7 @@ import { BasesKanbanView } from './BasesKanbanView'
 import { BasesSourceView } from './BasesSourceView'
 import { BasesPluginViewHost } from './BasesPluginViewHost'
 import { deriveBaseScopeFolder, buildBlankFrontmatter, resolveNewNotePath } from './base-add-item'
+import { sortRowsByFormula } from './base-formula-sort'
 
 export interface BasesViewProps {
   apiClient: IApiClient
@@ -73,6 +74,14 @@ export const BasesView = memo(function BasesView({
     [activeView, pluginViewError, BUILT_IN_VIEW_TYPES],
   )
   const isKanbanView = !!activeView && activeView.type === 'cards' && !isPluginView
+
+  // Formula columns are not sortable server-side (buildQuerySpec drops them),
+  // so when the active view's first sort clause targets a formula column we
+  // sort the already-fetched rows here by the evaluated value, stable on ties.
+  const displayRows = useMemo(
+    () => (doc ? sortRowsByFormula(rows, doc, activeView) : rows),
+    [rows, doc, activeView],
+  )
 
   const runQuery = useCallback(async () => {
     if (!doc || !activeView) return
@@ -313,7 +322,7 @@ export const BasesView = memo(function BasesView({
         <BasesKanbanView
           doc={doc}
           view={activeView}
-          rows={rows}
+          rows={displayRows}
           onOpenNote={onOpenNote}
           onMoveCard={readOnly ? undefined : handleMoveCard}
         />
@@ -323,7 +332,7 @@ export const BasesView = memo(function BasesView({
         <BasesTableView
           doc={doc}
           view={activeView}
-          rows={rows}
+          rows={displayRows}
           onOpenNote={onOpenNote}
           onCommitCell={handleCommitCell}
           onSortChange={handleSortChange}
