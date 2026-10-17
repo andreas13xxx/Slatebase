@@ -3,6 +3,7 @@ type: task
 status: in-progress
 priority: high
 deadline: "2026-11-15"
+estimate: 8
 tags: [example, task]
 ---
 

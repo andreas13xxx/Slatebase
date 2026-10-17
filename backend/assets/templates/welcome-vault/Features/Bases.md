@@ -21,7 +21,7 @@ Stell es dir als gespeicherte, strukturierte Ansicht über deine Notizen vor —
 | **`properties`** | Anzeigenamen der Spalten |
 | **`formulas`** | Berechnete Spalten (schreibgeschützt), z. B. Tage bis zur Deadline |
 | **`views`** | Eine oder mehrere benannte Ansichten: **Tabelle** oder **Karten** (Kanban), je mit eigener Spaltenreihenfolge, Sortierung, Filter und `limit` |
-| **`summaries`** | Zusammenfassungen je Spalte — werden gelesen und beim Speichern erhalten, aber noch nicht berechnet (siehe Grenzen) |
+| **`summaries`** | Zusammenfassungen je Spalte (Summe, Anzahl, Durchschnitt, Min/Max …) — unter der Tabelle bzw. im Kanban-Kopf |
 
 ---
 
@@ -86,11 +86,38 @@ formulas:
 
 ---
 
+## Zusammenfassungen (`summaries`)
+
+Pro Spalte lässt sich eine Zusammenfassung über die angezeigten Zeilen berechnen. Sie steht unter `summaries:` der Ansicht als `Spalte: Funktion` und erscheint in der Tabelle als Zeile unter dem Inhalt, in der Karten-Ansicht als Leiste über dem Board.
+
+```yaml
+views:
+  - type: table
+    name: Aufgaben
+    order: [file.name, status, estimate]
+    summaries:
+      file.name: Count
+      estimate: Sum
+```
+
+Eingebaute Funktionen (wie in Obsidian):
+
+| Gilt für | Funktionen |
+|----------|-----------|
+| Alle Typen | `Count`, `Empty`, `Filled`, `Unique` |
+| Zahlen | `Sum`, `Average`, `Min`, `Max`, `Median`, `Range`, `Stddev` |
+| Daten | `Earliest`, `Latest`, `Range` |
+| Checkbox | `Checked`, `Unchecked` |
+
+Eine numerische Funktion auf einer nicht-numerischen Spalte ergibt einen leeren Wert, keinen Fehler. Eigene Zusammenfassungen per Formel über `values` (Lambdas) sind nicht umgesetzt.
+
+---
+
 ## In der Tabelle bearbeiten
 
 Property-Zellen sind inline editierbar, über dieselben typisierten Controls wie der [[Features/Tags und Properties|Properties-Editor]] — Text, Zahl, Datum, Checkbox, Liste/Tags. Eine Änderung landet direkt in der Frontmatter der Notiz. Formel-Spalten sind schreibgeschützt.
 
-Klick auf einen Spalten-Header sortiert; die Sortierung wird in die `.base`-Datei zurückgeschrieben.
+Klick auf einen Spalten-Header sortiert; die Sortierung wird in die `.base`-Datei zurückgeschrieben. Das gilt auch für Formel-Spalten — die werden nach dem Laden anhand ihrer berechneten Werte sortiert.
 
 ---
 
@@ -122,48 +149,58 @@ Andere Ansichtstypen kommen von Obsidian-Plugins (siehe [[Fortgeschritten/Obsidi
 
 ---
 
+## Eine Base einbetten und Einträge anlegen
+
+- **Einbetten:** Schreibe `![[Meine Base.base]]` in eine Notiz. Im Lesemodus und in der Live-Vorschau erscheint die Base als schreibgeschützte Tabelle direkt in der Notiz — nützlich für ein Dashboard, das mehrere Bases nebeneinander zeigt.
+- **Eintrag hinzufügen:** Führe **„Bases: Add item"** über die [[Features/Command Palette|Command Palette]] aus, während eine Base geöffnet ist. Slatebase legt eine neue Notiz im Geltungsbereich der Base an — der Zielordner stammt aus einem `file.inFolder(...)`-Filter (sonst Vault-Wurzel), und die angezeigten Properties werden als leere Frontmatter-Felder vorbereitet (ein `property == "x"`-Filter füllt den Wert vor). Die Notiz öffnet sich und erscheint als neue Zeile.
+
+---
+
 ## Grenzen und Lücken
 
 Damit du nicht überrascht wirst:
 
 **Datenmenge**
-- Pro Abfrage liefert der Index **höchstens 1000 Notizen** als Kandidaten (in der Reihenfolge der Ansichts-Sortierung); gefiltert wird erst danach. In sehr großen Vaults kann eine Base daher Treffer nicht sehen, die jenseits dieser 1000 liegen — auch ein Filter wie `file.inFolder(...)` verkleinert diesen Kreis nicht, weil er erst nachträglich greift.
+- Pro Abfrage prüft der Index **bis zu 5000 Notizen** als Kandidaten. Wo möglich schiebt Slatebase die billig prüfbaren Teile deines Filters (Property-Gleichheit, `file.hasTag`, `file.inFolder`) **vor** diese Grenze, sodass sie echte Treffer kaum je erreicht. Wird sie dennoch überschritten, zeigt die Ansicht einen sichtbaren Hinweis „Ergebnis gekappt" — nie ein stilles Abschneiden.
 
 **Ausdruckssprache**
 - Es ist eine **pragmatische Teilmenge** von Obsidians Funktionen (siehe Liste oben), nicht die vollständige Bibliothek. Eine unbekannte Funktion ergibt in einer Formelspalte `#ERR` und lässt in einem Filter die Notiz weg.
-- **Keine Lambdas** und keine `map`/`filter`-Operationen auf Listen.
-- Nicht unterstützte Datei-Felder: `file.size`, `file.backlinks`, `file.embeds`.
-- **Listen mit einem Eintrag:** Der Index liefert jede Property als Liste, ein einzelner Wert und eine Ein-Element-Liste sind dort nicht zu unterscheiden. Nur `tags`, `aliases`, `cssclasses`, `file.tags` und `file.links` gelten immer als Liste; bei jeder anderen Property wird eine Liste mit genau einem Eintrag wie ein einzelner Wert behandelt (`.contains()` prüft dann Text statt Listenelement).
+- **Keine Lambdas** und keine `map`/`filter`-Operationen auf Listen (das gilt auch für eigene `summaries` per Formel).
+- Nicht unterstützt: `file.embeds`. `file.size` und `file.backlinks` werden dagegen unterstützt.
 
-**Formeln und Zusammenfassungen**
-- Formelspalten sind **schreibgeschützt** und lassen sich **nicht sortieren** (die Sortierung greift nur für Properties, `file.name`, `file.ctime`, `file.mtime`).
-- **`summaries` werden nicht berechnet:** Der Block wird gelesen und beim Speichern unverändert erhalten, eine Zusammenfassungszeile erscheint aber nicht.
+**Listen vs. Einzelwerte**
+- Der Index liefert jede Property als Liste. Eine Property, die in deinem Vault **irgendwo mehrere Werte** hat — oder in der Property-Typ-Registry als Liste/Tags deklariert ist — wird auch mit nur einem Wert als Liste behandelt. Nur bei einer Property, die nirgends als Liste auftaucht und nicht so deklariert ist, wird eine Ein-Element-Liste wie ein Einzelwert gelesen.
 
-**Ansichten**
-- Eingebaut sind nur **Tabelle** und **Karten**; alles andere braucht ein Plugin. Die Plugin-Ansichten laufen ausschließlich im Browser, nicht auf dem Server.
-- Eine Base lässt sich **nicht als Codeblock in eine Notiz einbetten**, nur als eigene `.base`-Datei öffnen.
-- Der Obsidian-Befehl „Eintrag zur Base hinzufügen" (`bases:add-item`) fehlt: Neue Notizen legst du selbst an; sie erscheinen, sobald sie den Filter erfüllen.
+**Ansichten und Einbettung**
+- Eingebaut sind **Tabelle** und **Karten**; andere Ansichtstypen brauchen ein Plugin, und Plugin-Ansichten laufen nur im Browser, nicht auf dem Server.
+- Eine Base lässt sich **als eigene `.base`-Datei öffnen oder per `![[…]]` einbetten** (schreibgeschützte Tabelle). Ein Einbetten als Codeblock innerhalb einer Notiz gibt es nicht.
 
 **KI-Zugriff über MCP**
-- Das Werkzeug `query_base` wertet eine `.base` serverseitig mit derselben Engine aus ([[Fortgeschritten/MCP Context Server|MCP-Schnittstelle]] für KI-Clients). Es hat dieselbe 1000er-Grenze, liefert standardmäßig 100 Zeilen (maximal 1000) und gibt Formelwerte als Text zurück. `total` ist die Zeilenzahl der Ansicht (nach deren eigenem `limit`), `truncated` zeigt nur, ob das `limit` des Aufrufs weitere Zeilen abgeschnitten hat.
+- Das Werkzeug `query_base` wertet eine `.base` serverseitig mit derselben Engine aus ([[Fortgeschritten/MCP Context Server|MCP-Schnittstelle]] für KI-Clients), inklusive der `summaries`. Es liefert standardmäßig 100 Zeilen (maximal 1000) und gibt Formelwerte als Text zurück.
 
 ---
 
 ## Praxisbeispiel
 
-Dieser Vault bringt ein fertiges Beispiel mit: [[Features/Beispiel-Aufgaben (Base)]]. Es filtert eine kleine Menge Aufgaben-Notizen mit `file.inFolder(...)` und `type == "task"` und zeigt eine Formel-Spalte „Tage übrig". Öffne es, dann:
+Dieser Vault bringt zwei fertige Beispiele mit, die auf denselben Aufgaben-Notizen arbeiten:
 
-1. Bearbeite eine `status`-Zelle direkt in der Tabelle — die Änderung landet in der Frontmatter der Notiz.
-2. Klick auf den Spalten-Header **Priorität**, um zu sortieren.
-3. Öffne den Rohquellen-Modus, um das YAML hinter der Tabelle zu sehen.
+- [[Features/Beispiel-Aufgaben (Base)]] — eine **Tabelle** mit Filter, Formel-Spalte „Tage übrig", der Aufwands-Spalte und einer **Zusammenfassungszeile** (Anzahl, Summe des Aufwands, Durchschnitt der Resttage).
+- [[Features/Beispiel-Board (Base)]] — ein **Karten-Board**, nach `status` gruppiert, mit einer Summary-Leiste über den Spalten.
+
+Öffne die Tabelle, dann:
+
+1. Bearbeite eine `status`-Zelle direkt in der Tabelle — die Änderung landet in der Frontmatter der Notiz, und die Summary-Zeile rechnet neu.
+2. Klick auf den Spalten-Header **Tage übrig** (eine Formel-Spalte), um clientseitig danach zu sortieren.
+3. Öffne den Rohquellen-Modus, um das YAML samt `summaries`-Block zu sehen.
+4. Öffne das Board und zieh eine Karte in eine andere Status-Spalte.
 
 ---
 
 > [!todo] Übung
 > 1. Öffne die Beispiel-Base und ändere den `status` einer Notiz aus der Tabelle heraus.
-> 2. Lege eine neue Notiz mit `type: task`, `status` und `priority` im Ordner der Beispiel-Aufgaben an — sie sollte als neue Zeile erscheinen.
+> 2. Führe **„Bases: Add item"** aus, während die Base geöffnet ist — eine neue Aufgaben-Notiz sollte im richtigen Ordner entstehen und als Zeile erscheinen.
 > 3. Führe **„Neue Base erstellen"** aus und baue eine kleine eigene Base mit dem Filter `file.hasTag("features")`.
-> 4. Füge eine zweite Ansicht `type: cards` mit `groupBy: { property: status }` hinzu und ziehe eine Karte in eine andere Spalte.
+> 4. Füge eine `summaries`-Zeile mit `estimate: Sum` hinzu und bette die Base per `![[…]]` in eine andere Notiz ein.
 
 ---
 

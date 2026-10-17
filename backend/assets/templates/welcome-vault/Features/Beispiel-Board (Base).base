@@ -1,0 +1,24 @@
+filters:
+  and:
+    - file.inFolder("Features/Beispiel-Aufgaben")
+    - 'type == "task"'
+properties:
+  file.name:
+    displayName: "Aufgabe"
+  priority:
+    displayName: "Priorität"
+  estimate:
+    displayName: "Aufwand (h)"
+views:
+  - type: cards
+    name: "Nach Status"
+    groupBy:
+      property: status
+      direction: ASC
+    order:
+      - file.name
+      - priority
+      - estimate
+    summaries:
+      file.name: Count
+      estimate: Sum
