@@ -28,7 +28,7 @@ export interface EmbedNode extends Literal {
   heading: string | null
   blockRef: string | null
   display: string | null
-  embedType: 'image' | 'pdf' | 'audio' | 'video' | 'note'
+  embedType: 'image' | 'pdf' | 'audio' | 'video' | 'base' | 'note'
 }
 
 /**

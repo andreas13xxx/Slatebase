@@ -433,3 +433,22 @@
 .bases-kanban__chip-val {
   color: var(--text-primary);
 }
+
+/* ─── Embedded base (![[file.base]]) ───────────────────────────────────── */
+.bases-embed {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md, 6px);
+  overflow: auto;
+  max-height: 480px;
+  background: var(--bg-primary);
+  color: var(--text-normal);
+}
+
+.bases-embed--loading {
+  padding: var(--spacing-md);
+  color: var(--text-muted);
+}
+
+.cm-lp-embed-base {
+  margin: 0.5em 0;
+}

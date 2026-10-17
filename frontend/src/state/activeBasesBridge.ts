@@ -16,6 +16,14 @@ export interface ActiveBasesController {
    * spreadsheet). @returns false when no table is displayed or the clipboard write failed.
    */
   copyTable(): Promise<boolean>
+
+  /**
+   * Create a new note in the base's scope (target folder from a `file.inFolder`
+   * filter, else vault root; frontmatter keys from the displayed properties,
+   * left blank) so it appears as a new row. @returns the new note's path, or
+   * null when the base is unparsable or the note could not be created.
+   */
+  addItem(): Promise<string | null>
 }
 
 let activeController: ActiveBasesController | null = null

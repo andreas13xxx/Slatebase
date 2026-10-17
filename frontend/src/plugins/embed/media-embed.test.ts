@@ -52,6 +52,11 @@ describe('detectEmbedType — audio/video extensions', () => {
       expect(detectEmbedType('data.json')).toBe('note')
       expect(detectEmbedType('file')).toBe('note')
     })
+
+    it('recognises .base as a base embed', () => {
+      expect(detectEmbedType('Tasks.base')).toBe('base')
+      expect(detectEmbedType('folder/My Tasks.BASE')).toBe('base')
+    })
   })
 })
 

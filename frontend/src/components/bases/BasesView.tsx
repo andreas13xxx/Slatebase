@@ -29,6 +29,7 @@ import { BasesTableView } from './BasesTableView'
 import { BasesKanbanView } from './BasesKanbanView'
 import { BasesSourceView } from './BasesSourceView'
 import { BasesPluginViewHost } from './BasesPluginViewHost'
+import { deriveBaseScopeFolder, buildBlankFrontmatter, resolveNewNotePath } from './base-add-item'
 
 export interface BasesViewProps {
   apiClient: IApiClient
@@ -200,10 +201,29 @@ export const BasesView = memo(function BasesView({
           return false
         }
       },
+      addItem: async () => {
+        if (!doc) return null
+        const view = doc.views[safeIndex]
+        const folder = deriveBaseScopeFolder(doc, view)
+        const columns = (view?.order ?? Object.keys(doc.properties ?? {})).filter(
+          (c) => !c.startsWith('file.') && !c.startsWith('formula.') && !(doc.formulas && c in doc.formulas),
+        )
+        const frontmatter = buildBlankFrontmatter(columns, doc, view)
+        const baseName = 'Unbenannt'
+        try {
+          // Resolve a non-colliding file name under the target folder.
+          const path = await resolveNewNotePath(apiClient, vaultId, folder, baseName)
+          await apiClient.saveFile(vaultId, path, frontmatter)
+          onOpenNote(path)
+          return path
+        } catch {
+          return null
+        }
+      },
     }
     setActiveBasesController(controller)
     return () => clearActiveBasesController(controller)
-  }, [views.length, safeIndex, doc, readOnly, onSaveSource])
+  }, [views.length, safeIndex, doc, readOnly, onSaveSource, apiClient, vaultId, onOpenNote])
 
   // Stable callback for the plugin host to report a render/query failure.
   const handlePluginViewError = useCallback((message: string) => {
