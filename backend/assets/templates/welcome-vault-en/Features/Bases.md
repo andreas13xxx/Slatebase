@@ -21,7 +21,7 @@ Think of it as a saved, structured view over your notes — the database layer t
 | **`properties`** | Display names of the columns |
 | **`formulas`** | Calculated columns (read-only), e.g. days until a deadline |
 | **`views`** | One or more named views: **table** or **cards** (Kanban), each with its own column order, sort, filter and `limit` |
-| **`summaries`** | Per-column summaries — read and preserved on save, but not computed yet (see limits) |
+| **`summaries`** | Per-column summaries (sum, count, average, min/max …) — under the table or in the Kanban header |
 
 ---
 
@@ -86,11 +86,38 @@ formulas:
 
 ---
 
+## Summaries (`summaries`)
+
+Each column can show a summary over the displayed rows. It lives under the view's `summaries:` as `column: function` and appears as a row under the table, or as a bar above the Kanban board.
+
+```yaml
+views:
+  - type: table
+    name: Tasks
+    order: [file.name, status, estimate]
+    summaries:
+      file.name: Count
+      estimate: Sum
+```
+
+Built-in functions (as in Obsidian):
+
+| Applies to | Functions |
+|------------|-----------|
+| All types | `Count`, `Empty`, `Filled`, `Unique` |
+| Numbers | `Sum`, `Average`, `Min`, `Max`, `Median`, `Range`, `Stddev` |
+| Dates | `Earliest`, `Latest`, `Range` |
+| Checkbox | `Checked`, `Unchecked` |
+
+A numeric function on a non-numeric column yields an empty value, not an error. Custom summaries written as a formula over `values` (lambdas) are not implemented.
+
+---
+
 ## Editing in the table
 
 Property cells are editable inline, using the same typed controls as the [[Features/Tags and Properties|Properties editor]] — text, number, date, checkbox, list/tags. A change goes straight into the note's frontmatter. Formula columns are read-only.
 
-Click a column header to sort; the sort is written back into the `.base` file.
+Click a column header to sort; the sort is written back into the `.base` file. This also works for formula columns — they are sorted after loading by their computed values.
 
 ---
 
@@ -122,48 +149,58 @@ Other view types come from Obsidian plugins.
 
 ---
 
+## Embedding a base and adding items
+
+- **Embed:** write `![[My Base.base]]` in a note. In reading mode and Live Preview the base renders as a read-only table inside the note — handy for a dashboard that shows several bases side by side.
+- **Add an item:** run **"Bases: Add item"** from the [[Features/Command Palette|Command Palette]] while a base is open. Slatebase creates a new note in the base's scope — the target folder comes from a `file.inFolder(...)` filter (else the vault root), and the displayed properties are prepared as blank frontmatter fields (a `property == "x"` filter pre-fills the value). The note opens and appears as a new row.
+
+---
+
 ## Limits and gaps
 
 So nothing surprises you:
 
 **Data volume**
-- Each query returns **at most 1000 notes** from the index as candidates (in the view's sort order); filtering happens afterwards. In very large vaults a base can therefore miss matches beyond those 1000 — even a filter like `file.inFolder(...)` does not shrink that pool, because it only applies afterwards.
+- Each query examines **up to 5000 notes** from the index as candidates. Where possible, Slatebase pushes the cheaply-checkable parts of your filter (property equality, `file.hasTag`, `file.inFolder`) **ahead of** that cap, so it rarely reaches real matches. If it is exceeded anyway, the view shows a visible "result truncated" notice — never a silent cut.
 
 **Expression language**
 - This is a **pragmatic subset** of Obsidian's functions (see the lists above), not the full library. An unknown function yields `#ERR` in a formula column and drops the note in a filter.
-- **No lambdas** and no `map`/`filter` operations on lists.
-- Unsupported file fields: `file.size`, `file.backlinks`, `file.embeds`.
-- **One-element lists:** the index hands over every property as a list, so a single value and a one-element list cannot be told apart. Only `tags`, `aliases`, `cssclasses`, `file.tags` and `file.links` are always lists; for any other property a list with exactly one entry is treated like a single value (`.contains()` then checks text, not a list element).
+- **No lambdas** and no `map`/`filter` operations on lists (this also means custom `summaries` written as a formula).
+- Unsupported: `file.embeds`. `file.size` and `file.backlinks` ARE supported.
 
-**Formulas and summaries**
-- Formula columns are **read-only** and **cannot be sorted** (sorting only works for properties, `file.name`, `file.ctime`, `file.mtime`).
-- **`summaries` are not computed:** the block is read and preserved unchanged on save, but no summary row is shown.
+**Lists vs. single values**
+- The index hands over every property as a list. A property that has **more than one value somewhere** in your vault — or is declared as a list/tags in the property-type registry — is treated as a list even with a single value. Only for a property that never appears as a list and is not declared one is a one-element list read like a single value.
 
-**Views**
-- Only **table** and **cards** are built in; anything else needs a plugin. Plugin views run in the browser only, never on the server.
-- A base **cannot be embedded as a code block in a note**, only opened as its own `.base` file.
-- Obsidian's "add item to base" command (`bases:add-item`) is missing: create new notes yourself; they appear as soon as they match the filter.
+**Views and embedding**
+- Only **table** and **cards** are built in; other view types need a plugin, and plugin views run in the browser only, never on the server.
+- A base can be **opened as its own `.base` file or embedded via `![[…]]`** (a read-only table). There is no embedding as a code block inside a note.
 
 **AI access via MCP**
-- The `query_base` tool evaluates a `.base` server-side with the same engine ([[Advanced/MCP Context Server|MCP interface]] for AI clients). It has the same 1000-note limit, returns 100 rows by default (maximum 1000) and returns formula values as text. `total` is the number of rows the view shows (after its own `limit`); `truncated` only says whether the call's `limit` cut further rows.
+- The `query_base` tool evaluates a `.base` server-side with the same engine ([[Advanced/MCP Context Server|MCP interface]] for AI clients), including its `summaries`. It returns 100 rows by default (maximum 1000) and returns formula values as text.
 
 ---
 
 ## Worked example
 
-This vault ships a ready-made example: [[Features/Example Tasks (Base)]]. It filters a small set of task notes with `file.inFolder(...)` and `type == "task"` and shows a "Days left" formula column. Open it, then:
+This vault ships two ready-made examples that work on the same task notes:
 
-1. Edit a `status` cell directly in the table — the change lands in the note's frontmatter.
-2. Click the **Priority** column header to sort.
-3. Open raw-source mode to see the YAML behind the table.
+- [[Features/Example Tasks (Base)]] — a **table** with a filter, a "Days left" formula column, the estimate column and a **summary row** (count, sum of estimate, average of days left).
+- [[Features/Example Board (Base)]] — a **card board** grouped by `status`, with a summary bar above the columns.
+
+Open the table, then:
+
+1. Edit a `status` cell directly in the table — the change lands in the note's frontmatter and the summary row recomputes.
+2. Click the **Days left** column header (a formula column) to sort by it client-side.
+3. Open raw-source mode to see the YAML, including the `summaries` block.
+4. Open the board and drag a card to another status column.
 
 ---
 
 > [!todo] Exercise
 > 1. Open the example base and change a note's `status` from the table.
-> 2. Create a new note with `type: task`, `status` and `priority` in the example tasks folder — it should appear as a new row.
+> 2. Run **"Bases: Add item"** while the base is open — a new task note should be created in the right folder and appear as a row.
 > 3. Run **"Create new Base"** and build a small base of your own with the filter `file.hasTag("features")`.
-> 4. Add a second view `type: cards` with `groupBy: { property: status }` and drag a card to another column.
+> 4. Add a `summaries` row with `estimate: Sum` and embed the base in another note with `![[…]]`.
 
 ---
 

@@ -114,6 +114,47 @@ describe('filters over formulas, lists and file fields', () => {
   })
 })
 
+describe('file.size and file.backlinks (R4)', () => {
+  it('resolves file.size as a number in a filter', () => {
+    const rows = [wire('a.md', {}, { size: 5000 }), wire('b.md', {}, { size: 100 })]
+    const d: BaseDocument = { filters: 'file.size > 1000', views: [] }
+    expect(filterRows(rows, d, { type: 'table' }).rows.map((r) => r.path)).toEqual(['a.md'])
+  })
+
+  it('resolves file.size in a formula', () => {
+    const rows = [wire('a.md', {}, { size: 2048 })]
+    const d: BaseDocument = { formulas: { kb: 'file.size / 1024' }, filters: 'formula.kb == 2', views: [] }
+    expect(filterRows(rows, d, { type: 'table' }).rows.map((r) => r.path)).toEqual(['a.md'])
+  })
+
+  it('resolves file.backlinks as a list (length + contains)', () => {
+    const rows = [
+      wire('a.md', {}, { backlinks: ['x.md', 'y.md'] }),
+      wire('b.md', {}, { backlinks: ['x.md'] }),
+      wire('c.md', {}, {}),
+    ]
+    expect(
+      filterRows(rows, { filters: 'file.backlinks.length >= 2', views: [] }, { type: 'table' }).rows.map((r) => r.path),
+    ).toEqual(['a.md'])
+    expect(
+      filterRows(rows, { filters: 'file.backlinks.contains("x.md")', views: [] }, { type: 'table' }).rows.map((r) => r.path),
+    ).toEqual(['a.md', 'b.md'])
+  })
+
+  it('keeps file.backlinks a list even with a single entry', () => {
+    const rows = [wire('b.md', {}, { backlinks: ['x.md'] })]
+    expect(
+      filterRows(rows, { filters: 'file.backlinks.length == 1', views: [] }, { type: 'table' }).rows.map((r) => r.path),
+    ).toEqual(['b.md'])
+  })
+
+  it('declares referenced file.* columns in the query spec', () => {
+    const d: BaseDocument = { filters: 'file.size > 0', views: [] }
+    const spec = buildQuerySpec(d, { type: 'table', order: ['file.size'] })
+    expect(spec.fileColumns).toContain('file.size')
+  })
+})
+
 describe('evaluateFormulaColumn', () => {
   const row: BaseRow = { path: 'a.md', fileName: 'a', values: { price: 4 } }
 
@@ -135,5 +176,40 @@ describe('evaluateFormulaColumn', () => {
 
   it('reports an unknown formula id', () => {
     expect(evaluateFormulaColumn({ views: [] }, row, 'nope').ok).toBe(false)
+  })
+})
+
+describe('property-type list keys (R2)', () => {
+  // A property declared/observed as a list stays a list even with one value,
+  // instead of being unwrapped to a scalar by the one-element heuristic.
+  it('keeps a one-element value a list when the key is in listKeys', () => {
+    const rows = [wire('a.md', { authors: ['Ada'] })]
+    const d: BaseDocument = { filters: 'authors.length == 1', views: [] }
+    // Without listKeys the single value is a scalar: .length would be the
+    // string length (3), so the filter fails.
+    expect(filterRows(rows, d, { type: 'table' }).rows).toEqual([])
+    // With listKeys it is a one-element list: .length == 1 matches.
+    expect(filterRows(rows, d, { type: 'table' }, false, ['authors']).rows.map((r) => r.path)).toEqual(['a.md'])
+  })
+
+  it('honours listKeys in a formula too, not only filters', () => {
+    const rows = [wire('a.md', { authors: ['Ada'] })]
+    const d: BaseDocument = { formulas: { n: 'authors.length' }, filters: 'formula.n == 1', views: [] }
+    expect(filterRows(rows, d, { type: 'table' }, false, ['authors']).rows.map((r) => r.path)).toEqual(['a.md'])
+  })
+
+  it('leaves a scalar a scalar even when another key is a list key', () => {
+    const rows = [wire('a.md', { title: ['Hello'], authors: ['Ada', 'Bob'] })]
+    // title is NOT in listKeys → stays scalar; contains works as substring.
+    const d: BaseDocument = { filters: 'title.contains("ell")', views: [] }
+    expect(filterRows(rows, d, { type: 'table' }, false, ['authors']).rows.map((r) => r.path)).toEqual(['a.md'])
+  })
+
+  it('is unchanged for an untyped vault (no listKeys) — regression', () => {
+    const rows = [wire('a.md', { status: ['open'] })]
+    // One-element value reads as a scalar exactly as before.
+    const d: BaseDocument = { filters: 'status == "open"', views: [] }
+    expect(filterRows(rows, d, { type: 'table' }).rows.map((r) => r.path)).toEqual(['a.md'])
+    expect(filterRows(rows, d, { type: 'table' }, false, []).rows.map((r) => r.path)).toEqual(['a.md'])
   })
 })

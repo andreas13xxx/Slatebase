@@ -31,7 +31,7 @@ Specs gebündelt statt einzeln spezifiziert.
 
 > **Zurückgestellte Reste ausgelieferter Features** (nicht in der Summe oben, siehe eigenen
 > Abschnitt unten): Split-Panes — gespeicherte, benannte Workspace-Layouts + Workspace-Switcher;
-> Bases — `summaries`-Aggregation, `bases:insert`/`bases:add-item`, erweiterte Ausdruckssprache.
+> Bases — nur noch die erweiterte Ausdruckssprache (Lambdas/`map`/`filter`, custom `summaries`-Formeln, `file.embeds`); R1–R7 der Spec `bases-feature-completion` sind umgesetzt.
 
 ## Abhängigkeiten
 
@@ -188,9 +188,14 @@ Spec: `.kiro/specs/bases/` (+ `bases-plugin-api/`, `bases-expression-language/`)
 Ausdrucks-Engine für Filter und Formeln (in `shared-contracts/`), editierbare Tabellen-View,
 Karten-/Kanban-View inkl. Drag zwischen Spalten, Feature-Toggle `bases` (cold/default-aus),
 Plugin-API `registerBasesView()`, MCP-Werkzeug `query_base`, Welcome-Vault-Guides DE/EN.
-**Zurückgestellt:** `summaries`-Aggregation (Spec 6.2), `bases:insert`/`bases:add-item`,
-`file.size`/`file.backlinks`/`file.embeds`, Lambdas/`map`/`filter` in der Ausdruckssprache,
-sortierbare Formelspalten; Kandidaten-Obergrenze von 1000 Zeilen (Filter läuft erst danach).
+**Umgesetzt (Spec `bases-feature-completion`, R1–R7):** Kandidaten-Obergrenze auf 5000 angehoben
+mit konservativem Prädikat-Pushdown (Property-Gleichheit/`file.hasTag`/`file.inFolder` vor der
+Kappung) + sichtbarem `truncated`-Hinweis; Property-Typ Liste/Skalar (beobachtet + Registry);
+`summaries`-Aggregation (Tabelle, Kanban-Header, MCP); `file.size`/`file.backlinks`; `bases:insert`
+(`![[file.base]]`-Embed) + `bases:add-item`; sortierbare Formelspalten (clientseitig); Welcome-Vault-
+Guides + Beispiele DE/EN erweitert.
+**Noch zurückgestellt:** Lambdas/`map`/`filter` in der Ausdruckssprache, custom `summaries`-Formeln
+über `values`, `file.embeds` (bräuchte getrennte Embed-Markierung im Index).
 Plugin-Views laufen nur im Browser (Architekturgrenze, kein Serverpfad).
 
 ---

@@ -10,6 +10,7 @@ import { createWikilinkRegex, resolveWikilinkMatchTarget } from './link-decorati
 import { DEFAULT_KEYBINDINGS, matchesShortcut } from '../../state/keybindingsStore'
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
 import { ViewMode } from '../../components/ViewMode'
+import { BasesEmbed, type IBasesEmbedApiClient } from '../../components/bases/BasesEmbed'
 import type { DirectoryTree } from '../../types'
 import { errorOnce } from '../../plugins/compat/log'
 import { findEmbedCreatorForTarget, getLinktextExtension, mountRegisteredEmbed, type EmbedComponent, type EmbedContext } from '../../plugins/compat/embed-registry'
@@ -63,6 +64,8 @@ export interface WidgetDecorationOptions {
   typeRegistry?: PropertyTypeEntry[] | null
   /** Callback to persist an explicit type choice for a property key to the vault's type registry. */
   onPropertyTypeChange?: (key: string, type: PropertyType) => void
+  /** API client, for the embedded Bases view (`![[file.base]]`) to query the vault. */
+  apiClient?: IBasesEmbedApiClient | null
 }
 
 /**
@@ -128,7 +131,7 @@ function addStandaloneLineTightening(
 // ---------------------------------------------------------------------------
 
 /** What kind of inline preview an embed target gets in Live Preview. */
-type EmbedKind = 'image' | 'pdf' | 'audio' | 'video' | 'note'
+type EmbedKind = 'image' | 'pdf' | 'audio' | 'video' | 'base' | 'note'
 
 /**
  * Widget for inline image/PDF/note embed previews.
@@ -159,6 +162,7 @@ class EmbedWidget extends WidgetType {
   private readonly display: string | null
   private readonly heading: string | null
   private readonly directoryTree: DirectoryTree | null
+  private readonly apiClient: IBasesEmbedApiClient | null
   private objectUrl: string | null = null
   private reactRoot: Root | null = null
   private pluginEmbed: EmbedComponent | null = null
@@ -170,7 +174,8 @@ class EmbedWidget extends WidgetType {
     kind: EmbedKind,
     display: string | null,
     heading: string | null,
-    directoryTree: DirectoryTree | null
+    directoryTree: DirectoryTree | null,
+    apiClient: IBasesEmbedApiClient | null = null
   ) {
     super()
     this.filename = filename
@@ -180,6 +185,7 @@ class EmbedWidget extends WidgetType {
     this.display = display
     this.heading = heading
     this.directoryTree = directoryTree
+    this.apiClient = apiClient
   }
 
   /**
@@ -218,6 +224,10 @@ class EmbedWidget extends WidgetType {
 
     if (this.kind === 'video') {
       return this.buildVideoDOM()
+    }
+
+    if (this.kind === 'base') {
+      return this.buildBaseDOM()
     }
 
     return this.buildNoteDOM()
@@ -294,6 +304,36 @@ class EmbedWidget extends WidgetType {
     source.src = this.buildRawSrc()
     video.appendChild(source)
     return video
+  }
+
+  /**
+   * Builds an embedded Bases view (`![[file.base]]`): resolves the target,
+   * then mounts the read-only BasesEmbed React component in a nested root.
+   * The apiClient is passed explicitly because this detached root has no
+   * AppContext provider above it.
+   */
+  private buildBaseDOM(): HTMLElement {
+    const container = document.createElement('div')
+    container.className = 'cm-lp-embed-base'
+
+    const resolvedPath = resolveWikilinkTarget(this.filename, this.directoryTree)
+    if (!resolvedPath) {
+      container.classList.add('cm-lp-embed-note--missing')
+      container.textContent = `Base nicht gefunden: ${this.filename}`
+      return container
+    }
+
+    this.reactRoot = createRoot(container)
+    this.reactRoot.render(
+      createElement(BasesEmbed, {
+        vaultId: this.vaultId,
+        filePath: resolvedPath,
+        target: this.filename,
+        onOpenNote: () => { /* navigation is handled by the editor host */ },
+        apiClient: this.apiClient,
+      })
+    )
+    return container
   }
 
   /**
@@ -1749,6 +1789,7 @@ export function buildWidgetDecorations(
               PDF_EXTENSIONS.has(ext) ? 'pdf' :
               AUDIO_EXTENSIONS.has(ext) ? 'audio' :
               VIDEO_EXTENSIONS.has(ext) ? 'video' :
+              ext === 'base' ? 'base' :
               'note'
 
             const widget = new EmbedWidget(
@@ -1758,7 +1799,8 @@ export function buildWidgetDecorations(
               kind,
               display,
               heading,
-              options.directoryTree ?? null
+              options.directoryTree ?? null,
+              options.apiClient ?? null
             )
 
             // Replace the ![[...]] syntax with the widget

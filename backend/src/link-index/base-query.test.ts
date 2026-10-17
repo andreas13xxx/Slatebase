@@ -138,6 +138,18 @@ describe('LinkIndexService.queryForBase', () => {
     expect(result.rows).toHaveLength(2)
   })
 
+  it('flags truncated when matches exceed the limit', async () => {
+    await setupVault()
+    const result = await service.queryForBase({ filters: { property: 'type', op: 'eq', value: 'task' }, columns: [], limit: 2 })
+    expect(result.truncated).toBe(true)
+  })
+
+  it('does not flag truncated when all matches fit', async () => {
+    await setupVault()
+    const result = await service.queryForBase({ filters: { property: 'type', op: 'eq', value: 'task' }, columns: [], limit: 10 })
+    expect(result.truncated).toBe(false)
+  })
+
   it('populates file-metadata fields (ext/folder/tags) on each row', async () => {
     await setupVault()
     const result = await service.queryForBase({ filters: { path: 'Tasks/a.md' }, columns: [] })
@@ -153,5 +165,74 @@ describe('LinkIndexService.queryForBase', () => {
     const result = await service.queryForBase({ filters: { path: 'note.md' }, columns: [] })
     expect(result.rows).toHaveLength(1)
     expect(result.rows[0]!.folder).toBe('')
+  })
+
+  describe('observed list keys (R2)', () => {
+    it('reports a property observed with two or more values as a list key', async () => {
+      await fs.writeFile(
+        path.join(tempDir, 'multi.md'),
+        '---\nauthors: [Ada, Bob]\nstatus: open\n---\n# Multi',
+      )
+      await service.rebuild()
+      const result = await service.queryForBase({ columns: [] })
+      expect(result.listKeys).toContain('authors')
+      // A single-valued scalar property is NOT reported as a list key.
+      expect(result.listKeys).not.toContain('status')
+    })
+
+    it('omits listKeys entries when no property has multiple values', async () => {
+      await fs.writeFile(path.join(tempDir, 'solo.md'), '---\nstatus: open\n---\n# Solo')
+      await service.rebuild()
+      const result = await service.queryForBase({ columns: [] })
+      expect(result.listKeys).toEqual([])
+    })
+
+    it('invalidates the cached list keys after a mutation adds a multi-value property', async () => {
+      await fs.writeFile(path.join(tempDir, 'note.md'), '---\nstatus: open\n---\n# Note')
+      await service.rebuild()
+      // First query: no multi-value property yet.
+      expect((await service.queryForBase({ columns: [] })).listKeys).not.toContain('authors')
+      // A mutation introduces a two-value property; the memo must be invalidated.
+      await service.updateFile('note.md', '---\nauthors: [Ada, Bob]\nstatus: open\n---\n# Note')
+      expect((await service.queryForBase({ columns: [] })).listKeys).toContain('authors')
+    })
+
+    it('returns a fresh listKeys array so a caller mutating it cannot corrupt the cache', async () => {
+      await fs.writeFile(path.join(tempDir, 'multi.md'), '---\nauthors: [Ada, Bob]\n---\n# Multi')
+      await service.rebuild()
+      const first = await service.queryForBase({ columns: [] })
+      // The route layer unions declared keys into this array in place.
+      first.listKeys!.push('injected-by-route')
+      const second = await service.queryForBase({ columns: [] })
+      expect(second.listKeys).toContain('authors')
+      expect(second.listKeys).not.toContain('injected-by-route')
+    })
+  })
+
+  describe('file.size and file.backlinks (R4)', () => {
+    it('populates file.size when requested via fileColumns', async () => {
+      await fs.writeFile(path.join(tempDir, 'big.md'), '---\ntype: note\n---\n# Big\n' + 'x'.repeat(2000))
+      await service.rebuild()
+      const result = await service.queryForBase({ columns: [], fileColumns: ['file.size'] })
+      const row = result.rows.find((r) => r.path === 'big.md')!
+      expect(row.size).toBeGreaterThan(2000)
+    })
+
+    it('does NOT stat for size when file.size is not referenced', async () => {
+      await fs.writeFile(path.join(tempDir, 'plain.md'), '---\ntype: note\n---\n# Plain')
+      await service.rebuild()
+      const result = await service.queryForBase({ columns: [] })
+      const row = result.rows.find((r) => r.path === 'plain.md')!
+      expect(row.size).toBeUndefined()
+    })
+
+    it('populates backlinks from the reverse map (always, cheap)', async () => {
+      await fs.writeFile(path.join(tempDir, 'target.md'), '# Target')
+      await fs.writeFile(path.join(tempDir, 'source.md'), '# Source\n[[target]]')
+      await service.rebuild()
+      const result = await service.queryForBase({ columns: [] })
+      const target = result.rows.find((r) => r.path === 'target.md')!
+      expect(target.backlinks).toContain('source.md')
+    })
   })
 })

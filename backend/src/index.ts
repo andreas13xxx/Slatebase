@@ -899,6 +899,7 @@ app.route('/api/v1', propertyRoutes)
 // Bases query routes (feature-gated on `bases`; vault auth via shared middleware)
 const basesRoutes = createBasesRoutes({
   linkIndexResolver: (vaultId: string) => linkIndexCache.getAsync(vaultId),
+  propertyTypeService: propertyTypeStore,
   logger,
 })
 app.route('/api/v1', basesRoutes)

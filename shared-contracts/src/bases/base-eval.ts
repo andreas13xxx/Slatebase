@@ -11,6 +11,7 @@ import type { BaseDocument, BaseFilterNode, BaseRow, BaseView, BaseQuerySpecWire
 import { evaluateCondition, evaluateFormula, collectExpressionRefs } from './formula/evaluator.js'
 import type { FormulaContext, FormulaResult } from './formula/evaluator.js'
 import type { FormulaValue } from './formula/functions.js'
+import { buildCombinedPrefilter } from './prefilter.js'
 
 // ─── Filter column collection ──────────────────────────────────────────────────
 
@@ -62,6 +63,20 @@ export function buildQuerySpec(doc: BaseDocument, view: BaseView): BaseQuerySpec
       .map((s) => (s.direction ? { column: s.column, direction: s.direction } : { column: s.column }))
     if (serverSort.length > 0) spec.sort = serverSort
   }
+
+  // Conservative structured prefilter: a necessary-condition subset of the
+  // document + view filters, so the backend narrows candidates before its row
+  // cap. The full expression filter still runs client-side in `filterRows`.
+  const prefilter = buildCombinedPrefilter(doc.filters, view.filters)
+  if (prefilter !== null) spec.filters = prefilter
+
+  // file.* pseudo-columns referenced anywhere (columns/filters/formulas/sort),
+  // so the backend knows whether a stat() for file.size is worth doing.
+  const fileColumns = new Set<string>()
+  for (const id of wanted) if (id.startsWith('file.')) fileColumns.add(id)
+  for (const s of view.sort ?? []) if (s.column.startsWith('file.')) fileColumns.add(s.column)
+  if (fileColumns.size > 0) spec.fileColumns = Array.from(fileColumns)
+
   return spec
 }
 
@@ -73,12 +88,18 @@ export function buildQuerySpec(doc: BaseDocument, view: BaseView): BaseQuerySpec
  * these keys are therefore never unwrapped (`tags.contains(..)` must behave the
  * same for one tag and for two).
  */
-const LIST_KEYS: ReadonlySet<string> = new Set(['tags', 'aliases', 'cssclasses', 'file.tags', 'file.links'])
+const LIST_KEYS: ReadonlySet<string> = new Set(['tags', 'aliases', 'cssclasses', 'file.tags', 'file.links', 'file.backlinks'])
 
-/** Converts an index value to an expression value; one-element lists of other properties read as scalars. */
-function toExprValue(key: string, v: unknown): FormulaValue {
+/**
+ * Converts an index value to an expression value. A one-element list reads as a
+ * scalar UNLESS the key is a known list key — either a static Obsidian list key
+ * (`LIST_KEYS`) or one the backend reported for this vault (`extraListKeys`,
+ * from the property-type registry or observed multi-value form). This is what
+ * keeps a genuinely list-typed property with a single current value a list.
+ */
+function toExprValue(key: string, v: unknown, extraListKeys?: ReadonlySet<string>): FormulaValue {
   if (Array.isArray(v)) {
-    if (LIST_KEYS.has(key)) return v as FormulaValue[]
+    if (LIST_KEYS.has(key) || extraListKeys?.has(key)) return v as FormulaValue[]
     if (v.length === 0) return null
     if (v.length === 1) return v[0] as FormulaValue
     return v as FormulaValue[]
@@ -98,6 +119,7 @@ export function rowContext(row: BaseRow, doc?: BaseDocument): FormulaContext {
 
 function buildContext(row: BaseRow, doc: BaseDocument | undefined, active: ReadonlySet<string>): FormulaContext {
   const values = row.values
+  const listKeys = row.listKeys
   const tags = Array.isArray(values['file.tags']) ? (values['file.tags'] as string[]) : []
   const links = Array.isArray(values['file.links']) ? (values['file.links'] as string[]) : []
   const folder = typeof values['file.folder'] === 'string' ? (values['file.folder'] as string) : ''
@@ -111,9 +133,9 @@ function buildContext(row: BaseRow, doc: BaseDocument | undefined, active: Reado
       }
       if (name === 'file.name' || name === 'file.basename') return row.fileName
       if (name === 'file.path') return row.path
-      if (name.startsWith('file.')) return toExprValue(name, values[name])
+      if (name.startsWith('file.')) return toExprValue(name, values[name], listKeys)
       const key = name.startsWith('note.') ? name.slice('note.'.length) : name
-      return toExprValue(key, values[key] ?? values[name])
+      return toExprValue(key, values[key] ?? values[name], listKeys)
     },
     fileApi: {
       hasTag: (tag: string) => {
@@ -152,13 +174,19 @@ function matchesFilter(node: BaseFilterNode | undefined, ctx: FormulaContext): b
  * Maps the query route's wire rows to `BaseRow`s (file metadata folded into
  * `values` under `file.*`), keeps those passing BOTH the document filter and
  * the view filter, then applies the view `limit`. `total` is the match count
- * before the limit.
+ * before the limit. `truncated` propagates the backend's candidate-cap flag so
+ * the view can warn the result may be incomplete. `listKeys` (the backend's
+ * vault-wide list-property set) is attached to every row so the engine treats
+ * a one-element value for such a key as a list, not a scalar.
  */
 export function filterRows(
   wireRows: BaseQueryRowWire[],
   doc: BaseDocument,
   view: BaseView,
-): { rows: BaseRow[]; total: number } {
+  truncated?: boolean,
+  listKeys?: readonly string[],
+): { rows: BaseRow[]; total: number; truncated: boolean } {
+  const listKeySet = listKeys && listKeys.length > 0 ? new Set(listKeys) : undefined
   const allRows: BaseRow[] = wireRows.map((r) => {
     const values: Record<string, unknown> = { ...r.values }
     if (r.ctime !== undefined) values['file.ctime'] = r.ctime
@@ -167,7 +195,11 @@ export function filterRows(
     if (r.folder !== undefined) values['file.folder'] = r.folder
     if (r.tags !== undefined) values['file.tags'] = r.tags
     if (r.links !== undefined) values['file.links'] = r.links
-    return { path: r.path, fileName: r.fileName, values }
+    if (r.size !== undefined) values['file.size'] = r.size
+    if (r.backlinks !== undefined) values['file.backlinks'] = r.backlinks
+    return listKeySet
+      ? { path: r.path, fileName: r.fileName, values, listKeys: listKeySet }
+      : { path: r.path, fileName: r.fileName, values }
   })
 
   const matched = allRows.filter((row) => {
@@ -175,7 +207,7 @@ export function filterRows(
     return matchesFilter(doc.filters, ctx) && matchesFilter(view.filters, ctx)
   })
   const rows = view.limit !== undefined ? matched.slice(0, view.limit) : matched
-  return { rows, total: matched.length }
+  return { rows, total: matched.length, truncated: truncated ?? false }
 }
 
 // ─── Formula columns ────────────────────────────────────────────────────────

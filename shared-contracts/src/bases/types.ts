@@ -143,6 +143,12 @@ export interface BaseRow {
   fileName: string
   /** Raw property values keyed by property key. */
   values: Record<string, unknown>
+  /**
+   * Property keys known to be lists vault-wide (from the backend's registry +
+   * observed multi-value form). A one-element value for such a key stays a
+   * list instead of unwrapping to a scalar. Absent falls back to `LIST_KEYS`.
+   */
+  listKeys?: ReadonlySet<string>
 }
 
 // ─── Parse result ─────────────────────────────────────────────────────────────
@@ -167,14 +173,26 @@ export interface BaseQuerySortWire {
 }
 
 /**
- * Normalized query spec posted to `POST /vaults/:vaultId/bases/query`. Carries
- * no filters: the Obsidian filter expressions are evaluated by the caller
- * (`filterRows`), the backend only returns candidate rows.
+ * Normalized query spec posted to `POST /vaults/:vaultId/bases/query`. The rich
+ * Obsidian filter expressions are evaluated by the caller (`filterRows`); the
+ * backend only returns candidate rows. `filters` carries a CONSERVATIVE
+ * structured prefilter (a necessary-condition subset extracted from the
+ * expression filter, see `prefilter.ts`) so the backend can narrow candidates
+ * BEFORE its row cap applies — it never replaces the client-side filter.
  */
 export interface BaseQuerySpecWire {
   columns: string[]
   sort?: BaseQuerySortWire[]
   limit?: number
+  /** Conservative structured prefilter (backend `BaseQueryNode` shape). */
+  filters?: unknown
+  /**
+   * `file.*` pseudo-columns referenced by the base (column, sort, filter or
+   * formula), e.g. `file.size`. The backend derives these itself, but a stat()
+   * is only worth doing when actually referenced; `file.size` is the one that
+   * needs it. Cheap fields (`file.backlinks`) are always populated regardless.
+   */
+  fileColumns?: string[]
 }
 
 /** A single row returned by the backend query. */
@@ -191,6 +209,10 @@ export interface BaseQueryRowWire {
   tags?: string[] | undefined
   /** Internal link targets in the file (`file.links`), vault-relative. */
   links?: string[] | undefined
+  /** File size in bytes (`file.size`), when the base referenced it. */
+  size?: number | undefined
+  /** Vault-relative paths of files linking to this one (`file.backlinks`). */
+  backlinks?: string[] | undefined
   values: Record<string, string[]>
 }
 
@@ -198,4 +220,18 @@ export interface BaseQueryRowWire {
 export interface BaseQueryResultWire {
   rows: BaseQueryRowWire[]
   total: number
+  /**
+   * True when the backend hit its candidate-row cap, so `rows` may be missing
+   * matches. The view surfaces this so the result is never silently truncated.
+   */
+  truncated?: boolean
+  /**
+   * Property keys the backend knows to be LISTS vault-wide — either declared
+   * `list`/`tags`/`aliases` in the property-type registry, or observed with two
+   * or more values somewhere in the vault. The engine treats a one-element
+   * value for such a key as a list instead of unwrapping it to a scalar, so a
+   * genuinely list-typed property with a single current value still behaves as
+   * a list. Absent/empty falls back to the static `LIST_KEYS` heuristic.
+   */
+  listKeys?: string[]
 }

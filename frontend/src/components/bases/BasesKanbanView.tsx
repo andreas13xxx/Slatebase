@@ -17,7 +17,8 @@
 import { memo, useCallback, useMemo, useState } from 'react'
 import type { DragEvent } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import type { BaseDocument, BaseRow, BaseView } from '@slatebase/shared-contracts'
+import type { BaseDocument, BaseRow, BaseView, ComputedSummaries } from '@slatebase/shared-contracts'
+import { computeSummaries, formatFormulaValue } from '@slatebase/shared-contracts'
 
 export interface BasesKanbanViewProps {
   doc: BaseDocument
@@ -70,6 +71,17 @@ export const BasesKanbanView = memo(function BasesKanbanView({
   const columnLabel = useCallback(
     (col: string): string => doc.properties?.[col]?.displayName ?? col,
     [doc.properties],
+  )
+
+  // Overall (whole-board) summaries shown as a header bar. Per-group summaries
+  // are a marked follow-up (R3.3) — the table view carries per-column summaries.
+  const summaries: ComputedSummaries = useMemo(
+    () => computeSummaries(rows, view, doc),
+    [rows, view, doc],
+  )
+  const summaryEntries = useMemo(
+    () => Object.entries(summaries).map(([col, s]) => ({ col, ...s })),
+    [summaries],
   )
 
   const columns = useMemo<KanbanColumn[]>(() => {
@@ -164,8 +176,20 @@ export const BasesKanbanView = memo(function BasesKanbanView({
   }
 
   return (
-    <div className="bases-kanban" role="list" aria-label="Karten-Ansicht">
-      {columns.map((column) => {
+    <div className="bases-kanban-view">
+      {summaryEntries.length > 0 && (
+        <div className="bases-kanban__summary-bar" role="status">
+          {summaryEntries.map((s) => (
+            <span key={s.col} className="bases-kanban__summary">
+              <span className="bases-kanban__summary-col">{columnLabel(s.col)}</span>
+              <span className="bases-kanban__summary-label">{s.summary}</span>
+              <span className="bases-kanban__summary-value">{formatFormulaValue(s.value)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="bases-kanban" role="list" aria-label="Karten-Ansicht">
+        {columns.map((column) => {
         const isCollapsed = collapsed[column.key] ?? false
         const isDropTarget = draggable && dragOverKey === column.key && dragFromKey !== column.key
         return (
@@ -223,6 +247,7 @@ export const BasesKanbanView = memo(function BasesKanbanView({
           </section>
         )
       })}
+      </div>
     </div>
   )
 })

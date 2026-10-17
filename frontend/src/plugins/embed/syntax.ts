@@ -19,10 +19,14 @@ declare module 'micromark-util-types' {
  * 'pdf' if it ends with .pdf,
  * 'audio' if it ends with a known audio extension,
  * 'video' if it ends with a known video extension,
+ * 'base' if it ends with .base (an embedded Bases view),
  * otherwise returns 'note'.
  */
-export function detectEmbedType(target: string): 'image' | 'pdf' | 'audio' | 'video' | 'note' {
+export function detectEmbedType(target: string): 'image' | 'pdf' | 'audio' | 'video' | 'base' | 'note' {
   const lower = target.toLowerCase()
+  if (lower.endsWith('.base')) {
+    return 'base'
+  }
   for (const ext of IMAGE_EXTENSIONS) {
     if (lower.endsWith(ext)) {
       return 'image'

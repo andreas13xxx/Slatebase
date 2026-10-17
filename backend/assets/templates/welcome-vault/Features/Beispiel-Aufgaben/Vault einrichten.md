@@ -3,6 +3,7 @@ type: task
 status: done
 priority: low
 deadline: "2026-10-01"
+estimate: 3
 tags: [beispiel, task]
 ---
 
