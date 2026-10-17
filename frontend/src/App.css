@@ -6820,7 +6820,12 @@
 /* Touch long-press opens the context menu: suppress the native iOS callout / text selection on those rows. */
 @media (pointer: coarse) {
   .tree-node-row,
-  .tab-bar-tab {
+  .tab-bar-tab,
+  .favorites-view__entry,
+  .outline-view__button,
+  .context-panel-link-button,
+  .search-panel__file-header-toggle,
+  .app-toolbar button {
     -webkit-touch-callout: none;
     user-select: none;
   }

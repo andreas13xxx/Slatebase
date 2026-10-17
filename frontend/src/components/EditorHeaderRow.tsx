@@ -2,8 +2,8 @@ import { useRef, useState, type ReactNode } from 'react'
 import { MoreHorizontal, Columns2, Rows2, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, X, PanelTopClose } from 'lucide-react'
 import { useTranslation } from '../i18n'
 import { usePaneTree } from '../state/paneTreeContext'
-import { findPane, generatePaneId, getActivePaneTabState, listPanes, type PaneNode, type SplitDirection } from '../state/paneTreeState'
-import { findPaneInDirection, type FocusDirection, type PaneRect } from './panes/pane-focus-direction'
+import { findPane, getActivePaneTabState, listPanes, type PaneNode } from '../state/paneTreeState'
+import { splitActivePane, focusPaneInDirection } from './panes/pane-commands'
 import { ContextMenu, type ContextMenuItem } from './ContextMenu'
 import { NavigationControls } from './NavigationControls'
 
@@ -36,31 +36,17 @@ export function EditorHeaderRow({ children, showPaneMenu = true }: EditorHeaderR
   const paneCount = listPanes(paneTree).length
   const activeTabId = getActivePaneTabState(paneTree)?.activeTabId ?? null
 
-  function split(direction: SplitDirection) {
-    if (!activeTabId) return
-    paneTreeDispatch({
-      type: 'SPLIT_PANE_WITH_TAB',
-      payload: { paneId: paneTree.activePaneId, direction, newPaneId: generatePaneId(), tabId: activeTabId, copy: true },
-    })
-  }
-
-  // Pane geometry only exists in the DOM (see the `onFocusPaneDirection` handler
-  // in CommandPaletteContainer, which does the same lookup).
-  function focus(direction: FocusDirection) {
-    const rects: PaneRect[] = Array.from(
-      document.querySelectorAll<HTMLElement>('.pane-leaf[data-pane-id]'),
-    ).map((el) => {
-      const r = el.getBoundingClientRect()
-      return { paneId: el.dataset.paneId ?? '', left: r.left, right: r.right, top: r.top, bottom: r.bottom }
-    })
-    const targetId = findPaneInDirection(rects, paneTree.activePaneId, direction)
-    if (targetId) paneTreeDispatch({ type: 'FOCUS_PANE', payload: { paneId: targetId } })
-  }
-
+  /** The menu items are rebuilt on every render, so this sees the latest tree and unsaved edits. */
   function closeOthers() {
-    for (const pane of listPanes(paneTree)) {
-      if (pane.id !== paneTree.activePaneId) paneTreeDispatch({ type: 'CLOSE_PANE', payload: { paneId: pane.id } })
-    }
+    const others = listPanes(paneTree).filter((p) => p.id !== paneTree.activePaneId)
+    if (others.some(hasUnsavedTabs)) return
+    for (const pane of others) paneTreeDispatch({ type: 'CLOSE_PANE', payload: { paneId: pane.id } })
+  }
+
+  function closeActivePane() {
+    const active = findPane(paneTree, paneTree.activePaneId)
+    if (!active || hasUnsavedTabs(active)) return
+    paneTreeDispatch({ type: 'CLOSE_PANE', payload: { paneId: active.id } })
   }
 
   function buildItems(): ContextMenuItem[] {
@@ -72,15 +58,15 @@ export function EditorHeaderRow({ children, showPaneMenu = true }: EditorHeaderR
     const canCloseOthers = multi && !others.some(hasUnsavedTabs)
     const icon = (Icon: typeof X) => <Icon size={ICON_SIZE} />
     return [
-      { id: 'split-right', label: t('splitPanes.splitRight'), icon: icon(Columns2), disabled: !activeTabId, run: () => split('horizontal') },
-      { id: 'split-down', label: t('splitPanes.splitDown'), icon: icon(Rows2), disabled: !activeTabId, run: () => split('vertical') },
+      { id: 'split-right', label: t('splitPanes.splitRight'), icon: icon(Columns2), disabled: !activeTabId, run: () => splitActivePane(paneTree, paneTreeDispatch, 'horizontal') },
+      { id: 'split-down', label: t('splitPanes.splitDown'), icon: icon(Rows2), disabled: !activeTabId, run: () => splitActivePane(paneTree, paneTreeDispatch, 'vertical') },
       { id: 'sep-focus', label: '', separator: true },
-      { id: 'focus-left', label: t('splitPanes.focusLeft'), icon: icon(ArrowLeft), disabled: !multi, run: () => focus('left') },
-      { id: 'focus-right', label: t('splitPanes.focusRight'), icon: icon(ArrowRight), disabled: !multi, run: () => focus('right') },
-      { id: 'focus-up', label: t('splitPanes.focusUp'), icon: icon(ArrowUp), disabled: !multi, run: () => focus('up') },
-      { id: 'focus-down', label: t('splitPanes.focusDown'), icon: icon(ArrowDown), disabled: !multi, run: () => focus('down') },
+      { id: 'focus-left', label: t('splitPanes.focusLeft'), icon: icon(ArrowLeft), disabled: !multi, run: () => focusPaneInDirection(paneTree, paneTreeDispatch, 'left') },
+      { id: 'focus-right', label: t('splitPanes.focusRight'), icon: icon(ArrowRight), disabled: !multi, run: () => focusPaneInDirection(paneTree, paneTreeDispatch, 'right') },
+      { id: 'focus-up', label: t('splitPanes.focusUp'), icon: icon(ArrowUp), disabled: !multi, run: () => focusPaneInDirection(paneTree, paneTreeDispatch, 'up') },
+      { id: 'focus-down', label: t('splitPanes.focusDown'), icon: icon(ArrowDown), disabled: !multi, run: () => focusPaneInDirection(paneTree, paneTreeDispatch, 'down') },
       { id: 'sep-close', label: '', separator: true },
-      { id: 'close-pane', label: t('splitPanes.closePane'), icon: icon(X), disabled: !canClosePane, run: () => paneTreeDispatch({ type: 'CLOSE_PANE', payload: { paneId: paneTree.activePaneId } }) },
+      { id: 'close-pane', label: t('splitPanes.closePane'), icon: icon(X), disabled: !canClosePane, run: closeActivePane },
       { id: 'close-others', label: t('splitPanes.closeOtherPanes'), icon: icon(PanelTopClose), disabled: !canCloseOthers, run: closeOthers },
     ]
   }
