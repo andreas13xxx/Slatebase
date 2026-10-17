@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.56.0](https://github.com/andreas13xxx/Slatebase/compare/v0.55.0...v0.56.0) (2026-10-17)
+
+
+### Features
+
+* **activity:** stat panel, origin badges, folder filter, git-sync event ([#249](https://github.com/andreas13xxx/Slatebase/issues/249)) ([122cef4](https://github.com/andreas13xxx/Slatebase/commit/122cef432c9948d13333be0846598651e73f9c31))
+
 ## [0.55.0](https://github.com/andreas13xxx/Slatebase/compare/v0.54.0...v0.55.0) (2026-10-17)
 
 
