@@ -56,7 +56,7 @@ Neue Datei `plugins/appearance/theme-bridge.css`, nur wirksam bei gesetztem Mark
 | `--bg-overlay` | `--background-modifier-cover` |
 | `--text-primary` | `--text-normal` |
 | `--text-secondary` | `--text-muted` |
-| `--text-muted` | `--text-faint` |
+| `--text-subtle` (bisher `--text-muted`, umbenannt) | `--text-faint` |
 | `--text-inverse` | `--text-on-accent` |
 | `--border-subtle` / `--border-default` / `--border-strong` | `--background-modifier-border` / `-hover` / `-active-hover` |
 | `--accent` / `--accent-hover` / `--accent-text` | `--interactive-accent` / `--interactive-accent-hover` / `--text-accent` |

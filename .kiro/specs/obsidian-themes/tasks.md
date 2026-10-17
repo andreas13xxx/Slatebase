@@ -7,10 +7,20 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, lint, Tests).
 - [ ] 0.1 Requirements, Design, Tasks committen
 
 ## Phase 1 — Zuordnung klären (nur Analyse + Test, kein Verhalten)
+- [ ] 1.4 Umbenennung `--text-muted` → `--text-subtle` in `index.css`, `App.css` und allen Komponenten als
+      eigener Commit (nur Umbenennung, Test/Lint/tsc grün), danach Screenshot-Vergleich hell/dunkel
 - [ ] 1.1 Nutzung aller Slatebase-Tokens in `App.css`/Komponenten auflisten; Zuordnungstabelle im Design
       finalisieren (insb. `--bg-elevated`, `--text-*`-Stufen)
-- [ ] 1.2 Namenskollisionen (`--text-muted`, `--radius-xl`, `--status-bar-font-size`, `--canvas-color-*`,
-      `--graph-node-unresolved`) einzeln auf gleiche Semantik prüfen; Abweichungen dokumentieren
+- [x] 1.2 Namenskollisionen (`--text-muted`, `--radius-xl`, `--status-bar-font-size`, `--canvas-color-*`,
+      `--graph-node-unresolved`) einzeln auf gleiche Semantik prüfen; Abweichungen dokumentieren.
+      Ergebnis (Computed Style im Browser, 2026-10-17): `obsidian-compat.css` gewinnt die Reihenfolge.
+      Hell: `--text-muted` = `--text-secondary` = #475569 (gewollt war #64748b); Dunkel: beide #94a3b8
+      (gewollt #7a8592) → die Stufen „sekundär" und „gedämpft" sind heute gleich. Ebenso überschrieben:
+      `--graph-node-unresolved` (hell #64748b statt #94a3b8, dunkel #7a8088), `--canvas-color-1`
+      (#dc2626 statt #fb464c/#e93147). Identisch: `--radius-xl` (12px), `--status-bar-font-size` (12px).
+      Folge für 3.x/Umbenennung: Slatebases `--text-muted` in `index.css` ist faktisch toter Wert; die
+      273 Verwendungsstellen sehen Obsidians Wert. Umbenennen in `--text-subtle` (o. ä.) stellt die
+      beabsichtigte Stufe wieder her und **ändert das Aussehen** (heller) — bewusst entscheiden.
 - [x] 1.3 Fehlende Variablen gegen die offizielle Referenz abgleichen (110 fehlend, davon ca. 60 echte; siehe Design §2)
 
 ## Phase 2 — Variablen-Lücken und Typografie
@@ -71,6 +81,13 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, lint, Tests).
   Obsidian-Bedeutung (= unser `--text-secondary`), Slatebases `index.css` meint dagegen #64748b. Welche
   Definition in der UI heute gewinnt, hängt von der CSS-Reihenfolge ab und wird in 1.2/3.3 im Browser
   (Computed Style) geprüft, bevor umbenannt wird.
+
+- `--text-muted` (entschieden 2026-10-17): Slatebases Token wird in `--text-subtle` umbenannt (alle ca. 273
+  Verwendungsstellen, reine Umbenennung, vorab in einem eigenen Commit). `--text-muted` gehört danach allein
+  Obsidian (Compat-Datei). Das macht die beabsichtigte Abstufung wieder sichtbar: gedämpfter Text wird
+  ohne Theme etwas heller als heute (#64748b hell / #7a8592 dunkel statt #475569 / #94a3b8). Das ist die
+  **einzige gewollte visuelle Änderung ohne Theme**, Ausnahme von R1.3; in der PR mit Screenshots belegen.
+  Brücke: `--text-secondary` ← `--text-muted`, `--text-subtle` ← `--text-faint`.
 
 ## Offene Entscheidungen
 - Stufe 2 (Klassen-Aliase) als eigene Spec `obsidian-themes-structure`, sobald Stufe 1 gemessen wurde.
