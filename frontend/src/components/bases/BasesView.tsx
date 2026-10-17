@@ -51,6 +51,7 @@ export const BasesView = memo(function BasesView({
   const [mode, setMode] = useState<Mode>('view')
   const [selectedViewIndex, setSelectedViewIndex] = useState(0)
   const [rows, setRows] = useState<BaseRow[]>([])
+  const [truncated, setTruncated] = useState(false)
   const [queryError, setQueryError] = useState<string | null>(null)
   const [pluginViewError, setPluginViewError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -76,8 +77,9 @@ export const BasesView = memo(function BasesView({
     if (!doc || !activeView) return
     setLoading(true)
     try {
-      const { rows: resultRows } = await runBaseQuery(apiClient, vaultId, doc, activeView)
+      const { rows: resultRows, truncated: resultTruncated } = await runBaseQuery(apiClient, vaultId, doc, activeView)
       setRows(resultRows)
+      setTruncated(resultTruncated)
       setQueryError(null)
     } catch (err) {
       setQueryError(extractErrorMessage(err, 'Die Base-Abfrage ist fehlgeschlagen'))
@@ -259,6 +261,11 @@ export const BasesView = memo(function BasesView({
       </div>
 
       {queryError && <div className="bases-view__error" role="alert">{queryError}</div>}
+      {truncated && !queryError && (
+        <div className="bases-view__warning" role="status" aria-live="polite">
+          Es werden nicht alle Treffer angezeigt — das Ergebnis wurde gekappt. Verfeinere die Filter, um alle passenden Notizen zu sehen.
+        </div>
+      )}
       {pluginViewError && (
         <div className="bases-view__error" role="alert">
           Die Plugin-Ansicht ist fehlgeschlagen ({pluginViewError}) — es wird die Tabelle angezeigt.

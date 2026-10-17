@@ -11,6 +11,7 @@ import type { BaseDocument, BaseFilterNode, BaseRow, BaseView, BaseQuerySpecWire
 import { evaluateCondition, evaluateFormula, collectExpressionRefs } from './formula/evaluator.js'
 import type { FormulaContext, FormulaResult } from './formula/evaluator.js'
 import type { FormulaValue } from './formula/functions.js'
+import { buildCombinedPrefilter } from './prefilter.js'
 
 // ─── Filter column collection ──────────────────────────────────────────────────
 
@@ -62,6 +63,13 @@ export function buildQuerySpec(doc: BaseDocument, view: BaseView): BaseQuerySpec
       .map((s) => (s.direction ? { column: s.column, direction: s.direction } : { column: s.column }))
     if (serverSort.length > 0) spec.sort = serverSort
   }
+
+  // Conservative structured prefilter: a necessary-condition subset of the
+  // document + view filters, so the backend narrows candidates before its row
+  // cap. The full expression filter still runs client-side in `filterRows`.
+  const prefilter = buildCombinedPrefilter(doc.filters, view.filters)
+  if (prefilter !== null) spec.filters = prefilter
+
   return spec
 }
 
@@ -152,13 +160,15 @@ function matchesFilter(node: BaseFilterNode | undefined, ctx: FormulaContext): b
  * Maps the query route's wire rows to `BaseRow`s (file metadata folded into
  * `values` under `file.*`), keeps those passing BOTH the document filter and
  * the view filter, then applies the view `limit`. `total` is the match count
- * before the limit.
+ * before the limit. `truncated` propagates the backend's candidate-cap flag so
+ * the view can warn the result may be incomplete.
  */
 export function filterRows(
   wireRows: BaseQueryRowWire[],
   doc: BaseDocument,
   view: BaseView,
-): { rows: BaseRow[]; total: number } {
+  truncated?: boolean,
+): { rows: BaseRow[]; total: number; truncated: boolean } {
   const allRows: BaseRow[] = wireRows.map((r) => {
     const values: Record<string, unknown> = { ...r.values }
     if (r.ctime !== undefined) values['file.ctime'] = r.ctime
@@ -175,7 +185,7 @@ export function filterRows(
     return matchesFilter(doc.filters, ctx) && matchesFilter(view.filters, ctx)
   })
   const rows = view.limit !== undefined ? matched.slice(0, view.limit) : matched
-  return { rows, total: matched.length }
+  return { rows, total: matched.length, truncated: truncated ?? false }
 }
 
 // ─── Formula columns ────────────────────────────────────────────────────────

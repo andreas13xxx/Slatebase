@@ -167,14 +167,19 @@ export interface BaseQuerySortWire {
 }
 
 /**
- * Normalized query spec posted to `POST /vaults/:vaultId/bases/query`. Carries
- * no filters: the Obsidian filter expressions are evaluated by the caller
- * (`filterRows`), the backend only returns candidate rows.
+ * Normalized query spec posted to `POST /vaults/:vaultId/bases/query`. The rich
+ * Obsidian filter expressions are evaluated by the caller (`filterRows`); the
+ * backend only returns candidate rows. `filters` carries a CONSERVATIVE
+ * structured prefilter (a necessary-condition subset extracted from the
+ * expression filter, see `prefilter.ts`) so the backend can narrow candidates
+ * BEFORE its row cap applies — it never replaces the client-side filter.
  */
 export interface BaseQuerySpecWire {
   columns: string[]
   sort?: BaseQuerySortWire[]
   limit?: number
+  /** Conservative structured prefilter (backend `BaseQueryNode` shape). */
+  filters?: unknown
 }
 
 /** A single row returned by the backend query. */
@@ -198,4 +203,9 @@ export interface BaseQueryRowWire {
 export interface BaseQueryResultWire {
   rows: BaseQueryRowWire[]
   total: number
+  /**
+   * True when the backend hit its candidate-row cap, so `rows` may be missing
+   * matches. The view surfaces this so the result is never silently truncated.
+   */
+  truncated?: boolean
 }

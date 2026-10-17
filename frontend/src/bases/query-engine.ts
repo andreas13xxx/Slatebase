@@ -22,7 +22,7 @@ export async function runBaseQuery(
   vaultId: string,
   doc: BaseDocument,
   view: BaseView,
-): Promise<{ rows: BaseRow[]; total: number }> {
+): Promise<{ rows: BaseRow[]; total: number; truncated: boolean }> {
   const result = await apiClient.queryBase(vaultId, buildQuerySpec(doc, view))
-  return filterRows(result.rows, doc, view)
+  return filterRows(result.rows, doc, view, result.truncated)
 }

@@ -138,6 +138,18 @@ describe('LinkIndexService.queryForBase', () => {
     expect(result.rows).toHaveLength(2)
   })
 
+  it('flags truncated when matches exceed the limit', async () => {
+    await setupVault()
+    const result = await service.queryForBase({ filters: { property: 'type', op: 'eq', value: 'task' }, columns: [], limit: 2 })
+    expect(result.truncated).toBe(true)
+  })
+
+  it('does not flag truncated when all matches fit', async () => {
+    await setupVault()
+    const result = await service.queryForBase({ filters: { property: 'type', op: 'eq', value: 'task' }, columns: [], limit: 10 })
+    expect(result.truncated).toBe(false)
+  })
+
   it('populates file-metadata fields (ext/folder/tags) on each row', async () => {
     await setupVault()
     const result = await service.queryForBase({ filters: { path: 'Tasks/a.md' }, columns: [] })

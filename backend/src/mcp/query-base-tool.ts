@@ -19,7 +19,7 @@ import {
 import type { BaseDocument, BaseRow, BaseView } from '@slatebase/shared-contracts'
 import { VaultNotFoundError, VaultAccessDeniedError } from '../business/index.js'
 import { PathTraversalError } from '../vault/index.js'
-import type { ILinkIndex } from '../link-index/index.js'
+import type { ILinkIndex, BaseQuerySpec } from '../link-index/index.js'
 import type { ToolHandlerDeps } from './tool-handlers.js'
 import { mcpToolError, mcpToolSuccess } from './tool-results.js'
 import {
@@ -174,8 +174,16 @@ export function registerQueryBase(
         }
 
         // Filters + limit are evaluated here, not by the index (see buildQuerySpec).
-        const candidates = await linkIndex.queryForBase(buildQuerySpec(doc, view))
-        const { rows, total } = filterRows(candidates.rows, doc, view)
+        // The wire spec's `filters` is the conservative structured prefilter,
+        // structurally a BaseQueryNode (property/tag/path/op/value + and/or).
+        const wireSpec = buildQuerySpec(doc, view)
+        const indexSpec: BaseQuerySpec = {
+          columns: wireSpec.columns,
+          sort: wireSpec.sort,
+          filters: wireSpec.filters as BaseQuerySpec['filters'],
+        }
+        const candidates = await linkIndex.queryForBase(indexSpec)
+        const { rows, total, truncated: candidatesTruncated } = filterRows(candidates.rows, doc, view, candidates.truncated)
 
         const returned = rows.slice(0, args.limit)
         // `filterRows` counts matches before the view's own limit. The view limit
@@ -195,7 +203,10 @@ export function registerQueryBase(
           total: available,
           matches: total,
           returned: returned.length,
-          truncated: returned.length < available,
+          // Truncated if the caller's limit cut rows OR the backend hit its
+          // candidate cap (then matches beyond the cap were never evaluated).
+          truncated: returned.length < available || candidatesTruncated,
+          ...(candidatesTruncated ? { candidateCapHit: true } : {}),
           ...(parsed.errors && parsed.errors.length > 0
             ? { warnings: parsed.errors.map((e) => e.message) }
             : {}),

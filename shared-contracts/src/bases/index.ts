@@ -30,6 +30,8 @@ export type {
 export { parseBase } from './parser.js'
 export { serializeBase } from './serializer.js'
 export { buildQuerySpec, rowContext, filterRows, evaluateFormulaColumn } from './base-eval.js'
+export { buildPrefilterNode, buildCombinedPrefilter } from './prefilter.js'
+export type { PrefilterNode, PrefilterCondition, PrefilterAnd, PrefilterOr } from './prefilter.js'
 export { evaluateFormula, evaluateCondition, formatFormulaValue, collectExpressionRefs } from './formula/evaluator.js'
 export type { FormulaContext, FormulaResult } from './formula/evaluator.js'
 export type { FormulaValue } from './formula/functions.js'

@@ -631,7 +631,13 @@ export class LinkIndexService implements ILinkIndex {
    * read from disk only for the notes that reach the sort/return stage.
    */
   async queryForBase(spec: BaseQuerySpec): Promise<BaseQueryResult> {
-    const MAX_ROWS = 1000
+    // Candidate rows are capped so a pathological vault cannot allocate without
+    // bound. The client re-applies the full expression filter on what it gets;
+    // a conservative structured prefilter (spec.filters) narrows candidates
+    // BEFORE this cap, so the cap bites prefiltered rows, not arbitrary ones.
+    // When the cap is still hit, the result is flagged `truncated` so the view
+    // can warn — never a silent cut.
+    const MAX_ROWS = 5000
     const limit = spec.limit !== undefined ? Math.min(Math.max(1, spec.limit), MAX_ROWS) : MAX_ROWS
 
     // Candidate universe: every real note the index has parsed (link sources,
@@ -658,7 +664,7 @@ export class LinkIndexService implements ILinkIndex {
 
     const total = rows.length
     this.sortBaseRows(rows, spec.sort ?? [])
-    return { rows: rows.slice(0, limit), total }
+    return { rows: rows.slice(0, limit), total, truncated: total > limit }
   }
 
   /** Whether a filter tree contains any file ctime/mtime condition. */

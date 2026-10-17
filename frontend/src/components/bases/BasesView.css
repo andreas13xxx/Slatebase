@@ -51,6 +51,14 @@
   background: var(--danger);
 }
 
+.bases-view__warning {
+  padding: var(--spacing-sm) var(--spacing-md);
+  color: var(--warning);
+  background: var(--warning-bg);
+  border-bottom: 1px solid var(--warning-border);
+  font-size: 0.85em;
+}
+
 .bases-view__loading {
   padding: var(--spacing-xs) var(--spacing-md);
   color: var(--text-muted);

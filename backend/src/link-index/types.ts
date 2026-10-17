@@ -337,4 +337,6 @@ export interface BaseQueryResult {
   rows: BaseQueryRow[]
   /** Total matches before the limit was applied. */
   total: number
+  /** True when the candidate cap was hit, so rows may be missing matches. */
+  truncated?: boolean | undefined
 }
