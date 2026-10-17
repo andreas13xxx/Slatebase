@@ -12,6 +12,7 @@
  */
 
 import { useState, useCallback, type ReactNode } from 'react'
+import { useLongPress } from '../../hooks/useLongPress'
 import { FileText, FolderOpen, Pencil, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import type { LinkEntry, UnlinkedMentionEntry } from '../../state/documentPanelData'
@@ -210,6 +211,7 @@ interface LinkItemProps {
 }
 
 function LinkItem({ link, onLinkClick }: LinkItemProps) {
+  const longPress = useLongPress()
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
 
   if (link.resolved) {
@@ -219,6 +221,7 @@ function LinkItem({ link, onLinkClick }: LinkItemProps) {
           className="context-panel-link-button"
           onClick={() => onLinkClick(link.target, true)}
           onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY }) }}
+          {...longPress}
           title={link.target}
           type="button"
         >
@@ -255,6 +258,7 @@ interface UnlinkedMentionItemProps {
 }
 
 function UnlinkedMentionItem({ entry, onClick, onLinkMention }: UnlinkedMentionItemProps) {
+  const longPress = useLongPress()
   const { t } = useTranslation()
   const [linking, setLinking] = useState(false)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
@@ -275,6 +279,7 @@ function UnlinkedMentionItem({ entry, onClick, onLinkMention }: UnlinkedMentionI
         className="context-panel-link-button context-panel-unlinked-mention-button"
         onClick={() => onClick(entry.filePath)}
         onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY }) }}
+        {...longPress}
         title={entry.filePath}
         type="button"
       >

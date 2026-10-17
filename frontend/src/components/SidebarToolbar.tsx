@@ -20,6 +20,7 @@ import {
 } from './toolbar-context-menu'
 
 import type { AppPage } from '../App'
+import { useLongPress } from '../hooks/useLongPress'
 
 /** Icon size shared by built-in icons and plugin ribbon glyphs. */
 const ICON_SIZE = 15
@@ -95,6 +96,7 @@ export function SidebarToolbar({
   onOpenQuickSwitcher, onOpenRandomNote, onInsertTemplate, onToggleDictation,
   isAdmin, isVaultOwner, globalUnreadCount,
 }: SidebarToolbarProps) {
+  const longPress = useLongPress()
   const { isEnabled } = useFeatureContext()
   const { ribbonIcons } = usePluginContext()
   const prefs = useToolbarPrefs()
@@ -242,6 +244,7 @@ export function SidebarToolbar({
             aria-label={item.label}
             onClick={disabled ? undefined : item.action}
             onContextMenu={(e) => openButtonMenu(e, id)}
+            {...longPress}
             // `aria-disabled` rather than `disabled`: a disabled control fires
             // no mouse events at all, which would swallow the right-click and
             // leave the user unable to hide or move a button that happens to be

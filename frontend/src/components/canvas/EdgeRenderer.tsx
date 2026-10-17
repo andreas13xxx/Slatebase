@@ -3,6 +3,7 @@
  */
 
 import { memo, useMemo } from 'react'
+import { useLongPress } from '../../hooks/useLongPress'
 import type { CanvasEdge, CanvasNode, EdgeSide } from '../../canvas/types'
 import { getCanvasColorVar } from './canvas-utils'
 
@@ -53,6 +54,7 @@ function getOffset(side: EdgeSide, distance: number): { x: number; y: number } {
 export const EdgeRenderer = memo(function EdgeRenderer({
   edges, nodes, selectedEdgeIds, onSelectEdge, onEdgeContextMenu,
 }: EdgeRendererProps) {
+  const longPress = useLongPress()
   const nodeMap = useMemo(() => {
     const map = new Map<string, CanvasNode>()
     for (const node of nodes) map.set(node.id, node)
@@ -123,6 +125,7 @@ export const EdgeRenderer = memo(function EdgeRenderer({
                 e.stopPropagation()
                 onSelectEdge(edge.id, e.shiftKey)
               }}
+              {...longPress}
               onContextMenu={(e) => {
                 if (onEdgeContextMenu) {
                   e.preventDefault()

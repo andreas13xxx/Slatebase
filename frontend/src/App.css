@@ -545,6 +545,32 @@
   cursor: default;
 }
 
+/* Row below the tab bar: back/forward, breadcrumb, pane menu. The row owns the
+   bottom border, so its children drop their own. */
+.editor-header-row {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-width: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+
+.editor-header-row__center {
+  flex: 1;
+  min-width: 0;
+}
+
+.editor-header-row .nav-controls,
+.editor-header-row .breadcrumb {
+  border-bottom: none;
+}
+
+.editor-header-row__menu {
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
 /* ===== Breadcrumb ===== */
 .breadcrumb {
   display: flex;
@@ -6788,5 +6814,14 @@
     left: 0;
     top: 0;
     width: 100%;
+  }
+}
+
+/* Touch long-press opens the context menu: suppress the native iOS callout / text selection on those rows. */
+@media (pointer: coarse) {
+  .tree-node-row,
+  .tab-bar-tab {
+    -webkit-touch-callout: none;
+    user-select: none;
   }
 }

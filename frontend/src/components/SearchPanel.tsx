@@ -14,6 +14,7 @@ import { revealInExplorer, renameInExplorer, deleteInExplorer } from '../state/f
 import type { SearchFileResult } from '../state/searchState'
 import type { VaultInfo } from '../types'
 import type { ISearchApiClient } from '../state/searchActions'
+import { useLongPress } from '../hooks/useLongPress'
 import './SearchPanel.css'
 
 /**
@@ -777,6 +778,7 @@ function SearchFileGroup({
 }: SearchFileGroupProps) {
   const [expanded, setExpanded] = useState(true)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const longPress = useLongPress()
   const { t } = useTranslation()
 
   function buildFileGroupMenuItems(): ContextMenuItem[] {
@@ -803,6 +805,7 @@ function SearchFileGroup({
           className="search-panel__file-header-toggle"
           onClick={() => setExpanded(prev => !prev)}
           onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY }) }}
+          {...longPress}
           title={fileResult.filePath}
           aria-expanded={expanded}
         >

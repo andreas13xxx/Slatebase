@@ -11,6 +11,7 @@ import { Copy, Link2 } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import type { OutlineHeading } from '../../state/documentPanelData'
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
+import { useLongPress } from '../../hooks/useLongPress'
 import './OutlineView.css'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -30,6 +31,7 @@ export interface OutlineViewProps {
 
 export function OutlineView({ headings, activeAnchor, onHeadingClick, hasDocument = true }: OutlineViewProps) {
   const { t } = useTranslation()
+  const longPress = useLongPress()
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; heading: OutlineHeading } | null>(null)
 
   /**
@@ -83,6 +85,7 @@ export function OutlineView({ headings, activeAnchor, onHeadingClick, hasDocumen
                 className="outline-view__button"
                 onClick={() => onHeadingClick(heading.anchor)}
                 onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, heading }) }}
+                {...longPress}
                 title={heading.text}
                 aria-current={isActive ? 'location' : undefined}
               >
