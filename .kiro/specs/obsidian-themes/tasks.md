@@ -11,7 +11,7 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, lint, Tests).
       finalisieren (insb. `--bg-elevated`, `--text-*`-Stufen)
 - [ ] 1.2 Namenskollisionen (`--text-muted`, `--radius-xl`, `--status-bar-font-size`, `--canvas-color-*`,
       `--graph-node-unresolved`) einzeln auf gleiche Semantik prüfen; Abweichungen dokumentieren
-- [ ] 1.3 Fehlende Variablen gegen https://docs.obsidian.md/Reference/CSS+variables abgleichen
+- [x] 1.3 Fehlende Variablen gegen die offizielle Referenz abgleichen (110 fehlend, davon ca. 60 echte; siehe Design §2)
 
 ## Phase 2 — Variablen-Lücken und Typografie
 - [ ] 2.1 Dokumentierte fehlende Variablen in `obsidian-compat.css` ergänzen (+ Test: Liste vorhanden)
@@ -63,7 +63,14 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, lint, Tests).
 - Live-Aktualisierung: bestehendes `vault:change`-Event mit Dot-Pfaden, kein neuer Event-Typ.
 - Git-Sync: Themes und `appearance.json` werden synchronisiert (geprüft in `sync-engine.ts`).
 
+- Namenskollisionen (`--text-muted`, `--radius-xl`, `--status-bar-font-size`, `--canvas-color-*`,
+  `--graph-node-unresolved`): hat eine Variable in Slatebase eine andere Bedeutung als in Obsidian, wird der
+  **Slatebase-Token umbenannt**; die Obsidian-Variable behält ihre Obsidian-Bedeutung und bleibt anbindbar.
+  Bei gleicher Bedeutung (z. B. `--radius-xl: 12px`) bleibt der Name. Entschieden 2026-10-17.
+  Vorbefund aus Phase 1: Die Compat-Datei definiert `--text-muted` (#475569 hell) bereits mit
+  Obsidian-Bedeutung (= unser `--text-secondary`), Slatebases `index.css` meint dagegen #64748b. Welche
+  Definition in der UI heute gewinnt, hängt von der CSS-Reihenfolge ab und wird in 1.2/3.3 im Browser
+  (Computed Style) geprüft, bevor umbenannt wird.
+
 ## Offene Entscheidungen
-- Bei abweichender Semantik einer Kollisionsvariablen: Slatebase-Token umbenennen (Spec-Stand) oder
-  Obsidian-Variable bewusst nicht anbinden?
 - Stufe 2 (Klassen-Aliase) als eigene Spec `obsidian-themes-structure`, sobald Stufe 1 gemessen wurde.

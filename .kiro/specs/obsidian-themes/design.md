@@ -73,15 +73,22 @@ Semantische Farben (Erfolg/Fehler/Warnung, Syntax-Highlighting, Datei-Icons) ble
 Slatebase; abgeleitet wird nur, was Themes üblicherweise setzen.
 
 ## 2. Variablen-Lücken
-Ausgangsliste aus dem Abgleich mit Things und Minimal (vor dem Übernehmen jeweils gegen die offizielle
-Referenz prüfen, nur Dokumentiertes ergänzen):
+**Phase-1-Ergebnis (2026-10-17):** Abgleich gegen die offizielle Referenz
+(`obsidianmd/obsidian-developer-docs`, `en/Reference/CSS variables/**`, 689 Variablennamen) ergibt nur
+**110 fehlende** Namen. Davon sind rund 50 Obsidian-Publish-/Sync-Variablen (`--page-*`, `--site-*`,
+`--logo-*`, `--sidebar-left/right-*`, `--sync-avatar-*`, `--graph-height`, `--footer-display`) und
+Platzhalter-Fragmente (`--font-`, `--size`); sie werden **nicht** ergänzt. Echte Lücken:
 
-- Things: `--radius-xs`, `--thin-border`, `--checkbox-icon`, `--normal-weight`, `--highlight-text-color--active`
-- Minimal: `--blockquote-size`, `--editor-font-size`, `--gutter-background`, `--table-drag-handle-size`,
-  `--bases-table-header-icon-display`, `--bases-toolbar-opacity`, `--tab-stacked-spine-order`,
-  `--checkbox-icon`
-- Nicht ergänzen: `--font-text-override`, `--font-editor-override`, `--font-todoist-*`,
-  `--font-adaptive-small` u. ä. (Plugin- bzw. theme-eigene Variablen).
+- `--bases-*` (ca. 35: Cards, Table, Header, Toolbar, Embed, Filter-Menü)
+- `--component-title-*`, `--dropdown-*`
+- `--nav-item-border-color*`, `--nav-parent-item-color*`, `--nav-parent-item-weight`,
+  `--nav-collapse-icon-color-hover`, `--outline-heading-*`
+- `--color-accent-hsl`, `--text-highlight-bg-rgb`
+
+**Korrektur zum ersten Abgleich:** `--radius-xs`, `--thin-border`, `--checkbox-icon`, `--normal-weight`,
+`--blockquote-size`, `--editor-font-size`, `--gutter-background`, `--table-drag-handle-size` stehen nicht
+in der offiziellen Referenz; sie gehören den Themes (Things/Minimal) oder dem Style-Settings-Plugin und
+werden nicht ergänzt. Plugin-/theme-eigene Variablen (`--font-text-override`, `--font-todoist-*`, …) ebenfalls nicht.
 
 Zusätzlich Typografie-Anbindung: `editor/` (CM6-Theme) und Leseansicht lesen `--font-text`,
 `--h1…h6-*`, `--line-height-normal`, `--file-line-width`. Falls die Editor-CSS dafür feste Werte nutzt,
