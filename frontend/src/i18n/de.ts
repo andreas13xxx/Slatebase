@@ -662,6 +662,7 @@ export const de = {
       canvas: 'Canvas',
       bases: 'Bases',
       snippets: 'Snippets',
+      sync: 'Sync',
     },
     bucket: {
       today: 'Heute',
@@ -684,6 +685,25 @@ export const de = {
       snippetCreated: 'Snippet angelegt',
       snippetEdited: 'Snippet bearbeitet',
       snippetDeleted: 'Snippet gelöscht',
+      syncCompleted: 'Synchronisierung',
+    },
+    origin: {
+      mcp: 'MCP',
+      gitSync: 'Git-Sync',
+      mailImport: 'Mail-Import',
+    },
+    range: {
+      day: 'Tag',
+      week: 'Woche',
+      month: 'Monat',
+      year: 'Jahr',
+    },
+    stats: {
+      byType: 'Nach Typ',
+      last10Weeks: 'Letzte 10 Wochen',
+    },
+    folderFilter: {
+      all: 'Alle Ordner',
     },
   },
 

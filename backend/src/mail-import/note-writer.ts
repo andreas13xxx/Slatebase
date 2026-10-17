@@ -50,12 +50,29 @@ export interface IMailNoteWriter {
   writeMail(vaultId: string, targetFolder: string, mail: ConvertedMail): Promise<string>
 }
 
+/**
+ * Fire-and-forget timeline recorder for an imported mail note, injected only
+ * when the `activity-timeline` feature is enabled. Same optional-hook shape as
+ * the MCP/trashRoutes recorders — a failure never fails the import.
+ */
+export type RecordMailActivityHook = (vaultId: string, notePath: string) => void
+
+/**
+ * Link-index notification for an imported mail note, injected always (not
+ * feature-gated): keeping the index in step with a second write path is a
+ * correctness fix independent of the timeline (L1 — imported mails were
+ * previously invisible to the graph).
+ */
+export type MailLinkIndexHook = (vaultId: string, notePath: string, content: string) => void
+
 export class MailNoteWriter implements IMailNoteWriter {
   constructor(
     private readonly vaultManager: IVaultManager,
     private readonly logger: ILogger,
     private readonly eventBus?: IEventBus,
     private readonly accessControl?: IVaultAccessControl,
+    private readonly recordActivity?: RecordMailActivityHook,
+    private readonly linkIndexHook?: MailLinkIndexHook,
   ) {}
 
   async writeMail(vaultId: string, targetFolder: string, mail: ConvertedMail): Promise<string> {
@@ -91,6 +108,15 @@ export class MailNoteWriter implements IMailNoteWriter {
     this.logger.info('Mail imported as note', {
       vaultId, notePath: noteRelativePath, attachments: mail.attachments.length,
     })
+
+    // Keep the link index in step with this (second) write path — otherwise an
+    // imported mail never appears in the graph/backlinks (L1). Markdown only.
+    if (noteRelativePath.endsWith('.md')) {
+      this.linkIndexHook?.(vaultId, noteRelativePath, noteMarkdown)
+    }
+    // Record the import as a note.created timeline event (origin set by the
+    // injected hook). Fire-and-forget; no-op unless activity-timeline is on.
+    this.recordActivity?.(vaultId, noteRelativePath)
 
     await this.publishVaultChange(vaultId, noteRelativePath)
 

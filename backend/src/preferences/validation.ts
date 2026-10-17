@@ -98,4 +98,5 @@ export const saveVaultSettingsSchema = z.object({
   graph: opaqueBlobSchema.optional(),
   sidebarPanel: opaqueBlobSchema.optional(),
   contextPanel: opaqueBlobSchema.optional(),
+  activityRange: z.string().max(16).nullable().optional(),
 })

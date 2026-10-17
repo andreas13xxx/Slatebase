@@ -65,7 +65,7 @@ export interface TrashRouteDependencies {
    * Optional — when set, a restored file records a `note.restored` activity
    * event for the timeline. Fire-and-forget; a failure never fails the restore.
    */
-  activityService?: { record(vaultId: string, event: { type: 'note.restored'; path: string; user: string }): Promise<void> } | undefined
+  activityService?: { record(vaultId: string, event: { type: 'note.restored'; path: string; user: string; origin?: 'web' }): Promise<void> } | undefined
 }
 
 // --- Trash Route Factory ---
@@ -198,6 +198,7 @@ export function createTrashRoutes(deps: TrashRouteDependencies): Hono {
         type: 'note.restored',
         path: result.restoredPath,
         user: session.username,
+        origin: 'web',
       })
 
       return c.json({ restoredPath: result.restoredPath }, 200)

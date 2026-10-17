@@ -51,6 +51,7 @@ const EVENT_TYPES = [
   'snippet.created',
   'snippet.edited',
   'snippet.deleted',
+  'sync.completed',
 ] as const
 
 const eventTypeSchema = z.enum(EVENT_TYPES)
@@ -65,6 +66,8 @@ const querySchema = z.object({
   to: z.string().datetime().optional(),
   cursor: z.string().max(200).optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
+  /** Vault-relative folder prefix to restrict events to (path='/' events always pass). */
+  pathPrefix: z.string().max(1000).optional(),
 })
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -92,6 +95,7 @@ export function createActivityRoutes(deps: ActivityRoutesDeps): Hono {
       to: c.req.query('to'),
       cursor: c.req.query('cursor'),
       limit: c.req.query('limit'),
+      pathPrefix: c.req.query('pathPrefix'),
     })
     if (!parsed.success) {
       const firstIssue = parsed.error.issues[0]
@@ -116,6 +120,7 @@ export function createActivityRoutes(deps: ActivityRoutesDeps): Hono {
         ...(parsed.data.from ? { from: parsed.data.from } : {}),
         ...(parsed.data.to ? { to: parsed.data.to } : {}),
         ...(parsed.data.cursor ? { cursor: parsed.data.cursor } : {}),
+        ...(parsed.data.pathPrefix ? { pathPrefix: parsed.data.pathPrefix } : {}),
       }
       const page = await activityService.query(vaultId, query)
       return c.json(page, 200)

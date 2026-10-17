@@ -150,6 +150,8 @@ export interface UserVaultSettings {
   sidebarPanel: Record<string, unknown> | null
   /** Right context panel layout; shape owned by the client. */
   contextPanel: Record<string, unknown> | null
+  /** Selected activity-timeline range ('day'|'week'|'month'|'year'); null = default. */
+  activityRange: string | null
 }
 
 // ─── Patch Types ─────────────────────────────────────────────────────────────
@@ -196,6 +198,7 @@ export const DEFAULT_VAULT_SETTINGS: UserVaultSettings = {
   graph: null,
   sidebarPanel: null,
   contextPanel: null,
+  activityRange: null,
 }
 
 // ─── Aggregate ───────────────────────────────────────────────────────────────

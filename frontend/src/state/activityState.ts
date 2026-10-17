@@ -9,6 +9,15 @@
 
 import type { ActivityEvent, ActivityEventType } from '../types'
 
+/** Time range for the list + by-type stats (NOT the heatmap, which has its own fixed window). */
+export type ActivityRange = 'day' | 'week' | 'month' | 'year'
+
+/** Default list/stats range. */
+export const DEFAULT_ACTIVITY_RANGE: ActivityRange = 'week'
+
+/** Fixed heatmap window, independent of the range switcher (L4). */
+export const HEATMAP_WEEKS = 10
+
 export interface ActivityState {
   /** Loaded events, newest first (may span multiple fetched pages). */
   events: ActivityEvent[]
@@ -16,6 +25,12 @@ export interface ActivityState {
   nextCursor: string | null
   /** Active type-lane filter: the set of event types currently shown. Empty = all. */
   activeTypes: ActivityEventType[]
+  /** Selected list/stats time range. */
+  range: ActivityRange
+  /** Heatmap-window events, loaded separately from the range (L4). */
+  heatmapEvents: ActivityEvent[]
+  /** Folder prefix filter ('' = all folders). */
+  pathPrefix: string
   /** True while the first page is loading. */
   loading: boolean
   /** True while a subsequent page is loading. */
@@ -29,6 +44,9 @@ export function createInitialActivityState(): ActivityState {
     events: [],
     nextCursor: null,
     activeTypes: [],
+    range: DEFAULT_ACTIVITY_RANGE,
+    heatmapEvents: [],
+    pathPrefix: '',
     loading: false,
     loadingMore: false,
     error: null,
@@ -44,6 +62,9 @@ export type ActivityAction =
   | { type: 'LOAD_MORE_ERROR'; error: string }
   | { type: 'PREPEND_RECENT'; events: ActivityEvent[] }
   | { type: 'SET_ACTIVE_TYPES'; types: ActivityEventType[] }
+  | { type: 'SET_RANGE'; range: ActivityRange }
+  | { type: 'HEATMAP_LOADED'; events: ActivityEvent[] }
+  | { type: 'SET_PATH_PREFIX'; pathPrefix: string }
 
 /** Merge new events into existing ones, de-duplicating by id, newest first. */
 function mergeNewestFirst(existing: ActivityEvent[], incoming: ActivityEvent[]): ActivityEvent[] {
@@ -79,6 +100,12 @@ export function activityReducer(state: ActivityState, action: ActivityAction): A
       return { ...state, events: mergeNewestFirst(state.events, action.events) }
     case 'SET_ACTIVE_TYPES':
       return { ...state, activeTypes: action.types }
+    case 'SET_RANGE':
+      return { ...state, range: action.range }
+    case 'HEATMAP_LOADED':
+      return { ...state, heatmapEvents: action.events }
+    case 'SET_PATH_PREFIX':
+      return { ...state, pathPrefix: action.pathPrefix }
     default:
       return state
   }

@@ -26,6 +26,14 @@ export type ActivityEventType =
   | 'snippet.created'
   | 'snippet.edited'
   | 'snippet.deleted'
+  | 'sync.completed'
+
+/**
+ * Where a recorded activity originated. A missing `origin` on a persisted
+ * event is interpreted as `web` (events written before this field existed
+ * carry none) — see {@link ActivityEvent.origin}.
+ */
+export type ActivityOrigin = 'web' | 'mcp' | 'git-sync' | 'mail-import'
 
 /**
  * A single recorded vault activity, persisted as one JSONL line under
@@ -53,6 +61,17 @@ export interface ActivityEvent {
   oldPath?: string
   /** Username that triggered the activity. */
   user: string
+  /**
+   * Where the activity originated. Omitted events are read as `web`
+   * (backward-compatible: lines written before this field existed carry none).
+   */
+  origin?: ActivityOrigin
+  /** Only for `sync.completed`: files brought in by the merge (pull). */
+  pulledFiles?: number
+  /** Only for `sync.completed`: files committed locally and pushed. */
+  pushedFiles?: number
+  /** Only for `sync.completed`: the remote's user-facing name. */
+  remoteName?: string
 }
 
 /**
@@ -71,6 +90,12 @@ export interface ActivityQuery {
   from?: string
   /** Only events strictly before this ISO 8601 timestamp. */
   to?: string
+  /**
+   * Restrict to events whose `path` is at or under this vault-relative
+   * prefix. Vault-wide events (`path === '/'`, e.g. `sync.completed`) are
+   * never filtered out by this — they concern the whole vault (L6).
+   */
+  pathPrefix?: string
   /**
    * Opaque pagination cursor from a previous page's `nextCursor`.
    * Omit for the first page.
