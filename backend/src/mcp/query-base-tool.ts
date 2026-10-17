@@ -15,6 +15,7 @@ import {
   filterRows,
   evaluateFormulaColumn,
   formatFormulaValue,
+  computeSummaries,
 } from '@slatebase/shared-contracts'
 import type { BaseDocument, BaseRow, BaseView } from '@slatebase/shared-contracts'
 import { VaultNotFoundError, VaultAccessDeniedError } from '../business/index.js'
@@ -192,6 +193,13 @@ export function registerQueryBase(
         const available = rows.length
         const columns = outputColumns(doc, view)
 
+        // Column summaries over ALL matched rows (not just the returned page),
+        // so a Sum/Average/Count reflects the whole filtered set.
+        const summaryMap = computeSummaries(rows, view, doc)
+        const summaries = Object.fromEntries(
+          Object.entries(summaryMap).map(([col, s]) => [col, { summary: s.summary, value: formatFormulaValue(s.value) }]),
+        )
+
         return mcpToolSuccess({
           base: args.path,
           view: { name: view.name ?? null, type: view.type },
@@ -207,6 +215,7 @@ export function registerQueryBase(
           // candidate cap (then matches beyond the cap were never evaluated).
           truncated: returned.length < available || candidatesTruncated,
           ...(candidatesTruncated ? { candidateCapHit: true } : {}),
+          ...(Object.keys(summaries).length > 0 ? { summaries } : {}),
           ...(parsed.errors && parsed.errors.length > 0
             ? { warnings: parsed.errors.map((e) => e.message) }
             : {}),

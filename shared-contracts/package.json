@@ -1,6 +1,6 @@
 {
   "name": "@slatebase/shared-contracts",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "AP10 feasibility proof: Zod schemas shared between backend and frontend for the vault routes (GET /vaults, /tree, /files; PUT /files). Not a workspace package — consumed via a file: dependency from each side's own package.json.",
   "type": "module",

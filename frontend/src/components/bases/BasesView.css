@@ -140,6 +140,33 @@
   color: var(--text-muted);
 }
 
+.bases-table__summary-row {
+  border-top: 2px solid var(--border-default);
+  background: var(--bg-secondary);
+}
+
+.bases-table__summary-cell {
+  font-size: 0.85em;
+}
+
+.bases-table__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.bases-table__summary-label {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 0.75em;
+  letter-spacing: 0.03em;
+}
+
+.bases-table__summary-value {
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
 .base-cell--readonly {
   color: var(--text-normal);
 }
@@ -238,6 +265,46 @@
 }
 
 /* ─── Kanban (cards) view ──────────────────────────────────────────────── */
+.bases-kanban-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.bases-kanban__summary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-default);
+  font-size: 0.85em;
+}
+
+.bases-kanban__summary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.bases-kanban__summary-col {
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
+.bases-kanban__summary-label {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 0.75em;
+  letter-spacing: 0.03em;
+}
+
+.bases-kanban__summary-value {
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
 .bases-kanban {
   display: flex;
   gap: 12px;

@@ -10,8 +10,8 @@
 
 import { memo, useCallback, useMemo } from 'react'
 import type { BaseDocument, BaseRow, BaseView, BaseSortClause } from '@slatebase/shared-contracts'
-import { evaluateFormula, formatFormulaValue } from '@slatebase/shared-contracts'
-import type { FormulaContext } from '@slatebase/shared-contracts'
+import { evaluateFormula, formatFormulaValue, computeSummaries } from '@slatebase/shared-contracts'
+import type { FormulaContext, ComputedSummaries } from '@slatebase/shared-contracts'
 import { BaseCell } from './BaseCell'
 import { inferCellType } from './base-cell-type'
 
@@ -62,6 +62,13 @@ export const BasesTableView = memo(function BasesTableView({
     const next: BaseSortClause = { column: col, direction: current === 'asc' ? 'desc' : 'asc' }
     onSortChange([next])
   }, [sortByColumn, onSortChange])
+
+  // Column summaries (Sum/Average/Count/…) over the currently shown rows.
+  const summaries: ComputedSummaries = useMemo(
+    () => computeSummaries(rows, view, doc),
+    [rows, view, doc],
+  )
+  const hasSummaries = Object.keys(summaries).length > 0
 
   return (
     <div className="bases-table-view">
@@ -149,6 +156,25 @@ export const BasesTableView = memo(function BasesTableView({
             </tr>
           ))}
         </tbody>
+        {hasSummaries && (
+          <tfoot>
+            <tr className="bases-table__summary-row">
+              {columns.map((col) => {
+                const s = summaries[col]
+                return (
+                  <td key={col} className="bases-table__cell bases-table__summary-cell">
+                    {s && (
+                      <span className="bases-table__summary">
+                        <span className="bases-table__summary-label">{s.summary}</span>
+                        <span className="bases-table__summary-value">{formatFormulaValue(s.value)}</span>
+                      </span>
+                    )}
+                  </td>
+                )
+              })}
+            </tr>
+          </tfoot>
+        )}
       </table>
       {rows.length === 0 && <p className="bases-table-view__empty">Keine Einträge</p>}
     </div>
