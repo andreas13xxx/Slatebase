@@ -183,7 +183,7 @@ export function registerQueryBase(
           filters: wireSpec.filters as BaseQuerySpec['filters'],
         }
         const candidates = await linkIndex.queryForBase(indexSpec)
-        const { rows, total, truncated: candidatesTruncated } = filterRows(candidates.rows, doc, view, candidates.truncated)
+        const { rows, total, truncated: candidatesTruncated } = filterRows(candidates.rows, doc, view, candidates.truncated, candidates.listKeys)
 
         const returned = rows.slice(0, args.limit)
         // `filterRows` counts matches before the view's own limit. The view limit

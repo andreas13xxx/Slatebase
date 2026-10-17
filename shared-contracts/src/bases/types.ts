@@ -143,6 +143,12 @@ export interface BaseRow {
   fileName: string
   /** Raw property values keyed by property key. */
   values: Record<string, unknown>
+  /**
+   * Property keys known to be lists vault-wide (from the backend's registry +
+   * observed multi-value form). A one-element value for such a key stays a
+   * list instead of unwrapping to a scalar. Absent falls back to `LIST_KEYS`.
+   */
+  listKeys?: ReadonlySet<string>
 }
 
 // ─── Parse result ─────────────────────────────────────────────────────────────
@@ -208,4 +214,13 @@ export interface BaseQueryResultWire {
    * matches. The view surfaces this so the result is never silently truncated.
    */
   truncated?: boolean
+  /**
+   * Property keys the backend knows to be LISTS vault-wide — either declared
+   * `list`/`tags`/`aliases` in the property-type registry, or observed with two
+   * or more values somewhere in the vault. The engine treats a one-element
+   * value for such a key as a list instead of unwrapping it to a scalar, so a
+   * genuinely list-typed property with a single current value still behaves as
+   * a list. Absent/empty falls back to the static `LIST_KEYS` heuristic.
+   */
+  listKeys?: string[]
 }

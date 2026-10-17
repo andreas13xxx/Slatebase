@@ -339,4 +339,11 @@ export interface BaseQueryResult {
   total: number
   /** True when the candidate cap was hit, so rows may be missing matches. */
   truncated?: boolean | undefined
+  /**
+   * Property keys known to be lists vault-wide — observed with two or more
+   * values somewhere in the index, unioned with any list-typed keys the route
+   * supplies from the property-type registry. The engine treats a one-element
+   * value for such a key as a list, fixing the single-value list ambiguity.
+   */
+  listKeys?: string[] | undefined
 }

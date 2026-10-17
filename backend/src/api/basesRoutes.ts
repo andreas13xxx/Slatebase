@@ -19,6 +19,7 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { z } from 'zod'
 import type { ILinkIndex, BaseQueryNode, BaseQuerySpec } from '../link-index/index.js'
+import type { IPropertyTypeService } from '../property-type/index.js'
 import type { ILogger } from '../logger/index.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -31,8 +32,18 @@ interface ApiError {
 
 interface BasesRoutesDeps {
   linkIndexResolver: (vaultId: string) => Promise<ILinkIndex | undefined>
+  /**
+   * Optional property-type registry source. When present, keys declared
+   * `list`/`tags`/`aliases` are added to the query response's `listKeys`, so a
+   * list-typed property with a single current value is still read as a list
+   * even when no file in the vault happens to carry two values for it yet.
+   */
+  propertyTypeService?: IPropertyTypeService | undefined
   logger: ILogger
 }
+
+/** Property types whose values are lists. */
+const LIST_PROPERTY_TYPES: ReadonlySet<string> = new Set(['list', 'tags', 'aliases'])
 
 // ─── Validation ──────────────────────────────────────────────────────────────
 
@@ -82,7 +93,7 @@ function createApiError(code: string, message: string): ApiError {
  * Creates a Hono sub-app with the Bases query route.
  */
 export function createBasesRoutes(deps: BasesRoutesDeps): Hono {
-  const { linkIndexResolver, logger } = deps
+  const { linkIndexResolver, propertyTypeService, logger } = deps
   const app = new Hono()
 
   // POST /vaults/:vaultId/bases/query — resolve a base query to table rows
@@ -117,6 +128,29 @@ export function createBasesRoutes(deps: BasesRoutesDeps): Hono {
       }
 
       const result = await linkIndex.queryForBase(spec)
+
+      // Union the index-observed list keys with any declared list-typed keys
+      // from the property-type registry, so a genuinely list-typed property
+      // with a single current value is still treated as a list.
+      if (propertyTypeService) {
+        try {
+          const registry = await propertyTypeService.getRegistry(vaultId)
+          const declared = registry.entries
+            .filter((e) => LIST_PROPERTY_TYPES.has(e.type))
+            .map((e) => e.key)
+          if (declared.length > 0) {
+            result.listKeys = [...new Set([...(result.listKeys ?? []), ...declared])]
+          }
+        } catch (error) {
+          // A missing/unreadable registry must not fail the query — the
+          // index-observed list keys and the engine's static fallback remain.
+          logger.warn('Failed to read property-type registry for base query', {
+            vaultId,
+            error: String(error),
+          })
+        }
+      }
+
       return c.json(result, 200)
     } catch (error) {
       logger.error('Failed to run base query', { vaultId, error: String(error) })

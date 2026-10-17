@@ -83,10 +83,16 @@ export function buildQuerySpec(doc: BaseDocument, view: BaseView): BaseQuerySpec
  */
 const LIST_KEYS: ReadonlySet<string> = new Set(['tags', 'aliases', 'cssclasses', 'file.tags', 'file.links'])
 
-/** Converts an index value to an expression value; one-element lists of other properties read as scalars. */
-function toExprValue(key: string, v: unknown): FormulaValue {
+/**
+ * Converts an index value to an expression value. A one-element list reads as a
+ * scalar UNLESS the key is a known list key — either a static Obsidian list key
+ * (`LIST_KEYS`) or one the backend reported for this vault (`extraListKeys`,
+ * from the property-type registry or observed multi-value form). This is what
+ * keeps a genuinely list-typed property with a single current value a list.
+ */
+function toExprValue(key: string, v: unknown, extraListKeys?: ReadonlySet<string>): FormulaValue {
   if (Array.isArray(v)) {
-    if (LIST_KEYS.has(key)) return v as FormulaValue[]
+    if (LIST_KEYS.has(key) || extraListKeys?.has(key)) return v as FormulaValue[]
     if (v.length === 0) return null
     if (v.length === 1) return v[0] as FormulaValue
     return v as FormulaValue[]
@@ -106,6 +112,7 @@ export function rowContext(row: BaseRow, doc?: BaseDocument): FormulaContext {
 
 function buildContext(row: BaseRow, doc: BaseDocument | undefined, active: ReadonlySet<string>): FormulaContext {
   const values = row.values
+  const listKeys = row.listKeys
   const tags = Array.isArray(values['file.tags']) ? (values['file.tags'] as string[]) : []
   const links = Array.isArray(values['file.links']) ? (values['file.links'] as string[]) : []
   const folder = typeof values['file.folder'] === 'string' ? (values['file.folder'] as string) : ''
@@ -119,9 +126,9 @@ function buildContext(row: BaseRow, doc: BaseDocument | undefined, active: Reado
       }
       if (name === 'file.name' || name === 'file.basename') return row.fileName
       if (name === 'file.path') return row.path
-      if (name.startsWith('file.')) return toExprValue(name, values[name])
+      if (name.startsWith('file.')) return toExprValue(name, values[name], listKeys)
       const key = name.startsWith('note.') ? name.slice('note.'.length) : name
-      return toExprValue(key, values[key] ?? values[name])
+      return toExprValue(key, values[key] ?? values[name], listKeys)
     },
     fileApi: {
       hasTag: (tag: string) => {
@@ -161,14 +168,18 @@ function matchesFilter(node: BaseFilterNode | undefined, ctx: FormulaContext): b
  * `values` under `file.*`), keeps those passing BOTH the document filter and
  * the view filter, then applies the view `limit`. `total` is the match count
  * before the limit. `truncated` propagates the backend's candidate-cap flag so
- * the view can warn the result may be incomplete.
+ * the view can warn the result may be incomplete. `listKeys` (the backend's
+ * vault-wide list-property set) is attached to every row so the engine treats
+ * a one-element value for such a key as a list, not a scalar.
  */
 export function filterRows(
   wireRows: BaseQueryRowWire[],
   doc: BaseDocument,
   view: BaseView,
   truncated?: boolean,
+  listKeys?: readonly string[],
 ): { rows: BaseRow[]; total: number; truncated: boolean } {
+  const listKeySet = listKeys && listKeys.length > 0 ? new Set(listKeys) : undefined
   const allRows: BaseRow[] = wireRows.map((r) => {
     const values: Record<string, unknown> = { ...r.values }
     if (r.ctime !== undefined) values['file.ctime'] = r.ctime
@@ -177,7 +188,9 @@ export function filterRows(
     if (r.folder !== undefined) values['file.folder'] = r.folder
     if (r.tags !== undefined) values['file.tags'] = r.tags
     if (r.links !== undefined) values['file.links'] = r.links
-    return { path: r.path, fileName: r.fileName, values }
+    return listKeySet
+      ? { path: r.path, fileName: r.fileName, values, listKeys: listKeySet }
+      : { path: r.path, fileName: r.fileName, values }
   })
 
   const matched = allRows.filter((row) => {

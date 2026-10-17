@@ -24,5 +24,5 @@ export async function runBaseQuery(
   view: BaseView,
 ): Promise<{ rows: BaseRow[]; total: number; truncated: boolean }> {
   const result = await apiClient.queryBase(vaultId, buildQuerySpec(doc, view))
-  return filterRows(result.rows, doc, view, result.truncated)
+  return filterRows(result.rows, doc, view, result.truncated, result.listKeys)
 }

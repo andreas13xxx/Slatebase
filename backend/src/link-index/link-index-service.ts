@@ -664,7 +664,25 @@ export class LinkIndexService implements ILinkIndex {
 
     const total = rows.length
     this.sortBaseRows(rows, spec.sort ?? [])
-    return { rows: rows.slice(0, limit), total, truncated: total > limit }
+    return { rows: rows.slice(0, limit), total, truncated: total > limit, listKeys: this.collectObservedListKeys() }
+  }
+
+  /**
+   * Property keys the index has seen as a LIST (two or more values) in at least
+   * one file. A one-element value for such a key is then treated as a list by
+   * the expression engine instead of being unwrapped to a scalar — the vault's
+   * own data is the evidence, so no per-property type declaration is required.
+   * The property-type registry contributes additional declared list keys at the
+   * route layer; this is the index-observed half.
+   */
+  private collectObservedListKeys(): string[] {
+    const keys = new Set<string>()
+    for (const propsMap of this.fileProperties.values()) {
+      for (const [key, values] of propsMap) {
+        if (values.length >= 2) keys.add(key)
+      }
+    }
+    return [...keys]
   }
 
   /** Whether a filter tree contains any file ctime/mtime condition. */

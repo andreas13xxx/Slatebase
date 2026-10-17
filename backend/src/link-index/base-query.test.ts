@@ -166,4 +166,25 @@ describe('LinkIndexService.queryForBase', () => {
     expect(result.rows).toHaveLength(1)
     expect(result.rows[0]!.folder).toBe('')
   })
+
+  describe('observed list keys (R2)', () => {
+    it('reports a property observed with two or more values as a list key', async () => {
+      await fs.writeFile(
+        path.join(tempDir, 'multi.md'),
+        '---\nauthors: [Ada, Bob]\nstatus: open\n---\n# Multi',
+      )
+      await service.rebuild()
+      const result = await service.queryForBase({ columns: [] })
+      expect(result.listKeys).toContain('authors')
+      // A single-valued scalar property is NOT reported as a list key.
+      expect(result.listKeys).not.toContain('status')
+    })
+
+    it('omits listKeys entries when no property has multiple values', async () => {
+      await fs.writeFile(path.join(tempDir, 'solo.md'), '---\nstatus: open\n---\n# Solo')
+      await service.rebuild()
+      const result = await service.queryForBase({ columns: [] })
+      expect(result.listKeys).toEqual([])
+    })
+  })
 })
