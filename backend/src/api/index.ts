@@ -332,6 +332,7 @@ export class VaultController implements IVaultController {
         type: result.created ? 'note.created' : 'note.edited',
         path: filePath,
         user: session.username,
+        origin: 'web',
       })
 
       return c.json(result, 200)
@@ -545,6 +546,7 @@ export class VaultController implements IVaultController {
         type: 'note.deleted',
         path: decodedPath,
         user: session.username,
+        origin: 'web',
       })
 
       return c.body(null, 204)
@@ -608,6 +610,7 @@ export class VaultController implements IVaultController {
         path: result.newPath,
         oldPath: sourcePath,
         user: session.username,
+        origin: 'web',
       })
 
       return c.json(linkMigrationWarnings ? { ...result, linkMigrationWarnings } : result, 200)
@@ -668,6 +671,7 @@ export class VaultController implements IVaultController {
         path: result.newPath,
         oldPath: filePath,
         user: session.username,
+        origin: 'web',
       })
 
       return c.json(linkMigrationWarnings ? { ...result, linkMigrationWarnings } : result, 200)

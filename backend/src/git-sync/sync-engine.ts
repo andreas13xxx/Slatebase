@@ -66,6 +66,16 @@ export interface IGitSyncEngine {
   runOne(vaultId: string, remoteId: string): Promise<GitSyncRunOutcome>
 }
 
+/**
+ * Fire-and-forget activity recorder, injected only when the `activity-timeline`
+ * feature is enabled. Same optional-hook shape as the MCP tool-handlers and
+ * trashRoutes: a failure here never fails the sync (recording is a side effect).
+ */
+export type RecordSyncActivityHook = (
+  vaultId: string,
+  event: { remoteName: string; pulledFiles: number; pushedFiles: number },
+) => void
+
 export class GitSyncEngine implements IGitSyncEngine {
   private readonly locks = new KeyedMutex()
 
@@ -79,6 +89,7 @@ export class GitSyncEngine implements IGitSyncEngine {
     private readonly logger: ILogger,
     private readonly eventBus?: IEventBus,
     private readonly accessControl?: IVaultAccessControl,
+    private readonly recordActivity?: RecordSyncActivityHook,
   ) {}
 
   /**
@@ -193,6 +204,15 @@ export class GitSyncEngine implements IGitSyncEngine {
       }
 
       await this.gitCli.push(cwd, remoteName, vaultData.branch, auth)
+
+      // Record one sync.completed event — only when the merge actually brought
+      // something in (pulledFiles > 0). A pure push (pulledFiles = 0) reflects
+      // local edits already tracked as note.edited/created and is not a
+      // remote-originated change, so it writes no event (L3). Fire-and-forget:
+      // injected only when the activity-timeline feature is enabled.
+      if (pulledFiles > 0) {
+        this.recordActivity?.(vaultId, { remoteName: remote.name, pulledFiles, pushedFiles })
+      }
 
       this.logger.info('Git-sync run succeeded', { vaultId, remoteId, pulledFiles, pushedFiles })
       return this.finish(vaultId, remoteId, { result: 'success', pulledFiles, pushedFiles })

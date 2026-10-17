@@ -364,9 +364,9 @@ if (featureToggleService.isEnabled('mcp')) {
                 const user = await userRepository.findById(event.userId)
                 const username = user ? (user.displayName || user.username) : 'MCP'
                 if (event.type === 'note.moved') {
-                  await activityStore.record(vaultId, { type: 'note.moved', path: event.path, oldPath: event.oldPath, user: username })
+                  await activityStore.record(vaultId, { type: 'note.moved', path: event.path, oldPath: event.oldPath, user: username, origin: 'mcp' })
                 } else {
-                  await activityStore.record(vaultId, { type: event.type, path: event.path, user: username })
+                  await activityStore.record(vaultId, { type: event.type, path: event.path, user: username, origin: 'mcp' })
                 }
               } catch {
                 // recording is a side effect; swallow
@@ -802,7 +802,22 @@ app.route('/api/v1', trashRoutes)
 const gitSyncConfigStore = new GitSyncConfigStore(serverConfig.dataDir)
 const gitSyncStatusStore = new GitSyncStatusStore(serverConfig.dataDir)
 const gitCli = new GitCli()
-const gitSyncEngine = new GitSyncEngine(gitCli, vaultRegistry, gitSyncConfigStore, gitSyncStatusStore, moduleSecretStore, serverConfig.dataDir, logger, eventBus, vaultAccessControl)
+// Record one sync.completed per effective pull; gated on the activity-timeline
+// feature. Fire-and-forget — never part of the sync's success (Task 2.4, L8).
+const gitSyncRecordActivity = activityEnabled
+  ? (vaultId: string, event: { remoteName: string; pulledFiles: number; pushedFiles: number }): void => {
+      void activityStore.record(vaultId, {
+        type: 'sync.completed',
+        path: '/',
+        user: 'Git-Sync',
+        origin: 'git-sync',
+        pulledFiles: event.pulledFiles,
+        pushedFiles: event.pushedFiles,
+        remoteName: event.remoteName,
+      })
+    }
+  : undefined
+const gitSyncEngine = new GitSyncEngine(gitCli, vaultRegistry, gitSyncConfigStore, gitSyncStatusStore, moduleSecretStore, serverConfig.dataDir, logger, eventBus, vaultAccessControl, gitSyncRecordActivity)
 const gitSyncScheduler = new GitSyncScheduler(gitSyncConfigStore, gitSyncStatusStore, gitSyncEngine, logger)
 const gitSshKeyGenerator = new SshKeyGenerator()
 const gitSyncRoutes = createGitSyncRoutes({
@@ -821,7 +836,30 @@ app.route('/api/v1', gitSyncRoutes)
 const mailImportConfigStore = new MailImportConfigStore(serverConfig.dataDir)
 const mailImportStatusStore = new MailImportStatusStore(serverConfig.dataDir)
 const imapClient = new ImapClient()
-const mailNoteWriter = new MailNoteWriter(vaultManager, logger, eventBus, vaultAccessControl)
+const mailNoteWriter = new MailNoteWriter(
+  vaultManager,
+  logger,
+  eventBus,
+  vaultAccessControl,
+  // Record an imported mail as note.created with origin='mail-import'.
+  // Fire-and-forget; no-op unless activity-timeline is enabled (Task 3.3, L8).
+  activityEnabled
+    ? (vaultId: string, notePath: string): void => {
+        void activityStore.record(vaultId, {
+          type: 'note.created',
+          path: notePath,
+          user: 'Mail-Import',
+          origin: 'mail-import',
+        })
+      }
+    : undefined,
+  // Keep the link index in step with this second write path — not feature-gated
+  // (correctness fix independent of the timeline, L1). Closure: linkIndexHook is
+  // a const declared further down; the body runs only on an actual import.
+  (vaultId: string, notePath: string, content: string): void => {
+    linkIndexHook.onFileSaved(vaultId, notePath, content)
+  },
+)
 const mailImportEngine = new MailImportEngine(mailImportConfigStore, mailImportStatusStore, moduleSecretStore, imapClient, mailNoteWriter, logger)
 const mailImportScheduler = new MailImportScheduler(mailImportConfigStore, mailImportStatusStore, mailImportEngine, logger)
 const mailImportRoutes = createMailImportRoutes({

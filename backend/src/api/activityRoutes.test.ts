@@ -92,6 +92,27 @@ describe('Activity Route', () => {
     expect(body.items).toEqual([])
     expect(body.nextCursor).toBeNull()
   })
+
+  it('filters by pathPrefix, keeping vault-wide sync.completed visible (L6)', async () => {
+    await store.record('vault-1', { type: 'note.created', path: 'Projects/a.md', user: 'u' })
+    await store.record('vault-1', { type: 'note.created', path: 'Other/b.md', user: 'u' })
+    await store.record('vault-1', { type: 'sync.completed', path: '/', user: 'Git-Sync', origin: 'git-sync', pulledFiles: 1 })
+
+    const res = await get('?pathPrefix=Projects')
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as ActivityPage
+    const paths = body.items.map(e => e.path).sort()
+    expect(paths).toEqual(['/', 'Projects/a.md'])
+  })
+
+  it('accepts sync.completed as a type filter', async () => {
+    await store.record('vault-1', { type: 'sync.completed', path: '/', user: 'Git-Sync', origin: 'git-sync', pulledFiles: 2 })
+    const res = await get('?types=sync.completed')
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as ActivityPage
+    expect(body.items).toHaveLength(1)
+    expect(body.items[0]?.type).toBe('sync.completed')
+  })
 })
 
 describe('Activity Route — access control & feature gate (composed with middleware)', () => {

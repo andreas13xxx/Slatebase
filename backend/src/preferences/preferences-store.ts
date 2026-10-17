@@ -121,6 +121,9 @@ function sanitizeVaultSettings(raw: unknown): UserVaultSettings {
     graph: isRecord(parsed['graph']) ? parsed['graph'] : null,
     sidebarPanel: isRecord(parsed['sidebarPanel']) ? parsed['sidebarPanel'] : null,
     contextPanel: isRecord(parsed['contextPanel']) ? parsed['contextPanel'] : null,
+    activityRange: typeof parsed['activityRange'] === 'string' && parsed['activityRange'].length <= 16
+      ? parsed['activityRange']
+      : DEFAULT_VAULT_SETTINGS.activityRange,
   }
 }
 

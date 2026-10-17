@@ -42,4 +42,23 @@ describe('activityReducer', () => {
     expect(s1.error).toBe('nope')
     expect(s1.loading).toBe(false)
   })
+
+  it('SET_RANGE updates the range without touching events', () => {
+    const s0 = { ...createInitialActivityState(), events: [evt('a', '2026-10-10T00:00:00Z')] }
+    const s1 = activityReducer(s0, { type: 'SET_RANGE', range: 'month' })
+    expect(s1.range).toBe('month')
+    expect(s1.events).toBe(s0.events)
+  })
+
+  it('HEATMAP_LOADED stores heatmap events separately from the list', () => {
+    const s0 = { ...createInitialActivityState(), events: [evt('list', '2026-10-10T00:00:00Z')] }
+    const s1 = activityReducer(s0, { type: 'HEATMAP_LOADED', events: [evt('hm', '2026-09-01T00:00:00Z')] })
+    expect(s1.heatmapEvents.map(e => e.id)).toEqual(['hm'])
+    expect(s1.events).toBe(s0.events) // list untouched (L4)
+  })
+
+  it('SET_PATH_PREFIX updates the folder filter', () => {
+    const s1 = activityReducer(createInitialActivityState(), { type: 'SET_PATH_PREFIX', pathPrefix: 'Projects' })
+    expect(s1.pathPrefix).toBe('Projects')
+  })
 })
