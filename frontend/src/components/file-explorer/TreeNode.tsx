@@ -7,6 +7,7 @@ import type { DirectoryTree } from '../../types'
 import type { DragState, ExternalDropState, InlineInputState } from './types'
 import { registerFileExplorerRow, unregisterFileExplorerRow } from '../../plugins/compat/file-explorer-dom-registry'
 import { isOpenInSplitModifier, requestOpenInSplit } from '../../state/openInSplitBridge'
+import { useLongPress } from '../../hooks/useLongPress'
 
 /**
  * Props for the recursive TreeNode component.
@@ -89,6 +90,8 @@ export function TreeNode({
     }
   }, [node.path, node.name, node.type])
 
+  const longPress = useLongPress()
+
   if (isDirectory) {
     const isValidTarget = dragState.draggedPath !== null && dragState.draggedVaultId === vaultId && dragState.validTargets.has(node.path)
     const isExternalDropTarget = externalDropState.targetPath === node.path && externalDropState.targetVaultId === vaultId
@@ -169,6 +172,7 @@ export function TreeNode({
           onDragLeave={(e) => onDragLeave(e, node.path, vaultId)}
           onDrop={(e) => onDrop(e, node.path, vaultId)}
           onContextMenu={(e) => onContextMenu(e, node, vaultId)}
+          {...longPress}
           title={node.path}
         >
           <span className="tree-node-chevron tree-item-icon collapse-icon" aria-hidden="true">
@@ -308,6 +312,7 @@ export function TreeNode({
         onDragStart={(e) => onDragStart(e, node.path, node.type, vaultId)}
         onDragEnd={onDragEnd}
         onContextMenu={(e) => onContextMenu(e, node, vaultId)}
+        {...longPress}
         title={node.path}
       >
         <span className="tree-node-name-wrapper nav-file-title-content tree-item-inner">

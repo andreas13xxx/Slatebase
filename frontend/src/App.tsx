@@ -94,7 +94,7 @@ import type { SettingsCategory, SettingsSection } from './state/settingsState'
 import { PluginProvider } from './plugins/compat/plugin-context'
 import { CommandPaletteContainer } from './components/CommandPaletteContainer'
 import { TabBar, type SettingsTabDescriptor } from './components/TabBar'
-import { NavigationControls } from './components/NavigationControls'
+import { EditorHeaderRow } from './components/EditorHeaderRow'
 import { Breadcrumb } from './components/Breadcrumb'
 import { useResize } from './hooks/useResize'
 import { useStatusBar } from './hooks/useStatusBar'
@@ -1268,12 +1268,11 @@ function AppContent() {
           {/* workspace-tab-container: Obsidian-parity marker class — see mod-vertical/mod-root
               note above. Some plugins requestFullscreen() this element by selector. */}
           <section className="app-content workspace-tab-container">
-            {/* Back/forward navigation history + settings-page tab bar in one
+            {/* Settings-page tab bar in one
                 row. While unsplit (or while a settings page hides the panes)
                 this row also carries the file tabs; once split, each pane
                 shows its own bar instead (see renderPane below). */}
             <div className="tab-bar-row">
-              <NavigationControls />
               <TabBar
                 settingsTabs={settingsTabs}
                 isShowingSettings={isShowingSettings}
@@ -1285,6 +1284,17 @@ function AppContent() {
               />
             </div>
 
+            {/* Back/forward, breadcrumb and the pane menu share the row below the tabs. */}
+            <EditorHeaderRow showPaneMenu={!isShowingSettings}>
+              {!isShowingSettings && breadcrumbFilePath !== null && selectedVault && (
+                <Breadcrumb
+                  vaultName={selectedVault.name}
+                  filePath={breadcrumbFilePath}
+                  onSegmentClick={handleBreadcrumbSegmentClick}
+                />
+              )}
+            </EditorHeaderRow>
+
             {/* Content: settings page or vault editor */}
             {isShowingSettings ? (
               <div className="tab-content" style={{ overflow: 'auto' }}>
@@ -1294,13 +1304,6 @@ function AppContent() {
               </div>
             ) : (
               <>
-                {breadcrumbFilePath !== null && selectedVault && (
-                  <Breadcrumb
-                    vaultName={selectedVault.name}
-                    filePath={breadcrumbFilePath}
-                    onSegmentClick={handleBreadcrumbSegmentClick}
-                  />
-                )}
                 <ErrorBoundary>
                   <PaneTreeView
                     tree={paneTree}

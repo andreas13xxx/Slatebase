@@ -7,6 +7,7 @@ import { getCustomIconSvg, sizeCustomIconSvg, useIconResolutionTick } from '../u
 import { resolveIconMarkupSync } from '../plugins/compat/lucide-icons'
 import { ContextMenu, type ContextMenuItem } from './ContextMenu'
 import { buildTabContextMenuItems } from './tab-context-menu'
+import { useLongPress } from '../hooks/useLongPress'
 
 /** A single settings-page tab shown ahead of the file tabs (not draggable). */
 export interface SettingsTabDescriptor {
@@ -65,6 +66,8 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab, pan
   const { activeTabId } = tabState
   const tabs = showFileTabs ? tabState.tabs : []
   const dragIndexRef = useRef<number | null>(null)
+  // One instance serves all tabs: only a single finger can long-press at a time.
+  const longPress = useLongPress()
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
 
@@ -262,6 +265,7 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab, pan
             className={`tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}${dragOverIndex === index ? ' tab-bar-tab--drag-over' : ''}`}
             onClick={() => handleActivate(tab.id)}
             onContextMenu={(e) => handleTabContextMenu(e, index)}
+            {...longPress}
             title={isGraphTab ? 'Graph' : tab.filePath}
             tabIndex={isActive ? 0 : -1}
             draggable

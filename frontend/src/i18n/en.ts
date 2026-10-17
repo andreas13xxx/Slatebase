@@ -186,6 +186,15 @@ export const en: TranslationShape = {
 
   splitPanes: {
     noActiveTab: 'No active tab to split.',
+    menuLabel: 'View menu',
+    splitRight: 'Split right',
+    splitDown: 'Split down',
+    focusLeft: 'Focus pane to the left',
+    focusRight: 'Focus pane to the right',
+    focusUp: 'Focus pane above',
+    focusDown: 'Focus pane below',
+    closePane: 'Close pane',
+    closeOtherPanes: 'Close other panes',
   },
 
   binaryViewer: {

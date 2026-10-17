@@ -180,6 +180,15 @@ export const de = {
 
   splitPanes: {
     noActiveTab: 'Kein aktiver Tab zum Teilen.',
+    menuLabel: 'Ansichtsmenü',
+    splitRight: 'Nach rechts teilen',
+    splitDown: 'Nach unten teilen',
+    focusLeft: 'Fokus nach links',
+    focusRight: 'Fokus nach rechts',
+    focusUp: 'Fokus nach oben',
+    focusDown: 'Fokus nach unten',
+    closePane: 'Bereich schließen',
+    closeOtherPanes: 'Andere Bereiche schließen',
   },
 
   binaryViewer: {
