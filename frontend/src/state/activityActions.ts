@@ -14,17 +14,22 @@ import { extractErrorMessage } from '../utils/error'
 
 const PAGE_LIMIT = 50
 
-/** Milliseconds per range window, used to derive the `from` boundary. */
-const RANGE_MS: Record<ActivityRange, number> = {
-  day: 24 * 60 * 60 * 1000,
-  week: 7 * 24 * 60 * 60 * 1000,
-  month: 30 * 24 * 60 * 60 * 1000,
-  year: 365 * 24 * 60 * 60 * 1000,
-}
-
-/** ISO `from` boundary for a range, relative to now. */
-function rangeFrom(range: ActivityRange, now: number = Date.now()): string {
-  return new Date(now - RANGE_MS[range]).toISOString()
+/**
+ * ISO `from` boundary for a range, relative to now. `day`/`week` are rolling
+ * windows (24h / 7 days back); `month`/`year` snap to the calendar
+ * month/year start so a range chosen late in the month isn't a short window.
+ */
+function rangeFrom(range: ActivityRange, now: Date = new Date()): string {
+  switch (range) {
+    case 'day':
+      return new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
+    case 'week':
+      return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    case 'month':
+      return new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    case 'year':
+      return new Date(now.getFullYear(), 0, 1).toISOString()
+  }
 }
 
 /** Load the first page of activity for a vault (replaces any loaded events). */

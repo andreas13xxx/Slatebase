@@ -172,17 +172,19 @@ export function ActivityTimelineView({ onOpenFile, variant }: ActivityTimelineVi
 
   return (
     <div className={`activity-timeline activity-timeline--${variant}`}>
-      {/* Filter chips — only lanes with events */}
-      {presentLanes.length > 0 && (
+      {/* Filter row: lane chips (when events exist) + folder filter (full variant) */}
+      {(presentLanes.length > 0 || (variant === 'full' && folderPaths.length > 0)) && (
         <div className="activity-timeline__filters" role="group" aria-label={t('activity.filterLabel')}>
-          <button
-            type="button"
-            className={`activity-chip ${activeLane === null ? 'activity-chip--active' : ''}`}
-            aria-pressed={activeLane === null}
-            onClick={() => selectLane(null)}
-          >
-            {t('activity.lane.all')}
-          </button>
+          {presentLanes.length > 0 && (
+            <button
+              type="button"
+              className={`activity-chip ${activeLane === null ? 'activity-chip--active' : ''}`}
+              aria-pressed={activeLane === null}
+              onClick={() => selectLane(null)}
+            >
+              {t('activity.lane.all')}
+            </button>
+          )}
           {presentLanes.map(lane => (
             <button
               key={lane}
