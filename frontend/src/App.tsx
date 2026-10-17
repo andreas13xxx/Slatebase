@@ -1285,7 +1285,7 @@ function AppContent() {
             </div>
 
             {/* Back/forward, breadcrumb and the pane menu share the row below the tabs. */}
-            <EditorHeaderRow>
+            <EditorHeaderRow showPaneMenu={!isShowingSettings}>
               {!isShowingSettings && breadcrumbFilePath !== null && selectedVault && (
                 <Breadcrumb
                   vaultName={selectedVault.name}

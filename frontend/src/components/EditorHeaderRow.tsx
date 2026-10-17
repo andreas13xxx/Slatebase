@@ -1,8 +1,8 @@
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { MoreHorizontal, Columns2, Rows2, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, X, PanelTopClose } from 'lucide-react'
 import { useTranslation } from '../i18n'
 import { usePaneTree } from '../state/paneTreeContext'
-import { generatePaneId, getActivePaneTabState, listPanes, type SplitDirection } from '../state/paneTreeState'
+import { findPane, generatePaneId, getActivePaneTabState, listPanes, type PaneNode, type SplitDirection } from '../state/paneTreeState'
 import { findPaneInDirection, type FocusDirection, type PaneRect } from './panes/pane-focus-direction'
 import { ContextMenu, type ContextMenuItem } from './ContextMenu'
 import { NavigationControls } from './NavigationControls'
@@ -12,16 +12,26 @@ const ICON_SIZE = 14
 export interface EditorHeaderRowProps {
   /** Breadcrumb (or nothing) shown between the navigation buttons and the menu. */
   children?: ReactNode
+  /** Hides the pane menu, e.g. while a settings page covers the panes. Default true. */
+  showPaneMenu?: boolean
+}
+
+/** True if any tab of the pane holds edits that closing the pane would discard. */
+function hasUnsavedTabs(pane: PaneNode): boolean {
+  return pane.tabState.tabs.some((tab) => tab.editBuffer !== null && tab.editBuffer !== tab.content)
 }
 
 /**
  * Row below the tab bar: back/forward on the left, the breadcrumb in the
  * middle and a "…" menu with pane commands on the right.
  */
-export function EditorHeaderRow({ children }: EditorHeaderRowProps) {
+export function EditorHeaderRow({ children, showPaneMenu = true }: EditorHeaderRowProps) {
   const { t } = useTranslation()
   const { paneTree, paneTreeDispatch } = usePaneTree()
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
+  // ContextMenu closes on an outside mousedown, which includes this very button;
+  // remember that it was open at press time so the click toggles instead of reopening.
+  const wasOpenOnPressRef = useRef(false)
 
   const paneCount = listPanes(paneTree).length
   const activeTabId = getActivePaneTabState(paneTree)?.activeTabId ?? null
@@ -55,6 +65,11 @@ export function EditorHeaderRow({ children }: EditorHeaderRowProps) {
 
   function buildItems(): ContextMenuItem[] {
     const multi = paneCount > 1
+    const others = listPanes(paneTree).filter((p) => p.id !== paneTree.activePaneId)
+    const activePane = findPane(paneTree, paneTree.activePaneId)
+    // Closing a pane drops its tabs without a save prompt, so refuse while edits are pending.
+    const canClosePane = multi && activePane !== null && !hasUnsavedTabs(activePane)
+    const canCloseOthers = multi && !others.some(hasUnsavedTabs)
     const icon = (Icon: typeof X) => <Icon size={ICON_SIZE} />
     return [
       { id: 'split-right', label: t('splitPanes.splitRight'), icon: icon(Columns2), disabled: !activeTabId, run: () => split('horizontal') },
@@ -65,8 +80,8 @@ export function EditorHeaderRow({ children }: EditorHeaderRowProps) {
       { id: 'focus-up', label: t('splitPanes.focusUp'), icon: icon(ArrowUp), disabled: !multi, run: () => focus('up') },
       { id: 'focus-down', label: t('splitPanes.focusDown'), icon: icon(ArrowDown), disabled: !multi, run: () => focus('down') },
       { id: 'sep-close', label: '', separator: true },
-      { id: 'close-pane', label: t('splitPanes.closePane'), icon: icon(X), disabled: !multi, run: () => paneTreeDispatch({ type: 'CLOSE_PANE', payload: { paneId: paneTree.activePaneId } }) },
-      { id: 'close-others', label: t('splitPanes.closeOtherPanes'), icon: icon(PanelTopClose), disabled: !multi, run: closeOthers },
+      { id: 'close-pane', label: t('splitPanes.closePane'), icon: icon(X), disabled: !canClosePane, run: () => paneTreeDispatch({ type: 'CLOSE_PANE', payload: { paneId: paneTree.activePaneId } }) },
+      { id: 'close-others', label: t('splitPanes.closeOtherPanes'), icon: icon(PanelTopClose), disabled: !canCloseOthers, run: closeOthers },
     ]
   }
 
@@ -74,6 +89,7 @@ export function EditorHeaderRow({ children }: EditorHeaderRowProps) {
     <div className="editor-header-row">
       <NavigationControls />
       <div className="editor-header-row__center">{children}</div>
+      {showPaneMenu && (
       <button
         type="button"
         className="nav-controls-button editor-header-row__menu"
@@ -81,14 +97,19 @@ export function EditorHeaderRow({ children }: EditorHeaderRowProps) {
         aria-haspopup="menu"
         aria-expanded={menuPos !== null}
         title={t('splitPanes.menuLabel')}
+        onMouseDown={() => { wasOpenOnPressRef.current = menuPos !== null }}
         onClick={(e) => {
+          const wasOpen = wasOpenOnPressRef.current
+          wasOpenOnPressRef.current = false
+          if (wasOpen) { setMenuPos(null); return }
           const r = e.currentTarget.getBoundingClientRect()
           setMenuPos({ x: r.right, y: r.bottom })
         }}
       >
         <MoreHorizontal size={16} />
       </button>
-      {menuPos && (
+      )}
+      {showPaneMenu && menuPos && (
         <ContextMenu
           x={menuPos.x}
           y={menuPos.y}

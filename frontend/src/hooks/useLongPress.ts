@@ -1,10 +1,12 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import type React from 'react'
 
 /** Touch hold duration before the context menu opens (ms). */
 export const LONG_PRESS_MS = 500
 /** Finger movement (px) that turns a hold into a scroll/drag and cancels it. */
 const MOVE_TOLERANCE_PX = 10
+/** How long after lifting the finger the click-suppression stays armed (ms). The trailing click follows immediately; if none comes, the flag must not outlive it. */
+const CLICK_SUPPRESS_MS = 400
 
 export interface LongPressHandlers {
   onPointerDown: (e: React.PointerEvent<Element>) => void
@@ -29,6 +31,7 @@ export function useLongPress(): LongPressHandlers {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const startRef = useRef<{ x: number; y: number } | null>(null)
   const firedRef = useRef(false)
+  const releaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const cancel = useCallback(() => {
     if (timerRef.current !== null) clearTimeout(timerRef.current)
@@ -36,9 +39,28 @@ export function useLongPress(): LongPressHandlers {
     startRef.current = null
   }, [])
 
+  /** Ends a touch: disarms the timer and lets the click suppression expire on its own. */
+  const release = useCallback(() => {
+    cancel()
+    if (!firedRef.current) return
+    if (releaseTimerRef.current !== null) clearTimeout(releaseTimerRef.current)
+    releaseTimerRef.current = setTimeout(() => {
+      releaseTimerRef.current = null
+      firedRef.current = false
+    }, CLICK_SUPPRESS_MS)
+  }, [cancel])
+
+  // A row can unmount mid-hold (tab closed, tree refreshed): drop both timers.
+  useEffect(() => () => {
+    if (timerRef.current !== null) clearTimeout(timerRef.current)
+    if (releaseTimerRef.current !== null) clearTimeout(releaseTimerRef.current)
+  }, [])
+
   const onPointerDown = useCallback((e: React.PointerEvent<Element>) => {
     if (e.pointerType !== 'touch' || !e.isPrimary) return
     cancel()
+    if (releaseTimerRef.current !== null) clearTimeout(releaseTimerRef.current)
+    releaseTimerRef.current = null
     firedRef.current = false
     const target = e.currentTarget
     const x = e.clientX
@@ -65,5 +87,5 @@ export function useLongPress(): LongPressHandlers {
     e.stopPropagation()
   }, [])
 
-  return { onPointerDown, onPointerMove, onPointerUp: cancel, onPointerCancel: cancel, onPointerLeave: cancel, onClickCapture }
+  return { onPointerDown, onPointerMove, onPointerUp: release, onPointerCancel: release, onPointerLeave: release, onClickCapture }
 }

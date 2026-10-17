@@ -32,4 +32,24 @@ describe('EditorHeaderRow', () => {
     const close = items.find((i) => /schließen|close pane/i.test(i.textContent ?? '') && !/andere|other/i.test(i.textContent ?? ''))
     expect(close?.getAttribute('aria-disabled') ?? close?.hasAttribute('disabled')).toBeTruthy()
   })
+
+  it('hides the pane menu when showPaneMenu is false', () => {
+    render(
+      <PaneTreeProvider>
+        <EditorHeaderRow showPaneMenu={false} />
+      </PaneTreeProvider>,
+    )
+    expect(screen.queryByRole('button', { name: /menü|menu/i })).toBeNull()
+    expect(screen.getByLabelText('Zurück')).toBeTruthy()
+  })
+
+  it('closes the menu when the button is pressed again', () => {
+    renderRow()
+    const btn = screen.getByRole('button', { name: /menü|menu/i })
+    fireEvent.click(btn)
+    expect(screen.queryAllByRole('menuitem').length).toBe(8)
+    fireEvent.mouseDown(btn)
+    fireEvent.click(btn)
+    expect(screen.queryAllByRole('menuitem').length).toBe(0)
+  })
 })

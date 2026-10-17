@@ -64,4 +64,25 @@ describe('useLongPress', () => {
     fireEvent.click(el)
     expect(onClick).toHaveBeenCalledTimes(1)
   })
+
+  it('does not swallow a later click when none followed the long press', () => {
+    const { el, onClick } = setup()
+    fireEvent.pointerDown(el, { pointerType: 'touch', isPrimary: true })
+    vi.advanceTimersByTime(LONG_PRESS_MS)
+    fireEvent.pointerUp(el, { pointerType: 'touch' })
+    vi.advanceTimersByTime(1000)
+    fireEvent.click(el)
+    expect(onClick).toHaveBeenCalledTimes(1)
+  })
+
+  it('drops the pending timer on unmount', () => {
+    const onContextMenu = vi.fn()
+    const { getByTestId, unmount } = render(<Target onClick={vi.fn()} />)
+    const el = getByTestId('t')
+    el.addEventListener('contextmenu', onContextMenu)
+    fireEvent.pointerDown(el, { pointerType: 'touch', isPrimary: true })
+    unmount()
+    vi.advanceTimersByTime(LONG_PRESS_MS * 2)
+    expect(onContextMenu).not.toHaveBeenCalled()
+  })
 })
