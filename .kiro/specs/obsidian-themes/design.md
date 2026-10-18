@@ -22,29 +22,27 @@ Dark-Mode einen **Zyklus** bilden (ungültig → `unset`), und auf `:root` dekla
 die ein Theme auf `body`/`.theme-dark` setzt (Custom Properties lösen am Element auf, an dem sie
 deklariert sind).
 
-### Lösung
-Neue Datei `plugins/appearance/theme-bridge.css`, nur wirksam bei gesetztem Marker:
+### Lösung (Stand Phase 3)
+Neue Datei `plugins/appearance/theme-bridge.css`, nur wirksam bei gesetztem Marker `data-obsidian-theme`
+am `<html>`; die Slatebase-Tokens werden auf **`body`** von den Obsidian-Variablen abgeleitet:
 
 ```css
-/* 1. Standardwerte als Literale, damit kein Zyklus entsteht */
-:root[data-obsidian-theme] body { /* Light-Defaults der Compat-Variablen als Literale */ }
-:root[data-obsidian-theme] body.theme-dark { /* Dark-Defaults als Literale */ }
-
-/* 2. Brücke: Slatebase-Tokens leiten sich von Obsidian-Variablen ab */
-:root[data-obsidian-theme] body {
-  --bg-base: var(--background-primary);
-  /* … siehe Tabelle … */
-}
+:root[data-obsidian-theme] body { --bg-base: var(--background-primary); /* … siehe Tabelle … */ }
 ```
 
-- Die Selektor-Spezifität ist so gewählt, dass Theme-Regeln auf `body` / `body.theme-dark` per
-  Quellreihenfolge (Theme-Tag steht später im `<head>`) die Literale überschreiben. Bridge-Regeln
-  stehen dagegen auf `body` und gewinnen gegen `:root`-Tokens, ohne `!important`.
-- Die Literale werden **nicht** von Hand gepflegt: Ein Test liest `obsidian-compat.css` (Light-Block,
-  Dark-Block) und `theme-bridge.css` und prüft, dass jede brücken-relevante Variable in beiden Dateien
-  denselben aufgelösten Wert hat. Driftet einer, schlägt der Test fehl.
-- Ohne Marker ändert sich nichts (R1.3). Ein Snapshot-Test auf die Liste der Slatebase-Tokens stellt
-  sicher, dass `index.css` unangetastet bleibt.
+- **Kein Zyklus, keine Literale:** Die Compat-Variablen stehen auf `:root`
+  (dunkel z. B. `--background-primary: var(--bg-base)`), die Brücke steht auf `body`. Dort ist
+  `--background-primary` der von `:root` geerbte, bereits aufgelöste Wert, solange das Theme ihn nicht
+  auf `body` überschreibt. `--bg-base` verweist also nie auf sich selbst. (Der ursprüngliche Entwurf mit
+  duplizierten Literalen ist damit überflüssig.)
+- Themes setzen ihre Werte auf `body`/`.theme-*`; die Brücke liest sie dort, weil sie ebenfalls auf `body` liegt.
+- Ohne Marker ändert sich nichts. Test: jeder Selektor der Datei beginnt mit `:root[data-obsidian-theme]`.
+- Hell sind die Compat-Defaults identisch zu Slatebases Werten (Test); dunkel lösen sie über `var()` auf
+  dieselben Tokens auf. Kleine Abweichungen nur bei `--bg-overlay`, `--border-strong`, `--text-subtle` (dunkel).
+- **Nicht gebrückt:** `--text-inverse` (Slatebase nutzt dunkel dunkle Schrift auf hellem Akzent, Obsidians
+  `--text-on-accent` ist weiß) und semantische Farben.
+- Typografie (Überschriften, Bold/Italic, Editor-Schrift, Zeilenhöhe, `--file-line-width`) ist ebenfalls
+  nur unter dem Marker gebunden, weil Obsidians Standardgrößen von Slatebases abweichen.
 
 ### Zuordnung (Entwurf — in Phase 1 gegen die tatsächliche Nutzung in `App.css` verifizieren)
 

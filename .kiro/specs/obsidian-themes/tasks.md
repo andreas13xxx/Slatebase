@@ -34,13 +34,16 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, lint, Tests).
       Aussehen ohne Theme ändern (verletzt R1.3). Die Bindung erfolgt deshalb nur unter dem Theme-Marker.
 
 ## Phase 3 — Token-Brücke
-- [ ] 3.1 `plugins/appearance/theme-bridge.css` (Literale + Brücke, nur mit `[data-obsidian-theme]`)
-- [ ] 3.2 Paritäts-Test: Literale = aufgelöste Compat-Werte (Hell/Dunkel); Snapshot der `index.css`-Tokens
-- [ ] 3.4 Typografie-Bindung unter `:root[data-obsidian-theme]`: `.cm-lp-h1…h6` ← `--h1…h6-size/weight/color/
-      line-height`; Editor-Inhalt ← `--font-text`, `--line-height-normal`; `.cm-editor-wrapper` max-width ←
-      `--file-line-width`; UI-Schrift ← `--font-interface`; `--font-sans`/`--font-mono` ← `--font-interface`/
-      `--font-monospace`; `.cm-lp-bold/italic` ← `--bold-weight`/`--italic-*` (+ Tests auf die CSS-Datei)
-- [ ] 3.3 Sichtprüfung der Kollisionsvariablen in Hell/Dunkel mit einem Test-Theme
+- [x] 3.1 `plugins/appearance/theme-bridge.css`: Brücke auf `body` hinter `:root[data-obsidian-theme]`,
+      eingebunden in `main.tsx`. **Keine Literale nötig:** Compat-Variablen stehen auf `:root`, die Brücke auf
+      `body`; dort ist die Obsidian-Variable der von `:root` geerbte, bereits aufgelöste Wert, es entsteht
+      kein Zyklus. Nicht gebrückt: `--text-inverse` (Kontrast), semantische Farben.
+- [x] 3.2 Test `theme-bridge.test.ts`: Zuordnung, Gate auf den Marker, keine Deklaration auf `:root`,
+      Compat-Defaults (hell) = Slatebase-Werte, Überschriften-Variablen vorhanden
+- [x] 3.3 Live-Check (Computed Style, Chromium): Mini-Theme + Marker ändert `--bg-base`, `--text-primary`,
+      `--accent`, Schrift und Body-Hintergrund; Marker entfernen stellt alles wieder her
+- [x] 3.4 Typografie unter dem Marker: `.cm-lp-h1…h6`, Bold/Italic, Editor-Schrift, Zeilenhöhe,
+      `--file-line-width` (Breite 700px statt 800px, nur mit Theme)
 
 ## Phase 4 — Backend-Theme-Service (Vault-Dateien)
 - [ ] 4.1 Passende `IVaultAccessControl`-Methode für den Schreibzugriff bestimmen (Vorbild:
