@@ -56,7 +56,7 @@
   justify-content: center;
   gap: 8px;
   padding: 32px 16px;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   min-height: 120px;
 }
 
@@ -148,7 +148,7 @@
 }
 
 .version-browser__entry-size {
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-size: 11px;
 }
 
@@ -167,7 +167,7 @@
   justify-content: center;
   height: 100%;
   min-height: 80px;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-size: 13px;
 }
 
@@ -177,7 +177,7 @@
   justify-content: center;
   gap: 8px;
   padding: 24px;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-size: 13px;
 }
 

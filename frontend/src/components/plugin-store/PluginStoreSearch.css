@@ -27,7 +27,7 @@
   top: 50%;
   left: 10px;
   transform: translateY(-50%);
-  color: var(--text-muted);
+  color: var(--text-subtle);
   pointer-events: none;
 }
 
@@ -45,7 +45,7 @@
 }
 
 .plugin-store-search__input::placeholder {
-  color: var(--text-muted);
+  color: var(--text-subtle);
 }
 
 .plugin-store-search__input:focus {
@@ -55,7 +55,7 @@
 
 .plugin-store-search__counter {
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   white-space: nowrap;
   margin-left: auto;
 }

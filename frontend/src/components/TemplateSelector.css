@@ -35,7 +35,7 @@
 
 .template-selector-search-icon {
   flex-shrink: 0;
-  color: var(--text-muted);
+  color: var(--text-subtle);
 }
 
 .template-selector-input {
@@ -49,7 +49,7 @@
 }
 
 .template-selector-input::placeholder {
-  color: var(--text-muted);
+  color: var(--text-subtle);
 }
 
 .template-selector-list {
@@ -62,7 +62,7 @@
 
 .template-selector-empty {
   padding: 12px 14px;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-size: 13px;
   text-align: center;
 }
@@ -90,7 +90,7 @@
 
 .template-selector-item-icon {
   flex-shrink: 0;
-  color: var(--text-muted);
+  color: var(--text-subtle);
 }
 
 .template-selector-item--selected .template-selector-item-icon {

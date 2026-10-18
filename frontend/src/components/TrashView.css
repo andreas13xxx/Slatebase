@@ -26,7 +26,7 @@
 }
 
 .trash-view__header-icon {
-  color: var(--text-muted);
+  color: var(--text-subtle);
   flex-shrink: 0;
 }
 
@@ -39,7 +39,7 @@
 
 .trash-view__count {
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   background: var(--bg-surface);
   padding: 1px 6px;
   border-radius: var(--radius-full);
@@ -54,7 +54,7 @@
   justify-content: center;
   gap: 8px;
   padding: 32px 16px;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-size: 13px;
 }
 
@@ -80,13 +80,13 @@
 }
 
 .trash-view__empty-icon {
-  color: var(--text-muted);
+  color: var(--text-subtle);
   opacity: 0.5;
 }
 
 .trash-view__empty-text {
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   margin: 0;
 }
 
@@ -130,7 +130,7 @@
   height: 28px;
   border-radius: var(--radius-sm);
   background: var(--bg-elevated);
-  color: var(--text-muted);
+  color: var(--text-subtle);
   margin-top: 2px;
 }
 
@@ -155,7 +155,7 @@
 
 .trash-view__entry-date {
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-subtle);
 }
 
 /* ===== Entry Actions ===== */

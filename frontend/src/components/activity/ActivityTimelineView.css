@@ -22,7 +22,7 @@
   appearance: none;
   border: 1px solid var(--border-default);
   background: var(--bg-secondary);
-  color: var(--text-muted);
+  color: var(--text-subtle);
   border-radius: 999px;
   padding: 0.15rem 0.7rem;
   font-size: 0.8rem;
@@ -45,7 +45,7 @@
 
 .activity-timeline__status {
   padding: var(--space-3, 0.75rem);
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-size: 0.85rem;
 }
 
@@ -60,7 +60,7 @@
   justify-content: center;
   gap: var(--space-2, 0.5rem);
   padding: var(--space-6, 1.5rem);
-  color: var(--text-muted);
+  color: var(--text-subtle);
   text-align: center;
   flex: 1 1 auto;
 }
@@ -87,7 +87,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   background: var(--bg-primary);
   z-index: 1;
 }
@@ -155,7 +155,7 @@
   height: 1.4rem;
   border-radius: 50%;
   background: var(--bg-secondary);
-  color: var(--text-muted);
+  color: var(--text-subtle);
 }
 
 .activity-row__icon--notes { color: var(--accent); }
@@ -178,13 +178,13 @@
 }
 
 .activity-row__from {
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-size: 0.8rem;
 }
 
 .activity-row__meta {
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -200,7 +200,7 @@
   background: var(--bg-secondary);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm, 4px);
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-size: 0.82rem;
   cursor: pointer;
 }

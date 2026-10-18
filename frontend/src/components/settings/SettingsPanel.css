@@ -413,7 +413,7 @@
 }
 
 .keybindings-unset {
-  color: var(--text-muted);
+  color: var(--text-subtle);
 }
 
 .keybindings-edit-row {

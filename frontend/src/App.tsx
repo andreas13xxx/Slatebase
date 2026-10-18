@@ -777,7 +777,7 @@ function AppContent() {
       case 'vault-sharing':
         return state.selectedVaultId
           ? <VaultSharing apiClient={apiClient} vaultId={state.selectedVaultId} />
-          : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
+          : <div style={{ padding: 24, color: 'var(--text-subtle)' }}>{t('common.noSelection')}</div>
       case 'vault-deletion':
         return state.selectedVaultId
           ? <VaultDeletionWorkflow
@@ -788,7 +788,7 @@ function AppContent() {
                 handleCloseSettingsTab('vault-deletion')
               }}
             />
-          : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
+          : <div style={{ padding: 24, color: 'var(--text-subtle)' }}>{t('common.noSelection')}</div>
       case 'mcp-tokens':
         if (!isEnabled('mcp')) return <FeatureDisabledHint featureName="MCP" />
         return <McpTokensPage apiClient={apiClient} />
@@ -796,11 +796,11 @@ function AppContent() {
         if (!isEnabled('obsidian-plugin-compat')) return <FeatureDisabledHint featureName="Plugin-Kompatibilität" />
         return state.selectedVaultId
           ? <PluginManagementPage apiClient={apiClient} vaultId={state.selectedVaultId} />
-          : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
+          : <div style={{ padding: 24, color: 'var(--text-subtle)' }}>{t('common.noSelection')}</div>
       case 'trash':
         return state.selectedVaultId
           ? <TrashView vaultId={state.selectedVaultId} apiClient={apiClient} />
-          : <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.noSelection')}</div>
+          : <div style={{ padding: 24, color: 'var(--text-subtle)' }}>{t('common.noSelection')}</div>
       default: return null
     }
   }

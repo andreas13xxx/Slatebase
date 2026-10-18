@@ -16,7 +16,7 @@
 }
 
 .tab-content--empty p {
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-size: 0.95rem;
 }
 

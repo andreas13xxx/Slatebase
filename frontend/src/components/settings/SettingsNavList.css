@@ -65,7 +65,7 @@
 .settings-nav-list__no-results {
   padding: 16px;
   text-align: center;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-size: 0.8125rem;
   font-family: var(--font-sans);
 }

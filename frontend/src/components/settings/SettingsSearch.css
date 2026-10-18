@@ -10,7 +10,7 @@
 .settings-search__icon {
   position: absolute;
   left: 20px;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   pointer-events: none;
   flex-shrink: 0;
 }
@@ -35,7 +35,7 @@
 }
 
 .settings-search__input::placeholder {
-  color: var(--text-muted);
+  color: var(--text-subtle);
 }
 
 .settings-search__clear {
@@ -50,7 +50,7 @@
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   cursor: pointer;
   transition: color var(--transition-fast), background var(--transition-fast);
 }
