@@ -62,11 +62,16 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, lint, Tests).
       `.obsidian/themes/<id>/theme.css`) an alle Nutzer mit Zugriff außer dem Auslöser + Test
 
 ## Phase 5 — Frontend-Injection
-- [ ] 5.1 `theme-injector.ts` + Tests (Reihenfolge vor Snippets, Marker, Entfernen)
-- [ ] 5.2 `themeStore.ts` + API-Client-Methoden (`IApiClient` erweitern, Mocks nachziehen)
-- [ ] 5.3 `ThemeLifecycle.tsx` + Tests (Vault-Wechsel, Ladefehler behält Theme, 404 → Standard)
-- [ ] 5.4 `ThemeLifecycle` reagiert auf `vault:change` für `.obsidian/appearance.json` und
-      `.obsidian/themes/**` (R4.5); Test, dass Dot-Pfade den Dateibaum nicht verändern
+- [x] 5.1 `plugins/appearance/theme-injector.ts` + Tests (ein Tag, Reihenfolge vor Snippets, Marker, 2-MB-Limit)
+- [x] 5.2 API-Client: `listThemes`, `getActiveTheme`, `loadTheme`, `saveTheme`, `deleteTheme`, `setActiveTheme`
+      (IDs URL-kodiert). Ein eigener `themeStore.ts` entfällt vorerst; die Aktionen für die UI (Import,
+      Auswählen, Löschen) entstehen mit der Settings-UI in Phase 6
+- [x] 5.3 `ThemeLifecycle.tsx` (in `App.tsx` neben `SnippetLifecycle`) + Tests: Anwenden beim Öffnen,
+      Vault-Wechsel, Ladefehler behält das Theme, `THEME_NOT_FOUND` → Standard, veraltete Antworten werden verworfen
+- [x] 5.4 `ThemeLifecycle` reagiert auf `vault:change` für `.obsidian/appearance.json` und `.obsidian/themes/**`
+      (über `onRealtimeVaultChange`); andere Pfade/Vaults werden ignoriert (Test). Der Dateibaum lädt bei
+      jedem `vault:change` neu, der Server liefert Dot-Pfade nicht aus; die RealtimeProvider-Meldung
+      („X hat .obsidian/appearance.json geändert") bleibt als Hinweis an andere Nutzer bestehen
 
 ## Phase 6 — Settings-UI
 - [ ] 6.1 `ThemeManager.tsx`, `ThemesSection.tsx`, Registry-Eintrag, `de.ts`/`en.ts`

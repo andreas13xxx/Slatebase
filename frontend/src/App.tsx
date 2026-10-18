@@ -58,6 +58,7 @@ import { SidebarToolbar } from './components/SidebarToolbar'
 import { useToolbarPrefs } from './state/toolbarStore'
 import { StatusBar } from './components/StatusBar'
 import { SnippetLifecycle } from './components/SnippetLifecycle'
+import { ThemeLifecycle } from './components/ThemeLifecycle'
 import { DictationIndicator } from './components/DictationIndicator'
 import { PluginViewPanel } from './components/PluginViewPanel'
 import { VersionBrowser } from './components/VersionBrowser'
@@ -1398,6 +1399,7 @@ function AppContent() {
           </button>
         </div>
         {statusBarVisible && <StatusBar />}
+        <ThemeLifecycle />
         <SnippetLifecycle />
         {isEnabled('voice-transcription') && (
           <DictationIndicator vaultId={state.selectedVaultId} apiClient={apiClient} />
