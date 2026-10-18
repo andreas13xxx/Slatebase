@@ -4,12 +4,12 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, lint, Tests).
 (vor dem ersten Commit `git branch --show-current` prüfen).
 
 ## Phase 0 — Spec
-- [ ] 0.1 Requirements, Design, Tasks committen
+- [x] 0.1 Requirements, Design, Tasks committen
 
 ## Phase 1 — Zuordnung klären (nur Analyse + Test, kein Verhalten)
-- [ ] 1.4 Umbenennung `--text-muted` → `--text-subtle` in `index.css`, `App.css` und allen Komponenten als
+- [x] 1.4 Umbenennung `--text-muted` → `--text-subtle` in `index.css`, `App.css` und allen Komponenten als
       eigener Commit (nur Umbenennung, Test/Lint/tsc grün), danach Screenshot-Vergleich hell/dunkel
-- [ ] 1.1 Nutzung aller Slatebase-Tokens in `App.css`/Komponenten auflisten; Zuordnungstabelle im Design
+- [x] 1.1 Nutzung aller Slatebase-Tokens in `App.css`/Komponenten auflisten; Zuordnungstabelle im Design
       finalisieren (insb. `--bg-elevated`, `--text-*`-Stufen)
 - [x] 1.2 Namenskollisionen (`--text-muted`, `--radius-xl`, `--status-bar-font-size`, `--canvas-color-*`,
       `--graph-node-unresolved`) einzeln auf gleiche Semantik prüfen; Abweichungen dokumentieren.
@@ -24,13 +24,22 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, lint, Tests).
 - [x] 1.3 Fehlende Variablen gegen die offizielle Referenz abgleichen (110 fehlend, davon ca. 60 echte; siehe Design §2)
 
 ## Phase 2 — Variablen-Lücken und Typografie
-- [ ] 2.1 Dokumentierte fehlende Variablen in `obsidian-compat.css` ergänzen (+ Test: Liste vorhanden)
-- [ ] 2.2 Editor/Leseansicht: `--font-text`, `--h1…h6-*`, `--line-height-normal`, `--file-line-width`,
-      `--bold-*`, `--italic-*` mit `var(--x, <alter Wert>)` anbinden (kein sichtbarer Unterschied ohne Theme)
+- [x] 2.1 Dokumentierte, rein abgeleitete Variablen als Aliase auf `body` in `obsidian-compat.css`
+      (`--color-accent-hsl`, `--text-highlight-bg-rgb`, `--nav-parent-*`, `--bases-table-*`, `--dropdown-*`)
+      + Test `obsidian-compat.derived.test.ts`. Bewusst nicht ergänzt: `--bases-cards-*`, `--component-title-*`,
+      `--outline-heading-*` u. a. ohne belastbaren Standardwert (ein erfundener Wert hilft keinem Theme;
+      Themes setzen sie selbst). Aliase stehen auf `body`, weil Themes dort überschreiben.
+- [~] 2.2 verschoben nach 3.4: Die Obsidian-Standardwerte (`--h3-size` 1.37em usw.) weichen von Slatebases
+      Editor-Werten ab (`.cm-lp-h3` 1.35em, h5/h6 1em/0.9em). Eine direkte Bindung im Basis-CSS würde das
+      Aussehen ohne Theme ändern (verletzt R1.3). Die Bindung erfolgt deshalb nur unter dem Theme-Marker.
 
 ## Phase 3 — Token-Brücke
 - [ ] 3.1 `plugins/appearance/theme-bridge.css` (Literale + Brücke, nur mit `[data-obsidian-theme]`)
 - [ ] 3.2 Paritäts-Test: Literale = aufgelöste Compat-Werte (Hell/Dunkel); Snapshot der `index.css`-Tokens
+- [ ] 3.4 Typografie-Bindung unter `:root[data-obsidian-theme]`: `.cm-lp-h1…h6` ← `--h1…h6-size/weight/color/
+      line-height`; Editor-Inhalt ← `--font-text`, `--line-height-normal`; `.cm-editor-wrapper` max-width ←
+      `--file-line-width`; UI-Schrift ← `--font-interface`; `--font-sans`/`--font-mono` ← `--font-interface`/
+      `--font-monospace`; `.cm-lp-bold/italic` ← `--bold-weight`/`--italic-*` (+ Tests auf die CSS-Datei)
 - [ ] 3.3 Sichtprüfung der Kollisionsvariablen in Hell/Dunkel mit einem Test-Theme
 
 ## Phase 4 — Backend-Theme-Service (Vault-Dateien)
