@@ -54,6 +54,8 @@ import { createVaultAuthorizationMiddleware } from './api/vault-authorization-mi
 import { InstalledPluginStore, PluginInstaller, PluginService, PluginSecretKeyManager, PluginSecretStore } from './plugin/index.js'
 import { createPluginRoutes } from './api/pluginRoutes.js'
 import { SnippetStore } from './snippets/index.js'
+import { ThemeService } from './themes/index.js'
+import { createThemeRoutes } from './api/themeRoutes.js'
 import { createSnippetRoutes } from './api/snippetRoutes.js'
 import { GitHubClient, PluginStoreCache, PluginStoreService, UpdateChecker } from './plugin-store/index.js'
 import type { IPluginStoreConfig } from './plugin-store/index.js'
@@ -719,6 +721,17 @@ const snippetRoutes = createSnippetRoutes({
   logger,
 })
 app.route('/api/v1/vaults/:vaultId/snippets', snippetRoutes)
+
+// Obsidian theme routes (themes live in the vault's .obsidian/themes/; access levels come from
+// the vault-authorization middleware: GET = read, everything else = write)
+const themeRoutes = createThemeRoutes({
+  themeService: new ThemeService(),
+  accessControl: vaultAccessControl,
+  vaultRegistry,
+  eventBus,
+  logger,
+})
+app.route('/api/v1/vaults/:vaultId/themes', themeRoutes)
 
 // Plugin Store route registration (auth middleware applies via /api/v1/* pattern)
 const pluginStoreRoutes = createPluginStoreRoutes({ pluginStoreService, accessControl: vaultAccessControl, vaultRegistry, logger })

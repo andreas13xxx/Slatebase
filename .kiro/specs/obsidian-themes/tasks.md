@@ -46,18 +46,20 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, lint, Tests).
       `--file-line-width` (Breite 700px statt 800px, nur mit Theme)
 
 ## Phase 4 — Backend-Theme-Service (Vault-Dateien)
-- [ ] 4.1 Passende `IVaultAccessControl`-Methode für den Schreibzugriff bestimmen (Vorbild:
-      Datei-Schreibrouten/`snippetRoutes.ts`). Git-Sync ist geklärt: Themes und `appearance.json` werden
-      synchronisiert, kein Eingriff nötig
-- [ ] 4.2 `themes/types.ts`, `errors.ts`, `validation.ts` (ID, 2-MB-Limit, Manifest), Barrel
-- [ ] 4.3 `ThemeService`: list/load/save/delete unter `.obsidian/themes/`, `validateFilePath()`, atomare
-      Writes mit Retries + Tests (Traversal, Limits, Ordner ohne `theme.css`)
-- [ ] 4.4 `appearance.json`: `getActiveThemeId`/`setActiveThemeId` mit Mutex + `json-file-store`; Tests:
-      fremde Felder bleiben, ungültiges JSON wird nie überschrieben, EPERM-Retry, Auswahl auf fehlendes Theme
-- [ ] 4.5 `externalHosts`-Erkennung + Tests (inkl. Pathologie-/ReDoS-Eingaben)
-- [ ] 4.6 `themeRoutes.ts` + Tests (Lesen/Schreiben je nach Zugriff, 403 ohne Schreibrecht), manuelle DI in
-      `src/index.ts`; Löschen des aktiven Themes setzt `cssTheme` zurück
-- [ ] 4.7 Schreibende Routen veröffentlichen `vault:change` (ohne auslösenden Nutzer) + Test
+- [x] 4.1 Zugriff geklärt: `vault-authorization-middleware.ts` erzwingt Default-Deny für alle
+      `/vaults/:vaultId/*`-Routen (GET = read, alles andere = write). Die Theme-Routen brauchen keine
+      Ausnahme und keine eigene Prüfung: Import, Löschen und Auswählen verlangen Schreibzugriff.
+      Git-Sync war bereits geklärt (Themes und `appearance.json` werden synchronisiert)
+- [x] 4.2 `themes/types.ts`, `errors.ts`, `validation.ts` (ID, 2-MB-Limit, Manifest), Barrel
+- [x] 4.3 `ThemeService`: list/load/save/delete unter `.obsidian/themes/`, `validateFilePath()`, atomare Writes
+      mit Retries, Symlinks werden nie gefolgt (+ Tests: Traversal, Limits, Ordner ohne `theme.css`, Symlink)
+- [x] 4.4 `appearance.json`: `getActiveThemeId`/`setActiveThemeId` unter Mutex + `writeJsonFileAtomic`;
+      Tests: fremde Felder bleiben, ungültiges JSON wird nie überschrieben (409), Auswahl auf fehlendes Theme
+- [x] 4.5 `externalHosts`-Erkennung (`@import`/`url()`, linear, Test mit Pathologie-Eingaben)
+- [x] 4.6 `api/themeRoutes.ts` + Tests, manuelle DI in `src/index.ts` unter `/api/v1/vaults/:vaultId/themes`;
+      Löschen des aktiven Themes setzt `cssTheme` zurück
+- [x] 4.7 Schreibende Routen veröffentlichen `vault:change` (`.obsidian/appearance.json`,
+      `.obsidian/themes/<id>/theme.css`) an alle Nutzer mit Zugriff außer dem Auslöser + Test
 
 ## Phase 5 — Frontend-Injection
 - [ ] 5.1 `theme-injector.ts` + Tests (Reihenfolge vor Snippets, Marker, Entfernen)
