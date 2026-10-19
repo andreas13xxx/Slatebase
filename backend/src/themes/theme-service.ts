@@ -17,6 +17,9 @@ const RETRY_ATTEMPTS = 3
 const RETRY_DELAY_MS = 50
 const TRANSIENT_CODES = new Set(['EPERM', 'EACCES', 'EBUSY'])
 
+/** Upper bound for the external-hosts cache; it is cleared when exceeded (entries are cheap to recompute). */
+const HOSTS_CACHE_LIMIT = 500
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -48,15 +51,28 @@ async function lstatOrNull(filePath: string): Promise<Stats | null> {
   }
 }
 
-/** Writes `content` via temp file + rename, retrying the rename on transient lock errors. */
-async function writeFileAtomic(filePath: string, content: string): Promise<void> {
-  const tempPath = `${filePath}.${randomBytes(8).toString('hex')}.tmp`
-  await fs.writeFile(tempPath, content, 'utf-8')
+/**
+ * Writes several files so that they change together as closely as the filesystem allows:
+ * every file is first written to a temp file next to its target, and only then are the
+ * renames done back to back (retrying transient lock errors). A failure while staging
+ * leaves every target untouched; temp files are always cleaned up.
+ */
+async function writeFilesTogether(files: ReadonlyArray<{ path: string; content: string }>): Promise<void> {
+  const staged: Array<{ temp: string; path: string }> = []
   try {
-    await withRetry(() => fs.rename(tempPath, filePath))
-  } catch (error: unknown) {
-    await fs.unlink(tempPath).catch(() => undefined)
-    throw error
+    for (const file of files) {
+      const temp = `${file.path}.${randomBytes(8).toString('hex')}.tmp`
+      await fs.writeFile(temp, file.content, 'utf-8')
+      staged.push({ temp, path: file.path })
+    }
+    for (const entry of staged) {
+      await withRetry(() => fs.rename(entry.temp, entry.path))
+      entry.temp = ''
+    }
+  } finally {
+    for (const entry of staged) {
+      if (entry.temp !== '') await fs.unlink(entry.temp).catch(() => undefined)
+    }
   }
 }
 
@@ -69,8 +85,11 @@ async function writeFileAtomic(filePath: string, content: string): Promise<void>
  * so a link planted in a synced vault cannot expose files outside the vault.
  */
 export class ThemeService implements IThemeService {
-  /** Serialises appearance.json read-modify-write cycles per vault. */
+  /** Serialises appearance.json read-modify-write cycles (and theme deletion) per vault. */
   private readonly appearanceMutex = new KeyedMutex()
+
+  /** External hosts per stylesheet, keyed by path + mtime + size, so unchanged themes are not re-scanned on every listing. */
+  private readonly hostsCache = new Map<string, string[]>()
 
   private themeDir(vaultPath: string, themeId: string): string {
     if (!isValidThemeId(themeId)) throw new InvalidThemeIdError(themeId)
@@ -98,14 +117,43 @@ export class ThemeService implements IThemeService {
     }
   }
 
-  private async metaFor(vaultPath: string, themeId: string, stat: Stats, css: string): Promise<ThemeMeta> {
-    return {
-      id: themeId,
-      manifest: await this.readManifest(vaultPath, themeId),
-      size: stat.size,
-      updatedAt: stat.mtime.toISOString(),
-      externalHosts: extractExternalHosts(css),
+  /** Hostnames the stylesheet loads from; cached per file version. `knownCss` avoids a second read. */
+  private async externalHostsFor(cssFile: string, stat: Stats, knownCss?: string): Promise<string[]> {
+    const key = `${cssFile}|${stat.mtimeMs}|${stat.size}`
+    const cached = this.hostsCache.get(key)
+    if (cached !== undefined) return cached
+
+    const css = knownCss ?? (stat.size <= MAX_THEME_CSS_SIZE ? await withRetry(() => fs.readFile(cssFile, 'utf-8')) : '')
+    const hosts = extractExternalHosts(css)
+    if (this.hostsCache.size >= HOSTS_CACHE_LIMIT) this.hostsCache.clear()
+    this.hostsCache.set(key, hosts)
+    return hosts
+  }
+
+  private async metaFor(vaultPath: string, themeId: string, stat: Stats, knownCss?: string): Promise<ThemeMeta> {
+    const cssFile = this.cssPath(vaultPath, themeId)
+    const [manifest, externalHosts] = await Promise.all([
+      this.readManifest(vaultPath, themeId),
+      this.externalHostsFor(cssFile, stat, knownCss),
+    ])
+    return { id: themeId, manifest, size: stat.size, updatedAt: stat.mtime.toISOString(), externalHosts }
+  }
+
+  /**
+   * Returns the id of an existing theme folder whose name equals `themeId` ignoring case, or
+   * `themeId` itself. On case-insensitive filesystems (Windows, macOS) `Minimal` and `minimal`
+   * are the same folder, so an import must overwrite it rather than collide with it.
+   */
+  private async resolveExistingId(vaultPath: string, themeId: string): Promise<string> {
+    let entries: Dirent[]
+    try {
+      entries = await withRetry(() => fs.readdir(validateFilePath(vaultPath, THEMES_DIR), { withFileTypes: true }))
+    } catch (error: unknown) {
+      if (isMissing(error)) return themeId
+      throw error
     }
+    const wanted = themeId.toLowerCase()
+    return entries.find((entry) => entry.isDirectory() && entry.name.toLowerCase() === wanted)?.name ?? themeId
   }
 
   async listThemes(vaultPath: string): Promise<ThemeMeta[]> {
@@ -117,16 +165,21 @@ export class ThemeService implements IThemeService {
       throw error
     }
 
-    const themes: ThemeMeta[] = []
-    for (const entry of entries) {
-      if (!entry.isDirectory() || !isValidThemeId(entry.name)) continue
-      const cssFile = this.cssPath(vaultPath, entry.name)
-      const stat = await lstatOrNull(cssFile)
-      if (stat === null || !stat.isFile()) continue
-      const css = stat.size <= MAX_THEME_CSS_SIZE ? await withRetry(() => fs.readFile(cssFile, 'utf-8')) : ''
-      themes.push(await this.metaFor(vaultPath, entry.name, stat, css))
-    }
-    return themes.sort((a, b) => a.id.localeCompare(b.id))
+    const found = await Promise.all(
+      entries
+        .filter((entry) => entry.isDirectory() && isValidThemeId(entry.name))
+        .map(async (entry): Promise<ThemeMeta | null> => {
+          const stat = await lstatOrNull(this.cssPath(vaultPath, entry.name))
+          if (stat === null || !stat.isFile()) return null
+          return this.metaFor(vaultPath, entry.name, stat)
+        }),
+    )
+    return found.filter((meta): meta is ThemeMeta => meta !== null).sort((a, b) => a.id.localeCompare(b.id))
+  }
+
+  async themeExists(vaultPath: string, themeId: string): Promise<boolean> {
+    const stat = await lstatOrNull(this.cssPath(vaultPath, this.checkedId(themeId)))
+    return stat !== null && stat.isFile()
   }
 
   async loadTheme(vaultPath: string, themeId: string): Promise<{ css: string; meta: ThemeMeta } | null> {
@@ -140,17 +193,21 @@ export class ThemeService implements IThemeService {
 
   async saveTheme(
     vaultPath: string,
-    themeId: string,
+    requestedId: string,
     css: string,
     manifest?: ThemeManifestInput,
   ): Promise<ThemeMeta> {
-    const dir = this.themeDir(vaultPath, themeId)
+    this.checkedId(requestedId)
     const size = Buffer.byteLength(css, 'utf-8')
     if (size > MAX_THEME_CSS_SIZE) throw new ThemeTooLargeError(MAX_THEME_CSS_SIZE, size)
 
-    await fs.mkdir(dir, { recursive: true })
-    await writeFileAtomic(this.cssPath(vaultPath, themeId), css)
-    await writeJsonFileAtomic(this.manifestPath(vaultPath, themeId), normalizeManifest(manifest, themeId))
+    const themeId = await this.resolveExistingId(vaultPath, requestedId)
+    await fs.mkdir(this.themeDir(vaultPath, themeId), { recursive: true })
+    // The manifest is committed before the stylesheet: a folder only counts as a theme once theme.css exists.
+    await writeFilesTogether([
+      { path: this.manifestPath(vaultPath, themeId), content: `${JSON.stringify(normalizeManifest(manifest, themeId), null, 2)}\n` },
+      { path: this.cssPath(vaultPath, themeId), content: css },
+    ])
 
     const loaded = await this.loadTheme(vaultPath, themeId)
     if (loaded === null) throw new ThemeNotFoundError(themeId)
@@ -159,10 +216,23 @@ export class ThemeService implements IThemeService {
 
   async deleteTheme(vaultPath: string, themeId: string): Promise<void> {
     const dir = this.themeDir(vaultPath, themeId)
-    if ((await this.getActiveThemeId(vaultPath)) === themeId) {
-      await this.setActiveThemeId(vaultPath, null)
-    }
-    await withRetry(() => fs.rm(dir, { recursive: true, force: true }))
+    // Remove the folder first and reset the selection only afterwards: if the removal fails (a lock
+    // that outlives the retries), the vault must not lose its active theme. Both steps run under the
+    // appearance mutex so a concurrent selection cannot be overwritten.
+    await this.appearanceMutex.runExclusive(vaultPath, async () => {
+      await withRetry(() => fs.rm(dir, { recursive: true, force: true }))
+
+      let current: Record<string, unknown> | null
+      try {
+        current = await this.readAppearance(vaultPath)
+      } catch (error: unknown) {
+        if (error instanceof AppearanceFileInvalidError) return // never touch a file we cannot parse
+        throw error
+      }
+      if (current !== null && current['cssTheme'] === themeId) {
+        await writeJsonFileAtomic(validateFilePath(vaultPath, APPEARANCE_FILE), { ...current, cssTheme: '' })
+      }
+    })
   }
 
   async getActiveThemeId(vaultPath: string): Promise<string | null> {
@@ -178,10 +248,7 @@ export class ThemeService implements IThemeService {
   }
 
   async setActiveThemeId(vaultPath: string, themeId: string | null): Promise<void> {
-    if (themeId !== null) {
-      const stat = await lstatOrNull(this.cssPath(vaultPath, this.checkedId(themeId)))
-      if (stat === null || !stat.isFile()) throw new ThemeNotFoundError(themeId)
-    }
+    if (themeId !== null && !(await this.themeExists(vaultPath, themeId))) throw new ThemeNotFoundError(themeId)
     await this.appearanceMutex.runExclusive(vaultPath, async () => {
       const current = (await this.readAppearance(vaultPath)) ?? {}
       await writeJsonFileAtomic(validateFilePath(vaultPath, APPEARANCE_FILE), {

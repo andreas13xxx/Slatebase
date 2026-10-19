@@ -11,14 +11,17 @@ export const MAX_THEME_CSS_SIZE = 2 * 1024 * 1024
  */
 const THEME_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 _.-]{0,119}$/
 
-/** Returns true if `id` is safe to use as a theme folder name. */
+/** Device names Windows refuses as file or folder names, with or without an extension. */
+const WINDOWS_RESERVED_NAME = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i
+
+/** Returns true if `id` is safe to use as a theme folder name on every supported platform. */
 export function isValidThemeId(id: string): boolean {
-  return THEME_ID_PATTERN.test(id) && !/[. ]$/.test(id)
+  return THEME_ID_PATTERN.test(id) && !/[. ]$/.test(id) && !WINDOWS_RESERVED_NAME.test(id)
 }
 
 /** Schema for the theme id route parameter. `active` is reserved for the selection endpoint. */
 export const themeIdSchema = z.string()
-  .refine(isValidThemeId, 'Invalid theme ID: letters, digits, space, underscore, dot and hyphen only')
+  .refine(isValidThemeId, 'Invalid theme ID: letters, digits, space, underscore, dot and hyphen only, and not a reserved system name')
   .refine((id) => id.toLowerCase() !== 'active', 'The theme ID "active" is reserved')
 
 const manifestSchema = z.object({

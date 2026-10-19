@@ -10,7 +10,7 @@
  * A failed request is "unknown", never "gone": the theme that is currently applied stays.
  * Only an explicit answer ends it — no active theme, or `THEME_NOT_FOUND` for the selected one.
  */
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useAppContext } from '../state'
 import { onRealtimeVaultChange } from '../state/realtimeVaultBridge'
 import { themeInjector } from '../plugins/appearance/theme-injector'
@@ -29,6 +29,9 @@ function isThemeNotFound(error: unknown): boolean {
 export function ThemeLifecycle(): null {
   const { state, apiClient } = useAppContext()
   const vaultId = state.selectedVaultId
+  // The vault whose theme is currently applied. The effect re-runs when only `apiClient` changes
+  // (re-auth, provider re-creation); that must not clear the theme of the same vault.
+  const appliedVaultRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!apiClient || !vaultId) return
@@ -61,8 +64,12 @@ export function ThemeLifecycle(): null {
     }
 
     // A different vault has its own theme (or none): clear the previous one first so it
-    // cannot linger if the new vault's request fails.
-    themeInjector.remove()
+    // cannot linger if the new vault's request fails. The same vault keeps its theme while
+    // it is re-read — a failed request must not undo it.
+    if (appliedVaultRef.current !== vaultId) {
+      themeInjector.remove()
+      appliedVaultRef.current = vaultId
+    }
     void sync()
 
     const unsubscribe = onRealtimeVaultChange((event) => {

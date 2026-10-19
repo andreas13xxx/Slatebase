@@ -82,10 +82,18 @@ export function ThemeManager() {
     setError(null)
     try {
       await apiClient.setActiveTheme(vaultId, themeId)
-      await applyLocally(themeId)
     } catch (err) {
+      // Nothing was saved: the vault still uses the previous theme, so the radio goes back.
       setActiveId(previous)
       setError(extractErrorMessage(err, 'Theme konnte nicht aktiviert werden'))
+      return
+    }
+    // The choice is saved. If showing it here fails, the selection must stay — rolling it back would
+    // make the UI disagree with the vault. The next load of this tab applies it.
+    try {
+      await applyLocally(themeId)
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Das Theme wurde gespeichert, konnte aber hier nicht angezeigt werden'))
     }
   }, [vaultId, apiClient, activeId, applyLocally])
 
@@ -115,8 +123,11 @@ export function ThemeManager() {
       return
     }
     const css = await picked.files.css.text()
-    if (themes.some((t) => t.id === themeId)) {
-      setOverwrite({ themeId, css, manifest })
+    // Case-insensitive: on Windows and macOS `Minimal` and `minimal` are the same folder.
+    const existing = themes.find((t) => t.id.toLowerCase() === themeId.toLowerCase())
+    if (existing !== undefined) {
+      // Use the existing folder's spelling so the "is this the active theme" check below stays exact.
+      setOverwrite({ themeId: existing.id, css, manifest })
       return
     }
     await saveTheme(themeId, css, manifest)

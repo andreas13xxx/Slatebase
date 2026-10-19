@@ -26,6 +26,7 @@ const meta: ThemeMeta = {
 function createMockThemeService(overrides: Partial<IThemeService> = {}): IThemeService {
   return {
     listThemes: async () => [],
+    themeExists: async () => false,
     loadTheme: async () => null,
     saveTheme: async () => meta,
     deleteTheme: async () => {},
@@ -166,20 +167,44 @@ describe('themeRoutes', () => {
     expect((await broken.app.request(base)).status).toBe(500)
   })
 
-  it('DELETE /:themeId removes the theme (204), 404 when missing, and announces both changes', async () => {
+  it('DELETE /:themeId removes a non-active theme (204) and announces only the deleted file', async () => {
     let deleted = ''
     const { app, published } = createTestApp({
       themeService: createMockThemeService({
-        loadTheme: async (_p, id) => (id === 'Things' ? { css: 'a{}', meta } : null),
+        themeExists: async (_p, id) => id === 'Things',
+        getActiveThemeId: async () => 'Other',
         deleteTheme: async (_p, id) => { deleted = id },
       }),
     })
     expect((await app.request(`${base}/Things`, { method: 'DELETE' })).status).toBe(204)
     expect(deleted).toBe('Things')
+    expect(published.map((p) => (p.payload as { path: string }).path)).toEqual(['.obsidian/themes/Things/theme.css'])
+    expect((await app.request(`${base}/Nope`, { method: 'DELETE' })).status).toBe(404)
+  })
+
+  it('DELETE of the active theme also announces the changed selection file', async () => {
+    const { app, published } = createTestApp({
+      themeService: createMockThemeService({
+        themeExists: async () => true,
+        getActiveThemeId: async () => 'Things',
+      }),
+    })
+    expect((await app.request(`${base}/Things`, { method: 'DELETE' })).status).toBe(204)
     expect(published.map((p) => (p.payload as { path: string }).path)).toEqual([
       '.obsidian/themes/Things/theme.css',
       '.obsidian/appearance.json',
     ])
-    expect((await app.request(`${base}/Nope`, { method: 'DELETE' })).status).toBe(404)
+  })
+
+  it('DELETE works for a theme whose CSS is over the size limit (existence is a stat, not a read)', async () => {
+    let loaded = false
+    const { app } = createTestApp({
+      themeService: createMockThemeService({
+        themeExists: async () => true,
+        loadTheme: async () => { loaded = true; throw new ThemeTooLargeError(1, 2) },
+      }),
+    })
+    expect((await app.request(`${base}/Huge`, { method: 'DELETE' })).status).toBe(204)
+    expect(loaded).toBe(false)
   })
 })

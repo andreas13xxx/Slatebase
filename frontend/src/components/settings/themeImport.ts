@@ -44,9 +44,19 @@ export function toThemeId(rawName: string): string | null {
     .replace(/[^A-Za-z0-9 _.-]/g, '')
     .replace(/^[^A-Za-z0-9]+/, '')
     .replace(/[. ]+$/, '')
-    .slice(0, 120)
+    .slice(0, 100) // leaves room for the "-theme" suffix below within the backend's 120 characters
     .replace(/[. ]+$/, '')
-  return cleaned === '' ? null : cleaned
+  if (cleaned === '') return null
+  return isReservedThemeId(cleaned) ? `${cleaned}-theme` : cleaned
+}
+
+/**
+ * Ids the backend refuses: `active` (the selection endpoint) and the device names Windows reserves
+ * (`CON`, `NUL`, `COM1`, … with or without an extension). Mirrors `backend/src/themes/validation.ts`;
+ * importing renames such a theme instead of failing with an error the user cannot act on.
+ */
+function isReservedThemeId(id: string): boolean {
+  return id.toLowerCase() === 'active' || /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i.test(id)
 }
 
 /** Picks the theme folder name: manifest name first, then the stylesheet's file name (unless it is `theme.css`). */

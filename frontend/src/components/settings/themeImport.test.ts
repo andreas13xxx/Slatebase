@@ -45,6 +45,21 @@ describe('toThemeId', () => {
     expect(toThemeId('theme. ')).toBe('theme')
   })
 
+  it('renames ids the backend reserves instead of letting the import fail', () => {
+    expect(toThemeId('Active')).toBe('Active-theme')
+    expect(toThemeId('active')).toBe('active-theme')
+    expect(toThemeId('CON')).toBe('CON-theme')
+    expect(toThemeId('nul.txt')).toBe('nul.txt-theme')
+    expect(toThemeId('COM1')).toBe('COM1-theme')
+    expect(toThemeId('Active Theme')).toBe('Active Theme')
+  })
+
+  it('keeps a long name within the backend limit even after the suffix', () => {
+    const id = toThemeId(`active${'x'.repeat(200)}`)
+    expect(id?.length).toBeLessThanOrEqual(120)
+    expect(toThemeId('con')?.length).toBeLessThanOrEqual(120)
+  })
+
   it('returns null when nothing usable is left', () => {
     expect(toThemeId('///')).toBeNull()
     expect(toThemeId('')).toBeNull()

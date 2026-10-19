@@ -39,9 +39,14 @@ export interface ThemeMeta {
 export interface IThemeService {
   /** Lists all themes (folders containing a `theme.css`). Missing folder → empty list. */
   listThemes(vaultPath: string): Promise<ThemeMeta[]>;
+  /** Whether a theme exists. Cheap (a stat, no CSS read), so it works for themes over the size limit too. */
+  themeExists(vaultPath: string, themeId: string): Promise<boolean>;
   /** Loads a theme's CSS and metadata. Returns null if the theme does not exist. */
   loadTheme(vaultPath: string, themeId: string): Promise<{ css: string; meta: ThemeMeta } | null>;
-  /** Creates or overwrites a theme. `manifest` defaults to `{ name: themeId }`. */
+  /**
+   * Creates or overwrites a theme. `manifest` defaults to `{ name: themeId }`. An existing theme whose
+   * folder name differs only in case is overwritten (the returned `id` is the existing folder's name).
+   */
   saveTheme(vaultPath: string, themeId: string, css: string, manifest?: ThemeManifestInput): Promise<ThemeMeta>;
   /** Deletes a theme folder. If it was the active theme, the selection is reset. No-op if missing. */
   deleteTheme(vaultPath: string, themeId: string): Promise<void>;

@@ -174,4 +174,46 @@ describe('ThemeManager', () => {
 
     expect(await screen.findByRole('alert')).toBeInTheDocument()
   })
+
+  it('keeps the new selection when the choice was saved but showing it here fails', async () => {
+    const apiClient = createMockApiClient({
+      listThemes: vi.fn().mockResolvedValue({ themes: [things], activeThemeId: null }),
+      loadTheme: vi.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', message: 'Netz weg' }),
+    })
+    renderManager(apiClient)
+
+    fireEvent.click(await screen.findByRole('radio', { name: /Things/ }))
+
+    await waitFor(() => expect(apiClient.setActiveTheme).toHaveBeenCalledWith('vault1', 'Things'))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Netz weg|gespeichert/)
+    // The vault now uses Things, so the UI must say so — no rollback to the default.
+    expect(screen.getByRole('radio', { name: /Things/ })).toBeChecked()
+  })
+
+  it('treats a differently cased name as the existing theme and overwrites that folder', async () => {
+    const minimal: ThemeMeta = { id: 'Minimal', manifest: { name: 'Minimal' }, size: 10, updatedAt: '2026-10-17T00:00:00.000Z', externalHosts: [] }
+    const apiClient = createMockApiClient({
+      listThemes: vi.fn().mockResolvedValue({ themes: [minimal], activeThemeId: null }),
+    })
+    renderManager(apiClient)
+    await screen.findByRole('radio', { name: /Minimal/ })
+
+    fireEvent.change(screen.getByTestId('theme-file-input'), { target: { files: [new File(['a{}'], 'minimal.css')] } })
+
+    expect(await screen.findByText(/existiert bereits/)).toBeInTheDocument()
+    expect(apiClient.saveTheme).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Überschreiben' }))
+    await waitFor(() => expect(apiClient.saveTheme).toHaveBeenCalledWith('vault1', 'Minimal', 'a{}', {}))
+  })
+
+  it('imports a theme named "Active" under a free id instead of a reserved one', async () => {
+    const apiClient = createMockApiClient()
+    renderManager(apiClient)
+    await screen.findByLabelText('Slatebase (Standard)')
+
+    const manifest = new File([JSON.stringify({ name: 'Active' })], 'manifest.json')
+    fireEvent.change(screen.getByTestId('theme-file-input'), { target: { files: [new File(['a{}'], 'theme.css'), manifest] } })
+
+    await waitFor(() => expect(apiClient.saveTheme).toHaveBeenCalledWith('vault1', 'Active-theme', 'a{}', { name: 'Active' }))
+  })
 })

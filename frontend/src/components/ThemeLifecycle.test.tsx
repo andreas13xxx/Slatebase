@@ -194,4 +194,34 @@ describe('ThemeLifecycle', () => {
 
     expect(getActiveTheme).toHaveBeenCalledTimes(1)
   })
+
+  it('does not clear the theme when only the api client changes for the same vault', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const first = createMockApiClient({
+      getActiveTheme: vi.fn().mockResolvedValue('Things'),
+      loadTheme: vi.fn().mockResolvedValue({ css: 'body { color: red; }', meta: {} }),
+    })
+    const second = createMockApiClient({
+      getActiveTheme: vi.fn().mockRejectedValue(new Error('network down')),
+    })
+
+    const { rerender } = render(
+      <AppProvider apiClient={first}>
+        <VaultSwitcher vaults={[vaultA]} />
+        <ThemeLifecycle />
+      </AppProvider>,
+    )
+    await waitFor(() => expect(themeTag()).not.toBeNull())
+
+    rerender(
+      <AppProvider apiClient={second}>
+        <VaultSwitcher vaults={[vaultA]} />
+        <ThemeLifecycle />
+      </AppProvider>,
+    )
+
+    await waitFor(() => expect(second.getActiveTheme).toHaveBeenCalledWith('vault-a'))
+    // The re-read failed: "unknown" must not undo the applied theme.
+    expect(themeTag()?.textContent).toBe('body { color: red; }')
+  })
 })

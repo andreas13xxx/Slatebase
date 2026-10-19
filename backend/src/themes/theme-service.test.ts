@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppearanceFileInvalidError, InvalidThemeIdError, ThemeNotFoundError, ThemeTooLargeError } from './errors.js'
 import { ThemeService } from './theme-service.js'
 import { MAX_THEME_CSS_SIZE, extractExternalHosts, isValidThemeId, normalizeManifest } from './validation.js'
@@ -60,7 +60,7 @@ describe('ThemeService', () => {
   })
 
   it('rejects unsafe ids before touching the filesystem', async () => {
-    for (const id of ['..', '../x', 'a/b', 'a\\b', '.hidden', 'trailing.', '']) {
+    for (const id of ['..', '../x', 'a/b', 'a\\b', '.hidden', 'trailing.', '', 'CON', 'nul.txt', 'COM1', 'lpt9']) {
       await expect(service.saveTheme(vault, id, 'a{}')).rejects.toBeInstanceOf(InvalidThemeIdError)
       await expect(service.loadTheme(vault, id)).rejects.toBeInstanceOf(InvalidThemeIdError)
     }
@@ -167,5 +167,105 @@ describe('theme validation helpers', () => {
     extractExternalHosts(`@import${' '.repeat(200_000)}x`)
     extractExternalHosts(`url(${' '.repeat(200_000)}`)
     expect(Date.now() - start).toBeLessThan(1000)
+  })
+})
+
+describe('ThemeService review fixes', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('deleteTheme works for a theme over the size limit and themeExists does not read the CSS', async () => {
+    const dir = path.join(vault, '.obsidian', 'themes', 'Huge')
+    await fs.mkdir(dir, { recursive: true })
+    await fs.writeFile(path.join(dir, 'theme.css'), 'a'.repeat(MAX_THEME_CSS_SIZE + 1))
+
+    expect(await service.themeExists(vault, 'Huge')).toBe(true)
+    await expect(service.loadTheme(vault, 'Huge')).rejects.toBeInstanceOf(ThemeTooLargeError)
+    await service.deleteTheme(vault, 'Huge')
+    expect(await service.themeExists(vault, 'Huge')).toBe(false)
+  })
+
+  it('keeps the active selection when removing the folder fails', async () => {
+    await service.saveTheme(vault, 'Things', 'a{}')
+    await service.setActiveThemeId(vault, 'Things')
+    vi.spyOn(fs, 'rm').mockRejectedValue(Object.assign(new Error('locked'), { code: 'EBUSY' }))
+
+    await expect(service.deleteTheme(vault, 'Things')).rejects.toMatchObject({ code: 'EBUSY' })
+
+    vi.restoreAllMocks()
+    expect(await service.getActiveThemeId(vault)).toBe('Things')
+    expect(await service.themeExists(vault, 'Things')).toBe(true)
+  })
+
+  it('does not touch an invalid appearance.json while deleting', async () => {
+    await service.saveTheme(vault, 'Things', 'a{}')
+    await fs.mkdir(path.dirname(appearancePath()), { recursive: true })
+    await fs.writeFile(appearancePath(), '{ broken')
+
+    await service.deleteTheme(vault, 'Things')
+
+    expect(await fs.readFile(appearancePath(), 'utf-8')).toBe('{ broken')
+  })
+
+  it('a concurrent selection is not lost while another theme is deleted', async () => {
+    await service.saveTheme(vault, 'A', 'a{}')
+    await service.saveTheme(vault, 'B', 'b{}')
+    await service.setActiveThemeId(vault, 'A')
+
+    await Promise.all([service.deleteTheme(vault, 'A'), service.setActiveThemeId(vault, 'B')])
+
+    // Either order is consistent: B is selected (set after the delete) or the selection was reset
+    // to default — but never the deleted theme A.
+    expect(await service.getActiveThemeId(vault)).not.toBe('A')
+  })
+
+  it('overwrites an existing theme whose folder name differs only in case', async () => {
+    await service.saveTheme(vault, 'Minimal', 'a{}', { name: 'Minimal', version: '1' })
+    const meta = await service.saveTheme(vault, 'minimal', 'b{}', { name: 'Minimal', version: '2' })
+
+    expect(meta.id).toBe('Minimal')
+    const folders = await fs.readdir(path.join(vault, '.obsidian', 'themes'))
+    expect(folders).toEqual(['Minimal'])
+    expect((await service.loadTheme(vault, 'Minimal'))?.css).toBe('b{}')
+    expect(meta.manifest.version).toBe('2')
+  })
+
+  it('writes manifest and stylesheet together and leaves no temp files behind', async () => {
+    await service.saveTheme(vault, 'Things', 'a{}', { name: 'Things', author: 'Colin' })
+    const files = (await fs.readdir(path.join(vault, '.obsidian', 'themes', 'Things'))).sort()
+    expect(files).toEqual(['manifest.json', 'theme.css'])
+  })
+
+  it('a failed save keeps the previous theme intact', async () => {
+    await service.saveTheme(vault, 'Things', 'old{}', { name: 'Things', version: '1' })
+    vi.spyOn(fs, 'rename').mockRejectedValue(Object.assign(new Error('nope'), { code: 'EIO' }))
+
+    await expect(service.saveTheme(vault, 'Things', 'new{}', { name: 'Things', version: '2' })).rejects.toMatchObject({ code: 'EIO' })
+
+    vi.restoreAllMocks()
+    const loaded = await service.loadTheme(vault, 'Things')
+    expect(loaded?.css).toBe('old{}')
+    expect(loaded?.meta.manifest.version).toBe('1')
+    expect((await fs.readdir(path.join(vault, '.obsidian', 'themes', 'Things'))).sort()).toEqual(['manifest.json', 'theme.css'])
+  })
+
+  it('does not re-read an unchanged stylesheet on every listing (hosts are cached by file version)', async () => {
+    await service.saveTheme(vault, 'Fancy', '@import url("https://fonts.googleapis.com/x");')
+    const readFile = vi.spyOn(fs, 'readFile')
+
+    const first = await service.listThemes(vault)
+    const readsFirst = readFile.mock.calls.filter(([p]) => String(p).endsWith('theme.css')).length
+    const second = await service.listThemes(vault)
+    const readsAfter = readFile.mock.calls.filter(([p]) => String(p).endsWith('theme.css')).length
+
+    expect(first[0]?.externalHosts).toEqual(['fonts.googleapis.com'])
+    expect(second).toEqual(first)
+    expect(readsAfter).toBe(readsFirst)
+  })
+
+  it('lists many themes (read in parallel) in a stable order', async () => {
+    for (const id of ['Zeta', 'Alpha', 'Mid']) await service.saveTheme(vault, id, 'a{}')
+    expect((await service.listThemes(vault)).map((t) => t.id)).toEqual(['Alpha', 'Mid', 'Zeta'])
   })
 })

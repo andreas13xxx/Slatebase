@@ -105,6 +105,19 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, lint, Tests).
 - [x] 7.2 Doku: Welcome-Vault-Seite `Features/Themes` (DE + EN) mit Verlinkung in Übersicht/Einstellungen,
       README (Feature-Zeile + Themes-API), `VAULT-ROUTE-AUTHORIZATION.md` (Nachtrag), `structure.md`,
       `AGENTS.md` (Abschnitt „Themes"). Grenzen (Struktur-Selektoren, Style Settings) stehen auf der Themes-Seite
+- [x] 7.4 Code-Review (`/code-review`): neun Punkte, alle behoben (Tests ergänzt):
+      (1) Löschen prüft die Existenz per `themeExists` (Stat) statt `loadTheme`, ein Theme über dem Limit bleibt
+      löschbar; (2) die UI rollt die Auswahl nur zurück, wenn das Speichern scheitert, nicht wenn nur das lokale
+      Anwenden scheitert; (3) `deleteTheme` löscht erst den Ordner, setzt dann die Auswahl zurück, beides unter dem
+      Mutex, und fasst eine ungültige `appearance.json` nie an; (4) `ThemeLifecycle` entfernt das Theme nur bei
+      Vault-Wechsel, nicht bei geändertem `apiClient`; (5) IDs wie „Active" werden beim Import umbenannt
+      (`Active-theme`); (6) Namensvergleich ohne Groß-/Kleinschreibung (Überschreiben statt Kollision, Backend und
+      UI), reservierte Windows-Namen (`CON`, `NUL`, `COM1`, …) sind ungültig; (7) Manifest und CSS werden
+      zusammen gestaged und direkt nacheinander umbenannt, ein Fehler hinterlässt das alte Theme intakt;
+      (8) `listThemes` liest parallel und cached die Hosts nach Pfad + mtime + Größe; (9) das Löschen meldet
+      `appearance.json` nur noch, wenn das gelöschte Theme aktiv war.
+      Bewusst nicht behoben: Theme-CSS gilt ungescoped für alle Nutzer des Vaults (wie Snippets, bei Themes ist
+      Schreibzugriff nötig). Eine CSP-Einschränkung für `url()`/`@import` ist ein eigenes Thema.
 - [ ] 7.3 `test:coverage` und `lint` in beiden Paketen; Coverage-Schwellen ggf. anheben, nie senken
 
 ## Entscheidungen

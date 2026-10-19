@@ -191,11 +191,15 @@ export function createThemeRoutes(deps: ThemeRouteDependencies): Hono {
     }
 
     try {
-      const existing = await themeService.loadTheme(vaultPath, themeId)
-      if (existing === null) return c.json(createApiError('THEME_NOT_FOUND', `Theme "${themeId}" not found`), 404)
+      // A stat, not loadTheme: a theme over the size limit must still be deletable.
+      if (!(await themeService.themeExists(vaultPath, themeId))) {
+        return c.json(createApiError('THEME_NOT_FOUND', `Theme "${themeId}" not found`), 404)
+      }
+      const wasActive = (await themeService.getActiveThemeId(vaultPath)) === themeId
       await themeService.deleteTheme(vaultPath, themeId)
       await publishChange(c, vaultId, `.obsidian/themes/${themeId}/theme.css`, 'deleted')
-      await publishChange(c, vaultId, APPEARANCE_PATH, 'saved')
+      // The selection file only changed if the deleted theme was the active one.
+      if (wasActive) await publishChange(c, vaultId, APPEARANCE_PATH, 'saved')
       logger.info('Theme deleted', { vaultId, themeId })
       return c.body(null, 204)
     } catch (error) {
