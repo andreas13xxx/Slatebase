@@ -85,7 +85,11 @@ describe('CodeMirrorEditor Obsidian marker classes', () => {
 })
 
 describe('Slatebase CSS does not target the Obsidian marker classes', () => {
-  const TARGET_CLASSES = ['mod-cm6', 'is-live-preview', 'is-readable-line-width', 'cm-s-obsidian']
+  const TARGET_CLASSES = [
+    'mod-cm6', 'is-live-preview', 'is-readable-line-width', 'cm-s-obsidian',
+    'HyperMD-header', 'HyperMD-codeblock', 'HyperMD-quote', 'HyperMD-task-line',
+    'cm-inline-code', 'cm-highlight', 'cm-hashtag', 'cm-formatting',
+  ]
 
   /** Lists app CSS files; `plugins/compat/` is Obsidian compat CSS for plugin DOM and is checked separately. */
   function cssFiles(dir: string, out: string[] = []): string[] {

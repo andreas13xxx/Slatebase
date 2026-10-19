@@ -39,11 +39,17 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, Lint, betroff
 - Hinweis: `src/editor/live-preview/standalone-block-spacing.test.ts` schlägt im Verbund mit anderen Tests fehl (allein
   grün). Das ist **vorbestehend**: Der Lauf ohne meine Änderung zeigt dasselbe.
 
-## Phase 2 — Editor-Zeilen und Elemente (R2, optional)
-- [ ] 2.1 Entscheiden, ob sich der Aufwand lohnt (Wirkung ist keine belegt; Argument ist Parität). Nur bei kleinem Aufwand
-- [ ] 2.2 `HyperMD-header(-N)`, `HyperMD-codeblock(-bg/-begin/-end)`, `HyperMD-quote`, `HyperMD-task-line`, `cm-inline-code`,
-      `cm-highlight`, `cm-hashtag`, `cm-formatting` an den bestehenden Decorations
-- [ ] 2.3 Tests pro Klasse am erzeugten DOM; Wirkungsprobe wiederholen (erwartet unverändert)
+## Phase 2 — Editor-Zeilen und Elemente (R2) — umgesetzt 2026-10-19
+- [x] 2.1 Entscheidung: auf Wunsch umgesetzt, obwohl keine Wirkung belegt ist (Parität). Aufwand klein: nur Zusatzklassen an
+      bestehenden Decorations, keine neuen Ranges
+- [x] 2.2 `HyperMD-header` + `HyperMD-header-N` (Überschriftenzeile), `cm-formatting` (Überschriften-Marker),
+      `HyperMD-codeblock`/`-bg` (jede Zeile), `-begin`/`-end` (erste/letzte), `HyperMD-quote`, `HyperMD-task-line`,
+      `cm-inline-code`, `cm-highlight`, `cm-hashtag`. Die `cm-lp-*`-Klassen bleiben unverändert
+- [x] 2.3 Tests (`live-preview/obsidian-classes.test.ts`, 11) pro Klasse am erzeugten Decoration-Set; der
+      „keine eigene Regel"-Test deckt jetzt alle 12 Klassen ab. Wirkungsprobe in der laufenden Anwendung noch **nicht**
+      wiederholt (Phase 3.1)
+- Nicht umgesetzt: `cm-formatting` an weiteren Markern (Listen-, Zitat-, Emphasis-Zeichen), weil Slatebase sie ausblendet
+  statt zu markieren
 
 ## Phase 3 — Abnahme und Doku
 - [ ] 3.1 Messung und Sonden wiederholen; Zahlen hier eintragen

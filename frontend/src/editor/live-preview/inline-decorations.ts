@@ -59,7 +59,7 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
 
         // Line decoration for heading font size
         decorations.push(
-          Decoration.line({ attributes: { class: `cm-lp-h${level}` } }).range(line.from)
+          Decoration.line({ attributes: { class: `cm-lp-h${level} HyperMD-header HyperMD-header-${level}` } }).range(line.from)
         )
 
         // Find HeaderMark child nodes and add marker decorations + hideable ranges
@@ -72,7 +72,7 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
 
               // Mark the header marker characters with a specific class
               decorations.push(
-                Decoration.mark({ class: 'cm-lp-heading-marker' }).range(markFrom, markTo)
+                Decoration.mark({ class: 'cm-lp-heading-marker cm-formatting' }).range(markFrom, markTo)
               )
 
               // Hide the marker (# characters + trailing space)
@@ -188,7 +188,7 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
 
         // Mark the full range with inline-code class (including backticks for styling)
         decorations.push(
-          Decoration.mark({ class: 'cm-lp-inline-code' }).range(from, to)
+          Decoration.mark({ class: 'cm-lp-inline-code cm-inline-code' }).range(from, to)
         )
 
         // Find the backtick markers via child nodes (CodeMark)
@@ -296,7 +296,7 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
       const inner = docText.slice(contentFrom, contentTo)
       const { color } = matchHighlightColor(inner)
       decorations.push(
-        Decoration.mark({ class: `cm-lp-highlight cm-lp-hl-${color}` }).range(contentFrom, contentTo)
+        Decoration.mark({ class: `cm-lp-highlight cm-lp-hl-${color} cm-highlight` }).range(contentFrom, contentTo)
       )
 
       // Opening marker ==
@@ -337,7 +337,7 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
 
     // Mark the entire tag (#value) with the tag class
     decorations.push(
-      Decoration.mark({ class: 'cm-lp-tag' }).range(fullFrom, fullTo)
+      Decoration.mark({ class: 'cm-lp-tag cm-hashtag' }).range(fullFrom, fullTo)
     )
   }
 
