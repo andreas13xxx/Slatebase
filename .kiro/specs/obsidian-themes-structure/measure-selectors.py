@@ -94,19 +94,39 @@ def classify(cls):
             return "native", area
     return "unclassified", ""
 
-# ---- 3. count classes; detect toggles (class in the first compound that starts with `body`) ---
+# ---- 3. count classes; separate selectors that a Style Settings toggle gates ------------------
+# A toggle is a class the theme puts on <body> (`body.minimal-focus-mode`, `.theme-dark.colorful-frame`) that
+# Obsidian itself does not set. Slatebase never sets them, so a rule that REQUIRES one can never match. Those
+# rules are counted separately ("gated") and are not part of the gap Stage 2 has to close. A toggle inside
+# `:not(...)` means "enabled by default", so the rule stays reachable.
 class_re = re.compile(r"\.(-?[_a-zA-Z][_a-zA-Z0-9-]*)")
-counts, toggles = Counter(), Counter()
-for sel_group in selectors:
+
+def parts(sel_group):
     for sel in sel_group.split(","):
         sel = re.sub(r"\[[^\]]*\]", "", sel).strip()
-        if not sel:
-            continue
-        first = re.split(r"[\s>+~]", sel, maxsplit=1)[0]
-        first_classes = set(class_re.findall(first)) if first.startswith("body") or first.startswith(".theme-") else set()
+        if sel:
+            yield sel
+
+def first_compound_classes(sel):
+    first = re.split(r"[\s>+~]", sel, maxsplit=1)[0]
+    return set(class_re.findall(first)) if first.startswith("body") or first.startswith(".theme-") else set()
+
+toggle_vocab = set()
+for sel_group in selectors:
+    for sel in parts(sel_group):
+        toggle_vocab |= {c for c in first_compound_classes(sel) if c not in NATIVE_BODY}
+
+counts, toggles, gated = Counter(), Counter(), Counter()
+for sel_group in selectors:
+    for sel in parts(sel_group):
+        required = set(class_re.findall(re.sub(r":not\([^)]*\)", "", sel)))
+        is_gated = bool(required & toggle_vocab)
+        first_classes = first_compound_classes(sel)
         for cls in class_re.findall(sel):
-            if cls in first_classes and cls not in NATIVE_BODY:
+            if cls in toggle_vocab and cls not in NATIVE_BODY:
                 toggles[cls] += 1
+            elif is_gated:
+                gated[cls] += 1
             else:
                 counts[cls] += 1
 
@@ -142,6 +162,14 @@ for cls, uses in toggles.items():
     rows.append({"class": cls, "uses": uses, "kind": "toggle", "area": "", "slatebase_files": present.get(cls, 0)})
     by_kind["toggle"] += uses
 
+gated_by_area = defaultdict(lambda: [0, 0])
+for cls, uses in gated.items():
+    kind, area = classify(cls)
+    if kind == "native":
+        gated_by_area[area][0] += uses
+        if present.get(cls, 0) == 0:
+            gated_by_area[area][1] += uses
+
 rows.sort(key=lambda r: -r["uses"])
 native_total = sum(v[0] for v in by_area.values())
 native_missing = sum(v[1] for v in by_area.values())
@@ -151,9 +179,12 @@ result = {
     "native_uses": native_total,
     "native_uses_missing": native_missing,
     "areas": {k: {"uses": v[0], "missing_uses": v[1]} for k, v in sorted(by_area.items(), key=lambda kv: -kv[1][1])},
+    "gated_native_uses": sum(v[0] for v in gated_by_area.values()),
+    "gated_native_uses_missing": sum(v[1] for v in gated_by_area.values()),
+    "gated_areas": {k: {"uses": v[0], "missing_uses": v[1]} for k, v in sorted(gated_by_area.items(), key=lambda kv: -kv[1][1])},
     "rows": rows,
 }
 Path(out_path).write_text(json.dumps(result, indent=1), encoding="utf-8")
-print(f"{Path(css_path).name}: selectors={len(selectors)} kinds={dict(by_kind)} native={native_total} native_missing={native_missing} ({100*native_missing//max(native_total,1)}%)")
+print(f"{Path(css_path).name}: selectors={len(selectors)} reachable native={native_total} missing={native_missing} ({100*native_missing//max(native_total,1)}%) | gated by toggles: {result['gated_native_uses']} uses ({result['gated_native_uses_missing']} missing) | toggle vocab={len(toggle_vocab)}")
 unc = [r for r in rows if r["kind"] == "unclassified"][:25]
 print("unclassified top:", ", ".join(f".{r['class']}({r['uses']})" for r in unc))
