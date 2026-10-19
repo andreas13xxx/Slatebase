@@ -21,14 +21,23 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, Lint, betroff
       Editor-Wrapper-Klassen werden umgesetzt; Editor-Zeilen- und Elementklassen sind optional. Siehe Requirements und
       Design §3
 
-## Phase 1 — Editor-Wrapper-Klassen (R1)
-- [ ] 1.1 `CodeMirrorEditor.tsx`: `mod-cm6` am `editorArea`, neben `markdown-source-view`; Aufräumen beim Abbau
-- [ ] 1.2 `is-live-preview` (folgt `livePreviewMode`, auch beim Moduswechsel) und `is-readable-line-width` (folgt
-      `readableLineLength`, Gegenstück zu `cm-full-width`)
-- [ ] 1.3 `cm-s-obsidian` am `.cm-editor` über `EditorView.editorAttributes`
-- [ ] 1.4 Tests: Setzen, Moduswechsel, Einstellung an/aus, Aufräumen; Test „keine eigene CSS-Regel für die neuen Klassen"
-- [ ] 1.5 Wirkungsprobe bei Minimal und Things (Sonde vor/nach), manuelle Sicht auf Tabellen und Editorbreite in
-      Hell/Dunkel mit Screenshots
+## Phase 1 — Editor-Wrapper-Klassen (R1) — abgeschlossen 2026-10-19
+- [x] 1.1 `CodeMirrorEditor.tsx`: `mod-cm6` am `editorArea`, neben `markdown-source-view`; Aufräumen beim Abbau
+- [x] 1.2 `is-live-preview` (folgt dem `livePreview`-Prop, auch beim Moduswechsel) und `is-readable-line-width` (folgt
+      `readableLineLength`, Gegenstück zu `cm-full-width`). Umsetzung als eigener Effect, weil das Element EditModes Markup
+      gehört und die Klassen den Props folgen müssen. `is-live-preview` nutzt dasselbe Prop wie `editorLivePreviewField`
+      (und damit wie die Plugins), nicht die interne 50.000-Zeichen-Abschaltung
+- [x] 1.3 `cm-s-obsidian` am `.cm-editor` über `EditorView.editorAttributes`
+- [x] 1.4 Tests (`CodeMirrorEditor.obsidianClasses.test.tsx`, 10): Setzen, Moduswechsel, Einstellung an/aus inklusive
+      Gegenstück `cm-full-width`, Aufräumen beim Unmount, `cm-s-obsidian` am `.cm-editor`, und „keine CSS-Regel in Slatebase
+      zielt auf die vier Klassen" (über alle CSS-Dateien außer Compat)
+- [x] 1.5 Wirkungsprobe in der laufenden Anwendung: Editor-Sonde bei **Minimal 0 von 164 Elementen** (vorher 6, die
+      Tabellen- und Breitenregeln greifen jetzt nativ: Tabellenrahmen 1 px, Zellabstände `4px 10px 4px 0px`,
+      `.cm-content` `max-width: 100%`), bei **Things 0 von 164** (unverändert). Klassen im DOM:
+      `edit-mode-editor-area markdown-source-view mod-cm6 is-live-preview is-readable-line-width` und
+      `cm-editor cm-s-obsidian`
+- Hinweis: `src/editor/live-preview/standalone-block-spacing.test.ts` schlägt im Verbund mit anderen Tests fehl (allein
+  grün). Das ist **vorbestehend**: Der Lauf ohne meine Änderung zeigt dasselbe.
 
 ## Phase 2 — Editor-Zeilen und Elemente (R2, optional)
 - [ ] 2.1 Entscheiden, ob sich der Aufwand lohnt (Wirkung ist keine belegt; Argument ist Parität). Nur bei kleinem Aufwand
