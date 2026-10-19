@@ -46,6 +46,7 @@ export const DEFAULT_VAULT_SETTINGS: UserVaultSettings = {
   graph: null,
   sidebarPanel: null,
   contextPanel: null,
+  activityRange: null,
 }
 
 // ─── Internal State ──────────────────────────────────────────────────────────
@@ -80,6 +81,7 @@ function normalize(raw: unknown): UserVaultSettings {
     graph: parsed.graph ?? null,
     sidebarPanel: parsed.sidebarPanel ?? null,
     contextPanel: parsed.contextPanel ?? null,
+    activityRange: typeof parsed.activityRange === 'string' ? parsed.activityRange : null,
   }
 }
 

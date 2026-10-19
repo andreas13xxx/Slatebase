@@ -24,6 +24,7 @@ import { INLINE_HTML_OPEN_TAG_RE, INLINE_HTML_CLOSE_TAG_RE, parseInlineHtmlAttrs
 import { PdfViewer } from './BinaryViewer'
 import { MermaidRenderer } from './MermaidRenderer'
 import { MathRenderer } from './MathRenderer'
+import { BasesEmbed } from './bases/BasesEmbed'
 import { findEmbedCreatorForTarget, getLinktextExtension, mountRegisteredEmbed, type EmbedCreator, type EmbedContext } from '../plugins/compat/embed-registry'
 import { ContextMenu, type ContextMenuItem } from './ContextMenu'
 import { buildTFileFromPath } from '../plugins/compat/plugin-event-bridge'
@@ -880,7 +881,7 @@ function renderBlockNode(
       return renderCalloutNode(node as unknown as CalloutNode, vaultId, directoryTree, onInternalLinkClick, key, token, anchorTracker, onTagClick, embedDepth)
 
     case 'embed':
-      return renderEmbedNode(node as unknown as EmbedNode, vaultId, directoryTree, key, token, embedDepth)
+      return renderEmbedNode(node as unknown as EmbedNode, vaultId, directoryTree, key, token, embedDepth, onInternalLinkClick)
 
     case 'mathBlock':
       return createElement(MathRenderer, { key, source: (node as unknown as { value: string }).value, displayMode: true })
@@ -1250,7 +1251,7 @@ function renderPhrasingNode(
 
     case 'embed' as PhrasingContent['type']:
       // Embeds can appear as phrasing content inside paragraphs
-      return renderEmbedNode(node as unknown as EmbedNode, vaultId, directoryTree, key, token)
+      return renderEmbedNode(node as unknown as EmbedNode, vaultId, directoryTree, key, token, 0, onInternalLinkClick)
 
     case 'image':
       // Req 7.5: Render inline images with max-width 100%
@@ -1836,7 +1837,8 @@ function renderEmbedNode(
   directoryTree: DirectoryTree | null,
   key: string,
   token?: string,
-  embedDepth: number = 0
+  embedDepth: number = 0,
+  onInternalLinkClick?: (targetPath: string) => void
 ): ReactNode {
   // Requirement 5.7: Recursion depth check — stop at max 3 levels
   if (embedDepth > MAX_EMBED_DEPTH) {
@@ -1923,6 +1925,23 @@ function renderEmbedNode(
       key,
       className: 'view-mode-embed view-mode-embed--missing',
     }, `Video nicht gefunden: ${node.target}`)
+  }
+
+  if (node.embedType === 'base') {
+    const resolvedBasePath = resolveWikilinkTarget(node.target, directoryTree)
+    if (resolvedBasePath) {
+      return createElement(BasesEmbed, {
+        key,
+        vaultId,
+        filePath: resolvedBasePath,
+        target: node.target,
+        onOpenNote: (path: string) => onInternalLinkClick?.(path),
+      })
+    }
+    return createElement('span', {
+      key,
+      className: 'view-mode-embed view-mode-embed--missing',
+    }, `Base nicht gefunden: ${node.target}`)
   }
 
   // Note embed — render as styled placeholder container

@@ -1274,9 +1274,9 @@ describe('registerCoreAppCommands — footnotes and commands without an equivale
     expect(handlers.onCreateBase).toHaveBeenCalledTimes(1)
   })
 
-  it('routes bases:change-view / add-view / copy-table to the active base', async () => {
+  it('routes bases:change-view / add-view / copy-table / add-item to the active base', async () => {
     const toastSpy = vi.spyOn(ToastNotificationModule, 'showToast').mockImplementation(() => {})
-    const controller = { nextView: vi.fn(() => true), addView: vi.fn(() => true), copyTable: vi.fn(async () => true) }
+    const controller = { nextView: vi.fn(() => true), addView: vi.fn(() => true), copyTable: vi.fn(async () => true), addItem: vi.fn(async () => 'Tasks/Unbenannt.md') }
     setActiveBasesController(controller)
     const registry = new CommandRegistry()
     registerCoreAppCommands(registry, () => makeMinimalHandlers({ activeTab: makeTab() }))
@@ -1284,11 +1284,14 @@ describe('registerCoreAppCommands — footnotes and commands without an equivale
     registry.executeCommand('bases:change-view')
     registry.executeCommand('bases:add-view')
     registry.executeCommand('bases:copy-table')
+    registry.executeCommand('bases:add-item')
+    await Promise.resolve()
     await Promise.resolve()
 
     expect(controller.nextView).toHaveBeenCalled()
     expect(controller.addView).toHaveBeenCalled()
     expect(controller.copyTable).toHaveBeenCalled()
+    expect(controller.addItem).toHaveBeenCalled()
     expect(toastSpy).toHaveBeenCalledWith('success', expect.any(String))
     setActiveBasesController(null)
     toastSpy.mockRestore()

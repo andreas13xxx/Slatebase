@@ -186,6 +186,15 @@ export const en: TranslationShape = {
 
   splitPanes: {
     noActiveTab: 'No active tab to split.',
+    menuLabel: 'View menu',
+    splitRight: 'Split right',
+    splitDown: 'Split down',
+    focusLeft: 'Focus pane to the left',
+    focusRight: 'Focus pane to the right',
+    focusUp: 'Focus pane above',
+    focusDown: 'Focus pane below',
+    closePane: 'Close pane',
+    closeOtherPanes: 'Close other panes',
   },
 
   binaryViewer: {
@@ -659,6 +668,7 @@ export const en: TranslationShape = {
       canvas: 'Canvas',
       bases: 'Bases',
       snippets: 'Snippets',
+      sync: 'Sync',
     },
     bucket: {
       today: 'Today',
@@ -681,6 +691,25 @@ export const en: TranslationShape = {
       snippetCreated: 'Snippet created',
       snippetEdited: 'Snippet edited',
       snippetDeleted: 'Snippet deleted',
+      syncCompleted: 'Synced',
+    },
+    origin: {
+      mcp: 'MCP',
+      gitSync: 'Git sync',
+      mailImport: 'Mail import',
+    },
+    range: {
+      day: 'Day',
+      week: 'Week',
+      month: 'Month',
+      year: 'Year',
+    },
+    stats: {
+      byType: 'By type',
+      last10Weeks: 'Last 10 weeks',
+    },
+    folderFilter: {
+      all: 'All folders',
     },
   },
 

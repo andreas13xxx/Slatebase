@@ -3,7 +3,7 @@ import { useNavigationHistory } from '../state/navigationHistoryContext'
 
 /**
  * Back/forward buttons for the navigation history (Requirements 1.2–1.5).
- * Rendered next to the TabBar; disabled when the respective stack is empty.
+ * Rendered in the EditorHeaderRow below the tab bar; disabled when the respective stack is empty.
  */
 export function NavigationControls() {
   const { goBack, goForward, canGoBack, canGoForward } = useNavigationHistory()

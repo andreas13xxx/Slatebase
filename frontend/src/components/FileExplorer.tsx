@@ -25,6 +25,7 @@ import type { DragState, ExternalDropState, ContextMenuState, InlineInputState }
 import { buildTFileFromPath, buildTFolderFromPath } from '../plugins/compat/plugin-event-bridge'
 import type { TFile, TFolder } from '../plugins/compat/types'
 import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
+import { useLongPress } from '../hooks/useLongPress'
 
 /**
  * Monotonic per-vault sequence counter used to discard out-of-order fetchVaultTree
@@ -60,6 +61,8 @@ export interface FileExplorerProps {
  * Supports drag & drop for moving files and folders within a vault.
  */
 export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onRegisterCreateVault, onRegisterCreateCanvas, onOpenVersions }: FileExplorerProps = {}) {
+  // Vault rows only; the container's own empty-area menu stays mouse-only, since a child's long-press would bubble into it.
+  const vaultLongPress = useLongPress()
   const { state, dispatch, apiClient } = useAppContext()
   const { tabState, tabDispatch } = useTabContext()
   const { t } = useTranslation()
@@ -1266,6 +1269,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
                   <div
                     className={`tree-node-row tree-node-row--vault${isSelected ? ' tree-node-row--vault-selected' : ''}${externalDropState.targetPath === '' && externalDropState.targetVaultId === vault.id ? ' tree-node--drop-target' : ''}`}
                     onContextMenu={(e) => handleVaultContextMenu(e, vault)}
+                    {...vaultLongPress}
                     onMouseEnter={() => handleVaultMouseEnter(vault.id)}
                     onDragOver={(e) => handleRootDragOver(e, vault.id)}
                     onDragLeave={() => setExternalDropState((prev) => prev.targetPath === '' && prev.targetVaultId === vault.id ? { targetPath: null, targetVaultId: null } : prev)}

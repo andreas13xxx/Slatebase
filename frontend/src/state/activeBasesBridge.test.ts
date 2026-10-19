@@ -8,7 +8,7 @@ import {
 } from './activeBasesBridge'
 
 function makeController(): ActiveBasesController {
-  return { nextView: () => false, addView: () => false, copyTable: async () => false }
+  return { nextView: () => false, addView: () => false, copyTable: async () => false, addItem: async () => null }
 }
 
 describe('active bases controller (identity-guarded clear)', () => {

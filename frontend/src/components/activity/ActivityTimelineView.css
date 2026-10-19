@@ -221,3 +221,64 @@
     transition: none;
   }
 }
+
+/* ─── Origin badge (shown only for non-web origin) ─────────────────────── */
+
+.activity-row__origin {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-left: var(--space-2, 0.5rem);
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 500;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+
+
+/* ─── Two-column layout (full variant) ────────────────────────────────── */
+
+.activity-timeline__content {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.activity-timeline__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+/* The stat panel is a fixed-width right column only in the full variant;
+   the compact variant never renders it. */
+.activity-timeline--full .activity-stat-panel {
+  flex: 0 0 15rem;
+}
+
+.activity-timeline--compact .activity-timeline__content {
+  display: block;
+  overflow-y: auto;
+}
+
+
+/* ─── Folder filter (full variant) ────────────────────────────────────── */
+
+.activity-folder-filter {
+  appearance: none;
+  margin-left: auto;
+  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  color: var(--text-normal);
+  border-radius: 999px;
+  padding: 0.15rem 0.7rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  max-width: 14rem;
+}

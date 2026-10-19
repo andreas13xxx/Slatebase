@@ -148,6 +148,10 @@ export type ActivityEventType =
   | 'canvas.created' | 'canvas.edited' | 'canvas.deleted'
   | 'base.created' | 'base.edited' | 'base.deleted'
   | 'snippet.created' | 'snippet.edited' | 'snippet.deleted'
+  | 'sync.completed'
+
+/** Where a recorded activity originated (mirrors the backend union). A missing origin reads as `web`. */
+export type ActivityOrigin = 'web' | 'mcp' | 'git-sync' | 'mail-import'
 
 /** A single activity-timeline event. */
 export interface ActivityEvent {
@@ -163,6 +167,14 @@ export interface ActivityEvent {
   oldPath?: string
   /** Username that triggered the activity. */
   user: string
+  /** Where it originated. Omitted ⇒ `web` (backward-compatible). */
+  origin?: ActivityOrigin
+  /** Only for sync.completed: files brought in by the merge. */
+  pulledFiles?: number
+  /** Only for sync.completed: files committed and pushed. */
+  pushedFiles?: number
+  /** Only for sync.completed: the remote's user-facing name. */
+  remoteName?: string
 }
 
 /** One page of activity events, newest first. */
@@ -179,6 +191,8 @@ export interface ActivityQueryParams {
   to?: string
   cursor?: string
   limit?: number
+  /** Restrict to events at/under this vault-relative folder prefix. */
+  pathPrefix?: string
 }
 
 /** Discriminated union of all actions dispatched to the app reducer. */

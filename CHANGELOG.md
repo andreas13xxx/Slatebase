@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.56.0](https://github.com/andreas13xxx/Slatebase/compare/v0.55.0...v0.56.0) (2026-10-17)
+
+
+### Features
+
+* **activity:** stat panel, origin badges, folder filter, git-sync event ([#249](https://github.com/andreas13xxx/Slatebase/issues/249)) ([122cef4](https://github.com/andreas13xxx/Slatebase/commit/122cef432c9948d13333be0846598651e73f9c31))
+
+## [0.55.0](https://github.com/andreas13xxx/Slatebase/compare/v0.54.0...v0.55.0) (2026-10-17)
+
+
+### Features
+
+* **bases:** complete deferred Bases features (R1-R7) ([#247](https://github.com/andreas13xxx/Slatebase/issues/247)) ([2d395fb](https://github.com/andreas13xxx/Slatebase/commit/2d395fbcd69b690a6f8caf556e5ef5009a373a1a))
+
+## [0.54.0](https://github.com/andreas13xxx/Slatebase/compare/v0.53.2...v0.54.0) (2026-10-17)
+
+
+### Features
+
+* **frontend:** Long-Press-Kontextmenüs für Touch und Pane-Menü in der Kopfzeile ([#245](https://github.com/andreas13xxx/Slatebase/issues/245)) ([80fef61](https://github.com/andreas13xxx/Slatebase/commit/80fef617b328bebb224604252fea45fbab39bd4e))
+
+## [0.53.2](https://github.com/andreas13xxx/Slatebase/compare/v0.53.1...v0.53.2) (2026-10-16)
+
+
+### Bugfixes
+
+* **git-sync:** restrict temp key ACL on Windows for ssh-keygen ([#242](https://github.com/andreas13xxx/Slatebase/issues/242)) ([2b4e631](https://github.com/andreas13xxx/Slatebase/commit/2b4e63188c150156ceaf6334f28d0f51f3ff46a7))
+
+
+### Sonstige Änderungen
+
+* sync implementation plan, tech.md and welcome vault start pages ([#243](https://github.com/andreas13xxx/Slatebase/issues/243)) ([6fdb010](https://github.com/andreas13xxx/Slatebase/commit/6fdb010e2069032d44c7764f15eafd574094c4ce))
+
+## [0.53.1](https://github.com/andreas13xxx/Slatebase/compare/v0.53.0...v0.53.1) (2026-10-16)
+
+
+### Bugfixes
+
+* sync backend lockfile with shared-contracts moment/yaml deps ([#240](https://github.com/andreas13xxx/Slatebase/issues/240)) ([64775f4](https://github.com/andreas13xxx/Slatebase/commit/64775f4717cb7cea3320fa7c286622d3f2a512e3))
+
 ## [0.53.0](https://github.com/andreas13xxx/Slatebase/compare/v0.52.1...v0.53.0) (2026-10-15)
 
 

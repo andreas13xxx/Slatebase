@@ -17,6 +17,7 @@ import { buildTFileFromPath } from '../plugins/compat/plugin-event-bridge'
 import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
 import { revealInExplorer, renameInExplorer, deleteInExplorer } from '../state/fileNavigation'
 import { RefreshCw, Search, Minus, Plus, FileText, FolderOpen, Pencil, Trash2 } from 'lucide-react'
+import { useLongPress } from '../hooks/useLongPress'
 
 /** Debounce delay for local-graph refetch triggered by remote vault changes. */
 const LOCAL_GRAPH_REFRESH_DEBOUNCE_MS = 1000
@@ -72,6 +73,7 @@ interface SimLink extends SimulationLinkDatum<SimNode> {
  * Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 9.1, 9.2, 9.3, 9.4, 9.5
  */
 export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
+  const longPress = useLongPress()
   const { apiClient, dispatch: appDispatch } = useAppContext()
   const { tabDispatch } = useTabContext()
   const { t } = useTranslation()
@@ -943,6 +945,7 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
                   onClick={(e) => handleNodeClick(e, node)}
                   onDoubleClick={(e) => handleNodeDoubleClick(e, node)}
                   onContextMenu={(e) => handleNodeContextMenu(e, node)}
+                  {...longPress}
                   onMouseEnter={() => handleNodeHoverEnter(node.id)}
                   onMouseLeave={handleNodeHoverLeave}
                   style={{ cursor: node.exists ? 'pointer' : 'default', opacity: nodeOpacity }}

@@ -8,6 +8,7 @@ import type { PropertyType, PropertyTypeEntry } from '../../state/propertyTypes'
 import { buildInlineDecorations, type HideableRange } from './inline-decorations'
 import { buildLinkDecorations } from './link-decorations'
 import { buildWidgetDecorations, toggleCalloutFoldEffect } from './widget-decorations'
+import type { IBasesEmbedApiClient } from '../../components/bases/BasesEmbed'
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
 import { editorInfoField } from '../editor-state-fields'
 
@@ -29,6 +30,8 @@ export interface LivePreviewOptions {
   typeRegistry?: PropertyTypeEntry[] | null
   /** Callback to persist an explicit type choice for a property key to the vault's type registry. */
   onPropertyTypeChange?: (key: string, type: PropertyType) => void
+  /** API client, for an embedded Bases view (`![[file.base]]`) to query the vault. */
+  apiClient?: IBasesEmbedApiClient | null
   /**
    * Callback when the user right-clicks a rendered link (`.cm-lp-link` /
    * `.cm-lp-wikilink`) in Live Preview — lets the caller show a link-specific
@@ -126,6 +129,7 @@ function buildDecorations(
     directoryTree: options.directoryTree,
     typeRegistry: options.typeRegistry,
     onPropertyTypeChange: options.onPropertyTypeChange,
+    apiClient: options.apiClient,
   })
 
   // Merge all decorations and hideable ranges

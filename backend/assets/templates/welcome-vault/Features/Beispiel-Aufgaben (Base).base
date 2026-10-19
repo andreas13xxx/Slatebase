@@ -13,6 +13,8 @@ properties:
     displayName: "Priorität"
   deadline:
     displayName: "Deadline"
+  estimate:
+    displayName: "Aufwand (h)"
   formula.days_left:
     displayName: "Tage übrig"
 views:
@@ -23,7 +25,12 @@ views:
       - status
       - priority
       - deadline
+      - estimate
       - formula.days_left
     sort:
       - column: priority
         direction: desc
+    summaries:
+      file.name: Count
+      estimate: Sum
+      days_left: Average

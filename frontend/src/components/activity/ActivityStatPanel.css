@@ -1,0 +1,140 @@
+/* ActivityStatPanel — right-hand statistics column (full variant). */
+
+.activity-stat-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 1rem);
+  padding: var(--space-3, 0.75rem);
+  border-left: 1px solid var(--border-subtle);
+  overflow-y: auto;
+  min-width: 0;
+  color: var(--text-normal);
+}
+
+/* ─── Range switcher ───────────────────────────────────────────────────── */
+
+.activity-stat-panel__ranges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1, 0.25rem);
+}
+
+.activity-range-chip {
+  appearance: none;
+  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm, 4px);
+  padding: 0.1rem 0.6rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.activity-range-chip:hover {
+  background: var(--bg-hover);
+  color: var(--text-normal);
+}
+
+.activity-range-chip--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent, #fff);
+}
+
+/* ─── Sections ─────────────────────────────────────────────────────────── */
+
+.activity-stat-panel__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+}
+
+.activity-stat-panel__heading {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.activity-stat-panel__empty {
+  margin: 0;
+  color: var(--text-faint, var(--text-muted));
+  font-size: 0.8rem;
+}
+
+/* ─── By-type bars ─────────────────────────────────────────────────────── */
+
+.activity-stat-panel__bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 0.25rem);
+}
+
+.activity-stat-bar {
+  display: grid;
+  grid-template-columns: minmax(5rem, auto) 1fr auto;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  font-size: 0.78rem;
+}
+
+.activity-stat-bar__label {
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activity-stat-bar__track {
+  height: 0.5rem;
+  background: var(--bg-secondary);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.activity-stat-bar__fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+.activity-stat-bar__count {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 1.5rem;
+  text-align: right;
+}
+
+/* ─── Heatmap ──────────────────────────────────────────────────────────── */
+
+.activity-heatmap {
+  display: flex;
+  gap: 3px;
+}
+
+.activity-heatmap__week {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.activity-heatmap__cell {
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  background: var(--bg-secondary);
+}
+
+/* Intensity levels: tint the accent over the empty-cell background.
+   color-mix keeps a single hue and stays correct in dark mode. */
+.activity-heatmap__cell--l1 { background: color-mix(in srgb, var(--accent) 25%, var(--bg-secondary)); }
+.activity-heatmap__cell--l2 { background: color-mix(in srgb, var(--accent) 50%, var(--bg-secondary)); }
+.activity-heatmap__cell--l3 { background: color-mix(in srgb, var(--accent) 75%, var(--bg-secondary)); }
+.activity-heatmap__cell--l4 { background: var(--accent); }

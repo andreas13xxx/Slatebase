@@ -3,6 +3,7 @@ type: task
 status: todo
 priority: medium
 deadline: "2026-12-01"
+estimate: 5
 tags: [beispiel, task]
 ---
 

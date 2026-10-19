@@ -271,3 +271,73 @@ describe('GitSyncEngine', () => {
     await expect(engine.runOne('vault-1', 'missing-remote')).rejects.toThrow()
   })
 })
+
+describe('GitSyncEngine — sync.completed recording (Task 2.6, L3)', () => {
+  let vaultPath: string
+  let gitCli: FakeGitCli
+  let vaultRegistry: IVaultRegistry
+  let configStore: IGitSyncConfigStore
+  let statusStore: IGitSyncStatusStore
+  let secretStore: IModuleSecretStore
+  let recorded: Array<{ remoteName: string; pulledFiles: number; pushedFiles: number }>
+
+  function makeEngine(): GitSyncEngine {
+    const record = (_vaultId: string, event: { remoteName: string; pulledFiles: number; pushedFiles: number }): void => {
+      recorded.push(event)
+    }
+    return new GitSyncEngine(gitCli, vaultRegistry, configStore, statusStore, secretStore, vaultPath, createMockLogger(), undefined, undefined, record)
+  }
+
+  beforeEach(async () => {
+    vaultPath = await mkdtemp(join(tmpdir(), 'git-sync-rec-'))
+    gitCli = new FakeGitCli()
+    recorded = []
+    vaultRegistry = {
+      findById: (id: string) => (id === 'vault-1' ? ({ id: 'vault-1', storagePath: vaultPath } as VaultRegistryEntry) : null),
+    } as unknown as IVaultRegistry
+    const vaultData: GitSyncVaultData = { branch: 'main', remotes: [makeRemote()] }
+    configStore = {
+      getVaultData: async () => vaultData,
+      getRemote: async (_v: string, remoteId: string) => vaultData.remotes.find((r) => r.id === remoteId) ?? null,
+    } as unknown as IGitSyncConfigStore
+    statusStore = { setStatus: async () => {} } as unknown as IGitSyncStatusStore
+    secretStore = { getSecret: async () => 'dummy-token' } as unknown as IModuleSecretStore
+  })
+
+  afterEach(async () => {
+    await rm(vaultPath, { recursive: true, force: true })
+  })
+
+  it('records exactly one sync.completed when files were pulled (pulledFiles > 0)', async () => {
+    gitCli.diffResult = ['a.md', 'b.md']
+    const outcome = await makeEngine().runOne('vault-1', 'remote-1')
+    expect(outcome.result).toBe('success')
+    expect(recorded).toHaveLength(1)
+    expect(recorded[0]).toMatchObject({ remoteName: 'Origin', pulledFiles: 2 })
+  })
+
+  it('records NOTHING on a pure push (pulledFiles = 0, pushedFiles > 0) — L3', async () => {
+    // Fetch fails => no merge => pulledFiles stays 0; a local commit still produces a push.
+    gitCli.fetchShouldThrow = true
+    gitCli.isRepoValue = true
+    gitCli.diffResult = ['local.md'] // the local-commit diff
+    const outcome = await makeEngine().runOne('vault-1', 'remote-1')
+    expect(outcome.result).toBe('success')
+    expect(outcome.pulledFiles).toBe(0)
+    expect(recorded).toHaveLength(0)
+  })
+
+  it('records NOTHING on a conflict', async () => {
+    gitCli.isRepoValue = true
+    gitCli.mergeResult = 'conflict'
+    gitCli.conflicted = ['x.md']
+    await makeEngine().runOne('vault-1', 'remote-1')
+    expect(recorded).toHaveLength(0)
+  })
+
+  it('records NOTHING when no credential is stored (error path)', async () => {
+    secretStore = { getSecret: async () => null } as unknown as IModuleSecretStore
+    await makeEngine().runOne('vault-1', 'remote-1')
+    expect(recorded).toHaveLength(0)
+  })
+})

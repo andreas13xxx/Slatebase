@@ -820,7 +820,13 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'note-composer:merge-file', name: 'Note composer: Merge current file with another file...', run: (h) => { void mergeActiveFileInto(h) } },
     { id: 'note-composer:split-file', name: 'Note composer: Extract current selection...', run: (h) => { void splitFileFromSelection(h) } },
     // bases:new-file is registered with the canvas commands above.
-    { id: 'bases:add-item', name: 'Bases: Add item', unsupported: 'bases-add-item' },
+    { id: 'bases:add-item', name: 'Bases: Add item', run: async () => {
+      const controller = getActiveBasesController()
+      if (!controller) { showToast('error', 'Keine Base geöffnet'); return }
+      const path = await controller.addItem()
+      if (path) showToast('success', 'Neue Notiz angelegt')
+      else showToast('error', 'Notiz konnte nicht angelegt werden')
+    } },
     { id: 'bases:insert', name: 'Bases: Insert new base', unsupported: 'bases-embed' },
     {
       id: 'bases:add-view',

@@ -273,7 +273,7 @@ src/
 │   ├── status-store.ts        — MailImportStatusStore (last run, found/imported counts, error per config)
 │   ├── imap-client.ts         — ImapClient (connect, list mailbox tree, fetch unread; password read from ModuleSecretStore under MAIL_IMPORT_SECRET_MODULE_ID)
 │   ├── mail-to-markdown.ts    — convertMailToMarkdown() (headers → frontmatter, body → Markdown, attachments extracted)
-│   ├── note-writer.ts         — MailNoteWriter (writes the note + attachments into the target folder via IVaultService, unique-filename resolution)
+│   ├── note-writer.ts         — MailNoteWriter (writes the note + attachments atomically via `fs.writeFile`, unique-filename resolution; after each write it fires the optional `recordActivity` hook — `note.created` with `origin='mail-import'`, gated on the activity-timeline feature — AND the always-on `linkIndexHook`, so an imported mail appears in the timeline and the graph. Both hooks are injected in the composition root, mirroring the MCP/trashRoutes side-effect shape)
 │   ├── import-engine.ts       — MailImportEngine (one run: fetch → convert → write → mark seen, per-message error isolation)
 │   └── mail-import-scheduler.ts — MailImportScheduler (per-config interval timer, lifecycle owned by the composition root)
 ├── transcription/            — Voice-to-text (dictation) via a self-hosted Whisper HTTP backend. Feature toggle `voice-transcription` (cold, default off). Audio is forwarded to the operator-configured backend and never persisted here.

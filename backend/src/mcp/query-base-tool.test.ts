@@ -117,9 +117,11 @@ describe('query_base', () => {
       { path: 'Tasks/c.md', cells: { 'file.name': 'c', status: 'open', 'formula.double': '2' } },
     ])
     expect(out['truncated']).toBe(false)
-    // The expression filter is NOT sent to the index
+    // The conservative prefilter (status == "open" → an eq condition) IS sent
+    // to the index so the candidate cap bites prefiltered rows; the full
+    // expression filter still runs client-side on the returned candidates.
     const spec = vi.mocked(linkIndex.queryForBase).mock.calls[0]![0]
-    expect(spec.filters).toBeUndefined()
+    expect(spec.filters).toEqual({ property: 'status', op: 'eq', value: 'open' })
   })
 
   it('applies the view limit after filtering; only the tool limit counts as truncation', async () => {

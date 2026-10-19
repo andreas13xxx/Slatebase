@@ -25,8 +25,17 @@ describe('buildQuerySpec', () => {
     expect(spec.columns.sort()).toEqual(['deadline', 'priority', 'status'])
   })
 
-  it('does NOT push the filter to the backend (client-side evaluation)', () => {
+  it('pushes a conservative prefilter for a pushable expression', () => {
     const spec = buildQuerySpec(doc, { type: 'table', order: ['status'] })
+    // `status == "open"` is a necessary condition → sent as an eq prefilter so
+    // the backend narrows candidates before its cap; the full expression still
+    // runs client-side.
+    expect(spec.filters).toEqual({ property: 'status', op: 'eq', value: 'open' })
+  })
+
+  it('pushes no prefilter for an un-pushable expression', () => {
+    const unpushable: BaseDocument = { ...doc, filters: 'status != "open"' }
+    const spec = buildQuerySpec(unpushable, { type: 'table', order: ['status'] })
     expect('filters' in spec).toBe(false)
   })
 

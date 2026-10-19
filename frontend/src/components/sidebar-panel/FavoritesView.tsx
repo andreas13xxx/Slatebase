@@ -21,6 +21,7 @@ import { InlineInput } from '../InlineInput'
 import type { FavoriteEntry } from '../../state/favoritesStore'
 import type { PanelState, PanelAction } from '../../state/panelState'
 import type { Dispatch } from 'react'
+import { useLongPress } from '../../hooks/useLongPress'
 import './FavoritesView.css'
 
 export interface FavoritesViewProps {
@@ -118,6 +119,7 @@ function entryIconClass(entry: FavoriteEntry): string {
  * a context menu (remove/reveal/rename), and custom labels.
  */
 export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _refreshKey, panelState, panelDispatch }: FavoritesViewProps): React.ReactElement {
+  const longPress = useLongPress()
   const { dispatch: searchDispatch } = useSearchContext()
   const { apiClient } = useAppContext()
   const [internalRefreshTick, setInternalRefreshTick] = useState(0)
@@ -313,6 +315,7 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
                   className="favorites-view__entry"
                   onClick={() => handleEntryClick(entry)}
                   onContextMenu={(e) => handleContextMenuTrigger(e, entry)}
+                  {...longPress}
                   onKeyDown={(e) => handleKeyDownEntry(e, entry)}
                   title={getEntryTooltip(entry)}
                   type="button"

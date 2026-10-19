@@ -82,10 +82,11 @@ export class ActivityStore implements IActivityService {
         return
       }
       // If only the old path was hidden (move into visibility), still record
-      // the move but omit the hidden source so it is not surfaced.
+      // the move but omit the hidden source so it is not surfaced. All other
+      // fields (origin, sync counts, …) are preserved.
       const normalized: ActivityEventInput =
         event.oldPath !== undefined && this.isHiddenPath(event.oldPath)
-          ? { type: event.type, path: event.path, user: event.user }
+          ? (() => { const { oldPath: _omit, ...rest } = event; return rest })()
           : event
 
       const activityDir = this.activityDir(vaultId)
@@ -138,7 +139,7 @@ export class ActivityStore implements IActivityService {
           } catch {
             continue
           }
-          if (!this.matches(evt, typeSet, query.from, query.to, cursor)) continue
+          if (!this.matches(evt, typeSet, query.from, query.to, cursor, query.pathPrefix)) continue
           matched.push(evt)
         }
       }
@@ -212,6 +213,10 @@ export class ActivityStore implements IActivityService {
       path: input.path,
       user: input.user,
       ...(input.oldPath !== undefined ? { oldPath: input.oldPath } : {}),
+      ...(input.origin !== undefined ? { origin: input.origin } : {}),
+      ...(input.pulledFiles !== undefined ? { pulledFiles: input.pulledFiles } : {}),
+      ...(input.pushedFiles !== undefined ? { pushedFiles: input.pushedFiles } : {}),
+      ...(input.remoteName !== undefined ? { remoteName: input.remoteName } : {}),
     }
     const dateStr = iso.slice(0, 10)
     await appendFile(path.join(activityDir, `${dateStr}.jsonl`), JSON.stringify(event) + '\n', 'utf-8')
@@ -299,16 +304,33 @@ export class ActivityStore implements IActivityService {
     from: string | undefined,
     to: string | undefined,
     cursor: { timestamp: string; id: string } | null,
+    pathPrefix: string | undefined,
   ): boolean {
     if (typeSet && !typeSet.has(evt.type)) return false
     if (from !== undefined && evt.timestamp < from) return false
     if (to !== undefined && evt.timestamp >= to) return false
+    if (pathPrefix !== undefined && pathPrefix !== '' && !this.pathUnderPrefix(evt.path, pathPrefix)) return false
     if (cursor) {
       // Only events strictly older than the cursor boundary.
       if (evt.timestamp > cursor.timestamp) return false
       if (evt.timestamp === cursor.timestamp && evt.id >= cursor.id) return false
     }
     return true
+  }
+
+  /**
+   * True if `eventPath` is at or under the given vault-relative folder prefix.
+   * Vault-wide events (`path === '/'`, e.g. `sync.completed`) are always kept
+   * regardless of the prefix — a sync concerns the whole vault (L6). The
+   * comparison is boundary-aware so prefix `Notes` matches `Notes/a.md` but
+   * not `Notebook.md`.
+   */
+  private pathUnderPrefix(eventPath: string, prefix: string): boolean {
+    if (eventPath === '/') return true
+    const p = prefix.replace(/\\/g, '/').replace(/\/+$/, '')
+    if (p === '') return true
+    const e = eventPath.replace(/\\/g, '/')
+    return e === p || e.startsWith(`${p}/`)
   }
 
   private parseCursor(cursor: string | undefined): { timestamp: string; id: string } | null {

@@ -254,3 +254,80 @@ describe('ActivityStore', () => {
     ).resolves.toBeUndefined()
   })
 })
+
+describe('ActivityStore — origin, sync.completed, pathPrefix', () => {
+  let tmpDir: string
+  let vaultDir: string
+  let store: ActivityStore
+  let logger: ILogger
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'activity-ext-test-'))
+    vaultDir = path.join(tmpDir, 'vault')
+    await fs.mkdir(vaultDir, { recursive: true })
+    logger = createMockLogger()
+    store = new ActivityStore(() => vaultDir, logger)
+  })
+
+  afterEach(async () => {
+    vi.useRealTimers()
+    await fs.rm(tmpDir, { recursive: true, force: true })
+  })
+
+  async function readAll(): Promise<ActivityEvent[]> {
+    return (await store.query(VAULT_ID, { limit: 200 })).items
+  }
+
+  it('persists origin and reads it back', async () => {
+    await store.record(VAULT_ID, { type: 'note.created', path: 'A.md', user: 'andreas', origin: 'mcp' })
+    const [evt] = await readAll()
+    expect(evt?.origin).toBe('mcp')
+  })
+
+  it('a persisted event without origin reads back with origin undefined (⇒ web, L7)', async () => {
+    // Write a legacy JSONL line directly, as a pre-feature writer would (no origin field).
+    const dir = path.join(vaultDir, '.slatebase', 'activity')
+    await fs.mkdir(dir, { recursive: true })
+    const day = new Date().toISOString().slice(0, 10)
+    const legacy = { id: 'abc123abc123', type: 'note.created', timestamp: new Date().toISOString(), lastModified: new Date().toISOString(), path: 'Legacy.md', user: 'andreas' }
+    await fs.writeFile(path.join(dir, `${day}.jsonl`), JSON.stringify(legacy) + '\n', 'utf-8')
+    const [evt] = await readAll()
+    expect(evt?.path).toBe('Legacy.md')
+    expect(evt?.origin).toBeUndefined()
+  })
+
+  it('records a sync.completed carrying pulled/pushed/remoteName (not coalesced)', async () => {
+    await store.record(VAULT_ID, {
+      type: 'sync.completed', path: '/', user: 'Git-Sync', origin: 'git-sync',
+      pulledFiles: 3, pushedFiles: 1, remoteName: 'origin',
+    })
+    const [evt] = await readAll()
+    expect(evt?.type).toBe('sync.completed')
+    expect(evt?.pulledFiles).toBe(3)
+    expect(evt?.pushedFiles).toBe(1)
+    expect(evt?.remoteName).toBe('origin')
+    expect(evt?.origin).toBe('git-sync')
+  })
+
+  it('pathPrefix filters to events under the folder', async () => {
+    await store.record(VAULT_ID, { type: 'note.created', path: 'Projects/a.md', user: 'u' })
+    await store.record(VAULT_ID, { type: 'note.created', path: 'Other/b.md', user: 'u' })
+    const page = await store.query(VAULT_ID, { limit: 200, pathPrefix: 'Projects' })
+    expect(page.items.map(e => e.path).sort()).toEqual(['Projects/a.md'])
+  })
+
+  it('pathPrefix is boundary-aware (Projects matches Projects/x, not Projectile.md)', async () => {
+    await store.record(VAULT_ID, { type: 'note.created', path: 'Projects/a.md', user: 'u' })
+    await store.record(VAULT_ID, { type: 'note.created', path: 'Projectile.md', user: 'u' })
+    const page = await store.query(VAULT_ID, { limit: 200, pathPrefix: 'Projects' })
+    expect(page.items.map(e => e.path)).toEqual(['Projects/a.md'])
+  })
+
+  it("keeps a path='/' event (sync.completed) visible under any folder filter (L6)", async () => {
+    await store.record(VAULT_ID, { type: 'note.created', path: 'Projects/a.md', user: 'u' })
+    await store.record(VAULT_ID, { type: 'sync.completed', path: '/', user: 'Git-Sync', origin: 'git-sync', pulledFiles: 1 })
+    const page = await store.query(VAULT_ID, { limit: 200, pathPrefix: 'Other' })
+    // The note under Projects is filtered out, but the vault-wide sync event survives.
+    expect(page.items.map(e => e.type)).toEqual(['sync.completed'])
+  })
+})

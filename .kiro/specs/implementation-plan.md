@@ -1,8 +1,14 @@
 # Implementierungsplan — Slatebase Ausstehende Features
 
-Dieses Dokument listet ausschließlich **offene** Arbeit. Umgesetzte Features stehen in
+Dieses Dokument listet die **offene** Arbeit. Umgesetzte Features stehen in
 `.kiro/steering/product.md`, die dabei getroffenen Entscheidungen in `.kiro/steering/`
 und in der jeweiligen Spec unter `.kiro/specs/<feature>/`.
+
+**Bereits ausgeliefert (nicht mehr im Backlog unten):** **Bases** inkl. Karten-/Kanban-View,
+`registerBasesView()`-Plugin-API und MCP-`query_base` — der Rest sind bewusst zurückgestellte
+Grenzen, siehe „Ausgelieferte Features mit zurückgestellten Resten" unten. **Workspaces &
+Split-Panes** (Phasen 0–5 auf `master`) — offen sind nur die zwei zurückgestellten Reste. **Voice
+Transcription** ist ausgeliefert (Feature-Toggle `voice-transcription`, siehe `product.md`).
 
 **Strategie:** Features mit vorhandener Spec direkt umsetzen, komplexe Features erst
 vollständig spezifizieren. Kleinere, thematisch verwandte Features werden zu gemeinsamen
@@ -16,15 +22,16 @@ Specs gebündelt statt einzeln spezifiziert.
 | 2 | Public Sharing | C | ~19–24h | Keine Spec |
 | 3 | Responsive/Mobile | F/G | ~24–34h | Vollständig (Req + Design + Tasks) |
 | 4 | Echte E2E-Test-Suite | F | ~30–45h | Req + Design vollständig |
-| 5 | Workspaces & Split-Panes | G | ~60–90h | Spec: `.kiro/specs/split-panes/` — Phasen 0–5 umgesetzt (Branch `feat/split-panes`); offen: Phase 7 (Doku teils erledigt) + zurückgestellte Keyboard-Pane-Fokus/„in Split öffnen" |
-| 6 | Bases | H | ~55–75h | Spec: `.kiro/specs/bases/` — Phasen 1–7 umgesetzt |
-| 7 | Server-Side Plugins | B | ~48–68h | Tasks vorhanden |
-| 8 | Fremdformat-Importer | I | ~20–30h | Keine Spec |
-| 9 | Semantische Suche / AI-Embeddings | E | ~38–58h | Keine Spec |
-| 10 | Voice Transcription (Diktieren) | E | ~24–34h | Vollständig (Req + Design + Tasks) |
-| 11 | Collaborative Editing | D | ~68–88h | Nur Requirements |
+| 5 | Server-Side Plugins | B | ~48–68h | Tasks vorhanden |
+| 6 | Fremdformat-Importer | I | ~20–30h | Keine Spec |
+| 7 | Semantische Suche / AI-Embeddings | E | ~38–58h | Keine Spec |
+| 8 | Collaborative Editing | D | ~68–88h | Nur Requirements |
 
-**Summe:** ~401–566h.
+**Summe:** ~262–367h.
+
+> **Zurückgestellte Reste ausgelieferter Features** (nicht in der Summe oben, siehe eigenen
+> Abschnitt unten): Split-Panes — gespeicherte, benannte Workspace-Layouts + Workspace-Switcher;
+> Bases — nur noch die erweiterte Ausdruckssprache (Lambdas/`map`/`filter`, custom `summaries`-Formeln, `file.embeds`); R1–R7 der Spec `bases-feature-completion` sind umgesetzt.
 
 ## Abhängigkeiten
 
@@ -32,10 +39,10 @@ Specs gebündelt statt einzeln spezifiziert.
 Track B (Plugins):    Obsidian Themes → Server-Side Plugins
 Track C (Sharing):    Public Sharing (unabhängig)
 Track D (Editor):     Collaborative Editing (braucht Realtime + CM6, beide vorhanden)
-Track E (AI):         Semantische Suche (unabhängig); Voice Transcription (unabhängig)
+Track E (AI):         Semantische Suche (unabhängig). Voice Transcription: ausgeliefert
 Track F (Qualität):   Responsive/Mobile; E2E-Test-Suite (unabhängig, parallel möglich)
-Track G (Layout):     Responsive/Mobile (empfohlene Vorarbeit) → Workspaces & Split-Panes
-Track H (Daten):      Bases (Properties-/Metadaten-Schicht ist vorhanden)
+Track G (Layout):     Workspaces & Split-Panes: ausgeliefert (Phasen 0–5)
+Track H (Daten):      Bases: ausgeliefert
 Track I (Onboarding): Fremdformat-Importer (unabhängig)
 ```
 
@@ -75,9 +82,10 @@ Scope: ~4h Design + ~20–30h Implementierung. **Spec:** `.kiro/specs/responsive
 - Sidebar als Overlay/Drawer, Touch-Interaktionen, Canvas Pinch-to-Zoom
 - Optional: PWA-Manifest (nur Installation, kein Offline-Anspruch)
 
-**Sequenzierung:** bewusst vor Workspaces (Prio 5). Ein Split-Pane-Layout nachträglich
-responsive zu machen ist deutlich schwerer, als ein bestehendes Single-Pane-Layout
-umzustellen — die Workspaces-Spec sollte Responsive-Verhalten von Anfang an mitdenken.
+**Sequenzierung:** Split-Panes (Workspaces, Track G) sind bereits ausgeliefert. Das macht
+Responsive/Mobile anspruchsvoller, weil ein bestehendes Split-Pane-Layout responsive zu machen
+schwerer ist als ein Single-Pane-Layout — die Responsive-Spec muss das Pane-Layout von Anfang an
+mitdenken.
 
 ---
 
@@ -103,66 +111,7 @@ desto mehr profitieren die großen Features darunter von Regressionsschutz.
 
 ---
 
-## Prio 5 — Workspaces & Split-Panes (Track G)
-
-Scope: ~60–90h. Spec: `.kiro/specs/split-panes/` (+ `slash-commands/`). **Nutzerwunsch.** Größter Architektur-Eingriff im Backlog. **Phasen 0–5 umgesetzt** auf `feat/split-panes` (Pane-Baum-Reducer, Rendering/Resize, Splits + Tab-Drag + Kanten-Split, Persistenz/Migration, Plugin-Workspace-Shim). Offen: Phase 7 (Doku, teils erledigt) sowie bewusst zurückgestellt Keyboard-Pane-Fokus und „in Split öffnen" per Modifikator.
-
-- Pane-Baum statt einzelner Tab-Reihe: horizontale/vertikale Splits, verschachtelbar
-- Gespeicherte, benannte Workspace-Layouts + Workspace-Switcher
-- `workspace-leaf-compat` erweitern: `createLeafBySplit`/`splitActiveLeaf` erzeugen echte
-  Splits statt neuer Tabs — hebt betroffene Plugins von "partial" auf "full"
-- Tab-Drag-and-Drop zwischen Panes
-- Persistenz des Pane-Baums analog zur bestehenden Tab-/Panel-State-Persistierung
-
-**Risiko:** größte einzelne Architekturänderung am Layout-System. Vor dem Requirements-
-Dokument ein Design-Spike gegen die bekannten Regressionsflächen (Tab-State-Persistenz,
-Plugin-Sidebar-Views, Canvas-/Graph-Fullscreen) einplanen.
-
----
-
-## Prio 6 — Bases (Track H)
-
-Scope: ~55–75h. **Spec:** `.kiro/specs/bases/` (Nutzerwunsch). **Stand:** Phasen 1–8
-umgesetzt (`.base`-Parser/Serializer, Query-Engine auf dem Link-Index, Formel-Interpreter,
-editierbare Tabellen-View, Tab-Integration, Feature-Toggle `bases` kalt/default-aus,
-Welcome-Vault-Guides DE/EN, Steering-Doku). **Plugin-View-Freigabe umgesetzt:** die
-Bases-**Plugin-API** (`.kiro/specs/bases-plugin-api/`) ist implementiert — fremde Plugins
-können über `Plugin.registerBasesView()` eigene Bases-Views beisteuern, die mit echten
-Vault-Daten gerendert werden. **Umgesetzt (Branch `bases-v3`):** Karten-/Kanban-View inkl.
-Drag zwischen Spalten, echtes Obsidian-`.base`-Format (Ausdrucks-String-Filter, `groupBy`-Objekt,
-View-`limit`) mit gemeinsamer Ausdrucks-Engine für Filter und Formeln
-(`.kiro/specs/bases-expression-language/`, Phasen 1–5; Engine liegt in `shared-contracts/`) und
-das MCP-Werkzeug `query_base`.
-
-**Bekannte Grenzen/Lücken (bewusst offen):**
-- Kandidaten-Obergrenze: der Link-Index liefert höchstens 1000 Zeilen, gefiltert wird erst danach
-- Ausdruckssprache ist eine pragmatische Teilmenge der Obsidian-Funktionen; keine Lambdas/`map`/`filter`
-- `file.size`, `file.backlinks`, `file.embeds` fehlen (`file.path`/`basename` gibt es)
-- Der Index liefert Properties nur als Listen: außer `tags`/`aliases`/`cssclasses`/`file.tags`/`file.links` wird eine Ein-Element-Liste als Einzelwert gelesen
-- Formelspalten read-only und nicht sortierbar (Sortierung nur Properties/`file.name`/`ctime`/`mtime`)
-- `summaries` werden geparst und erhalten, aber nicht aggregiert (Spec 6.2)
-- kein Einbetten einer Base als Codeblock (`bases:insert`), kein `bases:add-item`
-- Plugin-Views laufen nur im Browser (Architekturgrenze, kein Serverpfad)
-
-- `.base`-Dateiformat lesen/schreiben (YAML: Filter, Views, Formeln) — kompatibel zu
-  Obsidians Format, damit importierte Vaults funktionieren
-- Query-Engine auf der vorhandenen Property-/Metadaten-Schicht: Filter nach
-  Properties/Tags/Pfad, Sortierung
-- View-Typen: Tabelle (editierbare Zellen) zuerst; Karten-/Board-Ansicht als Ausbaustufe
-- Formeln/Filter: Obsidian-Ausdruckssprache als pragmatische Teilmenge (siehe Grenzen oben)
-- Bases-Tabs im Tab-System (bzw. in eigenen Panes, falls Prio 5 vorher landet)
-
-**Scope-Risiko** liegt bei der Ausdruckssprache — Obsidians Funktionsbibliothek ist groß;
-Umfang wird bewusst schrittweise erweitert statt vollständig nachgebaut.
-
-Die Obsidian-Bases-Plugin-API in `plugins/compat/` ist nicht mehr No-Op, sondern
-funktional (`registerBasesView()`, `Value`-Hierarchie, `BasesView`/`QueryController`/
-`BasesEntry`) — der CompatibilityAnalyzer stuft ein reines Bases-Plugin als `supported`
-ein. Nur der Desktop-CLI-Handler bleibt ein bewusster No-Op (`partial`).
-
----
-
-## Prio 7 — Server-Side Plugins (Track B)
+## Prio 5 — Server-Side Plugins (Track B)
 
 Scope: ~8h Design + ~40–60h Implementierung. **Spec:** `.kiro/specs/server-side-plugins/`
 (Task-Liste in 7 Phasen: Plugin-Klassifikation → Server-Side Sandbox (vm) → Runtime
@@ -177,7 +126,7 @@ Per-User-Rate-Limiter für `/proxy`/`/shares`/`/search` — beide im Fix-Backlog
 
 ---
 
-## Prio 8 — Fremdformat-Importer (Track I)
+## Prio 6 — Fremdformat-Importer (Track I)
 
 Scope: ~20–30h. Keine Spec.
 
@@ -192,7 +141,7 @@ Notion/Evernote/HTML zwar ab, läuft aber hinter dem experimentellen
 
 ---
 
-## Prio 9 — Semantische Suche / AI-Embeddings (Track E)
+## Prio 7 — Semantische Suche / AI-Embeddings (Track E)
 
 Scope: ~8h Design + ~30–50h Implementierung.
 
@@ -206,29 +155,7 @@ Optionales Feature hinter Feature-Toggle `semantic-search`, lokal-first (Ollama)
 
 ---
 
-## Prio 10 — Voice Transcription / Diktieren (Track E)
-
-Scope: ~24–34h. **Spec:** `.kiro/specs/voice-transcription/` (Requirements + Design + Tasks
-vollständig).
-
-Native Diktier-/Spracherkennungsfunktion mit **self-hosted Whisper** — bewusst statt eines
-Obsidian-Community-Diktier-Plugins (Einordnung + Vorlagen in `PLUGIN-COMPAT.md`, Abschnitt
-„Diktier-/Spracherkennungs-Plugins → native Lösung statt Compat-Layer").
-
-- Aufnahme im Browser via `MediaRecorder`, serverseitige Transkription über ein vom
-  Betreiber konfiguriertes Whisper-Backend (Audio verlässt den Server nie), Text-Insert am Cursor
-- Optional: Aufnahme als Vault-Anhang (über den bestehenden Upload-Pfad) + Audio-Embed
-- Mehrsprachig (Whisper-nativ), Sprache pro Nutzer/Vault gemerkt (`vaultSettingsStore`)
-- Feature-Toggle `voice-transcription` (cold, default: false), admin-abschaltbar; Whisper-Backend
-  ist **nicht** Teil des Slatebase-Images (Betreiber stellt es bereit, URL per Env)
-
-**Serveranforderung** ist der Hauptvorbehalt: Whisper braucht spürbar Rechenleistung (GPU
-empfohlen), auf kleinem VPS langsam — Doku und UI weisen ausdrücklich darauf hin. Deshalb
-default-aus.
-
----
-
-## Prio 11 — Collaborative Editing (Track D)
+## Prio 8 — Collaborative Editing (Track D)
 
 Scope: ~8h Design + ~60–80h Implementierung. **Spec:**
 `.kiro/specs/collaborative-editing/` (nur Requirements).
@@ -240,11 +167,44 @@ Technisch anspruchsvollstes und riskantestes Feature im Backlog — bewusst zule
 
 ---
 
+## Ausgelieferte Features mit zurückgestellten Resten
+
+Diese Features sind auf `master` ausgeliefert (siehe `product.md`); hier stehen nur die
+bewusst zurückgestellten Reste, damit sie nicht aus dem Blick geraten.
+
+### Workspaces & Split-Panes (Track G) — ausgeliefert (Phasen 0–5)
+
+Spec: `.kiro/specs/split-panes/` (+ `slash-commands/`). Umgesetzt: Pane-Baum-Reducer,
+Rendering/Resize, Splits + Tab-Drag + Kanten-Split, Persistenz/Migration pro Vault,
+Plugin-Workspace-Shim (`createLeafBySplit`/`splitActiveLeaf`/`getLeaf('split')` erzeugen echte
+Panes). **Zurückgestellt:** Keyboard-Pane-Fokus und „in Split öffnen" per Modifikator sind
+inzwischen ebenfalls vorhanden (`pane-focus-direction.ts`, `openInSplitBridge.ts`); offen bleiben
+nur gespeicherte, benannte Workspace-Layouts + Workspace-Switcher.
+
+### Bases (Track H) — ausgeliefert
+
+Spec: `.kiro/specs/bases/` (+ `bases-plugin-api/`, `bases-expression-language/`). Umgesetzt:
+`.base`-Parser/Serializer im echten Obsidian-Format, Query-Engine auf dem Link-Index,
+Ausdrucks-Engine für Filter und Formeln (in `shared-contracts/`), editierbare Tabellen-View,
+Karten-/Kanban-View inkl. Drag zwischen Spalten, Feature-Toggle `bases` (cold/default-aus),
+Plugin-API `registerBasesView()`, MCP-Werkzeug `query_base`, Welcome-Vault-Guides DE/EN.
+**Umgesetzt (Spec `bases-feature-completion`, R1–R7):** Kandidaten-Obergrenze auf 5000 angehoben
+mit konservativem Prädikat-Pushdown (Property-Gleichheit/`file.hasTag`/`file.inFolder` vor der
+Kappung) + sichtbarem `truncated`-Hinweis; Property-Typ Liste/Skalar (beobachtet + Registry);
+`summaries`-Aggregation (Tabelle, Kanban-Header, MCP); `file.size`/`file.backlinks`; `bases:insert`
+(`![[file.base]]`-Embed) + `bases:add-item`; sortierbare Formelspalten (clientseitig); Welcome-Vault-
+Guides + Beispiele DE/EN erweitert.
+**Noch zurückgestellt:** Lambdas/`map`/`filter` in der Ausdruckssprache, custom `summaries`-Formeln
+über `values`, `file.embeds` (bräuchte getrennte Embed-Markierung im Index).
+Plugin-Views laufen nur im Browser (Architekturgrenze, kein Serverpfad).
+
+---
+
 ## Bewusst nicht implementierte Features
 
 | Idee | Grund |
 |------|-------|
-| Mehrere native Fenster / OS-Fensterverwaltung | Browser-App-Architektur schließt das aus. Tabs + geplante Split-Panes (Prio 5) decken den Bedarf innerhalb eines Browser-Fensters ab. |
+| Mehrere native Fenster / OS-Fensterverwaltung | Browser-App-Architektur schließt das aus. Tabs + ausgelieferte Split-Panes decken den Bedarf innerhalb eines Browser-Fensters ab. |
 | Native Mobile-Apps (iOS/Android) | Bewusst web-only. Responsive/Mobile (Prio 3) deckt den Mobile-Anwendungsfall ohne zweite Codebasis ab. |
 | Generisches HTML-Rendering | XSS-Risiko. Eine enge Allowlist für Inline-Tags plus `<center>`-Blöcke ist umgesetzt (`plugins/inline-html.ts`); alles außerhalb bleibt literaler Text. Volles HTML-Rendering bleibt verworfen. |
 | Offline-Modus (volles PWA-Offline) | Self-Hosted = Server nötig. Vault-Sync mit Obsidian-Desktop deckt Offline ab. (Ein reines PWA-Installations-Manifest ohne Offline-Anspruch ist als Option in Prio 3 vorgesehen.) |

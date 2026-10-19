@@ -4,8 +4,9 @@ import { usePluginContext } from '../plugins/compat/plugin-context'
 import { useFeatureContext } from '../state/featureContext'
 import { useTabContext } from '../state/tabContext'
 import { usePaneTree } from '../state/paneTreeContext'
-import { getActivePaneTabState, generatePaneId } from '../state/paneTreeState'
-import { findPaneInDirection, type PaneRect, type FocusDirection } from './panes/pane-focus-direction'
+import { generatePaneId } from '../state/paneTreeState'
+import { splitActivePane, focusPaneInDirection } from './panes/pane-commands'
+import type { FocusDirection } from './panes/pane-focus-direction'
 import { useAppContext, loadVaults } from '../state/index'
 import { useAuthContext } from '../state/authContext'
 import { useNavigationHistory } from '../state/navigationHistoryContext'
@@ -354,33 +355,10 @@ export function CommandPaletteContainer({
     onNavigateForward: goForward,
     onOpenQuickSwitcher: () => { if (state.selectedVaultId) setQuickSwitcherOpen(true) },
     onSplitPane: (direction) => {
-      // Split the active pane, moving its active tab into the new pane. With no
-      // active tab there is nothing to show in the new pane, so skip.
-      const activeTabId = getActivePaneTabState(paneTree)?.activeTabId
-      if (!activeTabId) {
-        showToast('info', t('splitPanes.noActiveTab'))
-        return
-      }
-      const newPaneId = generatePaneId()
-      paneTreeDispatch({
-        type: 'SPLIT_PANE_WITH_TAB',
-        payload: { paneId: paneTree.activePaneId, direction, newPaneId, tabId: activeTabId, copy: true },
-      })
+      // With no active tab there is nothing to show in the new pane, so skip.
+      if (!splitActivePane(paneTree, paneTreeDispatch, direction)) showToast('info', t('splitPanes.noActiveTab'))
     },
-    onFocusPaneDirection: (direction: FocusDirection) => {
-      // Read live pane rectangles from the DOM (each pane leaf carries
-      // data-pane-id) and let the pure geometry helper pick the neighbour —
-      // the tree shape alone can't say which pane is visually "to the left"
-      // once splits nest. A no-op when there is no pane that way.
-      const rects: PaneRect[] = Array.from(
-        document.querySelectorAll<HTMLElement>('.pane-leaf[data-pane-id]'),
-      ).map((el) => {
-        const r = el.getBoundingClientRect()
-        return { paneId: el.dataset.paneId ?? '', left: r.left, right: r.right, top: r.top, bottom: r.bottom }
-      })
-      const targetId = findPaneInDirection(rects, paneTree.activePaneId, direction)
-      if (targetId) paneTreeDispatch({ type: 'FOCUS_PANE', payload: { paneId: targetId } })
-    },
+    onFocusPaneDirection: (direction: FocusDirection) => focusPaneInDirection(paneTree, paneTreeDispatch, direction),
     searchQuery: searchState.query,
     searchCaseSensitive: searchState.caseSensitive,
     searchRegex: searchState.regex,

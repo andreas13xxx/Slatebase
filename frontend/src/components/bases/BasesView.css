@@ -51,6 +51,14 @@
   background: var(--danger);
 }
 
+.bases-view__warning {
+  padding: var(--spacing-sm) var(--spacing-md);
+  color: var(--warning);
+  background: var(--warning-bg);
+  border-bottom: 1px solid var(--warning-border);
+  font-size: 0.85em;
+}
+
 .bases-view__loading {
   padding: var(--spacing-xs) var(--spacing-md);
   color: var(--text-subtle);
@@ -130,6 +138,33 @@
 .bases-table-view__empty {
   padding: var(--spacing-md);
   color: var(--text-subtle);
+}
+
+.bases-table__summary-row {
+  border-top: 2px solid var(--border-default);
+  background: var(--bg-secondary);
+}
+
+.bases-table__summary-cell {
+  font-size: 0.85em;
+}
+
+.bases-table__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.bases-table__summary-label {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 0.75em;
+  letter-spacing: 0.03em;
+}
+
+.bases-table__summary-value {
+  color: var(--text-normal);
+  font-weight: 600;
 }
 
 .base-cell--readonly {
@@ -230,6 +265,46 @@
 }
 
 /* ─── Kanban (cards) view ──────────────────────────────────────────────── */
+.bases-kanban-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.bases-kanban__summary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-default);
+  font-size: 0.85em;
+}
+
+.bases-kanban__summary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.bases-kanban__summary-col {
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
+.bases-kanban__summary-label {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 0.75em;
+  letter-spacing: 0.03em;
+}
+
+.bases-kanban__summary-value {
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
 .bases-kanban {
   display: flex;
   gap: 12px;
@@ -357,4 +432,23 @@
 
 .bases-kanban__chip-val {
   color: var(--text-primary);
+}
+
+/* ─── Embedded base (![[file.base]]) ───────────────────────────────────── */
+.bases-embed {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md, 6px);
+  overflow: auto;
+  max-height: 480px;
+  background: var(--bg-primary);
+  color: var(--text-normal);
+}
+
+.bases-embed--loading {
+  padding: var(--spacing-md);
+  color: var(--text-muted);
+}
+
+.cm-lp-embed-base {
+  margin: 0.5em 0;
 }

@@ -29,6 +29,8 @@ import { BasesTableView } from './BasesTableView'
 import { BasesKanbanView } from './BasesKanbanView'
 import { BasesSourceView } from './BasesSourceView'
 import { BasesPluginViewHost } from './BasesPluginViewHost'
+import { deriveBaseScopeFolder, buildBlankFrontmatter, resolveNewNotePath } from './base-add-item'
+import { sortRowsByFormula } from './base-formula-sort'
 
 export interface BasesViewProps {
   apiClient: IApiClient
@@ -51,6 +53,7 @@ export const BasesView = memo(function BasesView({
   const [mode, setMode] = useState<Mode>('view')
   const [selectedViewIndex, setSelectedViewIndex] = useState(0)
   const [rows, setRows] = useState<BaseRow[]>([])
+  const [truncated, setTruncated] = useState(false)
   const [queryError, setQueryError] = useState<string | null>(null)
   const [pluginViewError, setPluginViewError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -72,12 +75,21 @@ export const BasesView = memo(function BasesView({
   )
   const isKanbanView = !!activeView && activeView.type === 'cards' && !isPluginView
 
+  // Formula columns are not sortable server-side (buildQuerySpec drops them),
+  // so when the active view's first sort clause targets a formula column we
+  // sort the already-fetched rows here by the evaluated value, stable on ties.
+  const displayRows = useMemo(
+    () => (doc ? sortRowsByFormula(rows, doc, activeView) : rows),
+    [rows, doc, activeView],
+  )
+
   const runQuery = useCallback(async () => {
     if (!doc || !activeView) return
     setLoading(true)
     try {
-      const { rows: resultRows } = await runBaseQuery(apiClient, vaultId, doc, activeView)
+      const { rows: resultRows, truncated: resultTruncated } = await runBaseQuery(apiClient, vaultId, doc, activeView)
       setRows(resultRows)
+      setTruncated(resultTruncated)
       setQueryError(null)
     } catch (err) {
       setQueryError(extractErrorMessage(err, 'Die Base-Abfrage ist fehlgeschlagen'))
@@ -198,10 +210,29 @@ export const BasesView = memo(function BasesView({
           return false
         }
       },
+      addItem: async () => {
+        if (!doc) return null
+        const view = doc.views[safeIndex]
+        const folder = deriveBaseScopeFolder(doc, view)
+        const columns = (view?.order ?? Object.keys(doc.properties ?? {})).filter(
+          (c) => !c.startsWith('file.') && !c.startsWith('formula.') && !(doc.formulas && c in doc.formulas),
+        )
+        const frontmatter = buildBlankFrontmatter(columns, doc, view)
+        const baseName = 'Unbenannt'
+        try {
+          // Resolve a non-colliding file name under the target folder.
+          const path = await resolveNewNotePath(apiClient, vaultId, folder, baseName)
+          await apiClient.saveFile(vaultId, path, frontmatter)
+          onOpenNote(path)
+          return path
+        } catch {
+          return null
+        }
+      },
     }
     setActiveBasesController(controller)
     return () => clearActiveBasesController(controller)
-  }, [views.length, safeIndex, doc, readOnly, onSaveSource])
+  }, [views.length, safeIndex, doc, readOnly, onSaveSource, apiClient, vaultId, onOpenNote])
 
   // Stable callback for the plugin host to report a render/query failure.
   const handlePluginViewError = useCallback((message: string) => {
@@ -259,6 +290,11 @@ export const BasesView = memo(function BasesView({
       </div>
 
       {queryError && <div className="bases-view__error" role="alert">{queryError}</div>}
+      {truncated && !queryError && (
+        <div className="bases-view__warning" role="status" aria-live="polite">
+          Es werden nicht alle Treffer angezeigt — das Ergebnis wurde gekappt. Verfeinere die Filter, um alle passenden Notizen zu sehen.
+        </div>
+      )}
       {pluginViewError && (
         <div className="bases-view__error" role="alert">
           Die Plugin-Ansicht ist fehlgeschlagen ({pluginViewError}) — es wird die Tabelle angezeigt.
@@ -286,7 +322,7 @@ export const BasesView = memo(function BasesView({
         <BasesKanbanView
           doc={doc}
           view={activeView}
-          rows={rows}
+          rows={displayRows}
           onOpenNote={onOpenNote}
           onMoveCard={readOnly ? undefined : handleMoveCard}
         />
@@ -296,7 +332,7 @@ export const BasesView = memo(function BasesView({
         <BasesTableView
           doc={doc}
           view={activeView}
-          rows={rows}
+          rows={displayRows}
           onOpenNote={onOpenNote}
           onCommitCell={handleCommitCell}
           onSortChange={handleSortChange}

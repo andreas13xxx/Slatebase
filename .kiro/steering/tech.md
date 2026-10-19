@@ -2,7 +2,30 @@
 
 ## Architecture
 
-Monorepo: `backend/` + `frontend/`. Separate `package.json` + `node_modules` each. No workspace tooling.
+Monorepo: `backend/` + `frontend/` + `shared-contracts/`. Separate `package.json` +
+`node_modules` each. No workspace tooling.
+
+`shared-contracts/` is a third package consumed by **both** backend and frontend via a `file:`
+dependency (a *copy*, not a symlink — see AGENTS.md). It holds the shared Zod schemas and the
+Bases parser/expression engine (shared with the MCP `query_base` tool). It carries its own
+**runtime** dependencies — `moment@2.31.0` and `yaml@^2.9.1` — so a consumer's install must
+resolve those transitively.
+
+### Backend install convention — `npm ci --install-links` (not plain `npm ci`)
+
+The backend installs `shared-contracts` as a **packed `file:` package** (`npm ci --install-links`),
+not a symlink. Every backend consumer must agree on this one form:
+
+- `backend/Dockerfile` build stage (line 52) and prod stage (line 70): `npm ci [--omit=dev] --install-links`
+- CI `backend` and `e2e` jobs (`.github/workflows/ci.yml`): `npm ci --install-links`
+- The **frontend never uses `--install-links`** — it stays symlinked (plain `npm ci`).
+
+The two forms are mutually exclusive on npm 11: a lockfile generated with `--install-links`
+(packed, transitive `moment`/`yaml` inlined) is rejected by a plain `npm ci`, and vice versa. A
+single `backend/package-lock.json` cannot satisfy both. This exact mismatch made Release #313 red
+(the backend Docker build failed `EUSAGE` because the lockfile had not resolved the transitive
+runtime deps). Before any backend lockfile change, dry-run **both** `npm ci` and
+`npm ci --install-links` against the exact Node/npm version (Node 24 / npm 11.16, same as CI/Docker).
 
 ## Backend
 

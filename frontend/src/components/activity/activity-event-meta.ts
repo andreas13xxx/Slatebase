@@ -9,12 +9,12 @@
 import type { ComponentType } from 'react'
 import {
   FilePlus, FilePen, FileX, FileSymlink, FileClock,
-  LayoutDashboard, Table2, Palette, type LucideProps,
+  LayoutDashboard, Table2, Palette, RefreshCw, Bot, GitBranch, Mail, type LucideProps,
 } from 'lucide-react'
-import type { ActivityEventType } from '../../types'
+import type { ActivityEventType, ActivityOrigin } from '../../types'
 
 /** Filter lane an event type belongs to (drives the filter chips). */
-export type ActivityLane = 'notes' | 'canvas' | 'bases' | 'snippets'
+export type ActivityLane = 'notes' | 'canvas' | 'bases' | 'snippets' | 'sync'
 
 export interface ActivityEventMeta {
   icon: ComponentType<LucideProps>
@@ -38,6 +38,7 @@ export const ACTIVITY_EVENT_META: Record<ActivityEventType, ActivityEventMeta> =
   'snippet.created': { icon: Palette, labelKey: 'activity.eventType.snippetCreated', lane: 'snippets' },
   'snippet.edited': { icon: Palette, labelKey: 'activity.eventType.snippetEdited', lane: 'snippets' },
   'snippet.deleted': { icon: Palette, labelKey: 'activity.eventType.snippetDeleted', lane: 'snippets' },
+  'sync.completed': { icon: RefreshCw, labelKey: 'activity.eventType.syncCompleted', lane: 'sync' },
 }
 
 /** All event types that belong to a lane (for building a lane's type filter). */
@@ -50,4 +51,27 @@ export function typesForLane(lane: ActivityLane): ActivityEventType[] {
 /** i18n key for a lane's filter-chip label. */
 export function laneLabelKey(lane: ActivityLane): string {
   return `activity.lane.${lane}`
+}
+
+/**
+ * Badge meta per non-`web` origin. `web` has no badge (it is the default and
+ * carries no extra signal). Single source for icon + label so the row and any
+ * legend stay in step.
+ */
+export interface ActivityOriginMeta {
+  icon: ComponentType<LucideProps>
+  /** i18n key under `activity.origin.*`. */
+  labelKey: string
+}
+
+export const ACTIVITY_ORIGIN_META: Record<Exclude<ActivityOrigin, 'web'>, ActivityOriginMeta> = {
+  mcp: { icon: Bot, labelKey: 'activity.origin.mcp' },
+  'git-sync': { icon: GitBranch, labelKey: 'activity.origin.gitSync' },
+  'mail-import': { icon: Mail, labelKey: 'activity.origin.mailImport' },
+}
+
+/** Badge meta for an event's origin, or null for `web`/undefined (no badge). */
+export function originBadgeMeta(origin: ActivityOrigin | undefined): ActivityOriginMeta | null {
+  if (!origin || origin === 'web') return null
+  return ACTIVITY_ORIGIN_META[origin]
 }

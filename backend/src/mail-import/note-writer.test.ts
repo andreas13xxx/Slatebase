@@ -152,3 +152,36 @@ describe('MailNoteWriter', () => {
     expect(relativePath).toBe(`${expectedDatePrefix(MAIL_DATE)} Re InvoiceOrder #42 urgent.md`)
   })
 })
+
+describe('MailNoteWriter — activity + link-index hooks (L1)', () => {
+  let vaultPath: string
+  let vaultManager: VaultManager
+
+  beforeEach(async () => {
+    vaultPath = await mkdtemp(join(tmpdir(), 'mail-note-writer-hooks-'))
+    vaultManager = new VaultManager(createMockLogger())
+    vaultManager.addVault({ info: { id: 'vault-1', name: 'Vault', path: vaultPath, status: 'loaded' } })
+  })
+
+  afterEach(async () => {
+    await rm(vaultPath, { recursive: true, force: true })
+  })
+
+  it('fires recordActivity and linkIndexHook once for a .md import', async () => {
+    const recordActivity = vi.fn()
+    const linkIndexHook = vi.fn()
+    const writer = new MailNoteWriter(vaultManager, createMockLogger(), undefined, undefined, recordActivity, linkIndexHook)
+
+    const relativePath = await writer.writeMail('vault-1', 'Mail', makeMail())
+
+    expect(recordActivity).toHaveBeenCalledTimes(1)
+    expect(recordActivity).toHaveBeenCalledWith('vault-1', relativePath)
+    expect(linkIndexHook).toHaveBeenCalledTimes(1)
+    expect(linkIndexHook).toHaveBeenCalledWith('vault-1', relativePath, expect.stringContaining('Hello'))
+  })
+
+  it('works when the hooks are not provided (both optional)', async () => {
+    const writer = new MailNoteWriter(vaultManager, createMockLogger())
+    await expect(writer.writeMail('vault-1', 'Mail', makeMail())).resolves.toBeDefined()
+  })
+})

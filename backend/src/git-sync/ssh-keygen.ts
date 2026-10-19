@@ -13,12 +13,13 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { tmpdir, userInfo } from 'node:os'
 import { join } from 'node:path'
 import { GitCommandFailedError } from './errors.js'
 
 const execFileAsync = promisify(execFile)
 const SSH_KEYGEN_TIMEOUT_MS = 30 * 1000
+const ICACLS_TIMEOUT_MS = 10 * 1000
 
 export interface ISshKeyGenerator {
   /** Generates a new passphrase-less ed25519 keypair. Not persisted anywhere by this call. */
@@ -50,10 +51,33 @@ export class SshKeyGenerator implements ISshKeyGenerator {
       const normalizedKey = privateKey.replace(/\r\n/g, '\n')
       const keyContent = normalizedKey.endsWith('\n') ? normalizedKey : `${normalizedKey}\n`
       await writeFile(keyPath, keyContent, { mode: 0o600 })
+      await this.restrictKeyPermissions(keyPath)
       const { stdout } = await this.run(['-y', '-f', keyPath])
       return stdout.trim()
     } finally {
       await rm(tmpDir, { recursive: true, force: true })
+    }
+  }
+
+  /**
+   * Restricts the temp key file so OpenSSH accepts it. On POSIX the file mode
+   * (0o600) already satisfies ssh-keygen's permission check and this is a
+   * no-op. On Windows the Node file mode is ignored and OpenSSH inspects the
+   * NTFS ACL instead, rejecting the `OWNER RIGHTS` (S-1-3-4) entry the file
+   * inherits from the temp directory with "Bad permissions". `icacls` strips
+   * inheritance and grants only the current user, which clears that check.
+   * Fails soft: if icacls errors, the subsequent ssh-keygen call still runs
+   * and surfaces the real error.
+   */
+  private async restrictKeyPermissions(keyPath: string): Promise<void> {
+    if (process.platform !== 'win32') return
+    try {
+      const user = userInfo().username
+      await execFileAsync('icacls', [keyPath, '/inheritance:r', '/grant:r', `${user}:F`], {
+        timeout: ICACLS_TIMEOUT_MS,
+      })
+    } catch {
+      // Best-effort: let ssh-keygen report the authoritative failure.
     }
   }
 

@@ -496,6 +496,8 @@ export interface UserVaultSettings {
   sidebarPanel: Record<string, unknown> | null
   /** Client-owned blob; the server stores it verbatim. */
   contextPanel: Record<string, unknown> | null
+  /** Selected activity-timeline range ('day'|'week'|'month'|'year'); null = default. */
+  activityRange: string | null
 }
 
 /** Partial per-vault settings update. */
@@ -1164,6 +1166,7 @@ export class ApiClient implements IApiClient {
     if (params?.to) search.set('to', params.to)
     if (params?.cursor) search.set('cursor', params.cursor)
     if (params?.limit !== undefined) search.set('limit', String(params.limit))
+    if (params?.pathPrefix) search.set('pathPrefix', params.pathPrefix)
     const qs = search.toString()
     return this.request<ActivityPage>('GET', `/api/v1/vaults/${vaultId}/activity${qs ? '?' + qs : ''}`)
   }
