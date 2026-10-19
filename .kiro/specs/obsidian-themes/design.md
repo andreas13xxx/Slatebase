@@ -22,29 +22,36 @@ Dark-Mode einen **Zyklus** bilden (ungültig → `unset`), und auf `:root` dekla
 die ein Theme auf `body`/`.theme-dark` setzt (Custom Properties lösen am Element auf, an dem sie
 deklariert sind).
 
-### Lösung
-Neue Datei `plugins/appearance/theme-bridge.css`, nur wirksam bei gesetztem Marker:
+### Lösung (Stand Phase 3)
+Neue Datei `plugins/appearance/theme-bridge.css`, nur wirksam bei gesetztem Marker `data-obsidian-theme`
+am `<html>`; die Slatebase-Tokens werden auf **`body`** von den Obsidian-Variablen abgeleitet:
 
 ```css
-/* 1. Standardwerte als Literale, damit kein Zyklus entsteht */
-:root[data-obsidian-theme] body { /* Light-Defaults der Compat-Variablen als Literale */ }
-:root[data-obsidian-theme] body.theme-dark { /* Dark-Defaults als Literale */ }
-
-/* 2. Brücke: Slatebase-Tokens leiten sich von Obsidian-Variablen ab */
-:root[data-obsidian-theme] body {
-  --bg-base: var(--background-primary);
-  /* … siehe Tabelle … */
-}
+:root[data-obsidian-theme] body { --bg-base: var(--background-primary); /* … siehe Tabelle … */ }
 ```
 
-- Die Selektor-Spezifität ist so gewählt, dass Theme-Regeln auf `body` / `body.theme-dark` per
-  Quellreihenfolge (Theme-Tag steht später im `<head>`) die Literale überschreiben. Bridge-Regeln
-  stehen dagegen auf `body` und gewinnen gegen `:root`-Tokens, ohne `!important`.
-- Die Literale werden **nicht** von Hand gepflegt: Ein Test liest `obsidian-compat.css` (Light-Block,
-  Dark-Block) und `theme-bridge.css` und prüft, dass jede brücken-relevante Variable in beiden Dateien
-  denselben aufgelösten Wert hat. Driftet einer, schlägt der Test fehl.
-- Ohne Marker ändert sich nichts (R1.3). Ein Snapshot-Test auf die Liste der Slatebase-Tokens stellt
-  sicher, dass `index.css` unangetastet bleibt.
+- **Kein Zyklus, keine Literale:** Die Compat-Variablen stehen auf `:root`
+  (dunkel z. B. `--background-primary: var(--bg-base)`), die Brücke steht auf `body`. Dort ist
+  `--background-primary` der von `:root` geerbte, bereits aufgelöste Wert, solange das Theme ihn nicht
+  auf `body` überschreibt. `--bg-base` verweist also nie auf sich selbst. (Der ursprüngliche Entwurf mit
+  duplizierten Literalen ist damit überflüssig.)
+- Themes setzen ihre Werte auf `body`/`.theme-*`; die Brücke liest sie dort, weil sie ebenfalls auf `body` liegt.
+- Ohne Marker ändert sich nichts. Test: jeder Selektor der Datei beginnt mit `:root[data-obsidian-theme]`.
+- Hell sind die Compat-Defaults identisch zu Slatebases Werten (Test); dunkel lösen sie über `var()` auf
+  dieselben Tokens auf. Kleine Abweichungen nur bei `--bg-overlay`, `--border-strong`, `--text-subtle` (dunkel).
+- **Basis-Skala und Ableitung (aus der Abnahme):** Themes wie Things setzen nur `--color-base-*` und
+  `--color-accent` und verlassen sich darauf, dass Obsidian `--background-primary`, `--text-normal` usw. daraus
+  ableitet. Unter dem Marker gilt deshalb Obsidians dokumentierte Basis-Skala (hell/dunkel) und die Ableitung
+  `--background-primary ← base-00`, `-primary-alt ← base-10`, `--background-secondary ← base-20`,
+  `--text-normal ← base-100`, `--text-muted ← base-70`, `--text-faint ← base-50`, Rahmen ← base-30/35/40,
+  Akzent ← `--color-accent`. Alles in `:where()`: Spezifität 0, ein Theme-Selektor für `body`/`.theme-*` gewinnt immer.
+- **Panel-Tokens:** `--sidebar-*`, `--right-panel-*`, `--status-bar-*` folgen `--background-secondary`,
+  `--background-modifier-border`, `--text-*`; die Editorfläche (`.cm-editor`) nutzt unter einem Theme
+  `--background-primary` statt `--bg-elevated`.
+- **Nicht gebrückt:** `--text-inverse` (Slatebase nutzt dunkel dunkle Schrift auf hellem Akzent, Obsidians
+  `--text-on-accent` ist weiß) und semantische Farben.
+- Typografie (Überschriften, Bold/Italic, Editor-Schrift, Zeilenhöhe, `--file-line-width`) ist ebenfalls
+  nur unter dem Marker gebunden, weil Obsidians Standardgrößen von Slatebases abweichen.
 
 ### Zuordnung (Entwurf — in Phase 1 gegen die tatsächliche Nutzung in `App.css` verifizieren)
 
@@ -56,7 +63,7 @@ Neue Datei `plugins/appearance/theme-bridge.css`, nur wirksam bei gesetztem Mark
 | `--bg-overlay` | `--background-modifier-cover` |
 | `--text-primary` | `--text-normal` |
 | `--text-secondary` | `--text-muted` |
-| `--text-muted` | `--text-faint` |
+| `--text-subtle` (bisher `--text-muted`, umbenannt) | `--text-faint` |
 | `--text-inverse` | `--text-on-accent` |
 | `--border-subtle` / `--border-default` / `--border-strong` | `--background-modifier-border` / `-hover` / `-active-hover` |
 | `--accent` / `--accent-hover` / `--accent-text` | `--interactive-accent` / `--interactive-accent-hover` / `--text-accent` |
@@ -73,15 +80,22 @@ Semantische Farben (Erfolg/Fehler/Warnung, Syntax-Highlighting, Datei-Icons) ble
 Slatebase; abgeleitet wird nur, was Themes üblicherweise setzen.
 
 ## 2. Variablen-Lücken
-Ausgangsliste aus dem Abgleich mit Things und Minimal (vor dem Übernehmen jeweils gegen die offizielle
-Referenz prüfen, nur Dokumentiertes ergänzen):
+**Phase-1-Ergebnis (2026-10-17):** Abgleich gegen die offizielle Referenz
+(`obsidianmd/obsidian-developer-docs`, `en/Reference/CSS variables/**`, 689 Variablennamen) ergibt nur
+**110 fehlende** Namen. Davon sind rund 50 Obsidian-Publish-/Sync-Variablen (`--page-*`, `--site-*`,
+`--logo-*`, `--sidebar-left/right-*`, `--sync-avatar-*`, `--graph-height`, `--footer-display`) und
+Platzhalter-Fragmente (`--font-`, `--size`); sie werden **nicht** ergänzt. Echte Lücken:
 
-- Things: `--radius-xs`, `--thin-border`, `--checkbox-icon`, `--normal-weight`, `--highlight-text-color--active`
-- Minimal: `--blockquote-size`, `--editor-font-size`, `--gutter-background`, `--table-drag-handle-size`,
-  `--bases-table-header-icon-display`, `--bases-toolbar-opacity`, `--tab-stacked-spine-order`,
-  `--checkbox-icon`
-- Nicht ergänzen: `--font-text-override`, `--font-editor-override`, `--font-todoist-*`,
-  `--font-adaptive-small` u. ä. (Plugin- bzw. theme-eigene Variablen).
+- `--bases-*` (ca. 35: Cards, Table, Header, Toolbar, Embed, Filter-Menü)
+- `--component-title-*`, `--dropdown-*`
+- `--nav-item-border-color*`, `--nav-parent-item-color*`, `--nav-parent-item-weight`,
+  `--nav-collapse-icon-color-hover`, `--outline-heading-*`
+- `--color-accent-hsl`, `--text-highlight-bg-rgb`
+
+**Korrektur zum ersten Abgleich:** `--radius-xs`, `--thin-border`, `--checkbox-icon`, `--normal-weight`,
+`--blockquote-size`, `--editor-font-size`, `--gutter-background`, `--table-drag-handle-size` stehen nicht
+in der offiziellen Referenz; sie gehören den Themes (Things/Minimal) oder dem Style-Settings-Plugin und
+werden nicht ergänzt. Plugin-/theme-eigene Variablen (`--font-text-override`, `--font-todoist-*`, …) ebenfalls nicht.
 
 Zusätzlich Typografie-Anbindung: `editor/` (CM6-Theme) und Leseansicht lesen `--font-text`,
 `--h1…h6-*`, `--line-height-normal`, `--file-line-width`. Falls die Editor-CSS dafür feste Werte nutzt,

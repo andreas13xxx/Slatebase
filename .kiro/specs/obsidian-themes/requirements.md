@@ -45,7 +45,9 @@ Vault installiert, aktiviert und gewechselt werden und färben die **gesamte Sla
     als Tabelle im Design und wird in einem Test gegen die tatsächliche CSS-Datei geprüft.
 1.2 Die abgeleiteten Tokens werden auf `body` deklariert (nicht nur `:root`), damit Werte, die ein Theme
     auf `body`, `.theme-light` oder `.theme-dark` setzt, ankommen.
-1.3 Ohne aktives Theme ist das Erscheinungsbild **pixelgleich** zum heutigen Stand (kein Regressionsrisiko
+1.3 Ohne aktives Theme ist das Erscheinungsbild **pixelgleich** zum heutigen Stand (einzige bewusste
+    Ausnahme: die Umbenennung `--text-muted` → `--text-subtle` stellt die gedämpfte Textstufe wieder her,
+    siehe tasks.md) (kein Regressionsrisiko
     für alle, die keine Themes nutzen). Die Brücke ist daher nur mit einem Marker am `<html>` aktiv.
 1.4 Zyklen (`--bg-base` ↔ `--background-primary`) sind ausgeschlossen: Bei aktivem Theme haben die
     Compat-Variablen eigene Standardwerte und zeigen nicht auf Slatebase-Tokens.

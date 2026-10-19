@@ -32,7 +32,7 @@
   appearance: none;
   border: 1px solid var(--border-default);
   background: var(--bg-secondary);
-  color: var(--text-muted);
+  color: var(--text-subtle);
   border-radius: var(--radius-sm);
   padding: 2px 10px;
   font-size: 0.85em;
@@ -61,7 +61,7 @@
 
 .bases-view__loading {
   padding: var(--spacing-xs) var(--spacing-md);
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-size: 0.85em;
 }
 
@@ -111,7 +111,7 @@
 }
 
 .bases-table__cell--formula {
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-variant-numeric: tabular-nums;
 }
 
@@ -137,7 +137,7 @@
 
 .bases-table-view__empty {
   padding: var(--spacing-md);
-  color: var(--text-muted);
+  color: var(--text-subtle);
 }
 
 .bases-table__summary-row {
@@ -189,7 +189,7 @@
 }
 
 .bases-source-view__title {
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-size: 0.85em;
 }
 
@@ -242,7 +242,7 @@
   appearance: none;
   border: 1px solid var(--border-default);
   background: var(--bg-secondary);
-  color: var(--text-muted);
+  color: var(--text-subtle);
   border-radius: var(--radius-sm);
   padding: 2px 10px;
   font-size: 0.85em;
@@ -319,7 +319,7 @@
 .bases-kanban__empty {
   display: block;
   padding: 12px;
-  color: var(--text-muted);
+  color: var(--text-subtle);
 }
 
 .bases-kanban__column {
@@ -361,7 +361,7 @@
 
 .bases-kanban__column-count {
   flex: 0 0 auto;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   background: var(--bg-base);
   border-radius: var(--radius-sm);
   padding: 0 6px;
@@ -419,7 +419,7 @@
   gap: 4px;
   align-items: baseline;
   font-size: 0.78em;
-  color: var(--text-muted);
+  color: var(--text-subtle);
 }
 
 .bases-kanban__chip-key {

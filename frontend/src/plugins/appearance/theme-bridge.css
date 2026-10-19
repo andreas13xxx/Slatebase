@@ -1,0 +1,203 @@
+/**
+ * Theme bridge — lets an active Obsidian theme restyle Slatebase's own UI.
+ *
+ * Slatebase's UI reads its design tokens (`--bg-base`, `--text-primary`, …);
+ * Obsidian themes override Obsidian's variables (`--background-primary`,
+ * `--text-normal`, …). Everything here is gated on `data-obsidian-theme`, which
+ * `ThemeInjector` sets on <html> only while a theme is applied, so without a
+ * theme none of this matches and the UI is exactly as before.
+ *
+ * Why this cannot form a cycle: the compat variables (`obsidian-compat.css`,
+ * dark values like `var(--bg-base)`) are declared on `:root`, the bridge
+ * declares the Slatebase tokens on `body`. On `body` the Obsidian variable is
+ * the value inherited from `:root` (already resolved) unless a theme sets it
+ * there — so `--bg-base` never refers back to itself.
+ *
+ * Why `body`, not `:root`: themes set their variables on `body`, `.theme-light`
+ * and `.theme-dark` (both on <body>). A `var()` alias resolves on the element
+ * that declares it, so an alias on `:root` would never see those values.
+ *
+ * Not bridged: `--text-inverse` (Slatebase uses dark-on-light there in dark
+ * mode, Obsidian's `--text-on-accent` is white) and all semantic colors
+ * (success/error/warning, syntax highlighting, file icons).
+ */
+
+/* ─── Obsidian base colors and their semantic derivation ─────────────────────
+   Obsidian themes usually override only the base scale (`--color-base-00…100`, accent)
+   and rely on Obsidian to derive `--background-primary`, `--text-normal`, … from it.
+   Our compat layer defines those semantic variables as fixed values, so without this
+   block a theme like Things would recolor almost nothing.
+
+   While a theme is active the base scale is Obsidian's documented default (docs: CSS
+   variables → Foundations → Colors; the compat layer's own `--color-base-*` is a
+   differently tuned scale for plugins), and the semantic variables are derived from it
+   the way Obsidian's default theme does it.
+
+   Everything here is wrapped in `:where()` — specificity 0 — so any rule a theme writes
+   for `body`, `.theme-light` or `.theme-dark` wins, and `.theme-dark` colors are set on
+   <body> exactly like Obsidian does. The accent is deliberately not reset: the compat
+   layer's `--color-accent` follows Slatebase's accent unless the theme sets its own. */
+:where(:root[data-obsidian-theme] body) {
+  --color-base-00: #ffffff;
+  --color-base-05: #fcfcfc;
+  --color-base-10: #fafafa;
+  --color-base-20: #f6f6f6;
+  --color-base-25: #efefef;
+  --color-base-30: #e4e4e4;
+  --color-base-35: #dadada;
+  --color-base-40: #bdbdbd;
+  --color-base-50: #ababab;
+  --color-base-60: #707070;
+  --color-base-70: #5c5c5c;
+  --color-base-100: #222222;
+
+  --background-secondary-alt: var(--color-base-05);
+}
+
+:where(:root[data-obsidian-theme] body.theme-dark) {
+  --color-base-00: #1c1c1c;
+  --color-base-05: #212121;
+  --color-base-10: #232323;
+  --color-base-20: #282828;
+  --color-base-25: #2e2e2e;
+  --color-base-30: #333333;
+  --color-base-35: #3f3f3f;
+  --color-base-40: #555555;
+  --color-base-50: #666666;
+  --color-base-60: #999999;
+  --color-base-70: #b3b3b3;
+  --color-base-100: #dadada;
+
+  --background-secondary-alt: var(--color-base-30);
+}
+
+:where(:root[data-obsidian-theme] body) {
+  --background-primary: var(--color-base-00);
+  --background-primary-alt: var(--color-base-10);
+  --background-secondary: var(--color-base-20);
+  --background-modifier-border: var(--color-base-30);
+  --background-modifier-border-hover: var(--color-base-35);
+  --background-modifier-border-focus: var(--color-base-40);
+  --divider-color: var(--background-modifier-border);
+
+  --text-normal: var(--color-base-100);
+  --text-muted: var(--color-base-70);
+  --text-faint: var(--color-base-50);
+  --text-accent: var(--color-accent);
+  --interactive-accent: var(--color-accent);
+}
+
+:root[data-obsidian-theme] body {
+  /* ─── Surfaces ─────────────────────────────────────────────────────────── */
+  --bg-base: var(--background-primary);
+  --bg-surface: var(--background-secondary);
+  --bg-elevated: var(--background-secondary-alt);
+  --bg-overlay: var(--background-modifier-cover);
+
+  /* ─── Text ─────────────────────────────────────────────────────────────── */
+  --text-primary: var(--text-normal);
+  --text-secondary: var(--text-muted);
+  --text-subtle: var(--text-faint);
+
+  /* ─── Borders ──────────────────────────────────────────────────────────── */
+  --border-subtle: var(--divider-color);
+  --border-default: var(--background-modifier-border);
+  --border-strong: var(--background-modifier-border-hover);
+
+  /* ─── Accent ───────────────────────────────────────────────────────────── */
+  --accent: var(--interactive-accent);
+  --accent-hover: var(--interactive-accent-hover);
+  --accent-text: var(--text-accent);
+  --accent-light: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary));
+
+  /* ─── Panels (own tokens in index.css; Obsidian's side panels use the secondary background) ─── */
+  --sidebar-bg: var(--background-secondary);
+  --sidebar-text: var(--text-muted);
+  --sidebar-text-active: var(--text-normal);
+  --sidebar-border: var(--background-modifier-border);
+  --right-panel-bg: var(--background-secondary);
+  --right-panel-border: var(--background-modifier-border);
+  --right-panel-text: var(--text-normal);
+  --right-panel-text-muted: var(--text-muted);
+  --status-bar-bg: var(--background-secondary);
+  --status-bar-border: var(--background-modifier-border);
+  --status-bar-text: var(--text-muted);
+
+  /* ─── Fonts ────────────────────────────────────────────────────────────── */
+  --font-sans: var(--font-interface);
+  --font-mono: var(--font-monospace);
+}
+
+/* Slatebase's editor sits on `--bg-elevated` (a lifted card); in Obsidian the editor is the primary surface. */
+:root[data-obsidian-theme] .cm-editor {
+  background-color: var(--background-primary);
+}
+
+/* ─── Typography (editor content) ───────────────────────────────────────────
+   Obsidian's default heading sizes differ slightly from Slatebase's, so these
+   bindings live behind the theme marker instead of in live-preview.css. */
+:root[data-obsidian-theme] .cm-editor-wrapper .cm-content {
+  font-family: var(--font-text);
+  line-height: var(--line-height-normal);
+}
+
+:root[data-obsidian-theme] .cm-editor-wrapper:not(.cm-full-width) {
+  max-width: var(--file-line-width);
+}
+
+:root[data-obsidian-theme] .cm-lp-h1 {
+  font-family: var(--h1-font);
+  font-size: var(--h1-size);
+  font-weight: var(--h1-weight);
+  line-height: var(--h1-line-height);
+  color: var(--h1-color);
+}
+
+:root[data-obsidian-theme] .cm-lp-h2 {
+  font-family: var(--h2-font);
+  font-size: var(--h2-size);
+  font-weight: var(--h2-weight);
+  line-height: var(--h2-line-height);
+  color: var(--h2-color);
+}
+
+:root[data-obsidian-theme] .cm-lp-h3 {
+  font-family: var(--h3-font);
+  font-size: var(--h3-size);
+  font-weight: var(--h3-weight);
+  line-height: var(--h3-line-height);
+  color: var(--h3-color);
+}
+
+:root[data-obsidian-theme] .cm-lp-h4 {
+  font-family: var(--h4-font);
+  font-size: var(--h4-size);
+  font-weight: var(--h4-weight);
+  line-height: var(--h4-line-height);
+  color: var(--h4-color);
+}
+
+:root[data-obsidian-theme] .cm-lp-h5 {
+  font-family: var(--h5-font);
+  font-size: var(--h5-size);
+  font-weight: var(--h5-weight);
+  line-height: var(--h5-line-height);
+  color: var(--h5-color);
+}
+
+:root[data-obsidian-theme] .cm-lp-h6 {
+  font-family: var(--h6-font);
+  font-size: var(--h6-size);
+  font-weight: var(--h6-weight);
+  line-height: var(--h6-line-height);
+  color: var(--h6-color);
+}
+
+:root[data-obsidian-theme] .cm-lp-bold {
+  font-weight: var(--bold-weight);
+  color: var(--bold-color);
+}
+
+:root[data-obsidian-theme] .cm-lp-italic {
+  color: var(--italic-color);
+}

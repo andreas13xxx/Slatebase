@@ -20,6 +20,7 @@ import { FeatureTogglesSection } from './FeatureTogglesSection'
 import { ServerRestartSection } from './ServerRestartSection'
 import { VaultConfigSection } from './VaultConfigSection'
 import { CssSnippetsSection } from './CssSnippetsSection'
+import { ThemesSection } from './ThemesSection'
 import { GitSyncSection } from './GitSyncSection'
 import { MailImportSection } from './MailImportSection'
 import { KeybindingsSection } from './KeybindingsSection'
@@ -127,6 +128,11 @@ function renderSection(
         return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>
       }
       return <VaultConfigSection apiClient={apiClient} vaultId={selectedVaultId} />
+    case 'themes':
+      if (selectedVaultId === null) {
+        return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>
+      }
+      return <ThemesSection />
     case 'css-snippets':
       if (selectedVaultId === null) {
         return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>

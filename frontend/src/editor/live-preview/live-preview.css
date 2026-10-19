@@ -81,7 +81,7 @@
 
 /* --- Heading Markers (# characters, faded when revealed) --- */
 .cm-lp-heading-marker {
-  color: var(--text-muted);
+  color: var(--text-subtle);
 }
 
 /* --- Inline Formatting --- */
@@ -159,7 +159,7 @@
 }
 
 .cm-lp-embed-note--missing {
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-style: italic;
   border-left-color: var(--danger, #e5484d);
 }
@@ -174,7 +174,7 @@
   display: block;
   font-weight: 600;
   font-size: 0.85em;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   margin-bottom: 4px;
 }
 
@@ -315,7 +315,7 @@
   cursor: pointer;
   transition: transform 0.15s ease;
   transform: rotate(0deg);
-  color: var(--text-muted);
+  color: var(--text-subtle);
   border-radius: var(--radius-sm);
   line-height: 1;
 }
@@ -417,7 +417,7 @@
 }
 
 .cm-lp-mermaid-loading {
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-style: italic;
   font-size: 0.9em;
 }
@@ -487,7 +487,7 @@
 /* Dataview's result count, which it renders as a bare number glued to the
    first header cell ("File5"). Set apart as "File (5)". */
 .cm-lp-code-block-processed .dataview.small-text {
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-weight: 400;
 }
 
@@ -523,7 +523,7 @@
 /* Dataview status messages */
 .cm-lp-code-block-processed .dataview.dataview-error,
 .cm-lp-code-block-processed .dataview.dataview-no-value {
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-style: italic;
   text-align: center;
   padding: 16px;
@@ -679,7 +679,7 @@
 }
 
 .cm-lp-frontmatter--empty {
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-style: italic;
 }
 

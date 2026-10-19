@@ -213,6 +213,27 @@ export interface SnippetRegistryData {
   snippets: Record<string, { enabled: boolean; updatedAt: string }>
 }
 
+/** Obsidian theme manifest fields Slatebase reads (`.obsidian/themes/<id>/manifest.json`). */
+export interface ThemeManifest {
+  name: string
+  version?: string
+  author?: string
+  authorUrl?: string
+  minAppVersion?: string
+}
+
+/** Metadata for one Obsidian theme found in a vault's `.obsidian/themes/` folder. */
+export interface ThemeMeta {
+  /** Folder name, e.g. `Things`. */
+  id: string
+  manifest: ThemeManifest
+  /** Byte size of `theme.css`. */
+  size: number
+  updatedAt: string
+  /** Hostnames the CSS loads resources from via `@import` / `url(...)`. */
+  externalHosts: string[]
+}
+
 /** Git-sync authentication method: an HTTPS personal access token or an SSH private key. */
 export type GitAuthMethod = 'https-token' | 'ssh-key'
 
@@ -679,6 +700,20 @@ export interface IApiClient {
   loadSnippetRegistry(vaultId: string): Promise<SnippetRegistryData>
   /** Save the snippet activation registry for a vault. */
   saveSnippetRegistry(vaultId: string, registry: SnippetRegistryData): Promise<void>
+
+  // --- Obsidian Theme methods (themes live in the vault's .obsidian/ folder) ---
+  /** List the vault's themes together with the active theme id (null = Slatebase default). */
+  listThemes(vaultId: string): Promise<{ themes: ThemeMeta[]; activeThemeId: string | null }>
+  /** Id of the vault's active theme (null = Slatebase default). Cheaper than listing every theme. */
+  getActiveTheme(vaultId: string): Promise<string | null>
+  /** Load a theme's CSS and metadata. Rejects with code `THEME_NOT_FOUND` if it does not exist. */
+  loadTheme(vaultId: string, themeId: string): Promise<{ css: string; meta: ThemeMeta }>
+  /** Create or overwrite a theme (import). */
+  saveTheme(vaultId: string, themeId: string, css: string, manifest?: Partial<ThemeManifest>): Promise<ThemeMeta>
+  /** Delete a theme folder; resets the selection if it was active. */
+  deleteTheme(vaultId: string, themeId: string): Promise<void>
+  /** Select the vault's theme (null = Slatebase default). Applies to everyone who opens the vault. */
+  setActiveTheme(vaultId: string, themeId: string | null): Promise<void>
 
   // --- Git-Sync methods ---
   /** Load a vault's git-sync branch + remotes (no credentials). */
@@ -1371,6 +1406,39 @@ export class ApiClient implements IApiClient {
   /** Save the snippet activation registry for a vault. */
   async saveSnippetRegistry(vaultId: string, registry: SnippetRegistryData): Promise<void> {
     await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/snippets/registry`, registry)
+  }
+
+  // --- Obsidian Theme methods ---
+
+  /** List the vault's themes together with the active theme id. */
+  async listThemes(vaultId: string): Promise<{ themes: ThemeMeta[]; activeThemeId: string | null }> {
+    return this.request<{ themes: ThemeMeta[]; activeThemeId: string | null }>('GET', `/api/v1/vaults/${vaultId}/themes`)
+  }
+
+  /** Id of the vault's active theme. */
+  async getActiveTheme(vaultId: string): Promise<string | null> {
+    const result = await this.request<{ themeId: string | null }>('GET', `/api/v1/vaults/${vaultId}/themes/active`)
+    return result.themeId
+  }
+
+  /** Load a theme's CSS and metadata. */
+  async loadTheme(vaultId: string, themeId: string): Promise<{ css: string; meta: ThemeMeta }> {
+    return this.request<{ css: string; meta: ThemeMeta }>('GET', `/api/v1/vaults/${vaultId}/themes/${encodeURIComponent(themeId)}`)
+  }
+
+  /** Create or overwrite a theme. */
+  async saveTheme(vaultId: string, themeId: string, css: string, manifest?: Partial<ThemeManifest>): Promise<ThemeMeta> {
+    return this.request<ThemeMeta>('PUT', `/api/v1/vaults/${vaultId}/themes/${encodeURIComponent(themeId)}`, { css, manifest })
+  }
+
+  /** Delete a theme. */
+  async deleteTheme(vaultId: string, themeId: string): Promise<void> {
+    await this.request<void>('DELETE', `/api/v1/vaults/${vaultId}/themes/${encodeURIComponent(themeId)}`)
+  }
+
+  /** Select the vault's theme (null = Slatebase default). */
+  async setActiveTheme(vaultId: string, themeId: string | null): Promise<void> {
+    await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/themes/active`, { themeId })
   }
 
   // --- Git-Sync methods ---

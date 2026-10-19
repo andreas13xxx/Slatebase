@@ -34,7 +34,7 @@ export function createSlatebaseTheme(): Extension {
     },
     '.cm-gutters': {
       backgroundColor: 'var(--bg-surface)',
-      color: 'var(--text-muted)',
+      color: 'var(--text-subtle)',
       borderRight: '1px solid var(--border-subtle)',
     },
     '.cm-activeLineGutter': {
@@ -59,7 +59,7 @@ export function createSlatebaseTheme(): Extension {
     '.cm-foldPlaceholder': {
       backgroundColor: 'var(--bg-surface)',
       border: '1px solid var(--border-subtle)',
-      color: 'var(--text-muted)',
+      color: 'var(--text-subtle)',
     },
     '.cm-tooltip': {
       backgroundColor: 'var(--bg-elevated)',
@@ -107,18 +107,18 @@ export function createSlatebaseHighlightStyle(): Extension {
     { tag: tags.strong, color: 'var(--text-primary)', fontWeight: 'bold' },
     { tag: tags.keyword, color: 'var(--accent)' },
     { tag: tags.string, color: 'var(--success)' },
-    { tag: tags.comment, color: 'var(--text-muted)', fontStyle: 'italic' },
+    { tag: tags.comment, color: 'var(--text-subtle)', fontStyle: 'italic' },
     { tag: tags.link, color: 'var(--accent-text)', textDecoration: 'underline' },
     { tag: tags.url, color: 'var(--accent-text)' },
     { tag: tags.monospace, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' },
     { tag: tags.processingInstruction, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' },
-    { tag: tags.strikethrough, textDecoration: 'line-through', color: 'var(--text-muted)' },
+    { tag: tags.strikethrough, textDecoration: 'line-through', color: 'var(--text-subtle)' },
     { tag: tags.atom, color: 'var(--accent)' },
     { tag: tags.bool, color: 'var(--accent)' },
     { tag: tags.number, color: 'var(--warning)' },
     { tag: tags.operator, color: 'var(--text-secondary)' },
-    { tag: tags.punctuation, color: 'var(--text-muted)' },
-    { tag: tags.meta, color: 'var(--text-muted)' },
+    { tag: tags.punctuation, color: 'var(--text-subtle)' },
+    { tag: tags.meta, color: 'var(--text-subtle)' },
     { tag: tags.contentSeparator, color: 'var(--border-strong)' },
     { tag: tags.definition(tags.variableName), color: 'var(--accent-text)' },
     { tag: tags.function(tags.variableName), color: 'var(--accent)' },
@@ -129,7 +129,7 @@ export function createSlatebaseHighlightStyle(): Extension {
     { tag: tags.attributeName, color: 'var(--accent-text)' },
     { tag: tags.attributeValue, color: 'var(--success)' },
     { tag: tags.tagName, color: 'var(--danger-text)' },
-    { tag: tags.angleBracket, color: 'var(--text-muted)' },
+    { tag: tags.angleBracket, color: 'var(--text-subtle)' },
     { tag: tags.quote, color: 'var(--text-secondary)', fontStyle: 'italic' },
   ])
 

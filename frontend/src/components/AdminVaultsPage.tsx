@@ -112,7 +112,7 @@ export function AdminVaultsPage({ apiClient }: AdminVaultsPageProps) {
       {loading ? (
         <p className="admin-users-loading">{t('admin.vaults.loading')}</p>
       ) : vaults.length === 0 ? (
-        <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>{t('admin.vaults.empty')}</p>
+        <p style={{ color: 'var(--text-subtle)', fontSize: 13 }}>{t('admin.vaults.empty')}</p>
       ) : (
         <div className="admin-users-table-wrapper">
           <table className="admin-users-table">
@@ -130,7 +130,7 @@ export function AdminVaultsPage({ apiClient }: AdminVaultsPageProps) {
               {vaults.map((vault) => (
                 <tr key={vault.id}>
                   <td style={{ fontWeight: 600 }}>{vault.name}</td>
-                  <td style={{ color: vault.ownerName ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                  <td style={{ color: vault.ownerName ? 'var(--text-primary)' : 'var(--text-subtle)' }}>
                     {vault.ownerName ?? vault.ownerId ?? '—'}
                   </td>
                   <td>{vault.fileCount ?? '—'}</td>
@@ -138,7 +138,7 @@ export function AdminVaultsPage({ apiClient }: AdminVaultsPageProps) {
                   <td>
                     {vault.shareCount !== undefined && vault.shareCount > 0
                       ? <span style={{ fontWeight: 500 }}>{vault.shareCount}</span>
-                      : <span style={{ color: 'var(--text-muted)' }}>—</span>
+                      : <span style={{ color: 'var(--text-subtle)' }}>—</span>
                     }
                   </td>
                   <td>

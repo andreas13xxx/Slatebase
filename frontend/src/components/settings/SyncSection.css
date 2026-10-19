@@ -53,7 +53,7 @@
   flex-wrap: wrap;
   gap: 6px 12px;
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--text-subtle);
 }
 
 .sync-section__item-status {
@@ -103,11 +103,11 @@
 
 .sync-status-badge--pending {
   background: var(--bg-elevated);
-  color: var(--text-muted);
+  color: var(--text-subtle);
 }
 
 .sync-section__empty {
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-size: 13px;
   margin: 8px 0;
 }
@@ -183,7 +183,7 @@
 }
 
 .mailbox-tree__node-label {
-  color: var(--text-muted);
+  color: var(--text-subtle);
 }
 
 .ssh-public-key-box {
@@ -212,7 +212,7 @@
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-subtle);
 }
 
 .sync-section__item-publickey code {

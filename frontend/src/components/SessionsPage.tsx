@@ -101,7 +101,7 @@ export function SessionsPage({ apiClient }: SessionsPageProps) {
               const isCurrent = session.sessionId === currentSessionId
               return (
                 <li key={session.sessionId} className={`sessions-item${isCurrent ? ' sessions-item--current' : ''}`}>
-                  <Monitor size={18} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                  <Monitor size={18} style={{ color: 'var(--text-subtle)', flexShrink: 0 }} />
                   <div className="sessions-item-info">
                     <div className="sessions-item-agent" title={session.userAgent}>
                       {session.userAgent.length > 60 ? session.userAgent.slice(0, 60) + '…' : session.userAgent}

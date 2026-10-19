@@ -205,6 +205,7 @@ oversight — but it means:
 | 🧮 **Bases** ⚠️ | Real Obsidian `.base` files as filterable, sortable, editable views over your notes' metadata — a table and a cards/Kanban board (drag cards between columns), filters and formulas written in Obsidian's expression language (a pragmatic subset), inline cell editing, and an MCP tool (`query_base`) to evaluate a base from AI clients. Limits: at most 1000 candidate notes per query, read-only unsortable formula columns, `summaries` not computed yet. Experimental, off by default (`bases` toggle) |
 | 🔖 **Bookmarks** | Bookmark files, headings, blocks, or saved searches — reorder by drag and drop, rename, and bookmark all open tabs at once |
 | 📟 **Status Bar** | Clock, vault name, word/character count, and cursor position with click-to-"go to line" — each item toggleable |
+| 🖌️ **Obsidian Themes** | Obsidian themes read straight from the vault's `.obsidian/themes/` folder (the active one is Obsidian's `cssTheme` in `.obsidian/appearance.json`, so the choice applies to everyone using the vault and a vault brought over from Obsidian shows its themes without an import). Works for themes built on Obsidian CSS variables — colors, fonts, headings, line width. Themes that restyle Obsidian's own layout (tabs, sidebars, title bars) are only partly applied, and Style Settings values are not evaluated |
 | 🎨 **CSS Snippets** | Per-vault custom CSS, uploaded or written in an embedded editor, enabled and disabled individually |
 | 🔍 **Search & Replace** | Vault-wide full-text search with regex, context lines, multi-vault, find & replace, and `path:`/`file:`/`tag:`/`property:` operators |
 | 📊 **Mermaid & LaTeX** | Mermaid code blocks as interactive SVG diagrams and KaTeX math (inline `$…$` and block `$$…$$`), both dark-mode aware |
@@ -396,6 +397,18 @@ All routes under `/api/v1`. Authentication required (session cookie or Bearer to
 | GET/PUT | `/vaults/:vaultId/snippets/:snippetId` | Read / write snippet content |
 | DELETE | `/vaults/:vaultId/snippets/:snippetId` | Delete snippet (also prunes its registry entry) |
 | GET/PUT | `/vaults/:vaultId/snippets/registry` | Enabled/disabled state |
+
+### Themes
+
+Themes live in the vault (`.obsidian/themes/<id>/theme.css` + `manifest.json`); the selection is `cssTheme` in `.obsidian/appearance.json`. Reads need read access to the vault, every mutating route needs write access. Writes publish a `vault:change` event for the changed path.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/vaults/:vaultId/themes` | List themes plus the active theme id |
+| GET/PUT | `/vaults/:vaultId/themes/active` | Read / set the active theme (`{ "themeId": "Name" \| null }`) |
+| GET | `/vaults/:vaultId/themes/:themeId` | Theme CSS and metadata |
+| PUT | `/vaults/:vaultId/themes/:themeId` | Create or overwrite a theme (`{ "css", "manifest"? }`, CSS up to 2 MB) |
+| DELETE | `/vaults/:vaultId/themes/:themeId` | Delete a theme (resets the selection if it was active) |
 
 ### Git-Sync & Mail-Import
 

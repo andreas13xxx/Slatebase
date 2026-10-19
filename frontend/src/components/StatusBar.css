@@ -103,7 +103,7 @@
 
 .status-bar__goto-line-field-label {
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-subtle);
 }
 
 .status-bar__goto-line-input {

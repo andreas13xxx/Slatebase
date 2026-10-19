@@ -46,6 +46,7 @@ Diese Abschnitte brauchen einen geöffneten Vault; die schreibenden sind dem Bes
 |-----------|--------|
 | Vault-Konfiguration | Vorlagen-Verzeichnis (Standard: `Templates`), Daily-Notes-Verzeichnis, Anhänge-Verzeichnis, "Aktive Datei im Explorer verfolgen" |
 | Plugins | Obsidian-Community-Plugins installieren, aktualisieren, verwalten (nur bei aktivem `obsidian-plugin-compat`-Toggle) |
+| Themes | Obsidian-Themes des Vaults auswählen, importieren und löschen — siehe [[Features/Themes]] |
 | CSS-Snippets | Eigenes CSS pro Vault hochladen oder im eingebauten Editor schreiben, einzeln ein-/ausschalten |
 | Git-Synchronisation | Git-Remotes pro Vault einrichten (nur bei aktivem `git-sync`-Toggle) — siehe [[Features/Git-Sync]] |
 | Mail-Import | IMAP-Postfächer als Markdown-Notizen importieren (nur bei aktivem `mail-import`-Toggle) — siehe [[Features/Mail-Import]] |
@@ -231,6 +232,7 @@ Personalisiere deine Slatebase-Instanz:
 ## Verwandte Features
 
 - [[Features/Command Palette]] — Alternativer Weg zu den Einstellungen
+- [[Features/Themes]] — Obsidian-Themes nutzen
 - [[Features/CSS-Snippets]] — Detailguide zu eigenem CSS pro Vault
 - [[Features/Lesezeichen]] — Lesezeichen-Ansicht, ebenfalls über die Seitenleiste erreichbar
 - [[Features/Vorlagen und Daily Notes]] — Templates-Verzeichnis konfigurieren

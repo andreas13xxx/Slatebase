@@ -10,8 +10,8 @@ describe('settingsRegistry', () => {
   })
 
   describe('SETTINGS_SECTIONS', () => {
-    it('contains exactly 18 section definitions', () => {
-      expect(SETTINGS_SECTIONS).toHaveLength(18)
+    it('contains exactly 19 section definitions', () => {
+      expect(SETTINGS_SECTIONS).toHaveLength(19)
     })
 
     it('has unique ids across all sections', () => {
@@ -53,10 +53,10 @@ describe('settingsRegistry', () => {
       ])
     })
 
-    it('returns 5 vault sections', () => {
+    it('returns 6 vault sections', () => {
       const sections = registry.getSections('vault', false)
-      expect(sections).toHaveLength(5)
-      expect(sections.map((s) => s.id)).toEqual(['vault-config', 'plugins', 'css-snippets', 'git-sync', 'mail-import'])
+      expect(sections).toHaveLength(6)
+      expect(sections.map((s) => s.id)).toEqual(['vault-config', 'plugins', 'themes', 'css-snippets', 'git-sync', 'mail-import'])
     })
 
     it('returns 5 administration sections for admin', () => {
@@ -89,14 +89,14 @@ describe('settingsRegistry', () => {
   })
 
   describe('getAllSections', () => {
-    it('returns 13 sections for non-admin (account + vault)', () => {
+    it('returns 14 sections for non-admin (account + vault)', () => {
       const sections = registry.getAllSections(false)
-      expect(sections).toHaveLength(13)
+      expect(sections).toHaveLength(14)
     })
 
-    it('returns all 18 sections for admin', () => {
+    it('returns all 19 sections for admin', () => {
       const sections = registry.getAllSections(true)
-      expect(sections).toHaveLength(18)
+      expect(sections).toHaveLength(19)
     })
 
     it('does not include admin sections for non-admin', () => {

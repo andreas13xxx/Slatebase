@@ -56,7 +56,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   margin-bottom: 8px;
 }
 
@@ -110,7 +110,7 @@
 
 .graph-settings-slider-value {
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-variant-numeric: tabular-nums;
 }
 
@@ -182,7 +182,7 @@
 
 .graph-settings-property-count {
   font-size: 10px;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   margin-left: auto;
 }
 
