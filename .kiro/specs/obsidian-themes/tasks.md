@@ -85,7 +85,23 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, lint, Tests).
       Settings-Suite: 13 Dateien, 150 Tests grün
 
 ## Phase 7 — Abnahme und Doku
-- [ ] 7.1 Manuelle Abnahme mit Things und Minimal (Hell/Dunkel), Screenshots vorher/nachher
+- [x] 7.1 Manuelle Abnahme (isolierte Instanz, frischer Datenordner, Welcome-Vault mit `.obsidian/themes/Things`
+      und `Minimal`, Chromium): Die Themes-Sektion listet beide Themes aus den Vault-Dateien; Auswahl schreibt
+      `{"cssTheme": "Things"}` nach `.obsidian/appearance.json` und wirkt sofort. Die Abnahme deckte zwei Lücken auf,
+      beide behoben (`theme-bridge.css` + Tests):
+      1. Things setzt nur die Basis-Skala (`--color-base-*`) und `--color-accent`; Obsidian leitet daraus
+         `--background-primary`, `--text-normal` usw. ab. Unsere Compat-Datei hat dafür feste Werte, und ihre
+         `--color-base-*` sind eine andere (für Plugins abgestimmte) Skala. Jetzt gilt unter einem Theme Obsidians
+         dokumentierte Basis-Skala (hell/dunkel, aus der offiziellen Referenz) mit der Ableitung der semantischen
+         Variablen, alles in `:where()` (Spezifität 0), damit jede Theme-Regel gewinnt. Das Akzent-Default bleibt bei
+         Slatebase, solange das Theme keinen eigenen setzt.
+      2. Slatebase-eigene Panel-Tokens (`--sidebar-bg`, `--right-panel-bg`, `--status-bar-bg` …) und die Editorfläche
+         (`--bg-elevated`) folgten dem Theme nicht. Jetzt gebrückt; der Editor nutzt unter einem Theme den primären
+         Hintergrund wie in Obsidian.
+      Ergebnis nach den Korrekturen: Things (hell + dunkel) färbt Seitenleisten, Hauptfläche, Statusleiste, Akzent,
+      Text und Überschriften um; Minimal wird wie erwartet teilweise umgesetzt (Schrift, Überschriften, Farben; Layout
+      bleibt Slatebases). Offen/bewusst: Buttons (`--interactive-normal/-hover`), Tab-Leiste und semantische Farben
+      bleiben bei Slatebase.
 - [x] 7.2 Doku: Welcome-Vault-Seite `Features/Themes` (DE + EN) mit Verlinkung in Übersicht/Einstellungen,
       README (Feature-Zeile + Themes-API), `VAULT-ROUTE-AUTHORIZATION.md` (Nachtrag), `structure.md`,
       `AGENTS.md` (Abschnitt „Themes"). Grenzen (Struktur-Selektoren, Style Settings) stehen auf der Themes-Seite

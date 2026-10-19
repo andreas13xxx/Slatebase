@@ -42,6 +42,17 @@ const BRIDGE: ReadonlyArray<readonly [string, string]> = [
   ['--accent', '--interactive-accent'],
   ['--accent-hover', '--interactive-accent-hover'],
   ['--accent-text', '--text-accent'],
+  ['--sidebar-bg', '--background-secondary'],
+  ['--sidebar-text', '--text-muted'],
+  ['--sidebar-text-active', '--text-normal'],
+  ['--sidebar-border', '--background-modifier-border'],
+  ['--right-panel-bg', '--background-secondary'],
+  ['--right-panel-border', '--background-modifier-border'],
+  ['--right-panel-text', '--text-normal'],
+  ['--right-panel-text-muted', '--text-muted'],
+  ['--status-bar-bg', '--background-secondary'],
+  ['--status-bar-border', '--background-modifier-border'],
+  ['--status-bar-text', '--text-muted'],
   ['--font-sans', '--font-interface'],
   ['--font-mono', '--font-monospace'],
 ]
@@ -50,7 +61,7 @@ const BRIDGE: ReadonlyArray<readonly [string, string]> = [
 const LIGHT_DEFAULT_DIFFERS = new Set(['--bg-overlay'])
 
 describe('theme bridge', () => {
-  const bridged = declarations(ruleBody(bridge, ':root[data-obsidian-theme] body'))
+  const bridged = declarations(ruleBody(bridge, '\n:root[data-obsidian-theme] body {'))
   const compatLight = declarations(ruleBody(compat, '\n:root {'))
   const slatebaseLight = declarations(ruleBody(tokens, '\n:root {'))
 
@@ -76,7 +87,10 @@ describe('theme bridge', () => {
     )
     expect(selectors.length).toBeGreaterThan(0)
     for (const selector of selectors) {
-      expect(selector.startsWith(':root[data-obsidian-theme]'), selector).toBe(true)
+      expect(
+        selector.startsWith(':root[data-obsidian-theme]') || selector.startsWith(':where(:root[data-obsidian-theme]'),
+        selector,
+      ).toBe(true)
     }
   })
 
@@ -86,10 +100,15 @@ describe('theme bridge', () => {
     }
   })
 
+  it('moves the editor surface to the primary background while a theme is active', () => {
+    expect(ruleBody(bridge, ':root[data-obsidian-theme] .cm-editor {')).toContain('var(--background-primary)')
+  })
+
   it('keeps the compat defaults equal to Slatebase\'s light values (so a theme that sets nothing changes nothing)', () => {
     for (const [token, obsidianVar] of BRIDGE) {
       if (LIGHT_DEFAULT_DIFFERS.has(token)) continue
       if (token === '--font-sans' || token === '--font-mono') continue // compat aliases these back
+      if (/^--(sidebar|right-panel|status-bar)-/.test(token)) continue // panel tokens are not part of the default-parity contract
       expect(compatLight.get(obsidianVar), `${obsidianVar} vs ${token}`).toBe(slatebaseLight.get(token))
     }
   })
@@ -103,5 +122,50 @@ describe('theme bridge', () => {
         expect(compat, `--h${level}-${suffix}`).toMatch(new RegExp(`\\n\\s*--h${level}-${suffix}:`))
       }
     }
+  })
+
+  describe('base scale and semantic derivation (themes that only set --color-base-*)', () => {
+    /** Obsidian's documented defaults: docs → CSS variables → Foundations → Colors. */
+    const DOCS_LIGHT: Record<string, string> = {
+      '00': '#ffffff', '05': '#fcfcfc', '10': '#fafafa', '20': '#f6f6f6', '25': '#efefef', '30': '#e4e4e4',
+      '35': '#dadada', '40': '#bdbdbd', '50': '#ababab', '60': '#707070', '70': '#5c5c5c', '100': '#222222',
+    }
+    const DOCS_DARK: Record<string, string> = {
+      '00': '#1c1c1c', '05': '#212121', '10': '#232323', '20': '#282828', '25': '#2e2e2e', '30': '#333333',
+      '35': '#3f3f3f', '40': '#555555', '50': '#666666', '60': '#999999', '70': '#b3b3b3', '100': '#dadada',
+    }
+
+    it.each([
+      [':where(:root[data-obsidian-theme] body) {', DOCS_LIGHT],
+      [':where(:root[data-obsidian-theme] body.theme-dark) {', DOCS_DARK],
+    ] as const)('%s uses the documented Obsidian base colors', (selector, expected) => {
+      const found = declarations(ruleBody(bridge, selector))
+      for (const [step, value] of Object.entries(expected)) {
+        expect(found.get(`--color-base-${step}`), `--color-base-${step}`).toBe(value)
+      }
+    })
+
+    it('derives the semantic surface, text and accent variables from the base scale', () => {
+      const derived = declarations(ruleBody(bridge, ':where(:root[data-obsidian-theme] body) {\n  --background-primary'))
+      expect(Object.fromEntries(derived)).toMatchObject({
+        '--background-primary': 'var(--color-base-00)',
+        '--background-primary-alt': 'var(--color-base-10)',
+        '--background-secondary': 'var(--color-base-20)',
+        '--background-modifier-border': 'var(--color-base-30)',
+        '--text-normal': 'var(--color-base-100)',
+        '--text-muted': 'var(--color-base-70)',
+        '--text-faint': 'var(--color-base-50)',
+        '--text-accent': 'var(--color-accent)',
+        '--interactive-accent': 'var(--color-accent)',
+      })
+    })
+
+    it('keeps specificity at zero so any theme rule for body/.theme-* wins', () => {
+      const defaults = bridge.match(/(^|\n)(:where\(:root\[data-obsidian-theme\][^{]*)\{/g) ?? []
+      expect(defaults.length).toBeGreaterThanOrEqual(3)
+      for (const rule of defaults) {
+        expect(rule.trim().startsWith(':where(') && rule.trim().endsWith(') {'), rule).toBe(true)
+      }
+    })
   })
 })

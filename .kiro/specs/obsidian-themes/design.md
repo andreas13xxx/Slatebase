@@ -39,6 +39,15 @@ am `<html>`; die Slatebase-Tokens werden auf **`body`** von den Obsidian-Variabl
 - Ohne Marker ändert sich nichts. Test: jeder Selektor der Datei beginnt mit `:root[data-obsidian-theme]`.
 - Hell sind die Compat-Defaults identisch zu Slatebases Werten (Test); dunkel lösen sie über `var()` auf
   dieselben Tokens auf. Kleine Abweichungen nur bei `--bg-overlay`, `--border-strong`, `--text-subtle` (dunkel).
+- **Basis-Skala und Ableitung (aus der Abnahme):** Themes wie Things setzen nur `--color-base-*` und
+  `--color-accent` und verlassen sich darauf, dass Obsidian `--background-primary`, `--text-normal` usw. daraus
+  ableitet. Unter dem Marker gilt deshalb Obsidians dokumentierte Basis-Skala (hell/dunkel) und die Ableitung
+  `--background-primary ← base-00`, `-primary-alt ← base-10`, `--background-secondary ← base-20`,
+  `--text-normal ← base-100`, `--text-muted ← base-70`, `--text-faint ← base-50`, Rahmen ← base-30/35/40,
+  Akzent ← `--color-accent`. Alles in `:where()`: Spezifität 0, ein Theme-Selektor für `body`/`.theme-*` gewinnt immer.
+- **Panel-Tokens:** `--sidebar-*`, `--right-panel-*`, `--status-bar-*` folgen `--background-secondary`,
+  `--background-modifier-border`, `--text-*`; die Editorfläche (`.cm-editor`) nutzt unter einem Theme
+  `--background-primary` statt `--bg-elevated`.
 - **Nicht gebrückt:** `--text-inverse` (Slatebase nutzt dunkel dunkle Schrift auf hellem Akzent, Obsidians
   `--text-on-accent` ist weiß) und semantische Farben.
 - Typografie (Überschriften, Bold/Italic, Editor-Schrift, Zeilenhöhe, `--file-line-width`) ist ebenfalls

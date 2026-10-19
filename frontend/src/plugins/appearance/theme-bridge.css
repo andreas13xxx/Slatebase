@@ -22,6 +22,71 @@
  * (success/error/warning, syntax highlighting, file icons).
  */
 
+/* ─── Obsidian base colors and their semantic derivation ─────────────────────
+   Obsidian themes usually override only the base scale (`--color-base-00…100`, accent)
+   and rely on Obsidian to derive `--background-primary`, `--text-normal`, … from it.
+   Our compat layer defines those semantic variables as fixed values, so without this
+   block a theme like Things would recolor almost nothing.
+
+   While a theme is active the base scale is Obsidian's documented default (docs: CSS
+   variables → Foundations → Colors; the compat layer's own `--color-base-*` is a
+   differently tuned scale for plugins), and the semantic variables are derived from it
+   the way Obsidian's default theme does it.
+
+   Everything here is wrapped in `:where()` — specificity 0 — so any rule a theme writes
+   for `body`, `.theme-light` or `.theme-dark` wins, and `.theme-dark` colors are set on
+   <body> exactly like Obsidian does. The accent is deliberately not reset: the compat
+   layer's `--color-accent` follows Slatebase's accent unless the theme sets its own. */
+:where(:root[data-obsidian-theme] body) {
+  --color-base-00: #ffffff;
+  --color-base-05: #fcfcfc;
+  --color-base-10: #fafafa;
+  --color-base-20: #f6f6f6;
+  --color-base-25: #efefef;
+  --color-base-30: #e4e4e4;
+  --color-base-35: #dadada;
+  --color-base-40: #bdbdbd;
+  --color-base-50: #ababab;
+  --color-base-60: #707070;
+  --color-base-70: #5c5c5c;
+  --color-base-100: #222222;
+
+  --background-secondary-alt: var(--color-base-05);
+}
+
+:where(:root[data-obsidian-theme] body.theme-dark) {
+  --color-base-00: #1c1c1c;
+  --color-base-05: #212121;
+  --color-base-10: #232323;
+  --color-base-20: #282828;
+  --color-base-25: #2e2e2e;
+  --color-base-30: #333333;
+  --color-base-35: #3f3f3f;
+  --color-base-40: #555555;
+  --color-base-50: #666666;
+  --color-base-60: #999999;
+  --color-base-70: #b3b3b3;
+  --color-base-100: #dadada;
+
+  --background-secondary-alt: var(--color-base-30);
+}
+
+:where(:root[data-obsidian-theme] body) {
+  --background-primary: var(--color-base-00);
+  --background-primary-alt: var(--color-base-10);
+  --background-secondary: var(--color-base-20);
+  --background-modifier-border: var(--color-base-30);
+  --background-modifier-border-hover: var(--color-base-35);
+  --background-modifier-border-focus: var(--color-base-40);
+  --divider-color: var(--background-modifier-border);
+
+  --text-normal: var(--color-base-100);
+  --text-muted: var(--color-base-70);
+  --text-faint: var(--color-base-50);
+  --text-accent: var(--color-accent);
+  --interactive-accent: var(--color-accent);
+}
+
 :root[data-obsidian-theme] body {
   /* ─── Surfaces ─────────────────────────────────────────────────────────── */
   --bg-base: var(--background-primary);
@@ -45,9 +110,27 @@
   --accent-text: var(--text-accent);
   --accent-light: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary));
 
+  /* ─── Panels (own tokens in index.css; Obsidian's side panels use the secondary background) ─── */
+  --sidebar-bg: var(--background-secondary);
+  --sidebar-text: var(--text-muted);
+  --sidebar-text-active: var(--text-normal);
+  --sidebar-border: var(--background-modifier-border);
+  --right-panel-bg: var(--background-secondary);
+  --right-panel-border: var(--background-modifier-border);
+  --right-panel-text: var(--text-normal);
+  --right-panel-text-muted: var(--text-muted);
+  --status-bar-bg: var(--background-secondary);
+  --status-bar-border: var(--background-modifier-border);
+  --status-bar-text: var(--text-muted);
+
   /* ─── Fonts ────────────────────────────────────────────────────────────── */
   --font-sans: var(--font-interface);
   --font-mono: var(--font-monospace);
+}
+
+/* Slatebase's editor sits on `--bg-elevated` (a lifted card); in Obsidian the editor is the primary surface. */
+:root[data-obsidian-theme] .cm-editor {
+  background-color: var(--background-primary);
 }
 
 /* ─── Typography (editor content) ───────────────────────────────────────────
