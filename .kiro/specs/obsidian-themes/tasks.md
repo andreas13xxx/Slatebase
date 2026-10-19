@@ -86,7 +86,9 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, lint, Tests).
 
 ## Phase 7 — Abnahme und Doku
 - [ ] 7.1 Manuelle Abnahme mit Things und Minimal (Hell/Dunkel), Screenshots vorher/nachher
-- [ ] 7.2 README/Docs, Welcome-Vault-Hinweis, bekannte Grenzen dokumentieren
+- [x] 7.2 Doku: Welcome-Vault-Seite `Features/Themes` (DE + EN) mit Verlinkung in Übersicht/Einstellungen,
+      README (Feature-Zeile + Themes-API), `VAULT-ROUTE-AUTHORIZATION.md` (Nachtrag), `structure.md`,
+      `AGENTS.md` (Abschnitt „Themes"). Grenzen (Struktur-Selektoren, Style Settings) stehen auf der Themes-Seite
 - [ ] 7.3 `test:coverage` und `lint` in beiden Paketen; Coverage-Schwellen ggf. anheben, nie senken
 
 ## Entscheidungen

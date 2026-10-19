@@ -58,6 +58,7 @@ Beyond the core features listed above, you'll find these additional capabilities
 - [[Features/Status Bar]] — Word count, cursor position, go to line, plugin items
 - [[Features/Vault Management]] — Create, share, and manage vaults
 - [[Features/Settings]] — All configuration options
+- [[Features/Themes]] — Obsidian themes for colors, fonts and headings
 - [[Features/CSS Snippets]] — Custom CSS per vault
 - [[Features/Chat]] — Messages with other users
 - [[Features/Live Preview Editor]] — Source mode and inline-rendered Live Preview

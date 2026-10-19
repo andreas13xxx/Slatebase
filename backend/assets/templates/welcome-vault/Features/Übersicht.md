@@ -58,6 +58,7 @@ Neben den hier aufgelisteten Kern-Features findest du in den folgenden Guides we
 - [[Features/Statusleiste]] — Wortanzahl, Cursor-Position, Gehe zu Zeile, Plugin-Items
 - [[Features/Vault-Verwaltung]] — Vaults erstellen, teilen und verwalten
 - [[Features/Einstellungen]] — Alle Konfigurationsmöglichkeiten
+- [[Features/Themes]] — Obsidian-Themes für Farben, Schriften und Überschriften
 - [[Features/CSS-Snippets]] — Eigenes CSS pro Vault
 - [[Features/Chat]] — Nachrichten mit anderen Nutzern
 - [[Features/Live Preview Editor]] — Source-Modus und inline-gerenderte Live-Vorschau

@@ -113,6 +113,11 @@ Filesystem-based, no database. All under `backend/data/`:
 - Spellcheck is Slatebase's own (`editor/spellcheck/`), not the browser's — the editor owns the context menu and no browser exposes its suggestions to JS. `contentDOM` is therefore always `spellcheck="false"`; don't "fix" that back
 - Hunspell dictionaries are served as static assets from `/dictionaries/` by the `spellcheckDictionaries()` plugin in `vite.config.ts`, never imported. A new language needs an entry there **and** in `SPELLCHECK_LANGUAGES` (`editor/spellcheck/protocol.ts`)
 
+**Themes**
+- Obsidian themes are vault content (`<vault>/.obsidian/themes/<id>/`), the active one is `cssTheme` in `.obsidian/appearance.json` (shared by everyone using the vault) — not `data/`, not a user preference. Writing `appearance.json` must preserve its other fields and never overwrite a file that is not valid JSON
+- `plugins/appearance/theme-bridge.css` derives Slatebase tokens from Obsidian variables only behind `:root[data-obsidian-theme]`, declared on `body` (themes set variables there; compat variables sit on `:root`, which is also why there is no cycle). Never bind Obsidian variables in base CSS — their defaults differ from ours and the look without a theme must not change
+- `--text-muted` belongs to the Obsidian compat layer; Slatebase's dimmed text is `--text-subtle`. Don't reintroduce `--text-muted` in app CSS
+
 **Plugin compat**
 - Obsidian's view/modal class chain lives only in `plugins/compat/install-globals.ts` — never add a parallel definition in a second module
 - `CachedMetadata` is produced only by `plugins/compat/metadata-parser.ts` — extend it there, not in `metadata-cache-shim.ts`

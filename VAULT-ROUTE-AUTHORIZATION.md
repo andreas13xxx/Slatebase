@@ -386,3 +386,17 @@ eliminates: enforcement no longer depends on every call site remembering to pass
   /vaults`, `GET /search`, `GET`/`PATCH /users/me/vault-settings/:vaultId`, `POST
   /welcome-vault`), each with its own documented reason above.
 - **5** findings (F1-F5) reported for awareness, none changed in this PR.
+
+## Addendum — `backend/src/api/themeRoutes.ts` (Obsidian themes, 2026-10-19)
+
+Added after the inventory above, so the counts above do not include it. Mounted via
+`app.route('/api/v1/vaults/:vaultId/themes', themeRoutes)` (`index.ts`). The routes contain no access
+checks of their own: the middleware default applies, and **no exception was added** — unlike snippets
+and plugins, mutating theme routes require **write** access, because a theme is a file in the vault
+(`.obsidian/themes/`) and the selection (`.obsidian/appearance.json`) applies to every user of the vault.
+
+| Method | Path | Level |
+|---|---|---|
+| GET | `.../themes`, `.../themes/active`, `.../themes/:themeId` | read |
+| PUT | `.../themes/active`, `.../themes/:themeId` | write |
+| DELETE | `.../themes/:themeId` | write |

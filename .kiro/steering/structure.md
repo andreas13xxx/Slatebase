@@ -63,6 +63,7 @@ src/
 │   ├── request-id.ts   — Request-ID middleware (X-Request-Id header, UUID generation)
 │   ├── pluginRoutes.ts  — Plugin management CRUD routes (list, install, delete, bundle, styles, settings, registry)
 │   ├── snippetRoutes.ts — CSS snippet CRUD routes (list, create, get/put/delete content, registry) — same access-control model as pluginRoutes.ts
+│   ├── themeRoutes.ts   — Obsidian theme routes under /vaults/:vaultId/themes (list + active, get/put/delete theme, get/put active); no access checks of its own — the vault-authorization middleware's default applies (GET = read, mutations = write); writes publish `vault:change`
 │   ├── featureRoutes.ts — Feature toggle admin + public routes (GET/PUT /admin/features, GET /features)
 │   ├── searchRoutes.ts — Search routes (GET /vaults/:vaultId/search, GET /search, POST /vaults/:vaultId/replace)
 │   ├── searchRoutes.test.ts — Integration tests for search routes
@@ -185,6 +186,13 @@ src/
 │   ├── validation.ts         — Zod schemas + `SNIPPET_FILENAME_PATTERN` (`^[a-zA-Z0-9_-]+\.css$`), `MAX_SNIPPET_SIZE` (512 KB)
 │   ├── snippet-store.ts      — SnippetStore (filesystem persistence, atomic writes, per-vault dirs; `data/snippets/<vaultId>/<snippetId>.css` + `_registry.json`)
 │   └── snippet-store.test.ts — Unit tests for SnippetStore
+├── themes/                   — Obsidian themes. Vault content, not Slatebase data: `<vault>/.obsidian/themes/<id>/{theme.css,manifest.json}`; the active theme is `cssTheme` in `<vault>/.obsidian/appearance.json`. Symlinks are never followed.
+│   ├── index.ts              — Barrel export for themes module
+│   ├── types.ts              — IThemeService, ThemeManifest, ThemeManifestInput, ThemeMeta
+│   ├── errors.ts             — ThemeNotFoundError, ThemeTooLargeError, InvalidThemeIdError, AppearanceFileInvalidError
+│   ├── validation.ts         — Zod schemas, `isValidThemeId`, `MAX_THEME_CSS_SIZE` (2 MB), `normalizeManifest`, `extractExternalHosts`
+│   ├── theme-service.ts      — ThemeService (read/write via `validateFilePath`, atomic writes with retries, `appearance.json` read-modify-write under a mutex that preserves foreign fields and never overwrites an invalid file)
+│   └── theme-service.test.ts — Unit tests for ThemeService and the validation helpers
 ├── feature-toggle/
 │   ├── index.ts              — Barrel export for feature-toggle module
 │   ├── types.ts              — IFeatureToggleService, IFeatureRegistry, FeatureToggleDefinition, FeatureToggleState, etc.
@@ -420,6 +428,10 @@ src/
 │   ├── appearance/           — User-facing appearance customization (CSS Snippets), distinct from plugin CSS
 │   │   ├── snippet-injector.ts — SnippetInjector (unscoped `<style data-snippet-id>` injection — deliberately does NOT reuse compat/css-injector.ts's `[data-plugin-id]` scoping, since user snippets must affect the whole app, e.g. `body`/`:root` overrides)
 │   │   └── snippet-injector.test.ts — Unit tests for SnippetInjector
+│   │   ├── theme-injector.ts — ThemeInjector (one `<style data-slatebase-theme>` placed before the snippet tags; sets `data-obsidian-theme` on <html>, which switches on theme-bridge.css)
+│   │   ├── theme-injector.test.ts — Unit tests for ThemeInjector
+│   │   ├── theme-bridge.css  — Gated on `:root[data-obsidian-theme]`: derives Slatebase tokens (`--bg-*`, `--text-*`, `--border-*`, `--accent*`, fonts) from Obsidian variables on `body`, and binds editor typography (headings, bold/italic, `--file-line-width`). Compat variables live on `:root`, the bridge on `body` — no cycle
+│   │   └── theme-bridge.test.ts — Guards the mapping, the marker gate and the compat defaults
 │   └── compat/           — Obsidian Plugin Compatibility Layer
 │       ├── types.ts      — TFile, TFolder, TAbstractFile, CachedMetadata, PluginManifest, PluginRegistryEntry, etc.
 │       ├── errors.ts     — PluginError, ManifestValidationError, BundleEvaluationError, LifecycleError, etc.
@@ -578,6 +590,7 @@ src/
 │   ├── SlatebaseLogo.tsx — SVG logo component
 │   ├── StatusBar.tsx     — Bottom status bar (clock, vault name, word/char count, cursor position with "go to line" popover, extensible plugin items — each built-in item independently togglable). Plugin items are diff-synced into the DOM (only added/removed elements touched, never a full `innerHTML = ''` + rebuild) so a plugin mutating its own element in place never gets torn out and flickers
 │   ├── SnippetLifecycle.tsx — Renders nothing; applies a vault's enabled CSS snippets on open and swaps them for the new vault's on switch. Mounted once near the app root (reacts to `state.selectedVaultId` via useAppContext) — same "self-contained, context-only, no prop drilling" pattern as StatusBar's VaultNameItem
+│   ├── ThemeLifecycle.tsx — Renders nothing; applies the vault's active Obsidian theme on open and vault switch and re-reads it on `vault:change` for `.obsidian/appearance.json` / `.obsidian/themes/**`. A failed request keeps the applied theme (unknown is not gone); only `THEME_NOT_FOUND` or no selection removes it
 │   ├── StatusBar.css     — Status bar styles (Design Tokens)
 │   ├── UserMenu.tsx      — User avatar and dropdown menu (navigation, import/export, admin)
 │   ├── ErrorBoundary.tsx — React Error Boundary (fallback UI, reset button)
@@ -756,6 +769,9 @@ src/
 │   │   ├── ServerRestartSection.tsx   — Server restart with confirmation
 │   │   ├── VaultConfigSection.tsx     — Per-vault config split into two SettingSection cards — "Anzeige" ("Aktive Datei im Explorer verfolgen", client-only `workspaceStore.explorerFollowActiveFile`, applies instantly, no save button) and "Verzeichnisse" (templates dir, daily notes dir, attachments dir, server-persisted, save button)
 │   │   ├── CssSnippetsSection.tsx      — Per-vault CSS snippets; sits under the Vault category because snippets are vault data (`data/snippets/<vaultId>/…`), not account data
+│   │   ├── ThemesSection.tsx           — Per-vault Obsidian themes (Vault category); wraps ThemeManager
+│   │   ├── ThemeManager.tsx            — Theme list (radio selection, delete with ConfirmModal), import via file picker / drag & drop, external-host warning; applies the choice locally because `vault:change` excludes the acting user
+│   │   ├── themeImport.ts              — Pure import helpers (pick theme.css/manifest.json, derive a safe theme id, read manifest fields)
 │   │   ├── GitSyncSection.tsx          — Per-vault git-sync: shared local branch + one or more remotes (URL, auth method, interval, SSH deploy key, sync-now, last-run line). Owner only, gated on the `git-sync` toggle
 │   │   ├── MailImportSection.tsx       — Per-vault IMAP mailboxes polled server-side and imported as Markdown notes (host/port/credentials, mailbox tree picker, target folder, interval, import-now). Owner only, gated on `mail-import`
 │   │   ├── syncStatusFormat.ts         — Shared "last run" formatting for both sync sections (git-sync adds `conflict` to the result vocabulary) — one place instead of a verbatim copy in each

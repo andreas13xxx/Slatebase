@@ -45,6 +45,7 @@ These need an open vault; the writable ones are owner-only:
 
 - **Vault Configuration** — Templates directory (default: `Templates`), daily notes directory, attachments directory, "follow active file in explorer"
 - **Plugins** — Install, update and manage Obsidian community plugins (only while the `obsidian-plugin-compat` toggle is on)
+- **Themes** — Choose, import and delete the vault's Obsidian themes — see [[Features/Themes]]
 - **CSS Snippets** — Per-vault custom CSS, uploaded or written in the embedded editor, enabled and disabled individually
 - **Git Sync** — Configure git remotes per vault (only while the `git-sync` toggle is on) — see [[Features/Git Sync]]
 - **Mail Import** — Import IMAP mailboxes as Markdown notes (only while the `mail-import` toggle is on) — see [[Features/Mail Import]]
@@ -141,6 +142,7 @@ The settings panel has a search field that filters sections by keyword. Type to 
 ## Related Features
 
 - [[Advanced/Custom Keybindings]] — Detailed keybinding guide
+- [[Features/Themes]] — Using Obsidian themes
 - [[Features/CSS Snippets]] — Detailed guide to custom per-vault CSS
 - [[Features/Bookmarks]] — Bookmarks view, also reachable via the sidebar
 - [[Features/Vault Management]] — Vault administration
