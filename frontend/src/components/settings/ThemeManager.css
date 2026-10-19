@@ -1,0 +1,123 @@
+/* ===== ThemeManager Styles ===== */
+
+.theme-manager {
+  margin-top: 8px;
+}
+
+.theme-manager__note {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.theme-manager__error {
+  color: #dc3545;
+  font-size: 13px;
+  margin: 4px 0 8px;
+}
+
+.theme-manager__loading,
+.theme-manager__empty {
+  color: var(--text-subtle);
+  font-size: 13px;
+  margin: 8px 0;
+}
+
+.theme-manager__list {
+  border: none;
+  margin: 8px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.theme-manager__legend {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 0;
+  margin-bottom: 6px;
+}
+
+.theme-manager__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-manager__item {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  cursor: pointer;
+}
+
+.theme-manager__name {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.theme-manager__meta {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-subtle);
+  white-space: nowrap;
+}
+
+.theme-manager__action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.theme-manager__action-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.theme-manager__warning {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-basis: 100%;
+  margin: 0 0 2px 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.theme-manager__dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px dashed var(--border-default);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.theme-manager__dropzone:hover,
+.theme-manager__dropzone:focus-visible,
+.theme-manager__dropzone--active {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.theme-manager__file-input {
+  display: none;
+}

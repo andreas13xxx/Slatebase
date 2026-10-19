@@ -74,9 +74,15 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, lint, Tests).
       („X hat .obsidian/appearance.json geändert") bleibt als Hinweis an andere Nutzer bestehen
 
 ## Phase 6 — Settings-UI
-- [ ] 6.1 `ThemeManager.tsx`, `ThemesSection.tsx`, Registry-Eintrag, `de.ts`/`en.ts`
-- [ ] 6.2 Import (Datei-Auswahl, Drag & Drop), Löschen mit Bestätigung, Hinweis zu `externalHosts`
-- [ ] 6.3 `*.test.tsx` und `*.a11y.test.tsx`, `useFocusTrap` in Dialogen
+- [x] 6.1 `ThemeManager.tsx`, `ThemesSection.tsx`, Registry-Eintrag `themes` (Kategorie Vault), Label in
+      `settingsLabels.ts`. Abweichung von R5.1: Die Settings-Oberfläche nutzt durchgehend feste deutsche
+      Texte (`SECTION_LABELS`, `CssSnippetsSection`), nicht `de.ts`/`en.ts`; die neue Sektion folgt diesem Muster
+- [x] 6.2 Import (Datei-Auswahl, Drag & Drop; Name aus `manifest.json` oder Dateiname, Rückfrage vor
+      Überschreiben), Auswahl per Radio mit lokalem Sofort-Effekt (das `vault:change`-Event schließt den
+      Auslöser aus), Löschen mit Bestätigung, Hinweis zu `externalHosts`. Helfer in `themeImport.ts`
+- [x] 6.3 Tests: `themeImport.test.ts`, `ThemeManager.test.tsx`, `ThemeManager.a11y.test.tsx` (axe fand ein
+      verschachteltes interaktives Element, behoben). Dialoge nutzen `ConfirmModal` (bringt den Fokus-Trap mit).
+      Settings-Suite: 13 Dateien, 150 Tests grün
 
 ## Phase 7 — Abnahme und Doku
 - [ ] 7.1 Manuelle Abnahme mit Things und Minimal (Hell/Dunkel), Screenshots vorher/nachher
