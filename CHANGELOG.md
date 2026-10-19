@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.57.0](https://github.com/andreas13xxx/Slatebase/compare/v0.56.0...v0.57.0) (2026-10-19)
+
+
+### Features
+
+* **themes:** Obsidian-Themes aus dem Vault (Stufe 1) ([#251](https://github.com/andreas13xxx/Slatebase/issues/251)) ([acaf235](https://github.com/andreas13xxx/Slatebase/commit/acaf2356b6a2ebfeeb537ee6ac18370229b11c18))
+
 ## [0.56.0](https://github.com/andreas13xxx/Slatebase/compare/v0.55.0...v0.56.0) (2026-10-17)
 
 
