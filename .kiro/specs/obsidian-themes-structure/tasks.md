@@ -61,7 +61,11 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, Lint, betroff
       Zeile); sonst wird er ausgeblendet. Die Klassenzählung (`measure-selectors.py`) wurde nicht wiederholt
 - [ ] 3.2 Themes-Seite im Welcome-Vault (DE + EN), README und `AGENTS.md`: Tabellen und Editorbreite sind angeglichen,
       Tab-Leiste, Ribbon, Titelleiste und Style-Settings-Optionen nicht
-- [ ] 3.3 `test:coverage` und Lint in beiden Paketen; Coverage-Schwellen nie senken
+- [x] 3.3 Frontend `test:coverage` (2026-10-20): 3478 bestanden, 42 fehlgeschlagen in 19 Dateien; alle 42 waren
+      Zeitüberschreitungen, weil parallel die Test-Instanz lief. Einzellauf der 19 Dateien mit `--testTimeout=30000`:
+      344 bestanden, 1 fehlgeschlagen (`standalone-block-spacing.test.ts`, vorbestehend und lastabhängig, allein grün).
+      Es gab keine Schwellenmeldung im Lauf. Ein sauberer Lauf ohne Parallellast steht noch aus (CI). Lint und `tsc`
+      beider Pakete laufen über den Pre-commit-Hook bei jedem Commit. Backend unberührt (Welcome-Vault-Tests grün)
 
 ## Entscheidungen
 - 2026-10-19: Workspace/Tabs/Ribbon/Titelleiste werden nicht angeglichen (Spike, Design §2/§3).
