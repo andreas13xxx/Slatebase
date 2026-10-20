@@ -63,7 +63,9 @@ Slatebase supports **themes that work through Obsidian CSS variables**:
 - Size, weight and color of headings, bold and italic text
 - Line height and editor width
 
-Not supported are **layout changes** that target Obsidian's internal structure (for example custom arrangements of tabs, sidebars or title bars). Themes that rely heavily on this — such as *Minimal* or *AnuPpuccin* — are therefore only partly applied: colors and fonts take effect, the layout stays Slatebase's own. Settings from the *Style Settings* plugin are not evaluated.
+The editor also carries the classes many themes hang their rules on (`mod-cm6`, `is-live-preview`, `is-readable-line-width`, `HyperMD-header`, `HyperMD-codeblock`, `HyperMD-quote`, `HyperMD-task-line`, `cm-inline-code`, `cm-highlight`, `cm-hashtag`). This is why, for example, *Minimal*'s table styling and editor width take effect. The same applies to plugin CSS that targets these classes.
+
+Not supported are **layout changes** that target Obsidian's internal structure (for example custom arrangements of tabs, sidebars or title bars). Themes that rely heavily on this — such as *Minimal* or *AnuPpuccin* — are therefore only partly applied: colors and fonts take effect, the layout stays Slatebase's own (tab bar, sidebars, title bar). Obsidian's reading view does not exist in Slatebase as a separate mode. Settings from the *Style Settings* plugin are not evaluated.
 
 ---
 

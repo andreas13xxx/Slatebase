@@ -116,6 +116,7 @@ Filesystem-based, no database. All under `backend/data/`:
 **Themes**
 - Obsidian themes are vault content (`<vault>/.obsidian/themes/<id>/`), the active one is `cssTheme` in `.obsidian/appearance.json` (shared by everyone using the vault) — not `data/`, not a user preference. Writing `appearance.json` must preserve its other fields and never overwrite a file that is not valid JSON
 - `plugins/appearance/theme-bridge.css` derives Slatebase tokens from Obsidian variables only behind `:root[data-obsidian-theme]`, declared on `body` (themes set variables there; compat variables sit on `:root`, which is also why there is no cycle). Never bind Obsidian variables in base CSS — their defaults differ from ours and the look without a theme must not change
+- The editor carries Obsidian marker classes next to its own (`mod-cm6`, `is-live-preview`, `is-readable-line-width` on the area in `CodeMirrorEditor.tsx`; `cm-s-obsidian`; `HyperMD-*`/`cm-inline-code`/`cm-highlight`/`cm-hashtag`/`cm-formatting` on the Live Preview decorations). They are for themes and plugin CSS only: no app CSS may select them (`CodeMirrorEditor.obsidianClasses.test.tsx` enforces it). Workspace, tab, ribbon and title-bar classes are deliberately not aligned (measured: no effect) — see `.kiro/specs/obsidian-themes-structure/`
 - `--text-muted` belongs to the Obsidian compat layer; Slatebase's dimmed text is `--text-subtle`. Don't reintroduce `--text-muted` in app CSS
 
 **Plugin compat**
