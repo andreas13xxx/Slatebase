@@ -44,7 +44,11 @@ geprüft hat.
 1.1 Der Abschnitt **Themes** bekommt zwei Tabs: **Installiert** (heutige Ansicht mit Import) und **Entdecken** (Katalog).
 1.2 Der Backend-Server lädt `community-css-themes.json`, validiert jeden Eintrag (`repo` muss `owner/repo` sein, `name`
     nicht leer, `modes` Teilmenge von `dark`/`light`) und überspringt fehlerhafte Einträge mit einer Warnung im Log.
-1.3 Die Liste wird serverseitig gecacht (TTL 1 Stunde, wie der Plugin-Katalog). Schlägt der Abruf fehl, liefert der Server
+1.3 Der Server **wärmt den Katalog beim Start vor** (Entscheidung 2026-10-20): ein einmaliger, nicht blockierender Abruf
+    nach dem Start, nur wenn das Feature eingeschaltet ist. Scheitert er (offline), läuft der Server normal weiter, loggt
+    eine Warnung und startet mit dem persistierten Stand; es gibt keine Wiederholungsschleife, der nächste Abruf erfolgt
+    beim ersten Öffnen von „Entdecken" nach Ablauf der TTL.
+    Die Liste wird serverseitig gecacht (TTL 1 Stunde, wie der Plugin-Katalog). Schlägt der Abruf fehl, liefert der Server
     den letzten gültigen Stand; ohne Cache eine Fehlermeldung mit Grund. Ein fehlgeschlagener Abruf ist „unbekannt", nie
     „leer".
 1.4 Pro Eintrag zeigt die Oberfläche Name, Autor, unterstützte Modi (Hell/Dunkel) und, falls installiert, die
@@ -61,7 +65,13 @@ geprüft hat.
 2.3 Filter **Installiert** und **Update verfügbar**.
 2.4 Gesamtzahl und Zahl der Treffer sind sichtbar; leere Ergebnisse zeigen „Keine Themes gefunden" mit
     „Filter zurücksetzen".
-2.5 Die Liste ist virtualisiert oder paginiert (910 Einträge); die Filterung läuft im Client auf dem geladenen Katalog.
+2.5 Die Liste lädt **unendlich nach** (Entscheidung 2026-10-20): Zunächst werden 24 Karten gerendert, beim Scrollen
+    kommen weitere 24 hinzu (`IntersectionObserver`). Die Filterung läuft im Client auf dem vollständig geladenen Katalog;
+    ein Filterwechsel setzt die Liste auf die ersten 24 zurück.
+2.6 Unendliches Scrollen bleibt zugänglich: Unter der Liste steht immer die Schaltfläche **„Mehr laden"** (tastaturbedienbar,
+    der Observer löst nur dieselbe Aktion aus), der Zähler „24 von 310 angezeigt" ist ein `aria-live`-Bereich, und der
+    Fokus springt beim Nachladen nicht. Bei `prefers-reduced-motion` und ohne `IntersectionObserver` greift nur die
+    Schaltfläche.
 
 ### R3 — Installieren
 3.1 „Installieren" ruft eine Vault-Route auf (`POST /vaults/:vaultId/theme-store/install`, Body `{ "repo": "owner/repo" }`);
@@ -114,7 +124,7 @@ geprüft hat.
 
 ### R7 — Berechtigung, Feature-Gate, Betrieb
 7.1 Katalog lesen darf jeder angemeldete Nutzer; Installieren und Aktualisieren braucht Schreibzugriff auf den Vault.
-7.2 Das Feature hängt an einem **eigenen** Feature-Toggle (`obsidian-theme-store`, Standard: an), weil es als einziges
+7.2 Abschalten geschieht **nur serverweit** (Entscheidung 2026-10-20), nicht pro Vault. Das Feature hängt an einem **eigenen** Feature-Toggle (`obsidian-theme-store`, Standard: an), weil es als einziges
     Theme-Feature ausgehenden Netzverkehr auslöst. Aus: Tab „Entdecken" und alle `theme-store`-Routen entfallen
     (`createFeatureGuard`, Eintrag `feature:` in der Settings-Registry).
 7.3 Ohne Internetzugang (Offline-Betrieb) bleibt der Tab „Installiert" voll nutzbar; „Entdecken" zeigt, dass der Katalog

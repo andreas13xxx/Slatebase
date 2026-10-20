@@ -29,6 +29,9 @@ Import tut. Aktivierung, Anzeige, Löschen und `vault:change`-Ereignisse bleiben
 | Automatischer Check? | **Nein** | Offline-Betrieb und Datenschutz; nur auf Klick (R4.6) |
 | Screenshots | **Über den Server**, nicht direkt vom Browser | Der Browser würde sonst bei jedem Öffnen von „Entdecken" bis zu 900 Anfragen an GitHub schicken und dabei IP und Referrer preisgeben |
 | Feature-Gate | Eigener Toggle `obsidian-theme-store` (Standard an, `cold`) | Einziges Theme-Feature mit ausgehendem Netzverkehr; ein Betreiber ohne Außenzugriff schaltet es ab, ohne Themes zu verlieren |
+| Katalog beim Start laden? | **Ja, vorwärmen** (einmalig, nicht blockierend, nur bei eingeschaltetem Feature) | Entscheidung 2026-10-20. Das erste Öffnen von „Entdecken" ist sofort fertig. Kosten: ein ausgehender Abruf pro Start, auch wenn nie jemand den Store öffnet; offline scheitert er leise (Warnung, persistierter Stand), ohne Wiederholungen |
+| Liste: Seiten oder unendlich? | **Unendliches Scrollen** in Schritten von 24, mit Schaltfläche „Mehr laden" als gleichwertigem Weg | Entscheidung 2026-10-20. Die Schaltfläche hält Tastatur und Screenreader nutzbar |
+| Abschalten | **Nur serverweit** über den Feature-Toggle | Entscheidung 2026-10-20 |
 | Katalog-Quelle konfigurierbar? | Nein, fest `obsidianmd/obsidian-releases` | Nicht-Ziel; spart SSRF-Fläche |
 
 ## 3. Backend
@@ -101,8 +104,12 @@ abgesichert. Der Eintrag in `VAULT-ROUTE-AUTHORIZATION.md` nennt die neuen Pfade
   „Installiert" sofort nach dem Installieren stimmt. Filter sind reiner Sitzungszustand und werden nicht gespeichert.
 - **Modus-Filter:** Voreinstellung aus dem Farbmodus des Nutzers (`body.theme-light/dark`); der Nutzer kann auf „Alle"
   wechseln.
-- **Liste:** Kartenraster mit Paginierung (24 pro Seite) statt Virtualisierung: Ein Raster mit Bildern ist mit Seiten
-  einfacher zugänglich und tastaturfreundlich. Bilder `loading="lazy"`.
+- **Liste:** Kartenraster mit unendlichem Nachladen: 24 Karten sichtbar, ein Beobachter (`IntersectionObserver`) am Listenende
+  rendert 24 weitere; es werden nur Karten gerendert, die Daten liegen komplett im Speicher (910 Einträge, wenige KB).
+  Gleichwertiger Weg ist die Schaltfläche „Mehr laden" unter der Liste; der Zähler „24 von 310 angezeigt" ist
+  `aria-live="polite"`. Beim Nachladen wandert der Fokus nicht. Ohne `IntersectionObserver` oder bei
+  `prefers-reduced-motion` gibt es nur die Schaltfläche. Ein Filterwechsel setzt auf die ersten 24 zurück. Bilder
+  `loading="lazy"`.
 - **Rückfrage vor Ersetzen:** `useFocusTrap`, wie beim Import-Überschreiben.
 - **Hinweis zum Fremd-CSS:** einmalig vor der ersten Installation pro Browser (nur Hinweis, kein Gate); der Merker liegt
   als `localStorage`-**Cache**, nicht als Einstellung (reiner Komfort, Projektregel „localStorage ist Cache").
@@ -134,12 +141,9 @@ abgesichert. Der Eintrag in `VAULT-ROUTE-AUTHORIZATION.md` nennt die neuen Pfade
 - **Datenschutz-Check:** im Netzwerkprotokoll des Browsers dürfen beim Öffnen von „Entdecken" keine Anfragen an GitHub
   auftauchen, nur an den eigenen Server.
 
-## 7. Offene Fragen
+## 7. Offene Fragen und Entscheidungen
 
-- Soll der Katalog-Abruf beim Serverstart vorgewärmt werden, oder erst beim ersten Öffnen von „Entdecken"? (Vorschlag:
-  erst beim ersten Öffnen, damit der Server im Offline-Betrieb keinen Verbindungsversuch macht.)
-- Reicht seitenweise Anzeige (24 pro Seite), oder wünscht ihr „unendliches Scrollen"?
-- Dürfen Administratoren den Store pro Server abschalten **und** zusätzlich pro Vault? (Vorschlag: nur serverweit über
-  den Feature-Toggle.)
+Entschieden am 2026-10-20: Katalog beim Start vorwärmen, unendliches Scrollen, Abschalten nur serverweit (siehe §2).
+
 - Der Plugin-Store schickt das GitHub-Token an alle Hosts. Das ist ein eigenes Thema; hier nur erwähnt, nicht Teil
   dieser Spec.

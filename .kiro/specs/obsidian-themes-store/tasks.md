@@ -17,6 +17,8 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, Lint, betroff
 - [ ] 1.2 `theme-store/{types,errors,validation}.ts` + Tests (Repo-Regex, Pfadnormalisierung, SemVer-Vergleich)
 - [ ] 1.3 `theme-store-client.ts` (Katalog, Dateien, Screenshot) + Tests
 - [ ] 1.4 `theme-store-cache.ts` über `JsonFileStore` (Katalog persistiert, Rest im Speicher) + Tests
+- [ ] 1.5 Vorwärmen: nicht blockierender Abruf nach dem Start, nur bei eingeschaltetem Feature; Fehlschlag = Warnung im Log
+      und persistierter Stand, keine Wiederholungsschleife; Test, dass ein Fehlschlag den Start nicht verzögert
 
 ## Phase 2 — Service, Routen, Feature-Gate
 - [ ] 2.1 `theme-store-service.ts`: `listCatalog`, `install`, `checkUpdates`, `screenshot` + Tests (Ersetzen, 409,
@@ -28,7 +30,7 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, Lint, betroff
 ## Phase 3 — Frontend
 - [ ] 3.1 `api/index.ts`: `listStoreThemes`, `installStoreTheme`, `checkStoreThemeUpdates`, Screenshot-URL
 - [ ] 3.2 `themeStoreFilter.ts` + Tests
-- [ ] 3.3 `ThemeStoreBrowser` und `ThemeStoreCard` (Tabs im `ThemeManager`, Paginierung, Modus-Voreinstellung,
+- [ ] 3.3 `ThemeStoreBrowser` und `ThemeStoreCard` (Tabs im `ThemeManager`, unendliches Nachladen mit Schaltfläche „Mehr laden", Modus-Voreinstellung,
       Ersetzen-Rückfrage mit `useFocusTrap`, Offline-/Fehlerzustände)
 - [ ] 3.4 Feature-Gate in `settingsRegistry.ts` (`feature:`), Tab entfällt bei ausgeschaltetem Feature
 - [ ] 3.5 Tests und `*.a11y.test.tsx`
@@ -51,3 +53,5 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, Lint, betroff
   Token (siehe Design §2).
 - 2026-10-20: Zuordnung installierter Themes zum Katalog über den Namen, keine Zusatzdatei im Vault.
 - 2026-10-20: Kein automatischer Update-Check; Screenshots nur über den Server.
+- 2026-10-20: Katalog beim Start vorwärmen (nicht blockierend), unendliches Scrollen mit Schaltfläche „Mehr laden",
+  Abschalten nur serverweit.
