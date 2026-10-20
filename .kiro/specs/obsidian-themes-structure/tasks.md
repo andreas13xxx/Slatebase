@@ -52,7 +52,13 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, Lint, betroff
   statt zu markieren
 
 ## Phase 3 — Abnahme und Doku
-- [ ] 3.1 Messung und Sonden wiederholen; Zahlen hier eintragen
+- [x] 3.1 Wirkungsprobe wiederholt (2026-10-20, isolierte Instanz, Welcome-Vault mit Probe-Notiz: Überschriften 1–6,
+      Inline-Code, Markierung, Tag, Zitat, Codeblock, Aufgaben, Tabelle). Alle Klassen stehen nativ im DOM
+      (`HyperMD-header` 6, `-header-1`/`-6` je 1, `cm-inline-code`, `cm-highlight`, `cm-hashtag`, `HyperMD-quote` je 1,
+      `HyperMD-codeblock` 3 mit je einem `-begin`/`-end`, `HyperMD-task-line` 2). Editor-Sonde: **Minimal 0 von 105,
+      Things 0 von 105** geänderte Elemente, d. h. die Klassen verändern nichts, was Phase 1 nicht schon bewirkt hat.
+      Ausnahme: `cm-formatting` am Überschriften-Marker erscheint nur, solange der Marker sichtbar ist (Cursor in der
+      Zeile); sonst wird er ausgeblendet. Die Klassenzählung (`measure-selectors.py`) wurde nicht wiederholt
 - [ ] 3.2 Themes-Seite im Welcome-Vault (DE + EN), README und `AGENTS.md`: Tabellen und Editorbreite sind angeglichen,
       Tab-Leiste, Ribbon, Titelleiste und Style-Settings-Optionen nicht
 - [ ] 3.3 `test:coverage` und Lint in beiden Paketen; Coverage-Schwellen nie senken
