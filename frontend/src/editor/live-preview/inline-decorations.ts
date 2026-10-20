@@ -59,7 +59,7 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
 
         // Line decoration for heading font size
         decorations.push(
-          Decoration.line({ attributes: { class: `cm-lp-h${level}` } }).range(line.from)
+          Decoration.line({ attributes: { class: `cm-lp-h${level} HyperMD-header HyperMD-header-${level}` } }).range(line.from)
         )
 
         // Find HeaderMark child nodes and add marker decorations + hideable ranges
@@ -72,7 +72,7 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
 
               // Mark the header marker characters with a specific class
               decorations.push(
-                Decoration.mark({ class: 'cm-lp-heading-marker' }).range(markFrom, markTo)
+                Decoration.mark({ class: 'cm-lp-heading-marker cm-formatting' }).range(markFrom, markTo)
               )
 
               // Hide the marker (# characters + trailing space)
@@ -192,16 +192,27 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
         )
 
         // Find the backtick markers via child nodes (CodeMark)
+        const marks: { from: number; to: number }[] = []
         const cursor = node.node.cursor()
         if (cursor.firstChild()) {
           do {
             if (cursor.name === 'CodeMark') {
+              marks.push({ from: cursor.from, to: cursor.to })
               hideableRanges.push({ from: cursor.from, to: cursor.to, groupFrom: from, groupTo: to })
               decorations.push(
                 Decoration.replace({}).range(cursor.from, cursor.to)
               )
+              // Obsidian parity: backticks are formatting, only the content between them is inline code
+              decorations.push(
+                Decoration.mark({ class: 'cm-formatting cm-formatting-code' }).range(cursor.from, cursor.to)
+              )
             }
           } while (cursor.nextSibling())
+        }
+        const contentFrom = marks.length >= 2 ? marks[0]!.to : from
+        const contentTo = marks.length >= 2 ? marks[marks.length - 1]!.from : to
+        if (contentFrom < contentTo) {
+          decorations.push(Decoration.mark({ class: 'cm-inline-code' }).range(contentFrom, contentTo))
         }
       }
     }
@@ -296,7 +307,7 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
       const inner = docText.slice(contentFrom, contentTo)
       const { color } = matchHighlightColor(inner)
       decorations.push(
-        Decoration.mark({ class: `cm-lp-highlight cm-lp-hl-${color}` }).range(contentFrom, contentTo)
+        Decoration.mark({ class: `cm-lp-highlight cm-lp-hl-${color} cm-highlight` }).range(contentFrom, contentTo)
       )
 
       // Opening marker ==
@@ -337,7 +348,7 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
 
     // Mark the entire tag (#value) with the tag class
     decorations.push(
-      Decoration.mark({ class: 'cm-lp-tag' }).range(fullFrom, fullTo)
+      Decoration.mark({ class: 'cm-lp-tag cm-hashtag' }).range(fullFrom, fullTo)
     )
   }
 

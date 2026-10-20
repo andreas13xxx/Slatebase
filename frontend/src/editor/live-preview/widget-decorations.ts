@@ -1915,6 +1915,9 @@ export function buildWidgetDecorations(
             Decoration.replace({ widget }).range(bracketFrom, bracketTo)
           )
           hideableRanges.push({ from: bracketFrom, to: bracketTo, groupFrom: bracketFrom, groupTo: bracketTo })
+          decorations.push(
+            Decoration.line({ attributes: { class: 'HyperMD-task-line' } }).range(line.from)
+          )
         }
       }
 
@@ -1992,10 +1995,10 @@ export function buildWidgetDecorations(
           const line = doc.line(lineNum)
           const isFirst = lineNum === startLine.number
           const isLast = lineNum === endLine.number
-          let lineClass = 'cm-lp-code-block-line'
+          let lineClass = 'cm-lp-code-block-line HyperMD-codeblock HyperMD-codeblock-bg'
 
-          if (isFirst) lineClass += ' cm-lp-code-block-first'
-          if (isLast) lineClass += ' cm-lp-code-block-last'
+          if (isFirst) lineClass += ' cm-lp-code-block-first HyperMD-codeblock-begin'
+          if (isLast) lineClass += ' cm-lp-code-block-last HyperMD-codeblock-end'
           if (language) lineClass += ` cm-lp-code-lang-${language}`
 
           decorations.push(
@@ -2128,7 +2131,7 @@ export function buildWidgetDecorations(
           for (let lineNum = startLine.number; lineNum <= endLine.number; lineNum++) {
             const line = doc.line(lineNum)
             decorations.push(
-              Decoration.line({ attributes: { class: 'cm-lp-blockquote' } }).range(line.from)
+              Decoration.line({ attributes: { class: 'cm-lp-blockquote HyperMD-quote' } }).range(line.from)
             )
 
             // Hide the "> " prefix

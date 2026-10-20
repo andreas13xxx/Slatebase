@@ -68,6 +68,9 @@ function isPasteableFile(file: File): boolean {
  */
 const externalContentSync = Annotation.define<boolean>()
 
+/** Obsidian marker classes the editor puts on its area (`mod-cm6`, plus the two that follow props). */
+const OBSIDIAN_EDITOR_AREA_CLASSES = ['mod-cm6', 'is-live-preview', 'is-readable-line-width'] as const
+
 /**
  * Props for the CodeMirror 6 editor component.
  * Replaces the <textarea> in EditMode with a full CM6 EditorView.
@@ -309,6 +312,9 @@ export function CodeMirrorEditor({
       }),
       createSlatebaseTheme(),
       createSlatebaseHighlightStyle(),
+      // Obsidian's marker class on the editor root (`.cm-editor.cm-s-obsidian`); themes key rules on it.
+      // No Slatebase CSS targets it — see OBSIDIAN_EDITOR_AREA_CLASSES below for the container classes.
+      EditorView.editorAttributes.of({ class: 'cm-s-obsidian' }),
       EditorView.lineWrapping,
       // Multi-cursor support — off by default in CM6. Needed for Obsidian's
       // editor:add-cursor-above/below core commands (see core-commands.ts);
@@ -645,6 +651,30 @@ export function CodeMirrorEditor({
     if (!view) return
     view.dispatch({ effects: setEditorLivePreview.of(livePreview) })
   }, [livePreview])
+
+  // Obsidian marker classes on the editor area (the container that already carries `markdown-source-view`).
+  // Themes key rules on them — Minimal's table and editor-width rules hang on `.markdown-source-view.mod-cm6`
+  // and `.mod-cm6.is-readable-line-width` — but nothing in Slatebase's own CSS targets them, so they change
+  // nothing without a theme. The element is owned by EditMode's markup, so the classes are toggled
+  // imperatively (like `markdown-source-view` in the mount effect) and removed again on cleanup.
+  useEffect(() => {
+    const area = containerRef.current?.parentElement
+    if (!area) return
+    area.classList.add('mod-cm6')
+    return () => {
+      area.classList.remove(...OBSIDIAN_EDITOR_AREA_CLASSES)
+    }
+  }, [tabId])
+
+  // The two state-dependent classes follow their props without touching `mod-cm6`, so a setting toggle never
+  // shows a transient removal to class observers. `tabId` is a dependency because the effect above clears all
+  // three classes when the tab changes.
+  useEffect(() => {
+    const area = containerRef.current?.parentElement
+    if (!area) return
+    area.classList.toggle('is-live-preview', livePreview)
+    area.classList.toggle('is-readable-line-width', readableLineLength)
+  }, [tabId, livePreview, readableLineLength])
 
   // Expose imperative handle
   useImperativeHandle(editorRef, () => ({
