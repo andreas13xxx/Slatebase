@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.58.0](https://github.com/andreas13xxx/Slatebase/compare/v0.57.0...v0.58.0) (2026-10-20)
+
+
+### Features
+
+* **themes:** Obsidian-Editor-Klassen für Themes (Stufe 2) ([#253](https://github.com/andreas13xxx/Slatebase/issues/253)) ([b67f6d5](https://github.com/andreas13xxx/Slatebase/commit/b67f6d584fd15e6526d2080feb9bbfd55431f891))
+
 ## [0.57.0](https://github.com/andreas13xxx/Slatebase/compare/v0.56.0...v0.57.0) (2026-10-19)
 
 
