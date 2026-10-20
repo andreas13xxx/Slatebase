@@ -98,8 +98,7 @@ abgesichert. Der Eintrag in `VAULT-ROUTE-AUTHORIZATION.md` nennt die neuen Pfade
 | `api/index.ts` | `listStoreThemes`, `installStoreTheme`, `checkStoreThemeUpdates`; `storeThemeScreenshotUrl(repo)` baut nur die URL |
 
 - **Zustand:** lokal im Browser-Component; installierte Themes kommen aus dem vorhandenen `ThemeManager`-State, damit
-  „Installiert" sofort nach dem Installieren stimmt. Keine Persistenz außer dem Filter „Veraltete anzeigen" (nein, nicht
-  einmal das: Filter sind Sitzungszustand).
+  „Installiert" sofort nach dem Installieren stimmt. Filter sind reiner Sitzungszustand und werden nicht gespeichert.
 - **Modus-Filter:** Voreinstellung aus dem Farbmodus des Nutzers (`body.theme-light/dark`); der Nutzer kann auf „Alle"
   wechseln.
 - **Liste:** Kartenraster mit Paginierung (24 pro Seite) statt Virtualisierung: Ein Raster mit Bildern ist mit Seiten
@@ -139,7 +138,7 @@ abgesichert. Der Eintrag in `VAULT-ROUTE-AUTHORIZATION.md` nennt die neuen Pfade
 
 - Soll der Katalog-Abruf beim Serverstart vorgewärmt werden, oder erst beim ersten Öffnen von „Entdecken"? (Vorschlag:
   erst beim ersten Öffnen, damit der Server im Offline-Betrieb keinen Verbindungsversuch macht.)
-- Reicht Seitenweise Anzeige (24 pro Seite), oder wünscht ihr „unendliches Scrollen"?
+- Reicht seitenweise Anzeige (24 pro Seite), oder wünscht ihr „unendliches Scrollen"?
 - Dürfen Administratoren den Store pro Server abschalten **und** zusätzlich pro Vault? (Vorschlag: nur serverweit über
   den Feature-Toggle.)
 - Der Plugin-Store schickt das GitHub-Token an alle Hosts. Das ist ein eigenes Thema; hier nur erwähnt, nicht Teil
