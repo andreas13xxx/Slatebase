@@ -48,8 +48,16 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, Lint, betroff
 - [x] 2.3 Tests (`live-preview/obsidian-classes.test.ts`, 11) pro Klasse am erzeugten Decoration-Set; der
       „keine eigene Regel"-Test deckt jetzt alle 12 Klassen ab. Wirkungsprobe in der laufenden Anwendung noch **nicht**
       wiederholt (Phase 3.1)
-- Nicht umgesetzt: `cm-formatting` an weiteren Markern (Listen-, Zitat-, Emphasis-Zeichen), weil Slatebase sie ausblendet
-  statt zu markieren
+- Review-Nachtrag (PR #253): Inline-Code trennt jetzt wie Obsidian: `cm-inline-code` nur am Inhalt, die Backticks tragen
+  `cm-formatting cm-formatting-code` (vorher lag `cm-inline-code` auch auf den Backticks und hätte bei Themes mit
+  Hintergrund auf `.cm-inline-code` die Zeichen mitgemalt). `cm-lp-inline-code` bleibt auf dem ganzen Bereich
+
+### Bekannte Grenzen (bewusst nicht umgesetzt)
+- `cm-formatting` steht nur an Überschriften-Markern und Backticks, nicht an Fett-, Kursiv-, `==`-, Listen- und
+  Zitatzeichen; Slatebase blendet diese aus, sie bräuchten eigene Mark-Decorations.
+- Im Quellmodus gibt es keine `HyperMD-*`-Klassen, weil sie an den Live-Preview-Decorations hängen; `mod-cm6` und
+  `cm-s-obsidian` stehen dort schon. Regeln, die `.mod-cm6` mit `.HyperMD-*` kombinieren, greifen im Quellmodus nicht.
+- Wirkung ist nur an Minimal und Things gemessen; andere Themes können auf diese Lücken anders reagieren.
 
 ## Phase 3 — Abnahme und Doku
 - [x] 3.1 Wirkungsprobe wiederholt (2026-10-20, isolierte Instanz, Welcome-Vault mit Probe-Notiz: Überschriften 1–6,

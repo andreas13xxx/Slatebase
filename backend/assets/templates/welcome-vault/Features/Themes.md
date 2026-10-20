@@ -63,7 +63,7 @@ Slatebase unterstützt **Themes, die über Obsidian-CSS-Variablen arbeiten**:
 - Größe, Gewicht und Farbe der Überschriften, fetter und kursiver Text
 - Zeilenhöhe und Breite des Editors
 
-Außerdem trägt der Editor die Klassen, an denen viele Themes ihre Regeln festmachen (`mod-cm6`, `is-live-preview`, `is-readable-line-width`, `HyperMD-header`, `HyperMD-codeblock`, `HyperMD-quote`, `HyperMD-task-line`, `cm-inline-code`, `cm-highlight`, `cm-hashtag`). Dadurch greifen zum Beispiel Tabellenstil und Editorbreite von *Minimal*. Dasselbe gilt für CSS von Plugins, das diese Klassen anspricht.
+Außerdem trägt der Editor die Klassen, an denen viele Themes ihre Regeln festmachen (`mod-cm6`, `is-live-preview`, `is-readable-line-width`, `HyperMD-header`, `HyperMD-codeblock`, `HyperMD-quote`, `HyperMD-task-line`, `cm-inline-code`, `cm-highlight`, `cm-hashtag`). Dadurch greifen zum Beispiel Tabellenstil und Editorbreite von *Minimal*. Dasselbe gilt für CSS von Plugins, das diese Klassen anspricht. Die Zeilen- und Elementklassen (`HyperMD-*`, `cm-*`) gibt es nur in der Live Preview, nicht im Quellmodus, und `cm-formatting` nur an Überschriften und Code-Zeichen.
 
 Nicht unterstützt sind **Layout-Anpassungen**, die auf Obsidians interne Struktur zielen (zum Beispiel eigene Anordnungen von Tabs, Seitenleisten oder Titelzeilen). Themes, die stark darauf aufbauen — etwa *Minimal* oder *AnuPpuccin* — werden deshalb nur teilweise umgesetzt: Farben und Schriften greifen, das Layout bleibt das von Slatebase (Tab-Leiste, Seitenleisten, Titelzeile). Die Leseansicht von Obsidian gibt es in Slatebase nicht als eigenen Modus. Einstellungen des Plugins *Style Settings* werden nicht ausgewertet.
 

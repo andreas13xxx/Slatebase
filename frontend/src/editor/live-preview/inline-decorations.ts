@@ -188,20 +188,31 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
 
         // Mark the full range with inline-code class (including backticks for styling)
         decorations.push(
-          Decoration.mark({ class: 'cm-lp-inline-code cm-inline-code' }).range(from, to)
+          Decoration.mark({ class: 'cm-lp-inline-code' }).range(from, to)
         )
 
         // Find the backtick markers via child nodes (CodeMark)
+        const marks: { from: number; to: number }[] = []
         const cursor = node.node.cursor()
         if (cursor.firstChild()) {
           do {
             if (cursor.name === 'CodeMark') {
+              marks.push({ from: cursor.from, to: cursor.to })
               hideableRanges.push({ from: cursor.from, to: cursor.to, groupFrom: from, groupTo: to })
               decorations.push(
                 Decoration.replace({}).range(cursor.from, cursor.to)
               )
+              // Obsidian parity: backticks are formatting, only the content between them is inline code
+              decorations.push(
+                Decoration.mark({ class: 'cm-formatting cm-formatting-code' }).range(cursor.from, cursor.to)
+              )
             }
           } while (cursor.nextSibling())
+        }
+        const contentFrom = marks.length >= 2 ? marks[0]!.to : from
+        const contentTo = marks.length >= 2 ? marks[marks.length - 1]!.from : to
+        if (contentFrom < contentTo) {
+          decorations.push(Decoration.mark({ class: 'cm-inline-code' }).range(contentFrom, contentTo))
         }
       }
     }

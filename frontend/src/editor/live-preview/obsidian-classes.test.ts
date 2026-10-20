@@ -45,9 +45,21 @@ describe('Obsidian parity classes in Live Preview', () => {
     const line = 'a `code` ==mark== #tag'
     const state = makeState(line)
     const cls = classesOn(state, buildInlineDecorations(state).decorations, line)
-    for (const c of ['cm-lp-inline-code', 'cm-inline-code', 'cm-lp-highlight', 'cm-highlight', 'cm-lp-tag', 'cm-hashtag']) {
+    for (const c of ['cm-lp-inline-code', 'cm-inline-code', 'cm-formatting-code', 'cm-lp-highlight', 'cm-highlight', 'cm-lp-tag', 'cm-hashtag']) {
       expect(cls, c).toContain(c)
     }
+  })
+
+  it('inline code: only the content carries cm-inline-code, the backticks carry cm-formatting-code', () => {
+    const state = makeState('a `code` b')
+    const decos = buildInlineDecorations(state).decorations
+    const withClass = (cls: string) =>
+      decos
+        .filter((d) => ((d.value.spec as { class?: string }).class ?? '').split(' ').includes(cls))
+        .map((d) => state.doc.sliceString(d.from, d.to))
+    expect(withClass('cm-inline-code')).toEqual(['code'])
+    expect(withClass('cm-formatting-code')).toEqual(['`', '`'])
+    expect(withClass('cm-lp-inline-code')).toEqual(['`code`'])
   })
 
   it('fenced code lines get HyperMD-codeblock(-bg) and begin/end on the first and last line', () => {
