@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import { CodeMirrorEditor } from './CodeMirrorEditor'
 
@@ -64,6 +64,16 @@ describe('CodeMirrorEditor Obsidian marker classes', () => {
     expect(container.querySelector('.cm-editor-wrapper')?.classList.contains('cm-full-width')).toBe(true)
   })
 
+  it('never removes mod-cm6 while a setting toggles', () => {
+    const { update } = renderEditor({ livePreview: false })
+    const remove = vi.spyOn(DOMTokenList.prototype, 'remove')
+    update({ livePreview: true, readableLineLength: false })
+    update({ livePreview: false, readableLineLength: true })
+    const removedModCm6 = remove.mock.calls.some((args) => args.includes('mod-cm6'))
+    remove.mockRestore()
+    expect(removedModCm6).toBe(false)
+  })
+
   it('keeps the classes when only the mode changes (no flicker of mod-cm6)', () => {
     const { area, update } = renderEditor({ livePreview: false })
     update({ livePreview: true })
@@ -91,7 +101,7 @@ describe('Slatebase CSS does not target the Obsidian marker classes', () => {
     'cm-inline-code', 'cm-highlight', 'cm-hashtag', 'cm-formatting',
   ]
 
-  /** Lists app CSS files; `plugins/compat/` is Obsidian compat CSS for plugin DOM and is checked separately. */
+  /** Lists every CSS file under `src`, `plugins/compat/` included: no compat rule may target these classes either. */
   function cssFiles(dir: string, out: string[] = []): string[] {
     for (const name of readdirSync(dir)) {
       const path = join(dir, name)

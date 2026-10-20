@@ -661,11 +661,19 @@ export function CodeMirrorEditor({
     const area = containerRef.current?.parentElement
     if (!area) return
     area.classList.add('mod-cm6')
-    area.classList.toggle('is-live-preview', livePreview)
-    area.classList.toggle('is-readable-line-width', readableLineLength)
     return () => {
       area.classList.remove(...OBSIDIAN_EDITOR_AREA_CLASSES)
     }
+  }, [tabId])
+
+  // The two state-dependent classes follow their props without touching `mod-cm6`, so a setting toggle never
+  // shows a transient removal to class observers. `tabId` is a dependency because the effect above clears all
+  // three classes when the tab changes.
+  useEffect(() => {
+    const area = containerRef.current?.parentElement
+    if (!area) return
+    area.classList.toggle('is-live-preview', livePreview)
+    area.classList.toggle('is-readable-line-width', readableLineLength)
   }, [tabId, livePreview, readableLineLength])
 
   // Expose imperative handle
