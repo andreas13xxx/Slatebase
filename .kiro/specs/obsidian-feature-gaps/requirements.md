@@ -50,10 +50,13 @@ Andreas zur Umsetzung freigegeben hat. Entscheidungen des Abgleichs:
 - Canvas kann bereits Link-Nodes mit iframe (`LinkNodeRenderer.tsx`); hier als allgemeiner
   Viewer-Tab. Sicherheitsrahmen: CSP `frame-src 'self' https:` ist bereits gesetzt.
 
-### R5 — Bases List-View
-- Als Benutzer möchte ich einen `.base` zusätzlich als flache Listen-Ansicht (`type: list`) sehen.
-- Dritter eingebauter View-Typ neben `table`/`cards`. `BUILT_IN_VIEW_TYPES` in `BasesView.tsx`
-  erweitern; nutzt dieselbe Query-Pipeline.
+### R5 — Bases List-View ✅ ERLEDIGT (Branch feature/obsidian-feature-gaps)
+- Umgesetzt: dritter eingebauter View-Typ `list` neben `table`/`cards`. `BasesListView.tsx`
+  rendert eine flache Liste (ein Eintrag pro Notiz, Dateiname als Titel + konfigurierte Spalten
+  als Chips, Formelspalten read-only ausgewertet, Gesamt-Summaries als Kopfzeile). `list` in
+  `BUILT_IN_VIEW_TYPES` ergänzt, `isListView`-Branch in `BasesView.tsx`, dieselbe Query-Pipeline
+  (`runBaseQuery`) und Formel-Sortierung (`displayRows`) wie die Tabelle — keine neue Dependency.
+  5 Tests (`BasesListView.test.tsx`).
 
 ### R6 — Bases Map-View (Geo)
 - Als Benutzer möchte ich `.base`-Zeilen mit Geo-Koordinaten-Properties auf einer Karte sehen

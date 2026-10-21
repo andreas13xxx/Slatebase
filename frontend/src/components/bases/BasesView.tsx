@@ -27,6 +27,7 @@ import { hasBasesViewRegistration } from '../../plugins/compat/bases-view-regist
 import { ErrorBoundary } from '../ErrorBoundary'
 import { BasesTableView } from './BasesTableView'
 import { BasesKanbanView } from './BasesKanbanView'
+import { BasesListView } from './BasesListView'
 import { BasesSourceView } from './BasesSourceView'
 import { BasesPluginViewHost } from './BasesPluginViewHost'
 import { deriveBaseScopeFolder, buildBlankFrontmatter, resolveNewNotePath } from './base-add-item'
@@ -68,12 +69,13 @@ export const BasesView = memo(function BasesView({
   // A view whose `type` a plugin registered renders via the plugin host; the
   // built-in types (`table`, `cards`) and any other unregistered type render
   // in-app. An errored plugin view falls back to the built-in table.
-  const BUILT_IN_VIEW_TYPES = useMemo(() => new Set(['table', 'cards']), [])
+  const BUILT_IN_VIEW_TYPES = useMemo(() => new Set(['table', 'cards', 'list']), [])
   const isPluginView = useMemo(
     () => !!activeView && !BUILT_IN_VIEW_TYPES.has(activeView.type) && hasBasesViewRegistration(activeView.type) && !pluginViewError,
     [activeView, pluginViewError, BUILT_IN_VIEW_TYPES],
   )
   const isKanbanView = !!activeView && activeView.type === 'cards' && !isPluginView
+  const isListView = !!activeView && activeView.type === 'list' && !isPluginView
 
   // Formula columns are not sortable server-side (buildQuerySpec drops them),
   // so when the active view's first sort clause targets a formula column we
@@ -328,7 +330,16 @@ export const BasesView = memo(function BasesView({
         />
       )}
 
-      {mode === 'view' && !isPluginView && !isKanbanView && activeView && (
+      {mode === 'view' && !isPluginView && isListView && activeView && (
+        <BasesListView
+          doc={doc}
+          view={activeView}
+          rows={displayRows}
+          onOpenNote={onOpenNote}
+        />
+      )}
+
+      {mode === 'view' && !isPluginView && !isKanbanView && !isListView && activeView && (
         <BasesTableView
           doc={doc}
           view={activeView}
