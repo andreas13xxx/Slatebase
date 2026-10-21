@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.59.0](https://github.com/andreas13xxx/Slatebase/compare/v0.58.0...v0.59.0) (2026-10-21)
+
+
+### Features
+
+* **themes:** Community-Store für Obsidian-Themes und CSS-Grenze 3 MB ([#255](https://github.com/andreas13xxx/Slatebase/issues/255)) ([abce1d4](https://github.com/andreas13xxx/Slatebase/commit/abce1d4d765108362c934224901361575f2a7aeb))
+
 ## [0.58.0](https://github.com/andreas13xxx/Slatebase/compare/v0.57.0...v0.58.0) (2026-10-20)
 
 
