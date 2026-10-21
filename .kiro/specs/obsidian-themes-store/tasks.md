@@ -21,13 +21,20 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, Lint, betroff
       Umgesetzt an drei Stellen (Backend, Import-Prüfung, `ThemeInjector`), Randwerttests, Doku. Messung auf einer
       Testseite mit 4000 Elementen: Catppuccin und Virgo brauchen beim ersten Einfügen samt Stilberechnung 0,4–0,8 s,
       danach ca. 0,15 s; in der vollen Anwendung noch nicht gemessen
-- [ ] 1.1 `shared/guarded-fetch.ts` (Allowlist je Hop, Streaming-Limit, Timeout, kein Authorization-Header) + Tests gegen
-      lokalen Test-Server
-- [ ] 1.2 `theme-store/{types,errors,validation}.ts` + Tests (Repo-Regex, Pfadnormalisierung, SemVer-Vergleich)
-- [ ] 1.3 `theme-store-client.ts` (Katalog, Dateien, Screenshot) + Tests
-- [ ] 1.4 `theme-store-cache.ts` über `JsonFileStore` (Katalog persistiert, Rest im Speicher) + Tests
-- [ ] 1.5 Vorwärmen: nicht blockierender Abruf nach dem Start, nur bei eingeschaltetem Feature; Fehlschlag = Warnung im Log
-      und persistierter Stand, keine Wiederholungsschleife; Test, dass ein Fehlschlag den Start nicht verzögert
+- [x] 1.1 `shared/guarded-fetch.ts` (Allowlist je Hop, Streaming-Limit, Timeout, kein Authorization-Header) + Tests gegen
+      lokalen Test-Server (12 Tests: fremder Host im Redirect wird nicht angefragt, Limit greift beim Streamen, keine
+      Credential-Header, Timeout, Netzfehler getrennt vom Status)
+- [x] 1.2 `theme-store/{types,errors,validation}.ts` + Tests (46). Repo-Regex strenger als im Plugin-Store: `..`/`.` als Segment
+      wird abgelehnt (`../x` passt dort auf das Muster und würde im URL-Pfad ausbrechen); Bildtyp aus den ersten Bytes,
+      SVG abgelehnt; Versionsvergleich liefert `null` (= unbekannt) statt „kein Update"
+- [x] 1.3 `theme-store-client.ts` (Katalog, Dateien, Screenshot) + Tests (12, gegen lokalen Server als Ersatz für
+      `raw.githubusercontent.com`; Ursprung konfigurierbar nur für Tests, Allowlist und Protokoll folgen daraus)
+- [x] 1.4 `theme-store-cache.ts` über `JsonFileStore` (Katalog persistiert, Rest im Speicher) + Tests; veraltete/ungültige
+      Cache-Datei zählt als leer, ungültige Einträge werden beim Laden verworfen
+- [x] 1.5 Vorwärmen: `warmThemeStoreCatalog` (`theme-store/warmup.ts`) ist nicht blockierend gedacht (Aufruf ohne `await`),
+      wirft nie, wiederholt nie; Fehlschlag = eine Warnung und persistierter Stand. Ein noch frischer Katalog braucht keine
+      Anfrage. Tests in `theme-store-cache.test.ts`. Das **Einhängen in den Serverstart** (nur bei eingeschaltetem
+      Feature) folgt mit der DI in 2.3
 
 ## Phase 2 — Service, Routen, Feature-Gate
 - [ ] 2.1 `theme-store-service.ts`: `listCatalog`, `install`, `checkUpdates`, `screenshot` + Tests (Ersetzen, 409,
