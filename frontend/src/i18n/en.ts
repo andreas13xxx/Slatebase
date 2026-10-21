@@ -917,4 +917,10 @@ export const en: TranslationShape = {
     viaAlias: '{alias} → {name}',
   },
 
+  webViewer: {
+    promptLabel: 'Open web page',
+    promptPlaceholder: 'Enter a URL (https://…)',
+    invalidUrl: 'Please enter a valid http(s) address.',
+  },
+
 } as const

@@ -99,4 +99,5 @@ export const saveVaultSettingsSchema = z.object({
   sidebarPanel: opaqueBlobSchema.optional(),
   contextPanel: opaqueBlobSchema.optional(),
   activityRange: z.string().max(16).nullable().optional(),
+  webEmbedEnabled: z.boolean().optional(),
 })

@@ -95,6 +95,8 @@ export interface CoreAppCommandHandlers {
   onOpenRandomNote: () => void
   /** Creates a timestamp-prefixed unique note and opens it. */
   onCreateUniqueNote: () => void
+  /** Opens the web-viewer URL prompt. */
+  onOpenWebViewer: () => void
   /** Shows/hides the app toolbar (Obsidian's "ribbon"). */
   onToggleToolbar: () => void
   onOpenReleaseNotes: () => void
@@ -795,6 +797,7 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'insert-template', name: 'Templates: Insert template', run: (h) => h.onInsertTemplate() },
     { id: 'random-note', name: 'Random note: Open random note', run: (h) => h.onOpenRandomNote() },
     { id: 'unique-note:create-today', name: 'Unique note: Create new unique note', run: (h) => h.onCreateUniqueNote() },
+    { id: 'webviewer:open', name: 'Web viewer: Open a web page', run: (h) => h.onOpenWebViewer() },
 
     // ── markdown:* ──
     { id: 'markdown:toggle-preview', name: 'Toggle reading view', run: (h) => { const t = getActiveTab(h); if (t) h.tabDispatch({ type: 'TOGGLE_MODE', payload: { tabId: t.id } }) } },

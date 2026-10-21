@@ -37,6 +37,7 @@ export function viewTypeForTab(tab: Pick<TabEntry, 'filePath'>): string {
   const path = tab.filePath
   if (path.startsWith(VIEW_TAB_PREFIX)) return path.slice(VIEW_TAB_PREFIX.length)
   if (path === '__graph__') return 'graph'
+  if (path.startsWith('__webview::')) return 'webview'
   const ext = path.includes('.') ? path.slice(path.lastIndexOf('.') + 1).toLowerCase() : ''
   if (ext === 'md') return 'markdown'
   if (ext === 'canvas') return 'canvas'

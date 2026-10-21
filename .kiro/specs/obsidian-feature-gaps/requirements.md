@@ -48,11 +48,22 @@ Andreas zur Umsetzung freigegeben hat. Entscheidungen des Abgleichs:
 - Verdrahtet in Command Palette + Core-Command + i18n (de/en) + Keybinding (ohne Default). Kein
   Toolbar-Button (bewusst; Palette/Keybinding genügen).
 
-### R4 — Web Viewer (eingebettete Webseiten)
-- Als Benutzer möchte ich eine URL als Tab-Inhalt öffnen und `![](url)` als eingebettete Webseite
-  rendern.
-- Canvas kann bereits Link-Nodes mit iframe (`LinkNodeRenderer.tsx`); hier als allgemeiner
-  Viewer-Tab. Sicherheitsrahmen: CSP `frame-src 'self' https:` ist bereits gesetzt.
+### R4 — Web Viewer (eingebettete Webseiten) ✅ ERLEDIGT (Branch feature/obsidian-feature-gaps)
+- **Teil 1 — Web-Viewer-Tab**: Befehl „Webseite öffnen" (`webviewer:open`) öffnet einen URL-Prompt
+  (`WebViewerPrompt`), der eine http(s)-URL als sandboxed-iframe-Tab öffnet (`WebViewer`,
+  Sentinel-Pfad `__webview::<url>`, `sandbox`+`referrerPolicy=no-referrer`, nur http(s)). Tab wird
+  als Nicht-Datei behandelt (pane-layout `webview`, Kontextmenü/Editier-Guards, kein Datei-Fetch).
+- **Teil 2 — `![](url)`-Auto-Embed hinter Opt-in**: neue per-User+Vault-Einstellung `webEmbedEnabled`
+  (Default AUS; Backend `UserVaultSettings`+Zod+Store, Frontend-Store+`useWebEmbed`-Hook, Toggle in
+  `VaultConfigSection`). Bei AN rendert der Lesemodus (`ViewMode`) eine externe `![](https://…)` als
+  `EmbeddedWebFrame` (gleicher Sandbox); bei AUS als normaler Link. Begründung Default-Aus:
+  Auto-Laden fremder URLs aus Dokumenten = Tracking/Referer/Clickjacking, in geteilten Vaults lädt
+  der Leser ungefragt fremde Seiten.
+- Verifiziert: Backend/Frontend `tsc` sauber, `parseWebUrl`-Tests (http(s) akzeptiert,
+  javascript:/data:/file: abgelehnt) + preferences-Tests grün, ESLint 0 Errors.
+- Offener Folgeschritt (bewusst außerhalb Scope): `![](url)`-Auto-Embed auch in Live Preview (CM6
+  Widget-Decoration) — aktuell nur Lesemodus; der Web-Viewer-Tab + Lesemodus-Embed liefern den
+  Use-Case, das CM6-iframe-Widget ist deutlich aufwändiger/riskanter und folgt separat.
 
 ### R5 — Bases List-View ✅ ERLEDIGT (Branch feature/obsidian-feature-gaps)
 - Umgesetzt: dritter eingebauter View-Typ `list` neben `table`/`cards`. `BasesListView.tsx`

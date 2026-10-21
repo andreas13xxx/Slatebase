@@ -564,6 +564,8 @@ export interface UserVaultSettings {
   contextPanel: Record<string, unknown> | null
   /** Selected activity-timeline range ('day'|'week'|'month'|'year'); null = default. */
   activityRange: string | null
+  /** Whether `![](url)` in a note auto-embeds the page in a sandboxed iframe (default off). */
+  webEmbedEnabled: boolean
 }
 
 /** Partial per-vault settings update. */

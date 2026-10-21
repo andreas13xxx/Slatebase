@@ -910,4 +910,10 @@ export const de = {
     createError: '„{name}“ konnte nicht erstellt werden.',
     viaAlias: '{alias} → {name}',
   },
+
+  webViewer: {
+    promptLabel: 'Webseite öffnen',
+    promptPlaceholder: 'URL eingeben (https://…)',
+    invalidUrl: 'Bitte eine gültige http(s)-Adresse eingeben.',
+  },
 } as const

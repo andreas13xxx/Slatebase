@@ -10,7 +10,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { IApiClient, VaultConfig } from '../../api'
 import { showToast } from '../ToastNotification'
-import { SettingSection, Button } from './ui'
+import { SettingSection, SettingRow, Button } from './ui'
+import { useWebEmbed } from '../../hooks/useWebEmbed'
 
 interface VaultConfigSectionProps {
   apiClient: IApiClient
@@ -22,6 +23,7 @@ interface VaultConfigSectionProps {
  * Loads current config from backend and saves on change (with save button).
  */
 export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionProps) {
+  const { enabled: webEmbedEnabled, setEnabled: setWebEmbedEnabled } = useWebEmbed()
   const [config, setConfig] = useState<VaultConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -209,6 +211,21 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
             {saving ? 'Speichern…' : 'Speichern'}
           </Button>
         </div>
+      </SettingSection>
+
+      <SettingSection title="Web-Embeds">
+        <SettingRow
+          label="Webseiten in Notizen einbetten"
+          htmlFor="vault-web-embed-toggle"
+          hint="Wenn aktiviert, wird `![](https://…)` in einer Notiz als eingebettete Webseite (sandboxed iframe) angezeigt. Standard aus: Das automatische Laden fremder URLs aus einem Dokument ist eine Tracking-/Clickjacking-Fläche und lädt in einem geteilten Vault beim Lesen ungefragt fremde Seiten. Aus = als normaler Link anzeigen."
+        >
+          <input
+            id="vault-web-embed-toggle"
+            type="checkbox"
+            checked={webEmbedEnabled}
+            onChange={(e) => setWebEmbedEnabled(e.target.checked)}
+          />
+        </SettingRow>
       </SettingSection>
     </div>
   )

@@ -124,6 +124,7 @@ function sanitizeVaultSettings(raw: unknown): UserVaultSettings {
     activityRange: typeof parsed['activityRange'] === 'string' && parsed['activityRange'].length <= 16
       ? parsed['activityRange']
       : DEFAULT_VAULT_SETTINGS.activityRange,
+    webEmbedEnabled: bool('webEmbedEnabled', DEFAULT_VAULT_SETTINGS.webEmbedEnabled),
   }
 }
 

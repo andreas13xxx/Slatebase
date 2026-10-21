@@ -16,6 +16,7 @@ import { onOpenInSplit } from '../state/openInSplitBridge'
 import type { TabAction } from '../state/tabState'
 import { TemplateSelector } from './TemplateSelector'
 import { QuickSwitcher } from './QuickSwitcher'
+import { WebViewerPrompt } from './WebViewerPrompt'
 import { ReleaseNotesModal } from './ReleaseNotesModal'
 import { DebugInfoModal } from './DebugInfoModal'
 import { matchesShortcut } from '../state/keybindingsStore'
@@ -193,6 +194,7 @@ export function CommandPaletteContainer({
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false)
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false)
   const [debugInfoOpen, setDebugInfoOpen] = useState(false)
+  const [webViewerPromptOpen, setWebViewerPromptOpen] = useState(false)
 
   /** Opens the template picker in "create a new note" mode. */
   const openTemplateSelector = useCallback(() => {
@@ -293,6 +295,25 @@ export function CommandPaletteContainer({
     })()
   }, [state.selectedVaultId, apiClient, appDispatch, tabDispatch])
 
+  /**
+   * Opens a web-viewer tab for a confirmed http(s) URL. The URL lives in the
+   * tab's virtual path (`__webview::<url>`); the host becomes the tab title.
+   */
+  const openWebViewerTab = useCallback((url: string) => {
+    const vaultId = state.selectedVaultId
+    if (!vaultId || !apiClient) return
+    let title = url
+    try {
+      title = new URL(url).hostname
+    } catch {
+      // Keep the raw string if the URL does not parse (already validated upstream).
+    }
+    // A web-viewer tab is a sentinel (virtual) tab like the graph tab — dispatch
+    // OPEN_TAB directly rather than via openTab(), which would try to fetch file
+    // content for the `__webview::` path.
+    tabDispatch({ type: 'OPEN_TAB', payload: { vaultId, filePath: `__webview::${url}`, fileName: title, icon: 'globe' } })
+  }, [state.selectedVaultId, apiClient, tabDispatch])
+
   // ─── Custom events for the toolbar buttons ─────────────────────────────────
   // The toolbar buttons and the palette commands must do the same thing, so the
   // buttons dispatch these instead of carrying their own copies of the logic.
@@ -379,6 +400,7 @@ export function CommandPaletteContainer({
     onInsertTemplate: openTemplateInserter,
     onOpenRandomNote: openRandomNote,
     onCreateUniqueNote: createUniqueNoteCmd,
+    onOpenWebViewer: () => setWebViewerPromptOpen(true),
     onToggleToolbar: toggleToolbarVisible,
     onOpenReleaseNotes: () => setReleaseNotesOpen(true),
     onOpenDebugInfo: () => setDebugInfoOpen(true),
@@ -571,7 +593,7 @@ export function CommandPaletteContainer({
 
     // Determine if there's an active tab in edit mode (for editor commands)
     const activeTab = tabState.tabs.find((t) => t.id === tabState.activeTabId)
-    const isEditing = activeTab !== undefined && activeTab.mode === 'edit' && !activeTab.isBinary && activeTab.filePath !== '__graph__'
+    const isEditing = activeTab !== undefined && activeTab.mode === 'edit' && !activeTab.isBinary && activeTab.filePath !== '__graph__' && !activeTab.filePath.startsWith('__webview::')
     const isCanvasActive = activeTab !== undefined && activeTab.fileName.endsWith('.canvas')
 
     // ── Navigation ──────────────────────────────────────────────────────────
@@ -706,7 +728,7 @@ export function CommandPaletteContainer({
     // ── Vault operations (require a vault selected) ─────────────────────────
 
     // Toggle editor mode (always available when a non-binary file tab is active)
-    if (activeTab && !activeTab.isBinary && activeTab.filePath !== '__graph__' && !activeTab.fileName.endsWith('.canvas')) {
+    if (activeTab && !activeTab.isBinary && activeTab.filePath !== '__graph__' && !activeTab.filePath.startsWith('__webview::') && !activeTab.fileName.endsWith('.canvas')) {
       commands.push({
         id: 'slatebase:toggle-mode',
         name: 'Editor-Modus wechseln (Bearbeiten/Vorschau)',
@@ -1187,6 +1209,13 @@ export function CommandPaletteContainer({
           apiClient={apiClient}
           tabDispatch={tabDispatch}
           appDispatch={appDispatch}
+        />
+      )}
+      {state.selectedVaultId && apiClient && (
+        <WebViewerPrompt
+          isOpen={webViewerPromptOpen}
+          onClose={() => setWebViewerPromptOpen(false)}
+          onConfirm={openWebViewerTab}
         />
       )}
       <ReleaseNotesModal

@@ -152,6 +152,13 @@ export interface UserVaultSettings {
   contextPanel: Record<string, unknown> | null
   /** Selected activity-timeline range ('day'|'week'|'month'|'year'); null = default. */
   activityRange: string | null
+  /**
+   * Whether `![](url)` in a note auto-embeds the page in a sandboxed iframe.
+   * Default off: auto-loading a third-party URL from a document is a tracking /
+   * referer / clickjacking surface, and in a shared vault it would make a
+   * reader's browser fetch URLs an author put there. Off = render a plain link.
+   */
+  webEmbedEnabled: boolean
 }
 
 // ─── Patch Types ─────────────────────────────────────────────────────────────
@@ -199,6 +206,7 @@ export const DEFAULT_VAULT_SETTINGS: UserVaultSettings = {
   sidebarPanel: null,
   contextPanel: null,
   activityRange: null,
+  webEmbedEnabled: false,
 }
 
 // ─── Aggregate ───────────────────────────────────────────────────────────────
