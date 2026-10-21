@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useImperativeHandle, useCallback, useState } from 'react'
 import { ExternalLink, Copy, FileText, FolderOpen } from 'lucide-react'
 import { EditorState, Compartment, Annotation, type Extension } from '@codemirror/state'
-import { EditorView, lineNumbers as cmLineNumbers, dropCursor, keymap } from '@codemirror/view'
+import { EditorView, lineNumbers as cmLineNumbers, dropCursor, drawSelection, rectangularSelection, keymap } from '@codemirror/view'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { GFM } from '@lezer/markdown'
@@ -23,7 +23,7 @@ const markdownParserWithProps = (markdownLanguage.parser as unknown as { configu
 const markdownLanguageWithProps: typeof markdownLanguage = Object.create(markdownLanguage, {
   parser: { value: markdownParserWithProps, configurable: true },
 })
-import { search } from '@codemirror/search'
+import { search, selectNextOccurrence } from '@codemirror/search'
 import { undo as cmUndo, redo as cmRedo, defaultKeymap, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { autocompletion, type CompletionSource } from '@codemirror/autocomplete'
 import { highlightColorCompletions } from './live-preview/highlight-color-complete'
@@ -316,11 +316,16 @@ export function CodeMirrorEditor({
       // No Slatebase CSS targets it — see OBSIDIAN_EDITOR_AREA_CLASSES below for the container classes.
       EditorView.editorAttributes.of({ class: 'cm-s-obsidian' }),
       EditorView.lineWrapping,
-      // Multi-cursor support — off by default in CM6. Needed for Obsidian's
-      // editor:add-cursor-above/below core commands (see core-commands.ts);
-      // relaxing this only permits multi-range selections, it doesn't change
-      // any single-cursor editing behavior.
+      // Multi-cursor support. CM6 renders only the browser's single native caret
+      // unless `drawSelection()` replaces it with drawn selections/cursors, so
+      // without it the secondary cursors from the commands below would be invisible.
+      // `allowMultipleSelections` permits multi-range selections; `rectangularSelection`
+      // + `clickAddsSelectionRange` (Alt) add a cursor at an arbitrary click, matching
+      // Obsidian/CM6 defaults. See core-commands.ts for add-cursor-above/below.
       EditorState.allowMultipleSelections.of(true),
+      drawSelection(),
+      rectangularSelection(),
+      EditorView.clickAddsSelectionRange.of((event) => event.altKey),
       // Shows a cursor following the mouse while a file is dragged over the
       // editor, so the drop position (e.g. for an image) is visible before release.
       dropCursor(),
@@ -392,7 +397,15 @@ export function CodeMirrorEditor({
       // Core key bindings (Enter, Backspace, Tab, undo/redo shortcuts, etc.).
       // Placed after plugin extensions so a plugin's own keymap gets first
       // chance to handle a key and can fall through to these defaults.
-      keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+      // Mod-d (select next occurrence) is bound explicitly rather than pulling in
+      // the whole searchKeymap, whose other bindings would collide with Slatebase's
+      // own search/replace panel.
+      keymap.of([
+        { key: 'Mod-d', run: selectNextOccurrence, preventDefault: true },
+        ...defaultKeymap,
+        ...historyKeymap,
+        indentWithTab,
+      ]),
     ]
 
     // Autocompletion: the built-in `==` highlight-color source is always
