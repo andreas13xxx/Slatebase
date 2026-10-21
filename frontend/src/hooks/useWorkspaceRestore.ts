@@ -21,6 +21,7 @@ import {
   type PaneTreeAction,
   type PersistedPaneTab,
 } from '../state/paneTreeState'
+import { fetchPaneTreeContent } from '../state/paneTreeRestore'
 
 /** LocalStorage key for persisting the last selected vault (also used by App.tsx's logout handler). */
 export const LAST_VAULT_KEY = 'slatebase_last_vault'
@@ -217,54 +218,7 @@ export function useWorkspaceRestore({
     // Fetch content for every pane's tabs. `mountedRef` guards against a late
     // fetch resolving after unmount (fast logout) and dispatching into a stale tree.
     const validVaultIds = new Set(vaults.map((v) => v.id))
-
-    for (const pane of listPanes(paneTree)) {
-      for (const tab of pane.tabState.tabs) {
-        const tabId = tab.id
-        // A tab whose vault no longer exists is closed in its own pane.
-        if (!validVaultIds.has(tab.vaultId)) {
-          paneTreeDispatch({
-            type: 'PANE_TAB_ACTION',
-            payload: { paneId: pane.id, action: { type: 'CLOSE_TAB', payload: { tabId } } },
-          })
-          continue
-        }
-        // Virtual tabs (graph, plugin views) carry no file content.
-        if (tab.filePath.startsWith('__')) {
-          paneTreeDispatch({
-            type: 'PANE_TAB_ACTION',
-            payload: {
-              paneId: pane.id,
-              action: { type: 'TAB_CONTENT_LOADED', payload: { tabId, content: '', isBinary: false } },
-            },
-          })
-          continue
-        }
-        apiClient.fetchFileContent(tab.vaultId, tab.filePath).then(
-          (result) => {
-            if (!mountedRef.current) return
-            paneTreeDispatch({
-              type: 'PANE_TAB_ACTION',
-              payload: {
-                paneId: pane.id,
-                action: {
-                  type: 'TAB_CONTENT_LOADED',
-                  payload: { tabId, content: result.content, isBinary: result.isBinary },
-                },
-              },
-            })
-          },
-          () => {
-            if (!mountedRef.current) return
-            // File no longer exists — close the tab in its pane.
-            paneTreeDispatch({
-              type: 'PANE_TAB_ACTION',
-              payload: { paneId: pane.id, action: { type: 'CLOSE_TAB', payload: { tabId } } },
-            })
-          },
-        )
-      }
-    }
+    fetchPaneTreeContent(paneTree, paneTreeDispatch, apiClient, validVaultIds, () => mountedRef.current)
 
     // Enable persistence now that restore is complete.
     isRestoringRef.current = false

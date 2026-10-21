@@ -566,6 +566,12 @@ export interface UserVaultSettings {
   activityRange: string | null
   /** Whether `![](url)` in a note auto-embeds the page in a sandboxed iframe (default off). */
   webEmbedEnabled: boolean
+  /**
+   * Named workspace snapshots (content-free pane tree + tabs + panel layouts).
+   * Typed loosely here to avoid an api←state import cycle; the precise
+   * `NamedWorkspace` shape lives in `state/workspacesStore.ts`.
+   */
+  workspaces: Record<string, unknown>[]
 }
 
 /** Partial per-vault settings update. */

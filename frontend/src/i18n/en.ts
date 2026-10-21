@@ -923,4 +923,16 @@ export const en: TranslationShape = {
     invalidUrl: 'Please enter a valid http(s) address.',
   },
 
+  workspaces: {
+    saveLabel: 'Save workspace',
+    loadLabel: 'Load workspace',
+    namePlaceholder: 'Workspace name',
+    overwriteConfirm: '“{name}” already exists — confirm again to overwrite.',
+    empty: 'No workspaces saved yet.',
+    renameLabel: 'Rename “{name}”',
+    deleteLabel: 'Delete “{name}”',
+    saved: 'Workspace “{name}” saved.',
+    limitReached: 'Maximum number of workspaces reached.',
+  },
+
 } as const

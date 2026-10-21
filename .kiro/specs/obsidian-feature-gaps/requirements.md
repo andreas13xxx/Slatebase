@@ -30,13 +30,18 @@ Andreas zur Umsetzung freigegeben hat. Entscheidungen des Abgleichs:
   in Backlinks/Unlinked-Mentions, `[[`-Autovervollständigung. (Der QuickSwitcher wurde bei der
   Gelegenheit vollständig auf i18n umgestellt — neuer `quickSwitcher`-Namespace in de.ts + en.ts.)
 
-### R2 — Workspaces (benannte Layouts)
+### R2 — Workspaces (benannte Layouts) ✅ ERLEDIGT (Branch feature/obsidian-feature-gaps)
 → **Vollständige Spec: `.kiro/specs/workspaces/`** (requirements + design + tasks).
-- Als Benutzer möchte ich das aktuelle Panel-/Pane-Layout als benannten Workspace speichern und
-  zwischen mehreren Workspaces umschalten.
-- Baut auf dem vorhandenen Split-Panes-Pane-Baum + Persistenz auf (`state/paneTreeState.ts`,
-  `workspaceStore.ts`). Heute wird genau EIN Layout pro Vault persistiert.
-- Entspricht dem zurückgestellten Rest von Track G im `implementation-plan.md`.
+- Umgesetzt: benannte, content-freie Layout-Snapshots (Pane-Baum + Tabs + Panel-Layouts),
+  server-backed per User+Vault über `vaultSettings.workspaces` (Backend-Typ+Zod-Array-Cap 50+Store,
+  Frontend-Store+`normalize`). `state/workspacesStore.ts` (build/save/overwrite/rename/delete,
+  lenientes Parsen). Neue Reducer-Aktion `REPLACE_PANE_TREE` (`paneTreeState.ts`). Gemeinsame
+  Restore-Logik `state/paneTreeRestore.ts` (`fetchPaneTreeContent`), von Session-Restore UND
+  Workspace-Laden genutzt (R5: nicht-auflösbare Tabs übersprungen). `WorkspacesModal` (save/load,
+  Inline-Rename/Delete, Überschreib-Bestätigung). Commands `workspaces:save`/`workspaces:load` +
+  i18n. Offene Editor-Puffer werden beim Tree-Replace über EditMode's Unmount-Flush gesichert.
+- Tests: `REPLACE_PANE_TREE`-Reducer, workspacesStore Round-Trip/lenient. Entspricht dem
+  zurückgestellten Rest von Track G.
 
 ### R3 — Unique Note / Zettelkasten-Prefix ✅ ERLEDIGT (Branch feature/obsidian-feature-gaps)
 - Umgesetzt: Befehl „Eindeutige Notiz anlegen“ (`slatebase:create-unique-note`, Obsidian-Compat

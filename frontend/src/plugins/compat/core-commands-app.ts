@@ -97,6 +97,10 @@ export interface CoreAppCommandHandlers {
   onCreateUniqueNote: () => void
   /** Opens the web-viewer URL prompt. */
   onOpenWebViewer: () => void
+  /** Opens the "save current layout as workspace" prompt. */
+  onSaveWorkspace: () => void
+  /** Opens the workspace load/manage list. */
+  onLoadWorkspace: () => void
   /** Shows/hides the app toolbar (Obsidian's "ribbon"). */
   onToggleToolbar: () => void
   onOpenReleaseNotes: () => void
@@ -798,6 +802,8 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'random-note', name: 'Random note: Open random note', run: (h) => h.onOpenRandomNote() },
     { id: 'unique-note:create-today', name: 'Unique note: Create new unique note', run: (h) => h.onCreateUniqueNote() },
     { id: 'webviewer:open', name: 'Web viewer: Open a web page', run: (h) => h.onOpenWebViewer() },
+    { id: 'workspaces:save', name: 'Workspaces: Save current layout', run: (h) => h.onSaveWorkspace() },
+    { id: 'workspaces:load', name: 'Workspaces: Load layout', run: (h) => h.onLoadWorkspace() },
 
     // ── markdown:* ──
     { id: 'markdown:toggle-preview', name: 'Toggle reading view', run: (h) => { const t = getActiveTab(h); if (t) h.tabDispatch({ type: 'TOGGLE_MODE', payload: { tabId: t.id } }) } },

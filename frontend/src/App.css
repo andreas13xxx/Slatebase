@@ -5410,7 +5410,60 @@
   max-width: 50%;
 }
 
-/* â”€â”€â”€ Plugin Upload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Workspaces modal (load/manage list) ─────────────────────────────────── */
+.workspaces-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workspaces-name {
+  appearance: none;
+  flex: 1 1 auto;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text-normal);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+.workspaces-actions {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.workspaces-rename {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.workspaces-action {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-subtle);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.workspaces-action:hover {
+  color: var(--text-normal);
+  background: var(--bg-surface);
+}
+
+.workspaces-action--danger:hover {
+  color: var(--danger);
+}
+
 
 .plugin-upload {
   display: flex;

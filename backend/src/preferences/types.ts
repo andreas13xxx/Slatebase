@@ -159,6 +159,13 @@ export interface UserVaultSettings {
    * reader's browser fetch URLs an author put there. Off = render a plain link.
    */
   webEmbedEnabled: boolean
+  /**
+   * Named workspace layouts (saved pane trees + tab lists + panel layouts).
+   * Content-free snapshots owned by the client; the server stores them as
+   * opaque objects (size/type bounded, no shape check — the pane-tree internals
+   * belong to the client, like `graph`/`sidebarPanel`).
+   */
+  workspaces: Record<string, unknown>[]
 }
 
 // ─── Patch Types ─────────────────────────────────────────────────────────────
@@ -207,6 +214,7 @@ export const DEFAULT_VAULT_SETTINGS: UserVaultSettings = {
   contextPanel: null,
   activityRange: null,
   webEmbedEnabled: false,
+  workspaces: [],
 }
 
 // ─── Aggregate ───────────────────────────────────────────────────────────────

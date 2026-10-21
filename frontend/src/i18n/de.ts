@@ -916,4 +916,16 @@ export const de = {
     promptPlaceholder: 'URL eingeben (https://…)',
     invalidUrl: 'Bitte eine gültige http(s)-Adresse eingeben.',
   },
+
+  workspaces: {
+    saveLabel: 'Arbeitsbereich speichern',
+    loadLabel: 'Arbeitsbereich laden',
+    namePlaceholder: 'Name des Arbeitsbereichs',
+    overwriteConfirm: '„{name}“ existiert bereits — nochmal bestätigen zum Überschreiben.',
+    empty: 'Noch keine Arbeitsbereiche gespeichert.',
+    renameLabel: '„{name}“ umbenennen',
+    deleteLabel: '„{name}“ löschen',
+    saved: 'Arbeitsbereich „{name}“ gespeichert.',
+    limitReached: 'Höchstzahl an Arbeitsbereichen erreicht.',
+  },
 } as const

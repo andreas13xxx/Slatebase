@@ -4,7 +4,7 @@ import { usePluginContext } from '../plugins/compat/plugin-context'
 import { useFeatureContext } from '../state/featureContext'
 import { useTabContext } from '../state/tabContext'
 import { usePaneTree } from '../state/paneTreeContext'
-import { generatePaneId } from '../state/paneTreeState'
+import { generatePaneId, serializePaneTree, rehydratePaneTree } from '../state/paneTreeState'
 import { splitActivePane, focusPaneInDirection } from './panes/pane-commands'
 import type { FocusDirection } from './panes/pane-focus-direction'
 import { useAppContext, loadVaults } from '../state/index'
@@ -17,6 +17,13 @@ import type { TabAction } from '../state/tabState'
 import { TemplateSelector } from './TemplateSelector'
 import { QuickSwitcher } from './QuickSwitcher'
 import { WebViewerPrompt } from './WebViewerPrompt'
+import { WorkspacesModal } from './WorkspacesModal'
+import {
+  buildWorkspace, saveWorkspace, getWorkspaces, findWorkspace,
+  renameWorkspace, deleteWorkspace,
+} from '../state/workspacesStore'
+import { fetchPaneTreeContent } from '../state/paneTreeRestore'
+import { loadPanelLayout, savePanelLayout } from './side-panel/utils/persistence'
 import { ReleaseNotesModal } from './ReleaseNotesModal'
 import { DebugInfoModal } from './DebugInfoModal'
 import { matchesShortcut } from '../state/keybindingsStore'
@@ -195,6 +202,7 @@ export function CommandPaletteContainer({
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false)
   const [debugInfoOpen, setDebugInfoOpen] = useState(false)
   const [webViewerPromptOpen, setWebViewerPromptOpen] = useState(false)
+  const [workspacesModal, setWorkspacesModal] = useState<{ open: boolean; mode: 'save' | 'load' }>({ open: false, mode: 'load' })
 
   /** Opens the template picker in "create a new note" mode. */
   const openTemplateSelector = useCallback(() => {
@@ -314,6 +322,47 @@ export function CommandPaletteContainer({
     tabDispatch({ type: 'OPEN_TAB', payload: { vaultId, filePath: `__webview::${url}`, fileName: title, icon: 'globe' } })
   }, [state.selectedVaultId, apiClient, tabDispatch])
 
+  // ── Workspaces (named layouts) ─────────────────────────────────────────────
+  // A workspace captures the live pane tree + both panel layouts. On apply, the
+  // active editor unmounts when REPLACE_PANE_TREE swaps the tree, which triggers
+  // EditMode's own flushPendingSave — so an open unsaved buffer is flushed by
+  // the existing unmount path, no extra flush event needed.
+  const saveWorkspaceToName = useCallback((name: string) => {
+    const ws = buildWorkspace(
+      name,
+      serializePaneTree(paneTree),
+      loadPanelLayout('sidebar'),
+      loadPanelLayout('context'),
+    )
+    if (!saveWorkspace(ws)) {
+      showToast('error', t('workspaces.limitReached'))
+      return
+    }
+    showToast('success', t('workspaces.saved', { name: ws.name }))
+  }, [paneTree, t])
+
+  const applyWorkspaceByName = useCallback((name: string) => {
+    const ws = findWorkspace(name)
+    if (!ws || !apiClient) return
+    const validVaultIds = new Set(state.vaults.map((v) => v.id))
+    // Replace the whole layout, then fetch each restored tab's content (R5:
+    // unresolvable tabs are skipped by the shared restore helper).
+    const tree = rehydratePaneTree(ws.paneTree)
+    paneTreeDispatch({ type: 'REPLACE_PANE_TREE', payload: { tree } })
+    fetchPaneTreeContent(tree, paneTreeDispatch, apiClient, validVaultIds, () => true)
+    // Restore the panel layouts the workspace captured.
+    if (ws.sidebarPanel) savePanelLayout('sidebar', ws.sidebarPanel)
+    if (ws.contextPanel) savePanelLayout('context', ws.contextPanel)
+  }, [apiClient, state.vaults, paneTreeDispatch])
+
+  const renameWorkspaceByName = useCallback((from: string, to: string) => {
+    renameWorkspace(from, to)
+  }, [])
+
+  const deleteWorkspaceByName = useCallback((name: string) => {
+    deleteWorkspace(name)
+  }, [])
+
   // ─── Custom events for the toolbar buttons ─────────────────────────────────
   // The toolbar buttons and the palette commands must do the same thing, so the
   // buttons dispatch these instead of carrying their own copies of the logic.
@@ -401,6 +450,8 @@ export function CommandPaletteContainer({
     onOpenRandomNote: openRandomNote,
     onCreateUniqueNote: createUniqueNoteCmd,
     onOpenWebViewer: () => setWebViewerPromptOpen(true),
+    onSaveWorkspace: () => setWorkspacesModal({ open: true, mode: 'save' }),
+    onLoadWorkspace: () => setWorkspacesModal({ open: true, mode: 'load' }),
     onToggleToolbar: toggleToolbarVisible,
     onOpenReleaseNotes: () => setReleaseNotesOpen(true),
     onOpenDebugInfo: () => setDebugInfoOpen(true),
@@ -1216,6 +1267,18 @@ export function CommandPaletteContainer({
           isOpen={webViewerPromptOpen}
           onClose={() => setWebViewerPromptOpen(false)}
           onConfirm={openWebViewerTab}
+        />
+      )}
+      {state.selectedVaultId && (
+        <WorkspacesModal
+          isOpen={workspacesModal.open}
+          mode={workspacesModal.mode}
+          onClose={() => setWorkspacesModal((m) => ({ ...m, open: false }))}
+          workspaces={getWorkspaces()}
+          onSave={saveWorkspaceToName}
+          onApply={applyWorkspaceByName}
+          onRename={renameWorkspaceByName}
+          onDelete={deleteWorkspaceByName}
         />
       )}
       <ReleaseNotesModal

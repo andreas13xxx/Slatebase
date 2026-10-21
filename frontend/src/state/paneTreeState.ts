@@ -99,6 +99,13 @@ export type PaneTreeAction =
       type: 'SPLIT_PANE_WITH_TAB'
       payload: { paneId: string; direction: SplitDirection; newPaneId: string; tabId: string; copy?: boolean }
     }
+  /**
+   * Replace the ENTIRE pane tree (root + active pane) with a new one. Used when
+   * switching to a saved workspace at runtime — unlike SPLIT/FOCUS/CLOSE this
+   * swaps the whole layout in one step. The caller passes a fully-formed tree
+   * (e.g. from `rehydratePaneTree`); tab content is loaded afterwards.
+   */
+  | { type: 'REPLACE_PANE_TREE'; payload: { tree: PaneTree } }
 
 // ─── Helpers (pure) ──────────────────────────────────────────────────────────
 
@@ -374,6 +381,15 @@ export function paneTreeReducer(state: PaneTree, action: PaneTreeAction): PaneTr
         return split
       })
       return { root, activePaneId: newPaneId }
+    }
+
+    case 'REPLACE_PANE_TREE': {
+      const { tree } = action.payload
+      // Guard the active id against a tree whose activePaneId does not resolve.
+      const activePaneId = findPane(tree, tree.activePaneId)
+        ? tree.activePaneId
+        : firstPaneId(tree.root)
+      return { root: tree.root, activePaneId }
     }
 
     default:
