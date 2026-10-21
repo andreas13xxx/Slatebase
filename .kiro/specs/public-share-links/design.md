@@ -12,7 +12,7 @@ Config → Logger → Vault → PublicShareService → publicShareRoutes
 | `errors.ts` | `PublicShareNotFoundError`, `PublicSharePasswordRequiredError`, `PublicShareDisabledError` |
 | `public-share-store.ts` | `IPublicShareStore` + `createPublicShareStore()` über `shared/json-file-store.ts` → `data/public-shares.json` |
 | `public-share-service.ts` | `IPublicShareService`: create / list / revoke / update, `resolve(token)`, `readNote`, `readAsset` |
-| `embed-resolver.ts` | ermittelt die Einbettungen einer Notiz (Quelle: Link-Index), Basis für die Asset-Allowlist |
+| `embed-resolver.ts` | löst Einbettungen rekursiv auf (Tiefe 3, Zyklenerkennung, Größenlimit) und liefert `ResolvedEmbeds`: Map `ref → { kind: 'note' \| 'asset' \| 'unavailable', … }`; die Menge der Assets ist zugleich die Allowlist |
 | `index.ts` | Barrel |
 
 ### Datenmodell
@@ -57,12 +57,24 @@ CSRF und Session entfallen, Rate-Limit greift stattdessen):
 
 | Methode | Pfad | Zweck |
 |---|---|---|
-| GET | `/public/s/:token` | gerenderte Notiz (JSON: Titel, Markdown, Einbettungs-Map) |
+| GET | `/public/s/:token` | JSON: Titel, Markdown (ohne Frontmatter) und `embeds` (aufgelöste Notizinhalte inkl. Abschnitts-/Blockauszug, Asset-Verweise, `unavailable`-Einträge) |
 | POST | `/public/s/:token/unlock` | Passwort prüfen → kurzlebiges, an den Token gebundenes Cookie |
 | GET | `/public/s/:token/asset?ref=<verweis>` | eingebettete Datei |
 
 `ref` ist der Verweis, wie er in der Notiz steht, **nicht** ein Vault-Pfad. Der Service löst ihn serverseitig auf und
-liefert nur, was in der Einbettungsliste der Notiz steht.
+liefert nur, was in der transitiven Einbettungsmenge der Notiz steht (frisch pro Abruf, damit der Live-Stand gilt).
+
+### Einbettungen im Rendering
+
+Die Pipeline bekommt im `publicMode` einen Embed-Resolver, der aus der `embeds`-Map der Antwort liest statt aus dem
+Vault. So nutzen Notiz-, Bild- und Mediendarstellung denselben Code wie im Editor. Der Resolver behandelt vier Fälle:
+`note` (Inhalt rekursiv rendern, Frontmatter bereits entfernt), `asset` (URL der Asset-Route mit `ref`),
+`unavailable` (Hinweisbox „Eingebetteter Inhalt nicht verfügbar“, ohne Pfad), und `.base`/`.canvas`/Abfrageblöcke, die
+der Server immer als `unavailable` meldet. Wikilinks und Markdown-Links auf Notizen werden im `publicMode` zu Text.
+
+Die gleiche Auflösung dient dem Teilen-Dialog: ein authentifizierter Endpunkt
+`GET /vaults/:vaultId/public-shares/preview?path=…` liefert nur die Liste der eingebundenen Notizen/Dateien und der
+Hinweise, damit der Nutzer vor dem Teilen sieht, was der Link enthält.
 
 ### Rendering
 
@@ -92,5 +104,9 @@ der auseinanderläuft. Im öffentlichen Modus werden Wikilinks, Transklusionen u
 | Pfad-Traversal über `ref` | Auflösung nur gegen die Einbettungsliste; zusätzlich `validateFilePath()` |
 | Versehentlich öffentlicher Reverse-Proxy-Pfad | README-Abschnitt, Toggle standardmäßig aus |
 | Inhaltsleck über Frontmatter/Wikilinks | 3.6/2.4: Frontmatter entfernt, Links neutralisiert |
+| Eingebettete Notiz gibt unbeabsichtigt Inhalt frei | Dialog-Vorschau (4.1a), Tiefe 3, Größenlimit |
+| Bases/Canvas/Abfrageblöcke ziehen Vault-Daten | werden nie aufgelöst (2.5a) |
+| Rekursion / Zyklen / riesige Ergebnisse | Zyklenerkennung, Tiefen- und Größenlimit, Tests mit Ringen und Fan-out |
+| Hinweistext verrät Pfade | generischer Text ohne Pfad und ohne Grund (2.5b) |
 | Token im Referer/Log | Seite setzt `Referrer-Policy: no-referrer`; Audit speichert nur den Hint |
 | Live-Stand zeigt versehentlich Änderungen | im Dialog Hinweis „zeigt immer den aktuellen Stand“ |

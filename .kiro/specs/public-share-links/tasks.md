@@ -12,7 +12,10 @@ Jede Phase wird einzeln grün (tsc, Lint, betroffene Tests) committet.
 
 - [ ] 1.1 Typen, Fehler, `IPublicShareStore` + Store über `json-file-store.ts` (Token nur als Hash)
 - [ ] 1.2 `IPublicShareService`: create/list/revoke/update, Passwort (scrypt), Ablauf
-- [ ] 1.3 `embed-resolver.ts` und `readAsset` mit Einbettungs-Allowlist
+- [ ] 1.3 `embed-resolver.ts`: rekursive Auflösung (Notiz, Abschnitt, Block, Asset), Tiefe 3, Zyklen, Größenlimit,
+      `.base`/`.canvas`/Abfrageblöcke und Dot-Dateien → `unavailable`; `readAsset` mit transitiver Allowlist
+- [ ] 1.3a Tests: Ring A→B→A, Tiefe 4, Fan-out über dem Limit, Abschnitts-/Blockauszug, Frontmatter entfernt,
+      gelöschte Einbettung, `.base`, `.slatebase/…`, Asset außerhalb der Allowlist
 - [ ] 1.4 Pfad-Umschreiben bei Umbenennen/Verschieben, 404 bei Löschen/Papierkorb
 - [ ] 1.5 Tests (hand-geschriebene Mocks): Token-Entropie, Ablauf, Widerruf, Traversal, Dot-Dateien, Papierkorb
 
@@ -25,13 +28,17 @@ Jede Phase wird einzeln grün (tsc, Lint, betroffene Tests) committet.
 
 ## Phase 3 — Öffentliche Seite
 
-- [ ] 3.1 `publicMode` in der Reading-View-Pipeline (Wikilinks/Transklusion/Plugin-Blöcke neutralisiert)
+- [ ] 3.1 `publicMode` in der Reading-View-Pipeline: Embed-Resolver aus der `embeds`-Map, Wikilinks/Markdown-Links
+      zu Text, Plugin-Blöcke neutralisiert, Hinweisbox für `unavailable`
+- [ ] 3.1a Vergleichstest: dieselbe Notiz mit Notiz-, Abschnitts-, Bild-Einbettung rendert im `publicMode` wie in der
+      Reading View
 - [ ] 3.2 `PublicSharePage` unter `/s/:token`, Passwortabfrage, Fehlerseite, Hell/Dunkel
 - [ ] 3.3 Tests + `*.a11y.test.tsx`
 
 ## Phase 4 — Verwaltung
 
 - [ ] 4.1 `PublicShareDialog` (Fokus-Falle, Kopieren, Passwort, Ablauf, Widerruf) und Kontextmenü-Eintrag
+- [ ] 4.1a Vorschau „Dieser Link enthält zusätzlich …“ über `GET …/public-shares/preview`, inkl. Hinweisen
 - [ ] 4.2 Einstellungen „Meine Links“ mit `feature:` in `settingsRegistry.ts`
 - [ ] 4.3 Admin-Toggle in den Feature-Einstellungen
 

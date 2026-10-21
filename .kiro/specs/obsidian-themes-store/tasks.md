@@ -49,13 +49,22 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, Lint, betroff
 - [x] 2.4 `VAULT-ROUTE-AUTHORIZATION.md` ergänzt; Test, dass `GET …/theme-store/updates` = read und
       `POST …/theme-store/install` = write ohne Ausnahme gilt
 
-## Phase 3 — Frontend
-- [ ] 3.1 `api/index.ts`: `listStoreThemes`, `installStoreTheme`, `checkStoreThemeUpdates`, Screenshot-URL
-- [ ] 3.2 `themeStoreFilter.ts` + Tests
-- [ ] 3.3 `ThemeStoreBrowser` und `ThemeStoreCard` (Tabs im `ThemeManager`, unendliches Nachladen mit Schaltfläche „Mehr laden", Modus-Voreinstellung,
-      Ersetzen-Rückfrage mit `useFocusTrap`, Offline-/Fehlerzustände)
-- [ ] 3.4 Feature-Gate in `settingsRegistry.ts` (`feature:`), Tab entfällt bei ausgeschaltetem Feature
-- [ ] 3.5 Tests und `*.a11y.test.tsx`
+## Phase 3 — Frontend (abgeschlossen 2026-10-21)
+- [x] 3.1 `api/index.ts`: `listStoreThemes`, `installStoreTheme`, `checkStoreThemeUpdates`, `storeThemeScreenshotUrl` (reine
+      URL, relativ: Cookie-Anmeldung, der Browser spricht nur mit dem eigenen Server)
+- [x] 3.2 `themeStoreFilter.ts` + 15 Tests (Text, Modus, installiert, Update, veraltet; Fehlertexte auf Deutsch je Fehlercode)
+- [x] 3.3 `ThemeStoreBrowser` und `ThemeStoreCard` (22 Tests): unendliches Nachladen mit „Mehr laden", Modus-Voreinstellung
+      aus dem Farbmodus, Ersetzen-Rückfrage (`ConfirmModal`), Fehler je Karte, Katalogfehler mit „Erneut versuchen",
+      Hinweis „zuletzt bekannte Liste", Update-Prüfung mit Warnungen, einmaliger Fremd-CSS-Hinweis. Der Test „Mehr laden bleibt
+      nach 400 ms erhalten" fand einen echten Fehler: Der Suchtimer setzte die Liste nach 200 ms auch ohne geänderten Text
+      auf 24 zurück (behoben)
+- [x] 3.4 Feature-Gate: **nicht** über `feature:` in `settingsRegistry.ts`, weil das den ganzen Abschnitt „Themes"
+      ausblenden würde. `ThemesSection` zeigt den Tab „Entdecken" nur bei eingeschaltetem `obsidian-theme-store`; ohne
+      Feature gibt es keine Tabs und keine Katalog-Anfrage (getestet). Tabs nach dem ARIA-Muster (Pfeiltasten, Home/End,
+      `aria-controls`)
+- [x] 3.5 `ThemesSection.test.tsx` (4) und erweiterter `ThemeManager.a11y.test.tsx` (axe auf „Entdecken" ohne Verstöße)
+- Hinweis: Unter paralleler Last laufen `SettingsPanel.a11y.test.tsx` und die 60-Karten-Tests ins 5-s-Limit; einzeln grün.
+  Die 60-Karten-Tests haben deshalb 20 s und zählen Karten ohne Rollenabfrage
 
 ## Phase 4 — Abnahme und Doku
 - [ ] 4.1 Isolierte Instanz: Minimal, Things und ein `legacy`-Theme installieren, Ersetzen, Update-Check mit gesenkter
