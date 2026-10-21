@@ -213,6 +213,25 @@ describe('ThemeStoreBrowser', () => {
     expect(screen.getByRole('button', { name: 'Things installieren' })).toBeEnabled()
   })
 
+  it('does not show or apply an install that finishes after the browser was closed (vault switched)', async () => {
+    let finish!: (meta: ThemeMeta) => void
+    const apiClient = createMockApiClient({
+      installStoreTheme: vi.fn().mockImplementation(() => new Promise<ThemeMeta>((resolve) => { finish = resolve })),
+    })
+    const { unmount } = renderBrowser(apiClient)
+    await screen.findByText(/angezeigt/)
+
+    fireEvent.click(screen.getByLabelText('Nach der Installation aktivieren'))
+    fireEvent.click(screen.getByRole('button', { name: 'Things installieren' }))
+    await waitFor(() => expect(apiClient.installStoreTheme).toHaveBeenCalled())
+    unmount() // what switching the vault does to the browser (ThemesSection keys it by vault)
+    finish(installedThings)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    expect(themeTag()).toBeNull()
+    expect(apiClient.loadTheme).not.toHaveBeenCalled()
+  })
+
   it('checks for updates, shows old → new and updates with replace', async () => {
     const check: ThemeUpdateCheck = {
       updates: [{ themeId: 'Things', name: 'Things', repo: 'owner/things', installedVersion: '1.0.0', latestVersion: '1.1.0' }],
@@ -232,7 +251,7 @@ describe('ThemeStoreBrowser', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Things aktualisieren' }))
 
-    await waitFor(() => expect(apiClient.installStoreTheme).toHaveBeenCalledWith('vault1', 'owner/things', { replace: true, activate: false }))
+    await waitFor(() => expect(apiClient.installStoreTheme).toHaveBeenCalledWith('vault1', 'owner/things', { replace: true, activate: false, themeId: 'Things' }))
     await waitFor(() => expect(screen.queryByText('1.0.0 → 1.1.0')).not.toBeInTheDocument())
   })
 

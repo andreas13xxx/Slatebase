@@ -15,7 +15,7 @@ import type { SessionContext } from '../auth/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { IEventBus } from '../realtime/types.js'
-import { AppearanceFileInvalidError, InvalidThemeIdError, ThemeTooLargeError } from '../themes/index.js'
+import { AppearanceFileInvalidError, InvalidThemeIdError, ThemeNotFoundError, ThemeTooLargeError, themeIdSchema } from '../themes/index.js'
 import {
   ThemeAlreadyInstalledError,
   ThemeAssetTooLargeError,
@@ -41,6 +41,8 @@ const installSchema = z.object({
   repo: z.string().refine(isValidRepo, 'repo must be "owner/repo"'),
   replace: z.boolean().optional().default(false),
   activate: z.boolean().optional().default(false),
+  /** Folder of the installed theme to update in place (from the update check). */
+  themeId: themeIdSchema.optional(),
 })
 
 export interface ThemeStoreRouteDependencies {
@@ -104,17 +106,23 @@ export function createVaultThemeStoreRoutes(deps: ThemeStoreRouteDependencies): 
     return vaultRegistry.findById(vaultId)?.storagePath ?? null
   }
 
-  /** Tells other clients of the vault that a theme file or the selection changed (best effort). */
-  async function publishChange(c: Context, vaultId: string, path: string): Promise<void> {
+  /**
+   * Tells other clients of the vault that theme files or the selection changed (best effort). The audience is
+   * looked up once and shared by all events of one install.
+   */
+  async function publishChanges(c: Context, vaultId: string, paths: string[]): Promise<void> {
     const session = c.get('session') as SessionContext | undefined
     if (session === undefined) return
     try {
-      eventBus.publish({
-        type: 'vault:change',
-        payload: { vaultId, action: 'saved', path, userId: session.userId, username: session.username },
-        target: { kind: 'users', userIds: await accessControl.getUsersWithAccess(vaultId) },
-        excludeUserId: session.userId,
-      })
+      const userIds = await accessControl.getUsersWithAccess(vaultId)
+      for (const path of paths) {
+        eventBus.publish({
+          type: 'vault:change',
+          payload: { vaultId, action: 'saved', path, userId: session.userId, username: session.username },
+          target: { kind: 'users', userIds },
+          excludeUserId: session.userId,
+        })
+      }
     } catch (error) {
       logger.warn('Failed to publish theme store change event', {
         message: error instanceof Error ? error.message : String(error),
@@ -149,11 +157,14 @@ export function createVaultThemeStoreRoutes(deps: ThemeStoreRouteDependencies): 
       return c.json(createApiError('VALIDATION_ERROR', parsed.error.issues[0]?.message ?? 'Validation failed'), 400)
     }
 
-    const { repo, replace, activate } = parsed.data
+    const { repo, replace, activate, themeId } = parsed.data
     try {
-      const meta = await themeStoreService.install(vaultId, vaultPath, repo, { replace, activate })
-      await publishChange(c, vaultId, `.obsidian/themes/${meta.id}/theme.css`)
-      if (activate) await publishChange(c, vaultId, APPEARANCE_PATH)
+      const meta = await themeStoreService.install(vaultId, vaultPath, repo, {
+        replace,
+        activate,
+        ...(themeId !== undefined ? { targetThemeId: themeId } : {}),
+      })
+      await publishChanges(c, vaultId, activate ? [`.obsidian/themes/${meta.id}/theme.css`, APPEARANCE_PATH] : [`.obsidian/themes/${meta.id}/theme.css`])
       logger.info('Theme installed from the community catalog', { vaultId, themeId: meta.id, repo, replace, activate })
       return c.json(meta, 200)
     } catch (error) {
@@ -165,6 +176,7 @@ export function createVaultThemeStoreRoutes(deps: ThemeStoreRouteDependencies): 
 }
 
 function handleStoreError(c: Context, error: unknown, logger: ILogger): Response {
+  if (error instanceof ThemeNotFoundError) return c.json(createApiError('THEME_NOT_FOUND', error.message), 404)
   if (error instanceof ThemeNotInCatalogError) return c.json(createApiError('THEME_NOT_IN_CATALOG', error.message), 404)
   if (error instanceof ThemeAlreadyInstalledError) return c.json(createApiError('THEME_ALREADY_INSTALLED', error.message), 409)
   if (error instanceof AppearanceFileInvalidError) return c.json(createApiError('APPEARANCE_FILE_INVALID', error.message), 409)

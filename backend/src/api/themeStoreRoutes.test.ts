@@ -6,7 +6,7 @@ import type { SessionContext } from '../auth/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { IEventBus, PublishOptions } from '../realtime/types.js'
-import { AppearanceFileInvalidError } from '../themes/index.js'
+import { AppearanceFileInvalidError, ThemeNotFoundError } from '../themes/index.js'
 import type { ThemeMeta } from '../themes/index.js'
 import {
   ThemeAlreadyInstalledError,
@@ -40,6 +40,7 @@ const vaultEntry: VaultRegistryEntry = {
 
 function createTestApp(options: { service?: IThemeStoreService; entry?: VaultRegistryEntry | null } = {}) {
   const published: PublishOptions[] = []
+  const audience = { lookups: 0 }
   const service = options.service ?? createMockService()
   const session: SessionContext = { userId: 'owner-1', username: 'owner', role: 'user', sessionId: 's1' }
   const app = new Hono()
@@ -52,13 +53,13 @@ function createTestApp(options: { service?: IThemeStoreService; entry?: VaultReg
     '/api/v1/vaults/:vaultId/theme-store',
     createVaultThemeStoreRoutes({
       themeStoreService: service,
-      accessControl: { getUsersWithAccess: async () => ['owner-1', 'user-2'] } as unknown as IVaultAccessControl,
+      accessControl: { getUsersWithAccess: async () => { audience.lookups++; return ['owner-1', 'user-2'] } } as unknown as IVaultAccessControl,
       vaultRegistry: { findById: () => (options.entry === undefined ? vaultEntry : options.entry) } as unknown as IVaultRegistry,
       eventBus: { publish: (o: PublishOptions) => { published.push(o) } } as unknown as IEventBus,
       logger,
     }),
   )
-  return { app, published }
+  return { app, published, audience }
 }
 
 const install = (body: unknown): RequestInit => ({
@@ -169,6 +170,27 @@ describe('POST /vaults/:vaultId/theme-store/install', () => {
     expect(published.map((p) => (p.payload as { path: string }).path)).toEqual(['.obsidian/themes/Things/theme.css', '.obsidian/appearance.json'])
   })
 
+  it('looks the audience up once, even when it publishes both the theme and the selection change', async () => {
+    const { app, audience } = createTestApp()
+    await app.request('/api/v1/vaults/vault-1/theme-store/install', install({ repo: 'o/things', activate: true }))
+    expect(audience.lookups).toBe(1)
+  })
+
+  it('passes the folder of the theme to update on to the service', async () => {
+    let options: InstallThemeOptions | null = null
+    const { app } = createTestApp({ service: createMockService({ install: async (_id, _path, _repo, o) => { options = o; return meta } }) })
+    await app.request('/api/v1/vaults/vault-1/theme-store/install', install({ repo: 'o/things', replace: true, themeId: 'things-v1' }))
+    expect(options).toEqual({ replace: true, activate: false, targetThemeId: 'things-v1' })
+  })
+
+  it('rejects an invalid themeId before calling the service', async () => {
+    let called = false
+    const { app } = createTestApp({ service: createMockService({ install: async () => { called = true; return meta } }) })
+    const res = await app.request('/api/v1/vaults/vault-1/theme-store/install', install({ repo: 'o/things', themeId: '../x' }))
+    expect(res.status).toBe(400)
+    expect(called).toBe(false)
+  })
+
   it('validates the body before calling the service', async () => {
     let called = false
     const { app } = createTestApp({ service: createMockService({ install: async () => { called = true; return meta } }) })
@@ -186,6 +208,7 @@ describe('POST /vaults/:vaultId/theme-store/install', () => {
 
   it.each([
     ['not in catalog', () => new ThemeNotInCatalogError('o/x'), 404, 'THEME_NOT_IN_CATALOG'],
+    ['theme to update missing', () => new ThemeNotFoundError('x'), 404, 'THEME_NOT_FOUND'],
     ['already installed', () => new ThemeAlreadyInstalledError('Things'), 409, 'THEME_ALREADY_INSTALLED'],
     ['appearance.json invalid', () => new AppearanceFileInvalidError(), 409, 'APPEARANCE_FILE_INVALID'],
     ['files missing', () => new ThemeFilesNotFoundError('o/x', 'theme.css'), 422, 'THEME_FILES_NOT_FOUND'],

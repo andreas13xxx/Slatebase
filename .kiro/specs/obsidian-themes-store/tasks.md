@@ -93,6 +93,30 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, Lint, betroff
 - [ ] 4.4 `test:coverage` und Lint in beiden Paketen; Coverage-Schwellen nie senken (läuft in der CI; lokal nur die
       betroffenen Tests)
 
+## Review PR #255 (2026-10-21)
+Behoben:
+- Update schrieb in den falschen Ordner: `install` leitete den Ordner immer aus dem Katalognamen ab, auch beim Update eines
+  Themes in `minimal-v2` (Duplikat, altes bleibt veraltet und aktiv). Der Update-Check meldet den echten Ordner (`themeId`),
+  `install` nimmt `themeId` (`targetThemeId`) und schreibt dorthin; der Ordner muss existieren und den Katalognamen tragen
+- Screenshot-Proxy ohne Cache: Speicher-Cache (1 h, Fehltreffer 5 min, höchstens 40 MB und 300 Einträge) und eine geteilte
+  Upstream-Anfrage je Repo
+- Update-Cache nur durch Store-Installationen verworfen (laufende Prüfung konnte danach ein veraltetes Ergebnis schreiben;
+  Import und Löschen über die normalen Routen fehlten): Das Ergebnis trägt jetzt einen Fingerabdruck der installierten Themes
+  (Ordner, Name, Version, Änderungszeit) und gilt nur für genau diesen Stand
+- „Schon installiert"-Prüfung und Speichern waren nicht atomar (doppelter Klick, zwei Nutzer): je Vault serialisiert
+- Frontend: Vault-Wechsel während einer Installation konnte das CSS des alten Vaults einspielen und Zustände vermischen:
+  `ThemeStoreBrowser` wird je Vault neu aufgebaut (`key`) und verwirft späte Ergebnisse
+- `publishChange` löste die Nutzerliste je Ereignis neu auf: einmal je Installation
+- `guardedFetch` verglich nur den Hostnamen: jetzt `host:port`, ein Redirect auf einen anderen Port wird abgelehnt
+- Vorwärmen lief an `catalogInFlight` vorbei (zwei Abrufe beim Start): läuft jetzt über `listCatalog` des Services
+
+Bewusst nicht geändert:
+- Zuordnung installiert ↔ Katalog über `manifest.name`: wie Obsidian. Ein eigenes Theme mit gleichem Namen bekommt Updates
+  angeboten; mit dem Fix landen sie wenigstens im richtigen Ordner und ersetzen nur auf Klick auf „Aktualisieren"
+- `manifest.json` und `theme.css` kommen aus zwei Anfragen an `HEAD`: Ein Push dazwischen kann Manifest und CSS
+  verschiedener Commits mischen (Version passt dann nicht zum CSS). Auflösen bräuchte die GitHub-API (Rate-Limit); das
+  Risiko ist gering und ein weiterer Update-Check korrigiert es
+
 ## Backlog (außerhalb dieser Spec, siehe Requirements)
 - Spike „Style Settings" (läuft das Plugin über die Plugin-Kompatibilität, was setzt es?), danach eigene Spec
 - Stichprobe der Wirkung an den häufigsten Katalog-Themes (`measure-selectors.py` und Sonden aus `obsidian-themes-structure`)

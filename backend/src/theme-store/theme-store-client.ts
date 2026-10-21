@@ -53,7 +53,7 @@ export class ThemeStoreClient implements IThemeStoreClient {
   ) {
     const base = new URL(options.rawBaseUrl ?? DEFAULT_RAW_BASE_URL)
     this.origin = base.origin
-    this.guards = { allowedHosts: new Set([base.hostname]), protocols: [base.protocol], userAgent: USER_AGENT }
+    this.guards = { allowedHosts: new Set([base.host]), protocols: [base.protocol], userAgent: USER_AGENT }
   }
 
   async fetchCatalog(): Promise<CommunityThemeEntry[]> {

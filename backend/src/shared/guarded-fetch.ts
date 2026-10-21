@@ -23,7 +23,7 @@ export class GuardedFetchError extends Error {
 
 /** Options for {@link guardedFetch}. */
 export interface GuardedFetchOptions {
-  /** Hostnames (without port) the request and every redirect hop may target. */
+  /** `host[:port]` values the request and every redirect hop may target; the default port is written without one. */
   allowedHosts: ReadonlySet<string>
   /** Maximum body size in bytes; exceeding it aborts the read. */
   maxBytes: number
@@ -59,7 +59,7 @@ function checkUrl(url: string, options: GuardedFetchOptions): URL {
     throw new GuardedFetchError('host-not-allowed', url, 'invalid URL')
   }
   const protocols = options.protocols ?? ['https:']
-  if (!protocols.includes(parsed.protocol) || !options.allowedHosts.has(parsed.hostname)) {
+  if (!protocols.includes(parsed.protocol) || !options.allowedHosts.has(parsed.host)) {
     throw new GuardedFetchError('host-not-allowed', url)
   }
   return parsed

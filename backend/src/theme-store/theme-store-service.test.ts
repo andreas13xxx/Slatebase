@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ILogger } from '../logger/index.js'
-import { ThemeService } from '../themes/index.js'
+import { ThemeNotFoundError, ThemeService } from '../themes/index.js'
 import {
   ThemeAlreadyInstalledError,
   ThemeFilesNotFoundError,
@@ -82,7 +82,7 @@ afterEach(async () => {
 
 function createService(client: IThemeStoreClient) {
   const cache = new ThemeStoreCache(config, undefined, undefined, () => clock)
-  return { service: new ThemeStoreService(client, cache, themes, silent), cache }
+  return { service: new ThemeStoreService(client, cache, themes, silent, () => clock), cache }
 }
 
 describe('listCatalog', () => {
@@ -196,6 +196,41 @@ describe('install', () => {
   })
 })
 
+describe('install: updating in place and concurrency', () => {
+  it('updates the folder the theme really lives in, not the one derived from the catalog name', async () => {
+    await themes.saveTheme(vault, 'things-v1', 'old{}', { name: 'Things', version: '1.0.0' })
+    const { service } = createService(createMockClient({ files: { 'o/things': files('Things', '2.0.0', 'new{}') } }))
+
+    const meta = await service.install('v1', vault, 'o/things', { replace: true, activate: false, targetThemeId: 'things-v1' })
+
+    expect(meta.id).toBe('things-v1')
+    expect((await themes.loadTheme(vault, 'things-v1'))?.css).toBe('new{}')
+    expect((await themes.listThemes(vault)).map((t) => t.id)).toEqual(['things-v1']) // no duplicate "Things" folder
+  })
+
+  it('refuses to update a folder that does not exist or that holds a different theme', async () => {
+    await themes.saveTheme(vault, 'Mine', 'mine{}', { name: 'Totally Different' })
+    const { service } = createService(createMockClient({ files: { 'o/things': files('Things') } }))
+
+    await expect(service.install('v1', vault, 'o/things', { replace: true, activate: false, targetThemeId: 'Nope' })).rejects.toBeInstanceOf(ThemeNotFoundError)
+    await expect(service.install('v1', vault, 'o/things', { replace: true, activate: false, targetThemeId: 'Mine' })).rejects.toBeInstanceOf(ThemeManifestMismatchError)
+    expect((await themes.loadTheme(vault, 'Mine'))?.css).toBe('mine{}') // untouched
+  })
+
+  it('lets exactly one of two simultaneous installs of the same theme through', async () => {
+    const { service } = createService(createMockClient({ files: { 'o/things': files('Things') } }))
+
+    const results = await Promise.allSettled([
+      service.install('v1', vault, 'o/things', { replace: false, activate: false }),
+      service.install('v1', vault, 'o/things', { replace: false, activate: false }),
+    ])
+
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+    const rejected = results.find((r) => r.status === 'rejected') as PromiseRejectedResult
+    expect(rejected.reason).toBeInstanceOf(ThemeAlreadyInstalledError)
+  })
+})
+
 describe('checkUpdates', () => {
   async function installLocally(name: string, version?: string): Promise<void> {
     await themes.saveTheme(vault, name, 'a{}', { name, ...(version ? { version } : {}) })
@@ -268,6 +303,25 @@ describe('checkUpdates', () => {
     expect(cache.getUpdateCheck('v2')).not.toBeNull()
   })
 
+  it('recomputes when the installed themes changed behind the store\'s back (import or delete)', async () => {
+    await installLocally('Things', '1.0.0')
+    const client = createMockClient({ manifests: { 'o/things': { version: '2.0.0' }, 'o/minimal': { version: '1.0.0' } } })
+    const { service } = createService(client)
+
+    expect((await service.checkUpdates('v1', vault)).checked).toBe(1)
+    await installLocally('Minimal', '1.0.0') // imported through the regular theme routes
+    expect((await service.checkUpdates('v1', vault)).checked).toBe(2)
+
+    await themes.deleteTheme(vault, 'Things')
+    expect((await service.checkUpdates('v1', vault)).updates).toEqual([])
+  })
+
+  it('reports the real folder of an installed theme so the update can target it', async () => {
+    await themes.saveTheme(vault, 'things-v1', 'a{}', { name: 'Things', version: '1.0.0' })
+    const { service } = createService(createMockClient({ manifests: { 'o/things': { version: '2.0.0' } } }))
+    expect((await service.checkUpdates('v1', vault)).updates[0]?.themeId).toBe('things-v1')
+  })
+
   it('lists themes whose version cannot be compared as unknown instead of up to date', async () => {
     await installLocally('Things') // no version in the local manifest
     await installLocally('Minimal', '1.0.0')
@@ -294,6 +348,42 @@ describe('checkUpdates', () => {
   it('returns an empty result for a vault without themes', async () => {
     const { service } = createService(createMockClient())
     expect(await service.checkUpdates('v1', vault)).toMatchObject({ updates: [], unknown: [], warnings: [], checked: 0 })
+  })
+})
+
+describe('getScreenshot caching', () => {
+  const shot: ThemeScreenshot = { contentType: 'image/png', data: Buffer.from([1, 2, 3]) }
+
+  it('answers repeated requests from memory and shares one upstream request between concurrent ones', async () => {
+    const client = createMockClient({ screenshot: shot })
+    const { service } = createService(client)
+
+    await Promise.all([service.getScreenshot('o/things'), service.getScreenshot('o/things'), service.getScreenshot('o/things')])
+    await service.getScreenshot('o/things')
+
+    expect(client.calls.screenshots).toHaveLength(1)
+  })
+
+  it('remembers a missing screenshot only briefly, then asks again', async () => {
+    const client = createMockClient({ screenshot: null })
+    const { service } = createService(client)
+
+    expect(await service.getScreenshot('o/things')).toBeNull()
+    expect(await service.getScreenshot('o/things')).toBeNull()
+    expect(client.calls.screenshots).toHaveLength(1)
+
+    clock += 6 * 60 * 1000
+    await service.getScreenshot('o/things')
+    expect(client.calls.screenshots).toHaveLength(2)
+  })
+
+  it('asks again after a cached image expired', async () => {
+    const client = createMockClient({ screenshot: shot })
+    const { service } = createService(client)
+    await service.getScreenshot('o/things')
+    clock += 61 * 60 * 1000
+    await service.getScreenshot('o/things')
+    expect(client.calls.screenshots).toHaveLength(2)
   })
 })
 

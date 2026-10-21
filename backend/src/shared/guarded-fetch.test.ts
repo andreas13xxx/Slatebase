@@ -23,6 +23,9 @@ function handler(req: IncomingMessage, res: ServerResponse): void {
   } else if (url === '/redirect-foreign') {
     res.writeHead(302, { Location: 'http://evil.example.test/steal' })
     res.end()
+  } else if (url === '/redirect-other-port') {
+    res.writeHead(302, { Location: 'http://127.0.0.1:1/x' })
+    res.end()
   } else if (url === '/redirect-loop') {
     res.writeHead(302, { Location: '/redirect-loop' })
     res.end()
@@ -45,7 +48,9 @@ function handler(req: IncomingMessage, res: ServerResponse): void {
 beforeAll(async () => {
   server = createServer(handler)
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-  base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+  const port = (server.address() as AddressInfo).port
+  base = `http://127.0.0.1:${port}`
+  options = { allowedHosts: new Set([`127.0.0.1:${port}`]), maxBytes: 4096, protocols: ['http:'] }
 })
 
 afterAll(async () => {
@@ -53,7 +58,8 @@ afterAll(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()))
 })
 
-const options = { allowedHosts: new Set(['127.0.0.1']), maxBytes: 4096, protocols: ['http:'] as const }
+/** Allowlist entries are host:port; the port is only known once the test server listens. */
+let options: { allowedHosts: Set<string>; maxBytes: number; protocols: readonly ['http:'] }
 
 async function failureOf(promise: Promise<unknown>): Promise<GuardedFetchError> {
   try {
@@ -91,6 +97,11 @@ describe('guardedFetch', () => {
     expect(error.url).toContain('evil.example.test')
   })
 
+  it('rejects a redirect to the same host on another port', async () => {
+    const error = await failureOf(guardedFetch(`${base}/redirect-other-port`, options))
+    expect(error.kind).toBe('host-not-allowed')
+  })
+
   it('rejects a start URL outside the allowlist or with a disallowed protocol', async () => {
     expect((await failureOf(guardedFetch('http://evil.example.test/x', options))).kind).toBe('host-not-allowed')
     expect((await failureOf(guardedFetch(`${base}/ok`, { ...options, protocols: ['https:'] }))).kind).toBe('host-not-allowed')
@@ -122,7 +133,7 @@ describe('guardedFetch', () => {
   })
 
   it('reports a refused connection as a network error, not as a status', async () => {
-    const error = await failureOf(guardedFetch('http://127.0.0.1:1/x', options))
+    const error = await failureOf(guardedFetch('http://127.0.0.1:1/x', { ...options, allowedHosts: new Set(['127.0.0.1:1']) }))
     expect(error.kind).toBe('network')
   })
 

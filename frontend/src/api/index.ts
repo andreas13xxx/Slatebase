@@ -276,6 +276,8 @@ export interface InstallStoreThemeOptions {
   replace?: boolean
   /** Make the theme the vault's active theme. */
   activate?: boolean
+  /** Folder of the installed theme to update in place (the update check reports it). */
+  themeId?: string
 }
 
 /** URL of a catalog theme's screenshot (served by the backend, so the browser never contacts GitHub). */
@@ -1511,6 +1513,7 @@ export class ApiClient implements IApiClient {
       repo,
       replace: options.replace ?? false,
       activate: options.activate ?? false,
+      ...(options.themeId !== undefined ? { themeId: options.themeId } : {}),
     })
   }
 

@@ -759,7 +759,7 @@ app.route(
 // Warm the catalog in the background so the first visit is instant. Not awaited: an offline server must start
 // normally (the helper logs one warning and keeps the persisted catalog).
 if (featureToggleService.isEnabled('obsidian-theme-store')) {
-  void warmThemeStoreCatalog(themeStoreClient, themeStoreCache, logger)
+  void warmThemeStoreCatalog(themeStoreService, logger)
 }
 
 // Plugin Store route registration (auth middleware applies via /api/v1/* pattern)

@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import type { ILogger } from '../logger/index.js'
 import { ThemeStoreCache } from './theme-store-cache.js'
-import type { CommunityThemeEntry, IThemeStoreClient } from './types.js'
+import type { CommunityThemeEntry } from './types.js'
 import { warmThemeStoreCatalog } from './warmup.js'
 
 const ENTRY: CommunityThemeEntry = { name: 'Things', author: 'a', repo: 'o/things', screenshot: '', modes: ['dark'], legacy: false }
@@ -106,61 +106,36 @@ describe('ThemeStoreCache', () => {
 })
 
 describe('warmThemeStoreCatalog', () => {
-  function clientReturning(result: CommunityThemeEntry[] | Error): IThemeStoreClient & { calls: number } {
-    return {
-      calls: 0,
-      async fetchCatalog() {
-        this.calls++
-        if (result instanceof Error) throw result
-        return result
-      },
-      fetchThemeFiles: () => Promise.reject(new Error('unused')),
-      fetchManifest: () => Promise.reject(new Error('unused')),
-      fetchScreenshot: () => Promise.resolve(null),
-    }
-  }
+  const entries = [ENTRY]
 
-  it('fetches and caches the catalog', async () => {
-    const cache = new ThemeStoreCache(config, undefined, undefined, now)
-    const client = clientReturning([ENTRY])
-    expect(await warmThemeStoreCatalog(client, cache, silent)).toBe(1)
-    expect(cache.getCatalog()).toEqual([ENTRY])
+  it('reports the number of entries once the catalog is available', async () => {
+    expect(await warmThemeStoreCatalog({ listCatalog: async () => ({ themes: entries, stale: false }) }, silent)).toBe(1)
   })
 
-  it('skips the request when the catalog is still fresh', async () => {
-    const cache = new ThemeStoreCache(config, undefined, undefined, now)
-    cache.setCatalog([ENTRY])
-    const client = clientReturning([])
-    expect(await warmThemeStoreCatalog(client, cache, silent)).toBeNull()
-    expect(client.calls).toBe(0)
-  })
-
-  it('never rejects when the network fails: logs once, keeps the stale catalog, does not retry', async () => {
-    const cache = new ThemeStoreCache(config, undefined, undefined, now)
-    cache.setCatalog([ENTRY])
-    clock += 5000
+  it('returns null and warns once when only a stale list is left', async () => {
     const warnings: string[] = []
     const logger: ILogger = { ...silent, warn: (message) => { warnings.push(message) } }
-    const client = clientReturning(new Error('offline'))
-
-    await expect(warmThemeStoreCatalog(client, cache, logger)).resolves.toBeNull()
+    expect(await warmThemeStoreCatalog({ listCatalog: async () => ({ themes: entries, stale: true }) }, logger)).toBeNull()
     expect(warnings).toHaveLength(1)
-    expect(client.calls).toBe(1)
-    expect(cache.getCatalogStale()).toEqual([ENTRY])
+  })
+
+  it('never rejects when the network fails and nothing is cached: one warning, no retry', async () => {
+    const warnings: string[] = []
+    const logger: ILogger = { ...silent, warn: (message) => { warnings.push(message) } }
+    let calls = 0
+    const source = { listCatalog: async () => { calls++; throw new Error('offline') } }
+
+    await expect(warmThemeStoreCatalog(source, logger)).resolves.toBeNull()
+    expect(warnings).toHaveLength(1)
+    expect(calls).toBe(1)
   })
 
   it('does not hold up its caller: a slow upstream only delays the returned promise', async () => {
-    const cache = new ThemeStoreCache(config, undefined, undefined, now)
     let release!: () => void
     const gate = new Promise<void>((resolve) => { release = resolve })
-    const client: IThemeStoreClient = {
-      async fetchCatalog() { await gate; return [ENTRY] },
-      fetchThemeFiles: () => Promise.reject(new Error('unused')),
-      fetchManifest: () => Promise.reject(new Error('unused')),
-      fetchScreenshot: () => Promise.resolve(null),
-    }
-    const pending = warmThemeStoreCatalog(client, cache, silent) // deliberately not awaited, as at startup
-    expect(cache.getCatalog()).toBeNull()
+    let started = false
+    const pending = warmThemeStoreCatalog({ listCatalog: async () => { started = true; await gate; return { themes: entries, stale: false } } }, silent) // not awaited, as at startup
+    expect(started).toBe(true) // it began, and the caller got control back immediately
     release()
     expect(await pending).toBe(1)
   })

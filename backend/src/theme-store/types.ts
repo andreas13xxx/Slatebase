@@ -67,6 +67,12 @@ export interface InstallThemeOptions {
   replace: boolean
   /** Make the installed theme the vault's active theme. */
   activate: boolean
+  /**
+   * Folder of an installed theme to update in place. Set by updates (the update check reports it), so the new files
+   * land in the folder the theme really lives in, not in one derived from the catalog name. Implies `replace`; the
+   * theme must exist and carry the catalog entry's name.
+   */
+  targetThemeId?: string
 }
 
 /** An installed theme with a newer version in the catalog. */

@@ -80,6 +80,12 @@ export function ThemeStoreBrowser() {
   const sentinelRef = useRef<HTMLDivElement>(null)
   /** The search text the filters currently use (the debounce timer compares against it). */
   const appliedQueryRef = useRef('')
+  /** False once this browser unmounted (for example because the vault changed): late results are dropped. */
+  const aliveRef = useRef(true)
+  useEffect(() => {
+    aliveRef.current = true
+    return () => { aliveRef.current = false }
+  }, [])
 
   // Catalog: loaded on mount and whenever "Erneut versuchen" bumps reloadKey.
   useEffect(() => {
@@ -161,10 +167,12 @@ export function ThemeStoreBrowser() {
   const applyLocally = useCallback(async (themeId: string) => {
     if (!vaultId || !apiClient) return
     const { css } = await apiClient.loadTheme(vaultId, themeId)
+    // Switched to another vault meanwhile: this theme belongs to the old one and must not be injected now.
+    if (!aliveRef.current) return
     themeInjector.apply(themeId, css)
   }, [vaultId, apiClient])
 
-  const runInstall = useCallback(async (repo: string, name: string, replace: boolean) => {
+  const runInstall = useCallback(async (repo: string, name: string, replace: boolean, themeId?: string) => {
     if (!vaultId || !apiClient) return
     setBusy((b) => ({ ...b, [repo]: true }))
     setErrors((e) => {
@@ -172,11 +180,14 @@ export function ThemeStoreBrowser() {
       return rest
     })
     try {
-      const meta = await apiClient.installStoreTheme(vaultId, repo, { replace, activate: activateAfter })
+      const meta = await apiClient.installStoreTheme(vaultId, repo, { replace, activate: activateAfter, ...(themeId !== undefined ? { themeId } : {}) })
+      // The vault was switched while the download ran: the install itself is done, but nothing here may show it.
+      if (!aliveRef.current) return
 
       let nowActive = activateAfter ? meta.id : activeId
       try {
         const list = await apiClient.listThemes(vaultId)
+        if (!aliveRef.current) return
         setInstalled(list.themes)
         setActiveId(list.activeThemeId)
         nowActive = list.activeThemeId
@@ -194,6 +205,7 @@ export function ThemeStoreBrowser() {
       if (nowActive === meta.id) {
         try {
           await applyLocally(meta.id)
+          if (!aliveRef.current) return
         } catch {
           setNotice(`"${name}" wurde ${replace ? 'aktualisiert' : 'installiert'}, konnte hier aber nicht angezeigt werden.`)
           return
@@ -334,7 +346,7 @@ export function ThemeStoreBrowser() {
                 busy={busy[theme.repo] === true}
                 error={errors[theme.repo]}
                 onInstall={() => void runInstall(theme.repo, theme.name, false)}
-                onUpdate={() => void runInstall(theme.repo, theme.name, true)}
+                onUpdate={() => void runInstall(theme.repo, theme.name, true, updatesByName.get(theme.name.toLowerCase())?.themeId)}
               />
             ))}
           </ul>

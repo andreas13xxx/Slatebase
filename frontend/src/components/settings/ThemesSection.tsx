@@ -11,6 +11,7 @@
  */
 import { useCallback, useId, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
+import { useAppContext } from '../../state'
 import { useFeatureContext } from '../../state/featureContext'
 import { ThemeManager } from './ThemeManager'
 import { ThemeStoreBrowser } from './ThemeStoreBrowser'
@@ -26,6 +27,7 @@ const TABS: ReadonlyArray<{ id: ThemesTab; label: string }> = [
 /** Wraps ThemeManager (and, with the store feature on, the catalog browser) with the section title/description. */
 export function ThemesSection() {
   const { isEnabled } = useFeatureContext()
+  const { state } = useAppContext()
   const storeEnabled = isEnabled('obsidian-theme-store')
   const [tab, setTab] = useState<ThemesTab>('installed')
   const baseId = useId()
@@ -79,7 +81,7 @@ export function ThemesSection() {
         id={`${baseId}-panel-${shown}`}
         aria-labelledby={storeEnabled ? `${baseId}-tab-${shown}` : undefined}
       >
-        {shown === 'installed' ? <ThemeManager /> : <ThemeStoreBrowser />}
+        {shown === 'installed' ? <ThemeManager /> : <ThemeStoreBrowser key={state.selectedVaultId ?? ''} />}
       </div>
     </SettingSection>
   )
