@@ -38,11 +38,15 @@ Andreas zur Umsetzung freigegeben hat. Entscheidungen des Abgleichs:
   `workspaceStore.ts`). Heute wird genau EIN Layout pro Vault persistiert.
 - Entspricht dem zurückgestellten Rest von Track G im `implementation-plan.md`.
 
-### R3 — Unique Note / Zettelkasten-Prefix
-- Als Benutzer möchte ich per Command eine neue Notiz mit einem Zeitstempel-Prefix
-  (z. B. `YYYYMMDDHHmmss`) an einem konfigurierbaren Zielort anlegen.
-- Baut auf dem vorhandenen Template-/Daily-Note-Mechanismus auf (`state/dailyNoteService.ts`,
-  `template-service.ts`), nur anderes Benennungsschema + Zielordner-Config.
+### R3 — Unique Note / Zettelkasten-Prefix ✅ ERLEDIGT (Branch feature/obsidian-feature-gaps)
+- Umgesetzt: Befehl „Eindeutige Notiz anlegen“ (`slatebase:create-unique-note`, Obsidian-Compat
+  `unique-note:create-today`) legt eine neue Notiz mit Zeitstempel-Namen `YYYYMMDDHHmmss` an und
+  öffnet sie. `state/uniqueNoteService.ts` (reine Helfer für Name + Pfad, 7 Tests).
+- Zielordner ist konfigurierbar: neues Vault-Config-Feld `uniqueNoteDirectory` (Backend-Typ +
+  Default + Zod + Store-Merge, Frontend-`VaultConfig`-Typ + Settings-UI-Feld in `VaultConfigSection`),
+  leer = Vault-Wurzel — analog zu `attachmentsDirectory`. Zeitstempel-Format fest (nicht konfigurierbar).
+- Verdrahtet in Command Palette + Core-Command + i18n (de/en) + Keybinding (ohne Default). Kein
+  Toolbar-Button (bewusst; Palette/Keybinding genügen).
 
 ### R4 — Web Viewer (eingebettete Webseiten)
 - Als Benutzer möchte ich eine URL als Tab-Inhalt öffnen und `![](url)` als eingebettete Webseite

@@ -32,6 +32,7 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
   const [dailyNotesDir, setDailyNotesDir] = useState('')
   const [dailyNoteTemplateName, setDailyNoteTemplateName] = useState('')
   const [attachmentsDir, setAttachmentsDir] = useState('')
+  const [uniqueNoteDir, setUniqueNoteDir] = useState('')
 
   // "Aktive Datei im Explorer verfolgen" used to live here. It is an account
   // preference that applies to every vault, so it moved to
@@ -50,6 +51,7 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
         setDailyNotesDir(cfg.dailyNotesDirectory)
         setDailyNoteTemplateName(cfg.dailyNoteTemplateName)
         setAttachmentsDir(cfg.attachmentsDirectory)
+        setUniqueNoteDir(cfg.uniqueNoteDirectory ?? '')
         setError(null)
       } catch (err: unknown) {
         if (cancelled) return
@@ -75,12 +77,14 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
         dailyNotesDirectory: dailyNotesDir.trim(),
         dailyNoteTemplateName: dailyNoteTemplateName.trim(),
         attachmentsDirectory: attachmentsDir.trim(),
+        uniqueNoteDirectory: uniqueNoteDir.trim(),
       })
       setConfig(updated)
       setTemplatesDir(updated.templatesDirectory)
       setDailyNotesDir(updated.dailyNotesDirectory)
       setDailyNoteTemplateName(updated.dailyNoteTemplateName)
       setAttachmentsDir(updated.attachmentsDirectory)
+      setUniqueNoteDir(updated.uniqueNoteDirectory ?? '')
       showToast('success', 'Vault-Konfiguration gespeichert')
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'message' in err
@@ -91,13 +95,14 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
     } finally {
       setSaving(false)
     }
-  }, [apiClient, vaultId, templatesDir, dailyNotesDir, dailyNoteTemplateName, attachmentsDir])
+  }, [apiClient, vaultId, templatesDir, dailyNotesDir, dailyNoteTemplateName, attachmentsDir, uniqueNoteDir])
 
   const hasChanges = config !== null && (
     templatesDir.trim() !== config.templatesDirectory ||
     dailyNotesDir.trim() !== config.dailyNotesDirectory ||
     dailyNoteTemplateName.trim() !== config.dailyNoteTemplateName ||
-    attachmentsDir.trim() !== config.attachmentsDirectory
+    attachmentsDir.trim() !== config.attachmentsDirectory ||
+    uniqueNoteDir.trim() !== (config.uniqueNoteDirectory ?? '')
   )
 
   if (loading) {
@@ -177,6 +182,24 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
             value={attachmentsDir}
             onChange={(e) => setAttachmentsDir(e.target.value)}
             placeholder="(gleicher Ordner wie die Notiz)"
+            disabled={saving}
+          />
+        </div>
+
+        <div className="settings-field">
+          <label htmlFor="vault-unique-note-dir" className="settings-field-label">
+            Verzeichnis für eindeutige Notizen
+          </label>
+          <p className="settings-field-hint">
+            Relativer Pfad im Vault, in dem der Befehl „Eindeutige Notiz anlegen“ neue Notizen mit Zeitstempel-Namen (<code>JJJJMMTThhmmss</code>) erstellt. Leer = Vault-Wurzel.
+          </p>
+          <input
+            id="vault-unique-note-dir"
+            type="text"
+            className="settings-field-input"
+            value={uniqueNoteDir}
+            onChange={(e) => setUniqueNoteDir(e.target.value)}
+            placeholder="(Vault-Wurzel)"
             disabled={saving}
           />
         </div>

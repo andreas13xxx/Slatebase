@@ -94,6 +94,7 @@ export const DEFAULT_KEYBINDINGS: KeybindingDefinition[] = [
   { commandId: 'slatebase:new-from-template', label: 'Neue Notiz aus Vorlage', defaultShortcut: '', category: 'vault' },
   { commandId: 'slatebase:insert-template', label: 'Vorlage einfügen', defaultShortcut: '', category: 'vault' },
   { commandId: 'slatebase:open-random-note', label: 'Zufällige Notiz öffnen', defaultShortcut: '', category: 'vault' },
+  { commandId: 'slatebase:create-unique-note', label: 'Eindeutige Notiz anlegen', defaultShortcut: '', category: 'vault' },
   { commandId: 'slatebase:open-graph', label: 'Knowledge Graph öffnen', defaultShortcut: '', category: 'vault' },
   { commandId: 'slatebase:open-trash', label: 'Papierkorb öffnen', defaultShortcut: '', category: 'vault' },
 ]

@@ -11,6 +11,7 @@ import { useAppContext, loadVaults } from '../state/index'
 import { useAuthContext } from '../state/authContext'
 import { useNavigationHistory } from '../state/navigationHistoryContext'
 import { openTab } from '../state/tabActions'
+import { createUniqueNote } from '../state/uniqueNoteService'
 import { onOpenInSplit } from '../state/openInSplitBridge'
 import type { TabAction } from '../state/tabState'
 import { TemplateSelector } from './TemplateSelector'
@@ -68,6 +69,7 @@ const DUPLICATE_OF_NATIVE_COMMAND = new Map<string, string>([
   ['daily-notes', 'slatebase:daily-note'],
   ['insert-template', 'slatebase:insert-template'],
   ['random-note', 'slatebase:open-random-note'],
+  ['unique-note:create-today', 'slatebase:create-unique-note'],
   ['app:toggle-ribbon', 'slatebase:toggle-toolbar'],
   ['command-palette:open', 'slatebase:open-command-palette'],
   ['file-explorer:new-file', 'slatebase:create-file'],
@@ -269,6 +271,28 @@ export function CommandPaletteContainer({
     void openTab(tabDispatch, appDispatch, apiClient, vaultId, pick.path, pick.name)
   }, [state.selectedVaultId, state.vaultTrees, state.directoryTree, apiClient, tabState, tabDispatch, appDispatch])
 
+  /**
+   * Creates a new unique note (timestamp-prefixed name `YYYYMMDDHHmmss`) in the
+   * vault's configured unique-note folder and opens it. Refreshes the tree so
+   * the new file shows in the explorer, mirroring the Quick Switcher's create
+   * flow.
+   */
+  const createUniqueNoteCmd = useCallback(() => {
+    const vaultId = state.selectedVaultId
+    if (!vaultId || !apiClient) return
+    void (async () => {
+      try {
+        const path = await createUniqueNote(apiClient, vaultId)
+        const tree = await apiClient.fetchVaultTree(vaultId)
+        appDispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree } })
+        const name = path.split('/').pop() ?? path
+        void openTab(tabDispatch, appDispatch, apiClient, vaultId, path, name)
+      } catch (err) {
+        showToast('error', extractErrorMessage(err, 'Die eindeutige Notiz konnte nicht erstellt werden.'))
+      }
+    })()
+  }, [state.selectedVaultId, apiClient, appDispatch, tabDispatch])
+
   // ─── Custom events for the toolbar buttons ─────────────────────────────────
   // The toolbar buttons and the palette commands must do the same thing, so the
   // buttons dispatch these instead of carrying their own copies of the logic.
@@ -276,16 +300,19 @@ export function CommandPaletteContainer({
     function handleRandomNote() { openRandomNote() }
     function handleInsertTemplate() { openTemplateInserter() }
     function handleToggleDictation() { toggleDictation() }
+    function handleCreateUniqueNote() { createUniqueNoteCmd() }
 
     window.addEventListener('slatebase:open-random-note', handleRandomNote)
     window.addEventListener('slatebase:insert-template', handleInsertTemplate)
     window.addEventListener('slatebase:toggle-dictation', handleToggleDictation)
+    window.addEventListener('slatebase:create-unique-note', handleCreateUniqueNote)
     return () => {
       window.removeEventListener('slatebase:open-random-note', handleRandomNote)
       window.removeEventListener('slatebase:insert-template', handleInsertTemplate)
       window.removeEventListener('slatebase:toggle-dictation', handleToggleDictation)
+      window.removeEventListener('slatebase:create-unique-note', handleCreateUniqueNote)
     }
-  }, [openRandomNote, openTemplateInserter, toggleDictation])
+  }, [openRandomNote, openTemplateInserter, toggleDictation, createUniqueNoteCmd])
 
   // ─── Keyboard shortcuts for the toolbar-related commands ───────────────────
   // These ship without a default binding, so nothing fires until the user
@@ -303,12 +330,15 @@ export function CommandPaletteContainer({
       } else if (matchesShortcut('slatebase:insert-template', e)) {
         e.preventDefault()
         openTemplateInserter()
+      } else if (matchesShortcut('slatebase:create-unique-note', e)) {
+        e.preventDefault()
+        createUniqueNoteCmd()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [openRandomNote, openTemplateInserter])
+  }, [openRandomNote, openTemplateInserter, createUniqueNoteCmd])
 
   // ─── Core command registration (Obsidian's workspace:*/app:*/theme:*/... commands) ──
   // Registered once; commands read fresh state via this ref instead of stale closures
@@ -348,6 +378,7 @@ export function CommandPaletteContainer({
     onOpenTemplateSelector: openTemplateSelector,
     onInsertTemplate: openTemplateInserter,
     onOpenRandomNote: openRandomNote,
+    onCreateUniqueNote: createUniqueNoteCmd,
     onToggleToolbar: toggleToolbarVisible,
     onOpenReleaseNotes: () => setReleaseNotesOpen(true),
     onOpenDebugInfo: () => setDebugInfoOpen(true),

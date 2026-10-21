@@ -590,6 +590,8 @@ export interface VaultConfig {
   dailyNoteTemplateName: string
   /** Directory for new attachments. Empty = same folder as the note being edited. */
   attachmentsDirectory: string
+  /** Directory for new unique notes (timestamp-prefixed). Empty = vault root. */
+  uniqueNoteDirectory?: string
 }
 
 /**

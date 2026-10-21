@@ -22,6 +22,13 @@ export interface VaultConfig {
    */
   attachmentsDirectory: string
   /**
+   * Directory for new unique notes (relative to vault root). Empty string =
+   * vault root. A unique note is created with a timestamp prefix name
+   * (`YYYYMMDDHHmmss`), Obsidian's Zettelkasten convention — the folder is the
+   * one configurable part; the timestamp format is fixed.
+   */
+  uniqueNoteDirectory: string
+  /**
    * How many days of activity-timeline events to retain for this vault before
    * the periodic cleanup job prunes them. Default 90. 0 disables pruning.
    */
@@ -34,6 +41,7 @@ export const DEFAULT_VAULT_CONFIG: VaultConfig = {
   dailyNotesDirectory: '',
   dailyNoteTemplateName: 'daily.md',
   attachmentsDirectory: '',
+  uniqueNoteDirectory: '',
   activityRetentionDays: 90,
 }
 
