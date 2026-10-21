@@ -13,6 +13,7 @@ import { ConfirmModal } from './ConfirmModal'
 import { extractErrorMessage } from '../utils/error'
 import { useTranslation } from '../i18n'
 import { PluginStoreBrowser } from './plugin-store'
+import { mountSettingTab, waitForElement } from '../plugins/compat/setting-tab-mount'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -290,24 +291,35 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
     // Check if the plugin has a native settings tab registered
     const settingTab = pluginContext?.settingTabRegistry.get(pluginId)
     if (settingTab) {
-      // Native settings: try declarative definitions first, then fall back to display()
+      // The tab's host element only exists once the loading state is over. Mount the container into it *before* the
+      // tab draws itself: Obsidian attaches containerEl first and plugins (Style Settings) render only when attached.
+      setSettingsLoading(false)
+      const host = await waitForElement(() => settingsContainerRef.current)
+      if (!host) {
+        setSettingsError('Plugin-Einstellungen konnten nicht angezeigt werden.')
+        return
+      }
       try {
-        settingTab.containerEl.innerHTML = ''
-
-        // Check for declarative settings (Obsidian 1.13+)
-        const defs = (settingTab as unknown as { getSettingDefinitions?: () => unknown[] }).getSettingDefinitions?.()
-        if (defs && Array.isArray(defs) && defs.length > 0) {
-          // Use declarative renderer
-          const { renderSettingDefinitions } = await import('../plugins/compat/declarative-settings-renderer')
-          renderSettingDefinitions(
-            defs as import('../plugins/compat/declarative-settings-renderer').SettingDefinitionItem[],
-            settingTab.containerEl,
-            settingTab as import('../plugins/compat/declarative-settings-renderer').IDeclarativeSettingTab,
-          )
-        } else {
-          // Classic imperative display()
-          settingTab.display()
-        }
+        mountSettingTab(host, settingTab, () => {
+          // Check for declarative settings (Obsidian 1.13+)
+          const defs = (settingTab as unknown as { getSettingDefinitions?: () => unknown[] }).getSettingDefinitions?.()
+          if (defs && Array.isArray(defs) && defs.length > 0) {
+            // Use declarative renderer
+            void import('../plugins/compat/declarative-settings-renderer').then(({ renderSettingDefinitions }) => {
+              renderSettingDefinitions(
+                defs as import('../plugins/compat/declarative-settings-renderer').SettingDefinitionItem[],
+                settingTab.containerEl,
+                settingTab as import('../plugins/compat/declarative-settings-renderer').IDeclarativeSettingTab,
+              )
+            }).catch((err: unknown) => {
+              console.error(`[PluginSettings] Error rendering declarative settings for "${pluginId}":`, err)
+              setSettingsError(`Plugin-Einstellungen konnten nicht gerendert werden: ${extractErrorMessage(err, 'Unbekannter Fehler')}`)
+            })
+          } else {
+            // Classic imperative display()
+            settingTab.display()
+          }
+        })
       } catch (err) {
         console.error(`[PluginSettings] Error rendering settings for "${pluginId}":`, err)
         const detail = extractErrorMessage(err, 'Unbekannter Fehler')
@@ -319,14 +331,6 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
           setSettingsError(`Plugin-Einstellungen konnten nicht gerendert werden: ${detail}`)
         }
       }
-      setSettingsLoading(false)
-      // Mount containerEl in the next render via ref
-      requestAnimationFrame(() => {
-        if (settingsContainerRef.current && settingTab.containerEl) {
-          settingsContainerRef.current.innerHTML = ''
-          settingsContainerRef.current.appendChild(settingTab.containerEl)
-        }
-      })
       return
     }
 
