@@ -84,6 +84,7 @@ export class GraphRouteModule implements RouteModule {
     router.get('/vaults/:vaultId/graph/meta', (c) => this.getGraphMeta(c))
     router.get('/vaults/:vaultId/backlinks', (c) => this.getBacklinks(c))
     router.get('/vaults/:vaultId/tags', (c) => this.getTags(c))
+    router.get('/vaults/:vaultId/aliases', (c) => this.getAliases(c))
   }
 
   // ─── Route Handlers ──────────────────────────────────────────────────────
@@ -237,6 +238,44 @@ export class GraphRouteModule implements RouteModule {
     }))
 
     return c.json({ tags }, 200)
+  }
+
+  /**
+   * GET /vaults/:vaultId/aliases
+   * Returns the full alias→path list for the vault, built from the `aliases`
+   * frontmatter property index. Each entry maps one declared alias value to one
+   * file path; a file with several aliases yields one entry per alias, and the
+   * same alias on several files yields one entry per file.
+   * Requires read or write permission. Triggers lazy-init if index not ready.
+   * Returns an empty list for vaults without a link index or without aliases.
+   */
+  private async getAliases(c: Context): Promise<Response> {
+    const vaultId = c.req.param('vaultId') as string
+
+    const linkIndex = this.getLinkIndex(vaultId)
+    if (linkIndex === undefined) {
+      return c.json({ aliases: [] }, 200)
+    }
+
+    if (!linkIndex.isReady()) {
+      this.logger.info('Link index not ready, triggering rebuild', { vaultId })
+      await linkIndex.rebuild()
+    }
+
+    // Build the alias → path list from the `aliases` property index.
+    // getPropertyValues returns each distinct alias value; getFilesByProperty
+    // returns every file declaring that value. A high limit covers any realistic
+    // vault (aliases are far fewer than notes).
+    const aliases: Array<{ alias: string; path: string }> = []
+    const values = linkIndex.getPropertyValues('aliases', 100000)
+    for (const { value } of values) {
+      const paths = linkIndex.getFilesByProperty('aliases', value)
+      for (const path of paths) {
+        aliases.push({ alias: value, path })
+      }
+    }
+
+    return c.json({ aliases }, 200)
   }
 }
 

@@ -14,14 +14,21 @@ Andreas zur Umsetzung freigegeben hat. Entscheidungen des Abgleichs:
 
 ## Pflicht-Features (zur Umsetzung vorgesehen)
 
-### R1 — Aliases
+### R1 — Aliases ✅ ERLEDIGT (Branch feature/obsidian-feature-gaps)
 → **Vollständige Spec: `.kiro/specs/aliases/`** (requirements + design + tasks).
-- Als Benutzer möchte ich im Frontmatter `aliases:` definieren, damit eine Notiz unter mehreren
-  Namen auffindbar und verlinkbar ist.
-- Der Wikilink-Resolver MUSS `[[Alias]]` auf die Notiz auflösen, die diesen Alias deklariert.
-- Der Quick Switcher (Ctrl+O) MUSS Alias-Treffer anzeigen, sichtbar als „Alias → Datei".
-- Aliase werden bereits im Property-Editor gespeichert (Listen-Typ); nur Auflösung + Switcher-Index
-  fehlen. Reservierter Property-Key `aliases` ist bereits bekannt (`RESERVED_PROPERTY_KEYS`).
+- Umgesetzt: Backend-Route `GET /vaults/:vaultId/aliases` (über `getPropertyValues('aliases')`
+  + `getFilesByProperty`), `IApiClient.getVaultAliases`, `state/aliasStore.ts` (Map +
+  Original-casing-Entries, `vault:change`-Invalidierung, Vault-Wechsel-Lifecycle in `App.tsx`),
+  Resolver-Erweiterung (`resolveWikilinkTargetWithAlternatives` optionaler `aliasMap`-Parameter,
+  Alias-Pass NUR nach erfolglosem Namens-/Pfad-Pass), Verdrahtung in ViewMode + Live-Preview-Click,
+  Quick-Switcher-Alias-Treffer („Alias → Datei", dedupliziert gegen Namenstreffer).
+- Wikilink-Resolver (`frontend/src/plugins/link-resolver.ts`) matcht jetzt gegen Aliase.
+- Der Quick Switcher (Ctrl+O) zeigt Alias-Treffer, sichtbar als „Alias → Datei".
+- Aliase werden bereits im Property-Editor gespeichert (Listen-Typ); Auflösung + Switcher-Index
+  sind jetzt implementiert. Reservierter Property-Key `aliases` (`RESERVED_PROPERTY_KEYS`).
+- Offener Folgeschritt (bewusst außerhalb Scope): Alias-Anzeige im Explorer-Titel, Alias-Pass
+  in Backlinks/Unlinked-Mentions, `[[`-Autovervollständigung, i18n-Namespace für den QuickSwitcher
+  (die Komponente ist aktuell durchgängig hartkodiert-deutsch).
 
 ### R2 — Workspaces (benannte Layouts)
 → **Vollständige Spec: `.kiro/specs/workspaces/`** (requirements + design + tasks).

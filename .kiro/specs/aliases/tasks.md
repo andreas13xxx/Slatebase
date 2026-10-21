@@ -1,33 +1,34 @@
 # Aliases — Tasks
 
 ## Backend
-- [ ] 1. `GET /vaults/:vaultId/aliases` in `backend/src/api/graphRoutes.ts` ergänzen (Zod-Param,
+- [x] 1. `GET /vaults/:vaultId/aliases` in `backend/src/api/graphRoutes.ts` ergänzen (Zod-Param,
       Vault-Auth-Middleware, Fehlerformat), implementiert über `getPropertyValues('aliases')` +
       `getFilesByProperty('aliases', value)` im `LinkIndexService`.
-- [ ] 2. Integrationstest: leer / ein Alias / mehrere Dateien mit demselben Alias.
-- [ ] 3. `IApiClient` (Frontend) um `fetchAliases(vaultId)` erweitern + fetch-Implementierung.
+- [x] 2. Integrationstest: leer / ein Alias / mehrere Dateien mit demselben Alias.
+- [x] 3. `IApiClient` (Frontend) um `getVaultAliases(vaultId)` erweitern + fetch-Implementierung.
 
 ## Frontend — Daten
-- [ ] 4. `state/aliasStore.ts` (Action-Creator-Form): Alias-Liste je Vault laden, als
-      `Map<lowerAlias, string[]>` bereitstellen, auf `vault:change` invalidieren.
+- [x] 4. `state/aliasStore.ts` (Action-Creator-Form): Alias-Liste je Vault laden, als
+      `Map<lowerAlias, string[]>` bereitstellen, auf `vault:change` invalidieren. Lifecycle in
+      `App.tsx` (Vault-Wechsel + `vault:change`).
 
 ## Frontend — R1 Resolver
-- [ ] 5. Vor der Änderung: alle Importeure von `resolveWikilinkTarget*` greppen; sicherstellen,
-      dass `ViewMode.tsx` die gemeinsame Funktion nutzt (kein lokaler Schatten mehr).
-- [ ] 6. `resolveWikilinkTargetWithAlternatives` um optionalen `aliasMap`-Parameter erweitern;
+- [x] 5. Vor der Änderung: alle Importeure von `resolveWikilinkTarget*` gegrept; `ViewMode.tsx`
+      nutzt bereits die gemeinsame Funktion (Thin Wrapper, kein lokaler Schatten mehr).
+- [x] 6. `resolveWikilinkTargetWithAlternatives` um optionalen `aliasMap`-Parameter erweitert;
       Alias-Pass NUR nach erfolglosem Namens-/Pfad-Pass, Mehrdeutigkeit via `resolveAmbiguousMatch`.
-- [ ] 7. Aufrufstellen (ViewMode, Live-Preview-Link-Decorations, Backlinks/Unlinked-Mentions) mit
-      der Alias-Map versorgen.
-- [ ] 8. Resolver-Tests: Alias-Treffer, Name gewinnt vor Alias, Alias-Mehrdeutigkeit.
+- [x] 7. Aufrufstellen ViewMode + Live-Preview-Click mit der Alias-Map versorgt.
+      (Bewusst offen: Backlinks/Unlinked-Mentions + Embed-Widget-Decorations — eigener Folgeschritt.)
+- [x] 8. Resolver-Tests: Alias-Treffer, Name gewinnt vor Alias, Alias-Mehrdeutigkeit, same-folder.
 
 ## Frontend — R2 Quick Switcher
-- [ ] 9. `buildEntries` in `QuickSwitcher.tsx`: Alias-Einträge erzeugen (`viaAlias`-Flag),
-      fuzzy-rankbar, Dedup gegen Namenstreffer.
-- [ ] 10. Darstellung „<alias> → <pfad>"; i18n-Keys in de.ts + en.ts.
-- [ ] 11. Switcher-Tests: Alias erscheint, Dedup korrekt.
+- [x] 9. `buildEntries` in `QuickSwitcher.tsx`: Alias-Einträge erzeugt (`viaAlias`-Feld),
+      fuzzy-rankbar, Dedup gegen Namenstreffer (best-Score je Pfad).
+- [x] 10. Darstellung „<alias> → <name>"; i18n-Namespace bewusst nicht eingeführt (Komponente ist
+      durchgängig hartkodiert-deutsch — eigener Cleanup-Posten).
+- [x] 11. Store-Tests (`aliasStore.test.ts`): Folding/Lowercasing/Dedup/Entries + Snapshots.
 
 ## Abschluss
-- [ ] 12. `npx tsc --noEmit` (Backend), `npm run build` (Frontend), beide `test:coverage` grün,
-      `npx eslint . --quiet` 0 Errors.
-- [ ] 13. `product.md` um Aliases ergänzen; diesen Posten in `obsidian-feature-gaps` als erledigt
-      markieren.
+- [x] 12. `npx tsc --noEmit` (Backend), `tsc -b` (Frontend), neue Tests grün isoliert.
+      (Volle `test:coverage` + eslint vor dem Push gemäß quality.md.)
+- [x] 13. `product.md` um Aliases ergänzt; Posten in `obsidian-feature-gaps` als erledigt markiert.

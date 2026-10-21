@@ -17,6 +17,7 @@ import type { DirectoryTree } from '../types'
 import { AppContext } from '../state'
 import { requestHoverPreview, dismissHoverPreview } from '../plugins/compat/hover-link-bus'
 import { resolveWikilinkTargetWithAlternatives } from '../plugins/link-resolver'
+import { getAliasMapSnapshot } from '../state/aliasStore'
 import { warnOnce } from '../plugins/compat/log'
 import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, remarkBreaks, remarkBlockRef, remarkPreserveTableCodeEscapes, remarkMath, remarkFootnotes, remarkHighlight, getFootnoteEntries, createAnchorTracker } from '../plugins'
 import type { WikilinkNode, EmbedNode, CalloutNode, TagNode, FootnoteEntry, NumberedFootnoteReference, HighlightNode } from '../plugins'
@@ -1535,7 +1536,7 @@ function renderTextWithEmbeds(
       const displayText = match[4] ?? target
 
       // Resolve the wikilink target against the directory tree
-      const resolution = resolveWikilinkTargetWithAlternatives(target, directoryTree)
+      const resolution = resolveWikilinkTargetWithAlternatives(target, directoryTree, undefined, getAliasMapSnapshot())
       const isBroken = resolution === null
 
       const linkPath = resolution?.resolved.path ?? `${target}.md`
@@ -1617,7 +1618,7 @@ function renderWikilinkNode(
   }
 
   // Resolve the wikilink target against the directory tree
-  const resolution = resolveWikilinkTargetWithAlternatives(target, directoryTree)
+  const resolution = resolveWikilinkTargetWithAlternatives(target, directoryTree, undefined, getAliasMapSnapshot())
   const isBroken = resolution === null
 
   const linkPath = resolution?.resolved.path ?? `${target}.md`

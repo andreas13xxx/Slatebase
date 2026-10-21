@@ -10,6 +10,7 @@ import { buildLinkDecorations } from './link-decorations'
 import { buildWidgetDecorations, toggleCalloutFoldEffect } from './widget-decorations'
 import type { IBasesEmbedApiClient } from '../../components/bases/BasesEmbed'
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
+import { getAliasMapSnapshot } from '../../state/aliasStore'
 import { editorInfoField } from '../editor-state-fields'
 
 /**
@@ -389,7 +390,7 @@ export function createLivePreviewClickHandler(options: LivePreviewOptions): Exte
           event.preventDefault()
           event.stopPropagation()
           // Resolve wikilink target against directory tree (adds .md if needed)
-          const resolvedPath = resolveWikilinkTarget(wikilinkTarget, options.directoryTree)
+          const resolvedPath = resolveWikilinkTarget(wikilinkTarget, options.directoryTree, undefined, getAliasMapSnapshot())
           options.onInternalLinkClick(resolvedPath ?? `${wikilinkTarget}.md`)
           return
         }

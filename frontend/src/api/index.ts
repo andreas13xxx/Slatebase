@@ -83,6 +83,21 @@ export interface VaultTagsResponse {
   tags: VaultTagInfo[]
 }
 
+/**
+ * One alias→path entry from the vault aliases API endpoint.
+ */
+export interface VaultAliasEntry {
+  alias: string
+  path: string
+}
+
+/**
+ * Response from the vault aliases API endpoint.
+ */
+export interface VaultAliasesResponse {
+  aliases: VaultAliasEntry[]
+}
+
 // ─── Plugin Store Types ───────────────────────────────────────────────────────
 
 /** Entry from community-plugins.json */
@@ -686,6 +701,8 @@ export interface IApiClient {
   getActivity(vaultId: string, params?: ActivityQueryParams): Promise<ActivityPage>
   /** Get all tags for a vault with occurrence counts and file lists. */
   getVaultTags(vaultId: string): Promise<VaultTagsResponse>
+  /** Get the full alias→path list for a vault (frontmatter `aliases`). */
+  getVaultAliases(vaultId: string): Promise<VaultAliasesResponse>
   /** Get aggregated graph metadata (tag counts, property key counts). */
   getGraphMeta(vaultId: string): Promise<GraphMeta>
 
@@ -1233,6 +1250,11 @@ export class ApiClient implements IApiClient {
   /** Get all tags for a vault with occurrence counts and file lists. */
   async getVaultTags(vaultId: string): Promise<VaultTagsResponse> {
     return this.request<VaultTagsResponse>('GET', `/api/v1/vaults/${vaultId}/tags`)
+  }
+
+  /** Get the full alias→path list for a vault (frontmatter `aliases`). */
+  async getVaultAliases(vaultId: string): Promise<VaultAliasesResponse> {
+    return this.request<VaultAliasesResponse>('GET', `/api/v1/vaults/${vaultId}/aliases`)
   }
 
   /** Get aggregated graph metadata (tag counts, property key counts). */
