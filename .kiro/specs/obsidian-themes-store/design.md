@@ -143,6 +143,11 @@ abgesichert. Der Eintrag in `VAULT-ROUTE-AUTHORIZATION.md` nennt die neuen Pfade
 
 ## 7. Offene Fragen und Entscheidungen
 
+- **Grenze für `theme.css`:** 2 MB schließt 26 von 911 Themes aus, darunter Catppuccin (2,2 MB). Optionen: bei 2 MB
+  bleiben (Vorschlag; gleich wie Import), auf 3 MB anheben (holt Catppuccin und Typomagical zurück, die übrigen 24 bleiben
+  draußen) oder auf 5 MB. Eine Anhebung gilt dann auch für den Import (`MAX_THEME_CSS_SIZE`) und hängt davon ab, wie träge
+  der Browser mit großen `<style>`-Blöcken ist.
+
 Entschieden am 2026-10-20: Katalog beim Start vorwärmen, unendliches Scrollen, Abschalten nur serverweit (siehe §2).
 
 - Der Plugin-Store schickt das GitHub-Token an alle Hosts. Das ist ein eigenes Thema; hier nur erwähnt, nicht Teil

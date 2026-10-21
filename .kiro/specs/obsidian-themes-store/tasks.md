@@ -3,13 +3,14 @@
 Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, Lint, betroffene Tests). Branch:
 `obsidian-themes-store`, aufbauend auf `master` (Stufe 1 und 2 sind gemergt: #251, #253).
 
-## Phase 0 — Spike gegen die Wirklichkeit
-- [ ] 0.1 Skript im Spec-Ordner: Katalog laden, für alle 910 Einträge `manifest.json` und `theme.css` am Repo-Wurzel
-      abrufen (mäßige Parallelität, keine Wiederholung bei 404). Ausgabe: Anzahl vollständig / ohne Manifest / ohne CSS /
-      über 2 MB / Manifestname ≠ Katalogname / ungültiges JSON
-- [ ] 0.2 Screenshot-Pfade normalisieren und prüfen, wie viele auflösen (HEAD)
-- [ ] 0.3 Ergebnis in Requirements und Design nachtragen; R3.3 (Manifest Pflicht?) und R5.2 anhand der Zahlen bestätigen
-      oder lockern
+## Phase 0 — Spike gegen die Wirklichkeit (abgeschlossen 2026-10-21)
+- [x] 0.1 `probe-catalog.py` im Spec-Ordner: Katalog laden, für alle Einträge `manifest.json` und `theme.css` am Repo-Wurzel
+      abrufen (Wiederholung mit Wartezeit bei fehlender Antwort, Fortsetzen eines früheren Laufs). Erster Lauf mit 8
+      parallelen Anfragen unbrauchbar (431 Anfragen ohne Antwort), zweiter mit 3 Anfragen vollständig
+- [x] 0.2 Screenshot-Pfade normalisiert und geprüft: 906 von 911 lösen auf
+- [x] 0.3 Ergebnis in den Requirements nachgetragen: 818 von 911 (90 %) installierbar, 26 über 2 MB, 62/66 ohne Manifest/CSS;
+      R3.3 (Manifest Pflicht) bestätigt, R3.8 und R5.1 um die gemessenen Fälle ergänzt. Offene Entscheidung: CSS-Grenze
+      (Design §7)
 
 ## Phase 1 — Grundlagen im Backend
 - [ ] 1.1 `shared/guarded-fetch.ts` (Allowlist je Hop, Streaming-Limit, Timeout, kein Authorization-Header) + Tests gegen

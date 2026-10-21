@@ -15,12 +15,45 @@ Themes-Anforderungen mit Entscheidung, was in diese Spec gehört und was nicht.
 
 | Punkt | Befund |
 |---|---|
-| Katalog | `obsidianmd/obsidian-releases/master/community-css-themes.json`, 910 Einträge, Felder `name`, `author`, `repo` (`owner/repo`), `screenshot` (Pfad im Repo), `modes` (`dark`/`light`), bei 17 Einträgen `legacy: true` |
+| Katalog | `obsidianmd/obsidian-releases/master/community-css-themes.json`, 910–911 Einträge (Stand beim Messen: 911), Felder `name`, `author`, `repo` (`owner/repo`), `screenshot` (Pfad im Repo), `modes` (`dark`/`light`), bei 17 Einträgen `legacy: true` |
 | Namen | alle 910 Namen sind eindeutig (auch case-insensitiv); Obsidian ordnet installierte Themes dem Katalog über den Namen zu |
 | Dateien | `theme.css` und `manifest.json` im Repo-Wurzelverzeichnis des Default-Branches, abrufbar über `raw.githubusercontent.com/<repo>/HEAD/…` (Minimal, Things geprüft: beide 200). **Kein GitHub-API-Aufruf nötig, kein API-Rate-Limit** |
 | Statistik | Es gibt keine `community-css-theme-stats.json` wie bei Plugins; keine Download-Zahlen |
 | Screenshots | repo-relative Pfade mit Unregelmäßigkeiten (`./docs/dark.png`, `/images/x.png`, Leerzeichen, leer), 378 verschiedene Werte |
 | `legacy` | Ältere Themes (`obsidian.css`), die Obsidian nur noch begrenzt unterstützt |
+
+### Messung gegen die Wirklichkeit (Phase 0, 2026-10-21, `probe-catalog.py`)
+
+Alle 911 Einträge wurden abgerufen (nur `raw.githubusercontent.com`, mit Wiederholung bei Netzfehlern; ein erster Lauf mit
+8 parallelen Anfragen lieferte bei 431 Anfragen gar keine Antwort und wurde verworfen, der gültige Lauf nutzt 3).
+
+| Ergebnis | Zahl |
+|---|---|
+| installierbar: `manifest.json` gültig **und** `theme.css` ≤ 2 MB | **818 (90 %)** |
+| davon Manifestname = Katalogname | 818 (alle) |
+| `manifest.json` fehlt (404) | 62 |
+| `theme.css` fehlt (404) | 66 |
+| beide fehlen | 60, davon **15 der 17 `legacy`-Themes** |
+| nur eines fehlt | 6 ohne CSS (z. B. Material 3, steam), 2 ohne Manifest (Lizardmen Zettelkasten, Viridian) |
+| Manifest ungültig / über 64 KB | 0 / 0 |
+| `theme.css` über 2 MB | **26** (siehe unten) |
+| Screenshot erreichbar (normalisierter Pfad) | 906 von 911; 3 × 404, 2 ohne Pfad |
+| Screenshot über 2 MB | 16 |
+| Screenshot-Typen | PNG 829, JPEG 69, WebP 5, GIF 1, SVG 1, `octet-stream` 1 |
+
+Größe der installierbaren `theme.css`: Median 37 KB, 90. Perzentil 392 KB, Maximum 2038 KB. Die 26 zu großen Themes liegen
+zwischen 2,0 und 42,5 MB; die größten betten offenbar Schriften oder Bilder als Base64 ein (Latsidian 42,5 MB, Agate
+16,3 MB, Mint-Breeze, Evergreen-Shadow, Lavender-Mist je 8,1 MB). Knapp über der Grenze liegen **Catppuccin (2,2 MB)** und
+Typomagical (2,0 MB), beides bekannte Themes.
+
+**Folgerungen:**
+- Das Manifest als Pflicht (R3.3) kostet nichts: Es gibt keinen Eintrag mit gültigem CSS und ungültigem Manifest. Die zwei
+  Themes ohne Manifest (Lizardmen Zettelkasten, Viridian) sind über den Katalog nicht installierbar.
+- 93 Themes (10 %) sind nicht installierbar. Der Katalog zeigt sie trotzdem (er kennt die Dateien erst beim Abruf); die
+  Oberfläche muss „Nicht installierbar: <Grund>" sauber anzeigen (R3.8), statt einen allgemeinen Fehler.
+- Das 2-MB-Limit schließt 26 Themes aus. Es bleibt bei 2 MB (gleich wie beim Import; ein Browser parst 40 MB CSS nicht
+  sinnvoll), die Entscheidung über Catppuccin steht in den offenen Fragen des Designs.
+- Screenshot-Normalisierung (R5.2) funktioniert: 906 von 911 lösen auf.
 
 ## Ziel
 
@@ -88,7 +121,7 @@ geprüft hat.
     denselben Hinweis zeigen kann wie beim Import.
 3.7 Optional „Danach aktivieren" (Standard: aus). Aktivieren nutzt den bestehenden Weg (`appearance.json`,
     `vault:change`).
-3.8 Ein Fehler (Netz, 404, zu groß, ungültig) zeigt die konkrete Ursache am Eintrag; es bleibt kein halber Zustand im
+3.8 Ein Fehler (Netz, 404, zu groß, ungültig) zeigt die konkrete Ursache am Eintrag, getrennt nach „Dateien nicht im Repo gefunden" (404), „Theme zu groß (x MB, Grenze 2 MB)" und „Netzwerkfehler, erneut versuchen"; es bleibt kein halber Zustand im
     Vault.
 
 ### R4 — Updates
@@ -105,7 +138,7 @@ geprüft hat.
 ### R5 — Vorschau
 5.1 Screenshots werden **nicht** direkt vom Browser bei GitHub geladen (Datenschutz). Der Server liefert sie über eine
     Route (`GET /theme-store/screenshot?repo=…`) aus, nur von `raw.githubusercontent.com`, nur Bildtypen (PNG, JPEG, WebP,
-    GIF), höchstens 2 MB, mit Cache-Header.
+    GIF), höchstens 2 MB (16 von 911 Screenshots sind größer und bekommen den Platzhalter), mit Cache-Header.
 5.2 Der Pfad aus dem Katalog wird normalisiert (`./`, führender `/`, URL-Kodierung); gelingt das nicht oder fehlt das Bild,
     zeigt die Karte einen neutralen Platzhalter. Ein fehlendes Bild blockiert nichts.
 5.3 Die Bilder werden erst geladen, wenn die Karte sichtbar ist (lazy).
