@@ -396,6 +396,11 @@ export interface PluginInstance {
   manifest: PluginManifestData;
   app: IAppShim;
   onload(): Promise<void> | void;
+  /**
+   * Marks the Component base as loaded before `onload()` runs, so `addChild` loads children added during and after it.
+   * Present on instances of Slatebase's `Plugin`; bundles that bring their own base class may not have it.
+   */
+  markLoaded?(): void;
   onunload(): void;
   loadData(): Promise<unknown>;
   saveData(data: unknown): Promise<void>;

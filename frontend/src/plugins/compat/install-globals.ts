@@ -818,6 +818,15 @@ export function installObsidianGlobals(): void {
         this._loaded = true
         containAsyncLoad(this.constructor?.name || 'Component', this.onload())
       }
+      /**
+       * Marks the component as loaded without running `onload()`. PluginLoader calls `onload()` itself (it needs the
+       * returned promise, a timeout and the plugin execution context), so it uses this to give `addChild` Obsidian's
+       * semantics: a child added during or after `onload()` is loaded at once. Without it a plugin's `_loaded` stays
+       * false and its children (Style Settings' markup tree, views, settings tabs) are never loaded.
+       */
+      markLoaded(): void {
+        this._loaded = true
+      }
       onload(): void {}
       unload(): void {
         this._loaded = false
