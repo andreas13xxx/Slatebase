@@ -37,6 +37,23 @@ Views, Markup-Bäume), bekommt sie nicht geladen. Das ist ein allgemeiner Fehler
 Markierung), damit `addChild` während und nach `onload()` die Kinder lädt, wie Obsidian. Dazu ein Test: Plugin, das in
 `onload()` und später per `addChild` ein Kind hinzufügt, bekommt `onload` des Kindes aufgerufen.
 
+**Umgesetzt (2026-10-21):** `PluginLoader` ruft vor `onload()` `markLoaded()` auf (`b28ffbc`, 4 Tests; drei schlagen ohne den
+Fix fehl). Danach zeigte die Live-Prüfung aber weiter „No style settings found" (**Befund 1b**, unten).
+
+### Befund 1b: `display()` lief vor dem Einhängen des Containers
+
+Slatebase rief `tab.display()` auf, bevor `tab.containerEl` im Dialog hing (`PluginManagementPage` hängt ihn erst danach
+ein). Obsidian hängt zuerst ein. Style Settings' `setSettings()` rendert nur, `if (containerEl.parentNode)`, der erste
+Aufruf blieb deshalb leer. Auch das betrifft jedes Plugin, dessen Tab Elemente nur im Dokument aufbaut.
+
+**Umgesetzt (`0f40aa2`):** `mountSettingTab()` und `waitForElement()` (`plugins/compat/setting-tab-mount.ts`, 5 Tests):
+Container einhängen, dann `display()`; `PluginManagementPage` nutzt beides.
+
+**Live bestätigt:** Die Seite rendert sofort (Suchfeld, „Minimal", „Minimal Cards", „Minimal Advanced Settings"), bis hinunter
+zu „Tables" mit fünf Schaltern. „Row lines" und „Striped rows" setzen per Klick `row-lines` und `row-alt` auf `<body>`;
+die Werte bleiben nach einem Neuladen erhalten (`data/plugins/<vaultId>/obsidian-style-settings/data.json`, gilt für alle
+Nutzer des Vaults).
+
 ## Befund 2: Variablen wirken (Ende zu Ende)
 
 `settingsManager.setSetting('minimal-style', 'h1-size', '3em')` erzeugt `body.css-settings-manager { --h1-size: 3em; }`,
@@ -94,7 +111,7 @@ weit, wie Slatebase die Struktur hat (Befund 3).
    YAML-/Einstellungsformat nicht selbst implementieren.
 2. **Der Nutzen ist begrenzt.** Variablen-Einstellungen (Farben, Größen, Schriften: der größte Teil bei Minimal) wirken voll;
    Klassen-Schalter nur bei rund einem Sechstel (Tabellen, Überschriften), solange Slatebase die Struktur nicht nachbaut.
-3. **Der Fix ist ohnehin fällig** (Befund 1 betrifft alle Plugins).
+3. **Die Fixes waren ohnehin fällig** (Befund 1 und 1b betreffen alle Plugins) und sind umgesetzt.
 
 ## Offene Punkte
 
@@ -104,7 +121,7 @@ weit, wie Slatebase die Struktur hat (Befund 3).
   alle Nutzer des Vaults, wie das Theme selbst; das ist stimmig, sollte aber so dokumentiert werden.
 - Das Plugin ist über den Plugin-Store installierbar. Soll die Themes-Seite darauf hinweisen (Theme hat `@settings` →
   „Dieses Theme bietet Einstellungen: Plugin Style Settings installieren")?
-- `PLUGIN-COMPAT.md` führt Style Settings als „Voll kompatibel" nach **statischer Analyse**. Der Live-Test zeigt: nicht
-  voll. Eintrag auf „Live getestet" mit der Einschränkung bis zum Fix anpassen.
+- `PLUGIN-COMPAT.md` führt Style Settings als „Voll kompatibel" nach **statischer Analyse**. Mit den beiden Fixes live
+  bestätigt (Einstellungsseite, Klassen, Variablen, Persistenz); Eintrag auf „Live getestet" anpassen.
 - Minimal hat ein eigenes Plugin **Minimal Theme Settings** (`obsidian-minimal-settings`, 1,7 Mio. Downloads, im Plugin-
   Katalog). Nicht geprüft.
