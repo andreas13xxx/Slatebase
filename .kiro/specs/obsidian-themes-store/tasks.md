@@ -13,11 +13,14 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, Lint, betroff
       (Entscheidung 2026-10-21, 824 von 911 installierbar)
 
 ## Phase 1 — Grundlagen im Backend
-- [ ] 1.0 CSS-Grenze auf 3 MB (Entscheidung 2026-10-21), zuerst und einzeln committbar, weil sie den bestehenden Import
+- [x] 1.0 (erledigt 2026-10-21, `4721a2e`) CSS-Grenze auf 3 MB (Entscheidung 2026-10-21), zuerst und einzeln committbar, weil sie den bestehenden Import
       betrifft: `MAX_THEME_CSS_SIZE` (`backend/src/themes/validation.ts`), `MAX_THEME_CSS_BYTES` und Meldung
       (`themeImport.ts`), Request-Body-Grenze der Theme-Route prüfen, Tests der Grenzwerte (3 MB ok, 3 MB + 1 abgelehnt),
       Doku (Welcome-Vault DE/EN „maximal 3 MB", README-API-Tabelle). Messung: Wechsel auf Catppuccin und Virgo bremst die
-      Oberfläche nicht merklich
+      Oberfläche nicht merklich.
+      Umgesetzt an drei Stellen (Backend, Import-Prüfung, `ThemeInjector`), Randwerttests, Doku. Messung auf einer
+      Testseite mit 4000 Elementen: Catppuccin und Virgo brauchen beim ersten Einfügen samt Stilberechnung 0,4–0,8 s,
+      danach ca. 0,15 s; in der vollen Anwendung noch nicht gemessen
 - [ ] 1.1 `shared/guarded-fetch.ts` (Allowlist je Hop, Streaming-Limit, Timeout, kein Authorization-Header) + Tests gegen
       lokalen Test-Server
 - [ ] 1.2 `theme-store/{types,errors,validation}.ts` + Tests (Repo-Regex, Pfadnormalisierung, SemVer-Vergleich)
