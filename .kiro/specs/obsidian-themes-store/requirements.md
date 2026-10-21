@@ -154,7 +154,9 @@ geprüft hat.
 6.5 Ein Theme ist beliebiges CSS aus fremder Hand. Die Oberfläche sagt das vor der ersten Installation einmalig und zeigt
     externe Hosts (R3.6). CSS wird nicht ausgeführt, aber es kann Inhalte von fremden Servern laden; das ist derselbe
     Hinweis wie beim Import.
-6.6 Audit-Log: Installation und Aktualisierung eines Themes werden wie andere Vault-Schreibvorgänge protokolliert.
+6.6 Protokoll: Installation und Aktualisierung eines Themes werden mit `logger.info` festgehalten (Vault, Theme, Repo), wie der
+    bestehende Import. Der `AuditService` ist für Anmelde- und Berechtigungsereignisse gedacht; Vault-Schreibvorgänge wie der
+    Theme-Import laufen dort nicht hindurch (Korrektur 2026-10-21, vorher stand hier „Audit-Log").
 
 ### R7 — Berechtigung, Feature-Gate, Betrieb
 7.1 Katalog lesen darf jeder angemeldete Nutzer; Installieren und Aktualisieren braucht Schreibzugriff auf den Vault.

@@ -22,6 +22,28 @@ export function isValidThemeId(id: string): boolean {
   return THEME_ID_PATTERN.test(id) && !/[. ]$/.test(id) && !WINDOWS_RESERVED_NAME.test(id)
 }
 
+/** True for ids the backend refuses even though they match the character pattern: `active` and Windows device names. */
+function isReservedThemeId(id: string): boolean {
+  return id.toLowerCase() === 'active' || WINDOWS_RESERVED_NAME.test(id)
+}
+
+/**
+ * Derives a valid theme folder name from a display name (mirrors `toThemeId` in the frontend's `themeImport.ts`):
+ * strips characters the backend refuses, trims, and appends `-theme` for reserved names.
+ * Returns null when nothing usable is left (for example a name made only of symbols).
+ */
+export function toThemeId(rawName: string): string | null {
+  const cleaned = rawName
+    .normalize('NFKD')
+    .replace(/[^A-Za-z0-9 _.-]/g, '')
+    .replace(/^[^A-Za-z0-9]+/, '')
+    .replace(/[. ]+$/, '')
+    .slice(0, 100) // leaves room for the "-theme" suffix within the 120 characters the pattern allows
+    .replace(/[. ]+$/, '')
+  if (cleaned === '') return null
+  return isReservedThemeId(cleaned) ? `${cleaned}-theme` : cleaned
+}
+
 /** Schema for the theme id route parameter. `active` is reserved for the selection endpoint. */
 export const themeIdSchema = z.string()
   .refine(isValidThemeId, 'Invalid theme ID: letters, digits, space, underscore, dot and hyphen only, and not a reserved system name')

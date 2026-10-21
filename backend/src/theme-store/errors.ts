@@ -50,3 +50,30 @@ export class ThemeNotInCatalogError extends Error {
     this.name = 'ThemeNotInCatalogError'
   }
 }
+
+/** Thrown when the repo's manifest names a different theme than the catalog entry. Maps to HTTP 422. */
+export class ThemeManifestMismatchError extends Error {
+  constructor(
+    public readonly catalogName: string,
+    public readonly manifestName: string,
+  ) {
+    super(`Catalog lists "${catalogName}" but the repository's manifest.json names "${manifestName}"`)
+    this.name = 'ThemeManifestMismatchError'
+  }
+}
+
+/** Thrown when a theme name yields no usable folder name. Maps to HTTP 422. */
+export class ThemeIdUnderivableError extends Error {
+  constructor(public readonly themeName: string) {
+    super(`Theme name "${themeName}" cannot be turned into a folder name`)
+    this.name = 'ThemeIdUnderivableError'
+  }
+}
+
+/** Thrown when a theme with the same folder name exists and `replace` was not requested. Maps to HTTP 409. */
+export class ThemeAlreadyInstalledError extends Error {
+  constructor(public readonly themeId: string) {
+    super(`Theme "${themeId}" is already installed`)
+    this.name = 'ThemeAlreadyInstalledError'
+  }
+}

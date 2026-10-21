@@ -36,12 +36,18 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, Lint, betroff
       Anfrage. Tests in `theme-store-cache.test.ts`. Das **Einhängen in den Serverstart** (nur bei eingeschaltetem
       Feature) folgt mit der DI in 2.3
 
-## Phase 2 — Service, Routen, Feature-Gate
-- [ ] 2.1 `theme-store-service.ts`: `listCatalog`, `install`, `checkUpdates`, `screenshot` + Tests (Ersetzen, 409,
-      Namenskonflikt, Teilfehler beim Update-Check)
-- [ ] 2.2 `api/themeStoreRoutes.ts` + Tests (Rechte, Fehlerabbildung, Audit-Eintrag)
-- [ ] 2.3 DI und Feature-Toggle `obsidian-theme-store` in `index.ts`; `createFeatureGuard` für beide Präfixe
-- [ ] 2.4 `VAULT-ROUTE-AUTHORIZATION.md` ergänzen
+## Phase 2 — Service, Routen, Feature-Gate (abgeschlossen 2026-10-21)
+- [x] 2.1 `theme-store-service.ts`: `listCatalog` (Cache, geteilte Anfrage, veralteter Stand bei Fehler), `install`,
+      `checkUpdates`, `getScreenshot` + 21 Tests. `toThemeId` ist jetzt auch im Backend (`themes/validation.ts`, Spiegel der
+      Frontend-Funktion). Zuordnung installiert ↔ Katalog über `manifest.name`; ein Update-Check mit fehlgeschlagenen
+      Abfragen wird nicht gecacht, damit der nächste Klick sie wiederholt; nicht vergleichbare Versionen landen in
+      `unknown`, nie in „aktuell"
+- [x] 2.2 `api/themeStoreRoutes.ts` + 20 Tests (Rechte, Fehlerabbildung, Eingabeprüfung, Screenshot-Header). Der 502 nennt
+      keine Upstream-URL. Protokoll über `logger.info` statt `AuditService` (Requirements 6.6 korrigiert)
+- [x] 2.3 DI und Feature-Toggle `obsidian-theme-store` in `index.ts`; `createFeatureGuard` für alle vier Pfade; Vorwärmen
+      nicht blockierend (`void warmThemeStoreCatalog`), nur bei eingeschaltetem Feature
+- [x] 2.4 `VAULT-ROUTE-AUTHORIZATION.md` ergänzt; Test, dass `GET …/theme-store/updates` = read und
+      `POST …/theme-store/install` = write ohne Ausnahme gilt
 
 ## Phase 3 — Frontend
 - [ ] 3.1 `api/index.ts`: `listStoreThemes`, `installStoreTheme`, `checkStoreThemeUpdates`, Screenshot-URL

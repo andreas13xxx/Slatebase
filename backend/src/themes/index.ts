@@ -5,6 +5,7 @@ export { ThemeNotFoundError, ThemeTooLargeError, InvalidThemeIdError, Appearance
 export {
   MAX_THEME_CSS_SIZE,
   isValidThemeId,
+  toThemeId,
   themeIdSchema,
   saveThemeSchema,
   setActiveThemeSchema,
