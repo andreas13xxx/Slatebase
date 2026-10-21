@@ -125,7 +125,7 @@ describe('install', () => {
     const client = createMockClient({ files: { 'o/things': files('Things', '2.2.4') } })
     const { service } = createService(client)
 
-    const meta = await service.install(vault, 'o/things', { replace: false, activate: false })
+    const meta = await service.install('v1', vault, 'o/things', { replace: false, activate: false })
 
     expect(meta.id).toBe('Things')
     expect(meta.manifest).toMatchObject({ name: 'Things', version: '2.2.4', author: 'Someone' })
@@ -140,7 +140,7 @@ describe('install', () => {
     await fs.writeFile(path.join(vault, '.obsidian/appearance.json'), JSON.stringify({ baseFontSize: 18 }))
     const { service } = createService(createMockClient({ files: { 'o/things': files('Things') } }))
 
-    await service.install(vault, 'o/things', { replace: false, activate: true })
+    await service.install('v1', vault, 'o/things', { replace: false, activate: true })
 
     expect(await themes.getActiveThemeId(vault)).toBe('Things')
     expect(JSON.parse(await fs.readFile(path.join(vault, '.obsidian/appearance.json'), 'utf-8'))).toMatchObject({ baseFontSize: 18, cssTheme: 'Things' })
@@ -149,19 +149,19 @@ describe('install', () => {
   it('refuses a repo that is not in the catalog without fetching anything', async () => {
     const client = createMockClient()
     const { service } = createService(client)
-    await expect(service.install(vault, 'evil/repo', { replace: false, activate: false })).rejects.toBeInstanceOf(ThemeNotInCatalogError)
+    await expect(service.install('v1', vault, 'evil/repo', { replace: false, activate: false })).rejects.toBeInstanceOf(ThemeNotInCatalogError)
     expect(client.calls.files).toEqual([])
   })
 
   it('refuses a manifest that names a different theme than the catalog', async () => {
     const { service } = createService(createMockClient({ files: { 'o/things': files('Minimal') } }))
-    await expect(service.install(vault, 'o/things', { replace: false, activate: false })).rejects.toBeInstanceOf(ThemeManifestMismatchError)
+    await expect(service.install('v1', vault, 'o/things', { replace: false, activate: false })).rejects.toBeInstanceOf(ThemeManifestMismatchError)
     expect(await themes.listThemes(vault)).toEqual([])
   })
 
   it('matches the manifest name case-insensitively', async () => {
     const { service } = createService(createMockClient({ files: { 'o/things': files('THINGS') } }))
-    const meta = await service.install(vault, 'o/things', { replace: false, activate: false })
+    const meta = await service.install('v1', vault, 'o/things', { replace: false, activate: false })
     expect(meta.id).toBe('THINGS')
   })
 
@@ -169,10 +169,10 @@ describe('install', () => {
     await themes.saveTheme(vault, 'Things', 'old{}', { name: 'Things', version: '1.0.0' })
     const { service } = createService(createMockClient({ files: { 'o/things': files('Things', '2.0.0', 'new{}') } }))
 
-    await expect(service.install(vault, 'o/things', { replace: false, activate: false })).rejects.toBeInstanceOf(ThemeAlreadyInstalledError)
+    await expect(service.install('v1', vault, 'o/things', { replace: false, activate: false })).rejects.toBeInstanceOf(ThemeAlreadyInstalledError)
     expect((await themes.loadTheme(vault, 'Things'))?.css).toBe('old{}')
 
-    const meta = await service.install(vault, 'o/things', { replace: true, activate: false })
+    const meta = await service.install('v1', vault, 'o/things', { replace: true, activate: false })
     expect(meta.manifest.version).toBe('2.0.0')
     expect((await themes.loadTheme(vault, 'Things'))?.css).toBe('new{}')
   })
@@ -180,19 +180,19 @@ describe('install', () => {
   it('detects an existing theme whose folder differs only in case', async () => {
     await themes.saveTheme(vault, 'things', 'old{}', { name: 'things' })
     const { service } = createService(createMockClient({ files: { 'o/things': files('Things') } }))
-    await expect(service.install(vault, 'o/things', { replace: false, activate: false })).rejects.toBeInstanceOf(ThemeAlreadyInstalledError)
+    await expect(service.install('v1', vault, 'o/things', { replace: false, activate: false })).rejects.toBeInstanceOf(ThemeAlreadyInstalledError)
   })
 
   it('writes nothing when the download fails', async () => {
     const { service } = createService(createMockClient({ files: { 'o/things': new ThemeFilesNotFoundError('o/things', 'theme.css') } }))
-    await expect(service.install(vault, 'o/things', { replace: false, activate: false })).rejects.toBeInstanceOf(ThemeFilesNotFoundError)
+    await expect(service.install('v1', vault, 'o/things', { replace: false, activate: false })).rejects.toBeInstanceOf(ThemeFilesNotFoundError)
     await expect(fs.stat(path.join(vault, '.obsidian/themes'))).rejects.toThrow()
   })
 
   it('derives a folder name from the theme name, or fails when none is usable', async () => {
     const { service } = createService(createMockClient({ files: { 'o/odd': files('Odd'), 'o/cjk': files('日本語') } }))
-    await expect(service.install(vault, 'o/cjk', { replace: false, activate: false })).rejects.toBeInstanceOf(ThemeIdUnderivableError)
-    expect((await service.install(vault, 'o/odd', { replace: false, activate: false })).id).toBe('Odd')
+    await expect(service.install('v1', vault, 'o/cjk', { replace: false, activate: false })).rejects.toBeInstanceOf(ThemeIdUnderivableError)
+    expect((await service.install('v1', vault, 'o/odd', { replace: false, activate: false })).id).toBe('Odd')
   })
 })
 
@@ -238,6 +238,34 @@ describe('checkUpdates', () => {
 
     await service.checkUpdates('v1', vault)
     expect(client.calls.manifests.filter((r) => r === 'o/minimal')).toHaveLength(2) // retried: the failed check was not cached
+  })
+
+  it('drops the cached result after an install, so a just-updated theme is no longer reported as outdated', async () => {
+    await installLocally('Things', '1.0.0')
+    const client = createMockClient({
+      manifests: { 'o/things': { version: '2.0.0' } },
+      files: { 'o/things': files('Things', '2.0.0') },
+    })
+    const { service } = createService(client)
+
+    expect((await service.checkUpdates('v1', vault)).updates).toHaveLength(1)
+    await service.install('v1', vault, 'o/things', { replace: true, activate: false })
+
+    const after = await service.checkUpdates('v1', vault)
+    expect(after.updates).toEqual([]) // recomputed against the freshly installed 2.0.0, not served from the cache
+    expect(client.calls.manifests.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('leaves another vault\'s cached result alone', async () => {
+    await installLocally('Things', '1.0.0')
+    const client = createMockClient({ manifests: { 'o/things': { version: '2.0.0' } }, files: { 'o/things': files('Things', '2.0.0') } })
+    const { service, cache } = createService(client)
+    await service.checkUpdates('v2', vault)
+    expect(cache.getUpdateCheck('v2')).not.toBeNull()
+
+    await service.install('v1', vault, 'o/things', { replace: true, activate: false })
+
+    expect(cache.getUpdateCheck('v2')).not.toBeNull()
   })
 
   it('lists themes whose version cannot be compared as unknown instead of up to date', async () => {

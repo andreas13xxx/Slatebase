@@ -162,7 +162,8 @@ geprüft hat.
 7.1 Katalog lesen darf jeder angemeldete Nutzer; Installieren und Aktualisieren braucht Schreibzugriff auf den Vault.
 7.2 Abschalten geschieht **nur serverweit** (Entscheidung 2026-10-20), nicht pro Vault. Das Feature hängt an einem **eigenen** Feature-Toggle (`obsidian-theme-store`, Standard: an), weil es als einziges
     Theme-Feature ausgehenden Netzverkehr auslöst. Aus: Tab „Entdecken" und alle `theme-store`-Routen entfallen
-    (`createFeatureGuard`, Eintrag `feature:` in der Settings-Registry).
+    (`createFeatureGuard` antwortet mit 403; der Tab wird in `ThemesSection` ausgeblendet, nicht über `feature:` in der
+    Settings-Registry, weil sonst der ganze Abschnitt „Themes" verschwände).
 7.3 Ohne Internetzugang (Offline-Betrieb) bleibt der Tab „Installiert" voll nutzbar; „Entdecken" zeigt, dass der Katalog
     nicht erreichbar ist, und bietet „Erneut versuchen".
 7.4 Single-Instance: Cache und Update-Ergebnisse liegen im Arbeitsspeicher; der Katalog wird zusätzlich wie beim

@@ -151,7 +151,7 @@ export function createVaultThemeStoreRoutes(deps: ThemeStoreRouteDependencies): 
 
     const { repo, replace, activate } = parsed.data
     try {
-      const meta = await themeStoreService.install(vaultPath, repo, { replace, activate })
+      const meta = await themeStoreService.install(vaultId, vaultPath, repo, { replace, activate })
       await publishChange(c, vaultId, `.obsidian/themes/${meta.id}/theme.css`)
       if (activate) await publishChange(c, vaultId, APPEARANCE_PATH)
       logger.info('Theme installed from the community catalog', { vaultId, themeId: meta.id, repo, replace, activate })

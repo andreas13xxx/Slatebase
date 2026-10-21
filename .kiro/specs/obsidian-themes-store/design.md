@@ -88,7 +88,7 @@ abgesichert. Der Eintrag in `VAULT-ROUTE-AUTHORIZATION.md` nennt die neuen Pfade
 | Theme existiert, `replace` fehlt | 409 |
 | Datei zu groß, Manifest ungültig / passt nicht | 422 |
 | GitHub nicht erreichbar, Timeout | 502 (Katalog: letzter Cache-Stand mit `stale: true`) |
-| Feature aus | 404 (Feature-Guard) |
+| Feature aus | 403 (Feature-Guard) |
 
 ## 4. Frontend
 

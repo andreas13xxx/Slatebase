@@ -205,7 +205,7 @@ oversight — but it means:
 | 🧮 **Bases** ⚠️ | Real Obsidian `.base` files as filterable, sortable, editable views over your notes' metadata — a table and a cards/Kanban board (drag cards between columns), filters and formulas written in Obsidian's expression language (a pragmatic subset), inline cell editing, and an MCP tool (`query_base`) to evaluate a base from AI clients. Limits: at most 1000 candidate notes per query, read-only unsortable formula columns, `summaries` not computed yet. Experimental, off by default (`bases` toggle) |
 | 🔖 **Bookmarks** | Bookmark files, headings, blocks, or saved searches — reorder by drag and drop, rename, and bookmark all open tabs at once |
 | 📟 **Status Bar** | Clock, vault name, word/character count, and cursor position with click-to-"go to line" — each item toggleable |
-| 🖌️ **Obsidian Themes** | Obsidian themes read straight from the vault's `.obsidian/themes/` folder (the active one is Obsidian's `cssTheme` in `.obsidian/appearance.json`, so the choice applies to everyone using the vault and a vault brought over from Obsidian shows its themes without an import). Works for themes built on Obsidian CSS variables — colors, fonts, headings, line width, plus the editor's Obsidian classes (`mod-cm6`, `HyperMD-*`, `cm-inline-code`, …) so rules such as Minimal's tables and editor width apply. Themes that restyle Obsidian's own layout (tabs, sidebars, title bars) are only partly applied, and Style Settings values are not evaluated |
+| 🖌️ **Obsidian Themes** | Obsidian themes read straight from the vault's `.obsidian/themes/` folder (the active one is Obsidian's `cssTheme` in `.obsidian/appearance.json`, so the choice applies to everyone using the vault and a vault brought over from Obsidian shows its themes without an import). Works for themes built on Obsidian CSS variables — colors, fonts, headings, line width, plus the editor's Obsidian classes (`mod-cm6`, `HyperMD-*`, `cm-inline-code`, …) so rules such as Minimal's tables and editor width apply. Themes that restyle Obsidian's own layout (tabs, sidebars, title bars) are only partly applied, and Style Settings values are not evaluated. A **community catalog** (Settings → Themes → Discover, about 900 themes from Obsidian's catalog) installs themes with one click and checks for updates on demand; the server fetches everything from `raw.githubusercontent.com`, the browser never contacts GitHub, and an admin can switch it off (feature `obsidian-theme-store`) |
 | 🎨 **CSS Snippets** | Per-vault custom CSS, uploaded or written in an embedded editor, enabled and disabled individually |
 | 🔍 **Search & Replace** | Vault-wide full-text search with regex, context lines, multi-vault, find & replace, and `path:`/`file:`/`tag:`/`property:` operators |
 | 📊 **Mermaid & LaTeX** | Mermaid code blocks as interactive SVG diagrams and KaTeX math (inline `$…$` and block `$$…$$`), both dark-mode aware |
@@ -409,6 +409,12 @@ Themes live in the vault (`.obsidian/themes/<id>/theme.css` + `manifest.json`); 
 | GET | `/vaults/:vaultId/themes/:themeId` | Theme CSS and metadata |
 | PUT | `/vaults/:vaultId/themes/:themeId` | Create or overwrite a theme (`{ "css", "manifest"? }`, CSS up to 3 MB) |
 | DELETE | `/vaults/:vaultId/themes/:themeId` | Delete a theme (resets the selection if it was active) |
+| GET | `/theme-store/themes` | Community theme catalog (`{ themes, stale }`; `stale` = GitHub unreachable, last known list) |
+| GET | `/theme-store/screenshot?repo=owner/repo` | Preview image of a catalog theme, served by the backend (PNG/JPEG/GIF/WebP only) |
+| GET | `/vaults/:vaultId/theme-store/updates` | Compare installed themes with the catalog (read access) |
+| POST | `/vaults/:vaultId/theme-store/install` | Install a catalog theme (`{ "repo", "replace"?, "activate"? }`; write access; 409 if it exists and `replace` is not set) |
+
+The theme store routes sit behind the `obsidian-theme-store` feature toggle (403 when off).
 
 ### Git-Sync & Mail-Import
 

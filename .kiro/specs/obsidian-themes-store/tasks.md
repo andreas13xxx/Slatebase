@@ -66,12 +66,32 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, Lint, betroff
 - Hinweis: Unter paralleler Last laufen `SettingsPanel.a11y.test.tsx` und die 60-Karten-Tests ins 5-s-Limit; einzeln grün.
   Die 60-Karten-Tests haben deshalb 20 s und zählen Karten ohne Rollenabfrage
 
-## Phase 4 — Abnahme und Doku
-- [ ] 4.1 Isolierte Instanz: Minimal, Things und ein `legacy`-Theme installieren, Ersetzen, Update-Check mit gesenkter
-      Version, Offline-Verhalten (Netz gesperrt), Feature aus
-- [ ] 4.2 Datenschutz-Check: beim Öffnen von „Entdecken" keine Anfragen des Browsers an GitHub
-- [ ] 4.3 Welcome-Vault `Themes.md` (DE + EN), README, `AGENTS.md`, `.kiro/steering/structure.md`
-- [ ] 4.4 `test:coverage` und Lint in beiden Paketen; Coverage-Schwellen nie senken
+## Phase 4 — Abnahme und Doku (abgeschlossen 2026-10-21)
+- [x] 4.1 Abnahme in isolierter Instanz mit dem echten GitHub (Minimal, Things, Catppuccin, Blue Topaz über die Oberfläche):
+      - Start: Katalog beim Start vorgewärmt (911 Einträge, ohne den Start zu blockieren), in `data/theme-store-cache.json`
+        gespeichert; nach Neustart „Katalog von Platte geladen", keine neue Anfrage
+      - Installieren: Minimal 9.1.4, Things 2.2.4, Catppuccin (2,2 MB) → 200; erneut ohne `replace` → 409; mit → 200;
+        Amethyst (`legacy`) → 422 `THEME_FILES_NOT_FOUND`; Fancy-a-Story (3,1 MB) → 422 `THEME_TOO_LARGE`; Repo nicht im
+        Katalog → 404; `../x` → 400
+      - Update-Prüfung mit auf 1.0.0 gesenkter lokaler Version: Things 1.0.0 → 2.2.4 erkannt, Aktualisieren → 200,
+        erneute Prüfung ohne Update. **Dabei gefundener Fehler:** Der 15-Minuten-Cache des Update-Checks wurde nach einer
+        Installation nicht verworfen, ein gerade aktualisiertes Theme wäre weiter als veraltet gemeldet worden (behoben,
+        `install` bekommt die Vault-ID, 2 Tests)
+      - Oberfläche: Tab „Entdecken" mit Hell-Voreinstellung, „24 von 671 angezeigt (Katalog: 911)", Vorschaubilder;
+        unendliches Nachladen live (24 → 48 → 72 beim Scrollen); Blue Topaz mit „Nach der Installation aktivieren":
+        sofort angewendet, `appearance.json` = `{"cssTheme":"Blue Topaz"}`, Hinweis „Fremdes CSS" danach weg
+      - Feature aus (`PUT /admin/features/obsidian-theme-store`): Store-Routen 403, normale Theme-Routen 200, in der
+        Oberfläche keine Tabs und keine Katalog-Anfrage, 5 Radiobuttons (Standard + 4 installierte Themes)
+      - **Nicht live geprüft:** Verhalten ohne Internetzugang (Netz ließ sich nicht sperren). Durch Tests abgedeckt:
+        veralteter Stand bei Ausfall, Vorwärmen wirft nie, Katalogfehler mit „Erneut versuchen"
+- [x] 4.2 Datenschutz-Check: Beim Öffnen von „Entdecken" lud der Browser 14 Ressourcen, **alle von `127.0.0.1:5173`**
+      (eigener Server), 0 externe Hosts, davon 10 Screenshots über `/api/v1/theme-store/screenshot` (lazy, nur die
+      sichtbaren Karten)
+- [x] 4.3 Doku: Welcome-Vault `Themes.md` (DE + EN: Abschnitt „Themes aus dem Katalog", Hinweis auf Netzzugriff und
+      Schalter), README (Features-Tabelle, API-Tabelle), `AGENTS.md`, `structure.md`, `VAULT-ROUTE-AUTHORIZATION.md`.
+      Nebenbei: Größenanzeige in MB ab 1 MB (Catppuccin zeigte „2287.4 KB")
+- [ ] 4.4 `test:coverage` und Lint in beiden Paketen; Coverage-Schwellen nie senken (läuft in der CI; lokal nur die
+      betroffenen Tests)
 
 ## Backlog (außerhalb dieser Spec, siehe Requirements)
 - Spike „Style Settings" (läuft das Plugin über die Plugin-Kompatibilität, was setzt es?), danach eigene Spec

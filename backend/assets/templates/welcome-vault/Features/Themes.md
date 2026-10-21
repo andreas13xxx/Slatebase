@@ -54,6 +54,23 @@ Themes bekommst du zum Beispiel aus dem Community-Verzeichnis von Obsidian oder 
 
 ---
 
+## Themes aus dem Katalog
+
+Im Abschnitt **Themes** gibt es neben **Installiert** den Tab **Entdecken**: Er zeigt den Community-Katalog von Obsidian (rund 900 Themes) mit Vorschaubild.
+
+- **Suchen und filtern:** nach Name oder Autor, nach **Hell** oder **Dunkel** (vorbelegt mit deinem aktuellen Modus), nur **Installiert** oder nur **Update verfügbar**. Themes im alten Format sind ausgeblendet, bis du **Veraltete anzeigen** aktivierst.
+- **Installieren:** ein Klick lädt `theme.css` und `manifest.json` in den Vault (`.obsidian/themes/`). Mit **Nach der Installation aktivieren** wird das Theme sofort ausgewählt. Existiert es schon, fragt Slatebase vor dem Ersetzen nach.
+- **Updates:** **Nach Updates suchen** vergleicht die installierten Themes mit dem Katalog. Aktualisiert wird nur auf Klick, nie automatisch. Selbst importierte Themes ohne Katalogeintrag werden nicht angefasst.
+- **Nicht jedes Theme ist installierbar:** Etwa jedes zehnte Theme des Katalogs hat keine `theme.css` oder `manifest.json` im Hauptverzeichnis oder ist größer als 3 MB. Slatebase nennt dann den Grund.
+
+> [!info] Wer greift auf das Internet zu?
+> Der Slatebase-Server holt Katalog, Theme-Dateien und Vorschaubilder von `raw.githubusercontent.com`. Dein Browser spricht dabei nur mit Slatebase, nie mit GitHub. Ein Administrator kann den Katalog in den Funktionsschaltern ausschalten (**obsidian-theme-store**); dann entfällt der Tab **Entdecken**, installierte Themes bleiben nutzbar. Ohne Internetzugang zeigt Slatebase die zuletzt geladene Liste.
+
+> [!warning] Fremdes CSS
+> Ein Theme ist fremdes CSS. Slatebase führt kein Skript daraus aus, manche Themes laden aber Schriften oder Bilder von anderen Servern. Das zeigt dir der Tab **Installiert** unter dem Theme an.
+
+---
+
 ## Was unterstützt wird — und was nicht
 
 Slatebase unterstützt **Themes, die über Obsidian-CSS-Variablen arbeiten**:

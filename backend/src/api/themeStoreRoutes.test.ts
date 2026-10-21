@@ -152,7 +152,7 @@ describe('POST /vaults/:vaultId/theme-store/install', () => {
   it('installs with the defaults replace=false and activate=false', async () => {
     let options: InstallThemeOptions | null = null
     const { app, published } = createTestApp({
-      service: createMockService({ install: async (_path, _repo, o) => { options = o; return meta } }),
+      service: createMockService({ install: async (_id, _path, _repo, o) => { options = o; return meta } }),
     })
     const res = await app.request('/api/v1/vaults/vault-1/theme-store/install', install({ repo: 'o/things' }))
     expect(res.status).toBe(200)

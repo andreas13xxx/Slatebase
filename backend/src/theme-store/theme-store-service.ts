@@ -82,7 +82,7 @@ export class ThemeStoreService implements IThemeStoreService {
     }
   }
 
-  async install(vaultPath: string, repo: string, options: InstallThemeOptions): Promise<ThemeMeta> {
+  async install(vaultId: string, vaultPath: string, repo: string, options: InstallThemeOptions): Promise<ThemeMeta> {
     const entry = await this.findEntry(repo)
     const files = await this.client.fetchThemeFiles(repo)
 
@@ -100,6 +100,8 @@ export class ThemeStoreService implements IThemeStoreService {
 
     const meta = await this.themeService.saveTheme(vaultPath, themeId, files.css, pickManifest(files.manifest))
     if (options.activate) await this.themeService.setActiveThemeId(vaultPath, meta.id)
+    // The cached update check predates this install (a just-updated theme would still be listed as outdated).
+    this.cache.invalidateUpdateCheck(vaultId)
     this.logger.info('Theme installed from the community catalog', { repo, themeId: meta.id, size: meta.size, replace: options.replace })
     return meta
   }

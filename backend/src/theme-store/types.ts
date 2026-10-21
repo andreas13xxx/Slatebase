@@ -98,8 +98,11 @@ export interface ThemeUpdateCheckResult {
 export interface IThemeStoreService {
   /** Catalog from cache, else from GitHub; on failure the last known list with `stale: true`, else the error. */
   listCatalog(): Promise<ThemeCatalogResult>
-  /** Downloads a catalog theme and saves it as `<vault>/.obsidian/themes/<id>/`. Returns the saved theme's metadata. */
-  install(vaultPath: string, repo: string, options: InstallThemeOptions): Promise<ThemeMeta>
+  /**
+   * Downloads a catalog theme and saves it as `<vault>/.obsidian/themes/<id>/`. Returns the saved theme's metadata.
+   * Drops the vault's cached update check, which the install has just made out of date.
+   */
+  install(vaultId: string, vaultPath: string, repo: string, options: InstallThemeOptions): Promise<ThemeMeta>
   /** Compares installed themes that match a catalog entry by name with the remote manifest version. */
   checkUpdates(vaultId: string, vaultPath: string): Promise<ThemeUpdateCheckResult>
   /** Screenshot of a catalog theme (path taken from the catalog, never from the caller); null if unavailable. */

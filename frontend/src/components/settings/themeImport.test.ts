@@ -100,5 +100,7 @@ describe('formatThemeSize', () => {
   it('formats bytes and kilobytes', () => {
     expect(formatThemeSize(512)).toBe('512 B')
     expect(formatThemeSize(2048)).toBe('2.0 KB')
+    expect(formatThemeSize(1024 * 1024 - 1)).toBe('1024.0 KB')
+    expect(formatThemeSize(2342309)).toBe('2.2 MB') // Catppuccin, the size that made 3 MB the limit
   })
 })
