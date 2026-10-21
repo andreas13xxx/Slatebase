@@ -27,7 +27,12 @@ describe('pickThemeFiles', () => {
     expect(result.ok && result.files.manifest).toBeNull()
   })
 
-  it('rejects a stylesheet above 2 MB', () => {
+  it('accepts a stylesheet of exactly 3 MB', () => {
+    expect(MAX_THEME_CSS_BYTES).toBe(3 * 1024 * 1024)
+    expect(pickThemeFiles([file('theme.css', 'a'.repeat(MAX_THEME_CSS_BYTES))]).ok).toBe(true)
+  })
+
+  it('rejects a stylesheet above 3 MB', () => {
     const big = file('theme.css', 'a'.repeat(MAX_THEME_CSS_BYTES + 1))
     expect(pickThemeFiles([big]).ok).toBe(false)
   })
@@ -95,5 +100,7 @@ describe('formatThemeSize', () => {
   it('formats bytes and kilobytes', () => {
     expect(formatThemeSize(512)).toBe('512 B')
     expect(formatThemeSize(2048)).toBe('2.0 KB')
+    expect(formatThemeSize(1024 * 1024 - 1)).toBe('1024.0 KB')
+    expect(formatThemeSize(2342309)).toBe('2.2 MB') // Catppuccin, the size that made 3 MB the limit
   })
 })

@@ -5,7 +5,7 @@
  */
 
 /** Same limit as the backend (`MAX_THEME_CSS_SIZE`). */
-export const MAX_THEME_CSS_BYTES = 2 * 1024 * 1024
+export const MAX_THEME_CSS_BYTES = 3 * 1024 * 1024
 
 /** The files that make up an importable theme. */
 export interface ThemeFiles {
@@ -27,7 +27,7 @@ export function pickThemeFiles(files: readonly File[]): ThemeFilesResult {
   }
   const css = stylesheets.find((f) => f.name.toLowerCase() === 'theme.css') ?? stylesheets[0]!
   if (css.size > MAX_THEME_CSS_BYTES) {
-    return { ok: false, message: 'Die Datei überschreitet die maximale Größe von 2 MB.' }
+    return { ok: false, message: 'Die Datei überschreitet die maximale Größe von 3 MB.' }
   }
   const manifest = files.find((f) => f.name.toLowerCase() === 'manifest.json') ?? null
   return { ok: true, files: { css, manifest } }
@@ -90,5 +90,6 @@ export async function readManifestFields(
 /** Formats a byte count for the theme list. */
 export function formatThemeSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
-  return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }

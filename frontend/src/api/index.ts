@@ -234,6 +234,57 @@ export interface ThemeMeta {
   externalHosts: string[]
 }
 
+/** One entry of Obsidian's community theme catalog, as served by the theme store. */
+export interface CommunityTheme {
+  name: string
+  author: string
+  /** GitHub `owner/repo`; the key for install and screenshot requests. */
+  repo: string
+  modes: Array<'dark' | 'light'>
+  /** Old-style theme (mostly without installable files). */
+  legacy: boolean
+}
+
+/** The community catalog. `stale` means GitHub could not be reached and the last known list is shown. */
+export interface CommunityThemeCatalog {
+  themes: CommunityTheme[]
+  stale: boolean
+}
+
+/** An installed theme with a newer version in the catalog. */
+export interface ThemeStoreUpdate {
+  themeId: string
+  name: string
+  repo: string
+  installedVersion: string
+  latestVersion: string
+}
+
+/** Result of the theme update check. Failed lookups are warnings, never "up to date". */
+export interface ThemeUpdateCheck {
+  updates: ThemeStoreUpdate[]
+  /** Installed catalog themes whose version could not be compared. */
+  unknown: string[]
+  warnings: string[]
+  checked: number
+  checkedAt: string
+}
+
+/** Options for installing a catalog theme. */
+export interface InstallStoreThemeOptions {
+  /** Overwrite an installed theme with the same folder name. */
+  replace?: boolean
+  /** Make the theme the vault's active theme. */
+  activate?: boolean
+  /** Folder of the installed theme to update in place (the update check reports it). */
+  themeId?: string
+}
+
+/** URL of a catalog theme's screenshot (served by the backend, so the browser never contacts GitHub). */
+export function storeThemeScreenshotUrl(repo: string): string {
+  return `/api/v1/theme-store/screenshot?repo=${encodeURIComponent(repo)}`
+}
+
 /** Git-sync authentication method: an HTTPS personal access token or an SSH private key. */
 export type GitAuthMethod = 'https-token' | 'ssh-key'
 
@@ -714,6 +765,14 @@ export interface IApiClient {
   deleteTheme(vaultId: string, themeId: string): Promise<void>
   /** Select the vault's theme (null = Slatebase default). Applies to everyone who opens the vault. */
   setActiveTheme(vaultId: string, themeId: string | null): Promise<void>
+
+  // --- Community theme store (catalog from GitHub, served by the backend) ---
+  /** The community theme catalog. Rejects when GitHub is unreachable and no earlier list is known. */
+  listStoreThemes(): Promise<CommunityThemeCatalog>
+  /** Download a catalog theme into the vault. Rejects with code `THEME_ALREADY_INSTALLED` unless `replace` is set. */
+  installStoreTheme(vaultId: string, repo: string, options?: InstallStoreThemeOptions): Promise<ThemeMeta>
+  /** Compare the vault's installed themes with the catalog. */
+  checkStoreThemeUpdates(vaultId: string): Promise<ThemeUpdateCheck>
 
   // --- Git-Sync methods ---
   /** Load a vault's git-sync branch + remotes (no credentials). */
@@ -1439,6 +1498,28 @@ export class ApiClient implements IApiClient {
   /** Select the vault's theme (null = Slatebase default). */
   async setActiveTheme(vaultId: string, themeId: string | null): Promise<void> {
     await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/themes/active`, { themeId })
+  }
+
+  // --- Community theme store ---
+
+  /** The community theme catalog. */
+  async listStoreThemes(): Promise<CommunityThemeCatalog> {
+    return this.request<CommunityThemeCatalog>('GET', '/api/v1/theme-store/themes')
+  }
+
+  /** Download a catalog theme into the vault. */
+  async installStoreTheme(vaultId: string, repo: string, options: InstallStoreThemeOptions = {}): Promise<ThemeMeta> {
+    return this.request<ThemeMeta>('POST', `/api/v1/vaults/${vaultId}/theme-store/install`, {
+      repo,
+      replace: options.replace ?? false,
+      activate: options.activate ?? false,
+      ...(options.themeId !== undefined ? { themeId: options.themeId } : {}),
+    })
+  }
+
+  /** Compare the vault's installed themes with the catalog. */
+  async checkStoreThemeUpdates(vaultId: string): Promise<ThemeUpdateCheck> {
+    return this.request<ThemeUpdateCheck>('GET', `/api/v1/vaults/${vaultId}/theme-store/updates`)
   }
 
   // --- Git-Sync methods ---

@@ -43,7 +43,7 @@ Wechselt jemand anderes das Theme, während du den Vault offen hast, übernimmt 
 ## Ein Theme importieren
 
 1. Klicke im Abschnitt **Themes** auf die Fläche am Ende der Seite (oder ziehe die Dateien darauf)
-2. Wähle die `theme.css` aus, optional zusammen mit der `manifest.json` (maximal 2 MB)
+2. Wähle die `theme.css` aus, optional zusammen mit der `manifest.json` (maximal 3 MB)
 3. Der Name kommt aus der `manifest.json`; ohne Manifest wird der Dateiname verwendet
 4. Existiert schon ein Theme mit diesem Namen, fragt Slatebase vor dem Überschreiben nach
 
@@ -51,6 +51,23 @@ Themes bekommst du zum Beispiel aus dem Community-Verzeichnis von Obsidian oder 
 
 > [!warning] Themes mit Fremdinhalten
 > Manche Themes laden Schriften oder Bilder von anderen Servern (zum Beispiel Google Fonts). Slatebase zeigt dann unter dem Theme an, von welchen Hosts Inhalte geladen werden. Prüfe das, wenn du Wert auf Datenschutz legst.
+
+---
+
+## Themes aus dem Katalog
+
+Im Abschnitt **Themes** gibt es neben **Installiert** den Tab **Entdecken**: Er zeigt den Community-Katalog von Obsidian (rund 900 Themes) mit Vorschaubild.
+
+- **Suchen und filtern:** nach Name oder Autor, nach **Hell** oder **Dunkel** (vorbelegt mit deinem aktuellen Modus), nur **Installiert** oder nur **Update verfügbar**. Themes im alten Format sind ausgeblendet, bis du **Veraltete anzeigen** aktivierst.
+- **Installieren:** ein Klick lädt `theme.css` und `manifest.json` in den Vault (`.obsidian/themes/`). Mit **Nach der Installation aktivieren** wird das Theme sofort ausgewählt. Existiert es schon, fragt Slatebase vor dem Ersetzen nach.
+- **Updates:** **Nach Updates suchen** vergleicht die installierten Themes mit dem Katalog. Aktualisiert wird nur auf Klick, nie automatisch. Selbst importierte Themes ohne Katalogeintrag werden nicht angefasst.
+- **Nicht jedes Theme ist installierbar:** Etwa jedes zehnte Theme des Katalogs hat keine `theme.css` oder `manifest.json` im Hauptverzeichnis oder ist größer als 3 MB. Slatebase nennt dann den Grund.
+
+> [!info] Wer greift auf das Internet zu?
+> Der Slatebase-Server holt Katalog, Theme-Dateien und Vorschaubilder von `raw.githubusercontent.com`. Dein Browser spricht dabei nur mit Slatebase, nie mit GitHub. Ein Administrator kann den Katalog in den Funktionsschaltern ausschalten (**obsidian-theme-store**); dann entfällt der Tab **Entdecken**, installierte Themes bleiben nutzbar. Ohne Internetzugang zeigt Slatebase die zuletzt geladene Liste.
+
+> [!warning] Fremdes CSS
+> Ein Theme ist fremdes CSS. Slatebase führt kein Skript daraus aus, manche Themes laden aber Schriften oder Bilder von anderen Servern. Das zeigt dir der Tab **Installiert** unter dem Theme an.
 
 ---
 

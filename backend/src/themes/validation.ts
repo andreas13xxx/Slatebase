@@ -1,8 +1,11 @@
 import { z } from 'zod'
 import type { ThemeManifest } from './types.js'
 
-/** Maximum `theme.css` size: 2 MB (Minimal is ~270 KB; snippets stay at 512 KB). */
-export const MAX_THEME_CSS_SIZE = 2 * 1024 * 1024
+/**
+ * Maximum `theme.css` size: 3 MB (Minimal is ~270 KB; snippets stay at 512 KB). Measured against the Obsidian community
+ * catalog: the median theme is 37 KB, 3 MB admits 824 of 911 listed themes (2 MB would be 818).
+ */
+export const MAX_THEME_CSS_SIZE = 3 * 1024 * 1024
 
 /**
  * Theme ids are folder names. Letters, digits, space, `_`, `.`, `-`; must start
@@ -17,6 +20,28 @@ const WINDOWS_RESERVED_NAME = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i
 /** Returns true if `id` is safe to use as a theme folder name on every supported platform. */
 export function isValidThemeId(id: string): boolean {
   return THEME_ID_PATTERN.test(id) && !/[. ]$/.test(id) && !WINDOWS_RESERVED_NAME.test(id)
+}
+
+/** True for ids the backend refuses even though they match the character pattern: `active` and Windows device names. */
+function isReservedThemeId(id: string): boolean {
+  return id.toLowerCase() === 'active' || WINDOWS_RESERVED_NAME.test(id)
+}
+
+/**
+ * Derives a valid theme folder name from a display name (mirrors `toThemeId` in the frontend's `themeImport.ts`):
+ * strips characters the backend refuses, trims, and appends `-theme` for reserved names.
+ * Returns null when nothing usable is left (for example a name made only of symbols).
+ */
+export function toThemeId(rawName: string): string | null {
+  const cleaned = rawName
+    .normalize('NFKD')
+    .replace(/[^A-Za-z0-9 _.-]/g, '')
+    .replace(/^[^A-Za-z0-9]+/, '')
+    .replace(/[. ]+$/, '')
+    .slice(0, 100) // leaves room for the "-theme" suffix within the 120 characters the pattern allows
+    .replace(/[. ]+$/, '')
+  if (cleaned === '') return null
+  return isReservedThemeId(cleaned) ? `${cleaned}-theme` : cleaned
 }
 
 /** Schema for the theme id route parameter. `active` is reserved for the selection endpoint. */

@@ -56,6 +56,8 @@ import { createPluginRoutes } from './api/pluginRoutes.js'
 import { SnippetStore } from './snippets/index.js'
 import { ThemeService } from './themes/index.js'
 import { createThemeRoutes } from './api/themeRoutes.js'
+import { ThemeStoreCache, ThemeStoreClient, ThemeStoreService, warmThemeStoreCatalog } from './theme-store/index.js'
+import { createThemeStoreRoutes, createVaultThemeStoreRoutes } from './api/themeStoreRoutes.js'
 import { createSnippetRoutes } from './api/snippetRoutes.js'
 import { GitHubClient, PluginStoreCache, PluginStoreService, UpdateChecker } from './plugin-store/index.js'
 import type { IPluginStoreConfig } from './plugin-store/index.js'
@@ -112,6 +114,7 @@ logger.setLogStore(serverLogStore)
 // 1c. Feature Toggle System
 const featureRegistry = new FeatureRegistry()
 featureRegistry.register({ name: 'obsidian-plugin-compat', description: 'Obsidian Community Plugin Compatibility Layer', defaultEnabled: true, type: 'cold' })
+featureRegistry.register({ name: 'obsidian-theme-store', description: 'Community-Store für Obsidian-Themes (Katalog, Installation, Updates; lädt von GitHub)', defaultEnabled: true, type: 'cold' })
 featureRegistry.register({ name: 'chat', description: 'Echtzeit-Chat zwischen Benutzern', defaultEnabled: true, type: 'hot' })
 featureRegistry.register({ name: 'mcp', description: 'AI Context Server (MCP Integration)', defaultEnabled: true, type: 'cold' })
 featureRegistry.register({ name: 'git-sync', description: 'Git-Synchronisation von Vaults mit externen Remotes', defaultEnabled: true, type: 'cold' })
@@ -667,6 +670,10 @@ app.use('/api/v1/vaults/:vaultId/*', createVaultAuthorizationMiddleware({ vaultR
 
 // Feature guards for route protection
 app.use('/api/v1/chat/*', createFeatureGuard('chat', featureToggleService))
+app.use('/api/v1/theme-store/*', createFeatureGuard('obsidian-theme-store', featureToggleService))
+app.use('/api/v1/theme-store', createFeatureGuard('obsidian-theme-store', featureToggleService))
+app.use('/api/v1/vaults/:vaultId/theme-store/*', createFeatureGuard('obsidian-theme-store', featureToggleService))
+app.use('/api/v1/vaults/:vaultId/theme-store', createFeatureGuard('obsidian-theme-store', featureToggleService))
 app.use('/api/v1/vaults/:vaultId/plugins/*', createFeatureGuard('obsidian-plugin-compat', featureToggleService))
 app.use('/api/v1/vaults/:vaultId/plugins', createFeatureGuard('obsidian-plugin-compat', featureToggleService))
 app.use('/api/v1/plugin-store/*', createFeatureGuard('obsidian-plugin-compat', featureToggleService))
@@ -724,14 +731,36 @@ app.route('/api/v1/vaults/:vaultId/snippets', snippetRoutes)
 
 // Obsidian theme routes (themes live in the vault's .obsidian/themes/; access levels come from
 // the vault-authorization middleware: GET = read, everything else = write)
+const themeService = new ThemeService()
 const themeRoutes = createThemeRoutes({
-  themeService: new ThemeService(),
+  themeService,
   accessControl: vaultAccessControl,
   vaultRegistry,
   eventBus,
   logger,
 })
 app.route('/api/v1/vaults/:vaultId/themes', themeRoutes)
+
+// Community theme store (browse/install/update Obsidian community themes from GitHub; feature-guarded above).
+// Fetches only from raw.githubusercontent.com and never sends credentials.
+const themeStoreCache = new ThemeStoreCache(
+  { cacheTtlCatalog: 60 * 60 * 1000, cacheTtlManifest: 15 * 60 * 1000 },
+  serverConfig.dataDir,
+  logger,
+)
+await themeStoreCache.load()
+const themeStoreClient = new ThemeStoreClient(logger)
+const themeStoreService = new ThemeStoreService(themeStoreClient, themeStoreCache, themeService, logger)
+app.route('/api/v1/theme-store', createThemeStoreRoutes({ themeStoreService, logger }))
+app.route(
+  '/api/v1/vaults/:vaultId/theme-store',
+  createVaultThemeStoreRoutes({ themeStoreService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger }),
+)
+// Warm the catalog in the background so the first visit is instant. Not awaited: an offline server must start
+// normally (the helper logs one warning and keeps the persisted catalog).
+if (featureToggleService.isEnabled('obsidian-theme-store')) {
+  void warmThemeStoreCatalog(themeStoreService, logger)
+}
 
 // Plugin Store route registration (auth middleware applies via /api/v1/* pattern)
 const pluginStoreRoutes = createPluginStoreRoutes({ pluginStoreService, accessControl: vaultAccessControl, vaultRegistry, logger })

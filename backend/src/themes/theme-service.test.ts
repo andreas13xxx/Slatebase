@@ -66,6 +66,12 @@ describe('ThemeService', () => {
     }
   })
 
+  it('accepts CSS of exactly 3 MB, the limit that admits the larger catalog themes', async () => {
+    expect(MAX_THEME_CSS_SIZE).toBe(3 * 1024 * 1024)
+    const meta = await service.saveTheme(vault, 'Exact', 'a'.repeat(MAX_THEME_CSS_SIZE))
+    expect(meta.id).toBe('Exact')
+  })
+
   it('rejects CSS above the size limit', async () => {
     await expect(service.saveTheme(vault, 'Big', 'a'.repeat(MAX_THEME_CSS_SIZE + 1))).rejects.toBeInstanceOf(
       ThemeTooLargeError,

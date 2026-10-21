@@ -331,3 +331,10 @@ describe('Vault authorization middleware — table-driven route sweep', () => {
     }
   })
 })
+
+describe('theme store routes use the method default (no exception)', () => {
+  it('the update check needs read access, installing needs write access', () => {
+    expect(resolveRequiredLevel('GET', '/theme-store/updates')).toBe('read')
+    expect(resolveRequiredLevel('POST', '/theme-store/install')).toBe('write')
+  })
+})

@@ -400,3 +400,17 @@ and plugins, mutating theme routes require **write** access, because a theme is 
 | GET | `.../themes`, `.../themes/active`, `.../themes/:themeId` | read |
 | PUT | `.../themes/active`, `.../themes/:themeId` | write |
 | DELETE | `.../themes/:themeId` | write |
+
+## Addendum — `backend/src/api/themeStoreRoutes.ts` (Community theme store, 2026-10-21)
+
+Mounted via `app.route('/api/v1/vaults/:vaultId/theme-store', …)` and `app.route('/api/v1/theme-store', …)`
+(`index.ts`), both behind the `obsidian-theme-store` feature guard. As with themes, the routes contain no access checks
+of their own and **no exception was added**: the update check is a GET (read); installing writes theme files that apply
+to everyone who opens the vault, so it needs **write**. `/theme-store/themes` and `/theme-store/screenshot` involve no
+vault and only need a session.
+
+| Method | Path | Level |
+|---|---|---|
+| GET | `.../theme-store/updates` | read |
+| POST | `.../theme-store/install` | write |
+| GET | `/api/v1/theme-store/themes`, `/api/v1/theme-store/screenshot` | session only (no vault) |
