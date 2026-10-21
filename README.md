@@ -407,7 +407,7 @@ Themes live in the vault (`.obsidian/themes/<id>/theme.css` + `manifest.json`); 
 | GET | `/vaults/:vaultId/themes` | List themes plus the active theme id |
 | GET/PUT | `/vaults/:vaultId/themes/active` | Read / set the active theme (`{ "themeId": "Name" \| null }`) |
 | GET | `/vaults/:vaultId/themes/:themeId` | Theme CSS and metadata |
-| PUT | `/vaults/:vaultId/themes/:themeId` | Create or overwrite a theme (`{ "css", "manifest"? }`, CSS up to 2 MB) |
+| PUT | `/vaults/:vaultId/themes/:themeId` | Create or overwrite a theme (`{ "css", "manifest"? }`, CSS up to 3 MB) |
 | DELETE | `/vaults/:vaultId/themes/:themeId` | Delete a theme (resets the selection if it was active) |
 
 ### Git-Sync & Mail-Import

@@ -43,7 +43,7 @@ Wechselt jemand anderes das Theme, während du den Vault offen hast, übernimmt 
 ## Ein Theme importieren
 
 1. Klicke im Abschnitt **Themes** auf die Fläche am Ende der Seite (oder ziehe die Dateien darauf)
-2. Wähle die `theme.css` aus, optional zusammen mit der `manifest.json` (maximal 2 MB)
+2. Wähle die `theme.css` aus, optional zusammen mit der `manifest.json` (maximal 3 MB)
 3. Der Name kommt aus der `manifest.json`; ohne Manifest wird der Dateiname verwendet
 4. Existiert schon ein Theme mit diesem Namen, fragt Slatebase vor dem Überschreiben nach
 

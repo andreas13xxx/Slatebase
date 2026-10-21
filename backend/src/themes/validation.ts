@@ -1,8 +1,11 @@
 import { z } from 'zod'
 import type { ThemeManifest } from './types.js'
 
-/** Maximum `theme.css` size: 2 MB (Minimal is ~270 KB; snippets stay at 512 KB). */
-export const MAX_THEME_CSS_SIZE = 2 * 1024 * 1024
+/**
+ * Maximum `theme.css` size: 3 MB (Minimal is ~270 KB; snippets stay at 512 KB). Measured against the Obsidian community
+ * catalog: the median theme is 37 KB, 3 MB admits 824 of 911 listed themes (2 MB would be 818).
+ */
+export const MAX_THEME_CSS_SIZE = 3 * 1024 * 1024
 
 /**
  * Theme ids are folder names. Letters, digits, space, `_`, `.`, `-`; must start
