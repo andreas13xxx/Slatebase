@@ -899,4 +899,15 @@ export const de = {
     copy: 'In Zwischenablage kopieren',
     copied: 'Kopiert',
   },
+
+  quickSwitcher: {
+    dialogLabel: 'Schnellwechsler',
+    placeholder: 'Datei öffnen oder erstellen …',
+    listLabel: 'Dateien',
+    noResults: 'Keine Dateien gefunden',
+    recentHeader: 'Zuletzt geöffnet',
+    createFile: 'Neue Datei „{name}“ erstellen',
+    createError: '„{name}“ konnte nicht erstellt werden.',
+    viaAlias: '{alias} → {name}',
+  },
 } as const

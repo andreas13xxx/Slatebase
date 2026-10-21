@@ -27,8 +27,8 @@ Andreas zur Umsetzung freigegeben hat. Entscheidungen des Abgleichs:
 - Aliase werden bereits im Property-Editor gespeichert (Listen-Typ); Auflösung + Switcher-Index
   sind jetzt implementiert. Reservierter Property-Key `aliases` (`RESERVED_PROPERTY_KEYS`).
 - Offener Folgeschritt (bewusst außerhalb Scope): Alias-Anzeige im Explorer-Titel, Alias-Pass
-  in Backlinks/Unlinked-Mentions, `[[`-Autovervollständigung, i18n-Namespace für den QuickSwitcher
-  (die Komponente ist aktuell durchgängig hartkodiert-deutsch).
+  in Backlinks/Unlinked-Mentions, `[[`-Autovervollständigung. (Der QuickSwitcher wurde bei der
+  Gelegenheit vollständig auf i18n umgestellt — neuer `quickSwitcher`-Namespace in de.ts + en.ts.)
 
 ### R2 — Workspaces (benannte Layouts)
 → **Vollständige Spec: `.kiro/specs/workspaces/`** (requirements + design + tasks).

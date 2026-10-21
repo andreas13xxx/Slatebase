@@ -10,6 +10,7 @@ import { openTab } from '../state/tabActions'
 import { getRecent } from '../state/recentFilesStore'
 import { getAliasEntriesSnapshot, type AliasEntry } from '../state/aliasStore'
 import { extractErrorMessage } from '../utils/error'
+import { useTranslation } from '../i18n'
 
 export interface QuickSwitcherProps {
   isOpen: boolean
@@ -53,6 +54,7 @@ export function QuickSwitcher({
   tabDispatch,
   appDispatch,
 }: QuickSwitcherProps) {
+  const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [creating, setCreating] = useState(false)
@@ -111,11 +113,11 @@ export function QuickSwitcher({
       onClose()
     } catch (err: unknown) {
       // Requirement 2.8: keep the switcher open, show the reason inline.
-      setCreateError(extractErrorMessage(err, `„${name}“ konnte nicht erstellt werden.`))
+      setCreateError(extractErrorMessage(err, t('quickSwitcher.createError', { name })))
     } finally {
       setCreating(false)
     }
-  }, [apiClient, vaultId, appDispatch, tabDispatch, onClose])
+  }, [apiClient, vaultId, appDispatch, tabDispatch, onClose, t])
 
   const handleSelect = useCallback((entry: SwitcherEntry) => {
     if (entry.kind === 'create') {
@@ -161,7 +163,7 @@ export function QuickSwitcher({
         className="command-palette"
         role="dialog"
         aria-modal="true"
-        aria-label="Schnellwechsler"
+        aria-label={t('quickSwitcher.dialogLabel')}
       >
         <div className="command-palette-search">
           <Search size={14} className="command-palette-search-icon" />
@@ -169,7 +171,7 @@ export function QuickSwitcher({
             ref={inputRef}
             type="text"
             className="command-palette-input"
-            placeholder="Datei öffnen oder erstellen…"
+            placeholder={t('quickSwitcher.placeholder')}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value)
@@ -194,18 +196,18 @@ export function QuickSwitcher({
           id="quick-switcher-list"
           className="command-palette-list"
           role="listbox"
-          aria-label="Dateien"
+          aria-label={t('quickSwitcher.listLabel')}
         >
           {totalItems === 0 ? (
             <li className="command-palette-empty" role="option" aria-selected={false}>
-              Keine Dateien gefunden
+              {t('quickSwitcher.noResults')}
             </li>
           ) : (
             <>
               {showingRecent && (
                 <li className="command-palette-section-header" aria-hidden="true">
                   <Clock size={12} className="command-palette-section-icon" />
-                  Zuletzt geöffnet
+                  {t('quickSwitcher.recentHeader')}
                 </li>
               )}
               {entries.map((entry, index) => (
@@ -222,13 +224,15 @@ export function QuickSwitcher({
                     <>
                       <span className="command-palette-item-name">
                         <FilePlus size={13} style={{ marginRight: 6, verticalAlign: 'text-bottom' }} />
-                        Neue Datei „{entry.name}“ erstellen
+                        {t('quickSwitcher.createFile', { name: entry.name })}
                       </span>
                     </>
                   ) : (
                     <>
                       <span className="command-palette-item-name">
-                        {entry.viaAlias ? `${entry.viaAlias} → ${entry.name}` : entry.name}
+                        {entry.viaAlias
+                          ? t('quickSwitcher.viaAlias', { alias: entry.viaAlias, name: entry.name })
+                          : entry.name}
                       </span>
                       <span className="command-palette-item-path">{entry.path}</span>
                     </>

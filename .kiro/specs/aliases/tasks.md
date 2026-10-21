@@ -24,8 +24,8 @@
 ## Frontend — R2 Quick Switcher
 - [x] 9. `buildEntries` in `QuickSwitcher.tsx`: Alias-Einträge erzeugt (`viaAlias`-Feld),
       fuzzy-rankbar, Dedup gegen Namenstreffer (best-Score je Pfad).
-- [x] 10. Darstellung „<alias> → <name>"; i18n-Namespace bewusst nicht eingeführt (Komponente ist
-      durchgängig hartkodiert-deutsch — eigener Cleanup-Posten).
+- [x] 10. Darstellung „<alias> → <name>"; QuickSwitcher vollständig auf i18n umgestellt
+      (neuer `quickSwitcher`-Namespace in de.ts + en.ts, alle 6 Strings inkl. Alias-Zeile).
 - [x] 11. Store-Tests (`aliasStore.test.ts`): Folding/Lowercasing/Dedup/Entries + Snapshots.
 
 ## Abschluss

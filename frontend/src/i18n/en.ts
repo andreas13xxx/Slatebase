@@ -906,4 +906,15 @@ export const en: TranslationShape = {
     copied: 'Copied',
   },
 
+  quickSwitcher: {
+    dialogLabel: 'Quick Switcher',
+    placeholder: 'Open or create a file …',
+    listLabel: 'Files',
+    noResults: 'No files found',
+    recentHeader: 'Recently opened',
+    createFile: 'Create new file “{name}”',
+    createError: '“{name}” could not be created.',
+    viaAlias: '{alias} → {name}',
+  },
+
 } as const
