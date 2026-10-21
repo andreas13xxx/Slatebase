@@ -58,7 +58,7 @@ guardedFetch(url, { allowedHosts, maxBytes, timeoutMs, maxRedirects, accept? }):
 
 ### Install-Ablauf (`install`)
 1. `repo` gegen Schema und gegen den **aktuellen Katalog** prüfen (`ThemeNotInCatalogError` → 404).
-2. `manifest.json` (≤ 64 KB) und `theme.css` (≤ 2 MB) parallel holen. Eines fehlt oder ist ungültig → Fehler, nichts wird geschrieben.
+2. `manifest.json` (≤ 64 KB) und `theme.css` (≤ 3 MB) parallel holen. Eines fehlt oder ist ungültig → Fehler, nichts wird geschrieben.
 3. `manifest.name` muss mit dem Katalognamen übereinstimmen (case-insensitiv); sonst Fehler „Manifest passt nicht zum Katalog" (verhindert, dass ein Repo ein fremdes Theme überschreibt).
 4. `ThemeService.saveTheme(vaultPath, id, css, manifest)` unter dem bestehenden Schutz (Reservierte Namen, Groß-/Kleinschreibung, Staged Writes). `replace` entscheidet vorher über `themeExists`: vorhanden und nicht `replace` → `409`.
 5. Optional `setActiveThemeId`. Die bestehenden Ereignisse (`vault:change`) tragen die Änderung zu offenen Clients.
@@ -143,10 +143,11 @@ abgesichert. Der Eintrag in `VAULT-ROUTE-AUTHORIZATION.md` nennt die neuen Pfade
 
 ## 7. Offene Fragen und Entscheidungen
 
-- **Grenze für `theme.css`:** 2 MB schließt 26 von 911 Themes aus, darunter Catppuccin (2,2 MB). Optionen: bei 2 MB
-  bleiben (Vorschlag; gleich wie Import), auf 3 MB anheben (holt Catppuccin und Typomagical zurück, die übrigen 24 bleiben
-  draußen) oder auf 5 MB. Eine Anhebung gilt dann auch für den Import (`MAX_THEME_CSS_SIZE`) und hängt davon ab, wie träge
-  der Browser mit großen `<style>`-Blöcken ist.
+- **Grenze für `theme.css`: entschieden am 2026-10-21 auf 3 MB** (vorher 2 MB). Gilt für Store und Import
+  (`MAX_THEME_CSS_SIZE` im Backend, `MAX_THEME_CSS_BYTES` und die Meldung im Frontend, Doku „maximal 2 MB" in
+  Welcome-Vault und README). Sechs weitere Themes werden installierbar, 20 bleiben draußen. Zu prüfen: Das Anhängen eines
+  bis zu 3 MB großen `<style>`-Blocks muss die Oberfläche beim Wechsel nicht merklich bremsen (Messung in der Abnahme,
+  mit Catppuccin und Virgo), und die Request-Body-Grenze der Theme-Route darf 3 MB nicht unterschreiten.
 
 Entschieden am 2026-10-20: Katalog beim Start vorwärmen, unendliches Scrollen, Abschalten nur serverweit (siehe §2).
 

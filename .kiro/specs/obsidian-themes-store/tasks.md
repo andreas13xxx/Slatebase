@@ -9,10 +9,15 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, Lint, betroff
       parallelen Anfragen unbrauchbar (431 Anfragen ohne Antwort), zweiter mit 3 Anfragen vollständig
 - [x] 0.2 Screenshot-Pfade normalisiert und geprüft: 906 von 911 lösen auf
 - [x] 0.3 Ergebnis in den Requirements nachgetragen: 818 von 911 (90 %) installierbar, 26 über 2 MB, 62/66 ohne Manifest/CSS;
-      R3.3 (Manifest Pflicht) bestätigt, R3.8 und R5.1 um die gemessenen Fälle ergänzt. Offene Entscheidung: CSS-Grenze
-      (Design §7)
+      R3.3 (Manifest Pflicht) bestätigt, R3.8 und R5.1 um die gemessenen Fälle ergänzt. CSS-Grenze auf 3 MB angehoben
+      (Entscheidung 2026-10-21, 824 von 911 installierbar)
 
 ## Phase 1 — Grundlagen im Backend
+- [ ] 1.0 CSS-Grenze auf 3 MB (Entscheidung 2026-10-21), zuerst und einzeln committbar, weil sie den bestehenden Import
+      betrifft: `MAX_THEME_CSS_SIZE` (`backend/src/themes/validation.ts`), `MAX_THEME_CSS_BYTES` und Meldung
+      (`themeImport.ts`), Request-Body-Grenze der Theme-Route prüfen, Tests der Grenzwerte (3 MB ok, 3 MB + 1 abgelehnt),
+      Doku (Welcome-Vault DE/EN „maximal 3 MB", README-API-Tabelle). Messung: Wechsel auf Catppuccin und Virgo bremst die
+      Oberfläche nicht merklich
 - [ ] 1.1 `shared/guarded-fetch.ts` (Allowlist je Hop, Streaming-Limit, Timeout, kein Authorization-Header) + Tests gegen
       lokalen Test-Server
 - [ ] 1.2 `theme-store/{types,errors,validation}.ts` + Tests (Repo-Regex, Pfadnormalisierung, SemVer-Vergleich)
@@ -54,5 +59,6 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, Lint, betroff
   Token (siehe Design §2).
 - 2026-10-20: Zuordnung installierter Themes zum Katalog über den Namen, keine Zusatzdatei im Vault.
 - 2026-10-20: Kein automatischer Update-Check; Screenshots nur über den Server.
+- 2026-10-21: CSS-Grenze 3 MB für Store und Import (6 weitere Themes installierbar, 20 bleiben zu groß).
 - 2026-10-20: Katalog beim Start vorwärmen (nicht blockierend), unendliches Scrollen mit Schaltfläche „Mehr laden",
   Abschalten nur serverweit.

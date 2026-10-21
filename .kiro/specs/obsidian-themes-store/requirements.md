@@ -36,7 +36,7 @@ Alle 911 Einträge wurden abgerufen (nur `raw.githubusercontent.com`, mit Wieder
 | beide fehlen | 60, davon **15 der 17 `legacy`-Themes** |
 | nur eines fehlt | 6 ohne CSS (z. B. Material 3, steam), 2 ohne Manifest (Lizardmen Zettelkasten, Viridian) |
 | Manifest ungültig / über 64 KB | 0 / 0 |
-| `theme.css` über 2 MB | **26** (siehe unten) |
+| `theme.css` über 2 MB | **26** (siehe unten); über 3 MB bleiben 20 |
 | Screenshot erreichbar (normalisierter Pfad) | 906 von 911; 3 × 404, 2 ohne Pfad |
 | Screenshot über 2 MB | 16 |
 | Screenshot-Typen | PNG 829, JPEG 69, WebP 5, GIF 1, SVG 1, `octet-stream` 1 |
@@ -51,8 +51,9 @@ Typomagical (2,0 MB), beides bekannte Themes.
   Themes ohne Manifest (Lizardmen Zettelkasten, Viridian) sind über den Katalog nicht installierbar.
 - 93 Themes (10 %) sind nicht installierbar. Der Katalog zeigt sie trotzdem (er kennt die Dateien erst beim Abruf); die
   Oberfläche muss „Nicht installierbar: <Grund>" sauber anzeigen (R3.8), statt einen allgemeinen Fehler.
-- Das 2-MB-Limit schließt 26 Themes aus. Es bleibt bei 2 MB (gleich wie beim Import; ein Browser parst 40 MB CSS nicht
-  sinnvoll), die Entscheidung über Catppuccin steht in den offenen Fragen des Designs.
+- **Entscheidung 2026-10-21: Die CSS-Grenze steigt auf 3 MB** (Store **und** Import). Damit werden sechs weitere Themes
+  installierbar (Virgo 2,7 MB, Ravenloft, Lumines, Cosmical je 2,3 MB, Catppuccin 2,2 MB, Typomagical 2,0 MB), also
+  **824 von 911 (90,4 %)**. 20 Themes bleiben darüber (Fancy-a-Story 3,1 MB bis Latsidian 42,5 MB).
 - Screenshot-Normalisierung (R5.2) funktioniert: 906 von 911 lösen auf.
 
 ## Ziel
@@ -111,7 +112,7 @@ geprüft hat.
     sie braucht Schreibzugriff auf den Vault (zentrale Vault-Autorisierung: GET = lesen, sonst schreiben).
 3.2 Der Server prüft, dass `repo` im aktuellen Katalog steht (kein beliebiges Repo), und lädt `manifest.json` und
     `theme.css` von `raw.githubusercontent.com/<repo>/HEAD/`.
-3.3 Der Server validiert wie beim Import: CSS höchstens 2 MB, Manifest höchstens 64 KB und gültiges JSON, Theme-ID aus
+3.3 Der Server validiert wie beim Import: CSS höchstens 3 MB (Anhebung von 2 MB, siehe Messung), Manifest höchstens 64 KB und gültiges JSON, Theme-ID aus
     `manifest.name` (gleiche Regeln wie `validation.ts`: reservierte Namen, Windows-Namen, Groß-/Kleinschreibung). Fehlt
     das Manifest oder ist es ungültig, schlägt die Installation fehl (anders als beim Import: Der Katalog verspricht eins).
 3.4 Die Installation geht durch `ThemeService.saveTheme` (atomare Schreibvorgänge, Manifest vor CSS, keine Symlinks).
@@ -121,7 +122,7 @@ geprüft hat.
     denselben Hinweis zeigen kann wie beim Import.
 3.7 Optional „Danach aktivieren" (Standard: aus). Aktivieren nutzt den bestehenden Weg (`appearance.json`,
     `vault:change`).
-3.8 Ein Fehler (Netz, 404, zu groß, ungültig) zeigt die konkrete Ursache am Eintrag, getrennt nach „Dateien nicht im Repo gefunden" (404), „Theme zu groß (x MB, Grenze 2 MB)" und „Netzwerkfehler, erneut versuchen"; es bleibt kein halber Zustand im
+3.8 Ein Fehler (Netz, 404, zu groß, ungültig) zeigt die konkrete Ursache am Eintrag, getrennt nach „Dateien nicht im Repo gefunden" (404), „Theme zu groß (x MB, Grenze 3 MB)" und „Netzwerkfehler, erneut versuchen"; es bleibt kein halber Zustand im
     Vault.
 
 ### R4 — Updates
@@ -147,7 +148,7 @@ geprüft hat.
 6.1 Nur diese Hosts: `raw.githubusercontent.com` (Dateien, Screenshots) und für den Katalog dieselbe Allowlist wie der
     Plugin-Store. Redirects werden nur innerhalb der Allowlist verfolgt (höchstens 5).
 6.2 `repo` wird gegen `^[\w.-]+/[\w.-]+$` und gegen den Katalog geprüft, bevor es in eine URL eingesetzt wird.
-6.3 Größenlimits wie R3.3 und R5.1, hart beim Lesen des Streams (nicht erst nach dem vollständigen Download).
+6.3 Größenlimits wie R3.3 (3 MB) und R5.1 (2 MB), hart beim Lesen des Streams (nicht erst nach dem vollständigen Download).
 6.4 Der Server gibt kein Token und keine internen Pfade zurück. Ein konfiguriertes `SLATEBASE_GITHUB_TOKEN` wird für
     `raw.githubusercontent.com` **nicht** mitgesendet (kein Grund, und es würde das Token an einen Cache-Host geben).
 6.5 Ein Theme ist beliebiges CSS aus fremder Hand. Die Oberfläche sagt das vor der ersten Installation einmalig und zeigt
