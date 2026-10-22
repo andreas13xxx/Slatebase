@@ -83,6 +83,16 @@ export class VaultAdapterShim implements IVaultAdapter {
   }
 
   /**
+   * URL under which the browser can load the file (same scheme as `VaultShim.getResourcePath`), authenticated by the
+   * session cookie. Plugins on the non-desktop code path derive a stable per-vault identifier from it: Remotely Save
+   * calls `getResourcePath("").split("?")[0]` when the adapter is not a `FileSystemAdapter`, and used to fail onload
+   * because the proxy's no-op stub returned `undefined`.
+   */
+  getResourcePath(path: string): string {
+    return `/api/v1/vaults/${this.vaultId}/files?path=${encodeURIComponent(path)}&raw=true`
+  }
+
+  /**
    * Check if a file or folder exists at the given path.
    */
   async exists(path: string): Promise<boolean> {
@@ -255,7 +265,7 @@ export class VaultAdapterShim implements IVaultAdapter {
   /**
    * Wraps a VaultAdapterShim instance with a Proxy for non-emulated API
    * interception. Real Obsidian's DataAdapter has methods this class doesn't
-   * implement (`copy`, `trashSystem`, `trashLocal`, `getResourcePath`,
+   * implement (`copy`, `trashSystem`, `trashLocal`,
    * `process`, `append`, `getFullPath`, ...) — without this, reading one of
    * those off the raw instance is `undefined`, and calling `undefined()` is
    * an uncaught TypeError. Mirrors VaultShim/WorkspaceShim's pattern: a
@@ -264,6 +274,7 @@ export class VaultAdapterShim implements IVaultAdapter {
   static wrapWithProxy(instance: VaultAdapterShim): VaultAdapterShim & Record<string, unknown> {
     const emulatedProperties = new Set<string | symbol>([
       'insensitive',
+      'getResourcePath',
       'exists',
       'read',
       'readBinary',

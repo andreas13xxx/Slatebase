@@ -4,9 +4,10 @@ import { z } from 'zod'
 
 /**
  * Regex for validating GitHub repository format "owner/repo".
- * Allows alphanumeric characters, dots, hyphens, and underscores in both segments.
+ * Allows alphanumeric characters, dots, hyphens, and underscores in both segments, but not a segment made only of
+ * dots (`..`, `.`): the value is interpolated into URL paths, where `../x` would climb out of the repo.
  */
-export const REPO_FORMAT_PATTERN = /^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/
+export const REPO_FORMAT_PATTERN = /^(?!\.+\/)(?!.*\/\.+$)[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/
 
 // ─── Plugin Store Validation Schemas ─────────────────────────────────────────
 

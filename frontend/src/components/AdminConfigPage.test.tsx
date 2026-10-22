@@ -77,8 +77,9 @@ describe('AdminConfigPage', () => {
       if (url.endsWith('/api/v1/version')) {
         return Promise.resolve(new Response(JSON.stringify({ version: '0.1.0' }), { status: 200 }))
       }
-      if (url.includes('api.github.com')) {
-        return Promise.resolve(new Response(JSON.stringify({ tag_name: 'v0.1.0', html_url: 'https://github.com' }), { status: 200 }))
+      if (url.endsWith('/api/v1/releases')) {
+        const latest = { tagName: 'v0.1.0', name: null, body: null, htmlUrl: 'https://github.com', prerelease: false }
+        return Promise.resolve(new Response(JSON.stringify({ releases: [latest], latest, stale: false }), { status: 200 }))
       }
       const response = responses.shift()
       if (response instanceof Promise) return response
@@ -93,8 +94,9 @@ describe('AdminConfigPage', () => {
       if (url.endsWith('/api/v1/version')) {
         return Promise.resolve(new Response(JSON.stringify({ version: '0.1.0' }), { status: 200 }))
       }
-      if (url.includes('api.github.com')) {
-        return Promise.resolve(new Response(JSON.stringify({ tag_name: 'v0.1.0' }), { status: 200 }))
+      if (url.endsWith('/api/v1/releases')) {
+        const latest = { tagName: 'v0.1.0', name: null, body: null, htmlUrl: 'https://github.com', prerelease: false }
+        return Promise.resolve(new Response(JSON.stringify({ releases: [latest], latest, stale: false }), { status: 200 }))
       }
       return new Promise(() => {}) // never resolves for config
     })

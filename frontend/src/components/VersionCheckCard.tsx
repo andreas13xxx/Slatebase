@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CheckCircle, ArrowUpCircle, Info, AlertTriangle, Loader } from 'lucide-react'
 import { compareSemver } from '../utils/semver'
+import { fetchReleaseList } from '../hooks/releaseApi'
 
 /**
  * Internal state for the version check logic.
@@ -61,35 +62,19 @@ export function VersionCheckCard() {
         return
       }
 
-      // 2. Fetch latest release from GitHub API (10s timeout)
+      // 2. Fetch the latest release via the server (it looks it up on GitHub; 10s timeout)
       let latestVersion: string | null = null
       let latestReleaseUrl: string | null = null
 
       try {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 10000)
-
-        const ghResponse = await fetch(
-          'https://api.github.com/repos/andreas13xxx/Slatebase/releases/latest',
-          {
-            signal: controller.signal,
-            headers: { 'Accept': 'application/vnd.github.v3+json' },
-          }
-        )
-        clearTimeout(timeoutId)
-
-        if (ghResponse.ok) {
-          const release = await ghResponse.json() as { tag_name?: string; html_url?: string }
-          if (release.tag_name) {
-            // Strip leading 'v' for comparison
-            latestVersion = release.tag_name.startsWith('v')
-              ? release.tag_name.slice(1)
-              : release.tag_name
-          }
-          latestReleaseUrl = release.html_url ?? null
+        const release = (await fetchReleaseList()).latest
+        if (release) {
+          // Strip leading 'v' for comparison
+          latestVersion = release.tagName.startsWith('v') ? release.tagName.slice(1) : release.tagName
+          latestReleaseUrl = release.htmlUrl
         }
       } catch {
-        // GitHub API failure: silently continue without comparison
+        // Release lookup unavailable: silently continue without comparison
       }
 
       if (!cancelled) {

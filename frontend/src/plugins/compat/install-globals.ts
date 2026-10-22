@@ -389,18 +389,23 @@ export function installObsidianGlobals(): void {
       writable: true, configurable: true,
     })
   }
-  // Obsidian exposes `element.doc` as a getter returning the ownerDocument.
+  // Obsidian exposes `node.doc` as a getter returning the ownerDocument.
   // Plugins (e.g. LiveSync) use `containerEl.doc.createEl(...)` to create elements.
-  if (!('doc' in Element.prototype)) {
-    Object.defineProperty(Element.prototype, 'doc', {
-      get: function (this: Element): Document { return this.ownerDocument },
+  // Defined on `Node`, not `Element`, as in Obsidian: QuickAdd resolves `createFragment()` (a DocumentFragment) to its
+  // owner document and then reads `document.win.createEl(...)`, so Document, fragments and text nodes need both too.
+  if (!('doc' in Node.prototype)) {
+    Object.defineProperty(Node.prototype, 'doc', {
+      get: function (this: Node): Document { return this.nodeType === Node.DOCUMENT_NODE ? (this as Document) : this.ownerDocument ?? document },
       configurable: true,
     })
   }
-  // Also expose `win` getter (ownerDocument.defaultView) used by some plugins.
-  if (!('win' in Element.prototype)) {
-    Object.defineProperty(Element.prototype, 'win', {
-      get: function (this: Element): Window { return this.ownerDocument.defaultView ?? window },
+  // Also expose `win` getter (the document's defaultView) used by some plugins.
+  if (!('win' in Node.prototype)) {
+    Object.defineProperty(Node.prototype, 'win', {
+      get: function (this: Node): Window {
+        const doc = this.nodeType === Node.DOCUMENT_NODE ? (this as Document) : this.ownerDocument ?? document
+        return doc.defaultView ?? window
+      },
       configurable: true,
     })
   }
@@ -817,6 +822,16 @@ export function installObsidianGlobals(): void {
       load(): void {
         this._loaded = true
         containAsyncLoad(this.constructor?.name || 'Component', this.onload())
+      }
+      /**
+       * Host-only: marks the component as loaded without running `onload()` (double-underscore name so it cannot clash
+       * with a plugin's own members, and is not part of Obsidian's API). PluginLoader calls `onload()` itself (it needs the
+       * returned promise, a timeout and the plugin execution context), so it uses this to give `addChild` Obsidian's
+       * semantics: a child added during or after `onload()` is loaded at once. Without it a plugin's `_loaded` stays
+       * false and its children (Style Settings' markup tree, views, settings tabs) are never loaded.
+       */
+      __markLoadedByHost(): void {
+        this._loaded = true
       }
       onload(): void {}
       unload(): void {

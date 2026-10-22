@@ -17,12 +17,16 @@ describe('useReleaseNotes', () => {
     expect(result.current).toEqual({ releases: [], loading: true, error: false })
   })
 
-  it('fetches and maps GitHub releases when active', async () => {
+  it('fetches the releases from the server when active', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => [
-        { tag_name: 'v1.2.0', name: 'v1.2.0', body: '### Fixed\n- a bug', html_url: 'https://github.com/x/y/releases/tag/v1.2.0' },
-      ],
+      json: async () => ({
+        releases: [
+          { tagName: 'v1.2.0', name: 'v1.2.0', body: '### Fixed\n- a bug', htmlUrl: 'https://github.com/x/y/releases/tag/v1.2.0', prerelease: false },
+        ],
+        latest: null,
+        stale: false,
+      }),
     })
     vi.stubGlobal('fetch', fetchMock)
 
@@ -34,14 +38,12 @@ describe('useReleaseNotes', () => {
     expect(result.current.releases).toEqual([
       { tagName: 'v1.2.0', name: 'v1.2.0', body: '### Fixed\n- a bug', htmlUrl: 'https://github.com/x/y/releases/tag/v1.2.0' },
     ])
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('api.github.com/repos/andreas13xxx/Slatebase/releases'),
-      expect.any(Object),
-    )
+    // The browser asks its own server, never GitHub.
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/releases', expect.any(Object))
   })
 
-  it('sets error=true when the GitHub API responds with a non-ok status', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 403 }))
+  it('sets error=true when the server responds with a non-ok status', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 502 }))
 
     const { result } = renderHook(() => useReleaseNotes(true))
 

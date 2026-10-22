@@ -16,9 +16,13 @@ describe('ReleaseNotesModal', () => {
   it('shows a loading state, then renders fetched release notes as HTML', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => [
-        { tag_name: 'v1.0.0', name: 'v1.0.0', body: '**bold** release notes', html_url: 'https://example.com/v1.0.0' },
-      ],
+      json: async () => ({
+        releases: [
+          { tagName: 'v1.0.0', name: 'v1.0.0', body: '**bold** release notes', htmlUrl: 'https://example.com/v1.0.0', prerelease: false },
+        ],
+        latest: null,
+        stale: false,
+      }),
     }))
 
     render(<ReleaseNotesModal open onClose={vi.fn()} />)
@@ -43,7 +47,7 @@ describe('ReleaseNotesModal', () => {
   })
 
   it('calls onClose when the close button is clicked', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [] }))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ releases: [], latest: null, stale: false }) }))
     const onClose = vi.fn()
 
     render(<ReleaseNotesModal open onClose={onClose} />)

@@ -78,24 +78,60 @@ describe('GitHubClient', () => {
       await expect(client.fetchCommunityPlugins()).rejects.toThrow(GitHubFetchError)
     })
 
-    it('includes Authorization header when token is configured', async () => {
+    const releaseWithAssets = (host: string) => ({
+      tag_name: '1.0.0',
+      html_url: 'https://github.com/o/r/releases/tag/1.0.0',
+      assets: [
+        { name: 'main.js', browser_download_url: `https://${host}/main.js`, size: 10 },
+        { name: 'manifest.json', browser_download_url: `https://${host}/manifest.json`, size: 10 },
+      ],
+    })
+    const authOfCall = (n: number) =>
+      (vi.mocked(fetch).mock.calls[n]?.[1]?.headers as Record<string, string>)['Authorization']
+
+    it('sends the token to api.github.com only, not to the asset downloads', async () => {
       config = createMockConfig({ githubToken: 'ghp_test123' })
       client = new GitHubClient(config, logger)
 
-      vi.mocked(fetch).mockResolvedValueOnce(createMockResponse([], {
-        headers: { 'X-RateLimit-Remaining': '4999' },
-      }))
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(createMockResponse(releaseWithAssets('release-assets.githubusercontent.com')))
+        .mockResolvedValueOnce(createMockResponse('bundle'))
+        .mockResolvedValueOnce(createMockResponse('{}'))
+      await client.downloadReleaseAssets('o/r')
 
+      expect(vi.mocked(fetch).mock.calls[0]?.[0]).toBe('https://api.github.com/repos/o/r/releases/latest')
+      expect(authOfCall(0)).toBe('Bearer ghp_test123')
+      expect(authOfCall(1)).toBeUndefined()
+      expect(authOfCall(2)).toBeUndefined()
+    })
+
+    it('does not send the token to raw.githubusercontent.com', async () => {
+      config = createMockConfig({ githubToken: 'ghp_test123' })
+      client = new GitHubClient(config, logger)
+
+      vi.mocked(fetch).mockResolvedValueOnce(createMockResponse([]))
       await client.fetchCommunityPlugins()
 
-      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            'Authorization': 'Bearer ghp_test123',
-          }),
-        }),
-      )
+      const headers = vi.mocked(fetch).mock.calls[0]?.[1]?.headers as Record<string, string>
+      expect(headers['Authorization']).toBeUndefined()
+    })
+
+    it('drops the token when a redirect leaves the API host', async () => {
+      config = createMockConfig({ githubToken: 'ghp_test123' })
+      client = new GitHubClient(config, logger)
+
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(new Response(null, {
+          status: 302,
+          headers: { location: 'https://objects.githubusercontent.com/x' },
+        }))
+        .mockResolvedValueOnce(createMockResponse(releaseWithAssets('objects.githubusercontent.com')))
+        .mockResolvedValueOnce(createMockResponse('bundle'))
+        .mockResolvedValueOnce(createMockResponse('{}'))
+      await client.downloadReleaseAssets('o/r')
+
+      expect(authOfCall(0)).toBe('Bearer ghp_test123')
+      expect(authOfCall(1)).toBeUndefined()
     })
 
     it('does not include Authorization header when no token', async () => {

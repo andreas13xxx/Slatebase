@@ -23,6 +23,7 @@ import type { WorkspaceShim } from './shims/workspace-shim'
 import type { MetadataCacheShim } from './shims/metadata-cache-shim'
 import type { VaultShim } from './shims/vault-shim'
 import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
+import { CSS_CHANGE_EVENT } from '../appearance/css-change'
 import { THEME_CHANGE_EVENT } from './body-classes'
 import { getPaneLayout, onPaneLayoutChange } from './pane-split-bridge'
 
@@ -397,13 +398,20 @@ export function usePluginEventBridge({
   // ─── Theme flip → workspace 'css-change' event ────────────────────────────
   //
   // Obsidian emits 'css-change' when the theme or loaded CSS changes; plugins
-  // that render to a canvas (Excalidraw, charts) re-read their colors on it.
+  // that render to a canvas (Excalidraw, charts) re-read their colors on it,
+  // and Style Settings re-reads the `@settings` blocks of the active theme.
+  // Two sources: the light/dark flip, and the vault theme or a snippet being
+  // applied, replaced or removed (the appearance injectors).
 
   useEffect(() => {
     if (!workspaceShim) return
-    const handleThemeChange = () => workspaceShim.trigger('css-change')
-    window.addEventListener(THEME_CHANGE_EVENT, handleThemeChange)
-    return () => window.removeEventListener(THEME_CHANGE_EVENT, handleThemeChange)
+    const handleCssChange = () => workspaceShim.trigger('css-change')
+    window.addEventListener(THEME_CHANGE_EVENT, handleCssChange)
+    window.addEventListener(CSS_CHANGE_EVENT, handleCssChange)
+    return () => {
+      window.removeEventListener(THEME_CHANGE_EVENT, handleCssChange)
+      window.removeEventListener(CSS_CHANGE_EVENT, handleCssChange)
+    }
   }, [workspaceShim])
 
   // ─── Editor change → workspace 'editor-change' event ──────────────────────

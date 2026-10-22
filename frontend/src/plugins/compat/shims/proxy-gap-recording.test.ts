@@ -108,10 +108,10 @@ describe('proxy gap recording', () => {
     it('records a non-emulated read instead of returning undefined', () => {
       const adapter = createProxiedAdapter()
 
-      void adapter['getResourcePath']
+      void adapter['getFullPath']
 
       expect(getApiGaps()).toEqual([
-        { shim: 'VaultAdapter', property: 'getResourcePath', pluginId: 'unknown', reads: 1, calls: 0 },
+        { shim: 'VaultAdapter', property: 'getFullPath', pluginId: 'unknown', reads: 1, calls: 0 },
       ])
     })
 
@@ -130,6 +130,7 @@ describe('proxy gap recording', () => {
 
       void adapter['exists']
       void adapter['read']
+      void adapter['getResourcePath']
 
       expect(getApiGaps()).toEqual([])
     })

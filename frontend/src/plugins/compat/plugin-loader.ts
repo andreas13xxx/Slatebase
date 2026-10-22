@@ -237,6 +237,10 @@ export class PluginLoader implements IPluginLoader {
       // overwritten it to undefined during construction.
       (record.instance as unknown as { scope: Scope }).scope = new Scope();
 
+      // Obsidian's plugin.load() marks the Component loaded and then runs onload(); here onload() runs directly (the
+      // loader needs its promise), so the flag has to be set explicitly. Otherwise `addChild` never loads a child.
+      record.instance.__markLoadedByHost?.();
+
       // Scoped so createEl() calls made during onload — including everything
       // after an internal `await` inside an async onload(), not just its first
       // synchronous chunk (see withPluginContextAsync) — and, via captured
@@ -287,6 +291,13 @@ export class PluginLoader implements IPluginLoader {
       record.status = 'error';
       this.deps.onStatusChange(pluginId, 'error', detail);
       console.error(`[PluginLoader] Plugin "${pluginId}" failed during onload:`, err);
+      // Obsidian unloads a plugin whose onload() failed. Doing the same keeps children it already added from running
+      // on behalf of a plugin reported as failed (they are loaded at once now that the plugin counts as loaded).
+      try {
+        (record.instance as { unload?: () => unknown }).unload?.();
+      } catch {
+        // A half-initialised plugin's onunload() may throw; the failure is already reported above.
+      }
       throw lifecycleError;
     }
   }

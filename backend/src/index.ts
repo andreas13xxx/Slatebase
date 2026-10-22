@@ -59,6 +59,8 @@ import { createThemeRoutes } from './api/themeRoutes.js'
 import { ThemeStoreCache, ThemeStoreClient, ThemeStoreService, warmThemeStoreCatalog } from './theme-store/index.js'
 import { createThemeStoreRoutes, createVaultThemeStoreRoutes } from './api/themeStoreRoutes.js'
 import { createSnippetRoutes } from './api/snippetRoutes.js'
+import { ReleaseInfoService } from './release-info/index.js'
+import { createReleaseRoutes } from './api/releaseRoutes.js'
 import { GitHubClient, PluginStoreCache, PluginStoreService, UpdateChecker } from './plugin-store/index.js'
 import type { IPluginStoreConfig } from './plugin-store/index.js'
 import { createPluginStoreRoutes, createVaultPluginStoreRoutes } from './api/pluginStoreRoutes.js'
@@ -615,8 +617,6 @@ app.use(
 //   the Excalidraw plugin pulls from unpkg.com) — same latitude already given to imgSrc;
 //   `data:` additionally covers a plugin embedding its own font inline as a base64 URI
 //   (e.g. Excalidraw's bundled "Excalifont" handwriting font)
-// - `https://api.github.com` in connectSrc: the built-in update checker
-//   (useVersionInfo.ts, useReleaseNotes.ts) calls the GitHub API directly from the browser
 // - `https:` in frameSrc: Canvas link-node iframes embed external URLs
 // - `crossOriginResourcePolicy: false`: frontend and backend run on different origins
 //   (allowedOrigins config) — `same-origin` CORP would block <img src> loads from
@@ -634,7 +634,7 @@ app.use(
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
       fontSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://api.github.com"],
+      connectSrc: ["'self'"],
       frameSrc: ["'self'", "https:"],
       objectSrc: ["'none'"],
       frameAncestors: ["'none'"],
@@ -742,6 +742,9 @@ const themeRoutes = createThemeRoutes({
   logger,
 })
 app.route('/api/v1/vaults/:vaultId/themes', themeRoutes)
+
+// Slatebase's own releases (update hint, release notes): looked up here so the browser never calls GitHub itself.
+app.route('/api/v1/releases', createReleaseRoutes({ releaseInfoService: new ReleaseInfoService(logger), logger }))
 
 // Community theme store (browse/install/update Obsidian community themes from GitHub; feature-guarded above).
 // Fetches only from raw.githubusercontent.com and never sends credentials.
