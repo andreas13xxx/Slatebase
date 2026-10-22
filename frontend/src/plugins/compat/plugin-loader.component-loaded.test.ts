@@ -62,12 +62,12 @@ describe('PluginLoader marks the plugin as loaded before onload()', { timeout: 3
   it('loads a child added after onload() has returned (the Style Settings case: a settings tab built on demand)', async () => {
     const { child, events } = createChild()
     const Plugin = (window as unknown as { obsidian: { Plugin: new (app: unknown, manifest: unknown) => ComponentLike } }).obsidian.Plugin
-    let instance: ComponentLike | undefined
+    const instances: ComponentLike[] = []
     const loader = createLoader(async () => ({
       default: class extends Plugin {
         constructor(app: unknown, m: unknown) {
           super(app, m)
-          instance = this
+          instances.push(this)
         }
       },
     }))
@@ -76,7 +76,7 @@ describe('PluginLoader marks the plugin as loaded before onload()', { timeout: 3
     await loader.activatePlugin('child-plugin')
     expect(events).toEqual([])
 
-    instance?.addChild(child)
+    instances[0]?.addChild(child)
 
     expect(events).toEqual(['load'])
   })
