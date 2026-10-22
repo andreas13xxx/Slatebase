@@ -30,6 +30,9 @@ export interface IThemeInjector {
 }
 
 export class ThemeInjector implements IThemeInjector {
+  /** CSS last written by this instance, so a repeated apply does not compare or rewrite a multi-megabyte string. */
+  private appliedCss: string | null = null
+
   apply(themeId: string, css: string): boolean {
     const byteLength = new TextEncoder().encode(css).length
     if (byteLength > MAX_THEME_CSS_SIZE_BYTES) {
@@ -38,15 +41,19 @@ export class ThemeInjector implements IThemeInjector {
     }
 
     let style = document.head.querySelector<HTMLStyleElement>(THEME_STYLE_SELECTOR)
+    const created = style === null
     if (style === null) {
       style = document.createElement('style')
       const firstSnippet = document.head.querySelector(SNIPPET_STYLE_SELECTOR)
       document.head.insertBefore(style, firstSnippet)
     }
     // Re-applying the same theme with the same CSS (the lifecycle does that on every vault change event) is not a change.
-    const changed = style.getAttribute('data-slatebase-theme') !== themeId || style.textContent !== css
-    style.setAttribute('data-slatebase-theme', themeId)
-    style.textContent = css
+    const changed = created || style.getAttribute('data-slatebase-theme') !== themeId || this.appliedCss !== css
+    if (changed) {
+      style.setAttribute('data-slatebase-theme', themeId)
+      style.textContent = css
+      this.appliedCss = css
+    }
     document.documentElement.setAttribute(THEME_MARKER_ATTRIBUTE, themeId)
     if (changed) notifyCssChange()
     return true
@@ -55,6 +62,7 @@ export class ThemeInjector implements IThemeInjector {
   remove(): void {
     const existing = document.head.querySelector(THEME_STYLE_SELECTOR)
     existing?.remove()
+    this.appliedCss = null
     document.documentElement.removeAttribute(THEME_MARKER_ATTRIBUTE)
     if (existing !== null) notifyCssChange()
   }

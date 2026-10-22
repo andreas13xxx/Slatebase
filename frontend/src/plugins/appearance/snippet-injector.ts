@@ -85,10 +85,13 @@ export class SnippetInjector implements ISnippetInjector {
 
   /** Removes the tag without announcing it. Returns whether one existed. */
   private removeTag(snippetId: string): boolean {
-    const existing = document.querySelector(`style[data-snippet-id="${snippetId}"]`);
+    // Compared in code, not interpolated into a selector: a snippet id is a file name and may contain quotes or backslashes.
+    const existing = [...document.querySelectorAll('style[data-snippet-id]')].find(
+      (el) => el.getAttribute('data-snippet-id') === snippetId,
+    );
     existing?.remove();
     appliedIds.delete(snippetId);
-    return existing !== null;
+    return existing !== undefined;
   }
 }
 

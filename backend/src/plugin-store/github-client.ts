@@ -355,6 +355,7 @@ export class GitHubClient implements IGitHubClient {
   /**
    * Request headers for one hop. The token is evaluated per hop and only ever sent to the API host: the CDN hosts
    * need no credentials, and a redirect (github.com → objects.githubusercontent.com) must not carry it along.
+   * Every other host is deliberately anonymous: they serve public content only, and a token there is a leak risk.
    */
   private headersFor(url: string, base: Record<string, string>): Record<string, string> {
     if (!this.config.githubToken || new URL(url).hostname !== RATE_LIMITED_HOST) return base

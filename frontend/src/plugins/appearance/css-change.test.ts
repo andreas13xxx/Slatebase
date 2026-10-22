@@ -7,14 +7,19 @@ import { SnippetInjector } from './snippet-injector'
 const flush = (): Promise<void> => Promise.resolve()
 
 let listener: ReturnType<typeof vi.fn>
+let styleListener: (() => void) | undefined
 
 beforeEach(() => {
   listener = vi.fn()
   window.addEventListener(CSS_CHANGE_EVENT, listener)
 })
 
-afterEach(() => {
+afterEach(async () => {
+  // Drain a pending coalesced event: its flag is module state and would otherwise swallow the next test's notification.
+  await flush()
   window.removeEventListener(CSS_CHANGE_EVENT, listener)
+  if (styleListener) window.removeEventListener(CSS_CHANGE_EVENT, styleListener)
+  styleListener = undefined
   document.head.querySelectorAll('style[data-slatebase-theme], style[data-snippet-id]').forEach((el) => el.remove())
   document.documentElement.removeAttribute('data-obsidian-theme')
 })
@@ -41,9 +46,10 @@ describe('notifyCssChange', () => {
 describe('ThemeInjector announces css-change', () => {
   it('when a theme is applied, with the style already in the document', async () => {
     let styleAtEvent: string | null | undefined
-    window.addEventListener(CSS_CHANGE_EVENT, () => {
+    styleListener = () => {
       styleAtEvent = document.head.querySelector('style[data-slatebase-theme]')?.textContent
-    }, { once: true })
+    }
+    window.addEventListener(CSS_CHANGE_EVENT, styleListener)
 
     new ThemeInjector().apply('Things', 'body { --x: 1 }')
     await flush()
@@ -118,6 +124,20 @@ describe('SnippetInjector announces css-change', () => {
     listener.mockClear()
     injector.remove('s2')
     await flush()
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it('removes a snippet whose id contains quotes and backslashes', async () => {
+    const injector = new SnippetInjector()
+    const id = 'a"b\\c.css'
+    injector.apply(id, 'a{}')
+    await flush()
+    listener.mockClear()
+
+    injector.remove(id)
+    await flush()
+
+    expect(document.head.querySelector('style[data-snippet-id]')).toBeNull()
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
