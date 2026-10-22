@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { compareSemver } from '../utils/semver'
+import { fetchReleaseList } from './releaseApi'
 
 interface VersionInfo {
   installed: string | null
@@ -64,26 +65,17 @@ export function useVersionInfo(): VersionInfo {
       // Only check GitHub if we have a real version (not 'development')
       if (installed && installed !== 'development') {
         try {
-          const controller = new AbortController()
-          const timeoutId = setTimeout(() => controller.abort(), 10000)
-          const ghRes = await fetch(
-            'https://api.github.com/repos/andreas13xxx/Slatebase/releases/latest',
-            { signal: controller.signal, headers: { 'Accept': 'application/vnd.github.v3+json' } }
-          )
-          clearTimeout(timeoutId)
-          if (ghRes.ok) {
-            const release = await ghRes.json() as { tag_name?: string; html_url?: string }
-            if (release.tag_name) {
-              const ver = release.tag_name.startsWith('v') ? release.tag_name.slice(1) : release.tag_name
-              // Only show as "latest" if it's actually newer
-              if (compareSemver(installed, ver) < 0) {
-                latest = ver
-                latestUrl = release.html_url ?? null
-              }
+          const release = (await fetchReleaseList()).latest
+          if (release) {
+            const ver = release.tagName.startsWith('v') ? release.tagName.slice(1) : release.tagName
+            // Only show as "latest" if it's actually newer
+            if (compareSemver(installed, ver) < 0) {
+              latest = ver
+              latestUrl = release.htmlUrl
             }
           }
         } catch {
-          // GitHub unreachable — no update info
+          // Release lookup unavailable — no update info
         }
       }
 

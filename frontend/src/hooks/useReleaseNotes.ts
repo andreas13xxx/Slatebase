@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { fetchReleaseList } from './releaseApi'
 
 /** A single GitHub release, trimmed to what the release-notes modal needs. */
 export interface ReleaseNote {
@@ -13,9 +14,6 @@ interface ReleaseNotesInfo {
   loading: boolean
   error: boolean
 }
-
-const REPO = 'andreas13xxx/Slatebase'
-const RELEASES_URL = `https://api.github.com/repos/${REPO}/releases?per_page=5`
 
 /**
  * Fetches the most recent GitHub releases (including their Markdown release
@@ -35,25 +33,11 @@ export function useReleaseNotes(active: boolean): ReleaseNotesInfo {
     async function load() {
       setInfo({ releases: [], loading: true, error: false })
       try {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 10000)
-        const res = await fetch(RELEASES_URL, {
-          signal: controller.signal,
-          headers: { 'Accept': 'application/vnd.github.v3+json' },
-        })
-        clearTimeout(timeoutId)
-        if (!res.ok) throw new Error(`GitHub API responded ${res.status}`)
-
-        const data = await res.json() as Array<{
-          tag_name: string
-          name: string | null
-          body: string | null
-          html_url: string
-        }>
+        const { releases } = await fetchReleaseList()
 
         if (!cancelled) {
           setInfo({
-            releases: data.map((r) => ({ tagName: r.tag_name, name: r.name, body: r.body, htmlUrl: r.html_url })),
+            releases: releases.map((r) => ({ tagName: r.tagName, name: r.name, body: r.body, htmlUrl: r.htmlUrl })),
             loading: false,
             error: false,
           })
