@@ -27,10 +27,16 @@
   const total = before.length
   const results = []
   for (const { cls, kind } of classes) {
-    if (!cls || document.body.classList.contains(cls)) { results.push({ cls, kind, skipped: true }); continue }
-    document.body.classList.add(cls)
-    const after = snap()
-    document.body.classList.remove(cls)
+    if (!cls) continue
+    // A class that is already on <body> (an active select option) is measured by taking it off and putting it back.
+    const wasOn = document.body.classList.contains(cls)
+    let after
+    try {
+      document.body.classList.toggle(cls, !wasOn)
+      after = snap()
+    } finally {
+      document.body.classList.toggle(cls, wasOn) // never leave the page changed, whatever happened above
+    }
     let changed = 0
     for (let i = 0; i < total; i += 1) if (after[i] !== before[i]) changed += 1
     results.push({ cls, kind, changed })

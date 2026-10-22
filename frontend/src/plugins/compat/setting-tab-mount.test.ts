@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mountSettingTab, waitForElement } from './setting-tab-mount'
 
 afterEach(() => {
@@ -52,7 +52,16 @@ describe('waitForElement', () => {
     expect(await waitForElement(() => element)).toBeInstanceOf(HTMLElement)
   })
 
-  it('gives up with null after the frame limit', async () => {
-    expect(await waitForElement(() => null, 2)).toBeNull()
+  it('gives up with null after the timeout', async () => {
+    expect(await waitForElement(() => null, 40)).toBeNull()
+  })
+
+  it('does not depend on animation frames (they are paused in a background tab)', async () => {
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0)
+    let element: HTMLElement | null = null
+    setTimeout(() => { element = document.createElement('div') }, 20)
+    expect(await waitForElement(() => element)).toBeInstanceOf(HTMLElement)
+    expect(raf).not.toHaveBeenCalled()
+    raf.mockRestore()
   })
 })

@@ -24,21 +24,22 @@ export function mountSettingTab(host: HTMLElement, tab: MountableSettingTab, ren
 }
 
 /**
- * Resolves with the element returned by `get()` as soon as it exists, checking once per animation frame.
- * Used to wait for React to render the dialog body that hosts the tab. Gives up after `maxFrames` and returns null.
+ * Resolves with the element returned by `get()` as soon as it exists, polling every `intervalMs`.
+ * Used to wait for React to render the dialog body that hosts the tab. Polls with timers, not animation frames:
+ * `requestAnimationFrame` is paused in a background tab and would leave the promise pending forever. Gives up after
+ * `timeoutMs` and returns null.
  */
-export function waitForElement<T extends HTMLElement>(get: () => T | null, maxFrames = 30): Promise<T | null> {
+export function waitForElement<T extends HTMLElement>(get: () => T | null, timeoutMs = 3000, intervalMs = 16): Promise<T | null> {
   return new Promise((resolve) => {
-    let frames = 0
+    const startedAt = Date.now()
     const check = (): void => {
       const element = get()
-      if (element !== null || frames >= maxFrames) {
+      if (element !== null || Date.now() - startedAt >= timeoutMs) {
         resolve(element)
         return
       }
-      frames += 1
-      requestAnimationFrame(check)
+      setTimeout(check, intervalMs)
     }
-    requestAnimationFrame(check)
+    check()
   })
 }

@@ -97,7 +97,25 @@ describe('PluginLoader marks the plugin as loaded before onload()', { timeout: 3
     expect(events).toEqual(['load', 'unload'])
   })
 
-  it('keeps working for a plugin class without markLoaded (a bundle that brings its own base class)', async () => {
+  it('unloads a plugin whose onload() throws, so children it added first do not keep running', async () => {
+    const { child, events } = createChild()
+    const Plugin = (window as unknown as { obsidian: { Plugin: new (app: unknown, manifest: unknown) => ComponentLike } }).obsidian.Plugin
+    const loader = createLoader(async () => ({
+      default: class extends Plugin {
+        override onload(): void {
+          this.addChild(child)
+          throw new Error('onload failed')
+        }
+      },
+    }))
+    await loader.loadPlugin('child-plugin', 'bundle', manifest)
+
+    await expect(loader.activatePlugin('child-plugin')).rejects.toThrow()
+
+    expect(events).toEqual(['load', 'unload'])
+  })
+
+  it('keeps working for a plugin class without __markLoadedByHost (a bundle that brings its own base class)', async () => {
     const onload = vi.fn()
     const loader = createLoader(async () => ({
       default: class {

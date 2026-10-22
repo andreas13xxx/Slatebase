@@ -83,6 +83,8 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
 
   const analyzerRef = useRef(new CompatibilityAnalyzer())
   const settingsContainerRef = useRef<HTMLDivElement>(null)
+  /** Counts opened settings dialogs, so a late result of an earlier open never touches the current one. */
+  const settingsOpenRef = useRef(0)
   const pluginContext = useContext(PluginContext)
 
   // ─── Background: Analyze compatibility + detect settings ───────────────
@@ -284,6 +286,8 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
   // ─── Settings modal handlers ───────────────────────────────────────────
 
   async function openSettings(pluginId: string, pluginName: string): Promise<void> {
+    const openId = ++settingsOpenRef.current
+    const isCurrent = (): boolean => settingsOpenRef.current === openId
     setSettingsModal({ pluginId, pluginName })
     setSettingsError(null)
     setSettingsLoading(true)
@@ -295,6 +299,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       // tab draws itself: Obsidian attaches containerEl first and plugins (Style Settings) render only when attached.
       setSettingsLoading(false)
       const host = await waitForElement(() => settingsContainerRef.current)
+      if (!isCurrent()) return // another plugin's settings were opened (or the dialog closed) meanwhile
       if (!host) {
         setSettingsError('Plugin-Einstellungen konnten nicht angezeigt werden.')
         return
@@ -306,12 +311,14 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
           if (defs && Array.isArray(defs) && defs.length > 0) {
             // Use declarative renderer
             void import('../plugins/compat/declarative-settings-renderer').then(({ renderSettingDefinitions }) => {
+              if (!isCurrent()) return // the dialog now belongs to another plugin; its tab was cleared
               renderSettingDefinitions(
                 defs as import('../plugins/compat/declarative-settings-renderer').SettingDefinitionItem[],
                 settingTab.containerEl,
                 settingTab as import('../plugins/compat/declarative-settings-renderer').IDeclarativeSettingTab,
               )
             }).catch((err: unknown) => {
+              if (!isCurrent()) return
               console.error(`[PluginSettings] Error rendering declarative settings for "${pluginId}":`, err)
               setSettingsError(`Plugin-Einstellungen konnten nicht gerendert werden: ${extractErrorMessage(err, 'Unbekannter Fehler')}`)
             })

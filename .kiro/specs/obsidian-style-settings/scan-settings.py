@@ -37,12 +37,16 @@ def get(url, attempts=4):
 
 def load_css(out, entry):
     path = os.path.join(out, 'css', entry['repo'].replace('/', '__') + '.css')
-    if os.path.exists(path):
-        return open(path, 'rb').read()
+    if os.path.exists(path) and os.path.getsize(path) > 0:
+        with open(path, 'rb') as f:
+            return f.read()
     status, body = get(RAW.format(repo=entry['repo']))
     if status == 200 and len(body) <= LIMIT:
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        open(path, 'wb').write(body)
+        tmp = path + '.part'
+        with open(tmp, 'wb') as f:  # write then rename: an interrupted run never leaves a truncated cache file
+            f.write(body)
+        os.replace(tmp, path)
         return body
     return None
 
@@ -95,6 +99,8 @@ def main():
     workers = int(sys.argv[3]) if len(sys.argv) > 3 else 3
     if src == 'all':
         status, body = get(CATALOG)
+        if status != 200:
+            sys.exit(f'catalog download failed (status {status})')
         entries = json.loads(body)
     else:
         entries = json.load(open(src))
@@ -106,7 +112,8 @@ def main():
     with ThreadPoolExecutor(max_workers=workers) as ex:
         rows = list(ex.map(one, entries))
     ok = [r for r in rows if r is not None]
-    json.dump({'themes': ok, 'unavailable': [e['name'] for e, r in zip(entries, rows) if r is None]}, open(os.path.join(out, 'settings.json'), 'w'), indent=1)
+    with open(os.path.join(out, 'settings.json'), 'w') as f:
+        json.dump({'themes': ok, 'unavailable': [e['name'] for e, r in zip(entries, rows) if r is None]}, f, indent=1)
 
     with_settings = [r for r in ok if r['settings'] > 0]
     totals = {}
@@ -119,4 +126,5 @@ def main():
     print('top by setting count:', [(r['name'], r['settings']) for r in sorted(with_settings, key=lambda r: -r['settings'])[:12]])
 
 
-main()
+if __name__ == '__main__':
+    main()
