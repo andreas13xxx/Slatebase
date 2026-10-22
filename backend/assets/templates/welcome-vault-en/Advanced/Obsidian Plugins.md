@@ -73,7 +73,7 @@ Each installed plugin has an on/off toggle:
 
 ### Plugin Settings
 
-If a plugin provides settings, they appear in the plugin management area. Settings are persisted per-vault, per-plugin.
+If a plugin provides settings, they appear in the plugin management area. Settings are persisted per-vault, per-plugin. They apply to **everyone who uses the vault**, not per person: whoever changes a setting changes it for all users (just like the theme).
 
 ### Deleting a Plugin
 

@@ -146,7 +146,8 @@ Viele Plugins bringen eigene Settings mit:
 1. Aktiviere das Plugin
 2. In den Einstellungen erscheint ein neuer Plugin-Abschnitt
 3. Einstellungen werden pro Vault in `data.json` gespeichert
-4. Bleiben bei Plugin-Updates erhalten
+4. Sie gelten für **alle Nutzer, die den Vault verwenden**, nicht pro Person. Wer eine Einstellung ändert, ändert sie für alle (genau wie beim Theme)
+5. Bleiben bei Plugin-Updates erhalten
 
 ---
 
