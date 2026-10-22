@@ -395,7 +395,7 @@ export function installObsidianGlobals(): void {
   // owner document and then reads `document.win.createEl(...)`, so Document, fragments and text nodes need both too.
   if (!('doc' in Node.prototype)) {
     Object.defineProperty(Node.prototype, 'doc', {
-      get: function (this: Node): Document { return this.nodeType === Node.DOCUMENT_NODE ? (this as Document) : this.ownerDocument as Document },
+      get: function (this: Node): Document { return this.nodeType === Node.DOCUMENT_NODE ? (this as Document) : this.ownerDocument ?? document },
       configurable: true,
     })
   }
@@ -403,8 +403,8 @@ export function installObsidianGlobals(): void {
   if (!('win' in Node.prototype)) {
     Object.defineProperty(Node.prototype, 'win', {
       get: function (this: Node): Window {
-        const doc = this.nodeType === Node.DOCUMENT_NODE ? (this as Document) : this.ownerDocument
-        return doc?.defaultView ?? window
+        const doc = this.nodeType === Node.DOCUMENT_NODE ? (this as Document) : this.ownerDocument ?? document
+        return doc.defaultView ?? window
       },
       configurable: true,
     })

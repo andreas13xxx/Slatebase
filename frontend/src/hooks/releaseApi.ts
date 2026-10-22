@@ -18,6 +18,19 @@ export interface ReleaseList {
 
 const RELEASES_TIMEOUT_MS = 10000
 
+function isRelease(value: unknown): value is ReleaseInfo {
+  if (typeof value !== 'object' || value === null) return false
+  const r = value as Record<string, unknown>
+  return typeof r['tagName'] === 'string' && typeof r['htmlUrl'] === 'string'
+}
+
+/** Guards against a 200 answer of another shape (proxy, captive portal): callers index into it without checks. */
+function isReleaseList(value: unknown): value is ReleaseList {
+  if (typeof value !== 'object' || value === null) return false
+  const list = value as Record<string, unknown>
+  return Array.isArray(list['releases']) && list['releases'].every(isRelease) && (list['latest'] === null || isRelease(list['latest']))
+}
+
 /**
  * Loads Slatebase's own releases from the server, which looks them up on GitHub (the browser never calls GitHub).
  *
@@ -30,7 +43,9 @@ export async function fetchReleaseList(): Promise<ReleaseList> {
   try {
     const res = await fetch('/api/v1/releases', { signal: controller.signal })
     if (!res.ok) throw new Error(`Releases responded ${res.status}`)
-    return await res.json() as ReleaseList
+    const data: unknown = await res.json()
+    if (!isReleaseList(data)) throw new Error('Unexpected releases response')
+    return data
   } finally {
     clearTimeout(timeoutId)
   }

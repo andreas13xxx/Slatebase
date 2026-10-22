@@ -106,11 +106,47 @@ describe('ReleaseInfoService', () => {
     await expect(service.getReleases()).rejects.toBeInstanceOf(ReleaseInfoUnavailableError)
   })
 
-  it('does not cache a failure: the next call asks again', async () => {
-    const { service, fetcher } = setup([new GuardedFetchError('timeout', 'u'), ok([release('v1.0.0')])])
+  it('stays off GitHub for five minutes after a failure, then asks again', async () => {
+    const { service, fetcher, advance } = setup([new GuardedFetchError('timeout', 'u'), ok([release('v1.0.0')])])
 
     await expect(service.getReleases()).rejects.toBeInstanceOf(ReleaseInfoUnavailableError)
+    await expect(service.getReleases()).rejects.toBeInstanceOf(ReleaseInfoUnavailableError)
+    expect(fetcher).toHaveBeenCalledTimes(1) // backing off: no second outbound request
+
+    advance(5 * 60 * 1000 + 1)
     expect((await service.getReleases()).latest?.tagName).toBe('v1.0.0')
     expect(fetcher).toHaveBeenCalledTimes(2)
+  })
+
+  it('serves the stale list during the backoff without asking GitHub', async () => {
+    const { service, fetcher, advance } = setup([ok([release('v1.0.0')]), new GuardedFetchError('network', 'u')])
+
+    await service.getReleases()
+    advance(61 * 60 * 1000) // cache expired
+    expect((await service.getReleases()).stale).toBe(true) // the failing lookup
+    const again = await service.getReleases() // within the backoff
+    expect(again.stale).toBe(true)
+    expect(fetcher).toHaveBeenCalledTimes(2)
+  })
+
+  it('logs one warning for concurrent callers sharing a failed lookup', async () => {
+    const logger = createMockLogger()
+    const fetcher = vi.fn(async () => { throw new GuardedFetchError('network', 'u') })
+    const service = new ReleaseInfoService(logger, fetcher, () => 1000)
+
+    await Promise.allSettled([service.getReleases(), service.getReleases(), service.getReleases()])
+
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    expect(logger.warn).toHaveBeenCalledTimes(1)
+  })
+
+  it('finds latest even when five or more pre-releases come first', async () => {
+    const pre = ['rc6', 'rc5', 'rc4', 'rc3', 'rc2', 'rc1'].map((t) => release(`v2.0.0-${t}`, { prerelease: true }))
+    const { service } = setup([ok([...pre, release('v1.9.0')])])
+
+    const result = await service.getReleases()
+
+    expect(result.releases).toHaveLength(5)
+    expect(result.latest?.tagName).toBe('v1.9.0')
   })
 })
