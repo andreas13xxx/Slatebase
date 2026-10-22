@@ -14,6 +14,8 @@ import type { ThemeMeta } from '../../api'
 import { themeInjector } from '../../plugins/appearance/theme-injector'
 import { extractErrorMessage } from '../../utils/error'
 import { ConfirmModal } from '../ConfirmModal'
+import { StyleSettingsHint } from './StyleSettingsHint'
+import { useStyleSettingsPluginState } from './useStyleSettingsPluginState'
 import { deriveThemeId, formatThemeSize, pickThemeFiles, readManifestFields } from './themeImport'
 import './ThemeManager.css'
 
@@ -33,6 +35,7 @@ export function ThemeManager() {
   const [overwrite, setOverwrite] = useState<{ themeId: string; css: string; manifest: Awaited<ReturnType<typeof readManifestFields>> } | null>(null)
   const [dragging, setDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const styleSettingsState = useStyleSettingsPluginState(apiClient, vaultId, themes.some((t) => t.hasStyleSettings))
 
   const load = useCallback(async () => {
     if (!vaultId || !apiClient) return
@@ -220,6 +223,7 @@ export function ThemeManager() {
               >
                 <Trash2 size={14} />
               </button>
+              {theme.hasStyleSettings && <StyleSettingsHint state={styleSettingsState} />}
               {theme.externalHosts.length > 0 && (
                 <p className="theme-manager__warning">
                   <AlertTriangle size={13} aria-hidden="true" /> Lädt Inhalte von: {theme.externalHosts.join(', ')}

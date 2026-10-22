@@ -9,8 +9,8 @@ import { ThemesSection } from './ThemesSection'
 import type { IApiClient, ThemeMeta } from '../../api'
 
 const themes: ThemeMeta[] = [
-  { id: 'Things', manifest: { name: 'Things', version: '2.1.0' }, size: 2048, updatedAt: '2026-10-17T00:00:00.000Z', externalHosts: [] },
-  { id: 'Fancy', manifest: { name: 'Fancy' }, size: 100, updatedAt: '2026-10-17T00:00:00.000Z', externalHosts: ['fonts.googleapis.com'] },
+  { id: 'Things', manifest: { name: 'Things', version: '2.1.0' }, size: 2048, updatedAt: '2026-10-17T00:00:00.000Z', externalHosts: [], hasStyleSettings: false },
+  { id: 'Fancy', manifest: { name: 'Fancy' }, size: 100, updatedAt: '2026-10-17T00:00:00.000Z', externalHosts: ['fonts.googleapis.com'], hasStyleSettings: false },
 ]
 
 function VaultSeeder() {

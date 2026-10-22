@@ -87,6 +87,15 @@ export function normalizeManifest(raw: unknown, themeId: string): ThemeManifest 
 }
 
 /**
+ * Whether a stylesheet carries a Style Settings block, i.e. a comment that starts with `@settings`. The community
+ * plugin "Style Settings" reads those blocks to offer the theme's own options. The pattern is a fixed prefix with one
+ * bounded whitespace run, so it is linear in the input.
+ */
+export function hasStyleSettingsBlock(css: string): boolean {
+  return /\/\*\s{0,200}@settings\b/.test(css)
+}
+
+/**
  * Extracts the hostnames a stylesheet loads resources from via `@import` or
  * `url(...)` with an absolute (`http(s):` or protocol-relative) address. Data
  * URIs and relative URLs are ignored. The pattern has a single bounded

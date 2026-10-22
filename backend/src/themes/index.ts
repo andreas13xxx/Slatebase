@@ -11,6 +11,7 @@ export {
   setActiveThemeSchema,
   normalizeManifest,
   extractExternalHosts,
+  hasStyleSettingsBlock,
 } from './validation.js'
 export type { IThemeService, ThemeManifest, ThemeManifestInput, ThemeMeta } from './types.js'
 export type { SaveThemeInput } from './validation.js'

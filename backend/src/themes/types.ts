@@ -24,6 +24,8 @@ export interface ThemeMeta {
   updatedAt: string;
   /** Hostnames the CSS loads resources from (`@import` / `url(...)`), sorted. */
   externalHosts: string[];
+  /** Whether the CSS has a Style Settings (`/* @settings`) block, i.e. the theme offers options through that plugin. */
+  hasStyleSettings: boolean;
 }
 
 /**

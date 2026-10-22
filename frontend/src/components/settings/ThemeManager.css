@@ -87,6 +87,16 @@
   color: var(--text-primary);
 }
 
+.theme-manager__hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-basis: 100%;
+  margin: 0 0 2px 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 .theme-manager__warning {
   display: flex;
   align-items: center;
