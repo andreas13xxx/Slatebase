@@ -43,7 +43,7 @@ export function buildTabContextMenuItems(
     },
   ]
 
-  const isRegularFile = tab.filePath !== '__graph__' && !tab.filePath.startsWith(VIEW_PATH_PREFIX)
+  const isRegularFile = tab.filePath !== '__graph__' && !tab.filePath.startsWith(VIEW_PATH_PREFIX) && !tab.filePath.startsWith('__webview::')
   if (!isRegularFile) return items
 
   items.push(

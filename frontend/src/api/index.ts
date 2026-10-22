@@ -83,6 +83,21 @@ export interface VaultTagsResponse {
   tags: VaultTagInfo[]
 }
 
+/**
+ * One alias→path entry from the vault aliases API endpoint.
+ */
+export interface VaultAliasEntry {
+  alias: string
+  path: string
+}
+
+/**
+ * Response from the vault aliases API endpoint.
+ */
+export interface VaultAliasesResponse {
+  aliases: VaultAliasEntry[]
+}
+
 // ─── Plugin Store Types ───────────────────────────────────────────────────────
 
 /** Entry from community-plugins.json */
@@ -549,6 +564,14 @@ export interface UserVaultSettings {
   contextPanel: Record<string, unknown> | null
   /** Selected activity-timeline range ('day'|'week'|'month'|'year'); null = default. */
   activityRange: string | null
+  /** Whether `![](url)` in a note auto-embeds the page in a sandboxed iframe (default off). */
+  webEmbedEnabled: boolean
+  /**
+   * Named workspace snapshots (content-free pane tree + tabs + panel layouts).
+   * Typed loosely here to avoid an api←state import cycle; the precise
+   * `NamedWorkspace` shape lives in `state/workspacesStore.ts`.
+   */
+  workspaces: Record<string, unknown>[]
 }
 
 /** Partial per-vault settings update. */
@@ -575,6 +598,8 @@ export interface VaultConfig {
   dailyNoteTemplateName: string
   /** Directory for new attachments. Empty = same folder as the note being edited. */
   attachmentsDirectory: string
+  /** Directory for new unique notes (timestamp-prefixed). Empty = vault root. */
+  uniqueNoteDirectory?: string
 }
 
 /**
@@ -686,6 +711,8 @@ export interface IApiClient {
   getActivity(vaultId: string, params?: ActivityQueryParams): Promise<ActivityPage>
   /** Get all tags for a vault with occurrence counts and file lists. */
   getVaultTags(vaultId: string): Promise<VaultTagsResponse>
+  /** Get the full alias→path list for a vault (frontmatter `aliases`). */
+  getVaultAliases(vaultId: string): Promise<VaultAliasesResponse>
   /** Get aggregated graph metadata (tag counts, property key counts). */
   getGraphMeta(vaultId: string): Promise<GraphMeta>
 
@@ -880,6 +907,9 @@ export interface IApiClient {
 
   // --- Server Version methods ---
   getVersion(): Promise<{ version: string }>
+
+  // --- Map tile config (operator-set, env-only) ---
+  getMapConfig(): Promise<{ tileUrl: string; attribution: string }>
 
   // --- Preferences methods ---
   /** Get the current user's recent files list. */
@@ -1233,6 +1263,11 @@ export class ApiClient implements IApiClient {
   /** Get all tags for a vault with occurrence counts and file lists. */
   async getVaultTags(vaultId: string): Promise<VaultTagsResponse> {
     return this.request<VaultTagsResponse>('GET', `/api/v1/vaults/${vaultId}/tags`)
+  }
+
+  /** Get the full alias→path list for a vault (frontmatter `aliases`). */
+  async getVaultAliases(vaultId: string): Promise<VaultAliasesResponse> {
+    return this.request<VaultAliasesResponse>('GET', `/api/v1/vaults/${vaultId}/aliases`)
   }
 
   /** Get aggregated graph metadata (tag counts, property key counts). */
@@ -1814,6 +1849,14 @@ export class ApiClient implements IApiClient {
       await handleErrorResponse(response)
     }
     return response.json() as Promise<{ version: string }>
+  }
+
+  async getMapConfig(): Promise<{ tileUrl: string; attribution: string }> {
+    const response = await fetch('/api/v1/map-config')
+    if (!response.ok) {
+      await handleErrorResponse(response)
+    }
+    return response.json() as Promise<{ tileUrl: string; attribution: string }>
   }
 
   // --- Preferences methods ---

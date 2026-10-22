@@ -906,4 +906,33 @@ export const en: TranslationShape = {
     copied: 'Copied',
   },
 
+  quickSwitcher: {
+    dialogLabel: 'Quick Switcher',
+    placeholder: 'Open or create a file …',
+    listLabel: 'Files',
+    noResults: 'No files found',
+    recentHeader: 'Recently opened',
+    createFile: 'Create new file “{name}”',
+    createError: '“{name}” could not be created.',
+    viaAlias: '{alias} → {name}',
+  },
+
+  webViewer: {
+    promptLabel: 'Open web page',
+    promptPlaceholder: 'Enter a URL (https://…)',
+    invalidUrl: 'Please enter a valid http(s) address.',
+  },
+
+  workspaces: {
+    saveLabel: 'Save workspace',
+    loadLabel: 'Load workspace',
+    namePlaceholder: 'Workspace name',
+    overwriteConfirm: '“{name}” already exists — confirm again to overwrite.',
+    empty: 'No workspaces saved yet.',
+    renameLabel: 'Rename “{name}”',
+    deleteLabel: 'Delete “{name}”',
+    saved: 'Workspace “{name}” saved.',
+    limitReached: 'Maximum number of workspaces reached.',
+  },
+
 } as const

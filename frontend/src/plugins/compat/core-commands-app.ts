@@ -93,6 +93,14 @@ export interface CoreAppCommandHandlers {
   onInsertTemplate: () => void
   /** Opens a random note from the current vault. */
   onOpenRandomNote: () => void
+  /** Creates a timestamp-prefixed unique note and opens it. */
+  onCreateUniqueNote: () => void
+  /** Opens the web-viewer URL prompt. */
+  onOpenWebViewer: () => void
+  /** Opens the "save current layout as workspace" prompt. */
+  onSaveWorkspace: () => void
+  /** Opens the workspace load/manage list. */
+  onLoadWorkspace: () => void
   /** Shows/hides the app toolbar (Obsidian's "ribbon"). */
   onToggleToolbar: () => void
   onOpenReleaseNotes: () => void
@@ -792,6 +800,10 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'daily-notes:goto-prev', name: 'Daily notes: Open previous daily note', run: (h) => h.onDailyNoteOffset(-1) },
     { id: 'insert-template', name: 'Templates: Insert template', run: (h) => h.onInsertTemplate() },
     { id: 'random-note', name: 'Random note: Open random note', run: (h) => h.onOpenRandomNote() },
+    { id: 'unique-note:create-today', name: 'Unique note: Create new unique note', run: (h) => h.onCreateUniqueNote() },
+    { id: 'webviewer:open', name: 'Web viewer: Open a web page', run: (h) => h.onOpenWebViewer() },
+    { id: 'workspaces:save', name: 'Workspaces: Save current layout', run: (h) => h.onSaveWorkspace() },
+    { id: 'workspaces:load', name: 'Workspaces: Load layout', run: (h) => h.onLoadWorkspace() },
 
     // ── markdown:* ──
     { id: 'markdown:toggle-preview', name: 'Toggle reading view', run: (h) => { const t = getActiveTab(h); if (t) h.tabDispatch({ type: 'TOGGLE_MODE', payload: { tabId: t.id } }) } },

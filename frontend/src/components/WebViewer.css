@@ -1,0 +1,91 @@
+/* Web Viewer tab + inline web embed (R4). Design tokens only. */
+
+.web-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg-primary);
+}
+
+.web-viewer--error {
+  padding: var(--spacing-md, 12px);
+  color: var(--text-subtle);
+}
+
+.web-viewer__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  color: var(--text-normal);
+  font-size: 0.85em;
+}
+
+.web-viewer__url {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.web-viewer__external {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-subtle);
+}
+
+.web-viewer__external:hover {
+  color: var(--text-normal);
+}
+
+.web-viewer__frame {
+  flex: 1 1 auto;
+  width: 100%;
+  border: none;
+  background: var(--bg-primary);
+}
+
+/* ── Inline embed (![](url)) ─────────────────────────────────────────────── */
+.web-embed {
+  display: block;
+  margin: 0.5em 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md, 6px);
+  overflow: hidden;
+  background: var(--bg-surface);
+}
+
+.web-embed__header {
+  display: block;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+  font-size: 0.8em;
+}
+
+.web-embed__url {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-accent, var(--accent));
+  text-decoration: none;
+}
+
+.web-embed__url:hover {
+  text-decoration: underline;
+}
+
+.web-embed__frame {
+  display: block;
+  width: 100%;
+  height: 360px;
+  border: none;
+  background: var(--bg-primary);
+}
+
+.web-embed__fallback-link {
+  color: var(--text-accent, var(--accent));
+}

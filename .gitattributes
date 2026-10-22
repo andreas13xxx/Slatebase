@@ -10,3 +10,10 @@ backend/assets/templates/** text eol=lf
 # endings get rewritten). Binary assets must opt back out explicitly.
 backend/assets/templates/**/*.png binary
 backend/assets/templates/**/*.pdf binary
+
+# theme-bridge.test.ts disambiguates CSS rules by searching for a selector
+# string with an embedded `\n`; a CRLF checkout (Windows autocrlf) stores the
+# file with `\r\n`, so the search never matches and the test fails locally
+# while passing in CI (Linux, LF). Pin the appearance CSS assets to LF so the
+# working-tree bytes match what the test expects regardless of platform.
+frontend/src/plugins/appearance/*.css text eol=lf

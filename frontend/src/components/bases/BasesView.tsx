@@ -11,7 +11,7 @@
  * stale row behind.
  */
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import type { IApiClient } from '../../api'
 import { parseBase } from '@slatebase/shared-contracts'
 import { serializeBase } from '@slatebase/shared-contracts'
@@ -27,10 +27,14 @@ import { hasBasesViewRegistration } from '../../plugins/compat/bases-view-regist
 import { ErrorBoundary } from '../ErrorBoundary'
 import { BasesTableView } from './BasesTableView'
 import { BasesKanbanView } from './BasesKanbanView'
+import { BasesListView } from './BasesListView'
 import { BasesSourceView } from './BasesSourceView'
 import { BasesPluginViewHost } from './BasesPluginViewHost'
 import { deriveBaseScopeFolder, buildBlankFrontmatter, resolveNewNotePath } from './base-add-item'
 import { sortRowsByFormula } from './base-formula-sort'
+
+// Lazy so Leaflet (+ its CSS) only loads when a `map` view is actually opened.
+const BasesMapView = lazy(() => import('./BasesMapView').then((m) => ({ default: m.BasesMapView })))
 
 export interface BasesViewProps {
   apiClient: IApiClient
@@ -57,6 +61,8 @@ export const BasesView = memo(function BasesView({
   const [queryError, setQueryError] = useState<string | null>(null)
   const [pluginViewError, setPluginViewError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  // Operator-configured map tile source, fetched lazily when a map view is shown.
+  const [mapConfig, setMapConfig] = useState<{ tileUrl: string; attribution: string } | null>(null)
 
   // Parse the base source. A parse failure keeps the raw source reachable.
   const parseResult = useMemo(() => parseBase(source), [source])
@@ -68,12 +74,14 @@ export const BasesView = memo(function BasesView({
   // A view whose `type` a plugin registered renders via the plugin host; the
   // built-in types (`table`, `cards`) and any other unregistered type render
   // in-app. An errored plugin view falls back to the built-in table.
-  const BUILT_IN_VIEW_TYPES = useMemo(() => new Set(['table', 'cards']), [])
+  const BUILT_IN_VIEW_TYPES = useMemo(() => new Set(['table', 'cards', 'list', 'map']), [])
   const isPluginView = useMemo(
     () => !!activeView && !BUILT_IN_VIEW_TYPES.has(activeView.type) && hasBasesViewRegistration(activeView.type) && !pluginViewError,
     [activeView, pluginViewError, BUILT_IN_VIEW_TYPES],
   )
   const isKanbanView = !!activeView && activeView.type === 'cards' && !isPluginView
+  const isListView = !!activeView && activeView.type === 'list' && !isPluginView
+  const isMapView = !!activeView && activeView.type === 'map' && !isPluginView
 
   // Formula columns are not sortable server-side (buildQuerySpec drops them),
   // so when the active view's first sort clause targets a formula column we
@@ -122,6 +130,18 @@ export const BasesView = memo(function BasesView({
       setPluginViewError(null)
     }
   }, [safeIndex])
+
+  // Fetch the operator tile config the first time a map view is shown. It is a
+  // per-instance operator value (not per-vault), so one fetch per BasesView is
+  // enough; a failed read leaves `mapConfig` null and the map shows inactive.
+  useEffect(() => {
+    if (!isMapView || mapConfig !== null) return
+    let cancelled = false
+    void apiClient.getMapConfig()
+      .then((cfg) => { if (!cancelled) setMapConfig(cfg) })
+      .catch(() => { if (!cancelled) setMapConfig({ tileUrl: '', attribution: '' }) })
+    return () => { cancelled = true }
+  }, [isMapView, mapConfig, apiClient])
 
   // Write one note's frontmatter back to disk with optimistic concurrency:
   // read (capturing its ETag), apply `mutate`, save with `If-Match`. If the
@@ -328,7 +348,29 @@ export const BasesView = memo(function BasesView({
         />
       )}
 
-      {mode === 'view' && !isPluginView && !isKanbanView && activeView && (
+      {mode === 'view' && !isPluginView && isListView && activeView && (
+        <BasesListView
+          doc={doc}
+          view={activeView}
+          rows={displayRows}
+          onOpenNote={onOpenNote}
+        />
+      )}
+
+      {mode === 'view' && !isPluginView && isMapView && activeView && (
+        <Suspense fallback={<div className="bases-view__loading" role="status" aria-live="polite">Karte lädt…</div>}>
+          <BasesMapView
+            doc={doc}
+            view={activeView}
+            rows={displayRows}
+            tileUrl={mapConfig?.tileUrl ?? ''}
+            attribution={mapConfig?.attribution ?? ''}
+            onOpenNote={onOpenNote}
+          />
+        </Suspense>
+      )}
+
+      {mode === 'view' && !isPluginView && !isKanbanView && !isListView && !isMapView && activeView && (
         <BasesTableView
           doc={doc}
           view={activeView}

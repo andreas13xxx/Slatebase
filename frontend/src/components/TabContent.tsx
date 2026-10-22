@@ -16,6 +16,7 @@ const GraphView = lazy(() => import('./GraphView').then((m) => ({ default: m.Gra
 const CanvasView = lazy(() => import('./canvas/CanvasView').then((m) => ({ default: m.CanvasView })))
 const BasesView = lazy(() => import('./bases/BasesView').then((m) => ({ default: m.BasesView })))
 const ActivityTimelineView = lazy(() => import('./activity/ActivityTimelineView').then((m) => ({ default: m.ActivityTimelineView })))
+const WebViewer = lazy(() => import('./WebViewer').then((m) => ({ default: m.WebViewer })))
 import { useTranslation } from '../i18n'
 import { extractErrorMessage } from '../utils/error'
 import { PluginContext } from '../plugins/compat/plugin-context'
@@ -127,6 +128,7 @@ export function TabContent() {
   // Determine if the active tab's content matches a plugin file view
   const fileViewMatch = activeTab && !activeTab.loading && !activeTab.error && !activeTab.isBinary
     && !activeTab.filePath.startsWith('__view::') && !activeTab.filePath.startsWith('__graph__')
+    && !activeTab.filePath.startsWith('__webview::')
     && !activeTab.fileName.endsWith('.canvas')
     && !activeTab.fileName.endsWith('.base')
     ? findFileViewMatch(activeTab.filePath, activeTab.content)
@@ -323,6 +325,20 @@ export function TabContent() {
         <ErrorBoundary>
           <Suspense fallback={<PageLoadingFallback />}>
             <GraphView vaultId={activeTab.vaultId} />
+          </Suspense>
+        </ErrorBoundary>
+      </div>
+    )
+  }
+
+  // Web viewer tab — render an external page in a sandboxed iframe
+  if (activeTab.filePath.startsWith('__webview::')) {
+    const url = activeTab.filePath.slice('__webview::'.length)
+    return (
+      <div className="tab-content tab-content--web-viewer" role="tabpanel" aria-label={activeTab.fileName}>
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoadingFallback />}>
+            <WebViewer url={url} />
           </Suspense>
         </ErrorBoundary>
       </div>

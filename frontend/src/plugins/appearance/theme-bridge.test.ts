@@ -11,7 +11,9 @@ const compat = read('src/plugins/compat/obsidian-compat.css')
 const tokens = read('src/index.css')
 
 /** Returns the declaration body of the first rule whose selector starts with `selector`. */
-function ruleBody(css: string, selector: string): string {
+function ruleBody(cssRaw: string, selector: string): string {
+  // Normalize CRLF→LF: selectors embed `\n`, which never matches a CRLF checkout (Windows autocrlf).
+  const css = cssRaw.replace(/\r\n/g, '\n')
   const start = css.indexOf(selector)
   expect(start, `selector not found: ${selector}`).toBeGreaterThanOrEqual(0)
   const open = css.indexOf('{', start)

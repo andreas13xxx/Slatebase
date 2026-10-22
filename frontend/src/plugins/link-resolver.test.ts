@@ -233,3 +233,44 @@ describe('resolvePathTarget', () => {
     expect(resolvePathTarget('nonexistent/file', files)).toBeNull()
   })
 })
+
+describe('resolveWikilinkTarget — aliases', () => {
+  it('resolves a target to the file declaring it as an alias (case-insensitive)', () => {
+    const aliasMap = new Map<string, string[]>([['mein alias', ['another/gamma.md']]])
+    expect(resolveWikilinkTarget('Mein Alias', sampleTree, undefined, aliasMap)).toBe('another/gamma.md')
+  })
+
+  it('returns null when neither a name nor an alias matches', () => {
+    const aliasMap = new Map<string, string[]>([['something', ['another/gamma.md']]])
+    expect(resolveWikilinkTarget('Unknown', sampleTree, undefined, aliasMap)).toBeNull()
+  })
+
+  it('prefers a real file name over an alias with the same text', () => {
+    // "Notes" matches real files; an alias also named "Notes" must NOT win.
+    const aliasMap = new Map<string, string[]>([['notes', ['another/gamma.md']]])
+    const resolved = resolveWikilinkTarget('Notes', sampleTree, undefined, aliasMap)
+    expect(resolved).not.toBe('another/gamma.md')
+    expect(['Notes.md', 'folder/sub/Notes.md']).toContain(resolved)
+  })
+
+  it('disambiguates several files sharing an alias via resolveAmbiguousMatch (shortest path)', () => {
+    const aliasMap = new Map<string, string[]>([
+      ['shared', ['folder/sub/deep.md', 'another/gamma.md']],
+    ])
+    // Shortest path wins when no sourcePath is given: "another/gamma.md" (2 segments)
+    // beats "folder/sub/deep.md" (3 segments).
+    expect(resolveWikilinkTarget('shared', sampleTree, undefined, aliasMap)).toBe('another/gamma.md')
+  })
+
+  it('prefers a same-folder alias target when sourcePath is given', () => {
+    const aliasMap = new Map<string, string[]>([
+      ['shared', ['folder/alpha.md', 'another/gamma.md']],
+    ])
+    expect(resolveWikilinkTarget('shared', sampleTree, 'folder/Beta.md', aliasMap)).toBe('folder/alpha.md')
+  })
+
+  it('ignores an empty alias map and resolves nothing extra', () => {
+    const aliasMap = new Map<string, string[]>()
+    expect(resolveWikilinkTarget('Unknown', sampleTree, undefined, aliasMap)).toBeNull()
+  })
+})

@@ -99,4 +99,8 @@ export const saveVaultSettingsSchema = z.object({
   sidebarPanel: opaqueBlobSchema.optional(),
   contextPanel: opaqueBlobSchema.optional(),
   activityRange: z.string().max(16).nullable().optional(),
+  webEmbedEnabled: z.boolean().optional(),
+  // Named workspace snapshots: opaque client-owned objects, bounded in count.
+  // The pane-tree/tab shape is the client's, so no inner schema here.
+  workspaces: z.array(z.record(z.string().max(128), z.unknown())).max(50).optional(),
 })

@@ -124,6 +124,10 @@ function sanitizeVaultSettings(raw: unknown): UserVaultSettings {
     activityRange: typeof parsed['activityRange'] === 'string' && parsed['activityRange'].length <= 16
       ? parsed['activityRange']
       : DEFAULT_VAULT_SETTINGS.activityRange,
+    webEmbedEnabled: bool('webEmbedEnabled', DEFAULT_VAULT_SETTINGS.webEmbedEnabled),
+    workspaces: Array.isArray(parsed['workspaces'])
+      ? parsed['workspaces'].filter((w): w is Record<string, unknown> => isRecord(w))
+      : DEFAULT_VAULT_SETTINGS.workspaces,
   }
 }
 

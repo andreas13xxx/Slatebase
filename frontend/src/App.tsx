@@ -46,6 +46,7 @@ import {
 } from './state/realtimeChatBridge'
 import { dispatchRealtimeVaultChange, onRealtimeVaultChange } from './state/realtimeVaultBridge'
 import type { VaultChangeEvent } from './state/realtimeVaultBridge'
+import { refreshAliasMap, clearAliasMap } from './state/aliasStore'
 import { dispatchPluginSettingsChange } from './state/pluginSettingsChangeBridge'
 import { FileExplorer } from './components/FileExplorer'
 import { TabContent } from './components/TabContent'
@@ -286,6 +287,12 @@ function AppContent() {
         void reloadVaultTree(dispatch, apiClient, vaultId)
       }
 
+      // Reload the alias map when the change touches the vault the user is in —
+      // a save/rename can add or remove a frontmatter `aliases` value.
+      if (vaultId === state.selectedVaultId) {
+        void refreshAliasMap(apiClient, vaultId)
+      }
+
       // Reload content of open tabs affected by this change
       const affectedTabs = tabState.tabs.filter(
         (tab) => tab.vaultId === vaultId && tab.filePath === path
@@ -316,7 +323,7 @@ function AppContent() {
         }
       }
     })
-  }, [state.vaultTrees, tabState.tabs, dispatch, tabDispatch])
+  }, [state.vaultTrees, state.selectedVaultId, tabState.tabs, dispatch, tabDispatch])
 
   useEffect(() => {
     // Skip polling when SSE is connected — unread updates come via realtime push
@@ -365,6 +372,17 @@ function AppContent() {
   // vault the user is actually looking at.
   useEffect(() => {
     void setActiveVaultSettings(state.selectedVaultId)
+  }, [state.selectedVaultId])
+
+  // Keep the alias map (frontmatter `aliases` → path) pointed at the selected
+  // vault so the wikilink resolver and Quick Switcher resolve aliases for the
+  // vault the user is in. Cleared when no vault is selected.
+  useEffect(() => {
+    if (state.selectedVaultId) {
+      void refreshAliasMap(apiClient, state.selectedVaultId)
+    } else {
+      clearAliasMap()
+    }
   }, [state.selectedVaultId])
 
   useWorkspaceRestore({

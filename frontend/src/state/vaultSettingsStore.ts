@@ -47,6 +47,8 @@ export const DEFAULT_VAULT_SETTINGS: UserVaultSettings = {
   sidebarPanel: null,
   contextPanel: null,
   activityRange: null,
+  webEmbedEnabled: false,
+  workspaces: [],
 }
 
 // ─── Internal State ──────────────────────────────────────────────────────────
@@ -82,6 +84,8 @@ function normalize(raw: unknown): UserVaultSettings {
     sidebarPanel: parsed.sidebarPanel ?? null,
     contextPanel: parsed.contextPanel ?? null,
     activityRange: typeof parsed.activityRange === 'string' ? parsed.activityRange : null,
+    webEmbedEnabled: parsed.webEmbedEnabled ?? DEFAULT_VAULT_SETTINGS.webEmbedEnabled,
+    workspaces: Array.isArray(parsed.workspaces) ? parsed.workspaces : [],
   }
 }
 

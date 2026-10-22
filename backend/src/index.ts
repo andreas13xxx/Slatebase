@@ -63,6 +63,7 @@ import { GitHubClient, PluginStoreCache, PluginStoreService, UpdateChecker } fro
 import type { IPluginStoreConfig } from './plugin-store/index.js'
 import { createPluginStoreRoutes, createVaultPluginStoreRoutes } from './api/pluginStoreRoutes.js'
 import { versionRoutes } from './api/versionRoutes.js'
+import { mapConfigRoutes } from './api/mapConfigRoutes.js'
 import { createHealthRoutes } from './api/healthRoutes.js'
 import { SearchService, ReplaceService } from './search/index.js'
 import { EventReplayBuffer, RateLimiter as SseRateLimiter, ConnectionManager, PresenceService, EventBus, ConnectionLimitError } from './realtime/index.js'
@@ -707,6 +708,7 @@ if (featureToggleService.isEnabled('mcp') && mcpTokenService !== undefined && mc
 }
 app.get('/.well-known/mcp.json', createMcpWellKnownHandler(featureToggleService))
 app.route('', versionRoutes)
+app.route('', mapConfigRoutes)
 app.route('', createHealthRoutes({ isReady }))
 
 // Plugin route registration (auth middleware applies via /api/v1/* pattern)

@@ -17,6 +17,9 @@ import type { DirectoryTree } from '../types'
 import { AppContext } from '../state'
 import { requestHoverPreview, dismissHoverPreview } from '../plugins/compat/hover-link-bus'
 import { resolveWikilinkTargetWithAlternatives } from '../plugins/link-resolver'
+import { getAliasMapSnapshot } from '../state/aliasStore'
+import { getWebEmbedEnabled } from '../hooks/useWebEmbed'
+import { EmbeddedWebFrame } from './EmbeddedWebFrame'
 import { warnOnce } from '../plugins/compat/log'
 import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, remarkBreaks, remarkBlockRef, remarkPreserveTableCodeEscapes, remarkMath, remarkFootnotes, remarkHighlight, getFootnoteEntries, createAnchorTracker } from '../plugins'
 import type { WikilinkNode, EmbedNode, CalloutNode, TagNode, FootnoteEntry, NumberedFootnoteReference, HighlightNode } from '../plugins'
@@ -1256,6 +1259,13 @@ function renderPhrasingNode(
     case 'image':
       // Req 7.5: Render inline images with max-width 100%
       // Req 7.6: Show placeholder for images not found
+      // R4: an external http(s) URL in `![](url)` auto-embeds the page in a
+      // sandboxed iframe, but only when the per-vault opt-in is enabled;
+      // otherwise fall through to the normal image handling (which shows a
+      // "not found" notice for a non-vault path).
+      if (/^https?:\/\//i.test(node.url) && getWebEmbedEnabled()) {
+        return createElement(EmbeddedWebFrame, { key, url: node.url })
+      }
       return renderImage(node.url, node.alt, vaultId, directoryTree, key)
 
     case 'html': {
@@ -1535,7 +1545,7 @@ function renderTextWithEmbeds(
       const displayText = match[4] ?? target
 
       // Resolve the wikilink target against the directory tree
-      const resolution = resolveWikilinkTargetWithAlternatives(target, directoryTree)
+      const resolution = resolveWikilinkTargetWithAlternatives(target, directoryTree, undefined, getAliasMapSnapshot())
       const isBroken = resolution === null
 
       const linkPath = resolution?.resolved.path ?? `${target}.md`
@@ -1617,7 +1627,7 @@ function renderWikilinkNode(
   }
 
   // Resolve the wikilink target against the directory tree
-  const resolution = resolveWikilinkTargetWithAlternatives(target, directoryTree)
+  const resolution = resolveWikilinkTargetWithAlternatives(target, directoryTree, undefined, getAliasMapSnapshot())
   const isBroken = resolution === null
 
   const linkPath = resolution?.resolved.path ?? `${target}.md`

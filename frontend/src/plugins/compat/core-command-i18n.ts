@@ -176,6 +176,10 @@ const NAMES: Record<string, { de: string; en: string }> = {
   'daily-notes:goto-prev': { de: 'Tagesnotizen: Vorherige Tagesnotiz öffnen', en: 'Daily notes: Open previous daily note' },
   'insert-template': { de: 'Vorlagen: Vorlage einfügen', en: 'Templates: Insert template' },
   'random-note': { de: 'Zufällige Notiz: Zufällige Notiz öffnen', en: 'Random note: Open random note' },
+  'unique-note:create-today': { de: 'Eindeutige Notiz: Neue eindeutige Notiz anlegen', en: 'Unique note: Create new unique note' },
+  'webviewer:open': { de: 'Web-Viewer: Webseite öffnen', en: 'Web viewer: Open a web page' },
+  'workspaces:save': { de: 'Arbeitsbereiche: Aktuelles Layout speichern', en: 'Workspaces: Save current layout' },
+  'workspaces:load': { de: 'Arbeitsbereiche: Layout laden', en: 'Workspaces: Load layout' },
   'insert-current-date': { de: 'Vorlagen: Aktuelles Datum einfügen', en: 'Templates: Insert current date' },
   'insert-current-time': { de: 'Vorlagen: Aktuelle Uhrzeit einfügen', en: 'Templates: Insert current time' },
 

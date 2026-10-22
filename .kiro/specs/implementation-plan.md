@@ -26,6 +26,7 @@ Specs gebündelt statt einzeln spezifiziert.
 | 6 | Fremdformat-Importer | I | ~20–30h | Keine Spec |
 | 7 | Semantische Suche / AI-Embeddings | E | ~38–58h | Keine Spec |
 | 8 | Collaborative Editing | D | ~68–88h | Nur Requirements |
+| — | Obsidian-Feature-Gaps (Aliases, Workspaces, Web Viewer, Unique Note, Bases List/Map; optional Format Converter, Slides, Audio Recorder; Multi-Cursor-Rest) | — | tbd | Backlog-Skizze (`obsidian-feature-gaps/requirements.md`) |
 
 **Summe:** ~262–367h.
 

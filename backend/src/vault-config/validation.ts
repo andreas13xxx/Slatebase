@@ -41,6 +41,14 @@ export const updateVaultConfigSchema = z.object({
       'Attachments directory must be a relative path without parent traversal',
     )
     .optional(),
+  uniqueNoteDirectory: z
+    .string()
+    .max(255, 'Unique note directory must be at most 255 characters')
+    .refine(
+      (val) => !val.includes('..') && !val.startsWith('/') && !val.startsWith('\\'),
+      'Unique note directory must be a relative path without parent traversal',
+    )
+    .optional(),
   activityRetentionDays: z
     .number()
     .int('Activity retention must be a whole number of days')

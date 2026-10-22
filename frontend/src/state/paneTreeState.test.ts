@@ -608,3 +608,22 @@ describe('generatePaneId', () => {
     expect(ids.size).toBe(50)
   })
 })
+
+describe('REPLACE_PANE_TREE', () => {
+  it('swaps the entire tree and active pane', () => {
+    const current = seededTree('p1', 'v', 'a.md')
+    const replacement = seededTree('p9', 'v', 'b.md')
+    const next = paneTreeReducer(current, { type: 'REPLACE_PANE_TREE', payload: { tree: replacement } })
+    expect(next.activePaneId).toBe('p9')
+    expect(findPane(next, 'p9')).not.toBeNull()
+    expect(findPane(next, 'p1')).toBeNull()
+    expect(getActiveTabId(next)).toBe('v::b.md')
+  })
+
+  it('falls back to the first pane when the replacement active id does not resolve', () => {
+    const current = createInitialPaneTree('p1')
+    const replacement: PaneTree = { ...seededTree('p9', 'v', 'b.md'), activePaneId: 'does-not-exist' }
+    const next = paneTreeReducer(current, { type: 'REPLACE_PANE_TREE', payload: { tree: replacement } })
+    expect(next.activePaneId).toBe('p9')
+  })
+})

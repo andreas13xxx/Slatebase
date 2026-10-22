@@ -26,14 +26,17 @@ import type { DirectoryTree } from '../types'
  * @param sourcePath - Path of the file the link appears in, used to prefer a same-folder
  *   match when the target name is ambiguous. Omit when the source file isn't known —
  *   resolution then falls back to shortest-path-then-alphabetical only.
+ * @param aliasMap - Optional lowercased-alias → declaring-file-paths map. Consulted only
+ *   when no file-name/path match exists, so a real file name always wins over an alias.
  * @returns The full relative path to the resolved file, or null if not found
  */
 export function resolveWikilinkTarget(
   target: string,
   tree: DirectoryTree | null,
   sourcePath?: string,
+  aliasMap?: Map<string, string[]>,
 ): string | null {
-  const result = resolveWikilinkTargetWithAlternatives(target, tree, sourcePath)
+  const result = resolveWikilinkTargetWithAlternatives(target, tree, sourcePath, aliasMap)
   return result ? result.resolved.path : null
 }
 
@@ -45,6 +48,7 @@ export function resolveWikilinkTargetWithAlternatives(
   target: string,
   tree: DirectoryTree | null,
   sourcePath?: string,
+  aliasMap?: Map<string, string[]>,
 ): { resolved: FileCandidate; alternativeCount: number } | null {
   if (!tree || !target.trim()) return null
 
@@ -73,9 +77,25 @@ export function resolveWikilinkTargetWithAlternatives(
 
   const targetWithMdLower = `${targetLower}.md`
   const mdCandidates = files.filter((file) => file.name.toLowerCase() === targetWithMdLower)
-  if (mdCandidates.length === 0) return null
+  if (mdCandidates.length > 0) {
+    return resolveAmbiguousMatch(mdCandidates, sourcePath)
+  }
 
-  return resolveAmbiguousMatch(mdCandidates, sourcePath)
+  // Alias pass — only reached when no file name/path matched. A real file name always
+  // wins over an alias. Several files declaring the same alias disambiguate exactly like
+  // same-named files (same folder → shortest path → alphabetical).
+  if (aliasMap) {
+    const aliasPaths = aliasMap.get(targetLower)
+    if (aliasPaths && aliasPaths.length > 0) {
+      const aliasCandidates: FileCandidate[] = aliasPaths.map((path) => ({
+        name: path.split('/').pop() ?? path,
+        path,
+      }))
+      return resolveAmbiguousMatch(aliasCandidates, sourcePath)
+    }
+  }
+
+  return null
 }
 
 /** A minimal file reference used throughout link resolution. */

@@ -4,17 +4,26 @@ import { usePluginContext } from '../plugins/compat/plugin-context'
 import { useFeatureContext } from '../state/featureContext'
 import { useTabContext } from '../state/tabContext'
 import { usePaneTree } from '../state/paneTreeContext'
-import { generatePaneId } from '../state/paneTreeState'
+import { generatePaneId, serializePaneTree, rehydratePaneTree } from '../state/paneTreeState'
 import { splitActivePane, focusPaneInDirection } from './panes/pane-commands'
 import type { FocusDirection } from './panes/pane-focus-direction'
 import { useAppContext, loadVaults } from '../state/index'
 import { useAuthContext } from '../state/authContext'
 import { useNavigationHistory } from '../state/navigationHistoryContext'
 import { openTab } from '../state/tabActions'
+import { createUniqueNote } from '../state/uniqueNoteService'
 import { onOpenInSplit } from '../state/openInSplitBridge'
 import type { TabAction } from '../state/tabState'
 import { TemplateSelector } from './TemplateSelector'
 import { QuickSwitcher } from './QuickSwitcher'
+import { WebViewerPrompt } from './WebViewerPrompt'
+import { WorkspacesModal } from './WorkspacesModal'
+import {
+  buildWorkspace, saveWorkspace, getWorkspaces, findWorkspace,
+  renameWorkspace, deleteWorkspace,
+} from '../state/workspacesStore'
+import { fetchPaneTreeContent } from '../state/paneTreeRestore'
+import { loadPanelLayout, savePanelLayout } from './side-panel/utils/persistence'
 import { ReleaseNotesModal } from './ReleaseNotesModal'
 import { DebugInfoModal } from './DebugInfoModal'
 import { matchesShortcut } from '../state/keybindingsStore'
@@ -68,6 +77,7 @@ const DUPLICATE_OF_NATIVE_COMMAND = new Map<string, string>([
   ['daily-notes', 'slatebase:daily-note'],
   ['insert-template', 'slatebase:insert-template'],
   ['random-note', 'slatebase:open-random-note'],
+  ['unique-note:create-today', 'slatebase:create-unique-note'],
   ['app:toggle-ribbon', 'slatebase:toggle-toolbar'],
   ['command-palette:open', 'slatebase:open-command-palette'],
   ['file-explorer:new-file', 'slatebase:create-file'],
@@ -191,6 +201,8 @@ export function CommandPaletteContainer({
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false)
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false)
   const [debugInfoOpen, setDebugInfoOpen] = useState(false)
+  const [webViewerPromptOpen, setWebViewerPromptOpen] = useState(false)
+  const [workspacesModal, setWorkspacesModal] = useState<{ open: boolean; mode: 'save' | 'load' }>({ open: false, mode: 'load' })
 
   /** Opens the template picker in "create a new note" mode. */
   const openTemplateSelector = useCallback(() => {
@@ -269,6 +281,88 @@ export function CommandPaletteContainer({
     void openTab(tabDispatch, appDispatch, apiClient, vaultId, pick.path, pick.name)
   }, [state.selectedVaultId, state.vaultTrees, state.directoryTree, apiClient, tabState, tabDispatch, appDispatch])
 
+  /**
+   * Creates a new unique note (timestamp-prefixed name `YYYYMMDDHHmmss`) in the
+   * vault's configured unique-note folder and opens it. Refreshes the tree so
+   * the new file shows in the explorer, mirroring the Quick Switcher's create
+   * flow.
+   */
+  const createUniqueNoteCmd = useCallback(() => {
+    const vaultId = state.selectedVaultId
+    if (!vaultId || !apiClient) return
+    void (async () => {
+      try {
+        const path = await createUniqueNote(apiClient, vaultId)
+        const tree = await apiClient.fetchVaultTree(vaultId)
+        appDispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree } })
+        const name = path.split('/').pop() ?? path
+        void openTab(tabDispatch, appDispatch, apiClient, vaultId, path, name)
+      } catch (err) {
+        showToast('error', extractErrorMessage(err, 'Die eindeutige Notiz konnte nicht erstellt werden.'))
+      }
+    })()
+  }, [state.selectedVaultId, apiClient, appDispatch, tabDispatch])
+
+  /**
+   * Opens a web-viewer tab for a confirmed http(s) URL. The URL lives in the
+   * tab's virtual path (`__webview::<url>`); the host becomes the tab title.
+   */
+  const openWebViewerTab = useCallback((url: string) => {
+    const vaultId = state.selectedVaultId
+    if (!vaultId || !apiClient) return
+    let title = url
+    try {
+      title = new URL(url).hostname
+    } catch {
+      // Keep the raw string if the URL does not parse (already validated upstream).
+    }
+    // A web-viewer tab is a sentinel (virtual) tab like the graph tab — dispatch
+    // OPEN_TAB directly rather than via openTab(), which would try to fetch file
+    // content for the `__webview::` path.
+    tabDispatch({ type: 'OPEN_TAB', payload: { vaultId, filePath: `__webview::${url}`, fileName: title, icon: 'globe' } })
+  }, [state.selectedVaultId, apiClient, tabDispatch])
+
+  // ── Workspaces (named layouts) ─────────────────────────────────────────────
+  // A workspace captures the live pane tree + both panel layouts. On apply, the
+  // active editor unmounts when REPLACE_PANE_TREE swaps the tree, which triggers
+  // EditMode's own flushPendingSave — so an open unsaved buffer is flushed by
+  // the existing unmount path, no extra flush event needed.
+  const saveWorkspaceToName = useCallback((name: string) => {
+    const ws = buildWorkspace(
+      name,
+      serializePaneTree(paneTree),
+      loadPanelLayout('sidebar'),
+      loadPanelLayout('context'),
+    )
+    if (!saveWorkspace(ws)) {
+      showToast('error', t('workspaces.limitReached'))
+      return
+    }
+    showToast('success', t('workspaces.saved', { name: ws.name }))
+  }, [paneTree, t])
+
+  const applyWorkspaceByName = useCallback((name: string) => {
+    const ws = findWorkspace(name)
+    if (!ws || !apiClient) return
+    const validVaultIds = new Set(state.vaults.map((v) => v.id))
+    // Replace the whole layout, then fetch each restored tab's content (R5:
+    // unresolvable tabs are skipped by the shared restore helper).
+    const tree = rehydratePaneTree(ws.paneTree)
+    paneTreeDispatch({ type: 'REPLACE_PANE_TREE', payload: { tree } })
+    fetchPaneTreeContent(tree, paneTreeDispatch, apiClient, validVaultIds, () => true)
+    // Restore the panel layouts the workspace captured.
+    if (ws.sidebarPanel) savePanelLayout('sidebar', ws.sidebarPanel)
+    if (ws.contextPanel) savePanelLayout('context', ws.contextPanel)
+  }, [apiClient, state.vaults, paneTreeDispatch])
+
+  const renameWorkspaceByName = useCallback((from: string, to: string) => {
+    renameWorkspace(from, to)
+  }, [])
+
+  const deleteWorkspaceByName = useCallback((name: string) => {
+    deleteWorkspace(name)
+  }, [])
+
   // ─── Custom events for the toolbar buttons ─────────────────────────────────
   // The toolbar buttons and the palette commands must do the same thing, so the
   // buttons dispatch these instead of carrying their own copies of the logic.
@@ -276,16 +370,19 @@ export function CommandPaletteContainer({
     function handleRandomNote() { openRandomNote() }
     function handleInsertTemplate() { openTemplateInserter() }
     function handleToggleDictation() { toggleDictation() }
+    function handleCreateUniqueNote() { createUniqueNoteCmd() }
 
     window.addEventListener('slatebase:open-random-note', handleRandomNote)
     window.addEventListener('slatebase:insert-template', handleInsertTemplate)
     window.addEventListener('slatebase:toggle-dictation', handleToggleDictation)
+    window.addEventListener('slatebase:create-unique-note', handleCreateUniqueNote)
     return () => {
       window.removeEventListener('slatebase:open-random-note', handleRandomNote)
       window.removeEventListener('slatebase:insert-template', handleInsertTemplate)
       window.removeEventListener('slatebase:toggle-dictation', handleToggleDictation)
+      window.removeEventListener('slatebase:create-unique-note', handleCreateUniqueNote)
     }
-  }, [openRandomNote, openTemplateInserter, toggleDictation])
+  }, [openRandomNote, openTemplateInserter, toggleDictation, createUniqueNoteCmd])
 
   // ─── Keyboard shortcuts for the toolbar-related commands ───────────────────
   // These ship without a default binding, so nothing fires until the user
@@ -303,12 +400,15 @@ export function CommandPaletteContainer({
       } else if (matchesShortcut('slatebase:insert-template', e)) {
         e.preventDefault()
         openTemplateInserter()
+      } else if (matchesShortcut('slatebase:create-unique-note', e)) {
+        e.preventDefault()
+        createUniqueNoteCmd()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [openRandomNote, openTemplateInserter])
+  }, [openRandomNote, openTemplateInserter, createUniqueNoteCmd])
 
   // ─── Core command registration (Obsidian's workspace:*/app:*/theme:*/... commands) ──
   // Registered once; commands read fresh state via this ref instead of stale closures
@@ -348,6 +448,10 @@ export function CommandPaletteContainer({
     onOpenTemplateSelector: openTemplateSelector,
     onInsertTemplate: openTemplateInserter,
     onOpenRandomNote: openRandomNote,
+    onCreateUniqueNote: createUniqueNoteCmd,
+    onOpenWebViewer: () => setWebViewerPromptOpen(true),
+    onSaveWorkspace: () => setWorkspacesModal({ open: true, mode: 'save' }),
+    onLoadWorkspace: () => setWorkspacesModal({ open: true, mode: 'load' }),
     onToggleToolbar: toggleToolbarVisible,
     onOpenReleaseNotes: () => setReleaseNotesOpen(true),
     onOpenDebugInfo: () => setDebugInfoOpen(true),
@@ -540,7 +644,7 @@ export function CommandPaletteContainer({
 
     // Determine if there's an active tab in edit mode (for editor commands)
     const activeTab = tabState.tabs.find((t) => t.id === tabState.activeTabId)
-    const isEditing = activeTab !== undefined && activeTab.mode === 'edit' && !activeTab.isBinary && activeTab.filePath !== '__graph__'
+    const isEditing = activeTab !== undefined && activeTab.mode === 'edit' && !activeTab.isBinary && activeTab.filePath !== '__graph__' && !activeTab.filePath.startsWith('__webview::')
     const isCanvasActive = activeTab !== undefined && activeTab.fileName.endsWith('.canvas')
 
     // ── Navigation ──────────────────────────────────────────────────────────
@@ -675,7 +779,7 @@ export function CommandPaletteContainer({
     // ── Vault operations (require a vault selected) ─────────────────────────
 
     // Toggle editor mode (always available when a non-binary file tab is active)
-    if (activeTab && !activeTab.isBinary && activeTab.filePath !== '__graph__' && !activeTab.fileName.endsWith('.canvas')) {
+    if (activeTab && !activeTab.isBinary && activeTab.filePath !== '__graph__' && !activeTab.filePath.startsWith('__webview::') && !activeTab.fileName.endsWith('.canvas')) {
       commands.push({
         id: 'slatebase:toggle-mode',
         name: 'Editor-Modus wechseln (Bearbeiten/Vorschau)',
@@ -1156,6 +1260,25 @@ export function CommandPaletteContainer({
           apiClient={apiClient}
           tabDispatch={tabDispatch}
           appDispatch={appDispatch}
+        />
+      )}
+      {state.selectedVaultId && apiClient && (
+        <WebViewerPrompt
+          isOpen={webViewerPromptOpen}
+          onClose={() => setWebViewerPromptOpen(false)}
+          onConfirm={openWebViewerTab}
+        />
+      )}
+      {state.selectedVaultId && (
+        <WorkspacesModal
+          isOpen={workspacesModal.open}
+          mode={workspacesModal.mode}
+          onClose={() => setWorkspacesModal((m) => ({ ...m, open: false }))}
+          workspaces={getWorkspaces()}
+          onSave={saveWorkspaceToName}
+          onApply={applyWorkspaceByName}
+          onRename={renameWorkspaceByName}
+          onDelete={deleteWorkspaceByName}
         />
       )}
       <ReleaseNotesModal

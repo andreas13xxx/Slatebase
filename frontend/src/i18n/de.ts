@@ -899,4 +899,33 @@ export const de = {
     copy: 'In Zwischenablage kopieren',
     copied: 'Kopiert',
   },
+
+  quickSwitcher: {
+    dialogLabel: 'Schnellwechsler',
+    placeholder: 'Datei öffnen oder erstellen …',
+    listLabel: 'Dateien',
+    noResults: 'Keine Dateien gefunden',
+    recentHeader: 'Zuletzt geöffnet',
+    createFile: 'Neue Datei „{name}“ erstellen',
+    createError: '„{name}“ konnte nicht erstellt werden.',
+    viaAlias: '{alias} → {name}',
+  },
+
+  webViewer: {
+    promptLabel: 'Webseite öffnen',
+    promptPlaceholder: 'URL eingeben (https://…)',
+    invalidUrl: 'Bitte eine gültige http(s)-Adresse eingeben.',
+  },
+
+  workspaces: {
+    saveLabel: 'Arbeitsbereich speichern',
+    loadLabel: 'Arbeitsbereich laden',
+    namePlaceholder: 'Name des Arbeitsbereichs',
+    overwriteConfirm: '„{name}“ existiert bereits — nochmal bestätigen zum Überschreiben.',
+    empty: 'Noch keine Arbeitsbereiche gespeichert.',
+    renameLabel: '„{name}“ umbenennen',
+    deleteLabel: '„{name}“ löschen',
+    saved: 'Arbeitsbereich „{name}“ gespeichert.',
+    limitReached: 'Höchstzahl an Arbeitsbereichen erreicht.',
+  },
 } as const

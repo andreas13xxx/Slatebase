@@ -68,6 +68,7 @@ export class VaultConfigStore implements IVaultConfigService {
       dailyNotesDirectory: stored.dailyNotesDirectory ?? DEFAULT_VAULT_CONFIG.dailyNotesDirectory,
       dailyNoteTemplateName: stored.dailyNoteTemplateName ?? DEFAULT_VAULT_CONFIG.dailyNoteTemplateName,
       attachmentsDirectory: stored.attachmentsDirectory ?? DEFAULT_VAULT_CONFIG.attachmentsDirectory,
+      uniqueNoteDirectory: stored.uniqueNoteDirectory ?? DEFAULT_VAULT_CONFIG.uniqueNoteDirectory,
       activityRetentionDays: stored.activityRetentionDays ?? DEFAULT_VAULT_CONFIG.activityRetentionDays,
     }
   }

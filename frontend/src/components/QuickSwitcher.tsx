@@ -8,7 +8,9 @@ import { collectFilesSorted } from '../plugins/link-resolver'
 import { fuzzyMatch } from '../utils/fuzzyMatch'
 import { openTab } from '../state/tabActions'
 import { getRecent } from '../state/recentFilesStore'
+import { getAliasEntriesSnapshot, type AliasEntry } from '../state/aliasStore'
 import { extractErrorMessage } from '../utils/error'
+import { useTranslation } from '../i18n'
 
 export interface QuickSwitcherProps {
   isOpen: boolean
@@ -31,7 +33,7 @@ interface FileCandidate {
 }
 
 type SwitcherEntry =
-  | { kind: 'file'; name: string; path: string }
+  | { kind: 'file'; name: string; path: string; viaAlias?: string }
   | { kind: 'create'; name: string; path: string }
 
 /**
@@ -52,6 +54,7 @@ export function QuickSwitcher({
   tabDispatch,
   appDispatch,
 }: QuickSwitcherProps) {
+  const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [creating, setCreating] = useState(false)
@@ -76,7 +79,7 @@ export function QuickSwitcher({
     }
   }, [isOpen])
 
-  const entries = buildEntries(query, vaultId, directoryTree)
+  const entries = buildEntries(query, vaultId, directoryTree, getAliasEntriesSnapshot())
   const totalItems = entries.length
 
   useEffect(() => {
@@ -110,11 +113,11 @@ export function QuickSwitcher({
       onClose()
     } catch (err: unknown) {
       // Requirement 2.8: keep the switcher open, show the reason inline.
-      setCreateError(extractErrorMessage(err, `„${name}“ konnte nicht erstellt werden.`))
+      setCreateError(extractErrorMessage(err, t('quickSwitcher.createError', { name })))
     } finally {
       setCreating(false)
     }
-  }, [apiClient, vaultId, appDispatch, tabDispatch, onClose])
+  }, [apiClient, vaultId, appDispatch, tabDispatch, onClose, t])
 
   const handleSelect = useCallback((entry: SwitcherEntry) => {
     if (entry.kind === 'create') {
@@ -160,7 +163,7 @@ export function QuickSwitcher({
         className="command-palette"
         role="dialog"
         aria-modal="true"
-        aria-label="Schnellwechsler"
+        aria-label={t('quickSwitcher.dialogLabel')}
       >
         <div className="command-palette-search">
           <Search size={14} className="command-palette-search-icon" />
@@ -168,7 +171,7 @@ export function QuickSwitcher({
             ref={inputRef}
             type="text"
             className="command-palette-input"
-            placeholder="Datei öffnen oder erstellen…"
+            placeholder={t('quickSwitcher.placeholder')}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value)
@@ -193,18 +196,18 @@ export function QuickSwitcher({
           id="quick-switcher-list"
           className="command-palette-list"
           role="listbox"
-          aria-label="Dateien"
+          aria-label={t('quickSwitcher.listLabel')}
         >
           {totalItems === 0 ? (
             <li className="command-palette-empty" role="option" aria-selected={false}>
-              Keine Dateien gefunden
+              {t('quickSwitcher.noResults')}
             </li>
           ) : (
             <>
               {showingRecent && (
                 <li className="command-palette-section-header" aria-hidden="true">
                   <Clock size={12} className="command-palette-section-icon" />
-                  Zuletzt geöffnet
+                  {t('quickSwitcher.recentHeader')}
                 </li>
               )}
               {entries.map((entry, index) => (
@@ -221,12 +224,16 @@ export function QuickSwitcher({
                     <>
                       <span className="command-palette-item-name">
                         <FilePlus size={13} style={{ marginRight: 6, verticalAlign: 'text-bottom' }} />
-                        Neue Datei „{entry.name}“ erstellen
+                        {t('quickSwitcher.createFile', { name: entry.name })}
                       </span>
                     </>
                   ) : (
                     <>
-                      <span className="command-palette-item-name">{entry.name}</span>
+                      <span className="command-palette-item-name">
+                        {entry.viaAlias
+                          ? t('quickSwitcher.viaAlias', { alias: entry.viaAlias, name: entry.name })
+                          : entry.name}
+                      </span>
                       <span className="command-palette-item-path">{entry.path}</span>
                     </>
                   )}
@@ -241,7 +248,12 @@ export function QuickSwitcher({
 }
 
 /** Builds the ranked list of file entries (or recent files) plus an optional create-new entry. */
-function buildEntries(query: string, vaultId: string, tree: DirectoryTree | null): SwitcherEntry[] {
+function buildEntries(
+  query: string,
+  vaultId: string,
+  tree: DirectoryTree | null,
+  aliasEntries: readonly AliasEntry[],
+): SwitcherEntry[] {
   const trimmed = query.trim()
 
   if (trimmed.length === 0) {
@@ -252,16 +264,42 @@ function buildEntries(query: string, vaultId: string, tree: DirectoryTree | null
   }
 
   const allFiles: FileCandidate[] = tree ? collectFilesSorted(tree) : []
-  const scored: Array<{ file: FileCandidate; score: number }> = []
+
+  // Score file-name/path matches and alias-text matches together, so the best
+  // fuzzy score wins regardless of which produced it. Keep the best score per
+  // path: a file reached both by name and by an alias appears once.
+  const bestByPath = new Map<string, { score: number; entry: SwitcherEntry }>()
+
+  const consider = (path: string, score: number, entry: SwitcherEntry): void => {
+    const prev = bestByPath.get(path)
+    if (!prev || score < prev.score) {
+      bestByPath.set(path, { score, entry })
+    }
+  }
+
   for (const file of allFiles) {
     const score = fuzzyMatch(trimmed, file.path)
-    if (score !== null) scored.push({ file, score })
+    if (score !== null) {
+      consider(file.path, score, { kind: 'file', name: file.name, path: file.path })
+    }
   }
-  scored.sort((a, b) => a.score - b.score)
 
-  const results: SwitcherEntry[] = scored
-    .slice(0, MAX_RESULTS)
-    .map(({ file }) => ({ kind: 'file', name: file.name, path: file.path }))
+  for (const { alias, path } of aliasEntries) {
+    const score = fuzzyMatch(trimmed, alias)
+    if (score !== null) {
+      // A name match for the same file wins (lower score); the alias entry only
+      // takes the slot if it scores better or the file had no name match.
+      consider(path, score, {
+        kind: 'file',
+        name: path.split('/').pop() ?? path,
+        path,
+        viaAlias: alias,
+      })
+    }
+  }
+
+  const scored = Array.from(bestByPath.values()).sort((a, b) => a.score - b.score)
+  const results: SwitcherEntry[] = scored.slice(0, MAX_RESULTS).map((s) => s.entry)
 
   const targetName = trimmed.endsWith('.md') ? trimmed : `${trimmed}.md`
   const targetPath = targetName
