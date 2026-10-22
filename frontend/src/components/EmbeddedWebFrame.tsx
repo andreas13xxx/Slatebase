@@ -8,8 +8,11 @@
  * put there. When the setting is off the caller renders the URL as a plain link
  * instead of mounting this.
  *
- * Shares the WebViewer sandbox (scripts/same-origin/forms/popups, no-referrer),
- * only http(s) URLs.
+ * Sandbox is tighter than the WebViewer tab: the embed URL is author-supplied
+ * (it sits in a note a reader opens), not reader-chosen, so `allow-same-origin`
+ * is deliberately NOT granted here — combined with `allow-scripts` it would let
+ * the framed page remove its own sandboxing. Scripts/forms/popups + no-referrer,
+ * only http(s) URLs. The WebViewer tab keeps `allow-same-origin` (user-chosen URL).
  */
 
 import { memo } from 'react'
@@ -50,7 +53,7 @@ export const EmbeddedWebFrame = memo(function EmbeddedWebFrame({ url }: Embedded
       <iframe
         src={url}
         className="web-embed__frame"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+        sandbox="allow-scripts allow-forms allow-popups"
         title={`Eingebettete Webseite: ${displayUrl}`}
         loading="lazy"
         referrerPolicy="no-referrer"
