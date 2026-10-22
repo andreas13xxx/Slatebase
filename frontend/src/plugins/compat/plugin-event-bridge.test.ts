@@ -7,6 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
+import { CSS_CHANGE_EVENT } from '../appearance/css-change'
 import { THEME_CHANGE_EVENT } from './body-classes'
 import { publishPaneLayout, resetPaneLayoutForTests } from './pane-split-bridge'
 import type { PaneTree } from '../../state/paneTreeState'
@@ -940,6 +941,38 @@ describe('usePluginEventBridge', () => {
       )
       window.dispatchEvent(new Event(THEME_CHANGE_EVENT))
       expect(cssChange).toHaveBeenCalledTimes(1)
+    })
+
+    it('also triggers css-change when the vault theme or a snippet changed (appearance injectors)', () => {
+      const cssChange = vi.fn()
+      workspaceShim.on('css-change', cssChange)
+      renderHook(() =>
+        usePluginEventBridge({
+          tabState: baseTabState,
+          directoryTree: mockTree,
+          workspaceShim,
+          metadataCacheShim,
+        }),
+      )
+      window.dispatchEvent(new Event(CSS_CHANGE_EVENT))
+      expect(cssChange).toHaveBeenCalledTimes(1)
+    })
+
+    it('stops listening when the bridge unmounts', () => {
+      const cssChange = vi.fn()
+      workspaceShim.on('css-change', cssChange)
+      const { unmount } = renderHook(() =>
+        usePluginEventBridge({
+          tabState: baseTabState,
+          directoryTree: mockTree,
+          workspaceShim,
+          metadataCacheShim,
+        }),
+      )
+      unmount()
+      window.dispatchEvent(new Event(CSS_CHANGE_EVENT))
+      window.dispatchEvent(new Event(THEME_CHANGE_EVENT))
+      expect(cssChange).not.toHaveBeenCalled()
     })
   })
 })

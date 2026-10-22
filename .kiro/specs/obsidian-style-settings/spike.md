@@ -115,8 +115,11 @@ weit, wie Slatebase die Struktur hat (Befund 3).
 
 ## Offene Punkte
 
-- `css-change` beim Aktivieren/Wechseln/Entfernen des Vault-Themes und beim Ein-/Ausschalten von Snippets prüfen und bei
-  Bedarf auslösen (heute nur bei hell/dunkel).
+- ~~`css-change` beim Wechsel/Entfernen des Vault-Themes und bei Snippets~~ **Erledigt (2026-10-21):** Die Injektoren melden
+  Änderungen über `CSS_CHANGE_EVENT`, die Event-Brücke leitet sie als `css-change` weiter (zusammengefasst, ohne Ereignis bei
+  unverändertem CSS). Live bestätigt mit Style Settings: Things → Abschnitt „Things Theme", Minimal → die drei
+  Minimal-Abschnitte, Standard → keine Abschnitte. Style Settings löst nach dem Setzen seiner Variablen selbst ein
+  `css-change` aus; das schleift nicht, weil die Brücke Workspace-Ereignisse nicht zurück in Fensterereignisse übersetzt.
 - Persistenz: Style Settings speichert seine Werte über `saveData` (pro Vault, `plugins/<vaultId>/…/data.json`). Gilt für
   alle Nutzer des Vaults, wie das Theme selbst; das ist stimmig, sollte aber so dokumentiert werden.
 - Das Plugin ist über den Plugin-Store installierbar. Soll die Themes-Seite darauf hinweisen (Theme hat `@settings` →

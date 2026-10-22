@@ -9,6 +9,8 @@
  * shared imports, so the two modules can evolve without coupling.
  */
 
+import { notifyCssChange } from './css-change';
+
 /** Maximum allowed CSS size in bytes (512 KB) — mirrors the backend limit. */
 const MAX_CSS_SIZE_BYTES = 512 * 1024;
 
@@ -58,28 +60,35 @@ export class SnippetInjector implements ISnippetInjector {
       );
     }
 
-    // Re-injection scenario (e.g. edited content) — remove any existing tag first.
-    this.remove(snippetId);
+    // Re-injection scenario (e.g. edited content) — remove any existing tag first (silently: one event below).
+    this.removeTag(snippetId);
 
     const style = document.createElement('style');
     style.setAttribute('data-snippet-id', snippetId);
     style.textContent = css;
     document.head.appendChild(style);
     appliedIds.add(snippetId);
+    notifyCssChange();
   }
 
   remove(snippetId: string): void {
-    const existing = document.querySelector(`style[data-snippet-id="${snippetId}"]`);
-    if (existing) {
-      existing.remove();
-    }
-    appliedIds.delete(snippetId);
+    if (this.removeTag(snippetId)) notifyCssChange();
   }
 
   removeAll(): void {
+    let removedAny = false;
     for (const id of [...appliedIds]) {
-      this.remove(id);
+      if (this.removeTag(id)) removedAny = true;
     }
+    if (removedAny) notifyCssChange();
+  }
+
+  /** Removes the tag without announcing it. Returns whether one existed. */
+  private removeTag(snippetId: string): boolean {
+    const existing = document.querySelector(`style[data-snippet-id="${snippetId}"]`);
+    existing?.remove();
+    appliedIds.delete(snippetId);
+    return existing !== null;
   }
 }
 

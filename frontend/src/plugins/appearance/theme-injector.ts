@@ -11,6 +11,8 @@
  * first snippet tag if snippets are already present; snippets applied later append after it.
  */
 
+import { notifyCssChange } from './css-change'
+
 /** Maximum allowed theme CSS size in bytes (3 MB) — mirrors the backend limit. */
 const MAX_THEME_CSS_SIZE_BYTES = 3 * 1024 * 1024
 
@@ -41,15 +43,20 @@ export class ThemeInjector implements IThemeInjector {
       const firstSnippet = document.head.querySelector(SNIPPET_STYLE_SELECTOR)
       document.head.insertBefore(style, firstSnippet)
     }
+    // Re-applying the same theme with the same CSS (the lifecycle does that on every vault change event) is not a change.
+    const changed = style.getAttribute('data-slatebase-theme') !== themeId || style.textContent !== css
     style.setAttribute('data-slatebase-theme', themeId)
     style.textContent = css
     document.documentElement.setAttribute(THEME_MARKER_ATTRIBUTE, themeId)
+    if (changed) notifyCssChange()
     return true
   }
 
   remove(): void {
-    document.head.querySelector(THEME_STYLE_SELECTOR)?.remove()
+    const existing = document.head.querySelector(THEME_STYLE_SELECTOR)
+    existing?.remove()
     document.documentElement.removeAttribute(THEME_MARKER_ATTRIBUTE)
+    if (existing !== null) notifyCssChange()
   }
 
   currentThemeId(): string | null {
