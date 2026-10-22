@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.60.0](https://github.com/andreas13xxx/Slatebase/compare/v0.59.0...v0.60.0) (2026-10-22)
+
+
+### Features
+
+* **aliases:** resolve [[Alias]] wikilinks and surface aliases in Quick Switcher ([e1bdd15](https://github.com/andreas13xxx/Slatebase/commit/e1bdd15d091813bf4083505a057e2ad26c9f161c))
+* **bases:** add a flat list view type (type: list) ([7e84ef8](https://github.com/andreas13xxx/Slatebase/commit/7e84ef8db016f9d3a55f68f8b1337e05ebeab2cd))
+* **bases:** add a map view type (type: map) with Leaflet ([7bedda8](https://github.com/andreas13xxx/Slatebase/commit/7bedda82bff0b640fcf675e6a3d3e406e1409cbc))
+* **editor:** complete native multi-cursor + obsidian feature-gap specs ([2c71fb2](https://github.com/andreas13xxx/Slatebase/commit/2c71fb27aef0a44b978b887bf70980cfe4563cec))
+* Obsidian feature gaps (aliases, workspaces, unique note, web viewer, bases list/map, multi-cursor) ([1c8887a](https://github.com/andreas13xxx/Slatebase/commit/1c8887a52163dcc84d510dd85b639083713c4148))
+* **plugin-compat:** Style Settings und weitere Plugins laufen, Release-Abfrage über den Server ([#257](https://github.com/andreas13xxx/Slatebase/issues/257)) ([95489db](https://github.com/andreas13xxx/Slatebase/commit/95489db9863ef3ac05867d336d73f73a9706d6fa))
+* **unique-note:** add timestamp-prefixed unique note command ([be1f48a](https://github.com/andreas13xxx/Slatebase/commit/be1f48af79fce9bc97d636d3ef83ade49130b272))
+* **web-viewer:** sandboxed web-page tab + opt-in inline web embed ([4226912](https://github.com/andreas13xxx/Slatebase/commit/42269129fc49da99419d6cc9d1ee2226860afd81))
+* **workspaces:** named layout snapshots, save/load/manage per vault ([ef089c6](https://github.com/andreas13xxx/Slatebase/commit/ef089c60fad63e52d085fba326ed90ab63759747))
+
+
+### Bugfixes
+
+* **themes:** make theme-bridge test CRLF-robust and pin appearance CSS to LF ([7d4db24](https://github.com/andreas13xxx/Slatebase/commit/7d4db2436039f2e822a6a8538c5120c0d818f607))
+* **web-viewer:** drop allow-same-origin from the inline web embed sandbox ([49eaf44](https://github.com/andreas13xxx/Slatebase/commit/49eaf44752d83bc92831f317839fa0966ed3c1c6))
+
+
+### Sonstige Änderungen
+
+* bump the minor-patch group across 1 directory with 10 updates ([#259](https://github.com/andreas13xxx/Slatebase/issues/259)) ([13d243a](https://github.com/andreas13xxx/Slatebase/commit/13d243aa8d824faf54b479f5bde72098112d3e28))
+* bump the minor-patch group in /backend with 7 updates ([#258](https://github.com/andreas13xxx/Slatebase/issues/258)) ([a80cddf](https://github.com/andreas13xxx/Slatebase/commit/a80cddfdd3ddba430d42f524a476239c624b36d5))
+* **i18n:** migrate QuickSwitcher strings to the i18n namespace ([4945ccb](https://github.com/andreas13xxx/Slatebase/commit/4945ccb96609f7c65c9d5af40ff62f6c12d4c3a5))
+
 ## [0.59.0](https://github.com/andreas13xxx/Slatebase/compare/v0.58.0...v0.59.0) (2026-10-21)
 
 
