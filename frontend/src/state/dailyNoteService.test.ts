@@ -72,6 +72,7 @@ function createMockApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
     searchMultiVault: vi.fn(),
     replaceInVault: vi.fn(),
     getVersion: vi.fn(),
+    getMapConfig: vi.fn(),
     getVaultStatistics: vi.fn(),
     uploadFiles: vi.fn(),
     uploadImagePaste: vi.fn(),

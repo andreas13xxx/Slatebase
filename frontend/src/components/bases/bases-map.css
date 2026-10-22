@@ -1,0 +1,46 @@
+/* Bases Map view — imperative Leaflet map container + notices.
+   Leaflet's own stylesheet (leaflet/dist/leaflet.css) is imported by the
+   component; this file only styles the Slatebase wrapper and notices. */
+
+.bases-map-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.bases-map__canvas {
+  flex: 1;
+  min-height: 300px;
+  width: 100%;
+  /* Leaflet tiles render on a neutral surface until they load. */
+  background: var(--bg-secondary);
+}
+
+.bases-map__notice {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-subtle);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.bases-map--inactive {
+  padding: 1rem 1.25rem;
+  font-size: 0.9rem;
+  color: var(--text-subtle);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+}
+
+.bases-map--inactive code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--text-primary);
+}
+
+/* Keep Leaflet's popups/tooltips legible in dark mode. */
+.bases-map__canvas .leaflet-container {
+  font-family: inherit;
+}

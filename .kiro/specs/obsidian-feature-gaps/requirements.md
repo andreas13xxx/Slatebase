@@ -78,21 +78,25 @@ Andreas zur Umsetzung freigegeben hat. Entscheidungen des Abgleichs:
   (`runBaseQuery`) und Formel-Sortierung (`displayRows`) wie die Tabelle — keine neue Dependency.
   5 Tests (`BasesListView.test.tsx`).
 
-### R6 — Bases Map-View (Geo)
-- Als Benutzer möchte ich `.base`-Zeilen mit Geo-Koordinaten-Properties auf einer Karte sehen
-  (`type: map`).
-- Größter der Pflicht-Posten; braucht eine Lat/Lon-Property-Konvention.
-- **Karten-Bibliothek entschieden (Andreas, 2026-10-21): Leaflet + react-leaflet.** Begründung:
-  BSD-2-Lizenz (kein proprietäres Mapbox GL v2), ~42 KB Bundle (DOM/Canvas, keine GPU nötig),
-  Raster-Tiles + einfache Marker decken den „Notiz-Pins auf einer Karte"-Use-Case vollständig ab;
-  MapLibre GL (Vektor/3D/WebGL, ~800 KB) wäre Overkill. Dependency-Regeln (`tech.md`) beachten:
-  gepinnt, Lizenz dokumentiert, `npm audit`.
-- **Tile-Quelle als Betreiber-Config (Default deaktiviert).** Jeder Kachel-Request sendet die IP
-  des Nutzers an den Tile-Server — ein fest verdrahteter externer Server (OSM-Public, Carto,
-  Mapbox) wäre ein stiller Privacy-Leak und bei OSM zusätzlich ein Fair-Use-Verstoß bei mehreren
-  Nutzern. Die Tile-URL ist daher Server-Config (leer/deaktiviert per Default; der Betreiber trägt
-  seinen eigenen oder einen erlaubten Tile-Server ein), analog zu `SLATEBASE_PROXY_ALLOWED_ORIGINS`
-  und dem Whisper-Backend. Ohne konfigurierte Tile-URL ist die Map-View inaktiv/ausgeblendet.
+### R6 — Bases Map-View (Geo) ✅ ERLEDIGT (Branch feature/obsidian-feature-gaps)
+- Umgesetzt: vierter eingebauter View-Typ `map` neben `table`/`cards`/`list`. `BasesMapView.tsx`
+  plottet jede Notiz mit Geo-Koordinate als Pin auf einer Leaflet-Karte; Klick auf einen Pin
+  öffnet die Notiz. Koordinaten-Konvention (aus `view._unknown`, mit Fallbacks): `coordinates`
+  (eine Property `"lat,lng"`, Default `location`) ODER `latProperty`+`lngProperty` (zwei numerische
+  Properties, Default `lat`/`lng`). Notizen ohne auswertbare Koordinate werden nicht geplottet,
+  ein Zähler meldet die übersprungenen. Reine Helfer (`readMapConfig`/`extractPins`/Range-Checks)
+  in `bases-map-coords.ts` (9 Tests).
+- **Leaflet direkt, KEIN react-leaflet** (Entscheidung Andreas 2026-10-21 nach Lizenzprüfung:
+  react-leaflet@5 ist Hippocratic-2.1, nicht in der `tech.md`-MIT/Apache/BSD-Liste). `leaflet@1.9.4`
+  (BSD-2) + `@types/leaflet@1.9.22` (dev, MIT), gepinnt. Imperativer `useEffect`-Wrapper (Map bei
+  Mount erzeugen/zerstören, Marker bei Zeilenänderung neu aufbauen). Lazy-importiert in `BasesView`,
+  sodass Leaflet+CSS nur beim Öffnen einer Map-View laden.
+- **Tile-Quelle als Betreiber-Config (Default leer → View inaktiv):** neue Public-Route
+  `GET /api/v1/map-config` (`mapConfigRoutes.ts`, 3 Tests) liest `SLATEBASE_MAP_TILE_URL` +
+  `SLATEBASE_MAP_TILE_ATTRIBUTION` env-only (wie die Whisper-Backend-URL). `IApiClient.getMapConfig`.
+  Ohne Tile-URL zeigt die View einen Inaktiv-Hinweis. Env-Vars in README + docker.env.example
+  dokumentiert (inkl. IP-Leak-Begründung).
+- Verifiziert: Backend+Frontend `tsc` sauber, map-coords 9/9, mapConfigRoutes 3/3 grün, ESLint 0.
 
 ## Multi-Cursor (Teil-Gap, Verifizierung + Vervollständigung)
 
