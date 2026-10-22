@@ -389,18 +389,23 @@ export function installObsidianGlobals(): void {
       writable: true, configurable: true,
     })
   }
-  // Obsidian exposes `element.doc` as a getter returning the ownerDocument.
+  // Obsidian exposes `node.doc` as a getter returning the ownerDocument.
   // Plugins (e.g. LiveSync) use `containerEl.doc.createEl(...)` to create elements.
-  if (!('doc' in Element.prototype)) {
-    Object.defineProperty(Element.prototype, 'doc', {
-      get: function (this: Element): Document { return this.ownerDocument },
+  // Defined on `Node`, not `Element`, as in Obsidian: QuickAdd resolves `createFragment()` (a DocumentFragment) to its
+  // owner document and then reads `document.win.createEl(...)`, so Document, fragments and text nodes need both too.
+  if (!('doc' in Node.prototype)) {
+    Object.defineProperty(Node.prototype, 'doc', {
+      get: function (this: Node): Document { return this.nodeType === Node.DOCUMENT_NODE ? (this as Document) : this.ownerDocument as Document },
       configurable: true,
     })
   }
-  // Also expose `win` getter (ownerDocument.defaultView) used by some plugins.
-  if (!('win' in Element.prototype)) {
-    Object.defineProperty(Element.prototype, 'win', {
-      get: function (this: Element): Window { return this.ownerDocument.defaultView ?? window },
+  // Also expose `win` getter (the document's defaultView) used by some plugins.
+  if (!('win' in Node.prototype)) {
+    Object.defineProperty(Node.prototype, 'win', {
+      get: function (this: Node): Window {
+        const doc = this.nodeType === Node.DOCUMENT_NODE ? (this as Document) : this.ownerDocument
+        return doc?.defaultView ?? window
+      },
       configurable: true,
     })
   }

@@ -17,7 +17,7 @@
  * as the install call — no microtask gap. Anything registered via a deferred
  * import is therefore absent from it.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { EditorView } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { installObsidianGlobals } from './install-globals'
@@ -386,6 +386,34 @@ describe('installObsidianGlobals', () => {
 
       expect(before['parseYaml']).toBe(parseYaml)
       expect(before['Plugin']).toBe(Plugin)
+    })
+  })
+
+  describe('Node.win/doc', () => {
+    // Regression: QuickAdd's settings tab builds a link with `createFragment()`, resolves the fragment to its owner
+    // document and calls `document.win.createEl('a')`. `win`/`doc` were only defined on Element, so the document had
+    // no `win` and the whole settings page failed with "Cannot read properties of undefined (reading 'createEl')".
+    beforeAll(() => installObsidianGlobals())
+
+    it('resolves win and doc for the document itself', () => {
+      const node = document as unknown as { win?: Window; doc?: Document }
+      expect(node.win).toBe(window)
+      expect(node.doc).toBe(document)
+    })
+
+    it('resolves win and doc for a DocumentFragment and a text node', () => {
+      const fragment = document.createDocumentFragment() as unknown as { win?: Window; doc?: Document }
+      const text = document.createTextNode('x') as unknown as { win?: Window; doc?: Document }
+      expect(fragment.win).toBe(window)
+      expect(fragment.doc).toBe(document)
+      expect(text.win).toBe(window)
+      expect(text.doc).toBe(document)
+    })
+
+    it('still resolves win and doc for elements', () => {
+      const el = document.createElement('div') as unknown as { win?: Window; doc?: Document }
+      expect(el.win).toBe(window)
+      expect(el.doc).toBe(document)
     })
   })
 
