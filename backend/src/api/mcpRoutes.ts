@@ -26,6 +26,15 @@ export interface McpRouteDependencies {
   rateLimiter: IMcpRateLimiter
   serverFactory: IMcpServerFactory
   logger: ILogger
+  /**
+   * Origins allowed to make cross-origin requests to the MCP transport. The
+   * request's `Origin` is echoed back ONLY when it is on this list — never a
+   * reflect-any or `*` fallback, which would void the allowlist and become a
+   * full cross-origin hole the moment auth is ever cookie/query based. An
+   * empty list means no cross-origin browser client is permitted (non-browser
+   * MCP clients send no `Origin` and are unaffected).
+   */
+  allowedOrigins: readonly string[]
 }
 
 // ─── Raw HTTP Handler (bypasses Hono to avoid double-response) ───────────────
@@ -43,7 +52,7 @@ export type McpHttpHandler = (req: IncomingMessage, res: ServerResponse) => Prom
  * @returns A raw HTTP handler function, or null if MCP is disabled.
  */
 export function createMcpHttpHandler(deps: McpRouteDependencies & { onAuthenticated?: (userId: string) => void }): McpHttpHandler | null {
-  const { tokenService, rateLimiter, serverFactory, logger, onAuthenticated } = deps
+  const { tokenService, rateLimiter, serverFactory, logger, onAuthenticated, allowedOrigins } = deps
 
   /** In-memory map of active sessions for this handler. */
   const httpSessions = new Map<string, {
@@ -98,7 +107,15 @@ export function createMcpHttpHandler(deps: McpRouteDependencies & { onAuthentica
    */
   function setCorsHeaders(req: IncomingMessage, res: ServerResponse): void {
     const origin = req.headers['origin']
-    res.setHeader('Access-Control-Allow-Origin', origin ?? '*')
+    // Echo the Origin back ONLY when it is explicitly allowed. A reflect-any
+    // (or `*`) response here would void the server's origin allowlist and, the
+    // moment MCP auth ever became cookie/query based, turn into a full
+    // cross-origin hole. A non-allowed (or absent) Origin simply gets no
+    // Access-Control-Allow-Origin header, so a browser blocks the response;
+    // non-browser MCP clients send no Origin and are unaffected.
+    if (typeof origin === 'string' && allowedOrigins.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin)
+    }
     res.setHeader('Vary', 'Origin')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Mcp-Session-Id')
