@@ -11,6 +11,20 @@ import { isNodeError } from '../shared/fs-utils.js'
 
 // ─── Interface ───────────────────────────────────────────────────────────────
 
+/**
+ * Thrown when the encryption key cannot be loaded for a reason that must NOT be
+ * silently recovered by generating a new key — a corrupt file, an unreadable
+ * file, or an explicitly-set-but-invalid env var. Regenerating in any of these
+ * cases would orphan every plugin secret the existing key encrypted, so the
+ * process refuses to start instead.
+ */
+export class PluginSecretKeyError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'PluginSecretKeyError'
+  }
+}
+
 export interface IPluginSecretKeyManager {
   /** Load or generate the encryption key. Must be called before encrypt/decrypt. */
   loadOrCreate(): Promise<void>
@@ -102,31 +116,55 @@ export class PluginSecretKeyManager implements IPluginSecretKeyManager {
     const envSecret = process.env[SECRET_KEY_ENV_VAR]
     if (envSecret && envSecret.length > 0) {
       if (!this.isValidSecret(envSecret)) {
-        this.logger.warn('SLATEBASE_PLUGIN_SECRET_KEY is set but invalid (expected 64 hex chars), generating new')
-      } else {
-        this.logger.info('Plugin secret key loaded from environment variable')
-        return envSecret
+        // An explicitly-set-but-malformed env var is an operator mistake, not a
+        // reason to silently fall through to a different key source.
+        throw new PluginSecretKeyError(
+          `${SECRET_KEY_ENV_VAR} is set but invalid (expected 64 hex chars). ` +
+          `Fix or unset it — refusing to start rather than fall back to a different key.`,
+        )
       }
+      this.logger.info('Plugin secret key loaded from environment variable')
+      return envSecret
     }
 
     // 2. Try reading from file
+    let fileContent: string
     try {
-      const fileContent = await readFile(this.secretPath, 'utf-8')
-      const secret = fileContent.trim()
-      if (this.isValidSecret(secret)) {
-        this.logger.info('Plugin secret key loaded from file')
-        return secret
-      }
-      this.logger.warn('Plugin secret key file is corrupted, regenerating')
+      fileContent = await readFile(this.secretPath, 'utf-8')
     } catch (err: unknown) {
       if (isNodeError(err) && err.code === 'ENOENT') {
+        // Genuine first run: no key file yet, nothing encrypted to orphan.
         this.logger.info('Plugin secret key file not found, generating new key')
-      } else {
-        this.logger.warn('Failed to read plugin secret key file, regenerating')
+        return this.generateAndPersist()
       }
+      // A read that fails for any OTHER reason (EPERM/EBUSY from antivirus or a
+      // synced folder on Windows, a torn read) does NOT prove the key is gone.
+      // Regenerating would orphan every plugin secret the existing key
+      // encrypted. Refuse to start and let the operator retry instead.
+      throw new PluginSecretKeyError(
+        `Failed to read the plugin secret key at ${this.secretPath} ` +
+        `(${isNodeError(err) ? err.code : String(err)}). Refusing to start: regenerating the key ` +
+        `would make every stored plugin secret undecryptable. ` +
+        `Retry once the file is readable, or set ${SECRET_KEY_ENV_VAR}.`,
+      )
     }
 
-    // 3. Generate new secret and persist atomically
+    const secret = fileContent.trim()
+    if (this.isValidSecret(secret)) {
+      this.logger.info('Plugin secret key loaded from file')
+      return secret
+    }
+    // The file exists and was read, but its contents are not a valid key.
+    throw new PluginSecretKeyError(
+      `The plugin secret key file at ${this.secretPath} is corrupt (not 64 hex chars). ` +
+      `Refusing to start: regenerating would make every stored plugin secret undecryptable. ` +
+      `Restore the correct key, or set ${SECRET_KEY_ENV_VAR}; if the secrets are already lost, ` +
+      `delete the file to start fresh and re-enter them.`,
+    )
+  }
+
+  /** Generates a fresh key and persists it atomically. Only for a genuine first run. */
+  private async generateAndPersist(): Promise<string> {
     const newSecret = randomBytes(SECRET_LENGTH_BYTES).toString('hex')
     await this.persistSecret(newSecret)
     this.logger.warn(

@@ -4,7 +4,7 @@ export { InstalledPluginStore } from './installed-plugin-store.js'
 export { PluginInstaller, PluginInstallError, compareSemver } from './plugin-installer.js'
 export { PluginService } from './plugin-service.js'
 export { PluginSecretStore, SecretLimitExceededError, SecretTooLargeError } from './secret-store.js'
-export { PluginSecretKeyManager } from './secret-key-manager.js'
+export { PluginSecretKeyManager, PluginSecretKeyError } from './secret-key-manager.js'
 export { PluginNotFoundError, PluginFileTooLargeError, PluginSettingsTooLargeError } from './errors.js'
 export { PLUGIN_ID_PATTERN, isValidPluginId } from './validation.js'
 export type {

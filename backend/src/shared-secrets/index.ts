@@ -4,7 +4,7 @@
  */
 
 export type { IModuleSecretKeyManager } from './secret-key-manager.js'
-export { ModuleSecretKeyManager } from './secret-key-manager.js'
+export { ModuleSecretKeyManager, SecretKeyError } from './secret-key-manager.js'
 
 export type { IModuleSecretStore } from './secret-store.js'
 export { ModuleSecretStore, ModuleSecretTooLargeError } from './secret-store.js'
