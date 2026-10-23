@@ -26,6 +26,7 @@
  */
 
 import { getCsrfToken } from '../../state/authContext'
+import DOMPurify from 'dompurify'
 import { recordGapRead } from './api-gap-registry'
 import { containAsyncLoad, containAsyncUnload } from './async-lifecycle'
 import { debugLog } from './log'
@@ -184,9 +185,12 @@ function fallbackHtmlToMarkdown(h: string | { textContent?: string | null }): st
 }
 
 function fallbackSanitizeHTMLToDom(h: string): DocumentFragment {
-  const t = document.createElement('template')
-  t.innerHTML = h
-  return t.content
+  // Must actually sanitize: this fallback can win the registration race, and a
+  // plugin feeding untrusted HTML (fetched web content) through it would otherwise
+  // inject script/on*/dangerous-URL markup straight into the host realm (CSRF
+  // token, window.app, every vault). DOMPurify is already a dependency; a detached
+  // <template> that strips nothing is not a sanitizer despite the name.
+  return DOMPurify.sanitize(h, { RETURN_DOM_FRAGMENT: true })
 }
 
 interface FallbackCache {
