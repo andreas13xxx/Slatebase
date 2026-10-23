@@ -251,6 +251,30 @@ describe('ThemeManager', () => {
       expect(await screen.findByText(/Du findest sie unter Einstellungen → Plugins → Style Settings → Einstellungen/)).toBeInTheDocument()
     })
 
+    it.each(['error', 'loading'])('makes no claim when the plugin registry says "%s" (not "inactive")', async (status) => {
+      renderWithRegistry(registryWith(status))
+      expect(await screen.findByText(/ob es in diesem Vault installiert ist, konnte nicht geprüft werden/)).toBeInTheDocument()
+      expect(screen.queryByText(/Aktiviere dafür/)).not.toBeInTheDocument()
+    })
+
+    it('does not call plugin compatibility "off" while the feature list is not loaded', async () => {
+      const apiClient = createMockApiClient({
+        listThemes: vi.fn().mockResolvedValue({ themes: [withSettings], activeThemeId: null }),
+        loadRegistry: vi.fn(registryWith()),
+      } as Partial<IApiClient>)
+      render(
+        // An empty, not yet loaded list: `isEnabled` would answer false for the unknown name.
+        <FeatureContext.Provider value={{ state: initialFeatureState, dispatch: vi.fn(), isEnabled: () => false }}>
+          <AppProvider apiClient={apiClient}>
+            <VaultSeeder vault={testVault} />
+            <ThemeManager />
+          </AppProvider>
+        </FeatureContext.Provider>,
+      )
+      expect(await screen.findByText(/Installiere dafür unter Einstellungen/)).toBeInTheDocument()
+      expect(screen.queryByText(/Administrator/)).not.toBeInTheDocument()
+    })
+
     it('makes no claim about the plugin when the lookup fails (unknown is not "not installed")', async () => {
       renderWithRegistry(async () => { throw new Error('offline') })
       expect(await screen.findByText(/ob es in diesem Vault installiert ist, konnte nicht geprüft werden/)).toBeInTheDocument()
@@ -270,7 +294,13 @@ describe('ThemeManager', () => {
         loadRegistry: vi.fn(),
       } as Partial<IApiClient>)
       render(
-        <FeatureContext.Provider value={{ state: initialFeatureState, dispatch: vi.fn(), isEnabled: () => false }}>
+        <FeatureContext.Provider
+          value={{
+            state: { ...initialFeatureState, features: [{ name: 'obsidian-plugin-compat', enabled: false, type: 'cold', description: '' }] },
+            dispatch: vi.fn(),
+            isEnabled: () => false,
+          }}
+        >
           <AppProvider apiClient={apiClient}>
             <VaultSeeder vault={testVault} />
             <ThemeManager />

@@ -168,12 +168,14 @@ describe('theme validation helpers', () => {
     expect(extractExternalHosts(css)).toEqual(['cdn.example.com', 'fonts.googleapis.com', 'img.example.org'])
   })
 
-  it('recognises Style Settings blocks only as a comment that starts with @settings', () => {
+  it('recognises Style Settings blocks the way the plugin does: a comment starting with @settings and a line break', () => {
     expect(hasStyleSettingsBlock('/* @settings\nname: x\n*/')).toBe(true)
-    expect(hasStyleSettingsBlock('/*@settings\nname: x\n*/')).toBe(true)
+    expect(hasStyleSettingsBlock('/*@settings\r\nname: x\r\n*/')).toBe(true)
+    expect(hasStyleSettingsBlock('/*! @settings\nname: x\n*/')).toBe(true) // the plugin accepts the preserved-comment form
     expect(hasStyleSettingsBlock('a{}\n\n/*   @settings\nid: y\n*/\nb{}')).toBe(true)
     expect(hasStyleSettingsBlock('/* the @settings block is documented elsewhere */')).toBe(false)
-    expect(hasStyleSettingsBlock('/* @settingsX */')).toBe(false)
+    expect(hasStyleSettingsBlock('/* @settings */')).toBe(false) // no line break after the marker: the plugin ignores it
+    expect(hasStyleSettingsBlock('/* @settingsX\n*/')).toBe(false)
     expect(hasStyleSettingsBlock('.settings { }')).toBe(false)
     expect(hasStyleSettingsBlock('')).toBe(false)
   })

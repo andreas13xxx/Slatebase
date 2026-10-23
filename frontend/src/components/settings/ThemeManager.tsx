@@ -215,6 +215,12 @@ export function ThemeManager() {
                   {[theme.manifest.version, theme.manifest.author, formatThemeSize(theme.size)].filter(Boolean).join(' · ')}
                 </span>
               </label>
+              {theme.hasStyleSettings && <StyleSettingsHint state={styleSettingsState} />}
+              {theme.externalHosts.length > 0 && (
+                <p className="theme-manager__warning">
+                  <AlertTriangle size={13} aria-hidden="true" /> Lädt Inhalte von: {theme.externalHosts.join(', ')}
+                </p>
+              )}
               <button
                 type="button"
                 className="theme-manager__action-btn"
@@ -223,12 +229,6 @@ export function ThemeManager() {
               >
                 <Trash2 size={14} />
               </button>
-              {theme.hasStyleSettings && <StyleSettingsHint state={styleSettingsState} />}
-              {theme.externalHosts.length > 0 && (
-                <p className="theme-manager__warning">
-                  <AlertTriangle size={13} aria-hidden="true" /> Lädt Inhalte von: {theme.externalHosts.join(', ')}
-                </p>
-              )}
             </div>
           ))}
         </fieldset>

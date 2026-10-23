@@ -87,12 +87,13 @@ export function normalizeManifest(raw: unknown, themeId: string): ThemeManifest 
 }
 
 /**
- * Whether a stylesheet carries a Style Settings block, i.e. a comment that starts with `@settings`. The community
- * plugin "Style Settings" reads those blocks to offer the theme's own options. The pattern is a fixed prefix with one
- * bounded whitespace run, so it is linear in the input.
+ * Whether a stylesheet carries a Style Settings block: a comment that starts with `@settings` (optionally `/*!`) and
+ * has a line break right after it. This is the plugin's own start pattern (`settingRegExp` in obsidian-style-settings),
+ * so a block it would read is a block we report, and a lookalike it ignores is one we ignore. The whitespace run is
+ * bounded, so the test is linear in the input.
  */
 export function hasStyleSettingsBlock(css: string): boolean {
-  return /\/\*\s{0,200}@settings\b/.test(css)
+  return /\/\*!?\s{0,200}@settings[\r\n]/.test(css)
 }
 
 /**
