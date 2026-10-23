@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.61.0](https://github.com/andreas13xxx/Slatebase/compare/v0.60.0...v0.61.0) (2026-10-23)
+
+
+### Features
+
+* **themes:** Hinweis auf Style-Settings-Optionen in der Themenliste ([#262](https://github.com/andreas13xxx/Slatebase/issues/262)) ([8c67130](https://github.com/andreas13xxx/Slatebase/commit/8c67130aff1fb35e50551d7e0a985e4b709b5f7b))
+
+
+### Bugfixes
+
+* **api:** reject non-canonical IPv4 octets to prevent proxy-trust spoofing ([b1739bb](https://github.com/andreas13xxx/Slatebase/commit/b1739bbb425e6c9f51c19bab7273bc6079987b51))
+* **api:** serve application/xml as attachment, not inline (XSS hardening) ([e6ba3d8](https://github.com/andreas13xxx/Slatebase/commit/e6ba3d87a9fa4ae5be65ac3513706fdfb23a5892))
+* **api:** validate incoming X-Request-Id charset to prevent log/header injection ([1379f6a](https://github.com/andreas13xxx/Slatebase/commit/1379f6a756473b21d8c8fad0de64bb370f44bc74))
+* **auth:** count 403 suspended-account logins against the rate limit ([d24c0e0](https://github.com/andreas13xxx/Slatebase/commit/d24c0e0518ccac821c9283b00bca042fb5989381))
+* **auth:** escalate login rate-limit blocks with exponential backoff ([70acc3d](https://github.com/andreas13xxx/Slatebase/commit/70acc3df917322250462b934780bf8b411f8950f))
+* **bases:** do not push numeric/boolean eq to backend prefilter (soundness) ([e093f60](https://github.com/andreas13xxx/Slatebase/commit/e093f607fcec9d710415f06ff33b0d997cb4abf1))
+* **bases:** match tag filters case-insensitively, matching the client ([bbe2635](https://github.com/andreas13xxx/Slatebase/commit/bbe2635ae46cc596215e6121c7fcb82fec04a14d))
+* deep-dive must-fixes (XSS, auth/MCP/IP hardening, Bases prefilter) ([f82873b](https://github.com/andreas13xxx/Slatebase/commit/f82873be5a27039122ff497ae151cc706bd99690))
+* deep-dive should-fixes (auth DoS, Bases tag casing, proxy/mail/log hardening) ([1874774](https://github.com/andreas13xxx/Slatebase/commit/1874774a68ccb47523baed84e4fb06f2ceb6b5f2))
+* **mail-import:** cap fetched message size to avoid OOM on a huge mail ([b304c2e](https://github.com/andreas13xxx/Slatebase/commit/b304c2e57c17aa4e9f972c1a752a6d3b698afde9))
+* **mcp:** restrict CORS to allowedOrigins instead of reflecting any origin ([fe3cf04](https://github.com/andreas13xxx/Slatebase/commit/fe3cf042a9164e065b00cc481539a4bfaed6086c))
+* **plugin-compat:** make fallback sanitizeHTMLToDom actually sanitize via DOMPurify ([b382032](https://github.com/andreas13xxx/Slatebase/commit/b3820325c1a692a4fd0a1f5dd1ffcb37700b622b))
+* **plugin-compat:** sanitizeHTMLToDom uses DOMPurify instead of a deny-list ([f89de43](https://github.com/andreas13xxx/Slatebase/commit/f89de43f417c05e295b8e4eb82c0140b31d606e8))
+* **proxy:** refuse to forward credentials over cleartext http URLs ([d4d0def](https://github.com/andreas13xxx/Slatebase/commit/d4d0def2dc082aee5c72960b6b0db592e5389c3e))
+* **secrets:** fail fast on a corrupt/unreadable secret key ([c555687](https://github.com/andreas13xxx/Slatebase/commit/c5556879be14856ed624dee727d0987eef0e39fd))
+* **secrets:** fail fast on a corrupt/unreadable secret key instead of orphaning credentials ([c985b33](https://github.com/andreas13xxx/Slatebase/commit/c985b33839cab8c88dfe11c4d46284fc6065c960))
+
+
+### Sonstige Änderungen
+
+* **plugin-compat:** align sanitizeHTMLToDom tests with DOMPurify semantics ([340c0d6](https://github.com/andreas13xxx/Slatebase/commit/340c0d69090df234fbbea943dbd3bde4343a2222))
+
 ## [0.60.0](https://github.com/andreas13xxx/Slatebase/compare/v0.59.0...v0.60.0) (2026-10-22)
 
 
