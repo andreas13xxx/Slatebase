@@ -247,6 +247,8 @@ export interface ThemeMeta {
   updatedAt: string
   /** Hostnames the CSS loads resources from via `@import` / `url(...)`. */
   externalHosts: string[]
+  /** True if the CSS has a Style Settings (`/* @settings`) block: the theme offers options through that plugin. */
+  hasStyleSettings: boolean
 }
 
 /** One entry of Obsidian's community theme catalog, as served by the theme store. */

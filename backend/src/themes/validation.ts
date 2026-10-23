@@ -87,6 +87,16 @@ export function normalizeManifest(raw: unknown, themeId: string): ThemeManifest 
 }
 
 /**
+ * Whether a stylesheet carries a Style Settings block: a comment that starts with `@settings` (optionally `/*!`) and
+ * has a line break right after it. This is the plugin's own start pattern (`settingRegExp` in obsidian-style-settings),
+ * so a block it would read is a block we report, and a lookalike it ignores is one we ignore. The whitespace run is
+ * bounded, so the test is linear in the input.
+ */
+export function hasStyleSettingsBlock(css: string): boolean {
+  return /\/\*!?\s{0,200}@settings[\r\n]/.test(css)
+}
+
+/**
  * Extracts the hostnames a stylesheet loads resources from via `@import` or
  * `url(...)` with an absolute (`http(s):` or protocol-relative) address. Data
  * URIs and relative URLs are ignored. The pattern has a single bounded

@@ -17,7 +17,7 @@ const PAPER = theme('Paper', { modes: ['light'] })
 const AMETHYST = theme('Amethyst', { legacy: true })
 
 const installedThings: ThemeMeta = {
-  id: 'Things', manifest: { name: 'Things', version: '1.0.0' }, size: 100, updatedAt: '2026-10-21T00:00:00.000Z', externalHosts: [],
+  id: 'Things', manifest: { name: 'Things', version: '1.0.0' }, size: 100, updatedAt: '2026-10-21T00:00:00.000Z', externalHosts: [], hasStyleSettings: false,
 }
 
 const noUpdates: ThemeUpdateCheck = { updates: [], unknown: [], warnings: [], checked: 0, checkedAt: 'x' }

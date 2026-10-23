@@ -7,7 +7,7 @@ import { writeJsonFileAtomic } from '../shared/json-file-store.js'
 import { validateFilePath } from '../vault/index.js'
 import { AppearanceFileInvalidError, InvalidThemeIdError, ThemeNotFoundError, ThemeTooLargeError } from './errors.js'
 import type { IThemeService, ThemeManifest, ThemeManifestInput, ThemeMeta } from './types.js'
-import { MAX_THEME_CSS_SIZE, extractExternalHosts, isValidThemeId, normalizeManifest } from './validation.js'
+import { MAX_THEME_CSS_SIZE, extractExternalHosts, hasStyleSettingsBlock, isValidThemeId, normalizeManifest } from './validation.js'
 
 const THEMES_DIR = '.obsidian/themes'
 const APPEARANCE_FILE = '.obsidian/appearance.json'
@@ -18,7 +18,10 @@ const RETRY_DELAY_MS = 50
 const TRANSIENT_CODES = new Set(['EPERM', 'EACCES', 'EBUSY'])
 
 /** Upper bound for the external-hosts cache; it is cleared when exceeded (entries are cheap to recompute). */
-const HOSTS_CACHE_LIMIT = 500
+const ANALYSIS_CACHE_LIMIT = 500
+
+/** Facts read from a stylesheet once per file version. */
+type StylesheetAnalysis = Pick<ThemeMeta, 'externalHosts' | 'hasStyleSettings'>
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -89,7 +92,7 @@ export class ThemeService implements IThemeService {
   private readonly appearanceMutex = new KeyedMutex()
 
   /** External hosts per stylesheet, keyed by path + mtime + size, so unchanged themes are not re-scanned on every listing. */
-  private readonly hostsCache = new Map<string, string[]>()
+  private readonly analysisCache = new Map<string, StylesheetAnalysis>()
 
   private themeDir(vaultPath: string, themeId: string): string {
     if (!isValidThemeId(themeId)) throw new InvalidThemeIdError(themeId)
@@ -117,26 +120,26 @@ export class ThemeService implements IThemeService {
     }
   }
 
-  /** Hostnames the stylesheet loads from; cached per file version. `knownCss` avoids a second read. */
-  private async externalHostsFor(cssFile: string, stat: Stats, knownCss?: string): Promise<string[]> {
+  /** What the stylesheet loads and offers (hosts, Style Settings); cached per file version. `knownCss` avoids a second read. */
+  private async analysisFor(cssFile: string, stat: Stats, knownCss?: string): Promise<StylesheetAnalysis> {
     const key = `${cssFile}|${stat.mtimeMs}|${stat.size}`
-    const cached = this.hostsCache.get(key)
+    const cached = this.analysisCache.get(key)
     if (cached !== undefined) return cached
 
     const css = knownCss ?? (stat.size <= MAX_THEME_CSS_SIZE ? await withRetry(() => fs.readFile(cssFile, 'utf-8')) : '')
-    const hosts = extractExternalHosts(css)
-    if (this.hostsCache.size >= HOSTS_CACHE_LIMIT) this.hostsCache.clear()
-    this.hostsCache.set(key, hosts)
-    return hosts
+    const analysis = { externalHosts: extractExternalHosts(css), hasStyleSettings: hasStyleSettingsBlock(css) }
+    if (this.analysisCache.size >= ANALYSIS_CACHE_LIMIT) this.analysisCache.clear()
+    this.analysisCache.set(key, analysis)
+    return analysis
   }
 
   private async metaFor(vaultPath: string, themeId: string, stat: Stats, knownCss?: string): Promise<ThemeMeta> {
     const cssFile = this.cssPath(vaultPath, themeId)
-    const [manifest, externalHosts] = await Promise.all([
+    const [manifest, analysis] = await Promise.all([
       this.readManifest(vaultPath, themeId),
-      this.externalHostsFor(cssFile, stat, knownCss),
+      this.analysisFor(cssFile, stat, knownCss),
     ])
-    return { id: themeId, manifest, size: stat.size, updatedAt: stat.mtime.toISOString(), externalHosts }
+    return { id: themeId, manifest, size: stat.size, updatedAt: stat.mtime.toISOString(), ...analysis }
   }
 
   /**

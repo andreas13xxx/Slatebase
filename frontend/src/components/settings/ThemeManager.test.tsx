@@ -3,12 +3,14 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useEffect } from 'react'
 import { AppProvider, useAppContext } from '../../state'
 import { themeInjector } from '../../plugins/appearance/theme-injector'
+import { FeatureContext } from '../../state/featureContext'
+import { initialFeatureState } from '../../state/featureState'
 import { ThemeManager } from './ThemeManager'
 import type { IApiClient, ThemeMeta } from '../../api'
 import type { VaultInfo } from '../../types'
 
-const things: ThemeMeta = { id: 'Things', manifest: { name: 'Things', version: '2.1.0', author: 'Colin' }, size: 2048, updatedAt: '2026-10-17T00:00:00.000Z', externalHosts: [] }
-const fonts: ThemeMeta = { id: 'Fancy', manifest: { name: 'Fancy' }, size: 100, updatedAt: '2026-10-17T00:00:00.000Z', externalHosts: ['fonts.googleapis.com'] }
+const things: ThemeMeta = { id: 'Things', manifest: { name: 'Things', version: '2.1.0', author: 'Colin' }, size: 2048, updatedAt: '2026-10-17T00:00:00.000Z', externalHosts: [], hasStyleSettings: false }
+const fonts: ThemeMeta = { id: 'Fancy', manifest: { name: 'Fancy' }, size: 100, updatedAt: '2026-10-17T00:00:00.000Z', externalHosts: ['fonts.googleapis.com'], hasStyleSettings: false }
 
 function createMockApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
   return {
@@ -191,7 +193,7 @@ describe('ThemeManager', () => {
   })
 
   it('treats a differently cased name as the existing theme and overwrites that folder', async () => {
-    const minimal: ThemeMeta = { id: 'Minimal', manifest: { name: 'Minimal' }, size: 10, updatedAt: '2026-10-17T00:00:00.000Z', externalHosts: [] }
+    const minimal: ThemeMeta = { id: 'Minimal', manifest: { name: 'Minimal' }, size: 10, updatedAt: '2026-10-17T00:00:00.000Z', externalHosts: [], hasStyleSettings: false }
     const apiClient = createMockApiClient({
       listThemes: vi.fn().mockResolvedValue({ themes: [minimal], activeThemeId: null }),
     })
@@ -215,5 +217,98 @@ describe('ThemeManager', () => {
     fireEvent.change(screen.getByTestId('theme-file-input'), { target: { files: [new File(['a{}'], 'theme.css'), manifest] } })
 
     await waitFor(() => expect(apiClient.saveTheme).toHaveBeenCalledWith('vault1', 'Active-theme', 'a{}', { name: 'Active' }))
+  })
+
+  describe('Style Settings hint', () => {
+    const withSettings: ThemeMeta = { ...things, id: 'Minimal', manifest: { name: 'Minimal' }, hasStyleSettings: true }
+
+    function renderWithRegistry(loadRegistry: IApiClient['loadRegistry'], themes: ThemeMeta[] = [withSettings]) {
+      const apiClient = createMockApiClient({
+        listThemes: vi.fn().mockResolvedValue({ themes, activeThemeId: null }),
+        loadRegistry: vi.fn(loadRegistry),
+      } as Partial<IApiClient>)
+      renderManager(apiClient)
+      return apiClient
+    }
+
+    const registryWith = (status?: string) => async () => ({
+      version: 1 as const,
+      plugins: status === undefined ? {} : { 'obsidian-style-settings': { status, permissions: {}, compatibilityLevel: 'full', installedAt: '', updatedAt: '' } },
+    }) as unknown as Awaited<ReturnType<IApiClient['loadRegistry']>>
+
+    it('asks to install the plugin when it is not in the vault', async () => {
+      renderWithRegistry(registryWith())
+      expect(await screen.findByText(/Installiere dafür unter Einstellungen → Plugins das Plugin „Style Settings“/)).toBeInTheDocument()
+    })
+
+    it('asks to activate the plugin when it is installed but not active', async () => {
+      renderWithRegistry(registryWith('inactive'))
+      expect(await screen.findByText(/Aktiviere dafür unter Einstellungen → Plugins das Plugin „Style Settings“/)).toBeInTheDocument()
+    })
+
+    it('points to the plugin settings when it is active', async () => {
+      renderWithRegistry(registryWith('active'))
+      expect(await screen.findByText(/Du findest sie unter Einstellungen → Plugins → Style Settings → Einstellungen/)).toBeInTheDocument()
+    })
+
+    it.each(['error', 'loading'])('makes no claim when the plugin registry says "%s" (not "inactive")', async (status) => {
+      renderWithRegistry(registryWith(status))
+      expect(await screen.findByText(/ob es in diesem Vault installiert ist, konnte nicht geprüft werden/)).toBeInTheDocument()
+      expect(screen.queryByText(/Aktiviere dafür/)).not.toBeInTheDocument()
+    })
+
+    it('does not call plugin compatibility "off" while the feature list is not loaded', async () => {
+      const apiClient = createMockApiClient({
+        listThemes: vi.fn().mockResolvedValue({ themes: [withSettings], activeThemeId: null }),
+        loadRegistry: vi.fn(registryWith()),
+      } as Partial<IApiClient>)
+      render(
+        // An empty, not yet loaded list: `isEnabled` would answer false for the unknown name.
+        <FeatureContext.Provider value={{ state: initialFeatureState, dispatch: vi.fn(), isEnabled: () => false }}>
+          <AppProvider apiClient={apiClient}>
+            <VaultSeeder vault={testVault} />
+            <ThemeManager />
+          </AppProvider>
+        </FeatureContext.Provider>,
+      )
+      expect(await screen.findByText(/Installiere dafür unter Einstellungen/)).toBeInTheDocument()
+      expect(screen.queryByText(/Administrator/)).not.toBeInTheDocument()
+    })
+
+    it('makes no claim about the plugin when the lookup fails (unknown is not "not installed")', async () => {
+      renderWithRegistry(async () => { throw new Error('offline') })
+      expect(await screen.findByText(/ob es in diesem Vault installiert ist, konnte nicht geprüft werden/)).toBeInTheDocument()
+      expect(screen.queryByText(/Installiere dafür/)).not.toBeInTheDocument()
+    })
+
+    it('shows nothing, and does not query the plugin registry, for themes without settings', async () => {
+      const apiClient = renderWithRegistry(registryWith(), [things])
+      await screen.findByRole('radio', { name: /Things/ })
+      expect(screen.queryByText(/bringt eigene Einstellungen mit/)).not.toBeInTheDocument()
+      expect(apiClient.loadRegistry).not.toHaveBeenCalled()
+    })
+
+    it('says an administrator must enable plugin compatibility when that feature is off', async () => {
+      const apiClient = createMockApiClient({
+        listThemes: vi.fn().mockResolvedValue({ themes: [withSettings], activeThemeId: null }),
+        loadRegistry: vi.fn(),
+      } as Partial<IApiClient>)
+      render(
+        <FeatureContext.Provider
+          value={{
+            state: { ...initialFeatureState, features: [{ name: 'obsidian-plugin-compat', enabled: false, type: 'cold', description: '' }] },
+            dispatch: vi.fn(),
+            isEnabled: () => false,
+          }}
+        >
+          <AppProvider apiClient={apiClient}>
+            <VaultSeeder vault={testVault} />
+            <ThemeManager />
+          </AppProvider>
+        </FeatureContext.Provider>,
+      )
+      expect(await screen.findByText(/dafür muss ein Administrator die Plugin-Kompatibilität aktivieren/)).toBeInTheDocument()
+      expect(apiClient.loadRegistry).not.toHaveBeenCalled()
+    })
   })
 })

@@ -21,6 +21,7 @@ const meta: ThemeMeta = {
   size: 12,
   updatedAt: '2026-10-17T00:00:00.000Z',
   externalHosts: [],
+  hasStyleSettings: false,
 }
 
 function createMockThemeService(overrides: Partial<IThemeService> = {}): IThemeService {

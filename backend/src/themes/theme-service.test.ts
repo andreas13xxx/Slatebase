@@ -4,7 +4,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppearanceFileInvalidError, InvalidThemeIdError, ThemeNotFoundError, ThemeTooLargeError } from './errors.js'
 import { ThemeService } from './theme-service.js'
-import { MAX_THEME_CSS_SIZE, extractExternalHosts, isValidThemeId, normalizeManifest } from './validation.js'
+import { MAX_THEME_CSS_SIZE, extractExternalHosts, hasStyleSettingsBlock, isValidThemeId, normalizeManifest } from './validation.js'
 
 let vault: string
 let service: ThemeService
@@ -168,8 +168,21 @@ describe('theme validation helpers', () => {
     expect(extractExternalHosts(css)).toEqual(['cdn.example.com', 'fonts.googleapis.com', 'img.example.org'])
   })
 
+  it('recognises Style Settings blocks the way the plugin does: a comment starting with @settings and a line break', () => {
+    expect(hasStyleSettingsBlock('/* @settings\nname: x\n*/')).toBe(true)
+    expect(hasStyleSettingsBlock('/*@settings\r\nname: x\r\n*/')).toBe(true)
+    expect(hasStyleSettingsBlock('/*! @settings\nname: x\n*/')).toBe(true) // the plugin accepts the preserved-comment form
+    expect(hasStyleSettingsBlock('a{}\n\n/*   @settings\nid: y\n*/\nb{}')).toBe(true)
+    expect(hasStyleSettingsBlock('/* the @settings block is documented elsewhere */')).toBe(false)
+    expect(hasStyleSettingsBlock('/* @settings */')).toBe(false) // no line break after the marker: the plugin ignores it
+    expect(hasStyleSettingsBlock('/* @settingsX\n*/')).toBe(false)
+    expect(hasStyleSettingsBlock('.settings { }')).toBe(false)
+    expect(hasStyleSettingsBlock('')).toBe(false)
+  })
+
   it('stays fast on pathological whitespace input', () => {
     const start = Date.now()
+    hasStyleSettingsBlock(`/*${' '.repeat(200_000)}x`)
     extractExternalHosts(`@import${' '.repeat(200_000)}x`)
     extractExternalHosts(`url(${' '.repeat(200_000)}`)
     expect(Date.now() - start).toBeLessThan(1000)
@@ -268,6 +281,24 @@ describe('ThemeService review fixes', () => {
     expect(first[0]?.externalHosts).toEqual(['fonts.googleapis.com'])
     expect(second).toEqual(first)
     expect(readsAfter).toBe(readsFirst)
+  })
+
+  it('reports whether a theme has a Style Settings block, in the listing and when loading', async () => {
+    await service.saveTheme(vault, 'WithSettings', '/* @settings\nname: Mine\nid: mine\n*/\nbody { color: red }')
+    await service.saveTheme(vault, 'Plain', 'body { color: red } /* a comment about settings */')
+
+    const listed = await service.listThemes(vault)
+    expect(listed.map((t) => [t.id, t.hasStyleSettings])).toEqual([['Plain', false], ['WithSettings', true]])
+    expect((await service.loadTheme(vault, 'WithSettings'))?.meta.hasStyleSettings).toBe(true)
+    expect((await service.loadTheme(vault, 'Plain'))?.meta.hasStyleSettings).toBe(false)
+  })
+
+  it('updates hasStyleSettings when the stylesheet changes', async () => {
+    await service.saveTheme(vault, 'Changing', 'a{}')
+    expect((await service.listThemes(vault))[0]?.hasStyleSettings).toBe(false)
+
+    await service.saveTheme(vault, 'Changing', '/* @settings\nname: x\nid: x\n*/ a{}')
+    expect((await service.listThemes(vault))[0]?.hasStyleSettings).toBe(true)
   })
 
   it('lists many themes (read in parallel) in a stable order', async () => {

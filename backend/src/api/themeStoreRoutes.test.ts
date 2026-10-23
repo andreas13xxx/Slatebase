@@ -22,7 +22,7 @@ import { createThemeStoreRoutes, createVaultThemeStoreRoutes } from './themeStor
 
 const logger: ILogger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} }
 
-const meta: ThemeMeta = { id: 'Things', manifest: { name: 'Things' }, size: 12, updatedAt: '2026-10-21T00:00:00.000Z', externalHosts: [] }
+const meta: ThemeMeta = { id: 'Things', manifest: { name: 'Things' }, size: 12, updatedAt: '2026-10-21T00:00:00.000Z', externalHosts: [], hasStyleSettings: false }
 
 function createMockService(overrides: Partial<IThemeStoreService> = {}): IThemeStoreService {
   return {
