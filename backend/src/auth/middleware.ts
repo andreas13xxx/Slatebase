@@ -223,8 +223,12 @@ export function createRateLimitMiddleware(
     // Process the request
     await next()
 
-    // After the request, check if login failed (4xx status) and record the attempt
-    if (c.res.status === 401) {
+    // After the request, check if login failed and record the attempt.
+    // Both 401 (bad credentials) and 403 (suspended account) are counted:
+    // authenticate() runs a full argon2 verify BEFORE the suspended check, so an
+    // uncounted 403 would let an attacker spend unlimited expensive hashes against
+    // a known-suspended username (CPU-exhaustion DoS).
+    if (c.res.status === 401 || c.res.status === 403) {
       rateLimiter.recordFailedAttempt(rateLimitKey)
     } else if (c.res.status >= 200 && c.res.status < 300) {
       // Successful login — reset rate limit for this key
