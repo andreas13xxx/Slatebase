@@ -98,6 +98,13 @@ slatebase.example.com {
 
 For detailed reverse proxy setup (Nginx Proxy Manager, Traefik, etc.), see [CONTRIBUTING.md](CONTRIBUTING.md#reverse-proxy).
 
+### Public links and the reverse proxy
+
+If you enable `public-shares`, the paths `/s/*` (the reading page) and `/api/v1/public/*` must be reachable by people outside
+your network — that is the point. Everything else can stay restricted. The links carry a 192-bit random token that is stored
+only as a hash; reader routes are rate-limited per address, answer 404 for unknown, expired and revoked links alike, and are
+never indexed. Revoke a link in the note's dialog or under *Settings → Public links*.
+
 ### Production Secrets
 
 Slatebase uses three secrets in production. Without them it falls back to a value generated on startup or kept in the data directory — meaning sessions are invalidated and encrypted data becomes unreadable whenever that state is lost. The first is always required; the other two only if you use the feature they protect.
@@ -195,6 +202,7 @@ oversight — but it means:
 | 👁️ **Markdown Viewer** | Rendered view with GFM, syntax highlighting, frontmatter, collapsible headings, and colored `==highlights==` (yellow + 🔴🟠🟢🔵🟣, with `==` autocomplete) |
 | 🗂️ **Tabs & Navigation** | Open multiple files simultaneously with unsaved indicators; split the editor into resizable panes (side-by-side or stacked, drag tabs between them); browser-like back/forward history, fuzzy Quick Switcher (Ctrl+O), Ctrl+Shift+]/[ tab cycling, and a clickable folder breadcrumb |
 | 👥 **Multi-User & Sharing** | Invite others to your vaults with read or write access, transfer ownership |
+| 🔗 **Public Links** | Share a single note read-only with people who have no account: a link with optional password and expiry that always shows the current note, embedded notes and media included. Off by default (`public-shares` toggle); see [Public links and the reverse proxy](#public-links-and-the-reverse-proxy) |
 | 💬 **Real-time Chat** | Messaging between users with unread badges, archiving, and pagination |
 | 🔒 **Authentication** | Session-based auth with argon2id hashing, CSRF protection, rate limiting |
 | 🔄 **Vault Sync** | Via Obsidian LiveSync plugin (running in plugin compat layer with server-side CORS proxy) |
@@ -296,6 +304,23 @@ All routes under `/api/v1`. Authentication required (session cookie or Bearer to
 | PUT | `/vaults/:vaultId/shares/:userId` | Update permission |
 | DELETE | `/vaults/:vaultId/shares/:userId` | Revoke share |
 | POST | `/vaults/:vaultId/transfer` | Transfer ownership |
+
+### Public links
+
+Behind the `public-shares` feature toggle (off by default). The first group needs a session; the reader routes are anonymous.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/vaults/:vaultId/public-shares` | Create a link for `{ path, expiresAt?, password? }` (the token is returned once) |
+| GET | `/vaults/:vaultId/public-shares` | List the vault's links (writers only) |
+| GET | `/vaults/:vaultId/public-shares/preview?path=` | What a link for this note would include |
+| PUT | `/vaults/:vaultId/public-shares/:id` | Change expiry / password (`null` removes) |
+| DELETE | `/vaults/:vaultId/public-shares/:id` | Revoke |
+| GET | `/public-shares` | The caller's own links across vaults |
+| DELETE | `/public-shares/:id` | Revoke one of the caller's own links |
+| GET | `/public/s/:token` | **Anonymous.** The note with its resolved embeds |
+| POST | `/public/s/:token/unlock` | **Anonymous.** Password → link-scoped cookie |
+| GET | `/public/s/:token/asset?ref=` | **Anonymous.** An asset the note embeds |
 
 ### Auth & Users
 

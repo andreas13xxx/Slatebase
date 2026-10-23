@@ -52,6 +52,7 @@ Beyond the core features listed above, you'll find these additional capabilities
 
 - [[Features/Templates and Daily Notes]] — Templates and daily notes
 - [[Features/Trash and Versions]] — Restore deleted files, version history
+- [[Features/Public Links]] — Share a note with people without an account
 - [[Features/Canvas]] — Visual whiteboards with nodes and connections
 - [[Features/Command Palette]] — Quick access to all commands via keyboard
 - [[Features/Bookmarks]] — Reorder and rename favorites, heading/block/search bookmarks

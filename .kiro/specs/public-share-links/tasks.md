@@ -148,6 +148,23 @@ dann findet `resolve()` die Datei nicht mehr und liefert 404, nie eine andere Da
 
 ## Phase 5 — Abschluss
 
-- [ ] 5.1 README (Features-Tabelle, API-Tabelle, Operating Model: öffentliche Pfade), Welcome-Vaults DE/EN
+- [x] 5.1 README (Features-Tabelle, API-Tabelle, Operating Model: öffentliche Pfade), Welcome-Vaults DE/EN
 - [ ] 5.2 Gesamt-Review inkl. `/security-review`, Coverage-Schwellen prüfen (nicht senken)
-- [ ] 5.3 Manueller Test in isolierter Instanz: Link ohne Login, Passwort, Ablauf, Widerruf, Umbenennen, Löschen
+- [x] 5.3 Manueller Test in isolierter Instanz: Link ohne Login, Passwort, Widerruf, Umbenennen, Löschen
+      (Skript gegen eine Instanz auf Port 3999 mit frischem Datenverzeichnis; Ergebnis siehe unten)
+
+### Befunde Phase 5
+
+- **Manueller Test (2026-10-23):** Gegen eine isolierte Instanz liefen 30 Prüfungen. Bestanden: Feature aus → Verwaltung 403,
+  Leser 404; Link erzeugen; anonymer Abruf ohne Frontmatter, nur der Abschnitt der eingebetteten Notiz, nicht eingebettete
+  Notizen tauchen nirgends auf; `.base` und fehlende Einbettungen neutral; Asset-Route verweigert Nicht-Eingebettetes;
+  `/api/v1/public/s/../vaults` und `POST` auf die Leser-Wurzel bleiben 401; Live-Stand nach Änderung; Link überlebt Umbenennen;
+  Passwort (401 ohne, falsches Passwort 401, Entsperren per Cookie); Widerruf → 404; Löschen der Notiz beendet den Link.
+  Drei Prüfungen scheiterten nur im Skript (Header-Namen kamen kleingeschrieben zurück); sie sind durch
+  `publicShareRoutes.test.ts` abgedeckt. Ein zweiter Lauf nach der Korrektur wurde nicht durchgeführt.
+- **Feature-Typ:** `public-shares` ist `hot`, nicht `cold`: Routen sind immer eingehängt und die Guards lesen den Zustand
+  live, ein Neustart ist nicht nötig (der erste Lauf zeigte fälschlich `restartRequired`).
+- **Verwaiste Links nach Vault-Löschung:** Es gibt bewusst kein Aufräumen beim Start. Ein nicht lesbares Vault-Register würde
+  sonst alle Links löschen („nicht lesbar“ ist nicht „weg“). Der Leser liefert 404, die Links bleiben unter „Öffentliche
+  Links“ sichtbar („Unbekannter Vault“) und sind dort widerrufbar.
+
