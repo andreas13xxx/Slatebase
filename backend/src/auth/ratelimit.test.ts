@@ -4,6 +4,7 @@ import {
   MAX_ATTEMPTS,
   WINDOW_MS,
   BLOCK_DURATION_MS,
+  MAX_BLOCK_DURATION_MS,
 } from './ratelimit.js'
 
 describe('RateLimiter', () => {
@@ -139,6 +140,40 @@ describe('RateLimiter', () => {
     })
   })
 
+  describe('exponential backoff', () => {
+    const blockAgain = (key: string): void => {
+      for (let i = 0; i < MAX_ATTEMPTS; i++) limiter.recordFailedAttempt(key)
+    }
+
+    it('doubles the block duration on each repeated block', () => {
+      blockAgain('user1')
+      const first = limiter.checkRateLimit('user1').retryAfter!
+      expect(first).toBeLessThanOrEqual(BLOCK_DURATION_MS / 1000)
+
+      // Wait out the first block, then re-offend.
+      vi.advanceTimersByTime(BLOCK_DURATION_MS + 1)
+      limiter.checkRateLimit('user1')
+      blockAgain('user1')
+      const second = limiter.checkRateLimit('user1').retryAfter!
+      // Second block is ~2x the first (30 min vs 15 min).
+      expect(second).toBeGreaterThan(first)
+      expect(second).toBeLessThanOrEqual((BLOCK_DURATION_MS * 2) / 1000)
+    })
+
+    it('caps the escalated block at MAX_BLOCK_DURATION_MS', () => {
+      // Drive many repeated blocks so 2^n would exceed the cap.
+      for (let round = 0; round < 12; round++) {
+        blockAgain('user1')
+        const wait = limiter.checkRateLimit('user1').retryAfter! * 1000
+        vi.advanceTimersByTime(wait + 1)
+        limiter.checkRateLimit('user1')
+      }
+      blockAgain('user1')
+      const retry = limiter.checkRateLimit('user1').retryAfter!
+      expect(retry).toBeLessThanOrEqual(MAX_BLOCK_DURATION_MS / 1000)
+    })
+  })
+
   describe('reset', () => {
     it('clears rate-limit state for a username', () => {
       for (let i = 0; i < MAX_ATTEMPTS; i++) {
@@ -175,7 +210,7 @@ describe('RateLimiter', () => {
       expect(limiter.size).toBe(0)
     })
 
-    it('removes expired block entries when checked', () => {
+    it('retains the entry after a block expires (for exponential backoff)', () => {
       for (let i = 0; i < MAX_ATTEMPTS; i++) {
         limiter.recordFailedAttempt('user1')
       }
@@ -183,7 +218,25 @@ describe('RateLimiter', () => {
 
       vi.advanceTimersByTime(BLOCK_DURATION_MS + 1)
 
-      limiter.checkRateLimit('user1')
+      // Allowed again, but the entry is deliberately kept so blockCount survives
+      // and the next block escalates instead of resetting to a free batch.
+      expect(limiter.checkRateLimit('user1').allowed).toBe(true)
+      expect(limiter.size).toBe(1)
+    })
+
+    it('finally clears a previously-blocked entry after a long idle period', () => {
+      for (let i = 0; i < MAX_ATTEMPTS; i++) {
+        limiter.recordFailedAttempt('user1')
+      }
+
+      // Block expires, entry retained.
+      vi.advanceTimersByTime(BLOCK_DURATION_MS + 1)
+      expect(limiter.checkRateLimit('user1').allowed).toBe(true)
+      expect(limiter.size).toBe(1)
+
+      // After sitting idle past the max block window, it is cleaned up.
+      vi.advanceTimersByTime(MAX_BLOCK_DURATION_MS + 1)
+      expect(limiter.checkRateLimit('user1').allowed).toBe(true)
       expect(limiter.size).toBe(0)
     })
   })

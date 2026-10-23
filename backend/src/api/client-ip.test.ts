@@ -109,6 +109,28 @@ describe('getClientIp', () => {
 
       expect(ip).toBe('11.0.0.1')
     })
+
+    it('does NOT trust a non-canonical remote that only matches via lenient parsing', () => {
+      // '010.0.0.1' must not be read as 10.0.0.1 and slip into the 10.0.0.0/8
+      // trusted range — a lenient parseInt would have let a spoofed X-Forwarded-For
+      // through. Strict octet validation rejects the leading-zero octet, so the
+      // connection is untrusted and the (non-canonical) socket IP is returned verbatim.
+      mockGetConnInfo.mockReturnValue({ remote: { address: '010.0.0.1' } } as ReturnType<typeof getConnInfo>)
+      const c = createMockContext({ 'X-Forwarded-For': '203.0.113.99' })
+
+      const ip = getClientIp(c, config)
+
+      expect(ip).toBe('010.0.0.1')
+    })
+
+    it('does NOT trust a remote with a trailing-garbage octet', () => {
+      mockGetConnInfo.mockReturnValue({ remote: { address: '10.0.0.1abc' } } as ReturnType<typeof getConnInfo>)
+      const c = createMockContext({ 'X-Forwarded-For': '203.0.113.99' })
+
+      const ip = getClientIp(c, config)
+
+      expect(ip).toBe('10.0.0.1abc')
+    })
   })
 
   describe('IPv6 loopback normalization', () => {

@@ -54,6 +54,28 @@ function literalValue(node: ExprNode): string | number | boolean | null {
   return null
 }
 
+/**
+ * Whether a `prop == literal` equality is SAFE to push to the backend.
+ *
+ * The backend applies property `eq` as a case-insensitive STRING comparison
+ * (`value.toLowerCase() === literal.toLowerCase()`). The client's expression
+ * `==` (`looseEquals`) instead coerces BOTH sides to numbers whenever each
+ * parses as one, so `price == 10` keeps a note whose stored `price` is `"10.0"`
+ * — a match the backend's string compare would miss (`"10.0" !== "10"`), silently
+ * dropping the row before the candidate cap.
+ *
+ * Pushing is therefore sound ONLY for a string literal that is not itself
+ * numeric-coercible (same rule as the evaluator's `toNumber`): then neither side
+ * can take the client's numeric path, and the backend's case-insensitive string
+ * compare reproduces the client semantics exactly. Numbers, booleans and
+ * numeric-looking strings are left to the client filter.
+ */
+function pushableEqLiteral(value: string | number | boolean | null): value is string {
+  if (typeof value !== 'string') return false
+  const n = Number(value)
+  return value.trim() === '' || Number.isNaN(n)
+}
+
 /** A bare/`note.`-prefixed property reference → its plain key, else null. */
 function propertyKey(node: ExprNode): string | null {
   if (node.kind !== 'property') return null
@@ -100,10 +122,10 @@ function extractFromNode(node: ExprNode): PrefilterNode | null {
       if (node.op === '==') {
         const lk = propertyKey(node.left)
         const lv = literalValue(node.right)
-        if (lk !== null && lv !== null) return { property: lk, op: 'eq', value: lv }
+        if (lk !== null && pushableEqLiteral(lv)) return { property: lk, op: 'eq', value: lv }
         const rk = propertyKey(node.right)
         const rv = literalValue(node.left)
-        if (rk !== null && rv !== null) return { property: rk, op: 'eq', value: rv }
+        if (rk !== null && pushableEqLiteral(rv)) return { property: rk, op: 'eq', value: rv }
       }
       return null
     }

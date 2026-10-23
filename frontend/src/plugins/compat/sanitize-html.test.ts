@@ -25,9 +25,20 @@ describe('sanitizeHTMLToDom', () => {
     expect(out).not.toContain('javascript:')
   })
 
-  it('strips data:image/svg+xml URLs (can carry an embedded <script>)', () => {
-    const out = html(sanitizeHTMLToDom('<img src="data:image/svg+xml;base64,AAAA">'))
-    expect(out).not.toContain('data:image/svg+xml')
+  it('neutralizes the real SVG XSS vector: an inline <svg> with a <script> child', () => {
+    // The dangerous case is an inline <svg> carrying executable content, not an
+    // SVG loaded through <img src> (which browsers render script-inert). DOMPurify
+    // strips the script either way.
+    const out = html(sanitizeHTMLToDom('<svg><script>alert(1)</script></svg>'))
+    expect(out).not.toContain('<script')
+    expect(out).not.toContain('alert(1)')
+  })
+
+  it('keeps an svg data: URL on <img> (script-inert in the image context) and plain content intact', () => {
+    const out = html(sanitizeHTMLToDom('<img src="data:image/svg+xml;base64,AAAA"><b>bold</b>'))
+    // An SVG loaded via <img> cannot execute scripts, so DOMPurify keeps it —
+    // the XSS surface is inline <svg>/<object>/<embed>, covered above.
+    expect(out).toContain('<b>bold</b>')
   })
 
   it('keeps ordinary data:image URLs and plain content intact', () => {

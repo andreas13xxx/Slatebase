@@ -76,6 +76,28 @@ describe('buildPrefilterNode — unpushable forms yield null (soundness)', () =>
     expect(buildPrefilterNode('title.length == 3')).toBeNull()
   })
 
+  it('does not push a numeric-literal equality', () => {
+    // The backend compares property eq as a case-insensitive string, but the
+    // client coerces to numbers, so `price == 10` keeps a note with price
+    // "10.0" that the backend's "10.0" !== "10" would drop. Not pushable.
+    expect(buildPrefilterNode('price == 10')).toBeNull()
+    expect(buildPrefilterNode('10 == price')).toBeNull()
+  })
+
+  it('does not push a boolean-literal equality', () => {
+    expect(buildPrefilterNode('done == true')).toBeNull()
+  })
+
+  it('does not push a numeric-looking STRING literal equality', () => {
+    // "10" would also trigger the client's numeric coercion against a "10.0"
+    // value, which the backend string compare cannot reproduce.
+    expect(buildPrefilterNode('price == "10"')).toBeNull()
+  })
+
+  it('still pushes a non-numeric string equality', () => {
+    expect(buildPrefilterNode('status == "done"')).toEqual({ property: 'status', op: 'eq', value: 'done' })
+  })
+
   it('an AND keeps only its pushable child', () => {
     // `status == "done"` is pushable, `price < 10` is not → push only the first.
     expect(buildPrefilterNode({ and: ['status == "done"', 'price < 10'] })).toEqual({

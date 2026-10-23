@@ -18,6 +18,14 @@ export const WINDOW_MS = 15 * 60 * 1000
 /** Duration in milliseconds to block a username after exceeding max attempts (15 minutes). */
 export const BLOCK_DURATION_MS = 15 * 60 * 1000
 
+/**
+ * Upper bound for an escalated block (24 hours). Each repeated block doubles the
+ * previous duration (15m → 30m → 1h → …) up to this cap, so an attacker cannot
+ * simply wait out a fixed 15-minute block and get a fresh batch of free attempts
+ * indefinitely.
+ */
+export const MAX_BLOCK_DURATION_MS = 24 * 60 * 60 * 1000
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /**
@@ -30,6 +38,13 @@ export interface RateLimitEntry {
   firstAttemptAt: number
   /** Unix timestamp (ms) until which the username is blocked, or null if not blocked. */
   blockedUntil: number | null
+  /**
+   * How many times this key has been blocked. Drives exponential backoff: the
+   * next block lasts BLOCK_DURATION_MS * 2^(blockCount-1), capped at
+   * MAX_BLOCK_DURATION_MS. Survives a block's expiry so repeated offenders face
+   * progressively longer blocks instead of resetting to a fresh 5 attempts.
+   */
+  blockCount: number
 }
 
 /**
@@ -68,9 +83,18 @@ export class RateLimiter {
       return { allowed: true }
     }
 
-    // Window expired and not currently blocked → reset
+    // Window expired and not currently blocked → reset only if this key has
+    // never been blocked. A previously-blocked key keeps its entry (and its
+    // blockCount) so the next offence escalates; it is finally cleared once it
+    // has sat idle for longer than the maximum block (nothing new recorded).
     if (now - entry.firstAttemptAt > WINDOW_MS && entry.blockedUntil === null) {
-      this.store.delete(key)
+      if (entry.blockCount === 0 || now - entry.firstAttemptAt > MAX_BLOCK_DURATION_MS) {
+        this.store.delete(key)
+        return { allowed: true }
+      }
+      // Keep the entry (retain blockCount) but allow a fresh window of attempts.
+      entry.attempts = 0
+      entry.firstAttemptAt = now
       return { allowed: true }
     }
 
@@ -82,9 +106,13 @@ export class RateLimiter {
       }
     }
 
-    // Block has expired → reset
+    // Block has expired → clear the block but KEEP the entry so blockCount
+    // survives; a renewed burst then escalates the next block instead of
+    // getting a fresh unpenalised batch of attempts.
     if (entry.blockedUntil !== null && now >= entry.blockedUntil) {
-      this.store.delete(key)
+      entry.blockedUntil = null
+      entry.attempts = 0
+      entry.firstAttemptAt = now
       return { allowed: true }
     }
 
@@ -106,6 +134,7 @@ export class RateLimiter {
         attempts: 1,
         firstAttemptAt: now,
         blockedUntil: null,
+        blockCount: 0,
       })
       return
     }
@@ -113,7 +142,12 @@ export class RateLimiter {
     entry.attempts++
 
     if (entry.attempts >= MAX_ATTEMPTS) {
-      entry.blockedUntil = now + BLOCK_DURATION_MS
+      // Exponential backoff: each successive block doubles the previous one,
+      // capped at MAX_BLOCK_DURATION_MS. blockCount persists across block
+      // expiries (see checkRateLimit), so a repeat offender is blocked longer.
+      const duration = Math.min(BLOCK_DURATION_MS * 2 ** entry.blockCount, MAX_BLOCK_DURATION_MS)
+      entry.blockedUntil = now + duration
+      entry.blockCount++
     }
   }
 

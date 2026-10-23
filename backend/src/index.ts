@@ -391,6 +391,7 @@ if (featureToggleService.isEnabled('mcp')) {
     rateLimiter: mcpRateLimiter,
     serverFactory: mcpServerFactory,
     logger,
+    allowedOrigins: serverConfig.allowedOrigins,
     onAuthenticated: (userId: string) => { currentUserId = userId },
   })
   mcpTokenRoutes = createMcpTokenRoutes({ tokenService: mcpTokenService, logger, tokenCreationRateLimiter: mcpTokenCreationRateLimiter })
