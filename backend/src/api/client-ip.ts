@@ -51,15 +51,25 @@ function parseCidr(cidr: string): { base: number; mask: number } | null {
 /**
  * Converts an IPv4 address string to a 32-bit unsigned integer.
  * Returns null for invalid addresses.
+ *
+ * Octets are validated strictly: each must be 1–3 decimal digits with no
+ * leading zero (except the literal "0"), in 0–255. `parseInt` alone is too
+ * lenient here — it accepts `"010"` (→10) and `"25abc"` (→25), and a
+ * non-canonical octet that still parses could flip trusted-proxy matching,
+ * letting a client spoof X-Forwarded-For / X-Forwarded-Proto (rate-limit key
+ * spoofing and a wrong Secure-cookie decision).
  */
+const OCTET_RE = /^(0|[1-9][0-9]{0,2})$/
+
 function ipv4ToNumber(ip: string): number | null {
   const octets = ip.split('.')
   if (octets.length !== 4) return null
 
   let result = 0
   for (const octet of octets) {
+    if (!OCTET_RE.test(octet)) return null
     const num = parseInt(octet, 10)
-    if (isNaN(num) || num < 0 || num > 255) return null
+    if (num > 255) return null
     result = (result << 8) | num
   }
   return result >>> 0
