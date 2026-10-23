@@ -745,7 +745,12 @@ export class LinkIndexService implements ILinkIndex {
   private async evaluateBaseCondition(cond: BaseQueryCondition, filePath: string): Promise<boolean> {
     if (cond.tag !== undefined) {
       const tags = this.fileTags.get(filePath)
-      const has = tags ? tags.has(cond.tag) : false
+      // Case-insensitive, matching the client's `file.hasTag` (which lowercases
+      // both sides). A case-sensitive `tags.has(cond.tag)` here would silently
+      // under-exclude rows whose tag differs only in case from the pushed
+      // prefilter value — a match the client would have kept.
+      const needle = cond.tag.toLowerCase()
+      const has = tags ? [...tags].some((t) => t.toLowerCase() === needle) : false
       // Default operator for a tag is presence; `op: 'empty'` means "not present".
       return cond.op === 'empty' ? !has : has
     }
