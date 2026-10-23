@@ -10,6 +10,15 @@
 import { ImapFlow, type ListTreeResponse } from 'imapflow'
 import { ImapConnectionError } from './errors.js'
 
+/**
+ * Hard cap on a single fetched message's RFC822 source (25 MB). The whole
+ * source is buffered in memory, and the engine isolates per-message failures,
+ * so without this one oversized mail would OOM the single-instance process
+ * before the catch could skip it. An over-cap message is left unseen (never
+ * silently dropped) and re-checked — cheaply, size only — on the next run.
+ */
+export const MAX_MESSAGE_SIZE_BYTES = 25 * 1024 * 1024
+
 /** Credentials for one IMAP account, without a specific mailbox selected. */
 export interface ImapAccountConfig {
   host: string
@@ -121,12 +130,22 @@ class ImapConnection implements IImapConnection {
 
   async fetchMessage(uid: number): Promise<Buffer> {
     try {
+      // Check the size BEFORE pulling the body, so an oversized message never
+      // gets buffered into memory at all. `size` is cheap metadata the server
+      // returns without transferring the body.
+      const meta = await this.client.fetchOne(uid, { size: true }, { uid: true })
+      if (meta && typeof meta.size === 'number' && meta.size > MAX_MESSAGE_SIZE_BYTES) {
+        throw new ImapConnectionError(
+          `Message ${uid} is ${meta.size} bytes, over the ${MAX_MESSAGE_SIZE_BYTES}-byte limit — skipped (left unseen)`,
+        )
+      }
       const message = await this.client.fetchOne(uid, { source: true }, { uid: true })
       if (!message || !message.source) {
         throw new Error(`Message ${uid} has no source`)
       }
       return message.source
     } catch (error) {
+      if (error instanceof ImapConnectionError) throw error
       throw new ImapConnectionError(`Failed to fetch message ${uid}: ${describeImapError(error)}`)
     }
   }

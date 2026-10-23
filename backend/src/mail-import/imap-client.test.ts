@@ -115,14 +115,32 @@ describe('ImapClient', () => {
   })
 
   it('fetches a single message by UID', async () => {
-    fetchOneMock.mockResolvedValue({ source: Buffer.from('hello') })
+    // First call is the cheap size probe, second pulls the source.
+    fetchOneMock
+      .mockResolvedValueOnce({ size: 1234 })
+      .mockResolvedValueOnce({ source: Buffer.from('hello') })
 
     const client = new ImapClient()
     const connection = await client.connect(CONFIG)
     const source = await connection.fetchMessage(42)
 
+    expect(fetchOneMock).toHaveBeenCalledWith(42, { size: true }, { uid: true })
     expect(fetchOneMock).toHaveBeenCalledWith(42, { source: true }, { uid: true })
     expect(source.toString()).toBe('hello')
+  })
+
+  it('skips an oversized message without ever buffering its source', async () => {
+    // Only the size probe resolves; the source fetch must never be reached.
+    fetchOneMock.mockReset().mockResolvedValue({ size: 30 * 1024 * 1024 })
+
+    const client = new ImapClient()
+    const connection = await client.connect(CONFIG)
+    await expect(connection.fetchMessage(42)).rejects.toThrow(ImapConnectionError)
+    await expect(connection.fetchMessage(42)).rejects.toThrow(/over the .* limit/)
+    // Every fetchOne call was the size probe — the source was never requested.
+    for (const call of fetchOneMock.mock.calls) {
+      expect(call[1]).toEqual({ size: true })
+    }
   })
 
   it('marks a message as read via the \\Seen flag', async () => {
