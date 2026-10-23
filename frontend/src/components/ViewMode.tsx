@@ -28,6 +28,8 @@ import { PdfViewer } from './BinaryViewer'
 import { MermaidRenderer } from './MermaidRenderer'
 import { MathRenderer } from './MathRenderer'
 import { BasesEmbed } from './bases/BasesEmbed'
+import { usePublicEmbeds } from '../public-share/PublicEmbedContext'
+import { embedRef, parsePublicVaultId, publicAssetUrl } from '../public-share/publicVault'
 import { findEmbedCreatorForTarget, getLinktextExtension, mountRegisteredEmbed, type EmbedCreator, type EmbedContext } from '../plugins/compat/embed-registry'
 import { ContextMenu, type ContextMenuItem } from './ContextMenu'
 import { buildTFileFromPath } from '../plugins/compat/plugin-event-bridge'
@@ -378,7 +380,15 @@ function NoteEmbed({ vaultId, filePath, target, heading, blockRef, directoryTree
   const appContext = useContext(AppContext)
   const apiClient = appContext?.apiClient ?? null
 
+  // On a public share the server already resolved this embed (including the heading/block excerpt),
+  // so nothing is fetched and nothing is excerpted again.
+  const publicEmbeds = usePublicEmbeds()
+  const isPublic = parsePublicVaultId(vaultId) !== null
+  const ref = embedRef(target, heading, blockRef)
+  const publicEmbed = isPublic && publicEmbeds !== null && Object.hasOwn(publicEmbeds, ref) ? publicEmbeds[ref] : undefined
+
   useEffect(() => {
+    if (isPublic) return
     if (!apiClient) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setError('Kein API-Client verfügbar')
@@ -414,13 +424,16 @@ function NoteEmbed({ vaultId, filePath, target, heading, blockRef, directoryTree
       })
 
     return () => { cancelled = true }
-  }, [apiClient, vaultId, filePath, heading, blockRef, target])
+  }, [apiClient, isPublic, vaultId, filePath, heading, blockRef, target])
 
-  if (error) {
-    return createElement('span', { className: 'view-mode-embed view-mode-embed--missing' }, error)
+  const shownError = isPublic ? (publicEmbed?.kind === 'note' ? null : PUBLIC_EMBED_UNAVAILABLE) : error
+  const shownContent = isPublic ? (publicEmbed?.kind === 'note' ? publicEmbed.markdown : null) : noteContent
+
+  if (shownError) {
+    return createElement('span', { className: 'view-mode-embed view-mode-embed--missing' }, shownError)
   }
 
-  if (noteContent === null) {
+  if (shownContent === null) {
     return createElement('span', { className: 'view-mode-embed view-mode-embed--note' },
       createElement('span', { className: 'view-mode-embed-loading' }, 'Laden…')
     )
@@ -432,7 +445,7 @@ function NoteEmbed({ vaultId, filePath, target, heading, blockRef, directoryTree
       createElement('span', { className: 'view-mode-embed-title' }, target)
     ),
     createElement(ViewMode, {
-      content: noteContent,
+      content: shownContent,
       vaultId,
       directoryTree,
       token,
@@ -1413,7 +1426,21 @@ function pathExistsInTree(tree: DirectoryTree | null, filePath: string): boolean
  * needs to (or safely can) travel in the URL itself.
  */
 function buildImageSrc(vaultId: string, resolvedPath: string): string {
+  // A public share addresses assets by the embed reference, which is the path in its synthetic tree.
+  const shareToken = parsePublicVaultId(vaultId)
+  if (shareToken !== null) return publicAssetUrl(shareToken, resolvedPath)
   return `/api/v1/vaults/${vaultId}/files?path=${encodeURIComponent(resolvedPath)}&raw=true`
+}
+
+/** Generic notice for an embed a public share cannot show; reveals neither a path nor a reason. */
+const PUBLIC_EMBED_UNAVAILABLE = 'Eingebetteter Inhalt nicht verfügbar'
+
+/**
+ * Text for an embed that could not be resolved. In the app it names the missing target; on a public
+ * share it stays generic, so the page says nothing about what the vault does or does not contain.
+ */
+function missingEmbedLabel(vaultId: string, label: string): string {
+  return parsePublicVaultId(vaultId) === null ? label : PUBLIC_EMBED_UNAVAILABLE
 }
 
 /**
@@ -1437,7 +1464,7 @@ function renderImage(
   if (!exists) {
     // Req 7.6: Show placeholder notice for images not found
     return createElement('span', { key, className: 'view-mode-image-not-found' },
-      `Bild nicht gefunden: ${alt ?? url}`
+      missingEmbedLabel(vaultId, `Bild nicht gefunden: ${alt ?? url}`)
     )
   }
 
@@ -1518,7 +1545,7 @@ function renderTextWithEmbeds(
           parts.push(createElement('span', {
             key: `${key}-embed-${matchStart}`,
             className: 'view-mode-image-not-found',
-          }, `Bild nicht gefunden: ${filename}`))
+          }, missingEmbedLabel(vaultId, `Bild nicht gefunden: ${filename}`)))
         }
       } else if (isPdfFile(filename)) {
         const resolvedPath = findFileInTree(directoryTree, filename)
@@ -1533,7 +1560,7 @@ function renderTextWithEmbeds(
           parts.push(createElement('span', {
             key: `${key}-embed-${matchStart}`,
             className: 'view-mode-embed view-mode-embed--missing',
-          }, `PDF nicht gefunden: ${filename}`))
+          }, missingEmbedLabel(vaultId, `PDF nicht gefunden: ${filename}`)))
         }
       } else {
         // Not an image or PDF embed — leave as-is
@@ -1590,7 +1617,7 @@ function renderTextWithEmbeds(
  */
 function renderWikilinkNode(
   node: WikilinkNode,
-  _vaultId: string,
+  vaultId: string,
   directoryTree: DirectoryTree | null,
   onInternalLinkClick: ((targetPath: string) => void) | undefined,
   key: string
@@ -1624,6 +1651,12 @@ function renderWikilinkNode(
         scrollToBlockAnchor(blockRef)
       },
     }, displayText)
+  }
+
+  // On a public share a link to another note is plain text: it must not link anywhere nor
+  // reveal whether the note exists. (Same-page heading/block links above still work.)
+  if (parsePublicVaultId(vaultId) !== null) {
+    return createElement('span', { key, className: 'view-mode-link--plain' }, displayText)
   }
 
   // Resolve the wikilink target against the directory tree
@@ -1879,7 +1912,7 @@ function renderEmbedNode(
     return createElement('span', {
       key,
       className: 'view-mode-embed view-mode-embed--missing',
-    }, `Bild nicht gefunden: ${node.target}`)
+    }, missingEmbedLabel(vaultId, `Bild nicht gefunden: ${node.target}`))
   }
 
   if (node.embedType === 'pdf') {
@@ -1896,7 +1929,7 @@ function renderEmbedNode(
     return createElement('span', {
       key,
       className: 'view-mode-embed view-mode-embed--missing',
-    }, `PDF nicht gefunden: ${node.target}`)
+    }, missingEmbedLabel(vaultId, `PDF nicht gefunden: ${node.target}`))
   }
 
   if (node.embedType === 'audio') {
@@ -1914,7 +1947,7 @@ function renderEmbedNode(
     return createElement('span', {
       key,
       className: 'view-mode-embed view-mode-embed--missing',
-    }, `Audio nicht gefunden: ${node.target}`)
+    }, missingEmbedLabel(vaultId, `Audio nicht gefunden: ${node.target}`))
   }
 
   if (node.embedType === 'video') {
@@ -1934,11 +1967,12 @@ function renderEmbedNode(
     return createElement('span', {
       key,
       className: 'view-mode-embed view-mode-embed--missing',
-    }, `Video nicht gefunden: ${node.target}`)
+    }, missingEmbedLabel(vaultId, `Video nicht gefunden: ${node.target}`))
   }
 
   if (node.embedType === 'base') {
-    const resolvedBasePath = resolveWikilinkTarget(node.target, directoryTree)
+    // The server never resolves .base on a public share; its tree has no such file, but be explicit.
+    const resolvedBasePath = parsePublicVaultId(vaultId) === null ? resolveWikilinkTarget(node.target, directoryTree) : null
     if (resolvedBasePath) {
       return createElement(BasesEmbed, {
         key,
@@ -1951,7 +1985,7 @@ function renderEmbedNode(
     return createElement('span', {
       key,
       className: 'view-mode-embed view-mode-embed--missing',
-    }, `Base nicht gefunden: ${node.target}`)
+    }, missingEmbedLabel(vaultId, `Base nicht gefunden: ${node.target}`))
   }
 
   // Note embed — render as styled placeholder container
@@ -1964,7 +1998,7 @@ function renderEmbedNode(
     return createElement('span', {
       key,
       className: 'view-mode-embed view-mode-embed--missing',
-    }, `Notiz nicht gefunden: ${node.target}`)
+    }, missingEmbedLabel(vaultId, `Notiz nicht gefunden: ${node.target}`))
   }
 
   // Before falling into the generic note pipeline: check app.embedRegistry
@@ -1973,7 +2007,9 @@ function renderEmbedNode(
   // the link text (e.g. "excalidraw" from "Drawing.excalidraw") or the
   // resolved file's real one (e.g. "md"). A match delegates to that
   // plugin's own embed component instead of rendering the raw note.
-  const embedCreator = findEmbedCreatorForTarget(node.target, getLinktextExtension(resolvedNotePath))
+  const embedCreator = parsePublicVaultId(vaultId) === null
+    ? findEmbedCreatorForTarget(node.target, getLinktextExtension(resolvedNotePath))
+    : null
   if (embedCreator) {
     return createElement(RegisteredEmbed, {
       key,
@@ -2081,6 +2117,11 @@ function renderLink(
       rel: 'noopener noreferrer',
       className: 'view-mode-link view-mode-link--external',
     }, ...children)
+  }
+
+  // On a public share, only in-page anchors and external links are links (see renderWikilinkNode).
+  if (parsePublicVaultId(vaultId) !== null && !url.startsWith('#')) {
+    return createElement('span', { key, className: 'view-mode-link--plain' }, ...children)
   }
 
   // Internal link — check if target exists in tree

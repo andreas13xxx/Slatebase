@@ -70,6 +70,11 @@ describe('extractEmbeds', () => {
     expect(embeds.map((e) => e.ref)).toEqual(['img/my pic.png'])
   })
 
+  it('normalizes markdown image paths like the reading view does', () => {
+    const embeds = extractEmbeds('![](./a/b.png) ![](a\\c.png) ![](a//d.png)')
+    expect(embeds.map((e) => e.ref)).toEqual(['a/b.png', 'a/c.png', 'a/d.png'])
+  })
+
   it('does not treat wikilinks as embeds', () => {
     expect(extractEmbeds('[[Note]] and [text](Note.md)')).toEqual([])
   })

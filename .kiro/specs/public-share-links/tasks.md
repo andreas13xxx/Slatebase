@@ -58,6 +58,24 @@ dann findet `resolve()` die Datei nicht mehr und liefert 404, nie eine andere Da
       (`onFileRenamed`/`onFileDeleted` im Service; das Anhängen an `ILinkIndexHook` folgt bei der Verdrahtung in Phase 2.4)
 - [x] 1.5 Tests (hand-geschriebene Mocks): Token-Entropie, Ablauf, Widerruf, Traversal, Dot-Dateien, Papierkorb
 
+### Befunde Phase 3
+
+- **Umsetzung ohne Umbau von `ViewMode`:** Statt die Embed-Quelle durch alle Render-Funktionen zu reichen, bekommt die
+  Reading View eine **synthetische Vault-ID** `public-share:<token>` (`public-share/publicVault.ts`). Nur wenige Stellen
+  erkennen sie: `buildImageSrc` (Asset-URL statt Vault-URL), `renderWikilinkNode` und `renderLink` (Text statt Link),
+  `NoteEmbed` (liest aus `PublicEmbedContext` statt aus dem API-Client, ohne erneuten Auszug) und
+  `missingEmbedLabel` (neutraler Hinweis „Eingebetteter Inhalt nicht verfügbar“). Plugin-Embeds und Bases sind im
+  öffentlichen Modus abgeschaltet. Der Standardpfad bleibt unverändert (64 bestehende `ViewMode`-Tests grün).
+- **Synthetischer Dateibaum** (`buildPublicTree`): enthält nur vom Server aufgelöste Einbettungen; Pfad = Ziel wie
+  geschrieben (Notizen mit `.md`), das ist zugleich die `ref` der Asset-URL. Nicht aufgelöste Einbettungen fehlen im Baum
+  und erscheinen als neutraler Hinweis.
+- **Markdown-Bilder:** Der Server normalisiert den Schlüssel wie `normalizeImagePath` (dekodiert, `\` → `/`, `./` weg,
+  doppelte `/` zusammengefasst), damit Client und Server denselben Schlüssel bilden.
+- **Standalone:** `main.tsx` rendert für `/s/<token>` nur `PublicSharePage` (dynamisch geladen), ohne `App`, Sitzungsprüfung
+  und Provider. Ein fehlgeschlagener Abruf gilt als „unbekannt“ (Wiederholen-Knopf), nur ein 404 als „Link nicht verfügbar“.
+- **Nicht umgesetzt:** Der in 3.1a genannte Vergleichstest „wie in der Reading View“ ist als Verhaltenstest umgesetzt
+  (Notiz-, Bild-, Wikilink-Verhalten in `PublicSharePage.test.tsx`), nicht als Pixelvergleich.
+
 ### Befunde Phase 2
 
 - **Header:** `secureHeaders` ist global vor den Routen registriert und setzt seine Header nach dem Handler; eine eigene CSP
@@ -99,12 +117,12 @@ dann findet `resolve()` die Datei nicht mehr und liefert 404, nie eine andere Da
 
 ## Phase 3 — Öffentliche Seite
 
-- [ ] 3.1 `publicMode` in der Reading-View-Pipeline: Embed-Resolver aus der `embeds`-Map, Wikilinks/Markdown-Links
+- [x] 3.1 `publicMode` in der Reading-View-Pipeline: Embed-Resolver aus der `embeds`-Map, Wikilinks/Markdown-Links
       zu Text, Plugin-Blöcke neutralisiert, Hinweisbox für `unavailable`
-- [ ] 3.1a Vergleichstest: dieselbe Notiz mit Notiz-, Abschnitts-, Bild-Einbettung rendert im `publicMode` wie in der
+- [x] 3.1a Vergleichstest: dieselbe Notiz mit Notiz-, Abschnitts-, Bild-Einbettung rendert im `publicMode` wie in der
       Reading View
-- [ ] 3.2 `PublicSharePage` unter `/s/:token`, Passwortabfrage, Fehlerseite, Hell/Dunkel
-- [ ] 3.3 Tests + `*.a11y.test.tsx`
+- [x] 3.2 `PublicSharePage` unter `/s/:token`, Passwortabfrage, Fehlerseite, Hell/Dunkel
+- [x] 3.3 Tests + `*.a11y.test.tsx`
 
 ## Phase 4 — Verwaltung
 

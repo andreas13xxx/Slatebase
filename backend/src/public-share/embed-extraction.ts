@@ -179,7 +179,11 @@ export function extractEmbeds(markdown: string): ParsedEmbed[] {
     } catch {
       // keep the raw text; resolution will simply not find it
     }
-    target = target.trim()
+    // Same normalization as the reading view's `normalizeImagePath`, so the key the client
+    // derives from the Markdown matches the key the server stored.
+    target = target.replace(/\\/g, '/')
+    if (target.startsWith('./')) target = target.slice(2)
+    target = target.replace(/\/+/g, '/').trim()
     if (target === '') continue
     if (!found.has(target)) found.set(target, { ref: target, target, heading: null, blockRef: null })
   }
