@@ -27,6 +27,7 @@
  * @module obsidian-api-extensions
  */
 
+import DOMPurify from 'dompurify';
 import { parse as parseYamlDoc, stringify as stringifyYamlDoc } from 'yaml';
 import { errorOnce, warnNoOp } from './log';
 import type { BlockCache, CachedMetadata, HeadingCache, Pos } from './types';
@@ -648,36 +649,16 @@ export function htmlToMarkdown(html: string | HTMLElement | Document | DocumentF
 }
 
 /**
- * Sanitize an HTML string to a DocumentFragment (strips scripts).
+ * Sanitize an HTML string to a DocumentFragment.
+ *
+ * Uses DOMPurify (an allow-list sanitizer) rather than a hand-rolled deny list:
+ * the previous implementation only stripped <script>, on* handlers and a few URL
+ * schemes, so `<iframe srcdoc>`, `<object>`/`<embed>`, SVG/MathML script and
+ * `style`-based CSS all slipped through into the host realm. This matches real
+ * Obsidian, which also sanitizes with DOMPurify.
  */
-/** javascript:/vbscript: URLs execute code outright; no legitimate href/src ever needs them. */
-const DANGEROUS_URL_SCHEME = /^\s*(javascript|vbscript):/i;
-/** data: URLs whose payload itself is executable content (script, or SVG — which can carry an embedded <script>). */
-const DANGEROUS_DATA_URL = /^\s*data:(text\/html|application\/(x-)?javascript|image\/svg\+xml)/i;
-/** Attributes whose value is a URL a browser can navigate to or fetch. */
-const URL_ATTRIBUTES = new Set(['href', 'src', 'action', 'formaction', 'xlink:href']);
-
 export function sanitizeHTMLToDom(html: string): DocumentFragment {
-  const template = document.createElement('template');
-  template.innerHTML = html;
-  // Remove script tags
-  for (const script of template.content.querySelectorAll('script')) {
-    script.remove();
-  }
-  // Strip inline event handlers (onclick=, onerror=, ...) and javascript:/dangerous-data: URLs —
-  // real Obsidian's sanitizer (DOMPurify) blocks both; without this a plugin rendering
-  // untrusted HTML (e.g. fetched web content) via this function could execute arbitrary JS.
-  for (const el of template.content.querySelectorAll('*')) {
-    for (const attr of [...el.attributes]) {
-      const name = attr.name.toLowerCase();
-      if (name.startsWith('on')) {
-        el.removeAttribute(attr.name);
-      } else if (URL_ATTRIBUTES.has(name) && (DANGEROUS_URL_SCHEME.test(attr.value) || DANGEROUS_DATA_URL.test(attr.value))) {
-        el.removeAttribute(attr.name);
-      }
-    }
-  }
-  return template.content;
+  return DOMPurify.sanitize(html, { RETURN_DOM_FRAGMENT: true });
 }
 
 /**
