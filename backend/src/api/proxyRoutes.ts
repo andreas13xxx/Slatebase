@@ -220,6 +220,24 @@ function createPinnedLookup(pinned: SafeAddress): LookupFunction {
   }
 }
 
+/**
+ * True when forwarding `outgoingHeaders` to `urlStr` would send credentials in
+ * cleartext — an Authorization header over a plain-http URL. The Slatebase
+ * Bearer token is already stripped upstream, so this catches a plugin's own
+ * Basic (CouchDB/LiveSync) credentials, which must never travel unencrypted.
+ * Plain http without credentials stays allowed (e.g. a LAN CouchDB with no
+ * auth header), so this does not break the documented http use case.
+ */
+function wouldLeakCredentialsOverHttp(urlStr: string, outgoingHeaders: Record<string, string>): boolean {
+  const hasAuth = Object.keys(outgoingHeaders).some((k) => k.toLowerCase() === 'authorization')
+  if (!hasAuth) return false
+  try {
+    return new URL(urlStr).protocol === 'http:'
+  } catch {
+    return true // unparseable → fail closed
+  }
+}
+
 /** Creates a per-hop undici Agent whose connections are pinned to a single validated IP. */
 function createPinnedDispatcher(pinned: SafeAddress): Agent {
   return new Agent({ connect: { lookup: createPinnedLookup(pinned) } })
@@ -348,6 +366,14 @@ export function createProxyRoutes(deps: ProxyRoutesDeps): Hono {
       outgoingHeaders['Content-Type'] = effectiveContentType
     }
 
+    // Security: never forward credentials over cleartext http (a plugin's Basic
+    // auth for CouchDB/LiveSync). Plain http without an Authorization header is
+    // still allowed, so the documented http CouchDB case is unaffected.
+    if (wouldLeakCredentialsOverHttp(url, outgoingHeaders)) {
+      logger.warn('Proxy request blocked: credentials over cleartext http', { userId: session.userId, url })
+      return c.json(createApiError('PROXY_BLOCKED', 'Refusing to forward credentials over an unencrypted http:// URL'), 403)
+    }
+
     // Execute the proxied request with timeout
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS)
@@ -391,6 +417,9 @@ export function createProxyRoutes(deps: ProxyRoutesDeps): Hono {
         }
         if (!isUrlAllowed(nextUrl, allowedOrigins)) {
           throw new ProxyBlockedError('PROXY_BLOCKED', 'Redirect target is not in the allowed origins list')
+        }
+        if (wouldLeakCredentialsOverHttp(nextUrl, outgoingHeaders)) {
+          throw new ProxyBlockedError('PROXY_BLOCKED', 'Redirect target would send credentials over an unencrypted http:// URL')
         }
         currentUrl = nextUrl
         currentAddress = nextAddress
