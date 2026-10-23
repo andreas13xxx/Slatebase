@@ -29,7 +29,11 @@ Eine Notiz bekommt einen Link, den jeder ohne Konto im Browser öffnen kann.
 
 1.1 Ein Nutzer mit Schreibrecht auf den Vault kann für eine Notiz einen Link erzeugen, auflisten und widerrufen.
 1.2 Der Token hat mindestens 128 Bit Zufall und ist nicht aus Vault, Pfad oder Zeit ableitbar.
-1.3 Pro Notiz gibt es höchstens einen aktiven Link; erneutes Erzeugen liefert den bestehenden.
+1.3 Pro Notiz gibt es höchstens einen aktiven Link. Da der Token nur als Hash gespeichert wird, ist er nach dem Erzeugen
+    nicht erneut anzeigbar; ein zweites Erzeugen schlägt mit einem Konflikt fehl, der Link muss erst widerrufen werden
+    („Link neu erzeugen“ im Dialog = widerrufen + erzeugen). Abgelaufene Links blockieren einen neuen nicht.
+1.3a Wird eine Notiz oder ihr Ordner gelöscht (auch in den Papierkorb), wird der Link endgültig entfernt und lebt bei
+    einer Wiederherstellung nicht wieder auf.
 1.4 Optional: Ablaufdatum und Passwort. Beides lässt sich nachträglich ändern oder entfernen.
 1.5 Widerruf wirkt sofort; der Link liefert danach 404.
 1.6 „Meine Links“ in den Einstellungen listet alle eigenen Links mit Notiz, Erstellung, Ablauf, letztem Zugriff.
@@ -59,7 +63,7 @@ Eine Notiz bekommt einen Link, den jeder ohne Konto im Browser öffnen kann.
 
 3.1 Alle Dateizugriffe laufen über `validateFilePath()`; Dot-Dateien (`.slatebase/`, `.obsidian/`) sind nie ausliefierbar.
 3.2 Rate-Limit pro IP für die öffentlichen Routen, strenger für falsche Passwörter.
-3.3 Passwörter werden nur als Hash gespeichert (scrypt, wie bei Nutzerpasswörtern).
+3.3 Passwörter werden nur als Hash gespeichert (scrypt aus Node; Nutzerpasswörter nutzen argon2, hier genügt die eingebaute Funktion).
 3.4 Antworten tragen `Cache-Control: no-store`, `X-Robots-Tag: noindex` und eine restriktive CSP.
 3.5 Rohes HTML wird über dieselbe Allowlist bereinigt wie in Live Preview und Reading View (`plugins/inline-html.ts`).
 3.6 Frontmatter-Properties werden nicht ausgeliefert, auch nicht die eingebetteter Notizen, außer dem Titel der

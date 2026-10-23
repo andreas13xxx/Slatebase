@@ -47,14 +47,30 @@ dann findet `resolve()` die Datei nicht mehr und liefert 404, nie eine andere Da
 
 ## Phase 1 — Backend-Kern
 
-- [ ] 1.1 Typen, Fehler, `IPublicShareStore` + Store über `json-file-store.ts` (Token nur als Hash)
-- [ ] 1.2 `IPublicShareService`: create/list/revoke/update, Passwort (scrypt), Ablauf
-- [ ] 1.3 `embed-resolver.ts`: rekursive Auflösung (Notiz, Abschnitt, Block, Asset), Tiefe 3, Zyklen, Größenlimit,
+- [x] 1.1 Typen, Fehler, `IPublicShareStore` + Store über `json-file-store.ts` (Token nur als Hash)
+- [x] 1.2 `IPublicShareService`: create/list/revoke/update, Passwort (scrypt), Ablauf
+- [x] 1.3 `embed-resolver.ts`: rekursive Auflösung (Notiz, Abschnitt, Block, Asset), Tiefe 3, Zyklen, Größenlimit,
       `.base`/`.canvas`/Abfrageblöcke und Dot-Dateien → `unavailable`; `readAsset` mit transitiver Allowlist
-- [ ] 1.3a Tests: Ring A→B→A, Tiefe 4, Fan-out über dem Limit, Abschnitts-/Blockauszug, Frontmatter entfernt,
+      (umgesetzt als `getAsset` im Service, das die Einbettungen pro Abruf neu auflöst)
+- [x] 1.3a Tests: Ring A→B→A, Tiefe 4, Fan-out über dem Limit, Abschnitts-/Blockauszug, Frontmatter entfernt,
       gelöschte Einbettung, `.base`, `.slatebase/…`, Asset außerhalb der Allowlist
-- [ ] 1.4 Pfad-Umschreiben bei Umbenennen/Verschieben, 404 bei Löschen/Papierkorb
-- [ ] 1.5 Tests (hand-geschriebene Mocks): Token-Entropie, Ablauf, Widerruf, Traversal, Dot-Dateien, Papierkorb
+- [x] 1.4 Pfad-Umschreiben bei Umbenennen/Verschieben, 404 bei Löschen/Papierkorb
+      (`onFileRenamed`/`onFileDeleted` im Service; das Anhängen an `ILinkIndexHook` folgt bei der Verdrahtung in Phase 2.4)
+- [x] 1.5 Tests (hand-geschriebene Mocks): Token-Entropie, Ablauf, Widerruf, Traversal, Dot-Dateien, Papierkorb
+
+### Befunde Phase 1 (für Phase 2/3)
+
+- **Vault-Zugriff ist abstrahiert** (`IPublicShareVaultAccess`: `getTree`, `readText`, `readBinary`). Die Implementierung auf
+  `VaultReader` + `validateFilePath()` + `assertRealPathInsideVault` entsteht bei der Verdrahtung (2.4) und braucht eigene
+  Tests (Symlink aus dem Vault heraus, Pfad mit `..`, Binärdatei als Text).
+- **SVG als Asset:** SVG kann Skripte enthalten. Die Asset-Route (2.3) muss `Content-Security-Policy: sandbox` bzw.
+  `default-src 'none'` und `X-Content-Type-Options: nosniff` setzen und SVG nur als `<img>`, nie inline ausliefern.
+- **Auflösung relativ zum Vault, nicht zur Notiz:** Wie die Reading View löst der Resolver Einbettungsnamen ohne Quellordner
+  auf; die Map ist nach dem Verweis wie geschrieben geschlüsselt. Der Client muss denselben Schlüssel bilden
+  (`embedRef`: `ziel`, `ziel#Überschrift`, `ziel#^block`).
+- **Passwort-Hash ist scrypt** (Salt + 64 Byte, Node-Standardparameter), nicht argon2 wie bei Nutzerpasswörtern, um keine
+  zweite Abhängigkeit im öffentlichen Pfad zu brauchen; passt zu Anforderung 3.3.
+- **Zugriffszeit** (`lastAccessAt`) wird höchstens einmal pro Minute geschrieben und scheitert still.
 
 ## Phase 2 — Routen und Sicherheit
 
