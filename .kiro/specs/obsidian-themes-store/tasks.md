@@ -90,8 +90,9 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, Lint, betroff
 - [x] 4.3 Doku: Welcome-Vault `Themes.md` (DE + EN: Abschnitt „Themes aus dem Katalog", Hinweis auf Netzzugriff und
       Schalter), README (Features-Tabelle, API-Tabelle), `AGENTS.md`, `structure.md`, `VAULT-ROUTE-AUTHORIZATION.md`.
       Nebenbei: Größenanzeige in MB ab 1 MB (Catppuccin zeigte „2287.4 KB")
-- [ ] 4.4 `test:coverage` und Lint in beiden Paketen; Coverage-Schwellen nie senken (läuft in der CI; lokal nur die
-      betroffenen Tests)
+- [x] 4.4 `test:coverage` und Lint in beiden Paketen; Coverage-Schwellen nie senken (läuft in der CI; lokal nur die
+      betroffenen Tests). Bestätigt durch die CI von PR #255: backend, frontend (inkl. Coverage-Schwellen), e2e,
+      CodeQL und gitleaks grün.
 
 ## Review PR #255 (2026-10-21)
 Behoben:
