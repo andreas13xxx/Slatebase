@@ -1,0 +1,35 @@
+.public-shares-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.public-shares-table th,
+.public-shares-table td {
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.public-shares-table thead th {
+  font-weight: 600;
+  color: var(--text-subtle);
+}
+
+.public-shares-table tbody th {
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.public-shares-table .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

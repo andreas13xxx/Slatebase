@@ -1,11 +1,11 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useContext, useEffect, useRef } from 'react'
 import { useAppContext, exportVault } from '../state'
 import { useTabContext } from '../state/tabContext'
 import { useTranslation } from '../i18n'
 import { openTab } from '../state/tabActions'
 import type { DirectoryTree, VaultInfo } from '../types'
 import { extractErrorMessage } from '../utils/error'
-import { ChevronRight, ChevronDown, Database, Eye, Pencil, Users, FilePlus, FolderPlus, Trash2, Copy, Move, Download, Star, FileText, History, LayoutDashboard } from 'lucide-react'
+import { ChevronRight, ChevronDown, Database, Eye, Pencil, Users, FilePlus, FolderPlus, Trash2, Copy, Move, Download, Star, FileText, History, LayoutDashboard, Link2 } from 'lucide-react'
 import { getValidDropTargets } from '../utils/pathUtils'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
@@ -26,6 +26,8 @@ import { buildTFileFromPath, buildTFolderFromPath } from '../plugins/compat/plug
 import type { TFile, TFolder } from '../plugins/compat/types'
 import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
 import { useLongPress } from '../hooks/useLongPress'
+import { FeatureContext } from '../state/featureContext'
+import { openPublicShareDialog } from '../public-share/publicShareEvents'
 
 /**
  * Monotonic per-vault sequence counter used to discard out-of-order fetchVaultTree
@@ -61,6 +63,9 @@ export interface FileExplorerProps {
  * Supports drag & drop for moving files and folders within a vault.
  */
 export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onRegisterCreateVault, onRegisterCreateCanvas, onOpenVersions }: FileExplorerProps = {}) {
+  // Optional context (not the throwing hook): the explorer also renders without a FeatureProvider.
+  const featureContext = useContext(FeatureContext)
+  const publicSharesEnabled = featureContext?.isEnabled('public-shares') ?? false
   // Vault rows only; the container's own empty-area menu stays mouse-only, since a child's long-press would bubble into it.
   const vaultLongPress = useLongPress()
   const { state, dispatch, apiClient } = useAppContext()
@@ -845,6 +850,11 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
           onOpenVersions(contextMenuState.vaultId, node.path)
         }
         break
+      case 'publicShare':
+        if (contextMenuState.vaultId) {
+          openPublicShareDialog(contextMenuState.vaultId, node.path)
+        }
+        break
     }
   }
 
@@ -1422,6 +1432,10 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
             { id: 'move', label: t('contextMenu.move'), icon: <Move size={14} /> },
             { id: 'separator-2', label: '', separator: true },
             { id: 'versions', label: 'Versionen', icon: <History size={14} /> },
+            // Public links are for notes only, and only while the admin has enabled the feature.
+            ...(publicSharesEnabled && node.name.toLowerCase().endsWith('.md')
+              ? [{ id: 'publicShare', label: 'Öffentlichen Link verwalten', icon: <Link2 size={14} /> }]
+              : []),
           ]
           menuItems = [...menuItems, ...buildFileMenuItems(node)]
         } else if (isFolder) {

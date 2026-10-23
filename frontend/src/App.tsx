@@ -63,6 +63,9 @@ import { ThemeLifecycle } from './components/ThemeLifecycle'
 import { DictationIndicator } from './components/DictationIndicator'
 import { PluginViewPanel } from './components/PluginViewPanel'
 import { VersionBrowser } from './components/VersionBrowser'
+import { PublicShareDialog } from './public-share/PublicShareDialog'
+import { OPEN_PUBLIC_SHARE_EVENT } from './public-share/publicShareEvents'
+import type { OpenPublicShareDetail } from './public-share/publicShareEvents'
 import { PageLoadingFallback } from './components/PageLoadingFallback'
 
 // Standalone settings/admin pages — code-split (AP8). Each is only ever
@@ -227,6 +230,18 @@ function AppContent() {
 
   // Version browser state: which file to show versions for
   const [versionBrowserTarget, setVersionBrowserTarget] = useState<{ vaultId: string; filePath: string } | null>(null)
+
+  // Public-link dialog state: which note to manage the link for (context menu / command palette).
+  const [publicShareTarget, setPublicShareTarget] = useState<OpenPublicShareDetail | null>(null)
+  useEffect(() => {
+    function handleOpenPublicShare(e: Event) {
+      const detail = (e as CustomEvent<OpenPublicShareDetail>).detail
+      if (!detail?.vaultId || !detail?.filePath) return
+      setPublicShareTarget({ vaultId: detail.vaultId, filePath: detail.filePath })
+    }
+    window.addEventListener(OPEN_PUBLIC_SHARE_EVENT, handleOpenPublicShare)
+    return () => window.removeEventListener(OPEN_PUBLIC_SHARE_EVENT, handleOpenPublicShare)
+  }, [])
 
   // Opens the version browser for a given file (file-recovery:open core command).
   useEffect(() => {
@@ -1126,6 +1141,15 @@ function AppContent() {
       />
       {/* Unified Settings Panel (renders as fixed overlay when open) */}
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} initialNav={settingsInitialNav} />
+      {/* Public link dialog */}
+      {publicShareTarget && (
+        <PublicShareDialog
+          apiClient={apiClient}
+          vaultId={publicShareTarget.vaultId}
+          filePath={publicShareTarget.filePath}
+          onClose={() => setPublicShareTarget(null)}
+        />
+      )}
       {/* Version Browser Modal */}
       {versionBrowserTarget && (
         <div className="version-browser-modal-overlay" onClick={() => setVersionBrowserTarget(null)}>

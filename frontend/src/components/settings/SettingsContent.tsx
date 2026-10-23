@@ -23,6 +23,7 @@ import { CssSnippetsSection } from './CssSnippetsSection'
 import { ThemesSection } from './ThemesSection'
 import { GitSyncSection } from './GitSyncSection'
 import { MailImportSection } from './MailImportSection'
+import { PublicSharesSection } from '../../public-share/PublicSharesSection'
 import { KeybindingsSection } from './KeybindingsSection'
 import { AppearanceSection } from './AppearanceSection'
 import { WelcomeVaultSection } from './WelcomeVaultSection'
@@ -105,6 +106,8 @@ function renderSection(
       return <SessionsPage apiClient={apiClient} />
     case 'mcp-tokens':
       return <McpTokensPage apiClient={apiClient} />
+    case 'public-shares':
+      return <PublicSharesSection apiClient={apiClient} />
     case 'delete-account':
       return <AccountDeletionSection apiClient={apiClient} />
     case 'keybindings':

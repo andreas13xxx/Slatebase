@@ -58,6 +58,21 @@ dann findet `resolve()` die Datei nicht mehr und liefert 404, nie eine andere Da
       (`onFileRenamed`/`onFileDeleted` im Service; das Anhängen an `ILinkIndexHook` folgt bei der Verdrahtung in Phase 2.4)
 - [x] 1.5 Tests (hand-geschriebene Mocks): Token-Entropie, Ablauf, Widerruf, Traversal, Dot-Dateien, Papierkorb
 
+### Befunde Phase 4
+
+- **Zugang:** Kontextmenü einer Notiz im Explorer („Öffentlichen Link verwalten“, nur `.md`, nur Schreibende, nur bei
+  aktivem Feature) und Befehlspalette („Öffentlichen Link der Notiz verwalten“). Beide lösen das Window-Event
+  `slatebase:open-public-share` aus (wie bei der Versionsansicht); `App` zeigt den Dialog. Der Explorer liest das Feature
+  über den optionalen `FeatureContext`, damit er auch ohne `FeatureProvider` rendert.
+- **Dialog:** Vorschau „Der Link enthält zusätzlich“ (Notizen, Dateien, nicht verfügbare Einbettungen mit Erklärung),
+  Passwort und Ablaufdatum beim Erzeugen, danach URL nur einmal sichtbar und kopierbar. Ein bestehender Link zeigt seine
+  Eigenschaften (ohne URL), erlaubt Passwort/Ablauf setzen und entfernen, widerrufen und „Neuen Link erzeugen“.
+- **Einstellungen:** Sektion „Öffentliche Links“ (Konto, `feature: 'public-shares'`) mit allen eigenen Links über alle
+  Vaults, Widerruf mit Bestätigung. Die `settings.sections.*`-i18n-Schlüssel der Registry werden im Code nicht gelesen
+  (Labels kommen aus `SECTION_LABELS`); ein Eintrag dort wurde deshalb nicht angelegt.
+- **Admin-Toggle:** Die Feature-Tabelle der Administration kommt generisch aus der Backend-Registry; `public-shares`
+  erscheint ohne Frontend-Änderung. Das Audit-Log kennt die fünf neuen Aktionen (Filter-Dropdown ergänzt).
+
 ### Befunde Phase 3
 
 - **Umsetzung ohne Umbau von `ViewMode`:** Statt die Embed-Quelle durch alle Render-Funktionen zu reichen, bekommt die
@@ -126,10 +141,10 @@ dann findet `resolve()` die Datei nicht mehr und liefert 404, nie eine andere Da
 
 ## Phase 4 — Verwaltung
 
-- [ ] 4.1 `PublicShareDialog` (Fokus-Falle, Kopieren, Passwort, Ablauf, Widerruf) und Kontextmenü-Eintrag
-- [ ] 4.1a Vorschau „Dieser Link enthält zusätzlich …“ über `GET …/public-shares/preview`, inkl. Hinweisen
-- [ ] 4.2 Einstellungen „Meine Links“ mit `feature:` in `settingsRegistry.ts`
-- [ ] 4.3 Admin-Toggle in den Feature-Einstellungen
+- [x] 4.1 `PublicShareDialog` (Fokus-Falle, Kopieren, Passwort, Ablauf, Widerruf) und Kontextmenü-Eintrag
+- [x] 4.1a Vorschau „Dieser Link enthält zusätzlich …“ über `GET …/public-shares/preview`, inkl. Hinweisen
+- [x] 4.2 Einstellungen „Meine Links“ mit `feature:` in `settingsRegistry.ts`
+- [x] 4.3 Admin-Toggle in den Feature-Einstellungen
 
 ## Phase 5 — Abschluss
 

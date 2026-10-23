@@ -22,6 +22,11 @@ export type AuditAction =
   | 'VAULT_SHARE_UPDATED'
   | 'VAULT_OWNERSHIP_TRANSFERRED'
   | 'CONFIG_CHANGED'
+  | 'PUBLIC_SHARE_CREATED'
+  | 'PUBLIC_SHARE_UPDATED'
+  | 'PUBLIC_SHARE_REVOKED'
+  | 'PUBLIC_SHARE_ACCESSED'
+  | 'PUBLIC_SHARE_DENIED'
 
 /** All possible audit action values for the filter dropdown. */
 const AUDIT_ACTIONS: AuditAction[] = [
@@ -40,6 +45,11 @@ const AUDIT_ACTIONS: AuditAction[] = [
   'VAULT_SHARE_UPDATED',
   'VAULT_OWNERSHIP_TRANSFERRED',
   'CONFIG_CHANGED',
+  'PUBLIC_SHARE_CREATED',
+  'PUBLIC_SHARE_UPDATED',
+  'PUBLIC_SHARE_REVOKED',
+  'PUBLIC_SHARE_ACCESSED',
+  'PUBLIC_SHARE_DENIED',
 ]
 
 /** A single audit log entry returned by the API. */

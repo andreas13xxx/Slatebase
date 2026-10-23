@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, type Dispatch } from 'react'
 import { CommandPalette } from './CommandPalette'
 import { usePluginContext } from '../plugins/compat/plugin-context'
 import { useFeatureContext } from '../state/featureContext'
+import { openPublicShareDialog } from '../public-share/publicShareEvents'
 import { useTabContext } from '../state/tabContext'
 import { usePaneTree } from '../state/paneTreeContext'
 import { generatePaneId, serializePaneTree, rehydratePaneTree } from '../state/paneTreeState'
@@ -932,6 +933,23 @@ export function CommandPaletteContainer({
         callback: onOpenGraph,
         pluginId: 'slatebase',
       })
+
+      // Public link of the active note (feature-gated; only notes can be shared).
+      const activeNote = tabState.tabs.find((t) => t.id === tabState.activeTabId)
+      if (
+        isEnabled('public-shares') &&
+        state.selectedVaultId !== null &&
+        activeNote?.filePath.toLowerCase().endsWith('.md') === true
+      ) {
+        const vaultId = state.selectedVaultId
+        const filePath = activeNote.filePath
+        commands.push({
+          id: 'slatebase:public-share',
+          name: 'Öffentlichen Link der Notiz verwalten',
+          callback: () => openPublicShareDialog(vaultId, filePath),
+          pluginId: 'slatebase',
+        })
+      }
 
       if (isEnabled('activity-timeline')) {
         commands.push({

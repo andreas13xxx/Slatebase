@@ -37,7 +37,7 @@ describe('PublicSharePage', () => {
     const { container } = render(<PublicSharePage token="tok" />)
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Preisliste' })).toBeInTheDocument()
-    expect(document.title).toBe('Preisliste')
+    await waitFor(() => expect(document.title).toBe('Preisliste'))
     expect(await screen.findByText('Eingebetteter Text')).toBeInTheDocument()
 
     const img = container.querySelector('img.view-mode-image') as HTMLImageElement
