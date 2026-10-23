@@ -92,6 +92,8 @@ import { PropertyTypeStore } from './property-type/index.js'
 import { createPropertyTypeRoutes } from './api/propertyTypeRoutes.js'
 import { createPropertyRoutes } from './api/propertyRoutes.js'
 import { createBasesRoutes } from './api/basesRoutes.js'
+import { createPublicShareManagementRoutes, createPublicShareReaderRoutes } from './api/publicShareRoutes.js'
+import { createPublicShareService, createPublicShareStore, createPublicShareVaultAccess } from './public-share/index.js'
 import { WelcomeVaultService } from './welcome-vault/index.js'
 import { createWelcomeVaultRoutes, deduplicateVaultName } from './api/welcomeVaultRoutes.js'
 import { ModuleSecretKeyManager, ModuleSecretStore } from './shared-secrets/index.js'
@@ -124,6 +126,7 @@ featureRegistry.register({ name: 'git-sync', description: 'Git-Synchronisation v
 featureRegistry.register({ name: 'mail-import', description: 'IMAP-Mail-Import als Markdown-Notizen', defaultEnabled: true, type: 'cold' })
 featureRegistry.register({ name: 'voice-transcription', description: 'Diktieren / Spracherkennung via self-hosted Whisper (rechenintensiv, GPU empfohlen)', defaultEnabled: false, type: 'cold' })
 featureRegistry.register({ name: 'bases', description: 'Bases — filterbare, editierbare Tabellen über die Vault-Metadaten (experimentell)', defaultEnabled: false, type: 'cold' })
+featureRegistry.register({ name: 'public-shares', description: 'Öffentliche Freigabe-Links — Notizen per Link für Personen ohne Konto lesbar machen (Inhalte verlassen den Server)', defaultEnabled: false, type: 'cold' })
 featureRegistry.register({ name: 'activity-timeline', description: 'Aktivitätszeitleiste — chronologische Vault-Aktivität als Tab und Seitenleiste (experimentell)', defaultEnabled: false, type: 'cold' })
 
 const featureToggleStore = new FeatureToggleStore(serverConfig.dataDir, logger)
@@ -267,6 +270,19 @@ const activityEnabled = featureToggleService.isEnabled('activity-timeline')
 
 const vaultService = new VaultService(vaultManager, vaultReader, config, logger, vaultRegistry, vaultShareRegistry, userRepository, auditService, trashService, versionService)
 const importService = new ImportService(vaultManager, config, logger)
+
+// Public share links: read-only links for people without an account. The service always runs
+// (links must follow renames/deletions even while the feature is off); only the routes are gated.
+const publicShareService = createPublicShareService({
+  store: createPublicShareStore(path.join(serverConfig.dataDir, 'public-shares.json'), (error) => {
+    logger.warn('Public share store unreadable', { error: error instanceof Error ? error.message : String(error) })
+  }),
+  vault: createPublicShareVaultAccess({
+    vaultService,
+    getVaultRoot: (vaultId) => vaultManager.getVault(vaultId)?.info.path ?? null,
+    logger,
+  }),
+})
 
 // 4a. Welcome Vault Service (wires onUserCreated callback)
 const welcomeVaultService = new WelcomeVaultService(
@@ -688,6 +704,15 @@ app.use('/api/v1/vaults/:vaultId/mail-import', createFeatureGuard('mail-import',
 app.use('/api/v1/vaults/:vaultId/mail-import/*', createFeatureGuard('mail-import', featureToggleService))
 app.use('/api/v1/vaults/:vaultId/transcribe', createFeatureGuard('voice-transcription', featureToggleService))
 app.use('/api/v1/vaults/:vaultId/bases/*', createFeatureGuard('bases', featureToggleService))
+app.use('/api/v1/vaults/:vaultId/public-shares', createFeatureGuard('public-shares', featureToggleService))
+app.use('/api/v1/vaults/:vaultId/public-shares/*', createFeatureGuard('public-shares', featureToggleService))
+app.use('/api/v1/public-shares', createFeatureGuard('public-shares', featureToggleService))
+app.use('/api/v1/public-shares/*', createFeatureGuard('public-shares', featureToggleService))
+// The anonymous reader gets a plain 404 while the feature is off: it must not reveal that links exist.
+app.use('/api/v1/public/s/*', async (c, next) => {
+  if (featureToggleService.isEnabled('public-shares')) return next()
+  return c.json({ code: 'NOT_FOUND', message: 'Not found', timestamp: new Date().toISOString() }, 404)
+})
 app.use('/api/v1/vaults/:vaultId/activity', createFeatureGuard('activity-timeline', featureToggleService))
 
 // Route registration
@@ -990,6 +1015,19 @@ const basesRoutes = createBasesRoutes({
 })
 app.route('/api/v1', basesRoutes)
 
+// Public share links (feature-gated on `public-shares`). Management needs a session; the reader
+// routes are anonymous and bypass session auth via isPublicSharePath (auth/middleware.ts).
+app.route('/api/v1', createPublicShareManagementRoutes({ service: publicShareService, auditService, logger }))
+app.route(
+  '/api/v1/public/s',
+  createPublicShareReaderRoutes({
+    service: publicShareService,
+    auditService,
+    logger,
+    cookieConfig: { trustedProxies: serverConfig.trustedProxies, cookieSecureMode: serverConfig.cookieSecure },
+  }),
+)
+
 // Activity timeline read route (feature-gated on `activity-timeline`; vault auth via shared middleware)
 const activityRoutes = createActivityRoutes({
   activityService: activityStore,
@@ -1102,6 +1140,9 @@ const linkIndexHook = {
     }
   },
   onFileDeleted(vaultId: string, filePath: string): void {
+    publicShareService.onFileDeleted(vaultId, filePath).catch((error: unknown) => {
+      logger.error('Public share cleanup failed', { vaultId, filePath, error: error instanceof Error ? error.message : String(error) })
+    })
     const linkIndex = getLinkIndex(vaultId)
     if (linkIndex) {
       linkIndex.removeFile(filePath).catch((error: unknown) => {
@@ -1126,6 +1167,10 @@ const linkIndexHook = {
       })
   },
   onFileRenamed(vaultId: string, oldPath: string, newPath: string): Promise<void> {
+    // Public links follow the file even when the vault has no link index.
+    publicShareService.onFileRenamed(vaultId, oldPath, newPath).catch((error: unknown) => {
+      logger.error('Public share rewrite failed', { vaultId, oldPath, newPath, error: error instanceof Error ? error.message : String(error) })
+    })
     const linkIndex = getLinkIndex(vaultId)
     const entry = vaultRegistry.findById(vaultId)
     if (!linkIndex || !entry) return Promise.resolve()

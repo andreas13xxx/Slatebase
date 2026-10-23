@@ -58,6 +58,24 @@ dann findet `resolve()` die Datei nicht mehr und liefert 404, nie eine andere Da
       (`onFileRenamed`/`onFileDeleted` im Service; das Anhängen an `ILinkIndexHook` folgt bei der Verdrahtung in Phase 2.4)
 - [x] 1.5 Tests (hand-geschriebene Mocks): Token-Entropie, Ablauf, Widerruf, Traversal, Dot-Dateien, Papierkorb
 
+### Befunde Phase 2
+
+- **Header:** `secureHeaders` ist global vor den Routen registriert und setzt seine Header nach dem Handler; eine eigene CSP
+  oder Referrer-Policy pro Route würde überschrieben. Die globale CSP (`frame-ancestors 'none'`, `default-src 'self'`) und die
+  Referrer-Policy `strict-origin-when-cross-origin` (kein Pfad, also kein Token, an Fremdseiten) gelten daher auch für die
+  öffentlichen Routen; die Route setzt `Cache-Control: no-store` und `X-Robots-Tag: noindex, nofollow`. SVG/HTML/XML-Assets
+  werden mit `Content-Disposition: attachment` ausgeliefert (als `<img>` bleiben sie wirkungslos). Die Seite setzt zusätzlich
+  `<meta name="referrer" content="no-referrer">` (Phase 3).
+- **Feature aus:** Verwaltungsrouten antworten wie alle Feature-Guards mit 403 `FEATURE_DISABLED`, der anonyme Leser mit 404.
+- **Audit:** Aufrufe der Notiz (`PUBLIC_SHARE_ACCESSED`) und Fehlversuche (`PUBLIC_SHARE_DENIED`, höchstens 10 Zeilen pro
+  Minute und Adresse) werden protokolliert; Asset-Abrufe nicht einzeln (sie gehören zum Aufruf der Notiz). Das Audit nennt nur
+  die letzten vier Zeichen des Tokens.
+- **Passwort-Sitzung:** Cookie `sb_share_<hash>` (HttpOnly, SameSite=Strict, Pfad = genau dieser Link, 30 min), HMAC über
+  Link, Ablauf und eine vom Passwort abhängige Bindung; ein neues oder entferntes Passwort entwertet es sofort. Falsche
+  Passwörter: 5 pro 15 Minuten je Adresse und Link, dazu 300 Anfragen pro Minute und Adresse insgesamt.
+- **Offen:** Beim Löschen eines ganzen Vaults bleiben dessen Link-Einträge in `public-shares.json` liegen (der Leser liefert
+  404, die Verwaltung zeigt sie nicht mehr). Aufräumen in Phase 5.
+
 ### Befunde Phase 1 (für Phase 2/3)
 
 - **Vault-Zugriff ist abstrahiert** (`IPublicShareVaultAccess`: `getTree`, `readText`, `readBinary`). Die Implementierung auf
@@ -74,10 +92,10 @@ dann findet `resolve()` die Datei nicht mehr und liefert 404, nie eine andere Da
 
 ## Phase 2 — Routen und Sicherheit
 
-- [ ] 2.1 Authentifizierte Routen, Feature-Guard (`public-shares`, Default aus), Audit-Einträge
-- [ ] 2.2 Öffentliche Routen, Auth-Bypass-Präfix, Rate-Limit, Unlock-Cookie
-- [ ] 2.3 Antwort-Header (no-store, noindex, CSP, Referrer-Policy)
-- [ ] 2.4 Verdrahtung in `src/index.ts` (manuelle DI); Routen-Tests inkl. „404 ununterscheidbar“
+- [x] 2.1 Authentifizierte Routen, Feature-Guard (`public-shares`, Default aus), Audit-Einträge
+- [x] 2.2 Öffentliche Routen, Auth-Bypass-Präfix, Rate-Limit, Unlock-Cookie
+- [x] 2.3 Antwort-Header (no-store, noindex, CSP, Referrer-Policy)
+- [x] 2.4 Verdrahtung in `src/index.ts` (manuelle DI); Routen-Tests inkl. „404 ununterscheidbar“
 
 ## Phase 3 — Öffentliche Seite
 

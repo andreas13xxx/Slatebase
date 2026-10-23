@@ -156,6 +156,19 @@ describe('getNote', () => {
     expect(await service.verifyPassword('nope', 'whatever-password')).toBe(false)
   })
 
+  it('binds the unlock to the current password', async () => {
+    const { service } = setup()
+    const { share, token } = await service.create({ ...input, password: 'long-enough-password' })
+    const first = await service.passwordBinding(token)
+    expect(first).toMatch(/^[0-9a-f]{64}$/)
+    expect(await service.passwordBinding(token)).toBe(first)
+    await service.update(share.id, { password: 'another-long-password' })
+    expect(await service.passwordBinding(token)).not.toBe(first)
+    await service.update(share.id, { password: null })
+    expect(await service.passwordBinding(token)).toBeNull()
+    expect(await service.passwordBinding('nope')).toBeNull()
+  })
+
   it('verifies passwords', async () => {
     const { service } = setup()
     const { token } = await service.create({ ...input, password: 'long-enough-password' })

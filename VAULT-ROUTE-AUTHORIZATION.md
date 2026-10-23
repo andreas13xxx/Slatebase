@@ -414,3 +414,23 @@ vault and only need a session.
 | GET | `.../theme-store/updates` | read |
 | POST | `.../theme-store/install` | write |
 | GET | `/api/v1/theme-store/themes`, `/api/v1/theme-store/screenshot` | session only (no vault) |
+
+## Addendum — `backend/src/api/publicShareRoutes.ts` (Public share links, 2026-10-23)
+
+Management routes are mounted via `app.route('/api/v1', …)` (`index.ts`) behind the `public-shares` feature guard (default
+**off**). A public link publishes note content outside the server, so even the two GETs get an **exception to `write`**
+(`VAULT_ROUTE_LEVEL_EXCEPTIONS`). The handlers additionally check that a link ID belongs to the vault in the URL, so write
+access to one vault never reaches another vault's links.
+
+| Method | Path | Level |
+|---|---|---|
+| POST | `.../public-shares` | write |
+| GET | `.../public-shares`, `.../public-shares/preview` | write (exception) |
+| PUT, DELETE | `.../public-shares/:id` | write |
+| GET | `/api/v1/public-shares` | session only (own links) |
+| DELETE | `/api/v1/public-shares/:id` | session only, creator only |
+
+The anonymous reader routes `GET /api/v1/public/s/:token`, `POST …/unlock`, `GET …/asset` are **not** vault-scoped and
+bypass session auth and CSRF in `auth/middleware.ts` (`isPublicSharePath`: strict token pattern, only those three
+method/path combinations). The link token is the credential; the routes have their own rate limits and answer 404 for
+unknown, expired and revoked links alike (and for everything while the feature is off).

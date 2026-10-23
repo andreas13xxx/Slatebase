@@ -58,6 +58,11 @@ export interface IPublicShareService {
   revoke(id: string): Promise<boolean>
   /** True if the token belongs to a live link that requires a password. */
   requiresPassword(token: string): Promise<boolean>
+  /**
+   * Opaque value that changes whenever the link's password changes, or `null` if the token is not
+   * live or has no password. Callers bind an "unlocked" cookie to it so a new password invalidates it.
+   */
+  passwordBinding(token: string): Promise<string | null>
   /** Checks a password for a live link. Unknown/expired tokens yield `false`. */
   verifyPassword(token: string, password: string): Promise<boolean>
   /** Rendered view of the shared note with its embeds (live state, resolved per call). */
@@ -124,7 +129,7 @@ function validatePassword(password: string): void {
   }
 }
 
-function toSummary(share: PublicShare): PublicShareSummary {
+export function toPublicShareSummary(share: PublicShare): PublicShareSummary {
   const { tokenHash: _tokenHash, passwordHash, ...rest } = share
   return { ...rest, passwordProtected: passwordHash !== undefined }
 }
@@ -225,16 +230,16 @@ export function createPublicShareService(deps: PublicShareServiceDeps): IPublicS
     },
 
     async listForVault(vaultId) {
-      return (await store.list()).filter((s) => s.vaultId === vaultId).map(toSummary)
+      return (await store.list()).filter((s) => s.vaultId === vaultId).map(toPublicShareSummary)
     },
 
     async listForUser(userId) {
-      return (await store.list()).filter((s) => s.createdBy === userId).map(toSummary)
+      return (await store.list()).filter((s) => s.createdBy === userId).map(toPublicShareSummary)
     },
 
     async get(id) {
       const share = (await store.list()).find((s) => s.id === id)
-      return share === undefined ? null : toSummary(share)
+      return share === undefined ? null : toPublicShareSummary(share)
     },
 
     async update(id, input) {
@@ -258,7 +263,7 @@ export function createPublicShareService(deps: PublicShareServiceDeps): IPublicS
         }),
       )
       if (updated === undefined) throw new PublicShareNotFoundError()
-      return toSummary(updated)
+      return toPublicShareSummary(updated)
     },
 
     async revoke(id) {
@@ -274,6 +279,11 @@ export function createPublicShareService(deps: PublicShareServiceDeps): IPublicS
     async requiresPassword(token) {
       const share = await findLive(token)
       return share?.passwordHash !== undefined
+    },
+
+    async passwordBinding(token) {
+      const share = await findLive(token)
+      return share?.passwordHash === undefined ? null : hashToken(`${share.id}:${share.passwordHash}`)
     },
 
     async verifyPassword(token, password) {

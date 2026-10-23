@@ -38,6 +38,9 @@ import type { ITranscriptionService } from '../transcription/index.js'
 import type { ITemplateService } from '../template/index.js'
 import type { IVaultStatisticsService } from '../statistics/index.js'
 import type { IVersionService } from '../version/index.js'
+import type { IAuditService } from '../audit/index.js'
+import type { IPublicShareService } from '../public-share/index.js'
+import { createPublicShareManagementRoutes } from './publicShareRoutes.js'
 import type { IVaultConfigService } from '../vault-config/index.js'
 import type { IPropertyTypeService } from '../property-type/index.js'
 import type { ILinkIndex } from '../link-index/index.js'
@@ -274,6 +277,9 @@ app.route('/api/v1', propertyTypeRoutes)
 const propertyRoutes = createPropertyRoutes({ linkIndexResolver: async () => undefined as ILinkIndex | undefined, propertyTypeService: stub<IPropertyTypeService>('propertyTypeService'), accessControl, logger: silentLogger })
 app.route('/api/v1', propertyRoutes)
 
+const publicShareRoutes = createPublicShareManagementRoutes({ service: stub<IPublicShareService>('publicShareService'), auditService: stub<IAuditService>('auditService'), logger: silentLogger })
+app.route('/api/v1', publicShareRoutes)
+
 // ─── Route discovery — the single source of truth, shared with the middleware ─────────────
 
 function subPathFromRoutePattern(routePath: string): string {
@@ -336,5 +342,15 @@ describe('theme store routes use the method default (no exception)', () => {
   it('the update check needs read access, installing needs write access', () => {
     expect(resolveRequiredLevel('GET', '/theme-store/updates')).toBe('read')
     expect(resolveRequiredLevel('POST', '/theme-store/install')).toBe('write')
+  })
+})
+
+describe('public share routes', () => {
+  it('listing and previewing links is reserved for writers, like creating and revoking them', () => {
+    expect(resolveRequiredLevel('GET', '/public-shares')).toBe('write')
+    expect(resolveRequiredLevel('GET', '/public-shares/preview')).toBe('write')
+    expect(resolveRequiredLevel('POST', '/public-shares')).toBe('write')
+    expect(resolveRequiredLevel('PUT', '/public-shares/abc')).toBe('write')
+    expect(resolveRequiredLevel('DELETE', '/public-shares/abc')).toBe('write')
   })
 })
