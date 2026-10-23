@@ -82,6 +82,18 @@ describe('LinkIndexService.queryForBase', () => {
     expect(result.rows.map((r) => r.path).sort()).toEqual(['Tasks/a.md', 'Tasks/c.md'])
   })
 
+  it('matches a tag filter case-insensitively (parity with the client file.hasTag)', async () => {
+    await setupVault()
+    // a.md is tagged `urgent`; a prefilter pushed from `file.hasTag("URGENT")`
+    // must still match it, since the client lowercases both sides.
+    const spec: BaseQuerySpec = {
+      filters: { tag: 'URGENT' },
+      columns: [],
+    }
+    const result = await service.queryForBase(spec)
+    expect(result.rows.map((r) => r.path)).toEqual(['Tasks/a.md'])
+  })
+
   it('supports a path glob filter', async () => {
     await setupVault()
     const spec: BaseQuerySpec = {

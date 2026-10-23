@@ -24,11 +24,20 @@ import type { Context, Next } from 'hono'
  *
  * @returns A Hono middleware function.
  */
+/**
+ * Characters allowed in a reused incoming request ID. An upstream proxy's id is
+ * attacker-influenced data that ends up in log lines and the response header, so
+ * a CR/LF or other control character would enable log- and header-injection.
+ * Restricted to a conservative token charset; anything else forces a fresh UUID.
+ */
+const SAFE_REQUEST_ID = /^[A-Za-z0-9._~-]{1,128}$/
+
 export function createRequestIdMiddleware(): (c: Context, next: Next) => Promise<void> {
   return async (c: Context, next: Next): Promise<void> => {
-    // Reuse incoming request ID from upstream proxy, or generate a new one
+    // Reuse the incoming request ID from an upstream proxy only when it is a safe
+    // token; otherwise generate a new UUIDv4 (never echo unvalidated header bytes).
     const incoming = c.req.header('X-Request-Id')
-    const requestId = (incoming && incoming.length > 0 && incoming.length <= 128)
+    const requestId = (incoming !== undefined && SAFE_REQUEST_ID.test(incoming))
       ? incoming
       : randomUUID()
 

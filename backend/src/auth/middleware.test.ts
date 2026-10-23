@@ -392,6 +392,33 @@ describe('createRateLimitMiddleware', () => {
     expect(res.status).toBe(429)
   })
 
+  it('should record failed attempt after 403 (suspended) response', async () => {
+    // authenticate() runs a full argon2 verify before the suspended check and
+    // then returns 403, so an uncounted 403 would allow unlimited expensive
+    // hashes against a known-suspended username.
+    const app = new Hono()
+    app.use('*', createRateLimitMiddleware(rateLimiter))
+    app.post('/api/v1/auth/login', (c) => {
+      return c.json({ code: 'ACCOUNT_SUSPENDED', message: 'Account is suspended', timestamp: new Date().toISOString() }, 403)
+    })
+
+    for (let i = 0; i < 5; i++) {
+      await app.request('/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'suspended-user', password: 'wrong' }),
+      })
+    }
+
+    // 6th attempt is blocked, so the argon2 verify is never reached again.
+    const res = await app.request('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'suspended-user', password: 'wrong' }),
+    })
+    expect(res.status).toBe(429)
+  })
+
   it('should reset rate limit on successful login', async () => {
     // Record some failed attempts with composite key (username:ip)
     rateLimiter.recordFailedAttempt('reset-user:0.0.0.0')

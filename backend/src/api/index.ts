@@ -880,7 +880,13 @@ export class VaultController implements IVaultController {
  * (embedded `<script>`) when opened as a top-level navigation. These must
  * never be served with `Content-Disposition: inline`.
  */
-const INLINE_UNSAFE_CONTENT_TYPES = new Set(['image/svg+xml', 'text/html; charset=utf-8'])
+const INLINE_UNSAFE_CONTENT_TYPES = new Set([
+  'image/svg+xml',
+  'text/html; charset=utf-8',
+  // XML can carry an XSLT/processing-instruction stylesheet that executes script
+  // when opened as a top-level document in some browsers — force a download too.
+  'application/xml; charset=utf-8',
+])
 
 function isInlineUnsafeContentType(contentType: string): boolean {
   return INLINE_UNSAFE_CONTENT_TYPES.has(contentType)

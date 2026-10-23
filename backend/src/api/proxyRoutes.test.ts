@@ -115,6 +115,47 @@ describe('proxyRoutes', () => {
     })
   })
 
+  describe('credentials over cleartext http', () => {
+    it('blocks forwarding an Authorization header to an http:// URL', async () => {
+      mockDnsResolves(PUBLIC_IP)
+      const { app } = createTestApp()
+
+      const res = await postProxy(app, {
+        url: 'http://example.com/db',
+        headers: { Authorization: 'Basic dXNlcjpwYXNz' },
+      })
+
+      expect(res.status).toBe(403)
+      const body = await res.json() as { code: string }
+      expect(body.code).toBe('PROXY_BLOCKED')
+      expect(mockFetch).not.toHaveBeenCalled()
+    })
+
+    it('still allows a plain http request with no Authorization header (CouchDB-on-LAN case)', async () => {
+      mockDnsResolves(PUBLIC_IP)
+      mockFetch.mockResolvedValueOnce(fakeUpstreamResponse({ body: 'ok' }))
+      const { app } = createTestApp()
+
+      const res = await postProxy(app, { url: 'http://example.com/db' })
+
+      expect(res.status).toBe(200)
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('allows an Authorization header over https', async () => {
+      mockDnsResolves(PUBLIC_IP)
+      mockFetch.mockResolvedValueOnce(fakeUpstreamResponse({ body: 'ok' }))
+      const { app } = createTestApp()
+
+      const res = await postProxy(app, {
+        url: 'https://example.com/db',
+        headers: { Authorization: 'Basic dXNlcjpwYXNz' },
+      })
+
+      expect(res.status).toBe(200)
+    })
+  })
+
   describe('allowlist matching', () => {
     it('allows a request to an exact-match allowed host', async () => {
       mockDnsResolves(PUBLIC_IP)
