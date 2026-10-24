@@ -156,17 +156,37 @@ describe('getNote', () => {
     expect(await service.verifyPassword('nope', 'whatever-password')).toBe(false)
   })
 
-  it('binds the unlock to the current password', async () => {
-    const { service } = setup()
+  it('starts a new unlock version whenever the password changes', async () => {
+    const { service, store } = setup()
     const { share, token } = await service.create({ ...input, password: 'long-enough-password' })
-    const first = await service.passwordBinding(token)
-    expect(first).toMatch(/^[0-9a-f]{64}$/)
-    expect(await service.passwordBinding(token)).toBe(first)
+    const first = await service.unlockVersion(token)
+    expect(first).toMatch(/^[0-9a-f-]{36}$/)
+    expect(await service.unlockVersion(token)).toBe(first)
+
+    await service.update(share.id, { expiresAt: '2999-01-01T00:00:00.000Z' })
+    expect(await service.unlockVersion(token)).toBe(first)
+
     await service.update(share.id, { password: 'another-long-password' })
-    expect(await service.passwordBinding(token)).not.toBe(first)
+    const second = await service.unlockVersion(token)
+    expect(second).not.toBe(first)
+
     await service.update(share.id, { password: null })
-    expect(await service.passwordBinding(token)).toBeNull()
-    expect(await service.passwordBinding('nope')).toBeNull()
+    expect(await service.unlockVersion(token)).toBeNull()
+    expect(store.shares[0]).not.toHaveProperty('unlockVersion')
+    expect(await service.unlockVersion('nope')).toBeNull()
+  })
+
+  it('never exposes the unlock version or hashes in summaries', async () => {
+    const { service } = setup()
+    await service.create({ ...input, password: 'long-enough-password' })
+    expect(JSON.stringify(await service.listForVault('v1'))).not.toMatch(/unlockVersion|Hash/)
+  })
+
+  it('falls back to the link ID for records without an unlock version', async () => {
+    const { service, store } = setup()
+    const { share, token } = await service.create({ ...input, password: 'long-enough-password' })
+    delete store.shares[0]!.unlockVersion
+    expect(await service.unlockVersion(token)).toBe(share.id)
   })
 
   it('verifies passwords', async () => {

@@ -18,6 +18,12 @@ export interface PublicShare {
   expiresAt?: string
   /** scrypt hash (`salt:hash`, hex) of the optional password. */
   passwordHash?: string
+  /**
+   * Random value renewed whenever the password is set, changed or removed. An "unlocked" cookie
+   * is bound to it, so a password change invalidates earlier unlocks without hashing anything.
+   * Records written before this field existed fall back to the link ID.
+   */
+  unlockVersion?: string
   lastAccessAt?: string
 }
 
@@ -43,7 +49,7 @@ export interface CreatedPublicShare {
 }
 
 /** A share record without secrets, as returned by the management routes. */
-export type PublicShareSummary = Omit<PublicShare, 'tokenHash' | 'passwordHash'> & {
+export type PublicShareSummary = Omit<PublicShare, 'tokenHash' | 'passwordHash' | 'unlockVersion'> & {
   passwordProtected: boolean
 }
 

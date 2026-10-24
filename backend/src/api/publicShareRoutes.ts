@@ -304,8 +304,8 @@ export function createPublicShareReaderRoutes(deps: PublicShareReaderDependencie
   const cookieName = (token: string): string => `sb_share_${hashToken(token).slice(0, 16)}`
   const cookiePath = (token: string): string => `/api/v1/public/s/${token}`
 
-  const sign = (token: string, expires: number, binding: string): string =>
-    createHmac('sha256', cookieSecret).update(`${hashToken(token)}|${expires}|${binding}`).digest('base64url')
+  const sign = (token: string, expires: number, unlockVersion: string): string =>
+    createHmac('sha256', cookieSecret).update(`${hashToken(token)}|${expires}|${unlockVersion}`).digest('base64url')
 
   const isUnlocked = async (c: Context, token: string): Promise<boolean> => {
     const value = getCookie(c, cookieName(token))
@@ -313,9 +313,9 @@ export function createPublicShareReaderRoutes(deps: PublicShareReaderDependencie
     const [expiresText, signature] = value.split('.')
     const expires = Number(expiresText)
     if (signature === undefined || !Number.isFinite(expires) || expires < Date.now()) return false
-    const binding = await service.passwordBinding(token)
-    if (binding === null) return false
-    const expected = Buffer.from(sign(token, expires, binding))
+    const unlockVersion = await service.unlockVersion(token)
+    if (unlockVersion === null) return false
+    const expected = Buffer.from(sign(token, expires, unlockVersion))
     const actual = Buffer.from(signature)
     return expected.length === actual.length && timingSafeEqual(expected, actual)
   }
@@ -382,8 +382,8 @@ export function createPublicShareReaderRoutes(deps: PublicShareReaderDependencie
       return c.json(createApiError('VALIDATION_ERROR', 'Invalid body'), 400)
     }
 
-    const binding = await service.passwordBinding(token)
-    if (binding === null) {
+    const unlockVersion = await service.unlockVersion(token)
+    if (unlockVersion === null) {
       // Unknown token, or a link without a password: indistinguishable from "not found".
       return handle(c, token, new PublicShareNotFoundError())
     }
@@ -395,7 +395,7 @@ export function createPublicShareReaderRoutes(deps: PublicShareReaderDependencie
 
     passwordLimiter.clear(attemptKey)
     const expires = Date.now() + UNLOCK_TTL_SECONDS * 1000
-    setCookie(c, cookieName(token), `${expires}.${sign(token, expires, binding)}`, {
+    setCookie(c, cookieName(token), `${expires}.${sign(token, expires, unlockVersion)}`, {
       httpOnly: true,
       sameSite: 'Strict',
       path: cookiePath(token),

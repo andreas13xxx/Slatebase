@@ -68,10 +68,11 @@ export interface IPublicShareService {
   /** True if the token belongs to a live link that requires a password. */
   requiresPassword(token: string): Promise<boolean>
   /**
-   * Opaque value that changes whenever the link's password changes, or `null` if the token is not
-   * live or has no password. Callers bind an "unlocked" cookie to it so a new password invalidates it.
+   * Opaque value that changes whenever the link's password is set, changed or removed, or `null` if
+   * the token is not live or has no password. Callers bind an "unlocked" cookie to it so that a
+   * password change invalidates earlier unlocks.
    */
-  passwordBinding(token: string): Promise<string | null>
+  unlockVersion(token: string): Promise<string | null>
   /** Checks a password for a live link. Unknown/expired tokens yield `false`. */
   verifyPassword(token: string, password: string): Promise<boolean>
   /** Rendered view of the shared note with its embeds (live state, resolved per call). */
@@ -149,7 +150,7 @@ function validatePassword(password: string): void {
 }
 
 export function toPublicShareSummary(share: PublicShare): PublicShareSummary {
-  const { tokenHash: _tokenHash, passwordHash, ...rest } = share
+  const { tokenHash: _tokenHash, passwordHash, unlockVersion: _unlockVersion, ...rest } = share
   return { ...rest, passwordProtected: passwordHash !== undefined }
 }
 
@@ -252,7 +253,7 @@ export function createPublicShareService(deps: PublicShareServiceDeps): IPublicS
         createdBy: input.createdBy,
         createdAt: now().toISOString(),
         ...(expiresAt === undefined ? {} : { expiresAt }),
-        ...(passwordHash === undefined ? {} : { passwordHash }),
+        ...(passwordHash === undefined ? {} : { passwordHash, unlockVersion: randomUUID() }),
       }
 
       let conflict = false
@@ -292,13 +293,17 @@ export function createPublicShareService(deps: PublicShareServiceDeps): IPublicS
       await store.mutate((all) =>
         all.map((s) => {
           if (s.id !== id) return s
-          const { expiresAt: _e, passwordHash: _p, ...base } = s
+          const { expiresAt: _e, passwordHash: _p, unlockVersion: _v, ...base } = s
           const nextExpiry = expiresAt === undefined ? s.expiresAt : (expiresAt ?? undefined)
-          const nextPassword = input.password === undefined ? s.passwordHash : (passwordHash ?? undefined)
+          const passwordChanged = input.password !== undefined
+          const nextPassword = passwordChanged ? (passwordHash ?? undefined) : s.passwordHash
+          // A new, changed or removed password starts a new unlock version; earlier unlocks stop working.
+          const nextVersion = passwordChanged ? randomUUID() : s.unlockVersion
           updated = {
             ...base,
             ...(nextExpiry === undefined ? {} : { expiresAt: nextExpiry }),
             ...(nextPassword === undefined ? {} : { passwordHash: nextPassword }),
+            ...(nextPassword === undefined || nextVersion === undefined ? {} : { unlockVersion: nextVersion }),
           }
           return updated
         }),
@@ -340,9 +345,9 @@ export function createPublicShareService(deps: PublicShareServiceDeps): IPublicS
       return share?.passwordHash !== undefined
     },
 
-    async passwordBinding(token) {
+    async unlockVersion(token) {
       const share = await findLive(token)
-      return share?.passwordHash === undefined ? null : hashToken(`${share.id}:${share.passwordHash}`)
+      return share?.passwordHash === undefined ? null : (share.unlockVersion ?? share.id)
     },
 
     async verifyPassword(token, password) {

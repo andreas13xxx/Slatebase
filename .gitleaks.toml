@@ -55,6 +55,14 @@ regexes = [
   # marker and annotated later still fails. An allowlist entry covers the whole
   # range.
   '''meinEchtesPasswort''',
+  # Dummy passwords in the public-share tests (backend service/route tests, frontend dialog tests).
+  # Listed by value, not by path, like the entries above.
+  '''long-enough-p''',
+  '''wrong-password''',
+  '''another-long-p''',
+  '''a-brand-new-password''',
+  '''whatever-password''',
+  '''secret-pw''',
 ]
 
 [allowlist]
