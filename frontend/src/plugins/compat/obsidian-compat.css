@@ -114,14 +114,6 @@
   --code-tag: #dc2626;
   --code-value: #d97706;
 
-  /* ─── Headings ──────────────────────────────────────────────────────────── */
-  --h1-color: #0f172a;
-  --h2-color: #0f172a;
-  --h3-color: #0f172a;
-  --h4-color: #0f172a;
-  --h5-color: #475569;
-  --h6-color: #475569;
-
   /* ─── Tags ──────────────────────────────────────────────────────────────── */
   --tag-color: #0f766e;
   --tag-color-hover: var(--text-accent-hover);
@@ -763,6 +755,15 @@ body {
 
   --dropdown-background: var(--interactive-normal);
   --dropdown-background-hover: var(--interactive-hover);
+
+  /* Headings follow the text colour like in Obsidian, so a theme that recolours
+     `--text-normal` / `--text-muted` on `body` also recolours headings. */
+  --h1-color: var(--text-normal);
+  --h2-color: var(--text-normal);
+  --h3-color: var(--text-normal);
+  --h4-color: var(--text-normal);
+  --h5-color: var(--text-muted);
+  --h6-color: var(--text-muted);
 }
 
 /* ─── Dark Mode Overrides ───────────────────────────────────────────────────── */
