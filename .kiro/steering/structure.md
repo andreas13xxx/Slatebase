@@ -179,12 +179,13 @@ src/
 │   ├── plugin-store-cache.ts — PluginStoreCache (in-memory TTL cache for plugin list/manifests/update results)
 │   ├── plugin-store-service.ts — PluginStoreService (browse/install/update orchestration; installs via the shared `plugin/` InstalledPluginStore)
 │   └── update-checker.ts     — UpdateChecker (periodic update check, default 24h interval, persists last-check timestamp)
-├── snippets/                 — User CSS snippets (per vault). Modeled on `plugin/installed-plugin-store.ts`'s atomic-write pattern, but stores unscoped user CSS rather than plugin-scoped bundles.
+├── snippets/                 — User CSS snippets. Vault content, not Slatebase data: `<vault>/.obsidian/snippets/<id>.css`; the enabled ones are `enabledCssSnippets` in `<vault>/.obsidian/appearance.json` (shared lock in `shared/appearance-file.ts`). Symlinks are never followed.
 │   ├── index.ts              — Barrel export for snippets module
 │   ├── types.ts              — ISnippetStore, SnippetMeta, SnippetRegistryData interfaces
 │   ├── errors.ts             — SnippetNotFoundError, SnippetTooLargeError, InvalidSnippetFilenameError
-│   ├── validation.ts         — Zod schemas + `SNIPPET_FILENAME_PATTERN` (`^[a-zA-Z0-9_-]+\.css$`), `MAX_SNIPPET_SIZE` (512 KB)
-│   ├── snippet-store.ts      — SnippetStore (filesystem persistence, atomic writes, per-vault dirs; `data/snippets/<vaultId>/<snippetId>.css` + `_registry.json`)
+│   ├── validation.ts         — Zod schemas + `SNIPPET_FILENAME_PATTERN` (Obsidian-style names: spaces and dots allowed; no `/ \ % : * ? " < > |`, no leading dot), `MAX_SNIPPET_SIZE` (512 KB)
+│   ├── snippet-store.ts      — SnippetStore (atomic writes into the vault; takes the vault path, not the vault id)
+│   ├── legacy-migration.ts   — One-time, non-destructive copy of the old `data/snippets/<vaultId>/` into the vault (marker file `.migrated-to-vault` in the old folder)
 │   └── snippet-store.test.ts — Unit tests for SnippetStore
 ├── themes/                   — Obsidian themes. Vault content, not Slatebase data: `<vault>/.obsidian/themes/<id>/{theme.css,manifest.json}`; the active theme is `cssTheme` in `<vault>/.obsidian/appearance.json`. Symlinks are never followed.
 ├── theme-store/              — Community theme marketplace (browse/install/update from the Obsidian catalog `community-css-themes.json`). Fetches only from `raw.githubusercontent.com` via `shared/guarded-fetch.ts` (host allowlist re-checked on every redirect, streaming size limit, no credentials, never the GitHub token). Installs through `ThemeService.saveTheme`; installed themes are matched to catalog entries by `manifest.name`. Catalog warmed at startup (not awaited) and persisted to `data/theme-store-cache.json`. Behind the `obsidian-theme-store` feature toggle.
@@ -769,7 +770,7 @@ src/
 │   │   ├── FeatureTogglesSection.tsx  — Feature toggle UI wrapped in one SettingSection card; single consumer of state/featureActions.ts + the global FeatureContext (also embedded by AdminConfigPage, which no longer duplicates the load/toggle logic itself)
 │   │   ├── ServerRestartSection.tsx   — Server restart with confirmation
 │   │   ├── VaultConfigSection.tsx     — Per-vault config split into two SettingSection cards — "Anzeige" ("Aktive Datei im Explorer verfolgen", client-only `workspaceStore.explorerFollowActiveFile`, applies instantly, no save button) and "Verzeichnisse" (templates dir, daily notes dir, attachments dir, server-persisted, save button)
-│   │   ├── CssSnippetsSection.tsx      — Per-vault CSS snippets; sits under the Vault category because snippets are vault data (`data/snippets/<vaultId>/…`), not account data
+│   │   ├── CssSnippetsSection.tsx      — Per-vault CSS snippets; sits under the Vault category because snippets are vault data (`<vault>/.obsidian/snippets/`), not account data
 │   │   ├── ThemesSection.tsx           — Per-vault Obsidian themes (Vault category); wraps ThemeManager
 │   │   ├── ThemeManager.tsx            — Theme list (radio selection, delete with ConfirmModal), import via file picker / drag & drop, external-host warning; applies the choice locally because `vault:change` excludes the acting user
 │   │   ├── themeImport.ts              — Pure import helpers (pick theme.css/manifest.json, derive a safe theme id, read manifest fields)

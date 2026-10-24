@@ -1,48 +1,21 @@
 import { randomBytes } from 'node:crypto'
 import fs from 'node:fs/promises'
 import type { Dirent, Stats } from 'node:fs'
-import { KeyedMutex } from '../shared/async-mutex.js'
+import { AppearanceFileInvalidError, readAppearance, withAppearanceLock, writeAppearance } from '../shared/appearance-file.js'
+import { isMissing, withRetry } from '../shared/fs-retry.js'
 import { isNodeError } from '../shared/fs-utils.js'
-import { writeJsonFileAtomic } from '../shared/json-file-store.js'
 import { validateFilePath } from '../vault/index.js'
-import { AppearanceFileInvalidError, InvalidThemeIdError, ThemeNotFoundError, ThemeTooLargeError } from './errors.js'
+import { InvalidThemeIdError, ThemeNotFoundError, ThemeTooLargeError } from './errors.js'
 import type { IThemeService, ThemeManifest, ThemeManifestInput, ThemeMeta } from './types.js'
 import { MAX_THEME_CSS_SIZE, extractExternalHosts, hasStyleSettingsBlock, isValidThemeId, normalizeManifest } from './validation.js'
 
 const THEMES_DIR = '.obsidian/themes'
-const APPEARANCE_FILE = '.obsidian/appearance.json'
-
-/** Attempts for reads/renames that can hit transient Windows locks (OneDrive, antivirus). */
-const RETRY_ATTEMPTS = 3
-const RETRY_DELAY_MS = 50
-const TRANSIENT_CODES = new Set(['EPERM', 'EACCES', 'EBUSY'])
 
 /** Upper bound for the external-hosts cache; it is cleared when exceeded (entries are cheap to recompute). */
 const ANALYSIS_CACHE_LIMIT = 500
 
 /** Facts read from a stylesheet once per file version. */
 type StylesheetAnalysis = Pick<ThemeMeta, 'externalHosts' | 'hasStyleSettings'>
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-/** Runs `fn`, retrying a few times on transient lock errors. Other errors propagate at once. */
-async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      return await fn()
-    } catch (error: unknown) {
-      const transient = isNodeError(error) && error.code !== undefined && TRANSIENT_CODES.has(error.code)
-      if (!transient || attempt >= RETRY_ATTEMPTS) throw error
-      await delay(RETRY_DELAY_MS * attempt)
-    }
-  }
-}
-
-function isMissing(error: unknown): boolean {
-  return isNodeError(error) && (error.code === 'ENOENT' || error.code === 'ENOTDIR')
-}
 
 /** lstat that returns null for a missing path. Symlinks are reported as-is (never followed). */
 async function lstatOrNull(filePath: string): Promise<Stats | null> {
@@ -88,9 +61,6 @@ async function writeFilesTogether(files: ReadonlyArray<{ path: string; content: 
  * so a link planted in a synced vault cannot expose files outside the vault.
  */
 export class ThemeService implements IThemeService {
-  /** Serialises appearance.json read-modify-write cycles (and theme deletion) per vault. */
-  private readonly appearanceMutex = new KeyedMutex()
-
   /** External hosts per stylesheet, keyed by path + mtime + size, so unchanged themes are not re-scanned on every listing. */
   private readonly analysisCache = new Map<string, StylesheetAnalysis>()
 
@@ -222,18 +192,18 @@ export class ThemeService implements IThemeService {
     // Remove the folder first and reset the selection only afterwards: if the removal fails (a lock
     // that outlives the retries), the vault must not lose its active theme. Both steps run under the
     // appearance mutex so a concurrent selection cannot be overwritten.
-    await this.appearanceMutex.runExclusive(vaultPath, async () => {
+    await withAppearanceLock(vaultPath, async () => {
       await withRetry(() => fs.rm(dir, { recursive: true, force: true }))
 
       let current: Record<string, unknown> | null
       try {
-        current = await this.readAppearance(vaultPath)
+        current = await readAppearance(vaultPath)
       } catch (error: unknown) {
         if (error instanceof AppearanceFileInvalidError) return // never touch a file we cannot parse
         throw error
       }
       if (current !== null && current['cssTheme'] === themeId) {
-        await writeJsonFileAtomic(validateFilePath(vaultPath, APPEARANCE_FILE), { ...current, cssTheme: '' })
+        await writeAppearance(vaultPath, { ...current, cssTheme: '' })
       }
     })
   }
@@ -241,7 +211,7 @@ export class ThemeService implements IThemeService {
   async getActiveThemeId(vaultPath: string): Promise<string | null> {
     let appearance: Record<string, unknown> | null
     try {
-      appearance = await this.readAppearance(vaultPath)
+      appearance = await readAppearance(vaultPath)
     } catch (error: unknown) {
       if (error instanceof AppearanceFileInvalidError) return null
       throw error
@@ -252,9 +222,9 @@ export class ThemeService implements IThemeService {
 
   async setActiveThemeId(vaultPath: string, themeId: string | null): Promise<void> {
     if (themeId !== null && !(await this.themeExists(vaultPath, themeId))) throw new ThemeNotFoundError(themeId)
-    await this.appearanceMutex.runExclusive(vaultPath, async () => {
-      const current = (await this.readAppearance(vaultPath)) ?? {}
-      await writeJsonFileAtomic(validateFilePath(vaultPath, APPEARANCE_FILE), {
+    await withAppearanceLock(vaultPath, async () => {
+      const current = (await readAppearance(vaultPath)) ?? {}
+      await writeAppearance(vaultPath, {
         ...current,
         cssTheme: themeId ?? '',
       })
@@ -264,31 +234,5 @@ export class ThemeService implements IThemeService {
   private checkedId(themeId: string): string {
     if (!isValidThemeId(themeId)) throw new InvalidThemeIdError(themeId)
     return themeId
-  }
-
-  /**
-   * Reads appearance.json. Returns null if the file does not exist; throws
-   * {@link AppearanceFileInvalidError} if it is not a JSON object, and the raw
-   * I/O error if it cannot be read — never reports an unreadable file as absent.
-   */
-  private async readAppearance(vaultPath: string): Promise<Record<string, unknown> | null> {
-    const file = validateFilePath(vaultPath, APPEARANCE_FILE)
-    let raw: string
-    try {
-      raw = await withRetry(() => fs.readFile(file, 'utf-8'))
-    } catch (error: unknown) {
-      if (isMissing(error)) return null
-      throw error
-    }
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(raw)
-    } catch {
-      throw new AppearanceFileInvalidError()
-    }
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      throw new AppearanceFileInvalidError()
-    }
-    return parsed as Record<string, unknown>
   }
 }

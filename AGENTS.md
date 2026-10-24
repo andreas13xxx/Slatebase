@@ -71,9 +71,10 @@ cd frontend && npm run lint           # ESLint
 Filesystem-based, no database. All under `backend/data/`:
 - `vaults.json` + `vaults/<id>/` — Vault registry + files
 - `vaults/<id>/.slatebase/` — Per-vault internal data (trash, versions, link-index, config, property types)
+- CSS snippets are vault content like themes: `<vault>/.obsidian/snippets/<id>.css`, enabled ones in `enabledCssSnippets` of `.obsidian/appearance.json` (edit it only through `shared/appearance-file.ts`, which holds the per-vault lock and refuses to overwrite invalid JSON). The old `snippets/<vaultId>/` under `data/` is migrated at startup and no longer written
 - `users/`, `sessions/`, `shares.json` — Auth data
 - `audit/` — Append-only JSONL (daily rotation)
-- `chat/`, `mcp/tokens/`, `plugins/<vaultId>/`, `snippets/<vaultId>/`, `features.json`
+- `chat/`, `mcp/tokens/`, `plugins/<vaultId>/`, `features.json`
 - `server-config.json` — admin overrides from `PUT /admin/config`. Precedence: `config/default.json` < this file < `SLATEBASE_*` env
 - `users/<userId>-preferences.json` — recent files, bookmarks (`favorites`), keybindings, `uiSettings` (account-wide), `vaultSettings[vaultId]` (per user *and* vault)
 - Encrypted secrets, AES-256-GCM per value: plugins in `plugins/<vaultId>/<pluginId>/secrets.json` (key from `SLATEBASE_PLUGIN_SECRET_KEY`, else `data/.plugin-secret-key`); git-sync and mail-import credentials in `module-secrets/<vaultId>/<moduleId>/secrets.json`

@@ -6,6 +6,7 @@ import type { SessionContext } from '../auth/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { ISnippetStore, SnippetMeta, SnippetRegistryData } from '../snippets/types.js'
 import { SnippetTooLargeError } from '../snippets/errors.js'
+import { AppearanceFileInvalidError } from '../shared/appearance-file.js'
 import type { IVaultAccessControl } from '../business/index.js'
 import type { IVaultRegistry, VaultRegistryEntry } from '../vault/registry.js'
 import { createSnippetRoutes } from './snippetRoutes.js'
@@ -22,10 +23,8 @@ function createMockSnippetStore(overrides: Partial<ISnippetStore> = {}): ISnippe
     loadSnippet: async () => null,
     deleteSnippet: async () => {},
     listSnippets: async () => [],
-    saveRegistry: async () => {},
-    loadRegistry: async () => null,
-    mutateRegistry: async (_v, fn) => fn(null),
-    deleteAllForVault: async () => {},
+    loadEnabledIds: async () => [],
+    saveEnabledIds: async () => {},
     ...overrides,
   }
 }
@@ -72,7 +71,7 @@ function createTestApp(options: {
   const logger = createMockLogger()
   const snippetStore = options.snippetStore ?? createMockSnippetStore()
   const accessControl = options.accessControl ?? createMockAccessControl()
-  const vaultRegistry = createMockVaultRegistry(options.entry ?? defaultEntry)
+  const vaultRegistry = createMockVaultRegistry(options.entry === undefined ? defaultEntry : options.entry)
   const session: SessionContext = options.session ?? { userId: 'owner-1', username: 'owner', role: 'user', sessionId: 'sess-1' }
 
   const app = new Hono()
@@ -199,30 +198,19 @@ describe('Snippet Routes', () => {
   })
 
   describe('DELETE /vaults/:vaultId/snippets/:snippetId', () => {
-    it('deletes the snippet and prunes its registry entry', async () => {
-      let deletedId: string | undefined
-      let savedRegistry: SnippetRegistryData | undefined
-      const registry: SnippetRegistryData = {
-        version: 1,
-        snippets: { 'dark-accent': { enabled: true, updatedAt: '2026-01-01T00:00:00.000Z' }, 'other': { enabled: false, updatedAt: '2026-01-01T00:00:00.000Z' } },
-      }
+    it('deletes the snippet in the vault folder', async () => {
+      let deleted: { vaultPath: string; id: string } | undefined
       const app = createTestApp({
         snippetStore: createMockSnippetStore({
           loadSnippet: async () => 'body {}',
-          deleteSnippet: async (_v, id) => { deletedId = id },
-          mutateRegistry: async (_v, fn) => {
-            const next = fn(registry)
-            savedRegistry = next
-            return next
-          },
+          deleteSnippet: async (vaultPath, id) => { deleted = { vaultPath, id } },
         }),
       })
 
       const res = await app.request('/api/v1/vaults/vault-1/snippets/dark-accent', { method: 'DELETE' })
 
       expect(res.status).toBe(204)
-      expect(deletedId).toBe('dark-accent')
-      expect(savedRegistry?.snippets).toEqual({ other: { enabled: false, updatedAt: '2026-01-01T00:00:00.000Z' } })
+      expect(deleted).toEqual({ vaultPath: '/data/vaults/vault-1', id: 'dark-accent' })
     })
 
     it('returns 404 when the snippet does not exist', async () => {
@@ -242,13 +230,39 @@ describe('Snippet Routes', () => {
       expect(await res.json()).toEqual({ version: 1, snippets: {} })
     })
 
-    it('PUT /registry saves the registry and returns 204', async () => {
-      let saved: SnippetRegistryData | undefined
+    it('GET /registry reports the enabled snippets with their modification time', async () => {
+      const meta: SnippetMeta = { id: 'a', filename: 'a.css', size: 1, updatedAt: '2026-01-01T00:00:00.000Z' }
       const app = createTestApp({
-        snippetStore: createMockSnippetStore({ saveRegistry: async (_v, r) => { saved = r } }),
+        snippetStore: createMockSnippetStore({
+          loadEnabledIds: async () => ['a', 'gone'],
+          listSnippets: async () => [meta],
+        }),
       })
 
-      const registry: SnippetRegistryData = { version: 1, snippets: { a: { enabled: true, updatedAt: '2026-01-01T00:00:00.000Z' } } }
+      const res = await app.request('/api/v1/vaults/vault-1/snippets/registry')
+      expect(await res.json()).toEqual({
+        version: 1,
+        snippets: {
+          a: { enabled: true, updatedAt: '2026-01-01T00:00:00.000Z' },
+          gone: { enabled: true, updatedAt: '' },
+        },
+      })
+    })
+
+    it('PUT /registry stores only the enabled snippet ids and returns 204', async () => {
+      let saved: string[] | undefined
+      const app = createTestApp({
+        snippetStore: createMockSnippetStore({ saveEnabledIds: async (_v, ids) => { saved = ids } }),
+      })
+
+      const registry: SnippetRegistryData = {
+        version: 1,
+        snippets: {
+          a: { enabled: true, updatedAt: '2026-01-01T00:00:00.000Z' },
+          off: { enabled: false, updatedAt: '2026-01-01T00:00:00.000Z' },
+          'with space': { enabled: true, updatedAt: '2026-01-01T00:00:00.000Z' },
+        },
+      }
       const res = await app.request('/api/v1/vaults/vault-1/snippets/registry', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -256,7 +270,35 @@ describe('Snippet Routes', () => {
       })
 
       expect(res.status).toBe(204)
-      expect(saved).toEqual(registry)
+      expect(saved).toEqual(['a', 'with space'])
+    })
+
+    it('maps an invalid appearance.json to 409', async () => {
+      const app = createTestApp({
+        snippetStore: createMockSnippetStore({ saveEnabledIds: async () => { throw new AppearanceFileInvalidError() } }),
+      })
+
+      const res = await app.request('/api/v1/vaults/vault-1/snippets/registry', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version: 1, snippets: {} }),
+      })
+
+      expect(res.status).toBe(409)
+    })
+
+    it('returns 404 for an unknown vault', async () => {
+      const app = createTestApp({ entry: null })
+
+      const res = await app.request('/api/v1/vaults/vault-1/snippets')
+      expect(res.status).toBe(404)
+    })
+
+    it('accepts snippet ids with spaces (Obsidian-style names)', async () => {
+      const app = createTestApp({ snippetStore: createMockSnippetStore({ loadSnippet: async () => 'a {}' }) })
+
+      const res = await app.request('/api/v1/vaults/vault-1/snippets/my%20snippet')
+      expect(res.status).toBe(200)
     })
 
     it('rejects an invalid registry body with 400', async () => {

@@ -45,11 +45,6 @@ export const VAULT_ROUTE_LEVEL_EXCEPTIONS: VaultRouteLevelException[] = [
   { method: 'PUT', pathPattern: '/plugins/:pluginId/settings', level: 'read' },
   { method: 'PUT', pathPattern: '/plugins/:pluginId/secrets/:secretId', level: 'read' },
   { method: 'DELETE', pathPattern: '/plugins/:pluginId/secrets/:secretId', level: 'read' },
-  // snippetRoutes.ts — same model as pluginRoutes.ts.
-  { method: 'PUT', pathPattern: '/snippets/registry', level: 'read' },
-  { method: 'POST', pathPattern: '/snippets', level: 'read' },
-  { method: 'PUT', pathPattern: '/snippets/:snippetId', level: 'read' },
-  { method: 'DELETE', pathPattern: '/snippets/:snippetId', level: 'read' },
   // pluginStoreRoutes.ts (vault-scoped) — flagged as arguably too weak (VAULT-ROUTE-AUTHORIZATION.md
   // finding F2), deliberately not tightened in this PR to keep the authorization refactor
   // behavior-neutral and safely revertible.

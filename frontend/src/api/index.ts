@@ -1503,7 +1503,7 @@ export class ApiClient implements IApiClient {
   /** Load a snippet's CSS content. */
   async loadSnippetContent(vaultId: string, snippetId: string): Promise<string> {
     const headers = this.buildHeaders('GET', false)
-    const response = await fetch(`/api/v1/vaults/${vaultId}/snippets/${snippetId}`, { method: 'GET', headers })
+    const response = await fetch(`/api/v1/vaults/${vaultId}/snippets/${encodeURIComponent(snippetId)}`, { method: 'GET', headers })
 
     if (response.status === 401) {
       await this.handleAuthFailure()
@@ -1519,12 +1519,12 @@ export class ApiClient implements IApiClient {
 
   /** Save (overwrite) a snippet's CSS content. */
   async saveSnippetContent(vaultId: string, snippetId: string, content: string): Promise<void> {
-    await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/snippets/${snippetId}`, { content })
+    await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/snippets/${encodeURIComponent(snippetId)}`, { content })
   }
 
   /** Delete a snippet. */
   async deleteSnippet(vaultId: string, snippetId: string): Promise<void> {
-    await this.request<void>('DELETE', `/api/v1/vaults/${vaultId}/snippets/${snippetId}`)
+    await this.request<void>('DELETE', `/api/v1/vaults/${vaultId}/snippets/${encodeURIComponent(snippetId)}`)
   }
 
   /** Load the snippet activation registry for a vault. */

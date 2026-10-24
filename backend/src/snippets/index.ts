@@ -1,9 +1,12 @@
 // ─── Snippets Module Barrel Export ─────────────────────────────────────────────
 
 export { SnippetStore } from './snippet-store.js'
+export { migrateLegacySnippets, LEGACY_MIGRATED_MARKER } from './legacy-migration.js'
+export { AppearanceFileInvalidError } from '../shared/appearance-file.js'
 export { SnippetNotFoundError, SnippetTooLargeError, InvalidSnippetFilenameError } from './errors.js'
 export {
   SNIPPET_FILENAME_PATTERN,
+  SNIPPET_ID_PATTERN,
   isValidSnippetFilename,
   snippetIdFromFilename,
   MAX_SNIPPET_SIZE,

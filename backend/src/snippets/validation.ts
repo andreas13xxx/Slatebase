@@ -3,12 +3,19 @@ import { z } from 'zod'
 // ─── Snippet Filename Validation ──────────────────────────────────────────────
 
 /**
- * Strict pattern for snippet filenames (Requirement 10.6):
- * - Only letters, digits, underscore, hyphen in the basename
- * - Must end in `.css`
- * - No path separators or `..` sequences
+ * Pattern for snippet filenames. Snippets live in Obsidian's `.obsidian/snippets/`, where
+ * names such as `my snippet.css` or `Dark.v2.css` are normal, so the pattern is wider than
+ * letters and digits:
+ * - must end in `.css` and must not start with a dot
+ * - no path separators, `%` (validateFilePath URL-decodes), Windows-reserved characters
+ *   or control characters
  */
-export const SNIPPET_FILENAME_PATTERN = /^[a-zA-Z0-9_-]+\.css$/
+// eslint-disable-next-line no-control-regex -- control characters are rejected on purpose
+export const SNIPPET_FILENAME_PATTERN = /^(?!\.)[^\\/%:*?"<>|\u0000-\u001f]+\.css$/
+
+/** Pattern for a snippet id (the filename without `.css`). */
+// eslint-disable-next-line no-control-regex -- control characters are rejected on purpose
+export const SNIPPET_ID_PATTERN = /^(?!\.)[^\\/%:*?"<>|\u0000-\u001f]+$/
 
 /**
  * Validates a snippet filename string against the safe pattern.
@@ -34,7 +41,7 @@ export const MAX_SNIPPET_SIZE = 512 * 1024
 export const snippetFilenameSchema = z.string()
   .min(5, 'Filename must not be empty') // shortest valid: "a.css"
   .max(128, 'Filename must not exceed 128 characters')
-  .regex(SNIPPET_FILENAME_PATTERN, 'Filename must match [a-zA-Z0-9_-]+.css')
+  .regex(SNIPPET_FILENAME_PATTERN, 'Filename must end in .css, must not start with a dot and must not contain / \\ % : * ? " < > | or control characters')
 
 /** Schema for validating snippet CSS content. Must not exceed 512 KB. */
 export const snippetContentSchema = z.string().max(MAX_SNIPPET_SIZE, 'Snippet must not exceed 512 KB')
