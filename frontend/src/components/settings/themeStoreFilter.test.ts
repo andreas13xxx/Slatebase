@@ -112,6 +112,7 @@ describe('formatDownloads', () => {
     expect(formatDownloads(842)).toBe('842')
     expect(formatDownloads(1234)).toBe('1.234')
     expect(formatDownloads(567_524)).toBe('567,5 Tsd.')
+    expect(formatDownloads(999_960)).toBe('1 Mio.')
     expect(formatDownloads(1_250_000)).toBe('1,3 Mio.')
   })
 })

@@ -44,6 +44,9 @@ function pickManifest(raw: Record<string, unknown>): ThemeManifestInput {
   return out
 }
 
+/** How long a catalog without download counts is cached before the next refresh tries the statistics again. */
+const INCOMPLETE_CATALOG_TTL_MS = 5 * 60 * 1000
+
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
@@ -250,7 +253,9 @@ export class ThemeStoreService implements IThemeStoreService {
       this.catalogInFlight = Promise.all([this.client.fetchCatalog(), this.fetchCountsOrNull()])
         .then(([entries, counts]) => {
           const merged = this.withDownloads(entries, counts)
-          this.cache.setCatalog(merged)
+          // A catalog without any count is retried sooner than a complete one.
+          const complete = merged.some((e) => e.downloads !== undefined) || counts !== null
+          this.cache.setCatalog(merged, complete ? undefined : INCOMPLETE_CATALOG_TTL_MS)
           return merged
         })
         .finally(() => {
@@ -275,9 +280,9 @@ export class ThemeStoreService implements IThemeStoreService {
    * request does not wipe the numbers; a theme without any count simply has none ("unknown", not 0).
    */
   private withDownloads(entries: CommunityThemeEntry[], counts: Map<string, number> | null): CommunityThemeEntry[] {
-    const previous = counts === null ? new Map((this.cache.getCatalogStale() ?? []).map((e) => [e.repo, e.downloads])) : null
+    const known = counts ?? new Map((this.cache.getCatalogStale() ?? []).flatMap((e) => (e.downloads === undefined ? [] : [[e.name.toLowerCase(), e.downloads] as const])))
     return entries.map((entry) => {
-      const downloads = counts !== null ? counts.get(entry.name.toLowerCase()) : previous?.get(entry.repo)
+      const downloads = known.get(entry.name.toLowerCase())
       const { downloads: _drop, ...rest } = entry
       return downloads === undefined ? rest : { ...rest, downloads }
     })

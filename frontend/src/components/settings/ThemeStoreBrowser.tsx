@@ -286,6 +286,7 @@ export function ThemeStoreBrowser() {
                 <option value="dark">Dunkel</option>
               </select>
             </label>
+            {catalog.themes.some((t) => t.downloads !== undefined) && (
             <label className="theme-store__field">
               <span>Sortieren nach</span>
               <select value={filters.sort} onChange={(e) => changeFilters({ sort: e.target.value as SortOrder })}>
@@ -293,6 +294,7 @@ export function ThemeStoreBrowser() {
                 <option value="name">Name</option>
               </select>
             </label>
+            )}
             <label className="theme-store__check">
               <input type="checkbox" checked={filters.installedOnly} onChange={(e) => changeFilters({ installedOnly: e.target.checked })} />
               Installiert

@@ -132,6 +132,18 @@ describe('listCatalog', () => {
     expect(result.themes[0]).not.toHaveProperty('downloads')
   })
 
+  it('retries a catalog without counts after 5 minutes instead of the full TTL', async () => {
+    let failStats = true
+    const client = createMockClient({ counts: async () => { if (failStats) throw new ThemeStoreFetchError('u', 503); return new Map([['things', 7]]) } })
+    const { service } = createService(client)
+    await service.listCatalog()
+    clock += 5 * 60 * 1000 + 1
+    failStats = false
+    const { themes: list } = await service.listCatalog()
+    expect(client.calls.catalog).toBe(2)
+    expect(list.find((t) => t.name === 'Things')?.downloads).toBe(7)
+  })
+
   it('keeps the last known counts when a refresh cannot load the statistics', async () => {
     let failStats = false
     const client = createMockClient({

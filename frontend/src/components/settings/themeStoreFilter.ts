@@ -79,7 +79,7 @@ export function filterCatalog(
 /** German short form of a download count: `842`, `12,3 Tsd.`, `1,2 Mio.`. */
 export function formatDownloads(count: number): string {
   const short = (value: number, unit: string): string => `${value.toLocaleString('de-DE', { maximumFractionDigits: 1 })} ${unit}`
-  if (count >= 1_000_000) return short(count / 1_000_000, 'Mio.')
+  if (count >= 999_950) return short(count / 1_000_000, 'Mio.')
   if (count >= 10_000) return short(count / 1_000, 'Tsd.')
   return count.toLocaleString('de-DE')
 }

@@ -29,6 +29,8 @@ const DEFAULT_STATS_URL = 'https://releases.obsidian.md/stats/theme'
 const CATALOG_PATH = 'obsidianmd/obsidian-releases/master/community-css-themes.json'
 /** Size cap for a remote `manifest.json`. */
 const MAX_MANIFEST_BYTES = 64 * 1024
+/** The statistics are optional, so a slow host must not hold up the catalog for the default 30 s. */
+const STATS_TIMEOUT_MS = 5_000
 const USER_AGENT = 'Slatebase-Theme-Store/1.0'
 
 /** Options for {@link ThemeStoreClient}. */
@@ -51,10 +53,10 @@ class BodyTooLargeError extends Error {}
  */
 export class ThemeStoreClient implements IThemeStoreClient {
   private readonly origin: string
-  private readonly guards: Pick<GuardedFetchOptions, 'allowedHosts' | 'protocols' | 'userAgent'>
+  private readonly guards: Pick<GuardedFetchOptions, 'allowedHosts' | 'protocols' | 'userAgent' | 'timeoutMs'>
   private readonly statsUrl: string
   /** Separate allowlist for the statistics host, so the repo-file requests can never reach it (or the reverse). */
-  private readonly statsGuards: Pick<GuardedFetchOptions, 'allowedHosts' | 'protocols' | 'userAgent'>
+  private readonly statsGuards: Pick<GuardedFetchOptions, 'allowedHosts' | 'protocols' | 'userAgent' | 'timeoutMs'>
 
   constructor(
     private readonly logger: ILogger,
@@ -65,7 +67,7 @@ export class ThemeStoreClient implements IThemeStoreClient {
     this.guards = { allowedHosts: new Set([base.host]), protocols: [base.protocol], userAgent: USER_AGENT }
     const stats = new URL(options.statsUrl ?? DEFAULT_STATS_URL)
     this.statsUrl = stats.href
-    this.statsGuards = { allowedHosts: new Set([stats.host]), protocols: [stats.protocol], userAgent: USER_AGENT }
+    this.statsGuards = { allowedHosts: new Set([stats.host]), protocols: [stats.protocol], userAgent: USER_AGENT, timeoutMs: STATS_TIMEOUT_MS }
   }
 
   async fetchCatalog(): Promise<CommunityThemeEntry[]> {
@@ -190,7 +192,7 @@ export class ThemeStoreClient implements IThemeStoreClient {
     url: string,
     maxBytes: number,
     accept?: string,
-    guards: Pick<GuardedFetchOptions, 'allowedHosts' | 'protocols' | 'userAgent'> = this.guards,
+    guards: Pick<GuardedFetchOptions, 'allowedHosts' | 'protocols' | 'userAgent' | 'timeoutMs'> = this.guards,
   ): Promise<GuardedFetchResult> {
     try {
       return await guardedFetch(url, { ...guards, maxBytes, ...(accept ? { accept } : {}) })

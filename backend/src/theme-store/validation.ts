@@ -29,8 +29,10 @@ export const communityThemeEntrySchema = z.object({
   screenshot: z.string().max(500).default(''),
   modes: z.array(z.string()).default([]).transform((modes) => modes.filter((m): m is 'dark' | 'light' => m === 'dark' || m === 'light')),
   legacy: z.boolean().default(false),
-  downloads: z.number().int().nonnegative().optional(),
 })
+
+/** An entry as persisted in the local cache: the catalog entry plus the download count merged in by the service. */
+export const cachedThemeEntrySchema = communityThemeEntrySchema.extend({ downloads: z.number().int().nonnegative().optional() })
 
 /** Upper bound on the download statistics (~75 KB upstream today). */
 export const MAX_STATS_BYTES = 1024 * 1024
