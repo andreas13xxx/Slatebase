@@ -223,9 +223,9 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
   // ancestor folders, then scroll the target into view once it's rendered.
   const pendingRevealRef = useRef<{ path: string; kind: 'file' | 'folder' } | null>(null)
   useEffect(() => {
-    function applyReveal(detail: { path: string; kind?: 'file' | 'folder' } | null | undefined) {
+    function applyReveal(detail: { path: string; kind?: 'file' | 'folder'; vaultId?: string } | null | undefined) {
       if (!detail || detail.path === undefined) return
-      const vaultId = state.selectedVaultId
+      const vaultId = detail.vaultId ?? state.selectedVaultId
       if (!vaultId) return
       const kind = detail.kind ?? 'file'
 
@@ -263,7 +263,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
     }
 
     function handleRevealFile(e: Event) {
-      applyReveal((e as CustomEvent<{ path: string; kind?: 'file' | 'folder' }>).detail)
+      applyReveal((e as CustomEvent<{ path: string; kind?: 'file' | 'folder'; vaultId?: string }>).detail)
     }
 
     // Pick up a reveal request made before this listener existed — e.g. auto-reveal

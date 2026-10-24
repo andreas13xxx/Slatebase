@@ -16,13 +16,16 @@
 export interface RevealRequest {
   path: string
   kind: 'file' | 'folder'
+  /** Vault the path belongs to; unset means the currently selected vault. */
+  vaultId?: string
 }
 
 let pendingReveal: RevealRequest | null = null
 
-export function requestReveal(path: string, kind: 'file' | 'folder' = 'file'): void {
-  pendingReveal = { path, kind }
-  window.dispatchEvent(new CustomEvent('slatebase:reveal-file', { detail: { path, kind } }))
+export function requestReveal(path: string, kind: 'file' | 'folder' = 'file', vaultId?: string): void {
+  const request: RevealRequest = vaultId === undefined ? { path, kind } : { path, kind, vaultId }
+  pendingReveal = request
+  window.dispatchEvent(new CustomEvent('slatebase:reveal-file', { detail: request }))
 }
 
 export function consumePendingReveal(): RevealRequest | null {

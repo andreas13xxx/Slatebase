@@ -101,6 +101,8 @@ import { CommandPaletteContainer } from './components/CommandPaletteContainer'
 import { TabBar, type SettingsTabDescriptor } from './components/TabBar'
 import { EditorHeaderRow } from './components/EditorHeaderRow'
 import { Breadcrumb } from './components/Breadcrumb'
+import { PaneHeader } from './components/panes/PaneHeader'
+import { isBreadcrumbPath } from './components/panes/breadcrumbPath'
 import { useResize } from './hooks/useResize'
 import { useStatusBar } from './hooks/useStatusBar'
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts'
@@ -950,7 +952,7 @@ function AppContent() {
   }, [leftPanelDispatch, rightPanelDispatch])
 
   // Breadcrumb (Requirement 7.5): only for real file tabs, not the graph tab or plugin views.
-  const breadcrumbFilePath = activeTab && activeTab.filePath !== '__graph__' && !activeTab.filePath.startsWith('__view::')
+  const breadcrumbFilePath = activeTab && isBreadcrumbPath(activeTab.filePath)
     ? activeTab.filePath
     : null
 
@@ -986,9 +988,9 @@ function AppContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [explorerFollowActiveFile, activeTab?.id])
 
-  const handleBreadcrumbSegmentClick = useCallback((folderPath: string) => {
+  const handleBreadcrumbSegmentClick = useCallback((folderPath: string, vaultId?: string) => {
     if (!showSidebar) setShowSidebar(true)
-    requestReveal(folderPath, 'folder')
+    requestReveal(folderPath, 'folder', vaultId)
   }, [showSidebar])
 
   // ── Split Panes: id generation + cross-pane tab move ──
@@ -1328,8 +1330,9 @@ function AppContent() {
             </div>
 
             {/* Back/forward, breadcrumb and the pane menu share the row below the tabs. */}
+            {(singlePaneId !== null || isShowingSettings) && (
             <EditorHeaderRow showPaneMenu={!isShowingSettings}>
-              {!isShowingSettings && breadcrumbFilePath !== null && selectedVault && (
+              {!isShowingSettings && singlePaneId !== null && breadcrumbFilePath !== null && selectedVault && (
                 <Breadcrumb
                   vaultName={selectedVault.name}
                   filePath={breadcrumbFilePath}
@@ -1337,6 +1340,7 @@ function AppContent() {
                 />
               )}
             </EditorHeaderRow>
+            )}
 
             {/* Content: settings page or vault editor */}
             {isShowingSettings ? (
@@ -1366,6 +1370,9 @@ function AppContent() {
                             paneId={pane.id}
                             onMoveTabToPane={handleMoveTabToPane}
                           />
+                        )}
+                        {singlePaneId === null && (
+                          <PaneHeader pane={pane} vaults={state.vaults} onSegmentClick={handleBreadcrumbSegmentClick} />
                         )}
                         <ErrorBoundary>
                           <TabContent />

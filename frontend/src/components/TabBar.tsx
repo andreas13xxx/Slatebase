@@ -72,8 +72,9 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab, pan
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
 
   // A pane-local bar always renders (even empty) so an empty pane stays a valid
-  // drop target for a cross-pane move; the legacy single row collapses when empty.
-  if (paneId === undefined && showFileTabs && settingsTabs.length === 0 && tabs.length === 0) {
+  // drop target for a cross-pane move; the legacy top row collapses when it has nothing to show
+  // (also when split, where it carries no file tabs).
+  if (paneId === undefined && settingsTabs.length === 0 && tabs.length === 0) {
     return null
   }
 
