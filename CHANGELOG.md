@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.64.0](https://github.com/andreas13xxx/Slatebase/compare/v0.63.1...v0.64.0) (2026-10-24)
+
+
+### Features
+
+* **plugins:** Plugins in .obsidian/plugins speichern, Import entfernt ([7919927](https://github.com/andreas13xxx/Slatebase/commit/79199279ec603a0be5327b05b8935b51bdf21915))
+* **plugins:** Plugins in .obsidian/plugins speichern, Import entfernt ([e76f610](https://github.com/andreas13xxx/Slatebase/commit/e76f6109b0f61d1139d86ce05be002ccfd53bce4))
+* **plugins:** vault:change bei Plugin-Aenderungen ([e4e458c](https://github.com/andreas13xxx/Slatebase/commit/e4e458c690cd42f331fe5912ef63ef7d548663eb))
+* **snippets:** CSS-Snippets in .obsidian/snippets speichern ([fc1cb80](https://github.com/andreas13xxx/Slatebase/commit/fc1cb806f6ddfa9b4ed1b5ac9dc7f2e9b313e26c))
+
+
+### Bugfixes
+
+* **plugins:** Plugin-IDs wie im Obsidian-Katalog zulassen ([966cdb6](https://github.com/andreas13xxx/Slatebase/commit/966cdb665bed0d1127bd92c1c4a3de6cdec8e298))
+* **plugins:** Review-Befunde zu Registry, Ereignissen und Einstellungen ([f5a36f7](https://github.com/andreas13xxx/Slatebase/commit/f5a36f75a4a3f85c0c1f7e842135add1c80473b9))
+* **snippets:** Review-Befunde zur Vault-Ablage beheben ([ee7e470](https://github.com/andreas13xxx/Slatebase/commit/ee7e4707858c515ce34b55cf615810b7ad72b7dd))
+
 ## [0.63.1](https://github.com/andreas13xxx/Slatebase/compare/v0.63.0...v0.63.1) (2026-10-24)
 
 
