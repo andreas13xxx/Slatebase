@@ -31,7 +31,8 @@ export function ThemeManager() {
   const [loading, setLoading] = useState(() => Boolean(vaultId && apiClient))
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<ThemeMeta | null>(null)
-  const styleSettingsState = useStyleSettingsPluginState(apiClient, vaultId, themes.some((t) => t.hasStyleSettings))
+  const anyStyleSettings = themes.some((t) => t.hasStyleSettings)
+  const styleSettingsState = useStyleSettingsPluginState(apiClient, vaultId, anyStyleSettings)
 
   const load = useCallback(async () => {
     if (!vaultId || !apiClient) return
@@ -123,7 +124,7 @@ export function ThemeManager() {
       </p>
 
       {error && <p className="theme-manager__error" role="alert">{error}</p>}
-      {themes.some((t) => t.hasStyleSettings) && <StyleSettingsHint state={styleSettingsState} />}
+      {!loading && anyStyleSettings && <StyleSettingsHint state={styleSettingsState} />}
       {loading && <p className="theme-manager__loading">Lädt…</p>}
 
       {!loading && (
@@ -150,11 +151,12 @@ export function ThemeManager() {
                   value={theme.id}
                   checked={activeId === theme.id}
                   onChange={() => void handleSelect(theme.id)}
+                  aria-describedby={theme.hasStyleSettings ? `theme-settings-${theme.id}` : undefined}
                 />
                 <span className="theme-manager__name">{theme.manifest.name}</span>
                 {theme.hasStyleSettings && (
-                  <span className="theme-manager__settings-icon" role="img" aria-label="Hat eigene Einstellungen" title="Hat eigene Einstellungen">
-                    <SlidersHorizontal size={13} aria-hidden="true" />
+                  <span className="theme-manager__settings-icon" title="Hat eigene Einstellungen" aria-hidden="true">
+                    <SlidersHorizontal size={13} />
                   </span>
                 )}
                 <span className="theme-manager__meta">
@@ -166,6 +168,7 @@ export function ThemeManager() {
                   <AlertTriangle size={13} aria-hidden="true" /> Lädt Inhalte von: {theme.externalHosts.join(', ')}
                 </p>
               )}
+              {theme.hasStyleSettings && <span id={`theme-settings-${theme.id}`} className="theme-manager__sr-only">Hat eigene Einstellungen</span>}
               <button
                 type="button"
                 className="theme-manager__action-btn"

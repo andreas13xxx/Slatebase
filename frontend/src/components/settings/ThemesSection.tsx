@@ -9,7 +9,7 @@
  *
  * @module components/settings/ThemesSection
  */
-import { useCallback, useId, useRef, useState } from 'react'
+import { useCallback, useId, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { useAppContext } from '../../state'
 import { useFeatureContext } from '../../state/featureContext'
@@ -31,7 +31,7 @@ export function ThemesSection() {
   const { isEnabled } = useFeatureContext()
   const { state } = useAppContext()
   const storeEnabled = isEnabled('obsidian-theme-store')
-  const tabs = storeEnabled ? TABS : TABS.filter((t) => t.id !== 'discover')
+  const tabs = useMemo(() => (storeEnabled ? TABS : TABS.filter((t) => t.id !== 'discover')), [storeEnabled])
   const [tab, setTab] = useState<ThemesTab>('installed')
   const baseId = useId()
   const tabRefs = useRef<Record<ThemesTab, HTMLButtonElement | null>>({ installed: null, discover: null, import: null })

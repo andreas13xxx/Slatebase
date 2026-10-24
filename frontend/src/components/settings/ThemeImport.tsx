@@ -5,7 +5,7 @@
  * Whether a theme with the same name exists is looked up right before saving, so this tab needs no theme list of
  * its own. A theme that is overwritten while active is re-applied locally; other clients follow via `vault:change`.
  */
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, DragEvent, KeyboardEvent } from 'react'
 import { Upload } from 'lucide-react'
 import { useAppContext } from '../../state'
@@ -21,8 +21,6 @@ interface PendingOverwrite {
   themeId: string
   css: string
   manifest: Manifest
-  /** Whether the theme being replaced is the vault's active one. */
-  active: boolean
 }
 
 export function ThemeImport() {
@@ -34,16 +32,32 @@ export function ThemeImport() {
   const [overwrite, setOverwrite] = useState<PendingOverwrite | null>(null)
   const [dragging, setDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  /** The vault shown now; a save that finishes after a vault switch must not touch the new vault's screen. */
+  const vaultRef = useRef(vaultId)
+  useEffect(() => { vaultRef.current = vaultId }, [vaultId])
 
-  const saveTheme = useCallback(async (themeId: string, css: string, manifest: Manifest, active: boolean) => {
+  const saveTheme = useCallback(async (themeId: string, css: string, manifest: Manifest, replacing: boolean) => {
     if (!vaultId || !apiClient) return
+    const label = manifest.name ?? themeId
     try {
       await apiClient.saveTheme(vaultId, themeId, css, manifest)
-      // Re-applying keeps the screen in step when the overwritten theme is the active one.
-      if (active) themeInjector.apply(themeId, css)
-      setNotice(`„${manifest.name ?? themeId}“ wurde importiert. Aktivieren kannst du es unter „Installiert“.`)
     } catch (err) {
       setError(extractErrorMessage(err, 'Theme konnte nicht importiert werden'))
+      return
+    }
+    if (vaultRef.current !== vaultId) return
+    if (!replacing) {
+      setNotice(`„${label}“ wurde importiert. Aktivieren kannst du es unter „Installiert“.`)
+      return
+    }
+    setNotice(`„${label}“ wurde überschrieben.`)
+    // Re-applying keeps the screen in step when the overwritten theme is the active one. Whether it is active is
+    // asked now, not when the file was picked: the choice may have changed while the dialog was open.
+    try {
+      const { activeThemeId } = await apiClient.listThemes(vaultId)
+      if (activeThemeId === themeId && vaultRef.current === vaultId) themeInjector.apply(themeId, css)
+    } catch {
+      // The theme is saved; the screen follows on the next load.
     }
   }, [vaultId, apiClient])
 
@@ -56,13 +70,20 @@ export function ThemeImport() {
       setError(picked.message)
       return
     }
-    const manifest = await readManifestFields(picked.files.manifest)
+    let manifest: Manifest
+    let css: string
+    try {
+      manifest = await readManifestFields(picked.files.manifest)
+      css = await picked.files.css.text()
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Die Dateien konnten nicht gelesen werden'))
+      return
+    }
     const themeId = deriveThemeId(manifest.name ?? null, picked.files.css.name)
     if (themeId === null) {
       setError('Der Theme-Name fehlt: Bitte manifest.json mit "name" mitliefern oder die CSS-Datei umbenennen.')
       return
     }
-    const css = await picked.files.css.text()
 
     // A failed lookup is "unknown", not "does not exist": stop instead of overwriting a theme unasked.
     let listed: Awaited<ReturnType<typeof apiClient.listThemes>>
@@ -76,7 +97,7 @@ export function ThemeImport() {
     const existing = listed.themes.find((t) => t.id.toLowerCase() === themeId.toLowerCase())
     if (existing !== undefined) {
       // Use the existing folder's spelling so the "is this the active theme" check stays exact.
-      setOverwrite({ themeId: existing.id, css, manifest, active: existing.id === listed.activeThemeId })
+      setOverwrite({ themeId: existing.id, css, manifest })
       return
     }
     await saveTheme(themeId, css, manifest, false)
@@ -151,7 +172,7 @@ export function ThemeImport() {
         onConfirm={() => {
           const pending = overwrite
           setOverwrite(null)
-          if (pending) void saveTheme(pending.themeId, pending.css, pending.manifest, pending.active)
+          if (pending) void saveTheme(pending.themeId, pending.css, pending.manifest, true)
         }}
         onCancel={() => setOverwrite(null)}
       />
