@@ -125,9 +125,9 @@ featureRegistry.register({ name: 'mcp', description: 'AI Context Server (MCP Int
 featureRegistry.register({ name: 'git-sync', description: 'Git-Synchronisation von Vaults mit externen Remotes', defaultEnabled: true, type: 'cold' })
 featureRegistry.register({ name: 'mail-import', description: 'IMAP-Mail-Import als Markdown-Notizen', defaultEnabled: true, type: 'cold' })
 featureRegistry.register({ name: 'voice-transcription', description: 'Diktieren / Spracherkennung via self-hosted Whisper (rechenintensiv, GPU empfohlen)', defaultEnabled: false, type: 'cold' })
-featureRegistry.register({ name: 'bases', description: 'Bases — filterbare, editierbare Tabellen über die Vault-Metadaten (experimentell)', defaultEnabled: false, type: 'cold' })
+featureRegistry.register({ name: 'bases', description: 'Bases — filterbare, editierbare Tabellen über die Vault-Metadaten', defaultEnabled: false, type: 'cold' })
 featureRegistry.register({ name: 'public-shares', description: 'Öffentliche Freigabe-Links — Notizen per Link für Personen ohne Konto lesbar machen (Inhalte verlassen den Server)', defaultEnabled: false, type: 'hot' })
-featureRegistry.register({ name: 'activity-timeline', description: 'Aktivitätszeitleiste — chronologische Vault-Aktivität als Tab und Seitenleiste (experimentell)', defaultEnabled: false, type: 'cold' })
+featureRegistry.register({ name: 'activity-timeline', description: 'Aktivitätszeitleiste — chronologische Vault-Aktivität als Tab und Seitenleiste', defaultEnabled: false, type: 'cold' })
 
 const featureToggleStore = new FeatureToggleStore(serverConfig.dataDir, logger)
 const persistedFeatureState = await featureToggleStore.load()
