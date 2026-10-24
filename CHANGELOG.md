@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.62.0](https://github.com/andreas13xxx/Slatebase/compare/v0.61.0...v0.62.0) (2026-10-24)
+
+
+### Features
+
+* öffentliche Freigabe-Links für Notizen ([ff90d3b](https://github.com/andreas13xxx/Slatebase/commit/ff90d3bfb10b2a1ed93a262c0adbd1fba33245dd))
+* **public-share:** Backend-Kern fuer Freigabe-Links (Phase 1) ([45449ee](https://github.com/andreas13xxx/Slatebase/commit/45449eebc59bbd06b8eac33c0d171819eb1e9aa8))
+* **public-share:** oeffentliche Leseseite /s/&lt;token&gt; (Phase 3) ([432e81c](https://github.com/andreas13xxx/Slatebase/commit/432e81c8a3627d063aadea639f7f873b0a2eadf0))
+* **public-share:** Routen, Auth-Bypass und Verdrahtung fuer Freigabe-Links (Phase 2) ([40069fe](https://github.com/andreas13xxx/Slatebase/commit/40069feef22d4600602972ff50737a2fac5e0c5e))
+* **public-share:** Teilen-Dialog, Link-Uebersicht und Menue-Eintraege (Phase 4) ([253c8ea](https://github.com/andreas13xxx/Slatebase/commit/253c8ea94c124210a3774589224cd05e933fcfcc))
+
+
+### Bugfixes
+
+* **ci:** Backend-Lockfile passend zu npm ci --install-links ([c25fb8a](https://github.com/andreas13xxx/Slatebase/commit/c25fb8a36fed1df8828b005daad49769818e966d))
+* **ci:** CodeQL, gitleaks und npm audit fuer die Freigabe-Links ([9e5d21e](https://github.com/andreas13xxx/Slatebase/commit/9e5d21e21ffd9a84af7c9eba48e4fb430db4104e))
+* **public-share:** Befunde des Code-Reviews behoben ([5093f22](https://github.com/andreas13xxx/Slatebase/commit/5093f22f08e2e7abefffc92b4364bcc3201301ad))
+
+
+### Sonstige Änderungen
+
+* **public-share:** README, Welcome-Vaults und Abschlussbefunde (Phase 5) ([14d775f](https://github.com/andreas13xxx/Slatebase/commit/14d775f72226d60a1ae8caaca7977cc78fa0c98a))
+* **spec:** Freigabe-Links Phase 0 - Befunde zu Datei-ID, Reading View und Auth-Bypass ([adfdbc9](https://github.com/andreas13xxx/Slatebase/commit/adfdbc92659d24ce894038a1ef24612c9d408126))
+
 ## [0.61.0](https://github.com/andreas13xxx/Slatebase/compare/v0.60.0...v0.61.0) (2026-10-23)
 
 
