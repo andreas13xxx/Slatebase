@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.63.1](https://github.com/andreas13xxx/Slatebase/compare/v0.63.0...v0.63.1) (2026-10-24)
+
+
+### Bugfixes
+
+* **file-explorer:** Dateinamen bei AnuPpuccin sichtbar ([4ef90a3](https://github.com/andreas13xxx/Slatebase/commit/4ef90a3ffb1acfe86993dc5f96928ca4d9f5f125))
+* **file-explorer:** Dateinamen bei Themes mit flex-grow-Variable sichtbar ([2c78bd5](https://github.com/andreas13xxx/Slatebase/commit/2c78bd57ed95caeca38ba993792d8c847d88dcb2))
+
 ## [0.63.0](https://github.com/andreas13xxx/Slatebase/compare/v0.62.0...v0.63.0) (2026-10-24)
 
 
