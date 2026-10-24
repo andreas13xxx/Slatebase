@@ -11,14 +11,16 @@
  * @module components/StatusBar
  */
 
-import { useState, useEffect, useRef, useCallback, type FormEvent } from 'react'
+import { useState, useEffect, useRef, useCallback, useSyncExternalStore, type FormEvent } from 'react'
 import { useTranslation } from '../i18n'
-import { Clock, Vault as VaultIcon, FileText, MoveVertical, Link2 } from 'lucide-react'
+import { Clock, Vault as VaultIcon, FileText, MoveVertical, Link2, Palette } from 'lucide-react'
 import {
   getStatusBarItems,
   onStatusBarItemsChange,
 } from '../plugins/compat/status-bar-registry'
 import type { StatusBarItemEntry } from '../plugins/compat/status-bar-registry'
+import { themeInjector } from '../plugins/appearance/theme-injector'
+import { CSS_CHANGE_EVENT } from '../plugins/appearance/css-change'
 import { useStatusBarItemVisibility } from '../hooks/useStatusBarItemVisibility'
 import { useWordStats } from '../hooks/useWordStats'
 import { useLinkCounts } from '../hooks/useLinkCounts'
@@ -91,6 +93,45 @@ function LinkCountsItem() {
     <div className="status-bar__item status-bar__link-counts" aria-label={t('statusBar.linkCountsAriaLabel')}>
       <Link2 size={12} aria-hidden="true" />
       <span>{t('statusBar.linkCounts', { forward: counts.forward, backlinks: counts.backlinks })}</span>
+    </div>
+  )
+}
+
+function subscribeThemeChange(listener: () => void): () => void {
+  window.addEventListener(CSS_CHANGE_EVENT, listener)
+  return () => { window.removeEventListener(CSS_CHANGE_EVENT, listener) }
+}
+
+/** Active Obsidian theme of the open vault; hidden while no theme is applied. */
+function ThemeItem() {
+  const { t } = useTranslation()
+  const { visible } = useStatusBarItemVisibility('theme')
+  const themeId = useSyncExternalStore(subscribeThemeChange, () => themeInjector.currentThemeId())
+  const { state, apiClient } = useAppContext()
+  const vaultId = state.selectedVaultId
+  const [resolved, setResolved] = useState<{ vaultId: string; themeId: string; name: string } | null>(null)
+
+  // The manifest name is the display name; the id (folder name) is the fallback while it loads or if it cannot be read.
+  useEffect(() => {
+    if (!visible || !themeId || !vaultId || !apiClient) return
+    let cancelled = false
+    // listThemes carries metadata only; loadTheme would download the whole stylesheet (up to 3 MB) a second time.
+    apiClient.listThemes(vaultId)
+      .then(({ themes }) => {
+        const name = themes.find((theme) => theme.id === themeId)?.manifest.name
+        if (!cancelled && name) setResolved({ vaultId, themeId, name })
+      })
+      .catch(() => { /* cosmetic: keep showing the id */ })
+    return () => { cancelled = true }
+  }, [visible, themeId, vaultId, apiClient])
+
+  if (!visible || !themeId) return null
+  const name = resolved?.themeId === themeId && resolved.vaultId === vaultId ? resolved.name : themeId
+
+  return (
+    <div className="status-bar__item status-bar__theme" aria-label={t('statusBar.themeAriaLabel')}>
+      <Palette size={12} aria-hidden="true" />
+      <span>{name}</span>
     </div>
   )
 }
@@ -258,6 +299,7 @@ export function StatusBar() {
         <VaultNameItem />
         <WordStatsItem />
         <LinkCountsItem />
+        <ThemeItem />
         <CursorPositionItem />
       </div>
       <div

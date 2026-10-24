@@ -820,6 +820,7 @@ export const de = {
     wordStatsSelection: '{selected} von {total} Wörtern ausgewählt',
     linkCounts: '{forward} aus- / {backlinks} eingehend',
     linkCountsAriaLabel: 'Anzahl aus- und eingehender Links',
+    themeAriaLabel: 'Aktives Theme',
     cursorPositionAriaLabel: 'Cursor-Position, klicken um zu einer Zeile zu springen',
     cursorSelectedLines: '{count} Zeilen ausgewählt',
     goToLineTitle: 'Gehe zu Zeile',
