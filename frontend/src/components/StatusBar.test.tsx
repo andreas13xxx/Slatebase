@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, act, fireEvent } from '@testing-library/react'
+import { render, screen, act, fireEvent, waitFor } from '@testing-library/react'
 import { useEffect } from 'react'
 import { EditorView } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
@@ -7,8 +7,10 @@ import { AppProvider, useAppContext } from '../state'
 import { setActiveEditorView } from '../editor/plugin-extensions'
 import { addStatusBarItem, removeStatusBarItemsForPlugin, clearAllStatusBarItems } from '../plugins/compat/status-bar-registry'
 import { useStatusBarItemVisibility, type BuiltinStatusBarItemId } from '../hooks/useStatusBarItemVisibility'
+import { themeInjector } from '../plugins/appearance/theme-injector'
 import { StatusBar } from './StatusBar'
 import type { VaultInfo } from '../types'
+import type { IApiClient } from '../api'
 
 /** Exposes a toggle button for a given item — useStatusBarItemVisibility is a
  * module-level singleton store, so tests must go through its own toggle()
@@ -82,6 +84,69 @@ describe('StatusBar', () => {
   it('shows the vault name when a vault is selected', () => {
     renderStatusBar(testVault)
     expect(screen.getByText('My Vault')).toBeInTheDocument()
+  })
+
+  it('shows the active theme and hides it when the item toggle is off', () => {
+    themeInjector.apply('minimal', 'body {}')
+    try {
+      render(
+        <AppProvider>
+          <ItemToggleHarness id="theme" />
+          <StatusBar />
+        </AppProvider>
+      )
+      expect(document.querySelector('.status-bar__theme')).toHaveTextContent('minimal')
+
+      fireEvent.click(screen.getByText('toggle-theme'))
+      expect(document.querySelector('.status-bar__theme')).not.toBeInTheDocument()
+
+      // Restore — the visibility store is a module-level singleton shared across tests.
+      fireEvent.click(screen.getByText('toggle-theme'))
+    } finally {
+      themeInjector.remove()
+    }
+  })
+
+  it('shows the theme manifest name instead of the id once it is loaded', async () => {
+    themeInjector.apply('minimal', 'body {}')
+    const listThemes = vi.fn().mockResolvedValue({
+      themes: [{ id: 'minimal', manifest: { name: 'Minimal Theme' } }],
+      activeThemeId: 'minimal',
+    })
+    try {
+      render(
+        <AppProvider apiClient={{ listThemes } as unknown as IApiClient}>
+          <VaultSeeder vault={testVault} />
+          <StatusBar />
+        </AppProvider>
+      )
+      expect(await screen.findByText('Minimal Theme')).toBeInTheDocument()
+      expect(listThemes).toHaveBeenCalledWith('vault1')
+    } finally {
+      themeInjector.remove()
+    }
+  })
+
+  it('keeps showing the theme id when the name cannot be loaded', async () => {
+    themeInjector.apply('minimal', 'body {}')
+    const listThemes = vi.fn().mockRejectedValue(new Error('offline'))
+    try {
+      render(
+        <AppProvider apiClient={{ listThemes } as unknown as IApiClient}>
+          <VaultSeeder vault={testVault} />
+          <StatusBar />
+        </AppProvider>
+      )
+      await waitFor(() => expect(listThemes).toHaveBeenCalled())
+      expect(document.querySelector('.status-bar__theme')).toHaveTextContent('minimal')
+    } finally {
+      themeInjector.remove()
+    }
+  })
+
+  it('shows no theme item while no theme is applied', () => {
+    renderStatusBar()
+    expect(document.querySelector('.status-bar__theme')).not.toBeInTheDocument()
   })
 
   it('does not show word stats or cursor position when no editor is active', () => {

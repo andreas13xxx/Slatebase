@@ -39,6 +39,7 @@ const BUILTIN_ITEMS: Array<{ id: BuiltinStatusBarItemId; label: string }> = [
   { id: 'wordStats', label: 'Wort- und Zeichenanzahl' },
   { id: 'cursorPosition', label: 'Cursor-Position' },
   { id: 'linkCounts', label: 'Aus-/eingehende Links' },
+  { id: 'theme', label: 'Aktives Theme' },
 ]
 
 /** One visibility toggle row for a built-in status bar item. */

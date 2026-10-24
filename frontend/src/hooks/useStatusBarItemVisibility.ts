@@ -10,7 +10,7 @@
 import { useCallback } from 'react'
 import { useUiSettings, updateUiSettings, getUiSettings } from '../state/userSettingsStore'
 
-export type BuiltinStatusBarItemId = 'clock' | 'wordStats' | 'cursorPosition' | 'vaultName' | 'linkCounts'
+export type BuiltinStatusBarItemId = 'clock' | 'wordStats' | 'cursorPosition' | 'vaultName' | 'linkCounts' | 'theme'
 
 export interface UseStatusBarItemVisibilityReturn {
   visible: boolean

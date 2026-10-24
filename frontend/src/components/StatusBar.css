@@ -41,7 +41,8 @@
 
 .status-bar__vault-name,
 .status-bar__word-stats,
-.status-bar__link-counts {
+.status-bar__link-counts,
+.status-bar__theme {
   color: var(--status-bar-text);
   opacity: 0.85;
 }

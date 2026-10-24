@@ -826,6 +826,7 @@ export const en: TranslationShape = {
     wordStatsSelection: '{selected} of {total} words selected',
     linkCounts: '{forward} out / {backlinks} in',
     linkCountsAriaLabel: 'Outgoing and incoming link count',
+    themeAriaLabel: 'Active theme',
     cursorPositionAriaLabel: 'Cursor position, click to jump to a line',
     cursorSelectedLines: '{count} lines selected',
     goToLineTitle: 'Go to line',
