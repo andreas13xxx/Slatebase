@@ -7,6 +7,9 @@ import type { CommunityTheme, ThemeUpdateCheck } from '../../api'
 /** Which color modes a theme must support. */
 export type ModeFilter = 'all' | 'dark' | 'light'
 
+/** Order of the list: most downloaded first, or alphabetical. */
+export type SortOrder = 'downloads' | 'name'
+
 /** The browser's filter state. */
 export interface StoreFilters {
   /** Search text; matched against name and author, case-insensitively. */
@@ -16,6 +19,7 @@ export interface StoreFilters {
   updatesOnly: boolean
   /** Old-style (`legacy`) themes are hidden unless this is on. */
   showLegacy: boolean
+  sort: SortOrder
 }
 
 /** Initial filters; the mode is set from the user's current color mode by the caller. */
@@ -25,6 +29,7 @@ export const DEFAULT_FILTERS: StoreFilters = {
   installedOnly: false,
   updatesOnly: false,
   showLegacy: false,
+  sort: 'downloads',
 }
 
 /** Number of cards rendered at first and added per step of the infinite list. */
@@ -42,7 +47,7 @@ function supportsMode(theme: CommunityTheme, mode: ModeFilter): boolean {
 }
 
 /**
- * Applies the filters to the catalog and returns the matches sorted by name.
+ * Applies the filters to the catalog and returns the matches in the chosen order (themes without a download count come last, by name).
  * `installedNames` and `updateNames` hold lower-cased theme names (an installed theme is matched to the catalog by name).
  */
 export function filterCatalog(
@@ -62,7 +67,21 @@ export function filterCatalog(
       if (query === '') return true
       return key.includes(query) || theme.author.toLowerCase().includes(query)
     })
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+    .sort((a, b) => {
+      if (filters.sort === 'downloads') {
+        const diff = (b.downloads ?? -1) - (a.downloads ?? -1)
+        if (diff !== 0) return diff
+      }
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+    })
+}
+
+/** German short form of a download count: `842`, `12,3 Tsd.`, `1,2 Mio.`. */
+export function formatDownloads(count: number): string {
+  const short = (value: number, unit: string): string => `${value.toLocaleString('de-DE', { maximumFractionDigits: 1 })} ${unit}`
+  if (count >= 1_000_000) return short(count / 1_000_000, 'Mio.')
+  if (count >= 10_000) return short(count / 1_000, 'Tsd.')
+  return count.toLocaleString('de-DE')
 }
 
 /** Lower-cased names of the themes with a newer version, for the "update available" filter. */

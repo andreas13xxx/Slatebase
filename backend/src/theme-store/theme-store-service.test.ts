@@ -30,6 +30,7 @@ const CATALOG = [
 /** Hand-written client double: serves fixed files and records every call. */
 function createMockClient(overrides: {
   catalog?: () => Promise<CommunityThemeEntry[]>
+  counts?: () => Promise<Map<string, number>>
   files?: Record<string, RemoteThemeFiles | Error>
   manifests?: Record<string, Record<string, unknown> | Error>
   screenshot?: ThemeScreenshot | null
@@ -40,6 +41,9 @@ function createMockClient(overrides: {
     async fetchCatalog() {
       calls.catalog++
       return overrides.catalog ? overrides.catalog() : CATALOG
+    },
+    async fetchDownloadCounts() {
+      return overrides.counts ? overrides.counts() : new Map()
     },
     async fetchThemeFiles(repo) {
       calls.files.push(repo)
@@ -111,6 +115,34 @@ describe('listCatalog', () => {
     const result = await service.listCatalog()
     expect(result.stale).toBe(true)
     expect(result.themes).toHaveLength(4)
+  })
+
+  it('adds download counts by case-insensitive theme name; themes without a count stay without one', async () => {
+    const { service } = createService(createMockClient({ counts: async () => new Map([['things', 1234]]) }))
+    const { themes: list } = await service.listCatalog()
+    expect(list.find((t) => t.name === 'Things')?.downloads).toBe(1234)
+    expect(list.find((t) => t.name === 'Minimal')).not.toHaveProperty('downloads')
+  })
+
+  it('still serves the catalog when the statistics fail', async () => {
+    const { service } = createService(createMockClient({ counts: async () => { throw new ThemeStoreFetchError('u', 503) } }))
+    const result = await service.listCatalog()
+    expect(result.stale).toBe(false)
+    expect(result.themes).toHaveLength(4)
+    expect(result.themes[0]).not.toHaveProperty('downloads')
+  })
+
+  it('keeps the last known counts when a refresh cannot load the statistics', async () => {
+    let failStats = false
+    const client = createMockClient({
+      counts: async () => { if (failStats) throw new ThemeStoreFetchError('u', 503); return new Map([['things', 99]]) },
+    })
+    const { service } = createService(client)
+    await service.listCatalog()
+    clock += config.cacheTtlCatalog + 1
+    failStats = true
+    const { themes: list } = await service.listCatalog()
+    expect(list.find((t) => t.name === 'Things')?.downloads).toBe(99)
   })
 
   it('throws when there is nothing cached and GitHub fails: unknown is not "empty"', async () => {

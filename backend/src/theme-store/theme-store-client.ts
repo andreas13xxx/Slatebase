@@ -14,14 +14,18 @@ import {
   MAX_CATALOG_BYTES,
   MAX_CATALOG_ENTRIES,
   MAX_SCREENSHOT_BYTES,
+  MAX_STATS_BYTES,
   communityThemeEntrySchema,
   isValidRepo,
   normalizeScreenshotPath,
   sniffImageType,
+  themeStatsEntrySchema,
 } from './validation.js'
 
 /** Production origin. Themes live in plain repo files, so no GitHub API (and no API rate limit or token) is involved. */
 const DEFAULT_RAW_BASE_URL = 'https://raw.githubusercontent.com'
+/** Obsidian's own download statistics for themes (keyed by theme name). Not on raw.githubusercontent.com. */
+const DEFAULT_STATS_URL = 'https://releases.obsidian.md/stats/theme'
 const CATALOG_PATH = 'obsidianmd/obsidian-releases/master/community-css-themes.json'
 /** Size cap for a remote `manifest.json`. */
 const MAX_MANIFEST_BYTES = 64 * 1024
@@ -34,6 +38,8 @@ export interface ThemeStoreClientOptions {
    * protocol are derived from it, so the client can never reach a second host.
    */
   rawBaseUrl?: string
+  /** URL of the download statistics. Only tests override this; the allowlist for it is derived from the URL. */
+  statsUrl?: string
 }
 
 /** Marker for a request that failed because the body was over the limit (as opposed to any other fetch failure). */
@@ -46,6 +52,9 @@ class BodyTooLargeError extends Error {}
 export class ThemeStoreClient implements IThemeStoreClient {
   private readonly origin: string
   private readonly guards: Pick<GuardedFetchOptions, 'allowedHosts' | 'protocols' | 'userAgent'>
+  private readonly statsUrl: string
+  /** Separate allowlist for the statistics host, so the repo-file requests can never reach it (or the reverse). */
+  private readonly statsGuards: Pick<GuardedFetchOptions, 'allowedHosts' | 'protocols' | 'userAgent'>
 
   constructor(
     private readonly logger: ILogger,
@@ -54,6 +63,9 @@ export class ThemeStoreClient implements IThemeStoreClient {
     const base = new URL(options.rawBaseUrl ?? DEFAULT_RAW_BASE_URL)
     this.origin = base.origin
     this.guards = { allowedHosts: new Set([base.host]), protocols: [base.protocol], userAgent: USER_AGENT }
+    const stats = new URL(options.statsUrl ?? DEFAULT_STATS_URL)
+    this.statsUrl = stats.href
+    this.statsGuards = { allowedHosts: new Set([stats.host]), protocols: [stats.protocol], userAgent: USER_AGENT }
   }
 
   async fetchCatalog(): Promise<CommunityThemeEntry[]> {
@@ -89,6 +101,33 @@ export class ThemeStoreClient implements IThemeStoreClient {
       }
     }
     return entries
+  }
+
+  async fetchDownloadCounts(): Promise<Map<string, number>> {
+    let result: GuardedFetchResult
+    try {
+      result = await this.get(this.statsUrl, MAX_STATS_BYTES, 'application/json', this.statsGuards)
+    } catch (error: unknown) {
+      if (error instanceof BodyTooLargeError) throw new ThemeStoreFetchError(this.statsUrl, 0, 'statistics are too large')
+      throw error
+    }
+    if (result.status !== 200) throw new ThemeStoreFetchError(this.statsUrl, result.status)
+
+    let data: unknown
+    try {
+      data = JSON.parse(result.body.toString('utf-8'))
+    } catch {
+      throw new ThemeStoreFetchError(this.statsUrl, result.status, 'statistics are not valid JSON')
+    }
+    if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+      throw new ThemeStoreFetchError(this.statsUrl, result.status, 'statistics are not an object')
+    }
+    const counts = new Map<string, number>()
+    for (const [name, raw] of Object.entries(data)) {
+      const parsed = themeStatsEntrySchema.safeParse(raw)
+      if (parsed.success) counts.set(name.toLowerCase(), parsed.data.download)
+    }
+    return counts
   }
 
   async fetchThemeFiles(repo: string): Promise<RemoteThemeFiles> {
@@ -147,9 +186,14 @@ export class ThemeStoreClient implements IThemeStoreClient {
     return result.body
   }
 
-  private async get(url: string, maxBytes: number, accept?: string): Promise<GuardedFetchResult> {
+  private async get(
+    url: string,
+    maxBytes: number,
+    accept?: string,
+    guards: Pick<GuardedFetchOptions, 'allowedHosts' | 'protocols' | 'userAgent'> = this.guards,
+  ): Promise<GuardedFetchResult> {
     try {
-      return await guardedFetch(url, { ...this.guards, maxBytes, ...(accept ? { accept } : {}) })
+      return await guardedFetch(url, { ...guards, maxBytes, ...(accept ? { accept } : {}) })
     } catch (error: unknown) {
       if (error instanceof GuardedFetchError) {
         if (error.kind === 'too-large') throw new BodyTooLargeError(url)

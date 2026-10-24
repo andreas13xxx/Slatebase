@@ -247,16 +247,39 @@ export class ThemeStoreService implements IThemeStoreService {
 
   private refreshCatalog(): Promise<CommunityThemeEntry[]> {
     if (this.catalogInFlight === null) {
-      this.catalogInFlight = this.client
-        .fetchCatalog()
-        .then((entries) => {
-          this.cache.setCatalog(entries)
-          return entries
+      this.catalogInFlight = Promise.all([this.client.fetchCatalog(), this.fetchCountsOrNull()])
+        .then(([entries, counts]) => {
+          const merged = this.withDownloads(entries, counts)
+          this.cache.setCatalog(merged)
+          return merged
         })
         .finally(() => {
           this.catalogInFlight = null
         })
     }
     return this.catalogInFlight
+  }
+
+  /** Download counts, or null when they cannot be loaded: the statistics are a nicety and never block the catalog. */
+  private async fetchCountsOrNull(): Promise<Map<string, number> | null> {
+    try {
+      return await this.client.fetchDownloadCounts()
+    } catch (error: unknown) {
+      this.logger.warn('Theme download statistics unavailable', { error: describeError(error) })
+      return null
+    }
+  }
+
+  /**
+   * Adds `downloads` to the entries. Without fresh counts the last known ones are kept, so a failed statistics
+   * request does not wipe the numbers; a theme without any count simply has none ("unknown", not 0).
+   */
+  private withDownloads(entries: CommunityThemeEntry[], counts: Map<string, number> | null): CommunityThemeEntry[] {
+    const previous = counts === null ? new Map((this.cache.getCatalogStale() ?? []).map((e) => [e.repo, e.downloads])) : null
+    return entries.map((entry) => {
+      const downloads = counts !== null ? counts.get(entry.name.toLowerCase()) : previous?.get(entry.repo)
+      const { downloads: _drop, ...rest } = entry
+      return downloads === undefined ? rest : { ...rest, downloads }
+    })
   }
 }

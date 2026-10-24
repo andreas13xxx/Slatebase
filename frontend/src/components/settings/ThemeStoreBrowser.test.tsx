@@ -78,6 +78,22 @@ describe('ThemeStoreBrowser', () => {
     expect(cardNames()).toEqual(['Minimal', 'Night Owl', 'Things'])
   })
 
+  it('shows download counts and sorts by them by default, by name on request', async () => {
+    renderBrowser(createMockApiClient({
+      listStoreThemes: vi.fn().mockResolvedValue({
+        themes: [{ ...THINGS, downloads: 1234 }, { ...MINIMAL, downloads: 567_524 }, NIGHT_OWL], stale: false,
+      }),
+    }))
+    await screen.findByText(/angezeigt/)
+
+    expect(cardNames()).toEqual(['Minimal', 'Things', 'Night Owl'])
+    expect(within(cardOf('Minimal')).getByText(/567,5 Tsd\. Downloads/)).toBeInTheDocument()
+    expect(within(cardOf('Night Owl')).queryByText(/Downloads/)).toBeNull()
+
+    fireEvent.change(screen.getByLabelText('Sortieren nach'), { target: { value: 'name' } })
+    expect(cardNames()).toEqual(['Minimal', 'Night Owl', 'Things'])
+  })
+
   it('starts in light mode when the interface is light', async () => {
     document.body.className = 'theme-light'
     renderBrowser(createMockApiClient())
