@@ -27,7 +27,7 @@ const GITIGNORE_BLOCK_END = '# <<< slatebase managed <<<'
 /**
  * Vault-specific settings (`.slatebase/config.json`, property types, Obsidian config/themes/plugins)
  * are synced; per-instance data (trash, versions, link-index cache) and per-device state
- * (workspace layout, plugin `data.json` which may hold tokens) are not. `.slatebase/*` rather than
+ * (workspace layout) are not. Plugin `data.json` is synced so plugin settings follow the vault. `.slatebase/*` rather than
  * `.slatebase/` because git cannot re-include a file inside an excluded directory.
  */
 const MANAGED_GITIGNORE_LINES = [
@@ -35,7 +35,6 @@ const MANAGED_GITIGNORE_LINES = [
   '!.slatebase/config.json',
   '!.slatebase/property-types.json',
   '.obsidian/workspace*.json',
-  '.obsidian/plugins/*/data.json',
 ]
 /** Lines older versions wrote on their own — superseded by the managed block. */
 const LEGACY_GITIGNORE_LINES = ['.slatebase/', '.obsidian/']
