@@ -1401,17 +1401,26 @@ export function installObsidianGlobals(): void {
   }
   if (!Object.hasOwn(HTMLElement.prototype, 'onNodeInserted')) {
     Object.defineProperty(HTMLElement.prototype, 'onNodeInserted', {
-      value: function (_callback: () => void) {
+      value: function (this: HTMLElement, callback: () => void, once?: boolean) {
         // Obsidian fires this when the element enters the document. Plugins use
-        // it to defer measuring until layout exists; here it never fires, so
-        // that measurement never happens — worth saying out loud, because the
-        // symptom is a silently unsized widget rather than an error.
-        warnOnce(
-          'dom::onNodeInserted',
-          '[PluginCompat] onNodeInserted() is not implemented and never fires. ' +
-            'Plugin code waiting on it (deferred layout/measurement) will not run.',
-        )
-        return () => {}
+        // it to defer measuring until layout exists. We watch for the element
+        // becoming connected; an element that is already connected has nothing
+        // left to report.
+        let wasConnected = this.isConnected
+        const observer = new MutationObserver(() => {
+          const connected = this.isConnected
+          if (connected && !wasConnected) {
+            if (once) observer.disconnect()
+            try {
+              callback()
+            } catch (err) {
+              console.error('[PluginCompat] onNodeInserted callback failed', err)
+            }
+          }
+          wasConnected = connected
+        })
+        observer.observe(this.ownerDocument, { childList: true, subtree: true })
+        return () => observer.disconnect()
       },
       writable: true,
       configurable: true,
