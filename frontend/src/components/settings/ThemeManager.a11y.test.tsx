@@ -58,6 +58,7 @@ describe('ThemesSection accessibility', () => {
       </AppProvider>,
     ))
 
+    fireEvent.click(await screen.findByRole('tab', { name: 'Importieren' }))
     const zone = await screen.findByRole('button', { name: /Theme importieren/ })
     expect(zone).toHaveAttribute('tabindex', '0')
   })
