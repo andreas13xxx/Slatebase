@@ -63,8 +63,6 @@ function createMockApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
     saveSettings: vi.fn(),
     loadRegistry: vi.fn(),
     saveRegistry: vi.fn(),
-    getDetectedPlugins: vi.fn(),
-    installDetectedPlugin: vi.fn(),
     loadFeatures: vi.fn(),
     loadAdminFeatures: vi.fn(),
     toggleAdminFeature: vi.fn(),

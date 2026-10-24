@@ -398,23 +398,23 @@ Behind the `public-shares` feature toggle (off by default). The first group need
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/vaults/:vaultId/plugins` | List plugins |
+| GET | `/vaults/:vaultId/plugins` | List the plugins in the vault's `.obsidian/plugins/` |
 | POST | `/vaults/:vaultId/plugins` | Install plugin (ZIP) |
 | DELETE | `/vaults/:vaultId/plugins/:pluginId` | Uninstall |
 | GET | `/vaults/:vaultId/plugins/:pluginId/bundle` | JS bundle |
 | GET | `/vaults/:vaultId/plugins/:pluginId/styles` | CSS styles |
 | GET/PUT | `/vaults/:vaultId/plugins/:pluginId/settings` | Settings |
-| GET/PUT | `/vaults/:vaultId/plugins/registry` | Registry |
+| GET/PUT | `/vaults/:vaultId/plugins/registry` | Registry (permissions, compatibility, approval; enabled state is mirrored to `.obsidian/community-plugins.json`) |
 | GET | `/vaults/:vaultId/plugins/:pluginId/secrets` | Plugin SecretStorage — IDs only, never values |
 | GET/PUT/DELETE | `/vaults/:vaultId/plugins/:pluginId/secrets/:secretId` | Read / set / delete one secret |
-| GET | `/vaults/:vaultId/plugins/detected` | Plugins found in the vault's `.obsidian/plugins/` |
 | GET | `/plugins` | Community plugin list (store) |
 | POST | `/vaults/:vaultId/plugins/store-install` | Install from a GitHub release |
-| POST | `/vaults/:vaultId/plugins/detected/:pluginId/install` | Adopt a plugin found in `.obsidian/plugins/` |
 | POST | `/vaults/:vaultId/plugins/check-updates` | Check all installed plugins for updates |
 | POST | `/vaults/:vaultId/plugins/:pluginId/update` | Update one plugin |
 | POST | `/vaults/:vaultId/plugins/update-all` | Update all plugins |
 | POST | `/proxy` | CORS-free HTTP proxy for plugin `requestUrl` (SSRF-protected, allowlisted) |
+
+Plugins are stored the way Obsidian stores them: files and settings in `<vault>/.obsidian/plugins/<id>/`, the enabled ones in `<vault>/.obsidian/community-plugins.json`. A plugin that Obsidian or a sync put there appears in the list on its own. It does **not** start by itself: the server's approval (permissions, compatibility) is kept outside the vault in `data/plugins/<vaultId>/_registry.json`, and a plugin only runs while it is both approved there and enabled in `community-plugins.json`. Disabling it in Obsidian therefore switches it off here too; enabling it only in Obsidian does not switch it on. Installing, deleting and activating need write access to the vault, since plugin code runs in every user's browser. Secrets stay encrypted under `data/plugins/<vaultId>/<pluginId>/secrets.json`.
 
 ### CSS Snippets
 

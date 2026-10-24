@@ -35,23 +35,19 @@ export const VAULT_ROUTE_LEVEL_EXCEPTIONS: VaultRouteLevelException[] = [
   // --- read instead of the write/patch/delete default ---
   // propertyRoutes.ts:143 — read-only filter, POST verb used for the query body only.
   { method: 'POST', pathPattern: '/properties/query', level: 'read' },
-  // pluginRoutes.ts — every route in this file (including these 7 mutating ones) checks
-  // read access only; collaborators are trusted to manage vault-scoped plugin state, not
-  // just vault content (see snippetRoutes.ts:84-86's doc comment for the same rationale).
-  { method: 'POST', pathPattern: '/plugins/detected/:pluginId/install', level: 'read' },
-  { method: 'PUT', pathPattern: '/plugins/registry', level: 'read' },
-  { method: 'POST', pathPattern: '/plugins', level: 'read' },
-  { method: 'DELETE', pathPattern: '/plugins/:pluginId', level: 'read' },
+  // pluginRoutes.ts — plugin code and activation live in the vault (.obsidian/plugins/,
+  // community-plugins.json) and run in every user's browser, so installing, deleting and
+  // activating need write access (they fall through to the write default). What stays at read:
+  // a plugin's own settings (data.json), which plugins write while they run — a read-only
+  // collaborator's plugin would otherwise fail on every save — and the secrets, which are
+  // server-side and not vault content.
   { method: 'PUT', pathPattern: '/plugins/:pluginId/settings', level: 'read' },
   { method: 'PUT', pathPattern: '/plugins/:pluginId/secrets/:secretId', level: 'read' },
   { method: 'DELETE', pathPattern: '/plugins/:pluginId/secrets/:secretId', level: 'read' },
-  // pluginStoreRoutes.ts (vault-scoped) — flagged as arguably too weak (VAULT-ROUTE-AUTHORIZATION.md
-  // finding F2), deliberately not tightened in this PR to keep the authorization refactor
-  // behavior-neutral and safely revertible.
-  { method: 'POST', pathPattern: '/plugins/store-install', level: 'read' },
+  // pluginStoreRoutes.ts (vault-scoped) — installing and updating write plugin code into the
+  // vault, so store-install, update-all and update need write access (default). Only the update
+  // check, which changes nothing, stays at read.
   { method: 'POST', pathPattern: '/plugins/check-updates', level: 'read' },
-  { method: 'POST', pathPattern: '/plugins/update-all', level: 'read' },
-  { method: 'POST', pathPattern: '/plugins/:pluginId/update', level: 'read' },
 
   // --- write instead of the read default ---
   // publicShareRoutes.ts — a public link exposes note content outside the server, so even listing

@@ -152,6 +152,8 @@ describe('PluginInstaller — manifest ID path traversal', () => {
       saveRegistry: async () => {},
       loadRegistry: async () => null,
       mutateRegistry: async (_v: string, fn: (current: PluginRegistryData | null) => PluginRegistryData) => fn(null),
+      loadEnabledIds: async () => [],
+      updateEnabledIds: async () => {},
     }
 
     const installer = new PluginInstaller(mockStore)

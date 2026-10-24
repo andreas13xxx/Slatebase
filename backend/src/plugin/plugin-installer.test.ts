@@ -29,6 +29,8 @@ function createMockPluginStore(overrides?: Partial<IInstalledPluginStore>): IIns
     async mutateRegistry(_vaultId: string, fn: (current: PluginRegistryData | null) => PluginRegistryData): Promise<PluginRegistryData> {
       return fn(null)
     },
+    async loadEnabledIds(): Promise<string[]> { return [] },
+    async updateEnabledIds(): Promise<void> { /* no-op */ },
     ...overrides,
   }
 }

@@ -29,3 +29,24 @@ export class PluginSettingsTooLargeError extends Error {
     this.name = 'PluginSettingsTooLargeError'
   }
 }
+
+/**
+ * Thrown when `.obsidian/community-plugins.json` exists but is not a JSON array.
+ * The file is never overwritten in that case — it may be mid-sync or hand-edited.
+ */
+export class CommunityPluginsFileInvalidError extends Error {
+  constructor() {
+    super('.obsidian/community-plugins.json is not a valid JSON array; leaving it untouched')
+    this.name = 'CommunityPluginsFileInvalidError'
+  }
+}
+
+/**
+ * Thrown when a vault id has no storage path (unknown vault).
+ */
+export class PluginVaultUnavailableError extends Error {
+  constructor(public readonly vaultId: string) {
+    super(`Vault "${vaultId}" is not available`)
+    this.name = 'PluginVaultUnavailableError'
+  }
+}

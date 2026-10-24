@@ -164,11 +164,12 @@ src/
 │   ├── validation.ts         — Zod schemas (pluginManifestSchema, pluginRegistrySchema)
 │   ├── secret-key-manager.ts — PluginSecretKeyManager (encryption key for plugin secrets at rest: env `SLATEBASE_PLUGIN_SECRET_KEY` → file → generate, same pattern as CsrfSecretManager; HKDF-SHA256 down to an AES-256 key)
 │   ├── secret-store.ts   — PluginSecretStore (`data/plugins/<vaultId>/<pluginId>/secrets.json`, each value encrypted individually with AES-256-GCM; `listSecrets()` returns IDs only, never values)
-│   ├── installed-plugin-store.ts — InstalledPluginStore (filesystem persistence, atomic writes, per-vault per-plugin dirs); `loadManifest` normalizes `manifest.id` to the directory name, since every other lookup is keyed by that and a manifest's self-declared id is upstream-controlled and can drift. The atomic write retries on EPERM/EACCES (Windows file locking from OneDrive sync or antivirus), then unlinks and retries, then falls back to a direct write — a transient lock must never surface as a lost write
+│   ├── installed-plugin-store.ts — InstalledPluginStore (plugin files + `data.json` in the vault at `.obsidian/plugins/<id>/`, enabled ids in `.obsidian/community-plugins.json`; registry and secrets stay under `data/plugins/<vaultId>/`; symlinks leaving the vault are treated as absent; takes a vault-path resolver; atomic writes); `loadManifest` normalizes `manifest.id` to the directory name, since every other lookup is keyed by that and a manifest's self-declared id is upstream-controlled and can drift. The atomic write retries on EPERM/EACCES (Windows file locking from OneDrive sync or antivirus), then unlinks and retries, then falls back to a direct write — a transient lock must never surface as a lost write
 │   ├── installed-plugin-store.test.ts — Unit tests for InstalledPluginStore
+│   ├── legacy-migration.ts   — One-time, non-destructive copy of the old `data/plugins/<vaultId>/<id>/` files into the vault (marker file `.migrated-to-vault`; registry and secrets are not moved)
 │   ├── plugin-installer.ts   — PluginInstaller (ZIP extraction, manifest validation, bundle integrity, version comparison)
 │   ├── plugin-installer.test.ts — Unit tests for PluginInstaller
-│   ├── plugin-service.ts     — PluginService (routes→service→store layer wrapping InstalledPluginStore + PluginInstaller; also hosts the `.obsidian/plugins/` detected-plugin scanner); `saveSettings()` publishes a `plugin-settings:change` broadcast so other tabs/devices reload instead of drifting
+│   ├── plugin-service.ts     — PluginService (routes→service→store layer wrapping InstalledPluginStore + PluginInstaller; mirrors activation into the vault's `community-plugins.json`: a plugin counts as active only while approved in the registry AND listed there); `saveSettings()` publishes a `plugin-settings:change` broadcast so other tabs/devices reload instead of drifting
 │   └── plugin-service.test.ts — Unit tests for PluginService
 ├── plugin-store/             — Community plugin marketplace (browse/install/update from GitHub releases). Distinct from `plugin/` (installed plugins).
 │   ├── index.ts              — Barrel export for plugin-store module
@@ -788,7 +789,7 @@ src/
 │   ├── AdminConfigPage.tsx — Server configuration (card-based layout)
 │   ├── AdminAuditPage.tsx — Audit log viewer
 │   ├── PluginManagementPage.tsx — Plugin list with activation toggle, compatibility, error display
-│   ├── PluginUpload.tsx  — Plugin ZIP upload + detected plugins from .obsidian/plugins/
+│   ├── PluginUpload.tsx  — Plugin ZIP upload
 │   ├── VersionCheckCard.tsx — Admin version check (installed vs. latest, GitHub API, update notification)
 │   ├── CommandPalette.tsx — Modal command palette (search, execute, keyboard nav, Ctrl+P always active)
 │   ├── QuickSwitcher.tsx — Fuzzy-open-by-name modal (Ctrl+O), structurally mirrors CommandPalette.tsx (overlay, useFocusTrap, Arrow/Enter/Escape) and reuses its `.command-palette-*` CSS classes; sources candidates via `collectFilesSorted()`, ranks via `fuzzyMatch()`, shows `recentFilesStore.getRecent()` for an empty query, offers "create new file" when nothing matches
@@ -908,22 +909,34 @@ data/mcp/
 
 ### Plugin Data
 
+Plugins are vault content, stored the way Obsidian stores them:
+
+```
+<vault>/.obsidian/
+├── community-plugins.json    — ids of the enabled plugins (JSON array, the list Obsidian uses)
+└── plugins/<pluginId>/
+    ├── manifest.json         — Plugin manifest
+    ├── main.js               — Plugin bundle (JavaScript, max 10 MB; ZIP upload capped at 10 MB, max 20 MB extracted)
+    ├── styles.css            — Plugin styles (optional)
+    └── data.json             — Plugin settings (max 1 MB, preserved across upgrades)
+```
+
+What stays on the server, outside the vault (a trust decision of this server, not vault content):
+
 ```
 data/plugins/
 └── <vaultId>/
     ├── _registry.json        — Plugin registry (status, permissions, compatibility per plugin)
     └── <pluginId>/
-        ├── manifest.json     — Plugin manifest (original from ZIP)
-        ├── main.js           — Plugin bundle (JavaScript, max 10 MB; ZIP upload capped at 10 MB, max 20 MB extracted)
-        ├── styles.css        — Plugin styles (optional, max 512 KB)
-        ├── data.json         — Plugin settings (max 1 MB, preserved across upgrades)
         └── secrets.json      — Plugin secrets (SecretStorage API), each value AES-256-GCM encrypted; key from `SLATEBASE_PLUGIN_SECRET_KEY` or `data/.plugin-secret-key`
 ```
 
+- **Activation**: A plugin runs only while it is `active` in `_registry.json` (approved here) AND listed in `community-plugins.json`. A plugin that merely appears in the vault never starts on its own; disabling it in Obsidian switches it off here.
 - **Registry**: One JSON file per vault with all plugin states. Atomic writes.
-- **Plugin Files**: Per-vault, per-plugin directory. Atomic writes (temp → rename).
+- **Plugin Files**: Atomic writes (temp → rename). Symlinks leaving the vault are treated as absent.
 - **Settings**: Preserved across version upgrades (savePlugin only touches manifest/bundle/styles).
-- **Vault Deletion Hook**: `deleteAllForVault(vaultId)` removes entire `data/plugins/<vaultId>/` directory.
+- **Vault Deletion Hook**: `deleteAllForVault(vaultId)` removes the server-side `data/plugins/<vaultId>/` directory only; the plugins in the vault go with the vault.
+- **Migration**: At startup `plugin/legacy-migration.ts` copies old `data/plugins/<vaultId>/<id>/` files into the vault (vault wins, nothing deleted, marker `.migrated-to-vault`).
 
 ### Vault Internal Data (per vault directory)
 

@@ -413,18 +413,26 @@ interface PluginInstance {
 
 ## Data Models
 
-### Backend-Speicherstruktur
+### Speicherstruktur
+
+Plugin-Dateien liegen im Vault, wie Obsidian sie ablegt; die Freigabe (Registry) und die Secrets bleiben serverseitig:
 
 ```
+<vault>/.obsidian/
+├── community-plugins.json      — IDs der aktivierten Plugins (JSON-Array)
+└── plugins/<pluginId>/
+    ├── manifest.json           — Plugin-Manifest (Original)
+    ├── main.js                 — Plugin-Bundle (JavaScript)
+    ├── styles.css              — Plugin-Styles (optional)
+    └── data.json               — Plugin-Settings (max 1 MB)
+
 data/plugins/
 └── <vaultId>/
     ├── _registry.json          — Plugin-Registry (Status, Permissions pro Plugin)
-    └── <pluginId>/
-        ├── manifest.json       — Plugin-Manifest (Original)
-        ├── main.js             — Plugin-Bundle (JavaScript)
-        ├── styles.css          — Plugin-Styles (optional)
-        └── data.json           — Plugin-Settings (max 1 MB)
+    └── <pluginId>/secrets.json — verschlüsselte Secrets
 ```
+
+Ein Plugin läuft nur, solange es in `_registry.json` freigegeben (`active`) und in `community-plugins.json` eingetragen ist.
 
 ### Registry-Datenmodell (`_registry.json`)
 

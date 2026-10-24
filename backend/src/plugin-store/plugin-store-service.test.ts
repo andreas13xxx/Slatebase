@@ -63,6 +63,8 @@ function createMockPluginStore(): IInstalledPluginStore {
     saveRegistry: vi.fn(),
     loadRegistry: vi.fn().mockResolvedValue(null),
     mutateRegistry: vi.fn().mockImplementation(async (_v, fn) => fn(null)),
+    loadEnabledIds: vi.fn().mockResolvedValue([]),
+    updateEnabledIds: vi.fn().mockResolvedValue(undefined),
   }
 }
 

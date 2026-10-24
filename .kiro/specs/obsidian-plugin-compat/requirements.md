@@ -220,13 +220,15 @@ Dieses Feature implementiert einen Compatibility Layer für Obsidian Community P
 #### Acceptance Criteria
 
 1. THE Slatebase_Frontend SHALL Plugin-Bundles (`main.js`, `manifest.json`, `styles.css`) über einen dedizierten API-Endpoint an das Backend senden, wobei einzelne Dateien eine maximale Größe von 5 MB nicht überschreiten dürfen
-2. THE Backend SHALL Plugin-Dateien unter `data/plugins/<vaultId>/<pluginId>/` mittels atomarer Schreiboperationen (Temp-Datei → rename) speichern
-3. THE Backend SHALL Plugin-Einstellungen unter `data/plugins/<vaultId>/<pluginId>/data.json` speichern, wobei die maximale Größe der Einstellungsdatei 1 MB beträgt
+2. THE Backend SHALL Plugin-Dateien im Vault unter `.obsidian/plugins/<pluginId>/` (wie Obsidian) mittels atomarer Schreiboperationen (Temp-Datei → rename) speichern; die aktivierten Plugins stehen in `.obsidian/community-plugins.json`
+3. THE Backend SHALL Plugin-Einstellungen unter `.obsidian/plugins/<pluginId>/data.json` im Vault speichern, wobei die maximale Größe der Einstellungsdatei 1 MB beträgt
 4. WHEN ein Benutzer sich anmeldet und einen Vault öffnet, THE Slatebase_Frontend SHALL die Plugin-Liste und aktive Plugins vom Backend laden
 5. IF ein nicht-authentifizierter oder nicht-berechtigter Benutzer auf Plugin-Daten zugreift, THEN THE Backend SHALL den Zugriff mit der gleichen Zugriffskontrolle wie Vault-Dateien ablehnen (nur Vault-Besitzer und Benutzer mit Vault-Freigabe erhalten Zugriff)
-6. IF ein Plugin gelöscht wird, THEN THE Backend SHALL alle zugehörigen Dateien und Einstellungen unter `data/plugins/<vaultId>/<pluginId>/` vollständig entfernen
-7. WHEN ein Vault gelöscht wird, THEN THE Backend SHALL alle Plugin-Daten unter `data/plugins/<vaultId>/` vollständig entfernen
+6. IF ein Plugin gelöscht wird, THEN THE Backend SHALL alle zugehörigen Dateien und Einstellungen unter `.obsidian/plugins/<pluginId>/`, seine serverseitigen Secrets unter `data/plugins/<vaultId>/<pluginId>/` und seinen Eintrag in `community-plugins.json` entfernen
+7. WHEN ein Vault gelöscht wird, THEN THE Backend SHALL die serverseitigen Plugin-Daten (Registry, Secrets) unter `data/plugins/<vaultId>/` entfernen; die Plugins im Vault gehen mit dem Vault
 8. IF der Upload einer Plugin-Datei die maximale Dateigröße von 5 MB überschreitet, THEN THE Backend SHALL den Upload ablehnen und eine Fehlermeldung zurückgeben die auf die Größenbeschränkung hinweist
+9. THE Backend SHALL ein Plugin nur ausführen lassen, solange es in der serverseitigen Registry (`data/plugins/<vaultId>/_registry.json`) freigegeben (`active`) UND in `community-plugins.json` eingetragen ist; ein Plugin, das nur im Vault liegt oder nur in Obsidian aktiviert wurde, startet nicht von selbst
+10. WHEN beim Start Plugin-Dateien unter `data/plugins/<vaultId>/<pluginId>/` vorhanden sind, THE Backend SHALL sie ohne Überschreiben in den Vault kopieren (die Vault-Version gewinnt), aktive Plugins in `community-plugins.json` eintragen und danach die Datei `.migrated-to-vault` anlegen; bei nicht erreichbarem Vault-Ordner oder ungültiger `community-plugins.json` wird die Migration ohne Marker verschoben
 
 ### Requirement 15: CSS-Injection für Plugins
 

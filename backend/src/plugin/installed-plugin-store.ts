@@ -1,15 +1,28 @@
-// InstalledPluginStore — Filesystem persistence for plugin files, settings, and registry
-// of plugins installed into a vault. Not to be confused with the `plugin-store/`
-// module, which manages the marketplace of plugins available to install.
+// InstalledPluginStore — Plugins of a vault, stored the way Obsidian stores them:
+//   <vault>/.obsidian/plugins/<id>/{manifest.json,main.js,styles.css,data.json}
+//   <vault>/.obsidian/community-plugins.json   (ids of the enabled plugins)
+// What stays on the server, outside the vault (it is a trust decision of this server, not vault
+// content): `data/plugins/<vaultId>/_registry.json` (permissions, compatibility, approval) and
+// `data/plugins/<vaultId>/<id>/secrets.json` (encrypted secrets, see secret-store.ts).
+//
+// Not to be confused with the `plugin-store/` module, which manages the marketplace of plugins
+// available to install.
 
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import type { IInstalledPluginStore, PluginFiles, PluginManifest, PluginRegistryData } from './types.js'
-import { PluginFileTooLargeError, PluginSettingsTooLargeError } from './errors.js'
+import {
+  CommunityPluginsFileInvalidError,
+  PluginFileTooLargeError,
+  PluginSettingsTooLargeError,
+  PluginVaultUnavailableError,
+} from './errors.js'
 import { isValidPluginId } from './validation.js'
+import { KeyedMutex } from '../shared/async-mutex.js'
 import { isNodeError } from '../shared/fs-utils.js'
-import { KeyedJsonFileStore } from '../shared/json-file-store.js'
+import { KeyedJsonFileStore, writeJsonFileAtomic } from '../shared/json-file-store.js'
+import { PathTraversalError, assertRealPathInsideVault, validateFilePath } from '../vault/index.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -19,18 +32,34 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024
 /** Maximum file size for plugin settings (data.json): 1 MB */
 const MAX_SETTINGS_SIZE = 1 * 1024 * 1024
 
+const PLUGINS_DIR = '.obsidian/plugins'
+const COMMUNITY_PLUGINS_FILE = '.obsidian/community-plugins.json'
+
+/** Resolves a vault id to the absolute path of the vault, or null for an unknown vault. */
+export type VaultPathResolver = (vaultId: string) => string | null
+
+function isMissing(error: unknown): boolean {
+  return isNodeError(error) && (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+}
+
 // ─── Implementation ──────────────────────────────────────────────────────────
 
 /**
  * Filesystem-based persistence for plugin files and metadata.
- * Stores plugins under `data/plugins/<vaultId>/<pluginId>/`.
- * All writes are atomic (temp file → rename).
+ * Plugin files live in the vault (`.obsidian/plugins/<pluginId>/`); the registry and the
+ * secrets stay under `data/plugins/<vaultId>/`. All writes are atomic (temp file → rename).
+ *
+ * Nothing in the vault is trusted: a plugin file that is a symlink leaving the vault is treated
+ * as absent, and file sizes are capped before reading.
  */
 export class InstalledPluginStore implements IInstalledPluginStore {
+  /** Server-local data: registry and secrets. */
   private readonly pluginsDir: string
   private readonly registryStore: KeyedJsonFileStore<PluginRegistryData | null>
+  /** Serialises community-plugins.json read-modify-write cycles per vault. */
+  private readonly enabledMutex = new KeyedMutex()
 
-  constructor(dataDir: string) {
+  constructor(dataDir: string, private readonly resolveVaultPath: VaultPathResolver) {
     this.pluginsDir = path.join(dataDir, 'plugins')
     this.registryStore = new KeyedJsonFileStore<PluginRegistryData | null>(
       (vaultId) => path.join(this.getVaultDir(vaultId), '_registry.json'),
@@ -39,7 +68,7 @@ export class InstalledPluginStore implements IInstalledPluginStore {
   }
 
   /**
-   * Saves plugin files (manifest, bundle, optional styles) atomically.
+   * Saves plugin files (manifest, bundle, optional styles) atomically into the vault.
    * Creates the plugin directory if it does not exist.
    * Validates file sizes before writing.
    */
@@ -51,6 +80,7 @@ export class InstalledPluginStore implements IInstalledPluginStore {
     }
 
     const dir = this.getPluginDir(vaultId, pluginId)
+    await this.assertInsideVault(vaultId, dir)
     await fs.mkdir(dir, { recursive: true })
 
     await this.atomicWrite(path.join(dir, 'manifest.json'), files.manifest)
@@ -76,11 +106,15 @@ export class InstalledPluginStore implements IInstalledPluginStore {
    * follow-up requests 404.
    */
   async loadManifest(vaultId: string, pluginId: string): Promise<PluginManifest | null> {
-    const filePath = path.join(this.getPluginDir(vaultId, pluginId), 'manifest.json')
-    const manifest = await this.readJsonFile<PluginManifest>(filePath)
-    if (manifest === null) {
+    const raw = await this.readVaultFile(vaultId, path.join(this.getPluginDir(vaultId, pluginId), 'manifest.json'), MAX_FILE_SIZE)
+    if (raw === null) return null
+    let manifest: PluginManifest
+    try {
+      manifest = JSON.parse(raw) as PluginManifest
+    } catch {
       return null
     }
+    if (typeof manifest !== 'object' || manifest === null || Array.isArray(manifest)) return null
     return { ...manifest, id: pluginId }
   }
 
@@ -89,8 +123,7 @@ export class InstalledPluginStore implements IInstalledPluginStore {
    * Returns null if the file does not exist.
    */
   async loadBundle(vaultId: string, pluginId: string): Promise<string | null> {
-    const filePath = path.join(this.getPluginDir(vaultId, pluginId), 'main.js')
-    return this.readTextFile(filePath)
+    return this.readVaultFile(vaultId, path.join(this.getPluginDir(vaultId, pluginId), 'main.js'), MAX_FILE_SIZE)
   }
 
   /**
@@ -98,8 +131,7 @@ export class InstalledPluginStore implements IInstalledPluginStore {
    * Returns null if the file does not exist.
    */
   async loadStyles(vaultId: string, pluginId: string): Promise<string | null> {
-    const filePath = path.join(this.getPluginDir(vaultId, pluginId), 'styles.css')
-    return this.readTextFile(filePath)
+    return this.readVaultFile(vaultId, path.join(this.getPluginDir(vaultId, pluginId), 'styles.css'), MAX_FILE_SIZE)
   }
 
   /**
@@ -113,10 +145,10 @@ export class InstalledPluginStore implements IInstalledPluginStore {
     }
 
     const dir = this.getPluginDir(vaultId, pluginId)
+    await this.assertInsideVault(vaultId, dir)
     await fs.mkdir(dir, { recursive: true })
 
-    const filePath = path.join(dir, 'data.json')
-    await this.atomicWrite(filePath, data)
+    await this.atomicWrite(path.join(dir, 'data.json'), data)
   }
 
   /**
@@ -124,34 +156,41 @@ export class InstalledPluginStore implements IInstalledPluginStore {
    * Returns null if the file does not exist.
    */
   async loadSettings(vaultId: string, pluginId: string): Promise<string | null> {
-    const filePath = path.join(this.getPluginDir(vaultId, pluginId), 'data.json')
-    return this.readTextFile(filePath)
+    return this.readVaultFile(
+      vaultId,
+      path.join(this.getPluginDir(vaultId, pluginId), 'data.json'),
+      MAX_SETTINGS_SIZE,
+      () => new PluginSettingsTooLargeError(pluginId),
+    )
   }
 
   /**
-   * Lists all plugins installed for a vault by reading subdirectories
-   * and loading their manifest.json files.
-   * Skips directories without a valid manifest.
+   * Lists all plugins in the vault's `.obsidian/plugins/` folder by reading the
+   * subdirectories and their manifest.json files. Skips entries that are not plain
+   * directories, whose name is not a valid plugin id, or that have no valid manifest.
    */
   async listPlugins(vaultId: string): Promise<PluginManifest[]> {
-    const vaultDir = this.getVaultDir(vaultId)
+    const pluginsDir = validateFilePath(this.getVaultPath(vaultId), PLUGINS_DIR)
     const manifests: PluginManifest[] = []
 
     let entries: string[]
     try {
-      entries = await fs.readdir(vaultDir)
+      entries = await fs.readdir(pluginsDir)
     } catch (error: unknown) {
-      if (isNodeError(error) && error.code === 'ENOENT') {
-        return manifests
-      }
+      if (isMissing(error)) return manifests
       throw error
     }
 
     for (const entry of entries) {
-      // Skip registry file and hidden files
-      if (entry.startsWith('_') || entry.startsWith('.')) {
+      if (!isValidPluginId(entry)) continue
+
+      let stat: Awaited<ReturnType<typeof fs.lstat>>
+      try {
+        stat = await fs.lstat(path.join(pluginsDir, entry))
+      } catch {
         continue
       }
+      if (!stat.isDirectory()) continue
 
       const manifest = await this.loadManifest(vaultId, entry)
       if (manifest !== null) {
@@ -163,37 +202,30 @@ export class InstalledPluginStore implements IInstalledPluginStore {
   }
 
   /**
-   * Deletes a plugin and all its data (manifest, bundle, styles, settings).
-   * Recursively removes the plugin directory.
-   * Does nothing if the directory does not exist.
+   * Deletes a plugin: its folder in the vault, its server-side data (secrets) and its entry in
+   * `community-plugins.json`. Does nothing for parts that do not exist.
    */
   async deletePlugin(vaultId: string, pluginId: string): Promise<void> {
     const dir = this.getPluginDir(vaultId, pluginId)
+    await this.assertInsideVault(vaultId, dir)
+    await fs.rm(dir, { recursive: true, force: true })
+    await fs.rm(this.getServerPluginDir(vaultId, pluginId), { recursive: true, force: true })
+
     try {
-      await fs.rm(dir, { recursive: true, force: true })
+      await this.updateEnabledIds(vaultId, (ids) => ids.filter((id) => id !== pluginId))
     } catch (error: unknown) {
-      if (isNodeError(error) && error.code === 'ENOENT') {
-        return
-      }
-      throw error
+      // A hand-edited community-plugins.json must not block the uninstall; the id stays listed.
+      if (!(error instanceof CommunityPluginsFileInvalidError)) throw error
     }
   }
 
   /**
-   * Deletes all plugin data for a vault.
-   * Recursively removes the vault plugin directory.
+   * Deletes the server-side plugin data of a vault (registry, secrets).
+   * The plugins themselves live in the vault and go with it.
    * Does nothing if the directory does not exist.
    */
   async deleteAllForVault(vaultId: string): Promise<void> {
-    const dir = this.getVaultDir(vaultId)
-    try {
-      await fs.rm(dir, { recursive: true, force: true })
-    } catch (error: unknown) {
-      if (isNodeError(error) && error.code === 'ENOENT') {
-        return
-      }
-      throw error
-    }
+    await fs.rm(this.getVaultDir(vaultId), { recursive: true, force: true })
   }
 
   /**
@@ -227,34 +259,129 @@ export class InstalledPluginStore implements IInstalledPluginStore {
     return this.registryStore.mutate(vaultId, (current) => fn(current)) as Promise<PluginRegistryData>
   }
 
-  // ─── Private Helpers ─────────────────────────────────────────────────────────
+  /**
+   * Ids listed in `community-plugins.json`. A missing or invalid file yields an empty list;
+   * I/O errors propagate.
+   */
+  async loadEnabledIds(vaultId: string): Promise<string[]> {
+    try {
+      return (await this.readEnabledIds(vaultId)) ?? []
+    } catch (error: unknown) {
+      if (error instanceof CommunityPluginsFileInvalidError) return []
+      throw error
+    }
+  }
 
   /**
-   * Returns the directory path for a vault's plugins.
+   * Read-modify-write of `community-plugins.json` inside a per-vault lock. `fn` receives the
+   * current ids (empty if the file does not exist) and returns the ids to persist. The write is
+   * skipped when nothing changed.
+   * @throws CommunityPluginsFileInvalidError if the file exists but is not a JSON array.
    */
+  async updateEnabledIds(vaultId: string, fn: (current: string[]) => string[]): Promise<void> {
+    const vaultPath = this.getVaultPath(vaultId)
+    await this.enabledMutex.runExclusive(vaultPath, async () => {
+      const existing = await this.readEnabledIds(vaultId)
+      const current = existing ?? []
+      const next = [...new Set(fn(current))]
+      if (existing === null && next.length === 0) return
+      if (existing !== null && next.length === current.length && next.every((id, index) => id === current[index])) return
+      const file = validateFilePath(vaultPath, COMMUNITY_PLUGINS_FILE)
+      await assertRealPathInsideVault(vaultPath, file, { vaultId, requestedPath: COMMUNITY_PLUGINS_FILE })
+      await writeJsonFileAtomic(file, next)
+    })
+  }
+
+  // ─── Private Helpers ─────────────────────────────────────────────────────────
+
+  /** Reads community-plugins.json; null if it does not exist. */
+  private async readEnabledIds(vaultId: string): Promise<string[] | null> {
+    const vaultPath = this.getVaultPath(vaultId)
+    const raw = await this.readVaultFile(vaultId, validateFilePath(vaultPath, COMMUNITY_PLUGINS_FILE), MAX_SETTINGS_SIZE)
+    if (raw === null) return null
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      throw new CommunityPluginsFileInvalidError()
+    }
+    if (!Array.isArray(parsed)) throw new CommunityPluginsFileInvalidError()
+    return parsed.filter((entry): entry is string => typeof entry === 'string')
+  }
+
+  /** Absolute path of the vault; throws for an unknown vault. */
+  private getVaultPath(vaultId: string): string {
+    const vaultPath = this.resolveVaultPath(vaultId)
+    if (vaultPath === null) throw new PluginVaultUnavailableError(vaultId)
+    return vaultPath
+  }
+
+  /** Returns the server-local directory of a vault (registry, secrets). */
   private getVaultDir(vaultId: string): string {
     return path.join(this.pluginsDir, vaultId)
   }
 
-  /**
-   * Returns the directory path for a specific plugin.
-   * Validates the pluginId to prevent path traversal attacks.
-   * @throws Error if pluginId contains unsafe characters.
-   */
-  private getPluginDir(vaultId: string, pluginId: string): string {
+  /** Server-local directory of one plugin (secrets). */
+  private getServerPluginDir(vaultId: string, pluginId: string): string {
+    this.assertValidPluginId(pluginId)
+    return path.join(this.getVaultDir(vaultId), pluginId)
+  }
+
+  private assertValidPluginId(pluginId: string): void {
     if (!isValidPluginId(pluginId)) {
       throw new Error(`Invalid plugin ID: "${pluginId}" — must match /^[a-z0-9][a-z0-9-]{0,63}$/`)
     }
+  }
 
-    const resolved = path.join(this.pluginsDir, vaultId, pluginId)
-    const expectedParent = path.join(this.pluginsDir, vaultId) + path.sep
+  /**
+   * Returns the directory of a specific plugin inside the vault.
+   * Validates the pluginId and confines the path to the vault.
+   * @throws Error if pluginId contains unsafe characters.
+   */
+  private getPluginDir(vaultId: string, pluginId: string): string {
+    this.assertValidPluginId(pluginId)
+    return validateFilePath(this.getVaultPath(vaultId), `${PLUGINS_DIR}/${pluginId}`)
+  }
 
-    // Defense-in-depth: verify resolved path stays within the vault plugins directory
-    if (!resolved.startsWith(expectedParent)) {
-      throw new Error(`Path traversal detected for plugin ID: "${pluginId}"`)
+  /** Throws PathTraversalError if `target` resolves outside the vault through a symlink. */
+  private async assertInsideVault(vaultId: string, target: string): Promise<void> {
+    const vaultPath = this.getVaultPath(vaultId)
+    await assertRealPathInsideVault(vaultPath, target, { vaultId, requestedPath: path.relative(vaultPath, target) })
+  }
+
+  /**
+   * Reads a text file from the vault. Returns null if it does not exist, is not a regular file,
+   * or resolves outside the vault. A file over `maxSize` is rejected before it is read.
+   */
+  private async readVaultFile(
+    vaultId: string,
+    filePath: string,
+    maxSize: number,
+    tooLarge: (size: number) => Error = (size) => new PluginFileTooLargeError(maxSize, size),
+  ): Promise<string | null> {
+    try {
+      await this.assertInsideVault(vaultId, filePath)
+    } catch (error: unknown) {
+      if (error instanceof PathTraversalError) return null
+      throw error
     }
 
-    return resolved
+    let stat: Awaited<ReturnType<typeof fs.lstat>>
+    try {
+      stat = await fs.lstat(filePath)
+    } catch (error: unknown) {
+      if (isMissing(error)) return null
+      throw error
+    }
+    if (!stat.isFile()) return null
+    if (stat.size > maxSize) throw tooLarge(stat.size)
+
+    try {
+      return await fs.readFile(filePath, 'utf-8')
+    } catch (error: unknown) {
+      if (isMissing(error)) return null
+      throw error
+    }
   }
 
   /**
@@ -333,39 +460,4 @@ export class InstalledPluginStore implements IInstalledPluginStore {
     }
     throw lastError
   }
-
-  /**
-   * Reads and parses a JSON file from disk.
-   * Returns null if the file does not exist or cannot be parsed.
-   */
-  private async readJsonFile<T>(filePath: string): Promise<T | null> {
-    try {
-      const raw = await fs.readFile(filePath, 'utf-8')
-      return JSON.parse(raw) as T
-    } catch (error: unknown) {
-      if (isNodeError(error) && error.code === 'ENOENT') {
-        return null
-      }
-      // Parse errors or other read errors → return null
-      return null
-    }
-  }
-
-  /**
-   * Reads a text file from disk.
-   * Returns null if the file does not exist.
-   */
-  private async readTextFile(filePath: string): Promise<string | null> {
-    try {
-      return await fs.readFile(filePath, 'utf-8')
-    } catch (error: unknown) {
-      if (isNodeError(error) && error.code === 'ENOENT') {
-        return null
-      }
-      throw error
-    }
-  }
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-

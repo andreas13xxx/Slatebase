@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
-import { Upload, CheckCircle, AlertTriangle, Package, Loader, Download } from 'lucide-react'
+import { useState, useRef, useCallback } from 'react'
+import { Upload, CheckCircle, AlertTriangle, Loader } from 'lucide-react'
 import type { IApiClient, PluginInstallResult } from '../api'
 import { useTranslation } from '../i18n'
 
@@ -16,20 +16,11 @@ export interface PluginUploadProps {
   onPluginInstalled?: (result: PluginInstallResult) => void
 }
 
-/** Detected plugin from .obsidian/plugins/ directory. */
-interface DetectedPlugin {
-  /** Plugin folder name (used as plugin ID). */
-  id: string
-  /** Whether a manifest.json was found. */
-  hasManifest: boolean
-  /** Whether a main.js was found. */
-  hasMainJs: boolean
-}
-
 /**
  * Plugin upload component.
- * Provides a button to upload ZIP files and displays detected plugins
- * from the .obsidian/plugins/ directory in synced vaults.
+ * Provides a button to upload a plugin ZIP. The plugin is installed into the vault's
+ * `.obsidian/plugins/` folder, where Obsidian keeps its plugins — plugins that are already
+ * there (created by Obsidian or arrived through a sync) show up in the plugin list on their own.
  */
 export function PluginUpload({ apiClient, vaultId, onPluginInstalled }: PluginUploadProps) {
   const { t } = useTranslation()
@@ -39,31 +30,6 @@ export function PluginUpload({ apiClient, vaultId, onPluginInstalled }: PluginUp
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploadSuccess, setUploadSuccess] = useState<PluginInstallResult | null>(null)
-
-  // Detected plugins state (fetched from backend)
-  const [detectedPlugins, setDetectedPlugins] = useState<DetectedPlugin[]>([])
-  const [installingPlugins, setInstallingPlugins] = useState<Set<string>>(new Set())
-  const [installErrors, setInstallErrors] = useState<Record<string, string>>({})
-
-  /** Fetch detected plugins from .obsidian/plugins/ via backend endpoint. */
-  useEffect(() => {
-    let cancelled = false
-    async function fetchDetected() {
-      try {
-        const result = await apiClient.getDetectedPlugins(vaultId)
-        if (!cancelled) {
-          setDetectedPlugins(result.plugins)
-        }
-      } catch {
-        // Silently ignore — detected plugins are optional info
-        if (!cancelled) {
-          setDetectedPlugins([])
-        }
-      }
-    }
-    void fetchDetected()
-    return () => { cancelled = true }
-  }, [apiClient, vaultId])
 
   /** Trigger the hidden file input. */
   const handleUploadClick = useCallback(() => {
@@ -111,34 +77,6 @@ export function PluginUpload({ apiClient, vaultId, onPluginInstalled }: PluginUp
     }
   }, [apiClient, vaultId, onPluginInstalled])
 
-  /** Handle installing a detected plugin from .obsidian/plugins/. */
-  const handleInstallDetected = useCallback(async (pluginId: string) => {
-    setInstallingPlugins(prev => new Set([...prev, pluginId]))
-    setInstallErrors(prev => {
-      const next = { ...prev }
-      delete next[pluginId]
-      return next
-    })
-
-    try {
-      const result = await apiClient.installDetectedPlugin(vaultId, pluginId)
-      // Remove from detected list (now installed)
-      setDetectedPlugins(prev => prev.filter(p => p.id !== pluginId))
-      onPluginInstalled?.(result)
-    } catch (err: unknown) {
-      const message = err && typeof err === 'object' && 'message' in err
-        ? (err as { message: string }).message
-        : 'Installation fehlgeschlagen.'
-      setInstallErrors(prev => ({ ...prev, [pluginId]: mapUploadError(message) }))
-    } finally {
-      setInstallingPlugins(prev => {
-        const next = new Set(prev)
-        next.delete(pluginId)
-        return next
-      })
-    }
-  }, [apiClient, vaultId, onPluginInstalled])
-
   return (
     <div className="plugin-upload">
       {/* Upload Section */}
@@ -168,6 +106,7 @@ export function PluginUpload({ apiClient, vaultId, onPluginInstalled }: PluginUp
           </button>
           <p className="plugin-upload__hint">
             Obsidian-Plugin als ZIP-Datei hochladen (max. 5 MB). Die ZIP muss eine manifest.json und main.js enthalten.
+            Das Plugin wird im Ordner .obsidian/plugins/ des Vaults abgelegt.
           </p>
         </div>
 
@@ -208,65 +147,6 @@ export function PluginUpload({ apiClient, vaultId, onPluginInstalled }: PluginUp
           </div>
         )}
       </div>
-
-      {/* Detected plugins from .obsidian/plugins/ */}
-      {detectedPlugins.length > 0 && (
-        <div className="plugin-upload__section plugin-upload__detected">
-          <h3 className="plugin-upload__title">
-            <Package size={14} />
-            Erkannte Plugins
-          </h3>
-          <p className="plugin-upload__hint">
-            Diese Plugins wurden im .obsidian/plugins/-Verzeichnis des Vaults erkannt (z.B. durch Sync).
-            Installierbare Plugins können direkt aktiviert werden.
-          </p>
-          <ul className="plugin-upload__detected-list">
-            {detectedPlugins.map(plugin => {
-              const isInstallable = plugin.hasManifest && plugin.hasMainJs
-              const isInstalling = installingPlugins.has(plugin.id)
-              const installError = installErrors[plugin.id]
-
-              return (
-                <li key={plugin.id} className="plugin-upload__detected-item">
-                  <span className="plugin-upload__detected-name">{plugin.id}</span>
-                  {isInstallable ? (
-                    <button
-                      className="plugin-upload__install-button"
-                      onClick={() => void handleInstallDetected(plugin.id)}
-                      disabled={isInstalling}
-                      aria-label={`Plugin ${plugin.id} installieren`}
-                    >
-                      {isInstalling ? (
-                        <>
-                          <Loader size={12} className="plugin-upload__spinner" />
-                          <span>Installieren…</span>
-                        </>
-                      ) : (
-                        <>
-                          <Download size={12} />
-                          <span>Installieren</span>
-                        </>
-                      )}
-                    </button>
-                  ) : (
-                    <span className="plugin-upload__detected-status plugin-upload__detected-status--incomplete">
-                      Unvollständig
-                      {!plugin.hasManifest && ' (manifest.json fehlt)'}
-                      {!plugin.hasMainJs && ' (main.js fehlt)'}
-                    </span>
-                  )}
-                  {installError && (
-                    <span className="plugin-upload__detected-error">
-                      <AlertTriangle size={11} />
-                      {installError}
-                    </span>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        </div>
-      )}
     </div>
   )
 }
