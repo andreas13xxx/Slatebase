@@ -87,6 +87,7 @@ Detailed guides for individual Obsidian plugins:
 | [[Advanced/Plugins/Outliner\|Outliner]] | Lists as a real outline editor |
 | [[Advanced/Plugins/Paste URL into Selection\|Paste URL into Selection]] | Turn a selection into a link by pasting |
 | [[Advanced/Plugins/Recent Files\|Recent Files]] | Sidebar with recently opened notes |
+| [[Advanced/Plugins/Style Settings\|Style Settings]] | Theme and snippet settings in one UI |
 | [[Advanced/Plugins/Tasks\|Tasks]] | Checkbox lines as task management with query blocks |
 | [[Advanced/Plugins/Templater\|Templater]] | Dynamic templates |
 
