@@ -358,7 +358,7 @@ if (featureToggleService.isEnabled('mcp')) {
       // further down (4h) — see the note on migrateLinks above.
       linkIndexHook: {
         onFileSaved: (vaultId, filePath, content) => { linkIndexHook.onFileSaved(vaultId, filePath, content) },
-        onFileDeleted: (vaultId, filePath) => { linkIndexHook.onFileDeleted(vaultId, filePath) },
+        onFileDeleted: (vaultId, filePath) => linkIndexHook.onFileDeleted(vaultId, filePath),
         onFileRenamed: (vaultId, oldPath, newPath) => linkIndexHook.onFileRenamed(vaultId, oldPath, newPath),
       },
       // Closure, not a direct reference: `eventBus` is a `const` declared
@@ -1139,10 +1139,13 @@ const linkIndexHook = {
       })
     }
   },
-  onFileDeleted(vaultId: string, filePath: string): void {
-    publicShareService.onFileDeleted(vaultId, filePath).catch((error: unknown) => {
+  async onFileDeleted(vaultId: string, filePath: string): Promise<void> {
+    // Awaited by the callers: a public link must be gone before a new note can be created at this path.
+    try {
+      await publicShareService.onFileDeleted(vaultId, filePath)
+    } catch (error) {
       logger.error('Public share cleanup failed', { vaultId, filePath, error: error instanceof Error ? error.message : String(error) })
-    })
+    }
     const linkIndex = getLinkIndex(vaultId)
     if (linkIndex) {
       linkIndex.removeFile(filePath).catch((error: unknown) => {
@@ -1166,11 +1169,14 @@ const linkIndexHook = {
         logger.error('Link index restore failed', { vaultId, filePath, error: message })
       })
   },
-  onFileRenamed(vaultId: string, oldPath: string, newPath: string): Promise<void> {
-    // Public links follow the file even when the vault has no link index.
-    publicShareService.onFileRenamed(vaultId, oldPath, newPath).catch((error: unknown) => {
+  async onFileRenamed(vaultId: string, oldPath: string, newPath: string): Promise<void> {
+    // Public links follow the file even when the vault has no link index. Awaited, so the response
+    // only goes out once the link points at the new path.
+    try {
+      await publicShareService.onFileRenamed(vaultId, oldPath, newPath)
+    } catch (error) {
       logger.error('Public share rewrite failed', { vaultId, oldPath, newPath, error: error instanceof Error ? error.message : String(error) })
-    })
+    }
     const linkIndex = getLinkIndex(vaultId)
     const entry = vaultRegistry.findById(vaultId)
     if (!linkIndex || !entry) return Promise.resolve()

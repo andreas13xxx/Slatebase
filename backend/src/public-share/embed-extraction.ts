@@ -5,6 +5,26 @@
 // and must stay behaviorally identical, so a shared note shows the same excerpt
 // the editor does.
 
+/** Extensions delivered as assets (kept in step with frontend/src/plugins/types.ts). */
+export const ASSET_EXTENSIONS: ReadonlySet<string> = new Set([
+  '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.avif', '.bmp',
+  '.pdf',
+  '.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac', '.wma',
+  '.mp4', '.webm', '.ogv', '.mov', '.mkv',
+])
+
+/** Lower-case extension including the dot, or `''`. */
+function extensionOf(target: string): string {
+  const name = target.slice(target.lastIndexOf('/') + 1)
+  const dot = name.lastIndexOf('.')
+  return dot <= 0 ? '' : name.slice(dot).toLowerCase()
+}
+
+/** True if the target names a media file (image, PDF, audio, video). */
+export function isAssetTarget(target: string): boolean {
+  return ASSET_EXTENSIONS.has(extensionOf(target))
+}
+
 /** An embed found in a Markdown string. */
 export interface ParsedEmbed {
   /** Key under which the embed is stored in the resolved map (see {@link embedRef}). */
@@ -164,8 +184,11 @@ export function extractEmbeds(markdown: string): ParsedEmbed[] {
     const target = (hashIndex === -1 ? inner : inner.slice(0, hashIndex)).trim()
     const fragment = hashIndex === -1 ? '' : inner.slice(hashIndex + 1).trim()
     if (target === '') continue
-    const blockRef = fragment.startsWith('^') && fragment.length > 1 ? fragment.slice(1) : null
-    const heading = blockRef === null && fragment !== '' ? fragment : null
+    // A fragment on a media embed (`![[doc.pdf#page=3]]`) is a viewer hint, not a note section: the
+    // asset is addressed by its target alone, which is also what the reading view asks for.
+    const media = isAssetTarget(target)
+    const blockRef = !media && fragment.startsWith('^') && fragment.length > 1 ? fragment.slice(1) : null
+    const heading = !media && blockRef === null && fragment !== '' ? fragment : null
     const ref = embedRef(target, heading, blockRef)
     if (!found.has(ref)) found.set(ref, { ref, target, heading, blockRef })
   }

@@ -116,13 +116,29 @@ describe('PublicShareDialog', () => {
       expect(api.revokePublicShare).toHaveBeenCalledWith('v1', 'share-1')
     })
 
-    it('replaces the link: revokes the old one and shows the new URL', async () => {
-      const api = createApi({ listPublicShares: vi.fn().mockResolvedValue([existing]) })
+    it('gives the link a new URL in one step, keeping password and expiry', async () => {
+      const api = createApi({
+        listPublicShares: vi.fn().mockResolvedValue([existing]),
+        regeneratePublicShare: vi.fn().mockResolvedValue({ share: existing, token: 'tok123', path: '/s/tok123' }),
+      })
       open(api)
       fireEvent.click(await screen.findByRole('button', { name: 'Neuen Link erzeugen' }))
       expect(await screen.findByLabelText(/Dein Link/)).toHaveValue(`${window.location.origin}/s/tok123`)
-      expect(api.revokePublicShare).toHaveBeenCalledWith('v1', 'share-1')
-      expect(api.createPublicShare).toHaveBeenCalledWith('v1', { path: 'Notes/Preise.md' })
+      expect(api.regeneratePublicShare).toHaveBeenCalledWith('v1', 'share-1')
+      expect(api.revokePublicShare).not.toHaveBeenCalled()
+      expect(api.createPublicShare).not.toHaveBeenCalled()
+      expect(screen.getByText('ja')).toBeInTheDocument()
+    })
+
+    it('keeps the old link when renewing fails', async () => {
+      const api = createApi({
+        listPublicShares: vi.fn().mockResolvedValue([existing]),
+        regeneratePublicShare: vi.fn().mockRejectedValue(new Error('offline')),
+      })
+      open(api)
+      fireEvent.click(await screen.findByRole('button', { name: 'Neuen Link erzeugen' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent('offline')
+      expect(screen.getByRole('button', { name: 'Link widerrufen' })).toBeInTheDocument()
     })
 
     it('sets and removes password and expiry', async () => {

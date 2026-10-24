@@ -269,7 +269,6 @@ export interface CommunityThemeCatalog {
   stale: boolean
 }
 
-/** An installed theme with a newer version in the catalog. */
 /** Body of `POST /vaults/:vaultId/public-shares`. */
 export interface CreatePublicShareInput {
   path: string
@@ -284,6 +283,7 @@ export interface UpdatePublicShareInput {
   password?: string | null
 }
 
+/** An installed theme with a newer version in the catalog. */
 export interface ThemeStoreUpdate {
   themeId: string
   name: string
@@ -829,6 +829,8 @@ export interface IApiClient {
   previewPublicShare(vaultId: string, path: string): Promise<EmbedPreviewEntry[]>
   /** Change expiry and/or password; `null` removes the value. */
   updatePublicShare(vaultId: string, id: string, input: UpdatePublicShareInput): Promise<PublicShareSummary>
+  /** Give a link a new URL, keeping its password and expiry. The token in the result is shown only once. */
+  regeneratePublicShare(vaultId: string, id: string): Promise<CreatedPublicShare>
   /** Revoke a link of a vault. */
   revokePublicShare(vaultId: string, id: string): Promise<void>
   /** Revoke one of the caller's own links without needing access to its vault. */
@@ -1616,6 +1618,11 @@ export class ApiClient implements IApiClient {
   /** Change expiry and/or password of a public link. */
   async updatePublicShare(vaultId: string, id: string, input: UpdatePublicShareInput): Promise<PublicShareSummary> {
     return (await this.request<{ share: PublicShareSummary }>('PUT', `/api/v1/vaults/${vaultId}/public-shares/${id}`, input)).share
+  }
+
+  /** Give a public link a new URL, keeping its password and expiry. */
+  async regeneratePublicShare(vaultId: string, id: string): Promise<CreatedPublicShare> {
+    return this.request<CreatedPublicShare>('POST', `/api/v1/vaults/${vaultId}/public-shares/${id}/regenerate`, {})
   }
 
   /** Revoke a public link of a vault. */

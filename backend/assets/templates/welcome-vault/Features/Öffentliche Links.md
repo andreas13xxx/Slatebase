@@ -15,7 +15,7 @@ Mit einem öffentlichen Link kannst du eine Notiz mit Personen teilen, die **kei
 2. Optional ein **Passwort** (mindestens 8 Zeichen) und ein **Ablaufdatum** setzen.
 3. **„Link erzeugen“** wählen und den Link kopieren.
 
-Der Link wird **nur einmal** angezeigt. Verlierst du ihn, erzeugst du mit „Neuen Link erzeugen“ einen neuen — der alte wird dabei ungültig.
+Der Link wird **nur einmal** angezeigt. Verlierst du ihn, erzeugst du mit „Neuen Link erzeugen“ eine neue Adresse — die alte wird dabei ungültig, Passwort und Ablaufdatum bleiben erhalten.
 
 ## Was die Empfänger sehen
 

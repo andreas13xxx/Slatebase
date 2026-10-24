@@ -75,6 +75,12 @@ describe('extractEmbeds', () => {
     expect(embeds.map((e) => e.ref)).toEqual(['a/b.png', 'a/c.png', 'a/d.png'])
   })
 
+  it('ignores fragments on media embeds, so the asset is addressed by its target', () => {
+    const embeds = extractEmbeds('![[doc.pdf#page=3]] ![[pic.png#^x]] ![[Note#Sec]]')
+    expect(embeds.map((e) => e.ref)).toEqual(['doc.pdf', 'pic.png', 'Note#Sec'])
+    expect(embeds[0]).toMatchObject({ heading: null, blockRef: null })
+  })
+
   it('does not treat wikilinks as embeds', () => {
     expect(extractEmbeds('[[Note]] and [text](Note.md)')).toEqual([])
   })

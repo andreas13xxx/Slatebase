@@ -6,7 +6,7 @@ import type { SessionContext } from '../auth/index.js'
 import type { ILogger } from '../logger/index.js'
 import { createPublicShareService } from '../public-share/index.js'
 import { createMockStore, createMockVaultAccess } from '../public-share/test-helpers.js'
-import { createPublicShareManagementRoutes, createPublicShareReaderRoutes } from './publicShareRoutes.js'
+import { createPublicShareManagementRoutes, createPublicShareReaderRoutes, parseByteRange } from './publicShareRoutes.js'
 
 const logger: ILogger = { debug() {}, info() {}, warn() {}, error() {} }
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47])
@@ -275,5 +275,113 @@ describe('reader routes', () => {
     expect(denied.length).toBeLessThanOrEqual(10)
     expect(denied.every((a) => a.userId === null && !a.success)).toBe(true)
     expect(JSON.stringify(audit)).not.toContain(body.token)
+  })
+
+  it('writes one "viewed" audit line per address and link and minute, not one per reload', async () => {
+    const { create, app, audit } = setup()
+    const { body } = await create()
+    for (let i = 0; i < 10; i++) await app.request(`/api/v1/public/s/${body.token}`)
+    await app.request(`/api/v1/public/s/${body.token}`, { headers: { 'x-test-ip': '9.9.9.9' } })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(audit.filter((a) => a.action === 'PUBLIC_SHARE_ACCESSED')).toHaveLength(2)
+  })
+
+  it('counts password guesses before checking them, so a parallel burst cannot outrun the limit', async () => {
+    const { create, app, json } = setup({ passwordAttempts: 3 })
+    const { body } = await create({ path: 'Note.md', password: 'long-enough-password' })
+    const guess = (i: number) => app.request(`/api/v1/public/s/${body.token}/unlock`, json({ password: `wrong-password-${i}` }))
+
+    const statuses = (await Promise.all(Array.from({ length: 20 }, (_, i) => guess(i)))).map((r) => r.status)
+    expect(statuses.filter((s) => s === 401)).toHaveLength(3)
+    expect(statuses.filter((s) => s === 429)).toHaveLength(17)
+  })
+})
+
+describe('asset ranges', () => {
+  const MEDIA = Buffer.from('0123456789')
+
+  async function setupMedia() {
+    const ctx = setup()
+    ctx.files['Note.md'] = '![[clip.mp4]]'
+    ctx.files['clip.mp4'] = MEDIA
+    const { body } = await ctx.create()
+    const get = (range?: string) =>
+      ctx.app.request(`/api/v1/public/s/${body.token}/asset?ref=clip.mp4`, range === undefined ? {} : { headers: { range } })
+    return { get }
+  }
+
+  it('announces range support and serves the whole file without a Range header', async () => {
+    const { get } = await setupMedia()
+    const res = await get()
+    expect(res.status).toBe(200)
+    expect(res.headers.get('accept-ranges')).toBe('bytes')
+    expect(res.headers.get('content-length')).toBe('10')
+  })
+
+  it.each([
+    ['bytes=2-4', '234', 'bytes 2-4/10'],
+    ['bytes=7-', '789', 'bytes 7-9/10'],
+    ['bytes=-3', '789', 'bytes 7-9/10'],
+    ['bytes=5-99', '56789', 'bytes 5-9/10'],
+  ])('serves %s as 206', async (range, expected, contentRange) => {
+    const { get } = await setupMedia()
+    const res = await get(range)
+    expect(res.status).toBe(206)
+    expect(res.headers.get('content-range')).toBe(contentRange)
+    expect(await res.text()).toBe(expected)
+    expect(res.headers.get('cache-control')).toBe('no-store')
+  })
+
+  it('answers a range beyond the file with 416', async () => {
+    const { get } = await setupMedia()
+    const res = await get('bytes=10-20')
+    expect(res.status).toBe(416)
+    expect(res.headers.get('content-range')).toBe('bytes */10')
+  })
+
+  it('ignores malformed and multi-range headers and sends the whole file', async () => {
+    const { get } = await setupMedia()
+    for (const range of ['items=0-1', 'bytes=0-1,3-4', 'bytes=', 'bytes=5-2', 'garbage']) {
+      expect((await get(range)).status).toBe(200)
+    }
+  })
+})
+
+describe('parseByteRange', () => {
+  it('handles edge cases', () => {
+    expect(parseByteRange(undefined, 10)).toBeNull()
+    expect(parseByteRange('bytes=0-0', 10)).toEqual({ start: 0, end: 0 })
+    expect(parseByteRange('bytes=-0', 10)).toBe('unsatisfiable')
+    expect(parseByteRange('bytes=-50', 10)).toEqual({ start: 0, end: 9 })
+    expect(parseByteRange('bytes=0-', 0)).toBe('unsatisfiable')
+  })
+})
+
+describe('regenerate route', () => {
+  it('issues a new URL for the same link and keeps its protection', async () => {
+    const { create, app, json, audit } = setup()
+    const { body } = await create({ path: 'Note.md', password: 'long-enough-password' })
+
+    const res = await app.request(`/api/v1/vaults/v1/public-shares/${body.share.id}/regenerate`, json({}))
+    expect(res.status).toBe(200)
+    const renewed = (await res.json()) as { token: string; path: string; share: { id: string; passwordProtected: boolean } }
+    expect(renewed.token).not.toBe(body.token)
+    expect(renewed.path).toBe(`/s/${renewed.token}`)
+    expect(renewed.share).toMatchObject({ id: body.share.id, passwordProtected: true })
+    expect(JSON.stringify(renewed.share)).not.toContain('Hash')
+
+    expect((await app.request(`/api/v1/public/s/${body.token}`)).status).toBe(404)
+    expect((await app.request(`/api/v1/public/s/${renewed.token}`)).status).toBe(401)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(audit.map((a) => a.action)).toContain('PUBLIC_SHARE_UPDATED')
+    expect(JSON.stringify(audit)).not.toContain(renewed.token)
+  })
+
+  it('does not reach another vault’s link or an unknown one', async () => {
+    const { create, app, json } = setup()
+    const { body } = await create()
+    expect((await app.request(`/api/v1/vaults/other/public-shares/${body.share.id}/regenerate`, json({}))).status).toBe(404)
+    expect((await app.request('/api/v1/vaults/v1/public-shares/nope/regenerate', json({}))).status).toBe(404)
+    expect((await app.request(`/api/v1/public/s/${body.token}`)).status).toBe(200)
   })
 })

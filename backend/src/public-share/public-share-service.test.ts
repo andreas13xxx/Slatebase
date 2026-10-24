@@ -322,4 +322,75 @@ describe('vault hooks', () => {
     await service.onFileRenamed('v1', 'A.md', 'B.md')
     expect((await service.getNote(token)).title).toBe('B')
   })
+
+  it('ends a link whose note is moved to a place that could not be shared directly', async () => {
+    const { service, store } = await shared(['A.md', 'B.md', 'dir/C.md'])
+    await service.onFileRenamed('v1', 'A.md', '.hidden/A.md')
+    await service.onFileRenamed('v1', 'B.md', 'B.txt')
+    await service.onFileRenamed('v1', 'dir', '.obsidian')
+    expect(store.shares).toHaveLength(0)
+  })
+
+  it('never leaves two links on one path: the link of a replaced file ends', async () => {
+    const { service, store } = await shared(['A.md', 'B.md'])
+    const movedId = store.shares.find((s) => s.filePath === 'A.md')!.id
+    await service.onFileRenamed('v1', 'A.md', 'B.md')
+    expect(store.shares.map((s) => [s.id, s.filePath])).toEqual([[movedId, 'B.md']])
+  })
+})
+
+describe('regenerate', () => {
+  it('replaces the token but keeps password, expiry and creator', async () => {
+    const { service, store } = setup()
+    const { share, token } = await service.create({ ...input, password: 'long-enough-password', expiresAt: '2999-01-01T00:00:00.000Z' })
+    const renewed = await service.regenerate(share.id)
+
+    expect(renewed.token).not.toBe(token)
+    expect(renewed.share).toMatchObject({ id: share.id, createdBy: 'u1', expiresAt: '2999-01-01T00:00:00.000Z' })
+    expect(store.shares).toHaveLength(1)
+    await expect(service.getNote(token, { unlocked: true })).rejects.toBeInstanceOf(PublicShareNotFoundError)
+    await expect(service.getNote(renewed.token)).rejects.toBeInstanceOf(PublicSharePasswordRequiredError)
+    await expect(service.getNote(renewed.token, { password: 'long-enough-password' })).resolves.toBeDefined()
+  })
+
+  it('throws for an unknown ID', async () => {
+    const { service } = setup()
+    await expect(service.regenerate('nope')).rejects.toBeInstanceOf(PublicShareNotFoundError)
+  })
+})
+
+describe('assets', () => {
+  it('serves a media embed that carries a viewer fragment', async () => {
+    const { service } = setup({ 'Note.md': '![[doc.pdf#page=3]]', 'doc.pdf': PNG })
+    const { token } = await service.create(input)
+    expect((await service.getNote(token)).embeds['doc.pdf']).toEqual({ kind: 'asset', contentType: 'application/pdf' })
+    await expect(service.getAsset(token, 'doc.pdf')).resolves.toMatchObject({ contentType: 'application/pdf' })
+  })
+
+  it('resolves the embeds once for a page view and its asset requests', async () => {
+    const { service, vault } = setup({ 'Note.md': '![[a.png]] ![[b.png]] ![[Inner]]', 'a.png': PNG, 'b.png': PNG, 'Inner.md': 'x' })
+    const { token } = await service.create(input)
+    await service.getNote(token)
+    const readsAfterView = vault.reads.length
+    for (const ref of ['a.png', 'b.png', 'a.png', 'b.png']) await service.getAsset(token, ref)
+    expect(vault.reads.length).toBe(readsAfterView)
+  })
+
+  it('drops cached embeds when the link is revoked or its note changes place', async () => {
+    const { service } = setup({ 'Note.md': '![[a.png]]', 'a.png': PNG })
+    const { share, token } = await service.create(input)
+    await service.getNote(token)
+    await service.revoke(share.id)
+    await expect(service.getAsset(token, 'a.png')).rejects.toBeInstanceOf(PublicShareNotFoundError)
+  })
+
+  it('re-reads after the cache has expired', async () => {
+    const { service, vault, clock } = setup({ 'Note.md': '![[a.png]]', 'a.png': PNG })
+    const { token } = await service.create(input)
+    await service.getNote(token)
+    const readsAfterView = vault.reads.length
+    clock.time = new Date(clock.time.getTime() + 11_000)
+    await service.getAsset(token, 'a.png')
+    expect(vault.reads.length).toBeGreaterThan(readsAfterView)
+  })
 })

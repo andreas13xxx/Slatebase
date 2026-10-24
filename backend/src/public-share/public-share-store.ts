@@ -44,18 +44,41 @@ function parseFile(raw: unknown): PublicShareFile | null {
  * Creates a store backed by a single JSON file (`public-shares.json`).
  * The file holds token hashes and password hashes, so it is written with
  * owner-only permissions.
+ *
+ * The list is kept in memory after the first successful read and updated on every
+ * mutation: the reader routes look a link up on every request (a page with 40 images
+ * makes 41), and a single process is the only writer. A read that failed is never
+ * cached, so a transient error (EPERM from antivirus, say) cannot hide every link until
+ * the next restart.
  */
 export function createPublicShareStore(
   filePath: string,
   onError?: (error: unknown) => void,
 ): IPublicShareStore {
-  const store = new JsonFileStore<PublicShareFile>(filePath, { shares: [] }, parseFile, onError, 0o600)
+  let readFailed = false
+  const store = new JsonFileStore<PublicShareFile>(
+    filePath,
+    { shares: [] },
+    parseFile,
+    (error) => {
+      readFailed = true
+      onError?.(error)
+    },
+    0o600,
+  )
+  let cache: PublicShare[] | null = null
+
   return {
     async list() {
-      return (await store.read()).shares
+      if (cache !== null) return cache
+      readFailed = false
+      const { shares } = await store.read()
+      if (!readFailed) cache = shares
+      return shares
     },
     async mutate(fn) {
       const next = await store.mutate((current) => ({ shares: fn(current.shares) }))
+      cache = next.shares
       return next.shares
     },
   }

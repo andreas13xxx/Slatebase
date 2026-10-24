@@ -4,6 +4,7 @@ import path from 'node:path'
 import { getContentTypeFromExtension } from '../vault/mime.js'
 import { resolveWikilinkTargetOnTree } from '../link-index/link-match-resolver.js'
 import {
+  ASSET_EXTENSIONS,
   extractBlockById,
   extractEmbeds,
   extractHeadingSection,
@@ -19,14 +20,6 @@ import {
   type ResolvedEmbed,
   type ResolvedEmbeds,
 } from './types.js'
-
-/** Extensions delivered as assets (kept in step with frontend/src/plugins/types.ts). */
-const ASSET_EXTENSIONS: ReadonlySet<string> = new Set([
-  '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.avif', '.bmp',
-  '.pdf',
-  '.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac', '.wma',
-  '.mp4', '.webm', '.ogv', '.mov', '.mkv',
-])
 
 /** Targets that pull data from the rest of the vault or need the app; never inlined. */
 const UNSUPPORTED_EXTENSIONS: ReadonlySet<string> = new Set(['.base', '.canvas'])

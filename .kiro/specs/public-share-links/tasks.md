@@ -168,3 +168,24 @@ dann findet `resolve()` die Datei nicht mehr und liefert 404, nie eine andere Da
   sonst alle Links löschen („nicht lesbar“ ist nicht „weg“). Der Leser liefert 404, die Links bleiben unter „Öffentliche
   Links“ sichtbar („Unbekannter Vault“) und sind dort widerrufbar.
 
+### Befunde Code-Review (2026-10-24), alle behoben
+
+- **Neuen Link erzeugen verlor Passwort und Ablauf:** ersetzt durch `regenerate` (`POST …/public-shares/:id/regenerate`):
+  ein atomarer Schritt, der nur das Token tauscht; Passwort, Ablauf und Ersteller bleiben, die alte URL ist sofort tot.
+- **Passwort-Limiter war nicht atomar:** Prüfung und Zählen geschehen jetzt in einem synchronen Schritt vor jedem `await`;
+  ein richtiges Passwort setzt den Zähler zurück (Test: 20 parallele Versuche, 3 werden geprüft, 17 geben 429).
+- **`![[doc.pdf#page=3]]`:** Bei Medien-Einbettungen wird das Fragment ignoriert, das Asset hat den Schlüssel `doc.pdf`.
+- **Asset-Abrufe lösten jedes Mal alles neu auf:** Aufgelöste Einbettungen werden 10 s pro Link gemerkt (100 Einträge,
+  jede Änderung am Link leert den Speicher); die Link-Liste liegt nach dem ersten erfolgreichen Lesen im Speicher. Ein
+  fehlgeschlagener Lesezugriff wird nie als „keine Links“ gemerkt.
+- **Audit-Rauschen:** höchstens eine „Aufgerufen“-Zeile pro Adresse, Link und Minute.
+- **Range:** Die Asset-Route unterstützt einen einzelnen `Range`-Header (206/416, `Accept-Ranges`), nötig für Audio/Video
+  in Safari. Der Befund „kein `nosniff`/CSP“ trifft nicht zu (setzt die globale `secureHeaders`-Middleware). Die
+  Speichergrenze von 50 MB pro Datei bleibt (die bestehende Raw-Datei-Route liest ebenfalls komplett in den Speicher).
+- **Umbenennen:** Landet ein Link auf einem Pfad, der direkt nicht teilbar wäre (versteckter Ordner, kein `.md`), oder auf
+  dem Pfad eines anderen Links, endet der betroffene Link.
+- **Hooks wurden nicht abgewartet:** `onFileDeleted` und `onFileRenamed` werden in Controller und MCP-Handler abgewartet.
+  Sonst könnte ein Link nach einem fehlgeschlagenen Löschen auf eine später am selben Pfad angelegte Notiz zeigen.
+- **Bekannte Grenze:** Wird eine Datei außerhalb von Slatebase gelöscht und am selben Pfad neu angelegt, meldet kein Hook
+  etwas; der Link zeigt dann die neue Datei. Das gilt für alle pfadbasierten Funktionen (Link-Index, Favoriten).
+

@@ -103,9 +103,8 @@ export function PublicShareDialog({ apiClient, vaultId, filePath, onClose }: Pub
   const replace = (): Promise<void> =>
     run(async () => {
       if (existing === null) return
-      await apiClient.revokePublicShare(vaultId, existing.id)
-      setExisting(null)
-      const result = await apiClient.createPublicShare(vaultId, { path: filePath })
+      // One atomic step on the server: the old URL stops working and password and expiry stay.
+      const result = await apiClient.regeneratePublicShare(vaultId, existing.id)
       setCreated(result)
       setExisting(result.share)
     }, 'Der Link konnte nicht erneuert werden.')

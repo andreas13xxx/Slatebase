@@ -15,7 +15,7 @@ A public link lets you share a note with people who have **no Slatebase account*
 2. Optionally set a **password** (at least 8 characters) and an **expiry date**.
 3. Choose **"Link erzeugen"** and copy the link.
 
-The link is shown **only once**. If you lose it, "Neuen Link erzeugen" creates a new one — the old one stops working.
+The link is shown **only once**. If you lose it, "Neuen Link erzeugen" gives it a new address — the old one stops working, password and expiry are kept.
 
 ## What recipients see
 

@@ -44,6 +44,26 @@ describe('createPublicShareStore', () => {
     expect((await createPublicShareStore(file).list()).map((s) => s.id)).toEqual(['ok'])
   })
 
+  it('serves later reads from memory and stays in step with its own mutations', async () => {
+    const store = createPublicShareStore(file)
+    await store.mutate((all) => [...all, share('a')])
+    await fs.writeFile(file, JSON.stringify({ shares: [] }))
+    expect((await store.list()).map((s) => s.id)).toEqual(['a'])
+    await store.mutate((all) => [...all, share('b')])
+    expect((await store.list()).map((s) => s.id)).toEqual(['b'])
+  })
+
+  it('does not remember a failed read as "no links"', async () => {
+    const errors: unknown[] = []
+    const store = createPublicShareStore(file, (error) => errors.push(error))
+    await fs.writeFile(file, '{ not json')
+    expect(await store.list()).toEqual([])
+    expect(errors).toHaveLength(1)
+
+    await fs.writeFile(file, JSON.stringify({ shares: [share('a')] }))
+    expect((await store.list()).map((s) => s.id)).toEqual(['a'])
+  })
+
   it.skipIf(process.platform === 'win32')('writes the file with owner-only permissions', async () => {
     await createPublicShareStore(file).mutate((all) => [...all, share('a')])
     expect((await fs.stat(file)).mode & 0o777).toBe(0o600)

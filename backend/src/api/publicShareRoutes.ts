@@ -55,6 +55,32 @@ function param(c: Context, name: string): string {
   return c.req.param(name) ?? ''
 }
 
+/**
+ * Parses a single `Range: bytes=…` request header against a body of `size` bytes.
+ * Returns the inclusive byte range, `'unsatisfiable'` for a range outside the body, or `null`
+ * when there is no (usable) range — absent, malformed or multi-range headers are ignored and
+ * the whole body is sent, which the HTTP spec allows.
+ */
+export function parseByteRange(header: string | undefined, size: number): { start: number; end: number } | 'unsatisfiable' | null {
+  if (header === undefined) return null
+  const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim())
+  if (match === null || (match[1] === '' && match[2] === '')) return null
+  const first = match[1] ?? ''
+  const last = match[2] ?? ''
+
+  if (first === '') {
+    // Suffix range: the last N bytes.
+    const suffix = Number(last)
+    if (suffix === 0 || size === 0) return 'unsatisfiable'
+    return { start: Math.max(0, size - suffix), end: size - 1 }
+  }
+  const start = Number(first)
+  if (start >= size) return 'unsatisfiable'
+  const end = last === '' ? size - 1 : Math.min(Number(last), size - 1)
+  if (end < start) return null
+  return { start, end }
+}
+
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
 const createSchema = z.object({
@@ -173,6 +199,21 @@ export function createPublicShareManagementRoutes(deps: PublicShareManagementDep
     }
   })
 
+  // New URL for an existing link; password, expiry and creator stay, the old URL stops working at once.
+  app.post('/vaults/:vaultId/public-shares/:id/regenerate', async (c: Context) => {
+    const vaultId = param(c, 'vaultId')
+    const id = param(c, 'id')
+    try {
+      const existing = await service.get(id)
+      if (existing === null || existing.vaultId !== vaultId) throw new PublicShareNotFoundError()
+      const { share, token } = await service.regenerate(id)
+      audit(c, 'PUBLIC_SHARE_UPDATED', id, `vault ${vaultId}, link …${existing.tokenHint} replaced by …${share.tokenHint}`)
+      return c.json({ share: toPublicShareSummary(share), token, path: `/s/${token}` }, 200)
+    } catch (error) {
+      return handle(c, error)
+    }
+  })
+
   app.delete('/vaults/:vaultId/public-shares/:id', async (c) => {
     const vaultId = param(c, 'vaultId')
     const id = param(c, 'id')
@@ -231,6 +272,8 @@ export function createPublicShareReaderRoutes(deps: PublicShareReaderDependencie
   const passwordLimiter = new SlidingWindowRateLimiter(deps.passwordAttempts ?? 5, 15 * 60_000)
   // Caps how many denied-access audit lines one address can write.
   const deniedAuditLimiter = new SlidingWindowRateLimiter(10, 60_000)
+  // One "viewed" audit line per address and link per minute, so reloads do not flood the log.
+  const viewAuditLimiter = new SlidingWindowRateLimiter(1, 60_000)
   // Process-local; an unlock cookie simply stops working after a restart (single-instance by design).
   const cookieSecret = randomBytes(32)
 
@@ -241,6 +284,10 @@ export function createPublicShareReaderRoutes(deps: PublicShareReaderDependencie
     if (!success) {
       if (!deniedAuditLimiter.checkLimit(ip).allowed) return
       deniedAuditLimiter.recordRequest(ip)
+    } else if (action === 'PUBLIC_SHARE_ACCESSED') {
+      const viewKey = `${ip}|${hashToken(token)}`
+      if (!viewAuditLimiter.checkLimit(viewKey).allowed) return
+      viewAuditLimiter.recordRequest(viewKey)
     }
     void auditService
       .log({
@@ -318,11 +365,15 @@ export function createPublicShareReaderRoutes(deps: PublicShareReaderDependencie
     const ip = clientIp(c)
     const attemptKey = `${ip}|${hashToken(token)}`
 
+    // Check and count in one synchronous step, before any await: scrypt and the body read
+    // yield to other requests, so counting only after a failure would let a burst of parallel
+    // guesses all pass the check. A correct password clears the count again.
     const blocked = passwordLimiter.checkLimit(attemptKey)
     if (!blocked.allowed) {
       c.header('Retry-After', String(blocked.retryAfter))
       return c.json(createApiError('RATE_LIMITED', 'Too many attempts'), 429)
     }
+    passwordLimiter.recordRequest(attemptKey)
 
     let parsed: z.infer<typeof unlockSchema>
     try {
@@ -334,12 +385,10 @@ export function createPublicShareReaderRoutes(deps: PublicShareReaderDependencie
     const binding = await service.passwordBinding(token)
     if (binding === null) {
       // Unknown token, or a link without a password: indistinguishable from "not found".
-      passwordLimiter.recordRequest(attemptKey)
       return handle(c, token, new PublicShareNotFoundError())
     }
 
     if (!(await service.verifyPassword(token, parsed.password))) {
-      passwordLimiter.recordRequest(attemptKey)
       audit(c, 'PUBLIC_SHARE_DENIED', token, false, 'wrong password')
       return c.json(createApiError('INVALID_PASSWORD', 'Wrong password'), 401)
     }
@@ -362,14 +411,27 @@ export function createPublicShareReaderRoutes(deps: PublicShareReaderDependencie
     if (ref === undefined || ref === '') return notFound(c)
     try {
       const asset = await service.getAsset(token, ref, { unlocked: await isUnlocked(c, token) })
+      const headers: Record<string, string> = {
+        'Content-Type': asset.contentType,
+        // SVG/HTML/XML could run script if opened as a document; as <img> they stay inert.
+        'Content-Disposition': INLINE_UNSAFE_TYPES.has(asset.contentType) ? 'attachment' : 'inline',
+        // Browsers need ranges to seek in audio/video (Safari refuses to play without them).
+        'Accept-Ranges': 'bytes',
+      }
+      const range = parseByteRange(c.req.header('Range'), asset.data.length)
+      if (range === 'unsatisfiable') {
+        return new Response(null, { status: 416, headers: { ...headers, 'Content-Range': `bytes */${asset.data.length}` } })
+      }
+      if (range !== null) {
+        const part = asset.data.subarray(range.start, range.end + 1)
+        return new Response(new Uint8Array(part), {
+          status: 206,
+          headers: { ...headers, 'Content-Range': `bytes ${range.start}-${range.end}/${asset.data.length}`, 'Content-Length': String(part.length) },
+        })
+      }
       return new Response(new Uint8Array(asset.data), {
         status: 200,
-        headers: {
-          'Content-Type': asset.contentType,
-          // SVG/HTML/XML could run script if opened as a document; as <img> they stay inert.
-          'Content-Disposition': INLINE_UNSAFE_TYPES.has(asset.contentType) ? 'attachment' : 'inline',
-          'Content-Length': String(asset.data.length),
-        },
+        headers: { ...headers, 'Content-Length': String(asset.data.length) },
       })
     } catch (error) {
       return handle(c, token, error)

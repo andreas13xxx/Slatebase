@@ -315,6 +315,7 @@ Behind the `public-shares` feature toggle (off by default). The first group need
 | GET | `/vaults/:vaultId/public-shares` | List the vault's links (writers only) |
 | GET | `/vaults/:vaultId/public-shares/preview?path=` | What a link for this note would include |
 | PUT | `/vaults/:vaultId/public-shares/:id` | Change expiry / password (`null` removes) |
+| POST | `/vaults/:vaultId/public-shares/:id/regenerate` | New URL for the same link; password and expiry are kept, the old URL stops working (new token returned once) |
 | DELETE | `/vaults/:vaultId/public-shares/:id` | Revoke |
 | GET | `/public-shares` | The caller's own links across vaults |
 | DELETE | `/public-shares/:id` | Revoke one of the caller's own links |

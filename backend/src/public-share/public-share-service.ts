@@ -22,6 +22,7 @@ import type {
   PublicNoteView,
   PublicShare,
   PublicShareSummary,
+  ResolvedEmbeds,
   UpdatePublicShareInput,
 } from './types.js'
 import { DEFAULT_EMBED_LIMITS } from './types.js'
@@ -33,6 +34,9 @@ const PASSWORD_MAX_LENGTH = 256
 const SCRYPT_KEY_LENGTH = 64
 /** `lastAccessAt` is rewritten at most this often, so reads do not become writes. */
 const LAST_ACCESS_GRANULARITY_MS = 60_000
+/** How long resolved embeds are reused for the asset requests that follow a page view. */
+const EMBED_CACHE_TTL_MS = 10_000
+const EMBED_CACHE_MAX_ENTRIES = 100
 
 /** Credentials presented by a public reader for a password-protected link. */
 export interface PublicShareCredentials {
@@ -54,6 +58,11 @@ export interface IPublicShareService {
   get(id: string): Promise<PublicShareSummary | null>
   /** Changes expiry or password. Throws `PublicShareNotFoundError` for an unknown ID. */
   update(id: string, input: UpdatePublicShareInput): Promise<PublicShareSummary>
+  /**
+   * Replaces the token of a link in place: the old URL stops working at once, while password,
+   * expiry and creator are kept. Throws `PublicShareNotFoundError` for an unknown ID.
+   */
+  regenerate(id: string): Promise<CreatedPublicShare>
   /** Revokes a link. Returns `false` if the ID is unknown. */
   revoke(id: string): Promise<boolean>
   /** True if the token belongs to a live link that requires a password. */
@@ -119,6 +128,16 @@ function normalizeNotePath(raw: string): string {
     throw new PublicShareValidationError('Nur sichtbare Markdown-Notizen können geteilt werden')
   }
   return normalized
+}
+
+/** True if a note at this path could be shared directly (visible Markdown). */
+function isShareablePath(filePath: string): boolean {
+  try {
+    normalizeNotePath(filePath)
+    return true
+  } catch {
+    return false
+  }
 }
 
 function validatePassword(password: string): void {
@@ -188,6 +207,28 @@ export function createPublicShareService(deps: PublicShareServiceDeps): IPublicS
     const text = await vault.readText(share.vaultId, share.filePath)
     if (text === null) throw new PublicShareNotFoundError()
     return stripFrontmatter(text)
+  }
+
+  // Resolved embeds per link, kept for a few seconds. A page view resolves them once; the asset
+  // requests that follow (one per image) reuse that result instead of re-reading the note, the
+  // vault tree and every embedded note. Anything that changes a link clears the cache.
+  const embedCache = new Map<string, { at: number; embeds: ResolvedEmbeds }>()
+  const clearEmbedCache = (): void => embedCache.clear()
+
+  async function resolveFresh(share: PublicShare, markdown: string): Promise<ResolvedEmbeds> {
+    const embeds = await resolveEmbeds(share.vaultId, share.filePath, markdown, vault, limits)
+    if (embedCache.size >= EMBED_CACHE_MAX_ENTRIES) {
+      const oldest = embedCache.keys().next()
+      if (!oldest.done) embedCache.delete(oldest.value)
+    }
+    embedCache.set(share.id, { at: now().getTime(), embeds })
+    return embeds
+  }
+
+  async function resolveForAsset(share: PublicShare): Promise<ResolvedEmbeds> {
+    const cached = embedCache.get(share.id)
+    if (cached !== undefined && now().getTime() - cached.at < EMBED_CACHE_TTL_MS) return cached.embeds
+    return resolveFresh(share, await readSharedNote(share))
   }
 
   return {
@@ -262,8 +303,25 @@ export function createPublicShareService(deps: PublicShareServiceDeps): IPublicS
           return updated
         }),
       )
+      clearEmbedCache()
       if (updated === undefined) throw new PublicShareNotFoundError()
       return toPublicShareSummary(updated)
+    },
+
+    async regenerate(id) {
+      const token = generateToken()
+      let renewed: PublicShare | undefined
+      await store.mutate((all) =>
+        all.map((s) => {
+          if (s.id !== id) return s
+          renewed = { ...s, tokenHash: hashToken(token), tokenHint: token.slice(-4) }
+          delete renewed.lastAccessAt
+          return renewed
+        }),
+      )
+      clearEmbedCache()
+      if (renewed === undefined) throw new PublicShareNotFoundError()
+      return { share: renewed, token }
     },
 
     async revoke(id) {
@@ -273,6 +331,7 @@ export function createPublicShareService(deps: PublicShareServiceDeps): IPublicS
         found = next.length !== all.length
         return next
       })
+      clearEmbedCache()
       return found
     },
 
@@ -295,7 +354,7 @@ export function createPublicShareService(deps: PublicShareServiceDeps): IPublicS
     async getNote(token, credentials) {
       const share = await authorize(token, credentials)
       const markdown = await readSharedNote(share)
-      const embeds = await resolveEmbeds(share.vaultId, share.filePath, markdown, vault, limits)
+      const embeds = await resolveFresh(share, markdown)
       touch(share)
       return {
         title: path.posix.basename(share.filePath, path.posix.extname(share.filePath)),
@@ -306,8 +365,7 @@ export function createPublicShareService(deps: PublicShareServiceDeps): IPublicS
 
     async getAsset(token, ref, credentials) {
       const share = await authorize(token, credentials)
-      const markdown = await readSharedNote(share)
-      const embeds = await resolveEmbeds(share.vaultId, share.filePath, markdown, vault, limits)
+      const embeds = await resolveForAsset(share)
       const embed = Object.hasOwn(embeds, ref) ? embeds[ref] : undefined
       if (embed?.kind !== 'asset') throw new PublicShareNotFoundError()
       const data = await vault.readBinary(share.vaultId, embed.path)
@@ -324,22 +382,36 @@ export function createPublicShareService(deps: PublicShareServiceDeps): IPublicS
     },
 
     async onFileRenamed(vaultId, oldPath, newPath) {
-      await store.mutate((all) =>
-        all.map((s) => {
+      await store.mutate((all) => {
+        const moved = new Set<string>()
+        const rewritten = all.map((s) => {
           if (s.vaultId !== vaultId) return s
-          if (s.filePath === oldPath) return { ...s, filePath: newPath }
-          if (s.filePath.startsWith(`${oldPath}/`)) {
-            return { ...s, filePath: `${newPath}${s.filePath.slice(oldPath.length)}` }
+          let target: string | null = null
+          if (s.filePath === oldPath) target = newPath
+          else if (s.filePath.startsWith(`${oldPath}/`)) target = `${newPath}${s.filePath.slice(oldPath.length)}`
+          if (target === null) return s
+          moved.add(s.id)
+          return { ...s, filePath: target }
+        })
+        return rewritten.filter((s, index, list) => {
+          if (!moved.has(s.id)) {
+            // A link that was already at a destination now points at the file that replaced it.
+            return !list.some((other) => moved.has(other.id) && other.vaultId === s.vaultId && other.filePath === s.filePath)
           }
-          return s
-        }),
-      )
+          // A move must not make a note shareable that could not be shared directly (hidden folder, other type)...
+          if (!isShareablePath(s.filePath)) return false
+          // ...and two links never share one path.
+          return !list.some((other, i) => i < index && moved.has(other.id) && other.vaultId === s.vaultId && other.filePath === s.filePath)
+        })
+      })
+      clearEmbedCache()
     },
 
     async onFileDeleted(vaultId, filePath) {
       await store.mutate((all) =>
         all.filter((s) => !(s.vaultId === vaultId && (s.filePath === filePath || s.filePath.startsWith(`${filePath}/`)))),
       )
+      clearEmbedCache()
     },
   }
 }
