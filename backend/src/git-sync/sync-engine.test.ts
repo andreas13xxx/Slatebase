@@ -155,6 +155,16 @@ describe('GitSyncEngine', () => {
       expect(await readGitignore()).toBe(first)
     })
 
+    it('syncs plugin data.json and drops the old exclusion from an existing managed block', async () => {
+      await engine.runOne('vault-1', 'remote-1')
+      const first = await readGitignore()
+      expect(first).not.toContain('data.json')
+
+      await writeFile(join(vaultPath, '.gitignore'), first.replace('.obsidian/workspace*.json\n', '.obsidian/workspace*.json\n.obsidian/plugins/*/data.json\n'))
+      await engine.runOne('vault-1', 'remote-1')
+      expect(await readGitignore()).toBe(first)
+    })
+
     it('handles CRLF files', async () => {
       await writeFile(join(vaultPath, '.gitignore'), 'mine/\r\n.slatebase/\r\n')
       await engine.runOne('vault-1', 'remote-1')

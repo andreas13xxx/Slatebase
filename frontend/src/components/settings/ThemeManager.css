@@ -87,13 +87,23 @@
   color: var(--text-primary);
 }
 
+.theme-manager__settings-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-secondary);
+}
+
+.theme-manager__notice {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 .theme-manager__hint {
-  order: 2;
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-basis: 100%;
-  margin: 0 0 2px 8px;
+  margin: 0 0 8px;
   font-size: 12px;
   color: var(--text-secondary);
 }
@@ -132,4 +142,13 @@
 
 .theme-manager__file-input {
   display: none;
+}
+
+.theme-manager__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
